@@ -1,0 +1,1180 @@
+#define _DARWIN_C_SOURCE 1
+#include <arpa/inet.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <libproc.h>
+#include <limits.h>
+#include <mach-o/dyld.h>
+#ifdef H039_INSTALLER
+#include <mach-o/getsect.h>
+#include <mach-o/ldsyms.h>
+#endif
+#include <poll.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/proc_info.h>
+#include <sys/resource.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/stdio.h>
+#include <sys/time.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+extern char **environ;
+int main(int argc,char **argv);
+
+#define CLIENT_UID 501
+#define CLIENT_GID 20
+#define FRAME_MAX 16384U
+#define FILE_MAX (1024U * 1024U)
+#define TREE_FILES_MAX 4096U
+#define TREE_BYTES_MAX (64ULL * 1024ULL * 1024ULL)
+#define TREE_DEPTH_MAX 64U
+#define NS "/private/var/db/nortropic-runtime-cleanup-v1"
+#define INSTALLED "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator"
+#define PYTHON_SOURCE "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/Resources/Python.app/Contents/MacOS/Python"
+#define PYTHON_SHA256 "9ea12d11e0573548d6d8b0added1740b2d6377366081dbca05c19746ce7c616e"
+
+typedef struct {
+  uint32_t h[8]; uint64_t bits; unsigned char block[64]; size_t used;
+} Sha256;
+
+static uint32_t rr(uint32_t x,unsigned n){return (x>>n)|(x<<(32-n));}
+static void sha_block(Sha256 *s,const unsigned char *b){
+  static const uint32_t k[64]={
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2};
+  uint32_t w[64];
+  for(int i=0;i<16;i++)w[i]=(uint32_t)b[4*i]<<24|(uint32_t)b[4*i+1]<<16|(uint32_t)b[4*i+2]<<8|b[4*i+3];
+  for(int i=16;i<64;i++){uint32_t x=w[i-15],y=w[i-2];w[i]=w[i-16]+(rr(x,7)^rr(x,18)^(x>>3))+w[i-7]+(rr(y,17)^rr(y,19)^(y>>10));}
+  uint32_t a=s->h[0],bb=s->h[1],c=s->h[2],d=s->h[3],e=s->h[4],f=s->h[5],g=s->h[6],h=s->h[7];
+  for(int i=0;i<64;i++){uint32_t s1=rr(e,6)^rr(e,11)^rr(e,25),ch=(e&f)^((~e)&g),t1=h+s1+ch+k[i]+w[i],s0=rr(a,2)^rr(a,13)^rr(a,22),maj=(a&bb)^(a&c)^(bb&c),t2=s0+maj;h=g;g=f;f=e;e=d+t1;d=c;c=bb;bb=a;a=t1+t2;}
+  s->h[0]+=a;s->h[1]+=bb;s->h[2]+=c;s->h[3]+=d;s->h[4]+=e;s->h[5]+=f;s->h[6]+=g;s->h[7]+=h;
+}
+static void sha_init(Sha256*s){uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};memcpy(s->h,h,sizeof h);s->bits=0;s->used=0;}
+static void sha_add(Sha256*s,const unsigned char*p,size_t n){s->bits+=(uint64_t)n*8;while(n){size_t take=64-s->used;if(take>n)take=n;memcpy(s->block+s->used,p,take);s->used+=take;p+=take;n-=take;if(s->used==64){sha_block(s,s->block);s->used=0;}}}
+static void sha_final(Sha256*s,char out[65]){s->block[s->used++]=0x80;if(s->used>56){while(s->used<64)s->block[s->used++]=0;sha_block(s,s->block);s->used=0;}while(s->used<56)s->block[s->used++]=0;for(int i=7;i>=0;i--)s->block[s->used++]=(unsigned char)(s->bits>>(8*i));sha_block(s,s->block);for(int i=0;i<8;i++)snprintf(out+8*i,9,"%08x",s->h[i]);out[64]=0;}
+static void digest(const void*p,size_t n,char out[65]){Sha256 s;sha_init(&s);sha_add(&s,p,n);sha_final(&s,out);}
+
+static __attribute__((unused)) int lower_hex(const char *s,size_t n){if(!s||strlen(s)!=n)return 0;for(size_t i=0;i<n;i++)if(!((s[i]>='0'&&s[i]<='9')||(s[i]>='a'&&s[i]<='f')))return 0;return 1;}
+static __attribute__((unused)) void random_hex(char *out,size_t bytes){unsigned char raw[32];if(bytes>sizeof raw)_exit(125);arc4random_buf(raw,bytes);for(size_t i=0;i<bytes;i++)snprintf(out+2*i,3,"%02x",raw[i]);out[2*bytes]=0;}
+static int same_stat(const struct stat*a,const struct stat*b){return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&a->st_nlink==b->st_nlink&&a->st_size==b->st_size&&a->st_mtimespec.tv_sec==b->st_mtimespec.tv_sec&&a->st_mtimespec.tv_nsec==b->st_mtimespec.tv_nsec&&a->st_ctimespec.tv_sec==b->st_ctimespec.tv_sec&&a->st_ctimespec.tv_nsec==b->st_ctimespec.tv_nsec;}
+static int write_all(int fd,const void *raw,size_t n){const unsigned char*p=raw;while(n){ssize_t q=write(fd,p,n);if(q<0&&errno==EINTR)continue;if(q<=0)return 0;p+=q;n-=(size_t)q;}return 1;}
+static int pread_all(int fd,unsigned char *raw,size_t n){size_t at=0;while(at<n){ssize_t q=pread(fd,raw+at,n-at,(off_t)at);if(q<0&&errno==EINTR)continue;if(q<=0)return 0;at+=(size_t)q;}return 1;}
+static int stable_read_fd(int fd,size_t maximum,unsigned char **out,size_t *length,struct stat *identity){
+  struct stat a,b,c;if(fstat(fd,&a)||!S_ISREG(a.st_mode)||a.st_nlink!=1||a.st_size<0||(uint64_t)a.st_size>maximum)return 0;
+  size_t n=(size_t)a.st_size;unsigned char *one=malloc(n?n:1),*two=malloc(n?n:1);if(!one||!two){free(one);free(two);return 0;}
+  unsigned char extra;ssize_t eof_one,eof_two;do{eof_one=pread(fd,&extra,1,(off_t)n);}while(eof_one<0&&errno==EINTR);
+  int ok=pread_all(fd,one,n)&&eof_one==0&&fstat(fd,&b)==0&&same_stat(&a,&b)&&pread_all(fd,two,n);do{eof_two=pread(fd,&extra,1,(off_t)n);}while(eof_two<0&&errno==EINTR);ok=ok&&eof_two==0&&fstat(fd,&c)==0&&same_stat(&b,&c)&&memcmp(one,two,n)==0;
+  free(two);if(!ok){free(one);return 0;}*out=one;*length=n;if(identity)*identity=c;return 1;
+}
+static int stable_named_fd(int dir,const char *name,int flags,uid_t uid,gid_t gid,mode_t mode,size_t maximum,unsigned char **out,size_t *length,struct stat *identity){
+  int fd=openat(dir,name,flags|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);if(fd<0)return -1;struct stat before,rebound;int ok=fstat(fd,&before)==0&&S_ISREG(before.st_mode)&&before.st_uid==uid&&(gid==(gid_t)-1||before.st_gid==gid)&&((before.st_mode&07777)==mode)&&before.st_nlink==1;
+  if(ok&&out)ok=stable_read_fd(fd,maximum,out,length,identity);else if(ok&&identity)*identity=before;
+  if(ok)ok=fstatat(dir,name,&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0&&same_stat(identity?identity:&before,&rebound);
+  if(!ok){close(fd);errno=EINVAL;return -1;}return fd;
+}
+static int fixed_dir_at(int parent,const char *name,uid_t uid,gid_t gid,mode_t mode){int fd=openat(parent,name,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat s,r;if(fd<0)return -1;if(fstat(fd,&s)||!S_ISDIR(s.st_mode)||s.st_uid!=uid||(gid!=(gid_t)-1&&s.st_gid!=gid)||(s.st_mode&07777)!=mode||fstatat(parent,name,&r,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&s,&r)){close(fd);errno=EINVAL;return -1;}return fd;}
+static int flush_dir(int fd){return fsync(fd)==0;}
+
+typedef struct{const unsigned char*s;size_t n,i;} Parser;
+static void ws(Parser*p){while(p->i<p->n&&(p->s[p->i]==' '||p->s[p->i]=='\t'||p->s[p->i]=='\r'||p->s[p->i]=='\n'))p->i++;}
+static int take(Parser*p,unsigned char c){ws(p);if(p->i>=p->n||p->s[p->i]!=c)return 0;p->i++;return 1;}
+static int utf8(const unsigned char*s,size_t n){size_t i=0;while(i<n){unsigned c=s[i++];if(c<128)continue;unsigned need,min,v;if((c&0xe0)==0xc0){need=1;min=0x80;v=c&31;}else if((c&0xf0)==0xe0){need=2;min=0x800;v=c&15;}else if((c&0xf8)==0xf0){need=3;min=0x10000;v=c&7;}else return 0;if(i+need>n)return 0;for(unsigned j=0;j<need;j++){unsigned d=s[i++];if((d&0xc0)!=0x80)return 0;v=(v<<6)|(d&63);}if(v<min||v>0x10ffff||(v>=0xd800&&v<=0xdfff))return 0;}return 1;}
+static int hex4(Parser*p,unsigned*v){unsigned x=0;if(p->i+4>p->n)return 0;for(int i=0;i<4;i++){unsigned c=p->s[p->i++],d;if(c>='0'&&c<='9')d=c-'0';else if(c>='a'&&c<='f')d=c-'a'+10;else if(c>='A'&&c<='F')d=c-'A'+10;else return 0;x=(x<<4)|d;}*v=x;return 1;}
+static int put_utf8(char*out,size_t cap,size_t*used,unsigned v){unsigned char b[4];size_t n;if(v<0x20)return 0;if(v<0x80){b[0]=v;n=1;}else if(v<0x800){b[0]=0xc0|(v>>6);b[1]=0x80|(v&63);n=2;}else if(v<0x10000){b[0]=0xe0|(v>>12);b[1]=0x80|((v>>6)&63);b[2]=0x80|(v&63);n=3;}else{b[0]=0xf0|(v>>18);b[1]=0x80|((v>>12)&63);b[2]=0x80|((v>>6)&63);b[3]=0x80|(v&63);n=4;}if(*used+n>=cap)return 0;memcpy(out+*used,b,n);*used+=n;return 1;}
+static int string_value(Parser*p,char*out,size_t cap){size_t used=0;ws(p);if(!cap||p->i>=p->n||p->s[p->i++]!='"')return 0;while(p->i<p->n){unsigned c=p->s[p->i++];if(c=='"'){out[used]=0;return 1;}if(c<0x20)return 0;if(c!='\\'){if(used+1>=cap)return 0;out[used++]=(char)c;continue;}if(p->i>=p->n)return 0;c=p->s[p->i++];if(c=='"'||c=='\\'||c=='/'){if(used+1>=cap)return 0;out[used++]=(char)c;}else if(c=='b'||c=='f'||c=='n'||c=='r'||c=='t')return 0;else if(c=='u'){unsigned v,lo;if(!hex4(p,&v))return 0;if(v>=0xd800&&v<=0xdbff){if(p->i+2>p->n||p->s[p->i++]!='\\'||p->s[p->i++]!='u'||!hex4(p,&lo)||lo<0xdc00||lo>0xdfff)return 0;v=0x10000+((v-0xd800)<<10)+(lo-0xdc00);}else if(v>=0xdc00&&v<=0xdfff)return 0;if(!put_utf8(out,cap,&used,v))return 0;}else return 0;}return 0;}
+static int skip_value(Parser*,unsigned);
+static int skip_number(Parser*p){ws(p);size_t i=p->i;if(i<p->n&&p->s[i]=='-')i++;if(i>=p->n)return 0;if(p->s[i]=='0')i++;else{if(p->s[i]<'1'||p->s[i]>'9')return 0;while(i<p->n&&p->s[i]>='0'&&p->s[i]<='9')i++;}if(i<p->n&&p->s[i]=='.'){i++;if(i>=p->n||p->s[i]<'0'||p->s[i]>'9')return 0;while(i<p->n&&p->s[i]>='0'&&p->s[i]<='9')i++;}if(i<p->n&&(p->s[i]=='e'||p->s[i]=='E')){i++;if(i<p->n&&(p->s[i]=='+'||p->s[i]=='-'))i++;if(i>=p->n||p->s[i]<'0'||p->s[i]>'9')return 0;while(i<p->n&&p->s[i]>='0'&&p->s[i]<='9')i++;}p->i=i;return 1;}
+static int skip_object(Parser*p,unsigned depth){char keys[32][128],key[128],tmp[512];size_t count=0;if(depth>8||!take(p,'{'))return 0;ws(p);if(p->i<p->n&&p->s[p->i]=='}'){p->i++;return 1;}for(;;){if(count==32||!string_value(p,key,sizeof key))return 0;for(size_t j=0;j<count;j++)if(!strcmp(keys[j],key))return 0;strcpy(keys[count++],key);if(!take(p,':')||!skip_value(p,depth+1))return 0;ws(p);if(p->i<p->n&&p->s[p->i]=='}'){p->i++;return 1;}if(!take(p,','))return 0;(void)tmp;}}
+static int skip_array(Parser*p,unsigned depth){if(depth>8||!take(p,'['))return 0;ws(p);if(p->i<p->n&&p->s[p->i]==']'){p->i++;return 1;}for(;;){if(!skip_value(p,depth+1))return 0;ws(p);if(p->i<p->n&&p->s[p->i]==']'){p->i++;return 1;}if(!take(p,','))return 0;}}
+static int skip_value(Parser*p,unsigned depth){char tmp[1024];ws(p);if(p->i>=p->n)return 0;unsigned c=p->s[p->i];if(c=='"')return string_value(p,tmp,sizeof tmp);if(c=='{')return skip_object(p,depth);if(c=='[')return skip_array(p,depth);if(c=='-'||(c>='0'&&c<='9'))return skip_number(p);for(const char **q=(const char*[]){"true","false","null",NULL};*q;q++){size_t n=strlen(*q);if(p->i+n<=p->n&&!memcmp(p->s+p->i,*q,n)){p->i+=n;return 1;}}return 0;}
+
+typedef struct{char operation[32],nonce[65],capability[65];int schema_one;unsigned keys;int has_operation,has_nonce,has_capability,has_schema;} Request;
+static __attribute__((unused)) int parse_request(const unsigned char*raw,size_t n,Request*r){
+  if(!utf8(raw,n))return 0;Parser p={raw,n,0};char seen[16][128],key[128];size_t count=0;memset(r,0,sizeof *r);if(!take(&p,'{'))return 0;ws(&p);if(p.i<p.n&&p.s[p.i]=='}')p.i++;else for(;;){if(count==16||!string_value(&p,key,sizeof key))return 0;for(size_t j=0;j<count;j++)if(!strcmp(seen[j],key))return 0;strcpy(seen[count++],key);if(!take(&p,':'))return 0;if(!strcmp(key,"operation")){if(!string_value(&p,r->operation,sizeof r->operation))return 0;r->has_operation=1;}else if(!strcmp(key,"request_nonce")){if(!string_value(&p,r->nonce,sizeof r->nonce))return 0;r->has_nonce=1;}else if(!strcmp(key,"capability")){if(!string_value(&p,r->capability,sizeof r->capability))return 0;r->has_capability=1;}else if(!strcmp(key,"schema_version")){ws(&p);size_t start=p.i;if(!skip_value(&p,1))return 0;r->has_schema=1;r->schema_one=p.i-start==1&&p.s[start]=='1';}else if(!skip_value(&p,1))return 0;ws(&p);if(p.i<p.n&&p.s[p.i]=='}'){p.i++;break;}if(!take(&p,','))return 0;}ws(&p);if(p.i!=p.n)return 0;r->keys=(unsigned)count;return 1;
+}
+
+static int start_absolute_deadline(struct timespec *deadline){
+  if(clock_gettime(CLOCK_MONOTONIC,deadline))return 0;
+  deadline->tv_sec+=5;
+  return 1;
+}
+static int deadline_remaining(const struct timespec *deadline){
+  struct timespec now;
+  if(clock_gettime(CLOCK_MONOTONIC,&now))return -1;
+  time_t seconds=deadline->tv_sec-now.tv_sec;
+  long nanoseconds=deadline->tv_nsec-now.tv_nsec;
+  if(nanoseconds<0){seconds--;nanoseconds+=1000000000L;}
+  if(seconds<0||(seconds==0&&nanoseconds<=0))return 0;
+  long long milliseconds=(long long)seconds*1000LL+(nanoseconds+999999L)/1000000L;
+  if(milliseconds<1)milliseconds=1;
+  return milliseconds>INT_MAX?INT_MAX:(int)milliseconds;
+}
+static int wait_input_until(int fd,const struct timespec *deadline){
+  for(;;){
+    int timeout=deadline_remaining(deadline);
+    if(timeout<=0)return 0;
+    struct pollfd watched={fd,POLLIN|POLLHUP,0};
+    int ready=poll(&watched,1,timeout);
+    if(ready<0&&errno==EINTR)continue;
+    if(ready<=0||watched.revents&(POLLERR|POLLNVAL))return 0;
+    if(watched.revents&(POLLIN|POLLHUP))return deadline_remaining(deadline)>0;
+  }
+}
+static int account_ancillary(struct msghdr *msg,int *ancillary){
+  if(msg->msg_flags&(MSG_TRUNC|MSG_CTRUNC))return 0;
+  for(struct cmsghdr*c=CMSG_FIRSTHDR(msg);c;c=CMSG_NXTHDR(msg,c)){
+    *ancillary=1;
+    if(c->cmsg_level==SOL_SOCKET&&c->cmsg_type==SCM_RIGHTS){
+      size_t bytes=c->cmsg_len>=CMSG_LEN(0)?c->cmsg_len-CMSG_LEN(0):0;
+      int*fds=(int*)CMSG_DATA(c);
+      for(size_t i=0;i<bytes/sizeof(int);i++)close(fds[i]);
+    }
+  }
+  return 1;
+}
+static int recv_piece(int fd,unsigned char*dst,size_t n,int *ancillary,const struct timespec *deadline){
+  size_t at=0;
+  while(at<n){
+    if(!wait_input_until(fd,deadline))return 0;
+    struct iovec iov={dst+at,n-at};
+    unsigned char control[CMSG_SPACE(sizeof(int)*16)]={0};
+    struct msghdr msg={0};
+    msg.msg_iov=&iov;msg.msg_iovlen=1;msg.msg_control=control;msg.msg_controllen=sizeof control;
+    ssize_t q=recvmsg(fd,&msg,MSG_DONTWAIT);
+    if(q<0&&(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK))continue;
+    if(q<=0||deadline_remaining(deadline)<=0||!account_ancillary(&msg,ancillary))return 0;
+    at+=(size_t)q;
+  }
+  return 1;
+}
+static __attribute__((unused)) int receive_frame(int fd,unsigned char **out,size_t *length){
+  struct timespec request_deadline;
+  if(!start_absolute_deadline(&request_deadline))return 0;
+  unsigned char prefix[4],extra;
+  int ancillary=0;
+  if(!recv_piece(fd,prefix,4,&ancillary,&request_deadline))return 0;
+  uint32_t n=(uint32_t)prefix[0]<<24|(uint32_t)prefix[1]<<16|(uint32_t)prefix[2]<<8|prefix[3];
+  if(n>FRAME_MAX)return 0;
+  unsigned char*raw=malloc(n?n:1);
+  if(!raw)return 0;
+  if(!recv_piece(fd,raw,n,&ancillary,&request_deadline)){free(raw);return 0;}
+  for(;;){
+    if(!wait_input_until(fd,&request_deadline)){free(raw);return 0;}
+    struct iovec iov={&extra,1};
+    unsigned char control[CMSG_SPACE(sizeof(int)*16)]={0};
+    struct msghdr msg={0};
+    msg.msg_iov=&iov;msg.msg_iovlen=1;msg.msg_control=control;msg.msg_controllen=sizeof control;
+    ssize_t q=recvmsg(fd,&msg,MSG_DONTWAIT);
+    if(q<0&&(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK))continue;
+    if(deadline_remaining(&request_deadline)<=0||!account_ancillary(&msg,&ancillary)||q!=0||ancillary){free(raw);return 0;}
+    break;
+  }
+  *out=raw;*length=n;return 1;
+}
+
+#if defined(H039_INSTALLER)
+static int exact_names(int directory,const char*const*allowed,size_t allowed_count,unsigned required){
+  struct stat original_before,scan_identity,original_after;if(fstat(directory,&original_before)||!S_ISDIR(original_before.st_mode))return 0;int scan=openat(directory,".",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);if(scan<0)return 0;if(fstat(scan,&scan_identity)||!same_stat(&original_before,&scan_identity)){close(scan);return 0;}DIR*stream=fdopendir(scan);if(!stream){close(scan);return 0;}unsigned seen=0;int ok=1;struct dirent*entry;errno=0;while((entry=readdir(stream))!=NULL){if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,".."))continue;size_t index;for(index=0;index<allowed_count;index++)if(!strcmp(entry->d_name,allowed[index]))break;if(index==allowed_count||index>=sizeof(unsigned)*8U||(seen&(1U<<index))){ok=0;break;}seen|=1U<<index;}if(errno)ok=0;if(closedir(stream))ok=0;if(fstat(directory,&original_after)||!same_stat(&original_before,&original_after))ok=0;return ok&&(seen&required)==required;
+}
+#else
+static int exact_names(int directory,const char*const*allowed,size_t allowed_count,unsigned required){
+  int scan=dup(directory);if(scan<0)return 0;DIR*stream=fdopendir(scan);if(!stream){close(scan);return 0;}unsigned seen=0;int ok=1;struct dirent*entry;errno=0;while((entry=readdir(stream))!=NULL){if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,".."))continue;size_t index;for(index=0;index<allowed_count;index++)if(!strcmp(entry->d_name,allowed[index]))break;if(index==allowed_count||index>=sizeof(unsigned)*8U||(seen&(1U<<index))){ok=0;break;}seen|=1U<<index;}if(errno)ok=0;if(closedir(stream))ok=0;return ok&&(seen&required)==required;
+}
+#endif
+static int exact_empty(int directory){return exact_names(directory,NULL,0,0);}
+
+#if defined(H039_INSTALLER) && (!defined(H039_MEDIATOR_SHA256) || !defined(H039_MEDIATOR_SIZE) || !defined(H039_ROOT_ENTRY_FD0_NORMALIZATION) || !defined(H039_OLD_MEDIATOR_SHA256) || !defined(H039_OLD_MEDIATOR_SIZE) || !defined(H039_R15_MEDIATOR_SHA256) || !defined(H039_R15_MEDIATOR_SIZE) || !defined(H039_R15_OLD_MEDIATOR_SHA256) || !defined(H039_R15_OLD_MEDIATOR_SIZE))
+#error H039 installer identity and root-entry normalization must be compile-time bound
+#endif
+
+#ifndef H039_INSTALLER
+typedef struct {
+  char phase[16],runtime[33],cap[65],create_nonce[65],cleanup_nonce[65];
+  unsigned long long object_dev,object_ino,runtime_dev,runtime_ino,fifo_dev,fifo_ino,portal_dev,portal_ino,socket_dev,socket_ino,sequence;
+} State;
+typedef struct {
+  char runtime[33],cap[65],create_nonce[65],cleanup_nonce[65],effect[65];
+  unsigned long long sequence;
+} Receipt;
+typedef struct {int ns,a,c,q,r,s,lock;} Store;
+typedef struct {
+  int valid;
+  char operation[32],nonce[65],capability_sha256[65],current_sha256[65];
+  size_t current_length;
+} RecoveryContinuation;
+
+static int phase_known(const char*p){const char*v[]={"RESERVING","CREATING","PUBLISHING","PREPARING","PREPARED","ACTIVE","QUARANTINING","CLEANING",NULL};for(size_t i=0;v[i];i++)if(!strcmp(p,v[i]))return 1;return 0;}
+static int phase_index(const char*p);
+static int state_preimage(const State*s,char*out,size_t cap){return snprintf(out,cap,"{\"capability_sha256\":\"%s\",\"cleanup_request_nonce\":\"%s\",\"create_request_nonce\":\"%s\",\"fifo_dev\":%llu,\"fifo_ino\":%llu,\"object_dev\":%llu,\"object_ino\":%llu,\"phase\":\"%s\",\"portal_dev\":%llu,\"portal_ino\":%llu,\"runtime_dev\":%llu,\"runtime_id\":\"%s\",\"runtime_ino\":%llu,\"schema_version\":1,\"sequence\":%llu,\"socket_dev\":%llu,\"socket_ino\":%llu}",s->cap,s->cleanup_nonce,s->create_nonce,s->fifo_dev,s->fifo_ino,s->object_dev,s->object_ino,s->phase,s->portal_dev,s->portal_ino,s->runtime_dev,s->runtime,s->runtime_ino,s->sequence,s->socket_dev,s->socket_ino);}
+static int state_bytes(const State*s,char*out,size_t cap){char pre[4096],sum[65];int n=state_preimage(s,pre,sizeof pre);if(n<=0||(size_t)n>=sizeof pre)return -1;digest(pre,(size_t)n,sum);return snprintf(out,cap,"{\"capability_sha256\":\"%s\",\"cleanup_request_nonce\":\"%s\",\"create_request_nonce\":\"%s\",\"fifo_dev\":%llu,\"fifo_ino\":%llu,\"object_dev\":%llu,\"object_ino\":%llu,\"phase\":\"%s\",\"portal_dev\":%llu,\"portal_ino\":%llu,\"record_sha256\":\"%s\",\"runtime_dev\":%llu,\"runtime_id\":\"%s\",\"runtime_ino\":%llu,\"schema_version\":1,\"sequence\":%llu,\"socket_dev\":%llu,\"socket_ino\":%llu}",s->cap,s->cleanup_nonce,s->create_nonce,s->fifo_dev,s->fifo_ino,s->object_dev,s->object_ino,s->phase,s->portal_dev,s->portal_ino,sum,s->runtime_dev,s->runtime,s->runtime_ino,s->sequence,s->socket_dev,s->socket_ino);}
+static int parse_state_raw(const unsigned char*raw,size_t n,State*s){
+  if(n>=4096)return 0;char text[4096],record[65];memcpy(text,raw,n);text[n]=0;memset(s,0,sizeof *s);int used=0,matched;
+  matched=sscanf(text,"{\"capability_sha256\":\"%64[0-9a-f]\",\"cleanup_request_nonce\":\"%64[0-9a-f]\",\"create_request_nonce\":\"%64[0-9a-f]\",\"fifo_dev\":%llu,\"fifo_ino\":%llu,\"object_dev\":%llu,\"object_ino\":%llu,\"phase\":\"%15[A-Z]\",\"portal_dev\":%llu,\"portal_ino\":%llu,\"record_sha256\":\"%64[0-9a-f]\",\"runtime_dev\":%llu,\"runtime_id\":\"%32[0-9a-f]\",\"runtime_ino\":%llu,\"schema_version\":1,\"sequence\":%llu,\"socket_dev\":%llu,\"socket_ino\":%llu}%n",s->cap,s->cleanup_nonce,s->create_nonce,&s->fifo_dev,&s->fifo_ino,&s->object_dev,&s->object_ino,s->phase,&s->portal_dev,&s->portal_ino,record,&s->runtime_dev,s->runtime,&s->runtime_ino,&s->sequence,&s->socket_dev,&s->socket_ino,&used);
+  if(matched!=17||(size_t)used!=n){memset(s,0,sizeof *s);matched=sscanf(text,"{\"capability_sha256\":\"%64[0-9a-f]\",\"cleanup_request_nonce\":\"\",\"create_request_nonce\":\"%64[0-9a-f]\",\"fifo_dev\":%llu,\"fifo_ino\":%llu,\"object_dev\":%llu,\"object_ino\":%llu,\"phase\":\"%15[A-Z]\",\"portal_dev\":%llu,\"portal_ino\":%llu,\"record_sha256\":\"%64[0-9a-f]\",\"runtime_dev\":%llu,\"runtime_id\":\"%32[0-9a-f]\",\"runtime_ino\":%llu,\"schema_version\":1,\"sequence\":%llu,\"socket_dev\":%llu,\"socket_ino\":%llu}%n",s->cap,s->create_nonce,&s->fifo_dev,&s->fifo_ino,&s->object_dev,&s->object_ino,s->phase,&s->portal_dev,&s->portal_ino,record,&s->runtime_dev,s->runtime,&s->runtime_ino,&s->sequence,&s->socket_dev,&s->socket_ino,&used);if(matched!=16||(size_t)used!=n)return 0;}
+  char pre[4096],sum[65],again[4096];int pn=state_preimage(s,pre,sizeof pre),an=state_bytes(s,again,sizeof again);if(pn<=0||an!=(int)n||memcmp(again,raw,n)||!lower_hex(s->cap,64)||!lower_hex(s->runtime,32)||!lower_hex(s->create_nonce,64)||(*s->cleanup_nonce&&!lower_hex(s->cleanup_nonce,64))||!phase_known(s->phase))return 0;digest(pre,(size_t)pn,sum);if(strcmp(sum,record)||!s->sequence)return 0;
+  int phase=phase_index(s->phase);unsigned long long values[]={s->object_dev,s->object_ino,s->runtime_dev,s->runtime_ino,s->fifo_dev,s->fifo_ino,s->portal_dev,s->portal_ino,s->socket_dev,s->socket_ino};
+  if((phase<6&&*s->cleanup_nonce)||(phase>=6&&!lower_hex(s->cleanup_nonce,64)))return 0;
+  if(phase==0){for(size_t i=0;i<sizeof values/sizeof values[0];i++)if(values[i])return 0;}
+  else if(!s->object_dev||!s->object_ino)return 0;
+  if(phase==1){for(size_t i=2;i<sizeof values/sizeof values[0];i++)if(values[i])return 0;}
+  if(phase>=2&&(!s->runtime_dev||!s->runtime_ino||!s->fifo_dev||!s->fifo_ino||!s->portal_dev||!s->portal_ino))return 0;
+  if((phase==2||phase==3)&&(s->socket_dev||s->socket_ino))return 0;
+  if(phase>=4){if(!s->socket_dev||!s->socket_ino)return 0;}
+  if((s->socket_dev==0)!=(s->socket_ino==0))return 0;
+  return 1;
+}
+static int receipt_preimage(const Receipt*r,char*out,size_t cap){return snprintf(out,cap,"{\"capability_sha256\":\"%s\",\"cleanup_request_nonce\":\"%s\",\"create_request_nonce\":\"%s\",\"runtime_id\":\"%s\",\"schema_version\":1,\"sequence\":%llu,\"zero_runtime_residue\":true}",r->cap,r->cleanup_nonce,r->create_nonce,r->runtime,r->sequence);}
+static int receipt_bytes(Receipt*r,char*out,size_t cap){char effect[1024];int en=receipt_preimage(r,effect,sizeof effect);if(en<=0||(size_t)en>=sizeof effect)return -1;digest(effect,(size_t)en,r->effect);return snprintf(out,cap,"{\"capability_sha256\":\"%s\",\"cleanup_request_nonce\":\"%s\",\"create_request_nonce\":\"%s\",\"effect_sha256\":\"%s\",\"runtime_id\":\"%s\",\"schema_version\":1,\"sequence\":%llu}",r->cap,r->cleanup_nonce,r->create_nonce,r->effect,r->runtime,r->sequence);}
+static int parse_receipt_raw(const unsigned char*raw,size_t n,Receipt*r){if(n>=2048)return 0;char text[2048],again[2048];memcpy(text,raw,n);text[n]=0;memset(r,0,sizeof *r);int used=0,got=sscanf(text,"{\"capability_sha256\":\"%64[0-9a-f]\",\"cleanup_request_nonce\":\"%64[0-9a-f]\",\"create_request_nonce\":\"%64[0-9a-f]\",\"effect_sha256\":\"%64[0-9a-f]\",\"runtime_id\":\"%32[0-9a-f]\",\"schema_version\":1,\"sequence\":%llu}%n",r->cap,r->cleanup_nonce,r->create_nonce,r->effect,r->runtime,&r->sequence,&used);char saved[65];strcpy(saved,r->effect);int an=receipt_bytes(r,again,sizeof again);return got==6&&(size_t)used==n&&an==(int)n&&!memcmp(again,raw,n)&&!strcmp(saved,r->effect)&&lower_hex(r->cap,64)&&lower_hex(r->cleanup_nonce,64)&&lower_hex(r->create_nonce,64)&&lower_hex(r->effect,64)&&lower_hex(r->runtime,32)&&r->sequence>0;}
+
+static int open_store(Store*t){memset(t,-1,sizeof *t);t->ns=open(NS,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat s;if(t->ns<0||fstat(t->ns,&s)||!S_ISDIR(s.st_mode)||s.st_uid||s.st_gid||(s.st_mode&07777)!=0555)return 0;t->a=fixed_dir_at(t->ns,"a",0,0,0555);t->c=fixed_dir_at(t->ns,"c",0,0,0555);t->q=fixed_dir_at(t->ns,"q",0,0,0555);t->r=fixed_dir_at(t->ns,"r",0,0,0555);t->s=fixed_dir_at(t->ns,"s",0,0,0555);if(t->a<0||t->c<0||t->q<0||t->r<0||t->s<0)return 0;t->lock=stable_named_fd(t->s,"lock",O_RDWR,0,0,0600,0,NULL,NULL,&s);return t->lock>=0&&s.st_size==0;}
+static void close_store(Store*t){int descriptors[]={t->ns,t->a,t->c,t->q,t->r,t->s,t->lock};for(size_t i=0;i<sizeof descriptors/sizeof descriptors[0];i++)if(descriptors[i]>=0)close(descriptors[i]);memset(t,-1,sizeof *t);}
+static int acquire_lock(int fd){struct flock lk;memset(&lk,0,sizeof lk);lk.l_type=F_WRLCK;lk.l_whence=SEEK_SET;lk.l_start=0;lk.l_len=0;return fcntl(fd,F_OFD_SETLK,&lk)==0;}
+static int read_named(int dir,const char*name,unsigned char**raw,size_t*n,struct stat*id){int fd=stable_named_fd(dir,name,O_RDONLY,0,0,0444,4096,raw,n,id);if(fd<0)return errno==ENOENT?0:-1;if(close(fd)){free(*raw);*raw=NULL;return -1;}return 1;}
+static int state_present(Store*t,State*s){unsigned char*raw=NULL;size_t n=0;struct stat id;int found=read_named(t->s,"current",&raw,&n,&id);if(found<=0)return found;int ok=parse_state_raw(raw,n,s);free(raw);return ok?1:-1;}
+static int last_present(Store*t,Receipt*r,unsigned char **bytes,size_t *length){struct stat id;unsigned char*raw=NULL;size_t n=0;int found=read_named(t->r,"last",&raw,&n,&id);if(found<=0)return found;int ok=parse_receipt_raw(raw,n,r);if(ok&&bytes)*bytes=raw;else free(raw);if(ok&&length)*length=n;return ok?1:-1;}
+static int write_temp(int dir,const char*name,const void*raw,size_t n){int fd=openat(dir,name,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE,0444);if(fd<0)return 0;int ok=write_all(fd,raw,n)&&!fsync(fd)&&!fchown(fd,0,0)&&!fchmod(fd,0444)&&!fsync(fd);struct stat a,b;if(ok)ok=!fstat(fd,&a)&&S_ISREG(a.st_mode)&&a.st_uid==0&&a.st_gid==0&&(a.st_mode&07777)==0444&&a.st_nlink==1&&a.st_size==(off_t)n&&!fstatat(dir,name,&b,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&a,&b);close(fd);return ok;}
+static int publish_temp(int dir,const char*tmp,const char*final,int absent){unsigned flags=RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH|(absent?RENAME_EXCL:0);return renameatx_np(dir,tmp,dir,final,flags)==0&&flush_dir(dir);}
+static int put_state(Store*t,const State*s,int absent){char raw[4096];int n=state_bytes(s,raw,sizeof raw);return n>0&&(size_t)n<sizeof raw&&write_temp(t->s,".current.tmp",raw,(size_t)n)&&publish_temp(t->s,".current.tmp","current",absent);}
+static int remove_state(Store*t){return unlinkat(t->s,"current",AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE)==0&&flush_dir(t->s);}
+
+static int error_frame(int fd,const char*nonce,const char*reason){char body[512];int n=snprintf(body,sizeof body,"{\"operation\":\"error-v1\",\"reason\":\"%s\",\"request_nonce\":\"%s\",\"schema_version\":1}",reason,nonce);if(n<=0||(size_t)n>=sizeof body)return 0;unsigned char prefix[4]={(unsigned char)((unsigned)n>>24),(unsigned char)((unsigned)n>>16),(unsigned char)((unsigned)n>>8),(unsigned char)n};return write_all(fd,prefix,4)&&write_all(fd,body,(size_t)n);}
+static int json_frame(int fd,const char*body){size_t n=strlen(body);if(n>FRAME_MAX)return 0;unsigned char prefix[4]={(unsigned char)(n>>24),(unsigned char)(n>>16),(unsigned char)(n>>8),(unsigned char)n};return write_all(fd,prefix,4)&&write_all(fd,body,n);}
+
+static int object_name(const State*s,char out[35]){return snprintf(out,35,"o-%s",s->runtime)==34;}
+static int open_exact_dir(int parent,const char*name,uid_t uid,gid_t gid,mode_t mode,unsigned long long dev,unsigned long long ino){int fd=openat(parent,name,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat a,b;if(fd<0)return -1;if(fstat(fd,&a)||!S_ISDIR(a.st_mode)||a.st_uid!=uid||a.st_gid!=gid||(a.st_mode&07777)!=mode||a.st_nlink<2||(dev&&((unsigned long long)a.st_dev!=dev||(unsigned long long)a.st_ino!=ino))||fstatat(parent,name,&b,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&a,&b)){close(fd);errno=EINVAL;return -1;}return fd;}
+static int create_dir_owned(int parent,const char*name,uid_t uid,gid_t gid,mode_t mode){if(mkdirat(parent,name,0700))return -1;int fd=openat(parent,name,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat a,b;if(fd<0||fchown(fd,uid,gid)||fchmod(fd,mode)||fsync(fd)||fstat(fd,&a)||!S_ISDIR(a.st_mode)||a.st_uid!=uid||a.st_gid!=gid||(a.st_mode&07777)!=mode||fstatat(parent,name,&b,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&a,&b)||!flush_dir(parent)){if(fd>=0)close(fd);return -1;}return fd;}
+static int hex_bytes(const char*hex,unsigned char*out,size_t n){if(!lower_hex(hex,n*2))return 0;for(size_t i=0;i<n;i++){unsigned a=hex[2*i],b=hex[2*i+1];a=a<='9'?a-'0':a-'a'+10;b=b<='9'?b-'0':b-'a'+10;out[i]=(unsigned char)((a<<4)|b);}return 1;}
+static int load_private_python(unsigned char**out,size_t*n){
+  if(seteuid(CLIENT_UID))return 0;int fd=open(PYTHON_SOURCE,O_RDONLY|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW_ANY|O_UNIQUE);struct stat a,b;int ok=fd>=0&&!fstat(fd,&a)&&S_ISREG(a.st_mode)&&a.st_uid==CLIENT_UID&&a.st_gid==80&&(a.st_mode&07777)==0755&&a.st_nlink==1&&a.st_size==33568&&stable_read_fd(fd,33568,out,n,&a)&&!lstat(PYTHON_SOURCE,&b)&&same_stat(&a,&b);char sum[65]={0};if(ok)digest(*out,*n,sum);if(fd>=0&&close(fd))ok=0;if(ok&&strcmp(sum,PYTHON_SHA256))ok=0;if(seteuid(0))_exit(125);if(!ok){free(*out);*out=NULL;return 0;}return 1;
+}
+static int create_python(int portal,const unsigned char*raw,size_t n,struct stat*identity){int fd=openat(portal,"python",O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE,0500);if(fd<0)return 0;int ok=write_all(fd,raw,n)&&!fsync(fd)&&!fchown(fd,0,0)&&!fchmod(fd,0555)&&!fsync(fd);struct stat rebound;if(ok)ok=!fstat(fd,identity)&&S_ISREG(identity->st_mode)&&identity->st_uid==0&&identity->st_gid==0&&(identity->st_mode&07777)==0555&&identity->st_nlink==1&&identity->st_size==(off_t)n&&!fstatat(portal,"python",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(identity,&rebound);close(fd);return ok;}
+static int descriptor_path_exact(int fd,const char*wanted){char raw[1024]={0};if(fcntl(fd,F_GETPATH,raw)<0)return 0;return !strcmp(raw,wanted);}
+static int listener_identity(int fd,const char*path,struct stat*out){
+  struct sockaddr_un address;memset(&address,0,sizeof address);socklen_t n=sizeof address;if(getsockname(fd,(struct sockaddr*)&address,&n)||address.sun_family!=AF_UNIX||strcmp(address.sun_path,path))return 0;
+  struct socket_fdinfo info;memset(&info,0,sizeof info);int got=proc_pidfdinfo(getpid(),fd,PROC_PIDFDSOCKETINFO,&info,sizeof info);if(got!=(int)sizeof info||info.psi.soi_family!=AF_UNIX||info.psi.soi_type!=SOCK_STREAM||info.psi.soi_kind!=SOCKINFO_UN||strcmp(info.psi.soi_proto.pri_un.unsi_addr.ua_sun.sun_path,path))return 0;
+  struct stat named;if(fstat(fd,out)||!S_ISSOCK(out->st_mode)||lstat(path,&named)||!same_stat(out,&named)||out->st_uid||out->st_gid!=CLIENT_GID||(out->st_mode&07777)!=0620)return 0;return 1;
+}
+static int bind_listener(const State*s,int portal,struct stat*identity){
+  char name[35],path[104];if(!object_name(s,name))return -1;int pn=snprintf(path,sizeof path,NS "/a/%s/p/c",name);if(pn<=0||(size_t)pn>=sizeof path||(size_t)pn>=sizeof(((struct sockaddr_un*)0)->sun_path))return -1;
+  int fd=socket(AF_UNIX,SOCK_STREAM,0);if(fd<0)return -1;int one=1;if(fcntl(fd,F_SETFD,FD_CLOEXEC)||setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof one)){close(fd);return -1;}struct sockaddr_un address;memset(&address,0,sizeof address);address.sun_family=AF_UNIX;strcpy(address.sun_path,path);if(bind(fd,(struct sockaddr*)&address,(socklen_t)(offsetof(struct sockaddr_un,sun_path)+strlen(path)+1))||chown(path,0,CLIENT_GID)||chmod(path,0620)||listen(fd,16)||!flush_dir(portal)||!listener_identity(fd,path,identity)){close(fd);return -1;}return fd;
+}
+static int send_prepared(int fd,const char*body,int runtime,int writer,int listener){
+  size_t n=strlen(body);unsigned char prefix[4]={(unsigned char)(n>>24),(unsigned char)(n>>16),(unsigned char)(n>>8),(unsigned char)n};struct iovec iov[2]={{prefix,4},{(void*)body,n}};unsigned char control[CMSG_SPACE(sizeof(int)*3)]={0};struct msghdr msg={0};msg.msg_iov=iov;msg.msg_iovlen=2;msg.msg_control=control;msg.msg_controllen=sizeof control;struct cmsghdr*c=CMSG_FIRSTHDR(&msg);c->cmsg_level=SOL_SOCKET;c->cmsg_type=SCM_RIGHTS;c->cmsg_len=CMSG_LEN(sizeof(int)*3);int fds[3]={runtime,writer,listener};memcpy(CMSG_DATA(c),fds,sizeof fds);msg.msg_controllen=c->cmsg_len;ssize_t sent;do{sent=sendmsg(fd,&msg,0);}while(sent<0&&errno==EINTR);return sent==(ssize_t)(n+4);
+}
+static int fifo_ack(int reader){
+  struct timespec ack_deadline;
+  if(!start_absolute_deadline(&ack_deadline))return 0;
+  unsigned char bytes[2];
+  ssize_t n;
+  for(;;){
+    if(!wait_input_until(reader,&ack_deadline))return 0;
+    n=read(reader,bytes,sizeof bytes);
+    if(n<0&&(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK))continue;
+    break;
+  }
+  if(deadline_remaining(&ack_deadline)<=0||n!=1||bytes[0]!='A')return 0;
+  for(;;){
+    n=read(reader,bytes,1);
+    if(n<0&&errno==EINTR){
+      if(deadline_remaining(&ack_deadline)<=0)return 0;
+      continue;
+    }
+    break;
+  }
+  return n<0&&(errno==EAGAIN||errno==EWOULDBLOCK);
+}
+static unsigned long long next_sequence(Store*t){Receipt last;int p=last_present(t,&last,NULL,NULL);return p==0?1:p==1?last.sequence+1:0;}
+
+static int create_runtime_object(Store*t,const Request*request){
+  State s;memset(&s,0,sizeof s);strcpy(s.phase,"RESERVING");random_hex(s.runtime,16);strcpy(s.create_nonce,request->nonce);char capability[65];random_hex(capability,32);unsigned char capraw[32];if(!hex_bytes(capability,capraw,32))return 0;digest(capraw,sizeof capraw,s.cap);s.sequence=next_sequence(t);if(!s.sequence||!put_state(t,&s,1))return 0;
+  char name[35];if(!object_name(&s,name))return 0;int object=create_dir_owned(t->c,name,0,0,0700);if(object<0)return 0;struct stat object_stat;if(fstat(object,&object_stat)){close(object);return 0;}s.object_dev=(unsigned long long)object_stat.st_dev;s.object_ino=(unsigned long long)object_stat.st_ino;strcpy(s.phase,"CREATING");if(!put_state(t,&s,0)){close(object);return 0;}
+  int hidden=-1,runtime=-1,reader=-1,writer=-1,portal=-1,listener=-1;unsigned char*python=NULL;size_t python_n=0;int ok=0;struct stat runtime_stat,fifo_stat,portal_stat,socket_stat,python_stat;
+  hidden=create_dir_owned(object,"h",0,0,0700);if(hidden<0)goto done;runtime=create_dir_owned(hidden,"r",CLIENT_UID,CLIENT_GID,0700);if(runtime<0||mkfifoat(hidden,"l",0600))goto done;reader=openat(hidden,"l",O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);writer=openat(hidden,"l",O_WRONLY|O_NONBLOCK|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);struct stat fifo_rebound;if(reader<0||writer<0||fchown(reader,0,0)||fchmod(reader,0600)||fstat(runtime,&runtime_stat)||fstat(writer,&fifo_stat)||fstatat(hidden,"l",&fifo_rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&fifo_stat,&fifo_rebound)||!S_ISFIFO(fifo_stat.st_mode)||fifo_stat.st_uid||fifo_stat.st_gid||(fifo_stat.st_mode&07777)!=0600||fifo_stat.st_nlink!=1||!flush_dir(hidden))goto done;
+  portal=create_dir_owned(object,"p",0,CLIENT_GID,0700);const char*object_members[]={"h","p"},*hidden_members[]={"r","l"},*portal_members[]={"python"};if(portal<0||!load_private_python(&python,&python_n)||!create_python(portal,python,python_n,&python_stat)||!exact_names(hidden,hidden_members,2,3U)||!exact_names(portal,portal_members,1,1U)||!exact_names(object,object_members,2,3U)||!flush_dir(portal)||!flush_dir(hidden)||fchmod(portal,0550)||fsync(portal)||fchmod(object,0555)||fsync(object)||!flush_dir(t->c)||fstat(portal,&portal_stat))goto done;
+  s.runtime_dev=(unsigned long long)runtime_stat.st_dev;s.runtime_ino=(unsigned long long)runtime_stat.st_ino;s.fifo_dev=(unsigned long long)fifo_stat.st_dev;s.fifo_ino=(unsigned long long)fifo_stat.st_ino;s.portal_dev=(unsigned long long)portal_stat.st_dev;s.portal_ino=(unsigned long long)portal_stat.st_ino;strcpy(s.phase,"PUBLISHING");if(!put_state(t,&s,0)||renameatx_np(t->c,name,t->a,name,RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH)||!flush_dir(t->c)||!flush_dir(t->a))goto done;
+  strcpy(s.phase,"PREPARING");if(!put_state(t,&s,0))goto done;listener=bind_listener(&s,portal,&socket_stat);if(listener<0)goto done;s.socket_dev=(unsigned long long)socket_stat.st_dev;s.socket_ino=(unsigned long long)socket_stat.st_ino;strcpy(s.phase,"PREPARED");if(!put_state(t,&s,0))goto done;
+  char runtime_path[256],fifo_path[256],body[1024];snprintf(runtime_path,sizeof runtime_path,NS "/a/%s/h/r",name);snprintf(fifo_path,sizeof fifo_path,NS "/a/%s/h/l",name);if(!descriptor_path_exact(runtime,runtime_path)||!descriptor_path_exact(writer,fifo_path))goto done;int bn=snprintf(body,sizeof body,"{\"capability\":\"%s\",\"operation\":\"create-prepared-v1\",\"portal_identity\":\"%s/a/%s/p\",\"request_nonce\":\"%s\",\"runtime_id\":\"%s\",\"schema_version\":1}",capability,NS,name,request->nonce,s.runtime);if(bn<=0||(size_t)bn>=sizeof body||!send_prepared(0,body,runtime,writer,listener))goto done;
+  if(!fifo_ack(reader)){error_frame(0,request->nonce,"INVALID_ACK");goto done;}strcpy(s.phase,"ACTIVE");if(!put_state(t,&s,0))goto done;char committed[512];snprintf(committed,sizeof committed,"{\"operation\":\"create-committed-v1\",\"request_nonce\":\"%s\",\"runtime_id\":\"%s\",\"schema_version\":1}",request->nonce,s.runtime);if(!json_frame(0,committed))goto done;ok=1;
+done:free(python);if(listener>=0)close(listener);if(portal>=0)close(portal);if(writer>=0)close(writer);if(reader>=0)close(reader);if(runtime>=0)close(runtime);if(hidden>=0)close(hidden);close(object);return ok;
+}
+
+typedef struct{unsigned count,depth;unsigned long long bytes;const char*reason;} Clean;
+static const char *delete_reason(int error){if(error==EBUSY)return "INCOMPLETE_BUSY";if(error==ENOTCAPABLE||error==EMLINK)return "INCOMPLETE_UNIQUE";if(error==EINVAL||error==ENOTSUP||error==EOPNOTSUPP)return "UNSUPPORTED_PRIMITIVE";return "INCOMPLETE_IDENTITY";}
+static int clean_contents(int dir,dev_t device,unsigned depth,Clean*c){
+  if(depth>TREE_DEPTH_MAX){c->reason="INCOMPLETE_IDENTITY";return 0;}int scanfd=dup(dir);if(scanfd<0)return 0;DIR*d=fdopendir(scanfd);if(!d){close(scanfd);return 0;}struct dirent*e;int ok=1;
+  while(ok&&(e=readdir(d))!=NULL){if(!strcmp(e->d_name,".")||!strcmp(e->d_name,".."))continue;size_t name_n=strlen(e->d_name);if(!name_n||name_n>255||!utf8((const unsigned char*)e->d_name,name_n)||strchr(e->d_name,'/')){c->reason="INCOMPLETE_IDENTITY";ok=0;break;}if(++c->count>TREE_FILES_MAX){c->reason="INCOMPLETE_IDENTITY";ok=0;break;}struct stat st;if(fstatat(dir,e->d_name,&st,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||st.st_dev!=device){c->reason="INCOMPLETE_IDENTITY";ok=0;break;}
+    if(S_ISDIR(st.st_mode)){int child=openat(dir,e->d_name,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat opened,rebound;if(child<0||fstat(child,&opened)||!same_stat(&st,&opened)||fstatat(dir,e->d_name,&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&opened,&rebound)){if(child>=0)close(child);c->reason="INCOMPLETE_IDENTITY";ok=0;break;}if(!clean_contents(child,device,depth+1,c)){close(child);ok=0;break;}close(child);if(unlinkat(dir,e->d_name,AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY)){c->reason=delete_reason(errno);ok=0;break;}}
+    else if(S_ISREG(st.st_mode)||S_ISLNK(st.st_mode)||S_ISFIFO(st.st_mode)||S_ISSOCK(st.st_mode)){if(S_ISREG(st.st_mode)){if(st.st_size<0||(c->bytes+=(unsigned long long)st.st_size)>TREE_BYTES_MAX){c->reason="INCOMPLETE_IDENTITY";ok=0;break;}}if(unlinkat(dir,e->d_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY|AT_UNIQUE)){c->reason=delete_reason(errno);ok=0;break;}}
+    else{c->reason="INCOMPLETE_IDENTITY";ok=0;break;}
+  }
+  closedir(d);return ok;
+}
+static int locate_object(Store*t,const State*s,int *parent,char name[35]){
+  if(!object_name(s,name))return -1;int candidates[3]={t->c,t->a,t->q},found=-1,count=0;for(int i=0;i<3;i++){struct stat st;if(fstatat(candidates[i],name,&st,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0){if(!S_ISDIR(st.st_mode)||(s->object_dev&&((unsigned long long)st.st_dev!=s->object_dev||(unsigned long long)st.st_ino!=s->object_ino)))return -1;found=candidates[i];count++;}else if(errno!=ENOENT)return -1;}if(count>1)return -1;*parent=found;return count;
+}
+static int validate_store_shape(Store*t,const State*s,int *receipt_temp_present){
+  const char*fixed[]={"a","c","q","r","s"};if(!exact_names(t->ns,fixed,5,31U))return 0;const char*state_names[]={"lock","current"};if(!exact_names(t->s,state_names,2,3U))return 0;
+  const char*receipt_names[]={"last",".last.tmp"};if(!exact_names(t->r,receipt_names,2,0))return 0;Receipt last;int has_last=last_present(t,&last,NULL,NULL);if(has_last<0||(has_last==0&&s->sequence!=1)||(has_last==1&&last.sequence+1!=s->sequence))return 0;
+  unsigned char*temp_raw=NULL;size_t temp_n=0;struct stat temp_id;int has_temp=read_named(t->r,".last.tmp",&temp_raw,&temp_n,&temp_id);Receipt temp;int temp_ok=has_temp==0||(has_temp==1&&parse_receipt_raw(temp_raw,temp_n,&temp));free(temp_raw);if(has_temp<0||!temp_ok)return 0;
+  char name[35];if(!object_name(s,name))return 0;const char*only[]={name};if(!exact_names(t->a,only,1,0)||!exact_names(t->c,only,1,0)||!exact_names(t->q,only,1,0))return 0;int parent=-1,located=locate_object(t,s,&parent,name);if(located<0)return 0;int phase=phase_index(s->phase),orientation=0;
+  if(phase==0)orientation=located==0||parent==t->c;else if(phase==1)orientation=located==1&&parent==t->c;else if(phase==2)orientation=located==1&&(parent==t->c||parent==t->a);else if(phase>=3&&phase<=5)orientation=located==1&&parent==t->a;else if(phase==6)orientation=located==1&&(parent==t->a||parent==t->q);else if(phase==7)orientation=(located==1&&parent==t->q)||(located==0&&has_temp==1);if(!orientation)return 0;
+  if(located==1){int object=open_exact_dir(parent,name,0,0,phase<=1?0700:0555,s->object_dev,s->object_ino);if(object<0)return 0;int object_ok=(phase!=0&&has_temp!=1)||exact_empty(object);if(close(object))object_ok=0;if(!object_ok)return 0;}
+  if(has_temp==1){if(phase!=7||strcmp(temp.runtime,s->runtime)||strcmp(temp.cap,s->cap)||strcmp(temp.create_nonce,s->create_nonce)||strcmp(temp.cleanup_nonce,s->cleanup_nonce)||temp.sequence!=s->sequence||!strcmp(temp.cleanup_nonce,s->create_nonce)||(has_last==1&&(!strcmp(temp.create_nonce,last.create_nonce)||!strcmp(temp.create_nonce,last.cleanup_nonce)||!strcmp(temp.cleanup_nonce,last.create_nonce)||!strcmp(temp.cleanup_nonce,last.cleanup_nonce))))return 0;}if(receipt_temp_present)*receipt_temp_present=has_temp==1;return 1;
+}
+static int terminal_receipt(Store*t,Receipt*r,unsigned char **raw,size_t *length){struct stat id;int found=read_named(t->r,".last.tmp",raw,length,&id);if(found<=0)return found;if(!parse_receipt_raw(*raw,*length,r)){free(*raw);*raw=NULL;return -1;}return 1;}
+static int validated_terminal_receipt(Store*t,Receipt*r,unsigned char **raw,size_t *length){
+  int found=terminal_receipt(t,r,raw,length);if(found<=0)return found;const char*fixed[]={"a","c","q","r","s"},*state_names[]={"lock"},*receipt_names[]={"last",".last.tmp"};int ok=exact_names(t->ns,fixed,5,31U)&&exact_names(t->s,state_names,1,1U)&&exact_empty(t->a)&&exact_empty(t->c)&&exact_empty(t->q)&&exact_names(t->r,receipt_names,2,2U);Receipt last;int has_last=last_present(t,&last,NULL,NULL);if(has_last<0||(has_last==0&&r->sequence!=1)||(has_last==1&&last.sequence+1!=r->sequence))ok=0;if(ok&&(!strcmp(r->cleanup_nonce,r->create_nonce)||(has_last==1&&(!strcmp(r->create_nonce,last.create_nonce)||!strcmp(r->create_nonce,last.cleanup_nonce)||!strcmp(r->cleanup_nonce,last.create_nonce)||!strcmp(r->cleanup_nonce,last.cleanup_nonce)))))ok=0;if(!ok){free(*raw);*raw=NULL;*length=0;return -1;}return 1;
+}
+static int validate_idle_store(Store*t){const char*fixed[]={"a","c","q","r","s"},*state_names[]={"lock"},*receipt_names[]={"last"};return exact_names(t->ns,fixed,5,31U)&&exact_names(t->s,state_names,1,1U)&&exact_names(t->r,receipt_names,1,0)&&exact_empty(t->a)&&exact_empty(t->c)&&exact_empty(t->q);}
+static int fifo_eof_for(Store*t,const State*s,int *reader,const char **reason){
+  char name[35];int parent=-1,located=locate_object(t,s,&parent,name);if(located==0&&!strcmp(s->phase,"CLEANING")){*reader=-1;return 1;}if(located!=1){*reason="INCOMPLETE_IDENTITY";return -1;}int object=open_exact_dir(parent,name,0,0,(!strcmp(s->phase,"RESERVING")||!strcmp(s->phase,"CREATING"))?0700:0555,s->object_dev,s->object_ino);if(object<0){*reason="INCOMPLETE_IDENTITY";return -1;}int hidden=open_exact_dir(object,"h",0,0,0700,0,0);if(hidden<0){int missing=errno==ENOENT&&!strcmp(s->phase,"CLEANING");close(object);if(missing){*reader=-1;return 1;}*reason="INCOMPLETE_IDENTITY";return -1;}int fd=openat(hidden,"l",O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);struct stat st;int saved=errno;close(hidden);close(object);errno=saved;if(fd<0){if(!strcmp(s->phase,"CLEANING")&&errno==ENOENT){*reader=-1;return 1;}*reason="INCOMPLETE_IDENTITY";return -1;}if(fstat(fd,&st)||!S_ISFIFO(st.st_mode)||(unsigned long long)st.st_dev!=s->fifo_dev||(unsigned long long)st.st_ino!=s->fifo_ino||st.st_uid||st.st_gid||(st.st_mode&07777)!=0600||st.st_nlink!=1){close(fd);*reason="INCOMPLETE_IDENTITY";return -1;}unsigned char bytes[2];ssize_t n;do{n=read(fd,bytes,sizeof bytes);}while(n<0&&errno==EINTR);if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){close(fd);return 0;}if(n!=0){close(fd);*reason="INCOMPLETE_IDENTITY";return -1;}*reader=fd;return 1;
+}
+static int quarantine(Store*t,State*s,const char **reason){
+  char name[35];int parent=-1,located=locate_object(t,s,&parent,name);if(located!=1){*reason="INCOMPLETE_IDENTITY";return 0;}
+  if(!strcmp(s->phase,"ACTIVE")){strcpy(s->phase,"QUARANTINING");if(!put_state(t,s,0)){*reason="INCOMPLETE_IDENTITY";return 0;}parent=t->a;}
+  if(!strcmp(s->phase,"PUBLISHING")){char cleanup[65];strcpy(cleanup,s->cleanup_nonce);s->cleanup_nonce[0]=0;if(parent==t->c){if(renameatx_np(t->c,name,t->a,name,RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH)||!flush_dir(t->c)||!flush_dir(t->a)){*reason=delete_reason(errno);return 0;}parent=t->a;}if(parent!=t->a){*reason="INCOMPLETE_IDENTITY";return 0;}strcpy(s->phase,"PREPARING");if(!put_state(t,s,0)){*reason="INCOMPLETE_IDENTITY";return 0;}strcpy(s->cleanup_nonce,cleanup);}
+  if((!strcmp(s->phase,"QUARANTINING")||!strcmp(s->phase,"PREPARING")||!strcmp(s->phase,"PREPARED")||!strcmp(s->phase,"ACTIVE"))&&parent==t->a){if(strcmp(s->phase,"QUARANTINING")){strcpy(s->phase,"QUARANTINING");if(!put_state(t,s,0)){*reason="INCOMPLETE_IDENTITY";return 0;}}if(renameatx_np(t->a,name,t->q,name,RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH)||!flush_dir(t->a)||!flush_dir(t->q)){*reason=delete_reason(errno);return 0;}parent=t->q;}
+  if(parent!=t->q){*reason="INCOMPLETE_IDENTITY";return 0;}strcpy(s->phase,"CLEANING");if(!put_state(t,s,0)){*reason="INCOMPLETE_IDENTITY";return 0;}return 1;
+}
+static int remove_registered_object(Store*t,State*s,int *lease_reader,const char **reason,int *object_present){
+  char name[35];int parent=-1,located=locate_object(t,s,&parent,name);*object_present=0;if(located==0&&!strcmp(s->phase,"CLEANING"))return 1;if(located!=1||parent!=t->q){*reason="INCOMPLETE_IDENTITY";return 0;}*object_present=1;
+  int object=open_exact_dir(t->q,name,0,0,0555,s->object_dev,s->object_ino);if(object<0){*reason="INCOMPLETE_IDENTITY";return 0;}Clean clean={0,0,0,"INCOMPLETE_IDENTITY"};int ok=1;
+  int hidden=open_exact_dir(object,"h",0,0,0700,0,0);if(hidden<0&&errno!=ENOENT)ok=0;if(ok&&hidden>=0){
+    int runtime=open_exact_dir(hidden,"r",CLIENT_UID,CLIENT_GID,0700,s->runtime_dev,s->runtime_ino);if(runtime<0&&errno!=ENOENT)ok=0;if(ok&&runtime>=0){struct stat rootst;if(fstat(runtime,&rootst)||!clean_contents(runtime,rootst.st_dev,0,&clean))ok=0;if(close(runtime))ok=0;if(ok&&unlinkat(hidden,"r",AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY))ok=0,clean.reason=delete_reason(errno);}
+    if(ok){if(*lease_reader>=0){if(close(*lease_reader))ok=0;*lease_reader=-1;}struct stat fifo;if(ok&&fstatat(hidden,"l",&fifo,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0){if(!S_ISFIFO(fifo.st_mode)||(unsigned long long)fifo.st_dev!=s->fifo_dev||(unsigned long long)fifo.st_ino!=s->fifo_ino||fifo.st_uid||fifo.st_gid||(fifo.st_mode&07777)!=0600||fifo.st_nlink!=1)ok=0,clean.reason="INCOMPLETE_IDENTITY";else if(unlinkat(hidden,"l",AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY|AT_UNIQUE))ok=0,clean.reason=delete_reason(errno);}else if(ok&&errno!=ENOENT)ok=0,clean.reason="INCOMPLETE_IDENTITY";}
+    if(close(hidden))ok=0;if(ok&&unlinkat(object,"h",AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY))ok=0,clean.reason=delete_reason(errno);
+  }
+  int portal=-1;if(ok){portal=open_exact_dir(object,"p",0,CLIENT_GID,0550,s->portal_dev,s->portal_ino);if(portal<0&&errno!=ENOENT)ok=0;}if(ok&&portal>=0){
+    struct stat socket_named;if(fstatat(portal,"c",&socket_named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0){if(!S_ISSOCK(socket_named.st_mode)||(s->socket_dev&&((unsigned long long)socket_named.st_dev!=s->socket_dev||(unsigned long long)socket_named.st_ino!=s->socket_ino))||socket_named.st_uid||socket_named.st_gid!=CLIENT_GID||(socket_named.st_mode&07777)!=0620||socket_named.st_nlink!=1)ok=0,clean.reason="INCOMPLETE_IDENTITY";else if(unlinkat(portal,"c",AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY|AT_UNIQUE))ok=0,clean.reason=delete_reason(errno);}else if(errno!=ENOENT)ok=0,clean.reason="INCOMPLETE_IDENTITY";
+    if(ok){unsigned char*python=NULL;size_t python_n=0;struct stat python_id;int python_fd=stable_named_fd(portal,"python",O_RDONLY,0,0,0555,33568,&python,&python_n,&python_id);if(python_fd<0&&errno!=ENOENT)ok=0,clean.reason="INCOMPLETE_IDENTITY";if(python_fd>=0){char sum[65];digest(python,python_n,sum);free(python);if(close(python_fd)||python_n!=33568||strcmp(sum,PYTHON_SHA256))ok=0,clean.reason="INCOMPLETE_IDENTITY";else if(unlinkat(portal,"python",AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY|AT_UNIQUE))ok=0,clean.reason=delete_reason(errno);}}
+    if(close(portal))ok=0;if(ok&&unlinkat(object,"p",AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY))ok=0,clean.reason=delete_reason(errno);
+  }
+  if(close(object))ok=0;if(!ok)*reason=clean.reason;return ok;
+}
+static int prepare_receipt(Store*t,const State*s,char digest_out[65],int *already_present){
+  Receipt receipt;memset(&receipt,0,sizeof receipt);strcpy(receipt.runtime,s->runtime);strcpy(receipt.cap,s->cap);strcpy(receipt.create_nonce,s->create_nonce);strcpy(receipt.cleanup_nonce,s->cleanup_nonce);receipt.sequence=s->sequence;char raw[2048];int n=receipt_bytes(&receipt,raw,sizeof raw);if(n<=0||(size_t)n>=sizeof raw)return 0;
+  Receipt last;int has_last=last_present(t,&last,NULL,NULL);if(has_last<0||(has_last==0&&s->sequence!=1)||(has_last==1&&last.sequence+1!=s->sequence))return 0;
+  unsigned char*existing=NULL;size_t existing_n=0;struct stat id;int found=read_named(t->r,".last.tmp",&existing,&existing_n,&id);if(found<0)return 0;*already_present=found==1;if(found==0){if(!write_temp(t->r,".last.tmp",raw,(size_t)n)||!flush_dir(t->r))return 0;}else{int equal=existing_n==(size_t)n&&!memcmp(existing,raw,(size_t)n);free(existing);if(!equal)return 0;}digest(raw,(size_t)n,digest_out);return 1;
+}
+static int publish_prepared_receipt(Store*t){struct stat pending;int has_last=fstatat(t->r,"last",&pending,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0;if(!has_last&&errno!=ENOENT)return 0;if(!remove_state(t))return 0;return publish_temp(t->r,".last.tmp","last",!has_last);}
+static int finish_cleanup(Store*t,State*s,int *lease_reader,const char **reason,char receipt_sha[65]){
+  int object_present=0;if(!remove_registered_object(t,s,lease_reader,reason,&object_present))return 0;int temp_preexisting=0;if(!prepare_receipt(t,s,receipt_sha,&temp_preexisting)){*reason="INCOMPLETE_IDENTITY";return 0;}char name[35];if(!object_name(s,name))return 0;if(object_present){if(unlinkat(t->q,name,AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY)||!flush_dir(t->q)){*reason=delete_reason(errno);return 0;}}else if(!temp_preexisting){*reason="INCOMPLETE_IDENTITY";return 0;}if(!publish_prepared_receipt(t)){*reason="INCOMPLETE_IDENTITY";return 0;}return 1;
+}
+
+static int remove_prepublication(Store*t,State*s,const char **reason){
+  char name[35];int parent=-1,located=locate_object(t,s,&parent,name);if(!strcmp(s->phase,"RESERVING")){if(located==1){int fd=open_exact_dir(t->c,name,0,0,0700,0,0);if(fd<0){*reason="INCOMPLETE_IDENTITY";return 0;}DIR*d=fdopendir(dup(fd));struct dirent*e;int empty=1;while(d&&(e=readdir(d)))if(strcmp(e->d_name,".")&&strcmp(e->d_name,".."))empty=0;if(d)closedir(d);close(fd);if(!empty||unlinkat(t->c,name,AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY)){*reason=delete_reason(errno);return 0;}}else if(located<0){*reason="INCOMPLETE_IDENTITY";return 0;}return remove_state(t);}
+  if(strcmp(s->phase,"CREATING")||located!=1||parent!=t->c){*reason="INCOMPLETE_IDENTITY";return 0;}int object=open_exact_dir(t->c,name,0,0,0700,s->object_dev,s->object_ino);if(object<0){*reason="INCOMPLETE_IDENTITY";return 0;}struct stat st;if(fstat(object,&st)){close(object);return 0;}Clean clean={0,0,0,"INCOMPLETE_IDENTITY"};int ok=clean_contents(object,st.st_dev,0,&clean);close(object);if(ok&&unlinkat(t->c,name,AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_NODELETEBUSY))ok=0,clean.reason=delete_reason(errno);if(ok)ok=flush_dir(t->c)&&remove_state(t);if(!ok)*reason=clean.reason;return ok;
+}
+
+static int state_tx_equal(const State*a,const State*b){return !strcmp(a->runtime,b->runtime)&&!strcmp(a->cap,b->cap)&&!strcmp(a->create_nonce,b->create_nonce)&&a->sequence==b->sequence;}
+static int state_ids_equal(const State*a,const State*b){return a->object_dev==b->object_dev&&a->object_ino==b->object_ino&&a->runtime_dev==b->runtime_dev&&a->runtime_ino==b->runtime_ino&&a->fifo_dev==b->fifo_dev&&a->fifo_ino==b->fifo_ino&&a->portal_dev==b->portal_dev&&a->portal_ino==b->portal_ino&&a->socket_dev==b->socket_dev&&a->socket_ino==b->socket_ino;}
+static int same_regular_identity(const struct stat*a,const struct stat*b){return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&S_ISREG(a->st_mode)&&S_ISREG(b->st_mode)&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&a->st_nlink==b->st_nlink&&a->st_size==b->st_size;}
+typedef struct {dev_t dev;ino_t ino;} RuntimeIdentity;
+typedef struct {unsigned count;unsigned long long bytes;RuntimeIdentity identities[TREE_FILES_MAX];} RuntimeAudit;
+static int audit_identity(RuntimeAudit*a,const struct stat*s){
+  if(a->count>=TREE_FILES_MAX)return 0;for(unsigned i=0;i<a->count;i++)if(a->identities[i].dev==s->st_dev&&a->identities[i].ino==s->st_ino)return 0;a->identities[a->count].dev=s->st_dev;a->identities[a->count].ino=s->st_ino;a->count++;return 1;
+}
+static int validate_runtime_contents(int directory,dev_t device,unsigned depth,RuntimeAudit*a){
+  if(depth>TREE_DEPTH_MAX)return 0;int scan=dup(directory);if(scan<0)return 0;DIR*stream=fdopendir(scan);if(!stream){close(scan);return 0;}int ok=1;struct dirent*entry;errno=0;
+  while(ok&&(entry=readdir(stream))!=NULL){
+    if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,".."))continue;size_t name_length=strlen(entry->d_name);if(!name_length||name_length>255||strchr(entry->d_name,'/')||!utf8((const unsigned char*)entry->d_name,name_length)){ok=0;break;}
+    struct stat named,rebound;if(fstatat(directory,entry->d_name,&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||named.st_dev!=device||!audit_identity(a,&named)){ok=0;break;}
+    if(S_ISDIR(named.st_mode)){
+      int child=openat(directory,entry->d_name,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat opened;if(child<0||fstat(child,&opened)||!same_stat(&named,&opened)||fstatat(directory,entry->d_name,&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&opened,&rebound)||!validate_runtime_contents(child,device,depth+1,a)){if(child>=0)close(child);ok=0;break;}if(close(child)){ok=0;break;}
+    }else if(S_ISREG(named.st_mode)||S_ISLNK(named.st_mode)||S_ISFIFO(named.st_mode)||S_ISSOCK(named.st_mode)){
+      if(named.st_nlink!=1||(S_ISREG(named.st_mode)&&(named.st_size<0||(a->bytes+=(unsigned long long)named.st_size)>TREE_BYTES_MAX))||fstatat(directory,entry->d_name,&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&named,&rebound)){ok=0;break;}
+    }else{ok=0;break;}
+  }
+  if(errno)ok=0;if(closedir(stream))ok=0;return ok;
+}
+static int exact_leaf(int directory,const char*name,mode_t kind,uid_t uid,gid_t gid,mode_t mode,unsigned long long dev,unsigned long long ino){
+  struct stat first,second;if(fstatat(directory,name,&first,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||fstatat(directory,name,&second,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&first,&second)||((first.st_mode&S_IFMT)!=kind)||first.st_uid!=uid||first.st_gid!=gid||(first.st_mode&07777)!=mode||first.st_nlink!=1)return 0;return (!dev||((unsigned long long)first.st_dev==dev&&(unsigned long long)first.st_ino==ino));
+}
+static int exact_python(int portal){
+  unsigned char*raw=NULL;size_t length=0;struct stat identity;int fd=stable_named_fd(portal,"python",O_RDONLY,0,0,0555,33568,&raw,&length,&identity);if(fd<0)return 0;char sum[65]={0};if(raw)digest(raw,length,sum);free(raw);return close(fd)==0&&length==33568&&!strcmp(sum,PYTHON_SHA256);
+}
+static int validate_quarantine_progress(Store*t,const State*s){
+  char name[35];if(!object_name(s,name))return 0;const char*only[]={name};if(!exact_empty(t->a)||!exact_empty(t->c)||!exact_names(t->q,only,1,1U))return 0;int object=open_exact_dir(t->q,name,0,0,0555,s->object_dev,s->object_ino);if(object<0)return 0;
+  const char*object_full[]={"h","p"},*object_portal[]={"p"},*hidden_full[]={"r","l"},*hidden_fifo[]={"l"},*portal_full[]={"c","python"},*portal_python[]={"python"};int progress=-1,hidden=-1,portal=-1,runtime=-1,ok=1;
+  if(exact_names(object,object_full,2,3U)){
+    hidden=open_exact_dir(object,"h",0,0,0700,0,0);portal=open_exact_dir(object,"p",0,CLIENT_GID,0550,s->portal_dev,s->portal_ino);if(hidden<0||portal<0)ok=0;else if(!exact_names(portal,portal_full,2,3U))ok=0;else if(exact_names(hidden,hidden_full,2,3U))progress=0;else if(exact_names(hidden,hidden_fifo,1,1U))progress=1;else if(exact_empty(hidden))progress=2;else ok=0;
+  }else if(exact_names(object,object_portal,1,1U)){
+    portal=open_exact_dir(object,"p",0,CLIENT_GID,0550,s->portal_dev,s->portal_ino);if(portal<0)ok=0;else if(exact_names(portal,portal_full,2,3U))progress=3;else if(exact_names(portal,portal_python,1,1U))progress=4;else if(exact_empty(portal))progress=5;else ok=0;
+  }else if(exact_empty(object))progress=6;else ok=0;
+  if(ok&&progress==0){runtime=open_exact_dir(hidden,"r",CLIENT_UID,CLIENT_GID,0700,s->runtime_dev,s->runtime_ino);if(runtime<0)ok=0;else{struct stat root;RuntimeAudit audit;memset(&audit,0,sizeof audit);if(fstat(runtime,&root)||root.st_dev!=(dev_t)s->runtime_dev||!validate_runtime_contents(runtime,root.st_dev,0,&audit))ok=0;}}
+  if(ok&&progress<=1&&!exact_leaf(hidden,"l",S_IFIFO,0,0,0600,s->fifo_dev,s->fifo_ino))ok=0;
+  if(ok&&progress<=3&&(!exact_leaf(portal,"c",S_IFSOCK,0,CLIENT_GID,0620,s->socket_dev,s->socket_ino)||!exact_python(portal)))ok=0;
+  if(ok&&progress==4&&!exact_python(portal))ok=0;
+  if(runtime>=0&&close(runtime))ok=0;if(hidden>=0&&close(hidden))ok=0;if(portal>=0&&close(portal))ok=0;if(close(object))ok=0;
+  if(!ok||progress<0)return 0;return !strcmp(s->phase,"QUARANTINING")?progress==0:!strcmp(s->phase,"CLEANING");
+}
+static int valid_predecessor(Store*t,const State*s,Receipt*last,int*has_last){
+  const char*receipt_names[]={"last"};*has_last=last_present(t,last,NULL,NULL);if(*has_last<0||!exact_names(t->r,receipt_names,1,s->sequence==1?0U:1U)||(*has_last==0)!=(s->sequence==1))return 0;if(*has_last==0)return 1;return last->sequence+1==s->sequence&&strcmp(last->create_nonce,last->cleanup_nonce)&&strcmp(s->create_nonce,last->create_nonce)&&strcmp(s->create_nonce,last->cleanup_nonce)&&strcmp(s->cleanup_nonce,last->create_nonce)&&strcmp(s->cleanup_nonce,last->cleanup_nonce);
+}
+static int valid_cleanup_reconciliation(Store*t,const State*old,const State*next){
+  const char*fixed[]={"a","c","q","r","s"};if(!exact_names(t->ns,fixed,5,31U)||!state_tx_equal(old,next)||!state_ids_equal(old,next)||strcmp(next->phase,"CLEANING")||!strcmp(old->cleanup_nonce,old->create_nonce))return 0;int old_phase=phase_index(old->phase);if(old_phase!=6&&old_phase!=7)return 0;Receipt last;int has_last=0;if(!valid_predecessor(t,old,&last,&has_last)||!validate_quarantine_progress(t,old))return 0;int ordinary=old_phase==6&&!strcmp(old->cleanup_nonce,next->cleanup_nonce);if(ordinary)return 1;if(!strcmp(old->cleanup_nonce,next->cleanup_nonce)||!strcmp(next->cleanup_nonce,old->create_nonce))return 0;if(has_last==1&&(!strcmp(next->cleanup_nonce,last.create_nonce)||!strcmp(next->cleanup_nonce,last.cleanup_nonce)))return 0;return 1;
+}
+static int valid_state_transition(const State*a,const State*b){
+  if(!state_tx_equal(a,b))return 0;int old=phase_index(a->phase),next=phase_index(b->phase);if(old<0||next<0)return 0;
+  if(old==0&&next==1)return !*a->cleanup_nonce&&!*b->cleanup_nonce&&!a->object_dev&&!a->object_ino&&b->object_dev&&b->object_ino&&!b->runtime_dev&&!b->runtime_ino&&!b->fifo_dev&&!b->fifo_ino&&!b->portal_dev&&!b->portal_ino&&!b->socket_dev&&!b->socket_ino;
+  if(old==1&&next==2)return !*a->cleanup_nonce&&!*b->cleanup_nonce&&a->object_dev==b->object_dev&&a->object_ino==b->object_ino&&!a->runtime_dev&&!a->runtime_ino&&!a->fifo_dev&&!a->fifo_ino&&!a->portal_dev&&!a->portal_ino&&!a->socket_dev&&!a->socket_ino&&b->runtime_dev&&b->runtime_ino&&b->fifo_dev&&b->fifo_ino&&b->portal_dev&&b->portal_ino&&!b->socket_dev&&!b->socket_ino;
+  if(old==2&&next==3)return !*a->cleanup_nonce&&!*b->cleanup_nonce&&state_ids_equal(a,b);
+  if(old==3&&next==4)return !*a->cleanup_nonce&&!*b->cleanup_nonce&&a->object_dev==b->object_dev&&a->object_ino==b->object_ino&&a->runtime_dev==b->runtime_dev&&a->runtime_ino==b->runtime_ino&&a->fifo_dev==b->fifo_dev&&a->fifo_ino==b->fifo_ino&&a->portal_dev==b->portal_dev&&a->portal_ino==b->portal_ino&&!a->socket_dev&&!a->socket_ino&&b->socket_dev&&b->socket_ino;
+  if(old==4&&next==5)return !*a->cleanup_nonce&&!*b->cleanup_nonce&&state_ids_equal(a,b);
+  if(old>=3&&old<=5&&next==6)return !*a->cleanup_nonce&&lower_hex(b->cleanup_nonce,64)&&state_ids_equal(a,b);
+  return 0;
+}
+static int phase_index(const char*p){const char*v[]={"RESERVING","CREATING","PUBLISHING","PREPARING","PREPARED","ACTIVE","QUARANTINING","CLEANING"};for(int i=0;i<8;i++)if(!strcmp(p,v[i]))return i;return -1;}
+static int capability_matches(const char*expected,const char*capability);
+static int reconcile_state_temp(Store*t,const Request*r,int operation,RecoveryContinuation*continuation){
+  unsigned char*tmp=NULL,*cur=NULL,*receipt_tmp=NULL,*promoted=NULL;size_t tn=0,cn=0,rn=0,pn=0;struct stat temp_id,current_id,promoted_id;memset(continuation,0,sizeof *continuation);int has_tmp=read_named(t->s,".current.tmp",&tmp,&tn,&temp_id);if(has_tmp<0)return 0;if(has_tmp==0)return 1;int has_receipt_tmp=read_named(t->r,".last.tmp",&receipt_tmp,&rn,&current_id);free(receipt_tmp);if(has_receipt_tmp!=0){free(tmp);return 0;}State next,old,confirmed;if(!parse_state_raw(tmp,tn,&next)){free(tmp);return 0;}int has_cur=read_named(t->s,"current",&cur,&cn,&current_id);if(has_cur<0){free(tmp);return 0;}if(has_cur==0){int ok=!strcmp(next.phase,"RESERVING")&&exact_names(t->s,(const char*const[]){"lock",".current.tmp"},2,3U)&&publish_temp(t->s,".current.tmp","current",1);free(tmp);return ok;}
+  int parsed=parse_state_raw(cur,cn,&old);if(!parsed){free(cur);free(tmp);return 0;}int cleanup_transition=(!strcmp(old.phase,"QUARANTINING")||!strcmp(old.phase,"CLEANING"))&&!strcmp(next.phase,"CLEANING");int ok=exact_names(t->s,(const char*const[]){"lock","current",".current.tmp"},3,7U)&&(cleanup_transition?valid_cleanup_reconciliation(t,&old,&next):valid_state_transition(&old,&next));if(!ok||!publish_temp(t->s,".current.tmp","current",0)){free(cur);free(tmp);return 0;}
+  int reread=read_named(t->s,"current",&promoted,&pn,&promoted_id),tmp_absent=fstatat(t->s,".current.tmp",&current_id,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH);ok=reread==1&&tmp_absent<0&&errno==ENOENT&&pn==tn&&!memcmp(promoted,tmp,tn)&&same_regular_identity(&temp_id,&promoted_id)&&parse_state_raw(promoted,pn,&confirmed)&&state_tx_equal(&confirmed,&next)&&state_ids_equal(&confirmed,&next)&&!strcmp(confirmed.phase,next.phase)&&!strcmp(confirmed.cleanup_nonce,next.cleanup_nonce)&&exact_names(t->s,(const char*const[]){"lock","current"},2,3U);if(ok&&cleanup_transition&&operation==2&&!strcmp(r->operation,"cleanup-v1")&&!strcmp(r->nonce,next.cleanup_nonce)&&capability_matches(next.cap,r->capability)){continuation->valid=1;strcpy(continuation->operation,"cleanup-v1");strcpy(continuation->nonce,next.cleanup_nonce);strcpy(continuation->capability_sha256,next.cap);digest(tmp,tn,continuation->current_sha256);continuation->current_length=tn;}free(promoted);free(cur);free(tmp);return ok;
+}
+static int nonce_replayed(Store*t,const State*current,const char*nonce){if(current&&(!strcmp(nonce,current->create_nonce)||(*current->cleanup_nonce&&!strcmp(nonce,current->cleanup_nonce))))return 1;Receipt last;int p=last_present(t,&last,NULL,NULL);return p<0?-1:p==1&&(!strcmp(nonce,last.create_nonce)||!strcmp(nonce,last.cleanup_nonce));}
+static int capability_matches(const char*expected,const char*capability){unsigned char raw[32];char sum[65];if(!hex_bytes(capability,raw,sizeof raw))return 0;digest(raw,sizeof raw,sum);return !strcmp(sum,expected);}
+static int current_capability(const State*s,const char*capability){return capability_matches(s->cap,capability);}
+static int continuation_matches(const RecoveryContinuation*c,const State*s,const Request*r){char raw[4096],sum[65];int n=state_bytes(s,raw,sizeof raw);if(!c||!c->valid||strcmp(c->operation,"cleanup-v1")||strcmp(c->nonce,r->nonce)||strcmp(c->nonce,s->cleanup_nonce)||strcmp(c->capability_sha256,s->cap)||!capability_matches(c->capability_sha256,r->capability)||n<=0||(size_t)n!=c->current_length)return 0;digest(raw,(size_t)n,sum);return !strcmp(sum,c->current_sha256);}
+
+static int recover_with_create(Store*t,State*s,const Request*r,const char **reason){
+  if(!strcmp(s->phase,"RESERVING")||!strcmp(s->phase,"CREATING")){if(!remove_prepublication(t,s,reason))return 0;*reason="RECOVERED_RETRY";return 1;}
+  if(!strcmp(s->phase,"QUARANTINING")||!strcmp(s->phase,"CLEANING")){*reason="CAPACITY";return 1;}
+  if(strcmp(s->phase,"PUBLISHING")&&strcmp(s->phase,"PREPARING")&&strcmp(s->phase,"PREPARED")&&strcmp(s->phase,"ACTIVE")){*reason="INCOMPLETE_IDENTITY";return 0;}
+  int reader=-1,eof=fifo_eof_for(t,s,&reader,reason);if(eof==0){*reason="CAPACITY";return 1;}if(eof<0)return 0;strcpy(s->cleanup_nonce,r->nonce);if(!quarantine(t,s,reason)){if(reader>=0)close(reader);return 0;}char receipt[65];int ok=finish_cleanup(t,s,&reader,reason,receipt);if(reader>=0)close(reader);if(ok)*reason="RECOVERED_RETRY";return ok;
+}
+static int recover_terminal_create(Store*t,const Request*r){
+  Receipt terminal;
+  unsigned char*raw=NULL;
+  size_t n=0;
+  int found=validated_terminal_receipt(t,&terminal,&raw,&n);
+  free(raw);
+  if(found<=0)return found;
+  Receipt last;
+  int has_last=last_present(t,&last,NULL,NULL);
+  if(has_last<0)return -1;
+  if(!strcmp(r->nonce,terminal.create_nonce)||!strcmp(r->nonce,terminal.cleanup_nonce)||
+      (has_last==1&&(!strcmp(r->nonce,last.create_nonce)||!strcmp(r->nonce,last.cleanup_nonce)))){
+    error_frame(0,r->nonce,"REPLAY");
+    return 2;
+  }
+  if(!publish_temp(t->r,".last.tmp","last",has_last==0))return -1;
+  error_frame(0,r->nonce,"RECOVERED_RETRY");
+  return 2;
+}
+static int recover_terminal_cleanup(Store*t,const Request*r,int *handled){
+  Receipt terminal;unsigned char*raw=NULL;size_t n=0;int found=validated_terminal_receipt(t,&terminal,&raw,&n);if(found==0){*handled=0;return 1;}*handled=1;if(found<0)return 1;Receipt last;int has_last=last_present(t,&last,NULL,NULL);if(has_last<0){free(raw);return 1;}if(!strcmp(r->nonce,terminal.create_nonce)||(has_last==1&&(!strcmp(r->nonce,last.create_nonce)||!strcmp(r->nonce,last.cleanup_nonce)))){free(raw);error_frame(0,r->nonce,"REPLAY");return 1;}if(!capability_matches(terminal.cap,r->capability)){free(raw);error_frame(0,r->nonce,"INVALID_CAPABILITY");return 1;}if(strcmp(r->nonce,terminal.cleanup_nonce)){free(raw);error_frame(0,r->nonce,"CAPACITY");return 1;}char receipt[65];digest(raw,n,receipt);free(raw);if(!publish_temp(t->r,".last.tmp","last",has_last==0))return 1;char body[512];snprintf(body,sizeof body,"{\"operation\":\"cleanup-result-v1\",\"receipt_sha256\":\"%s\",\"request_nonce\":\"%s\",\"runtime_id\":\"%s\",\"schema_version\":1}",receipt,r->nonce,terminal.runtime);return json_frame(0,body)?0:1;
+}
+
+static const unsigned char diagnostic_request[]={"{\"operation\":\"create-phase-diagnostic-v1\",\"request_nonce\":\"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b\",\"schema_version\":1}"};
+static const unsigned char diagnostic_predecessor[]={"{\"capability_sha256\":\"c0561f2ff4b382a39fb79da72c3e34ad6c884a7b4f7eb2ae1fc77057d557d6ae\",\"cleanup_request_nonce\":\"66002a07aed574c8775a2c9759ffb19ca5672a2b5433f0dbb47b405cce7947be\",\"create_request_nonce\":\"7ea091edc6b1f543ac49ed517611e0b0b36d8a0eb0a78f770974ae15583a5263\",\"effect_sha256\":\"b86112a8b274aefe308ccaad0b697f2d13fe1d4f83810f3ec876a7ebe771bf0d\",\"runtime_id\":\"733a61fcdcd54d230e0e2ec6a4df8384\",\"schema_version\":1,\"sequence\":1}"};
+static int diagnostic_exact_names(int directory,const char*const*allowed,size_t allowed_count,unsigned required){
+  struct stat original_before,scan_identity,original_after;if(fstat(directory,&original_before)||!S_ISDIR(original_before.st_mode))return 0;int scan=openat(directory,".",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);if(scan<0)return 0;if(fstat(scan,&scan_identity)||!same_stat(&original_before,&scan_identity)){close(scan);return 0;}DIR*stream=fdopendir(scan);if(!stream){close(scan);return 0;}unsigned seen=0;int ok=1;struct dirent*entry;errno=0;while((entry=readdir(stream))!=NULL){if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,".."))continue;size_t index;for(index=0;index<allowed_count;index++)if(!strcmp(entry->d_name,allowed[index]))break;if(index==allowed_count||index>=sizeof(unsigned)*8U||(seen&(1U<<index))){ok=0;break;}seen|=1U<<index;}if(errno)ok=0;if(closedir(stream))ok=0;if(fstat(directory,&original_after)||!same_stat(&original_before,&original_after))ok=0;return ok&&(seen&required)==required;
+}
+static int diagnostic_ack(int reader){
+  struct timespec deadline;if(!start_absolute_deadline(&deadline))return 0;unsigned char byte;ssize_t n;for(;;){n=read(reader,&byte,1);if(n<0&&errno==EINTR)continue;if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){if(!wait_input_until(reader,&deadline))return 0;continue;}break;}if(deadline_remaining(&deadline)<=0||n!=1||byte!='X')return 0;for(;;){n=read(reader,&byte,1);if(n<0&&errno==EINTR)continue;if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){if(deadline_remaining(&deadline)<=0)return 0;struct timespec pause={0,1000000};while(nanosleep(&pause,&pause)&&errno==EINTR){}continue;}break;}return deadline_remaining(&deadline)>0&&n==0;
+}
+static int diagnostic_wait_eof(int reader){struct timespec deadline;if(!start_absolute_deadline(&deadline))return 0;unsigned char bytes[32];for(;;){if(deadline_remaining(&deadline)<=0)return 0;ssize_t n=read(reader,bytes,sizeof bytes);if(n==0)return 1;if(n>0){if(deadline_remaining(&deadline)<=0)return 0;continue;}if(errno==EINTR)continue;if(errno!=EAGAIN&&errno!=EWOULDBLOCK)return 0;if(deadline_remaining(&deadline)<=0)return 0;struct timespec pause={0,1000000};if(nanosleep(&pause,NULL)&&errno!=EINTR)return 0;}
+}
+static int
+diagnostic_close_fd(int fd);
+static int diagnostic_bind_listener(const State*s,int portal,struct stat*path_identity,struct stat*fd_identity,int*owned){*owned=-1;char name[35],path[104];if(!object_name(s,name))return 0;int pn=snprintf(path,sizeof path,NS "/a/%s/p/c",name);if(pn<=0||(size_t)pn>=sizeof path||(size_t)pn>=sizeof(((struct sockaddr_un*)0)->sun_path))return 0;int fd=socket(AF_UNIX,SOCK_STREAM,0);if(fd<0)return 0;*owned=fd;int one=1;if(fcntl(fd,F_SETFD,FD_CLOEXEC)||setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof one))return 0;struct sockaddr_un address;memset(&address,0,sizeof address);address.sun_family=AF_UNIX;strcpy(address.sun_path,path);struct stat rebound,descriptor;if(bind(fd,(struct sockaddr*)&address,(socklen_t)(offsetof(struct sockaddr_un,sun_path)+strlen(path)+1))||chown(path,0,CLIENT_GID)||chmod(path,0620)||listen(fd,16)||!flush_dir(portal)||fstat(fd,&descriptor)||!S_ISSOCK(descriptor.st_mode)||lstat(path,path_identity)||!S_ISSOCK(path_identity->st_mode)||path_identity->st_uid||path_identity->st_gid!=CLIENT_GID||(path_identity->st_mode&07777)!=0620||path_identity->st_nlink!=1||fstatat(portal,"c",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(path_identity,&rebound))return 0;*fd_identity=descriptor;return 1;
+}
+static int diagnostic_prepared_descriptors(int runtime,int writer,int listener,int portal,const State*s,const struct stat*listener_identity){if(runtime<3||writer<3||listener<3||portal<3||runtime==writer||runtime==listener||writer==listener)return 0;int rf=fcntl(runtime,F_GETFD),wf=fcntl(writer,F_GETFD),lf=fcntl(listener,F_GETFD),ra=fcntl(runtime,F_GETFL),wa=fcntl(writer,F_GETFL),la=fcntl(listener,F_GETFL);if(rf<0||wf<0||lf<0||ra<0||wa<0||la<0||!(rf&FD_CLOEXEC)||!(wf&FD_CLOEXEC)||!(lf&FD_CLOEXEC)||(ra&O_ACCMODE)!=O_RDONLY||(wa&O_ACCMODE)!=O_WRONLY||(la&O_ACCMODE)!=O_RDWR)return 0;struct stat r,w,l,named,rebound,before;if(fstat(runtime,&r)||fstat(writer,&w)||!S_ISDIR(r.st_mode)||!S_ISFIFO(w.st_mode)||(unsigned long long)r.st_dev!=s->runtime_dev||(unsigned long long)r.st_ino!=s->runtime_ino||(unsigned long long)w.st_dev!=s->fifo_dev||(unsigned long long)w.st_ino!=s->fifo_ino)return 0;char name[35],path[104];if(!object_name(s,name))return 0;int pn=snprintf(path,sizeof path,NS "/a/%s/p/c",name);if(pn<=0||(size_t)pn>=sizeof path||fstatat(portal,"c",&before,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return 0;struct sockaddr_un address;socklen_t length=sizeof address;memset(&address,0,sizeof address);struct socket_fdinfo info;memset(&info,0,sizeof info);int got=proc_pidfdinfo(getpid(),listener,PROC_PIDFDSOCKETINFO,&info,sizeof info);return !getsockname(listener,(struct sockaddr*)&address,&length)&&address.sun_family==AF_UNIX&&!strcmp(address.sun_path,path)&&got==(int)sizeof info&&info.psi.soi_family==AF_UNIX&&info.psi.soi_type==SOCK_STREAM&&info.psi.soi_kind==SOCKINFO_UN&&(info.psi.soi_options&SO_ACCEPTCONN)&&!strcmp(info.psi.soi_proto.pri_un.unsi_addr.ua_sun.sun_path,path)&&!lstat(path,&named)&&!fstatat(portal,"c",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&before,&named)&&same_stat(&named,&rebound)&&S_ISSOCK(named.st_mode)&&(unsigned long long)named.st_dev==s->socket_dev&&(unsigned long long)named.st_ino==s->socket_ino&&named.st_uid==0&&named.st_gid==CLIENT_GID&&(named.st_mode&07777)==0620&&named.st_nlink==1&&!fstat(listener,&l)&&S_ISSOCK(l.st_mode)&&l.st_dev==listener_identity->st_dev&&l.st_ino==listener_identity->st_ino;
+}
+static int diagnostic_close_fd(int fd){
+  if(close(fd)==0)return 1;int saved=errno,probe=fcntl(fd,F_GETFD);if(probe<0&&errno==EBADF){errno=saved;return 1;}if(probe<0){errno=saved;return 0;}if(close(fd)==0){errno=saved;return 1;}saved=errno;int closed=fcntl(fd,F_GETFD)<0&&errno==EBADF;errno=saved;return closed;
+}
+static int diagnostic_release(int*fd){if(*fd<0)return 1;int value=*fd;if(!diagnostic_close_fd(value))return 0;*fd=-1;return 1;}
+static int diagnostic_remove_owned_temp(Store*t,const struct stat*owned){
+  struct stat named;if(fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!S_ISREG(named.st_mode)||named.st_dev!=owned->st_dev||named.st_ino!=owned->st_ino||named.st_nlink!=1)return 0;if(unlinkat(t->s,".current.tmp",AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE)||!flush_dir(t->s))return 0;if(fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0||errno!=ENOENT)return 0;return 1;
+}
+static int diagnostic_same_file(const struct stat*a,const struct stat*b){
+  return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&a->st_nlink==b->st_nlink&&a->st_size==b->st_size;
+}
+static int diagnostic_current_equals(Store*t,const State*s,const struct stat*owned){
+  char expected[4096];int expected_n=state_bytes(s,expected,sizeof expected);unsigned char*raw=NULL;size_t n=0;struct stat identity;int found=read_named(t->s,"current",&raw,&n,&identity);int ok=expected_n>0&&found==1&&n==(size_t)expected_n&&!memcmp(raw,expected,n)&&(!owned||diagnostic_same_file(owned,&identity))&&diagnostic_exact_names(t->s,(const char*const[]){"lock","current"},2,3U);free(raw);return ok;
+}
+static int diagnostic_prior_state(Store*t,int absent,const State*last){
+  if(absent){State ignored;return state_present(t,&ignored)==0&&diagnostic_exact_names(t->s,(const char*const[]){"lock"},1,1U);}return diagnostic_current_equals(t,last,NULL);
+}
+static int diagnostic_put_state(Store*t,const State*s,int absent,State*last,State*reportable){
+  char raw[4096];int n=state_bytes(s,raw,sizeof raw);if(n<=0||(size_t)n>=sizeof raw)return -1;int fd=openat(t->s,".current.tmp",O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE,0444);if(fd<0)return -1;struct stat owned,ready,retained,named;if(fstat(fd,&owned)){int identified=!fstatat(t->s,".current.tmp",&owned,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&S_ISREG(owned.st_mode)&&owned.st_uid==0&&owned.st_gid==0&&(owned.st_mode&07777)==0400&&owned.st_nlink==1&&owned.st_size==0;int closed=diagnostic_release(&fd),removed=identified&&diagnostic_remove_owned_temp(t,&owned),prior=removed&&diagnostic_prior_state(t,absent,last);return closed&&prior?0:-1;}int complete=S_ISREG(owned.st_mode)&&owned.st_nlink==1&&write_all(fd,raw,(size_t)n)&&!fsync(fd)&&!fchown(fd,0,0)&&!fchmod(fd,0444)&&!fsync(fd)&&!fstat(fd,&ready)&&S_ISREG(ready.st_mode)&&ready.st_uid==0&&ready.st_gid==0&&(ready.st_mode&07777)==0444&&ready.st_nlink==1&&ready.st_size==(off_t)n&&ready.st_dev==owned.st_dev&&ready.st_ino==owned.st_ino&&!fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&ready,&named);if(complete)owned=ready;if(!complete){int closed=diagnostic_release(&fd),removed=diagnostic_remove_owned_temp(t,&owned),prior=removed&&diagnostic_prior_state(t,absent,last);return closed&&prior?0:-1;}unsigned flags=RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH|(absent?RENAME_EXCL:0);int renamed=renameatx_np(t->s,".current.tmp",t->s,"current",flags)==0;int retained_ok=!fstat(fd,&retained)&&diagnostic_same_file(&owned,&retained);if(!retained_ok)retained_ok=!fstat(fd,&retained)&&diagnostic_same_file(&owned,&retained);int committed=diagnostic_current_equals(t,s,&owned);if(!committed)committed=diagnostic_current_equals(t,s,&owned);if(committed){int first_flush=flush_dir(t->s),durable=first_flush||flush_dir(t->s);*last=*s;int closed=diagnostic_release(&fd),classified=retained_ok&&durable&&closed;if(classified)*reportable=*s;else return -1;return renamed&&first_flush?1:2;}int temp=fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH);if(!renamed&&temp==0&&same_stat(&owned,&named)){int closed=diagnostic_release(&fd),removed=diagnostic_remove_owned_temp(t,&owned),prior=removed&&diagnostic_prior_state(t,absent,last);return closed&&prior?0:-1;}diagnostic_release(&fd);return -1;
+}
+static int diagnostic_create_runtime_object(Store*t,const Request*request,State*last,State*reportable,int*unwound){
+  int object=-1,hidden=-1,runtime=-1,reader=-1,writer=-1,portal=-1,listener=-1;unsigned char*python=NULL;size_t python_n=0;int ok=0,pre_release_ok=1;struct stat runtime_stat,fifo_stat,portal_stat,socket_stat,listener_fd_stat,python_stat;State s;memset(&s,0,sizeof s);strcpy(s.phase,"RESERVING");random_hex(s.runtime,16);strcpy(s.create_nonce,request->nonce);char capability[65];random_hex(capability,32);unsigned char capraw[32];if(!hex_bytes(capability,capraw,32))goto done;digest(capraw,sizeof capraw,s.cap);s.sequence=next_sequence(t);int diagnostic_state_result=s.sequence==2?diagnostic_put_state(t,&s,1,last,reportable):-1;if(diagnostic_state_result!=1)goto done;
+  char name[35];if(!object_name(&s,name))goto done;object=create_dir_owned(t->c,name,0,0,0700);if(object<0)goto done;struct stat object_stat;if(fstat(object,&object_stat))goto done;s.object_dev=(unsigned long long)object_stat.st_dev;s.object_ino=(unsigned long long)object_stat.st_ino;strcpy(s.phase,"CREATING");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;
+  hidden=create_dir_owned(object,"h",0,0,0700);if(hidden<0)goto done;runtime=create_dir_owned(hidden,"r",CLIENT_UID,CLIENT_GID,0700);if(runtime<0||mkfifoat(hidden,"l",0600))goto done;reader=openat(hidden,"l",O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);writer=openat(hidden,"l",O_WRONLY|O_NONBLOCK|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);struct stat fifo_rebound;if(reader<0||writer<0||fchown(reader,0,0)||fchmod(reader,0600)||fstat(runtime,&runtime_stat)||fstat(writer,&fifo_stat)||fstatat(hidden,"l",&fifo_rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&fifo_stat,&fifo_rebound)||!S_ISFIFO(fifo_stat.st_mode)||fifo_stat.st_uid||fifo_stat.st_gid||(fifo_stat.st_mode&07777)!=0600||fifo_stat.st_nlink!=1||!flush_dir(hidden))goto done;
+  portal=create_dir_owned(object,"p",0,CLIENT_GID,0700);const char*object_members[]={"h","p"},*hidden_members[]={"r","l"},*portal_members[]={"python"};if(portal<0||!load_private_python(&python,&python_n)||!create_python(portal,python,python_n,&python_stat)||!exact_names(hidden,hidden_members,2,3U)||!exact_names(portal,portal_members,1,1U)||!exact_names(object,object_members,2,3U)||!flush_dir(portal)||!flush_dir(hidden)||fchmod(portal,0550)||fsync(portal)||fchmod(object,0555)||fsync(object)||!flush_dir(t->c)||fstat(portal,&portal_stat))goto done;
+  s.runtime_dev=(unsigned long long)runtime_stat.st_dev;s.runtime_ino=(unsigned long long)runtime_stat.st_ino;s.fifo_dev=(unsigned long long)fifo_stat.st_dev;s.fifo_ino=(unsigned long long)fifo_stat.st_ino;s.portal_dev=(unsigned long long)portal_stat.st_dev;s.portal_ino=(unsigned long long)portal_stat.st_ino;strcpy(s.phase,"PUBLISHING");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;if(renameatx_np(t->c,name,t->a,name,RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH)||!flush_dir(t->c)||!flush_dir(t->a))goto done;
+  strcpy(s.phase,"PREPARING");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;if(!diagnostic_bind_listener(&s,portal,&socket_stat,&listener_fd_stat,&listener))goto done;if(listener<0)goto done;s.socket_dev=(unsigned long long)socket_stat.st_dev;s.socket_ino=(unsigned long long)socket_stat.st_ino;strcpy(s.phase,"PREPARED");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;
+  char runtime_path[256],fifo_path[256],body[1024];snprintf(runtime_path,sizeof runtime_path,NS "/a/%s/h/r",name);snprintf(fifo_path,sizeof fifo_path,NS "/a/%s/h/l",name);if(!descriptor_path_exact(runtime,runtime_path)||!descriptor_path_exact(writer,fifo_path))goto done;int bn=snprintf(body,sizeof body,"{\"fifo_dev\":%llu,\"fifo_ino\":%llu,\"listener_fd_dev\":%lld,\"listener_fd_ino\":%llu,\"operation\":\"create-phase-diagnostic-prepared-v1\",\"reached_phase\":\"PREPARED\",\"request_nonce\":\"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b\",\"runtime_dev\":%llu,\"runtime_id\":\"%s\",\"runtime_ino\":%llu,\"schema_version\":1,\"socket_dev\":%llu,\"socket_ino\":%llu,\"transaction_sequence\":2}",s.fifo_dev,s.fifo_ino,(long long)listener_fd_stat.st_dev,(unsigned long long)listener_fd_stat.st_ino,s.runtime_dev,s.runtime,s.runtime_ino,s.socket_dev,s.socket_ino);if(bn<=0||(size_t)bn>=sizeof body||!diagnostic_prepared_descriptors(runtime,writer,listener,portal,&s,&listener_fd_stat)||!send_prepared(0,body,runtime,writer,listener))goto done;
+  if(!diagnostic_release(&runtime))pre_release_ok=0;if(!diagnostic_release(&listener))pre_release_ok=0;if(!diagnostic_release(&writer))pre_release_ok=0;if(!diagnostic_release(&portal))pre_release_ok=0;if(!diagnostic_release(&hidden))pre_release_ok=0;if(!diagnostic_release(&object))pre_release_ok=0;if(!pre_release_ok)goto done;int diagnostic_ack_ok=diagnostic_ack(reader);if(!diagnostic_ack_ok){(void)diagnostic_wait_eof(reader);goto done;}ok=1;
+done:free(python);int unwind_ok=pre_release_ok;if(!diagnostic_release(&listener))unwind_ok=0;if(!diagnostic_release(&portal))unwind_ok=0;if(!diagnostic_release(&writer))unwind_ok=0;if(!diagnostic_release(&runtime))unwind_ok=0;if(!diagnostic_release(&hidden))unwind_ok=0;if(object>=0&&!strcmp(last->phase,"CREATING")&&(fchmod(object,0700)||fsync(object)||!flush_dir(t->c)))unwind_ok=0;if(!diagnostic_release(&object))unwind_ok=0;if(!diagnostic_release(&reader))unwind_ok=0;*unwound=unwind_ok;return ok&&unwind_ok;
+}
+
+typedef struct{struct stat ns,a,c,q,r,s,lock;} DiagnosticStoreIdentity;
+static int diagnostic_identity8_equal(const struct stat*a,const struct stat*b){
+  return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&a->st_nlink==b->st_nlink&&a->st_size==b->st_size&&a->st_flags==b->st_flags;
+}
+static int diagnostic_directory_shape(const struct stat*s,unsigned long links){
+  return S_ISDIR(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0555&&s->st_nlink==links;
+}
+static int diagnostic_store_identity(Store*t,DiagnosticStoreIdentity*identity,const DiagnosticStoreIdentity*expected){
+  struct stat named;if(fstat(t->ns,&identity->ns)||fstat(t->a,&identity->a)||fstat(t->c,&identity->c)||fstat(t->q,&identity->q)||fstat(t->r,&identity->r)||fstat(t->s,&identity->s)||fstat(t->lock,&identity->lock))return 0;if(!diagnostic_directory_shape(&identity->ns,7)||!diagnostic_directory_shape(&identity->a,2)||!diagnostic_directory_shape(&identity->c,2)||!diagnostic_directory_shape(&identity->q,2)||!diagnostic_directory_shape(&identity->r,3)||!diagnostic_directory_shape(&identity->s,3)||!S_ISREG(identity->lock.st_mode)||identity->lock.st_uid||identity->lock.st_gid||(identity->lock.st_mode&07777)!=0600||identity->lock.st_nlink!=1||identity->lock.st_size)return 0;if(lstat(NS,&named)||!same_stat(&identity->ns,&named))return 0;const char*names[]={"a","c","q","r","s"};const struct stat*values[]={&identity->a,&identity->c,&identity->q,&identity->r,&identity->s};for(size_t i=0;i<5;i++)if(fstatat(t->ns,names[i],&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(values[i],&named))return 0;if(fstatat(t->s,"lock",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&identity->lock,&named))return 0;if(!expected)return 1;const struct stat*observed[]={&identity->ns,&identity->a,&identity->c,&identity->q,&identity->r,&identity->s,&identity->lock};const struct stat*prior[]={&expected->ns,&expected->a,&expected->c,&expected->q,&expected->r,&expected->s,&expected->lock};for(size_t i=0;i<7;i++)if(!diagnostic_identity8_equal(observed[i],prior[i]))return 0;return 1;
+}
+static int diagnostic_predecessor_open(Store*t,struct stat*identity,DiagnosticStoreIdentity*store_identity){
+  const char*fixed[]={"a","c","q","r","s"},*lock_names[]={"lock"},*last_names[]={"last"};unsigned char*raw=NULL;size_t n=0;Receipt receipt;int fd=-1,ok=diagnostic_store_identity(t,store_identity,NULL)&&diagnostic_exact_names(t->ns,fixed,5,31U)&&diagnostic_exact_names(t->a,NULL,0,0)&&diagnostic_exact_names(t->c,NULL,0,0)&&diagnostic_exact_names(t->q,NULL,0,0)&&diagnostic_exact_names(t->r,last_names,1,1U)&&diagnostic_exact_names(t->s,lock_names,1,1U);if(ok)fd=stable_named_fd(t->r,"last",O_RDONLY,0,0,0444,sizeof diagnostic_predecessor-1,&raw,&n,identity);ok=fd>=0&&n==sizeof diagnostic_predecessor-1&&!memcmp(raw,diagnostic_predecessor,n)&&parse_receipt_raw(raw,n,&receipt)&&receipt.sequence==1;free(raw);if(!ok&&fd>=0){close(fd);fd=-1;}return fd;
+}
+static int diagnostic_predecessor_same(Store*t,int fd,const struct stat*identity){
+  unsigned char*raw=NULL;size_t n=0;struct stat retained,named;int ok=stable_read_fd(fd,sizeof diagnostic_predecessor-1,&raw,&n,&retained)&&same_stat(identity,&retained)&&n==sizeof diagnostic_predecessor-1&&!memcmp(raw,diagnostic_predecessor,n)&&!fstatat(t->r,"last",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);free(raw);return ok;
+}
+static int diagnostic_predecessor_unlinked(int fd,const struct stat*identity){
+  struct stat after;return !fstat(fd,&after)&&identity->st_dev==after.st_dev&&identity->st_ino==after.st_ino&&identity->st_mode==after.st_mode&&identity->st_uid==after.st_uid&&identity->st_gid==after.st_gid&&identity->st_size==after.st_size&&identity->st_nlink==1&&after.st_nlink==0;
+}
+static int diagnostic_store_fds_only(const Store*t){
+  const int wanted[]={0,t->ns,t->a,t->c,t->q,t->r,t->s,t->lock};struct proc_fdinfo list[17];memset(list,0,sizeof list);errno=0;int got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)sizeof list);if(got!=8*(int)sizeof(struct proc_fdinfo)||errno)return 0;unsigned seen=0;for(int i=0;i<8;i++){int match=-1;for(int j=0;j<8;j++)if(list[i].proc_fd==wanted[j]){match=j;break;}if(match<0||(seen&(1U<<(unsigned)match)))return 0;seen|=1U<<(unsigned)match;}return seen==255U;
+}
+static int diagnostic_final(Store*t,const State*created,int early,const DiagnosticStoreIdentity*initial,char receipt_sha[65]){
+  const char*fixed[]={"a","c","q","r","s"},*lock_names[]={"lock"},*last_names[]={"last"};DiagnosticStoreIdentity final_identity;if(!diagnostic_store_identity(t,&final_identity,initial)||!diagnostic_exact_names(t->ns,fixed,5,31U)||!diagnostic_exact_names(t->a,NULL,0,0)||!diagnostic_exact_names(t->c,NULL,0,0)||!diagnostic_exact_names(t->q,NULL,0,0)||!diagnostic_exact_names(t->r,last_names,1,1U)||!diagnostic_exact_names(t->s,lock_names,1,1U))return 0;State absent;if(state_present(t,&absent)!=0)return 0;Receipt receipt;unsigned char*raw=NULL;size_t n=0;int found=last_present(t,&receipt,&raw,&n);if(found!=1)return 0;int ok=0;if(early){ok=n==sizeof diagnostic_predecessor-1&&!memcmp(raw,diagnostic_predecessor,n)&&receipt.sequence==1;}else{Receipt expected;memset(&expected,0,sizeof expected);strcpy(expected.runtime,created->runtime);strcpy(expected.cap,created->cap);strcpy(expected.create_nonce,"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b");strcpy(expected.cleanup_nonce,"0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417");expected.sequence=2;char exact[2048];int exact_n=receipt_bytes(&expected,exact,sizeof exact);ok=exact_n==432&&n==432&&!memcmp(raw,exact,n)&&receipt.sequence==2&&!strcmp(receipt.create_nonce,expected.create_nonce)&&!strcmp(receipt.cleanup_nonce,expected.cleanup_nonce)&&!strcmp(receipt.runtime,expected.runtime)&&!strcmp(receipt.cap,expected.cap)&&!strcmp(receipt.effect,expected.effect);}if(ok)digest(raw,n,receipt_sha);free(raw);return ok;
+}
+static int process_diagnostic(Store*t,const Request*r){
+  struct stat predecessor_identity;DiagnosticStoreIdentity store_identity;int predecessor=diagnostic_predecessor_open(t,&predecessor_identity,&store_identity);if(predecessor<0||strcmp(r->operation,"create-phase-diagnostic-v1")||strcmp(r->nonce,"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b")||*r->capability){if(predecessor>=0)close(predecessor);return 1;}State created,reportable;memset(&created,0,sizeof created);memset(&reportable,0,sizeof reportable);int unwound=0,prepared_ack=diagnostic_create_runtime_object(t,r,&created,&reportable,&unwound);State current;int present=state_present(t,&current),phase=phase_index(created.phase);int self=present==1&&phase>=0&&phase<=4&&created.sequence==2&&!strcmp(created.create_nonce,r->nonce)&&!*created.cleanup_nonce&&state_tx_equal(&created,&current)&&state_ids_equal(&created,&current)&&!strcmp(created.phase,current.phase)&&!*current.cleanup_nonce&&validate_store_shape(t,&current,NULL);if(!self){close(predecessor);return 1;}int classified=state_tx_equal(&created,&reportable)&&state_ids_equal(&created,&reportable)&&!strcmp(created.phase,reportable.phase),result_eligible=classified&&unwound&&((phase<4&&!prepared_ack)||(phase==4&&prepared_ack));char reached[16];strcpy(reached,created.phase);int early=phase<=1;Request recovery;memset(&recovery,0,sizeof recovery);strcpy(recovery.nonce,"0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417");const char*reason="INCOMPLETE_IDENTITY";if(!recover_with_create(t,&current,&recovery,&reason)){close(predecessor);return 1;}char receipt_sha[65];int final=(early?diagnostic_predecessor_same(t,predecessor,&predecessor_identity):diagnostic_predecessor_unlinked(predecessor,&predecessor_identity))&&diagnostic_final(t,&created,early,&store_identity,receipt_sha);if(close(predecessor))final=0;if(!final||!diagnostic_store_fds_only(t)||!result_eligible)return 1;unsigned long long receipt_sequence=early?1ULL:2ULL;char body[1024];int n=snprintf(body,sizeof body,"{\"cleanup_request_nonce\":\"0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417\",\"operation\":\"create-phase-diagnostic-result-v1\",\"reached_phase\":\"%s\",\"receipt_sequence\":%llu,\"receipt_sha256\":\"%s\",\"request_nonce\":\"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b\",\"runtime_id\":\"%s\",\"schema_version\":1,\"transaction_sequence\":2,\"zero_runtime_residue\":true}",reached,receipt_sequence,receipt_sha,created.runtime);return n>0&&(size_t)n<sizeof body&&json_frame(0,body)?0:1;
+}
+
+static int process_create(Store*t,const Request*r){
+  State current;int present=state_present(t,&current);if(present<0)return 1;if(!present){int terminal=recover_terminal_create(t,r);if(terminal<0)return 1;if(terminal==2)return 1;if(!validate_idle_store(t))return 1;}if(present&&!validate_store_shape(t,&current,NULL))return 1;int replay=nonce_replayed(t,present?&current:NULL,r->nonce);if(replay<0)return 1;if(replay)return error_frame(0,r->nonce,"REPLAY")?1:1;
+  if(present){const char*reason="INCOMPLETE_IDENTITY";int recovered=recover_with_create(t,&current,r,&reason);error_frame(0,r->nonce,recovered?reason:reason);return 1;}
+  return create_runtime_object(t,r)?0:1;
+}
+static int process_cleanup(Store*t,const Request*r,RecoveryContinuation*continuation){
+  State current;int present=state_present(t,&current);if(present<0)return 1;if(!present){memset(continuation,0,sizeof *continuation);int handled=0,rc=recover_terminal_cleanup(t,r,&handled);if(handled)return rc;if(!validate_idle_store(t))return 1;int replay=nonce_replayed(t,NULL,r->nonce);if(replay<0)return 1;if(replay){error_frame(0,r->nonce,"REPLAY");return 1;}error_frame(0,r->nonce,"INVALID_CAPABILITY");return 1;}int receipt_temp_present=0;if(!validate_store_shape(t,&current,&receipt_temp_present)){memset(continuation,0,sizeof *continuation);return 1;}int recovery_continuation=continuation_matches(continuation,&current,r);memset(continuation,0,sizeof *continuation);int temp_continuation=receipt_temp_present&&!strcmp(current.cleanup_nonce,r->nonce);if(recovery_continuation&&receipt_temp_present)return 1;if(!temp_continuation&&!recovery_continuation){int replay=nonce_replayed(t,&current,r->nonce);if(replay<0)return 1;if(replay){error_frame(0,r->nonce,"REPLAY");return 1;}}if(!current_capability(&current,r->capability)){error_frame(0,r->nonce,"INVALID_CAPABILITY");return 1;}if(receipt_temp_present&&!temp_continuation){error_frame(0,r->nonce,"CAPACITY");return 1;}if(strcmp(current.phase,"ACTIVE")&&strcmp(current.phase,"QUARANTINING")&&strcmp(current.phase,"CLEANING")){error_frame(0,r->nonce,"INVALID_CAPABILITY");return 1;}
+  const char*reason="INCOMPLETE_IDENTITY";int reader=-1,eof=fifo_eof_for(t,&current,&reader,&reason);if(eof==0){error_frame(0,r->nonce,"LEASE_LIVE");return 1;}if(eof<0){error_frame(0,r->nonce,reason);return 1;}if(!receipt_temp_present&&!recovery_continuation){strcpy(current.cleanup_nonce,r->nonce);if(!strcmp(current.phase,"CLEANING")){if(!put_state(t,&current,0)){if(reader>=0)close(reader);error_frame(0,r->nonce,"INCOMPLETE_IDENTITY");return 1;}}else if(!quarantine(t,&current,&reason)){if(reader>=0)close(reader);error_frame(0,r->nonce,reason);return 1;}}
+  char receipt[65];if(!finish_cleanup(t,&current,&reader,&reason,receipt)){if(reader>=0)close(reader);error_frame(0,r->nonce,reason);return 1;}if(reader>=0)close(reader);char body[512];snprintf(body,sizeof body,"{\"operation\":\"cleanup-result-v1\",\"receipt_sha256\":\"%s\",\"request_nonce\":\"%s\",\"runtime_id\":\"%s\",\"schema_version\":1}",receipt,r->nonce,current.runtime);return json_frame(0,body)?0:1;
+}
+static int request_semantics(const Request*r,const char**reason){
+  if(!r->has_nonce||!lower_hex(r->nonce,64))return 0;if(!r->has_operation){*reason="INVALID_OPERATION";return -1;}if(strcmp(r->operation,"create-v1")&&strcmp(r->operation,"cleanup-v1")){*reason="INVALID_OPERATION";return -1;}
+  if(!strcmp(r->operation,"create-v1")){if(r->keys!=3||!r->has_nonce||!r->has_schema||!r->schema_one||r->has_capability){*reason="INVALID_KEYS";return -1;}return 1;}
+  if(r->keys!=4||!r->has_nonce||!r->has_schema||!r->schema_one||!r->has_capability){*reason="INVALID_KEYS";return -1;}if(!lower_hex(r->capability,64)){*reason="INVALID_CAPABILITY";return -1;}return 2;
+}
+static int mediator_boundary(void){
+  if(getuid()!=CLIENT_UID||getgid()!=CLIENT_GID||geteuid()!=0||getegid()!=CLIENT_GID)return 0;struct stat s;if(fstat(0,&s)||!S_ISSOCK(s.st_mode))return 0;int type=0;socklen_t tn=sizeof type;if(getsockopt(0,SOL_SOCKET,SO_TYPE,&type,&tn)||type!=SOCK_STREAM)return 0;struct sockaddr_un peer;socklen_t pn=sizeof peer;if(getpeername(0,(struct sockaddr*)&peer,&pn)||peer.sun_family!=AF_UNIX)return 0;uid_t uid=(uid_t)-1;gid_t gid=(gid_t)-1;if(getpeereid(0,&uid,&gid)||uid!=CLIENT_UID||gid!=CLIENT_GID)return 0;int one=1;struct timeval timeout={5,0};return setsockopt(0,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof one)==0&&setsockopt(0,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof timeout)==0;
+}
+static int close_inherited(void){
+  int bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0||bytes>(int)(sizeof(struct proc_fdinfo)*1048576U))return 0;size_t cap=(size_t)bytes+sizeof(struct proc_fdinfo)*16U;struct proc_fdinfo *list=malloc(cap?cap:sizeof *list);if(!list)return 0;int got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0||got%(int)sizeof *list){free(list);return 0;}size_t count=(size_t)got/sizeof *list;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0&&close(list[i].proc_fd)){free(list);return 0;}free(list);
+  struct proc_fdinfo final_list[17];got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,final_list,(int)sizeof final_list);return got==(int)sizeof *final_list&&final_list[0].proc_fd==0;
+}
+#if defined(H039_RUNTIME_PRESTORE_EXIT_DIAGNOSTIC)
+#define H039_R22_PATH "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-pre-effect-diagnostic-v1"
+enum {
+  H039_R22_INVALID_KEYS_FRAME_READY_NO_WRITE_PRESTORE_ZERO_EFFECT=0,
+  H039_R22_MAIN_ARGC=1,H039_R22_MAIN_ARGV_POINTER=2,H039_R22_MAIN_ARGV0_POINTER=3,H039_R22_MAIN_ARGV0_FIXED_DIAGNOSTIC_PATH=4,
+  H039_R22_BOUNDARY_RUID=5,H039_R22_BOUNDARY_RGID=6,H039_R22_BOUNDARY_EUID=7,H039_R22_BOUNDARY_EGID=8,
+  H039_R22_BOUNDARY_FD0_FSTAT=9,H039_R22_BOUNDARY_FD0_IS_SOCKET=10,H039_R22_BOUNDARY_SO_TYPE_GET=11,H039_R22_BOUNDARY_SO_TYPE_VALUE=12,
+  H039_R22_BOUNDARY_GETPEERNAME=13,H039_R22_BOUNDARY_PEER_FAMILY=14,H039_R22_BOUNDARY_GETPEEREID=15,H039_R22_BOUNDARY_PEER_UID=16,H039_R22_BOUNDARY_PEER_GID=17,
+  H039_R22_BOUNDARY_SO_NOSIGPIPE=18,H039_R22_BOUNDARY_SO_SNDTIMEO=19,H039_R22_CHDIR_ROOT=20,
+  H039_R22_FD_SCAN1_SIZE=21,H039_R22_FD_SCAN1_CAP=22,H039_R22_FD_SCAN1_ALLOC=23,H039_R22_FD_SCAN1_FETCH=24,H039_R22_FD_SCAN1_ALIGNMENT=25,H039_R22_FD_SCAN1_CLOSE_NONZERO=26,
+  H039_R22_FD_SCAN2_SIZE=27,H039_R22_FD_SCAN2_CAP=28,H039_R22_FD_SCAN2_ALLOC=29,H039_R22_FD_SCAN2_FETCH=30,H039_R22_FD_SCAN2_ALIGNMENT=31,H039_R22_FD_SCAN2_ONLY_ZERO=32,
+  H039_R22_RECEIVE_DEADLINE_START=33,H039_R22_PREFIX_DEADLINE_ERROR=34,H039_R22_PREFIX_DEADLINE_EXPIRED=35,H039_R22_PREFIX_POLL_ERROR=36,H039_R22_PREFIX_POLL_TIMEOUT=37,
+  H039_R22_PREFIX_POLL_REVENT_ERROR=38,H039_R22_PREFIX_POST_POLL_DEADLINE=39,H039_R22_PREFIX_RECVMSG_ERROR=40,H039_R22_PREFIX_PREMATURE_EOF=41,H039_R22_PREFIX_POST_RECV_DEADLINE=42,H039_R22_PREFIX_TRUNCATION=43,
+  H039_R22_FRAME_LENGTH=44,H039_R22_BODY_ALLOC=45,H039_R22_BODY_DEADLINE_ERROR=46,H039_R22_BODY_DEADLINE_EXPIRED=47,H039_R22_BODY_POLL_ERROR=48,H039_R22_BODY_POLL_TIMEOUT=49,
+  H039_R22_BODY_POLL_REVENT_ERROR=50,H039_R22_BODY_POST_POLL_DEADLINE=51,H039_R22_BODY_RECVMSG_ERROR=52,H039_R22_BODY_PREMATURE_EOF=53,H039_R22_BODY_POST_RECV_DEADLINE=54,H039_R22_BODY_TRUNCATION=55,
+  H039_R22_EOF_DEADLINE_ERROR=56,H039_R22_EOF_DEADLINE_EXPIRED=57,H039_R22_EOF_POLL_ERROR=58,H039_R22_EOF_POLL_TIMEOUT=59,H039_R22_EOF_POLL_REVENT_ERROR=60,H039_R22_EOF_POST_POLL_DEADLINE=61,
+  H039_R22_EOF_RECVMSG_ERROR=62,H039_R22_EOF_POST_RECV_DEADLINE=63,H039_R22_EOF_TRUNCATION=64,H039_R22_EOF_EXTRA_BYTE=65,H039_R22_EOF_ANCILLARY_PRESENT=66,
+  H039_R22_PARSE_REQUEST=67,H039_R22_REQUEST_SEMANTICS_ZERO=68,H039_R22_REQUEST_NOT_NEGATIVE_INVALID_KEYS=69,H039_R22_SEMANTIC_REASON_OR_CANONICAL_FRAME_MISMATCH=70
+};
+static int r22_boundary(void){
+  if(getuid()!=CLIENT_UID)return H039_R22_BOUNDARY_RUID;if(getgid()!=CLIENT_GID)return H039_R22_BOUNDARY_RGID;
+  if(geteuid()!=0)return H039_R22_BOUNDARY_EUID;if(getegid()!=CLIENT_GID)return H039_R22_BOUNDARY_EGID;
+  struct stat s;if(fstat(0,&s))return H039_R22_BOUNDARY_FD0_FSTAT;if(!S_ISSOCK(s.st_mode))return H039_R22_BOUNDARY_FD0_IS_SOCKET;
+  int type=0;socklen_t tn=sizeof type;if(getsockopt(0,SOL_SOCKET,SO_TYPE,&type,&tn))return H039_R22_BOUNDARY_SO_TYPE_GET;if(type!=SOCK_STREAM)return H039_R22_BOUNDARY_SO_TYPE_VALUE;
+  struct sockaddr_un peer;socklen_t pn=sizeof peer;if(getpeername(0,(struct sockaddr*)&peer,&pn))return H039_R22_BOUNDARY_GETPEERNAME;if(peer.sun_family!=AF_UNIX)return H039_R22_BOUNDARY_PEER_FAMILY;
+  uid_t uid=(uid_t)-1;gid_t gid=(gid_t)-1;if(getpeereid(0,&uid,&gid))return H039_R22_BOUNDARY_GETPEEREID;if(uid!=CLIENT_UID)return H039_R22_BOUNDARY_PEER_UID;if(gid!=CLIENT_GID)return H039_R22_BOUNDARY_PEER_GID;
+  int one=1;struct timeval timeout={5,0};if(setsockopt(0,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof one))return H039_R22_BOUNDARY_SO_NOSIGPIPE;if(setsockopt(0,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof timeout))return H039_R22_BOUNDARY_SO_SNDTIMEO;return 0;
+}
+static int r22_close_inherited(void){
+  int bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0)return H039_R22_FD_SCAN1_SIZE;if(bytes>(int)(sizeof(struct proc_fdinfo)*1048576U))return H039_R22_FD_SCAN1_CAP;
+  size_t cap=(size_t)bytes+sizeof(struct proc_fdinfo)*16U;struct proc_fdinfo*list=malloc(cap?cap:sizeof *list);if(!list)return H039_R22_FD_SCAN1_ALLOC;
+  int got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0){free(list);return H039_R22_FD_SCAN1_FETCH;}if(got%(int)sizeof *list){free(list);return H039_R22_FD_SCAN1_ALIGNMENT;}
+  size_t count=(size_t)got/sizeof *list;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0&&close(list[i].proc_fd)){free(list);return H039_R22_FD_SCAN1_CLOSE_NONZERO;}free(list);
+  bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0)return H039_R22_FD_SCAN2_SIZE;if(bytes>(int)(sizeof(struct proc_fdinfo)*16U))return H039_R22_FD_SCAN2_CAP;
+  cap=(size_t)bytes+sizeof(struct proc_fdinfo)*4U;list=malloc(cap?cap:sizeof *list);if(!list)return H039_R22_FD_SCAN2_ALLOC;
+  got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0){free(list);return H039_R22_FD_SCAN2_FETCH;}if(got%(int)sizeof *list){free(list);return H039_R22_FD_SCAN2_ALIGNMENT;}
+  count=(size_t)got/sizeof *list;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0){free(list);return H039_R22_FD_SCAN2_ONLY_ZERO;}free(list);return 0;
+}
+static void r22_ancillary(struct msghdr*msg,int*seen){
+  for(struct cmsghdr*c=CMSG_FIRSTHDR(msg);c;c=CMSG_NXTHDR(msg,c)){*seen=1;if(c->cmsg_level==SOL_SOCKET&&c->cmsg_type==SCM_RIGHTS){size_t bytes=c->cmsg_len>=CMSG_LEN(0)?c->cmsg_len-CMSG_LEN(0):0;int*fds=(int*)CMSG_DATA(c);for(size_t i=0;i<bytes/sizeof(int);i++)close(fds[i]);}}
+}
+static int r22_piece(int fd,unsigned char*dst,size_t n,int*ancillary,const struct timespec*deadline,int base){
+  size_t at=0;while(at<n){int remaining=deadline_remaining(deadline);if(remaining<0)return base;if(remaining==0)return base+1;
+    struct pollfd watched={fd,POLLIN|POLLHUP,0};int ready=poll(&watched,1,remaining);if(ready<0&&errno==EINTR)continue;if(ready<0)return base+2;if(ready==0)return base+3;if(watched.revents&(POLLERR|POLLNVAL))return base+4;
+    remaining=deadline_remaining(deadline);if(remaining<=0)return base+5;struct iovec iov={dst+at,n-at};unsigned char control[CMSG_SPACE(sizeof(int)*16)]={0};struct msghdr msg={0};msg.msg_iov=&iov;msg.msg_iovlen=1;msg.msg_control=control;msg.msg_controllen=sizeof control;
+    ssize_t q=recvmsg(fd,&msg,MSG_DONTWAIT);if(q<0&&(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK))continue;if(q<0)return base+6;if(q==0)return base+7;if(deadline_remaining(deadline)<=0)return base+8;r22_ancillary(&msg,ancillary);if(msg.msg_flags&(MSG_TRUNC|MSG_CTRUNC))return base+9;at+=(size_t)q;}return 0;
+}
+static int r22_receive(unsigned char**out,size_t*length){
+  struct timespec deadline;if(!start_absolute_deadline(&deadline))return H039_R22_RECEIVE_DEADLINE_START;unsigned char prefix[4],extra;int ancillary=0;
+  int status=r22_piece(0,prefix,4,&ancillary,&deadline,H039_R22_PREFIX_DEADLINE_ERROR);if(status)return status;uint32_t n=(uint32_t)prefix[0]<<24|(uint32_t)prefix[1]<<16|(uint32_t)prefix[2]<<8|prefix[3];if(n!=127U)return H039_R22_FRAME_LENGTH;
+  unsigned char*raw=malloc(n);if(!raw)return H039_R22_BODY_ALLOC;status=r22_piece(0,raw,n,&ancillary,&deadline,H039_R22_BODY_DEADLINE_ERROR);if(status){free(raw);return status;}
+  for(;;){int remaining=deadline_remaining(&deadline);if(remaining<0){free(raw);return H039_R22_EOF_DEADLINE_ERROR;}if(remaining==0){free(raw);return H039_R22_EOF_DEADLINE_EXPIRED;}
+    struct pollfd watched={0,POLLIN|POLLHUP,0};int ready=poll(&watched,1,remaining);if(ready<0&&errno==EINTR)continue;if(ready<0){free(raw);return H039_R22_EOF_POLL_ERROR;}if(ready==0){free(raw);return H039_R22_EOF_POLL_TIMEOUT;}if(watched.revents&(POLLERR|POLLNVAL)){free(raw);return H039_R22_EOF_POLL_REVENT_ERROR;}if(deadline_remaining(&deadline)<=0){free(raw);return H039_R22_EOF_POST_POLL_DEADLINE;}
+    struct iovec iov={&extra,1};unsigned char control[CMSG_SPACE(sizeof(int)*16)]={0};struct msghdr msg={0};msg.msg_iov=&iov;msg.msg_iovlen=1;msg.msg_control=control;msg.msg_controllen=sizeof control;ssize_t q=recvmsg(0,&msg,MSG_DONTWAIT);if(q<0&&(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK))continue;if(q<0){free(raw);return H039_R22_EOF_RECVMSG_ERROR;}if(deadline_remaining(&deadline)<=0){free(raw);return H039_R22_EOF_POST_RECV_DEADLINE;}r22_ancillary(&msg,&ancillary);if(msg.msg_flags&(MSG_TRUNC|MSG_CTRUNC)){free(raw);return H039_R22_EOF_TRUNCATION;}if(q!=0){free(raw);return H039_R22_EOF_EXTRA_BYTE;}if(ancillary){free(raw);return H039_R22_EOF_ANCILLARY_PRESENT;}break;}
+  *out=raw;*length=n;return 0;
+}
+static int mediator_main(int argc,char**argv){
+  if(argc!=1)return H039_R22_MAIN_ARGC;if(!argv)return H039_R22_MAIN_ARGV_POINTER;if(!argv[0])return H039_R22_MAIN_ARGV0_POINTER;if(strcmp(argv[0],H039_R22_PATH))return H039_R22_MAIN_ARGV0_FIXED_DIAGNOSTIC_PATH;
+  int status=r22_boundary();if(status)return status;static char*empty[]={NULL};environ=empty;if(chdir("/"))return H039_R22_CHDIR_ROOT;status=r22_close_inherited();if(status)return status;
+  unsigned char*raw=NULL;size_t n=0;status=r22_receive(&raw,&n);if(status)return status;static const unsigned char exact[]={"{\"operation\":\"create-v1\",\"request_nonce\":\"a4583df42239f5c1c383d260d92e17715fb8484cafa9e13660203e8263cdf501\",\"schema_version\":2}"};
+  Request request;if(n!=sizeof exact-1||memcmp(raw,exact,sizeof exact-1)||!parse_request(raw,n,&request)){free(raw);return H039_R22_PARSE_REQUEST;}free(raw);const char*reason="INVALID_KEYS";int operation=request_semantics(&request,&reason);if(operation==0)return H039_R22_REQUEST_SEMANTICS_ZERO;if(operation!=-1)return H039_R22_REQUEST_NOT_NEGATIVE_INVALID_KEYS;
+  static const char expected_body[]={"{\"operation\":\"error-v1\",\"reason\":\"INVALID_KEYS\",\"request_nonce\":\"a4583df42239f5c1c383d260d92e17715fb8484cafa9e13660203e8263cdf501\",\"schema_version\":1}"};char body[512];int body_n=snprintf(body,sizeof body,"{\"operation\":\"error-v1\",\"reason\":\"%s\",\"request_nonce\":\"%s\",\"schema_version\":1}",reason,request.nonce);unsigned char frame[4+sizeof expected_body-1];if(body_n!=(int)sizeof expected_body-1||strcmp(reason,"INVALID_KEYS")||memcmp(body,expected_body,sizeof expected_body)||sizeof expected_body-1!=150U)return H039_R22_SEMANTIC_REASON_OR_CANONICAL_FRAME_MISMATCH;frame[0]=0;frame[1]=0;frame[2]=0;frame[3]=150;memcpy(frame+4,body,150);static const unsigned char expected_prefix[4]={0,0,0,150};if(memcmp(frame,expected_prefix,4)||memcmp(frame+4,expected_body,150))return H039_R22_SEMANTIC_REASON_OR_CANONICAL_FRAME_MISMATCH;
+  return H039_R22_INVALID_KEYS_FRAME_READY_NO_WRITE_PRESTORE_ZERO_EFFECT;
+}
+#else
+static int mediator_main(int argc,char **argv){
+  if(argc!=1||!argv||!argv[0]||!mediator_boundary())return 1;static char*empty[]={NULL};environ=empty;if(chdir("/")||!close_inherited())return 1;umask(077);unsigned char*raw=NULL;size_t n=0;if(!receive_frame(0,&raw,&n))return 1;int exact_diagnostic=n==sizeof diagnostic_request-1&&!memcmp(raw,diagnostic_request,sizeof diagnostic_request-1);Request request;int parsed=parse_request(raw,n,&request);free(raw);if(!parsed)return 1;const char*semantic_reason="INVALID_KEYS";int operation=exact_diagnostic?3:request_semantics(&request,&semantic_reason);if(!operation)return 1;if(operation<0){error_frame(0,request.nonce,semantic_reason);return 1;}
+  Store store;RecoveryContinuation continuation;memset(&continuation,0,sizeof continuation);if(!open_store(&store)){close_store(&store);return 1;}if(!acquire_lock(store.lock)){int saved=errno;error_frame(0,request.nonce,(saved==EAGAIN||saved==EACCES)?"LOCK_BUSY":"UNSUPPORTED_PRIMITIVE");close_store(&store);return 1;}if(operation==3){int rc=process_diagnostic(&store,&request);close_store(&store);return rc;}if(!reconcile_state_temp(&store,&request,operation,&continuation)){close_store(&store);return 1;}int rc=operation==1?process_create(&store,&request):process_cleanup(&store,&request,&continuation);memset(&continuation,0,sizeof continuation);close_store(&store);return rc;
+}
+#endif
+#endif
+
+#ifdef H039_INSTALLER
+#define Q1(x) #x
+#define Q(x) Q1(x)
+
+static int canonical_absolute(const char *p){
+  if(!p)return 0;
+  size_t length=strlen(p);
+  if(length<sizeof("/install")-1||p[0]!='/'||p[length-1]=='/')return 0;
+  if(!strcmp(p+length-2,"/.")||!strcmp(p+length-3,"/.."))return 0;
+  if(strstr(p,"/./")!=NULL||strstr(p,"/../")!=NULL)return 0;
+  return strstr(p,"//")==NULL;
+}
+static int loaded_self(char path[4096],struct stat *identity,int *parent_fd){
+  uint32_t cap=4096;if(_NSGetExecutablePath(path,&cap)||!canonical_absolute(path))return 0;
+  char copy[4096];if(strlen(path)>=sizeof copy)return 0;strcpy(copy,path);char*slash=strrchr(copy,'/');if(!slash||strcmp(slash+1,"install"))return 0;*slash=0;
+  int parent=open(copy,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);if(parent<0)return 0;
+  int self=openat(parent,"install",O_RDONLY|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);struct stat a,b;if(self<0||fstat(self,&a)||fstatat(parent,"install",&b,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&a,&b)||!S_ISREG(a.st_mode)||a.st_nlink!=1){if(self>=0)close(self);close(parent);return 0;}
+  struct proc_regionwithpathinfo image={0};int got=proc_pidinfo(getpid(),PROC_PIDREGIONPATHINFO,(uint64_t)(uintptr_t)&main,&image,sizeof image);
+  int ok=got==(int)sizeof image&&image.prp_vip.vip_vi.vi_stat.vst_dev==(uint32_t)a.st_dev&&image.prp_vip.vip_vi.vi_stat.vst_ino==(uint64_t)a.st_ino&&strcmp(image.prp_vip.vip_path,path)==0;
+  close(self);if(!ok){close(parent);return 0;}*identity=a;*parent_fd=parent;return 1;
+}
+static int parent_dir(int child,uid_t uid,gid_t gid,mode_t mode){int fd=openat(child,"..",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat s;if(fd<0||fstat(fd,&s)||!S_ISDIR(s.st_mode)||s.st_uid!=uid||(gid!=(gid_t)-1&&s.st_gid!=gid)||(s.st_mode&07777)!=mode){if(fd>=0)close(fd);return -1;}return fd;}
+static int load_source(int project,uid_t uid,gid_t gid,mode_t mode,dev_t device,unsigned char **raw,size_t *length,struct stat *identity){
+  int fd=stable_named_fd(project,"verify/h039/runtime-cleanup-mediator",O_RDONLY,uid,gid,mode,4194304,raw,length,identity);if(fd<0)return errno==ENOENT?0:-1;if(identity->st_dev!=device||!*length){close(fd);free(*raw);*raw=NULL;return -1;}int ok=close(fd)==0;char sum[65];if(ok)digest(*raw,*length,sum);if(!ok||strcmp(sum,Q(H039_R15_MEDIATOR_SHA256))){free(*raw);*raw=NULL;return -1;}return 1;
+}
+static int load_embedded_mediator(unsigned char **raw,size_t *length){
+  unsigned long section_size=0;uint8_t *section=getsectiondata(&_mh_execute_header,"__H039RO","__h039med",&section_size);if(!section||section_size!=(unsigned long)H039_R15_MEDIATOR_SIZE||section_size==0)return 0;char sum[65];digest(section,(size_t)section_size,sum);if(strcmp(sum,Q(H039_R15_MEDIATOR_SHA256)))return 0;unsigned char *copy=malloc((size_t)section_size);if(!copy)return 0;memcpy(copy,section,(size_t)section_size);*raw=copy;*length=(size_t)section_size;return 1;
+}
+static int durable_fixed_dir_at(int parent,const char*name,uid_t uid,gid_t gid,mode_t mode){
+  int fd=fixed_dir_at(parent,name,uid,gid,mode);struct stat before,after,rebound;int ok=fd>=0;if(ok)ok=!fstat(fd,&before)&&!fsync(fd)&&flush_dir(parent)&&!fstat(fd,&after)&&same_stat(&before,&after)&&!fstatat(parent,name,&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&after,&rebound);if(!ok&&fd>=0){close(fd);fd=-1;}return fd;
+}
+static int validate_staging(int project,const struct stat*self,const struct stat*source){
+  uid_t uid=getuid();gid_t gid=(gid_t)-1;struct stat project_stat;if(fstat(project,&project_stat)||!S_ISDIR(project_stat.st_mode)||project_stat.st_uid!=uid||(project_stat.st_mode&07777)!=0700)return 0;
+  const char*project_names[]={"controller","verify"},*controller_names[]={"runtime-cleanup"},*runtime_names[]={"install"},*verify_names[]={"h039"},*h039_names[]={"runtime-cleanup-mediator"};if(!exact_names(project,project_names,2,3U))return 0;
+  int controller=fixed_dir_at(project,"controller",uid,gid,0755),verify=fixed_dir_at(project,"verify",uid,gid,0755),runtime=-1,h039=-1,self_fd=-1,source_fd=-1;int ok=controller>=0&&verify>=0;if(ok){runtime=fixed_dir_at(controller,"runtime-cleanup",uid,gid,0755);h039=fixed_dir_at(verify,"h039",uid,gid,0755);ok=runtime>=0&&h039>=0;}struct stat self_named,source_named;if(ok)ok=exact_names(controller,controller_names,1,1U)&&exact_names(runtime,runtime_names,1,1U)&&exact_names(verify,verify_names,1,1U)&&exact_names(h039,h039_names,1,1U);if(ok){self_fd=stable_named_fd(runtime,"install",O_RDONLY,uid,gid,0755,4194304,NULL,NULL,&self_named);source_fd=stable_named_fd(h039,"runtime-cleanup-mediator",O_RDONLY,uid,gid,0555,4194304,NULL,NULL,&source_named);ok=self_fd>=0&&source_fd>=0&&same_stat(self,&self_named)&&same_stat(source,&source_named);}if(self_fd>=0&&close(self_fd))ok=0;if(source_fd>=0&&close(source_fd))ok=0;if(runtime>=0&&close(runtime))ok=0;if(h039>=0&&close(h039))ok=0;if(controller>=0&&close(controller))ok=0;if(verify>=0&&close(verify))ok=0;return ok;
+}
+static int validate_bootstrap_staging(int project,const struct stat*self){
+  struct stat project_before,project_after;if(fstat(project,&project_before)||!S_ISDIR(project_before.st_mode)||project_before.st_uid||project_before.st_gid||(project_before.st_mode&07777)!=0700||fsync(project)||fstat(project,&project_after)||!same_stat(&project_before,&project_after))return 0;const char*project_names[]={"controller","mediator"},*controller_names[]={"runtime-cleanup"},*runtime_names[]={"install"};if(!exact_names(project,project_names,2,1U))return 0;int controller=durable_fixed_dir_at(project,"controller",0,0,0700),runtime=-1,self_fd=-1;int ok=controller>=0;if(ok){runtime=durable_fixed_dir_at(controller,"runtime-cleanup",0,0,0700);ok=runtime>=0&&exact_names(controller,controller_names,1,1U)&&exact_names(runtime,runtime_names,1,1U);}struct stat named,after,rebound;if(ok){self_fd=stable_named_fd(runtime,"install",O_RDONLY,0,0,0500,4194304,NULL,NULL,&named);ok=self_fd>=0&&same_stat(self,&named)&&!fsync(self_fd)&&flush_dir(runtime)&&!fstat(self_fd,&after)&&same_stat(&named,&after)&&!fstatat(runtime,"install",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&after,&rebound);}if(self_fd>=0&&close(self_fd))ok=0;if(runtime>=0&&close(runtime))ok=0;if(controller>=0&&close(controller))ok=0;return ok;
+}
+static int exact_regular_bytes(int parent,const char*name,mode_t mode,const unsigned char*raw,size_t n,struct stat*identity,int*opened){
+  unsigned char*first=NULL,*second=NULL;size_t first_n=0,second_n=0;struct stat before,after,rebound;int fd=stable_named_fd(parent,name,O_RDONLY,0,0,mode,4194304,&first,&first_n,&before);int ok=fd>=0&&first_n==n&&!memcmp(first,raw,n)&&!fsync(fd)&&flush_dir(parent)&&stable_read_fd(fd,4194304,&second,&second_n,&after)&&same_stat(&before,&after)&&second_n==n&&!memcmp(second,raw,n)&&!fstatat(parent,name,&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&after,&rebound);free(first);free(second);if(!ok){if(fd>=0)close(fd);return 0;}if(identity)*identity=after;if(opened)*opened=fd;else if(close(fd))return 0;return 1;
+}
+static int same_rename_identity(const struct stat*a,const struct stat*b){return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&a->st_nlink==b->st_nlink&&a->st_size==b->st_size;}
+static int make_final_directory(int parent,const char*name){
+  int existing=durable_fixed_dir_at(parent,name,0,0,0555);if(existing>=0){int ok=close(existing)==0;return ok;}if(errno!=ENOENT)return 0;mode_t previous=umask(0);if(previous!=077){umask(previous);return 0;}int made=mkdirat(parent,name,0555);mode_t during=umask(077);if(made||during!=0)return 0;int fd=durable_fixed_dir_at(parent,name,0,0,0555);int ok=fd>=0;if(fd>=0&&close(fd))ok=0;return ok;
+}
+static int ensure_lock(int state){struct stat identity,after,rebound;int fd=stable_named_fd(state,"lock",O_RDWR,0,0,0600,0,NULL,NULL,&identity);if(fd>=0){int ok=identity.st_size==0&&!fsync(fd)&&flush_dir(state)&&!fstat(fd,&after)&&same_stat(&identity,&after)&&!fstatat(state,"lock",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&after,&rebound);if(close(fd))ok=0;return ok;}if(errno!=ENOENT)return 0;fd=openat(state,"lock",O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE,0600);int ok=fd>=0&&!fchown(fd,0,0)&&!fchmod(fd,0600)&&!fsync(fd)&&!fstat(fd,&identity)&&identity.st_size==0&&S_ISREG(identity.st_mode)&&identity.st_uid==0&&identity.st_gid==0&&(identity.st_mode&07777)==0600&&identity.st_nlink==1&&!fstatat(state,"lock",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&identity,&rebound)&&flush_dir(state)&&!fstat(fd,&after)&&same_stat(&identity,&after)&&!fstatat(state,"lock",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&after,&rebound);if(fd>=0&&close(fd))ok=0;return ok;}
+static int stage_embedded_mediator(int project,const unsigned char*raw,size_t n){
+  struct stat named;if(fstatat(project,"mediator",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0){mode_t mode=named.st_mode&07777;if(mode!=0400&&mode!=04555)return 0;unsigned char*first=NULL,*second=NULL;size_t first_n=0,second_n=0;struct stat before,after,rebound;int fd=stable_named_fd(project,"mediator",O_RDONLY,0,0,mode,4194304,&first,&first_n,&before);int ok=fd>=0&&first_n<=n&&!memcmp(first,raw,first_n)&&!fsync(fd)&&flush_dir(project)&&stable_read_fd(fd,4194304,&second,&second_n,&after)&&same_stat(&before,&after)&&second_n==first_n&&!memcmp(second,raw,second_n)&&!fstatat(project,"mediator",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&after,&rebound);free(first);free(second);if(!ok){if(fd>=0)close(fd);return 0;}if(mode==04555){ok=first_n==n&&close(fd)==0;return ok;}if(first_n<n){if(close(fd)||unlinkat(project,"mediator",AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE)||!flush_dir(project))return 0;}else{struct stat ready;if(fchmod(fd,04555)||fsync(fd)||!flush_dir(project)||fstat(fd,&ready)||!S_ISREG(ready.st_mode)||ready.st_uid||ready.st_gid||(ready.st_mode&07777)!=04555||ready.st_nlink!=1||ready.st_size!=(off_t)n||fstatat(project,"mediator",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&ready,&rebound)){close(fd);return 0;}return close(fd)==0;}}
+  else if(errno!=ENOENT)return 0;
+  int fd=openat(project,"mediator",O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE,0400);if(fd<0)return 0;unsigned char*reloaded=NULL;size_t reloaded_n=0;struct stat durable,ready,rebound;int ok=!fchown(fd,0,0)&&!fchmod(fd,0400)&&write_all(fd,raw,n)&&!fsync(fd)&&stable_read_fd(fd,4194304,&reloaded,&reloaded_n,&durable)&&reloaded_n==n&&!memcmp(reloaded,raw,n)&&durable.st_uid==0&&durable.st_gid==0&&(durable.st_mode&07777)==0400&&durable.st_nlink==1&&!fstatat(project,"mediator",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&durable,&rebound);free(reloaded);if(ok)ok=!fchmod(fd,04555)&&!fsync(fd)&&flush_dir(project)&&!fstat(fd,&ready)&&(ready.st_mode&07777)==04555&&ready.st_dev==durable.st_dev&&ready.st_ino==durable.st_ino&&ready.st_uid==0&&ready.st_gid==0&&ready.st_nlink==1&&ready.st_size==(off_t)n&&!fstatat(project,"mediator",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&ready,&rebound);if(close(fd))ok=0;return ok;
+}
+static int installed_mediator_status(int helpers,const unsigned char*raw,size_t n){struct stat named;if(fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)){return errno==ENOENT?0:-1;}return exact_regular_bytes(helpers,"se.nortropic.runtime-cleanup-mediator",04555,raw,n,NULL,NULL)?1:-1;}
+static int publish_staged_mediator(int project,int helpers,const unsigned char*raw,size_t n){
+  int installed=installed_mediator_status(helpers,raw,n);if(installed<0)return 0;if(installed==1){struct stat staged;if(fstatat(project,"mediator",&staged,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0||errno!=ENOENT)return 0;if(!flush_dir(project)||fstatat(project,"mediator",&staged,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0||errno!=ENOENT)return 0;return installed_mediator_status(helpers,raw,n)==1;}struct stat staged,project_stat,helpers_stat;int fd=-1;if(!exact_regular_bytes(project,"mediator",04555,raw,n,&staged,&fd)||fstat(project,&project_stat)||fstat(helpers,&helpers_stat)||staged.st_dev!=project_stat.st_dev||staged.st_dev!=helpers_stat.st_dev){if(fd>=0)close(fd);return 0;}int flags=RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH;int ok=!renameatx_np(project,"mediator",helpers,"se.nortropic.runtime-cleanup-mediator",flags)&&flush_dir(project)&&flush_dir(helpers);struct stat retained,published;if(ok)ok=!fstat(fd,&retained)&&same_rename_identity(&staged,&retained)&&!fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&published)&&installed_mediator_status(helpers,raw,n)==1;if(close(fd))ok=0;return ok;
+}
+static int directory_prefix(int ns,int *prefix,int *has_lock){
+  const char*dirs[]={"a","c","q","r","s"};int count=0,missing=0,lock=0;for(size_t i=0;i<5;i++){int fd=durable_fixed_dir_at(ns,dirs[i],0,0,0555);if(fd<0){if(errno!=ENOENT)return 0;missing=1;continue;}if(missing){close(fd);return 0;}count++;if(i<4){if(!exact_empty(fd)){close(fd);return 0;}}else{const char*names[]={"lock"};if(!exact_names(fd,names,1,0)){close(fd);return 0;}struct stat value;if(fstatat(fd,"lock",&value,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0){int lock_fd=stable_named_fd(fd,"lock",O_RDWR,0,0,0600,0,NULL,NULL,&value);struct stat after,rebound;if(lock_fd<0||value.st_size!=0||fsync(lock_fd)||!flush_dir(fd)||fstat(lock_fd,&after)||!same_stat(&value,&after)||fstatat(fd,"lock",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&after,&rebound)){if(lock_fd>=0)close(lock_fd);close(fd);return 0;}lock=close(lock_fd)==0;}else if(errno!=ENOENT){close(fd);return 0;}}if(close(fd))return 0;}if(count<5&&lock)return 0;*prefix=count;*has_lock=lock;return 1;
+}
+static int remove_fixed_staging(int project){
+  unsigned leaf=AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE,dir_flags=AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH;const char*project_names[]={"controller"},*controller_names[]={"runtime-cleanup"},*runtime_names[]={"install"};if(!exact_names(project,project_names,1,1U))return 0;int controller=durable_fixed_dir_at(project,"controller",0,0,0700),runtime=-1,self=-1;if(controller<0)goto fail;runtime=durable_fixed_dir_at(controller,"runtime-cleanup",0,0,0700);if(runtime<0||!exact_names(controller,controller_names,1,1U)||!exact_names(runtime,runtime_names,1,1U))goto fail;struct stat identity,after,rebound;self=stable_named_fd(runtime,"install",O_RDONLY,0,0,0500,4194304,NULL,NULL,&identity);if(self<0||fsync(self)||!flush_dir(runtime)||fstat(self,&after)||!same_stat(&identity,&after)||fstatat(runtime,"install",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&after,&rebound))goto fail;if(close(self))goto fail;self=-1;if(unlinkat(runtime,"install",leaf)||!flush_dir(runtime)||close(runtime))goto fail;runtime=-1;if(unlinkat(controller,"runtime-cleanup",dir_flags)||!flush_dir(controller)||close(controller))goto fail;controller=-1;if(unlinkat(project,"controller",dir_flags)||!flush_dir(project))goto fail;return exact_empty(project);
+fail:if(self>=0)close(self);if(runtime>=0)close(runtime);if(controller>=0)close(controller);return 0;
+}
+
+typedef struct{int a,c,q,r,s,lock;} UpgradeGuard;
+static void upgrade_guard_init(UpgradeGuard*g){g->a=g->c=g->q=g->r=g->s=g->lock=-1;}
+static int upgrade_same_directory_object(const struct stat*a,const struct stat*b){return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&S_ISDIR(a->st_mode)&&S_ISDIR(b->st_mode);}
+static int upgrade_directory_shape(const struct stat*s){return S_ISDIR(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0555;}
+static int upgrade_rebound_dir(int ns,const char*name,int fd){struct stat retained,named;return fd>=0&&!fstat(fd,&retained)&&upgrade_directory_shape(&retained)&&!fstatat(ns,name,&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);}
+static int upgrade_lock_shape(const struct stat*s){return S_ISREG(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0600&&s->st_nlink==1&&s->st_size==0;}
+static int upgrade_guard_shape(int ns,const UpgradeGuard*g,int with_install){const char*staged[]={".install","a","c","q","r","s"},*final[]={"a","c","q","r","s"},*lock_names[]={"lock"};struct stat retained,named;if(with_install){if(!exact_names(ns,staged,6,63U))return 0;}else if(!exact_names(ns,final,5,31U))return 0;return upgrade_rebound_dir(ns,"a",g->a)&&upgrade_rebound_dir(ns,"c",g->c)&&upgrade_rebound_dir(ns,"q",g->q)&&upgrade_rebound_dir(ns,"r",g->r)&&upgrade_rebound_dir(ns,"s",g->s)&&exact_empty(g->a)&&exact_empty(g->c)&&exact_empty(g->q)&&exact_empty(g->r)&&exact_names(g->s,lock_names,1,1U)&&g->lock>=0&&!fstat(g->lock,&retained)&&upgrade_lock_shape(&retained)&&!fstatat(g->s,"lock",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);}
+static int upgrade_guard_acquire(int ns,UpgradeGuard*g){upgrade_guard_init(g);g->a=durable_fixed_dir_at(ns,"a",0,0,0555);g->c=durable_fixed_dir_at(ns,"c",0,0,0555);g->q=durable_fixed_dir_at(ns,"q",0,0,0555);g->r=durable_fixed_dir_at(ns,"r",0,0,0555);g->s=durable_fixed_dir_at(ns,"s",0,0,0555);struct stat lock_id;g->lock=g->s>=0?stable_named_fd(g->s,"lock",O_RDWR,0,0,0600,0,NULL,NULL,&lock_id):-1;if(!upgrade_guard_shape(ns,g,1)||fsync(g->lock)||!flush_dir(g->s))return 0;struct flock lk;memset(&lk,0,sizeof lk);lk.l_type=F_WRLCK;lk.l_whence=SEEK_SET;lk.l_start=0;lk.l_len=0;if(fcntl(g->lock,F_OFD_SETLK,&lk)||!upgrade_guard_shape(ns,g,1))return 0;return 1;}
+static int upgrade_guard_close(UpgradeGuard*g){int ok=1;if(g->a>=0&&close(g->a))ok=0;if(g->c>=0&&close(g->c))ok=0;if(g->q>=0&&close(g->q))ok=0;if(g->r>=0&&close(g->r))ok=0;if(g->s>=0&&close(g->s))ok=0;if(g->lock>=0&&close(g->lock))ok=0;upgrade_guard_init(g);return ok;}
+static int upgrade_fixed_absent(int parent,const char*name){struct stat value;errno=0;return fstatat(parent,name,&value,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)<0&&errno==ENOENT;}
+static int upgrade_project_rebound(int ns,int project){struct stat retained,named;return !fstat(project,&retained)&&!fstatat(ns,".install",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&upgrade_same_directory_object(&retained,&named);}
+static int upgrade_helpers_rebound(int helpers){struct stat retained,named;return !fstat(helpers,&retained)&&!lstat("/Library/PrivilegedHelperTools",&named)&&upgrade_same_directory_object(&retained,&named);}
+static int upgrade_namespace_rebound(int ns,int db){struct stat retained,named,path;return !fstat(ns,&retained)&&!fstatat(db,"nortropic-runtime-cleanup-v1",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named)&&!lstat(NS,&path)&&same_stat(&retained,&path)&&(retained.st_mode&07777)==0555;}
+static int retained_installed_version(int helpers,const unsigned char*new_raw,size_t new_n,struct stat*identity,int*opened){struct stat present;if(fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&present,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)){return errno==ENOENT?0:-1;}unsigned char*raw=NULL;size_t n=0;struct stat before,after,rebound;int fd=stable_named_fd(helpers,"se.nortropic.runtime-cleanup-mediator",O_RDONLY,0,0,04555,4194304,&raw,&n,&before);if(fd<0)return -1;char sum[65];digest(raw,n,sum);int version=n==new_n&&!memcmp(raw,new_raw,new_n)&&!strcmp(sum,Q(H039_MEDIATOR_SHA256))?2:(n==(size_t)H039_OLD_MEDIATOR_SIZE&&!strcmp(sum,Q(H039_OLD_MEDIATOR_SHA256))?1:-1);free(raw);if(version<0||fsync(fd)||!flush_dir(helpers)||fstat(fd,&after)||!same_stat(&before,&after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&after,&rebound)){close(fd);return -1;}*identity=after;*opened=fd;return version;}
+static int upgrade_old_unlinked(const struct stat*before,const struct stat*after){return before->st_dev==after->st_dev&&before->st_ino==after->st_ino&&before->st_mode==after->st_mode&&before->st_uid==after->st_uid&&before->st_gid==after->st_gid&&before->st_size==after->st_size&&before->st_nlink==1&&after->st_nlink==0;}
+static int upgrade_installed_mediator(int project,int ns,int db,int helpers,const unsigned char*raw,size_t n){
+  UpgradeGuard guard;upgrade_guard_init(&guard);int old_fd=-1,new_fd=-1,ok=0;struct stat project_id,helpers_id,old_id,new_id,old_after,new_after,published;
+  if(!upgrade_guard_acquire(ns,&guard))goto done;
+  const char*project_names[]={"controller","mediator"};if(!exact_names(project,project_names,2,1U)||fstat(project,&project_id)||fstat(helpers,&helpers_id)||!upgrade_project_rebound(ns,project)||!upgrade_helpers_rebound(helpers))goto done;
+  int version=retained_installed_version(helpers,raw,n,&old_id,&old_fd);if(version!=1&&version!=2)goto done;
+  if(old_id.st_dev!=project_id.st_dev||old_id.st_dev!=helpers_id.st_dev)goto done;
+  if(version==1){
+    if(!stage_embedded_mediator(project,raw,n)||!exact_regular_bytes(project,"mediator",04555,raw,n,&new_id,&new_fd)||new_id.st_dev!=old_id.st_dev||!upgrade_guard_shape(ns,&guard,1)||!upgrade_project_rebound(ns,project)||!upgrade_helpers_rebound(helpers))goto done;
+    if(fstat(old_fd,&old_after)||!same_stat(&old_id,&old_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&old_after,&published)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(project,"mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+    unsigned flags=RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH;if(renameatx_np(project,"mediator",helpers,"se.nortropic.runtime-cleanup-mediator",flags)||!flush_dir(project)||!flush_dir(helpers))goto done;
+    if(fstat(old_fd,&old_after)||!upgrade_old_unlinked(&old_id,&old_after)||fstat(new_fd,&new_after)||!same_rename_identity(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published)||!upgrade_fixed_absent(project,"mediator"))goto done;new_id=new_after;
+  }else{
+    new_fd=old_fd;old_fd=-1;new_id=old_id;if(!upgrade_fixed_absent(project,"mediator"))goto done;
+  }
+  if(new_id.st_dev!=project_id.st_dev||new_id.st_dev!=helpers_id.st_dev||!upgrade_guard_shape(ns,&guard,1)||!upgrade_project_rebound(ns,project)||!upgrade_helpers_rebound(helpers)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+  if(!remove_fixed_staging(project)||!upgrade_project_rebound(ns,project)||!exact_empty(project)||unlinkat(ns,".install",AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!upgrade_fixed_absent(ns,".install")||!flush_dir(ns)||!flush_dir(db)||!upgrade_guard_shape(ns,&guard,0)||!upgrade_fixed_absent(ns,".install")||!upgrade_namespace_rebound(ns,db)||!upgrade_helpers_rebound(helpers)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+  ok=1;
+done:
+  if(old_fd>=0&&close(old_fd))ok=0;if(new_fd>=0&&close(new_fd))ok=0;if(!upgrade_guard_close(&guard))ok=0;return ok;
+}
+
+
+static int sequence_one_candidate(int ns){const char*names[]={"last"};int r=durable_fixed_dir_at(ns,"r",0,0,0555);unsigned char*raw=NULL;size_t n=0;struct stat identity;int fd=r>=0?stable_named_fd(r,"last",O_RDONLY,0,0,0444,432,&raw,&n,&identity):-1;int ok=r>=0&&fd>=0&&exact_names(r,names,1,1U)&&n==432&&!memcmp(raw,"{\"capability_sha256\":\"c0561f2ff4b382a39fb79da72c3e34ad6c884a7b4f7eb2ae1fc77057d557d6ae\",\"cleanup_request_nonce\":\"66002a07aed574c8775a2c9759ffb19ca5672a2b5433f0dbb47b405cce7947be\",\"create_request_nonce\":\"7ea091edc6b1f543ac49ed517611e0b0b36d8a0eb0a78f770974ae15583a5263\",\"effect_sha256\":\"b86112a8b274aefe308ccaad0b697f2d13fe1d4f83810f3ec876a7ebe771bf0d\",\"runtime_id\":\"733a61fcdcd54d230e0e2ec6a4df8384\",\"schema_version\":1,\"sequence\":1}",432);free(raw);if(fd>=0&&close(fd))ok=0;if(r>=0&&close(r))ok=0;return ok;}
+typedef struct{int a,c,q,r,s,lock,last;struct stat last_identity;} SequenceOneUpgradeGuard;
+static void sequence_one_guard_init(SequenceOneUpgradeGuard*g){g->a=g->c=g->q=g->r=g->s=g->lock=g->last=-1;memset(&g->last_identity,0,sizeof g->last_identity);}
+static int sequence_one_same_directory_object(const struct stat*a,const struct stat*b){return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&S_ISDIR(a->st_mode)&&S_ISDIR(b->st_mode);}
+static int sequence_one_directory_shape(const struct stat*s){return S_ISDIR(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0555;}
+static int sequence_one_rebound_dir(int ns,const char*name,int fd){struct stat retained,named;return fd>=0&&!fstat(fd,&retained)&&sequence_one_directory_shape(&retained)&&!fstatat(ns,name,&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);}
+static int sequence_one_lock_shape(const struct stat*s){return S_ISREG(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0600&&s->st_nlink==1&&s->st_size==0;}
+static int sequence_one_receipt(const SequenceOneUpgradeGuard*g){const char*names[]={"last"};unsigned char*raw=NULL;size_t n=0;struct stat retained,named;int ok=g->last>=0&&stable_read_fd(g->last,432,&raw,&n,&retained)&&same_stat(&g->last_identity,&retained)&&n==432&&!memcmp(raw,"{\"capability_sha256\":\"c0561f2ff4b382a39fb79da72c3e34ad6c884a7b4f7eb2ae1fc77057d557d6ae\",\"cleanup_request_nonce\":\"66002a07aed574c8775a2c9759ffb19ca5672a2b5433f0dbb47b405cce7947be\",\"create_request_nonce\":\"7ea091edc6b1f543ac49ed517611e0b0b36d8a0eb0a78f770974ae15583a5263\",\"effect_sha256\":\"b86112a8b274aefe308ccaad0b697f2d13fe1d4f83810f3ec876a7ebe771bf0d\",\"runtime_id\":\"733a61fcdcd54d230e0e2ec6a4df8384\",\"schema_version\":1,\"sequence\":1}",432)&&exact_names(g->r,names,1,1U)&&!fstatat(g->r,"last",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);free(raw);return ok;}
+static int sequence_one_guard_shape(int ns,const SequenceOneUpgradeGuard*g,int with_install){const char*staged[]={".install","a","c","q","r","s"},*final[]={"a","c","q","r","s"},*lock_names[]={"lock"};struct stat retained,named;if(with_install){if(!exact_names(ns,staged,6,63U))return 0;}else if(!exact_names(ns,final,5,31U))return 0;return sequence_one_rebound_dir(ns,"a",g->a)&&sequence_one_rebound_dir(ns,"c",g->c)&&sequence_one_rebound_dir(ns,"q",g->q)&&sequence_one_rebound_dir(ns,"r",g->r)&&sequence_one_rebound_dir(ns,"s",g->s)&&exact_empty(g->a)&&exact_empty(g->c)&&exact_empty(g->q)&&sequence_one_receipt(g)&&exact_names(g->s,lock_names,1,1U)&&g->lock>=0&&!fstat(g->lock,&retained)&&sequence_one_lock_shape(&retained)&&!fstatat(g->s,"lock",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);}
+static int sequence_one_guard_acquire(int ns,SequenceOneUpgradeGuard*g){sequence_one_guard_init(g);g->a=durable_fixed_dir_at(ns,"a",0,0,0555);g->c=durable_fixed_dir_at(ns,"c",0,0,0555);g->q=durable_fixed_dir_at(ns,"q",0,0,0555);g->r=durable_fixed_dir_at(ns,"r",0,0,0555);struct stat last_id;g->last=g->r>=0?stable_named_fd(g->r,"last",O_RDONLY,0,0,0444,432,NULL,NULL,&last_id):-1;if(g->last>=0)g->last_identity=last_id;g->s=durable_fixed_dir_at(ns,"s",0,0,0555);struct stat lock_id;g->lock=g->s>=0?stable_named_fd(g->s,"lock",O_RDWR,0,0,0600,0,NULL,NULL,&lock_id):-1;if(!sequence_one_guard_shape(ns,g,1)||fsync(g->last)||!flush_dir(g->r)||fsync(g->lock)||!flush_dir(g->s))return 0;struct flock lk;memset(&lk,0,sizeof lk);lk.l_type=F_WRLCK;lk.l_whence=SEEK_SET;lk.l_start=0;lk.l_len=0;if(fcntl(g->lock,F_OFD_SETLK,&lk)||!sequence_one_guard_shape(ns,g,1))return 0;return 1;}
+static int sequence_one_guard_close(SequenceOneUpgradeGuard*g){int ok=1;if(g->a>=0&&close(g->a))ok=0;if(g->c>=0&&close(g->c))ok=0;if(g->q>=0&&close(g->q))ok=0;if(g->last>=0&&close(g->last))ok=0;if(g->r>=0&&close(g->r))ok=0;if(g->s>=0&&close(g->s))ok=0;if(g->lock>=0&&close(g->lock))ok=0;sequence_one_guard_init(g);return ok;}
+static int sequence_one_fixed_absent(int parent,const char*name){struct stat value;errno=0;return fstatat(parent,name,&value,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)<0&&errno==ENOENT;}
+static int sequence_one_project_rebound(int ns,int project){struct stat retained,named;return !fstat(project,&retained)&&!fstatat(ns,".install",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&sequence_one_same_directory_object(&retained,&named);}
+static int sequence_one_helpers_rebound(int helpers){struct stat retained,named;return !fstat(helpers,&retained)&&!lstat("/Library/PrivilegedHelperTools",&named)&&sequence_one_same_directory_object(&retained,&named);}
+static int sequence_one_namespace_rebound(int ns,int db){struct stat retained,named,path;return !fstat(ns,&retained)&&!fstatat(db,"nortropic-runtime-cleanup-v1",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named)&&!lstat(NS,&path)&&same_stat(&retained,&path)&&(retained.st_mode&07777)==0555;}
+static int sequence_one_retained_installed_version(int helpers,const unsigned char*new_raw,size_t new_n,struct stat*identity,int*opened){struct stat present;if(fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&present,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)){return errno==ENOENT?0:-1;}unsigned char*raw=NULL;size_t n=0;struct stat before,after,rebound;int fd=stable_named_fd(helpers,"se.nortropic.runtime-cleanup-mediator",O_RDONLY,0,0,04555,4194304,&raw,&n,&before);if(fd<0)return -1;char sum[65];digest(raw,n,sum);int version=n==new_n&&!memcmp(raw,new_raw,new_n)&&!strcmp(sum,Q(H039_R15_MEDIATOR_SHA256))?2:(n==(size_t)H039_R15_OLD_MEDIATOR_SIZE&&!strcmp(sum,Q(H039_R15_OLD_MEDIATOR_SHA256))?1:-1);free(raw);if(version<0||fsync(fd)||!flush_dir(helpers)||fstat(fd,&after)||!same_stat(&before,&after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&after,&rebound)){close(fd);return -1;}*identity=after;*opened=fd;return version;}
+static int sequence_one_old_unlinked(const struct stat*before,const struct stat*after){return before->st_dev==after->st_dev&&before->st_ino==after->st_ino&&before->st_mode==after->st_mode&&before->st_uid==after->st_uid&&before->st_gid==after->st_gid&&before->st_size==after->st_size&&before->st_nlink==1&&after->st_nlink==0;}
+static int sequence_one_upgrade_installed_mediator(int project,int ns,int db,int helpers,const unsigned char*raw,size_t n){
+  SequenceOneUpgradeGuard guard;sequence_one_guard_init(&guard);int old_fd=-1,new_fd=-1,ok=0;struct stat project_id,helpers_id,old_id,new_id,old_after,new_after,published;
+  if(!sequence_one_guard_acquire(ns,&guard))goto done;
+  const char*project_names[]={"controller","mediator"};if(!exact_names(project,project_names,2,1U)||fstat(project,&project_id)||fstat(helpers,&helpers_id)||!sequence_one_project_rebound(ns,project)||!sequence_one_helpers_rebound(helpers))goto done;
+  int version=sequence_one_retained_installed_version(helpers,raw,n,&old_id,&old_fd);if(version!=1)goto done;
+  if(old_id.st_dev!=project_id.st_dev||old_id.st_dev!=helpers_id.st_dev)goto done;
+  if(version==1){
+    if(!stage_embedded_mediator(project,raw,n)||!exact_regular_bytes(project,"mediator",04555,raw,n,&new_id,&new_fd)||new_id.st_dev!=old_id.st_dev||!sequence_one_guard_shape(ns,&guard,1)||!sequence_one_project_rebound(ns,project)||!sequence_one_helpers_rebound(helpers))goto done;
+    if(fstat(old_fd,&old_after)||!same_stat(&old_id,&old_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&old_after,&published)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(project,"mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+    unsigned flags=RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH;if(renameatx_np(project,"mediator",helpers,"se.nortropic.runtime-cleanup-mediator",flags)||!flush_dir(project)||!flush_dir(helpers))goto done;
+    if(fstat(old_fd,&old_after)||!sequence_one_old_unlinked(&old_id,&old_after)||fstat(new_fd,&new_after)||!same_rename_identity(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published)||!sequence_one_fixed_absent(project,"mediator"))goto done;new_id=new_after;
+  }else{
+    new_fd=old_fd;old_fd=-1;new_id=old_id;if(!sequence_one_fixed_absent(project,"mediator"))goto done;
+  }
+  if(new_id.st_dev!=project_id.st_dev||new_id.st_dev!=helpers_id.st_dev||!sequence_one_guard_shape(ns,&guard,1)||!sequence_one_project_rebound(ns,project)||!sequence_one_helpers_rebound(helpers)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+  if(!remove_fixed_staging(project)||!sequence_one_project_rebound(ns,project)||!exact_empty(project)||unlinkat(ns,".install",AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!sequence_one_fixed_absent(ns,".install")||!flush_dir(ns)||!flush_dir(db)||!sequence_one_guard_shape(ns,&guard,0)||!sequence_one_fixed_absent(ns,".install")||!sequence_one_namespace_rebound(ns,db)||!sequence_one_helpers_rebound(helpers)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+  ok=1;
+done:
+  if(old_fd>=0&&close(old_fd))ok=0;if(new_fd>=0&&close(new_fd))ok=0;if(!sequence_one_guard_close(&guard))ok=0;return ok;
+}
+
+static int apply_install(int project,const unsigned char *mediator,size_t mediator_n){
+  int ns=open(NS,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY),db=-1;struct stat nss,named_ns,project_stat,staging_stat,after;if(ns<0||fstat(ns,&nss)||!S_ISDIR(nss.st_mode)||nss.st_uid||nss.st_gid||((nss.st_mode&07777)!=0700&&(nss.st_mode&07777)!=0555)){if(ns>=0)close(ns);return 0;}db=parent_dir(ns,0,0,0755);if(db<0||fsync(ns)||!flush_dir(db)||fstat(ns,&after)||!same_stat(&nss,&after)||fstatat(db,"nortropic-runtime-cleanup-v1",&named_ns,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&after,&named_ns)||lstat(NS,&named_ns)||!same_stat(&after,&named_ns)||fstat(project,&project_stat)||fstatat(ns,".install",&staging_stat,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&project_stat,&staging_stat)||fsync(project)||fsync(ns)||fstat(project,&after)||!same_stat(&project_stat,&after)||fstatat(ns,".install",&staging_stat,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&after,&staging_stat)){if(db>=0)close(db);close(ns);return 0;}int finalizing=(nss.st_mode&07777)==0555;if(finalizing&&sequence_one_candidate(ns)){int helpers=open("/Library/PrivilegedHelperTools",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat hs,hs_after;if(helpers<0||fstat(helpers,&hs)||!S_ISDIR(hs.st_mode)||hs.st_uid||hs.st_gid||(hs.st_mode&0022)||fsync(helpers)||fstat(helpers,&hs_after)||!same_stat(&hs,&hs_after)){if(helpers>=0)close(helpers);close(db);close(ns);return 0;}int upgraded=sequence_one_upgrade_installed_mediator(project,ns,db,helpers,mediator,mediator_n);if(close(helpers))upgraded=0;if(close(db))upgraded=0;if(close(ns))upgraded=0;return upgraded;}close(db);close(ns);return 0;const char*namespace_names[]={".install","a","c","q","r","s"};if(!exact_names(ns,namespace_names,6,1U)){close(db);close(ns);return 0;}int prefix=0,has_lock=0;if(!directory_prefix(ns,&prefix,&has_lock)){close(db);close(ns);return 0;}
+  int helpers=open("/Library/PrivilegedHelperTools",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);struct stat hs,hs_after;if(helpers<0||fstat(helpers,&hs)||!S_ISDIR(hs.st_mode)||hs.st_uid||hs.st_gid||(hs.st_mode&0022)||fsync(helpers)||fstat(helpers,&hs_after)||!same_stat(&hs,&hs_after)){if(helpers>=0)close(helpers);close(db);close(ns);return 0;}if(finalizing&&prefix==5&&has_lock){int upgraded=upgrade_installed_mediator(project,ns,db,helpers,mediator,mediator_n);if(close(helpers))upgraded=0;if(close(db))upgraded=0;if(close(ns))upgraded=0;return upgraded;}int installed=installed_mediator_status(helpers,mediator,mediator_n);if(installed<0){close(helpers);close(db);close(ns);return 0;}struct stat staged;int staged_present=fstatat(project,"mediator",&staged,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0;if(!staged_present&&errno!=ENOENT){close(helpers);close(db);close(ns);return 0;}
+  int ok=1;if(finalizing){ok=installed==1&&prefix==5&&has_lock&&!staged_present;}else if(installed==1){ok=prefix==5&&has_lock&&!staged_present;}else{if(prefix>0&&(!staged_present||(staged.st_mode&07777)!=04555))ok=0;if(ok)ok=stage_embedded_mediator(project,mediator,mediator_n);const char*dirs[]={"a","c","q","r","s"};for(int i=prefix;ok&&i<5;i++)ok=make_final_directory(ns,dirs[i]);int state=ok?durable_fixed_dir_at(ns,"s",0,0,0555):-1;if(ok)ok=state>=0&&ensure_lock(state);if(state>=0&&close(state))ok=0;if(ok)ok=publish_staged_mediator(project,helpers,mediator,mediator_n);}if(!ok){close(helpers);close(db);close(ns);return 0;}
+  const char*dirs[]={"a","c","q","r","s"},*lock_name[]={"lock"};int a=durable_fixed_dir_at(ns,"a",0,0,0555),c=durable_fixed_dir_at(ns,"c",0,0,0555),q=durable_fixed_dir_at(ns,"q",0,0,0555),r=durable_fixed_dir_at(ns,"r",0,0,0555),s=durable_fixed_dir_at(ns,"s",0,0,0555);ok=a>=0&&c>=0&&q>=0&&r>=0&&s>=0&&exact_empty(a)&&exact_empty(c)&&exact_empty(q)&&exact_empty(r)&&ensure_lock(s)&&exact_names(s,lock_name,1,1U)&&exact_names(ns,namespace_names,6,63U)&&installed_mediator_status(helpers,mediator,mediator_n)==1;if(a>=0)close(a);if(c>=0)close(c);if(q>=0)close(q);if(r>=0)close(r);if(s>=0)close(s);if(close(helpers))ok=0;if(!ok){close(db);close(ns);return 0;}
+  struct stat published_fd,published_name;if(!finalizing&&(fchmod(ns,0555)||fsync(ns)||!flush_dir(db))) {close(db);close(ns);return 0;}if(fstat(ns,&published_fd)||fstatat(db,"nortropic-runtime-cleanup-v1",&published_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&published_fd,&published_name)||lstat(NS,&published_name)||!same_stat(&published_fd,&published_name)||!S_ISDIR(published_fd.st_mode)||published_fd.st_uid||published_fd.st_gid||(published_fd.st_mode&07777)!=0555){close(db);close(ns);return 0;}
+  if(!remove_fixed_staging(project)||unlinkat(ns,".install",AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!flush_dir(ns)||!flush_dir(db)||!exact_names(ns,dirs,5,31U)||fstat(ns,&published_fd)||fstatat(db,"nortropic-runtime-cleanup-v1",&published_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&published_fd,&published_name)||lstat(NS,&published_name)||!same_stat(&published_fd,&published_name)||(published_fd.st_mode&07777)!=0555){close(db);close(ns);return 0;}if(close(db)||close(ns))return 0;return 1;
+}
+static int installer_verify(const unsigned char*embedded,size_t embedded_n){
+  char self_path[4096];struct stat self,source;int self_parent=-1,controller=-1,project=-1;unsigned char*adjacent=NULL;size_t adjacent_n=0;int result=1;if(!loaded_self(self_path,&self,&self_parent)||self.st_uid!=getuid()||(self.st_mode&07777)!=0755||self.st_nlink!=1)goto done;controller=parent_dir(self_parent,getuid(),(gid_t)-1,0755);if(controller<0)goto done;project=parent_dir(controller,getuid(),(gid_t)-1,0700);if(project<0)goto done;int source_status=load_source(project,getuid(),(gid_t)-1,0555,self.st_dev,&adjacent,&adjacent_n,&source);if(source_status!=1||!validate_staging(project,&self,&source)||adjacent_n!=embedded_n||memcmp(adjacent,embedded,embedded_n))goto done;result=0;
+done:if(project>=0)close(project);if(controller>=0)close(controller);if(self_parent>=0)close(self_parent);free(adjacent);return result;
+}
+static int close_bootstrap_descriptors(void){
+  const int byte_cap=1048576;pid_t self=getpid();errno=0;int sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);if(sizing<=0||errno!=0||sizing>byte_cap||sizing%(int)sizeof(struct proc_fdinfo))return 0;struct proc_fdinfo*list=malloc((size_t)byte_cap);if(!list)return 0;errno=0;int got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);if(got!=2*(int)sizeof *list||errno!=0){free(list);return 0;}int one=0,two=0;for(size_t i=0;i<2;i++){if(list[i].proc_fd==1&&!one)one=1;else if(list[i].proc_fd==2&&!two)two=1;else{free(list);return 0;}}if(!one||!two){free(list);return 0;}if(close(1)!=0){free(list);return 0;}if(close(2)!=0){free(list);return 0;}errno=0;sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);if(sizing<0||errno!=0||sizing>byte_cap||sizing%(int)sizeof *list){free(list);return 0;}memset(list,0,(size_t)byte_cap);errno=0;got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);int ok=got==0&&errno==0;free(list);return ok;
+}
+#if defined(H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC)
+enum h039_diagnostic_exit {
+  H039_DIAG_IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT = 0,
+  H039_DIAG_MAIN_ARGC = 1,
+  H039_DIAG_MAIN_ARGV_POINTER = 2,
+  H039_DIAG_MAIN_ARGV0 = 3,
+  H039_DIAG_MAIN_ARGV1 = 4,
+  H039_DIAG_MAIN_OPERATION = 5,
+  H039_DIAG_FD0_CLOSE = 6,
+  H039_DIAG_FD0_POSTCLOSE_FCNTL_RESULT = 7,
+  H039_DIAG_FD0_POSTCLOSE_ERRNO = 8,
+  H039_DIAG_FD_INITIAL_SIZING = 9,
+  H039_DIAG_FD_INITIAL_ERRNO = 10,
+  H039_DIAG_FD_INITIAL_CAP = 11,
+  H039_DIAG_FD_INITIAL_ALIGNMENT = 12,
+  H039_DIAG_FD_INVENTORY_ALLOCATION = 13,
+  H039_DIAG_FD_POPULATED_COUNT = 14,
+  H039_DIAG_FD_POPULATED_ERRNO = 15,
+  H039_DIAG_FD_ENTRY0_MEMBERSHIP_UNIQUENESS = 16,
+  H039_DIAG_FD_ENTRY1_MEMBERSHIP_UNIQUENESS = 17,
+  H039_DIAG_FD1_ABSENT = 18,
+  H039_DIAG_FD2_ABSENT = 19,
+  H039_DIAG_FD1_CLOSE = 20,
+  H039_DIAG_FD2_CLOSE = 21,
+  H039_DIAG_FD_SECOND_SIZING = 22,
+  H039_DIAG_FD_SECOND_ERRNO = 23,
+  H039_DIAG_FD_SECOND_CAP = 24,
+  H039_DIAG_FD_SECOND_ALIGNMENT = 25,
+  H039_DIAG_FD_FINAL_GOT_NONZERO = 26,
+  H039_DIAG_FD_FINAL_ERRNO = 27,
+  H039_DIAG_HANDLER_ARGC = 28,
+  H039_DIAG_HANDLER_ARGV_POINTER = 29,
+  H039_DIAG_HANDLER_ARGV0 = 30,
+  H039_DIAG_HANDLER_ARGV1 = 31,
+  H039_DIAG_HANDLER_BOOTSTRAP = 32,
+  H039_DIAG_ROOT_RUID = 33,
+  H039_DIAG_ROOT_EUID = 34,
+  H039_DIAG_ROOT_RGID = 35,
+  H039_DIAG_ROOT_EGID = 36,
+  H039_DIAG_INITIAL_NSGET = 37,
+  H039_DIAG_INITIAL_CANONICAL = 38,
+  H039_DIAG_INITIAL_FIXED_PATH = 39,
+  H039_DIAG_INITIAL_ARGV0_PATH = 40,
+  H039_DIAG_CHDIR_ROOT = 41,
+  H039_DIAG_LOADED_SECOND_NSGET = 42,
+  H039_DIAG_LOADED_CANONICAL = 43,
+  H039_DIAG_LOADED_PATH_LENGTH = 44,
+  H039_DIAG_LOADED_SLASH = 45,
+  H039_DIAG_LOADED_BASENAME = 46,
+  H039_DIAG_LOADED_PARENT_OPEN = 47,
+  H039_DIAG_LOADED_SELF_OPEN = 48,
+  H039_DIAG_LOADED_SELF_FSTAT = 49,
+  H039_DIAG_LOADED_NAME_FSTATAT = 50,
+  H039_DIAG_LOADED_SAME_STAT = 51,
+  H039_DIAG_LOADED_REGULAR = 52,
+  H039_DIAG_LOADED_NLINK = 53,
+  H039_DIAG_LOADED_REGION_FULL_SIZE = 54,
+  H039_DIAG_LOADED_REGION_DEVICE = 55,
+  H039_DIAG_LOADED_REGION_INODE = 56,
+  H039_DIAG_LOADED_REGION_PATH = 57,
+  H039_DIAG_LOADED_INITIAL_PATH = 58,
+  H039_DIAG_LOADED_SELF_UID = 59,
+  H039_DIAG_LOADED_SELF_GID = 60,
+  H039_DIAG_LOADED_SELF_MODE = 61,
+  H039_DIAG_LOADED_SELF_OUTER_NLINK = 62,
+  H039_DIAG_EMBEDDED_SECTION_POINTER = 63,
+  H039_DIAG_EMBEDDED_SECTION_SIZE_NONZERO = 64,
+  H039_DIAG_EMBEDDED_DIGEST = 65,
+  H039_DIAG_EMBEDDED_ALLOCATION = 66,
+  H039_DIAG_CONTROLLER_PARENT_OPEN = 67,
+  H039_DIAG_CONTROLLER_PARENT_FSTAT = 68,
+  H039_DIAG_CONTROLLER_PARENT_SHAPE = 69,
+  H039_DIAG_PROJECT_PARENT_OPEN = 70,
+  H039_DIAG_PROJECT_PARENT_FSTAT = 71,
+  H039_DIAG_PROJECT_PARENT_SHAPE = 72,
+  H039_DIAG_STAGING_PROJECT_FSTAT = 73,
+  H039_DIAG_STAGING_PROJECT_SHAPE = 74,
+  H039_DIAG_STAGING_PROJECT_FSYNC = 75,
+  H039_DIAG_STAGING_PROJECT_POST_FSYNC_FSTAT = 76,
+  H039_DIAG_STAGING_PROJECT_SAME_STAT = 77,
+  H039_DIAG_STAGING_PROJECT_MEMBERSHIP = 78,
+  H039_DIAG_STAGING_DURABLE_CONTROLLER = 79,
+  H039_DIAG_STAGING_DURABLE_RUNTIME = 80,
+  H039_DIAG_STAGING_CONTROLLER_MEMBERSHIP = 81,
+  H039_DIAG_STAGING_RUNTIME_MEMBERSHIP = 82,
+  H039_DIAG_STAGING_STABLE_SELF = 83,
+  H039_DIAG_STAGING_SELF_IDENTITY_EQUALITY = 84,
+  H039_DIAG_STAGING_SELF_FSYNC = 85,
+  H039_DIAG_STAGING_RUNTIME_FSYNC = 86,
+  H039_DIAG_STAGING_SELF_POST_FSYNC_FSTAT = 87,
+  H039_DIAG_STAGING_SELF_SAME_STAT = 88,
+  H039_DIAG_STAGING_SELF_NAME_FSTATAT = 89,
+  H039_DIAG_STAGING_SELF_FINAL_SAME_STAT = 90,
+  H039_DIAG_STAGING_SELF_CLOSE = 91,
+  H039_DIAG_STAGING_RUNTIME_CLOSE = 92,
+  H039_DIAG_STAGING_CONTROLLER_CLOSE = 93,
+  H039_DIAG_NAMESPACE_OPEN = 94,
+  H039_DIAG_NAMESPACE_FSTAT = 95,
+  H039_DIAG_NAMESPACE_SHAPE = 96,
+  H039_DIAG_DATABASE_PARENT = 97,
+  H039_DIAG_NAMESPACE_FSYNC = 98,
+  H039_DIAG_DATABASE_FSYNC = 99,
+  H039_DIAG_NAMESPACE_POST_FSYNC_FSTAT = 100,
+  H039_DIAG_NAMESPACE_POST_FSYNC_SAME_STAT = 101,
+  H039_DIAG_DATABASE_NAME_FSTATAT = 102,
+  H039_DIAG_DATABASE_NAME_SAME_STAT = 103,
+  H039_DIAG_NAMESPACE_LSTAT = 104,
+  H039_DIAG_NAMESPACE_LSTAT_SAME_STAT = 105,
+  H039_DIAG_PROJECT_RE_FSTAT = 106,
+  H039_DIAG_NAMESPACE_INSTALL_FSTATAT = 107,
+  H039_DIAG_NAMESPACE_INSTALL_SAME_STAT = 108,
+  H039_DIAG_PROJECT_RE_FSYNC = 109,
+  H039_DIAG_NAMESPACE_RE_FSYNC = 110,
+  H039_DIAG_PROJECT_FINAL_FSTAT = 111,
+  H039_DIAG_PROJECT_FINAL_SAME_STAT = 112,
+  H039_DIAG_NAMESPACE_INSTALL_FINAL_FSTATAT = 113,
+  H039_DIAG_NAMESPACE_INSTALL_FINAL_SAME_STAT = 114,
+  H039_DIAG_NAMESPACE_EXACT_MEMBERSHIP = 115,
+  H039_DIAG_NAMESPACE_A_ENOENT = 116,
+  H039_DIAG_NAMESPACE_C_ENOENT = 117,
+  H039_DIAG_NAMESPACE_Q_ENOENT = 118,
+  H039_DIAG_NAMESPACE_R_ENOENT = 119,
+  H039_DIAG_NAMESPACE_S_ENOENT = 120,
+  H039_DIAG_NAMESPACE_PREFIX0_NO_LOCK = 121,
+  H039_DIAG_HELPERS_OPEN = 122,
+  H039_DIAG_HELPERS_FSTAT_SHAPE_FSYNC_REBIND = 123,
+  H039_DIAG_INSTALLED_HELPER_ENOENT = 124,
+  H039_DIAG_STAGED_MEDIATOR_ENOENT = 125
+};
+
+static int diagnostic_close_bootstrap_descriptors(void){
+  const int byte_cap=1048576;
+  pid_t self=getpid();
+  errno=0;
+  int sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);
+  if(sizing<=0)return H039_DIAG_FD_INITIAL_SIZING;
+  if(errno!=0)return H039_DIAG_FD_INITIAL_ERRNO;
+  if(sizing>byte_cap)return H039_DIAG_FD_INITIAL_CAP;
+  if(sizing%(int)sizeof(struct proc_fdinfo))return H039_DIAG_FD_INITIAL_ALIGNMENT;
+  struct proc_fdinfo *list=malloc((size_t)byte_cap);
+  if(!list)return H039_DIAG_FD_INVENTORY_ALLOCATION;
+  errno=0;
+  int got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);
+  if(got!=2*(int)sizeof *list){free(list);return H039_DIAG_FD_POPULATED_COUNT;}
+  if(errno!=0){free(list);return H039_DIAG_FD_POPULATED_ERRNO;}
+  if(list[0].proc_fd!=1&&list[0].proc_fd!=2){free(list);return H039_DIAG_FD_ENTRY0_MEMBERSHIP_UNIQUENESS;}
+  if((list[1].proc_fd!=1&&list[1].proc_fd!=2)||list[1].proc_fd==list[0].proc_fd){free(list);return H039_DIAG_FD_ENTRY1_MEMBERSHIP_UNIQUENESS;}
+  int one=list[0].proc_fd==1||list[1].proc_fd==1;
+  int two=list[0].proc_fd==2||list[1].proc_fd==2;
+  if(!one){free(list);return H039_DIAG_FD1_ABSENT;}
+  if(!two){free(list);return H039_DIAG_FD2_ABSENT;}
+  if(close(1)!=0){free(list);return H039_DIAG_FD1_CLOSE;}
+  if(close(2)!=0){free(list);return H039_DIAG_FD2_CLOSE;}
+  errno=0;
+  sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);
+  if(sizing<0){free(list);return H039_DIAG_FD_SECOND_SIZING;}
+  if(errno!=0){free(list);return H039_DIAG_FD_SECOND_ERRNO;}
+  if(sizing>byte_cap){free(list);return H039_DIAG_FD_SECOND_CAP;}
+  if(sizing%(int)sizeof *list){free(list);return H039_DIAG_FD_SECOND_ALIGNMENT;}
+  memset(list,0,(size_t)byte_cap);
+  errno=0;
+  got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);
+  if(got!=0){free(list);return H039_DIAG_FD_FINAL_GOT_NONZERO;}
+  if(errno!=0){free(list);return H039_DIAG_FD_FINAL_ERRNO;}
+  free(list);
+  return -1;
+}
+
+__attribute__((noinline,used)) int installer_bootstrap(int argc,char **argv){
+  if(close(0)!=0)return H039_DIAG_FD0_CLOSE;
+  errno=0;
+  int fd0=fcntl(0,F_GETFD);
+  if(fd0!=-1)return H039_DIAG_FD0_POSTCLOSE_FCNTL_RESULT;
+  if(errno!=EBADF)return H039_DIAG_FD0_POSTCLOSE_ERRNO;
+  int descriptor_result=diagnostic_close_bootstrap_descriptors();
+  if(descriptor_result!=-1)return descriptor_result;
+
+  if(argc!=2)return H039_DIAG_HANDLER_ARGC;
+  if(!argv)return H039_DIAG_HANDLER_ARGV_POINTER;
+  if(!argv[0])return H039_DIAG_HANDLER_ARGV0;
+  if(!argv[1])return H039_DIAG_HANDLER_ARGV1;
+  if(strcmp(argv[1],"bootstrap"))return H039_DIAG_HANDLER_BOOTSTRAP;
+  if(getuid()!=0)return H039_DIAG_ROOT_RUID;
+  if(geteuid()!=0)return H039_DIAG_ROOT_EUID;
+  if(getgid()!=0)return H039_DIAG_ROOT_RGID;
+  if(getegid()!=0)return H039_DIAG_ROOT_EGID;
+
+  char initial[4096];
+  uint32_t cap=4096;
+  if(_NSGetExecutablePath(initial,&cap))return H039_DIAG_INITIAL_NSGET;
+  if(!canonical_absolute(initial))return H039_DIAG_INITIAL_CANONICAL;
+  if(strcmp(initial,NS "/.install/controller/runtime-cleanup/install"))return H039_DIAG_INITIAL_FIXED_PATH;
+  if(strcmp(argv[0],initial))return H039_DIAG_INITIAL_ARGV0_PATH;
+  static char *empty[]={NULL};
+  environ=empty;
+  if(chdir("/"))return H039_DIAG_CHDIR_ROOT;
+
+  char self_path[4096];
+  cap=4096;
+  if(_NSGetExecutablePath(self_path,&cap))return H039_DIAG_LOADED_SECOND_NSGET;
+  if(!canonical_absolute(self_path))return H039_DIAG_LOADED_CANONICAL;
+  size_t self_path_n=strlen(self_path);
+  if(self_path_n>=sizeof self_path)return H039_DIAG_LOADED_PATH_LENGTH;
+  char *slash=strrchr(self_path,'/');
+  if(!slash)return H039_DIAG_LOADED_SLASH;
+  if(strcmp(slash+1,"install"))return H039_DIAG_LOADED_BASENAME;
+  int self_parent=open(NS "/.install/controller/runtime-cleanup",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(self_parent<0)return H039_DIAG_LOADED_PARENT_OPEN;
+  int self_fd=openat(self_parent,"install",O_RDONLY|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);
+  if(self_fd<0)return H039_DIAG_LOADED_SELF_OPEN;
+  struct stat self;
+  if(fstat(self_fd,&self))return H039_DIAG_LOADED_SELF_FSTAT;
+  struct stat self_name;
+  if(fstatat(self_parent,"install",&self_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_LOADED_NAME_FSTATAT;
+  if(!same_stat(&self,&self_name))return H039_DIAG_LOADED_SAME_STAT;
+  if(!S_ISREG(self.st_mode))return H039_DIAG_LOADED_REGULAR;
+  if(self.st_nlink!=1)return H039_DIAG_LOADED_NLINK;
+  struct proc_regionwithpathinfo image={0};
+  int got=proc_pidinfo(getpid(),PROC_PIDREGIONPATHINFO,(uint64_t)(uintptr_t)&main,&image,sizeof image);
+  if(got!=(int)sizeof image)return H039_DIAG_LOADED_REGION_FULL_SIZE;
+  if(image.prp_vip.vip_vi.vi_stat.vst_dev!=(uint32_t)self.st_dev)return H039_DIAG_LOADED_REGION_DEVICE;
+  if(image.prp_vip.vip_vi.vi_stat.vst_ino!=(uint64_t)self.st_ino)return H039_DIAG_LOADED_REGION_INODE;
+  if(strcmp(image.prp_vip.vip_path,self_path))return H039_DIAG_LOADED_REGION_PATH;
+  if(strcmp(self_path,initial))return H039_DIAG_LOADED_INITIAL_PATH;
+  if(self.st_uid!=0)return H039_DIAG_LOADED_SELF_UID;
+  if(self.st_gid!=0)return H039_DIAG_LOADED_SELF_GID;
+  if((self.st_mode&07777)!=0500)return H039_DIAG_LOADED_SELF_MODE;
+  if(self.st_nlink!=1)return H039_DIAG_LOADED_SELF_OUTER_NLINK;
+
+  unsigned long section_n=0;
+  uint8_t *section=getsectiondata(&_mh_execute_header,"__H039RO","__h039med",&section_n);
+  if(!section)return H039_DIAG_EMBEDDED_SECTION_POINTER;
+  if(section_n==0||section_n!=(unsigned long)H039_R15_MEDIATOR_SIZE)return H039_DIAG_EMBEDDED_SECTION_SIZE_NONZERO;
+  char section_digest[65];
+  digest(section,(size_t)section_n,section_digest);
+  if(strcmp(section_digest,Q(H039_R15_MEDIATOR_SHA256)))return H039_DIAG_EMBEDDED_DIGEST;
+  unsigned char *mediator=malloc((size_t)section_n);
+  if(!mediator)return H039_DIAG_EMBEDDED_ALLOCATION;
+  memcpy(mediator,section,(size_t)section_n);
+  (void)*(volatile unsigned char *)mediator;
+
+  int controller=openat(self_parent,"..",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(controller<0)return H039_DIAG_CONTROLLER_PARENT_OPEN;
+  struct stat controller_stat;
+  if(fstat(controller,&controller_stat))return H039_DIAG_CONTROLLER_PARENT_FSTAT;
+  if(!S_ISDIR(controller_stat.st_mode)||controller_stat.st_uid!=0||controller_stat.st_gid!=0||(controller_stat.st_mode&07777)!=0700)return H039_DIAG_CONTROLLER_PARENT_SHAPE;
+  int project=openat(controller,"..",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(project<0)return H039_DIAG_PROJECT_PARENT_OPEN;
+  struct stat project_stat;
+  if(fstat(project,&project_stat))return H039_DIAG_PROJECT_PARENT_FSTAT;
+  if(!S_ISDIR(project_stat.st_mode)||project_stat.st_uid!=0||project_stat.st_gid!=0||(project_stat.st_mode&07777)!=0700)return H039_DIAG_PROJECT_PARENT_SHAPE;
+
+  struct stat project_before;
+  if(fstat(project,&project_before))return H039_DIAG_STAGING_PROJECT_FSTAT;
+  if(!S_ISDIR(project_before.st_mode)||project_before.st_uid!=0||project_before.st_gid!=0||(project_before.st_mode&07777)!=0700)return H039_DIAG_STAGING_PROJECT_SHAPE;
+  if(fsync(project))return H039_DIAG_STAGING_PROJECT_FSYNC;
+  struct stat project_after;
+  if(fstat(project,&project_after))return H039_DIAG_STAGING_PROJECT_POST_FSYNC_FSTAT;
+  if(!same_stat(&project_before,&project_after))return H039_DIAG_STAGING_PROJECT_SAME_STAT;
+  const char *project_names[]={"controller","mediator"};
+  if(!exact_names(project,project_names,2,1U))return H039_DIAG_STAGING_PROJECT_MEMBERSHIP;
+  int staging_controller=durable_fixed_dir_at(project,"controller",0,0,0700);
+  if(staging_controller<0)return H039_DIAG_STAGING_DURABLE_CONTROLLER;
+  int staging_runtime=durable_fixed_dir_at(staging_controller,"runtime-cleanup",0,0,0700);
+  if(staging_runtime<0)return H039_DIAG_STAGING_DURABLE_RUNTIME;
+  const char *controller_names[]={"runtime-cleanup"};
+  if(!exact_names(staging_controller,controller_names,1,1U))return H039_DIAG_STAGING_CONTROLLER_MEMBERSHIP;
+  const char *runtime_names[]={"install"};
+  if(!exact_names(staging_runtime,runtime_names,1,1U))return H039_DIAG_STAGING_RUNTIME_MEMBERSHIP;
+  struct stat named;
+  int stable_self=stable_named_fd(staging_runtime,"install",O_RDONLY,0,0,0500,4194304,NULL,NULL,&named);
+  if(stable_self<0)return H039_DIAG_STAGING_STABLE_SELF;
+  if(!same_stat(&self,&named))return H039_DIAG_STAGING_SELF_IDENTITY_EQUALITY;
+  if(fsync(stable_self))return H039_DIAG_STAGING_SELF_FSYNC;
+  if(!flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;
+  struct stat stable_after;
+  if(fstat(stable_self,&stable_after))return H039_DIAG_STAGING_SELF_POST_FSYNC_FSTAT;
+  if(!same_stat(&named,&stable_after))return H039_DIAG_STAGING_SELF_SAME_STAT;
+  struct stat stable_name;
+  if(fstatat(staging_runtime,"install",&stable_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_STAGING_SELF_NAME_FSTATAT;
+  if(!same_stat(&stable_after,&stable_name))return H039_DIAG_STAGING_SELF_FINAL_SAME_STAT;
+  if(close(stable_self))return H039_DIAG_STAGING_SELF_CLOSE;
+  if(close(staging_runtime))return H039_DIAG_STAGING_RUNTIME_CLOSE;
+  if(close(staging_controller))return H039_DIAG_STAGING_CONTROLLER_CLOSE;
+
+  int ns=open(NS,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(ns<0)return H039_DIAG_NAMESPACE_OPEN;
+  struct stat namespace_stat;
+  if(fstat(ns,&namespace_stat))return H039_DIAG_NAMESPACE_FSTAT;
+  if(!S_ISDIR(namespace_stat.st_mode)||namespace_stat.st_uid!=0||namespace_stat.st_gid!=0||((namespace_stat.st_mode&07777)!=0700&&(namespace_stat.st_mode&07777)!=0555))return H039_DIAG_NAMESPACE_SHAPE;
+  int database=openat(ns,"..",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  struct stat database_stat;
+  if(database<0||fstat(database,&database_stat)||!S_ISDIR(database_stat.st_mode)||database_stat.st_uid!=0||database_stat.st_gid!=0||(database_stat.st_mode&07777)!=0755)return H039_DIAG_DATABASE_PARENT;
+  if(fsync(ns))return H039_DIAG_NAMESPACE_FSYNC;
+  if(!flush_dir(database))return H039_DIAG_DATABASE_FSYNC;
+  struct stat namespace_after;
+  if(fstat(ns,&namespace_after))return H039_DIAG_NAMESPACE_POST_FSYNC_FSTAT;
+  if(!same_stat(&namespace_stat,&namespace_after))return H039_DIAG_NAMESPACE_POST_FSYNC_SAME_STAT;
+  struct stat namespace_name;
+  if(fstatat(database,"nortropic-runtime-cleanup-v1",&namespace_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_DATABASE_NAME_FSTATAT;
+  if(!same_stat(&namespace_after,&namespace_name))return H039_DIAG_DATABASE_NAME_SAME_STAT;
+  struct stat namespace_path;
+  if(lstat(NS,&namespace_path))return H039_DIAG_NAMESPACE_LSTAT;
+  if(!same_stat(&namespace_after,&namespace_path))return H039_DIAG_NAMESPACE_LSTAT_SAME_STAT;
+  struct stat project_recheck;
+  if(fstat(project,&project_recheck))return H039_DIAG_PROJECT_RE_FSTAT;
+  struct stat install_name;
+  if(fstatat(ns,".install",&install_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_NAMESPACE_INSTALL_FSTATAT;
+  if(!same_stat(&project_recheck,&install_name))return H039_DIAG_NAMESPACE_INSTALL_SAME_STAT;
+  if(fsync(project))return H039_DIAG_PROJECT_RE_FSYNC;
+  if(fsync(ns))return H039_DIAG_NAMESPACE_RE_FSYNC;
+  struct stat project_final;
+  if(fstat(project,&project_final))return H039_DIAG_PROJECT_FINAL_FSTAT;
+  if(!same_stat(&project_recheck,&project_final))return H039_DIAG_PROJECT_FINAL_SAME_STAT;
+  struct stat install_final;
+  if(fstatat(ns,".install",&install_final,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_NAMESPACE_INSTALL_FINAL_FSTATAT;
+  if(!same_stat(&project_final,&install_final))return H039_DIAG_NAMESPACE_INSTALL_FINAL_SAME_STAT;
+  const char *namespace_names[]={".install"};
+  if(!exact_names(ns,namespace_names,1,1U))return H039_DIAG_NAMESPACE_EXACT_MEMBERSHIP;
+
+  struct stat absent;
+  errno=0;
+  if(fstatat(ns,"a",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_A_ENOENT;
+  errno=0;
+  if(fstatat(ns,"c",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_C_ENOENT;
+  errno=0;
+  if(fstatat(ns,"q",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_Q_ENOENT;
+  errno=0;
+  if(fstatat(ns,"r",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_R_ENOENT;
+  errno=0;
+  if(fstatat(ns,"s",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_S_ENOENT;
+  errno=0;
+  if(fstatat(ns,"s/lock",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_PREFIX0_NO_LOCK;
+
+  int helpers=open("/Library/PrivilegedHelperTools",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(helpers<0)return H039_DIAG_HELPERS_OPEN;
+  struct stat helpers_before,helpers_after,helpers_name;
+  if(fstat(helpers,&helpers_before)||!S_ISDIR(helpers_before.st_mode)||helpers_before.st_uid!=0||helpers_before.st_gid!=0||(helpers_before.st_mode&0022)||fsync(helpers)||fstat(helpers,&helpers_after)||!same_stat(&helpers_before,&helpers_after)||lstat("/Library/PrivilegedHelperTools",&helpers_name)||!same_stat(&helpers_after,&helpers_name))return H039_DIAG_HELPERS_FSTAT_SHAPE_FSYNC_REBIND;
+  errno=0;
+  if(fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_INSTALLED_HELPER_ENOENT;
+  errno=0;
+  if(fstatat(project,"mediator",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_STAGED_MEDIATOR_ENOENT;
+
+  (void)mediator;
+  return H039_DIAG_IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT;
+}
+
+static int installer_main(int argc,char **argv){
+  if(argc!=2)return H039_DIAG_MAIN_ARGC;
+  if(!argv)return H039_DIAG_MAIN_ARGV_POINTER;
+  if(!argv[0])return H039_DIAG_MAIN_ARGV0;
+  if(!argv[1])return H039_DIAG_MAIN_ARGV1;
+  if(strcmp(argv[1],"bootstrap"))return H039_DIAG_MAIN_OPERATION;
+  return installer_bootstrap(argc,argv);
+}
+#else
+static int installer_bootstrap(int argc,char **argv){
+  if(close(0)!=0)return 1;errno=0;if(fcntl(0,F_GETFD)!=-1||errno!=EBADF)return 1;if(!close_bootstrap_descriptors())return 1;if(argc!=2||!argv||!argv[0]||strcmp(argv[1],"bootstrap")||getuid()!=0||geteuid()!=0||getgid()!=0||getegid()!=0)return 1;char initial[4096];uint32_t cap=4096;if(_NSGetExecutablePath(initial,&cap)||!canonical_absolute(initial)||strcmp(initial,NS "/.install/controller/runtime-cleanup/install")||strcmp(argv[0],initial))return 1;static char*empty[]={NULL};environ=empty;if(chdir("/"))return 1;umask(077);char self_path[4096];struct stat self;int self_parent=-1,controller=-1,project=-1;unsigned char*mediator=NULL;size_t mediator_n=0;int result=1;if(!loaded_self(self_path,&self,&self_parent)||strcmp(self_path,initial)||self.st_uid!=0||self.st_gid!=0||(self.st_mode&07777)!=0500||self.st_nlink!=1)goto done;if(!load_embedded_mediator(&mediator,&mediator_n))goto done;controller=parent_dir(self_parent,0,0,0700);if(controller<0)goto done;project=parent_dir(controller,0,0,0700);if(project<0||!validate_bootstrap_staging(project,&self))goto done;result=!apply_install(project,mediator,mediator_n);
+done:if(project>=0)close(project);if(controller>=0)close(controller);if(self_parent>=0)close(self_parent);free(mediator);return result;
+}
+static int installer_main(int argc,char **argv){
+  if(argc!=2||!argv||!argv[0])return 1;if(!strcmp(argv[1],"verify")){unsigned char*embedded=NULL;size_t embedded_n=0;if(!load_embedded_mediator(&embedded,&embedded_n))return 1;int result=installer_verify(embedded,embedded_n);free(embedded);return result;}if(!strcmp(argv[1],"bootstrap"))return installer_bootstrap(argc,argv);return 1;
+}
+#endif
+#endif
+
+int main(int argc,char **argv){
+#ifdef H039_INSTALLER
+  return installer_main(argc,argv);
+#else
+  return mediator_main(argc,argv);
+#endif
+}
