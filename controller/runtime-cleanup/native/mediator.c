@@ -1,3 +1,169 @@
+/* Gate-generated asset branches; no installation authority. */
+#if defined(H039_ASSET_CONTAINER) && defined(H039_LISTENER_ADAPTER)
+#error mixed_asset_selection
+#endif
+#if defined(H039_ASSET_CONTAINER) || defined(H039_LISTENER_ADAPTER)
+#if defined(H039_INSTALLER) || defined(H039_RUNTIME_PRESTORE_EXIT_DIAGNOSTIC) || defined(H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC) || defined(H039_MEDIATOR_SHA256) || defined(H039_MEDIATOR_SIZE) || defined(H039_ROOT_ENTRY_FD0_NORMALIZATION) || defined(H039_OLD_MEDIATOR_SHA256) || defined(H039_OLD_MEDIATOR_SIZE) || defined(H039_R15_MEDIATOR_SHA256) || defined(H039_R15_MEDIATOR_SIZE) || defined(H039_R15_OLD_MEDIATOR_SHA256) || defined(H039_R15_OLD_MEDIATOR_SIZE)
+#error historical_asset_selection
+#endif
+#endif
+#if defined(H039_ASSET_CONTAINER)
+#if H039_ASSET_CONTAINER != 1
+#error asset_selector_value
+#endif
+int main(void){return 2;}
+#elif defined(H039_LISTENER_ADAPTER)
+#if H039_LISTENER_ADAPTER != 1
+#error asset_selector_value
+#endif
+/* Compile-only candidate. NOT approved for loading or runtime use.
+ * Returns query facts, never an end-to-end listener/lifecycle verdict.
+ * Loader/image provenance and Unix sun_len policy remain release blockers.
+ */
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <sys/proc_info.h>
+#include <libproc.h>
+#include <unistd.h>
+
+_Static_assert(PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 9 &&
+               PY_MICRO_VERSION == 6, "exact CPython header version");
+_Static_assert(sizeof(int) == 4 && sizeof(short) == 2 && sizeof(void *) == 8,
+               "candidate data model");
+_Static_assert(sizeof(struct socket_fdinfo) <= INT_MAX, "signed buffer size");
+_Static_assert(_Generic(((struct socket_info *)0)->soi_options,
+                        short: 1, default: 0), "signed short options");
+_Static_assert(PROC_PIDFDSOCKETINFO == 3 && SOCKINFO_UN == 3 &&
+               AF_UNIX == 1 && SOCK_STREAM == 1 && SO_ACCEPTCONN == 2,
+               "fixed SDK constants");
+
+/* Numeric compiler layout evidence; read from LLVM/Mach-O, never executed.
+ * Ordered field names are defined in abi-manifest.json. Full union retained.
+ */
+__attribute__((used, visibility("default"), section("__DATA,__h039abi")))
+const uint64_t H039_ABI_VALUES[] = {
+    sizeof(struct socket_fdinfo), _Alignof(struct socket_fdinfo),
+    sizeof(struct proc_fileinfo), _Alignof(struct proc_fileinfo),
+    sizeof(struct socket_info), _Alignof(struct socket_info),
+    sizeof(struct vinfo_stat), _Alignof(struct vinfo_stat),
+    sizeof(struct un_sockinfo), _Alignof(struct un_sockinfo),
+    sizeof(struct sockaddr_un), _Alignof(struct sockaddr_un),
+    offsetof(struct socket_fdinfo, psi),
+    offsetof(struct socket_info, soi_family),
+    offsetof(struct socket_info, soi_type),
+    offsetof(struct socket_info, soi_kind),
+    offsetof(struct socket_info, soi_options),
+    offsetof(struct socket_info, soi_proto),
+    sizeof(((struct socket_info *)0)->soi_proto),
+    offsetof(struct un_sockinfo, unsi_addr),
+    sizeof(((struct un_sockinfo *)0)->unsi_addr),
+    offsetof(struct sockaddr_un, sun_len),
+    offsetof(struct sockaddr_un, sun_family),
+    offsetof(struct sockaddr_un, sun_path),
+    sizeof(((struct sockaddr_un *)0)->sun_path),
+    sizeof(((struct socket_info *)0)->soi_options),
+    sizeof(((struct vinfo_stat *)0)->vst_dev),
+    sizeof(((struct socket_info *)0)->soi_family),
+    sizeof(((struct socket_info *)0)->soi_type),
+    sizeof(((struct socket_info *)0)->soi_kind),
+    sizeof(((struct sockaddr_un *)0)->sun_len),
+    sizeof(((struct sockaddr_un *)0)->sun_family)
+};
+
+static int same_identity(const struct stat *a, const struct stat *b) {
+    return a->st_dev == b->st_dev && a->st_ino == b->st_ino &&
+           a->st_mode == b->st_mode && a->st_uid == b->st_uid &&
+           a->st_gid == b->st_gid && a->st_nlink == b->st_nlink &&
+           a->st_size == b->st_size && a->st_flags == b->st_flags;
+}
+
+static PyObject *refuse(const char *reason) {
+    PyErr_SetString(PyExc_ValueError, reason);
+    return NULL;
+}
+
+static PyObject *query_received_listener(PyObject *self, PyObject *arg) {
+    (void)self;
+    /* Provenance comes from the frozen consumer, not the integer type. */
+    if (!PyLong_CheckExact(arg)) return refuse("exact internal FD integer required");
+    long value = PyLong_AsLong(arg);
+    if (PyErr_Occurred()) return NULL;
+    if (value < 3 || value > INT_MAX) return refuse("internal FD range");
+    const int fd = (int)value;
+    struct stat before, after;
+    if (fstat(fd, &before) != 0) return PyErr_SetFromErrno(PyExc_OSError);
+    int df = fcntl(fd, F_GETFD), fl = fcntl(fd, F_GETFL);
+    if (df < 0 || fl < 0) return PyErr_SetFromErrno(PyExc_OSError);
+    if (!S_ISSOCK(before.st_mode) || !(df & FD_CLOEXEC) ||
+        (fl & O_ACCMODE) != O_RDWR) return refuse("listener FD precondition");
+
+    struct socket_fdinfo info;
+    memset(&info, 0, sizeof info);
+    const pid_t pid = getpid();
+    if (pid <= 0 || (int64_t)pid > INT_MAX) return refuse("self PID range");
+    /* Type checked assignment; no dynamic symbol lookup or PID/flavor input. */
+    int (*const query)(int, int, int, void *, int) = proc_pidfdinfo;
+    errno = 0;
+    const int got = query((int)pid, fd, PROC_PIDFDSOCKETINFO, &info, (int)sizeof info);
+    const int saved_errno = errno;
+    if (got != (int)sizeof info) {
+        PyErr_Format(PyExc_ValueError, "proc_pidfdinfo size refusal: return=%d errno=%d",
+                     got, saved_errno);
+        return NULL;
+    }
+    if (info.psi.soi_family != AF_UNIX || info.psi.soi_type != SOCK_STREAM ||
+        info.psi.soi_kind != SOCKINFO_UN ||
+        !(info.psi.soi_options & SO_ACCEPTCONN)) return refuse("listener query semantics");
+    const struct sockaddr_un *address = &info.psi.soi_proto.pri_un.unsi_addr.ua_sun;
+    if (address->sun_family != AF_UNIX) return refuse("Unix address family");
+    const char *nul = memchr(address->sun_path, 0, sizeof address->sun_path);
+    if (!nul) return refuse("unterminated bounded Unix address");
+    const Py_ssize_t path_size = (Py_ssize_t)(nul - address->sun_path);
+    /* sun_len is observed only. Its exact kernel convention is NOT approved.
+     * The consumer must reject release until it has its independent exact
+     * length/path/getsockname policy; prefix extraction is not path acceptance.
+     */
+    if (fstat(fd, &after) != 0) return PyErr_SetFromErrno(PyExc_OSError);
+    const int df_after = fcntl(fd, F_GETFD), fl_after = fcntl(fd, F_GETFL);
+    if (df_after < 0 || fl_after < 0) return PyErr_SetFromErrno(PyExc_OSError);
+    if (!same_identity(&before, &after) || df != df_after || fl != fl_after)
+        return refuse("listener identity or flags changed");
+
+    /* No GIL release, callbacks, close, dup, setter, path open or retry above.
+     * No opaque kernel addresses, native stat device or unused padding emitted.
+     */
+    return Py_BuildValue("(siiiiiiiiiy#s)", "proc_pidfdinfo-v1", (int)pid, fd,
+                         got, saved_errno, info.psi.soi_family, info.psi.soi_type,
+                         info.psi.soi_kind, (int)info.psi.soi_options,
+                         (int)address->sun_len, address->sun_path, path_size,
+                         "UNVALIDATED_ADDRESS_AND_IMAGE");
+}
+
+static PyMethodDef methods[] = {
+    {"query_received_listener", query_received_listener, METH_O,
+     "Internal capability query; not an integrated verdict or public API."},
+    {NULL, NULL, 0, NULL}
+};
+static struct PyModuleDef module = {
+    PyModuleDef_HEAD_INIT, "_h039_listener_v1",
+    "Compile-only unapproved native candidate", -1, methods,
+    NULL, NULL, NULL, NULL
+};
+PyMODINIT_FUNC PyInit__h039_listener_v1(void) {
+    /* No query or external effect at initialization; loading still forbidden. */
+    return PyModule_Create(&module);
+}
+
+#else
 #define _DARWIN_C_SOURCE 1
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -1178,3 +1344,5 @@ int main(int argc,char **argv){
   return mediator_main(argc,argv);
 #endif
 }
+
+#endif
