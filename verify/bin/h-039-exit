@@ -13,6 +13,903 @@ a caller path, PID, command, state, nonce, or descriptor.
 
 from __future__ import annotations
 
+# H039_LOCAL_ASSET_DRAFT_BEGIN
+# Unfrozen local asset preparation. Everything outside this exact block is
+# byte-identical historical R33 data, not an available execution lane.
+import hashlib as _local_hashlib
+import json as _local_json
+import os as _local_os
+import stat as _local_stat
+import subprocess as _local_subprocess
+import sys as _local_sys
+
+_LOCAL_BASE = "8095d947c83202e2b87801531d9f7cb1457c8719"
+_LOCAL_OLD_GATE_SHA = "d3d147da8d88427aad52550fffcd6156deb38ec88c7bc61908afc197062a5250"
+_LOCAL_SPEC_SHA = "3e5d564cb633c5f720a715c7591a849673b0a95736e6ceb0bcac8db9e63b1b95"
+_LOCAL_MEMBER_SHA = "d149e640c0657920a0573a00fbc584021d2f0924563eb98efcf811692bceb04c"
+_LOCAL_CONTRACT_PATHS = (
+    "verify/bin/h-039-exit", "specs/tasks.spec.json",
+    "verify/bin/platform-separation-final-exit",
+    "docs/loop/platform-separation-final-local-development.md",
+    "SEPARATION-20260910/REFREEZE.json", "controller/verify/cli")
+_LOCAL_PRODUCTS = (
+    "controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json")
+_LOCAL_RUNTIME = "verify/h039/runtime-cleanup-mediator"
+_LOCAL_BASE_PRODUCT_SHA = (
+    "05a23e0c63a295367c83a2c0de45495f9f3e3caee36101d1b088e93302a1a486",
+    "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b",
+    "bee82dd83dbff08fff1164294046ea3a980ecc8301a1a1563e68822693474380",
+    "84eca73421ed1cac2c92fd01e519e259cb9088213e66311acd61846e3f27563a")
+_LOCAL_REFERENCE_PRODUCT_SHA = (
+    "563fcecdf4b4d7625baee7cffa09db53f087a63d437a2846e28912dbd4a598a3",
+    "a1dd9e698a644be61b65f1d73229747c7dfc5257c9073b063b85be75757fa1d8",
+    "49506e46ab1486de99e1b2c2883a0cf42a1f564e97c6cdf84fc04d89347534bb",
+    "e5cb7deb73b84a71914981df02fb5d3b5f39d60ae1cf2bf60b17cff3e5f4257e")
+# Actual five-path reference-only Git result 28bc544a..., not a full-repo budget.
+# Fixed Myers + indentHeuristic=true; no .gitattributes in the reference trees.
+_LOCAL_REFERENCE_NUMSTAT = dict(zip(_LOCAL_PRODUCTS, ((None, None), (168, 0), (282, 84), (75, 52))))
+
+
+def h039_local_sha(raw: bytes) -> str:
+    return _local_hashlib.sha256(raw).hexdigest()
+
+
+def h039_local_oid(value: object) -> bool:
+    return type(value) is str and len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+
+
+def h039_local_blob(raw: bytes) -> str:
+    return _local_hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+
+
+def h039_local_unique(pairs: list) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def h039_local_historical_gate(raw: bytes) -> bool:
+    start = b"# H039_LOCAL_ASSET_DRAFT_" + b"BEGIN\n"
+    end = b"# H039_LOCAL_ASSET_DRAFT_" + b"END\n"
+    if raw.count(start) != 1 or raw.count(end) != 1:
+        return False
+    a, b = raw.index(start), raw.index(end) + len(end)
+    return a < b and h039_local_sha(raw[:a] + raw[b:]) == _LOCAL_OLD_GATE_SHA
+
+
+def h039_local_spec(raw: bytes) -> bool:
+    start = b'      "h039_local_asset_build_only_v1": {\n'
+    end = b'      "h039_os_exclusive_runtime_cleanup": {\n'
+    try:
+        parsed = _local_json.loads(raw, object_pairs_hook=h039_local_unique)
+        rows = [row for row in parsed["tasks"] if row["id"] == "h-039"]
+        if len(rows) != 1 or raw.count(start) != 1 or raw.count(end) != 1:
+            return False
+        a, b = raw.index(start), raw.index(end)
+        member = rows[0]["h039_local_asset_build_only_v1"]
+        encoded = _local_json.dumps(member, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+        return (a < b and h039_local_sha(raw[:a] + raw[b:]) == _LOCAL_SPEC_SHA
+                and h039_local_sha(encoded) == _LOCAL_MEMBER_SHA)
+    except (ValueError, KeyError, TypeError):
+        return False
+
+
+def h039_local_relation(before: dict, after: dict, phase: str) -> str:
+    """Pure full-map relation. Maps must originate from the local observer below."""
+    if (type(before) is not dict or type(after) is not dict or before.keys() != after.keys()
+            or not set(_LOCAL_CONTRACT_PATHS + _LOCAL_PRODUCTS + (_LOCAL_RUNTIME,)) <= before.keys()):
+        return "TREE_MEMBERSHIP"
+    if any(type(row) is not tuple or len(row) != 2 or row[0] not in ("100644", "100755")
+           or not h039_local_oid(row[1]) for mapping in (before, after) for row in mapping.values()):
+        return "TREE_SCHEMA"
+    if any(before[path][0] != after[path][0] for path in before):
+        return "TREE_MODE"
+    changed = {path for path in before if before[path] != after[path]}
+    if phase == "contract":
+        return "RELATION_ONLY_NOT_ACCEPTANCE" if changed == set(_LOCAL_CONTRACT_PATHS) else "CONTRACT_SIX_SCOPE"
+    if phase == "product":
+        return "RELATION_ONLY_NOT_ACCEPTANCE" if changed == set(_LOCAL_PRODUCTS) else "PRODUCT_FOUR_SCOPE"
+    return "PHASE"
+
+
+def h039_local_asset_material_stage(files: dict) -> str:
+    """Actual bytes distinguish absent assets; matching hashes never give PASS.
+
+    Remaining positive chain: independent inputs -> existing B actual-material
+    and resealed causal controls -> reviewed full graph/attributes -> receipt.
+    No native loading or whole historical/B gate execution belongs to this lane.
+    """
+    if type(files) is not dict or set(files) != set(_LOCAL_PRODUCTS):
+        return "MATERIAL_SCHEMA"
+    if any(type(files[path]) is not bytes for path in _LOCAL_PRODUCTS):
+        return "MATERIAL_SCHEMA"
+    actual = tuple(h039_local_sha(files[path]) for path in _LOCAL_PRODUCTS)
+    if actual == _LOCAL_BASE_PRODUCT_SHA:
+        return "ASSET_REPRESENTATION_ABSENT"
+    if actual != _LOCAL_REFERENCE_PRODUCT_SHA:
+        return "ASSET_REFERENCE_BINDING"
+    return "NOT_READY_POSITIVE_MATERIAL_GRAPH_ATTRIBUTE_CHAIN"
+
+
+
+
+def h039_local_observe(contract: str, candidate: str) -> dict:
+    """Use the B-derived closure; no caller report or second observer path."""
+    phase = "CONTRACT_SIX" if contract == candidate else "PRODUCT_FOUR"
+    facts = h039_asset_draft_git_observe_local(_LOCAL_BASE, candidate, phase, contract)
+    return {"commits": {oid: {"commit": facts["commits"][oid], "tree": mapping}
+                        for oid, mapping in facts["trees"].items()},
+            "materials": {path: facts["disk"][path] for path in _LOCAL_PRODUCTS},
+            "controls": {path: facts["disk"][path] for path in _LOCAL_CONTRACT_PATHS},
+            "relations": facts["relations"]}
+
+
+def h039_local_main(argv: list) -> int:
+    if not argv:
+        print("H039_COMPLETION_UNPROVEN", file=_local_sys.stderr)
+        return 2
+    if len(argv) == 2 and argv[0] == "--asset-contract" and h039_local_oid(argv[1]):
+        phase, contract, candidate = "contract", argv[1], argv[1]
+    elif len(argv) == 3 and argv[0] == "--asset-product" and all(h039_local_oid(arg) for arg in argv[1:]):
+        phase, contract, candidate = "product", argv[1], argv[2]
+    else:
+        print("LOCAL_ASSET_ARGV_REFUSED_NO_CONSUMED_LANE", file=_local_sys.stderr)
+        return 2
+    try:
+        facts = h039_local_observe(contract, candidate)
+        base, contract_row = facts["commits"][_LOCAL_BASE], facts["commits"][contract]
+        if contract == _LOCAL_BASE or contract_row["commit"]["parents"] != [_LOCAL_BASE]:
+            raise ValueError("contract direct parent")
+        relation = h039_local_relation(base["tree"], contract_row["tree"], "contract")
+        if relation != "RELATION_ONLY_NOT_ACCEPTANCE":
+            raise ValueError(relation)
+        if not h039_local_historical_gate(facts["controls"]["verify/bin/h-039-exit"]):
+            raise ValueError("historical gate byte closure")
+        if not h039_local_spec(facts["controls"]["specs/tasks.spec.json"]):
+            raise ValueError("local spec byte closure")
+        if phase == "product" and candidate != contract:
+            row = facts["commits"][candidate]
+            if row["commit"]["parents"] != [contract]:
+                raise ValueError("product direct parent")
+            relation = h039_local_relation(contract_row["tree"], row["tree"], "product")
+            if relation != "RELATION_ONLY_NOT_ACCEPTANCE":
+                raise ValueError(relation)
+        stage = h039_local_asset_material_stage(facts["materials"])
+        if stage == "ASSET_REPRESENTATION_ABSENT":
+            print("FAIL ASSET_REPRESENTATION_ABSENT")
+            return 1
+        print(stage + " NO_GATE_OR_PRODUCT_CREDIT", file=_local_sys.stderr)
+        return 2
+    except (ValueError, OSError, _local_subprocess.SubprocessError) as exc:
+        failure = {"error": type(exc).__name__, "detail": str(exc)}
+        for name in ("h039_git_postauth", "h039_git_close_failures", "h039_close_failures",
+                     "h039_git_child_cleanup_failures", "h039_git_capture_close_failures"):
+            if hasattr(exc, name):
+                failure[name] = getattr(exc, name)
+        print("LOCAL_ASSET_UNJUDGEABLE " + _local_json.dumps(failure, sort_keys=True), file=_local_sys.stderr)
+        return 2
+
+
+# B closure from source aa9f5147..., no B module or build-driver import.
+# Five helpers remain exact source; operation/observer deltas are documented.
+_asset_hashlib = _local_hashlib
+
+_asset_os = _local_os
+_asset_stat = _local_stat
+_asset_sys = _local_sys
+_asset_subprocess = _local_subprocess
+import selectors as _asset_selectors
+import struct as _asset_struct
+import time as _asset_time
+
+def h039_asset_draft_git_operation(kind: str, oids: list) -> dict:
+    """Fixed local builtin requests, not execution or a caller-selected argv API."""
+    counts = {"config": 0, "head": 0, "type": 1, "size": 1, "commit": 1, "tree": 1,
+              "blob": 1, "listing": 1, "rawdiff": 2, "numstat": 2, "index": 0, "status": 0}
+    if (type(kind) is not str or kind not in counts or type(oids) is not list
+            or len(oids) != counts[kind] or any(type(oid) is not str or len(oid) != 40
+                or any(c not in "0123456789abcdef" for c in oid) for oid in oids)):
+        raise ValueError("fixed Git request")
+    environment = {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_COUNT": "0",
+        "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_NO_REPLACE_OBJECTS": "1", "GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"}
+    prefix = ["/Library/Developer/CommandLineTools/usr/bin/git", "--no-pager", "--literal-pathspecs", "--no-replace-objects",
+              "-c", "core.attributesFile=/dev/null", "-c", "core.excludesFile=/dev/null",
+              "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+              "-c", "diff.external=", "-c", "pager.diff=false",
+              "-c", "diff.algorithm=myers", "-c", "diff.indentHeuristic=true"]
+    if kind == "config":
+        suffix = ["config", "--no-includes", "--file", "-", "--null", "--list"]
+    elif kind == "head":
+        suffix = ["rev-parse", "--verify", "HEAD"]
+    elif kind == "index":
+        suffix = ["ls-files", "--stage", "-z"]
+    elif kind == "status":
+        suffix = ["status", "--porcelain=v1", "-z", "--untracked-files=all"]
+    elif kind in ("type", "size"):
+        suffix = ["cat-file", "-t" if kind == "type" else "-s", oids[0]]
+    elif kind in ("commit", "tree", "blob"):
+        suffix = ["cat-file", kind, oids[0]]
+    elif kind == "listing":
+        suffix = ["ls-tree", "-r", "-z", "--full-tree", oids[0]]
+    else:
+        suffix = ["diff-tree", "-r", "--no-commit-id", "--no-abbrev", "--no-renames",
+                  "--no-ext-diff", "--no-textconv", "--raw" if kind == "rawdiff" else "--numstat",
+                  "-z", oids[0], oids[1], "--"]
+    return {"prefix": prefix, "suffix": suffix, "environment": environment,
+            "tool_size": 7604272,
+            "tool_sha256": "be4afb2b003904725826250de9fb76567bbacf82323457b5a1ec26706b66bcae",
+            "scope": "LOCAL_BUILTIN_ONLY_NO_REMOTE_OR_HELPERS"}
+
+
+def h039_asset_draft_git_observe_local(base: str, candidate: str, phase: str, contract: str) -> dict:
+    """Local B-derived observer, still unfrozen and never a phase verdict.
+
+    B retained/raw-object/subprocess/attribute/postauth closure is reused.
+    Local deltas: six platform paths, two authenticated edges at HEAD=P,
+    fixed index/status operations and candidate disk bytes in the same closure.
+    No temporary files, Git writes, compiler, asset loading or runtime effect.
+    """
+    h039_asset_draft_git_operation("rawdiff", [base, candidate])
+    h039_asset_draft_git_operation("type", [contract])
+    if (base != _LOCAL_BASE or contract == base or type(phase) is not str
+            or phase not in ("CONTRACT_SIX", "PRODUCT_FOUR")
+            or (phase == "CONTRACT_SIX" and contract != candidate)):
+        raise ValueError("Git fact phase or fixed generation")
+    contract_paths = list(_LOCAL_CONTRACT_PATHS)
+    product_paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+                     "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    # The contract edge is always checked; P=C is only the productless baseline.
+    edges = [("contract", base, contract, contract_paths)]
+    if phase == "PRODUCT_FOUR" and candidate != contract:
+        edges.append(("product", contract, candidate, product_paths))
+    selected_paths = contract_paths + (product_paths if len(edges) == 2 else [])
+    source_path = _asset_os.path.abspath(__file__)
+    if not source_path.endswith("/verify/bin/h-039-exit") or _asset_os.path.realpath(source_path) != source_path:
+        raise ValueError("Git gate-relative root")
+    root = source_path[:-len("/verify/bin/h-039-exit")]
+    tool = h039_asset_draft_git_operation("config", [])
+    tool_raw, config_snapshot, head_snapshot, index_snapshot = None, None, None, None
+    disk_snapshots = []
+    authenticated_attribute_source = None
+    prestate_complete = False
+    descriptors, retained, absent = [], [], []
+    def identity(info: object) -> tuple:
+        return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+                info.st_nlink, info.st_size, info.st_flags, info.st_mtime_ns, info.st_ctime_ns)
+    def open_member(parent: int, name: str, directory: bool, limit: int = 0, tracked_mode: str = None) -> tuple:
+        before = _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+        flags = _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK
+        if directory:
+            flags |= _asset_os.O_DIRECTORY
+        fd = _asset_os.open(name, flags, dir_fd=parent); descriptors.append(fd)
+        after = _asset_os.fstat(fd)
+        if identity(before) != identity(after) or (_asset_stat.S_ISDIR(after.st_mode) if directory else
+                _asset_stat.S_ISREG(after.st_mode)) is not True:
+            raise ValueError("Git retained member identity")
+        if not directory and (after.st_uid != _asset_os.getuid() or after.st_nlink != 1
+                or _asset_stat.S_IMODE(after.st_mode) not in ((0o600, 0o644) if tracked_mode is None
+                    else (int(tracked_mode[-3:], 8),)) or after.st_size > limit):
+            raise ValueError("Git metadata leaf shape")
+        retained.append((parent, name, fd, identity(after)))
+        data = b""
+        if not directory:
+            while len(data) < after.st_size:
+                chunk = _asset_os.pread(fd, min(65536, after.st_size - len(data)), len(data))
+                if not chunk:
+                    raise ValueError("Git metadata short read")
+                data += chunk
+            if _asset_os.pread(fd, 1, len(data)):
+                raise ValueError("Git metadata grew")
+        return fd, data
+    def absent_member(parent: int, name: str) -> None:
+        try:
+            _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            absent.append((parent, name))
+        else:
+            raise ValueError("Git forbidden local input", name)
+    def run(kind: str, oids: list, data: bytes = b"", limit: int = 4194304) -> bytes:
+        request = h039_asset_draft_git_operation(kind, oids)
+        attr_option = []
+        if kind in ("rawdiff", "numstat"):
+            if (authenticated_attribute_source != oids[-1]
+                    or oids not in [[left, right] for _, left, right, _ in edges]):
+                raise ValueError("Git attributes lack authenticated candidate tree")
+            # Installed CLT git.1 --attr-source and gitattributes.5: an absent
+            # working-tree file alone otherwise permits fallback to the index.
+            attr_option = ["--attr-source=" + authenticated_attribute_source]
+        argv = request["prefix"] + attr_option + ([] if kind == "config" else ["--git-dir=" + root + "/.git", "--work-tree=" + root]) + request["suffix"]
+        if kind != "config" and data:
+            raise ValueError("Git unexpected stdin")
+        proc = _asset_subprocess.Popen(argv, cwd="/private/var/empty" if kind == "config" else root,
+            env=request["environment"], stdin=_asset_subprocess.PIPE if data else _asset_subprocess.DEVNULL,
+            stdout=_asset_subprocess.PIPE, stderr=_asset_subprocess.PIPE, shell=False, close_fds=True)
+        poller = None
+        streams, sent = {"stdout": bytearray(), "stderr": bytearray()}, 0
+        deadline = _asset_time.monotonic() + 15.0
+        try:
+            poller = _asset_selectors.DefaultSelector()
+            for stream, label in ((proc.stdout, "stdout"), (proc.stderr, "stderr")):
+                _asset_os.set_blocking(stream.fileno(), False)
+                poller.register(stream, _asset_selectors.EVENT_READ, label)
+            if data:
+                _asset_os.set_blocking(proc.stdin.fileno(), False)
+                poller.register(proc.stdin, _asset_selectors.EVENT_WRITE, "stdin")
+            while poller.get_map():
+                remaining = deadline - _asset_time.monotonic()
+                if remaining <= 0:
+                    raise ValueError("Git direct-child deadline")
+                for key, events in poller.select(min(remaining, 0.1)):
+                    stream, label = key.fileobj, key.data
+                    if label == "stdin":
+                        try:
+                            count = _asset_os.write(stream.fileno(), data[sent:sent + 4096])
+                        except BlockingIOError:
+                            continue
+                        if count <= 0:
+                            raise ValueError("Git config stdin progress")
+                        sent += count
+                        if sent == len(data):
+                            poller.unregister(stream); stream.close()
+                        continue
+                    try:
+                        chunk = _asset_os.read(stream.fileno(), 65536)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        poller.unregister(stream); stream.close()
+                        continue
+                    streams[label].extend(chunk)
+                    if len(streams[label]) > (limit if label == "stdout" else 65536):
+                        raise ValueError("Git bounded capture", label)
+            remaining = deadline - _asset_time.monotonic()
+            if remaining <= 0:
+                raise ValueError("Git EOF is not direct-child exit")
+            status = proc.wait(timeout=remaining)
+            if status != 0 or streams["stderr"] or (data and sent != len(data)):
+                raise ValueError("Git builtin failed", status, bytes(streams["stderr"]))
+            return bytes(streams["stdout"])
+        except BaseException as primary:
+            # Eligibility is closed trusted local builtins only. This makes no
+            # descendant-cleanup claim and grants no killpg/native-scan authority.
+            cleanup_failures, polled, child_status = [], False, None
+            try:
+                child_status = proc.poll(); polled = True
+            except BaseException as exc:
+                cleanup_failures.append(("poll", type(exc).__name__, str(exc)))
+            if polled and child_status is None:
+                try:
+                    proc.kill()
+                except BaseException as exc:
+                    cleanup_failures.append(("kill", type(exc).__name__, str(exc)))
+            # Wait is attempted independently even if poll or kill failed.
+            try:
+                proc.wait(timeout=5.0)
+            except BaseException as exc:
+                cleanup_failures.append(("wait", type(exc).__name__, str(exc)))
+            primary.h039_git_child_cleanup_failures = cleanup_failures
+            raise
+        finally:
+            primary = _asset_sys.exc_info()[1]
+            close_failures = []
+            for label, owned in (("selector", poller), ("stdin", proc.stdin),
+                                 ("stdout", proc.stdout), ("stderr", proc.stderr)):
+                if owned is not None:
+                    try:
+                        owned.close()
+                    except BaseException as exc:
+                        close_failures.append((label, type(exc).__name__, str(exc)))
+            if close_failures and primary is None:
+                raise ValueError("Git owned capture close", close_failures)
+            if close_failures and primary is not None:
+                primary.h039_git_capture_close_failures = close_failures
+    def object_raw(kind: str, oid: str, limit: int) -> bytes:
+        if h039_asset_draft_git_records("type", run("type", [oid], limit=16), "") != kind:
+            raise ValueError("Git object kind disagreement")
+        size = h039_asset_draft_git_records("size", run("size", [oid], limit=32), "")
+        if size > limit:
+            raise ValueError("Git object capture bound")
+        raw = run(kind, [oid], limit=limit)
+        if len(raw) != size:
+            raise ValueError("Git object size disagreement")
+        h039_asset_draft_git_records(kind, raw, oid)
+        return raw
+    try:
+        tool_raw = h039_asset_draft_retained_read(tool["prefix"][0], tool["tool_sha256"], tool["tool_size"], True)
+        if (len(tool_raw) != tool["tool_size"] or tool_raw[:8] != bytes.fromhex("cafebabe00000002")
+                or [_asset_struct.unpack_from(">5I", tool_raw, off) for off in (8, 28)] != [
+                    (16777223, 3, 16384, 3867856, 14), (16777228, 0, 3899392, 3704880, 14)]):
+            raise ValueError("fixed direct CLT Git architecture")
+        fd = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_CLOEXEC)
+        descriptors.append(fd)
+        for component in root.split("/")[1:]:
+            fd, unused = open_member(fd, component, True)
+        root_fd = fd
+        if not _asset_stat.S_ISDIR(_asset_os.stat(".git", dir_fd=root_fd, follow_symlinks=False).st_mode):
+            raise ValueError("RIG_UNSUPPORTED_NON_STANDALONE_CHECKOUT")
+        git_fd, unused = open_member(root_fd, ".git", True)
+        config_fd, config = open_member(git_fd, "config", False, 1048576)
+        config_snapshot = (config_fd, config)
+        head_fd, head_before = open_member(git_fd, "HEAD", False, 4096)
+        head_snapshot = (head_fd, head_before)
+        index_fd, index_before = open_member(git_fd, "index", False, 4194304)
+        index_snapshot = (index_fd, index_before)
+        for name in ("commondir", "config.worktree", "shallow"):
+            absent_member(git_fd, name)
+        info_fd, unused = open_member(git_fd, "info", True)
+        for name in ("grafts", "attributes"):
+            absent_member(info_fd, name)
+        object_fd, unused = open_member(git_fd, "objects", True)
+        object_info_fd, unused = open_member(object_fd, "info", True)
+        for name in ("alternates", "http-alternates"):
+            absent_member(object_info_fd, name)
+        refs_fd, unused = open_member(git_fd, "refs", True)
+        absent_member(refs_fd, "replace")
+        attribute_parents = {""}
+        for path in selected_paths:
+            pieces = path.split("/")[:-1]
+            attribute_parents.update("/".join(pieces[:i]) for i in range(1, len(pieces) + 1))
+        for parent in sorted(attribute_parents):
+            current = root_fd
+            for component in parent.split("/") if parent else []:
+                current, unused = open_member(current, component, True)
+            absent_member(current, ".gitattributes")
+        prestate_complete = True
+        if not h039_asset_draft_git_config_exact(run("config", [], config, 1048576)):
+            raise ValueError("Git safe config rejected before repository commands")
+        if h039_asset_draft_git_records("head", run("head", [], limit=64), "") != candidate:
+            raise ValueError("Git candidate is not observed HEAD")
+        commits, maps = {}, {}
+        for commit in dict.fromkeys((base, contract, candidate)):
+            commits[commit] = h039_asset_draft_git_records("commit", object_raw("commit", commit, 65536), commit)
+            pending = [("", commits[commit]["tree"], 0)]; complete = {}; tree_count = 0
+            while pending:
+                prefix, tree_oid, depth = pending.pop(); tree_count += 1
+                if tree_count > 8192 or depth > 128:
+                    raise ValueError("Git tree traversal capture bound")
+                rows = h039_asset_draft_git_records("tree", object_raw("tree", tree_oid, 4194304), tree_oid)
+                for mode, name, member in rows:
+                    relative = prefix + name
+                    if mode == "40000":
+                        pending.append((relative + "/", member, depth + 1))
+                    else:
+                        if relative in complete or len(complete) >= 8192:
+                            raise ValueError("Git full tree membership bound")
+                        complete[relative] = (mode, member)
+            listing = h039_asset_draft_git_records("listing", run("listing", [commit]), "")
+            if listing != complete:
+                raise ValueError("Git listing versus raw recursive tree")
+            maps[commit] = complete
+        # Attribute selection becomes eligible only after both recursive tree
+        # object closures and complete listings have been authenticated.
+        for parent in sorted(attribute_parents):
+            name = (parent + "/" if parent else "") + ".gitattributes"
+            if any(name in mapping for mapping in maps.values()):
+                raise ValueError("Git unreviewed committed attributes")
+        if commits[contract]["parents"] != [base]:
+            raise ValueError("Git contract direct parent")
+        if candidate != contract and commits[candidate]["parents"] != [contract]:
+            raise ValueError("Git product direct parent")
+        relations = {}
+        for edge, left, right, expected_paths in edges:
+            authenticated_attribute_source = right
+            diff = h039_asset_draft_git_records("rawdiff", run("rawdiff", [left, right]), "")
+            actual_changed = sorted(path for path in set(maps[left]) | set(maps[right])
+                                    if maps[left].get(path) != maps[right].get(path))
+            if sorted(diff) != actual_changed or actual_changed != sorted(expected_paths):
+                raise ValueError("Git complete diff surface", edge)
+            for path, row in diff.items():
+                if (row[4] != "M" or row[:2] != (maps[left][path][0], maps[right][path][0])
+                        or row[2:4] != (maps[left][path][1], maps[right][path][1])
+                        or row[0] != row[1]):
+                    raise ValueError("Git raw diff/tree disagreement", edge)
+            numstat = h039_asset_draft_git_records("numstat", run("numstat", [left, right]), "")
+            if set(numstat) != set(diff) or any(
+                    (counts == (None, None)) != (path == "controller/runtime-cleanup/install")
+                    for path, counts in numstat.items()):
+                raise ValueError("Git actual numstat membership/type", edge)
+            if edge == "product" and numstat != _LOCAL_REFERENCE_NUMSTAT:
+                raise ValueError("Git measured reference numstat", numstat)
+            relations[edge] = {"base": left, "candidate": right, "rawdiff": diff,
+                               "observed_git_numstat": numstat}
+        # Opaque unchanged gate/spec blobs may exceed 1 MiB; their modes/OIDs
+        # are already complete. Read only four small material blobs per tree.
+        material = {}
+        for commit, mapping in maps.items():
+            material[commit] = {}
+            for path in product_paths:
+                mode, oid = mapping[path]
+                material[commit][path] = (mode, object_raw("blob", oid, 1048576))
+        # Bind the actual candidate, not only Git's index or skip-worktree view.
+        disk, directories = {}, {"": root_fd}
+        for path, (mode, oid) in sorted(maps[candidate].items()):
+            parts = path.split("/")
+            parent_name = ""
+            for name in parts[:-1]:
+                relative = parent_name + ("/" if parent_name else "") + name
+                if relative not in directories:
+                    directories[relative], unused = open_member(directories[parent_name], name, True)
+                parent_name = relative
+            child, raw = open_member(directories[parent_name], parts[-1], False, 4194304, mode)
+            if h039_local_blob(raw) != oid:
+                raise ValueError("Git candidate disk/object mismatch", path)
+            disk[path] = raw
+            disk_snapshots.append((path, (child, raw)))
+        expected_index = b"".join(f"{mode} {oid} 0\t{path}\0".encode()
+                                  for path, (mode, oid) in sorted(maps[candidate].items()))
+        if run("index", []) != expected_index:
+            raise ValueError("Git candidate index/object mismatch")
+        if run("status", []):
+            raise ValueError("Git candidate is not clean")
+        if h039_asset_draft_git_records("head", run("head", [], limit=64), "") != candidate:
+            raise ValueError("Git HEAD changed")
+        return {"status": "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT",
+                "base": base, "candidate": candidate, "contract": contract, "commits": commits,
+                "trees": maps, "relations": relations, "material": material, "disk": disk}
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        postauth_failures, unobserved, close_failures = [], [], []
+        try:
+            if not prestate_complete:
+                unobserved.append("remaining_prestate_bindings")
+            for label, snapshot in ([("config_bytes", config_snapshot), ("head_bytes", head_snapshot),
+                                     ("index_bytes", index_snapshot)] + disk_snapshots):
+                if snapshot is None:
+                    unobserved.append(label)
+                    continue
+                child, expected_bytes = snapshot
+                try:
+                    if _asset_os.pread(child, len(expected_bytes) + 1, 0) != expected_bytes:
+                        raise ValueError("Git metadata bytes changed")
+                except BaseException as exc:
+                    postauth_failures.append((label, type(exc).__name__, str(exc)))
+            for parent, name, child, expected in retained:
+                try:
+                    if identity(_asset_os.fstat(child)) != expected:
+                        raise ValueError("Git retained FD changed")
+                except BaseException as exc:
+                    postauth_failures.append(("fd:" + name, type(exc).__name__, str(exc)))
+                try:
+                    if identity(_asset_os.stat(name, dir_fd=parent, follow_symlinks=False)) != expected:
+                        raise ValueError("Git retained name changed")
+                except BaseException as exc:
+                    postauth_failures.append(("name:" + name, type(exc).__name__, str(exc)))
+            for parent, name in absent:
+                try:
+                    _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                except BaseException as exc:
+                    postauth_failures.append(("absence:" + name, type(exc).__name__, str(exc)))
+                else:
+                    postauth_failures.append(("absence:" + name, "ValueError", "Git forbidden input appeared"))
+            if tool_raw is None:
+                unobserved.append("tool_bytes")
+            else:
+                try:
+                    if h039_asset_draft_retained_read(tool["prefix"][0], tool["tool_sha256"], tool["tool_size"], True) != tool_raw:
+                        raise ValueError("Git direct tool changed")
+                except BaseException as exc:
+                    postauth_failures.append(("tool_bytes", type(exc).__name__, str(exc)))
+        except BaseException as exc:
+            postauth_failures.append(("postauth_internal", type(exc).__name__, str(exc)))
+        finally:
+            try:
+                close_failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+            except BaseException as exc:
+                close_failures.append(("close_internal", type(exc).__name__, str(exc)))
+        postauth = {"failures": postauth_failures, "unobserved": unobserved,
+                    "acquired_bindings_unchanged": not postauth_failures,
+                    "state": "UNKNOWN_OR_CHANGED" if primary is not None or postauth_failures
+                    or unobserved or close_failures else "ACQUIRED_BINDINGS_UNCHANGED"}
+        if primary is not None:
+            primary.h039_git_postauth = postauth
+            primary.h039_git_close_failures = close_failures
+        elif postauth_failures or unobserved or close_failures:
+            raise ValueError("Git final postauthentication or close failed", postauth, close_failures)
+
+
+def h039_asset_draft_retained_read(path: str, expected_sha256: str,
+                                 maximum_bytes: int, root_owned: bool) -> bytes:
+    """Dormant retained-ancestor, nofollow bounded reader; never executable loading.
+
+    Path/digest/bound originate in the reviewed gate, not an untrusted manifest.
+    No caller can reach this through current argv dispatch. All opened FDs close.
+    This read primitive alone does not authenticate a compiler's later pathname IO.
+    """
+    if (type(path) is not str or not path.startswith("/") or "\0" in path
+            or any(part in {"", ".", ".."} for part in path.split("/")[1:])
+            or type(expected_sha256) is not str or len(expected_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in expected_sha256)
+            or type(maximum_bytes) is not int or not 0 < maximum_bytes <= 536870912
+            or type(root_owned) is not bool):
+        raise ValueError("retained read authority shape")
+    descriptors, bindings = [], []
+    try:
+        current = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_CLOEXEC)
+        descriptors.append(current)
+        root_stat = _asset_os.fstat(current)
+        if root_stat.st_uid != 0 or root_stat.st_mode & 0o022:
+            raise ValueError("root ancestor authority")
+        if root_owned:
+            h039_asset_draft_acl_empty(current)
+        components = path.split("/")[1:]
+        for index, name in enumerate(components):
+            final = index == len(components) - 1
+            flags = _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK
+            if not final:
+                flags |= _asset_os.O_DIRECTORY
+            child = _asset_os.open(name, flags, dir_fd=current)
+            descriptors.append(child)
+            observed = _asset_os.fstat(child)
+            identity = (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_uid,
+                        observed.st_gid, observed.st_nlink, observed.st_size, observed.st_flags,
+                        observed.st_mtime_ns, observed.st_ctime_ns)
+            if root_owned and (observed.st_uid != 0 or observed.st_mode & 0o022):
+                raise ValueError("non-root-writable tool ancestry")
+            if root_owned:
+                h039_asset_draft_acl_empty(child)
+            if final and (not _asset_stat.S_ISREG(observed.st_mode) or observed.st_nlink != 1
+                          or not 0 <= observed.st_size <= maximum_bytes):
+                raise ValueError("retained regular leaf bound")
+            if not final and not _asset_stat.S_ISDIR(observed.st_mode):
+                raise ValueError("retained ancestor type")
+            bindings.append((current, name, child, identity))
+            current = child
+        chunks, offset = [], 0
+        while offset < bindings[-1][3][6]:
+            chunk = _asset_os.pread(current, min(1048576, bindings[-1][3][6] - offset), offset)
+            if not chunk:
+                raise ValueError("retained short read")
+            chunks.append(chunk)
+            offset += len(chunk)
+        if _asset_os.pread(current, 1, offset):
+            raise ValueError("retained leaf grew")
+        raw = b"".join(chunks)
+        if _asset_hashlib.sha256(raw).hexdigest() != expected_sha256:
+            raise ValueError("retained source digest")
+        for parent, name, child, identity in bindings:
+            if root_owned:
+                h039_asset_draft_acl_empty(child)
+            for observed in [_asset_os.fstat(child), _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)]:
+                if (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_uid,
+                    observed.st_gid, observed.st_nlink, observed.st_size, observed.st_flags,
+                    observed.st_mtime_ns, observed.st_ctime_ns) != identity:
+                    raise ValueError("retained final identity/name rebind")
+        return raw
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+        if failures and primary is None:
+            raise ValueError("retained close failure", failures)
+        if failures and primary is not None:
+            primary.h039_close_failures = failures
+
+
+def h039_asset_draft_close_owned(descriptors: list, closer: object) -> list:
+    """Attempt each owned close once; ambiguous close is never retried."""
+    if (type(descriptors) is not list or len(set(descriptors)) != len(descriptors)
+            or any(type(fd) is not int or fd < 0 for fd in descriptors)):
+        raise ValueError("owned descriptor list")
+    failures = []
+    for descriptor in descriptors:
+        try:
+            closer(descriptor)
+        except BaseException as exc:
+            failures.append((descriptor, type(exc).__name__, str(exc)))
+    return failures
+
+
+def h039_asset_draft_acl_empty(descriptor: int) -> None:
+    """Dormant Darwin ACL metadata query, not candidate loading.
+
+    Small retained-FD ACL arm derived from the published gate and SDK sys/acl.h.
+    UID/mode alone never claims write exclusion; any extended ACL fails closed.
+    """
+    import ctypes
+    import errno
+    if type(descriptor) is not int or descriptor < 0:
+        raise ValueError("ACL descriptor")
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.acl_get_fd_np.argtypes = [ctypes.c_int, ctypes.c_int]
+    libc.acl_get_fd_np.restype = ctypes.c_void_p
+    libc.acl_free.argtypes = [ctypes.c_void_p]
+    libc.acl_free.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    acl = libc.acl_get_fd_np(descriptor, 0x100)
+    if not acl:
+        if ctypes.get_errno() == errno.ENOENT:
+            return
+        raise ValueError("ACL acquisition error", ctypes.get_errno())
+    # Policy is absence of an ACL object, not acceptance of present-empty ACLs.
+    # No undocumented acl_get_entry return convention is used.
+    released = libc.acl_free(acl)
+    raise ValueError("ACL object present or unexpected", "released" if released == 0 else "release failed")
+
+def h039_asset_draft_git_config_exact(raw: bytes) -> bool:
+    """Strict output of pinned Git config --no-includes --file -; no config IO."""
+    if type(raw) is not bytes or not raw or len(raw) > 1048576 or not raw.endswith(b"\0"):
+        return False
+    try:
+        values = {}
+        for row in raw[:-1].split(b"\0"):
+            key, sep, value = row.partition(b"\n")
+            key, value = key.decode("ascii").lower(), value.decode("utf-8")
+            if not sep or not key or key in values or "\n" in value or "\r" in value:
+                return False
+            values[key] = value
+        required = {"core.repositoryformatversion": "0", "core.filemode": "true",
+                    "core.bare": "false", "core.logallrefupdates": "true",
+                    "core.ignorecase": "true", "core.precomposeunicode": "true",
+                    "remote.origin.url": "git@github.com:Nortropic/nortropic-system.git",
+                    "remote.origin.fetch": "+refs/heads/*:refs/remotes/origin/*"}
+        if any(values.get(key) != value for key, value in required.items()):
+            return False
+        for key, value in values.items():
+            if key in required:
+                continue
+            if key in ("user.name", "user.email") and 0 < len(value) <= 256:
+                continue
+            if not key.startswith("branch.") or "." not in key[7:]:
+                return False
+            branch, field = key[7:].rsplit(".", 1)
+            if (not branch or any(c.isspace() or c in "\0\\" for c in branch)
+                    or field not in ("remote", "merge", "vscode-merge-base")):
+                return False
+            if ((field == "remote" and value != "origin")
+                    or (field == "vscode-merge-base" and value != "origin/main")
+                    or (field == "merge" and (not value.startswith("refs/heads/")
+                        or len(value) == 11 or any(c.isspace() for c in value)))):
+                return False
+        return True
+    except (UnicodeError, ValueError):
+        return False
+
+
+def h039_asset_draft_git_records(kind: str, raw: bytes, oid: str) -> object:
+    """Closed wire formats; parsed models alone never authenticate real Git state."""
+    if type(raw) is not bytes or type(kind) is not str:
+        raise ValueError("Git record input")
+    def hexoid(value: str) -> bool:
+        return len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+    def path(value: bytes) -> str:
+        decoded = value.decode("utf-8", "strict")
+        if (not decoded or decoded.startswith("/") or "\0" in decoded
+                or any(part in ("", ".", "..") for part in decoded.split("/"))):
+            raise ValueError("Git path")
+        return decoded
+    if kind in ("commit", "tree", "blob"):
+        if type(oid) is not str or not hexoid(oid):
+            raise ValueError("Git object OID")
+        digest = _asset_hashlib.sha1(kind.encode("ascii") + b" " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+        if digest != oid:
+            raise ValueError("Git object hash")
+    if kind == "blob":
+        return raw
+    if kind == "head":
+        if not raw.endswith(b"\n") or not hexoid(raw[:-1].decode("ascii")):
+            raise ValueError("Git HEAD OID")
+        return raw[:-1].decode("ascii")
+    if kind == "type":
+        if raw not in (b"commit\n", b"tree\n", b"blob\n"):
+            raise ValueError("Git object type")
+        return raw[:-1].decode("ascii")
+    if kind == "size":
+        if not raw.endswith(b"\n") or not raw[:-1].isdigit() or str(int(raw[:-1])).encode() != raw[:-1]:
+            raise ValueError("Git object size")
+        return int(raw[:-1])
+    if kind == "commit":
+        header, separator, message = raw.partition(b"\n\n")
+        if not separator or b"\0" in header or b"\r" in header:
+            raise ValueError("Git commit header")
+        lines = header.split(b"\n")
+        trees = [line[5:].decode("ascii") for line in lines if line.startswith(b"tree ")]
+        parents = [line[7:].decode("ascii") for line in lines if line.startswith(b"parent ")]
+        if (len(trees) != 1 or lines[0] != b"tree " + trees[0].encode()
+                or not hexoid(trees[0]) or any(not hexoid(parent) for parent in parents)
+                or len(set(parents)) != len(parents)
+                or lines[1:1 + len(parents)] != [b"parent " + parent.encode() for parent in parents]
+                or len(lines) < len(parents) + 3
+                or not lines[len(parents) + 1].startswith(b"author ")
+                or not lines[len(parents) + 2].startswith(b"committer ")
+                or sum(line.startswith(b"author ") for line in lines) != 1
+                or sum(line.startswith(b"committer ") for line in lines) != 1):
+            raise ValueError("Git commit fields")
+        optional, continuation = set(), False
+        for line in lines[len(parents) + 3:]:
+            if line.startswith(b" ") and continuation:
+                continue
+            key, sep, value = line.partition(b" ")
+            if (not sep or not value or key not in (b"encoding", b"gpgsig", b"gpgsig-sha256", b"mergetag")
+                    or key in optional):
+                raise ValueError("Git commit optional header")
+            optional.add(key)
+            continuation = key != b"encoding"
+        return {"tree": trees[0], "parents": parents}
+    if kind == "tree":
+        cursor, rows, seen, order = 0, [], set(), []
+        while cursor < len(raw):
+            end = raw.find(b"\0", cursor)
+            if end < 0 or end + 21 > len(raw):
+                raise ValueError("Git tree framing")
+            mode, sep, name = raw[cursor:end].partition(b" ")
+            if not sep or mode not in (b"40000", b"100644", b"100755") or b"/" in name:
+                raise ValueError("Git tree entry")
+            label = path(name)
+            if label in seen:
+                raise ValueError("Git tree duplicate")
+            seen.add(label)
+            member = raw[end + 1:end + 21].hex()
+            if member == "0" * 40:
+                raise ValueError("Git tree null object")
+            rows.append((mode.decode(), label, member))
+            order.append(name + (b"/" if mode == b"40000" else b""))
+            cursor = end + 21
+        if order != sorted(order):
+            raise ValueError("Git tree ordering")
+        return rows
+    if kind not in ("listing", "rawdiff", "numstat"):
+        raise ValueError("Git record kind")
+    if raw and not raw.endswith(b"\0"):
+        raise ValueError("Git NUL framing")
+    parts = raw[:-1].split(b"\0") if raw else []
+    rows = {}
+    if kind == "rawdiff":
+        if len(parts) % 2:
+            raise ValueError("Git rawdiff framing")
+        for meta, name in zip(parts[::2], parts[1::2]):
+            fields = meta.split(b" ")
+            if len(fields) != 5 or not fields[0].startswith(b":"):
+                raise ValueError("Git rawdiff metadata")
+            oldmode, newmode = fields[0][1:].decode("ascii"), fields[1].decode("ascii")
+            oldoid, newoid, status = (value.decode("ascii") for value in fields[2:])
+            if (oldmode not in ("000000", "100644", "100755")
+                    or newmode not in ("000000", "100644", "100755")
+                    or not hexoid(oldoid) or not hexoid(newoid) or status not in ("A", "D", "M")
+                    or (oldmode == "000000") != (oldoid == "0" * 40)
+                    or (newmode == "000000") != (newoid == "0" * 40)
+                    or (status == "A" and (oldmode != "000000" or newmode == "000000"))
+                    or (status == "D" and (newmode != "000000" or oldmode == "000000"))
+                    or (status == "M" and "000000" in (oldmode, newmode))):
+                raise ValueError("Git rawdiff fields")
+            label = path(name)
+            if label in rows:
+                raise ValueError("Git duplicate path")
+            rows[label] = (oldmode, newmode, oldoid, newoid, status)
+    else:
+        for row in parts:
+            fields = row.split(b"\t", 2 if kind == "numstat" else 1)
+            if len(fields) != (3 if kind == "numstat" else 2):
+                raise ValueError("Git row fields")
+            label = path(fields[-1])
+            if label in rows:
+                raise ValueError("Git duplicate path")
+            if kind == "listing":
+                meta = fields[0].split(b" ")
+                if (len(meta) != 3 or meta[0] not in (b"100644", b"100755")
+                        or meta[1] != b"blob" or not hexoid(meta[2].decode("ascii"))):
+                    raise ValueError("Git listing fields")
+                rows[label] = (meta[0].decode(), meta[2].decode())
+            else:
+                counts = fields[:2]
+                if counts == [b"-", b"-"]:
+                    rows[label] = (None, None)
+                elif any(not value.isdigit() or str(int(value)).encode() != value for value in counts):
+                    raise ValueError("Git numstat counts")
+                else:
+                    rows[label] = tuple(int(value) for value in counts)
+    return rows
+
+# Every invocation terminates here; the historical R33 imports below are data.
+raise SystemExit(h039_local_main(_local_sys.argv[1:]))
+# H039_LOCAL_ASSET_DRAFT_END
 import array
 import ast
 import base64
