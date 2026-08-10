@@ -68,12 +68,14 @@ inbyggd backlog och antar aldrig ett namnschema.
 """
 
 import json
+import math
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 if sys.version_info < (3, 12):
@@ -90,11 +92,10 @@ VERIFY = ROT / "controller/verify/cli"
 ATTEST = ROT / "controller/attest/cli"
 LEASE = ROT / "controller/lease/cli"
 
-# v4.1 §9:s tal. Config bär inget ttl-fält och komponenten uppfinner inget
-# eget — planens namn och planens siffror. Heartbeat och förnyelse (samma §)
-# har ingen spec-rad och byggs inte: en körning som varar längre än ttl kan
-# därför återtas av en annan controller. Skrivet här i stället för antaget.
-LEASE_TTL = "180"
+# h-004:s produktionsdefault. Testkörningar får snävare positiva värden via
+# config, men heartbeat måste alltid vara strikt kortare än TTL.
+LEASE_TTL_DEFAULT = 180
+LEASE_HEARTBEAT_DEFAULT = 30
 
 # Körningens exitkoder. 3 är RENT STOPP och hålls skilt från både slutförd
 # drain (0) och fel (1): driftformen är kör tills kvoten tar slut, börja om,
@@ -158,6 +159,115 @@ def kor(argv: list, text: bool = True,
         )
     except OSError as e:
         raise Avbryt(f"{argv[0]} kunde inte startas — {e}") from e
+
+
+class LeaseVakt:
+    """Håll en lease-generation levande och publicera första förlusten.
+
+    Samma lokala mutex serialiserar heartbeatens observation med den sista
+    tokenbundna kontrollen och attest-starten. Därmed kan en redan observerad
+    leaseförlust aldrig passera vidare till ATTEST.
+    """
+
+    def __init__(self, kat: str, task: str, lease_id: str, intervall: float):
+        self.kat = kat
+        self.task = task
+        self.lease_id = lease_id
+        self.intervall = intervall
+        self._stopp = threading.Event()
+        self._forlorad = threading.Event()
+        self._operation = threading.Lock()
+        self._orsak = ""
+        self._attesterade: list[tuple[str, str]] = []
+        self._trad = threading.Thread(
+            target=self._heartbeat,
+            name=f"lease-heartbeat-{task}",
+            daemon=True,
+        )
+
+    def start(self) -> None:
+        self._trad.start()
+
+    def _markera_forlust(self, orsak: str) -> None:
+        if not self._forlorad.is_set():
+            self._orsak = orsak
+            self._forlorad.set()
+            felaktiga = []
+            for attest_dir, sha in self._attesterade:
+                try:
+                    r = kor([ATTEST, attest_dir, "invalidate", sha])
+                except Avbryt as e:
+                    felaktiga.append(str(e))
+                    continue
+                if r.returncode != 0:
+                    felaktiga.append(sista(r.stderr or r.stdout))
+            if felaktiga:
+                self._orsak += f"; attestation kunde inte invalideras: {felaktiga[0]}"
+
+    def _fornya_lasd(self) -> bool:
+        try:
+            r = kor([LEASE, self.kat, "renew", self.task, self.lease_id])
+        except Avbryt as e:
+            self._markera_forlust(str(e))
+            return False
+        if r.returncode != 0:
+            self._markera_forlust(sista(r.stderr or r.stdout))
+            return False
+        return True
+
+    def _heartbeat(self) -> None:
+        try:
+            while not self._stopp.wait(self.intervall):
+                with self._operation:
+                    if self._stopp.is_set() or not self._fornya_lasd():
+                        return
+        except Exception as e:
+            # Varje accepterat positivt tal, även ett som hostens wait-API inte
+            # kan representera, måste bli fail-closed och aldrig en tyst död
+            # heartbeattråd.
+            with self._operation:
+                self._markera_forlust(
+                    f"heartbeat kraschade — {type(e).__name__}: {e}"
+                )
+
+    def krav(self, fornya: bool = False) -> None:
+        with self._operation:
+            if self._forlorad.is_set():
+                raise Avbryt(f"lease förlorad: {self._orsak}")
+            if fornya and not self._fornya_lasd():
+                raise Avbryt(f"lease förlorad: {self._orsak}")
+
+    def attestera(self, argv: list, attest_dir: str, sha: str) -> subprocess.CompletedProcess:
+        """Bind attesteringen mellan två synkrona generationskontroller.
+
+        Om generationen ersätts medan ATTEST arbetar fäller efterkontrollen
+        runnet och gör den nyss skrivna posten stale innan något senare led
+        kan läsa den som giltig. Tidigare poster från samma run invalideras
+        likaså om heartbeat observerar en senare leaseförlust.
+        """
+        with self._operation:
+            if self._forlorad.is_set():
+                raise Avbryt(f"lease förlorad: {self._orsak}")
+            if not self._fornya_lasd():
+                raise Avbryt(f"lease förlorad: {self._orsak}")
+            r = kor(argv)
+            if r.returncode == 0:
+                self._attesterade.append((attest_dir, sha))
+            if not self._fornya_lasd():
+                raise Avbryt(f"lease förlorad: {self._orsak}")
+            return r
+
+    def stoppa(self) -> None:
+        self._stopp.set()
+        self._trad.join()
+
+    def forlustorsak(self) -> str | None:
+        with self._operation:
+            return self._orsak if self._forlorad.is_set() else None
+
+    def markera_forlust(self, orsak: str) -> None:
+        with self._operation:
+            self._markera_forlust(orsak)
 
 
 def enrad(text: str, tecken: int = 300, svansrader: int = 0) -> str:
@@ -224,6 +334,24 @@ def las_config(fil: Path) -> dict:
     t = k.get("timeout_s")
     if isinstance(t, bool) or not isinstance(t, (int, float)) or t <= 0:
         raise Avbryt(f"config: timeout_s måste vara ett positivt tal, fick {t!r}")
+
+    for f, standard in (
+        ("lease_ttl_s", LEASE_TTL_DEFAULT),
+        ("lease_heartbeat_s", LEASE_HEARTBEAT_DEFAULT),
+    ):
+        v = k.get(f, standard)
+        if (
+            isinstance(v, bool)
+            or not isinstance(v, (int, float))
+            or not math.isfinite(v)
+            or v <= 0
+        ):
+            raise Avbryt(f"config: {f} måste vara ett positivt ändligt tal, fick {v!r}")
+        k[f] = v
+    if k["lease_heartbeat_s"] >= k["lease_ttl_s"]:
+        raise Avbryt(
+            "config: lease_heartbeat_s måste vara strikt mindre än lease_ttl_s"
+        )
     return k
 
 
@@ -234,7 +362,8 @@ def utsaga(nr: int, task: str, steg: str, text: str, svansrader: int = 0) -> Non
 
 
 def forsok(k: dict, task: str, base: str, tmpkat: Path, nr: int, f: int,
-           taskdom: tuple[str, str] | None) -> tuple[str, str | None]:
+           taskdom: tuple[str, str] | None,
+           leasevakt: LeaseVakt) -> tuple[str, str | None]:
     """Ett försök inuti claimet. Kandidatens SHA vid attestation, annars None.
 
     Eget workspace, eget kuvert, ett anrop till brytaren. Basen är densamma
@@ -243,15 +372,18 @@ def forsok(k: dict, task: str, base: str, tmpkat: Path, nr: int, f: int,
     attempt = f"{k['run_id']}-{task}-{f}"
     ws = None
     try:
+        leasevakt.krav()
         # attempt-id:ts form prövas av skiva 5, inte här: en andra regel om
         # samma sträng hade blivit den andra sanningen.
         r = kor([WORKSPACE, k["workspace_rot"], "create", attempt, base])
+        leasevakt.krav()
         if r.returncode != 0:
             utsaga(nr, task, "workspace", r.stderr or r.stdout)
             return VARV_SLUT, None
         ws = r.stdout.strip()
 
         r = kor([ENVELOPE, "build", k["run_id"], task, base, k["spec"]])
+        leasevakt.krav()
         if r.returncode != 0:
             utsaga(nr, task, "kuvert", r.stdout)
             return VARV_SLUT, None
@@ -278,6 +410,7 @@ def forsok(k: dict, task: str, base: str, tmpkat: Path, nr: int, f: int,
         r = kor([BRYTARE, "kor", Path(k["brytare_rot"]) / task, task,
                  k["budget"], k["troskel"], ws, kuvertfil, k["timeout_s"],
                  "--", *k["worker_cmd"]], text=False, env=worker_env)
+        leasevakt.krav()
         # Rapporten hålls i BYTES hela vägen. Skiva 6 dömer själv om den är
         # läsbar UTF-8; en avkodning här hade gjort en oparsbar rapport
         # parsbar. Avkodningen nedan är bara till utsagorna.
@@ -308,12 +441,14 @@ def forsok(k: dict, task: str, base: str, tmpkat: Path, nr: int, f: int,
         rapportfil.write_bytes(rapport)
 
         r = kor([WORKER, "parse", rapportfil])
+        leasevakt.krav()
         if r.returncode != 0:
             utsaga(nr, task, "parse", r.stdout)
             return FALLET, None
         sha = r.stdout.strip()
 
         r = kor([POLICY, "check", task, base, sha, k["spec"]])
+        leasevakt.krav()
         if r.returncode != 0:
             utsaga(nr, task, "policy", r.stdout)
             return FALLET, None
@@ -328,6 +463,7 @@ def forsok(k: dict, task: str, base: str, tmpkat: Path, nr: int, f: int,
             VERIFY, "run-commit", k["_register_sha256"], k["verifier_id"], sha,
             k["_snapshot_sha256"], k["_snapshot_dir"],
         ], env=dom_env)
+        leasevakt.krav()
         if r.returncode == VER_FAIL:
             utsaga(nr, task, "verifierare", r.stdout or r.stderr)
             return FALLET, None
@@ -350,6 +486,7 @@ def forsok(k: dict, task: str, base: str, tmpkat: Path, nr: int, f: int,
                 VERIFY, "task-run", k["_register_sha256"], grind_id,
                 grind_sha256, sha, k["_snapshot_sha256"], k["_snapshot_dir"],
             ], env=dom_env)
+            leasevakt.krav()
             if r.returncode == VER_FAIL:
                 utsaga(nr, task, "taskgrind", f"{grind_id}: {r.stdout or r.stderr}")
                 return FALLET, None
@@ -366,7 +503,9 @@ def forsok(k: dict, task: str, base: str, tmpkat: Path, nr: int, f: int,
         attest_argv = [ATTEST, k["attest_dir"], "write", task, sha]
         if taskdom is not None:
             attest_argv.extend(taskdom)
-        r = kor(attest_argv)
+        # Den sista synkrona renewen och ATTEST-starten ordnas mot heartbeatens
+        # förlustobservation. En redan observerad förlust når aldrig hit.
+        r = leasevakt.attestera(attest_argv, k["attest_dir"], sha)
         if r.returncode != 0:
             utsaga(nr, task, "attest", r.stderr or r.stdout)
             return FALLET, None
@@ -416,7 +555,8 @@ def hamta_taskdom(k: dict, task: str) -> tuple[str, str] | None:
     return svar["grind_id"], svar["grind_sha256"]
 
 
-def varv(k: dict, task: str, base: str, tmpkat: Path, nr: int) -> tuple[str, str | None]:
+def varv(k: dict, task: str, base: str, tmpkat: Path, nr: int,
+         leasevakt: LeaseVakt) -> tuple[str, str | None]:
     """Ett varv = ETT claim och ett eller flera försök.
 
     Loopen tar slut därför att den bara gör om BOKFÖRDA utfall: brytarens
@@ -429,7 +569,9 @@ def varv(k: dict, task: str, base: str, tmpkat: Path, nr: int) -> tuple[str, str
     bunden_taskdom: tuple[str, str] | None | object = object()
     f = 0
     while True:
+        leasevakt.krav()
         taskdom = hamta_taskdom(k, task)
+        leasevakt.krav()
         if f == 0:
             bunden_taskdom = taskdom
         elif taskdom != bunden_taskdom:
@@ -438,16 +580,18 @@ def varv(k: dict, task: str, base: str, tmpkat: Path, nr: int) -> tuple[str, str
                 f"{bunden_taskdom!r} → {taskdom!r}"
             )
         f += 1
-        utfall, sha = forsok(k, task, base, tmpkat, nr, f, taskdom)
+        utfall, sha = forsok(k, task, base, tmpkat, nr, f, taskdom, leasevakt)
         if utfall is not FALLET:
             return utfall, sha
 
 
-def drain(k: dict, tmpkat: Path) -> int:
+def drain(k: dict, tmpkat: Path, leasevakt: LeaseVakt) -> int:
     base, nr, attesterade = k["base_sha"], 0, 0
     sedda: set[str] = set()
     while True:
+        leasevakt.krav()
         r = kor([TASKVAL, "claim", k["spec"], k["attest_dir"], k["state_dir"]])
+        leasevakt.krav()
         if r.returncode != 0:
             raise Avbryt(f"taskval: {sista(r.stderr)}")
         task = r.stdout.strip()
@@ -461,7 +605,7 @@ def drain(k: dict, tmpkat: Path) -> int:
             raise Avbryt(f"taskval: {task} valdes två gånger — claimet tog inte")
         sedda.add(task)
         nr += 1
-        utfall, sha = varv(k, task, base, tmpkat, nr)
+        utfall, sha = varv(k, task, base, tmpkat, nr, leasevakt)
         if utfall is ATTESTERAD:
             base, attesterade = sha, attesterade + 1
         elif utfall is STOPP:
@@ -498,17 +642,37 @@ def gor_run(configfil: Path) -> int:
 
     # Leasen tas FÖRE allt annat och före varje skrivning. En körning som
     # inte äger resursen får inte lämna ett spår efter sig.
-    r = kor([LEASE, k["lease_dir"], "acquire", k["lease_resurs"], "--ttl", LEASE_TTL])
+    r = kor([
+        LEASE, k["lease_dir"], "acquire", k["lease_resurs"],
+        "--ttl", k["lease_ttl_s"], "--holder-pid", os.getpid(),
+    ])
     if r.returncode != 0:
         return fel(f"lease: {sista(r.stderr)}")
+    lease_id = r.stdout.strip()
+    if (
+        not 8 <= len(lease_id) <= 256
+        or any(c.isspace() or ord(c) < 33 for c in lease_id)
+    ):
+        # En holder-bunden lease får aldrig städas med legacy bare release.
+        # Detta är ett systerintegritetsfel; den bundna PID:n dör med loopen
+        # och TTL:n gör generationen återtagbar utan att vi gissar token.
+        return fel("lease: acquire gav ingen giltig lease_id")
 
-    tmpkat = Path(tempfile.mkdtemp(prefix="nortropic-loop-"))
+    leasevakt = LeaseVakt(
+        k["lease_dir"], k["lease_resurs"], lease_id, k["lease_heartbeat_s"]
+    )
+    tmpkat = None
+    heartbeat_startad = False
     try:
+        leasevakt.start()
+        heartbeat_startad = True
+        tmpkat = Path(tempfile.mkdtemp(prefix="nortropic-loop-"))
         # Snapshoten skapas efter vunnen lease men före första claim/event,
         # workspace eller session. Den lever hela runnet och är den enda
         # control-plane-authority som taskgrindarna senare får projicera.
         snapshot = tmpkat / "pre-task-authority"
         r = kor([VERIFY, "prepare", k["_register_sha256"], snapshot])
+        leasevakt.krav()
         if r.returncode != 0:
             raise Avbryt(f"pre-task authority: {sista(r.stderr or r.stdout)}")
         try:
@@ -525,13 +689,29 @@ def gor_run(configfil: Path) -> int:
             raise Avbryt(f"pre-task authority: ogiltigt snapshotsvar — {r.stdout.strip()[:300]}")
         k["_snapshot_dir"] = str(snapshot)
         k["_snapshot_sha256"] = svar["snapshot_sha256"]
-        return drain(k, tmpkat)
+        utfall = drain(k, tmpkat, leasevakt)
+        # Även ett tomt drain måste fortfarande äga generationen när det
+        # deklarerar sitt utfall.
+        leasevakt.krav(fornya=True)
+        return utfall
     finally:
-        try:
-            shutil.rmtree(tmpkat)
-        except OSError as e:
-            print(f"VARNING: temp-katalogen {tmpkat} blev kvar — {e}", file=sys.stderr)
-        kor([LEASE, k["lease_dir"], "release", k["lease_resurs"]])
+        if tmpkat is not None:
+            try:
+                shutil.rmtree(tmpkat)
+            except OSError as e:
+                print(f"VARNING: temp-katalogen {tmpkat} blev kvar — {e}", file=sys.stderr)
+        if heartbeat_startad:
+            leasevakt.stoppa()
+        release = kor([
+            LEASE, k["lease_dir"], "release", k["lease_resurs"], lease_id,
+        ])
+        if release.returncode != 0 and leasevakt.forlustorsak() is None:
+            leasevakt.markera_forlust(
+                f"tokenbunden release vägrades — {sista(release.stderr or release.stdout)}"
+            )
+        forlust = leasevakt.forlustorsak()
+        if forlust is not None:
+            raise Avbryt(f"lease förlorad: {forlust}")
 
 
 def main(argv: list[str]) -> int:

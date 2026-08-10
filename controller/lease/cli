@@ -1,32 +1,39 @@
 #!/usr/bin/env python3.12
-"""controller/lease/cli — skiva 4: exklusiv lease.
+"""controller/lease/cli — skiva 4: exklusiv lease med generation.
 
 Exakt en controller äger en task åt gången. Exklusiviteten vilar på
 O_CREAT|O_EXCL — en atomär operation i filsystemet, inte på en läs-sen-skriv
 som 100 samtidiga starter hade sluppit förbi.
 
-    [<dir>] acquire <task> --ttl <sek>   tar leasen om den är fri
-    [<dir>] release <task>               släpper leasen
-    [<dir>] owner <task>                 skriver innehavaren, tomt om ingen
+    [<dir>] acquire <task> --ttl <sek> [--holder-pid <pid>]
+    [<dir>] renew <task> <lease_id>
+    [<dir>] release <task> [<lease_id>]
+    [<dir>] owner <task>
 
 Katalogen är valfri och ligger först; utelämnad ger controller/lease/state/.
+Bare release är legacy för obundna leases. Holder-bundna generationer kräver
+rätt lease_id vid release.
 
 Exit 0 = leasen är din / kommandot lyckades. Exit 1 = den ägs av någon annan,
-eller fel.
+generationen matchar inte, eller fel.
 """
 
+import fcntl
 import json
+import math
 import os
 import re
+import secrets
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 if sys.version_info < (3, 12):
     sys.exit(f"controller/lease/cli kräver Python 3.12+, kördes på {sys.version.split()[0]}")
 
 ROT = Path(__file__).resolve().parents[2]
-KOMMANDON = ("acquire", "release", "owner")
+KOMMANDON = ("acquire", "renew", "release", "owner")
 # Tasknamnet blir ett filnamn. Utan denna spärr är ../../ ett giltigt tasknamn.
 TASK_FORM = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -40,16 +47,36 @@ def lease_fil(kat: Path, task: str) -> Path:
     return kat / f"{task}.lease"
 
 
-def jag() -> str:
-    return f"{os.uname().nodename}:{os.getpid()}"
+def jag(holder_pid: int | None = None) -> str:
+    pid = holder_pid if holder_pid is not None else os.getpid()
+    return f"{os.uname().nodename}:{pid}"
 
 
 def las_lease(p: Path) -> dict | None:
     try:
         with p.open(encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            return data if isinstance(data, dict) else None
     except (OSError, ValueError):
         return None
+
+
+@contextmanager
+def mutationslas(kat: Path):
+    """Serialisera generation check + canonical mutation.
+
+    Låset sitter på katalogens stabila inode och lämnar ingen sidecar som kan
+    bytas under en väntande process. Den kanoniska leasefilen förblir ensam
+    state-authority; kataloglåset bär inget ägarskapstillstånd.
+    """
+    kat.mkdir(parents=True, exist_ok=True)
+    fd = os.open(kat, os.O_RDONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def skapa_exklusivt(p: Path, data: dict) -> bool:
@@ -59,9 +86,45 @@ def skapa_exklusivt(p: Path, data: dict) -> bool:
         fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
     except FileExistsError:
         return False
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, sort_keys=True)
-        f.write("\n")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, sort_keys=True, allow_nan=False)
+            f.write("\n")
+    except BaseException:
+        p.unlink(missing_ok=True)
+        raise
+    return True
+
+
+def positivt_tal(varde: object, namn: str) -> float:
+    if (
+        isinstance(varde, bool)
+        or not isinstance(varde, (int, float))
+        or not math.isfinite(varde)
+        or varde <= 0
+    ):
+        raise ValueError(f"{namn} är inte ett positivt ändligt tal")
+    return float(varde)
+
+
+def holder_levande(lease: dict) -> bool:
+    """Processkontroll gäller bara explicit holder-bundna generationer."""
+    if "holder_pid" not in lease:
+        return False
+    pid = lease["holder_pid"]
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        raise ValueError("holder_pid är ogiltig")
+    host = lease.get("holder_host")
+    if host is not None and host != os.uname().nodename:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OverflowError as e:
+        raise ValueError("holder_pid ryms inte i hostens pid_t") from e
     return True
 
 
@@ -78,7 +141,7 @@ def utgangen(lease: dict) -> bool:
     därför som spärr mot just det.
 
     Kravet är att BÅDA klockorna säger att ttl förflutit. Ett väggklockshopp
-    framåt blåser upp vagg_forfluten men lämnar mono_forfluten sann, och
+    framåt blåser upp vagg_forfluten men lämnar mono_forfluten färsk, och
     leasen behålls. Ett hopp bakåt krymper vagg_forfluten, och leasen behålls
     också. Åt båda hållen vägrar vi hellre än tillåter dubbelägande.
 
@@ -87,88 +150,242 @@ def utgangen(lease: dict) -> bool:
     startat om — och då är innehavarprocessen med säkerhet död, så väggklockan
     får avgöra ensam. Utan undantaget hade en lease som överlevt en omstart
     blockerat för alltid.
+
+    En uttryckligen holder-bunden generation får dessutom aldrig dömas ut
+    medan samma-host-processen fortfarande lever, även efter passerad TTL.
     """
-    ttl = lease["ttl"]
-    vagg_forfluten = time.time() - lease["beviljad_vagg"]
-    mono_forfluten = time.monotonic() - lease["beviljad_mono"]
+    if holder_levande(lease):
+        return False
+    ttl = positivt_tal(lease.get("ttl"), "ttl")
+    beviljad_vagg = positivt_tal(lease.get("beviljad_vagg"), "beviljad_vagg")
+    beviljad_mono = lease.get("beviljad_mono")
+    if (
+        isinstance(beviljad_mono, bool)
+        or not isinstance(beviljad_mono, (int, float))
+        or not math.isfinite(beviljad_mono)
+    ):
+        raise ValueError("beviljad_mono är ogiltig")
+    vagg_forfluten = time.time() - beviljad_vagg
+    mono_forfluten = time.monotonic() - beviljad_mono
     if mono_forfluten < 0:
         return vagg_forfluten >= ttl
     return vagg_forfluten >= ttl and mono_forfluten >= ttl
 
 
-def kmd_acquire(kat: Path, task: str, ttl: float) -> int:
+def ny_generation(task: str, ttl: float, holder_pid: int | None) -> dict:
+    nu_vagg, nu_mono = time.time(), time.monotonic()
     data = {
         "task": task,
-        "agare": jag(),
+        "lease_id": secrets.token_urlsafe(32),
+        "agare": jag(holder_pid),
         "ttl": ttl,
-        "beviljad_vagg": time.time(),
-        "beviljad_mono": time.monotonic(),
+        "beviljad_vagg": nu_vagg,
+        "beviljad_mono": nu_mono,
+        "heartbeat_nr": 0,
     }
+    if holder_pid is not None:
+        data["holder_pid"] = holder_pid
+        data["holder_host"] = os.uname().nodename
+    return data
+
+
+def kmd_acquire(kat: Path, task: str, ttl: float, holder_pid: int | None) -> int:
     p = lease_fil(kat, task)
-    if skapa_exklusivt(p, data):
-        return 0
+    with mutationslas(kat):
+        # Grantankarna föds EFTER eventuell väntan på mutationslåset. Annars
+        # kunde kötid förbruka hela TTL:n innan acquire ens returnerade.
+        data = ny_generation(task, ttl, holder_pid)
+        if skapa_exklusivt(p, data):
+            print(data["lease_id"])
+            return 0
 
-    # Filen fanns. Bara en utgången lease får tas över.
-    ravar = p.read_bytes() if p.exists() else None
-    lease = las_lease(p)
-    if lease is None:
-        return fel(f"acquire: {task} har en oläsbar lease — vägrar hellre än gissar")
-    if not utgangen(lease):
-        return fel(f"acquire: {task} ägs av {lease['agare']}")
-
-    # Ta bort den utgångna leasen bara om den fortfarande är exakt den vi
-    # dömde. Hann någon annan skriva en färsk däremellan rör vi den aldrig.
-    try:
-        if p.read_bytes() != ravar:
+        # Filen fanns. Bara en utgången lease får tas över.
+        try:
+            ravar = p.read_bytes()
+        except FileNotFoundError:
+            data = ny_generation(task, ttl, holder_pid)
+            if skapa_exklusivt(p, data):
+                print(data["lease_id"])
+                return 0
             return fel(f"acquire: {task} togs av någon annan")
-        p.unlink()
-    except OSError:
-        pass
-    if skapa_exklusivt(p, data):
-        return 0
-    return fel(f"acquire: {task} togs av någon annan")
+        lease = las_lease(p)
+        if lease is None:
+            return fel(f"acquire: {task} har en oläsbar lease — vägrar hellre än gissar")
+        try:
+            utgang = utgangen(lease)
+        except (TypeError, ValueError):
+            return fel(f"acquire: {task} har en oläsbar lease — vägrar hellre än gissar")
+        if not utgang:
+            return fel(f"acquire: {task} ägs av {lease.get('agare', 'okänd')}")
+
+        # Samma kataloglås täcker generationskontroll, borttagning och den
+        # nya O_EXCL-acquiren för alla publika lease-operationer.
+        try:
+            if p.read_bytes() != ravar:
+                return fel(f"acquire: {task} togs av någon annan")
+            p.unlink()
+        except OSError:
+            return fel(f"acquire: {task} togs av någon annan")
+        data = ny_generation(task, ttl, holder_pid)
+        if skapa_exklusivt(p, data):
+            print(data["lease_id"])
+            return 0
+        return fel(f"acquire: {task} togs av någon annan")
 
 
-def kmd_release(kat: Path, task: str) -> int:
-    lease_fil(kat, task).unlink(missing_ok=True)
+def kmd_renew(kat: Path, task: str, lease_id: str) -> int:
+    p = lease_fil(kat, task)
+    with mutationslas(kat):
+        try:
+            fd = os.open(p, os.O_RDWR)
+        except OSError:
+            return fel(f"renew: {task} ägs inte av generationen")
+        try:
+            with os.fdopen(fd, "r+b") as f:
+                try:
+                    lease = json.loads(f.read())
+                except (OSError, ValueError):
+                    return fel(f"renew: {task} har oläsbart heartbeat-state")
+                if not isinstance(lease, dict):
+                    return fel(f"renew: {task} har oläsbart heartbeat-state")
+                if lease.get("task") != task or lease.get("lease_id") != lease_id:
+                    return fel(f"renew: {task} ägs av en annan generation")
+                nr = lease.get("heartbeat_nr", 0)
+                if isinstance(nr, bool) or not isinstance(nr, int) or nr < 0:
+                    return fel(f"renew: {task} har oläsbart heartbeat-state")
+                nu_vagg, nu_mono = time.time(), time.monotonic()
+                lease["beviljad_vagg"] = nu_vagg
+                lease["beviljad_mono"] = nu_mono
+                lease["heartbeat_vagg"] = nu_vagg
+                lease["heartbeat_mono"] = nu_mono
+                lease["heartbeat_nr"] = nr + 1
+                payload = (
+                    json.dumps(
+                        lease, ensure_ascii=False, sort_keys=True, allow_nan=False
+                    ) + "\n"
+                ).encode("utf-8")
+
+                # Skriv till den generationens redan öppnade inode. Om en rå
+                # fault-injektion unlinkar canonical path skriver vi högst till
+                # en föräldralös inode — den gamla generationen kan aldrig
+                # återskapa sig ovanpå en successor med os.replace.
+                oppnad = os.fstat(f.fileno())
+                try:
+                    aktuell = p.stat()
+                except OSError:
+                    return fel(f"renew: {task} förlorade generationen")
+                if (aktuell.st_dev, aktuell.st_ino) != (oppnad.st_dev, oppnad.st_ino):
+                    return fel(f"renew: {task} ägs av en annan generation")
+                f.seek(0)
+                f.write(payload)
+                f.truncate()
+                f.flush()
+                os.fsync(f.fileno())
+                try:
+                    aktuell = p.stat()
+                except OSError:
+                    return fel(f"renew: {task} förlorade generationen")
+                if (aktuell.st_dev, aktuell.st_ino) != (oppnad.st_dev, oppnad.st_ino):
+                    return fel(f"renew: {task} ägs av en annan generation")
+        except (OSError, TypeError, ValueError):
+            return fel(f"renew: {task} kunde inte skriva heartbeat-state")
+    return 0
+
+
+def kmd_release(kat: Path, task: str, lease_id: str | None) -> int:
+    p = lease_fil(kat, task)
+    with mutationslas(kat):
+        if not p.exists():
+            return 0 if lease_id is None else fel(f"release: {task} ägs inte av generationen")
+        lease = las_lease(p)
+        if lease is None:
+            return fel(f"release: {task} har en oläsbar lease — vägrar hellre än gissar")
+        if lease_id is None:
+            if "holder_pid" in lease:
+                return fel(f"release: {task} är holder-bunden och kräver lease_id")
+        elif lease.get("task") != task or lease.get("lease_id") != lease_id:
+            return fel(f"release: {task} ägs av en annan generation")
+        try:
+            p.unlink()
+        except OSError as e:
+            return fel(f"release: {task} kunde inte släppas — {e}")
     return 0
 
 
 def kmd_owner(kat: Path, task: str) -> int:
-    lease = las_lease(lease_fil(kat, task))
-    if lease is None or utgangen(lease):
-        return fel(f"owner: {task} ägs inte")
-    print(lease["agare"])
+    with mutationslas(kat):
+        lease = las_lease(lease_fil(kat, task))
+        if lease is None:
+            return fel(f"owner: {task} ägs inte")
+        try:
+            if utgangen(lease):
+                return fel(f"owner: {task} ägs inte")
+        except (TypeError, ValueError):
+            return fel(f"owner: {task} har en oläsbar lease — vägrar hellre än gissar")
+        agare = lease.get("agare")
+        if not isinstance(agare, str) or not agare:
+            return fel(f"owner: {task} har en oläsbar lease — vägrar hellre än gissar")
+        print(agare)
     return 0
 
 
 def main(argv: list[str]) -> int:
+    bruk = (
+        "användning: cli [<dir>] acquire <task> --ttl <sek> [--holder-pid <pid>] | "
+        "renew <task> <lease_id> | release <task> [<lease_id>] | owner <task>"
+    )
     if len(argv) < 2:
-        return fel("användning: cli [<dir>] acquire <task> --ttl <sek> | release <task> | owner <task>")
+        return fel(bruk)
     if argv[1] in KOMMANDON:
         kat, arg = ROT / "controller" / "lease" / "state", argv[1:]
     else:
         kat, arg = Path(argv[1]), argv[2:]
     if len(arg) < 2:
-        return fel("användning: cli [<dir>] acquire <task> --ttl <sek> | release <task> | owner <task>")
+        return fel(bruk)
 
     kommando, task = arg[0], arg[1]
-    if not TASK_FORM.match(task):
+    if not TASK_FORM.fullmatch(task):
         return fel(f"otillåtet tasknamn: {task}")
 
     if kommando == "acquire":
-        if len(arg) != 4 or arg[2] != "--ttl":
-            return fel("användning: cli [<dir>] acquire <task> --ttl <sek>")
+        if len(arg) not in (4, 6) or arg[2] != "--ttl":
+            return fel(
+                "användning: cli [<dir>] acquire <task> --ttl <sek> "
+                "[--holder-pid <pid>]"
+            )
         try:
             ttl = float(arg[3])
         except ValueError:
             return fel(f"--ttl kräver ett tal, fick {arg[3]}")
-        if ttl <= 0:
+        if not math.isfinite(ttl) or ttl <= 0:
             return fel(f"--ttl måste vara positiv, fick {ttl}")
-        return kmd_acquire(kat, task, ttl)
+        holder_pid = None
+        if len(arg) == 6:
+            if arg[4] != "--holder-pid":
+                return fel(
+                    "användning: cli [<dir>] acquire <task> --ttl <sek> "
+                    "[--holder-pid <pid>]"
+                )
+            try:
+                holder_pid = int(arg[5])
+            except ValueError:
+                return fel(f"--holder-pid kräver ett heltal, fick {arg[5]}")
+            if holder_pid <= 0:
+                return fel(f"--holder-pid måste vara positiv, fick {holder_pid}")
+            if holder_pid > 2_147_483_647:
+                return fel(f"--holder-pid ryms inte i hostens pid_t, fick {holder_pid}")
+        return kmd_acquire(kat, task, ttl, holder_pid)
+    if kommando == "renew":
+        if len(arg) != 3 or not arg[2]:
+            return fel("användning: cli [<dir>] renew <task> <lease_id>")
+        return kmd_renew(kat, task, arg[2])
     if kommando == "release":
-        return kmd_release(kat, task)
+        if len(arg) not in (2, 3):
+            return fel("användning: cli [<dir>] release <task> [<lease_id>]")
+        return kmd_release(kat, task, arg[2] if len(arg) == 3 else None)
     if kommando == "owner":
+        if len(arg) != 2:
+            return fel("användning: cli [<dir>] owner <task>")
         return kmd_owner(kat, task)
     return fel(f"okänt kommando: {kommando}")
 

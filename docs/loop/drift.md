@@ -1,6 +1,6 @@
 # Att köra loopen
 
-**Skriven 2026-08-09, UR den första verkliga körningen** — inte före den. Varje siffra
+**Skriven 2026-08-09, UR den första verkliga körningen; uppdaterad 2026-08-10 med S3-lease-remediation** — inte före den. Varje siffra
 och varje utfall nedan är mätt på `premiar-1`, som körde `p-001` och `p-002` mot main
 `3e781fa` och attesterade båda. En manual skriven i förväg hade varit en gissning.
 
@@ -39,6 +39,11 @@ per körning — annars faller taskval före första varvet med
 ```
 ./controller/state/cli init ~/.nortropic/kor/state
 ```
+
+Leasen använder produktionsdefault `lease_ttl_s: 180` och
+`lease_heartbeat_s: 30`. Fälten får utelämnas. Kortare positiva värden är endast
+praktiska för prov; heartbeat måste vara strikt mindre än TTL. Ogiltiga värden
+vägras innan lease, claim-event eller session skapas.
 
 **`budget` måste vara strikt större än `troskel`.** Brytaren prövar budget före öppen, så
 ett för snålt tak maskerar en öppen brytare permanent.
@@ -152,9 +157,13 @@ körnings `create`.
 
 ## 8. Kända gränser, mätta
 
-**Leasens TTL är 180 s utan heartbeat.** Ett varv tog tio till tjugo minuter i premiären,
-alltså långt över TTL:n. En andra controller kan i teorin ta över resursen mitt i en
-levande körning. Kör aldrig två körningar mot samma `lease_dir` samtidigt.
+**Leasen har generationsbunden heartbeat.** Loopen binder generationen till sin egen
+långlivade PID, förnyar det serialiserade lease-state var 30:e sekund och använder samma
+opaque `lease_id` vid förnyelse och release. En levande holder kan därför inte tas över
+efter den ursprungliga 180-sekunders-TTL:n. Om generationen ändå ersätts faller det gamla
+runnet stängt utan en senare attestation; dess tokenbundna cleanup kan inte radera
+efterträdaren. En andra körning mot samma `lease_dir` vägras medan den första äger
+generationen.
 
 **Kvoten.** En session per försök, tio till tjugo minuter var. Smoke-momentet mätte 8–20
 sekunder — det var en trivial enfilsskrivning och säger ingenting om verkligt arbete.
