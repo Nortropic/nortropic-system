@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
 # h-003-exit — skiva 3 (attestationer + stale-markering)
-# Kontrakt: controller/attest/cli <dir> write <task> <sha>
-#           controller/attest/cli <dir> read <task> [--require-valid]
-#           controller/attest/cli <dir> invalidate <sha>
+# Legacy-kontraktet står kvar:
+#   controller/attest/cli <dir> write <task> <sha> [<grind-id> <grind-sha256>]
+#   controller/attest/cli <dir> read <task> [--require-valid]
+#   controller/attest/cli <dir> invalidate <sha>
+# Generiskt authority-kontrakt:
+#   controller/attest/cli <dir> begin-authority <opaque-authority-id>
+#   controller/attest/cli <dir> write <task> <sha>
+#       [<grind-id> <grind-sha256>] --authority <opaque-authority-id>
+#   controller/attest/cli <dir> read <task> --authority <opaque-authority-id>
+#   controller/attest/cli <dir> finalize-authority <opaque-authority-id>
+#       [--test-before-publication-barrier <dir>]
+# Authority-write är alltid PROVISIONAL. Bara finalize-authority får göra den
+# aktuella generationens kompletta publication-set globalt giltigt, atomiskt.
 # Katalogen anges av anroparen, aldrig av komponenten (h-001-formen).
 . "$(dirname "$0")/_lib.sh"
 CLI="controller/attest/cli"
@@ -95,4 +105,1385 @@ else
     ok "K7 omtest köas vid stale och töms av ny attestation"
   fi
 fi
+
+# ========== Generic authority-generation ====================================
+
+giltig() {
+  "$CLI" "$1" read "$2" --require-valid >/dev/null 2>&1
+}
+
+authority_lasbar() {
+  "$CLI" "$1" read "$2" --authority "$3" >/dev/null 2>&1
+}
+
+sha_for() {
+  printf '%040x' "$1"
+}
+
+post_exact() {
+  python3 -c 'import json,sys
+try:
+    post=json.loads(sys.argv[1])
+except Exception:
+    raise SystemExit(1)
+if not isinstance(post,dict):
+    raise SystemExit(1)
+if post.get("task") != sys.argv[2] or post.get("candidate_sha") != sys.argv[3]:
+    raise SystemExit(1)
+if sys.argv[4] != "-":
+    if post.get("grind_id") != sys.argv[4] or post.get("grind_sha256") != sys.argv[5]:
+        raise SystemExit(1)
+' "$1" "$2" "$3" "$4" "$5"
+}
+
+i_ko_task() {
+  python3 -c 'import json,sys
+try: d=json.load(open(sys.argv[1]))
+except Exception: sys.exit(2)
+sys.exit(0 if sys.argv[2] in d.get("omtest_ko",[]) else 1)' "$1" "$2"
+}
+
+# K8: BEGIN tar ett generiskt opaque id och lämnar legacy-resultat giltiga.
+D8="$WORK/authority-begin"
+A8="opaque-A8-not-a-uuid"
+L8="$(sha_for 108)"
+"$CLI" "$D8" write legacy-anchor "$L8" >/dev/null 2>&1
+begin8=0
+"$CLI" "$D8" begin-authority "$A8" >/dev/null 2>&1 || begin8=$?
+if [ "$begin8" -eq 0 ] && giltig "$D8" legacy-anchor; then
+  ok "K8 BEGIN: opaque authority-id etableras utan att legacy-resultat ogiltigförklaras"
+else
+  no "K8 BEGIN" "begin=$begin8 eller legacy-ankaret blev ogiltigt"
+fi
+
+# K9: authority-writes är provisional, men positivt läsbara för exakt samma
+# aktuella generation. Ett av fallen bär h-017:s valfria grindpar.
+D9="$WORK/authority-provisional"
+A9="generation-A9-not-a-uuid"
+WRONG9="generation-wrong"
+S9A="$(sha_for 1091)"
+S9B="$(sha_for 1092)"
+G9="$(printf '9%.0s' $(seq 1 64))"
+begin9=0; write9a=0; write9b=0
+"$CLI" "$D9" begin-authority "$A9" >/dev/null 2>&1 || begin9=$?
+"$CLI" "$D9" write auth-nine-a "$S9A" --authority "$A9" >/dev/null 2>&1 || write9a=$?
+"$CLI" "$D9" write auth-nine-b "$S9B" gate-nine "$G9" --authority "$A9" >/dev/null 2>&1 || write9b=$?
+out9a=$("$CLI" "$D9" read auth-nine-a --authority "$A9" 2>/dev/null); read9a=$?
+out9b=$("$CLI" "$D9" read auth-nine-b --authority "$A9" 2>/dev/null); read9b=$?
+wrongread9=0
+"$CLI" "$D9" read auth-nine-a --authority "$WRONG9" >/dev/null 2>&1 || wrongread9=$?
+wrongwrite9=0
+"$CLI" "$D9" write auth-nine-wrong "$(sha_for 1093)" --authority "$WRONG9" >/dev/null 2>&1 || wrongwrite9=$?
+wrongfin9=0
+"$CLI" "$D9" finalize-authority "$WRONG9" >/dev/null 2>&1 || wrongfin9=$?
+after_wrong_out9a=$("$CLI" "$D9" read auth-nine-a --authority "$A9" 2>/dev/null); after_wrong_read9a=$?
+if [ "$begin9" -eq 0 ] \
+   && [ "$write9a" -eq 0 ] && [ "$write9b" -eq 0 ] \
+   && [ "$read9a" -eq 0 ] && [ "$read9b" -eq 0 ] \
+   && post_exact "$out9a" auth-nine-a "$S9A" - - \
+   && post_exact "$out9b" auth-nine-b "$S9B" gate-nine "$G9" \
+   && [ "$wrongread9" -ne 0 ] && [ "$wrongwrite9" -ne 0 ] && [ "$wrongfin9" -ne 0 ] \
+   && [ "$after_wrong_read9a" -eq 0 ] \
+   && post_exact "$after_wrong_out9a" auth-nine-a "$S9A" - - \
+   && ! authority_lasbar "$D9" auth-nine-wrong "$WRONG9" \
+   && ! giltig "$D9" auth-nine-wrong \
+   && ! giltig "$D9" auth-nine-a \
+   && ! giltig "$D9" auth-nine-b; then
+  ok "K9 PROVISIONAL: exact-authority read är positivt; global validity och fel-id read/write/finalize spärras"
+else
+  no "K9 PROVISIONAL" "begin/write/read=$begin9/$write9a,$write9b/$read9a,$read9b wrong-read/write/finalize=$wrongread9/$wrongwrite9/$wrongfin9 after-current=$after_wrong_read9a eller validity/bindning fel"
+fi
+
+# K10: en enda finalize gör hela batchen giltig. En senare BEGIN fencar bara
+# publiceringsrätten — redan finalized resultat får aldrig global-wipas.
+fin10=0
+"$CLI" "$D9" finalize-authority "$A9" >/dev/null 2>&1 || fin10=$?
+final_out10a=$("$CLI" "$D9" read auth-nine-a --require-valid 2>/dev/null); final_read10a=$?
+final_out10b=$("$CLI" "$D9" read auth-nine-b --require-valid 2>/dev/null); final_read10b=$?
+A10="generation-B10-not-a-uuid"
+begin10=0
+"$CLI" "$D9" begin-authority "$A10" >/dev/null 2>&1 || begin10=$?
+after_begin_out10a=$("$CLI" "$D9" read auth-nine-a --require-valid 2>/dev/null); after_begin_read10a=$?
+after_begin_out10b=$("$CLI" "$D9" read auth-nine-b --require-valid 2>/dev/null); after_begin_read10b=$?
+oldbound10=0
+"$CLI" "$D9" read auth-nine-a --authority "$A9" >/dev/null 2>&1 || oldbound10=$?
+S10="$(sha_for 1100)"
+write10=0; fin10b=0
+"$CLI" "$D9" write auth-ten "$S10" --authority "$A10" >/dev/null 2>&1 || write10=$?
+"$CLI" "$D9" finalize-authority "$A10" >/dev/null 2>&1 || fin10b=$?
+final_out10c=$("$CLI" "$D9" read auth-ten --require-valid 2>/dev/null); final_read10c=$?
+after_fin_b_out10a=$("$CLI" "$D9" read auth-nine-a --require-valid 2>/dev/null); after_fin_b_read10a=$?
+after_fin_b_out10b=$("$CLI" "$D9" read auth-nine-b --require-valid 2>/dev/null); after_fin_b_read10b=$?
+if [ "$fin10" -eq 0 ] && [ "$final_read10a" -eq 0 ] && [ "$final_read10b" -eq 0 ] \
+   && post_exact "$final_out10a" auth-nine-a "$S9A" - - \
+   && post_exact "$final_out10b" auth-nine-b "$S9B" gate-nine "$G9" \
+   && [ "$begin10" -eq 0 ] && [ "$after_begin_read10a" -eq 0 ] && [ "$after_begin_read10b" -eq 0 ] \
+   && post_exact "$after_begin_out10a" auth-nine-a "$S9A" - - \
+   && post_exact "$after_begin_out10b" auth-nine-b "$S9B" gate-nine "$G9" \
+   && [ "$oldbound10" -ne 0 ] \
+   && [ "$write10" -eq 0 ] && [ "$fin10b" -eq 0 ] \
+   && [ "$final_read10c" -eq 0 ] && post_exact "$final_out10c" auth-ten "$S10" - - \
+   && [ "$after_fin_b_read10a" -eq 0 ] && [ "$after_fin_b_read10b" -eq 0 ] \
+   && post_exact "$after_fin_b_out10a" auth-nine-a "$S9A" - - \
+   && post_exact "$after_fin_b_out10b" auth-nine-b "$S9B" gate-nine "$G9"; then
+  ok "K10 FINALIZE: batchen blir atomiskt giltig och senare BEGIN bevarar finalized resultat"
+else
+  no "K10 FINALIZE" "finalize/reads/begin/reads/current-write/finalize/read=$fin10/$final_read10a,$final_read10b/$begin10/$after_begin_read10a,$after_begin_read10b/$write10/$fin10b/$final_read10c old-bound=$oldbound10 eller exact batchbindning saknas"
+fi
+
+# K11: historical ids och slutna generationer får aldrig återfå publication-
+# rätt. Varje failure följs av färska läsprocesser som bevisar oförändrad dom.
+A11="generation-current-C11"
+S11A="$(sha_for 1110)"
+S11B="$(sha_for 1111)"
+begin11=0; anchor_write11=0
+"$CLI" "$D9" begin-authority "$A11" >/dev/null 2>&1 || begin11=$?
+"$CLI" "$D9" write current-anchor-eleven "$S11A" --authority "$A11" >/dev/null 2>&1 || anchor_write11=$?
+stale_write11=0; stale_fin11=0; reuse11=0; closed_write11=0
+"$CLI" "$D9" write stale-eleven "$(sha_for 1111)" --authority "$A9" >/dev/null 2>&1 || stale_write11=$?
+"$CLI" "$D9" finalize-authority "$A9" >/dev/null 2>&1 || stale_fin11=$?
+"$CLI" "$D9" begin-authority "$A9" >/dev/null 2>&1 || reuse11=$?
+"$CLI" "$D9" write closed-eleven "$(sha_for 1112)" --authority "$A10" >/dev/null 2>&1 || closed_write11=$?
+anchor_out11=$("$CLI" "$D9" read current-anchor-eleven --authority "$A11" 2>/dev/null); anchor_read11=$?
+current_write11=0
+"$CLI" "$D9" write current-after-failures "$S11B" --authority "$A11" >/dev/null 2>&1 || current_write11=$?
+fin11=0
+"$CLI" "$D9" finalize-authority "$A11" >/dev/null 2>&1 || fin11=$?
+post_closed11=0
+"$CLI" "$D9" write post-finalize-eleven "$(sha_for 1113)" --authority "$A11" >/dev/null 2>&1 || post_closed11=$?
+if [ "$begin11" -eq 0 ] && [ "$anchor_write11" -eq 0 ] \
+   && [ "$stale_write11" -ne 0 ] && [ "$stale_fin11" -ne 0 ] \
+   && [ "$reuse11" -ne 0 ] && [ "$closed_write11" -ne 0 ] \
+   && [ "$anchor_read11" -eq 0 ] && post_exact "$anchor_out11" current-anchor-eleven "$S11A" - - \
+   && [ "$current_write11" -eq 0 ] && [ "$fin11" -eq 0 ] && [ "$post_closed11" -ne 0 ] \
+   && ! authority_lasbar "$D9" stale-eleven "$A9" \
+   && ! authority_lasbar "$D9" closed-eleven "$A10" \
+   && ! authority_lasbar "$D9" post-finalize-eleven "$A11" \
+   && ! giltig "$D9" stale-eleven && ! giltig "$D9" closed-eleven && ! giltig "$D9" post-finalize-eleven \
+   && giltig "$D9" auth-nine-a && giltig "$D9" auth-nine-b \
+   && giltig "$D9" auth-ten && giltig "$D9" current-anchor-eleven \
+   && giltig "$D9" current-after-failures; then
+  ok "K11 fencing: stale/reused/closed generationer kan inte skapa eller återställa valid state"
+else
+  no "K11 fencing" "begin/anchor=$begin11/$anchor_write11 stale-write/finalize/reuse/closed-write=$stale_write11/$stale_fin11/$reuse11/$closed_write11 current-read/write/finalize/post=$anchor_read11/$current_write11/$fin11/$post_closed11 eller unsafe state"
+fi
+
+# K12: noll-publication är en legitim batch, men även den generationen är
+# single-use och stängd efter finalize.
+D12="$WORK/authority-empty"
+A12="empty-A12"
+B12="empty-B12"
+S12B="$(sha_for 1122)"
+begin12=0; fin12=0; post12=0; begin12b=0; write12b=0; duplicate12b=0; reuse12=0; fin12b=0
+"$CLI" "$D12" begin-authority "$A12" >/dev/null 2>&1 || begin12=$?
+"$CLI" "$D12" finalize-authority "$A12" >/dev/null 2>&1 || fin12=$?
+"$CLI" "$D12" write empty-late "$(sha_for 1121)" --authority "$A12" >/dev/null 2>&1 || post12=$?
+"$CLI" "$D12" begin-authority "$B12" >/dev/null 2>&1 || begin12b=$?
+"$CLI" "$D12" write current-twelve "$S12B" --authority "$B12" >/dev/null 2>&1 || write12b=$?
+"$CLI" "$D12" begin-authority "$B12" >/dev/null 2>&1 || duplicate12b=$?
+bound12b=$("$CLI" "$D12" read current-twelve --authority "$B12" 2>/dev/null); bound12b_rc=$?
+"$CLI" "$D12" begin-authority "$A12" >/dev/null 2>&1 || reuse12=$?
+"$CLI" "$D12" finalize-authority "$B12" >/dev/null 2>&1 || fin12b=$?
+if [ "$begin12" -eq 0 ] && [ "$fin12" -eq 0 ] \
+   && [ "$post12" -ne 0 ] && [ "$begin12b" -eq 0 ] && [ "$write12b" -eq 0 ] \
+   && [ "$duplicate12b" -ne 0 ] && [ "$bound12b_rc" -eq 0 ] \
+   && post_exact "$bound12b" current-twelve "$S12B" - - \
+   && [ "$reuse12" -ne 0 ] && [ "$fin12b" -eq 0 ] \
+   && ! giltig "$D12" empty-late && giltig "$D12" current-twelve; then
+  ok "K12 empty/single-use: tom batch, duplicate BEGIN och historisk reuse bevarar current state"
+else
+  no "K12 empty/single-use" "begin/finalize/post/new-begin/write/duplicate/read/reuse/finalize=$begin12/$fin12/$post12/$begin12b/$write12b/$duplicate12b/$bound12b_rc/$reuse12/$fin12b"
+fi
+
+# K13: SHA-global stale-semantik gäller även authority-state. En provisional
+# ersättning får inte tappa omtestskulden; först en lyckad batch-finalize tömmer
+# kön. Innehåller batchen en invalidated member får ingen delmängd finaliseras.
+D13="$WORK/authority-stale"
+OLD13="$(sha_for 1130)"
+NEW13="$(sha_for 1131)"
+OTHER13="$(sha_for 1132)"
+A13="stale-A13"
+"$CLI" "$D13" write retest-thirteen "$OLD13" >/dev/null 2>&1
+"$CLI" "$D13" invalidate "$OLD13" >/dev/null 2>&1
+begin13=0; write13=0; other13=0; fin13=0
+"$CLI" "$D13" begin-authority "$A13" >/dev/null 2>&1 || begin13=$?
+"$CLI" "$D13" write retest-thirteen "$NEW13" --authority "$A13" >/dev/null 2>&1 || write13=$?
+queue_during13=1
+i_ko_task "$D13/attestations.json" retest-thirteen && queue_during13=0
+"$CLI" "$D13" write unrelated-thirteen "$OTHER13" --authority "$A13" >/dev/null 2>&1 || other13=$?
+global_during13=0
+giltig "$D13" retest-thirteen || global_during13=$?
+"$CLI" "$D13" finalize-authority "$A13" >/dev/null 2>&1 || fin13=$?
+queue_after13=0
+i_ko_task "$D13/attestations.json" retest-thirteen || queue_after13=$?
+"$CLI" "$D13" invalidate "$NEW13" >/dev/null 2>&1
+if [ "$begin13" -eq 0 ] && [ "$write13" -eq 0 ] && [ "$other13" -eq 0 ] \
+   && [ "$queue_during13" -eq 0 ] && [ "$global_during13" -ne 0 ] \
+   && [ "$fin13" -eq 0 ] && [ "$queue_after13" -ne 0 ] \
+   && ! giltig "$D13" retest-thirteen \
+   && giltig "$D13" unrelated-thirteen \
+   && i_ko_task "$D13/attestations.json" retest-thirteen; then
+  ok "K13 stale/queue: provisional behåller omtestskuld, finalize tömmer, SHA-invalidate träffar authority-post"
+else
+  no "K13 stale/queue" "begin/write/other/finalize=$begin13/$write13/$other13/$fin13 queue-during/after=$queue_during13/$queue_after13 global-during=$global_during13"
+fi
+
+D13B="$WORK/authority-stale-batch"
+A13B="stale-batch-A13"
+OLD13B="$(sha_for 1132)"
+X13B="$(sha_for 1133)"
+Y13B="$(sha_for 1134)"
+"$CLI" "$D13B" write queued-member "$OLD13B" >/dev/null 2>&1
+"$CLI" "$D13B" invalidate "$OLD13B" >/dev/null 2>&1
+begin13b=0; write13bx=0; write13by=0; invalidate13b=0
+"$CLI" "$D13B" begin-authority "$A13B" >/dev/null 2>&1 || begin13b=$?
+"$CLI" "$D13B" write queued-member "$X13B" --authority "$A13B" >/dev/null 2>&1 || write13bx=$?
+"$CLI" "$D13B" write clean-member "$Y13B" --authority "$A13B" >/dev/null 2>&1 || write13by=$?
+queue_before_fail13b=1
+i_ko_task "$D13B/attestations.json" queued-member && queue_before_fail13b=0
+"$CLI" "$D13B" invalidate "$X13B" >/dev/null 2>&1 || invalidate13b=$?
+stale_bound13b=0; clean_bound13b=0
+authority_lasbar "$D13B" queued-member "$A13B" || stale_bound13b=$?
+authority_lasbar "$D13B" clean-member "$A13B" || clean_bound13b=$?
+fin13b=0
+"$CLI" "$D13B" finalize-authority "$A13B" >/dev/null 2>&1 || fin13b=$?
+queue_after_fail13b=1
+i_ko_task "$D13B/attestations.json" queued-member && queue_after_fail13b=0
+if [ "$begin13b" -eq 0 ] && [ "$write13bx" -eq 0 ] && [ "$write13by" -eq 0 ] \
+   && [ "$queue_before_fail13b" -eq 0 ] && [ "$invalidate13b" -eq 0 ] \
+   && [ "$stale_bound13b" -ne 0 ] && [ "$clean_bound13b" -eq 0 ] \
+   && [ "$fin13b" -ne 0 ] && [ "$queue_after_fail13b" -eq 0 ] \
+   && ! giltig "$D13B" queued-member && ! giltig "$D13B" clean-member; then
+  ok "K13b stale batch: failed finalize lämnar noll valid och bevarar omtestskuld"
+else
+  no "K13b stale batch" "begin/write/invalidate=$begin13b/$write13bx,$write13by/$invalidate13b queue-before/after=$queue_before_fail13b/$queue_after_fail13b bound=$stale_bound13b/$clean_bound13b finalize=$fin13b eller partial validity"
+fi
+
+# K14: positivt giltighetsankare före korruption. Trunkerad/kontradiktorisk
+# authoritative store får aldrig behandlas som tom/färsk eller valid.
+D14="$WORK/authority-corrupt"
+A14="corrupt-A14"
+S14="$(sha_for 1140)"
+"$CLI" "$D14" begin-authority "$A14" >/dev/null 2>&1
+"$CLI" "$D14" write corrupt-anchor "$S14" --authority "$A14" >/dev/null 2>&1
+"$CLI" "$D14" finalize-authority "$A14" >/dev/null 2>&1
+anchor14=1
+giltig "$D14" corrupt-anchor && anchor14=0
+corrupt14=1
+contradict14=1
+if [ -f "$D14/attestations.json" ]; then
+  cp "$D14/attestations.json" "$D14/good.copy"
+  printf '{"partial":' > "$D14/attestations.json"
+  bad_valid14=0; bad_bound14=0; bad_begin14=0
+  giltig "$D14" corrupt-anchor || bad_valid14=$?
+  authority_lasbar "$D14" corrupt-anchor "$A14" || bad_bound14=$?
+  "$CLI" "$D14" begin-authority "corrupt-new" >/dev/null 2>&1 || bad_begin14=$?
+  if [ "$bad_valid14" -ne 0 ] && [ "$bad_bound14" -ne 0 ] && [ "$bad_begin14" -ne 0 ]; then
+    corrupt14=0
+  fi
+  cp "$D14/good.copy" "$D14/attestations.json"
+  python3 -c 'import json,pathlib,sys
+p=pathlib.Path(sys.argv[1]); text=p.read_text(encoding="utf-8").strip()
+pairs=json.loads(text, object_pairs_hook=lambda xs: xs)
+if not pairs or not text.startswith("{"):
+    raise SystemExit(1)
+key=pairs[0][0]
+p.write_text("{" + json.dumps(key) + ":null," + text[1:] + "\n", encoding="utf-8")
+' "$D14/attestations.json" >/dev/null 2>&1
+  duplicate_valid14=0; duplicate_bound14=0; duplicate_begin14=0
+  giltig "$D14" corrupt-anchor || duplicate_valid14=$?
+  authority_lasbar "$D14" corrupt-anchor "$A14" || duplicate_bound14=$?
+  "$CLI" "$D14" begin-authority "contradict-new" >/dev/null 2>&1 || duplicate_begin14=$?
+  if [ "$duplicate_valid14" -ne 0 ] && [ "$duplicate_bound14" -ne 0 ] \
+     && [ "$duplicate_begin14" -ne 0 ]; then
+    contradict14=0
+  fi
+fi
+if [ "$anchor14" -eq 0 ] && [ "$corrupt14" -eq 0 ] && [ "$contradict14" -eq 0 ]; then
+  ok "K14 corrupt/partial/contradictory state faller stängt efter positivt validitetsankare"
+else
+  no "K14 corrupt/partial/contradictory" "anchor=$anchor14 truncated=$corrupt14 duplicate-key=$contradict14"
+fi
+
+# K14b: fail-closed gäller varje authoritative mutationsväg, inte bara read
+# och BEGIN. Varje fall körs mot en isolerad kopia och en normal nonzero-return
+# måste lämna HELA katalogens bytes oförändrade. Detta fäller corrupt-as-empty
+# och implementationer som skriver en reparerad/partiell snapshot före failure.
+cat > "$WORK/h003-corrupt-mutations.py" <<'PYCORRUPTMUT'
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+seed = root / "seed"
+current = "corrupt-mutation-current"
+
+def run(*args):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=10
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"CLI timeout: {args!r}") from exc
+
+def sha(number):
+    return f"{number:040x}"
+
+def snapshot(directory):
+    answer = {}
+    if not directory.exists():
+        return answer
+    for path in sorted(directory.rglob("*")):
+        relative = str(path.relative_to(directory))
+        if path.is_symlink():
+            answer[relative] = ("link", os.readlink(path))
+        elif path.is_file():
+            answer[relative] = ("file", path.read_bytes())
+        elif path.is_dir():
+            answer[relative] = ("dir", None)
+        else:
+            answer[relative] = ("other", None)
+    return answer
+
+if run(seed, "write", "corrupt-legacy-anchor", sha(1400)).returncode != 0:
+    raise SystemExit("legacy seed föll")
+if run(seed, "write", "corrupt-invalidate-victim", sha(1401)).returncode != 0:
+    raise SystemExit("invalidate seed föll")
+if run(seed, "begin-authority", current).returncode != 0:
+    raise SystemExit("authority seed begin föll")
+if run(seed, "write", "corrupt-authority-anchor", sha(1402), "--authority", current).returncode != 0:
+    raise SystemExit("authority seed write föll")
+
+state = seed / "attestations.json"
+good = state.read_bytes()
+stripped = good.lstrip()
+if not stripped.startswith(b"{"):
+    raise SystemExit("seed-state saknar objectform")
+prefix = good[: len(good) - len(stripped)]
+corruptions = {
+    "truncated": b'{"partial":',
+    "duplicate-key": prefix + b'{"attestations":null,' + stripped[1:],
+}
+mutations = {
+    "legacy-write": ("write", "corrupt-new-legacy", sha(1410)),
+    "authority-write": ("write", "corrupt-new-authority", sha(1411), "--authority", current),
+    "begin": ("begin-authority", "corrupt-next"),
+    "finalize": ("finalize-authority", current),
+    "invalidate": ("invalidate", sha(1401)),
+}
+
+for corruption_name, payload in corruptions.items():
+    for mutation_name, command in mutations.items():
+        case = root / f"{corruption_name}-{mutation_name}"
+        shutil.copytree(seed, case)
+        (case / "attestations.json").write_bytes(payload)
+        before = snapshot(case)
+        answer = run(case, *command)
+        after = snapshot(case)
+        if answer.returncode == 0:
+            raise SystemExit(f"{corruption_name}/{mutation_name}: corrupt state godtogs")
+        if after != before:
+            raise SystemExit(f"{corruption_name}/{mutation_name}: failure muterade authoritative bytes")
+
+print("10 corrupt mutation paths failed closed with exact prestate")
+PYCORRUPTMUT
+
+corrupt_mut14=$(python3 "$WORK/h003-corrupt-mutations.py" "$CLI" "$WORK/corrupt-mutations" 2>&1); corrupt_mut14_rc=$?
+if [ "$corrupt_mut14_rc" -eq 0 ]; then
+  ok "K14b corrupt mutation: write/BEGIN/FINALIZE/INVALIDATE faller före exakt prestate-mutation"
+else
+  no "K14b corrupt mutation" "${corrupt_mut14:-corrupt-mutation harness exit $corrupt_mut14_rc}"
+fi
+
+# K15: samtidiga publika histories — inte en gissning om intern mekanism.
+# Varje write som rapporterar success ska förbli observerbar, och en write av
+# en ANNAN task får aldrig skriva tillbaka en snapshot som tappar invalidate.
+cat > "$WORK/h003-concurrency.py" <<'PYCONC'
+import concurrent.futures
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import threading
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+
+def run(*args):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=10
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"CLI timeout: {args!r}") from exc
+
+def sha(n):
+    return f"{n:040x}"
+
+def exact(answer, task, candidate):
+    if answer.returncode != 0:
+        return False
+    try:
+        post = json.loads(answer.stdout)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return isinstance(post, dict) and post.get("task") == task and post.get("candidate_sha") == candidate
+
+def simultaneous(calls):
+    barrier = threading.Barrier(len(calls))
+    def one(call):
+        barrier.wait()
+        return run(*call)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        return [f.result(timeout=20) for f in [pool.submit(one, c) for c in calls]]
+
+# Alla distinkta current-authority writes måste kunna lyckas och finnas kvar.
+d = root / "all-writes"
+auth = "concurrent:all-writes"
+if run(d, "begin-authority", auth).returncode != 0:
+    raise SystemExit("begin saknas")
+calls = [(d, "write", f"cw-{i}", sha(1500 + i), "--authority", auth) for i in range(32)]
+answers = simultaneous(calls)
+successful = [i for i, answer in enumerate(answers) if answer.returncode == 0]
+if not successful:
+    raise SystemExit("alla concurrent writes föll")
+for i in successful:
+    a = run(d, "read", f"cw-{i}", "--authority", auth)
+    if not exact(a, f"cw-{i}", sha(1500 + i)):
+        raise SystemExit(f"successful write tappades: {i}")
+for i, answer in enumerate(answers):
+    if answer.returncode == 0:
+        continue
+    retry = run(d, "write", f"cw-{i}", sha(1500 + i), "--authority", auth)
+    if retry.returncode != 0:
+        raise SystemExit(f"safe-failed write kunde inte retryas: {i}")
+    reread = run(d, "read", f"cw-{i}", "--authority", auth)
+    if not exact(reread, f"cw-{i}", sha(1500 + i)):
+        raise SystemExit(f"retried write saknas: {i}")
+if run(d, "finalize-authority", auth).returncode != 0:
+    raise SystemExit("batch-finalize föll")
+if any(not exact(run(d, "read", f"cw-{i}", "--require-valid"), f"cw-{i}", sha(1500 + i)) for i in range(32)):
+    raise SystemExit("finalized concurrent write saknas")
+
+# Unrelated authority-write och legacy invalidate måste bevara BÅDA effekterna.
+d = root / "write-invalidate"
+auth = "concurrent:write-invalidate"
+if run(d, "begin-authority", auth).returncode != 0:
+    raise SystemExit("begin write/invalidate föll")
+for i in range(60):
+    if run(d, "write", f"filler-{i}", sha(1600 + i)).returncode != 0:
+        raise SystemExit("filler write föll")
+queue_task, queue_sha = "unrelated-queue-debt", sha(1699)
+if run(d, "write", queue_task, queue_sha).returncode != 0:
+    raise SystemExit("queue-debt seed föll")
+if run(d, "invalidate", queue_sha).returncode != 0:
+    raise SystemExit("queue-debt invalidate föll")
+side_tasks = []
+for i in range(16):
+    victim, side = f"victim-{i}", f"side-{i}"
+    victim_sha, side_sha = sha(1700 + i), sha(1800 + i)
+    if run(d, "write", victim, victim_sha).returncode != 0:
+        raise SystemExit("victim seed föll")
+    write, invalidate = simultaneous([
+        (d, "write", side, side_sha, "--authority", auth),
+        (d, "invalidate", victim_sha),
+    ])
+    if write.returncode != 0 and invalidate.returncode != 0:
+        raise SystemExit("write/invalidate saknade concurrent winner")
+    if write.returncode != 0:
+        write = run(d, "write", side, side_sha, "--authority", auth)
+    if invalidate.returncode != 0:
+        invalidate = run(d, "invalidate", victim_sha)
+    if write.returncode != 0 or invalidate.returncode != 0:
+        raise SystemExit("safe-failed write/invalidate kunde inte retryas")
+    if run(d, "read", victim, "--require-valid").returncode == 0:
+        raise SystemExit("invalidate tappades av write-snapshot")
+    side_read = run(d, "read", side, "--authority", auth)
+    if not exact(side_read, side, side_sha):
+        raise SystemExit("authority-write tappades av invalidate-snapshot")
+    side_tasks.append(side)
+if run(d, "finalize-authority", auth).returncode != 0:
+    raise SystemExit("write/invalidate-batch kunde inte finaliseras")
+if any(run(d, "read", task, "--require-valid").returncode != 0 for task in side_tasks):
+    raise SystemExit("en preserved side-write blev inte valid")
+if not exact(run(d, "read", "filler-0", "--require-valid"), "filler-0", sha(1600)):
+    raise SystemExit("authority finalize ändrade/tappade legacy payload")
+if run(d, "read", queue_task, "--require-valid").returncode == 0:
+    raise SystemExit("authority finalize resurrected unrelated stale legacy task")
+try:
+    queue_state = json.loads((d / "attestations.json").read_text(encoding="utf-8"))
+except Exception as exc:
+    raise SystemExit(f"queue-state oläsbar efter finalize: {exc}") from exc
+if queue_task not in queue_state.get("omtest_ko", []):
+    raise SystemExit("authority finalize tömde unrelated omtest-skuld")
+
+# Samma lost-update-klass måste vara stängd på den bevarade legacy-vägen;
+# ett lås endast runt nya authority-kommandon är inte en gemensam ordering.
+d = root / "legacy-write-invalidate"
+for i in range(16):
+    victim, side = f"legacy-victim-{i}", f"legacy-side-{i}"
+    victim_sha, side_sha = sha(1900 + i), sha(1950 + i)
+    if run(d, "write", victim, victim_sha).returncode != 0:
+        raise SystemExit("legacy victim seed föll")
+    write, invalidate = simultaneous([
+        (d, "write", side, side_sha),
+        (d, "invalidate", victim_sha),
+    ])
+    if write.returncode != 0 and invalidate.returncode != 0:
+        raise SystemExit("legacy write/invalidate saknade concurrent winner")
+    if write.returncode != 0:
+        write = run(d, "write", side, side_sha)
+    if invalidate.returncode != 0:
+        invalidate = run(d, "invalidate", victim_sha)
+    if write.returncode != 0 or invalidate.returncode != 0:
+        raise SystemExit("safe-failed legacy write/invalidate kunde inte retryas")
+    if run(d, "read", victim, "--require-valid").returncode == 0:
+        raise SystemExit("legacy write resurrected completed invalidate")
+    side_read = run(d, "read", side, "--require-valid")
+    if not exact(side_read, side, side_sha):
+        raise SystemExit("invalidate tappade successful legacy write")
+
+# Legacy och authority WRITE måste dela ordering sinsemellan, inte bara med
+# INVALIDATE. Varje reported success ska vara exakt läsbar och överleva finalize.
+d = root / "mixed-writes"
+auth = "concurrent-mixed-writes"
+if run(d, "begin-authority", auth).returncode != 0:
+    raise SystemExit("mixed writes begin föll")
+mixed = []
+for i in range(16):
+    legacy_task, authority_task = f"mixed-legacy-{i}", f"mixed-authority-{i}"
+    legacy_sha, authority_sha = sha(1970 + i), sha(1990 + i)
+    legacy, authority = simultaneous([
+        (d, "write", legacy_task, legacy_sha),
+        (d, "write", authority_task, authority_sha, "--authority", auth),
+    ])
+    if legacy.returncode != 0 and authority.returncode != 0:
+        raise SystemExit("mixed writes saknade concurrent winner")
+    if legacy.returncode != 0:
+        legacy = run(d, "write", legacy_task, legacy_sha)
+    if authority.returncode != 0:
+        authority = run(d, "write", authority_task, authority_sha, "--authority", auth)
+    if legacy.returncode != 0 or authority.returncode != 0:
+        raise SystemExit("safe-failed mixed write kunde inte retryas")
+    if not exact(run(d, "read", legacy_task, "--require-valid"), legacy_task, legacy_sha):
+        raise SystemExit("authority write tappade successful legacy write")
+    if not exact(run(d, "read", authority_task, "--authority", auth), authority_task, authority_sha):
+        raise SystemExit("legacy write tappade successful authority write")
+    mixed.append((legacy_task, legacy_sha, authority_task, authority_sha))
+if run(d, "finalize-authority", auth).returncode != 0:
+    raise SystemExit("mixed write batch finalize föll")
+for legacy_task, legacy_sha, authority_task, authority_sha in mixed:
+    if not exact(run(d, "read", legacy_task, "--require-valid"), legacy_task, legacy_sha):
+        raise SystemExit("finalize tappade mixed legacy write")
+    if not exact(run(d, "read", authority_task, "--require-valid"), authority_task, authority_sha):
+        raise SystemExit("finalize tappade mixed authority write")
+
+print("concurrent authority/legacy writes + write/invalidate preserved")
+PYCONC
+
+conc15=$(python3 "$WORK/h003-concurrency.py" "$CLI" "$WORK/k15" 2>&1); rc15=$?
+if [ "$rc15" -eq 0 ]; then
+  ok "K15 ordering: authority+legacy write/invalidate bevarar varje successful effekt"
+else
+  no "K15 ordering" "${conc15:-concurrency-harness exit $rc15}"
+fi
+
+# K16–K17: samtidiga authority-transitioner döms endast mot de tillåtna
+# serialiserade utfallen. Provet föreskriver aldrig flock/CAS/DB/rename.
+cat > "$WORK/h003-transitions.py" <<'PYTRANS'
+import concurrent.futures
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import threading
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+
+def run(*args):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=10
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"CLI timeout: {args!r}") from exc
+
+def sha(n):
+    return f"{n:040x}"
+
+def exact(answer, task, candidate):
+    if answer.returncode != 0:
+        return False
+    try:
+        post = json.loads(answer.stdout)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return isinstance(post, dict) and post.get("task") == task and post.get("candidate_sha") == candidate
+
+def simultaneous(calls):
+    barrier = threading.Barrier(len(calls))
+    def one(call):
+        barrier.wait()
+        return run(*call)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        futures = [pool.submit(one, c) for c in calls]
+        return [f.result(timeout=20) for f in futures]
+
+# Provisional writes A mot BEGIN B: B ska vara current efter completed begin,
+# och ingen ofinaliserad A-publication får bli globalt giltig eller publishable.
+d = root / "write-begin"
+a, b = "transition-A16", "transition-B16"
+if run(d, "begin-authority", a).returncode != 0:
+    raise SystemExit("K16 begin A föll")
+calls = [(d, "write", f"a16-{i}", sha(2000 + i), "--authority", a) for i in range(16)]
+answers = simultaneous(calls + [(d, "begin-authority", b)])
+if all(answer.returncode != 0 for answer in answers):
+    raise SystemExit("K16 alla concurrent mutationer föll")
+if answers[-1].returncode != 0:
+    answers[-1] = run(d, "begin-authority", b)
+if answers[-1].returncode != 0:
+    raise SystemExit("K16 safe-failed begin B kunde inte retryas")
+if run(d, "finalize-authority", a).returncode == 0:
+    raise SystemExit("K16 stale A finalize godtogs")
+for i in range(16):
+    if run(d, "read", f"a16-{i}", "--require-valid").returncode == 0:
+        raise SystemExit("K16 ofinaliserad A blev globalt giltig")
+    if run(d, "read", f"a16-{i}", "--authority", a).returncode == 0:
+        raise SystemExit("K16 A är fortfarande current-readable")
+bsha = sha(2099)
+if run(d, "write", "b16", bsha, "--authority", b).returncode != 0:
+    raise SystemExit("K16 B current-write föll")
+if run(d, "finalize-authority", b).returncode != 0:
+    raise SystemExit("K16 B finalize föll")
+if run(d, "read", "b16", "--require-valid").returncode != 0:
+    raise SystemExit("K16 B-resultat saknas")
+
+# Legacy write mot BEGIN måste bevara båda oberoende effekterna.
+d = root / "legacy-begin"
+a, b = "transition-legacy-A", "transition-legacy-B"
+if run(d, "begin-authority", a).returncode != 0:
+    raise SystemExit("K16 legacy begin A föll")
+legacy_sha = sha(2100)
+legacy, begin = simultaneous([
+    (d, "write", "legacy-during-begin", legacy_sha),
+    (d, "begin-authority", b),
+])
+if legacy.returncode != 0 and begin.returncode != 0:
+    raise SystemExit("K16 legacy-write/begin saknade concurrent winner")
+if legacy.returncode != 0:
+    legacy = run(d, "write", "legacy-during-begin", legacy_sha)
+if begin.returncode != 0:
+    begin = run(d, "begin-authority", b)
+if legacy.returncode != 0 or begin.returncode != 0:
+    raise SystemExit("K16 safe-failed legacy-write/begin kunde inte retryas")
+if run(d, "read", "legacy-during-begin", "--require-valid").returncode != 0:
+    raise SystemExit("K16 begin tappade concurrent legacy write")
+if run(d, "write", "b-current", sha(2101), "--authority", b).returncode != 0:
+    raise SystemExit("K16 legacy write tappade B-current state")
+
+# BEGIN mot INVALIDATE måste också bevara båda effekterna. En BEGIN som gör
+# olåst full-store RMW får varken resurrecta stale-posten eller tappa kön.
+for i in range(16):
+    d = root / f"begin-invalidate-{i}"
+    victim = f"begin-victim-{i}"
+    victim_sha = sha(2120 + i)
+    b = f"transition-invalidate-B-{i}"
+    if run(d, "write", victim, victim_sha).returncode != 0:
+        raise SystemExit("K16 begin/invalidate victim seed föll")
+    begin, invalidate = simultaneous([
+        (d, "begin-authority", b),
+        (d, "invalidate", victim_sha),
+    ])
+    if begin.returncode != 0 and invalidate.returncode != 0:
+        raise SystemExit("K16 begin/invalidate saknade concurrent winner")
+    if begin.returncode != 0:
+        begin = run(d, "begin-authority", b)
+    if invalidate.returncode != 0:
+        invalidate = run(d, "invalidate", victim_sha)
+    if begin.returncode != 0 or invalidate.returncode != 0:
+        raise SystemExit("K16 safe-failed begin/invalidate kunde inte retryas")
+    if run(d, "read", victim, "--require-valid").returncode == 0:
+        raise SystemExit("K16 BEGIN resurrected completed invalidate")
+    try:
+        state = json.loads((d / "attestations.json").read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise SystemExit(f"K16 queue-state oläsbar: {exc}") from exc
+    if victim not in state.get("omtest_ko", []):
+        raise SystemExit("K16 BEGIN tappade invalidate-kön")
+    btask, bsha = f"begin-current-{i}", sha(2150 + i)
+    if run(d, "write", btask, bsha, "--authority", b).returncode != 0:
+        raise SystemExit("K16 begin-effect var inte current-writable")
+    if run(d, "read", btask, "--authority", b).returncode != 0:
+        raise SystemExit("K16 begin-effect var inte current-readable")
+    if run(d, "finalize-authority", b).returncode != 0:
+        raise SystemExit("K16 begin/invalidate batch finalize föll")
+    if run(d, "read", btask, "--require-valid").returncode != 0:
+        raise SystemExit("K16 begin/invalidate current-resultat saknas")
+    if run(d, "read", victim, "--require-valid").returncode == 0:
+        raise SystemExit("K16 unrelated finalize resurrected stale victim")
+    try:
+        state_after_finalize = json.loads((d / "attestations.json").read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise SystemExit(f"K16 queue-state oläsbar efter finalize: {exc}") from exc
+    if victim not in state_after_finalize.get("omtest_ko", []):
+        raise SystemExit("K16 unrelated finalize tömde invalidate-kön")
+
+print("K16 transitions preserved")
+
+# FINALIZE A mot BEGIN B: finalize success => HELA A-batchen valid; failure =>
+# NOLL. B ska därefter vara current i båda ordningar.
+d = root / "finalize-begin"
+a, b = "transition-A17", "transition-B17"
+if run(d, "begin-authority", a).returncode != 0:
+    raise SystemExit("K17 begin A föll")
+for i in range(24):
+    if run(d, "write", f"a17-{i}", sha(2200 + i), "--authority", a).returncode != 0:
+        raise SystemExit("K17 provisional seed föll")
+finalize, begin = simultaneous([
+    (d, "finalize-authority", a),
+    (d, "begin-authority", b),
+])
+if finalize.returncode != 0 and begin.returncode != 0:
+    raise SystemExit("K17 finalize/begin saknade concurrent winner")
+if begin.returncode != 0:
+    begin = run(d, "begin-authority", b)
+if begin.returncode != 0:
+    raise SystemExit("K17 safe-failed begin B kunde inte retryas")
+valid_count = sum(
+    run(d, "read", f"a17-{i}", "--require-valid").returncode == 0
+    for i in range(24)
+)
+expected = 24 if finalize.returncode == 0 else 0
+if valid_count != expected:
+    raise SystemExit(f"K17 partial/failure persistence: finalize={finalize.returncode} valid={valid_count}")
+if any(run(d, "read", f"a17-{i}", "--authority", a).returncode == 0 for i in range(24)):
+    raise SystemExit("K17 A förblev current-readable")
+if run(d, "write", "b17", sha(2299), "--authority", b).returncode != 0:
+    raise SystemExit("K17 B current-write föll")
+if run(d, "finalize-authority", b).returncode != 0:
+    raise SystemExit("K17 B finalize föll")
+if run(d, "read", "b17", "--require-valid").returncode != 0:
+    raise SystemExit("K17 B valid-resultat saknas")
+
+# FINALIZE mot INVALIDATE: den träffade publicationen är alltid invalid. Den
+# andra är valid endast om finalize hann serialiseras först och rapporterade 0.
+d = root / "finalize-invalidate"
+a = "transition-invalidate-A17"
+x, y = sha(2300), sha(2301)
+if run(d, "begin-authority", a).returncode != 0:
+    raise SystemExit("K17 invalidate begin föll")
+if run(d, "write", "x17", x, "--authority", a).returncode != 0:
+    raise SystemExit("K17 x seed föll")
+if run(d, "write", "y17", y, "--authority", a).returncode != 0:
+    raise SystemExit("K17 y seed föll")
+finalize, invalidate = simultaneous([
+    (d, "finalize-authority", a),
+    (d, "invalidate", x),
+])
+if finalize.returncode != 0 and invalidate.returncode != 0:
+    raise SystemExit("K17 finalize/invalidate saknade concurrent winner")
+if invalidate.returncode != 0:
+    invalidate = run(d, "invalidate", x)
+if invalidate.returncode != 0:
+    raise SystemExit("K17 safe-failed invalidate kunde inte retryas")
+x_valid = run(d, "read", "x17", "--require-valid").returncode == 0
+y_valid = run(d, "read", "y17", "--require-valid").returncode == 0
+if x_valid or y_valid != (finalize.returncode == 0):
+    raise SystemExit(
+        f"K17 finalize/invalidate otillåtet utfall finalize={finalize.returncode} x={x_valid} y={y_valid}"
+    )
+
+# Current WRITE mot FINALIZE: om write rapporterar success måste den ingå i
+# den kompletta batchen; om finalize stängde först måste write falla utan
+# provisional rest. Safe finalize-failure får retryas efter en successful write.
+for i in range(24):
+    d = root / f"write-finalize-{i}"
+    a = f"transition-write-finalize-{i}"
+    seed_task, late_task = f"wf-seed-{i}", f"wf-late-{i}"
+    seed_sha, late_sha = sha(2400 + i), sha(2450 + i)
+    if run(d, "begin-authority", a).returncode != 0:
+        raise SystemExit("K17 write/finalize begin föll")
+    if run(d, "write", seed_task, seed_sha, "--authority", a).returncode != 0:
+        raise SystemExit("K17 write/finalize seed föll")
+    write, finalize = simultaneous([
+        (d, "write", late_task, late_sha, "--authority", a),
+        (d, "finalize-authority", a),
+    ])
+    if write.returncode != 0 and finalize.returncode != 0:
+        raise SystemExit("K17 write/finalize saknade concurrent winner")
+    if finalize.returncode != 0:
+        finalize = run(d, "finalize-authority", a)
+    if finalize.returncode != 0:
+        raise SystemExit("K17 safe-failed finalize kunde inte retryas")
+    if run(d, "read", seed_task, "--require-valid").returncode != 0:
+        raise SystemExit("K17 finalized seed saknas")
+    late_valid = run(d, "read", late_task, "--require-valid")
+    late_bound = run(d, "read", late_task, "--authority", a)
+    if write.returncode == 0:
+        if not exact(late_valid, late_task, late_sha):
+            raise SystemExit("K17 successful current write utelämnades ur finalized batch")
+    elif late_valid.returncode == 0 or late_bound.returncode == 0:
+        raise SystemExit("K17 failed post-close write lämnade publication")
+    closed_task = f"wf-closed-{i}"
+    if run(d, "write", closed_task, sha(2480 + i), "--authority", a).returncode == 0:
+        raise SystemExit("K17 finalized generation återöppnades")
+    if run(d, "read", closed_task, "--authority", a).returncode == 0:
+        raise SystemExit("K17 closed write blev authority-readable")
+
+# Unrelated legacy WRITE mot FINALIZE måste bevara båda effects. Finalize får
+# inte skriva tillbaka en äldre whole-store snapshot som tappar legacy success.
+for i in range(16):
+    d = root / f"legacy-finalize-{i}"
+    a = f"transition-legacy-finalize-{i}"
+    seed_task, legacy_task = f"lf-seed-{i}", f"lf-legacy-{i}"
+    seed_sha, legacy_sha = sha(2500 + i), sha(2550 + i)
+    if run(d, "begin-authority", a).returncode != 0:
+        raise SystemExit("K17 legacy/finalize begin föll")
+    if run(d, "write", seed_task, seed_sha, "--authority", a).returncode != 0:
+        raise SystemExit("K17 legacy/finalize seed föll")
+    legacy, finalize = simultaneous([
+        (d, "write", legacy_task, legacy_sha),
+        (d, "finalize-authority", a),
+    ])
+    if legacy.returncode != 0 and finalize.returncode != 0:
+        raise SystemExit("K17 legacy/finalize saknade concurrent winner")
+    if finalize.returncode != 0:
+        finalize = run(d, "finalize-authority", a)
+    if finalize.returncode != 0:
+        raise SystemExit("K17 safe-failed legacy/finalize kunde inte finalize-retryas")
+    if legacy.returncode != 0:
+        legacy = run(d, "write", legacy_task, legacy_sha)
+    if legacy.returncode != 0:
+        raise SystemExit("K17 safe-failed legacy write kunde inte retryas")
+    if not exact(run(d, "read", seed_task, "--require-valid"), seed_task, seed_sha):
+        raise SystemExit("K17 legacy write ändrade finalized authority seed")
+    if not exact(run(d, "read", legacy_task, "--require-valid"), legacy_task, legacy_sha):
+        raise SystemExit("K17 finalize tappade successful legacy write")
+
+print("K17 transitions all-or-none")
+PYTRANS
+
+trans_out=$(python3 "$WORK/h003-transitions.py" "$CLI" "$WORK/transitions" 2>&1); trans_rc=$?
+if echo "$trans_out" | grep -q 'K16 transitions preserved'; then
+  ok "K16 ordering: writes/INVALIDATE vs BEGIN ger endast serialiserade effekter"
+else
+  no "K16 ordering" "${trans_out:-transition-harness exit $trans_rc}"
+fi
+if [ "$trans_rc" -eq 0 ] && echo "$trans_out" | grep -q 'K17 transitions all-or-none'; then
+  ok "K17 ordering: FINALIZE vs BEGIN/INVALIDATE/current-WRITE ger all-or-none outcomes"
+else
+  no "K17 ordering" "${trans_out:-transition-harness exit $trans_rc}"
+fi
+
+# K18: externa process-stopp vid flera schemaläggningspunkter. Detta hävdar
+# inte att ett visst SIGKILL träffade före eller efter den atomiska commit-
+# punkten; det dömer den publika effekten: rapporterad normal failure ger NOLL,
+# success ger HEL och ett asynkront stopp får aldrig lämna proper subset.
+cat > "$WORK/h003-finalize-crash.py" <<'PYCRASH'
+import json
+import os
+import pathlib
+import signal
+import subprocess
+import sys
+import time
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+
+def run(*args):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=10
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"CLI timeout: {args!r}") from exc
+
+def sha(n):
+    return f"{n:040x}"
+
+def exact(directory, task, candidate, *extra):
+    answer = run(directory, "read", task, *extra)
+    if answer.returncode != 0:
+        return False
+    try:
+        post = json.loads(answer.stdout)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(post, dict)
+        and post.get("task") == task
+        and post.get("candidate_sha") == candidate
+    )
+
+delays = (0.0, 0.001, 0.005, 0.02, 0.05)
+n = 48
+killed = 0
+for round_no, delay in enumerate(delays):
+    d = root / f"round-{round_no}"
+    auth = f"crash-authority-{round_no}"
+    anchor_task = f"crash-anchor-{round_no}"
+    anchor_sha = sha(2900 + round_no)
+    if run(d, "write", anchor_task, anchor_sha).returncode != 0:
+        raise SystemExit(f"round {round_no}: legacy anchor write föll")
+    if run(d, "begin-authority", auth).returncode != 0:
+        raise SystemExit(f"round {round_no}: begin föll")
+    for i in range(n):
+        if run(d, "write", f"crash-{i}", sha(3000 + round_no * n + i), "--authority", auth).returncode != 0:
+            raise SystemExit(f"round {round_no}: seed write föll")
+    proc = subprocess.Popen(
+        [cli, str(d), "finalize-authority", auth],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    time.sleep(delay)
+    if proc.poll() is None:
+        proc.kill()
+        killed += 1
+    rc = proc.wait(timeout=10)
+    valid = 0
+    for i in range(n):
+        task = f"crash-{i}"
+        candidate = sha(3000 + round_no * n + i)
+        answer = run(d, "read", task, "--require-valid")
+        if answer.returncode == 0:
+            try:
+                post = json.loads(answer.stdout)
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise SystemExit(f"round {round_no}: valid read var inte JSON: {task}") from exc
+            if not (
+                isinstance(post, dict)
+                and post.get("task") == task
+                and post.get("candidate_sha") == candidate
+            ):
+                raise SystemExit(f"round {round_no}: valid member hade fel payload: {task}")
+            valid += 1
+    if not exact(d, anchor_task, anchor_sha, "--require-valid"):
+        raise SystemExit(f"round {round_no}: finalize/crash skadade tidigare legacy-anchor")
+    if valid not in (0, n):
+        raise SystemExit(f"round {round_no}: crash lämnade partial batch {valid}/{n}, rc={rc}")
+    if rc == 0 and valid != n:
+        raise SystemExit(f"round {round_no}: finalize success var inte durably HEL")
+    if rc > 0 and valid != 0:
+        raise SystemExit(f"round {round_no}: reported failure lämnade valid batch {valid}/{n}")
+
+if killed == 0:
+    raise SystemExit("ingen finalize-process stoppades; crashhistoriken är odömd")
+
+print(f"crash histories left only zero-or-all batches; killed={killed}")
+PYCRASH
+
+crash18=$(python3 "$WORK/h003-finalize-crash.py" "$CLI" "$WORK/crash" 2>&1); rc18=$?
+if [ "$rc18" -eq 0 ]; then
+  ok "K18a async-stop atomicity: success=hel, rapporterad failure=noll och stopp lämnar aldrig partial"
+else
+  no "K18a async-stop atomicity" "${crash18:-crash-harness exit $rc18}"
+fi
+
+# K18b: explicit owner seam immediately before the one durable whole-batch
+# publication point. READY is emitted only after whole-batch revalidation and
+# while global validity is still zero. Killing there must leave zero; RELEASE
+# must give exit 0 and a complete batch. Wrong/stale/closed/nonfinalizable ids
+# must fail without READY. Marker files are deleted before the fresh-process
+# durability reads, so they can never masquerade as ongoing authority.
+cat > "$WORK/h003-finalize-barrier.py" <<'PYFINALBARRIER'
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import threading
+import time
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+
+def run(*args, timeout=10):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=timeout
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"CLI timeout: {args!r}") from exc
+
+def sha(number):
+    return f"{number:040x}"
+
+def exact(directory, task, candidate, *read_args):
+    answer = run(directory, "read", task, *read_args)
+    if answer.returncode != 0:
+        return False
+    try:
+        post = json.loads(answer.stdout)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(post, dict)
+        and post.get("task") == task
+        and post.get("candidate_sha") == candidate
+    )
+
+def globally_invalid(directory, tasks):
+    return all(run(directory, "read", task, "--require-valid").returncode != 0 for task, _sha in tasks)
+
+def queue_contains(directory, task):
+    try:
+        state = json.loads((directory / "attestations.json").read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    return task in state.get("omtest_ko", [])
+
+def state_bytes(directory):
+    path = directory / "attestations.json"
+    return path.read_bytes() if path.is_file() else None
+
+def wait_ready(process, barrier, seconds=5):
+    deadline = time.monotonic() + seconds
+    ready = barrier / "ready"
+    while time.monotonic() < deadline:
+        if ready.is_file() and not ready.is_symlink():
+            time.sleep(0.05)
+            if process.poll() is not None:
+                raise RuntimeError("finalize exited instead of waiting after READY")
+            return
+        if process.poll() is not None:
+            raise RuntimeError(f"finalize exited before READY rc={process.returncode}")
+        time.sleep(0.02)
+    raise RuntimeError("READY was not created before harness deadline")
+
+def require_release_wait(process, seconds=0.35):
+    # A READY-only mutant that ignores RELEASE and publishes after a fixed
+    # delay must be falsified without concurrent reads (the seam does not ban
+    # an implementation from holding a store lock while it waits).
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(
+                f"finalize exited without RELEASE rc={process.returncode}"
+            )
+        time.sleep(0.02)
+
+def start_invalid_observers(directory, tasks):
+    # Fresh CLI processes sample before and throughout READY. A legitimate
+    # implementation may hold an exclusive lock: the read may then block, but
+    # after the killed finalizer releases that lock it must complete nonzero.
+    stop = threading.Event()
+    valid_hits = []
+    errors = []
+
+    def observe(task):
+        try:
+            while not stop.is_set():
+                answer = run(directory, "read", task, "--require-valid")
+                if answer.returncode == 0:
+                    valid_hits.append((task, answer.stdout))
+                stop.wait(0.02)
+        except Exception as exc:
+            errors.append((task, repr(exc)))
+
+    threads = [
+        threading.Thread(target=observe, args=(task,), daemon=True)
+        for task, _candidate in tasks
+    ]
+    for thread in threads:
+        thread.start()
+    return stop, threads, valid_hits, errors
+
+def stop_invalid_observers(observers):
+    stop, threads, valid_hits, errors = observers
+    stop.set()
+    for thread in threads:
+        thread.join(timeout=12)
+    if any(thread.is_alive() for thread in threads):
+        raise RuntimeError("fresh validity read remained blocked after finalizer death")
+    if errors:
+        raise RuntimeError(f"fresh validity observer failed: {errors!r}")
+    if valid_hits:
+        raise RuntimeError(f"batch became globally valid before publication release: {valid_hits!r}")
+
+def start_barrier(directory, authority, barrier):
+    barrier.mkdir(parents=True, exist_ok=False)
+    return subprocess.Popen(
+        [
+            cli,
+            str(directory),
+            "finalize-authority",
+            authority,
+            "--test-before-publication-barrier",
+            str(barrier),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+def establish_anchors(directory, suffix):
+    legacy_task = f"legacy-{suffix}"
+    legacy_sha = sha(5000 + suffix)
+    queue_task = f"queue-{suffix}"
+    queue_old = sha(5100 + suffix)
+    prior_task = f"prior-{suffix}"
+    prior_sha = sha(5200 + suffix)
+    prior_auth = f"prior-authority-{suffix}"
+    calls = [
+        (directory, "write", legacy_task, legacy_sha),
+        (directory, "write", queue_task, queue_old),
+        (directory, "invalidate", queue_old),
+        (directory, "begin-authority", prior_auth),
+        (directory, "write", prior_task, prior_sha, "--authority", prior_auth),
+        (directory, "finalize-authority", prior_auth),
+    ]
+    for call in calls:
+        answer = run(*call)
+        if answer.returncode != 0:
+            raise RuntimeError(f"anchor setup failed: {call!r}: {answer.stderr!r}")
+    if not exact(directory, legacy_task, legacy_sha, "--require-valid"):
+        raise RuntimeError("legacy positive anchor missing")
+    if not exact(directory, prior_task, prior_sha, "--require-valid"):
+        raise RuntimeError("prior-finalized positive anchor missing")
+    if not queue_contains(directory, queue_task):
+        raise RuntimeError("queue-debt anchor missing")
+    return {
+        "legacy": (legacy_task, legacy_sha),
+        "queue": (queue_task, queue_old),
+        "prior": (prior_task, prior_sha),
+    }
+
+def establish_batch(directory, suffix, anchors):
+    authority = f"barrier-current-{suffix}"
+    queue_task, _queue_old = anchors["queue"]
+    tasks = [
+        (queue_task, sha(5300 + suffix)),
+        (f"batch-a-{suffix}", sha(5400 + suffix)),
+        (f"batch-b-{suffix}", sha(5500 + suffix)),
+    ]
+    if run(directory, "begin-authority", authority).returncode != 0:
+        raise RuntimeError("batch begin failed")
+    for task, candidate in tasks:
+        if run(directory, "write", task, candidate, "--authority", authority).returncode != 0:
+            raise RuntimeError(f"batch write failed: {task}")
+        if not exact(directory, task, candidate, "--authority", authority):
+            raise RuntimeError(f"batch provisional exact-read failed: {task}")
+    if not globally_invalid(directory, tasks):
+        raise RuntimeError("batch was globally valid before finalize")
+    if not queue_contains(directory, queue_task):
+        raise RuntimeError("provisional replacement cleared queue debt")
+    return authority, tasks
+
+def anchors_intact(directory, anchors, expect_queue):
+    legacy_task, legacy_sha = anchors["legacy"]
+    prior_task, prior_sha = anchors["prior"]
+    queue_task, _queue_old = anchors["queue"]
+    return (
+        exact(directory, legacy_task, legacy_sha, "--require-valid")
+        and exact(directory, prior_task, prior_sha, "--require-valid")
+        and queue_contains(directory, queue_task) == expect_queue
+    )
+
+# Deterministic death before publication linearization: exact zero, with all
+# unrelated positive/negative anchors intact. The contract does not prescribe
+# whether an asynchronously aborted provisional staging area remains readable.
+d_kill = root / "kill"
+anchors_kill = establish_anchors(d_kill, 1)
+auth_kill, tasks_kill = establish_batch(d_kill, 1, anchors_kill)
+barrier_kill = root / "barrier-kill"
+observers_kill = start_invalid_observers(d_kill, tasks_kill)
+proc_kill = start_barrier(d_kill, auth_kill, barrier_kill)
+try:
+    wait_ready(proc_kill, barrier_kill)
+    require_release_wait(proc_kill)
+    proc_kill.kill()
+    proc_kill.communicate(timeout=5)
+    if proc_kill.returncode is None or proc_kill.returncode >= 0:
+        raise RuntimeError(f"held finalize was not asynchronously killed: {proc_kill.returncode}")
+finally:
+    if proc_kill.poll() is None:
+        proc_kill.kill()
+        proc_kill.communicate(timeout=5)
+    stop_invalid_observers(observers_kill)
+shutil.rmtree(barrier_kill)
+if not globally_invalid(d_kill, tasks_kill):
+    raise SystemExit("kill before publication left valid batch member")
+if not anchors_intact(d_kill, anchors_kill, True):
+    raise SystemExit("kill before publication damaged legacy/prior/queue anchors")
+
+# RELEASE branch: zero while held, then one acknowledged complete durable
+# publication. Delete scheduling markers before all final fresh-process reads.
+d_release = root / "release"
+anchors_release = establish_anchors(d_release, 2)
+auth_release, tasks_release = establish_batch(d_release, 2, anchors_release)
+barrier_release = root / "barrier-release"
+proc_release = start_barrier(d_release, auth_release, barrier_release)
+try:
+    wait_ready(proc_release, barrier_release)
+    require_release_wait(proc_release)
+    (barrier_release / "release").write_bytes(b"release\n")
+    stdout, stderr = proc_release.communicate(timeout=10)
+    if proc_release.returncode != 0:
+        raise RuntimeError(f"released finalize did not acknowledge success rc={proc_release.returncode}: {stderr!r}")
+finally:
+    if proc_release.poll() is None:
+        proc_release.kill()
+        proc_release.communicate(timeout=5)
+shutil.rmtree(barrier_release)
+if not all(exact(d_release, task, candidate, "--require-valid") for task, candidate in tasks_release):
+    raise SystemExit("released finalize did not durably publish complete exact batch")
+if not anchors_intact(d_release, anchors_release, False):
+    raise SystemExit("released finalize damaged anchors or failed to clear included queue debt")
+
+# Zero-publication is also a current finalizable whole batch. It must traverse
+# the same explicit seam, acknowledge success after RELEASE and become closed;
+# otherwise an empty-only fast path could bypass the frozen publication point.
+d_empty = root / "empty-release"
+empty_auth = "empty-barrier-authority"
+if run(d_empty, "begin-authority", empty_auth).returncode != 0:
+    raise SystemExit("empty barrier begin failed")
+barrier_empty = root / "barrier-empty"
+proc_empty = start_barrier(d_empty, empty_auth, barrier_empty)
+try:
+    wait_ready(proc_empty, barrier_empty)
+    require_release_wait(proc_empty)
+    (barrier_empty / "release").write_bytes(b"release\n")
+    _stdout, stderr = proc_empty.communicate(timeout=10)
+    if proc_empty.returncode != 0:
+        raise RuntimeError(f"empty released finalize failed rc={proc_empty.returncode}: {stderr!r}")
+finally:
+    if proc_empty.poll() is None:
+        proc_empty.kill()
+        proc_empty.communicate(timeout=5)
+shutil.rmtree(barrier_empty)
+if run(d_empty, "write", "empty-late", sha(5590), "--authority", empty_auth).returncode == 0:
+    raise SystemExit("empty barrier finalize did not close publication-set")
+if run(d_empty, "finalize-authority", empty_auth).returncode == 0:
+    raise SystemExit("empty barrier authority was not single-use")
+empty_next = "empty-barrier-next"
+if run(d_empty, "begin-authority", empty_next).returncode != 0:
+    raise SystemExit("empty barrier finalize poisoned next BEGIN")
+if run(d_empty, "write", "empty-next-task", sha(5591), "--authority", empty_next).returncode != 0:
+    raise SystemExit("empty barrier finalize poisoned next generation")
+
+def reject_without_ready(label, directory, authority, barrier, verify):
+    process = start_barrier(directory, authority, barrier)
+    try:
+        try:
+            _stdout, stderr = process.communicate(timeout=3)
+        except subprocess.TimeoutExpired as exc:
+            process.kill()
+            process.communicate(timeout=5)
+            raise RuntimeError(f"{label}: invalid finalize waited instead of failing") from exc
+        if process.returncode == 0:
+            raise RuntimeError(f"{label}: invalid finalize returned success")
+        if (barrier / "ready").exists():
+            raise RuntimeError(f"{label}: invalid finalize created READY")
+        verify()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=5)
+        shutil.rmtree(barrier, ignore_errors=True)
+
+# Never-established wrong id; current finalizable batch must remain exact.
+d_wrong = root / "wrong"
+anchors_wrong = establish_anchors(d_wrong, 3)
+auth_wrong, tasks_wrong = establish_batch(d_wrong, 3, anchors_wrong)
+reject_without_ready(
+    "wrong",
+    d_wrong,
+    "never-established-authority",
+    root / "barrier-wrong",
+    lambda: (
+        globally_invalid(d_wrong, tasks_wrong)
+        and all(exact(d_wrong, task, candidate, "--authority", auth_wrong) for task, candidate in tasks_wrong)
+        and anchors_intact(d_wrong, anchors_wrong, True)
+    ) or (_ for _ in ()).throw(RuntimeError("wrong-id attempt changed current state")),
+)
+
+# Stale/superseded id.
+d_stale = root / "stale"
+old_auth, new_auth = "stale-old", "stale-current"
+old_task, old_sha = "stale-old-task", sha(5601)
+if run(d_stale, "begin-authority", old_auth).returncode != 0:
+    raise SystemExit("stale setup old begin failed")
+if run(d_stale, "write", old_task, old_sha, "--authority", old_auth).returncode != 0:
+    raise SystemExit("stale setup old write failed")
+if run(d_stale, "begin-authority", new_auth).returncode != 0:
+    raise SystemExit("stale setup new begin failed")
+reject_without_ready(
+    "stale",
+    d_stale,
+    old_auth,
+    root / "barrier-stale",
+    lambda: (
+        run(d_stale, "read", old_task, "--require-valid").returncode != 0
+        and run(d_stale, "read", old_task, "--authority", old_auth).returncode != 0
+    ) or (_ for _ in ()).throw(RuntimeError("stale-id attempt revived old publication")),
+)
+new_task, new_sha = "stale-current-task", sha(5602)
+if run(d_stale, "write", new_task, new_sha, "--authority", new_auth).returncode != 0:
+    raise SystemExit("stale no-READY attempt damaged current authority")
+
+# Closed id: its already-linearized publication remains valid, but duplicate
+# finalize is a normal nonzero and never enters the pre-publication barrier.
+d_closed = root / "closed"
+closed_auth, closed_task, closed_sha = "closed-authority", "closed-task", sha(5701)
+for call in (
+    (d_closed, "begin-authority", closed_auth),
+    (d_closed, "write", closed_task, closed_sha, "--authority", closed_auth),
+    (d_closed, "finalize-authority", closed_auth),
+):
+    if run(*call).returncode != 0:
+        raise SystemExit(f"closed setup failed: {call!r}")
+reject_without_ready(
+    "closed",
+    d_closed,
+    closed_auth,
+    root / "barrier-closed",
+    lambda: exact(d_closed, closed_task, closed_sha, "--require-valid")
+    or (_ for _ in ()).throw(RuntimeError("closed-id attempt damaged finalized publication")),
+)
+
+# Current but whole-batch-nonfinalizable: one member was invalidated. READY
+# before this validation would create a false pre-publication scheduling point.
+d_bad = root / "current-nonfinalizable"
+bad_auth = "current-nonfinalizable"
+bad_task, bad_sha = "bad-member", sha(5801)
+clean_task, clean_sha = "clean-member", sha(5802)
+for call in (
+    (d_bad, "begin-authority", bad_auth),
+    (d_bad, "write", bad_task, bad_sha, "--authority", bad_auth),
+    (d_bad, "write", clean_task, clean_sha, "--authority", bad_auth),
+    (d_bad, "invalidate", bad_sha),
+):
+    if run(*call).returncode != 0:
+        raise SystemExit(f"nonfinalizable setup failed: {call!r}")
+reject_without_ready(
+    "current-nonfinalizable",
+    d_bad,
+    bad_auth,
+    root / "barrier-nonfinalizable",
+    lambda: (
+        run(d_bad, "read", bad_task, "--require-valid").returncode != 0
+        and run(d_bad, "read", clean_task, "--require-valid").returncode != 0
+        and exact(d_bad, clean_task, clean_sha, "--authority", bad_auth)
+        and queue_contains(d_bad, bad_task)
+    ) or (_ for _ in ()).throw(RuntimeError("nonfinalizable attempt changed batch/queue")),
+)
+
+print("kill=zero release=complete invalid-ids=no-ready anchors=preserved")
+PYFINALBARRIER
+
+barrier18=$(python3 "$WORK/h003-finalize-barrier.py" "$CLI" "$WORK/finalize-barrier" 2>&1); barrier18_rc=$?
+if [ "$barrier18_rc" -eq 0 ]; then
+  ok "K18b publication barrier: held kill=noll, release=hel och invalid ids skapar aldrig READY"
+else
+  no "K18b publication barrier" "${barrier18:-finalize-barrier harness exit $barrier18_rc}"
+fi
+
 summera

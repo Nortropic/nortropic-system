@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 # h-004-exit — skiva 4 (exklusiv lease)
 # Kontrakt efter S3 owner-remediation:
-#   controller/lease/cli [<dir>] acquire <task> --ttl <sek> [--holder-pid <pid>]
+#   controller/lease/cli [<dir>] acquire <task> --ttl <sek> [--holder-pid <pid>
+#       [--incarnation-oracle <absolute-executable>]]
 #       stdout = unik opaque lease_id
 #   controller/lease/cli [<dir>] renew <task> <lease_id>
-#   controller/lease/cli [<dir>] release <task> [<lease_id>]
+#       [--test-mutation-barrier-fds <ready-fd> <continue-fd>]
+#   controller/lease/cli [<dir>] release <task> [<lease_id>
+#       [--test-mutation-barrier-fds <ready-fd> <continue-fd>]]
 #   controller/lease/cli [<dir>] owner <task>
 # Bare release är legacy för obundna leases. En --holder-pid-bunden lease får
 # aldrig kunna raderas utan rätt lease_id.
+# Holder-liveness binds till host + pid + faktisk opaque process-incarnation;
+# numerisk PID ensam är aldrig authority.
+# Loopen binder samma lease_id till h-003:
+#   begin-authority <lease_id>
+#   write ... --authority <lease_id>             (PROVISIONAL per task)
+#   taskval claim ... --authority <lease_id>     (same-run dependency read)
+#   final guard → heartbeat stop/join → token-release → finalize-authority
 # Katalogen är valfri och ligger först; utelämnad ger controller/lease/state/.
 # Provet kör alltid mot temp_kat så inget tillstånd ärvs mellan körningar.
 . "$(dirname "$0")/_lib.sh"
@@ -15,7 +25,20 @@ CLI="controller/lease/cli"
 krav_komponent "$CLI"
 
 WORK="$(temp_kat)" || { echo "FAIL  harness — temp-katalog kunde inte skapas"; exit 2; }
-trap 'rm -rf "$WORK"' EXIT
+H004_GUARD_TIMER_PID=""
+H004_DEFAULT_TIMER_PID=""
+stada_h004() {
+  if [ -n "${H004_GUARD_TIMER_PID:-}" ]; then
+    kill "$H004_GUARD_TIMER_PID" >/dev/null 2>&1 || true
+    wait "$H004_GUARD_TIMER_PID" >/dev/null 2>&1 || true
+  fi
+  if [ -n "${H004_DEFAULT_TIMER_PID:-}" ]; then
+    kill "$H004_DEFAULT_TIMER_PID" >/dev/null 2>&1 || true
+    wait "$H004_DEFAULT_TIMER_PID" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$WORK"
+}
+trap stada_h004 EXIT
 D="$WORK/state"
 
 # K1: acquire på fri task MÅSTE lyckas. Utan positiv kontroll är varje
@@ -156,11 +179,235 @@ fi
 # heartbeat-fältnamn och skriver aldrig en egen lease-JSON.
 
 PY3="$(command -v python3)"
+H004_DEADLINE_PROBE_MARKER="$WORK/h004-deadline-probe-failed"
+export H004_DEADLINE_PROBE_MARKER
+rm -f "$H004_DEADLINE_PROBE_MARKER"
+
+cat > "$WORK/h004-deadline.py" <<'PYDEADLINE'
+import os
+import pathlib
+import signal
+import subprocess
+import sys
+import time
+
+seconds = float(sys.argv[1])
+process = subprocess.Popen(sys.argv[2:], start_new_session=True)
+pid_file = os.environ.get("H004_DEADLINE_CHILD_PID_FILE")
+if pid_file:
+    pathlib.Path(pid_file).write_text(str(process.pid) + "\n", encoding="utf-8")
+
+class ProcessProbeError(RuntimeError):
+    pass
+
+def record_probe_failure(exc):
+    marker = os.environ.get("H004_DEADLINE_PROBE_MARKER")
+    if marker:
+        pathlib.Path(marker).write_text(str(exc) + "\n", encoding="utf-8")
+
+def process_table():
+    """Return pid -> (ppid, pgid, state, process-start identity)."""
+    failure = None
+    for _attempt in range(3):
+        try:
+            answer = subprocess.run(
+                ["ps", "-axo", "pid=,ppid=,pgid=,stat=,lstart="],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=True,
+            )
+            break
+        except (OSError, subprocess.SubprocessError) as exc:
+            failure = exc
+            time.sleep(0.05)
+    else:
+        raise ProcessProbeError(str(failure)) from failure
+    table = {}
+    for line in answer.stdout.splitlines():
+        fields = line.split(None, 4)
+        if len(fields) != 5 or not all(field.isdigit() for field in fields[:3]):
+            continue
+        pid, ppid, pgid = map(int, fields[:3])
+        table[pid] = (ppid, pgid, fields[3], fields[4].strip())
+    return table
+
+tracked = {}
+
+def track_descendants(table):
+    parents = {process.pid}
+    parents.update(
+        pid for pid, started in tracked.items()
+        if pid in table and table[pid][3] == started
+    )
+    changed = True
+    while changed:
+        changed = False
+        for pid, (ppid, _pgid, state, started) in table.items():
+            if pid == os.getpid() or state.startswith("Z") or ppid not in parents:
+                continue
+            if pid not in tracked:
+                tracked[pid] = started
+                changed = True
+            parents.add(pid)
+
+def escaped_pids(table):
+    escaped = {
+        pid for pid, started in tracked.items()
+        if pid in table and table[pid][3] == started and not table[pid][2].startswith("Z")
+    }
+    escaped.update(
+        pid for pid, (_ppid, pgid, state, _started) in table.items()
+        if pgid == process.pid and pid != process.pid and not state.startswith("Z")
+    )
+    return escaped
+
+def terminate_tree(known=None):
+    targets = set(known or ())
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        pass
+    for pid in targets:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            pass
+    time.sleep(0.1)
+    try:
+        table = process_table()
+        track_descendants(table)
+        targets.update(escaped_pids(table))
+    except ProcessProbeError:
+        table = {}
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    for pid in targets:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+deadline = time.monotonic() + seconds
+timed_out = False
+probe_failed = None
+last_table = {}
+while True:
+    try:
+        table = process_table()
+        last_table = table
+        track_descendants(table)
+    except ProcessProbeError as exc:
+        probe_failed = exc
+        break
+    returncode = process.poll()
+    if returncode is not None:
+        break
+    if time.monotonic() >= deadline:
+        timed_out = True
+        break
+    time.sleep(0.1)
+
+if probe_failed is not None:
+    record_probe_failure(probe_failed)
+    print(f"H004_HARNESS_PROCESS_PROBE_FAILED: {probe_failed}", file=sys.stderr)
+    terminate_tree(escaped_pids(last_table))
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+    raise SystemExit(126)
+
+if timed_out:
+    print(f"H004_HARNESS_TIMEOUT after {seconds}s", file=sys.stderr)
+    terminate_tree(escaped_pids(table))
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+    raise SystemExit(124)
+
+time.sleep(0.05)
+try:
+    table = process_table()
+    last_table = table
+    track_descendants(table)
+except ProcessProbeError as exc:
+    record_probe_failure(exc)
+    print(f"H004_HARNESS_PROCESS_PROBE_FAILED: {exc}", file=sys.stderr)
+    terminate_tree(escaped_pids(last_table))
+    raise SystemExit(126)
+escaped = escaped_pids(table)
+if escaped:
+    print(f"H004_ESCAPED_DESCENDANTS after main exit: {sorted(escaped)}", file=sys.stderr)
+    terminate_tree(escaped)
+    raise SystemExit(125)
+# 124–126 are authenticated helper sentinels below. A normally completed
+# child may itself use any of those codes; map that ordinary product failure
+# away from the sentinel range so it can never become a false ODÖMBART.
+if returncode in (124, 125, 126):
+    raise SystemExit(123)
+raise SystemExit(returncode)
+PYDEADLINE
+
+deadline_probe=0
+"$PY3" "$WORK/h004-deadline.py" 2 "$PY3" -c 'raise SystemExit(0)' >/dev/null 2>&1 || deadline_probe=$?
+deadline_timeout_probe=0
+"$PY3" "$WORK/h004-deadline.py" 0.05 "$PY3" -c 'import time; time.sleep(2)' >/dev/null 2>&1 || deadline_timeout_probe=$?
+deadline_escape_probe=0
+"$PY3" "$WORK/h004-deadline.py" 12 "$PY3" -c 'import subprocess,sys; subprocess.Popen([sys.executable,"-c","import time;time.sleep(20)"])' >/dev/null 2>&1 || deadline_escape_probe=$?
+deadline_detached_probe=0
+"$PY3" "$WORK/h004-deadline.py" 12 "$PY3" -c 'import subprocess,sys,time; subprocess.Popen([sys.executable,"-c","import time;time.sleep(20)"],start_new_session=True);time.sleep(5)' >/dev/null 2>&1 || deadline_detached_probe=$?
+deadline_reserved_child_probe=0
+"$PY3" "$WORK/h004-deadline.py" 2 "$PY3" -c 'raise SystemExit(126)' >/dev/null 2>&1 || deadline_reserved_child_probe=$?
+if [ "$deadline_probe" -ne 0 ] || [ "$deadline_timeout_probe" -ne 124 ] \
+   || [ "$deadline_escape_probe" -ne 125 ] \
+   || [ "$deadline_detached_probe" -ne 125 ] \
+   || [ "$deadline_reserved_child_probe" -ne 123 ]; then
+  echo "SKIP  harness — processgrupps-deadline kunde inte aktiveras, ODÖMBART"
+  exit 2
+fi
+
+deadline_probe_or_od() {
+  if [ -s "$H004_DEADLINE_PROBE_MARKER" ]; then
+    probe_reason=$(tr '\n' ' ' < "$H004_DEADLINE_PROBE_MARKER")
+    echo "SKIP  $2 — process-trädets harness-orakel föll ($probe_reason), ODÖMBART"
+    exit 2
+  fi
+}
+
+sha_for() {
+  printf '%040x' "$1"
+}
+
+post_exact_cli() {
+  post_cli="$1"; post_dir="$2"; post_task="$3"; post_sha="$4"
+  post_out=$("$post_cli" "$post_dir" read "$post_task" --require-valid 2>/dev/null) || return 1
+  "$PY3" - "$post_out" "$post_task" "$post_sha" <<'PYPOSTEXACT'
+import json
+import sys
+
+try:
+    post = json.loads(sys.argv[1])
+except (TypeError, json.JSONDecodeError):
+    raise SystemExit(1)
+raise SystemExit(
+    0 if isinstance(post, dict)
+    and post.get("task") == sys.argv[2]
+    and post.get("candidate_sha") == sys.argv[3]
+    else 1
+)
+PYPOSTEXACT
+}
 LOOP="controller/loop/cli"
 ATT="controller/attest/cli"
 ST="controller/state/cli"
 
 token_ok() {
+  # Bevarad K8-kontroll från den tidigare frysta h-004-gaten. Opaque betyder
+  # att innehållet inte tolkas, inte att ett oanvändbart argv-värde godtas.
   "$PY3" - "$1" <<'PYTOK'
 import sys
 
@@ -414,6 +661,40 @@ else
   "$CLI" "$D11" release s3-holder >/dev/null 2>&1 || true
 fi
 
+# K11b — holder-död häver aldrig TTL-minimumet. Processliveness kan skydda
+# längre än TTL men får inte göra en bunden generation reclaimbar omedelbart.
+D11B="$WORK/s3-holder-dead-before-ttl"
+mkdir -p "$D11B"
+sleep 6 &
+holder11b=$!
+t11b="$(
+  "$CLI" "$D11B" acquire s3-holder-dead-before-ttl \
+    --ttl 1.5 \
+    --holder-pid "$holder11b" \
+    2>/dev/null
+)"
+r11b=$?
+kill "$holder11b" 2>/dev/null || true
+wait "$holder11b" 2>/dev/null || true
+early11b="$("$CLI" "$D11B" acquire s3-holder-dead-before-ttl --ttl 30 2>/dev/null)"
+early11b_rc=$?
+sleep 1.7
+late11b="$("$CLI" "$D11B" acquire s3-holder-dead-before-ttl --ttl 30 2>/dev/null)"
+late11b_rc=$?
+if [ "$r11b" -eq 0 ] && token_ok "$t11b" \
+   && [ "$early11b_rc" -ne 0 ] \
+   && [ "$late11b_rc" -eq 0 ] && token_ok "$late11b" \
+   && [ "$late11b" != "$t11b" ]; then
+  ok "K11b holder-död: bunden lease skyddas före TTL och reclaimas först efter"
+else
+  no "K11b holder-död före TTL" "acquire/early/late=$r11b/$early11b_rc/$late11b_rc tokens=[$t11b]/[$late11b]"
+fi
+if [ "$late11b_rc" -eq 0 ] && token_ok "$late11b"; then
+  "$CLI" "$D11B" release s3-holder-dead-before-ttl "$late11b" >/dev/null 2>&1 || true
+elif [ "$r11b" -eq 0 ] && token_ok "$t11b"; then
+  "$CLI" "$D11B" release s3-holder-dead-before-ttl "$t11b" >/dev/null 2>&1 || true
+fi
+
 
 # K12–K14 är riktiga loopintegrationer.
 for dep in \
@@ -503,6 +784,14 @@ open(
     encoding="utf-8",
 ).write("heartbeat\n")
 
+open(os.environ["S3_HB_DONE"], "w", encoding="utf-8").write("done\n")
+for _ in range(100):
+    if os.path.exists(os.environ["S3_HB_CONTINUE"]):
+        break
+    time.sleep(0.05)
+else:
+    raise SystemExit("heartbeat harness gav aldrig continue")
+
 print("heartbeat fixture klar")
 PYWORK
 
@@ -578,6 +867,8 @@ mkdir -p "$W12"
 "$ST" init "$S12" >/dev/null 2>&1
 
 export S3_HB_MARK="$WORK/s3-heartbeat-started"
+export S3_HB_DONE="$WORK/s3-heartbeat-done"
+export S3_HB_CONTINUE="$WORK/s3-heartbeat-continue"
 
 write_config \
   "$WORK/s3-heartbeat-config.json" \
@@ -587,7 +878,8 @@ write_config \
   "s3-heartbeat-run" \
   1.2 0.25
 
-"$LOOP" run "$WORK/s3-heartbeat-config.json" \
+H004_DEADLINE_CHILD_PID_FILE="$WORK/s3-heartbeat-loop.pid" \
+"$PY3" "$WORK/h004-deadline.py" 30 "$LOOP" run "$WORK/s3-heartbeat-config.json" \
   >"$WORK/s3-heartbeat.out" \
   2>"$WORK/s3-heartbeat.err" &
 loop12=$!
@@ -596,16 +888,65 @@ started12=0
 wait_mark_or_exit "$S3_HB_MARK" "$loop12" && started12=1
 
 lease12="$D12/s3-heartbeat.lease"
-sha12a=""
-sha12b=""
 owner12_during=""
+controller12="$(tr -d '[:space:]' < "$WORK/s3-heartbeat-loop.pid" 2>/dev/null || true)"
+heartbeat_progress12=1
+heartbeat_changes12=0
 
 if [ "$started12" -eq 1 ] && [ -f "$lease12" ]; then
-  sha12a="$(file_sha "$lease12")"
   owner12_during="$("$CLI" "$D12" owner s3-heartbeat 2>/dev/null || true)"
-  sleep 0.7
-  sha12b="$(file_sha "$lease12")"
-  sleep 0.7
+  monitor12_rc=0
+  heartbeat_changes12=$("$PY3" - "$lease12" "$S3_HB_DONE" <<'PYMONITOR'
+import hashlib
+import pathlib
+import sys
+import time
+
+lease = pathlib.Path(sys.argv[1])
+done = pathlib.Path(sys.argv[2])
+try:
+    previous = hashlib.sha256(lease.read_bytes()).digest()
+except OSError:
+    print(0)
+    raise SystemExit(1)
+
+changes = 0
+last_change = time.monotonic()
+absolute_deadline = last_change + 12
+while not done.is_file() or done.stat().st_size == 0:
+    time.sleep(0.05)
+    now = time.monotonic()
+    if now >= absolute_deadline:
+        print(changes)
+        raise SystemExit(1)
+    try:
+        current = hashlib.sha256(lease.read_bytes()).digest()
+    except OSError:
+        print(changes)
+        raise SystemExit(1)
+    if current != previous:
+        previous = current
+        changes += 1
+        last_change = now
+    elif now - last_change >= 1.0:
+        # TTL är 1.2 s. En hel sekund utan serialized advance medan
+        # workern lever lämnar inte den kontrakterade kontinuitetsmarginalen.
+        print(changes)
+        raise SystemExit(1)
+
+print(changes)
+raise SystemExit(0 if changes >= 5 else 1)
+PYMONITOR
+  ) || monitor12_rc=$?
+  if [ "$monitor12_rc" -eq 0 ] && [ -s "$S3_HB_DONE" ]; then
+    heartbeat_progress12=0
+  fi
+fi
+
+# Håll takeover-provet vid worker-barriären även när progress-oraklet redan
+# har falsifierat kandidaten; då mäts också en utebliven heartbeat efter TTL.
+if [ "$started12" -eq 1 ] && [ ! -s "$S3_HB_DONE" ]; then
+  wait_mark_or_exit "$S3_HB_DONE" "$loop12" >/dev/null 2>&1 || true
 fi
 
 steal12=""
@@ -615,9 +956,11 @@ if kill -0 "$loop12" 2>/dev/null; then
   steal12="$("$CLI" "$D12" acquire s3-heartbeat --ttl 30 2>/dev/null)"
   steal12_rc=$?
 fi
+touch "$S3_HB_CONTINUE"
 
 wait "$loop12"
 loop12_rc=$?
+deadline_probe_or_od "$loop12_rc" "K12 deadline"
 
 att12=1
 "$ATT" "$A12" read s3-heartbeat-task --require-valid >/dev/null 2>&1 \
@@ -626,25 +969,23 @@ att12=1
 owner12="$("$CLI" "$D12" owner s3-heartbeat 2>/dev/null || true)"
 
 if [ "$started12" -eq 1 ] \
-   && text_has_pid "$owner12_during" "$loop12" \
-   && [ -n "$sha12a" ] \
-   && [ -n "$sha12b" ] \
-   && [ "$sha12a" != "$sha12b" ] \
+   && [ -n "$controller12" ] && text_has_pid "$owner12_during" "$controller12" \
+   && [ "$heartbeat_progress12" -eq 0 ] \
    && [ "$steal12_rc" -ne 0 ] \
    && [ "$loop12_rc" -eq 0 ] \
    && [ "$att12" -eq 0 ] \
    && [ -z "$owner12" ]; then
-  ok "K12 loop-heartbeat: owner är controller-PID, leasebytes förnyas och run längre än TTL kan inte tas över"
+  ok "K12 loop-heartbeat: serialized heartbeat fortsätter genom hela workersessionen och sen takeover vägras"
 else
   no "K12 loop-heartbeat" \
-    "start/owner-during/loop-pid/sha-change/steal/loop/att/owner-after=$started12/[$owner12_during]/$loop12/$([ -n "$sha12a" ] && [ "$sha12a" != "$sha12b" ] && echo ja || echo nej)/$steal12_rc/$loop12_rc/$att12/[$owner12]"
+    "start/owner-during/loop-pid/heartbeat-progress/late-steal/loop/att/owner-after=$started12/[$owner12_during]/${controller12:-saknas}/$heartbeat_progress12($heartbeat_changes12)/$steal12_rc/$loop12_rc/$att12/[$owner12]"
 fi
 
 if [ "$steal12_rc" -eq 0 ] && token_ok "$steal12"; then
   "$CLI" "$D12" release s3-heartbeat "$steal12" >/dev/null 2>&1 || true
 fi
 
-unset S3_HB_MARK
+unset S3_HB_MARK S3_HB_DONE S3_HB_CONTINUE
 
 
 # K13 — simulera lease-loss UTAN egen JSON:
@@ -668,7 +1009,7 @@ write_config \
   "s3-loss-run" \
   4 0.2
 
-"$LOOP" run "$WORK/s3-loss-config.json" \
+"$PY3" "$WORK/h004-deadline.py" 30 "$LOOP" run "$WORK/s3-loss-config.json" \
   >"$WORK/s3-loss.out" \
   2>"$WORK/s3-loss.err" &
 loop13=$!
@@ -693,6 +1034,7 @@ fi
 
 wait "$loop13"
 loop13_rc=$?
+deadline_probe_or_od "$loop13_rc" "K13 deadline"
 
 att13=1
 "$ATT" "$A13" read s3-loss-task --require-valid >/dev/null 2>&1 \
@@ -740,10 +1082,11 @@ write_config \
   "s3-bad-run" \
   1 1
 
-"$LOOP" run "$WORK/s3-bad-config.json" \
+"$PY3" "$WORK/h004-deadline.py" 15 "$LOOP" run "$WORK/s3-bad-config.json" \
   >"$WORK/s3-bad.out" \
   2>"$WORK/s3-bad.err"
 bad14_rc=$?
+deadline_probe_or_od "$bad14_rc" "K14 deadline"
 
 events14="$(wc -l < "$S14/events.jsonl" | tr -d ' ')"
 
@@ -758,5 +1101,2472 @@ else
 fi
 
 unset S3_BAD_MARK
+
+# K15 — den frysta mekanismneutrala observationsseamen. Samma numeriska PID P
+# hålls konstant. Oracle A (1 byte) skyddar efter TTL; när exakt samma P byter
+# till oracle B (256 bytes) måste en NY lease_id kunna installeras och därefter
+# skyddas. Oracle argv, felutfall och exact-prestate döms utan source checks.
+cat > "$WORK/h004-incarnation-seam.py" <<'PYINCSEAM'
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import time
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+deadline = pathlib.Path(sys.argv[3]).resolve()
+python = sys.executable
+oracle_dir = root / "oracle"
+lease_dir = root / "leases"
+oracle_dir.mkdir(parents=True, exist_ok=True)
+lease_dir.mkdir(parents=True, exist_ok=True)
+control = oracle_dir / "control"
+log = oracle_dir / "invocations.jsonl"
+shell_sentinel = oracle_dir / "shell-sentinel"
+oracle_held_ready = oracle_dir / "incarnation-held-ready-sentinel"
+oracle_held_release = oracle_dir / "incarnation-held-release-sentinel"
+pid = "424242"
+
+oracle_source = f'''#!{python}
+import json
+import os
+import pathlib
+import sys
+import time
+
+control = pathlib.Path(os.environ["H004_ORACLE_CONTROL"])
+log = pathlib.Path(os.environ["H004_ORACLE_LOG"])
+mode = control.read_text(encoding="utf-8").strip()
+with log.open("a", encoding="utf-8") as stream:
+    stream.write(json.dumps({{"mode": mode, "argv": sys.argv[1:], "pid": os.getpid()}}, sort_keys=True) + "\\n")
+if mode == "live-A":
+    os.write(1, b"A\\n")
+    raise SystemExit(0)
+if mode == "live-B":
+    os.write(1, b"B" * 256 + b"\\n")
+    raise SystemExit(0)
+if mode == "dead":
+    raise SystemExit(1)
+if mode == "empty":
+    raise SystemExit(0)
+if mode == "multi":
+    os.write(1, b"A B\\n")
+    raise SystemExit(0)
+if mode == "multiline":
+    os.write(1, b"A\\nB\\n")
+    raise SystemExit(0)
+if mode == "control":
+    os.write(1, b"A\\x01\\n")
+    raise SystemExit(0)
+if mode == "del":
+    os.write(1, b"A\\x7f\\n")
+    raise SystemExit(0)
+if mode == "badutf8":
+    os.write(1, b"\\xff\\n")
+    raise SystemExit(0)
+if mode == "long":
+    os.write(1, b"C" * 257 + b"\\n")
+    raise SystemExit(0)
+if mode == "error":
+    os.write(1, b"looks-live\\n")
+    raise SystemExit(7)
+if mode == "timeout":
+    time.sleep(30)
+    os.write(1, b"late\\n")
+    raise SystemExit(0)
+if mode == "held-malformed":
+    ready = pathlib.Path(os.environ["H004_ORACLE_HELD_READY"])
+    release = pathlib.Path(os.environ["H004_ORACLE_HELD_RELEASE"])
+    ready.write_bytes(b"ready\\n")
+    for _ in range(200):
+        if release.is_file():
+            os.write(1, b"A B\\n")
+            raise SystemExit(0)
+        time.sleep(0.05)
+    raise SystemExit(9)
+raise SystemExit(9)
+'''
+
+# Metatecken + blanksteg i ett absolut executable path fäller vanliga shell-
+# invocationer. Basnamnet finns också så en oquotad shell-mutant kan fortsätta
+# men lämnar shell-sentinel via command substitution.
+oracle = oracle_dir / "oracle with space$(touch${IFS}shell-sentinel)"
+base_oracle = oracle_dir / "oracle with space"
+relative_oracle = oracle_dir / "oracle-relative"
+for path in (oracle, base_oracle, relative_oracle):
+    path.write_text(oracle_source, encoding="utf-8")
+    path.chmod(0o700)
+nonexec_oracle = oracle_dir / "oracle-nonexec"
+nonexec_oracle.write_text(oracle_source, encoding="utf-8")
+nonexec_oracle.chmod(0o600)
+missing_oracle = oracle_dir / "oracle-missing"
+
+env = os.environ | {
+    "H004_ORACLE_CONTROL": str(control),
+    "H004_ORACLE_LOG": str(log),
+    "H004_ORACLE_HELD_READY": str(oracle_held_ready),
+    "H004_ORACLE_HELD_RELEASE": str(oracle_held_release),
+}
+
+def set_mode(mode):
+    control.write_text(mode + "\n", encoding="utf-8")
+
+def run(*args, seconds=10):
+    answer = subprocess.run(
+        [python, str(deadline), str(seconds), cli, *map(str, args)],
+        cwd=oracle_dir,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=seconds + 8,
+    )
+    if answer.returncode in (124, 125, 126):
+        raise RuntimeError(
+            f"CLI/oracle exceeded deadline or leaked process rc={answer.returncode}: {args!r}"
+        )
+    return answer
+
+def acquire(task, oracle_path=oracle, ttl="0.35"):
+    return run(
+        lease_dir,
+        "acquire",
+        task,
+        "--ttl",
+        ttl,
+        "--holder-pid",
+        pid,
+        "--incarnation-oracle",
+        oracle_path,
+        seconds=12,
+    )
+
+def token(answer):
+    value = answer.stdout.strip()
+    if not (
+        answer.returncode == 0
+        and 8 <= len(value) <= 256
+        and all(ord(character) >= 33 and not character.isspace() for character in value)
+    ):
+        raise RuntimeError(f"usable lease_id missing rc={answer.returncode} stdout={answer.stdout!r}")
+    return value
+
+def lease_path(task):
+    return lease_dir / f"{task}.lease"
+
+def release(task, lease_id):
+    answer = run(lease_dir, "release", task, lease_id)
+    if answer.returncode != 0:
+        raise RuntimeError(f"cleanup release failed for {task}: {answer.stderr!r}")
+
+def no_serialized_oracle_seam(raw):
+    forbidden_values = {
+        str(oracle), oracle.name, str(base_oracle), base_oracle.name,
+        str(control), str(log), str(oracle_held_ready), oracle_held_ready.name,
+        str(oracle_held_release), oracle_held_release.name, "--incarnation-oracle",
+    }
+    for value in forbidden_values:
+        if value.encode() in raw:
+            raise SystemExit(f"oracle observation input serialized as authority: {value!r}")
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SystemExit("canonical oracle-bound lease was not inspectable JSON") from exc
+    forbidden_keys = {
+        "incarnation_oracle", "oracle_path", "oracle_executable",
+        "test_mode", "test_seam", "test_oracle", "seam", "test",
+    }
+
+    def inspect(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                normalized = str(key).lower().replace("-", "_")
+                if normalized in forbidden_keys:
+                    raise SystemExit(f"oracle test-mode fact serialized under key {key!r}")
+                inspect(child)
+        elif isinstance(value, list):
+            for child in value:
+                inspect(child)
+        elif isinstance(value, str) and value in forbidden_values:
+            raise SystemExit(f"oracle observation value serialized as authority: {value!r}")
+
+    inspect(payload)
+
+set_mode("live-A")
+first = acquire("same-pid")
+token_a = token(first)
+path = lease_path("same-pid")
+if not path.is_file():
+    raise SystemExit("oracle-bound acquire did not create canonical lease")
+bytes_a = path.read_bytes()
+no_serialized_oracle_seam(bytes_a)
+time.sleep(0.55)
+
+same_a = acquire("same-pid")
+if same_a.returncode == 0 or path.read_bytes() != bytes_a:
+    raise SystemExit("same live incarnation A was not protected beyond TTL with exact prestate")
+
+set_mode("live-B")
+second = acquire("same-pid")
+token_b = token(second)
+if token_b == token_a:
+    raise SystemExit("same PID/new incarnation B reused old lease_id")
+bytes_b = path.read_bytes()
+if bytes_b == bytes_a:
+    raise SystemExit("same PID/new incarnation did not install successor state")
+no_serialized_oracle_seam(bytes_b)
+time.sleep(0.55)
+same_b = acquire("same-pid")
+if same_b.returncode == 0 or path.read_bytes() != bytes_b:
+    raise SystemExit("new live incarnation B was not protected beyond TTL with exact prestate")
+release("same-pid", token_b)
+
+def seed_case(name):
+    set_mode("live-A")
+    answer = acquire(name, ttl="0.22")
+    lease_id = token(answer)
+    target = lease_path(name)
+    before = target.read_bytes()
+    time.sleep(0.35)
+    return lease_id, target, before
+
+def cleanup_case(name):
+    set_mode("live-B")
+    answer = acquire(name, ttl="30")
+    lease_id = token(answer)
+    release(name, lease_id)
+
+# A nonreturning oracle must be converted to a normal nonzero product result
+# before the gate's disposable 12-second operational deadline. An outer
+# deadline exit is candidate noncompliance, never evidence that production
+# implemented timeout handling.
+for mode in ("empty", "multi", "multiline", "control", "del", "badutf8", "long", "error", "timeout"):
+    name = f"malformed-{mode}"
+    _old_token, target, before = seed_case(name)
+    set_mode(mode)
+    answer = acquire(name)
+    if answer.returncode == 0:
+        raise SystemExit(f"{mode}: indeterminate oracle output/exit authorized reclaim")
+    if not target.is_file() or target.read_bytes() != before:
+        raise SystemExit(f"{mode}: indeterminate oracle changed canonical prestate")
+    cleanup_case(name)
+
+# Deterministic before-observation ordering: an expired A exists while the
+# oracle has been invoked but has emitted no result. Canonical bytes must still
+# be exact A; mutate-then-rollback after malformed output is not fail-closed
+# before mutation.
+_held_token, held_path, held_before = seed_case("held-malformed")
+for marker in (oracle_held_ready, oracle_held_release):
+    marker.unlink(missing_ok=True)
+set_mode("held-malformed")
+held_process = subprocess.Popen(
+    [
+        python, str(deadline), "12", cli, str(lease_dir), "acquire",
+        "held-malformed", "--ttl", "30", "--holder-pid", pid,
+        "--incarnation-oracle", str(oracle),
+    ],
+    cwd=oracle_dir,
+    env=env,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+    start_new_session=True,
+)
+try:
+    entered_deadline = time.monotonic() + 5
+    while time.monotonic() < entered_deadline:
+        if oracle_held_ready.is_file():
+            break
+        if held_process.poll() is not None:
+            raise RuntimeError(
+                f"held oracle acquire exited before observation rc={held_process.returncode}"
+            )
+        time.sleep(0.02)
+    else:
+        raise RuntimeError("held oracle was never invoked")
+    if held_process.poll() is not None:
+        raise RuntimeError(f"held oracle acquire exited after READY rc={held_process.returncode}")
+    if not held_path.is_file() or held_path.read_bytes() != held_before:
+        raise RuntimeError("canonical lease mutated before held oracle produced an observation")
+    oracle_held_release.write_bytes(b"release\n")
+    held_stdout, held_stderr = held_process.communicate(timeout=15)
+    if held_process.returncode == 0:
+        raise RuntimeError("held malformed oracle authorized reclaim")
+    if not held_path.is_file() or held_path.read_bytes() != held_before:
+        raise RuntimeError("held malformed oracle failed to preserve exact canonical prestate")
+finally:
+    if held_process.poll() is None:
+        oracle_held_release.write_bytes(b"release\n")
+        try:
+            # Let the 12-second deadline helper perform its own cross-session
+            # process-tree cleanup before the outer harness considers killing
+            # it; killing the helper early could orphan its separate-session CLI.
+            held_process.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(held_process.pid, 9)
+            except ProcessLookupError:
+                pass
+            held_process.communicate(timeout=5)
+cleanup_case("held-malformed")
+
+# Exit 1 is the determinate no-live observation, but the same holder-bound
+# request still cannot install a successor for P when P has no incarnation to
+# bind. It therefore refuses with exact prestate, distinct from silently
+# treating PID alone as a live identity.
+_old_dead, dead_path, dead_before = seed_case("oracle-dead")
+set_mode("dead")
+dead_answer = acquire("oracle-dead", ttl="30")
+if dead_answer.returncode == 0 or not dead_path.is_file() or dead_path.read_bytes() != dead_before:
+    raise SystemExit("oracle exit 1 installed/mutated a holder-bound lease without a live incarnation")
+cleanup_case("oracle-dead")
+
+for label, oracle_path in (
+    ("relative", "./oracle-relative"),
+    ("missing", missing_oracle),
+    ("nonexec", nonexec_oracle),
+):
+    name = f"unavailable-{label}"
+    _old_token, target, before = seed_case(name)
+    set_mode("live-B")
+    answer = acquire(name, oracle_path=oracle_path)
+    if answer.returncode == 0:
+        raise SystemExit(f"{label}: unavailable/non-absolute oracle authorized reclaim")
+    if not target.is_file() or target.read_bytes() != before:
+        raise SystemExit(f"{label}: oracle execution failure changed canonical prestate")
+    cleanup_case(name)
+
+# An indeterminate observation on a free holder-bound acquire must not create
+# a canonical lease for a holder whose incarnation cannot be bound.
+for mode in ("empty", "dead"):
+    name = f"free-{mode}"
+    set_mode(mode)
+    answer = acquire(name)
+    if answer.returncode == 0 or lease_path(name).exists():
+        raise SystemExit(f"free {mode}: unbound holder created canonical lease")
+
+try:
+    rows = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+except Exception as exc:
+    raise SystemExit(f"oracle argv log malformed: {exc}") from exc
+if not rows:
+    raise SystemExit("oracle was never directly observed")
+hosts = set()
+for row in rows:
+    argv = row.get("argv")
+    if not isinstance(argv, list) or len(argv) != 2:
+        raise SystemExit(f"oracle argv was not [host, decimal_pid]: {argv!r}")
+    host, observed_pid = argv
+    if (
+        not isinstance(host, str)
+        or not host
+        or any(character.isspace() or ord(character) < 33 for character in host)
+        or observed_pid != pid
+        or not observed_pid.isdecimal()
+    ):
+        raise SystemExit(f"oracle argv host/pid malformed: {argv!r}")
+    hosts.add(host)
+if len(hosts) != 1:
+    raise SystemExit(f"oracle host identity was not stable: {hosts!r}")
+if shell_sentinel.exists():
+    raise SystemExit("oracle executable was routed through shell expansion")
+seen_modes = {row.get("mode") for row in rows}
+for required in (
+    "live-A", "live-B", "empty", "multi", "multiline", "control", "del",
+    "badutf8", "long", "error", "timeout", "held-malformed", "dead",
+):
+    if required not in seen_modes:
+        raise SystemExit(f"oracle mode was not actually invoked: {required}")
+
+print(f"same-pid A->B protected; oracle-cases={len(rows)} host={next(iter(hosts))}")
+PYINCSEAM
+
+incarnation15=$(python3 "$WORK/h004-incarnation-seam.py" "$CLI" "$WORK/incarnation-seam" "$WORK/h004-deadline.py" 2>&1); incarnation15_rc=$?
+deadline_probe_or_od "$incarnation15_rc" "K15 deadline"
+if [ "$incarnation15_rc" -eq 0 ]; then
+  ok "K15 process-incarnation: same PID A→B, direct oracle argv och exact-prestate fail-closed"
+else
+  no "K15 process-incarnation" "${incarnation15:-incarnation-seam harness exit $incarnation15_rc}"
+fi
+
+# K16/K17 — publika samtidiga histories plus fortsatt stale-flood efter att en
+# successor faktiskt installerats. Exakt successor-bytes och token ska överleva.
+cat > "$WORK/h004-overlap.py" <<'PYOVER'
+import concurrent.futures
+import os
+import pathlib
+import subprocess
+import sys
+import threading
+import time
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+root.mkdir(parents=True, exist_ok=True)
+
+def run(*args):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=10
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"CLI timeout: {args!r}") from exc
+
+def acquire(task, ttl="0.18"):
+    answer = run(root, "acquire", task, "--ttl", ttl)
+    return answer, answer.stdout.strip()
+
+def simultaneous(calls):
+    barrier = threading.Barrier(len(calls))
+    def one(call):
+        barrier.wait()
+        return run(*call)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        futures = [pool.submit(one, call) for call in calls]
+        return [f.result(timeout=10) for f in futures]
+
+def exercise(stale_op):
+    direct_successors = 0
+    for round_no in range(16):
+        task = f"overlap-{stale_op}-{round_no}"
+        first, token_a = acquire(task)
+        if first.returncode != 0 or not token_a:
+            raise RuntimeError(f"{stale_op}/{round_no}: generation A saknas")
+        time.sleep(0.28)
+        stale, take = simultaneous([
+            (root, stale_op, task, token_a),
+            (root, "acquire", task, "--ttl", "30"),
+        ])
+        token_b = take.stdout.strip() if take.returncode == 0 else ""
+        if token_b:
+            direct_successors += 1
+        else:
+            # Renew får legitimt serialiseras först. Efter dess TTL installeras
+            # B publikt; separata rundor kräver också direkt concurrent B-vinst.
+            time.sleep(0.28)
+            take, token_b = acquire(task, "30")
+        if take.returncode != 0 or not token_b or token_b == token_a:
+            raise RuntimeError(f"{stale_op}/{round_no}: successor installerades inte")
+        path = root / f"{task}.lease"
+        # Publik tokenbunden renew bevisar B:s identity utan lagringsfältnamn.
+        if run(root, "renew", task, token_b).returncode != 0 or not path.is_file():
+            raise RuntimeError(f"{stale_op}/{round_no}: successor-token är inte current")
+        before = path.read_bytes()
+        calls = [(root, stale_op, task, token_a) for _ in range(24)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+            answers = list(pool.map(lambda c: run(*c), calls))
+        if not path.is_file() or path.read_bytes() != before:
+            raise RuntimeError(f"{stale_op}/{round_no}: stale flood muterade/raderade successor")
+        owner = run(root, "owner", task)
+        if owner.returncode != 0 or not owner.stdout.strip():
+            raise RuntimeError(f"{stale_op}/{round_no}: successor owner saknas")
+        if any(a.returncode == 0 for a in answers) and path.read_bytes() != before:
+            raise RuntimeError(f"{stale_op}/{round_no}: successful stale op var inte harmless")
+        if run(root, "release", task, token_b).returncode != 0:
+            raise RuntimeError(f"{stale_op}/{round_no}: successor-token kunde inte release:a")
+    print(f"{stale_op}: rounds=16 direct-successors={direct_successors}")
+
+exercise(sys.argv[3])
+PYOVER
+
+release_overlap=$(python3 "$WORK/h004-overlap.py" "$CLI" "$WORK/overlap-release" release 2>&1); release_overlap_rc=$?
+if [ "$release_overlap_rc" -eq 0 ]; then
+  ok "K16 stale release overlap histories: successor identity och bytes överlever"
+else
+  no "K16 stale release overlap" "${release_overlap:-overlap-harness exit $release_overlap_rc}"
+fi
+renew_overlap=$(python3 "$WORK/h004-overlap.py" "$CLI" "$WORK/overlap-renew" renew 2>&1); renew_overlap_rc=$?
+if [ "$renew_overlap_rc" -eq 0 ]; then
+  ok "K17 stale renew overlap histories: successor identity och bytes överlever"
+else
+  no "K17 stale renew overlap" "${renew_overlap:-overlap-harness exit $renew_overlap_rc}"
+fi
+cat > "$WORK/h004-mutation-barrier.py" <<'PYMUTBARRIER'
+import fcntl
+import json
+import os
+import pathlib
+import select
+import signal
+import subprocess
+import sys
+import time
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+root.mkdir(parents=True, exist_ok=True)
+
+def run(*args, timeout=8):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=timeout
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"public CLI blocked: {args!r}") from exc
+
+def valid_token(answer):
+    value = answer.stdout.strip()
+    if not (
+        answer.returncode == 0
+        and 8 <= len(value) <= 256
+        and all(ord(character) >= 33 and not character.isspace() for character in value)
+    ):
+        raise RuntimeError(f"usable lease_id missing rc={answer.returncode} stdout={answer.stdout!r}")
+    return value
+
+def acquire(task, ttl):
+    answer = run(root, "acquire", task, "--ttl", str(ttl))
+    return answer, valid_token(answer)
+
+def lease_path(task):
+    return root / f"{task}.lease"
+
+class Held:
+    def __init__(self, operation, task, lease_id, eof=False):
+        self.ready_r, ready_w_raw = os.pipe()
+        continue_r_raw, self.continue_w = os.pipe()
+        # High, runtime-allocated descriptors are disposable canaries. They
+        # remain valid inherited FDs but are unlikely to collide with ordinary
+        # lease values, so numeric serialization is mechanically observable.
+        ready_w = fcntl.fcntl(ready_w_raw, fcntl.F_DUPFD, 220)
+        continue_r = fcntl.fcntl(continue_r_raw, fcntl.F_DUPFD, 220)
+        os.close(ready_w_raw)
+        os.close(continue_r_raw)
+        self.ready_fd = ready_w
+        self.continue_fd = continue_r
+        os.set_blocking(self.ready_r, False)
+        if eof:
+            os.close(self.continue_w)
+            self.continue_w = None
+        self.process = subprocess.Popen(
+            [
+                cli,
+                str(root),
+                operation,
+                task,
+                lease_id,
+                "--test-mutation-barrier-fds",
+                str(ready_w),
+                str(continue_r),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            pass_fds=(ready_w, continue_r),
+            start_new_session=True,
+        )
+        os.close(ready_w)
+        os.close(continue_r)
+
+    def ready_bytes(self, timeout=3):
+        readable, _, _ = select.select([self.ready_r], [], [], timeout)
+        if not readable:
+            return None
+        time.sleep(0.03)
+        try:
+            return os.read(self.ready_r, 1024)
+        except BlockingIOError:
+            return b""
+
+    def require_ready(self):
+        data = self.ready_bytes()
+        if data != b"R" and len(data or b"") != 1:
+            raise RuntimeError(f"barrier emitted {data!r}, expected exactly one READY byte")
+        if self.process.poll() is not None:
+            raise RuntimeError(f"barrier process exited after READY rc={self.process.returncode}")
+        return time.monotonic()
+
+    def continue_one(self):
+        if self.continue_w is None:
+            raise RuntimeError("continue pipe already EOF")
+        os.write(self.continue_w, b"C")
+        os.close(self.continue_w)
+        self.continue_w = None
+
+    def wait(self, timeout=5):
+        try:
+            stdout, stderr = self.process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            try:
+                os.killpg(self.process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            self.process.communicate(timeout=5)
+            raise RuntimeError("barrier process did not terminate") from exc
+        return self.process.returncode, stdout, stderr
+
+    def close(self):
+        if self.continue_w is not None:
+            os.close(self.continue_w)
+            self.continue_w = None
+        try:
+            os.close(self.ready_r)
+        except OSError:
+            pass
+        if self.process.poll() is None:
+            try:
+                os.killpg(self.process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            self.process.communicate(timeout=5)
+
+def exact_bytes(path, expected, label):
+    if not path.is_file() or path.read_bytes() != expected:
+        raise RuntimeError(f"{label}: canonical lease bytes changed")
+
+def no_serialized_seam(path, held):
+    raw = path.read_bytes()
+    flag = "--test-mutation-barrier-fds"
+    if flag.encode() in raw:
+        raise RuntimeError("mutation-barrier flag was serialized as lease authority")
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("canonical lease was not inspectable JSON") from exc
+    fd_strings = {str(held.ready_fd), str(held.continue_fd)}
+    forbidden_keys = {
+        "mutation_barrier", "test_mutation_barrier", "ready_fd", "continue_fd",
+        "barrier_fds", "test_mode", "test_seam", "seam", "test",
+    }
+
+    def inspect(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                normalized = str(key).lower().replace("-", "_")
+                if normalized in forbidden_keys:
+                    raise RuntimeError(f"test seam fact serialized under key {key!r}")
+                inspect(child)
+        elif isinstance(value, list):
+            for child in value:
+                inspect(child)
+        elif isinstance(value, str) and (value == flag or value in fd_strings):
+            raise RuntimeError(f"test seam argv value serialized as authority: {value!r}")
+        elif (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and value in {held.ready_fd, held.continue_fd}
+        ):
+            raise RuntimeError(f"test seam numeric FD serialized as authority: {value!r}")
+
+    inspect(payload)
+
+def overlap(operation):
+    task = f"deterministic-{operation}"
+    ttl = 1.20
+    acquire_started = time.monotonic()
+    _first, token_a = acquire(task, ttl)
+    acquire_returned = time.monotonic()
+    path = lease_path(task)
+    bytes_a = path.read_bytes()
+    held = Held(operation, task, token_a)
+    try:
+        ready_at = held.require_ready()
+        if ready_at >= acquire_started + ttl:
+            raise RuntimeError(f"{operation}: READY was not observed before A TTL expiry")
+        exact_bytes(path, bytes_a, f"{operation} before CONTINUE")
+        # The lease cannot have been installed after acquire returned, so this
+        # upper bound guarantees expiry before public successor B is requested.
+        time.sleep(max(0, acquire_returned + ttl + 0.20 - time.monotonic()))
+        takeover, token_b = acquire(task, 30)
+        if token_b == token_a:
+            raise RuntimeError(f"{operation}: successor reused A token")
+        bytes_b = path.read_bytes()
+        held.continue_one()
+        stale_rc, _stdout, _stderr = held.wait()
+        exact_bytes(path, bytes_b, f"{operation} after stale CONTINUE rc={stale_rc}")
+        # Usable B token is proven through normal public mutation and cleanup.
+        if run(root, "renew", task, token_b).returncode != 0:
+            raise RuntimeError(f"{operation}: successor token could not renew")
+        if run(root, "release", task, token_b).returncode != 0:
+            raise RuntimeError(f"{operation}: successor token could not release")
+        if path.exists():
+            raise RuntimeError(f"{operation}: successor release did not free lease")
+    finally:
+        held.close()
+    print(f"{operation}-overlap ok")
+
+def wrong_token_no_ready(operation):
+    task = f"wrong-{operation}"
+    _answer, current = acquire(task, 30)
+    path = lease_path(task)
+    before = path.read_bytes()
+    held = Held(operation, task, "wrong-" + current)
+    try:
+        rc, _stdout, _stderr = held.wait(timeout=3)
+        data = held.ready_bytes(timeout=0)
+        if rc == 0 or data not in (b"", None):
+            raise RuntimeError(f"{operation}: wrong token emitted READY/succeeded rc={rc} data={data!r}")
+        exact_bytes(path, before, f"{operation} wrong token")
+    finally:
+        held.close()
+    if run(root, "release", task, current).returncode != 0:
+        raise RuntimeError(f"{operation}: wrong-token control damaged current token")
+
+def invalid_descriptors(operation):
+    task = f"bad-fd-{operation}"
+    _answer, current = acquire(task, 30)
+    path = lease_path(task)
+    before = path.read_bytes()
+    # Både syntaktiskt negativa och syntaktiskt giltiga men stängda positiva
+    # descriptors ska falla före mutation. Annars kan en implementation
+    # validera heltal, mutera, och först därefter upptäcka EBADF.
+    probe = os.open(os.devnull, os.O_RDONLY)
+    try:
+        os.dup2(probe, 240)
+        os.dup2(probe, 241)
+    finally:
+        for descriptor in {probe, 240, 241}:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+    for ready_fd, continue_fd, label in (
+        ("-1", "-2", "negative"),
+        ("240", "241", "closed-positive"),
+    ):
+        answer = run(
+            root,
+            operation,
+            task,
+            current,
+            "--test-mutation-barrier-fds",
+            ready_fd,
+            continue_fd,
+        )
+        if answer.returncode == 0:
+            raise RuntimeError(f"{operation}: {label} descriptors returned success")
+        exact_bytes(path, before, f"{operation} invalid descriptors {label}")
+    if run(root, "release", task, current).returncode != 0:
+        raise RuntimeError(f"{operation}: invalid-descriptor control damaged token")
+
+def eof_before_mutation(operation):
+    task = f"eof-{operation}"
+    _answer, current = acquire(task, 30)
+    path = lease_path(task)
+    before = path.read_bytes()
+    held = Held(operation, task, current)
+    try:
+        held.require_ready()
+        exact_bytes(path, before, f"{operation} before CONTINUE EOF")
+        os.close(held.continue_w)
+        held.continue_w = None
+        rc, _stdout, _stderr = held.wait(timeout=3)
+        if rc == 0:
+            raise RuntimeError(f"{operation}: CONTINUE EOF returned success")
+        exact_bytes(path, before, f"{operation} continue EOF")
+    finally:
+        held.close()
+    if run(root, "release", task, current).returncode != 0:
+        raise RuntimeError(f"{operation}: EOF control damaged token")
+
+def positive_release():
+    task = "positive-release"
+    _answer, current = acquire(task, 30)
+    path = lease_path(task)
+    before = path.read_bytes()
+    held = Held("release", task, current)
+    try:
+        held.require_ready()
+        exact_bytes(path, before, "positive release before CONTINUE")
+        held.continue_one()
+        rc, _stdout, _stderr = held.wait()
+        if rc != 0 or path.exists():
+            raise RuntimeError(f"barrier release lost normal effect rc={rc}")
+    finally:
+        held.close()
+    _next, successor = acquire(task, 30)
+    if successor == current:
+        raise RuntimeError("barrier release reacquire reused token")
+    if run(root, "release", task, successor).returncode != 0:
+        raise RuntimeError("barrier release successor cleanup failed")
+
+def positive_renew():
+    task = "positive-renew"
+    _answer, current = acquire(task, 0.55)
+    path = lease_path(task)
+    time.sleep(0.38)
+    before = path.read_bytes()
+    held = Held("renew", task, current)
+    try:
+        held.require_ready()
+        exact_bytes(path, before, "positive renew before CONTINUE")
+        held.continue_one()
+        rc, _stdout, _stderr = held.wait()
+        if rc != 0 or not path.is_file() or path.read_bytes() == before:
+            raise RuntimeError(f"barrier renew lost normal serialized effect rc={rc}")
+        no_serialized_seam(path, held)
+    finally:
+        held.close()
+    # Original TTL has elapsed, renewed TTL has not.
+    time.sleep(0.30)
+    early = run(root, "acquire", task, "--ttl", "30")
+    if early.returncode == 0:
+        raise RuntimeError("barrier renew did not move TTL window")
+    time.sleep(0.35)
+    late, successor = acquire(task, 30)
+    if successor == current:
+        raise RuntimeError("post-renew expiry reused token")
+    if run(root, "release", task, successor).returncode != 0:
+        raise RuntimeError("positive renew cleanup failed")
+
+for operation in ("release", "renew"):
+    overlap(operation)
+    wrong_token_no_ready(operation)
+    invalid_descriptors(operation)
+    eof_before_mutation(operation)
+positive_release()
+positive_renew()
+print("barrier-negative-controls ok")
+PYMUTBARRIER
+
+barrier_overlap=$(python3 "$WORK/h004-mutation-barrier.py" "$CLI" "$WORK/mutation-barrier" 2>&1); barrier_overlap_rc=$?
+if [ "$barrier_overlap_rc" -eq 0 ] && echo "$barrier_overlap" | grep -q 'release-overlap ok'; then
+  ok "K16b release barrier: READY→public B→CONTINUE bevarar exact B plus negativa/positiva ankare"
+else
+  no "K16b release barrier" "${barrier_overlap:-mutation-barrier harness exit $barrier_overlap_rc}"
+fi
+if [ "$barrier_overlap_rc" -eq 0 ] && echo "$barrier_overlap" | grep -q 'renew-overlap ok'; then
+  ok "K17b renew barrier: READY→public B→CONTINUE bevarar exact B plus negativa/positiva ankare"
+else
+  no "K17b renew barrier" "${barrier_overlap:-mutation-barrier harness exit $barrier_overlap_rc}"
+fi
+
+# K18+ kör den VERKLIGA loopen i en disponibel lokal klon. Tunna wrappers
+# loggar publika argv/exit-effekter och kan injicera ett enda systerfel eller
+# en owner-kontrollerad barriär. De är aldrig production authority och säger
+# ingenting om implementationens interna lås/storage.
+TRACE_REPO="$WORK/trace-repo"
+trace_repo_ok=0
+if git clone -q --no-hardlinks . "$TRACE_REPO" >/dev/null 2>&1 \
+   && rsync -a --delete controller/ "$TRACE_REPO/controller/" >/dev/null 2>&1; then
+  # Få med den komponentversion som faktiskt döms även vid en pre-commit run.
+  trace_repo_ok=1
+fi
+if [ "$trace_repo_ok" -ne 1 ]; then
+  echo "SKIP  K18+ trace-rigg — clone/deletion-aware overlay misslyckades, ODÖMBART"
+  echo
+  echo "$pass PASS, $fail FAIL, ODÖMBART"
+  exit 2
+fi
+
+cat > "$WORK/h004-trace-wrapper.py" <<'PYTRACE'
+#!/usr/bin/env python3
+import json
+import os
+import pathlib
+import signal
+import subprocess
+import sys
+import time
+
+here = pathlib.Path(__file__).resolve()
+component = here.parent.name
+real = here.with_name("cli.real")
+args = sys.argv[1:]
+trace_path = os.environ.get("H004_TRACE", "")
+mode = os.environ.get("H004_MODE", "normal")
+
+def command():
+    if component in ("attest", "lease", "workspace"):
+        return args[1] if len(args) > 1 else ""
+    return args[0] if args else ""
+
+def trace(phase, **extra):
+    if not trace_path:
+        return
+    record = {
+        "wall_ns": time.time_ns(),
+        "process_monotonic_ns": time.monotonic_ns(),
+        "pid": os.getpid(),
+        "component": component,
+        "phase": phase,
+        "command": command(),
+        "args": args,
+        **extra,
+    }
+    payload = (json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n").encode()
+    fd = os.open(trace_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        os.write(fd, payload)
+    finally:
+        os.close(fd)
+
+def call(path, call_args):
+    return subprocess.run(
+        [str(path), *map(str, call_args)], capture_output=True, timeout=90
+    )
+
+def answer(rc, out=b"", err=b""):
+    return subprocess.CompletedProcess([str(real), *args], rc, out, err)
+
+def save_successor(token, lease_file, authority_task, authority_sha):
+    target = os.environ.get("H004_SUCCESSOR_FILE", "")
+    if target:
+        pathlib.Path(target).write_text(
+            json.dumps({
+                "token": token,
+                "lease_file": str(lease_file),
+                "bytes_hex": lease_file.read_bytes().hex(),
+                "authority_task": authority_task,
+                "authority_sha": authority_sha,
+            }, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+def install_successor(lease_dir, resource, attest_dir):
+    holder = os.environ.get("H004_HARNESS_PID", "")
+    acquire_args = [lease_dir, "acquire", resource, "--ttl", "60"]
+    if holder:
+        acquire_args += ["--holder-pid", holder]
+    lease_real = here.parents[1] / "lease" / "cli.real"
+    acquired = call(lease_real, acquire_args)
+    token = acquired.stdout.decode(errors="replace").strip()
+    if acquired.returncode != 0 or not token:
+        raise RuntimeError(f"successor acquire föll: {acquired.stderr!r}")
+    attest_real = here.parents[1] / "attest" / "cli.real"
+    begun = call(attest_real, [attest_dir, "begin-authority", token])
+    if begun.returncode != 0:
+        raise RuntimeError(f"successor begin föll: {begun.stderr!r}")
+    anchor_task = "h004-successor-anchor"
+    anchor_sha = "f" * 40
+    written = call(
+        attest_real,
+        [attest_dir, "write", anchor_task, anchor_sha, "--authority", token],
+    )
+    readable = call(
+        attest_real,
+        [attest_dir, "read", anchor_task, "--authority", token],
+    )
+    if written.returncode != 0 or readable.returncode != 0 or anchor_sha.encode() not in readable.stdout:
+        raise RuntimeError("successor provisional anchor kunde inte etableras")
+    lease_file = pathlib.Path(lease_dir) / f"{resource}.lease"
+    save_successor(token, lease_file, anchor_task, anchor_sha)
+    deadline_marker = os.environ.get("H004_GUARD_DEADLINE_MARKER", "")
+    deadline_open = bool(deadline_marker) and not pathlib.Path(deadline_marker).exists()
+    trace(
+        "injected_successor",
+        successor_token=token,
+        before_heartbeat_deadline=deadline_open if deadline_marker else None,
+    )
+    return token
+
+cmd = command()
+start_extra = {}
+if component == "lease" and cmd == "renew" and mode == "replace_final_guard":
+    deadline_marker = os.environ.get("H004_GUARD_DEADLINE_MARKER", "")
+    start_extra["before_heartbeat_deadline"] = bool(deadline_marker) and not pathlib.Path(
+        deadline_marker
+    ).exists()
+if component == "lease" and cmd == "renew" and mode == "default_timing":
+    immediate_closed = os.environ.get("H004_DEFAULT_IMMEDIATE_CLOSED", "")
+    window_open = os.environ.get("H004_DEFAULT_WINDOW_OPEN", "")
+    window_closed = os.environ.get("H004_DEFAULT_WINDOW_CLOSED", "")
+    start_extra["default_immediate_window"] = bool(immediate_closed) and not pathlib.Path(
+        immediate_closed
+    ).exists()
+    start_extra["default_heartbeat_window"] = (
+        bool(window_open) and pathlib.Path(window_open).exists()
+        and bool(window_closed) and not pathlib.Path(window_closed).exists()
+    )
+trace("start", **start_extra)
+
+try:
+    if component == "attest" and cmd == "begin-authority" and mode == "begin_fail":
+        trace("injected_begin_fail")
+        result = answer(1, err=b"injected begin failure\n")
+    elif component == "attest" and cmd == "finalize-authority" and mode == "finalize_fail":
+        trace("injected_finalize_fail")
+        result = answer(1, err=b"injected finalize failure\n")
+    elif component == "attest" and cmd == "finalize-authority" and mode == "crash_finalize":
+        run_pid_file = pathlib.Path(os.environ["H004_DEADLINE_CHILD_PID_FILE"])
+        run_pid = int(run_pid_file.read_text(encoding="utf-8").strip())
+        trace("crash_before_finalize", run_pid=run_pid)
+        os.kill(run_pid, signal.SIGKILL)
+        result = answer(1, err=b"parent survived injected crash\n")
+    elif component == "lease" and cmd == "release" and mode == "release_refuse":
+        trace("injected_release_refuse")
+        result = answer(1, err=b"injected release refusal\n")
+    elif component == "lease" and cmd == "release" and mode == "release_delete_fail":
+        delegated = call(real, args)
+        trace("injected_release_delete_fail", delegated_rc=delegated.returncode)
+        result = answer(1, delegated.stdout, b"injected failure after release\n")
+    elif component == "lease" and cmd == "release" and mode in ("release_delay", "default_timing"):
+        # Deterministic observer window: en heartbeat som inte stop/joinats
+        # före release blir synlig i trace medan releasen pågår.
+        time.sleep(0.5)
+        result = call(real, args)
+    else:
+        result = call(real, args)
+
+    if component == "lease" and cmd == "acquire" and mode == "default_timing" and result.returncode == 0:
+        pathlib.Path(os.environ["H004_DEFAULT_ACQUIRED"]).write_text(
+            "acquired\n", encoding="utf-8"
+        )
+
+    if component == "lease" and cmd == "release" and mode == "successor_after_release" and result.returncode == 0:
+        trace("delegated_release_success")
+        install_successor(args[0], args[2], os.environ["H004_ATTEST_DIR"])
+
+    if component == "attest" and cmd == "write" and mode == "replace_after_write" and result.returncode == 0:
+        once = pathlib.Path(os.environ["H004_BARRIER_ONCE"])
+        try:
+            fd = os.open(once, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            fd = None
+        if fd is not None:
+            os.close(fd)
+            lease_dir = os.environ["H004_LEASE_DIR"]
+            resource = os.environ["H004_LEASE_RESOURCE"]
+            (pathlib.Path(lease_dir) / f"{resource}.lease").unlink(missing_ok=True)
+            install_successor(lease_dir, resource, os.environ["H004_ATTEST_DIR"])
+
+    if (
+        component == "taskval"
+        and cmd == "claim"
+        and mode == "replace_final_guard"
+        and result.returncode == 0
+        and not result.stdout.strip()
+    ):
+        once = pathlib.Path(os.environ["H004_BARRIER_ONCE"])
+        try:
+            fd = os.open(once, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            fd = None
+        if fd is not None:
+            os.close(fd)
+            lease_dir = os.environ["H004_LEASE_DIR"]
+            resource = os.environ["H004_LEASE_RESOURCE"]
+            (pathlib.Path(lease_dir) / f"{resource}.lease").unlink(missing_ok=True)
+            install_successor(lease_dir, resource, os.environ["H004_ATTEST_DIR"])
+finally:
+    if "result" not in locals():
+        result = answer(1, err=b"trace wrapper injection failed\n")
+
+trace(
+    "end",
+    rc=result.returncode,
+    stdout=result.stdout.decode(errors="replace"),
+    stderr=result.stderr.decode(errors="replace"),
+)
+sys.stdout.buffer.write(result.stdout)
+sys.stderr.buffer.write(result.stderr)
+raise SystemExit(result.returncode)
+PYTRACE
+chmod +x "$WORK/h004-trace-wrapper.py" || {
+  echo "SKIP  K18+ trace-rigg — wrapper chmod misslyckades, ODÖMBART"
+  exit 2
+}
+
+for component in attest lease taskval state workspace launch; do
+  if ! mv "$TRACE_REPO/controller/$component/cli" "$TRACE_REPO/controller/$component/cli.real" \
+     || ! cp "$WORK/h004-trace-wrapper.py" "$TRACE_REPO/controller/$component/cli" \
+     || ! chmod +x "$TRACE_REPO/controller/$component/cli"; then
+    echo "SKIP  K18+ trace-rigg — wrapperinstallation för $component misslyckades, ODÖMBART"
+    exit 2
+  fi
+done
+
+cat > "$WORK/h004-trace-valid.py" <<'PYTRACEVALID'
+import json
+import pathlib
+import sys
+
+try:
+    rows = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.strip()]
+    if any(
+        not isinstance(row, dict)
+        or not isinstance(row.get("component"), str)
+        or not isinstance(row.get("command"), str)
+        or not isinstance(row.get("phase"), str)
+        or not isinstance(row.get("pid"), int)
+        for row in rows
+    ):
+        raise ValueError("bad trace row")
+except Exception as exc:
+    print(f"invalid trace: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+PYTRACEVALID
+
+trace_valid() {
+  "$PY3" "$WORK/h004-trace-valid.py" "$1" >/dev/null 2>&1
+}
+
+cat > "$WORK/h004-authority-worker.py" <<'PYAUTHWORK'
+import json
+import os
+import pathlib
+import sys
+import time
+
+envelope = json.load(sys.stdin)
+task = envelope["task_id"]
+counter = pathlib.Path(os.environ["H004_WORKER_COUNT"])
+with counter.open("a", encoding="utf-8") as stream:
+    stream.write(task + "\n")
+
+if task.endswith("-b"):
+    pathlib.Path(os.environ["H004_B_MARK"]).write_text("started\n", encoding="utf-8")
+    release = pathlib.Path(os.environ["H004_B_CONTINUE"])
+    for _ in range(200):
+        if release.exists():
+            break
+        time.sleep(0.05)
+    else:
+        raise SystemExit("B fick aldrig continue")
+
+target = pathlib.Path("tests/h004-authority-fixture")
+target.mkdir(parents=True, exist_ok=True)
+(target / f"{task}.txt").write_text(task + "\n", encoding="utf-8")
+print(f"{task} klar")
+PYAUTHWORK
+
+cat > "$WORK/h004-two.json" <<'JSON'
+{
+  "spec_version": "h004-authority-fixture",
+  "defaults": {"max_changed_files": 8, "max_added_lines": 600},
+  "tasks": [
+    {
+      "id": "authority-a", "slice": 0, "title": "A", "summary": "A",
+      "allowed_write": ["tests/h004-authority-fixture/**"],
+      "exit_test": "verify/bin/ingen", "exit_criterion": "-",
+      "docs_impact": [], "depends_on": []
+    },
+    {
+      "id": "authority-b", "slice": 0, "title": "B", "summary": "B",
+      "allowed_write": ["tests/h004-authority-fixture/**"],
+      "exit_test": "verify/bin/ingen", "exit_criterion": "-",
+      "docs_impact": [], "depends_on": ["authority-a"]
+    }
+  ]
+}
+JSON
+
+cat > "$WORK/h004-one.json" <<'JSON'
+{
+  "spec_version": "h004-authority-fixture",
+  "defaults": {"max_changed_files": 8, "max_added_lines": 600},
+  "tasks": [
+    {
+      "id": "authority-one", "slice": 0, "title": "one", "summary": "one",
+      "allowed_write": ["tests/h004-authority-fixture/**"],
+      "exit_test": "verify/bin/ingen", "exit_criterion": "-",
+      "docs_impact": [], "depends_on": []
+    }
+  ]
+}
+JSON
+
+cat > "$WORK/h004-empty.json" <<'JSON'
+{
+  "spec_version": "h004-authority-fixture",
+  "defaults": {"max_changed_files": 8, "max_added_lines": 600},
+  "tasks": []
+}
+JSON
+
+TRACE_BAS=""
+if [ "$trace_repo_ok" -eq 1 ]; then
+  TRACE_BAS="$(git -C "$TRACE_REPO" rev-parse HEAD 2>/dev/null || true)"
+fi
+if [ -z "$TRACE_BAS" ]; then
+  echo "SKIP  K18+ trace-rigg — disposable base-SHA saknas, ODÖMBART"
+  exit 2
+fi
+for component in attest lease taskval state workspace launch; do
+  if [ ! -x "$TRACE_REPO/controller/$component/cli.real" ] \
+     || [ ! -x "$TRACE_REPO/controller/$component/cli" ]; then
+    echo "SKIP  K18+ trace-rigg — $component wrapper/real saknas, ODÖMBART"
+    exit 2
+  fi
+done
+
+authority_config() {
+  cfg="$1"; spec="$2"; prefix="$3"; resource="$4"
+  cat > "$cfg" <<JSON
+{
+  "spec": "$spec",
+  "attest_dir": "$prefix-att",
+  "state_dir": "$prefix-state",
+  "lease_dir": "$prefix-lease",
+  "lease_resurs": "$resource",
+  "workspace_rot": "$prefix-ws",
+  "base_sha": "$TRACE_BAS",
+  "worker_cmd": ["$PY3", "$WORK/h004-authority-worker.py"],
+  "timeout_s": 15,
+  "verifier_id": "check-invariants",
+  "run_id": "$(basename "$prefix")",
+  "brytare_rot": "$prefix-breaker",
+  "budget": 1,
+  "troskel": 2,
+  "lease_ttl_s": 1.5,
+  "lease_heartbeat_s": 0.2
+}
+JSON
+}
+
+cat > "$WORK/h004-trace-check.py" <<'PYTRACECHECK'
+import json
+import pathlib
+import sys
+
+events = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.strip()]
+expected_holder_pid = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8").strip()
+if not expected_holder_pid.isdecimal():
+    raise SystemExit("actual run PID saknas")
+for sequence, event in enumerate(events):
+    event["_seq"] = sequence
+
+def selected(component, command, phase=None, rc=None):
+    rows = [e for e in events if e["component"] == component and e["command"] == command]
+    if phase is not None:
+        rows = [e for e in rows if e["phase"] == phase]
+    if rc is not None:
+        rows = [e for e in rows if e.get("rc") == rc]
+    return rows
+
+acquires = selected("lease", "acquire", "end", 0)
+if len(acquires) != 1 or not acquires[0].get("stdout", "").strip():
+    raise SystemExit("acquire-token saknas/är inte unik")
+token = acquires[0]["stdout"].strip()
+acquire_starts = selected("lease", "acquire", "start")
+if not acquire_starts:
+    raise SystemExit("acquire-start saknas")
+for event in acquire_starts:
+    args = event.get("args", [])
+    if (
+        args.count("--holder-pid") != 1
+        or args[args.index("--holder-pid") + 1] != expected_holder_pid
+        or "--incarnation-oracle" in args
+    ):
+        raise SystemExit("något loop-acquire saknar actual run PID eller skickar test-oracle")
+acquire_args = acquires[0].get("args", [])
+if (
+    acquire_args.count("--holder-pid") != 1
+    or acquire_args[acquire_args.index("--holder-pid") + 1] != expected_holder_pid
+    or "--incarnation-oracle" in acquire_args
+):
+    raise SystemExit("loop acquire är inte bundet till actual run PID eller skickar test-oracle")
+
+begins = selected("attest", "begin-authority", "end", 0)
+begin_starts = selected("attest", "begin-authority", "start")
+if (len(begin_starts) != 1 or len(begins) != 1
+        or begins[0]["args"][-1] != token
+        or not acquires[0]["_seq"] < begin_starts[0]["_seq"] < begins[0]["_seq"]):
+    raise SystemExit("begin-authority använder inte exakt acquired lease_id")
+begin_done = begins[0]["_seq"]
+claim_starts = selected("taskval", "claim", "start")
+state_appends = selected("state", "append", "start")
+workspace_starts = selected("workspace", "create", "start")
+session_starts = selected("launch", "run", "start")
+for name, rows in (
+    ("taskval claim", claim_starts),
+    ("claim-event", state_appends),
+    ("workspace create", workspace_starts),
+    ("session launch", session_starts),
+):
+    if not rows or begin_done >= min(e["_seq"] for e in rows):
+        raise SystemExit(f"BEGIN skedde inte före första {name}")
+
+writes = selected("attest", "write", "end", 0)
+if len(writes) != 2 or sorted(
+    e.get("args", [None, None, None])[2] if len(e.get("args", [])) > 2 else None
+    for e in writes
+) != ["authority-a", "authority-b"]:
+    raise SystemExit("successful write-set ska vara exakt {authority-a, authority-b}")
+for event in writes:
+    args = event["args"]
+    if "--authority" not in args or args[args.index("--authority") + 1] != token:
+        raise SystemExit("task-write saknar exakt run-authority")
+
+claims = selected("taskval", "claim", "end", 0)
+claims.sort(key=lambda event: event["_seq"])
+if len(claims) != 3 or [e.get("stdout", "").strip() for e in claims] != [
+    "authority-a", "authority-b", ""
+]:
+    raise SystemExit("drain ska vara exakt claim A, claim B, terminalt tomt claim")
+for event in claims:
+    args = event["args"]
+    if len(args) < 6 or args[-2:] != ["--authority", token]:
+        raise SystemExit("taskval claim saknar exakt run-authority")
+
+releases = selected("lease", "release", "end", 0)
+finalizes = selected("attest", "finalize-authority", "end", 0)
+if len(releases) != 1 or releases[0]["args"][-1] != token:
+    raise SystemExit("clean token-bound release saknas")
+if len(finalizes) != 1 or finalizes[0]["args"][-1] != token:
+    raise SystemExit("exakt en finalize med lease_id saknas")
+finalize_starts = selected("attest", "finalize-authority", "start")
+if len(finalize_starts) != 1 or releases[0]["_seq"] >= finalize_starts[0]["_seq"]:
+    raise SystemExit("finalize startade före clean release returnerade success")
+
+empty_claim = max(claims, key=lambda e: e["_seq"])
+release_starts = selected("lease", "release", "start")
+renew_ends = selected("lease", "renew", "end", 0)
+if len(release_starts) != 1:
+    raise SystemExit("release-start saknas")
+if not any(empty_claim["_seq"] < e["_seq"] < release_starts[0]["_seq"] for e in renew_ends):
+    raise SystemExit("sista lease-guard saknas mellan drain och release")
+renew_starts = selected("lease", "renew", "start")
+all_renew_ends = selected("lease", "renew", "end")
+ends_by_pid = {e["pid"]: e for e in all_renew_ends}
+for start in renew_starts:
+    end = ends_by_pid.get(start["pid"])
+    if end is None or end["_seq"] >= release_starts[0]["_seq"]:
+        raise SystemExit("heartbeat var inte fullständigt stop/joinat före release")
+for event in renew_starts + release_starts:
+    if "--test-mutation-barrier-fds" in event.get("args", []):
+        raise SystemExit("normal loop skickade disposable mutation-barrier")
+
+print(token)
+PYTRACECHECK
+
+# K18/K19/K21 — solskensrun med två beroende tasks. B hålls i workern så A:s
+# publication kan observeras som same-authority PROVISIONAL före release.
+P18="$WORK/k18-positive"
+T18="$P18.trace"
+authority_config "$P18.json" "$WORK/h004-two.json" "$P18" "h004-positive"
+mkdir -p "$P18-ws"
+if [ "$trace_repo_ok" -eq 1 ]; then
+  "$TRACE_REPO/controller/state/cli.real" init "$P18-state" >/dev/null 2>&1
+fi
+: > "$T18"
+rm -f "$WORK/k18-b-started" "$WORK/k18-b-continue" "$WORK/k18-worker-count"
+
+if [ "$trace_repo_ok" -eq 1 ]; then
+  (
+    cd "$TRACE_REPO" || exit 1
+    H004_TRACE="$T18" \
+    H004_MODE=release_delay \
+    H004_HARNESS_PID="$$" \
+    H004_WORKER_COUNT="$WORK/k18-worker-count" \
+    H004_B_MARK="$WORK/k18-b-started" \
+    H004_B_CONTINUE="$WORK/k18-b-continue" \
+    H004_DEADLINE_CHILD_PID_FILE="$P18.loop-pid" \
+    "$PY3" "$WORK/h004-deadline.py" 60 ./controller/loop/cli run "$P18.json"
+  ) >"$P18.out" 2>"$P18.err" &
+  loop18=$!
+  started18=0
+  i18=0
+  while [ "$i18" -lt 200 ]; do
+    if [ -s "$WORK/k18-b-started" ]; then started18=1; break; fi
+    kill -0 "$loop18" 2>/dev/null || break
+    sleep 0.1
+    i18=$((i18 + 1))
+  done
+else
+  loop18=""
+  started18=0
+fi
+
+token18=""
+if [ "$started18" -eq 1 ]; then
+  token18=$(python3 -c 'import json,sys
+rows=[json.loads(x) for x in open(sys.argv[1]) if x.strip()]
+hits=[r for r in rows if r.get("component")=="lease" and r.get("command")=="acquire" and r.get("phase")=="end" and r.get("rc")==0]
+print(hits[-1].get("stdout","").strip() if hits else "")' "$T18" 2>/dev/null)
+fi
+
+bound18=1; global18=0
+if [ -n "$token18" ]; then
+  H004_TRACE="$T18" H004_MODE=normal \
+    "$TRACE_REPO/controller/attest/cli" "$P18-att" read authority-a --authority "$token18" \
+    >/dev/null 2>&1 && bound18=0
+  H004_TRACE="$T18" H004_MODE=normal \
+    "$TRACE_REPO/controller/attest/cli" "$P18-att" read authority-a --require-valid \
+    >/dev/null 2>&1 || global18=$?
+fi
+
+touch "$WORK/k18-b-continue"
+if [ -n "$loop18" ]; then
+  wait "$loop18"; loop18_rc=$?
+else
+  loop18_rc=99
+fi
+deadline_probe_or_od "$loop18_rc" "K18 deadline"
+if ! trace_valid "$T18"; then
+  echo "SKIP  K18 trace-rigg — malformed/partial trace, ODÖMBART"
+  exit 2
+fi
+
+trace18=""
+trace18_rc=1
+if [ "$trace_repo_ok" -eq 1 ]; then
+  trace18=$(python3 "$WORK/h004-trace-check.py" "$T18" "$P18.loop-pid" 2>&1); trace18_rc=$?
+fi
+valid18a=1; valid18b=1
+"$TRACE_REPO/controller/attest/cli.real" "$P18-att" read authority-a --require-valid >/dev/null 2>&1 && valid18a=0
+"$TRACE_REPO/controller/attest/cli.real" "$P18-att" read authority-b --require-valid >/dev/null 2>&1 && valid18b=0
+
+if [ "$started18" -eq 1 ] && [ "$trace18_rc" -eq 0 ]; then
+  ok "K18 lease→authority: exact lease_id BEGIN sker före claim/event/session"
+else
+  no "K18 lease→authority" "started=$started18 trace=${trace18:-trace-check exit $trace18_rc}"
+fi
+if [ "$bound18" -eq 0 ] && [ "$global18" -ne 0 ] \
+   && grep -qx 'authority-a' "$WORK/k18-worker-count" 2>/dev/null \
+   && grep -qx 'authority-b' "$WORK/k18-worker-count" 2>/dev/null \
+   && [ "$(wc -l < "$WORK/k18-worker-count" | tr -d ' ')" = "2" ]; then
+  ok "K19 in-run dependency: A är provisional-globalt spärrad men gör B behörig under samma id"
+else
+  no "K19 in-run dependency" "bound/global=$bound18/$global18 workers=$(tr '\n' ',' < "$WORK/k18-worker-count" 2>/dev/null || true)"
+fi
+if [ "$loop18_rc" -eq 0 ] && [ "$trace18_rc" -eq 0 ] \
+   && [ "$valid18a" -eq 0 ] && [ "$valid18b" -eq 0 ]; then
+  ok "K21 clean finalize: final guard → joined heartbeat → release → exakt en atomic finalize"
+else
+  no "K21 clean finalize" "loop/trace/valid-a/valid-b=$loop18_rc/$trace18_rc/$valid18a/$valid18b"
+fi
+
+# K20 — taskval-authority är UNION(global valid, same-current provisional).
+# Legacy utan flagga står byte-/effektbakåtkompatibelt; wrong/stale explicit id
+# får aldrig ge claim eller event (exit 0 tomt eller fail-closed 1 tolereras).
+rc_zero_or_one() {
+  [ "$1" -eq 0 ] || [ "$1" -eq 1 ]
+}
+
+cat > "$WORK/h004-selector.json" <<'JSON'
+{
+  "spec_version": "h004-selector",
+  "tasks": [
+    {
+      "id": "selector-target", "slice": 0, "title": "selector", "summary": "selector",
+      "allowed_write": [], "exit_test": "verify/bin/ingen", "exit_criterion": "-",
+      "docs_impact": [], "depends_on": ["legacy-dep", "finalized-dep", "provisional-dep"]
+    }
+  ]
+}
+JSON
+
+D20="$WORK/k20-att"
+S20="$WORK/k20-state"
+A20="selector-A20"
+"$TRACE_REPO/controller/state/cli.real" init "$S20" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20" write legacy-dep "$(sha_for 4200)" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20" begin-authority selector-prior-P20 >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20" write finalized-dep "$(sha_for 4202)" --authority selector-prior-P20 >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20" finalize-authority selector-prior-P20 >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20" begin-authority "$A20" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20" write provisional-dep "$(sha_for 4201)" --authority "$A20" >/dev/null 2>&1
+
+right20=$("$TRACE_REPO/controller/taskval/cli.real" select "$WORK/h004-selector.json" "$D20" "$S20" --authority "$A20" 2>/dev/null); right20_rc=$?
+legacy20=$("$TRACE_REPO/controller/taskval/cli.real" select "$WORK/h004-selector.json" "$D20" "$S20" 2>/dev/null); legacy20_rc=$?
+wrong20=$("$TRACE_REPO/controller/taskval/cli.real" select "$WORK/h004-selector.json" "$D20" "$S20" --authority "selector-wrong" 2>/dev/null); wrong20_rc=$?
+"$TRACE_REPO/controller/attest/cli.real" "$D20" finalize-authority "$A20" >/dev/null 2>&1
+legacy_after20=$("$TRACE_REPO/controller/taskval/cli.real" select "$WORK/h004-selector.json" "$D20" "$S20" 2>/dev/null); legacy_after20_rc=$?
+
+D20S="$WORK/k20-stale-att"
+S20S="$WORK/k20-stale-state"
+A20S="selector-stale-A"; B20S="selector-current-B"
+"$TRACE_REPO/controller/state/cli.real" init "$S20S" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20S" write legacy-dep "$(sha_for 4210)" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20S" begin-authority selector-prior-P20S >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20S" write finalized-dep "$(sha_for 4212)" --authority selector-prior-P20S >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20S" finalize-authority selector-prior-P20S >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20S" begin-authority "$A20S" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20S" write provisional-dep "$(sha_for 4211)" --authority "$A20S" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$D20S" begin-authority "$B20S" >/dev/null 2>&1
+stale20=$("$TRACE_REPO/controller/taskval/cli.real" claim "$WORK/h004-selector.json" "$D20S" "$S20S" --authority "$A20S" 2>/dev/null); stale20_rc=$?
+events20=$(wc -l < "$S20S/events.jsonl" 2>/dev/null | tr -d ' ')
+
+# Separat anti-fallback-ankare: samtliga dependencies är globalt giltiga.
+# Legacy/no-flag SKA då välja/claima, medan wrong/stale explicit authority
+# måste vägra eller ge tomt — en implementation som ignorerar flaggan fälls.
+cat > "$WORK/h004-selector-fallback.json" <<'JSON'
+{
+  "spec_version": "h004-selector-fallback",
+  "tasks": [
+    {
+      "id": "fallback-target", "slice": 0, "title": "fallback", "summary": "fallback",
+      "allowed_write": [], "exit_test": "verify/bin/ingen", "exit_criterion": "-",
+      "docs_impact": [], "depends_on": ["fallback-dep"]
+    }
+  ]
+}
+JSON
+DF20="$WORK/k20-fallback-att"
+"$TRACE_REPO/controller/attest/cli.real" "$DF20" write fallback-dep "$(sha_for 4220)" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$DF20" begin-authority fallback-old-A >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$DF20" begin-authority fallback-current-B >/dev/null 2>&1
+
+SF20L="$WORK/k20-fallback-legacy-state"
+"$TRACE_REPO/controller/state/cli.real" init "$SF20L" >/dev/null 2>&1
+legacy_claim20=$("$TRACE_REPO/controller/taskval/cli.real" claim "$WORK/h004-selector-fallback.json" "$DF20" "$SF20L" 2>/dev/null); legacy_claim20_rc=$?
+legacy_events20=$(wc -l < "$SF20L/events.jsonl" 2>/dev/null | tr -d ' ')
+
+SF20W="$WORK/k20-fallback-wrong-state"
+"$TRACE_REPO/controller/state/cli.real" init "$SF20W" >/dev/null 2>&1
+wrong_fallback20=$("$TRACE_REPO/controller/taskval/cli.real" select "$WORK/h004-selector-fallback.json" "$DF20" "$SF20W" --authority fallback-wrong 2>/dev/null); wrong_fallback20_rc=$?
+
+SF20WC="$WORK/k20-fallback-wrong-claim-state"
+"$TRACE_REPO/controller/state/cli.real" init "$SF20WC" >/dev/null 2>&1
+wrong_claim_fallback20=$("$TRACE_REPO/controller/taskval/cli.real" claim "$WORK/h004-selector-fallback.json" "$DF20" "$SF20WC" --authority fallback-wrong 2>/dev/null); wrong_claim_fallback20_rc=$?
+wrong_claim_events20=$(wc -l < "$SF20WC/events.jsonl" 2>/dev/null | tr -d ' ')
+
+SF20S="$WORK/k20-fallback-stale-state"
+"$TRACE_REPO/controller/state/cli.real" init "$SF20S" >/dev/null 2>&1
+stale_fallback20=$("$TRACE_REPO/controller/taskval/cli.real" claim "$WORK/h004-selector-fallback.json" "$DF20" "$SF20S" --authority fallback-old-A 2>/dev/null); stale_fallback20_rc=$?
+stale_fallback_events20=$(wc -l < "$SF20S/events.jsonl" 2>/dev/null | tr -d ' ')
+current_fallback20=$("$TRACE_REPO/controller/taskval/cli.real" select "$WORK/h004-selector-fallback.json" "$DF20" "$SF20W" --authority fallback-current-B 2>/dev/null); current_fallback20_rc=$?
+
+if [ "$right20_rc" -eq 0 ] && [ "$right20" = "selector-target" ] \
+   && [ "$legacy20_rc" -eq 0 ] && [ -z "$legacy20" ] \
+   && rc_zero_or_one "$wrong20_rc" && [ -z "$wrong20" ] \
+   && [ "$legacy_after20_rc" -eq 0 ] && [ "$legacy_after20" = "selector-target" ] \
+   && rc_zero_or_one "$stale20_rc" && [ -z "$stale20" ] && [ "$events20" = "0" ] \
+   && [ "$legacy_claim20_rc" -eq 0 ] && [ "$legacy_claim20" = "fallback-target" ] \
+   && [ "$legacy_events20" = "1" ] \
+   && rc_zero_or_one "$wrong_fallback20_rc" && [ -z "$wrong_fallback20" ] \
+   && rc_zero_or_one "$wrong_claim_fallback20_rc" && [ -z "$wrong_claim_fallback20" ] \
+   && [ "$wrong_claim_events20" = "0" ] \
+   && rc_zero_or_one "$stale_fallback20_rc" && [ -z "$stale_fallback20" ] \
+   && [ "$stale_fallback_events20" = "0" ] \
+   && [ "$current_fallback20_rc" -eq 0 ] && [ "$current_fallback20" = "fallback-target" ]; then
+  ok "K20 taskval authority: legacy+prior-final+same-run union och explicit wrong/stale anti-fallback"
+else
+  no "K20 taskval authority" "union=$right20_rc/[$right20] legacy=$legacy20_rc/[$legacy20] wrong=$wrong20_rc/[$wrong20] legacy-after=$legacy_after20_rc/[$legacy_after20] stale=$stale20_rc/[$stale20]/$events20 fallback legacy=$legacy_claim20_rc/[$legacy_claim20]/$legacy_events20 wrong-select=$wrong_fallback20_rc/[$wrong_fallback20] wrong-claim=$wrong_claim_fallback20_rc/[$wrong_claim_fallback20]/$wrong_claim_events20 stale=$stale_fallback20_rc/[$stale_fallback20]/$stale_fallback_events20 current=$current_fallback20_rc/[$current_fallback20]"
+fi
+
+h010_out=$("$PY3" "$WORK/h004-deadline.py" 60 bash verify/bin/h-010-exit 2>&1); h010_rc=$?
+deadline_probe_or_od "$h010_rc" "K20b deadline"
+if [ "$h010_rc" -eq 0 ] && echo "$h010_out" | grep -q '15 PASS, 0 FAIL'; then
+  ok "K20b legacy taskval: hela frysta h-010-gaten förblir grön"
+else
+  no "K20b legacy taskval" "exit=$h010_rc ${h010_out:-ingen output}"
+fi
+
+trace_count() {
+  python3 -c 'import json,sys
+try: rows=[json.loads(x) for x in open(sys.argv[1]) if x.strip()]
+except Exception: print(0); raise SystemExit
+print(sum(r.get("component")==sys.argv[2] and r.get("command")==sys.argv[3] and r.get("phase")==sys.argv[4] for r in rows))' "$1" "$2" "$3" "$4"
+}
+
+trace_token() {
+  python3 -c 'import json,sys
+try: rows=[json.loads(x) for x in open(sys.argv[1]) if x.strip()]
+except Exception: print(""); raise SystemExit
+hits=[r for r in rows if r.get("component")=="lease" and r.get("command")=="acquire" and r.get("phase")=="end" and r.get("rc")==0]
+print(hits[0].get("stdout","").strip() if hits else "")' "$1"
+}
+
+run_variant() {
+  V_PREFIX="$1"; V_MODE="$2"; V_SPEC="$3"; V_RESOURCE="$4"
+  V_TRACE="$V_PREFIX.trace"
+  V_COUNT="$V_PREFIX.workers"
+  V_SUCCESSOR="$V_PREFIX.successor"
+  authority_config "$V_PREFIX.json" "$V_SPEC" "$V_PREFIX" "$V_RESOURCE"
+  V_DEADLINE=60
+  if [ "$V_MODE" = "replace_final_guard" ]; then
+    # Denna variant ska observera den explicita post-drain-guarden, inte en
+    # schemalagd heartbeat. Samtidigt ryms en legitim sleep-baserad stop/join.
+    if ! "$PY3" - "$V_PREFIX.json" <<'PYLONGGUARD'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+config = json.loads(path.read_text(encoding="utf-8"))
+config["lease_ttl_s"] = 60
+config["lease_heartbeat_s"] = 30
+path.write_text(json.dumps(config, sort_keys=True) + "\n", encoding="utf-8")
+check = json.loads(path.read_text(encoding="utf-8"))
+raise SystemExit(0 if (check.get("lease_ttl_s"), check.get("lease_heartbeat_s")) == (60, 30) else 1)
+PYLONGGUARD
+    then
+      echo "SKIP  K23 config-rigg — timing rewrite kunde inte verifieras, ODÖMBART"
+      exit 2
+    fi
+    V_DEADLINE=90
+  fi
+  mkdir -p "$V_PREFIX-ws"
+  "$TRACE_REPO/controller/state/cli.real" init "$V_PREFIX-state" >/dev/null 2>&1
+  : > "$V_TRACE"
+  V_GUARD_MARKER=""
+  V_GUARD_READY=""
+  rm -f "$V_COUNT" "$V_SUCCESSOR" "$V_PREFIX.once" "$V_PREFIX.bmark" \
+    "$V_PREFIX.guard-deadline" "$V_PREFIX.guard-ready"
+  touch "$V_PREFIX.continue"
+  if [ "$V_MODE" = "replace_final_guard" ]; then
+    V_GUARD_MARKER="$V_PREFIX.guard-deadline"
+    V_GUARD_READY="$V_PREFIX.guard-ready"
+    "$PY3" - "$V_GUARD_MARKER" "$V_GUARD_READY" <<'PYGUARDTIMER' &
+import pathlib
+import sys
+import time
+
+deadline = pathlib.Path(sys.argv[1])
+ready = pathlib.Path(sys.argv[2])
+ready.write_text("ready\n", encoding="utf-8")
+time.sleep(20)
+deadline.write_text("elapsed\n", encoding="utf-8")
+PYGUARDTIMER
+    H004_GUARD_TIMER_PID=$!
+    guard_ready_i=0
+    while [ ! -s "$V_GUARD_READY" ] && kill -0 "$H004_GUARD_TIMER_PID" 2>/dev/null \
+      && [ "$guard_ready_i" -lt 100 ]; do
+      sleep 0.02
+      guard_ready_i=$((guard_ready_i + 1))
+    done
+    if [ ! -s "$V_GUARD_READY" ]; then
+      kill "$H004_GUARD_TIMER_PID" >/dev/null 2>&1 || true
+      wait "$H004_GUARD_TIMER_PID" >/dev/null 2>&1 || true
+      H004_GUARD_TIMER_PID=""
+      echo "SKIP  K23 guard-timer — central monotonic timer startade inte, ODÖMBART"
+      exit 2
+    fi
+  fi
+  (
+    cd "$TRACE_REPO" || exit 1
+    H004_TRACE="$V_TRACE" \
+    H004_MODE="$V_MODE" \
+    H004_HARNESS_PID="$$" \
+    H004_WORKER_COUNT="$V_COUNT" \
+    H004_B_MARK="$V_PREFIX.bmark" \
+    H004_B_CONTINUE="$V_PREFIX.continue" \
+    H004_SUCCESSOR_FILE="$V_SUCCESSOR" \
+    H004_BARRIER_ONCE="$V_PREFIX.once" \
+    H004_LEASE_DIR="$V_PREFIX-lease" \
+    H004_LEASE_RESOURCE="$V_RESOURCE" \
+    H004_ATTEST_DIR="$V_PREFIX-att" \
+    H004_GUARD_DEADLINE_MARKER="$V_GUARD_MARKER" \
+    H004_DEADLINE_CHILD_PID_FILE="$V_PREFIX.loop-pid" \
+    "$PY3" "$WORK/h004-deadline.py" "$V_DEADLINE" ./controller/loop/cli run "$V_PREFIX.json"
+  ) >"$V_PREFIX.out" 2>"$V_PREFIX.err"
+  V_RC=$?
+  if [ -n "${H004_GUARD_TIMER_PID:-}" ]; then
+    kill "$H004_GUARD_TIMER_PID" >/dev/null 2>&1 || true
+    wait "$H004_GUARD_TIMER_PID" >/dev/null 2>&1 || true
+    H004_GUARD_TIMER_PID=""
+  fi
+  deadline_probe_or_od "$V_RC" "K18+ deadline"
+  if ! trace_valid "$V_TRACE"; then
+    echo "SKIP  K18+ trace-rigg — malformed/partial trace, ODÖMBART"
+    exit 2
+  fi
+  if [ -f "$V_PREFIX-state/events.jsonl" ]; then
+    V_EVENTS=$(wc -l < "$V_PREFIX-state/events.jsonl" | tr -d ' ')
+  else
+    V_EVENTS=0
+  fi
+  if [ -f "$V_COUNT" ]; then
+    V_WORKERS=$(wc -l < "$V_COUNT" | tr -d ' ')
+  else
+    V_WORKERS=0
+  fi
+  V_BEGIN_START=$(trace_count "$V_TRACE" attest begin-authority start)
+  V_AUTH_WRITE_START=$(trace_count "$V_TRACE" attest write start)
+  V_CLAIM_START=$(trace_count "$V_TRACE" taskval claim start)
+  V_WORKSPACE_START=$(trace_count "$V_TRACE" workspace create start)
+  V_SESSION_START=$(trace_count "$V_TRACE" launch run start)
+  V_CRASH_MARK=$(trace_count "$V_TRACE" attest finalize-authority crash_before_finalize)
+  V_FINALIZE_START=$(trace_count "$V_TRACE" attest finalize-authority start)
+  V_FINALIZE_END=$(trace_count "$V_TRACE" attest finalize-authority end)
+  V_INJECT_BEGIN_FAIL=$(trace_count "$V_TRACE" attest begin-authority injected_begin_fail)
+  V_INJECT_RELEASE_REFUSE=$(trace_count "$V_TRACE" lease release injected_release_refuse)
+  V_INJECT_RELEASE_DELETE=$(trace_count "$V_TRACE" lease release injected_release_delete_fail)
+  V_INJECT_FINALIZE_FAIL=$(trace_count "$V_TRACE" attest finalize-authority injected_finalize_fail)
+  V_DELEGATED_RELEASE=$(trace_count "$V_TRACE" lease release delegated_release_success)
+  V_TOKEN=$(trace_token "$V_TRACE")
+}
+
+cat > "$WORK/h004-one-phase-check.py" <<'PYPHASECHECK'
+import json
+import pathlib
+import sys
+
+rows = [
+    json.loads(line)
+    for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+    if line.strip()
+]
+for sequence, row in enumerate(rows):
+    row["_seq"] = sequence
+mode = sys.argv[2]
+
+def chosen(component=None, command=None, phase=None, rc=None):
+    answer = rows
+    if component is not None:
+        answer = [r for r in answer if r.get("component") == component]
+    if command is not None:
+        answer = [r for r in answer if r.get("command") == command]
+    if phase is not None:
+        answer = [r for r in answer if r.get("phase") == phase]
+    if rc is not None:
+        answer = [r for r in answer if r.get("rc") == rc]
+    return answer
+
+acquires = chosen("lease", "acquire", "end", 0)
+if len(acquires) != 1:
+    raise SystemExit("one successful acquire required")
+token = acquires[0].get("stdout", "").strip()
+if not token:
+    raise SystemExit("empty acquire token")
+
+begin_starts = chosen("attest", "begin-authority", "start")
+begins = chosen("attest", "begin-authority", "end")
+if (
+    len(begin_starts) != 1 or len(begins) != 1 or begins[0].get("rc") != 0
+    or begins[0].get("args", [])[-1:] != [token]
+):
+    raise SystemExit("exact old-token begin missing")
+
+write_starts = chosen("attest", "write", "start")
+writes = chosen("attest", "write", "end")
+if len(write_starts) != 1 or len(writes) != 1 or writes[0].get("rc") != 0:
+    raise SystemExit("successful write-set is not exactly one publication")
+write = writes[0]
+if (
+    len(write.get("args", [])) <= 2
+    or write["args"][2] != "authority-one"
+    or write["args"][-2:] != ["--authority", token]
+    or not acquires[0]["_seq"] < begin_starts[0]["_seq"] < begins[0]["_seq"] < write["_seq"]
+):
+    raise SystemExit("exact authority-one publication missing")
+if chosen("attest", "invalidate", "start"):
+    raise SystemExit("unexpected invalidation in one-task run")
+
+def token_rows(component, command, phase, rc=None):
+    return [
+        r for r in chosen(component, command, phase, rc)
+        if r.get("args", [])[-1:] == [token]
+    ]
+
+release_starts = token_rows("lease", "release", "start")
+release_ends = token_rows("lease", "release", "end")
+all_release_starts = chosen("lease", "release", "start")
+all_release_ends = chosen("lease", "release", "end")
+finalize_starts = token_rows("attest", "finalize-authority", "start")
+finalize_ends = token_rows("attest", "finalize-authority", "end")
+all_finalize_starts = chosen("attest", "finalize-authority", "start")
+all_finalize_ends = chosen("attest", "finalize-authority", "end")
+
+if mode in ("release_refuse", "release_delete_fail"):
+    marker_name = "injected_" + mode
+    markers = chosen("lease", "release", marker_name)
+    if (len(release_starts) != 1 or len(release_ends) != 1
+            or len(all_release_starts) != 1 or len(all_release_ends) != 1
+            or len(markers) != 1):
+        raise SystemExit("exact injected release history missing")
+    if release_ends[0].get("rc") != 1 or all_finalize_starts or all_finalize_ends:
+        raise SystemExit("release fault did not fail closed")
+    if not write["_seq"] < release_starts[0]["_seq"] < markers[0]["_seq"] < release_ends[0]["_seq"]:
+        raise SystemExit("release fault ordering")
+    if mode == "release_delete_fail" and markers[0].get("delegated_rc") != 0:
+        raise SystemExit("forward release did not succeed before injected failure")
+elif mode == "finalize_fail":
+    markers = chosen("attest", "finalize-authority", "injected_finalize_fail")
+    if (len(release_starts) != 1 or len(release_ends) != 1
+            or len(all_release_starts) != 1 or len(all_release_ends) != 1
+            or release_ends[0].get("rc") != 0):
+        raise SystemExit("clean release missing")
+    if (len(finalize_starts) != 1 or len(finalize_ends) != 1
+            or len(all_finalize_starts) != 1 or len(all_finalize_ends) != 1
+            or len(markers) != 1):
+        raise SystemExit("exact injected finalize history missing")
+    if finalize_ends[0].get("rc") != 1:
+        raise SystemExit("injected finalize did not report failure")
+    if not write["_seq"] < release_ends[0]["_seq"] < finalize_starts[0]["_seq"] < markers[0]["_seq"] < finalize_ends[0]["_seq"]:
+        raise SystemExit("finalize fault ordering")
+elif mode in ("replace_after_write", "replace_final_guard"):
+    injected = chosen(phase="injected_successor")
+    empty_claims = [
+        r for r in chosen("taskval", "claim", "end", 0)
+        if not r.get("stdout", "").strip()
+    ]
+    if all_release_starts or all_release_ends or all_finalize_starts or all_finalize_ends:
+        raise SystemExit("lease-loss path attempted finalize")
+    write_point = write_starts[0] if mode == "replace_after_write" else write
+    if len(injected) != 1 or not write_point["_seq"] < injected[0]["_seq"]:
+        raise SystemExit("successor did not follow old provisional publication")
+    if mode == "replace_final_guard" and (
+        len(empty_claims) != 1 or not injected[0]["_seq"] < empty_claims[0]["_seq"]
+    ):
+        raise SystemExit("final-guard successor was not observed before empty claim returned")
+elif mode == "crash_finalize":
+    crash = chosen("attest", "finalize-authority", "crash_before_finalize")
+    if (len(release_starts) != 1 or len(release_ends) != 1
+            or len(all_release_starts) != 1 or len(all_release_ends) != 1
+            or release_ends[0].get("rc") != 0
+            or len(finalize_starts) != 1 or len(all_finalize_starts) != 1
+            or len(crash) != 1):
+        raise SystemExit("crash history missing")
+    if not write["_seq"] < release_ends[0]["_seq"] < finalize_starts[0]["_seq"] < crash[0]["_seq"]:
+        raise SystemExit("crash ordering")
+elif mode == "successor_after_release":
+    delegated = chosen("lease", "release", "delegated_release_success")
+    injected = chosen(phase="injected_successor")
+    if (len(release_starts) != 1 or len(release_ends) != 1
+            or len(all_release_starts) != 1 or len(all_release_ends) != 1
+            or release_ends[0].get("rc") != 0):
+        raise SystemExit("clean old release history missing")
+    if len(delegated) != 1 or len(injected) != 1:
+        raise SystemExit("successor injection history missing")
+    if (len(finalize_starts) != 1 or len(finalize_ends) != 1
+            or len(all_finalize_starts) != 1 or len(all_finalize_ends) != 1
+            or finalize_ends[0].get("rc") != 1):
+        raise SystemExit("stale old finalize did not fail")
+    if not (
+        write["_seq"] < release_starts[0]["_seq"]
+        < delegated[0]["_seq"] < injected[0]["_seq"]
+        < release_ends[0]["_seq"] < finalize_starts[0]["_seq"]
+        < finalize_ends[0]["_seq"]
+    ):
+        raise SystemExit("successor/finalize ordering")
+else:
+    raise SystemExit("unknown mode")
+PYPHASECHECK
+
+one_phase_ok() {
+  "$PY3" "$WORK/h004-one-phase-check.py" "$1" "$2" >/dev/null 2>&1
+}
+
+# K18b: BEGIN-failure och korrupt authority-store stannar före claim/event,
+# session, publication och finalize. Acquire/release får ske för ren cleanup.
+run_variant "$WORK/k18-begin-fail" begin_fail "$WORK/h004-one.json" h004-begin-fail
+begin_fail_ok=0
+if [ "$V_RC" -eq 1 ] && [ "${V_EVENTS:-x}" = "0" ] \
+   && [ "${V_WORKERS:-0}" = "0" ] && [ "$V_BEGIN_START" = "1" ] \
+   && [ "$V_INJECT_BEGIN_FAIL" = "1" ] \
+   && [ "$V_AUTH_WRITE_START" = "0" ] && [ "$V_CLAIM_START" = "0" ] \
+   && [ "$V_WORKSPACE_START" = "0" ] && [ "$V_SESSION_START" = "0" ] \
+   && [ "$V_FINALIZE_START" = "0" ]; then
+  begin_fail_ok=1
+fi
+
+COR18="$WORK/k18-corrupt"
+mkdir -p "$COR18-att"
+"$TRACE_REPO/controller/attest/cli.real" "$COR18-att" write corrupt-seed "$(sha_for 4180)" >/dev/null 2>&1
+corrupted18=$(python3 -c 'import pathlib,sys
+root=pathlib.Path(sys.argv[1]); count=0
+for path in root.rglob("*"):
+    if path.is_file() and not path.is_symlink():
+        path.write_bytes(b"nortropic-partial-authority-state")
+        count += 1
+print(count)
+raise SystemExit(0 if count else 1)' "$COR18-att" 2>/dev/null); corrupted18_rc=$?
+if [ "$corrupted18_rc" -ne 0 ]; then
+  echo "SKIP  K18b corrupt-state fixture — ingen katalogbunden state kunde prepareras, ODÖMBART"
+  exit 2
+fi
+run_variant "$COR18" normal "$WORK/h004-one.json" h004-corrupt
+corrupt_begin_ok=0
+if [ "$V_RC" -eq 1 ] && [ "${V_EVENTS:-x}" = "0" ] \
+   && [ "${V_WORKERS:-0}" = "0" ] && [ "$V_BEGIN_START" = "1" ] \
+   && [ "$V_AUTH_WRITE_START" = "0" ] && [ "$V_CLAIM_START" = "0" ] \
+   && [ "$V_WORKSPACE_START" = "0" ] && [ "$V_SESSION_START" = "0" ] \
+   && [ "$V_FINALIZE_START" = "0" ]; then
+  corrupt_begin_ok=1
+fi
+
+if [ "$begin_fail_ok" -eq 1 ] && [ "$corrupt_begin_ok" -eq 1 ] && [ "$corrupted18" -gt 0 ]; then
+  ok "K18b BEGIN failure/corruption vägras före event, worker, publication och finalize"
+else
+  no "K18b BEGIN failure" "injected-ok=$begin_fail_ok corrupt-ok=$corrupt_begin_ok"
+fi
+
+# K22: två release-failure-former och en finalize-failure. Reported release
+# failure får ALDRIG följas av finalize — även om systern hann delete:a bytes.
+run_variant "$WORK/k22-release-refuse" release_refuse "$WORK/h004-one.json" h004-release-refuse
+rr_valid=0
+"$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --require-valid >/dev/null 2>&1 || rr_valid=$?
+rr_bound=1
+[ -n "$V_TOKEN" ] && "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --authority "$V_TOKEN" >/dev/null 2>&1 && rr_bound=0
+rr_phase=1
+one_phase_ok "$V_TRACE" release_refuse && rr_phase=0
+rr_ok=0
+if [ "$V_RC" -eq 1 ] && [ "${V_WORKERS:-0}" = "1" ] \
+   && [ "$V_INJECT_RELEASE_REFUSE" = "1" ] \
+   && [ "$V_FINALIZE_START" = "0" ] && [ "$rr_valid" -ne 0 ] \
+   && [ "$rr_bound" -eq 0 ] && [ "$rr_phase" -eq 0 ]; then
+  rr_ok=1
+fi
+if [ -n "$V_TOKEN" ]; then
+  "$TRACE_REPO/controller/lease/cli.real" "$V_PREFIX-lease" release h004-release-refuse "$V_TOKEN" >/dev/null 2>&1 || true
+fi
+
+run_variant "$WORK/k22-release-delete" release_delete_fail "$WORK/h004-one.json" h004-release-delete
+rd_valid=0
+"$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --require-valid >/dev/null 2>&1 || rd_valid=$?
+rd_bound=1
+[ -n "$V_TOKEN" ] && "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --authority "$V_TOKEN" >/dev/null 2>&1 && rd_bound=0
+rd_owner=0
+"$TRACE_REPO/controller/lease/cli.real" "$V_PREFIX-lease" owner h004-release-delete >/dev/null 2>&1 || rd_owner=$?
+rd_phase=1
+one_phase_ok "$V_TRACE" release_delete_fail && rd_phase=0
+rd_ok=0
+if [ "$V_RC" -eq 1 ] && [ "${V_WORKERS:-0}" = "1" ] \
+   && [ "$V_INJECT_RELEASE_DELETE" = "1" ] \
+   && [ "$V_FINALIZE_START" = "0" ] && [ "$rd_valid" -ne 0 ] \
+   && [ "$rd_bound" -eq 0 ] && [ "$rd_owner" -ne 0 ] && [ "$rd_phase" -eq 0 ]; then
+  rd_ok=1
+fi
+
+run_variant "$WORK/k22-finalize-fail" finalize_fail "$WORK/h004-one.json" h004-finalize-fail
+ff_valid=0
+"$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --require-valid >/dev/null 2>&1 || ff_valid=$?
+ff_bound=1
+[ -n "$V_TOKEN" ] && "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --authority "$V_TOKEN" >/dev/null 2>&1 && ff_bound=0
+ff_phase=1
+one_phase_ok "$V_TRACE" finalize_fail && ff_phase=0
+ff_ok=0
+if [ "$V_RC" -eq 1 ] && [ "${V_WORKERS:-0}" = "1" ] \
+   && [ "$V_FINALIZE_START" = "1" ] && [ "$V_FINALIZE_END" = "1" ] \
+   && [ "$V_INJECT_FINALIZE_FAIL" = "1" ] \
+   && [ "$ff_valid" -ne 0 ] && [ "$ff_bound" -eq 0 ] && [ "$ff_phase" -eq 0 ]; then
+  ff_ok=1
+fi
+
+if [ "$rr_ok" -eq 1 ] && [ "$rd_ok" -eq 1 ] && [ "$ff_ok" -eq 1 ]; then
+  ok "K22 failure validity: release/finalize failures ger ingen finalize-after-release-failure och noll batch-validity"
+else
+  no "K22 failure validity" "release-refuse/delete/finalize=$rr_ok/$rd_ok/$ff_ok bound=$rr_bound/$rd_bound/$ff_bound phase=$rr_phase/$rd_phase/$ff_phase"
+fi
+
+# K14b — hela scalarfamiljen döms via loopens publika run-effekt. Ogiltiga
+# bool/string/zero/negative/NaN/Inf och heartbeat>=TTL får inte ens nå acquire.
+cat > "$WORK/h004-config-matrix.py" <<'PYCONFIG'
+import json
+import math
+import os
+import pathlib
+import subprocess
+import sys
+
+repo = pathlib.Path(sys.argv[1])
+work = pathlib.Path(sys.argv[2])
+spec = pathlib.Path(sys.argv[3])
+base_sha = sys.argv[4]
+deadline = pathlib.Path(sys.argv[5])
+loop = repo / "controller/loop/cli"
+work.mkdir(parents=True, exist_ok=True)
+canary = work / "session-canary.py"
+canary.write_text(
+    "import os,pathlib\n"
+    "pathlib.Path(os.environ['H004_WORKER_COUNT']).write_text('started\\n', encoding='utf-8')\n",
+    encoding="utf-8",
+)
+invalid = []
+for field in ("lease_ttl_s", "lease_heartbeat_s"):
+    for value in (None, True, "1", [], {}, 0, -1, math.nan, math.inf):
+        invalid.append({field: value})
+invalid += [
+    {"lease_ttl_s": 1, "lease_heartbeat_s": 1},
+    {"lease_ttl_s": 1, "lease_heartbeat_s": 2},
+]
+
+for index, extra in enumerate(invalid):
+    prefix = work / f"case-{index}"
+    config = {
+        "spec": str(spec),
+        "attest_dir": str(prefix) + "-att",
+        "state_dir": str(prefix) + "-state",
+        "lease_dir": str(prefix) + "-lease",
+        "lease_resurs": f"bad-config-{index}",
+        "workspace_rot": str(prefix) + "-ws",
+        "base_sha": base_sha,
+        "worker_cmd": [sys.executable, str(canary)],
+        "timeout_s": 2,
+        "verifier_id": "check-invariants",
+        "run_id": f"bad-config-{index}",
+        "brytare_rot": str(prefix) + "-breaker",
+        "budget": 1,
+        "troskel": 2,
+        "lease_ttl_s": 2,
+        "lease_heartbeat_s": 0.2,
+        **extra,
+    }
+    path = prefix.with_suffix(".json")
+    path.write_text(json.dumps(config, allow_nan=True), encoding="utf-8")
+    trace = prefix.with_suffix(".trace")
+    trace.write_text("", encoding="utf-8")
+    env = os.environ | {
+        "H004_TRACE": str(trace),
+        "H004_MODE": "normal",
+        "H004_HARNESS_PID": str(os.getpid()),
+        "H004_WORKER_COUNT": str(prefix) + ".workers",
+        "H004_B_MARK": str(prefix) + ".bmark",
+        "H004_B_CONTINUE": str(prefix) + ".continue",
+    }
+    try:
+        answer = subprocess.run(
+            [sys.executable, str(deadline), "30", str(loop), "run", str(path)],
+            cwd=repo, env=env, capture_output=True, timeout=40,
+        )
+    except subprocess.TimeoutExpired:
+        print("descendant-aware deadline helper hung", file=sys.stderr)
+        raise SystemExit(3)
+    if answer.returncode == 126:
+        print("descendant-aware deadline process probe failed", file=sys.stderr)
+        raise SystemExit(3)
+    try:
+        rows = [json.loads(line) for line in trace.read_text().splitlines() if line.strip()]
+        if any(not isinstance(row, dict) for row in rows):
+            raise ValueError("non-object trace row")
+    except Exception as exc:
+        print(f"malformed config trace: {exc}", file=sys.stderr)
+        raise SystemExit(3)
+    mutating_commands = {
+        ("lease", "acquire"), ("lease", "renew"), ("lease", "release"),
+        ("attest", "begin-authority"), ("attest", "write"),
+        ("attest", "finalize-authority"), ("attest", "invalidate"),
+        ("taskval", "claim"), ("state", "append"),
+        ("workspace", "create"), ("launch", "run"),
+    }
+    side_effect = any(
+        row.get("phase") == "start"
+        and (row.get("component"), row.get("command")) in mutating_commands
+        for row in rows
+    )
+    events = pathlib.Path(str(prefix) + "-state") / "events.jsonl"
+    event_effect = events.is_file() and events.stat().st_size > 0
+    authority_artifact = any(
+        candidate.is_file() or candidate.is_symlink()
+        for root in (
+            pathlib.Path(str(prefix) + "-lease"),
+            pathlib.Path(str(prefix) + "-att"),
+        )
+        if root.exists()
+        for candidate in root.rglob("*")
+    )
+    escaped_effect = pathlib.Path(str(prefix) + "-ws").exists() or pathlib.Path(
+        str(prefix) + ".workers"
+    ).exists()
+    if answer.returncode != 1 or side_effect or event_effect or authority_artifact or escaped_effect:
+        raise SystemExit(f"case {index} accepterades/berörde authority: {extra!r}, rc={answer.returncode}")
+
+print(f"{len(invalid)} invalid timing configs refused pre-authority")
+PYCONFIG
+
+config14b=$(python3 "$WORK/h004-config-matrix.py" "$TRACE_REPO" "$WORK/k14b" "$WORK/h004-empty.json" "$TRACE_BAS" "$WORK/h004-deadline.py" 2>&1); config14b_rc=$?
+if [ "$config14b_rc" -eq 0 ]; then
+  ok "K14b configfamilj: null/bool/string/collection/icke-positiv/icke-finite och heartbeat>=TTL vägras före authority/session"
+elif [ "$config14b_rc" -eq 3 ]; then
+  echo "SKIP  K14b configfamilj — trace/processgrupp kunde inte bedömas, ODÖMBART"
+  exit 2
+else
+  no "K14b configfamilj" "${config14b:-config-matrix exit $config14b_rc}"
+fi
+
+# K14c — defaultvärden mäts på effekt, inte source. Omitted config ska skicka
+# TTL 180 till acquire och ge första serialized renew omkring 30 sekunder.
+cat > "$WORK/h004-default-worker.py" <<'PYDEFAULTWORK'
+import json
+import os
+import pathlib
+import sys
+import time
+json.load(sys.stdin)
+pathlib.Path(os.environ["H004_WORKER_COUNT"]).write_text("started\n", encoding="utf-8")
+time.sleep(31.2)
+target=pathlib.Path("tests/h004-authority-fixture")
+target.mkdir(parents=True, exist_ok=True)
+(target/"default.txt").write_text("default\n", encoding="utf-8")
+print("default worker klar")
+PYDEFAULTWORK
+
+P14C="$WORK/k14c-default"
+T14C="$P14C.trace"
+cat > "$P14C.json" <<JSON
+{
+  "spec": "$WORK/h004-one.json",
+  "attest_dir": "$P14C-att",
+  "state_dir": "$P14C-state",
+  "lease_dir": "$P14C-lease",
+  "lease_resurs": "h004-default",
+  "workspace_rot": "$P14C-ws",
+  "base_sha": "$TRACE_BAS",
+  "worker_cmd": ["$PY3", "$WORK/h004-default-worker.py"],
+  "timeout_s": 40,
+  "verifier_id": "check-invariants",
+  "run_id": "h004-default",
+  "brytare_rot": "$P14C-breaker",
+  "budget": 1,
+  "troskel": 2
+}
+JSON
+mkdir -p "$P14C-ws"
+"$TRACE_REPO/controller/state/cli.real" init "$P14C-state" >/dev/null 2>&1
+: > "$T14C"
+rm -f "$P14C.workers" "$P14C.default-acquired" "$P14C.default-immediate-closed" "$P14C.default-window-open" \
+  "$P14C.default-window-closed" "$P14C.default-timer-ready"
+"$PY3" - "$P14C.default-acquired" "$P14C.default-immediate-closed" "$P14C.default-window-open" \
+  "$P14C.default-window-closed" "$P14C.default-timer-ready" <<'PYDEFAULTTIMER' &
+import pathlib
+import sys
+import time
+
+acquired, immediate_closed, opened, closed, ready = map(pathlib.Path, sys.argv[1:])
+ready.write_text("ready\n", encoding="utf-8")
+for _ in range(400):
+    if acquired.exists():
+        break
+    time.sleep(0.05)
+else:
+    raise SystemExit(3)
+time.sleep(2)
+immediate_closed.write_text("closed\n", encoding="utf-8")
+time.sleep(25)
+opened.write_text("open\n", encoding="utf-8")
+time.sleep(9)
+closed.write_text("closed\n", encoding="utf-8")
+PYDEFAULTTIMER
+H004_DEFAULT_TIMER_PID=$!
+default_timer_i=0
+while [ ! -s "$P14C.default-timer-ready" ] \
+  && kill -0 "$H004_DEFAULT_TIMER_PID" 2>/dev/null \
+  && [ "$default_timer_i" -lt 100 ]; do
+  sleep 0.02
+  default_timer_i=$((default_timer_i + 1))
+done
+if [ ! -s "$P14C.default-timer-ready" ]; then
+  kill "$H004_DEFAULT_TIMER_PID" >/dev/null 2>&1 || true
+  wait "$H004_DEFAULT_TIMER_PID" >/dev/null 2>&1 || true
+  H004_DEFAULT_TIMER_PID=""
+  echo "SKIP  K14c default-timer — central monotonic timer startade inte, ODÖMBART"
+  exit 2
+fi
+(
+  cd "$TRACE_REPO" || exit 1
+  H004_TRACE="$T14C" \
+  H004_MODE=default_timing \
+  H004_HARNESS_PID="$$" \
+  H004_WORKER_COUNT="$P14C.workers" \
+  H004_B_MARK="$P14C.bmark" \
+  H004_B_CONTINUE="$P14C.continue" \
+  H004_DEFAULT_ACQUIRED="$P14C.default-acquired" \
+  H004_DEFAULT_IMMEDIATE_CLOSED="$P14C.default-immediate-closed" \
+  H004_DEFAULT_WINDOW_OPEN="$P14C.default-window-open" \
+  H004_DEFAULT_WINDOW_CLOSED="$P14C.default-window-closed" \
+  "$PY3" "$WORK/h004-deadline.py" 90 ./controller/loop/cli run "$P14C.json"
+) >"$P14C.out" 2>"$P14C.err"
+default14c_run=$?
+if [ -n "${H004_DEFAULT_TIMER_PID:-}" ]; then
+  kill "$H004_DEFAULT_TIMER_PID" >/dev/null 2>&1 || true
+  wait "$H004_DEFAULT_TIMER_PID" >/dev/null 2>&1 || true
+  H004_DEFAULT_TIMER_PID=""
+fi
+deadline_probe_or_od "$default14c_run" "K14c deadline"
+if ! trace_valid "$T14C"; then
+  echo "SKIP  K14c trace-rigg — malformed/partial trace, ODÖMBART"
+  exit 2
+fi
+default14c=$(python3 -c 'import json,sys
+rows=[json.loads(x) for x in open(sys.argv[1]) if x.strip()]
+for seq,row in enumerate(rows): row["_seq"]=seq
+acq=[r for r in rows if r.get("component")=="lease" and r.get("command")=="acquire" and r.get("phase")=="end" and r.get("rc")==0]
+renew_start=[r for r in rows if r.get("component")=="lease" and r.get("command")=="renew" and r.get("phase")=="start"]
+renew_end=[r for r in rows if r.get("component")=="lease" and r.get("command")=="renew" and r.get("phase")=="end" and r.get("rc")==0]
+success_pids={r["pid"] for r in renew_end}
+renew_start=[r for r in renew_start if r["pid"] in success_pids]
+launch_start=[r for r in rows if r.get("component")=="launch" and r.get("command")=="run" and r.get("phase")=="start"]
+launch_end=[r for r in rows if r.get("component")=="launch" and r.get("command")=="run" and r.get("phase")=="end" and r.get("rc")==0]
+claims=[r for r in rows if r.get("component")=="taskval" and r.get("command")=="claim" and r.get("phase")=="end" and r.get("rc")==0]
+release_start=[r for r in rows if r.get("component")=="lease" and r.get("command")=="release" and r.get("phase")=="start"]
+if len(acq)!=1 or len(launch_start)!=1 or len(launch_end)!=1 or len(release_start)!=1: raise SystemExit("acquire/session/release saknas")
+args=acq[0]["args"]
+if "--ttl" not in args or float(args[args.index("--ttl")+1]) != 180.0: raise SystemExit("TTL-default är inte 180")
+periodic=[r for r in renew_start if launch_start[0]["_seq"] < r["_seq"] < launch_end[0]["_seq"]]
+if not periodic: raise SystemExit("periodiskt heartbeat saknas medan workern lever")
+periodic.sort(key=lambda r:r["_seq"])
+window=[r for r in periodic if r.get("default_heartbeat_window") is True]
+if not window: raise SystemExit("heartbeat-default saknar renew i central monotonic 27–36 s-window")
+outside=[r for r in periodic if r.get("default_heartbeat_window") is not True]
+if len(outside)>1 or any(r.get("default_immediate_window") is not True for r in outside):
+    raise SystemExit("default-heartbeat förnyade utanför en valfri immediate guard och 27–36 s-window")
+claims.sort(key=lambda r:r["_seq"])
+if not claims or claims[-1].get("stdout","").strip(): raise SystemExit("terminalt empty claim saknas")
+guards=[r for r in renew_end if claims[-1]["_seq"] < r["_seq"] < release_start[0]["_seq"]]
+if not guards: raise SystemExit("post-drain guard saknas")
+ends_by_pid={r["pid"]:r for r in [x for x in rows if x.get("component")=="lease" and x.get("command")=="renew" and x.get("phase")=="end"]}
+if any(r["pid"] not in ends_by_pid or ends_by_pid[r["pid"]]["_seq"] >= release_start[0]["_seq"] for r in [x for x in rows if x.get("component")=="lease" and x.get("command")=="renew" and x.get("phase")=="start"]): raise SystemExit("heartbeat var inte joined före release")
+print(f"ttl=180 periodic-window={len(window)} guards={len(guards)}")' "$T14C" 2>&1); default14c_rc=$?
+default14c_valid=1
+"$TRACE_REPO/controller/attest/cli.real" "$P14C-att" read authority-one --require-valid >/dev/null 2>&1 && default14c_valid=0
+if [ "$default14c_run" -eq 0 ] && [ "$default14c_rc" -eq 0 ] && [ "$default14c_valid" -eq 0 ]; then
+  ok "K14c defaults: omitted config ger TTL/heartbeat 180/30 på observerbar run-effekt"
+else
+  no "K14c defaults" "run/trace/valid=$default14c_run/${default14c:-exit $default14c_rc}/$default14c_valid"
+fi
+
+successor_intact() {
+  python3 -c 'import json,pathlib,sys
+try:
+    meta=json.load(open(sys.argv[1]))
+    path=pathlib.Path(meta["lease_file"])
+    ok=path.is_file() and path.read_bytes().hex()==meta["bytes_hex"] and bool(meta["token"])
+except Exception:
+    ok=False
+raise SystemExit(0 if ok else 1)' "$1"
+}
+
+successor_token() {
+  python3 -c 'import json,sys
+try: print(json.load(open(sys.argv[1]))["token"])
+except Exception: print("")' "$1"
+}
+
+successor_authority_intact() {
+  python3 -c 'import json,subprocess,sys
+try:
+    meta=json.load(open(sys.argv[1]))
+    answer=subprocess.run(
+        [sys.argv[2],sys.argv[3],"read",meta["authority_task"],"--authority",meta["token"]],
+        capture_output=True,text=True,timeout=10,
+    )
+    post=json.loads(answer.stdout) if answer.returncode==0 else None
+    ok=(isinstance(post,dict) and post.get("task")==meta["authority_task"]
+        and post.get("candidate_sha")==meta["authority_sha"])
+except Exception:
+    ok=False
+raise SystemExit(0 if ok else 1)' "$1" "$TRACE_REPO/controller/attest/cli.real" "$2"
+}
+
+k23_guard_observed() {
+  python3 -c 'import json,pathlib,sys
+rows=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.strip()]
+for seq,row in enumerate(rows): row["_seq"]=seq
+acq=[r for r in rows if r.get("component")=="lease" and r.get("command")=="acquire" and r.get("phase")=="end" and r.get("rc")==0]
+injected=[r for r in rows if r.get("phase")=="injected_successor"]
+if len(acq)!=1 or len(injected)!=1: raise SystemExit(1)
+token=acq[0].get("stdout","").strip()
+lease_args=acq[0].get("args",[])
+if len(lease_args)<3: raise SystemExit(1)
+lease_dir,resource=lease_args[0],lease_args[2]
+claims=[r for r in rows if r.get("component")=="taskval" and r.get("command")=="claim" and r.get("phase")=="end"]
+if len(claims)!=2 or any(r.get("rc")!=0 for r in claims): raise SystemExit(1)
+claims.sort(key=lambda r:r["_seq"])
+if [r.get("stdout","").strip() for r in claims] != ["authority-one",""]: raise SystemExit(1)
+if any(r.get("args",[])[-2:] != ["--authority",token] for r in claims): raise SystemExit(1)
+empty=claims[-1]
+if not injected[0]["_seq"] < empty["_seq"]: raise SystemExit(1)
+if injected[0].get("before_heartbeat_deadline") is not True: raise SystemExit(2)
+starts=[r for r in rows if r.get("component")=="lease" and r.get("command")=="renew" and r.get("phase")=="start" and r.get("args",[])==[lease_dir,"renew",resource,token] and r["_seq"]>empty["_seq"] and r.get("before_heartbeat_deadline") is True]
+ends={r["pid"]:r for r in rows if r.get("component")=="lease" and r.get("command")=="renew" and r.get("phase")=="end"}
+guards=[(s,ends.get(s["pid"])) for s in starts]
+guards=[(s,e) for s,e in guards if e is not None and e.get("rc")!=0 and e["_seq"]>s["_seq"]]
+if not guards: raise SystemExit(1)
+release=[r for r in rows if r.get("component")=="lease" and r.get("command")=="release" and r.get("phase")=="start"]
+if release and min(r["_seq"] for r in release) < min(e["_seq"] for _,e in guards): raise SystemExit(1)
+' "$1"
+}
+
+k24_crash_ordered() {
+  python3 -c 'import json,pathlib,sys
+rows=[json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.strip()]
+for seq,row in enumerate(rows): row["_seq"]=seq
+acq=[r for r in rows if r.get("component")=="lease" and r.get("command")=="acquire" and r.get("phase")=="end" and r.get("rc")==0]
+if len(acq)!=1: raise SystemExit(1)
+token=acq[0].get("stdout","").strip()
+release=[r for r in rows if r.get("component")=="lease" and r.get("command")=="release" and r.get("phase")=="end" and r.get("rc")==0 and r.get("args",[])[-1:]==[token]]
+finalize=[r for r in rows if r.get("component")=="attest" and r.get("command")=="finalize-authority" and r.get("phase")=="start" and r.get("args",[])[-1:]==[token]]
+crash=[r for r in rows if r.get("component")=="attest" and r.get("command")=="finalize-authority" and r.get("phase")=="crash_before_finalize"]
+if len(release)!=1 or len(finalize)!=1 or len(crash)!=1: raise SystemExit(1)
+if not release[0]["_seq"] < finalize[0]["_seq"] < crash[0]["_seq"]: raise SystemExit(1)
+if not isinstance(crash[0].get("run_pid"),int): raise SystemExit(1)
+' "$1"
+}
+
+# K13b — lease loss installeras omedelbart efter det lyckade task-resultatets
+# publication-anrop. Trace-domaren kräver exact authority-bunden PROVISIONAL
+# write och förbjuder legacy-valid write, INVALIDATE-rollback, release och
+# finalize; successor lease + authority måste överleva exakt.
+run_variant "$WORK/k13-trace-loss" replace_after_write "$WORK/h004-one.json" h004-midrun-loss
+k13b_phase=1
+one_phase_ok "$V_TRACE" replace_after_write && k13b_phase=0
+k13b_valid=0
+"$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --require-valid >/dev/null 2>&1 || k13b_valid=$?
+k13b_successor=1
+successor_intact "$V_SUCCESSOR" && k13b_successor=0
+k13b_preanchor=1
+successor_authority_intact "$V_SUCCESSOR" "$V_PREFIX-att" && k13b_preanchor=0
+k13b_owner=1
+"$TRACE_REPO/controller/lease/cli.real" "$V_PREFIX-lease" owner h004-midrun-loss >/dev/null 2>&1 && k13b_owner=0
+if [ "$V_RC" -eq 1 ] && [ "${V_WORKERS:-0}" = "1" ] \
+   && [ "$V_FINALIZE_START" = "0" ] && [ "$k13b_valid" -ne 0 ] \
+   && [ "$k13b_successor" -eq 0 ] && [ "$k13b_preanchor" -eq 0 ] \
+   && [ "$k13b_owner" -eq 0 ] && [ "$k13b_phase" -eq 0 ]; then
+  ok "K13b mid-run lease-loss: provisional-only path utan valid→invalidate och successor överlever"
+else
+  no "K13b mid-run lease-loss" "run/workers/finalize/valid/successor/preanchor/owner/phase=$V_RC/${V_WORKERS:-x}/$V_FINALIZE_START/$k13b_valid/$k13b_successor/$k13b_preanchor/$k13b_owner/$k13b_phase"
+fi
+k13b_token=$(successor_token "$V_SUCCESSOR")
+if [ -n "$k13b_token" ]; then
+  "$TRACE_REPO/controller/lease/cli.real" "$V_PREFIX-lease" release h004-midrun-loss "$k13b_token" >/dev/null 2>&1 || true
+  "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" finalize-authority "$k13b_token" >/dev/null 2>&1 || true
+fi
+
+# K23 — deterministic final-guard barrier: när sista taskval-claim svarar tomt
+# ersätter harnessen lease + begins successor innan loopen får fortsätta.
+run_variant "$WORK/k23-final-guard" replace_final_guard "$WORK/h004-one.json" h004-final-guard
+k23_phase=1
+one_phase_ok "$V_TRACE" replace_final_guard && k23_phase=0
+k23_valid=0
+"$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --require-valid >/dev/null 2>&1 || k23_valid=$?
+k23_successor=1
+successor_intact "$V_SUCCESSOR" && k23_successor=0
+k23_owner=1
+"$TRACE_REPO/controller/lease/cli.real" "$V_PREFIX-lease" owner h004-final-guard >/dev/null 2>&1 && k23_owner=0
+k23_guard=1
+k23_guard_observed "$V_TRACE"; k23_guard_rc=$?
+if [ "$k23_guard_rc" -eq 2 ]; then
+  echo "SKIP  K23 guard-timer — terminal claim nådde central deadline, ODÖMBART"
+  exit 2
+elif [ "$k23_guard_rc" -eq 0 ]; then
+  k23_guard=0
+fi
+k23_token=$(successor_token "$V_SUCCESSOR")
+k23_preanchor=1
+successor_authority_intact "$V_SUCCESSOR" "$V_PREFIX-att" && k23_preanchor=0
+k23_authority=1
+if [ -n "$k23_token" ] \
+   && "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" write successor-k23 "$(sha_for 4230)" --authority "$k23_token" >/dev/null 2>&1 \
+   && "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read successor-k23 --authority "$k23_token" >/dev/null 2>&1; then
+  k23_authority=0
+fi
+if [ "$V_RC" -eq 1 ] && [ "${V_WORKERS:-0}" = "1" ] \
+   && [ "$V_FINALIZE_START" = "0" ] && [ "$k23_valid" -ne 0 ] \
+   && [ "$k23_successor" -eq 0 ] && [ "$k23_owner" -eq 0 ] \
+   && [ "$k23_guard" -eq 0 ] && [ "$k23_preanchor" -eq 0 ] \
+   && [ "$k23_authority" -eq 0 ] && [ "$k23_phase" -eq 0 ]; then
+  ok "K23 final lease-loss guard: ingen finalize och successor lease/authority överlever"
+else
+  no "K23 final lease-loss guard" "run/workers/finalize/valid/successor/owner/guard/preanchor/authority/phase=$V_RC/${V_WORKERS:-x}/$V_FINALIZE_START/$k23_valid/$k23_successor/$k23_owner/$k23_guard/$k23_preanchor/$k23_authority/$k23_phase"
+fi
+if [ -n "$k23_token" ]; then
+  "$TRACE_REPO/controller/lease/cli.real" "$V_PREFIX-lease" release h004-final-guard "$k23_token" >/dev/null 2>&1 || true
+  "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" finalize-authority "$k23_token" >/dev/null 2>&1 || true
+fi
+
+# K24 — release har svarat success, men wrappern dödar runprocessen precis när
+# finalize anropas och före mutation. Batchen måste förbli provisional/invalid.
+run_variant "$WORK/k24-crash" crash_finalize "$WORK/h004-one.json" h004-crash
+k24_phase=1
+one_phase_ok "$V_TRACE" crash_finalize && k24_phase=0
+k24_valid=0
+"$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --require-valid >/dev/null 2>&1 || k24_valid=$?
+k24_bound=1
+[ -n "$V_TOKEN" ] && "$TRACE_REPO/controller/attest/cli.real" "$V_PREFIX-att" read authority-one --authority "$V_TOKEN" >/dev/null 2>&1 && k24_bound=0
+k24_owner=0
+"$TRACE_REPO/controller/lease/cli.real" "$V_PREFIX-lease" owner h004-crash >/dev/null 2>&1 || k24_owner=$?
+k24_order=1
+k24_crash_ordered "$V_TRACE" && k24_order=0
+if [ "$V_RC" -eq 247 ] && [ "${V_WORKERS:-0}" = "1" ] \
+   && [ "$V_CRASH_MARK" = "1" ] && [ "$k24_order" -eq 0 ] \
+   && [ "$V_FINALIZE_START" = "1" ] && [ "$k24_valid" -ne 0 ] \
+   && [ "$k24_bound" -eq 0 ] && [ "$k24_owner" -ne 0 ] \
+   && [ "$k24_phase" -eq 0 ]; then
+  ok "K24 pre-publication crash: clean release följd av död före finalize-mutation lämnar noll valid batch"
+else
+  no "K24 pre-publication crash" "run/crash-marker/order/workers/finalize/valid/bound/owner/phase=$V_RC/$V_CRASH_MARK/$k24_order/${V_WORKERS:-x}/$V_FINALIZE_START/$k24_valid/$k24_bound/$k24_owner/$k24_phase"
+fi
+
+# K25 — successor acquire+BEGIN installeras EFTER lyckad old release men FÖRE
+# att release-wrappern återvänder. Old finalize ska då falla; äldre finalized
+# och legacy anchors ska däremot stå kvar (BEGIN är aldrig global wipe).
+P25="$WORK/k25-successor"
+mkdir -p "$P25-att"
+"$TRACE_REPO/controller/attest/cli.real" "$P25-att" write legacy-k25 "$(sha_for 4250)" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$P25-att" begin-authority prior-k25 >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$P25-att" write finalized-k25 "$(sha_for 4251)" --authority prior-k25 >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$P25-att" finalize-authority prior-k25 >/dev/null 2>&1
+run_variant "$P25" successor_after_release "$WORK/h004-one.json" h004-successor-window
+k25_phase=1
+one_phase_ok "$V_TRACE" successor_after_release && k25_phase=0
+k25_batch=0; k25_legacy=1; k25_final=1
+"$TRACE_REPO/controller/attest/cli.real" "$P25-att" read authority-one --require-valid >/dev/null 2>&1 || k25_batch=$?
+post_exact_cli "$TRACE_REPO/controller/attest/cli.real" "$P25-att" legacy-k25 "$(sha_for 4250)" && k25_legacy=0
+post_exact_cli "$TRACE_REPO/controller/attest/cli.real" "$P25-att" finalized-k25 "$(sha_for 4251)" && k25_final=0
+k25_successor=1
+successor_intact "$V_SUCCESSOR" && k25_successor=0
+k25_token=$(successor_token "$V_SUCCESSOR")
+k25_preanchor=1
+successor_authority_intact "$V_SUCCESSOR" "$P25-att" && k25_preanchor=0
+k25_authority=1
+if [ -n "$k25_token" ] \
+   && "$TRACE_REPO/controller/attest/cli.real" "$P25-att" write successor-k25 "$(sha_for 4252)" --authority "$k25_token" >/dev/null 2>&1 \
+   && "$TRACE_REPO/controller/attest/cli.real" "$P25-att" read successor-k25 --authority "$k25_token" >/dev/null 2>&1; then
+  k25_authority=0
+fi
+if [ "$V_RC" -eq 1 ] && [ "${V_WORKERS:-0}" = "1" ] \
+   && [ "$V_FINALIZE_START" = "1" ] && [ "$k25_batch" -ne 0 ] \
+   && [ "$k25_legacy" -eq 0 ] && [ "$k25_final" -eq 0 ] \
+   && [ "$k25_successor" -eq 0 ] && [ "$k25_preanchor" -eq 0 ] \
+   && [ "$k25_authority" -eq 0 ] && [ "$k25_phase" -eq 0 ]; then
+  ok "K25 successor window: new authority fencar old batch utan global wipe"
+else
+  no "K25 successor window" "run/workers/finalize/batch/anchors/successor/preanchor/authority/phase=$V_RC/${V_WORKERS:-x}/$V_FINALIZE_START/$k25_batch/$k25_legacy,$k25_final/$k25_successor/$k25_preanchor/$k25_authority/$k25_phase"
+fi
+if [ -n "$k25_token" ]; then
+  "$TRACE_REPO/controller/lease/cli.real" "$P25-lease" release h004-successor-window "$k25_token" >/dev/null 2>&1 || true
+  "$TRACE_REPO/controller/attest/cli.real" "$P25-att" finalize-authority "$k25_token" >/dev/null 2>&1 || true
+fi
+
+cat > "$WORK/h004-empty-trace.py" <<'PYEMPTY'
+import json
+import pathlib
+import sys
+
+rows = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.strip()]
+for seq,row in enumerate(rows): row["_seq"]=seq
+def choose(component, command, phase, rc=None):
+    found=[r for r in rows if r.get("component")==component and r.get("command")==command and r.get("phase")==phase]
+    return [r for r in found if rc is None or r.get("rc")==rc]
+acq=choose("lease","acquire","end",0)
+if len(acq)!=1 or not acq[0].get("stdout","").strip(): raise SystemExit("acquire")
+token=acq[0]["stdout"].strip()
+begin=choose("attest","begin-authority","end",0)
+begin_start=choose("attest","begin-authority","start")
+claim_start=choose("taskval","claim","start")
+claim=choose("taskval","claim","end",0)
+release=choose("lease","release","end",0)
+release_starts=choose("lease","release","start")
+release_ends=choose("lease","release","end")
+finalize_start=choose("attest","finalize-authority","start")
+finalize=choose("attest","finalize-authority","end",0)
+if (len(begin_start)!=1 or len(begin)!=1 or begin[0]["args"][-1]!=token
+        or not acq[0]["_seq"] < begin_start[0]["_seq"] < begin[0]["_seq"]): raise SystemExit("begin")
+if len(claim_start)!=1 or len(claim)!=1 or claim[0]["args"][-2:] != ["--authority",token] or claim[0].get("stdout","").strip(): raise SystemExit("claim")
+acq_args=acq[0].get("args",[])
+if len(acq_args)<3: raise SystemExit("acquire-args")
+expected_release=[acq_args[0],"release",acq_args[2],token]
+if (len(release_starts)!=1 or len(release_ends)!=1 or len(release)!=1
+        or release_starts[0].get("args",[])!=expected_release
+        or release[0].get("args",[])!=expected_release): raise SystemExit("release")
+if len(finalize_start)!=1 or len(finalize)!=1 or finalize[0]["args"][-1]!=token: raise SystemExit("finalize")
+if not (begin[0]["_seq"] < claim_start[0]["_seq"] < claim[0]["_seq"] < release[0]["_seq"] < finalize_start[0]["_seq"] < finalize[0]["_seq"]): raise SystemExit("order")
+release_start=release_starts[0]["_seq"]
+renews=choose("lease","renew","end",0)
+if not any(claim[0]["_seq"] < r["_seq"] < release_start for r in renews): raise SystemExit("guard")
+renew_starts=choose("lease","renew","start")
+renew_ends=choose("lease","renew","end")
+ends_by_pid={r["pid"]:r for r in renew_ends}
+if any(r["pid"] not in ends_by_pid or ends_by_pid[r["pid"]]["_seq"] >= release_start for r in renew_starts): raise SystemExit("heartbeat-not-joined")
+if choose("workspace","create","start") or choose("launch","run","start"): raise SystemExit("empty-run-session-effect")
+if choose("attest","write","start") or choose("attest","invalidate","start"): raise SystemExit("empty-run-unexpected-attest-mutation")
+print(token)
+PYEMPTY
+
+# K26 — en tom run-generation går igenom samma enda finalize och rör inga
+# tidigare giltiga resultat, event eller workers.
+P26="$WORK/k26-empty"
+mkdir -p "$P26-att"
+"$TRACE_REPO/controller/attest/cli.real" "$P26-att" write legacy-k26 "$(sha_for 4260)" >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$P26-att" begin-authority prior-k26 >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$P26-att" write finalized-k26 "$(sha_for 4261)" --authority prior-k26 >/dev/null 2>&1
+"$TRACE_REPO/controller/attest/cli.real" "$P26-att" finalize-authority prior-k26 >/dev/null 2>&1
+run_variant "$P26" release_delay "$WORK/h004-empty.json" h004-empty
+empty26=$(python3 "$WORK/h004-empty-trace.py" "$V_TRACE" 2>&1); empty26_rc=$?
+k26_anchor=1; k26_final_anchor=1
+post_exact_cli "$TRACE_REPO/controller/attest/cli.real" "$P26-att" legacy-k26 "$(sha_for 4260)" && k26_anchor=0
+post_exact_cli "$TRACE_REPO/controller/attest/cli.real" "$P26-att" finalized-k26 "$(sha_for 4261)" && k26_final_anchor=0
+if [ "$V_RC" -eq 0 ] && [ "$empty26_rc" -eq 0 ] \
+   && [ "${V_EVENTS:-x}" = "0" ] && [ "${V_WORKERS:-0}" = "0" ] \
+   && [ "$k26_anchor" -eq 0 ] && [ "$k26_final_anchor" -eq 0 ]; then
+  ok "K26 empty run: begin → guard/join → release → en tom finalize, äldre validitet bevaras"
+else
+  no "K26 empty run" "run/trace/events/workers/anchors=$V_RC/${empty26:-exit $empty26_rc}/${V_EVENTS:-x}/${V_WORKERS:-x}/$k26_anchor,$k26_final_anchor"
+fi
 
 summera
