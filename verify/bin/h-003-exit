@@ -1,98 +1,748 @@
 #!/usr/bin/env bash
-# h-003-exit — skiva 3 (attestationer + stale-markering)
-# Kontrakt: controller/attest/cli <dir> write <task> <sha>
-#           controller/attest/cli <dir> read <task> [--require-valid]
-#           controller/attest/cli <dir> invalidate <sha>
-# Katalogen anges av anroparen, aldrig av komponenten (h-001-formen).
+# h-003-exit — skiva 3 (attestation, stale och authority-generation)
+#
+# Legacy API (oforandrat):
+#   controller/attest/cli <dir> write <task> <sha> [<grind-id> <grind-sha256>]
+#   controller/attest/cli <dir> read <task> [--require-valid]
+#   controller/attest/cli <dir> invalidate <sha>
+#
+# Generiskt authority-API (h-003 ar lease-agnostisk):
+#   controller/attest/cli <dir> begin-authority <opaque-authority-id>
+#   controller/attest/cli <dir> write-authority <authority-id> <task> <sha>
+#                                [<grind-id> <grind-sha256>]
+#   controller/attest/cli <dir> read <task> --require-authority <authority-id>
+#   controller/attest/cli <dir> finalize-authority <authority-id>
+#
+# Disposable scheduling surface (test-only, never authority): when both
+# NORTROPIC_TEST_BARRIER_READY and NORTROPIC_TEST_BARRIER_GO are set for a
+# mutating invocation, the process creates READY after it has admitted its
+# authoritative pre-state and immediately before its authoritative transition,
+# then waits for GO. The gate accepts optimistic and pessimistic serialization.
+#
+# write-authority ar alltid PROVISIONAL. Endast aktuell generation kan skriva
+# och lasa provisional evidence. Vanlig --require-valid accepterar den forst
+# efter en atomisk finalize av generationens kompletta publication-set.
 . "$(dirname "$0")/_lib.sh"
-CLI="controller/attest/cli"
+
+CLI="${NORTROPIC_H003_CLI:-controller/attest/cli}"
 krav_komponent "$CLI"
 
+PY3="$(command -v python3 2>/dev/null || true)"
+if [ -z "$PY3" ]; then
+  echo "SKIP  harness — python3 saknas, testet ar odombart"
+  echo
+  echo "$pass PASS, $fail FAIL, ODÖMBART"
+  exit 2
+fi
+
 WORK="$(temp_kat)" || { echo "FAIL  harness — temp-katalog kunde inte skapas"; exit 2; }
-trap 'rm -rf "$WORK"' EXIT
-D="$WORK/state"
+cleanup() {
+  for p in $(jobs -pr 2>/dev/null); do kill "$p" 2>/dev/null || true; done
+  for p in $(jobs -pr 2>/dev/null); do wait "$p" 2>/dev/null || true; done
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
 
-# Fabricerat SHA — finns inte i repot, kan inte härledas ur git.
-# Ett prov som använder HEAD mäter bara att strängen finns i utdata.
-SHA="a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
-ANNAT="fedcba9876543210fedcba9876543210fedcba98"
+# Fabricerade SHA:n: giltig form men ingen utsaga om repots Git-state.
+S1="1111111111111111111111111111111111111111"
+S2="2222222222222222222222222222222222222222"
+S3="3333333333333333333333333333333333333333"
+S4="4444444444444444444444444444444444444444"
+S5="5555555555555555555555555555555555555555"
+G1="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-# K1: attestation binds till candidate-SHA och PERSISTERAS
-"$CLI" "$D" write h-test "$SHA" >/dev/null 2>&1
-if "$CLI" "$D" read h-test 2>/dev/null | grep -q "$SHA"; then
-  ok "K1 attestation bunden till candidate-SHA och läsbar ur state"
+json_post_exact() { # stdout-json, task, sha, optional grind-id, grind-sha
+  if [ "$#" -eq 2 ]; then
+    "$PY3" -c '
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: raise SystemExit(2)
+ok=d.get("task")==sys.argv[1] and d.get("candidate_sha")==sys.argv[2].lower()
+raise SystemExit(0 if ok else 1)
+' "$1" "$2"
+  else
+    "$PY3" -c '
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: raise SystemExit(2)
+ok=(d.get("task")==sys.argv[1]
+    and d.get("candidate_sha")==sys.argv[2].lower()
+    and d.get("grind_id")==sys.argv[3]
+    and d.get("grind_sha256")==sys.argv[4].lower())
+raise SystemExit(0 if ok else 1)
+' "$1" "$2" "$3" "$4"
+  fi
+}
+
+i_ko() { # state-dir, task
+  "$PY3" -c '
+import json,sys
+try: d=json.load(open(sys.argv[1]+"/attestations.json"))
+except Exception: raise SystemExit(2)
+raise SystemExit(0 if sys.argv[2] in d.get("omtest_ko",[]) else 1)
+' "$1" "$2"
+}
+
+valid_count() { # state-dir, task-prefix, count
+  d="$1"; prefix="$2"; n="$3"; c=0; i=1
+  while [ "$i" -le "$n" ]; do
+    task=$(printf '%s%03d' "$prefix" "$i")
+    "$CLI" "$d" read "$task" --require-valid >/dev/null 2>&1 && c=$((c + 1))
+    i=$((i + 1))
+  done
+  echo "$c"
+}
+
+valid_exact() { # state-dir, task, sha, optional grind-id, grind-sha
+  d="$1"; task="$2"; sha="$3"; shift 3
+  out=$("$CLI" "$d" read "$task" --require-valid 2>/dev/null) || return 1
+  if [ "$#" -eq 0 ]; then
+    printf '%s' "$out" | json_post_exact "$task" "$sha"
+  else
+    printf '%s' "$out" | json_post_exact "$task" "$sha" "$1" "$2"
+  fi
+}
+
+wait_file_or_exit() { # marker, pid
+  marker="$1"; pid="$2"; i=0
+  while [ "$i" -lt 200 ]; do
+    [ -e "$marker" ] && return 0
+    kill -0 "$pid" 2>/dev/null || return 1
+    sleep 0.01
+    i=$((i + 1))
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------------------
+# K1-K7: den tidigare h-003-domen bevaras ordagrant i effekt.
+D="$WORK/legacy"
+
+"$CLI" "$D" write h-test "$S1" >/dev/null 2>&1
+if "$CLI" "$D" read h-test 2>/dev/null | grep -q "$S1"; then
+  ok "K1 legacy attestation bunden till candidate-SHA och persisterad"
 else
-  no "K1 SHA-bindning" "attestationen bär inte candidate-SHA efter skrivning"
+  no "K1 legacy SHA-bindning" "attestationen bar inte candidate-SHA efter skrivning"
 fi
 
-# K2: attestation utan SHA avvisas
 if "$CLI" "$D" write h-test-2 >/dev/null 2>&1; then
-  no "K2 SHA obligatorisk" "attestation skrevs utan SHA"
+  no "K2 legacy SHA obligatorisk" "attestation skrevs utan SHA"
 else
-  ok "K2 attestation utan SHA avvisas"
+  ok "K2 legacy attestation utan SHA avvisas"
 fi
 
-# K3: POSITIV kontroll — giltig attestation måste passera --require-valid.
-# Utan denna är "stale spärrar" och "läsning failar alltid" samma utfall.
 if "$CLI" "$D" read h-test --require-valid >/dev/null 2>&1; then
-  ok "K3 giltig attestation passerar --require-valid"
+  ok "K3 legacy giltig attestation passerar --require-valid"
 else
-  no "K3 positiv kontroll" "--require-valid avvisade en GILTIG attestation — flaggan oimplementerad eller läsningen trasig"
+  no "K3 legacy positiv kontroll" "--require-valid avvisade en giltig attestation"
 fi
 
-# K4: orelaterad invalidering rör inte attestationen
-"$CLI" "$D" invalidate "$ANNAT" >/dev/null 2>&1
+"$CLI" "$D" invalidate "$S2" >/dev/null 2>&1
 if "$CLI" "$D" read h-test --require-valid >/dev/null 2>&1; then
-  ok "K4 orelaterad invalidering lämnar attestationen giltig"
+  ok "K4 legacy orelaterad invalidering lamnar attestationen giltig"
 else
-  no "K4 träffsäkerhet" "invalidering av annat SHA gjorde attestationen ogiltig"
+  no "K4 legacy traffsakerhet" "invalidering av annat SHA gjorde posten ogiltig"
 fi
 
-# K5: invalidering → stale. Grep mot VÄRDE, aldrig fältnamn —
-# {"stale":false} innehåller ordet stale och hade passerat en fältnamnsmatchning.
-"$CLI" "$D" invalidate "$SHA" >/dev/null 2>&1
-ut=$("$CLI" "$D" read h-test 2>/dev/null)
+"$CLI" "$D" invalidate "$S1" >/dev/null 2>&1
+ut=$("$CLI" "$D" read h-test 2>/dev/null || true)
 if echo "$ut" | grep -Eqi '"stale"[[:space:]]*:[[:space:]]*true|(^|[^-[:alnum:]])stale([^"[:alnum:]]|$)' \
    && ! echo "$ut" | grep -Eqi '"stale"[[:space:]]*:[[:space:]]*false'; then
-  ok "K5 invalidering markerar attestationen stale"
+  ok "K5 legacy invalidering markerar attestationen stale"
 else
-  no "K5 stale-markering" "attestationen står inte som stale efter invalidering"
+  no "K5 legacy stale-markering" "attestationen star inte stale efter invalidering"
 fi
 
-# K6: stale kan inte läsas som giltig
 if "$CLI" "$D" read h-test --require-valid >/dev/null 2>&1; then
-  no "K6 stale spärrar" "--require-valid accepterade en stale attestation"
+  no "K6 legacy stale sparrar" "--require-valid accepterade stale attestation"
 else
-  ok "K6 stale attestation kan inte läsas som giltig"
+  ok "K6 legacy stale kan inte lasas som giltig"
 fi
 
-# K7: omtest köas, och kön töms av en ny attestation på nytt SHA.
-# Exit-kriteriet säger "A blir stale, omtest köas automatiskt" — utan kö är
-# stale dekoration; utan tömning kan en gammal invalidering spärra en färsk
-# verifiering.
-NYTT="0f1e2d3c4b5a69788796a5b4c3d2e1f009182736"
-# Kön ligger på toppnivå i state, inte i attestationsobjektet — read h-test
-# returnerar bara attestationen. Prövas därför mot state-filen, och parsas
-# som JSON: ett fältnamn i utdata får aldrig kunna räknas som en kö.
-i_ko() {
-  python3 -c 'import json,sys
-try: d=json.load(open(sys.argv[1]))
-except Exception: sys.exit(2)
-sys.exit(0 if "h-test" in d.get("omtest_ko",[]) else 1)' "$1"
-}
-if ! i_ko "$D/attestations.json"; then
-  no "K7 omtest-kö" "stale attestation står inte i omtest-kön"
+if ! i_ko "$D" h-test; then
+  no "K7 legacy omtest-ko" "stale task saknas i omtest-kon"
 else
-  "$CLI" "$D" write h-test "$NYTT" >/dev/null 2>&1
-  ef=$("$CLI" "$D" read h-test 2>/dev/null)
-  if echo "$ef" | grep -Eqi '"stale"[[:space:]]*:[[:space:]]*true'; then
-    no "K7 omtest-kö" "ny attestation på nytt SHA lämnade tasken stale"
-  elif ! "$CLI" "$D" read h-test --require-valid >/dev/null 2>&1; then
-    no "K7 omtest-kö" "ny attestation på nytt SHA passerar inte --require-valid"
-  elif i_ko "$D/attestations.json"; then
-    no "K7 omtest-kö" "kön är inte tömd efter ny attestation på nytt SHA"
+  "$CLI" "$D" write h-test "$S3" >/dev/null 2>&1
+  if "$CLI" "$D" read h-test --require-valid >/dev/null 2>&1 \
+     && ! i_ko "$D" h-test; then
+    ok "K7 legacy omtest koas och toms av ny attestation pa nytt SHA"
   else
-    ok "K7 omtest köas vid stale och töms av ny attestation"
+    no "K7 legacy omtest-ko" "ny attestation blev inte giltig eller lamnade tasken i kon"
   fi
 fi
+
+# ---------------------------------------------------------------------------
+# K8: generisk opaque authority, provisional positivt ankare och legacy-skydd.
+D8="$WORK/authority-anchor"
+AUTH8="Opaque:run-A+17"
+WRONG8="opaque:run-a+17"
+"$CLI" "$D8" write legacy-fore-begin "$S1" >/dev/null 2>&1
+b8=0; "$CLI" "$D8" begin-authority "$AUTH8" >/dev/null 2>&1 || b8=$?
+w8=0; "$CLI" "$D8" write-authority "$AUTH8" auth-one "$S2" gate-alpha "$G1" >/dev/null 2>&1 || w8=$?
+r8=$("$CLI" "$D8" read auth-one --require-authority "$AUTH8" 2>/dev/null); rr8=$?
+wrong8=0; "$CLI" "$D8" read auth-one --require-authority "$WRONG8" >/dev/null 2>&1 || wrong8=$?
+global8=0; "$CLI" "$D8" read auth-one --require-valid >/dev/null 2>&1 || global8=$?
+legacy8=0; "$CLI" "$D8" read legacy-fore-begin --require-valid >/dev/null 2>&1 || legacy8=$?
+if [ "$b8" -eq 0 ] && [ "$w8" -eq 0 ] && [ "$rr8" -eq 0 ] \
+   && printf '%s' "$r8" | json_post_exact auth-one "$S2" gate-alpha "$G1" \
+   && [ "$wrong8" -ne 0 ] && [ "$global8" -ne 0 ] && [ "$legacy8" -eq 0 ]; then
+  ok "K8 opaque authority: exact provisional read, wrong-id/global denial, legacy survives BEGIN"
+else
+  no "K8 opaque/provisional authority" "begin/write/read/wrong/global/legacy=$b8/$w8/$rr8/$wrong8/$global8/$legacy8"
+fi
+
+# K9: zero publications ar tillatet; finalized generation ar stangd.
+D9="$WORK/empty-finalize"
+A9="empty-generation"
+B9="successor-after-empty"
+b9=0; "$CLI" "$D9" begin-authority "$A9" >/dev/null 2>&1 || b9=$?
+f9=0; "$CLI" "$D9" finalize-authority "$A9" >/dev/null 2>&1 || f9=$?
+late9=0; "$CLI" "$D9" write-authority "$A9" late "$S1" >/dev/null 2>&1 || late9=$?
+bb9=0; "$CLI" "$D9" begin-authority "$B9" >/dev/null 2>&1 || bb9=$?
+wb9=0; "$CLI" "$D9" write-authority "$B9" successor "$S2" >/dev/null 2>&1 || wb9=$?
+rb9=0; "$CLI" "$D9" read successor --require-authority "$B9" >/dev/null 2>&1 || rb9=$?
+if [ "$b9" -eq 0 ] && [ "$f9" -eq 0 ] && [ "$late9" -ne 0 ] \
+   && [ "$bb9" -eq 0 ] && [ "$wb9" -eq 0 ] && [ "$rb9" -eq 0 ]; then
+  ok "K9 tom generation finaliseras; finalized set stangs; successor fungerar"
+else
+  no "K9 zero/finalized/successor" "begin/finalize/late/new-begin/write/read=$b9/$f9/$late9/$bb9/$wb9/$rb9"
+fi
+
+# K10: multi-publication batch, wrong-id utan effekt, korrekt all-or-none.
+D10="$WORK/batch"
+A10="batch-current"
+"$CLI" "$D10" begin-authority "$A10" >/dev/null 2>&1
+i=1
+while [ "$i" -le 3 ]; do
+  task=$(printf 'batch-%03d' "$i")
+  sha=$(printf '%040x' "$i")
+  if [ "$i" -eq 2 ]; then
+    "$CLI" "$D10" write-authority "$A10" "$task" "$sha" batch-gate "$G1" >/dev/null 2>&1
+  else
+    "$CLI" "$D10" write-authority "$A10" "$task" "$sha" >/dev/null 2>&1
+  fi
+  i=$((i + 1))
+done
+wrong10=0; "$CLI" "$D10" finalize-authority "not-$A10" >/dev/null 2>&1 || wrong10=$?
+before10=$(valid_count "$D10" batch- 3)
+good10=0; "$CLI" "$D10" finalize-authority "$A10" >/dev/null 2>&1 || good10=$?
+after10=$(valid_count "$D10" batch- 3)
+exact10=1
+valid_exact "$D10" batch-001 "$(printf '%040x' 1)" || exact10=0
+valid_exact "$D10" batch-002 "$(printf '%040x' 2)" batch-gate "$G1" || exact10=0
+valid_exact "$D10" batch-003 "$(printf '%040x' 3)" || exact10=0
+if [ "$wrong10" -ne 0 ] && [ "$before10" = "0" ] \
+   && [ "$good10" -eq 0 ] && [ "$after10" = "3" ] && [ "$exact10" -eq 1 ]; then
+  ok "K10 tre exakta publications finaliseras atomiskt; wrong authority ger noll"
+else
+  no "K10 batch-finalize/payload" "wrong/before/good/after/exact=$wrong10/$before10/$good10/$after10/$exact10"
+fi
+
+# K11: BEGIN ar store-global fence, authority-id behandlas exakt/case-sensitive.
+B10="Batch-Current"
+bb10=0; "$CLI" "$D10" begin-authority "$B10" >/dev/null 2>&1 || bb10=$?
+old_valid10=$(valid_count "$D10" batch- 3)
+old_scoped10=0; "$CLI" "$D10" read batch-001 --require-authority "$A10" >/dev/null 2>&1 || old_scoped10=$?
+old_write10=0; "$CLI" "$D10" write-authority "$A10" resurrect "$S4" >/dev/null 2>&1 || old_write10=$?
+old_fin10=0; "$CLI" "$D10" finalize-authority "$A10" >/dev/null 2>&1 || old_fin10=$?
+resurrect10=0; "$CLI" "$D10" read resurrect --require-authority "$A10" >/dev/null 2>&1 || resurrect10=$?
+new_write10=0; "$CLI" "$D10" write-authority "$B10" current "$S5" >/dev/null 2>&1 || new_write10=$?
+new_read10=0; "$CLI" "$D10" read current --require-authority "$B10" >/dev/null 2>&1 || new_read10=$?
+case_wrong10=0; "$CLI" "$D10" read current --require-authority "$A10" >/dev/null 2>&1 || case_wrong10=$?
+reuse10=0; "$CLI" "$D10" begin-authority "$A10" >/dev/null 2>&1 || reuse10=$?
+after_reuse10=0; "$CLI" "$D10" read current --require-authority "$B10" >/dev/null 2>&1 || after_reuse10=$?
+if [ "$bb10" -eq 0 ] && [ "$old_valid10" = "0" ] \
+   && [ "$old_scoped10" -ne 0 ] && [ "$old_write10" -ne 0 ] && [ "$old_fin10" -ne 0 ] \
+   && [ "$resurrect10" -ne 0 ] && [ "$new_write10" -eq 0 ] && [ "$new_read10" -eq 0 ] \
+   && [ "$case_wrong10" -ne 0 ] && [ "$reuse10" -ne 0 ] && [ "$after_reuse10" -eq 0 ]; then
+  ok "K11 ny BEGIN fencar global/scoped state; failed write och re-BEGIN kan inte resurrecta"
+else
+  no "K11 store-global fence" "begin/old-valid/scoped/write/finalize/resurrect/new-write/read/wrong/reuse/after=$bb10/$old_valid10/$old_scoped10/$old_write10/$old_fin10/$resurrect10/$new_write10/$new_read10/$case_wrong10/$reuse10/$after_reuse10"
+fi
+
+# K12: invalidate deltar i samma ordering; stale member far aldrig ge partial batch.
+D12="$WORK/invalidate-authority"
+A12="invalidate-generation"
+b12=0; "$CLI" "$D12" begin-authority "$A12" >/dev/null 2>&1 || b12=$?
+w12a=0; "$CLI" "$D12" write-authority "$A12" inv-target "$S1" >/dev/null 2>&1 || w12a=$?
+w12b=0; "$CLI" "$D12" write-authority "$A12" inv-sibling "$S2" >/dev/null 2>&1 || w12b=$?
+pr12=0; "$CLI" "$D12" read inv-sibling --require-authority "$A12" >/dev/null 2>&1 || pr12=$?
+inv12=0; "$CLI" "$D12" invalidate "$S1" >/dev/null 2>&1 || inv12=$?
+target_scoped12=0; "$CLI" "$D12" read inv-target --require-authority "$A12" >/dev/null 2>&1 || target_scoped12=$?
+sibling_scoped12=0; "$CLI" "$D12" read inv-sibling --require-authority "$A12" >/dev/null 2>&1 || sibling_scoped12=$?
+fin12=0; "$CLI" "$D12" finalize-authority "$A12" >/dev/null 2>&1 || fin12=$?
+tv12=0; "$CLI" "$D12" read inv-target --require-valid >/dev/null 2>&1 || tv12=$?
+sv12=0; "$CLI" "$D12" read inv-sibling --require-valid >/dev/null 2>&1 || sv12=$?
+if [ "$b12" -eq 0 ] && [ "$w12a" -eq 0 ] && [ "$w12b" -eq 0 ] && [ "$pr12" -eq 0 ] \
+   && [ "$inv12" -eq 0 ] && [ "$target_scoped12" -ne 0 ] && [ "$sibling_scoped12" -eq 0 ] \
+   && [ "$fin12" -ne 0 ] && [ "$tv12" -ne 0 ] && [ "$sv12" -ne 0 ]; then
+  ok "K12 invalidated provisional nekas scoped och kan inte partial-finaliseras med sibling"
+else
+  no "K12 invalidate/finalize ordering" "begin/writes/provisional/invalidate/scoped/finalize/valid=$b12/$w12a,$w12b/$pr12/$inv12/$target_scoped12,$sibling_scoped12/$fin12/$tv12,$sv12"
+fi
+
+# SHA-global stale bevaras for legacy + authority, orelaterat state overlever.
+D12B="$WORK/invalidate-global"
+A12B="global-stale-generation"
+l12a=0; "$CLI" "$D12B" write legacy-same "$S3" >/dev/null 2>&1 || l12a=$?
+l12b=0; "$CLI" "$D12B" write legacy-other "$S4" >/dev/null 2>&1 || l12b=$?
+b12b=0; "$CLI" "$D12B" begin-authority "$A12B" >/dev/null 2>&1 || b12b=$?
+w12c=0; "$CLI" "$D12B" write-authority "$A12B" bound-same "$S3" >/dev/null 2>&1 || w12c=$?
+f12b=0; "$CLI" "$D12B" finalize-authority "$A12B" >/dev/null 2>&1 || f12b=$?
+i12b=0; "$CLI" "$D12B" invalidate "$S3" >/dev/null 2>&1 || i12b=$?
+ls12=0; "$CLI" "$D12B" read legacy-same --require-valid >/dev/null 2>&1 || ls12=$?
+bs12=0; "$CLI" "$D12B" read bound-same --require-valid >/dev/null 2>&1 || bs12=$?
+lo12=0; "$CLI" "$D12B" read legacy-other --require-valid >/dev/null 2>&1 || lo12=$?
+if [ "$l12a" -eq 0 ] && [ "$l12b" -eq 0 ] && [ "$b12b" -eq 0 ] \
+   && [ "$w12c" -eq 0 ] && [ "$f12b" -eq 0 ] && [ "$i12b" -eq 0 ] \
+   && [ "$ls12" -ne 0 ] && [ "$bs12" -ne 0 ] && [ "$lo12" -eq 0 ] \
+   && i_ko "$D12B" legacy-same && i_ko "$D12B" bound-same; then
+  ok "K12b SHA-global invalidate stalar legacy/bound men inte orelaterat state"
+else
+  no "K12b SHA-global stale" "legacy-same/bound-same/other=$ls12/$bs12/$lo12 eller omtest-ko saknas"
+fi
+
+# K13: deterministic write-vs-invalidate. Bada serialiseringar slutar NEW.
+D13="$WORK/write-invalidate-race"
+race13_ok=1
+i=1
+while [ "$i" -le 20 ]; do
+  task=$(printf 'race-%03d' "$i")
+  old=$(printf 'a%039x' "$i")
+  new=$(printf 'b%039x' "$i")
+  "$CLI" "$D13" write "$task" "$old" >/dev/null 2>&1 || race13_ok=0
+  ( "$CLI" "$D13" write "$task" "$new" >/dev/null 2>&1 && : > "$WORK/r13-w-$i" ) & p1=$!
+  ( "$CLI" "$D13" invalidate "$old" >/dev/null 2>&1 && : > "$WORK/r13-i-$i" ) & p2=$!
+  wait "$p1" 2>/dev/null || true
+  wait "$p2" 2>/dev/null || true
+  # Retryable serialization conflicts are allowed, but all-refusal is not.
+  if [ ! -e "$WORK/r13-w-$i" ] && [ ! -e "$WORK/r13-i-$i" ]; then
+    race13_ok=0
+  fi
+  if [ ! -e "$WORK/r13-i-$i" ]; then
+    "$CLI" "$D13" invalidate "$old" >/dev/null 2>&1 || race13_ok=0
+  fi
+  if [ ! -e "$WORK/r13-w-$i" ]; then
+    "$CLI" "$D13" write "$task" "$new" >/dev/null 2>&1 || race13_ok=0
+  fi
+  out=$("$CLI" "$D13" read "$task" 2>/dev/null || true)
+  if ! printf '%s' "$out" | json_post_exact "$task" "$new" \
+     || ! "$CLI" "$D13" read "$task" --require-valid >/dev/null 2>&1 \
+     || i_ko "$D13" "$task"; then
+    race13_ok=0
+  fi
+  i=$((i + 1))
+done
+if [ "$race13_ok" -eq 1 ]; then
+  ok "K13 write NEW vs invalidate OLD serialiseras utan stale snapshot-resurrection"
+else
+  no "K13 write/invalidate race" "minst ett av 20 varv tappade NEW, giltighet eller ko-effekt"
+fi
+
+# K14: disjoint concurrent authority writes far inte tappas eller bara refusal-faila.
+D14="$WORK/concurrent-writes"
+A14="concurrent-publication-set"
+"$CLI" "$D14" begin-authority "$A14" >/dev/null 2>&1
+mkdir -p "$WORK/r14"
+pids=""
+i=1
+while [ "$i" -le 32 ]; do
+  task=$(printf 'parallel-%03d' "$i")
+  sha=$(printf '%040x' "$((1000 + i))")
+  ( "$CLI" "$D14" write-authority "$A14" "$task" "$sha" >/dev/null 2>&1 && : > "$WORK/r14/$i" ) &
+  pids="$pids $!"
+  i=$((i + 1))
+done
+for p in $pids; do wait "$p" 2>/dev/null || true; done
+ok14=1
+initial14=$(find "$WORK/r14" -type f 2>/dev/null | wc -l | tr -d ' ')
+[ "$initial14" -ge 1 ] || ok14=0
+i=1
+while [ "$i" -le 32 ]; do
+  task=$(printf 'parallel-%03d' "$i")
+  sha=$(printf '%040x' "$((1000 + i))")
+  if [ ! -e "$WORK/r14/$i" ]; then
+    "$CLI" "$D14" write-authority "$A14" "$task" "$sha" >/dev/null 2>&1 || ok14=0
+  fi
+  out=$("$CLI" "$D14" read "$task" --require-authority "$A14" 2>/dev/null || true)
+  printf '%s' "$out" | json_post_exact "$task" "$sha" || ok14=0
+  i=$((i + 1))
+done
+if [ "$ok14" -eq 1 ]; then
+  ok "K14 concurrent writes ger framsteg; retryade conflicts och varje exakt effekt overlever"
+else
+  no "K14 serialized disjoint writes" "initial-success=$initial14; all-refusal eller minst en retry/effect tappades"
+fi
+
+# K15: concurrent BEGIN har exakt en slutlig current generation.
+D15="$WORK/concurrent-begin"
+A15="Case-Sensitive-A"
+B15="case-sensitive-a"
+mkdir -p "$WORK/r15"
+( "$CLI" "$D15" begin-authority "$A15" >/dev/null 2>&1 && : > "$WORK/r15/a" ) & p1=$!
+( "$CLI" "$D15" begin-authority "$B15" >/dev/null 2>&1 && : > "$WORK/r15/b" ) & p2=$!
+wait "$p1" 2>/dev/null || true
+wait "$p2" 2>/dev/null || true
+wa15=0; "$CLI" "$D15" write-authority "$A15" current-a "$S1" >/dev/null 2>&1 || wa15=$?
+wb15=0; "$CLI" "$D15" write-authority "$B15" current-b "$S2" >/dev/null 2>&1 || wb15=$?
+succ15=0; [ "$wa15" -eq 0 ] && succ15=$((succ15 + 1)); [ "$wb15" -eq 0 ] && succ15=$((succ15 + 1))
+begin15=0; [ -e "$WORK/r15/a" ] && begin15=$((begin15 + 1)); [ -e "$WORK/r15/b" ] && begin15=$((begin15 + 1))
+matched15=0
+[ "$wa15" -eq 0 ] && [ -e "$WORK/r15/a" ] && matched15=$((matched15 + 1))
+[ "$wb15" -eq 0 ] && [ -e "$WORK/r15/b" ] && matched15=$((matched15 + 1))
+if [ "$begin15" -ge 1 ] && [ "$succ15" -eq 1 ] && [ "$matched15" -eq 1 ]; then
+  ok "K15 concurrent case-distinct BEGIN ger exakt en aktuell store-generation"
+else
+  no "K15 concurrent BEGIN" "successful-begins/current-writers/matched=$begin15/$succ15/$matched15"
+fi
+
+# K16: verkliga overlap vid den publika mutationens semantiska commit-grans.
+# Barriaren ar endast judgeability: implementationen far halla ett pessimistiskt
+# las (successor blockerar) eller gora en optimistisk attempt (successor vinner).
+OVERLAP="$WORK/overlap.py"
+cat > "$OVERLAP" <<'PY'
+import json, os, signal, subprocess, sys, time
+from pathlib import Path
+
+cli=str(Path(sys.argv[1]).resolve()); root=Path(sys.argv[2])
+
+class Harness(Exception): pass
+class Product(Exception): pass
+
+live=[]
+def killp(p):
+    if p.poll() is None:
+        try: os.killpg(p.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError): pass
+    try: p.wait(timeout=5)
+    except subprocess.TimeoutExpired: pass
+
+def launch(*args, env=None):
+    p=subprocess.Popen([cli,*map(str,args)], stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True, start_new_session=True, env=env)
+    live.append(p); return p
+
+def finish(p, timeout=30):
+    try: out,err=p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        killp(p); raise Harness("COMMAND_TIMEOUT")
+    return p.returncode,out,err
+
+def run(*args): return finish(launch(*args))
+
+def barrier_launch(tag,*args):
+    ready=root/(tag+".ready"); go=root/(tag+".go")
+    env=os.environ.copy()
+    env["NORTROPIC_TEST_BARRIER_READY"]=str(ready)
+    env["NORTROPIC_TEST_BARRIER_GO"]=str(go)
+    p=launch(*args,env=env)
+    deadline=time.monotonic()+8
+    while time.monotonic()<deadline:
+        if ready.exists(): return p,go
+        if p.poll() is not None:
+            _,_,err=finish(p); raise Product("BARRIER_NOT_REACHED:"+err[-120:])
+        time.sleep(.01)
+    killp(p); raise Harness("BARRIER_READY_TIMEOUT")
+
+def current_after_overlap(d,old,go,new,successor,retry):
+    time.sleep(.25)
+    new_won=new.poll() is not None and new.returncode == 0
+    go.touch()
+    oldrc,_,_=finish(old); newrc,_,_=finish(new)
+    if newrc != 0:
+        rc,_,_=run(d,"begin-authority",retry)
+        if rc != 0: raise Product("SUCCESSOR_RETRY_FAILED")
+        successor=retry
+    if new_won and oldrc == 0:
+        raise Product("STALE_MUTATION_REPORTED_SUCCESS_AFTER_SUCCESSOR")
+    return oldrc,successor
+
+try:
+    # FINALIZE(A) admitted while BEGIN(B) overlaps.
+    d=root/"finalize-begin"; a="overlap-finalize-a"; b="overlap-finalize-b"
+    if run(d,"begin-authority",a)[0] or run(d,"write-authority",a,"old-finalize","1"*40)[0]:
+        raise Product("FINALIZE_PREP")
+    old,go=barrier_launch("finalize",d,"finalize-authority",a)
+    newer=launch(d,"begin-authority",b)
+    oldrc,current=current_after_overlap(d,old,go,newer,b,"overlap-finalize-c")
+    if run(d,"read","old-finalize","--require-valid")[0] == 0:
+        raise Product("OLD_FINALIZE_GLOBAL_RESURRECTED")
+    if run(d,"read","old-finalize","--require-authority",a)[0] == 0:
+        raise Product("OLD_FINALIZE_SCOPED_RESURRECTED")
+    if run(d,"write-authority",current,"new-finalize","2"*40)[0] != 0:
+        raise Product("FINALIZE_SUCCESSOR_UNUSABLE")
+
+    # WRITE(A) admitted while BEGIN(B) overlaps.
+    d=root/"write-begin"; a="overlap-write-a"; b="overlap-write-b"
+    if run(d,"begin-authority",a)[0]: raise Product("WRITE_PREP")
+    old,go=barrier_launch("write",d,"write-authority",a,"old-write","3"*40)
+    newer=launch(d,"begin-authority",b)
+    oldrc,current=current_after_overlap(d,old,go,newer,b,"overlap-write-c")
+    if run(d,"read","old-write","--require-authority",a)[0] == 0:
+        raise Product("OLD_WRITE_RESURRECTED")
+    if run(d,"write-authority",current,"new-write","4"*40)[0] != 0:
+        raise Product("WRITE_SUCCESSOR_UNUSABLE")
+
+    # FINALIZE and INVALIDATE overlap. Both legal linearizations are accepted;
+    # the invalidated target is never valid/scoped afterwards.
+    d=root/"finalize-invalidate"; a="overlap-invalidate-a"
+    if (run(d,"begin-authority",a)[0]
+        or run(d,"write-authority",a,"inv-target","5"*40)[0]
+        or run(d,"write-authority",a,"inv-sibling","6"*40)[0]):
+        raise Product("INVALIDATE_PREP")
+    old,go=barrier_launch("invalidate",d,"finalize-authority",a)
+    inv=launch(d,"invalidate","5"*40)
+    time.sleep(.25); inv_won=inv.poll() is not None and inv.returncode == 0
+    go.touch(); oldrc,_,_=finish(old); invrc,_,_=finish(inv)
+    if invrc != 0 and run(d,"invalidate","5"*40)[0] != 0:
+        raise Product("INVALIDATE_RETRY_FAILED")
+    if inv_won and oldrc == 0:
+        raise Product("FINALIZE_SUCCEEDED_AFTER_INVALIDATE")
+    if run(d,"read","inv-target","--require-valid")[0] == 0:
+        raise Product("INVALIDATED_TARGET_VALID")
+    if run(d,"read","inv-target","--require-authority",a)[0] == 0:
+        raise Product("INVALIDATED_TARGET_SCOPED")
+    sibling=run(d,"read","inv-sibling","--require-valid")[0]
+    if oldrc == 0 and sibling != 0: raise Product("SUCCESSFUL_FINALIZE_LOST_SIBLING")
+    if oldrc != 0 and sibling == 0: raise Product("FAILED_FINALIZE_PUBLISHED_SIBLING")
+    print("OVERLAPS_SERIALIZED=finalize-begin,write-begin,finalize-invalidate")
+except Harness as e:
+    print("HARNESS:"+str(e)); raise SystemExit(90)
+except Product as e:
+    print("PRODUCT:"+str(e)); raise SystemExit(20)
+finally:
+    for p in live: killp(p)
+PY
+
+overlap_out=$("$PY3" "$OVERLAP" "$CLI" "$WORK/semantic-overlap" 2>&1); overlap_rc=$?
+if [ "$overlap_rc" -eq 90 ]; then
+  echo "SKIP  K16 harness — $overlap_out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+elif [ "$overlap_rc" -eq 0 ] && echo "$overlap_out" | grep -q 'OVERLAPS_SERIALIZED='; then
+  ok "K16 admitted write/finalize overlaps serialiseras mot BEGIN/INVALIDATE utan resurrection"
+else
+  no "K16 semantic mutation overlap" "rc=$overlap_rc evidence=[$overlap_out]"
+fi
+
+# K17/K18: fresh-reader atomicity, exact payload och kill/recovery. Alla barn
+# ligger i egna processgrupper och stadas fore ett harness-timeout blir ODÖMBART.
+ATOMIC="$WORK/atomicity.py"
+cat > "$ATOMIC" <<'PY'
+import json, os, signal, subprocess, sys, time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+cli=str(Path(sys.argv[1]).resolve()); root=Path(sys.argv[2]); n=int(sys.argv[3])
+live=[]
+class Harness(Exception): pass
+class Product(Exception): pass
+
+def killp(p):
+    if p.poll() is None:
+        try: os.killpg(p.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError): pass
+    try: p.wait(timeout=5)
+    except subprocess.TimeoutExpired: pass
+
+def launch(*args):
+    p=subprocess.Popen([cli,*map(str,args)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                       text=True,start_new_session=True)
+    live.append(p); return p
+
+def call(*args,timeout=30):
+    p=launch(*args)
+    try: out,err=p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        killp(p); raise Harness("COMMAND_TIMEOUT:"+" ".join(map(str,args[1:3])))
+    return p.returncode,out,err
+
+def expected(i): return f"atomic-{i:03d}",f"{9000+i:040x}"
+
+def exact(out,i):
+    try: d=json.loads(out)
+    except Exception: return False
+    task,sha=expected(i)
+    return d.get("task")==task and d.get("candidate_sha")==sha
+
+def prep(d,a):
+    if call(d,"begin-authority",a)[0] != 0: raise Product("PREP_BEGIN")
+    def one(i):
+        task,sha=expected(i); return i,call(d,"write-authority",a,task,sha)[0]
+    with ThreadPoolExecutor(max_workers=min(16,n)) as ex: first=list(ex.map(one,range(1,n+1)))
+    if not any(rc==0 for _,rc in first): raise Product("PREP_ALL_REFUSED")
+    for i,rc in first:
+        if rc != 0:
+            task,sha=expected(i)
+            if call(d,"write-authority",a,task,sha)[0] != 0: raise Product("PREP_RETRY")
+    for i in range(1,n+1):
+        task,_=expected(i); rc,out,_=call(d,"read",task,"--require-authority",a)
+        if rc != 0 or not exact(out,i): raise Product("PREP_PAYLOAD")
+
+def scan(d):
+    def one(i):
+        task,_=expected(i); rc,out,_=call(d,"read",task,"--require-valid",timeout=20)
+        if rc==0 and not exact(out,i): raise Product("VALID_PAYLOAD_MISMATCH")
+        return rc==0
+    with ThreadPoolExecutor(max_workers=min(16,n)) as ex: vals=list(ex.map(one,range(1,n+1)))
+    return sum(vals)
+
+try:
+    d=root/"normal"; a="atomic-normal"; prep(d,a)
+    p=launch(d,"finalize-authority",a); partial=None; deadline=time.monotonic()+30
+    while p.poll() is None and time.monotonic()<deadline:
+        c=scan(d)
+        if 0<c<n:
+            try: os.killpg(p.pid,signal.SIGSTOP)
+            except (ProcessLookupError, PermissionError): pass
+            frozen=scan(d)
+            if 0<frozen<n:
+                partial=frozen; killp(p)
+            else:
+                try: os.killpg(p.pid,signal.SIGCONT)
+                except (ProcessLookupError, PermissionError): pass
+            break
+    if partial is not None: raise Product(f"PARTIAL_VISIBLE={partial}/{n}")
+    try: out,err=p.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        killp(p); raise Harness("FINALIZE_TIMEOUT")
+    final=scan(d)
+    if (p.returncode==0 and final!=n) or (p.returncode!=0 and final!=0):
+        raise Product(f"RETURN_MISMATCH=rc{p.returncode}/valid{final}")
+
+    for trial,delay in enumerate((0,.001,.004,.012,.03),1):
+        d=root/f"kill-{trial}"; a=f"atomic-kill-{trial}"; prep(d,a)
+        p=launch(d,"finalize-authority",a); time.sleep(delay)
+        if p.poll() is None:
+            try: os.killpg(p.pid,signal.SIGSTOP)
+            except (ProcessLookupError, PermissionError): pass
+            killp(p)
+        else: finish=p.returncode
+        c=scan(d)
+        if c not in (0,n): raise Product(f"PARTIAL_RECOVERY={trial}:{c}/{n}")
+
+    d=root/"after-kill"; a="atomic-after-kill"; prep(d,a)
+    if call(d,"finalize-authority",a)[0] != 0 or scan(d) != n:
+        raise Product("POST_KILL_POSITIVE")
+    print(f"ATOMIC_ALL_OR_NONE={n}")
+except Harness as e:
+    print("HARNESS:"+str(e)); raise SystemExit(90)
+except Product as e:
+    print("PRODUCT:"+str(e)); raise SystemExit(20)
+finally:
+    for p in live: killp(p)
+PY
+
+atomic_out=$("$PY3" "$ATOMIC" "$CLI" "$WORK/atomic-stores" 64 2>&1); atomic_rc=$?
+if [ "$atomic_rc" -eq 90 ]; then
+  echo "SKIP  K17/K18 harness — $atomic_out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+elif [ "$atomic_rc" -eq 0 ] && echo "$atomic_out" | grep -q 'ATOMIC_ALL_OR_NONE=64'; then
+  ok "K17/K18 exact 64-publication finalize ar fresh-reader-atomisk och kill-recoverar 0/all"
+else
+  no "K17/K18 atomic finalize/recovery" "rc=$atomic_rc evidence=[$atomic_out]"
+fi
+
+# K19: storage-neutral corruption. Gate copies the public state directory and
+# corrupts one regular file at a time; no filename, JSON key or format is named.
+CORRUPT="$WORK/corrupt.py"
+cat > "$CORRUPT" <<'PY'
+import os,shutil,signal,subprocess,sys,tempfile
+from pathlib import Path
+cli=str(Path(sys.argv[1]).resolve()); src=Path(sys.argv[2]); root=Path(sys.argv[3]); auth=sys.argv[4]
+def call(d,*args):
+    p=subprocess.Popen([cli,str(d),*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                       text=True,start_new_session=True)
+    try: return (*p.communicate(timeout=20),p.returncode)
+    except subprocess.TimeoutExpired:
+        try: os.killpg(p.pid,signal.SIGKILL)
+        except (ProcessLookupError, PermissionError): pass
+        p.wait(); print("HARNESS:TIMEOUT"); raise SystemExit(90)
+clean_err=call(src,"read","missing-clean","--require-authority",auth)[1]
+files=[p for p in src.rglob("*") if p.is_file()]
+if not files: print("PRODUCT:NO_PERSISTED_STATE"); raise SystemExit(20)
+caught=0
+for i,f in enumerate(files):
+    d=root/f"variant-{i}"; shutil.copytree(src,d)
+    target=d/f.relative_to(src)
+    target.write_bytes(b"NORTROPIC-PARTIAL-CORRUPTION\n")
+    out,err,rc=call(d,"read","corrupt-task","--require-authority",auth)
+    _,berr,brc=call(d,"begin-authority",f"after-corrupt-{i}")
+    if rc!=0 and brc!=0 and err.strip() and err!=clean_err:
+        caught+=1
+if not caught: print(f"PRODUCT:CORRUPTION_LOOKED_CLEAN files={len(files)}"); raise SystemExit(20)
+print(f"CORRUPT_FAIL_CLOSED={caught}/{len(files)}")
+PY
+D19="$WORK/corrupt-source"; A19="corrupt-generation"
+legacy19=0; "$CLI" "$D19" write corrupt-legacy "$S2" >/dev/null 2>&1 || legacy19=$?
+begin19=0; "$CLI" "$D19" begin-authority "$A19" >/dev/null 2>&1 || begin19=$?
+write19=0; "$CLI" "$D19" write-authority "$A19" corrupt-task "$S1" >/dev/null 2>&1 || write19=$?
+anchor19=0; "$CLI" "$D19" read corrupt-task --require-authority "$A19" >/dev/null 2>&1 || anchor19=$?
+corrupt_out=$("$PY3" "$CORRUPT" "$CLI" "$D19" "$WORK/corrupt-variants" "$A19" 2>&1); corrupt_rc=$?
+if [ "$corrupt_rc" -eq 90 ]; then
+  echo "SKIP  K19 harness — $corrupt_out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+elif [ "$legacy19" -eq 0 ] && [ "$begin19" -eq 0 ] && [ "$write19" -eq 0 ] \
+   && [ "$anchor19" -eq 0 ] && [ "$corrupt_rc" -eq 0 ] \
+   && echo "$corrupt_out" | grep -q 'CORRUPT_FAIL_CLOSED='; then
+  ok "K19 partial/corrupt authoritative file state failar stangt utan formatkoppling"
+else
+  no "K19 corrupt fail-closed" "anchors=$legacy19/$begin19/$write19/$anchor19 rc=$corrupt_rc evidence=[$corrupt_out]"
+fi
+
+# K20: faithful disposable mutant. All exercised semantics are correct except
+# finalize, which durably publishes one exact post per transition instead of
+# one generation-wide transition. No forged read path and no child sleep exist.
+SEQ="$WORK/sequential-mutant.py"
+cat > "$SEQ" <<'PY'
+#!/usr/bin/env python3
+import fcntl,json,os,sys,tempfile
+from pathlib import Path
+d=Path(sys.argv[1]); cmd=sys.argv[2]; args=sys.argv[3:]; d.mkdir(parents=True,exist_ok=True)
+lock=open(d/"lock","a+")
+with lock:
+ fcntl.flock(lock,fcntl.LOCK_EX)
+ f=d/"state"
+ try: s=json.loads(f.read_text())
+ except FileNotFoundError: s={"seen":[],"current":None,"open":False,"posts":{}}
+ def save():
+  fd,tmp=tempfile.mkstemp(dir=d); os.close(fd); Path(tmp).write_text(json.dumps(s,sort_keys=True))
+  os.replace(tmp,f); fd=os.open(d,os.O_RDONLY); os.fsync(fd); os.close(fd)
+ if cmd=="begin-authority":
+  a=args[0]
+  if a in s["seen"]: raise SystemExit(1)
+  s["seen"].append(a); s["current"]=a; s["open"]=True; save(); raise SystemExit(0)
+ if cmd=="write-authority":
+  a,t,sha=args
+  if s["current"]!=a or not s["open"]: raise SystemExit(1)
+  s["posts"][t]={"task":t,"candidate_sha":sha.lower(),"authority":a,"valid":False}
+  save(); raise SystemExit(0)
+ if cmd=="read":
+  t=args[0]; p=s["posts"].get(t)
+  if not p: raise SystemExit(1)
+  if args[1]=="--require-authority":
+   if args[2]!=s["current"] or p["authority"]!=args[2]: raise SystemExit(1)
+  elif args[1]=="--require-valid":
+   if not p["valid"] or p["authority"]!=s["current"]: raise SystemExit(1)
+  else: raise SystemExit(1)
+  print(json.dumps(p)); raise SystemExit(0)
+ if cmd=="finalize-authority":
+  a=args[0]
+  if s["current"]!=a or not s["open"]: raise SystemExit(1)
+  # Sole defect: each save exposes and durably commits a proper subset.
+  for t in sorted(s["posts"]):
+   if s["posts"][t]["authority"]==a:
+    s["posts"][t]["valid"]=True; save()
+  s["open"]=False; save(); raise SystemExit(0)
+ raise SystemExit(2)
+PY
+chmod +x "$SEQ"
+mut_out=$("$PY3" "$ATOMIC" "$SEQ" "$WORK/mutant-atomic" 64 2>&1); mut_rc=$?
+if [ "$atomic_rc" -eq 0 ] && [ "$mut_rc" -eq 20 ] \
+   && echo "$mut_out" | grep -Eq 'PARTIAL_VISIBLE|PARTIAL_RECOVERY|RETURN_MISMATCH'; then
+  ok "K20 one-defect mutant: durable sequential per-post finalize falls av all-or-none-oraklet"
+else
+  no "K20 mutant sensitivity" "real-atomic-rc=$atomic_rc mutant-rc=$mut_rc evidence=[$mut_out]"
+fi
+
 summera

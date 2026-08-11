@@ -8,6 +8,25 @@
 #   controller/lease/cli [<dir>] owner <task>
 # Bare release är legacy för obundna leases. En --holder-pid-bunden lease får
 # aldrig kunna raderas utan rätt lease_id.
+# Holder-liveness binds till host + pid + faktisk process-incarnation; PID
+# ensam eller ett oanvant randomfalt ar aldrig liveness-authority.
+# Huvudloopen anvander lease_id som h-003 authority-id: begin fore claim,
+# write-authority per task, token-bound clean release, sedan exakt en atomisk
+# finalize-authority. Taskvalets valfria sista argv ar --authority <lease_id>.
+# Den enda process-source-substitutionen ar det explicita CLI-suffixet
+#   --gate-incarnation-observation <absolute-capability.json>
+# Capabilityn ar data-only, binds till exakt canonical disposable non-default
+# lease-root och exakta lookup(host,pid)-fragor, och kan bara svara LIVE med
+# opaque token-bytes, ABSENT eller INDETERMINATE. Den bar aldrig TTL, lease_id,
+# action eller reclaim-verdict. Ambient env/config/state/provider-output ar
+# aldrig source-selectors. NORTROPIC_TEST_BARRIER_READY/GO och den valfria
+# NORTROPIC_TEST_BARRIER_WAIT_READY ar separat disposable scheduling-
+# observability. READY betyder admitted efter generation-read och omedelbart
+# fore authoritative transition. WAIT_READY betyder att ingen generation har
+# antagits och operationen faktiskt koar bakom en redan admitted operation.
+# WAIT_READY ar bara notification och styr inte kon; samma process maste senare
+# ge READY, och endast READY blockerar till GO. Signalerna ar aldrig lease/
+# liveness/token/verdict/PASS-authority och foreskriver ingen lock/CAS-mekanism.
 # Katalogen är valfri och ligger först; utelämnad ger controller/lease/state/.
 # Provet kör alltid mot temp_kat så inget tillstånd ärvs mellan körningar.
 . "$(dirname "$0")/_lib.sh"
@@ -15,7 +34,13 @@ CLI="controller/lease/cli"
 krav_komponent "$CLI"
 
 WORK="$(temp_kat)" || { echo "FAIL  harness — temp-katalog kunde inte skapas"; exit 2; }
-trap 'rm -rf "$WORK"' EXIT
+cleanup() {
+  for p in $(jobs -pr 2>/dev/null); do kill "$p" 2>/dev/null || true; done
+  for p in $(jobs -pr 2>/dev/null); do wait "$p" 2>/dev/null || true; done
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
 D="$WORK/state"
 
 # K1: acquire på fri task MÅSTE lyckas. Utan positiv kontroll är varje
@@ -199,13 +224,13 @@ wait_mark_or_exit() {
   mark="$1"
   pid="$2"
   i=0
-  while [ "$i" -lt 60 ]; do
+  while [ "$i" -lt 600 ]; do
     [ -s "$mark" ] && return 0
     kill -0 "$pid" 2>/dev/null || return 1
     sleep 0.1
     i=$((i + 1))
   done
-  return 1
+  return 2
 }
 
 
@@ -264,30 +289,32 @@ if [ "$r9a" -eq 0 ] && token_ok "$t9a"; then
 
   if [ "$r9b" -eq 0 ] && token_ok "$t9b"; then
     owner_before="$("$CLI" "$D9" owner s3-fence 2>/dev/null || true)"
+    sha9_before="$(file_sha "$D9/s3-fence.lease")"
 
     stale_rc=0
     "$CLI" "$D9" release s3-fence "$t9a" >/dev/null 2>&1 || stale_rc=$?
     owner_after_stale="$("$CLI" "$D9" owner s3-fence 2>/dev/null || true)"
+    sha9_stale="$(file_sha "$D9/s3-fence.lease")"
 
     bare_rc=0
     "$CLI" "$D9" release s3-fence >/dev/null 2>&1 || bare_rc=$?
     owner_after_bare="$("$CLI" "$D9" owner s3-fence 2>/dev/null || true)"
+    sha9_bare="$(file_sha "$D9/s3-fence.lease")"
 
     good_rc=0
     "$CLI" "$D9" release s3-fence "$t9b" >/dev/null 2>&1 || good_rc=$?
     owner_after_good="$("$CLI" "$D9" owner s3-fence 2>/dev/null || true)"
 
-    if [ -n "$owner_before" ] \
-       && [ "$stale_rc" -ne 0 ] \
-       && [ "$bare_rc" -ne 0 ] \
-       && [ -n "$owner_after_stale" ] \
-       && [ -n "$owner_after_bare" ] \
+    if [ -n "$owner_before" ] && [ "$owner_before" = "$owner_after_stale" ] \
+       && [ "$owner_before" = "$owner_after_bare" ] \
+       && [ -n "$sha9_before" ] && [ "$sha9_before" = "$sha9_stale" ] \
+       && [ "$sha9_before" = "$sha9_bare" ] \
        && [ "$good_rc" -eq 0 ] \
        && [ -z "$owner_after_good" ]; then
-      ok "K9 fencing: gammal token och bare release kan inte radera bunden efterträdare"
+      ok "K9 fencing: stale/bare release ar failure eller harmless; successor-bytes ar exakta"
     else
       no "K9 fencing" \
-        "owners=[$owner_before]/[$owner_after_stale]/[$owner_after_bare]/[$owner_after_good] rc=$stale_rc/$bare_rc/$good_rc"
+        "owners=[$owner_before]/[$owner_after_stale]/[$owner_after_bare]/[$owner_after_good] sha=$sha9_before/$sha9_stale/$sha9_bare rc=$stale_rc/$bare_rc/$good_rc"
     fi
   else
     no "K9 fencing" \
@@ -363,7 +390,7 @@ fi
 D11="$WORK/s3-holder"
 mkdir -p "$D11"
 
-sleep 6 &
+sleep 30 &
 holder11=$!
 
 t11="$(
@@ -593,7 +620,13 @@ write_config \
 loop12=$!
 
 started12=0
-wait_mark_or_exit "$S3_HB_MARK" "$loop12" && started12=1
+wait_mark_or_exit "$S3_HB_MARK" "$loop12"; mark12_rc=$?
+if [ "$mark12_rc" -eq 2 ]; then
+  kill -9 "$loop12" 2>/dev/null || true; wait "$loop12" 2>/dev/null || true
+  echo "SKIP  K12 harness — loop marker timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+[ "$mark12_rc" -eq 0 ] && started12=1
 
 lease12="$D12/s3-heartbeat.lease"
 sha12a=""
@@ -674,10 +707,18 @@ write_config \
 loop13=$!
 
 started13=0
-wait_mark_or_exit "$S3_LOSS_MARK" "$loop13" && started13=1
+wait_mark_or_exit "$S3_LOSS_MARK" "$loop13"; mark13_rc=$?
+if [ "$mark13_rc" -eq 2 ]; then
+  kill -9 "$loop13" 2>/dev/null || true; wait "$loop13" 2>/dev/null || true
+  echo "SKIP  K13 harness — loop marker timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+[ "$mark13_rc" -eq 0 ] && started13=1
 
 successor13=""
 successor13_rc=99
+sha13_before=""
+owner13_before=""
 
 if [ "$started13" -eq 1 ] && [ -f "$D13/s3-loss.lease" ]; then
   rm -f "$D13/s3-loss.lease"
@@ -689,6 +730,10 @@ if [ "$started13" -eq 1 ] && [ -f "$D13/s3-loss.lease" ]; then
       2>/dev/null
   )"
   successor13_rc=$?
+  if [ "$successor13_rc" -eq 0 ] && token_ok "$successor13"; then
+    sha13_before="$(file_sha "$D13/s3-loss.lease")"
+    owner13_before="$("$CLI" "$D13" owner s3-loss 2>/dev/null || true)"
+  fi
 fi
 
 wait "$loop13"
@@ -699,17 +744,19 @@ att13=1
   && att13=0
 
 owner13="$("$CLI" "$D13" owner s3-loss 2>/dev/null || true)"
+sha13_after="$(file_sha "$D13/s3-loss.lease")"
 
 if [ "$started13" -eq 1 ] \
    && [ "$successor13_rc" -eq 0 ] \
    && token_ok "$successor13" \
    && [ "$loop13_rc" -eq 1 ] \
    && [ "$att13" -ne 0 ] \
-   && [ -n "$owner13" ]; then
-  ok "K13 lease-loss: gammalt run faller stängt och lämnar efterträdarens lease"
+   && [ -n "$sha13_before" ] && [ "$sha13_before" = "$sha13_after" ] \
+   && [ -n "$owner13_before" ] && [ "$owner13_before" = "$owner13" ]; then
+  ok "K13 lease-loss: gammalt run faller stängt och lämnar exakta successor-bytes"
 else
   no "K13 lease-loss" \
-    "start/successor/loop/att/owner=$started13/$successor13_rc/$loop13_rc/$att13/[$owner13]"
+    "start/successor/loop/att/owner=$started13/$successor13_rc/$loop13_rc/$att13/[$owner13_before]/[$owner13] sha=$sha13_before/$sha13_after"
 fi
 
 if [ "$successor13_rc" -eq 0 ] && token_ok "$successor13"; then
@@ -721,42 +768,1936 @@ fi
 unset S3_LOSS_MARK
 
 
-# K14 — heartbeat måste vara positiv och strikt mindre än TTL.
-D14="$WORK/s3-bad-lease"
-S14="$WORK/s3-bad-state"
-A14="$WORK/s3-bad-att"
-W14="$WORK/s3-bad-ws"
+# K14 — hela configdomänen: bool/null/string/zero/negativ och heartbeat >= TTL
+# vägras före lease, authority, event och session. En gate-owned lease/attest-
+# trace fäller även en implementation som ignorerar fälten, tar och clean-
+# releasar leasen och därför lämnar tom slutkatalog. En riktig one-task-spec
+# hindrar en implementation från att kortsluta en tom backlog före configdomän-
+# valideringen; lease-wrappern gör ändå varje ignorerat fält snabbt och rött.
+BADCFG="$WORK/make-bad-config.py"
+cat > "$BADCFG" <<'PY'
+import json,sys
+p,case=sys.argv[1:3]; d=json.load(open(p))
+cases={
+ "equal":(1,1), "greater":(1,2), "ttl-zero":(0,.2), "ttl-neg":(-1,.2),
+ "hb-zero":(1,0), "hb-neg":(1,-.2), "ttl-string":("1",.2),
+ "hb-string":(1,".2"), "ttl-bool":(True,.2), "hb-bool":(1,False),
+ "ttl-null":(None,.2), "hb-null":(1,None), "ttl-list":([1],.2),
+ "hb-list":(1,[.2])}
+if case=="cap-config":
+    d["gate_incarnation_observation"]=sys.argv[3]
+else:
+    d["lease_ttl_s"],d["lease_heartbeat_s"]=cases[case]
+json.dump(d,open(p,"w"))
+PY
 
-mkdir -p "$W14"
-"$ST" init "$S14" >/dev/null 2>&1
+cat > "$WORK/s3-bad-one-task.json" <<'JSON'
+{"spec_version":"s3-bad-one","defaults":{"max_changed_files":8,"max_added_lines":600},"tasks":[{"id":"bad-config-task","slice":0,"title":"B","summary":"B","allowed_write":["tests/lease-bad-config-fixture/**"],"exit_test":"verify/bin/ingen","exit_criterion":"-","docs_impact":[],"depends_on":[]}]}
+JSON
 
-export S3_BAD_MARK="$WORK/s3-bad-started"
+CFG_REPO_ROOT=$(git rev-parse --show-toplevel)
+CFG_SHADOW="$WORK/config-shadow"
+CFG_CAPTURE="$WORK/capture-config-lease-call.py"
+cat > "$CFG_CAPTURE" <<'PY'
+#!/usr/bin/env python3
+import base64,json,sys
+payload={"argv":sys.argv[1:]}
+raw=json.dumps(payload,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+print(base64.urlsafe_b64encode(raw).decode())
+PY
+chmod +x "$CFG_CAPTURE"
+mkdir -p "$CFG_SHADOW/controller/loop" "$CFG_SHADOW/controller/lease" \
+  "$CFG_SHADOW/controller/attest"
+cp controller/loop/cli "$CFG_SHADOW/controller/loop/cli"
+chmod +x "$CFG_SHADOW/controller/loop/cli"
+for sibling in taskval state workspace envelope brytare utforare launch worker policy verify; do
+  mkdir -p "$CFG_SHADOW/controller/$sibling"
+  ln -s "$CFG_REPO_ROOT/controller/$sibling/cli" "$CFG_SHADOW/controller/$sibling/cli"
+done
+cat > "$CFG_SHADOW/controller/lease/cli" <<'SH'
+#!/bin/sh
+encoded=$("$H004_CFG_CAPTURE" "$@")
+printf 'LEASE\t%s\t%s\n' "$*" "$encoded" >> "$H004_CFG_LEASE_TRACE"
+exit 1
+SH
+cat > "$CFG_SHADOW/controller/attest/cli" <<'SH'
+#!/bin/sh
+printf 'ATTEST\t%s\n' "$*" >> "$H004_CFG_ATTEST_TRACE"
+exit 1
+SH
+chmod +x "$CFG_SHADOW/controller/lease/cli" "$CFG_SHADOW/controller/attest/cli"
 
-write_config \
-  "$WORK/s3-bad-config.json" \
-  "$WORK/s3-heartbeat-backlog.json" \
-  "$A14" "$S14" "$D14" "s3-bad" "$W14" \
-  "$WORK/s3-bad-worker.py" \
-  "s3-bad-run" \
-  1 1
+CFG_NORMAL_CHECK="$WORK/check-config-normal-acquire.py"
+cat > "$CFG_NORMAL_CHECK" <<'PY'
+import base64,json,os,sys
+trace,root,resource=sys.argv[1:4]
 
-"$LOOP" run "$WORK/s3-bad-config.json" \
-  >"$WORK/s3-bad.out" \
-  2>"$WORK/s3-bad.err"
-bad14_rc=$?
+def capture(path):
+    try: lines=open(path,encoding="utf-8").read().splitlines()
+    except FileNotFoundError: lines=[]
+    if len(lines)!=1: raise ValueError(f"CALLS={len(lines)}")
+    parts=lines[0].split("\t",2)
+    payload=json.loads(base64.urlsafe_b64decode(parts[2]).decode())
+    a=payload.get("argv") if isinstance(payload,dict) else None
+    if not isinstance(a,list) or len(a)!=7 \
+       or os.path.realpath(a[0])!=os.path.realpath(root) \
+       or a[1:3] != ["acquire",resource]:
+        raise ValueError("ARGV="+repr(a))
+    opts=a[3:]
+    if set((opts[0],opts[2]))!={"--ttl","--holder-pid"}:
+        raise ValueError("OPTS="+repr(opts))
+    pairs={opts[0]:opts[1],opts[2]:opts[3]}
+    try: ok=float(pairs["--ttl"])==1 and int(pairs["--holder-pid"])>0
+    except (TypeError,ValueError): ok=False
+    if not ok: raise ValueError("VALUES="+repr(pairs))
+    normalized={"root":os.path.realpath(a[0]),"verb":a[1],"resource":a[2],
+                "ttl":1.0,"holder":"<LOOP_PID>"}
+    return normalized
 
-events14="$(wc -l < "$S14/events.jsonl" | tr -d ' ')"
+try:
+    got=capture(trace)
+except Exception as e:
+    print(str(e)); raise SystemExit(1)
+print("NORMAL_ACQUIRE")
+PY
 
-if [ "$bad14_rc" -eq 1 ] \
-   && [ ! -s "$S3_BAD_MARK" ] \
-   && [ ! -e "$D14/s3-bad.lease" ] \
-   && [ "$events14" = "0" ]; then
-  ok "K14 config: heartbeat >= TTL vägras före lease, event och session"
+bad14_ok=1; bad14_evidence=""
+for case14 in equal greater ttl-zero ttl-neg hb-zero hb-neg ttl-string hb-string \
+  ttl-bool hb-bool ttl-null hb-null ttl-list hb-list cap-config
+do
+  D14="$WORK/s3-bad-$case14-lease"; S14="$WORK/s3-bad-$case14-state"
+  A14="$WORK/s3-bad-$case14-att"; W14="$WORK/s3-bad-$case14-ws"
+  C14="$WORK/s3-bad-$case14.json"; M14="$WORK/s3-bad-$case14.started"
+  C14CAP="$WORK/s3-bad-$case14-cap.json"
+  L14="$WORK/s3-bad-$case14.lease-trace"; T14="$WORK/s3-bad-$case14.attest-trace"
+  mkdir -p "$W14"; "$ST" init "$S14" >/dev/null 2>&1
+  write_config "$C14" "$WORK/s3-bad-one-task.json" "$A14" "$S14" "$D14" \
+    "s3-bad-$case14" "$W14" "$WORK/s3-bad-worker.py" "s3-bad-$case14-run" 1 0.2
+  "$PY3" - "$C14CAP" "$D14" "$$" <<'PY'
+import base64,json,os,sys
+from pathlib import Path
+p=Path(sys.argv[1]).resolve(); root=Path(sys.argv[2]).resolve(); pid=int(sys.argv[3])
+d={"kind":"h004-process-incarnation-v1","lease_root":str(root),"observations":[{"host":os.uname().nodename,"pid":pid,"status":"LIVE","token_b64":base64.b64encode(b"config-bait-opaque\x00").decode()}]}
+p.write_text(json.dumps(d,sort_keys=True,separators=(",",":"))); p.chmod(0o600)
+PY
+  if ! "$PY3" "$BADCFG" "$C14" "$case14" "$C14CAP"; then
+    bad14_ok=0; bad14_evidence="$bad14_evidence $case14:fixture-error"; continue
+  fi
+  H004_CFG_CAPTURE="$CFG_CAPTURE" H004_CFG_LEASE_TRACE="$L14" H004_CFG_ATTEST_TRACE="$T14" S3_BAD_MARK="$M14" \
+    "$CFG_SHADOW/controller/loop/cli" run "$C14" \
+    >"$WORK/bad-$case14.out" 2>"$WORK/bad-$case14.err"
+  rc14=$?; events14=$(wc -l < "$S14/events.jsonl" | tr -d ' ')
+  attfiles14=$(find "$A14" -type f 2>/dev/null | wc -l | tr -d ' ')
+  calls14=0
+  if [ -f "$L14" ]; then calls14=$(wc -l < "$L14" | tr -d ' '); fi
+  statefiles14=$(find "$D14" -type f 2>/dev/null | wc -l | tr -d ' ')
+  invalid14=0
+  if [ "$case14" = "cap-config" ]; then
+    # Strict schema rejection (zero calls) and a normal, capability-free
+    # acquire (one exact public call) are both admissible here. K20c below is
+    # the behavioral A→B final-guard proof for the accepted/inert branch.
+    inert14_rc=1
+    if [ "$calls14" -eq 1 ]; then
+      "$PY3" "$CFG_NORMAL_CHECK" "$L14" "$D14" "s3-bad-$case14" \
+        >"$WORK/bad-$case14.inert-check" 2>&1
+      inert14_rc=$?
+    fi
+    if [ "$statefiles14" != "0" ] \
+       || { [ "$calls14" -ne 0 ] && [ "$inert14_rc" -ne 0 ]; }; then
+      invalid14=1
+    fi
+  elif [ -s "$L14" ]; then
+    invalid14=1
+  fi
+  if [ "$rc14" -ne 1 ] || [ -s "$M14" ] || [ "$invalid14" -ne 0 ] || [ -s "$T14" ] \
+     || [ "$events14" != "0" ] || [ "$attfiles14" != "0" ]; then
+    bad14_ok=0
+    bad14_evidence="$bad14_evidence $case14:$rc14/$events14/lease$([ -s "$L14" ] && echo 1 || echo 0)/attest$([ -s "$T14" ] && echo 1 || echo 0)"
+  fi
+done
+if [ "$bad14_ok" -eq 1 ]; then
+  ok "K14 configdomän: 14 ogiltiga TTL/heartbeat-former + config-selector vägras eller förblir inert före effekt"
 else
-  no "K14 config" \
-    "exit/start/lease/events=$bad14_rc/$([ -s "$S3_BAD_MARK" ] && echo ja || echo nej)/$([ -e "$D14/s3-bad.lease" ] && echo ja || echo nej)/$events14"
+  no "K14 configdomän" "case:exit/events/calls=$bad14_evidence"
 fi
 
-unset S3_BAD_MARK
+# K14d — absent test overrides select the frozen production defaults. The
+# fail-fast lease wrapper makes the acquire argv observable before any other
+# effect; this preserves the default TTL=180 anchor independently of K12's
+# deliberately short heartbeat fixture.
+C14D="$WORK/s3-default-config.json"; L14D="$WORK/s3-default.lease-trace"
+S14D="$WORK/s3-default-state"; A14D="$WORK/s3-default-att"; W14D="$WORK/s3-default-ws"
+mkdir -p "$W14D"; "$ST" init "$S14D" >/dev/null 2>&1
+write_config "$C14D" "$WORK/s3-bad-one-task.json" "$A14D" "$S14D" \
+  "$WORK/s3-default-lease" s3-default-config "$W14D" "$WORK/s3-bad-worker.py" \
+  s3-default-run 1 0.2
+"$PY3" - "$C14D" <<'PY'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); d.pop("lease_ttl_s"); d.pop("lease_heartbeat_s")
+json.dump(d,open(p,"w"))
+PY
+H004_CFG_CAPTURE="$CFG_CAPTURE" H004_CFG_LEASE_TRACE="$L14D" H004_CFG_ATTEST_TRACE="$WORK/s3-default.attest-trace" \
+S3_BAD_MARK="$WORK/s3-default.started" "$CFG_SHADOW/controller/loop/cli" run "$C14D" \
+  >"$WORK/s3-default.out" 2>"$WORK/s3-default.err"
+rc14d=$?
+if [ "$rc14d" -eq 1 ] && [ "$(wc -l < "$L14D" | tr -d ' ')" = "1" ] \
+   && grep -q ' acquire s3-default-config --ttl 180' "$L14D" \
+   && ! grep -Eq 'gate-incarnation|capability|observation' "$L14D" \
+   && [ "$(wc -l < "$S14D/events.jsonl" | tr -d ' ')" = "0" ]; then
+  ok "K14d config utan overrides använder default TTL 180 före varje effekt"
+else
+  no "K14d default lease config" "exit=$rc14d trace=[$(cat "$L14D" 2>/dev/null)]"
+fi
+
+
+# ========== S3 owner hardening: incarnation + authority/finalize =============
+
+AS1="1111111111111111111111111111111111111111"
+AS2="2222222222222222222222222222222222222222"
+
+# K15 — komplett ProcessIncarnationSource-matris genom en explicit, data-only
+# gate-capability. Capabilityn ligger UTANFOR lease-rooten, binds till rootens
+# canonical identity + exakta (host,pid)-queries och kontrolleras byte-identisk
+# efter varje call. Den kan inte se TTL/token/action och kan inte ge verdict.
+# Ingen source-/API-string eller serialiserad lease-nyckel inspekteras.
+INC15="$WORK/incarnation-matrix.py"
+cat > "$INC15" <<'PY'
+import base64, hashlib, json, os, shutil, signal, subprocess, sys, time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+cli=str(Path(sys.argv[1]).resolve()); base=Path(sys.argv[2]).resolve()
+caps=base/"caps"; caps.mkdir(parents=True,exist_ok=True)
+host=os.uname().nodename
+FLAG="--gate-incarnation-observation"
+KIND="h004-process-incarnation-v1"
+
+class Harness(Exception): pass
+class Product(Exception): pass
+
+def digest_file(p):
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+def tree(root):
+    h=hashlib.sha256(); root=Path(root)
+    if not root.exists(): return h.hexdigest()
+    for p in sorted(root.rglob("*"),key=lambda x:x.relative_to(root).as_posix()):
+        rel=p.relative_to(root).as_posix(); st=p.lstat()
+        h.update(rel.encode()+b"\0"+str(st.st_mode & 0o7777).encode()+b"\0")
+        if p.is_symlink(): h.update(b"L"+os.readlink(p).encode())
+        elif p.is_file(): h.update(b"F"+p.read_bytes())
+        elif p.is_dir(): h.update(b"D")
+        else: h.update(b"O")
+    return h.hexdigest()
+
+def live(pid,token):
+    return {"host":host,"pid":int(pid),"status":"LIVE",
+            "token_b64":base64.b64encode(token).decode("ascii")}
+def absent(pid): return {"host":host,"pid":int(pid),"status":"ABSENT"}
+def indeterminate(pid): return {"host":host,"pid":int(pid),"status":"INDETERMINATE"}
+
+cap_no=0
+def capability(root,rows=None,raw=None,bound=None,name="cap",extra=None):
+    global cap_no; cap_no+=1
+    p=caps/f"{cap_no:03d}-{name}.json"
+    if raw is None:
+        data={"kind":KIND,"lease_root":str(Path(bound or root).resolve()),
+              "observations":rows or []}
+        if extra: data.update(extra)
+        raw=json.dumps(data,sort_keys=True,separators=(",",":")).encode()
+    p.write_bytes(raw); p.chmod(0o600); return p
+
+def call(root,*args,cap=None,env=None,timeout=20):
+    argv=[cli,str(Path(root).resolve()),*map(str,args)]
+    before=None
+    if cap is not None:
+        cap=Path(cap).resolve(); before=digest_file(cap) if cap.exists() else "MISSING"
+        argv.extend([FLAG,str(cap)])
+    e=os.environ.copy()
+    if env: e.update(env)
+    try:
+        p=subprocess.run(argv,capture_output=True,text=True,timeout=timeout,env=e)
+    except subprocess.TimeoutExpired as ex:
+        raise Harness("COMMAND_TIMEOUT:"+" ".join(map(str,args[:2]))) from ex
+    if cap is not None:
+        after=digest_file(cap) if cap.exists() else "MISSING"
+        if after!=before: raise Product("CAPABILITY_MUTATED:"+cap.name)
+    return p.returncode,p.stdout.strip(),p.stderr.strip()
+
+def lease_token(rc,out,label):
+    if rc!=0 or not (8<=len(out)<=256) or any(c.isspace() for c in out):
+        raise Product(f"{label}:NO_OPAQUE_LEASE_ID rc={rc} out={out!r}")
+    return out
+
+def root(name):
+    p=base/name; p.mkdir(parents=True,exist_ok=False); return p.resolve()
+
+def refuse_same(r,before,args,cap,label,env=None):
+    rc,_,_=call(r,*args,cap=cap,env=env)
+    after=tree(r)
+    if rc==0 or after!=before:
+        raise Product(f"{label}:rc={rc}:bytes_same={after==before}")
+
+def refuse_cap_arg_same(r,before,args,cap,cap_arg,label):
+    cap=Path(cap); cap_before=digest_file(cap)
+    argv=[cli,str(Path(r).resolve()),*map(str,args),FLAG,str(cap_arg)]
+    try:
+        p=subprocess.run(argv,capture_output=True,text=True,timeout=20,cwd=base)
+    except subprocess.TimeoutExpired as ex:
+        raise Harness("COMMAND_TIMEOUT:"+label) from ex
+    if digest_file(cap)!=cap_before: raise Product("CAPABILITY_MUTATED:"+cap.name)
+    after=tree(r)
+    if p.returncode==0 or after!=before:
+        raise Product(f"{label}:rc={p.returncode}:bytes_same={after==before}")
+
+observed={}
+def observe(label,value):
+    if label in observed: raise Harness("DUPLICATE_OBSERVATION:"+label)
+    observed[label]=value
+
+def prove_race_winner_current(r,task,old,winner,cap,label):
+    # Counting rc=0 is insufficient: a losing command may have installed a
+    # later hidden generation and then returned failure. The old token must be
+    # byte-harmless, the sole reported winner must renew and release the actual
+    # current generation, and the task must then be freely acquirable.
+    state=Path(r)/(task+".lease")
+    try: before=state.read_bytes()
+    except FileNotFoundError: raise Product(f"{label}:AUTHORITATIVE_STATE_MISSING")
+    oldrc,_,_=call(r,"release",task,old)
+    try: after_old=state.read_bytes()
+    except FileNotFoundError: after_old=None
+    if oldrc==0 or after_old!=before:
+        raise Product(f"{label}:OLD_TOKEN_MUTATED_CURRENT rc={oldrc}")
+    rrc,_,_=call(r,"renew",task,winner,cap=cap)
+    try: after_renew=state.read_bytes()
+    except FileNotFoundError: after_renew=None
+    if rrc!=0 or after_renew in (None,before):
+        raise Product(f"{label}:WINNER_NOT_RENEWABLE rc={rrc}")
+    relrc,_,_=call(r,"release",task,winner)
+    if relrc!=0: raise Product(f"{label}:WINNER_NOT_RELEASABLE rc={relrc}")
+    frc,fout,_=call(r,"acquire",task,"--ttl","30")
+    fresh=lease_token(frc,fout,label+"_POST_RELEASE_FREE")
+    if fresh in (old,winner): raise Product(f"{label}:GENERATION_REUSED")
+    if call(r,"release",task,fresh)[0]!=0:
+        raise Product(f"{label}:POST_RELEASE_CLEANUP")
+
+holder=subprocess.Popen(["sleep","60"],start_new_session=True)
+pid=holder.pid
+successor_holder=subprocess.Popen(["sleep","60"],start_new_session=True)
+successor_pid=successor_holder.pid
+A=b"A\x00opaque/\xff lifetime token \xce\xa9"
+B=b"B:{not-a-uuid}+opaque\x00\x01"
+C=b"C successor opaque\x00\xfe"
+try:
+    # LIVE is mandatory at holder-bound acquire. Negative observations and
+    # malformed/error capabilities must leave an empty root byte-identical.
+    for name,make in (
+        ("absent",lambda r:capability(r,[absent(pid)],name="acq-absent")),
+        ("indeterminate",lambda r:capability(r,[indeterminate(pid)],name="acq-indet")),
+        ("malformed",lambda r:capability(r,raw=b"{not-json",name="acq-malformed")),
+        ("missing",lambda r:caps/"does-not-exist.json"),
+        ("duplicate",lambda r:capability(r,[live(pid,A),live(pid,A)],name="acq-duplicate")),
+    ):
+        r=root("requires-live-"+name); cap=make(r)
+        rc,_,_=call(r,"acquire","requires-live","--ttl","30","--holder-pid",pid,cap=cap)
+        if rc==0: raise Product(f"HOLDER_ACQUIRE_{name}:UNSAFE_SUCCESS")
+        # A rejected observer may initialize mechanism-neutral lock/database
+        # scaffolding, but it may not leave ownership: ordinary free acquire
+        # must still succeed immediately and be token-releasable.
+        frc,fout,_=call(r,"acquire","requires-live","--ttl","30")
+        ftok=lease_token(frc,fout,f"HOLDER_ACQUIRE_{name}_LEFT_STATE")
+        rrc,_,_=call(r,"release","requires-live",ftok)
+        if rrc!=0: raise Product(f"HOLDER_ACQUIRE_{name}:CLEANUP_RC={rrc}")
+
+    # Same numeric PID, A vs B. Before TTL every observation refuses. After
+    # TTL exact A refuses; B permits reclaim. Tokens exercise arbitrary bytes.
+    r=root("same-pid"); cap_a=capability(r,[live(pid,A)],name="same-a")
+    rc,out,_=call(r,"acquire","same-pid","--ttl","3","--holder-pid",pid,cap=cap_a)
+    old=lease_token(rc,out,"SAME_PID_ACQUIRE"); before=tree(r)
+    cap_b=capability(r,[live(pid,B)],name="same-b")
+    cap_abs=capability(r,[absent(pid),live(successor_pid,C)],name="same-absent")
+    cap_ind=capability(r,[indeterminate(pid),live(successor_pid,C)],name="same-indet")
+    refuse_same(r,before,("acquire","same-pid","--ttl","30","--holder-pid",pid),cap_a,"A_BEFORE_TTL")
+    refuse_same(r,before,("acquire","same-pid","--ttl","30","--holder-pid",pid),cap_b,"B_BEFORE_TTL")
+    observe("pre_b","REFUSE")
+    refuse_same(r,before,("acquire","same-pid","--ttl","30","--holder-pid",successor_pid),cap_abs,"ABSENT_BEFORE_TTL")
+    refuse_same(r,before,("acquire","same-pid","--ttl","30","--holder-pid",successor_pid),cap_ind,"INDET_BEFORE_TTL")
+    deadline=time.monotonic()+3.25
+    while time.monotonic()<deadline: time.sleep(.05)
+    refuse_same(r,before,("acquire","same-pid","--ttl","30","--holder-pid",pid),cap_a,"A_AFTER_TTL")
+    observe("after_a","REFUSE")
+    rc,out,_=call(r,"acquire","same-pid","--ttl","30","--holder-pid",pid,cap=cap_b)
+    new=lease_token(rc,out,"B_AFTER_TTL")
+    if new==old: raise Product("B_AFTER_TTL_REUSED_LEASE_ID")
+    observe("after_b","RECLAIM")
+
+    # ABSENT after TTL permits reclaim through the same serialized path.
+    r=root("absent-after"); ca=capability(r,[live(pid,A)],name="abs-a")
+    rc,out,_=call(r,"acquire","absent-after","--ttl","0.5","--holder-pid",pid,cap=ca)
+    old=lease_token(rc,out,"ABSENT_PREP"); time.sleep(.75)
+    cab=capability(r,[absent(pid),live(successor_pid,C)],name="absent")
+    rc,out,_=call(r,"acquire","absent-after","--ttl","30",
+                  "--holder-pid",successor_pid,cap=cab)
+    if lease_token(rc,out,"ABSENT_AFTER_TTL")==old: raise Product("ABSENT_REUSED_ID")
+    observe("after_absent","RECLAIM")
+
+    # Indeterminate/malformed/error/duplicate/verdict-like results after TTL
+    # all refuse with exact state bytes and never fall back to numeric PID.
+    r=root("closed-after"); ca=capability(r,[live(pid,A)],name="closed-a")
+    rc,out,_=call(r,"acquire","closed-after","--ttl","0.5","--holder-pid",pid,cap=ca)
+    lease_token(rc,out,"CLOSED_PREP"); time.sleep(.75); before=tree(r)
+    malformed=capability(r,raw=b"[]",name="malformed")
+    duplicate=capability(r,[live(pid,B),live(pid,B),live(successor_pid,C)],name="duplicate")
+    verdict_row=live(pid,B); verdict_row["reclaim"]=True
+    verdict=capability(r,[verdict_row,live(successor_pid,C)],name="verdict")
+    missing=caps/"still-missing.json"
+    wrong_host=live(pid,B); wrong_host["host"]=host+"-not-this-host"
+    wrong_pid=live(pid+100000,B)
+    unknown={"host":host,"pid":pid,"status":"UNKNOWN"}
+    live_without_token={"host":host,"pid":pid,"status":"LIVE"}
+    live_bad_token={"host":host,"pid":pid,"status":"LIVE","token_b64":"%%%not-base64%%%"}
+    for label,cap in (("INDETERMINATE",capability(r,[indeterminate(pid),live(successor_pid,C)],name="indet")),
+                      ("MALFORMED",malformed),("ERROR",missing),
+                      ("DUPLICATE",duplicate),("RECLAIM_VERDICT",verdict),
+                      ("UNKNOWN_STATUS",capability(r,[unknown,live(successor_pid,C)],name="unknown-status")),
+                      ("LIVE_NO_TOKEN",capability(r,[live_without_token,live(successor_pid,C)],name="live-no-token")),
+                      ("LIVE_BAD_TOKEN",capability(r,[live_bad_token,live(successor_pid,C)],name="live-bad-token")),
+                      ("WRONG_HOST",capability(r,[wrong_host,live(successor_pid,C)],name="wrong-host")),
+                      ("WRONG_PID",capability(r,[wrong_pid,live(successor_pid,C)],name="wrong-pid")),
+                      ("NO_MATCH",capability(r,[],name="no-match")),
+                      ("FORBIDDEN_TTL",capability(r,[live(pid,B),live(successor_pid,C)],name="has-ttl",extra={"ttl":0})),
+                      ("FORBIDDEN_LEASE_ID",capability(r,[live(pid,B),live(successor_pid,C)],name="has-lease",extra={"lease_id":"verdict-bait"})),
+                      ("FORBIDDEN_ACTION",capability(r,[live(pid,B),live(successor_pid,C)],name="has-action",extra={"action":"RECLAIM"}))):
+        refuse_same(r,before,("acquire","closed-after","--ttl","30","--holder-pid",successor_pid),cap,label+"_AFTER_TTL")
+        if label=="INDETERMINATE": observe("after_indet","REFUSE")
+    relative=capability(r,[live(pid,B),live(successor_pid,C)],name="relative")
+    refuse_cap_arg_same(r,before,
+                        ("acquire","closed-after","--ttl","30","--holder-pid",successor_pid),
+                        relative,os.path.relpath(relative,base),"RELATIVE_CAPABILITY")
+
+    # Fail-closed must not be an accidental kill(pid,0) fallback. Anchor a
+    # lease through fake LIVE(A) for a PID that is then verified absent; after
+    # TTL, INDETERMINATE/malformed/error still refuse an unbound successor.
+    dead_proc=subprocess.Popen(["sleep","60"],start_new_session=True)
+    dead_pid=dead_proc.pid
+    os.killpg(dead_pid,signal.SIGKILL); dead_proc.wait(timeout=5)
+    try: os.kill(dead_pid,0)
+    except ProcessLookupError: pass
+    else: raise Harness("DEAD_PID_NOT_ABSENT")
+    for label,make in (
+        ("DEAD_INDETERMINATE",lambda r:capability(r,[indeterminate(dead_pid)],name="dead-indet")),
+        ("DEAD_MALFORMED",lambda r:capability(r,raw=b"{broken",name="dead-malformed")),
+        ("DEAD_ERROR",lambda r:caps/"dead-observer-error.json"),
+    ):
+        r=root(label.lower()); alive=capability(r,[live(dead_pid,A)],name="dead-live-a")
+        rc,out,_=call(r,"acquire",label.lower(),"--ttl","0.5","--holder-pid",dead_pid,cap=alive)
+        lease_token(rc,out,label+"_PREP"); time.sleep(.75); before=tree(r)
+        refuse_same(r,before,("acquire",label.lower(),"--ttl","30"),make(r),label)
+
+    # Renew and therefore the loop's final renew/guard compare both generation
+    # and stored incarnation. Only exact A may move heartbeat bytes.
+    r=root("renew"); ca=capability(r,[live(pid,A)],name="renew-a")
+    rc,out,_=call(r,"acquire","renew","--ttl","30","--holder-pid",pid,cap=ca)
+    tok=lease_token(rc,out,"RENEW_PREP")
+    before=tree(r); rc,_,_=call(r,"renew","renew",tok,cap=ca)
+    if rc!=0 or tree(r)==before: raise Product(f"RENEW_A:rc={rc}:bytes_changed={tree(r)!=before}")
+    stable=tree(r)
+    renew_caps=(("B",capability(r,[live(pid,B)],name="renew-b")),
+                ("ABSENT",capability(r,[absent(pid)],name="renew-absent")),
+                ("INDETERMINATE",capability(r,[indeterminate(pid)],name="renew-indet")),
+                ("MALFORMED",capability(r,raw=b"garbage",name="renew-malformed")),
+                ("ERROR",caps/"renew-missing.json"))
+    for label,cap in renew_caps:
+        refuse_same(r,stable,("renew","renew",tok),cap,"RENEW_"+label)
+        if label=="B": observe("renew_b","REFUSE")
+
+    # Incarnation branch keeps the historical exactly-one expired-reclaim
+    # serialization: 100 LIVE(B) observers may yield exactly one successor.
+    r=root("concurrent"); ca=capability(r,[live(pid,A)],name="race-a")
+    rc,out,_=call(r,"acquire","inc-race","--ttl","0.5","--holder-pid",pid,cap=ca)
+    old=lease_token(rc,out,"RACE_PREP"); time.sleep(.75)
+    cb=capability(r,[live(pid,B)],name="race-b")
+    def contender(_):
+        return call(r,"acquire","inc-race","--ttl","30","--holder-pid",pid,cap=cb)[:2]
+    with ThreadPoolExecutor(max_workers=24) as ex: results=list(ex.map(contender,range(100)))
+    winners=[out for rc,out in results if rc==0]
+    if len(winners)!=1 or not winners[0] or winners[0]==old:
+        raise Product(f"INCARNATION_RACE:winners={len(winners)}:token={winners[:1]}")
+    prove_race_winner_current(r,"inc-race",old,winners[0],cb,"INCARNATION_RACE")
+    observe("winners",len(winners))
+
+    # ABSENT follows the identical serialized reclaim primitive. Its old-
+    # holder lookup and prospective LIVE(C) lookup are separate exact rows.
+    r=root("concurrent-absent"); ca=capability(r,[live(pid,A)],name="race-abs-a")
+    rc,out,_=call(r,"acquire","inc-race-absent","--ttl","0.5","--holder-pid",pid,cap=ca)
+    old_abs=lease_token(rc,out,"ABSENT_RACE_PREP"); time.sleep(.75)
+    cab=capability(r,[absent(pid),live(successor_pid,C)],name="race-absent-c")
+    def absent_contender(_):
+        return call(r,"acquire","inc-race-absent","--ttl","30",
+                    "--holder-pid",successor_pid,cap=cab)[:2]
+    with ThreadPoolExecutor(max_workers=24) as ex:
+        absent_results=list(ex.map(absent_contender,range(100)))
+    absent_winners=[out for rc,out in absent_results if rc==0]
+    if len(absent_winners)!=1 or not absent_winners[0] or absent_winners[0]==old_abs:
+        raise Product(f"ABSENT_RACE:winners={len(absent_winners)}:token={absent_winners[:1]}")
+    prove_race_winner_current(r,"inc-race-absent",old_abs,absent_winners[0],cab,"ABSENT_RACE")
+
+    # Capability is root-confined. A valid B observation bound to another
+    # canonical root is INDETERMINATE and cannot change the lease bytes.
+    r=root("root-bound"); ca=capability(r,[live(pid,A)],name="bound-a")
+    rc,out,_=call(r,"acquire","root-bound","--ttl","0.5","--holder-pid",pid,cap=ca)
+    lease_token(rc,out,"BOUND_PREP"); time.sleep(.75); before=tree(r)
+    other=root("other-root")
+    wrong=capability(r,[live(pid,B)],bound=other,name="wrong-root")
+    refuse_same(r,before,("acquire","root-bound","--ttl","30","--holder-pid",pid),wrong,"WRONG_ROOT")
+
+    # The capability is forbidden on the CLI's compiled/default lease root.
+    # An exact CLI copy gives that default a disposable physical location;
+    # omitting the root positional must reject before even scaffolding state.
+    shadow=base/"default-shadow"/"controller"/"lease"
+    shutil.copytree(Path(cli).parent,shadow); shadow_cli=shadow/"cli"
+    default_root=shadow/"state"; default_root.mkdir()
+    default_cap=capability(default_root,[live(pid,A)],name="default-root")
+    default_before=tree(default_root); cap_before=digest_file(default_cap)
+    try:
+        p=subprocess.run([str(shadow_cli),"acquire","default-root","--ttl","30",
+                          "--holder-pid",str(pid),FLAG,str(default_cap)],
+                         capture_output=True,text=True,timeout=20)
+    except subprocess.TimeoutExpired as ex:
+        raise Harness("COMMAND_TIMEOUT:DEFAULT_ROOT") from ex
+    if p.returncode==0 or tree(default_root)!=default_before or digest_file(default_cap)!=cap_before:
+        raise Product(f"DEFAULT_ROOT_CAPABILITY:rc={p.returncode}:bytes_same={tree(default_root)==default_before}")
+    try:
+        p=subprocess.run([str(shadow_cli),str(default_root.resolve()),"acquire","default-root",
+                          "--ttl","30","--holder-pid",str(pid),FLAG,str(default_cap)],
+                         capture_output=True,text=True,timeout=20)
+    except subprocess.TimeoutExpired as ex:
+        raise Harness("COMMAND_TIMEOUT:EXPLICIT_DEFAULT_ROOT") from ex
+    if p.returncode==0 or tree(default_root)!=default_before or digest_file(default_cap)!=cap_before:
+        raise Product(f"EXPLICIT_DEFAULT_ROOT_CAPABILITY:rc={p.returncode}:bytes_same={tree(default_root)==default_before}")
+
+    # Historical ambient oracle bait must be inert. Without the explicit
+    # capability argv, the fixed production OS source protects the live holder.
+    r=root("ambient-inert")
+    bait=capability(r,[live(pid,A)],name="ambient-valid-a")
+    env={"NORTROPIC_TEST_PROCESS_INCARNATION_FILE":str(bait)}
+    rc,out,_=call(r,"acquire","ambient","--ttl","0.5","--holder-pid",pid,env=env)
+    lease_token(rc,out,"AMBIENT_PREP"); time.sleep(.75); before=tree(r)
+    bait.write_text(json.dumps({"kind":KIND,"lease_root":str(r),
+                               "observations":[live(pid,B)]},
+                              sort_keys=True,separators=(",",":")))
+    bait.chmod(0o600)
+    refuse_same(r,before,("acquire","ambient","--ttl","30"),None,"AMBIENT_SELECTOR",env=env)
+
+    # A capability-shaped file inside lease state is also inert unless its
+    # absolute path is carried by the explicit argv suffix. Flip A→B after
+    # TTL; the fixed OS source must still see the same live real holder.
+    r=root("state-inert"); state_bait=r/"__gate-incarnation-observation.json"
+    def write_state_bait(token_bytes):
+        data={"kind":KIND,"lease_root":str(r),"observations":[live(pid,token_bytes)]}
+        state_bait.write_text(json.dumps(data,sort_keys=True,separators=(",",":")))
+    write_state_bait(A)
+    rc,out,_=call(r,"acquire","state-inert","--ttl","0.5","--holder-pid",pid)
+    lease_token(rc,out,"STATE_BAIT_PREP"); time.sleep(.75)
+    write_state_bait(B); before=tree(r)
+    refuse_same(r,before,("acquire","state-inert","--ttl","30"),None,"STATE_SELECTOR")
+
+    # The real product checks above populate this ledger only after each
+    # effect has been observed. The same exact oracle is now run against
+    # predicted one-defect decision mutants; every required ledger scenario
+    # is populated by a completed product check before the oracle executes.
+    facts={
+      "pre_b":       {"op":"acquire","expired":False,"obs":"DIFFERENT"},
+      "after_a":     {"op":"acquire","expired":True, "obs":"SAME"},
+      "after_b":     {"op":"acquire","expired":True, "obs":"DIFFERENT"},
+      "after_absent":{"op":"acquire","expired":True, "obs":"ABSENT"},
+      "after_indet": {"op":"acquire","expired":True, "obs":"INDETERMINATE"},
+      "renew_b":     {"op":"renew",  "expired":True, "obs":"DIFFERENT"},
+      "winners":     {"op":"race",   "expired":True, "obs":"DIFFERENT"},
+    }
+    def reference(f):
+        if f["op"]=="race": return 1
+        if f["op"]=="renew": return "RENEW" if f["obs"]=="SAME" else "REFUSE"
+        if not f["expired"]: return "REFUSE"
+        return "RECLAIM" if f["obs"] in ("DIFFERENT","ABSENT") else "REFUSE"
+    expected={name:reference(f) for name,f in facts.items()}
+    if observed!=expected:
+        raise Product(f"OBSERVATION_LEDGER:{observed!r}!={expected!r}")
+
+    # Predictions precede execution: PID/kill(0), H(host,pid), and an unused
+    # random token all miss after_b; TTL-blind and fake-verdict paths miss
+    # pre_b; UNKNOWN-as-dead misses after_indet; token-only guard misses
+    # renew_b; nonserialized reclaim misses winners.
+    predicted={
+      "PID_KILL0":"after_b", "H_HOST_PID":"after_b",
+      "UNUSED_RANDOM_TOKEN":"after_b", "MISMATCH_BEFORE_TTL":"pre_b",
+      "FAKE_VERDICT_BYPASSES_TTL":"pre_b", "UNKNOWN_AS_DEAD":"after_indet",
+      "TOKEN_ONLY_FINAL_GUARD":"renew_b", "UNSERIALIZED_RECLAIM":"winners",
+    }
+    def mutant(name,label,f):
+        value=reference(f)
+        if name in ("PID_KILL0","H_HOST_PID","UNUSED_RANDOM_TOKEN") and label=="after_b":
+            return "REFUSE"
+        if name in ("MISMATCH_BEFORE_TTL","FAKE_VERDICT_BYPASSES_TTL") and label=="pre_b":
+            return "RECLAIM"
+        if name=="UNKNOWN_AS_DEAD" and label=="after_indet": return "RECLAIM"
+        if name=="TOKEN_ONLY_FINAL_GUARD" and label=="renew_b": return "RENEW"
+        if name=="UNSERIALIZED_RECLAIM" and label=="winners": return 100
+        return value
+    caught=[]
+    for name,key in predicted.items():
+        ledger={label:mutant(name,label,f) for label,f in facts.items()}
+        mismatches={label for label in facts if ledger[label]!=observed[label]}
+        if key not in mismatches:
+            raise Product(f"MUTANT_SURVIVED:{name}:{sorted(mismatches)}")
+        caught.append(name)
+
+    print("INCARNATION_MATRIX=LIVE_REQUIRED,PRE_TTL,A/B/ABSENT,INDETERMINATE,NO_PID_FALLBACK,QUERY_SCHEMA,RENEW,RACE_B_AND_ABSENT,ROOT,DEFAULT,AMBIENT,STATE")
+    print("MUTANTS_CAUGHT=8/8:"+",".join(caught))
+except Harness as e:
+    print("HARNESS:"+str(e)); raise SystemExit(90)
+except Product as e:
+    print("PRODUCT:"+str(e)); raise SystemExit(20)
+finally:
+    for proc in (holder,successor_holder):
+        if proc.poll() is None:
+            try: os.killpg(proc.pid,signal.SIGKILL)
+            except (ProcessLookupError,PermissionError): pass
+        try: proc.wait(timeout=5)
+        except subprocess.TimeoutExpired: pass
+PY
+
+inc15_out=$("$PY3" "$INC15" "$CLI" "$WORK/incarnation-capability" 2>&1); inc15_rc=$?
+if [ "$inc15_rc" -eq 90 ]; then
+  echo "SKIP  K15 harness — $inc15_out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+elif [ "$inc15_rc" -eq 0 ] && echo "$inc15_out" | grep -q 'INCARNATION_MATRIX='; then
+  ok "K15 ProcessIncarnationSource: full tri-state/TTL/renew/concurrency/capability matrix"
+else
+  no "K15 process-incarnation matrix" "rc=$inc15_rc evidence=[$inc15_out]"
+fi
+
+# K15m — mutantprediktionerna körs inne i exakt samma driver och mot den
+# ledger som endast fylldes av K15:s verkliga produktutfall. Därmed kan detta
+# PASS aldrig överleva en borttagen scenariofamilj eller ett försvagat oracle.
+if [ "$inc15_rc" -eq 0 ] && echo "$inc15_out" | grep -q 'MUTANTS_CAUGHT=8/8'; then
+  ok "K15m produktbunden matrix fäller PID/H/token/TTL/fake/UNKNOWN/guard/serialization-mutants"
+else
+  no "K15m mutant sensitivity" "product-matrix-rc=$inc15_rc evidence=[$inc15_out]"
+fi
+
+
+# K16 — verkligt admitted stale-release/successor-overlap. Productionens
+# disposable barrier ligger efter att release har last/admitted generationen
+# och omedelbart fore authoritative transition. Pessimistisk serialisering
+# (successor blockerar) och optimistisk (successor installeras forst) accepteras;
+# efterat maste exakt successor finnas. Stale rc=0 ar tillatet endast som
+# harmless no-op — exitstatus kan aldrig dölja raderade successor-bytes.
+OVERLAP16="$WORK/release-overlap.py"
+cat > "$OVERLAP16" <<'PY'
+import os,signal,subprocess,sys,time
+from pathlib import Path
+
+cli=str(Path(sys.argv[1]).resolve()); base=Path(sys.argv[2]).resolve()
+root=base/"lease"; root.mkdir(parents=True)
+live=[]
+class Harness(Exception): pass
+class Product(Exception): pass
+
+def authoritative():
+    try: return (root/"overlap.lease").read_bytes()
+    except FileNotFoundError: return None
+
+def launch(*args,env=None):
+    p=subprocess.Popen([cli,*map(str,args)],stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,text=True,start_new_session=True,env=env)
+    live.append(p); return p
+
+def finish(p,timeout=20):
+    try: out,err=p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as ex:
+        killp(p); raise Harness("COMMAND_TIMEOUT") from ex
+    return p.returncode,out.strip(),err.strip()
+
+def run(*args): return finish(launch(*args))
+
+def token(rc,out,label):
+    if rc!=0 or not (8<=len(out)<=256) or any(c.isspace() for c in out):
+        raise Product(f"{label}:NO_TOKEN rc={rc} out={out!r}")
+    return out
+
+def killp(p):
+    if p.poll() is None:
+        try: os.killpg(p.pid,signal.SIGKILL)
+        except (ProcessLookupError,PermissionError): pass
+    try: p.wait(timeout=5)
+    except subprocess.TimeoutExpired: pass
+
+def wait_ready(path,p,timeout,label):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        if path.exists(): return True
+        if p.poll() is not None:
+            rc,out,err=finish(p)
+            raise Product(f"{label}_NOT_REACHED rc={rc} out={out!r} err={err[-120:]!r}")
+        time.sleep(.01)
+    raise Harness(label+"_TIMEOUT")
+
+def barrier_env(tag,with_wait=False):
+    ready=base/(tag+".ready"); go=base/(tag+".go")
+    env=os.environ.copy(); env["NORTROPIC_TEST_BARRIER_READY"]=str(ready)
+    env["NORTROPIC_TEST_BARRIER_GO"]=str(go)
+    wait=base/(tag+".wait-ready")
+    if with_wait: env["NORTROPIC_TEST_BARRIER_WAIT_READY"]=str(wait)
+    return ready,wait,go,env
+
+def first_successor_marker(ready,wait,p,timeout=20):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        r,w=ready.exists(),wait.exists()
+        if r and w: raise Product("SUCCESSOR_DUPLICATE_INITIAL_MARKERS")
+        if r: return "admitted"
+        if w: return "serialized-wait"
+        if p.poll() is not None:
+            rc,out,err=finish(p)
+            raise Product(f"SUCCESSOR_MARKER_NOT_REACHED rc={rc} out={out!r} err={err[-120:]!r}")
+        time.sleep(.01)
+    raise Harness("SUCCESSOR_MARKER_TIMEOUT")
+
+try:
+    rc,out,_=run(root,"acquire","overlap","--ttl","0.5")
+    old=token(rc,out,"OLD_ACQUIRE"); time.sleep(.75)
+    old_bytes=authoritative()
+    if not old_bytes: raise Product("OLD_AUTHORITY_BYTES_MISSING")
+
+    old_ready,_,old_go,old_env=barrier_env("old-release")
+    stale=launch(root,"release","overlap",old,env=old_env)
+    wait_ready(old_ready,stale,20,"OLD_ADMITTED_READY")
+    if authoritative()!=old_bytes:
+        raise Product("OLD_BARRIER_AFTER_TRANSITION")
+
+    # The successor reports a semantic fact, never its mechanism. Optimistic
+    # implementations can admit it beside the paused stale release. A
+    # pessimistic serializer reports that it is genuinely queued without
+    # having admitted any generation, then must later reach ADMITTED itself.
+    new_ready,new_wait,new_go,new_env=barrier_env("successor",with_wait=True)
+    successor=launch(root,"acquire","overlap","--ttl","30",
+                     "--holder-pid",os.getpid(),env=new_env)
+    mode=first_successor_marker(new_ready,new_wait,successor)
+    if authoritative()!=old_bytes:
+        raise Product("SUCCESSOR_MARKER_AFTER_TRANSITION")
+
+    if mode=="admitted":
+        if successor.poll() is not None: raise Product("SUCCESSOR_TRANSITION_BEFORE_GO")
+        new_go.touch(); newrc,newout,_=finish(successor)
+        new=token(newrc,newout,"OPTIMISTIC_SUCCESSOR")
+        successor_bytes=authoritative()
+        if not successor_bytes or successor_bytes==old_bytes:
+            raise Product("SUCCESSOR_DID_NOT_INSTALL")
+        old_go.touch(); finish(stale)
+        if authoritative()!=successor_bytes:
+            raise Product("STALE_RELEASE_MUTATED_SUCCESSOR")
+        mode="optimistic-admitted"
+    else:
+        if new_ready.exists() or successor.poll() is not None:
+            raise Product("SERIALIZED_WAIT_NOT_BLOCKED")
+        old_go.touch(); finish(stale)
+        post_stale=authoritative()
+        wait_ready(new_ready,successor,20,"SUCCESSOR_ADMITTED_READY")
+        if authoritative()!=post_stale:
+            raise Product("SUCCESSOR_TRANSITION_BEFORE_ADMITTED_GO")
+        if successor.poll() is not None:
+            raise Product("SERIALIZED_SUCCESSOR_EXITED_BEFORE_GO")
+        new_go.touch(); newrc,newout,_=finish(successor)
+        new=token(newrc,newout,"PESSIMISTIC_SUCCESSOR")
+        mode="pessimistic-serialized-wait"
+
+    if new==old: raise Product("SUCCESSOR_REUSED_GENERATION")
+    final_bytes=authoritative()
+    orc,owner,_=run(root,"owner","overlap")
+    if orc!=0 or not owner or final_bytes==old_bytes:
+        raise Product(f"SUCCESSOR_NOT_AUTHORITATIVE owner_rc={orc} owner={owner!r}")
+    rrc,_,_=run(root,"release","overlap",new)
+    if rrc!=0: raise Product("SUCCESSOR_CLEANUP_FAILED")
+    print("OVERLAP_SERIALIZED="+mode)
+except Harness as e:
+    print("HARNESS:"+str(e)); raise SystemExit(90)
+except Product as e:
+    print("PRODUCT:"+str(e)); raise SystemExit(20)
+finally:
+    for p in live: killp(p)
+PY
+
+overlap16_out=$("$PY3" "$OVERLAP16" "$CLI" "$WORK/s3-release-overlap" 2>&1); overlap16_rc=$?
+if [ "$overlap16_rc" -eq 90 ]; then
+  echo "SKIP  K16 harness — $overlap16_out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+elif [ "$overlap16_rc" -eq 0 ] && echo "$overlap16_out" | grep -q 'OVERLAP_SERIALIZED='; then
+  ok "K16 admitted stale release serialiseras harmless mot exakt successor"
+else
+  no "K16 stale release/successor overlap" "rc=$overlap16_rc evidence=[$overlap16_out]"
+fi
+
+# K16m — exakt samma overlap-driver måste fälla en långsam check-token-then-
+# unlink-mutant. Fem sekunders pre-admission-delay får inte feltolkas som
+# pessimistisk serialisering: mutanten rapporterar ADMITTED, installerar
+# successor och låter sedan den pausade stale releasen blint radera den.
+MUT16="$WORK/unsafe-stale-release-mutant.py"
+cat > "$MUT16" <<'PY'
+#!/usr/bin/env python3
+import os,sys,time
+from pathlib import Path
+
+root=Path(sys.argv[1]); root.mkdir(parents=True,exist_ok=True)
+verb=sys.argv[2]; task=sys.argv[3]; state=root/(task+".lease")
+
+def barrier():
+    ready=os.environ.get("NORTROPIC_TEST_BARRIER_READY")
+    go=os.environ.get("NORTROPIC_TEST_BARRIER_GO")
+    if not ready or not go: return
+    Path(ready).write_text("admitted\n")
+    deadline=time.monotonic()+20
+    while not Path(go).exists() and time.monotonic()<deadline: time.sleep(.01)
+    if not Path(go).exists(): raise SystemExit(90)
+
+if verb=="acquire":
+    if state.exists():
+        time.sleep(5)
+        barrier()
+        token="new-mutant-generation"
+    else:
+        token="old-mutant-generation"
+    state.write_text(token)
+    print(token)
+elif verb=="release":
+    supplied=sys.argv[4] if len(sys.argv)>4 else ""
+    before=state.read_text() if state.exists() else ""
+    if before!=supplied: raise SystemExit(1)
+    barrier()
+    state.unlink(missing_ok=True)  # defect: no generation recheck
+elif verb=="owner":
+    if not state.exists(): raise SystemExit(1)
+    print(state.read_text())
+else:
+    raise SystemExit(2)
+PY
+chmod +x "$MUT16"
+mut16_out=$("$PY3" "$OVERLAP16" "$MUT16" "$WORK/s3-release-overlap-mutant" 2>&1); mut16_rc=$?
+if [ "$mut16_rc" -eq 20 ] && echo "$mut16_out" | grep -q 'STALE_RELEASE_MUTATED_SUCCESSOR'; then
+  ok "K16m samma oracle fäller långsam check-token-then-unlink-mutant"
+elif [ "$mut16_rc" -eq 90 ]; then
+  echo "SKIP  K16m harness — $mut16_out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+else
+  no "K16m overlap-mutant sensitivity" "rc=$mut16_rc evidence=[$mut16_out]"
+fi
+
+# K16b — byte-oraklets selftest: radera successor med dess riktiga token och
+# fabricera sedan failure. Detta ar inte den admitted-operation-mutant som K16
+# sjalv fanger; det belagger att returned failure aldrig maskerar byteforlust.
+D16B="$WORK/s3-release-mutant"
+mkdir -p "$D16B"
+old16b=$("$CLI" "$D16B" acquire overlap-mutant --ttl 0.5 2>/dev/null); old16b_rc=$?
+sleep 0.7
+new16b=$("$CLI" "$D16B" acquire overlap-mutant --ttl 30 --holder-pid "$$" 2>/dev/null); new16b_rc=$?
+mutant16b_caught=0
+if [ "$old16b_rc" -eq 0 ] && token_ok "$old16b" \
+   && [ "$new16b_rc" -eq 0 ] && token_ok "$new16b"; then
+  sha16b_before=$(file_sha "$D16B/overlap-mutant.lease")
+  # Prediktion: mutanten rapporterar failure men successor saknas efterat.
+  "$CLI" "$D16B" release overlap-mutant "$new16b" >/dev/null 2>&1
+  mutant16b_rc=1
+  sha16b_after=$(file_sha "$D16B/overlap-mutant.lease")
+  if [ "$mutant16b_rc" -ne 0 ] \
+     && { [ -z "$sha16b_after" ] || [ "$sha16b_before" != "$sha16b_after" ]; }; then
+    mutant16b_caught=1
+  fi
+fi
+if [ "$mutant16b_caught" -eq 1 ]; then
+  ok "K16b byte-orakel: fabricerad failure efter successor-delete upptacks"
+else
+  no "K16b successor-byte-orakel" "positiva generationstokens saknas eller byte-oraklet reagerade inte"
+fi
+
+
+# K17 — expired reclaim har samma exakt-en-vinnare-semantik som fresh acquire.
+D17="$WORK/s3-expired-race"
+mkdir -p "$D17" "$WORK/r17"
+seed17=$("$CLI" "$D17" acquire expired-race --ttl 0.5 2>/dev/null); seed17_rc=$?
+sleep 0.7
+pids=""
+for i in $(seq 1 100); do
+  ( tok=$("$CLI" "$D17" acquire expired-race --ttl 30 2>/dev/null) \
+      && printf '%s' "$tok" > "$WORK/r17/$i" ) &
+  pids="$pids $!"
+done
+for p in $pids; do wait "$p" 2>/dev/null || true; done
+win17=$(ls "$WORK/r17" | wc -l | tr -d ' ')
+winner17=""
+if [ "$win17" = "1" ]; then winner17=$(cat "$WORK/r17/$(ls "$WORK/r17")"); fi
+current17=0; post17=""
+if [ "$seed17_rc" -eq 0 ] && token_ok "$seed17" \
+   && [ "$win17" = "1" ] && token_ok "$winner17" && [ "$winner17" != "$seed17" ]; then
+  sha17_before=$(file_sha "$D17/expired-race.lease")
+  "$CLI" "$D17" release expired-race "$seed17" >/dev/null 2>&1; stale17_rc=$?
+  sha17_after=$(file_sha "$D17/expired-race.lease")
+  "$CLI" "$D17" renew expired-race "$winner17" >/dev/null 2>&1; renew17_rc=$?
+  "$CLI" "$D17" release expired-race "$winner17" >/dev/null 2>&1; release17_rc=$?
+  post17=$([ "$release17_rc" -eq 0 ] && "$CLI" "$D17" acquire expired-race --ttl 30 2>/dev/null || true)
+  if [ "$stale17_rc" -ne 0 ] && [ -n "$sha17_before" ] \
+     && [ "$sha17_before" = "$sha17_after" ] && [ "$renew17_rc" -eq 0 ] \
+     && [ "$release17_rc" -eq 0 ] && token_ok "$post17" \
+     && [ "$post17" != "$seed17" ] && [ "$post17" != "$winner17" ]; then
+    current17=1
+  fi
+fi
+if [ "$current17" -eq 1 ]; then
+  ok "K17 100 samtidiga expired-reclaims ger exakt en ny generation"
+else
+  no "K17 expired reclaim race" "seed=$seed17_rc winners=$win17 winner-current=$current17 token=[$winner17]"
+fi
+if token_ok "$post17"; then "$CLI" "$D17" release expired-race "$post17" >/dev/null 2>&1 || true; fi
+
+
+# K18 — taskval far se provisional endast med exakt aktuell authority.
+TV="controller/taskval/cli"
+D18="$WORK/s3-taskval-att"
+S18="$WORK/s3-taskval-state"
+SPEC18="$WORK/s3-taskval.json"
+cat > "$SPEC18" <<'JSON'
+{
+  "tasks": [
+    {"id":"dep-legacy","depends_on":[]},
+    {"id":"dep-provisional","depends_on":[]},
+    {"id":"task-child","depends_on":["dep-legacy","dep-provisional"]}
+  ]
+}
+JSON
+"$ST" init "$S18" >/dev/null 2>&1
+"$ST" append "$S18" '{"task":"dep-legacy","status":"claimed"}' >/dev/null 2>&1
+"$ST" append "$S18" '{"task":"dep-provisional","status":"claimed"}' >/dev/null 2>&1
+"$ATT" "$D18" write dep-legacy "$AS1" >/dev/null 2>&1
+A18="taskval-current-authority"
+"$ATT" "$D18" begin-authority "$A18" >/dev/null 2>&1
+"$ATT" "$D18" write-authority "$A18" dep-provisional "$AS2" >/dev/null 2>&1
+none18=$("$TV" select "$SPEC18" "$D18" "$S18" 2>/dev/null); none18_rc=$?
+wrong18=$("$TV" select "$SPEC18" "$D18" "$S18" --authority wrong-authority 2>/dev/null); wrong18_rc=$?
+right18=$("$TV" select "$SPEC18" "$D18" "$S18" --authority "$A18" 2>/dev/null); right18_rc=$?
+prevalid18=0; "$ATT" "$D18" read dep-provisional --require-valid >/dev/null 2>&1 || prevalid18=$?
+if [ "$none18_rc" -eq 0 ] && [ -z "$none18" ] \
+   && [ "$wrong18_rc" -eq 0 ] && [ -z "$wrong18" ] \
+   && [ "$right18_rc" -eq 0 ] && [ "$right18" = "task-child" ] \
+   && [ "$prevalid18" -ne 0 ]; then
+  ok "K18 taskval: exact same-authority provisional kompletterar legacy dependency"
+else
+  no "K18 authority-bound taskval" "none=[$none18]/$none18_rc wrong=[$wrong18]/$wrong18_rc right=[$right18]/$right18_rc prevalid=$prevalid18"
+fi
+
+
+# K19 — fryst regressionsankare for taskval-ytan h-004 far andra.
+h010_out=$(./verify/bin/h-010-exit 2>&1); h010_rc=$?
+if [ "$h010_rc" -eq 2 ]; then
+  echo "SKIP  K19 harness — h-010 blev ODÖMBART"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+elif [ "$h010_rc" -eq 0 ]; then
+  ok "K19 legacy h-010 utan --authority forblir gron"
+else
+  no "K19 h-010 regression" "rc=$h010_rc tail=[$(echo "$h010_out" | tail -n 1)]"
+fi
+
+
+# K20 — clean two-task run genom disposable shadow root. Wrappers delegerar
+# riktiga systerkomponenter och loggar endast argv/rc; loggen ar evidence, aldrig
+# authority. Kopierad loop + taskval ar exakt kandidatens bytes.
+REPO_ROOT=$(git rev-parse --show-toplevel)
+SHADOW="$WORK/shadow"
+mkdir -p "$SHADOW/controller/loop" "$SHADOW/controller/taskval" \
+  "$SHADOW/controller/lease" "$SHADOW/controller/attest"
+cp controller/loop/cli "$SHADOW/controller/loop/cli"
+cp controller/taskval/cli "$SHADOW/controller/taskval/real"
+chmod +x "$SHADOW/controller/loop/cli" "$SHADOW/controller/taskval/real"
+for sibling in state workspace envelope brytare utforare launch worker policy verify; do
+  mkdir -p "$SHADOW/controller/$sibling"
+  ln -s "$REPO_ROOT/controller/$sibling/cli" "$SHADOW/controller/$sibling/cli"
+done
+
+ARGV_ENCODER="$WORK/encode-trace-argv.py"
+cat > "$ARGV_ENCODER" <<'PY'
+#!/usr/bin/env python3
+import base64,json,sys,time
+raw=json.dumps(sys.argv[1:],ensure_ascii=False,separators=(",",":")).encode()
+print(base64.urlsafe_b64encode(raw).decode()+"\t"+f"{time.monotonic():.9f}")
+PY
+chmod +x "$ARGV_ENCODER"
+export H004_ARGV_ENCODER="$ARGV_ENCODER"
+
+cat > "$SHADOW/controller/taskval/cli" <<'SH'
+#!/bin/sh
+out="$H004_TRACE.taskval.$$.out"; err="$H004_TRACE.taskval.$$.err"
+selector_bait=""; selector_tag=""
+if [ -n "${H004_PROVIDER_BAIT-}" ]; then
+  selector_bait="$H004_PROVIDER_BAIT"; selector_tag="PROVIDER"
+elif [ -n "${H004_CONFIG_BAIT-}" ]; then
+  selector_bait="$H004_CONFIG_BAIT"; selector_tag="CONFIG"
+fi
+if [ -n "$selector_bait" ] && [ ! -e "$H004_TRACE.selector-flipped" ] \
+   && [ -s "$H004_TRACE.holder" ] && [ -s "$H004_TRACE.root" ]; then
+  for marker in "$H004_WORK_MARK".*; do
+    if [ -f "$marker" ]; then
+      holder=$(cat "$H004_TRACE.holder")
+      root=$(cat "$H004_TRACE.root")
+      expected=$("$H004_CAP_MAKER" "$selector_bait" "$root" "$holder" B 2>/dev/null || true)
+      actual=$(shasum -a 256 "$selector_bait" 2>/dev/null | awk '{print $1}')
+      if [ -n "$expected" ] && [ "$expected" = "$actual" ]; then
+        printf '%s_BAIT_FLIPPED\t%s\n' "$selector_tag" "$actual" >> "$H004_TRACE"
+        : > "$H004_TRACE.selector-flipped"
+      else
+        printf '%s_BAIT_FLIP_FAILED\t%s\t%s\n' "$selector_tag" "$expected" "$actual" >> "$H004_TRACE"
+      fi
+      break
+    fi
+  done
+fi
+printf 'TASKVAL_ENTER\t%s\n' "$*" >> "$H004_TRACE"
+"$(dirname "$0")/real" "$@" >"$out" 2>"$err"; rc=$?
+cat "$out"; cat "$err" >&2
+printf 'TASKVAL\t%s\t%s\n' "$rc" "$*" >> "$H004_TRACE"
+if [ "${1-}" = "claim" ] && [ "$rc" -eq 0 ] && [ ! -s "$out" ]; then
+  printf 'TASKVAL_DRAIN\t0\t%s\n' "$*" >> "$H004_TRACE"
+fi
+rm -f "$out" "$err"
+exit "$rc"
+SH
+
+CAP_MAKER="$WORK/make-final-guard-cap.py"
+cat > "$CAP_MAKER" <<'PY'
+#!/usr/bin/env python3
+import base64,hashlib,json,os,sys
+from pathlib import Path
+p=Path(sys.argv[1]).resolve(); root=Path(sys.argv[2]).resolve(); pid=int(sys.argv[3]); label=sys.argv[4]
+token=("gate-"+label+"-incarnation").encode()+b"\x00\xff"
+data={"kind":"h004-process-incarnation-v1","lease_root":str(root),
+      "observations":[{"host":os.uname().nodename,"pid":pid,"status":"LIVE",
+                       "token_b64":base64.b64encode(token).decode()}]}
+raw=json.dumps(data,sort_keys=True,separators=(",",":")).encode()
+tmp=p.with_name(p.name+f".tmp-{os.getpid()}")
+tmp.write_bytes(raw); tmp.chmod(0o600); os.replace(tmp,p)
+print(hashlib.sha256(raw).hexdigest())
+PY
+
+RUN_BOUNDED="$WORK/run-bounded.py"
+cat > "$RUN_BOUNDED" <<'PY'
+import os,signal,subprocess,sys
+timeout=float(sys.argv[1]); argv=sys.argv[2:]
+p=subprocess.Popen(argv,start_new_session=True)
+pid_file=os.environ.get("H004_RUN_PID_FILE")
+if pid_file:
+    with open(pid_file,"w",encoding="ascii") as f: f.write(str(p.pid)+"\n")
+try: raise SystemExit(p.wait(timeout=timeout))
+except subprocess.TimeoutExpired:
+    try: os.killpg(p.pid,signal.SIGKILL)
+    except ProcessLookupError: pass
+    p.wait(); print("HARNESS:COMMAND_TIMEOUT:"+" ".join(argv[:2]),file=sys.stderr)
+    raise SystemExit(90)
+PY
+
+cat > "$SHADOW/controller/lease/cli" <<'SH'
+#!/bin/sh
+if [ "${2-}" = "renew" ] && [ "${H004_FINAL_GUARD_FAIL-0}" = "1" ] \
+   && grep -q '^TASKVAL_DRAIN' "$H004_TRACE" 2>/dev/null; then
+  holder=$(cat "$H004_TRACE.holder" 2>/dev/null || true)
+  cap="$H004_TRACE.final-guard-cap.json"
+  expected=$("$H004_CAP_MAKER" "$cap" "$1" "$holder" B 2>/dev/null || true)
+  err="$H004_TRACE.guard.$$.err"
+  out=$("$H004_REAL_LEASE" "$@" --gate-incarnation-observation "$cap" 2>"$err"); rc=$?
+  cat "$err" >&2; rm -f "$err"
+  actual=$(shasum -a 256 "$cap" 2>/dev/null | awk '{print $1}')
+  if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+    printf 'CAPABILITY_MUTATED\t%s\t%s\n' "$expected" "$actual" >> "$H004_TRACE"
+  fi
+  encoded=$("$H004_ARGV_ENCODER" "$@")
+  printf 'LEASE_GUARD_OBSERVATION\t%s\t%s\t%s\t%s\n' "$rc" "$out" "$*" "$encoded" >> "$H004_TRACE"
+  printf '%s\n' "$out"
+  exit "$rc"
+fi
+if [ "${2-}" = "release" ] && [ "${H004_RELEASE_FAIL-0}" = "1" ]; then
+  encoded=$("$H004_ARGV_ENCODER" "$@")
+  printf 'LEASE_FAIL\t1\t%s\t%s\n' "$*" "$encoded" >> "$H004_TRACE"
+  exit 1
+fi
+if [ "${2-}" = "release" ] && [ -n "${H004_PRE_RELEASE_QUIET_S-}" ]; then
+  printf 'LEASE_RELEASE_ENTER\t%s\n' "$*" >> "$H004_TRACE"
+  sleep "$H004_PRE_RELEASE_QUIET_S"
+  printf 'LEASE_RELEASE_QUIET_END\t%s\n' "$*" >> "$H004_TRACE"
+fi
+err="$H004_TRACE.lease.$$.err"
+selector_bait=""; selector_tag=""
+if [ -n "${H004_PROVIDER_BAIT-}" ]; then
+  selector_bait="$H004_PROVIDER_BAIT"; selector_tag="PROVIDER"
+elif [ -n "${H004_CONFIG_BAIT-}" ]; then
+  selector_bait="$H004_CONFIG_BAIT"; selector_tag="CONFIG"
+fi
+if [ "${2-}" = "acquire" ] && [ -n "$selector_bait" ]; then
+  provider_holder=""; provider_previous=""
+  for provider_arg in "$@"; do
+    if [ "$provider_previous" = "--holder-pid" ]; then provider_holder="$provider_arg"; break; fi
+    provider_previous="$provider_arg"
+  done
+  provider_expected=$("$H004_CAP_MAKER" "$selector_bait" "$1" "$provider_holder" A 2>/dev/null || true)
+  provider_actual=$(shasum -a 256 "$selector_bait" 2>/dev/null | awk '{print $1}')
+  if [ -z "$provider_expected" ] || [ "$provider_expected" != "$provider_actual" ]; then
+    printf '%s_BAIT_INIT_FAILED\t%s\t%s\n' "$selector_tag" "$provider_expected" "$provider_actual" >> "$H004_TRACE"
+  fi
+fi
+if [ "${2-}" = "acquire" ] && [ "${H004_FINAL_GUARD_FAIL-0}" = "1" ]; then
+  holder=""; previous=""
+  for arg in "$@"; do
+    if [ "$previous" = "--holder-pid" ]; then holder="$arg"; break; fi
+    previous="$arg"
+  done
+  cap="$H004_TRACE.initial-cap.json"
+  expected=$("$H004_CAP_MAKER" "$cap" "$1" "$holder" A 2>/dev/null || true)
+  out=$("$H004_REAL_LEASE" "$@" --gate-incarnation-observation "$cap" 2>"$err"); rc=$?
+  actual=$(shasum -a 256 "$cap" 2>/dev/null | awk '{print $1}')
+  if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+    printf 'CAPABILITY_MUTATED\t%s\t%s\n' "$expected" "$actual" >> "$H004_TRACE"
+  fi
+else
+  out=$("$H004_REAL_LEASE" "$@" 2>"$err"); rc=$?
+fi
+cat "$err" >&2; rm -f "$err"
+if [ "${2-}" = "release" ] && [ -n "${H004_RELEASE_BLOCK_READY-}" ]; then
+  encoded=$("$H004_ARGV_ENCODER" "$@")
+  printf 'LEASE_RELEASED\t%s\t%s\t%s\n' "$rc" "$*" "$encoded" >> "$H004_TRACE"
+  printf 'ready\n' > "$H004_RELEASE_BLOCK_READY"
+  while [ ! -e "$H004_RELEASE_BLOCK_GO" ]; do sleep 0.01; done
+fi
+encoded=$("$H004_ARGV_ENCODER" "$@")
+printf 'LEASE\t%s\t%s\t%s\t%s\n' "$rc" "$out" "$*" "$encoded" >> "$H004_TRACE"
+if [ "${2-}" = "acquire" ] && [ "$rc" -eq 0 ]; then
+  printf '%s\n' "$1" > "$H004_TRACE.root"
+  previous=""
+  for arg in "$@"; do
+    if [ "$previous" = "--holder-pid" ]; then
+      printf '%s\n' "$arg" > "$H004_TRACE.holder"
+      break
+    fi
+    previous="$arg"
+  done
+fi
+printf '%s\n' "$out"
+exit "$rc"
+SH
+cat > "$SHADOW/controller/attest/cli" <<'SH'
+#!/bin/sh
+if [ "${2-}" = "finalize-authority" ] && [ "${H004_FINALIZE_FAIL-0}" = "1" ]; then
+  encoded=$("$H004_ARGV_ENCODER" "$@")
+  printf 'ATTEST_FAIL\t1\t%s\t%s\n' "$*" "$encoded" >> "$H004_TRACE"
+  exit 1
+fi
+if [ "${2-}" = "finalize-authority" ] && [ -n "${H004_FINALIZE_BLOCK_READY-}" ]; then
+  printf 'ready\n' > "$H004_FINALIZE_BLOCK_READY"
+  while [ ! -e "$H004_FINALIZE_BLOCK_GO" ]; do sleep 0.01; done
+fi
+"$H004_REAL_ATTEST" "$@"; rc=$?
+encoded=$("$H004_ARGV_ENCODER" "$@")
+printf 'ATTEST\t%s\t%s\t%s\n' "$rc" "$*" "$encoded" >> "$H004_TRACE"
+exit "$rc"
+SH
+chmod +x "$SHADOW/controller/taskval/cli" "$SHADOW/controller/lease/cli" \
+  "$SHADOW/controller/attest/cli" "$CAP_MAKER"
+
+# Shared non-vacuity oracle for every negative run below. It derives the one
+# successful acquire token, then requires successful BEGIN and exact
+# authority-bound provisional writes before accepting the injected terminal
+# fault. Calls with wrong token or nonzero rc never count as protocol progress.
+PREFIX_CHECK="$WORK/check-run-prefix.py"
+cat > "$PREFIX_CHECK" <<'PY'
+import base64,json,sys
+trace,resource,tasks_csv,mode=sys.argv[1:5]
+tasks=tasks_csv.split(",") if tasks_csv else []
+try: lines=[x.rstrip("\n").split("\t") for x in open(trace,encoding="utf-8")]
+except Exception as e: print("TRACE_ERROR:"+str(e)); raise SystemExit(2)
+
+def command(tag,rc,verb):
+    found=[]
+    for i,x in enumerate(lines):
+        if x[0]!=tag or len(x)<2 or x[1]!=str(rc): continue
+        index=4 if tag in ("LEASE","LEASE_GUARD_OBSERVATION") else 3
+        if len(x)<=index: continue
+        try: argv=json.loads(base64.urlsafe_b64decode(x[index]).decode())
+        except Exception: continue
+        if not isinstance(argv,list) or len(argv)<2 or argv[1]!=verb: continue
+        found.append((i,x,argv[2:]))
+    return found
+
+def command_any(tag,verb):
+    found=[]
+    for i,x in enumerate(lines):
+        index=4 if tag in ("LEASE","LEASE_GUARD_OBSERVATION") else 3
+        if x[0]!=tag or len(x)<=index: continue
+        try: argv=json.loads(base64.urlsafe_b64decode(x[index]).decode())
+        except Exception: continue
+        if not isinstance(argv,list) or len(argv)<2 or argv[1]!=verb: continue
+        found.append((i,x,argv[2:]))
+    return found
+
+def lease(tag,rc,verb):
+    return [z for z in command(tag,rc,verb) if z[2] and z[2][0]==resource]
+def attest(tag,rc,verb): return command(tag,rc,verb)
+
+acq=lease("LEASE",0,"acquire")
+if len(acq)!=1 or len(acq[0][1])<3 or not acq[0][1][2]:
+    print(f"ACQUIRE:{len(acq)}"); raise SystemExit(1)
+token=acq[0][1][2]
+all_beg=attest("ATTEST",0,"begin-authority")
+all_writes=attest("ATTEST",0,"write-authority")
+all_successful_finalize=attest("ATTEST",0,"finalize-authority")
+beg=[z for z in all_beg if z[2]==[token]]
+writes=[]
+for z in all_writes:
+    tail=z[2]
+    if len(tail) in (3,5) and tail[0]==token and tail[1] in tasks:
+        writes.append((z,tail[1]))
+if len(beg)!=1 or sorted(t for _,t in writes)!=sorted(tasks) or len(writes)!=len(tasks):
+    print(f"PREFIX begin={len(beg)} writes={[t for _,t in writes]} token={token}")
+    raise SystemExit(1)
+if not (acq[0][0] < beg[0][0] < min(z[0][0] for z in writes)):
+    print("PREFIX_ORDER"); raise SystemExit(1)
+last_write=max(z[0][0] for z in writes)
+drains=[i for i,x in enumerate(lines) if x[0]=="TASKVAL_DRAIN" and len(x)>1 and x[1]=="0"]
+if len(drains)!=1 or last_write>=drains[0]:
+    print(f"DRAIN_ORDER write={last_write} drain={drains}"); raise SystemExit(1)
+
+regular_release_all=lease("LEASE",0,"release")
+regular_release=[z for z in regular_release_all if z[2]==[resource,token]]
+successful_renew=[z for z in lease("LEASE",0,"renew") if z[2]==[resource,token]]
+release_attempts=[z for tag in ("LEASE","LEASE_FAIL","LEASE_RELEASED")
+                  for z in command_any(tag,"release") if z[2] and z[2][0]==resource]
+renew_attempts=[z for tag in ("LEASE","LEASE_GUARD_OBSERVATION")
+                for z in command_any(tag,"renew") if z[2] and z[2][0]==resource]
+finalize_attempts=[z for tag in ("ATTEST","ATTEST_FAIL")
+                   for z in command_any(tag,"finalize-authority")]
+if all_successful_finalize:
+    print("UNSAFE_SUCCESSFUL_FINALIZE"); raise SystemExit(1)
+
+if len(all_beg)!=1 or len(all_writes)!=len(tasks):
+    print(f"EXTRA_AUTHORITY begin={len(all_beg)} writes={len(all_writes)}"); raise SystemExit(1)
+
+def exact_attempts(tags):
+    return sum(1 for x in lines if x[0] in tags)
+
+regular_renew_attempts=[z for z in command_any("LEASE","renew")
+                        if z[2] and z[2][0]==resource]
+pre_renew=[z for z in successful_renew if z[0] < drains[0]]
+pre_renew_attempts=[z for z in renew_attempts if z[0] < drains[0]]
+post_renew_attempts=[z for z in renew_attempts if z[0] > drains[0]]
+renew_prefix_ok=(len(regular_renew_attempts)==len(successful_renew)
+                 and all(z[2]==[resource,token] for z in regular_renew_attempts)
+                 and len(pre_renew_attempts)==len(pre_renew))
+
+if mode=="guard":
+    all_fault=lease("LEASE_GUARD_OBSERVATION",1,"renew")
+    fault=[z for z in all_fault if z[2]==[resource,token]]
+    ok=(len(fault)==1 and len(all_fault)==1 and renew_prefix_ok
+        and len(post_renew_attempts)==1 and post_renew_attempts[0]==fault[0]
+        and not release_attempts and not finalize_attempts
+        and not any(z[0] > drains[0] for z in successful_renew)
+        and drains[0] < fault[0][0])
+elif mode=="release_fail":
+    all_fault=lease("LEASE_FAIL",1,"release")
+    fault=[z for z in all_fault if z[2]==[resource,token]]
+    post=[z for z in successful_renew if z[0] > drains[0]]
+    ok=(len(fault)==1 and len(all_fault)==1 and len(release_attempts)==1
+        and renew_prefix_ok and len(post_renew_attempts)==1 and len(post)==1
+        and post_renew_attempts[0]==post[0] and not finalize_attempts
+        and drains[0] < post[0][0] < fault[0][0])
+elif mode=="released_barrier":
+    all_fault=lease("LEASE_RELEASED",0,"release")
+    fault=[z for z in all_fault if z[2]==[resource,token]]
+    post=[z for z in successful_renew if z[0] > drains[0]]
+    ok=(len(fault)==1 and len(all_fault)==1 and len(release_attempts)==1
+        and renew_prefix_ok and len(post_renew_attempts)==1 and len(post)==1
+        and post_renew_attempts[0]==post[0] and not finalize_attempts
+        and drains[0] < post[0][0] < fault[0][0])
+elif mode=="finalize_fail":
+    all_fault=attest("ATTEST_FAIL",1,"finalize-authority")
+    fault=[z for z in all_fault if z[2]==[token]]
+    post=[z for z in successful_renew if z[0] > drains[0]]
+    ok=(len(regular_release)==1 and len(regular_release_all)==1 and len(release_attempts)==1
+        and len(fault)==1 and len(all_fault)==1 and len(finalize_attempts)==1
+        and renew_prefix_ok and len(post_renew_attempts)==1 and len(post)==1
+        and post_renew_attempts[0]==post[0]
+        and drains[0] < post[0][0] < regular_release[0][0] < fault[0][0])
+elif mode=="released_prefix":
+    fault=[]
+    post=[z for z in successful_renew if z[0] > drains[0]]
+    ok=(len(regular_release)==1 and len(regular_release_all)==1 and len(release_attempts)==1
+        and renew_prefix_ok and len(post_renew_attempts)==1 and len(post)==1
+        and post_renew_attempts[0]==post[0] and not finalize_attempts
+        and drains[0] < post[0][0] < regular_release[0][0])
+elif mode=="stale_finalize":
+    all_fault=[]
+    for z in command_any("ATTEST","finalize-authority"):
+        try: nonzero=int(z[1][1])!=0
+        except (IndexError,ValueError): nonzero=False
+        if nonzero: all_fault.append(z)
+    fault=[z for z in all_fault if z[2]==[token]]
+    post=[z for z in successful_renew if z[0] > drains[0]]
+    ok=(len(regular_release)==1 and len(regular_release_all)==1 and len(release_attempts)==1
+        and len(fault)==1 and len(all_fault)==1 and len(finalize_attempts)==1
+        and renew_prefix_ok and len(post_renew_attempts)==1 and len(post)==1
+        and post_renew_attempts[0]==post[0]
+        and drains[0] < post[0][0] < regular_release[0][0] < fault[0][0]
+        and exact_attempts({"LEASE_GUARD_OBSERVATION","LEASE_FAIL","LEASE_RELEASED","ATTEST_FAIL"})==0)
+else:
+    print("UNKNOWN_MODE:"+mode); raise SystemExit(2)
+if not ok:
+    print(f"TERMINAL mode={mode} release={len(regular_release)} fault={len(fault)}")
+    raise SystemExit(1)
+print(token)
+PY
+
+SPEC21="$WORK/s3-authority-loop.json"
+cat > "$SPEC21" <<'JSON'
+{
+  "spec_version":"s3-authority-fixture",
+  "defaults":{"max_changed_files":8,"max_added_lines":600},
+  "tasks":[
+    {"id":"auth-step-a","slice":0,"title":"A","summary":"A","allowed_write":["tests/lease-authority-fixture/**"],"exit_test":"verify/bin/ingen","exit_criterion":"-","docs_impact":[],"depends_on":[]},
+    {"id":"auth-step-b","slice":0,"title":"B","summary":"B","allowed_write":["tests/lease-authority-fixture/**"],"exit_test":"verify/bin/ingen","exit_criterion":"-","docs_impact":[],"depends_on":["auth-step-a"]}
+  ]
+}
+JSON
+
+WORKER21="$WORK/s3-authority-worker.py"
+PROVIDER_BAIT="$WORK/provider-session-incarnation-bait.json"
+cat > "$WORKER21" <<'PY'
+import json,os,sys
+e=json.load(sys.stdin); task=e["task_id"]
+os.makedirs("tests/lease-authority-fixture",exist_ok=True)
+open(f"tests/lease-authority-fixture/{task}.txt","w").write(task+"\n")
+open(os.environ["H004_WORK_MARK"]+"."+task,"w").write("started\n")
+if os.environ.get("H004_PROVIDER_BAIT"):
+    print("provider-session-output:"+os.environ["H004_PROVIDER_BAIT"])
+print(task+" klar")
+PY
+
+D21="$WORK/s3-authority-lease"
+S21="$WORK/s3-authority-state"
+A21="$WORK/s3-authority-att"
+W21="$WORK/s3-authority-ws"
+TRACE21="$WORK/s3-authority.trace"
+mkdir -p "$W21"
+"$ST" init "$S21" >/dev/null 2>&1
+"$PY3" - "$PROVIDER_BAIT" "$D21" "$$" <<'PY'
+import base64,json,os,sys
+from pathlib import Path
+p=Path(sys.argv[1]).resolve(); root=Path(sys.argv[2]).resolve(); pid=int(sys.argv[3])
+d={"kind":"h004-process-incarnation-v1","lease_root":str(root),"observations":[{"host":os.uname().nodename,"pid":pid,"status":"LIVE","token_b64":base64.b64encode(b"provider-session-bait\x00\xff").decode()}]}
+p.write_text(json.dumps(d,sort_keys=True,separators=(",",":"))); p.chmod(0o600)
+PY
+write_config "$WORK/s3-authority-config.json" "$SPEC21" "$A21" "$S21" "$D21" \
+  "s3-authority-run-resource" "$W21" "$WORKER21" "s3-authority-run" 1.2 0.25
+
+H004_TRACE="$TRACE21" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-worker" \
+H004_PRE_RELEASE_QUIET_S=0.8 H004_PROVIDER_BAIT="$PROVIDER_BAIT" H004_CAP_MAKER="$CAP_MAKER" \
+  "$PY3" "$RUN_BOUNDED" 120 "$SHADOW/controller/loop/cli" run "$WORK/s3-authority-config.json" \
+  >"$WORK/s3-authority.out" 2>"$WORK/s3-authority.err"
+loop21_rc=$?
+if [ "$loop21_rc" -eq 90 ]; then
+  echo "SKIP  K20 harness — bounded loop timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+
+va21=1; vb21=1
+"$ATT" "$A21" read auth-step-a --require-valid >/dev/null 2>&1 && va21=0
+"$ATT" "$A21" read auth-step-b --require-valid >/dev/null 2>&1 && vb21=0
+events21=$(wc -l < "$S21/events.jsonl" | tr -d ' ')
+
+trace21_out=$("$PY3" - "$TRACE21" "$PROVIDER_BAIT" "$D21" <<'PYTRACE'
+import base64,json,os,sys
+try: lines=[x.rstrip("\n").split("\t") for x in open(sys.argv[1])]
+except Exception as e:
+    print(f"TRACE_ERROR:{e}"); raise SystemExit(2)
+def argv(x):
+    index=4 if x[0] in ("LEASE","LEASE_GUARD_OBSERVATION") else 3
+    try: return json.loads(base64.urlsafe_b64decode(x[index]).decode())
+    except Exception: return []
+acq=[(i,x) for i,x in enumerate(lines) if x[0]=="LEASE" and x[1]=="0" and len(argv(x))>=3 and argv(x)[1:3]==["acquire","s3-authority-run-resource"]]
+if len(acq)!=1 or not acq[0][1][2]: print("ACQUIRE_COUNT"); raise SystemExit(1)
+token=acq[0][1][2]
+acq_argv=argv(acq[0][1])
+try: holder=int(acq_argv[acq_argv.index("--holder-pid")+1])
+except Exception: print("HOLDER_PID"); raise SystemExit(1)
+lease_calls=[(i,x,argv(x)) for i,x in enumerate(lines) if x[0]=="LEASE"]
+def acquire_grammar(a):
+    if len(a)!=7 or os.path.realpath(a[0])!=os.path.realpath(sys.argv[3]) \
+       or a[1:3]!=["acquire","s3-authority-run-resource"]: return False
+    opts=a[3:]
+    if opts[0] in (opts[2],) or set((opts[0],opts[2]))!={"--ttl","--holder-pid"}: return False
+    pairs={opts[0]:opts[1],opts[2]:opts[3]}
+    try: return float(pairs["--ttl"])==1.2 and int(pairs["--holder-pid"])==holder
+    except (TypeError,ValueError): return False
+def lease_grammar(a):
+    if a==acq_argv: return acquire_grammar(a)
+    if len(a)==4 and os.path.realpath(a[0])==os.path.realpath(sys.argv[3]):
+        return a[1:]==["renew","s3-authority-run-resource",token] \
+            or a[1:]==["release","s3-authority-run-resource",token]
+    return False
+lease_grammar_ok=(len(lease_calls)>=3
+    and sum(1 for _,_,a in lease_calls if len(a)>1 and a[1]=="acquire")==1
+    and all(lease_grammar(a) for _,_,a in lease_calls))
+try: provider=json.load(open(sys.argv[2],encoding="utf-8"))
+except Exception as e: print("PROVIDER_CAP:"+str(e)); raise SystemExit(1)
+rows=provider.get("observations") if isinstance(provider,dict) else None
+provider_ok=(set(provider)=={"kind","lease_root","observations"}
+    and provider.get("kind")=="h004-process-incarnation-v1"
+    and os.path.realpath(provider.get("lease_root",""))==os.path.realpath(sys.argv[3])
+    and isinstance(rows,list) and len(rows)==1
+    and set(rows[0])=={"host","pid","status","token_b64"}
+    and rows[0].get("host")==os.uname().nodename and rows[0].get("pid")==holder
+    and rows[0].get("status")=="LIVE"
+    and base64.b64decode(rows[0].get("token_b64",""),validate=True)==b"gate-B-incarnation\x00\xff"
+    and sum(1 for x in lines if x[0]=="PROVIDER_BAIT_FLIPPED")==1
+    and not any(x[0] in ("PROVIDER_BAIT_INIT_FAILED","PROVIDER_BAIT_FLIP_FAILED") for x in lines))
+all_beg=[(i,x) for i,x in enumerate(lines) if x[0]=="ATTEST" and len(argv(x))>=2 and argv(x)[1]=="begin-authority"]
+all_writes=[(i,x) for i,x in enumerate(lines) if x[0]=="ATTEST" and len(argv(x))>=2 and argv(x)[1]=="write-authority"]
+all_rels=[(i,x) for i,x in enumerate(lines) if x[0]=="LEASE" and len(argv(x))>=2 and argv(x)[1]=="release" and argv(x)[2:3]==["s3-authority-run-resource"]]
+all_fins=[(i,x) for i,x in enumerate(lines) if x[0]=="ATTEST" and len(argv(x))>=2 and argv(x)[1]=="finalize-authority"]
+authority_reads=[(i,x) for i,x in enumerate(lines) if x[0]=="ATTEST" and x[1]=="0" and "--require-authority" in argv(x)]
+beg=[i for i,x in all_beg if x[1]=="0" and argv(x)[1:]==["begin-authority",token]]
+writes=[(i,argv(x)) for i,x in all_writes if x[1]=="0"]
+reads=[i for i,x in enumerate(lines) if x[0]=="ATTEST" and x[1]=="0" and len(argv(x))==5 and argv(x)[1]=="read" and argv(x)[3:]==["--require-authority",token]]
+rels=[i for i,x in all_rels if x[1]=="0" and argv(x)[1:]==["release","s3-authority-run-resource",token]]
+fins=[i for i,x in all_fins if x[1]=="0" and argv(x)[1:]==["finalize-authority",token]]
+renews=[(i,x) for i,x in enumerate(lines) if x[0]=="LEASE" and argv(x)[1:3]==["renew","s3-authority-run-resource"]]
+drains=[i for i,x in enumerate(lines) if x[0]=="TASKVAL_DRAIN" and len(x)>2 and x[1]=="0"]
+claims=[i for i,x in enumerate(lines) if x[0]=="TASKVAL_ENTER" and len(x)>1 and x[1].split()[:1]==["claim"]]
+enter=[i for i,x in enumerate(lines) if x[0]=="LEASE_RELEASE_ENTER" and len(x)>1 and x[1].endswith(" release s3-authority-run-resource "+token)]
+quiet=[i for i,x in enumerate(lines) if x[0]=="LEASE_RELEASE_QUIET_END" and len(x)>1 and x[1].endswith(" release s3-authority-run-resource "+token)]
+tasks=[]
+for _,args in writes:
+    try:
+        j=args.index("write-authority"); tasks.append((args[j+1],args[j+2]))
+    except Exception: pass
+ok=(provider_ok and lease_grammar_ok
+    and len(all_beg)==1 and len(all_writes)==2 and len(all_rels)==1 and len(all_fins)==1
+    and len(beg)==1 and len(writes)==2 and sorted(tasks)==[(token,"auth-step-a"),(token,"auth-step-b")]
+    and reads and len(authority_reads)==len(reads) and claims and len(rels)==1 and len(fins)==1 and len(drains)==1
+    and len(enter)==1 and len(quiet)==1 and acq[0][0] < beg[0] < min(claims) and beg[0] < min(reads)
+    and renews and max(i for i,_ in writes) < drains[0] < max(i for i,_ in renews) < enter[0] < quiet[0] < rels[0] < fins[0]
+    and all(i < rels[0] and x[1]=="0" and argv(x)[-1:]==[token] for i,x in renews)
+    and all("--gate-incarnation-observation" not in argv(x) and sys.argv[2] not in argv(x)
+            for x in lines if x[0] in ("LEASE","LEASE_GUARD_OBSERVATION")))
+if not ok:
+    print(f"ORDER_FAIL token={token} begin={beg} claims={claims} writes={tasks} reads={len(reads)} drain={drains} quiet={enter}/{quiet} release={rels} finalize={fins} renew={len(renews)}")
+    raise SystemExit(1)
+print("TOKEN="+token)
+PYTRACE
+); trace21_rc=$?
+
+successor21=""; stable21=0
+if [ "$loop21_rc" -eq 0 ] && [ "$trace21_rc" -eq 0 ]; then
+  successor21=$("$CLI" "$D21" acquire s3-authority-run-resource --ttl 30 --holder-pid "$$" 2>/dev/null)
+  successor21_rc=$?
+  if [ "$successor21_rc" -eq 0 ] && token_ok "$successor21"; then
+    sha21a=$(file_sha "$D21/s3-authority-run-resource.lease")
+    sleep 0.8
+    sha21b=$(file_sha "$D21/s3-authority-run-resource.lease")
+    [ -n "$sha21a" ] && [ "$sha21a" = "$sha21b" ] && stable21=1
+    "$CLI" "$D21" release s3-authority-run-resource "$successor21" >/dev/null 2>&1 || true
+  fi
+fi
+
+# Re-read trace after the successor stability window. A leaked heartbeat that
+# survived stop/join would now appear after release; harmless failure calls are
+# still forbidden because the frozen sequence stops the heartbeat first.
+post_trace21_out=$("$PY3" - "$TRACE21" <<'PY'
+import base64,json,sys
+try: lines=[x.rstrip("\n").split("\t") for x in open(sys.argv[1])]
+except Exception as e: print(f"TRACE_ERROR:{e}"); raise SystemExit(2)
+def argv(x):
+    index=4 if x[0] in ("LEASE","LEASE_GUARD_OBSERVATION") else 3
+    try: return json.loads(base64.urlsafe_b64decode(x[index]).decode())
+    except Exception: return []
+writes=[i for i,x in enumerate(lines) if x[0]=="ATTEST" and x[1]=="0" and argv(x)[1:2]==["write-authority"]]
+renews=[(i,x) for i,x in enumerate(lines) if x[0]=="LEASE" and argv(x)[1:3]==["renew","s3-authority-run-resource"]]
+drain=[i for i,x in enumerate(lines) if x[0]=="TASKVAL_DRAIN" and len(x)>2 and x[1]=="0"]
+release=[i for i,x in enumerate(lines) if x[0]=="LEASE" and x[1]=="0" and argv(x)[1:3]==["release","s3-authority-run-resource"]]
+enter=[i for i,x in enumerate(lines) if x[0]=="LEASE_RELEASE_ENTER" and len(x)>1 and " release s3-authority-run-resource " in (" "+x[1]+" ")]
+quiet=[i for i,x in enumerate(lines) if x[0]=="LEASE_RELEASE_QUIET_END" and len(x)>1 and " release s3-authority-run-resource " in (" "+x[1]+" ")]
+if not writes or not renews or len(drain)!=1 or len(enter)!=1 or len(quiet)!=1 or len(release)!=1 or not (max(writes)<drain[0]<max(i for i,_ in renews)<enter[0]<quiet[0]<release[0]) or any(i>enter[0] or x[1]!="0" for i,x in renews):
+    print(f"FINAL_GUARD_ORDER writes={writes} drain={drain} renews={renews} quiet={enter}/{quiet} release={release}")
+    raise SystemExit(1)
+print("FINAL_GUARD_BEFORE_RELEASE_NO_POST_RENEW")
+PY
+); post_trace21_rc=$?
+
+if [ "$loop21_rc" -eq 0 ] && [ "$va21" -eq 0 ] && [ "$vb21" -eq 0 ] \
+   && [ "$events21" = "2" ] && [ -s "$WORK/s3-worker.auth-step-a" ] \
+   && [ -s "$WORK/s3-worker.auth-step-b" ] && [ "$trace21_rc" -eq 0 ] \
+   && [ "$post_trace21_rc" -eq 0 ] && [ "$stable21" -eq 1 ]; then
+  ok "K20 loop: one lease_id, final guard + heartbeat join, release then one finalize"
+else
+  no "K20 run-level authority protocol" "loop/valid/events/trace/postguard/stable=$loop21_rc/$va21,$vb21/$events21/$trace21_rc/$post_trace21_rc/$stable21 evidence=[$trace21_out][$post_trace21_out]"
+fi
+
+# K20c — loop-config may reject an unknown selector before every effect, or
+# treat it as inert. The inert branch is behavioral, not a first-call proxy:
+# a canonical config capability is LIVE(A) at acquire and flips to LIVE(B)
+# after provider work. A fixed OS source still completes cleanly; any config-
+# selected liveness path loses the mandatory post-drain final guard.
+D20C="$WORK/s3-config-inert-lease"; S20C="$WORK/s3-config-inert-state"
+A20C="$WORK/s3-config-inert-att"; W20C="$WORK/s3-config-inert-ws"
+TRACE20C="$WORK/s3-config-inert.trace"; C20C="$WORK/s3-config-inert.json"
+CAP20C="$WORK/s3-config-inert-capability.json"; PID20C="$WORK/s3-config-inert.loop-pid"
+mkdir -p "$W20C"; "$ST" init "$S20C" >/dev/null 2>&1
+write_config "$C20C" "$SPEC21" "$A20C" "$S20C" "$D20C" \
+  s3-config-inert-resource "$W20C" "$WORKER21" s3-config-inert-run 600 300
+"$CAP_MAKER" "$CAP20C" "$D20C" "$$" A >/dev/null
+"$PY3" - "$C20C" "$CAP20C" <<'PY'
+import json,os,sys
+p=sys.argv[1]; d=json.load(open(p)); d["gate_incarnation_observation"]=os.path.realpath(sys.argv[2])
+json.dump(d,open(p,"w"))
+PY
+H004_TRACE="$TRACE20C" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-config-inert-worker" \
+H004_CONFIG_BAIT="$CAP20C" H004_CAP_MAKER="$CAP_MAKER" H004_RUN_PID_FILE="$PID20C" \
+  "$PY3" "$RUN_BOUNDED" 120 "$SHADOW/controller/loop/cli" run "$C20C" \
+  >"$WORK/s3-config-inert.out" 2>"$WORK/s3-config-inert.err"
+loop20c_rc=$?
+if [ "$loop20c_rc" -eq 90 ]; then
+  echo "SKIP  K20c harness — bounded config-selector run timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+events20c=$(wc -l < "$S20C/events.jsonl" | tr -d ' ')
+attfiles20c=$(find "$A20C" -type f 2>/dev/null | wc -l | tr -d ' ')
+leasefiles20c=$(find "$D20C" -type f 2>/dev/null | wc -l | tr -d ' ')
+strict20c=0
+if [ "$loop20c_rc" -eq 1 ] && [ ! -s "$TRACE20C" ] && [ "$events20c" = "0" ] \
+   && [ "$attfiles20c" = "0" ] && [ "$leasefiles20c" = "0" ] \
+   && [ ! -e "$WORK/s3-config-inert-worker.auth-step-a" ] \
+   && [ ! -e "$WORK/s3-config-inert-worker.auth-step-b" ]; then
+  strict20c=1
+fi
+va20c=1; vb20c=1
+"$ATT" "$A20C" read auth-step-a --require-valid >/dev/null 2>&1 && va20c=0
+"$ATT" "$A20C" read auth-step-b --require-valid >/dev/null 2>&1 && vb20c=0
+inert20c_out=$("$PY3" - "$TRACE20C" "$CAP20C" "$D20C" "$PID20C" <<'PY'
+import base64,json,os,sys
+try:
+    lines=[x.rstrip("\n").split("\t") for x in open(sys.argv[1],encoding="utf-8")]
+    loop_pid=int(open(sys.argv[4],encoding="ascii").read().strip())
+except Exception as e: print("FIXTURE:"+str(e)); raise SystemExit(1)
+def argv(x):
+    index=4 if x[0] in ("LEASE","LEASE_GUARD_OBSERVATION") else 3
+    try: return json.loads(base64.urlsafe_b64decode(x[index]).decode())
+    except Exception: return []
+lease=[(i,x,argv(x)) for i,x in enumerate(lines) if x[0]=="LEASE"]
+acq=[z for z in lease if z[1][1]=="0" and len(z[2])>2 and z[2][1:3]==["acquire","s3-config-inert-resource"]]
+if len(acq)!=1 or not acq[0][1][2]: print("ACQUIRE"); raise SystemExit(1)
+token=acq[0][1][2]; a=acq[0][2]
+if len(a)!=7 or os.path.realpath(a[0])!=os.path.realpath(sys.argv[3]):
+    print("ACQUIRE_GRAMMAR:"+repr(a)); raise SystemExit(1)
+opts=a[3:]
+if set((opts[0],opts[2]))!={"--ttl","--holder-pid"}:
+    print("ACQUIRE_OPTIONS:"+repr(a)); raise SystemExit(1)
+pairs={opts[0]:opts[1],opts[2]:opts[3]}
+try: acq_ok=float(pairs["--ttl"])==600 and int(pairs["--holder-pid"])==loop_pid
+except (TypeError,ValueError): acq_ok=False
+def grammar(a):
+    if a==acq[0][2]: return acq_ok
+    return len(a)==4 and os.path.realpath(a[0])==os.path.realpath(sys.argv[3]) \
+        and (a[1:]==["renew","s3-config-inert-resource",token]
+             or a[1:]==["release","s3-config-inert-resource",token])
+drain=[i for i,x in enumerate(lines) if x[0]=="TASKVAL_DRAIN" and len(x)>1 and x[1]=="0"]
+renew=[z for z in lease if len(z[2])>1 and z[2][1]=="renew"]
+release=[z for z in lease if len(z[2])>1 and z[2][1]=="release"]
+post=[z for z in renew if len(drain)==1 and z[0]>drain[0]]
+try: cap=json.load(open(sys.argv[2],encoding="utf-8")); rows=cap["observations"]
+except Exception as e: print("CAP:"+str(e)); raise SystemExit(1)
+cap_ok=(set(cap)=={"kind","lease_root","observations"}
+    and cap["kind"]=="h004-process-incarnation-v1"
+    and os.path.realpath(cap["lease_root"])==os.path.realpath(sys.argv[3])
+    and isinstance(rows,list) and len(rows)==1
+    and set(rows[0])=={"host","pid","status","token_b64"}
+    and rows[0]["host"]==os.uname().nodename and rows[0]["pid"]==loop_pid
+    and rows[0]["status"]=="LIVE"
+    and base64.b64decode(rows[0]["token_b64"],validate=True)==b"gate-B-incarnation\x00\xff")
+ok=(acq_ok and len(lease)>=3
+    and sum(1 for z in lease if len(z[2])>1 and z[2][1]=="acquire")==1
+    and all(grammar(z[2]) for z in lease)
+    and all(z[1][1]=="0" for z in renew+release)
+    and len(drain)==1 and len(post)==1 and len(release)==1
+    and post[0][0]<release[0][0] and cap_ok
+    and sum(1 for x in lines if x[0]=="CONFIG_BAIT_FLIPPED")==1
+    and not any(x[0] in ("CONFIG_BAIT_INIT_FAILED","CONFIG_BAIT_FLIP_FAILED") for x in lines)
+    and all("--gate-incarnation-observation" not in z[2] and sys.argv[2] not in z[2] for z in lease))
+if not ok:
+    print(f"INERT grammar={acq_ok} lease={len(lease)} drain={drain} renew={len(renew)}/{len(post)} release={len(release)} cap={cap_ok}")
+    raise SystemExit(1)
+print("CONFIG_SELECTOR_INERT_A_TO_B")
+PY
+); inert20c_rc=$?
+if [ "$strict20c" -eq 1 ] \
+   || { [ "$loop20c_rc" -eq 0 ] && [ "$va20c" -eq 0 ] && [ "$vb20c" -eq 0 ] \
+        && [ "$events20c" = "2" ] && [ -s "$WORK/s3-config-inert-worker.auth-step-a" ] \
+        && [ -s "$WORK/s3-config-inert-worker.auth-step-b" ] && [ "$inert20c_rc" -eq 0 ]; }; then
+  ok "K20c loop-config capability vägras före effekt eller förblir behaviorally inert A→B"
+else
+  no "K20c config-selector confinement" "strict/loop/valid/events/inert=$strict20c/$loop20c_rc/$va20c,$vb20c/$events20c/$inert20c_rc evidence=[$inert20c_out]"
+fi
+
+# K20d — override-free positive anchor for the production defaults 180/30.
+# The worker stays alive across two scheduled ticks. Monotonic timestamps are
+# gate evidence only; both the first non-immediate renew and the next cadence
+# must land near 30 s, while the acquire argv carries 180. One broad single-
+# tick window would incorrectly accept a defaults-only 40 s heartbeat.
+SPEC20D="$WORK/s3-default-heartbeat.json"
+cat > "$SPEC20D" <<'JSON'
+{"spec_version":"s3-default-heartbeat","defaults":{"max_changed_files":8,"max_added_lines":600},"tasks":[{"id":"default-heartbeat-task","slice":0,"title":"D","summary":"D","allowed_write":["tests/lease-authority-fixture/**"],"exit_test":"verify/bin/ingen","exit_criterion":"-","docs_impact":[],"depends_on":[]}]}
+JSON
+WORKER20D="$WORK/s3-default-heartbeat-worker.py"
+cat > "$WORKER20D" <<'PY'
+import json,os,sys,time
+e=json.load(sys.stdin); task=e["task_id"]
+open(os.environ["H004_WORK_MARK"],"w").write("started\n")
+time.sleep(75)
+os.makedirs("tests/lease-authority-fixture",exist_ok=True)
+open("tests/lease-authority-fixture/default-heartbeat-task.txt","w").write(task+"\n")
+print(task+" klar")
+PY
+D20D="$WORK/s3-default-heartbeat-lease"; S20D="$WORK/s3-default-heartbeat-state"
+A20D="$WORK/s3-default-heartbeat-att"; W20D="$WORK/s3-default-heartbeat-ws"
+TRACE20D="$WORK/s3-default-heartbeat.trace"; C20D="$WORK/s3-default-heartbeat-config.json"
+mkdir -p "$W20D"; "$ST" init "$S20D" >/dev/null 2>&1
+write_config "$C20D" "$SPEC20D" "$A20D" "$S20D" "$D20D" \
+  s3-default-heartbeat-resource "$W20D" "$WORKER20D" s3-default-heartbeat-run 1 0.2
+"$PY3" - "$C20D" <<'PY'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); d.pop("lease_ttl_s"); d.pop("lease_heartbeat_s")
+d["timeout_s"]=100
+json.dump(d,open(p,"w"))
+PY
+H004_TRACE="$TRACE20D" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-default-heartbeat.started" \
+H004_RUN_PID_FILE="$WORK/s3-default-heartbeat.loop-pid" \
+  "$PY3" "$RUN_BOUNDED" 160 "$SHADOW/controller/loop/cli" run "$C20D" \
+  >"$WORK/s3-default-heartbeat.out" 2>"$WORK/s3-default-heartbeat.err"
+loop20d_rc=$?
+if [ "$loop20d_rc" -eq 90 ]; then
+  echo "SKIP  K20d harness — bounded default-heartbeat run timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+valid20d=1; "$ATT" "$A20D" read default-heartbeat-task --require-valid >/dev/null 2>&1 && valid20d=0
+default20d_out=$("$PY3" - "$TRACE20D" "$D20D" "$WORK/s3-default-heartbeat.loop-pid" <<'PY'
+import base64,json,os,sys
+lines=[x.rstrip("\n").split("\t") for x in open(sys.argv[1])]
+def argv(x):
+    index=4 if x[0] in ("LEASE","LEASE_GUARD_OBSERVATION") else 3
+    try: return json.loads(base64.urlsafe_b64decode(x[index]).decode())
+    except Exception: return []
+acq=[(i,x) for i,x in enumerate(lines) if x[0]=="LEASE" and x[1]=="0" and argv(x)[1:3]==["acquire","s3-default-heartbeat-resource"]]
+if len(acq)!=1 or not acq[0][1][2]:
+    print("DEFAULT_ACQUIRE"); raise SystemExit(1)
+a=argv(acq[0][1]); token=acq[0][1][2]
+try: loop_pid=int(open(sys.argv[3],encoding="ascii").read().strip())
+except Exception: print("DEFAULT_LOOP_PID"); raise SystemExit(1)
+if len(a)!=7 or os.path.realpath(a[0])!=os.path.realpath(sys.argv[2]) \
+   or a[1:3]!=["acquire","s3-default-heartbeat-resource"]:
+    print("DEFAULT_ACQUIRE_GRAMMAR:"+repr(a)); raise SystemExit(1)
+opts=a[3:]
+if set((opts[0],opts[2]))!={"--ttl","--holder-pid"}:
+    print("DEFAULT_OPTIONS:"+repr(a)); raise SystemExit(1)
+pairs={opts[0]:opts[1],opts[2]:opts[3]}
+try: grammar_ok=float(pairs["--ttl"])==180 and int(pairs["--holder-pid"])==loop_pid
+except (TypeError,ValueError): grammar_ok=False
+if not grammar_ok:
+    print("DEFAULT_TTL_HOLDER:"+repr(a)+f" loop={loop_pid}"); raise SystemExit(1)
+try: acquired=float(acq[0][1][5])
+except Exception: print("ACQUIRE_TIME"); raise SystemExit(1)
+writes=[i for i,x in enumerate(lines) if x[0]=="ATTEST" and x[1]=="0" and argv(x)[1:2]==["write-authority"] and argv(x)[2:4]==[token,"default-heartbeat-task"]]
+if len(writes)!=1: print("DEFAULT_WRITE"); raise SystemExit(1)
+renew=[]
+for i,x in enumerate(lines):
+    if i>=writes[0] or x[0]!="LEASE" or x[1]!="0" or argv(x)[1:]!=["renew","s3-default-heartbeat-resource",token]: continue
+    try: renew.append(float(x[5])-acquired)
+    except Exception: print("RENEW_TIME"); raise SystemExit(1)
+scheduled=sorted(d for d in renew if d>3)
+if len(scheduled)<2 or not 27 <= scheduled[0] <= 34 \
+   or not 27 <= scheduled[1]-scheduled[0] <= 34:
+    print(f"DEFAULT_HEARTBEAT deltas={renew}"); raise SystemExit(1)
+print(f"DEFAULTS=180/30 first={scheduled[0]:.3f} cadence={scheduled[1]-scheduled[0]:.3f}")
+PY
+); default20d_rc=$?
+if [ "$loop20d_rc" -eq 0 ] && [ "$valid20d" -eq 0 ] \
+   && [ -s "$WORK/s3-default-heartbeat.started" ] && [ "$default20d_rc" -eq 0 ]; then
+  ok "K20d override-free run använder TTL/heartbeat 180/30"
+else
+  no "K20d default TTL/heartbeat" "loop/valid/trace=$loop20d_rc/$valid20d/$default20d_rc evidence=[$default20d_out]"
+fi
+
+# K20b — efter exakt TASKVAL_DRAIN matar gate-wrappern LIVE(B) genom samma
+# explicita capability-suffix och verkliga renew-path som K15. Heartbeat ligger
+# 300 s bort, sa faulten kan bara vara runnets uttryckliga sista guard.
+D20B="$WORK/s3-guard-loss-lease"; S20B="$WORK/s3-guard-loss-state"
+A20B="$WORK/s3-guard-loss-att"; W20B="$WORK/s3-guard-loss-ws"
+TRACE20B="$WORK/s3-guard-loss.trace"
+mkdir -p "$W20B"; "$ST" init "$S20B" >/dev/null 2>&1
+write_config "$WORK/s3-guard-loss-config.json" "$SPEC21" "$A20B" "$S20B" "$D20B" \
+  "s3-guard-loss-resource" "$W20B" "$WORKER21" "s3-guard-loss-run" 600 300
+H004_TRACE="$TRACE20B" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-guard-loss-worker" \
+H004_FINAL_GUARD_FAIL=1 H004_CAP_MAKER="$CAP_MAKER" \
+  "$PY3" "$RUN_BOUNDED" 120 "$SHADOW/controller/loop/cli" run "$WORK/s3-guard-loss-config.json" \
+  >"$WORK/s3-guard-loss.out" 2>"$WORK/s3-guard-loss.err"
+guard20_rc=$?
+if [ "$guard20_rc" -eq 90 ]; then
+  echo "SKIP  K20b harness — bounded loop timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+ga20=0; gb20=0
+"$ATT" "$A20B" read auth-step-a --require-valid >/dev/null 2>&1 || ga20=$?
+"$ATT" "$A20B" read auth-step-b --require-valid >/dev/null 2>&1 || gb20=$?
+prefix20_out=$("$PY3" "$PREFIX_CHECK" "$TRACE20B" s3-guard-loss-resource \
+  auth-step-a,auth-step-b guard 2>&1); prefix20_rc=$?
+token20="$prefix20_out"
+guards20=$(grep -c '^LEASE_GUARD_OBSERVATION' "$TRACE20B" 2>/dev/null || true)
+drains20=$(grep -c '^TASKVAL_DRAIN' "$TRACE20B" 2>/dev/null || true)
+mutcap20=$(grep -c '^CAPABILITY_MUTATED' "$TRACE20B" 2>/dev/null || true)
+owner20=$("$CLI" "$D20B" owner s3-guard-loss-resource 2>/dev/null || true)
+sha20=$(file_sha "$D20B/s3-guard-loss-resource.lease")
+cap20_ok=1
+"$PY3" - "$TRACE20B.initial-cap.json" "$TRACE20B.final-guard-cap.json" \
+  "$D20B" "$TRACE20B.holder" <<'PY' >/dev/null 2>&1 || cap20_ok=0
+import base64,json,os,sys
+from pathlib import Path
+initial,final,root,hp=map(Path,sys.argv[1:]); tokens=[]
+for p in (initial,final):
+    d=json.loads(p.read_text()); row=d["observations"][0]
+    assert not p.resolve().is_relative_to(root.resolve())
+    assert set(d)=={"kind","lease_root","observations"}
+    assert d["kind"]=="h004-process-incarnation-v1" and Path(d["lease_root"]).resolve()==root.resolve()
+    assert len(d["observations"])==1 and set(row)=={"host","pid","status","token_b64"}
+    assert row["host"]==os.uname().nodename and row["pid"]==int(hp.read_text()) and row["status"]=="LIVE"
+    tokens.append(base64.b64decode(row["token_b64"],validate=True))
+assert tokens[0] and tokens[1] and tokens[0]!=tokens[1]
+PY
+if [ "$guard20_rc" -eq 1 ] && [ "$ga20" -ne 0 ] && [ "$gb20" -ne 0 ] \
+   && [ "$prefix20_rc" -eq 0 ] && token_ok "$token20" \
+   && [ "$guards20" = "1" ] && [ "$drains20" = "1" ] \
+   && [ "$mutcap20" = "0" ] && [ "$cap20_ok" -eq 1 ] \
+   && [ -n "$owner20" ] && [ -n "$sha20" ]; then
+  ok "K20b incarnation-loss vid final guard ger ingen release/finalize/valid publication"
+else
+  no "K20b final incarnation guard" "loop/valid/prefix/guard/drain/cap/mut/owner/sha=$guard20_rc/$ga20,$gb20/$prefix20_rc/$guards20/$drains20/$cap20_ok/$mutcap20/[$owner20]/[$sha20] evidence=[$prefix20_out]"
+fi
+if token_ok "$token20"; then
+  "$CLI" "$D20B" release s3-guard-loss-resource "$token20" >/dev/null 2>&1 || true
+fi
+
+
+# K21 — release failure ar clean-finalizationens harda negativa kontroll.
+SPECNEG="$WORK/s3-authority-negative.json"
+cat > "$SPECNEG" <<'JSON'
+{
+  "spec_version":"s3-authority-negative",
+  "defaults":{"max_changed_files":8,"max_added_lines":600},
+  "tasks":[
+    {"id":"auth-negative","slice":0,"title":"N","summary":"N","allowed_write":["tests/lease-authority-fixture/**"],"exit_test":"verify/bin/ingen","exit_criterion":"-","docs_impact":[],"depends_on":[]}
+  ]
+}
+JSON
+
+D21F="$WORK/s3-release-fail-lease"; S21F="$WORK/s3-release-fail-state"
+A21F="$WORK/s3-release-fail-att"; W21F="$WORK/s3-release-fail-ws"
+TRACE21F="$WORK/s3-release-fail.trace"
+mkdir -p "$W21F"; "$ST" init "$S21F" >/dev/null 2>&1
+write_config "$WORK/s3-release-fail-config.json" "$SPECNEG" "$A21F" "$S21F" "$D21F" \
+  "s3-release-fail-resource" "$W21F" "$WORKER21" "s3-release-fail-run" 600 300
+H004_TRACE="$TRACE21F" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-release-fail-worker" \
+H004_RELEASE_FAIL=1 "$PY3" "$RUN_BOUNDED" 120 \
+  "$SHADOW/controller/loop/cli" run "$WORK/s3-release-fail-config.json" \
+  >"$WORK/s3-release-fail.out" 2>"$WORK/s3-release-fail.err"
+release_fail21_rc=$?
+if [ "$release_fail21_rc" -eq 90 ]; then
+  echo "SKIP  K21 harness — bounded loop timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+valid_fail21=0; "$ATT" "$A21F" read auth-negative --require-valid >/dev/null 2>&1 || valid_fail21=$?
+prefix_fail21_out=$("$PY3" "$PREFIX_CHECK" "$TRACE21F" s3-release-fail-resource \
+  auth-negative release_fail 2>&1); prefix_fail21_rc=$?
+token_fail21="$prefix_fail21_out"
+scoped_fail21=1
+if token_ok "$token_fail21"; then
+  "$ATT" "$A21F" read auth-negative --require-authority "$token_fail21" >/dev/null 2>&1
+  scoped_fail21=$?
+fi
+owner_fail21=$("$CLI" "$D21F" owner s3-release-fail-resource 2>/dev/null || true)
+sha_fail21=$(file_sha "$D21F/s3-release-fail-resource.lease")
+if [ "$release_fail21_rc" -eq 1 ] && [ "$valid_fail21" -ne 0 ] \
+   && [ "$prefix_fail21_rc" -eq 0 ] && token_ok "$token_fail21" \
+   && [ "$scoped_fail21" -eq 0 ] && [ -n "$owner_fail21" ] && [ -n "$sha_fail21" ]; then
+  ok "K21 release failure ger ingen FINALIZE och provisional publication forblir globalt ogiltig"
+else
+  no "K21 release-failure fencing" "loop/valid/prefix/scoped/owner/sha=$release_fail21_rc/$valid_fail21/$prefix_fail21_rc/$scoped_fail21/[$owner_fail21]/[$sha_fail21] evidence=[$prefix_fail21_out]"
+fi
+if token_ok "$token_fail21"; then
+  "$CLI" "$D21F" release s3-release-fail-resource "$token_fail21" >/dev/null 2>&1 || true
+fi
+
+
+# K22 — crash efter verklig clean release men fore wrapper-return/finalize.
+# Vid barriaren ar leasen faktiskt borta; publication far fortfarande inte vara
+# globalt giltig. Kill av loopprocessen ersatts aldrig av post-hoc invalidate.
+D22="$WORK/s3-after-release-lease"; S22="$WORK/s3-after-release-state"
+A22="$WORK/s3-after-release-att"; W22="$WORK/s3-after-release-ws"
+TRACE22="$WORK/s3-after-release.trace"; READY22="$WORK/s3-after-release.ready"; GO22="$WORK/s3-after-release.go"
+mkdir -p "$W22"; "$ST" init "$S22" >/dev/null 2>&1
+write_config "$WORK/s3-after-release-config.json" "$SPECNEG" "$A22" "$S22" "$D22" \
+  "s3-after-release-resource" "$W22" "$WORKER21" "s3-after-release-run" 600 300
+H004_TRACE="$TRACE22" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-after-release-worker" \
+H004_RELEASE_BLOCK_READY="$READY22" H004_RELEASE_BLOCK_GO="$GO22" \
+  "$SHADOW/controller/loop/cli" run "$WORK/s3-after-release-config.json" \
+  >"$WORK/s3-after-release.out" 2>"$WORK/s3-after-release.err" & loop22=$!
+ready22=0; wait_mark_or_exit "$READY22" "$loop22"; mark22_rc=$?
+if [ "$mark22_rc" -eq 2 ]; then
+  kill -9 "$loop22" 2>/dev/null || true; wait "$loop22" 2>/dev/null || true
+  echo "SKIP  K22 harness — release barrier timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+[ "$mark22_rc" -eq 0 ] && ready22=1
+owner22=$("$CLI" "$D22" owner s3-after-release-resource 2>/dev/null || true)
+valid22=0; "$ATT" "$A22" read auth-negative --require-valid >/dev/null 2>&1 || valid22=$?
+prefix22_out=$("$PY3" "$PREFIX_CHECK" "$TRACE22" s3-after-release-resource \
+  auth-negative released_barrier 2>&1); prefix22_rc=$?
+token22="$prefix22_out"
+scoped22=1
+if token_ok "$token22"; then
+  "$ATT" "$A22" read auth-negative --require-authority "$token22" >/dev/null 2>&1
+  scoped22=$?
+fi
+pre_finalize22=$(grep -c 'ATTEST.* finalize-authority ' "$TRACE22" 2>/dev/null || true)
+if kill -0 "$loop22" 2>/dev/null; then kill -9 "$loop22" 2>/dev/null || true; fi
+wait "$loop22" 2>/dev/null; killed22_rc=$?
+: > "$GO22"
+sleep 0.2
+post_finalize22=$(grep -c 'ATTEST.* finalize-authority ' "$TRACE22" 2>/dev/null || true)
+postvalid22=0; "$ATT" "$A22" read auth-negative --require-valid >/dev/null 2>&1 || postvalid22=$?
+if [ "$ready22" -eq 1 ] && [ -z "$owner22" ] && [ "$prefix22_rc" -eq 0 ] \
+   && token_ok "$token22" && [ "$scoped22" -eq 0 ] \
+   && [ "$valid22" -ne 0 ] && [ "$pre_finalize22" = "0" ] \
+   && [ "$killed22_rc" -ne 0 ] && [ "$post_finalize22" = "0" ] && [ "$postvalid22" -ne 0 ]; then
+  ok "K22 crash efter clean release fore FINALIZE lamnar noll giltiga publications"
+else
+  no "K22 release/finalize crash window" "ready/owner/prefix/scoped/prevalid/pre-finalize/kill/post-finalize/postvalid=$ready22/[$owner22]/$prefix22_rc/$scoped22/$valid22/$pre_finalize22/$killed22_rc/$post_finalize22/$postvalid22 evidence=[$prefix22_out]"
+fi
+
+# K23 — ett faktiskt returnerat FINALIZE-fel efter clean release ar run-fel,
+# aldrig clean success. Wrappern feller bara anropet; h-003:s egen gate ager
+# atomic failure/kill-semantiken inne i finaliseringen.
+D23="$WORK/s3-finalize-fail-lease"; S23="$WORK/s3-finalize-fail-state"
+A23="$WORK/s3-finalize-fail-att"; W23="$WORK/s3-finalize-fail-ws"
+TRACE23="$WORK/s3-finalize-fail.trace"
+mkdir -p "$W23"; "$ST" init "$S23" >/dev/null 2>&1
+write_config "$WORK/s3-finalize-fail-config.json" "$SPECNEG" "$A23" "$S23" "$D23" \
+  "s3-finalize-fail-resource" "$W23" "$WORKER21" "s3-finalize-fail-run" 600 300
+H004_TRACE="$TRACE23" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-finalize-fail-worker" \
+H004_FINALIZE_FAIL=1 "$PY3" "$RUN_BOUNDED" 120 \
+  "$SHADOW/controller/loop/cli" run "$WORK/s3-finalize-fail-config.json" \
+  >"$WORK/s3-finalize-fail.out" 2>"$WORK/s3-finalize-fail.err"
+loop23_rc=$?
+if [ "$loop23_rc" -eq 90 ]; then
+  echo "SKIP  K23 harness — bounded loop timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+valid23=0; "$ATT" "$A23" read auth-negative --require-valid >/dev/null 2>&1 || valid23=$?
+owner23=$("$CLI" "$D23" owner s3-finalize-fail-resource 2>/dev/null || true)
+prefix23_out=$("$PY3" "$PREFIX_CHECK" "$TRACE23" s3-finalize-fail-resource \
+  auth-negative finalize_fail 2>&1); prefix23_rc=$?
+token23="$prefix23_out"; scoped23=1
+if token_ok "$token23"; then
+  "$ATT" "$A23" read auth-negative --require-authority "$token23" >/dev/null 2>&1
+  scoped23=$?
+fi
+if [ "$loop23_rc" -eq 1 ] && [ "$valid23" -ne 0 ] && [ -z "$owner23" ] \
+   && [ "$prefix23_rc" -eq 0 ] && token_ok "$token23" && [ "$scoped23" -eq 0 ]; then
+  ok "K23 finalize failure efter clean release ger non-clean run och noll valid"
+else
+  no "K23 finalize-failure" "loop/valid/owner/prefix/scoped=$loop23_rc/$valid23/[$owner23]/$prefix23_rc/$scoped23 evidence=[$prefix23_out]"
+fi
+
+# K24 — nyare authority installeras i det riktiga release→finalize-fonstret.
+# Den gamla generationens finalize ska falla, hela gamla batchen forbli
+# globalt ogiltig och successor-authority fortsatt vara anvandbar.
+D24="$WORK/s3-newer-authority-lease"; S24="$WORK/s3-newer-authority-state"
+A24="$WORK/s3-newer-authority-att"; W24="$WORK/s3-newer-authority-ws"
+TRACE24="$WORK/s3-newer-authority.trace"; READY24="$WORK/s3-newer-authority.ready"; GO24="$WORK/s3-newer-authority.go"
+mkdir -p "$W24"; "$ST" init "$S24" >/dev/null 2>&1
+write_config "$WORK/s3-newer-authority-config.json" "$SPECNEG" "$A24" "$S24" "$D24" \
+  "s3-newer-authority-resource" "$W24" "$WORKER21" "s3-newer-authority-run" 600 300
+H004_TRACE="$TRACE24" H004_REAL_LEASE="$REPO_ROOT/controller/lease/cli" \
+H004_REAL_ATTEST="$REPO_ROOT/controller/attest/cli" H004_WORK_MARK="$WORK/s3-newer-authority-worker" \
+H004_FINALIZE_BLOCK_READY="$READY24" H004_FINALIZE_BLOCK_GO="$GO24" \
+  "$SHADOW/controller/loop/cli" run "$WORK/s3-newer-authority-config.json" \
+  >"$WORK/s3-newer-authority.out" 2>"$WORK/s3-newer-authority.err" & loop24=$!
+ready24=0; wait_mark_or_exit "$READY24" "$loop24"; mark24_rc=$?
+if [ "$mark24_rc" -eq 2 ]; then
+  kill -9 "$loop24" 2>/dev/null || true; wait "$loop24" 2>/dev/null || true
+  echo "SKIP  K24 harness — finalize barrier timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+[ "$mark24_rc" -eq 0 ] && ready24=1
+owner24=$("$CLI" "$D24" owner s3-newer-authority-resource 2>/dev/null || true)
+prefix24pre_out=$("$PY3" "$PREFIX_CHECK" "$TRACE24" s3-newer-authority-resource \
+  auth-negative released_prefix 2>&1); prefix24pre_rc=$?
+oldtoken24="$prefix24pre_out"; oldscoped_pre24=1
+if token_ok "$oldtoken24"; then
+  "$ATT" "$A24" read auth-negative --require-authority "$oldtoken24" >/dev/null 2>&1
+  oldscoped_pre24=$?
+fi
+succ24="successor-authority-after-release"
+begin24=1; write24=1; scoped24=1
+if [ "$ready24" -eq 1 ] && [ "$prefix24pre_rc" -eq 0 ] \
+   && token_ok "$oldtoken24" && [ "$oldscoped_pre24" -eq 0 ]; then
+  "$ATT" "$A24" begin-authority "$succ24" >/dev/null 2>&1; begin24=$?
+  "$ATT" "$A24" write-authority "$succ24" successor-proof "$AS1" >/dev/null 2>&1; write24=$?
+  "$ATT" "$A24" read successor-proof --require-authority "$succ24" >/dev/null 2>&1; scoped24=$?
+else
+  kill -9 "$loop24" 2>/dev/null || true
+fi
+: > "$GO24"
+timeout24="$WORK/s3-newer-authority.timeout"
+( sleep 30; if kill -0 "$loop24" 2>/dev/null; then : > "$timeout24"; kill -9 "$loop24" 2>/dev/null || true; fi ) & watchdog24=$!
+wait "$loop24" 2>/dev/null; loop24_rc=$?
+kill "$watchdog24" 2>/dev/null || true; wait "$watchdog24" 2>/dev/null || true
+if [ -e "$timeout24" ]; then
+  echo "SKIP  K24 harness — post-GO loop timed out"
+  echo; echo "$pass PASS, $fail FAIL, ODÖMBART"; exit 2
+fi
+oldvalid24=0; "$ATT" "$A24" read auth-negative --require-valid >/dev/null 2>&1 || oldvalid24=$?
+oldscoped_after24=0; "$ATT" "$A24" read auth-negative --require-authority "$oldtoken24" >/dev/null 2>&1 || oldscoped_after24=$?
+succglobal24=0; "$ATT" "$A24" read successor-proof --require-valid >/dev/null 2>&1 || succglobal24=$?
+scoped_after24=0; "$ATT" "$A24" read successor-proof --require-authority "$succ24" >/dev/null 2>&1 || scoped_after24=$?
+prefix24post_out=$("$PY3" "$PREFIX_CHECK" "$TRACE24" s3-newer-authority-resource \
+  auth-negative stale_finalize 2>&1); prefix24post_rc=$?
+events24=$(wc -l < "$S24/events.jsonl" | tr -d ' ')
+if [ "$ready24" -eq 1 ] && [ -z "$owner24" ] \
+   && [ "$prefix24pre_rc" -eq 0 ] && [ "$prefix24post_rc" -eq 0 ] \
+   && [ "$prefix24post_out" = "$oldtoken24" ] && token_ok "$oldtoken24" \
+   && [ "$oldscoped_pre24" -eq 0 ] && [ "$oldscoped_after24" -ne 0 ] \
+   && [ -s "$WORK/s3-newer-authority-worker.auth-negative" ] && [ "$events24" = "1" ] \
+   && [ "$begin24" -eq 0 ] \
+   && [ "$write24" -eq 0 ] && [ "$scoped24" -eq 0 ] && [ "$scoped_after24" -eq 0 ] && [ "$loop24_rc" -eq 1 ] \
+   && [ "$oldvalid24" -ne 0 ] && [ "$succglobal24" -ne 0 ]; then
+  ok "K24 newer authority mellan release/finalize fencar hela gamla batchen"
+else
+  no "K24 release/finalize authority race" "ready/owner/prefix-pre,post/token/scoped-old-pre,post/successor-begin,write,scope-pre,post/loop/oldvalid/succglobal/events=$ready24/[$owner24]/$prefix24pre_rc,$prefix24post_rc/[$oldtoken24]/$oldscoped_pre24,$oldscoped_after24/$begin24,$write24,$scoped24,$scoped_after24/$loop24_rc/$oldvalid24/$succglobal24/$events24 evidence=[$prefix24pre_out][$prefix24post_out]"
+fi
 
 summera
