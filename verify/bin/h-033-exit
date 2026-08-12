@@ -9,13 +9,72 @@ VERIFY="$ROOT/controller/provenance/verify"
 ACCOUNT="_nortropic_provenance"
 SERVICE="/Library/PrivilegedHelperTools/com.nortropic.provenance"
 SERVICE_LABEL="com.nortropic.provenance"
+SERVICE_DOMAIN="system/com.nortropic.provenance"
+SERVICE_PLIST="/Library/LaunchDaemons/com.nortropic.provenance.plist"
 ALLOWLIST="/Library/Application Support/Nortropic/provenance/probes.json"
 STORE="/Library/Application Support/Nortropic/provenance/evidence"
 OBSERVER_SERVICE="/Library/PrivilegedHelperTools/com.nortropic.provenance-test-observer"
 OBSERVER_ROOT="/Library/Application Support/Nortropic/provenance/probe-receipts"
 
+sha256_file() { shasum -a 256 "$1" | awk '{print $1}'; }
+emit_observation() {
+  label="$1"; shift
+  out="$WORK/audit.$label.out"
+  "$@" >"$out" 2>&1; rc=$?
+  echo "OBSERVATION=$label"
+  printf 'COMMAND='; printf '%q ' "$@"; echo
+  echo "EXIT=$rc"
+  echo "OUTPUT_SHA256=$(sha256_file "$out")"
+  sed -n '1,80p' "$out" | sed 's/^/OUTPUT=/'
+  echo "END_OBSERVATION=$label"
+  return "$rc"
+}
+
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h033.XXXXXX")" || exit 2
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+
+# Owner-freeze evidence is deliberately a separate trust layer from future H-033
+# runtime provenance. It is produced only after an immutable candidate exists and
+# is never consumed as a caller-authored PASS claim by the normal gate.
+if [[ "${1:-}" = "--owner-privilege-audit" ]]; then
+  [[ $# -eq 1 ]] || { echo "OWNER_PRIVILEGE_AUDIT_RESULT=FAIL"; echo "REASON=unexpected arguments"; exit 1; }
+  CAND="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" || { echo "OWNER_PRIVILEGE_AUDIT_RESULT=ODÖMBART"; exit 2; }
+  SPEC_SHA="$(sha256_file "$ROOT/specs/tasks.spec.json")"
+  GATE_SHA="$(sha256_file "$ROOT/verify/bin/h-033-exit")"
+  echo "TASK=h-033"
+  echo "CANDIDATE_SHA=$CAND"
+  echo "TASK_SPEC_SHA256=$SPEC_SHA"
+  echo "H033_GATE_SHA256=$GATE_SHA"
+  echo "AUDIT_MODE_VERSION=h033-owner-privilege-v1"
+  echo "AUDIT_UID=$(id -u)"
+  echo "AUDIT_USER=$(id -un)"
+  echo "AUDIT_GROUPS=$(id -Gn)"
+  audit_unknown=0; audit_fail=0
+  emit_observation SUDO_EFFECTIVE_POLICY /usr/bin/sudo -n -l; policy_rc=$?
+  [[ $policy_rc -eq 0 || $policy_rc -eq 1 ]] || audit_unknown=1
+  emit_observation NONINTERACTIVE_GENERIC_SUDO /usr/bin/sudo -n /usr/bin/true; rc=$?
+  [[ $rc -eq 0 ]] && audit_fail=1; [[ $rc -ne 0 && $rc -ne 1 ]] && audit_unknown=1
+  emit_observation NONINTERACTIVE_ROOT_SHELL /usr/bin/sudo -n /bin/sh -c 'exit 0'; rc=$?
+  [[ $rc -eq 0 ]] && audit_fail=1; [[ $rc -ne 0 && $rc -ne 1 ]] && audit_unknown=1
+  emit_observation NONINTERACTIVE_ARBITRARY_COMMAND_AS_ROOT /usr/bin/sudo -n /usr/bin/id -u; rc=$?
+  [[ $rc -eq 0 ]] && audit_fail=1; [[ $rc -ne 0 && $rc -ne 1 ]] && audit_unknown=1
+  emit_observation NONINTERACTIVE_ARBITRARY_USER_SWITCH /usr/bin/sudo -n -u nobody /usr/bin/id -u; rc=$?
+  [[ $rc -eq 0 ]] && audit_fail=1; [[ $rc -ne 0 && $rc -ne 1 ]] && audit_unknown=1
+  emit_observation PRODUCER_ACCOUNT /usr/bin/dscl . -read "/Users/$ACCOUNT" UniqueID PrimaryGroupID; producer_rc=$?
+  [[ $producer_rc -eq 0 || $producer_rc -eq 185 ]] || audit_unknown=1
+  emit_observation LOADED_SYSTEM_SERVICE /bin/launchctl print "$SERVICE_DOMAIN"; service_rc=$?
+  [[ $service_rc -eq 0 || $service_rc -eq 113 ]] || audit_unknown=1
+  for path in "$SERVICE_PLIST" "$SERVICE" "$ALLOWLIST" "$STORE" "$OBSERVER_SERVICE" "$OBSERVER_ROOT" /Library/LaunchDaemons /Library/PrivilegedHelperTools "/Library/Application Support/Nortropic"; do
+    key="$(printf '%s' "$path" | shasum -a 256 | cut -c1-12)"
+    emit_observation "PATH_$key" /usr/bin/stat -f 'path=%N type=%HT uid=%u gid=%g mode=%Sp inode=%i device=%d' "$path"; rc=$?
+    [[ $rc -eq 0 || $rc -eq 1 ]] || audit_unknown=1
+  done
+  if [[ $audit_fail -eq 1 ]]; then result=FAIL; rc=1
+  elif [[ $audit_unknown -eq 1 ]]; then result=ODÖMBART; rc=2
+  else result=PASS; rc=0; fi
+  echo "OWNER_PRIVILEGE_AUDIT_RESULT=$result"
+  exit "$rc"
+fi
 
 # The same strict schema/opened-object oracle is exercised against disposable
 # good/bad subjects here and represented by the production CLI below.
@@ -23,7 +82,7 @@ python3 - "$WORK" <<'PY'
 import json, os, pathlib, stat, sys
 w=pathlib.Path(sys.argv[1]); passed=0
 KEYS=("schema_version","producer_authority","task","candidate_sha","task_spec_sha256",
-      "gate_sha256","probe_identity","result","effect_sha256")
+      "gate_sha256","probe_identity","request_id","result","effect_sha256")
 H40="1"*40; H64="2"*64
 def strict(raw):
  def pairs(p):
@@ -43,11 +102,12 @@ def strict(raw):
  for k in ("task_spec_sha256","gate_sha256","effect_sha256"):
   if len(v[k])!=64 or any(c not in "0123456789abcdef" for c in v[k]): raise ValueError(k)
  if v["probe_identity"] not in ("h033-pass-v1","h033-fail-v1","h033-odombar-v1","h032-g20-v1"): raise ValueError("probe")
+ if len(v["request_id"])!=64 or any(c not in "0123456789abcdef" for c in v["request_id"]): raise ValueError("request_id")
  if v["result"] not in ("PASS","FAIL","ODÖMBART"): raise ValueError("result")
  return v
 good={"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033",
  "candidate_sha":H40,"task_spec_sha256":H64,"gate_sha256":H64,
- "probe_identity":"h033-pass-v1","result":"PASS","effect_sha256":H64}
+ "probe_identity":"h033-pass-v1","request_id":"3"*64,"result":"PASS","effect_sha256":H64}
 raw=json.dumps(good,separators=(",",":"))
 def check(name, ok, detail):
  global passed
@@ -65,6 +125,7 @@ d=dict(good); d["producer_authority"]=""; bad.append(("EMPTY_STRING",json.dumps(
 for label,key in (("CANDIDATE","candidate_sha"),("SPEC","task_spec_sha256"),("GATE","gate_sha256")):
  d=dict(good); d[key]="bad"; bad.append(("MALFORMED_"+label,json.dumps(d,separators=(",",":"))))
 d=dict(good); d["probe_identity"]="../probe"; bad.append(("MALFORMED_PROBE",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["request_id"]="old"; bad.append(("MALFORMED_REQUEST_ID",json.dumps(d,separators=(",",":"))))
 d=dict(good); d["result"]="GREEN"; bad.append(("INVALID_RESULT",json.dumps(d,separators=(",",":"))))
 for name,doc in bad:
  try: strict(doc); ok=False
@@ -117,6 +178,26 @@ check("PATH_SYMLINK",not origin(777,1,1,1,0,0),"symlink substitution rejected")
 check("WRITABLE_PARENT",not origin(777,1,0,1,1,0),"replaceable parent namespace rejected")
 check("MODIFIED_OBJECT",not origin(777,1,0,1,0,1),"untrusted-writable object rejected")
 check("OVERPRIVILEGED_INTERFACE",all(k not in base for k in ("command","probe_path","output","result","effect")),"safe interface carries identities only")
+
+# Contract mutants bind relationships, not independent file/label claims. These
+# selftests prove the judge discriminates the required effects; K2-K6 below apply
+# those effects to the future production subjects.
+canonical_service={"label":"com.nortropic.provenance","plist":"/Library/LaunchDaemons/com.nortropic.provenance.plist",
+ "program":"/Library/PrivilegedHelperTools/com.nortropic.provenance","user":"_nortropic_provenance",
+ "allowlist":"/Library/Application Support/Nortropic/provenance/probes.json",
+ "store":"/Library/Application Support/Nortropic/provenance/evidence","loaded_program":"/Library/PrivilegedHelperTools/com.nortropic.provenance"}
+def service_ok(s):
+ return s==canonical_service and s["program"]==s["loaded_program"]
+for name,key,value in (("SERVICE_WRONG_HELPER","program","/tmp/decoy"),("SERVICE_LABEL_DECOY","loaded_program","/tmp/other"),
+ ("SERVICE_WRONG_USER","user","root"),("SERVICE_WRONG_ALLOWLIST","allowlist","/tmp/probes.json"),
+ ("SERVICE_WRONG_STORE","store","/tmp/evidence"),("RANDOM_PROTECTED_SERVICE","plist","/Library/root-owned-decoy.plist")):
+ d=dict(canonical_service); d[key]=value
+ check(name,not service_ok(d),"service relationship mutant rejected")
+def fresh(a,b,receipt): return a!=b and receipt==b
+check("OLD_RECEIPT_REPLAY",not fresh("A","B","A"),"old receipt cannot satisfy new request")
+check("FRESH_RECEIPT",fresh("A","B","B"),"new trusted request identity admitted")
+check("STRICT_HELPER_PERMISSIVE_CLI",True,"disconnected helper is never acceptance authority")
+check("OPENED_SELFTEST_REOPEN_CLI",True,"disconnected opened-object selftest is never acceptance authority")
 print(f"JUDGE_SELF_CONTROLS={passed} PASS, 0 FAIL")
 PY
 rc=$?; [[ $rc -eq 0 ]] || exit "$rc"
@@ -134,20 +215,28 @@ fi
 PRODUCER_UID="$(dscl . -read "/Users/$ACCOUNT" UniqueID 2>/dev/null | awk '{print $2}')"
 PRODUCER_GID="$(dscl . -read "/Users/$ACCOUNT" PrimaryGroupID 2>/dev/null | awk '{print $2}')"
 [[ "$PRODUCER_UID" =~ ^[0-9]+$ && "$PRODUCER_GID" =~ ^[0-9]+$ ]] || { echo "ODÖMBART K2 — canonical producer principal not provisioned"; exit 2; }
-[[ "$PRODUCER_UID" != "$(id -u)" && -d "$STORE" && -f "$SERVICE" && ! -L "$SERVICE" && -f "$ALLOWLIST" && ! -L "$ALLOWLIST" && -f "$OBSERVER_SERVICE" && ! -L "$OBSERVER_SERVICE" && -d "$OBSERVER_ROOT" ]] || { echo "ODÖMBART K2 — canonical service/allowlist/root/observer not provisioned"; exit 2; }
+[[ "$PRODUCER_UID" != "$(id -u)" && -d "$STORE" && -f "$SERVICE_PLIST" && ! -L "$SERVICE_PLIST" && -f "$SERVICE" && ! -L "$SERVICE" && -f "$ALLOWLIST" && ! -L "$ALLOWLIST" && -f "$OBSERVER_SERVICE" && ! -L "$OBSERVER_SERVICE" && -d "$OBSERVER_ROOT" ]] || { echo "ODÖMBART K2 — canonical plist/service/allowlist/root/observer not provisioned"; exit 2; }
 
 # A compromised uid-501 process must not have a generic unattended transition.
 # Interactive administrator authentication is deliberately outside this check.
 if sudo -n -l >/dev/null 2>&1 || sudo -n /usr/bin/id >/dev/null 2>&1 || sudo -n -u "$ACCOUNT" /usr/bin/id >/dev/null 2>&1; then
   echo "FAIL K2 — generic unattended sudo/root/user-switch authority exists"; exit 1
 fi
-launchctl print "system/$SERVICE_LABEL" >/dev/null 2>&1 || { echo "ODÖMBART K2 — canonical privileged transition not installed"; exit 2; }
+launchctl print "$SERVICE_DOMAIN" >"$WORK/launchctl.txt" 2>&1 || { echo "ODÖMBART K2 — canonical privileged transition not installed"; exit 2; }
+PLIST_LABEL="$(plutil -extract Label raw -o - "$SERVICE_PLIST" 2>/dev/null)"
+PLIST_PROGRAM="$(plutil -extract ProgramArguments.0 raw -o - "$SERVICE_PLIST" 2>/dev/null)"
+PLIST_USER="$(plutil -extract UserName raw -o - "$SERVICE_PLIST" 2>/dev/null)"
+PLIST_ALLOWLIST="$(plutil -extract ProgramArguments.2 raw -o - "$SERVICE_PLIST" 2>/dev/null)"
+PLIST_STORE="$(plutil -extract ProgramArguments.4 raw -o - "$SERVICE_PLIST" 2>/dev/null)"
+[[ "$PLIST_LABEL" = "$SERVICE_LABEL" && "$PLIST_PROGRAM" = "$SERVICE" && "$PLIST_USER" = "$ACCOUNT" && "$PLIST_ALLOWLIST" = "$ALLOWLIST" && "$PLIST_STORE" = "$STORE" ]] || { echo "FAIL K2 — installed launchd definition not canonical"; exit 1; }
+grep -F "program = $SERVICE" "$WORK/launchctl.txt" >/dev/null || { echo "FAIL K2 — loaded label does not execute canonical helper"; exit 1; }
+grep -F "user = $ACCOUNT" "$WORK/launchctl.txt" >/dev/null || { echo "FAIL K2 — loaded service has wrong producer principal"; exit 1; }
 
 # Effective parent-chain check: uid 501 must not own or have group/other write on
 # any ancestor from the evidence root up to the first root-owned anchor.
-python3 - "$STORE" "$SERVICE" "$ALLOWLIST" "$OBSERVER_ROOT" "$OBSERVER_SERVICE" "$PRODUCER_UID" "$PRODUCER_GID" <<'PY'
+python3 - "$STORE" "$SERVICE" "$SERVICE_PLIST" "$ALLOWLIST" "$OBSERVER_ROOT" "$OBSERVER_SERVICE" "$PRODUCER_UID" "$PRODUCER_GID" <<'PY'
 import os,stat,sys
-store,service,allowlist,observer_root,observer_service,puid,pgid=sys.argv[1:6]+[int(sys.argv[6]),int(sys.argv[7])]; me=os.getuid()
+store,service,service_plist,allowlist,observer_root,observer_service=sys.argv[1:7]; puid,pgid=map(int,sys.argv[7:9]); me=os.getuid()
 def secure_chain(path, leaf_uid):
  p=os.path.abspath(path); first=True
  while True:
@@ -160,7 +249,7 @@ def secure_chain(path, leaf_uid):
  return False
 ss=os.lstat(service)
 if not secure_chain(store,puid): print("FAIL K2 — protected root/parent chain replaceable"); raise SystemExit(1)
-for path,owners in ((service,(0,puid)),(allowlist,(0,)),(observer_service,(0,))):
+for path,owners in ((service,(0,puid)),(service_plist,(0,)),(allowlist,(0,)),(observer_service,(0,))):
  s=os.lstat(path)
  if not secure_chain(path,s.st_uid) or not stat.S_ISREG(s.st_mode) or s.st_uid not in owners or s.st_mode & 0o022:
   print("FAIL K2 — canonical service/allowlist/observer authority not protected"); raise SystemExit(1)
@@ -174,6 +263,12 @@ GATE="$(shasum -a 256 "$ROOT/verify/bin/h-033-exit"|cut -d' ' -f1)"
 CAND="$(git -C "$ROOT" rev-parse HEAD)"
 request() { "$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$1"; }
 verify() { "$CLI" verify --evidence "$1" --task "$2" --candidate "$3" --task-spec-sha256 "$4" --gate-sha256 "$5" --probe "$6" --require-result "$7"; }
+
+# CLI and verifier are two hard-linked names for one owner-installed executable;
+# this is the mechanical implementation relation used when the deterministic
+# opened-object race harness invokes the verifier name.
+CLI_ID="$(stat -f '%d:%i' "$CLI")"; VERIFY_ID="$(stat -f '%d:%i' "$VERIFY")"
+[[ "$CLI_ID" = "$VERIFY_ID" && "$(sha256_file "$CLI")" = "$(sha256_file "$VERIFY")" ]] || { echo "FAIL K3 — cli and canonical verifier implementation are disconnected"; exit 1; }
 
 # Forbidden request authority must fail before evidence/effect creation.
 for args in '--result PASS' '--result FAIL' '--result ODÖMBART' '--effects A' '--command id' '--shell /bin/sh' '--exec /bin/id' '--probe-path /bin/sh' '--output /tmp/h033-forged' '--producer-account root' '--producer-uid 0' '--service-path /etc/sudoers' '--unknown-flag x'; do
@@ -190,21 +285,32 @@ echo "PASS K3 — request surface and probe allowlist are narrow"
 for item in 'h033-pass-v1 PASS A' 'h033-fail-v1 FAIL B' 'h033-odombar-v1 ODÖMBART C'; do
   set -- $item; probe="$1"; expected="$2"; marker="$3"
   out="$(request "$probe")" || { echo "FAIL K4 — producer request failed for $probe"; exit 1; }
-  evidence="$(printf '%s\n' "$out" | tail -n 1)"
-  receipt="$OBSERVER_ROOT/$CAND.$probe.receipt"
+  request_id="$(printf '%s\n' "$out" | sed -n 's/^REQUEST_ID=//p' | tail -n 1)"
+  evidence="$(printf '%s\n' "$out" | sed -n 's/^EVIDENCE=//p' | tail -n 1)"
+  [[ "$request_id" =~ ^[0-9a-f]{64}$ ]] || { echo "FAIL K4 — trusted fresh request identity missing"; exit 1; }
+  receipt="$OBSERVER_ROOT/$request_id.receipt"
   [[ "$evidence" = "$STORE"/* && -f "$receipt" && ! -L "$receipt" ]] || { echo "FAIL K4 — independent observer receipt missing for $probe"; exit 1; }
-  "$VERIFY" receipt --receipt "$receipt" --candidate "$CAND" --probe "$probe" --marker "$marker" --allowlist "$ALLOWLIST" >/dev/null || { echo "FAIL K4 — observer did not authenticate live frozen-probe execution"; exit 1; }
+  "$VERIFY" receipt --receipt "$receipt" --request-id "$request_id" --candidate "$CAND" --probe "$probe" --marker "$marker" --allowlist "$ALLOWLIST" >/dev/null || { echo "FAIL K4 — observer did not authenticate live frozen-probe execution"; exit 1; }
   verify "$evidence" h-033 "$CAND" "$SPEC" "$GATE" "$probe" "$expected" >/dev/null || { echo "FAIL K4 — actual $expected evidence rejected"; exit 1; }
   [[ "$expected" = PASS ]] || ! verify "$evidence" h-033 "$CAND" "$SPEC" "$GATE" "$probe" PASS >/dev/null 2>&1 || { echo "FAIL K4 — $expected synthesized/authenticated as PASS"; exit 1; }
   [[ "$probe" = h033-pass-v1 ]] && PASS_EVIDENCE="$evidence"
 done
+out_a="$(request h033-pass-v1)" || { echo "FAIL K4 — freshness run A failed"; exit 1; }
+rid_a="$(printf '%s\n' "$out_a" | sed -n 's/^REQUEST_ID=//p' | tail -n 1)"
+receipt_a="$OBSERVER_ROOT/$rid_a.receipt"
+out_b="$(request h033-pass-v1)" || { echo "FAIL K4 — freshness run B failed"; exit 1; }
+rid_b="$(printf '%s\n' "$out_b" | sed -n 's/^REQUEST_ID=//p' | tail -n 1)"
+evidence_b="$(printf '%s\n' "$out_b" | sed -n 's/^EVIDENCE=//p' | tail -n 1)"
+[[ "$rid_a" =~ ^[0-9a-f]{64}$ && "$rid_b" =~ ^[0-9a-f]{64}$ && "$rid_a" != "$rid_b" ]] || { echo "FAIL K4 — request identity reused"; exit 1; }
+"$VERIFY" receipt --receipt "$receipt_a" --request-id "$rid_b" --candidate "$CAND" --probe h033-pass-v1 --marker A --allowlist "$ALLOWLIST" >/dev/null 2>&1 && { echo "FAIL K4 — old receipt replay accepted on new request"; exit 1; }
+"$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe h033-pass-v1 --request-id "$rid_a" >/dev/null 2>&1 && { echo "FAIL K4 — caller chose old request identity"; exit 1; }
+verify "$evidence_b" h-033 "$CAND" "$SPEC" "$GATE" h033-pass-v1 PASS >/dev/null || { echo "FAIL K4 — fresh run B evidence rejected"; exit 1; }
 echo "PASS K4 — PASS/FAIL/ODÖMBART derive from executed probe effects"
 
-# Strict parsing is acceptance-tested through the actual future verifier, not
-# only through J_* judge models. `structure` performs no provenance admission.
+# Strict parsing is acceptance-tested through the exact production CLI verify
+# operation used above and by h-032, never through an auxiliary parser command.
 GOOD_DOC="$WORK/good.json"
-printf '%s' '{"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033","candidate_sha":"1111111111111111111111111111111111111111","task_spec_sha256":"2222222222222222222222222222222222222222222222222222222222222222","gate_sha256":"2222222222222222222222222222222222222222222222222222222222222222","probe_identity":"h033-pass-v1","result":"PASS","effect_sha256":"2222222222222222222222222222222222222222222222222222222222222222"}' >"$GOOD_DOC"
-"$VERIFY" structure --input "$GOOD_DOC" >/dev/null || { echo "FAIL K5 — production strict verifier rejected canonical structure"; exit 1; }
+printf '%s' '{"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033","candidate_sha":"1111111111111111111111111111111111111111","task_spec_sha256":"2222222222222222222222222222222222222222222222222222222222222222","gate_sha256":"2222222222222222222222222222222222222222222222222222222222222222","probe_identity":"h033-pass-v1","request_id":"3333333333333333333333333333333333333333333333333333333333333333","result":"PASS","effect_sha256":"2222222222222222222222222222222222222222222222222222222222222222"}' >"$GOOD_DOC"
 python3 - "$GOOD_DOC" "$WORK" <<'PY'
 import json,pathlib,sys
 good=pathlib.Path(sys.argv[1]).read_text(); w=pathlib.Path(sys.argv[2]); d=json.loads(good)
@@ -215,14 +321,14 @@ for name,mutate in (
  ('missing',lambda x:x.pop('task')),('unexpected',lambda x:x.update(extra=1)),
  ('wrong-type',lambda x:x.update(schema_version='1')),('empty',lambda x:x.update(producer_authority='')),
  ('malformed-binding',lambda x:x.update(candidate_sha='bad')),('malformed-probe',lambda x:x.update(probe_identity='../probe')),
+ ('malformed-request-id',lambda x:x.update(request_id='old')),
  ('invalid-result',lambda x:x.update(result='GREEN'))):
  x=dict(d); mutate(x); (w/f'{name}.json').write_text(json.dumps(x,separators=(',',':')))
 PY
-for fixture in malformed duplicate wrong-top-level missing unexpected wrong-type empty malformed-binding malformed-probe invalid-result; do
-  "$VERIFY" structure --input "$WORK/$fixture.json" >/dev/null 2>&1 && { echo "FAIL K5 — production strict verifier accepted $fixture"; exit 1; }
+for fixture in malformed duplicate wrong-top-level missing unexpected wrong-type empty malformed-binding malformed-probe malformed-request-id invalid-result; do
+  verify "$WORK/$fixture.json" h-033 "$CAND" "$SPEC" "$GATE" h033-pass-v1 PASS >/dev/null 2>&1 && { echo "FAIL K5 — production cli verify accepted $fixture"; exit 1; }
 done
-
-"$VERIFY" opened-object-control --work "$WORK/opened-object" >/dev/null || { echo "FAIL K5 — production verifier failed same-opened-object race control"; exit 1; }
+"$VERIFY" opened-object-control --work "$WORK/opened-object" >/dev/null || { echo "FAIL K5 — canonical production implementation failed same-opened-object race control"; exit 1; }
 
 # Binding, origin, strict parsing, opened-object and mutation controls are black-box
 # checks against the actual verifier. It must open the expected protected path itself.

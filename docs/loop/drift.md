@@ -338,3 +338,14 @@ The observer authenticates the live frozen-probe peer executable and writes A/B/
 authority, so producer evidence cannot forge its own execution oracle. Material parser, request,
 binding, opened-object race and namespace clauses map to future black-box CLI/verifier controls;
 the Python controls are explicitly judge selftests only. No account, service or root was provisioned.
+
+## 2026-08-12 — H-033 GR-11..GR-15 service/freshness/freeze remediation
+
+The frozen service authority is one relationship: protected LaunchDaemon definition and loaded
+`system/com.nortropic.provenance` bind the canonical helper, producer, allowlist and evidence root.
+Each run receives a trusted fresh request identity, and observer receipt plus evidence bind that
+instance so an old same-probe receipt cannot prove a new execution. Strict-document controls call
+the actual `cli verify` consumer path. CLI and verifier names must identify one hard-linked
+executable, connecting the deterministic opened-object control to production. Pre-freeze uid-501
+privilege is a separate candidate-bound owner-terminal subgate with raw command/result evidence and
+PASS/FAIL/ODÖMBART; it is not recursive H-033 runtime provenance. Production remains honestly RED.
