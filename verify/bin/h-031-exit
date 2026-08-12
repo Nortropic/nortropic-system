@@ -1,0 +1,586 @@
+#!/usr/bin/env bash
+# h-031-exit — explicit Codex-modellrouting per faktisk autopilotroll
+#
+# MUTANTPREDIKTION (före produktionsimplementation):
+#   M01 journalen påstår rätt modell men argv saknar explicit routing   -> K2
+#   M02 alla roller får max                                            -> K2 (BUILDER)
+#   M03 okänd roll faller tillbaka till en default                      -> K4
+#   M04 äldre persisted ultra återanvänds                               -> K2/K5
+#   M05 alternativ agentväg startar Codex utanför gemensam spawnpunkt   -> K1/K8
+#   M06 status/watch/roadmap når agentlauncher via helper                -> K6/K9
+#   M07 argv är rätt men journalens källa/fält saknas                    -> K3
+#
+# Provet använder en falsk codex-binär. Den fångar den faktiskt exekverade
+# argv-listan och skriver en minimal giltig agentrapport. Därmed dömer K2
+# launch-effekten, inte källkodens påståenden. En avsiktligt motstridig
+# CODEX_HOME-konfiguration (annan modell + ultra) är startvärdet.
+
+set -u
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "ODÖMBART K0 — ingen git-reporot"
+  exit 2
+}
+SOURCE="$ROOT/scripts/nortropic-codex-autopilot.py"
+SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h031.XXXXXX")" || {
+  echo "ODÖMBART K0 — temp-katalog kunde inte skapas"
+  exit 2
+}
+cleanup() {
+  rm -rf "$WORK"
+}
+trap cleanup EXIT HUP INT TERM
+
+if [ ! -f "$SOURCE" ] || [ ! -f "$SCHEMA" ]; then
+  echo "ODÖMBART K0 — källa eller rapportschema saknas"
+  exit 2
+fi
+
+python3 - "$SOURCE" "$SCHEMA" "$WORK" <<'PY'
+from __future__ import annotations
+
+import ast
+from collections import Counter
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import stat
+import subprocess
+import sys
+import traceback
+
+source = Path(sys.argv[1]).resolve()
+schema_source = Path(sys.argv[2]).resolve()
+work = Path(sys.argv[3]).resolve()
+
+EXPECTED = {
+    "ARCHITECT": ("gpt-5.6-sol", "max"),
+    "TEST_AUTHOR": ("gpt-5.6-sol", "max"),
+    "GATE_REVIEWER": ("gpt-5.6-sol", "max"),
+    "BUILDER": ("gpt-5.6-sol", "high"),
+    "REVIEWER": ("gpt-5.6-sol", "max"),
+    "EMPIRICAL": ("gpt-5.6-sol", "max"),
+}
+ROUTING_SOURCE = "AUTOPILOT_ROLE_POLICY"
+checks: list[tuple[str, bool, str]] = []
+
+
+def check(key: str, ok: bool, detail: str) -> None:
+    checks.append((key, ok, detail))
+
+
+def sh(*argv: str, cwd: Path | None = None) -> str:
+    p = subprocess.run(
+        list(argv), cwd=str(cwd) if cwd else None, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    )
+    if p.returncode != 0:
+        raise RuntimeError(f"command rc={p.returncode}: {' '.join(argv)}\n{p.stdout}")
+    return p.stdout
+
+
+def call_name(node: ast.Call) -> str:
+    f = node.func
+    if isinstance(f, ast.Name):
+        return f.id
+    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):
+        return f"{f.value.id}.{f.attr}"
+    return ""
+
+
+PROCESS_CALLS = {
+    "subprocess.Popen", "subprocess.run", "subprocess.call",
+    "subprocess.check_call", "subprocess.check_output",
+    "subprocess.getoutput", "subprocess.getstatusoutput",
+    "os.system", "os.popen", "os.posix_spawn", "os.posix_spawnp",
+    "asyncio.create_subprocess_exec", "asyncio.create_subprocess_shell",
+    "pty.spawn",
+}
+ALLOWED_RUN_CALLERS = {
+    "git", "run_gate", "run_invariants", "ensure_dependencies",
+    "repo_identity", "publish", "run_empirical_gate",
+    "assert_s7_external_prerequisite", "supervisor_resume", "run_codex",
+}
+EXPECTED_RESOLVER_CALLS = Counter({
+    ("roadmap_contract_flow", "TEST_AUTHOR"): 2,
+    ("roadmap_contract_flow", "GATE_REVIEWER"): 1,
+    ("empirical_gate_contract_flow", "TEST_AUTHOR"): 2,
+    ("empirical_gate_contract_flow", "GATE_REVIEWER"): 1,
+    ("empirical_unattended_flow", "EMPIRICAL"): 1,
+    ("test_author_flow", "TEST_AUTHOR"): 2,
+    ("test_author_flow", "GATE_REVIEWER"): 1,
+    ("builder_flow", "BUILDER"): 2,
+    ("builder_flow", "REVIEWER"): 1,
+})
+EXPECTED_DIRECT_LAUNCH_CALLS = Counter({
+    ("architect_resolution", "ARCHITECT"): 1,
+    ("run_codex_resolving_architecture", "$role"): 1,
+})
+
+
+def imported_names(tree: ast.Module) -> tuple[dict[str, str], dict[str, str]]:
+    modules: dict[str, str] = {}
+    symbols: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                modules[alias.asname or alias.name] = alias.name
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                symbols[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return modules, symbols
+
+
+def qualified_call(node: ast.Call, modules: dict[str, str], symbols: dict[str, str]) -> str:
+    f = node.func
+    if isinstance(f, ast.Name):
+        return symbols.get(f.id, f.id)
+    parts: list[str] = []
+    cur: ast.expr = f
+    while isinstance(cur, ast.Attribute):
+        parts.append(cur.attr)
+        cur = cur.value
+    if isinstance(cur, ast.Name):
+        root = modules.get(cur.id, cur.id)
+        return ".".join([root, *reversed(parts)])
+    return ""
+
+
+def is_process_call(name: str) -> bool:
+    return (
+        name in PROCESS_CALLS
+        or name.startswith("os.exec")
+        or name.startswith("os.spawn")
+    )
+
+
+def role_expr(node: ast.expr) -> str:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name) and node.id == "role":
+        return "$role"
+    return "$dynamic"
+
+
+def first_literal(node: ast.Call) -> str | None:
+    if not node.args:
+        return None
+    value = node.args[0]
+    if isinstance(value, (ast.List, ast.Tuple)) and value.elts:
+        first = value.elts[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            return first.value
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+        return value.value
+    return None
+
+
+def analyze_launch_graph(subject_text: str) -> dict[str, object]:
+    subject_tree = ast.parse(subject_text)
+    subject_funcs = {
+        n.name: n for n in subject_tree.body
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    modules, symbols = imported_names(subject_tree)
+    graph: dict[str, set[str]] = {name: set() for name in subject_funcs}
+    process_sites: list[tuple[str, str, int, str | None]] = []
+    run_callers: Counter[str] = Counter()
+    run_sites: list[tuple[str, int, str | None]] = []
+    resolver_calls: Counter[tuple[str, str]] = Counter()
+    direct_calls: Counter[tuple[str, str]] = Counter()
+    dynamic_resolution: list[tuple[str, str, int]] = []
+    resolver_run_codex_in_loop = False
+
+    for fn_name, fn in subject_funcs.items():
+        parents: dict[ast.AST, ast.AST] = {}
+        for parent in ast.walk(fn):
+            for child in ast.iter_child_nodes(parent):
+                parents[child] = parent
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Call):
+                continue
+            local = call_name(node)
+            qualified = qualified_call(node, modules, symbols)
+            if local in subject_funcs:
+                graph[fn_name].add(local)
+            if is_process_call(qualified):
+                process_sites.append((fn_name, qualified, node.lineno, first_literal(node)))
+            if local == "run":
+                run_callers[fn_name] += 1
+                run_sites.append((fn_name, node.lineno, first_literal(node)))
+            if local == "run_codex_resolving_architecture":
+                role = role_expr(node.args[2]) if len(node.args) > 2 else "$missing"
+                resolver_calls[(fn_name, role)] += 1
+            if local == "run_codex":
+                role = role_expr(node.args[2]) if len(node.args) > 2 else "$missing"
+                direct_calls[(fn_name, role)] += 1
+                if fn_name == "run_codex_resolving_architecture":
+                    cur: ast.AST | None = node
+                    while cur in parents:
+                        cur = parents[cur]
+                        if isinstance(cur, (ast.For, ast.While)):
+                            resolver_run_codex_in_loop = True
+                            break
+            if qualified in {"__import__", "importlib.import_module", "eval", "exec", "compile"}:
+                dynamic_resolution.append((fn_name, qualified, node.lineno))
+
+    def reachable(start: str) -> set[str]:
+        seen: set[str] = set()
+        todo = [start]
+        while todo:
+            cur = todo.pop()
+            if cur in seen:
+                continue
+            seen.add(cur)
+            todo.extend(graph.get(cur, ()))
+        return seen
+
+    unexpected_process: list[tuple[str, str, int, str | None]] = []
+    for site in process_sites:
+        fn_name, qualified, _line, literal = site
+        allowed = (
+            (fn_name == "run" and qualified == "subprocess.run")
+            or (fn_name == "run_codex" and qualified in {"subprocess.Popen", "subprocess.run"})
+            or (fn_name == "watch" and qualified == "os.system" and literal == "clear")
+        )
+        if not allowed:
+            unexpected_process.append(site)
+
+    agent_execution = any(
+        fn_name == "run_codex" and qualified in {"subprocess.Popen", "subprocess.run"}
+        for fn_name, qualified, _line, _literal in process_sites
+    ) or "run" in graph.get("run_codex", set())
+    boundary_ok = (
+        not unexpected_process
+        and not dynamic_resolution
+        and set(run_callers) <= ALLOWED_RUN_CALLERS
+        and resolver_calls == EXPECTED_RESOLVER_CALLS
+        and direct_calls == EXPECTED_DIRECT_LAUNCH_CALLS
+        and agent_execution
+    )
+
+    bootstrap_reach = reachable("bootstrap")
+    main_reach = reachable("main")
+    resolver_reach = reachable("run_codex_resolving_architecture")
+    workflow_roles = {
+        role for (caller, role), count in resolver_calls.items()
+        if count and caller in bootstrap_reach and role in EXPECTED
+    }
+    workflow_roles.update({
+        role for (caller, role), count in direct_calls.items()
+        if count and caller in bootstrap_reach and role in EXPECTED
+    })
+    supervisor_reach = reachable("supervisor_resume")
+    resume_launchctl = [site for site in run_sites if site[0] == "supervisor_resume"]
+    resume_ok = (
+        {"supervisor_resume", "bootstrap"} <= graph.get("main", set())
+        and "run" in supervisor_reach
+        and not ({"run_codex", "run_codex_resolving_architecture"} & supervisor_reach)
+        and "run_codex" in bootstrap_reach
+        and workflow_roles == set(EXPECTED)
+        and len(resume_launchctl) == 3
+        and all(site[2] == "launchctl" for site in resume_launchctl)
+    )
+    paths_ok = (
+        resolver_run_codex_in_loop
+        and {"run_codex", "architect_resolution"} <= resolver_reach
+        and resume_ok
+        and workflow_roles == set(EXPECTED)
+    )
+
+    observer_reach = {
+        name: sorted(reachable(name)) for name in ("status", "watch", "roadmap_status")
+    }
+    agent_nodes = {
+        "run_codex", "run_codex_resolving_architecture", "architect_resolution",
+        *(site[0] for site in unexpected_process),
+    }
+    observer_violations = {
+        name: sorted(set(reach) & agent_nodes)
+        for name, reach in observer_reach.items()
+        if set(reach) & agent_nodes
+    }
+    return {
+        "tree": subject_tree,
+        "funcs": subject_funcs,
+        "graph": graph,
+        "reachable": reachable,
+        "boundary_ok": boundary_ok,
+        "paths_ok": paths_ok,
+        "observer_clean": not observer_violations,
+        "process_sites": process_sites,
+        "unexpected_process": unexpected_process,
+        "dynamic_resolution": dynamic_resolution,
+        "run_callers": run_callers,
+        "run_sites": run_sites,
+        "resolver_calls": resolver_calls,
+        "direct_calls": direct_calls,
+        "workflow_roles": workflow_roles,
+        "resume_ok": resume_ok,
+        "observer_violations": observer_violations,
+    }
+
+
+def resolved_route(argv: list[str]) -> tuple[str, str]:
+    # Deliberately begin with the conflicting user config. Explicit launch
+    # arguments must replace both values.
+    model = "user-config-other-model"
+    effort = "ultra"
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in {"-m", "--model"} and i + 1 < len(argv):
+            model = argv[i + 1]
+            i += 2
+            continue
+        if arg.startswith("--model="):
+            model = arg.split("=", 1)[1]
+        value = None
+        if arg in {"-c", "--config"} and i + 1 < len(argv):
+            value = argv[i + 1]
+            i += 1
+        elif arg.startswith("--config="):
+            value = arg.split("=", 1)[1]
+        if value and "=" in value:
+            key, raw = value.split("=", 1)
+            if key.strip() == "model_reasoning_effort":
+                effort = raw.strip().strip("\"'")
+        i += 1
+    return model, effort
+
+
+try:
+    text = source.read_text(encoding="utf-8")
+    analysis = analyze_launch_graph(text)
+    tree = analysis["tree"]
+    funcs = analysis["funcs"]
+    required_api = {"run_codex", "status", "watch", "roadmap_status", "journal_root"}
+    check("K0", required_api <= funcs.keys(), f"runtime API present={sorted(required_api & funcs.keys())}")
+    check(
+        "K1", bool(analysis["boundary_ok"]),
+        "process_sites={} unexpected={} dynamic={} run_callers={} direct={} resolver={}".format(
+            analysis["process_sites"], analysis["unexpected_process"],
+            analysis["dynamic_resolution"], dict(analysis["run_callers"]),
+            dict(analysis["direct_calls"]), dict(analysis["resolver_calls"]),
+        ),
+    )
+    check(
+        "K1P", bool(analysis["paths_ok"]),
+        f"workflow_roles={sorted(analysis['workflow_roles'])} resume_ok={analysis['resume_ok']}",
+    )
+
+    repo = work / "repo"
+    repo.mkdir()
+    sh("git", "init", "-q", cwd=repo)
+    sh("git", "config", "user.name", "h031-gate", cwd=repo)
+    sh("git", "config", "user.email", "h031-gate@nortropic.invalid", cwd=repo)
+    schema = repo / "docs/loop/codex-autopilot-report.schema.json"
+    schema.parent.mkdir(parents=True)
+    shutil.copyfile(schema_source, schema)
+    (repo / "anchor.txt").write_text("h031\n", encoding="utf-8")
+    sh("git", "add", ".", cwd=repo)
+    sh("git", "commit", "-qm", "fixture", cwd=repo)
+
+    fakebin = work / "fakebin"
+    fakebin.mkdir()
+    capture = work / "codex-argv.jsonl"
+    fake = fakebin / "codex"
+    fake.write_text(
+        """#!/usr/bin/env python3
+import json, os, pathlib, re, sys
+argv = sys.argv[1:]
+with pathlib.Path(os.environ['H031_CAPTURE']).open('a', encoding='utf-8') as f:
+    f.write(json.dumps(argv) + '\\n')
+out = pathlib.Path(argv[argv.index('-o') + 1])
+prompt = argv[-1]
+m = re.search(r'H031_GATE_ROLE=([A-Z_]+)', prompt)
+role = m.group(1) if m else 'OVERIFIERAT'
+out.write_text(json.dumps({
+    'role': role, 'outcome': 'READY', 'owner_decision_required': False,
+    'blocking_findings': []
+}), encoding='utf-8')
+print(json.dumps({'type': 'thread.started', 'thread_id': 'h031-' + role.lower()}))
+""",
+        encoding="utf-8",
+    )
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+
+    codex_home = work / "codex-home"
+    codex_home.mkdir()
+    (codex_home / "config.toml").write_text(
+        'model = "user-config-other-model"\nmodel_reasoning_effort = "ultra"\n',
+        encoding="utf-8",
+    )
+    os.environ["PATH"] = str(fakebin) + os.pathsep + os.environ.get("PATH", "")
+    os.environ["CODEX_HOME"] = str(codex_home)
+    os.environ["H031_CAPTURE"] = str(capture)
+
+    spec = importlib.util.spec_from_file_location("h031_autopilot_subject", source)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load autopilot source")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    journal_file = module.journal_root(repo) / "events.jsonl"
+    old = {
+        "ts": "2026-01-01T00:00:00+00:00", "event": "AGENT_START",
+        "role": "BUILDER", "model": "legacy-model",
+        "reasoning_effort": "ultra", "model_routing_source": "USER_CONFIG",
+    }
+    journal_file.write_text(json.dumps(old, sort_keys=True) + "\n", encoding="utf-8")
+
+    runtime_errors: list[str] = []
+    for role in EXPECTED:
+        try:
+            module.run_codex(repo, repo, role, f"H031_GATE_ROLE={role}")
+        except Exception as exc:
+            runtime_errors.append(f"{role}:{type(exc).__name__}:{exc}")
+
+    captures = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()] if capture.exists() else []
+    routes = [resolved_route(argv) for argv in captures]
+    expected_routes = [EXPECTED[role] for role in EXPECTED]
+    check(
+        "K2", not runtime_errors and routes == expected_routes,
+        f"routes={routes} expected={expected_routes} errors={runtime_errors}",
+    )
+
+    records = [json.loads(line) for line in journal_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    starts = [r for r in records[1:] if r.get("event") == "AGENT_START"]
+    journal_ok = len(starts) == len(EXPECTED)
+    if journal_ok:
+        for rec, role in zip(starts, EXPECTED):
+            model, effort = EXPECTED[role]
+            journal_ok = journal_ok and all((
+                rec.get("role") == role,
+                rec.get("model") == model,
+                rec.get("reasoning_effort") == effort,
+                rec.get("model_routing_source") == ROUTING_SOURCE,
+            ))
+    check("K3", journal_ok, f"AGENT_START={starts}")
+
+    before_capture = len(captures)
+    before_runs = sorted((module.journal_root(repo) / "runs").glob("*"))
+    before_lines = len(records)
+    unknown_error = "NO_ERROR"
+    try:
+        module.run_codex(repo, repo, "UNKNOWN_ROLE", "H031_GATE_ROLE=UNKNOWN_ROLE")
+    except Exception as exc:
+        unknown_error = f"{type(exc).__name__}:{exc}"
+    after_captures = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()] if capture.exists() else []
+    after_runs = sorted((module.journal_root(repo) / "runs").glob("*"))
+    after_records = [json.loads(line) for line in journal_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    unknown_ok = (
+        unknown_error != "NO_ERROR"
+        and len(after_captures) == before_capture
+        and len(after_runs) == len(before_runs)
+        and len(after_records) == before_lines
+    )
+    check(
+        "K4", unknown_ok,
+        f"error={unknown_error} spawns={before_capture}->{len(after_captures)} runs={len(before_runs)}->{len(after_runs)} journal={before_lines}->{len(after_records)}",
+    )
+
+    old_preserved = after_records and after_records[0] == old
+    no_new_ultra = all(
+        r.get("reasoning_effort") != "ultra"
+        for r in after_records[1:]
+        if r.get("event") == "AGENT_START"
+    ) and all(effort != "ultra" for _, effort in routes)
+    check("K5", old_preserved and no_new_ultra, f"old_preserved={old_preserved} no_new_ultra={no_new_ultra}")
+
+    check(
+        "K6", bool(analysis["observer_clean"]),
+        f"transitive_agent_reachability={analysis['observer_violations']}",
+    )
+
+    # Judge controls: admit both normal CLI spellings, but reject the tempting
+    # superficial variants "journal only" and "max for everybody".
+    short_form = resolved_route(["-m", "gpt-5.6-sol", "-c", 'model_reasoning_effort="high"'])
+    long_form = resolved_route(["--model=gpt-5.6-sol", "--config=model_reasoning_effort='max'"])
+    journal_only_mutant = resolved_route([])
+    all_max_builder_mutant = resolved_route(["--model", "gpt-5.6-sol", "-c", "model_reasoning_effort=max"])
+    controls_ok = (
+        short_form == EXPECTED["BUILDER"]
+        and long_form == EXPECTED["REVIEWER"]
+        and journal_only_mutant != EXPECTED["ARCHITECT"]
+        and all_max_builder_mutant != EXPECTED["BUILDER"]
+    )
+    check(
+        "K7", controls_ok,
+        f"short={short_form} long={long_form} journal_only={journal_only_mutant} all_max_builder={all_max_builder_mutant}",
+    )
+
+    # K8 uses the SAME launch-graph judge as K1/K1P. The command is built
+    # dynamically and uses subprocess.call from a remediation helper, so a
+    # Popen/literal-"codex" source counter would miss it.
+    bypass_function = '''
+def h031_retry_bypass(repo, wt, role, prompt):
+    executable = "".join(("co", "dex"))
+    command = [executable, "exec", prompt]
+    return subprocess.call(command, cwd=str(wt))
+'''
+    bypass_needle = '        rem = run_codex_resolving_architecture(repo, wt, "BUILDER"'
+    if bypass_needle not in text:
+        raise RuntimeError("K8 mutant insertion point missing")
+    bypass_mutant = text.replace(
+        bypass_needle,
+        '        h031_retry_bypass(repo, wt, "BUILDER", "retry")\n' + bypass_needle,
+        1,
+    ) + bypass_function
+    bypass_analysis = analyze_launch_graph(bypass_mutant)
+    bypass_rejected = not bool(bypass_analysis["boundary_ok"])
+    check(
+        "K8", bypass_rejected,
+        f"alternate_launch_rejected={bypass_rejected} unexpected={bypass_analysis['unexpected_process']}",
+    )
+
+    # K9 proves K6 is transitive: the observer calls an innocently named
+    # helper, and only that helper reaches the agent launcher.
+    observer_function = '''
+def h031_observer_helper(repo):
+    executable = "".join(("co", "dex"))
+    command = [executable, "exec", "observer must not launch an agent"]
+    return subprocess.call(command, cwd=str(repo))
+'''
+    observer_needle = 'def status(repo: Path, wt_root: Path) -> None:\n'
+    if observer_needle not in text:
+        raise RuntimeError("K9 mutant insertion point missing")
+    observer_mutant = text.replace(
+        observer_needle,
+        observer_needle + '    h031_observer_helper(repo)\n',
+        1,
+    ) + observer_function
+    observer_analysis = analyze_launch_graph(observer_mutant)
+    observer_rejected = not bool(observer_analysis["observer_clean"])
+    check(
+        "K9", observer_rejected,
+        f"observer_helper_rejected={observer_rejected} violations={observer_analysis['observer_violations']}",
+    )
+
+except Exception as exc:
+    print(f"ODÖMBART K0 — gate harness exception: {type(exc).__name__}: {exc}")
+    traceback.print_exc()
+    sys.exit(2)
+
+passed = 0
+failed = 0
+for key, ok, detail in checks:
+    if ok:
+        passed += 1
+        print(f"PASS  {key} — {detail}")
+    else:
+        failed += 1
+        print(f"FAIL  {key} — {detail}")
+print(f"\n{passed} PASS, {failed} FAIL")
+sys.exit(0 if failed == 0 else 1)
+PY
+rc=$?
+
+case "$rc" in
+  0|1) exit "$rc" ;;
+  *) exit 2 ;;
+esac
