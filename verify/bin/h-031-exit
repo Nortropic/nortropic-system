@@ -16,9 +16,13 @@
 #   M12 process-site i modulkomprehension startar dynamisk Codex         -> K1/K17
 #   M13 lambda-process får ett olöst exekverbart kommando                 -> K1/K18
 #   M14 process-site i ett funktionsdefaultsuttryck startar Codex         -> K1/K19
+#   M15 subprocess nås via vanlig assignment-alias och startar Codex      -> K1/K20
+#   M16 lagrad lambda-callable startar Codex via dictionary lookup         -> K1/K22
 #   V01 upprepade rollcalls samlas bakom en helper utan effektändring    -> K10 PASS
 #   V02 publish använder generic run för bevisat icke-Codex-kommando     -> K12 PASS
 #   V03 samma lambda-process får bevisat icke-Codex-kommando              -> K16 PASS
+#   V04 assignment-alias kör bevisat icke-Codex-kommando                  -> K21 PASS
+#   V05 lagrad lambda-callable kör bevisat icke-Codex-kommando             -> K23 PASS
 #
 # Provet använder en falsk codex-binär. Den fångar den faktiskt exekverade
 # argv-listan och skriver en minimal giltig agentrapport. Därmed dömer K2
@@ -145,7 +149,7 @@ def qualified_expr(node: ast.expr, modules: dict[str, str], symbols: dict[str, s
         parts.append(cur.attr)
         cur = cur.value
     if isinstance(cur, ast.Name):
-        root = modules.get(cur.id, cur.id)
+        root = (local_aliases or {}).get(cur.id, modules.get(cur.id, cur.id))
         return ".".join([root, *reversed(parts)])
     return ""
 
@@ -241,6 +245,7 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
             methods.setdefault(simple, set()).add(callable_id)
 
     module_strings: dict[str, str] = {}
+    module_aliases: dict[str, str] = {}
     for node in subject_tree.body:
         if isinstance(node, (ast.Assign, ast.AnnAssign)):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
@@ -249,6 +254,19 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
                 for target in targets:
                     if isinstance(target, ast.Name):
                         module_strings[target.id] = value.value
+    for _ in range(len(subject_tree.body) + 1):
+        changed = False
+        for node in subject_tree.body:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)) or node.value is None:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            resolved = qualified_expr(node.value, modules, symbols, module_aliases)
+            for target in targets:
+                if isinstance(target, ast.Name) and resolved and module_aliases.get(target.id) != resolved:
+                    module_aliases[target.id] = resolved
+                    changed = True
+        if not changed:
+            break
 
     assignments: dict[str, dict[str, list[tuple[int, ast.expr]]]] = {}
     augmented: dict[str, dict[str, list[int]]] = {}
@@ -406,6 +424,7 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
     # call sites with the same bounded head evaluator used for ordinary generic
     # wrappers. Unsupported/unresolved executable semantics remain explicit.
     lambda_bindings: dict[str, ast.Lambda] = {}
+    stored_lambda_bindings: dict[tuple[str, object], ast.Lambda] = {}
     for node in ast.walk(subject_tree):
         if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
@@ -413,6 +432,16 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
                 for target in targets:
                     if isinstance(target, ast.Name):
                         lambda_bindings[target.id] = node.value
+            elif isinstance(node.value, ast.Dict):
+                for target in targets:
+                    if not isinstance(target, ast.Name):
+                        continue
+                    for key, value in zip(node.value.keys, node.value.values):
+                        if (
+                            isinstance(key, ast.Constant)
+                            and isinstance(value, ast.Lambda)
+                        ):
+                            stored_lambda_bindings[(target.id, key.value)] = value
 
     global_process_sites: list[tuple[str, str, int]] = []
     global_process_nodes: list[tuple[str, ast.Call]] = []
@@ -420,10 +449,26 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
     for node in ast.walk(subject_tree):
         if not isinstance(node, ast.Call):
             continue
-        qualified = qualified_call(node, modules, symbols)
+        owner = enclosing_callable(node) or "<module>"
+        local_aliases: dict[str, str] = dict(module_aliases)
+        if owner in subject_funcs:
+            # Deterministic ordinary assignment aliases are semantic identity,
+            # independent of the chosen variable name. Iterate to cover chains.
+            for _ in range(len(assignments[owner]) + 1):
+                changed = False
+                for name, values in assignments[owner].items():
+                    prior = [(line, value) for line, value in values if line < node.lineno]
+                    if len(prior) != 1:
+                        continue
+                    resolved = qualified_expr(prior[0][1], modules, symbols, local_aliases)
+                    if resolved and local_aliases.get(name) != resolved:
+                        local_aliases[name] = resolved
+                        changed = True
+                if not changed:
+                    break
+        qualified = qualified_call(node, modules, symbols, local_aliases)
         if not is_process_call(qualified):
             continue
-        owner = enclosing_callable(node) or "<module>"
         global_process_sites.append((owner, qualified, node.lineno))
         global_process_nodes.append((owner, node))
         cur: ast.AST | None = node
@@ -440,22 +485,34 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
                 for binding, value in lambda_bindings.items():
                     if value is enclosing_lambda:
                         lambda_forwarders[binding] = (owner, qualified, node.lineno)
+                for (binding, key), value in stored_lambda_bindings.items():
+                    if value is enclosing_lambda:
+                        lambda_forwarders[f"{binding}[{key!r}]"] = (owner, qualified, node.lineno)
 
     global_semantic_violations: list[tuple[str, int, str]] = []
     lambda_call_classifications: list[tuple[str, int, tuple[str, ...]]] = []
     for node in ast.walk(subject_tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+        if not isinstance(node, ast.Call):
             continue
-        if node.func.id not in lambda_forwarders:
+        binding = ""
+        if isinstance(node.func, ast.Name):
+            binding = node.func.id
+        elif (
+            isinstance(node.func, ast.Subscript)
+            and isinstance(node.func.value, ast.Name)
+            and isinstance(node.func.slice, ast.Constant)
+        ):
+            binding = f"{node.func.value.id}[{node.func.slice.value!r}]"
+        if binding not in lambda_forwarders:
             continue
         caller = enclosing_callable(node)
         if caller is None or caller.startswith("<lambda@") or not node.args:
             heads = {UNKNOWN_HEAD}
         else:
             heads = abstract_heads(node.args[0], caller, node.lineno)
-        lambda_call_classifications.append((node.func.id, node.lineno, tuple(sorted(heads))))
+        lambda_call_classifications.append((binding, node.lineno, tuple(sorted(heads))))
         if "codex" in heads or UNKNOWN_HEAD in heads:
-            global_semantic_violations.append((node.func.id, node.lineno, repr(sorted(heads))))
+            global_semantic_violations.append((binding, node.lineno, repr(sorted(heads))))
 
     # Any native site outside a modeled function must still receive a verdict.
     # Forwarding lambdas are classified above at their invocation sites; other
@@ -510,7 +567,7 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
             node.value for node in nodes
             if isinstance(node, ast.Constant) and isinstance(node.value, str)
         }
-        local_aliases: dict[str, str] = {}
+        local_aliases: dict[str, str] = dict(module_aliases)
         callable_aliases: dict[str, str] = {}
         instances: dict[str, set[str]] = {}
         for node in nodes:
@@ -521,8 +578,8 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
             for target in targets:
                 if not isinstance(target, ast.Name) or value is None:
                     continue
-                resolved = qualified_expr(value, modules, symbols)
-                if is_process_call(resolved):
+                resolved = qualified_expr(value, modules, symbols, local_aliases)
+                if resolved:
                     local_aliases[target.id] = resolved
                 if resolved in subject_funcs:
                     callable_aliases[target.id] = resolved
@@ -597,7 +654,21 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
     # the call-graph model omits still receive command classification here.
     body_inventory = {(site[1], site[2]) for site in process_sites}
     for owner, node in global_process_nodes:
-        qualified = qualified_call(node, modules, symbols)
+        caller_aliases: dict[str, str] = dict(module_aliases)
+        if owner in subject_funcs:
+            for _ in range(len(assignments[owner]) + 1):
+                changed = False
+                for name, values in assignments[owner].items():
+                    prior = [(line, value) for line, value in values if line < node.lineno]
+                    if len(prior) != 1:
+                        continue
+                    resolved = qualified_expr(prior[0][1], modules, symbols, caller_aliases)
+                    if resolved and caller_aliases.get(name) != resolved:
+                        caller_aliases[name] = resolved
+                        changed = True
+                if not changed:
+                    break
+        qualified = qualified_call(node, modules, symbols, caller_aliases)
         if (qualified, node.lineno) in body_inventory:
             continue
         if owner.startswith("<lambda@") and node.lineno in forwarded_lambda_lines:
@@ -670,7 +741,20 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
         if private_launcher_site:
             launcher_process_nodes.add(fn_name)
         else:
-            unexpected_process.append(site)
+            node = next(
+                (candidate for owner, candidate in global_process_nodes
+                 if owner == fn_name and candidate.lineno == _line),
+                None,
+            )
+            heads = (
+                abstract_heads(node.args[0], fn_name, _line)
+                if node is not None and node.args else {UNKNOWN_HEAD}
+            )
+            # Generic native process execution is legitimate when its executable
+            # is deterministically non-Codex. Codex or unresolved heads remain
+            # security-relevant and fail closed.
+            if "codex" in heads or UNKNOWN_HEAD in heads:
+                unexpected_process.append(site)
 
     agent_execution = bool(launcher_process_nodes) or any(
         caller in launcher_region for caller, _line, _heads, _argv, _rendered in run_sites
@@ -1234,6 +1318,112 @@ def h031_default_expression_probe(
             default_expression_analysis["global_semantic_violations"],
         ),
     )
+
+    # GR-06: ordinary assignment aliases preserve module identity. Variable
+    # names intentionally differ between the violating and legitimate controls.
+    assignment_alias_codex_mutant = text.replace(
+        publish_needle,
+        publish_needle
+        + '    process_facade = subprocess\n'
+        + '    executable = "".join(("co", "dex"))\n'
+        + '    process_facade.run([executable, "exec", "alias bypass"], check=False)\n',
+        1,
+    )
+    assignment_alias_codex_analysis = analyze_launch_graph(assignment_alias_codex_mutant)
+    assignment_alias_codex_rejected = not bool(assignment_alias_codex_analysis["boundary_ok"])
+    check(
+        "K20", assignment_alias_codex_rejected,
+        "assignment_alias_codex_process={}".format(
+            "REJECTED" if assignment_alias_codex_rejected else "ADMITTED"
+        ),
+    )
+
+    assignment_alias_non_codex_mutant = text.replace(
+        publish_needle,
+        publish_needle
+        + '    command_runtime = subprocess\n'
+        + '    executable = "".join(("g", "h"))\n'
+        + '    command_runtime.run([executable, "--version"], check=False)\n',
+        1,
+    )
+    assignment_alias_non_codex_analysis = analyze_launch_graph(assignment_alias_non_codex_mutant)
+    assignment_alias_non_codex_admitted = all((
+        bool(assignment_alias_non_codex_analysis["boundary_ok"]),
+        bool(assignment_alias_non_codex_analysis["paths_ok"]),
+        bool(assignment_alias_non_codex_analysis["observer_clean"]),
+    ))
+    check(
+        "K21", assignment_alias_non_codex_admitted,
+        "assignment_alias_non_codex_process={}".format(
+            "ADMITTED" if assignment_alias_non_codex_admitted else "REJECTED"
+        ),
+    )
+
+    # GR-07: a deterministically selected stored callable is classified by the
+    # executable it forwards, not rejected merely because a container is used.
+    stored_callable_codex_mutant = text.replace(
+        publish_needle,
+        publish_needle
+        + '    dispatch = {"invoke": lambda argv: subprocess.run(argv, check=False)}\n'
+        + '    executable = "co" + "dex"\n'
+        + '    dispatch["invoke"]([executable, "exec", "stored bypass"])\n',
+        1,
+    )
+    stored_callable_codex_analysis = analyze_launch_graph(stored_callable_codex_mutant)
+    stored_callable_codex_rejected = not bool(stored_callable_codex_analysis["boundary_ok"])
+    check(
+        "K22", stored_callable_codex_rejected,
+        "stored_callable_codex_process={}".format(
+            "REJECTED" if stored_callable_codex_rejected else "ADMITTED"
+        ),
+    )
+
+    stored_callable_non_codex_mutant = text.replace(
+        publish_needle,
+        publish_needle
+        + '    process_table = {"invoke": lambda argv: subprocess.run(argv, check=False)}\n'
+        + '    executable = "".join(("g", "h"))\n'
+        + '    process_table["invoke"]([executable, "--version"])\n',
+        1,
+    )
+    stored_callable_non_codex_analysis = analyze_launch_graph(stored_callable_non_codex_mutant)
+    stored_callable_non_codex_admitted = all((
+        bool(stored_callable_non_codex_analysis["boundary_ok"]),
+        bool(stored_callable_non_codex_analysis["paths_ok"]),
+        bool(stored_callable_non_codex_analysis["observer_clean"]),
+    ))
+    check(
+        "K23", stored_callable_non_codex_admitted,
+        "stored_callable_non_codex_process={}".format(
+            "ADMITTED" if stored_callable_non_codex_admitted else "REJECTED"
+        ),
+    )
+
+    # Equivalent GR-06 shape: chained aliases at module scope are still
+    # discovered by semantic identity, with a symmetric non-Codex control.
+    module_alias_codex_mutant = text + '''
+h031_runtime_module = subprocess
+h031_runtime_chain = h031_runtime_module
+H031_MODULE_ALIAS_RESULT = h031_runtime_chain.call(
+    ["".join(("co", "dex")), "exec", "module alias bypass"]
+)
+'''
+    module_alias_codex_analysis = analyze_launch_graph(module_alias_codex_mutant)
+    module_alias_codex_rejected = not bool(module_alias_codex_analysis["boundary_ok"])
+    check("K24", module_alias_codex_rejected,
+          f"module_chained_alias_codex={'REJECTED' if module_alias_codex_rejected else 'ADMITTED'}")
+
+    module_alias_non_codex_mutant = text + '''
+h031_tool_module = subprocess
+h031_tool_chain = h031_tool_module
+H031_MODULE_ALIAS_RESULT = h031_tool_chain.call(
+    ["".join(("g", "h")), "--version"]
+)
+'''
+    module_alias_non_codex_analysis = analyze_launch_graph(module_alias_non_codex_mutant)
+    module_alias_non_codex_admitted = bool(module_alias_non_codex_analysis["boundary_ok"])
+    check("K25", module_alias_non_codex_admitted,
+          f"module_chained_alias_non_codex={'ADMITTED' if module_alias_non_codex_admitted else 'REJECTED'}")
 
 except Exception as exc:
     print(f"ODÖMBART K0 — gate harness exception: {type(exc).__name__}: {exc}")
