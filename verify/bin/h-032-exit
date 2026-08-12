@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# h-032-exit — owner-frozen Codex executable/provider identity boundary
+#
+# Predicted controls before execution:
+#   valid locked bytes under an arbitrary basename -> admitted through a private snapshot
+#   PATH shadow, relative path, symlink, directory, non-executable and hash drift -> rejected
+#   source mutation by the launched fixture -> running image remains the verified snapshot
+
+set -u
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "ODÖMBART K0 — ingen git-reporot"
+  exit 2
+}
+SOURCE="$ROOT/scripts/nortropic-codex-autopilot.py"
+AUTHORITY="$ROOT/config/codex-provider-identity.json"
+SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h032.XXXXXX")" || exit 2
+cleanup() { rm -rf "$WORK"; }
+trap cleanup EXIT HUP INT TERM
+
+python3 - "$SOURCE" "$AUTHORITY" "$SCHEMA" "$WORK" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import stat
+import subprocess
+import sys
+
+source, authority_source, schema_source, work = map(Path, sys.argv[1:])
+checks: list[tuple[str, bool, str]] = []
+
+def check(key: str, ok: bool, detail: str) -> None:
+    checks.append((key, ok, detail))
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def sh(*argv: str, cwd: Path | None = None) -> str:
+    p = subprocess.run(argv, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if p.returncode:
+        raise RuntimeError(f"rc={p.returncode}: {' '.join(argv)}\n{p.stdout}")
+    return p.stdout
+
+try:
+    authority = json.loads(authority_source.read_text(encoding="utf-8"))
+    exact_keys = {"schema_version", "provider", "executable_path", "executable_sha256"}
+    apath = Path(authority.get("executable_path", ""))
+    digest = authority.get("executable_sha256", "")
+    authority_ok = (
+        set(authority) == exact_keys
+        and authority.get("schema_version") == 1
+        and authority.get("provider") == "openai-codex"
+        and apath.is_absolute()
+        and isinstance(digest, str) and len(digest) == 64
+        and digest == digest.lower() and all(c in "0123456789abcdef" for c in digest)
+        and apath.exists() and not apath.is_symlink() and apath.is_file()
+        and os.access(apath, os.X_OK) and sha256(apath) == digest
+    )
+    check("K0", authority_ok, f"provider={authority.get('provider')} path={apath} hash_match={apath.is_file() and sha256(apath) == digest}")
+
+    base = work / "base"; base.mkdir()
+    sh("git", "init", "-q", cwd=base)
+    sh("git", "config", "user.name", "h032-gate", cwd=base)
+    sh("git", "config", "user.email", "h032@nortropic.invalid", cwd=base)
+    schema = base / "docs/loop/codex-autopilot-report.schema.json"; schema.parent.mkdir(parents=True)
+    shutil.copyfile(schema_source, schema)
+    (base / "anchor").write_text("h032\n", encoding="utf-8")
+    sh("git", "add", ".", cwd=base); sh("git", "commit", "-qm", "fixture", cwd=base)
+
+    provider_dir = work / "providers"; provider_dir.mkdir()
+    provider = provider_dir / "totally-renamed-agent"
+    capture = work / "capture.json"
+    provider.write_text("""#!/usr/bin/env python3
+import hashlib,json,os,pathlib,sys
+source=pathlib.Path(os.environ['H032_LOCKED_SOURCE'])
+source.write_text('#!/bin/sh\\nexit 91\\n')
+self_path=pathlib.Path(sys.argv[0])
+pathlib.Path(os.environ['H032_CAPTURE']).write_text(json.dumps({'argv0':str(self_path),'sha256':hashlib.sha256(self_path.read_bytes()).hexdigest()}))
+args=sys.argv[1:]; out=pathlib.Path(args[args.index('-o')+1])
+out.write_text(json.dumps({'role':'TEST_AUTHOR','outcome':'READY','owner_decision_required':False,'blocking_findings':[]}))
+print(json.dumps({'type':'thread.started','thread_id':'h032'}))
+""", encoding="utf-8")
+    provider.chmod(0o700)
+    good_bytes = provider.read_bytes(); good_hash = hashlib.sha256(good_bytes).hexdigest()
+
+    path_shadow = work / "path-shadow"; path_shadow.mkdir()
+    shadow_marker = work / "PATH_SHADOW_RAN"
+    shadow = path_shadow / "codex"
+    shadow.write_text(f"#!/bin/sh\ntouch '{shadow_marker}'\nexit 88\n", encoding="utf-8"); shadow.chmod(0o700)
+    old_path = os.environ.get("PATH", "")
+    os.environ.update(PATH=str(path_shadow) + os.pathsep + old_path,
+                      H032_CAPTURE=str(capture), H032_LOCKED_SOURCE=str(provider))
+
+    counter = 0
+    def make_repo(path_value: str, hash_value: str = good_hash) -> Path:
+        nonlocal_counter[0] += 1
+        repo = work / f"repo-{nonlocal_counter[0]}"
+        shutil.copytree(base, repo)
+        cfg = repo / "config/codex-provider-identity.json"; cfg.parent.mkdir(parents=True)
+        cfg.write_text(json.dumps({"schema_version":1,"provider":"openai-codex",
+                                   "executable_path":path_value,"executable_sha256":hash_value}), encoding="utf-8")
+        return repo
+    nonlocal_counter = [counter]
+
+    spec = importlib.util.spec_from_file_location("h032_subject", source)
+    if spec is None or spec.loader is None: raise RuntimeError("cannot import subject")
+    module = importlib.util.module_from_spec(spec); sys.modules[spec.name] = module; spec.loader.exec_module(module)
+
+    def starts(repo: Path) -> int:
+        p = module.journal_root(repo) / "events.jsonl"
+        if not p.exists(): return 0
+        return sum(json.loads(x).get("event") == "AGENT_START" for x in p.read_text().splitlines() if x.strip())
+
+    def attempt(repo: Path) -> tuple[bool, str, int, int]:
+        before = starts(repo); cap_before = capture.stat().st_mtime_ns if capture.exists() else -1
+        try:
+            module.run_codex(repo, repo, "TEST_AUTHOR", "H032")
+            outcome = (True, "ADMITTED")
+        except Exception as exc:
+            outcome = (False, f"{type(exc).__name__}:{exc}")
+        cap_after = capture.stat().st_mtime_ns if capture.exists() else -1
+        return outcome[0], outcome[1], starts(repo) - before, int(cap_after != cap_before)
+
+    valid_repo = make_repo(str(provider))
+    valid = attempt(valid_repo)
+    cap = json.loads(capture.read_text()) if capture.exists() else {}
+    argv0 = Path(cap.get("argv0", ""))
+    check("K1", valid[0] and valid[2] == 1, f"valid={valid}")
+    check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
+    check("K3", argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash,
+          f"source={provider} argv0={argv0} hash={cap.get('sha256')}")
+    check("K4", provider.read_bytes() != good_bytes and cap.get("sha256") == good_hash,
+          "launched fixture mutated authority source but running snapshot retained verified bytes")
+    check("K5", not argv0.exists(), f"snapshot_exists_after={argv0.exists()}")
+
+    # Restore source fixture for independent negative controls.
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    cases: list[tuple[str, Path]] = []
+    cases.append(("RELATIVE", make_repo("codex")))
+    link = provider_dir / "linked-codex"; link.symlink_to(provider)
+    cases.append(("SYMLINK", make_repo(str(link))))
+    cases.append(("DIRECTORY", make_repo(str(provider_dir), good_hash)))
+    noexec = provider_dir / "noexec"; noexec.write_bytes(good_bytes); noexec.chmod(0o600)
+    cases.append(("NONEXEC", make_repo(str(noexec))))
+    drift = provider_dir / "drift"; drift.write_bytes(good_bytes + b"\n# drift\n"); drift.chmod(0o700)
+    cases.append(("HASH_DRIFT", make_repo(str(drift))))
+    missing_repo = make_repo(str(provider)); (missing_repo / "config/codex-provider-identity.json").unlink()
+    cases.append(("MISSING_AUTHORITY", missing_repo))
+    malformed_repo = make_repo(str(provider)); (malformed_repo / "config/codex-provider-identity.json").write_text("{}")
+    cases.append(("MALFORMED_AUTHORITY", malformed_repo))
+
+    results = {}
+    for name, repo in cases:
+        result = attempt(repo); results[name] = result
+        check("K_" + name, not result[0] and result[2] == 0 and result[3] == 0, f"result={result}")
+
+    passed = sum(ok for _, ok, _ in checks)
+    for key, ok, detail in checks:
+        print(("PASS " if ok else "FAIL ") + key + " — " + detail)
+    print(f"SAMMANFATTNING {passed} PASS / {len(checks)-passed} FAIL")
+    raise SystemExit(0 if passed == len(checks) else 1)
+except SystemExit:
+    raise
+except Exception as exc:
+    print(f"ODÖMBART K-RIGG — {type(exc).__name__}: {exc}")
+    raise SystemExit(2)
+PY

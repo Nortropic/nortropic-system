@@ -261,5 +261,14 @@ empirical-runner är en falsifierande andra blick, aldrig ersättning för gate 
 - New owner implementation-shape authority: `docs/loop/harness-substitution-contract-v1.md`.
 - Migration floor after S3: SUB-1/h-027 → SUB-2/h-028 → SUB-3/h-029 → SUB-4/h-030.
 - S2/S4/S5 must not freeze without h-030 dependency after this amendment.
+
+## 2026-08-12 — Codex provider identity authority before h-031
+
+Owner separates executable/provider provenance from h-031 source-level launch policy. New task
+`h-032` owns an owner-frozen `config/codex-provider-identity.json` and the runtime boundary that
+verifies the locked native executable, ignores PATH, launches a private rehashed snapshot and
+fails closed on symlink/path/hash/identity drift. `h-031` depends on h-032 and must not use a
+`basename == codex` test as provider-identity proof. Autopilot remains paused until h-032 is
+independently reviewed, owner-frozen and implemented through the normal builder/reviewer gates.
 - Pre-amendment quota-aborted h-003/h-004 worktree is preserved local evidence, not authority, not a resume candidate.
 - No frozen gate, constitution/rulebook boundary, G20, candidate identity, attestation/fencing, promotion identity or no-force rule is weakened by this amendment.
