@@ -30,8 +30,53 @@ emit_observation() {
   return "$rc"
 }
 
+# macOS dscl does not use a portable "not found" exit. The owner-observed
+# local-node result is exit 56 together with the DirectoryService RecordNotFound
+# identity below. Only that exact pair is absence; other lookup failures remain
+# unknown. A successful read is known-present only when both requested numeric
+# attributes were actually returned.
+classify_producer_account() {
+  account_rc="$1"; account_out="$2"
+  if [[ "$account_rc" -eq 0 ]] && awk '
+    /^UniqueID: [0-9]+$/ { uid++; next }
+    /^PrimaryGroupID: [0-9]+$/ { gid++; next }
+    { bad=1 }
+    END { exit !(uid == 1 && gid == 1 && !bad) }
+  ' "$account_out"; then
+    echo PRESENT; return 0
+  fi
+  account_text="$(tr -d '\r' <"$account_out")"
+  if [[ "$account_rc" -eq 56 && "$account_text" = '<dscl_cmd> DS Error: -14136 (eDSRecordNotFound)' ]]; then
+    echo ABSENT; return 1
+  fi
+  echo UNKNOWN; return 2
+}
+
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h033.XXXXXX")" || exit 2
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+
+if [[ "${1:-}" = "--owner-account-oracle-selftest" ]]; then
+  [[ $# -eq 1 ]] || { echo "JUDGE_SELF_CONTROLS=FAIL unexpected arguments"; exit 1; }
+  printf 'UniqueID: 299\nPrimaryGroupID: 299\n' >"$WORK/present"
+  printf '<dscl_cmd> DS Error: -14136 (eDSRecordNotFound)\n' >"$WORK/absent"
+  printf '<dscl_cmd> DS Error: -14009 (eDSUnknownNodeName)\n' >"$WORK/ambiguous"
+  printf 'UniqueID: 299\nPrimaryGroupID: 299\nunexpected\n' >"$WORK/malformed-present"
+  present="$(classify_producer_account 0 "$WORK/present")"; present_rc=$?
+  absent="$(classify_producer_account 56 "$WORK/absent")"; absent_rc=$?
+  ambiguous="$(classify_producer_account 56 "$WORK/ambiguous")"; ambiguous_rc=$?
+  [[ "$present:$present_rc" = PRESENT:0 ]] || { echo "ACCOUNT_PRESENT_CONTROL=FAIL"; exit 1; }
+  [[ "$absent:$absent_rc" = ABSENT:1 ]] || { echo "ACCOUNT_ABSENT_CONTROL=FAIL"; exit 1; }
+  [[ "$ambiguous:$ambiguous_rc" = UNKNOWN:2 ]] || { echo "ACCOUNT_LOOKUP_FAILURE_CONTROL=FAIL"; exit 1; }
+  false_absent="$(classify_producer_account 1 "$WORK/absent")"; false_absent_rc=$?
+  [[ "$false_absent:$false_absent_rc" = UNKNOWN:2 ]] || { echo "ACCOUNT_LOOKUP_FAILURE_CONTROL=FAIL"; exit 1; }
+  malformed_present="$(classify_producer_account 0 "$WORK/malformed-present")"; malformed_present_rc=$?
+  [[ "$malformed_present:$malformed_present_rc" = UNKNOWN:2 ]] || { echo "ACCOUNT_LOOKUP_FAILURE_CONTROL=FAIL"; exit 1; }
+  echo "ACCOUNT_PRESENT_CONTROL=PASS"
+  echo "ACCOUNT_ABSENT_CONTROL=PASS"
+  echo "ACCOUNT_LOOKUP_FAILURE_CONTROL=PASS"
+  echo "JUDGE_SELF_CONTROLS=5 PASS, 0 FAIL"
+  exit 0
+fi
 
 # Owner-freeze evidence is deliberately a separate trust layer from future H-033
 # runtime provenance. It is produced only after an immutable candidate exists and
@@ -45,7 +90,7 @@ if [[ "${1:-}" = "--owner-privilege-audit" ]]; then
   echo "CANDIDATE_SHA=$CAND"
   echo "TASK_SPEC_SHA256=$SPEC_SHA"
   echo "H033_GATE_SHA256=$GATE_SHA"
-  echo "AUDIT_MODE_VERSION=h033-owner-privilege-v1"
+  echo "AUDIT_MODE_VERSION=h033-owner-privilege-v2"
   echo "AUDIT_UID=$(id -u)"
   echo "AUDIT_USER=$(id -un)"
   echo "AUDIT_GROUPS=$(id -Gn)"
@@ -61,7 +106,9 @@ if [[ "${1:-}" = "--owner-privilege-audit" ]]; then
   emit_observation NONINTERACTIVE_ARBITRARY_USER_SWITCH /usr/bin/sudo -n -u nobody /usr/bin/id -u; rc=$?
   [[ $rc -eq 0 ]] && audit_fail=1; [[ $rc -ne 0 && $rc -ne 1 ]] && audit_unknown=1
   emit_observation PRODUCER_ACCOUNT /usr/bin/dscl . -read "/Users/$ACCOUNT" UniqueID PrimaryGroupID; producer_rc=$?
-  [[ $producer_rc -eq 0 || $producer_rc -eq 185 ]] || audit_unknown=1
+  producer_state="$(classify_producer_account "$producer_rc" "$WORK/audit.PRODUCER_ACCOUNT.out")"; account_class_rc=$?
+  echo "PRODUCER_ACCOUNT_STATE=$producer_state"
+  [[ $account_class_rc -eq 0 || $account_class_rc -eq 1 ]] || audit_unknown=1
   emit_observation LOADED_SYSTEM_SERVICE /bin/launchctl print "$SERVICE_DOMAIN"; service_rc=$?
   [[ $service_rc -eq 0 || $service_rc -eq 113 ]] || audit_unknown=1
   for path in "$SERVICE_PLIST" "$SERVICE" "$ALLOWLIST" "$STORE" "$OBSERVER_SERVICE" "$OBSERVER_ROOT" /Library/LaunchDaemons /Library/PrivilegedHelperTools "/Library/Application Support/Nortropic"; do

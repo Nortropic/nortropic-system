@@ -349,3 +349,14 @@ the actual `cli verify` consumer path. CLI and verifier names must identify one 
 executable, connecting the deterministic opened-object control to production. Pre-freeze uid-501
 privilege is a separate candidate-bound owner-terminal subgate with raw command/result evidence and
 PASS/FAIL/ODÖMBART; it is not recursive H-033 runtime provenance. Production remains honestly RED.
+
+## 2026-08-12 — H-033 owner-audit macOS account-oracle remediation
+
+The candidate-bound owner audit returned ODÖMBART solely because the absent canonical producer
+account was reported by the real macOS local DirectoryService node as exit 56 with
+`<dscl_cmd> DS Error: -14136 (eDSRecordNotFound)`, while the gate recognized an incorrect exit 185
+oracle. The audit now treats only that exact exit/output pair as known absent pre-provisioning,
+treats a successful read with numeric UniqueID and PrimaryGroupID as known present, and keeps every
+other lookup failure or malformed success ODÖMBART. Dedicated self-controls freeze all three states
+and prove that a RecordNotFound-looking message with a different exit is not accepted as absence.
+No producer principal, protected root, service or production component was created.
