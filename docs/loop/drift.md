@@ -290,3 +290,15 @@ the same opened identity and includes no-check, stale-path-stat, same-object and
 controls. Candidate bytes cannot change after G20 PASS; remediation means a new commit and probe.
 - Pre-amendment quota-aborted h-003/h-004 worktree is preserved local evidence, not authority, not a resume candidate.
 - No frozen gate, constitution/rulebook boundary, G20, candidate identity, attestation/fencing, promotion identity or no-force rule is weakened by this amendment.
+
+## 2026-08-12 — Separate authenticated runner provenance before h-032
+
+H-032 field binding is not producer authentication: its strict JSON can be reproduced byte-for-byte
+by the normal same-UID Codex/user context. Owner therefore reserves the next free task `h-033` as a
+separate provenance authority, and h-032 depends on h-033. The selected design is a dedicated OS
+producer UID which independently runs an allowlisted frozen probe and writes under a producer-owned,
+non-user-writable evidence root. The requester supplies identities, never a result. This protects
+against G20-contained Codex and arbitrary unsandboxed same-UID processes, not against the producer
+UID or root/admin. No such principal/root is currently provisioned; the gate has an honest RED
+implementation baseline and an ODÖMBART provisioning boundary, with no unsigned fallback. This is
+provenance only, not a second backlog, attestation store or promotion authority.

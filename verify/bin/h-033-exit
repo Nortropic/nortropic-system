@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# h-033-exit — authenticated owner/controller-runner provenance
+# Predicted: real producer PASS accepted; byte-copy, same-UID origin, wrong
+# bindings, replacement, replay and FAIL/ODÖMBART-as-PASS rejected.
+set -u
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "ODÖMBART K0 — no repository"; exit 2; }
+CLI="$ROOT/controller/provenance/cli"
+PRODUCER="${NORTROPIC_PROVENANCE_PRODUCER:-}"
+STORE="${NORTROPIC_PROVENANCE_ROOT:-}"
+
+# Honest current-state RED: the h-032 judge has complete field binding but no
+# producer-origin input, so attacker-written equivalent bytes are indistinguishable.
+python3 - "$ROOT/verify/bin/h-032-exit" <<'PY'
+import pathlib,sys
+s=pathlib.Path(sys.argv[1]).read_text()
+required=("valid_g20_evidence","candidate_sha","task_spec_sha256","h032_gate_sha256","g20_probe_identity")
+if any(x not in s for x in required):
+ print("ODÖMBART K_RED — h-032 judge shape drifted"); raise SystemExit(2)
+if any(x in s for x in ("producer_uid","producer_gid","protected_evidence_root","signature")):
+ print("ODÖMBART K_RED — unexpected producer authority already present"); raise SystemExit(2)
+print("PASS K_RED — exact attacker-authored h-032 PASS bytes cannot be distinguished")
+PY
+rc=$?; [[ $rc -eq 0 ]] || exit "$rc"
+
+[[ -x "$CLI" ]] || { echo "FAIL K1 — authenticated provenance component absent"; exit 1; }
+[[ "$PRODUCER" =~ ^[0-9]+$ && -n "$STORE" && "$STORE" = /* && -d "$STORE" ]] || { echo "ODÖMBART K0 — producer UID/protected root not provisioned"; exit 2; }
+CURRENT="$(id -u)"; OWNER="$(stat -f %u "$STORE" 2>/dev/null)"; MODE="$(stat -f %Lp "$STORE" 2>/dev/null)"
+[[ "$PRODUCER" != "$CURRENT" && "$OWNER" = "$PRODUCER" && $((8#$MODE & 0022)) -eq 0 && ! -w "$STORE" ]] || { echo "FAIL K2 — no separate producer-owned protected root"; exit 1; }
+
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h033.XXXXXX")" || exit 2
+trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+SPEC="$(shasum -a 256 "$ROOT/specs/tasks.spec.json"|cut -d' ' -f1)"
+GATE="$(shasum -a 256 "$ROOT/verify/bin/h-033-exit"|cut -d' ' -f1)"
+CAND="$(git -C "$ROOT" rev-parse HEAD)"; PROBE=h033-fixture-pass-v1
+
+# Request surface carries identities only. Result/stdout/effect are deliberately impossible inputs.
+"$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$PROBE" >"$WORK/out" 2>"$WORK/err"
+[[ $? -eq 0 ]] || { echo "FAIL K3 — producer request failed"; exit 1; }
+EVIDENCE="$(tail -n 1 "$WORK/out")"
+[[ "$EVIDENCE" = "$STORE"/* && -f "$EVIDENCE" && ! -L "$EVIDENCE" && "$(stat -f %u "$EVIDENCE")" = "$PRODUCER" ]] || { echo "FAIL K3 — no producer-owned regular evidence"; exit 1; }
+verify() { "$CLI" verify --evidence "$1" --task h-033 --candidate "$2" --task-spec-sha256 "$3" --gate-sha256 "$4" --probe "$5" --require-result "$6" >/dev/null 2>&1; }
+verify "$EVIDENCE" "$CAND" "$SPEC" "$GATE" "$PROBE" PASS || { echo "FAIL K3 — real producer PASS rejected"; exit 1; }
+echo "PASS K3 — real authorized producer PASS accepted"
+
+cp "$EVIDENCE" "$WORK/forged.json"
+verify "$WORK/forged.json" "$CAND" "$SPEC" "$GATE" "$PROBE" PASS && { echo "FAIL K4 — byte-perfect same-user forgery accepted"; exit 1; }
+echo "PASS K4 — byte-perfect/same-user forgery rejected"
+
+Z40=0000000000000000000000000000000000000000; Z64=0000000000000000000000000000000000000000000000000000000000000000
+verify "$EVIDENCE" "$Z40" "$SPEC" "$GATE" "$PROBE" PASS && { echo "FAIL K5 — wrong candidate"; exit 1; }
+verify "$EVIDENCE" "$CAND" "$Z64" "$GATE" "$PROBE" PASS && { echo "FAIL K5 — wrong spec"; exit 1; }
+verify "$EVIDENCE" "$CAND" "$SPEC" "$Z64" "$PROBE" PASS && { echo "FAIL K5 — wrong gate"; exit 1; }
+verify "$EVIDENCE" "$CAND" "$SPEC" "$GATE" wrong-probe PASS && { echo "FAIL K5 — wrong probe"; exit 1; }
+"$CLI" verify --evidence "$EVIDENCE" --task h-032 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$PROBE" --require-result PASS >/dev/null 2>&1 && { echo "FAIL K5 — wrong task"; exit 1; }
+echo "PASS K5 — wrong bindings and stale candidate replay rejected"
+
+if printf '\n' >>"$EVIDENCE" 2>/dev/null || rm -f "$EVIDENCE" 2>/dev/null; then echo "FAIL K6 — evidence mutable by normal user"; exit 1; fi
+verify "$EVIDENCE" "$CAND" "$SPEC" "$GATE" "$PROBE" PASS || { echo "FAIL K6 — evidence did not survive denied mutation"; exit 1; }
+echo "PASS K6 — modification/replacement denied"
+
+for item in 'h033-fixture-fail-v1 FAIL' 'h033-fixture-odombar-v1 ODÖMBART'; do
+  set -- $item; p="$1"; expected="$2"
+  "$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$p" >"$WORK/$p" 2>/dev/null || true
+  ev="$(tail -n 1 "$WORK/$p")"
+  verify "$ev" "$CAND" "$SPEC" "$GATE" "$p" "$expected" || { echo "FAIL K7 — $expected not authenticated"; exit 1; }
+  verify "$ev" "$CAND" "$SPEC" "$GATE" "$p" PASS && { echo "FAIL K7 — $expected authenticated as PASS"; exit 1; }
+done
+echo "PASS K7 — producer FAIL and ODÖMBART cannot authenticate as PASS"
+echo "SAMMANFATTNING 8 PASS, 0 FAIL"
