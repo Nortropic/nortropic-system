@@ -302,3 +302,21 @@ against G20-contained Codex and arbitrary unsandboxed same-UID processes, not ag
 UID or root/admin. No such principal/root is currently provisioned; the gate has an honest RED
 implementation baseline and an ODÖMBART provisioning boundary, with no unsigned fallback. This is
 provenance only, not a second backlog, attestation store or promotion authority.
+
+## 2026-08-12 — H-033 provenance gate review remediation
+
+Independent review blocked candidate `dc380854fa008fe830cf60e6d6d79162bfeebf4f` on
+GR-01..GR-05. The remediated contract keeps the separate OS-principal design but makes its effects
+executable: the requester sends only task/candidate/spec/gate/probe identities; the canonical
+producer resolves a closed owner-installed allowlist, executes the selected probe and derives
+PASS/FAIL/ODÖMBART from a separately observable producer-owned A/B/C effect record.
+
+Evidence has one exact duplicate-aware nine-field schema. Trust comes from canonical account
+`_nortropic_provenance` and the same opened regular object below a non-replaceable protected parent
+chain, never a JSON UID/trusted claim. Copies outside that origin, wrong producers, symlinks,
+stat-then-reopen, writable parents, mutations and stale/wrong bindings fail. The unattended
+transition may execute only the allowlist and publish only to its fixed destination; arbitrary
+command/path/output and generic passwordless privilege are forbidden. If uid 501 can generically
+become producer/root, or the owner-runner cannot prove the separate account/service/root, H-033 is
+ODÖMBART with no same-user fallback. Current production remains honestly RED because the component
+and root are absent; judge self-controls are separate from that RED and future production checks.

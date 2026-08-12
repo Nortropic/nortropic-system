@@ -1,69 +1,199 @@
 #!/usr/bin/env bash
-# h-033-exit — authenticated owner/controller-runner provenance
-# Predicted: real producer PASS accepted; byte-copy, same-UID origin, wrong
-# bindings, replacement, replay and FAIL/ODÖMBART-as-PASS rejected.
+# h-033-exit — authenticated producer provenance (owner/test-author gate)
+# Judge controls are disposable models. The production section separately judges
+# controller/provenance/cli and the provisioned OS objects; controls never replace it.
 set -u
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "ODÖMBART K0 — no repository"; exit 2; }
 CLI="$ROOT/controller/provenance/cli"
-PRODUCER="${NORTROPIC_PROVENANCE_PRODUCER:-}"
+ACCOUNT="${NORTROPIC_PROVENANCE_ACCOUNT:-_nortropic_provenance}"
 STORE="${NORTROPIC_PROVENANCE_ROOT:-}"
-
-# Honest current-state RED: the h-032 judge has complete field binding but no
-# producer-origin input, so attacker-written equivalent bytes are indistinguishable.
-python3 - "$ROOT/verify/bin/h-032-exit" <<'PY'
-import pathlib,sys
-s=pathlib.Path(sys.argv[1]).read_text()
-required=("valid_g20_evidence","candidate_sha","task_spec_sha256","h032_gate_sha256","g20_probe_identity")
-if any(x not in s for x in required):
- print("ODÖMBART K_RED — h-032 judge shape drifted"); raise SystemExit(2)
-if any(x in s for x in ("producer_uid","producer_gid","protected_evidence_root","signature")):
- print("ODÖMBART K_RED — unexpected producer authority already present"); raise SystemExit(2)
-print("PASS K_RED — exact attacker-authored h-032 PASS bytes cannot be distinguished")
-PY
-rc=$?; [[ $rc -eq 0 ]] || exit "$rc"
-
-[[ -x "$CLI" ]] || { echo "FAIL K1 — authenticated provenance component absent"; exit 1; }
-[[ "$PRODUCER" =~ ^[0-9]+$ && -n "$STORE" && "$STORE" = /* && -d "$STORE" ]] || { echo "ODÖMBART K0 — producer UID/protected root not provisioned"; exit 2; }
-CURRENT="$(id -u)"; OWNER="$(stat -f %u "$STORE" 2>/dev/null)"; MODE="$(stat -f %Lp "$STORE" 2>/dev/null)"
-[[ "$PRODUCER" != "$CURRENT" && "$OWNER" = "$PRODUCER" && $((8#$MODE & 0022)) -eq 0 && ! -w "$STORE" ]] || { echo "FAIL K2 — no separate producer-owned protected root"; exit 1; }
+SERVICE="${NORTROPIC_PROVENANCE_SERVICE:-}"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h033.XXXXXX")" || exit 2
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+
+# The same strict schema/opened-object oracle is exercised against disposable
+# good/bad subjects here and represented by the production CLI below.
+python3 - "$WORK" <<'PY'
+import json, os, pathlib, stat, sys
+w=pathlib.Path(sys.argv[1]); passed=0
+KEYS=("schema_version","producer_authority","task","candidate_sha","task_spec_sha256",
+      "gate_sha256","probe_identity","result","effect_sha256")
+H40="1"*40; H64="2"*64
+def strict(raw):
+ def pairs(p):
+  d={}
+  for k,v in p:
+   if k in d: raise ValueError("duplicate")
+   d[k]=v
+  return d
+ v=json.loads(raw,object_pairs_hook=pairs)
+ if type(v) is not dict or tuple(v.keys()) != KEYS: raise ValueError("schema")
+ if v["schema_version"] != 1 or type(v["schema_version"]) is not int: raise ValueError("version")
+ for k in KEYS[1:]:
+  if type(v[k]) is not str or not v[k]: raise ValueError("string")
+ if v["producer_authority"] != "_nortropic_provenance": raise ValueError("producer")
+ if v["task"] != "h-033": raise ValueError("task")
+ if len(v["candidate_sha"])!=40 or any(c not in "0123456789abcdef" for c in v["candidate_sha"]): raise ValueError("candidate")
+ for k in ("task_spec_sha256","gate_sha256","effect_sha256"):
+  if len(v[k])!=64 or any(c not in "0123456789abcdef" for c in v[k]): raise ValueError(k)
+ if v["probe_identity"] not in ("h033-pass-v1","h033-fail-v1","h033-odombar-v1","h032-g20-v1"): raise ValueError("probe")
+ if v["result"] not in ("PASS","FAIL","ODÖMBART"): raise ValueError("result")
+ return v
+good={"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033",
+ "candidate_sha":H40,"task_spec_sha256":H64,"gate_sha256":H64,
+ "probe_identity":"h033-pass-v1","result":"PASS","effect_sha256":H64}
+raw=json.dumps(good,separators=(",",":"))
+def check(name, ok, detail):
+ global passed
+ if not ok: print(f"FAIL J_{name} — {detail}"); raise SystemExit(1)
+ passed+=1; print(f"PASS J_{name} — {detail}")
+check("SAFE_OPENED_OBJECT", strict(raw)==good, "strict same-object fixture admitted")
+bad=[]
+bad.append(("MALFORMED_JSON","{"))
+bad.append(("TOP_LEVEL_TYPE","[]"))
+d=dict(good); d.pop("task"); bad.append(("MISSING_FIELD",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["extra"]=1; bad.append(("UNEXPECTED_FIELD",json.dumps(d,separators=(",",":"))))
+bad.append(("DUPLICATE_KEY",raw[:-1]+',"result":"PASS"}'))
+d=dict(good); d["schema_version"]="1"; bad.append(("WRONG_TYPE",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["producer_authority"]=""; bad.append(("EMPTY_STRING",json.dumps(d,separators=(",",":"))))
+for label,key in (("CANDIDATE","candidate_sha"),("SPEC","task_spec_sha256"),("GATE","gate_sha256")):
+ d=dict(good); d[key]="bad"; bad.append(("MALFORMED_"+label,json.dumps(d,separators=(",",":"))))
+d=dict(good); d["probe_identity"]="../probe"; bad.append(("MALFORMED_PROBE",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["result"]="GREEN"; bad.append(("INVALID_RESULT",json.dumps(d,separators=(",",":"))))
+for name,doc in bad:
+ try: strict(doc); ok=False
+ except Exception: ok=True
+ check(name,ok,"rejected by executable strict parser")
+
+# Behavioral implementation mutants: observable effect token must be produced by
+# the selected frozen probe; caller fields and arbitrary execution are outside API.
+effects=[]
+def probe(pid):
+ if pid=="h033-pass-v1": effects.append((pid,"A")); return "PASS","A"
+ if pid=="h033-fail-v1": effects.append((pid,"B")); return "FAIL","B"
+ if pid=="h033-odombar-v1": effects.append((pid,"C")); return "ODÖMBART","C"
+ raise ValueError("unknown probe")
+def safe(req):
+ if set(req)!={"task","candidate_sha","task_spec_sha256","gate_sha256","probe_identity"}: raise ValueError("request schema")
+ return probe(req["probe_identity"])
+base={"task":"h-033","candidate_sha":H40,"task_spec_sha256":H64,"gate_sha256":H64,"probe_identity":"h033-pass-v1"}
+for pid,res,mark in (("h033-pass-v1","PASS","A"),("h033-fail-v1","FAIL","B"),("h033-odombar-v1","ODÖMBART","C")):
+ effects.clear(); q=dict(base,probe_identity=pid); got=safe(q)
+ check("EXEC_"+res.replace("Ö","O"),got==(res,mark) and effects==[(pid,mark)],f"{res} derived from observed probe effect")
+for name,key,val in (("CALLER_RESULT","result","PASS"),("CALLER_EFFECT","effect","A"),
+                     ("ARBITRARY_COMMAND","command","id"),("ARBITRARY_PATH","probe_path","/bin/sh"),
+                     ("ARBITRARY_OUTPUT","output","/tmp/forged")):
+ try: safe(dict(base,**{key:val})); ok=False
+ except Exception: ok=True
+ check(name,ok,"forbidden requester authority rejected")
+try: safe(dict(base,probe_identity="unknown")); ok=False
+except Exception: ok=True
+check("UNKNOWN_PROBE",ok,"closed allowlist rejects unknown identity")
+def execution_oracle(subject,pid,expected,marker):
+ effects.clear(); got=subject(dict(base,probe_identity=pid))
+ return got==(expected,marker) and effects==[(pid,marker)]
+def hardcoded(result): return lambda req:(result,"synthetic")
+for name,result,pid,mark in (("HARDCODED_PASS","PASS","h033-pass-v1","A"),
+                             ("HARDCODED_FAIL","FAIL","h033-fail-v1","B"),
+                             ("HARDCODED_ODOMBAR","ODÖMBART","h033-odombar-v1","C")):
+ check(name,not execution_oracle(hardcoded(result),pid,result,mark),"disposable no-execution producer rejected")
+
+# Provenance/path mutants. Acceptance is tied to the opened object, its external
+# uid, and a protected parent chain — never JSON claims or a prior pathname stat.
+def origin(open_uid, regular, symlink, inside, parents_replaceable, object_writable, same_open=True):
+ return open_uid==777 and regular and not symlink and inside and not parents_replaceable and not object_writable and same_open
+check("WRONG_PRODUCER",not origin(501,1,0,1,0,0),"perfect bytes from uid 501 rejected")
+check("UNRELATED_UID",not origin(778,1,0,1,0,0),"unrelated uid rejected")
+check("FORGED_EXACT_PASS",not origin(501,1,0,1,0,0),"semantically exact PASS rejected for provenance")
+check("COPY_OUTSIDE_ROOT",not origin(777,1,0,0,0,0),"byte-identical copy outside protected origin rejected")
+check("STAT_THEN_REOPEN",not origin(777,1,0,1,0,0,False),"stale path-stat/reopen rejected")
+check("PATH_SYMLINK",not origin(777,1,1,1,0,0),"symlink substitution rejected")
+check("WRITABLE_PARENT",not origin(777,1,0,1,1,0),"replaceable parent namespace rejected")
+check("MODIFIED_OBJECT",not origin(777,1,0,1,0,1),"untrusted-writable object rejected")
+check("OVERPRIVILEGED_INTERFACE",all(k not in base for k in ("command","probe_path","output","result","effect")),"safe interface carries identities only")
+print(f"JUDGE_SELF_CONTROLS={passed} PASS, 0 FAIL")
+PY
+rc=$?; [[ $rc -eq 0 ]] || exit "$rc"
+
+# Honest pre-builder RED is independent from the forged-evidence judge control.
+if [[ ! -x "$CLI" ]]; then
+  echo "CURRENT_RED_REASON=AUTHENTICATED_PRODUCER_COMPONENT_ABSENT"
+  echo "PROTECTED_EVIDENCE_ROOT=ABSENT"
+  echo "FAIL K1 — authenticated producer implementation absent"
+  exit 1
+fi
+
+# Provisioning/rig inability is ODÖMBART, never PASS. Account name is canonical;
+# requester-controlled numeric expected UID is not accepted.
+PRODUCER_UID="$(dscl . -read "/Users/$ACCOUNT" UniqueID 2>/dev/null | awk '{print $2}')"
+PRODUCER_GID="$(dscl . -read "/Users/$ACCOUNT" PrimaryGroupID 2>/dev/null | awk '{print $2}')"
+[[ "$PRODUCER_UID" =~ ^[0-9]+$ && "$PRODUCER_GID" =~ ^[0-9]+$ ]] || { echo "ODÖMBART K2 — canonical producer principal not provisioned"; exit 2; }
+[[ "$PRODUCER_UID" != "$(id -u)" && -n "$STORE" && "$STORE" = /* && -d "$STORE" && -n "$SERVICE" && "$SERVICE" = /* && -f "$SERVICE" && ! -L "$SERVICE" ]] || { echo "ODÖMBART K2 — producer service/root not provisioned"; exit 2; }
+
+# Effective parent-chain check: uid 501 must not own or have group/other write on
+# any ancestor from the evidence root up to the first root-owned anchor.
+python3 - "$STORE" "$SERVICE" "$PRODUCER_UID" "$PRODUCER_GID" <<'PY'
+import os,stat,sys
+store,service,puid,pgid=sys.argv[1],sys.argv[2],int(sys.argv[3]),int(sys.argv[4]); me=os.getuid()
+def secure_chain(path, leaf_uid):
+ p=os.path.abspath(path); first=True
+ while True:
+  s=os.lstat(p)
+  if stat.S_ISLNK(s.st_mode) or (first and s.st_uid!=leaf_uid): return False
+  if s.st_uid==me or s.st_mode & 0o002: return False
+  if s.st_gid in os.getgroups() and s.st_mode & 0o020: return False
+  if p=="/" or s.st_uid==0: return True
+  p=os.path.dirname(p); first=False
+ return False
+ss=os.lstat(service)
+if not secure_chain(store,puid): print("FAIL K2 — protected root/parent chain replaceable"); raise SystemExit(1)
+if not stat.S_ISREG(ss.st_mode) or ss.st_uid not in (0,puid) or ss.st_mode & 0o022:
+ print("FAIL K2 — producer service authority not dedicated/protected"); raise SystemExit(1)
+print("PASS K2 — canonical producer, service, root and parent authority established")
+PY
+rc=$?; [[ $rc -eq 0 ]] || exit "$rc"
+
 SPEC="$(shasum -a 256 "$ROOT/specs/tasks.spec.json"|cut -d' ' -f1)"
 GATE="$(shasum -a 256 "$ROOT/verify/bin/h-033-exit"|cut -d' ' -f1)"
-CAND="$(git -C "$ROOT" rev-parse HEAD)"; PROBE=h033-fixture-pass-v1
+CAND="$(git -C "$ROOT" rev-parse HEAD)"
+request() { "$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$1"; }
+verify() { "$CLI" verify --evidence "$1" --task "$2" --candidate "$3" --task-spec-sha256 "$4" --gate-sha256 "$5" --probe "$6" --require-result "$7"; }
 
-# Request surface carries identities only. Result/stdout/effect are deliberately impossible inputs.
-"$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$PROBE" >"$WORK/out" 2>"$WORK/err"
-[[ $? -eq 0 ]] || { echo "FAIL K3 — producer request failed"; exit 1; }
-EVIDENCE="$(tail -n 1 "$WORK/out")"
-[[ "$EVIDENCE" = "$STORE"/* && -f "$EVIDENCE" && ! -L "$EVIDENCE" && "$(stat -f %u "$EVIDENCE")" = "$PRODUCER" ]] || { echo "FAIL K3 — no producer-owned regular evidence"; exit 1; }
-verify() { "$CLI" verify --evidence "$1" --task h-033 --candidate "$2" --task-spec-sha256 "$3" --gate-sha256 "$4" --probe "$5" --require-result "$6" >/dev/null 2>&1; }
-verify "$EVIDENCE" "$CAND" "$SPEC" "$GATE" "$PROBE" PASS || { echo "FAIL K3 — real producer PASS rejected"; exit 1; }
-echo "PASS K3 — real authorized producer PASS accepted"
-
-cp "$EVIDENCE" "$WORK/forged.json"
-verify "$WORK/forged.json" "$CAND" "$SPEC" "$GATE" "$PROBE" PASS && { echo "FAIL K4 — byte-perfect same-user forgery accepted"; exit 1; }
-echo "PASS K4 — byte-perfect/same-user forgery rejected"
-
-Z40=0000000000000000000000000000000000000000; Z64=0000000000000000000000000000000000000000000000000000000000000000
-verify "$EVIDENCE" "$Z40" "$SPEC" "$GATE" "$PROBE" PASS && { echo "FAIL K5 — wrong candidate"; exit 1; }
-verify "$EVIDENCE" "$CAND" "$Z64" "$GATE" "$PROBE" PASS && { echo "FAIL K5 — wrong spec"; exit 1; }
-verify "$EVIDENCE" "$CAND" "$SPEC" "$Z64" "$PROBE" PASS && { echo "FAIL K5 — wrong gate"; exit 1; }
-verify "$EVIDENCE" "$CAND" "$SPEC" "$GATE" wrong-probe PASS && { echo "FAIL K5 — wrong probe"; exit 1; }
-"$CLI" verify --evidence "$EVIDENCE" --task h-032 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$PROBE" --require-result PASS >/dev/null 2>&1 && { echo "FAIL K5 — wrong task"; exit 1; }
-echo "PASS K5 — wrong bindings and stale candidate replay rejected"
-
-if printf '\n' >>"$EVIDENCE" 2>/dev/null || rm -f "$EVIDENCE" 2>/dev/null; then echo "FAIL K6 — evidence mutable by normal user"; exit 1; fi
-verify "$EVIDENCE" "$CAND" "$SPEC" "$GATE" "$PROBE" PASS || { echo "FAIL K6 — evidence did not survive denied mutation"; exit 1; }
-echo "PASS K6 — modification/replacement denied"
-
-for item in 'h033-fixture-fail-v1 FAIL' 'h033-fixture-odombar-v1 ODÖMBART'; do
-  set -- $item; p="$1"; expected="$2"
-  "$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe "$p" >"$WORK/$p" 2>/dev/null || true
-  ev="$(tail -n 1 "$WORK/$p")"
-  verify "$ev" "$CAND" "$SPEC" "$GATE" "$p" "$expected" || { echo "FAIL K7 — $expected not authenticated"; exit 1; }
-  verify "$ev" "$CAND" "$SPEC" "$GATE" "$p" PASS && { echo "FAIL K7 — $expected authenticated as PASS"; exit 1; }
+# Forbidden request authority must fail before evidence/effect creation.
+for args in '--result PASS' '--effect A' '--command id' '--probe-path /bin/sh' '--output /tmp/h033-forged'; do
+  # shell splitting here is bounded to the five literal controls above.
+  set -- $args
+  "$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe h033-pass-v1 "$@" >/dev/null 2>&1 && { echo "FAIL K3 — forbidden request accepted: $args"; exit 1; }
 done
-echo "PASS K7 — producer FAIL and ODÖMBART cannot authenticate as PASS"
-echo "SAMMANFATTNING 8 PASS, 0 FAIL"
+request unknown-probe >/dev/null 2>&1 && { echo "FAIL K3 — unknown probe accepted"; exit 1; }
+echo "PASS K3 — request surface and probe allowlist are narrow"
+
+# Producer-owned effect records are independently observed. Each test probe must
+# atomically create <evidence>.effect with exactly its frozen marker.
+for item in 'h033-pass-v1 PASS A' 'h033-fail-v1 FAIL B' 'h033-odombar-v1 ODÖMBART C'; do
+  set -- $item; probe="$1"; expected="$2"; marker="$3"
+  out="$(request "$probe")" || { echo "FAIL K4 — producer request failed for $probe"; exit 1; }
+  evidence="$(printf '%s\n' "$out" | tail -n 1)"; effect="$evidence.effect"
+  [[ "$evidence" = "$STORE"/* && "$effect" = "$STORE"/* && -f "$effect" && ! -L "$effect" && "$(cat "$effect")" = "$marker" ]] || { echo "FAIL K4 — independently observable effect missing for $probe"; exit 1; }
+  verify "$evidence" h-033 "$CAND" "$SPEC" "$GATE" "$probe" "$expected" >/dev/null || { echo "FAIL K4 — actual $expected evidence rejected"; exit 1; }
+  [[ "$expected" = PASS ]] || ! verify "$evidence" h-033 "$CAND" "$SPEC" "$GATE" "$probe" PASS >/dev/null 2>&1 || { echo "FAIL K4 — $expected synthesized/authenticated as PASS"; exit 1; }
+  [[ "$probe" = h033-pass-v1 ]] && PASS_EVIDENCE="$evidence"
+done
+echo "PASS K4 — PASS/FAIL/ODÖMBART derive from executed probe effects"
+
+# Binding, origin, strict parsing, opened-object and mutation controls are black-box
+# checks against the actual verifier. It must open the expected protected path itself.
+Z40="$(printf '0%.0s' {1..40})"; Z64="$(printf '0%.0s' {1..64})"
+for tuple in "h-032 $CAND $SPEC $GATE h033-pass-v1" "h-033 $Z40 $SPEC $GATE h033-pass-v1" "h-033 $CAND $Z64 $GATE h033-pass-v1" "h-033 $CAND $SPEC $Z64 h033-pass-v1" "h-033 $CAND $SPEC $GATE h033-fail-v1"; do
+  set -- $tuple; verify "$PASS_EVIDENCE" "$1" "$2" "$3" "$4" "$5" PASS >/dev/null 2>&1 && { echo "FAIL K5 — wrong/stale binding accepted"; exit 1; }
+done
+cp "$PASS_EVIDENCE" "$WORK/perfect.json"
+verify "$WORK/perfect.json" h-033 "$CAND" "$SPEC" "$GATE" h033-pass-v1 PASS >/dev/null 2>&1 && { echo "FAIL K6 — forged/copy evidence accepted outside protected origin"; exit 1; }
+ln -s "$PASS_EVIDENCE" "$WORK/link.json"
+verify "$WORK/link.json" h-033 "$CAND" "$SPEC" "$GATE" h033-pass-v1 PASS >/dev/null 2>&1 && { echo "FAIL K6 — evidence symlink accepted"; exit 1; }
+if printf '\n' >>"$PASS_EVIDENCE" 2>/dev/null || mv "$PASS_EVIDENCE" "$PASS_EVIDENCE.replaced" 2>/dev/null; then echo "FAIL K6 — evidence mutable/replaceable by uid $(id -u)"; exit 1; fi
+verify "$PASS_EVIDENCE" h-033 "$CAND" "$SPEC" "$GATE" h033-pass-v1 PASS >/dev/null || { echo "FAIL K6 — same producer object rejected after denied mutation"; exit 1; }
+echo "PASS K5 — task/candidate/spec/gate/probe and stale bindings rejected"
+echo "PASS K6 — protected same-opened-object origin enforced"
+echo "SAMMANFATTNING 7 PASS, 0 FAIL"
