@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# Owner-frozen prerequisite for the H-034 Python interpreter authority.
+# This judges the authority artifact and its future invocation boundary; it does
+# not implement H-034 verifier semantics.
+
+set -u
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "ODÖMBART K0 — no Git repository root"
+  exit 2
+}
+AUTH_REL="config/python-interpreter-authority-v1.json"
+GATE_REL="verify/bin/python-interpreter-authority-v1-exit"
+AUTH="$ROOT/$AUTH_REL"
+GATE="$ROOT/$GATE_REL"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-python-authority.XXXXXX")" || exit 2
+cleanup() { rm -rf "$WORK"; }
+trap cleanup EXIT HUP INT TERM
+
+MODE=gate
+CANDIDATE=""
+if [[ $# -gt 0 ]]; then
+  [[ $# -eq 2 && "$1" == "--owner-audit" && "$2" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "ODÖMBART K0 — usage: python-interpreter-authority-v1-exit [--owner-audit <40-hex-candidate>]"
+    exit 2
+  }
+  MODE=audit
+  CANDIDATE="$2"
+fi
+
+command -v python3 >/dev/null 2>&1 || {
+  echo "ODÖMBART K0 — judge Python unavailable"
+  exit 2
+}
+
+python3 - "$AUTH" "$WORK" <<'PY'
+import hashlib, json, os, pathlib, stat, sys
+
+authority_path, work = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+passed = 0
+
+KEYS = (
+    "schema_version", "authority_version", "canonical_path", "python_version",
+    "executable_sha256", "required_regular_file", "required_executable",
+    "symlink_allowed", "path_lookup_allowed", "usr_bin_env_allowed",
+    "requester_override_allowed", "isolated_flags", "environment_authority",
+    "runtime_binding_model",
+)
+EXPECTED = {
+    "schema_version": 1,
+    "authority_version": "python3.12-v1",
+    "canonical_path": "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12",
+    "python_version": "3.12.13",
+    "executable_sha256": "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941",
+    "required_regular_file": True,
+    "required_executable": True,
+    "symlink_allowed": False,
+    "path_lookup_allowed": False,
+    "usr_bin_env_allowed": False,
+    "requester_override_allowed": False,
+    "isolated_flags": ["-I", "-S"],
+    "environment_authority": False,
+    "runtime_binding_model": "same-opened-source-private-protected-snapshot-final-rehash",
+}
+
+def strict(raw: str):
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out:
+                raise ValueError("duplicate key")
+            out[key] = value
+        return out
+    value = json.loads(raw, object_pairs_hook=pairs)
+    if type(value) is not dict or tuple(value) != KEYS:
+        raise ValueError("exact ordered schema")
+    if value != EXPECTED:
+        raise ValueError("exact authority values")
+    return value
+
+def check(name: str, ok: bool, detail: str):
+    global passed
+    if not ok:
+        print(f"FAIL J_{name} — {detail}")
+        raise SystemExit(1)
+    passed += 1
+    print(f"PASS J_{name} — {detail}")
+
+raw = authority_path.read_text(encoding="utf-8")
+authority = strict(raw)
+check("EXACT_AUTHORITY", authority == EXPECTED, "exact duplicate-aware authority admitted")
+
+def rejects(value):
+    try:
+        strict(json.dumps(value, separators=(",", ":")))
+        return False
+    except Exception:
+        return True
+
+mutants = []
+def mutate(name, key, value):
+    candidate = dict(EXPECTED); candidate[key] = value; mutants.append((name, candidate))
+
+mutate("PATH_LOOKUP", "canonical_path", "python3.12")
+mutate("USR_BIN_ENV", "canonical_path", "/usr/bin/env")
+mutate("SYMLINK_AUTHORITY", "canonical_path", "/opt/homebrew/opt/python@3.12/bin/python3.12")
+mutate("WRONG_VERSION", "python_version", "3.12.12")
+mutate("WRONG_DIGEST", "executable_sha256", "0" * 64)
+mutate("REGULAR_NOT_REQUIRED", "required_regular_file", False)
+mutate("EXECUTABLE_NOT_REQUIRED", "required_executable", False)
+mutate("SYMLINK_ALLOWED", "symlink_allowed", True)
+mutate("PATH_LOOKUP_ALLOWED", "path_lookup_allowed", True)
+mutate("ENV_ALLOWED", "environment_authority", True)
+mutate("REQUESTER_OVERRIDE", "requester_override_allowed", True)
+mutate("WEAK_ISOLATION", "isolated_flags", ["-I"])
+mutate("ALTERNATE_BINDING", "runtime_binding_model", "stat-then-path-exec")
+for name, mutant in mutants:
+    check(name, rejects(mutant), "one-defect authority mutant rejected")
+
+try:
+    strict(raw.rstrip()[:-1] + ',"python_version":"3.12.13"}')
+    duplicate_rejected = False
+except Exception:
+    duplicate_rejected = True
+check("DUPLICATE_KEY", duplicate_rejected, "duplicate authority field rejected")
+
+canonical = pathlib.Path(authority["canonical_path"])
+if not canonical.is_absolute():
+    print("FAIL K1 — canonical path is not absolute")
+    raise SystemExit(1)
+try:
+    lst = os.lstat(canonical)
+except OSError as exc:
+    print(f"ODÖMBART K1 — canonical interpreter cannot be lstat'ed: {exc}")
+    raise SystemExit(2)
+if stat.S_ISLNK(lst.st_mode):
+    print("FAIL K1 — canonical interpreter is a symlink")
+    raise SystemExit(1)
+if not stat.S_ISREG(lst.st_mode):
+    print("FAIL K1 — canonical interpreter is not regular")
+    raise SystemExit(1)
+if not os.access(canonical, os.X_OK):
+    print("FAIL K1 — canonical interpreter is not executable")
+    raise SystemExit(1)
+
+# Bind metadata and bytes to one opened object. A pathname identity change while
+# the descriptor is open is unknown/fail-closed; runtime execution must use the
+# separately frozen protected-snapshot pattern, not reopen this source blindly.
+fd = os.open(canonical, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+try:
+    fst = os.fstat(fd)
+    digest = hashlib.sha256()
+    while chunk := os.read(fd, 1024 * 1024):
+        digest.update(chunk)
+    after = os.stat(canonical, follow_symlinks=False)
+finally:
+    os.close(fd)
+same_identity = (fst.st_dev, fst.st_ino) == (after.st_dev, after.st_ino)
+check("SAME_OPENED_OBJECT", stat.S_ISREG(fst.st_mode) and same_identity,
+      "fstat/hash/path-stability derive from the opened object")
+check("CURRENT_DIGEST", digest.hexdigest() == authority["executable_sha256"],
+      "opened-object digest equals frozen expected digest")
+
+# Disposable origin controls: a symlink, non-regular object, non-executable
+# object and stale pathname identity cannot meet the admission predicate.
+fixture = work / "fixture"; fixture.write_bytes(b"python-fixture"); fixture.chmod(0o700)
+link = work / "link"; link.symlink_to(fixture)
+directory = work / "directory"; directory.mkdir()
+noexec = work / "noexec"; noexec.write_bytes(b"x"); noexec.chmod(0o600)
+def admissible(path):
+    try:
+        ls = os.lstat(path)
+        return stat.S_ISREG(ls.st_mode) and not stat.S_ISLNK(ls.st_mode) and os.access(path, os.X_OK)
+    except OSError:
+        return False
+check("SYMLINK_OBJECT", not admissible(link), "symlink object rejected")
+check("NON_REGULAR_OBJECT", not admissible(directory), "non-regular object rejected")
+check("NON_EXECUTABLE_OBJECT", not admissible(noexec), "non-executable object rejected")
+
+stale = work / "stale"; stale.write_bytes(b"A"); stale.chmod(0o700)
+fd = os.open(stale, os.O_RDONLY)
+before = os.fstat(fd)
+replacement = work / "replacement"; replacement.write_bytes(b"B"); replacement.chmod(0o700)
+os.replace(replacement, stale)
+after = os.stat(stale, follow_symlinks=False)
+os.close(fd)
+check("STALE_CHANGED_OBJECT", (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino),
+      "path replacement after open is detected")
+
+# Request/environment values are deliberately not inputs to selection.
+def selected(authority_value, request=None, environment=None):
+    del request, environment
+    return authority_value["canonical_path"], authority_value["executable_sha256"]
+selected_pair = selected(authority, {"python":"/tmp/python"}, {"PYTHONHOME":"/tmp/home","PATH":"/tmp"})
+check("REQUEST_ENV_SELECTION", selected_pair == (EXPECTED["canonical_path"], EXPECTED["executable_sha256"]),
+      "request and environment cannot select expected identity")
+print(f"SELFTEST_PASS_COUNT={passed}")
+PY
+judge_rc=$?
+[[ $judge_rc -eq 0 ]] || exit "$judge_rc"
+
+CANONICAL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["canonical_path"])' "$AUTH")" || exit 2
+EXPECTED_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["python_version"])' "$AUTH")" || exit 2
+EXPECTED_SHA="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["executable_sha256"])' "$AUTH")" || exit 2
+OBSERVED_VERSION="$($CANONICAL -I -S -c 'import platform; print(platform.python_version())' 2>/dev/null)" || {
+  echo "ODÖMBART K2 — exact isolated interpreter invocation failed"
+  exit 2
+}
+if [[ "$OBSERVED_VERSION" != "$EXPECTED_VERSION" ]]; then
+  echo "FAIL K2 — observed version $OBSERVED_VERSION != $EXPECTED_VERSION"
+  exit 1
+fi
+echo "PASS K2 — exact isolated interpreter version $OBSERVED_VERSION"
+
+if [[ "$MODE" == audit ]]; then
+  git cat-file -e "$CANDIDATE^{commit}" 2>/dev/null || {
+    echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=ODÖMBART"
+    exit 2
+  }
+  for rel in "$AUTH_REL" "$GATE_REL"; do
+    git show "$CANDIDATE:$rel" >"$WORK/candidate-file" 2>/dev/null || {
+      echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=ODÖMBART"
+      exit 2
+    }
+    cmp -s "$ROOT/$rel" "$WORK/candidate-file" || {
+      echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=ODÖMBART"
+      exit 2
+    }
+  done
+  echo "CANDIDATE_SHA=$CANDIDATE"
+  echo "AUTHORITY_FILE_SHA256=$(shasum -a 256 "$AUTH" | awk '{print $1}')"
+  echo "GATE_SHA256=$(shasum -a 256 "$GATE" | awk '{print $1}')"
+  echo "CANONICAL_INTERPRETER_PATH=$CANONICAL"
+  /usr/bin/stat -f 'OBSERVED_OBJECT_TYPE=%HT%nOBSERVED_MODE=%Sp%nOBSERVED_UID=%u%nOBSERVED_GID=%g' "$CANONICAL" || {
+    echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=ODÖMBART"
+    exit 2
+  }
+  if [[ -L "$CANONICAL" ]]; then echo "SYMLINK_STATE=SYMLINK"; else echo "SYMLINK_STATE=NOT_SYMLINK"; fi
+  OBSERVED_SHA="$(shasum -a 256 "$CANONICAL" | awk '{print $1}')" || {
+    echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=ODÖMBART"
+    exit 2
+  }
+  echo "OBSERVED_SHA256=$OBSERVED_SHA"
+  echo "OBSERVED_VERSION=$OBSERVED_VERSION"
+  if [[ "$OBSERVED_SHA" != "$EXPECTED_SHA" ]]; then
+    echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=FAIL"
+    exit 1
+  fi
+  echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=PASS"
+fi
+
+exit 0

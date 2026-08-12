@@ -263,3 +263,16 @@ empirical-runner är en falsifierande andra blick, aldrig ersättning för gate 
 - S2/S4/S5 must not freeze without h-030 dependency after this amendment.
 - Pre-amendment quota-aborted h-003/h-004 worktree is preserved local evidence, not authority, not a resume candidate.
 - No frozen gate, constitution/rulebook boundary, G20, candidate identity, attestation/fencing, promotion identity or no-force rule is weakened by this amendment.
+
+## 2026-08-12 — Versioned Python interpreter authority prerequisite for H-034
+
+H-034 cannot bootstrap from the repository's PATH-based Python shebangs or from the
+documentation-only `toolchain.lock.json` concept. A new owner-only versioned authority therefore
+binds the non-symlinked absolute Python 3.12.13 object and exact SHA-256, plus the fixed `-I -S`
+isolation contract. Its gate validates a duplicate-aware exact schema, hashes and fstats one opened
+source object, rejects path/env/request selection and disposable symlink, non-regular,
+non-executable, stale-object and identity mutants. Runtime pathname execution is not claimed to be
+arbitrary same-UID race-free: future H-034 must use the already accepted verified-source → private
+protected snapshot → final rehash → protected-path execution model. The candidate-bound read-only
+owner audit remains required from the real macOS owner terminal before freeze. No H-034 or H-033
+artifact, dependency, service or runtime implementation was created or resumed.
