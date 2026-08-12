@@ -9,7 +9,11 @@
 #   M05 klassmetod startar Codex utanför gemensam spawnpunkt             -> K1/K8
 #   M06 observer når process via helper→metod→self.metod                  -> K6/K9
 #   M07 argv är rätt men journalens källa/fält saknas                    -> K3
+#   M08 publish bygger Codex-argv dynamiskt och anropar generic run       -> K1/K11
+#   M09 publish skickar statiskt olöst ambient argv till generic run      -> K1/K13
+#   M10 generic processwrapper smyger in ett andra Codex-spawn            -> K1/K14
 #   V01 upprepade rollcalls samlas bakom en helper utan effektändring    -> K10 PASS
+#   V02 publish använder generic run för bevisat icke-Codex-kommando     -> K12 PASS
 #
 # Provet använder en falsk codex-binär. Den fångar den faktiskt exekverade
 # argv-listan och skriver en minimal giltig agentrapport. Därmed dömer K2
@@ -107,10 +111,8 @@ WORKFLOW_ROLE_REQUIREMENTS = {
     "test_author_flow": {"TEST_AUTHOR", "GATE_REVIEWER"},
     "builder_flow": {"BUILDER", "REVIEWER"},
 }
-# These existing functions deliberately execute a command selected by a trusted
-# gate path or construct a `gh` argv before calling the generic runner. They are
-# not agent launchers. No call count or surrounding topology is frozen.
-BENIGN_DYNAMIC_RUN_CALLERS = {"run_gate", "run_empirical_gate", "publish"}
+TASK_EXIT_HEAD = "<h031:repo-task-exit>"
+UNKNOWN_HEAD = "<h031:unknown>"
 
 
 def imported_names(tree: ast.Module) -> tuple[dict[str, str], dict[str, str]]:
@@ -216,8 +218,9 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
     modules, symbols = imported_names(subject_tree)
     graph: dict[str, set[str]] = {name: set() for name in subject_funcs}
     reverse: dict[str, set[str]] = {name: set() for name in subject_funcs}
-    process_sites: list[tuple[str, str, int, str | None]] = []
-    run_sites: list[tuple[str, int, str | None, str]] = []
+    process_sites: list[tuple[str, str, int, str | None, bool]] = []
+    run_sites: list[tuple[str, int, frozenset[str], tuple[str, ...] | None, str]] = []
+    call_records: list[tuple[str, ast.Call, set[str]]] = []
     dynamic_resolution: list[tuple[str, str, int]] = []
     literal_strings: dict[str, set[str]] = {}
 
@@ -232,10 +235,130 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
         if class_owners[callable_id]:
             methods.setdefault(simple, set()).add(callable_id)
 
+    module_strings: dict[str, str] = {}
+    for node in subject_tree.body:
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            value = node.value
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        module_strings[target.id] = value.value
+
+    assignments: dict[str, dict[str, list[tuple[int, ast.expr]]]] = {}
+    augmented: dict[str, dict[str, list[int]]] = {}
+    for callable_id, fn in subject_funcs.items():
+        assignments[callable_id] = {}
+        augmented[callable_id] = {}
+        for node in callable_body_nodes(fn):
+            if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        assignments[callable_id].setdefault(target.id, []).append(
+                            (node.lineno, node.value)
+                        )
+            elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+                augmented[callable_id].setdefault(node.target.id, []).append(node.lineno)
+
+    def abstract_heads(expr: ast.expr, caller: str, before: int,
+                       seen: frozenset[tuple[str, str, int]] = frozenset()) -> set[str]:
+        if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+            return {expr.value}
+        if isinstance(expr, ast.Name):
+            marker = (caller, expr.id, before)
+            if marker in seen:
+                return {UNKNOWN_HEAD}
+            if any(line < before for line in augmented[caller].get(expr.id, [])):
+                return {UNKNOWN_HEAD}
+            prior = [
+                (line, value) for line, value in assignments[caller].get(expr.id, [])
+                if line < before
+            ]
+            if prior:
+                values: set[str] = set()
+                for line, value in prior:
+                    values.update(abstract_heads(value, caller, line, seen | {marker}))
+                return values or {UNKNOWN_HEAD}
+            if expr.id in module_strings:
+                return {module_strings[expr.id]}
+            return {UNKNOWN_HEAD}
+        if isinstance(expr, (ast.List, ast.Tuple)):
+            if not expr.elts:
+                return {UNKNOWN_HEAD}
+            return abstract_heads(expr.elts[0], caller, before, seen)
+        if isinstance(expr, ast.IfExp):
+            return (
+                abstract_heads(expr.body, caller, before, seen)
+                | abstract_heads(expr.orelse, caller, before, seen)
+            )
+        if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
+            left = abstract_heads(expr.left, caller, before, seen)
+            right = abstract_heads(expr.right, caller, before, seen)
+            if UNKNOWN_HEAD in left or UNKNOWN_HEAD in right:
+                return {UNKNOWN_HEAD}
+            return {a + b for a in left for b in right}
+        if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Div):
+            right = abstract_heads(expr.right, caller, before, seen)
+            if TASK_EXIT_HEAD in right:
+                return {TASK_EXIT_HEAD}
+            if UNKNOWN_HEAD in right:
+                return {UNKNOWN_HEAD}
+            # A statically named executable below the repository/worktree root
+            # is command evidence, unlike an unresolved ambient executable.
+            if isinstance(expr.left, ast.Name) and expr.left.id in {"repo", "wt", "root"}:
+                return {f"<h031:repo-path>/{item}" for item in right}
+            return {UNKNOWN_HEAD}
+        if isinstance(expr, ast.Call):
+            qname = qualified_call(expr, modules, symbols)
+            if qname == "str" and len(expr.args) == 1:
+                return abstract_heads(expr.args[0], caller, before, seen)
+            if (
+                isinstance(expr.func, ast.Attribute)
+                and expr.func.attr == "get"
+                and expr.args
+                and isinstance(expr.args[0], ast.Constant)
+                and expr.args[0].value == "exit_test"
+            ):
+                return {TASK_EXIT_HEAD}
+            if isinstance(expr.func, ast.Attribute) and expr.func.attr == "join" and expr.args:
+                separators = abstract_heads(expr.func.value, caller, before, seen)
+                values = expr.args[0]
+                if isinstance(values, (ast.List, ast.Tuple)):
+                    parts = [abstract_heads(item, caller, before, seen) for item in values.elts]
+                    if (
+                        UNKNOWN_HEAD not in separators
+                        and all(part and UNKNOWN_HEAD not in part for part in parts)
+                    ):
+                        rendered = {""}
+                        for part in parts:
+                            rendered = {
+                                prefix + (separator if prefix else "") + suffix
+                                for prefix in rendered for separator in separators for suffix in part
+                            }
+                        return rendered
+                return {UNKNOWN_HEAD}
+            return {UNKNOWN_HEAD}
+        return {UNKNOWN_HEAD}
+
+    def concrete_argv(expr: ast.expr, caller: str, before: int) -> tuple[str, ...] | None:
+        if not isinstance(expr, (ast.List, ast.Tuple)):
+            return None
+        argv: list[str] = []
+        for item in expr.elts:
+            values = abstract_heads(item, caller, before)
+            if len(values) != 1 or UNKNOWN_HEAD in values:
+                return None
+            argv.append(next(iter(values)))
+        return tuple(argv)
+
     def resolve_targets(call: ast.Call, caller: str,
-                        instances: dict[str, set[str]]) -> set[str]:
+                        instances: dict[str, set[str]],
+                        callable_aliases: dict[str, str]) -> set[str]:
         f = call.func
         if isinstance(f, ast.Name):
+            if f.id in callable_aliases:
+                return {callable_aliases[f.id]}
             if f.id in subject_funcs:
                 return {f.id}
             hits = by_simple.get(f.id, set())
@@ -270,6 +393,7 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
             if isinstance(node, ast.Constant) and isinstance(node.value, str)
         }
         local_aliases: dict[str, str] = {}
+        callable_aliases: dict[str, str] = {}
         instances: dict[str, set[str]] = {}
         for node in nodes:
             if not isinstance(node, (ast.Assign, ast.AnnAssign)):
@@ -282,26 +406,92 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
                 resolved = qualified_expr(value, modules, symbols)
                 if is_process_call(resolved):
                     local_aliases[target.id] = resolved
+                if resolved in subject_funcs:
+                    callable_aliases[target.id] = resolved
                 if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
                     hits = classes_by_simple.get(value.func.id, set())
                     if hits:
                         instances[target.id] = set(hits)
+        # Resolve callable aliases only after instance identities are known.
+        for node in nodes:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)) or node.value is None:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            alias_targets: set[str] = set()
+            value = node.value
+            if isinstance(value, ast.Name) and value.id in subject_funcs:
+                alias_targets = {value.id}
+            elif isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name):
+                owner = class_owners.get(fn_name)
+                base = value.value.id
+                if base in {"self", "cls"} and owner:
+                    candidate = f"{owner}.{value.attr}"
+                    if candidate in subject_funcs:
+                        alias_targets = {candidate}
+                elif base in instances:
+                    alias_targets = {
+                        f"{class_id}.{value.attr}" for class_id in instances[base]
+                        if f"{class_id}.{value.attr}" in subject_funcs
+                    }
+            for target in targets:
+                if isinstance(target, ast.Name) and len(alias_targets) == 1:
+                    callable_aliases[target.id] = next(iter(alias_targets))
         for node in nodes:
             if not isinstance(node, ast.Call):
                 continue
-            targets = resolve_targets(node, fn_name, instances)
+            targets = resolve_targets(node, fn_name, instances, callable_aliases)
+            call_records.append((fn_name, node, targets))
             for target in targets:
                 graph[fn_name].add(target)
                 reverse[target].add(fn_name)
             qualified = qualified_call(node, modules, symbols, local_aliases)
             if is_process_call(qualified):
-                process_sites.append((fn_name, qualified, node.lineno, first_literal(node)))
-            if "run" in targets:
-                run_sites.append((fn_name, node.lineno, first_literal(node), ast.unparse(node)))
+                params = {
+                    arg.arg for arg in (*fn.args.posonlyargs, *fn.args.args, *fn.args.kwonlyargs)
+                }
+                first = node.args[0] if node.args else None
+                forwarded = isinstance(first, ast.Name) and first.id in params
+                if forwarded:
+                    forwarded = not any(
+                        line < node.lineno
+                        for line, _value in assignments[fn_name].get(first.id, [])
+                    ) and not any(
+                        line < node.lineno for line in augmented[fn_name].get(first.id, [])
+                    ) and not any(
+                        isinstance(other, ast.Call)
+                        and other.lineno < node.lineno
+                        and isinstance(other.func, ast.Attribute)
+                        and isinstance(other.func.value, ast.Name)
+                        and other.func.value.id == first.id
+                        and other.func.attr in {"append", "extend", "insert", "remove", "pop", "clear"}
+                        for other in nodes
+                    )
+                process_sites.append(
+                    (fn_name, qualified, node.lineno, first_literal(node), forwarded)
+                )
             if qualified in {
                 "__import__", "importlib.import_module", "eval", "exec", "compile", "getattr"
             }:
                 dynamic_resolution.append((fn_name, qualified, node.lineno))
+
+    sites_by_callable: dict[str, list[tuple[str, str, int, str | None, bool]]] = {}
+    for site in process_sites:
+        sites_by_callable.setdefault(site[0], []).append(site)
+    generic_wrappers = {
+        callable_id for callable_id, sites in sites_by_callable.items()
+        if sites
+        and all(site[4] for site in sites)
+        and all(site[1].startswith("subprocess.") for site in sites)
+    }
+    for caller, node, targets in call_records:
+        if not (targets & generic_wrappers):
+            continue
+        heads = frozenset(
+            abstract_heads(node.args[0], caller, node.lineno)
+            if node.args else {UNKNOWN_HEAD}
+        )
+        argv = concrete_argv(node.args[0], caller, node.lineno) if node.args else None
+        run_sites.append((caller, node.lineno, heads, argv, ast.unparse(node)))
 
     def reachable(start: str) -> set[str]:
         seen: set[str] = set()
@@ -317,23 +507,23 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
     launcher_region = reachable("run_codex")
     generic_run_violations: list[tuple[str, int, str | None, str]] = []
     for site in run_sites:
-        caller, _line, head, rendered = site
+        caller, line, heads, argv, rendered = site
         if caller in launcher_region:
             continue
-        if head == "codex":
-            if caller == "ensure_dependencies" and "--help" in rendered:
+        if "codex" in heads:
+            if argv in {("codex", "--help"), ("codex", "exec", "--help")}:
                 continue
-            generic_run_violations.append(site)
-        elif head is None and caller not in BENIGN_DYNAMIC_RUN_CALLERS:
-            generic_run_violations.append(site)
+            generic_run_violations.append((caller, line, "codex", rendered))
+        elif UNKNOWN_HEAD in heads:
+            generic_run_violations.append((caller, line, None, rendered))
 
-    unexpected_process: list[tuple[str, str, int, str | None]] = []
+    unexpected_process: list[tuple[str, str, int, str | None, bool]] = []
     launcher_process_nodes: set[str] = set()
     for site in process_sites:
-        fn_name, qualified, _line, literal = site
-        if fn_name == "run" and qualified == "subprocess.run":
+        fn_name, qualified, _line, literal, _forwarded = site
+        if fn_name in generic_wrappers:
             continue
-        if fn_name == "watch" and qualified == "os.system" and literal == "clear":
+        if qualified == "os.system" and literal == "clear":
             continue
         private_launcher_site = (
             fn_name in launcher_region
@@ -345,7 +535,7 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
             unexpected_process.append(site)
 
     agent_execution = bool(launcher_process_nodes) or any(
-        caller in launcher_region for caller, _line, _head, _rendered in run_sites
+        caller in launcher_region for caller, _line, _heads, _argv, _rendered in run_sites
     )
     boundary_ok = (
         not unexpected_process
@@ -405,6 +595,7 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
         "unexpected_process": unexpected_process,
         "generic_run_violations": generic_run_violations,
         "dynamic_resolution": dynamic_resolution,
+        "generic_wrappers": generic_wrappers,
         "launcher_process_nodes": launcher_process_nodes,
         "workflow_roles": workflow_roles,
         "role_contexts": role_contexts,
@@ -651,7 +842,8 @@ class H031ClassBypass:
     observer_helpers = '''
 class H031ObserverBypass:
     def first_hop(self, repo):
-        return self.launch(repo)
+        process_boundary = self.launch
+        return process_boundary(repo)
 
     def launch(self, repo):
         executable = "".join(("co", "dex"))
@@ -707,6 +899,97 @@ def h031_consolidated_role_launch(*args, **kwargs):
         "C_topology_refactor_admitted={} paths={} unexpected={}".format(
             refactor_admitted, refactor_analysis["path_results"],
             refactor_analysis["unexpected_process"],
+        ),
+    )
+
+    # GR-04 negative control: caller identity must never make unresolved or
+    # dynamically assembled Codex argv benign at the generic process wrapper.
+    publish_needle = '            title: str, changed: list[str]) -> str:\n'
+    if publish_needle not in text:
+        raise RuntimeError("K11 mutant insertion point missing")
+    publish_codex_mutant = text.replace(
+        publish_needle,
+        publish_needle
+        + '    executable = "co" + "dex"\n'
+        + '    h031_agent_argv = [executable, "exec", "bypass policy"]\n'
+        + '    h031_process_helper = run\n'
+        + '    h031_process_helper(h031_agent_argv, cwd=wt)\n',
+        1,
+    )
+    publish_codex_analysis = analyze_launch_graph(publish_codex_mutant)
+    publish_codex_rejected = not bool(publish_codex_analysis["boundary_ok"])
+    check(
+        "K11", publish_codex_rejected,
+        "dynamic_codex_via_generic_run_in_publish={} generic_run={}".format(
+            "REJECTED" if publish_codex_rejected else "ADMITTED",
+            publish_codex_analysis["generic_run_violations"],
+        ),
+    )
+
+    # GR-04 positive control: generic run itself is not forbidden. A command
+    # whose assembled executable is mechanically non-Codex remains admissible.
+    publish_non_codex_mutant = text.replace(
+        publish_needle,
+        publish_needle
+        + '    executable = "".join(("g", "h"))\n'
+        + '    h031_non_agent_argv = [executable, "--version"]\n'
+        + '    run(h031_non_agent_argv, cwd=wt, check=False)\n',
+        1,
+    )
+    publish_non_codex_analysis = analyze_launch_graph(publish_non_codex_mutant)
+    publish_non_codex_admitted = all((
+        bool(publish_non_codex_analysis["boundary_ok"]),
+        bool(publish_non_codex_analysis["paths_ok"]),
+        bool(publish_non_codex_analysis["observer_clean"]),
+    ))
+    check(
+        "K12", publish_non_codex_admitted,
+        "legitimate_non_codex_generic_run={} generic_run={}".format(
+            "ADMITTED" if publish_non_codex_admitted else "REJECTED",
+            publish_non_codex_analysis["generic_run_violations"],
+        ),
+    )
+
+    # Unknown command provenance on a material generic process boundary is
+    # fail-closed; it is never made benign by the surrounding callable.
+    publish_unknown_mutant = text.replace(
+        publish_needle,
+        publish_needle
+        + '    executable = os.environ.get("H031_AMBIENT_TOOL")\n'
+        + '    h031_unknown_argv = [executable, "exec", "unresolved"]\n'
+        + '    run(h031_unknown_argv, cwd=wt)\n',
+        1,
+    )
+    publish_unknown_analysis = analyze_launch_graph(publish_unknown_mutant)
+    publish_unknown_rejected = not bool(publish_unknown_analysis["boundary_ok"])
+    check(
+        "K13", publish_unknown_rejected,
+        "unknown_generic_run_semantics={} generic_run={}".format(
+            "REJECTED" if publish_unknown_rejected else "ADMITTED",
+            publish_unknown_analysis["generic_run_violations"],
+        ),
+    )
+
+    # A forwarding wrapper is discovered from effect, not blessed by name.
+    # Adding any non-forwarding process site removes wrapper status and must
+    # expose the process boundary to K1.
+    wrapper_needle = '    p = subprocess.run(\n'
+    if wrapper_needle not in text:
+        raise RuntimeError("K14 mutant insertion point missing")
+    wrapper_bypass_mutant = text.replace(
+        wrapper_needle,
+        '    h031_hidden_tool = "co" + "dex"\n'
+        + '    subprocess.call([h031_hidden_tool, "exec", "hidden wrapper spawn"])\n'
+        + wrapper_needle,
+        1,
+    )
+    wrapper_bypass_analysis = analyze_launch_graph(wrapper_bypass_mutant)
+    wrapper_bypass_rejected = not bool(wrapper_bypass_analysis["boundary_ok"])
+    check(
+        "K14", wrapper_bypass_rejected,
+        "hidden_process_inside_generic_wrapper={} unexpected={}".format(
+            "REJECTED" if wrapper_bypass_rejected else "ADMITTED",
+            wrapper_bypass_analysis["unexpected_process"],
         ),
     )
 
