@@ -279,5 +279,14 @@ Seatbelt launcher was probed against snapshot write, chmod, unlink, rename, repl
 and parent-root rename; every mutation was denied while the contained process ran successfully.
 Arbitrary unsandboxed same-UID processes with independent controller-root authority remain outside
 h-032. H-032 stays unfrozen and h-031 stays paused pending a new independently reviewed candidate.
+
+GR-06/GR-07 remediation makes the sequencing explicit: first create an immutable h-032 candidate,
+then run `verify/bin/h-032-exit --emit-g20-evidence <outside-repo-path>` on an authorized owner
+runner. The strict JSON evidence binds task, candidate commit, complete task-spec bytes, gate bytes
+and the real `controller/launch/cli` probe identity; replay across any changed identity, malformed
+or manual PASS, FAIL and ODÖMBART are rejected by `--g20-evidence`. This is an ephemeral review
+artifact, not a new state store. The opened-object gate now requires observed regular-file proof on
+the same opened identity and includes no-check, stale-path-stat, same-object and non-regular judge
+controls. Candidate bytes cannot change after G20 PASS; remediation means a new commit and probe.
 - Pre-amendment quota-aborted h-003/h-004 worktree is preserved local evidence, not authority, not a resume candidate.
 - No frozen gate, constitution/rulebook boundary, G20, candidate identity, attestation/fencing, promotion identity or no-force rule is weakened by this amendment.

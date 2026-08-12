@@ -19,7 +19,17 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h032.XXXXXX")" || exit 2
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT HUP INT TERM
 
-python3 - "$SOURCE" "$AUTHORITY" "$SCHEMA" "$WORK" <<'PY'
+G20_EVIDENCE=""
+G20_EMIT=""
+if [[ $# -gt 0 ]]; then
+  [[ $# -eq 2 && ( "$1" == "--g20-evidence" || "$1" == "--emit-g20-evidence" ) ]] || {
+    echo "ODÖMBART K0 — användning: h-032-exit [--g20-evidence <strict-json> | --emit-g20-evidence <path>]"
+    exit 2
+  }
+  if [[ "$1" == "--g20-evidence" ]]; then G20_EVIDENCE="$2"; else G20_EMIT="$2"; fi
+fi
+
+python3 - "$SOURCE" "$AUTHORITY" "$SCHEMA" "$WORK" "$G20_EVIDENCE" "$G20_EMIT" <<'PY'
 from __future__ import annotations
 
 import hashlib
@@ -34,7 +44,9 @@ import stat
 import subprocess
 import sys
 
-source, authority_source, schema_source, work = map(Path, sys.argv[1:])
+source, authority_source, schema_source, work = map(Path, sys.argv[1:5])
+g20_evidence_path = Path(sys.argv[5]) if sys.argv[5] else None
+g20_emit_path = Path(sys.argv[6]) if sys.argv[6] else None
 checks: list[tuple[str, bool, str]] = []
 
 def check(key: str, ok: bool, detail: str) -> None:
@@ -318,8 +330,10 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
     same_bytes_target = provider_dir / "same-bytes-target"
     same_bytes_target.write_bytes(good_bytes); same_bytes_target.chmod(0o700)
     opened_identity_repo = make_repo(str(provider))
-    original_stat, original_lstat = os.stat, os.lstat
+    original_stat, original_lstat, original_fstat = os.stat, os.lstat, os.fstat
     stat_swapped = [False]
+    opened_object_regular_checks = []
+    provider_identity = original_stat(provider, follow_symlinks=False)
     target_text = os.fspath(provider)
     def swap_after_stat(path, *args, **kwargs):
         result = original_stat(path, *args, **kwargs)
@@ -331,16 +345,24 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
         if os.fspath(path) == target_text and not stat_swapped[0]:
             provider.unlink(); provider.symlink_to(same_bytes_target); stat_swapped[0] = True
         return result
-    os.stat, os.lstat = swap_after_stat, swap_after_lstat
+    def observe_fstat(fd, *args, **kwargs):
+        result = original_fstat(fd, *args, **kwargs)
+        if (result.st_dev, result.st_ino) == (provider_identity.st_dev, provider_identity.st_ino):
+            opened_object_regular_checks.append(
+                stat.S_ISREG(result.st_mode))
+        return result
+    os.stat, os.lstat, os.fstat = swap_after_stat, swap_after_lstat, observe_fstat
     try:
         opened_identity_result = attempt(opened_identity_repo)
     finally:
-        os.stat, os.lstat = original_stat, original_lstat
-    opened_identity_ok = ((stat_swapped[0] and not opened_identity_result[0]
-                           and opened_identity_result[2] == 0)
-                          or (not stat_swapped[0] and opened_identity_result[0]))
+        os.stat, os.lstat, os.fstat = original_stat, original_lstat, original_fstat
+    opened_identity_ok = (bool(opened_object_regular_checks)
+                          and all(opened_object_regular_checks)
+                          and ((stat_swapped[0] and not opened_identity_result[0]
+                                and opened_identity_result[2] == 0)
+                               or (not stat_swapped[0] and opened_identity_result[0])))
     check("K_OPENED_REGULAR_IDENTITY", opened_identity_ok,
-          f"path_swapped_to_symlink={stat_swapped[0]} result={opened_identity_result}")
+          f"opened_regular_checks={opened_object_regular_checks} path_swapped_to_symlink={stat_swapped[0]} result={opened_identity_result}")
     if provider.is_symlink(): provider.unlink()
 
     # GR-02/GR-05: mutate the first private executable when it is opened for
@@ -441,14 +463,35 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
     check("K_COHERENT_AUTHORITY", authority_swapped[0] and coherent_result[0],
           f"document_replaced_after_open={authority_swapped[0]} result={coherent_result}")
 
-    # GR-02 owner-runner control: execute the real controller Seatbelt launcher.
-    # An incapable nested sandbox is ODÖMBART, never PASS or ordinary RED.
+    # GR-02/GR-06 owner-runner control. Evidence may be consumed only when
+    # every immutable input equals THIS checked-out candidate.
     g20 = work / "g20"; trust = g20 / "trust"; ws = g20 / "ws"
     trust.mkdir(parents=True); ws.mkdir()
     protected = trust / "snapshot"; protected.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     protected.chmod(0o500); trust.chmod(0o500)
     envelope = g20 / "envelope.json"; envelope.write_text('{"task_id":"h-032"}\n', encoding="utf-8")
     launcher = source.parents[1] / "controller/launch/cli"
+    task_spec = source.parents[1] / "specs/tasks.spec.json"
+    gate_path = source.parents[1] / "verify/bin/h-032-exit"
+    candidate_sha = sh("git", "rev-parse", "HEAD", cwd=source.parents[1]).strip()
+    binding = {"schema_version": 1, "task": "h-032", "candidate_sha": candidate_sha,
+               "task_spec_sha256": sha256(task_spec), "h032_gate_sha256": sha256(gate_path),
+               "g20_probe_identity": "controller/launch/cli:" + sha256(launcher)}
+    evidence_keys = set(binding) | {
+        "g20_effect_result", "write_denied", "chmod_denied", "unlink_denied",
+        "rename_denied", "create_replacement_denied", "parent_rename_denied",
+        "launch_succeeded", "snapshot_survived", "replacement_absent"}
+    def valid_g20_evidence(value) -> tuple[bool, str]:
+        if not isinstance(value, dict) or set(value) != evidence_keys:
+            return False, "top-level/keys"
+        for key, expected in binding.items():
+            if type(value.get(key)) is not type(expected) or value.get(key) != expected:
+                return False, f"binding:{key}"
+        if value.get("g20_effect_result") != "PASS": return False, "effect-result"
+        effects = evidence_keys - set(binding) - {"g20_effect_result"}
+        if any(type(value.get(key)) is not str or value.get(key) != "YES" for key in effects):
+            return False, "effects"
+        return True, "exact-candidate-bound"
     attack = ('set +e; echo x >> "$1/snapshot"; echo WRITE=$?; '
               'chmod 700 "$1/snapshot"; echo CHMOD=$?; '
               'unlink "$1/snapshot"; echo UNLINK=$?; '
@@ -456,22 +499,57 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
               'echo y > "$1/replacement"; echo CREATE=$?; '
               'mv "$1" "$1-moved"; echo PARENT_RENAME=$?')
     env = dict(os.environ, NORTROPIC_TRUST_ROOT=str(trust))
-    g20_run = subprocess.run([str(launcher), "run", str(ws), str(envelope), "30", "--",
-                              "/bin/sh", "-c", attack, "sh", str(trust)],
-                             cwd=source.parents[1], env=env, text=True,
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    g20_out = g20_run.stdout
-    if g20_run.returncode == 3 and "sandbox_apply: Operation not permitted" in g20_out:
-        trust.chmod(0o700); protected.chmod(0o700)
-        print("ODÖMBART K_G20_NAMESPACE — nested sandbox-exec förbjuden; owner-runner krävs")
-        raise SystemExit(2)
-    denial_lines = {f"{name}=1" for name in
-                    ("WRITE","CHMOD","UNLINK","RENAME","CREATE","PARENT_RENAME")}
-    g20_ok = (g20_run.returncode == 0 and denial_lines.issubset(set(g20_out.splitlines()))
-              and protected.exists() and not (trust / "replacement").exists())
-    check("K_G20_NAMESPACE", g20_ok,
-          f"rc={g20_run.returncode} lines={g20_out.strip().replace(chr(10), '|')} snapshot={protected.exists()} replacement={(trust/'replacement').exists()}")
+    g20_odom = False
+    if g20_evidence_path is not None:
+        try:
+            evidence = strict_json(g20_evidence_path.read_text(encoding="utf-8"))
+            g20_ok, detail = valid_g20_evidence(evidence)
+        except Exception as exc:
+            g20_ok, detail = False, f"{type(exc).__name__}:{exc}"
+        check("K_G20_NAMESPACE", g20_ok, f"bound_evidence={detail}")
+    else:
+        g20_run = subprocess.run([str(launcher), "run", str(ws), str(envelope), "30", "--",
+                                  "/bin/sh", "-c", attack, "sh", str(trust)],
+                                 cwd=source.parents[1], env=env, text=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        g20_out = g20_run.stdout
+        if g20_run.returncode == 3 and "sandbox_apply: Operation not permitted" in g20_out:
+            g20_odom, g20_ok = True, False
+            check("K_G20_NAMESPACE", False, "ODÖMBART nested sandbox-exec förbjuden; owner-runner krävs")
+        else:
+            denial_lines = {f"{name}=1" for name in
+                            ("WRITE","CHMOD","UNLINK","RENAME","CREATE","PARENT_RENAME")}
+            g20_ok = (g20_run.returncode == 0 and denial_lines.issubset(set(g20_out.splitlines()))
+                      and protected.exists() and not (trust / "replacement").exists())
+            check("K_G20_NAMESPACE", g20_ok,
+                  f"rc={g20_run.returncode} lines={g20_out.strip().replace(chr(10), '|')} snapshot={protected.exists()} replacement={(trust/'replacement').exists()}")
+            if g20_ok:
+                evidence = dict(binding, g20_effect_result="PASS", write_denied="YES",
+                    chmod_denied="YES", unlink_denied="YES", rename_denied="YES",
+                    create_replacement_denied="YES", parent_rename_denied="YES",
+                    launch_succeeded="YES", snapshot_survived="YES", replacement_absent="YES")
+                print("G20_BOUND_EVIDENCE=" + json.dumps(evidence, sort_keys=True, separators=(",", ":")))
+                if g20_emit_path is not None:
+                    g20_emit_path.write_text(json.dumps(evidence, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     trust.chmod(0o700)
+
+    valid_evidence = dict(binding, g20_effect_result="PASS", write_denied="YES",
+        chmod_denied="YES", unlink_denied="YES", rename_denied="YES",
+        create_replacement_denied="YES", parent_rename_denied="YES",
+        launch_succeeded="YES", snapshot_survived="YES", replacement_absent="YES")
+    check("J_GR06_BOUND_EVIDENCE_POSITIVE", valid_g20_evidence(valid_evidence)[0], "exact binding admitted")
+    for name, key, value in (("WRONG_CANDIDATE", "candidate_sha", "0"*40),
+        ("STALE_GATE", "h032_gate_sha256", "0"*64), ("WRONG_SPEC", "task_spec_sha256", "0"*64),
+        ("WRONG_TASK", "task", "h-031"), ("WRONG_PROBE", "g20_probe_identity", "bad"),
+        ("FAIL_RESULT", "g20_effect_result", "FAIL"), ("ODOMBAR_RESULT", "g20_effect_result", "ODÖMBART")):
+        mutant = dict(valid_evidence); mutant[key] = value
+        check("J_GR06_" + name, not valid_g20_evidence(mutant)[0], f"{key} rejected")
+    missing = dict(valid_evidence); missing.pop("candidate_sha")
+    malformed = dict(valid_evidence); malformed["write_denied"] = True
+    extra = dict(valid_evidence); extra["manual_pass"] = True
+    check("J_GR06_MISSING_BINDING", not valid_g20_evidence(missing)[0], "missing binding rejected")
+    check("J_GR06_MALFORMED_EVIDENCE", not valid_g20_evidence(malformed)[0], "wrong type rejected")
+    check("J_GR06_UNEXPECTED_KEY", not valid_g20_evidence(extra)[0], "manual field rejected")
 
     # Judge self-controls: one defect per disposable effect mutant. These do
     # not replace the real subject checks above; they prove the oracles have
@@ -506,10 +584,47 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
     shutil.rmtree(cleanup_root)
     check("J_GR05_FAILURE_CLEANUP", not cleanup_root.exists(), f"residue={cleanup_root.exists()}")
 
+    # GR-07 judge controls: the verdict is attached to the exact opened
+    # object's identity. Path metadata alone and omission are insufficient.
+    regular_mode = stat.S_IFREG | 0o700; fifo_mode = stat.S_IFIFO | 0o600
+    def identity(st): return st.st_dev, st.st_ino
+    def opened_regular_oracle(opened_st, inspected_st):
+        return (inspected_st is not None and identity(opened_st) == identity(inspected_st)
+                and stat.S_ISREG(inspected_st.st_mode))
+    gr07_a = jc / "gr07-a"; gr07_b = jc / "gr07-b"
+    gr07_a.write_bytes(b"trusted"); gr07_b.write_bytes(b"trusted")
+    stale_path_st = gr07_a.stat()
+    with gr07_b.open("rb") as opened:
+        opened_st = original_fstat(opened.fileno())
+        # Disposable unsafe implementation: digest/read succeeds but it omits
+        # all metadata inspection of the opened object.
+        no_check_bytes, no_check_st = opened.read(), None
+    no_opened_check_admits = (no_check_bytes == b"trusted"
+                              and opened_regular_oracle(opened_st, no_check_st))
+    stale_path_stat_admits = opened_regular_oracle(opened_st, stale_path_st)
+    with gr07_b.open("rb") as opened:
+        same_opened_st = original_fstat(opened.fileno())
+        same_opened_bytes = opened.read()
+    same_opened_admits = (same_opened_bytes == b"trusted"
+                          and opened_regular_oracle(same_opened_st, same_opened_st))
+    nonregular_st = os.stat_result((fifo_mode, *same_opened_st[1:]))
+    nonregular_opened_admits = opened_regular_oracle(nonregular_st, nonregular_st)
+    check("J_GR07_NO_OPENED_OBJECT_TYPE_CHECK", not no_opened_check_admits,
+          "NO_OPENED_OBJECT_TYPE_CHECK=REJECTED")
+    check("J_GR07_STALE_PATH_STAT", not stale_path_stat_admits,
+          "STALE_PATH_STAT=REJECTED")
+    check("J_GR07_SAME_OPENED_OBJECT", same_opened_admits,
+          "SAME_OPENED_OBJECT_REGULAR_CHECK=ADMITTED")
+    check("J_GR07_NONREGULAR_OPENED_OBJECT", not nonregular_opened_admits,
+          "NONREGULAR_OPENED_OBJECT=REJECTED")
+
     passed = sum(ok for _, ok, _ in checks)
     for key, ok, detail in checks:
         print(("PASS " if ok else "FAIL ") + key + " — " + detail)
     print(f"SAMMANFATTNING {passed} PASS / {len(checks)-passed} FAIL")
+    if g20_odom:
+        print("ODÖMBART K_G20_NAMESPACE — nested sandbox-exec förbjuden; candidate-bound owner-runner evidence required")
+        raise SystemExit(2)
     raise SystemExit(0 if passed == len(checks) else 1)
 except SystemExit:
     raise
