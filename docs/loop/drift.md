@@ -320,3 +320,21 @@ command/path/output and generic passwordless privilege are forbidden. If uid 501
 become producer/root, or the owner-runner cannot prove the separate account/service/root, H-033 is
 ODÖMBART with no same-user fallback. Current production remains honestly RED because the component
 and root are absent; judge self-controls are separate from that RED and future production checks.
+
+## 2026-08-12 — H-033 GR-06..GR-10 production-boundary remediation
+
+Owner-runner inspection proved that uid 501 has interactive admin membership but no noninteractive
+sudo/root/arbitrary-user transition: `sudo -n -l`, `sudo -n id` and a switch to the absent canonical
+producer all required authentication or failed. Privileged system namespaces and installed helper
+binaries are root-owned and non-user-writable; the only Nortropic launch service is an unprivileged
+uid-501 LaunchAgent, and no Nortropic privileged wrapper exists. This permits a future narrow,
+owner-provisioned launchd transition without treating interactive administrator authority as an
+unattended attacker capability.
+
+Canonical authority is now literal owner contract rather than requester environment: account
+`_nortropic_provenance`, launchd label and producer helper, root-owned digest allowlist, protected
+evidence root, production verifier and a separate root-owned conformance observer/receipt root.
+The observer authenticates the live frozen-probe peer executable and writes A/B/C outside producer
+authority, so producer evidence cannot forge its own execution oracle. Material parser, request,
+binding, opened-object race and namespace clauses map to future black-box CLI/verifier controls;
+the Python controls are explicitly judge selftests only. No account, service or root was provisioned.

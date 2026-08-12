@@ -5,9 +5,14 @@
 set -u
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "ODÖMBART K0 — no repository"; exit 2; }
 CLI="$ROOT/controller/provenance/cli"
-ACCOUNT="${NORTROPIC_PROVENANCE_ACCOUNT:-_nortropic_provenance}"
-STORE="${NORTROPIC_PROVENANCE_ROOT:-}"
-SERVICE="${NORTROPIC_PROVENANCE_SERVICE:-}"
+VERIFY="$ROOT/controller/provenance/verify"
+ACCOUNT="_nortropic_provenance"
+SERVICE="/Library/PrivilegedHelperTools/com.nortropic.provenance"
+SERVICE_LABEL="com.nortropic.provenance"
+ALLOWLIST="/Library/Application Support/Nortropic/provenance/probes.json"
+STORE="/Library/Application Support/Nortropic/provenance/evidence"
+OBSERVER_SERVICE="/Library/PrivilegedHelperTools/com.nortropic.provenance-test-observer"
+OBSERVER_ROOT="/Library/Application Support/Nortropic/provenance/probe-receipts"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h033.XXXXXX")" || exit 2
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
@@ -117,25 +122,32 @@ PY
 rc=$?; [[ $rc -eq 0 ]] || exit "$rc"
 
 # Honest pre-builder RED is independent from the forged-evidence judge control.
-if [[ ! -x "$CLI" ]]; then
+if [[ ! -x "$CLI" || ! -x "$VERIFY" ]]; then
   echo "CURRENT_RED_REASON=AUTHENTICATED_PRODUCER_COMPONENT_ABSENT"
   echo "PROTECTED_EVIDENCE_ROOT=ABSENT"
   echo "FAIL K1 — authenticated producer implementation absent"
   exit 1
 fi
 
-# Provisioning/rig inability is ODÖMBART, never PASS. Account name is canonical;
-# requester-controlled numeric expected UID is not accepted.
+# Provisioning/rig inability is ODÖMBART, never PASS. Every authority path and
+# account name is owner-frozen above; requester environment is never authority.
 PRODUCER_UID="$(dscl . -read "/Users/$ACCOUNT" UniqueID 2>/dev/null | awk '{print $2}')"
 PRODUCER_GID="$(dscl . -read "/Users/$ACCOUNT" PrimaryGroupID 2>/dev/null | awk '{print $2}')"
 [[ "$PRODUCER_UID" =~ ^[0-9]+$ && "$PRODUCER_GID" =~ ^[0-9]+$ ]] || { echo "ODÖMBART K2 — canonical producer principal not provisioned"; exit 2; }
-[[ "$PRODUCER_UID" != "$(id -u)" && -n "$STORE" && "$STORE" = /* && -d "$STORE" && -n "$SERVICE" && "$SERVICE" = /* && -f "$SERVICE" && ! -L "$SERVICE" ]] || { echo "ODÖMBART K2 — producer service/root not provisioned"; exit 2; }
+[[ "$PRODUCER_UID" != "$(id -u)" && -d "$STORE" && -f "$SERVICE" && ! -L "$SERVICE" && -f "$ALLOWLIST" && ! -L "$ALLOWLIST" && -f "$OBSERVER_SERVICE" && ! -L "$OBSERVER_SERVICE" && -d "$OBSERVER_ROOT" ]] || { echo "ODÖMBART K2 — canonical service/allowlist/root/observer not provisioned"; exit 2; }
+
+# A compromised uid-501 process must not have a generic unattended transition.
+# Interactive administrator authentication is deliberately outside this check.
+if sudo -n -l >/dev/null 2>&1 || sudo -n /usr/bin/id >/dev/null 2>&1 || sudo -n -u "$ACCOUNT" /usr/bin/id >/dev/null 2>&1; then
+  echo "FAIL K2 — generic unattended sudo/root/user-switch authority exists"; exit 1
+fi
+launchctl print "system/$SERVICE_LABEL" >/dev/null 2>&1 || { echo "ODÖMBART K2 — canonical privileged transition not installed"; exit 2; }
 
 # Effective parent-chain check: uid 501 must not own or have group/other write on
 # any ancestor from the evidence root up to the first root-owned anchor.
-python3 - "$STORE" "$SERVICE" "$PRODUCER_UID" "$PRODUCER_GID" <<'PY'
+python3 - "$STORE" "$SERVICE" "$ALLOWLIST" "$OBSERVER_ROOT" "$OBSERVER_SERVICE" "$PRODUCER_UID" "$PRODUCER_GID" <<'PY'
 import os,stat,sys
-store,service,puid,pgid=sys.argv[1],sys.argv[2],int(sys.argv[3]),int(sys.argv[4]); me=os.getuid()
+store,service,allowlist,observer_root,observer_service,puid,pgid=sys.argv[1:6]+[int(sys.argv[6]),int(sys.argv[7])]; me=os.getuid()
 def secure_chain(path, leaf_uid):
  p=os.path.abspath(path); first=True
  while True:
@@ -148,9 +160,12 @@ def secure_chain(path, leaf_uid):
  return False
 ss=os.lstat(service)
 if not secure_chain(store,puid): print("FAIL K2 — protected root/parent chain replaceable"); raise SystemExit(1)
-if not stat.S_ISREG(ss.st_mode) or ss.st_uid not in (0,puid) or ss.st_mode & 0o022:
- print("FAIL K2 — producer service authority not dedicated/protected"); raise SystemExit(1)
-print("PASS K2 — canonical producer, service, root and parent authority established")
+for path,owners in ((service,(0,puid)),(allowlist,(0,)),(observer_service,(0,))):
+ s=os.lstat(path)
+ if not secure_chain(path,s.st_uid) or not stat.S_ISREG(s.st_mode) or s.st_uid not in owners or s.st_mode & 0o022:
+  print("FAIL K2 — canonical service/allowlist/observer authority not protected"); raise SystemExit(1)
+if not secure_chain(observer_root,0): print("FAIL K2 — independent observer root replaceable"); raise SystemExit(1)
+print("PASS K2 — canonical transition, producer, allowlist, roots and observer authority established")
 PY
 rc=$?; [[ $rc -eq 0 ]] || exit "$rc"
 
@@ -161,26 +176,53 @@ request() { "$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "
 verify() { "$CLI" verify --evidence "$1" --task "$2" --candidate "$3" --task-spec-sha256 "$4" --gate-sha256 "$5" --probe "$6" --require-result "$7"; }
 
 # Forbidden request authority must fail before evidence/effect creation.
-for args in '--result PASS' '--effect A' '--command id' '--probe-path /bin/sh' '--output /tmp/h033-forged'; do
-  # shell splitting here is bounded to the five literal controls above.
+for args in '--result PASS' '--result FAIL' '--result ODÖMBART' '--effects A' '--command id' '--shell /bin/sh' '--exec /bin/id' '--probe-path /bin/sh' '--output /tmp/h033-forged' '--producer-account root' '--producer-uid 0' '--service-path /etc/sudoers' '--unknown-flag x'; do
+  # Shell splitting here is bounded to the literal controls above.
   set -- $args
   "$CLI" request --task h-033 --candidate "$CAND" --task-spec-sha256 "$SPEC" --gate-sha256 "$GATE" --probe h033-pass-v1 "$@" >/dev/null 2>&1 && { echo "FAIL K3 — forbidden request accepted: $args"; exit 1; }
 done
 request unknown-probe >/dev/null 2>&1 && { echo "FAIL K3 — unknown probe accepted"; exit 1; }
 echo "PASS K3 — request surface and probe allowlist are narrow"
 
-# Producer-owned effect records are independently observed. Each test probe must
-# atomically create <evidence>.effect with exactly its frozen marker.
+# The root-owned observer authenticates the live peer executable identity/digest
+# and writes a receipt outside producer authority. Producer evidence is never its
+# own execution oracle. Hardcoded result/effect writers therefore lack a receipt.
 for item in 'h033-pass-v1 PASS A' 'h033-fail-v1 FAIL B' 'h033-odombar-v1 ODÖMBART C'; do
   set -- $item; probe="$1"; expected="$2"; marker="$3"
   out="$(request "$probe")" || { echo "FAIL K4 — producer request failed for $probe"; exit 1; }
-  evidence="$(printf '%s\n' "$out" | tail -n 1)"; effect="$evidence.effect"
-  [[ "$evidence" = "$STORE"/* && "$effect" = "$STORE"/* && -f "$effect" && ! -L "$effect" && "$(cat "$effect")" = "$marker" ]] || { echo "FAIL K4 — independently observable effect missing for $probe"; exit 1; }
+  evidence="$(printf '%s\n' "$out" | tail -n 1)"
+  receipt="$OBSERVER_ROOT/$CAND.$probe.receipt"
+  [[ "$evidence" = "$STORE"/* && -f "$receipt" && ! -L "$receipt" ]] || { echo "FAIL K4 — independent observer receipt missing for $probe"; exit 1; }
+  "$VERIFY" receipt --receipt "$receipt" --candidate "$CAND" --probe "$probe" --marker "$marker" --allowlist "$ALLOWLIST" >/dev/null || { echo "FAIL K4 — observer did not authenticate live frozen-probe execution"; exit 1; }
   verify "$evidence" h-033 "$CAND" "$SPEC" "$GATE" "$probe" "$expected" >/dev/null || { echo "FAIL K4 — actual $expected evidence rejected"; exit 1; }
   [[ "$expected" = PASS ]] || ! verify "$evidence" h-033 "$CAND" "$SPEC" "$GATE" "$probe" PASS >/dev/null 2>&1 || { echo "FAIL K4 — $expected synthesized/authenticated as PASS"; exit 1; }
   [[ "$probe" = h033-pass-v1 ]] && PASS_EVIDENCE="$evidence"
 done
 echo "PASS K4 — PASS/FAIL/ODÖMBART derive from executed probe effects"
+
+# Strict parsing is acceptance-tested through the actual future verifier, not
+# only through J_* judge models. `structure` performs no provenance admission.
+GOOD_DOC="$WORK/good.json"
+printf '%s' '{"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033","candidate_sha":"1111111111111111111111111111111111111111","task_spec_sha256":"2222222222222222222222222222222222222222222222222222222222222222","gate_sha256":"2222222222222222222222222222222222222222222222222222222222222222","probe_identity":"h033-pass-v1","result":"PASS","effect_sha256":"2222222222222222222222222222222222222222222222222222222222222222"}' >"$GOOD_DOC"
+"$VERIFY" structure --input "$GOOD_DOC" >/dev/null || { echo "FAIL K5 — production strict verifier rejected canonical structure"; exit 1; }
+python3 - "$GOOD_DOC" "$WORK" <<'PY'
+import json,pathlib,sys
+good=pathlib.Path(sys.argv[1]).read_text(); w=pathlib.Path(sys.argv[2]); d=json.loads(good)
+(w/'malformed.json').write_text('{')
+(w/'duplicate.json').write_text(good[:-1]+',"result":"PASS"}')
+(w/'wrong-top-level.json').write_text('[]')
+for name,mutate in (
+ ('missing',lambda x:x.pop('task')),('unexpected',lambda x:x.update(extra=1)),
+ ('wrong-type',lambda x:x.update(schema_version='1')),('empty',lambda x:x.update(producer_authority='')),
+ ('malformed-binding',lambda x:x.update(candidate_sha='bad')),('malformed-probe',lambda x:x.update(probe_identity='../probe')),
+ ('invalid-result',lambda x:x.update(result='GREEN'))):
+ x=dict(d); mutate(x); (w/f'{name}.json').write_text(json.dumps(x,separators=(',',':')))
+PY
+for fixture in malformed duplicate wrong-top-level missing unexpected wrong-type empty malformed-binding malformed-probe invalid-result; do
+  "$VERIFY" structure --input "$WORK/$fixture.json" >/dev/null 2>&1 && { echo "FAIL K5 — production strict verifier accepted $fixture"; exit 1; }
+done
+
+"$VERIFY" opened-object-control --work "$WORK/opened-object" >/dev/null || { echo "FAIL K5 — production verifier failed same-opened-object race control"; exit 1; }
 
 # Binding, origin, strict parsing, opened-object and mutation controls are black-box
 # checks against the actual verifier. It must open the expected protected path itself.
