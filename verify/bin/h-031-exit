@@ -12,8 +12,13 @@
 #   M08 publish bygger Codex-argv dynamiskt och anropar generic run       -> K1/K11
 #   M09 publish skickar statiskt olöst ambient argv till generic run      -> K1/K13
 #   M10 generic processwrapper smyger in ett andra Codex-spawn            -> K1/K14
+#   M11 lambda vidarebefordrar dynamiskt byggd Codex-argv till process   -> K1/K15
+#   M12 process-site i modulkomprehension startar dynamisk Codex         -> K1/K17
+#   M13 lambda-process får ett olöst exekverbart kommando                 -> K1/K18
+#   M14 process-site i ett funktionsdefaultsuttryck startar Codex         -> K1/K19
 #   V01 upprepade rollcalls samlas bakom en helper utan effektändring    -> K10 PASS
 #   V02 publish använder generic run för bevisat icke-Codex-kommando     -> K12 PASS
+#   V03 samma lambda-process får bevisat icke-Codex-kommando              -> K16 PASS
 #
 # Provet använder en falsk codex-binär. Den fångar den faktiskt exekverade
 # argv-listan och skriver en minimal giltig agentrapport. Därmed dömer K2
@@ -261,6 +266,25 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
             elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
                 augmented[callable_id].setdefault(node.target.id, []).append(node.lineno)
 
+    # Ownership is contextual metadata only. Native process discovery below
+    # walks the whole module and therefore cannot lose a site merely because
+    # this callable model does not represent its surrounding syntax.
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(subject_tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+    callable_node_ids = {id(node): name for name, node in subject_funcs.items()}
+
+    def enclosing_callable(node: ast.AST) -> str | None:
+        cur = parents.get(node)
+        while cur is not None:
+            if id(cur) in callable_node_ids:
+                return callable_node_ids[id(cur)]
+            if isinstance(cur, ast.Lambda):
+                return f"<lambda@{cur.lineno}>"
+            cur = parents.get(cur)
+        return None
+
     def abstract_heads(expr: ast.expr, caller: str, before: int,
                        seen: frozenset[tuple[str, str, int]] = frozenset()) -> set[str]:
         if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
@@ -351,6 +375,100 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
                 return None
             argv.append(next(iter(values)))
         return tuple(argv)
+
+    def context_free_heads(expr: ast.expr) -> set[str]:
+        if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+            return {expr.value}
+        if isinstance(expr, (ast.List, ast.Tuple)) and expr.elts:
+            return context_free_heads(expr.elts[0])
+        if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
+            left, right = context_free_heads(expr.left), context_free_heads(expr.right)
+            if UNKNOWN_HEAD in left or UNKNOWN_HEAD in right:
+                return {UNKNOWN_HEAD}
+            return {a + b for a in left for b in right}
+        if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Attribute):
+            if expr.func.attr == "join" and expr.args:
+                separators = context_free_heads(expr.func.value)
+                values = expr.args[0]
+                if isinstance(values, (ast.List, ast.Tuple)):
+                    parts = [context_free_heads(item) for item in values.elts]
+                    if UNKNOWN_HEAD not in separators and all(UNKNOWN_HEAD not in part for part in parts):
+                        rendered = {""}
+                        for part in parts:
+                            rendered = {
+                                prefix + (separator if prefix else "") + suffix
+                                for prefix in rendered for separator in separators for suffix in part
+                            }
+                        return rendered
+        return {UNKNOWN_HEAD}
+
+    # Global native-process inventory. Lambda forwarding is evaluated at its
+    # call sites with the same bounded head evaluator used for ordinary generic
+    # wrappers. Unsupported/unresolved executable semantics remain explicit.
+    lambda_bindings: dict[str, ast.Lambda] = {}
+    for node in ast.walk(subject_tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if isinstance(node.value, ast.Lambda):
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        lambda_bindings[target.id] = node.value
+
+    global_process_sites: list[tuple[str, str, int]] = []
+    global_process_nodes: list[tuple[str, ast.Call]] = []
+    lambda_forwarders: dict[str, tuple[str, str, int]] = {}
+    for node in ast.walk(subject_tree):
+        if not isinstance(node, ast.Call):
+            continue
+        qualified = qualified_call(node, modules, symbols)
+        if not is_process_call(qualified):
+            continue
+        owner = enclosing_callable(node) or "<module>"
+        global_process_sites.append((owner, qualified, node.lineno))
+        global_process_nodes.append((owner, node))
+        cur: ast.AST | None = node
+        enclosing_lambda: ast.Lambda | None = None
+        while cur is not None:
+            if isinstance(cur, ast.Lambda):
+                enclosing_lambda = cur
+                break
+            cur = parents.get(cur)
+        if enclosing_lambda and node.args:
+            params = {a.arg for a in (*enclosing_lambda.args.posonlyargs, *enclosing_lambda.args.args)}
+            first = node.args[0]
+            if isinstance(first, ast.Name) and first.id in params:
+                for binding, value in lambda_bindings.items():
+                    if value is enclosing_lambda:
+                        lambda_forwarders[binding] = (owner, qualified, node.lineno)
+
+    global_semantic_violations: list[tuple[str, int, str]] = []
+    lambda_call_classifications: list[tuple[str, int, tuple[str, ...]]] = []
+    for node in ast.walk(subject_tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id not in lambda_forwarders:
+            continue
+        caller = enclosing_callable(node)
+        if caller is None or caller.startswith("<lambda@") or not node.args:
+            heads = {UNKNOWN_HEAD}
+        else:
+            heads = abstract_heads(node.args[0], caller, node.lineno)
+        lambda_call_classifications.append((node.func.id, node.lineno, tuple(sorted(heads))))
+        if "codex" in heads or UNKNOWN_HEAD in heads:
+            global_semantic_violations.append((node.func.id, node.lineno, repr(sorted(heads))))
+
+    # Any native site outside a modeled function must still receive a verdict.
+    # Forwarding lambdas are classified above at their invocation sites; other
+    # unowned expression contexts are classified directly and fail closed.
+    forwarded_lambda_lines = {line for _owner, _qualified, line in lambda_forwarders.values()}
+    for owner, node in global_process_nodes:
+        if owner != "<module>" and not owner.startswith("<lambda@"):
+            continue
+        if owner.startswith("<lambda@") and node.lineno in forwarded_lambda_lines:
+            continue
+        heads = context_free_heads(node.args[0]) if node.args else {UNKNOWN_HEAD}
+        if "codex" in heads or UNKNOWN_HEAD in heads:
+            global_semantic_violations.append((owner, node.lineno, repr(sorted(heads))))
 
     def resolve_targets(call: ast.Call, caller: str,
                         instances: dict[str, set[str]],
@@ -474,6 +592,26 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
             }:
                 dynamic_resolution.append((fn_name, qualified, node.lineno))
 
+    # Reconcile the global inventory against body-based callable analysis.
+    # Signature defaults/decorators and any future executable AST context that
+    # the call-graph model omits still receive command classification here.
+    body_inventory = {(site[1], site[2]) for site in process_sites}
+    for owner, node in global_process_nodes:
+        qualified = qualified_call(node, modules, symbols)
+        if (qualified, node.lineno) in body_inventory:
+            continue
+        if owner.startswith("<lambda@") and node.lineno in forwarded_lambda_lines:
+            continue
+        caller = owner if owner in subject_funcs else ""
+        heads = (
+            abstract_heads(node.args[0], caller, node.lineno)
+            if node.args and caller else context_free_heads(node.args[0]) if node.args else {UNKNOWN_HEAD}
+        )
+        if "codex" in heads or UNKNOWN_HEAD in heads:
+            finding = (owner, node.lineno, repr(sorted(heads)))
+            if finding not in global_semantic_violations:
+                global_semantic_violations.append(finding)
+
     sites_by_callable: dict[str, list[tuple[str, str, int, str | None, bool]]] = {}
     for site in process_sites:
         sites_by_callable.setdefault(site[0], []).append(site)
@@ -541,6 +679,7 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
         not unexpected_process
         and not generic_run_violations
         and not dynamic_resolution
+        and not global_semantic_violations
         and agent_execution
     )
 
@@ -592,6 +731,9 @@ def analyze_launch_graph(subject_text: str) -> dict[str, object]:
         "paths_ok": paths_ok,
         "observer_clean": not observer_violations,
         "process_sites": process_sites,
+        "global_process_sites": global_process_sites,
+        "global_semantic_violations": global_semantic_violations,
+        "lambda_call_classifications": lambda_call_classifications,
         "unexpected_process": unexpected_process,
         "generic_run_violations": generic_run_violations,
         "dynamic_resolution": dynamic_resolution,
@@ -990,6 +1132,106 @@ def h031_consolidated_role_launch(*args, **kwargs):
         "hidden_process_inside_generic_wrapper={} unexpected={}".format(
             "REJECTED" if wrapper_bypass_rejected else "ADMITTED",
             wrapper_bypass_analysis["unexpected_process"],
+        ),
+    )
+
+    # GR-05: whole-module discovery must see a process boundary inside a
+    # lambda, then classify its forwarded argv symmetrically at call sites.
+    lambda_needle = '            title: str, changed: list[str]) -> str:\n'
+    lambda_codex_mutant = text.replace(
+        lambda_needle,
+        lambda_needle
+        + '    h031_process = lambda command: subprocess.run(command, cwd=str(wt), check=False)\n'
+        + '    h031_executable = "".join(("co", "dex"))\n'
+        + '    h031_process([h031_executable, "exec", "lambda policy bypass"])\n',
+        1,
+    )
+    lambda_codex_analysis = analyze_launch_graph(lambda_codex_mutant)
+    lambda_codex_rejected = not bool(lambda_codex_analysis["boundary_ok"])
+    check(
+        "K15", lambda_codex_rejected,
+        "lambda_dynamic_codex_process={} inventory={} semantics={}".format(
+            "REJECTED" if lambda_codex_rejected else "ADMITTED",
+            lambda_codex_analysis["global_process_sites"],
+            lambda_codex_analysis["lambda_call_classifications"],
+        ),
+    )
+
+    lambda_non_codex_mutant = text.replace(
+        lambda_needle,
+        lambda_needle
+        + '    h031_process = lambda command: subprocess.run(command, cwd=str(wt), check=False)\n'
+        + '    h031_executable = "".join(("g", "h"))\n'
+        + '    h031_process([h031_executable, "--version"])\n',
+        1,
+    )
+    lambda_non_codex_analysis = analyze_launch_graph(lambda_non_codex_mutant)
+    lambda_non_codex_admitted = all((
+        bool(lambda_non_codex_analysis["boundary_ok"]),
+        bool(lambda_non_codex_analysis["paths_ok"]),
+        bool(lambda_non_codex_analysis["observer_clean"]),
+    ))
+    check(
+        "K16", lambda_non_codex_admitted,
+        "lambda_dynamic_non_codex_process={} semantics={}".format(
+            "ADMITTED" if lambda_non_codex_admitted else "REJECTED",
+            lambda_non_codex_analysis["lambda_call_classifications"],
+        ),
+    )
+
+    # A module-level comprehension is neither FunctionDef, class method nor
+    # lambda. Its native process site must nevertheless enter the inventory.
+    comprehension_mutant = text + '''
+H031_PROCESS_PROBE = [
+    subprocess.call(["".join(("co", "dex")), "exec", "expression bypass"])
+    for _h031_item in (0,)
+]
+'''
+    comprehension_analysis = analyze_launch_graph(comprehension_mutant)
+    comprehension_rejected = not bool(comprehension_analysis["boundary_ok"])
+    check(
+        "K17", comprehension_rejected,
+        "additional_ast_shape_codex_process={} inventory={} semantics={}".format(
+            "REJECTED" if comprehension_rejected else "ADMITTED",
+            comprehension_analysis["global_process_sites"],
+            comprehension_analysis["global_semantic_violations"],
+        ),
+    )
+
+    lambda_unknown_mutant = text.replace(
+        lambda_needle,
+        lambda_needle
+        + '    h031_process = lambda command: subprocess.run(command, cwd=str(wt), check=False)\n'
+        + '    h031_executable = os.environ.get("H031_UNKNOWN_EXECUTABLE")\n'
+        + '    h031_process([h031_executable, "exec", "unresolved lambda command"])\n',
+        1,
+    )
+    lambda_unknown_analysis = analyze_launch_graph(lambda_unknown_mutant)
+    lambda_unknown_rejected = not bool(lambda_unknown_analysis["boundary_ok"])
+    check(
+        "K18", lambda_unknown_rejected,
+        "unresolved_dynamic_executable={} semantics={}".format(
+            "REJECTED" if lambda_unknown_rejected else "ADMITTED",
+            lambda_unknown_analysis["lambda_call_classifications"],
+        ),
+    )
+
+    # Function defaults execute outside the function body and were a plausible
+    # residual hole in body-driven discovery. The global inventory must own it.
+    default_expression_mutant = text + '''
+def h031_default_expression_probe(
+    result=subprocess.call(["".join(("co", "dex")), "exec", "default bypass"])
+):
+    return result
+'''
+    default_expression_analysis = analyze_launch_graph(default_expression_mutant)
+    default_expression_rejected = not bool(default_expression_analysis["boundary_ok"])
+    check(
+        "K19", default_expression_rejected,
+        "function_default_expression_codex_process={} inventory={} semantics={}".format(
+            "REJECTED" if default_expression_rejected else "ADMITTED",
+            default_expression_analysis["global_process_sites"],
+            default_expression_analysis["global_semantic_violations"],
         ),
     )
 
