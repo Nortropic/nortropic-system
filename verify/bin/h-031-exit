@@ -1,33 +1,22 @@
 #!/usr/bin/env bash
-# h-031-exit — explicit Codex-modellrouting per faktisk autopilotroll
+# h-031-exit — explicit Codex routing through one canonical launch boundary
 #
-# MUTANTPREDIKTION (före produktionsimplementation):
-#   M01 journalen påstår rätt modell men argv saknar explicit routing   -> K2
-#   M02 alla roller får max                                            -> K2 (BUILDER)
-#   M03 okänd roll faller tillbaka till en default                      -> K4
-#   M04 äldre persisted ultra återanvänds                               -> K2/K5
-#   M05 klassmetod startar Codex utanför gemensam spawnpunkt             -> K1/K8
-#   M06 observer når process via helper→metod→self.metod                  -> K6/K9
-#   M07 argv är rätt men journalens källa/fält saknas                    -> K3
-#   M08 publish bygger Codex-argv dynamiskt och anropar generic run       -> K1/K11
-#   M09 publish skickar statiskt olöst ambient argv till generic run      -> K1/K13
-#   M10 generic processwrapper smyger in ett andra Codex-spawn            -> K1/K14
-#   M11 lambda vidarebefordrar dynamiskt byggd Codex-argv till process   -> K1/K15
-#   M12 process-site i modulkomprehension startar dynamisk Codex         -> K1/K17
-#   M13 lambda-process får ett olöst exekverbart kommando                 -> K1/K18
-#   M14 process-site i ett funktionsdefaultsuttryck startar Codex         -> K1/K19
-#   M15 subprocess nås via vanlig assignment-alias och startar Codex      -> K1/K20
-#   M16 lagrad lambda-callable startar Codex via dictionary lookup         -> K1/K22
-#   V01 upprepade rollcalls samlas bakom en helper utan effektändring    -> K10 PASS
-#   V02 publish använder generic run för bevisat icke-Codex-kommando     -> K12 PASS
-#   V03 samma lambda-process får bevisat icke-Codex-kommando              -> K16 PASS
-#   V04 assignment-alias kör bevisat icke-Codex-kommando                  -> K21 PASS
-#   V05 lagrad lambda-callable kör bevisat icke-Codex-kommando             -> K23 PASS
+# Frozen process-boundary contract:
+#   * run_codex owns the only permitted subprocess.Popen site.
+#   * run owns the only permitted subprocess.run site and must reject every
+#     executable whose basename is "codex" before subprocess.run is reached.
+#   * watch may retain the literal, non-agent os.system("clear") site.
+#   * every other native process site and every alias of subprocess/os process
+#     capabilities is forbidden. This is an intentional security-relevant
+#     source-shape restriction, not a general Python dataflow analysis.
 #
-# Provet använder en falsk codex-binär. Den fångar den faktiskt exekverade
-# argv-listan och skriver en minimal giltig agentrapport. Därmed dömer K2
-# launch-effekten, inte källkodens påståenden. En avsiktligt motstridig
-# CODEX_HOME-konfiguration (annan modell + ultra) är startvärdet.
+# Predicted controls before execution:
+#   direct/module-alias/lambda/stored-lambda/key-alias/assignment-alias Codex
+#     -> structural boundary FAIL
+#   unknown executable through run -> admitted only when run's runtime guard
+#     demonstrably rejects a Codex basename before spawn
+#   ordinary gh through run -> admitted and reaches subprocess.run
+#   harmless role-call consolidation -> admitted
 
 set -u
 
@@ -41,9 +30,7 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h031.XXXXXX")" || {
   echo "ODÖMBART K0 — temp-katalog kunde inte skapas"
   exit 2
 }
-cleanup() {
-  rm -rf "$WORK"
-}
+cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT HUP INT TERM
 
 if [ ! -f "$SOURCE" ] || [ ! -f "$SCHEMA" ]; then
@@ -65,10 +52,7 @@ import subprocess
 import sys
 import traceback
 
-source = Path(sys.argv[1]).resolve()
-schema_source = Path(sys.argv[2]).resolve()
-work = Path(sys.argv[3]).resolve()
-
+source, schema_source, work = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
 EXPECTED = {
     "ARCHITECT": ("gpt-5.6-sol", "max"),
     "TEST_AUTHOR": ("gpt-5.6-sol", "max"),
@@ -78,6 +62,12 @@ EXPECTED = {
     "EMPIRICAL": ("gpt-5.6-sol", "max"),
 }
 ROUTING_SOURCE = "AUTOPILOT_ROLE_POLICY"
+PROCESS_ATTRS = {
+    "subprocess": {"Popen", "run", "call", "check_call", "check_output", "getoutput", "getstatusoutput"},
+    "os": {"system", "popen", "posix_spawn", "posix_spawnp", "execv", "execve", "execvp", "execvpe", "spawnl", "spawnle", "spawnlp", "spawnlpe", "spawnv", "spawnve", "spawnvp", "spawnvpe"},
+    "asyncio": {"create_subprocess_exec", "create_subprocess_shell"},
+    "pty": {"spawn"},
+}
 checks: list[tuple[str, bool, str]] = []
 
 
@@ -86,1365 +76,224 @@ def check(key: str, ok: bool, detail: str) -> None:
 
 
 def sh(*argv: str, cwd: Path | None = None) -> str:
-    p = subprocess.run(
-        list(argv), cwd=str(cwd) if cwd else None, text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-    )
-    if p.returncode != 0:
+    p = subprocess.run(list(argv), cwd=str(cwd) if cwd else None, text=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if p.returncode:
         raise RuntimeError(f"command rc={p.returncode}: {' '.join(argv)}\n{p.stdout}")
     return p.stdout
 
 
-def call_name(node: ast.Call) -> str:
-    f = node.func
-    if isinstance(f, ast.Name):
-        return f.id
-    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):
-        return f"{f.value.id}.{f.attr}"
-    return ""
+def owner_map(tree: ast.Module) -> dict[ast.AST, str]:
+    owners: dict[ast.AST, str] = {}
+    def walk(node: ast.AST, owner: str = "<module>", cls: str = "") -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            owner = f"{cls}.{node.name}" if cls else node.name
+        elif isinstance(node, ast.Lambda):
+            owner = f"<lambda@{getattr(node, 'lineno', 0)}>"
+        next_cls = f"{cls}.{node.name}".strip(".") if isinstance(node, ast.ClassDef) else cls
+        owners[node] = owner
+        for child in ast.iter_child_nodes(node):
+            walk(child, owner, next_cls)
+    walk(tree)
+    return owners
 
 
-PROCESS_CALLS = {
-    "subprocess.Popen", "subprocess.run", "subprocess.call",
-    "subprocess.check_call", "subprocess.check_output",
-    "subprocess.getoutput", "subprocess.getstatusoutput",
-    "os.system", "os.popen", "os.posix_spawn", "os.posix_spawnp",
-    "asyncio.create_subprocess_exec", "asyncio.create_subprocess_shell",
-    "pty.spawn",
-}
-WORKFLOW_ROLE_REQUIREMENTS = {
-    "architect_resolution": {"ARCHITECT"},
-    "roadmap_contract_flow": {"TEST_AUTHOR", "GATE_REVIEWER"},
-    "empirical_gate_contract_flow": {"TEST_AUTHOR", "GATE_REVIEWER"},
-    "empirical_unattended_flow": {"EMPIRICAL"},
-    "test_author_flow": {"TEST_AUTHOR", "GATE_REVIEWER"},
-    "builder_flow": {"BUILDER", "REVIEWER"},
-}
-TASK_EXIT_HEAD = "<h031:repo-task-exit>"
-UNKNOWN_HEAD = "<h031:unknown>"
+def process_shape(text: str) -> dict[str, object]:
+    tree = ast.parse(text)
+    owners = owner_map(tree)
+    funcs = {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    sites: list[tuple[str, str, int, str]] = []
+    forbidden_aliases: list[tuple[str, int, str]] = []
+    calls: dict[str, set[str]] = {name: set() for name in funcs}
 
-
-def imported_names(tree: ast.Module) -> tuple[dict[str, str], dict[str, str]]:
-    modules: dict[str, str] = {}
-    symbols: dict[str, str] = {}
     for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                modules[alias.asname or alias.name] = alias.name
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            for alias in node.names:
-                symbols[alias.asname or alias.name] = f"{node.module}.{alias.name}"
-    return modules, symbols
-
-
-def qualified_expr(node: ast.expr, modules: dict[str, str], symbols: dict[str, str],
-                   local_aliases: dict[str, str] | None = None) -> str:
-    if isinstance(node, ast.Name):
-        if local_aliases and node.id in local_aliases:
-            return local_aliases[node.id]
-        return symbols.get(node.id, node.id)
-    parts: list[str] = []
-    cur: ast.expr = node
-    while isinstance(cur, ast.Attribute):
-        parts.append(cur.attr)
-        cur = cur.value
-    if isinstance(cur, ast.Name):
-        root = (local_aliases or {}).get(cur.id, modules.get(cur.id, cur.id))
-        return ".".join([root, *reversed(parts)])
-    return ""
-
-
-def qualified_call(node: ast.Call, modules: dict[str, str], symbols: dict[str, str],
-                   local_aliases: dict[str, str] | None = None) -> str:
-    return qualified_expr(node.func, modules, symbols, local_aliases)
-
-
-def is_process_call(name: str) -> bool:
-    return (
-        name in PROCESS_CALLS
-        or name.startswith("os.exec")
-        or name.startswith("os.spawn")
-    )
-
-
-def first_literal(node: ast.Call) -> str | None:
-    if not node.args:
-        return None
-    value = node.args[0]
-    if isinstance(value, (ast.List, ast.Tuple)) and value.elts:
-        first = value.elts[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            return first.value
-    if isinstance(value, ast.Constant) and isinstance(value.value, str):
-        return value.value
-    return None
-
-
-def collect_callables(tree: ast.Module) -> tuple[
-    dict[str, ast.FunctionDef | ast.AsyncFunctionDef], dict[str, str | None], set[str]
-]:
-    callables: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
-    owners: dict[str, str | None] = {}
-    classes: set[str] = set()
-
-    def visit_body(body: list[ast.stmt], prefix: str, owner_class: str | None,
-                   parent_kind: str) -> None:
-        for node in body:
-            if isinstance(node, ast.ClassDef):
-                class_id = f"{prefix}.{node.name}" if prefix else node.name
-                classes.add(class_id)
-                visit_body(node.body, class_id, class_id, "class")
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if parent_kind == "module":
-                    callable_id = node.name
-                elif parent_kind == "class":
-                    callable_id = f"{prefix}.{node.name}"
-                else:
-                    callable_id = f"{prefix}.<locals>.{node.name}"
-                callables[callable_id] = node
-                owners[callable_id] = owner_class
-                visit_body(node.body, callable_id, owner_class, "function")
-
-    visit_body(tree.body, "", None, "module")
-    return callables, owners, classes
-
-
-def callable_body_nodes(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.AST]:
-    found: list[ast.AST] = []
-    todo: list[ast.AST] = list(fn.body)
-    while todo:
-        node = todo.pop()
-        found.append(node)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
-            continue
-        todo.extend(ast.iter_child_nodes(node))
-    return found
-
-
-def analyze_launch_graph(subject_text: str) -> dict[str, object]:
-    subject_tree = ast.parse(subject_text)
-    subject_funcs, class_owners, classes = collect_callables(subject_tree)
-    modules, symbols = imported_names(subject_tree)
-    graph: dict[str, set[str]] = {name: set() for name in subject_funcs}
-    reverse: dict[str, set[str]] = {name: set() for name in subject_funcs}
-    process_sites: list[tuple[str, str, int, str | None, bool]] = []
-    run_sites: list[tuple[str, int, frozenset[str], tuple[str, ...] | None, str]] = []
-    call_records: list[tuple[str, ast.Call, set[str]]] = []
-    dynamic_resolution: list[tuple[str, str, int]] = []
-    literal_strings: dict[str, set[str]] = {}
-
-    by_simple: dict[str, set[str]] = {}
-    methods: dict[str, set[str]] = {}
-    classes_by_simple: dict[str, set[str]] = {}
-    for class_id in classes:
-        classes_by_simple.setdefault(class_id.rsplit(".", 1)[-1], set()).add(class_id)
-    for callable_id in subject_funcs:
-        simple = callable_id.rsplit(".", 1)[-1]
-        by_simple.setdefault(simple, set()).add(callable_id)
-        if class_owners[callable_id]:
-            methods.setdefault(simple, set()).add(callable_id)
-
-    module_strings: dict[str, str] = {}
-    module_aliases: dict[str, str] = {}
-    for node in subject_tree.body:
-        if isinstance(node, (ast.Assign, ast.AnnAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            value = node.value
-            if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                for target in targets:
-                    if isinstance(target, ast.Name):
-                        module_strings[target.id] = value.value
-    for _ in range(len(subject_tree.body) + 1):
-        changed = False
-        for node in subject_tree.body:
-            if not isinstance(node, (ast.Assign, ast.AnnAssign)) or node.value is None:
-                continue
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            resolved = qualified_expr(node.value, modules, symbols, module_aliases)
-            for target in targets:
-                if isinstance(target, ast.Name) and resolved and module_aliases.get(target.id) != resolved:
-                    module_aliases[target.id] = resolved
-                    changed = True
-        if not changed:
-            break
-
-    assignments: dict[str, dict[str, list[tuple[int, ast.expr]]]] = {}
-    augmented: dict[str, dict[str, list[int]]] = {}
-    for callable_id, fn in subject_funcs.items():
-        assignments[callable_id] = {}
-        augmented[callable_id] = {}
-        for node in callable_body_nodes(fn):
-            if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
-                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-                for target in targets:
-                    if isinstance(target, ast.Name):
-                        assignments[callable_id].setdefault(target.id, []).append(
-                            (node.lineno, node.value)
-                        )
-            elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
-                augmented[callable_id].setdefault(node.target.id, []).append(node.lineno)
-
-    # Ownership is contextual metadata only. Native process discovery below
-    # walks the whole module and therefore cannot lose a site merely because
-    # this callable model does not represent its surrounding syntax.
-    parents: dict[ast.AST, ast.AST] = {}
-    for parent in ast.walk(subject_tree):
-        for child in ast.iter_child_nodes(parent):
-            parents[child] = parent
-    callable_node_ids = {id(node): name for name, node in subject_funcs.items()}
-
-    def enclosing_callable(node: ast.AST) -> str | None:
-        cur = parents.get(node)
-        while cur is not None:
-            if id(cur) in callable_node_ids:
-                return callable_node_ids[id(cur)]
-            if isinstance(cur, ast.Lambda):
-                return f"<lambda@{cur.lineno}>"
-            cur = parents.get(cur)
-        return None
-
-    def abstract_heads(expr: ast.expr, caller: str, before: int,
-                       seen: frozenset[tuple[str, str, int]] = frozenset()) -> set[str]:
-        if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
-            return {expr.value}
-        if isinstance(expr, ast.Name):
-            marker = (caller, expr.id, before)
-            if marker in seen:
-                return {UNKNOWN_HEAD}
-            if any(line < before for line in augmented[caller].get(expr.id, [])):
-                return {UNKNOWN_HEAD}
-            prior = [
-                (line, value) for line, value in assignments[caller].get(expr.id, [])
-                if line < before
-            ]
-            if prior:
-                values: set[str] = set()
-                for line, value in prior:
-                    values.update(abstract_heads(value, caller, line, seen | {marker}))
-                return values or {UNKNOWN_HEAD}
-            if expr.id in module_strings:
-                return {module_strings[expr.id]}
-            return {UNKNOWN_HEAD}
-        if isinstance(expr, (ast.List, ast.Tuple)):
-            if not expr.elts:
-                return {UNKNOWN_HEAD}
-            return abstract_heads(expr.elts[0], caller, before, seen)
-        if isinstance(expr, ast.IfExp):
-            return (
-                abstract_heads(expr.body, caller, before, seen)
-                | abstract_heads(expr.orelse, caller, before, seen)
-            )
-        if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
-            left = abstract_heads(expr.left, caller, before, seen)
-            right = abstract_heads(expr.right, caller, before, seen)
-            if UNKNOWN_HEAD in left or UNKNOWN_HEAD in right:
-                return {UNKNOWN_HEAD}
-            return {a + b for a in left for b in right}
-        if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Div):
-            right = abstract_heads(expr.right, caller, before, seen)
-            if TASK_EXIT_HEAD in right:
-                return {TASK_EXIT_HEAD}
-            if UNKNOWN_HEAD in right:
-                return {UNKNOWN_HEAD}
-            # A statically named executable below the repository/worktree root
-            # is command evidence, unlike an unresolved ambient executable.
-            if isinstance(expr.left, ast.Name) and expr.left.id in {"repo", "wt", "root"}:
-                return {f"<h031:repo-path>/{item}" for item in right}
-            return {UNKNOWN_HEAD}
-        if isinstance(expr, ast.Call):
-            qname = qualified_call(expr, modules, symbols)
-            if qname == "str" and len(expr.args) == 1:
-                return abstract_heads(expr.args[0], caller, before, seen)
-            if (
-                isinstance(expr.func, ast.Attribute)
-                and expr.func.attr == "get"
-                and expr.args
-                and isinstance(expr.args[0], ast.Constant)
-                and expr.args[0].value == "exit_test"
-            ):
-                return {TASK_EXIT_HEAD}
-            if isinstance(expr.func, ast.Attribute) and expr.func.attr == "join" and expr.args:
-                separators = abstract_heads(expr.func.value, caller, before, seen)
-                values = expr.args[0]
-                if isinstance(values, (ast.List, ast.Tuple)):
-                    parts = [abstract_heads(item, caller, before, seen) for item in values.elts]
-                    if (
-                        UNKNOWN_HEAD not in separators
-                        and all(part and UNKNOWN_HEAD not in part for part in parts)
-                    ):
-                        rendered = {""}
-                        for part in parts:
-                            rendered = {
-                                prefix + (separator if prefix else "") + suffix
-                                for prefix in rendered for separator in separators for suffix in part
-                            }
-                        return rendered
-                return {UNKNOWN_HEAD}
-            return {UNKNOWN_HEAD}
-        return {UNKNOWN_HEAD}
-
-    def concrete_argv(expr: ast.expr, caller: str, before: int) -> tuple[str, ...] | None:
-        if not isinstance(expr, (ast.List, ast.Tuple)):
-            return None
-        argv: list[str] = []
-        for item in expr.elts:
-            values = abstract_heads(item, caller, before)
-            if len(values) != 1 or UNKNOWN_HEAD in values:
-                return None
-            argv.append(next(iter(values)))
-        return tuple(argv)
-
-    def context_free_heads(expr: ast.expr) -> set[str]:
-        if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
-            return {expr.value}
-        if isinstance(expr, (ast.List, ast.Tuple)) and expr.elts:
-            return context_free_heads(expr.elts[0])
-        if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
-            left, right = context_free_heads(expr.left), context_free_heads(expr.right)
-            if UNKNOWN_HEAD in left or UNKNOWN_HEAD in right:
-                return {UNKNOWN_HEAD}
-            return {a + b for a in left for b in right}
-        if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Attribute):
-            if expr.func.attr == "join" and expr.args:
-                separators = context_free_heads(expr.func.value)
-                values = expr.args[0]
-                if isinstance(values, (ast.List, ast.Tuple)):
-                    parts = [context_free_heads(item) for item in values.elts]
-                    if UNKNOWN_HEAD not in separators and all(UNKNOWN_HEAD not in part for part in parts):
-                        rendered = {""}
-                        for part in parts:
-                            rendered = {
-                                prefix + (separator if prefix else "") + suffix
-                                for prefix in rendered for separator in separators for suffix in part
-                            }
-                        return rendered
-        return {UNKNOWN_HEAD}
-
-    # Global native-process inventory. Lambda forwarding is evaluated at its
-    # call sites with the same bounded head evaluator used for ordinary generic
-    # wrappers. Unsupported/unresolved executable semantics remain explicit.
-    lambda_bindings: dict[str, ast.Lambda] = {}
-    stored_lambda_bindings: dict[tuple[str, object], ast.Lambda] = {}
-    for node in ast.walk(subject_tree):
         if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            if isinstance(node.value, ast.Lambda):
-                for target in targets:
-                    if isinstance(target, ast.Name):
-                        lambda_bindings[target.id] = node.value
-            elif isinstance(node.value, ast.Dict):
-                for target in targets:
-                    if not isinstance(target, ast.Name):
-                        continue
-                    for key, value in zip(node.value.keys, node.value.values):
-                        if (
-                            isinstance(key, ast.Constant)
-                            and isinstance(value, ast.Lambda)
-                        ):
-                            stored_lambda_bindings[(target.id, key.value)] = value
-
-    global_process_sites: list[tuple[str, str, int]] = []
-    global_process_nodes: list[tuple[str, ast.Call]] = []
-    lambda_forwarders: dict[str, tuple[str, str, int]] = {}
-    for node in ast.walk(subject_tree):
+            value = node.value
+            risky = False
+            rendered = ast.unparse(value)
+            if isinstance(value, ast.Name) and value.id in PROCESS_ATTRS:
+                risky = True
+            if (isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name)
+                    and value.value.id in PROCESS_ATTRS
+                    and value.attr in PROCESS_ATTRS[value.value.id]):
+                risky = True
+            if risky:
+                forbidden_aliases.append((owners[node], node.lineno, rendered))
         if not isinstance(node, ast.Call):
             continue
-        owner = enclosing_callable(node) or "<module>"
-        local_aliases: dict[str, str] = dict(module_aliases)
-        if owner in subject_funcs:
-            # Deterministic ordinary assignment aliases are semantic identity,
-            # independent of the chosen variable name. Iterate to cover chains.
-            for _ in range(len(assignments[owner]) + 1):
-                changed = False
-                for name, values in assignments[owner].items():
-                    prior = [(line, value) for line, value in values if line < node.lineno]
-                    if len(prior) != 1:
-                        continue
-                    resolved = qualified_expr(prior[0][1], modules, symbols, local_aliases)
-                    if resolved and local_aliases.get(name) != resolved:
-                        local_aliases[name] = resolved
-                        changed = True
-                if not changed:
-                    break
-        qualified = qualified_call(node, modules, symbols, local_aliases)
-        if not is_process_call(qualified):
+        owner = owners[node]
+        if isinstance(node.func, ast.Name) and owner in calls and node.func.id in funcs:
+            calls[owner].add(node.func.id)
+        if not (isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)):
             continue
-        global_process_sites.append((owner, qualified, node.lineno))
-        global_process_nodes.append((owner, node))
-        cur: ast.AST | None = node
-        enclosing_lambda: ast.Lambda | None = None
-        while cur is not None:
-            if isinstance(cur, ast.Lambda):
-                enclosing_lambda = cur
-                break
-            cur = parents.get(cur)
-        if enclosing_lambda and node.args:
-            params = {a.arg for a in (*enclosing_lambda.args.posonlyargs, *enclosing_lambda.args.args)}
-            first = node.args[0]
-            if isinstance(first, ast.Name) and first.id in params:
-                for binding, value in lambda_bindings.items():
-                    if value is enclosing_lambda:
-                        lambda_forwarders[binding] = (owner, qualified, node.lineno)
-                for (binding, key), value in stored_lambda_bindings.items():
-                    if value is enclosing_lambda:
-                        lambda_forwarders[f"{binding}[{key!r}]"] = (owner, qualified, node.lineno)
+        module, attr = node.func.value.id, node.func.attr
+        if module not in PROCESS_ATTRS or attr not in PROCESS_ATTRS[module]:
+            continue
+        literal = ""
+        if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+            literal = node.args[0].value
+        sites.append((owner, f"{module}.{attr}", node.lineno, literal))
 
-    global_semantic_violations: list[tuple[str, int, str]] = []
-    lambda_call_classifications: list[tuple[str, int, tuple[str, ...]]] = []
-    for node in ast.walk(subject_tree):
-        if not isinstance(node, ast.Call):
-            continue
-        binding = ""
-        if isinstance(node.func, ast.Name):
-            binding = node.func.id
-        elif (
-            isinstance(node.func, ast.Subscript)
-            and isinstance(node.func.value, ast.Name)
-            and isinstance(node.func.slice, ast.Constant)
-        ):
-            binding = f"{node.func.value.id}[{node.func.slice.value!r}]"
-        if binding not in lambda_forwarders:
-            continue
-        caller = enclosing_callable(node)
-        if caller is None or caller.startswith("<lambda@") or not node.args:
-            heads = {UNKNOWN_HEAD}
+    allowed = []
+    violations = []
+    counts = {"run": 0, "run_codex": 0, "clear": 0}
+    for site in sites:
+        owner, name, _line, literal = site
+        if owner == "run" and name == "subprocess.run":
+            counts["run"] += 1; allowed.append(site)
+        elif owner == "run_codex" and name == "subprocess.Popen":
+            counts["run_codex"] += 1; allowed.append(site)
+        elif owner == "watch" and name == "os.system" and literal == "clear":
+            counts["clear"] += 1; allowed.append(site)
         else:
-            heads = abstract_heads(node.args[0], caller, node.lineno)
-        lambda_call_classifications.append((binding, node.lineno, tuple(sorted(heads))))
-        if "codex" in heads or UNKNOWN_HEAD in heads:
-            global_semantic_violations.append((binding, node.lineno, repr(sorted(heads))))
-
-    # Any native site outside a modeled function must still receive a verdict.
-    # Forwarding lambdas are classified above at their invocation sites; other
-    # unowned expression contexts are classified directly and fail closed.
-    forwarded_lambda_lines = {line for _owner, _qualified, line in lambda_forwarders.values()}
-    for owner, node in global_process_nodes:
-        if owner != "<module>" and not owner.startswith("<lambda@"):
-            continue
-        if owner.startswith("<lambda@") and node.lineno in forwarded_lambda_lines:
-            continue
-        heads = context_free_heads(node.args[0]) if node.args else {UNKNOWN_HEAD}
-        if "codex" in heads or UNKNOWN_HEAD in heads:
-            global_semantic_violations.append((owner, node.lineno, repr(sorted(heads))))
-
-    def resolve_targets(call: ast.Call, caller: str,
-                        instances: dict[str, set[str]],
-                        callable_aliases: dict[str, str]) -> set[str]:
-        f = call.func
-        if isinstance(f, ast.Name):
-            if f.id in callable_aliases:
-                return {callable_aliases[f.id]}
-            if f.id in subject_funcs:
-                return {f.id}
-            hits = by_simple.get(f.id, set())
-            return set(hits) if len(hits) == 1 else set()
-        if not isinstance(f, ast.Attribute):
-            return set()
-        method = f.attr
-        base = f.value
-        owner = class_owners.get(caller)
-        if isinstance(base, ast.Name):
-            if base.id in {"self", "cls"} and owner:
-                hit = f"{owner}.{method}"
-                return {hit} if hit in subject_funcs else set()
-            class_hits = classes_by_simple.get(base.id, set())
-            resolved = {f"{class_id}.{method}" for class_id in class_hits}
-            resolved = {x for x in resolved if x in subject_funcs}
-            if resolved:
-                return resolved
-            instance_hits = instances.get(base.id, set())
-            resolved = {f"{class_id}.{method}" for class_id in instance_hits}
-            resolved = {x for x in resolved if x in subject_funcs}
-            if resolved:
-                return resolved
-        # `Factory().method()` and other attribute-mediated calls are connected
-        # conservatively when the method name identifies callable methods.
-        return set(methods.get(method, set()))
-
-    for fn_name, fn in subject_funcs.items():
-        nodes = callable_body_nodes(fn)
-        literal_strings[fn_name] = {
-            node.value for node in nodes
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        }
-        local_aliases: dict[str, str] = dict(module_aliases)
-        callable_aliases: dict[str, str] = {}
-        instances: dict[str, set[str]] = {}
-        for node in nodes:
-            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
-                continue
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            value = node.value
-            for target in targets:
-                if not isinstance(target, ast.Name) or value is None:
-                    continue
-                resolved = qualified_expr(value, modules, symbols, local_aliases)
-                if resolved:
-                    local_aliases[target.id] = resolved
-                if resolved in subject_funcs:
-                    callable_aliases[target.id] = resolved
-                if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
-                    hits = classes_by_simple.get(value.func.id, set())
-                    if hits:
-                        instances[target.id] = set(hits)
-        # Resolve callable aliases only after instance identities are known.
-        for node in nodes:
-            if not isinstance(node, (ast.Assign, ast.AnnAssign)) or node.value is None:
-                continue
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            alias_targets: set[str] = set()
-            value = node.value
-            if isinstance(value, ast.Name) and value.id in subject_funcs:
-                alias_targets = {value.id}
-            elif isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name):
-                owner = class_owners.get(fn_name)
-                base = value.value.id
-                if base in {"self", "cls"} and owner:
-                    candidate = f"{owner}.{value.attr}"
-                    if candidate in subject_funcs:
-                        alias_targets = {candidate}
-                elif base in instances:
-                    alias_targets = {
-                        f"{class_id}.{value.attr}" for class_id in instances[base]
-                        if f"{class_id}.{value.attr}" in subject_funcs
-                    }
-            for target in targets:
-                if isinstance(target, ast.Name) and len(alias_targets) == 1:
-                    callable_aliases[target.id] = next(iter(alias_targets))
-        for node in nodes:
-            if not isinstance(node, ast.Call):
-                continue
-            targets = resolve_targets(node, fn_name, instances, callable_aliases)
-            call_records.append((fn_name, node, targets))
-            for target in targets:
-                graph[fn_name].add(target)
-                reverse[target].add(fn_name)
-            qualified = qualified_call(node, modules, symbols, local_aliases)
-            if is_process_call(qualified):
-                params = {
-                    arg.arg for arg in (*fn.args.posonlyargs, *fn.args.args, *fn.args.kwonlyargs)
-                }
-                first = node.args[0] if node.args else None
-                forwarded = isinstance(first, ast.Name) and first.id in params
-                if forwarded:
-                    forwarded = not any(
-                        line < node.lineno
-                        for line, _value in assignments[fn_name].get(first.id, [])
-                    ) and not any(
-                        line < node.lineno for line in augmented[fn_name].get(first.id, [])
-                    ) and not any(
-                        isinstance(other, ast.Call)
-                        and other.lineno < node.lineno
-                        and isinstance(other.func, ast.Attribute)
-                        and isinstance(other.func.value, ast.Name)
-                        and other.func.value.id == first.id
-                        and other.func.attr in {"append", "extend", "insert", "remove", "pop", "clear"}
-                        for other in nodes
-                    )
-                process_sites.append(
-                    (fn_name, qualified, node.lineno, first_literal(node), forwarded)
-                )
-            if qualified in {
-                "__import__", "importlib.import_module", "eval", "exec", "compile", "getattr"
-            }:
-                dynamic_resolution.append((fn_name, qualified, node.lineno))
-
-    # Reconcile the global inventory against body-based callable analysis.
-    # Signature defaults/decorators and any future executable AST context that
-    # the call-graph model omits still receive command classification here.
-    body_inventory = {(site[1], site[2]) for site in process_sites}
-    for owner, node in global_process_nodes:
-        caller_aliases: dict[str, str] = dict(module_aliases)
-        if owner in subject_funcs:
-            for _ in range(len(assignments[owner]) + 1):
-                changed = False
-                for name, values in assignments[owner].items():
-                    prior = [(line, value) for line, value in values if line < node.lineno]
-                    if len(prior) != 1:
-                        continue
-                    resolved = qualified_expr(prior[0][1], modules, symbols, caller_aliases)
-                    if resolved and caller_aliases.get(name) != resolved:
-                        caller_aliases[name] = resolved
-                        changed = True
-                if not changed:
-                    break
-        qualified = qualified_call(node, modules, symbols, caller_aliases)
-        if (qualified, node.lineno) in body_inventory:
-            continue
-        if owner.startswith("<lambda@") and node.lineno in forwarded_lambda_lines:
-            continue
-        caller = owner if owner in subject_funcs else ""
-        heads = (
-            abstract_heads(node.args[0], caller, node.lineno)
-            if node.args and caller else context_free_heads(node.args[0]) if node.args else {UNKNOWN_HEAD}
-        )
-        if "codex" in heads or UNKNOWN_HEAD in heads:
-            finding = (owner, node.lineno, repr(sorted(heads)))
-            if finding not in global_semantic_violations:
-                global_semantic_violations.append(finding)
-
-    sites_by_callable: dict[str, list[tuple[str, str, int, str | None, bool]]] = {}
-    for site in process_sites:
-        sites_by_callable.setdefault(site[0], []).append(site)
-    generic_wrappers = {
-        callable_id for callable_id, sites in sites_by_callable.items()
-        if sites
-        and all(site[4] for site in sites)
-        and all(site[1].startswith("subprocess.") for site in sites)
-    }
-    for caller, node, targets in call_records:
-        if not (targets & generic_wrappers):
-            continue
-        heads = frozenset(
-            abstract_heads(node.args[0], caller, node.lineno)
-            if node.args else {UNKNOWN_HEAD}
-        )
-        argv = concrete_argv(node.args[0], caller, node.lineno) if node.args else None
-        run_sites.append((caller, node.lineno, heads, argv, ast.unparse(node)))
+            violations.append(site)
+    exact = counts == {"run": 1, "run_codex": 1, "clear": 1}
 
     def reachable(start: str) -> set[str]:
-        seen: set[str] = set()
-        todo = [start] if start in graph else []
+        seen, todo = set(), [start]
         while todo:
             cur = todo.pop()
-            if cur in seen:
-                continue
-            seen.add(cur)
-            todo.extend(graph.get(cur, ()))
+            if cur in seen: continue
+            seen.add(cur); todo.extend(calls.get(cur, ()))
         return seen
-
-    launcher_region = reachable("run_codex")
-    generic_run_violations: list[tuple[str, int, str | None, str]] = []
-    for site in run_sites:
-        caller, line, heads, argv, rendered = site
-        if caller in launcher_region:
-            continue
-        if "codex" in heads:
-            if argv in {("codex", "--help"), ("codex", "exec", "--help")}:
-                continue
-            generic_run_violations.append((caller, line, "codex", rendered))
-        elif UNKNOWN_HEAD in heads:
-            generic_run_violations.append((caller, line, None, rendered))
-
-    unexpected_process: list[tuple[str, str, int, str | None, bool]] = []
-    launcher_process_nodes: set[str] = set()
-    for site in process_sites:
-        fn_name, qualified, _line, literal, _forwarded = site
-        if fn_name in generic_wrappers:
-            continue
-        if qualified == "os.system" and literal == "clear":
-            continue
-        private_launcher_site = (
-            fn_name in launcher_region
-            and (fn_name == "run_codex" or reverse.get(fn_name, set()) <= launcher_region)
-        )
-        if private_launcher_site:
-            launcher_process_nodes.add(fn_name)
-        else:
-            node = next(
-                (candidate for owner, candidate in global_process_nodes
-                 if owner == fn_name and candidate.lineno == _line),
-                None,
-            )
-            heads = (
-                abstract_heads(node.args[0], fn_name, _line)
-                if node is not None and node.args else {UNKNOWN_HEAD}
-            )
-            # Generic native process execution is legitimate when its executable
-            # is deterministically non-Codex. Codex or unresolved heads remain
-            # security-relevant and fail closed.
-            if "codex" in heads or UNKNOWN_HEAD in heads:
-                unexpected_process.append(site)
-
-    agent_execution = bool(launcher_process_nodes) or any(
-        caller in launcher_region for caller, _line, _heads, _argv, _rendered in run_sites
-    )
-    boundary_ok = (
-        not unexpected_process
-        and not generic_run_violations
-        and not dynamic_resolution
-        and not global_semantic_violations
-        and agent_execution
-    )
-
-    role_contexts: dict[str, set[str]] = {}
-    paths: dict[str, bool] = {}
-    for root, required_roles in WORKFLOW_ROLE_REQUIREMENTS.items():
-        reach = reachable(root)
-        paths[root] = "run_codex" in reach
-        strings: set[str] = set()
-        for callable_id in reach:
-            strings.update(literal_strings.get(callable_id, set()))
-        role_contexts[root] = strings & set(EXPECTED)
-        paths[root] = paths[root] and required_roles <= role_contexts[root]
-
-    retry_path = "run_codex" in reachable("run_codex_resolving_architecture")
-    main_reach = reachable("main")
-    supervisor_reach = reachable("supervisor_resume")
-    supervisor_strings: set[str] = set()
-    for callable_id in supervisor_reach:
-        supervisor_strings.update(literal_strings.get(callable_id, set()))
-    resume_ok = (
-        {"supervisor_resume", "bootstrap"} <= main_reach
-        and "run_codex" in reachable("bootstrap")
-        and "run" in supervisor_reach
-        and "kickstart" in supervisor_strings
-        and not ({"run_codex", "run_codex_resolving_architecture"} & supervisor_reach)
-    )
-    paths_ok = all(paths.values()) and retry_path and resume_ok
-    workflow_roles = set().union(*role_contexts.values()) if role_contexts else set()
-
-    process_boundary_nodes = (
-        {"run_codex", "run_codex_resolving_architecture", "architect_resolution"}
-        | launcher_process_nodes
-        | {site[0] for site in unexpected_process}
-        | {site[0] for site in generic_run_violations}
-    )
-    observer_violations: dict[str, list[str]] = {}
-    for observer in ("status", "watch", "roadmap_status"):
-        hits = sorted(reachable(observer) & process_boundary_nodes)
-        if hits:
-            observer_violations[observer] = hits
-
-    return {
-        "tree": subject_tree,
-        "funcs": subject_funcs,
-        "graph": graph,
-        "reachable": reachable,
-        "boundary_ok": boundary_ok,
-        "paths_ok": paths_ok,
-        "observer_clean": not observer_violations,
-        "process_sites": process_sites,
-        "global_process_sites": global_process_sites,
-        "global_semantic_violations": global_semantic_violations,
-        "lambda_call_classifications": lambda_call_classifications,
-        "unexpected_process": unexpected_process,
-        "generic_run_violations": generic_run_violations,
-        "dynamic_resolution": dynamic_resolution,
-        "generic_wrappers": generic_wrappers,
-        "launcher_process_nodes": launcher_process_nodes,
-        "workflow_roles": workflow_roles,
-        "role_contexts": role_contexts,
-        "path_results": paths,
-        "retry_path": retry_path,
-        "resume_ok": resume_ok,
-        "observer_violations": observer_violations,
-    }
+    observer_hits = {name: sorted(reachable(name) & {"run_codex"})
+                     for name in ("status", "watch", "roadmap_status")}
+    observer_hits = {k: v for k, v in observer_hits.items() if v}
+    return {"tree": tree, "funcs": funcs, "sites": sites, "aliases": forbidden_aliases,
+            "violations": violations, "exact": exact,
+            "boundary_ok": exact and not violations and not forbidden_aliases,
+            "observer_ok": not observer_hits, "observer_hits": observer_hits}
 
 
 def resolved_route(argv: list[str]) -> tuple[str, str]:
-    # Deliberately begin with the conflicting user config. Explicit launch
-    # arguments must replace both values.
-    model = "user-config-other-model"
-    effort = "ultra"
-    i = 0
+    model, effort, i = "user-config-other-model", "ultra", 0
     while i < len(argv):
         arg = argv[i]
-        if arg in {"-m", "--model"} and i + 1 < len(argv):
-            model = argv[i + 1]
-            i += 2
-            continue
-        if arg.startswith("--model="):
-            model = arg.split("=", 1)[1]
+        if arg in {"-m", "--model"} and i + 1 < len(argv): model, i = argv[i + 1], i + 2; continue
+        if arg.startswith("--model="): model = arg.split("=", 1)[1]
         value = None
-        if arg in {"-c", "--config"} and i + 1 < len(argv):
-            value = argv[i + 1]
-            i += 1
-        elif arg.startswith("--config="):
-            value = arg.split("=", 1)[1]
-        if value and "=" in value:
-            key, raw = value.split("=", 1)
-            if key.strip() == "model_reasoning_effort":
-                effort = raw.strip().strip("\"'")
+        if arg in {"-c", "--config"} and i + 1 < len(argv): value, i = argv[i + 1], i + 1
+        elif arg.startswith("--config="): value = arg.split("=", 1)[1]
+        if value and "=" in value and value.split("=", 1)[0].strip() == "model_reasoning_effort":
+            effort = value.split("=", 1)[1].strip().strip("\"'")
         i += 1
     return model, effort
 
 
 try:
     text = source.read_text(encoding="utf-8")
-    analysis = analyze_launch_graph(text)
-    tree = analysis["tree"]
-    funcs = analysis["funcs"]
-    required_api = {"run_codex", "status", "watch", "roadmap_status", "journal_root"}
-    check("K0", required_api <= funcs.keys(), f"runtime API present={sorted(required_api & funcs.keys())}")
-    check(
-        "K1", bool(analysis["boundary_ok"]),
-        "process_sites={} launcher_nodes={} unexpected={} generic_run={} dynamic={}".format(
-            analysis["process_sites"], analysis["launcher_process_nodes"],
-            analysis["unexpected_process"], analysis["generic_run_violations"],
-            analysis["dynamic_resolution"],
-        ),
-    )
-    check(
-        "K1P", bool(analysis["paths_ok"]),
-        "roles={} paths={} retry={} resume={}".format(
-            sorted(analysis["workflow_roles"]), analysis["path_results"],
-            analysis["retry_path"], analysis["resume_ok"],
-        ),
-    )
+    shape = process_shape(text)
+    required = {"run", "run_codex", "status", "watch", "roadmap_status", "journal_root"}
+    check("K0", required <= shape["funcs"], f"required_api={sorted(required & shape['funcs'])}")
+    check("K1", bool(shape["boundary_ok"]),
+          f"sites={shape['sites']} aliases={shape['aliases']} violations={shape['violations']} exact={shape['exact']}")
+    check("K1O", bool(shape["observer_ok"]), f"observer_hits={shape['observer_hits']}")
 
-    repo = work / "repo"
-    repo.mkdir()
+    repo = work / "repo"; repo.mkdir()
     sh("git", "init", "-q", cwd=repo)
     sh("git", "config", "user.name", "h031-gate", cwd=repo)
     sh("git", "config", "user.email", "h031-gate@nortropic.invalid", cwd=repo)
-    schema = repo / "docs/loop/codex-autopilot-report.schema.json"
-    schema.parent.mkdir(parents=True)
+    schema = repo / "docs/loop/codex-autopilot-report.schema.json"; schema.parent.mkdir(parents=True)
     shutil.copyfile(schema_source, schema)
     (repo / "anchor.txt").write_text("h031\n", encoding="utf-8")
-    sh("git", "add", ".", cwd=repo)
-    sh("git", "commit", "-qm", "fixture", cwd=repo)
+    sh("git", "add", ".", cwd=repo); sh("git", "commit", "-qm", "fixture", cwd=repo)
 
-    fakebin = work / "fakebin"
-    fakebin.mkdir()
-    capture = work / "codex-argv.jsonl"
-    fake = fakebin / "codex"
-    fake.write_text(
-        """#!/usr/bin/env python3
+    fakebin = work / "fakebin"; fakebin.mkdir()
+    capture = work / "codex-argv.jsonl"; fake = fakebin / "codex"
+    fake.write_text("""#!/usr/bin/env python3
 import json, os, pathlib, re, sys
-argv = sys.argv[1:]
-with pathlib.Path(os.environ['H031_CAPTURE']).open('a', encoding='utf-8') as f:
-    f.write(json.dumps(argv) + '\\n')
-out = pathlib.Path(argv[argv.index('-o') + 1])
-prompt = argv[-1]
-m = re.search(r'H031_GATE_ROLE=([A-Z_]+)', prompt)
-role = m.group(1) if m else 'OVERIFIERAT'
-out.write_text(json.dumps({
-    'role': role, 'outcome': 'READY', 'owner_decision_required': False,
-    'blocking_findings': []
-}), encoding='utf-8')
-print(json.dumps({'type': 'thread.started', 'thread_id': 'h031-' + role.lower()}))
-""",
-        encoding="utf-8",
-    )
+argv=sys.argv[1:]
+with pathlib.Path(os.environ['H031_CAPTURE']).open('a') as f: f.write(json.dumps(argv)+'\\n')
+out=pathlib.Path(argv[argv.index('-o')+1]); m=re.search(r'H031_GATE_ROLE=([A-Z_]+)', argv[-1]); role=m.group(1) if m else 'OVERIFIERAT'
+out.write_text(json.dumps({'role':role,'outcome':'READY','owner_decision_required':False,'blocking_findings':[]}))
+print(json.dumps({'type':'thread.started','thread_id':'h031-'+role.lower()}))
+""", encoding="utf-8")
     fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-
-    codex_home = work / "codex-home"
-    codex_home.mkdir()
-    (codex_home / "config.toml").write_text(
-        'model = "user-config-other-model"\nmodel_reasoning_effort = "ultra"\n',
-        encoding="utf-8",
-    )
-    os.environ["PATH"] = str(fakebin) + os.pathsep + os.environ.get("PATH", "")
-    os.environ["CODEX_HOME"] = str(codex_home)
-    os.environ["H031_CAPTURE"] = str(capture)
-
-    spec = importlib.util.spec_from_file_location("h031_autopilot_subject", source)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("cannot load autopilot source")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    codex_home = work / "codex-home"; codex_home.mkdir()
+    (codex_home / "config.toml").write_text('model="other"\nmodel_reasoning_effort="ultra"\n')
+    os.environ.update(PATH=str(fakebin)+os.pathsep+os.environ.get("PATH", ""), CODEX_HOME=str(codex_home), H031_CAPTURE=str(capture))
+    spec = importlib.util.spec_from_file_location("h031_subject", source)
+    if spec is None or spec.loader is None: raise RuntimeError("cannot import subject")
+    module = importlib.util.module_from_spec(spec); sys.modules[spec.name] = module; spec.loader.exec_module(module)
 
     journal_file = module.journal_root(repo) / "events.jsonl"
-    old = {
-        "ts": "2026-01-01T00:00:00+00:00", "event": "AGENT_START",
-        "role": "BUILDER", "model": "legacy-model",
-        "reasoning_effort": "ultra", "model_routing_source": "USER_CONFIG",
-    }
-    journal_file.write_text(json.dumps(old, sort_keys=True) + "\n", encoding="utf-8")
-
-    runtime_errors: list[str] = []
+    old = {"ts":"2026-01-01T00:00:00+00:00","event":"AGENT_START","role":"BUILDER","model":"legacy","reasoning_effort":"ultra","model_routing_source":"USER_CONFIG"}
+    journal_file.write_text(json.dumps(old, sort_keys=True)+"\n")
+    errors=[]
     for role in EXPECTED:
-        try:
-            module.run_codex(repo, repo, role, f"H031_GATE_ROLE={role}")
-        except Exception as exc:
-            runtime_errors.append(f"{role}:{type(exc).__name__}:{exc}")
-
-    captures = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()] if capture.exists() else []
-    routes = [resolved_route(argv) for argv in captures]
-    expected_routes = [EXPECTED[role] for role in EXPECTED]
-    check(
-        "K2", not runtime_errors and routes == expected_routes,
-        f"routes={routes} expected={expected_routes} errors={runtime_errors}",
-    )
-
-    records = [json.loads(line) for line in journal_file.read_text(encoding="utf-8").splitlines() if line.strip()]
-    starts = [r for r in records[1:] if r.get("event") == "AGENT_START"]
-    journal_ok = len(starts) == len(EXPECTED)
-    if journal_ok:
-        for rec, role in zip(starts, EXPECTED):
-            model, effort = EXPECTED[role]
-            journal_ok = journal_ok and all((
-                rec.get("role") == role,
-                rec.get("model") == model,
-                rec.get("reasoning_effort") == effort,
-                rec.get("model_routing_source") == ROUTING_SOURCE,
-            ))
+        try: module.run_codex(repo, repo, role, f"H031_GATE_ROLE={role}")
+        except Exception as exc: errors.append(f"{role}:{type(exc).__name__}:{exc}")
+    captures=[json.loads(x) for x in capture.read_text().splitlines()] if capture.exists() else []
+    routes=[resolved_route(x) for x in captures]
+    check("K2", not errors and routes == list(EXPECTED.values()), f"routes={routes} errors={errors}")
+    records=[json.loads(x) for x in journal_file.read_text().splitlines() if x.strip()]
+    starts=[r for r in records[1:] if r.get("event")=="AGENT_START"]
+    journal_ok=len(starts)==len(EXPECTED) and all(
+        r.get("role")==role and (r.get("model"),r.get("reasoning_effort"))==EXPECTED[role]
+        and r.get("model_routing_source")==ROUTING_SOURCE for r,role in zip(starts,EXPECTED))
     check("K3", journal_ok, f"AGENT_START={starts}")
+    before=(len(captures), len(list((module.journal_root(repo)/"runs").glob("*"))), len(records))
+    unknown_error="NO_ERROR"
+    try: module.run_codex(repo, repo, "UNKNOWN_ROLE", "H031_GATE_ROLE=UNKNOWN_ROLE")
+    except Exception as exc: unknown_error=f"{type(exc).__name__}:{exc}"
+    after_caps=[json.loads(x) for x in capture.read_text().splitlines()] if capture.exists() else []
+    after_records=[json.loads(x) for x in journal_file.read_text().splitlines() if x.strip()]
+    after=(len(after_caps), len(list((module.journal_root(repo)/"runs").glob("*"))), len(after_records))
+    check("K4", unknown_error!="NO_ERROR" and before==after, f"error={unknown_error} effects={before}->{after}")
+    check("K5", after_records[0]==old and all(r.get("reasoning_effort")!="ultra" for r in after_records[1:]),
+          f"old_preserved={after_records[0]==old}")
 
-    before_capture = len(captures)
-    before_runs = sorted((module.journal_root(repo) / "runs").glob("*"))
-    before_lines = len(records)
-    unknown_error = "NO_ERROR"
-    try:
-        module.run_codex(repo, repo, "UNKNOWN_ROLE", "H031_GATE_ROLE=UNKNOWN_ROLE")
-    except Exception as exc:
-        unknown_error = f"{type(exc).__name__}:{exc}"
-    after_captures = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()] if capture.exists() else []
-    after_runs = sorted((module.journal_root(repo) / "runs").glob("*"))
-    after_records = [json.loads(line) for line in journal_file.read_text(encoding="utf-8").splitlines() if line.strip()]
-    unknown_ok = (
-        unknown_error != "NO_ERROR"
-        and len(after_captures) == before_capture
-        and len(after_runs) == len(before_runs)
-        and len(after_records) == before_lines
-    )
-    check(
-        "K4", unknown_ok,
-        f"error={unknown_error} spawns={before_capture}->{len(after_captures)} runs={len(before_runs)}->{len(after_runs)} journal={before_lines}->{len(after_records)}",
-    )
+    # The generic boundary is judged by effect: Codex basename must fail before
+    # subprocess.run; ordinary non-Codex and unknown-at-source commands remain usable.
+    real_run = module.subprocess.run; spawned=[]
+    class ProcessResult:
+        returncode = 0
+        stdout = "ok"
+    def process_stub(argv, **kwargs): spawned.append(list(argv)); return ProcessResult()
+    module.subprocess.run = process_stub
+    codex_results=[]
+    for executable in ("codex", "/usr/local/bin/codex"):
+        try: module.run([executable, "exec"]); codex_results.append("ADMITTED")
+        except Exception: codex_results.append("REJECTED")
+    codex_spawned=list(spawned); spawned.clear()
+    gh_error=""
+    try: module.run(["gh", "--version"])
+    except Exception as exc: gh_error=f"{type(exc).__name__}:{exc}"
+    module.subprocess.run = real_run
+    check("K6", codex_results==["REJECTED","REJECTED"] and not codex_spawned,
+          f"codex={codex_results} spawned={codex_spawned}")
+    check("K7", not gh_error and spawned==[["gh","--version"]], f"error={gh_error} spawned={spawned}")
 
-    old_preserved = after_records and after_records[0] == old
-    no_new_ultra = all(
-        r.get("reasoning_effort") != "ultra"
-        for r in after_records[1:]
-        if r.get("event") == "AGENT_START"
-    ) and all(effort != "ultra" for _, effort in routes)
-    check("K5", old_preserved and no_new_ultra, f"old_preserved={old_preserved} no_new_ultra={no_new_ultra}")
-
-    check(
-        "K6", bool(analysis["observer_clean"]),
-        f"transitive_agent_reachability={analysis['observer_violations']}",
-    )
-
-    # Positive parser controls admit both supported CLI spellings.
-    short_form = resolved_route(["-m", "gpt-5.6-sol", "-c", 'model_reasoning_effort="high"'])
-    long_form = resolved_route(["--model=gpt-5.6-sol", "--config=model_reasoning_effort='max'"])
-    check(
-        "K7", short_form == EXPECTED["BUILDER"] and long_form == EXPECTED["REVIEWER"],
-        f"short={short_form} long={long_form}",
-    )
-
-    # D: a perfect journal claim cannot satisfy the argv oracle when launch
-    # configuration is absent.
-    journal_only_claim = {
-        "role": "ARCHITECT", "model": "gpt-5.6-sol", "reasoning_effort": "max",
-        "model_routing_source": ROUTING_SOURCE,
+    insertion='def status(repo: Path, wt_root: Path) -> None:\n'
+    if insertion not in text: raise RuntimeError("mutant insertion anchor missing")
+    def verdict(extra: str) -> bool:
+        return not bool(process_shape(text.replace(insertion, extra+"\n"+insertion, 1))["boundary_ok"])
+    controls = {
+        "K8": 'def h031_direct():\n    return subprocess.run(["codex", "exec"])',
+        "K9": 'def h031_alias():\n    p = subprocess\n    return p.run(["codex", "exec"])',
+        "K10": 'def h031_lambda():\n    f = lambda a: subprocess.run(a)\n    return f(["codex", "exec"])',
+        "K11": 'def h031_stored():\n    d = {"x": lambda a: subprocess.run(a)}\n    return d["x"](["codex", "exec"])',
+        "K12": 'def h031_key():\n    key = "x"\n    d = {"x": lambda a: subprocess.run(a)}\n    return d[key](["codex", "exec"])',
+        "K13": 'def h031_chain():\n    p = subprocess\n    d = {"x": lambda a: p.run(a)}\n    key = "x"\n    return d[key](["co"+"dex", "exec"])',
+        "K14": 'def h031_unknown(a):\n    return subprocess.run(a)',
     }
-    journal_only_mutant = resolved_route([])
-    journal_only_rejected = (
-        journal_only_claim["model"] == EXPECTED["ARCHITECT"][0]
-        and journal_only_claim["reasoning_effort"] == EXPECTED["ARCHITECT"][1]
-        and journal_only_mutant != EXPECTED["ARCHITECT"]
-    )
-    check(
-        "K7D", journal_only_rejected,
-        f"journal_claim={journal_only_claim} executed_route={journal_only_mutant}",
-    )
+    for key, mutant in controls.items(): check(key, verdict(mutant), "REJECTED_BY_STRUCTURAL_BOUNDARY")
 
-    # E: BUILDER is intentionally distinct from the all-max roles.
-    all_max_builder_mutant = resolved_route(["--model", "gpt-5.6-sol", "-c", "model_reasoning_effort=max"])
-    check(
-        "K7E", all_max_builder_mutant != EXPECTED["BUILDER"],
-        f"all_max_builder={all_max_builder_mutant} expected={EXPECTED['BUILDER']}",
-    )
-
-    # A: the SAME K1 oracle must inspect methods, not merely top-level defs.
-    bypass_class = '''
-class H031ClassBypass:
-    @staticmethod
-    def launch(wt, prompt):
-        executable = "".join(("co", "dex"))
-        command = [executable, "exec", prompt]
-        return subprocess.call(command, cwd=str(wt))
-'''
-    bypass_needle = '        rem = run_codex_resolving_architecture(repo, wt, "BUILDER"'
-    if bypass_needle not in text:
-        raise RuntimeError("K8 mutant insertion point missing")
-    bypass_mutant = text.replace(
-        bypass_needle,
-        '        H031ClassBypass.launch(wt, "retry")\n' + bypass_needle,
-        1,
-    ) + bypass_class
-    bypass_analysis = analyze_launch_graph(bypass_mutant)
-    bypass_rejected = not bool(bypass_analysis["boundary_ok"])
-    check(
-        "K8", bypass_rejected,
-        f"A_class_method_launch_rejected={bypass_rejected} unexpected={bypass_analysis['unexpected_process']}",
-    )
-
-    # B: observer -> helper -> class method -> dynamic process launch.
-    observer_helpers = '''
-class H031ObserverBypass:
-    def first_hop(self, repo):
-        process_boundary = self.launch
-        return process_boundary(repo)
-
-    def launch(self, repo):
-        executable = "".join(("co", "dex"))
-        command = [executable, "exec", "observer must not launch an agent"]
-        return subprocess.call(command, cwd=str(repo))
-
-def h031_observer_hop(repo):
-    bypass = H031ObserverBypass()
-    return bypass.first_hop(repo)
-'''
-    observer_needle = 'def status(repo: Path, wt_root: Path) -> None:\n'
-    if observer_needle not in text:
-        raise RuntimeError("K9 mutant insertion point missing")
-    observer_mutant = text.replace(
-        observer_needle,
-        observer_needle + '    h031_observer_hop(repo)\n',
-        1,
-    ) + observer_helpers
-    observer_analysis = analyze_launch_graph(observer_mutant)
-    observer_rejected = not bool(observer_analysis["observer_clean"])
-    check(
-        "K9", observer_rejected,
-        f"B_observer_class_method_rejected={observer_rejected} violations={observer_analysis['observer_violations']}",
-    )
-
-    # C: consolidate every repeated role-launch call through one helper. The
-    # required role/context effects remain, but call counts and immediate
-    # topology change. K1/K1P must admit this legitimate shape.
-    class ConsolidateRoleLaunches(ast.NodeTransformer):
-        def visit_Call(self, node: ast.Call) -> ast.AST:
-            node = self.generic_visit(node)
-            if isinstance(node.func, ast.Name) and node.func.id == "run_codex_resolving_architecture":
-                node.func = ast.Name(id="h031_consolidated_role_launch", ctx=ast.Load())
-            return node
-
-    refactor_tree = ConsolidateRoleLaunches().visit(ast.parse(text))
-    helper = ast.parse('''
-def h031_consolidated_role_launch(*args, **kwargs):
-    return run_codex_resolving_architecture(*args, **kwargs)
-''').body[0]
-    # Insert before the module's executable __main__ tail; only static judge
-    # semantics are exercised, never the mutant's runtime.
-    refactor_tree.body.insert(-1, helper)
-    ast.fix_missing_locations(refactor_tree)
-    refactor_analysis = analyze_launch_graph(ast.unparse(refactor_tree))
-    refactor_admitted = all((
-        bool(refactor_analysis["boundary_ok"]),
-        bool(refactor_analysis["paths_ok"]),
-        bool(refactor_analysis["observer_clean"]),
-    ))
-    check(
-        "K10", refactor_admitted,
-        "C_topology_refactor_admitted={} paths={} unexpected={}".format(
-            refactor_admitted, refactor_analysis["path_results"],
-            refactor_analysis["unexpected_process"],
-        ),
-    )
-
-    # GR-04 negative control: caller identity must never make unresolved or
-    # dynamically assembled Codex argv benign at the generic process wrapper.
-    publish_needle = '            title: str, changed: list[str]) -> str:\n'
-    if publish_needle not in text:
-        raise RuntimeError("K11 mutant insertion point missing")
-    publish_codex_mutant = text.replace(
-        publish_needle,
-        publish_needle
-        + '    executable = "co" + "dex"\n'
-        + '    h031_agent_argv = [executable, "exec", "bypass policy"]\n'
-        + '    h031_process_helper = run\n'
-        + '    h031_process_helper(h031_agent_argv, cwd=wt)\n',
-        1,
-    )
-    publish_codex_analysis = analyze_launch_graph(publish_codex_mutant)
-    publish_codex_rejected = not bool(publish_codex_analysis["boundary_ok"])
-    check(
-        "K11", publish_codex_rejected,
-        "dynamic_codex_via_generic_run_in_publish={} generic_run={}".format(
-            "REJECTED" if publish_codex_rejected else "ADMITTED",
-            publish_codex_analysis["generic_run_violations"],
-        ),
-    )
-
-    # GR-04 positive control: generic run itself is not forbidden. A command
-    # whose assembled executable is mechanically non-Codex remains admissible.
-    publish_non_codex_mutant = text.replace(
-        publish_needle,
-        publish_needle
-        + '    executable = "".join(("g", "h"))\n'
-        + '    h031_non_agent_argv = [executable, "--version"]\n'
-        + '    run(h031_non_agent_argv, cwd=wt, check=False)\n',
-        1,
-    )
-    publish_non_codex_analysis = analyze_launch_graph(publish_non_codex_mutant)
-    publish_non_codex_admitted = all((
-        bool(publish_non_codex_analysis["boundary_ok"]),
-        bool(publish_non_codex_analysis["paths_ok"]),
-        bool(publish_non_codex_analysis["observer_clean"]),
-    ))
-    check(
-        "K12", publish_non_codex_admitted,
-        "legitimate_non_codex_generic_run={} generic_run={}".format(
-            "ADMITTED" if publish_non_codex_admitted else "REJECTED",
-            publish_non_codex_analysis["generic_run_violations"],
-        ),
-    )
-
-    # Unknown command provenance on a material generic process boundary is
-    # fail-closed; it is never made benign by the surrounding callable.
-    publish_unknown_mutant = text.replace(
-        publish_needle,
-        publish_needle
-        + '    executable = os.environ.get("H031_AMBIENT_TOOL")\n'
-        + '    h031_unknown_argv = [executable, "exec", "unresolved"]\n'
-        + '    run(h031_unknown_argv, cwd=wt)\n',
-        1,
-    )
-    publish_unknown_analysis = analyze_launch_graph(publish_unknown_mutant)
-    publish_unknown_rejected = not bool(publish_unknown_analysis["boundary_ok"])
-    check(
-        "K13", publish_unknown_rejected,
-        "unknown_generic_run_semantics={} generic_run={}".format(
-            "REJECTED" if publish_unknown_rejected else "ADMITTED",
-            publish_unknown_analysis["generic_run_violations"],
-        ),
-    )
-
-    # A forwarding wrapper is discovered from effect, not blessed by name.
-    # Adding any non-forwarding process site removes wrapper status and must
-    # expose the process boundary to K1.
-    wrapper_needle = '    p = subprocess.run(\n'
-    if wrapper_needle not in text:
-        raise RuntimeError("K14 mutant insertion point missing")
-    wrapper_bypass_mutant = text.replace(
-        wrapper_needle,
-        '    h031_hidden_tool = "co" + "dex"\n'
-        + '    subprocess.call([h031_hidden_tool, "exec", "hidden wrapper spawn"])\n'
-        + wrapper_needle,
-        1,
-    )
-    wrapper_bypass_analysis = analyze_launch_graph(wrapper_bypass_mutant)
-    wrapper_bypass_rejected = not bool(wrapper_bypass_analysis["boundary_ok"])
-    check(
-        "K14", wrapper_bypass_rejected,
-        "hidden_process_inside_generic_wrapper={} unexpected={}".format(
-            "REJECTED" if wrapper_bypass_rejected else "ADMITTED",
-            wrapper_bypass_analysis["unexpected_process"],
-        ),
-    )
-
-    # GR-05: whole-module discovery must see a process boundary inside a
-    # lambda, then classify its forwarded argv symmetrically at call sites.
-    lambda_needle = '            title: str, changed: list[str]) -> str:\n'
-    lambda_codex_mutant = text.replace(
-        lambda_needle,
-        lambda_needle
-        + '    h031_process = lambda command: subprocess.run(command, cwd=str(wt), check=False)\n'
-        + '    h031_executable = "".join(("co", "dex"))\n'
-        + '    h031_process([h031_executable, "exec", "lambda policy bypass"])\n',
-        1,
-    )
-    lambda_codex_analysis = analyze_launch_graph(lambda_codex_mutant)
-    lambda_codex_rejected = not bool(lambda_codex_analysis["boundary_ok"])
-    check(
-        "K15", lambda_codex_rejected,
-        "lambda_dynamic_codex_process={} inventory={} semantics={}".format(
-            "REJECTED" if lambda_codex_rejected else "ADMITTED",
-            lambda_codex_analysis["global_process_sites"],
-            lambda_codex_analysis["lambda_call_classifications"],
-        ),
-    )
-
-    lambda_non_codex_mutant = text.replace(
-        lambda_needle,
-        lambda_needle
-        + '    h031_process = lambda command: subprocess.run(command, cwd=str(wt), check=False)\n'
-        + '    h031_executable = "".join(("g", "h"))\n'
-        + '    h031_process([h031_executable, "--version"])\n',
-        1,
-    )
-    lambda_non_codex_analysis = analyze_launch_graph(lambda_non_codex_mutant)
-    lambda_non_codex_admitted = all((
-        bool(lambda_non_codex_analysis["boundary_ok"]),
-        bool(lambda_non_codex_analysis["paths_ok"]),
-        bool(lambda_non_codex_analysis["observer_clean"]),
-    ))
-    check(
-        "K16", lambda_non_codex_admitted,
-        "lambda_dynamic_non_codex_process={} semantics={}".format(
-            "ADMITTED" if lambda_non_codex_admitted else "REJECTED",
-            lambda_non_codex_analysis["lambda_call_classifications"],
-        ),
-    )
-
-    # A module-level comprehension is neither FunctionDef, class method nor
-    # lambda. Its native process site must nevertheless enter the inventory.
-    comprehension_mutant = text + '''
-H031_PROCESS_PROBE = [
-    subprocess.call(["".join(("co", "dex")), "exec", "expression bypass"])
-    for _h031_item in (0,)
-]
-'''
-    comprehension_analysis = analyze_launch_graph(comprehension_mutant)
-    comprehension_rejected = not bool(comprehension_analysis["boundary_ok"])
-    check(
-        "K17", comprehension_rejected,
-        "additional_ast_shape_codex_process={} inventory={} semantics={}".format(
-            "REJECTED" if comprehension_rejected else "ADMITTED",
-            comprehension_analysis["global_process_sites"],
-            comprehension_analysis["global_semantic_violations"],
-        ),
-    )
-
-    lambda_unknown_mutant = text.replace(
-        lambda_needle,
-        lambda_needle
-        + '    h031_process = lambda command: subprocess.run(command, cwd=str(wt), check=False)\n'
-        + '    h031_executable = os.environ.get("H031_UNKNOWN_EXECUTABLE")\n'
-        + '    h031_process([h031_executable, "exec", "unresolved lambda command"])\n',
-        1,
-    )
-    lambda_unknown_analysis = analyze_launch_graph(lambda_unknown_mutant)
-    lambda_unknown_rejected = not bool(lambda_unknown_analysis["boundary_ok"])
-    check(
-        "K18", lambda_unknown_rejected,
-        "unresolved_dynamic_executable={} semantics={}".format(
-            "REJECTED" if lambda_unknown_rejected else "ADMITTED",
-            lambda_unknown_analysis["lambda_call_classifications"],
-        ),
-    )
-
-    # Function defaults execute outside the function body and were a plausible
-    # residual hole in body-driven discovery. The global inventory must own it.
-    default_expression_mutant = text + '''
-def h031_default_expression_probe(
-    result=subprocess.call(["".join(("co", "dex")), "exec", "default bypass"])
-):
-    return result
-'''
-    default_expression_analysis = analyze_launch_graph(default_expression_mutant)
-    default_expression_rejected = not bool(default_expression_analysis["boundary_ok"])
-    check(
-        "K19", default_expression_rejected,
-        "function_default_expression_codex_process={} inventory={} semantics={}".format(
-            "REJECTED" if default_expression_rejected else "ADMITTED",
-            default_expression_analysis["global_process_sites"],
-            default_expression_analysis["global_semantic_violations"],
-        ),
-    )
-
-    # GR-06: ordinary assignment aliases preserve module identity. Variable
-    # names intentionally differ between the violating and legitimate controls.
-    assignment_alias_codex_mutant = text.replace(
-        publish_needle,
-        publish_needle
-        + '    process_facade = subprocess\n'
-        + '    executable = "".join(("co", "dex"))\n'
-        + '    process_facade.run([executable, "exec", "alias bypass"], check=False)\n',
-        1,
-    )
-    assignment_alias_codex_analysis = analyze_launch_graph(assignment_alias_codex_mutant)
-    assignment_alias_codex_rejected = not bool(assignment_alias_codex_analysis["boundary_ok"])
-    check(
-        "K20", assignment_alias_codex_rejected,
-        "assignment_alias_codex_process={}".format(
-            "REJECTED" if assignment_alias_codex_rejected else "ADMITTED"
-        ),
-    )
-
-    assignment_alias_non_codex_mutant = text.replace(
-        publish_needle,
-        publish_needle
-        + '    command_runtime = subprocess\n'
-        + '    executable = "".join(("g", "h"))\n'
-        + '    command_runtime.run([executable, "--version"], check=False)\n',
-        1,
-    )
-    assignment_alias_non_codex_analysis = analyze_launch_graph(assignment_alias_non_codex_mutant)
-    assignment_alias_non_codex_admitted = all((
-        bool(assignment_alias_non_codex_analysis["boundary_ok"]),
-        bool(assignment_alias_non_codex_analysis["paths_ok"]),
-        bool(assignment_alias_non_codex_analysis["observer_clean"]),
-    ))
-    check(
-        "K21", assignment_alias_non_codex_admitted,
-        "assignment_alias_non_codex_process={}".format(
-            "ADMITTED" if assignment_alias_non_codex_admitted else "REJECTED"
-        ),
-    )
-
-    # GR-07: a deterministically selected stored callable is classified by the
-    # executable it forwards, not rejected merely because a container is used.
-    stored_callable_codex_mutant = text.replace(
-        publish_needle,
-        publish_needle
-        + '    dispatch = {"invoke": lambda argv: subprocess.run(argv, check=False)}\n'
-        + '    executable = "co" + "dex"\n'
-        + '    dispatch["invoke"]([executable, "exec", "stored bypass"])\n',
-        1,
-    )
-    stored_callable_codex_analysis = analyze_launch_graph(stored_callable_codex_mutant)
-    stored_callable_codex_rejected = not bool(stored_callable_codex_analysis["boundary_ok"])
-    check(
-        "K22", stored_callable_codex_rejected,
-        "stored_callable_codex_process={}".format(
-            "REJECTED" if stored_callable_codex_rejected else "ADMITTED"
-        ),
-    )
-
-    stored_callable_non_codex_mutant = text.replace(
-        publish_needle,
-        publish_needle
-        + '    process_table = {"invoke": lambda argv: subprocess.run(argv, check=False)}\n'
-        + '    executable = "".join(("g", "h"))\n'
-        + '    process_table["invoke"]([executable, "--version"])\n',
-        1,
-    )
-    stored_callable_non_codex_analysis = analyze_launch_graph(stored_callable_non_codex_mutant)
-    stored_callable_non_codex_admitted = all((
-        bool(stored_callable_non_codex_analysis["boundary_ok"]),
-        bool(stored_callable_non_codex_analysis["paths_ok"]),
-        bool(stored_callable_non_codex_analysis["observer_clean"]),
-    ))
-    check(
-        "K23", stored_callable_non_codex_admitted,
-        "stored_callable_non_codex_process={}".format(
-            "ADMITTED" if stored_callable_non_codex_admitted else "REJECTED"
-        ),
-    )
-
-    # Equivalent GR-06 shape: chained aliases at module scope are still
-    # discovered by semantic identity, with a symmetric non-Codex control.
-    module_alias_codex_mutant = text + '''
-h031_runtime_module = subprocess
-h031_runtime_chain = h031_runtime_module
-H031_MODULE_ALIAS_RESULT = h031_runtime_chain.call(
-    ["".join(("co", "dex")), "exec", "module alias bypass"]
-)
-'''
-    module_alias_codex_analysis = analyze_launch_graph(module_alias_codex_mutant)
-    module_alias_codex_rejected = not bool(module_alias_codex_analysis["boundary_ok"])
-    check("K24", module_alias_codex_rejected,
-          f"module_chained_alias_codex={'REJECTED' if module_alias_codex_rejected else 'ADMITTED'}")
-
-    module_alias_non_codex_mutant = text + '''
-h031_tool_module = subprocess
-h031_tool_chain = h031_tool_module
-H031_MODULE_ALIAS_RESULT = h031_tool_chain.call(
-    ["".join(("g", "h")), "--version"]
-)
-'''
-    module_alias_non_codex_analysis = analyze_launch_graph(module_alias_non_codex_mutant)
-    module_alias_non_codex_admitted = bool(module_alias_non_codex_analysis["boundary_ok"])
-    check("K25", module_alias_non_codex_admitted,
-          f"module_chained_alias_non_codex={'ADMITTED' if module_alias_non_codex_admitted else 'REJECTED'}")
-
+    # Harmless topology refactor: an extra helper around role launch adds no
+    # process boundary or process alias and therefore remains admissible.
+    harmless = 'def h031_role_helper(*args, **kwargs):\n    return run_codex_resolving_architecture(*args, **kwargs)'
+    harmless_shape=process_shape(text.replace(insertion, harmless+"\n"+insertion,1))
+    check("K15", bool(harmless_shape["boundary_ok"]), f"violations={harmless_shape['violations']} aliases={harmless_shape['aliases']}")
+    check("K16", resolved_route(["-m","gpt-5.6-sol","-c",'model_reasoning_effort="high"'])==EXPECTED["BUILDER"], "parser positive anchor")
+    check("K17", resolved_route([])!=EXPECTED["ARCHITECT"], "journal-only/implicit config cannot satisfy argv oracle")
 except Exception as exc:
     print(f"ODÖMBART K0 — gate harness exception: {type(exc).__name__}: {exc}")
-    traceback.print_exc()
-    sys.exit(2)
+    traceback.print_exc(); sys.exit(2)
 
-passed = 0
-failed = 0
-for key, ok, detail in checks:
-    if ok:
-        passed += 1
-        print(f"PASS  {key} — {detail}")
-    else:
-        failed += 1
-        print(f"FAIL  {key} — {detail}")
+passed=sum(ok for _,ok,_ in checks); failed=len(checks)-passed
+for key,ok,detail in checks: print(f"{'PASS ' if ok else 'FAIL '} {key} — {detail}")
 print(f"\n{passed} PASS, {failed} FAIL")
-sys.exit(0 if failed == 0 else 1)
+sys.exit(0 if failed==0 else 1)
 PY
 rc=$?
-
-case "$rc" in
-  0|1) exit "$rc" ;;
-  *) exit 2 ;;
-esac
+case "$rc" in 0|1) exit "$rc" ;; *) exit 2 ;; esac
