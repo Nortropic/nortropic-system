@@ -263,3 +263,32 @@ empirical-runner är en falsifierande andra blick, aldrig ersättning för gate 
 - S2/S4/S5 must not freeze without h-030 dependency after this amendment.
 - Pre-amendment quota-aborted h-003/h-004 worktree is preserved local evidence, not authority, not a resume candidate.
 - No frozen gate, constitution/rulebook boundary, G20, candidate identity, attestation/fencing, promotion identity or no-force rule is weakened by this amendment.
+
+## 2026-08-12 — Python interpreter-authority prerequisite r2 (pre-freeze)
+
+This is owner-authorized gate hardening before H-034, not H-034 production work and not a new
+task in `specs/tasks.spec.json`. The ancestry-contaminated candidate `72c8d1b…` and the clean
+direct-child candidate `c4d3581…` are rejected forensic evidence only. The latter was falsified
+before freeze because unqualified PATH-selected `python3` could judge honestly once and lie on
+later authority lookups, because `bool`/`int` equality admitted wrong JSON scalar types, and
+because JSON member order was treated as authority.
+
+r2 keeps the owner-audited authority-file bytes and closes those admission defects. The gate's
+only judge entry is absolute `/usr/bin/python3 -I -S`; one duplicate-aware, exact-type authority
+object supplies all later canonical-path, version and digest decisions. A live disposable
+delegate-then-lie `python3` wrapper proves that PATH poisoning is active, then the real decision
+must complete without one wrapper call or execution of its foreign interpreter. Exact JSON types
+apply to every schema field, including nested isolation-flag strings; duplicate, missing, extra
+and wrong-typed data reject, while a semantically identical reordered object is a positive
+control. Candidate audit additionally requires a single-parent direct child of
+`1cf2caf75d2206d1adeab176650a2d22136687df`, exactly the four owner-authorized paths, and exact
+candidate authority/gate bytes.
+
+The canonical target remains the exact non-symlink regular executable Python 3.12.13 object and
+frozen digest. The gate retains opened-object fstat/hash/path-stability checks, fixed `-I -S`
+target invocation, and disposable symlink/non-regular/non-executable/stale-path controls. This
+does **not** claim arbitrary same-UID race-free source-path execution and does not turn the judge
+into runtime authority. Future H-034 must still use verified source → private protected snapshot
+→ final rehash → protected-path execution. The legitimate owner prerequisite is expected GREEN;
+a RED result is not manufactured to fit a generic test-author template. Independent r2 review
+has not yet occurred, so this work is a proposed pre-freeze candidate only.
