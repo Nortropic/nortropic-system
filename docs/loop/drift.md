@@ -270,5 +270,14 @@ verifies the locked native executable, ignores PATH, launches a private rehashed
 fails closed on symlink/path/hash/identity drift. `h-031` depends on h-032 and must not use a
 `basename == codex` test as provider-identity proof. Autopilot remains paused until h-032 is
 independently reviewed, owner-frozen and implemented through the normal builder/reviewer gates.
+
+Independent review of the first h-032 candidate confirmed GR-01..GR-05. Owner clarification now
+binds final snapshot rehash → absolute-path exec to an enforced controller-owned namespace, not to
+an impossible claim that macOS pathname exec is intrinsically race-free. The covered attacker is
+the untrusted provider/agent context and its delegated filesystem capabilities. The actual G20
+Seatbelt launcher was probed against snapshot write, chmod, unlink, rename, replacement creation
+and parent-root rename; every mutation was denied while the contained process ran successfully.
+Arbitrary unsandboxed same-UID processes with independent controller-root authority remain outside
+h-032. H-032 stays unfrozen and h-031 stays paused pending a new independently reviewed candidate.
 - Pre-amendment quota-aborted h-003/h-004 worktree is preserved local evidence, not authority, not a resume candidate.
 - No frozen gate, constitution/rulebook boundary, G20, candidate identity, attestation/fencing, promotion identity or no-force rule is weakened by this amendment.

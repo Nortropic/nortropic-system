@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import builtins
+import io
 import json
 import os
 from pathlib import Path
@@ -45,6 +47,38 @@ def sha256(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+class DuplicateKey(ValueError):
+    pass
+
+def strict_json(raw: str):
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out:
+                raise DuplicateKey(key)
+            out[key] = value
+        return out
+    return json.loads(raw, object_pairs_hook=pairs)
+
+def authority_shape(raw: str) -> tuple[bool, str]:
+    try:
+        value = strict_json(raw)
+    except Exception as exc:
+        return False, f"{type(exc).__name__}:{exc}"
+    keys = {"schema_version", "provider", "executable_path", "executable_sha256"}
+    if not isinstance(value, dict) or set(value) != keys:
+        return False, "top-level/keys"
+    path = value["executable_path"]
+    digest = value["executable_sha256"]
+    ok = (
+        type(value["schema_version"]) is int and value["schema_version"] == 1
+        and type(value["provider"]) is str and value["provider"] == "openai-codex"
+        and type(path) is str and bool(path) and Path(path).is_absolute()
+        and type(digest) is str and len(digest) == 64
+        and digest == digest.lower() and all(c in "0123456789abcdef" for c in digest)
+    )
+    return ok, "exact" if ok else "value/type"
+
 def sh(*argv: str, cwd: Path | None = None) -> str:
     p = subprocess.run(argv, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if p.returncode:
@@ -52,12 +86,14 @@ def sh(*argv: str, cwd: Path | None = None) -> str:
     return p.stdout
 
 try:
-    authority = json.loads(authority_source.read_text(encoding="utf-8"))
+    authority_raw = authority_source.read_text(encoding="utf-8")
+    shape_ok, shape_detail = authority_shape(authority_raw)
+    authority = strict_json(authority_raw)
     exact_keys = {"schema_version", "provider", "executable_path", "executable_sha256"}
     apath = Path(authority.get("executable_path", ""))
     digest = authority.get("executable_sha256", "")
     authority_ok = (
-        set(authority) == exact_keys
+        shape_ok and set(authority) == exact_keys
         and authority.get("schema_version") == 1
         and authority.get("provider") == "openai-codex"
         and apath.is_absolute()
@@ -66,7 +102,7 @@ try:
         and apath.exists() and not apath.is_symlink() and apath.is_file()
         and os.access(apath, os.X_OK) and sha256(apath) == digest
     )
-    check("K0", authority_ok, f"provider={authority.get('provider')} path={apath} hash_match={apath.is_file() and sha256(apath) == digest}")
+    check("K0", authority_ok, f"shape={shape_detail} provider={authority.get('provider')} path={apath} hash_match={apath.is_file() and sha256(apath) == digest}")
 
     base = work / "base"; base.mkdir()
     sh("git", "init", "-q", cwd=base)
@@ -81,11 +117,20 @@ try:
     provider = provider_dir / "totally-renamed-agent"
     capture = work / "capture.json"
     provider.write_text("""#!/usr/bin/env python3
-import hashlib,json,os,pathlib,sys
-source=pathlib.Path(os.environ['H032_LOCKED_SOURCE'])
-source.write_text('#!/bin/sh\\nexit 91\\n')
-self_path=pathlib.Path(sys.argv[0])
-pathlib.Path(os.environ['H032_CAPTURE']).write_text(json.dumps({'argv0':str(self_path),'sha256':hashlib.sha256(self_path.read_bytes()).hexdigest()}))
+import hashlib,json,os,pathlib,subprocess,sys
+self_path=pathlib.Path(sys.argv[0]); root=self_path.parent
+before=hashlib.sha256(self_path.read_bytes()).hexdigest()
+def op(argv):
+    return subprocess.run(argv,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode
+attacks={
+ 'write':op(['/bin/sh','-c','echo x >> "$1"','sh',str(self_path)]),
+ 'chmod':op(['/bin/chmod','700',str(self_path)]),
+ 'unlink':op(['/bin/rm','-f',str(self_path)]),
+ 'rename':op(['/bin/mv',str(self_path),str(root/'moved-provider')]),
+ 'create':op(['/bin/sh','-c','echo x > "$1"','sh',str(root/'replacement-provider')]),
+ 'parent_rename':op(['/bin/mv',str(root),str(root)+'-moved']),
+}
+pathlib.Path(os.environ['H032_CAPTURE']).write_text(json.dumps({'argv0':str(self_path),'sha256':before,'attacks':attacks}))
 args=sys.argv[1:]; out=pathlib.Path(args[args.index('-o')+1])
 out.write_text(json.dumps({'role':'TEST_AUTHOR','outcome':'READY','owner_decision_required':False,'blocking_findings':[]}))
 print(json.dumps({'type':'thread.started','thread_id':'h032'}))
@@ -110,11 +155,21 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
         cfg.write_text(json.dumps({"schema_version":1,"provider":"openai-codex",
                                    "executable_path":path_value,"executable_sha256":hash_value}), encoding="utf-8")
         return repo
+    def make_raw_repo(raw: str) -> Path:
+        repo = make_repo(str(provider))
+        (repo / "config/codex-provider-identity.json").write_text(raw, encoding="utf-8")
+        return repo
     nonlocal_counter = [counter]
 
     spec = importlib.util.spec_from_file_location("h032_subject", source)
     if spec is None or spec.loader is None: raise RuntimeError("cannot import subject")
     module = importlib.util.module_from_spec(spec); sys.modules[spec.name] = module; spec.loader.exec_module(module)
+    run_seq = [0]
+    original_now_id = module.now_id
+    def fixture_now_id():
+        run_seq[0] += 1
+        return f"{original_now_id()}-{run_seq[0]:04d}"
+    module.now_id = fixture_now_id
 
     def starts(repo: Path) -> int:
         p = module.journal_root(repo) / "events.jsonl"
@@ -139,8 +194,9 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
     check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
     check("K3", argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash,
           f"source={provider} argv0={argv0} hash={cap.get('sha256')}")
-    check("K4", provider.read_bytes() != good_bytes and cap.get("sha256") == good_hash,
-          "launched fixture mutated authority source but running snapshot retained verified bytes")
+    attacks = cap.get("attacks", {})
+    check("K4", cap.get("sha256") == good_hash and attacks and all(v != 0 for v in attacks.values()),
+          f"executed_sha={cap.get('sha256')} namespace_attacks={attacks}")
     check("K5", not argv0.exists(), f"snapshot_exists_after={argv0.exists()}")
 
     # Restore source fixture for independent negative controls.
@@ -159,10 +215,296 @@ print(json.dumps({'type':'thread.started','thread_id':'h032'}))
     malformed_repo = make_repo(str(provider)); (malformed_repo / "config/codex-provider-identity.json").write_text("{}")
     cases.append(("MALFORMED_AUTHORITY", malformed_repo))
 
+    authority_negative = {
+        "MISSING_KEY": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":str(provider)}),
+        "UNEXPECTED_KEY": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":str(provider),"executable_sha256":good_hash,"extra":1}),
+        "TOPLEVEL_TYPE": "[]",
+        "SCHEMA_WRONG_TYPE": json.dumps({"schema_version":True,"provider":"openai-codex","executable_path":str(provider),"executable_sha256":good_hash}),
+        "PROVIDER_WRONG_VALUE": json.dumps({"schema_version":1,"provider":"other","executable_path":str(provider),"executable_sha256":good_hash}),
+        "PATH_WRONG_TYPE": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":7,"executable_sha256":good_hash}),
+        "SHA_WRONG_TYPE": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":str(provider),"executable_sha256":7}),
+        "EMPTY_PATH": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":"","executable_sha256":good_hash}),
+        "EMPTY_SHA": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":str(provider),"executable_sha256":""}),
+        "SHA_WRONG_LENGTH": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":str(provider),"executable_sha256":"a"*63}),
+        "SHA_NONHEX": json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":str(provider),"executable_sha256":"g"*64}),
+        "DUPLICATE_PATH": '{"schema_version":1,"provider":"openai-codex","executable_path":"/first","executable_path":'+json.dumps(str(provider))+',"executable_sha256":"'+good_hash+'"}',
+        "DUPLICATE_SHA": '{"schema_version":1,"provider":"openai-codex","executable_path":'+json.dumps(str(provider))+',"executable_sha256":"'+good_hash+'","executable_sha256":"'+good_hash+'"}',
+        "BROKEN_JSON": "{",
+    }
+    for name, raw in authority_negative.items():
+        shape, why = authority_shape(raw)
+        check("J_" + name, not shape, f"strict_shape={shape}:{why}")
+        cases.append((name, make_raw_repo(raw)))
+
     results = {}
     for name, repo in cases:
         result = attempt(repo); results[name] = result
         check("K_" + name, not result[0] and result[2] == 0 and result[3] == 0, f"result={result}")
+
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    hardlink = provider_dir / "hardlink-provider"; os.link(provider, hardlink)
+    hardlink_result = attempt(make_repo(str(hardlink)))
+    check("K_HARDLINK_ALLOWED", hardlink_result[0], f"result={hardlink_result}")
+
+    # Fresh validation must occur at every launch in the same imported process.
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    fresh_provider_repo = make_repo(str(provider))
+    first = attempt(fresh_provider_repo)
+    provider.write_bytes(good_bytes + b"\n# provider drift\n"); provider.chmod(0o700)
+    second = attempt(fresh_provider_repo)
+    check("K_FRESH_PROVIDER", first[0] and not second[0] and second[2] == 0 and second[3] == 0,
+          f"first={first} second_after_drift={second}")
+
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    fresh_authority_repo = make_repo(str(provider))
+    first_authority = attempt(fresh_authority_repo)
+    (fresh_authority_repo / "config/codex-provider-identity.json").write_text(
+        json.dumps({"schema_version":1,"provider":"openai-codex","executable_path":str(provider),
+                    "executable_sha256":"0"*64}), encoding="utf-8")
+    second_authority = attempt(fresh_authority_repo)
+    check("K_FRESH_AUTHORITY", first_authority[0] and not second_authority[0]
+          and second_authority[2] == 0 and second_authority[3] == 0,
+          f"first={first_authority} second_after_authority_drift={second_authority}")
+
+    # GR-01: replace the authority pathname immediately AFTER an opened source
+    # object has been returned. A safe implementation continues from that open
+    # object; a path-reopen implementation observes B and cannot execute it.
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    source_b = provider_dir / "source-b"
+    source_b.write_text("#!/bin/sh\ntouch \"$H032_B_EXECUTED\"\nexit 0\n", encoding="utf-8")
+    source_b.chmod(0o700)
+    b_marker = work / "UNVERIFIED_B_EXECUTED"
+    os.environ["H032_B_EXECUTED"] = str(b_marker)
+    race_repo = make_repo(str(provider))
+    original_builtin_open, original_io_open, original_os_open = builtins.open, io.open, os.open
+    swapped = [False]
+    def swap_after_open(file, *args, **kwargs):
+        f = original_io_open(file, *args, **kwargs)
+        try: same = Path(file) == provider
+        except TypeError: same = False
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if same and "r" in str(mode) and not swapped[0]:
+            os.replace(source_b, provider); swapped[0] = True
+        return f
+    def swap_after_builtin_open(file, *args, **kwargs):
+        f = original_builtin_open(file, *args, **kwargs)
+        try: same = Path(file) == provider
+        except TypeError: same = False
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if same and "r" in str(mode) and not swapped[0]:
+            os.replace(source_b, provider); swapped[0] = True
+        return f
+    def swap_after_os_open(file, flags, *args, **kwargs):
+        fd = original_os_open(file, flags, *args, **kwargs)
+        try: same = Path(file) == provider
+        except TypeError: same = False
+        if same and not (flags & os.O_WRONLY) and not (flags & os.O_RDWR) and not swapped[0]:
+            os.replace(source_b, provider); swapped[0] = True
+        return fd
+    builtins.open, io.open, os.open = swap_after_builtin_open, swap_after_open, swap_after_os_open
+    try:
+        race_result = attempt(race_repo)
+    finally:
+        builtins.open, io.open, os.open = original_builtin_open, original_io_open, original_os_open
+    race_cap = json.loads(capture.read_text()) if capture.exists() else {}
+    check("K_SOURCE_PATH_REOPEN_RACE", swapped[0] and race_result[0]
+          and race_cap.get("sha256") == good_hash and not b_marker.exists(),
+          f"path_replaced={swapped[0]} result={race_result} executed_sha={race_cap.get('sha256')} b={b_marker.exists()}")
+
+    # A regular-looking path swapped to a symlink after path-stat must not gain
+    # trust. This requires the regular-file decision on the opened object plus
+    # no-follow authority-path semantics.
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    same_bytes_target = provider_dir / "same-bytes-target"
+    same_bytes_target.write_bytes(good_bytes); same_bytes_target.chmod(0o700)
+    opened_identity_repo = make_repo(str(provider))
+    original_stat, original_lstat = os.stat, os.lstat
+    stat_swapped = [False]
+    target_text = os.fspath(provider)
+    def swap_after_stat(path, *args, **kwargs):
+        result = original_stat(path, *args, **kwargs)
+        if os.fspath(path) == target_text and not stat_swapped[0]:
+            provider.unlink(); provider.symlink_to(same_bytes_target); stat_swapped[0] = True
+        return result
+    def swap_after_lstat(path, *args, **kwargs):
+        result = original_lstat(path, *args, **kwargs)
+        if os.fspath(path) == target_text and not stat_swapped[0]:
+            provider.unlink(); provider.symlink_to(same_bytes_target); stat_swapped[0] = True
+        return result
+    os.stat, os.lstat = swap_after_stat, swap_after_lstat
+    try:
+        opened_identity_result = attempt(opened_identity_repo)
+    finally:
+        os.stat, os.lstat = original_stat, original_lstat
+    opened_identity_ok = ((stat_swapped[0] and not opened_identity_result[0]
+                           and opened_identity_result[2] == 0)
+                          or (not stat_swapped[0] and opened_identity_result[0]))
+    check("K_OPENED_REGULAR_IDENTITY", opened_identity_ok,
+          f"path_swapped_to_symlink={stat_swapped[0]} result={opened_identity_result}")
+    if provider.is_symlink(): provider.unlink()
+
+    # GR-02/GR-05: mutate the first private executable when it is opened for
+    # final reading. If no final read occurs, mutate it at the spawn boundary.
+    # Correct code rejects and removes every observed private snapshot/root.
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    bad_snapshot_bytes = b"#!/bin/sh\ntouch \"$H032_BAD_SNAPSHOT_EXECUTED\"\nexit 0\n"
+    bad_marker = work / "BAD_SNAPSHOT_EXECUTED"
+    os.environ["H032_BAD_SNAPSHOT_EXECUTED"] = str(bad_marker)
+    rehash_repo = make_repo(str(provider))
+    mutated, snapshots = [False], []
+    original_builtin_open, original_io_open, original_os_open, original_popen = builtins.open, io.open, os.open, subprocess.Popen
+    def is_private_executable(file) -> bool:
+        try:
+            p = Path(file)
+            if p == provider or not p.is_file() or not os.access(p, os.X_OK): return False
+            h = hashlib.sha256()
+            with original_io_open(p, "rb") as f: h.update(f.read())
+            return h.hexdigest() == good_hash
+        except Exception:
+            return False
+    def corrupt(p: Path) -> None:
+        with original_io_open(p, "wb") as f: f.write(bad_snapshot_bytes)
+        p.chmod(0o700)
+    def mutate_before_rehash(file, *args, **kwargs):
+        try: candidate = is_private_executable(file)
+        except Exception: candidate = False
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if candidate and "r" in str(mode) and not mutated[0]:
+            p = Path(file); snapshots.append(p); corrupt(p); mutated[0] = True
+        return original_io_open(file, *args, **kwargs)
+    def mutate_before_rehash_builtin(file, *args, **kwargs):
+        candidate = is_private_executable(file)
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if candidate and "r" in str(mode) and not mutated[0]:
+            p = Path(file); snapshots.append(p); corrupt(p); mutated[0] = True
+        return original_builtin_open(file, *args, **kwargs)
+    def mutate_before_rehash_os(file, flags, *args, **kwargs):
+        if not mutated[0] and not (flags & os.O_WRONLY) and not (flags & os.O_RDWR) and is_private_executable(file):
+            p = Path(file); snapshots.append(p); corrupt(p); mutated[0] = True
+        return original_os_open(file, flags, *args, **kwargs)
+    def mutate_if_no_rehash(argv, *args, **kwargs):
+        if not mutated[0]:
+            for item in argv if isinstance(argv, (list, tuple)) else [argv]:
+                if is_private_executable(item):
+                    p = Path(item); snapshots.append(p); corrupt(p); mutated[0] = True; break
+        return original_popen(argv, *args, **kwargs)
+    builtins.open, io.open, os.open, subprocess.Popen = mutate_before_rehash_builtin, mutate_before_rehash, mutate_before_rehash_os, mutate_if_no_rehash
+    try:
+        rehash_result = attempt(rehash_repo)
+    finally:
+        builtins.open, io.open, os.open, subprocess.Popen = original_builtin_open, original_io_open, original_os_open, original_popen
+    residue = [str(p) for p in snapshots if p.exists() or p.parent.exists()]
+    check("K_FINAL_SNAPSHOT_REHASH", mutated[0] and not rehash_result[0]
+          and rehash_result[2] == 0 and not bad_marker.exists(),
+          f"mutated={mutated[0]} result={rehash_result} bad_executed={bad_marker.exists()}")
+    check("K_POST_SNAPSHOT_FAILURE_CLEANUP", mutated[0] and not residue,
+          f"observed={[str(p) for p in snapshots]} residue={residue}")
+
+    # Authority is one byte observation: replacing the document immediately
+    # after its read handle is returned must not mix old path with new digest.
+    provider.write_bytes(good_bytes); provider.chmod(0o700)
+    coherent_repo = make_repo(str(provider))
+    coherent_cfg = coherent_repo / "config/codex-provider-identity.json"
+    replacement_cfg = coherent_repo / "config/replacement.json"
+    replacement_cfg.write_text(json.dumps({"schema_version":1,"provider":"openai-codex",
+        "executable_path":str(provider),"executable_sha256":"0"*64}), encoding="utf-8")
+    original_builtin_open, original_io_open, original_os_open = builtins.open, io.open, os.open
+    authority_swapped = [False]
+    def authority_read_swap(file, *args, **kwargs):
+        f = original_io_open(file, *args, **kwargs)
+        mode = args[0] if args else kwargs.get("mode", "r")
+        try: same = Path(file) == coherent_cfg
+        except TypeError: same = False
+        if same and "r" in str(mode) and not authority_swapped[0]:
+            os.replace(replacement_cfg, coherent_cfg); authority_swapped[0] = True
+        return f
+    def authority_builtin_swap(file, *args, **kwargs):
+        f = original_builtin_open(file, *args, **kwargs)
+        mode = args[0] if args else kwargs.get("mode", "r")
+        try: same = Path(file) == coherent_cfg
+        except TypeError: same = False
+        if same and "r" in str(mode) and not authority_swapped[0]:
+            os.replace(replacement_cfg, coherent_cfg); authority_swapped[0] = True
+        return f
+    def authority_os_swap(file, flags, *args, **kwargs):
+        fd = original_os_open(file, flags, *args, **kwargs)
+        try: same = Path(file) == coherent_cfg
+        except TypeError: same = False
+        if same and not (flags & os.O_WRONLY) and not (flags & os.O_RDWR) and not authority_swapped[0]:
+            os.replace(replacement_cfg, coherent_cfg); authority_swapped[0] = True
+        return fd
+    builtins.open, io.open, os.open = authority_builtin_swap, authority_read_swap, authority_os_swap
+    try:
+        coherent_result = attempt(coherent_repo)
+    finally:
+        builtins.open, io.open, os.open = original_builtin_open, original_io_open, original_os_open
+    check("K_COHERENT_AUTHORITY", authority_swapped[0] and coherent_result[0],
+          f"document_replaced_after_open={authority_swapped[0]} result={coherent_result}")
+
+    # GR-02 owner-runner control: execute the real controller Seatbelt launcher.
+    # An incapable nested sandbox is ODÖMBART, never PASS or ordinary RED.
+    g20 = work / "g20"; trust = g20 / "trust"; ws = g20 / "ws"
+    trust.mkdir(parents=True); ws.mkdir()
+    protected = trust / "snapshot"; protected.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    protected.chmod(0o500); trust.chmod(0o500)
+    envelope = g20 / "envelope.json"; envelope.write_text('{"task_id":"h-032"}\n', encoding="utf-8")
+    launcher = source.parents[1] / "controller/launch/cli"
+    attack = ('set +e; echo x >> "$1/snapshot"; echo WRITE=$?; '
+              'chmod 700 "$1/snapshot"; echo CHMOD=$?; '
+              'unlink "$1/snapshot"; echo UNLINK=$?; '
+              'mv "$1/snapshot" "$1/moved"; echo RENAME=$?; '
+              'echo y > "$1/replacement"; echo CREATE=$?; '
+              'mv "$1" "$1-moved"; echo PARENT_RENAME=$?')
+    env = dict(os.environ, NORTROPIC_TRUST_ROOT=str(trust))
+    g20_run = subprocess.run([str(launcher), "run", str(ws), str(envelope), "30", "--",
+                              "/bin/sh", "-c", attack, "sh", str(trust)],
+                             cwd=source.parents[1], env=env, text=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    g20_out = g20_run.stdout
+    if g20_run.returncode == 3 and "sandbox_apply: Operation not permitted" in g20_out:
+        trust.chmod(0o700); protected.chmod(0o700)
+        print("ODÖMBART K_G20_NAMESPACE — nested sandbox-exec förbjuden; owner-runner krävs")
+        raise SystemExit(2)
+    denial_lines = {f"{name}=1" for name in
+                    ("WRITE","CHMOD","UNLINK","RENAME","CREATE","PARENT_RENAME")}
+    g20_ok = (g20_run.returncode == 0 and denial_lines.issubset(set(g20_out.splitlines()))
+              and protected.exists() and not (trust / "replacement").exists())
+    check("K_G20_NAMESPACE", g20_ok,
+          f"rc={g20_run.returncode} lines={g20_out.strip().replace(chr(10), '|')} snapshot={protected.exists()} replacement={(trust/'replacement').exists()}")
+    trust.chmod(0o700)
+
+    # Judge self-controls: one defect per disposable effect mutant. These do
+    # not replace the real subject checks above; they prove the oracles have
+    # opposite outcomes for the shallow unsafe construction.
+    jc = work / "judge-controls"; jc.mkdir()
+    jc_source = jc / "source"; jc_b = jc / "b"
+    jc_source.write_bytes(b"A"); jc_b.write_bytes(b"B")
+    with jc_source.open("rb") as opened:
+        os.replace(jc_b, jc_source)
+        same_opened = opened.read()
+        reopened = jc_source.read_bytes()
+    check("J_GR01_SAME_OPENED_OBJECT", same_opened == b"A", f"snapshot={same_opened!r}")
+    check("J_GR01_PATH_REOPEN_MUTANT", reopened != b"A", f"mutant_snapshot={reopened!r}")
+
+    authority_digest = hashlib.sha256(b"A").hexdigest()
+    jc_snapshot = jc / "snapshot"; jc_snapshot.write_bytes(b"A")
+    jc_snapshot.write_bytes(b"B")
+    safe_rehash_admits = hashlib.sha256(jc_snapshot.read_bytes()).hexdigest() == authority_digest
+    no_rehash_mutant_admits = True
+    check("J_GR02_FINAL_REHASH", not safe_rehash_admits, f"safe_admits={safe_rehash_admits}")
+    check("J_GR02_NO_REHASH_MUTANT", no_rehash_mutant_admits and not safe_rehash_admits,
+          "mutant would execute changed bytes while rehash oracle rejects")
+
+    cached_digest = authority_digest
+    drifted = b"B"
+    cached_mutant_admits = cached_digest == authority_digest
+    fresh_oracle_admits = hashlib.sha256(drifted).hexdigest() == authority_digest
+    check("J_GR04_CACHED_SUCCESS_MUTANT", cached_mutant_admits and not fresh_oracle_admits,
+          f"cached={cached_mutant_admits} fresh={fresh_oracle_admits}")
+
+    cleanup_root = jc / "cleanup-root"; cleanup_root.mkdir(); (cleanup_root / "snapshot").write_bytes(b"bad")
+    shutil.rmtree(cleanup_root)
+    check("J_GR05_FAILURE_CLEANUP", not cleanup_root.exists(), f"residue={cleanup_root.exists()}")
 
     passed = sum(ok for _, ok, _ in checks)
     for key, ok, detail in checks:
