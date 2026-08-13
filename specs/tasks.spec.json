@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.0.0",
+  "spec_version": "2.0.0",
   "written": "2026-08-07",
   "base_sha": "a6639d719c13b430265186bf823efa828d89ebb1",
   "authority": {
@@ -45,9 +45,15 @@
     "note_on_limits": "Räknade 2026-08-08 ur fem byggda h-tasks (n=5): h-001 2 filer/175 rader, h-002 3/161, h-003 2/130, h-004 2/178, h-005 2/263. Median 2 filer/178 rader, max 3/263. Taket ligger drygt två gånger över max — marginalen är bedömning, inte mätning, och avser h-006 och h-007 som inte är byggda. Pass 0 och Pass 1 ingår INTE i nämnaren: de är ägarhandspass med dokument och konfiguration, inte worker-byggda tasks under allowed_write. v4.1 §16 öppnar circuit vid 2x budget = 16 filer/1200 rader."
   },
 
+  "compatibility": {
+    "schema_v1_authority_class": "ordinary",
+    "schema_v1_owner_authority_inference": false
+  },
+
   "tasks": [
     {
       "id": "h-001",
+      "authority_class": "ordinary",
       "slice": 1,
       "title": "SQLite-state + append-only eventlogg",
       "summary": "Controllerns tillstånd i SQLite, varje övergång även som rad i events.jsonl. Loggen är sanningen; SQLite är projektionen.",
@@ -59,6 +65,7 @@
     },
     {
       "id": "h-002",
+      "authority_class": "ordinary",
       "slice": 2,
       "title": "Verifier-runner med förgodkänt register",
       "summary": "Verifierare körs ur ett register med SHA per fil, argv utan shell. Registrera de BEFINTLIGA grindarna — check-invariants.mjs och nortropic-verify-suite.js — bygg ingen ny verifierare.",
@@ -70,6 +77,7 @@
     },
     {
       "id": "h-003",
+      "authority_class": "ordinary",
       "slice": 3,
       "title": "Attestationer + stale-markering",
       "summary": "Varje verifierat resultat binds till candidate-SHA. Commit som matchar invalidates_on gör attestationen stale och köar omtest.",
@@ -81,6 +89,7 @@
     },
     {
       "id": "h-004",
+      "authority_class": "ordinary",
       "slice": 4,
       "title": "Exklusiv lease + heartbeat + generationsbindning",
       "summary": "Exakt en controller äger körningsresursen åt gången. Varje acquire skapar en unik lease-generation. Controllerloopen håller generationen levande med heartbeat och använder samma lease_id vid renew och release. En gammal generation får aldrig förnya eller radera sin efterträdare.",
@@ -104,6 +113,7 @@
     },
     {
       "id": "h-005",
+      "authority_class": "ordinary",
       "slice": 5,
       "title": "Isolerat workspace per försök",
       "summary": "Varje attempt får ren checkout på beordrad base-SHA i eget worktree. Workern arbetar aldrig i den levande arbetskopian.",
@@ -115,6 +125,7 @@
     },
     {
       "id": "h-006",
+      "authority_class": "ordinary",
       "slice": 6,
       "title": "Worker-launch med strikt utdatakontrakt",
       "summary": "Workern startas med en task och ett kuvert. Svaret parsas mekaniskt; prosa är ett fel, inte något att tolka.",
@@ -126,6 +137,7 @@
     },
     {
       "id": "h-007",
+      "authority_class": "ordinary",
       "slice": 7,
       "title": "Diffpolicy — mekanisk §A-vakt",
       "summary": "Kandidatens diff prövas mot §A-mängden, LOC-budget och docs-kravet innan den ens föreslås. Detta blir systemets första verkligt mekaniska §A-skydd.",
@@ -137,6 +149,7 @@
     },
     {
       "id": "h-008",
+      "authority_class": "ordinary",
       "slice": "6b",
       "title": "Taskkuvert — immutable uppdrag per attempt",
       "summary": "Controllern genererar ett immutable kuvert per attempt ur specen: run_id, task_id, base_sha, spec_sha256, title, description, allowed_write, denied_write, candidate_requirements (v4.1 §12). Kuvertet är workerns hela uppdrag — det bär outcome, aldrig verifierarens implementation, och workern kontrollerar aldrig certifieringssteget. Registrerad som öppet ärende 2026-08-08: skiva 6:s launch-halva byggdes inte med h-006.",
@@ -148,6 +161,7 @@
     },
     {
       "id": "h-009",
+      "authority_class": "ordinary",
       "slice": "6c",
       "title": "Worker-launch — processtart med timeout",
       "summary": "Controllern startar en worker som ett konfigurerat kommando i ett givet workspace, skickar kuvertet, och fångar stdout som slutrapport (v4.1 §13 run_worker). Kommandot är konfiguration, inte hårdkodat: provet kan därför starta hermetiska testprocesser i stället för en betald Claude Code-session. Att just Claude Code startar rätt prövas separat av människa — se öppen post.",
@@ -159,6 +173,7 @@
     },
     {
       "id": "h-010",
+      "authority_class": "ordinary",
       "slice": 8,
       "title": "Taskval och claim",
       "summary": "Deterministiskt val av nästa behöriga task ur en godtycklig backlog-spec, plus claim. Behörig = samtliga depends_on attesterade-och-giltiga (h-003), tasken själv inte attesterad, status i state frånvarande eller pending. Ordning: lägst id i kodpunktsordning. Claim appendar exakt ett claimed-event i state (h-001) efter attest-guard (v4.1 §13/§178). Lease hör till körningen, inte claimet — h-011. Specen är indata; komponenten antar aldrig ett namnschema. priority/risk_class/next_eligible_at finns inte i specen och byggs inte — skrivs som kommentar i komponenten.",
@@ -170,6 +185,7 @@
     },
     {
       "id": "h-011",
+      "authority_class": "ordinary",
       "slice": 9,
       "title": "Huvudloopen — kedjan",
       "summary": "controller/loop/cli run <config.json> kör v4.1 §13:s varv deterministiskt över en godtycklig backlog-spec: lease runt körningen (h-004, vägrar före första varvet om upptagen), select/claim (h-010), workspace på aktuell base (h-005), kuvert mot config-specen (h-008), konfigurerat worker-kommando som argv-lista med timeout (h-009), strikt parse (h-006), diffpolicy mot config-specen (h-007), registrerad verifierare mot kandidatträdet (h-002), attestation vid grönt (h-003). Integration = kedjande base: nästa varv bygger på förra attesterade kandidat-SHA:t. Failure i ett varv attesterar aldrig; tasken förblir claimed och är ovalbar resten av körningen — retry, attempt-budget och circuit är senare skivor (fälten finns inte i specen), skrivs som kommentar. Workspacet rivs efter varvet — kandidatens commit är beviset. Drain tills ingen behörig task finns, leasen släpps, exit 0. Config och alla kataloger är indata; komponenten har ingen inbyggd sökväg och antar aldrig ett namnschema.",
@@ -181,6 +197,7 @@
     },
     {
       "id": "h-012",
+      "authority_class": "ordinary",
       "slice": 10,
       "title": "Utföraren — fullbordat försök",
       "summary": "controller/utforare/cli kör konfigurerat kommando via h-009 med kuvertet, och gör därefter git-arbetet SJÄLV: stagar allt som ändrats i workspacet, committar med fast identitet och rapporterar {status, candidate_sha, files} på h-006:s form. Kandidat-SHA:t föds i controllerledet, aldrig i sessionens utsaga — sessionen behöver därmed ingen commiträtt. Domen vilar på git: ändrade filer avgör om ett försök lyckades. Sessionens egen text läses ENDAST vid failure, för att bära orsaken vidare, och kan aldrig vända ett failure till en kandidat. Kommandot är konfiguration; komponenten antar aldrig vilken binär som körs.",
@@ -192,6 +209,7 @@
     },
     {
       "id": "h-013",
+      "authority_class": "ordinary",
       "slice": 11,
       "title": "Brytaren — failureklassning, budget och kvotstopp",
       "summary": "controller/brytare/cli normaliserar failure till fingerprints, för attempt-budget per task och öppnar circuit vid upprepning. Kvotstopp är en EGEN klass, kvot_slut, skild från nonzero_exit: att modellkvoten tog slut är inte samma sak som att workern misslyckades, och två fel med samma namn kan inte räknas isär. Kvot_slut öppnar brytaren omedelbart utan att förbruka budget, så körningen stannar rent och kan återupptas. Ingen kvotbokföring och inget veckotak byggs (ägarbeslut 2026-08-08).",
@@ -203,6 +221,7 @@
     },
     {
       "id": "h-014",
+      "authority_class": "ordinary",
       "slice": 12,
       "title": "Notisen — Slack från controllern",
       "summary": "controller/notis/cli skickar notis till en konfigurerad webhook vid de fyra händelser som kräver en människa: brytare öppnad, kvot slut, körning slutförd med minst en attestation, och task blockerad av oattesterat beroende. Aldrig per varv. Controllern skickar, aldrig workern — annars är det modellen som avgör när Johnny störs. Notisen är en biverkan: en trasig eller saknad webhook får aldrig påverka körningens utfall. URL:en är en hemlighet, läses ur miljön, och ligger aldrig i repot.",
@@ -214,6 +233,7 @@
     },
     {
       "id": "h-015",
+      "authority_class": "ordinary",
       "slice": 13,
       "title": "Återtaget — återstart efter avbrott",
       "summary": "controller/atertag/cli återupptar en avbruten körning utan att förlora eller dubbla arbete: attesterade tasks väljs inte om, tasks som föll blir valbara igen med bevarad failure-historik, och öppen brytare överlever omstarten. Lease från en död körning återtas efter TTL, aldrig före. Detta är driftformen kör tills kvoten tar slut, börja om när den är tillbaka (ägarbeslut 2026-08-08).",
@@ -224,6 +244,7 @@
       "depends_on": ["h-010", "h-013", "h-016", "h-004", "h-030"]
     },
     { "id": "h-016", "slice": 14,
+      "authority_class": "ordinary",
       "title": "Kedjan kopplas in — varvet går genom brytaren och utföraren",
       "summary": "controller/loop/cli slutar anropa controller/launch/cli direkt och kör försöket genom controller/brytare/cli, som kör det genom controller/utforare/cli: sessionen redigerar, utföraren stagar och committar, brytaren för attempt-budget och fingerprints. Kandidatvägen är byte-identisk med utförarens rapport, så h-006, h-007, h-002 och h-003 står orörda. Budgeten får verkan genom att ett fallet försök görs OM inuti claimet — utan omförsök vore per-task-budgeten död kod, eftersom en fallen task förblir claimed och ovalbar. Varje försök får ett eget workspace på oförändrad base; bara attesterade kandidater flyttar basen. Brytarkatalogen är en per task under brytare_rot, ty fingerprinten bär ingen task-identitet — katalogsökvägen är det enda som gör räkningen per task, och h-015:s bevarade failure-historik förutsätter den. Öppen brytare avslutar drainet före nästa claim med exit 3, skilt från både slutförd drain och fel. Kandidatträdskontrollen stryks: efter inkopplingen kan den per konstruktion aldrig fälla.",
       "allowed_write": ["controller/loop/**", "tests/controller/loop/**",
@@ -234,6 +255,7 @@
       "depends_on": ["h-011", "h-012", "h-013"]
     },
     { "id": "h-017", "slice": 15,
+      "authority_class": "ordinary",
       "title": "Per-task-domen — kedjan kör taskens egen grind mot kandidatträdet",
       "summary": "controller/loop/cli kör TASKENS egen grind mot kandidatträdet, UTÖVER configens verifierare, så att en attestation slutar betyda enbart att diffen var laglig och de globala invarianterna höll. Grinden slås upp på SÖKVÄG, aldrig på id: uppslaget görs av controller/verify/cli, som löser task-id mot spec-radens exit_test och sedan mot den registerpost vars path är byte-lika med den sökvägen. Nyckeln kommer därmed ur specs/**, som är denied_write — den som får skriva registret kan registrera en grind men aldrig peka om sin egen task till en vänligare. Kedjan skickar spec och task-id och tolkar aldrig backloggen själv. RUNNERS får bash, ty registret kan i dag inte starta en enda av husets grindar och mekanismen vore annars inert. REGISTRET LIGGER UTANFÖR SKRIVYTAN: domarens förgodkännande får inte kunna ändras av den som döms, och controller/verify/cli anges som exakt sökväg så att register.json inte följer med. Riggfel och dom hålls isär: registret prövas i sin HELHET före leasen och taskens egen post en gång till överst i varvet, så en driven eller saknad post stannar körningen innan någon modellkvot bränns; en grind som svarar rött fäller varvet och kostar försök som varje annat nedströmsavslag. En task vars exit_test saknar registerpost attesteras som förut, men attestationen saknar då grind_id — frånvaron av dom bokförs i stället för att stoppa körningen (ägarbeslut 2026-08-09).",
       "allowed_write": ["controller/loop/**", "controller/verify/cli",
@@ -247,6 +269,7 @@
     },
     {
       "id": "h-032",
+      "authority_class": "ordinary",
       "slice": "16a",
       "title": "Codex provider-identitet vid processgränsen",
       "summary": "En separat owner-fryst manifest binder OpenAI Codex-providern till en absolut, vanlig och icke-symlinkad native executable med SHA-256. Autopiloten ignorerar PATH för providerlaunch, verifierar och kopierar bytes från samma öppnade filobjekt, materialiserar en privat byte-identisk launch-snapshot, verifierar snapshoten och startar endast dess absoluta sökväg under en controller-enforced G20/Seatbelt-gräns som nekar providerprocessen write/replace-authority över snapshotnamespace. Identitetsdrift faller stängt före providerprocess och AGENT_START. Detta är executable/provider-authority som h-031 konsumerar men inte duplicerar.",
@@ -262,6 +285,7 @@
     },
     {
       "id": "h-033",
+      "authority_class": "ordinary",
       "slice": "PROVENANCE",
       "title": "Authenticated owner/controller-runner provenance for effect evidence",
       "summary": "The dedicated canonical macOS producer account _nortropic_provenance serves fresh request instances through one protected launchd definition bound to the exact helper, allowlist and evidence root. A root-owned observer authenticates the live probe and publishes a request-bound receipt outside producer authority. The requester cannot choose freshness, result, executable, authority or destination. The exact production CLI verify path enforces strict parsing and same-opened-object provenance.",
@@ -273,6 +297,7 @@
     },
     {
       "id": "h-031",
+      "authority_class": "ordinary",
       "slice": 16,
       "title": "Codex-autopiloten — explicit modellrouting per agentroll",
       "summary": "scripts/nortropic-codex-autopilot.py binder varje faktisk agentstart till ownerpolicyn gpt-5.6-sol med max för ARCHITECT, TEST_AUTHOR, GATE_REVIEWER, REVIEWER och EMPIRICAL samt high för BUILDER. Modell och reasoning effort skickas explicit i den gemensamma Codex-launchern och bokförs i AGENT_START; användarens globala Codex-konfiguration, äldre journaldata och implicit ultra får aldrig styra en start. En okänd roll vägras före processpawn. Status, watch och roadmap förblir deterministiska och modellfria. h-031 äger source-level launch authority och konsumerar h-032:s separat frysta executable/provider-identitet utan att duplicera den.",
@@ -285,6 +310,31 @@
       "exit_criterion": "Mot en h-032-godkänd provider-fixtur och ett isolerat git-worktree: samtliga sex runtime-roller startas genom den enda kanoniska Codex-boundaryn run_codex och den exekverade argv-listan visar EXAKT MODEL=gpt-5.6-sol samt REASONING_EFFORT=max för ARCHITECT, TEST_AUTHOR, GATE_REVIEWER, REVIEWER och EMPIRICAL och high för BUILDER. Effekten mäts efter att CODEX_HOME avsiktligt har satts till en annan modell och ultra. Varje verklig AGENT_START-rad bär byte-lika role, model, reasoning_effort och model_routing_source=AUTOPILOT_ROLE_POLICY. Äldre persisted routing bevaras men styr aldrig en ny start. Okänd roll vägras före providerprocess, AGENT_START och run-katalog. SOURCE-LEVEL PROCESSGRÄNSEN ÄR EN DEL AV TRUSTKONTRAKTET: subprocess.Popen får endast innehas/anropas vid canonical run_codex-site; subprocess.run får endast innehas/anropas vid canonical generic run-site; watch får behålla exakt os.system(\"clear\"). Endast import subprocess utan alias är tillåten importform för processmodulen. Alternativa importnamn, from-import av processfunktion, getattr-indirection samt assignment, annotated assignment, walrus, container, lambda/default/closure, attribut, argument eller return av processkapabilitet är förbjudna. run_codex-callablen är själv en säkerhetskapabilitet: endast de explicit inventerade orchestration-entrypoints som krävs av aktuellt workflow får direkt anropa den; alias, lagring, passing, return, getattr och metod-/klass-/containerindirection är förbjudna. status, watch och roadmap_status kan därför varken vara auktoriserad caller eller nå run_codex genom capability escape. Vanlig orelaterad Python-aliasing och legitima icke-providerkommandon genom canonical run förblir tillåtna. h-031 klassar aldrig provideridentitet genom basename, PATH eller egen executable-heuristik: h-032 etablerar och levererar den enda godkända provider-executablen, och generic run saknar authority att erhålla eller starta den eftersom provider-capabilityn endast ägs av run_codex. Ingen normal runtime-roll använder eller rapporterar implicit ultra.",
       "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md"],
       "depends_on": ["h-017", "h-032"]
+    },
+    {
+      "id": "h-035",
+      "slice": "owner-author-workflow-bootstrap",
+      "authority_class": "ordinary",
+      "title": "Mechanically separate owner production authoring from ordinary builder",
+      "summary": "One-time bootstrap through the historical ordinary builder pipeline. It introduces versioned ordinary/owner_authority task semantics, one path oracle, authority-bound candidates, explicit owner-author transition, persistent owner states, independent review and explicit owner-final freeze. It creates no H-034 production bytes. Its frozen v1 allowed_write is the bounded bootstrap exception; after v2 activation ordinary tasks cannot grant authority-control paths.",
+      "allowed_write": [
+        "controller/authority/**", "controller/policy/**", "controller/taskval/**",
+        "controller/envelope/**", "controller/state/**", "controller/attest/**",
+        "controller/loop/**", "tests/controller/authority/**", "tests/controller/policy/**",
+        "tests/controller/taskval/**", "tests/controller/envelope/**", "tests/controller/state/**",
+        "tests/controller/attest/**", "tests/controller/loop/**",
+        "scripts/nortropic-codex-autopilot.py", "tests/scripts/nortropic-codex-autopilot/**",
+        "scripts/check-invariants.mjs", "docs/05-beslutslogg.md", "docs/loop/drift.md",
+        "docs/loop/owner-author-workflow-v1.md"
+      ],
+      "owner_author_allowed_write": [],
+      "exit_test": "verify/bin/h-035-exit",
+      "exit_criterion": "Actual parsing, policy, routing, persistence, candidate, review and final-freeze effects satisfy docs/loop/owner-author-workflow-v1.md and the frozen h-035 gate. Ordinary authority cannot overlap owner-production or prospective authority-control paths; TEST_AUTHOR cannot write owner production; owner author writes only its frozen owner surface and cannot edit task, registry, gate, fixtures or control plane. Missing/unknown authority, caller-selected authority bytes, role/environment claims, changed-file claims, wrong identities and v1 owner escalation fail closed. A RED owner task persists OWNER_ACTION_REQUIRED without BUILDER, retry, attestation, dependency advance or automatic publication; exact reviewed candidate reaches OWNER_FINAL_FREEZE_REQUIRED and only an explicit identity-bound owner-final action completes. H-034 remains a path reservation only.",
+      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md", "docs/loop/owner-author-workflow-v1.md"],
+      "depends_on": ["h-017"],
+      "max_changed_files": 32,
+      "max_added_lines": 4200,
+      "bootstrap_exception": {"kind": "frozen_v1_allowed_write_once", "prospective_task_id_bypass": false}
     }
   ],
 

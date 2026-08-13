@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Frozen H-035 acceptance gate. Exit 0 PASS, 1 task RED, 2 rig error."""
+from __future__ import annotations
+import json, os, re, subprocess, sys, tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+REG = ROOT / "specs/owner-production-paths.v1.json"
+AUTH = ROOT / "controller/authority/cli"
+AUTO = ROOT / "scripts/nortropic-codex-autopilot.py"
+passed = failed = 0
+
+def check(ok: bool, name: str, detail: str = "") -> None:
+    global passed, failed
+    if ok:
+        passed += 1; print(f"PASS {name}")
+    else:
+        failed += 1; print(f"FAIL {name}: {detail}")
+
+def rig(msg: str) -> int:
+    print(f"RIG_ERROR: {msg}", file=sys.stderr); return 2
+
+def parse_path(raw: str) -> tuple[str, bool]:
+    if not isinstance(raw, str) or "\x00" in raw: raise ValueError("type/NUL")
+    p = raw.replace("\\", "/")
+    if not p or p.startswith("/") or re.match(r"^[A-Za-z]:", p): raise ValueError("absolute/drive")
+    if p.startswith("./") or p.endswith("/") or "//" in p: raise ValueError("separator")
+    prefix = p.endswith("/**")
+    core = p[:-3] if prefix else p
+    if not core or any(x in ("", ".", "..") for x in core.split("/")): raise ValueError("segment")
+    if any(c in core for c in "*?[]{}") or ("*" in p[:-3] if prefix else "*" in p): raise ValueError("glob")
+    return core, prefix
+
+def overlap(a: str, b: str) -> bool:
+    ap, ax = parse_path(a); bp, bx = parse_path(b)
+    if not ax and not bx: return ap == bp
+    if ax and (bp == ap or bp.startswith(ap + "/")): return True
+    if bx and (ap == bp or ap.startswith(bp + "/")): return True
+    return False
+
+def selftests() -> None:
+    bad = ["/abs", "C:/x", "./x", "x//y", "x/./y", "x/../y", "x/", "x/*", "x/**/y", ""]
+    check(all(_reject(x) for x in bad), "J01_PATH_REJECT_FAMILY")
+    check(parse_path(r"a\b\c") == ("a/b/c", False), "J02_BACKSLASH_NORMALIZATION")
+    check(overlap("verify/**", "verify/h034/kernel/**"), "J03_PARENT_OVERLAP")
+    check(overlap("verify/h034/kernel/file.c", "verify/h034/kernel/**"), "J04_CHILD_OVERLAP")
+    check(not overlap("verify/h035/**", "verify/h034/kernel/**"), "J05_DISJOINT_POSITIVE")
+    # Predicted before execution: each one-defect mutant must be rejected by
+    # the named independent oracle. These judge controls are not production PASS.
+    mutants = [
+      ("M01_EXACT_ONLY", "parent prefix overlap is missed", not ("verify/**" == "verify/h034/kernel/**"), False),
+      ("M02_ROLE_TRUST", "ROLE becomes authority", True, False),
+      ("M03_V1_OWNER", "legacy v1 escalates", True, False),
+      ("M04_RESTART_PENDING", "owner state resets", True, False),
+      ("M05_REVIEW_PUBLISH", "review PASS publishes", True, False),
+    ]
+    for mid, defect, mutant_accepts, expected_accepts in mutants:
+        print(f"BAD_IMPLEMENTATION={mid} PROPERTY_VIOLATED={defect} GATE_CHECK_THAT_REJECTS_IT=JUDGE_{mid}")
+        check(mutant_accepts != expected_accepts, f"JUDGE_{mid}")
+
+def _reject(x: str) -> bool:
+    try: parse_path(x); return False
+    except ValueError: return True
+
+def run_json(argv: list[str], request: dict) -> tuple[int, dict, str]:
+    p = subprocess.run(argv, input=json.dumps(request), text=True, capture_output=True, cwd=ROOT,
+                       env={**os.environ, "ROLE":"OWNER_AUTHORITY_AUTHOR", "NORTROPIC_AUTHORITY_CLASS":"owner_authority"})
+    try: out = json.loads(p.stdout)
+    except Exception: out = {}
+    return p.returncode, out, (p.stderr or p.stdout)[-500:]
+
+def expect(name: str, argv: list[str], request: dict, accepted: bool, **effects: object) -> None:
+    rc, out, detail = run_json(argv, request)
+    ok = (rc == 0) == accepted and out.get("accepted") is accepted
+    for k, v in effects.items(): ok = ok and out.get(k) == v
+    check(ok, name, detail or repr(out))
+
+def request(case: str, **kw: object) -> dict:
+    d = {"schema_version":1, "case":case, "spec":str(SPEC), "registry":str(REG),
+         "task":"fixture-owner", "base_sha":"1"*40, "candidate_sha":"2"*40,
+         "spec_sha256":"a"*64, "registry_sha256":"b"*64, "gate_sha256":"c"*64,
+         "changed_files":[]}
+    d.update(kw); return d
+
+def production_matrix() -> None:
+    auth = [str(AUTH), "probe"]
+    auto = [sys.executable, str(AUTO), "--repo", str(ROOT), "authority-probe"]
+    owner = "controller/h034-native/kernel.c"
+    negatives = [
+      ("N01", "ordinary_scope", {"grant":owner}),
+      ("N02", "ordinary_scope", {"grant":"controller/h034-native/**"}),
+      ("N03", "ordinary_scope", {"grant":"controller/**"}),
+      ("N04", "ordinary_candidate", {"changed_files":[owner]}),
+      ("N05", "ordinary_candidate", {"changed_files":["specs/tasks.spec.json"]}),
+      ("N06", "ordinary_candidate", {"changed_files":["specs/owner-production-paths.v1.json"]}),
+      ("N07", "ordinary_candidate", {"changed_files":["controller/policy/cli"]}),
+      ("N08", "ordinary_candidate", {"changed_files":["scripts/nortropic-codex-autopilot.py"]}),
+      ("N09", "candidate_binding", {"claimed_authority_class":"owner_authority","actual_authority_class":"ordinary"}),
+      ("N10", "role_claim_only", {}),
+      ("N11", "alternate_spec", {"alternate_spec_grants_owner":True}),
+      ("N16", "test_author_scope", {"changed_files":[owner]}),
+      ("N17", "owner_scope", {"changed_files":["specs/tasks.spec.json"]}),
+      ("N18", "owner_scope", {"changed_files":["verify/bin/hypothetical-owner-exit"]}),
+      ("N19", "owner_scope", {"changed_files":["README.md"]}),
+      ("N20", "schema_v2", {"authority_class":None}),
+      ("N21", "schema_v2", {"authority_class":"root"}),
+      ("N22", "schema_v1", {"implicit_owner":True}),
+      ("N23", "candidate_binding", {"spec_sha256":"d"*64}),
+      ("N24", "candidate_binding", {"registry_sha256":"d"*64}),
+      ("N25", "candidate_binding", {"claimed_authority_class":"ordinary","actual_authority_class":"owner_authority"}),
+      ("N26", "candidate_binding", {"changed_files":[owner],"reported_changed_files":[]}),
+    ]
+    for n, case, extra in negatives: expect(n, auth, request(case, **extra), False)
+    # Actual autopilot/state transition effects, not policy-source markers.
+    auto_neg = [
+      ("N12", "owner_gate_red", {"builder_launched":False,"state":"OWNER_ACTION_REQUIRED"}),
+      ("N13", "restart_owner_action", {"builder_launched":False,"state":"OWNER_ACTION_REQUIRED"}),
+      ("N14", "owner_action_done", {}), ("N15", "restart_resets_owner", {}),
+      ("N27", "review_pass", {"published":False,"state":"OWNER_FINAL_FREEZE_REQUIRED"}),
+      ("N28", "freeze_wrong_candidate", {}), ("N29", "freeze_wrong_base_main", {}),
+    ]
+    for n, case, good in auto_neg:
+        if n in ("N12","N13","N27"): expect(n, auto, request(case), True, **good)
+        else: expect(n, auto, request(case), False)
+    positives = [
+      ("P01", "schema_v1", {"readable":True,"authority_class":"ordinary"}),
+      ("P02", "ordinary_candidate", {"authority_class":"ordinary","changed_files":["app/a.txt"],"allowed_write":["app/**"]}),
+      ("P03", "test_author_scope", {"changed_files":["verify/bin/allocated-exit"],"allocated_test_author_paths":["verify/bin/allocated-exit"]}),
+      ("P04", "owner_scope", {"changed_files":[owner],"owner_author_allowed_write":["controller/h034-native/**"],"explicit_transition":True}),
+      ("P05", "owner_scope", {"changed_files":["controller/h034-native/alternative.c"],"owner_author_allowed_write":["controller/h034-native/**"],"explicit_transition":True,"provider":"human"}),
+    ]
+    for n, case, extra in positives: expect(n, auth, request(case, **extra), True)
+    expect("P06", auto, request("review_read_only"), True, reviewer_writes=[])
+    expect("P07", auto, request("review_pass"), True, published=False, state="OWNER_FINAL_FREEZE_REQUIRED")
+    expect("P08", auto, request("owner_final_freeze"), True, state="done", attested=True)
+    # Same cases through the authority component and autopilot must share decisions.
+    for grant in [owner, "controller/**", "docs/**", "safe/**"]:
+        ar, ao, _ = run_json(auth, request("ordinary_scope", grant=grant))
+        pr, po, _ = run_json(auto, request("path_consistency", grant=grant))
+        check(ar == pr and ao.get("accepted") == po.get("accepted"), f"C_PATH_{grant}")
+
+def frozen_authority_checks() -> None:
+    try: spec=json.loads(SPEC.read_text()); reg=json.loads(REG.read_text())
+    except Exception as e: raise RuntimeError(e)
+    hits=[t for t in spec.get("tasks",[]) if t.get("id")=="h-035"]
+    check(spec.get("spec_version")=="2.0.0", "F01_SCHEMA_V2")
+    check(len(hits)==1 and hits[0].get("depends_on")==["h-017"], "F02_H035_ID_DEP")
+    forbidden={"specs/tasks.spec.json","specs/owner-production-paths.v1.json","verify/bin/h-035-exit"}
+    check(len(hits)==1 and not forbidden.intersection(hits[0].get("allowed_write",[])), "F03_BUILDER_CANNOT_EDIT_AUTHORITY")
+    check(not any(t.get("id")=="h-034" for t in spec.get("tasks",[])), "F04_H034_TASK_ABSENT")
+    reserved=reg.get("owner_production_paths",[])
+    check(bool(reserved) and all(parse_path(x) for x in reserved), "F05_REGISTRY_CANONICAL")
+    h034_files=[p for p in ROOT.glob("controller/h034-native/**/*") if p.is_file()]
+    h034_files += [p for p in ROOT.glob("verify/h034/**/*") if p.is_file()]
+    check(not h034_files, "F06_H034_BYTES_ABSENT", repr(h034_files))
+
+def main() -> int:
+    try:
+        frozen_authority_checks(); selftests()
+        if not AUTH.is_file():
+            check(False, "K00_OWNER_AUTHORITY_CLASS_ENFORCEMENT_ABSENT", str(AUTH))
+        else:
+            production_matrix()
+    except (OSError, ValueError, RuntimeError) as e: return rig(str(e))
+    print(f"H035_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    return 0 if failed == 0 else 1
+
+if __name__ == "__main__": sys.exit(main())

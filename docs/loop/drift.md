@@ -373,3 +373,6 @@ arbitrary same-UID race-free: future H-034 must use the already accepted verifie
 protected snapshot → final rehash → protected-path execution model. The candidate-bound read-only
 owner audit remains required from the real macOS owner terminal before freeze. No H-034 or H-033
 artifact, dependency, service or runtime implementation was created or resumed.
+## 2026-08-13 — H-035 owner-production authoring separation prerequisite
+
+Owner allocated `h-035` (with `h-034` still reserved for the native finite verifier kernel) as the one-time bootstrap from ordinary builder authority to separate ordinary, TEST_AUTHOR and owner-production authoring mechanics. The test-author candidate freezes schema v2 task classes, the owner-production path registry, the bounded historical H-035 exception and the RED effect gate. No H-034 task, source, binary, recipe or identity manifest is created. Current production remains RED at `OWNER_AUTHORITY_CLASS_ENFORCEMENT_ABSENT`; autopilot remains paused. See `docs/loop/owner-author-workflow-v1.md`.
