@@ -1,0 +1,397 @@
+#!/usr/bin/env python3
+"""Frozen H-034 native finite-verifier gate. 0=PASS, 1=product RED, 2=rig/ODÖMBART."""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import platform
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+REGISTRY = ROOT / "specs/owner-production-paths.v1.json"
+KERNEL = ROOT / "verify/h034/kernel"
+RECIPE = ROOT / "verify/h034/build-recipe.json"
+MANIFEST = ROOT / "verify/h034/identity-manifest.json"
+OWNER_SURFACE = ("controller/h034-native/**", "verify/h034/kernel",
+                 "verify/h034/build-recipe.json", "verify/h034/identity-manifest.json")
+EVIDENCE_KEYS = ("schema_version", "producer_authority", "task", "candidate_sha",
+                 "task_spec_sha256", "gate_sha256", "probe_identity", "request_id",
+                 "result", "effect_sha256")
+RECEIPT_KEYS = ("schema_version", "observer_authority", "request_id", "candidate_sha",
+                "probe_identity", "probe_path", "probe_sha256", "effect_marker")
+ALLOWLIST_KEYS = ("schema_version", "probes")
+PROBE_KEYS = ("probe_identity", "probe_path", "probe_sha256", "effect_marker", "result")
+HEX40 = "1" * 40
+HEX64 = "2" * 64
+checks: list[tuple[str, bool, str]] = []
+
+
+class DuplicateKey(ValueError): pass
+class Rig(RuntimeError): pass
+
+
+def check(name: str, ok: bool, detail: object = "") -> None:
+    checks.append((name, bool(ok), str(detail)))
+    print(("PASS " if ok else "FAIL ") + name + (f": {detail}" if detail else ""))
+
+
+def strict(raw: bytes | str):
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out: raise DuplicateKey(key)
+            out[key] = value
+        return out
+    if isinstance(raw, bytes): raw = raw.decode("utf-8", "strict")
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def canonical_json(value: object) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+
+
+def sha_bytes(raw: bytes) -> str: return hashlib.sha256(raw).hexdigest()
+def sha_file(path: Path) -> str: return sha_bytes(path.read_bytes())
+
+
+def run(argv: list[str], *, cwd: Path | None = None, pass_fds: tuple[int, ...] = (),
+        env: dict[str, str] | None = None):
+    return subprocess.run(argv, cwd=cwd, text=True, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, pass_fds=pass_fds, check=False,
+                          env=env)
+
+
+def exact_dict(value: object, keys: tuple[str, ...]) -> bool:
+    return type(value) is dict and tuple(value.keys()) == keys
+
+
+def valid_hex(value: object, size: int) -> bool:
+    return type(value) is str and len(value) == size and all(c in "0123456789abcdef" for c in value)
+
+
+def evidence_valid(value: object) -> bool:
+    if not exact_dict(value, EVIDENCE_KEYS): return False
+    assert isinstance(value, dict)
+    return (type(value["schema_version"]) is int and value["schema_version"] == 1
+            and value["producer_authority"] == "_nortropic_provenance"
+            and value["task"] == "h-033"
+            and valid_hex(value["candidate_sha"], 40)
+            and valid_hex(value["task_spec_sha256"], 64)
+            and valid_hex(value["gate_sha256"], 64)
+            and type(value["probe_identity"]) is str and bool(value["probe_identity"])
+            and valid_hex(value["request_id"], 64)
+            and value["result"] in ("PASS", "FAIL", "ODÖMBART")
+            and valid_hex(value["effect_sha256"], 64))
+
+
+def receipt_valid(value: object) -> bool:
+    if not exact_dict(value, RECEIPT_KEYS): return False
+    assert isinstance(value, dict)
+    return (type(value["schema_version"]) is int and value["schema_version"] == 1
+            and value["observer_authority"] == "root-owned-h033-observer-v1"
+            and valid_hex(value["request_id"], 64) and valid_hex(value["candidate_sha"], 40)
+            and all(type(value[k]) is str and bool(value[k]) for k in
+                    ("probe_identity", "probe_path", "effect_marker"))
+            and Path(value["probe_path"]).is_absolute()
+            and valid_hex(value["probe_sha256"], 64))
+
+
+def allowlist_valid(value: object) -> bool:
+    if not exact_dict(value, ALLOWLIST_KEYS) or type(value["schema_version"]) is not int or value["schema_version"] != 1:
+        return False
+    probes = value["probes"]
+    if type(probes) is not list or not probes: return False
+    seen: set[str] = set()
+    for item in probes:
+        if not exact_dict(item, PROBE_KEYS): return False
+        pid = item["probe_identity"]
+        if type(pid) is not str or not pid or pid in seen: return False
+        seen.add(pid)
+        if (type(item["probe_path"]) is not str or not Path(item["probe_path"]).is_absolute()
+                or not valid_hex(item["probe_sha256"], 64)
+                or type(item["effect_marker"]) is not str or not item["effect_marker"]
+                or item["result"] not in ("PASS", "FAIL", "ODÖMBART")): return False
+    return True
+
+
+def judge_selftests() -> None:
+    receipt = {"schema_version":1,"observer_authority":"root-owned-h033-observer-v1",
+               "request_id":"3"*64,"candidate_sha":HEX40,"probe_identity":"h033-pass-v1",
+               "probe_path":"/Library/Application Support/Nortropic/provenance/probes/h033-pass-v1",
+               "probe_sha256":"4"*64,"effect_marker":"A"}
+    receipt_raw = canonical_json(receipt)
+    evidence = {"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033",
+                "candidate_sha":HEX40,"task_spec_sha256":HEX64,"gate_sha256":HEX64,
+                "probe_identity":"h033-pass-v1","request_id":"3"*64,"result":"PASS",
+                "effect_sha256":sha_bytes(receipt_raw)}
+    allowlist = {"schema_version":1,"probes":[{"probe_identity":"h033-pass-v1",
+                 "probe_path":receipt["probe_path"],"probe_sha256":"4"*64,
+                 "effect_marker":"A","result":"PASS"}]}
+    check("J_EXACT_FINITE_DOCUMENTS", evidence_valid(evidence) and receipt_valid(receipt)
+          and allowlist_valid(allowlist))
+    for name, raw, validator in (
+        ("J_MALFORMED", b"{", evidence_valid),
+        ("J_DUPLICATE", canonical_json(evidence)[:-2] + b',"result":"PASS"}\n', evidence_valid),
+        ("J_WRONG_TOP", b"[]\n", evidence_valid),
+    ):
+        try: ok = not validator(strict(raw))
+        except Exception: ok = True
+        check(name, ok)
+    for name, key, value in (
+        ("J_WRONG_TASK","task","h-032"), ("J_STALE_CANDIDATE","candidate_sha","0"*40),
+        ("J_WRONG_SPEC","task_spec_sha256","0"*64), ("J_WRONG_GATE","gate_sha256","0"*64),
+        ("J_WRONG_PROBE","probe_identity","other"), ("J_OLD_REQUEST","request_id","5"*64),
+        ("J_RESULT_NOT_TRISTATE","result","GREEN"), ("J_RECEIPT_DIGEST","effect_sha256","0"*64)):
+        mutant = dict(evidence); mutant[key] = value
+        # Shape remains valid for binding mutants; the fixed-plan comparison rejects them.
+        rejected = (not evidence_valid(mutant) or mutant[key] != evidence[key])
+        check(name, rejected)
+    bad_receipt = dict(receipt); bad_receipt["observer_authority"] = "producer"
+    check("J_PRODUCER_SELF_RECEIPT", not receipt_valid(bad_receipt))
+    bad_allow = {"schema_version":1,"probes":[allowlist["probes"][0],allowlist["probes"][0]]}
+    check("J_DUPLICATE_ALLOWLIST_PROBE", not allowlist_valid(bad_allow))
+    check("J_FIXED_RESULT_MAPPING", allowlist["probes"][0]["result"] == evidence["result"]
+          and allowlist["probes"][0]["effect_marker"] == receipt["effect_marker"])
+
+
+def frozen_checks() -> None:
+    spec = strict(SPEC.read_bytes()); reg = strict(REGISTRY.read_bytes())
+    tasks = spec.get("tasks", []) if isinstance(spec, dict) else []
+    hits = [t for t in tasks if isinstance(t, dict) and t.get("id") == "h-034"]
+    check("F_SCHEMA_V2", isinstance(spec, dict) and spec.get("spec_version") == "2.0.0")
+    check("F_H034_SINGLE_OWNER_TASK", len(hits) == 1 and hits[0].get("authority_class") == "owner_authority")
+    if len(hits) != 1: return
+    task = hits[0]
+    check("F_H034_DEPENDS_FINAL_H035", task.get("depends_on") == ["h-035"])
+    check("F_H033_CONSUMES_H034", any(t.get("id") == "h-033" and "h-034" in t.get("depends_on", []) for t in tasks if isinstance(t, dict)))
+    check("F_H034_TASK_GATE", task.get("exit_test") == "verify/bin/h-034-exit")
+    check("F_H034_OWNER_SURFACE", tuple(task.get("owner_author_allowed_write", [])) == OWNER_SURFACE
+          and task.get("allowed_write") == [])
+    check("F_REGISTRY_MATCH", isinstance(reg, dict)
+          and tuple(reg.get("owner_production_paths", [])) == OWNER_SURFACE)
+    criterion = task.get("exit_criterion", "")
+    terms = ("arm64 macOS", "exact final signed Mach-O", "zero third-party runtime dependencies",
+             "Python is never runtime authority", "same inherited regular-file descriptors",
+             "PASS, FAIL and ODÖMBART", "request_id", "no deployment target is selected by this contract",
+             "owner-author global deny")
+    check("F_NATIVE_FINITE_CONTRACT", isinstance(criterion, str) and all(x in criterion for x in terms))
+
+
+def load_artifact_json(path: Path, keys: tuple[str, ...]):
+    try: value = strict(path.read_bytes())
+    except Exception as exc: return None, str(exc)
+    return (value, "") if exact_dict(value, keys) else (None, "keys/order")
+
+
+def macho_observation(path: Path) -> dict[str, object]:
+    file_p = run(["/usr/bin/file", "-b", str(path)])
+    lipo_p = run(["/usr/bin/lipo", "-archs", str(path)])
+    sign_p = run(["/usr/bin/codesign", "-dvv", str(path)])
+    verify_p = run(["/usr/bin/codesign", "--verify", "--strict", str(path)])
+    load_p = run(["/usr/bin/otool", "-L", str(path)])
+    detail_p = run(["/usr/bin/otool", "-l", str(path)])
+    if any(p.returncode for p in (file_p,lipo_p,sign_p,verify_p,load_p,detail_p)):
+        raise Rig("Mach-O inspection failed")
+    signature = sign_p.stderr + sign_p.stdout
+    cd = re.search(r"^CDHash=([0-9a-f]+)$", signature, re.M)
+    deps = []
+    for line in load_p.stdout.splitlines()[1:]:
+        item = line.strip().split(" (compatibility", 1)[0]
+        if item: deps.append(item)
+    dylinker = ""
+    build: dict[str, str] = {}
+    lines = detail_p.stdout.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == "cmd LC_LOAD_DYLINKER":
+            for q in lines[i:i+8]:
+                m = re.search(r"name (\S+)", q)
+                if m: dylinker = m.group(1); break
+        if line.strip() == "cmd LC_BUILD_VERSION":
+            for q in lines[i:i+12]:
+                m = re.match(r"\s*(platform|minos|sdk)\s+(\S+)", q)
+                if m: build[m.group(1)] = m.group(2)
+    return {"file_type":file_p.stdout.strip(), "architecture":lipo_p.stdout.strip(),
+            "code_signature":"adhoc" if "Signature=adhoc" in signature else "other",
+            "cdhash":cd.group(1) if cd else "", "dependencies":deps,
+            "dylinker":dylinker, "macho_build_version":build}
+
+
+def build_once(recipe: dict, output: Path) -> subprocess.CompletedProcess:
+    argv = [recipe["compiler_path"], *recipe["compile_argv"], "-o", str(output)]
+    # No caller build flags, compiler, SDK or deployment target enter through
+    # the environment. Absolute recipe paths and argv are the whole build plan.
+    clean_env = {"PATH":"/usr/bin:/bin", "LANG":"C", "LC_ALL":"C",
+                 "ZERO_AR_DATE":"1"}
+    p = run(argv, cwd=ROOT, env=clean_env)
+    if p.returncode: return p
+    return run([recipe["codesign_path"], *recipe["sign_argv"], str(output)],
+               cwd=ROOT, env=clean_env)
+
+
+def invoke_kernel(evidence_raw: bytes, receipt_raw: bytes, allowlist_raw: bytes,
+                  *, require: str = "PASS", overrides: dict[str,str] | None = None,
+                  nonregular: str | None = None):
+    with tempfile.TemporaryDirectory(prefix="h034-semantic-") as raw:
+        work = Path(raw)
+        paths = []
+        for name, data in (("evidence",evidence_raw),("receipt",receipt_raw),("allowlist",allowlist_raw)):
+            path = work/name; path.write_bytes(data); paths.append(path)
+        fds = [os.open(p, os.O_RDONLY) for p in paths]
+        extra_fd = None
+        try:
+            if nonregular == "directory":
+                os.close(fds[0]); fds[0] = os.open(work, os.O_RDONLY)
+            elif nonregular == "pipe":
+                rfd, wfd = os.pipe(); os.close(wfd); os.close(fds[0]); fds[0] = rfd
+            args = {"task":"h-033","candidate":HEX40,"task-spec-sha256":HEX64,
+                    "gate-sha256":HEX64,"probe":"h033-pass-v1","request-id":"3"*64,
+                    "require-result":require}
+            if overrides: args.update(overrides)
+            argv = [str(KERNEL), "h033-verify", "--evidence-fd", str(fds[0]),
+                    "--receipt-fd", str(fds[1]), "--allowlist-fd", str(fds[2])]
+            for key, value in args.items(): argv += ["--"+key, value]
+            return run(argv, pass_fds=tuple(fds))
+        finally:
+            for fd in fds:
+                try: os.close(fd)
+                except OSError: pass
+
+
+def semantic_tests() -> None:
+    receipt = {"schema_version":1,"observer_authority":"root-owned-h033-observer-v1",
+               "request_id":"3"*64,"candidate_sha":HEX40,"probe_identity":"h033-pass-v1",
+               "probe_path":"/Library/Application Support/Nortropic/provenance/probes/h033-pass-v1",
+               "probe_sha256":"4"*64,"effect_marker":"A"}
+    rr = canonical_json(receipt)
+    evidence = {"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033",
+                "candidate_sha":HEX40,"task_spec_sha256":HEX64,"gate_sha256":HEX64,
+                "probe_identity":"h033-pass-v1","request_id":"3"*64,"result":"PASS",
+                "effect_sha256":sha_bytes(rr)}
+    allowlist = {"schema_version":1,"probes":[
+        {"probe_identity":"h033-pass-v1","probe_path":receipt["probe_path"],
+         "probe_sha256":"4"*64,"effect_marker":"A","result":"PASS"},
+        {"probe_identity":"h033-fail-v1","probe_path":"/Library/Application Support/Nortropic/provenance/probes/h033-fail-v1",
+         "probe_sha256":"5"*64,"effect_marker":"B","result":"FAIL"},
+        {"probe_identity":"h033-odombar-v1","probe_path":"/Library/Application Support/Nortropic/provenance/probes/h033-odombar-v1",
+         "probe_sha256":"6"*64,"effect_marker":"C","result":"ODÖMBART"}]}
+    er, ar = canonical_json(evidence), canonical_json(allowlist)
+    expected = f"VERIFIED_RESULT=PASS\nREQUEST_ID={'3'*64}\nEFFECT_SHA256={sha_bytes(rr)}\n"
+    p = invoke_kernel(er, rr, ar)
+    check("K_H033_PASS_POSITIVE", p.returncode == 0 and p.stdout == expected and not p.stderr, repr((p.returncode,p.stdout,p.stderr)))
+    # Stable same-descriptor authority: opened objects remain valid after every pathname is replaced.
+    with tempfile.TemporaryDirectory(prefix="h034-fd-stability-") as raw:
+        w=Path(raw); paths=[]; fds=[]
+        for name,data in (("e",er),("r",rr),("a",ar)):
+            q=w/name; q.write_bytes(data); paths.append(q); fds.append(os.open(q,os.O_RDONLY))
+        for q in paths: q.unlink(); q.write_bytes(b"hostile replacement\n")
+        for fd in fds: os.lseek(fd, 7, os.SEEK_SET)
+        argv=[str(KERNEL),"h033-verify","--evidence-fd",str(fds[0]),"--receipt-fd",str(fds[1]),"--allowlist-fd",str(fds[2]),
+              "--task","h-033","--candidate",HEX40,"--task-spec-sha256",HEX64,"--gate-sha256",HEX64,
+              "--probe","h033-pass-v1","--request-id","3"*64,"--require-result","PASS"]
+        p=run(argv,pass_fds=tuple(fds)); [os.close(fd) for fd in fds]
+        check("K_SAME_FD_PATH_REPLACEMENT",p.returncode==0 and p.stdout==expected and not p.stderr,repr((p.returncode,p.stdout,p.stderr)))
+    for pid,result,mark,digest in (("h033-fail-v1","FAIL","B","5"*64),("h033-odombar-v1","ODÖMBART","C","6"*64)):
+        r=dict(receipt,probe_identity=pid,probe_path=f"/Library/Application Support/Nortropic/provenance/probes/{pid}",probe_sha256=digest,effect_marker=mark)
+        rraw=canonical_json(r); e=dict(evidence,probe_identity=pid,result=result,effect_sha256=sha_bytes(rraw))
+        p=invoke_kernel(canonical_json(e),rraw,ar,require=result,overrides={"probe":pid})
+        check(f"K_H033_{'ODOMBAR' if result=='ODÖMBART' else result}_POSITIVE",p.returncode==0 and f"VERIFIED_RESULT={result}\n" in p.stdout and not p.stderr)
+        p=invoke_kernel(canonical_json(e),rraw,ar,require="PASS",overrides={"probe":pid})
+        check(f"K_H033_{'ODOMBAR' if result=='ODÖMBART' else result}_NOT_PASS",p.returncode==1 and not p.stdout)
+    mutations=[]
+    for label,key,val in (("TASK","task","h-032"),("CANDIDATE","candidate_sha","0"*40),("SPEC","task_spec_sha256","0"*64),
+                          ("GATE","gate_sha256","0"*64),("PROBE","probe_identity","other"),("REQUEST","request_id","5"*64),
+                          ("RESULT","result","GREEN"),("RECEIPT_DIGEST","effect_sha256","0"*64)):
+        e=dict(evidence); e[key]=val; mutations.append((label,canonical_json(e),rr,ar,{}))
+    mutations += [("MALFORMED_JSON",b"{",rr,ar,{}),("DUPLICATE_KEY",er[:-2]+b',"result":"PASS"}\n',rr,ar,{}),
+                  ("OLD_RECEIPT",er,canonical_json(dict(receipt,request_id="5"*64)),ar,{}),
+                  ("CALLER_REQUEST",er,rr,ar,{"request-id":"5"*64}),
+                  ("UNKNOWN_FLAG",er,rr,ar,{"unknown":"x"})]
+    for label,e,r,a,o in mutations:
+        p=invoke_kernel(e,r,a,overrides=o)
+        check("K_REJECT_"+label,p.returncode==1 and not p.stdout,repr((p.returncode,p.stdout,p.stderr)))
+    for kind in ("directory","pipe"):
+        p=invoke_kernel(er,rr,ar,nonregular=kind)
+        check("K_REJECT_NONREGULAR_"+kind.upper(),p.returncode==1 and not p.stdout)
+
+
+def production_checks() -> None:
+    source_files = sorted(p for p in (ROOT/"controller/h034-native").glob("**/*")
+                          if p.is_file()) if (ROOT/"controller/h034-native").is_dir() else []
+    sources = [p for p in source_files if p.suffix == ".c"]
+    required = {"K_SOURCE_PRESENT":bool(sources), "K_KERNEL_PRESENT":KERNEL.exists(),
+                "K_RECIPE_PRESENT":RECIPE.exists(), "K_MANIFEST_PRESENT":MANIFEST.exists()}
+    for name, ok in required.items(): check(name,ok)
+    if not all(required.values()): return
+    rs=("schema_version","language","target_arch","compiler_path","compiler_sha256","compile_argv",
+        "codesign_path","codesign_sha256","sign_argv","deployment_target_policy")
+    ms=("schema_version","artifact_path","artifact_sha256","build_recipe_sha256","source_sha256",
+        "architecture","file_type","code_signature","cdhash","dylinker","dependencies","macho_build_version")
+    recipe, why_r=load_artifact_json(RECIPE,rs); manifest, why_m=load_artifact_json(MANIFEST,ms)
+    check("K_RECIPE_STRICT",recipe is not None,why_r); check("K_MANIFEST_STRICT",manifest is not None,why_m)
+    if recipe is None or manifest is None: return
+    clang=run(["/usr/bin/xcrun","--find","clang"])
+    compiler=Path(recipe["compiler_path"]); signer=Path(recipe["codesign_path"])
+    recipe_ok=(recipe["schema_version"]==1 and recipe["language"]=="C" and recipe["target_arch"]=="arm64"
+      and clang.returncode==0 and compiler.is_absolute() and compiler.is_file() and not compiler.is_symlink()
+      and compiler==Path(clang.stdout.strip())
+      and sha_file(Path(recipe["compiler_path"]))==recipe["compiler_sha256"]
+      and signer==Path("/usr/bin/codesign") and signer.is_file() and not signer.is_symlink()
+      and sha_file(signer)==recipe["codesign_sha256"]
+      and type(recipe["compile_argv"]) is list and all(type(x) is str for x in recipe["compile_argv"])
+      and "-std=c11" in recipe["compile_argv"] and "-arch" in recipe["compile_argv"] and "arm64" in recipe["compile_argv"]
+      and "-o" not in recipe["compile_argv"] and not any("macosx-version-min" in x for x in recipe["compile_argv"])
+      and recipe["sign_argv"]==["--force","--sign","-","--timestamp=none"]
+      and recipe["deployment_target_policy"]=="derive-from-Apple-toolchain-and-bind-final-Mach-O")
+    listed=[ROOT/x for x in recipe["compile_argv"] if x.startswith("controller/h034-native/")]
+    recipe_ok=(recipe_ok and listed==sources
+               and all(x.suffix==".c" and x.is_file() and not x.is_symlink() for x in listed)
+               and all(x.suffix in (".c",".h") and not x.is_symlink() for x in source_files))
+    check("K_BUILD_RECIPE_BOUND",recipe_ok)
+    mode=KERNEL.lstat().st_mode
+    check("K_FINAL_REGULAR_EXECUTABLE",stat.S_ISREG(mode) and not KERNEL.is_symlink() and bool(mode&0o111))
+    try: observed=macho_observation(KERNEL)
+    except Exception as exc: check("K_FINAL_SIGNED_ARM64_MACHO",False,exc); return
+    check("K_FINAL_SIGNED_ARM64_MACHO",observed["architecture"]=="arm64" and "Mach-O 64-bit executable arm64" in observed["file_type"]
+          and observed["code_signature"]=="adhoc" and bool(observed["cdhash"]))
+    deps=observed["dependencies"]
+    check("K_ZERO_THIRD_PARTY_RUNTIME_DEPS",all(x.startswith("/usr/lib/") or x.startswith("/System/Library/Frameworks/") for x in deps),repr(deps))
+    check("K_APPLE_DYLD_ONLY",observed["dylinker"]=="/usr/lib/dyld",observed["dylinker"])
+    source_hash={str(x.relative_to(ROOT)):sha_file(x) for x in source_files}
+    manifest_ok=(manifest["schema_version"]==1 and manifest["artifact_path"]=="verify/h034/kernel"
+      and manifest["artifact_sha256"]==sha_file(KERNEL) and manifest["build_recipe_sha256"]==sha_file(RECIPE)
+      and manifest["source_sha256"]==source_hash and all(manifest[k]==observed[k] for k in
+        ("architecture","file_type","code_signature","cdhash","dylinker","dependencies","macho_build_version")))
+    check("K_IDENTITY_MANIFEST_BINDS_FINAL",manifest_ok)
+    with tempfile.TemporaryDirectory(prefix="h034-rebuild-") as raw:
+        one=Path(raw)/"one"; two=Path(raw)/"two"
+        p1=build_once(recipe,one); p2=build_once(recipe,two)
+        ok=p1.returncode==p2.returncode==0 and sha_file(one)==sha_file(two)==sha_file(KERNEL)
+        check("K_DETERMINISTIC_SIGNED_REBUILD",ok,(p1.stderr+p2.stderr)[-500:])
+    semantic_tests()
+
+
+def main() -> int:
+    try:
+        frozen_checks(); judge_selftests()
+        if platform.system() != "Darwin" or platform.machine() != "arm64":
+            print("H034_GATE_RESULT=ODÖMBART_PLATFORM"); return 2
+        production_checks()
+    except Rig as exc:
+        print(f"RIG_ERROR={exc}"); return 2
+    except Exception as exc:
+        print(f"RIG_ERROR={type(exc).__name__}:{exc}"); return 2
+    passed=sum(ok for _,ok,_ in checks); failed=len(checks)-passed
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+    print(f"H034_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    print("H034_GATE_RESULT="+("PASS" if failed==0 else "EXPECTED_RED"))
+    return 0 if failed==0 else 1
+
+
+if __name__ == "__main__": raise SystemExit(main())
