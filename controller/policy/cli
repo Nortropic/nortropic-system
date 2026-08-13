@@ -187,13 +187,13 @@ def gor_check(task_id: str, base_arg: str, kand_arg: str, spec_fil: Path = SPEC)
                       f"{', '.join(saknade)} ändrades inte i samma commit", *arg)
 
     # 4. Budgetarna. Tak, inte mål (LOOP-ÄGARHAND-10).
-    tak_filer = std.get("max_changed_files")
+    tak_filer = task.get("max_changed_files", std.get("max_changed_files"))
     if tak_filer is not None and len(filer) > tak_filer:
         return avslag(FILBUDGET, "filbudget",
                       f"filbudget överskriden: {len(filer)} ändrade filer, taket är {tak_filer}",
                       *arg)
 
-    tak_rader = std.get("max_added_lines")
+    tak_rader = task.get("max_added_lines", std.get("max_added_lines"))
     if tak_rader is not None and rader > tak_rader:
         return avslag(RADBUDGET, "radbudget",
                       f"radbudget överskriden: {rader} tillagda rader, taket är {tak_rader}",
