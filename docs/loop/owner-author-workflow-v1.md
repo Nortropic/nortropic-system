@@ -24,7 +24,9 @@ The frozen gate's negative and positive production matrices are normative. They 
 
 ## Operational entrypoints frozen by H-035
 
-Production acceptance never calls a case-name probe. Normal ordinary and owner routing, including restart from reconstructed state, enters through `controller/loop/cli run <config.json>`. The config may substitute only disposable Git/state/workspace roots and an inert provider executable. Selection, claim, authority classification, persistence and launch decisions remain production code. A provider marker observes a launch; it does not decide one.
+Production acceptance never calls a case-name probe. Normal ordinary and owner routing, including restart from reconstructed state, enters through `controller/loop/cli run <config.json>`. The config may substitute only disposable Git/state/workspace roots and a disposable provider executable. Selection, claim, authority classification, persistence and launch decisions remain production code. No file, JSON field, PID, environment echo or marker written or reported by the subject proves provider execution. The gate-side harness observes the disposable executable's process image in the operating-system process table while that executable is alive.
+
+Nested Seatbelt may deny the provider exec before this observation. That denial is `ODÖMBART`, never PASS or product FAIL. The frozen owner-terminal interface is exactly `verify/bin/h-035-exit --owner-acceptance <candidate-sha> <artifact-path>`. It requires a clean checkout at that exact candidate and writes a raw JSON artifact outside the candidate binding `task`, `candidate_sha`, `gate_sha256`, `spec_sha256`, `acceptance_mode=H035_OWNER_PROVIDER_EXEC_V1`, normal entrypoint, observer, loop exit and observed boolean. A candidate is not freeze-eligible until this same normal-route subgate returns zero in the authorized macOS owner environment. Output is never committed back into the candidate.
 
 The normal authority-control CLI is `controller/authority/cli`. Its operational commands are:
 
@@ -37,7 +39,7 @@ The normal authority-control CLI is `controller/authority/cli`. Its operational 
 - `owner-freeze` — explicit candidate/review/base/main-bound final transition;
 - `path-consistency` — diagnostic comparison of results from the real authority consumers, never an acceptance substitute for those consumers.
 
-Commands consume one strict JSON request on stdin and emit one strict JSON result. `accepted` is boolean. Accepted state transitions additionally report the persisted resulting `state`; external effects report `builder_launched`, `owner_author_process_launched`, `published` and `merged` as applicable. These fields report effects already decided and performed by the production transition. They are not caller-selected case names.
+Commands consume one strict JSON request on stdin and may emit diagnostic JSON. No returned field is transition authority. The gate snapshots persisted state, bounded workspace effects and local-bare-remote refs before the command and inspects them again afterward. Rejected owner-author/freeze attempts change none of them. Explicit owner-author creates a persisted attempt plus bounded workspace effect; recovery reads persisted state and unknown state remains persisted fail-closed; review PASS persists `OWNER_FINAL_FREEZE_REQUIRED` while remote refs remain byte-identical; exact owner-freeze alone persists `OWNER_FROZEN`. Diagnostic fields must agree but can never replace those observations.
 
 Canonical authoritative operation ignores caller-selected spec or registry paths. Fixture paths are accepted only by separately designated non-authoritative unit-test modes; the commands above resolve the canonical spec and registry from the candidate/repository identity supplied to the transition and compare caller-provided digests rather than trusting them.
 
@@ -51,9 +53,9 @@ The registry is a duplicate-aware JSON object with exactly seven keys: `schema_v
 PROPERTY=owner RED routing and ordinary positive control
 SUBJECT=controller/loop/cli
 ENTRYPOINT=run <config.json>
-FIXTURE=disposable state/workspaces plus inert provider marker
-CURRENT_RESULT=owner task reaches ordinary claimed state; nested G20 may reject provider before marker
-FUTURE_REQUIRED_RESULT=owner persists OWNER_ACTION_REQUIRED without provider; ordinary attempts provider
+FIXTURE=disposable state/workspaces plus externally observed disposable provider process image
+CURRENT_RESULT=owner task reaches ordinary claimed state; ordinary effect requires candidate-bound owner acceptance when nested exec is denied
+FUTURE_REQUIRED_RESULT=owner persists OWNER_ACTION_REQUIRED without provider; ordinary provider executable is actually exec'd
 CLASS=PRODUCTION_ACCEPTANCE
 
 PROPERTY=restart/recovery persistence and unknown-state refusal
@@ -61,15 +63,15 @@ SUBJECT=controller/loop/cli plus controller/authority/cli
 ENTRYPOINT=run <same config> in a new process; recover
 FIXTURE=same disposable persisted state
 CURRENT_RESULT=owner state is ordinary claimed, not OWNER_ACTION_REQUIRED
-FUTURE_REQUIRED_RESULT=owner state preserved; unknown state fails closed
+FUTURE_REQUIRED_RESULT=owner state preserved in artifacts; unknown state remains persisted fail-closed
 CLASS=PRODUCTION_ACCEPTANCE
 
 PROPERTY=task, docs_impact, registry and path-language authority
 SUBJECT=canonical task/registry consumers used by policy, envelope and routing
-ENTRYPOINT=validate-task; validate-registry; path-consistency
+ENTRYPOINT=every real validate/policy/envelope/loop/owner-transition/invariant consumer; path-consistency is diagnostic only
 FIXTURE=canonical candidate plus one-defect inputs
 CURRENT_RESULT=operational authority component absent
-FUTURE_REQUIRED_RESULT=complete negative/positive matrix and identical consumer verdicts
+FUTURE_REQUIRED_RESULT=every enumerated real registry/path consumer rejects each one-defect mutant consistently
 CLASS=PRODUCTION_ACCEPTANCE
 
 PROPERTY=actor and candidate scope
@@ -85,7 +87,7 @@ SUBJECT=owner transition and external author-process boundary
 ENTRYPOINT=owner-author
 FIXTURE=identity-bound disposable owner task/state/workspace
 CURRENT_RESULT=operational authority component absent
-FUTURE_REQUIRED_RESULT=negative bindings reject before workspace/process; exact binding begins bounded attempt
+FUTURE_REQUIRED_RESULT=negative bindings leave state/workspace unchanged; exact binding persists attempt and creates bounded workspace
 CLASS=OWNER_TRANSITION_ACCEPTANCE
 
 PROPERTY=review publication guard and final freeze
@@ -93,7 +95,7 @@ SUBJECT=review-result and owner-final transitions
 ENTRYPOINT=record-review; owner-freeze
 FIXTURE=disposable candidate and local bare remote
 CURRENT_RESULT=operational authority component absent
-FUTURE_REQUIRED_RESULT=review PASS cannot publish; exact explicit freeze alone may advance
+FUTURE_REQUIRED_RESULT=review PASS persists final-freeze-required with identical remote refs; exact explicit freeze alone persists frozen state
 CLASS=OWNER_TRANSITION_ACCEPTANCE
 
 PROPERTY=path parser and registry judge integrity
@@ -105,4 +107,4 @@ FUTURE_REQUIRED_RESULT=PASS
 CLASS=JUDGE_SELFTEST
 ```
 
-No material exit property is established only by a judge self-test. Synthetic `probe`, `authority-probe`, or caller-selected semantic case commands are forbidden as production acceptance.
+No material exit property is established only by a judge self-test, returned JSON, source shape, or a subject-forgeable marker. Synthetic `probe`, `authority-probe`, `path-consistency`, and helper-only registry validation are `JUDGE_SELFTEST_ONLY`; they can never satisfy a production exit clause.
