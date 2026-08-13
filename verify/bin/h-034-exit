@@ -8,10 +8,12 @@ import os
 import platform
 import re
 import secrets
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +33,8 @@ ALLOWLIST_KEYS = ("schema_version", "probes")
 PROBE_KEYS = ("probe_identity", "probe_path", "probe_sha256", "effect_marker", "result")
 HEX40 = "1" * 40
 HEX64 = "2" * 64
+TOOL_TIMEOUT = 15.0
+KERNEL_TIMEOUT = 3.0
 checks: list[tuple[str, bool, str]] = []
 
 
@@ -62,11 +66,52 @@ def sha_bytes(raw: bytes) -> str: return hashlib.sha256(raw).hexdigest()
 def sha_file(path: Path) -> str: return sha_bytes(path.read_bytes())
 
 
+def process_group_gone(pgid: int) -> bool:
+    try: os.killpg(pgid, 0)
+    except ProcessLookupError: return True
+    except PermissionError: return False
+    return False
+
+
 def run(argv: list[str], *, cwd: Path | None = None, pass_fds: tuple[int, ...] = (),
-        env: dict[str, str] | None = None):
-    return subprocess.run(argv, cwd=cwd, text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE, pass_fds=pass_fds, check=False,
-                          env=env)
+        env: dict[str, str] | None = None, timeout: float = TOOL_TIMEOUT,
+        timeout_is_rig: bool = True):
+    """Run every disposable process in its own bounded, killable group."""
+    proc = subprocess.Popen(argv, cwd=cwd, text=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, pass_fds=pass_fds, env=env,
+                            start_new_session=True)
+    timed_out = False
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        try: os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        try: stdout, stderr = proc.communicate(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+    result = subprocess.CompletedProcess(argv, 124 if timed_out else proc.returncode,
+                                         stdout, stderr)
+    result.timed_out = timed_out
+    result.process_group_clean = proc.poll() is not None and process_group_gone(proc.pid)
+    if not result.process_group_clean:
+        raise Rig("process-group cleanup failed")
+    if result.timed_out and timeout_is_rig:
+        raise Rig("disposable tool timeout")
+    return result
+
+
+def timeout_selftests() -> None:
+    fast = run(["/usr/bin/true"], timeout=1.0, timeout_is_rig=False)
+    slow = run([sys.executable, "-c", "import time;time.sleep(.15)"], timeout=1.0,
+               timeout_is_rig=False)
+    hang = run([sys.executable, "-c", "import time;time.sleep(30)"], timeout=.15,
+               timeout_is_rig=False)
+    check("J_TIMEOUT_FAST_PASS", fast.returncode == 0 and not fast.timed_out and fast.process_group_clean)
+    check("J_TIMEOUT_SLOW_PASS", slow.returncode == 0 and not slow.timed_out and slow.process_group_clean)
+    check("J_TIMEOUT_HANG_FAIL_CLOSED_CLEANUP",
+          hang.returncode == 124 and hang.timed_out and hang.process_group_clean,
+          repr((hang.returncode,hang.timed_out,hang.process_group_clean)))
 
 
 def exact_dict(value: object, keys: tuple[str, ...]) -> bool:
@@ -178,6 +223,16 @@ def judge_selftests() -> None:
             p=run(["/usr/bin/codesign","-dvvv","--",str(binary)])
             ok=p.returncode==0 and re.search(r"^CDHash=[0-9a-f]+$",p.stderr+p.stdout,re.M) is not None
         check("J_OWNER_CODESIGN_CDHASH_POSITIVE",ok,(p.stderr+p.stdout)[-300:] if 'p' in locals() else "tool lookup")
+        if ok:
+            load=run([str(binary)], timeout=KERNEL_TIMEOUT)
+            detail=run(["/usr/bin/otool","-l",str(binary)])
+            has_uuid=detail.returncode==0 and re.search(r"^\s*cmd LC_UUID\s*$",detail.stdout,re.M) is not None
+            check("J_OWNER_SIGNED_LOADABLE_UUID_POSITIVE",
+                  load.returncode==0 and not load.stdout and not load.stderr and has_uuid
+                  and load.process_group_clean,
+                  repr((load.returncode,load.timed_out,load.process_group_clean,load.stderr[-200:])))
+        else:
+            check("J_OWNER_SIGNED_LOADABLE_UUID_POSITIVE",False,"fixture unavailable")
 
 
 def frozen_checks() -> None:
@@ -202,10 +257,11 @@ def frozen_checks() -> None:
              "owner-author global deny")
     check("F_NATIVE_FINITE_CONTRACT", isinstance(criterion, str) and all(x in criterion for x in terms))
     summary=task.get("summary","")
-    r3_terms=("one closed, exact sequence", "no response-file, pass-through, target-triple, deployment-selector or extension slot",
-              "fixed identifier independent of output basename", "every required ordered JSON field and relationship")
-    check("F_R3_CLOSED_BUILD_AND_METAMORPHIC_CONTRACT",
-          isinstance(summary,str) and all(x in summary for x in r3_terms))
+    r4_terms=("one closed, exact sequence", "normal loadable LC_UUID",
+              "bounded process-group timeout", "deterministic unsigned compile",
+              "final signed artifact's exact digest and CDHash")
+    check("F_R4_LOADABLE_BOUNDED_BUILD_CONTRACT",
+          isinstance(summary,str) and all(x in summary for x in r4_terms))
 
 
 def load_artifact_json(path: Path, keys: tuple[str, ...]):
@@ -231,6 +287,7 @@ def macho_observation(path: Path) -> dict[str, object]:
         item = line.strip().split(" (compatibility", 1)[0]
         if item: deps.append(item)
     dylinker = ""
+    uuid = ""
     build: dict[str, str] = {}
     lines = detail_p.stdout.splitlines()
     for i, line in enumerate(lines):
@@ -242,20 +299,28 @@ def macho_observation(path: Path) -> dict[str, object]:
             for q in lines[i:i+12]:
                 m = re.match(r"\s*(platform|minos|sdk)\s+(\S+)", q)
                 if m: build[m.group(1)] = m.group(2)
+        if line.strip() == "cmd LC_UUID":
+            for q in lines[i:i+6]:
+                m = re.match(r"\s*uuid\s+([0-9A-Fa-f-]+)", q)
+                if m: uuid = m.group(1).upper(); break
     return {"file_type":file_p.stdout.strip(), "architecture":lipo_p.stdout.strip(),
             "code_signature":"adhoc" if "Signature=adhoc" in signature else "other",
             "cdhash":cd.group(1) if cd else "", "dependencies":deps,
-            "dylinker":dylinker, "macho_build_version":build}
+            "dylinker":dylinker, "uuid":uuid, "macho_build_version":build}
 
 
-def build_once(recipe: dict, output: Path) -> subprocess.CompletedProcess:
+def compile_once(recipe: dict, output: Path) -> subprocess.CompletedProcess:
     argv = [recipe["compiler_path"], *recipe["compile_argv"], "-o", str(output)]
     # No caller build flags, compiler, SDK or deployment target enter through
     # the environment. Absolute recipe paths and argv are the whole build plan.
     clean_env = {"PATH":"/usr/bin:/bin", "LANG":"C", "LC_ALL":"C",
+                 "ZERO_AR_DATE":"1", "TMPDIR":str(output.parent)}
+    return run(argv, cwd=ROOT, env=clean_env)
+
+
+def sign_once(recipe: dict, output: Path) -> subprocess.CompletedProcess:
+    clean_env = {"PATH":"/usr/bin:/bin", "LANG":"C", "LC_ALL":"C",
                  "ZERO_AR_DATE":"1"}
-    p = run(argv, cwd=ROOT, env=clean_env)
-    if p.returncode: return p
     return run([recipe["codesign_path"], *recipe["sign_argv"], str(output)],
                cwd=ROOT, env=clean_env)
 
@@ -263,7 +328,7 @@ def build_once(recipe: dict, output: Path) -> subprocess.CompletedProcess:
 def exact_compile_argv(sdk_path: str, sources: list[str]) -> list[str]:
     """The complete shell-free build plan; there is no extension flag surface."""
     return ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
-            "-arch", "arm64", "-isysroot", sdk_path, "-Wl,-no_uuid", *sources]
+            "-arch", "arm64", "-isysroot", sdk_path, *sources]
 
 
 def compile_argv_allowed(argv: object, sdk_path: str, sources: list[str]) -> bool:
@@ -310,7 +375,8 @@ def invoke_kernel(evidence_raw: bytes, receipt_raw: bytes, allowlist_raw: bytes,
             argv = [str(KERNEL), "h033-verify", "--evidence-fd", str(fds[0]),
                     "--receipt-fd", str(fds[1]), "--allowlist-fd", str(fds[2])]
             for key, value in args.items(): argv += ["--"+key, value]
-            return run(argv, pass_fds=tuple(fds))
+            return run(argv, pass_fds=tuple(fds), timeout=KERNEL_TIMEOUT,
+                       timeout_is_rig=False)
         finally:
             for fd in fds:
                 try: os.close(fd)
@@ -350,7 +416,7 @@ def semantic_tests() -> None:
         argv=[str(KERNEL),"h033-verify","--evidence-fd",str(fds[0]),"--receipt-fd",str(fds[1]),"--allowlist-fd",str(fds[2]),
               "--task","h-033","--candidate",candidate,"--task-spec-sha256",spec_digest,"--gate-sha256",gate_digest,
               "--probe",probe_id,"--request-id",request_id,"--require-result","PASS"]
-        p=run(argv,pass_fds=tuple(fds)); [os.close(fd) for fd in fds]
+        p=run(argv,pass_fds=tuple(fds),timeout=KERNEL_TIMEOUT,timeout_is_rig=False); [os.close(fd) for fd in fds]
         check("K_SAME_FD_PATH_REPLACEMENT",p.returncode==0 and p.stdout==expected and not p.stderr,repr((p.returncode,p.stdout,p.stderr)))
     for result in ("FAIL","ODÖMBART"):
         pid=f"h033-{result.lower()}-{secrets.token_hex(8)}"; digest=secrets.token_hex(32)
@@ -417,7 +483,7 @@ def production_checks() -> None:
         "sdk_settings_sha256","compile_argv",
         "codesign_path","codesign_sha256","sign_argv","deployment_target_policy")
     ms=("schema_version","artifact_path","artifact_sha256","build_recipe_sha256","source_sha256",
-        "architecture","file_type","code_signature","cdhash","dylinker","dependencies","macho_build_version")
+        "architecture","file_type","code_signature","cdhash","dylinker","uuid","dependencies","macho_build_version")
     recipe, why_r=load_artifact_json(RECIPE,rs); manifest, why_m=load_artifact_json(MANIFEST,ms)
     check("K_RECIPE_STRICT",recipe is not None,why_r); check("K_MANIFEST_STRICT",manifest is not None,why_m)
     if recipe is None or manifest is None: return
@@ -445,7 +511,7 @@ def production_checks() -> None:
     try: observed=macho_observation(KERNEL)
     except Exception as exc: check("K_FINAL_SIGNED_ARM64_MACHO",False,exc); return
     check("K_FINAL_SIGNED_ARM64_MACHO",observed["architecture"]=="arm64" and "Mach-O 64-bit executable arm64" in observed["file_type"]
-          and observed["code_signature"]=="adhoc" and bool(observed["cdhash"]))
+          and observed["code_signature"]=="adhoc" and bool(observed["cdhash"]) and bool(observed["uuid"]))
     deps=observed["dependencies"]
     check("K_ZERO_THIRD_PARTY_RUNTIME_DEPS",all(x.startswith("/usr/lib/") or x.startswith("/System/Library/Frameworks/") for x in deps),repr(deps))
     check("K_APPLE_DYLD_ONLY",observed["dylinker"]=="/usr/lib/dyld",observed["dylinker"])
@@ -453,19 +519,33 @@ def production_checks() -> None:
     manifest_ok=(manifest["schema_version"]==1 and manifest["artifact_path"]=="verify/h034/kernel"
       and manifest["artifact_sha256"]==sha_file(KERNEL) and manifest["build_recipe_sha256"]==sha_file(RECIPE)
       and manifest["source_sha256"]==source_hash and all(manifest[k]==observed[k] for k in
-        ("architecture","file_type","code_signature","cdhash","dylinker","dependencies","macho_build_version")))
+        ("architecture","file_type","code_signature","cdhash","dylinker","uuid","dependencies","macho_build_version")))
     check("K_IDENTITY_MANIFEST_BINDS_FINAL",manifest_ok)
     with tempfile.TemporaryDirectory(prefix="h034-rebuild-") as raw:
-        one=Path(raw)/"one"; two=Path(raw)/"two"
-        p1=build_once(recipe,one); p2=build_once(recipe,two)
-        ok=p1.returncode==p2.returncode==0 and sha_file(one)==sha_file(two)==sha_file(KERNEL)
-        check("K_DETERMINISTIC_SIGNED_REBUILD",ok,(p1.stderr+p2.stderr)[-500:])
+        one=Path(raw)/"a"/"kernel"; two=Path(raw)/"b"/"kernel"
+        one.parent.mkdir(); two.parent.mkdir()
+        p1=compile_once(recipe,one); p2=compile_once(recipe,two)
+        unsigned_ok=p1.returncode==p2.returncode==0 and sha_file(one)==sha_file(two)
+        check("K_DETERMINISTIC_UNSIGNED_COMPILE",unsigned_ok,(p1.stderr+p2.stderr)[-500:])
+        s1=sign_once(recipe,one) if p1.returncode==0 else p1
+        s2=sign_once(recipe,two) if p2.returncode==0 else p2
+        try: rebuilt=[macho_observation(one),macho_observation(two)] if s1.returncode==s2.returncode==0 else []
+        except Rig: rebuilt=[]
+        stable_fields=("architecture","file_type","code_signature","dylinker","uuid","dependencies","macho_build_version")
+        stable_ok=len(rebuilt)==2 and all(rebuilt[0][k]==rebuilt[1][k]==observed[k] for k in stable_fields)
+        check("K_STABLE_REBUILT_MACHO_IDENTITY",stable_ok,(s1.stderr+s2.stderr)[-500:])
+        load1=run([str(one)],timeout=KERNEL_TIMEOUT) if rebuilt else s1
+        load2=run([str(two)],timeout=KERNEL_TIMEOUT) if rebuilt else s2
+        check("K_REBUILT_SIGNED_LOADABLE_UUID",
+              rebuilt and all(p.returncode==1 and not p.timed_out and p.process_group_clean for p in (load1,load2))
+              and all(bool(x["uuid"]) for x in rebuilt),
+              repr([(p.returncode,getattr(p,"timed_out",False),getattr(p,"process_group_clean",False)) for p in (load1,load2)]))
     semantic_tests()
 
 
 def main() -> int:
     try:
-        frozen_checks(); judge_selftests(); deployment_selector_selftests()
+        frozen_checks(); judge_selftests(); timeout_selftests(); deployment_selector_selftests()
         if platform.system() != "Darwin" or platform.machine() != "arm64":
             print("H034_GATE_RESULT=ODÖMBART_PLATFORM"); return 2
         production_checks()
