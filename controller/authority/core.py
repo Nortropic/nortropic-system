@@ -139,6 +139,47 @@ def blob_at(repo: Path, candidate: str, relative: str) -> bytes | None:
     return result.stdout
 
 
+def regular_blob_at(repo: Path, candidate: str, relative: object) -> tuple[str, bytes]:
+    """Return one exact regular Git blob, including its canonical path.
+
+    Git represents both regular files and symlinks as blob objects.  `cat-file
+    -t` alone therefore cannot establish the task gate's required file type;
+    bind the exact tree mode before reading bytes by object id.  Nothing here
+    consults the mutable checkout.
+    """
+    path = canonical_path(relative)
+    _core, recursive = parse_path(path)
+    if recursive:
+        raise AuthorityError("task exit_test must be one exact path")
+    tree = subprocess.run(
+        ["git", "-C", str(repo), "ls-tree", "-z", candidate, "--", path],
+        capture_output=True, shell=False, check=False,
+    )
+    if tree.returncode or not tree.stdout.endswith(b"\0"):
+        raise AuthorityError("cannot resolve task exit_test in candidate")
+    records = tree.stdout[:-1].split(b"\0")
+    if len(records) != 1 or b"\t" not in records[0]:
+        raise AuthorityError("task exit_test is missing or non-regular")
+    metadata, listed = records[0].split(b"\t", 1)
+    fields = metadata.split()
+    try:
+        listed_path = listed.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise AuthorityError("task exit_test tree path is not UTF-8") from exc
+    if (listed_path != path or len(fields) != 3
+            or fields[0] not in {b"100644", b"100755"}
+            or fields[1] != b"blob"
+            or re.fullmatch(rb"[0-9a-f]{40,64}", fields[2]) is None):
+        raise AuthorityError("task exit_test is not a regular Git blob")
+    content = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "blob", fields[2].decode("ascii")],
+        capture_output=True, shell=False, check=False,
+    )
+    if content.returncode:
+        raise AuthorityError("cannot read task exit_test Git blob")
+    return path, content.stdout
+
+
 def changed_files(repo: Path, base: str, candidate: str) -> list[str]:
     exact_commit(repo, base)
     exact_commit(repo, candidate)
