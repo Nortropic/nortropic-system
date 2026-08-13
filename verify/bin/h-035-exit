@@ -12,6 +12,7 @@ import os
 import re
 import secrets
 import shlex
+import stat
 import subprocess
 import sys
 import tempfile
@@ -386,6 +387,40 @@ def observer_selftests() -> None:
     check(observe_provider(sandbox, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
           "J_OBSERVER_OPTIONAL_SANDBOX_POSITIVE")
 
+    # V4 could end after three slow whole-process-table samples because its
+    # provider had an unsynchronized two-second lifetime.  V5 keeps one real
+    # provider process alive until the observer releases that same run.
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v5-selftest-") as raw:
+        root = Path(raw); ready = root / "ready"; release = root / "release"
+        worker = root / "provider.sh"
+        worker.write_text(synchronized_provider_script(ready, release)); worker.chmod(0o700)
+        proc = subprocess.Popen(["/bin/sh", str(worker), nonce], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True)
+        deadline = time.monotonic() + 2
+        while not ready.exists() and proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        alive_after_three_misses = ready.exists()
+        for _ in range(3):
+            time.sleep(0.03)
+            alive_after_three_misses = alive_after_three_misses and proc.poll() is None
+        release.touch(); proc.communicate(timeout=3)
+        check(alive_after_three_misses and proc.returncode == 7,
+              "J_OBSERVER_V5_HELD_AFTER_THREE_MISSED_SAMPLES")
+
+
+def synchronized_provider_script(ready: Path, release: Path) -> str:
+    """Gate-owned V5 fixture lifetime; never an execution verdict."""
+    return (
+        "#!/bin/sh\n"
+        f": > {shlex.quote(str(ready))}\n"
+        "h035_wait=0\n"
+        f"while [ ! -e {shlex.quote(str(release))} ] && [ \"$h035_wait\" -lt 300 ]; do\n"
+        "  sleep 0.05\n"
+        "  h035_wait=$((h035_wait + 1))\n"
+        "done\n"
+        "printf '%s\\n' 'fixture provider refusal' >&2\n"
+        "exit 7\n")
+
 
 def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
                  observe: bool = False) -> tuple[subprocess.CompletedProcess, str, str, bool, dict[str, object]]:
@@ -395,7 +430,15 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
     repo = ROOT; base = git(ROOT, "rev-parse", "HEAD").stdout.strip()
     worker = tmp / f"provider-{authority}-{int(restart)}.sh"
     nonce = secrets.token_hex(16)
-    worker.write_text("#!/bin/sh\nsleep 2\nprintf '%s\\n' 'fixture provider refusal' >&2\nexit 7\n")
+    ready = tmp / f"provider-{authority}-{int(restart)}-{nonce}.ready"
+    release = tmp / f"provider-{authority}-{int(restart)}-{nonce}.release"
+    if observe:
+        # V5 lifetime synchronization.  The marker only keeps the gate-owned
+        # shell alive long enough for external process-table observation; it
+        # is never evidence that the provider or its ancestry was executed.
+        worker.write_text(synchronized_provider_script(ready, release))
+    else:
+        worker.write_text("#!/bin/sh\nsleep 2\nprintf '%s\\n' 'fixture provider refusal' >&2\nexit 7\n")
     worker.chmod(0o700)
     allowed = ["safe/**"] if authority == "ordinary" else []
     owner_allowed = ["controller/h034-native/**"] if authority == "owner_authority" else []
@@ -414,24 +457,36 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
         "workspace_rot":str(tmp/f"workspaces-{authority}-{int(restart)}"), "base_sha":base,
         "verifier_id":"h035-fixture-unregistered", "run_id":f"h035-{authority}-{int(restart)}",
         "brytare_rot":str(tmp/f"breaker-{authority}-{int(restart)}"), "budget":1, "troskel":1,
-        "worker_cmd":[str(worker), nonce], "timeout_s":5})
+        "worker_cmd":[str(worker), nonce], "timeout_s":20 if observe else 5})
     def observed_run() -> tuple[subprocess.CompletedProcess, str, dict[str, object]]:
         proc = subprocess.Popen([str(LOOP), "run", str(cfg)], cwd=repo,
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        verdict = "FAIL"; evidence: dict[str, object] = {"nonce":nonce,"samples":0}
-        deadline = time.monotonic() + 12
+        verdict = "FAIL"; evidence: dict[str, object] = {
+            "nonce":nonce, "samples":0, "post_ready_samples":0,
+            "lifetime_synchronization":"gate-owned ready/release; never verdict authority",
+        }
+        deadline = time.monotonic() + 18
         while proc.poll() is None and time.monotonic() < deadline:
             status, rows, why = process_snapshot() if observe else ("OK", [], "")
             evidence["samples"] = int(evidence["samples"]) + 1
+            if observe and os.path.lexists(ready):
+                evidence["ready_observed"] = True
+                evidence["post_ready_samples"] = int(evidence["post_ready_samples"]) + 1
             if status == "ODÖMBART":
                 verdict = "ODÖMBART"; evidence["observer_error"] = why; break
             hit, chain = observe_provider(rows, loop_pid=proc.pid, provider=worker, nonce=nonce)
             if hit is not None:
                 verdict = "PASS"; evidence["provider"] = hit; evidence["ancestry"] = chain; break
             time.sleep(0.03)
+        if observe:
+            # Release on every verdict path.  PASS still requires the exact
+            # external ps row and ordered ancestry above; marker presence is
+            # recorded solely to diagnose the bounded sampling lifetime.
+            release.touch()
         stdout, stderr = proc.communicate(timeout=10)
         if not observe: verdict = "NOT_OBSERVED"
         evidence.update({"loop_pid":proc.pid,"provider_path":str(worker),
+                         "ready_observed":bool(evidence.get("ready_observed", False)),
                          "ps_fields":["pid","ppid","pgid","comm","args"]})
         return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr), verdict, evidence
     first, verdict, evidence = observed_run()
@@ -448,7 +503,7 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
 
 def real_routing(tmp: Path) -> None:
     ordinary, _verdict, _, _, _ = loop_fixture(tmp, "ordinary")
-    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V4")
+    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V5")
     print("OWNER_ACCEPTANCE_REQUIRED=YES")
     owner, verdict, state, done, _ = loop_fixture(tmp, "owner_authority")
     owner_required = "OWNER_ACTION_REQUIRED" in state
@@ -470,13 +525,14 @@ def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
     with tempfile.TemporaryDirectory(prefix="h035-owner-effect-") as raw:
         result, verdict, _state, _done, evidence = loop_fixture(Path(raw), "ordinary", observe=True)
     record = {
-        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V4",
+        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V5",
         "task": "h-035", "candidate_sha": candidate_sha,
         "gate_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "spec_sha256": hashlib.sha256(SPEC.read_bytes()).hexdigest(),
         "normal_entrypoint": "controller/loop/cli run",
-        "observer": "H035_OWNER_PROVIDER_EXEC_V4 exact-argv, loop-image-bound normal-ancestry observer",
-        "observer_version": 4,
+        "observer": "H035_OWNER_PROVIDER_EXEC_V5 exact-argv, loop-image-bound normal-ancestry, synchronized-lifetime observer",
+        "observer_version": 5,
+        "candidate_bound_attempts": 1,
         "observer_verdict": verdict,
         "provider_process_execution_observed": verdict == "PASS",
         "raw_process_evidence": evidence,
@@ -496,37 +552,89 @@ def authority_call(tmp: Path, command: str, request: dict[str, object]) -> tuple
     return p.returncode, out, (p.stderr or p.stdout)[-500:]
 
 
-def tree_digest(path: Path) -> str:
-    h = hashlib.sha256()
-    if not path.exists(): return "ABSENT"
-    for item in sorted(path.rglob("*")):
-        if item.is_file():
-            h.update(str(item.relative_to(path)).encode()); h.update(item.read_bytes())
-    return h.hexdigest()
+def filesystem_snapshot(root: Path, *, exclude_top: set[str] | None = None) -> dict[str, str]:
+    """Logical byte/type snapshot without following symlinks.
+
+    The root, empty directories, symlink targets and filesystem object types
+    are material.  Mode and ownership are included because content alone is
+    insufficient to restore an executable or equally owned projection.
+    Timestamps are excluded: merely reading the snapshot can update atime.
+    """
+    snapshot: dict[str, str] = {}
+    excluded = exclude_top or set()
+
+    def visit(item: Path, name: str) -> None:
+        try:
+            info = os.lstat(item)
+        except FileNotFoundError:
+            snapshot[name] = "ABSENT"
+            return
+        metadata = f"mode={stat.S_IMODE(info.st_mode):04o}:uid={info.st_uid}:gid={info.st_gid}"
+        if stat.S_ISLNK(info.st_mode):
+            snapshot[name] = f"L:{metadata}:target={os.readlink(item)}"
+        elif stat.S_ISDIR(info.st_mode):
+            snapshot[name] = f"D:{metadata}"
+            with os.scandir(item) as entries:
+                children = sorted(entries, key=lambda candidate: candidate.name)
+            for entry in children:
+                if name == "." and entry.name in excluded:
+                    continue
+                child_name = entry.name if name == "." else f"{name}/{entry.name}"
+                visit(Path(entry.path), child_name)
+        elif stat.S_ISREG(info.st_mode):
+            digest = hashlib.sha256(item.read_bytes()).hexdigest()
+            snapshot[name] = f"F:{metadata}:size={info.st_size}:sha256={digest}"
+        else:
+            snapshot[name] = f"OTHER:{stat.S_IFMT(info.st_mode):o}:{metadata}:size={info.st_size}"
+
+    visit(root, ".")
+    return snapshot
 
 
 def repository_snapshot(repo: Path) -> dict[str, str]:
     """All repository-local filesystem bytes/types outside Git metadata."""
-    snapshot: dict[str, str] = {}
-    for item in sorted(repo.rglob("*")):
-        relative = item.relative_to(repo)
-        if relative.parts and relative.parts[0] == ".git":
-            continue
-        name = relative.as_posix()
-        if item.is_symlink():
-            snapshot[name] = "L:" + os.readlink(item)
-        elif item.is_dir():
-            snapshot[name] = "D"
-        elif item.is_file():
-            snapshot[name] = "F:" + hashlib.sha256(item.read_bytes()).hexdigest()
-        else:
-            snapshot[name] = "OTHER"
-    return snapshot
+    return filesystem_snapshot(repo, exclude_top={".git"})
 
 
 def snapshot_delta(before: dict[str, str], after: dict[str, str]) -> list[str]:
     return sorted(name for name in set(before) | set(after)
                   if before.get(name) != after.get(name))
+
+
+def snapshot_selftests() -> None:
+    """Mutate disposable objects to prove cleanup/type drift cannot collide."""
+    with tempfile.TemporaryDirectory(prefix="h035-snapshot-selftest-") as raw:
+        root = Path(raw) / "projection"; root.mkdir()
+        empty = root / "state.db"; empty.mkdir()
+        payload = root / "events.jsonl"; payload.write_bytes(b"event\n")
+        link = root / "current"; link.symlink_to("events.jsonl")
+        baseline = filesystem_snapshot(root)
+
+        empty.rmdir()
+        deleted = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, deleted) == ["state.db"],
+              "J_SNAPSHOT_CLEANUP_MUTANT_EMPTY_DIRECTORY_DELETION_REJECTS",
+              repr(snapshot_delta(baseline, deleted)))
+
+        empty.write_bytes(b"")
+        changed_type = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, changed_type) == ["state.db"],
+              "J_SNAPSHOT_DIRECTORY_TO_FILE_REJECTS",
+              repr(snapshot_delta(baseline, changed_type)))
+
+        empty.unlink(); empty.mkdir()
+        link.unlink(); link.symlink_to("state.db")
+        changed_link = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, changed_link) == ["current"],
+              "J_SNAPSHOT_SYMLINK_TARGET_REJECTS",
+              repr(snapshot_delta(baseline, changed_link)))
+
+        link.unlink(); link.symlink_to("events.jsonl")
+        payload.chmod(0o600)
+        changed_mode = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, changed_mode) == ["events.jsonl"],
+              "J_SNAPSHOT_MODE_CHANGE_REJECTS",
+              repr(snapshot_delta(baseline, changed_mode)))
 
 
 def ordinary_python_env() -> dict[str, str]:
@@ -557,10 +665,14 @@ def expect_auth(tmp: Path, name: str, command: str, request: dict[str, object], 
                 **diagnostics: object) -> None:
     state_dir = Path(str(request["state_dir"])); workspace = Path(str(request["workspace_root"]))
     remote = Path(str(request["remote"]))
-    before_state, before_ws, before_refs = tree_digest(state_dir), tree_digest(workspace), remote_refs(remote)
+    before_state = filesystem_snapshot(state_dir)
+    before_ws = filesystem_snapshot(workspace)
+    before_refs = remote_refs(remote)
     rc, out, detail = authority_call(tmp, command, request)
     ok = ((rc == 0) == accepted) and out.get("accepted") is accepted
-    after_state, after_ws, after_refs = tree_digest(state_dir), tree_digest(workspace), remote_refs(remote)
+    after_state = filesystem_snapshot(state_dir)
+    after_ws = filesystem_snapshot(workspace)
+    after_refs = remote_refs(remote)
     for key, value in diagnostics.items(): ok = ok and out.get(key) == value
     if state_after is not None: ok = ok and state_after in persisted_state(state_dir)
     if state_changes is not None: ok = ok and ((before_state != after_state) is state_changes)
@@ -818,11 +930,11 @@ def remediation_matrix(tmp: Path) -> None:
         {**request, "review_result":"PASS", "review_identity":"ir05-review"})
     advanced = candidate(repo, base, "advance-main.txt", 501)
     set_remote_main(bare, repo, advanced)
-    state_before, refs_before = tree_digest(state), remote_refs(bare)
+    state_before, refs_before = filesystem_snapshot(state), remote_refs(bare)
     rc3, out3, d3 = authority_call(tmp, "owner-freeze",
         {**request, "review_result":"PASS", "review_identity":"ir05-review"})
     check(rc1 == 0 and rc2 == 0 and rc3 != 0 and out3.get("accepted") is False
-          and tree_digest(state) == state_before and remote_refs(bare) == refs_before
+          and filesystem_snapshot(state) == state_before and remote_refs(bare) == refs_before
           and advanced in refs_before,
           "A_IR05_ACTUAL_REMOTE_CURRENT_MAIN_ADVANCE_REJECT",
           " | ".join(x for x in (d1, d2, d3, repr(out3)) if x))
@@ -906,13 +1018,13 @@ def r6_remediation_matrix(tmp: Path) -> None:
     if p.returncode: raise Rig(p.stderr)
     set_remote_main(bare, repo, base)
     request = transition_request(repo, base, "owner-r6-atomic", state, workspace, bare)
-    state_before = tree_digest(state)
-    workspace_before = tree_digest(workspace)
+    state_before = filesystem_snapshot(state)
+    workspace_before = filesystem_snapshot(workspace)
     refs_before = remote_refs(bare)
     rc, out, detail = authority_call(tmp, "owner-author", request)
     rebuilt_after = run([str(STATE), "rebuild", str(state)])
-    state_after = tree_digest(state)
-    workspace_after = tree_digest(workspace)
+    state_after = filesystem_snapshot(state)
+    workspace_after = filesystem_snapshot(workspace)
     refs_after = remote_refs(bare)
     check(claim.returncode == 0 and "OWNER_ACTION_REQUIRED" in rebuilt_before.stdout
           and rc != 0 and out.get("accepted") is False
@@ -922,8 +1034,8 @@ def r6_remediation_matrix(tmp: Path) -> None:
           and rebuilt_after.stdout == rebuilt_before.stdout,
           "A_R6_RV01_REJECTED_OWNER_AUTHOR_ATOMIC_ON_PROJECTION_FAILURE",
           f"rc={rc} accepted={out.get('accepted')!r} "
-          f"state_changed={state_after != state_before} "
-          f"workspace_changed={workspace_after != workspace_before} "
+          f"state_delta={snapshot_delta(state_before, state_after)!r} "
+          f"workspace_delta={snapshot_delta(workspace_before, workspace_after)!r} "
           f"refs_changed={refs_after != refs_before} "
           f"rebuilt_changed={rebuilt_after.stdout != rebuilt_before.stdout} "
           f"detail={detail!r}")
@@ -997,6 +1109,14 @@ def frozen_checks() -> None:
     )
     check(isinstance(criterion, str) and all(term in criterion for term in remediation_terms),
           "F_IR01_IR07_PRODUCTION_CONTRACT")
+    r7_terms = (
+        "H035_OWNER_PROVIDER_EXEC_V5",
+        "gate-owned ready/release handshake",
+        "beyond three missed samples",
+        "root and nested files, empty directories, symlinks, path types, content, executable modes and ownership",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in r7_terms),
+          "F_R7_SNAPSHOT_AND_OBSERVER_V5_CONTRACT")
     forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
     check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
     check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
@@ -1012,7 +1132,7 @@ def main() -> int:
             return owner_acceptance(sys.argv[2], Path(sys.argv[3]).resolve())
         if len(sys.argv) != 1:
             raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH]")
-        frozen_checks(); path_selftests(); observer_selftests()
+        frozen_checks(); path_selftests(); observer_selftests(); snapshot_selftests()
         with tempfile.TemporaryDirectory(prefix="h035-real-effect-") as raw:
             tmp = Path(raw)
             real_routing(tmp)
