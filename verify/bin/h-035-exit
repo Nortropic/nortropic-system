@@ -11,6 +11,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -247,15 +248,28 @@ def process_snapshot() -> tuple[str, list[dict[str, object]], str]:
 def observe_provider(rows: list[dict[str, object]], *, loop_pid: int, provider: Path,
                      nonce: str) -> tuple[dict[str, object] | None, list[dict[str, object]]]:
     by_pid = {int(r["pid"]): r for r in rows}
-    provider_text = str(provider.resolve())
-    token = re.compile(rf"(?:^|\s){re.escape(nonce)}(?:\s|$)")
-    path_token = re.compile(rf"(?:^|\s){re.escape(provider_text)}(?:\s|$)")
+    # Bind the spelling actually passed to exec. On macOS /var resolves to
+    # /private/var; resolving here made V2 reject the real /var/folders argv.
+    provider_text = str(provider)
     required = [str(LOOP), str(ROOT/"controller/brytare/cli"),
                 str(ROOT/"controller/utforare/cli"), str(ROOT/"controller/launch/cli")]
+
+    def argv(row: dict[str, object]) -> list[str]:
+        try:
+            return shlex.split(str(row["args"]), posix=True)
+        except ValueError:
+            return []
+
+    def stage(row: dict[str, object]) -> str | None:
+        tokens = argv(row)
+        if not Path(str(row["comm"])).name.lower().startswith("python"):
+            return None
+        hits = [expected for expected in required if expected in tokens]
+        return hits[0] if len(hits) == 1 else None
+
     for row in rows:
-        args = str(row["args"]); comm = str(row["comm"])
-        if (comm.endswith("sandbox-exec") or not comm.endswith(("/sh", "sh"))
-                or not path_token.search(args) or not token.search(args)):
+        comm = str(row["comm"]); tokens = argv(row)
+        if comm != "/bin/sh" or tokens != ["/bin/sh", provider_text, nonce]:
             continue
         chain = [row]; seen = {int(row["pid"])}; parent = int(row["ppid"])
         while parent in by_pid and parent not in seen:
@@ -264,39 +278,60 @@ def observe_provider(rows: list[dict[str, object]], *, loop_pid: int, provider: 
             parent = int(ancestor["ppid"])
         if not chain or int(chain[-1]["pid"]) != loop_pid:
             continue
-        ancestor_args = [str(r["args"]) for r in reversed(chain)]
-        cursor = 0
-        for expected in required:
-            while cursor < len(ancestor_args) and expected not in ancestor_args[cursor]: cursor += 1
-            if cursor == len(ancestor_args): break
-            cursor += 1
-        else:
+        ordered = list(reversed(chain[1:]))
+        observed_stages = [stage(ancestor) for ancestor in ordered]
+        if observed_stages == required:
+            return row, chain
+        if (len(ordered) == len(required) + 1
+                and observed_stages[:len(required)] == required
+                and str(ordered[-1]["comm"]).endswith("sandbox-exec")
+                and stage(ordered[-1]) is None):
             return row, chain
     return None, []
 
 
 def observer_selftests() -> None:
-    provider = Path("/private/tmp/h035-provider"); nonce = "a" * 32
-    def row(pid: int, ppid: int, comm: str, args: str) -> dict[str, object]:
-        return {"pid":pid,"ppid":ppid,"pgid":60,"comm":comm,"args":args}
-    chain = [row(10,1,"Python",str(LOOP)+" run cfg"),
-             row(20,10,"Python",str(ROOT/"controller/brytare/cli")+" kor"),
-             row(30,20,"Python",str(ROOT/"controller/utforare/cli")+" kor"),
-             row(40,30,"Python",str(ROOT/"controller/launch/cli")+" run"),
-             row(60,40,"/bin/sh",f"/bin/sh {provider} {nonce}")]
+    provider = Path("/var/folders/h035/provider.sh"); nonce = "a" * 32
+    def row(pid: int, ppid: int, comm: str, args: str, pgid: int = 60) -> dict[str, object]:
+        return {"pid":pid,"ppid":ppid,"pgid":pgid,"comm":comm,"args":args}
+    forwarded = f" -- {provider} {nonce}"
+    chain = [row(10,1,"Python",str(LOOP)+" run cfg",60),
+             row(20,10,"Python",str(ROOT/"controller/brytare/cli")+" kor"+forwarded,60),
+             row(30,20,"Python",str(ROOT/"controller/utforare/cli")+" kor"+forwarded,60),
+             row(40,30,"Python",str(ROOT/"controller/launch/cli")+" run"+forwarded,60),
+             row(61,40,"/bin/sh",f"/bin/sh {provider} {nonce}",61)]
     check(observe_provider(chain, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
-          "J_OBSERVER_POSITIVE")
-    mutants = {"A_DISABLED_OLD_MARKER":chain[:-1],
-      "B_DISABLED_EXPECTED_JSON":chain[:-1]+[row(61,40,"Python",'{"observed":true}')],
-      "C_STALE_NONCE":chain[:-1]+[row(62,40,"/bin/sh",f"/bin/sh {provider} {'b'*32}")],
-      "D_SAME_BASENAME":chain[:-1]+[row(63,40,"/bin/sh",f"/bin/sh /private/other/{provider.name} {nonce}")],
-      "E_FAKE_PID":chain[:-1],
-      "F_NEVER_EXECUTES":chain[:-1]+[row(64,40,"sandbox-exec",f"/usr/bin/sandbox-exec {provider} {nonce}")],
-      "G_OUTSIDE_NORMAL_ANCESTRY":[chain[0],row(65,10,"/bin/sh",f"/bin/sh {provider} {nonce}")]}
+          "J_OBSERVER_REAL_OWNER_SPLIT_PGID_POSITIVE")
+    shell = lambda pid, ppid, path=provider, value=nonce, extra="": row(
+        pid, ppid, "/bin/sh", f"/bin/sh {path} {value}{extra}", pid)
+    mutants = {
+      "WRONG_NONCE":chain[:-1]+[shell(62,40,value="b"*32)],
+      "STALE_NONCE":chain[:-1]+[shell(63,40,value="c"*32)],
+      "NONCE_SUBSTRING":chain[:-1]+[shell(64,40,value=nonce+"x")],
+      "SAME_BASENAME_DIFFERENT_PATH":chain[:-1]+[shell(65,40,path=Path("/private/other/provider.sh"))],
+      "FORWARDED_ARGV_ONLY":chain[:-1],
+      "SANDBOX_WITHOUT_PROVIDER":chain[:-1]+[row(66,40,"/usr/bin/sandbox-exec",f"/usr/bin/sandbox-exec {provider} {nonce}")],
+      "OUTSIDE_LOOP_ANCESTRY":chain[:-1]+[shell(67,1)],
+      "WRONG_LOOP_PID":chain,
+      "MISSING_LAUNCH":chain[:3]+[shell(68,30)],
+      "MISSING_UTFORARE":chain[:2]+[chain[3]|{"ppid":20}]+[shell(69,40)],
+      "MISSING_BRYTARE":[chain[0],chain[2]|{"ppid":10},chain[3],shell(70,40)],
+      "REORDERED_ANCESTRY":[chain[0],chain[2]|{"ppid":10},chain[1]|{"ppid":30},chain[3]|{"ppid":20},shell(71,40)],
+      "UNRELATED_SH_EXTRA_ARG":chain[:-1]+[shell(72,40,extra=" unrelated")],
+      "FABRICATED_PPID":chain[:-1]+[shell(73,999)],
+      "FAKE_CONTROLLER_IMAGE":[chain[0],chain[1],chain[2],
+          row(40,30,"/bin/sh",str(ROOT/"controller/launch/cli")+" run"+forwarded),shell(74,40)],
+    }
     for name, rows in mutants.items():
         print(f"MUTANT={name} PREDICTED=REJECT GUARD=J_OBSERVER_{name}")
-        check(observe_provider(rows, loop_pid=10, provider=provider, nonce=nonce)[0] is None,
+        test_loop_pid = 999 if name == "WRONG_LOOP_PID" else 10
+        check(observe_provider(rows, loop_pid=test_loop_pid, provider=provider, nonce=nonce)[0] is None,
               f"J_OBSERVER_{name}")
+
+    sandbox = chain[:-1]+[row(80,40,"/usr/bin/sandbox-exec","/usr/bin/sandbox-exec profile",80),
+                          shell(81,80)]
+    check(observe_provider(sandbox, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
+          "J_OBSERVER_OPTIONAL_SANDBOX_POSITIVE")
 
 
 def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
@@ -360,7 +395,7 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
 
 def real_routing(tmp: Path) -> None:
     ordinary, _verdict, _, _, _ = loop_fixture(tmp, "ordinary")
-    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V2")
+    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V3")
     print("OWNER_ACCEPTANCE_REQUIRED=YES")
     owner, verdict, state, done, _ = loop_fixture(tmp, "owner_authority")
     owner_required = "OWNER_ACTION_REQUIRED" in state
@@ -382,12 +417,13 @@ def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
     with tempfile.TemporaryDirectory(prefix="h035-owner-effect-") as raw:
         result, verdict, _state, _done, evidence = loop_fixture(Path(raw), "ordinary", observe=True)
     record = {
-        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V2",
+        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V3",
         "task": "h-035", "candidate_sha": candidate_sha,
         "gate_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "spec_sha256": hashlib.sha256(SPEC.read_bytes()).hexdigest(),
         "normal_entrypoint": "controller/loop/cli run",
-        "observer": "gate-side ps pid/ppid/pgid/comm/args nonce-and-normal-ancestry observer",
+        "observer": "H035_OWNER_PROVIDER_EXEC_V3 exact-argv and exact normal-ancestry observer",
+        "observer_version": 3,
         "observer_verdict": verdict,
         "provider_process_execution_observed": verdict == "PASS",
         "raw_process_evidence": evidence,
