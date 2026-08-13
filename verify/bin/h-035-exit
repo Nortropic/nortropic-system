@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -226,24 +227,87 @@ def path_candidate(tmp: Path, name: str, pattern: str) -> tuple[Path, str, str]:
     return repo, base, git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
-def process_image_present(executable: Path) -> bool:
-    """Gate-side observation of an exec'd process image; no subject-written marker."""
+def process_snapshot() -> tuple[str, list[dict[str, object]], str]:
+    argv = ["ps", "-ww", "-axo", "pid=,ppid=,pgid=,comm=,args="]
     try:
-        p = subprocess.run(["ps", "-axo", "pid=,command="], text=True,
-                           capture_output=True, check=False)
-    except PermissionError:
-        return False
-    needle = str(executable.resolve())
-    return p.returncode == 0 and any(needle in line for line in p.stdout.splitlines())
+        p = subprocess.run(argv, text=True, capture_output=True, check=False)
+    except (OSError, PermissionError) as e:
+        return "ODÖMBART", [], f"{type(e).__name__}: {e}"
+    if p.returncode != 0:
+        return "ODÖMBART", [], f"ps exit {p.returncode}: {p.stderr.strip()[:200]}"
+    rows: list[dict[str, object]] = []
+    for line in p.stdout.splitlines():
+        fields = line.strip().split(None, 4)
+        if len(fields) == 5 and all(fields[i].isdigit() for i in range(3)):
+            rows.append({"pid":int(fields[0]), "ppid":int(fields[1]), "pgid":int(fields[2]),
+                         "comm":fields[3], "args":fields[4]})
+    return "OK", rows, ""
 
 
-def loop_fixture(tmp: Path, authority: str, *, restart: bool = False) -> tuple[subprocess.CompletedProcess, bool, str, bool]:
+def observe_provider(rows: list[dict[str, object]], *, loop_pid: int, provider: Path,
+                     nonce: str) -> tuple[dict[str, object] | None, list[dict[str, object]]]:
+    by_pid = {int(r["pid"]): r for r in rows}
+    provider_text = str(provider.resolve())
+    token = re.compile(rf"(?:^|\s){re.escape(nonce)}(?:\s|$)")
+    path_token = re.compile(rf"(?:^|\s){re.escape(provider_text)}(?:\s|$)")
+    required = [str(LOOP), str(ROOT/"controller/brytare/cli"),
+                str(ROOT/"controller/utforare/cli"), str(ROOT/"controller/launch/cli")]
+    for row in rows:
+        args = str(row["args"]); comm = str(row["comm"])
+        if (comm.endswith("sandbox-exec") or not comm.endswith(("/sh", "sh"))
+                or not path_token.search(args) or not token.search(args)):
+            continue
+        chain = [row]; seen = {int(row["pid"])}; parent = int(row["ppid"])
+        while parent in by_pid and parent not in seen:
+            ancestor = by_pid[parent]; chain.append(ancestor); seen.add(parent)
+            if parent == loop_pid: break
+            parent = int(ancestor["ppid"])
+        if not chain or int(chain[-1]["pid"]) != loop_pid:
+            continue
+        ancestor_args = [str(r["args"]) for r in reversed(chain)]
+        cursor = 0
+        for expected in required:
+            while cursor < len(ancestor_args) and expected not in ancestor_args[cursor]: cursor += 1
+            if cursor == len(ancestor_args): break
+            cursor += 1
+        else:
+            return row, chain
+    return None, []
+
+
+def observer_selftests() -> None:
+    provider = Path("/private/tmp/h035-provider"); nonce = "a" * 32
+    def row(pid: int, ppid: int, comm: str, args: str) -> dict[str, object]:
+        return {"pid":pid,"ppid":ppid,"pgid":60,"comm":comm,"args":args}
+    chain = [row(10,1,"Python",str(LOOP)+" run cfg"),
+             row(20,10,"Python",str(ROOT/"controller/brytare/cli")+" kor"),
+             row(30,20,"Python",str(ROOT/"controller/utforare/cli")+" kor"),
+             row(40,30,"Python",str(ROOT/"controller/launch/cli")+" run"),
+             row(60,40,"/bin/sh",f"/bin/sh {provider} {nonce}")]
+    check(observe_provider(chain, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
+          "J_OBSERVER_POSITIVE")
+    mutants = {"A_DISABLED_OLD_MARKER":chain[:-1],
+      "B_DISABLED_EXPECTED_JSON":chain[:-1]+[row(61,40,"Python",'{"observed":true}')],
+      "C_STALE_NONCE":chain[:-1]+[row(62,40,"/bin/sh",f"/bin/sh {provider} {'b'*32}")],
+      "D_SAME_BASENAME":chain[:-1]+[row(63,40,"/bin/sh",f"/bin/sh /private/other/{provider.name} {nonce}")],
+      "E_FAKE_PID":chain[:-1],
+      "F_NEVER_EXECUTES":chain[:-1]+[row(64,40,"sandbox-exec",f"/usr/bin/sandbox-exec {provider} {nonce}")],
+      "G_OUTSIDE_NORMAL_ANCESTRY":[chain[0],row(65,10,"/bin/sh",f"/bin/sh {provider} {nonce}")]}
+    for name, rows in mutants.items():
+        print(f"MUTANT={name} PREDICTED=REJECT GUARD=J_OBSERVER_{name}")
+        check(observe_provider(rows, loop_pid=10, provider=provider, nonce=nonce)[0] is None,
+              f"J_OBSERVER_{name}")
+
+
+def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
+                 observe: bool = False) -> tuple[subprocess.CompletedProcess, str, str, bool, dict[str, object]]:
     """Execute the real normal loop entrypoint; only external boundaries are fixtures."""
     # Current workspace/loop resolves the repository from its installed ROOT.
     # The only repository effect is a disposable worktree under workspace_rot.
     repo = ROOT; base = git(ROOT, "rev-parse", "HEAD").stdout.strip()
-    worker = tmp / f"provider-{authority}-{int(restart)}.py"
-    worker.write_text("#!/usr/bin/env python3\nimport sys,time\ntime.sleep(2)\nprint('fixture provider refusal', file=sys.stderr)\nsys.exit(7)\n")
+    worker = tmp / f"provider-{authority}-{int(restart)}.sh"
+    nonce = secrets.token_hex(16)
+    worker.write_text("#!/bin/sh\nsleep 2\nprintf '%s\\n' 'fixture provider refusal' >&2\nexit 7\n")
     worker.chmod(0o700)
     allowed = ["safe/**"] if authority == "ordinary" else []
     owner_allowed = ["controller/h034-native/**"] if authority == "owner_authority" else []
@@ -262,44 +326,50 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False) -> tuple[s
         "workspace_rot":str(tmp/f"workspaces-{authority}-{int(restart)}"), "base_sha":base,
         "verifier_id":"h035-fixture-unregistered", "run_id":f"h035-{authority}-{int(restart)}",
         "brytare_rot":str(tmp/f"breaker-{authority}-{int(restart)}"), "budget":1, "troskel":1,
-        "worker_cmd":[str(worker)], "timeout_s":5})
-    def observed_run() -> tuple[subprocess.CompletedProcess, bool]:
+        "worker_cmd":[str(worker), nonce], "timeout_s":5})
+    def observed_run() -> tuple[subprocess.CompletedProcess, str, dict[str, object]]:
         proc = subprocess.Popen([str(LOOP), "run", str(cfg)], cwd=repo,
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        observed = False
+        verdict = "FAIL"; evidence: dict[str, object] = {"nonce":nonce,"samples":0}
         deadline = time.monotonic() + 12
         while proc.poll() is None and time.monotonic() < deadline:
-            observed = observed or process_image_present(worker)
+            status, rows, why = process_snapshot() if observe else ("OK", [], "")
+            evidence["samples"] = int(evidence["samples"]) + 1
+            if status == "ODÖMBART":
+                verdict = "ODÖMBART"; evidence["observer_error"] = why; break
+            hit, chain = observe_provider(rows, loop_pid=proc.pid, provider=worker, nonce=nonce)
+            if hit is not None:
+                verdict = "PASS"; evidence["provider"] = hit; evidence["ancestry"] = chain; break
             time.sleep(0.03)
         stdout, stderr = proc.communicate(timeout=10)
-        return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr), observed
-    first, observed = observed_run()
+        if not observe: verdict = "NOT_OBSERVED"
+        evidence.update({"loop_pid":proc.pid,"provider_path":str(worker),
+                         "ps_fields":["pid","ppid","pgid","comm","args"]})
+        return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr), verdict, evidence
+    first, verdict, evidence = observed_run()
     if restart:
-        second, observed_second = observed_run()
-        observed = observed or observed_second
+        second, second_verdict, second_evidence = observed_run()
+        if second_verdict == "PASS" or verdict != "PASS": verdict, evidence = second_verdict, second_evidence
         result = second
     else: result = first
     events = state / "events.jsonl"
     text = events.read_text(errors="replace") if events.exists() else ""
     done = '"status": "done"' in text or '"status":"done"' in text
-    return result, observed, text, done
+    return result, verdict, text, done, evidence
 
 
 def real_routing(tmp: Path) -> None:
-    ordinary, launched, _, _ = loop_fixture(tmp, "ordinary")
-    if launched:
-        print("OWNER_ACCEPTANCE_OBSERVATION=PROVIDER_PROCESS_IMAGE_EXECUTED")
-    else:
-        print("OWNER_ACCEPTANCE_OBSERVATION=ODÖMBART_NESTED_SANDBOX")
-        print("OWNER_ACCEPTANCE_REQUIRED=YES")
-    owner, launched, state, done = loop_fixture(tmp, "owner_authority")
+    ordinary, _verdict, _, _, _ = loop_fixture(tmp, "ordinary")
+    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V2")
+    print("OWNER_ACCEPTANCE_REQUIRED=YES")
+    owner, verdict, state, done, _ = loop_fixture(tmp, "owner_authority")
     owner_required = "OWNER_ACTION_REQUIRED" in state
-    check(not launched and owner_required and not done, "A_OWNER_ROUTE_REAL_EFFECT",
-          f"rc={owner.returncode} launched={launched} state={state[-300:]!r}")
-    restarted, launched, state, done = loop_fixture(tmp, "owner_authority", restart=True)
-    check(not launched and "OWNER_ACTION_REQUIRED" in state and not done,
+    check(verdict == "NOT_OBSERVED" and owner_required and not done, "A_OWNER_ROUTE_REAL_EFFECT",
+          f"rc={owner.returncode} verdict={verdict} state={state[-300:]!r}")
+    restarted, verdict, state, done, _ = loop_fixture(tmp, "owner_authority", restart=True)
+    check(verdict == "NOT_OBSERVED" and "OWNER_ACTION_REQUIRED" in state and not done,
           "A_OWNER_RESTART_REAL_RECONSTRUCTION",
-          f"rc={restarted.returncode} launched={launched} state={state[-300:]!r}")
+          f"rc={restarted.returncode} verdict={verdict} state={state[-300:]!r}")
 
 
 def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
@@ -310,21 +380,23 @@ def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
     if git(ROOT, "status", "--porcelain").stdout.strip():
         raise Rig("owner acceptance requires clean immutable candidate")
     with tempfile.TemporaryDirectory(prefix="h035-owner-effect-") as raw:
-        result, observed, _state, _done = loop_fixture(Path(raw), "ordinary")
+        result, verdict, _state, _done, evidence = loop_fixture(Path(raw), "ordinary", observe=True)
     record = {
-        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V1",
+        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V2",
         "task": "h-035", "candidate_sha": candidate_sha,
         "gate_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "spec_sha256": hashlib.sha256(SPEC.read_bytes()).hexdigest(),
         "normal_entrypoint": "controller/loop/cli run",
-        "observer": "gate-side process-table process-image observer",
-        "provider_process_image_executed": observed,
+        "observer": "gate-side ps pid/ppid/pgid/comm/args nonce-and-normal-ancestry observer",
+        "observer_verdict": verdict,
+        "provider_process_execution_observed": verdict == "PASS",
+        "raw_process_evidence": evidence,
         "loop_exit": result.returncode,
     }
     artifact.parent.mkdir(parents=True, exist_ok=True)
     artifact.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n")
     print(json.dumps(record, sort_keys=True))
-    return 0 if observed else 1
+    return {"PASS":0, "FAIL":1, "ODÖMBART":2}.get(verdict, 2)
 
 
 def authority_call(tmp: Path, command: str, request: dict[str, object]) -> tuple[int, dict[str, object], str]:
@@ -529,7 +601,7 @@ def main() -> int:
             return owner_acceptance(sys.argv[2], Path(sys.argv[3]).resolve())
         if len(sys.argv) != 1:
             raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH]")
-        frozen_checks(); path_selftests()
+        frozen_checks(); path_selftests(); observer_selftests()
         with tempfile.TemporaryDirectory(prefix="h035-real-effect-") as raw:
             tmp = Path(raw)
             real_routing(tmp)
