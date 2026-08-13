@@ -1329,6 +1329,54 @@ def seed_owner_command_state(state: Path, command: str,
     write_json(state / "current.json", value)
 
 
+def positive_owner_gate_chain(tmp: Path, label: str, repo: Path, base: str,
+                              task_id: str, remote: Path) -> None:
+    """Exercise every material owner consumer as one independent positive chain."""
+    state = tmp / f"r10-{label}-state"
+    workspace = tmp / f"r10-{label}-workspace"
+    write_json(state / "current.json",
+               {"task":task_id, "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    request = transition_request(repo, base, task_id, state, workspace, remote)
+    refs_before = remote_refs(remote)
+    rc1, out1, d1 = authority_call(tmp, "owner-author", request)
+    rc2, out2, d2 = authority_call(tmp, "check-candidate",
+                                   {**request, "actor":"owner_authority"})
+    rc3, out3, d3 = authority_call(tmp, "record-review",
+        {**request, "review_result":"PASS", "review_identity":f"r10-{label}-review"})
+    rc4, out4, d4 = authority_call(tmp, "owner-freeze",
+        {**request, "review_result":"PASS", "review_identity":f"r10-{label}-review"})
+    check(all(rc == 0 and out.get("accepted") is True for rc, out in
+              ((rc1,out1),(rc2,out2),(rc3,out3),(rc4,out4)))
+          and "OWNER_FROZEN" in persisted_state(state)
+          and workspace.is_dir() and remote_refs(remote) == refs_before,
+          f"A_R10_{label.upper()}_FULL_OWNER_GATE_CHAIN_POSITIVE",
+          " | ".join((d1,d2,d3,d4,repr((out1,out2,out3,out4)))))
+
+
+def set_hostile_checkout_gate(target: Path, kind: str, canonical: bytes) -> None:
+    """Change only disposable mutable checkout state, never its Git object."""
+    hostile_target = target.parent / "r10-hostile-target"
+    if target.is_symlink() or target.is_file():
+        target.unlink()
+    elif target.is_dir():
+        for child in sorted(target.rglob("*"), reverse=True):
+            if child.is_symlink() or child.is_file(): child.unlink()
+            elif child.is_dir(): child.rmdir()
+        target.rmdir()
+    if hostile_target.exists() or hostile_target.is_symlink(): hostile_target.unlink()
+    if kind == "regular-bytes":
+        target.write_bytes(b"#!/bin/sh\nprintf 'hostile mutable checkout bytes\\n'\nexit 0\n")
+    elif kind == "directory":
+        target.mkdir(); (target / "payload").write_text("hostile directory\n")
+    elif kind == "symlink":
+        hostile_target.write_bytes(b"#!/bin/sh\nexit 0\n")
+        target.symlink_to(hostile_target.name)
+    elif kind == "restore":
+        target.write_bytes(canonical); target.chmod(0o755)
+    elif kind != "missing":
+        raise Rig(f"unknown hostile checkout kind: {kind}")
+
+
 def r9_task_gate_matrix(tmp: Path) -> None:
     """Operational task-specific gate binding for H035-H034-INTEGRATION-01."""
     gate_a = "verify/bin/r9-owner-a-exit"
@@ -1345,27 +1393,27 @@ def r9_task_gate_matrix(tmp: Path) -> None:
     set_remote_main(bare, repo, base)
     refs_before = remote_refs(bare)
 
-    # One actual four-command chain. The gate identity is the exit_test from
-    # owner-r9-a's exact candidate spec row plus the regular blob at that path
-    # in the same Git object. No request field is allowed to select another
-    # task's gate or alternate bytes.
-    state = tmp / "r9-e2e-state"; workspace = tmp / "r9-e2e-workspace"
-    write_json(state / "current.json",
-               {"task":"owner-r9-a", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
-    request = transition_request(repo, base, "owner-r9-a", state, workspace, bare)
-    rc1, out1, d1 = authority_call(tmp, "owner-author", request)
-    rc2, out2, d2 = authority_call(tmp, "check-candidate",
-                                   {**request, "actor":"owner_authority"})
-    rc3, out3, d3 = authority_call(tmp, "record-review",
-        {**request, "review_result":"PASS", "review_identity":"r9-review"})
-    rc4, out4, d4 = authority_call(tmp, "owner-freeze",
-        {**request, "review_result":"PASS", "review_identity":"r9-review"})
-    check(all(rc == 0 and out.get("accepted") is True for rc, out in
-              ((rc1,out1),(rc2,out2),(rc3,out3),(rc4,out4)))
-          and "OWNER_FROZEN" in persisted_state(state)
-          and workspace.is_dir() and remote_refs(bare) == refs_before,
-          "A_R9_TASK_SPECIFIC_GATE_END_TO_END_POSITIVE",
-          " | ".join((d1,d2,d3,d4,repr((out1,out2,out3,out4)))))
+    # Two independent full positive chains forbid a superficial implementation
+    # that special-cases the first task. Each task selects its own distinct
+    # canonical gate path and bytes from the exact same candidate object.
+    positive_owner_gate_chain(tmp, "task_a", repo, base, "owner-r9-a", bare)
+    positive_owner_gate_chain(tmp, "task_b_distinct", repo, base, "owner-r9-b", bare)
+
+    # Candidate-object authority is invariant to the mutable checkout. Four
+    # one-defect checkout variants change gate bytes/type/link/existence while
+    # candidate_sha stays byte-identical. Every legitimate Git-object reader
+    # accepts; a mutable Path-based authority implementation rejects or hashes
+    # the hostile bytes and is caught. Each variant uses a fresh complete chain.
+    checkout_gate = repo / gate_a
+    for label, kind in (("checkout_regular_bytes", "regular-bytes"),
+                        ("checkout_directory", "directory"),
+                        ("checkout_symlink", "symlink"),
+                        ("checkout_missing", "missing")):
+        set_hostile_checkout_gate(checkout_gate, kind, bytes_a)
+        positive_owner_gate_chain(tmp, label, repo, base, "owner-r9-a", bare)
+    set_hostile_checkout_gate(checkout_gate, "restore", bytes_a)
+    check(not git(repo, "status", "--porcelain").stdout.strip(),
+          "A_R10_HOSTILE_MUTABLE_CHECKOUT_FIXTURE_CLEANUP")
 
     digest_a = hashlib.sha256(bytes_a).hexdigest()
     digest_b = hashlib.sha256(bytes_b).hexdigest()
@@ -1407,6 +1455,26 @@ def r9_task_gate_matrix(tmp: Path) -> None:
         candidate_sha=changed)
     cases.append(("OWNER_CHANGED_OWN_GATE", repo, base, changed, changed_request))
 
+    # The inverse control: checkout and candidate both contain altered gate
+    # bytes, while the request repeats the prior candidate's digest. By making
+    # the altered commit both base and candidate, no changed-file or owner-
+    # author base check can independently explain rejection.
+    mismatch_repo, mismatch_old = authority_repo(tmp, "r10-object-mismatch-repo", [
+        owner_task("owner-r9-a", ["controller/h034-native/**"], gate_a)],
+        gates={gate_a:bytes_a})
+    mismatch_candidate = candidate(mismatch_repo, mismatch_old, gate_a, 1001)
+    mismatch_bare = tmp / "r10-object-mismatch-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(mismatch_bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(mismatch_bare, mismatch_repo, mismatch_candidate)
+    mismatch_request = transition_request(
+        mismatch_repo, mismatch_candidate, "owner-r9-a",
+        tmp/"r10-unused-object-mismatch-state",
+        tmp/"r10-unused-object-mismatch-workspace", mismatch_bare,
+        gate_sha256=digest_a)
+    cases.append(("CANDIDATE_GATE_OBJECT_MISMATCH", mismatch_repo,
+                  mismatch_candidate, mismatch_candidate, mismatch_request))
+
     for label, _case_repo, _case_base, _case_candidate, template in cases:
         for command in ("owner-author", "check-candidate", "record-review", "owner-freeze"):
             state = tmp / f"r9-{label.lower()}-{command}-state"
@@ -1419,7 +1487,8 @@ def r9_task_gate_matrix(tmp: Path) -> None:
                 request["review_result"] = "PASS"
                 request["review_identity"] = "r9-review"
             seed_owner_command_state(state, command, request)
-            expect_auth(tmp, f"A_R9_{label}_{command.upper().replace('-', '_')}_REJECT",
+            revision = "R10" if label == "CANDIDATE_GATE_OBJECT_MISMATCH" else "R9"
+            expect_auth(tmp, f"A_{revision}_{label}_{command.upper().replace('-', '_')}_REJECT",
                         command, request, False, state_changes=False,
                         workspace_changes=False, refs_change=False)
 
@@ -1464,6 +1533,14 @@ def frozen_checks() -> None:
     )
     check(isinstance(criterion, str) and all(term in criterion for term in r9_terms),
           "F_R9_TASK_SPECIFIC_GATE_CONTRACT")
+    r10_terms = (
+        "Two distinct canonical owner tasks with distinct gate paths and bytes",
+        "task identity may not be special-cased",
+        "mutable checkout path is hostile regular bytes, a directory, a symlink or missing",
+        "different candidate Git object's gate digest rejects",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in r10_terms),
+          "F_R10_GENERIC_TASK_AND_GIT_OBJECT_AUTHORITY_CONTRACT")
     forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
     check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
     check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
