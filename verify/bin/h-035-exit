@@ -30,6 +30,12 @@ POLICY = ROOT / "controller/policy/cli"
 REGISTER = ROOT / "controller/verify/register.json"
 passed = failed = 0
 
+V6_PROCESS_SNAPSHOT_TIMEOUT_S = 5.0
+V6_STARTUP_WINDOW_S = 24.0
+V6_POST_READY_WINDOW_S = 24.0
+V6_RELEASE_CLEANUP_MARGIN_S = 10.0
+V6_PROVIDER_FAILSAFE_S = 45
+
 
 class Rig(Exception):
     pass
@@ -277,8 +283,9 @@ def path_candidate(tmp: Path, name: str, pattern: str) -> tuple[Path, str, str]:
 def process_snapshot() -> tuple[str, list[dict[str, object]], str]:
     argv = ["ps", "-ww", "-axo", "pid=,ppid=,pgid=,comm=,args="]
     try:
-        p = subprocess.run(argv, text=True, capture_output=True, check=False)
-    except (OSError, PermissionError) as e:
+        p = subprocess.run(argv, text=True, capture_output=True, check=False,
+                           timeout=V6_PROCESS_SNAPSHOT_TIMEOUT_S)
+    except (OSError, PermissionError, subprocess.TimeoutExpired) as e:
         return "ODÖMBART", [], f"{type(e).__name__}: {e}"
     if p.returncode != 0:
         return "ODÖMBART", [], f"ps exit {p.returncode}: {p.stderr.strip()[:200]}"
@@ -343,6 +350,72 @@ def observe_provider(rows: list[dict[str, object]], *, loop_pid: int, provider: 
     return None, []
 
 
+def observe_provider_lifetime(proc: subprocess.Popen, *, provider: Path, nonce: str,
+                              ready: Path, release: Path, snapshot_fn=process_snapshot,
+                              clock=time.monotonic, pause=time.sleep,
+                              startup_window_s: float = V6_STARTUP_WINDOW_S,
+                              post_ready_window_s: float = V6_POST_READY_WINDOW_S,
+                              ) -> tuple[str, dict[str, object]]:
+    """Observe one provider attempt and unconditionally release it on conclusion.
+
+    A post-ready snapshot may finish after the nominal window.  Production
+    process_snapshot has its own hard timeout, and the controller fail-safe is
+    ordered after window + maximum overrun + cleanup margin.
+    """
+    verdict = "FAIL"
+    started = clock()
+    startup_deadline = started + startup_window_s
+    ready_deadline: float | None = None
+    evidence: dict[str, object] = {
+        "nonce":nonce, "samples":0, "post_ready_samples":0,
+        "lifetime_synchronization":"V6 observer-owned release; readiness is never verdict authority",
+        "startup_window_s":startup_window_s,
+        "post_ready_window_s":post_ready_window_s,
+        "process_snapshot_timeout_s":V6_PROCESS_SNAPSHOT_TIMEOUT_S,
+        "provider_failsafe_s":V6_PROVIDER_FAILSAFE_S,
+    }
+    try:
+        while proc.poll() is None:
+            before = clock()
+            if os.path.lexists(ready) and ready_deadline is None:
+                ready_deadline = before + post_ready_window_s
+                evidence["ready_observed"] = True
+                evidence["ready_observed_at_s"] = before - started
+            active_deadline = ready_deadline if ready_deadline is not None else startup_deadline
+            if before >= active_deadline:
+                evidence["window_exhausted"] = "post_ready" if ready_deadline is not None else "startup"
+                break
+
+            status, rows, why = snapshot_fn()
+            after = clock()
+            evidence["samples"] = int(evidence["samples"]) + 1
+            if os.path.lexists(ready):
+                if ready_deadline is None:
+                    # Readiness during a slow snapshot gets a complete new
+                    # post-ready window; elapsed pre-ready time cannot steal it.
+                    ready_deadline = after + post_ready_window_s
+                    evidence["ready_observed"] = True
+                    evidence["ready_observed_at_s"] = after - started
+                evidence["post_ready_samples"] = int(evidence["post_ready_samples"]) + 1
+            if status == "ODÖMBART":
+                verdict = "ODÖMBART"; evidence["observer_error"] = why; break
+            hit, chain = observe_provider(rows, loop_pid=proc.pid, provider=provider, nonce=nonce)
+            if hit is not None:
+                verdict = "PASS"; evidence["provider"] = hit; evidence["ancestry"] = chain; break
+            pause(0.03)
+        if proc.poll() is not None:
+            evidence["process_exited_before_observer_conclusion"] = True
+    finally:
+        # This is the only normal release.  The later controller timeout is a
+        # cleanup fail-safe and is mechanically ordered after every bounded
+        # post-ready sample can conclude, including its maximum overrun.
+        release.touch()
+        evidence["release_written"] = True
+        evidence["observer_elapsed_s"] = clock() - started
+    evidence["ready_observed"] = bool(evidence.get("ready_observed", False))
+    return verdict, evidence
+
+
 def observer_selftests() -> None:
     provider = Path("/var/folders/h035/provider.sh"); nonce = "a" * 32
     def row(pid: int, ppid: int, comm: str, args: str, pgid: int = 60) -> dict[str, object]:
@@ -387,36 +460,117 @@ def observer_selftests() -> None:
     check(observe_provider(sandbox, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
           "J_OBSERVER_OPTIONAL_SANDBOX_POSITIVE")
 
-    # V4 could end after three slow whole-process-table samples because its
-    # provider had an unsynchronized two-second lifetime.  V5 keeps one real
-    # provider process alive until the observer releases that same run.
-    with tempfile.TemporaryDirectory(prefix="h035-observer-v5-selftest-") as raw:
-        root = Path(raw); ready = root / "ready"; release = root / "release"
-        worker = root / "provider.sh"
-        worker.write_text(synchronized_provider_script(ready, release)); worker.chmod(0o700)
+    check((V6_PROCESS_SNAPSHOT_TIMEOUT_S, V6_STARTUP_WINDOW_S,
+           V6_POST_READY_WINDOW_S, V6_RELEASE_CLEANUP_MARGIN_S,
+           V6_PROVIDER_FAILSAFE_S) == (5.0, 24.0, 24.0, 10.0, 45),
+          "J_OBSERVER_V6_FROZEN_LIFETIME_CONSTANTS")
+    check(V6_PROVIDER_FAILSAFE_S > (V6_POST_READY_WINDOW_S
+          + V6_PROCESS_SNAPSHOT_TIMEOUT_S + V6_RELEASE_CLEANUP_MARGIN_S),
+          "J_OBSERVER_V6_FAILSAFE_AFTER_MAXIMUM_OBSERVER_COMPLETION")
+
+    def start_fixture(root: Path, *, creates_ready: bool = True,
+                      rapid_exit: bool = False) -> tuple[subprocess.Popen, Path, Path, Path]:
+        ready = root / "ready"; release = root / "release"; worker = root / "provider.sh"
+        if rapid_exit:
+            source = "#!/bin/sh\nexit 7\n"
+        elif creates_ready:
+            source = synchronized_provider_script(ready, release)
+        else:
+            source = ("#!/bin/sh\n"
+                      f"while [ ! -e {shlex.quote(str(release))} ]; do sleep 0.05; done\n"
+                      "exit 7\n")
+        worker.write_text(source); worker.chmod(0o700)
         proc = subprocess.Popen(["/bin/sh", str(worker), nonce], stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True)
+        return proc, worker, ready, release
+
+    def wait_ready(proc: subprocess.Popen, ready: Path) -> bool:
         deadline = time.monotonic() + 2
         while not ready.exists() and proc.poll() is None and time.monotonic() < deadline:
             time.sleep(0.01)
-        alive_after_three_misses = ready.exists()
-        for _ in range(3):
-            time.sleep(0.03)
-            alive_after_three_misses = alive_after_three_misses and proc.poll() is None
-        release.touch(); proc.communicate(timeout=3)
-        check(alive_after_three_misses and proc.returncode == 7,
-              "J_OBSERVER_V5_HELD_AFTER_THREE_MISSED_SAMPLES")
+        return ready.exists()
+
+    # Five empty snapshots consume 21 simulated seconds.  The sixth returns
+    # the exact relationship after 25.2 seconds, later than the R7 review's
+    # 20.2722-second counterexample and after the nominal 24-second check.
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-slow-match-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root)
+        is_ready = wait_ready(proc, ready); virtual = [0.0]; calls = [0]
+        slow_chain = [row(proc.pid,1,real_comm,str(LOOP)+" run cfg",60),
+                      row(120,proc.pid,real_comm,str(ROOT/"controller/brytare/cli")+f" kor -- {worker} {nonce}",60),
+                      row(130,120,real_comm,str(ROOT/"controller/utforare/cli")+f" kor -- {worker} {nonce}",60),
+                      row(140,130,real_comm,str(ROOT/"controller/launch/cli")+f" run -- {worker} {nonce}",60),
+                      row(161,140,"/bin/sh",f"/bin/sh {worker} {nonce}",161)]
+        def slow_then_match() -> tuple[str, list[dict[str, object]], str]:
+            calls[0] += 1; virtual[0] += 4.2
+            return "OK", slow_chain if calls[0] == 6 else [], ""
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=slow_then_match, clock=lambda:virtual[0], pause=lambda _delay:None)
+        proc.communicate(timeout=3)
+        check(is_ready and verdict == "PASS" and calls[0] == 6
+              and float(evidence["observer_elapsed_s"]) > 20.2722
+              and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_SLOW_MATCH_AFTER_PRIOR_20_27_SECONDS", repr(evidence))
+
+    # Marker-only slow schedules exhaust as FAIL, but the provider remains
+    # alive for every sample and exits only after observer-owned release.
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-slow-empty-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root)
+        is_ready = wait_ready(proc, ready); virtual = [0.0]; alive = [True]
+        def slow_empty() -> tuple[str, list[dict[str, object]], str]:
+            alive[0] = alive[0] and proc.poll() is None; virtual[0] += 4.2
+            return "OK", [], ""
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=slow_empty, clock=lambda:virtual[0], pause=lambda _delay:None)
+        proc.communicate(timeout=3)
+        check(is_ready and verdict == "FAIL" and alive[0]
+              and float(evidence["observer_elapsed_s"]) > 20.2722
+              and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_SLOW_MARKER_ONLY_REJECTS_AND_RELEASES", repr(evidence))
+
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-error-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root)
+        is_ready = wait_ready(proc, ready)
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=lambda:("ODÖMBART", [], "forced observer error"))
+        proc.communicate(timeout=3)
+        check(is_ready and verdict == "ODÖMBART" and release.exists() and proc.returncode == 7
+              and not evidence.get("provider"),
+              "J_OBSERVER_V6_ERROR_RELEASES_WITHOUT_PASS", repr(evidence))
+
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-no-ready-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root, creates_ready=False)
+        virtual = [0.0]
+        def no_ready_empty() -> tuple[str, list[dict[str, object]], str]:
+            virtual[0] += 4.2; return "OK", [], ""
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=no_ready_empty, clock=lambda:virtual[0], pause=lambda _delay:None)
+        proc.communicate(timeout=3)
+        check(verdict == "FAIL" and not ready.exists() and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_NO_READY_BOUNDED_FAIL_AND_CLEANUP", repr(evidence))
+
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-rapid-exit-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root, rapid_exit=True)
+        proc.wait(timeout=3)
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=lambda:("OK", [], ""))
+        proc.communicate(timeout=3)
+        check(verdict == "FAIL" and not ready.exists() and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_RAPID_EXIT_NO_READY_REJECTS", repr(evidence))
 
 
 def synchronized_provider_script(ready: Path, release: Path) -> str:
-    """Gate-owned V5 fixture lifetime; never an execution verdict."""
+    """V6 provider: only observer release ends normal fixture lifetime."""
     return (
         "#!/bin/sh\n"
         f": > {shlex.quote(str(ready))}\n"
-        "h035_wait=0\n"
-        f"while [ ! -e {shlex.quote(str(release))} ] && [ \"$h035_wait\" -lt 300 ]; do\n"
+        f"while [ ! -e {shlex.quote(str(release))} ]; do\n"
         "  sleep 0.05\n"
-        "  h035_wait=$((h035_wait + 1))\n"
         "done\n"
         "printf '%s\\n' 'fixture provider refusal' >&2\n"
         "exit 7\n")
@@ -433,9 +587,8 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
     ready = tmp / f"provider-{authority}-{int(restart)}-{nonce}.ready"
     release = tmp / f"provider-{authority}-{int(restart)}-{nonce}.release"
     if observe:
-        # V5 lifetime synchronization.  The marker only keeps the gate-owned
-        # shell alive long enough for external process-table observation; it
-        # is never evidence that the provider or its ancestry was executed.
+        # V6 lifetime synchronization.  Only observer release ends the normal
+        # gate-owned shell lifetime; readiness is never execution evidence.
         worker.write_text(synchronized_provider_script(ready, release))
     else:
         worker.write_text("#!/bin/sh\nsleep 2\nprintf '%s\\n' 'fixture provider refusal' >&2\nexit 7\n")
@@ -457,36 +610,29 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
         "workspace_rot":str(tmp/f"workspaces-{authority}-{int(restart)}"), "base_sha":base,
         "verifier_id":"h035-fixture-unregistered", "run_id":f"h035-{authority}-{int(restart)}",
         "brytare_rot":str(tmp/f"breaker-{authority}-{int(restart)}"), "budget":1, "troskel":1,
-        "worker_cmd":[str(worker), nonce], "timeout_s":20 if observe else 5})
+        "worker_cmd":[str(worker), nonce],
+        "timeout_s":V6_PROVIDER_FAILSAFE_S if observe else 5})
     def observed_run() -> tuple[subprocess.CompletedProcess, str, dict[str, object]]:
         proc = subprocess.Popen([str(LOOP), "run", str(cfg)], cwd=repo,
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        verdict = "FAIL"; evidence: dict[str, object] = {
-            "nonce":nonce, "samples":0, "post_ready_samples":0,
-            "lifetime_synchronization":"gate-owned ready/release; never verdict authority",
-        }
-        deadline = time.monotonic() + 18
-        while proc.poll() is None and time.monotonic() < deadline:
-            status, rows, why = process_snapshot() if observe else ("OK", [], "")
-            evidence["samples"] = int(evidence["samples"]) + 1
-            if observe and os.path.lexists(ready):
-                evidence["ready_observed"] = True
-                evidence["post_ready_samples"] = int(evidence["post_ready_samples"]) + 1
-            if status == "ODÖMBART":
-                verdict = "ODÖMBART"; evidence["observer_error"] = why; break
-            hit, chain = observe_provider(rows, loop_pid=proc.pid, provider=worker, nonce=nonce)
-            if hit is not None:
-                verdict = "PASS"; evidence["provider"] = hit; evidence["ancestry"] = chain; break
-            time.sleep(0.03)
         if observe:
-            # Release on every verdict path.  PASS still requires the exact
-            # external ps row and ordered ancestry above; marker presence is
-            # recorded solely to diagnose the bounded sampling lifetime.
-            release.touch()
-        stdout, stderr = proc.communicate(timeout=10)
-        if not observe: verdict = "NOT_OBSERVED"
+            verdict, evidence = observe_provider_lifetime(
+                proc, provider=worker, nonce=nonce, ready=ready, release=release)
+        else:
+            verdict, evidence = "NOT_OBSERVED", {"nonce":nonce}
+        try:
+            stdout, stderr = proc.communicate(timeout=V6_RELEASE_CLEANUP_MARGIN_S)
+        except subprocess.TimeoutExpired:
+            proc.terminate()
+            try:
+                stdout, stderr = proc.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill(); stdout, stderr = proc.communicate(timeout=2)
+            verdict = "ODÖMBART"
+            evidence["cleanup_error"] = "loop did not exit within release cleanup margin"
         evidence.update({"loop_pid":proc.pid,"provider_path":str(worker),
                          "ready_observed":bool(evidence.get("ready_observed", False)),
+                         "loop_cleanup_complete":proc.poll() is not None,
                          "ps_fields":["pid","ppid","pgid","comm","args"]})
         return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr), verdict, evidence
     first, verdict, evidence = observed_run()
@@ -503,7 +649,7 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
 
 def real_routing(tmp: Path) -> None:
     ordinary, _verdict, _, _, _ = loop_fixture(tmp, "ordinary")
-    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V5")
+    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V6")
     print("OWNER_ACCEPTANCE_REQUIRED=YES")
     owner, verdict, state, done, _ = loop_fixture(tmp, "owner_authority")
     owner_required = "OWNER_ACTION_REQUIRED" in state
@@ -525,13 +671,13 @@ def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
     with tempfile.TemporaryDirectory(prefix="h035-owner-effect-") as raw:
         result, verdict, _state, _done, evidence = loop_fixture(Path(raw), "ordinary", observe=True)
     record = {
-        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V5",
+        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V6",
         "task": "h-035", "candidate_sha": candidate_sha,
         "gate_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "spec_sha256": hashlib.sha256(SPEC.read_bytes()).hexdigest(),
         "normal_entrypoint": "controller/loop/cli run",
-        "observer": "H035_OWNER_PROVIDER_EXEC_V5 exact-argv, loop-image-bound normal-ancestry, synchronized-lifetime observer",
-        "observer_version": 5,
+        "observer": "H035_OWNER_PROVIDER_EXEC_V6 exact-argv, loop-image-bound normal-ancestry, observer-release-coupled lifetime",
+        "observer_version": 6,
         "candidate_bound_attempts": 1,
         "observer_verdict": verdict,
         "provider_process_execution_observed": verdict == "PASS",
@@ -1109,14 +1255,15 @@ def frozen_checks() -> None:
     )
     check(isinstance(criterion, str) and all(term in criterion for term in remediation_terms),
           "F_IR01_IR07_PRODUCTION_CONTRACT")
-    r7_terms = (
-        "H035_OWNER_PROVIDER_EXEC_V5",
-        "gate-owned ready/release handshake",
-        "beyond three missed samples",
+    r8_terms = (
+        "H035_OWNER_PROVIDER_EXEC_V6",
+        "observer completion/release the only normal provider lifetime terminator",
+        "slow schedules beyond 20.2722 seconds",
+        "no-ready or rapid-exit paths reject with bounded cleanup",
         "root and nested files, empty directories, symlinks, path types, content, executable modes and ownership",
     )
-    check(isinstance(criterion, str) and all(term in criterion for term in r7_terms),
-          "F_R7_SNAPSHOT_AND_OBSERVER_V5_CONTRACT")
+    check(isinstance(criterion, str) and all(term in criterion for term in r8_terms),
+          "F_R8_SNAPSHOT_AND_OBSERVER_V6_CONTRACT")
     forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
     check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
     check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
