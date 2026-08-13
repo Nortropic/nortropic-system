@@ -54,9 +54,11 @@ def repository(req: dict[str, object]) -> tuple[Path, str]:
     return repo, candidate
 
 
-def canonical_bytes(repo: Path, candidate: str, relative: str) -> bytes:
+def canonical_bytes(repo: Path, base: str, candidate: str, relative: str) -> bytes:
     raw = blob_at(repo, candidate, relative)
     if raw is None:
+        if blob_at(repo, base, relative) is not None:
+            raise AuthorityError(f"canonical authority file deleted: {relative}")
         raise AuthorityError(f"canonical authority file missing: {relative}")
     return raw
 
@@ -64,8 +66,8 @@ def canonical_bytes(repo: Path, candidate: str, relative: str) -> bytes:
 def authority_documents(req: dict[str, object]) -> tuple[Path, str, bytes, object, bytes, dict[str, object]]:
     repo, candidate = repository(req)
     base = exact_commit(repo, req.get("base_sha"))
-    spec_raw = canonical_bytes(repo, candidate, "specs/tasks.spec.json")
-    registry_raw = canonical_bytes(repo, candidate, "specs/owner-production-paths.v1.json")
+    spec_raw = canonical_bytes(repo, base, candidate, "specs/tasks.spec.json")
+    registry_raw = canonical_bytes(repo, base, candidate, "specs/owner-production-paths.v1.json")
     spec = strict_json_bytes(spec_raw)
     registry = validate_registry(strict_json_bytes(registry_raw))
     return repo, candidate, spec_raw, spec, registry_raw, registry
