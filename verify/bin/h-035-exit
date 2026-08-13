@@ -208,7 +208,8 @@ def commit_paths(repo: Path, message: str, *paths: str) -> str:
 
 
 def authority_repo(tmp: Path, name: str, tasks: list[dict[str, object]],
-                   *, gates: dict[str, bytes] | None = None) -> tuple[Path, str]:
+                   *, gates: dict[str, bytes] | None = None,
+                   gate_modes: dict[str, int] | None = None) -> tuple[Path, str]:
     """A disposable Git authority root containing both canonical documents."""
     repo = tmp / name; init_repo(repo)
     (repo / "specs").mkdir()
@@ -227,7 +228,7 @@ def authority_repo(tmp: Path, name: str, tasks: list[dict[str, object]],
             target.write_bytes(Path(__file__).read_bytes())
         else:
             target.write_bytes(b"#!/bin/sh\nexit 1\n")
-        target.chmod(0o755)
+        target.chmod(gate_modes.get(gate_path, 0o755) if gate_modes else 0o755)
         gate_paths.append(gate_path)
     base = commit_paths(repo, "canonical authority", "specs/tasks.spec.json",
                         "specs/owner-production-paths.v1.json", *gate_paths)
@@ -265,7 +266,8 @@ def candidate(repo: Path, base: str, path: str, serial: int) -> str:
     if p.returncode: raise Rig(p.stderr)
     target = repo / path; target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(f"h035 fixture candidate {serial}\n")
-    for args in (("add", "--", path), ("commit", "-qm", f"candidate-{serial}")):
+    for args in (("--literal-pathspecs", "add", "--", path),
+                 ("commit", "-qm", f"candidate-{serial}")):
         p = git(repo, *args)
         if p.returncode: raise Rig(p.stderr)
     return git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -1387,17 +1389,21 @@ def r9_task_gate_matrix(tmp: Path) -> None:
     gate_b = "verify/bin/r9-owner-b-exit"
     gate_literal = ":(literal)verify/bin/r11-owner-literal-exit"
     gate_top = ":(top)verify/bin/r11-owner-top-exit"
+    gate_utf8 = "verify/bin/r12 owner-β-exit"
     bytes_a = b"#!/bin/sh\nprintf 'r9 owner a red\\n' >&2\nexit 1\n"
     bytes_b = b"#!/bin/sh\nprintf 'r9 owner b red\\n' >&2\nexit 1\n"
     bytes_literal = b"#!/bin/sh\nprintf 'r11 literal owner red\\n' >&2\nexit 1\n"
     bytes_top = b"#!/bin/sh\nprintf 'r11 top owner red\\n' >&2\nexit 1\n"
+    bytes_utf8 = b"#!/bin/sh\nprintf 'r12 utf8 space owner red\\n' >&2\nexit 1\n"
     repo, base = authority_repo(tmp, "r9-canonical-repo", [
         owner_task("owner-r9-a", ["controller/h034-native/**"], gate_a),
         owner_task("owner-r9-b", ["controller/h034-native/**"], gate_b),
         owner_task("owner-r11-literal", ["controller/h034-native/**"], gate_literal),
         owner_task("owner-r11-top", ["controller/h034-native/**"], gate_top),
+        owner_task("owner-r12-utf8-space", ["controller/h034-native/**"], gate_utf8),
     ], gates={gate_a:bytes_a, gate_b:bytes_b,
-              gate_literal:bytes_literal, gate_top:bytes_top})
+              gate_literal:bytes_literal, gate_top:bytes_top,
+              gate_utf8:bytes_utf8}, gate_modes={gate_utf8:0o644})
     bare = tmp / "r9-canonical-origin.git"
     p = run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
     if p.returncode: raise Rig(p.stderr)
@@ -1413,6 +1419,30 @@ def r9_task_gate_matrix(tmp: Path) -> None:
                               "owner-r11-literal", bare, revision="R11")
     positive_owner_gate_chain(tmp, "pathspec_top", repo, base,
                               "owner-r11-top", bare, revision="R11")
+    positive_owner_gate_chain(tmp, "utf8_space_100644", repo, base,
+                              "owner-r12-utf8-space", bare, revision="R12")
+
+    # R12 composes pathspec syntax with immutable candidate-object authority.
+    # Predicted before execution: a generic literal candidate-tree resolver
+    # accepts every chain; a narrow `:(...)` mutable-checkout fallback fails.
+    # Each checkout has one hostile property while candidate_sha remains exact.
+    for label, target, kind, canonical, task_id in (
+        ("pathspec_literal_checkout_regular_bytes", repo/gate_literal,
+         "regular-bytes", bytes_literal, "owner-r11-literal"),
+        ("pathspec_literal_checkout_directory", repo/gate_literal,
+         "directory", bytes_literal, "owner-r11-literal"),
+        ("pathspec_top_checkout_symlink", repo/gate_top,
+         "symlink", bytes_top, "owner-r11-top"),
+        ("pathspec_top_checkout_missing", repo/gate_top,
+         "missing", bytes_top, "owner-r11-top"),
+    ):
+        set_hostile_checkout_gate(target, kind, canonical)
+        positive_owner_gate_chain(tmp, label, repo, base, task_id, bare,
+                                  revision="R12")
+    set_hostile_checkout_gate(repo/gate_literal, "restore", bytes_literal)
+    set_hostile_checkout_gate(repo/gate_top, "restore", bytes_top)
+    check(not git(repo, "status", "--porcelain").stdout.strip(),
+          "A_R12_PATHSPEC_HOSTILE_MUTABLE_CHECKOUT_FIXTURE_CLEANUP")
 
     # Candidate-object authority is invariant to the mutable checkout. Four
     # one-defect checkout variants change gate bytes/type/link/existence while
@@ -1490,6 +1520,30 @@ def r9_task_gate_matrix(tmp: Path) -> None:
     cases.append(("CANDIDATE_GATE_OBJECT_MISMATCH", mismatch_repo,
                   mismatch_candidate, mismatch_candidate, mismatch_request))
 
+    # Inverse R12 control: the checkout and exact candidate both contain
+    # changed bytes at a literal pathspec-looking filename, while the request
+    # repeats the prior candidate digest. All four consumers must reject with
+    # state, bounded workspace and refs unchanged.
+    literal_mismatch_repo, literal_mismatch_old = authority_repo(
+        tmp, "r12-literal-object-mismatch-repo", [
+            owner_task("owner-r11-literal", ["controller/h034-native/**"],
+                       gate_literal)], gates={gate_literal:bytes_literal})
+    literal_mismatch_candidate = candidate(
+        literal_mismatch_repo, literal_mismatch_old, gate_literal, 1201)
+    literal_mismatch_bare = tmp / "r12-literal-object-mismatch-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(literal_mismatch_bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(literal_mismatch_bare, literal_mismatch_repo,
+                    literal_mismatch_candidate)
+    literal_mismatch_request = transition_request(
+        literal_mismatch_repo, literal_mismatch_candidate, "owner-r11-literal",
+        tmp/"r12-unused-literal-object-mismatch-state",
+        tmp/"r12-unused-literal-object-mismatch-workspace", literal_mismatch_bare,
+        gate_sha256=hashlib.sha256(bytes_literal).hexdigest())
+    cases.append(("PATHSPEC_LITERAL_CANDIDATE_GATE_OBJECT_MISMATCH",
+                  literal_mismatch_repo, literal_mismatch_candidate,
+                  literal_mismatch_candidate, literal_mismatch_request))
+
     for label, _case_repo, _case_base, _case_candidate, template in cases:
         for command in ("owner-author", "check-candidate", "record-review", "owner-freeze"):
             state = tmp / f"r9-{label.lower()}-{command}-state"
@@ -1502,7 +1556,12 @@ def r9_task_gate_matrix(tmp: Path) -> None:
                 request["review_result"] = "PASS"
                 request["review_identity"] = "r9-review"
             seed_owner_command_state(state, command, request)
-            revision = "R10" if label == "CANDIDATE_GATE_OBJECT_MISMATCH" else "R9"
+            if label == "CANDIDATE_GATE_OBJECT_MISMATCH":
+                revision = "R10"
+            elif label == "PATHSPEC_LITERAL_CANDIDATE_GATE_OBJECT_MISMATCH":
+                revision = "R12"
+            else:
+                revision = "R9"
             expect_auth(tmp, f"A_{revision}_{label}_{command.upper().replace('-', '_')}_REJECT",
                         command, request, False, state_changes=False,
                         workspace_changes=False, refs_change=False)
@@ -1565,6 +1624,13 @@ def frozen_checks() -> None:
     )
     check(all(term in task_contract for term in r11_terms),
           "F_R11_LITERAL_GIT_PATHSPEC_FILENAME_CONTRACT")
+    r12_terms = (
+        "pathspec-prefixed mutable checkout path has hostile regular bytes, a directory, a symlink or is missing",
+        "changed candidate Git object's literal gate digest rejects with no effects",
+        "UTF-8/space gate stored as a 100644 regular blob remains valid",
+    )
+    check(all(term in task_contract for term in r12_terms),
+          "F_R12_PATHSPEC_IMMUTABLE_GIT_OBJECT_COMPOSITION_CONTRACT")
     forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
     check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
     check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
