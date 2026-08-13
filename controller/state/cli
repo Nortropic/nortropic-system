@@ -17,6 +17,7 @@ ingen rekonstruktion än en tyst partiell.
 """
 
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -88,22 +89,37 @@ def kmd_append(kat: Path, rå: str) -> int:
     if not giltigt_event(händelse):
         return fel("append: event kräver icke-tomma strängfälten task och status")
 
-    # Loggen först: den är sanningen. Kanonisk enradsform, så ett event
-    # alltid är exakt en rad — annars kan projektionen inte rekonstrueras.
+    # Loggen först: den är sanningen. Ett avvisat append är dock inget event:
+    # om projektionen inte kan committa rullas exakt den nyss appendade raden
+    # tillbaka innan felet returneras. Därmed kan en överordnad transition
+    # behandla state-append som en enda accepterad eller oförändrad effekt.
     rad = json.dumps(händelse, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    ursprunglig_storlek = logg.stat().st_size
     with logg.open("a", encoding="utf-8") as f:
         f.write(rad + "\n")
+        f.flush()
+        os.fsync(f.fileno())
 
-    db = sqlite3.connect(dbfil)
     try:
-        db.execute(
-            "INSERT INTO task_state (task, status) VALUES (?, ?)"
-            " ON CONFLICT(task) DO UPDATE SET status = excluded.status",
-            (händelse["task"], händelse["status"]),
-        )
-        db.commit()
-    finally:
-        db.close()
+        db = sqlite3.connect(dbfil)
+        try:
+            db.execute(
+                "INSERT INTO task_state (task, status) VALUES (?, ?)"
+                " ON CONFLICT(task) DO UPDATE SET status = excluded.status",
+                (händelse["task"], händelse["status"]),
+            )
+            db.commit()
+        finally:
+            db.close()
+    except (OSError, sqlite3.Error) as e:
+        try:
+            with logg.open("r+b") as f:
+                f.truncate(ursprunglig_storlek)
+                f.flush()
+                os.fsync(f.fileno())
+        except OSError as rollback:
+            return fel(f"append: projektionen föll ({e}) och eventrollback föll ({rollback})")
+        return fel(f"append: projektionen kunde inte uppdateras — eventet återställt ({e})")
     return 0
 
 

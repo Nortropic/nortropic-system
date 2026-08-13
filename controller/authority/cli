@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -251,8 +252,14 @@ def owner_author(req: dict[str, object]) -> int:
         raise AuthorityError("workspace_root missing")
     workspace = Path(workspace_raw)
     workspace.mkdir(parents=True, exist_ok=False)
-    atomic_json(workspace / "owner-attempt.json", next_state)
-    persist_state(req, next_state)
+    try:
+        atomic_json(workspace / "owner-attempt.json", next_state)
+        persist_state(req, next_state)
+    except (AuthorityError, OSError):
+        # The owner attempt is one material transition. A rejected state
+        # append must not leave its prewritten bounded-workspace half behind.
+        shutil.rmtree(workspace)
+        raise
     return response(True, authority_class="owner_authority", state=next_state["state"])
 
 

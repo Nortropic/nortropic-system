@@ -39,6 +39,10 @@ if sys.version_info < (3, 12):
 ROT = Path(__file__).resolve().parents[2]
 ATT = ROT / "controller/attest/cli"
 ST = ROT / "controller/state/cli"
+# Shared authority parsing is executable code, not a repository mutation.
+# Disable interpreter cache emission before importing it so normal routing
+# remains byte-clean without relying on caller environment variables.
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROT / "controller/authority"))
 from core import AuthorityError, canonical_path  # noqa: E402
 

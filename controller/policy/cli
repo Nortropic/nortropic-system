@@ -47,6 +47,9 @@ if sys.version_info < (3, 12):
 ROT = Path(__file__).resolve().parents[2]
 SPEC = ROT / "specs/tasks.spec.json"
 EVIDENCE = ROT / "controller/policy/evidence"
+# Policy may read the shared authority parser but never materialize runtime
+# cache bytes in the immutable candidate repository.
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROT / "controller/authority"))
 from core import (AuthorityError, overlaps, permits, strict_json_bytes, strict_json_file,
                   task_authority, validate_registry)  # noqa: E402
