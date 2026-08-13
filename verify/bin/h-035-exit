@@ -1,169 +1,417 @@
 #!/usr/bin/env python3
-"""Frozen H-035 acceptance gate. Exit 0 PASS, 1 task RED, 2 rig error."""
+"""Frozen H-035 real-effect gate. 0=PASS, 1=product RED, 2=rig error.
+
+J_* checks are judge self-tests.  A_*/N_*/P_* invoke operational controller
+entrypoints against disposable repositories/state; they are acceptance.
+"""
 from __future__ import annotations
-import json, os, re, subprocess, sys, tempfile
+
+import hashlib
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = ROOT / "specs/tasks.spec.json"
 REG = ROOT / "specs/owner-production-paths.v1.json"
+LOOP = ROOT / "controller/loop/cli"
 AUTH = ROOT / "controller/authority/cli"
-AUTO = ROOT / "scripts/nortropic-codex-autopilot.py"
+REGISTER = ROOT / "controller/verify/register.json"
 passed = failed = 0
+
+
+class Rig(Exception):
+    pass
+
 
 def check(ok: bool, name: str, detail: str = "") -> None:
     global passed, failed
     if ok:
-        passed += 1; print(f"PASS {name}")
+        passed += 1
+        print(f"PASS {name}")
     else:
-        failed += 1; print(f"FAIL {name}: {detail}")
+        failed += 1
+        print(f"FAIL {name}: {detail}")
 
-def rig(msg: str) -> int:
-    print(f"RIG_ERROR: {msg}", file=sys.stderr); return 2
 
-def parse_path(raw: str) -> tuple[str, bool]:
-    if not isinstance(raw, str) or "\x00" in raw: raise ValueError("type/NUL")
+def run(argv: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None,
+        stdin: str | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(argv, cwd=cwd, env=env, input=stdin, text=True,
+                          capture_output=True, shell=False, timeout=45)
+
+
+def parse_path(raw: object) -> tuple[str, bool]:
+    if not isinstance(raw, str) or "\x00" in raw:
+        raise ValueError("type/NUL")
     p = raw.replace("\\", "/")
-    if not p or p.startswith("/") or re.match(r"^[A-Za-z]:", p): raise ValueError("absolute/drive")
-    if p.startswith("./") or p.endswith("/") or "//" in p: raise ValueError("separator")
-    prefix = p.endswith("/**")
-    core = p[:-3] if prefix else p
-    if not core or any(x in ("", ".", "..") for x in core.split("/")): raise ValueError("segment")
-    if any(c in core for c in "*?[]{}") or ("*" in p[:-3] if prefix else "*" in p): raise ValueError("glob")
-    return core, prefix
+    if not p or p.startswith("/") or re.match(r"^[A-Za-z]:", p):
+        raise ValueError("absolute/drive/empty")
+    if p.startswith("./") or p.endswith("/") or "//" in p:
+        raise ValueError("separator")
+    recursive = p.endswith("/**")
+    core = p[:-3] if recursive else p
+    if not core or any(x in ("", ".", "..") for x in core.split("/")):
+        raise ValueError("segment")
+    if any(c in core for c in "*?[]{}"):
+        raise ValueError("unsupported glob")
+    return core, recursive
 
-def overlap(a: str, b: str) -> bool:
+
+def overlap(a: object, b: object) -> bool:
     ap, ax = parse_path(a); bp, bx = parse_path(b)
-    if not ax and not bx: return ap == bp
-    if ax and (bp == ap or bp.startswith(ap + "/")): return True
-    if bx and (ap == bp or ap.startswith(bp + "/")): return True
-    return False
+    return ((not ax and not bx and ap == bp)
+            or (ax and (bp == ap or bp.startswith(ap + "/")))
+            or (bx and (ap == bp or ap.startswith(bp + "/"))))
 
-def selftests() -> None:
-    bad = ["/abs", "C:/x", "./x", "x//y", "x/./y", "x/../y", "x/", "x/*", "x/**/y", ""]
-    check(all(_reject(x) for x in bad), "J01_PATH_REJECT_FAMILY")
-    check(parse_path(r"a\b\c") == ("a/b/c", False), "J02_BACKSLASH_NORMALIZATION")
-    check(overlap("verify/**", "verify/h034/kernel/**"), "J03_PARENT_OVERLAP")
-    check(overlap("verify/h034/kernel/file.c", "verify/h034/kernel/**"), "J04_CHILD_OVERLAP")
-    check(not overlap("verify/h035/**", "verify/h034/kernel/**"), "J05_DISJOINT_POSITIVE")
-    # Predicted before execution: each one-defect mutant must be rejected by
-    # the named independent oracle. These judge controls are not production PASS.
-    mutants = [
-      ("M01_EXACT_ONLY", "parent prefix overlap is missed", not ("verify/**" == "verify/h034/kernel/**"), False),
-      ("M02_ROLE_TRUST", "ROLE becomes authority", True, False),
-      ("M03_V1_OWNER", "legacy v1 escalates", True, False),
-      ("M04_RESTART_PENDING", "owner state resets", True, False),
-      ("M05_REVIEW_PUBLISH", "review PASS publishes", True, False),
-    ]
-    for mid, defect, mutant_accepts, expected_accepts in mutants:
-        print(f"BAD_IMPLEMENTATION={mid} PROPERTY_VIOLATED={defect} GATE_CHECK_THAT_REJECTS_IT=JUDGE_{mid}")
-        check(mutant_accepts != expected_accepts, f"JUDGE_{mid}")
 
-def _reject(x: str) -> bool:
-    try: parse_path(x); return False
+def strict_load(path: Path) -> object:
+    def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
+        out: dict[str, object] = {}
+        for k, v in items:
+            if k in out:
+                raise ValueError(f"duplicate key {k}")
+            out[k] = v
+        return out
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=pairs)
+
+
+REG_KEYS = {
+    "schema_version", "path_grammar", "authority_source", "self_digest_is_authority",
+    "owner_production_paths", "prospective_ordinary_protected_paths",
+    "owner_author_global_denied_paths",
+}
+REQUIRED_OWNER = {
+    "controller/h034-native/**", "verify/h034/kernel",
+    "verify/h034/build-recipe.json", "verify/h034/identity-manifest.json",
+}
+
+
+def validate_registry(doc: object) -> tuple[bool, str]:
+    if not isinstance(doc, dict): return False, "top-level type"
+    if set(doc) != REG_KEYS: return False, "top-level membership"
+    if doc.get("schema_version") != 1: return False, "schema version"
+    if doc.get("path_grammar") != "repo-tree-exact-or-terminal-recursive-prefix-v1": return False, "grammar"
+    if doc.get("authority_source") != "git-candidate-plus-independent-gate-review-plus-owner-final-freeze": return False, "authority source"
+    if doc.get("self_digest_is_authority") is not False: return False, "self digest"
+    for key in ("owner_production_paths", "prospective_ordinary_protected_paths", "owner_author_global_denied_paths"):
+        value = doc.get(key)
+        if not isinstance(value, list) or not value or not all(isinstance(x, str) for x in value):
+            return False, f"{key} type/empty"
+        try: canon = [parse_path(x) for x in value]
+        except ValueError as e: return False, f"{key} path {e}"
+        if len(canon) != len(set(canon)): return False, f"{key} duplicate"
+    if set(doc["owner_production_paths"]) != REQUIRED_OWNER: return False, "required H034 membership"
+    return True, "ok"
+
+
+def registry_selftests(good: dict[str, object]) -> None:
+    ok, why = validate_registry(good); check(ok, "J_REGISTRY_POSITIVE", why)
+    mutants: list[tuple[str, object]] = []
+    for name, mutate in (
+        ("MISSING_KEY", lambda d: d.pop("path_grammar")),
+        ("UNEXPECTED_KEY", lambda d: d.update(extra=[])),
+        ("WRONG_VERSION", lambda d: d.update(schema_version=2)),
+        ("WRONG_LIST_TYPE", lambda d: d.update(owner_production_paths={})),
+        ("EMPTY_LIST", lambda d: d.update(owner_production_paths=[])),
+        ("DUPLICATE_PATH", lambda d: d.update(owner_production_paths=list(d["owner_production_paths"])+[d["owner_production_paths"][0]])),
+        ("MALFORMED_PATH", lambda d: d.update(owner_production_paths=["../escape"])),
+        ("REQUIRED_REMOVED", lambda d: d.update(owner_production_paths=list(d["owner_production_paths"])[1:])),
+        ("REQUIRED_ALTERED", lambda d: d.update(owner_production_paths=["controller/h034-native/*", *list(d["owner_production_paths"])[1:]])),
+    ):
+        copy = json.loads(json.dumps(good)); mutate(copy); mutants.append((name, copy))
+    for name, mutant in mutants:
+        accepted, _ = validate_registry(mutant)
+        check(not accepted, f"J_REGISTRY_{name}")
+    try:
+        json.loads('{"schema_version":1,"schema_version":1}', object_pairs_hook=lambda p: (_ for _ in ()).throw(ValueError("duplicate")) if len({k for k,_ in p}) != len(p) else dict(p))
+        duplicate_rejected = False
+    except ValueError: duplicate_rejected = True
+    check(duplicate_rejected, "J_REGISTRY_DUPLICATE_KEY")
+
+
+def path_selftests() -> None:
+    bad = ["", "/x", "C:/x", "./x", "x//y", "x/../y", "x/./y", "x/", "x/*", "x/**/y", "../x"]
+    check(all(_bad_path(x) for x in bad), "J_PATH_REJECT_FAMILY")
+    check(parse_path(r"a\b\c") == ("a/b/c", False), "J_PATH_BACKSLASH_NORMALIZED")
+    check(overlap("controller/**", "controller/h034-native/kernel.c"), "J_PATH_PARENT")
+    check(overlap("controller/h034-native/**", "controller/h034-native/kernel.c"), "J_PATH_CHILD")
+    check(not overlap("safe/**", "controller/h034-native/**"), "J_PATH_SIBLING")
+    # Predicted outcome: each superficial implementation is rejected by real acceptance below.
+    for mutant, guard in (
+        ("HARDCODE_PROBE_NAMES", "A_OWNER_ROUTE"),
+        ("PERMISSIVE_REGISTRY_CONSUMER", "N_REGISTRY_RUNTIME"),
+        ("DOCS_IMPACT_ESCALATION", "N_DOCS_IMPACT"),
+        ("RESTART_LAUNCHES_BUILDER", "A_OWNER_RESTART"),
+        ("REVIEW_AUTO_PUBLISH", "N_REVIEW_PUBLICATION"),
+        ("AUTOPILOT_OLD_MATCHER", "N_PATH_CONSISTENCY"),
+    ):
+        print(f"MUTANT={mutant} PREDICTED=REJECT GUARD={guard}")
+
+
+def _bad_path(value: str) -> bool:
+    try: parse_path(value); return False
     except ValueError: return True
 
-def run_json(argv: list[str], request: dict) -> tuple[int, dict, str]:
-    p = subprocess.run(argv, input=json.dumps(request), text=True, capture_output=True, cwd=ROOT,
-                       env={**os.environ, "ROLE":"OWNER_AUTHORITY_AUTHOR", "NORTROPIC_AUTHORITY_CLASS":"owner_authority"})
+
+def write_json(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+    return run(["git", *args], cwd=cwd)
+
+
+def init_repo(path: Path) -> str:
+    path.mkdir()
+    for args in (("init", "-q"), ("config", "user.name", "H035 Fixture"), ("config", "user.email", "fixture@example.invalid")):
+        p = git(path, *args)
+        if p.returncode: raise Rig(p.stderr)
+    (path / "seed.txt").write_text("seed\n")
+    for args in (("add", "seed.txt"), ("commit", "-qm", "seed")):
+        p = git(path, *args)
+        if p.returncode: raise Rig(p.stderr)
+    return git(path, "rev-parse", "HEAD").stdout.strip()
+
+
+def candidate(repo: Path, base: str, path: str, serial: int) -> str:
+    p = git(repo, "checkout", "-q", base)
+    if p.returncode: raise Rig(p.stderr)
+    target = repo / path; target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(f"h035 fixture candidate {serial}\n")
+    for args in (("add", "--", path), ("commit", "-qm", f"candidate-{serial}")):
+        p = git(repo, *args)
+        if p.returncode: raise Rig(p.stderr)
+    return git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def registry_candidate(tmp: Path, name: str, raw: str) -> tuple[Path, str, str]:
+    repo = tmp / f"registry-{name}"; base = init_repo(repo)
+    target = repo / "specs/owner-production-paths.v1.json"; target.parent.mkdir()
+    target.write_text(raw)
+    for args in (("add", str(target.relative_to(repo))), ("commit", "-qm", name)):
+        p = git(repo, *args)
+        if p.returncode: raise Rig(p.stderr)
+    return repo, base, git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def task_candidate(tmp: Path, name: str, version: str, task: dict[str, object]) -> tuple[Path, str, str]:
+    repo = tmp / f"task-{name}"; base = init_repo(repo)
+    (repo / "specs").mkdir()
+    write_json(repo / "specs/tasks.spec.json", {"spec_version":version,"defaults":{"denied_write":[]},"tasks":[{"id":"fixture-task","depends_on":[],**task}]})
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    p = git(repo, "add", "specs")
+    if p.returncode: raise Rig(p.stderr)
+    p = git(repo, "commit", "-qm", name)
+    if p.returncode: raise Rig(p.stderr)
+    return repo, base, git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def loop_fixture(tmp: Path, authority: str, *, restart: bool = False) -> tuple[subprocess.CompletedProcess, bool, str, bool]:
+    """Execute the real normal loop entrypoint; only external boundaries are fixtures."""
+    # Current workspace/loop resolves the repository from its installed ROOT.
+    # The only repository effect is a disposable worktree under workspace_rot.
+    repo = ROOT; base = git(ROOT, "rev-parse", "HEAD").stdout.strip()
+    marker = tmp / f"provider-{authority}-{int(restart)}.marker"
+    worker = tmp / f"provider-{authority}-{int(restart)}.py"
+    worker.write_text("#!/usr/bin/env python3\nimport os,sys\nopen(os.environ['H035_PROVIDER_MARKER'],'a').write('launch\\n')\nprint('fixture provider refusal', file=sys.stderr)\nsys.exit(7)\n")
+    worker.chmod(worker.stat().st_mode | stat.S_IXUSR)
+    allowed = ["safe/**"] if authority == "ordinary" else []
+    owner_allowed = ["controller/h034-native/**"] if authority == "owner_authority" else []
+    task = {"id":"fixture-task", "authority_class":authority, "allowed_write":allowed,
+            "owner_author_allowed_write":owner_allowed, "docs_impact":[], "depends_on":[],
+            "exit_test":"verify/bin/fixture-red", "max_changed_files":5, "max_added_lines":20}
+    spec = tmp / f"spec-{authority}-{int(restart)}.json"
+    write_json(spec, {"spec_version":"2.0.0", "defaults":{"denied_write":[]}, "tasks":[task]})
+    state = tmp / f"state-{authority}-{int(restart)}"; attest = tmp / f"attest-{authority}-{int(restart)}"
+    state_init = run([str(ROOT / "controller/state/cli"), "init", str(state)])
+    if state_init.returncode: raise Rig(state_init.stderr or state_init.stdout)
+    attest.mkdir()
+    cfg = tmp / f"config-{authority}-{int(restart)}.json"
+    write_json(cfg, {"spec":str(spec), "attest_dir":str(attest), "state_dir":str(state),
+        "lease_dir":str(tmp/f"lease-{authority}-{int(restart)}"), "lease_resurs":"fixture",
+        "workspace_rot":str(tmp/f"workspaces-{authority}-{int(restart)}"), "base_sha":base,
+        "verifier_id":"h035-fixture-unregistered", "run_id":f"h035-{authority}-{int(restart)}",
+        "brytare_rot":str(tmp/f"breaker-{authority}-{int(restart)}"), "budget":1, "troskel":1,
+        "worker_cmd":[str(worker)], "timeout_s":5})
+    env = {**os.environ, "H035_PROVIDER_MARKER":str(marker)}
+    first = run([str(LOOP), "run", str(cfg)], cwd=repo, env=env)
+    if restart:
+        second = run([str(LOOP), "run", str(cfg)], cwd=repo, env=env)
+        result = second
+    else: result = first
+    events = state / "events.jsonl"
+    text = events.read_text(errors="replace") if events.exists() else ""
+    done = '"status": "done"' in text or '"status":"done"' in text
+    return result, marker.exists(), text, done
+
+
+def real_routing(tmp: Path) -> None:
+    ordinary, launched, _, _ = loop_fixture(tmp, "ordinary")
+    check(launched, "P03_ORDINARY_RED_LAUNCHES_BUILDER", (ordinary.stderr or ordinary.stdout)[-400:])
+    owner, launched, state, done = loop_fixture(tmp, "owner_authority")
+    owner_required = "OWNER_ACTION_REQUIRED" in state
+    check(not launched and owner_required and not done, "A_OWNER_ROUTE_REAL_EFFECT",
+          f"rc={owner.returncode} launched={launched} state={state[-300:]!r}")
+    restarted, launched, state, done = loop_fixture(tmp, "owner_authority", restart=True)
+    check(not launched and "OWNER_ACTION_REQUIRED" in state and not done,
+          "A_OWNER_RESTART_REAL_RECONSTRUCTION",
+          f"rc={restarted.returncode} launched={launched} state={state[-300:]!r}")
+
+
+def authority_call(tmp: Path, command: str, request: dict[str, object]) -> tuple[int, dict[str, object], str]:
+    if not AUTH.is_file(): return 127, {}, f"missing operational entrypoint {AUTH}"
+    p = run([str(AUTH), command], cwd=tmp, stdin=json.dumps(request))
     try: out = json.loads(p.stdout)
-    except Exception: out = {}
+    except ValueError: out = {}
     return p.returncode, out, (p.stderr or p.stdout)[-500:]
 
-def expect(name: str, argv: list[str], request: dict, accepted: bool, **effects: object) -> None:
-    rc, out, detail = run_json(argv, request)
-    ok = (rc == 0) == accepted and out.get("accepted") is accepted
-    for k, v in effects.items(): ok = ok and out.get(k) == v
+
+def expect_auth(tmp: Path, name: str, command: str, request: dict[str, object], accepted: bool,
+                **effects: object) -> None:
+    rc, out, detail = authority_call(tmp, command, request)
+    ok = ((rc == 0) == accepted) and out.get("accepted") is accepted
+    for key, value in effects.items(): ok = ok and out.get(key) == value
     check(ok, name, detail or repr(out))
 
-def request(case: str, **kw: object) -> dict:
-    d = {"schema_version":1, "case":case, "spec":str(SPEC), "registry":str(REG),
-         "task":"fixture-owner", "base_sha":"1"*40, "candidate_sha":"2"*40,
-         "spec_sha256":"a"*64, "registry_sha256":"b"*64, "gate_sha256":"c"*64,
-         "changed_files":[]}
-    d.update(kw); return d
 
-def production_matrix() -> None:
-    auth = [str(AUTH), "probe"]
-    auto = [sys.executable, str(AUTO), "--repo", str(ROOT), "authority-probe"]
-    owner = "controller/h034-native/kernel.c"
-    negatives = [
-      ("N01", "ordinary_scope", {"grant":owner}),
-      ("N02", "ordinary_scope", {"grant":"controller/h034-native/**"}),
-      ("N03", "ordinary_scope", {"grant":"controller/**"}),
-      ("N04", "ordinary_candidate", {"changed_files":[owner]}),
-      ("N05", "ordinary_candidate", {"changed_files":["specs/tasks.spec.json"]}),
-      ("N06", "ordinary_candidate", {"changed_files":["specs/owner-production-paths.v1.json"]}),
-      ("N07", "ordinary_candidate", {"changed_files":["controller/policy/cli"]}),
-      ("N08", "ordinary_candidate", {"changed_files":["scripts/nortropic-codex-autopilot.py"]}),
-      ("N09", "candidate_binding", {"claimed_authority_class":"owner_authority","actual_authority_class":"ordinary"}),
-      ("N10", "role_claim_only", {}),
-      ("N11", "alternate_spec", {"alternate_spec_grants_owner":True}),
-      ("N16", "test_author_scope", {"changed_files":[owner]}),
-      ("N17", "owner_scope", {"changed_files":["specs/tasks.spec.json"]}),
-      ("N18", "owner_scope", {"changed_files":["verify/bin/hypothetical-owner-exit"]}),
-      ("N19", "owner_scope", {"changed_files":["README.md"]}),
-      ("N20", "schema_v2", {"authority_class":None}),
-      ("N21", "schema_v2", {"authority_class":"root"}),
-      ("N22", "schema_v1", {"implicit_owner":True}),
-      ("N23", "candidate_binding", {"spec_sha256":"d"*64}),
-      ("N24", "candidate_binding", {"registry_sha256":"d"*64}),
-      ("N25", "candidate_binding", {"claimed_authority_class":"ordinary","actual_authority_class":"owner_authority"}),
-      ("N26", "candidate_binding", {"changed_files":[owner],"reported_changed_files":[]}),
+def production_matrix(tmp: Path) -> None:
+    """Future operational CLI contract; every case is black-box, never a named probe."""
+    repo = tmp / "authority-repo"; base = init_repo(repo)
+    bare = tmp / "origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    spec_digest = hashlib.sha256(SPEC.read_bytes()).hexdigest()
+    reg_digest = hashlib.sha256(REG.read_bytes()).hexdigest()
+    gate_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    common: dict[str, object] = {"repo":str(repo), "task_id":"h-035", "base_sha":base,
+        "main_sha":base, "spec_sha256":spec_digest, "registry_sha256":reg_digest,
+        "gate_path":"verify/bin/h-035-exit", "gate_sha256":gate_digest,
+        "state_dir":str(tmp/"authority-state"), "workspace_root":str(tmp/"authority-ws"),
+        "remote":str(bare)}
+    def req(**kw: object) -> dict[str, object]: return {**common, **kw}
+    # Actual task/schema/authority consumer matrix (N01-N18, N36-N41; P01-P05).
+    invalid = [
+      ("N01_EXACT_OWNER", "2.0.0", dict(authority_class="ordinary",allowed_write=["verify/h034/kernel"])),
+      ("N02_PARENT_OWNER", "2.0.0", dict(authority_class="ordinary",allowed_write=["verify/**"])),
+      ("N03_WILDCARD_OWNER", "2.0.0", dict(authority_class="ordinary",allowed_write=["controller/**"])),
+      ("N09_ORDINARY_BOTH", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],owner_author_allowed_write=["controller/h034-native/**"])),
+      ("N10_OWNER_NONEMPTY_ORDINARY", "2.0.0", dict(authority_class="owner_authority",allowed_write=["safe/**"],owner_author_allowed_write=["controller/h034-native/**"])),
+      ("N10B_OWNER_EMPTY_OWNER", "2.0.0", dict(authority_class="owner_authority",allowed_write=["safe/**"],owner_author_allowed_write=[])),
+      ("N11_EMPTY_CLASS", "2.0.0", dict(authority_class="",allowed_write=["safe/**"])),
+      ("N12_UPPER_CLASS", "2.0.0", dict(authority_class="OWNER",allowed_write=["safe/**"])),
+      ("N13_MIXED_CLASS", "2.0.0", dict(authority_class="OwNeR",allowed_write=["safe/**"])),
+      ("N14_V1_OWNER_FIELD", "1.0.0", dict(allowed_write=["safe/**"],owner_author_allowed_write=["controller/h034-native/**"])),
+      ("N15_DOCS_EXACT", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=["verify/h034/kernel"])),
+      ("N16_DOCS_PARENT", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=["verify/**"])),
+      ("N16B_OWNER_DOCS_GATE", "2.0.0", dict(authority_class="owner_authority",allowed_write=[],owner_author_allowed_write=["safe-owner/**"],docs_impact=["verify/bin/h-035-exit"])),
     ]
-    for n, case, extra in negatives: expect(n, auth, request(case, **extra), False)
-    # Actual autopilot/state transition effects, not policy-source markers.
-    auto_neg = [
-      ("N12", "owner_gate_red", {"builder_launched":False,"state":"OWNER_ACTION_REQUIRED"}),
-      ("N13", "restart_owner_action", {"builder_launched":False,"state":"OWNER_ACTION_REQUIRED"}),
-      ("N14", "owner_action_done", {}), ("N15", "restart_resets_owner", {}),
-      ("N27", "review_pass", {"published":False,"state":"OWNER_FINAL_FREEZE_REQUIRED"}),
-      ("N28", "freeze_wrong_candidate", {}), ("N29", "freeze_wrong_base_main", {}),
+    for name, version, task in invalid:
+        trepo, tbase, tsha = task_candidate(tmp, name, version, task)
+        expect_auth(tmp, name, "validate-task", {**common,"repo":str(trepo),"base_sha":tbase,"candidate_sha":tsha,"task_id":"fixture-task"}, False)
+    for name, version, task in (
+      ("P01_V1_ORDINARY", "1.0.0", dict(allowed_write=["safe/**"],docs_impact=[])),
+      ("P02_V2_ORDINARY", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=[])),
+      ("P04_DOCS_LEGITIMATE", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=["safe/docs/**"])),
+    ):
+        trepo, tbase, tsha = task_candidate(tmp, name, version, task)
+        expect_auth(tmp, name, "validate-task", {**common,"repo":str(trepo),"base_sha":tbase,"candidate_sha":tsha,"task_id":"fixture-task"}, True)
+    trepo, tbase, tsha = task_candidate(tmp, "HOSTILE_AUTHORITY_INPUTS", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=[]))
+    canonical = {**common,"repo":str(trepo),"base_sha":tbase,"candidate_sha":tsha,"task_id":"fixture-task"}
+    expect_auth(tmp, "N17_ROLE_SELF_CLAIM", "validate-task", {**canonical,"claimed_role":"OWNER_AUTHORITY_AUTHOR"}, True, authority_class="ordinary")
+    alt = tmp / "alternate.json"; write_json(alt, {"tasks":[{"id":"fixture-task","authority_class":"owner_authority","owner_author_allowed_write":["controller/h034-native/**"]}]})
+    expect_auth(tmp, "N18_ALTERNATE_SPEC", "validate-task", {**canonical,"alternate_spec":str(alt)}, True, authority_class="ordinary")
+    freeze_common = req(review_result="PASS",candidate_sha=base,review_identity="review-1")
+    rrepo, rbase, rsha = registry_candidate(tmp, "P05_REGISTRY_RUNTIME", REG.read_text())
+    expect_auth(tmp, "P05_REGISTRY_RUNTIME", "validate-registry", {**common,"repo":str(rrepo),"base_sha":rbase,"candidate_sha":rsha}, True)
+    good_reg = strict_load(REG)
+    malformed: list[tuple[str, str]] = [
+      ("N36_DUPLICATE_KEY", REG.read_text().replace('"schema_version": 1,', '"schema_version": 1,\n  "schema_version": 1,')),
+      ("N37_UNEXPECTED_KEY", json.dumps({**good_reg, "unexpected": []})),
+      ("N38_MISSING_KEY", json.dumps({k:v for k,v in good_reg.items() if k != "path_grammar"})),
+      ("N39_DUPLICATE_PATH", json.dumps({**good_reg, "owner_production_paths":[*good_reg["owner_production_paths"], good_reg["owner_production_paths"][0]]})),
+      ("N40_REQUIRED_REMOVED", json.dumps({**good_reg, "owner_production_paths":good_reg["owner_production_paths"][1:]})),
+      ("N_REG_WRONG_VERSION", json.dumps({**good_reg, "schema_version":2})),
+      ("N_REG_WRONG_TOP_TYPE", "[]"),
+      ("N_REG_MALFORMED_PATH", json.dumps({**good_reg, "owner_production_paths":["../escape"]})),
     ]
-    for n, case, good in auto_neg:
-        if n in ("N12","N13","N27"): expect(n, auto, request(case), True, **good)
-        else: expect(n, auto, request(case), False)
-    positives = [
-      ("P01", "schema_v1", {"readable":True,"authority_class":"ordinary"}),
-      ("P02", "ordinary_candidate", {"authority_class":"ordinary","changed_files":["app/a.txt"],"allowed_write":["app/**"]}),
-      ("P03", "test_author_scope", {"changed_files":["verify/bin/allocated-exit"],"allocated_test_author_paths":["verify/bin/allocated-exit"]}),
-      ("P04", "owner_scope", {"changed_files":[owner],"owner_author_allowed_write":["controller/h034-native/**"],"explicit_transition":True}),
-      ("P05", "owner_scope", {"changed_files":["controller/h034-native/alternative.c"],"owner_author_allowed_write":["controller/h034-native/**"],"explicit_transition":True,"provider":"human"}),
+    for name, raw in malformed:
+        rrepo, rbase, rsha = registry_candidate(tmp, name, raw)
+        expect_auth(tmp, name, "validate-registry", {**common,"repo":str(rrepo),"base_sha":rbase,"candidate_sha":rsha}, False)
+    # Mechanical actor/candidate scope uses Git changed files, not reported lists.
+    scope_neg = [
+      ("N04_OWNER_ARTIFACT", "controller/h034-native/kernel.c", "ordinary"),
+      ("N05_SCHEMA", "specs/tasks.spec.json", "ordinary"), ("N06_REGISTRY", "specs/owner-production-paths.v1.json", "ordinary"),
+      ("N07_POLICY", "controller/policy/cli", "ordinary"), ("N08_AUTOPILOT", "scripts/nortropic-codex-autopilot.py", "ordinary"),
+      ("N23_TEST_AUTHOR_OWNER", "controller/h034-native/kernel.c", "test_author"),
+      ("N24_OWNER_SPEC", "specs/tasks.spec.json", "owner_authority"), ("N25_OWNER_REGISTRY", "specs/owner-production-paths.v1.json", "owner_authority"),
+      ("N26_OWNER_GATE", "verify/bin/h-035-exit", "owner_authority"), ("N27_OWNER_OUTSIDE", "README.md", "owner_authority"),
     ]
-    for n, case, extra in positives: expect(n, auth, request(case, **extra), True)
-    expect("P06", auto, request("review_read_only"), True, reviewer_writes=[])
-    expect("P07", auto, request("review_pass"), True, published=False, state="OWNER_FINAL_FREEZE_REQUIRED")
-    expect("P08", auto, request("owner_final_freeze"), True, state="done", attested=True)
-    # Same cases through the authority component and autopilot must share decisions.
-    for grant in [owner, "controller/**", "docs/**", "safe/**"]:
-        ar, ao, _ = run_json(auth, request("ordinary_scope", grant=grant))
-        pr, po, _ = run_json(auto, request("path_consistency", grant=grant))
-        check(ar == pr and ao.get("accepted") == po.get("accepted"), f"C_PATH_{grant}")
+    serial = 0
+    for name, path, actor in scope_neg:
+        serial += 1; sha = candidate(repo, base, path, serial)
+        expect_auth(tmp, name, "check-candidate", req(actor=actor,candidate_sha=sha,reported_changed_files=[]), False)
+    serial += 1; sha = candidate(repo, base, "controller/h034-native/kernel.c", serial)
+    expect_auth(tmp, "P07_OWNER_EXACT_SURFACE", "check-candidate", req(actor="owner_authority",candidate_sha=sha), True)
+    serial += 1; sha = candidate(repo, base, "controller/h034-native/alternative.c", serial)
+    expect_auth(tmp, "P08_OWNER_ALT_BYTES", "check-candidate", req(actor="owner_authority",candidate_sha=sha), True)
+    serial += 1; sha = candidate(repo, base, "controller/h034-native/kernel.c", serial)
+    expect_auth(tmp, "N31_REPORTED_FILES_NOT_AUTHORITY", "check-candidate", req(actor="ordinary",candidate_sha=sha,reported_changed_files=["safe/x"]), False)
+    # Explicit operational owner transitions and publication guard.
+    expect_auth(tmp, "N_OWNER_AUTHOR_MISSING_BINDING", "owner-author", req(state="OWNER_ACTION_REQUIRED",candidate_sha="0"*40), False)
+    expect_auth(tmp, "P06_OWNER_AUTHOR_EXPLICIT", "owner-author", req(state="OWNER_ACTION_REQUIRED",candidate_sha=base), True, state="OWNER_CANDIDATE_REVIEW_REQUIRED")
+    expect_auth(tmp, "N_NORMAL_ROUTE_OWNER_AUTHOR", "recover", req(state="OWNER_ACTION_REQUIRED"), True, owner_author_process_launched=False, state="OWNER_ACTION_REQUIRED")
+    expect_auth(tmp, "N_UNKNOWN_STATE", "recover", req(state="UNKNOWN_FUTURE_STATE"), False, builder_launched=False)
+    expect_auth(tmp, "N32_REVIEW_PUBLICATION", "record-review", req(review_result="PASS",candidate_sha=base,review_identity="review-1"), True, published=False, merged=False, state="OWNER_FINAL_FREEZE_REQUIRED")
+    for name, extra in (
+      ("N33_WRONG_CANDIDATE", dict(candidate_sha="1"*40)), ("N34_WRONG_REVIEW", dict(review_identity="wrong")),
+      ("N35_WRONG_BASE", dict(base_sha="2"*40)), ("N35B_WRONG_MAIN", dict(main_sha="3"*40)),
+      ("N28_WRONG_SPEC_DIGEST", dict(spec_sha256="4"*64)), ("N29_WRONG_REGISTRY_DIGEST", dict(registry_sha256="5"*64)),
+      ("N_FREEZE_MISSING_PASS", dict(review_result="FAIL")),
+    ): expect_auth(tmp, name, "owner-freeze", {**freeze_common, **extra}, False)
+    expect_auth(tmp, "P10_REVIEW_TO_FINAL", "record-review", req(review_result="PASS",candidate_sha=base,review_identity="review-1"), True, state="OWNER_FINAL_FREEZE_REQUIRED", published=False)
+    expect_auth(tmp, "P11_EXACT_OWNER_FREEZE", "owner-freeze", req(review_result="PASS",candidate_sha=base,review_identity="review-1"), True)
+    # Same hostile path corpus through each actual authority consumer.
+    corpus = ["safe/x", "safe/**", "safe/child", "sibling/x", "x/*", r"safe\x", "../x", "./x", "x//y", "**"]
+    for i, pattern in enumerate(corpus):
+        expect_auth(tmp, f"N41_PATH_CONSISTENCY_{i}", "path-consistency", req(pattern=pattern), True, consistent=True)
 
-def frozen_authority_checks() -> None:
-    try: spec=json.loads(SPEC.read_text()); reg=json.loads(REG.read_text())
-    except Exception as e: raise RuntimeError(e)
-    hits=[t for t in spec.get("tasks",[]) if t.get("id")=="h-035"]
-    check(spec.get("spec_version")=="2.0.0", "F01_SCHEMA_V2")
-    check(len(hits)==1 and hits[0].get("depends_on")==["h-017"], "F02_H035_ID_DEP")
-    forbidden={"specs/tasks.spec.json","specs/owner-production-paths.v1.json","verify/bin/h-035-exit"}
-    check(len(hits)==1 and not forbidden.intersection(hits[0].get("allowed_write",[])), "F03_BUILDER_CANNOT_EDIT_AUTHORITY")
-    check(not any(t.get("id")=="h-034" for t in spec.get("tasks",[])), "F04_H034_TASK_ABSENT")
-    reserved=reg.get("owner_production_paths",[])
-    check(bool(reserved) and all(parse_path(x) for x in reserved), "F05_REGISTRY_CANONICAL")
-    h034_files=[p for p in ROOT.glob("controller/h034-native/**/*") if p.is_file()]
-    h034_files += [p for p in ROOT.glob("verify/h034/**/*") if p.is_file()]
-    check(not h034_files, "F06_H034_BYTES_ABSENT", repr(h034_files))
+
+def frozen_checks() -> None:
+    spec = strict_load(SPEC); reg = strict_load(REG)
+    if not isinstance(spec, dict) or not isinstance(reg, dict): raise Rig("frozen JSON top-level")
+    tasks = spec.get("tasks", []); hits = [t for t in tasks if isinstance(t, dict) and t.get("id") == "h-035"]
+    check(spec.get("spec_version") == "2.0.0", "F_SCHEMA_V2")
+    check(len(hits) == 1 and hits[0].get("depends_on") == ["h-017"], "F_H035_ID_DEP")
+    forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
+    check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
+    check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
+    ok, why = validate_registry(reg); check(ok, "F_REGISTRY_STRICT", why)
+    registry_selftests(reg)
+    h034 = [p for p in ROOT.glob("controller/h034-native/**/*") if p.is_file()] + [p for p in ROOT.glob("verify/h034/**/*") if p.is_file()]
+    check(not h034, "F_H034_BYTES_ABSENT", repr(h034))
+
 
 def main() -> int:
     try:
-        frozen_authority_checks(); selftests()
-        if not AUTH.is_file():
-            check(False, "K00_OWNER_AUTHORITY_CLASS_ENFORCEMENT_ABSENT", str(AUTH))
-        else:
-            production_matrix()
-    except (OSError, ValueError, RuntimeError) as e: return rig(str(e))
+        frozen_checks(); path_selftests()
+        with tempfile.TemporaryDirectory(prefix="h035-real-effect-") as raw:
+            tmp = Path(raw)
+            real_routing(tmp)
+            production_matrix(tmp)
+    except (OSError, subprocess.SubprocessError, ValueError, Rig) as e:
+        print(f"RIG_ERROR: {e}", file=sys.stderr)
+        return 2
     print(f"H035_GATE_SUMMARY={passed} PASS {failed} FAIL")
-    return 0 if failed == 0 else 1
+    if failed:
+        print("H035_GATE_RESULT=EXPECTED_RED")
+        return 1
+    print("H035_GATE_RESULT=PASS")
+    return 0
 
-if __name__ == "__main__": sys.exit(main())
+
+if __name__ == "__main__":
+    sys.exit(main())

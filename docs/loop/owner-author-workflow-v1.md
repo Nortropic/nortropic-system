@@ -20,4 +20,89 @@ An owner-author attempt is created only from explicit owner action and a frozen 
 
 The controller derives owner candidate SHA and changed files from Git bytes. A candidate binds task, class, base, spec digest, registry digest, gate identity/digest, attempt identity and actual files. A new independent read-only reviewer is mandatory. Review PASS moves the exact candidate to `OWNER_FINAL_FREEZE_REQUIRED`; it never calls automatic publication. Explicit owner-final action binds candidate, review, base and current-main identity before completion/attestation. Attestation additionally binds class, spec, registry, gate, transition and review identities. Reviewer PASS, role, candidate or gate PASS alone is never final owner freeze.
 
-The frozen gate's N01–N29 negative and P01–P08 positive controls are normative. They exercise parsing, policy, routing, persistence/restart, candidate scope, review and final freeze in disposable local repositories without network. G20 live-filesystem containment remains distinct from Git tree-path authority and must not regress.
+The frozen gate's negative and positive production matrices are normative. They exercise parsing, policy, routing, persistence/restart, candidate scope, review and final freeze in disposable local repositories without network. G20 live-filesystem containment remains distinct from Git tree-path authority and must not regress.
+
+## Operational entrypoints frozen by H-035
+
+Production acceptance never calls a case-name probe. Normal ordinary and owner routing, including restart from reconstructed state, enters through `controller/loop/cli run <config.json>`. The config may substitute only disposable Git/state/workspace roots and an inert provider executable. Selection, claim, authority classification, persistence and launch decisions remain production code. A provider marker observes a launch; it does not decide one.
+
+The normal authority-control CLI is `controller/authority/cli`. Its operational commands are:
+
+- `validate-task` — strict canonical task/schema/path validation;
+- `validate-registry` — strict authoritative registry consumption;
+- `check-candidate` — actual Git-diff scope and identity validation;
+- `owner-author` — explicit identity-bound owner authoring transition;
+- `recover` — normal persisted-state reconstruction/resume;
+- `record-review` — independent review-result transition;
+- `owner-freeze` — explicit candidate/review/base/main-bound final transition;
+- `path-consistency` — diagnostic comparison of results from the real authority consumers, never an acceptance substitute for those consumers.
+
+Commands consume one strict JSON request on stdin and emit one strict JSON result. `accepted` is boolean. Accepted state transitions additionally report the persisted resulting `state`; external effects report `builder_launched`, `owner_author_process_launched`, `published` and `merged` as applicable. These fields report effects already decided and performed by the production transition. They are not caller-selected case names.
+
+Canonical authoritative operation ignores caller-selected spec or registry paths. Fixture paths are accepted only by separately designated non-authoritative unit-test modes; the commands above resolve the canonical spec and registry from the candidate/repository identity supplied to the transition and compare caller-provided digests rather than trusting them.
+
+## Strict registry v1
+
+The registry is a duplicate-aware JSON object with exactly seven keys: `schema_version`, `path_grammar`, `authority_source`, `self_digest_is_authority`, `owner_production_paths`, `prospective_ordinary_protected_paths`, and `owner_author_global_denied_paths`. Version is exactly `1`; the two authority strings and `false` self-digest value are exact. Each path list is non-empty, contains only canonical grammar paths, and has no duplicates after canonicalization. `owner_production_paths` has exact v1 membership: `controller/h034-native/**`, `verify/h034/kernel`, `verify/h034/build-recipe.json`, and `verify/h034/identity-manifest.json`. Missing, altered, duplicated, or additional membership rejects. A separately owner-reviewed future version requires a new versioned parser and is not accepted as v1.
+
+## Production traceability
+
+```text
+PROPERTY=owner RED routing and ordinary positive control
+SUBJECT=controller/loop/cli
+ENTRYPOINT=run <config.json>
+FIXTURE=disposable state/workspaces plus inert provider marker
+CURRENT_RESULT=owner task reaches ordinary claimed state; nested G20 may reject provider before marker
+FUTURE_REQUIRED_RESULT=owner persists OWNER_ACTION_REQUIRED without provider; ordinary attempts provider
+CLASS=PRODUCTION_ACCEPTANCE
+
+PROPERTY=restart/recovery persistence and unknown-state refusal
+SUBJECT=controller/loop/cli plus controller/authority/cli
+ENTRYPOINT=run <same config> in a new process; recover
+FIXTURE=same disposable persisted state
+CURRENT_RESULT=owner state is ordinary claimed, not OWNER_ACTION_REQUIRED
+FUTURE_REQUIRED_RESULT=owner state preserved; unknown state fails closed
+CLASS=PRODUCTION_ACCEPTANCE
+
+PROPERTY=task, docs_impact, registry and path-language authority
+SUBJECT=canonical task/registry consumers used by policy, envelope and routing
+ENTRYPOINT=validate-task; validate-registry; path-consistency
+FIXTURE=canonical candidate plus one-defect inputs
+CURRENT_RESULT=operational authority component absent
+FUTURE_REQUIRED_RESULT=complete negative/positive matrix and identical consumer verdicts
+CLASS=PRODUCTION_ACCEPTANCE
+
+PROPERTY=actor and candidate scope
+SUBJECT=actual Git changed-file policy
+ENTRYPOINT=check-candidate
+FIXTURE=disposable Git candidates; reported file lists are hostile input
+CURRENT_RESULT=operational authority component absent
+FUTURE_REQUIRED_RESULT=ordinary/TEST_AUTHOR/owner-author scopes enforced mechanically
+CLASS=PRODUCTION_ACCEPTANCE
+
+PROPERTY=explicit owner authoring
+SUBJECT=owner transition and external author-process boundary
+ENTRYPOINT=owner-author
+FIXTURE=identity-bound disposable owner task/state/workspace
+CURRENT_RESULT=operational authority component absent
+FUTURE_REQUIRED_RESULT=negative bindings reject before workspace/process; exact binding begins bounded attempt
+CLASS=OWNER_TRANSITION_ACCEPTANCE
+
+PROPERTY=review publication guard and final freeze
+SUBJECT=review-result and owner-final transitions
+ENTRYPOINT=record-review; owner-freeze
+FIXTURE=disposable candidate and local bare remote
+CURRENT_RESULT=operational authority component absent
+FUTURE_REQUIRED_RESULT=review PASS cannot publish; exact explicit freeze alone may advance
+CLASS=OWNER_TRANSITION_ACCEPTANCE
+
+PROPERTY=path parser and registry judge integrity
+SUBJECT=frozen gate local oracles
+ENTRYPOINT=internal J_* controls
+FIXTURE=one-defect mutants
+CURRENT_RESULT=PASS
+FUTURE_REQUIRED_RESULT=PASS
+CLASS=JUDGE_SELFTEST
+```
+
+No material exit property is established only by a judge self-test. Synthetic `probe`, `authority-probe`, or caller-selected semantic case commands are forbidden as production acceptance.
