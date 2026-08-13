@@ -253,6 +253,10 @@ def observe_provider(rows: list[dict[str, object]], *, loop_pid: int, provider: 
     provider_text = str(provider)
     required = [str(LOOP), str(ROOT/"controller/brytare/cli"),
                 str(ROOT/"controller/utforare/cli"), str(ROOT/"controller/launch/cli")]
+    loop_row = by_pid.get(loop_pid)
+    if loop_row is None:
+        return None, []
+    controller_image = str(loop_row["comm"])
 
     def argv(row: dict[str, object]) -> list[str]:
         try:
@@ -262,7 +266,10 @@ def observe_provider(rows: list[dict[str, object]], *, loop_pid: int, provider: 
 
     def stage(row: dict[str, object]) -> str | None:
         tokens = argv(row)
-        if not Path(str(row["comm"])).name.lower().startswith("python"):
+        # macOS truncates ps(1)'s comm field (the real Homebrew Python image is
+        # observed as /opt/homebrew/Ce). Bind every controller stage to the
+        # exact image reported for the gate-started loop.
+        if str(row["comm"]) != controller_image:
             return None
         hits = [expected for expected in required if expected in tokens]
         return hits[0] if len(hits) == 1 else None
@@ -295,10 +302,11 @@ def observer_selftests() -> None:
     def row(pid: int, ppid: int, comm: str, args: str, pgid: int = 60) -> dict[str, object]:
         return {"pid":pid,"ppid":ppid,"pgid":pgid,"comm":comm,"args":args}
     forwarded = f" -- {provider} {nonce}"
-    chain = [row(10,1,"Python",str(LOOP)+" run cfg",60),
-             row(20,10,"Python",str(ROOT/"controller/brytare/cli")+" kor"+forwarded,60),
-             row(30,20,"Python",str(ROOT/"controller/utforare/cli")+" kor"+forwarded,60),
-             row(40,30,"Python",str(ROOT/"controller/launch/cli")+" run"+forwarded,60),
+    real_comm = "/opt/homebrew/Ce"
+    chain = [row(10,1,real_comm,str(LOOP)+" run cfg",60),
+             row(20,10,real_comm,str(ROOT/"controller/brytare/cli")+" kor"+forwarded,60),
+             row(30,20,real_comm,str(ROOT/"controller/utforare/cli")+" kor"+forwarded,60),
+             row(40,30,real_comm,str(ROOT/"controller/launch/cli")+" run"+forwarded,60),
              row(61,40,"/bin/sh",f"/bin/sh {provider} {nonce}",61)]
     check(observe_provider(chain, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
           "J_OBSERVER_REAL_OWNER_SPLIT_PGID_POSITIVE")
@@ -395,7 +403,7 @@ def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
 
 def real_routing(tmp: Path) -> None:
     ordinary, _verdict, _, _, _ = loop_fixture(tmp, "ordinary")
-    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V3")
+    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V4")
     print("OWNER_ACCEPTANCE_REQUIRED=YES")
     owner, verdict, state, done, _ = loop_fixture(tmp, "owner_authority")
     owner_required = "OWNER_ACTION_REQUIRED" in state
@@ -417,13 +425,13 @@ def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
     with tempfile.TemporaryDirectory(prefix="h035-owner-effect-") as raw:
         result, verdict, _state, _done, evidence = loop_fixture(Path(raw), "ordinary", observe=True)
     record = {
-        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V3",
+        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V4",
         "task": "h-035", "candidate_sha": candidate_sha,
         "gate_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "spec_sha256": hashlib.sha256(SPEC.read_bytes()).hexdigest(),
         "normal_entrypoint": "controller/loop/cli run",
-        "observer": "H035_OWNER_PROVIDER_EXEC_V3 exact-argv and exact normal-ancestry observer",
-        "observer_version": 3,
+        "observer": "H035_OWNER_PROVIDER_EXEC_V4 exact-argv, loop-image-bound normal-ancestry observer",
+        "observer_version": 4,
         "observer_verdict": verdict,
         "provider_process_execution_observed": verdict == "PASS",
         "raw_process_evidence": evidence,
