@@ -201,6 +201,11 @@ def frozen_checks() -> None:
              "PASS, FAIL and ODÖMBART", "request_id", "no deployment target is selected by this contract",
              "owner-author global deny")
     check("F_NATIVE_FINITE_CONTRACT", isinstance(criterion, str) and all(x in criterion for x in terms))
+    summary=task.get("summary","")
+    r3_terms=("one closed, exact sequence", "no response-file, pass-through, target-triple, deployment-selector or extension slot",
+              "fixed identifier independent of output basename", "every required ordered JSON field and relationship")
+    check("F_R3_CLOSED_BUILD_AND_METAMORPHIC_CONTRACT",
+          isinstance(summary,str) and all(x in summary for x in r3_terms))
 
 
 def load_artifact_json(path: Path, keys: tuple[str, ...]):
@@ -255,19 +260,14 @@ def build_once(recipe: dict, output: Path) -> subprocess.CompletedProcess:
                cwd=ROOT, env=clean_env)
 
 
-def explicit_deployment_selector(argv: list[str]) -> bool:
-    """Reject every recipe representation that selects a minimum OS version."""
-    joined = "\n".join(argv)
-    if re.search(r"(?:^|[-_])m(?:ac)?os(?:x)?[-_]?(?:version[-_]?min|min)(?:=|$)", joined, re.I) or "macosx-version-min" in joined.lower():
-        return True
-    if any(x in ("-mmacosx-version-min", "-macosx_version_min", "-platform_version")
-           for x in argv): return True
-    for i, value in enumerate(argv):
-        if value in ("-target", "--target") and i + 1 < len(argv):
-            if re.search(r"apple-(?:macosx?|darwin)\d", argv[i+1], re.I): return True
-        if re.match(r"--?target=", value) and re.search(r"apple-(?:macosx?|darwin)\d", value, re.I):
-            return True
-    return False
+def exact_compile_argv(sdk_path: str, sources: list[str]) -> list[str]:
+    """The complete shell-free build plan; there is no extension flag surface."""
+    return ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+            "-arch", "arm64", "-isysroot", sdk_path, "-Wl,-no_uuid", *sources]
+
+
+def compile_argv_allowed(argv: object, sdk_path: str, sources: list[str]) -> bool:
+    return type(argv) is list and argv == exact_compile_argv(sdk_path, sources)
 
 
 def deployment_selector_selftests() -> None:
@@ -277,11 +277,15 @@ def deployment_selector_selftests() -> None:
         ["-target", "arm64-apple-macos11.0"], ["--target=arm64-apple-macosx11.0"],
         ["--target", "arm64-apple-darwin20.1.0"],
     )
-    for index, argv in enumerate(bad, 1):
-        check(f"J_DEPLOYMENT_SELECTOR_{index}_REJECT", explicit_deployment_selector(argv), repr(argv))
-    for index, argv in enumerate((["-arch","arm64"], ["-target","arm64-apple-macos"],
-                                  ["--target=arm64-apple-darwin"], ["-std=c11","-O2"]), 1):
-        check(f"J_VERSIONLESS_TARGET_{index}_ALLOW", not explicit_deployment_selector(argv), repr(argv))
+    bad += (["-Wl,-platform_version,macos,11.0,26.5"],
+            ["-Wl,-macosx_version_min,11.0"],
+            ["-Xlinker","-platform_version","-Xlinker","macos","-Xlinker","11.0","-Xlinker","26.5"],
+            ["@flags.rsp"], ["-Wp,@flags.rsp"])
+    expected=exact_compile_argv("/SDK", ["controller/h034-native/kernel.c"])
+    for index, injected in enumerate(bad, 1):
+        check(f"J_CLOSED_ARGV_INJECTION_{index}_REJECT",
+              not compile_argv_allowed(expected+injected,"/SDK",["controller/h034-native/kernel.c"]),repr(injected))
+    check("J_CLOSED_ARGV_EXACT_POSITIVE",compile_argv_allowed(expected,"/SDK",["controller/h034-native/kernel.c"]))
 
 
 def invoke_kernel(evidence_raw: bytes, receipt_raw: bytes, allowlist_raw: bytes,
@@ -369,6 +373,30 @@ def semantic_tests() -> None:
                   ("OLD_RECEIPT",er,canonical_json(dict(receipt,request_id=secrets.token_hex(32))),ar,{}),
                   ("CALLER_REQUEST",er,rr,ar,{"request-id":secrets.token_hex(32)}),
                   ("UNKNOWN_FLAG",er,rr,ar,{"unknown":"x"})]
+    # Metamorphic schema matrix: every required field in each document is
+    # independently removed; ordering, extra keys and nested probe fields vary.
+    for key in EVIDENCE_KEYS:
+        d={k:v for k,v in evidence.items() if k != key}
+        mutations.append(("EVIDENCE_MISSING_"+key.upper(),canonical_json(d),rr,ar,{}))
+    mutations.append(("EVIDENCE_UNEXPECTED",canonical_json({**evidence,"extra":"x"}),rr,ar,{}))
+    mutations.append(("EVIDENCE_REORDERED",canonical_json(dict(reversed(list(evidence.items())))),rr,ar,{}))
+    for key in RECEIPT_KEYS:
+        d={k:v for k,v in receipt.items() if k != key}
+        mutations.append(("RECEIPT_MISSING_"+key.upper(),er,canonical_json(d),ar,{}))
+    mutations.append(("RECEIPT_UNEXPECTED",er,canonical_json({**receipt,"extra":"x"}),ar,{}))
+    mutations.append(("RECEIPT_REORDERED",er,canonical_json(dict(reversed(list(receipt.items())))),ar,{}))
+    mutations.append(("ALLOWLIST_MISSING_SCHEMA",er,rr,canonical_json({"probes":allowlist["probes"]}),{}))
+    mutations.append(("ALLOWLIST_UNEXPECTED",er,rr,canonical_json({**allowlist,"extra":"x"}),{}))
+    mutations.append(("ALLOWLIST_REORDERED",er,rr,canonical_json(dict(reversed(list(allowlist.items())))),{}))
+    probe=allowlist["probes"][0]
+    for key in PROBE_KEYS:
+        d={k:v for k,v in probe.items() if k != key}
+        mutations.append(("ALLOWLIST_PROBE_MISSING_"+key.upper(),er,rr,
+                          canonical_json({"schema_version":1,"probes":[d]}),{}))
+    mutations.append(("ALLOWLIST_PROBE_UNEXPECTED",er,rr,
+                      canonical_json({"schema_version":1,"probes":[{**probe,"extra":"x"}]}),{}))
+    mutations.append(("ALLOWLIST_PROBE_REORDERED",er,rr,
+                      canonical_json({"schema_version":1,"probes":[dict(reversed(list(probe.items())))]}),{}))
     for label,e,r,a,o in mutations:
         p=invoke_kernel(e,r,a,overrides={**bindings,**o})
         check("K_REJECT_"+label,p.returncode==1 and not p.stdout,repr((p.returncode,p.stdout,p.stderr)))
@@ -405,14 +433,11 @@ def production_checks() -> None:
       and signer==Path("/usr/bin/codesign") and signer.is_file() and not signer.is_symlink()
       and sha_file(signer)==recipe["codesign_sha256"]
       and type(recipe["compile_argv"]) is list and all(type(x) is str for x in recipe["compile_argv"])
-      and "-std=c11" in recipe["compile_argv"] and "-arch" in recipe["compile_argv"] and "arm64" in recipe["compile_argv"]
-      and "-isysroot" in recipe["compile_argv"] and recipe["sdk_path"] in recipe["compile_argv"]
-      and "-o" not in recipe["compile_argv"] and not explicit_deployment_selector(recipe["compile_argv"])
-      and recipe["sign_argv"]==["--force","--sign","-","--timestamp=none"]
+      and recipe["sign_argv"]==["--force","--sign","-","--identifier","com.nortropic.h034.kernel","--timestamp=none"]
       and recipe["deployment_target_policy"]=="derive-from-Apple-toolchain-and-bind-final-Mach-O")
-    listed=[ROOT/x for x in recipe["compile_argv"] if x.startswith("controller/h034-native/")]
-    recipe_ok=(recipe_ok and listed==sources
-               and all(x.suffix==".c" and x.is_file() and not x.is_symlink() for x in listed)
+    listed=[str(x.relative_to(ROOT)) for x in sources]
+    recipe_ok=(recipe_ok and compile_argv_allowed(recipe["compile_argv"],recipe["sdk_path"],listed)
+               and all(x.suffix==".c" and x.is_file() and not x.is_symlink() for x in sources)
                and all(x.suffix in (".c",".h") and not x.is_symlink() for x in source_files))
     check("K_BUILD_RECIPE_BOUND",recipe_ok)
     mode=KERNEL.lstat().st_mode

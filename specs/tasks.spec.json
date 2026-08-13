@@ -9,7 +9,6 @@
     "backlog": "docs/100-dagar/programregister.md",
     "note": "Backloggen är programregistret. Denna spec beskriver kontrollplanets sju skivor — den är inte och blir aldrig en andra uppgiftslista."
   },
-
   "defaults": {
     "branch_pattern": "nortropic/loop-<id>",
     "allowed_write": [
@@ -44,12 +43,10 @@
     "max_added_lines": 600,
     "note_on_limits": "Räknade 2026-08-08 ur fem byggda h-tasks (n=5): h-001 2 filer/175 rader, h-002 3/161, h-003 2/130, h-004 2/178, h-005 2/263. Median 2 filer/178 rader, max 3/263. Taket ligger drygt två gånger över max — marginalen är bedömning, inte mätning, och avser h-006 och h-007 som inte är byggda. Pass 0 och Pass 1 ingår INTE i nämnaren: de är ägarhandspass med dokument och konfiguration, inte worker-byggda tasks under allowed_write. v4.1 §16 öppnar circuit vid 2x budget = 16 filer/1200 rader."
   },
-
   "compatibility": {
     "schema_v1_authority_class": "ordinary",
     "schema_v1_owner_authority_inference": false
   },
-
   "tasks": [
     {
       "id": "h-001",
@@ -57,10 +54,16 @@
       "slice": 1,
       "title": "SQLite-state + append-only eventlogg",
       "summary": "Controllerns tillstånd i SQLite, varje övergång även som rad i events.jsonl. Loggen är sanningen; SQLite är projektionen.",
-      "allowed_write": ["controller/state/**", "tests/controller/state/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/state/**",
+        "tests/controller/state/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-001-exit",
       "exit_criterion": "Rekonstruera statustabellen enbart ur events.jsonl, diffa mot SQLite → noll avvikelse. Trunkerad logg → rekonstruktion vägrar, aldrig tyst partiell.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
       "depends_on": []
     },
     {
@@ -69,11 +72,19 @@
       "slice": 2,
       "title": "Verifier-runner med förgodkänt register",
       "summary": "Verifierare körs ur ett register med SHA per fil, argv utan shell. Registrera de BEFINTLIGA grindarna — check-invariants.mjs och nortropic-verify-suite.js — bygg ingen ny verifierare.",
-      "allowed_write": ["controller/verify/**", "tests/controller/verify/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/verify/**",
+        "tests/controller/verify/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-002-exit",
       "exit_criterion": "Manipulerad verifierarfil → hash_mismatch FÖRE körning. Fri text i verifier-fältet kan inte exekvera. Registret pekar på befintliga grindar, inte kopior.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-001"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001"
+      ]
     },
     {
       "id": "h-003",
@@ -81,11 +92,20 @@
       "slice": 3,
       "title": "Attestationer + stale-markering",
       "summary": "Varje verifierat resultat binds till candidate-SHA. Commit som matchar invalidates_on gör attestationen stale och köar omtest.",
-      "allowed_write": ["controller/attest/**", "tests/controller/attest/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/attest/**",
+        "tests/controller/attest/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-003-exit",
       "exit_criterion": "Verifiera task A → commit som matchar invalidates_on → A blir stale, omtest köas automatiskt. Stale attestation kan aldrig läsas som giltig.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-001", "h-002"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001",
+        "h-002"
+      ]
     },
     {
       "id": "h-004",
@@ -117,11 +137,20 @@
       "slice": 5,
       "title": "Isolerat workspace per försök",
       "summary": "Varje attempt får ren checkout på beordrad base-SHA i eget worktree. Workern arbetar aldrig i den levande arbetskopian.",
-      "allowed_write": ["controller/workspace/**", "tests/controller/workspace/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/workspace/**",
+        "tests/controller/workspace/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-005-exit",
       "exit_criterion": "Ren checkout på beordrad base-SHA. Skrivförsök mot denied_write stoppas av OS, inte av prompt. Ctrl-C mitt i → rest städas, ingen kvarlämnad gren eller lås.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-001", "h-004"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001",
+        "h-004"
+      ]
     },
     {
       "id": "h-006",
@@ -129,11 +158,20 @@
       "slice": 6,
       "title": "Worker-launch med strikt utdatakontrakt",
       "summary": "Workern startas med en task och ett kuvert. Svaret parsas mekaniskt; prosa är ett fel, inte något att tolka.",
-      "allowed_write": ["controller/worker/**", "tests/controller/worker/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/worker/**",
+        "tests/controller/worker/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-006-exit",
       "exit_criterion": "Välformad rapport parsas och CANDIDATE_SHA returneras ur den — en komponent som klassar allt som failure är ingen parser. Prosa-svar → unparseable_output, aldrig tolkningsförsök. Påstådd CANDIDATE_SHA som inte finns i repot → failure, inte krasch. Tomt svar → failure, aldrig tyst PASS.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-001", "h-005"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001",
+        "h-005"
+      ]
     },
     {
       "id": "h-007",
@@ -141,11 +179,23 @@
       "slice": 7,
       "title": "Diffpolicy — mekanisk §A-vakt",
       "summary": "Kandidatens diff prövas mot §A-mängden, LOC-budget och docs-kravet innan den ens föreslås. Detta blir systemets första verkligt mekaniska §A-skydd.",
-      "allowed_write": ["controller/policy/**", "tests/controller/policy/**", "docs/05-beslutslogg.md", "docs/00-borja-har.md"],
+      "allowed_write": [
+        "controller/policy/**",
+        "tests/controller/policy/**",
+        "docs/05-beslutslogg.md",
+        "docs/00-borja-har.md"
+      ],
       "exit_test": "verify/bin/h-007-exit",
       "exit_criterion": "Kandidat som rör §A-mängden avvisas med sparat evidence. 3× LOC-budget avvisas. Task med docs_impact ≠ ingen utan docs-ändring i samma commit avvisas (regel 17 + 22).",
-      "docs_impact": ["docs/00-borja-har.md", "docs/05-beslutslogg.md"],
-      "depends_on": ["h-001", "h-003", "h-006"]
+      "docs_impact": [
+        "docs/00-borja-har.md",
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001",
+        "h-003",
+        "h-006"
+      ]
     },
     {
       "id": "h-008",
@@ -153,11 +203,21 @@
       "slice": "6b",
       "title": "Taskkuvert — immutable uppdrag per attempt",
       "summary": "Controllern genererar ett immutable kuvert per attempt ur specen: run_id, task_id, base_sha, spec_sha256, title, description, allowed_write, denied_write, candidate_requirements (v4.1 §12). Kuvertet är workerns hela uppdrag — det bär outcome, aldrig verifierarens implementation, och workern kontrollerar aldrig certifieringssteget. Registrerad som öppet ärende 2026-08-08: skiva 6:s launch-halva byggdes inte med h-006.",
-      "allowed_write": ["controller/envelope/**", "tests/controller/envelope/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/envelope/**",
+        "tests/controller/envelope/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-008-exit",
       "exit_criterion": "Kuvert för känd task bär alla nio fälten med värden ur specen. spec_sha256 är filens FAKTISKA sha256, inte ett påstått värde. allowed_write och denied_write kommer ur task + defaults, aldrig ur en egen lista i koden. Okänd task-id ger failure med orsak, aldrig tomt kuvert. Två anrop med samma run_id och task_id ger byte-identiskt kuvert. Kuvertet innehåller inget om verifierarens implementation (verifier-id, exit_test-sökväg eller registerinnehåll).",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-001", "h-006", "h-007"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001",
+        "h-006",
+        "h-007"
+      ]
     },
     {
       "id": "h-009",
@@ -165,11 +225,21 @@
       "slice": "6c",
       "title": "Worker-launch — processtart med timeout",
       "summary": "Controllern startar en worker som ett konfigurerat kommando i ett givet workspace, skickar kuvertet, och fångar stdout som slutrapport (v4.1 §13 run_worker). Kommandot är konfiguration, inte hårdkodat: provet kan därför starta hermetiska testprocesser i stället för en betald Claude Code-session. Att just Claude Code startar rätt prövas separat av människa — se öppen post.",
-      "allowed_write": ["controller/launch/**", "tests/controller/launch/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/launch/**",
+        "tests/controller/launch/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-009-exit",
       "exit_criterion": "Process som skriver välformad rapport ger exit 0 och rapporten oförändrad på stdout. Process som överskrider timeout dödas — hela processgruppen, inte bara barnet — och ger failure-klass timeout, aldrig hängning. Process som avslutar med nollskild kod ger failure med koden bevarad. Kuvertet når processen (den kan läsa det). Ingen rest efter timeout: inga kvarlämnade processer i gruppen. Ett dödat barnbarn räknas som rest.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-005", "h-006", "h-008"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-005",
+        "h-006",
+        "h-008"
+      ]
     },
     {
       "id": "h-010",
@@ -177,11 +247,20 @@
       "slice": 8,
       "title": "Taskval och claim",
       "summary": "Deterministiskt val av nästa behöriga task ur en godtycklig backlog-spec, plus claim. Behörig = samtliga depends_on attesterade-och-giltiga (h-003), tasken själv inte attesterad, status i state frånvarande eller pending. Ordning: lägst id i kodpunktsordning. Claim appendar exakt ett claimed-event i state (h-001) efter attest-guard (v4.1 §13/§178). Lease hör till körningen, inte claimet — h-011. Specen är indata; komponenten antar aldrig ett namnschema. priority/risk_class/next_eligible_at finns inte i specen och byggs inte — skrivs som kommentar i komponenten.",
-      "allowed_write": ["controller/taskval/**", "tests/controller/taskval/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/taskval/**",
+        "tests/controller/taskval/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-010-exit",
       "exit_criterion": "Mot en fixturspec med främmande namn och opaddade tal där kodpunktsordning skiljer sig från numerisk: väljer lägst id i kodpunktsordning bland behöriga; task med oattesterat beroende hoppas över trots lägst id; redan attesterad task väljs inte om; invaliderad dependency gör den beroende tasken obehörig igen; blandade namnscheman sorteras utan prefixantagande; claimad task återväljs inte; claim appendar exakt ett claimed-event, verifierat via state/cli rebuild; ingen behörig task ger tomt val med exit 0 och oförändrad state-logg.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-001", "h-003"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001",
+        "h-003"
+      ]
     },
     {
       "id": "h-011",
@@ -189,11 +268,28 @@
       "slice": 9,
       "title": "Huvudloopen — kedjan",
       "summary": "controller/loop/cli run <config.json> kör v4.1 §13:s varv deterministiskt över en godtycklig backlog-spec: lease runt körningen (h-004, vägrar före första varvet om upptagen), select/claim (h-010), workspace på aktuell base (h-005), kuvert mot config-specen (h-008), konfigurerat worker-kommando som argv-lista med timeout (h-009), strikt parse (h-006), diffpolicy mot config-specen (h-007), registrerad verifierare mot kandidatträdet (h-002), attestation vid grönt (h-003). Integration = kedjande base: nästa varv bygger på förra attesterade kandidat-SHA:t. Failure i ett varv attesterar aldrig; tasken förblir claimed och är ovalbar resten av körningen — retry, attempt-budget och circuit är senare skivor (fälten finns inte i specen), skrivs som kommentar. Workspacet rivs efter varvet — kandidatens commit är beviset. Drain tills ingen behörig task finns, leasen släpps, exit 0. Config och alla kataloger är indata; komponenten har ingen inbyggd sökväg och antar aldrig ett namnschema.",
-      "allowed_write": ["controller/loop/**", "tests/controller/loop/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/loop/**",
+        "tests/controller/loop/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-011-exit",
       "exit_criterion": "Mot en fixturbacklog med två beroende tasks (steg-a, steg-b) och en konfigurerad testsession som endast redigerar filer i workspacet — kandidatens commit görs i controllerledet: kedjan tar lease, väljer, claimar, levererar kuvertet, parsar strikt, dömer diffen mot fixturspecens allowed_write, kör registrerad verifierare mot kandidatträdet och attesterar; varv två blir behörigt av varv etts attestation och bygger på dess kandidat-SHA — steg-b:s träd innehåller steg-a:s fil. Prosa-worker ger varv utan attestation och kedjan fortsätter till exit 0. Worker som skriver utanför allowed_write avvisas av policy utan attestation. Upptagen lease vägrar körningen före första varvet utan event. Efter drain är leasen släppt, och en redan attesterad backlog ger noll nya event.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-001", "h-002", "h-003", "h-004", "h-005", "h-006", "h-007", "h-008", "h-009", "h-010"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-001",
+        "h-002",
+        "h-003",
+        "h-004",
+        "h-005",
+        "h-006",
+        "h-007",
+        "h-008",
+        "h-009",
+        "h-010"
+      ]
     },
     {
       "id": "h-012",
@@ -201,11 +297,21 @@
       "slice": 10,
       "title": "Utföraren — fullbordat försök",
       "summary": "controller/utforare/cli kör konfigurerat kommando via h-009 med kuvertet, och gör därefter git-arbetet SJÄLV: stagar allt som ändrats i workspacet, committar med fast identitet och rapporterar {status, candidate_sha, files} på h-006:s form. Kandidat-SHA:t föds i controllerledet, aldrig i sessionens utsaga — sessionen behöver därmed ingen commiträtt. Domen vilar på git: ändrade filer avgör om ett försök lyckades. Sessionens egen text läses ENDAST vid failure, för att bära orsaken vidare, och kan aldrig vända ett failure till en kandidat. Kommandot är konfiguration; komponenten antar aldrig vilken binär som körs.",
-      "allowed_write": ["controller/utforare/**", "tests/controller/utforare/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/utforare/**",
+        "tests/controller/utforare/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-012-exit",
       "exit_criterion": "Mot ett workspace på beordrad base och ett konfigurerat kommando: en session som ändrar filer ger kandidat vars candidate_sha är EXAKT workspacets nya HEAD efter committen (mätt med git, aldrig ur rapportens utsaga — kontrollnamn candidate_sha_ar_HEAD), vars files räknas ur git och därför bär ÄVEN filer sessionen inte nämnde, och h-006 parse accepterar rapporten. En session som ändrar noll filer men skriver en välformad framgångsrapport ger failure utan commit — utsagan vänder aldrig ett failure till en kandidat. En session som ändrar filer utan att svara alls ger ändå kandidat, med files ur git. Failure bär sessionens orsakstext ordagrant NÄR h-009 levererar den — alltså när processen slutar med kod 0 utan att ha ändrat något; vid nonzero_exit kastar h-009 sessionens stdout och bär bara sin egen klass plus avkortad stderr, och h-012 uppfinner ingen text den inte fått. Tom orsak sväljs aldrig: utfallet namnger steget i stället för att tiga. Timeout och nonzero_exit bärs vidare som skilda klasser från h-009. Ingen commit skapas när inget ändrats, och arbetskopian utanför workspacet är orörd före och efter.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-005", "h-006", "h-009"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-005",
+        "h-006",
+        "h-009"
+      ]
     },
     {
       "id": "h-013",
@@ -213,11 +319,21 @@
       "slice": 11,
       "title": "Brytaren — failureklassning, budget och kvotstopp",
       "summary": "controller/brytare/cli normaliserar failure till fingerprints, för attempt-budget per task och öppnar circuit vid upprepning. Kvotstopp är en EGEN klass, kvot_slut, skild från nonzero_exit: att modellkvoten tog slut är inte samma sak som att workern misslyckades, och två fel med samma namn kan inte räknas isär. Kvot_slut öppnar brytaren omedelbart utan att förbruka budget, så körningen stannar rent och kan återupptas. Ingen kvotbokföring och inget veckotak byggs (ägarbeslut 2026-08-08).",
-      "allowed_write": ["controller/brytare/**", "tests/controller/brytare/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/brytare/**",
+        "tests/controller/brytare/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-013-exit",
       "exit_criterion": "Mot ett workspace via h-005 och ett konfigurerat kommando kör brytaren försöket genom h-012 och rör aldrig kandidatvägen: en lyckad rapport vidarebefordras OFÖRÄNDRAD och h-006 parse accepterar den. Två varianter av samma fel ger samma fingerprint; två olika fel ger två — mätt på tröskelbeteende, aldrig på brytarens egen utsaga. Samma fingerprint N gånger öppnar brytaren, N-1 gånger gör det inte, och olika fingerprints öppnar den aldrig oavsett antal. Kvotklassningen styrs av konfigurerade mönster: utan mönsterfil, eller när felet inte matchar något mönster, sker aldrig kvotklassning. Kvot_slut klassas skilt från nonzero_exit, öppnar brytaren direkt och lämnar attempt-budgeten oförbrukad — mätt som att samma task efter återstart (varje anrop är en ny process mot samma tillståndskatalog) har kvar sina försök, och budget prövas före öppen brytare. Öppen brytare stoppar körningen med orsak på stdout, aldrig tyst och aldrig med exit 2. Attempt-budgeten räknar varje startat försök, även lyckade. Budget noll ger aldrig ett försök: inget kommando startas.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-006", "h-009", "h-012"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-006",
+        "h-009",
+        "h-012"
+      ]
     },
     {
       "id": "h-014",
@@ -225,11 +341,19 @@
       "slice": 12,
       "title": "Notisen — Slack från controllern",
       "summary": "controller/notis/cli skickar notis till en konfigurerad webhook vid de fyra händelser som kräver en människa: brytare öppnad, kvot slut, körning slutförd med minst en attestation, och task blockerad av oattesterat beroende. Aldrig per varv. Controllern skickar, aldrig workern — annars är det modellen som avgör när Johnny störs. Notisen är en biverkan: en trasig eller saknad webhook får aldrig påverka körningens utfall. URL:en är en hemlighet, läses ur miljön, och ligger aldrig i repot.",
-      "allowed_write": ["controller/notis/**", "tests/controller/notis/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/notis/**",
+        "tests/controller/notis/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-014-exit",
       "exit_criterion": "Mot en lokal mottagare, aldrig mot Slack: de fyra händelserna ger var sin notis som bär run_id, task, klass och orsak; ett vanligt lyckat varv ger ingen. Saknad webhook, ogiltig URL och mottagare som vägrar svara ger alla oförändrad exit-kod på körningen. URL:en förekommer inte i stdout, stderr eller något felmeddelande, mätt med en URL som bär en sökbar hemlighetssträng. Ingen notis skickas två gånger för samma händelse.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-013"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-013"
+      ]
     },
     {
       "id": "h-015",
@@ -237,35 +361,73 @@
       "slice": 13,
       "title": "Återtaget — återstart efter avbrott",
       "summary": "controller/atertag/cli återupptar en avbruten körning utan att förlora eller dubbla arbete: attesterade tasks väljs inte om, tasks som föll blir valbara igen med bevarad failure-historik, och öppen brytare överlever omstarten. Lease från en död körning återtas efter TTL, aldrig före. Detta är driftformen kör tills kvoten tar slut, börja om när den är tillbaka (ägarbeslut 2026-08-08).",
-      "allowed_write": ["controller/atertag/**", "tests/controller/atertag/**", "docs/05-beslutslogg.md"],
+      "allowed_write": [
+        "controller/atertag/**",
+        "tests/controller/atertag/**",
+        "docs/05-beslutslogg.md"
+      ],
       "exit_test": "verify/bin/h-015-exit",
       "exit_criterion": "Efter en avbruten körning: attesterad task väljs inte om och ger inga nya event; task som föll blir valbar igen och dess tidigare fingerprints finns kvar; öppen brytare är fortfarande öppen och släpper först när dess villkor släpper. Lease från en död körning återtas efter TTL och aldrig före — mätt på klockan, inte på utsagan. Två samtidiga återstarter ger exakt en ägare. Återstart på tom eller helt attesterad backlog ger exit 0 utan nya event.",
-      "docs_impact": ["docs/05-beslutslogg.md"],
-      "depends_on": ["h-010", "h-013", "h-016", "h-004", "h-030"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md"
+      ],
+      "depends_on": [
+        "h-010",
+        "h-013",
+        "h-016",
+        "h-004",
+        "h-030"
+      ]
     },
-    { "id": "h-016", "slice": 14,
+    {
+      "id": "h-016",
+      "slice": 14,
       "authority_class": "ordinary",
       "title": "Kedjan kopplas in — varvet går genom brytaren och utföraren",
       "summary": "controller/loop/cli slutar anropa controller/launch/cli direkt och kör försöket genom controller/brytare/cli, som kör det genom controller/utforare/cli: sessionen redigerar, utföraren stagar och committar, brytaren för attempt-budget och fingerprints. Kandidatvägen är byte-identisk med utförarens rapport, så h-006, h-007, h-002 och h-003 står orörda. Budgeten får verkan genom att ett fallet försök görs OM inuti claimet — utan omförsök vore per-task-budgeten död kod, eftersom en fallen task förblir claimed och ovalbar. Varje försök får ett eget workspace på oförändrad base; bara attesterade kandidater flyttar basen. Brytarkatalogen är en per task under brytare_rot, ty fingerprinten bär ingen task-identitet — katalogsökvägen är det enda som gör räkningen per task, och h-015:s bevarade failure-historik förutsätter den. Öppen brytare avslutar drainet före nästa claim med exit 3, skilt från både slutförd drain och fel. Kandidatträdskontrollen stryks: efter inkopplingen kan den per konstruktion aldrig fälla.",
-      "allowed_write": ["controller/loop/**", "tests/controller/loop/**",
-                        "docs/05-beslutslogg.md", "docs/loop/byggplan-v3.md"],
+      "allowed_write": [
+        "controller/loop/**",
+        "tests/controller/loop/**",
+        "docs/05-beslutslogg.md",
+        "docs/loop/byggplan-v3.md"
+      ],
       "exit_test": "verify/bin/h-016-exit",
       "exit_criterion": "Mot en fixturbacklog och en konfigurerad session som ENDAST redigerar filer — aldrig stagar, aldrig committar, i ett fall aldrig skriver en rad på stdout — attesterar kedjan ändå, och den attesterade kandidatens SHA finns i git, bär författaren nortropic-utforare och har sessionens fil i sitt träd; allt mätt med git och attestbutiken, aldrig ur kedjans utsaga. En session som committar SJÄLV ger ingen attestation, och dess commit återfinns i ingen attestationsbutik. Omförsöket sker inuti claimet: en fixtur som faller första försöket och lyckas det andra attesteras i SAMMA körning, startas exakt två gånger, har exakt ETT claimed-event, och det attesterade trädet bär andra försökets fil men inte det förstas. Antalet starter mäts utanför varje workspace — en räknare i arbetsträdet hade stagats in i kandidaten av utföraren. Budgeten är per task: med en task som alltid faller och en som lyckas startas den fallande exakt budget många gånger, förblir claimed utan attestation, och den andra attesteras ändå. Avslag NEDSTRÖMS om rapporten kostar försök på samma sätt. Fingerprintar räknas per task: samma fel i två OLIKA tasks öppnar aldrig något stopp, medan samma fel i SAMMA task når tröskeln och avslutar drainet FÖRE nästa claim med exit 3 — den orörda tasken har då inget event, ingen rad i räknaren och ingen attestation, leasen är släppt och inga worktrees ligger kvar. Öppningen mäts på systerns eget tillstånd över processgränsen och med budget STRIKT högre än tröskeln, annars maskerar budgetstoppet den öppna brytaren. Stoppet kostar ingenting: en ny körning direkt efteråt attesterar den orörda tasken och lägger inga event på den fallna. Kvotstopp stannar körningen redan vid första felet med forbrukat noll. Failure attesterar aldrig och sväljs aldrig: timeout mäts på effekt, och avbrottsraden namnger steget och bär systerns klass och fingerprint-rad ordagrant. Brytarens anropsfel fäller hela körningen med exit 1 i stället för ett tyst drain. Config prövas i sin helhet före leasen: saknat brytare_rot eller icke-heltaliga budget och tröskel ger exit 1 med noll rader i eventloggen, ingen lease-ägare och ingen brytarkatalog på disk. Kedjande base överlever omförsöken, och reporotens HEAD, arbetsträd och refs är oförändrade.",
-      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/byggplan-v3.md"],
-      "depends_on": ["h-011", "h-012", "h-013"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md",
+        "docs/loop/byggplan-v3.md"
+      ],
+      "depends_on": [
+        "h-011",
+        "h-012",
+        "h-013"
+      ]
     },
-    { "id": "h-017", "slice": 15,
+    {
+      "id": "h-017",
+      "slice": 15,
       "authority_class": "ordinary",
       "title": "Per-task-domen — kedjan kör taskens egen grind mot kandidatträdet",
       "summary": "controller/loop/cli kör TASKENS egen grind mot kandidatträdet, UTÖVER configens verifierare, så att en attestation slutar betyda enbart att diffen var laglig och de globala invarianterna höll. Grinden slås upp på SÖKVÄG, aldrig på id: uppslaget görs av controller/verify/cli, som löser task-id mot spec-radens exit_test och sedan mot den registerpost vars path är byte-lika med den sökvägen. Nyckeln kommer därmed ur specs/**, som är denied_write — den som får skriva registret kan registrera en grind men aldrig peka om sin egen task till en vänligare. Kedjan skickar spec och task-id och tolkar aldrig backloggen själv. RUNNERS får bash, ty registret kan i dag inte starta en enda av husets grindar och mekanismen vore annars inert. REGISTRET LIGGER UTANFÖR SKRIVYTAN: domarens förgodkännande får inte kunna ändras av den som döms, och controller/verify/cli anges som exakt sökväg så att register.json inte följer med. Riggfel och dom hålls isär: registret prövas i sin HELHET före leasen och taskens egen post en gång till överst i varvet, så en driven eller saknad post stannar körningen innan någon modellkvot bränns; en grind som svarar rött fäller varvet och kostar försök som varje annat nedströmsavslag. En task vars exit_test saknar registerpost attesteras som förut, men attestationen saknar då grind_id — frånvaron av dom bokförs i stället för att stoppa körningen (ägarbeslut 2026-08-09).",
-      "allowed_write": ["controller/loop/**", "controller/verify/cli",
-                        "controller/launch/cli", "controller/attest/cli",
-                        "tests/controller/loop/**", "docs/05-beslutslogg.md",
-                        "docs/loop/drift.md"],
+      "allowed_write": [
+        "controller/loop/**",
+        "controller/verify/cli",
+        "controller/launch/cli",
+        "controller/attest/cli",
+        "tests/controller/loop/**",
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md"
+      ],
       "exit_test": "verify/bin/h-017-exit",
       "exit_criterion": "Mot en fixturbacklog vars tasks pekar sitt exit_test på grindar som är registrerade FÖRE körningen, och konfigurerade sessioner som ENDAST redigerar filer: allt mätt på EFFEKT med git, attestbutiken, brytarens eget tillstånd över processgränsen, eventloggen och en starträknare utanför varje workspace — aldrig ur kedjans utsaga utom där utsagan ÄR saken. GRINDEN DÖMER KANDIDATEN: två fixturtasks med samma skrivyta och samma registrerade grind, där grinden ger noll endast när en fil finns på sin relativa sökväg — den som skriver rätt fil attesteras, den som skriver fel fil attesteras aldrig. Paret krävs: en grind som kördes mot reporoten hade fällt båda, en som aldrig kördes hade friat båda. GRINDEN, BIBLIOTEKET OCH REGISTRET KOMMER UR REPOT, MÅLET UR KANDIDATEN: en fixturtask som i sitt EGET träd lägger en alltid-grön kopia av sin grind, av verify/bin/_lib.sh och av registret attesteras ändå aldrig, och den kandidat-SHA som saknas i butiken finns samtidigt i git med kopiorna i sitt träd. GRINDEN VÄLJS PÅ SÖKVÄG: fixturregistret bär den rätta grinden under ett id utan likhet med sökvägen OCH en alltid-grön post under ett vänligt id med ett ANNAT path — den rätta väljs, den vänliga aldrig; två poster med samma path är vägran. En säker repo-intern exit_test-sökväg med noll registerposter är däremot OGRINDAD enligt ägarbeslut 2026-08-09: tasken får attesteras utan grind_id och grind_sha256. En exit_test-sträng som inte är en säker repo-intern sökväg vägras och får aldrig tolkas som shell. G20 RUNTIMEGRÄNS: builderprocessen och alla dess barn, även efter ny process-session, får skriva kandidatworkspacet och neutral scratch men får aldrig skriva reporotens live control plane eller den controller-ägda trust-root som bär pre-task-domaren. Skrivspärren installeras före builderstart och måste ärvas av barnprocesser. TVÅ DOMAR, INGEN ERSÄTTER DEN ANDRA: configens verifierare körs först och taskens grind sedan; grön grind men röd global ger ingen attestation, grön global men röd grind ger ingen attestation, och båda leden provoceras med ÄKTA verdikt — det globala med en agentfil utan EXTERN DATA-blocket som check-invariants fäller på INV-004. Positivt ankare: en kandidat som är grön på båda attesteras i SAMMA körning. RÖD GRIND KOSTAR FÖRSÖK: den fallande startas exakt budget många gånger mätt på räknaren, brytarens forbrukat når budgeten, tasken förblir claimed utan attestation, och en annan task i samma körning attesteras ändå. DOMEN ÄR BOKFÖRD, ELLER DESS FRÅNVARO ÄR DET: attestationen för en dömd task bär grind_id och grind_sha256, och sha-värdet är byte-lika med det controller/verify/cli check <id> skriver ut — mätt mot systern, aldrig mot en påstådd sträng. En task vars exit_test saknar registerpost attesteras som förut men utan grind_id, och efter en körning över en blandad backlog gäller för VARJE task att den bär en attestation med de två fälten, en attestation utan dem, eller ingen attestation alls — aldrig en attestation vars dom inte går att avgöra ur butiken ensam. RIGGFEL STANNAR INNAN KVOT BRÄNNS: registret prövas i sin helhet före leasen — varje post ska ha en säker sökväg till en vanlig fil inne i repot och en SHA-256 lika med filens, även poster som inte är startbara — och en post som drivit, saknas eller pekar ut ur repot ger exit 1 med NOLL sessionsstarter, noll rader i eventloggen, ingen lease-ägare och ingen brytarkatalog på disk. Taskens egen post prövas dessutom överst i varvet, före workspace och kuvert: en post som drivit efter leasen fäller körningen utan att någon session startats för den tasken, och den drivna grinden lämnade ingen markörfil eftersom den aldrig kördes. Positivt ankare: samma config med orört register attesterar båda fixturtasksen. ODÖMBART BLIR ALDRIG GRÖNT OCH ALDRIG RÖTT: en registrerad grind som svarar 2 fäller hela körningen med exit 1 utan attestation och utan omförsök, och detsamma gäller en post som inte är startbar eller vars runner är okänd. FRI TEXT EXEKVERAR ALDRIG: ett exit_test som är ett skalkommando lämnar ingen bevisfil i provets temp-katalog — aldrig i /tmp, där sandboxens skrivförbud hade gett falskt PASS — och ger vägran, inte start. BASH-GRINDAR ÄR STARTBARA UR REGISTRET: ett direkt anrop mot en registrerad bash-post med måldir ger grindens EGEN exitkod, noll för en grön och ett för en röd fixturgrind, och stderr säger inte okänd runner. REGISTRET SVARAR MOT VERKLIGHETEN: ingen registerpost pekar på en fil som saknas, varje registrerad grind bär filens faktiska SHA-256, och verifierarens egen vägran bär en kod skild från 0, 1 och 2, ty verify/bin/_lib.sh binder dem till PASS, FAIL och ODÖMBART. AVBROTTSRADEN NAMNGER ETT EGET STEG: ett icke-tomt ord, skilt från både policyledets och det globala verifierarledets ord ur samma körning, varken taskens id eller grindens sökväg, och raden bär den dömande grindens id. OCH SVEPET: kedjande base överlever de nya leden, reporotens HEAD, arbetsträd och refs är oförändrade mätt mot HELA worktree-listan som den såg ut FÖRE provet, leasen är släppt, inga worktrees ligger kvar, och ingen väg genom kedjan och ingen kontroll i provet har använt exitkod 2 som dom.",
-      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md"],
-      "depends_on": ["h-002", "h-016"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md"
+      ],
+      "depends_on": [
+        "h-002",
+        "h-016"
+      ]
     },
     {
       "id": "h-032",
@@ -280,8 +442,14 @@
       ],
       "exit_test": "verify/bin/h-032-exit",
       "exit_criterion": "OWNER-FRYST AUTHORITY: config/codex-provider-identity.json är inte builder-write och är ett entydigt JSON-objekt med exakt schema_version=1, provider=openai-codex, en icke-tom absolut executable_path och en lowercase SHA-256; saknade/oväntade/duplicerade nycklar, fel typer, tomma värden och malformed JSON vägras. Vid VARJE providerstart läses authorityn som ett sammanhängande dokument ur det beordrade repot och ny provideridentitet verifieras; tidigare success eller snapshot får aldrig cache-auktorisera en senare start. executable_path måste vara en vanlig exekverbar fil och får inte vara symlink. PATH används aldrig för att välja provider. Implementationen öppnar den låsta filen fail-closed och binder open -> fstat regular-file-identitet -> read/hash -> authority-match -> snapshotkopiering till SAMMA öppnade objekt och samma byteström; path-stat eller återöppning av authority-path efter kontroll ger ingen trust. De verifierade bytesen materialiseras i en ny privat katalog/fil; snapshotens bytes hashas på nytt mot authorityn före start och exakt den absoluta snapshot-sökvägen blir providerprocessens argv[0]. Providerprocessen startas under Nortropics faktiska controller-enforced G20/Seatbelt-gräns med snapshotens controller-ägda execution-root som explicit trust-root. Den täckta untrusted provider/agent-kontexten får under final rehash -> absolute-path exec och under körningen ingen capability att skriva snapshotbytes, göra dem skrivbara, unlinka/renama/ersätta snapshotpathen, skapa ersättning eller mutera/renama parent execution-root för substitution. Säkerhetsargumentet är denna mekaniskt provade authority-denial, inte att pathname exec i sig är race-free; godtyckliga osandboxade same-UID-processer med separat authority över controller-roten ligger utanför h-032. Saknad/ogiltig authority, relativ path, symlink, katalog, icke-exekverbar fil, hashdrift, PATH-substitution, källbyte under materialisering, snapshotdrift före slutlig rehash och saknad containment vägras före providerprocess och AGENT_START. En giltig låst executable startar; en godtyckligt omdöpt men byte-identisk låst executable startar också, eftersom identiteten är authority-path + bytes och aldrig basename. Ett symlinknamn till samma bytes vägras; hardlink förbjuds inte av h-032. Efter success och varje failure efter snapshotskapande städas privat snapshot/root utan rå PATH-/basename-fallback; cleanupfel får aldrig omvandla identity failure till success. h-031 ska bero på h-032 och äger därefter endast source-level process-/run_codex-capability och rollrouting.",
-      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md"],
-      "depends_on": ["h-017", "h-033"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md"
+      ],
+      "depends_on": [
+        "h-017",
+        "h-033"
+      ]
     },
     {
       "id": "h-033",
@@ -289,24 +457,45 @@
       "slice": "PROVENANCE",
       "title": "Authenticated owner/controller-runner provenance for effect evidence",
       "summary": "The dedicated canonical macOS producer account _nortropic_provenance serves fresh request instances through one protected launchd definition bound to the exact helper, allowlist and evidence root. A root-owned observer authenticates the live probe and publishes a request-bound receipt outside producer authority. The requester cannot choose freshness, result, executable, authority or destination. The exact production CLI verify path enforces strict parsing and same-opened-object provenance.",
-      "allowed_write": ["controller/provenance/**", "tests/controller/provenance/**", "docs/05-beslutslogg.md", "docs/loop/drift.md"],
+      "allowed_write": [
+        "controller/provenance/**",
+        "tests/controller/provenance/**",
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md"
+      ],
       "exit_test": "verify/bin/h-033-exit",
       "exit_criterion": "OWNER FREEZE PRECONDITION: after an immutable candidate commit, owner terminal runs verify/bin/h-033-exit --owner-privilege-audit; tri-state PASS/FAIL/ODÖMBART raw output binds task, candidate, full task-spec digest, gate digest, audit identity, uid, commands, exits and decisive output. PASS requires actual effective-policy checks proving no generic unattended sudo/root shell/arbitrary root command/user switch or existing replacement authority; any changed candidate requires a new audit. CANONICAL AUTHORITY: Owner provisioning resolves literal _nortropic_provenance through the OS database; account/UID/service/allowlist/observer/evidence-root authority never comes from environment, request or mutable user config. Canonical subjects are controller/provenance/cli and controller/provenance/verify. Protected /Library/LaunchDaemons/com.nortropic.provenance.plist and loaded system/com.nortropic.provenance must coherently bind Label, ProgramArguments and UserName to exact helper /Library/PrivilegedHelperTools/com.nortropic.provenance, bound to canonical path/blob, protected ownership and narrow request surface. Canonical owner-installed authorities are /Library/Application Support/Nortropic/provenance/probes.json, producer-owned /Library/Application Support/Nortropic/provenance/evidence, root-owned /Library/PrivilegedHelperTools/com.nortropic.provenance-test-observer and root-owned /Library/Application Support/Nortropic/provenance/probe-receipts. A random protected file or NORTROPIC_PROVENANCE_* override is never authority. INTERACTIVE VERSUS UNATTENDED: interactive owner/admin authentication is allowed; uid 501 must have no generic unattended sudo, root shell, arbitrary root command/user switch, privileged service replacement, producer/service/allowlist/root/parent modification or equivalent wrapper. The sole unattended transition requests one frozen probe; it cannot run shell/arbitrary command, choose user/service/probe executable/result/effect/destination or modify producer state. REQUEST: exactly task=h-033, lowercase 40-hex candidate, lowercase 64-hex task-spec and gate digests and one probe ID are allowed. Trusted service/observer generates a fresh cryptographically strong 64-hex request_id for every run; caller cannot choose it, two same-candidate/probe runs differ, and receipt A cannot satisfy run B. result PASS/FAIL/ODÖMBART, effects, command, shell, exec, probe-path, output, producer-account, producer-uid, service-path, unknown flags and unknown probe IDs reject before execution. INDEPENDENT EXECUTION: root-owned allowlist binds h032-g20-v1 and h033-pass-v1/h033-fail-v1/h033-odombar-v1 to canonical executable path/blob and interpretation. Producer executes and derives result. Separately, root-owned observer authenticates the live connecting probe process against the allowlist and writes A/B/C receipt outside producer write authority. Gate reads receipt and evidence separately and requires agreement. Hardcoded PASS/FAIL/ODÖMBART without frozen-probe execution lacks a receipt and fails; producer-written evidence is never its own oracle. EVIDENCE: exact ordered UTF-8 JSON keys are schema_version(integer 1), producer_authority(exact _nortropic_provenance), task(exact h-033), candidate_sha(lowercase 40-hex), task_spec_sha256(lowercase 64-hex), gate_sha256(lowercase 64-hex), probe_identity(frozen ID), request_id(lowercase 64-hex), result(PASS|FAIL|ODÖMBART), effect_sha256(lowercase 64-hex receipt digest). Actual controller/provenance/cli verify used by H-032, not only judge Python or an auxiliary structure path, is black-box tested against canonical, malformed, duplicate, missing, unexpected, wrong-top-level/field-type, empty, malformed binding/probe and invalid-result documents. SAME-OPENED OBJECT: accepted evidence is a regular producer object below canonical root and non-replaceable parent chain. UID 501 cannot create, write, chmod/chown, unlink, rename, replace, symlink-substitute or replace security parents/service/allowlist/observer. controller/provenance/cli and controller/provenance/verify are one hard-linked executable identity; its race control binds the production implementation. Actual verifier opens without following final symlink, fstats and reads/strict-parses that same descriptor; frozen pathname-swap control rejects stat-then-reopen. Wrong/unrelated/requester-selected UID, outside copy, symlink, writable parent, stale/wrong task/candidate/spec/gate/probe/result/receipt and mutation fail. FAIL and ODÖMBART authenticate only as themselves. TEST MAPPING: J_* parser/request/provenance/hardcoded mutants are JUDGE_SELFTESTS only. K3 is future CLI request acceptance; K4 future canonical transition/live-probe/observer/evidence acceptance; K5 future production verifier parser/binding/opened-object-race acceptance; K6 future protected-origin/namespace acceptance. No material clause is satisfied only by J_*. Current RED is AUTHENTICATED_PRODUCER_COMPONENT_ABSENT plus PROTECTED_EVIDENCE_ROOT_ABSENT. Unprovable provisioning or no-generic-unattended-privilege is exit 2 ODÖMBART with no same-user fallback.",
-      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md"],
-      "depends_on": ["h-017", "h-034"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md"
+      ],
+      "depends_on": [
+        "h-017",
+        "h-034"
+      ]
     },
     {
       "id": "h-034",
       "authority_class": "owner_authority",
       "slice": "H034_NATIVE_FINITE_VERIFIER_KERNEL",
       "title": "Native finite verifier kernel for authenticated provenance semantics",
-      "summary": "A fixed C verification plan becomes the native semantic authority consumed by H-033. The accepted artifact is the exact final signed arm64 macOS Mach-O bound by a strict recipe and identity manifest. It consumes already-opened regular evidence, observer-receipt and allowlist descriptors, never pathnames or Python authority, and authenticates strict H-033 bindings and tri-state results fail-closed.",
+      "summary": "A fixed C verification plan becomes the native semantic authority consumed by H-033. The accepted artifact is the exact final signed arm64 macOS Mach-O bound by a strict recipe and identity manifest. The recipe's compile argv is one closed, exact sequence of justified C standard, optimization, warning, arm64, resolved sysroot, deterministic no-UUID and complete source arguments; it has no response-file, pass-through, target-triple, deployment-selector or extension slot, and signing uses one fixed identifier independent of output basename. It consumes already-opened regular evidence, observer-receipt and allowlist descriptors, never pathnames or Python authority, and authenticates every required ordered JSON field and relationship across multiple fresh H-033 bindings and tri-state results fail-closed.",
       "allowed_write": [],
-      "owner_author_allowed_write": ["controller/h034-native/**", "verify/h034/kernel", "verify/h034/build-recipe.json", "verify/h034/identity-manifest.json"],
+      "owner_author_allowed_write": [
+        "controller/h034-native/**",
+        "verify/h034/kernel",
+        "verify/h034/build-recipe.json",
+        "verify/h034/identity-manifest.json"
+      ],
       "exit_test": "verify/bin/h-034-exit",
-      "exit_criterion": "AUTHORITY AND ARTIFACT: H-034 is an owner_authority task reached only after final H-035. Its task-specific gate is verify/bin/h-034-exit and the owner surface is exactly controller/h034-native/** plus verify/h034/kernel, verify/h034/build-recipe.json and verify/h034/identity-manifest.json. The task gate, task spec, registry, tests and control plane remain in the owner-author global deny set. Production is C for arm64 macOS. Authority is the exact final signed Mach-O at verify/h034/kernel, a regular executable non-symlink whose SHA-256, code-directory hash, arm64 architecture, Mach-O file identity, signature, load commands and source/recipe hashes are bound by the strict identity manifest. Runtime has zero third-party runtime dependencies: every linked image is an absolute Apple system runtime/framework path and the only dynamic loader is /usr/lib/dyld. Python is never runtime authority; Python in the frozen gate only orchestrates and judges black-box effects. BUILD IDENTITY: the strict build recipe binds C, arm64, the exact Apple clang and codesign objects and hashes, the resolved current Apple macOS SDK path plus its SDKSettings digest, source list, argv and timestamp-free signing. Two clean rebuilds are byte-identical to each other and the final signed artifact. The recipe contains no shell command and no environment-selected compiler, SDK, source, flags, output or signer. Because current authority specifies no deployment minimum, no deployment target is selected by this contract: every explicit minimum selector is forbidden, including `-mmacosx-version-min`, linker platform-version forms, and `-target`/`--target` triples that encode macOS or Darwin versions; versionless arm64 Apple target triples remain legitimate, while the actual final Mach-O platform/minOS/SDK load-command tuple must be recorded byte-for-byte in the manifest and reproduced by the same Apple toolchain. FINITE H-033 OPERATION: the only runtime operation is `h033-verify` with exactly three inherited decimal descriptors (`--evidence-fd`, `--receipt-fd`, `--allowlist-fd`) and exact expected `--task`, `--candidate`, `--task-spec-sha256`, `--gate-sha256`, `--probe`, `--request-id` and `--require-result`. Unknown, duplicate, missing or malformed flags reject. The kernel accepts only same inherited regular-file descriptors, uses fstat and bounded reads from those same opened objects, and never resolves or reopens a pathname. H-033 remains responsible for protected origin, safe opening and passing those exact descriptors; pathname replacement after open cannot alter the kernel decision. INPUT SCHEMAS: evidence is strict ordered UTF-8 JSON with exactly schema_version=1, producer_authority=_nortropic_provenance, task=h-033, lowercase candidate/task-spec/gate digests, probe_identity, lowercase 64-hex request_id, result and effect_sha256. Observer receipt is strict ordered UTF-8 JSON with exactly schema_version=1, observer_authority=root-owned-h033-observer-v1, request_id, candidate_sha, probe_identity, absolute probe_path, probe_sha256 and effect_marker. Allowlist is strict ordered UTF-8 JSON with schema_version=1 and a nonempty unique probes array whose entries have exactly probe_identity, absolute probe_path, probe_sha256, effect_marker and result. Duplicate keys, extra/missing keys, wrong order/top-level/type/encoding, empty strings, malformed hex, duplicate probes, oversize/trailing data or nonregular descriptors reject. SEMANTICS AND FRESHNESS: one allowlist entry must match probe identity and bind receipt path/blob/marker/result. Evidence and receipt must agree with every expected task/candidate/spec/gate/probe/request binding; evidence effect_sha256 is SHA-256 of the exact receipt bytes. Freshness is the exact trusted request_id binding: another run's otherwise valid receipt and any caller-chosen mismatch reject. PASS, FAIL and ODÖMBART authenticate only as the exact `--require-result` requested; neither FAIL nor ODÖMBART can satisfy PASS. A verified operation exits zero and writes exactly VERIFIED_RESULT, REQUEST_ID and EFFECT_SHA256 lines; contract rejection exits one with no stdout; unavailable descriptor/platform/resource conditions exit two with no success output. Fixed size/field/count bounds make allocation and parsing fail closed. BLACK-BOX CONTROLS: real final Mach-O execution over multiple gate-generated unpredictable valid document families proves PASS/FAIL/ODÖMBART positives, cross-result rejection, stable same-FD pathname replacement, stale request replay, strict metamorphic document mutations, every fresh binding mismatch, computed receipt-digest/allowlist relations, unknown arguments, directory/pipe descriptors, cleanup and deterministic identity. Gate entropy supplies test inputs only and is never runtime authority. One-defect fake-shell, unsigned/non-arm64, dependency, recipe/manifest, hardcoded result, permissive parser, path-reopen, receipt-replay and Python-dispatch mutants cannot pass. No material property is judge-selftest only.",
-      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md"],
-      "depends_on": ["h-035"],
+      "exit_criterion": "AUTHORITY AND ARTIFACT: H-034 is an owner_authority task reached only after final H-035. Its task-specific gate is verify/bin/h-034-exit and the owner surface is exactly controller/h034-native/** plus verify/h034/kernel, verify/h034/build-recipe.json and verify/h034/identity-manifest.json. The task gate, task spec, registry, tests and control plane remain in the owner-author global deny set. Production is C for arm64 macOS. Authority is the exact final signed Mach-O at verify/h034/kernel, a regular executable non-symlink whose SHA-256, code-directory hash, arm64 architecture, Mach-O file identity, signature, load commands and source/recipe hashes are bound by the strict identity manifest. Runtime has zero third-party runtime dependencies: every linked image is an absolute Apple system runtime/framework path and the only dynamic loader is /usr/lib/dyld. Python is never runtime authority; Python in the frozen gate only orchestrates and judges black-box effects. BUILD IDENTITY: the strict build recipe binds C, arm64, the exact Apple clang and codesign objects and hashes, the resolved current Apple macOS SDK path plus its SDKSettings digest, source list, argv and timestamp-free signing. Two clean rebuilds are byte-identical to each other and the final signed artifact. The recipe contains no shell command and no environment-selected compiler, SDK, source, flags, output or signer. Because current authority specifies no deployment minimum, no deployment target is selected by this contract: every explicit minimum selector is forbidden, including direct deployment flags. Joined or separated linker pass-through, every target triple and every response file are structurally impossible because compile_argv is the exact closed sequence above, while the actual final Mach-O platform/minOS/SDK load-command tuple must be recorded byte-for-byte in the manifest and reproduced by the same Apple toolchain. FINITE H-033 OPERATION: the only runtime operation is `h033-verify` with exactly three inherited decimal descriptors (`--evidence-fd`, `--receipt-fd`, `--allowlist-fd`) and exact expected `--task`, `--candidate`, `--task-spec-sha256`, `--gate-sha256`, `--probe`, `--request-id` and `--require-result`. Unknown, duplicate, missing or malformed flags reject. The kernel accepts only same inherited regular-file descriptors, uses fstat and bounded reads from those same opened objects, and never resolves or reopens a pathname. H-033 remains responsible for protected origin, safe opening and passing those exact descriptors; pathname replacement after open cannot alter the kernel decision. INPUT SCHEMAS: evidence is strict ordered UTF-8 JSON with exactly schema_version=1, producer_authority=_nortropic_provenance, task=h-033, lowercase candidate/task-spec/gate digests, probe_identity, lowercase 64-hex request_id, result and effect_sha256. Observer receipt is strict ordered UTF-8 JSON with exactly schema_version=1, observer_authority=root-owned-h033-observer-v1, request_id, candidate_sha, probe_identity, absolute probe_path, probe_sha256 and effect_marker. Allowlist is strict ordered UTF-8 JSON with schema_version=1 and a nonempty unique probes array whose entries have exactly probe_identity, absolute probe_path, probe_sha256, effect_marker and result. Duplicate keys, extra/missing keys, wrong order/top-level/type/encoding, empty strings, malformed hex, duplicate probes, oversize/trailing data or nonregular descriptors reject. SEMANTICS AND FRESHNESS: one allowlist entry must match probe identity and bind receipt path/blob/marker/result. Evidence and receipt must agree with every expected task/candidate/spec/gate/probe/request binding; evidence effect_sha256 is SHA-256 of the exact receipt bytes. Freshness is the exact trusted request_id binding: another run's otherwise valid receipt and any caller-chosen mismatch reject. PASS, FAIL and ODÖMBART authenticate only as the exact `--require-result` requested; neither FAIL nor ODÖMBART can satisfy PASS. A verified operation exits zero and writes exactly VERIFIED_RESULT, REQUEST_ID and EFFECT_SHA256 lines; contract rejection exits one with no stdout; unavailable descriptor/platform/resource conditions exit two with no success output. Fixed size/field/count bounds make allocation and parsing fail closed. BLACK-BOX CONTROLS: real final Mach-O execution over multiple gate-generated unpredictable valid document families proves PASS/FAIL/ODÖMBART positives, cross-result rejection, stable same-FD pathname replacement, stale request replay, strict metamorphic document mutations, every fresh binding mismatch, computed receipt-digest/allowlist relations, unknown arguments, directory/pipe descriptors, cleanup and deterministic identity. Gate entropy supplies test inputs only and is never runtime authority. One-defect fake-shell, unsigned/non-arm64, dependency, recipe/manifest, hardcoded result, permissive parser, path-reopen, receipt-replay and Python-dispatch mutants cannot pass. No material property is judge-selftest only.",
+      "docs_impact": [
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md"
+      ],
+      "depends_on": [
+        "h-035"
+      ],
       "max_changed_files": 16,
       "max_added_lines": 2600
     },
@@ -323,8 +512,14 @@
       ],
       "exit_test": "verify/bin/h-031-exit",
       "exit_criterion": "Mot en h-032-godkänd provider-fixtur och ett isolerat git-worktree: samtliga sex runtime-roller startas genom den enda kanoniska Codex-boundaryn run_codex och den exekverade argv-listan visar EXAKT MODEL=gpt-5.6-sol samt REASONING_EFFORT=max för ARCHITECT, TEST_AUTHOR, GATE_REVIEWER, REVIEWER och EMPIRICAL och high för BUILDER. Effekten mäts efter att CODEX_HOME avsiktligt har satts till en annan modell och ultra. Varje verklig AGENT_START-rad bär byte-lika role, model, reasoning_effort och model_routing_source=AUTOPILOT_ROLE_POLICY. Äldre persisted routing bevaras men styr aldrig en ny start. Okänd roll vägras före providerprocess, AGENT_START och run-katalog. SOURCE-LEVEL PROCESSGRÄNSEN ÄR EN DEL AV TRUSTKONTRAKTET: subprocess.Popen får endast innehas/anropas vid canonical run_codex-site; subprocess.run får endast innehas/anropas vid canonical generic run-site; watch får behålla exakt os.system(\"clear\"). Endast import subprocess utan alias är tillåten importform för processmodulen. Alternativa importnamn, from-import av processfunktion, getattr-indirection samt assignment, annotated assignment, walrus, container, lambda/default/closure, attribut, argument eller return av processkapabilitet är förbjudna. run_codex-callablen är själv en säkerhetskapabilitet: endast de explicit inventerade orchestration-entrypoints som krävs av aktuellt workflow får direkt anropa den; alias, lagring, passing, return, getattr och metod-/klass-/containerindirection är förbjudna. status, watch och roadmap_status kan därför varken vara auktoriserad caller eller nå run_codex genom capability escape. Vanlig orelaterad Python-aliasing och legitima icke-providerkommandon genom canonical run förblir tillåtna. h-031 klassar aldrig provideridentitet genom basename, PATH eller egen executable-heuristik: h-032 etablerar och levererar den enda godkända provider-executablen, och generic run saknar authority att erhålla eller starta den eftersom provider-capabilityn endast ägs av run_codex. Ingen normal runtime-roll använder eller rapporterar implicit ultra.",
-      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md"],
-      "depends_on": ["h-017", "h-032"]
+      "docs_impact": [
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md"
+      ],
+      "depends_on": [
+        "h-017",
+        "h-032"
+      ]
     },
     {
       "id": "h-035",
@@ -333,26 +528,46 @@
       "title": "Mechanically separate owner production authoring from ordinary builder",
       "summary": "One-time bootstrap through the historical ordinary builder pipeline. It introduces versioned ordinary/owner_authority task semantics, one path oracle, authority-bound candidates, explicit owner-author transition, persistent owner states, independent review and explicit owner-final freeze. Exact canonical gate filenames accepted by that path oracle are repository data, never Git pathspec programs: leading `:(literal)` and `:(top)` filenames must resolve literally from the exact candidate Git object through owner-author, check-candidate, record-review and owner-freeze, with persisted state, bounded workspace and remote refs proving effects. This remains true while a pathspec-prefixed mutable checkout path has hostile regular bytes, a directory, a symlink or is missing; a changed candidate Git object's literal gate digest rejects with no effects, while a UTF-8/space gate stored as a 100644 regular blob remains valid. It creates no H-034 production bytes. Its frozen v1 allowed_write is the bounded bootstrap exception; after v2 activation ordinary tasks cannot grant authority-control paths.",
       "allowed_write": [
-        "controller/authority/**", "controller/policy/**", "controller/taskval/**",
-        "controller/envelope/**", "controller/state/**", "controller/attest/**",
-        "controller/loop/**", "tests/controller/authority/**", "tests/controller/policy/**",
-        "tests/controller/taskval/**", "tests/controller/envelope/**", "tests/controller/state/**",
-        "tests/controller/attest/**", "tests/controller/loop/**",
-        "scripts/nortropic-codex-autopilot.py", "tests/scripts/nortropic-codex-autopilot/**",
-        "scripts/check-invariants.mjs", "docs/05-beslutslogg.md", "docs/loop/drift.md",
+        "controller/authority/**",
+        "controller/policy/**",
+        "controller/taskval/**",
+        "controller/envelope/**",
+        "controller/state/**",
+        "controller/attest/**",
+        "controller/loop/**",
+        "tests/controller/authority/**",
+        "tests/controller/policy/**",
+        "tests/controller/taskval/**",
+        "tests/controller/envelope/**",
+        "tests/controller/state/**",
+        "tests/controller/attest/**",
+        "tests/controller/loop/**",
+        "scripts/nortropic-codex-autopilot.py",
+        "tests/scripts/nortropic-codex-autopilot/**",
+        "scripts/check-invariants.mjs",
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md",
         "docs/loop/owner-author-workflow-v1.md"
       ],
       "owner_author_allowed_write": [],
       "exit_test": "verify/bin/h-035-exit",
       "exit_criterion": "Black-box execution of normal controller/loop routing and restart plus operational controller/authority transitions satisfies docs/loop/owner-author-workflow-v1.md and the frozen h-035 gate; helper probes are judge-selftest only. Ordinary BUILDER execution is established only by H035_OWNER_PROVIDER_EXEC_V6 gate-side process-table observation of an exact /bin/sh provider leaf carrying the exact disposable provider path and a fresh nonce as complete argv tokens, with real PPID ancestry to the exact loop PID through ordered brytare, utforare and launch stages whose process image exactly matches the gate-started loop image, and only the explicitly permitted optional sandbox-exec intermediate. The macOS comm field may be truncated; no Python basename is assumed. Provider/controller process-group equality is not required. A gate-owned ready/release handshake makes observer completion/release the only normal provider lifetime terminator. The full bounded observation window starts when readiness is observed; each process-table snapshot has a hard maximum duration; and the controller cleanup fail-safe is strictly later than that window, one maximum snapshot overrun and the cleanup margin. Thus slow schedules beyond 20.2722 seconds cannot expire the provider before observer conclusion. The handshake and all subject-written markers are synchronization only and never verdict authority. Returned JSON, reported PID, wrong/stale/substring nonce, same basename, forwarded ancestor argv, sandbox argv without a provider child, wrong/reordered/missing ancestry, fabricated topology, mismatched controller images and unrelated shell processes are insufficient. Process-table or platform denial is ODÖMBART, not product FAIL; a working observer that finds no exact match is FAIL, no-ready or rapid-exit paths reject with bounded cleanup, and retrying a failed candidate-bound run cannot replace that verdict. Ordinary authority cannot overlap owner-production or prospective authority-control paths through allowed_write or docs_impact; TEST_AUTHOR cannot write owner production; owner author writes only its frozen task-specific owner_author_allowed_write surface and cannot edit task, registry, gate, fixtures or control plane. Missing/unknown authority, caller-selected authority bytes, role/environment claims, changed-file claims, wrong identities, dual write surfaces and v1 owner escalation fail closed through every real authority consumer. Material transitions are proven from one authoritative persisted state, bounded workspace and isolated bare-remote refs after commands, never returned JSON: the normal taskval/loop OWNER_ACTION_REQUIRED event is directly consumable by owner-author without a judge-created current.json bridge; canonical ordinary tasks can never enter owner-author even if hostile persisted state claims otherwise; future ordinary protected grants are rejected by the exact policy path used by the normal loop; owner-final freeze derives current main from the configured remote and rejects when refs/heads/main advances. Operational authority never falls back to installed spec or registry bytes when either canonical candidate document is missing. Every malformed owner_author_allowed_write path is rejected by normal task selection before a handoff event, using the same strict path language as other authority consumers. If any owner-author persistence step fails, the rejected owner-author leaves state, workspace and remote refs byte-identical, including root and nested files, empty directories, symlinks, path types, content, executable modes and ownership, when the append-only eventlog write succeeds but its SQLite projection fails; the existing successful eventlog handoff remains valid. Normal task selection and policy create no repository-local runtime bytes, including __pycache__ or .pyc, when invoked without bytecode-control environment variables; taskval's authorized state effect stays in its configured disposable state root, the accepted policy check creates no evidence effect, and the immutable candidate remains clean. This does not redefine rejection-evidence semantics. For every owner_authority task, gate identity is derived from the task's exact canonical task row and its task-specific exit_test at the exact candidate Git object; that path must be a repository-relative regular Git blob whose SHA-256 is bound independently of requester fields. H-035 keeps verify/bin/h-035-exit, while any later owner task binds its own canonical gate. Two distinct canonical owner tasks with distinct gate paths and bytes must each complete owner-author, check-candidate, record-review and owner-freeze; task identity may not be special-cased. Gate type and bytes come only from the exact candidate Git object and remain authoritative when the mutable checkout path is hostile regular bytes, a directory, a symlink or missing; a different candidate Git object's gate digest rejects. A wrong gate path or digest, another task's gate, caller gate override, or missing, non-regular, symlink or changed gate fails closed through owner-author, check-candidate, record-review and owner-freeze with unchanged authoritative state, bounded workspace and remote refs. The task-specific gate itself remains inside the global owner-author deny set even when its task owner surface would otherwise cover it. A RED owner task persists OWNER_ACTION_REQUIRED without BUILDER, retry, attestation, dependency advance or publication across new-process restart; review PASS persists OWNER_FINAL_FREEZE_REQUIRED with unchanged remote refs; only exact explicit owner-final action persists frozen completion. H-034 remains a path reservation only.",
-      "docs_impact": ["docs/05-beslutslogg.md", "docs/loop/drift.md", "docs/loop/owner-author-workflow-v1.md"],
-      "depends_on": ["h-017"],
+      "docs_impact": [
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md",
+        "docs/loop/owner-author-workflow-v1.md"
+      ],
+      "depends_on": [
+        "h-017"
+      ],
       "max_changed_files": 32,
       "max_added_lines": 4200,
-      "bootstrap_exception": {"kind": "frozen_v1_allowed_write_once", "prospective_task_id_bypass": false}
+      "bootstrap_exception": {
+        "kind": "frozen_v1_allowed_write_once",
+        "prospective_task_id_bypass": false
+      }
     }
   ],
-
   "human_only": {
     "note": "Byggs ALDRIG genom loopen. Människohand, HÖGRISK-märkt commit.",
     "items": [
