@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -53,20 +54,18 @@ def repository(req: dict[str, object]) -> tuple[Path, str]:
     return repo, candidate
 
 
-def canonical_bytes(repo: Path, base: str, candidate: str, relative: str, fallback: Path) -> bytes:
+def canonical_bytes(repo: Path, candidate: str, relative: str) -> bytes:
     raw = blob_at(repo, candidate, relative)
-    if raw is not None:
-        return raw
-    if blob_at(repo, base, relative) is not None:
-        raise AuthorityError(f"canonical authority file deleted: {relative}")
-    return fallback.read_bytes()
+    if raw is None:
+        raise AuthorityError(f"canonical authority file missing: {relative}")
+    return raw
 
 
 def authority_documents(req: dict[str, object]) -> tuple[Path, str, bytes, object, bytes, dict[str, object]]:
     repo, candidate = repository(req)
     base = exact_commit(repo, req.get("base_sha"))
-    spec_raw = canonical_bytes(repo, base, candidate, "specs/tasks.spec.json", SPEC_PATH)
-    registry_raw = canonical_bytes(repo, base, candidate, "specs/owner-production-paths.v1.json", REGISTRY_PATH)
+    spec_raw = canonical_bytes(repo, candidate, "specs/tasks.spec.json")
+    registry_raw = canonical_bytes(repo, candidate, "specs/owner-production-paths.v1.json")
     spec = strict_json_bytes(spec_raw)
     registry = validate_registry(strict_json_bytes(registry_raw))
     return repo, candidate, spec_raw, spec, registry_raw, registry
@@ -125,11 +124,17 @@ def check_candidate(req: dict[str, object]) -> int:
                for guard in registry["owner_production_paths"]):
             raise AuthorityError("test author changed owner production")
     elif actor == "owner_authority":
+        task_id = req.get("task_id")
+        if not isinstance(task_id, str):
+            raise AuthorityError("task_id missing")
+        _task, authority, surface = task_authority(spec, task_id)
+        if authority != "owner_authority":
+            raise AuthorityError("owner actor/class mismatch")
         if any(overlaps(item, guard) for item in files
                for guard in registry["owner_author_global_denied_paths"]):
             raise AuthorityError("owner candidate changed global deny")
-        if any(not permitted(item, registry["owner_production_paths"]) for item in files):
-            raise AuthorityError("owner candidate outside owner production")
+        if any(not permitted(item, surface) for item in files):
+            raise AuthorityError("owner candidate outside task owner surface")
     else:
         raise AuthorityError("unknown actor")
     return response(True, authority_class=actor, changed_files=files)
@@ -143,10 +148,33 @@ def state_file(req: dict[str, object]) -> Path:
 
 
 def read_state(req: dict[str, object]) -> dict[str, object]:
-    value = strict_json_file(state_file(req))
-    if not isinstance(value, dict):
-        raise AuthorityError("persisted state must be object")
-    return value
+    current_path = state_file(req)
+    if current_path.exists():
+        value = strict_json_file(current_path)
+        if not isinstance(value, dict):
+            raise AuthorityError("persisted state must be object")
+        return value
+    eventlog = current_path.parent / "events.jsonl"
+    try:
+        raw = eventlog.read_bytes()
+    except OSError as exc:
+        raise AuthorityError(f"cannot read {eventlog}: {exc}") from exc
+    if raw and not raw.endswith(b"\n"):
+        raise AuthorityError("persisted eventlog is truncated")
+    task_id = req.get("task_id")
+    latest: dict[str, object] | None = None
+    for number, line in enumerate(raw.splitlines(), start=1):
+        value = strict_json_bytes(line)
+        if not isinstance(value, dict):
+            raise AuthorityError(f"persisted event {number} must be object")
+        if value.get("task") == task_id:
+            latest = value
+    if latest is None:
+        raise AuthorityError("persisted task state missing")
+    status = latest.get("status")
+    if not isinstance(status, str) or not status:
+        raise AuthorityError("persisted event status missing")
+    return {**latest, "state": status}
 
 
 def atomic_json(path: Path, value: dict[str, object]) -> None:
@@ -166,15 +194,30 @@ def atomic_json(path: Path, value: dict[str, object]) -> None:
             pass
 
 
+def persist_state(req: dict[str, object], value: dict[str, object]) -> None:
+    """Advance whichever single authoritative state representation initiated the handoff."""
+    current_path = state_file(req)
+    if current_path.exists():
+        atomic_json(current_path, value)
+        return
+    event = {**value, "status": value["state"]}
+    result = subprocess.run(
+        [str(ROOT / "controller/state/cli"), "append", str(current_path.parent),
+         json.dumps(event, sort_keys=True, separators=(",", ":"))],
+        text=True, capture_output=True, shell=False, check=False,
+    )
+    if result.returncode:
+        raise AuthorityError(f"cannot persist owner event: {result.stderr.strip()}")
+
+
 def transition_context(req: dict[str, object]) -> tuple[Path, str, dict[str, object]]:
     repo, candidate, spec_raw, spec, registry_raw, _registry = authority_documents(req)
     task_id = req.get("task_id")
     if not isinstance(task_id, str):
         raise AuthorityError("task_id missing")
-    hits = [item for item in spec.get("tasks", [])
-            if isinstance(item, dict) and item.get("id") == task_id] if isinstance(spec, dict) else []
-    if len(hits) != 1:
-        raise AuthorityError("canonical task missing")
+    _task, authority, _surface = task_authority(spec, task_id)
+    if authority != "owner_authority":
+        raise AuthorityError("owner transition requires canonical owner task")
     base = exact_commit(repo, req.get("base_sha"))
     main = exact_commit(repo, req.get("main_sha"))
     if req.get("spec_sha256") != digest(spec_raw):
@@ -186,7 +229,8 @@ def transition_context(req: dict[str, object]) -> tuple[Path, str, dict[str, obj
         raise AuthorityError("gate identity mismatch")
     return repo, candidate, {"task": task_id, "base_sha": base, "main_sha": main,
         "spec_sha256": digest(spec_raw), "registry_sha256": digest(registry_raw),
-        "gate_path": gate_path, "gate_sha256": req["gate_sha256"]}
+        "gate_path": gate_path, "gate_sha256": req["gate_sha256"],
+        "authority_class": authority}
 
 
 def owner_author(req: dict[str, object]) -> int:
@@ -194,7 +238,7 @@ def owner_author(req: dict[str, object]) -> int:
     current = read_state(req)
     if current.get("task") != context["task"] or current.get("state") != "OWNER_ACTION_REQUIRED":
         raise AuthorityError("owner author requires persisted OWNER_ACTION_REQUIRED")
-    if current.get("base_sha") != context["base_sha"] or candidate != context["base_sha"]:
+    if current.get("base_sha") not in (None, context["base_sha"]) or candidate != context["base_sha"]:
         raise AuthorityError("owner author base/candidate binding mismatch")
     next_state = {**context, "state": "OWNER_CANDIDATE_REVIEW_REQUIRED",
                   "candidate_sha": candidate, "authority_class": "owner_authority"}
@@ -206,7 +250,7 @@ def owner_author(req: dict[str, object]) -> int:
     workspace = Path(workspace_raw)
     workspace.mkdir(parents=True, exist_ok=False)
     atomic_json(workspace / "owner-attempt.json", next_state)
-    atomic_json(state_file(req), next_state)
+    persist_state(req, next_state)
     return response(True, authority_class="owner_authority", state=next_state["state"])
 
 
@@ -240,7 +284,7 @@ def record_review(req: dict[str, object]) -> int:
                   "candidate_sha": candidate, "review_identity": review,
                   "review_result": "PASS"}
     if next_state != current:
-        atomic_json(state_file(req), next_state)
+        persist_state(req, next_state)
     return response(True, state=next_state["state"], published=False, merged=False)
 
 
@@ -258,7 +302,17 @@ def owner_freeze(req: dict[str, object]) -> int:
                 "review_identity": review, "review_result": "PASS"}
     if any(current.get(key) != value for key, value in required.items()):
         raise AuthorityError("final freeze binding mismatch")
-    atomic_json(state_file(req), {**current, "state": "OWNER_FROZEN"})
+    remote = req.get("remote")
+    if not isinstance(remote, str) or not remote:
+        raise AuthorityError("configured remote missing")
+    observed = subprocess.run(
+        ["git", "ls-remote", "--heads", remote, "refs/heads/main"],
+        text=True, capture_output=True, shell=False, check=False,
+    )
+    rows = [line.split() for line in observed.stdout.splitlines() if line.strip()]
+    if observed.returncode or rows != [[context["main_sha"], "refs/heads/main"]]:
+        raise AuthorityError("configured remote main no longer matches frozen binding")
+    persist_state(req, {**current, "state": "OWNER_FROZEN"})
     return response(True, state="OWNER_FROZEN", published=False, merged=False)
 
 

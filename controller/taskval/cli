@@ -39,6 +39,8 @@ if sys.version_info < (3, 12):
 ROT = Path(__file__).resolve().parents[2]
 ATT = ROT / "controller/attest/cli"
 ST = ROT / "controller/state/cli"
+sys.path.insert(0, str(ROT / "controller/authority"))
+from core import AuthorityError, canonical_path  # noqa: E402
 
 # Frånvarande status är None. Båda betyder "inte påbörjad".
 VALBARA_STATUS = (None, "pending")
@@ -106,6 +108,15 @@ def las_spec(spec: Path) -> list[tuple[str, list[str], str]]:
             owner = post.get("owner_author_allowed_write", [])
             if not isinstance(ordinary, list) or not isinstance(owner, list):
                 raise Avbryt(f"spec: skrivytan för {tid} är ogiltig")
+            docs = post.get("docs_impact", [])
+            if not isinstance(docs, list):
+                raise Avbryt(f"spec: docs_impact för {tid} är ogiltig")
+            try:
+                ordinary = [canonical_path(path) for path in ordinary]
+                owner = [canonical_path(path) for path in owner]
+                [canonical_path(path) for path in docs]
+            except AuthorityError as e:
+                raise Avbryt(f"spec: skrivytan för {tid} är ogiltig — {e}") from e
             if authority == "ordinary" and (not ordinary or owner):
                 raise Avbryt(f"spec: ordinary-skrivytan för {tid} är ogiltig")
             if authority == "owner_authority" and (ordinary or not owner):
@@ -115,6 +126,14 @@ def las_spec(spec: Path) -> list[tuple[str, list[str], str]]:
             # owner authority from a field, role string, or environment value.
             if "authority_class" in post or "owner_author_allowed_write" in post:
                 raise Avbryt(f"spec: endast schema v2 får uttrycka owner authority för {tid}")
+            ordinary = post.get("allowed_write", [])
+            if not isinstance(ordinary, list) or not ordinary:
+                raise Avbryt(f"spec: ordinary-skrivytan för {tid} är ogiltig")
+            try:
+                [canonical_path(path) for path in ordinary]
+                [canonical_path(path) for path in post.get("docs_impact", [])]
+            except (AuthorityError, TypeError) as e:
+                raise Avbryt(f"spec: skrivytan för {tid} är ogiltig — {e}") from e
             authority = "ordinary"
         tasks.append((tid, dep, authority))
     return tasks

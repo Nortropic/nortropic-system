@@ -48,7 +48,8 @@ ROT = Path(__file__).resolve().parents[2]
 SPEC = ROT / "specs/tasks.spec.json"
 EVIDENCE = ROT / "controller/policy/evidence"
 sys.path.insert(0, str(ROT / "controller/authority"))
-from core import AuthorityError, permits  # noqa: E402
+from core import (AuthorityError, overlaps, permits, strict_json_file,
+                  task_authority, validate_registry)  # noqa: E402
 
 # Vaktas av ägarhand, inte av den här komponenten (byggplan v3 §3.1,
 # "Två mekanismer, olika ytor"). controller/** står inte i denied_write.
@@ -160,6 +161,27 @@ def gor_check(task_id: str, base_arg: str, kand_arg: str, spec_fil: Path = SPEC)
 
     filer, rader, binara = diffen(base, kandidat)
     arg = (task_id, base, kandidat, filer, rader)
+
+    # Schema-v2 ordinary grants are checked prospectively by the same policy
+    # entrypoint the normal loop invokes. A future task cannot grant itself
+    # authority-control or owner-production paths even before such a path is
+    # present in its candidate diff.
+    if spec.get("spec_version") == "2.0.0":
+        try:
+            _task, authority, surface = task_authority(spec, task_id)
+            registry = validate_registry(strict_json_file(
+                ROT / "specs/owner-production-paths.v1.json"))
+        except AuthorityError as e:
+            return avslag(UTANFOR, "authority_contract",
+                          f"ogiltig authority contract för {task_id}: {e}", *arg)
+        if authority != "ordinary":
+            return avslag(UTANFOR, "owner_route",
+                          f"owner task {task_id} får inte gå genom ordinary policy", *arg)
+        protected = (registry["owner_production_paths"]
+                     + registry["prospective_ordinary_protected_paths"])
+        if any(overlaps(grant, guard) for grant in surface for guard in protected):
+            return avslag(UTANFOR, "protected_authority_grant",
+                          f"ordinary task {task_id} överlappar skyddad authority-yta", *arg)
 
     # 1. §A — den enda överträdelse som aldrig får maskeras av ett lindrigare
     #    avslag. Ytan är specens denied_write minus ägarhandsytorna.
