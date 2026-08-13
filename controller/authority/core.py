@@ -152,7 +152,8 @@ def regular_blob_at(repo: Path, candidate: str, relative: object) -> tuple[str, 
     if recursive:
         raise AuthorityError("task exit_test must be one exact path")
     tree = subprocess.run(
-        ["git", "-C", str(repo), "ls-tree", "-z", candidate, "--", path],
+        ["git", "-C", str(repo), "--literal-pathspecs", "ls-tree", "-z",
+         candidate, "--", path],
         capture_output=True, shell=False, check=False,
     )
     if tree.returncode or not tree.stdout.endswith(b"\0"):
