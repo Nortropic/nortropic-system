@@ -72,7 +72,7 @@ static int hex4(Parser *p, unsigned *value) {
 }
 static int append_utf8(char *out, size_t cap, size_t *used, unsigned v) {
   unsigned char b[4]; size_t count;
-  if (v == 0) return 0;
+  if (v < 0x20) return 0;
   if (v < 0x80) { b[0] = (unsigned char)v; count = 1; }
   else if (v < 0x800) { b[0] = 0xc0 | (v >> 6); b[1] = 0x80 | (v & 63); count = 2; }
   else if (v < 0x10000) { b[0] = 0xe0 | (v >> 12); b[1] = 0x80 | ((v >> 6) & 63); b[2] = 0x80 | (v & 63); count = 3; }
@@ -95,10 +95,7 @@ static int string(Parser *p, char *out, size_t cap, size_t *length) {
     if (c == '"' || c == '\\' || c == '/') {
       if (used + 1 >= cap) return 0; out[used++] = (char)c;
     } else if (c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't') {
-      static const char escaped[] = "\b\f\n\r\t";
-      static const char names[] = "bfnrt";
-      const char *hit = strchr(names, (int)c);
-      if (!hit || used + 1 >= cap) return 0; out[used++] = escaped[hit - names];
+      return 0;
     } else if (c == 'u') {
       unsigned v, low;
       if (!hex4(p, &v)) return 0;
