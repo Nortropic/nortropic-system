@@ -48,7 +48,7 @@ ROT = Path(__file__).resolve().parents[2]
 SPEC = ROT / "specs/tasks.spec.json"
 EVIDENCE = ROT / "controller/policy/evidence"
 sys.path.insert(0, str(ROT / "controller/authority"))
-from core import (AuthorityError, overlaps, permits, strict_json_file,
+from core import (AuthorityError, overlaps, permits, strict_json_bytes, strict_json_file,
                   task_authority, validate_registry)  # noqa: E402
 
 # Vaktas av ägarhand, inte av den här komponenten (byggplan v3 §3.1,
@@ -109,6 +109,24 @@ def diffen(base: str, kandidat: str) -> tuple[list[str], int, list[str]]:
         else:
             rader += int(lagt)
     return filer, rader, binara
+
+
+def prospective_task(base: str, task_id: str) -> bool:
+    """Whether the task was allocated after the registry activated protection."""
+    history = git("log", "--format=%H", "--reverse", base, "--",
+                  "specs/owner-production-paths.v1.json")
+    commits = history.stdout.splitlines() if history.returncode == 0 else []
+    if not commits:
+        raise AuthorityError("owner path registry has no reachable activation commit")
+    at_activation = git("show", f"{commits[0]}:specs/tasks.spec.json")
+    if at_activation.returncode:
+        raise AuthorityError("task spec missing at registry activation")
+    document = strict_json_bytes(at_activation.stdout.encode("utf-8"))
+    if not isinstance(document, dict) or not isinstance(document.get("tasks"), list):
+        raise AuthorityError("task spec malformed at registry activation")
+    hits = [task for task in document["tasks"]
+            if isinstance(task, dict) and task.get("id") == task_id]
+    return len(hits) != 1
 
 
 def skriv_evidence(task: str, base: str, kandidat: str, verdikt: str, orsak: str,
@@ -179,7 +197,13 @@ def gor_check(task_id: str, base_arg: str, kand_arg: str, spec_fil: Path = SPEC)
                           f"owner task {task_id} får inte gå genom ordinary policy", *arg)
         protected = (registry["owner_production_paths"]
                      + registry["prospective_ordinary_protected_paths"])
-        if any(overlaps(grant, guard) for grant in surface for guard in protected):
+        try:
+            is_prospective = prospective_task(base, task_id)
+        except AuthorityError as e:
+            return avslag(UTANFOR, "authority_contract",
+                          f"authority-aktivering kan inte bindas för {task_id}: {e}", *arg)
+        if is_prospective and any(overlaps(grant, guard)
+                                  for grant in surface for guard in protected):
             return avslag(UTANFOR, "protected_authority_grant",
                           f"ordinary task {task_id} överlappar skyddad authority-yta", *arg)
 
