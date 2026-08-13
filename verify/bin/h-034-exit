@@ -329,7 +329,8 @@ def production_checks() -> None:
                 "K_RECIPE_PRESENT":RECIPE.exists(), "K_MANIFEST_PRESENT":MANIFEST.exists()}
     for name, ok in required.items(): check(name,ok)
     if not all(required.values()): return
-    rs=("schema_version","language","target_arch","compiler_path","compiler_sha256","compile_argv",
+    rs=("schema_version","language","target_arch","compiler_path","compiler_sha256","sdk_path",
+        "sdk_settings_sha256","compile_argv",
         "codesign_path","codesign_sha256","sign_argv","deployment_target_policy")
     ms=("schema_version","artifact_path","artifact_sha256","build_recipe_sha256","source_sha256",
         "architecture","file_type","code_signature","cdhash","dylinker","dependencies","macho_build_version")
@@ -342,10 +343,14 @@ def production_checks() -> None:
       and clang.returncode==0 and compiler.is_absolute() and compiler.is_file() and not compiler.is_symlink()
       and compiler==Path(clang.stdout.strip())
       and sha_file(Path(recipe["compiler_path"]))==recipe["compiler_sha256"]
+      and Path(recipe["sdk_path"])==Path(run(["/usr/bin/xcrun","--sdk","macosx","--show-sdk-path"]).stdout.strip()).resolve()
+      and Path(recipe["sdk_path"]).is_dir()
+      and sha_file(Path(recipe["sdk_path"])/"SDKSettings.json")==recipe["sdk_settings_sha256"]
       and signer==Path("/usr/bin/codesign") and signer.is_file() and not signer.is_symlink()
       and sha_file(signer)==recipe["codesign_sha256"]
       and type(recipe["compile_argv"]) is list and all(type(x) is str for x in recipe["compile_argv"])
       and "-std=c11" in recipe["compile_argv"] and "-arch" in recipe["compile_argv"] and "arm64" in recipe["compile_argv"]
+      and "-isysroot" in recipe["compile_argv"] and recipe["sdk_path"] in recipe["compile_argv"]
       and "-o" not in recipe["compile_argv"] and not any("macosx-version-min" in x for x in recipe["compile_argv"])
       and recipe["sign_argv"]==["--force","--sign","-","--timestamp=none"]
       and recipe["deployment_target_policy"]=="derive-from-Apple-toolchain-and-bind-final-Mach-O")
