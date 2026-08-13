@@ -7,6 +7,7 @@ import json
 import os
 import platform
 import re
+import secrets
 import stat
 import subprocess
 import sys
@@ -160,6 +161,24 @@ def judge_selftests() -> None:
     check("J_FIXED_RESULT_MAPPING", allowlist["probes"][0]["result"] == evidence["result"]
           and allowlist["probes"][0]["effect_marker"] == receipt["effect_marker"])
 
+    # Positive owner-toolchain observation: the exact supported invocation used
+    # for final authority must actually expose CDHash on a disposable signed Mach-O.
+    with tempfile.TemporaryDirectory(prefix="h034-codesign-observer-") as raw:
+        work=Path(raw); source=work/"signed.c"; binary=work/"signed-fixture"
+        source.write_text("int main(void){return 0;}\n")
+        clang=run(["/usr/bin/xcrun","--find","clang"])
+        sdk=run(["/usr/bin/xcrun","--sdk","macosx","--show-sdk-path"])
+        ok=clang.returncode==sdk.returncode==0
+        if ok:
+            p=run([clang.stdout.strip(),"-std=c11","-arch","arm64","-isysroot",str(Path(sdk.stdout.strip()).resolve()),str(source),"-o",str(binary)])
+            ok=p.returncode==0
+        if ok:
+            p=run(["/usr/bin/codesign","--force","--sign","-","--timestamp=none",str(binary)]); ok=p.returncode==0
+        if ok:
+            p=run(["/usr/bin/codesign","-dvvv","--",str(binary)])
+            ok=p.returncode==0 and re.search(r"^CDHash=[0-9a-f]+$",p.stderr+p.stdout,re.M) is not None
+        check("J_OWNER_CODESIGN_CDHASH_POSITIVE",ok,(p.stderr+p.stdout)[-300:] if 'p' in locals() else "tool lookup")
+
 
 def frozen_checks() -> None:
     spec = strict(SPEC.read_bytes()); reg = strict(REGISTRY.read_bytes())
@@ -193,7 +212,8 @@ def load_artifact_json(path: Path, keys: tuple[str, ...]):
 def macho_observation(path: Path) -> dict[str, object]:
     file_p = run(["/usr/bin/file", "-b", str(path)])
     lipo_p = run(["/usr/bin/lipo", "-archs", str(path)])
-    sign_p = run(["/usr/bin/codesign", "-dvv", str(path)])
+    # On the owner toolchain CDHash is authoritative only at verbosity three.
+    sign_p = run(["/usr/bin/codesign", "-dvvv", "--", str(path)])
     verify_p = run(["/usr/bin/codesign", "--verify", "--strict", str(path)])
     load_p = run(["/usr/bin/otool", "-L", str(path)])
     detail_p = run(["/usr/bin/otool", "-l", str(path)])
@@ -235,6 +255,35 @@ def build_once(recipe: dict, output: Path) -> subprocess.CompletedProcess:
                cwd=ROOT, env=clean_env)
 
 
+def explicit_deployment_selector(argv: list[str]) -> bool:
+    """Reject every recipe representation that selects a minimum OS version."""
+    joined = "\n".join(argv)
+    if re.search(r"(?:^|[-_])m(?:ac)?os(?:x)?[-_]?(?:version[-_]?min|min)(?:=|$)", joined, re.I) or "macosx-version-min" in joined.lower():
+        return True
+    if any(x in ("-mmacosx-version-min", "-macosx_version_min", "-platform_version")
+           for x in argv): return True
+    for i, value in enumerate(argv):
+        if value in ("-target", "--target") and i + 1 < len(argv):
+            if re.search(r"apple-(?:macosx?|darwin)\d", argv[i+1], re.I): return True
+        if re.match(r"--?target=", value) and re.search(r"apple-(?:macosx?|darwin)\d", value, re.I):
+            return True
+    return False
+
+
+def deployment_selector_selftests() -> None:
+    bad = (
+        ["-mmacosx-version-min=11.0"], ["-mmacosx-version-min", "11.0"],
+        ["-macosx_version_min", "11.0"], ["-platform_version", "macos", "11.0", "26.5"],
+        ["-target", "arm64-apple-macos11.0"], ["--target=arm64-apple-macosx11.0"],
+        ["--target", "arm64-apple-darwin20.1.0"],
+    )
+    for index, argv in enumerate(bad, 1):
+        check(f"J_DEPLOYMENT_SELECTOR_{index}_REJECT", explicit_deployment_selector(argv), repr(argv))
+    for index, argv in enumerate((["-arch","arm64"], ["-target","arm64-apple-macos"],
+                                  ["--target=arm64-apple-darwin"], ["-std=c11","-O2"]), 1):
+        check(f"J_VERSIONLESS_TARGET_{index}_ALLOW", not explicit_deployment_selector(argv), repr(argv))
+
+
 def invoke_kernel(evidence_raw: bytes, receipt_raw: bytes, allowlist_raw: bytes,
                   *, require: str = "PASS", overrides: dict[str,str] | None = None,
                   nonregular: str | None = None):
@@ -265,25 +314,27 @@ def invoke_kernel(evidence_raw: bytes, receipt_raw: bytes, allowlist_raw: bytes,
 
 
 def semantic_tests() -> None:
+    candidate=secrets.token_hex(20); spec_digest=secrets.token_hex(32)
+    gate_digest=secrets.token_hex(32); request_id=secrets.token_hex(32)
+    probe_id="h033-pass-"+secrets.token_hex(8)
+    probe_path=f"/Library/Application Support/Nortropic/provenance/probes/{probe_id}"
+    probe_digest=secrets.token_hex(32); marker="effect-"+secrets.token_hex(12)
     receipt = {"schema_version":1,"observer_authority":"root-owned-h033-observer-v1",
-               "request_id":"3"*64,"candidate_sha":HEX40,"probe_identity":"h033-pass-v1",
-               "probe_path":"/Library/Application Support/Nortropic/provenance/probes/h033-pass-v1",
-               "probe_sha256":"4"*64,"effect_marker":"A"}
+               "request_id":request_id,"candidate_sha":candidate,"probe_identity":probe_id,
+               "probe_path":probe_path,"probe_sha256":probe_digest,"effect_marker":marker}
     rr = canonical_json(receipt)
     evidence = {"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033",
-                "candidate_sha":HEX40,"task_spec_sha256":HEX64,"gate_sha256":HEX64,
-                "probe_identity":"h033-pass-v1","request_id":"3"*64,"result":"PASS",
+                "candidate_sha":candidate,"task_spec_sha256":spec_digest,"gate_sha256":gate_digest,
+                "probe_identity":probe_id,"request_id":request_id,"result":"PASS",
                 "effect_sha256":sha_bytes(rr)}
     allowlist = {"schema_version":1,"probes":[
-        {"probe_identity":"h033-pass-v1","probe_path":receipt["probe_path"],
-         "probe_sha256":"4"*64,"effect_marker":"A","result":"PASS"},
-        {"probe_identity":"h033-fail-v1","probe_path":"/Library/Application Support/Nortropic/provenance/probes/h033-fail-v1",
-         "probe_sha256":"5"*64,"effect_marker":"B","result":"FAIL"},
-        {"probe_identity":"h033-odombar-v1","probe_path":"/Library/Application Support/Nortropic/provenance/probes/h033-odombar-v1",
-         "probe_sha256":"6"*64,"effect_marker":"C","result":"ODÖMBART"}]}
+        {"probe_identity":probe_id,"probe_path":probe_path,"probe_sha256":probe_digest,
+         "effect_marker":marker,"result":"PASS"}]}
     er, ar = canonical_json(evidence), canonical_json(allowlist)
-    expected = f"VERIFIED_RESULT=PASS\nREQUEST_ID={'3'*64}\nEFFECT_SHA256={sha_bytes(rr)}\n"
-    p = invoke_kernel(er, rr, ar)
+    bindings={"candidate":candidate,"task-spec-sha256":spec_digest,"gate-sha256":gate_digest,
+              "probe":probe_id,"request-id":request_id}
+    expected = f"VERIFIED_RESULT=PASS\nREQUEST_ID={request_id}\nEFFECT_SHA256={sha_bytes(rr)}\n"
+    p = invoke_kernel(er, rr, ar, overrides=bindings)
     check("K_H033_PASS_POSITIVE", p.returncode == 0 and p.stdout == expected and not p.stderr, repr((p.returncode,p.stdout,p.stderr)))
     # Stable same-descriptor authority: opened objects remain valid after every pathname is replaced.
     with tempfile.TemporaryDirectory(prefix="h034-fd-stability-") as raw:
@@ -293,31 +344,36 @@ def semantic_tests() -> None:
         for q in paths: q.unlink(); q.write_bytes(b"hostile replacement\n")
         for fd in fds: os.lseek(fd, 7, os.SEEK_SET)
         argv=[str(KERNEL),"h033-verify","--evidence-fd",str(fds[0]),"--receipt-fd",str(fds[1]),"--allowlist-fd",str(fds[2]),
-              "--task","h-033","--candidate",HEX40,"--task-spec-sha256",HEX64,"--gate-sha256",HEX64,
-              "--probe","h033-pass-v1","--request-id","3"*64,"--require-result","PASS"]
+              "--task","h-033","--candidate",candidate,"--task-spec-sha256",spec_digest,"--gate-sha256",gate_digest,
+              "--probe",probe_id,"--request-id",request_id,"--require-result","PASS"]
         p=run(argv,pass_fds=tuple(fds)); [os.close(fd) for fd in fds]
         check("K_SAME_FD_PATH_REPLACEMENT",p.returncode==0 and p.stdout==expected and not p.stderr,repr((p.returncode,p.stdout,p.stderr)))
-    for pid,result,mark,digest in (("h033-fail-v1","FAIL","B","5"*64),("h033-odombar-v1","ODÖMBART","C","6"*64)):
+    for result in ("FAIL","ODÖMBART"):
+        pid=f"h033-{result.lower()}-{secrets.token_hex(8)}"; digest=secrets.token_hex(32)
+        mark="effect-"+secrets.token_hex(12); rid=secrets.token_hex(32)
         r=dict(receipt,probe_identity=pid,probe_path=f"/Library/Application Support/Nortropic/provenance/probes/{pid}",probe_sha256=digest,effect_marker=mark)
-        rraw=canonical_json(r); e=dict(evidence,probe_identity=pid,result=result,effect_sha256=sha_bytes(rraw))
-        p=invoke_kernel(canonical_json(e),rraw,ar,require=result,overrides={"probe":pid})
+        r["request_id"]=rid
+        rraw=canonical_json(r); e=dict(evidence,probe_identity=pid,request_id=rid,result=result,effect_sha256=sha_bytes(rraw))
+        family_allow={"schema_version":1,"probes":[{"probe_identity":pid,"probe_path":r["probe_path"],"probe_sha256":digest,"effect_marker":mark,"result":result}]}
+        family_bind={**bindings,"probe":pid,"request-id":rid}
+        p=invoke_kernel(canonical_json(e),rraw,canonical_json(family_allow),require=result,overrides=family_bind)
         check(f"K_H033_{'ODOMBAR' if result=='ODÖMBART' else result}_POSITIVE",p.returncode==0 and f"VERIFIED_RESULT={result}\n" in p.stdout and not p.stderr)
-        p=invoke_kernel(canonical_json(e),rraw,ar,require="PASS",overrides={"probe":pid})
+        p=invoke_kernel(canonical_json(e),rraw,canonical_json(family_allow),require="PASS",overrides=family_bind)
         check(f"K_H033_{'ODOMBAR' if result=='ODÖMBART' else result}_NOT_PASS",p.returncode==1 and not p.stdout)
     mutations=[]
-    for label,key,val in (("TASK","task","h-032"),("CANDIDATE","candidate_sha","0"*40),("SPEC","task_spec_sha256","0"*64),
-                          ("GATE","gate_sha256","0"*64),("PROBE","probe_identity","other"),("REQUEST","request_id","5"*64),
-                          ("RESULT","result","GREEN"),("RECEIPT_DIGEST","effect_sha256","0"*64)):
+    for label,key,val in (("TASK","task","h-032"),("CANDIDATE","candidate_sha",secrets.token_hex(20)),("SPEC","task_spec_sha256",secrets.token_hex(32)),
+                          ("GATE","gate_sha256",secrets.token_hex(32)),("PROBE","probe_identity","other-"+secrets.token_hex(8)),("REQUEST","request_id",secrets.token_hex(32)),
+                          ("RESULT","result","GREEN"),("RECEIPT_DIGEST","effect_sha256",secrets.token_hex(32))):
         e=dict(evidence); e[key]=val; mutations.append((label,canonical_json(e),rr,ar,{}))
     mutations += [("MALFORMED_JSON",b"{",rr,ar,{}),("DUPLICATE_KEY",er[:-2]+b',"result":"PASS"}\n',rr,ar,{}),
-                  ("OLD_RECEIPT",er,canonical_json(dict(receipt,request_id="5"*64)),ar,{}),
-                  ("CALLER_REQUEST",er,rr,ar,{"request-id":"5"*64}),
+                  ("OLD_RECEIPT",er,canonical_json(dict(receipt,request_id=secrets.token_hex(32))),ar,{}),
+                  ("CALLER_REQUEST",er,rr,ar,{"request-id":secrets.token_hex(32)}),
                   ("UNKNOWN_FLAG",er,rr,ar,{"unknown":"x"})]
     for label,e,r,a,o in mutations:
-        p=invoke_kernel(e,r,a,overrides=o)
+        p=invoke_kernel(e,r,a,overrides={**bindings,**o})
         check("K_REJECT_"+label,p.returncode==1 and not p.stdout,repr((p.returncode,p.stdout,p.stderr)))
     for kind in ("directory","pipe"):
-        p=invoke_kernel(er,rr,ar,nonregular=kind)
+        p=invoke_kernel(er,rr,ar,nonregular=kind,overrides=bindings)
         check("K_REJECT_NONREGULAR_"+kind.upper(),p.returncode==1 and not p.stdout)
 
 
@@ -351,7 +407,7 @@ def production_checks() -> None:
       and type(recipe["compile_argv"]) is list and all(type(x) is str for x in recipe["compile_argv"])
       and "-std=c11" in recipe["compile_argv"] and "-arch" in recipe["compile_argv"] and "arm64" in recipe["compile_argv"]
       and "-isysroot" in recipe["compile_argv"] and recipe["sdk_path"] in recipe["compile_argv"]
-      and "-o" not in recipe["compile_argv"] and not any("macosx-version-min" in x for x in recipe["compile_argv"])
+      and "-o" not in recipe["compile_argv"] and not explicit_deployment_selector(recipe["compile_argv"])
       and recipe["sign_argv"]==["--force","--sign","-","--timestamp=none"]
       and recipe["deployment_target_policy"]=="derive-from-Apple-toolchain-and-bind-final-Mach-O")
     listed=[ROOT/x for x in recipe["compile_argv"] if x.startswith("controller/h034-native/")]
@@ -384,7 +440,7 @@ def production_checks() -> None:
 
 def main() -> int:
     try:
-        frozen_checks(); judge_selftests()
+        frozen_checks(); judge_selftests(); deployment_selector_selftests()
         if platform.system() != "Darwin" or platform.machine() != "arm64":
             print("H034_GATE_RESULT=ODÖMBART_PLATFORM"); return 2
         production_checks()
