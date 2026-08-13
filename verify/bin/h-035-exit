@@ -198,7 +198,10 @@ def init_repo(path: Path) -> str:
 
 
 def commit_paths(repo: Path, message: str, *paths: str) -> str:
-    for args in (("add", "--", *paths), ("commit", "-qm", message)):
+    # Fixture paths are repository data, never Git pathspec programs. This is
+    # material for R11's legitimate filenames beginning with pathspec magic.
+    for args in (("--literal-pathspecs", "add", "--", *paths),
+                 ("commit", "-qm", message)):
         p = git(repo, *args)
         if p.returncode: raise Rig(p.stderr)
     return git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -1330,7 +1333,8 @@ def seed_owner_command_state(state: Path, command: str,
 
 
 def positive_owner_gate_chain(tmp: Path, label: str, repo: Path, base: str,
-                              task_id: str, remote: Path) -> None:
+                              task_id: str, remote: Path,
+                              *, revision: str = "R10") -> None:
     """Exercise every material owner consumer as one independent positive chain."""
     state = tmp / f"r10-{label}-state"
     workspace = tmp / f"r10-{label}-workspace"
@@ -1349,7 +1353,7 @@ def positive_owner_gate_chain(tmp: Path, label: str, repo: Path, base: str,
               ((rc1,out1),(rc2,out2),(rc3,out3),(rc4,out4)))
           and "OWNER_FROZEN" in persisted_state(state)
           and workspace.is_dir() and remote_refs(remote) == refs_before,
-          f"A_R10_{label.upper()}_FULL_OWNER_GATE_CHAIN_POSITIVE",
+          f"A_{revision}_{label.upper()}_FULL_OWNER_GATE_CHAIN_POSITIVE",
           " | ".join((d1,d2,d3,d4,repr((out1,out2,out3,out4)))))
 
 
@@ -1381,12 +1385,19 @@ def r9_task_gate_matrix(tmp: Path) -> None:
     """Operational task-specific gate binding for H035-H034-INTEGRATION-01."""
     gate_a = "verify/bin/r9-owner-a-exit"
     gate_b = "verify/bin/r9-owner-b-exit"
+    gate_literal = ":(literal)verify/bin/r11-owner-literal-exit"
+    gate_top = ":(top)verify/bin/r11-owner-top-exit"
     bytes_a = b"#!/bin/sh\nprintf 'r9 owner a red\\n' >&2\nexit 1\n"
     bytes_b = b"#!/bin/sh\nprintf 'r9 owner b red\\n' >&2\nexit 1\n"
+    bytes_literal = b"#!/bin/sh\nprintf 'r11 literal owner red\\n' >&2\nexit 1\n"
+    bytes_top = b"#!/bin/sh\nprintf 'r11 top owner red\\n' >&2\nexit 1\n"
     repo, base = authority_repo(tmp, "r9-canonical-repo", [
         owner_task("owner-r9-a", ["controller/h034-native/**"], gate_a),
         owner_task("owner-r9-b", ["controller/h034-native/**"], gate_b),
-    ], gates={gate_a:bytes_a, gate_b:bytes_b})
+        owner_task("owner-r11-literal", ["controller/h034-native/**"], gate_literal),
+        owner_task("owner-r11-top", ["controller/h034-native/**"], gate_top),
+    ], gates={gate_a:bytes_a, gate_b:bytes_b,
+              gate_literal:bytes_literal, gate_top:bytes_top})
     bare = tmp / "r9-canonical-origin.git"
     p = run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
     if p.returncode: raise Rig(p.stderr)
@@ -1398,6 +1409,10 @@ def r9_task_gate_matrix(tmp: Path) -> None:
     # canonical gate path and bytes from the exact same candidate object.
     positive_owner_gate_chain(tmp, "task_a", repo, base, "owner-r9-a", bare)
     positive_owner_gate_chain(tmp, "task_b_distinct", repo, base, "owner-r9-b", bare)
+    positive_owner_gate_chain(tmp, "pathspec_literal", repo, base,
+                              "owner-r11-literal", bare, revision="R11")
+    positive_owner_gate_chain(tmp, "pathspec_top", repo, base,
+                              "owner-r11-top", bare, revision="R11")
 
     # Candidate-object authority is invariant to the mutable checkout. Four
     # one-defect checkout variants change gate bytes/type/link/existence while
@@ -1500,6 +1515,7 @@ def frozen_checks() -> None:
     check(spec.get("spec_version") == "2.0.0", "F_SCHEMA_V2")
     check(len(hits) == 1 and hits[0].get("depends_on") == ["h-017"], "F_H035_ID_DEP")
     criterion = hits[0].get("exit_criterion", "") if hits else ""
+    task_contract = f"{hits[0].get('summary', '')} {criterion}" if hits else ""
     remediation_terms = (
         "normal taskval/loop OWNER_ACTION_REQUIRED event",
         "canonical ordinary tasks can never enter owner-author",
@@ -1541,6 +1557,14 @@ def frozen_checks() -> None:
     )
     check(isinstance(criterion, str) and all(term in criterion for term in r10_terms),
           "F_R10_GENERIC_TASK_AND_GIT_OBJECT_AUTHORITY_CONTRACT")
+    r11_terms = (
+        "repository data, never Git pathspec programs",
+        "leading `:(literal)` and `:(top)` filenames",
+        "owner-author, check-candidate, record-review and owner-freeze",
+        "persisted state, bounded workspace and remote refs proving effects",
+    )
+    check(all(term in task_contract for term in r11_terms),
+          "F_R11_LITERAL_GIT_PATHSPEC_FILENAME_CONTRACT")
     forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
     check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
     check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
