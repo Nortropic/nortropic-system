@@ -717,7 +717,11 @@ def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
 
 def authority_call(tmp: Path, command: str, request: dict[str, object]) -> tuple[int, dict[str, object], str]:
     if not AUTH.is_file(): return 127, {}, f"missing operational entrypoint {AUTH}"
-    p = run([str(AUTH), command], cwd=tmp, stdin=json.dumps(request))
+    # Gate-owned operational probes must not dirty the immutable candidate.
+    # RV-02 separately removes these controls when judging normal taskval and
+    # policy production execution, so this harness hygiene cannot mask it.
+    env = os.environ.copy(); env["PYTHONDONTWRITEBYTECODE"] = "1"
+    p = run([str(AUTH), command], cwd=tmp, env=env, stdin=json.dumps(request))
     try: out = json.loads(p.stdout)
     except ValueError: out = {}
     return p.returncode, out, (p.stderr or p.stdout)[-500:]
