@@ -23,6 +23,9 @@ SPEC = ROOT / "specs/tasks.spec.json"
 REG = ROOT / "specs/owner-production-paths.v1.json"
 LOOP = ROOT / "controller/loop/cli"
 AUTH = ROOT / "controller/authority/cli"
+TASKVAL = ROOT / "controller/taskval/cli"
+STATE = ROOT / "controller/state/cli"
+POLICY = ROOT / "controller/policy/cli"
 REGISTER = ROOT / "controller/verify/register.json"
 passed = failed = 0
 
@@ -181,6 +184,47 @@ def init_repo(path: Path) -> str:
     return git(path, "rev-parse", "HEAD").stdout.strip()
 
 
+def commit_paths(repo: Path, message: str, *paths: str) -> str:
+    for args in (("add", "--", *paths), ("commit", "-qm", message)):
+        p = git(repo, *args)
+        if p.returncode: raise Rig(p.stderr)
+    return git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def authority_repo(tmp: Path, name: str, tasks: list[dict[str, object]]) -> tuple[Path, str]:
+    """A disposable Git authority root containing both canonical documents."""
+    repo = tmp / name; init_repo(repo)
+    (repo / "specs").mkdir()
+    write_json(repo / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0", "defaults":{"denied_write":[]}, "tasks":tasks})
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    base = commit_paths(repo, "canonical authority", "specs/tasks.spec.json",
+                        "specs/owner-production-paths.v1.json")
+    return repo, base
+
+
+def owner_task(task_id: str, surface: list[str]) -> dict[str, object]:
+    return {"id":task_id, "authority_class":"owner_authority", "allowed_write":[],
+            "owner_author_allowed_write":surface, "docs_impact":[], "depends_on":[]}
+
+
+def ordinary_task(task_id: str, surface: list[str]) -> dict[str, object]:
+    return {"id":task_id, "authority_class":"ordinary", "allowed_write":surface,
+            "owner_author_allowed_write":[], "docs_impact":[], "depends_on":[]}
+
+
+def init_state(path: Path) -> None:
+    p = run([str(STATE), "init", str(path)])
+    if p.returncode: raise Rig(p.stderr or p.stdout)
+
+
+def set_remote_main(remote: Path, source: Path, sha: str) -> None:
+    p = run(["git", "fetch", "-q", str(source), sha], cwd=remote)
+    if p.returncode: raise Rig(p.stderr)
+    p = run(["git", "update-ref", "refs/heads/main", sha], cwd=remote)
+    if p.returncode: raise Rig(p.stderr)
+
+
 def candidate(repo: Path, base: str, path: str, serial: int) -> str:
     p = git(repo, "checkout", "-q", base)
     if p.returncode: raise Rig(p.stderr)
@@ -196,9 +240,10 @@ def registry_candidate(tmp: Path, name: str, raw: str) -> tuple[Path, str, str]:
     repo = tmp / f"registry-{name}"; base = init_repo(repo)
     target = repo / "specs/owner-production-paths.v1.json"; target.parent.mkdir()
     target.write_text(raw)
-    for args in (("add", str(target.relative_to(repo))), ("commit", "-qm", name)):
-        p = git(repo, *args)
-        if p.returncode: raise Rig(p.stderr)
+    # Operational authority is always candidate-local. Registry tests carry
+    # a canonical task spec too, so none can pass by borrowing installed bytes.
+    (repo / "specs/tasks.spec.json").write_bytes(SPEC.read_bytes())
+    commit_paths(repo, name, "specs/tasks.spec.json", "specs/owner-production-paths.v1.json")
     return repo, base, git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
@@ -494,18 +539,22 @@ def expect_auth(tmp: Path, name: str, command: str, request: dict[str, object], 
 
 def production_matrix(tmp: Path) -> None:
     """Future operational CLI contract; every case is black-box, never a named probe."""
-    repo = tmp / "authority-repo"; base = init_repo(repo)
+    repo, base = authority_repo(tmp, "authority-repo", [
+        ordinary_task("fixture-ordinary", ["safe/**"]),
+        owner_task("fixture-owner", ["controller/h034-native/**"]),
+    ])
     bare = tmp / "origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
-    spec_digest = hashlib.sha256(SPEC.read_bytes()).hexdigest()
-    reg_digest = hashlib.sha256(REG.read_bytes()).hexdigest()
+    set_remote_main(bare, repo, base)
+    spec_digest = hashlib.sha256((repo / "specs/tasks.spec.json").read_bytes()).hexdigest()
+    reg_digest = hashlib.sha256((repo / "specs/owner-production-paths.v1.json").read_bytes()).hexdigest()
     gate_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-    common: dict[str, object] = {"repo":str(repo), "task_id":"h-035", "base_sha":base,
+    common: dict[str, object] = {"repo":str(repo), "task_id":"fixture-owner", "base_sha":base,
         "main_sha":base, "spec_sha256":spec_digest, "registry_sha256":reg_digest,
         "gate_path":"verify/bin/h-035-exit", "gate_sha256":gate_digest,
         "state_dir":str(tmp/"authority-state"), "workspace_root":str(tmp/"authority-ws"),
         "remote":str(bare)}
     write_json(Path(str(common["state_dir"])) / "current.json",
-               {"task":"h-035", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+               {"task":"fixture-owner", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
     def req(**kw: object) -> dict[str, object]: return {**common, **kw}
     # Actual task/schema/authority consumer matrix (N01-N18, N36-N41; P01-P05).
     invalid = [
@@ -571,13 +620,17 @@ def production_matrix(tmp: Path) -> None:
     serial = 0
     for name, path, actor in scope_neg:
         serial += 1; sha = candidate(repo, base, path, serial)
-        expect_auth(tmp, name, "check-candidate", req(actor=actor,candidate_sha=sha,reported_changed_files=[]), False)
+        task_id = "fixture-ordinary" if actor == "ordinary" else "fixture-owner"
+        expect_auth(tmp, name, "check-candidate", req(actor=actor,candidate_sha=sha,
+                    task_id=task_id,reported_changed_files=[]), False)
     serial += 1; sha = candidate(repo, base, "controller/h034-native/kernel.c", serial)
     expect_auth(tmp, "P07_OWNER_EXACT_SURFACE", "check-candidate", req(actor="owner_authority",candidate_sha=sha), True)
     serial += 1; sha = candidate(repo, base, "controller/h034-native/alternative.c", serial)
     expect_auth(tmp, "P08_OWNER_ALT_BYTES", "check-candidate", req(actor="owner_authority",candidate_sha=sha), True)
     serial += 1; sha = candidate(repo, base, "controller/h034-native/kernel.c", serial)
-    expect_auth(tmp, "N31_REPORTED_FILES_NOT_AUTHORITY", "check-candidate", req(actor="ordinary",candidate_sha=sha,reported_changed_files=["safe/x"]), False)
+    expect_auth(tmp, "N31_REPORTED_FILES_NOT_AUTHORITY", "check-candidate",
+                req(actor="ordinary",task_id="fixture-ordinary",candidate_sha=sha,
+                    reported_changed_files=["safe/x"]), False)
     # Explicit operational owner transitions and publication guard.
     expect_auth(tmp, "N_OWNER_AUTHOR_MISSING_BINDING", "owner-author", req(candidate_sha="0"*40), False,
                 state_changes=False, workspace_changes=False, refs_change=False)
@@ -589,11 +642,11 @@ def production_matrix(tmp: Path) -> None:
                 state_after="OWNER_CANDIDATE_REVIEW_REQUIRED", workspace_changes=False,
                 refs_change=False, owner_author_process_launched=False)
     state_file = Path(str(common["state_dir"])) / "current.json"
-    write_json(state_file, {"task":"h-035", "state":"UNKNOWN_FUTURE_STATE", "base_sha":base})
+    write_json(state_file, {"task":"fixture-owner", "state":"UNKNOWN_FUTURE_STATE", "base_sha":base})
     expect_auth(tmp, "N_UNKNOWN_STATE", "recover", req(state="OWNER_ACTION_REQUIRED"), False,
                 state_after="UNKNOWN_FUTURE_STATE", workspace_changes=False, refs_change=False,
                 builder_launched=False)
-    write_json(state_file, {"task":"h-035", "state":"OWNER_CANDIDATE_REVIEW_REQUIRED", "base_sha":base,
+    write_json(state_file, {"task":"fixture-owner", "state":"OWNER_CANDIDATE_REVIEW_REQUIRED", "base_sha":base,
                             "candidate_sha":base, "review_identity":"review-1"})
     expect_auth(tmp, "N32_REVIEW_PUBLICATION", "record-review", req(review_result="PASS",candidate_sha=base,review_identity="review-1"), True,
                 state_after="OWNER_FINAL_FREEZE_REQUIRED", state_changes=True, refs_change=False,
@@ -624,12 +677,199 @@ def production_matrix(tmp: Path) -> None:
         expect_auth(tmp, f"PATH_POLICY_{name}", "check-candidate", {**preq, "actor":"ordinary"}, permits)
 
 
+def transition_request(repo: Path, base: str, task_id: str, state: Path,
+                       workspace: Path, remote: Path, **extra: object) -> dict[str, object]:
+    return {"repo":str(repo), "task_id":task_id, "base_sha":base,
+        "candidate_sha":base, "main_sha":base,
+        "spec_sha256":hashlib.sha256((repo / "specs/tasks.spec.json").read_bytes()).hexdigest(),
+        "registry_sha256":hashlib.sha256((repo / "specs/owner-production-paths.v1.json").read_bytes()).hexdigest(),
+        "gate_path":"verify/bin/h-035-exit",
+        "gate_sha256":hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "state_dir":str(state), "workspace_root":str(workspace), "remote":str(remote),
+        **extra}
+
+
+def remediation_matrix(tmp: Path) -> None:
+    """Black-box guards for H035-IR-01..07 from independent builder review."""
+    # IR-01: normal task selection's authoritative event state must be the
+    # state consumed by the explicit owner transition. No judge-written
+    # current.json bridge is permitted in this path.
+    repo, base = authority_repo(tmp, "ir01-repo", [
+        owner_task("owner-ir01", ["controller/h034-native/**"])])
+    state, attest, workspace = tmp / "ir01-state", tmp / "ir01-attest", tmp / "ir01-ws"
+    init_state(state); attest.mkdir()
+    claim = run([str(TASKVAL), "claim", str(repo / "specs/tasks.spec.json"),
+                 str(attest), str(state)])
+    rebuilt = run([str(STATE), "rebuild", str(state)])
+    bare = tmp / "ir01-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    refs_before = remote_refs(bare)
+    request = transition_request(repo, base, "owner-ir01", state, workspace, bare)
+    rc, out, detail = authority_call(tmp, "owner-author", request)
+    check(claim.returncode == 0 and not claim.stdout.strip()
+          and "OWNER_ACTION_REQUIRED" in rebuilt.stdout
+          and rc == 0 and out.get("accepted") is True
+          and "OWNER_CANDIDATE_REVIEW_REQUIRED" in persisted_state(state)
+          and workspace.is_dir() and remote_refs(bare) == refs_before,
+          "A_IR01_NORMAL_EVENTLOG_OWNER_AUTHOR_HANDOFF", detail or repr(out))
+
+    # IR-02: persisted caller-hostile state can never change the canonical
+    # class of an ordinary task.
+    repo, base = authority_repo(tmp, "ir02-repo", [ordinary_task("ordinary-ir02", ["safe/**"])])
+    bare = tmp / "ir02-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    state, workspace = tmp / "ir02-state", tmp / "ir02-ws"
+    write_json(state / "current.json",
+               {"task":"ordinary-ir02", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    expect_auth(tmp, "A_IR02_ORDINARY_OWNER_AUTHOR_ESCALATION_REJECT", "owner-author",
+                transition_request(repo, base, "ordinary-ir02", state, workspace, bare), False,
+                state_changes=False, workspace_changes=False, refs_change=False)
+
+    # IR-03: the task's exact owner surface is narrower than the registry's
+    # global owner family. Both negative and legitimate exact-file controls
+    # use the actual Git-derived candidate check.
+    repo, base = authority_repo(tmp, "ir03-repo", [
+        owner_task("owner-ir03", ["controller/h034-native/kernel.c"])])
+    bare = tmp / "ir03-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    request = transition_request(repo, base, "owner-ir03", tmp/"ir03-state", tmp/"ir03-ws", bare)
+    alt = candidate(repo, base, "controller/h034-native/alternative.c", 301)
+    rc, out, detail = authority_call(tmp, "check-candidate",
+                                     {**request, "candidate_sha":alt, "actor":"owner_authority"})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR03_TASK_SPECIFIC_OWNER_SURFACE_REJECT", detail or repr(out))
+    exact = candidate(repo, base, "controller/h034-native/kernel.c", 302)
+    rc, out, detail = authority_call(tmp, "check-candidate",
+                                     {**request, "candidate_sha":exact, "actor":"owner_authority"})
+    check(rc == 0 and out.get("accepted") is True,
+          "A_IR03_TASK_SPECIFIC_OWNER_SURFACE_POSITIVE", detail or repr(out))
+
+    # IR-04: execute the exact policy CLI used by controller/loop/cli in a
+    # disposable clone. The task exists before its candidate; this is the
+    # prospective post-bootstrap ordinary route, not H-035's exception.
+    clone = tmp / "ir04-normal-policy-repo"
+    p = run(["git", "clone", "-q", "--no-hardlinks", str(ROOT), str(clone)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    write_json(clone / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0",
+        "defaults":{"denied_write":[], "max_changed_files":10, "max_added_lines":100},
+        "tasks":[ordinary_task("future-ordinary", ["controller/authority/**"])]})
+    policy_base = commit_paths(clone, "future ordinary task allocated", "specs/tasks.spec.json")
+    protected = candidate(clone, policy_base, "controller/authority/ir04-fixture.txt", 401)
+    p = run([str(clone / "controller/policy/cli"), "check", "future-ordinary",
+             policy_base, protected, str(clone / "specs/tasks.spec.json")], cwd=clone)
+    check(p.returncode != 0, "A_IR04_NORMAL_LOOP_POLICY_PROSPECTIVE_PROTECTION_REJECT",
+          (p.stdout or p.stderr)[-500:])
+    write_json(clone / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0",
+        "defaults":{"denied_write":[], "max_changed_files":10, "max_added_lines":100},
+        "tasks":[ordinary_task("future-safe", ["tests/h035safe/**"])]})
+    safe_base = commit_paths(clone, "future safe task allocated", "specs/tasks.spec.json")
+    safe = candidate(clone, safe_base, "tests/h035safe/effect.txt", 402)
+    p = run([str(clone / "controller/policy/cli"), "check", "future-safe",
+             safe_base, safe, str(clone / "specs/tasks.spec.json")], cwd=clone)
+    check(p.returncode == 0, "A_IR04_NORMAL_LOOP_POLICY_SAFE_POSITIVE",
+          (p.stdout or p.stderr)[-500:])
+
+    # IR-05: final freeze derives current main from the configured remote.
+    # Advancing the real bare ref after review must invalidate stale A.
+    repo, base = authority_repo(tmp, "ir05-repo", [
+        owner_task("owner-ir05", ["controller/h034-native/**"])])
+    bare = tmp / "ir05-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    state, workspace = tmp / "ir05-state", tmp / "ir05-ws"
+    write_json(state / "current.json",
+               {"task":"owner-ir05", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    request = transition_request(repo, base, "owner-ir05", state, workspace, bare)
+    rc1, _, d1 = authority_call(tmp, "owner-author", request)
+    rc2, _, d2 = authority_call(tmp, "record-review",
+        {**request, "review_result":"PASS", "review_identity":"ir05-review"})
+    advanced = candidate(repo, base, "advance-main.txt", 501)
+    set_remote_main(bare, repo, advanced)
+    state_before, refs_before = tree_digest(state), remote_refs(bare)
+    rc3, out3, d3 = authority_call(tmp, "owner-freeze",
+        {**request, "review_result":"PASS", "review_identity":"ir05-review"})
+    check(rc1 == 0 and rc2 == 0 and rc3 != 0 and out3.get("accepted") is False
+          and tree_digest(state) == state_before and remote_refs(bare) == refs_before
+          and advanced in refs_before,
+          "A_IR05_ACTUAL_REMOTE_CURRENT_MAIN_ADVANCE_REJECT",
+          " | ".join(x for x in (d1, d2, d3, repr(out3)) if x))
+
+    # IR-06: operational commands never borrow installed authority bytes.
+    missing = tmp / "ir06-both-missing"; seed = init_repo(missing)
+    rc, out, detail = authority_call(tmp, "validate-registry",
+                                     {"repo":str(missing), "base_sha":seed, "candidate_sha":seed})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR06_CANONICAL_SPEC_AND_REGISTRY_MISSING_REJECT", detail or repr(out))
+    spec_only = tmp / "ir06-spec-only"; base0 = init_repo(spec_only); (spec_only/"specs").mkdir()
+    write_json(spec_only / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0", "defaults":{"denied_write":[]},
+        "tasks":[ordinary_task("ordinary-ir06", ["safe/**"])]})
+    spec_sha = commit_paths(spec_only, "spec only", "specs/tasks.spec.json")
+    rc, out, detail = authority_call(tmp, "validate-registry",
+        {"repo":str(spec_only), "base_sha":base0, "candidate_sha":spec_sha})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR06_CANONICAL_REGISTRY_MISSING_REJECT", detail or repr(out))
+    reg_only = tmp / "ir06-registry-only"; base0 = init_repo(reg_only); (reg_only/"specs").mkdir()
+    (reg_only / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    reg_sha = commit_paths(reg_only, "registry only", "specs/owner-production-paths.v1.json")
+    rc, out, detail = authority_call(tmp, "validate-registry",
+        {"repo":str(reg_only), "base_sha":base0, "candidate_sha":reg_sha})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR06_CANONICAL_SPEC_MISSING_REJECT", detail or repr(out))
+
+    # IR-07: malformed owner surfaces are rejected by taskval, the actual
+    # normal routing consumer, before any owner handoff event is appended.
+    malformed: list[tuple[str, object]] = [
+        ("EMPTY", ""), ("ABSOLUTE", "/x"), ("DRIVE", "C:/x"),
+        ("LEADING_DOT", "./x"), ("REPEATED_SEPARATOR", "x//y"),
+        ("TRAILING_SEPARATOR", "x/"), ("DOT_SEGMENT", "x/./y"),
+        ("DOTDOT_SEGMENT", "x/../y"), ("GLOB", "x/*"),
+        ("NONTERMINAL_RECURSIVE", "x/**/y"), ("ROOT_RECURSIVE", "**"),
+        ("NON_STRING", None), ("NUL", "x\x00y"),
+    ]
+    for name, path in malformed:
+        state, attest = tmp / f"ir07-state-{name}", tmp / f"ir07-attest-{name}"
+        init_state(state); attest.mkdir()
+        spec = tmp / f"ir07-{name}.json"
+        write_json(spec, {"spec_version":"2.0.0", "tasks":[
+            owner_task("owner-ir07", [path])]})
+        p = run([str(TASKVAL), "claim", str(spec), str(attest), str(state)])
+        rebuilt = run([str(STATE), "rebuild", str(state)])
+        check(p.returncode != 0 and rebuilt.returncode == 0
+              and json.loads(rebuilt.stdout) == [],
+              f"A_IR07_NORMAL_TASKVAL_MALFORMED_{name}_REJECT",
+              (p.stderr or p.stdout)[-500:])
+    state, attest = tmp / "ir07-state-positive", tmp / "ir07-attest-positive"
+    init_state(state); attest.mkdir()
+    spec = tmp / "ir07-positive.json"
+    write_json(spec, {"spec_version":"2.0.0", "tasks":[
+        owner_task("owner-ir07", [r"controller\h034-native\**"])]})
+    p = run([str(TASKVAL), "claim", str(spec), str(attest), str(state)])
+    rebuilt = run([str(STATE), "rebuild", str(state)])
+    check(p.returncode == 0 and "OWNER_ACTION_REQUIRED" in rebuilt.stdout,
+          "A_IR07_NORMAL_TASKVAL_BACKSLASH_NORMALIZATION_POSITIVE",
+          (p.stderr or p.stdout)[-500:])
+
+
 def frozen_checks() -> None:
     spec = strict_load(SPEC); reg = strict_load(REG)
     if not isinstance(spec, dict) or not isinstance(reg, dict): raise Rig("frozen JSON top-level")
     tasks = spec.get("tasks", []); hits = [t for t in tasks if isinstance(t, dict) and t.get("id") == "h-035"]
     check(spec.get("spec_version") == "2.0.0", "F_SCHEMA_V2")
     check(len(hits) == 1 and hits[0].get("depends_on") == ["h-017"], "F_H035_ID_DEP")
+    criterion = hits[0].get("exit_criterion", "") if hits else ""
+    remediation_terms = (
+        "normal taskval/loop OWNER_ACTION_REQUIRED event",
+        "canonical ordinary tasks can never enter owner-author",
+        "task-specific owner_author_allowed_write",
+        "exact policy path used by the normal loop",
+        "configured remote",
+        "never falls back to installed spec or registry bytes",
+        "malformed owner_author_allowed_write path",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in remediation_terms),
+          "F_IR01_IR07_PRODUCTION_CONTRACT")
     forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
     check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
     check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
@@ -650,9 +890,11 @@ def main() -> int:
             tmp = Path(raw)
             real_routing(tmp)
             production_matrix(tmp)
+            remediation_matrix(tmp)
     except (OSError, subprocess.SubprocessError, ValueError, Rig) as e:
         print(f"RIG_ERROR: {e}", file=sys.stderr)
         return 2
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
     print(f"H035_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed:
         print("H035_GATE_RESULT=EXPECTED_RED")
