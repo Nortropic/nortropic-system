@@ -127,12 +127,13 @@ def las_spec(spec: Path) -> list[tuple[str, list[str], str]]:
             if "authority_class" in post or "owner_author_allowed_write" in post:
                 raise Avbryt(f"spec: endast schema v2 får uttrycka owner authority för {tid}")
             ordinary = post.get("allowed_write", [])
-            if not isinstance(ordinary, list) or not ordinary:
+            docs = post.get("docs_impact", [])
+            if not isinstance(ordinary, list) or not isinstance(docs, list):
                 raise Avbryt(f"spec: ordinary-skrivytan för {tid} är ogiltig")
             try:
                 [canonical_path(path) for path in ordinary]
-                [canonical_path(path) for path in post.get("docs_impact", [])]
-            except (AuthorityError, TypeError) as e:
+                [canonical_path(path) for path in docs]
+            except AuthorityError as e:
                 raise Avbryt(f"spec: skrivytan för {tid} är ogiltig — {e}") from e
             authority = "ordinary"
         tasks.append((tid, dep, authority))
