@@ -39,9 +39,11 @@ The normal authority-control CLI is `controller/authority/cli`. Its operational 
 - `owner-freeze` — explicit candidate/review/base/main-bound final transition;
 - `path-consistency` — diagnostic comparison of results from the real authority consumers, never an acceptance substitute for those consumers.
 
-Commands consume one strict JSON request on stdin and may emit diagnostic JSON. No returned field is transition authority. The gate snapshots persisted state, bounded workspace effects and local-bare-remote refs before the command and inspects them again afterward. Rejected owner-author/freeze attempts change none of them. Explicit owner-author consumes the state written by normal task selection, creates a persisted attempt plus bounded workspace effect, and never reclassifies an ordinary task; recovery reads the same persisted state and unknown state remains persisted fail-closed; review PASS persists `OWNER_FINAL_FREEZE_REQUIRED` while remote refs remain byte-identical; exact owner-freeze alone persists `OWNER_FROZEN`, and only while the actual configured remote main still matches its frozen binding. Diagnostic fields must agree but can never replace those observations.
+Commands consume one strict JSON request on stdin and may emit diagnostic JSON. No returned field is transition authority. The gate snapshots persisted state, bounded workspace effects and local-bare-remote refs before the command and inspects them again afterward. Rejected owner-author/freeze attempts change none of them. This atomicity includes a failure after the authoritative eventlog append but before or during SQLite projection: returning rejection may not leave the event, projection, owner-attempt workspace or remote refs advanced. Explicit owner-author consumes the state written by normal task selection, creates a persisted attempt plus bounded workspace effect only as one accepted transition, and never reclassifies an ordinary task; recovery reads the same persisted state and unknown state remains persisted fail-closed; review PASS persists `OWNER_FINAL_FREEZE_REQUIRED` while remote refs remain byte-identical; exact owner-freeze alone persists `OWNER_FROZEN`, and only while the actual configured remote main still matches its frozen binding. Diagnostic fields must agree but can never replace those observations.
 
 Canonical authoritative operation ignores caller-selected spec or registry paths. Fixture paths are accepted only by separately designated non-authoritative unit-test modes; the commands above resolve both canonical files from the candidate/repository identity supplied to the transition, reject either missing file, and compare caller-provided digests rather than trusting them.
+
+Normal accepted `controller/taskval/cli` claim and `controller/policy/cli` check execution must preserve the immutable repository filesystem. Shared parser loading may use any provider-neutral mechanism, but with `PYTHONDONTWRITEBYTECODE` and `PYTHONPYCACHEPREFIX` absent it creates no repository-local `__pycache__`, `.pyc`, ignored, untracked or tracked runtime byte. Taskval's authorized state effect remains in its configured disposable state root. Disposable clone snapshots measure every non-`.git` path and byte before and after each real consumer; an environment switch that merely hides the write is not acceptance. This does not redefine the separately frozen evidence semantics for a rejected policy decision.
 
 ## Strict registry v1
 
@@ -113,11 +115,29 @@ FIXTURE=canonical disposable Git candidates, one authoritative state directory, 
 CURRENT_RESULT=the remediated builder implementation closes H035-IR-01..07; the frozen gate remains the verdict authority
 FUTURE_REQUIRED_RESULT=all seven production guards and their legitimate positive controls pass
 CLASS=PRODUCTION_ACCEPTANCE
+
+PROPERTY=rejected owner-author atomicity under projection failure
+SUBJECT=normal taskval eventlog plus operational owner-author persistence/workspace transition
+ENTRYPOINT=controller/taskval/cli claim → controller/authority/cli owner-author
+FIXTURE=disposable canonical owner task/state/workspace/bare remote with state.db replaced by a directory after the normal handoff
+CURRENT_RESULT=rejected owner-author leaves OWNER_CANDIDATE_REVIEW_REQUIRED event and owner-attempt workspace behind
+FUTURE_REQUIRED_RESULT=nonzero accepted:false with byte-identical state, workspace and remote refs; normal successful eventlog handoff still passes
+CLASS=PRODUCTION_ACCEPTANCE
+
+PROPERTY=normal taskval/policy repository write containment
+SUBJECT=controller/taskval/cli and controller/policy/cli
+ENTRYPOINT=ordinary claim and accepted safe candidate check without Python bytecode-control environment
+FIXTURE=separate clean disposable repository clones plus external disposable state/spec roots
+CURRENT_RESULT=both consumers create controller/authority/__pycache__/core.cpython-312.pyc
+FUTURE_REQUIRED_RESULT=expected external effects succeed while every non-.git repository path and byte remains identical
+CLASS=PRODUCTION_ACCEPTANCE
 ```
 
 No material exit property is established only by a judge self-test, returned JSON, source shape, or a subject-forgeable marker. Synthetic `probe`, `authority-probe`, `path-consistency`, and helper-only registry validation are `JUDGE_SELFTEST_ONLY`; they can never satisfy a production exit clause.
 
 ## Production activation
+
+Builder candidate `3927ab145e3d894b1dcab6c78eba63a244a68342` is rejected implementation evidence. Although it closes H035-IR-01..07, independent review found that a projection failure can reject owner-author after advancing both eventlog and owner workspace, and that normal taskval/policy imports write Python cache bytes into the immutable repository. R6 freezes both as production effects through the real consumers. The projection-failure case compares state, workspace and actual bare-remote refs around the rejected command; separate clean clones execute normal task selection and policy without cache-control environment variables and compare the entire non-`.git` filesystem. `MATERIAL_PROPERTIES_JUDGE_ONLY=NONE` remains mandatory.
 
 Candidate `fe6010cfec149511559c33c7c67812fe45bc6be1` is rejected implementation evidence, not an activation authority. Independent review found seven material seams that the prior frozen gate did not exercise. The strengthened gate keeps the V4 owner observer and prior controls, but production acceptance now chains the normal event state into owner-author, uses an ordinary task against owner-author, narrows an owner candidate to its task-specific surface, executes the exact ordinary policy CLI used by the loop, advances the actual bare-remote main before freeze, removes fixture dependence on installed authority bytes, and sends the malformed path corpus through normal task selection. These are all `PRODUCTION_ACCEPTANCE`; `MATERIAL_PROPERTIES_JUDGE_ONLY=NONE`.
 

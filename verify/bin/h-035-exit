@@ -505,6 +505,38 @@ def tree_digest(path: Path) -> str:
     return h.hexdigest()
 
 
+def repository_snapshot(repo: Path) -> dict[str, str]:
+    """All repository-local filesystem bytes/types outside Git metadata."""
+    snapshot: dict[str, str] = {}
+    for item in sorted(repo.rglob("*")):
+        relative = item.relative_to(repo)
+        if relative.parts and relative.parts[0] == ".git":
+            continue
+        name = relative.as_posix()
+        if item.is_symlink():
+            snapshot[name] = "L:" + os.readlink(item)
+        elif item.is_dir():
+            snapshot[name] = "D"
+        elif item.is_file():
+            snapshot[name] = "F:" + hashlib.sha256(item.read_bytes()).hexdigest()
+        else:
+            snapshot[name] = "OTHER"
+    return snapshot
+
+
+def snapshot_delta(before: dict[str, str], after: dict[str, str]) -> list[str]:
+    return sorted(name for name in set(before) | set(after)
+                  if before.get(name) != after.get(name))
+
+
+def ordinary_python_env() -> dict[str, str]:
+    """Normal execution: do not let the outer gate hide bytecode writes."""
+    env = os.environ.copy()
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    env.pop("PYTHONPYCACHEPREFIX", None)
+    return env
+
+
 def remote_refs(remote: Path) -> str:
     p = run(["git", "for-each-ref", "--format=%(refname) %(objectname)"], cwd=remote)
     if p.returncode: raise Rig(p.stderr)
@@ -852,6 +884,99 @@ def remediation_matrix(tmp: Path) -> None:
           (p.stderr or p.stdout)[-500:])
 
 
+def r6_remediation_matrix(tmp: Path) -> None:
+    """Black-box guards for independent findings H035-R5-RV-01..02."""
+    # RV-01 predicted effect: after normal taskval has persisted the owner
+    # handoff, force the existing SQLite projection to reject its next write.
+    # A rejected owner-author must leave authoritative event bytes, projection,
+    # bounded workspace and remote refs byte-identical. The successful IR-01
+    # case remains the legitimate positive storage variant.
+    repo, base = authority_repo(tmp, "r6-atomic-repo", [
+        owner_task("owner-r6-atomic", ["controller/h034-native/**"])])
+    state, attest, workspace = (tmp / "r6-atomic-state", tmp / "r6-atomic-attest",
+                                tmp / "r6-atomic-workspace")
+    init_state(state); attest.mkdir()
+    claim = run([str(TASKVAL), "claim", str(repo / "specs/tasks.spec.json"),
+                 str(attest), str(state)])
+    rebuilt_before = run([str(STATE), "rebuild", str(state)])
+    database = state / "state.db"
+    database.unlink(); database.mkdir()
+    bare = tmp / "r6-atomic-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(bare, repo, base)
+    request = transition_request(repo, base, "owner-r6-atomic", state, workspace, bare)
+    state_before = tree_digest(state)
+    workspace_before = tree_digest(workspace)
+    refs_before = remote_refs(bare)
+    rc, out, detail = authority_call(tmp, "owner-author", request)
+    rebuilt_after = run([str(STATE), "rebuild", str(state)])
+    state_after = tree_digest(state)
+    workspace_after = tree_digest(workspace)
+    refs_after = remote_refs(bare)
+    check(claim.returncode == 0 and "OWNER_ACTION_REQUIRED" in rebuilt_before.stdout
+          and rc != 0 and out.get("accepted") is False
+          and state_after == state_before
+          and workspace_after == workspace_before
+          and refs_after == refs_before
+          and rebuilt_after.stdout == rebuilt_before.stdout,
+          "A_R6_RV01_REJECTED_OWNER_AUTHOR_ATOMIC_ON_PROJECTION_FAILURE",
+          f"rc={rc} accepted={out.get('accepted')!r} "
+          f"state_changed={state_after != state_before} "
+          f"workspace_changed={workspace_after != workspace_before} "
+          f"refs_changed={refs_after != refs_before} "
+          f"rebuilt_changed={rebuilt_after.stdout != rebuilt_before.stdout} "
+          f"detail={detail!r}")
+
+    # RV-02 predicted effect: normal task selection and policy are executed
+    # with no bytecode-control environment. Expected state/candidate effects
+    # are outside the observed repository tree; no cache or other local byte
+    # may appear. Fresh clones keep the two production consumers attributable.
+    taskval_repo = tmp / "r6-taskval-hygiene-repo"
+    p = run(["git", "clone", "-q", "--no-hardlinks", str(ROOT), str(taskval_repo)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    taskval_state, taskval_attest = tmp / "r6-taskval-state", tmp / "r6-taskval-attest"
+    p = run([str(taskval_repo / "controller/state/cli"), "init", str(taskval_state)],
+            cwd=taskval_repo, env=ordinary_python_env())
+    if p.returncode: raise Rig(p.stderr or p.stdout)
+    taskval_attest.mkdir()
+    taskval_spec = tmp / "r6-taskval-spec.json"
+    write_json(taskval_spec, {"spec_version":"2.0.0", "tasks":[
+        ordinary_task("ordinary-r6-hygiene", ["tests/h035-hygiene/**"])]})
+    taskval_before = repository_snapshot(taskval_repo)
+    p = run([str(taskval_repo / "controller/taskval/cli"), "claim", str(taskval_spec),
+             str(taskval_attest), str(taskval_state)], cwd=taskval_repo,
+            env=ordinary_python_env())
+    taskval_after = repository_snapshot(taskval_repo)
+    rebuilt = run([str(taskval_repo / "controller/state/cli"), "rebuild", str(taskval_state)],
+                  cwd=taskval_repo, env=ordinary_python_env())
+    taskval_delta = snapshot_delta(taskval_before, taskval_after)
+    check(p.returncode == 0 and p.stdout.strip() == "ordinary-r6-hygiene"
+          and "claimed" in rebuilt.stdout and not taskval_delta,
+          "A_R6_RV02_NORMAL_TASKVAL_REPOSITORY_HYGIENE",
+          f"rc={p.returncode} delta={taskval_delta!r} stderr={p.stderr[-300:]!r}")
+
+    policy_repo = tmp / "r6-policy-hygiene-repo"
+    p = run(["git", "clone", "-q", "--no-hardlinks", str(ROOT), str(policy_repo)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    policy_base = git(policy_repo, "rev-parse", "HEAD").stdout.strip()
+    policy_candidate = candidate(policy_repo, policy_base,
+                                 "tests/h035-hygiene/effect.txt", 602)
+    policy_spec = tmp / "r6-policy-spec.json"
+    write_json(policy_spec, {"spec_version":"2.0.0",
+        "defaults":{"denied_write":[], "max_changed_files":5, "max_added_lines":20},
+        "tasks":[ordinary_task("ordinary-r6-hygiene", ["tests/h035-hygiene/**"])]})
+    policy_before = repository_snapshot(policy_repo)
+    p = run([str(policy_repo / "controller/policy/cli"), "check", "ordinary-r6-hygiene",
+             policy_base, policy_candidate, str(policy_spec)], cwd=policy_repo,
+            env=ordinary_python_env())
+    policy_after = repository_snapshot(policy_repo)
+    policy_delta = snapshot_delta(policy_before, policy_after)
+    check(p.returncode == 0 and "accepterad:" in p.stdout and not policy_delta,
+          "A_R6_RV02_NORMAL_POLICY_REPOSITORY_HYGIENE",
+          f"rc={p.returncode} delta={policy_delta!r} output={(p.stdout or p.stderr)[-300:]!r}")
+
+
 def frozen_checks() -> None:
     spec = strict_load(SPEC); reg = strict_load(REG)
     if not isinstance(spec, dict) or not isinstance(reg, dict): raise Rig("frozen JSON top-level")
@@ -867,6 +992,8 @@ def frozen_checks() -> None:
         "configured remote",
         "never falls back to installed spec or registry bytes",
         "malformed owner_author_allowed_write path",
+        "If any owner-author persistence step fails",
+        "Normal task selection and policy create no repository-local runtime bytes",
     )
     check(isinstance(criterion, str) and all(term in criterion for term in remediation_terms),
           "F_IR01_IR07_PRODUCTION_CONTRACT")
@@ -891,6 +1018,7 @@ def main() -> int:
             real_routing(tmp)
             production_matrix(tmp)
             remediation_matrix(tmp)
+            r6_remediation_matrix(tmp)
     except (OSError, subprocess.SubprocessError, ValueError, Rig) as e:
         print(f"RIG_ERROR: {e}", file=sys.stderr)
         return 2
