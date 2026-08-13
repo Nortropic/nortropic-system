@@ -47,6 +47,8 @@ if sys.version_info < (3, 12):
 ROT = Path(__file__).resolve().parents[2]
 SPEC = ROT / "specs/tasks.spec.json"
 EVIDENCE = ROT / "controller/policy/evidence"
+sys.path.insert(0, str(ROT / "controller/authority"))
+from core import AuthorityError, permits  # noqa: E402
 
 # Vaktas av ägarhand, inte av den här komponenten (byggplan v3 §3.1,
 # "Två mekanismer, olika ytor"). controller/** står inte i denied_write.
@@ -67,10 +69,8 @@ def git(*argv: str) -> subprocess.CompletedProcess:
 
 
 def matchar(sokvag: str, monster: str) -> bool:
-    """Sökvägsmönster i specens form: exakt sökväg, eller prefix/**."""
-    if monster.endswith("/**"):
-        return sokvag.startswith(monster[:-2])
-    return sokvag == monster
+    """The shared H-035 exact-or-terminal-prefix path oracle."""
+    return permits(monster, sokvag)
 
 
 def los_upp_sha(sha: str) -> str | None:

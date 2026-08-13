@@ -1,0 +1,286 @@
+#!/usr/bin/env python3.12
+"""Operational H-035 authority and owner-transition interface."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+if sys.version_info < (3, 12):
+    sys.exit(f"controller/authority/cli requires Python 3.12+, ran {sys.version.split()[0]}")
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+sys.path.insert(0, str(HERE))
+from core import (AuthorityError, blob_at, changed_files, exact_commit, overlaps,  # noqa: E402
+                  permitted, strict_json_bytes, strict_json_file, task_authority,
+                  validate_registry)
+
+SPEC_PATH = ROOT / "specs/tasks.spec.json"
+REGISTRY_PATH = ROOT / "specs/owner-production-paths.v1.json"
+GATE_PATH = ROOT / "verify/bin/h-035-exit"
+KNOWN_STATES = {"OWNER_ACTION_REQUIRED", "OWNER_CANDIDATE_REVIEW_REQUIRED",
+                "OWNER_FINAL_FREEZE_REQUIRED", "OWNER_FROZEN"}
+
+
+def digest(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def response(accepted: bool, **fields: object) -> int:
+    print(json.dumps({"accepted": accepted, **fields}, sort_keys=True))
+    return 0 if accepted else 1
+
+
+def request() -> dict[str, object]:
+    raw = sys.stdin.buffer.read()
+    value = strict_json_bytes(raw)
+    if not isinstance(value, dict):
+        raise AuthorityError("request must be one JSON object")
+    return value
+
+
+def repository(req: dict[str, object]) -> tuple[Path, str]:
+    raw = req.get("repo")
+    if not isinstance(raw, str) or not raw:
+        raise AuthorityError("repo missing")
+    repo = Path(raw).resolve()
+    candidate = exact_commit(repo, req.get("candidate_sha"))
+    return repo, candidate
+
+
+def canonical_bytes(repo: Path, base: str, candidate: str, relative: str, fallback: Path) -> bytes:
+    raw = blob_at(repo, candidate, relative)
+    if raw is not None:
+        return raw
+    if blob_at(repo, base, relative) is not None:
+        raise AuthorityError(f"canonical authority file deleted: {relative}")
+    return fallback.read_bytes()
+
+
+def authority_documents(req: dict[str, object]) -> tuple[Path, str, bytes, object, bytes, dict[str, object]]:
+    repo, candidate = repository(req)
+    base = exact_commit(repo, req.get("base_sha"))
+    spec_raw = canonical_bytes(repo, base, candidate, "specs/tasks.spec.json", SPEC_PATH)
+    registry_raw = canonical_bytes(repo, base, candidate, "specs/owner-production-paths.v1.json", REGISTRY_PATH)
+    spec = strict_json_bytes(spec_raw)
+    registry = validate_registry(strict_json_bytes(registry_raw))
+    return repo, candidate, spec_raw, spec, registry_raw, registry
+
+
+def validate_task(req: dict[str, object]) -> int:
+    repo, candidate, _spec_raw, spec, _reg_raw, registry = authority_documents(req)
+    task_id = req.get("task_id")
+    if not isinstance(task_id, str) or not task_id:
+        raise AuthorityError("task_id missing")
+    _task, authority, surface = task_authority(spec, task_id)
+    protected = (registry["owner_production_paths"]
+                 + registry["prospective_ordinary_protected_paths"])
+    if authority == "ordinary" and any(overlaps(item, guard) for item in surface for guard in protected):
+        raise AuthorityError("ordinary surface overlaps protected authority")
+    if authority == "owner_authority":
+        if any(overlaps(item, guard) for item in surface
+               for guard in registry["owner_author_global_denied_paths"]):
+            raise AuthorityError("owner surface overlaps global deny")
+        if any(not permitted(item, registry["owner_production_paths"]) for item in surface):
+            raise AuthorityError("owner surface outside owner production")
+    base = exact_commit(repo, req.get("base_sha"))
+    files = changed_files(repo, base, candidate)
+    material = [item for item in files if item not in {
+        "specs/tasks.spec.json", "specs/owner-production-paths.v1.json"}]
+    if any(not permitted(item, surface) for item in material):
+        raise AuthorityError("candidate outside task surface")
+    return response(True, authority_class=authority)
+
+
+def validate_registry_command(req: dict[str, object]) -> int:
+    _repo, _candidate, _spec_raw, _spec, _registry_raw, _registry = authority_documents(req)
+    return response(True)
+
+
+def check_candidate(req: dict[str, object]) -> int:
+    repo, candidate, _spec_raw, spec, _reg_raw, registry = authority_documents(req)
+    base = exact_commit(repo, req.get("base_sha"))
+    actor = req.get("actor")
+    files = changed_files(repo, base, candidate)
+    if actor == "ordinary":
+        task_id = req.get("task_id")
+        if not isinstance(task_id, str):
+            raise AuthorityError("task_id missing")
+        _task, authority, surface = task_authority(spec, task_id)
+        if authority != "ordinary":
+            raise AuthorityError("ordinary actor/class mismatch")
+        forbidden = (registry["owner_production_paths"]
+                     + registry["prospective_ordinary_protected_paths"])
+        if any(overlaps(item, guard) for item in files for guard in forbidden):
+            raise AuthorityError("ordinary candidate overlaps protected authority")
+        if any(not permitted(item, surface) for item in files):
+            raise AuthorityError("ordinary candidate outside allowed_write")
+    elif actor == "test_author":
+        if any(overlaps(item, guard) for item in files
+               for guard in registry["owner_production_paths"]):
+            raise AuthorityError("test author changed owner production")
+    elif actor == "owner_authority":
+        if any(overlaps(item, guard) for item in files
+               for guard in registry["owner_author_global_denied_paths"]):
+            raise AuthorityError("owner candidate changed global deny")
+        if any(not permitted(item, registry["owner_production_paths"]) for item in files):
+            raise AuthorityError("owner candidate outside owner production")
+    else:
+        raise AuthorityError("unknown actor")
+    return response(True, authority_class=actor, changed_files=files)
+
+
+def state_file(req: dict[str, object]) -> Path:
+    raw = req.get("state_dir")
+    if not isinstance(raw, str) or not raw:
+        raise AuthorityError("state_dir missing")
+    return Path(raw) / "current.json"
+
+
+def read_state(req: dict[str, object]) -> dict[str, object]:
+    value = strict_json_file(state_file(req))
+    if not isinstance(value, dict):
+        raise AuthorityError("persisted state must be object")
+    return value
+
+
+def atomic_json(path: Path, value: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=".authority-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, sort_keys=True, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(name, path)
+    finally:
+        try:
+            os.unlink(name)
+        except FileNotFoundError:
+            pass
+
+
+def transition_context(req: dict[str, object]) -> tuple[Path, str, dict[str, object]]:
+    repo, candidate, spec_raw, spec, registry_raw, _registry = authority_documents(req)
+    task_id = req.get("task_id")
+    if not isinstance(task_id, str):
+        raise AuthorityError("task_id missing")
+    hits = [item for item in spec.get("tasks", [])
+            if isinstance(item, dict) and item.get("id") == task_id] if isinstance(spec, dict) else []
+    if len(hits) != 1:
+        raise AuthorityError("canonical task missing")
+    base = exact_commit(repo, req.get("base_sha"))
+    main = exact_commit(repo, req.get("main_sha"))
+    if req.get("spec_sha256") != digest(spec_raw):
+        raise AuthorityError("spec digest mismatch")
+    if req.get("registry_sha256") != digest(registry_raw):
+        raise AuthorityError("registry digest mismatch")
+    gate_path = req.get("gate_path")
+    if gate_path != "verify/bin/h-035-exit" or req.get("gate_sha256") != digest(GATE_PATH.read_bytes()):
+        raise AuthorityError("gate identity mismatch")
+    return repo, candidate, {"task": task_id, "base_sha": base, "main_sha": main,
+        "spec_sha256": digest(spec_raw), "registry_sha256": digest(registry_raw),
+        "gate_path": gate_path, "gate_sha256": req["gate_sha256"]}
+
+
+def owner_author(req: dict[str, object]) -> int:
+    _repo, candidate, context = transition_context(req)
+    current = read_state(req)
+    if current.get("task") != context["task"] or current.get("state") != "OWNER_ACTION_REQUIRED":
+        raise AuthorityError("owner author requires persisted OWNER_ACTION_REQUIRED")
+    if current.get("base_sha") != context["base_sha"] or candidate != context["base_sha"]:
+        raise AuthorityError("owner author base/candidate binding mismatch")
+    next_state = {**context, "state": "OWNER_CANDIDATE_REVIEW_REQUIRED",
+                  "candidate_sha": candidate, "authority_class": "owner_authority"}
+    next_state["transition_identity"] = digest(json.dumps(
+        next_state, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    workspace_raw = req.get("workspace_root")
+    if not isinstance(workspace_raw, str) or not workspace_raw:
+        raise AuthorityError("workspace_root missing")
+    workspace = Path(workspace_raw)
+    workspace.mkdir(parents=True, exist_ok=False)
+    atomic_json(workspace / "owner-attempt.json", next_state)
+    atomic_json(state_file(req), next_state)
+    return response(True, authority_class="owner_authority", state=next_state["state"])
+
+
+def recover(req: dict[str, object]) -> int:
+    # Recovery reconstructs persisted state and never selects a candidate.
+    # Use the already-bound base only to locate canonical authority bytes.
+    recovery_req = {**req, "candidate_sha": req.get("base_sha")}
+    transition_context(recovery_req)
+    current = read_state(req)
+    if current.get("state") not in KNOWN_STATES:
+        return response(False, reason="unknown persisted owner state",
+                        state=current.get("state"), owner_author_process_launched=False,
+                        builder_launched=False)
+    return response(True, state=current["state"], owner_author_process_launched=False,
+                    builder_launched=False)
+
+
+def record_review(req: dict[str, object]) -> int:
+    _repo, candidate, context = transition_context(req)
+    current = read_state(req)
+    review = req.get("review_identity")
+    if req.get("review_result") != "PASS" or not isinstance(review, str) or not review:
+        raise AuthorityError("independent review PASS identity required")
+    if current.get("task") != context["task"] or current.get("candidate_sha") != candidate:
+        raise AuthorityError("review candidate binding mismatch")
+    if current.get("state") not in {"OWNER_CANDIDATE_REVIEW_REQUIRED", "OWNER_FINAL_FREEZE_REQUIRED"}:
+        raise AuthorityError("review transition state")
+    if current.get("review_identity") not in (None, review):
+        raise AuthorityError("review identity mismatch")
+    next_state = {**current, **context, "state": "OWNER_FINAL_FREEZE_REQUIRED",
+                  "candidate_sha": candidate, "review_identity": review,
+                  "review_result": "PASS"}
+    if next_state != current:
+        atomic_json(state_file(req), next_state)
+    return response(True, state=next_state["state"], published=False, merged=False)
+
+
+def owner_freeze(req: dict[str, object]) -> int:
+    _repo, candidate, context = transition_context(req)
+    current = read_state(req)
+    review = req.get("review_identity")
+    if req.get("review_result") != "PASS" or current.get("state") != "OWNER_FINAL_FREEZE_REQUIRED":
+        raise AuthorityError("explicit final freeze prerequisites")
+    required = {"task": context["task"], "base_sha": context["base_sha"],
+                "main_sha": context["main_sha"], "candidate_sha": candidate,
+                "spec_sha256": context["spec_sha256"],
+                "registry_sha256": context["registry_sha256"],
+                "gate_path": context["gate_path"], "gate_sha256": context["gate_sha256"],
+                "review_identity": review, "review_result": "PASS"}
+    if any(current.get(key) != value for key, value in required.items()):
+        raise AuthorityError("final freeze binding mismatch")
+    atomic_json(state_file(req), {**current, "state": "OWNER_FROZEN"})
+    return response(True, state="OWNER_FROZEN", published=False, merged=False)
+
+
+def path_consistency(req: dict[str, object]) -> int:
+    pattern, path = req.get("pattern"), req.get("path")
+    return response(True, permitted=permitted(path, [pattern]))
+
+
+COMMANDS = {"validate-task": validate_task, "validate-registry": validate_registry_command,
+            "check-candidate": check_candidate, "owner-author": owner_author,
+            "recover": recover, "record-review": record_review,
+            "owner-freeze": owner_freeze, "path-consistency": path_consistency}
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 1 or argv[0] not in COMMANDS:
+        return response(False, reason="unknown command")
+    try:
+        return COMMANDS[argv[0]](request())
+    except (AuthorityError, OSError) as exc:
+        return response(False, reason=str(exc))
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -108,3 +108,9 @@ CLASS=JUDGE_SELFTEST
 ```
 
 No material exit property is established only by a judge self-test, returned JSON, source shape, or a subject-forgeable marker. Synthetic `probe`, `authority-probe`, `path-consistency`, and helper-only registry validation are `JUDGE_SELFTEST_ONLY`; they can never satisfy a production exit clause.
+
+## Production activation
+
+The H-035 implementation keeps this contract's authority inputs frozen. `controller/authority/core.py` is the single parser for strict registry JSON and repository paths; operational transitions enter through `controller/authority/cli`. Candidate scope is derived from Git, never from `reported_changed_files`. Schema-v2 owner tasks are persisted by task selection as `OWNER_ACTION_REQUIRED` with no ordinary provider output, and that state remains ineligible after process restart. Explicit owner authoring records the owner class and a transition identity in both the persisted state and bounded attempt workspace; independent review and final freeze extend the same record without changing remote refs.
+
+The historical H-035 bootstrap authorization is not implemented as a runtime `task == h-035` allowance. The already approved builder candidate is the one-time exception. Once these consumers are active, ordinary candidate checks use the registry's prospective protected set and reject owner-production or authority-control paths, including paths that were necessarily writable while H-035 itself was built. No file in the reserved H-034 families is created by this activation.

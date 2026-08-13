@@ -42,6 +42,7 @@ ST = ROT / "controller/state/cli"
 
 # Frånvarande status är None. Båda betyder "inte påbörjad".
 VALBARA_STATUS = (None, "pending")
+OWNER_ACTION_REQUIRED = "OWNER_ACTION_REQUIRED"
 
 
 class Avbryt(Exception):
@@ -71,8 +72,8 @@ def orsak(svar: subprocess.CompletedProcess) -> str:
     return rader[-1].strip()[:200] if rader else f"inget meddelande (exit {svar.returncode})"
 
 
-def las_spec(spec: Path) -> list[tuple[str, list[str]]]:
-    """Backloggen som (id, depends_on). Formen prövas, aldrig namnen."""
+def las_spec(spec: Path) -> list[tuple[str, list[str], str]]:
+    """Backloggen som (id, depends_on, authority_class)."""
     try:
         data = json.loads(spec.read_text(encoding="utf-8"))
     except OSError as e:
@@ -82,7 +83,8 @@ def las_spec(spec: Path) -> list[tuple[str, list[str]]]:
     if not isinstance(data, dict) or not isinstance(data.get("tasks"), list):
         raise Avbryt(f"spec: {spec} saknar listan tasks")
 
-    tasks: list[tuple[str, list[str]]] = []
+    version = data.get("spec_version")
+    tasks: list[tuple[str, list[str], str]] = []
     sedda: set[str] = set()
     for nr, post in enumerate(data["tasks"], start=1):
         if not isinstance(post, dict) or not isinstance(post.get("id"), str) or not post["id"]:
@@ -96,7 +98,25 @@ def las_spec(spec: Path) -> list[tuple[str, list[str]]]:
         dep = post.get("depends_on", [])
         if not isinstance(dep, list) or not all(isinstance(d, str) and d for d in dep):
             raise Avbryt(f"spec: depends_on för {tid} är ingen lista av id")
-        tasks.append((tid, dep))
+        if version == "2.0.0":
+            authority = post.get("authority_class")
+            if authority not in ("ordinary", "owner_authority"):
+                raise Avbryt(f"spec: authority_class för {tid} är ogiltig")
+            ordinary = post.get("allowed_write", [])
+            owner = post.get("owner_author_allowed_write", [])
+            if not isinstance(ordinary, list) or not isinstance(owner, list):
+                raise Avbryt(f"spec: skrivytan för {tid} är ogiltig")
+            if authority == "ordinary" and (not ordinary or owner):
+                raise Avbryt(f"spec: ordinary-skrivytan för {tid} är ogiltig")
+            if authority == "owner_authority" and (ordinary or not owner):
+                raise Avbryt(f"spec: owner-skrivytan för {tid} är ogiltig")
+        else:
+            # Historical/non-v2 inputs remain ordinary.  They can never infer
+            # owner authority from a field, role string, or environment value.
+            if "authority_class" in post or "owner_author_allowed_write" in post:
+                raise Avbryt(f"spec: endast schema v2 får uttrycka owner authority för {tid}")
+            authority = "ordinary"
+        tasks.append((tid, dep, authority))
     return tasks
 
 
@@ -128,7 +148,8 @@ def status_ur_state(stkat: Path) -> dict[str, str]:
     return {rad["task"]: rad["status"] for rad in tabell}
 
 
-def valj(tasks: list[tuple[str, list[str]]], attkat: Path, stkat: Path) -> str | None:
+def valj(tasks: list[tuple[str, list[str], str]], attkat: Path,
+         stkat: Path) -> tuple[str, str] | None:
     status = status_ur_state(stkat)
     besked: dict[str, bool] = {}
 
@@ -138,29 +159,34 @@ def valj(tasks: list[tuple[str, list[str]]], attkat: Path, stkat: Path) -> str |
         return besked[tid]
 
     behoriga = [
-        tid
-        for tid, dep in tasks
+        (tid, authority)
+        for tid, dep, authority in tasks
         if status.get(tid) in VALBARA_STATUS
         and not attesterad(tid)
         and all(attesterad(d) for d in dep)
     ]
     # min() på str är kodpunktsordning och lokaloberoende — samma semantik
     # som skiva 1:s sorted() i den kanoniska tabellen.
-    return min(behoriga) if behoriga else None
+    return min(behoriga, key=lambda item: item[0]) if behoriga else None
 
 
-def kmd_claim(tasks: list[tuple[str, list[str]]], attkat: Path, stkat: Path) -> int:
+def kmd_claim(tasks: list[tuple[str, list[str], str]], attkat: Path, stkat: Path) -> int:
     val = valj(tasks, attkat, stkat)
     if val is None:
         return 0  # Tomt claim rör aldrig loggen.
+    tid, authority = val
+    status = OWNER_ACTION_REQUIRED if authority == "owner_authority" else "claimed"
     # Eventet skrivs FÖRE svaret: ett claim som rapporterats men inte
     # registrerats hade gjort två controllers till ägare av samma task.
     kvitto = kor(
-        [str(ST), "append", str(stkat), json.dumps({"task": val, "status": "claimed"}, ensure_ascii=False)]
+        [str(ST), "append", str(stkat), json.dumps({"task": tid, "status": status}, ensure_ascii=False)]
     )
     if kvitto.returncode != 0:
-        raise Avbryt(f"claim: eventet för {val} kunde inte skrivas — {orsak(kvitto)}")
-    print(val)
+        raise Avbryt(f"claim: eventet för {tid} kunde inte skrivas — {orsak(kvitto)}")
+    # Owner production never enters the ordinary BUILDER/provider route.
+    # The persisted state is the handoff; an empty stdout ends this drain.
+    if authority == "ordinary":
+        print(tid)
     return 0
 
 
@@ -174,7 +200,7 @@ def main(argv: list[str]) -> int:
             return kmd_claim(tasks, attkat, stkat)
         val = valj(tasks, attkat, stkat)
         if val is not None:
-            print(val)
+            print(val[0])
         return 0
     except Avbryt as e:
         return fel(str(e))

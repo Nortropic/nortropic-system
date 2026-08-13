@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fcntl
-import fnmatch
 import hashlib
 import json
 import os
@@ -29,6 +28,10 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
+
+AUTHORITY_LIB = Path(__file__).resolve().parents[1] / "controller/authority"
+sys.path.insert(0, str(AUTHORITY_LIB))
+from core import AuthorityError, permits  # noqa: E402
 
 EXPECTED_REPO = "Nortropic/nortropic-system"
 OWNER_DECISION_PATH = "docs/loop/owner-h003-attestation-authority-v1.md"
@@ -253,16 +256,10 @@ def changed_files(repo: Path, base_ref: str = "HEAD") -> list[str]:
 
 
 def path_allowed(rel: str, patterns: Iterable[str]) -> bool:
-    rel = rel.replace(os.sep, "/")
-    for pat in patterns:
-        pat = pat.replace(os.sep, "/")
-        if pat.endswith("/**"):
-            prefix = pat[:-3].rstrip("/")
-            if rel == prefix or rel.startswith(prefix + "/"):
-                return True
-        if fnmatch.fnmatchcase(rel, pat):
-            return True
-    return False
+    try:
+        return any(permits(pattern, rel) for pattern in patterns)
+    except AuthorityError as exc:
+        raise Stop(f"invalid authority path: {exc}") from exc
 
 
 def common_git_dir(repo: Path) -> Path:
