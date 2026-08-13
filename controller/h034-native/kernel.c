@@ -16,13 +16,16 @@ typedef struct { const unsigned char *s; size_t n, i; } Parser;
 typedef struct {
   char candidate[41], spec[65], gate[65], probe[TEXT_MAX], request[65];
   char result[16], effect[65];
+  size_t candidate_n, spec_n, gate_n, probe_n, request_n, result_n, effect_n;
 } Evidence;
 typedef struct {
   char request[65], candidate[41], probe[TEXT_MAX], path[TEXT_MAX];
   char probe_sha[65], marker[TEXT_MAX];
+  size_t request_n, candidate_n, probe_n, path_n, probe_sha_n, marker_n;
 } Receipt;
 typedef struct {
   char probe[TEXT_MAX], path[TEXT_MAX], probe_sha[65], marker[TEXT_MAX], result[16];
+  size_t probe_n, path_n, probe_sha_n, marker_n, result_n;
 } Probe;
 typedef struct { Probe probes[PROBE_MAX]; size_t count; } Allowlist;
 
@@ -69,6 +72,7 @@ static int hex4(Parser *p, unsigned *value) {
 }
 static int append_utf8(char *out, size_t cap, size_t *used, unsigned v) {
   unsigned char b[4]; size_t count;
+  if (v == 0) return 0;
   if (v < 0x80) { b[0] = (unsigned char)v; count = 1; }
   else if (v < 0x800) { b[0] = 0xc0 | (v >> 6); b[1] = 0x80 | (v & 63); count = 2; }
   else if (v < 0x10000) { b[0] = 0xe0 | (v >> 12); b[1] = 0x80 | ((v >> 6) & 63); b[2] = 0x80 | (v & 63); count = 3; }
@@ -76,12 +80,12 @@ static int append_utf8(char *out, size_t cap, size_t *used, unsigned v) {
   if (*used + count >= cap) return 0;
   memcpy(out + *used, b, count); *used += count; return 1;
 }
-static int string(Parser *p, char *out, size_t cap) {
+static int string(Parser *p, char *out, size_t cap, size_t *length) {
   size_t used = 0; ws(p);
-  if (!cap || p->i >= p->n || p->s[p->i++] != '"') return 0;
+  if (!cap || !length || p->i >= p->n || p->s[p->i++] != '"') return 0;
   while (p->i < p->n) {
     unsigned c = p->s[p->i++];
-    if (c == '"') { out[used] = 0; return 1; }
+    if (c == '"') { out[used] = 0; *length = used; return 1; }
     if (c < 0x20) return 0;
     if (c != '\\') {
       if (used + 1 >= cap) return 0; out[used++] = (char)c; continue;
@@ -108,10 +112,16 @@ static int string(Parser *p, char *out, size_t cap) {
   }
   return 0;
 }
+static int text_equal(const char *a, size_t a_n, const char *b, size_t b_n) {
+  return a_n == b_n && (a_n == 0 || memcmp(a, b, a_n) == 0);
+}
+static int text_equal_c(const char *a, size_t a_n, const char *b) {
+  return text_equal(a, a_n, b, strlen(b));
+}
 static int field(Parser *p, int first, const char *wanted) {
-  char key[128];
+  char key[128]; size_t key_n;
   if (!first && !ch(p, ',')) return 0;
-  return string(p, key, sizeof key) && strcmp(key, wanted) == 0 && ch(p, ':');
+  return string(p, key, sizeof key, &key_n) && text_equal_c(key, key_n, wanted) && ch(p, ':');
 }
 static int one(Parser *p) {
   ws(p); if (p->i >= p->n || p->s[p->i++] != '1') return 0;
@@ -121,14 +131,15 @@ static int one(Parser *p) {
 }
 static int end_document(Parser *p) { ws(p); return p->i == p->n; }
 static int fixed(Parser *p, const char *wanted) {
-  char value[128]; return string(p, value, sizeof value) && strcmp(value, wanted) == 0;
+  char value[128]; size_t value_n;
+  return string(p, value, sizeof value, &value_n) && text_equal_c(value, value_n, wanted);
 }
-static int lower_hex(const char *s, size_t n) {
-  if (strlen(s) != n) return 0;
-  for (size_t i = 0; i < n; ++i) if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f'))) return 0;
+static int lower_hex(const char *s, size_t actual, size_t expected) {
+  if (actual != expected) return 0;
+  for (size_t i = 0; i < actual; ++i) if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f'))) return 0;
   return 1;
 }
-static int nonempty(const char *s) { return s[0] != 0; }
+static int nonempty(size_t n) { return n != 0; }
 
 static int parse_evidence(const unsigned char *raw, size_t n, Evidence *e) {
   Parser p = {raw, n, 0}; memset(e, 0, sizeof *e);
@@ -136,14 +147,14 @@ static int parse_evidence(const unsigned char *raw, size_t n, Evidence *e) {
     && field(&p,1,"schema_version") && one(&p)
     && field(&p,0,"producer_authority") && fixed(&p,"_nortropic_provenance")
     && field(&p,0,"task") && fixed(&p,"h-033")
-    && field(&p,0,"candidate_sha") && string(&p,e->candidate,sizeof e->candidate) && lower_hex(e->candidate,40)
-    && field(&p,0,"task_spec_sha256") && string(&p,e->spec,sizeof e->spec) && lower_hex(e->spec,64)
-    && field(&p,0,"gate_sha256") && string(&p,e->gate,sizeof e->gate) && lower_hex(e->gate,64)
-    && field(&p,0,"probe_identity") && string(&p,e->probe,sizeof e->probe) && nonempty(e->probe)
-    && field(&p,0,"request_id") && string(&p,e->request,sizeof e->request) && lower_hex(e->request,64)
-    && field(&p,0,"result") && string(&p,e->result,sizeof e->result)
-    && (!strcmp(e->result,"PASS") || !strcmp(e->result,"FAIL") || !strcmp(e->result,"ODÖMBART"))
-    && field(&p,0,"effect_sha256") && string(&p,e->effect,sizeof e->effect) && lower_hex(e->effect,64)
+    && field(&p,0,"candidate_sha") && string(&p,e->candidate,sizeof e->candidate,&e->candidate_n) && lower_hex(e->candidate,e->candidate_n,40)
+    && field(&p,0,"task_spec_sha256") && string(&p,e->spec,sizeof e->spec,&e->spec_n) && lower_hex(e->spec,e->spec_n,64)
+    && field(&p,0,"gate_sha256") && string(&p,e->gate,sizeof e->gate,&e->gate_n) && lower_hex(e->gate,e->gate_n,64)
+    && field(&p,0,"probe_identity") && string(&p,e->probe,sizeof e->probe,&e->probe_n) && nonempty(e->probe_n)
+    && field(&p,0,"request_id") && string(&p,e->request,sizeof e->request,&e->request_n) && lower_hex(e->request,e->request_n,64)
+    && field(&p,0,"result") && string(&p,e->result,sizeof e->result,&e->result_n)
+    && (text_equal_c(e->result,e->result_n,"PASS") || text_equal_c(e->result,e->result_n,"FAIL") || text_equal_c(e->result,e->result_n,"ODÖMBART"))
+    && field(&p,0,"effect_sha256") && string(&p,e->effect,sizeof e->effect,&e->effect_n) && lower_hex(e->effect,e->effect_n,64)
     && ch(&p,'}') && end_document(&p);
 }
 static int parse_receipt(const unsigned char *raw, size_t n, Receipt *r) {
@@ -151,23 +162,23 @@ static int parse_receipt(const unsigned char *raw, size_t n, Receipt *r) {
   return utf8_ok(raw,n) && ch(&p,'{')
     && field(&p,1,"schema_version") && one(&p)
     && field(&p,0,"observer_authority") && fixed(&p,"root-owned-h033-observer-v1")
-    && field(&p,0,"request_id") && string(&p,r->request,sizeof r->request) && lower_hex(r->request,64)
-    && field(&p,0,"candidate_sha") && string(&p,r->candidate,sizeof r->candidate) && lower_hex(r->candidate,40)
-    && field(&p,0,"probe_identity") && string(&p,r->probe,sizeof r->probe) && nonempty(r->probe)
-    && field(&p,0,"probe_path") && string(&p,r->path,sizeof r->path) && r->path[0]=='/'
-    && field(&p,0,"probe_sha256") && string(&p,r->probe_sha,sizeof r->probe_sha) && lower_hex(r->probe_sha,64)
-    && field(&p,0,"effect_marker") && string(&p,r->marker,sizeof r->marker) && nonempty(r->marker)
+    && field(&p,0,"request_id") && string(&p,r->request,sizeof r->request,&r->request_n) && lower_hex(r->request,r->request_n,64)
+    && field(&p,0,"candidate_sha") && string(&p,r->candidate,sizeof r->candidate,&r->candidate_n) && lower_hex(r->candidate,r->candidate_n,40)
+    && field(&p,0,"probe_identity") && string(&p,r->probe,sizeof r->probe,&r->probe_n) && nonempty(r->probe_n)
+    && field(&p,0,"probe_path") && string(&p,r->path,sizeof r->path,&r->path_n) && r->path_n>0 && r->path[0]=='/'
+    && field(&p,0,"probe_sha256") && string(&p,r->probe_sha,sizeof r->probe_sha,&r->probe_sha_n) && lower_hex(r->probe_sha,r->probe_sha_n,64)
+    && field(&p,0,"effect_marker") && string(&p,r->marker,sizeof r->marker,&r->marker_n) && nonempty(r->marker_n)
     && ch(&p,'}') && end_document(&p);
 }
 static int parse_probe(Parser *p, Probe *v) {
   memset(v,0,sizeof *v);
   return ch(p,'{')
-    && field(p,1,"probe_identity") && string(p,v->probe,sizeof v->probe) && nonempty(v->probe)
-    && field(p,0,"probe_path") && string(p,v->path,sizeof v->path) && v->path[0]=='/'
-    && field(p,0,"probe_sha256") && string(p,v->probe_sha,sizeof v->probe_sha) && lower_hex(v->probe_sha,64)
-    && field(p,0,"effect_marker") && string(p,v->marker,sizeof v->marker) && nonempty(v->marker)
-    && field(p,0,"result") && string(p,v->result,sizeof v->result)
-    && (!strcmp(v->result,"PASS") || !strcmp(v->result,"FAIL") || !strcmp(v->result,"ODÖMBART"))
+    && field(p,1,"probe_identity") && string(p,v->probe,sizeof v->probe,&v->probe_n) && nonempty(v->probe_n)
+    && field(p,0,"probe_path") && string(p,v->path,sizeof v->path,&v->path_n) && v->path_n>0 && v->path[0]=='/'
+    && field(p,0,"probe_sha256") && string(p,v->probe_sha,sizeof v->probe_sha,&v->probe_sha_n) && lower_hex(v->probe_sha,v->probe_sha_n,64)
+    && field(p,0,"effect_marker") && string(p,v->marker,sizeof v->marker,&v->marker_n) && nonempty(v->marker_n)
+    && field(p,0,"result") && string(p,v->result,sizeof v->result,&v->result_n)
+    && (text_equal_c(v->result,v->result_n,"PASS") || text_equal_c(v->result,v->result_n,"FAIL") || text_equal_c(v->result,v->result_n,"ODÖMBART"))
     && ch(p,'}');
 }
 static int parse_allowlist(const unsigned char *raw, size_t n, Allowlist *a) {
@@ -177,7 +188,8 @@ static int parse_allowlist(const unsigned char *raw, size_t n, Allowlist *a) {
   ws(&p); if (p.i < p.n && p.s[p.i] == ']') return 0;
   for (;;) {
     if (a->count == PROBE_MAX || !parse_probe(&p,&a->probes[a->count])) return 0;
-    for (size_t j=0;j<a->count;++j) if (!strcmp(a->probes[j].probe,a->probes[a->count].probe)) return 0;
+    for (size_t j=0;j<a->count;++j)
+      if (text_equal(a->probes[j].probe,a->probes[j].probe_n,a->probes[a->count].probe,a->probes[a->count].probe_n)) return 0;
     a->count++; ws(&p);
     if (p.i < p.n && p.s[p.i] == ']') { p.i++; break; }
     if (!ch(&p,',')) return 0;
@@ -222,7 +234,10 @@ static int stable_read(int fd,unsigned char **out,size_t *length){
 }
 static int decimal_fd(const char*s,int*out){if(!s||!*s)return 0;long v=0;for(;*s;s++){if(*s<'0'||*s>'9')return 0;v=v*10+(*s-'0');if(v>INT_MAX)return 0;}*out=(int)v;return 1;}
 
-typedef struct { int efd,rfd,afd; const char *candidate,*spec,*gate,*probe,*request,*result; } Args;
+typedef struct {
+  int efd,rfd,afd; const char *candidate,*spec,*gate,*probe,*request,*result;
+  size_t candidate_n,spec_n,gate_n,probe_n,request_n,result_n;
+} Args;
 static int args(int ac,char **av,Args *a){
   if(ac!=22||strcmp(av[1],"h033-verify"))return 0;memset(a,0,sizeof *a);a->efd=a->rfd=a->afd=-1;
   unsigned seen=0;
@@ -231,24 +246,35 @@ static int args(int ac,char **av,Args *a){
     else if(!strcmp(k,"--receipt-fd")){bit=2;if(!decimal_fd(v,&a->rfd))return 0;}
     else if(!strcmp(k,"--allowlist-fd")){bit=4;if(!decimal_fd(v,&a->afd))return 0;}
     else if(!strcmp(k,"--task")){bit=8;if(strcmp(v,"h-033"))return 0;}
-    else if(!strcmp(k,"--candidate")){bit=16;a->candidate=v;if(!lower_hex(v,40))return 0;}
-    else if(!strcmp(k,"--task-spec-sha256")){bit=32;a->spec=v;if(!lower_hex(v,64))return 0;}
-    else if(!strcmp(k,"--gate-sha256")){bit=64;a->gate=v;if(!lower_hex(v,64))return 0;}
-    else if(!strcmp(k,"--probe")){bit=128;a->probe=v;if(!*v||strlen(v)>=TEXT_MAX)return 0;}
-    else if(!strcmp(k,"--request-id")){bit=256;a->request=v;if(!lower_hex(v,64))return 0;}
-    else if(!strcmp(k,"--require-result")){bit=512;a->result=v;if(strcmp(v,"PASS")&&strcmp(v,"FAIL")&&strcmp(v,"ODÖMBART"))return 0;}
+    else if(!strcmp(k,"--candidate")){bit=16;a->candidate=v;a->candidate_n=strlen(v);if(!lower_hex(v,a->candidate_n,40))return 0;}
+    else if(!strcmp(k,"--task-spec-sha256")){bit=32;a->spec=v;a->spec_n=strlen(v);if(!lower_hex(v,a->spec_n,64))return 0;}
+    else if(!strcmp(k,"--gate-sha256")){bit=64;a->gate=v;a->gate_n=strlen(v);if(!lower_hex(v,a->gate_n,64))return 0;}
+    else if(!strcmp(k,"--probe")){bit=128;a->probe=v;a->probe_n=strlen(v);if(!a->probe_n||a->probe_n>=TEXT_MAX)return 0;}
+    else if(!strcmp(k,"--request-id")){bit=256;a->request=v;a->request_n=strlen(v);if(!lower_hex(v,a->request_n,64))return 0;}
+    else if(!strcmp(k,"--require-result")){bit=512;a->result=v;a->result_n=strlen(v);if(!text_equal_c(v,a->result_n,"PASS")&&!text_equal_c(v,a->result_n,"FAIL")&&!text_equal_c(v,a->result_n,"ODÖMBART"))return 0;}
     else return 0;if(seen&bit)return 0;seen|=bit;
   }
   return seen==1023;
 }
 static int verify(const Args*a,const Evidence*e,const Receipt*r,const Allowlist*l,const unsigned char*receipt_raw,size_t receipt_n){
   char effect[65];digest(receipt_raw,receipt_n,effect);
-  if(strcmp(e->candidate,a->candidate)||strcmp(e->spec,a->spec)||strcmp(e->gate,a->gate)||strcmp(e->probe,a->probe)||strcmp(e->request,a->request)||strcmp(e->result,a->result)||strcmp(e->effect,effect))return 0;
-  if(strcmp(r->candidate,a->candidate)||strcmp(r->probe,a->probe)||strcmp(r->request,a->request))return 0;
+  if(!text_equal(e->candidate,e->candidate_n,a->candidate,a->candidate_n)
+      ||!text_equal(e->spec,e->spec_n,a->spec,a->spec_n)
+      ||!text_equal(e->gate,e->gate_n,a->gate,a->gate_n)
+      ||!text_equal(e->probe,e->probe_n,a->probe,a->probe_n)
+      ||!text_equal(e->request,e->request_n,a->request,a->request_n)
+      ||!text_equal(e->result,e->result_n,a->result,a->result_n)
+      ||!text_equal_c(e->effect,e->effect_n,effect))return 0;
+  if(!text_equal(r->candidate,r->candidate_n,a->candidate,a->candidate_n)
+      ||!text_equal(r->probe,r->probe_n,a->probe,a->probe_n)
+      ||!text_equal(r->request,r->request_n,a->request,a->request_n))return 0;
   size_t matches=0;
-  for(size_t i=0;i<l->count;i++)if(!strcmp(l->probes[i].probe,a->probe)){
+  for(size_t i=0;i<l->count;i++)if(text_equal(l->probes[i].probe,l->probes[i].probe_n,a->probe,a->probe_n)){
     matches++;
-    if(strcmp(l->probes[i].path,r->path)||strcmp(l->probes[i].probe_sha,r->probe_sha)||strcmp(l->probes[i].marker,r->marker)||strcmp(l->probes[i].result,a->result))return 0;
+    if(!text_equal(l->probes[i].path,l->probes[i].path_n,r->path,r->path_n)
+        ||!text_equal(l->probes[i].probe_sha,l->probes[i].probe_sha_n,r->probe_sha,r->probe_sha_n)
+        ||!text_equal(l->probes[i].marker,l->probes[i].marker_n,r->marker,r->marker_n)
+        ||!text_equal(l->probes[i].result,l->probes[i].result_n,a->result,a->result_n))return 0;
   }
   return matches==1;
 }
@@ -259,6 +285,7 @@ int main(int ac,char **av){
   if(!stable_read(a.efd,&er,&en)||!stable_read(a.rfd,&rr,&rn)||!stable_read(a.afd,&ar,&an))goto done;
   if(!parse_evidence(er,en,&e)||!parse_receipt(rr,rn,&r)||!parse_allowlist(ar,an,&l))goto done;
   if(!verify(&a,&e,&r,&l,rr,rn))goto done;
-  printf("VERIFIED_RESULT=%s\nREQUEST_ID=%s\nEFFECT_SHA256=%s\n",e.result,e.request,e.effect);ok=1;
+  printf("VERIFIED_RESULT=%.*s\nREQUEST_ID=%.*s\nEFFECT_SHA256=%.*s\n",
+    (int)e.result_n,e.result,(int)e.request_n,e.request,(int)e.effect_n,e.effect);ok=1;
 done: free(er);free(rr);free(ar);return ok?0:1;
 }
