@@ -197,8 +197,9 @@ def gor_check(task_id: str, base_arg: str, kand_arg: str, spec_fil: Path = SPEC)
                           f"owner task {task_id} får inte gå genom ordinary policy", *arg)
         protected = (registry["owner_production_paths"]
                      + registry["prospective_ordinary_protected_paths"])
+        is_canonical = spec_fil.resolve() == SPEC.resolve()
         try:
-            is_prospective = prospective_task(base, task_id)
+            is_prospective = is_canonical and prospective_task(base, task_id)
         except AuthorityError as e:
             return avslag(UTANFOR, "authority_contract",
                           f"authority-aktivering kan inte bindas för {task_id}: {e}", *arg)
