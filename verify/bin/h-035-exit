@@ -179,6 +179,12 @@ def git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     return run(["git", *args], cwd=cwd)
 
 
+def git_object_bytes(repo: Path, sha: str, path: str) -> bytes | None:
+    result = subprocess.run(["git", "-C", str(repo), "show", f"{sha}:{path}"],
+                            capture_output=True, shell=False, check=False, timeout=45)
+    return result.stdout if result.returncode == 0 else None
+
+
 def init_repo(path: Path) -> str:
     path.mkdir()
     for args in (("init", "-q"), ("config", "user.name", "H035 Fixture"), ("config", "user.email", "fixture@example.invalid")):
@@ -198,26 +204,45 @@ def commit_paths(repo: Path, message: str, *paths: str) -> str:
     return git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
-def authority_repo(tmp: Path, name: str, tasks: list[dict[str, object]]) -> tuple[Path, str]:
+def authority_repo(tmp: Path, name: str, tasks: list[dict[str, object]],
+                   *, gates: dict[str, bytes] | None = None) -> tuple[Path, str]:
     """A disposable Git authority root containing both canonical documents."""
     repo = tmp / name; init_repo(repo)
     (repo / "specs").mkdir()
     write_json(repo / "specs/tasks.spec.json", {
         "spec_version":"2.0.0", "defaults":{"denied_write":[]}, "tasks":tasks})
     (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    gate_paths: list[str] = []
+    for task in tasks:
+        gate_path = task.get("exit_test")
+        if not isinstance(gate_path, str) or gate_path in gate_paths:
+            continue
+        target = repo / gate_path; target.parent.mkdir(parents=True, exist_ok=True)
+        if gates is not None and gate_path in gates:
+            target.write_bytes(gates[gate_path])
+        elif gate_path == "verify/bin/h-035-exit":
+            target.write_bytes(Path(__file__).read_bytes())
+        else:
+            target.write_bytes(b"#!/bin/sh\nexit 1\n")
+        target.chmod(0o755)
+        gate_paths.append(gate_path)
     base = commit_paths(repo, "canonical authority", "specs/tasks.spec.json",
-                        "specs/owner-production-paths.v1.json")
+                        "specs/owner-production-paths.v1.json", *gate_paths)
     return repo, base
 
 
-def owner_task(task_id: str, surface: list[str]) -> dict[str, object]:
+def owner_task(task_id: str, surface: list[str],
+               exit_test: str = "verify/bin/h-035-exit") -> dict[str, object]:
     return {"id":task_id, "authority_class":"owner_authority", "allowed_write":[],
-            "owner_author_allowed_write":surface, "docs_impact":[], "depends_on":[]}
+            "owner_author_allowed_write":surface, "docs_impact":[], "depends_on":[],
+            "exit_test":exit_test}
 
 
-def ordinary_task(task_id: str, surface: list[str]) -> dict[str, object]:
+def ordinary_task(task_id: str, surface: list[str],
+                  exit_test: str = "verify/bin/h-035-exit") -> dict[str, object]:
     return {"id":task_id, "authority_class":"ordinary", "allowed_write":surface,
-            "owner_author_allowed_write":[], "docs_impact":[], "depends_on":[]}
+            "owner_author_allowed_write":[], "docs_impact":[], "depends_on":[],
+            "exit_test":exit_test}
 
 
 def init_state(path: Path) -> None:
@@ -969,12 +994,28 @@ def production_matrix(tmp: Path) -> None:
 
 def transition_request(repo: Path, base: str, task_id: str, state: Path,
                        workspace: Path, remote: Path, **extra: object) -> dict[str, object]:
+    identity_sha = extra.get("candidate_sha", base)
+    if not isinstance(identity_sha, str):
+        raise Rig("fixture candidate identity must be a string")
+    spec_raw = git_object_bytes(repo, identity_sha, "specs/tasks.spec.json")
+    registry_raw = git_object_bytes(repo, identity_sha, "specs/owner-production-paths.v1.json")
+    if spec_raw is None or registry_raw is None:
+        raise Rig("fixture canonical authority documents missing")
+    spec = json.loads(spec_raw)
+    hits = [task for task in spec.get("tasks", [])
+            if isinstance(task, dict) and task.get("id") == task_id]
+    canonical_gate = hits[0].get("exit_test") if len(hits) == 1 else None
+    request_gate = extra.get("gate_path", canonical_gate)
+    gate_raw = (git_object_bytes(repo, identity_sha, canonical_gate)
+                if isinstance(canonical_gate, str) else None)
+    gate_digest = (extra.get("gate_sha256") if "gate_sha256" in extra
+                   else hashlib.sha256(gate_raw).hexdigest() if gate_raw is not None
+                   else "0" * 64)
     return {"repo":str(repo), "task_id":task_id, "base_sha":base,
         "candidate_sha":base, "main_sha":base,
-        "spec_sha256":hashlib.sha256((repo / "specs/tasks.spec.json").read_bytes()).hexdigest(),
-        "registry_sha256":hashlib.sha256((repo / "specs/owner-production-paths.v1.json").read_bytes()).hexdigest(),
-        "gate_path":"verify/bin/h-035-exit",
-        "gate_sha256":hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "spec_sha256":hashlib.sha256(spec_raw).hexdigest(),
+        "registry_sha256":hashlib.sha256(registry_raw).hexdigest(),
+        "gate_path":request_gate, "gate_sha256":gate_digest,
         "state_dir":str(state), "workspace_root":str(workspace), "remote":str(remote),
         **extra}
 
@@ -1235,6 +1276,150 @@ def r6_remediation_matrix(tmp: Path) -> None:
           f"rc={p.returncode} delta={policy_delta!r} output={(p.stdout or p.stderr)[-300:]!r}")
 
 
+def malformed_task_gate_repo(tmp: Path, name: str, kind: str,
+                             gate_path: str) -> tuple[Path, str]:
+    """Create a canonical owner task whose exit_test is absent or not a regular blob."""
+    repo = tmp / f"r9-{name}-repo"; init_repo(repo)
+    (repo / "specs").mkdir()
+    write_json(repo / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0", "defaults":{"denied_write":[]},
+        "tasks":[owner_task("owner-r9-a", ["controller/h034-native/**"], gate_path)]})
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    target = repo / gate_path
+    if kind == "tree":
+        target.mkdir(parents=True)
+        (target / "payload").write_text("not a regular gate\n")
+    elif kind == "symlink":
+        target.parent.mkdir(parents=True, exist_ok=True)
+        (target.parent / "r9-symlink-target").write_text("#!/bin/sh\nexit 1\n")
+        target.symlink_to("r9-symlink-target")
+    elif kind != "missing":
+        raise Rig(f"unknown malformed task gate fixture: {kind}")
+    p = git(repo, "add", "-A")
+    if p.returncode: raise Rig(p.stderr)
+    p = git(repo, "commit", "-qm", f"canonical {kind} gate authority")
+    if p.returncode: raise Rig(p.stderr)
+    return repo, git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def seed_owner_command_state(state: Path, command: str,
+                             request: dict[str, object]) -> None:
+    task = request["task_id"]; base = request["base_sha"]
+    candidate_sha = request["candidate_sha"]
+    if command == "owner-author":
+        value = {"task":task, "state":"OWNER_ACTION_REQUIRED", "base_sha":base}
+    elif command == "record-review":
+        value = {"task":task, "state":"OWNER_CANDIDATE_REVIEW_REQUIRED",
+                 "base_sha":base, "candidate_sha":candidate_sha}
+    elif command == "owner-freeze":
+        value = {"task":task, "state":"OWNER_FINAL_FREEZE_REQUIRED",
+                 "base_sha":base, "main_sha":request["main_sha"],
+                 "candidate_sha":candidate_sha,
+                 "spec_sha256":request["spec_sha256"],
+                 "registry_sha256":request["registry_sha256"],
+                 "gate_path":request["gate_path"],
+                 "gate_sha256":request["gate_sha256"],
+                 "review_identity":"r9-review", "review_result":"PASS"}
+    else:
+        return
+    write_json(state / "current.json", value)
+
+
+def r9_task_gate_matrix(tmp: Path) -> None:
+    """Operational task-specific gate binding for H035-H034-INTEGRATION-01."""
+    gate_a = "verify/bin/r9-owner-a-exit"
+    gate_b = "verify/bin/r9-owner-b-exit"
+    bytes_a = b"#!/bin/sh\nprintf 'r9 owner a red\\n' >&2\nexit 1\n"
+    bytes_b = b"#!/bin/sh\nprintf 'r9 owner b red\\n' >&2\nexit 1\n"
+    repo, base = authority_repo(tmp, "r9-canonical-repo", [
+        owner_task("owner-r9-a", ["controller/h034-native/**"], gate_a),
+        owner_task("owner-r9-b", ["controller/h034-native/**"], gate_b),
+    ], gates={gate_a:bytes_a, gate_b:bytes_b})
+    bare = tmp / "r9-canonical-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(bare, repo, base)
+    refs_before = remote_refs(bare)
+
+    # One actual four-command chain. The gate identity is the exit_test from
+    # owner-r9-a's exact candidate spec row plus the regular blob at that path
+    # in the same Git object. No request field is allowed to select another
+    # task's gate or alternate bytes.
+    state = tmp / "r9-e2e-state"; workspace = tmp / "r9-e2e-workspace"
+    write_json(state / "current.json",
+               {"task":"owner-r9-a", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    request = transition_request(repo, base, "owner-r9-a", state, workspace, bare)
+    rc1, out1, d1 = authority_call(tmp, "owner-author", request)
+    rc2, out2, d2 = authority_call(tmp, "check-candidate",
+                                   {**request, "actor":"owner_authority"})
+    rc3, out3, d3 = authority_call(tmp, "record-review",
+        {**request, "review_result":"PASS", "review_identity":"r9-review"})
+    rc4, out4, d4 = authority_call(tmp, "owner-freeze",
+        {**request, "review_result":"PASS", "review_identity":"r9-review"})
+    check(all(rc == 0 and out.get("accepted") is True for rc, out in
+              ((rc1,out1),(rc2,out2),(rc3,out3),(rc4,out4)))
+          and "OWNER_FROZEN" in persisted_state(state)
+          and workspace.is_dir() and remote_refs(bare) == refs_before,
+          "A_R9_TASK_SPECIFIC_GATE_END_TO_END_POSITIVE",
+          " | ".join((d1,d2,d3,d4,repr((out1,out2,out3,out4)))))
+
+    digest_a = hashlib.sha256(bytes_a).hexdigest()
+    digest_b = hashlib.sha256(bytes_b).hexdigest()
+    canonical_request = transition_request(repo, base, "owner-r9-a",
+        tmp/"r9-unused-state", tmp/"r9-unused-workspace", bare)
+
+    # Predicted before execution: every mutant below rejects. The check is
+    # repeated through all four operational consumers; rejected commands must
+    # preserve state, bounded workspace, and real bare-remote refs byte-for-byte.
+    cases: list[tuple[str, Path, str, str, dict[str, object]]] = [
+        ("WRONG_GATE_PATH", repo, base, base,
+         {**canonical_request, "gate_path":"verify/bin/r9-not-canonical-exit",
+          "gate_sha256":digest_a}),
+        ("WRONG_GATE_DIGEST", repo, base, base,
+         {**canonical_request, "gate_sha256":"a" * 64}),
+        ("ANOTHER_TASK_GATE", repo, base, base,
+         {**canonical_request, "gate_path":gate_b, "gate_sha256":digest_b}),
+        ("CALLER_GATE_OVERRIDE", repo, base, base,
+         {**canonical_request, "exit_test_override":gate_b,
+          "exit_test_override_sha256":digest_b}),
+    ]
+
+    for label, kind in (("MISSING_GATE", "missing"),
+                        ("NONREGULAR_GATE", "tree"),
+                        ("SYMLINK_GATE", "symlink")):
+        bad_repo, bad_base = malformed_task_gate_repo(
+            tmp, label.lower(), kind, f"verify/bin/r9-{kind}-exit")
+        bad_bare = tmp / f"r9-{kind}-origin.git"
+        p = run(["git", "init", "--bare", "-q", str(bad_bare)], cwd=tmp)
+        if p.returncode: raise Rig(p.stderr)
+        set_remote_main(bad_bare, bad_repo, bad_base)
+        bad_request = transition_request(bad_repo, bad_base, "owner-r9-a",
+            tmp/f"r9-unused-{kind}-state", tmp/f"r9-unused-{kind}-workspace", bad_bare)
+        cases.append((label, bad_repo, bad_base, bad_base, bad_request))
+
+    changed = candidate(repo, base, gate_a, 901)
+    changed_request = transition_request(repo, base, "owner-r9-a",
+        tmp/"r9-unused-changed-state", tmp/"r9-unused-changed-workspace", bare,
+        candidate_sha=changed)
+    cases.append(("OWNER_CHANGED_OWN_GATE", repo, base, changed, changed_request))
+
+    for label, _case_repo, _case_base, _case_candidate, template in cases:
+        for command in ("owner-author", "check-candidate", "record-review", "owner-freeze"):
+            state = tmp / f"r9-{label.lower()}-{command}-state"
+            workspace = tmp / f"r9-{label.lower()}-{command}-workspace"
+            request = {**template, "state_dir":str(state),
+                       "workspace_root":str(workspace)}
+            if command == "check-candidate":
+                request["actor"] = "owner_authority"
+            else:
+                request["review_result"] = "PASS"
+                request["review_identity"] = "r9-review"
+            seed_owner_command_state(state, command, request)
+            expect_auth(tmp, f"A_R9_{label}_{command.upper().replace('-', '_')}_REJECT",
+                        command, request, False, state_changes=False,
+                        workspace_changes=False, refs_change=False)
+
+
 def frozen_checks() -> None:
     spec = strict_load(SPEC); reg = strict_load(REG)
     if not isinstance(spec, dict) or not isinstance(reg, dict): raise Rig("frozen JSON top-level")
@@ -1264,6 +1449,17 @@ def frozen_checks() -> None:
     )
     check(isinstance(criterion, str) and all(term in criterion for term in r8_terms),
           "F_R8_SNAPSHOT_AND_OBSERVER_V6_CONTRACT")
+    r9_terms = (
+        "exact canonical task row",
+        "task-specific exit_test",
+        "regular Git blob",
+        "another task's gate",
+        "caller gate override",
+        "missing, non-regular, symlink or changed gate",
+        "owner-author, check-candidate, record-review and owner-freeze",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in r9_terms),
+          "F_R9_TASK_SPECIFIC_GATE_CONTRACT")
     forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
     check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
     check(not any(isinstance(t, dict) and t.get("id") == "h-034" for t in tasks), "F_H034_TASK_ABSENT")
@@ -1286,6 +1482,7 @@ def main() -> int:
             production_matrix(tmp)
             remediation_matrix(tmp)
             r6_remediation_matrix(tmp)
+            r9_task_gate_matrix(tmp)
     except (OSError, subprocess.SubprocessError, ValueError, Rig) as e:
         print(f"RIG_ERROR: {e}", file=sys.stderr)
         return 2
