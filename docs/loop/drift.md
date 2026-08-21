@@ -1912,3 +1912,39 @@ still establish argument-free full-live communication, no H031 full-live timeout
 120-second no-live timeout and the causal hidden one-second behavior. No whole-Python
 interpreter, outer containment claim, product credit or live provider call is introduced.
 The controller's 86400-second supervisor remains the sole provider lifetime owner.
+
+### 2026-08-21 — H032/H031 R84 protected namespace capabilities
+
+R83's early direct imports still left the captured names and actual helper functions in
+mutable Python namespaces. A later `globals()`/module-dictionary write, builtins mutation,
+dynamic exec, import hook or helper `__globals__`/defaults/closure/code replacement could
+therefore preserve the visible direct call while substituting a deadline-bearing callable.
+
+R84 adds one bounded, exact namespace-capability inventory to each embedded gate. It owns
+only the private Popen/run aliases and the actual live/dependency helper names; it is not a
+general control-flow or dataflow interpreter. Twenty-three adjacent mutants keep the actual
+direct-call fact true but make namespace integrity false across namespace mappings, aliases,
+reflection, dynamic code, import hooks and helper object mutation. Literal unrelated
+globals operations remain admissible. R82's runtime spies, R83's pristine identities,
+full-live no-outer-timeout and the 120-second no-live dependency remain unchanged.
+
+R84 itself was stopped non-READY: its final nested regression exposed an older R74 fixture
+race rather than a namespace failure. The closure is retained only as part of R85.
+
+### 2026-08-21 — H032/H031 R85 current-run clock identity chain
+
+R74 waited past the previously observed clock after every environment attempt except the
+first. Since product run directory ids are second-granular, that first attempt could collide
+with the immediately preceding physical attempt and intermittently report no newly current
+run, producing unrelated R72/R74 failures.
+
+R85 seeds the first judge-only transition from the physical clock read immediately after the
+preceding actual attempt. After each environment attempt, the exact newly observed run
+directory supplies the next seed. The gate waits at most two seconds for a distinct clock
+and then requires one current run with that observed identity; this bounded wait is rig
+mechanics and never product credit. A causal mutant creates the preceding same-second run
+object and drives actual `run_codex`: exclusive mkdir raises before provider start and the
+runs set stays unchanged. The six exact/drop/length/prefix/fixed/extra attempts form one
+distinct contiguous current-run chain while R72 complete-environment equality and R74
+stale/current/decoy controls remain intact. Production and live provider execution are
+unchanged.

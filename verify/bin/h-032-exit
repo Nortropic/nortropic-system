@@ -4287,17 +4287,36 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_prior_run.mkdir()
     r74_prior_envelope=r74_prior_run/"provider-envelope.json"
     r74_prior_envelope.write_text('{"prior":true}\n',encoding="utf-8")
-    r74_last_clock_id=[None]
+    # R85 binds the first oracle to the immediately preceding physical
+    # attempt.  The product's run directory key is second-granular; an
+    # unseeded first iteration could otherwise reuse that real run id and
+    # observe no current run.  Subsequent iterations carry the last observed
+    # clock id through the same bounded judge-only transition.
+    r74_role_suffix="-test_author"
+    # The immediately preceding physical attempt may clean its failed run
+    # root on the published RED baseline.  Its current physical clock is still
+    # an observable identity boundary, and is therefore the seed that the
+    # first R74 attempt must leave before it can claim a new current run.
+    r74_physical_clock_id=physical_module.now_id()
+    r74_physical_run=r74_runs_root/f"{r74_physical_clock_id}{r74_role_suffix}"
+    r74_last_clock_id=[r74_physical_clock_id]
+    r74_clock_transitions=[]
+    def next_r74_clock_id(previous_clock_id: str) -> str:
+        clock_deadline=time.monotonic()+2.0
+        current_clock_id=physical_module.now_id()
+        while (current_clock_id==previous_clock_id
+                and time.monotonic()<clock_deadline):
+            time.sleep(.01)
+            current_clock_id=physical_module.now_id()
+        if current_clock_id==previous_clock_id:
+            raise RuntimeError("R85 current-run clock did not advance")
+        return current_clock_id
     def run_r74_environment_oracle(name: str) -> dict[str,object]:
         # The product's frozen run identifier is second-granular.  Keep every
         # oracle invocation a genuinely new attempt instead of letting a fast
         # matrix collide with the preceding run directory.
-        clock_deadline=time.monotonic()+2.0
-        while (physical_module.now_id()==r74_last_clock_id[0]
-                and time.monotonic()<clock_deadline):
-            time.sleep(.01)
-        current_clock_id=physical_module.now_id()
-        r74_last_clock_id[0]=current_clock_id
+        previous_clock_id=r74_last_clock_id[0]
+        wait_clock_id=next_r74_clock_id(previous_clock_id)
         runs_before=frozenset(r74_runs_root.iterdir())
         journal_path=r74_runs_root.parent/"events.jsonl"
         journal_before=journal_path.read_bytes() if journal_path.is_file() else b""
@@ -4339,6 +4358,14 @@ def run_codex(sink, canonical, invocation, run, role):
         observation=launch_observations.get(output,{"valid":False})
         runs_after=set(r74_runs_root.iterdir())
         current_runs=sorted(runs_after-set(runs_before))
+        current_clock_id=(
+            current_runs[0].name[:-len(r74_role_suffix)]
+            if len(current_runs)==1
+            and current_runs[0].name.endswith(r74_role_suffix)
+            else None)
+        if current_clock_id is not None:
+            r74_last_clock_id[0]=current_clock_id
+            r74_clock_transitions.append((previous_clock_id,current_clock_id))
         split_entries=sorted(path.name for path in split_root.iterdir())
         output_parent=observed.get("output_parent") if isinstance(observed,dict) else None
         shutil.rmtree(split_root)
@@ -4348,12 +4375,62 @@ def run_codex(sink, canonical, invocation, run, role):
                 "split_sink":str(split_sink),"split_entries":split_entries,
                 "output_parent":output_parent,"split_clean":not split_root.exists(),
                 "current_runs":[str(path) for path in current_runs],
-                "intended_common":str(r74_intended_common)}
+                "intended_common":str(r74_intended_common),
+                "previous_clock_id":previous_clock_id,
+                "wait_clock_id":wait_clock_id,
+                "current_clock_id":current_clock_id}
+
+    # Connected causal mutant for the retired unseeded-first-attempt shape:
+    # force the actual run_codex route onto the preceding physical run id.
+    # mkdir(exist_ok=False) must reject before provider start and produce no
+    # newly current run.  This is rig sensitivity only, never product credit.
+    r85_collision_seed=(r74_runs_root/f"{r74_physical_clock_id}{r74_role_suffix}"
+                        if r74_physical_clock_id is not None else None)
+    r85_collision_seed_created=False
+    if r85_collision_seed is not None and not r85_collision_seed.exists():
+        r85_collision_seed.mkdir()
+        r85_collision_seed_created=True
+    r85_collision_before=frozenset(r74_runs_root.iterdir())
+    r85_collision_starts_before=provider_process_starts[0]
+    r85_original_now_id=physical_module.now_id
+    if r74_physical_clock_id is None:
+        r85_same_second_collision=(False,"UNBOUND_PHYSICAL_RUN")
+    else:
+        try:
+            physical_module.now_id=lambda: r74_physical_clock_id
+            try:
+                physical_module.run_codex(
+                    physical_repo,physical_wt,"TEST_AUTHOR","H032-R85-COLLISION")
+                r85_same_second_collision=(True,"ADMITTED")
+            except Exception as exc:
+                r85_same_second_collision=(False,f"{type(exc).__name__}:{exc}")
+        finally:
+            physical_module.now_id=r85_original_now_id
+    r85_collision_after=frozenset(r74_runs_root.iterdir())
+    r85_collision_current=sorted(r85_collision_after-r85_collision_before)
+    r85_collision_start_delta=(provider_process_starts[0]
+                               -r85_collision_starts_before)
+    if r85_collision_seed_created:
+        r85_collision_seed.rmdir()
     r74_decoy_before_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r72_environment_variants={
         name:run_r74_environment_oracle(name)
         for name in ("exact","drop_one","length","prefix","fixed","extra")
     }
+    r85_clock_chain_ok=(
+        isinstance(r74_physical_clock_id,str)
+        and len(r74_clock_transitions)==len(r72_environment_variants)
+        and all(isinstance(previous,str) and isinstance(current,str)
+                and previous!=current
+                for previous,current in r74_clock_transitions)
+        and r74_clock_transitions[0][0]==r74_physical_clock_id
+        and all(r74_clock_transitions[index][0]
+                ==r74_clock_transitions[index-1][1]
+                for index in range(1,len(r74_clock_transitions)))
+        and all(len(item.get("current_runs",[]))==1
+                and Path(item["current_runs"][0]).name
+                    ==item.get("current_clock_id","")+r74_role_suffix
+                for item in r72_environment_variants.values()))
     r74_decoy_after_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r73_split_variant=r72_environment_variants["exact"]
 
@@ -4575,6 +4652,21 @@ def run_codex(sink, canonical, invocation, run, role):
           f"stale={capture_was_stale} cleared={capture_absent_before} "
           f"starts={physical_git_start_delta} capture_bound={physical_git_capture_bound} "
           f"mutants_reject={capture_binding_mutants_reject}")
+    check("J_R85_SAME_SECOND_CURRENT_RUN_COLLISION_REJECT",
+          r74_physical_run is not None
+          and r85_same_second_collision[0] is False
+          and r85_same_second_collision[1].startswith("FileExistsError:")
+          and r85_collision_start_delta==0
+          and r85_collision_current==[]
+          and r85_collision_after==r85_collision_before,
+          f"physical={r74_physical_run} collision={r85_same_second_collision} "
+          f"starts={r85_collision_start_delta} current={r85_collision_current} "
+          f"unchanged={r85_collision_after==r85_collision_before}")
+    check("J_R85_CONSECUTIVE_CURRENT_RUN_CLOCK_CHAIN",
+          r85_clock_chain_ok,
+          f"physical_clock={r74_physical_clock_id} "
+          f"transitions={r74_clock_transitions} "
+          f"current_runs={[(name,item.get('current_runs')) for name,item in r72_environment_variants.items()]}")
     check("J_R72_COMPLETE_PROVIDER_ENVIRONMENT_RELATION",
           r72_dynamic_literals_absent and capture_binding_mutants_reject
           and r72_variant_observations.get("exact",{}).get("relation") is True
