@@ -1862,3 +1862,29 @@ exact report, while argv and AGENT_START retain their existing independent route
 connected seventh provider start writes the old partial object; it must be schema-rejected and
 leave no canonical result. These are dependent-gate repairs, not product credits. R77's exclusive
 no-live/H033 parser, H032 bytes, production, process topology and live-call guard are unchanged.
+
+### 2026-08-21 — H032/H031 R82 exact owner-live capabilities
+
+R81 removed the shorter outer deadlines but measured only a helper's visible
+`communicate()` and a runner call's visible keyword set. Independent review built two
+connected counterexamples: `HiddenDeadlineProxy` supplied `timeout=1` behind H032's
+argument-free helper call, and an H031 default/captured runner inserted the same timeout
+before delegating. Both retained every R81 source fact.
+
+R82 preserves the authority decision and narrows the architecture at the actual effect.
+H032 has one exact capability helper: it receives the unique captured
+`system_popen=module.subprocess.Popen`, constructs the live process itself, calls that
+same returned object's `communicate()` without arguments and returns the object plus its
+stdout. The real branch must call it directly with the live argv/environment. H031 has
+one no-default helper which receives exact unaliased, unmodified `subprocess.run`; the
+real dependency call supplies that capability directly. Full owner-live has no timeout,
+while explicit no-live carries exactly 120 seconds.
+
+Both unconditional lanes inject spies into the same helpers used by the real branches.
+They observe the exact no-timeout/full and 120-second/skip effects without sleeping or
+starting a provider. Internal timeout, default wait/runner, process proxy, captured
+wrapper, helper/guard bypass and unbounded skip mutants each fail the small AST-bound
+helper/call inventory; hidden spies additionally record the one-second effect that makes
+the mutants causal. No whole-Python analysis or outer descendant-containment claim is
+introduced. Product/controller `CODEX_RUN_TIMEOUT_SECONDS=86400` remains the sole
+provider lifetime and cleanup owner; external orchestration incidents remain ODÖMBART.

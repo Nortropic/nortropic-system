@@ -360,6 +360,129 @@ def owner_live_binding_valid(binding) -> bool:
     except (KeyError, OSError, RuntimeError, TypeError, ValueError):
         return False
 
+
+def run_exact_owner_live(popen_capability, argv, environment):
+    """Start and wait through the exact unwrapped owner-live capability."""
+    process = popen_capability(
+        argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=environment,
+    )
+    output, _ = process.communicate()
+    return process, output
+
+
+def owner_live_should_run(deterministic_ok: bool, mode: str) -> bool:
+    if mode not in {"run", "skip"}:
+        raise ValueError("invalid owner-live mode")
+    return deterministic_ok and mode == "run"
+
+
+def embedded_gate_python_source(gate_text: str) -> str:
+    marker = "<<'PY'\n"
+    if gate_text.count(marker) != 1 or not gate_text.endswith("\nPY\n"):
+        raise RuntimeError("owner gate has no single exact embedded Python program")
+    return gate_text.split(marker, 1)[1][:-4]
+
+
+def replace_last_exact(text: str, old: str, new: str) -> str:
+    index = text.rfind(old)
+    if index < 0:
+        return text
+    return text[:index] + new + text[index + len(old):]
+
+
+def owner_live_capability_source_facts(gate_text: str) -> dict[str, bool]:
+    """Inventory only the exact owner-live capability helper and real call."""
+    tree = ast.parse(embedded_gate_python_source(gate_text))
+    helpers = [node for node in tree.body
+               if isinstance(node, ast.FunctionDef)
+               and node.name == "run_exact_owner_live"]
+    predicates = [node for node in tree.body
+                  if isinstance(node, ast.FunctionDef)
+                  and node.name == "owner_live_should_run"]
+    expected_helper = ast.parse('''
+def run_exact_owner_live(popen_capability, argv, environment):
+    """Start and wait through the exact unwrapped owner-live capability."""
+    process = popen_capability(
+        argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=environment,
+    )
+    output, _ = process.communicate()
+    return process, output
+''').body[0]
+    helper_exact = (len(helpers) == 1
+                    and ast.dump(helpers[0], include_attributes=False)
+                    == ast.dump(expected_helper, include_attributes=False))
+    helper_stores = [node for node in ast.walk(tree)
+                     if isinstance(node, ast.Name)
+                     and node.id == "run_exact_owner_live"
+                     and isinstance(node.ctx, (ast.Store, ast.Del))]
+    system_popen_stores = [node for node in ast.walk(tree)
+                           if isinstance(node, ast.Name)
+                           and node.id == "system_popen"
+                           and isinstance(node.ctx, (ast.Store, ast.Del))]
+    system_popen_bindings = [node for node in ast.walk(tree)
+                             if isinstance(node, ast.Assign)
+                             and len(node.targets) == 1
+                             and isinstance(node.targets[0], ast.Name)
+                             and node.targets[0].id == "system_popen"
+                             and isinstance(node.value, ast.Attribute)
+                             and node.value.attr == "Popen"
+                             and isinstance(node.value.value, ast.Attribute)
+                             and node.value.value.attr == "subprocess"
+                             and isinstance(node.value.value.value, ast.Name)
+                             and node.value.value.value.id == "module"]
+    actual_calls = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Tuple)
+                and [item.id for item in node.targets[0].elts
+                     if isinstance(item, ast.Name)] == ["live_proc", "live_stdout"]
+                and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Name)
+                and node.value.func.id == "run_exact_owner_live"):
+            continue
+        call = node.value
+        if (len(call.args) == 3 and not call.keywords
+                and isinstance(call.args[0], ast.Name)
+                and call.args[0].id == "system_popen"
+                and isinstance(call.args[1], ast.List)
+                and isinstance(call.args[2], ast.Name)
+                and call.args[2].id == "live_env"):
+            actual_calls.append(call)
+    direct_live_waits = [node for node in ast.walk(tree)
+                         if isinstance(node, ast.Call)
+                         and isinstance(node.func, ast.Attribute)
+                         and isinstance(node.func.value, ast.Name)
+                         and node.func.value.id == "live_proc"
+                         and node.func.attr in {"communicate", "wait", "kill", "terminate"}]
+    predicate_calls = [node for node in ast.walk(tree)
+                       if isinstance(node, ast.Call)
+                       and isinstance(node.func, ast.Name)
+                       and node.func.id == "owner_live_should_run"
+                       and len(node.args) == 2
+                       and isinstance(node.args[0], ast.Name)
+                       and node.args[0].id == "deterministic_result_ok"
+                       and isinstance(node.args[1], ast.Name)
+                       and node.args[1].id == "owner_live_mode"
+                       and not node.keywords]
+    return {
+        "helper_exact": helper_exact,
+        "helper_binding_singleton": len(helpers) == 1 and not helper_stores,
+        "system_popen_exact": (len(system_popen_stores) == 1
+                               and len(system_popen_bindings) == 1),
+        "actual_direct_call": len(actual_calls) == 1,
+        "no_direct_live_wait": not direct_live_waits,
+        "predicate_singleton": len(predicates) == 1,
+        "actual_guard_once": len(predicate_calls) == 1,
+    }
+
 def exact_tree_snapshot(root: Path) -> tuple[tuple[object, ...], ...]:
     """Snapshot an exact tree without following links or interpreting contents."""
     if not root.exists() and not root.is_symlink():
@@ -600,6 +723,95 @@ try:
           f"stale={not owner_live_binding_valid(owner_live_stale_gate)} "
           f"wrong_gate={not owner_live_binding_valid(owner_live_wrong_gate)} "
           f"wrong_head={not owner_live_binding_valid(owner_live_wrong_head)}")
+
+    # R82 binds the effect at one capability boundary.  The same helper used
+    # by the real owner branch receives a judge spy here; no provider starts.
+    owner_gate_text = h032_gate.read_text(encoding="utf-8")
+    owner_capability_facts = owner_live_capability_source_facts(owner_gate_text)
+    owner_internal_timeout_mutant = owner_gate_text.replace(
+        "output, _ = process.communicate()",
+        "output, _ = process.communicate(timeout=1)", 1)
+    owner_proxy_mutant = owner_gate_text.replace(
+        "    output, _ = process.communicate()\n",
+        "    process = HiddenDeadlineProxy(process)\n"
+        "    output, _ = process.communicate()\n", 1)
+    owner_default_mutant = owner_gate_text.replace(
+        "def run_exact_owner_live(popen_capability, argv, environment):",
+        "def run_exact_owner_live(popen_capability, argv, environment, "
+        "wait=lambda process: process.communicate(timeout=1)):", 1).replace(
+        "    output, _ = process.communicate()\n",
+        "    output, _ = wait(process)\n", 1)
+    owner_captured_mutant = replace_last_exact(
+        owner_gate_text,
+        "run_exact_owner_live(\n            system_popen,",
+        "run_exact_owner_live(\n            hidden_popen,")
+    owner_guard_mutant = replace_last_exact(
+        owner_gate_text,
+        "owner_live_should_run(deterministic_result_ok, owner_live_mode)",
+        'deterministic_result_ok and owner_live_mode == "run"')
+    owner_capability_mutants = {
+        "internal_timeout": owner_live_capability_source_facts(owner_internal_timeout_mutant),
+        "proxy": owner_live_capability_source_facts(owner_proxy_mutant),
+        "default_wait": owner_live_capability_source_facts(owner_default_mutant),
+        "captured_wrapper": owner_live_capability_source_facts(owner_captured_mutant),
+        "guard_bypass": owner_live_capability_source_facts(owner_guard_mutant),
+    }
+    check("J_R82_OWNER_LIVE_CAPABILITY_SOURCE",
+          owner_capability_facts and all(owner_capability_facts.values()),
+          str(owner_capability_facts))
+    check("J_R82_OWNER_LIVE_CAPABILITY_MUTANTS_REJECT",
+          all(not all(facts.values()) for facts in owner_capability_mutants.values()),
+          str(owner_capability_mutants))
+
+    class OwnerLiveProcessSpy:
+        def __init__(self):
+            self.communicate_calls = []
+            self.returncode = 0
+        def communicate(self, *args, **kwargs):
+            self.communicate_calls.append((args, kwargs))
+            return "synthetic-owner-complete", None
+
+    owner_spawn_calls = []
+    owner_process_spy = OwnerLiveProcessSpy()
+    def owner_popen_spy(argv, **kwargs):
+        owner_spawn_calls.append((tuple(argv), dict(kwargs)))
+        return owner_process_spy
+    owner_process_result, owner_output_result = run_exact_owner_live(
+        owner_popen_spy, ["/judge/owner-live"], {"R82": "judge"})
+
+    hidden_process_spy = OwnerLiveProcessSpy()
+    class HiddenDeadlineProxy:
+        def __init__(self, process):
+            self.process = process
+        def communicate(self):
+            return self.process.communicate(timeout=1)
+    def hidden_popen_spy(argv, **kwargs):
+        return HiddenDeadlineProxy(hidden_process_spy)
+    run_exact_owner_live(hidden_popen_spy, ["/judge/hidden"], {})
+    owner_effect_ok = (
+        owner_process_result is owner_process_spy
+        and owner_output_result == "synthetic-owner-complete"
+        and len(owner_spawn_calls) == 1
+        and owner_spawn_calls[0][0] == ("/judge/owner-live",)
+        and owner_spawn_calls[0][1].get("env") == {"R82": "judge"}
+        and owner_process_spy.communicate_calls == [((), {})]
+        and hidden_process_spy.communicate_calls == [((), {"timeout": 1})]
+        and owner_live_should_run(True, "run")
+        and not owner_live_should_run(True, "skip")
+        and not owner_live_should_run(False, "run")
+    )
+    try:
+        owner_live_should_run(True, "other")
+    except ValueError:
+        owner_invalid_mode_rejected = True
+    else:
+        owner_invalid_mode_rejected = False
+    check("J_R82_OWNER_LIVE_CAPABILITY_EFFECT",
+          owner_effect_ok and owner_invalid_mode_rejected,
+          f"spawn={[(call[0], sorted(call[1])) for call in owner_spawn_calls]} "
+          f"exact_wait={owner_process_spy.communicate_calls} "
+          f"hidden_wait={hidden_process_spy.communicate_calls} "
+          f"invalid={owner_invalid_mode_rejected}")
 
     base = work / "base"; base.mkdir()
     sh(GIT, "init", "-q", cwd=base)
@@ -5513,7 +5725,7 @@ class CraftedConcretePath(type(Path())):
     exact_owner_live_detail = ("SKIPPED_OWNER_TEST_AUTHOR"
                                if owner_live_mode == "skip"
                                else "SKIPPED_DETERMINISTIC_RED")
-    if deterministic_result_ok and owner_live_mode == "run":
+    if owner_live_should_run(deterministic_result_ok, owner_live_mode):
         live_repo = work / "r14-exact-owner-live-clone"
         sh(GIT,"clone","-q","--no-hardlinks",str(repo),str(live_repo))
         sh(GIT,"checkout","-q",owner_live_binding["candidate_head"],cwd=live_repo)
@@ -5521,16 +5733,12 @@ class CraftedConcretePath(type(Path())):
         sh(GIT,"worktree","add","-q","--detach",str(live_wt),"HEAD",cwd=live_repo)
         live_source=live_repo/"scripts/nortropic-codex-autopilot.py"
         live_env = {key:value for key,value in os.environ.items() if not key.startswith("H032_")}
-        live_proc = system_popen(["/usr/bin/python3","-I","-S","-u",str(r12_runner),
-                                  str(live_source),str(live_repo),str(live_wt)],stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT,text=True,env=live_env)
-        try:
-            live_stdout,_ = live_proc.communicate(timeout=3600)
-        except subprocess.TimeoutExpired as exc:
-            live_proc.terminate()
-            try: live_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired: live_proc.kill();live_proc.wait()
-            raise RuntimeError("R13 exact owner provider unavailable: timeout") from exc
+        live_proc, live_stdout = run_exact_owner_live(
+            system_popen,
+            ["/usr/bin/python3","-I","-S","-u",str(r12_runner),
+             str(live_source),str(live_repo),str(live_wt)],
+            live_env,
+        )
         if live_proc.returncode != 0 or "R12_OUTCOME=ADMITTED" not in live_stdout:
             raise RuntimeError("R13 exact owner provider unavailable: auth/network/runtime")
         output_lines=[line.split(" ",1)[1] for line in live_stdout.splitlines()
