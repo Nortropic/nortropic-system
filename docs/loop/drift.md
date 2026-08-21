@@ -1862,3 +1862,24 @@ exact report, while argv and AGENT_START retain their existing independent route
 connected seventh provider start writes the old partial object; it must be schema-rejected and
 leave no canonical result. These are dependent-gate repairs, not product credits. R77's exclusive
 no-live/H033 parser, H032 bytes, production, process topology and live-call guard are unchanged.
+
+### 2026-08-21 — H032/H031 R89 isolated owner-live call
+
+R82-R88 attempted to make a subprocess capability immutable inside the large embedded
+Python judge by growing namespace and spelling inventories. Owner review reset that proof
+surface: those inventories are retired rather than extended.
+
+R89 adds one small owner-only, builder-inaccessible and hash-bound helper. H032 and H031
+write a strict private plan bound to nonce, device/inode, digest, exact executable, argv,
+cwd, mode and result path. The shell invokes the canonical helper directly. Full owner-live
+waits without an outer deadline; explicit skip alone uses 120 seconds. A strict atomic result
+repeats every binding and carries exact output bytes/digests. The still-running ordinary gate
+continues to decide only from the existing actual provider start, canonical result, journal,
+topology and cleanup effects. Transport selftests are rig evidence only.
+
+The R74 environment matrix now parses exact second clock identifiers and exact
+`<YYYYMMDD-HHMMSS>-test_author` paths. A bounded monotonic judge-only barrier releases each
+attempt only at a strictly later absent slot, then the actual run/capture/envelope/journal must
+bind that exact slot. An actual preseeded same-second product call rejects before provider
+start; rollback, stall, preseed and missing-current-effect controls reject independently. The
+barrier cannot grant product credit. Production and the guarded exact live positive are unchanged.

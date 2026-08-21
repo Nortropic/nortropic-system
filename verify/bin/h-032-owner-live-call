@@ -1,0 +1,221 @@
+#!/bin/bash -p
+# Frozen owner-gate process bridge. Product/builders never write this path.
+
+set -u
+umask 077
+unset CDPATH ENV BASH_ENV GLOBIGNORE PYTHONHOME PYTHONPATH
+export PATH="/usr/bin:/bin"
+
+SOURCE_PATH="${BASH_SOURCE[0]}"
+case "$SOURCE_PATH" in
+  /*) ;;
+  *) SOURCE_PATH="$(/bin/pwd -P)/$SOURCE_PATH" ;;
+esac
+if [[ -L "$SOURCE_PATH" ]]; then exit 2; fi
+SCRIPT_DIR="$(cd -P -- "$(/usr/bin/dirname -- "$SOURCE_PATH")" 2>/dev/null && /bin/pwd -P)" || exit 2
+if [[ ! "$SOURCE_PATH" -ef "$SCRIPT_DIR/h-032-owner-live-call" ]]; then exit 2; fi
+
+exec /usr/bin/python3 -I -S - "$SOURCE_PATH" "$@" <<'PY'
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import signal
+import stat
+from subprocess import PIPE, Popen, TimeoutExpired
+import sys
+import time
+
+MAX_PLAN_BYTES = 65536
+MAX_OUTPUT_BYTES = 16 * 1024 * 1024
+PLAN_READY_SECONDS = 300
+SKIP_SECONDS = 120
+HEX = frozenset("0123456789abcdef")
+
+
+class DuplicateKey(ValueError):
+    pass
+
+
+def strict_json(raw: bytes):
+    def pairs(items):
+        value = {}
+        for key, item in items:
+            if key in value:
+                raise DuplicateKey(key)
+            value[key] = item
+        return value
+    return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=pairs)
+
+
+def regular_nofollow_read(path: Path, maximum: int):
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    fd = os.open(path, flags)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RuntimeError("nonregular input")
+        chunks = []
+        total = 0
+        while total <= maximum:
+            chunk = os.read(fd, min(65536, maximum + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(fd)
+        identity = lambda value: (value.st_dev, value.st_ino, value.st_mode,
+                                  value.st_nlink, value.st_size,
+                                  value.st_mtime_ns, value.st_ctime_ns)
+        if len(raw) > maximum or identity(before) != identity(after) or len(raw) != before.st_size:
+            raise RuntimeError("unstable or oversized input")
+        return raw, before
+    finally:
+        os.close(fd)
+
+
+def sha256_path(path: Path) -> str:
+    raw, _identity = regular_nofollow_read(path, MAX_OUTPUT_BYTES)
+    return hashlib.sha256(raw).hexdigest()
+
+
+def absolute_regular_executable(path: Path, expected_sha: str):
+    if not path.is_absolute() or path.is_symlink():
+        return None
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
+            or not os.access(path, os.X_OK) or sha256_path(path) != expected_sha):
+        return None
+    return st
+
+
+def valid_hex(value, length: int) -> bool:
+    return isinstance(value, str) and len(value) == length and all(char in HEX for char in value)
+
+
+def plan_valid(plan, result_path: Path) -> bool:
+    keys = {"schema_version", "nonce", "purpose", "mode", "argv", "cwd",
+            "result_path", "executable_sha256"}
+    if not isinstance(plan, dict) or set(plan) != keys:
+        return False
+    if (plan.get("schema_version") != 1 or not valid_hex(plan.get("nonce"), 64)
+            or plan.get("purpose") not in {"H032_OWNER_LIVE", "H031_H032_DEPENDENCY"}
+            or plan.get("mode") not in {"full", "skip"}
+            or plan.get("result_path") != str(result_path)
+            or not valid_hex(plan.get("executable_sha256"), 64)):
+        return False
+    argv = plan.get("argv")
+    if (not isinstance(argv, list) or not 1 <= len(argv) <= 16
+            or any(not isinstance(item, str) or not item or "\x00" in item for item in argv)):
+        return False
+    executable = Path(argv[0])
+    cwd = Path(plan.get("cwd", ""))
+    return (absolute_regular_executable(executable, plan["executable_sha256"]) is not None
+            and cwd.is_absolute() and cwd.is_dir() and not cwd.is_symlink()
+            and result_path.is_absolute() and not result_path.exists()
+            and result_path.parent.is_dir() and not result_path.parent.is_symlink())
+
+
+def atomic_write(path: Path, raw: bytes) -> None:
+    temporary = path.with_name(path.name + ".tmp")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(temporary, flags, 0o600)
+    try:
+        offset = 0
+        while offset < len(raw):
+            offset += os.write(fd, raw[offset:])
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.replace(temporary, path)
+    parent_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
+def main() -> int:
+    if len(sys.argv) != 4:
+        return 2
+    helper_path, plan_path, result_path = map(Path, sys.argv[1:4])
+    if (not plan_path.is_absolute() or not result_path.is_absolute()
+            or plan_path.parent != result_path.parent):
+        return 2
+    deadline = time.monotonic() + PLAN_READY_SECONDS
+    while not plan_path.exists():
+        if plan_path.with_name(plan_path.name + ".closed").exists():
+            return 3
+        if time.monotonic() >= deadline:
+            return 2
+        time.sleep(0.01)
+    plan_raw, plan_stat = regular_nofollow_read(plan_path, MAX_PLAN_BYTES)
+    plan = strict_json(plan_raw)
+    if not plan_valid(plan, result_path):
+        return 2
+    helper_path = helper_path.resolve(strict=True)
+    helper_sha = sha256_path(helper_path)
+    argv = plan["argv"]
+    proc = Popen(argv, cwd=plan["cwd"], stdout=PIPE, stderr=PIPE,
+                 start_new_session=True)
+    timed_out = False
+    try:
+        if plan["mode"] == "skip":
+            stdout, stderr = proc.communicate(timeout=SKIP_SECONDS)
+        else:
+            stdout, stderr = proc.communicate()
+    except TimeoutExpired as exc:
+        timed_out = True
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            stdout, stderr = proc.communicate(timeout=5)
+        except TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = proc.communicate()
+        stdout = (exc.stdout or b"") + (stdout or b"")
+        stderr = (exc.stderr or b"") + (stderr or b"")
+    if len(stdout) > MAX_OUTPUT_BYTES or len(stderr) > MAX_OUTPUT_BYTES:
+        return 2
+    result = {
+        "schema_version": 1,
+        "nonce": plan["nonce"],
+        "purpose": plan["purpose"],
+        "mode": plan["mode"],
+        "plan_sha256": hashlib.sha256(plan_raw).hexdigest(),
+        "plan_dev": plan_stat.st_dev,
+        "plan_ino": plan_stat.st_ino,
+        "helper_sha256": helper_sha,
+        "argv": argv,
+        "cwd": plan["cwd"],
+        "returncode": proc.returncode,
+        "timed_out": timed_out,
+        "stdout_b64": base64.b64encode(stdout).decode("ascii"),
+        "stderr_b64": base64.b64encode(stderr).decode("ascii"),
+        "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+    }
+    raw = json.dumps(result, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    atomic_write(result_path, raw)
+    return 0
+
+
+try:
+    raise SystemExit(main())
+except SystemExit:
+    raise
+except Exception:
+    raise SystemExit(2)
+PY

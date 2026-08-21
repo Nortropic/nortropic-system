@@ -26,6 +26,17 @@ SOURCE="$ROOT/scripts/nortropic-codex-autopilot.py"
 SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
 SPEC="$ROOT/specs/tasks.spec.json"
 H032_GATE="$ROOT/verify/bin/h-032-exit"
+OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
+OWNER_LIVE_HELPER_SHA256="6f31aaac4d1bf170686ebd9ad1f3de62076be9471644ed49fccc61b97ca14044"
+if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
+  echo "ODÖMBART K0 — owner-live helper identity invalid"
+  exit 2
+fi
+OBSERVED_OWNER_LIVE_HELPER_SHA256="$(/usr/bin/shasum -a 256 -- "$OWNER_LIVE_HELPER" | /usr/bin/awk '{print $1}')"
+if [[ "$OBSERVED_OWNER_LIVE_HELPER_SHA256" != "$OWNER_LIVE_HELPER_SHA256" ]]; then
+  echo "ODÖMBART K0 — owner-live helper digest mismatch"
+  exit 2
+fi
 WORK="$(/usr/bin/mktemp -d /private/tmp/nortropic-h031.XXXXXX)" || exit 2
 case "$WORK" in /private/tmp/nortropic-h031.*) ;; *) echo "ODÖMBART K0 — osäker tempidentitet"; exit 2;; esac
 cleanup() {
@@ -51,10 +62,17 @@ if [[ $# -gt 0 ]]; then
   OWNER_LIVE_MODE="skip"
 fi
 
-/usr/bin/python3 -I -S - "$SOURCE" "$SCHEMA" "$SPEC" "$H032_GATE" "$WORK" "$OWNER_LIVE_MODE" <<'PY'
+OWNER_LIVE_CONTROL="$WORK/owner-live-control"
+/bin/mkdir -m 700 -- "$OWNER_LIVE_CONTROL" || exit 2
+OWNER_LIVE_PLAN="$OWNER_LIVE_CONTROL/plan.json"
+OWNER_LIVE_RESULT="$OWNER_LIVE_CONTROL/result.json"
+
+run_gate_python() {
+/usr/bin/python3 -I -S - "$SOURCE" "$SCHEMA" "$SPEC" "$H032_GATE" "$WORK/gate" "$OWNER_LIVE_MODE" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT" "$OWNER_LIVE_HELPER" "$OWNER_LIVE_HELPER_SHA256" <<'PY'
 from __future__ import annotations
 
 import ast
+import base64
 import builtins
 import contextlib
 import fcntl
@@ -69,11 +87,15 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
 
 source, schema_source, spec_path, h032_gate, work = map(Path, sys.argv[1:6])
 owner_live_mode = sys.argv[6]
+owner_live_plan, owner_live_result, owner_live_helper = map(Path, sys.argv[7:10])
+owner_live_helper_sha256 = sys.argv[10]
 if owner_live_mode not in {"run", "skip"}:
     raise SystemExit("invalid owner live mode")
+work.mkdir(mode=0o700)
 root = source.parents[1]
 GIT = "/usr/bin/git"
 EXPECTED = {
@@ -274,6 +296,71 @@ def strict_json(raw: str):
     return json.loads(raw, object_pairs_hook=pairs)
 
 
+OWNER_CALL_RESULT_KEYS = {
+    "schema_version", "nonce", "purpose", "mode", "plan_sha256",
+    "plan_dev", "plan_ino", "helper_sha256", "argv", "cwd",
+    "returncode", "timed_out", "stdout_b64", "stderr_b64",
+    "stdout_sha256", "stderr_sha256",
+}
+
+
+def atomic_owner_json(path: Path, value) -> bytes:
+    raw=json.dumps(value,sort_keys=True,separators=(",", ":")).encode("utf-8")
+    temporary=path.with_name(path.name+".tmp")
+    fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL
+               |getattr(os,"O_NOFOLLOW",0),0o600)
+    try:
+        offset=0
+        while offset<len(raw): offset+=os.write(fd,raw[offset:])
+        os.fsync(fd)
+    finally: os.close(fd)
+    os.replace(temporary,path)
+    return raw
+
+
+def stable_owner_json(path: Path, maximum: int=20*1024*1024):
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        before=os.fstat(fd);raw=b""
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1:
+            raise RuntimeError("owner-call object is not private regular nlink-one")
+        while len(raw)<=maximum:
+            chunk=os.read(fd,min(65536,maximum+1-len(raw)))
+            if not chunk: break
+            raw+=chunk
+        after=os.fstat(fd)
+        identity=lambda item:(item.st_dev,item.st_ino,item.st_mode,item.st_nlink,
+                              item.st_size,item.st_mtime_ns,item.st_ctime_ns)
+        if len(raw)>maximum or len(raw)!=before.st_size or identity(before)!=identity(after):
+            raise RuntimeError("owner-call object unstable or oversized")
+        return raw,before,strict_json(raw.decode("utf-8",errors="strict"))
+    finally: os.close(fd)
+
+
+def owner_call_result_valid(value, plan, plan_raw: bytes, plan_stat) -> bool:
+    if not isinstance(value,dict) or set(value)!=OWNER_CALL_RESULT_KEYS:
+        return False
+    try:
+        stdout=base64.b64decode(value.get("stdout_b64",""),validate=True)
+        stderr=base64.b64decode(value.get("stderr_b64",""),validate=True)
+    except Exception:
+        return False
+    return (value.get("schema_version")==1
+        and value.get("nonce")==plan.get("nonce")
+        and value.get("purpose")==plan.get("purpose")
+        and value.get("mode")==plan.get("mode")
+        and value.get("plan_sha256")==hashlib.sha256(plan_raw).hexdigest()
+        and value.get("plan_dev")==plan_stat.st_dev
+        and value.get("plan_ino")==plan_stat.st_ino
+        and value.get("helper_sha256")==owner_live_helper_sha256
+        and value.get("argv")==plan.get("argv")
+        and value.get("cwd")==plan.get("cwd")
+        and type(value.get("returncode")) is int
+        and type(value.get("timed_out")) is bool
+        and value.get("stdout_sha256")==hashlib.sha256(stdout).hexdigest()
+        and value.get("stderr_sha256")==hashlib.sha256(stderr).hexdigest())
+
+
 def check(key: str, ok: bool, detail: str) -> None:
     checks.append((key, bool(ok), detail))
 
@@ -283,7 +370,7 @@ def odombart(key: str, detail: str) -> None:
     raise SystemExit(2)
 
 
-H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 140 PASS / 1 FAIL"
+H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 142 PASS / 1 FAIL"
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
 H032_OWNER_LIVE_SKIP_MARKER = (
@@ -1271,7 +1358,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "0c4a481b60133d9db791a766e572d5364dfc9761a0f48f9e7d3cd2581004b659")
+                       == "0c44ea9b5ad287a1733511d032b4dee27c40c6cfc38d087a4c88c915555b921b")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -1993,8 +2080,44 @@ subprocess = object()
 
     upstream_argv=[str(h032_gate)]
     if owner_live_mode == "skip": upstream_argv.append("--skip-owner-live")
-    upstream = subprocess.run(upstream_argv, cwd=root, text=True,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+    if owner_live_plan.exists() or owner_live_result.exists():
+        odombart("K_H032_FRESH_UPSTREAM", "owner-call plan/result was preseeded")
+    upstream_plan = {
+        "schema_version": 1,
+        "nonce": os.urandom(32).hex(),
+        "purpose": "H031_H032_DEPENDENCY",
+        "mode": owner_live_mode,
+        "argv": upstream_argv,
+        "cwd": str(root),
+        "result_path": str(owner_live_result),
+        "executable_sha256": hashlib.sha256(h032_gate.read_bytes()).hexdigest(),
+    }
+    upstream_plan_raw = atomic_owner_json(owner_live_plan, upstream_plan)
+    upstream_plan_stat = owner_live_plan.lstat()
+    while not owner_live_result.exists():
+        time.sleep(0.01)
+    _upstream_result_raw, _upstream_result_stat, upstream_result = stable_owner_json(
+        owner_live_result)
+    if (hashlib.sha256(owner_live_helper.read_bytes()).hexdigest()
+            != owner_live_helper_sha256
+            or not owner_call_result_valid(upstream_result, upstream_plan,
+                                           upstream_plan_raw, upstream_plan_stat)):
+        odombart("K_H032_FRESH_UPSTREAM", "owner-call result binding invalid")
+    if upstream_result["timed_out"]:
+        odombart("K_H032_FRESH_UPSTREAM", "bounded skip dependency timed out")
+    try:
+        upstream_stdout = base64.b64decode(upstream_result["stdout_b64"], validate=True).decode(
+            "utf-8", errors="strict")
+        upstream_stderr = base64.b64decode(upstream_result["stderr_b64"], validate=True).decode(
+            "utf-8", errors="strict")
+    except Exception as exc:
+        odombart("K_H032_FRESH_UPSTREAM", f"owner-call output invalid:{type(exc).__name__}")
+    class OwnerUpstreamResult:
+        pass
+    upstream = OwnerUpstreamResult()
+    upstream.returncode = upstream_result["returncode"]
+    upstream.stdout = upstream_stdout
+    upstream.stderr = upstream_stderr
     owner_skip_fixture = owner_skip_fixture_from_observed_h032(upstream.stdout)
     owner_skip_positive = exclusive_h032_owner_live_skip(2, owner_skip_fixture)
     check("J_H032_EXCLUSIVE_OWNER_LIVE_SKIP_POSITIVE",
@@ -2402,3 +2525,27 @@ else:
 print("H031_GATE_RESULT=FAIL")
 raise SystemExit(1)
 PY
+}
+
+run_gate_python_and_close() {
+  run_gate_python
+  gate_rc=$?
+  : > "$OWNER_LIVE_PLAN.closed"
+  return "$gate_rc"
+}
+
+run_gate_python_and_close &
+GATE_PID=$!
+"$OWNER_LIVE_HELPER" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT"
+HELPER_RC=$?
+if [[ $HELPER_RC -ne 0 ]]; then
+  if [[ -e "$OWNER_LIVE_PLAN" ]]; then
+    /bin/kill -TERM "$GATE_PID" 2>/dev/null || true
+    wait "$GATE_PID" 2>/dev/null || true
+    echo "ODÖMBART K_H032_FRESH_UPSTREAM — owner-live helper failed rc=$HELPER_RC"
+    exit 2
+  fi
+  wait "$GATE_PID"
+  exit $?
+fi
+wait "$GATE_PID"
