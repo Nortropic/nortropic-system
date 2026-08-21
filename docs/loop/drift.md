@@ -1963,3 +1963,17 @@ must fail before provider start and preserve the run set. The intentional hostil
 baseline may route its envelope through the decoy, but that identity is scheduling-only
 and grants no product verdict. Public baseline, production bytes and live behavior remain
 unchanged.
+
+## 2026-08-21 — R95 complete predecessor observation
+
+Review falsified R94's permissive predecessor extractor: a parseable envelope-parent id
+could survive a missing current AGENT_START, false `valid`, wrong `current_run`, or other
+failed launcher checks. R95 accepts an id only from the exact complete frozen observation:
+the exact field and check inventories, `valid=true`, every check true, one output and
+worktree selector, exact timeout/separator/worktree, absolute output, and the envelope
+inside the same strict current run under the intended runs root. One-field causal
+observation mutants prove each missing link yields no id. The intentionally broken public
+product-Git attempt therefore cannot seed the chain; its rig-only successors use a separate
+bounded clock release while the product remains the sole structured-result RED. A green
+candidate must supply the full product-Git observation. Boundary-cross, multi-second and
+exact collision schedules remain admissible or rejecting as previously frozen.

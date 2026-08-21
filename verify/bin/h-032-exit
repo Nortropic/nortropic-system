@@ -3925,23 +3925,45 @@ def run_codex(sink, canonical, invocation, run, role):
                 return current,eligible
             time.sleep(.01)
         raise RuntimeError("R89 clock barrier stalled")
-    def r94_observed_run_id(observation: object):
-        if not isinstance(observation,dict):
+    r95_observation_keys=frozenset({
+        "valid","output","envelope","worktree","timeout","separator",
+        "provider_output_count","provider_worktree_count","checks","current_run",
+    })
+    r95_check_keys=frozenset({
+        "python_flags","launcher","run","worktree","envelope_object",
+        "envelope_name","envelope_journal","current_run","current_journal",
+        "timeout","provider","provider_worktree","output","python",
+    })
+    def r94_observed_run_id(observation: object, runs_root: Path,
+                            expected_worktree: Path):
+        if (not isinstance(observation,dict)
+                or frozenset(observation)!=r95_observation_keys
+                or observation.get("valid") is not True):
             return None
         checks=observation.get("checks")
         envelope=observation.get("envelope")
+        current_run=observation.get("current_run")
+        output=observation.get("output")
         if (not isinstance(checks,dict)
-                or checks.get("envelope_object") is not True
-                or checks.get("envelope_name") is not True
+                or frozenset(checks)!=r95_check_keys
+                or any(value is not True for value in checks.values())
                 or observation.get("provider_output_count")!=1
-                or not isinstance(envelope,str)):
+                or observation.get("provider_worktree_count")!=1
+                or observation.get("timeout")!="86400"
+                or observation.get("separator")!=8
+                or not isinstance(envelope,str)
+                or not isinstance(current_run,str)
+                or not isinstance(output,str)
+                or observation.get("worktree")!=str(expected_worktree)):
             return None
-        run_name=Path(envelope).parent.name
-        suffix="-test_author"
-        if not run_name.endswith(suffix):
+        run_path=Path(current_run)
+        envelope_path=Path(envelope)
+        output_path=Path(output)
+        if (not envelope_path.is_absolute()
+                or not output_path.is_absolute()
+                or envelope_path.parent!=run_path):
             return None
-        value=run_name[:-len(suffix)]
-        return value if r89_clock_value(value) is not None else None
+        return r89_run_identity(run_path,runs_root)
     def r94_new_launch_observation(before: frozenset[str]):
         current=sorted(set(launch_observations)-set(before))
         return (launch_observations[current[0]] if len(current)==1
@@ -3970,7 +3992,38 @@ def run_codex(sink, canonical, invocation, run, role):
         physical_start_delta=provider_process_starts[0]-physical_starts_before
         physical_launch_observation=r94_new_launch_observation(
             physical_launch_keys_before)
-        physical_run_id=r94_observed_run_id(physical_launch_observation)
+        physical_run_id=r94_observed_run_id(
+            physical_launch_observation,physical_runs_root,physical_wt)
+        def r95_observation_variant(observation: dict[str,object],
+                                    field: str, value: object):
+            variant=dict(observation)
+            variant["checks"]=dict(observation.get("checks",{}))
+            if field.startswith("checks."):
+                check_name=field.split(".",1)[1]
+                if value is None: variant["checks"].pop(check_name,None)
+                else: variant["checks"][check_name]=value
+            elif value is None: variant.pop(field,None)
+            else: variant[field]=value
+            return variant
+        r95_observation_mutants={
+            "agent_start_omitted":r95_observation_variant(
+                physical_launch_observation,"checks.current_journal",False),
+            "current_run_mismatch":r95_observation_variant(
+                physical_launch_observation,"current_run",
+                str(physical_runs_root/"20990101-000000-test_author")),
+            "valid_omitted":r95_observation_variant(
+                physical_launch_observation,"valid",None),
+            "checks_omitted":r95_observation_variant(
+                physical_launch_observation,"checks.output",None),
+            "envelope_mismatch":r95_observation_variant(
+                physical_launch_observation,"envelope",
+                str(physical_runs_root/"20990101-000000-test_author"
+                    /"provider-envelope.json")),
+        }
+        r95_observation_mutants_reject=all(
+            r94_observed_run_id(
+                mutant,physical_runs_root,physical_wt)
+            is None for mutant in r95_observation_mutants.values())
         physical_after_runs=set(physical_runs_root.iterdir()) if physical_runs_root.is_dir() else set()
         physical_new_runs=sorted(physical_after_runs-physical_before_runs)
         # Each later physical invocation is released only after the exact run
@@ -4004,7 +4057,7 @@ def run_codex(sink, canonical, invocation, run, role):
         physical_hostile_launch_observation=r94_new_launch_observation(
             physical_hostile_launch_keys_before)
         physical_hostile_run_id=r94_observed_run_id(
-            physical_hostile_launch_observation)
+            physical_hostile_launch_observation,physical_runs_root,physical_wt)
 
         # A caller-selected Git repository is exercised through the complete
         # product run, not merely through the judge helper.  Both repositories
@@ -4127,23 +4180,43 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_prior_run.mkdir()
     r74_prior_envelope=r74_prior_run/"provider-envelope.json"
     r74_prior_envelope.write_text('{"prior":true}\n',encoding="utf-8")
-    physical_git_run_id=r94_observed_run_id(physical_git_launch_observation)
-    if physical_git_run_id is None:
-        raise RuntimeError("R94 product-Git run identity unavailable")
+    physical_git_run_id=r94_observed_run_id(
+        physical_git_launch_observation,physical_runs_root,physical_wt)
     r94_physical_clock_chain=(physical_run_id,physical_hostile_run_id,
                               physical_git_run_id)
+    r94_product_git_observation_complete=(physical_git_run_id is not None)
+    r95_product_git_incomplete_without_identity=(
+        physical_git_run_id is None
+        and physical_git_launch_observation.get("valid") is False)
+    if r94_product_git_observation_complete:
+        r94_r74_seed_id=physical_git_run_id
+    elif r95_product_git_incomplete_without_identity:
+        # The intentionally nonconforming public product receives no run-id
+        # credit from its incomplete/decoy observation.  A separate bounded
+        # judge clock release schedules the rig-only R74 matrix instead.
+        r94_r74_seed_id,_=r89_clock_barrier(
+            physical_hostile_run_id,r74_runs_root)
+    else:
+        raise RuntimeError("R95 product-Git observation/identity inconsistent")
     r94_physical_clock_chain_ok=(
         physical_start_delta==1 and physical_hostile_start_delta==1
         and physical_git_start_delta==1
-        and all(r89_clock_value(value) is not None
-                for value in r94_physical_clock_chain)
+        and r89_clock_value(physical_run_id) is not None
+        and r89_clock_value(physical_hostile_run_id) is not None
         and r89_clock_value(physical_run_id)<r89_clock_value(physical_hostile_run_id)
-        and r89_clock_value(physical_hostile_run_id)<r89_clock_value(physical_git_run_id)
         and r89_clock_value(physical_hostile_release)
             <=r89_clock_value(physical_hostile_run_id)
+        and r94_product_git_observation_complete
+        and r89_clock_value(physical_git_run_id) is not None
+        and r89_clock_value(physical_hostile_run_id)
+            <r89_clock_value(physical_git_run_id)
         and r89_clock_value(physical_git_release)
             <=r89_clock_value(physical_git_run_id))
-    r74_last_clock_id=[physical_git_run_id]
+    r95_incomplete_product_schedule_ok=(
+        r95_product_git_incomplete_without_identity
+        and r89_clock_value(r94_r74_seed_id)
+            >r89_clock_value(physical_hostile_run_id))
+    r74_last_clock_id=[r94_r74_seed_id]
     def run_r74_environment_oracle(name: str, remove_current_effect: bool=False) -> dict[str,object]:
         # This is judge scheduling only.  Admission still comes exclusively
         # from the actual current run/capture/journal/output effects below.
@@ -4219,7 +4292,9 @@ def run_codex(sink, canonical, invocation, run, role):
     # Reuse the exact preceding product-Git run identity, not a judge-created
     # directory.  Without the release barrier this connected actual product
     # call must collide before provider start and leave the run set unchanged.
-    r89_collision_id=physical_git_run_id
+    r89_collision_id=(physical_git_run_id
+                      if physical_git_run_id is not None
+                      else physical_hostile_run_id)
     r89_collision_run=r74_runs_root/f"{r89_collision_id}-test_author"
     if r89_run_identity(r89_collision_run,r74_runs_root)!=r89_collision_id:
         raise RuntimeError("R94 actual collision run unavailable")
@@ -4567,7 +4642,8 @@ def run_codex(sink, canonical, invocation, run, role):
           f"prior={r74_prior_envelope} current={r73_exact_launch.get('current_run')} "
           f"decoy_unchanged={r74_decoy_after_environment_oracles==r74_decoy_before_environment_oracles}")
     check("J_R89_STRICT_CURRENT_RUN_CLOCK_AND_COLLISION",
-          r94_physical_clock_chain_ok
+          (r94_physical_clock_chain_ok or r95_incomplete_product_schedule_ok)
+          and r95_observation_mutants_reject
           and r89_collision_ok and r89_boundary_ok and r90_multisecond_ok
           and r89_rollback_reject
           and r89_stall_reject and r89_preseed_reject
@@ -4575,8 +4651,14 @@ def run_codex(sink, canonical, invocation, run, role):
           and all(item.get("clock_bound") is True
                   for item in r72_variant_observations.values()),
           f"physical_chain={r94_physical_clock_chain} "
+          f"product_complete={r94_product_git_observation_complete} "
+          f"product_incomplete={r95_product_git_incomplete_without_identity} "
+          f"chain_ok={r94_physical_clock_chain_ok} "
+          f"fallback_schedule={r95_incomplete_product_schedule_ok} "
+          f"r74_seed={r94_r74_seed_id} "
           f"releases={(physical_hostile_release,physical_git_release)} "
           f"starts={(physical_start_delta,physical_hostile_start_delta,physical_git_start_delta)} "
+          f"observation_mutants={r95_observation_mutants_reject} "
           f"collision={r89_collision_case,r89_collision_ok} "
           f"boundary={r89_boundary_ok} multisecond={r90_multisecond_ok} "
           f"rollback={r89_rollback_reject} "
@@ -4585,6 +4667,7 @@ def run_codex(sink, canonical, invocation, run, role):
           f"chain={[item.get('clock_bound') for item in r72_variant_observations.values()]}")
     physical_git_environment_ok=(
         physical_git_case[0]
+        and r94_product_git_observation_complete
         and product_git_decoy_after==product_git_decoy_before
         and product_git_decoy_restored
         and len(physical_git_new_runs)==1
