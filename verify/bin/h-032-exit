@@ -31,7 +31,7 @@ RESULT_KERNEL="$ROOT/controller/result/consumer.py"
 AUTHORITY="$ROOT/config/codex-provider-identity.json"
 SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
 OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
-OWNER_LIVE_HELPER_SHA256="6f31aaac4d1bf170686ebd9ad1f3de62076be9471644ed49fccc61b97ca14044"
+OWNER_LIVE_HELPER_SHA256="e5856a59c43a22bd20da60218650325d03633a99ac235bd9a23919d77dadcd1b"
 if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
   echo "ODÖMBART K0 — owner-live helper identity invalid"
   exit 2
@@ -43,9 +43,21 @@ if [[ "$OBSERVED_OWNER_LIVE_HELPER_SHA256" != "$OWNER_LIVE_HELPER_SHA256" ]]; th
 fi
 WORK="$(/usr/bin/mktemp -d /private/tmp/nortropic-h032.XXXXXX)" || exit 2
 case "$WORK" in /private/tmp/nortropic-h032.*) ;; *) echo "ODÖMBART K0 — osäker tempidentitet"; exit 2;; esac
+GATE_PID="";HELPER_PID=""
+quiesce_protocol() {
+  for owned_pid in "${HELPER_PID:-}" "${GATE_PID:-}"; do
+    [[ -n "$owned_pid" ]] || continue
+    /bin/kill -TERM "$owned_pid" 2>/dev/null || true
+  done
+  for owned_pid in "${HELPER_PID:-}" "${GATE_PID:-}"; do
+    [[ -n "$owned_pid" ]] || continue
+    wait "$owned_pid" 2>/dev/null || true
+  done
+}
 cleanup() {
   cleanup_rc=$?
   trap - EXIT HUP INT TERM
+  quiesce_protocol
   case "${WORK:-}" in
     /private/tmp/nortropic-h032.*) /bin/rm -rf -- "$WORK" || cleanup_rc=2 ;;
     *) cleanup_rc=2 ;;
@@ -136,6 +148,11 @@ def without_caller_git_controls(environment: dict[str, str]) -> dict[str, str]:
     return {key: value for key, value in environment.items()
             if not key.startswith(GIT_CONTROL_PREFIX)}
 
+def owner_call_environment(environment: dict[str,str]) -> dict[str,str]:
+    return {key:value for key,value in environment.items()
+            if not key.startswith(("GIT_","DYLD_","H032_","GH_","GITHUB_","SLACK_"))
+            and key not in {"LD_PRELOAD","LD_LIBRARY_PATH","__PYVENV_LAUNCHER__"}}
+
 # The owner gate itself is a composed execution boundary: imported product,
 # disposable helpers and the nested H-033 gate must not inherit a caller's
 # repository selector.  Preserve only judge evidence about the original names,
@@ -174,12 +191,17 @@ OWNER_CALL_RESULT_KEYS = {
     "schema_version", "nonce", "purpose", "mode", "plan_sha256",
     "plan_dev", "plan_ino", "helper_sha256", "argv", "cwd",
     "returncode", "timed_out", "stdout_b64", "stderr_b64",
-    "stdout_sha256", "stderr_sha256",
+    "stdout_sha256", "stderr_sha256", "environment_sha256", "tracked_processes",
+    "executable_dev", "executable_ino", "tracker_backend", "family_quiescent",
 }
+
+def owner_executable_binding(path: Path):
+    observed=path.stat()
+    return {"executable_dev":observed.st_dev,"executable_ino":observed.st_ino}
 
 def atomic_owner_json(path: Path, value) -> bytes:
     raw=json.dumps(value,sort_keys=True,separators=(",", ":")).encode("utf-8")
-    temporary=path.with_name(path.name+".tmp")
+    temporary=path.with_name(path.name+".tmp-"+os.urandom(16).hex())
     fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL
                |getattr(os,"O_NOFOLLOW",0),0o600)
     try:
@@ -187,7 +209,11 @@ def atomic_owner_json(path: Path, value) -> bytes:
         while offset<len(raw): offset+=os.write(fd,raw[offset:])
         os.fsync(fd)
     finally: os.close(fd)
-    os.replace(temporary,path)
+    try: os.link(temporary,path,follow_symlinks=False)
+    finally: os.unlink(temporary)
+    parent_fd=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+    try: os.fsync(parent_fd)
+    finally: os.close(parent_fd)
     return raw
 
 def stable_owner_json(path: Path, maximum: int=20*1024*1024):
@@ -224,12 +250,20 @@ def owner_call_result_valid(value, plan, plan_raw: bytes, plan_stat) -> bool:
         and value.get("plan_dev")==plan_stat.st_dev
         and value.get("plan_ino")==plan_stat.st_ino
         and value.get("helper_sha256")==owner_live_helper_sha256
+        and value.get("executable_dev")==plan.get("executable_dev")
+        and value.get("executable_ino")==plan.get("executable_ino")
         and value.get("argv")==plan.get("argv")
         and value.get("cwd")==plan.get("cwd")
         and type(value.get("returncode")) is int
         and type(value.get("timed_out")) is bool
         and value.get("stdout_sha256")==hashlib.sha256(stdout).hexdigest()
-        and value.get("stderr_sha256")==hashlib.sha256(stderr).hexdigest())
+        and value.get("stderr_sha256")==hashlib.sha256(stderr).hexdigest()
+        and value.get("environment_sha256")==hashlib.sha256(json.dumps(
+            plan.get("environment"),sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+        and type(value.get("tracked_processes")) is int
+        and value["tracked_processes"]>=0
+        and value.get("tracker_backend") in {"libproc-full","libproc-skip"}
+        and value.get("family_quiescent") is True)
 
 def canonical_result_valid(value, schema, accepted_digest=None, role="TEST_AUTHOR"):
     if not isinstance(value, dict) or set(value) != {
@@ -491,26 +525,227 @@ try:
     owner_helper_rig.mkdir(mode=0o700)
     owner_helper_plan_path=owner_helper_rig/"plan.json"
     owner_helper_result_path=owner_helper_rig/"result.json"
-    owner_helper_argv=["/bin/echo","R89-OWNER-CALL"]
+    owner_helper_environment=owner_call_environment(dict(os.environ))
+    # The disposable shell capture has no caller command identity; remove its
+    # volatile conventional `_` entry before the plan is frozen.  All actual
+    # product/provider environment relations remain covered independently.
+    owner_helper_environment.pop("_",None)
+    # Values are generated only after the candidate bytes are fixed.  The
+    # verdict binds the complete mapping digest, never a key spelling/value.
+    for _unused in range(2):
+        owner_helper_environment["NORTROPIC_RUNTIME_"+os.urandom(8).hex()]=os.urandom(24).hex()
+    owner_helper_environment["PWD"]=str(owner_helper_rig)
+    owner_helper_environment["SHLVL"]="0"
+    owner_helper_environment_fingerprint=hashlib.sha256(json.dumps(
+        owner_helper_environment,sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+    owner_helper_argv=["/bin/sh","-c","/bin/sleep .2; exec /usr/bin/env -0"]
     owner_helper_plan={
         "schema_version":1,"nonce":os.urandom(32).hex(),
         "purpose":"H032_OWNER_LIVE","mode":"full",
         "argv":owner_helper_argv,"cwd":str(owner_helper_rig),
         "result_path":str(owner_helper_result_path),
-        "executable_sha256":sha256(Path("/bin/echo")),
+        "executable_sha256":sha256(Path("/bin/sh")),
+        **owner_executable_binding(Path("/bin/sh")),
+        "environment":owner_helper_environment,
     }
     owner_helper_plan_raw=atomic_owner_json(owner_helper_plan_path,owner_helper_plan)
     owner_helper_plan_stat=owner_helper_plan_path.lstat()
     owner_helper_run=subprocess.run(
         [str(owner_live_helper),str(owner_helper_plan_path),str(owner_helper_result_path)],
         cwd=repo,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+    if not owner_helper_result_path.is_file():
+        raise RuntimeError("R90 owner helper positive produced no result: "
+                           f"rc={owner_helper_run.returncode} "
+                           f"stdout={owner_helper_run.stdout!r} stderr={owner_helper_run.stderr!r}")
     _owner_helper_raw,_owner_helper_stat,owner_helper_result=stable_owner_json(
         owner_helper_result_path)
+    owner_helper_actual_environment=dict(item.split("=",1) for item in
+        base64.b64decode(owner_helper_result["stdout_b64"],validate=True)
+            .decode("utf-8",errors="strict").split("\0") if item)
     owner_helper_positive=(owner_helper_run.returncode==0
         and owner_call_result_valid(owner_helper_result,owner_helper_plan,
                                     owner_helper_plan_raw,owner_helper_plan_stat)
-        and base64.b64decode(owner_helper_result["stdout_b64"],validate=True)
-            ==b"R89-OWNER-CALL\n")
+        and owner_helper_actual_environment==owner_helper_environment)
+    escaped_marker=owner_helper_rig/"escaped-family-marker"
+    escaped_plan_path=owner_helper_rig/"escaped-plan.json"
+    escaped_result_path=owner_helper_rig/"escaped-result.json"
+    escaped_code=("import os,time,sys;pid=os.fork();"
+        "(time.sleep(3),os._exit(0)) if pid else time.sleep(2);"
+        "os.setsid();p=sys.argv[1];open(p,'w').write('started');"
+        "\nwhile True:\n open(p,'a').write('x');time.sleep(.02)")
+    escaped_argv=["/usr/bin/python3","-I","-S","-c",escaped_code,str(escaped_marker)]
+    escaped_plan={"schema_version":1,"nonce":os.urandom(32).hex(),
+        "purpose":"H032_OWNER_LIVE","mode":"full","argv":escaped_argv,
+        "cwd":str(owner_helper_rig),"result_path":str(escaped_result_path),
+        "executable_sha256":sha256(Path("/usr/bin/python3")),
+        **owner_executable_binding(Path("/usr/bin/python3")),
+        "environment":owner_helper_environment}
+    atomic_owner_json(escaped_plan_path,escaped_plan)
+    escaped_helper=subprocess.Popen(
+        [str(owner_live_helper),str(escaped_plan_path),str(escaped_result_path)],
+        stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    escaped_deadline=time.monotonic()+5
+    while not escaped_marker.exists() and time.monotonic()<escaped_deadline:time.sleep(.01)
+    escaped_started=escaped_marker.exists()
+    if escaped_started: escaped_helper.terminate()
+    try: escaped_helper.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        escaped_helper.kill();escaped_helper.communicate();escaped_helper_bounded=False
+    else: escaped_helper_bounded=True
+    escaped_size=escaped_marker.stat().st_size if escaped_marker.exists() else 0
+    time.sleep(.15)
+    escaped_quiet=(escaped_marker.exists() and escaped_marker.stat().st_size==escaped_size)
+    escaped_result_ok=False
+    if escaped_result_path.is_file():
+        _a,_b,escaped_result=stable_owner_json(escaped_result_path)
+        escaped_result_ok=(escaped_result.get("timed_out") is True
+                           and escaped_result.get("tracked_processes",0)>=2)
+    owner_helper_containment_ok=(escaped_started and escaped_helper_bounded
+                                 and escaped_quiet and escaped_result_ok)
+    plan_preseed=owner_helper_rig/"plan-preseed.json"
+    plan_preseed.write_bytes(b"R90-PLAN-PRESEED")
+    try: atomic_owner_json(plan_preseed,{"replacement":True});plan_preseed_reject=False
+    except FileExistsError: plan_preseed_reject=plan_preseed.read_bytes()==b"R90-PLAN-PRESEED"
+    result_race_marker=owner_helper_rig/"result-race-started"
+    result_race_plan_path=owner_helper_rig/"result-race-plan.json"
+    result_race_path=owner_helper_rig/"result-race.json"
+    result_race_code=("import pathlib,sys,time;"
+        "pathlib.Path(sys.argv[1]).write_text('started');time.sleep(.2);print('done')")
+    result_race_argv=["/usr/bin/python3","-I","-S","-c",result_race_code,
+                      str(result_race_marker)]
+    result_race_plan={"schema_version":1,"nonce":os.urandom(32).hex(),
+        "purpose":"H032_OWNER_LIVE","mode":"full","argv":result_race_argv,
+        "cwd":str(owner_helper_rig),"result_path":str(result_race_path),
+        "executable_sha256":sha256(Path("/usr/bin/python3")),
+        **owner_executable_binding(Path("/usr/bin/python3")),
+        "environment":owner_helper_environment}
+    atomic_owner_json(result_race_plan_path,result_race_plan)
+    result_race_helper=subprocess.Popen(
+        [str(owner_live_helper),str(result_race_plan_path),str(result_race_path)])
+    race_deadline=time.monotonic()+5
+    while not result_race_marker.exists() and time.monotonic()<race_deadline:time.sleep(.01)
+    result_race_path.write_bytes(b"R90-RESULT-PRESEED")
+    result_race_rc=result_race_helper.wait(timeout=10)
+    result_race_reject=(result_race_rc==2
+        and result_race_path.read_bytes()==b"R90-RESULT-PRESEED")
+    owner_helper_no_replace_ok=plan_preseed_reject and result_race_reject
+    skip_reject_root=owner_helper_rig/"skip-rejects"
+    skip_reject_root.mkdir()
+    skip_rejects={}
+    def rejected_skip_plan(label,argv,executable,purpose="H031_H032_DEPENDENCY",
+                           digest=None):
+        plan_path=skip_reject_root/(label+"-plan.json")
+        result_path=skip_reject_root/(label+"-result.json")
+        marker=skip_reject_root/(label+"-started")
+        plan={"schema_version":1,"nonce":os.urandom(32).hex(),
+            "purpose":purpose,"mode":"skip","argv":argv,
+            "cwd":str(repo),"result_path":str(result_path),
+            "executable_sha256":digest if digest is not None else sha256(executable),
+            **owner_executable_binding(executable),
+            "environment":owner_helper_environment}
+        atomic_owner_json(plan_path,plan)
+        completed=subprocess.run(
+            [str(owner_live_helper),str(plan_path),str(result_path)],
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+        return completed.returncode==2 and not result_path.exists() and not marker.exists()
+    canonical_skip_gate=repo/"verify/bin/h-032-exit"
+    skip_rejects["wrong_argv"]=rejected_skip_plan(
+        "wrong-argv",[str(canonical_skip_gate),"--emit-g20-evidence","bad"],
+        canonical_skip_gate)
+    skip_provider_marker=skip_reject_root/"provider-started"
+    skip_provider_code=("import pathlib,sys;"
+        "pathlib.Path(sys.argv[1]).write_text('started')")
+    skip_rejects["provider_start"]=rejected_skip_plan(
+        "provider-start",["/usr/bin/python3","-I","-S","-c",
+                           skip_provider_code,str(skip_provider_marker)],
+        Path("/usr/bin/python3")) and not skip_provider_marker.exists()
+    skip_rejects["wrong_digest"]=rejected_skip_plan(
+        "wrong-digest",[str(canonical_skip_gate),"--skip-owner-live"],
+        canonical_skip_gate,digest="0"*64)
+    skip_rejects["wrong_purpose"]=rejected_skip_plan(
+        "wrong-purpose",[str(canonical_skip_gate),"--skip-owner-live"],
+        canonical_skip_gate,purpose="H032_OWNER_LIVE")
+
+    # The exact helper is copied only to shorten its frozen 120-second skip
+    # deadline for a causal containment rig.  The one-line constant change is
+    # mechanically checked; this fixture can never credit the product.
+    skip_rig_repo=owner_helper_rig/"skip-timeout-repo"
+    skip_rig_bin=skip_rig_repo/"verify/bin"
+    skip_rig_bin.mkdir(parents=True)
+    short_helper=skip_rig_bin/"h-032-owner-live-call"
+    helper_text=owner_live_helper.read_text(encoding="utf-8")
+    short_text=helper_text.replace("SKIP_SECONDS = 120","SKIP_SECONDS = 1.0",1)
+    short_helper.write_text(short_text,encoding="utf-8");short_helper.chmod(0o700)
+    short_helper_diff_ok=(short_text!=helper_text
+        and short_text.replace("SKIP_SECONDS = 1.0","SKIP_SECONDS = 120",1)==helper_text)
+    skip_escape_marker=skip_rig_repo/"escaped-marker"
+    skip_escape_gate=skip_rig_bin/"h-032-exit"
+    skip_escape_gate.write_text(
+        "#!/bin/bash\nexec /usr/bin/python3 -I -S - "
+        +repr(str(skip_escape_marker))+" <<'PY'\n"
+        "import os,sys,time\n"
+        "marker=sys.argv[1];time.sleep(.05);pid=os.fork()\n"
+        "if pid==0:\n"
+        " os.setsid();open(marker,'w').write(str(os.getpid()))\n"
+        " while True:\n"
+        "  open(marker,'a').write('x');time.sleep(.01)\n"
+        "while True: time.sleep(1)\nPY\n",encoding="utf-8")
+    skip_escape_gate.chmod(0o700)
+    skip_timeout_plan_path=skip_rig_repo/"plan.json"
+    skip_timeout_result_path=skip_rig_repo/"result.json"
+    skip_timeout_plan={"schema_version":1,"nonce":os.urandom(32).hex(),
+        "purpose":"H031_H032_DEPENDENCY","mode":"skip",
+        "argv":[str(skip_escape_gate),"--skip-owner-live"],
+        "cwd":str(skip_rig_repo),"result_path":str(skip_timeout_result_path),
+        "executable_sha256":sha256(skip_escape_gate),
+        **owner_executable_binding(skip_escape_gate),
+        "environment":owner_helper_environment}
+    atomic_owner_json(skip_timeout_plan_path,skip_timeout_plan)
+    skip_timeout_run=subprocess.run(
+        [str(short_helper),str(skip_timeout_plan_path),str(skip_timeout_result_path)],
+        stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+    skip_timeout_result={}
+    if skip_timeout_result_path.is_file():
+        _sr,_ss,skip_timeout_result=stable_owner_json(skip_timeout_result_path)
+    skip_escape_size=(skip_escape_marker.stat().st_size
+                      if skip_escape_marker.exists() else -1)
+    time.sleep(.1)
+    skip_timeout_contained=(short_helper_diff_ok and skip_timeout_run.returncode==0
+        and skip_timeout_result.get("timed_out") is True
+        and skip_timeout_result.get("tracker_backend")=="libproc-skip"
+        and skip_timeout_result.get("family_quiescent") is True
+        and skip_timeout_result.get("tracked_processes",0)>=2
+        and skip_escape_size>=1 and skip_escape_marker.stat().st_size==skip_escape_size)
+
+    # A direct-PGID-only mutant leaves the setsid descendant live.  Observe
+    # that causal failure, then clean that exact pid before continuing.
+    pgid_marker=owner_helper_rig/"pgid-only-marker"
+    pgid_code=("import os,sys,time;marker=sys.argv[1];pid=os.fork();"
+        "(time.sleep(10),os._exit(0)) if pid else None;os.setsid();"
+        "open(marker,'w').write(str(os.getpid())+'\\n');"
+        "\nwhile True:\n open(marker,'a').write('x');time.sleep(.01)")
+    pgid_root=subprocess.Popen(
+        ["/usr/bin/python3","-I","-S","-c",pgid_code,str(pgid_marker)],
+        start_new_session=True)
+    pgid_deadline=time.monotonic()+3
+    while not pgid_marker.exists() and time.monotonic()<pgid_deadline:time.sleep(.01)
+    pgid_started=pgid_marker.exists()
+    if pgid_started:
+        escaped_pid=int(pgid_marker.read_text().splitlines()[0])
+        try:os.killpg(pgid_root.pid,signal.SIGTERM)
+        except ProcessLookupError:pass
+        try:pgid_root.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pgid_root.kill();pgid_root.wait()
+        before_growth=pgid_marker.stat().st_size;time.sleep(.08)
+        pgid_only_survived=pgid_marker.stat().st_size>before_growth
+        try:os.kill(escaped_pid,signal.SIGKILL)
+        except ProcessLookupError:pass
+    else:
+        pgid_only_survived=False
+        pgid_root.kill();pgid_root.wait()
+    skip_containment_matrix_ok=(all(skip_rejects.values())
+        and skip_timeout_contained and pgid_started and pgid_only_survived)
     owner_helper_mutants={}
     for mutant_name,mutator in {
         "nonce":lambda item:item.__setitem__("nonce","0"*64),
@@ -527,10 +762,18 @@ try:
     owner_helper_mutants["replay"]=not owner_call_result_valid(
         owner_helper_result,replay_plan,owner_helper_plan_raw,owner_helper_plan_stat)
     check("J_R89_SPLIT_OWNER_CALL_RIG",
-          owner_helper_structure_ok and owner_helper_positive
+          owner_helper_structure_ok and owner_helper_positive and owner_helper_containment_ok
+          and owner_helper_no_replace_ok
           and all(owner_helper_mutants.values()),
           f"structure={owner_helper_structure_ok} positive={owner_helper_positive} "
+          f"env_diff={(sorted(set(owner_helper_environment)-set(owner_helper_actual_environment)),sorted(set(owner_helper_actual_environment)-set(owner_helper_environment)),sorted(key for key in owner_helper_environment if key in owner_helper_actual_environment and owner_helper_environment[key]!=owner_helper_actual_environment[key]))} "
+          f"containment={owner_helper_containment_ok,escaped_started,escaped_helper_bounded,escaped_quiet,escaped_result_ok} "
+          f"no_replace={owner_helper_no_replace_ok} "
           f"mutants={owner_helper_mutants}")
+    check("J_R91_MODE_SEPARATION_AND_SKIP_CONTAINMENT",
+          skip_containment_matrix_ok,
+          f"rejects={skip_rejects} timeout={skip_timeout_contained,skip_timeout_run.returncode,skip_timeout_run.stdout,skip_timeout_run.stderr,skip_escape_marker.exists(),skip_timeout_result.get('tracked_processes'),skip_timeout_result.get('family_quiescent'),skip_timeout_result.get('stdout_b64'),skip_timeout_result.get('stderr_b64')} "
+          f"pgid_only_survived={pgid_started,pgid_only_survived}")
 
     git_decoy = work / "r68-git-environment-decoy"
     git_decoy.mkdir()
@@ -3883,10 +4126,11 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_last_clock_id=[physical_module.now_id()]
     if r89_clock_value(r74_last_clock_id[0]) is None:
         raise RuntimeError("R89 initial clock observation invalid")
-    def run_r74_environment_oracle(name: str) -> dict[str,object]:
+    def run_r74_environment_oracle(name: str, remove_current_effect: bool=False) -> dict[str,object]:
         # This is judge scheduling only.  Admission still comes exclusively
         # from the actual current run/capture/journal/output effects below.
-        released_clock_id,eligible_run=r89_clock_barrier(r74_last_clock_id[0])
+        barrier_predecessor=r74_last_clock_id[0]
+        released_clock_id,eligible_run=r89_clock_barrier(barrier_predecessor)
         runs_before=frozenset(r74_runs_root.iterdir())
         journal_path=r74_runs_root.parent/"events.jsonl"
         journal_before=journal_path.read_bytes() if journal_path.is_file() else b""
@@ -3926,6 +4170,11 @@ def run_codex(sink, canonical, invocation, run, role):
         output=str(observed.get("output_path","")) if isinstance(observed,dict) else ""
         incoming=launch_environment_inputs.pop(output,{})
         observation=launch_observations.get(output,{"valid":False})
+        removed_current=None
+        if remove_current_effect and isinstance(observation.get("current_run"),str):
+            removed_current=Path(observation["current_run"])
+            if removed_current.parent==r74_runs_root and removed_current.is_dir():
+                shutil.rmtree(removed_current)
         runs_after=set(r74_runs_root.iterdir())
         current_runs=sorted(runs_after-set(runs_before))
         current_run_id=(r89_run_identity(current_runs[0])
@@ -3943,8 +4192,10 @@ def run_codex(sink, canonical, invocation, run, role):
                 "current_runs":[str(path) for path in current_runs],
                 "intended_common":str(r74_intended_common),
                 "barrier_anchor":released_clock_id,
+                "barrier_predecessor":barrier_predecessor,
                 "eligible_run":str(eligible_run),
-                "current_run_id":current_run_id}
+                "current_run_id":current_run_id,
+                "removed_current":str(removed_current) if removed_current else None}
 
     # A real product call, not a disconnected mkdir, reproduces the original
     # same-second collision.  The preseeded current slot must reject before a
@@ -3979,6 +4230,12 @@ def run_codex(sink, canonical, invocation, run, role):
         r89_boundary_ok=(r89_boundary_id=="20000101-000001"
                          and r89_boundary_path
                              ==r74_runs_root/"20000101-000001-test_author")
+        physical_module.now_id=lambda:"20000101-000005"
+        r90_multisecond_id,r90_multisecond_path=r89_clock_barrier(
+            "20000101-000001",.1)
+        r90_multisecond_ok=(r90_multisecond_id=="20000101-000005"
+            and r90_multisecond_path
+                ==r74_runs_root/"20000101-000005-test_author")
         physical_module.now_id=lambda:"19991231-235959"
         try:
             r89_clock_barrier("20000101-000000",.1)
@@ -4008,6 +4265,8 @@ def run_codex(sink, canonical, invocation, run, role):
         name:run_r74_environment_oracle(name)
         for name in ("exact","drop_one","length","prefix","fixed","extra")
     }
+    r89_missing_effect_variant=run_r74_environment_oracle(
+        "exact",remove_current_effect=True)
     r74_decoy_after_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r73_split_variant=r72_environment_variants["exact"]
 
@@ -4146,9 +4405,12 @@ def run_codex(sink, canonical, invocation, run, role):
                     ==Path(variant["intended_common"])/"nortropic-codex-autopilot"/"runs"
                 and variant["current_runs"]==[variant["launch"]["current_run"]]),
             "clock_bound":(
-                variant["current_run_id"]==variant["barrier_anchor"]
-                and variant["current_runs"]==[variant["eligible_run"]]
-                and variant["launch"].get("current_run")==variant["eligible_run"]),
+                r89_clock_value(variant["current_run_id"]) is not None
+                and r89_clock_value(variant["current_run_id"])
+                    >r89_clock_value(variant["barrier_predecessor"])
+                and variant["current_runs"]==[variant["launch"].get("current_run")]
+                and Path(variant["launch"].get("current_run","/")).name
+                    ==f"{variant['current_run_id']}-test_author"),
             "split":(variant["launch"].get("envelope")
                      not in {None,str(Path(variant["split_sink"]).with_name(
                          "provider-envelope.json"))}
@@ -4185,11 +4447,9 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_current_output_decoy_envelope_rejects=(expected_provider_environment(
         r73_exact_variant["incoming"],r73_exact_capture,
         r74_decoy_envelope_launch) is None)
-    r89_missing_effect_variant=dict(r73_exact_variant)
-    r89_missing_effect_variant["current_runs"]=[]
-    r89_missing_effect_reject=(
-        not (r89_missing_effect_variant["current_runs"]
-             ==[r89_missing_effect_variant["eligible_run"]]))
+    r89_missing_effect_reject=(r89_missing_effect_variant["starts"]==1
+        and r89_missing_effect_variant["removed_current"] is not None
+        and r89_missing_effect_variant["current_runs"]==[])
     r73_wrong_envelope_rejects=(
         r73_exact_capture.get("complete_environment")
         !=expected_provider_environment(r73_exact_variant["incoming"],
@@ -4280,13 +4540,15 @@ def run_codex(sink, canonical, invocation, run, role):
           f"prior={r74_prior_envelope} current={r73_exact_launch.get('current_run')} "
           f"decoy_unchanged={r74_decoy_after_environment_oracles==r74_decoy_before_environment_oracles}")
     check("J_R89_STRICT_CURRENT_RUN_CLOCK_AND_COLLISION",
-          r89_collision_ok and r89_boundary_ok and r89_rollback_reject
+          r89_collision_ok and r89_boundary_ok and r90_multisecond_ok
+          and r89_rollback_reject
           and r89_stall_reject and r89_preseed_reject
           and r89_missing_effect_reject
           and all(item.get("clock_bound") is True
                   for item in r72_variant_observations.values()),
           f"collision={r89_collision_case,r89_collision_ok} "
-          f"boundary={r89_boundary_ok} rollback={r89_rollback_reject} "
+          f"boundary={r89_boundary_ok} multisecond={r90_multisecond_ok} "
+          f"rollback={r89_rollback_reject} "
           f"stall={r89_stall_reject} preseed={r89_preseed_reject} "
           f"missing_effect={r89_missing_effect_reject} "
           f"chain={[item.get('clock_bound') for item in r72_variant_observations.values()]}")
@@ -5783,6 +6045,8 @@ class CraftedConcretePath(type(Path())):
             "purpose":"H032_OWNER_LIVE","mode":"full","argv":live_argv,
             "cwd":str(repo),"result_path":str(owner_live_result),
             "executable_sha256":sha256(Path(live_argv[0])),
+            **owner_executable_binding(Path(live_argv[0])),
+            "environment":owner_call_environment(dict(os.environ)),
         }
         if owner_live_plan.exists() or owner_live_result.exists():
             raise RuntimeError("R89 owner-live channel preseeded")
@@ -5794,6 +6058,10 @@ class CraftedConcretePath(type(Path())):
                 or not owner_call_result_valid(
                     live_call_result,live_plan,live_plan_raw,live_plan_stat)):
             raise RuntimeError("R89 exact owner helper result binding invalid")
+        owner_live_result.unlink()
+        owner_live_plan.unlink()
+        if owner_live_result.exists() or owner_live_plan.exists():
+            raise RuntimeError("R90 owner-call consume-once cleanup failed")
         if live_call_result["timed_out"]:
             raise RuntimeError("R13 exact owner provider unavailable: delegated timeout")
         live_stdout=base64.b64decode(live_call_result["stdout_b64"],validate=True).decode(
@@ -6902,6 +7170,9 @@ class CraftedConcretePath(type(Path())):
     owner_live_skip_expected = (owner_live_mode == "skip"
         and deterministic_result_ok
         and material_failed == {"K_STRUCTURED_RESULT_DELIVERY_BOUNDARY"})
+    if owner_live_mode == "skip":
+        print("OWNER_LIVE_EXECUTION=SKIPPED")
+        print("OWNER_LIVE_START_DELTA=0")
     if owner_live_skip_expected:
         print("CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN")
     elif material_failed == {"K_STRUCTURED_RESULT_DELIVERY_BOUNDARY"}:
@@ -6927,30 +7198,29 @@ except Exception as exc:
 PY
 }
 
-run_gate_python_and_close() {
-  run_gate_python
-  GATE_RC=$?
-  /usr/bin/touch -- "$OWNER_LIVE_PLAN.closed"
-  return "$GATE_RC"
-}
-
 if [[ "$OWNER_LIVE_MODE" == "run" ]]; then
-  run_gate_python_and_close &
+  run_gate_python &
   GATE_PID=$!
-  "$OWNER_LIVE_HELPER" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT"
+  PLAN_DEADLINE=$((SECONDS+300))
+  while [[ ! -e "$OWNER_LIVE_PLAN" ]]; do
+    if ! /bin/kill -0 "$GATE_PID" 2>/dev/null; then wait "$GATE_PID"; exit $?; fi
+    if (( SECONDS >= PLAN_DEADLINE )); then quiesce_protocol; echo "ODÖMBART K_OWNER_LIVE_PROTOCOL — plan readiness timeout"; exit 2; fi
+    /bin/sleep 0.05
+  done
+  "$OWNER_LIVE_HELPER" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT" &
+  HELPER_PID=$!
+  wait "$HELPER_PID"
   HELPER_RC=$?
+  HELPER_PID=""
   if [[ $HELPER_RC -ne 0 ]]; then
-    if [[ -e "$OWNER_LIVE_PLAN" ]]; then
-      /bin/kill -TERM "$GATE_PID" 2>/dev/null || true
-      wait "$GATE_PID" 2>/dev/null || true
-      echo "ODÖMBART K_OWNER_LIVE_HELPER — helper failed after current plan rc=$HELPER_RC"
-      exit 2
-    fi
-    wait "$GATE_PID"
-    exit $?
+    quiesce_protocol; echo "ODÖMBART K_OWNER_LIVE_HELPER — helper failed rc=$HELPER_RC"; exit 2
   fi
-  wait "$GATE_PID"
-  exit $?
+  POST_DEADLINE=$((SECONDS+300))
+  while /bin/kill -0 "$GATE_PID" 2>/dev/null; do
+    if (( SECONDS >= POST_DEADLINE )); then quiesce_protocol; echo "ODÖMBART K_OWNER_LIVE_PROTOCOL — postprocess timeout"; exit 2; fi
+    /bin/sleep 0.05
+  done
+  wait "$GATE_PID"; GATE_RC=$?;GATE_PID="";exit "$GATE_RC"
 fi
 
 run_gate_python

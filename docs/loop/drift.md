@@ -1883,3 +1883,45 @@ attempt only at a strictly later absent slot, then the actual run/capture/envelo
 bind that exact slot. An actual preseeded same-second product call rejects before provider
 start; rollback, stall, preseed and missing-current-effect controls reject independently. The
 barrier cannot grant product credit. Production and the guarded exact live positive are unchanged.
+
+### 2026-08-21 — H032/H031 R90 complete owner-live protocol
+
+Independent review showed that R89 isolated the call but did not yet close the transport:
+the plan omitted the exact child environment, publication used replacement, interruption
+could leave a session-escaped descendant, and the barrier mistook its release second for
+the only admissible current run.
+
+R90 carries the complete normalized child environment in the private strict plan and
+compares only its SHA-256 in results and evidence. Plan and result are owner-private,
+fsynced and published without replacement; the matching stable-read nonce/devino/digest
+channel is consumed and removed once. Signals are blocked across child assignment. The
+helper owns a new child session, binds descendants by stable PID/start identity before
+reparenting, and synchronously applies TERM, grace, KILL and wait. An escaped-session
+fixture must stop delayed writes and report at least two tracked identities. The shell
+bounds plan readiness and post-helper processing, while accepted full live still delegates
+the sole lifetime to the product and skip alone remains 120 seconds.
+
+The R74 barrier now supplies only a strict lower bound. Any actual well-formed current run
+strictly later than the predecessor is accepted and becomes the next predecessor, including
+multi-second advances. Same-second collision, rollback, stall, preseed and deletion of the
+actual current product run after one provider start reject. These are rig sensitivity facts,
+not product credit; production, provider authority, G20 and the sole prebuilder RED remain
+unchanged.
+
+### 2026-08-21 — H032/H031 R91 mode-separated owner-live containment
+
+R90's complete ledger made nested no-live H031 exceed its 300-second owner bound because
+every skip descendant sample launched `/bin/ps`. R91 narrows authority by mode. Full remains
+the sole provider-capable mode, has no outer deadline and retains continuous stable descendant
+identity tracking. Skip accepts only the canonical helper-adjacent H032 gate, exact repository
+cwd, current SHA/device/inode and the one `--skip-owner-live` argument; its deadline remains
+exactly 120 seconds.
+
+Skip uses native `libproc` pid/start and child observations instead of repeated external
+processes. On timeout or signal it terminates the direct PGID and every recorded identity,
+waits and publishes only a quiescent ODÖMBART result. A shortened owner-only helper copy with
+an exact canonical fork/setsid fixture proves the escape is stopped, while a PGID-only mutant
+continues writing and therefore fails. Wrong argv, purpose, digest and attempted provider
+start all reject before child creation. Successful skip must carry the H032-emitted exact
+SKIPPED/start-delta-zero evidence. These controls never grant product credit; R90 environment,
+no-replace, replay and signal closures and the guarded full live phase are unchanged.
