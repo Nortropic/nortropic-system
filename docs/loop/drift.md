@@ -1862,3 +1862,28 @@ exact report, while argv and AGENT_START retain their existing independent route
 connected seventh provider start writes the old partial object; it must be schema-rejected and
 leave no canonical result. These are dependent-gate repairs, not product credits. R77's exclusive
 no-live/H033 parser, H032 bytes, production, process topology and live-call guard are unchanged.
+
+### 2026-08-21 — H031 R79 composite owner-live dependency deadline
+
+The first normal H031 execution over the completed H032 product reached H032's real owner-live
+provider phase, but H031 still wrapped the complete dependency in `subprocess.run(...,
+timeout=120)`. The outer judge therefore raised `TimeoutExpired` before the legitimate inner
+provider could use its already-frozen 86400-second timeout. H032 removed its exact temporary root
+and left no process survivor, so the observation was an H031 composition defect rather than a
+product, authentication or cleanup failure.
+
+R79 gives the two ceremonies separate finite outer bounds. `--skip-owner-live` retains a
+600-second deadline, enough for the measured deterministic matrix while still bounding a stuck
+no-live gate. Normal execution receives 87300 seconds: H032 continues to own the only
+86400-second provider decision, with 900 seconds reserved for its deterministic work, inner
+timeout handling and post-run cleanup. The values are gate constants, not environment or product
+inputs.
+
+H031 starts H032 in a new session and owns that process group synchronously. At an outer deadline
+it signals TERM to the group, waits five seconds, sends KILL only if the group remains, waits five
+more seconds for absence and exits ODÖMBART with an explicit composite-timeout label. It also
+rejects a nominal H032 return if the owned group remains. Gate-local no-provider fixtures prove a
+quick success, a cooperative handler that removes its exact root on TERM, and an uncooperative
+parent plus child that require group KILL; the latter leaves zero fixture PIDs and never produces
+its delayed marker. These controls do not shorten H032, enter owner live, or call a provider.
+R75-R78's exclusive skip transcript and embedded-H033 requirements are unchanged.

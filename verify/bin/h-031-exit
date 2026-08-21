@@ -65,10 +65,12 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import shutil
 import stat
 import subprocess
 import sys
+import time
 
 source, schema_source, spec_path, h032_gate, work = map(Path, sys.argv[1:6])
 owner_live_mode = sys.argv[6]
@@ -281,6 +283,137 @@ def check(key: str, ok: bool, detail: str) -> None:
 def odombart(key: str, detail: str) -> None:
     print(f"ODÖMBART {key} — {detail}")
     raise SystemExit(2)
+
+
+H032_INNER_OWNER_LIVE_TIMEOUT_SECONDS = 86400
+H032_SKIP_COMPOSITE_TIMEOUT_SECONDS = 600
+H032_OWNER_COMPOSITE_TIMEOUT_SECONDS = 87300
+H032_COMPOSITE_TERM_GRACE_SECONDS = 5
+H032_COMPOSITE_KILL_GRACE_SECONDS = 5
+
+
+class H032CompositeTimeout(RuntimeError):
+    def __init__(self, *, timeout_seconds, pgid, term_sent, kill_sent,
+                 group_absent, stdout, stderr):
+        self.timeout_seconds = timeout_seconds
+        self.pgid = pgid
+        self.term_sent = term_sent
+        self.kill_sent = kill_sent
+        self.group_absent = group_absent
+        self.stdout = stdout
+        self.stderr = stderr
+        super().__init__(
+            "deadline=" + str(timeout_seconds)
+            + " term_sent=" + str(term_sent)
+            + " kill_sent=" + str(kill_sent)
+            + " group_absent=" + str(group_absent)
+        )
+
+
+class H032CompositeResidue(RuntimeError):
+    pass
+
+
+def h032_composite_timeout(owner_mode: str) -> int:
+    if owner_mode == "skip":
+        return H032_SKIP_COMPOSITE_TIMEOUT_SECONDS
+    if owner_mode == "run":
+        return H032_OWNER_COMPOSITE_TIMEOUT_SECONDS
+    raise ValueError("invalid owner-live mode")
+
+
+def process_group_absent(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    return False
+
+
+def wait_process_group_absent(pgid: int, timeout_seconds: float) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if process_group_absent(pgid):
+            return True
+        time.sleep(0.01)
+    return process_group_absent(pgid)
+
+
+def signal_process_group(pgid: int, signum: int) -> bool:
+    try:
+        os.killpg(pgid, signum)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def stop_h032_process_group(proc, pgid: int, term_grace: float, kill_grace: float):
+    term_sent = signal_process_group(pgid, signal.SIGTERM)
+    stdout = ""
+    stderr = ""
+    try:
+        stdout, stderr = proc.communicate(timeout=term_grace)
+    except subprocess.TimeoutExpired:
+        pass
+    kill_sent = False
+    if not process_group_absent(pgid):
+        kill_sent = signal_process_group(pgid, signal.SIGKILL)
+    try:
+        stdout, stderr = proc.communicate(timeout=kill_grace)
+    except subprocess.TimeoutExpired:
+        pass
+    group_absent = wait_process_group_absent(pgid, kill_grace)
+    return term_sent, kill_sent, group_absent, stdout, stderr
+
+
+def run_h032_composed(argv, cwd: Path, owner_mode: str, *,
+                      test_timeout_seconds=None, term_grace_seconds=None,
+                      kill_grace_seconds=None):
+    timeout_seconds = (
+        h032_composite_timeout(owner_mode)
+        if test_timeout_seconds is None else test_timeout_seconds
+    )
+    term_grace = (
+        H032_COMPOSITE_TERM_GRACE_SECONDS
+        if term_grace_seconds is None else term_grace_seconds
+    )
+    kill_grace = (
+        H032_COMPOSITE_KILL_GRACE_SECONDS
+        if kill_grace_seconds is None else kill_grace_seconds
+    )
+    proc = subprocess.Popen(
+        argv, cwd=cwd, text=True, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, start_new_session=True,
+    )
+    # Popen returns only after its POSIX child setup has completed; start_new_session
+    # therefore binds the owned session/process-group identity to this pid even if a
+    # very short-lived positive exits before the parent can call getpgid(2).
+    pgid = proc.pid
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        term_sent, kill_sent, group_absent, stdout, stderr = stop_h032_process_group(
+            proc, pgid, term_grace, kill_grace,
+        )
+        raise H032CompositeTimeout(
+            timeout_seconds=timeout_seconds, pgid=pgid,
+            term_sent=term_sent, kill_sent=kill_sent,
+            group_absent=group_absent, stdout=stdout, stderr=stderr,
+        )
+    except BaseException:
+        stop_h032_process_group(proc, pgid, term_grace, kill_grace)
+        raise
+    if not wait_process_group_absent(pgid, 0.25):
+        term_sent, kill_sent, group_absent, _out, _err = stop_h032_process_group(
+            proc, pgid, term_grace, kill_grace,
+        )
+        raise H032CompositeResidue(
+            "H032 returned with surviving process group: "
+            + f"term_sent={term_sent} kill_sent={kill_sent} group_absent={group_absent}"
+        )
+    return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
 
 
 H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 140 PASS / 1 FAIL"
@@ -1991,10 +2124,156 @@ subprocess = object()
     harmless = process_shape(source_text + "\ndef h031_harmless(repo, wt, role, prompt):\n    return run_codex(repo, wt, role, prompt)\n")
     check("J_HARMLESS_ROLE_CONSOLIDATION", bool(harmless["boundary_ok"]), str(harmless["detail"]))
 
+    check(
+        "J_H032_COMPOSITE_DEADLINE_POLICY",
+        h032_composite_timeout("skip") == 600
+        and h032_composite_timeout("run") == 87300
+        and h032_composite_timeout("run")
+            >= H032_INNER_OWNER_LIVE_TIMEOUT_SECONDS + 900
+        and h032_composite_timeout("skip") < H032_INNER_OWNER_LIVE_TIMEOUT_SECONDS,
+        "skip=600 owner=87300 inner_owner=86400",
+    )
+    check(
+        "J_H032_COMPOSITE_OLD_120_OWNER_DEADLINE_REJECT",
+        120 < H032_INNER_OWNER_LIVE_TIMEOUT_SECONDS
+        and 120 != h032_composite_timeout("run"),
+        "the superseded outer deadline cannot contain the frozen inner owner phase",
+    )
+    check(
+        "J_H032_COMPOSITE_OWNER_DEADLINE_FOR_SKIP_REJECT",
+        h032_composite_timeout("skip") != h032_composite_timeout("run")
+        and h032_composite_timeout("skip") == 600,
+        "deterministic no-live execution retains its shorter finite bound",
+    )
+    try:
+        h032_composite_timeout("other")
+    except ValueError:
+        invalid_mode_rejected = True
+    else:
+        invalid_mode_rejected = False
+    check("J_H032_COMPOSITE_INVALID_MODE_REJECT", invalid_mode_rejected,
+          "unknown owner-live mode has no deadline")
+
+    composite_fixture = work / "h032-composite-fixture"
+    composite_fixture.mkdir()
+    quick = run_h032_composed(
+        ["/usr/bin/python3", "-I", "-S", "-c",
+         "import sys;print('quick-ok');sys.stderr.write('quick-err\\n')"],
+        composite_fixture, "skip", test_timeout_seconds=2,
+        term_grace_seconds=0.5, kill_grace_seconds=0.5,
+    )
+    check(
+        "J_H032_COMPOSITE_QUICK_POSITIVE",
+        quick.returncode == 0 and quick.stdout == "quick-ok\n"
+        and quick.stderr == "quick-err\n",
+        f"rc={quick.returncode} stdout={quick.stdout!r} stderr={quick.stderr!r}",
+    )
+
+    cooperative_root = composite_fixture / "cooperative-root"
+    cooperative_root.mkdir()
+    cooperative_code = (
+        "import pathlib,signal,shutil,sys,time\n"
+        "root=pathlib.Path(sys.argv[1])\n"
+        "def stop(_signum,_frame):\n"
+        " shutil.rmtree(root)\n"
+        " raise SystemExit(143)\n"
+        "signal.signal(signal.SIGTERM,stop)\n"
+        "print('cooperative-ready',flush=True)\n"
+        "while True: time.sleep(1)\n"
+    )
+    cooperative_timeout = None
+    try:
+        run_h032_composed(
+            ["/usr/bin/python3", "-I", "-S", "-c", cooperative_code,
+             str(cooperative_root)],
+            composite_fixture, "skip", test_timeout_seconds=0.7,
+            term_grace_seconds=0.7, kill_grace_seconds=0.7,
+        )
+    except H032CompositeTimeout as exc:
+        cooperative_timeout = exc
+    check(
+        "J_H032_COMPOSITE_COOPERATIVE_TIMEOUT_CLEANUP",
+        cooperative_timeout is not None
+        and cooperative_timeout.term_sent
+        and not cooperative_timeout.kill_sent
+        and cooperative_timeout.group_absent
+        and not cooperative_root.exists()
+        and "cooperative-ready" in cooperative_timeout.stdout,
+        str(cooperative_timeout),
+    )
+
+    descendant_pids = composite_fixture / "descendant-pids"
+    delayed_marker = composite_fixture / "delayed-survivor-effect"
+    descendant_code = (
+        "import pathlib,signal,sys,time\n"
+        "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
+        "time.sleep(1.5)\n"
+        "pathlib.Path(sys.argv[1]).write_text('survived',encoding='utf-8')\n"
+        "while True: time.sleep(1)\n"
+    )
+    uncooperative_code = (
+        "import os,pathlib,signal,subprocess,sys,time\n"
+        "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
+        "child=subprocess.Popen([sys.executable,'-I','-S','-c',sys.argv[3],sys.argv[2]],"
+        "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
+        "pathlib.Path(sys.argv[1]).write_text(str(os.getpid())+' '+str(child.pid),encoding='utf-8')\n"
+        "print('uncooperative-ready',flush=True)\n"
+        "while True: time.sleep(1)\n"
+    )
+    uncooperative_timeout = None
+    try:
+        run_h032_composed(
+            ["/usr/bin/python3", "-I", "-S", "-c", uncooperative_code,
+             str(descendant_pids), str(delayed_marker), descendant_code],
+            composite_fixture, "skip", test_timeout_seconds=0.7,
+            term_grace_seconds=0.2, kill_grace_seconds=0.7,
+        )
+    except H032CompositeTimeout as exc:
+        uncooperative_timeout = exc
+    time.sleep(1.0)
+    recorded_pids = []
+    if descendant_pids.is_file():
+        recorded_pids = [int(item) for item in descendant_pids.read_text().split()]
+    live_pids = []
+    for fixture_pid in recorded_pids:
+        try:
+            os.kill(fixture_pid, 0)
+        except ProcessLookupError:
+            continue
+        except PermissionError:
+            live_pids.append(fixture_pid)
+        else:
+            live_pids.append(fixture_pid)
+    check(
+        "J_H032_COMPOSITE_UNCOOPERATIVE_GROUP_ESCALATION",
+        uncooperative_timeout is not None
+        and uncooperative_timeout.term_sent
+        and uncooperative_timeout.kill_sent
+        and uncooperative_timeout.group_absent
+        and len(recorded_pids) == 2
+        and not live_pids
+        and not delayed_marker.exists()
+        and "uncooperative-ready" in uncooperative_timeout.stdout,
+        str({
+            "timeout": str(uncooperative_timeout),
+            "pid_count": len(recorded_pids),
+            "live_pid_count": len(live_pids),
+            "delayed_effect": delayed_marker.exists(),
+        }),
+    )
+
     upstream_argv=[str(h032_gate)]
     if owner_live_mode == "skip": upstream_argv.append("--skip-owner-live")
-    upstream = subprocess.run(upstream_argv, cwd=root, text=True,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+    try:
+        upstream = run_h032_composed(upstream_argv, root, owner_live_mode)
+    except H032CompositeTimeout as exc:
+        odombart(
+            "K_H032_COMPOSITE_TIMEOUT",
+            str(exc) + " stdout_tail=" + exc.stdout[-300:].replace("\n", "|")
+            + " stderr_tail=" + exc.stderr[-300:].replace("\n", "|"),
+        )
+    except H032CompositeResidue as exc:
+        odombart("K_H032_COMPOSITE_PROCESS_RESIDUE", str(exc))
     owner_skip_fixture = owner_skip_fixture_from_observed_h032(upstream.stdout)
     owner_skip_positive = exclusive_h032_owner_live_skip(2, owner_skip_fixture)
     check("J_H032_EXCLUSIVE_OWNER_LIVE_SKIP_POSITIVE",
