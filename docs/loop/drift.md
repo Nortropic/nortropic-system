@@ -2018,3 +2018,23 @@ extra labels plus conflicting/arbitrary summaries and a top-level result marker.
 changes only the owner parser rig. It grants no replay or product credit: the preserved
 single full-live run remains historical evidence, and publication still requires a later
 normal full H031 exit zero without making another provider call during TEST_AUTHOR.
+
+## 2026-08-22 — R100 canonical transitions and accepted-source coherence
+
+R99 closed the observed product defect but independent review found two general holes.
+Its publication inventory deduplicated path/device/inode/digest tuples, so the same object
+could be republished twice after intervening absence and still look like one epoch. Its
+transient positive also accepted any schema-shaped final envelope because no retained
+private-source digest/value was supplied to the validator.
+
+R100 replaces unique-state counting with a per-path presence relation synchronized after
+the preceding audited filesystem operation and after the final operation. Every false to
+true edge is appended, including identical inode/digest republication. At the real
+consumer call the gate retains the stable private sink bytes, parsed report and digest.
+Transient recovery requires exactly one untouched canonical with the same report and
+result digest and no direct canonical writer. Persistent rejection permits zero
+publications or one publication followed by rollback, but ends canonical-absent. A
+same-object double-republication ending absent and a same-length schema-valid in-place
+substitution with stale digest are connected causal controls. The criterion binds effects,
+not publication API, source spelling or cleanup order; TEST_AUTHOR changes no product and
+runs no live provider/model.
