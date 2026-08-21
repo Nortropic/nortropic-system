@@ -30,11 +30,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-CONTROLLER_ROOT = Path(__file__).resolve().parents[1]
-# Normal orchestrator execution must not mutate the immutable candidate merely
-# by loading the shared authority parser.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(CONTROLLER_ROOT))
+sys.path.insert(0, str(REPOSITORY_ROOT))
 from controller.authority.core import (AuthorityError, canonical_path, permits,
                                        strict_json_bytes)  # noqa: E402
 from controller.result.consumer import consume_private_result  # noqa: E402
@@ -254,9 +252,7 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
             raise Stop(f"history rewrite command forbidden: {joined}")
         if any(arg.startswith("+") for arg in argv[1:]):
             raise Stop(f"leading + refspec forbidden: {joined}")
-    process_environment = without_caller_git_controls(
-        dict(os.environ) if env is None else dict(env)
-    )
+    process_environment = None if env is None else dict(env)
     p = subprocess.run(
         argv,
         cwd=str(cwd) if cwd else None,
@@ -272,7 +268,11 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
 
 
 def git(repo: Path, *args: str, check: bool = True, timeout: int | None = None) -> Cmd:
-    return run(["git", *args], cwd=repo, check=check, timeout=timeout)
+    environment = without_caller_git_controls({
+        key: value for key, value in os.environ.items()
+    })
+    return run(["git", *args], cwd=repo, check=check, timeout=timeout,
+               env=environment)
 
 
 def clean(repo: Path) -> bool:
@@ -801,8 +801,8 @@ def _remove_result_tree(root: Path) -> bool:
         if stat.S_ISDIR(opened.st_mode) and not child.is_symlink():
             _remove_result_tree(child)
         else:
-            os.remove(child)
-    os.rmdir(root)
+            child.unlink()
+    root.rmdir()
     return primary_failures == 3
 
 
