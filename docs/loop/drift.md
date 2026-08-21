@@ -2056,3 +2056,16 @@ observed transitions with final canonical absence. Zero-publication cleanup and 
 publication followed by rollback remain admissible. Every R100 retained-value, digest,
 direct-write and residue closure remains unchanged; production and live/provider execution
 are untouched.
+
+## 2026-08-22 — R102 safe no-replace hardlink publication
+
+R101 made hardlink publication observable but the source inventory still rejected every
+`os.link`, including a legitimate fully written, fsynced and writer-closed private temp linked
+once into an absent canonical leaf. R102 opens only that boundary: the unaliased callable must
+be a direct call in `consume_private_result` (with Python 3.9 `Path.link_to` as the same effect),
+while aliases and helper transfer stay closed. The fresh-child oracle supplies the authority:
+source under the canonical parent, exact absent destination, stable retained source bytes and
+identity, fsync, no writer, one transition, final exact envelope/digest, removed temp and no
+later publication or residue. Wrong value or destination, preseed and link/unlink/link all
+reject. The existing atomic rename path remains green, and no production or provider behavior
+is executed by this owner amendment.

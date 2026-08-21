@@ -1222,7 +1222,7 @@ if mode == 'output_then_fail': sys.exit(17)
             "os":{("open",),("close",),("read",),("pread",),("readv",),("preadv",),
                   ("write",),("pwrite",),("lseek",),("fstat",),("stat",),("lstat",),
                   ("access",),("readlink",),("fsync",),("unlink",),("remove",),
-                  ("replace",),("rename",),("fspath",),("O_RDONLY",),("O_WRONLY",),
+                  ("replace",),("rename",),("link",),("fspath",),("O_RDONLY",),("O_WRONLY",),
                   ("O_RDWR",),("O_CREAT",),("O_EXCL",),("O_TRUNC",),("O_CLOEXEC",),
                   ("O_NOFOLLOW",),("O_ACCMODE",),("SEEK_SET",),("F_OK",),("R_OK",),
                   ("W_OK",),("path","dirname"),("path","abspath"),("path","realpath"),
@@ -1237,7 +1237,7 @@ if mode == 'output_then_fail': sys.exit(17)
             "os":{("open",),("close",),("read",),("pread",),("readv",),("preadv",),
                   ("write",),("pwrite",),("lseek",),("fstat",),("stat",),("lstat",),
                   ("access",),("readlink",),("fsync",),("unlink",),("remove",),
-                  ("replace",),("rename",),("fspath",),("path","dirname"),
+                  ("replace",),("rename",),("link",),("fspath",),("path","dirname"),
                   ("path","abspath"),("path","realpath"),("path","lexists")},
         }
         # This is a lexical binding inventory, not a Python control-flow
@@ -1384,7 +1384,19 @@ if mode == 'output_then_fail': sys.exit(17)
                        and (chain not in callable_module_members.get(module_name,set())
                             or (isinstance(parents.get(current),ast.Call)
                                 and parents[current].func is current)))
+            if module_name=="os" and chain==("link",):
+                link_scope=node_scope.get(node)
+                permitted &= (len(consumers)==1 and link_scope is consumers[0])
             module_uses.append((module_name,chain,permitted))
+            module_capability_ok &= permitted
+        for node in ast.walk(tree):
+            if not (isinstance(node,ast.Attribute)
+                    and node.attr in {"link_to","hardlink_to"}): continue
+            link_scope=node_scope.get(node)
+            permitted=(isinstance(parents.get(node),ast.Call)
+                       and parents[node].func is node
+                       and len(consumers)==1 and link_scope is consumers[0])
+            module_uses.append(("path-instance",(node.attr,),permitted))
             module_capability_ok &= permitted
         imported_member_ok=True
         for node in ast.walk(tree):
@@ -5442,7 +5454,13 @@ def secure_mode(value,directory=False):
  return isinstance(value,int) and value>=0 and not (value&0o077)
 def mutation_allowed(name,args):
  if not args: return False
- if name in {"symlink","link"}: return False
+ if name=="symlink": return False
+ if name=="link":
+  if len(args)<2: return False
+  source=lexical_path(args[0]);destination=lexical_path(args[1])
+  return (source is not None and destination==lexical_path(canonical)
+          and os.path.dirname(source)==lexical_path(canonical_parent)
+          and strict_member(args[0]) and strict_member(args[1]))
  target=args[0]
  if not strict_member(target): return False
  if name in {"chmod","fchmod"}:
@@ -5540,7 +5558,9 @@ def observed_path_method(name):
   if name in {"rename","replace"}:
    allowed=strict_member(self) and bool(args) and strict_member(args[0])
   if name=="touch": allowed=strict_member(self) and secure_mode(args[0] if args else kwargs.get("mode",0o666))
-  if name in {"symlink_to","hardlink_to","link_to"}: allowed=False
+  if name=="symlink_to": allowed=False
+  if name=="link_to": allowed=mutation_allowed("link",(self,args[0])) if args else False
+  if name=="hardlink_to": allowed=mutation_allowed("link",(args[0],self)) if args else False
   if call_active[0]:
    events.append(("path."+name,path_label(self),path_label(args[0]) if args else "",allowed))
    if not allowed: raise PermissionError("path outside scoped result authority")
@@ -5664,7 +5684,30 @@ def audit(event,args):
  elif event in {"os.chmod","os.mkdir","os.rmdir","os.remove","os.unlink"} and args:
   allowed=mutation_allowed(event.split(".",1)[1],args);events.append((event,path_label(args[0]),event,allowed))
   if not allowed: raise PermissionError("audit mutation outside scoped result authority")
- elif event in {"os.symlink","os.link"} and len(args)>=2:
+ elif event=="os.link" and len(args)>=2:
+  src_path=lexical_path(args[0]);dst_path=lexical_path(args[1]);allowed=mutation_allowed("link",args)
+  events.append((event,path_label(args[0]),path_label(args[1]),allowed))
+  if not allowed: raise PermissionError("link authority denied")
+  canonical_path=lexical_path(canonical)
+  if dst_path!=canonical_path: raise PermissionError("link destination is not canonical")
+  observe_existing_canonical("before_link")
+  source_flags=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
+  source_ticket=make_ticket("canonical_link_source_open","original_os_open","open",(src_path,),source_flags,None,None,None)
+  try:
+   try: original_lstat(canonical);absent=False
+   except FileNotFoundError: absent=True
+   fd=original_os_open(src_path,source_flags);require_ticket_consumed(source_ticket);before=original_fstat(fd);data=b""
+   while len(data)<=5*1024*1024:
+    chunk=os.read(fd,min(65536,5*1024*1024+1-len(data)))
+    if not chunk: break
+    data+=chunk
+   after=original_fstat(fd);identity=(before.st_dev,before.st_ino);writers=fd_inventory(identity,True,"canonical_link_writer_inventory")
+   transitions.append({"event":"os.link","absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":hashlib.sha256(data).hexdigest(),"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":identity in fsynced})
+   held.append(fd);transition_done[0]=True
+  except Exception:
+   if source_ticket in ticket_queue(): ticket_queue().remove(source_ticket)
+   raise
+ elif event=="os.symlink" and len(args)>=2:
   events.append((event,path_label(args[1]),event,False));raise PermissionError("link authority denied")
  elif event=="subprocess.Popen" or event=="os.system" or event.startswith("os.exec") \
         or event.startswith("os.posix_spawn") or event.startswith("socket."):
@@ -5880,6 +5923,88 @@ for fd in held:
         and reference_cases["cleanup_persistent"].get("accepted") is False
         and reference_cases["cleanup_persistent"].get("cleanup_failures",0)>=2
         and bool(reference_cases["cleanup_persistent"].get("temps")))
+
+    # R102 admits one no-replace hardlink publication only after the private
+    # source writer has been closed and fsynced.  The same fresh child binds
+    # source bytes/identity to the sole absent canonical transition; source
+    # spelling, aliases and helper transfer never grant authority.
+    link_publication_source=reference_kernel_source.replace(
+        "        os.replace(temp_name,canonical_destination);temp_name=None",
+        "        os.link(temp_name,canonical_destination);os.unlink(temp_name);temp_name=None",1)
+    link_publication=work/"r102-link-publication-positive.py"
+    link_publication.write_text(link_publication_source,encoding="utf-8")
+    link_publication_inventory=kernel_structure_inventory(
+        ast.parse(link_publication_source),link_publication_source)
+    link_publication_case=fresh_kernel_effect(link_publication,rig_valid_raw)
+    link_publication_positive=(link_publication_inventory[0]
+        and fresh_success(link_publication_case,rig_valid_raw)
+        and link_publication_case.get("primitive_counts",{}).get("link",0)==1
+        and link_publication_case.get("primitive_counts",{}).get("unlink",0)>=1
+        and link_publication_case.get("transitions",[{}])[0].get("event")=="os.link")
+
+    path_link_publication_positive=True;path_link_publication_case={"skipped":True}
+    if hasattr(Path,"link_to"):
+        path_link_publication_source=reference_kernel_source.replace(
+            "        os.replace(temp_name,canonical_destination);temp_name=None",
+            "        Path(temp_name).link_to(Path(canonical_destination));os.unlink(temp_name);temp_name=None",1)
+        path_link_publication=work/"r102-path-link-publication-positive.py"
+        path_link_publication.write_text(path_link_publication_source,encoding="utf-8")
+        path_link_inventory=kernel_structure_inventory(
+            ast.parse(path_link_publication_source),path_link_publication_source)
+        path_link_publication_case=fresh_kernel_effect(path_link_publication,rig_valid_raw)
+        path_link_publication_positive=(path_link_inventory[0]
+            and fresh_success(path_link_publication_case,rig_valid_raw)
+            and path_link_publication_case.get("primitive_counts",{}).get("path_link_to",0)==1
+            and path_link_publication_case.get("transitions",[{}])[0].get("event")=="os.link")
+
+    link_alias_source=link_publication_source.replace(
+        "os.link(temp_name,canonical_destination)",
+        "publisher=os.link;publisher(temp_name,canonical_destination)",1)
+    link_helper_source=link_publication_source.replace(
+        "def consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",
+        "def _publish(source,destination):\n    os.link(source,destination)\n\ndef consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",1).replace(
+        "os.link(temp_name,canonical_destination)","_publish(temp_name,canonical_destination)",1)
+    link_alias_inventory=kernel_structure_inventory(ast.parse(link_alias_source),link_alias_source)
+    link_helper_inventory=kernel_structure_inventory(ast.parse(link_helper_source),link_helper_source)
+    link_same_name_helper_source=link_publication_source.replace(
+        "def consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",
+        "def _publish(source,destination):\n    def consume_private_result(left,right):\n        os.link(left,right)\n    consume_private_result(source,destination)\n\ndef consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",1).replace(
+        "os.link(temp_name,canonical_destination)","_publish(temp_name,canonical_destination)",1)
+    link_same_name_helper_inventory=kernel_structure_inventory(
+        ast.parse(link_same_name_helper_source),link_same_name_helper_source)
+
+    link_wrong_source_source=link_publication_source.replace(
+        "_write_all(temp_fd,encoded);_sync(temp_fd)",
+        "_write_all(temp_fd,b'{}');_sync(temp_fd)",1)
+    link_wrong_source=work/"r102-link-wrong-source-mutant.py"
+    link_wrong_source.write_text(link_wrong_source_source,encoding="utf-8")
+    link_wrong_source_case=fresh_kernel_effect(link_wrong_source,rig_valid_raw)
+    link_wrong_destination_source=link_publication_source.replace(
+        "os.link(temp_name,canonical_destination)",
+        "os.link(temp_name,os.fspath(Path(canonical_destination).with_name('wrong.json')))",1)
+    link_wrong_destination=work/"r102-link-wrong-destination-mutant.py"
+    link_wrong_destination.write_text(link_wrong_destination_source,encoding="utf-8")
+    link_wrong_destination_case=fresh_kernel_effect(link_wrong_destination,rig_valid_raw)
+    link_preseed_case=fresh_kernel_effect(link_publication,rig_valid_raw,"preseed")
+    link_multiple_source=reference_kernel_source.replace(
+        "        os.replace(temp_name,canonical_destination);temp_name=None",
+        "        os.link(temp_name,canonical_destination);os.unlink(canonical_destination);os.link(temp_name,canonical_destination);os.unlink(temp_name);temp_name=None",1)
+    link_multiple=work/"r102-link-multiple-publication-mutant.py"
+    link_multiple.write_text(link_multiple_source,encoding="utf-8")
+    link_multiple_case=fresh_kernel_effect(link_multiple,rig_valid_raw)
+    r102_link_publication_rig_ok=(link_publication_positive
+        and path_link_publication_positive
+        and link_alias_inventory[0] is False
+        and link_helper_inventory[0] is False
+        and link_same_name_helper_inventory[0] is False
+        and link_wrong_source_case.get("accepted") is True
+        and link_wrong_source_case.get("transition_ok") is True
+        and not fresh_success(link_wrong_source_case,rig_valid_raw)
+        and outside_blocked(link_wrong_destination_case,True)
+        and fresh_reject(link_preseed_case,True)
+        and link_multiple_case.get("accepted") is True
+        and len(link_multiple_case.get("transitions",[]))==2
+        and not fresh_success(link_multiple_case,rig_valid_raw))
 
     # Import and captured-reference sensitivity uses the same child and exact
     # public call. The subject is executed only after the judge has installed
@@ -6169,7 +6294,8 @@ class CraftedConcretePath(type(Path())):
         and not fresh_success(bool_version_case,rig_valid_raw))
     reference_effect_rig_ok=(reference_kernel_inventory_ok and reference_basic_ok and leak_mutants_ok
         and atomic_mutant_caught and double_publication_caught
-        and bool_version_caught and captured_primitive_rig_ok)
+        and bool_version_caught and captured_primitive_rig_ok
+        and r102_link_publication_rig_ok)
 
     product_fresh_cases={};product_fresh_ok=False
     if kernel_structure_ok:
@@ -6510,7 +6636,7 @@ class CraftedConcretePath(type(Path())):
     check("J_RESULT_KERNEL_RIG", kernel_inventory_rig_ok and integration_rig_ok
           and kernel_oracle_rig_ok and reference_effect_rig_ok
           and r55_complete_residue_oracle_ok and r56_setup_oracle_ok,
-          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught}")
+          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught} r102_link={r102_link_publication_rig_ok,link_publication_positive,path_link_publication_positive,link_alias_inventory[0],link_helper_inventory[0],link_same_name_helper_inventory[0],link_wrong_source_case.get('transition_ok'),bool(link_wrong_destination_case.get('outside')),link_preseed_case.get('accepted'),len(link_multiple_case.get('transitions',[]))}")
     def cleanup_detail(case):
         return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
