@@ -1948,3 +1948,18 @@ actual controller remains sole owner of its frozen 86400 timeout and family/resu
 which the connected product matrix already measures. Purpose/mode/argv and transport
 identity remain strict. External interruption is an operator incident and yields no gate
 verdict; no owner selftest intentionally interrupts the helper.
+
+## 2026-08-21 — R94 effect-bound physical run clock chain
+
+Two consecutive no-live executions of the implemented result-kernel candidate exposed a
+gate-only second collision before the R74 barrier: the physical, hostile and product-Git
+attempts could all select the same `<YYYYMMDD-HHMMSS>-test_author` leaf. R94 no longer
+uses a post-attempt `now_id()` read as their predecessor. The existing provider Popen
+observation records each actual envelope parent, validates its strict clock-shaped id and
+releases the next physical call only after a bounded strictly-later clock observation.
+The actual product-Git envelope id seeds the first R74 barrier; every later oracle still
+carries its own observed current id. Reusing that exact id in a connected product call
+must fail before provider start and preserve the run set. The intentional hostile-Git
+baseline may route its envelope through the decoy, but that identity is scheduling-only
+and grants no product verdict. Public baseline, production bytes and live behavior remain
+unchanged.
