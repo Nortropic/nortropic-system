@@ -2092,12 +2092,71 @@ def run_codex(sink, canonical, invocation, run, role):
     attempt_sequence = [0]
     audit_active: list[dict[str, object] | None] = [None]
     last_attempt_observed: list[dict[str, object] | None] = [None]
+
+    def register_canonical(active: dict[str, object], value: object) -> None:
+        if not isinstance(value, (str, bytes, os.PathLike)):
+            return
+        try:
+            path = Path(value).absolute()
+            runs_root = active["runs_root"]
+            assert isinstance(runs_root, Path)
+            if path.name != "result.json" or runs_root not in path.parents:
+                return
+            candidates = active["canonical_candidates"]
+            states = active["canonical_visibility_state"]
+            assert isinstance(candidates, set) and isinstance(states, dict)
+            key = str(path)
+            candidates.add(key)
+            # Every current run starts with no canonical result.  Initializing
+            # the exact newly discovered destination to absent makes the first
+            # post-operation observation causal even if the publishing API did
+            # not expose a separate pre-create callback.
+            states.setdefault(key, False)
+        except Exception:
+            return
+
+    def sync_canonical_visibility(active: dict[str, object]) -> None:
+        """Record every observed absent->present effect, without deduplication."""
+        if active.get("observer_busy") is True:
+            return
+        active["observer_busy"] = True
+        try:
+            candidates = active["canonical_candidates"]
+            states = active["canonical_visibility_state"]
+            epochs = active["canonical_visibility_epochs"]
+            assert isinstance(candidates, set) and isinstance(states, dict)
+            assert isinstance(epochs, list)
+            for value in sorted(candidates):
+                path = Path(value)
+                present = path.exists() or path.is_symlink()
+                prior = states.get(value, False)
+                if present and prior is False:
+                    dev = ino = None; digest = None
+                    try:
+                        current = path.lstat()
+                        dev, ino = current.st_dev, current.st_ino
+                        if stat.S_ISREG(current.st_mode) and not path.is_symlink():
+                            digest = sha256(path)
+                    except Exception:
+                        pass
+                    # Identical path/dev/inode/digest values are intentionally
+                    # appended again after an intervening absence.  Cardinality
+                    # is an effect count, not a unique-state inventory.
+                    epochs.append((value, dev, ino, digest))
+                states[value] = present
+        finally:
+            active["observer_busy"] = False
+
     def audit_inventory(event: str, args: tuple[object, ...]) -> None:
         active = audit_active[0]
         if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename", "subprocess.Popen"}:
             return
         if active.get("observer_busy") is True:
             return
+        # Audit callbacks precede their filesystem operation.  Synchronizing
+        # every already-known destination here observes the completed effect of
+        # the preceding operation.  attempt() performs the final post-run sync.
+        sync_canonical_visibility(active)
         if event == "subprocess.Popen":
             outputs = active["provider_outputs"]
             assert isinstance(outputs, list)
@@ -2107,6 +2166,16 @@ def run_codex(sink, canonical, invocation, run, role):
             return
         created = active["created"]
         assert isinstance(created, set)
+        if event == "open" and args:
+            register_canonical(active, args[0])
+        elif event == "os.remove" and args:
+            register_canonical(active, args[0])
+        elif event == "os.rename":
+            if args: register_canonical(active, args[0])
+            if len(args) > 1: register_canonical(active, args[1])
+        # Registration occurs before the audited operation and therefore
+        # retains the exact absent precondition for its later post-op sync.
+        sync_canonical_visibility(active)
         if event == "open":
             opened = active["opened"]
             assert isinstance(opened, list)
@@ -2124,25 +2193,6 @@ def run_codex(sink, canonical, invocation, run, role):
                         direct_writes.append((str(path), flags, path.exists()))
                 except Exception:
                     pass
-        if event in {"os.remove", "os.rename"} and args:
-            candidate = args[1] if event == "os.rename" and len(args) > 1 else args[0]
-            try:
-                path = Path(candidate).absolute()
-                runs_root = active["runs_root"]
-                assert isinstance(runs_root, Path)
-                if path.name == "result.json" and runs_root in path.parents \
-                        and path.is_file() and not path.is_symlink():
-                    active["observer_busy"] = True
-                    current = path.stat()
-                    epoch = (str(path), current.st_dev, current.st_ino, sha256(path))
-                    epochs = active["canonical_visibility_epochs"]
-                    assert isinstance(epochs, list)
-                    if not epochs or epochs[-1] != epoch:
-                        epochs.append(epoch)
-            except Exception:
-                pass
-            finally:
-                active["observer_busy"] = False
         values = args[1:2] if event == "os.rename" else args[:1]
         for value in values:
             if isinstance(value, (str, bytes, os.PathLike)):
@@ -2182,6 +2232,8 @@ def run_codex(sink, canonical, invocation, run, role):
                                       "runs_root": runs_root,
                                       "arena": arena,
                                       "canonical_direct_writes": [],
+                                      "canonical_candidates": set(),
+                                      "canonical_visibility_state": {},
                                       "canonical_visibility_epochs": [],
                                       "observer_busy": False}
         audit_active[0] = observed
@@ -2192,6 +2244,9 @@ def run_codex(sink, canonical, invocation, run, role):
             except Exception as exc:
                 outcome = (False, f"{type(exc).__name__}:{exc}")
         finally:
+            # This is the post-operation observation for the last filesystem
+            # effect in run_codex, before judge cleanup or verdict inspection.
+            sync_canonical_visibility(observed)
             audit_active[0] = None
             module.tempfile.tempdir = prior_tempdir
             if prior_tmpdir is None: os.environ.pop("TMPDIR", None)
@@ -2201,14 +2256,8 @@ def run_codex(sink, canonical, invocation, run, role):
         observed["canonical_paths"] = [str(path / "result.json")
                                        for path in sorted(after_runs - before_runs)]
         for value in observed["canonical_paths"]:
-            path = Path(value)
-            if path.is_file() and not path.is_symlink():
-                current = path.stat()
-                epoch = (str(path), current.st_dev, current.st_ino, sha256(path))
-                epochs = observed["canonical_visibility_epochs"]
-                assert isinstance(epochs, list)
-                if not epochs or epochs[-1] != epoch:
-                    epochs.append(epoch)
+            register_canonical(observed, value)
+        sync_canonical_visibility(observed)
         last_attempt_observed[0] = observed
         created = observed["created"]
         assert isinstance(created, set)
@@ -2594,16 +2643,99 @@ def run_codex(sink, canonical, invocation, run, role):
                             and value[4]==[(True,1,0o600)]
                             for value in object_attacks.values())
 
-    def cleanup_failure_case(persistent: bool):
+    def cleanup_failure_case(persistent: bool, mutation: str | None = None):
         cleanup_repo = make_repo(str(provider))
         targets: list[Path] = []; failures = [0]
         original_popen = module.subprocess.Popen
         original_unlink = module.os.unlink
         original_rmtree = module.shutil.rmtree
+        original_consume = getattr(module, "consume_private_result", None)
+        original_run_codex = module.run_codex
+        retained_sources: list[tuple[bytes, object, str]] = []
+        runs_root = module.journal_root(cleanup_repo) / "runs"
+        before_runs = set(runs_root.iterdir()) if runs_root.is_dir() else set()
+
+        def current_canonical() -> Path | None:
+            current = set(runs_root.iterdir()) if runs_root.is_dir() else set()
+            candidates = [path / "result.json" for path in sorted(current - before_runs)]
+            return candidates[0] if len(candidates) == 1 else None
+
         def observe_target(argv, *args, **kwargs):
             flat = list(argv)
             if "-o" in flat: targets.append(Path(flat[flat.index("-o") + 1]))
             return original_popen(argv, *args, **kwargs)
+
+        def retain_then_consume(sink_fd, canonical_destination,
+                                invocation_id, run_id, role):
+            before = os.fstat(sink_fd)
+            raw = os.pread(sink_fd, MAX_RESULT_BYTES + 1, 0)
+            after = os.fstat(sink_fd)
+            if (len(raw) <= MAX_RESULT_BYTES
+                    and (before.st_dev, before.st_ino, before.st_size,
+                         before.st_mtime_ns, before.st_ctime_ns)
+                        == (after.st_dev, after.st_ino, after.st_size,
+                            after.st_mtime_ns, after.st_ctime_ns)
+                    and len(raw) == before.st_size):
+                retained_sources.append((raw,
+                    strict_json(raw.decode("utf-8", errors="strict")),
+                    hashlib.sha256(raw).hexdigest()))
+            return original_consume(sink_fd, canonical_destination,
+                                    invocation_id, run_id, role)
+
+        def repeat_publication_effect() -> None:
+            canonical = current_canonical()
+            if canonical is None:
+                raise RuntimeError("R100 mutation has no exact current canonical path")
+            source = canonical.with_name(".r100-republish")
+            if canonical.exists() or canonical.is_symlink():
+                module.os.replace(canonical, source)
+            else:
+                source.write_bytes(b"R100 transition probe")
+            # Two real absent->present effects use the same source object and
+            # bytes.  Both are rolled away, leaving the canonical absent.
+            module.os.replace(source, canonical)
+            module.os.replace(canonical, source)
+            module.os.replace(source, canonical)
+            module.os.replace(canonical, source)
+            module.os.unlink(source)
+
+        def stale_canonical_effect() -> None:
+            canonical = current_canonical()
+            if canonical is None or not canonical.is_file() or canonical.is_symlink():
+                raise RuntimeError("R100 mutation has no published canonical")
+            raw = bounded_stable_result(canonical, MAX_CANONICAL_BYTES)
+            document = strict_json(raw.decode("utf-8", errors="strict"))
+            report = document.get("report") if isinstance(document, dict) else None
+            summary = report.get("summary") if isinstance(report, dict) else None
+            if not isinstance(summary, str) or not summary:
+                raise RuntimeError("R100 mutation has no mutable summary")
+            report["summary"] = ("X" if summary[0] != "X" else "Y") + summary[1:]
+            changed = json.dumps(document, ensure_ascii=False,
+                                 separators=(",", ":"), sort_keys=True).encode("utf-8")
+            if len(changed) != len(raw):
+                raise RuntimeError("R100 mutation did not preserve byte length")
+            fd = module.os.open(canonical, os.O_WRONLY | os.O_TRUNC)
+            try:
+                remaining = memoryview(changed)
+                while remaining:
+                    count = os.write(fd, remaining)
+                    if count <= 0: raise OSError("R100 short mutation write")
+                    remaining = remaining[count:]
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+        def run_with_mutation(*args, **kwargs):
+            try:
+                returned = original_run_codex(*args, **kwargs)
+            except BaseException:
+                if mutation == "repeat_publication":
+                    repeat_publication_effect()
+                raise
+            if mutation == "stale_canonical":
+                stale_canonical_effect()
+            return returned
+
         def injected_unlink(path, *args, **kwargs):
             candidate = Path(path)
             if targets and candidate == targets[-1] and (persistent or failures[0] == 0):
@@ -2618,26 +2750,69 @@ def run_codex(sink, canonical, invocation, run, role):
         module.subprocess.Popen = observe_target
         module.os.unlink = injected_unlink
         module.shutil.rmtree = injected_rmtree
+        if original_consume is not None:
+            module.consume_private_result = retain_then_consume
+        if mutation is not None:
+            module.run_codex = run_with_mutation
         try:
             outcome = attempt(cleanup_repo)
         finally:
             module.subprocess.Popen = original_popen
             module.os.unlink = original_unlink
             module.shutil.rmtree = original_rmtree
+            if original_consume is not None:
+                module.consume_private_result = original_consume
+            module.run_codex = original_run_codex
         transport_residue: list[Path] = []
         for target in targets:
             for candidate in (target, target.parent):
                 if candidate.exists() or candidate.is_symlink():
                     transport_residue.append(candidate)
+        observed_cleanup = last_attempt_observed[0] or {}
+        canonical_epochs = list(observed_cleanup.get(
+            "canonical_visibility_epochs", []))
+        canonical_candidates = {
+            Path(value) for value in observed_cleanup.get("canonical_paths", [])
+        }
+        canonical_candidates.update(
+            Path(epoch[0]) for epoch in canonical_epochs
+            if isinstance(epoch, (tuple, list)) and epoch
+            and isinstance(epoch[0], str))
+        retained_raw = retained_sources[0][0] if len(retained_sources) == 1 else None
+        retained_value = retained_sources[0][1] if len(retained_sources) == 1 else None
+        retained_digest = retained_sources[0][2] if len(retained_sources) == 1 else None
+        canonical_states = []
+        for canonical in sorted(canonical_candidates):
+            present = canonical.exists() or canonical.is_symlink()
+            regular = schema_valid = digest_bound = value_bound = False
+            if present and not canonical.is_symlink():
+                try:
+                    opened = canonical.stat()
+                    regular = stat.S_ISREG(opened.st_mode)
+                    raw = bounded_stable_result(canonical, MAX_CANONICAL_BYTES)
+                    document = strict_json(raw.decode("utf-8", errors="strict"))
+                    schema_valid = canonical_result_valid(document, schema_document)
+                    digest_bound = (retained_digest is not None
+                                    and document.get("result_sha256") == retained_digest)
+                    value_bound = (retained_value is not None
+                                   and document.get("report") == retained_value)
+                except Exception:
+                    pass
+            canonical_states.append((str(canonical), present, regular,
+                                     schema_valid, digest_bound, value_bound))
+        direct_writes = list(observed_cleanup.get("canonical_direct_writes", []))
         result = (outcome, failures[0], list(outcome[4]),
-                  sorted({str(path) for path in transport_residue}))
+                  sorted({str(path) for path in transport_residue}),
+                  canonical_states, canonical_epochs,
+                  (len(retained_sources), retained_digest,
+                   len(retained_raw) if retained_raw is not None else None),
+                  direct_writes)
         # Gate-owned cleanup happens only after the complete attempt residue and
         # private-parent observations have been retained in result.
         for target in targets:
             if target.parent.exists():
                 target.parent.chmod(0o700)
                 shutil.rmtree(target.parent)
-        observed_cleanup = last_attempt_observed[0] or {}
         cleanup_arena = observed_cleanup.get("arena")
         if isinstance(cleanup_arena, Path) and cleanup_arena.exists():
             # The persistent-failure control may leave protected provider
@@ -2653,12 +2828,36 @@ def run_codex(sink, canonical, invocation, run, role):
         return result
     transient_cleanup = cleanup_failure_case(False)
     persistent_cleanup = cleanup_failure_case(True)
+    repeated_publication_cleanup = cleanup_failure_case(
+        True, "repeat_publication")
+    stale_canonical_cleanup = cleanup_failure_case(
+        False, "stale_canonical")
+    cleanup_rig_ok = (
+        repeated_publication_cleanup[1] > 0
+        and not repeated_publication_cleanup[0][0]
+        and not any(state[1] for state in repeated_publication_cleanup[4])
+        and len(repeated_publication_cleanup[5]) >= 2
+        and stale_canonical_cleanup[1] == 1
+        and stale_canonical_cleanup[0][0]
+        and len(stale_canonical_cleanup[4]) == 1
+        and stale_canonical_cleanup[4][0][1:4] == (True, True, True)
+        and stale_canonical_cleanup[4][0][4] is True
+        and stale_canonical_cleanup[4][0][5] is False
+        and bool(stale_canonical_cleanup[7]))
     cleanup_error_ok = (
         transient_cleanup[1] == 1 and transient_cleanup[0][0]
         and not transient_cleanup[2] and not transient_cleanup[3]
+        and len(transient_cleanup[4]) == 1
+        and transient_cleanup[4][0][1:] == (True, True, True, True, True)
+        and transient_cleanup[6][0] == 1
+        and not transient_cleanup[7]
+        and len(transient_cleanup[5]) == 1
         and persistent_cleanup[1] > 0 and not persistent_cleanup[0][0]
         and "cleanup" in persistent_cleanup[0][1].lower()
-        and not persistent_cleanup[2] and not persistent_cleanup[3])
+        and not persistent_cleanup[2] and not persistent_cleanup[3]
+        and not any(state[1] for state in persistent_cleanup[4])
+        and len(persistent_cleanup[5]) <= 1
+        and cleanup_rig_ok)
 
     def result_root_ordinal_discovery():
         """Identify result staging by its observed -o child, never by snapshot order."""
@@ -6285,8 +6484,10 @@ class CraftedConcretePath(type(Path())):
           and kernel_oracle_rig_ok and reference_effect_rig_ok
           and r55_complete_residue_oracle_ok and r56_setup_oracle_ok,
           f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught}")
+    def cleanup_detail(case):
+        return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
-          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={transient_cleanup, persistent_cleanup, cleanup_error_ok} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
+          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
     check("K1", family_absent or (valid[0] and valid[2] == 1), f"valid={valid}")
     check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
     check("K3", family_absent or (argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash),
