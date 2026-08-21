@@ -27,7 +27,7 @@ SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
 SPEC="$ROOT/specs/tasks.spec.json"
 H032_GATE="$ROOT/verify/bin/h-032-exit"
 OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
-OWNER_LIVE_HELPER_SHA256="6f31aaac4d1bf170686ebd9ad1f3de62076be9471644ed49fccc61b97ca14044"
+OWNER_LIVE_HELPER_SHA256="e5856a59c43a22bd20da60218650325d03633a99ac235bd9a23919d77dadcd1b"
 if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
   echo "ODÖMBART K0 — owner-live helper identity invalid"
   exit 2
@@ -39,9 +39,15 @@ if [[ "$OBSERVED_OWNER_LIVE_HELPER_SHA256" != "$OWNER_LIVE_HELPER_SHA256" ]]; th
 fi
 WORK="$(/usr/bin/mktemp -d /private/tmp/nortropic-h031.XXXXXX)" || exit 2
 case "$WORK" in /private/tmp/nortropic-h031.*) ;; *) echo "ODÖMBART K0 — osäker tempidentitet"; exit 2;; esac
+GATE_PID="";HELPER_PID=""
+quiesce_protocol() {
+  for owned_pid in "${HELPER_PID:-}" "${GATE_PID:-}"; do [[ -n "$owned_pid" ]] && /bin/kill -TERM "$owned_pid" 2>/dev/null || true; done
+  for owned_pid in "${HELPER_PID:-}" "${GATE_PID:-}"; do [[ -n "$owned_pid" ]] && wait "$owned_pid" 2>/dev/null || true; done
+}
 cleanup() {
   cleanup_rc=$?
   trap - EXIT HUP INT TERM
+  quiesce_protocol
   case "${WORK:-}" in
     /private/tmp/nortropic-h031.*) /bin/rm -rf -- "$WORK" || cleanup_rc=2 ;;
     *) cleanup_rc=2 ;;
@@ -113,6 +119,10 @@ EXPECTED_PREBUILDER_RED = {
     "K_UNKNOWN_ROLE_PRE_EFFECT_REJECT",
     "K_GENERIC_CODEX_PRESPAWN_REJECT",
 }
+def owner_call_environment(environment: dict[str,str]) -> dict[str,str]:
+    return {key:value for key,value in environment.items()
+            if not key.startswith(("GIT_","DYLD_","H032_","GH_","GITHUB_","SLACK_"))
+            and key not in {"LD_PRELOAD","LD_LIBRARY_PATH","__PYVENV_LAUNCHER__"}}
 PROCESS_ATTRS = {
     "subprocess": {"Popen", "run", "call", "check_call", "check_output", "getoutput", "getstatusoutput"},
     "os": {"system", "popen", "fork", "forkpty", "register_at_fork", "kill", "killpg", "chdir", "fchdir", "putenv", "unsetenv", "umask", "posix_spawn", "posix_spawnp", "execv", "execve", "execvp", "execvpe", "spawnl", "spawnle", "spawnlp", "spawnlpe", "spawnv", "spawnve", "spawnvp", "spawnvpe"},
@@ -300,13 +310,18 @@ OWNER_CALL_RESULT_KEYS = {
     "schema_version", "nonce", "purpose", "mode", "plan_sha256",
     "plan_dev", "plan_ino", "helper_sha256", "argv", "cwd",
     "returncode", "timed_out", "stdout_b64", "stderr_b64",
-    "stdout_sha256", "stderr_sha256",
+    "stdout_sha256", "stderr_sha256", "environment_sha256", "tracked_processes",
+    "executable_dev", "executable_ino", "tracker_backend", "family_quiescent",
 }
+
+def owner_executable_binding(path: Path):
+    observed=path.stat()
+    return {"executable_dev":observed.st_dev,"executable_ino":observed.st_ino}
 
 
 def atomic_owner_json(path: Path, value) -> bytes:
     raw=json.dumps(value,sort_keys=True,separators=(",", ":")).encode("utf-8")
-    temporary=path.with_name(path.name+".tmp")
+    temporary=path.with_name(path.name+".tmp-"+os.urandom(16).hex())
     fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL
                |getattr(os,"O_NOFOLLOW",0),0o600)
     try:
@@ -314,7 +329,11 @@ def atomic_owner_json(path: Path, value) -> bytes:
         while offset<len(raw): offset+=os.write(fd,raw[offset:])
         os.fsync(fd)
     finally: os.close(fd)
-    os.replace(temporary,path)
+    try: os.link(temporary,path,follow_symlinks=False)
+    finally: os.unlink(temporary)
+    parent_fd=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+    try: os.fsync(parent_fd)
+    finally: os.close(parent_fd)
     return raw
 
 
@@ -353,12 +372,20 @@ def owner_call_result_valid(value, plan, plan_raw: bytes, plan_stat) -> bool:
         and value.get("plan_dev")==plan_stat.st_dev
         and value.get("plan_ino")==plan_stat.st_ino
         and value.get("helper_sha256")==owner_live_helper_sha256
+        and value.get("executable_dev")==plan.get("executable_dev")
+        and value.get("executable_ino")==plan.get("executable_ino")
         and value.get("argv")==plan.get("argv")
         and value.get("cwd")==plan.get("cwd")
         and type(value.get("returncode")) is int
         and type(value.get("timed_out")) is bool
         and value.get("stdout_sha256")==hashlib.sha256(stdout).hexdigest()
-        and value.get("stderr_sha256")==hashlib.sha256(stderr).hexdigest())
+        and value.get("stderr_sha256")==hashlib.sha256(stderr).hexdigest()
+        and value.get("environment_sha256")==hashlib.sha256(json.dumps(
+            plan.get("environment"),sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+        and type(value.get("tracked_processes")) is int
+        and value["tracked_processes"]>=0
+        and value.get("tracker_backend") in {"libproc-full","libproc-skip"}
+        and value.get("family_quiescent") is True)
 
 
 def check(key: str, ok: bool, detail: str) -> None:
@@ -370,7 +397,7 @@ def odombart(key: str, detail: str) -> None:
     raise SystemExit(2)
 
 
-H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 142 PASS / 1 FAIL"
+H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 143 PASS / 1 FAIL"
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
 H032_OWNER_LIVE_SKIP_MARKER = (
@@ -1358,7 +1385,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "0c44ea9b5ad287a1733511d032b4dee27c40c6cfc38d087a4c88c915555b921b")
+                       == "e19ed9b386151d6ef9b04d2ecaa12b3423e812b7c024defc0ad3da70be695339")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -2091,6 +2118,8 @@ subprocess = object()
         "cwd": str(root),
         "result_path": str(owner_live_result),
         "executable_sha256": hashlib.sha256(h032_gate.read_bytes()).hexdigest(),
+        **owner_executable_binding(h032_gate),
+        "environment": owner_call_environment(dict(os.environ)),
     }
     upstream_plan_raw = atomic_owner_json(owner_live_plan, upstream_plan)
     upstream_plan_stat = owner_live_plan.lstat()
@@ -2103,6 +2132,10 @@ subprocess = object()
             or not owner_call_result_valid(upstream_result, upstream_plan,
                                            upstream_plan_raw, upstream_plan_stat)):
         odombart("K_H032_FRESH_UPSTREAM", "owner-call result binding invalid")
+    owner_live_result.unlink()
+    owner_live_plan.unlink()
+    if owner_live_result.exists() or owner_live_plan.exists():
+        odombart("K_H032_FRESH_UPSTREAM", "owner-call consume-once cleanup failed")
     if upstream_result["timed_out"]:
         odombart("K_H032_FRESH_UPSTREAM", "bounded skip dependency timed out")
     try:
@@ -2527,25 +2560,25 @@ raise SystemExit(1)
 PY
 }
 
-run_gate_python_and_close() {
-  run_gate_python
-  gate_rc=$?
-  : > "$OWNER_LIVE_PLAN.closed"
-  return "$gate_rc"
-}
-
-run_gate_python_and_close &
+run_gate_python &
 GATE_PID=$!
-"$OWNER_LIVE_HELPER" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT"
+PLAN_DEADLINE=$((SECONDS+300))
+while [[ ! -e "$OWNER_LIVE_PLAN" ]]; do
+  if ! /bin/kill -0 "$GATE_PID" 2>/dev/null; then wait "$GATE_PID"; exit $?; fi
+  if (( SECONDS >= PLAN_DEADLINE )); then quiesce_protocol; echo "ODÖMBART K_H032_PROTOCOL — plan readiness timeout"; exit 2; fi
+  /bin/sleep 0.05
+done
+"$OWNER_LIVE_HELPER" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT" &
+HELPER_PID=$!
+wait "$HELPER_PID"
 HELPER_RC=$?
+HELPER_PID=""
 if [[ $HELPER_RC -ne 0 ]]; then
-  if [[ -e "$OWNER_LIVE_PLAN" ]]; then
-    /bin/kill -TERM "$GATE_PID" 2>/dev/null || true
-    wait "$GATE_PID" 2>/dev/null || true
-    echo "ODÖMBART K_H032_FRESH_UPSTREAM — owner-live helper failed rc=$HELPER_RC"
-    exit 2
-  fi
-  wait "$GATE_PID"
-  exit $?
+  quiesce_protocol; echo "ODÖMBART K_H032_FRESH_UPSTREAM — owner-live helper failed rc=$HELPER_RC"; exit 2
 fi
-wait "$GATE_PID"
+POST_DEADLINE=$((SECONDS+300))
+while /bin/kill -0 "$GATE_PID" 2>/dev/null; do
+  if (( SECONDS >= POST_DEADLINE )); then quiesce_protocol; echo "ODÖMBART K_H032_PROTOCOL — postprocess timeout"; exit 2; fi
+  /bin/sleep 0.05
+done
+wait "$GATE_PID";GATE_RC=$?;GATE_PID="";exit "$GATE_RC"

@@ -19,6 +19,7 @@ exec /usr/bin/python3 -I -S - "$SOURCE_PATH" "$@" <<'PY'
 from __future__ import annotations
 
 import base64
+import ctypes
 import hashlib
 import json
 import os
@@ -27,12 +28,13 @@ import signal
 import stat
 from subprocess import PIPE, Popen, TimeoutExpired
 import sys
+import threading
 import time
 
 MAX_PLAN_BYTES = 65536
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
-PLAN_READY_SECONDS = 300
 SKIP_SECONDS = 120
+GRACE_SECONDS = 5
 HEX = frozenset("0123456789abcdef")
 
 
@@ -51,12 +53,13 @@ def strict_json(raw: bytes):
     return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=pairs)
 
 
-def regular_nofollow_read(path: Path, maximum: int):
+def regular_nofollow_read(path: Path, maximum: int, *, single_link: bool = True):
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     fd = os.open(path, flags)
     try:
         before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        if (not stat.S_ISREG(before.st_mode)
+                or (single_link and before.st_nlink != 1)):
             raise RuntimeError("nonregular input")
         chunks = []
         total = 0
@@ -78,8 +81,9 @@ def regular_nofollow_read(path: Path, maximum: int):
         os.close(fd)
 
 
-def sha256_path(path: Path) -> str:
-    raw, _identity = regular_nofollow_read(path, MAX_OUTPUT_BYTES)
+def sha256_path(path: Path, *, single_link: bool = True) -> str:
+    raw, _identity = regular_nofollow_read(
+        path, MAX_OUTPUT_BYTES, single_link=single_link)
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -90,8 +94,9 @@ def absolute_regular_executable(path: Path, expected_sha: str):
         st = path.stat()
     except OSError:
         return None
-    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
-            or not os.access(path, os.X_OK) or sha256_path(path) != expected_sha):
+    if (not stat.S_ISREG(st.st_mode) or st.st_nlink < 1
+            or not os.access(path, os.X_OK)
+            or sha256_path(path, single_link=False) != expected_sha):
         return None
     return st
 
@@ -100,16 +105,37 @@ def valid_hex(value, length: int) -> bool:
     return isinstance(value, str) and len(value) == length and all(char in HEX for char in value)
 
 
-def plan_valid(plan, result_path: Path) -> bool:
+def environment_valid(value) -> bool:
+    if not isinstance(value,dict) or len(value)>512:
+        return False
+    encoded=0
+    for key,item in value.items():
+        if (not isinstance(key,str) or not key or "\x00" in key or "=" in key
+                or not isinstance(item,str) or "\x00" in item):
+            return False
+        encoded+=len(key.encode("utf-8"))+len(item.encode("utf-8"))+2
+        if encoded>262144:
+            return False
+        if (key.startswith(("GIT_","DYLD_","H032_","GH_","GITHUB_","SLACK_"))
+                or key in {"LD_PRELOAD","LD_LIBRARY_PATH","__PYVENV_LAUNCHER__"}):
+            return False
+    return True
+
+
+def plan_valid(plan, result_path: Path, helper_path: Path) -> bool:
     keys = {"schema_version", "nonce", "purpose", "mode", "argv", "cwd",
-            "result_path", "executable_sha256"}
+            "result_path", "executable_sha256", "executable_dev",
+            "executable_ino", "environment"}
     if not isinstance(plan, dict) or set(plan) != keys:
         return False
     if (plan.get("schema_version") != 1 or not valid_hex(plan.get("nonce"), 64)
             or plan.get("purpose") not in {"H032_OWNER_LIVE", "H031_H032_DEPENDENCY"}
             or plan.get("mode") not in {"full", "skip"}
             or plan.get("result_path") != str(result_path)
-            or not valid_hex(plan.get("executable_sha256"), 64)):
+            or not valid_hex(plan.get("executable_sha256"), 64)
+            or type(plan.get("executable_dev")) is not int
+            or type(plan.get("executable_ino")) is not int
+            or not environment_valid(plan.get("environment"))):
         return False
     argv = plan.get("argv")
     if (not isinstance(argv, list) or not 1 <= len(argv) <= 16
@@ -117,14 +143,26 @@ def plan_valid(plan, result_path: Path) -> bool:
         return False
     executable = Path(argv[0])
     cwd = Path(plan.get("cwd", ""))
-    return (absolute_regular_executable(executable, plan["executable_sha256"]) is not None
-            and cwd.is_absolute() and cwd.is_dir() and not cwd.is_symlink()
-            and result_path.is_absolute() and not result_path.exists()
-            and result_path.parent.is_dir() and not result_path.parent.is_symlink())
+    observed = absolute_regular_executable(executable, plan["executable_sha256"])
+    common = (observed is not None
+        and (observed.st_dev, observed.st_ino)
+            == (plan["executable_dev"], plan["executable_ino"])
+        and cwd.is_absolute() and cwd.is_dir() and not cwd.is_symlink()
+        and result_path.is_absolute() and not result_path.exists()
+        and result_path.parent.is_dir() and not result_path.parent.is_symlink())
+    if not common:
+        return False
+    if plan["mode"] == "skip":
+        canonical = helper_path.parent / "h-032-exit"
+        return (plan["purpose"] == "H031_H032_DEPENDENCY"
+            and cwd == helper_path.parents[2]
+            and executable == canonical and executable.resolve(strict=True) == canonical
+            and argv == [str(canonical), "--skip-owner-live"])
+    return plan["purpose"] == "H032_OWNER_LIVE"
 
 
-def atomic_write(path: Path, raw: bytes) -> None:
-    temporary = path.with_name(path.name + ".tmp")
+def atomic_write_new(path: Path, raw: bytes) -> None:
+    temporary = path.with_name(path.name + ".tmp-" + os.urandom(16).hex())
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(temporary, flags, 0o600)
     try:
@@ -134,12 +172,115 @@ def atomic_write(path: Path, raw: bytes) -> None:
         os.fsync(fd)
     finally:
         os.close(fd)
-    os.replace(temporary, path)
+    try:
+        os.link(temporary,path,follow_symlinks=False)
+    finally:
+        os.unlink(temporary)
     parent_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
         os.fsync(parent_fd)
     finally:
         os.close(parent_fd)
+
+
+class ProcBSDInfo(ctypes.Structure):
+    _fields_ = [
+        ("flags", ctypes.c_uint32), ("status", ctypes.c_uint32),
+        ("xstatus", ctypes.c_uint32), ("pid", ctypes.c_uint32),
+        ("ppid", ctypes.c_uint32), ("uid", ctypes.c_uint32),
+        ("gid", ctypes.c_uint32), ("ruid", ctypes.c_uint32),
+        ("rgid", ctypes.c_uint32), ("svuid", ctypes.c_uint32),
+        ("svgid", ctypes.c_uint32), ("reserved", ctypes.c_uint32),
+        ("comm", ctypes.c_char * 16), ("name", ctypes.c_char * 32),
+        ("nfiles", ctypes.c_uint32), ("pgid", ctypes.c_uint32),
+        ("pjobc", ctypes.c_uint32), ("tdev", ctypes.c_uint32),
+        ("tpgid", ctypes.c_uint32), ("nice", ctypes.c_int32),
+        ("start_sec", ctypes.c_uint64), ("start_usec", ctypes.c_uint64),
+    ]
+
+
+def libproc_api():
+    if sys.platform != "darwin" or ctypes.sizeof(ProcBSDInfo) != 136:
+        raise RuntimeError("native process identity observer unavailable")
+    library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+    library.proc_pidinfo.argtypes = [ctypes.c_int, ctypes.c_int,
+                                     ctypes.c_uint64, ctypes.c_void_p,
+                                     ctypes.c_int]
+    library.proc_pidinfo.restype = ctypes.c_int
+    library.proc_listchildpids.argtypes = [ctypes.c_int, ctypes.c_void_p,
+                                           ctypes.c_int]
+    library.proc_listchildpids.restype = ctypes.c_int
+    return library
+
+
+def native_identity(library, pid: int):
+    info = ProcBSDInfo()
+    size = library.proc_pidinfo(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info))
+    if size != ctypes.sizeof(info) or info.pid != pid:
+        return None
+    return (int(info.start_sec), int(info.start_usec))
+
+
+def native_children(library, pid: int):
+    buffer = (ctypes.c_int * 4096)()
+    count = library.proc_listchildpids(pid, buffer, ctypes.sizeof(buffer))
+    if count < 0 or count > len(buffer):
+        raise RuntimeError("native child inventory failed")
+    return tuple(int(buffer[index]) for index in range(count) if buffer[index] > 0)
+
+
+def native_family_tracker(root_pid: int, stop: threading.Event, identities: dict,
+                          interval: float):
+    library = libproc_api()
+    family = {root_pid}
+    while not stop.is_set():
+        for parent in tuple(family):
+            for child in native_children(library, parent):
+                family.add(child)
+        for pid in tuple(family):
+            identity = native_identity(library, pid)
+            if identity is not None:
+                identities[pid] = identity
+        stop.wait(interval)
+
+
+def native_alive(library, identities: dict):
+    return [pid for pid, identity in identities.items()
+            if native_identity(library, pid) == identity]
+
+
+def terminate_family(root_pid: int, identities: dict, backend: str) -> bool:
+    library = libproc_api() if backend.startswith("libproc") else None
+    def alive():
+        if library is not None:
+            return native_alive(library, identities)
+        raise RuntimeError("unknown process observer backend")
+    initial=alive()
+    if root_pid in initial:
+        try: os.killpg(root_pid,signal.SIGTERM)
+        except ProcessLookupError: pass
+    deadline=time.monotonic()+GRACE_SECONDS
+    while time.monotonic()<deadline:
+        remaining=alive()
+        if not remaining:return True
+        for pid in remaining:
+            try:os.kill(pid,signal.SIGTERM)
+            except ProcessLookupError:pass
+        time.sleep(.02)
+    for pid in alive():
+        try:os.kill(pid,signal.SIGKILL)
+        except ProcessLookupError:pass
+    deadline=time.monotonic()+GRACE_SECONDS
+    while time.monotonic()<deadline:
+        if not alive():return True
+        time.sleep(.02)
+    return not alive()
+
+
+def clear_child_signal_mask() -> None:
+    # The parent blocks termination signals only across assignment of the
+    # child capability.  The exec child must not inherit that critical window.
+    signal.pthread_sigmask(signal.SIG_SETMASK,set())
 
 
 def main() -> int:
@@ -149,44 +290,91 @@ def main() -> int:
     if (not plan_path.is_absolute() or not result_path.is_absolute()
             or plan_path.parent != result_path.parent):
         return 2
-    deadline = time.monotonic() + PLAN_READY_SECONDS
-    while not plan_path.exists():
-        if plan_path.with_name(plan_path.name + ".closed").exists():
-            return 3
-        if time.monotonic() >= deadline:
-            return 2
-        time.sleep(0.01)
     plan_raw, plan_stat = regular_nofollow_read(plan_path, MAX_PLAN_BYTES)
     plan = strict_json(plan_raw)
-    if not plan_valid(plan, result_path):
-        return 2
     helper_path = helper_path.resolve(strict=True)
+    if not plan_valid(plan, result_path, helper_path):
+        return 2
     helper_sha = sha256_path(helper_path)
     argv = plan["argv"]
-    proc = Popen(argv, cwd=plan["cwd"], stdout=PIPE, stderr=PIPE,
-                 start_new_session=True)
-    timed_out = False
+    executable_before = absolute_regular_executable(
+        Path(argv[0]), plan["executable_sha256"])
+    if (executable_before is None or (executable_before.st_dev, executable_before.st_ino)
+            != (plan["executable_dev"], plan["executable_ino"])):
+        return 2
+    interrupted=[]
+    blocked_signals={signal.SIGHUP,signal.SIGINT,signal.SIGTERM}
+    previous_mask=signal.pthread_sigmask(signal.SIG_BLOCK,blocked_signals)
+    def interrupted_handler(signum,_frame):
+        interrupted.append(signum)
+        raise KeyboardInterrupt
+    old_handlers={item:signal.signal(item,interrupted_handler)
+                  for item in (signal.SIGHUP,signal.SIGINT,signal.SIGTERM)}
+    proc=None
+    timed_out = False;tracker_stop=threading.Event();family={}
+    tracker_backend = "libproc-skip" if plan["mode"] == "skip" else "libproc-full"
+    family_quiescent = False
+    native_library = libproc_api()
     try:
+        proc = Popen(argv, cwd=plan["cwd"], stdout=PIPE, stderr=PIPE,
+                     env=plan["environment"], start_new_session=True,
+                     preexec_fn=clear_child_signal_mask)
+        root_identity=native_identity(native_library,proc.pid)
+        if root_identity is None:
+            raise RuntimeError("native root identity unavailable")
+        family[proc.pid]=root_identity
+        tracker_target=native_family_tracker
+        tracker_interval=.02 if plan["mode"]=="skip" else .005
+        tracker=threading.Thread(target=tracker_target,
+                                 args=(proc.pid,tracker_stop,family,tracker_interval),daemon=True)
+        tracker.start()
+        signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
+        if interrupted:
+            raise KeyboardInterrupt
         if plan["mode"] == "skip":
             stdout, stderr = proc.communicate(timeout=SKIP_SECONDS)
         else:
             stdout, stderr = proc.communicate()
-    except TimeoutExpired as exc:
+    except (TimeoutExpired,KeyboardInterrupt) as exc:
         timed_out = True
+        family_quiescent=terminate_family(proc.pid,family,tracker_backend)
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        try:
-            stdout, stderr = proc.communicate(timeout=5)
+            stdout, stderr = proc.communicate(timeout=GRACE_SECONDS)
         except TimeoutExpired:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
             stdout, stderr = proc.communicate()
-        stdout = (exc.stdout or b"") + (stdout or b"")
-        stderr = (exc.stderr or b"") + (stderr or b"")
+        stdout = (getattr(exc,"stdout",None) or b"") + (stdout or b"")
+        stderr = (getattr(exc,"stderr",None) or b"") + (stderr or b"")
+    finally:
+        tracker_stop.set()
+        if 'tracker' in locals(): tracker.join(timeout=1)
+        if proc is not None and proc.poll() is None:
+            family_quiescent=terminate_family(proc.pid,family,tracker_backend)
+            proc.wait(timeout=GRACE_SECONDS)
+        signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
+        for item,handler in old_handlers.items(): signal.signal(item,handler)
+    if proc is None:
+        return 2
+    if not timed_out:
+        family_quiescent=terminate_family(proc.pid,family,tracker_backend)
+    executable_after = absolute_regular_executable(
+        Path(argv[0]), plan["executable_sha256"])
+    if (not family_quiescent or executable_after is None
+            or (executable_after.st_dev, executable_after.st_ino)
+                != (plan["executable_dev"], plan["executable_ino"])):
+        return 2
+    if plan["mode"] == "skip" and not timed_out:
+        transcript = stdout.decode("utf-8", errors="strict")
+        reasons=(transcript.count("CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN")
+                 +transcript.count("CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"))
+        if (proc.returncode not in {1,2}
+                or transcript.count("OWNER_LIVE_EXECUTION=SKIPPED") != 1
+                or transcript.count("OWNER_LIVE_START_DELTA=0") != 1
+                or reasons != 1):
+            return 2
     if len(stdout) > MAX_OUTPUT_BYTES or len(stderr) > MAX_OUTPUT_BYTES:
         return 2
     result = {
@@ -198,6 +386,8 @@ def main() -> int:
         "plan_dev": plan_stat.st_dev,
         "plan_ino": plan_stat.st_ino,
         "helper_sha256": helper_sha,
+        "executable_dev": plan["executable_dev"],
+        "executable_ino": plan["executable_ino"],
         "argv": argv,
         "cwd": plan["cwd"],
         "returncode": proc.returncode,
@@ -206,9 +396,14 @@ def main() -> int:
         "stderr_b64": base64.b64encode(stderr).decode("ascii"),
         "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
         "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        "environment_sha256": hashlib.sha256(json.dumps(
+            plan["environment"],sort_keys=True,separators=(",", ":")).encode()).hexdigest(),
+        "tracked_processes": len(family),
+        "tracker_backend": tracker_backend,
+        "family_quiescent": family_quiescent,
     }
     raw = json.dumps(result, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    atomic_write(result_path, raw)
+    atomic_write_new(result_path, raw)
     return 0
 
 
