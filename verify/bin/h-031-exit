@@ -297,7 +297,7 @@ def odombart(key: str, detail: str) -> None:
     raise SystemExit(2)
 
 
-H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 146 PASS / 1 FAIL"
+H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 149 PASS / 1 FAIL"
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
 H032_OWNER_LIVE_SKIP_MARKER = (
@@ -427,6 +427,137 @@ def replace_last_h031(text: str, old: str, new: str) -> str:
     return text[:index] + new + text[index + len(old):]
 
 
+def protected_namespace_integrity(tree: ast.AST,
+                                  protected: set[str],
+                                  helper_names: set[str]) -> bool:
+    """Reject mutation/recovery of exact gate capabilities via namespaces."""
+    parents = {child: parent for parent in ast.walk(tree)
+               for child in ast.iter_child_nodes(parent)}
+    function_fields = {
+        "__globals__", "__defaults__", "__kwdefaults__", "__closure__",
+        "__code__", "__dict__", "globals", "locals", "vars", "eval",
+        "exec", "compile", "__import__",
+    }
+
+    def exact_key(node: ast.AST) -> str | None:
+        return node.value if (isinstance(node, ast.Constant)
+                              and isinstance(node.value, str)) else None
+
+    def current_module(node: ast.AST) -> bool:
+        registry = (lambda value: isinstance(value, ast.Attribute)
+                    and isinstance(value.value, ast.Name)
+                    and value.value.id == "sys" and value.attr == "modules")
+        if (isinstance(node, ast.Subscript) and registry(node.value)
+                and isinstance(node.slice, ast.Name)
+                and node.slice.id == "__name__"):
+            return True
+        return (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and registry(node.func.value)
+                and node.func.attr in {"get", "setdefault", "pop"}
+                and bool(node.args) and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "__name__")
+
+    def current_namespace(node: ast.AST) -> bool:
+        if (isinstance(node, ast.Call) and not node.args and not node.keywords
+                and ((isinstance(node.func, ast.Name)
+                      and node.func.id in {"globals", "locals", "vars"})
+                     or (isinstance(node.func, ast.Attribute)
+                         and isinstance(node.func.value, ast.Name)
+                         and node.func.value.id == "builtins"
+                         and node.func.attr in {"globals", "locals", "vars"}))):
+            return True
+        if (isinstance(node, ast.Attribute) and node.attr == "__globals__"
+                and isinstance(node.value, ast.Name)
+                and node.value.id in protected):
+            return True
+        if (isinstance(node, ast.Attribute) and node.attr == "__dict__"
+                and ((isinstance(node.value, ast.Name)
+                      and node.value.id in {"builtins", "__builtins__"})
+                     or current_module(node.value))):
+            return True
+        return current_module(node)
+
+    def safe_key(node: ast.AST) -> bool:
+        key = exact_key(node)
+        return key is not None and key not in protected and key not in function_fields
+
+    def namespace_use_safe(node: ast.AST) -> bool:
+        parent = parents.get(node)
+        if isinstance(parent, ast.Subscript) and parent.value is node:
+            return safe_key(parent.slice)
+        if (isinstance(parent, ast.Compare) and parent.comparators == [node]
+                and len(parent.ops) == 1 and isinstance(parent.ops[0], ast.In)):
+            return safe_key(parent.left)
+        if isinstance(parent, ast.Attribute) and parent.value is node:
+            call = parents.get(parent)
+            if not (isinstance(call, ast.Call) and call.func is parent):
+                return False
+            if parent.attr in {"get", "setdefault", "pop"}:
+                return bool(call.args) and safe_key(call.args[0]) and not call.keywords
+            if parent.attr == "update":
+                if len(call.args) != 1 or call.keywords:
+                    return False
+                mapping = call.args[0]
+                return (isinstance(mapping, ast.Dict)
+                        and all(key is not None and safe_key(key)
+                                for key in mapping.keys))
+            return False
+        return False
+
+    for node in ast.walk(tree):
+        if current_namespace(node) and not namespace_use_safe(node):
+            return False
+        if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+                and node.id in helper_names):
+            parent = parents.get(node)
+            if not (isinstance(parent, ast.Call) and parent.func is node):
+                return False
+        if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+                and node.id in {"builtins", "__builtins__"}
+                and not (isinstance(parents.get(node), ast.Attribute)
+                         and parents[node].value is node)):
+            return False
+        if (isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "sys" and node.attr == "modules"):
+            parent = parents.get(node)
+            direct_index = isinstance(parent, ast.Subscript) and parent.value is node
+            direct_method = (isinstance(parent, ast.Attribute) and parent.value is node
+                             and isinstance(parents.get(parent), ast.Call)
+                             and parents[parent].func is parent)
+            direct_len = (isinstance(parent, ast.Call)
+                          and isinstance(parent.func, ast.Name)
+                          and parent.func.id == "len" and node in parent.args)
+            if not (direct_index or direct_method or direct_len):
+                return False
+        if (isinstance(node, ast.Attribute) and node.attr in function_fields
+                and isinstance(node.value, ast.Name)
+                and node.value.id in protected):
+            return False
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in {"setattr", "delattr", "getattr"}):
+            if not node.args:
+                return False
+            target = node.args[0]
+            field = exact_key(node.args[1]) if len(node.args) > 1 else None
+            if ((isinstance(target, ast.Name)
+                 and target.id in protected | {"builtins", "__builtins__"})
+                    or current_namespace(target)
+                    or field in protected):
+                return False
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in {"eval", "exec"}):
+            if node.func.id == "eval" or len(node.args) < 2 or current_namespace(node.args[1]):
+                return False
+        if (isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "sys"
+                and node.attr in {"meta_path", "path_hooks", "path_importer_cache"}):
+            return False
+    return True
+
+
 def h032_dependency_capability_source_facts(gate_text: str) -> dict[str, bool]:
     """Inventory the early stdlib capture and exact H031 dependency handoff."""
     tree = ast.parse(embedded_h031_python_source(gate_text))
@@ -504,6 +635,7 @@ if not _H031_STDLIB_CAPABILITIES_PRISTINE:
         "_H031_PRISTINE_POPEN", "_H031_FRESH_POPEN",
         "_H031_PRISTINE_RUN", "_H031_FRESH_RUN",
     }
+    namespace_protected = protected | {"run_h032_dependency"}
     protected_stores = [node for node in ast.walk(tree)
                         if isinstance(node, ast.Name) and node.id in protected
                         and isinstance(node.ctx, (ast.Store, ast.Del))]
@@ -575,6 +707,9 @@ if not _H031_STDLIB_CAPABILITIES_PRISTINE:
                                                 and not protected_declarations
                                                 and protected_loads_exact),
         "no_subprocess_reflection": not dynamic_imports and not protected_reflection,
+        "namespace_capability_integrity":
+            protected_namespace_integrity(
+                tree, namespace_protected, {"run_h032_dependency"}),
         "actual_direct_call": len(actual_calls) == 1,
         "no_direct_upstream_run": not direct_upstream,
         "timeout_constant_exact": len(timeout_constants) == 1,
@@ -1488,7 +1623,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "449d437651b78ab4540026eb8c38d9b4a0b9dfb6e815ee9ea40e4a0131109d73")
+                       == "2a588135e8ca7ed44b0c099d5447a7e2ba0360c5591a538a388300f361e6d3a8")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -2277,6 +2412,70 @@ subprocess = object()
         name: h032_dependency_capability_source_facts(mutant)
         for name, mutant in dependency_precapture_mutants.items()
     }
+    dependency_call_anchor = (
+        "        upstream = run_h032_dependency(\n"
+        "            _H031_PRISTINE_RUN, upstream_argv, root, owner_live_mode)")
+    dependency_namespace_prefixes = {
+        "globals_store":
+            "        globals()['_H031_PRISTINE_RUN'] = hidden_runner\n",
+        "globals_delete":
+            "        del globals()['_H031_PRISTINE_RUN']\n",
+        "globals_update":
+            "        globals().update({'_H031_PRISTINE_RUN': hidden_runner})\n",
+        "globals_setdefault":
+            "        globals().setdefault('_H031_PRISTINE_RUN', hidden_runner)\n",
+        "globals_pop":
+            "        globals().pop('_H031_PRISTINE_RUN')\n",
+        "globals_computed_key":
+            "        capability_key = '_H031_' + 'PRISTINE_RUN'\n"
+            "        globals()[capability_key] = hidden_runner\n",
+        "globals_alias":
+            "        namespace_alias = globals()\n"
+            "        namespace_alias['_H031_PRISTINE_RUN'] = hidden_runner\n",
+        "locals_store":
+            "        locals()['_H031_PRISTINE_RUN'] = hidden_runner\n",
+        "vars_store":
+            "        vars()['_H031_PRISTINE_RUN'] = hidden_runner\n",
+        "helper_replace":
+            "        globals()['run_h032_dependency'] = hidden_dependency_helper\n",
+        "helper_globals":
+            "        run_h032_dependency.__globals__['_H031_PRISTINE_RUN'] = hidden_runner\n",
+        "helper_defaults":
+            "        run_h032_dependency.__defaults__ = (hidden_runner,)\n",
+        "helper_closure":
+            "        run_h032_dependency.__closure__[0].cell_contents = hidden_runner\n",
+        "helper_code":
+            "        run_h032_dependency.__code__ = hidden_dependency_helper.__code__\n",
+        "helper_setattr":
+            "        setattr(run_h032_dependency, '__defaults__', (hidden_runner,))\n",
+        "helper_delattr":
+            "        delattr(run_h032_dependency, '__defaults__')\n",
+        "builtins_dictionary":
+            "        builtins.__dict__['globals'] = hidden_globals\n",
+        "builtins_setattr":
+            "        setattr(builtins, 'globals', hidden_globals)\n",
+        "module_dictionary":
+            "        sys.modules[__name__].__dict__['_H031_PRISTINE_RUN'] = hidden_runner\n",
+        "module_alias":
+            "        current_module_alias = sys.modules[__name__]\n"
+            "        current_module_alias.__dict__['_H031_PRISTINE_RUN'] = hidden_runner\n",
+        "dynamic_exec":
+            "        exec(\"globals()['_H031_PRISTINE_RUN'] = hidden_runner\")\n",
+        "compiled_exec":
+            "        exec(compile(\"globals()['_H031_PRISTINE_RUN'] = hidden_runner\", '<mutant>', 'exec'), globals())\n",
+        "import_hook":
+            "        sys.meta_path = [hidden_import_hook]\n",
+    }
+    dependency_namespace_mutants = {
+        name: replace_last_h031(
+            h031_gate_text, dependency_call_anchor,
+            prefix + dependency_call_anchor)
+        for name, prefix in dependency_namespace_prefixes.items()
+    }
+    dependency_namespace_facts = {
+        name: h032_dependency_capability_source_facts(mutant)
+        for name, mutant in dependency_namespace_mutants.items()
+    }
     dependency_shadow_variants = {
         "parameters": h031_gate_text[:-4] +
             "\ndef r83_unrelated_shadow(subprocess, Popen, run):\n"
@@ -2285,6 +2484,14 @@ subprocess = object()
             "\ndef r83_unrelated_locals():\n"
             "    subprocess = Popen = run = object()\n"
             "    return subprocess, Popen, run\nPY\n",
+        "unrelated_global_literals": h031_gate_text[:-4] +
+            "\ndef r84_unrelated_global_literals():\n"
+            "    globals()['R84_UNRELATED_A'] = 1\n"
+            "    globals().update({'R84_UNRELATED_B': 2})\n"
+            "    value = globals().get('R84_UNRELATED_A')\n"
+            "    globals().pop('R84_UNRELATED_A')\n"
+            "    del globals()['R84_UNRELATED_B']\n"
+            "    return value\nPY\n",
     }
     dependency_shadow_facts = {
         name: h032_dependency_capability_source_facts(variant)
@@ -2305,6 +2512,21 @@ subprocess = object()
     check("J_R83_H031_FRESH_STDLIB_IDENTITY",
           _H031_STDLIB_CAPABILITIES_PRISTINE,
           f"identity={_H031_STDLIB_CAPABILITIES_PRISTINE}")
+    check("J_R84_H031_NAMESPACE_CAPABILITY_INTEGRITY",
+          dependency_capability_facts.get("namespace_capability_integrity") is True,
+          str(dependency_capability_facts))
+    check("J_R84_H031_NAMESPACE_MUTANTS_REJECT",
+          (all(mutant != h031_gate_text
+               for mutant in dependency_namespace_mutants.values())
+           and all(not all(facts.values())
+                   for facts in dependency_namespace_facts.values())
+           and all(facts.get("namespace_capability_integrity") is False
+                   and facts.get("actual_direct_call") is True
+                   for facts in dependency_namespace_facts.values())),
+          str(dependency_namespace_facts))
+    check("J_R84_H031_UNRELATED_NAMESPACE_LITERALS_ADMITTED",
+          all(all(facts.values()) for facts in dependency_shadow_facts.values()),
+          str(dependency_shadow_facts))
 
     dependency_calls = []
     def dependency_runner_spy(argv, **kwargs):
