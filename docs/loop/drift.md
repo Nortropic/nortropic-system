@@ -1948,3 +1948,45 @@ actual controller remains sole owner of its frozen 86400 timeout and family/resu
 which the connected product matrix already measures. Purpose/mode/argv and transport
 identity remain strict. External interruption is an operator incident and yields no gate
 verdict; no owner selftest intentionally interrupts the helper.
+
+## 2026-08-21 — R94 effect-bound physical run clock chain
+
+Two consecutive no-live executions of the implemented result-kernel candidate exposed a
+gate-only second collision before the R74 barrier: the physical, hostile and product-Git
+attempts could all select the same `<YYYYMMDD-HHMMSS>-test_author` leaf. R94 no longer
+uses a post-attempt `now_id()` read as their predecessor. The existing provider Popen
+observation records each actual envelope parent, validates its strict clock-shaped id and
+releases the next physical call only after a bounded strictly-later clock observation.
+The actual product-Git envelope id seeds the first R74 barrier; every later oracle still
+carries its own observed current id. Reusing that exact id in a connected product call
+must fail before provider start and preserve the run set. The intentional hostile-Git
+baseline may route its envelope through the decoy, but that identity is scheduling-only
+and grants no product verdict. Public baseline, production bytes and live behavior remain
+unchanged.
+
+## 2026-08-21 — R95 complete predecessor observation
+
+Review falsified R94's permissive predecessor extractor: a parseable envelope-parent id
+could survive a missing current AGENT_START, false `valid`, wrong `current_run`, or other
+failed launcher checks. R95 accepts an id only from the exact complete frozen observation:
+the exact field and check inventories, `valid=true`, every check true, one output and
+worktree selector, exact timeout/separator/worktree, absolute output, and the envelope
+inside the same strict current run under the intended runs root. One-field causal
+observation mutants prove each missing link yields no id. The intentionally broken public
+product-Git attempt therefore cannot seed the chain; its rig-only successors use a separate
+bounded clock release while the product remains the sole structured-result RED. A green
+candidate must supply the full product-Git observation. Boundary-cross, multi-second and
+exact collision schedules remain admissible or rejecting as previously frozen.
+
+## 2026-08-21 — R96 exact launch-output identity and scalar types
+
+Review showed that R95 did not relate `observation.output` to the actual parsed provider
+`-o` entry that keyed `launch_observations`, and Python equality admitted booleans/floats
+for selector counts and the separator. R96 passes the unique newly added map key into the
+same strict extractor and accepts only exact output equality. Both selector counts must be
+exact built-in integers equal to one and the separator an exact built-in integer equal to
+eight. One-field controls mutate the actual complete observation and reject a different
+absolute output, boolean/zero/two counts, float/wrong separator, timeout and worktree,
+alongside every earlier current journal/run/envelope/check control. An incomplete public
+product-Git observation still supplies neither scheduling identity nor product credit;
+the implemented disposable composition must retain its complete three-effect chain.
