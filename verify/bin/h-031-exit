@@ -283,7 +283,7 @@ def odombart(key: str, detail: str) -> None:
     raise SystemExit(2)
 
 
-H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 140 PASS / 1 FAIL"
+H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 143 PASS / 1 FAIL"
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
 H032_OWNER_LIVE_SKIP_MARKER = (
@@ -362,6 +362,131 @@ def h031_terminal_exit(owner_skip_pending: bool, failed_labels) -> int:
     if owner_skip_pending:
         return 2
     return 0 if not failed_labels else 1
+
+
+H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS = 120
+
+
+class H032DependencyTimeout(RuntimeError):
+    def __init__(self, owner_mode: str, timeout_seconds, stdout, stderr):
+        self.owner_mode = owner_mode
+        self.timeout_seconds = timeout_seconds
+        self.stdout = stdout
+        self.stderr = stderr
+        incident = ("SKIP_DEADLINE" if owner_mode == "skip"
+                    else "EXTERNAL_ORCHESTRATION_INCIDENT")
+        self.incident = incident
+        super().__init__(f"{incident}: timeout={timeout_seconds}")
+
+
+def run_h032_dependency(argv, cwd: Path, owner_mode: str, *, runner=None):
+    """Run H032; only the explicit no-live ceremony owns a short deadline."""
+    if owner_mode not in {"run", "skip"}:
+        raise ValueError("invalid owner-live mode")
+    if runner is None:
+        runner = subprocess.run
+    kwargs = {
+        "cwd": cwd,
+        "text": True,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+    }
+    if owner_mode == "skip":
+        kwargs["timeout"] = H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS
+    try:
+        return runner(argv, **kwargs)
+    except subprocess.TimeoutExpired as exc:
+        raise H032DependencyTimeout(
+            owner_mode, exc.timeout, exc.stdout or "", exc.stderr or "",
+        ) from exc
+
+
+def embedded_h031_python_source(gate_text: str) -> str:
+    marker = "<<'PY'\n"
+    if gate_text.count(marker) != 1 or not gate_text.endswith("\nPY\n"):
+        raise RuntimeError("H031 gate has no single exact embedded Python program")
+    return gate_text.split(marker, 1)[1][:-4]
+
+
+def replace_last_h031(text: str, old: str, new: str) -> str:
+    index = text.rfind(old)
+    if index < 0:
+        return text
+    return text[:index] + new + text[index + len(old):]
+
+
+def h032_dependency_wait_source_facts(gate_text: str) -> dict[str, bool]:
+    """Inventory only the frozen H031-to-H032 call layer."""
+    tree = ast.parse(embedded_h031_python_source(gate_text))
+    helpers = [node for node in tree.body
+               if isinstance(node, ast.FunctionDef)
+               and node.name == "run_h032_dependency"]
+    actual_calls = [node for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "run_h032_dependency"
+                    and len(node.args) == 3
+                    and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id == "upstream_argv"
+                    and isinstance(node.args[1], ast.Name)
+                    and node.args[1].id == "root"
+                    and isinstance(node.args[2], ast.Name)
+                    and node.args[2].id == "owner_live_mode"
+                    and not node.keywords]
+    direct_upstream = [node for node in ast.walk(tree)
+                       if isinstance(node, ast.Call)
+                       and isinstance(node.func, ast.Attribute)
+                       and isinstance(node.func.value, ast.Name)
+                       and node.func.value.id == "subprocess"
+                       and node.func.attr == "run"
+                       and node.args
+                       and isinstance(node.args[0], ast.Name)
+                       and node.args[0].id == "upstream_argv"]
+    skip_timeout_store = []
+    runner_calls = []
+    exact_skip_guard = False
+    if len(helpers) == 1:
+        helper = helpers[0]
+        for node in ast.walk(helper):
+            if (isinstance(node, ast.If)
+                    and isinstance(node.test, ast.Compare)
+                    and isinstance(node.test.left, ast.Name)
+                    and node.test.left.id == "owner_mode"
+                    and len(node.test.ops) == 1
+                    and isinstance(node.test.ops[0], ast.Eq)
+                    and len(node.test.comparators) == 1
+                    and isinstance(node.test.comparators[0], ast.Constant)
+                    and node.test.comparators[0].value == "skip"):
+                exact_skip_guard = True
+            if (isinstance(node, ast.Assign)
+                    and any(isinstance(target, ast.Subscript)
+                            and isinstance(target.value, ast.Name)
+                            and target.value.id == "kwargs"
+                            and isinstance(target.slice, ast.Constant)
+                            and target.slice.value == "timeout"
+                            for target in node.targets)):
+                skip_timeout_store.append(node)
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "runner"):
+                runner_calls.append(node)
+    timeout_constants = [node for node in tree.body
+                         if isinstance(node, ast.Assign)
+                         and len(node.targets) == 1
+                         and isinstance(node.targets[0], ast.Name)
+                         and node.targets[0].id == "H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS"
+                         and isinstance(node.value, ast.Constant)
+                         and type(node.value.value) is int
+                         and node.value.value == 120]
+    return {
+        "helper_singleton": len(helpers) == 1,
+        "actual_call_once": len(actual_calls) == 1,
+        "no_direct_upstream_run": not direct_upstream,
+        "skip_guard": exact_skip_guard,
+        "skip_timeout_store_once": len(skip_timeout_store) == 1,
+        "runner_call_once": len(runner_calls) == 1,
+        "timeout_constant_exact": len(timeout_constants) == 1,
+    }
 
 
 def sh(*argv: str, cwd: Path | None = None) -> str:
@@ -1271,7 +1396,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "0c4a481b60133d9db791a766e572d5364dfc9761a0f48f9e7d3cd2581004b659")
+                       == "6ced01d95e275ff2dd62417ab5574187cb0b50c3649a064376d68cdc462657e7")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -1991,10 +2116,84 @@ subprocess = object()
     harmless = process_shape(source_text + "\ndef h031_harmless(repo, wt, role, prompt):\n    return run_codex(repo, wt, role, prompt)\n")
     check("J_HARMLESS_ROLE_CONSOLIDATION", bool(harmless["boundary_ok"]), str(harmless["detail"]))
 
+    # R81 gives the full owner ceremony one lifetime owner.  H031 does not
+    # race H032 or its product/controller supervisor with a shorter deadline.
+    # The explicit no-live ceremony remains bounded and is the only branch to
+    # which this gate supplies a timeout.
+    h031_gate_text = (root / "verify/bin/h-031-exit").read_text(encoding="utf-8")
+    dependency_wait_facts = h032_dependency_wait_source_facts(h031_gate_text)
+    dependency_run_timeout_mutant = h031_gate_text.replace(
+        'if owner_mode == "skip":\n        kwargs["timeout"]',
+        'if owner_mode in {"skip", "run"}:\n        kwargs["timeout"]', 1)
+    dependency_skip_unbounded_mutant = h031_gate_text.replace(
+        '        kwargs["timeout"] = H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS\n',
+        '        pass  # mutant removes the bounded skip deadline\n', 1)
+    dependency_bypass_mutant = replace_last_h031(
+        h031_gate_text,
+        "run_h032_dependency(upstream_argv, root, owner_live_mode)",
+        "subprocess.run(upstream_argv, cwd=root)")
+    dependency_mutant_facts = {
+        "run_timeout": h032_dependency_wait_source_facts(dependency_run_timeout_mutant),
+        "skip_unbounded": h032_dependency_wait_source_facts(dependency_skip_unbounded_mutant),
+        "bypass": h032_dependency_wait_source_facts(dependency_bypass_mutant),
+    }
+    check("J_H032_DEPENDENCY_WAIT_SOURCE",
+          dependency_wait_facts and all(dependency_wait_facts.values()),
+          str(dependency_wait_facts))
+    check("J_H032_DEPENDENCY_WAIT_MUTANTS_REJECT",
+          dependency_run_timeout_mutant != h031_gate_text
+          and dependency_skip_unbounded_mutant != h031_gate_text
+          and dependency_bypass_mutant != h031_gate_text
+          and not all(dependency_mutant_facts["run_timeout"].values())
+          and not all(dependency_mutant_facts["skip_unbounded"].values())
+          and not all(dependency_mutant_facts["bypass"].values()),
+          str(dependency_mutant_facts))
+
+    synthetic_dependency_calls = []
+    def synthetic_dependency_runner(argv, **kwargs):
+        synthetic_dependency_calls.append((tuple(argv), dict(kwargs)))
+        return subprocess.CompletedProcess(argv, 0, "synthetic-complete\n", "")
+    synthetic_owner_result = run_h032_dependency(
+        ["/gate/h-032-exit"], root, "run", runner=synthetic_dependency_runner)
+    synthetic_skip_result = run_h032_dependency(
+        ["/gate/h-032-exit", "--skip-owner-live"], root, "skip",
+        runner=synthetic_dependency_runner)
+    synthetic_wait_ok = (
+        synthetic_owner_result.returncode == synthetic_skip_result.returncode == 0
+        and len(synthetic_dependency_calls) == 2
+        and "timeout" not in synthetic_dependency_calls[0][1]
+        and synthetic_dependency_calls[1][1].get("timeout") == 120
+    )
+    synthetic_timeout_incidents = []
+    def synthetic_timeout_runner(argv, **kwargs):
+        raise subprocess.TimeoutExpired(argv, kwargs.get("timeout", 999))
+    for synthetic_mode in ("skip", "run"):
+        try:
+            run_h032_dependency(
+                ["/gate/h-032-exit"], root, synthetic_mode,
+                runner=synthetic_timeout_runner)
+        except H032DependencyTimeout as exc:
+            synthetic_timeout_incidents.append((
+                exc.owner_mode, exc.incident, exc.timeout_seconds))
+    check("J_H032_DEPENDENCY_WAIT_EFFECT",
+          synthetic_wait_ok
+          and synthetic_timeout_incidents == [
+              ("skip", "SKIP_DEADLINE", 120),
+              ("run", "EXTERNAL_ORCHESTRATION_INCIDENT", 999),
+          ],
+          f"calls={[(call[0], sorted(call[1])) for call in synthetic_dependency_calls]} "
+          f"incidents={synthetic_timeout_incidents}")
+
     upstream_argv=[str(h032_gate)]
     if owner_live_mode == "skip": upstream_argv.append("--skip-owner-live")
-    upstream = subprocess.run(upstream_argv, cwd=root, text=True,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+    try:
+        upstream = run_h032_dependency(upstream_argv, root, owner_live_mode)
+    except H032DependencyTimeout as exc:
+        odombart(
+            "K_H032_DEPENDENCY_TIMEOUT",
+            f"incident={exc.incident} mode={exc.owner_mode} "
+            f"timeout={exc.timeout_seconds}",
+        )
     owner_skip_fixture = owner_skip_fixture_from_observed_h032(upstream.stdout)
     owner_skip_positive = exclusive_h032_owner_live_skip(2, owner_skip_fixture)
     check("J_H032_EXCLUSIVE_OWNER_LIVE_SKIP_POSITIVE",

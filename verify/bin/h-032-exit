@@ -360,6 +360,92 @@ def owner_live_binding_valid(binding) -> bool:
     except (KeyError, OSError, RuntimeError, TypeError, ValueError):
         return False
 
+
+def wait_exact_owner_live(proc):
+    """Wait for the owner ceremony without competing with product lifetime."""
+    return proc.communicate()
+
+
+def owner_live_should_run(deterministic_ok: bool, mode: str) -> bool:
+    if mode not in {"run", "skip"}:
+        raise ValueError("invalid owner-live mode")
+    return deterministic_ok and mode == "run"
+
+
+def embedded_gate_python_source(gate_text: str) -> str:
+    marker = "<<'PY'\n"
+    if gate_text.count(marker) != 1 or not gate_text.endswith("\nPY\n"):
+        raise RuntimeError("owner gate has no single exact embedded Python program")
+    return gate_text.split(marker, 1)[1][:-4]
+
+
+def replace_last_exact(text: str, old: str, new: str) -> str:
+    index = text.rfind(old)
+    if index < 0:
+        return text
+    return text[:index] + new + text[index + len(old):]
+
+
+def owner_live_wait_source_facts(gate_text: str) -> dict[str, bool]:
+    """Small structural inventory for the two frozen owner-live seams only."""
+    tree = ast.parse(embedded_gate_python_source(gate_text))
+    helpers = [node for node in tree.body
+               if isinstance(node, ast.FunctionDef)
+               and node.name == "wait_exact_owner_live"]
+    predicates = [node for node in tree.body
+                  if isinstance(node, ast.FunctionDef)
+                  and node.name == "owner_live_should_run"]
+    helper_exact = False
+    if len(helpers) == 1:
+        helper = helpers[0]
+        statement = helper.body[1] if (len(helper.body) == 2
+                                       and isinstance(helper.body[0], ast.Expr)
+                                       and isinstance(helper.body[0].value, ast.Constant)
+                                       and isinstance(helper.body[0].value.value, str)) else (
+                                           helper.body[0] if len(helper.body) == 1 else None)
+        helper_exact = (
+            statement is not None and isinstance(statement, ast.Return)
+            and isinstance(statement.value, ast.Call)
+            and isinstance(statement.value.func, ast.Attribute)
+            and isinstance(statement.value.func.value, ast.Name)
+            and statement.value.func.value.id == "proc"
+            and statement.value.func.attr == "communicate"
+            and not statement.value.args and not statement.value.keywords
+        )
+    wait_calls = [node for node in ast.walk(tree)
+                  if isinstance(node, ast.Call)
+                  and isinstance(node.func, ast.Name)
+                  and node.func.id == "wait_exact_owner_live"]
+    actual_wait_calls = [node for node in wait_calls
+                         if len(node.args) == 1
+                         and isinstance(node.args[0], ast.Name)
+                         and node.args[0].id == "live_proc"
+                         and not node.keywords]
+    direct_live_waits = [node for node in ast.walk(tree)
+                         if isinstance(node, ast.Call)
+                         and isinstance(node.func, ast.Attribute)
+                         and isinstance(node.func.value, ast.Name)
+                         and node.func.value.id == "live_proc"
+                         and node.func.attr in {"communicate", "wait"}]
+    predicate_calls = [node for node in ast.walk(tree)
+                       if isinstance(node, ast.Call)
+                       and isinstance(node.func, ast.Name)
+                       and node.func.id == "owner_live_should_run"
+                       and len(node.args) == 2
+                       and isinstance(node.args[0], ast.Name)
+                       and node.args[0].id == "deterministic_result_ok"
+                       and isinstance(node.args[1], ast.Name)
+                       and node.args[1].id == "owner_live_mode"
+                       and not node.keywords]
+    return {
+        "helper_exact": helper_exact,
+        "helper_singleton": len(helpers) == 1,
+        "predicate_singleton": len(predicates) == 1,
+        "actual_wait_once": len(actual_wait_calls) == 1,
+        "no_direct_live_wait": not direct_live_waits,
+        "actual_guard_once": len(predicate_calls) == 1,
+    }
+
 def exact_tree_snapshot(root: Path) -> tuple[tuple[object, ...], ...]:
     """Snapshot an exact tree without following links or interpreting contents."""
     if not root.exists() and not root.is_symlink():
@@ -600,6 +686,66 @@ try:
           f"stale={not owner_live_binding_valid(owner_live_stale_gate)} "
           f"wrong_gate={not owner_live_binding_valid(owner_live_wrong_gate)} "
           f"wrong_head={not owner_live_binding_valid(owner_live_wrong_head)}")
+
+    # R81 freezes one lifetime owner: the product/controller's existing 86400
+    # provider supervisor.  The owner gate waits for its exact runner without a
+    # competing deadline or kill.  This unconditional lane invokes only a
+    # judge-local probe and can never enter the real provider branch.
+    owner_gate_text = h032_gate.read_text(encoding="utf-8")
+    owner_wait_facts = owner_live_wait_source_facts(owner_gate_text)
+    owner_wait_timeout_mutant = owner_gate_text.replace(
+        "return proc.communicate()",
+        "return proc.communicate(timeout=3600)", 1)
+    owner_wait_direct_mutant = replace_last_exact(
+        owner_gate_text,
+        "wait_exact_owner_live(live_proc)",
+        "live_proc.communicate()")
+    owner_wait_guard_mutant = replace_last_exact(
+        owner_gate_text,
+        "owner_live_should_run(deterministic_result_ok, owner_live_mode)",
+        'deterministic_result_ok and owner_live_mode == "run"')
+    owner_wait_mutant_facts = {
+        "shorter_timeout": owner_live_wait_source_facts(owner_wait_timeout_mutant),
+        "direct_wait": owner_live_wait_source_facts(owner_wait_direct_mutant),
+        "bypassed_guard": owner_live_wait_source_facts(owner_wait_guard_mutant),
+    }
+    check("J_R81_OWNER_LIVE_WAIT_SOURCE",
+          owner_wait_facts and all(owner_wait_facts.values()),
+          str(owner_wait_facts))
+    check("J_R81_OWNER_LIVE_WAIT_MUTANTS_REJECT",
+          owner_wait_timeout_mutant != owner_gate_text
+          and owner_wait_direct_mutant != owner_gate_text
+          and owner_wait_guard_mutant != owner_gate_text
+          and not all(owner_wait_mutant_facts["shorter_timeout"].values())
+          and not all(owner_wait_mutant_facts["direct_wait"].values())
+          and not all(owner_wait_mutant_facts["bypassed_guard"].values()),
+          str(owner_wait_mutant_facts))
+
+    class OwnerLiveWaitProbe:
+        def __init__(self):
+            self.calls = []
+        def communicate(self, *args, **kwargs):
+            self.calls.append((args, kwargs))
+            return "synthetic-owner-complete", None
+    owner_wait_probe = OwnerLiveWaitProbe()
+    owner_wait_result = wait_exact_owner_live(owner_wait_probe)
+    owner_wait_runtime_ok = (
+        owner_wait_result == ("synthetic-owner-complete", None)
+        and owner_wait_probe.calls == [((), {})]
+        and owner_live_should_run(True, "run")
+        and not owner_live_should_run(True, "skip")
+        and not owner_live_should_run(False, "run")
+    )
+    try:
+        owner_live_should_run(True, "other")
+    except ValueError:
+        owner_wait_invalid_mode_rejected = True
+    else:
+        owner_wait_invalid_mode_rejected = False
+    check("J_R81_OWNER_LIVE_WAIT_EFFECT",
+          owner_wait_runtime_ok and owner_wait_invalid_mode_rejected,
+          f"calls={owner_wait_probe.calls} result={owner_wait_result!r} "
+          f"invalid={owner_wait_invalid_mode_rejected}")
 
     base = work / "base"; base.mkdir()
     sh(GIT, "init", "-q", cwd=base)
@@ -5513,7 +5659,7 @@ class CraftedConcretePath(type(Path())):
     exact_owner_live_detail = ("SKIPPED_OWNER_TEST_AUTHOR"
                                if owner_live_mode == "skip"
                                else "SKIPPED_DETERMINISTIC_RED")
-    if deterministic_result_ok and owner_live_mode == "run":
+    if owner_live_should_run(deterministic_result_ok, owner_live_mode):
         live_repo = work / "r14-exact-owner-live-clone"
         sh(GIT,"clone","-q","--no-hardlinks",str(repo),str(live_repo))
         sh(GIT,"checkout","-q",owner_live_binding["candidate_head"],cwd=live_repo)
@@ -5524,13 +5670,7 @@ class CraftedConcretePath(type(Path())):
         live_proc = system_popen(["/usr/bin/python3","-I","-S","-u",str(r12_runner),
                                   str(live_source),str(live_repo),str(live_wt)],stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT,text=True,env=live_env)
-        try:
-            live_stdout,_ = live_proc.communicate(timeout=3600)
-        except subprocess.TimeoutExpired as exc:
-            live_proc.terminate()
-            try: live_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired: live_proc.kill();live_proc.wait()
-            raise RuntimeError("R13 exact owner provider unavailable: timeout") from exc
+        live_stdout,_ = wait_exact_owner_live(live_proc)
         if live_proc.returncode != 0 or "R12_OUTCOME=ADMITTED" not in live_stdout:
             raise RuntimeError("R13 exact owner provider unavailable: auth/network/runtime")
         output_lines=[line.split(" ",1)[1] for line in live_stdout.splitlines()

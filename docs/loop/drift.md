@@ -1820,7 +1820,7 @@ the old predicate could continue into product checks and later turn the mixed ow
 state into exit 1.
 
 R76 classifies the complete upstream effect. The only admitted skip transcript has
-exit 2, the exact 140 PASS / 1 FAIL summary, only the structured-result failure, green
+exit 2, the current exact 143 PASS / 1 FAIL summary after R81's three owner-wait controls, only the structured-result failure, green
 G20 and H033 controls with exact H033 55/0 PASS markers, one exact no-live reason and
 one exact owner-live ODÖMBART line in that order. Mixed G20, mixed H033, unknown,
 duplicate, reordered and missing owner markers all exit ODÖMBART before H031 product
@@ -1862,3 +1862,29 @@ exact report, while argv and AGENT_START retain their existing independent route
 connected seventh provider start writes the old partial object; it must be schema-rejected and
 leave no canonical result. These are dependent-gate repairs, not product credits. R77's exclusive
 no-live/H033 parser, H032 bytes, production, process topology and live-call guard are unchanged.
+
+### 2026-08-21 — H032/H031 R81 single owner-live lifetime
+
+R79 attempted to make H031's dependency call bounded by putting H032 in a new process
+group. Independent review demonstrated that this group is not the real descendant
+boundary: `controller/launch/cli` starts the provider with `start_new_session=True`, so
+an outer kill can remove H032 and the launcher while leaving the provider alive. Polling
+PIDs or environment would not close the reparent/PID-reuse race, and the unprivileged
+owner gate has no Darwin coalition or EndpointSecurity authority.
+
+Owner therefore freezes one lifetime owner instead of adding another incomplete
+supervisor. In normal full owner-live, H031 calls H032 with no timeout argument and H032
+waits for its exact live runner with `communicate()` and no timeout argument. Neither
+layer terminates or kills that child. The already-frozen product/controller
+`CODEX_RUN_TIMEOUT_SECONDS=86400` supervisor is the sole provider deadline and cleanup
+owner. H031's explicit `--skip-owner-live` path remains bounded at 120 seconds, and
+H032's exact live guard proves that path never starts the real provider.
+
+Both owner gates use a small source inventory limited to these call seams plus
+unconditional judge-local probes. Shorter-live-timeout, direct-wait/guard bypass,
+unbounded-skip and dependency-helper bypass mutants reject. Synthetic normal and timeout
+results execute immediately; they cannot call a model. An interruption or orchestration
+hang outside the product supervisor is ODÖMBART/operator incident and is never converted
+to product PASS or FAIL. This amendment deliberately makes no outer descendant-cleanup
+claim. R77 skip parsing, R78 result fixtures, all deterministic H032 cleanup controls and
+production bytes remain unchanged.
