@@ -2038,3 +2038,21 @@ same-object double-republication ending absent and a same-length schema-valid in
 substitution with stale digest are connected causal controls. The criterion binds effects,
 not publication API, source spelling or cleanup order; TEST_AUTHOR changes no product and
 runs no live provider/model.
+
+## 2026-08-22 — R101 hardlink publication completeness
+
+Independent review found one missing filesystem effect in R100's otherwise causal presence
+relation: `os.link` was not among the callbacks that synchronize the previous operation.
+A canonical hardlink could therefore appear and disappear between handled callbacks while
+the cached state stayed present, hiding repeated publication of the same inode and bytes.
+
+R101 adds only `os.link` to that existing state machine. Source and destination are
+registered before the operation; the next relevant callback or the final attempt sync
+observes its post-operation state. Python 3.9's pathlib link form emits the same audit event,
+so no API-spelling rule is added. The connected persistent-cleanup control retains the
+actual product canonical through a hardlink, removes canonical, republishes the same object
+twice with an unlink after each publication, removes the alias and requires multiple
+observed transitions with final canonical absence. Zero-publication cleanup and a single
+publication followed by rollback remain admissible. Every R100 retained-value, digest,
+direct-write and residue closure remains unchanged; production and live/provider execution
+are untouched.

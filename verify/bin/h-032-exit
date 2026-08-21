@@ -2149,7 +2149,7 @@ def run_codex(sink, canonical, invocation, run, role):
 
     def audit_inventory(event: str, args: tuple[object, ...]) -> None:
         active = audit_active[0]
-        if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename", "subprocess.Popen"}:
+        if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename", "os.link", "subprocess.Popen"}:
             return
         if active.get("observer_busy") is True:
             return
@@ -2170,7 +2170,7 @@ def run_codex(sink, canonical, invocation, run, role):
             register_canonical(active, args[0])
         elif event == "os.remove" and args:
             register_canonical(active, args[0])
-        elif event == "os.rename":
+        elif event in {"os.rename", "os.link"}:
             if args: register_canonical(active, args[0])
             if len(args) > 1: register_canonical(active, args[1])
         # Registration occurs before the audited operation and therefore
@@ -2193,7 +2193,7 @@ def run_codex(sink, canonical, invocation, run, role):
                         direct_writes.append((str(path), flags, path.exists()))
                 except Exception:
                     pass
-        values = args[1:2] if event == "os.rename" else args[:1]
+        values = args[1:2] if event in {"os.rename", "os.link"} else args[:1]
         for value in values:
             if isinstance(value, (str, bytes, os.PathLike)):
                 try:
@@ -2699,6 +2699,25 @@ def run_codex(sink, canonical, invocation, run, role):
             module.os.replace(canonical, source)
             module.os.unlink(source)
 
+        def hardlink_publication_effect() -> None:
+            canonical = current_canonical()
+            if canonical is None:
+                raise RuntimeError("R101 mutation has no exact current canonical path")
+            source = canonical.with_name(".r101-link-republish")
+            if canonical.exists() and not canonical.is_symlink():
+                # Retain the actual product-published object before making the
+                # canonical absent.  The following two publications therefore
+                # reuse its exact inode and bytes.
+                module.os.link(canonical, source)
+                module.os.unlink(canonical)
+            else:
+                source.write_bytes(b"R101 hardlink transition probe")
+            module.os.link(source, canonical)
+            module.os.unlink(canonical)
+            module.os.link(source, canonical)
+            module.os.unlink(canonical)
+            module.os.unlink(source)
+
         def stale_canonical_effect() -> None:
             canonical = current_canonical()
             if canonical is None or not canonical.is_file() or canonical.is_symlink():
@@ -2731,6 +2750,8 @@ def run_codex(sink, canonical, invocation, run, role):
             except BaseException:
                 if mutation == "repeat_publication":
                     repeat_publication_effect()
+                elif mutation == "hardlink_publication":
+                    hardlink_publication_effect()
                 raise
             if mutation == "stale_canonical":
                 stale_canonical_effect()
@@ -2830,6 +2851,8 @@ def run_codex(sink, canonical, invocation, run, role):
     persistent_cleanup = cleanup_failure_case(True)
     repeated_publication_cleanup = cleanup_failure_case(
         True, "repeat_publication")
+    hardlink_publication_cleanup = cleanup_failure_case(
+        True, "hardlink_publication")
     stale_canonical_cleanup = cleanup_failure_case(
         False, "stale_canonical")
     cleanup_rig_ok = (
@@ -2837,6 +2860,10 @@ def run_codex(sink, canonical, invocation, run, role):
         and not repeated_publication_cleanup[0][0]
         and not any(state[1] for state in repeated_publication_cleanup[4])
         and len(repeated_publication_cleanup[5]) >= 2
+        and hardlink_publication_cleanup[1] > 0
+        and not hardlink_publication_cleanup[0][0]
+        and not any(state[1] for state in hardlink_publication_cleanup[4])
+        and len(hardlink_publication_cleanup[5]) >= 2
         and stale_canonical_cleanup[1] == 1
         and stale_canonical_cleanup[0][0]
         and len(stale_canonical_cleanup[4]) == 1
@@ -6487,7 +6514,7 @@ class CraftedConcretePath(type(Path())):
     def cleanup_detail(case):
         return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
-          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
+          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
     check("K1", family_absent or (valid[0] and valid[2] == 1), f"valid={valid}")
     check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
     check("K3", family_absent or (argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash),
