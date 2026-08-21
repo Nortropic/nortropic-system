@@ -1990,3 +1990,31 @@ absolute output, boolean/zero/two counts, float/wrong separator, timeout and wor
 alongside every earlier current journal/run/envelope/check control. An incomplete public
 product-Git observation still supplies neither scheduling identity nor product credit;
 the implemented disposable composition must retain its complete three-effect chain.
+
+## 2026-08-21 — R97 total owner-skip selftest after green H032
+
+The first completed full-live composition returned H032 144/0 and passed the real H032
+dependency, role, route and product controls. H031 nevertheless failed its unconditional
+owner-skip positive because the fixture builder recognized only a red or already-skipped
+upstream transcript. R97 adds one strict green source shape to that same selftest path:
+exit zero, exact 144/0, no failure, ODÖMBART, current-red reason or skip state, plus the
+exact structured-result, G20 and embedded H033 positives. The rig changes only the
+structured-result line and summary and inserts the frozen skip state, then invokes the
+unchanged exclusive parser. Wrong summary/return code, missing or duplicate boundary,
+extra failure/state and missing G20/H033 facts reject. When the real upstream is green,
+the selftest source must equal its observed transcript line-for-line. This grants no
+product credit and does not repeat the already completed live/provider call.
+
+## 2026-08-21 — R98 exact green transcript inventory
+
+Review falsified R97's green predicate with transcripts that retained its numeric count
+while duplicating one PASS label, omitting another, or adding conflicting summary/result
+controls. R98 binds the same actual green source to the frozen set of 144 unique H032 PASS
+labels. The one 144/0 summary must be the sole summary and terminal line; any other
+summary, FAIL, ODÖMBART, current-red, owner-live or top-level H032 gate marker rejects.
+PASS detail text remains variable, and embedded H033 structure is still checked by its
+dedicated parser. Causal one-field mutants cover duplicate, substituted, missing and
+extra labels plus conflicting/arbitrary summaries and a top-level result marker. This
+changes only the owner parser rig. It grants no replay or product credit: the preserved
+single full-live run remains historical evidence, and publication still requires a later
+normal full H031 exit zero without making another provider call during TEST_AUTHOR.
