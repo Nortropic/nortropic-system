@@ -76,11 +76,27 @@ import signal
 import shutil
 import socket
 import stat
-import subprocess
+from subprocess import (
+    DEVNULL as _H032_DEVNULL,
+    PIPE as _H032_PIPE,
+    STDOUT as _H032_STDOUT,
+    Popen as _H032_PRISTINE_POPEN,
+    Popen as _H032_FRESH_POPEN,
+    Popen as _H032_GATE_POPEN,
+    TimeoutExpired as _H032_TIMEOUT_EXPIRED,
+    run as _H032_GATE_RUN,
+    run as _H032_FRESH_RUN,
+)
 import sys
 import threading
 import time
 import selectors
+
+_H032_STDLIB_CAPABILITIES_PRISTINE = (
+    _H032_PRISTINE_POPEN is _H032_FRESH_POPEN
+    and _H032_GATE_RUN is _H032_FRESH_RUN)
+if not _H032_STDLIB_CAPABILITIES_PRISTINE:
+    raise SystemExit("stdlib subprocess capability identity mismatch")
 
 source, result_kernel, authority_source, schema_source, work = map(Path, sys.argv[1:6])
 g20_emit_path = Path(sys.argv[6]) if sys.argv[6] else None
@@ -258,8 +274,8 @@ def authority_shape(raw: str) -> tuple[bool, str]:
 def sh(*argv: str, cwd: Path | None = None) -> str:
     if not argv or argv[0] != GIT:
         raise RuntimeError("judge helper permits only exact system Git")
-    p = subprocess.run(argv, cwd=cwd, env=dict(GIT_CLOSED_ENV), text=True,
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = _H032_GATE_RUN(argv, cwd=cwd, env=dict(GIT_CLOSED_ENV), text=True,
+                      stdout=_H032_PIPE, stderr=_H032_PIPE)
     if p.returncode:
         raise RuntimeError(
             f"rc={p.returncode}: {' '.join(argv)}\nstdout={p.stdout}\nstderr={p.stderr}")
@@ -279,28 +295,28 @@ def strict_git_root_output(stdout: str, stderr: str) -> Path:
     return Path(line)
 
 def git_repository_head(cwd: Path) -> str:
-    root = subprocess.run(
+    root = _H032_GATE_RUN(
         [GIT, "rev-parse", "--show-toplevel"], cwd=cwd,
         env=dict(GIT_CLOSED_ENV), text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout=_H032_PIPE, stderr=_H032_PIPE)
     if root.returncode:
         raise RuntimeError(f"Git worktree identity failed: {root.stderr}")
     observed_root = strict_git_root_output(root.stdout, root.stderr)
     if observed_root.resolve() != cwd.resolve():
         raise RuntimeError("Git worktree identity does not match requested repository")
-    head = subprocess.run(
+    head = _H032_GATE_RUN(
         [GIT, "rev-parse", "--verify", "HEAD"], cwd=cwd,
         env=dict(GIT_CLOSED_ENV), text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout=_H032_PIPE, stderr=_H032_PIPE)
     if head.returncode:
         raise RuntimeError(f"Git HEAD identity failed: {head.stderr}")
     return strict_git_commit_output(head.stdout, head.stderr)
 
 def git_repository_common_dir(cwd: Path) -> Path:
-    common = subprocess.run(
+    common = _H032_GATE_RUN(
         [GIT, "rev-parse", "--path-format=absolute", "--git-common-dir"],
         cwd=cwd, env=dict(GIT_CLOSED_ENV), text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout=_H032_PIPE, stderr=_H032_PIPE)
     if common.returncode:
         raise RuntimeError(f"Git common-dir identity failed: {common.stderr}")
     return strict_git_root_output(common.stdout, common.stderr).resolve()
@@ -365,8 +381,8 @@ def run_exact_owner_live(popen_capability, argv, environment):
     """Start and wait through the exact unwrapped owner-live capability."""
     process = popen_capability(
         argv,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stdout=_H032_PIPE,
+        stderr=_H032_STDOUT,
         text=True,
         env=environment,
     )
@@ -395,7 +411,7 @@ def replace_last_exact(text: str, old: str, new: str) -> str:
 
 
 def owner_live_capability_source_facts(gate_text: str) -> dict[str, bool]:
-    """Inventory only the exact owner-live capability helper and real call."""
+    """Inventory the early stdlib capture and exact owner-live handoff."""
     tree = ast.parse(embedded_gate_python_source(gate_text))
     helpers = [node for node in tree.body
                if isinstance(node, ast.FunctionDef)
@@ -408,8 +424,8 @@ def run_exact_owner_live(popen_capability, argv, environment):
     """Start and wait through the exact unwrapped owner-live capability."""
     process = popen_capability(
         argv,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stdout=_H032_PIPE,
+        stderr=_H032_STDOUT,
         text=True,
         env=environment,
     )
@@ -423,21 +439,74 @@ def run_exact_owner_live(popen_capability, argv, environment):
                      if isinstance(node, ast.Name)
                      and node.id == "run_exact_owner_live"
                      and isinstance(node.ctx, (ast.Store, ast.Del))]
-    system_popen_stores = [node for node in ast.walk(tree)
-                           if isinstance(node, ast.Name)
-                           and node.id == "system_popen"
-                           and isinstance(node.ctx, (ast.Store, ast.Del))]
-    system_popen_bindings = [node for node in ast.walk(tree)
-                             if isinstance(node, ast.Assign)
-                             and len(node.targets) == 1
-                             and isinstance(node.targets[0], ast.Name)
-                             and node.targets[0].id == "system_popen"
-                             and isinstance(node.value, ast.Attribute)
-                             and node.value.attr == "Popen"
-                             and isinstance(node.value.value, ast.Attribute)
-                             and node.value.value.attr == "subprocess"
-                             and isinstance(node.value.value.value, ast.Name)
-                             and node.value.value.value.id == "module"]
+    expected_imports = [
+        ("DEVNULL", "_H032_DEVNULL"),
+        ("PIPE", "_H032_PIPE"),
+        ("STDOUT", "_H032_STDOUT"),
+        ("Popen", "_H032_PRISTINE_POPEN"),
+        ("Popen", "_H032_FRESH_POPEN"),
+        ("Popen", "_H032_GATE_POPEN"),
+        ("TimeoutExpired", "_H032_TIMEOUT_EXPIRED"),
+        ("run", "_H032_GATE_RUN"),
+        ("run", "_H032_FRESH_RUN"),
+    ]
+    direct_imports = [node for node in tree.body
+                      if isinstance(node, ast.ImportFrom)
+                      and node.module == "subprocess" and node.level == 0]
+    module_imports = [node for node in ast.walk(tree)
+                      if isinstance(node, ast.Import)
+                      and any(alias.name == "subprocess" for alias in node.names)]
+    nested_from_imports = [node for node in ast.walk(tree)
+                           if isinstance(node, ast.ImportFrom)
+                           and node.module == "subprocess"
+                           and node not in direct_imports]
+    import_exact = (len(direct_imports) == 1
+                    and [(alias.name, alias.asname)
+                         for alias in direct_imports[0].names] == expected_imports
+                    and not module_imports and not nested_from_imports)
+    import_index = tree.body.index(direct_imports[0]) if direct_imports else -1
+    import_before_body = (import_index >= 0
+                          and all(isinstance(node, (ast.Import, ast.ImportFrom))
+                                  for node in tree.body[:import_index]))
+    expected_identity = ast.parse('''
+_H032_STDLIB_CAPABILITIES_PRISTINE = (
+    _H032_PRISTINE_POPEN is _H032_FRESH_POPEN
+    and _H032_GATE_RUN is _H032_FRESH_RUN)
+if not _H032_STDLIB_CAPABILITIES_PRISTINE:
+    raise SystemExit("stdlib subprocess capability identity mismatch")
+''').body
+    identity_guards = [index for index in range(len(tree.body) - 1)
+                       if all(ast.dump(tree.body[index + offset], include_attributes=False)
+                              == ast.dump(expected_identity[offset], include_attributes=False)
+                              for offset in (0, 1))]
+    protected = {
+        "_H032_PRISTINE_POPEN", "_H032_FRESH_POPEN", "_H032_GATE_POPEN",
+        "_H032_GATE_RUN", "_H032_FRESH_RUN",
+    }
+    protected_stores = [node for node in ast.walk(tree)
+                        if isinstance(node, ast.Name) and node.id in protected
+                        and isinstance(node.ctx, (ast.Store, ast.Del))]
+    protected_declarations = [node for node in ast.walk(tree)
+                              if isinstance(node, (ast.Global, ast.Nonlocal))
+                              and protected.intersection(node.names)]
+    dynamic_imports = [node for node in ast.walk(tree)
+                       if isinstance(node, ast.Call)
+                       and ((isinstance(node.func, ast.Name)
+                             and node.func.id == "__import__")
+                            or (isinstance(node.func, ast.Attribute)
+                                and node.func.attr == "import_module"))]
+    protected_reflection = [node for node in ast.walk(tree)
+                            if ((isinstance(node, ast.Attribute)
+                                 and node.attr in {"__dict__", "__getattribute__"}
+                                 and isinstance(node.value, ast.Name)
+                                 and node.value.id in protected | {"subprocess"})
+                                or (isinstance(node, ast.Subscript)
+                                    and isinstance(node.value, ast.Attribute)
+                                    and isinstance(node.value.value, ast.Name)
+                                    and node.value.value.id == "sys"
+                                    and node.value.attr == "modules"
+                                    and isinstance(node.slice, ast.Constant)
+                                    and node.slice.value == "subprocess"))]
     actual_calls = []
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Assign) and len(node.targets) == 1
@@ -451,11 +520,29 @@ def run_exact_owner_live(popen_capability, argv, environment):
         call = node.value
         if (len(call.args) == 3 and not call.keywords
                 and isinstance(call.args[0], ast.Name)
-                and call.args[0].id == "system_popen"
+                and call.args[0].id == "_H032_PRISTINE_POPEN"
                 and isinstance(call.args[1], ast.List)
                 and isinstance(call.args[2], ast.Name)
                 and call.args[2].id == "live_env"):
             actual_calls.append(call)
+    parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+    identity_nodes = (set(ast.walk(tree.body[identity_guards[0]]))
+                      if len(identity_guards) == 1 else set())
+    protected_load_contexts = True
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Name) and node.id in protected
+                and isinstance(node.ctx, ast.Load)):
+            continue
+        parent = parents.get(node)
+        if node in identity_nodes:
+            continue
+        if (node.id == "_H032_PRISTINE_POPEN" and len(actual_calls) == 1
+                and parent is actual_calls[0] and actual_calls[0].args[0] is node):
+            continue
+        if (node.id in {"_H032_GATE_POPEN", "_H032_GATE_RUN"}
+                and isinstance(parent, ast.Call) and parent.func is node):
+            continue
+        protected_load_contexts = False
     direct_live_waits = [node for node in ast.walk(tree)
                          if isinstance(node, ast.Call)
                          and isinstance(node.func, ast.Attribute)
@@ -475,8 +562,12 @@ def run_exact_owner_live(popen_capability, argv, environment):
     return {
         "helper_exact": helper_exact,
         "helper_binding_singleton": len(helpers) == 1 and not helper_stores,
-        "system_popen_exact": (len(system_popen_stores) == 1
-                               and len(system_popen_bindings) == 1),
+        "subprocess_import_exact": import_exact and import_before_body,
+        "stdlib_identity_exact": len(identity_guards) == 1,
+        "protected_capabilities_unmodified": (not protected_stores
+                                                and not protected_declarations
+                                                and protected_load_contexts),
+        "no_subprocess_reflection": not dynamic_imports and not protected_reflection,
         "actual_direct_call": len(actual_calls) == 1,
         "no_direct_live_wait": not direct_live_waits,
         "predicate_singleton": len(predicates) == 1,
@@ -525,13 +616,13 @@ try:
     sh(GIT, "commit", "-qm", "decoy", cwd=git_decoy)
     decoy_head = git_repository_head(git_decoy)
     inherited_dir_env = dict(GIT_CLOSED_ENV, GIT_DIR=str(git_decoy / ".git"))
-    inherited_dir_probe = subprocess.run(
+    inherited_dir_probe = _H032_GATE_RUN(
         [GIT, "rev-parse", "--verify", "HEAD"], cwd=repo, env=inherited_dir_env,
-        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        text=True, stdout=_H032_PIPE, stderr=_H032_PIPE)
     inherited_trace_env = dict(GIT_CLOSED_ENV, GIT_TRACE="1")
-    inherited_trace_probe = subprocess.run(
+    inherited_trace_probe = _H032_GATE_RUN(
         [GIT, "rev-parse", "--verify", "HEAD"], cwd=repo, env=inherited_trace_env,
-        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        text=True, stdout=_H032_PIPE, stderr=_H032_PIPE)
     ambient_git_results = {}
     ambient_cases = {
         "git_dir": {"GIT_DIR": str(git_decoy / ".git")},
@@ -724,8 +815,9 @@ try:
           f"wrong_gate={not owner_live_binding_valid(owner_live_wrong_gate)} "
           f"wrong_head={not owner_live_binding_valid(owner_live_wrong_head)}")
 
-    # R82 binds the effect at one capability boundary.  The same helper used
-    # by the real owner branch receives a judge spy here; no provider starts.
+    # R83 binds the effect to a pristine direct stdlib import made before any
+    # executable gate body. The real helper receives that exact capability;
+    # judge spies below exercise the same helper without starting a provider.
     owner_gate_text = h032_gate.read_text(encoding="utf-8")
     owner_capability_facts = owner_live_capability_source_facts(owner_gate_text)
     owner_internal_timeout_mutant = owner_gate_text.replace(
@@ -743,7 +835,7 @@ try:
         "    output, _ = wait(process)\n", 1)
     owner_captured_mutant = replace_last_exact(
         owner_gate_text,
-        "run_exact_owner_live(\n            system_popen,",
+        "run_exact_owner_live(\n            _H032_PRISTINE_POPEN,",
         "run_exact_owner_live(\n            hidden_popen,")
     owner_guard_mutant = replace_last_exact(
         owner_gate_text,
@@ -756,12 +848,70 @@ try:
         "captured_wrapper": owner_live_capability_source_facts(owner_captured_mutant),
         "guard_bypass": owner_live_capability_source_facts(owner_guard_mutant),
     }
+    h032_import_anchor = "from subprocess import (\n"
+    h032_import_end = ")\nimport sys\n"
+    h032_hidden_prefix = (
+        "import subprocess as hidden_module\n"
+        "real_popen = hidden_module.Popen\n"
+        "class PreCaptureProxy:\n"
+        "    def __init__(self, process): self.process = process\n"
+        "    def communicate(self): return self.process.communicate(timeout=1)\n"
+        "def hidden_popen(*args, **kwargs):\n"
+        "    return PreCaptureProxy(real_popen(*args, **kwargs))\n")
+    owner_setattr_mutant = owner_gate_text.replace(
+        h032_import_anchor,
+        h032_hidden_prefix + "setattr(hidden_module, 'Popen', hidden_popen)\n"
+        + h032_import_anchor, 1)
+    owner_setattr_mutant = owner_setattr_mutant.replace(
+        h032_import_end,
+        h032_import_end + "setattr(hidden_module, 'Popen', real_popen)\n", 1)
+    owner_delattr_mutant = owner_gate_text.replace(
+        h032_import_anchor,
+        h032_hidden_prefix + "delattr(hidden_module, 'Popen')\n"
+        + h032_import_anchor, 1)
+    owner_delattr_mutant = owner_delattr_mutant.replace(
+        h032_import_end,
+        h032_import_end + "setattr(hidden_module, 'Popen', real_popen)\n", 1)
+    owner_precapture_mutants = {
+        "module_alias": owner_gate_text.replace(
+            h032_import_anchor,
+            h032_hidden_prefix + "hidden_module.Popen = hidden_popen\n"
+            + h032_import_anchor, 1),
+        "setattr_restore": owner_setattr_mutant,
+        "delattr_restore": owner_delattr_mutant,
+    }
+    owner_precapture_facts = {
+        name: owner_live_capability_source_facts(mutant)
+        for name, mutant in owner_precapture_mutants.items()
+    }
+    owner_shadow_variants = {
+        "parameters": owner_gate_text[:-4] +
+            "\ndef r83_unrelated_shadow(subprocess, Popen, run):\n"
+            "    return subprocess, Popen, run\nPY\n",
+        "locals": owner_gate_text[:-4] +
+            "\ndef r83_unrelated_locals():\n"
+            "    subprocess = Popen = run = object()\n"
+            "    return subprocess, Popen, run\nPY\n",
+    }
+    owner_shadow_facts = {
+        name: owner_live_capability_source_facts(variant)
+        for name, variant in owner_shadow_variants.items()
+    }
     check("J_R82_OWNER_LIVE_CAPABILITY_SOURCE",
           owner_capability_facts and all(owner_capability_facts.values()),
           str(owner_capability_facts))
     check("J_R82_OWNER_LIVE_CAPABILITY_MUTANTS_REJECT",
           all(not all(facts.values()) for facts in owner_capability_mutants.values()),
           str(owner_capability_mutants))
+    check("J_R83_H032_PRECAPTURE_MUTANTS_REJECT",
+          all(not all(facts.values()) for facts in owner_precapture_facts.values()),
+          str(owner_precapture_facts))
+    check("J_R83_H032_UNRELATED_SHADOWS_ADMITTED",
+          all(all(facts.values()) for facts in owner_shadow_facts.values()),
+          str(owner_shadow_facts))
+    check("J_R83_H032_FRESH_STDLIB_IDENTITY",
+          _H032_STDLIB_CAPABILITIES_PRISTINE,
+          f"identity={_H032_STDLIB_CAPABILITIES_PRISTINE}")
 
     class OwnerLiveProcessSpy:
         def __init__(self):
@@ -1664,7 +1814,6 @@ def run_codex(sink, canonical, invocation, run, role):
         elif mode=="extra": env[r72_extra_key]=r72_extra_value
         elif mode!="exact": raise RuntimeError(f"unknown fixture environment mode: {mode}")
         return env
-    system_popen = module.subprocess.Popen
     def observe_launcher_argv(flat: list[object], child_env: dict[str, str]) -> dict[str, object]:
         context=launch_expected_context[0]
         observation: dict[str, object]={"valid":False}
@@ -1779,7 +1928,7 @@ def run_codex(sink, canonical, invocation, run, role):
             observation=observe_launcher_argv(flat,child_env)
             output=observation.get("output")
             if isinstance(output,str): launch_observations[output]=observation
-        process = system_popen(argv, *args, **kwargs)
+        process = _H032_GATE_POPEN(argv, *args, **kwargs)
         if "-o" in flat:
             provider_process_starts[0] += 1
         return process
@@ -2043,8 +2192,8 @@ def run_codex(sink, canonical, invocation, run, role):
         module.tempfile.tempdir = str(arena)
         # Seed macOS's exact TMPDIR-local xcrun cache before observation. It is
         # now pre-existing host state, not a basename exception.
-        subprocess.run([GIT, "--version"], env=dict(os.environ),
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        _H032_GATE_RUN([GIT, "--version"], env=dict(os.environ),
+                       stdout=_H032_DEVNULL, stderr=_H032_DEVNULL, check=True)
         arena_before = {str(path.absolute()) for path in arena.rglob("*")}
         observed: dict[str, object] = {"created": set(), "opened": [], "provider_outputs": [],
                                       "sink_identities": [], "sink_fd_aliases": [],
@@ -2304,8 +2453,8 @@ def run_codex(sink, canonical, invocation, run, role):
             try:
                 st = fd_path.stat(); fd_state.append((int(fd_path.name), st.st_dev, st.st_ino))
             except (OSError, ValueError): pass
-        ps = subprocess.run(["/bin/ps", "-axo", "pid=,ppid=,command="], text=True,
-                            stdout=subprocess.PIPE, check=True).stdout.splitlines()
+        ps = _H032_GATE_RUN(["/bin/ps", "-axo", "pid=,ppid=,command="], text=True,
+                            stdout=_H032_PIPE, check=True).stdout.splitlines()
         owned = sorted(line.strip() for line in ps
                        if str(work) in line and int(line.split(None,1)[0]) != os.getpid())
         descendant_fds = []
@@ -2314,8 +2463,8 @@ def run_codex(sink, canonical, invocation, run, role):
             for line in owned:
                 try: pid = line.split(None, 1)[0]
                 except Exception: continue
-                listing = subprocess.run([str(lsof), "-n", "-p", pid], text=True,
-                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                listing = _H032_GATE_RUN([str(lsof), "-n", "-p", pid], text=True,
+                                         stdout=_H032_PIPE, stderr=_H032_DEVNULL,
                                          check=False).stdout.splitlines()
                 descendant_fds.extend(f"{pid}:{item}" for item in listing[1:])
         return sorted(entries), sorted(fd_state), owned, sorted(descendant_fds)
@@ -2346,8 +2495,8 @@ def run_codex(sink, canonical, invocation, run, role):
     monitor_stop = threading.Event(); monitor_threads: list[threading.Thread] = []
     original_tracked_popen = module.subprocess.Popen
     def process_table():
-        lines = subprocess.run(["/bin/ps", "-axo", "pid=,ppid=,lstart="], text=True,
-                               stdout=subprocess.PIPE, check=True).stdout.splitlines()
+        lines = _H032_GATE_RUN(["/bin/ps", "-axo", "pid=,ppid=,lstart="], text=True,
+                               stdout=_H032_PIPE, check=True).stdout.splitlines()
         rows = {}
         for line in lines:
             parts = line.split()
@@ -4400,9 +4549,9 @@ def run_codex(sink, canonical, invocation, run, role):
         case_repo = make_repo(str(fixture), sha256(fixture), str(fixture_host), sha256(fixture_host))
         env = {key:value for key,value in os.environ.items()
                if not key.startswith("H032_")}
-        proc = system_popen(["/usr/bin/python3", "-I", "-S", "-u", str(r12_runner),
-                             str(subject_source), str(case_repo), str(case_repo)], stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, env=env)
+        proc = _H032_GATE_POPEN(["/usr/bin/python3", "-I", "-S", "-u", str(r12_runner),
+                             str(subject_source), str(case_repo), str(case_repo)], stdout=_H032_PIPE,
+                            stderr=_H032_STDOUT, text=True, env=env)
         assert proc.stdout is not None
         selector = selectors.DefaultSelector(); selector.register(proc.stdout, selectors.EVENT_READ)
         identities=[]; outcome="NO_OUTCOME"; popen_type=""; canonical_absent=False
@@ -4469,10 +4618,10 @@ def run_codex(sink, canonical, invocation, run, role):
                             handle_closed(number)
                     except Exception: pass
         try: proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
+        except _H032_TIMEOUT_EXPIRED:
             proc.terminate()
             try: proc.wait(timeout=2)
-            except subprocess.TimeoutExpired: proc.kill(); proc.wait()
+            except _H032_TIMEOUT_EXPIRED: proc.kill(); proc.wait()
         for line in proc.stdout:
             line=line.strip()
             if line.startswith("R12_OUTCOME="): outcome=line.split("=",1)[1]
@@ -5112,9 +5261,9 @@ for fd in held:
         fresh_effect_counter[0]+=1
         arena=work/f"r48-effect-{fresh_effect_counter[0]}";arena.mkdir(mode=0o700)
         raw_path=arena/"input.bin";raw_path.write_bytes(raw)
-        proc=system_popen(["/usr/bin/python3","-I","-S",str(effect_runner),
-            str(module_path),str(arena),str(raw_path),mode],stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,text=True)
+        proc=_H032_GATE_POPEN(["/usr/bin/python3","-I","-S",str(effect_runner),
+            str(module_path),str(arena),str(raw_path),mode],stdout=_H032_PIPE,
+            stderr=_H032_PIPE,text=True)
         stdout,stderr=proc.communicate(timeout=20)
         try: result=strict_json(stdout.strip().splitlines()[-1])
         except Exception: result={"parse_error":stdout,"stderr":stderr,"rc":proc.returncode}
@@ -5650,9 +5799,9 @@ class CraftedConcretePath(type(Path())):
         host=fixture.parent/"codex-code-mode-host"
         case_repo=make_repo(str(fixture),sha256(fixture),str(host),sha256(host))
         env={key:value for key,value in os.environ.items() if not key.startswith("H032_")}
-        proc=system_popen(["/usr/bin/python3","-I","-S","-u",str(r12_runner),
-                           str(source),str(case_repo),str(case_repo),"1"],stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT,text=True,env=env)
+        proc=_H032_GATE_POPEN(["/usr/bin/python3","-I","-S","-u",str(r12_runner),
+                           str(source),str(case_repo),str(case_repo),"1"],stdout=_H032_PIPE,
+                          stderr=_H032_STDOUT,text=True,env=env)
         assert proc.stdout is not None
         selector=selectors.DefaultSelector();selector.register(proc.stdout,selectors.EVENT_READ)
         sink=None;outcome="NO_OUTCOME";deadline=time.monotonic()+8
@@ -5664,14 +5813,14 @@ class CraftedConcretePath(type(Path())):
         bounded=proc.poll() is not None
         if not bounded: proc.terminate()
         try: proc.wait(timeout=2)
-        except subprocess.TimeoutExpired: proc.kill();proc.wait()
+        except _H032_TIMEOUT_EXPIRED: proc.kill();proc.wait()
         stable_absent=True
         if sink is not None:
             for _ in range(8):
                 time.sleep(.25)
                 if sink.exists() or sink.parent.exists(): stable_absent=False
-        ps=subprocess.run(["/bin/ps","-axo","pid=,command="],text=True,
-                          stdout=subprocess.PIPE,check=True).stdout
+        ps=_H032_GATE_RUN(["/bin/ps","-axo","pid=,command="],text=True,
+                          stdout=_H032_PIPE,check=True).stdout
         for line in ps.splitlines():
             if str(fixture) in line:
                 try: os.kill(int(line.split(None,1)[0]),signal.SIGKILL)
@@ -5734,7 +5883,7 @@ class CraftedConcretePath(type(Path())):
         live_source=live_repo/"scripts/nortropic-codex-autopilot.py"
         live_env = {key:value for key,value in os.environ.items() if not key.startswith("H032_")}
         live_proc, live_stdout = run_exact_owner_live(
-            system_popen,
+            _H032_PRISTINE_POPEN,
             ["/usr/bin/python3","-I","-S","-u",str(r12_runner),
              str(live_source),str(live_repo),str(live_wt)],
             live_env,
@@ -5865,10 +6014,10 @@ class CraftedConcretePath(type(Path())):
     cases.append(("OVERSIZED_CODE_MODE_HOST", make_repo(
         str(provider), host_path_value=str(oversized_host),
         host_hash_value=oversized_host_hash)))
-    provider_unbounded = subprocess.run([str(oversized_provider)], check=False,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    host_unbounded = subprocess.run([str(oversized_host)], check=False,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    provider_unbounded = _H032_GATE_RUN([str(oversized_provider)], check=False,
+        stdout=_H032_DEVNULL, stderr=_H032_DEVNULL)
+    host_unbounded = _H032_GATE_RUN([str(oversized_host)], check=False,
+        stdout=_H032_DEVNULL, stderr=_H032_DEVNULL)
     provider_fixture_effect = provider_unbounded.returncode == 0 and oversized_provider_marker.is_file()
     host_fixture_effect = host_unbounded.returncode == 0 and oversized_host_marker.is_file()
     check("J_R4_OVERSIZED_PROVIDER_EXECUTABLE_EFFECT",
@@ -6158,7 +6307,7 @@ class CraftedConcretePath(type(Path())):
     writable_fds: set[int] = set()
     writable_handles: set[int] = set()
     originals = (builtins.open, io.open, os.open, os.read, os.close,
-                 os.chmod, os.fchmod, subprocess.Popen)
+                 os.chmod, os.fchmod, module.subprocess.Popen)
     original_builtin_open, original_io_open, original_os_open, original_os_read, original_os_close, original_chmod, original_fchmod, original_popen = originals
     original_sha256 = hashlib.sha256
     expected_by_name = {"provider": good_hash, "codex-code-mode-host": host_good_hash}
@@ -6273,14 +6422,14 @@ class CraftedConcretePath(type(Path())):
                             for name in expected_by_name)
                 trace_verdict.append(protected and fresh and not live_writable_aliases)
         return original_popen(argv, *args, **kwargs)
-    builtins.open, io.open, os.open, os.read, os.close, os.chmod, os.fchmod, subprocess.Popen = (
+    builtins.open, io.open, os.open, os.read, os.close, os.chmod, os.fchmod, module.subprocess.Popen = (
         traced_builtin_open, traced_io_open, traced_os_open, traced_os_read, traced_os_close,
         traced_chmod, traced_fchmod, traced_popen)
     hashlib.sha256 = traced_sha256
     try:
         trace_result = attempt(trace_repo)
     finally:
-        builtins.open, io.open, os.open, os.read, os.close, os.chmod, os.fchmod, subprocess.Popen = originals
+        builtins.open, io.open, os.open, os.read, os.close, os.chmod, os.fchmod, module.subprocess.Popen = originals
         hashlib.sha256 = original_sha256
     trace_ok = (trace_result[0] and trace_result[2] == 1 and trace_verdict == [True])
     check("K_FINAL_SNAPSHOT_REHASH", family_absent or trace_ok,
@@ -6310,7 +6459,7 @@ class CraftedConcretePath(type(Path())):
         target_repo = make_repo(str(provider))
         changed, targets = [False], []
         original_builtin, original_io, original_os, original_read, original_fdopen, original_chmod_local, original_fchmod_local, original_popen_local = (
-            builtins.open, io.open, os.open, os.read, os.fdopen, os.chmod, os.fchmod, subprocess.Popen)
+            builtins.open, io.open, os.open, os.read, os.fdopen, os.chmod, os.fchmod, module.subprocess.Popen)
         preseed_handles: dict[int, object] = {}
         preseed_owners: list[object] = []
         reuse_observation: list[tuple[bytes, bool, bool]] = []
@@ -6458,13 +6607,13 @@ class CraftedConcretePath(type(Path())):
                         path = Path(item).parent / target_name
                         if path.exists(): mutate(path); break
             return original_popen_local(argv, *args, **kwargs)
-        builtins.open, io.open, os.open, os.read, os.fdopen, os.chmod, os.fchmod, subprocess.Popen = wrap_builtin, wrap_io, wrap_os, wrap_read, wrap_fdopen, wrap_chmod, wrap_fchmod, wrap_popen
+        builtins.open, io.open, os.open, os.read, os.fdopen, os.chmod, os.fchmod, module.subprocess.Popen = wrap_builtin, wrap_io, wrap_os, wrap_read, wrap_fdopen, wrap_chmod, wrap_fchmod, wrap_popen
         if original_pread: os.pread = wrap_pread
         if original_readv: os.readv = wrap_readv
         if original_preadv: os.preadv = wrap_preadv
         try: result = attempt(target_repo)
         finally:
-            builtins.open, io.open, os.open, os.read, os.fdopen, os.chmod, os.fchmod, subprocess.Popen = original_builtin, original_io, original_os, original_read, original_fdopen, original_chmod_local, original_fchmod_local, original_popen_local
+            builtins.open, io.open, os.open, os.read, os.fdopen, os.chmod, os.fchmod, module.subprocess.Popen = original_builtin, original_io, original_os, original_read, original_fdopen, original_chmod_local, original_fchmod_local, original_popen_local
             if original_pread: os.pread = original_pread
             if original_readv: os.readv = original_readv
             if original_preadv: os.preadv = original_preadv
@@ -6598,10 +6747,10 @@ class CraftedConcretePath(type(Path())):
               'mv "$1" "$1-moved"; echo PARENT_RENAME=$?')
     env = dict(os.environ, NORTROPIC_TRUST_ROOT=str(trust))
     g20_odom = False
-    g20_run = subprocess.run([str(launcher), "run", str(ws), str(envelope), "30", "--",
+    g20_run = _H032_GATE_RUN([str(launcher), "run", str(ws), str(envelope), "30", "--",
                               "/bin/sh", "-c", attack, "sh", str(trust)],
                              cwd=source.parents[1], env=env, text=True,
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                             stdout=_H032_PIPE, stderr=_H032_STDOUT)
     g20_out = g20_run.stdout
     if g20_run.returncode == 3 and "sandbox_apply: Operation not permitted" in g20_out:
         g20_odom, g20_ok = True, False
@@ -6806,9 +6955,9 @@ class CraftedConcretePath(type(Path())):
     h033_env = without_caller_git_controls(dict(os.environ))
     h033_env["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
-        h033_result = subprocess.run(
+        h033_result = _H032_GATE_RUN(
             [str(h033_gate)], cwd=repo, env=h033_env, text=True,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
+            stdout=_H032_PIPE, stderr=_H032_STDOUT, timeout=180)
         h033_ok = (h033_result.returncode == 0
                    and "H033_GATE_SUMMARY=55 PASS 0 FAIL" in h033_result.stdout
                    and "H033_GATE_RESULT=PASS" in h033_result.stdout)
@@ -6821,7 +6970,7 @@ class CraftedConcretePath(type(Path())):
         ))
         check("K_H033_FRESH_UPSTREAM_PROVENANCE", h033_ok,
               f"rc={h033_result.returncode} tail={h033_result.stdout[-500:].replace(chr(10), '|')}")
-    except subprocess.TimeoutExpired:
+    except _H032_TIMEOUT_EXPIRED:
         h033_odom = True
         check("K_H033_FRESH_UPSTREAM_PROVENANCE", False, "timeout/cleanup authority unavailable")
 
