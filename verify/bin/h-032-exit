@@ -2629,15 +2629,41 @@ def run_codex(sink, canonical, invocation, run, role):
             for candidate in (target, target.parent):
                 if candidate.exists() or candidate.is_symlink():
                     transport_residue.append(candidate)
+        observed_cleanup = last_attempt_observed[0] or {}
+        canonical_epochs = list(observed_cleanup.get(
+            "canonical_visibility_epochs", []))
+        canonical_candidates = {
+            Path(value) for value in observed_cleanup.get("canonical_paths", [])
+        }
+        canonical_candidates.update(
+            Path(epoch[0]) for epoch in canonical_epochs
+            if isinstance(epoch, (tuple, list)) and epoch
+            and isinstance(epoch[0], str))
+        canonical_states = []
+        for canonical in sorted(canonical_candidates):
+            present = canonical.exists() or canonical.is_symlink()
+            regular = False
+            valid = False
+            if present and not canonical.is_symlink():
+                try:
+                    opened = canonical.stat()
+                    regular = stat.S_ISREG(opened.st_mode)
+                    raw = bounded_stable_result(canonical, MAX_CANONICAL_BYTES)
+                    valid = canonical_result_valid(
+                        strict_json(raw.decode("utf-8", errors="strict")),
+                        schema_document)
+                except Exception:
+                    pass
+            canonical_states.append((str(canonical), present, regular, valid))
         result = (outcome, failures[0], list(outcome[4]),
-                  sorted({str(path) for path in transport_residue}))
+                  sorted({str(path) for path in transport_residue}),
+                  canonical_states, canonical_epochs)
         # Gate-owned cleanup happens only after the complete attempt residue and
         # private-parent observations have been retained in result.
         for target in targets:
             if target.parent.exists():
                 target.parent.chmod(0o700)
                 shutil.rmtree(target.parent)
-        observed_cleanup = last_attempt_observed[0] or {}
         cleanup_arena = observed_cleanup.get("arena")
         if isinstance(cleanup_arena, Path) and cleanup_arena.exists():
             # The persistent-failure control may leave protected provider
@@ -2656,9 +2682,14 @@ def run_codex(sink, canonical, invocation, run, role):
     cleanup_error_ok = (
         transient_cleanup[1] == 1 and transient_cleanup[0][0]
         and not transient_cleanup[2] and not transient_cleanup[3]
+        and len(transient_cleanup[4]) == 1
+        and transient_cleanup[4][0][1:] == (True, True, True)
+        and len(transient_cleanup[5]) == 1
         and persistent_cleanup[1] > 0 and not persistent_cleanup[0][0]
         and "cleanup" in persistent_cleanup[0][1].lower()
-        and not persistent_cleanup[2] and not persistent_cleanup[3])
+        and not persistent_cleanup[2] and not persistent_cleanup[3]
+        and not any(state[1] for state in persistent_cleanup[4])
+        and len(persistent_cleanup[5]) <= 1)
 
     def result_root_ordinal_discovery():
         """Identify result staging by its observed -o child, never by snapshot order."""

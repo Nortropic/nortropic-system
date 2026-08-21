@@ -2018,3 +2018,20 @@ extra labels plus conflicting/arbitrary summaries and a top-level result marker.
 changes only the owner parser rig. It grants no replay or product credit: the preserved
 single full-live run remains historical evidence, and publication still requires a later
 normal full H031 exit zero without making another provider call during TEST_AUTHOR.
+
+## 2026-08-21 — R99 persistent cleanup must revoke canonical acceptance
+
+Independent product review connected a persistent private-staging cleanup fault to the
+real result kernel: the consumer first published a valid canonical envelope, caller
+cleanup then rejected, but the canonical result remained. The existing gate observed
+transport residue only and allowlisted `run/result.json` as journal state.
+
+R99 retains the exact canonical path and publication epochs before judge cleanup. The
+transient injected fault is the positive: bounded retry succeeds, the original verdict
+remains accepted and exactly one regular schema-valid canonical remains. The persistent
+fault is the negative: the invocation rejects for cleanup and every observed exact
+canonical is absent. Zero epochs are valid when cleanup precedes publication; one epoch
+is valid when a completed publication is compensated by rollback before rejection.
+Multiple epochs or a present canonical reject. This binds final filesystem effect rather
+than cleanup API, spelling, run-directory retention or source order. Product code is not
+changed by TEST_AUTHOR, and no live/provider/model call is repeated.
