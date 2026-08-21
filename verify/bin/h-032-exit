@@ -30,6 +30,17 @@ SOURCE="$ROOT/scripts/nortropic-codex-autopilot.py"
 RESULT_KERNEL="$ROOT/controller/result/consumer.py"
 AUTHORITY="$ROOT/config/codex-provider-identity.json"
 SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
+OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
+OWNER_LIVE_HELPER_SHA256="6f31aaac4d1bf170686ebd9ad1f3de62076be9471644ed49fccc61b97ca14044"
+if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
+  echo "ODÖMBART K0 — owner-live helper identity invalid"
+  exit 2
+fi
+OBSERVED_OWNER_LIVE_HELPER_SHA256="$(/usr/bin/shasum -a 256 -- "$OWNER_LIVE_HELPER" | /usr/bin/awk '{print $1}')"
+if [[ "$OBSERVED_OWNER_LIVE_HELPER_SHA256" != "$OWNER_LIVE_HELPER_SHA256" ]]; then
+  echo "ODÖMBART K0 — owner-live helper digest mismatch"
+  exit 2
+fi
 WORK="$(/usr/bin/mktemp -d /private/tmp/nortropic-h032.XXXXXX)" || exit 2
 case "$WORK" in /private/tmp/nortropic-h032.*) ;; *) echo "ODÖMBART K0 — osäker tempidentitet"; exit 2;; esac
 cleanup() {
@@ -59,13 +70,21 @@ if [[ $# -gt 0 ]]; then
   esac
 fi
 
-/usr/bin/python3 -I -S - "$SOURCE" "$RESULT_KERNEL" "$AUTHORITY" "$SCHEMA" "$WORK" "$G20_EMIT" "$OWNER_LIVE_MODE" <<'PY'
+OWNER_LIVE_CONTROL="$WORK/owner-live-control"
+/bin/mkdir -m 700 -- "$OWNER_LIVE_CONTROL" || exit 2
+OWNER_LIVE_PLAN="$OWNER_LIVE_CONTROL/plan.json"
+OWNER_LIVE_RESULT="$OWNER_LIVE_CONTROL/result.json"
+
+run_gate_python() {
+/usr/bin/python3 -I -S - "$SOURCE" "$RESULT_KERNEL" "$AUTHORITY" "$SCHEMA" "$WORK/gate" "$G20_EMIT" "$OWNER_LIVE_MODE" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT" "$OWNER_LIVE_HELPER" "$OWNER_LIVE_HELPER_SHA256" <<'PY'
 from __future__ import annotations
 
 import hashlib
+import base64
 import importlib.util
 import ast
 import builtins
+from datetime import datetime
 import fcntl
 import io
 import json
@@ -85,8 +104,11 @@ import selectors
 source, result_kernel, authority_source, schema_source, work = map(Path, sys.argv[1:6])
 g20_emit_path = Path(sys.argv[6]) if sys.argv[6] else None
 owner_live_mode = sys.argv[7]
+owner_live_plan, owner_live_result, owner_live_helper = map(Path, sys.argv[8:11])
+owner_live_helper_sha256 = sys.argv[11]
 if owner_live_mode not in {"run", "skip"}:
     raise SystemExit("invalid owner live mode")
+work.mkdir(mode=0o700)
 repo = source.parents[1]
 task_spec = repo / "specs/tasks.spec.json"
 h033_gate = repo / "verify/bin/h-033-exit"
@@ -147,6 +169,67 @@ def strict_json(raw: str):
             out[key] = value
         return out
     return json.loads(raw, object_pairs_hook=pairs)
+
+OWNER_CALL_RESULT_KEYS = {
+    "schema_version", "nonce", "purpose", "mode", "plan_sha256",
+    "plan_dev", "plan_ino", "helper_sha256", "argv", "cwd",
+    "returncode", "timed_out", "stdout_b64", "stderr_b64",
+    "stdout_sha256", "stderr_sha256",
+}
+
+def atomic_owner_json(path: Path, value) -> bytes:
+    raw=json.dumps(value,sort_keys=True,separators=(",", ":")).encode("utf-8")
+    temporary=path.with_name(path.name+".tmp")
+    fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL
+               |getattr(os,"O_NOFOLLOW",0),0o600)
+    try:
+        offset=0
+        while offset<len(raw): offset+=os.write(fd,raw[offset:])
+        os.fsync(fd)
+    finally: os.close(fd)
+    os.replace(temporary,path)
+    return raw
+
+def stable_owner_json(path: Path, maximum: int=20*1024*1024):
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        before=os.fstat(fd);raw=b""
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1:
+            raise RuntimeError("owner-call object is not private regular nlink-one")
+        while len(raw)<=maximum:
+            chunk=os.read(fd,min(65536,maximum+1-len(raw)))
+            if not chunk: break
+            raw+=chunk
+        after=os.fstat(fd)
+        identity=lambda item:(item.st_dev,item.st_ino,item.st_mode,item.st_nlink,
+                              item.st_size,item.st_mtime_ns,item.st_ctime_ns)
+        if len(raw)>maximum or len(raw)!=before.st_size or identity(before)!=identity(after):
+            raise RuntimeError("owner-call object unstable or oversized")
+        return raw,before,strict_json(raw.decode("utf-8",errors="strict"))
+    finally: os.close(fd)
+
+def owner_call_result_valid(value, plan, plan_raw: bytes, plan_stat) -> bool:
+    if not isinstance(value,dict) or set(value)!=OWNER_CALL_RESULT_KEYS:
+        return False
+    try:
+        stdout=base64.b64decode(value.get("stdout_b64",""),validate=True)
+        stderr=base64.b64decode(value.get("stderr_b64",""),validate=True)
+    except Exception:
+        return False
+    return (value.get("schema_version")==1
+        and value.get("nonce")==plan.get("nonce")
+        and value.get("purpose")==plan.get("purpose")
+        and value.get("mode")==plan.get("mode")
+        and value.get("plan_sha256")==hashlib.sha256(plan_raw).hexdigest()
+        and value.get("plan_dev")==plan_stat.st_dev
+        and value.get("plan_ino")==plan_stat.st_ino
+        and value.get("helper_sha256")==owner_live_helper_sha256
+        and value.get("argv")==plan.get("argv")
+        and value.get("cwd")==plan.get("cwd")
+        and type(value.get("returncode")) is int
+        and type(value.get("timed_out")) is bool
+        and value.get("stdout_sha256")==hashlib.sha256(stdout).hexdigest()
+        and value.get("stderr_sha256")==hashlib.sha256(stderr).hexdigest())
 
 def canonical_result_valid(value, schema, accepted_digest=None, role="TEST_AUTHOR"):
     if not isinstance(value, dict) or set(value) != {
@@ -308,6 +391,7 @@ def git_repository_common_dir(cwd: Path) -> Path:
 OWNER_LIVE_BINDING_KEYS = {
     "candidate_repo", "candidate_head", "candidate_tree", "candidate_source", "source_sha256",
     "candidate_spec", "spec_sha256", "candidate_gate", "gate_sha256",
+    "owner_live_helper", "owner_live_helper_sha256",
     "provider_path", "provider_sha256", "host_path", "host_sha256",
 }
 
@@ -320,19 +404,21 @@ def owner_live_binding_valid(binding) -> bool:
         candidate_source = binding["candidate_source"]
         candidate_spec = binding["candidate_spec"]
         candidate_gate = binding["candidate_gate"]
+        bound_helper = binding["owner_live_helper"]
         provider_path = binding["provider_path"]
         host_path = binding["host_path"]
         if not all(isinstance(path, Path) for path in (
                 candidate_repo, candidate_source, candidate_spec, candidate_gate,
-                provider_path, host_path)):
+                bound_helper, provider_path, host_path)):
             return False
         if (candidate_source != candidate_repo/"scripts/nortropic-codex-autopilot.py"
                 or candidate_spec != candidate_repo/"specs/tasks.spec.json"
-                or candidate_gate != candidate_repo/"verify/bin/h-032-exit"):
+                or candidate_gate != candidate_repo/"verify/bin/h-032-exit"
+                or bound_helper != candidate_repo/"verify/bin/h-032-owner-live-call"):
             return False
         if (not all(path.is_file() and not path.is_symlink()
                     for path in (candidate_source, candidate_spec, candidate_gate,
-                                 provider_path, host_path))
+                                 bound_helper, provider_path, host_path))
                 or not os.access(provider_path, os.X_OK)
                 or not os.access(host_path, os.X_OK)):
             return False
@@ -340,6 +426,7 @@ def owner_live_binding_valid(binding) -> bool:
         tree = binding["candidate_tree"]
         digests = [binding[key] for key in (
             "source_sha256", "spec_sha256", "gate_sha256",
+            "owner_live_helper_sha256",
             "provider_sha256", "host_sha256")]
         if (not isinstance(head, str) or len(head) != 40
                 or any(char not in "0123456789abcdef" for char in head)
@@ -355,6 +442,7 @@ def owner_live_binding_valid(binding) -> bool:
             and sha256(candidate_source) == binding["source_sha256"]
             and sha256(candidate_spec) == binding["spec_sha256"]
             and sha256(candidate_gate) == binding["gate_sha256"]
+            and sha256(bound_helper) == binding["owner_live_helper_sha256"]
             and sha256(provider_path) == binding["provider_sha256"]
             and sha256(host_path) == binding["host_sha256"])
     except (KeyError, OSError, RuntimeError, TypeError, ValueError):
@@ -392,6 +480,58 @@ authoritative_control_root = (
 authoritative_control_before = exact_tree_snapshot(authoritative_control_root)
 
 try:
+    # Rig sensitivity for the split owner-call transport.  This executes the
+    # exact hash-bound helper with a harmless disposable executable; it does
+    # not substitute for, or credit, the product/provider live attempt.
+    owner_helper_structure_ok=(owner_live_helper.is_file()
+        and not owner_live_helper.is_symlink()
+        and os.access(owner_live_helper,os.X_OK)
+        and sha256(owner_live_helper)==owner_live_helper_sha256)
+    owner_helper_rig=work/"owner-helper-rig"
+    owner_helper_rig.mkdir(mode=0o700)
+    owner_helper_plan_path=owner_helper_rig/"plan.json"
+    owner_helper_result_path=owner_helper_rig/"result.json"
+    owner_helper_argv=["/bin/echo","R89-OWNER-CALL"]
+    owner_helper_plan={
+        "schema_version":1,"nonce":os.urandom(32).hex(),
+        "purpose":"H032_OWNER_LIVE","mode":"full",
+        "argv":owner_helper_argv,"cwd":str(owner_helper_rig),
+        "result_path":str(owner_helper_result_path),
+        "executable_sha256":sha256(Path("/bin/echo")),
+    }
+    owner_helper_plan_raw=atomic_owner_json(owner_helper_plan_path,owner_helper_plan)
+    owner_helper_plan_stat=owner_helper_plan_path.lstat()
+    owner_helper_run=subprocess.run(
+        [str(owner_live_helper),str(owner_helper_plan_path),str(owner_helper_result_path)],
+        cwd=repo,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+    _owner_helper_raw,_owner_helper_stat,owner_helper_result=stable_owner_json(
+        owner_helper_result_path)
+    owner_helper_positive=(owner_helper_run.returncode==0
+        and owner_call_result_valid(owner_helper_result,owner_helper_plan,
+                                    owner_helper_plan_raw,owner_helper_plan_stat)
+        and base64.b64decode(owner_helper_result["stdout_b64"],validate=True)
+            ==b"R89-OWNER-CALL\n")
+    owner_helper_mutants={}
+    for mutant_name,mutator in {
+        "nonce":lambda item:item.__setitem__("nonce","0"*64),
+        "plan_digest":lambda item:item.__setitem__("plan_sha256","0"*64),
+        "plan_devino":lambda item:item.__setitem__("plan_ino",item["plan_ino"]+1),
+        "helper_digest":lambda item:item.__setitem__("helper_sha256","0"*64),
+        "argv":lambda item:item.__setitem__("argv",["/bin/false"]),
+        "result_digest":lambda item:item.__setitem__("stdout_sha256","0"*64),
+    }.items():
+        mutant=dict(owner_helper_result);mutator(mutant)
+        owner_helper_mutants[mutant_name]=not owner_call_result_valid(
+            mutant,owner_helper_plan,owner_helper_plan_raw,owner_helper_plan_stat)
+    replay_plan=dict(owner_helper_plan);replay_plan["nonce"]=os.urandom(32).hex()
+    owner_helper_mutants["replay"]=not owner_call_result_valid(
+        owner_helper_result,replay_plan,owner_helper_plan_raw,owner_helper_plan_stat)
+    check("J_R89_SPLIT_OWNER_CALL_RIG",
+          owner_helper_structure_ok and owner_helper_positive
+          and all(owner_helper_mutants.values()),
+          f"structure={owner_helper_structure_ok} positive={owner_helper_positive} "
+          f"mutants={owner_helper_mutants}")
+
     git_decoy = work / "r68-git-environment-decoy"
     git_decoy.mkdir()
     sh(GIT, "init", "-q", cwd=git_decoy)
@@ -572,6 +712,8 @@ try:
         "spec_sha256": sha256(task_spec),
         "candidate_gate": h032_gate,
         "gate_sha256": sha256(h032_gate),
+        "owner_live_helper": owner_live_helper,
+        "owner_live_helper_sha256": owner_live_helper_sha256,
         "provider_path": apath,
         "provider_sha256": digest,
         "host_path": host_path,
@@ -3705,17 +3847,46 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_prior_run.mkdir()
     r74_prior_envelope=r74_prior_run/"provider-envelope.json"
     r74_prior_envelope.write_text('{"prior":true}\n',encoding="utf-8")
-    r74_last_clock_id=[None]
-    def run_r74_environment_oracle(name: str) -> dict[str,object]:
-        # The product's frozen run identifier is second-granular.  Keep every
-        # oracle invocation a genuinely new attempt instead of letting a fast
-        # matrix collide with the preceding run directory.
-        clock_deadline=time.monotonic()+2.0
-        while (physical_module.now_id()==r74_last_clock_id[0]
-                and time.monotonic()<clock_deadline):
+    def r89_clock_value(value: object):
+        if not isinstance(value,str) or len(value)!=15:
+            return None
+        try:
+            parsed=datetime.strptime(value,"%Y%m%d-%H%M%S")
+        except ValueError:
+            return None
+        return parsed if parsed.strftime("%Y%m%d-%H%M%S")==value else None
+    def r89_run_identity(path: Path):
+        suffix="-test_author"
+        if path.parent!=r74_runs_root or not path.name.endswith(suffix):
+            return None
+        value=path.name[:-len(suffix)]
+        return value if r89_clock_value(value) is not None else None
+    def r89_clock_barrier(anchor: str, bound_seconds: float=3.0):
+        anchor_value=r89_clock_value(anchor)
+        if anchor_value is None:
+            raise RuntimeError("R89 clock barrier anchor invalid")
+        deadline=time.monotonic()+bound_seconds
+        while time.monotonic()<deadline:
+            current=physical_module.now_id()
+            current_value=r89_clock_value(current)
+            if current_value is None:
+                raise RuntimeError("R89 clock barrier observation invalid")
+            if current_value<anchor_value:
+                raise RuntimeError("R89 clock rollback")
+            eligible=r74_runs_root/f"{current}-test_author"
+            if current_value>anchor_value:
+                if eligible.exists():
+                    raise RuntimeError("R89 clock barrier eligible slot preseeded")
+                return current,eligible
             time.sleep(.01)
-        current_clock_id=physical_module.now_id()
-        r74_last_clock_id[0]=current_clock_id
+        raise RuntimeError("R89 clock barrier stalled")
+    r74_last_clock_id=[physical_module.now_id()]
+    if r89_clock_value(r74_last_clock_id[0]) is None:
+        raise RuntimeError("R89 initial clock observation invalid")
+    def run_r74_environment_oracle(name: str) -> dict[str,object]:
+        # This is judge scheduling only.  Admission still comes exclusively
+        # from the actual current run/capture/journal/output effects below.
+        released_clock_id,eligible_run=r89_clock_barrier(r74_last_clock_id[0])
         runs_before=frozenset(r74_runs_root.iterdir())
         journal_path=r74_runs_root.parent/"events.jsonl"
         journal_before=journal_path.read_bytes() if journal_path.is_file() else b""
@@ -3757,6 +3928,10 @@ def run_codex(sink, canonical, invocation, run, role):
         observation=launch_observations.get(output,{"valid":False})
         runs_after=set(r74_runs_root.iterdir())
         current_runs=sorted(runs_after-set(runs_before))
+        current_run_id=(r89_run_identity(current_runs[0])
+                        if len(current_runs)==1 else None)
+        if current_run_id is not None:
+            r74_last_clock_id[0]=current_run_id
         split_entries=sorted(path.name for path in split_root.iterdir())
         output_parent=observed.get("output_parent") if isinstance(observed,dict) else None
         shutil.rmtree(split_root)
@@ -3766,7 +3941,68 @@ def run_codex(sink, canonical, invocation, run, role):
                 "split_sink":str(split_sink),"split_entries":split_entries,
                 "output_parent":output_parent,"split_clean":not split_root.exists(),
                 "current_runs":[str(path) for path in current_runs],
-                "intended_common":str(r74_intended_common)}
+                "intended_common":str(r74_intended_common),
+                "barrier_anchor":released_clock_id,
+                "eligible_run":str(eligible_run),
+                "current_run_id":current_run_id}
+
+    # A real product call, not a disconnected mkdir, reproduces the original
+    # same-second collision.  The preseeded current slot must reject before a
+    # provider start and must not create any other run.
+    r89_collision_id=physical_module.now_id()
+    if r89_clock_value(r89_collision_id) is None:
+        raise RuntimeError("R89 collision clock invalid")
+    r89_collision_run=r74_runs_root/f"{r89_collision_id}-test_author"
+    r89_collision_run.mkdir()
+    r89_collision_before=frozenset(r74_runs_root.iterdir())
+    r89_collision_starts_before=provider_process_starts[0]
+    r89_original_now_id=physical_module.now_id
+    physical_module.now_id=lambda:r89_collision_id
+    try:
+        try:
+            physical_module.run_codex(
+                physical_repo,physical_wt,"TEST_AUTHOR","H032-R89-COLLISION")
+            r89_collision_case=(True,"ADMITTED")
+        except Exception as exc:
+            r89_collision_case=(False,f"{type(exc).__name__}:{exc}")
+    finally:
+        physical_module.now_id=r89_original_now_id
+    r89_collision_ok=(not r89_collision_case[0]
+        and provider_process_starts[0]==r89_collision_starts_before
+        and frozenset(r74_runs_root.iterdir())==r89_collision_before)
+    shutil.rmtree(r89_collision_run)
+
+    r89_original_now_id=physical_module.now_id
+    try:
+        physical_module.now_id=lambda:"20000101-000001"
+        r89_boundary_id,r89_boundary_path=r89_clock_barrier("20000101-000000",.1)
+        r89_boundary_ok=(r89_boundary_id=="20000101-000001"
+                         and r89_boundary_path
+                             ==r74_runs_root/"20000101-000001-test_author")
+        physical_module.now_id=lambda:"19991231-235959"
+        try:
+            r89_clock_barrier("20000101-000000",.1)
+            r89_rollback_reject=False
+        except RuntimeError as exc:
+            r89_rollback_reject="rollback" in str(exc)
+        physical_module.now_id=lambda:"20000101-000000"
+        try:
+            r89_clock_barrier("20000101-000000",.03)
+            r89_stall_reject=False
+        except RuntimeError as exc:
+            r89_stall_reject="stalled" in str(exc)
+        r89_preseed_path=r74_runs_root/"20000101-000002-test_author"
+        r89_preseed_path.mkdir()
+        physical_module.now_id=lambda:"20000101-000002"
+        try:
+            r89_clock_barrier("20000101-000001",.1)
+            r89_preseed_reject=False
+        except RuntimeError as exc:
+            r89_preseed_reject="preseeded" in str(exc)
+        finally:
+            r89_preseed_path.rmdir()
+    finally:
+        physical_module.now_id=r89_original_now_id
     r74_decoy_before_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r72_environment_variants={
         name:run_r74_environment_oracle(name)
@@ -3909,6 +4145,10 @@ def run_codex(sink, canonical, invocation, run, role):
                 and Path(variant["launch"]["current_run"]).parent
                     ==Path(variant["intended_common"])/"nortropic-codex-autopilot"/"runs"
                 and variant["current_runs"]==[variant["launch"]["current_run"]]),
+            "clock_bound":(
+                variant["current_run_id"]==variant["barrier_anchor"]
+                and variant["current_runs"]==[variant["eligible_run"]]
+                and variant["launch"].get("current_run")==variant["eligible_run"]),
             "split":(variant["launch"].get("envelope")
                      not in {None,str(Path(variant["split_sink"]).with_name(
                          "provider-envelope.json"))}
@@ -3945,6 +4185,11 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_current_output_decoy_envelope_rejects=(expected_provider_environment(
         r73_exact_variant["incoming"],r73_exact_capture,
         r74_decoy_envelope_launch) is None)
+    r89_missing_effect_variant=dict(r73_exact_variant)
+    r89_missing_effect_variant["current_runs"]=[]
+    r89_missing_effect_reject=(
+        not (r89_missing_effect_variant["current_runs"]
+             ==[r89_missing_effect_variant["eligible_run"]]))
     r73_wrong_envelope_rejects=(
         r73_exact_capture.get("complete_environment")
         !=expected_provider_environment(r73_exact_variant["incoming"],
@@ -4021,7 +4266,7 @@ def run_codex(sink, canonical, invocation, run, role):
           f"wrong_syntax={r73_wrong_syntax_rejects}")
     check("J_R74_CURRENT_RUN_AND_INTENDED_ENVIRONMENT_ORACLE",
           all(item.get("launcher") is True and item.get("intended") is True
-                  and item.get("split") is True
+                  and item.get("split") is True and item.get("clock_bound") is True
               for item in r72_variant_observations.values())
           and r74_current_output_stale_envelope_rejects
           and r74_current_output_decoy_envelope_rejects
@@ -4034,6 +4279,17 @@ def run_codex(sink, canonical, invocation, run, role):
           f"decoy_current_output={r74_current_output_decoy_envelope_rejects} "
           f"prior={r74_prior_envelope} current={r73_exact_launch.get('current_run')} "
           f"decoy_unchanged={r74_decoy_after_environment_oracles==r74_decoy_before_environment_oracles}")
+    check("J_R89_STRICT_CURRENT_RUN_CLOCK_AND_COLLISION",
+          r89_collision_ok and r89_boundary_ok and r89_rollback_reject
+          and r89_stall_reject and r89_preseed_reject
+          and r89_missing_effect_reject
+          and all(item.get("clock_bound") is True
+                  for item in r72_variant_observations.values()),
+          f"collision={r89_collision_case,r89_collision_ok} "
+          f"boundary={r89_boundary_ok} rollback={r89_rollback_reject} "
+          f"stall={r89_stall_reject} preseed={r89_preseed_reject} "
+          f"missing_effect={r89_missing_effect_reject} "
+          f"chain={[item.get('clock_bound') for item in r72_variant_observations.values()]}")
     physical_git_environment_ok=(
         physical_git_case[0]
         and product_git_decoy_after==product_git_decoy_before
@@ -5520,18 +5776,29 @@ class CraftedConcretePath(type(Path())):
         live_wt=work/"r14-exact-owner-live-worker"
         sh(GIT,"worktree","add","-q","--detach",str(live_wt),"HEAD",cwd=live_repo)
         live_source=live_repo/"scripts/nortropic-codex-autopilot.py"
-        live_env = {key:value for key,value in os.environ.items() if not key.startswith("H032_")}
-        live_proc = system_popen(["/usr/bin/python3","-I","-S","-u",str(r12_runner),
-                                  str(live_source),str(live_repo),str(live_wt)],stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT,text=True,env=live_env)
-        try:
-            live_stdout,_ = live_proc.communicate(timeout=3600)
-        except subprocess.TimeoutExpired as exc:
-            live_proc.terminate()
-            try: live_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired: live_proc.kill();live_proc.wait()
-            raise RuntimeError("R13 exact owner provider unavailable: timeout") from exc
-        if live_proc.returncode != 0 or "R12_OUTCOME=ADMITTED" not in live_stdout:
+        live_argv=["/usr/bin/python3","-I","-S","-u",str(r12_runner),
+                   str(live_source),str(live_repo),str(live_wt)]
+        live_plan={
+            "schema_version":1,"nonce":os.urandom(32).hex(),
+            "purpose":"H032_OWNER_LIVE","mode":"full","argv":live_argv,
+            "cwd":str(repo),"result_path":str(owner_live_result),
+            "executable_sha256":sha256(Path(live_argv[0])),
+        }
+        if owner_live_plan.exists() or owner_live_result.exists():
+            raise RuntimeError("R89 owner-live channel preseeded")
+        live_plan_raw=atomic_owner_json(owner_live_plan,live_plan)
+        live_plan_stat=owner_live_plan.stat()
+        while not owner_live_result.exists(): time.sleep(.01)
+        _result_raw,_result_stat,live_call_result=stable_owner_json(owner_live_result)
+        if (sha256(owner_live_helper)!=owner_live_helper_sha256
+                or not owner_call_result_valid(
+                    live_call_result,live_plan,live_plan_raw,live_plan_stat)):
+            raise RuntimeError("R89 exact owner helper result binding invalid")
+        if live_call_result["timed_out"]:
+            raise RuntimeError("R13 exact owner provider unavailable: delegated timeout")
+        live_stdout=base64.b64decode(live_call_result["stdout_b64"],validate=True).decode(
+            "utf-8",errors="strict")
+        if live_call_result["returncode"] != 0 or "R12_OUTCOME=ADMITTED" not in live_stdout:
             raise RuntimeError("R13 exact owner provider unavailable: auth/network/runtime")
         output_lines=[line.split(" ",1)[1] for line in live_stdout.splitlines()
                       if line.startswith("R13_OUTPUT_PATH ")]
@@ -5576,6 +5843,8 @@ class CraftedConcretePath(type(Path())):
                 ==owner_live_binding["spec_sha256"]
             and sha256(live_repo/"verify/bin/h-032-exit")
                 ==owner_live_binding["gate_sha256"]
+            and sha256(live_repo/"verify/bin/h-032-owner-live-call")
+                ==owner_live_binding["owner_live_helper_sha256"]
             and owner_live_binding["candidate_gate"].is_file())
         exact_owner_live_detail=(owner_live_binding["candidate_head"],
                                  hashlib.sha256(raw).hexdigest(),
@@ -6656,3 +6925,32 @@ except Exception as exc:
     print(f"ODÖMBART K-RIGG — {type(exc).__name__}: {exc}")
     raise SystemExit(2)
 PY
+}
+
+run_gate_python_and_close() {
+  run_gate_python
+  GATE_RC=$?
+  /usr/bin/touch -- "$OWNER_LIVE_PLAN.closed"
+  return "$GATE_RC"
+}
+
+if [[ "$OWNER_LIVE_MODE" == "run" ]]; then
+  run_gate_python_and_close &
+  GATE_PID=$!
+  "$OWNER_LIVE_HELPER" "$OWNER_LIVE_PLAN" "$OWNER_LIVE_RESULT"
+  HELPER_RC=$?
+  if [[ $HELPER_RC -ne 0 ]]; then
+    if [[ -e "$OWNER_LIVE_PLAN" ]]; then
+      /bin/kill -TERM "$GATE_PID" 2>/dev/null || true
+      wait "$GATE_PID" 2>/dev/null || true
+      echo "ODÖMBART K_OWNER_LIVE_HELPER — helper failed after current plan rc=$HELPER_RC"
+      exit 2
+    fi
+    wait "$GATE_PID"
+    exit $?
+  fi
+  wait "$GATE_PID"
+  exit $?
+fi
+
+run_gate_python
