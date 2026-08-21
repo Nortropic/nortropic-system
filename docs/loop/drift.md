@@ -1888,3 +1888,27 @@ helper/call inventory; hidden spies additionally record the one-second effect th
 the mutants causal. No whole-Python analysis or outer descendant-containment claim is
 introduced. Product/controller `CODEX_RUN_TIMEOUT_SECONDS=86400` remains the sole
 provider lifetime and cleanup owner; external orchestration incidents remain ODÖMBART.
+
+### 2026-08-21 — H032/H031 R83 pristine stdlib capability capture
+
+Independent review mutated `module.subprocess.Popen` immediately before R82's
+`system_popen` assignment, then restored it, and performed the equivalent operation on
+`subprocess.run` through a module alias in H031. The exact helper bodies and actual-looking
+calls stayed unchanged, so every R82 source fact remained true while the captured callable
+could still insert `timeout=1`.
+
+R83 moves capability provenance to the embedded interpreters' pristine `-I -S` import
+boundary. Each gate has one exact top-level direct subprocess ImportFrom before executable
+statements. Private Popen/run names and second direct reference aliases must be identical at
+runtime; the real helper receives the private name directly. The gate source contains no
+actual subprocess module import or alias and rejects nested/dynamic recovery, sys.modules,
+protected stores/deletes/declarations, defaults, containers, indirect arguments and protected
+reflection. Separate direct aliases serve unrelated judge subprocess calls.
+
+Unconditional source mutants insert pre-capture module assignment, setattr+restore and
+delattr+restore sequences and must fail the same small inventory. Parameter and local
+variables merely spelled subprocess, Popen or run remain admissible. Existing effect spies
+still establish argument-free full-live communication, no H031 full-live timeout, exact
+120-second no-live timeout and the causal hidden one-second behavior. No whole-Python
+interpreter, outer containment claim, product credit or live provider call is introduced.
+The controller's 86400-second supervisor remains the sole provider lifetime owner.
