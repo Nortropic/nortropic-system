@@ -489,6 +489,12 @@ def protected_namespace_integrity(tree: ast.AST,
         return False
 
     for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in {"globals", "locals", "vars"}):
+            return False
+        if (isinstance(node, ast.Attribute)
+                and node.attr in {"f_globals", "_getframe"}):
+            return False
         if current_namespace(node) and not namespace_use_safe(node):
             return False
         if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
@@ -1093,14 +1099,6 @@ try:
             "\ndef r83_unrelated_locals():\n"
             "    subprocess = Popen = run = object()\n"
             "    return subprocess, Popen, run\nPY\n",
-        "unrelated_global_literals": owner_gate_text[:-4] +
-            "\ndef r84_unrelated_global_literals():\n"
-            "    globals()['R84_UNRELATED_A'] = 1\n"
-            "    globals().update({'R84_UNRELATED_B': 2})\n"
-            "    value = globals().get('R84_UNRELATED_A')\n"
-            "    globals().pop('R84_UNRELATED_A')\n"
-            "    del globals()['R84_UNRELATED_B']\n"
-            "    return value\nPY\n",
     }
     owner_shadow_facts = {
         name: owner_live_capability_source_facts(variant)
@@ -1130,8 +1128,9 @@ try:
                    and facts.get("actual_direct_call") is True
                    for facts in owner_namespace_facts.values())),
           str(owner_namespace_facts))
-    check("J_R84_H032_UNRELATED_NAMESPACE_LITERALS_ADMITTED",
-          all(all(facts.values()) for facts in owner_shadow_facts.values()),
+    check("J_R88_H032_CRITICAL_NAMESPACE_CLOSED",
+          set(owner_shadow_facts)=={"parameters","locals"}
+          and all(all(facts.values()) for facts in owner_shadow_facts.values()),
           str(owner_shadow_facts))
 
     class OwnerLiveProcessSpy:
@@ -2709,8 +2708,7 @@ def run_codex(sink, canonical, invocation, run, role):
         timeout_case = result_case("timeout")
     finally:
         module.subprocess.Popen = original_popen_timeout
-    timeout_ok = rejected_clean(timeout_case) if 'rejected_clean' in locals() else (
-        not timeout_case[0][0] and not timeout_case[2] and not timeout_case[3] and not timeout_case[4])
+    timeout_ok = rejected_clean(timeout_case)
 
     tracked_identities: set[tuple[int, int, str]] = set()
     monitor_stop = threading.Event(); monitor_threads: list[threading.Thread] = []
@@ -2954,7 +2952,8 @@ def run_codex(sink, canonical, invocation, run, role):
                                and node.func.value.id in {"os", "stat", "subprocess",
                                    "tempfile", "shutil", "hashlib", "json", "sys", "fcntl"})
                       and callable(getattr(path_type, node.func.attr, None))}
-        helper_names = {name for name, value in vars(module).items()
+        helper_names = {name for name in dir(module)
+                        for value in (getattr(module,name),)
                         if name != "run_codex" and hasattr(value, "__code__")
                         and getattr(value, "__module__", None) == module.__name__}
         # Root/sink observation uses these operations even if a legitimate source
@@ -3031,7 +3030,8 @@ def run_codex(sink, canonical, invocation, run, role):
                 elif wrap_helper_code is not None and frame.f_code is wrap_helper_code:
                     label = f"helper.{frame.f_locals.get('_h032_effect_name', 'unknown')}"
             if label is None or caller is None \
-                    or caller.f_globals.get("__name__") != module.__name__:
+                    or (caller.f_code is not module.run_codex.__code__
+                        and caller.f_code not in code_capabilities):
                 return
             if label == "os.fstat":
                 candidate_fd = caller.f_locals.get("fd", caller.f_locals.get("sink_fd"))
@@ -4287,17 +4287,94 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_prior_run.mkdir()
     r74_prior_envelope=r74_prior_run/"provider-envelope.json"
     r74_prior_envelope.write_text('{"prior":true}\n',encoding="utf-8")
-    r74_last_clock_id=[None]
+
+    def valid_wall_clock_id(value) -> bool:
+        return (isinstance(value,str) and len(value)==15
+            and value[8]=="-" and value[:8].isdigit() and value[9:].isdigit())
+
+    def await_r74_clock_slot(now_capability,monotonic_capability,
+                             sleep_capability,runs_root:Path,
+                             deadline_seconds:float=2.5):
+        """Judge-only barrier; it never invokes or credits product work."""
+        anchor=now_capability()
+        if not valid_wall_clock_id(anchor):
+            raise RuntimeError("R88 wall-clock anchor malformed")
+        deadline=monotonic_capability()+deadline_seconds
+        while True:
+            current=now_capability()
+            if not valid_wall_clock_id(current):
+                raise RuntimeError("R88 wall-clock observation malformed")
+            if current<anchor:
+                raise RuntimeError("R88 wall-clock rollback")
+            if current>anchor:
+                eligible=runs_root/f"{current}-test_author"
+                if eligible.exists() or eligible.is_symlink():
+                    raise RuntimeError("R88 wall-clock slot preseeded")
+                return {"anchor":anchor,"released":current,
+                        "eligible":str(eligible)}
+            if monotonic_capability()>=deadline:
+                raise RuntimeError("R88 wall-clock barrier stalled")
+            sleep_capability(.01)
+
+    class R88Clock:
+        def __init__(self,values):
+            self.values=list(values);self.index=0;self.monotonic_value=0.0
+        def now(self):
+            value=self.values[min(self.index,len(self.values)-1)]
+            self.index+=1
+            return value
+        def monotonic(self):
+            self.monotonic_value+=.05
+            return self.monotonic_value
+        def sleep(self,_seconds):
+            pass
+
+    r88_rig_root=work/"r88-clock-rig";r88_rig_root.mkdir()
+    r88_boundary_clock=R88Clock(
+        ["20260821-010101","20260821-010101","20260821-010102"])
+    r88_boundary=await_r74_clock_slot(
+        r88_boundary_clock.now,r88_boundary_clock.monotonic,
+        r88_boundary_clock.sleep,r88_rig_root,.5)
+    r88_without_barrier_path=r88_rig_root/"20260821-010101-test_author"
+    r88_without_barrier_path.mkdir()
+    r88_without_barrier_collision=r88_without_barrier_path.exists()
+    r88_without_barrier_path.rmdir()
+    r88_stall_clock=R88Clock(["20260821-020202"])
+    try:
+        await_r74_clock_slot(r88_stall_clock.now,r88_stall_clock.monotonic,
+                             r88_stall_clock.sleep,r88_rig_root,.1)
+        r88_stall_reject=False
+    except RuntimeError as exc:
+        r88_stall_reject="stalled" in str(exc)
+    r88_rollback_clock=R88Clock(["20260821-020202","20260821-020201"])
+    try:
+        await_r74_clock_slot(r88_rollback_clock.now,r88_rollback_clock.monotonic,
+                             r88_rollback_clock.sleep,r88_rig_root,.1)
+        r88_rollback_reject=False
+    except RuntimeError as exc:
+        r88_rollback_reject="rollback" in str(exc)
+    r88_preseed=r88_rig_root/"20260821-030304-test_author";r88_preseed.mkdir()
+    r88_preseed_clock=R88Clock(["20260821-030303","20260821-030304"])
+    try:
+        await_r74_clock_slot(r88_preseed_clock.now,r88_preseed_clock.monotonic,
+                             r88_preseed_clock.sleep,r88_rig_root,.1)
+        r88_preseed_reject=False
+    except RuntimeError as exc:
+        r88_preseed_reject="preseeded" in str(exc)
+    r88_preseed.rmdir();r88_rig_root.rmdir()
+    r88_barrier_rig_ok=(
+        r88_boundary=={
+            "anchor":"20260821-010101",
+            "released":"20260821-010102",
+            "eligible":str(r88_rig_root/"20260821-010102-test_author")}
+        and r88_without_barrier_collision and r88_stall_reject
+        and r88_rollback_reject and r88_preseed_reject)
+
+    r88_last_actual_run=[None]
     def run_r74_environment_oracle(name: str) -> dict[str,object]:
-        # The product's frozen run identifier is second-granular.  Keep every
-        # oracle invocation a genuinely new attempt instead of letting a fast
-        # matrix collide with the preceding run directory.
-        clock_deadline=time.monotonic()+2.0
-        while (physical_module.now_id()==r74_last_clock_id[0]
-                and time.monotonic()<clock_deadline):
-            time.sleep(.01)
-        current_clock_id=physical_module.now_id()
-        r74_last_clock_id[0]=current_clock_id
+        barrier=await_r74_clock_slot(
+            physical_module.now_id,time.monotonic,time.sleep,r74_runs_root)
+        previous_actual=r88_last_actual_run[0]
         runs_before=frozenset(r74_runs_root.iterdir())
         journal_path=r74_runs_root.parent/"events.jsonl"
         journal_before=journal_path.read_bytes() if journal_path.is_file() else b""
@@ -4339,6 +4416,8 @@ def run_codex(sink, canonical, invocation, run, role):
         observation=launch_observations.get(output,{"valid":False})
         runs_after=set(r74_runs_root.iterdir())
         current_runs=sorted(runs_after-set(runs_before))
+        if len(current_runs)==1:
+            r88_last_actual_run[0]=current_runs[0]
         split_entries=sorted(path.name for path in split_root.iterdir())
         output_parent=observed.get("output_parent") if isinstance(observed,dict) else None
         shutil.rmtree(split_root)
@@ -4348,6 +4427,9 @@ def run_codex(sink, canonical, invocation, run, role):
                 "split_sink":str(split_sink),"split_entries":split_entries,
                 "output_parent":output_parent,"split_clean":not split_root.exists(),
                 "current_runs":[str(path) for path in current_runs],
+                "barrier":barrier,
+                "previous_actual":str(previous_actual)
+                    if isinstance(previous_actual,Path) else None,
                 "intended_common":str(r74_intended_common)}
     r74_decoy_before_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r72_environment_variants={
@@ -4356,6 +4438,54 @@ def run_codex(sink, canonical, invocation, run, role):
     }
     r74_decoy_after_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r73_split_variant=r72_environment_variants["exact"]
+
+    def r88_actual_chain_admits(variant,expected_previous) -> bool:
+        if not isinstance(variant,dict): return False
+        barrier=variant.get("barrier");current_runs=variant.get("current_runs")
+        launch=variant.get("launch")
+        if not (isinstance(barrier,dict)
+                and set(barrier)=={"anchor","released","eligible"}
+                and valid_wall_clock_id(barrier.get("anchor"))
+                and valid_wall_clock_id(barrier.get("released"))
+                and barrier["released"]>barrier["anchor"]
+                and variant.get("previous_actual")==expected_previous
+                and isinstance(current_runs,list) and len(current_runs)==1
+                and isinstance(launch,dict)
+                and variant.get("starts")==1):
+            return False
+        current=Path(current_runs[0]);current_id=current.name[:15]
+        return (valid_wall_clock_id(current_id)
+            and current.parent==r74_runs_root
+            and current_id>=barrier["released"]
+            and current_id>barrier["anchor"]
+            and launch.get("valid") is True
+            and launch.get("current_run")==str(current)
+            and launch.get("envelope")==str(current/"provider-envelope.json"))
+
+    r88_chain_results={};r88_expected_previous=None
+    for variant_name,variant in r72_environment_variants.items():
+        r88_chain_results[variant_name]=r88_actual_chain_admits(
+            variant,r88_expected_previous)
+        if len(variant.get("current_runs",[]))==1:
+            r88_expected_previous=variant["current_runs"][0]
+    r88_sequence=list(r72_environment_variants.values())
+    r88_boundary_mutant=dict(r88_sequence[0]);r88_boundary_mutant["barrier"]={
+        "anchor":r88_sequence[0]["barrier"]["released"],
+        "released":r88_sequence[0]["barrier"]["released"],
+        "eligible":r88_sequence[0]["barrier"]["eligible"]}
+    r88_rollback_mutant=dict(r88_sequence[1]);r88_rollback_mutant["previous_actual"]=None
+    r88_gap_mutant=dict(r88_sequence[2]);r88_gap_mutant["previous_actual"]=(
+        r88_sequence[0]["current_runs"][0])
+    r88_no_product_credit_mutant=dict(r88_sequence[0])
+    r88_no_product_credit_mutant["starts"]=0
+    r88_no_product_credit_mutant["launch"]={"valid":False}
+    r88_chain_mutants_reject=(
+        not r88_actual_chain_admits(r88_boundary_mutant,None)
+        and not r88_actual_chain_admits(
+            r88_rollback_mutant,r88_sequence[0]["current_runs"][0])
+        and not r88_actual_chain_admits(
+            r88_gap_mutant,r88_sequence[1]["current_runs"][0])
+        and not r88_actual_chain_admits(r88_no_product_credit_mutant,None))
 
     physical_output = Path(physical_capture.get("output_path", "/private/tmp/h032-missing-physical-output"))
     physical_canonical = (physical_new_runs[0]/"result.json" if len(physical_new_runs)==1
@@ -4616,6 +4746,12 @@ def run_codex(sink, canonical, invocation, run, role):
           f"decoy_current_output={r74_current_output_decoy_envelope_rejects} "
           f"prior={r74_prior_envelope} current={r73_exact_launch.get('current_run')} "
           f"decoy_unchanged={r74_decoy_after_environment_oracles==r74_decoy_before_environment_oracles}")
+    check("J_R88_BOUNDED_WALL_CLOCK_BARRIER",
+          r88_barrier_rig_ok
+          and all(r88_chain_results.values())
+          and r88_chain_mutants_reject,
+          f"rig={r88_barrier_rig_ok} chain={r88_chain_results} "
+          f"mutants_reject={r88_chain_mutants_reject}")
     physical_git_environment_ok=(
         physical_git_case[0]
         and product_git_decoy_after==product_git_decoy_before

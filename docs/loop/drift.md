@@ -1912,3 +1912,35 @@ still establish argument-free full-live communication, no H031 full-live timeout
 120-second no-live timeout and the causal hidden one-second behavior. No whole-Python
 interpreter, outer containment claim, product credit or live provider call is introduced.
 The controller's 86400-second supervisor remains the sole provider lifetime owner.
+
+### 2026-08-21 — H032/H031 R88 closed namespace and bounded wall-clock barrier
+
+R85 tried to prevent second-granular R74 run-directory collisions by inventing a fresh
+clock seed. R86 required the immediately preceding hostile physical attempt's persistent
+run directory, but the published prebuilder correctly cleaned that failed attempt. R87
+then measured the actual Popen boundary: one current provider capture existed, but its
+envelope and current run were not under the intended common Git because that wrong
+topology is the product behavior H032 is supposed to reject. Owner therefore superseded
+all three physical/synthetic seed requirements rather than turning hostile state into a
+positive anchor.
+
+R88 places a judge-only barrier immediately before every R74 environment attempt. It
+captures one well-formed second-granular anchor and waits with an independent monotonic
+deadline until the first strictly later clock value. That exact intended run path must be
+absent; malformed time, stall, rollback or preseed is K-RIGG/ODÖMBART before product
+execution. The subsequent actual observation must still show exactly one provider start,
+one current intended-common run/envelope and a clock not earlier than the released slot.
+Each observed actual run becomes the predecessor for the next attempt. Pure controls
+reproduce the old same-second collision and reject stall/rollback/preseed; connected
+boundary, missing-effect, rollback and gap mutants reject while all six actual attempts
+form one consecutive chain. Barrier success is never product credit, so the missing result
+kernel remains H032's only product failure.
+
+R88 also preserves the feasible R84/R86 capability closure. The owner-live critical source
+cannot obtain globals, locals or vars or reach frame globals/_getframe; the former
+unrelated-global positive is explicitly retired. Protected helpers and pristine subprocess
+capabilities remain singleton and direct. H031's no-live deadline is the literal 120 only
+inside its real skip branch, with no mutable module timeout binding after the spy; full
+owner-live remains deadline-free and delegates provider lifetime to the product's frozen
+86400-second supervisor. These are small capability/source checks, not a whole-Python
+interpreter. No production or live provider execution changes.
