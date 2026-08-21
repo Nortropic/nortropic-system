@@ -92,6 +92,7 @@ FORBIDDEN_GIT_TOKENS = (
     "--force-with-lease",
     "--amend",
 )
+GIT_CONTROL_PREFIX = "GIT_"
 MAX_ARCHITECT_ROUNDS = 5
 SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT = True
 ROADMAP_PLAN_BLOBS = {
@@ -119,6 +120,15 @@ class ContractRefreeze(Stop):
 class Cmd:
     rc: int
     out: str
+
+
+def without_caller_git_controls(environment: dict[str, str]) -> dict[str, str]:
+    """Preserve the process environment except caller-selected Git controls."""
+    return {
+        key: value
+        for key, value in environment.items()
+        if not key.startswith(GIT_CONTROL_PREFIX)
+    }
 
 
 @dataclass
@@ -244,6 +254,9 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
             raise Stop(f"history rewrite command forbidden: {joined}")
         if any(arg.startswith("+") for arg in argv[1:]):
             raise Stop(f"leading + refspec forbidden: {joined}")
+    process_environment = without_caller_git_controls(
+        dict(os.environ) if env is None else dict(env)
+    )
     p = subprocess.run(
         argv,
         cwd=str(cwd) if cwd else None,
@@ -251,7 +264,7 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
         stderr=subprocess.STDOUT,
         text=True,
         timeout=timeout,
-        env=env,
+        env=process_environment,
     )
     if check and p.returncode != 0:
         raise Stop(f"command failed rc={p.returncode}: {' '.join(argv)}\n{p.stdout}")
@@ -897,7 +910,8 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
                 "run", str(wt), str(envelope), str(CODEX_RUN_TIMEOUT_SECONDS),
                 "--", *provider_argv]
         env = {key: value for key, value in os.environ.items()
-               if not key.startswith("DYLD_")
+               if not key.startswith(GIT_CONTROL_PREFIX)
+               and not key.startswith("DYLD_")
                and key not in {"LD_PRELOAD", "LD_LIBRARY_PATH", "__PYVENV_LAUNCHER__"}}
         env["NORTROPIC_TRUST_ROOT"] = str(snapshot_root)
         thread_id: str | None = None
