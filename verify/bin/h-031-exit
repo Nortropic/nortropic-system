@@ -401,8 +401,11 @@ def odombart(key: str, detail: str) -> None:
 
 
 H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 143 PASS / 1 FAIL"
+H032_GREEN_SUMMARY = "SAMMANFATTNING 144 PASS / 0 FAIL"
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
+H032_OWNER_LIVE_EXECUTION = "OWNER_LIVE_EXECUTION=SKIPPED"
+H032_OWNER_LIVE_START_DELTA = "OWNER_LIVE_START_DELTA=0"
 H032_OWNER_LIVE_SKIP_MARKER = (
     "ODÖMBART K_OWNER_LIVE_PHASE_NOT_RUN — explicit owner TEST_AUTHOR no-live mode; "
     "deterministic product controls passed"
@@ -431,16 +434,49 @@ def h033_embedded_pass(lines):
     return all(facts.values()), facts
 
 
-def owner_skip_fixture_from_observed_h032(stdout: str) -> str:
+def owner_skip_fixture_from_observed_h032(returncode: int, stdout: str) -> str:
     lines = stdout.splitlines()
-    if (lines.count(H032_OWNER_LIVE_SKIP_REASON) == 1
+    if (returncode == 2
+            and lines.count(H032_OWNER_LIVE_SKIP_REASON) == 1
             and lines.count(H032_OWNER_LIVE_SKIP_MARKER) == 1):
         return stdout
-    if (lines.count(H032_STRUCTURED_RESULT_REASON) != 1
-            or H032_OWNER_LIVE_SKIP_MARKER in lines):
+    if returncode == 1:
+        if (lines.count(H032_STRUCTURED_RESULT_REASON) != 1
+                or H032_OWNER_LIVE_SKIP_MARKER in lines):
+            return ""
+        index = lines.index(H032_STRUCTURED_RESULT_REASON)
+        lines[index:index + 1] = [H032_OWNER_LIVE_SKIP_REASON,
+                                  H032_OWNER_LIVE_SKIP_MARKER]
+        return "\n".join(lines) + "\n"
+    if returncode != 0:
         return ""
-    index = lines.index(H032_STRUCTURED_RESULT_REASON)
-    lines[index:index + 1] = [H032_OWNER_LIVE_SKIP_REASON, H032_OWNER_LIVE_SKIP_MARKER]
+    h033_ok, _h033_facts = h033_embedded_pass(lines)
+    boundary_lines = [index for index, line in enumerate(lines)
+                      if line.startswith(
+                          "PASS K_STRUCTURED_RESULT_DELIVERY_BOUNDARY —")]
+    green_ok = (
+        lines.count(H032_GREEN_SUMMARY) == 1
+        and sum(line.startswith("PASS ") for line in lines) == 144
+        and not any(line.startswith("FAIL ") for line in lines)
+        and not any(line.startswith("ODÖMBART ") for line in lines)
+        and not any(line.startswith("CURRENT_RED_REASON=") for line in lines)
+        and not any(line.startswith("OWNER_LIVE_") for line in lines)
+        and len(boundary_lines) == 1
+        and sum(line.startswith("PASS K_G20_NAMESPACE —") for line in lines) == 1
+        and h033_ok
+    )
+    if not green_ok:
+        return ""
+    boundary_index = boundary_lines[0]
+    lines[boundary_index] = "FAIL " + lines[boundary_index][5:]
+    summary_index = lines.index(H032_GREEN_SUMMARY)
+    lines[summary_index] = H032_OWNER_LIVE_SKIP_SUMMARY
+    lines[summary_index + 1:summary_index + 1] = [
+        H032_OWNER_LIVE_EXECUTION,
+        H032_OWNER_LIVE_START_DELTA,
+        H032_OWNER_LIVE_SKIP_REASON,
+        H032_OWNER_LIVE_SKIP_MARKER,
+    ]
     return "\n".join(lines) + "\n"
 
 
@@ -2154,11 +2190,69 @@ subprocess = object()
     upstream.returncode = upstream_result["returncode"]
     upstream.stdout = upstream_stdout
     upstream.stderr = upstream_stderr
-    owner_skip_fixture = owner_skip_fixture_from_observed_h032(upstream.stdout)
+    owner_skip_fixture = owner_skip_fixture_from_observed_h032(
+        upstream.returncode, upstream.stdout)
     owner_skip_positive = exclusive_h032_owner_live_skip(2, owner_skip_fixture)
     check("J_H032_EXCLUSIVE_OWNER_LIVE_SKIP_POSITIVE",
           bool(owner_skip_fixture) and owner_skip_positive[0],
           str(owner_skip_positive[1]))
+    owner_green_lines = []
+    for line in owner_skip_fixture.splitlines():
+        if line.startswith("FAIL K_STRUCTURED_RESULT_DELIVERY_BOUNDARY —"):
+            owner_green_lines.append("PASS " + line[5:])
+        elif line == H032_OWNER_LIVE_SKIP_SUMMARY:
+            owner_green_lines.append(H032_GREEN_SUMMARY)
+        elif line in {
+                H032_OWNER_LIVE_EXECUTION,
+                H032_OWNER_LIVE_START_DELTA,
+                H032_OWNER_LIVE_SKIP_REASON,
+                H032_OWNER_LIVE_SKIP_MARKER}:
+            continue
+        else:
+            owner_green_lines.append(line)
+    owner_green_fixture = "\n".join(owner_green_lines) + "\n"
+    owner_green_derived = owner_skip_fixture_from_observed_h032(
+        0, owner_green_fixture)
+    owner_green_positive = exclusive_h032_owner_live_skip(
+        2, owner_green_derived)
+    owner_green_actual_bound = (
+        upstream.returncode != 0
+        or owner_green_fixture.splitlines() == upstream.stdout.splitlines())
+    check("J_H032_GREEN_TO_OWNER_LIVE_SKIP_POSITIVE",
+          bool(owner_green_fixture) and owner_green_positive[0]
+          and owner_green_actual_bound,
+          f"derived={owner_green_positive[1]} actual_bound={owner_green_actual_bound}")
+    green_boundary_line = next((line for line in owner_green_lines
+        if line.startswith("PASS K_STRUCTURED_RESULT_DELIVERY_BOUNDARY —")), "")
+    owner_green_mutants = {
+        "WRONG_SUMMARY": owner_green_fixture.replace(
+            H032_GREEN_SUMMARY, "SAMMANFATTNING 143 PASS / 1 FAIL", 1),
+        "MISSING_BOUNDARY": owner_green_fixture.replace(
+            green_boundary_line + "\n", "", 1),
+        "DUPLICATE_BOUNDARY": owner_green_fixture
+            + green_boundary_line + "\n",
+        "EXTRA_FAIL": owner_green_fixture
+            + "FAIL K_R97_GREEN_FIXTURE — injected failure\n",
+        "MIXED_ODOMBART": owner_green_fixture
+            + "ODÖMBART K_R97_GREEN_FIXTURE — injected state\n",
+        "CURRENT_REASON": owner_green_fixture
+            + H032_STRUCTURED_RESULT_REASON + "\n",
+        "OWNER_SKIP_STATE": owner_green_fixture
+            + H032_OWNER_LIVE_EXECUTION + "\n",
+        "MISSING_G20": owner_green_fixture.replace(
+            "PASS K_G20_NAMESPACE —", "PASS K_R97_G20_MISSING —", 1),
+        "H033_MISSING_SUMMARY": owner_green_fixture.replace(
+            H033_PASS_SUMMARY + "|", "", 1),
+        "H033_MISSING_RESULT": owner_green_fixture.replace(
+            H033_PASS_RESULT + "|", "", 1),
+    }
+    for label, mutant in owner_green_mutants.items():
+        check("J_H032_GREEN_" + label + "_REJECT",
+              owner_skip_fixture_from_observed_h032(0, mutant) == "",
+              "malformed green transcript cannot derive owner-live skip")
+    check("J_H032_GREEN_WRONG_RETURN_CODE_REJECT",
+          owner_skip_fixture_from_observed_h032(1, owner_green_fixture) == "",
+          "green transcript requires exact exit zero")
     owner_skip_mutants = {
         "MIXED_G20": owner_skip_fixture
             + "ODÖMBART K_G20_NAMESPACE — nested sandbox unavailable\n",

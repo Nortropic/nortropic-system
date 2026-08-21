@@ -1990,3 +1990,17 @@ absolute output, boolean/zero/two counts, float/wrong separator, timeout and wor
 alongside every earlier current journal/run/envelope/check control. An incomplete public
 product-Git observation still supplies neither scheduling identity nor product credit;
 the implemented disposable composition must retain its complete three-effect chain.
+
+## 2026-08-21 — R97 total owner-skip selftest after green H032
+
+The first completed full-live composition returned H032 144/0 and passed the real H032
+dependency, role, route and product controls. H031 nevertheless failed its unconditional
+owner-skip positive because the fixture builder recognized only a red or already-skipped
+upstream transcript. R97 adds one strict green source shape to that same selftest path:
+exit zero, exact 144/0, no failure, ODÖMBART, current-red reason or skip state, plus the
+exact structured-result, G20 and embedded H033 positives. The rig changes only the
+structured-result line and summary and inserts the frozen skip state, then invokes the
+unchanged exclusive parser. Wrong summary/return code, missing or duplicate boundary,
+extra failure/state and missing G20/H033 facts reject. When the real upstream is green,
+the selftest source must equal its observed transcript line-for-line. This grants no
+product credit and does not repeat the already completed live/provider call.
