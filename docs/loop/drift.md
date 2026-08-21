@@ -1925,3 +1925,14 @@ continues writing and therefore fails. Wrong argv, purpose, digest and attempted
 start all reject before child creation. Successful skip must carry the H032-emitted exact
 SKIPPED/start-delta-zero evidence. These controls never grant product credit; R90 environment,
 no-replace, replay and signal closures and the guarded full live phase are unchanged.
+
+## 2026-08-21 — R92 single provider-owner lifetime
+
+R91's sampled skip ledger was falsified by an escaped survivor. R92 therefore makes both
+H031 dependency forms trusted canonical H032 waits with no timeout and no containment claim.
+The result must say `trusted-none`, zero tracked processes and null quiescence. Only the
+separate `H032_OWNER_LIVE`/`provider-full` plan may start a provider and retain R90's continuous
+identity ledger and synchronous cleanup. Purpose, mode, exact argv and result backend are
+mutually bound; normal dependency starts H032 once, explicit no-live starts no provider, and
+cross-mode/provider/backend mutants reject. External interruption is an operator-recovery
+ODÖMBART state. A 300-second watchdog used by owner regressions is not part of gate semantics.

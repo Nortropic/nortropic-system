@@ -27,7 +27,7 @@ SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
 SPEC="$ROOT/specs/tasks.spec.json"
 H032_GATE="$ROOT/verify/bin/h-032-exit"
 OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
-OWNER_LIVE_HELPER_SHA256="e5856a59c43a22bd20da60218650325d03633a99ac235bd9a23919d77dadcd1b"
+OWNER_LIVE_HELPER_SHA256="da7f6aa4569544b0607c59887347219f54a032b56c112b80336768a105bab6ea"
 if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
   echo "ODÖMBART K0 — owner-live helper identity invalid"
   exit 2
@@ -39,7 +39,7 @@ if [[ "$OBSERVED_OWNER_LIVE_HELPER_SHA256" != "$OWNER_LIVE_HELPER_SHA256" ]]; th
 fi
 WORK="$(/usr/bin/mktemp -d /private/tmp/nortropic-h031.XXXXXX)" || exit 2
 case "$WORK" in /private/tmp/nortropic-h031.*) ;; *) echo "ODÖMBART K0 — osäker tempidentitet"; exit 2;; esac
-GATE_PID="";HELPER_PID=""
+GATE_PID="";HELPER_PID="";PROTOCOL_INTERRUPTED=0
 quiesce_protocol() {
   for owned_pid in "${HELPER_PID:-}" "${GATE_PID:-}"; do [[ -n "$owned_pid" ]] && /bin/kill -TERM "$owned_pid" 2>/dev/null || true; done
   for owned_pid in "${HELPER_PID:-}" "${GATE_PID:-}"; do [[ -n "$owned_pid" ]] && wait "$owned_pid" 2>/dev/null || true; done
@@ -47,6 +47,10 @@ quiesce_protocol() {
 cleanup() {
   cleanup_rc=$?
   trap - EXIT HUP INT TERM
+  if [[ "$PROTOCOL_INTERRUPTED" == 1 && -n "${HELPER_PID:-}" ]]; then
+    echo "ODÖMBART K_H032_PROTOCOL — external interruption during trusted dependency; operator recovery required" >&2
+    exit 2
+  fi
   quiesce_protocol
   case "${WORK:-}" in
     /private/tmp/nortropic-h031.*) /bin/rm -rf -- "$WORK" || cleanup_rc=2 ;;
@@ -55,9 +59,9 @@ cleanup() {
   exit "$cleanup_rc"
 }
 trap cleanup EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
+trap 'PROTOCOL_INTERRUPTED=1; exit 129' HUP
+trap 'PROTOCOL_INTERRUPTED=1; exit 130' INT
+trap 'PROTOCOL_INTERRUPTED=1; exit 143' TERM
 
 OWNER_LIVE_MODE="run"
 if [[ $# -gt 0 ]]; then
@@ -384,8 +388,15 @@ def owner_call_result_valid(value, plan, plan_raw: bytes, plan_stat) -> bool:
             plan.get("environment"),sort_keys=True,separators=(",", ":")).encode()).hexdigest()
         and type(value.get("tracked_processes")) is int
         and value["tracked_processes"]>=0
-        and value.get("tracker_backend") in {"libproc-full","libproc-skip"}
-        and value.get("family_quiescent") is True)
+        and ((plan.get("mode")=="provider-full"
+              and value.get("tracker_backend")=="libproc-full"
+              and value.get("family_quiescent") is True
+              and value["tracked_processes"]>=1)
+             or (plan.get("mode")=="trusted"
+              and value.get("tracker_backend")=="trusted-none"
+              and value.get("family_quiescent") is None
+              and value["tracked_processes"]==0
+              and value.get("timed_out") is False)))
 
 
 def check(key: str, ok: bool, detail: str) -> None:
@@ -1385,7 +1396,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "e19ed9b386151d6ef9b04d2ecaa12b3423e812b7c024defc0ad3da70be695339")
+                       == "a82ecbc7b3b32774a1a3d6ad460462196b912d5deac73de03dfb405ab8ed5ee4")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -2113,7 +2124,7 @@ subprocess = object()
         "schema_version": 1,
         "nonce": os.urandom(32).hex(),
         "purpose": "H031_H032_DEPENDENCY",
-        "mode": owner_live_mode,
+        "mode": "trusted",
         "argv": upstream_argv,
         "cwd": str(root),
         "result_path": str(owner_live_result),
@@ -2137,7 +2148,7 @@ subprocess = object()
     if owner_live_result.exists() or owner_live_plan.exists():
         odombart("K_H032_FRESH_UPSTREAM", "owner-call consume-once cleanup failed")
     if upstream_result["timed_out"]:
-        odombart("K_H032_FRESH_UPSTREAM", "bounded skip dependency timed out")
+        odombart("K_H032_FRESH_UPSTREAM", "trusted dependency reported impossible timeout")
     try:
         upstream_stdout = base64.b64decode(upstream_result["stdout_b64"], validate=True).decode(
             "utf-8", errors="strict")

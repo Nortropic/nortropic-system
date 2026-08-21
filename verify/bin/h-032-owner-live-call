@@ -33,7 +33,6 @@ import time
 
 MAX_PLAN_BYTES = 65536
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
-SKIP_SECONDS = 120
 GRACE_SECONDS = 5
 HEX = frozenset("0123456789abcdef")
 
@@ -130,7 +129,7 @@ def plan_valid(plan, result_path: Path, helper_path: Path) -> bool:
         return False
     if (plan.get("schema_version") != 1 or not valid_hex(plan.get("nonce"), 64)
             or plan.get("purpose") not in {"H032_OWNER_LIVE", "H031_H032_DEPENDENCY"}
-            or plan.get("mode") not in {"full", "skip"}
+            or plan.get("mode") not in {"provider-full", "trusted"}
             or plan.get("result_path") != str(result_path)
             or not valid_hex(plan.get("executable_sha256"), 64)
             or type(plan.get("executable_dev")) is not int
@@ -152,13 +151,21 @@ def plan_valid(plan, result_path: Path, helper_path: Path) -> bool:
         and result_path.parent.is_dir() and not result_path.parent.is_symlink())
     if not common:
         return False
-    if plan["mode"] == "skip":
+    if plan["mode"] == "trusted":
         canonical = helper_path.parent / "h-032-exit"
         return (plan["purpose"] == "H031_H032_DEPENDENCY"
             and cwd == helper_path.parents[2]
             and executable == canonical and executable.resolve(strict=True) == canonical
-            and argv == [str(canonical), "--skip-owner-live"])
-    return plan["purpose"] == "H032_OWNER_LIVE"
+            and argv in ([str(canonical)],
+                         [str(canonical), "--skip-owner-live"]))
+    return (plan["purpose"] == "H032_OWNER_LIVE"
+        and executable == Path("/usr/bin/python3")
+        and len(argv) == 8 and argv[1:4] == ["-I", "-S", "-u"]
+        and all(Path(item).is_absolute() for item in argv[4:])
+        and Path(argv[4]).is_file() and not Path(argv[4]).is_symlink()
+        and Path(argv[5]).is_file() and not Path(argv[5]).is_symlink()
+        and Path(argv[6]).is_dir() and not Path(argv[6]).is_symlink()
+        and Path(argv[7]).is_dir() and not Path(argv[7]).is_symlink())
 
 
 def atomic_write_new(path: Path, raw: bytes) -> None:
@@ -302,71 +309,67 @@ def main() -> int:
     if (executable_before is None or (executable_before.st_dev, executable_before.st_ino)
             != (plan["executable_dev"], plan["executable_ino"])):
         return 2
-    interrupted=[]
-    blocked_signals={signal.SIGHUP,signal.SIGINT,signal.SIGTERM}
-    previous_mask=signal.pthread_sigmask(signal.SIG_BLOCK,blocked_signals)
-    def interrupted_handler(signum,_frame):
-        interrupted.append(signum)
-        raise KeyboardInterrupt
-    old_handlers={item:signal.signal(item,interrupted_handler)
-                  for item in (signal.SIGHUP,signal.SIGINT,signal.SIGTERM)}
-    proc=None
-    timed_out = False;tracker_stop=threading.Event();family={}
-    tracker_backend = "libproc-skip" if plan["mode"] == "skip" else "libproc-full"
-    family_quiescent = False
-    native_library = libproc_api()
-    try:
-        proc = Popen(argv, cwd=plan["cwd"], stdout=PIPE, stderr=PIPE,
-                     env=plan["environment"], start_new_session=True,
-                     preexec_fn=clear_child_signal_mask)
-        root_identity=native_identity(native_library,proc.pid)
-        if root_identity is None:
-            raise RuntimeError("native root identity unavailable")
-        family[proc.pid]=root_identity
-        tracker_target=native_family_tracker
-        tracker_interval=.02 if plan["mode"]=="skip" else .005
-        tracker=threading.Thread(target=tracker_target,
-                                 args=(proc.pid,tracker_stop,family,tracker_interval),daemon=True)
-        tracker.start()
-        signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
-        if interrupted:
+    proc=None;timed_out=False;family={}
+    if plan["mode"] == "trusted":
+        tracker_backend="trusted-none";family_quiescent=None
+        proc=Popen(argv,cwd=plan["cwd"],stdout=PIPE,stderr=PIPE,
+                   env=plan["environment"],start_new_session=True)
+        stdout,stderr=proc.communicate()
+    else:
+        interrupted=[]
+        blocked_signals={signal.SIGHUP,signal.SIGINT,signal.SIGTERM}
+        previous_mask=signal.pthread_sigmask(signal.SIG_BLOCK,blocked_signals)
+        def interrupted_handler(signum,_frame):
+            interrupted.append(signum)
             raise KeyboardInterrupt
-        if plan["mode"] == "skip":
-            stdout, stderr = proc.communicate(timeout=SKIP_SECONDS)
-        else:
-            stdout, stderr = proc.communicate()
-    except (TimeoutExpired,KeyboardInterrupt) as exc:
-        timed_out = True
-        family_quiescent=terminate_family(proc.pid,family,tracker_backend)
+        old_handlers={item:signal.signal(item,interrupted_handler)
+                      for item in (signal.SIGHUP,signal.SIGINT,signal.SIGTERM)}
+        tracker_backend="libproc-full";family_quiescent=False
+        tracker_stop=threading.Event();native_library=libproc_api()
         try:
-            stdout, stderr = proc.communicate(timeout=GRACE_SECONDS)
-        except TimeoutExpired:
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            stdout, stderr = proc.communicate()
-        stdout = (getattr(exc,"stdout",None) or b"") + (stdout or b"")
-        stderr = (getattr(exc,"stderr",None) or b"") + (stderr or b"")
-    finally:
-        tracker_stop.set()
-        if 'tracker' in locals(): tracker.join(timeout=1)
-        if proc is not None and proc.poll() is None:
+            proc=Popen(argv,cwd=plan["cwd"],stdout=PIPE,stderr=PIPE,
+                       env=plan["environment"],start_new_session=True,
+                       preexec_fn=clear_child_signal_mask)
+            root_identity=native_identity(native_library,proc.pid)
+            if root_identity is None:
+                raise RuntimeError("native root identity unavailable")
+            family[proc.pid]=root_identity
+            tracker=threading.Thread(target=native_family_tracker,
+                args=(proc.pid,tracker_stop,family,.005),daemon=True)
+            tracker.start()
+            signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
+            if interrupted:raise KeyboardInterrupt
+            stdout,stderr=proc.communicate()
+        except KeyboardInterrupt as exc:
+            timed_out=True
             family_quiescent=terminate_family(proc.pid,family,tracker_backend)
-            proc.wait(timeout=GRACE_SECONDS)
-        signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
-        for item,handler in old_handlers.items(): signal.signal(item,handler)
-    if proc is None:
-        return 2
-    if not timed_out:
-        family_quiescent=terminate_family(proc.pid,family,tracker_backend)
+            try:stdout,stderr=proc.communicate(timeout=GRACE_SECONDS)
+            except TimeoutExpired:
+                try:os.killpg(proc.pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+                stdout,stderr=proc.communicate()
+            stdout=(getattr(exc,"stdout",None) or b"")+(stdout or b"")
+            stderr=(getattr(exc,"stderr",None) or b"")+(stderr or b"")
+        finally:
+            tracker_stop.set()
+            if 'tracker' in locals():tracker.join(timeout=1)
+            if proc is not None and proc.poll() is None:
+                family_quiescent=terminate_family(proc.pid,family,tracker_backend)
+                proc.wait(timeout=GRACE_SECONDS)
+            signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
+            for item,handler in old_handlers.items():signal.signal(item,handler)
+        if proc is None:return 2
+        if not timed_out:
+            family_quiescent=terminate_family(proc.pid,family,tracker_backend)
     executable_after = absolute_regular_executable(
         Path(argv[0]), plan["executable_sha256"])
-    if (not family_quiescent or executable_after is None
+    if ((plan["mode"]=="provider-full" and not family_quiescent)
+            or executable_after is None
             or (executable_after.st_dev, executable_after.st_ino)
                 != (plan["executable_dev"], plan["executable_ino"])):
         return 2
-    if plan["mode"] == "skip" and not timed_out:
+    if (plan["mode"] == "trusted" and len(argv)==2
+            and argv[1]=="--skip-owner-live"):
         transcript = stdout.decode("utf-8", errors="strict")
         reasons=(transcript.count("CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN")
                  +transcript.count("CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"))
