@@ -851,6 +851,7 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
     result_root: Path | None = None
     result_root_identity: tuple[int, int] | None = None
     sink_fd = -1
+    canonical_published = False
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
         result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-"))
@@ -961,7 +962,9 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
                 or sorted(path.name for path in result_root.iterdir()) != [result_sink.name]):
             raise Stop("provider result transport identity changed")
         _LAST_AGENT_CONTEXT = (thread_id, events, result)
-        return consume_private_result(sink_fd, result, invocation_id, run_id, role)
+        accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
+        canonical_published = True
+        return accepted
     finally:
         cleanup_errors: list[OSError] = []
         if sink_fd >= 0:
@@ -997,7 +1000,20 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
                 cleanup_errors.append(exc)
             else:
                 break
-        if result_residue or snapshot_root.exists() or result_cleanup_degraded:
+        cleanup_incomplete = (
+            bool(result_residue) or snapshot_root.exists() or result_cleanup_degraded
+        )
+        if cleanup_incomplete and canonical_published:
+            for _cleanup_attempt in range(3):
+                try:
+                    result.unlink()
+                except FileNotFoundError:
+                    break
+                except OSError as exc:
+                    cleanup_errors.append(exc)
+                else:
+                    break
+        if cleanup_incomplete:
             cause = cleanup_errors[-1] if cleanup_errors else None
             raise Stop("private execution staging cleanup incomplete") from cause
 
