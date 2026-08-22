@@ -2069,3 +2069,23 @@ identity, fsync, no writer, one transition, final exact envelope/digest, removed
 later publication or residue. Wrong value or destination, preseed and link/unlink/link all
 reject. The existing atomic rename path remains green, and no production or provider behavior
 is executed by this owner amendment.
+
+## 2026-08-22 — R103 version-bound fsync and safe dirfd hardlink
+
+Independent review found that R102 remembered only the fsynced device/inode, so a temp could
+be fsynced empty, written afterward and linked without another successful fsync. R103 records
+credit only after fsync succeeds and a stable bounded same-object snapshot binds exact bytes,
+digest, size, mtime, ctime and mutation generation. Successful write, pwrite and truncate
+advance that generation. Publication compares the current source to the credited snapshot;
+direct and Path stale-fsync and failed-fsync controls therefore execute the link but receive
+no fsync credit. Write-only descriptors are measured through a no-follow read capability whose
+device/inode is exact-equal to the fsynced descriptor.
+
+R103 also admits the safe dirfd-relative `os.link` spelling without widening source authority.
+Both names must be simple leaves; source and destination dirfds must be the same live exact
+integer; its opened directory and the current canonical parent must share device/inode;
+`follow_symlinks=False` is mandatory; and the resolved leaves remain the private temp and the
+absent canonical. The wrapper call is paired to its exact audit event and final transition.
+Wrong, mixed, closed, stale, reused and traversal descriptors reject with no residue, while
+absolute direct, Path and dirfd publications share the same retained-source, one-transition,
+writer-closed and cleanup oracle. Production and live/provider behavior remain untouched.

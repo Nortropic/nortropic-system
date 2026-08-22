@@ -5361,7 +5361,8 @@ sink_identity=None
 if sink_fd>=0:
  st=os.fstat(sink_fd);sink_identity=(st.st_dev,st.st_ino)
 accepted_digest=hashlib.sha256(raw).hexdigest()
-events=[];transitions=[];held=[];fsynced=set();call_active=[False];transition_done=[False]
+events=[];transitions=[];held=[];fsynced={};mutation_versions={};call_active=[False];transition_done=[False]
+pending_link=[None]
 canonical_epochs=[];canonical_direct_writes=[]
 primitive_counts={name:0 for name in ("open","fsync","fstat","stat","lstat","access","readlink","listdir","scandir","walk","chmod","fchmod","mkdir","makedirs","symlink","link","unlink","remove","rmdir","environ","environb","getenv","getenvb","putenv","unsetenv","path_open","path_iterdir","path_glob","path_rglob","path_read_text","path_read_bytes","path_stat","path_lstat","path_readlink","path_resolve","path_chmod","path_mkdir","path_symlink_to","path_hardlink_to","path_link_to","path_unlink","path_rmdir","path_rename","path_replace","path_touch")}
 env_events=[];security_events=[];original_environ=os.environ;original_environb=getattr(os,"environb",None)
@@ -5452,15 +5453,51 @@ def safe_existing(value):
  except OSError: return False
 def secure_mode(value,directory=False):
  return isinstance(value,int) and value>=0 and not (value&0o077)
-def mutation_allowed(name,args):
+def simple_leaf(value):
+ if type(value) is bytes:
+  try: value=value.decode(sys.getfilesystemencoding(),"surrogateescape")
+  except Exception: return None
+ if type(value) is not str or not value or "\0" in value or value in {".",".."}: return None
+ if os.sep in value or (os.altsep and os.altsep in value): return None
+ return value
+def exact_parent_fd(value):
+ if type(value) is not int or value<0: return False
+ try:
+  opened=original_fstat(value);current=original_lstat(canonical_parent)
+  return (fd_path(value)==lexical_path(canonical_parent)
+          and stat.S_ISDIR(opened.st_mode) and stat.S_ISDIR(current.st_mode)
+          and (opened.st_dev,opened.st_ino)==(current.st_dev,current.st_ino))
+ except OSError: return False
+def resolve_link(args,kwargs=None,audit=False):
+ if len(args)<2: return None
+ source=lexical_path(args[0]);destination=lexical_path(args[1])
+ src_dir_fd=(args[2] if audit and len(args)>2 else (kwargs or {}).get("src_dir_fd"))
+ dst_dir_fd=(args[3] if audit and len(args)>3 else (kwargs or {}).get("dst_dir_fd"))
+ if source is not None and destination is not None:
+  if src_dir_fd not in (None,-1) or dst_dir_fd not in (None,-1): return None
+  return (source,destination,"absolute")
+ source_leaf=simple_leaf(args[0]);destination_leaf=simple_leaf(args[1])
+ if source_leaf is None or destination_leaf is None: return None
+ if type(src_dir_fd) is not int or type(dst_dir_fd) is not int or src_dir_fd!=dst_dir_fd: return None
+ if not exact_parent_fd(src_dir_fd): return None
+ signature=(source_leaf,destination_leaf,src_dir_fd,dst_dir_fd)
+ if audit:
+  if pending_link[0]!=signature: return None
+ elif (kwargs or {}).get("follow_symlinks") is not False:
+  return None
+ parent=lexical_path(canonical_parent)
+ return (original_normpath(parent+os.sep+source_leaf),
+         original_normpath(parent+os.sep+destination_leaf),"dirfd")
+def mutation_allowed(name,args,kwargs=None,audit=False):
  if not args: return False
  if name=="symlink": return False
  if name=="link":
-  if len(args)<2: return False
-  source=lexical_path(args[0]);destination=lexical_path(args[1])
-  return (source is not None and destination==lexical_path(canonical)
+  resolved=resolve_link(args,kwargs,audit)
+  if resolved is None: return False
+  source,destination,unused=resolved
+  return (destination==lexical_path(canonical)
           and os.path.dirname(source)==lexical_path(canonical_parent)
-          and strict_member(args[0]) and strict_member(args[1]))
+          and source!=destination)
  target=args[0]
  if not strict_member(target): return False
  if name in {"chmod","fchmod"}:
@@ -5490,6 +5527,7 @@ def fd_inventory(identity,writable=None,ticket_phase=None):
   except OSError: pass
  return found
 original_fsync=os.fsync;original_os_open=os.open;original_builtin_open=builtins.open
+original_write=os.write;original_pwrite=getattr(os,"pwrite",None);original_ftruncate=os.ftruncate
 original_getenv=os.getenv;original_getenvb=getattr(os,"getenvb",None)
 original_putenv=os.putenv;original_unsetenv=os.unsetenv
 path_method_names=tuple(name for name in ("open","iterdir","glob","rglob","read_text","read_bytes","stat","lstat","readlink","resolve","chmod","mkdir","symlink_to","hardlink_to","link_to","unlink","rmdir","rename","replace","touch") if hasattr(pathlib.Path,name))
@@ -5519,9 +5557,59 @@ def observe_existing_canonical(reason):
   if not canonical_epochs or any(epoch.get(key)!=canonical_epochs[-1].get(key) for key in ("dev","ino","digest")):
    canonical_epochs.append(epoch)
  except FileNotFoundError: pass
+def fd_snapshot(fd):
+ before=original_fstat(fd)
+ if not stat.S_ISREG(before.st_mode) or before.st_size>5*1024*1024: return None
+ read_fd=fd;close_read=False
+ if fcntl.fcntl(fd,fcntl.F_GETFL)&os.O_ACCMODE==os.O_WRONLY:
+  path=fd_path(fd);flags=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
+  if path is None: return None
+  ticket=make_ticket("fsync_snapshot_open","original_os_open","open",(path,),flags,None,None,None)
+  try: read_fd=original_os_open(path,flags);require_ticket_consumed(ticket)
+  except OSError:
+   if ticket in ticket_queue(): ticket_queue().remove(ticket)
+   return None
+  close_read=True
+  opened=original_fstat(read_fd)
+  if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino):
+   os.close(read_fd);return None
+ try:
+  data=b"";offset=0
+  while len(data)<=5*1024*1024:
+   chunk=os.pread(read_fd,min(65536,5*1024*1024+1-len(data)),offset)
+   if not chunk: break
+   data+=chunk;offset+=len(chunk)
+ finally:
+  if close_read: os.close(read_fd)
+ after=original_fstat(fd);identity=(before.st_dev,before.st_ino)
+ return {"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,
+         "digest":hashlib.sha256(data).hexdigest(),"mtime_ns":before.st_mtime_ns,
+         "ctime_ns":before.st_ctime_ns,"version":mutation_versions.get(identity,0),
+         "stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==
+                  (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns)}
 def observed_fsync(fd):
- primitive_counts["fsync"]+=1;st=original_fstat(fd);fsynced.add((st.st_dev,st.st_ino));return original_fsync(fd)
+ primitive_counts["fsync"]+=1
+ if mode=="fsync_failure" and call_active[0]: raise OSError("injected fsync failure")
+ result=original_fsync(fd)
+ snapshot=fd_snapshot(fd)
+ if snapshot is not None and snapshot["stable"]:
+  fsynced[(snapshot["dev"],snapshot["ino"])]=snapshot
+ return result
 os.fsync=observed_fsync
+def note_mutation(fd):
+ try:
+  current=original_fstat(fd);identity=(current.st_dev,current.st_ino)
+  mutation_versions[identity]=mutation_versions.get(identity,0)+1
+ except OSError: pass
+def observed_write(fd,data):
+ result=original_write(fd,data);note_mutation(fd);return result
+def observed_pwrite(fd,data,offset):
+ result=original_pwrite(fd,data,offset);note_mutation(fd);return result
+def observed_ftruncate(fd,length):
+ result=original_ftruncate(fd,length);note_mutation(fd);return result
+os.write=observed_write
+if original_pwrite is not None: os.pwrite=observed_pwrite
+os.ftruncate=observed_ftruncate
 def observed_fstat(fd):
  primitive_counts["fstat"]+=1;return original_fstat(fd)
 os.fstat=observed_fstat
@@ -5593,11 +5681,17 @@ def observed_mutation(name):
  def invoke(*args,**kwargs):
   primitive_counts[name]+=1
   target=(args[1] if name in {"symlink","link"} and len(args)>1 else args[0] if args else "")
-  allowed=mutation_allowed(name,args)
+  resolved=resolve_link(args,kwargs) if name=="link" else None
+  allowed=mutation_allowed(name,args,kwargs)
   if call_active[0]:
    events.append(("os."+name,path_label(target),name,allowed))
    if not allowed: raise PermissionError("mutation outside scoped result authority")
-  return original_mutation_ops[name](*args,**kwargs)
+  if name=="link" and resolved is not None and resolved[2]=="dirfd":
+   pending_link[0]=(simple_leaf(args[0]),simple_leaf(args[1]),
+                    kwargs.get("src_dir_fd"),kwargs.get("dst_dir_fd"))
+  try: return original_mutation_ops[name](*args,**kwargs)
+  finally:
+   if name=="link": pending_link[0]=None
  return invoke
 for mutation_op in mutation_os_names: setattr(os,mutation_op,observed_mutation(mutation_op))
 class ObservedEnviron:
@@ -5670,7 +5764,11 @@ def audit(event,args):
      if not chunk: break
      data+=chunk
     after=original_fstat(fd);identity=(before.st_dev,before.st_ino);writers=fd_inventory(identity,True,"canonical_writer_inventory")
-    transitions.append({"absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":hashlib.sha256(data).hexdigest(),"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":identity in fsynced})
+    digest=hashlib.sha256(data).hexdigest();snapshot=fsynced.get(identity)
+    sync_match=(snapshot is not None and snapshot.get("stable") is True
+                and (snapshot.get("size"),snapshot.get("digest"),snapshot.get("mtime_ns"),snapshot.get("ctime_ns"),snapshot.get("version"))
+                    ==(before.st_size,digest,before.st_mtime_ns,before.st_ctime_ns,mutation_versions.get(identity,0)))
+    transitions.append({"absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":digest,"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":sync_match})
     held.append(fd);transition_done[0]=True
    except Exception:
     if source_ticket in ticket_queue(): ticket_queue().remove(source_ticket)
@@ -5685,8 +5783,9 @@ def audit(event,args):
   allowed=mutation_allowed(event.split(".",1)[1],args);events.append((event,path_label(args[0]),event,allowed))
   if not allowed: raise PermissionError("audit mutation outside scoped result authority")
  elif event=="os.link" and len(args)>=2:
-  src_path=lexical_path(args[0]);dst_path=lexical_path(args[1]);allowed=mutation_allowed("link",args)
-  events.append((event,path_label(args[0]),path_label(args[1]),allowed))
+  resolved=resolve_link(args,audit=True);allowed=mutation_allowed("link",args,audit=True)
+  src_path=resolved[0] if resolved else None;dst_path=resolved[1] if resolved else None
+  events.append((event,src_path or path_label(args[0]),dst_path or path_label(args[1]),allowed))
   if not allowed: raise PermissionError("link authority denied")
   canonical_path=lexical_path(canonical)
   if dst_path!=canonical_path: raise PermissionError("link destination is not canonical")
@@ -5702,7 +5801,11 @@ def audit(event,args):
     if not chunk: break
     data+=chunk
    after=original_fstat(fd);identity=(before.st_dev,before.st_ino);writers=fd_inventory(identity,True,"canonical_link_writer_inventory")
-   transitions.append({"event":"os.link","absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":hashlib.sha256(data).hexdigest(),"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":identity in fsynced})
+   digest=hashlib.sha256(data).hexdigest();snapshot=fsynced.get(identity)
+   sync_match=(snapshot is not None and snapshot.get("stable") is True
+               and (snapshot.get("size"),snapshot.get("digest"),snapshot.get("mtime_ns"),snapshot.get("ctime_ns"),snapshot.get("version"))
+                   ==(before.st_size,digest,before.st_mtime_ns,before.st_ctime_ns,mutation_versions.get(identity,0)))
+   transitions.append({"event":"os.link","mode":resolved[2],"absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":digest,"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":sync_match})
    held.append(fd);transition_done[0]=True
   except Exception:
    if source_ticket in ticket_queue(): ticket_queue().remove(source_ticket)
@@ -5957,6 +6060,78 @@ for fd in held:
             and path_link_publication_case.get("primitive_counts",{}).get("path_link_to",0)==1
             and path_link_publication_case.get("transitions",[{}])[0].get("event")=="os.link")
 
+    dirfd_publication_source=reference_kernel_source.replace(
+        "        os.replace(temp_name,canonical_destination);temp_name=None",'''        parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC)
+        try:
+            os.link(Path(temp_name).name,Path(canonical_destination).name,
+                    src_dir_fd=parent_fd,dst_dir_fd=parent_fd,follow_symlinks=False)
+        finally: os.close(parent_fd)
+        os.unlink(temp_name);temp_name=None''',1)
+    dirfd_publication=work/"r103-dirfd-link-publication-positive.py"
+    dirfd_publication.write_text(dirfd_publication_source,encoding="utf-8")
+    dirfd_publication_inventory=kernel_structure_inventory(
+        ast.parse(dirfd_publication_source),dirfd_publication_source)
+    dirfd_publication_case=fresh_kernel_effect(dirfd_publication,rig_valid_raw)
+    dirfd_publication_positive=(dirfd_publication_inventory[0]
+        and fresh_success(dirfd_publication_case,rig_valid_raw)
+        and dirfd_publication_case.get("transitions",[{}])[0].get("mode")=="dirfd")
+
+    stale_fsync_cases={}
+    for stale_name,base_source in (("direct",link_publication_source),
+                                   ("path",path_link_publication_source if hasattr(Path,"link_to") else link_publication_source)):
+        stale_source=base_source.replace(
+            "_write_all(temp_fd,encoded);_sync(temp_fd)",
+            "_sync(temp_fd);_write_all(temp_fd,encoded)",1)
+        stale_path=work/f"r103-{stale_name}-stale-fsync-mutant.py"
+        stale_path.write_text(stale_source,encoding="utf-8")
+        stale_fsync_cases[stale_name]=fresh_kernel_effect(stale_path,rig_valid_raw)
+    failed_fsync_cases={}
+    for failed_name,base_source in (("direct",link_publication_source),
+                                    ("path",path_link_publication_source if hasattr(Path,"link_to") else link_publication_source)):
+        failed_source=base_source.replace(
+            "_write_all(temp_fd,encoded);_sync(temp_fd)",
+            "_write_all(temp_fd,encoded)\n            try: _sync(temp_fd)\n            except OSError: pass",1)
+        failed_path=work/f"r103-{failed_name}-failed-fsync-mutant.py"
+        failed_path.write_text(failed_source,encoding="utf-8")
+        failed_fsync_cases[failed_name]=fresh_kernel_effect(failed_path,rig_valid_raw,"fsync_failure")
+
+    dirfd_negative_sources={
+        "wrong":dirfd_publication_source.replace(
+            "parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC)",
+            "parent_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC)",1),
+        "mixed":dirfd_publication_source.replace(
+            "parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC)",
+            "parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC);other_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC)",1).replace(
+            "src_dir_fd=parent_fd,dst_dir_fd=parent_fd",
+            "src_dir_fd=parent_fd,dst_dir_fd=other_fd",1).replace(
+            "finally: os.close(parent_fd)",
+            "finally: os.close(parent_fd);os.close(other_fd)",1),
+        "closed":dirfd_publication_source.replace(
+            "        try:\n            os.link", "        os.close(parent_fd)\n        try:\n            os.link",1),
+        "stale":dirfd_publication_source.replace(
+            "        try:\n            os.link", "        os.close(parent_fd);probe_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC);os.close(probe_fd)\n        try:\n            os.link",1),
+        "reused":dirfd_publication_source.replace(
+            "        try:\n            os.link", "        os.close(parent_fd);parent_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC)\n        try:\n            os.link",1),
+        "traversal":dirfd_publication_source.replace(
+            "os.link(Path(temp_name).name,Path(canonical_destination).name,",
+            "os.link('../'+Path(temp_name).name,Path(canonical_destination).name,",1),
+    }
+    dirfd_negative_cases={}
+    for dirfd_name,dirfd_source in dirfd_negative_sources.items():
+        dirfd_path=work/f"r103-dirfd-{dirfd_name}-mutant.py"
+        dirfd_path.write_text(dirfd_source,encoding="utf-8")
+        dirfd_negative_cases[dirfd_name]=fresh_kernel_effect(dirfd_path,rig_valid_raw)
+    r103_fsync_dirfd_rig_ok=(dirfd_publication_positive
+        and all(case.get("accepted") is True and case.get("transitions")
+                and case["transitions"][0].get("fsynced") is False
+                and not fresh_success(case,rig_valid_raw)
+                for case in stale_fsync_cases.values())
+        and all(case.get("accepted") is True and case.get("transitions")
+                and case["transitions"][0].get("fsynced") is False
+                and not fresh_success(case,rig_valid_raw)
+                for case in failed_fsync_cases.values())
+        and all(outside_blocked(case,True) for case in dirfd_negative_cases.values()))
+
     link_alias_source=link_publication_source.replace(
         "os.link(temp_name,canonical_destination)",
         "publisher=os.link;publisher(temp_name,canonical_destination)",1)
@@ -5994,6 +6169,7 @@ for fd in held:
     link_multiple_case=fresh_kernel_effect(link_multiple,rig_valid_raw)
     r102_link_publication_rig_ok=(link_publication_positive
         and path_link_publication_positive
+        and r103_fsync_dirfd_rig_ok
         and link_alias_inventory[0] is False
         and link_helper_inventory[0] is False
         and link_same_name_helper_inventory[0] is False
@@ -6636,7 +6812,7 @@ class CraftedConcretePath(type(Path())):
     check("J_RESULT_KERNEL_RIG", kernel_inventory_rig_ok and integration_rig_ok
           and kernel_oracle_rig_ok and reference_effect_rig_ok
           and r55_complete_residue_oracle_ok and r56_setup_oracle_ok,
-          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught} r102_link={r102_link_publication_rig_ok,link_publication_positive,path_link_publication_positive,link_alias_inventory[0],link_helper_inventory[0],link_same_name_helper_inventory[0],link_wrong_source_case.get('transition_ok'),bool(link_wrong_destination_case.get('outside')),link_preseed_case.get('accepted'),len(link_multiple_case.get('transitions',[]))}")
+          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} captured_predicates={(fresh_success(reference_cases['valid'],rig_valid_raw),reference_cases['valid'].get('primitive_counts'),fresh_success(captured_reference_case,rig_valid_raw),outside_blocked(import_probe_case,True),outside_blocked(captured_stat_case,True),fresh_success(path_positive_case,rig_valid_raw),environb_case.get('accepted'),getenvb_case.get('accepted'))} r51_inroot={(r51_inroot_case.get('accepted'),r51_inroot_case.get('error'),r51_inroot_case.get('transition_ok'),r51_inroot_case.get('publication_ok'),r51_inroot_case.get('temps'),r51_inroot_case.get('outside'),r51_inroot_case.get('primitive_counts'))} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught} r102_link={r102_link_publication_rig_ok,link_publication_positive,path_link_publication_positive,link_alias_inventory[0],link_helper_inventory[0],link_same_name_helper_inventory[0],link_wrong_source_case.get('transition_ok'),bool(link_wrong_destination_case.get('outside')),link_preseed_case.get('accepted'),len(link_multiple_case.get('transitions',[]))} r103={dirfd_publication_positive,dirfd_publication_inventory[0],dirfd_publication_case.get('accepted'),dirfd_publication_case.get('error'),dirfd_publication_case.get('transitions'),{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in stale_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in failed_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('outside'),case.get('temps'),case.get('canonical')) for name,case in dirfd_negative_cases.items()}}")
     def cleanup_detail(case):
         return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
