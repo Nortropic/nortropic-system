@@ -2243,3 +2243,54 @@ must be 0/1, 1/0 and 1/2 respectively; the latter two raise the rig failure befo
 predicates can default. R109's rename, direct-return, helper-relay, try/except/finally,
 duplicate-consumer and full-attempt ordering controls remain unchanged. This adds no general
 control-flow interpretation, production edit or live/provider execution.
+
+## 2026-08-22 — R112 complete pathless retained-sink handoff
+
+R111's first pathless handoff checked only the provider output leaf and its immediate parent,
+and it evaluated snapshot cleanup after the consumer returned. A late provider/Python snapshot,
+a moved or alternate attempt root, or a broken symlink could therefore survive at the exact
+publication boundary and disappear before the post-return observation. R111 also compared only
+device/inode and live alias cardinality, so duplicating the retained descriptor, closing the
+original, and passing the duplicate could receive credit. Finally, its new direct-call inventory
+contradicted R109's already-frozen one-hop Python-helper relay.
+
+R112 moves the complete-family observation to consumer entry. Attempt-owned mkdir/open/link,
+symlink and rename effects identify the private family, including destinations moved outside the
+original root; `lexists` plus no-follow `lstat` makes broken links present residue. Every original
+output/root, provider or Python snapshot root, alternate and moved family member must already be
+absent before publication. Post-return cleanup cannot change that entry record.
+
+The gate separately binds the exact numeric descriptor returned by the original no-follow,
+read-only open. It must remain open, be passed unchanged and be the sole live alias while the
+same fd provides stable metadata and bounded bytes at nlink zero. Narrow operation wrappers retain
+close/reopen, dup, dup2, F_DUPFD and fdopen lineage; restoring a number or inode does not erase
+that history. Direct consumption and an exact one-hop five-formal Python relay are both admitted;
+extra, reordered or changed relay capabilities, callbacks, pathname surrogates, zero calls and
+multiple calls reject. Causal family and fd-lineage fixtures prove each condition without granting
+the consumer any pathname or cleanup callback authority. R100–R110 publication, race, residue and
+seam-cardinality requirements remain unchanged; production and live/provider execution are not
+modified.
+
+## 2026-08-22 — R113 effect-neutral family observation
+
+The uncommitted R112 candidate failed its first host no-live run 142/3. Its audit-hook
+family registration probed every audited open destination with os.path.lexists, an
+os.lstat resolved at call time. The frozen K_OPENED_REGULAR_IDENTITY and
+K_CODE_MODE_HOST_OPENED_REGULAR_EXECUTABLE_IDENTITY fixtures swap the provider
+executable to a symlink on the first path-stat of its exact pathname, expecting the
+reference to bind opened-fd identity first; the observation itself therefore fired the
+swap inside the reference's own no-follow open, the open rejected ELOOP prelaunch and
+the opened-fd identity record stayed empty. Blocked evidence:
+evidence/bootstrap-supervisor/evidence/h032-complete-pathless-handoff-r112-hostrun-blocked-uncommitted-821e72c.txt.
+
+R113 restores observation effect-neutrality. The audit hook decides attempt-arena
+containment lexically before any filesystem probe, keeps the base import-bound
+Path.exists probe for foreign paths, and reserves the call-time os.path.lexists
+probe — the one that makes pre-existing symlinks visible — for arena-owned paths,
+which alone may enter private-family registration. Moved-destination propagation
+stays purely lexical. Complete consumer-entry family absence, provider/Python
+snapshot coverage, broken-symlink presence, original-fd lineage binding, the R109
+one-hop helper admission and every J_R112 predicate are unchanged, and neither
+frozen opened-identity control is weakened: both now observe the reference's
+unperturbed open-then-fstat boundary again. No production or live/provider
+execution is touched.

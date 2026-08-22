@@ -1513,22 +1513,67 @@ if mode == 'output_then_fail': sys.exit(17)
             and len(node.names)==1 and node.names[0].name=="consume_private_result"
             and node.names[0].asname is None]
         reachable={"run_codex"} if run is not None else set()
-        calls=[]
-        if run is not None:
-            calls=[("run_codex",call) for call in ast.walk(run)
-                if isinstance(call,ast.Call) and isinstance(call.func,ast.Name)
+        all_consumer_calls=[node for node in ast.walk(tree) if isinstance(node,ast.Call)
+            and isinstance(node.func,ast.Name) and node.func.id=="consume_private_result"]
+        direct_calls=[] if run is None else [call for call in ast.walk(run)
+            if isinstance(call,ast.Call) and isinstance(call.func,ast.Name)
+            and call.func.id=="consume_private_result"]
+        relay_candidates=[]
+        for name,helper in definitions.items():
+            if name in {"run_codex","consume_private_result"}: continue
+            helper_calls=[call for call in ast.walk(helper) if isinstance(call,ast.Call)
+                and isinstance(call.func,ast.Name)
                 and call.func.id=="consume_private_result"]
+            if len(helper_calls)!=1: continue
+            call=helper_calls[0]
+            parameters=[arg.arg for arg in helper.args.args]
+            helper_loads=[node for node in ast.walk(helper) if isinstance(node,ast.Name)
+                and isinstance(node.ctx,ast.Load) and node.id=="consume_private_result"]
+            valid=(not helper.decorator_list and not helper.args.posonlyargs
+                and not helper.args.kwonlyargs and helper.args.vararg is None
+                and helper.args.kwarg is None and not helper.args.defaults
+                and not helper.args.kw_defaults and len(parameters)==5
+                and len(call.args)==5 and not call.keywords
+                and all(isinstance(arg,ast.Name) for arg in call.args)
+                and [arg.id for arg in call.args]==parameters
+                and len(helper_loads)==1 and parents.get(helper_loads[0]) is call
+                and call.func is helper_loads[0]
+                and isinstance(parents.get(call),ast.Return)
+                and [node for node in ast.walk(helper)
+                     if isinstance(node,ast.Return) and node.value is not None]
+                    ==[parents[call]])
+            if valid: relay_candidates.append((name,helper))
+        relay_calls=[]
+        if run is not None:
+            relay_names={name for name,_helper in relay_candidates}
+            relay_calls=[call for call in ast.walk(run) if isinstance(call,ast.Call)
+                and isinstance(call.func,ast.Name) and call.func.id in relay_names]
+        direct_mode=len(direct_calls)==1 and not relay_calls
+        relay_mode=(not direct_calls and len(relay_calls)==1
+                    and len(relay_candidates)==1)
+        subject_calls=(direct_calls if direct_mode else relay_calls if relay_mode else [])
+        calls=[("run_codex",call) for call in subject_calls]
         args_ok=(len(calls)==1 and len(calls[0][1].args)==5
             and not calls[0][1].keywords
             and all(isinstance(arg,ast.Name) for arg in calls[0][1].args)
             and len({arg.id for arg in calls[0][1].args})==5)
+        if relay_mode:
+            relay_name=relay_candidates[0][0]
+            relay_loads=[node for node in ast.walk(tree) if isinstance(node,ast.Name)
+                and isinstance(node.ctx,ast.Load) and node.id==relay_name]
+            args_ok &= (len(relay_loads)==1
+                        and parents.get(relay_loads[0]) is calls[0][1]
+                        and calls[0][1].func is relay_loads[0])
+            reachable.add(relay_name)
         result_connected=False;connection_mode="NONE"
         if len(calls)==1:
             call=calls[0][1];parent=parents.get(call)
             valued_returns=[node for node in ast.walk(run)
                             if isinstance(node,ast.Return) and node.value is not None]
             if isinstance(parent,ast.Return):
-                result_connected=(valued_returns==[parent]);connection_mode="DIRECT_RETURN"
+                result_connected=(valued_returns==[parent])
+                connection_mode=("HELPER_DIRECT_RETURN" if relay_mode
+                                 else "DIRECT_RETURN")
             elif isinstance(parent,(ast.Assign,ast.AnnAssign)):
                 targets=(parent.targets if isinstance(parent,ast.Assign) else [parent.target])
                 names={target.id for target in targets if isinstance(target,ast.Name)}
@@ -1543,9 +1588,9 @@ if mode == 'output_then_fail': sys.exit(17)
                     result_connected=(len(stores)==1 and len(loads)==1
                         and len(exact_returns)==1 and valued_returns==exact_returns
                         and parents.get(loads[0]) is exact_returns[0])
-                    if result_connected: connection_mode="SINGLE_ASSIGN_RETURN"
-        all_consumer_calls=[node for node in ast.walk(tree) if isinstance(node,ast.Call)
-            and isinstance(node.func,ast.Name) and node.func.id=="consume_private_result"]
+                    if result_connected:
+                        connection_mode=("HELPER_SINGLE_ASSIGN_RETURN" if relay_mode
+                                         else "SINGLE_ASSIGN_RETURN")
         local_shadow=any(isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef))
             and node.name=="consume_private_result" for node in tree.body)
         ok=(len(imports)==1 and len(all_consumer_calls)==1 and len(calls)==1
@@ -1553,7 +1598,9 @@ if mode == 'output_then_fail': sys.exit(17)
         return ok,{"imports":len(imports),"reachable":tuple(sorted(reachable)),
                    "call_owners":tuple(owner for owner,_ in calls),"args":args_ok,
                    "result_connected":result_connected,"all_calls":len(all_consumer_calls),
-                   "local_shadow":local_shadow,"connection_mode":connection_mode}
+                   "local_shadow":local_shadow,"connection_mode":connection_mode,
+                   "relay_candidates":tuple(name for name,_helper in relay_candidates),
+                   "relay_mode":relay_mode}
 
     # Unconditional rig-only structural sensitivity.  It proves only that the
     # narrow inventory itself rejects one-defect source shapes; it grants no
@@ -1745,6 +1792,27 @@ def run_codex(sink, canonical, invocation, run, role):
     integration_direct=integration_structure_inventory(ast.parse(integration_fixture.replace(
         "accepted=consume_private_result(sink, canonical, invocation, run, role)\n    try:\n        return accepted\n    finally:\n        cleanup()",
         "return consume_private_result(sink, canonical, invocation, run, role)")))[0]
+    integration_helper_fixture='''from controller.result.consumer import consume_private_result
+def deliver(fd, destination, invocation, run, role):
+    return consume_private_result(fd, destination, invocation, run, role)
+def run_codex(sink, canonical, invocation, run, role):
+    accepted=deliver(sink, canonical, invocation, run, role)
+    return accepted
+'''
+    integration_helper_positive=integration_structure_inventory(
+        ast.parse(integration_helper_fixture))[0]
+    integration_helper_extra=integration_structure_inventory(ast.parse(
+        integration_helper_fixture.replace(
+            "def deliver(fd, destination, invocation, run, role):",
+            "def deliver(fd, destination, invocation, run, role, extra=None):")))[0]
+    integration_helper_changed=integration_structure_inventory(ast.parse(
+        integration_helper_fixture.replace(
+            "consume_private_result(fd, destination, invocation, run, role)",
+            "consume_private_result(destination, fd, invocation, run, role)")))[0]
+    integration_helper_callback=integration_structure_inventory(ast.parse(
+        integration_helper_fixture.replace(
+            "return consume_private_result(fd, destination, invocation, run, role)",
+            "callback=consume_private_result\n    return callback(fd, destination, invocation, run, role)")))[0]
     sentinel=object()
     integration_runtime_source=integration_fixture.replace(
         "from controller.result.consumer import consume_private_result\n","")
@@ -1759,6 +1827,8 @@ def run_codex(sink, canonical, invocation, run, role):
     exec(compile(discarded_runtime,"<h032-r49-discarded-rig>","exec"),discarded_namespace)
     integration_runtime_discarded=(discarded_namespace["run_codex"](1,2,3,4,5) is sentinel)
     integration_rig_ok=(integration_positive and integration_direct
+        and integration_helper_positive and not integration_helper_extra
+        and not integration_helper_changed and not integration_helper_callback
         and not integration_dead and not integration_constants and not integration_discard
         and not integration_rebind and integration_runtime_positive
         and not integration_runtime_discarded)
@@ -1890,6 +1960,34 @@ def run_codex(sink, canonical, invocation, run, role):
                     identity = (opened.st_dev, opened.st_ino)
                     if identity not in identities:
                         identities.append(identity)
+                    prechecks = active["sink_prechecks"]
+                    assert isinstance(prechecks, list)
+                    precheck = {
+                        "path": str(sink.absolute()), "dev": opened.st_dev,
+                        "ino": opened.st_ino, "mode": opened.st_mode,
+                        "nlink": opened.st_nlink, "size": opened.st_size,
+                        "mtime_ns": opened.st_mtime_ns,
+                        "ctime_ns": opened.st_ctime_ns,
+                    }
+                    prechecks.append(precheck)
+                    open_returns = active["open_returns"]
+                    assert isinstance(open_returns, list)
+                    retained = []
+                    for item in open_returns:
+                        number = item.get("fd")
+                        if type(number) is not int or item.get("path") != str(sink.absolute()):
+                            continue
+                        try:
+                            current = os.fstat(number)
+                            access = fcntl.fcntl(number, fcntl.F_GETFL) & os.O_ACCMODE
+                        except OSError:
+                            continue
+                        if ((current.st_dev, current.st_ino) == identity
+                                and access == os.O_RDONLY):
+                            retained.append(number)
+                    if len(retained) == 1:
+                        active["original_sink_fd"] = retained[0]
+                        active["original_sink_precheck"] = precheck
                 except (OSError, ValueError):
                     pass
             kwargs = dict(kwargs); child_env = dict(kwargs.get("env") or {})
@@ -2277,7 +2375,8 @@ def run_codex(sink, canonical, invocation, run, role):
                         raise OSError("H032 injected canonical rollback failure")
             except FileNotFoundError:
                 pass
-        if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename", "os.link", "subprocess.Popen"}:
+        if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename",
+                                           "os.link", "os.symlink", "subprocess.Popen"}:
             return
         if active.get("observer_busy") is True:
             return
@@ -2298,7 +2397,7 @@ def run_codex(sink, canonical, invocation, run, role):
             register_canonical(active, args[0])
         elif event == "os.remove" and args:
             register_canonical(active, args[0])
-        elif event in {"os.rename", "os.link"}:
+        elif event in {"os.rename", "os.link", "os.symlink"}:
             if args: register_canonical(active, args[0])
             if len(args) > 1: register_canonical(active, args[1])
         # Registration occurs before the audited operation and therefore
@@ -2321,13 +2420,39 @@ def run_codex(sink, canonical, invocation, run, role):
                         direct_writes.append((str(path), flags, path.exists()))
                 except Exception:
                     pass
-        values = args[1:2] if event in {"os.rename", "os.link"} else args[:1]
+        values = args[1:2] if event in {"os.rename", "os.link", "os.symlink"} else args[:1]
         for value in values:
             if isinstance(value, (str, bytes, os.PathLike)):
                 try:
                     path = Path(value).absolute()
-                    if not path.exists(): created.add(str(path))
+                    arena = active.get("arena")
+                    arena_before = active.get("arena_before", set())
+                    family = active.get("private_family_paths")
+                    assert isinstance(arena, Path) and isinstance(arena_before, set)
+                    assert isinstance(family, set)
+                    # Family probing may only touch attempt-arena paths through
+                    # the call-time os.lstat surface; foreign paths keep the
+                    # import-bound Path.exists probe so audited opens stay
+                    # effect-free for the provider-executable stale-path
+                    # controls, which bind the first path-stat of their target.
+                    if arena not in path.parents:
+                        if not path.exists(): created.add(str(path))
+                    elif not os.path.lexists(path):
+                        created.add(str(path))
+                        if str(path.absolute()) not in arena_before:
+                            family.add(str(path))
                 except Exception: pass
+        if event in {"os.rename", "os.link"} and len(args) > 1:
+            try:
+                source_path = Path(args[0]).absolute()
+                destination_path = Path(args[1]).absolute()
+                family = active.get("private_family_paths")
+                assert isinstance(family, set)
+                if (str(source_path) in family
+                        or any(Path(member) in source_path.parents for member in family)):
+                    family.add(str(destination_path))
+            except Exception:
+                pass
     sys.addaudithook(audit_inventory)
 
     def rollback_race_audit(event: str, args: tuple[object, ...]) -> None:
@@ -2609,7 +2734,12 @@ def run_codex(sink, canonical, invocation, run, role):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         arena_before = {str(path.absolute()) for path in arena.rglob("*")}
         observed: dict[str, object] = {"created": set(), "opened": [], "provider_outputs": [],
-                                      "sink_identities": [], "sink_fd_aliases": [],
+                                      "sink_identities": [], "sink_prechecks": [],
+                                      "sink_fd_aliases": [], "open_returns": [],
+                                      "original_sink_fd": None,
+                                      "original_sink_precheck": None,
+                                      "fd_lineage_events": [],
+                                      "private_family_paths": set(),
                                       "provider_process_starts": 0,
                                       "journal_start_records": [],
                                       "journal_append_valid": False,
@@ -2619,11 +2749,88 @@ def run_codex(sink, canonical, invocation, run, role):
                                       "run_return": None, "canonical_paths": [],
                                       "runs_root": runs_root,
                                       "arena": arena,
+                                      "arena_before": arena_before,
                                       "canonical_direct_writes": [],
                                       "canonical_candidates": set(),
                                       "canonical_visibility_state": {},
                                       "canonical_visibility_epochs": [],
                                       "observer_busy": False}
+        original_os_open = module.os.open
+        original_os_close = module.os.close
+        original_os_dup = module.os.dup
+        original_os_dup2 = module.os.dup2
+        original_os_fdopen = module.os.fdopen
+        original_fcntl_call = module.fcntl.fcntl
+
+        def observed_open(path, flags, *args, **kwargs):
+            number = original_os_open(path, flags, *args, **kwargs)
+            active = audit_active[0]
+            if isinstance(active, dict):
+                try:
+                    absolute = str(Path(path).absolute())
+                    opened = os.fstat(number)
+                    item = {"path": absolute, "fd": number, "flags": flags,
+                            "dev": opened.st_dev, "ino": opened.st_ino}
+                    returns = active["open_returns"]
+                    assert isinstance(returns, list); returns.append(item)
+                    if active.get("original_sink_fd") == number:
+                        events = active["fd_lineage_events"]
+                        assert isinstance(events, list)
+                        events.append(("open_reuse", number, absolute, flags))
+                except Exception:
+                    pass
+            return number
+
+        def observed_close(number):
+            active = audit_active[0]
+            if isinstance(active, dict) and active.get("original_sink_fd") == number:
+                events = active["fd_lineage_events"]
+                assert isinstance(events, list); events.append(("close_original", number))
+            return original_os_close(number)
+
+        def observed_dup(number):
+            duplicate = original_os_dup(number)
+            active = audit_active[0]
+            if isinstance(active, dict) and active.get("original_sink_fd") == number:
+                events = active["fd_lineage_events"]
+                assert isinstance(events, list); events.append(("dup", number, duplicate))
+            return duplicate
+
+        def observed_dup2(number, target, *args, **kwargs):
+            duplicate = original_os_dup2(number, target, *args, **kwargs)
+            active = audit_active[0]
+            if (isinstance(active, dict)
+                    and active.get("original_sink_fd") in {number, target}):
+                events = active["fd_lineage_events"]
+                assert isinstance(events, list); events.append(("dup2", number, target))
+            return duplicate
+
+        def observed_fdopen(number, *args, **kwargs):
+            active = audit_active[0]
+            if isinstance(active, dict) and active.get("original_sink_fd") == number:
+                events = active["fd_lineage_events"]
+                assert isinstance(events, list); events.append(("fdopen", number))
+            return original_os_fdopen(number, *args, **kwargs)
+
+        def observed_fcntl(number, command, *args):
+            result = original_fcntl_call(number, command, *args)
+            active = audit_active[0]
+            duplicate_commands = {fcntl.F_DUPFD}
+            if hasattr(fcntl, "F_DUPFD_CLOEXEC"):
+                duplicate_commands.add(fcntl.F_DUPFD_CLOEXEC)
+            if (isinstance(active, dict) and command in duplicate_commands
+                    and active.get("original_sink_fd") == number):
+                events = active["fd_lineage_events"]
+                assert isinstance(events, list)
+                events.append(("fcntl_dup", number, result))
+            return result
+
+        module.os.open = observed_open
+        module.os.close = observed_close
+        module.os.dup = observed_dup
+        module.os.dup2 = observed_dup2
+        module.os.fdopen = observed_fdopen
+        module.fcntl.fcntl = observed_fcntl
         audit_active[0] = observed
         try:
             try:
@@ -2636,6 +2843,12 @@ def run_codex(sink, canonical, invocation, run, role):
             # effect in run_codex, before judge cleanup or verdict inspection.
             sync_canonical_visibility(observed)
             audit_active[0] = None
+            module.os.open = original_os_open
+            module.os.close = original_os_close
+            module.os.dup = original_os_dup
+            module.os.dup2 = original_os_dup2
+            module.os.fdopen = original_os_fdopen
+            module.fcntl.fcntl = original_fcntl_call
             module.tempfile.tempdir = prior_tempdir
             if prior_tmpdir is None: os.environ.pop("TMPDIR", None)
             else: os.environ["TMPDIR"] = prior_tmpdir
@@ -2654,7 +2867,7 @@ def run_codex(sink, canonical, invocation, run, role):
                                and str(Path(value).absolute()) not in arena_before)
         observed["private_paths"] = [str(path) for path in private_paths]
         observed["private_paths_present"] = [str(path) for path in private_paths
-                                               if path.exists() or path.is_symlink()]
+                                               if os.path.lexists(path)]
         observed["provider_process_starts"] = (
             provider_process_starts[0] - process_starts_before)
         journal_append = strict_journal_append(journal_before, repo)
@@ -2700,10 +2913,51 @@ def run_codex(sink, canonical, invocation, run, role):
         def observed_consumer(sink_fd,canonical_destination,invocation_id,run_id,role):
             opened=os.fstat(sink_fd);flags=fcntl.fcntl(sink_fd,fcntl.F_GETFL)
             fdflags=fcntl.fcntl(sink_fd,fcntl.F_GETFD);capture_now=safe_capture()
+            active = audit_active[0] if isinstance(audit_active[0], dict) else {}
+            output_path=Path(capture_now.get(
+                "output_path","/private/tmp/h032-missing-connected-output"))
+            before_tuple=(opened.st_dev,opened.st_ino,opened.st_mode,opened.st_nlink,
+                          opened.st_size,opened.st_mtime_ns,opened.st_ctime_ns)
+            raw=os.pread(sink_fd,MAX_RESULT_BYTES+1,0)
+            after_read=os.fstat(sink_fd)
+            after_tuple=(after_read.st_dev,after_read.st_ino,after_read.st_mode,
+                         after_read.st_nlink,after_read.st_size,
+                         after_read.st_mtime_ns,after_read.st_ctime_ns)
+            aliases=[]
+            for fd_path in Path("/dev/fd").iterdir():
+                try:
+                    number=int(fd_path.name);candidate=os.fstat(number)
+                except (OSError,ValueError):
+                    continue
+                if (candidate.st_dev,candidate.st_ino)==(opened.st_dev,opened.st_ino):
+                    aliases.append(number)
+            precheck=active.get("original_sink_precheck")
+            original_fd=active.get("original_sink_fd")
+            family = active.get("private_family_paths", set())
+            family_paths = sorted(str(Path(value).absolute()) for value in family)
+            family_present = [value for value in family_paths if os.path.lexists(value)]
+            family_lstat=[]
+            for value in family_present:
+                try:
+                    current=os.lstat(value)
+                    family_lstat.append((value,current.st_mode,current.st_dev,current.st_ino))
+                except OSError:
+                    family_lstat.append((value,None,None,None))
+            lineage_events=list(active.get("fd_lineage_events", []))
             record={"dev":opened.st_dev,"ino":opened.st_ino,"mode":opened.st_mode,
+                "nlink":opened.st_nlink,"size":opened.st_size,
                 "access":flags&os.O_ACCMODE,"cloexec":bool(fdflags&fcntl.FD_CLOEXEC),
                 "canonical":str(canonical_destination),"invocation":invocation_id,
-                "run":run_id,"role":role,"capture":capture_now}
+                "run":run_id,"role":role,"capture":capture_now,
+                "handoff_stable":before_tuple==after_tuple and len(raw)==opened.st_size,
+                "path_absent":not os.path.lexists(output_path),
+                "private_family_paths":family_paths,
+                "private_family_present":family_present,
+                "private_family_lstat":family_lstat,
+                "aliases":sorted(aliases),"sink_fd":sink_fd,
+                "original_fd":original_fd,"same_numeric_fd":sink_fd==original_fd,
+                "original_open":original_fd is not None,
+                "precheck":precheck,"lineage_events":lineage_events}
             accepted=actual_consumer(sink_fd,canonical_destination,invocation_id,run_id,role)
             record["accepted"]=accepted;integration_calls.append(record)
             return integration_sentinel
@@ -2729,6 +2983,18 @@ def run_codex(sink, canonical, invocation, run, role):
         canonical_path=valid_canonical
         integration_dynamic_ok=(valid[0] and call.get("access")==os.O_RDONLY
             and call.get("cloexec") is True and stat.S_ISREG(call.get("mode",0))
+            and call.get("nlink")==0 and call.get("handoff_stable") is True
+            and call.get("path_absent") is True
+            and call.get("private_family_present")==[]
+            and call.get("aliases")==[call.get("sink_fd")]
+            and call.get("same_numeric_fd") is True
+            and call.get("original_open") is True
+            and call.get("lineage_events")==[]
+            and isinstance(call.get("precheck"),dict)
+            and stat.S_ISREG(call["precheck"].get("mode",0))
+            and call["precheck"].get("nlink")==1
+            and (call["precheck"].get("dev"),call["precheck"].get("ino"))
+                ==(call.get("dev"),call.get("ino"))
             and call.get("role")=="TEST_AUTHOR"
             and isinstance(call.get("invocation"),str) and len(call["invocation"])==32
             and isinstance(call.get("run"),str) and len(call["run"])==32
@@ -3400,6 +3666,147 @@ def run_codex(sink, canonical, invocation, run, role):
         and r110_cleanup_ambiguous_facts.get("seam_present") is True
         and r110_cleanup_ambiguous_facts.get("transform_available") is False
         and r110_fail_closed(r110_cleanup_ambiguous_facts))
+
+    # R112 freezes a pathless handoff at the exact consumer entry.  The whole
+    # current-attempt private execution family is checked with lexists/lstat so
+    # moved roots and broken symlinks cannot disappear from the verdict.  The
+    # originally opened numeric fd must remain the sole live alias; a restored
+    # number after close/dup2 is rejected by the operation lineage.
+    def r112_handoff_case(mode: str, relay: bool = False) -> dict[str, object]:
+        root = Path(module.tempfile.mkdtemp(prefix="r112-handoff-", dir=work))
+        private = root / "private"; private.mkdir(mode=0o700)
+        sink = private / "result.json"
+        snapshot = private / "provider-snapshot"
+        raw = b'{"role":"TEST_AUTHOR","summary":"r112"}'
+        sink.write_bytes(raw); sink.chmod(0o600)
+        retained = os.open(sink, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+                           | getattr(os, "O_NOFOLLOW", 0))
+        original_number = retained
+        pre_path = sink.lstat(); pre_fd = os.fstat(retained)
+        identity = (pre_fd.st_dev, pre_fd.st_ino)
+        family = {sink, private, snapshot}
+        lineage: list[tuple[object, ...]] = []
+        calls: list[dict[str, object]] = []
+        published = False
+        alias_fd = -1; other_fd = -1; writer_fd = -1
+
+        def aliases() -> list[int]:
+            found=[]
+            for item in Path("/dev/fd").iterdir():
+                try: number=int(item.name); current=os.fstat(number)
+                except (OSError,ValueError): continue
+                if (current.st_dev,current.st_ino)==identity: found.append(number)
+            return sorted(found)
+
+        def actual_consumer(fd, canonical, invocation, run, role):
+            nonlocal published
+            before=os.fstat(fd); before_state=(before.st_dev,before.st_ino,before.st_mode,
+                before.st_nlink,before.st_size,before.st_mtime_ns,before.st_ctime_ns)
+            value=os.pread(fd,MAX_RESULT_BYTES+1,0);after=os.fstat(fd)
+            after_state=(after.st_dev,after.st_ino,after.st_mode,after.st_nlink,
+                after.st_size,after.st_mtime_ns,after.st_ctime_ns)
+            present=[str(path) for path in sorted(family,key=str)
+                     if os.path.lexists(path)]
+            record={"fd":fd,"same_numeric":fd==original_number,
+                "same_inode":(before.st_dev,before.st_ino)==identity,
+                "nlink":before.st_nlink,"stable":before_state==after_state,
+                "raw":value,"aliases":aliases(),"lineage":list(lineage),
+                "family_present":present,"canonical":str(canonical),
+                "invocation":invocation,"run":run,"role":role}
+            calls.append(record)
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink!=0
+                    or before_state!=after_state or value!=raw
+                    or fd!=original_number or record["aliases"]!=[original_number]
+                    or lineage or present):
+                raise ValueError("R112 unsafe consumer-entry handoff")
+            published=True
+            return hashlib.sha256(value).hexdigest()
+
+        def helper(fd, canonical, invocation, run, role):
+            return actual_consumer(fd, canonical, invocation, run, role)
+
+        try:
+            if mode in {"late_snapshot_cleanup","moved_root"}:
+                snapshot.mkdir()
+            if mode == "moved_root":
+                moved=root/"moved-snapshot"; snapshot.rename(moved); family.add(moved)
+            if mode == "alternate_root":
+                alternate=root/"alternate-snapshot";alternate.mkdir();family.add(alternate)
+            if mode == "broken_symlink":
+                broken=root/"broken-snapshot";os.symlink("missing",broken);family.add(broken)
+            if mode == "unstable_bytes": writer_fd=os.open(sink,os.O_WRONLY)
+            if mode != "nlink_one_after_cleanup": sink.unlink()
+            if mode == "unstable_bytes":
+                os.pwrite(writer_fd,b"X",1);os.fsync(writer_fd)
+                os.close(writer_fd);writer_fd=-1
+            if mode == "extra_alias":
+                alias_fd=os.dup(retained);lineage.append(("dup",retained,alias_fd))
+            if mode == "dup_close_original":
+                alias_fd=os.dup(retained);lineage.append(("dup",retained,alias_fd))
+                os.close(retained);lineage.append(("close_original",retained));retained=-1
+            if mode == "dup2_reuse":
+                alias_fd=os.dup(retained);lineage.append(("dup",retained,alias_fd))
+                os.close(retained);lineage.append(("close_original",retained))
+                os.dup2(alias_fd,original_number);lineage.append(
+                    ("dup2",alias_fd,original_number));retained=original_number
+                os.close(alias_fd);alias_fd=-1
+            if mode == "fcntl_alias":
+                alias_fd=fcntl.fcntl(retained,fcntl.F_DUPFD,0)
+                lineage.append(("fcntl_dup",retained,alias_fd))
+            if mode == "different_fd":
+                other=root/"other";other.write_bytes(raw)
+                other_fd=os.open(other,os.O_RDONLY|getattr(os,"O_CLOEXEC",0))
+                other.unlink()
+            if mode == "residual_path": sink.write_bytes(b"residue")
+            if mode == "residual_private": (private/"residue").write_bytes(b"x")
+            if private.exists() and not any(private.iterdir()): private.rmdir()
+            selected=(other_fd if mode=="different_fd" else
+                      alias_fd if mode=="dup_close_original" else retained)
+            count=0 if mode=="zero_calls" else 2 if mode=="two_calls" else 1
+            error="NONE";returned=None
+            for _unused in range(count):
+                try:
+                    target=helper if relay else actual_consumer
+                    returned=target(selected,root/"canonical","1"*32,"2"*32,"TEST_AUTHOR")
+                except Exception as exc:
+                    error=f"{type(exc).__name__}:{exc}";break
+            entry_present=(calls[0]["family_present"] if calls else
+                           [str(path) for path in family if os.path.lexists(path)])
+            if mode == "late_snapshot_cleanup" and snapshot.exists(): snapshot.rmdir()
+            admitted=(published and len(calls)==1 and error=="NONE"
+                      and returned==hashlib.sha256(raw).hexdigest())
+            return {"admitted":admitted,"published":published,"calls":len(calls),
+                    "error":error,"same_numeric":bool(calls and calls[0]["same_numeric"]),
+                    "same_inode":bool(calls and calls[0]["same_inode"]),
+                    "pre_nlink":pre_path.st_nlink,
+                    "post_nlink":calls[0]["nlink"] if calls else None,
+                    "entry_family_present":entry_present,
+                    "post_family_present":[str(path) for path in family
+                                           if os.path.lexists(path)],
+                    "aliases":calls[0]["aliases"] if calls else aliases(),
+                    "lineage":list(lineage),"relay":relay}
+        finally:
+            for number in (alias_fd,other_fd,writer_fd,retained):
+                if number >= 0:
+                    try: os.close(number)
+                    except OSError: pass
+            shutil.rmtree(root,ignore_errors=True)
+
+    r112_direct_positive=r112_handoff_case("valid")
+    r112_helper_positive=r112_handoff_case("valid",True)
+    r112_negative_modes=("nlink_one_after_cleanup","unstable_bytes",
+        "residual_path","residual_private","late_snapshot_cleanup","moved_root",
+        "alternate_root","broken_symlink","different_fd","extra_alias","dup_close_original",
+        "dup2_reuse","fcntl_alias","zero_calls","two_calls")
+    r112_negative_cases={name:r112_handoff_case(name) for name in r112_negative_modes}
+    r112_handoff_rig_ok=(r112_direct_positive.get("admitted") is True
+        and r112_helper_positive.get("admitted") is True
+        and r112_direct_positive.get("pre_nlink")==1
+        and r112_direct_positive.get("post_nlink")==0
+        and r112_direct_positive.get("entry_family_present")==[]
+        and len(r112_direct_positive.get("aliases",[]))==1
+        and all(case.get("admitted") is False
+                for case in r112_negative_cases.values()))
 
     def cleanup_failure_case(persistent: bool, mutation: str | None = None,
                              rollback_fault: str | None = None,
@@ -6548,7 +6955,7 @@ def consume_private_result(sink_fd, canonical_destination, invocation_id, run_id
         fdflags=fcntl.fcntl(sink_fd,fcntl.F_GETFD)
         before=_fstat(sink_fd)
         if access!=os.O_RDONLY or not (fdflags&fcntl.FD_CLOEXEC): raise ValueError("unsafe sink fd")
-        if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1: raise ValueError("unsafe sink object")
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink!=0: raise ValueError("unsafe sink object")
         _path_stat(os.path.dirname(os.fspath(canonical_destination)))
         if os.path.lexists(canonical_destination): raise FileExistsError("canonical preseed")
         chunks=[];total=0;offset=0
@@ -6609,6 +7016,8 @@ else:
 if sink_fd>=0 and mode=="no_cloexec": fcntl.fcntl(sink_fd,fcntl.F_SETFD,fcntl.fcntl(sink_fd,fcntl.F_GETFD)&~fcntl.FD_CLOEXEC)
 if mode=="preseed":
  canonical.write_bytes(b"preseed");st=canonical.stat();preseed_identity=(st.st_dev,st.st_ino,canonical.read_bytes().hex())
+if sink_fd>=0 and mode not in {"directory","fifo","socket","symlink","hardlink","mutation"}:
+ sink.unlink()
 def object_inventory(root):
  records={}
  def visit(path):
@@ -8241,6 +8650,19 @@ class CraftedConcretePath(type(Path())):
         "disconnected": r108_case_evidence(r108_disconnected),
         "schema_version": 1, "task": "h-032",
     }, sort_keys=True, separators=(",", ":")))
+    print("R112_BOUND_EVIDENCE=" + json.dumps({
+        "handoff_rig_ok":r112_handoff_rig_ok,
+        "direct_positive":r112_direct_positive,
+        "helper_positive":r112_helper_positive,
+        "negative_cases":r112_negative_cases,
+        "integration_helper":{
+            "positive":integration_helper_positive,
+            "extra":integration_helper_extra,
+            "changed":integration_helper_changed,
+            "callback":integration_helper_callback},
+        "actual_consumer_entry":integration_calls,
+        "schema_version":1,"task":"h-032",
+    },sort_keys=True,separators=(",",":")))
     print("R60_BOUND_EVIDENCE=" + json.dumps({
         "candidate_sha": git_repository_head(repo),
         "journal_parser_rig_ok": journal_parser_rig_ok,
@@ -8255,6 +8677,10 @@ class CraftedConcretePath(type(Path())):
         "schema_version": 1,
         "task": "h-032",
     }, sort_keys=True, separators=(",", ":")))
+    check("J_R112_COMPLETE_PATHLESS_HANDOFF",r112_handoff_rig_ok,
+          f"direct={r112_direct_positive} helper={r112_helper_positive} "
+          f"negatives={r112_negative_cases} relay="
+          f"{integration_helper_positive,integration_helper_extra,integration_helper_changed,integration_helper_callback}")
     check("J_RESULT_KERNEL_RIG", kernel_inventory_rig_ok and integration_rig_ok
           and kernel_oracle_rig_ok and reference_effect_rig_ok
           and r55_complete_residue_oracle_ok and r56_setup_oracle_ok
@@ -8266,7 +8692,7 @@ class CraftedConcretePath(type(Path())):
           and r109_seam_cardinality_controls_ok
           and r109_disposition_controls_ok
           and r110_cardinality_controls_ok
-          and r108_connected_controls_ok,
+          and r108_connected_controls_ok and r112_handoff_rig_ok,
           f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} captured_predicates={(fresh_success(reference_cases['valid'],rig_valid_raw),reference_cases['valid'].get('primitive_counts'),fresh_success(captured_reference_case,rig_valid_raw),outside_blocked(import_probe_case,True),outside_blocked(captured_stat_case,True),fresh_success(path_positive_case,rig_valid_raw),environb_case.get('accepted'),getenvb_case.get('accepted'))} r51_inroot={(r51_inroot_case.get('accepted'),r51_inroot_case.get('error'),r51_inroot_case.get('transition_ok'),r51_inroot_case.get('publication_ok'),r51_inroot_case.get('temps'),r51_inroot_case.get('outside'),r51_inroot_case.get('primitive_counts'))} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught} r102_link={r102_link_publication_rig_ok,link_publication_positive,path_link_publication_positive,link_alias_inventory[0],link_helper_inventory[0],link_same_name_helper_inventory[0],link_wrong_source_case.get('transition_ok'),bool(link_wrong_destination_case.get('outside')),link_preseed_case.get('accepted'),len(link_multiple_case.get('transitions',[]))} r103={dirfd_publication_positive,dirfd_publication_inventory[0],dirfd_publication_case.get('accepted'),dirfd_publication_case.get('error'),dirfd_publication_case.get('transitions'),{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in stale_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in failed_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in dirfd_negative_cases.items()}} r104={r104_residue_mutants_caught} r105={rollback_fault_rig_ok} r106={rollback_full_state_rig_ok,rollback_race_rig_ok} r107={rollback_open_swap_rig_ok,rollback_third_retry_open_swap_rig_ok}")
     def cleanup_detail(case):
         return (case[:4], case[4], len(case[5]), case[6], len(case[7]))

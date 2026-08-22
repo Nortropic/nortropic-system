@@ -400,8 +400,8 @@ def odombart(key: str, detail: str) -> None:
     raise SystemExit(2)
 
 
-H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 143 PASS / 1 FAIL"
-H032_GREEN_SUMMARY = "SAMMANFATTNING 144 PASS / 0 FAIL"
+H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 144 PASS / 1 FAIL"
+H032_GREEN_SUMMARY = "SAMMANFATTNING 145 PASS / 0 FAIL"
 H032_GREEN_PASS_LABELS = frozenset("""
 J_R89_SPLIT_OWNER_CALL_RIG
 J_R93_PRODUCT_OWNED_LIFETIME
@@ -426,6 +426,7 @@ J_R72_COMPLETE_PROVIDER_ENVIRONMENT_RELATION
 J_R73_LAUNCHER_ENVELOPE_ENVIRONMENT_BINDING
 J_R74_CURRENT_RUN_AND_INTENDED_ENVIRONMENT_ORACLE
 J_R89_STRICT_CURRENT_RUN_CLOCK_AND_COLLISION
+J_R112_COMPLETE_PATHLESS_HANDOFF
 J_RESULT_KERNEL_RIG
 K_STRUCTURED_RESULT_DELIVERY_BOUNDARY
 K1
@@ -607,7 +608,7 @@ def owner_skip_fixture_from_observed_h032(returncode: int, stdout: str) -> str:
                           "PASS K_STRUCTURED_RESULT_DELIVERY_BOUNDARY —")]
     summary_lines = [line for line in lines if line.startswith("SAMMANFATTNING ")]
     green_ok = (
-        len(H032_GREEN_PASS_LABELS) == 144
+        len(H032_GREEN_PASS_LABELS) == 145
         and len(pass_labels) == len(H032_GREEN_PASS_LABELS)
         and len(pass_labels) == len(set(pass_labels))
         and set(pass_labels) == H032_GREEN_PASS_LABELS
@@ -1581,7 +1582,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "ed866ba151a220d9dcf498aa5971e134e628e9ec150d049e33d737c351438b4d")
+                       == "fab78f9263fcd4203f16d5df60ea4eb9e230d0cd288baeacee0e9fee457aed57")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -2393,9 +2394,9 @@ subprocess = object()
     green_second = green_ordinary_lines[1] if len(green_ordinary_lines) >= 2 else ""
     owner_green_mutants = {
         "WRONG_SUMMARY": owner_green_fixture.replace(
-            H032_GREEN_SUMMARY, "SAMMANFATTNING 143 PASS / 1 FAIL", 1),
+            H032_GREEN_SUMMARY, "SAMMANFATTNING 144 PASS / 1 FAIL", 1),
         "EXTRA_CONFLICTING_SUMMARY": before_green_summary(
-            "SAMMANFATTNING 143 PASS / 1 FAIL"),
+            "SAMMANFATTNING 144 PASS / 1 FAIL"),
         "EXTRA_ARBITRARY_SUMMARY": before_green_summary(
             "SAMMANFATTNING 999 PASS / 0 FAIL"),
         "TOP_LEVEL_RESULT": before_green_summary("H032_GATE_RESULT=FAIL"),
