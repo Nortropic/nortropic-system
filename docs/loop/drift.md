@@ -2113,3 +2113,133 @@ complete predicate, and substituting either into the ordinary negative family ma
 Judge cleanup occurs only after this observation and cannot grant credit. All R102/R103 positive
 publication forms and retained-value, fsync and transition semantics remain unchanged; no
 production or live/provider behavior is executed.
+
+## 2026-08-22 — R107 one-opened-object rollback state
+
+Independent review found one remaining split observation in R106: the rollback state copied
+metadata from pathname `lstat` and then read bytes through a separate pathname open. A swap in
+that interval could combine accepted metadata with identical foreign bytes and falsely compare
+equal before a blind unlink removed the foreign object.
+
+R107 obtains every published and rollback state from one `O_NOFOLLOW` read-only fd. That same fd
+provides fstat, bounded bytes/digest/value and a second stable fstat; no pathname metadata is
+mixed into the state. The current canonical pathname is rebound to the opened metadata at the
+removal event, but this does not claim pathname unlink is race-free: R106's later audit swap still
+rejects it.
+
+Connected D01 controls swap an identical-byte foreign inode during the exact internal open on
+the first removal and on retry three after two causal injected failures. In both cases the opened
+foreign identity mismatches the retained accepted object, the foreign remains at canonical, the
+accepted object survives aside, and no deletion/absence credit is granted. Unconditional probes
+exercise both ordinals. Cleanup-before-publication remains the API-neutral zero-epoch,
+zero-removal positive. R100-R106 closures remain unchanged; no production or live/provider work
+is performed.
+
+## 2026-08-22 — R108 connected cleanup-before-publication
+
+Independent review found that R107 described cleanup-before-publication as the simple race-free
+positive but exercised that branch only as a dormant alternative in predicates over two actual
+post-publication cases. Deleting the alternative did not change the rig.
+
+R108 compiles three variants from the current integrated `run_codex` source by changing only the
+position/connectivity of its existing bounded staging-cleanup decision relative to its existing
+consumer call. Each variant runs through the same full provider attempt. The cleanup-before
+variant suffers three primary cleanup failures, completes fallback removal, starts one provider,
+then rejects with `Stop` before publication. It must leave zero canonical visibility epochs,
+zero canonical removal attempts, an absent canonical, and no attempt, transport, private-object
+or sink-fd residue. Publish-before and syntactically present but disconnected cleanup variants
+must fail that exact predicate. An unconditional compiled event-order fixture makes deletion or
+bypass of the source transformation a rig failure without granting product credit.
+
+This is an admissibility proof, not a mandated product ordering or API. Implementations that
+publish first remain subject to R100–R107's exact rollback proofs. Production and live/provider
+execution remain untouched.
+
+## 2026-08-22 — R105 persistent-cleanup rollback identity
+
+Independent product review found that the D01 controller correctly rejected persistent private
+staging cleanup failure, but its subsequent `Path.unlink` rollback could fail persistently and
+leave the already accepted canonical `result.json` visible. R104 injected `os.unlink` at the
+staging leaf and therefore did not measure that distinct final rollback effect.
+
+R105 retains the accepted private sink bytes, report and digest and captures the published
+canonical's no-follow regular device/inode and strict envelope before the cleanup fault. The same
+connected attempt then injects the underlying removal audit effect through direct `Path.unlink`,
+`os.unlink` and `os.remove` spellings. Persistent rollback faults must reject and can never claim
+canonical absence; first-only and first-two faults are legitimate only when a bounded retry
+actually establishes no-follow absence. The unconditional rig proves these effects directly.
+
+Replacement controls remove the accepted object only inside the judge and install either a
+symlink or a hardlinked foreign guard before rollback. A conforming implementation must compare
+the current no-follow identity with the retained published identity and refuse to unlink the
+replacement; the attempt remains rejected/ODOMBAR and both replacement and guard are observed
+intact. Judge cleanup follows the complete observation. Cleanup-before-publication remains free,
+and R100-R104 transition cardinality, retained-value, fsync, no-replace and residue closures are
+unchanged. No production or live/provider execution is performed by this amendment.
+
+## 2026-08-22 — R106 full-state rollback and post-check race
+
+Independent review showed that R105 authorized the actual removal from device/inode alone. A
+same-inode hardlink/relink can change link count, mode or exact value/digest, and a later audit
+hook can replace the checked path after that comparison but before the removal syscall. The
+first case made altered state look accepted; the second let a blind path unlink delete a foreign
+object.
+
+R106 binds the decision to the complete no-follow published state: type, mode, nlink, size,
+mtime/ctime, bounded bytes/digest, strict envelope and retained provider value. Connected D01
+attempts change nlink, mode and a same-length strict value on the same inode and require rejection
+without removal. A separately ordered later audit hook observes the exact accepted check, swaps
+that object aside, installs a foreign object, and lets the pending syscall demonstrate why a
+check-then-path-unlink is not safe rollback authority. That attempt must reject; no precheck or
+trace alone grants absence.
+
+The API-neutral positive is cleanup before canonical publication: zero visibility epochs, zero
+rollback attempts and final absence. A post-publication implementation remains possible only if
+its actual mechanism causally proves removal of the accepted full state without deleting a
+replacement; otherwise it fails closed. Judge cleanup follows complete evidence. R100-R105
+publication, retained-value, fsync, transition and residue closures are unchanged, and no
+production or live/provider behavior is executed.
+
+## 2026-08-22 — R109 structural connected cleanup seam
+
+Independent review found that R108 recognized the connected consumer seam through one exact
+three-line local assignment/flag/return spelling. A harmless local rename or helper relay left
+the real consumer and cleanup capabilities present, but disabled the transform and caused every
+connected predicate to default true. The transform also inserted another cleanup call rather
+than moving the existing decision.
+
+R109 separates `consumer_seam_present` from `transform_available`. Absence remains the truthful
+prebuilder state; presence without one unambiguous transform now fails the rig. A bounded AST
+relation accepts exactly one `run_codex` try/finally, one direct consumer call or one direct
+Python-helper relay, and one private-staging cleanup call. It moves the existing publication
+slice across the existing cleanup statements, and moves the existing sink close into an inner
+finally so cleanup rejection still closes the descriptor. The cleanup call count must remain
+one before and after transformation.
+
+Connected fixtures cover local rename, direct return, Python-helper return and an equivalent
+try/except/finally publication form. Missing and duplicate consumer sites are causal controls;
+the latter is seam-present but transform-unavailable and therefore cannot receive default
+credit. The exact D01 overlay still executes a full provider attempt for cleanup-before,
+publish-before and disconnected orderings. R100–R108 filesystem, retained-value, rollback,
+race and residue effects are unchanged. No whole-Python interpreter, production edit or
+live/provider execution is introduced.
+
+## 2026-08-22 — R110 independent consumer and cleanup cardinalities
+
+Independent review found that R109 still defined consumer-seam presence as consumer presence
+AND cleanup presence. A source with one real consumer and no cleanup was therefore classified
+`ABSENT`, skipped the connected attempt and defaulted all three connected predicates true.
+
+R110 derives consumer presence only from the direct consumer or admitted one-hop Python-helper
+inventory. Cleanup cardinality is a separate transform prerequisite. The disposition table is
+now explicit: consumer zero is `ABSENT`; consumer one with cleanup cardinality other than one,
+or any remaining unsupported bounded shape, is `RIG_ODOMBART`; only a single consumer, a single
+cleanup call and every R109 shape constraint can be `CONNECTED`. The actual product uses the
+same disposition and enforcement function as the causal fixtures.
+
+Reciprocal controls retain cleanup while deleting the consumer, retain the consumer while
+removing cleanup, and retain the consumer while duplicating cleanup. Their exact cardinalities
+must be 0/1, 1/0 and 1/2 respectively; the latter two raise the rig failure before connected
+predicates can default. R109's rename, direct-return, helper-relay, try/except/finally,
+duplicate-consumer and full-attempt ordering controls remain unchanged. This adds no general
+control-flow interpretation, production edit or live/provider execution.

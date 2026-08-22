@@ -2104,6 +2104,68 @@ def run_codex(sink, canonical, invocation, run, role):
     attempt_sequence = [0]
     audit_active: list[dict[str, object] | None] = [None]
     last_attempt_observed: list[dict[str, object] | None] = [None]
+    rollback_fault_active: list[dict[str, object] | None] = [None]
+    rollback_race_active: list[dict[str, object] | None] = [None]
+    rollback_open_race_active: list[dict[str, object] | None] = [None]
+
+    def rollback_object_state(path: Path) -> dict[str, object]:
+        """Read metadata and bounded value from one retained no-follow object."""
+        flags = os.O_RDONLY | os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(path, flags)
+        try:
+            before = os.fstat(fd)
+            raw: bytes | None = None
+            value: object = None
+            digest: str | None = None
+            if stat.S_ISREG(before.st_mode):
+                chunks: list[bytes] = []
+                offset = 0
+                while offset <= MAX_CANONICAL_BYTES:
+                    chunk = os.pread(
+                        fd, min(65536, MAX_CANONICAL_BYTES + 1 - offset), offset)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    offset += len(chunk)
+                raw = b"".join(chunks)
+                if len(raw) > MAX_CANONICAL_BYTES:
+                    raise ValueError("R107 rollback object exceeds bound")
+                digest = hashlib.sha256(raw).hexdigest()
+                try:
+                    value = strict_json(raw.decode("utf-8", errors="strict"))
+                except Exception:
+                    value = None
+            after = os.fstat(fd)
+            before_tuple = (
+                before.st_dev, before.st_ino, before.st_mode, before.st_nlink,
+                before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+            after_tuple = (
+                after.st_dev, after.st_ino, after.st_mode, after.st_nlink,
+                after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+            if before_tuple != after_tuple:
+                raise OSError("R107 rollback object changed during opened read")
+            return {
+                "dev": after.st_dev, "ino": after.st_ino,
+                "mode": after.st_mode, "nlink": after.st_nlink,
+                "size": after.st_size, "mtime_ns": after.st_mtime_ns,
+                "ctime_ns": after.st_ctime_ns, "raw": raw,
+                "digest": digest, "value": value,
+            }
+        finally:
+            os.close(fd)
+
+    def rollback_path_matches_opened(path: Path,
+                                     opened: dict[str, object]) -> bool:
+        """Bind the current pathname metadata back to the one opened object."""
+        current = os.lstat(path)
+        return (
+            current.st_dev, current.st_ino, current.st_mode, current.st_nlink,
+            current.st_size, current.st_mtime_ns, current.st_ctime_ns) == (
+            opened.get("dev"), opened.get("ino"), opened.get("mode"),
+            opened.get("nlink"), opened.get("size"), opened.get("mtime_ns"),
+            opened.get("ctime_ns"))
 
     def register_canonical(active: dict[str, object], value: object) -> None:
         if not isinstance(value, (str, bytes, os.PathLike)):
@@ -2161,6 +2223,60 @@ def run_codex(sink, canonical, invocation, run, role):
 
     def audit_inventory(event: str, args: tuple[object, ...]) -> None:
         active = audit_active[0]
+        rollback = rollback_fault_active[0]
+        if event == "os.remove" and rollback is not None and args:
+            try:
+                candidate = Path(args[0]).absolute()
+                target = rollback["path"]
+                assert isinstance(target, Path)
+                if candidate == target:
+                    attempts = rollback["attempts"]
+                    foreign_attempts = rollback["foreign_attempts"]
+                    assert isinstance(attempts, list) and isinstance(foreign_attempts, list)
+                    expected = rollback["state"]
+                    assert isinstance(expected, dict)
+                    open_race = rollback_open_race_active[0]
+                    if open_race is not None:
+                        race_target = open_race.get("path")
+                        swap_attempt = open_race.get("swap_attempt")
+                        if (isinstance(race_target, Path) and race_target == candidate
+                                and type(swap_attempt) is int
+                                and len(attempts) + len(foreign_attempts) + 1
+                                    == swap_attempt):
+                            open_race["armed"] = True
+                    try:
+                        observed = rollback_object_state(candidate)
+                        path_bound = rollback_path_matches_opened(candidate, observed)
+                    except OSError as exc:
+                        foreign_attempts.append({
+                            "opened": False, "path_bound": False,
+                            "error": type(exc).__name__,
+                        })
+                        raise OSError(
+                            "H032 protected unopenable canonical replacement") from exc
+                    if observed != expected or not path_bound:
+                        foreign_attempts.append({
+                            "opened": True, "path_bound": path_bound,
+                            "devino_equal": (observed.get("dev"), observed.get("ino"))
+                                == (expected.get("dev"), expected.get("ino")),
+                            "mode_equal": observed.get("mode") == expected.get("mode"),
+                            "nlink_equal": observed.get("nlink") == expected.get("nlink"),
+                            "size_equal": observed.get("size") == expected.get("size"),
+                            "times_equal": (observed.get("mtime_ns"), observed.get("ctime_ns"))
+                                == (expected.get("mtime_ns"), expected.get("ctime_ns")),
+                            "raw_equal": observed.get("raw") == expected.get("raw"),
+                            "digest_equal": observed.get("digest") == expected.get("digest"),
+                            "value_equal": observed.get("value") == expected.get("value"),
+                        })
+                        raise OSError("H032 protected foreign canonical replacement")
+                    attempts.append({"full_state_equal": True, "path_bound": True})
+                    policy = rollback.get("fault")
+                    if (policy == "persistent"
+                            or (policy == "first" and len(attempts) == 1)
+                            or (policy == "first_two" and len(attempts) <= 2)):
+                        raise OSError("H032 injected canonical rollback failure")
+            except FileNotFoundError:
+                pass
         if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename", "os.link", "subprocess.Popen"}:
             return
         if active.get("observer_busy") is True:
@@ -2213,6 +2329,266 @@ def run_codex(sink, canonical, invocation, run, role):
                     if not path.exists(): created.add(str(path))
                 except Exception: pass
     sys.addaudithook(audit_inventory)
+
+    def rollback_race_audit(event: str, args: tuple[object, ...]) -> None:
+        """Causally swap after the R106 check but before the same remove syscall."""
+        race = rollback_race_active[0]
+        if event != "os.remove" or race is None or not args:
+            return
+        try:
+            candidate = Path(args[0]).absolute()
+        except Exception:
+            return
+        target = race["path"]
+        assert isinstance(target, Path)
+        if candidate != target:
+            return
+        attempts = race["attempts"]
+        assert isinstance(attempts, list)
+        race["check_saw_expected"] = bool(
+            attempts and attempts[-1]
+                == {"full_state_equal": True, "path_bound": True})
+        rollback_race_active[0] = None
+        accepted = race["accepted"]
+        foreign = race["foreign"]
+        assert isinstance(accepted, Path) and isinstance(foreign, Path)
+        os.rename(target, accepted)
+        os.rename(foreign, target)
+        race["swapped"] = True
+
+    sys.addaudithook(rollback_race_audit)
+
+    def rollback_open_race_audit(event: str, args: tuple[object, ...]) -> None:
+        """Swap during the exact internal no-follow open used for state credit."""
+        race = rollback_open_race_active[0]
+        if event != "open" or race is None or race.get("armed") is not True or not args:
+            return
+        try:
+            candidate = Path(args[0]).absolute()
+        except Exception:
+            return
+        target = race.get("path")
+        if not isinstance(target, Path) or candidate != target:
+            return
+        flags = args[2] if len(args) > 2 and type(args[2]) is int else 0
+        if flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC):
+            return
+        race["armed"] = False
+        rollback_open_race_active[0] = None
+        accepted = race.get("accepted")
+        foreign = race.get("foreign")
+        assert isinstance(accepted, Path) and isinstance(foreign, Path)
+        os.rename(target, accepted)
+        os.rename(foreign, target)
+        race["swapped"] = True
+        race["opened_foreign_devino"] = (
+            target.lstat().st_dev, target.lstat().st_ino)
+
+    sys.addaudithook(rollback_open_race_audit)
+
+    def rollback_fault_probe(api: str, fault: str, failures: int,
+                             foreign: bool = False) -> bool:
+        """Prove the rollback fault/identity hook observes the real unlink effect."""
+        probe = work / f"r105-rollback-probe-{api}-{fault}-{int(foreign)}"
+        probe.write_bytes(b"R105 rollback audit probe")
+        opened = probe.lstat()
+        attempts: list[object] = []
+        foreign_attempts: list[object] = []
+        expected_state = rollback_object_state(probe)
+        if foreign:
+            expected_state = dict(expected_state)
+            expected_state["ino"] = opened.st_ino + 1
+        rollback_fault_active[0] = {
+            "path": probe.absolute(),
+            "state": expected_state,
+            "fault": fault,
+            "attempts": attempts,
+            "foreign_attempts": foreign_attempts,
+        }
+        raised = 0
+        calls = failures if fault == "persistent" or foreign else failures + 1
+        try:
+            for _index in range(calls):
+                try:
+                    if api == "Path.unlink":
+                        probe.unlink()
+                    elif api == "os.unlink":
+                        os.unlink(probe)
+                    elif api == "os.remove":
+                        os.remove(probe)
+                    else:
+                        raise RuntimeError("unknown R105 rollback probe API")
+                except OSError:
+                    raised += 1
+        finally:
+            rollback_fault_active[0] = None
+        present = probe.exists() or probe.is_symlink()
+        if present:
+            probe.unlink()
+        if foreign:
+            return raised == calls and present and not attempts \
+                and len(foreign_attempts) == calls
+        if fault == "persistent":
+            return (raised == calls and present
+                    and len(attempts) == calls and not foreign_attempts)
+        return (raised == failures and not present
+                and len(attempts) == calls and not foreign_attempts)
+
+    rollback_fault_rig_ok = (
+        rollback_fault_probe("Path.unlink", "persistent", 1)
+        and rollback_fault_probe("os.unlink", "persistent", 1)
+        and rollback_fault_probe("os.remove", "persistent", 1)
+        and rollback_fault_probe("Path.unlink", "first", 1)
+        and rollback_fault_probe("Path.unlink", "first_two", 2)
+        and rollback_fault_probe("Path.unlink", "persistent", 1, True))
+
+    def rollback_state_probe(mutation: str) -> bool:
+        probe = work / f"r106-full-state-probe-{mutation}"
+        alias = work / f"r106-full-state-alias-{mutation}"
+        probe.write_bytes(b'{"value":1}')
+        expected_state = rollback_object_state(probe)
+        attempts: list[object] = []
+        foreign_attempts: list[object] = []
+        if mutation == "nlink":
+            os.link(probe, alias)
+        elif mutation == "mode":
+            probe.chmod(0o640)
+        elif mutation == "value":
+            fd = os.open(probe, os.O_WRONLY | os.O_TRUNC)
+            try:
+                os.write(fd, b'{"value":2}')
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        else:
+            raise RuntimeError("unknown R106 full-state probe")
+        changed_state = rollback_object_state(probe)
+        rollback_fault_active[0] = {
+            "path": probe.absolute(), "state": expected_state, "fault": None,
+            "attempts": attempts, "foreign_attempts": foreign_attempts,
+        }
+        raised = False
+        try:
+            probe.unlink()
+        except OSError:
+            raised = True
+        finally:
+            rollback_fault_active[0] = None
+        present = probe.exists() and not probe.is_symlink()
+        if present:
+            probe.unlink()
+        if alias.exists() or alias.is_symlink():
+            alias.unlink()
+        expected_difference = {
+            "nlink": changed_state.get("nlink") != expected_state.get("nlink"),
+            "mode": changed_state.get("mode") != expected_state.get("mode"),
+            "value": (changed_state.get("digest") != expected_state.get("digest")
+                      and changed_state.get("value") != expected_state.get("value")),
+        }[mutation]
+        return (expected_difference and raised and present and not attempts
+                and len(foreign_attempts) == 1
+                and foreign_attempts[0].get(f"{mutation if mutation != 'value' else 'digest'}_equal")
+                    is False)
+
+    rollback_full_state_rig_ok = all(
+        rollback_state_probe(mutation) for mutation in ("nlink", "mode", "value"))
+
+    def rollback_race_probe() -> bool:
+        probe = work / "r106-race-probe"
+        accepted = work / "r106-race-accepted"
+        foreign = work / "r106-race-foreign"
+        probe.write_bytes(b'{"accepted":true}')
+        foreign.write_bytes(b"R106 foreign race guard")
+        expected_state = rollback_object_state(probe)
+        foreign_state = rollback_object_state(foreign)
+        attempts: list[object] = []
+        foreign_attempts: list[object] = []
+        race_record: dict[str, object] = {
+            "path": probe.absolute(), "accepted": accepted, "foreign": foreign,
+            "attempts": attempts, "check_saw_expected": False, "swapped": False,
+        }
+        rollback_fault_active[0] = {
+            "path": probe.absolute(), "state": expected_state, "fault": None,
+            "attempts": attempts, "foreign_attempts": foreign_attempts,
+        }
+        rollback_race_active[0] = race_record
+        probe.unlink()
+        rollback_fault_active[0] = None
+        rollback_race_active[0] = None
+        accepted_state = rollback_object_state(accepted)
+        result = (
+            race_record.get("check_saw_expected") is True
+            and race_record.get("swapped") is True
+            and not probe.exists() and not probe.is_symlink()
+            and accepted_state.get("dev") == expected_state.get("dev")
+            and accepted_state.get("ino") == expected_state.get("ino")
+            and accepted_state.get("digest") == expected_state.get("digest")
+            and accepted_state.get("value") == expected_state.get("value")
+            and not foreign.exists() and not foreign.is_symlink()
+            and foreign_state.get("ino") != expected_state.get("ino")
+            and len(attempts) == 1 and not foreign_attempts)
+        accepted.unlink()
+        return result
+
+    rollback_race_rig_ok = rollback_race_probe()
+
+    def rollback_open_swap_probe(swap_attempt: int) -> bool:
+        probe = work / f"r107-open-swap-probe-{swap_attempt}"
+        accepted = work / f"r107-open-swap-accepted-{swap_attempt}"
+        foreign = work / f"r107-open-swap-foreign-{swap_attempt}"
+        raw = b'{"same":"bounded-value"}'
+        probe.write_bytes(raw)
+        foreign.write_bytes(raw)
+        expected_state = rollback_object_state(probe)
+        foreign_initial = rollback_object_state(foreign)
+        attempts: list[object] = []
+        foreign_attempts: list[object] = []
+        race_record: dict[str, object] = {
+            "path": probe.absolute(), "accepted": accepted,
+            "foreign": foreign, "swap_attempt": swap_attempt,
+            "armed": False, "swapped": False,
+        }
+        rollback_fault_active[0] = {
+            "path": probe.absolute(), "state": expected_state,
+            "fault": "first_two" if swap_attempt == 3 else None,
+            "attempts": attempts, "foreign_attempts": foreign_attempts,
+        }
+        rollback_open_race_active[0] = race_record
+        raised = 0
+        try:
+            for _index in range(swap_attempt):
+                try:
+                    probe.unlink()
+                except OSError:
+                    raised += 1
+        finally:
+            rollback_fault_active[0] = None
+            rollback_open_race_active[0] = None
+        canonical_state = rollback_object_state(probe)
+        accepted_state = rollback_object_state(accepted)
+        result = (
+            raised == swap_attempt
+            and race_record.get("swapped") is True
+            and len(attempts) == swap_attempt - 1
+            and all(attempt == {"full_state_equal": True, "path_bound": True}
+                    for attempt in attempts)
+            and len(foreign_attempts) == 1
+            and foreign_attempts[0].get("opened") is True
+            and foreign_attempts[0].get("path_bound") is True
+            and foreign_attempts[0].get("devino_equal") is False
+            and foreign_attempts[0].get("raw_equal") is True
+            and canonical_state.get("dev") == foreign_initial.get("dev")
+            and canonical_state.get("ino") == foreign_initial.get("ino")
+            and canonical_state.get("raw") == expected_state.get("raw")
+            and accepted_state.get("dev") == expected_state.get("dev")
+            and accepted_state.get("ino") == expected_state.get("ino")
+            and accepted_state.get("raw") == expected_state.get("raw"))
+        probe.unlink()
+        accepted.unlink()
+        return result
+
+    rollback_open_swap_rig_ok = rollback_open_swap_probe(1)
+    rollback_third_retry_open_swap_rig_ok = rollback_open_swap_probe(3)
 
     def attempt(repo: Path) -> tuple[bool, str, int, int, list[str]]:
         journal_before = journal_object(repo)
@@ -2655,17 +3031,415 @@ def run_codex(sink, canonical, invocation, run, role):
                             and value[4]==[(True,1,0o600)]
                             for value in object_attacks.values())
 
-    def cleanup_failure_case(persistent: bool, mutation: str | None = None):
+    def r109_call_name(node: ast.AST) -> str | None:
+        return node.id if isinstance(node, ast.Name) else None
+
+    def r109_direct_calls(node: ast.AST, capability: str) -> list[ast.Call]:
+        return [candidate for candidate in ast.walk(node)
+                if isinstance(candidate, ast.Call)
+                and r109_call_name(candidate.func) == capability]
+
+    def r109_top_level_helpers(tree: ast.Module) -> dict[str, ast.FunctionDef]:
+        helpers: dict[str, ast.FunctionDef] = {}
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef) and node.name != "run_codex":
+                helpers[node.name] = node
+        return helpers
+
+    def r109_statement_calls_capability(statement: ast.stmt, capability: str,
+                                        helpers: dict[str, ast.FunctionDef]) -> bool:
+        if r109_direct_calls(statement, capability):
+            return True
+        called = {r109_call_name(call.func) for call in ast.walk(statement)
+                  if isinstance(call, ast.Call)}
+        relays = [helper for name, helper in helpers.items() if name in called
+                  and len(r109_direct_calls(helper, capability)) == 1]
+        return len(relays) == 1
+
+    def r109_transform_tree(raw_source: str, ordering: str):
+        """Bounded structural move of the existing consume effect around cleanup.
+
+        This is deliberately not a Python interpreter.  It admits one run_codex
+        try/finally, one consumer capability (directly or through one Python
+        helper), and one cleanup capability in that finalizer.  The existing
+        cleanup statements are never copied: the publication slice is moved
+        across them and the existing fd-close slice is moved to an inner finally.
+        """
+        try:
+            tree = ast.parse(raw_source)
+        except (SyntaxError, ValueError):
+            return None, {"seam_present": False, "transform_available": False,
+                          "reason": "parse"}
+        functions = [node for node in tree.body
+                     if isinstance(node, ast.FunctionDef) and node.name == "run_codex"]
+        if len(functions) != 1:
+            return None, {"seam_present": False, "transform_available": False,
+                          "reason": "run_codex-cardinality"}
+        function = functions[0]
+        helpers = r109_top_level_helpers(tree)
+        consumer_calls = r109_direct_calls(function, "consume_private_result")
+        helper_relays = {
+            name for name, helper in helpers.items()
+            if len(r109_direct_calls(helper, "consume_private_result")) == 1
+        }
+        helper_call_sites = [call for call in ast.walk(function)
+                             if isinstance(call, ast.Call)
+                             and r109_call_name(call.func) in helper_relays]
+        cleanup_calls = r109_direct_calls(function, "_cleanup_result_staging")
+        # Consumer capability presence is independent of whether the cleanup
+        # prerequisite exists.  Cleanup cardinality belongs only to transform
+        # availability; otherwise consumer=1/cleanup=0 would falsely be ABSENT.
+        seam_present = bool(consumer_calls or helper_call_sites)
+        facts = {"seam_present": seam_present, "transform_available": False,
+                 "consumer_sites": len(consumer_calls) + len(helper_call_sites),
+                 "cleanup_sites": len(cleanup_calls), "reason": "shape"}
+        if not seam_present or len(consumer_calls) + len(helper_call_sites) != 1 \
+                or len(cleanup_calls) != 1:
+            return None, facts
+        outer_tries = [node for node in function.body if isinstance(node, ast.Try)
+                       and any(call is cleanup_calls[0] for call in ast.walk(node))]
+        if len(outer_tries) != 1:
+            return None, facts
+        outer_try = outer_tries[0]
+        publication_indices = [index for index, statement in enumerate(outer_try.body)
+                               if r109_statement_calls_capability(
+                                   statement, "consume_private_result", helpers)]
+        if len(publication_indices) != 1:
+            return None, facts
+        publication_index = publication_indices[0]
+        publication_statement = outer_try.body[publication_index]
+
+        # The return value is either assigned by the publication statement and
+        # returned once later, or is the direct return expression itself.
+        result_name = "__h032_r109_accepted"
+        moved: list[ast.stmt]
+        return_statement: ast.Return
+        remove_through = publication_index
+        if isinstance(publication_statement, ast.Return):
+            if publication_statement.value is None:
+                return None, facts
+            moved = [ast.Assign(targets=[ast.Name(id=result_name, ctx=ast.Store())],
+                                value=publication_statement.value)]
+            return_statement = ast.Return(value=ast.Name(id=result_name, ctx=ast.Load()))
+        else:
+            moved = [publication_statement]
+            later_returns = [(index, statement) for index, statement
+                             in enumerate(outer_try.body[publication_index + 1:],
+                                          publication_index + 1)
+                             if isinstance(statement, ast.Return)]
+            if len(later_returns) != 1 or later_returns[0][1].value is None:
+                return None, facts
+            return_index, original_return = later_returns[0]
+            # Only simple flag assignments may sit between publication and return;
+            # they move with the publication effect without depending on spelling.
+            middle = outer_try.body[publication_index + 1:return_index]
+            if any(not isinstance(statement, ast.Assign) for statement in middle):
+                return None, facts
+            moved.extend(middle)
+            return_statement = original_return
+            remove_through = return_index
+
+        # The publication slice must be terminal within the try body.  This keeps
+        # the transform local and prevents interpreting arbitrary later flow.
+        if remove_through != len(outer_try.body) - 1:
+            return None, facts
+        pending_name = "__h032_r109_publish_pending"
+        outer_try.body[publication_index:] = [
+            ast.Assign(targets=[ast.Name(id=pending_name, ctx=ast.Store())],
+                       value=ast.Constant(value=True))]
+        function.body.insert(function.body.index(outer_try), ast.Assign(
+            targets=[ast.Name(id=pending_name, ctx=ast.Store())],
+            value=ast.Constant(value=False)))
+
+        close_indices = [index for index, statement in enumerate(outer_try.finalbody)
+                         if any(isinstance(call, ast.Call)
+                                and r109_call_name(call.func) is None
+                                and isinstance(call.func, ast.Attribute)
+                                and isinstance(call.func.value, ast.Name)
+                                and call.func.value.id == "os"
+                                and call.func.attr == "close"
+                                for call in ast.walk(statement))]
+        if len(close_indices) != 1:
+            return None, facts
+        close_statement = outer_try.finalbody.pop(close_indices[0])
+        publish_guard = ast.If(
+            test=ast.Name(id=pending_name, ctx=ast.Load()), body=moved, orelse=[])
+
+        if ordering == "cleanup_before":
+            ordered_body = outer_try.finalbody + [publish_guard]
+        elif ordering == "publish_before":
+            ordered_body = [publish_guard] + outer_try.finalbody
+        elif ordering == "disconnected":
+            ordered_body = [publish_guard, ast.If(
+                test=ast.Constant(value=False), body=outer_try.finalbody, orelse=[])]
+        else:
+            raise RuntimeError(f"unsupported R109 ordering: {ordering}")
+        outer_try.finalbody = [ast.Try(body=ordered_body, handlers=[], orelse=[],
+                                      finalbody=[close_statement])]
+        function.body.insert(function.body.index(outer_try) + 1, return_statement)
+        facts.update({"transform_available": True, "reason": "ok",
+                      "helper_relay": bool(helper_call_sites),
+                      "helper_names": sorted(
+                          {r109_call_name(call.func) for call in helper_call_sites}),
+                      "publication_node": type(publication_statement).__name__,
+                      "transformed_cleanup_sites": len(r109_direct_calls(
+                          function, "_cleanup_result_staging"))})
+        ast.fix_missing_locations(tree)
+        return tree, facts
+
+    def r109_compile_run_codex(raw_source: str, ordering: str,
+                               namespace: dict[str, object]):
+        tree, facts = r109_transform_tree(raw_source, ordering)
+        if tree is None:
+            return None, False, facts
+        functions = [node for node in tree.body
+                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                     and node.name == "run_codex"]
+        if len(functions) != 1 or not isinstance(functions[0], ast.FunctionDef):
+            return None, False, facts
+        helper_names = set(facts.get("helper_names", []))
+        helper_defs = [node for node in tree.body
+                       if isinstance(node, ast.FunctionDef)
+                       and node.name in helper_names]
+        compiled_tree = ast.Module(body=helper_defs + [functions[0]], type_ignores=[])
+        ast.fix_missing_locations(compiled_tree)
+        variant_namespace = dict(namespace)
+        exec(compile(compiled_tree, f"<h032-r109-{ordering}>", "exec"),
+             variant_namespace)
+        function = variant_namespace.get("run_codex")
+        return (function if callable(function) else None,
+                integration_structure_inventory(tree)[0], facts)
+
+    # Unconditional source/effect sensitivity.  Product credit still comes
+    # only from the connected full-attempt cases below.
+    r109_fixture_source = '''def run_codex(repo, wt, role, prompt):
+        global _LAST_AGENT_CONTEXT
+        result_root = "private-root"
+        result_root_identity = (1, 2)
+        result = "canonical"
+        sink_fd = 3
+        invocation_id = "i"
+        run_id = "r"
+        canonical_published = False
+        try:
+            _LAST_AGENT_CONTEXT = (None, None, result)
+            accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
+            canonical_published = True
+            return accepted
+        finally:
+            if sink_fd >= 0:
+                try:
+                    os.close(sink_fd)
+                except OSError:
+                    pass
+            result_residue = []
+            result_cleanup_degraded = False
+            if result_root is not None and result_root_identity is not None:
+                result_residue, result_cleanup_degraded = _cleanup_result_staging(
+                    result_root, result_root_identity)
+            cleanup_incomplete = bool(result_residue) or result_cleanup_degraded
+            if cleanup_incomplete and canonical_published:
+                rollback()
+            if cleanup_incomplete:
+                raise Stop("private execution staging cleanup incomplete")
+'''
+    def r109_fixture_effect(source: str, ordering: str,
+                           namespace_extra: dict[str, object] | None = None):
+        events: list[str] = []
+        class FixtureStop(Exception): pass
+        namespace: dict[str, object] = {
+            "_LAST_AGENT_CONTEXT": None,
+            "OSError": OSError,
+            "Stop": FixtureStop,
+            "os": type("FixtureOS", (), {"close": staticmethod(lambda unused: None)}),
+            "rollback": lambda: events.append("rollback"),
+            "_cleanup_result_staging": lambda *unused: (events.append("cleanup") or ([], True)),
+            "consume_private_result": lambda *unused: (events.append("publish") or {"ok": True}),
+        }
+        if namespace_extra:
+            namespace.update(namespace_extra)
+        function, _inventory, facts = r109_compile_run_codex(source, ordering, namespace)
+        stopped = False
+        try:
+            if function is None:
+                return tuple(events), False, facts
+            function(None, None, "TEST_AUTHOR", "H032")
+        except FixtureStop:
+            stopped = True
+        return tuple(events), stopped, facts
+    r109_fixture_effects = {
+        ordering: r109_fixture_effect(r109_fixture_source, ordering)
+        for ordering in ("cleanup_before", "publish_before", "disconnected")}
+    r109_source_ordering_rig_ok = (
+        r109_fixture_effects["cleanup_before"][:2] == (("cleanup",), True)
+        and r109_fixture_effects["publish_before"][:2]
+            == (("publish", "cleanup", "rollback"), True)
+        and r109_fixture_effects["disconnected"][:2] == (("publish",), False)
+        and all(effect[2].get("transform_available") is True
+                for effect in r109_fixture_effects.values()))
+
+    r109_local_rename_source = r109_fixture_source.replace(
+        "accepted = consume_private_result", "delivered = consume_private_result"
+    ).replace("return accepted", "return delivered")
+    r109_direct_return_source = r109_fixture_source.replace(
+        '''            accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
+            canonical_published = True
+            return accepted''',
+        '''            return consume_private_result(
+                sink_fd, result, invocation_id, run_id, role)''')
+    r109_helper_relay_source = (
+        '''def publish_result(fd, destination, invocation, run, current_role):
+    return consume_private_result(fd, destination, invocation, run, current_role)
+
+''' + r109_fixture_source.replace(
+        "consume_private_result(sink_fd, result, invocation_id, run_id, role)",
+        "publish_result(sink_fd, result, invocation_id, run_id, role)"))
+    r109_try_relay_source = r109_fixture_source.replace(
+        '''            accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
+            canonical_published = True''',
+        '''            try:
+                accepted = consume_private_result(
+                    sink_fd, result, invocation_id, run_id, role)
+            except RuntimeError:
+                raise
+            finally:
+                publication_finally_marker()
+            canonical_published = True''')
+    r109_legitimate_sources = {
+        "local_rename": (r109_local_rename_source, {}),
+        "direct_return": (r109_direct_return_source, {}),
+        "helper_relay": (r109_helper_relay_source, {}),
+        "try_exception_finally": (
+            r109_try_relay_source, {"publication_finally_marker": lambda: None}),
+    }
+    r109_legitimate_effects = {
+        name: r109_fixture_effect(source, "cleanup_before", extra)
+        for name, (source, extra) in r109_legitimate_sources.items()}
+    r109_legitimate_variants_ok = all(
+        effect[:2] == (("cleanup",), True)
+        and effect[2].get("seam_present") is True
+        and effect[2].get("transform_available") is True
+        and effect[2].get("cleanup_sites") == 1
+        and effect[2].get("transformed_cleanup_sites") == 1
+        for effect in r109_legitimate_effects.values())
+    r109_missing_seam_source = r109_fixture_source.replace(
+        "consume_private_result(sink_fd, result, invocation_id, run_id, role)",
+        "{'not': 'a publication'}")
+    r109_ambiguous_seam_source = r109_fixture_source.replace(
+        "            accepted = consume_private_result",
+        "            ignored = consume_private_result(sink_fd, result, invocation_id, run_id, role)\n"
+        "            accepted = consume_private_result")
+    r110_cleanup_missing_source = r109_fixture_source.replace(
+        "_cleanup_result_staging(\n                    result_root, result_root_identity)",
+        "cleanup_not_available(\n                    result_root, result_root_identity)")
+    r110_cleanup_ambiguous_source = r109_fixture_source.replace(
+        '''                result_residue, result_cleanup_degraded = _cleanup_result_staging(
+                    result_root, result_root_identity)''',
+        '''                _cleanup_result_staging(result_root, result_root_identity)
+                result_residue, result_cleanup_degraded = _cleanup_result_staging(
+                    result_root, result_root_identity)''')
+    _r109_missing_tree, r109_missing_facts = r109_transform_tree(
+        r109_missing_seam_source, "cleanup_before")
+    _r109_ambiguous_tree, r109_ambiguous_facts = r109_transform_tree(
+        r109_ambiguous_seam_source, "cleanup_before")
+    _r110_cleanup_missing_tree, r110_cleanup_missing_facts = r109_transform_tree(
+        r110_cleanup_missing_source, "cleanup_before")
+    _r110_cleanup_ambiguous_tree, r110_cleanup_ambiguous_facts = r109_transform_tree(
+        r110_cleanup_ambiguous_source, "cleanup_before")
+    r109_seam_cardinality_controls_ok = (
+        r109_missing_facts.get("seam_present") is False
+        and r109_missing_facts.get("transform_available") is False
+        and r109_ambiguous_facts.get("seam_present") is True
+        and r109_ambiguous_facts.get("transform_available") is False)
+
+    def r109_connected_disposition(facts: dict[str, object]) -> str:
+        if facts.get("seam_present") is not True:
+            return "ABSENT"
+        if facts.get("transform_available") is not True:
+            return "RIG_ODOMBART"
+        return "CONNECTED"
+
+    def r109_enforce_connected_disposition(disposition: str) -> None:
+        if disposition == "RIG_ODOMBART":
+            raise RuntimeError(
+                "R109 connected consumer seam is present but structurally ambiguous")
+
+    try:
+        r109_enforce_connected_disposition(
+            r109_connected_disposition(r109_ambiguous_facts))
+    except RuntimeError as r109_ambiguous_error:
+        r109_ambiguous_fail_closed = "structurally ambiguous" in str(
+            r109_ambiguous_error)
+    else:
+        r109_ambiguous_fail_closed = False
+    r109_disposition_controls_ok = (
+        r109_connected_disposition(r109_missing_facts) == "ABSENT"
+        and r109_connected_disposition(
+            r109_legitimate_effects["local_rename"][2]) == "CONNECTED"
+        and r109_ambiguous_fail_closed)
+
+    def r110_fail_closed(facts: dict[str, object]) -> bool:
+        try:
+            r109_enforce_connected_disposition(
+                r109_connected_disposition(facts))
+        except RuntimeError as error:
+            return "structurally ambiguous" in str(error)
+        return False
+
+    r110_cardinality_controls_ok = (
+        r109_missing_facts.get("consumer_sites") == 0
+        and r109_missing_facts.get("cleanup_sites") == 1
+        and r109_connected_disposition(r109_missing_facts) == "ABSENT"
+        and r110_cleanup_missing_facts.get("consumer_sites") == 1
+        and r110_cleanup_missing_facts.get("cleanup_sites") == 0
+        and r110_cleanup_missing_facts.get("seam_present") is True
+        and r110_cleanup_missing_facts.get("transform_available") is False
+        and r110_fail_closed(r110_cleanup_missing_facts)
+        and r110_cleanup_ambiguous_facts.get("consumer_sites") == 1
+        and r110_cleanup_ambiguous_facts.get("cleanup_sites") == 2
+        and r110_cleanup_ambiguous_facts.get("seam_present") is True
+        and r110_cleanup_ambiguous_facts.get("transform_available") is False
+        and r110_fail_closed(r110_cleanup_ambiguous_facts))
+
+    def cleanup_failure_case(persistent: bool, mutation: str | None = None,
+                             rollback_fault: str | None = None,
+                             unlink_variant: str | None = None,
+                             replacement: str | None = None,
+                             ordering_variant: str | None = None):
         cleanup_repo = make_repo(str(provider))
         targets: list[Path] = []; failures = [0]
         original_popen = module.subprocess.Popen
         original_unlink = module.os.unlink
+        original_remove = module.os.remove
+        original_path_unlink = module.Path.unlink
         original_rmtree = module.shutil.rmtree
         original_consume = getattr(module, "consume_private_result", None)
         original_run_codex = module.run_codex
+        variant_function = None
+        variant_inventory_ok = False
+        variant_source_changed = False
+        variant_facts: dict[str, object] = {}
+        if ordering_variant is not None:
+            variant_function, variant_inventory_ok, variant_facts = (
+                r109_compile_run_codex(source_text, ordering_variant,
+                                       module.__dict__))
+            variant_source_changed = bool(
+                variant_facts.get("transform_available") is True)
         retained_sources: list[tuple[bytes, object, str]] = []
+        published_bindings: list[dict[str, object]] = []
+        rollback_attempts: list[object] = []
+        foreign_attempts: list[object] = []
+        replacement_observations: list[dict[str, object]] = []
+        race_observation: dict[str, object] = {}
+        race_records: list[dict[str, object]] = []
         runs_root = module.journal_root(cleanup_repo) / "runs"
         before_runs = set(runs_root.iterdir()) if runs_root.is_dir() else set()
+        foreign = work / f"r105-foreign-{nonlocal_counter[0]}-{replacement or 'none'}"
+        same_inode_alias = work / f"r106-same-inode-{nonlocal_counter[0]}-{replacement or 'none'}"
+        race_accepted = work / f"r106-race-accepted-{nonlocal_counter[0]}"
+        open_race_accepted = work / f"r107-open-race-accepted-{nonlocal_counter[0]}"
+        if replacement is not None:
+            foreign.write_bytes(b"R105 foreign canonical guard")
 
         def current_canonical() -> Path | None:
             current = set(runs_root.iterdir()) if runs_root.is_dir() else set()
@@ -2691,8 +3465,140 @@ def run_codex(sink, canonical, invocation, run, role):
                 retained_sources.append((raw,
                     strict_json(raw.decode("utf-8", errors="strict")),
                     hashlib.sha256(raw).hexdigest()))
-            return original_consume(sink_fd, canonical_destination,
-                                    invocation_id, run_id, role)
+            returned = original_consume(sink_fd, canonical_destination,
+                                        invocation_id, run_id, role)
+            canonical = Path(canonical_destination).absolute()
+            published_state = rollback_object_state(canonical)
+            canonical_raw = published_state.get("raw")
+            canonical_value = published_state.get("value")
+            if not isinstance(canonical_raw, bytes) or not isinstance(canonical_value, dict):
+                raise RuntimeError("R107 published canonical has no opened bounded state")
+            retained_value = retained_sources[-1][1] if retained_sources else None
+            retained_digest = retained_sources[-1][2] if retained_sources else None
+            published_bindings.append({
+                "path": str(canonical),
+                "dev": published_state.get("dev"),
+                "ino": published_state.get("ino"),
+                "mode": published_state.get("mode"),
+                "nlink": published_state.get("nlink"),
+                "size": published_state.get("size"),
+                "mtime_ns": published_state.get("mtime_ns"),
+                "ctime_ns": published_state.get("ctime_ns"),
+                "digest": published_state.get("digest"),
+                "schema": canonical_result_valid(canonical_value, schema_document),
+                "digest_bound": (retained_digest is not None
+                                 and canonical_value.get("result_sha256") == retained_digest),
+                "value_bound": (retained_value is not None
+                                and canonical_value.get("report") == retained_value),
+                "state": published_state,
+            })
+            if replacement is not None:
+                rollback_fault_active[0] = None
+                if replacement == "symlink":
+                    original_path_unlink(canonical)
+                    canonical.symlink_to(foreign)
+                elif replacement == "hardlink":
+                    original_path_unlink(canonical)
+                    module.os.link(foreign, canonical)
+                elif replacement == "same_inode_nlink":
+                    module.os.link(canonical, same_inode_alias)
+                    original_path_unlink(canonical)
+                    module.os.link(same_inode_alias, canonical)
+                elif replacement == "same_inode_mode":
+                    module.os.link(canonical, same_inode_alias)
+                    original_path_unlink(canonical)
+                    same_inode_alias.chmod(
+                        0o640 if stat.S_IMODE(published_state.get("mode", 0)) != 0o640
+                        else 0o600)
+                    module.os.link(same_inode_alias, canonical)
+                    original_path_unlink(same_inode_alias)
+                elif replacement == "same_inode_value":
+                    module.os.link(canonical, same_inode_alias)
+                    original_path_unlink(canonical)
+                    changed_value = strict_json(canonical_raw.decode("utf-8", errors="strict"))
+                    report = changed_value.get("report") if isinstance(changed_value, dict) else None
+                    summary = report.get("summary") if isinstance(report, dict) else None
+                    if not isinstance(summary, str) or not summary:
+                        raise RuntimeError("R106 mutation has no bounded summary")
+                    report["summary"] = ("X" if summary[0] != "X" else "Y") + summary[1:]
+                    changed_raw = json.dumps(changed_value, ensure_ascii=False,
+                                             separators=(",", ":"), sort_keys=True).encode("utf-8")
+                    if len(changed_raw) != len(canonical_raw):
+                        raise RuntimeError("R106 same-inode mutation changed size")
+                    fd = os.open(same_inode_alias, os.O_WRONLY | os.O_TRUNC)
+                    try:
+                        remaining = memoryview(changed_raw)
+                        while remaining:
+                            count = os.write(fd, remaining)
+                            if count <= 0:
+                                raise OSError("R106 short same-inode mutation")
+                            remaining = remaining[count:]
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
+                    module.os.link(same_inode_alias, canonical)
+                    original_path_unlink(same_inode_alias)
+                elif replacement == "audit_race":
+                    pass
+                elif replacement in {"open_swap", "third_retry_open_swap"}:
+                    fd = os.open(foreign, os.O_WRONLY | os.O_TRUNC)
+                    try:
+                        remaining = memoryview(canonical_raw)
+                        while remaining:
+                            count = os.write(fd, remaining)
+                            if count <= 0:
+                                raise OSError("R107 short foreign-value write")
+                            remaining = remaining[count:]
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
+                else:
+                    raise RuntimeError(f"unsupported R105 replacement: {replacement}")
+                replacement_state = canonical.lstat()
+                try:
+                    current_state = rollback_object_state(canonical)
+                except OSError:
+                    current_state = {"digest": None, "value": None}
+                replacement_observations.append({
+                    "path": str(canonical),
+                    "dev": replacement_state.st_dev,
+                    "ino": replacement_state.st_ino,
+                    "mode": replacement_state.st_mode,
+                    "nlink": replacement_state.st_nlink,
+                    "size": replacement_state.st_size,
+                    "mtime_ns": replacement_state.st_mtime_ns,
+                    "ctime_ns": replacement_state.st_ctime_ns,
+                    "digest": current_state.get("digest"),
+                    "value": current_state.get("value"),
+                    "foreign_dev": foreign.lstat().st_dev,
+                    "foreign_ino": foreign.lstat().st_ino,
+                    "foreign_digest": sha256(foreign),
+                })
+            rollback_fault_active[0] = {
+                "path": canonical,
+                "state": published_state,
+                "fault": rollback_fault,
+                "attempts": rollback_attempts,
+                "foreign_attempts": foreign_attempts,
+            }
+            if replacement == "audit_race":
+                race_record: dict[str, object] = {
+                    "path": canonical, "accepted": race_accepted,
+                    "foreign": foreign, "attempts": rollback_attempts,
+                    "check_saw_expected": False, "swapped": False,
+                }
+                race_records.append(race_record)
+                rollback_race_active[0] = race_record
+            elif replacement in {"open_swap", "third_retry_open_swap"}:
+                race_record = {
+                    "path": canonical, "accepted": open_race_accepted,
+                    "foreign": foreign,
+                    "swap_attempt": 3 if replacement == "third_retry_open_swap" else 1,
+                    "armed": False, "swapped": False,
+                }
+                race_records.append(race_record)
+                rollback_open_race_active[0] = race_record
+            return returned
 
         def repeat_publication_effect() -> None:
             canonical = current_canonical()
@@ -2756,9 +3662,10 @@ def run_codex(sink, canonical, invocation, run, role):
             finally:
                 os.close(fd)
 
+        case_run_codex = variant_function or original_run_codex
         def run_with_mutation(*args, **kwargs):
             try:
-                returned = original_run_codex(*args, **kwargs)
+                returned = case_run_codex(*args, **kwargs)
             except BaseException:
                 if mutation == "repeat_publication":
                     repeat_publication_effect()
@@ -2771,7 +3678,8 @@ def run_codex(sink, canonical, invocation, run, role):
 
         def injected_unlink(path, *args, **kwargs):
             candidate = Path(path)
-            if targets and candidate == targets[-1] and (persistent or failures[0] == 0):
+            if (ordering_variant is None and targets and candidate == targets[-1]
+                    and (persistent or failures[0] == 0)):
                 failures[0] += 1; raise OSError("H032 injected result cleanup failure")
             return original_unlink(path, *args, **kwargs)
         def injected_rmtree(path, *args, **kwargs):
@@ -2780,18 +3688,37 @@ def run_codex(sink, canonical, invocation, run, role):
                     and (persistent or failures[0] == 0):
                 failures[0] += 1; raise OSError("H032 injected result cleanup failure")
             return original_rmtree(path, *args, **kwargs)
+        def aliased_path_unlink(path, *args, **kwargs):
+            if unlink_variant == "os_unlink":
+                return module.os.unlink(path, *args, **kwargs)
+            if unlink_variant == "os_remove":
+                return module.os.remove(path, *args, **kwargs)
+            return original_path_unlink(path, *args, **kwargs)
         module.subprocess.Popen = observe_target
         module.os.unlink = injected_unlink
         module.shutil.rmtree = injected_rmtree
+        if unlink_variant is not None:
+            module.Path.unlink = aliased_path_unlink
         if original_consume is not None:
             module.consume_private_result = retain_then_consume
-        if mutation is not None:
+            if variant_function is not None:
+                variant_function.__globals__["consume_private_result"] = retain_then_consume
+        if ordering_variant is not None:
+            if variant_function is None:
+                raise RuntimeError(f"R108 source variant unavailable: {ordering_variant}")
+            module.run_codex = variant_function
+        elif mutation is not None:
             module.run_codex = run_with_mutation
         try:
             outcome = attempt(cleanup_repo)
         finally:
+            rollback_fault_active[0] = None
+            rollback_race_active[0] = None
+            rollback_open_race_active[0] = None
             module.subprocess.Popen = original_popen
             module.os.unlink = original_unlink
+            module.os.remove = original_remove
+            module.Path.unlink = original_path_unlink
             module.shutil.rmtree = original_rmtree
             if original_consume is not None:
                 module.consume_private_result = original_consume
@@ -2834,12 +3761,102 @@ def run_codex(sink, canonical, invocation, run, role):
             canonical_states.append((str(canonical), present, regular,
                                      schema_valid, digest_bound, value_bound))
         direct_writes = list(observed_cleanup.get("canonical_direct_writes", []))
+        rollback_post = []
+        for binding in published_bindings:
+            canonical = Path(binding["path"])
+            present = canonical.exists() or canonical.is_symlink()
+            post_dev = post_ino = post_mode = post_digest = None
+            if present:
+                try:
+                    post = canonical.lstat()
+                    post_dev, post_ino, post_mode = post.st_dev, post.st_ino, post.st_mode
+                    if stat.S_ISREG(post.st_mode) and not canonical.is_symlink():
+                        post_digest = sha256(canonical)
+                except OSError:
+                    pass
+            rollback_post.append({
+                "path": str(canonical), "present": present,
+                "dev": post_dev, "ino": post_ino, "mode": post_mode,
+                "digest": post_digest,
+            })
+        foreign_post = None
+        if replacement is not None:
+            canonical = Path(published_bindings[-1]["path"]) if published_bindings else None
+            foreign_post = {
+                "guard_present": foreign.exists() and not foreign.is_symlink(),
+                "guard_digest": sha256(foreign) if foreign.exists() and not foreign.is_symlink() else None,
+                "canonical_present": bool(canonical is not None
+                                          and (canonical.exists() or canonical.is_symlink())),
+                "same_inode_alias_present": (same_inode_alias.exists()
+                                              or same_inode_alias.is_symlink()),
+                "race_accepted_present": (race_accepted.exists()
+                                           or race_accepted.is_symlink()),
+            }
+            if replacement == "audit_race":
+                race_state = race_records[-1] if race_records else None
+                accepted_state = (rollback_object_state(race_accepted)
+                                  if race_accepted.exists() and not race_accepted.is_symlink()
+                                  else None)
+                race_observation = {
+                    "check_saw_expected": bool(race_state and race_state.get("check_saw_expected")),
+                    "swapped": bool(race_state and race_state.get("swapped")),
+                    "canonical_absent": bool(canonical is not None
+                                             and not canonical.exists()
+                                             and not canonical.is_symlink()),
+                    "accepted_present": accepted_state is not None,
+                    "accepted_object_content_equal": (
+                        all(accepted_state.get(key)
+                            == published_bindings[-1]["state"].get(key)
+                            for key in ("dev", "ino", "mode", "nlink", "size",
+                                        "digest", "value"))
+                        if accepted_state is not None and published_bindings else False),
+                    "foreign_deleted": not foreign.exists() and not foreign.is_symlink(),
+                }
+            elif replacement in {"open_swap", "third_retry_open_swap"}:
+                race_state = race_records[-1] if race_records else None
+                accepted_state = (rollback_object_state(open_race_accepted)
+                                  if open_race_accepted.exists()
+                                  and not open_race_accepted.is_symlink() else None)
+                current_state = (rollback_object_state(canonical)
+                                 if canonical is not None and canonical.exists()
+                                 and not canonical.is_symlink() else None)
+                race_observation = {
+                    "swap_attempt": (race_state.get("swap_attempt")
+                                     if race_state else None),
+                    "swapped": bool(race_state and race_state.get("swapped")),
+                    "canonical_present": current_state is not None,
+                    "foreign_preserved_at_canonical": bool(
+                        current_state is not None and replacement_observations
+                        and (current_state.get("dev"), current_state.get("ino"))
+                            == (replacement_observations[0].get("foreign_dev"),
+                                replacement_observations[0].get("foreign_ino"))),
+                    "accepted_present": accepted_state is not None,
+                    "accepted_object_equal": bool(
+                        accepted_state is not None and published_bindings
+                        and all(accepted_state.get(key)
+                                == published_bindings[-1]["state"].get(key)
+                                for key in ("dev", "ino", "mode", "nlink", "size",
+                                            "digest", "value"))),
+                }
+        attempt_residue = {
+            "private_paths_present": list(observed_cleanup.get(
+                "private_paths_present", [])),
+            "sink_fd_aliases": list(observed_cleanup.get("sink_fd_aliases", [])),
+            "provider_process_starts": observed_cleanup.get(
+                "provider_process_starts"),
+            "source_variant": ordering_variant,
+            "source_changed": variant_source_changed,
+            "inventory_ok": variant_inventory_ok,
+        }
         result = (outcome, failures[0], list(outcome[4]),
                   sorted({str(path) for path in transport_residue}),
                   canonical_states, canonical_epochs,
                   (len(retained_sources), retained_digest,
                    len(retained_raw) if retained_raw is not None else None),
-                  direct_writes)
+                  direct_writes, published_bindings, list(rollback_attempts),
+                  list(foreign_attempts), rollback_post,
+                  replacement_observations, foreign_post, race_observation,
+                  attempt_residue)
         # Gate-owned cleanup happens only after the complete attempt residue and
         # private-parent observations have been retained in result.
         for target in targets:
@@ -2858,6 +3875,18 @@ def run_codex(sink, canonical, invocation, run, role):
                     if not candidate.is_symlink(): candidate.chmod(0o700)
                 Path(root_path).chmod(0o700)
             shutil.rmtree(cleanup_arena)
+        for binding in published_bindings:
+            canonical = Path(binding["path"])
+            if canonical.exists() or canonical.is_symlink():
+                original_path_unlink(canonical)
+        if foreign.exists() or foreign.is_symlink():
+            original_path_unlink(foreign)
+        if same_inode_alias.exists() or same_inode_alias.is_symlink():
+            original_path_unlink(same_inode_alias)
+        if race_accepted.exists() or race_accepted.is_symlink():
+            original_path_unlink(race_accepted)
+        if open_race_accepted.exists() or open_race_accepted.is_symlink():
+            original_path_unlink(open_race_accepted)
         return result
     transient_cleanup = cleanup_failure_case(False)
     persistent_cleanup = cleanup_failure_case(True)
@@ -2867,6 +3896,222 @@ def run_codex(sink, canonical, invocation, run, role):
         True, "hardlink_publication")
     stale_canonical_cleanup = cleanup_failure_case(
         False, "stale_canonical")
+    rollback_path_persistent = cleanup_failure_case(
+        True, rollback_fault="persistent")
+    rollback_os_unlink_persistent = cleanup_failure_case(
+        True, rollback_fault="persistent", unlink_variant="os_unlink")
+    rollback_os_remove_persistent = cleanup_failure_case(
+        True, rollback_fault="persistent", unlink_variant="os_remove")
+    rollback_first_failure = cleanup_failure_case(
+        True, rollback_fault="first")
+    rollback_final_retry = cleanup_failure_case(
+        True, rollback_fault="first_two")
+    rollback_symlink_replacement = cleanup_failure_case(
+        True, replacement="symlink")
+    rollback_hardlink_replacement = cleanup_failure_case(
+        True, replacement="hardlink")
+    rollback_same_inode_nlink = cleanup_failure_case(
+        True, replacement="same_inode_nlink")
+    rollback_same_inode_mode = cleanup_failure_case(
+        True, replacement="same_inode_mode")
+    rollback_same_inode_value = cleanup_failure_case(
+        True, replacement="same_inode_value")
+    rollback_post_check_race = cleanup_failure_case(
+        True, replacement="audit_race")
+    rollback_open_swap = cleanup_failure_case(
+        True, replacement="open_swap")
+    rollback_third_retry_open_swap = cleanup_failure_case(
+        True, rollback_fault="first_two", replacement="third_retry_open_swap")
+    _r109_probe_tree, r109_connected_probe = r109_transform_tree(
+        source_text, "cleanup_before")
+    r109_consumer_seam_present = (
+        r109_connected_probe.get("seam_present") is True)
+    r109_transform_available = (
+        r109_consumer_seam_present
+        and all(r109_transform_tree(source_text, ordering)[1].get(
+                    "transform_available") is True
+                for ordering in ("cleanup_before", "publish_before", "disconnected")))
+    r109_actual_disposition = r109_connected_disposition({
+        "seam_present": r109_consumer_seam_present,
+        "transform_available": r109_transform_available,
+    })
+    r109_enforce_connected_disposition(r109_actual_disposition)
+    r108_cleanup_before = (cleanup_failure_case(
+        True, ordering_variant="cleanup_before")
+        if r109_transform_available else None)
+    r108_publish_before = (cleanup_failure_case(
+        True, ordering_variant="publish_before")
+        if r109_transform_available else None)
+    r108_disconnected = (cleanup_failure_case(
+        True, ordering_variant="disconnected")
+        if r109_transform_available else None)
+
+    def exact_published_binding(case) -> bool:
+        if len(case[8]) != 1:
+            return False
+        binding = case[8][0]
+        return (stat.S_ISREG(binding.get("mode", 0))
+                and binding.get("schema") is True
+                and binding.get("digest_bound") is True
+                and binding.get("value_bound") is True)
+
+    def rollback_fault_safe(case, minimum_attempts: int) -> bool:
+        rejected_absent = (case[1] > 0 and not case[0][0]
+                           and "cleanup" in case[0][1].lower()
+                           and not case[7]
+                           and not any(state[1] for state in case[4])
+                           and not case[10])
+        cleanup_before_publication = (
+            not case[8] and not case[5] and not case[9] and not case[11])
+        published_then_rolled_back = (
+            exact_published_binding(case)
+            and len(case[5]) == 1
+            and len(case[9]) >= minimum_attempts
+            and len(case[11]) == 1
+            and case[11][0].get("present") is False)
+        return rejected_absent and (
+            cleanup_before_publication or published_then_rolled_back)
+
+    rollback_fault_controls_ok = (
+        rollback_fault_safe(rollback_path_persistent, 3)
+        and rollback_fault_safe(rollback_os_unlink_persistent, 3)
+        and rollback_fault_safe(rollback_os_remove_persistent, 3)
+        and rollback_fault_safe(rollback_first_failure, 1)
+        and rollback_fault_safe(rollback_final_retry, 3))
+
+    def replacement_safe(case, expected_kind: int) -> bool:
+        observation = case[12][0] if len(case[12]) == 1 else {}
+        foreign_post = case[13] if isinstance(case[13], dict) else {}
+        rejected = (case[1] > 0 and not case[0][0]
+                    and "cleanup" in case[0][1].lower()
+                    and not case[7] and not case[9]
+                    and foreign_post.get("guard_present") is True
+                    and foreign_post.get("guard_digest")
+                        == hashlib.sha256(b"R105 foreign canonical guard").hexdigest())
+        cleanup_before_publication = (
+            not case[8] and not case[5] and not case[10] and not case[11]
+            and not case[12] and foreign_post.get("canonical_present") is False)
+        protected_replacement = (
+            exact_published_binding(case)
+            and stat.S_IFMT(observation.get("mode", 0)) == expected_kind
+            and not case[10]
+            and foreign_post.get("canonical_present") is True)
+        return rejected and (cleanup_before_publication or protected_replacement)
+
+    rollback_identity_controls_ok = (
+        replacement_safe(rollback_symlink_replacement, stat.S_IFLNK)
+        and replacement_safe(rollback_hardlink_replacement, stat.S_IFREG)
+        and replacement_safe(rollback_same_inode_nlink, stat.S_IFREG)
+        and replacement_safe(rollback_same_inode_mode, stat.S_IFREG)
+        and replacement_safe(rollback_same_inode_value, stat.S_IFREG))
+
+    def same_inode_change_observed(case, change: str) -> bool:
+        if not case[8] or len(case[12]) != 1:
+            return True  # cleanup-before-publication: no rollback authority exercised
+        binding = case[8][0]
+        observation = case[12][0]
+        common = ((binding.get("dev"), binding.get("ino"))
+                  == (observation.get("dev"), observation.get("ino")))
+        if change == "nlink":
+            changed = (observation.get("nlink") != binding.get("nlink")
+                       and observation.get("digest") == binding.get("digest")
+                       and observation.get("value") == binding.get("state", {}).get("value"))
+        elif change == "mode":
+            changed = (observation.get("mode") != binding.get("mode")
+                       and observation.get("digest") == binding.get("digest")
+                       and observation.get("value") == binding.get("state", {}).get("value"))
+        elif change == "value":
+            changed = (observation.get("digest") != binding.get("digest")
+                       and observation.get("value") != binding.get("state", {}).get("value"))
+        else:
+            return False
+        return common and changed
+
+    same_inode_controls_ok = (
+        same_inode_change_observed(rollback_same_inode_nlink, "nlink")
+        and same_inode_change_observed(rollback_same_inode_mode, "mode")
+        and same_inode_change_observed(rollback_same_inode_value, "value"))
+
+    def rollback_race_safe(case) -> bool:
+        foreign_post = case[13] if isinstance(case[13], dict) else {}
+        race = case[14] if isinstance(case[14], dict) else {}
+        cleanup_before_publication = (
+            case[1] > 0 and not case[0][0]
+            and "cleanup" in case[0][1].lower()
+            and not case[5] and not case[7] and not case[8]
+            and not case[9] and not case[10] and not case[11] and not case[12]
+            and foreign_post.get("guard_present") is True
+            and foreign_post.get("canonical_present") is False
+            and not race)
+        # Once a rollback syscall is entered, the ordered later hook proves the
+        # path operation cannot identify what the syscall actually removes.
+        return cleanup_before_publication
+
+    rollback_race_control_ok = rollback_race_safe(rollback_post_check_race)
+
+    def rollback_open_swap_safe(case, expected_attempts: int) -> bool:
+        foreign_post = case[13] if isinstance(case[13], dict) else {}
+        race = case[14] if isinstance(case[14], dict) else {}
+        cleanup_before_publication = (
+            case[1] > 0 and not case[0][0]
+            and "cleanup" in case[0][1].lower()
+            and not case[5] and not case[7] and not case[8]
+            and not case[9] and not case[10] and not case[11] and not case[12]
+            and foreign_post.get("canonical_present") is False and not race)
+        protected_open_swap = (
+            exact_published_binding(case)
+            and case[1] > 0 and not case[0][0]
+            and len(case[9]) == expected_attempts
+            and len(case[10]) >= 1
+            and case[10][-1].get("opened") is True
+            and case[10][-1].get("path_bound") is True
+            and case[10][-1].get("devino_equal") is False
+            and case[10][-1].get("raw_equal") is True
+            and race.get("swapped") is True
+            and race.get("foreign_preserved_at_canonical") is True
+            and race.get("accepted_present") is True
+            and race.get("accepted_object_equal") is True)
+        return cleanup_before_publication or protected_open_swap
+
+    rollback_open_swap_controls_ok = (
+        rollback_open_swap_safe(rollback_open_swap, 0)
+        and rollback_open_swap_safe(rollback_third_retry_open_swap, 2))
+
+    def r108_cleanup_before_safe(case) -> bool:
+        if case is None:
+            return False
+        residue = case[15] if len(case) > 15 and isinstance(case[15], dict) else {}
+        return (
+            not case[0][0] and "stop:" in case[0][1].lower()
+            and "cleanup" in case[0][1].lower()
+            and case[1] >= 3
+            and not case[2] and not case[3]
+            and all(state[1] is False for state in case[4])
+            and not case[5] and not case[7] and not case[8]
+            and not case[9] and not case[10] and not case[11]
+            and not case[12] and not case[14]
+            and residue.get("provider_process_starts") == 1
+            and residue.get("source_variant") == "cleanup_before"
+            and residue.get("source_changed") is True
+            and residue.get("inventory_ok") is True
+            and residue.get("private_paths_present") == []
+            and residue.get("sink_fd_aliases") == [])
+
+    r108_cleanup_before_connected_ok = (
+        r108_cleanup_before_safe(r108_cleanup_before)
+        if r109_transform_available else not r109_consumer_seam_present)
+    r108_publish_before_mutant_caught = (
+        not r108_cleanup_before_safe(r108_publish_before)
+        if r109_transform_available else not r109_consumer_seam_present)
+    r108_disconnected_mutant_caught = (
+        not r108_cleanup_before_safe(r108_disconnected)
+        if r109_transform_available else not r109_consumer_seam_present)
+    r108_connected_controls_ok = (
+        (not r109_consumer_seam_present or r109_transform_available)
+        and
+        r108_cleanup_before_connected_ok
+        and r108_publish_before_mutant_caught
+        and r108_disconnected_mutant_caught)
     cleanup_rig_ok = (
         repeated_publication_cleanup[1] > 0
         and not repeated_publication_cleanup[0][0]
@@ -2896,6 +4141,15 @@ def run_codex(sink, canonical, invocation, run, role):
         and not persistent_cleanup[2] and not persistent_cleanup[3]
         and not any(state[1] for state in persistent_cleanup[4])
         and len(persistent_cleanup[5]) <= 1
+        and rollback_fault_controls_ok and rollback_identity_controls_ok
+        and same_inode_controls_ok and rollback_race_control_ok
+        and rollback_open_swap_controls_ok
+        and r109_source_ordering_rig_ok
+        and r109_legitimate_variants_ok
+        and r109_seam_cardinality_controls_ok
+        and r109_disposition_controls_ok
+        and r110_cardinality_controls_ok
+        and r108_connected_controls_ok
         and cleanup_rig_ok)
 
     def result_root_ordinal_discovery():
@@ -6858,6 +8112,135 @@ class CraftedConcretePath(type(Path())):
                                  hashlib.sha256(raw).hexdigest(),
                                  before.st_dev,before.st_ino,not live_sink.parent.exists())
     result_delivery_ok = deterministic_result_ok and exact_owner_live_ok
+    def r105_case_evidence(case):
+        return {
+            "admitted": case[0][0], "error": case[0][1],
+            "staging_cleanup_failures": case[1],
+            "canonical_present": [state[1] for state in case[4]],
+            "visibility_epochs": len(case[5]),
+            "direct_writes": len(case[7]),
+            "published": [{key: value for key, value in binding.items()
+                           if key not in {"path", "dev", "ino", "state"}}
+                          for binding in case[8]],
+            "rollback_attempts": len(case[9]),
+            "foreign_attempts": len(case[10]),
+            "post_present": [state.get("present") for state in case[11]],
+            "replacement_modes": [stat.S_IFMT(state.get("mode", 0))
+                                  for state in case[12]],
+            "foreign_post": case[13],
+        }
+    print("R105_BOUND_EVIDENCE=" + json.dumps({
+        "fault_rig_ok": rollback_fault_rig_ok,
+        "fault_controls_ok": rollback_fault_controls_ok,
+        "identity_controls_ok": rollback_identity_controls_ok,
+        "fault_cases": {
+            "path_persistent": r105_case_evidence(rollback_path_persistent),
+            "os_unlink_persistent": r105_case_evidence(rollback_os_unlink_persistent),
+            "os_remove_persistent": r105_case_evidence(rollback_os_remove_persistent),
+            "first_failure": r105_case_evidence(rollback_first_failure),
+            "final_retry_failure": r105_case_evidence(rollback_final_retry),
+        },
+        "replacement_cases": {
+            "symlink": r105_case_evidence(rollback_symlink_replacement),
+            "hardlink": r105_case_evidence(rollback_hardlink_replacement),
+        },
+        "schema_version": 1, "task": "h-032",
+    }, sort_keys=True, separators=(",", ":")))
+    def r106_state_evidence(case):
+        binding = case[8][0] if len(case[8]) == 1 else {}
+        observed = case[12][0] if len(case[12]) == 1 else {}
+        return {
+            "published": bool(binding),
+            "same_devino": ((binding.get("dev"), binding.get("ino"))
+                             == (observed.get("dev"), observed.get("ino"))
+                             if binding and observed else None),
+            "mode_changed": (binding.get("mode") != observed.get("mode")
+                             if binding and observed else None),
+            "nlink_changed": (binding.get("nlink") != observed.get("nlink")
+                              if binding and observed else None),
+            "digest_changed": (binding.get("digest") != observed.get("digest")
+                               if binding and observed else None),
+            "value_changed": (binding.get("state", {}).get("value")
+                              != observed.get("value") if binding and observed else None),
+            "removal_attempts": len(case[9]),
+            "state_mismatches": case[10],
+            "canonical_present": bool(case[13] and case[13].get("canonical_present")),
+            "race": case[14],
+        }
+    print("R106_BOUND_EVIDENCE=" + json.dumps({
+        "fault_rig_ok": rollback_fault_rig_ok,
+        "full_state_rig_ok": rollback_full_state_rig_ok,
+        "race_rig_ok": rollback_race_rig_ok,
+        "fault_controls_ok": rollback_fault_controls_ok,
+        "identity_controls_ok": rollback_identity_controls_ok,
+        "same_inode_controls_ok": same_inode_controls_ok,
+        "race_control_ok": rollback_race_control_ok,
+        "same_inode": {
+            "nlink": r106_state_evidence(rollback_same_inode_nlink),
+            "mode": r106_state_evidence(rollback_same_inode_mode),
+            "value": r106_state_evidence(rollback_same_inode_value),
+        },
+        "post_check_race": r106_state_evidence(rollback_post_check_race),
+        "schema_version": 1, "task": "h-032",
+    }, sort_keys=True, separators=(",", ":")))
+    print("R107_BOUND_EVIDENCE=" + json.dumps({
+        "single_opened_state": True,
+        "open_swap_rig_ok": rollback_open_swap_rig_ok,
+        "third_retry_open_swap_rig_ok": rollback_third_retry_open_swap_rig_ok,
+        "open_swap_controls_ok": rollback_open_swap_controls_ok,
+        "first_open_swap": r106_state_evidence(rollback_open_swap),
+        "third_retry_open_swap": r106_state_evidence(
+            rollback_third_retry_open_swap),
+        "cleanup_before_publication_positive": (
+            not rollback_open_swap[8] and not rollback_open_swap[5]
+            if not rollback_open_swap[8] else None),
+        "schema_version": 1, "task": "h-032",
+    }, sort_keys=True, separators=(",", ":")))
+    def r108_case_evidence(case):
+        if case is None:
+            return None
+        residue = case[15] if len(case) > 15 else {}
+        return {
+            "admitted": case[0][0], "error": case[0][1],
+            "cleanup_failures": case[1],
+            "attempt_residue": case[2], "transport_residue": case[3],
+            "canonical_present": [state[1] for state in case[4]],
+            "visibility_epochs": len(case[5]),
+            "canonical_removals": len(case[9]),
+            "published_bindings": len(case[8]),
+            "private_paths_present": residue.get("private_paths_present"),
+            "sink_fd_aliases": residue.get("sink_fd_aliases"),
+            "provider_process_starts": residue.get("provider_process_starts"),
+            "source_variant": residue.get("source_variant"),
+            "source_changed": residue.get("source_changed"),
+            "inventory_ok": residue.get("inventory_ok"),
+        }
+    print("R110_BOUND_EVIDENCE=" + json.dumps({
+        "source_ordering_rig_ok": r109_source_ordering_rig_ok,
+        "fixture_effects": r109_fixture_effects,
+        "legitimate_variants_ok": r109_legitimate_variants_ok,
+        "legitimate_effects": r109_legitimate_effects,
+        "seam_cardinality_controls_ok": r109_seam_cardinality_controls_ok,
+        "disposition_controls_ok": r109_disposition_controls_ok,
+        "ambiguous_fail_closed": r109_ambiguous_fail_closed,
+        "missing_facts": r109_missing_facts,
+        "ambiguous_facts": r109_ambiguous_facts,
+        "cleanup_missing_facts": r110_cleanup_missing_facts,
+        "cleanup_ambiguous_facts": r110_cleanup_ambiguous_facts,
+        "cardinality_controls_ok": r110_cardinality_controls_ok,
+        "consumer_seam_present": r109_consumer_seam_present,
+        "transform_available": r109_transform_available,
+        "actual_disposition": r109_actual_disposition,
+        "connected_probe": r109_connected_probe,
+        "cleanup_before_connected_ok": r108_cleanup_before_connected_ok,
+        "publish_before_mutant_caught": r108_publish_before_mutant_caught,
+        "disconnected_mutant_caught": r108_disconnected_mutant_caught,
+        "connected_controls_ok": r108_connected_controls_ok,
+        "cleanup_before": r108_case_evidence(r108_cleanup_before),
+        "publish_before": r108_case_evidence(r108_publish_before),
+        "disconnected": r108_case_evidence(r108_disconnected),
+        "schema_version": 1, "task": "h-032",
+    }, sort_keys=True, separators=(",", ":")))
     print("R60_BOUND_EVIDENCE=" + json.dumps({
         "candidate_sha": git_repository_head(repo),
         "journal_parser_rig_ok": journal_parser_rig_ok,
@@ -6874,12 +8257,21 @@ class CraftedConcretePath(type(Path())):
     }, sort_keys=True, separators=(",", ":")))
     check("J_RESULT_KERNEL_RIG", kernel_inventory_rig_ok and integration_rig_ok
           and kernel_oracle_rig_ok and reference_effect_rig_ok
-          and r55_complete_residue_oracle_ok and r56_setup_oracle_ok,
-          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} captured_predicates={(fresh_success(reference_cases['valid'],rig_valid_raw),reference_cases['valid'].get('primitive_counts'),fresh_success(captured_reference_case,rig_valid_raw),outside_blocked(import_probe_case,True),outside_blocked(captured_stat_case,True),fresh_success(path_positive_case,rig_valid_raw),environb_case.get('accepted'),getenvb_case.get('accepted'))} r51_inroot={(r51_inroot_case.get('accepted'),r51_inroot_case.get('error'),r51_inroot_case.get('transition_ok'),r51_inroot_case.get('publication_ok'),r51_inroot_case.get('temps'),r51_inroot_case.get('outside'),r51_inroot_case.get('primitive_counts'))} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught} r102_link={r102_link_publication_rig_ok,link_publication_positive,path_link_publication_positive,link_alias_inventory[0],link_helper_inventory[0],link_same_name_helper_inventory[0],link_wrong_source_case.get('transition_ok'),bool(link_wrong_destination_case.get('outside')),link_preseed_case.get('accepted'),len(link_multiple_case.get('transitions',[]))} r103={dirfd_publication_positive,dirfd_publication_inventory[0],dirfd_publication_case.get('accepted'),dirfd_publication_case.get('error'),dirfd_publication_case.get('transitions'),{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in stale_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in failed_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('outside'),case.get('temps'),case.get('canonical')) for name,case in dirfd_negative_cases.items()}} r104={r104_residue_mutants_caught,{name:(dirfd_reject_clean(case),case.get('attempt_object_delta'),case.get('attempt_fd_aliases')) for name,case in dirfd_negative_cases.items()},(cleanup_leak_case.get('temps'),cleanup_leak_case.get('attempt_object_delta'),cleanup_leak_case.get('attempt_fd_aliases')),(fd_alias_leak_case.get('temps'),fd_alias_leak_case.get('attempt_object_delta'),fd_alias_leak_case.get('attempt_fd_aliases'))}")
+          and r55_complete_residue_oracle_ok and r56_setup_oracle_ok
+          and rollback_fault_rig_ok and rollback_full_state_rig_ok
+          and rollback_race_rig_ok and rollback_open_swap_rig_ok
+          and rollback_third_retry_open_swap_rig_ok
+          and r109_source_ordering_rig_ok
+          and r109_legitimate_variants_ok
+          and r109_seam_cardinality_controls_ok
+          and r109_disposition_controls_ok
+          and r110_cardinality_controls_ok
+          and r108_connected_controls_ok,
+          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} captured_predicates={(fresh_success(reference_cases['valid'],rig_valid_raw),reference_cases['valid'].get('primitive_counts'),fresh_success(captured_reference_case,rig_valid_raw),outside_blocked(import_probe_case,True),outside_blocked(captured_stat_case,True),fresh_success(path_positive_case,rig_valid_raw),environb_case.get('accepted'),getenvb_case.get('accepted'))} r51_inroot={(r51_inroot_case.get('accepted'),r51_inroot_case.get('error'),r51_inroot_case.get('transition_ok'),r51_inroot_case.get('publication_ok'),r51_inroot_case.get('temps'),r51_inroot_case.get('outside'),r51_inroot_case.get('primitive_counts'))} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught} r102_link={r102_link_publication_rig_ok,link_publication_positive,path_link_publication_positive,link_alias_inventory[0],link_helper_inventory[0],link_same_name_helper_inventory[0],link_wrong_source_case.get('transition_ok'),bool(link_wrong_destination_case.get('outside')),link_preseed_case.get('accepted'),len(link_multiple_case.get('transitions',[]))} r103={dirfd_publication_positive,dirfd_publication_inventory[0],dirfd_publication_case.get('accepted'),dirfd_publication_case.get('error'),dirfd_publication_case.get('transitions'),{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in stale_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in failed_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in dirfd_negative_cases.items()}} r104={r104_residue_mutants_caught} r105={rollback_fault_rig_ok} r106={rollback_full_state_rig_ok,rollback_race_rig_ok} r107={rollback_open_swap_rig_ok,rollback_third_retry_open_swap_rig_ok}")
     def cleanup_detail(case):
         return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
-          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
+          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} r105_cleanup={(rollback_fault_controls_ok,rollback_identity_controls_ok,[(len(case[8]),len(case[9]),len(case[10]),case[11]) for case in (rollback_path_persistent,rollback_os_unlink_persistent,rollback_os_remove_persistent,rollback_first_failure,rollback_final_retry)],[(case[12],case[13],case[10]) for case in (rollback_symlink_replacement,rollback_hardlink_replacement)])} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
     check("K1", family_absent or (valid[0] and valid[2] == 1), f"valid={valid}")
     check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
     check("K3", family_absent or (argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash),
