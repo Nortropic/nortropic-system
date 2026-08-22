@@ -853,8 +853,7 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
     sink_fd = -1
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
-        result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-",
-                                            dir="/private/tmp"))
+        result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-"))
         root_stat = result_root.lstat()
         result_root_identity = (root_stat.st_dev, root_stat.st_ino)
         live_root = repo.resolve()
@@ -966,12 +965,13 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
             raise Stop("provider result transport identity changed")
         # Pathless handoff: the complete attempt-private execution family must
         # already be absent at the consumer boundary while the original opened
-        # descriptor alone carries the result forward.
+        # descriptor alone carries the result forward.  A degraded primary
+        # teardown fails closed here, before any canonical publication.
         for _cleanup_attempt in range(3):
             if not snapshot_root.exists():
                 break
             try:
-                os.chmod(snapshot_root, 0o700)
+                snapshot_root.chmod(0o700)
             except OSError:
                 pass
             try:
@@ -982,22 +982,28 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
                 break
         if snapshot_root.exists():
             raise Stop("private provider execution family cleanup incomplete")
-        sink_unlink_failures = 0
+        retire_failures = 0
         for _cleanup_attempt in range(3):
             try:
-                os.unlink(result_sink)
+                shutil.rmtree(result_root)
                 break
             except FileNotFoundError:
                 break
             except OSError:
-                sink_unlink_failures += 1
-        else:
+                retire_failures += 1
+        if retire_failures == 3:
             try:
-                os.remove(result_sink)
-            except FileNotFoundError:
+                result_sink.unlink()
+            except OSError:
                 pass
-        if sink_unlink_failures == 3 or os.path.lexists(result_sink):
-            raise Stop("private result sink cleanup incomplete")
+            try:
+                result_root.rmdir()
+            except OSError:
+                pass
+        if (retire_failures == 3
+                or result_sink.exists() or result_sink.is_symlink()
+                or result_root.exists() or result_root.is_symlink()):
+            raise Stop("private result staging cleanup incomplete")
         handoff_identity = os.fstat(sink_fd)
         if (not stat.S_ISREG(handoff_identity.st_mode)
                 or handoff_identity.st_nlink != 0
