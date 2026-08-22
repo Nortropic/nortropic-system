@@ -851,10 +851,10 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
     result_root: Path | None = None
     result_root_identity: tuple[int, int] | None = None
     sink_fd = -1
-    canonical_published = False
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
-        result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-"))
+        result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-",
+                                            dir="/private/tmp"))
         root_stat = result_root.lstat()
         result_root_identity = (root_stat.st_dev, root_stat.st_ino)
         live_root = repo.resolve()
@@ -874,13 +874,16 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
         )
         try:
             os.fsync(create_fd)
+            # The retained read-only descriptor is opened while the writable
+            # create descriptor is still held, so their numbers can never
+            # coincide and the retained identity stays uniquely attributable.
+            sink_fd = os.open(
+                result_sink,
+                os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+            )
         finally:
             os.close(create_fd)
-        sink_fd = os.open(
-            result_sink,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0),
-        )
         sink_identity = os.fstat(sink_fd)
         if (not stat.S_ISREG(sink_identity.st_mode) or sink_identity.st_nlink != 1
                 or stat.S_IMODE(sink_identity.st_mode) != 0o600
@@ -961,9 +964,48 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
                     != (opened_identity.st_dev, opened_identity.st_ino)
                 or sorted(path.name for path in result_root.iterdir()) != [result_sink.name]):
             raise Stop("provider result transport identity changed")
+        # Pathless handoff: the complete attempt-private execution family must
+        # already be absent at the consumer boundary while the original opened
+        # descriptor alone carries the result forward.
+        for _cleanup_attempt in range(3):
+            if not snapshot_root.exists():
+                break
+            try:
+                os.chmod(snapshot_root, 0o700)
+            except OSError:
+                pass
+            try:
+                shutil.rmtree(snapshot_root)
+            except OSError:
+                pass
+            else:
+                break
+        if snapshot_root.exists():
+            raise Stop("private provider execution family cleanup incomplete")
+        sink_unlink_failures = 0
+        for _cleanup_attempt in range(3):
+            try:
+                os.unlink(result_sink)
+                break
+            except FileNotFoundError:
+                break
+            except OSError:
+                sink_unlink_failures += 1
+        else:
+            try:
+                os.remove(result_sink)
+            except FileNotFoundError:
+                pass
+        if sink_unlink_failures == 3 or os.path.lexists(result_sink):
+            raise Stop("private result sink cleanup incomplete")
+        handoff_identity = os.fstat(sink_fd)
+        if (not stat.S_ISREG(handoff_identity.st_mode)
+                or handoff_identity.st_nlink != 0
+                or (handoff_identity.st_dev, handoff_identity.st_ino)
+                    != (opened_identity.st_dev, opened_identity.st_ino)):
+            raise Stop("retained result sink lost its handoff identity")
         _LAST_AGENT_CONTEXT = (thread_id, events, result)
         accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
-        canonical_published = True
         return accepted
     finally:
         cleanup_errors: list[OSError] = []
@@ -1003,16 +1045,6 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
         cleanup_incomplete = (
             bool(result_residue) or snapshot_root.exists() or result_cleanup_degraded
         )
-        if cleanup_incomplete and canonical_published:
-            for _cleanup_attempt in range(3):
-                try:
-                    result.unlink()
-                except FileNotFoundError:
-                    break
-                except OSError as exc:
-                    cleanup_errors.append(exc)
-                else:
-                    break
         if cleanup_incomplete:
             cause = cleanup_errors[-1] if cleanup_errors else None
             raise Stop("private execution staging cleanup incomplete") from cause

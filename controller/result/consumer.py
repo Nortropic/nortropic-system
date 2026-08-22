@@ -106,7 +106,7 @@ def consume_private_result(sink_fd, canonical_destination, invocation_id, run_id
         before = _fstat(sink_fd)
         if access != os.O_RDONLY or not (fdflags & fcntl.FD_CLOEXEC):
             raise ValueError("unsafe sink fd")
-        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 0:
             raise ValueError("unsafe sink object")
         _path_stat(os.path.dirname(os.fspath(canonical_destination)))
         if os.path.lexists(canonical_destination):
