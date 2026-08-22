@@ -2113,3 +2113,69 @@ complete predicate, and substituting either into the ordinary negative family ma
 Judge cleanup occurs only after this observation and cannot grant credit. All R102/R103 positive
 publication forms and retained-value, fsync and transition semantics remain unchanged; no
 production or live/provider behavior is executed.
+
+## 2026-08-22 — R107 one-opened-object rollback state
+
+Independent review found one remaining split observation in R106: the rollback state copied
+metadata from pathname `lstat` and then read bytes through a separate pathname open. A swap in
+that interval could combine accepted metadata with identical foreign bytes and falsely compare
+equal before a blind unlink removed the foreign object.
+
+R107 obtains every published and rollback state from one `O_NOFOLLOW` read-only fd. That same fd
+provides fstat, bounded bytes/digest/value and a second stable fstat; no pathname metadata is
+mixed into the state. The current canonical pathname is rebound to the opened metadata at the
+removal event, but this does not claim pathname unlink is race-free: R106's later audit swap still
+rejects it.
+
+Connected D01 controls swap an identical-byte foreign inode during the exact internal open on
+the first removal and on retry three after two causal injected failures. In both cases the opened
+foreign identity mismatches the retained accepted object, the foreign remains at canonical, the
+accepted object survives aside, and no deletion/absence credit is granted. Unconditional probes
+exercise both ordinals. Cleanup-before-publication remains the API-neutral zero-epoch,
+zero-removal positive. R100-R106 closures remain unchanged; no production or live/provider work
+is performed.
+
+## 2026-08-22 — R105 persistent-cleanup rollback identity
+
+Independent product review found that the D01 controller correctly rejected persistent private
+staging cleanup failure, but its subsequent `Path.unlink` rollback could fail persistently and
+leave the already accepted canonical `result.json` visible. R104 injected `os.unlink` at the
+staging leaf and therefore did not measure that distinct final rollback effect.
+
+R105 retains the accepted private sink bytes, report and digest and captures the published
+canonical's no-follow regular device/inode and strict envelope before the cleanup fault. The same
+connected attempt then injects the underlying removal audit effect through direct `Path.unlink`,
+`os.unlink` and `os.remove` spellings. Persistent rollback faults must reject and can never claim
+canonical absence; first-only and first-two faults are legitimate only when a bounded retry
+actually establishes no-follow absence. The unconditional rig proves these effects directly.
+
+Replacement controls remove the accepted object only inside the judge and install either a
+symlink or a hardlinked foreign guard before rollback. A conforming implementation must compare
+the current no-follow identity with the retained published identity and refuse to unlink the
+replacement; the attempt remains rejected/ODOMBAR and both replacement and guard are observed
+intact. Judge cleanup follows the complete observation. Cleanup-before-publication remains free,
+and R100-R104 transition cardinality, retained-value, fsync, no-replace and residue closures are
+unchanged. No production or live/provider execution is performed by this amendment.
+
+## 2026-08-22 — R106 full-state rollback and post-check race
+
+Independent review showed that R105 authorized the actual removal from device/inode alone. A
+same-inode hardlink/relink can change link count, mode or exact value/digest, and a later audit
+hook can replace the checked path after that comparison but before the removal syscall. The
+first case made altered state look accepted; the second let a blind path unlink delete a foreign
+object.
+
+R106 binds the decision to the complete no-follow published state: type, mode, nlink, size,
+mtime/ctime, bounded bytes/digest, strict envelope and retained provider value. Connected D01
+attempts change nlink, mode and a same-length strict value on the same inode and require rejection
+without removal. A separately ordered later audit hook observes the exact accepted check, swaps
+that object aside, installs a foreign object, and lets the pending syscall demonstrate why a
+check-then-path-unlink is not safe rollback authority. That attempt must reject; no precheck or
+trace alone grants absence.
+
+The API-neutral positive is cleanup before canonical publication: zero visibility epochs, zero
+rollback attempts and final absence. A post-publication implementation remains possible only if
+its actual mechanism causally proves removal of the accepted full state without deleting a
+replacement; otherwise it fails closed. Judge cleanup follows complete evidence. R100-R105
+publication, retained-value, fsync, transition and residue closures are unchanged, and no
+production or live/provider behavior is executed.
