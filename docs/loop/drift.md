@@ -2243,3 +2243,29 @@ must be 0/1, 1/0 and 1/2 respectively; the latter two raise the rig failure befo
 predicates can default. R109's rename, direct-return, helper-relay, try/except/finally,
 duplicate-consumer and full-attempt ordering controls remain unchanged. This adds no general
 control-flow interpretation, production edit or live/provider execution.
+
+## 2026-08-22 — R111 pathless retained-sink handoff
+
+Builder measurability and independent authority review found a contradiction between the
+race-free cleanup-before-publication architecture and the frozen nlink-one consumer entry.
+Removing the sole private sink pathname while retaining its already-open fd necessarily changes
+the same regular object to nlink zero. Passing the cleanup pathname or a callback into the kernel
+would instead expand authority and reintroduce the path races closed by R105–R107.
+
+R111 keeps `consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role)`
+exactly unchanged. Before provider launch the caller binds one read-only, close-on-exec,
+no-follow fd to the exact regular nlink-one sink path. After provider completion it removes the
+sink and full private staging root while retaining that fd. Before the sole consumer call it
+revalidates the same device/inode and bounded stable bytes/metadata, regular nlink zero, path and
+root absence, and absence of every other fd alias. The kernel accepts only that stable pathless
+capability and performs the same-fd bounded read; it receives no sink path, cleanup callback or
+new publication authority.
+
+The unconditional connected filesystem fixture performs the real nlink-one to nlink-zero
+transition and one five-argument call. Causal controls cover nlink one after cleanup, a different
+fd/inode, same-object byte mutation, residual path/root/fd alias, consumer-before-cleanup,
+zero/duplicate calls and pathname/helper/callback surrogates. The actual integration wrapper
+observes the identical prelaunch binding and consumer-entry postcondition, so fixture success
+never grants product credit. R109/R110 seam and cleanup cardinalities remain independently
+fail-closed; R100–R108 retained-value, publication-epoch and persistent/transient cleanup
+requirements are unchanged. No production or live/provider execution occurs in this amendment.
