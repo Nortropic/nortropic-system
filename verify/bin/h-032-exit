@@ -3817,7 +3817,8 @@ def run_codex(sink, canonical, invocation, run, role):
                              rollback_fault: str | None = None,
                              unlink_variant: str | None = None,
                              replacement: str | None = None,
-                             ordering_variant: str | None = None):
+                             ordering_variant: str | None = None,
+                             substitution: str | None = None):
         cleanup_repo = make_repo(str(provider))
         targets: list[Path] = []; failures = [0]
         original_popen = module.subprocess.Popen
@@ -3852,16 +3853,67 @@ def run_codex(sink, canonical, invocation, run, role):
         open_race_accepted = work / f"r107-open-race-accepted-{nonlocal_counter[0]}"
         if replacement is not None:
             foreign.write_bytes(b"R105 foreign canonical guard")
+        # R115 provider-controlled staging substitution.  substitution_dest is a
+        # cross-parent destination that is NOT a sibling of the staging root's
+        # original parent; substitution_guard is an unrelated directory whose
+        # marker child must survive any root-symlink following.  Both live under
+        # work, outside the attempt arena, so only the gate's final teardown
+        # removes them and the product can never legitimately touch them.
+        substitution_scope = work / f"r115-substitution-{nonlocal_counter[0]}-{substitution or 'none'}"
+        substitution_dest = substitution_scope / "moved-elsewhere"
+        substitution_guard = substitution_scope / "unrelated-guard"
+        substitution_guard_marker = substitution_guard / "guard-marker"
+        substitution_state: dict[str, object] = {
+            "mode": substitution, "fired": False, "error": None}
+        if substitution is not None:
+            substitution_scope.mkdir(mode=0o700)
+            substitution_guard.mkdir(mode=0o700)
+            substitution_guard_marker.write_bytes(b"R115 unrelated guard marker")
 
         def current_canonical() -> Path | None:
             current = set(runs_root.iterdir()) if runs_root.is_dir() else set()
             candidates = [path / "result.json" for path in sorted(current - before_runs)]
             return candidates[0] if len(candidates) == 1 else None
 
+        def fire_substitution() -> None:
+            # Provider-controlled substitution of the exact staging root as the
+            # provider's final effect, landing after the provider process exits
+            # and before any controller post-provider logic.  This is agnostic
+            # to how the controller later retires the family: a safe controller
+            # binds the staging inode (a retained no-follow directory handle),
+            # so it never leaks relocated family content and never follows the
+            # substituted path into the unrelated guard.
+            if substitution is None or substitution_state["fired"] or not targets:
+                return
+            root = targets[-1].parent
+            substitution_state["fired"] = True
+            try:
+                if substitution == "cross_parent_move":
+                    os.rename(str(root), str(substitution_dest))
+                elif substitution == "root_symlink":
+                    original_rmtree(str(root))
+                    os.symlink(str(substitution_guard), str(root))
+            except OSError as exc:
+                substitution_state["error"] = f"{type(exc).__name__}:{exc}"
+
+        class _SubstitutionPopen:
+            """Delegates to the real provider process, firing the staging
+            substitution exactly once when the controller reaps it."""
+            def __init__(self, proc): self._h032_proc = proc
+            def wait(self, *args, **kwargs):
+                result = self._h032_proc.wait(*args, **kwargs)
+                fire_substitution()
+                return result
+            def __getattr__(self, name): return getattr(self._h032_proc, name)
+
         def observe_target(argv, *args, **kwargs):
             flat = list(argv)
-            if "-o" in flat: targets.append(Path(flat[flat.index("-o") + 1]))
-            return original_popen(argv, *args, **kwargs)
+            has_output = "-o" in flat
+            if has_output: targets.append(Path(flat[flat.index("-o") + 1]))
+            proc = original_popen(argv, *args, **kwargs)
+            if substitution is not None and has_output:
+                return _SubstitutionPopen(proc)
+            return proc
 
         def retain_then_consume(sink_fd, canonical_destination,
                                 invocation_id, run_id, role):
@@ -4090,13 +4142,15 @@ def run_codex(sink, canonical, invocation, run, role):
 
         def injected_unlink(path, *args, **kwargs):
             candidate = Path(path)
-            if (ordering_variant is None and targets and candidate == targets[-1]
+            if (substitution is None and ordering_variant is None and targets
+                    and candidate == targets[-1]
                     and (persistent or failures[0] == 0)):
                 failures[0] += 1; raise OSError("H032 injected result cleanup failure")
             return original_unlink(path, *args, **kwargs)
         def injected_rmtree(path, *args, **kwargs):
             candidate = Path(path)
-            if targets and (candidate == targets[-1] or candidate in targets[-1].parents) \
+            if substitution is None and targets \
+                    and (candidate == targets[-1] or candidate in targets[-1].parents) \
                     and (persistent or failures[0] == 0):
                 failures[0] += 1; raise OSError("H032 injected result cleanup failure")
             return original_rmtree(path, *args, **kwargs)
@@ -4271,6 +4325,29 @@ def run_codex(sink, canonical, invocation, run, role):
             "source_variant": ordering_variant,
             "source_changed": variant_source_changed,
             "inventory_ok": variant_inventory_ok,
+            "substitution": substitution,
+            "substitution_fired": bool(substitution_state["fired"]),
+            "substitution_error": substitution_state["error"],
+            # The unrelated guard and its marker must survive intact: a safe
+            # controller never follows the substituted staging path into an
+            # unrelated tree.
+            "substitution_guard_intact": (
+                substitution is None
+                or (substitution_guard.is_dir()
+                    and not substitution_guard.is_symlink()
+                    and substitution_guard_marker.is_file()
+                    and substitution_guard_marker.read_bytes()
+                        == b"R115 unrelated guard marker")),
+            # No private-family CONTENT may survive a substitution: a safe
+            # controller retires the family by the bound staging inode, so a
+            # relocated sink/result leaves no regular-file residue.  The
+            # unrelated guard subtree is excluded (it is not family).
+            "substitution_family_residue": sorted(
+                str(path) for path in substitution_scope.rglob("*")
+                if not path.is_symlink() and path.is_file()
+                and substitution_guard not in path.parents
+                and path != substitution_guard_marker
+            ) if substitution is not None else [],
         }
         result = (outcome, failures[0], list(outcome[4]),
                   sorted({str(path) for path in transport_residue}),
@@ -4282,9 +4359,21 @@ def run_codex(sink, canonical, invocation, run, role):
                   replacement_observations, foreign_post, race_observation,
                   attempt_residue)
         # Gate-owned cleanup happens only after the complete attempt residue and
-        # private-parent observations have been retained in result.
+        # private-parent observations have been retained in result.  A
+        # substituted staging root (a symlink, or a path relocated cross-parent)
+        # is retired here explicitly and symlink-safely so the generic
+        # target-parent teardown below only ever sees an absent or real parent.
+        if substitution is not None:
+            for target in targets:
+                parent = target.parent
+                if parent.is_symlink():
+                    original_path_unlink(parent)
+            if substitution_scope.exists():
+                shutil.rmtree(substitution_scope, ignore_errors=True)
         for target in targets:
-            if target.parent.exists():
+            if target.parent.is_symlink():
+                original_path_unlink(target.parent)
+            elif target.parent.exists():
                 target.parent.chmod(0o700)
                 shutil.rmtree(target.parent)
         cleanup_arena = observed_cleanup.get("arena")
@@ -4346,6 +4435,10 @@ def run_codex(sink, canonical, invocation, run, role):
         True, replacement="open_swap")
     rollback_third_retry_open_swap = cleanup_failure_case(
         True, rollback_fault="first_two", replacement="third_retry_open_swap")
+    staging_cross_parent_move = cleanup_failure_case(
+        True, substitution="cross_parent_move")
+    staging_root_symlink = cleanup_failure_case(
+        True, substitution="root_symlink")
     _r109_probe_tree, r109_connected_probe = r109_transform_tree(
         source_text, "cleanup_before")
     r109_consumer_seam_present = (
@@ -4500,6 +4593,29 @@ def run_codex(sink, canonical, invocation, run, role):
     rollback_open_swap_controls_ok = (
         rollback_open_swap_safe(rollback_open_swap, 0)
         and rollback_open_swap_safe(rollback_third_retry_open_swap, 2))
+
+    # R115: a provider-controlled substitution of the exact staging root at the
+    # controller's own teardown boundary must never leave private-family content
+    # residue and must never follow the substituted path into an unrelated tree.
+    # The injection actually fired cleanly, the provider still started exactly
+    # once, the unrelated guard survived intact, and no private-family regular
+    # file remains.  A path-based cleanup that trusts the staging pathname —
+    # missing a cross-parent move, or following a root symlink — fails at least
+    # one arm.  Publication is deliberately not constrained here: a controller
+    # that retires the family by its bound inode may still deliver the retained
+    # result, while one that fails closed is equally safe.
+    def staging_substitution_safe(case) -> bool:
+        residue = case[15] if len(case) > 15 and isinstance(case[15], dict) else {}
+        return (
+            residue.get("substitution_fired") is True
+            and residue.get("substitution_error") is None
+            and residue.get("provider_process_starts") == 1
+            and residue.get("substitution_guard_intact") is True
+            and residue.get("substitution_family_residue") == [])
+
+    staging_substitution_ok = (
+        staging_substitution_safe(staging_cross_parent_move)
+        and staging_substitution_safe(staging_root_symlink))
 
     def r108_cleanup_before_safe(case) -> bool:
         if case is None:
@@ -8438,7 +8554,7 @@ class CraftedConcretePath(type(Path())):
         and effect_sink_attacks_caught
         and oversized_positive[0][0]
         and atomic_ok and timeout_ok and object_attacks_ok
-        and cleanup_error_ok and setup_spawn_faults_ok
+        and cleanup_error_ok and staging_substitution_ok and setup_spawn_faults_ok
         and journal_faults_ok and preexisting_journal_positive
         and interruption_quiescent and tracked_quiescent
         and valid_output.is_absolute()
@@ -8714,7 +8830,7 @@ class CraftedConcretePath(type(Path())):
     def cleanup_detail(case):
         return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
-          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} r105_cleanup={(rollback_fault_controls_ok,rollback_identity_controls_ok,[(len(case[8]),len(case[9]),len(case[10]),case[11]) for case in (rollback_path_persistent,rollback_os_unlink_persistent,rollback_os_remove_persistent,rollback_first_failure,rollback_final_retry)],[(case[12],case[13],case[10]) for case in (rollback_symlink_replacement,rollback_hardlink_replacement)])} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
+          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} substitution={cleanup_detail(staging_cross_parent_move), staging_cross_parent_move[15], cleanup_detail(staging_root_symlink), staging_root_symlink[15], staging_substitution_ok} r105_cleanup={(rollback_fault_controls_ok,rollback_identity_controls_ok,[(len(case[8]),len(case[9]),len(case[10]),case[11]) for case in (rollback_path_persistent,rollback_os_unlink_persistent,rollback_os_remove_persistent,rollback_first_failure,rollback_final_retry)],[(case[12],case[13],case[10]) for case in (rollback_symlink_replacement,rollback_hardlink_replacement)])} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
     check("K1", family_absent or (valid[0] and valid[2] == 1), f"valid={valid}")
     check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
     check("K3", family_absent or (argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash),

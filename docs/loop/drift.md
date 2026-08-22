@@ -2332,3 +2332,39 @@ survivor object; a product that raced still produces the full record and
 must satisfy the protected branches unchanged. No frozen predicate,
 admitted variant, summary count or product requirement changes; production
 and live/provider execution are untouched.
+
+## 2026-08-22 — R115 provider-controlled staging-substitution controls + dirfd authority
+
+Codex cross-provider adversarial review of the first product result-kernel
+candidate confirmed two staging-substitution defects (H032-CODEX-REV-01): the
+path-based staging retirement reported clean while a provider-relocated family
+survived (cross-parent move), and the tree-removal helper followed a root
+symlink and deleted an unrelated directory's children (root symlink). Evidence:
+evidence/bootstrap-supervisor/evidence/h032-result-kernel-codex-cross-provider-review-3088dc9.txt.
+
+R115 adds two connected, effect-level H032 controls modelled as the provider's
+final act: a Popen proxy fires the substitution once the provider process is
+reaped, then the gate requires the controller to leave no private-family
+content residue and to preserve an unrelated guard intact, for both a
+cross-parent move and a root-symlink replacement. Both are mandatory in
+deterministic_result_ok; a path-trusting controller fails at least one arm.
+
+Closing the cross-parent arm soundly requires binding the staging directory's
+inode, so R115 also expands the frozen H031 source-form authority under owner
+approval, by the smallest capability: os.unlink is admitted only in the exact
+dirfd-relative retirement form os.unlink("result.json", dir_fd=<retained
+staging-fd parameter>), appearing once, in the sole authorized primitive
+_retire_bound_staging; every other unlink (bare path, dynamic name, extra
+argument, non-parameter dir_fd, wrong function, second occurrence) is a
+violation, and rmdir/rename/link/symlink/lstat/scandir and dir_fd-relative
+opens remain forbidden. The new staging os.open on result_root is bound to
+read-only + no-follow + close-on-exec with no mode and no dir_fd, with an
+S_ISDIR and result_root_identity check. The os-effect inventory gains
+run_codex:open 3 and _retire_bound_staging:unlink 1; the legacy product shape
+is unaffected. Eleven negative controls prove no unrelated dirfd operation is
+authorized. The product binds the staging directory descriptor once before the
+sink is created and before provider execution, retires the family by the ordinary
+identity-verified tree cleanup on the bound path or, under substitution, by the
+single dirfd-relative sink removal, then fails closed; the tree-removal helper
+unlinks a root symlink instead of following it. No live/provider execution is
+performed.

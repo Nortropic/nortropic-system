@@ -167,10 +167,19 @@ ALLOWED_SYS_ATTRS = {
 ALLOWED_OS_ATTRS = {
     "O_CREAT", "O_EXCL", "O_RDONLY", "O_WRONLY", "X_OK", "access", "chmod",
     "close", "environ", "fdopen", "fstat", "fsync", "getpid", "getuid", "open",
-    "read", "sep", "system", "urandom", "write",
+    "read", "sep", "system", "unlink", "urandom", "write",
 }
+# R115: os.unlink is admitted ONLY in the exact authorized dirfd-relative
+# retirement form below; every other unlink usage (bare-path, dynamic name,
+# extra argument, wrong function, second occurrence) is a violation.  This is
+# NOT a general dirfd-mutation grant.
+AUTHORIZED_STAGING_RETIREMENT = "_retire_bound_staging"
+AUTHORIZED_STAGING_SINK_NAME = "result.json"
+STAGING_DIR_OPEN_ARG = "result_root"
+STAGING_DIR_OPEN_FLAGS = {"O_RDONLY", "O_NOFOLLOW", "O_CLOEXEC"}
 RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS = {
     "_read_stable_opened:read": 1,
+    "_retire_bound_staging:unlink": 1,
     "_strict_provider_authority:close": 1,
     "_strict_provider_authority:open": 1,
     "_provider_snapshot:chmod": 1,
@@ -189,14 +198,15 @@ RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS = {
     "run_codex:chmod": 5,
     "run_codex:close": 2,
     "run_codex:fsync": 1,
-    "run_codex:open": 2,
+    "run_codex:open": 3,
     "run_codex:urandom": 2,
 }
 LEGACY_EXPECTED_OS_EFFECT_COUNTS = {
     key:value for key,value in RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS.items()
-    if not key.startswith("run_codex:") or key=="run_codex:chmod"
+    if (not key.startswith("run_codex:") or key=="run_codex:chmod")
+    and not key.startswith("_retire_bound_staging:")
 }
-DIRECT_OS_EFFECT_ATTRS = {"chmod", "close", "fdopen", "fsync", "open", "read", "urandom", "write"}
+DIRECT_OS_EFFECT_ATTRS = {"chmod", "close", "fdopen", "fsync", "open", "read", "unlink", "urandom", "write"}
 EXPECTED_FCNTL_EFFECT_COUNTS = {"acquire_lock:flock": 1}
 EXPECTED_SYS_STREAM_COUNTS = {"main:stderr.print": 4, "run_codex:stdout.write": 1}
 EXPECTED_SYS_STATE_COUNTS = {
@@ -1047,6 +1057,11 @@ def process_shape(text: str) -> dict[str, object]:
             annotation_nodes.update(ast.walk(annotation))
     funcs = {node.name for node in ast.walk(tree)
              if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    func_params: dict[str, list[str]] = {
+        node.name: [arg.arg for arg in (*node.args.posonlyargs, *node.args.args,
+                                        *node.args.kwonlyargs)]
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
     calls: dict[str, set[str]] = {name: set() for name in funcs}
     sites: list[tuple[str, str, int, str]] = []
     violations: list[tuple[str, int, str]] = []
@@ -1312,6 +1327,29 @@ def process_shape(text: str) -> dict[str, object]:
                             and effect_parent.func is parent):
                         violations.append((owner, node.lineno,
                                            "protected-fstat-not-direct-call"))
+                if parent.attr == "unlink":
+                    # R115: os.unlink is authorized only as the exact
+                    # dirfd-relative staging-sink retirement.  Any other shape
+                    # (bare path, dynamic/other name, extra argument, missing or
+                    # non-parameter dir_fd, or a call outside the authorized
+                    # retirement primitive) is a violation.  A second occurrence
+                    # is independently rejected by the frozen os-effect inventory.
+                    unlink_call = parents.get(parent)
+                    unlink_ok = (
+                        isinstance(unlink_call, ast.Call)
+                        and unlink_call.func is parent
+                        and owner == AUTHORIZED_STAGING_RETIREMENT
+                        and len(unlink_call.args) == 1
+                        and isinstance(unlink_call.args[0], ast.Constant)
+                        and unlink_call.args[0].value == AUTHORIZED_STAGING_SINK_NAME
+                        and len(unlink_call.keywords) == 1
+                        and unlink_call.keywords[0].arg == "dir_fd"
+                        and isinstance(unlink_call.keywords[0].value, ast.Name)
+                        and unlink_call.keywords[0].value.id
+                            in func_params.get(owner, []))
+                    if not unlink_ok:
+                        violations.append((owner, node.lineno,
+                                           "unauthorized-unlink-form"))
                 if parent.attr == "environ":
                     environ_parent = parents.get(parent)
                     environ_grandparent = parents.get(environ_parent)
@@ -1455,6 +1493,63 @@ def process_shape(text: str) -> dict[str, object]:
     observer_hits = {name: sorted(reachable(name) & {"run_codex"})
                      for name in ("status", "watch", "roadmap_status")}
     observer_hits = {name: hit for name, hit in observer_hits.items() if hit}
+    # R115: bind the newly introduced staging-directory open to its exact
+    # approved purpose.  This is not general os.open hardening; it applies only
+    # when the result-kernel staging pattern (an os.open on result_root) is
+    # present, so the legacy/no-consumer product is unaffected.  The open must
+    # be read-only + no-follow + close-on-exec on result_root, with no mode and
+    # no dir_fd (no write-capable flag, no dir_fd-relative open capability), and
+    # run_codex must verify the retained descriptor's directory type and inode.
+    def _staging_open_flag_atoms(expr):
+        atoms: set[str] = set(); shape_ok = [True]
+        def leaf(inner):
+            if isinstance(inner, ast.BinOp) and isinstance(inner.op, ast.BitOr):
+                leaf(inner.left); leaf(inner.right)
+            elif (isinstance(inner, ast.Attribute) and isinstance(inner.value, ast.Name)
+                  and inner.value.id == "os"):
+                atoms.add(inner.attr)
+            elif (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name)
+                  and inner.func.id == "getattr" and len(inner.args) == 3
+                  and isinstance(inner.args[0], ast.Name) and inner.args[0].id == "os"
+                  and isinstance(inner.args[1], ast.Constant)
+                  and isinstance(inner.args[2], ast.Constant) and inner.args[2].value == 0):
+                atoms.add(inner.args[1].value)
+            else:
+                shape_ok[0] = False
+        leaf(expr)
+        return atoms, shape_ok[0]
+    run_codex_node = next((node for node in ast.walk(tree)
+                           if isinstance(node, ast.FunctionDef)
+                           and node.name == "run_codex"), None)
+    staging_opens = []
+    if run_codex_node is not None:
+        for call in ast.walk(run_codex_node):
+            if (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                    and isinstance(call.func.value, ast.Name)
+                    and call.func.value.id == "os" and call.func.attr == "open"
+                    and call.args and isinstance(call.args[0], ast.Name)
+                    and call.args[0].id == STAGING_DIR_OPEN_ARG):
+                staging_opens.append(call)
+    if staging_opens:
+        if len(staging_opens) != 1:
+            violations.append(("run_codex", 0,
+                               f"staging-open-cardinality:{len(staging_opens)}"))
+        else:
+            staging_open = staging_opens[0]
+            atoms, atoms_shape = (_staging_open_flag_atoms(staging_open.args[1])
+                                  if len(staging_open.args) >= 2 else (set(), False))
+            if not (len(staging_open.args) == 2 and not staging_open.keywords
+                    and atoms_shape and atoms == STAGING_DIR_OPEN_FLAGS):
+                violations.append(("run_codex", getattr(staging_open, "lineno", 0),
+                                   f"staging-open-form:args={len(staging_open.args)},"
+                                   f"kw={len(staging_open.keywords)},flags={sorted(atoms)}"))
+            has_isdir = any(isinstance(node, ast.Attribute) and node.attr == "S_ISDIR"
+                            for node in ast.walk(run_codex_node))
+            has_identity = any(isinstance(node, ast.Name)
+                               and node.id == "result_root_identity"
+                               for node in ast.walk(run_codex_node))
+            if not (has_isdir and has_identity):
+                violations.append(("run_codex", 0, "staging-open-identity-binding"))
     inventory_ok = tuple(sorted(import_inventory)) in {
         tuple(LEGACY_EXPECTED_IMPORT_INVENTORY),
         tuple(RESULT_KERNEL_EXPECTED_IMPORT_INVENTORY),
@@ -1582,7 +1677,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "a9ea2ae158da1f68f31c3f912912fc0de6cbf4da9973b809950b77fc254beb1e")
+                       == "0e89c85b1e9dd64bd98061594a7954bbe72f361c030df72766ffbd912a97eb3a")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -2263,6 +2358,30 @@ subprocess = object()
         "FUNCTION_GLOBALS": "\nsha256_bytes.__globals__['subprocess'].Popen(['/bin/true'])\n",
         "PROCESS_DICTIONARY": "\nsubprocess.__dict__['Popen'](['/bin/true'])\n",
         "DYNAMIC_CODE": "\neval(\"__import__('subprocess').Popen(['/bin/true'])\")\n",
+        # R115 authority-expansion negative controls: the dirfd-relative unlink
+        # grant must not authorize any other dirfd mutation, a bare-path unlink,
+        # a differently-named/dynamic unlink, or an unlink outside the exact
+        # authorized retirement primitive.
+        "R115_UNLINK_BARE_PATH": "\nos.unlink('/private/tmp/h031-r115')\n",
+        "R115_UNLINK_DIRFD_WRONG_FUNCTION": "\nos.unlink('result.json', dir_fd=1)\n",
+        "R115_UNLINK_WRONG_NAME": (
+            "\ndef _retire_bound_staging_alias(staging_dir_fd):\n"
+            "    os.unlink('other.json', dir_fd=staging_dir_fd)\n"
+        ),
+        "R115_UNLINK_EXTRA_ARG": (
+            "\ndef _retire_bound_staging_alias(staging_dir_fd):\n"
+            "    os.unlink('result.json', 0, dir_fd=staging_dir_fd)\n"
+        ),
+        "R115_UNLINK_NONPARAM_DIRFD": (
+            "\ndef _retire_bound_staging_alias(staging_dir_fd):\n"
+            "    os.unlink('result.json', dir_fd=7)\n"
+        ),
+        "R115_OS_RMDIR": "\nos.rmdir('/private/tmp/h031-r115')\n",
+        "R115_OS_RENAME_DIRFD": "\nos.rename('a', 'b', src_dir_fd=1)\n",
+        "R115_OS_LINK_DIRFD": "\nos.link('a', 'b', dst_dir_fd=1)\n",
+        "R115_OS_SYMLINK_DIRFD": "\nos.symlink('a', 'b', dir_fd=1)\n",
+        "R115_OS_LSTAT": "\nos.lstat('/private/tmp/h031-r115')\n",
+        "R115_OS_SCANDIR": "\nos.scandir('/private/tmp/h031-r115')\n",
     }
     for label, suffix in shape_mutants.items():
         mutant_shape = process_shape(source_text + suffix)
