@@ -2018,3 +2018,98 @@ extra labels plus conflicting/arbitrary summaries and a top-level result marker.
 changes only the owner parser rig. It grants no replay or product credit: the preserved
 single full-live run remains historical evidence, and publication still requires a later
 normal full H031 exit zero without making another provider call during TEST_AUTHOR.
+
+## 2026-08-22 — R100 canonical transitions and accepted-source coherence
+
+R99 closed the observed product defect but independent review found two general holes.
+Its publication inventory deduplicated path/device/inode/digest tuples, so the same object
+could be republished twice after intervening absence and still look like one epoch. Its
+transient positive also accepted any schema-shaped final envelope because no retained
+private-source digest/value was supplied to the validator.
+
+R100 replaces unique-state counting with a per-path presence relation synchronized after
+the preceding audited filesystem operation and after the final operation. Every false to
+true edge is appended, including identical inode/digest republication. At the real
+consumer call the gate retains the stable private sink bytes, parsed report and digest.
+Transient recovery requires exactly one untouched canonical with the same report and
+result digest and no direct canonical writer. Persistent rejection permits zero
+publications or one publication followed by rollback, but ends canonical-absent. A
+same-object double-republication ending absent and a same-length schema-valid in-place
+substitution with stale digest are connected causal controls. The criterion binds effects,
+not publication API, source spelling or cleanup order; TEST_AUTHOR changes no product and
+runs no live provider/model.
+
+## 2026-08-22 — R101 hardlink publication completeness
+
+Independent review found one missing filesystem effect in R100's otherwise causal presence
+relation: `os.link` was not among the callbacks that synchronize the previous operation.
+A canonical hardlink could therefore appear and disappear between handled callbacks while
+the cached state stayed present, hiding repeated publication of the same inode and bytes.
+
+R101 adds only `os.link` to that existing state machine. Source and destination are
+registered before the operation; the next relevant callback or the final attempt sync
+observes its post-operation state. Python 3.9's pathlib link form emits the same audit event,
+so no API-spelling rule is added. The connected persistent-cleanup control retains the
+actual product canonical through a hardlink, removes canonical, republishes the same object
+twice with an unlink after each publication, removes the alias and requires multiple
+observed transitions with final canonical absence. Zero-publication cleanup and a single
+publication followed by rollback remain admissible. Every R100 retained-value, digest,
+direct-write and residue closure remains unchanged; production and live/provider execution
+are untouched.
+
+## 2026-08-22 — R102 safe no-replace hardlink publication
+
+R101 made hardlink publication observable but the source inventory still rejected every
+`os.link`, including a legitimate fully written, fsynced and writer-closed private temp linked
+once into an absent canonical leaf. R102 opens only that boundary: the unaliased callable must
+be a direct call in `consume_private_result` (with Python 3.9 `Path.link_to` as the same effect),
+while aliases and helper transfer stay closed. The fresh-child oracle supplies the authority:
+source under the canonical parent, exact absent destination, stable retained source bytes and
+identity, fsync, no writer, one transition, final exact envelope/digest, removed temp and no
+later publication or residue. Wrong value or destination, preseed and link/unlink/link all
+reject. The existing atomic rename path remains green, and no production or provider behavior
+is executed by this owner amendment.
+
+## 2026-08-22 — R103 version-bound fsync and safe dirfd hardlink
+
+Independent review found that R102 remembered only the fsynced device/inode, so a temp could
+be fsynced empty, written afterward and linked without another successful fsync. R103 records
+credit only after fsync succeeds and a stable bounded same-object snapshot binds exact bytes,
+digest, size, mtime, ctime and mutation generation. Successful write, pwrite and truncate
+advance that generation. Publication compares the current source to the credited snapshot;
+direct and Path stale-fsync and failed-fsync controls therefore execute the link but receive
+no fsync credit. Write-only descriptors are measured through a no-follow read capability whose
+device/inode is exact-equal to the fsynced descriptor.
+
+R103 also admits the safe dirfd-relative `os.link` spelling without widening source authority.
+Both names must be simple leaves; source and destination dirfds must be the same live exact
+integer; its opened directory and the current canonical parent must share device/inode;
+`follow_symlinks=False` is mandatory; and the resolved leaves remain the private temp and the
+absent canonical. The wrapper call is paired to its exact audit event and final transition.
+Wrong, mixed, closed, stale, reused and traversal descriptors reject with no residue, while
+absolute direct, Path and dirfd publications share the same retained-source, one-transition,
+writer-closed and cleanup oracle. Production and live/provider behavior remain untouched.
+
+## 2026-08-22 — R104 complete dirfd-rejection cleanup
+
+Independent review found that R103 checked its six rejected dirfd variants with the older
+`outside_blocked` predicate, which proved the denial and canonical absence but ignored temp and
+descriptor residue. A generated negative could therefore disable `_unlink_retry`, leave its
+private `.result-*`, and still keep J green.
+
+R104 gives these negatives one complete effect predicate. The fresh child records the exact
+attempt object tree immediately before subject execution and again before judge cleanup. The
+comparison binds no-follow type, mode, device/inode and exact regular-file size, nlink and digest;
+it also inventories every live fd resolving inside the attempt arena. A clean rejection requires
+no object delta, temp, sink or arena fd, canonical, transition, canonical epoch, direct write,
+post-publication event or cleanup failure in addition to the existing denial, environment,
+security and ticket facts. The unchanged wrong, mixed, closed, stale, reused and traversal cases
+all satisfy that relation.
+
+Two causal generated controls keep source/API freedom intact. Disabling only `_unlink_retry`
+leaves one added `.result-*`; disabling only the parent-fd close leaves no filesystem object but
+one live canonical-parent capability. Each still executes the expected denial yet fails the
+complete predicate, and substituting either into the ordinary negative family makes J false.
+Judge cleanup occurs only after this observation and cannot grant credit. All R102/R103 positive
+publication forms and retained-value, fsync and transition semantics remain unchanged; no
+production or live/provider behavior is executed.

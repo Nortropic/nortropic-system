@@ -1222,7 +1222,7 @@ if mode == 'output_then_fail': sys.exit(17)
             "os":{("open",),("close",),("read",),("pread",),("readv",),("preadv",),
                   ("write",),("pwrite",),("lseek",),("fstat",),("stat",),("lstat",),
                   ("access",),("readlink",),("fsync",),("unlink",),("remove",),
-                  ("replace",),("rename",),("fspath",),("O_RDONLY",),("O_WRONLY",),
+                  ("replace",),("rename",),("link",),("fspath",),("O_RDONLY",),("O_WRONLY",),
                   ("O_RDWR",),("O_CREAT",),("O_EXCL",),("O_TRUNC",),("O_CLOEXEC",),
                   ("O_NOFOLLOW",),("O_ACCMODE",),("SEEK_SET",),("F_OK",),("R_OK",),
                   ("W_OK",),("path","dirname"),("path","abspath"),("path","realpath"),
@@ -1237,7 +1237,7 @@ if mode == 'output_then_fail': sys.exit(17)
             "os":{("open",),("close",),("read",),("pread",),("readv",),("preadv",),
                   ("write",),("pwrite",),("lseek",),("fstat",),("stat",),("lstat",),
                   ("access",),("readlink",),("fsync",),("unlink",),("remove",),
-                  ("replace",),("rename",),("fspath",),("path","dirname"),
+                  ("replace",),("rename",),("link",),("fspath",),("path","dirname"),
                   ("path","abspath"),("path","realpath"),("path","lexists")},
         }
         # This is a lexical binding inventory, not a Python control-flow
@@ -1384,7 +1384,19 @@ if mode == 'output_then_fail': sys.exit(17)
                        and (chain not in callable_module_members.get(module_name,set())
                             or (isinstance(parents.get(current),ast.Call)
                                 and parents[current].func is current)))
+            if module_name=="os" and chain==("link",):
+                link_scope=node_scope.get(node)
+                permitted &= (len(consumers)==1 and link_scope is consumers[0])
             module_uses.append((module_name,chain,permitted))
+            module_capability_ok &= permitted
+        for node in ast.walk(tree):
+            if not (isinstance(node,ast.Attribute)
+                    and node.attr in {"link_to","hardlink_to"}): continue
+            link_scope=node_scope.get(node)
+            permitted=(isinstance(parents.get(node),ast.Call)
+                       and parents[node].func is node
+                       and len(consumers)==1 and link_scope is consumers[0])
+            module_uses.append(("path-instance",(node.attr,),permitted))
             module_capability_ok &= permitted
         imported_member_ok=True
         for node in ast.walk(tree):
@@ -2092,12 +2104,71 @@ def run_codex(sink, canonical, invocation, run, role):
     attempt_sequence = [0]
     audit_active: list[dict[str, object] | None] = [None]
     last_attempt_observed: list[dict[str, object] | None] = [None]
+
+    def register_canonical(active: dict[str, object], value: object) -> None:
+        if not isinstance(value, (str, bytes, os.PathLike)):
+            return
+        try:
+            path = Path(value).absolute()
+            runs_root = active["runs_root"]
+            assert isinstance(runs_root, Path)
+            if path.name != "result.json" or runs_root not in path.parents:
+                return
+            candidates = active["canonical_candidates"]
+            states = active["canonical_visibility_state"]
+            assert isinstance(candidates, set) and isinstance(states, dict)
+            key = str(path)
+            candidates.add(key)
+            # Every current run starts with no canonical result.  Initializing
+            # the exact newly discovered destination to absent makes the first
+            # post-operation observation causal even if the publishing API did
+            # not expose a separate pre-create callback.
+            states.setdefault(key, False)
+        except Exception:
+            return
+
+    def sync_canonical_visibility(active: dict[str, object]) -> None:
+        """Record every observed absent->present effect, without deduplication."""
+        if active.get("observer_busy") is True:
+            return
+        active["observer_busy"] = True
+        try:
+            candidates = active["canonical_candidates"]
+            states = active["canonical_visibility_state"]
+            epochs = active["canonical_visibility_epochs"]
+            assert isinstance(candidates, set) and isinstance(states, dict)
+            assert isinstance(epochs, list)
+            for value in sorted(candidates):
+                path = Path(value)
+                present = path.exists() or path.is_symlink()
+                prior = states.get(value, False)
+                if present and prior is False:
+                    dev = ino = None; digest = None
+                    try:
+                        current = path.lstat()
+                        dev, ino = current.st_dev, current.st_ino
+                        if stat.S_ISREG(current.st_mode) and not path.is_symlink():
+                            digest = sha256(path)
+                    except Exception:
+                        pass
+                    # Identical path/dev/inode/digest values are intentionally
+                    # appended again after an intervening absence.  Cardinality
+                    # is an effect count, not a unique-state inventory.
+                    epochs.append((value, dev, ino, digest))
+                states[value] = present
+        finally:
+            active["observer_busy"] = False
+
     def audit_inventory(event: str, args: tuple[object, ...]) -> None:
         active = audit_active[0]
-        if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename", "subprocess.Popen"}:
+        if active is None or event not in {"os.mkdir", "open", "os.remove", "os.rename", "os.link", "subprocess.Popen"}:
             return
         if active.get("observer_busy") is True:
             return
+        # Audit callbacks precede their filesystem operation.  Synchronizing
+        # every already-known destination here observes the completed effect of
+        # the preceding operation.  attempt() performs the final post-run sync.
+        sync_canonical_visibility(active)
         if event == "subprocess.Popen":
             outputs = active["provider_outputs"]
             assert isinstance(outputs, list)
@@ -2107,6 +2178,16 @@ def run_codex(sink, canonical, invocation, run, role):
             return
         created = active["created"]
         assert isinstance(created, set)
+        if event == "open" and args:
+            register_canonical(active, args[0])
+        elif event == "os.remove" and args:
+            register_canonical(active, args[0])
+        elif event in {"os.rename", "os.link"}:
+            if args: register_canonical(active, args[0])
+            if len(args) > 1: register_canonical(active, args[1])
+        # Registration occurs before the audited operation and therefore
+        # retains the exact absent precondition for its later post-op sync.
+        sync_canonical_visibility(active)
         if event == "open":
             opened = active["opened"]
             assert isinstance(opened, list)
@@ -2124,26 +2205,7 @@ def run_codex(sink, canonical, invocation, run, role):
                         direct_writes.append((str(path), flags, path.exists()))
                 except Exception:
                     pass
-        if event in {"os.remove", "os.rename"} and args:
-            candidate = args[1] if event == "os.rename" and len(args) > 1 else args[0]
-            try:
-                path = Path(candidate).absolute()
-                runs_root = active["runs_root"]
-                assert isinstance(runs_root, Path)
-                if path.name == "result.json" and runs_root in path.parents \
-                        and path.is_file() and not path.is_symlink():
-                    active["observer_busy"] = True
-                    current = path.stat()
-                    epoch = (str(path), current.st_dev, current.st_ino, sha256(path))
-                    epochs = active["canonical_visibility_epochs"]
-                    assert isinstance(epochs, list)
-                    if not epochs or epochs[-1] != epoch:
-                        epochs.append(epoch)
-            except Exception:
-                pass
-            finally:
-                active["observer_busy"] = False
-        values = args[1:2] if event == "os.rename" else args[:1]
+        values = args[1:2] if event in {"os.rename", "os.link"} else args[:1]
         for value in values:
             if isinstance(value, (str, bytes, os.PathLike)):
                 try:
@@ -2182,6 +2244,8 @@ def run_codex(sink, canonical, invocation, run, role):
                                       "runs_root": runs_root,
                                       "arena": arena,
                                       "canonical_direct_writes": [],
+                                      "canonical_candidates": set(),
+                                      "canonical_visibility_state": {},
                                       "canonical_visibility_epochs": [],
                                       "observer_busy": False}
         audit_active[0] = observed
@@ -2192,6 +2256,9 @@ def run_codex(sink, canonical, invocation, run, role):
             except Exception as exc:
                 outcome = (False, f"{type(exc).__name__}:{exc}")
         finally:
+            # This is the post-operation observation for the last filesystem
+            # effect in run_codex, before judge cleanup or verdict inspection.
+            sync_canonical_visibility(observed)
             audit_active[0] = None
             module.tempfile.tempdir = prior_tempdir
             if prior_tmpdir is None: os.environ.pop("TMPDIR", None)
@@ -2201,14 +2268,8 @@ def run_codex(sink, canonical, invocation, run, role):
         observed["canonical_paths"] = [str(path / "result.json")
                                        for path in sorted(after_runs - before_runs)]
         for value in observed["canonical_paths"]:
-            path = Path(value)
-            if path.is_file() and not path.is_symlink():
-                current = path.stat()
-                epoch = (str(path), current.st_dev, current.st_ino, sha256(path))
-                epochs = observed["canonical_visibility_epochs"]
-                assert isinstance(epochs, list)
-                if not epochs or epochs[-1] != epoch:
-                    epochs.append(epoch)
+            register_canonical(observed, value)
+        sync_canonical_visibility(observed)
         last_attempt_observed[0] = observed
         created = observed["created"]
         assert isinstance(created, set)
@@ -2594,16 +2655,120 @@ def run_codex(sink, canonical, invocation, run, role):
                             and value[4]==[(True,1,0o600)]
                             for value in object_attacks.values())
 
-    def cleanup_failure_case(persistent: bool):
+    def cleanup_failure_case(persistent: bool, mutation: str | None = None):
         cleanup_repo = make_repo(str(provider))
         targets: list[Path] = []; failures = [0]
         original_popen = module.subprocess.Popen
         original_unlink = module.os.unlink
         original_rmtree = module.shutil.rmtree
+        original_consume = getattr(module, "consume_private_result", None)
+        original_run_codex = module.run_codex
+        retained_sources: list[tuple[bytes, object, str]] = []
+        runs_root = module.journal_root(cleanup_repo) / "runs"
+        before_runs = set(runs_root.iterdir()) if runs_root.is_dir() else set()
+
+        def current_canonical() -> Path | None:
+            current = set(runs_root.iterdir()) if runs_root.is_dir() else set()
+            candidates = [path / "result.json" for path in sorted(current - before_runs)]
+            return candidates[0] if len(candidates) == 1 else None
+
         def observe_target(argv, *args, **kwargs):
             flat = list(argv)
             if "-o" in flat: targets.append(Path(flat[flat.index("-o") + 1]))
             return original_popen(argv, *args, **kwargs)
+
+        def retain_then_consume(sink_fd, canonical_destination,
+                                invocation_id, run_id, role):
+            before = os.fstat(sink_fd)
+            raw = os.pread(sink_fd, MAX_RESULT_BYTES + 1, 0)
+            after = os.fstat(sink_fd)
+            if (len(raw) <= MAX_RESULT_BYTES
+                    and (before.st_dev, before.st_ino, before.st_size,
+                         before.st_mtime_ns, before.st_ctime_ns)
+                        == (after.st_dev, after.st_ino, after.st_size,
+                            after.st_mtime_ns, after.st_ctime_ns)
+                    and len(raw) == before.st_size):
+                retained_sources.append((raw,
+                    strict_json(raw.decode("utf-8", errors="strict")),
+                    hashlib.sha256(raw).hexdigest()))
+            return original_consume(sink_fd, canonical_destination,
+                                    invocation_id, run_id, role)
+
+        def repeat_publication_effect() -> None:
+            canonical = current_canonical()
+            if canonical is None:
+                raise RuntimeError("R100 mutation has no exact current canonical path")
+            source = canonical.with_name(".r100-republish")
+            if canonical.exists() or canonical.is_symlink():
+                module.os.replace(canonical, source)
+            else:
+                source.write_bytes(b"R100 transition probe")
+            # Two real absent->present effects use the same source object and
+            # bytes.  Both are rolled away, leaving the canonical absent.
+            module.os.replace(source, canonical)
+            module.os.replace(canonical, source)
+            module.os.replace(source, canonical)
+            module.os.replace(canonical, source)
+            module.os.unlink(source)
+
+        def hardlink_publication_effect() -> None:
+            canonical = current_canonical()
+            if canonical is None:
+                raise RuntimeError("R101 mutation has no exact current canonical path")
+            source = canonical.with_name(".r101-link-republish")
+            if canonical.exists() and not canonical.is_symlink():
+                # Retain the actual product-published object before making the
+                # canonical absent.  The following two publications therefore
+                # reuse its exact inode and bytes.
+                module.os.link(canonical, source)
+                module.os.unlink(canonical)
+            else:
+                source.write_bytes(b"R101 hardlink transition probe")
+            module.os.link(source, canonical)
+            module.os.unlink(canonical)
+            module.os.link(source, canonical)
+            module.os.unlink(canonical)
+            module.os.unlink(source)
+
+        def stale_canonical_effect() -> None:
+            canonical = current_canonical()
+            if canonical is None or not canonical.is_file() or canonical.is_symlink():
+                raise RuntimeError("R100 mutation has no published canonical")
+            raw = bounded_stable_result(canonical, MAX_CANONICAL_BYTES)
+            document = strict_json(raw.decode("utf-8", errors="strict"))
+            report = document.get("report") if isinstance(document, dict) else None
+            summary = report.get("summary") if isinstance(report, dict) else None
+            if not isinstance(summary, str) or not summary:
+                raise RuntimeError("R100 mutation has no mutable summary")
+            report["summary"] = ("X" if summary[0] != "X" else "Y") + summary[1:]
+            changed = json.dumps(document, ensure_ascii=False,
+                                 separators=(",", ":"), sort_keys=True).encode("utf-8")
+            if len(changed) != len(raw):
+                raise RuntimeError("R100 mutation did not preserve byte length")
+            fd = module.os.open(canonical, os.O_WRONLY | os.O_TRUNC)
+            try:
+                remaining = memoryview(changed)
+                while remaining:
+                    count = os.write(fd, remaining)
+                    if count <= 0: raise OSError("R100 short mutation write")
+                    remaining = remaining[count:]
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+        def run_with_mutation(*args, **kwargs):
+            try:
+                returned = original_run_codex(*args, **kwargs)
+            except BaseException:
+                if mutation == "repeat_publication":
+                    repeat_publication_effect()
+                elif mutation == "hardlink_publication":
+                    hardlink_publication_effect()
+                raise
+            if mutation == "stale_canonical":
+                stale_canonical_effect()
+            return returned
+
         def injected_unlink(path, *args, **kwargs):
             candidate = Path(path)
             if targets and candidate == targets[-1] and (persistent or failures[0] == 0):
@@ -2618,26 +2783,69 @@ def run_codex(sink, canonical, invocation, run, role):
         module.subprocess.Popen = observe_target
         module.os.unlink = injected_unlink
         module.shutil.rmtree = injected_rmtree
+        if original_consume is not None:
+            module.consume_private_result = retain_then_consume
+        if mutation is not None:
+            module.run_codex = run_with_mutation
         try:
             outcome = attempt(cleanup_repo)
         finally:
             module.subprocess.Popen = original_popen
             module.os.unlink = original_unlink
             module.shutil.rmtree = original_rmtree
+            if original_consume is not None:
+                module.consume_private_result = original_consume
+            module.run_codex = original_run_codex
         transport_residue: list[Path] = []
         for target in targets:
             for candidate in (target, target.parent):
                 if candidate.exists() or candidate.is_symlink():
                     transport_residue.append(candidate)
+        observed_cleanup = last_attempt_observed[0] or {}
+        canonical_epochs = list(observed_cleanup.get(
+            "canonical_visibility_epochs", []))
+        canonical_candidates = {
+            Path(value) for value in observed_cleanup.get("canonical_paths", [])
+        }
+        canonical_candidates.update(
+            Path(epoch[0]) for epoch in canonical_epochs
+            if isinstance(epoch, (tuple, list)) and epoch
+            and isinstance(epoch[0], str))
+        retained_raw = retained_sources[0][0] if len(retained_sources) == 1 else None
+        retained_value = retained_sources[0][1] if len(retained_sources) == 1 else None
+        retained_digest = retained_sources[0][2] if len(retained_sources) == 1 else None
+        canonical_states = []
+        for canonical in sorted(canonical_candidates):
+            present = canonical.exists() or canonical.is_symlink()
+            regular = schema_valid = digest_bound = value_bound = False
+            if present and not canonical.is_symlink():
+                try:
+                    opened = canonical.stat()
+                    regular = stat.S_ISREG(opened.st_mode)
+                    raw = bounded_stable_result(canonical, MAX_CANONICAL_BYTES)
+                    document = strict_json(raw.decode("utf-8", errors="strict"))
+                    schema_valid = canonical_result_valid(document, schema_document)
+                    digest_bound = (retained_digest is not None
+                                    and document.get("result_sha256") == retained_digest)
+                    value_bound = (retained_value is not None
+                                   and document.get("report") == retained_value)
+                except Exception:
+                    pass
+            canonical_states.append((str(canonical), present, regular,
+                                     schema_valid, digest_bound, value_bound))
+        direct_writes = list(observed_cleanup.get("canonical_direct_writes", []))
         result = (outcome, failures[0], list(outcome[4]),
-                  sorted({str(path) for path in transport_residue}))
+                  sorted({str(path) for path in transport_residue}),
+                  canonical_states, canonical_epochs,
+                  (len(retained_sources), retained_digest,
+                   len(retained_raw) if retained_raw is not None else None),
+                  direct_writes)
         # Gate-owned cleanup happens only after the complete attempt residue and
         # private-parent observations have been retained in result.
         for target in targets:
             if target.parent.exists():
                 target.parent.chmod(0o700)
                 shutil.rmtree(target.parent)
-        observed_cleanup = last_attempt_observed[0] or {}
         cleanup_arena = observed_cleanup.get("arena")
         if isinstance(cleanup_arena, Path) and cleanup_arena.exists():
             # The persistent-failure control may leave protected provider
@@ -2653,12 +2861,42 @@ def run_codex(sink, canonical, invocation, run, role):
         return result
     transient_cleanup = cleanup_failure_case(False)
     persistent_cleanup = cleanup_failure_case(True)
+    repeated_publication_cleanup = cleanup_failure_case(
+        True, "repeat_publication")
+    hardlink_publication_cleanup = cleanup_failure_case(
+        True, "hardlink_publication")
+    stale_canonical_cleanup = cleanup_failure_case(
+        False, "stale_canonical")
+    cleanup_rig_ok = (
+        repeated_publication_cleanup[1] > 0
+        and not repeated_publication_cleanup[0][0]
+        and not any(state[1] for state in repeated_publication_cleanup[4])
+        and len(repeated_publication_cleanup[5]) >= 2
+        and hardlink_publication_cleanup[1] > 0
+        and not hardlink_publication_cleanup[0][0]
+        and not any(state[1] for state in hardlink_publication_cleanup[4])
+        and len(hardlink_publication_cleanup[5]) >= 2
+        and stale_canonical_cleanup[1] == 1
+        and stale_canonical_cleanup[0][0]
+        and len(stale_canonical_cleanup[4]) == 1
+        and stale_canonical_cleanup[4][0][1:4] == (True, True, True)
+        and stale_canonical_cleanup[4][0][4] is True
+        and stale_canonical_cleanup[4][0][5] is False
+        and bool(stale_canonical_cleanup[7]))
     cleanup_error_ok = (
         transient_cleanup[1] == 1 and transient_cleanup[0][0]
         and not transient_cleanup[2] and not transient_cleanup[3]
+        and len(transient_cleanup[4]) == 1
+        and transient_cleanup[4][0][1:] == (True, True, True, True, True)
+        and transient_cleanup[6][0] == 1
+        and not transient_cleanup[7]
+        and len(transient_cleanup[5]) == 1
         and persistent_cleanup[1] > 0 and not persistent_cleanup[0][0]
         and "cleanup" in persistent_cleanup[0][1].lower()
-        and not persistent_cleanup[2] and not persistent_cleanup[3])
+        and not persistent_cleanup[2] and not persistent_cleanup[3]
+        and not any(state[1] for state in persistent_cleanup[4])
+        and len(persistent_cleanup[5]) <= 1
+        and cleanup_rig_ok)
 
     def result_root_ordinal_discovery():
         """Identify result staging by its observed -o child, never by snapshot order."""
@@ -5117,13 +5355,32 @@ else:
 if sink_fd>=0 and mode=="no_cloexec": fcntl.fcntl(sink_fd,fcntl.F_SETFD,fcntl.fcntl(sink_fd,fcntl.F_GETFD)&~fcntl.FD_CLOEXEC)
 if mode=="preseed":
  canonical.write_bytes(b"preseed");st=canonical.stat();preseed_identity=(st.st_dev,st.st_ino,canonical.read_bytes().hex())
+def object_inventory(root):
+ records={}
+ def visit(path):
+  current=os.lstat(path);relative=os.path.relpath(os.fspath(path),os.fspath(root))
+  kind=("dir" if stat.S_ISDIR(current.st_mode) else "file" if stat.S_ISREG(current.st_mode)
+        else "symlink" if stat.S_ISLNK(current.st_mode) else "other")
+  record={"kind":kind,"mode":stat.S_IMODE(current.st_mode),"dev":current.st_dev,
+          "ino":current.st_ino}
+  if kind=="file":
+   record.update({"nlink":current.st_nlink,"size":current.st_size})
+   with open(path,"rb") as handle: record["digest"]=hashlib.sha256(handle.read()).hexdigest()
+  elif kind=="symlink": record.update({"nlink":current.st_nlink,"size":current.st_size,"target":os.readlink(path)})
+  elif kind!="dir": record.update({"nlink":current.st_nlink,"size":current.st_size})
+  records[relative]=record
+  if kind=="dir":
+   for child in sorted(os.scandir(path),key=lambda item:item.name): visit(pathlib.Path(child.path))
+ visit(root);return records
+attempt_pre_inventory=object_inventory(arena)
 module_source=module_path.read_bytes()
 mod=types.ModuleType("r49_subject_kernel");mod.__file__=str(module_path);mod.__package__=""
 sink_identity=None
 if sink_fd>=0:
  st=os.fstat(sink_fd);sink_identity=(st.st_dev,st.st_ino)
 accepted_digest=hashlib.sha256(raw).hexdigest()
-events=[];transitions=[];held=[];fsynced=set();call_active=[False];transition_done=[False]
+events=[];transitions=[];held=[];fsynced={};mutation_versions={};call_active=[False];transition_done=[False]
+pending_link=[None]
 canonical_epochs=[];canonical_direct_writes=[]
 primitive_counts={name:0 for name in ("open","fsync","fstat","stat","lstat","access","readlink","listdir","scandir","walk","chmod","fchmod","mkdir","makedirs","symlink","link","unlink","remove","rmdir","environ","environb","getenv","getenvb","putenv","unsetenv","path_open","path_iterdir","path_glob","path_rglob","path_read_text","path_read_bytes","path_stat","path_lstat","path_readlink","path_resolve","path_chmod","path_mkdir","path_symlink_to","path_hardlink_to","path_link_to","path_unlink","path_rmdir","path_rename","path_replace","path_touch")}
 env_events=[];security_events=[];original_environ=os.environ;original_environb=getattr(os,"environb",None)
@@ -5214,9 +5471,51 @@ def safe_existing(value):
  except OSError: return False
 def secure_mode(value,directory=False):
  return isinstance(value,int) and value>=0 and not (value&0o077)
-def mutation_allowed(name,args):
+def simple_leaf(value):
+ if type(value) is bytes:
+  try: value=value.decode(sys.getfilesystemencoding(),"surrogateescape")
+  except Exception: return None
+ if type(value) is not str or not value or "\0" in value or value in {".",".."}: return None
+ if os.sep in value or (os.altsep and os.altsep in value): return None
+ return value
+def exact_parent_fd(value):
+ if type(value) is not int or value<0: return False
+ try:
+  opened=original_fstat(value);current=original_lstat(canonical_parent)
+  return (fd_path(value)==lexical_path(canonical_parent)
+          and stat.S_ISDIR(opened.st_mode) and stat.S_ISDIR(current.st_mode)
+          and (opened.st_dev,opened.st_ino)==(current.st_dev,current.st_ino))
+ except OSError: return False
+def resolve_link(args,kwargs=None,audit=False):
+ if len(args)<2: return None
+ source=lexical_path(args[0]);destination=lexical_path(args[1])
+ src_dir_fd=(args[2] if audit and len(args)>2 else (kwargs or {}).get("src_dir_fd"))
+ dst_dir_fd=(args[3] if audit and len(args)>3 else (kwargs or {}).get("dst_dir_fd"))
+ if source is not None and destination is not None:
+  if src_dir_fd not in (None,-1) or dst_dir_fd not in (None,-1): return None
+  return (source,destination,"absolute")
+ source_leaf=simple_leaf(args[0]);destination_leaf=simple_leaf(args[1])
+ if source_leaf is None or destination_leaf is None: return None
+ if type(src_dir_fd) is not int or type(dst_dir_fd) is not int or src_dir_fd!=dst_dir_fd: return None
+ if not exact_parent_fd(src_dir_fd): return None
+ signature=(source_leaf,destination_leaf,src_dir_fd,dst_dir_fd)
+ if audit:
+  if pending_link[0]!=signature: return None
+ elif (kwargs or {}).get("follow_symlinks") is not False:
+  return None
+ parent=lexical_path(canonical_parent)
+ return (original_normpath(parent+os.sep+source_leaf),
+         original_normpath(parent+os.sep+destination_leaf),"dirfd")
+def mutation_allowed(name,args,kwargs=None,audit=False):
  if not args: return False
- if name in {"symlink","link"}: return False
+ if name=="symlink": return False
+ if name=="link":
+  resolved=resolve_link(args,kwargs,audit)
+  if resolved is None: return False
+  source,destination,unused=resolved
+  return (destination==lexical_path(canonical)
+          and os.path.dirname(source)==lexical_path(canonical_parent)
+          and source!=destination)
  target=args[0]
  if not strict_member(target): return False
  if name in {"chmod","fchmod"}:
@@ -5246,6 +5545,7 @@ def fd_inventory(identity,writable=None,ticket_phase=None):
   except OSError: pass
  return found
 original_fsync=os.fsync;original_os_open=os.open;original_builtin_open=builtins.open
+original_write=os.write;original_pwrite=getattr(os,"pwrite",None);original_ftruncate=os.ftruncate
 original_getenv=os.getenv;original_getenvb=getattr(os,"getenvb",None)
 original_putenv=os.putenv;original_unsetenv=os.unsetenv
 path_method_names=tuple(name for name in ("open","iterdir","glob","rglob","read_text","read_bytes","stat","lstat","readlink","resolve","chmod","mkdir","symlink_to","hardlink_to","link_to","unlink","rmdir","rename","replace","touch") if hasattr(pathlib.Path,name))
@@ -5275,9 +5575,59 @@ def observe_existing_canonical(reason):
   if not canonical_epochs or any(epoch.get(key)!=canonical_epochs[-1].get(key) for key in ("dev","ino","digest")):
    canonical_epochs.append(epoch)
  except FileNotFoundError: pass
+def fd_snapshot(fd):
+ before=original_fstat(fd)
+ if not stat.S_ISREG(before.st_mode) or before.st_size>5*1024*1024: return None
+ read_fd=fd;close_read=False
+ if fcntl.fcntl(fd,fcntl.F_GETFL)&os.O_ACCMODE==os.O_WRONLY:
+  path=fd_path(fd);flags=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
+  if path is None: return None
+  ticket=make_ticket("fsync_snapshot_open","original_os_open","open",(path,),flags,None,None,None)
+  try: read_fd=original_os_open(path,flags);require_ticket_consumed(ticket)
+  except OSError:
+   if ticket in ticket_queue(): ticket_queue().remove(ticket)
+   return None
+  close_read=True
+  opened=original_fstat(read_fd)
+  if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino):
+   os.close(read_fd);return None
+ try:
+  data=b"";offset=0
+  while len(data)<=5*1024*1024:
+   chunk=os.pread(read_fd,min(65536,5*1024*1024+1-len(data)),offset)
+   if not chunk: break
+   data+=chunk;offset+=len(chunk)
+ finally:
+  if close_read: os.close(read_fd)
+ after=original_fstat(fd);identity=(before.st_dev,before.st_ino)
+ return {"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,
+         "digest":hashlib.sha256(data).hexdigest(),"mtime_ns":before.st_mtime_ns,
+         "ctime_ns":before.st_ctime_ns,"version":mutation_versions.get(identity,0),
+         "stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==
+                  (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns)}
 def observed_fsync(fd):
- primitive_counts["fsync"]+=1;st=original_fstat(fd);fsynced.add((st.st_dev,st.st_ino));return original_fsync(fd)
+ primitive_counts["fsync"]+=1
+ if mode=="fsync_failure" and call_active[0]: raise OSError("injected fsync failure")
+ result=original_fsync(fd)
+ snapshot=fd_snapshot(fd)
+ if snapshot is not None and snapshot["stable"]:
+  fsynced[(snapshot["dev"],snapshot["ino"])]=snapshot
+ return result
 os.fsync=observed_fsync
+def note_mutation(fd):
+ try:
+  current=original_fstat(fd);identity=(current.st_dev,current.st_ino)
+  mutation_versions[identity]=mutation_versions.get(identity,0)+1
+ except OSError: pass
+def observed_write(fd,data):
+ result=original_write(fd,data);note_mutation(fd);return result
+def observed_pwrite(fd,data,offset):
+ result=original_pwrite(fd,data,offset);note_mutation(fd);return result
+def observed_ftruncate(fd,length):
+ result=original_ftruncate(fd,length);note_mutation(fd);return result
+os.write=observed_write
+if original_pwrite is not None: os.pwrite=observed_pwrite
+os.ftruncate=observed_ftruncate
 def observed_fstat(fd):
  primitive_counts["fstat"]+=1;return original_fstat(fd)
 os.fstat=observed_fstat
@@ -5314,7 +5664,9 @@ def observed_path_method(name):
   if name in {"rename","replace"}:
    allowed=strict_member(self) and bool(args) and strict_member(args[0])
   if name=="touch": allowed=strict_member(self) and secure_mode(args[0] if args else kwargs.get("mode",0o666))
-  if name in {"symlink_to","hardlink_to","link_to"}: allowed=False
+  if name=="symlink_to": allowed=False
+  if name=="link_to": allowed=mutation_allowed("link",(self,args[0])) if args else False
+  if name=="hardlink_to": allowed=mutation_allowed("link",(args[0],self)) if args else False
   if call_active[0]:
    events.append(("path."+name,path_label(self),path_label(args[0]) if args else "",allowed))
    if not allowed: raise PermissionError("path outside scoped result authority")
@@ -5347,11 +5699,17 @@ def observed_mutation(name):
  def invoke(*args,**kwargs):
   primitive_counts[name]+=1
   target=(args[1] if name in {"symlink","link"} and len(args)>1 else args[0] if args else "")
-  allowed=mutation_allowed(name,args)
+  resolved=resolve_link(args,kwargs) if name=="link" else None
+  allowed=mutation_allowed(name,args,kwargs)
   if call_active[0]:
    events.append(("os."+name,path_label(target),name,allowed))
    if not allowed: raise PermissionError("mutation outside scoped result authority")
-  return original_mutation_ops[name](*args,**kwargs)
+  if name=="link" and resolved is not None and resolved[2]=="dirfd":
+   pending_link[0]=(simple_leaf(args[0]),simple_leaf(args[1]),
+                    kwargs.get("src_dir_fd"),kwargs.get("dst_dir_fd"))
+  try: return original_mutation_ops[name](*args,**kwargs)
+  finally:
+   if name=="link": pending_link[0]=None
  return invoke
 for mutation_op in mutation_os_names: setattr(os,mutation_op,observed_mutation(mutation_op))
 class ObservedEnviron:
@@ -5424,7 +5782,11 @@ def audit(event,args):
      if not chunk: break
      data+=chunk
     after=original_fstat(fd);identity=(before.st_dev,before.st_ino);writers=fd_inventory(identity,True,"canonical_writer_inventory")
-    transitions.append({"absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":hashlib.sha256(data).hexdigest(),"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":identity in fsynced})
+    digest=hashlib.sha256(data).hexdigest();snapshot=fsynced.get(identity)
+    sync_match=(snapshot is not None and snapshot.get("stable") is True
+                and (snapshot.get("size"),snapshot.get("digest"),snapshot.get("mtime_ns"),snapshot.get("ctime_ns"),snapshot.get("version"))
+                    ==(before.st_size,digest,before.st_mtime_ns,before.st_ctime_ns,mutation_versions.get(identity,0)))
+    transitions.append({"absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":digest,"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":sync_match})
     held.append(fd);transition_done[0]=True
    except Exception:
     if source_ticket in ticket_queue(): ticket_queue().remove(source_ticket)
@@ -5438,7 +5800,35 @@ def audit(event,args):
  elif event in {"os.chmod","os.mkdir","os.rmdir","os.remove","os.unlink"} and args:
   allowed=mutation_allowed(event.split(".",1)[1],args);events.append((event,path_label(args[0]),event,allowed))
   if not allowed: raise PermissionError("audit mutation outside scoped result authority")
- elif event in {"os.symlink","os.link"} and len(args)>=2:
+ elif event=="os.link" and len(args)>=2:
+  resolved=resolve_link(args,audit=True);allowed=mutation_allowed("link",args,audit=True)
+  src_path=resolved[0] if resolved else None;dst_path=resolved[1] if resolved else None
+  events.append((event,src_path or path_label(args[0]),dst_path or path_label(args[1]),allowed))
+  if not allowed: raise PermissionError("link authority denied")
+  canonical_path=lexical_path(canonical)
+  if dst_path!=canonical_path: raise PermissionError("link destination is not canonical")
+  observe_existing_canonical("before_link")
+  source_flags=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
+  source_ticket=make_ticket("canonical_link_source_open","original_os_open","open",(src_path,),source_flags,None,None,None)
+  try:
+   try: original_lstat(canonical);absent=False
+   except FileNotFoundError: absent=True
+   fd=original_os_open(src_path,source_flags);require_ticket_consumed(source_ticket);before=original_fstat(fd);data=b""
+   while len(data)<=5*1024*1024:
+    chunk=os.read(fd,min(65536,5*1024*1024+1-len(data)))
+    if not chunk: break
+    data+=chunk
+   after=original_fstat(fd);identity=(before.st_dev,before.st_ino);writers=fd_inventory(identity,True,"canonical_link_writer_inventory")
+   digest=hashlib.sha256(data).hexdigest();snapshot=fsynced.get(identity)
+   sync_match=(snapshot is not None and snapshot.get("stable") is True
+               and (snapshot.get("size"),snapshot.get("digest"),snapshot.get("mtime_ns"),snapshot.get("ctime_ns"),snapshot.get("version"))
+                   ==(before.st_size,digest,before.st_mtime_ns,before.st_ctime_ns,mutation_versions.get(identity,0)))
+   transitions.append({"event":"os.link","mode":resolved[2],"absent":absent,"dev":before.st_dev,"ino":before.st_ino,"size":before.st_size,"digest":digest,"stable":(before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),"writers":writers,"fsynced":sync_match})
+   held.append(fd);transition_done[0]=True
+  except Exception:
+   if source_ticket in ticket_queue(): ticket_queue().remove(source_ticket)
+   raise
+ elif event=="os.symlink" and len(args)>=2:
   events.append((event,path_label(args[1]),event,False));raise PermissionError("link authority denied")
  elif event=="subprocess.Popen" or event=="os.system" or event.startswith("os.exec") \
         or event.startswith("os.posix_spawn") or event.startswith("socket."):
@@ -5552,11 +5942,26 @@ if canonical_info is not None:
 temps=[str(path) for path in canonical_parent.iterdir() if path.name!="result.json"]
 outside=[event for event in events if event[-1] is False and event[0] not in {"post_write","post_remove","post_rename"}]
 post_events=[event for event in events if event[0] in {"post_write","post_remove","post_rename"}]
+attempt_post_inventory=object_inventory(arena)
+attempt_object_delta={
+ "added":sorted(set(attempt_post_inventory)-set(attempt_pre_inventory)),
+ "removed":sorted(set(attempt_pre_inventory)-set(attempt_post_inventory)),
+ "changed":sorted(key for key in set(attempt_pre_inventory)&set(attempt_post_inventory)
+                  if attempt_pre_inventory[key]!=attempt_post_inventory[key]),
+}
+attempt_fd_aliases=[]
+for number in sorted(int(name) for name in original_listdir("/dev/fd") if name.isdigit()):
+ try:
+  path=fd_path(number)
+  if path is None or not (path==lexical_path(arena) or path.startswith(lexical_path(arena)+os.sep)): continue
+  current=original_fstat(number);access=fcntl.fcntl(number,fcntl.F_GETFL)&os.O_ACCMODE
+  attempt_fd_aliases.append([number,access,path,current.st_dev,current.st_ino])
+ except OSError: pass
 env_changed=(dict(original_environ)!=env_before or dict(original_environb or {})!=envb_before)
 transition_ok=(len(transitions)==1 and canonical_info is not None and transitions[0]["absent"] and transitions[0]["stable"] and transitions[0]["fsynced"] and not transitions[0]["writers"] and (transitions[0]["dev"],transitions[0]["ino"],transitions[0]["digest"])==(canonical_info.get("dev"),canonical_info.get("ino"),canonical_info.get("digest")))
 publication_ok=(len(canonical_epochs)==1 and not canonical_direct_writes and canonical_info is not None and canonical_epochs[0].get("dev")==canonical_info.get("dev") and canonical_epochs[0].get("ino")==canonical_info.get("ino") and canonical_epochs[0].get("digest")==canonical_info.get("digest"))
 visibility_ok=(publication_ok and (not visible or all(item==canonical_info.get("digest") for item in visible)))
-print(json.dumps({"accepted":accepted,"error":error,"module_error":module_error,"returned_type":type(returned).__name__,"accepted_digest":accepted_digest,"fd_aliases":fd_aliases,"transitions":transitions,"transition_ok":transition_ok,"publication_ok":publication_ok,"canonical_epochs":canonical_epochs,"canonical_direct_writes":canonical_direct_writes,"visibility_ok":visibility_ok,"visible_count":len(visible),"canonical":canonical_info,"temps":temps,"outside":outside,"post_events":post_events,"preseed":preseed_identity,"cleanup_failures":cleanup_failures[0],"trap_unchanged":random_trap.read_bytes()==trap_before,"second_rejected":second_rejected,"primitive_counts":primitive_counts,"env_events":env_events,"env_changed":env_changed,"security_events":security_events,"ticket_selftest":ticket_selftest},separators=(",",":"),sort_keys=True))
+print(json.dumps({"accepted":accepted,"error":error,"module_error":module_error,"returned_type":type(returned).__name__,"accepted_digest":accepted_digest,"fd_aliases":fd_aliases,"attempt_fd_aliases":attempt_fd_aliases,"attempt_object_delta":attempt_object_delta,"transitions":transitions,"transition_ok":transition_ok,"publication_ok":publication_ok,"canonical_epochs":canonical_epochs,"canonical_direct_writes":canonical_direct_writes,"visibility_ok":visibility_ok,"visible_count":len(visible),"canonical":canonical_info,"temps":temps,"outside":outside,"post_events":post_events,"preseed":preseed_identity,"cleanup_failures":cleanup_failures[0],"trap_unchanged":random_trap.read_bytes()==trap_before,"second_rejected":second_rejected,"primitive_counts":primitive_counts,"env_events":env_events,"env_changed":env_changed,"security_events":security_events,"ticket_selftest":ticket_selftest},separators=(",",":"),sort_keys=True))
 for fd in held:
  try: os.close(fd)
  except OSError: pass
@@ -5654,6 +6059,191 @@ for fd in held:
         and reference_cases["cleanup_persistent"].get("accepted") is False
         and reference_cases["cleanup_persistent"].get("cleanup_failures",0)>=2
         and bool(reference_cases["cleanup_persistent"].get("temps")))
+
+    # R102 admits one no-replace hardlink publication only after the private
+    # source writer has been closed and fsynced.  The same fresh child binds
+    # source bytes/identity to the sole absent canonical transition; source
+    # spelling, aliases and helper transfer never grant authority.
+    link_publication_source=reference_kernel_source.replace(
+        "        os.replace(temp_name,canonical_destination);temp_name=None",
+        "        os.link(temp_name,canonical_destination);os.unlink(temp_name);temp_name=None",1)
+    link_publication=work/"r102-link-publication-positive.py"
+    link_publication.write_text(link_publication_source,encoding="utf-8")
+    link_publication_inventory=kernel_structure_inventory(
+        ast.parse(link_publication_source),link_publication_source)
+    link_publication_case=fresh_kernel_effect(link_publication,rig_valid_raw)
+    link_publication_positive=(link_publication_inventory[0]
+        and fresh_success(link_publication_case,rig_valid_raw)
+        and link_publication_case.get("primitive_counts",{}).get("link",0)==1
+        and link_publication_case.get("primitive_counts",{}).get("unlink",0)>=1
+        and link_publication_case.get("transitions",[{}])[0].get("event")=="os.link")
+
+    path_link_publication_positive=True;path_link_publication_case={"skipped":True}
+    if hasattr(Path,"link_to"):
+        path_link_publication_source=reference_kernel_source.replace(
+            "        os.replace(temp_name,canonical_destination);temp_name=None",
+            "        Path(temp_name).link_to(Path(canonical_destination));os.unlink(temp_name);temp_name=None",1)
+        path_link_publication=work/"r102-path-link-publication-positive.py"
+        path_link_publication.write_text(path_link_publication_source,encoding="utf-8")
+        path_link_inventory=kernel_structure_inventory(
+            ast.parse(path_link_publication_source),path_link_publication_source)
+        path_link_publication_case=fresh_kernel_effect(path_link_publication,rig_valid_raw)
+        path_link_publication_positive=(path_link_inventory[0]
+            and fresh_success(path_link_publication_case,rig_valid_raw)
+            and path_link_publication_case.get("primitive_counts",{}).get("path_link_to",0)==1
+            and path_link_publication_case.get("transitions",[{}])[0].get("event")=="os.link")
+
+    dirfd_publication_source=reference_kernel_source.replace(
+        "        os.replace(temp_name,canonical_destination);temp_name=None",'''        parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC)
+        try:
+            os.link(Path(temp_name).name,Path(canonical_destination).name,
+                    src_dir_fd=parent_fd,dst_dir_fd=parent_fd,follow_symlinks=False)
+        finally: os.close(parent_fd)
+        os.unlink(temp_name);temp_name=None''',1)
+    dirfd_publication=work/"r103-dirfd-link-publication-positive.py"
+    dirfd_publication.write_text(dirfd_publication_source,encoding="utf-8")
+    dirfd_publication_inventory=kernel_structure_inventory(
+        ast.parse(dirfd_publication_source),dirfd_publication_source)
+    dirfd_publication_case=fresh_kernel_effect(dirfd_publication,rig_valid_raw)
+    dirfd_publication_positive=(dirfd_publication_inventory[0]
+        and fresh_success(dirfd_publication_case,rig_valid_raw)
+        and dirfd_publication_case.get("transitions",[{}])[0].get("mode")=="dirfd")
+
+    stale_fsync_cases={}
+    for stale_name,base_source in (("direct",link_publication_source),
+                                   ("path",path_link_publication_source if hasattr(Path,"link_to") else link_publication_source)):
+        stale_source=base_source.replace(
+            "_write_all(temp_fd,encoded);_sync(temp_fd)",
+            "_sync(temp_fd);_write_all(temp_fd,encoded)",1)
+        stale_path=work/f"r103-{stale_name}-stale-fsync-mutant.py"
+        stale_path.write_text(stale_source,encoding="utf-8")
+        stale_fsync_cases[stale_name]=fresh_kernel_effect(stale_path,rig_valid_raw)
+    failed_fsync_cases={}
+    for failed_name,base_source in (("direct",link_publication_source),
+                                    ("path",path_link_publication_source if hasattr(Path,"link_to") else link_publication_source)):
+        failed_source=base_source.replace(
+            "_write_all(temp_fd,encoded);_sync(temp_fd)",
+            "_write_all(temp_fd,encoded)\n            try: _sync(temp_fd)\n            except OSError: pass",1)
+        failed_path=work/f"r103-{failed_name}-failed-fsync-mutant.py"
+        failed_path.write_text(failed_source,encoding="utf-8")
+        failed_fsync_cases[failed_name]=fresh_kernel_effect(failed_path,rig_valid_raw,"fsync_failure")
+
+    dirfd_negative_sources={
+        "wrong":dirfd_publication_source.replace(
+            "parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC)",
+            "parent_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC)",1),
+        "mixed":dirfd_publication_source.replace(
+            "parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC)",
+            "parent_fd=os.open(parent,os.O_RDONLY|os.O_CLOEXEC);other_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC)",1).replace(
+            "src_dir_fd=parent_fd,dst_dir_fd=parent_fd",
+            "src_dir_fd=parent_fd,dst_dir_fd=other_fd",1).replace(
+            "finally: os.close(parent_fd)",
+            "finally: os.close(parent_fd);os.close(other_fd)",1),
+        "closed":dirfd_publication_source.replace(
+            "        try:\n            os.link", "        os.close(parent_fd)\n        try:\n            os.link",1),
+        "stale":dirfd_publication_source.replace(
+            "        try:\n            os.link", "        os.close(parent_fd);probe_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC);os.close(probe_fd)\n        try:\n            os.link",1),
+        "reused":dirfd_publication_source.replace(
+            "        try:\n            os.link", "        os.close(parent_fd);parent_fd=os.open(temp_name,os.O_RDONLY|os.O_CLOEXEC)\n        try:\n            os.link",1),
+        "traversal":dirfd_publication_source.replace(
+            "os.link(Path(temp_name).name,Path(canonical_destination).name,",
+            "os.link('../'+Path(temp_name).name,Path(canonical_destination).name,",1),
+    }
+    dirfd_negative_cases={}
+    for dirfd_name,dirfd_source in dirfd_negative_sources.items():
+        dirfd_path=work/f"r103-dirfd-{dirfd_name}-mutant.py"
+        dirfd_path.write_text(dirfd_source,encoding="utf-8")
+        dirfd_negative_cases[dirfd_name]=fresh_kernel_effect(dirfd_path,rig_valid_raw)
+    def dirfd_reject_clean(case):
+        delta=case.get("attempt_object_delta") or {}
+        return (outside_blocked(case,True)
+            and case.get("temps")==[] and case.get("fd_aliases")==[]
+            and case.get("attempt_fd_aliases")==[]
+            and delta.get("added")==[] and delta.get("removed")==[]
+            and delta.get("changed")==[]
+            and case.get("post_events")==[] and case.get("transitions")==[]
+            and case.get("canonical_epochs")==[]
+            and case.get("canonical_direct_writes")==[]
+            and case.get("cleanup_failures")==0)
+    cleanup_leak_source=dirfd_negative_sources["traversal"].replace(
+        "def _unlink_retry(path):\n    last=None",
+        "def _unlink_retry(path):\n    return\n    last=None",1)
+    cleanup_leak_path=work/"r104-dirfd-cleanup-disabled-mutant.py"
+    cleanup_leak_path.write_text(cleanup_leak_source,encoding="utf-8")
+    cleanup_leak_case=fresh_kernel_effect(cleanup_leak_path,rig_valid_raw)
+    fd_alias_leak_source=dirfd_negative_sources["traversal"].replace(
+        "finally: os.close(parent_fd)","finally: pass",1)
+    fd_alias_leak_path=work/"r104-dirfd-fd-alias-leak-mutant.py"
+    fd_alias_leak_path.write_text(fd_alias_leak_source,encoding="utf-8")
+    fd_alias_leak_case=fresh_kernel_effect(fd_alias_leak_path,rig_valid_raw)
+    r104_residue_mutants_caught=(outside_blocked(cleanup_leak_case,True)
+        and bool(cleanup_leak_case.get("temps"))
+        and bool((cleanup_leak_case.get("attempt_object_delta") or {}).get("added"))
+        and not dirfd_reject_clean(cleanup_leak_case)
+        and outside_blocked(fd_alias_leak_case,True)
+        and bool(fd_alias_leak_case.get("attempt_fd_aliases"))
+        and not dirfd_reject_clean(fd_alias_leak_case))
+    r103_fsync_dirfd_rig_ok=(dirfd_publication_positive
+        and all(case.get("accepted") is True and case.get("transitions")
+                and case["transitions"][0].get("fsynced") is False
+                and not fresh_success(case,rig_valid_raw)
+                for case in stale_fsync_cases.values())
+        and all(case.get("accepted") is True and case.get("transitions")
+                and case["transitions"][0].get("fsynced") is False
+                and not fresh_success(case,rig_valid_raw)
+                for case in failed_fsync_cases.values())
+        and all(dirfd_reject_clean(case) for case in dirfd_negative_cases.values())
+        and r104_residue_mutants_caught)
+
+    link_alias_source=link_publication_source.replace(
+        "os.link(temp_name,canonical_destination)",
+        "publisher=os.link;publisher(temp_name,canonical_destination)",1)
+    link_helper_source=link_publication_source.replace(
+        "def consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",
+        "def _publish(source,destination):\n    os.link(source,destination)\n\ndef consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",1).replace(
+        "os.link(temp_name,canonical_destination)","_publish(temp_name,canonical_destination)",1)
+    link_alias_inventory=kernel_structure_inventory(ast.parse(link_alias_source),link_alias_source)
+    link_helper_inventory=kernel_structure_inventory(ast.parse(link_helper_source),link_helper_source)
+    link_same_name_helper_source=link_publication_source.replace(
+        "def consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",
+        "def _publish(source,destination):\n    def consume_private_result(left,right):\n        os.link(left,right)\n    consume_private_result(source,destination)\n\ndef consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role):",1).replace(
+        "os.link(temp_name,canonical_destination)","_publish(temp_name,canonical_destination)",1)
+    link_same_name_helper_inventory=kernel_structure_inventory(
+        ast.parse(link_same_name_helper_source),link_same_name_helper_source)
+
+    link_wrong_source_source=link_publication_source.replace(
+        "_write_all(temp_fd,encoded);_sync(temp_fd)",
+        "_write_all(temp_fd,b'{}');_sync(temp_fd)",1)
+    link_wrong_source=work/"r102-link-wrong-source-mutant.py"
+    link_wrong_source.write_text(link_wrong_source_source,encoding="utf-8")
+    link_wrong_source_case=fresh_kernel_effect(link_wrong_source,rig_valid_raw)
+    link_wrong_destination_source=link_publication_source.replace(
+        "os.link(temp_name,canonical_destination)",
+        "os.link(temp_name,os.fspath(Path(canonical_destination).with_name('wrong.json')))",1)
+    link_wrong_destination=work/"r102-link-wrong-destination-mutant.py"
+    link_wrong_destination.write_text(link_wrong_destination_source,encoding="utf-8")
+    link_wrong_destination_case=fresh_kernel_effect(link_wrong_destination,rig_valid_raw)
+    link_preseed_case=fresh_kernel_effect(link_publication,rig_valid_raw,"preseed")
+    link_multiple_source=reference_kernel_source.replace(
+        "        os.replace(temp_name,canonical_destination);temp_name=None",
+        "        os.link(temp_name,canonical_destination);os.unlink(canonical_destination);os.link(temp_name,canonical_destination);os.unlink(temp_name);temp_name=None",1)
+    link_multiple=work/"r102-link-multiple-publication-mutant.py"
+    link_multiple.write_text(link_multiple_source,encoding="utf-8")
+    link_multiple_case=fresh_kernel_effect(link_multiple,rig_valid_raw)
+    r102_link_publication_rig_ok=(link_publication_positive
+        and path_link_publication_positive
+        and r103_fsync_dirfd_rig_ok
+        and link_alias_inventory[0] is False
+        and link_helper_inventory[0] is False
+        and link_same_name_helper_inventory[0] is False
+        and link_wrong_source_case.get("accepted") is True
+        and link_wrong_source_case.get("transition_ok") is True
+        and not fresh_success(link_wrong_source_case,rig_valid_raw)
+        and outside_blocked(link_wrong_destination_case,True)
+        and fresh_reject(link_preseed_case,True)
+        and link_multiple_case.get("accepted") is True
+        and len(link_multiple_case.get("transitions",[]))==2
+        and not fresh_success(link_multiple_case,rig_valid_raw))
 
     # Import and captured-reference sensitivity uses the same child and exact
     # public call. The subject is executed only after the judge has installed
@@ -5943,7 +6533,8 @@ class CraftedConcretePath(type(Path())):
         and not fresh_success(bool_version_case,rig_valid_raw))
     reference_effect_rig_ok=(reference_kernel_inventory_ok and reference_basic_ok and leak_mutants_ok
         and atomic_mutant_caught and double_publication_caught
-        and bool_version_caught and captured_primitive_rig_ok)
+        and bool_version_caught and captured_primitive_rig_ok
+        and r102_link_publication_rig_ok)
 
     product_fresh_cases={};product_fresh_ok=False
     if kernel_structure_ok:
@@ -6284,9 +6875,11 @@ class CraftedConcretePath(type(Path())):
     check("J_RESULT_KERNEL_RIG", kernel_inventory_rig_ok and integration_rig_ok
           and kernel_oracle_rig_ok and reference_effect_rig_ok
           and r55_complete_residue_oracle_ok and r56_setup_oracle_ok,
-          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught}")
+          f"inventory={rig_inventory_base[0],rig_inventory_mutants,inventory_adversary_results,fcntl_inventory_ok,reviewer_inventory_results,module_proxy_results,r51_capture_results,r51_shadow_results,r51_alias_escape_results,r51_path_deferred_results,r52_namedexpr_results} integration={integration_positive,integration_dead,integration_constants,integration_discard,integration_rebind,integration_direct,integration_runtime_positive,integration_runtime_discarded} oracle={kernel_oracle_rig_ok} reference={reference_kernel_inventory_ok,reference_basic_ok,(reference_cases['valid'].get('outside'),reference_cases['valid'].get('security_events'),reference_cases['valid'].get('env_events'),reference_cases['valid'].get('env_changed'),reference_cases['valid'].get('transition_ok'),reference_cases['valid'].get('fd_aliases'),reference_cases['valid'].get('ticket_selftest'))} effects={captured_primitive_rig_ok,bool(import_probe_case.get('outside')),bool(captured_stat_case.get('outside')),bool(iterdir_case.get('outside')),bool(environb_case.get('env_events')),bool(getenvb_case.get('env_events')),r51_outside_mutations_caught,tuple(name for name,case in r51_mutation_cases.items() if bool(case.get('outside'))),r51_inroot_positive,r51_object_rules_caught,r52_path_observer_ok,(r52_fspath_case.get('outside'),r52_subclass_case.get('outside'),r52_nested_case.get('outside')),r53_ticket_window_ok,(r53_ticket_window_case.get('accepted'),r53_ticket_window_case.get('transition_ok'),r53_ticket_window_case.get('outside'),r53_ticket_window_case.get('ticket_selftest')),bool(env_case.get('env_events')),unsynced_case.get('transition_ok'),fresh_success(path_positive_case,rig_valid_raw)} captured_predicates={(fresh_success(reference_cases['valid'],rig_valid_raw),reference_cases['valid'].get('primitive_counts'),fresh_success(captured_reference_case,rig_valid_raw),outside_blocked(import_probe_case,True),outside_blocked(captured_stat_case,True),fresh_success(path_positive_case,rig_valid_raw),environb_case.get('accepted'),getenvb_case.get('accepted'))} r51_inroot={(r51_inroot_case.get('accepted'),r51_inroot_case.get('error'),r51_inroot_case.get('transition_ok'),r51_inroot_case.get('publication_ok'),r51_inroot_case.get('temps'),r51_inroot_case.get('outside'),r51_inroot_case.get('primitive_counts'))} leak_aliases={ {name:case.get('fd_aliases') for name,case in leak_mutants.items()} } atomic_mutant={atomic_mutant_caught,atomic_mutant_case.get('transitions')} double_publication={double_publication_caught,double_publication_case.get('canonical_epochs'),double_publication_case.get('canonical_direct_writes')} residue_oracle={r55_clean_oracle_positive,r55_parent_residue_caught,r55_helper_residue_caught} setup_oracle={r56_zero_start_oracle_positive,r56_zero_start_mutants,r57_root_order_positive,r57_wrong_root_mutant_caught,r57_journal_order_positive,journal_parser_rig_ok,r59_post_retained_dynamic_positive,r59_empty_interval_positive,r58_distinct_popen_trace_positive} setup_effects={r57_setup_effect_summary,r59_post_retained_effect_summary} journal_faults={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} bool_version={bool_version_caught} r102_link={r102_link_publication_rig_ok,link_publication_positive,path_link_publication_positive,link_alias_inventory[0],link_helper_inventory[0],link_same_name_helper_inventory[0],link_wrong_source_case.get('transition_ok'),bool(link_wrong_destination_case.get('outside')),link_preseed_case.get('accepted'),len(link_multiple_case.get('transitions',[]))} r103={dirfd_publication_positive,dirfd_publication_inventory[0],dirfd_publication_case.get('accepted'),dirfd_publication_case.get('error'),dirfd_publication_case.get('transitions'),{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in stale_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('transitions'),case.get('outside')) for name,case in failed_fsync_cases.items()},{name:(case.get('accepted'),case.get('error'),case.get('outside'),case.get('temps'),case.get('canonical')) for name,case in dirfd_negative_cases.items()}} r104={r104_residue_mutants_caught,{name:(dirfd_reject_clean(case),case.get('attempt_object_delta'),case.get('attempt_fd_aliases')) for name,case in dirfd_negative_cases.items()},(cleanup_leak_case.get('temps'),cleanup_leak_case.get('attempt_object_delta'),cleanup_leak_case.get('attempt_fd_aliases')),(fd_alias_leak_case.get('temps'),fd_alias_leak_case.get('attempt_object_delta'),fd_alias_leak_case.get('attempt_fd_aliases'))}")
+    def cleanup_detail(case):
+        return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
-          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={transient_cleanup, persistent_cleanup, cleanup_error_ok} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
+          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
     check("K1", family_absent or (valid[0] and valid[2] == 1), f"valid={valid}")
     check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
     check("K3", family_absent or (argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash),
