@@ -2294,3 +2294,41 @@ one-hop helper admission and every J_R112 predicate are unchanged, and neither
 frozen opened-identity control is weakened: both now observe the reference's
 unperturbed open-then-fstat boundary again. No production or live/provider
 execution is touched.
+
+## 2026-08-22 — R114 judge-side fstat observation neutrality
+
+The first real product candidate (builder 257e121e, pathless retained-sink
+handoff) exposed a second observation-neutrality defect, this time on the
+judge side. The attempt-level observed_open wrapper records every product
+os.open return by calling os.fstat inside a swallowing try/except. The
+setup-fault machinery patches os.fstat so that the retained_fd_fstat stage
+injects at the first read-only fstat matching the sink create identity.
+Because observed_open runs inside the product's own open call, the wrapper's
+internal fstat is always that first qualifying fstat: the injection fired
+inside the judge's recorder, was swallowed by its exception guard, consumed
+the once-only injection flag, and the product proceeded to a full provider
+start. No os.open-retained implementation could satisfy the frozen
+zero-start requirement, and the connected schedule variants that drive
+product-source derivatives through the same machinery failed with it.
+Blocked evidence:
+evidence/bootstrap-supervisor/evidence/h032-result-kernel-builder-blocked-rig-fstat-swallow-257e121.txt.
+
+R114 binds the judge's recording fstat to the exact C callable captured at
+gate start, before any fixture or fault wrapper exists. The wrapper still
+records path, descriptor, flags and device/inode identity for the retained
+descriptor scan; it can no longer consume a fault injected on the patched
+os.fstat surface, so the retained_fd_fstat injection reaches the product's
+own retained validation and rejects before any provider start.
+
+The same first product execution exposed a sibling defect in the R106/R107
+rollback race summaries: cleanup_failure_case fabricated a race observation
+dict of all-false fields even when the armed audit/open-swap race never
+fired, so the frozen cleanup-before-publication branch of
+rollback_race_safe and rollback_open_swap_safe — which requires an empty
+race record — was unsatisfiable for any product that fails closed before
+publication and never enters a rollback syscall. R114 records a race
+observation only when the armed race actually fired or left an accepted
+survivor object; a product that raced still produces the full record and
+must satisfy the protected branches unchanged. No frozen predicate,
+admitted variant, summary count or product requirement changes; production
+and live/provider execution are untouched.

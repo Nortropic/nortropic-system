@@ -129,6 +129,11 @@ task_spec = repo / "specs/tasks.spec.json"
 h033_gate = repo / "verify/bin/h-033-exit"
 h032_gate = repo / "verify/bin/h-032-exit"
 checks: list[tuple[str, bool, str]] = []
+# Judge-side observation must never route through a patchable os surface:
+# this exact C fstat is bound before any fixture or fault wrapper exists, so
+# recording an opened descriptor can never consume a fault injected on the
+# patched os.fstat that the product itself is being measured against.
+system_os_fstat = os.fstat
 EXPECTED_PROVIDER_PATH = Path("/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex")
 EXPECTED_PROVIDER_SHA256 = "19c4f144c5226a9f17c58e6f0fa854843b0f77a6eb420f40e2745a12f10f5d37"
 EXPECTED_CODE_MODE_HOST_PATH = EXPECTED_PROVIDER_PATH.with_name("codex-code-mode-host")
@@ -2768,7 +2773,7 @@ def run_codex(sink, canonical, invocation, run, role):
             if isinstance(active, dict):
                 try:
                     absolute = str(Path(path).absolute())
-                    opened = os.fstat(number)
+                    opened = system_os_fstat(number)
                     item = {"path": absolute, "fd": number, "flags": flags,
                             "dev": opened.st_dev, "ino": opened.st_ino}
                     returns = active["open_returns"]
@@ -4204,7 +4209,14 @@ def run_codex(sink, canonical, invocation, run, role):
                 accepted_state = (rollback_object_state(race_accepted)
                                   if race_accepted.exists() and not race_accepted.is_symlink()
                                   else None)
-                race_observation = {
+                # A race observation exists only when the armed race actually
+                # fired; a cleanup-before rejection that never entered any
+                # rollback syscall must not be credited with a fabricated
+                # all-false race record.
+                if race_state is None and accepted_state is None:
+                    race_observation = {}
+                else:
+                    race_observation = {
                     "check_saw_expected": bool(race_state and race_state.get("check_saw_expected")),
                     "swapped": bool(race_state and race_state.get("swapped")),
                     "canonical_absent": bool(canonical is not None
@@ -4227,7 +4239,12 @@ def run_codex(sink, canonical, invocation, run, role):
                 current_state = (rollback_object_state(canonical)
                                  if canonical is not None and canonical.exists()
                                  and not canonical.is_symlink() else None)
-                race_observation = {
+                # Same arming rule as the audit race: no fired swap and no
+                # accepted-object survivor means no race observation at all.
+                if race_state is None and accepted_state is None:
+                    race_observation = {}
+                else:
+                    race_observation = {
                     "swap_attempt": (race_state.get("swap_attempt")
                                      if race_state else None),
                     "swapped": bool(race_state and race_state.get("swapped")),
