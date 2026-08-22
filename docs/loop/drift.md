@@ -2113,3 +2113,25 @@ complete predicate, and substituting either into the ordinary negative family ma
 Judge cleanup occurs only after this observation and cannot grant credit. All R102/R103 positive
 publication forms and retained-value, fsync and transition semantics remain unchanged; no
 production or live/provider behavior is executed.
+
+## 2026-08-22 — R105 persistent-cleanup rollback identity
+
+Independent product review found that the D01 controller correctly rejected persistent private
+staging cleanup failure, but its subsequent `Path.unlink` rollback could fail persistently and
+leave the already accepted canonical `result.json` visible. R104 injected `os.unlink` at the
+staging leaf and therefore did not measure that distinct final rollback effect.
+
+R105 retains the accepted private sink bytes, report and digest and captures the published
+canonical's no-follow regular device/inode and strict envelope before the cleanup fault. The same
+connected attempt then injects the underlying removal audit effect through direct `Path.unlink`,
+`os.unlink` and `os.remove` spellings. Persistent rollback faults must reject and can never claim
+canonical absence; first-only and first-two faults are legitimate only when a bounded retry
+actually establishes no-follow absence. The unconditional rig proves these effects directly.
+
+Replacement controls remove the accepted object only inside the judge and install either a
+symlink or a hardlinked foreign guard before rollback. A conforming implementation must compare
+the current no-follow identity with the retained published identity and refuse to unlink the
+replacement; the attempt remains rejected/ODOMBAR and both replacement and guard are observed
+intact. Judge cleanup follows the complete observation. Cleanup-before-publication remains free,
+and R100-R104 transition cardinality, retained-value, fsync, no-replace and residue closures are
+unchanged. No production or live/provider execution is performed by this amendment.
