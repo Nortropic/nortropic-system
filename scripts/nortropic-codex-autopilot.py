@@ -787,6 +787,11 @@ def _python_snapshot(root: Path) -> tuple[Path, str]:
 
 
 def _remove_result_tree(root: Path) -> bool:
+    if root.is_symlink():
+        # A substituted root symlink is unlinked, never followed: iterating
+        # through it would delete the unrelated symlink target's children.
+        root.unlink()
+        return False
     primary_failures = 0
     for _cleanup_attempt in range(3):
         try:
@@ -832,6 +837,36 @@ def _cleanup_result_staging(root: Path, identity: tuple[int, int]) -> tuple[list
     return residue, degraded
 
 
+def _retire_bound_staging(staging_dir_fd, root, identity):
+    # Authorized structured-result staging retirement.  When the staging path
+    # still resolves to the bound directory inode, remove it by the ordinary
+    # identity-verified tree cleanup.  Otherwise the path was substituted by a
+    # provider-controlled effect; remove the single relocated result sink by
+    # its exact name relative to the retained staging descriptor — never by the
+    # untrusted path — and fail closed.
+    try:
+        st = root.lstat()
+        path_bound = ((st.st_dev, st.st_ino) == identity
+                      and stat.S_ISDIR(st.st_mode) and not root.is_symlink())
+    except OSError:
+        path_bound = False
+    if path_bound:
+        for _cleanup_attempt in range(3):
+            try:
+                shutil.rmtree(root)
+                return True
+            except FileNotFoundError:
+                return True
+            except OSError:
+                continue
+        return False
+    try:
+        os.unlink("result.json", dir_fd=staging_dir_fd)
+    except FileNotFoundError:
+        pass
+    return False
+
+
 def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
     global _LAST_AGENT_CONTEXT
     route = AUTOPILOT_ROLE_POLICY.get(role)
@@ -851,6 +886,7 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
     result_root: Path | None = None
     result_root_identity: tuple[int, int] | None = None
     sink_fd = -1
+    staging_dir_fd = -1
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
         result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-"))
@@ -864,6 +900,20 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
                 or result_root_real == live_root or live_root in result_root_real.parents
                 or result_root_real == live_git or live_git in result_root_real.parents):
             raise Stop("private result staging root has unsafe identity")
+        # Bind the staging directory's inode with a retained read-only,
+        # no-follow, close-on-exec descriptor BEFORE the sink is created and
+        # BEFORE provider execution.  This handle is the sole authority for
+        # retiring a relocated result sink; it can never be a symlink and
+        # follows the bound inode across any provider-controlled cross-parent
+        # move.
+        staging_dir_fd = os.open(
+            result_root,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+        staging_dir_identity = os.fstat(staging_dir_fd)
+        if (not stat.S_ISDIR(staging_dir_identity.st_mode)
+                or (staging_dir_identity.st_dev, staging_dir_identity.st_ino)
+                    != result_root_identity):
+            raise Stop("private result staging directory identity unbound")
         result_sink = result_root / "result.json"
         create_fd = os.open(
             result_sink,
@@ -955,14 +1005,22 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
             rc = p.wait()
         if rc != 0:
             raise Stop(f"Codex role {role} failed rc={rc}; events={events}")
-        path_identity = result_sink.lstat()
         opened_identity = os.fstat(sink_fd)
-        if (result_sink.is_symlink() or not stat.S_ISREG(path_identity.st_mode)
-                or path_identity.st_nlink != 1
-                or (path_identity.st_dev, path_identity.st_ino)
-                    != (opened_identity.st_dev, opened_identity.st_ino)
-                or sorted(path.name for path in result_root.iterdir()) != [result_sink.name]):
-            raise Stop("provider result transport identity changed")
+        substituted = False
+        try:
+            path_identity = result_sink.lstat()
+            if (result_sink.is_symlink() or not stat.S_ISREG(path_identity.st_mode)
+                    or path_identity.st_nlink != 1
+                    or (path_identity.st_dev, path_identity.st_ino)
+                        != (opened_identity.st_dev, opened_identity.st_ino)
+                    or sorted(path.name for path in result_root.iterdir())
+                        != [result_sink.name]):
+                raise Stop("provider result transport identity changed")
+        except FileNotFoundError:
+            # The provider substituted the staging path after execution; the
+            # retained sink descriptor and bound staging directory descriptor
+            # remain the sole authority for retiring the relocated result.
+            substituted = True
         # Pathless handoff: the complete attempt-private execution family must
         # already be absent at the consumer boundary while the original opened
         # descriptor alone carries the result forward.  A degraded primary
@@ -982,28 +1040,10 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
                 break
         if snapshot_root.exists():
             raise Stop("private provider execution family cleanup incomplete")
-        retire_failures = 0
-        for _cleanup_attempt in range(3):
-            try:
-                shutil.rmtree(result_root)
-                break
-            except FileNotFoundError:
-                break
-            except OSError:
-                retire_failures += 1
-        if retire_failures == 3:
-            try:
-                result_sink.unlink()
-            except OSError:
-                pass
-            try:
-                result_root.rmdir()
-            except OSError:
-                pass
-        if (retire_failures == 3
-                or result_sink.exists() or result_sink.is_symlink()
-                or result_root.exists() or result_root.is_symlink()):
-            raise Stop("private result staging cleanup incomplete")
+        retired = _retire_bound_staging(
+            staging_dir_fd, result_root, result_root_identity)
+        if substituted or not retired:
+            raise Stop("private result staging cleanup incomplete: staging substituted")
         handoff_identity = os.fstat(sink_fd)
         if (not stat.S_ISREG(handoff_identity.st_mode)
                 or handoff_identity.st_nlink != 0
@@ -1015,11 +1055,12 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
         return accepted
     finally:
         cleanup_errors: list[OSError] = []
-        if sink_fd >= 0:
-            try:
-                os.close(sink_fd)
-            except OSError:
-                pass
+        for _fd in (staging_dir_fd, sink_fd):
+            if _fd >= 0:
+                try:
+                    os.close(_fd)
+                except OSError:
+                    pass
         result_residue: list[Path] = []
         result_cleanup_degraded = False
         if result_root is not None and result_root_identity is not None:
