@@ -1414,6 +1414,35 @@ if mode == 'output_then_fail': sys.exit(17)
             or not _r125_early_controller_source_ok(_r125_controller_text)):
         raise RuntimeError("candidate controller early capability inventory")
 
+    def _r125_result_materialize_locals(text):
+        try:
+            controller_tree = ast.parse(text)
+        except (SyntaxError, ValueError, TypeError):
+            return ()
+        return tuple(
+            alias.asname or alias.name
+            for node in controller_tree.body
+            if isinstance(node, ast.ImportFrom)
+            and node.level == 0
+            and node.module == "controller.result.materialize"
+            for alias in node.names
+            if alias.name == "materialize")
+    _r125_result_materialize_bindings = \
+        _r125_result_materialize_locals(_r125_controller_text)
+    if len(_r125_result_materialize_bindings) > 1:
+        raise RuntimeError("candidate materialize import binding is ambiguous")
+    _r125_uses_result_materialize = bool(
+        _r125_result_materialize_bindings)
+    _r125_selector_cases = (
+        ("from controller.result.materialize import materialize\n", ("materialize",)),
+        ("from controller . result . materialize import materialize\n", ("materialize",)),
+        ("from controller.result.materialize import (materialize,)\n", ("materialize",)),
+        ("from controller.result.materialize import materialize as mat\n", ("mat",)),
+        ("import core\n# controller.result.materialize\n", ()))
+    if not all(_r125_result_materialize_locals(text) == expected
+               for text, expected in _r125_selector_cases):
+        raise RuntimeError("candidate materialize import semantic selector rig")
+
     def _r125_dependency_literal(node, *, allow_set=False):
         if isinstance(node, ast.Constant):
             return True
@@ -1514,7 +1543,7 @@ if mode == 'output_then_fail': sys.exit(17)
     _r125_dependency_specs = [(_r125_core_path, [
         "F:0:__future__:annotations", "I:json", "I:re", "I:subprocess",
         "F:0:pathlib:Path", "F:0:typing:Iterable"], False, True)]
-    if "controller.result.materialize" in _r125_controller_text:
+    if _r125_uses_result_materialize:
         _r125_dependency_specs.extend([
             (repo / "controller/result/consumer.py", [
                 "I:fcntl", "I:hashlib", "I:json", "I:os",
@@ -1605,7 +1634,7 @@ if mode == 'output_then_fail': sys.exit(17)
     if not all(_r125_name in sys.modules for _r125_name in (
             "argparse", "dataclasses", "tempfile", "typing")):
         raise RuntimeError("judge dependency prewarm incomplete")
-    if "controller.result.materialize" in _r125_controller_text:
+    if _r125_uses_result_materialize:
         _r125_install_namespace("controller", repo / "controller")
         _r125_install_namespace("controller.authority", repo / "controller/authority")
         _r125_install_namespace("controller.result", repo / "controller/result")
@@ -7423,7 +7452,7 @@ def run_codex(sink, canonical, invocation, run, role):
         "controller/authority/core.py": "controller.authority.core",
         "controller/result/consumer.py": "controller.result.consumer",
         "controller/result/materialize.py": "controller.result.materialize"}
-        if "controller.result.materialize" in _r125_controller_text
+        if _r125_uses_result_materialize
         else {"controller/authority/core.py": "core"})
     r12_runner.write_text("import argparse,datetime,fcntl,fnmatch,hashlib,importlib.util,json,os,pathlib,re,shutil,stat,subprocess,sys,tempfile,time,types,typing,unicodedata,dataclasses\n"
 "source,repo,wt=map(pathlib.Path,sys.argv[1:4])\n"
