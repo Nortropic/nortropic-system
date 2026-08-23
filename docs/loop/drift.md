@@ -2575,3 +2575,44 @@ unchanged); H032 is byte-identical (no digest rebind). Validated on the host,
 un-nested, no live call; de-risked against the narrow-product overlay (193/0). The
 builder round then adopts the narrow product against published R120. Production,
 H017 and the prior R48-R119 effects remain unchanged.
+
+## 2026-08-23 — R122 protected candidate materialization boundary
+
+R121 proved that unprivileged macOS process-family observation cannot guarantee
+escape-complete absence after a provider descendant double-forks and calls
+`setsid`. R122 therefore adopts the owner-selected R2 integrity architecture:
+process cleanup remains defense-in-depth, while the accepted protected result's
+bounded `candidate_delta` is the provider's sole proposal and the live provider
+scratch has no evidentiary role.
+
+The schema adds exactly a nullable object with built-in integer version 1, format
+`git-diff-binary-v1`, the controller-pinned lowercase 40-hex base commit and a
+strict-base64 binary patch. The frozen materializer bounds are patch 262144
+bytes, resulting regular blob 2097152 bytes, aggregate changed-result blobs
+8388608 bytes, UTF-8 path 512 bytes, component 255 bytes and kernel operations
+64, further limited by H-032's task budgets (12 changed files, 2200 added lines).
+The reference applies the patch to a private index/object store, derives scope,
+modes, bytes and budgets from the resulting tree, and creates a deterministic
+no-ref commit in controller-owned Git. The returned commit and tree must still
+resolve after all temporary materialization state is gone.
+
+`J_MATERIALIZE_RIG` includes a byte-exact binary positive and rejects wrong or
+bool version, wrong format/base/base-blob, invalid/empty/oversize patch,
+delete-absent, symlink/gitlink, traversal/`.git`, file-prefix, casefold/NFC and
+changed-vs-unchanged collisions, unauthorized paths and every bound. A real
+subprocess/result/caller chain proves a double-fork+setsid late scratch write is
+harmless; the same caller on nonzero invokes materialization zero times, while a
+materialize-on-nonzero mutant is caught. The real `builder_flow` must call the
+product materializer once and select its durable exact candidate; a correct but
+dead module or live `stage_and_commit` path is RED. Disclosed object/index/
+checkout/ref surfaces under `NORTROPIC_TRUST_ROOT` remain denied through the real
+launcher Seatbelt; nested refusal is ODÖMBART.
+
+Against R120's absent product the exact expected H032 state is 148 PASS / 4 FAIL:
+the prior two confinement and structured-result boundaries plus R122's sole new
+`K_CANDIDATE_MATERIALIZATION_BOUNDARY`. Hardened owner-skip is 151/1 and full
+deterministic green 152/0. H031 binds the final H032 and owner-live-helper
+digests plus the exact 152-label inventory, changing no production/process authority. This round edits only owner
+gates/schema/spec/docs; product implementation and live provider execution are
+deferred until the frozen owner candidate is independently reviewed and
+published.
