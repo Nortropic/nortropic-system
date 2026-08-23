@@ -3252,8 +3252,14 @@ def run_codex(sink, canonical, invocation, run, role):
                             if tracked_timeout_paths else work)
     tracked_fork_paths = tracked_fork[1].get("_gate_output_paths", [])
     tracked_fork_root = Path(tracked_fork_paths[-1]).parent if tracked_fork_paths else work
+    # R117 control 4: identity-bound quiescence, not admit/reject.  A confined +
+    # killpg-on-success launcher legitimately ADMITS a fork-descendant run (its
+    # staging write is denied and it is killed before cleanup), so PASS may not
+    # require the fork run to be rejected.  Instead every bound pid+lstart
+    # identity of the launched family must be ACTUALLY gone before the sample and
+    # the staging must be residue-free; marker-absence or an observed killpg are
+    # not sufficient on their own.  Interruption and timeout still reject cleanly.
     tracked_quiescent = (not tracked_interruption[0][0] and not tracked_timeout[0][0]
-                         and not tracked_fork[0][0]
                          and bool(tracked_identities)
                          and not tracked_timeout_root.exists()
                          and not tracked_fork_root.exists()
@@ -3376,11 +3382,33 @@ def run_codex(sink, canonical, invocation, run, role):
         return outcome, len(seeded) == 1, intact, residue_free, precreated
     object_attacks = {kind: object_attack(kind) for kind in
                       ("symlink", "directory", "hardlink", "fifo", "socket", "parent_swap")}
+    def object_residue_acceptable(kind, residue) -> bool:
+        # R117 control 5: an object-substitution attack must leave no residue —
+        # EXCEPT a parent_swap, whose non-bound empty replacement directory the
+        # finalizer must PRESERVE (control 01: no blind deletion of a non-bound
+        # object).  A preserved replacement is acceptable ONLY when it is exactly
+        # an empty, non-symlink directory (no private-family content); any file,
+        # non-empty directory or symlink residue stays RED.  The moved BOUND
+        # staging object is separately required absent by residue_free (value[3]),
+        # and a blind-deleting finalizer is caught by control 01, so those stay RED.
+        if not residue:
+            return True
+        if kind != "parent_swap":
+            return False
+        for entry in residue:
+            path = Path(entry)
+            try:
+                if (path.is_symlink() or not path.is_dir()
+                        or any(True for _ in path.iterdir())):
+                    return False
+            except OSError:
+                return False
+        return True
     object_attacks_ok = all(not value[0][0]
-                            and not value[0][4]
+                            and object_residue_acceptable(kind, value[0][4])
                             and value[1] and value[2] and value[3]
                             and value[4]==[(True,1,0o600)]
-                            for value in object_attacks.values())
+                            for kind, value in object_attacks.items())
 
     def r109_call_name(node: ast.AST) -> str | None:
         return node.id if isinstance(node, ast.Name) else None
@@ -6637,11 +6665,18 @@ def run_codex(sink, canonical, invocation, run, role):
     def expected_provider_environment(incoming, observed, launch_observation):
         if not launcher_observation_admits(launch_observation,observed):
             return None
+        # R117 control 3: the two provider-confinement handoff variables are
+        # consumed by the launcher for its Seatbelt profile and MUST be absent
+        # from the provider environment.  They are excepted from the expected set
+        # by their exact names only; every other environment guarantee is
+        # unchanged, and a leak of either into the provider env still fails the
+        # relation (observed would carry a key the expected set excludes).
         expected={key:value for key,value in incoming.items()
                   if not key.startswith("GIT_")
                   and not key.startswith("DYLD_")
                   and key not in {"LD_PRELOAD","LD_LIBRARY_PATH",
                                   "__PYVENV_LAUNCHER__"}
+                  and key not in {"NORTROPIC_STAGING_ROOT","NORTROPIC_RESULT_SINK"}
                   and not key.startswith(("GH_","GITHUB_","SLACK_"))}
         expected.update({
             "NORTROPIC_TRUST_ROOT":str(Path(observed.get(
@@ -6906,8 +6941,7 @@ def run_codex(sink, canonical, invocation, run, role):
     timeout_ok = rejected_clean(timeout_case)
     tracked_quiescent = (tracked_quiescent
         and rejected_clean(tracked_interruption)
-        and rejected_clean(tracked_timeout)
-        and rejected_clean(tracked_fork))
+        and rejected_clean(tracked_timeout))
 
     # Unconditional oracle sensitivity: a leaf-free but still-existing private
     # parent, or any helper path present in the complete attempt residue list,
@@ -6954,7 +6988,7 @@ def run_codex(sink, canonical, invocation, run, role):
 "held_transition_fds=[]\n"
 "transition_seen=[False]\n"
 "def audit(event,args):\n"
-" if event=='os.rename' and len(args)>=2 and str(args[1]).endswith('/result.json'):\n"
+" if event in ('os.rename','os.link') and len(args)>=2 and str(args[1]).endswith('/result.json'):\n"
 "  os=__import__('os');hashlib=__import__('hashlib');fd=os.open(args[0],os.O_RDONLY|getattr(os,'O_NOFOLLOW',0));st=os.fstat(fd);raw=b''\n"
 "  while len(raw)<=5*1024*1024:\n"
 "   chunk=os.read(fd,min(65536,5*1024*1024+1-len(raw)))\n"
@@ -7845,13 +7879,20 @@ if mode=="mutation" and sink_fd>=0:
 else: stop_mutation=None
 module_os=getattr(mod,"os",os)
 original_replace=module_os.replace;original_unlink=module_os.unlink;cleanup_failures=[0]
-if mode in {"cleanup_transient","cleanup_persistent"}:
+original_link=module_os.link
+if mode in {"cleanup_transient","cleanup_persistent","cleanup_link_publish_fault"}:
  def fail_replace(src,dst): raise OSError("injected publication failure")
+ def fail_link(src,dst,*args,**kwargs): raise OSError("injected link publication failure")
  def fail_unlink(path,*args,**kwargs):
   if mode=="cleanup_persistent" or cleanup_failures[0]==0:
    cleanup_failures[0]+=1;raise OSError("injected cleanup failure")
   return original_unlink(path,*args,**kwargs)
- module_os.replace=fail_replace;module_os.unlink=fail_unlink
+ if mode=="cleanup_link_publish_fault":
+  # R117: fault the publish primitive itself (os.link and os.replace), leaving
+  # the temp cleanup intact — the publish must fail closed with no canonical.
+  module_os.link=fail_link;module_os.replace=fail_replace
+ else:
+  module_os.replace=fail_replace;module_os.unlink=fail_unlink
 accepted=False;returned=None;error="NONE";call_active[0]=True
 second_rejected=None
 try:
@@ -7866,7 +7907,7 @@ try:
   except Exception: second_rejected=True
 except Exception as exc: error=type(exc).__name__+":"+str(exc)
 finally:
- call_active[0]=False;module_os.replace=original_replace;module_os.unlink=original_unlink
+ call_active[0]=False;module_os.replace=original_replace;module_os.unlink=original_unlink;module_os.link=original_link
  for path_op,original_path_op in original_path_ops.items(): setattr(os,path_op,original_path_op)
  for dir_op,original_dir_op in original_dir_ops.items(): setattr(os,dir_op,original_dir_op)
  for mutation_op,original_mutation_op in original_mutation_ops.items(): setattr(os,mutation_op,original_mutation_op)
@@ -7978,6 +8019,30 @@ for fd in held:
             and not case.get("security_events")
             and case.get("ticket_selftest") and all(case["ticket_selftest"].values())
             and (canonical is None or preseed_ok))
+    def cleanup_transient_ok(case,raw):
+        # R117 control 1: transient temp-cleanup fault.  For a no-overwrite
+        # (os.link) kernel the publish SUCCEEDS and only the temp-unlink faults
+        # transiently, so an exactly-valid canonical with NO temp residue is the
+        # correct outcome; for an os.replace kernel the publish itself faults, so
+        # it must reject with no canonical.  Temp residue, a partial/invalid
+        # canonical, an fd alias or any out-of-scope effect is never acceptable.
+        canonical=case.get("canonical")
+        if (case.get("rc")!=0 or case.get("temps") or case.get("outside")
+                or case.get("fd_aliases")!=[]
+                or case.get("env_events") or case.get("env_changed") is not False
+                or case.get("security_events") or case.get("trap_unchanged") is not True
+                or not (case.get("ticket_selftest")
+                        and all(case["ticket_selftest"].values()))):
+            return False
+        if canonical is None:
+            return case.get("accepted") is False
+        return (canonical.get("keys")==expected_binding_keys
+            and canonical.get("schema_version_type")=="int"
+            and canonical.get("schema_version")==1
+            and canonical.get("invocation")=="1"*32 and canonical.get("run")=="2"*32
+            and canonical.get("role")==canonical.get("report_role")=="TEST_AUTHOR"
+            and canonical.get("result_sha256")==hashlib.sha256(raw).hexdigest()
+            and canonical.get("stable") is True)
     def outside_blocked(case,canonical_absent=False):
         return (case.get("rc")==0 and case.get("accepted") is False
             and bool(case.get("outside")) and case.get("trap_unchanged") is True
@@ -8008,14 +8073,17 @@ for fd in held:
         "second":fresh_kernel_effect(reference_kernel,rig_valid_raw,"second"),
         "cleanup_transient":fresh_kernel_effect(reference_kernel,rig_valid_raw,"cleanup_transient"),
         "cleanup_persistent":fresh_kernel_effect(reference_kernel,rig_valid_raw,"cleanup_persistent"),
+        "cleanup_link_publish_fault":fresh_kernel_effect(reference_kernel,rig_valid_raw,"cleanup_link_publish_fault"),
     }
     reference_basic_ok=(fresh_success(reference_cases["valid"],rig_valid_raw)
         and fresh_success(reference_cases["max"],exact_sized_report(MAX_RESULT_BYTES))
         and all(fresh_reject(reference_cases[name],name=="preseed") for name in (
             "over","duplicate","partial","nested","preseed","hardlink","writable","no_cloexec",
             "directory","fifo","socket","symlink","mutation","wrong_role",
-            "equal_binding","bad_invocation","cleanup_transient",
+            "equal_binding","bad_invocation",
             ))
+        and cleanup_transient_ok(reference_cases["cleanup_transient"],rig_valid_raw)
+        and fresh_reject(reference_cases["cleanup_link_publish_fault"])
         and fresh_success(reference_cases["second"],rig_valid_raw)
         and reference_cases["second"].get("second_rejected") is True
         and reference_cases["cleanup_persistent"].get("accepted") is False
@@ -8521,15 +8589,18 @@ class CraftedConcretePath(type(Path())):
             "bad_invocation":fresh_kernel_effect(result_kernel,rig_valid_raw,"bad_invocation"),
             "second":fresh_kernel_effect(result_kernel,rig_valid_raw,"second"),
             "cleanup_transient":fresh_kernel_effect(result_kernel,rig_valid_raw,"cleanup_transient"),
+            "cleanup_link_publish_fault":fresh_kernel_effect(result_kernel,rig_valid_raw,"cleanup_link_publish_fault"),
         }
         product_fresh_ok=(fresh_success(product_fresh_cases["valid"],rig_valid_raw)
             and fresh_success(product_fresh_cases["max"],exact_sized_report(MAX_RESULT_BYTES))
             and fresh_success(product_fresh_cases["second"],rig_valid_raw)
             and product_fresh_cases["second"].get("second_rejected") is True
+            and cleanup_transient_ok(product_fresh_cases["cleanup_transient"],rig_valid_raw)
+            and fresh_reject(product_fresh_cases["cleanup_link_publish_fault"])
             and all(fresh_reject(product_fresh_cases[name],name=="preseed") for name in (
                 "over","duplicate","partial","nested","preseed","hardlink","writable","no_cloexec",
                 "directory","fifo","socket","symlink","mutation","wrong_role",
-                "equal_binding","bad_invocation","cleanup_transient")))
+                "equal_binding","bad_invocation")))
 
     # R116 CONTROL 05 — concurrent-canonical no-overwrite (E167-REV-05, owner
     # precision #5).  A foreign canonical is published by an audit-hook adversary
@@ -8739,10 +8810,64 @@ class CraftedConcretePath(type(Path())):
         and r12_promote[5] and not r12_promote[6] and not r12_promote[7]
         and r12_swap[0].startswith("REJECTED:") and r12_swap[4] is None and r12_swap[5] and not r12_swap[6] and not r12_swap[7]
         and timeout_effect_ok)
+    # R117 reconciliation one-defect negatives: each loosened control must still
+    # fell its intended defect.  Predicate-level self-controls (product-independent)
+    # complement the real publish-fault fixture already required in product_fresh_ok
+    # (cleanup_link_publish_fault) and the real lingering-descendant control
+    # (success_quiescent_ok) and the real relocated-bound-dir control (residue_free
+    # in object_attacks).
+    r117_ok_canonical={"keys":expected_binding_keys,"schema_version_type":"int",
+        "schema_version":1,"invocation":"1"*32,"run":"2"*32,"role":"TEST_AUTHOR",
+        "report_role":"TEST_AUTHOR",
+        "result_sha256":hashlib.sha256(rig_valid_raw).hexdigest(),"stable":True}
+    r117_base_case={"rc":0,"temps":[],"outside":[],"fd_aliases":[],"env_events":[],
+        "env_changed":False,"security_events":[],"trap_unchanged":True,
+        "ticket_selftest":{"ok":True}}
+    # cleanup: valid no-overwrite outcome and a clean publish-fault rejection pass;
+    # temp residue or a partial/invalid canonical is felled.
+    r117_cleanup_selfcontrols=(
+        cleanup_transient_ok({**r117_base_case,"accepted":False,
+            "canonical":dict(r117_ok_canonical)},rig_valid_raw)
+        and cleanup_transient_ok({**r117_base_case,"accepted":False,
+            "canonical":None},rig_valid_raw)
+        and not cleanup_transient_ok({**r117_base_case,"accepted":False,
+            "temps":["leftover-temp"],"canonical":dict(r117_ok_canonical)},rig_valid_raw)
+        and not cleanup_transient_ok({**r117_base_case,"accepted":True,
+            "canonical":{**r117_ok_canonical,"result_sha256":"0"*64}},rig_valid_raw)
+        and not cleanup_transient_ok({**r117_base_case,"accepted":True,
+            "fd_aliases":[[7,0]],"canonical":dict(r117_ok_canonical)},rig_valid_raw))
+    # object parent_swap: an empty non-bound directory is preserved; a file or
+    # non-empty or symlink residue, or residue for any other kind, is felled.
+    r117_empty_dir=work/"r117-empty-nonbound-replacement";r117_empty_dir.mkdir()
+    r117_file_residue=work/"r117-file-residue";r117_file_residue.write_text("x",encoding="utf-8")
+    r117_object_selfcontrols=(
+        object_residue_acceptable("parent_swap",[])
+        and object_residue_acceptable("parent_swap",[str(r117_empty_dir)])
+        and not object_residue_acceptable("parent_swap",[str(r117_file_residue)])
+        and not object_residue_acceptable("parent_swap",
+            [str(r117_file_residue),str(r117_empty_dir)])
+        and not object_residue_acceptable("symlink",[str(r117_empty_dir)]))
+    # env relation: the two handoff variables (and only those) are excepted from
+    # the expected provider environment; a leak of either into the provider env
+    # still fails the observed==expected relation.
+    r117_env_expected=expected_provider_environment(
+        {**r73_exact_variant["incoming"],
+         "NORTROPIC_STAGING_ROOT":"/private/tmp/r117-staging",
+         "NORTROPIC_RESULT_SINK":"/private/tmp/r117-staging/result.json"},
+        r73_exact_capture,r73_exact_launch)
+    r117_env_selfcontrols=(isinstance(r117_env_expected,dict)
+        and "NORTROPIC_STAGING_ROOT" not in r117_env_expected
+        and "NORTROPIC_RESULT_SINK" not in r117_env_expected
+        and r117_env_expected==r73_exact_expected
+        and {**r117_env_expected,"NORTROPIC_STAGING_ROOT":"/private/tmp/r117-staging"}
+            !=r117_env_expected)
+    r117_selfcontrols_ok=(r117_cleanup_selfcontrols and r117_object_selfcontrols
+        and r117_env_selfcontrols)
+
     deterministic_result_ok = (
         kernel_structure_ok and kernel_integration_structure_ok and integration_dynamic_ok
         and kernel_direct_ok and product_fresh_ok
-        and concurrent_canonical_ok
+        and concurrent_canonical_ok and r117_selfcontrols_ok
         and valid[0] and valid_schema and valid_publication_lifecycle_ok
         and physical_topology_ok and physical_hostile_ok
         and physical_git_environment_ok and staging_ok
