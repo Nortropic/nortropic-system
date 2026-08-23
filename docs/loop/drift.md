@@ -2616,3 +2616,101 @@ digests plus the exact 152-label inventory, changing no production/process autho
 gates/schema/spec/docs; product implementation and live provider execution are
 deferred until the frozen owner candidate is independently reviewed and
 published.
+
+## 2026-08-23 — R123 complete materialization effects and Git state
+
+Independent R122 falsification found that tree equality, final `show-ref` and a
+named-call profile did not bind the complete materialization boundary. Two
+different commits may share a tree; `show-ref` omits `HEAD` and other
+pseudorefs; replacement refs and alternate object databases can change object
+resolution; an unreachable object or transient ref can disappear before a
+final-state sample; and a caller can pass the right protected-root argument
+while staging elsewhere. A patch-global full-index regex also allowed an index
+header detached from its changed entry.
+
+R123 therefore keeps R122's schema and authority but binds the actual effects.
+The canonical artifact is native `git diff --binary --full-index --no-renames`
+with no preamble and one exact 40/40 index line in every content-changing
+entry. An exact regular-file 100644↔100755 mode-only entry instead has no
+index line and keeps one bound nonzero blob identity. Independent positives
+cover add, modify, delete, binary, mode-only, canonical rename/copy and mixed
+changes; nonregular base deletion or type-change and detached/missing/short or
+mixed index headers reject. Materialization starts from a separate
+candidate-absent authoritative clone and must produce one exact independently
+derived commit, not merely an equal tree. Its exact reachable object delta is
+measured, repeat adds nothing, and every rejection and provider-nonzero attempt
+leaves the complete object set unchanged.
+
+The complete Git control plane excluding the object store and the exact private
+materialization root is snapshotted no-follow, so `HEAD`, pseudorefs, refs and
+configuration are bound before, after the first call, after repeat and after
+rejection. The complete object-store layout and object-id delta are bound in
+addition to the object root's fixed no-follow identity; alternates and
+http-alternates must be absent; Git runs with replacement objects disabled and
+alternate directories empty. Every Git/index/TMPDIR/filesystem write is bound
+to the protected root or the exact authoritative object store. Observation
+spans the actual controller phase from accepted provider result until detached
+candidate capture, preventing an unobserved process, Git argv authority
+override, or a correct materializer call from hiding direct live-scratch
+staging before or after it. A bounded source-capability inventory rejects
+native/FFI/raw-syscall, dynamic import/reflection and alternate process
+mechanisms that the Python audit stream cannot observe. The actual imported materialize capability receives
+the exact eight values once and returns the exact selected candidate on success,
+and is called zero times on provider nonzero; positional and keyword-only
+wrappers remain legitimate while name, basename and profiler dummies grant no
+credit.
+
+The product-absent summaries and labels stay unchanged: H032 is 148/4, hardened
+owner-skip is 151/1 and deterministic green is 152/0. H031 changes only its
+exact H032 digest binding. R123 edits owner gate/spec/docs only and adds no
+product, provider, ref, publication, attestation or live authority.
+
+## 2026-08-23 — R124 canonical patch, controller slice and ODB effects
+
+R123's first complete-effect formulation was not yet causally complete. A
+patch-global or per-entry identity check could accept reordered native headers
+or blocks, while rejecting legitimate empty executable, mode-only or quoted
+paths. Python audit observation could be bypassed through FFI, reflection,
+module relays, definition-time evaluation or hidden process callbacks. The
+caller also needed a directional boundary: its authoritative task reads must
+happen before one exact materializer interval, with no post-interval effects.
+Finally, a loose-object addition legitimately changes an existing APFS fanout
+directory's link count, but no other metadata or residue is admissible.
+
+R124 therefore compares the submitted artifact byte-for-byte with one complete
+native private-index `git diff --cached --binary --full-index --no-renames`
+after independent application. Status-specific headers and the first real
+payload marker are parsed in native order. Semantic fixtures cover empty
+100644/100755 add, delete and rename, binary, mode-only, quoted marker/tab and
+UTF-8 names and mixed effects. Unicode collision fixtures are constructed in a
+single native private index with command-scoped
+`core.precomposeUnicode=false`; they assert distinct exact NFC/NFD indexed
+bytes and native block order before the collision rule is credited.
+
+Both the materializer and the actual controller are checked before execution
+against bounded capability inventories. Native/FFI/raw-syscall, dynamic or
+hidden import, reflection, public/private module transfer, alternate process
+creation and executable definition-time effects reject. Capability-equivalent
+aliases, lexical shadows, nested functions/classes, comprehensions, walrus
+targets, variadics, postponed annotations and positional or keyword-only
+wrappers remain legitimate. Runtime observation then binds an ordered caller
+slice: two no-follow reads of the authoritative task spec from a task root
+outside provider scratch; one 0700 protected-root mkdir and its exact is-dir
+check; one judge-recorded materializer call span; and zero trailing effects.
+The recorder's exact return is the selected candidate. Wrong order, wrong root,
+chmod, extra effects, decoys and provider-nonzero materialization reject.
+
+Git control-plane and object-store state are captured no-follow for every call.
+The fixed ODB root and existing rows retain exact type/mode/uid/gid. If a
+pre-existing two-hex fanout receives N direct expected loose objects, its APFS
+link count must increase by exactly N; a fresh fanout must match root metadata
+with link count 2+N. Each new loose object is regular with mode exactly
+`object-root mode & 0444` (0400 under the gate's umask-077/root-0700 boundary),
+root-owned, nlink-one, positive exact-integer size and digest-bound. Fixed-0444
+under a 0700 root, missing, unreachable,
+hardlinked, alternate or non-object residue remains RED.
+
+No schema, task authority or top-level label changes. Product-absent H032 stays
+148/4, owner-skip stays 151/1 and deterministic green stays 152/0. H031 rebinds
+only the final H032 digest. R124 writes owner gate/spec/docs only; product,
+provider, live, ref, publication and attestation authority remain absent.
