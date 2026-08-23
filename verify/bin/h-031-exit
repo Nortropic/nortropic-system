@@ -175,6 +175,10 @@ ALLOWED_OS_ATTRS = {
 # NOT a general dirfd-mutation grant.
 AUTHORIZED_STAGING_RETIREMENT = "_retire_bound_staging"
 AUTHORIZED_STAGING_SINK_NAME = "result.json"
+# R119: the exact numeric staging descriptor parameter of the authorized
+# retirement primitive; the sole admitted first argument of the single macOS
+# F_GETPATH resolution (see the fcntl.fcntl authorization below).
+AUTHORIZED_STAGING_DIR_FD_PARAM = "staging_dir_fd"
 STAGING_DIR_OPEN_ARG = "result_root"
 STAGING_DIR_OPEN_FLAGS = {"O_RDONLY", "O_NOFOLLOW", "O_CLOEXEC"}
 RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS = {
@@ -207,7 +211,19 @@ LEGACY_EXPECTED_OS_EFFECT_COUNTS = {
     and not key.startswith("_retire_bound_staging:")
 }
 DIRECT_OS_EFFECT_ATTRS = {"chmod", "close", "fdopen", "fsync", "open", "read", "unlink", "urandom", "write"}
-EXPECTED_FCNTL_EFFECT_COUNTS = {"acquire_lock:flock": 1}
+# R119: the result-kernel autopilot performs exactly one additional fcntl
+# effect beyond the acquire_lock flock — the single macOS F_GETPATH staging
+# resolution in _retire_bound_staging.  Both the legacy (product-absent) and
+# result-kernel fcntl inventories are frozen; any other count (a second call,
+# a call in another owner, or a missing flock) is rejected.
+RESULT_KERNEL_EXPECTED_FCNTL_EFFECT_COUNTS = {
+    "acquire_lock:flock": 1,
+    "_retire_bound_staging:fcntl": 1,
+}
+LEGACY_EXPECTED_FCNTL_EFFECT_COUNTS = {
+    key: value for key, value in RESULT_KERNEL_EXPECTED_FCNTL_EFFECT_COUNTS.items()
+    if not key.startswith("_retire_bound_staging:")
+}
 EXPECTED_SYS_STREAM_COUNTS = {"main:stderr.print": 4, "run_codex:stdout.write": 1}
 EXPECTED_SYS_STATE_COUNTS = {
     "<module>:dont_write_bytecode=True": 1,
@@ -1329,7 +1345,7 @@ def process_shape(text: str) -> dict[str, object]:
             parent = parents.get(node)
             if not (isinstance(parent, ast.Attribute) and parent.value is node):
                 violations.append((owner, node.lineno, "bare-fcntl-module"))
-            elif parent.attr not in {"LOCK_EX", "LOCK_NB", "flock"}:
+            elif parent.attr not in {"LOCK_EX", "LOCK_NB", "flock", "fcntl", "F_GETPATH"}:
                 violations.append((owner, node.lineno,
                                    f"unapproved-fcntl-attribute:fcntl.{parent.attr}"))
             elif parent.attr == "flock":
@@ -1339,6 +1355,96 @@ def process_shape(text: str) -> dict[str, object]:
                 else:
                     key = f"{owner}:flock"
                     fcntl_effect_counts[key] = fcntl_effect_counts.get(key, 0) + 1
+            elif parent.attr == "fcntl":
+                # R119: fcntl.fcntl is admitted ONLY as the single macOS F_GETPATH
+                # staging-path resolution in _retire_bound_staging, and ONLY in the
+                # exact enclosing return form
+                #   Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH,
+                #                    b"\0" * 1024).split(b"\0", 1)[0].decode())
+                # binding: exactly one call (frozen fcntl-effect inventory); the
+                # first argument is exactly the retirement's staging_dir_fd
+                # parameter; the request is the direct fcntl.F_GETPATH attribute
+                # (never a literal, variable, alias or getattr); the buffer is the
+                # fixed b"\0" * 1024 literal; the return is NUL-trimmed by
+                # .split(b"\0", 1)[0], decoded by an argumentless .decode(), and
+                # wrapped in Path(...).  Any deviation (other function/fd/request/
+                # buffer, an untrimmed or non-argumentless-decoded or non-Path
+                # return, an alias/getattr, or an out-of-function call) is a
+                # violation; the downstream Path.lstat identity+S_ISDIR rebind
+                # before shutil.rmtree is enforced functionally by the H032
+                # moved-parent / foreign-preservation controls.
+                call = parents.get(parent)
+                args_ok = (
+                    isinstance(call, ast.Call) and call.func is parent
+                    and owner == AUTHORIZED_STAGING_RETIREMENT
+                    and len(call.args) == 3 and not call.keywords
+                    and isinstance(call.args[0], ast.Name)
+                    and call.args[0].id == AUTHORIZED_STAGING_DIR_FD_PARAM
+                    and call.args[0].id in func_params.get(owner, [])
+                    and isinstance(call.args[1], ast.Attribute)
+                    and call.args[1].attr == "F_GETPATH"
+                    and isinstance(call.args[1].value, ast.Name)
+                    and call.args[1].value.id == "fcntl"
+                    and isinstance(call.args[2], ast.BinOp)
+                    and isinstance(call.args[2].op, ast.Mult)
+                    and isinstance(call.args[2].left, ast.Constant)
+                    and call.args[2].left.value == b"\0"
+                    and isinstance(call.args[2].right, ast.Constant)
+                    and call.args[2].right.value == 1024)
+                split_attr = parents.get(call) if args_ok else None
+                split_call = (parents.get(split_attr)
+                              if isinstance(split_attr, ast.Attribute) else None)
+                subscript = (parents.get(split_call)
+                             if isinstance(split_call, ast.Call) else None)
+                decode_attr = (parents.get(subscript)
+                               if isinstance(subscript, ast.Subscript) else None)
+                decode_call = (parents.get(decode_attr)
+                               if isinstance(decode_attr, ast.Attribute) else None)
+                path_call = (parents.get(decode_call)
+                             if isinstance(decode_call, ast.Call) else None)
+                form_ok = (
+                    args_ok
+                    and isinstance(split_attr, ast.Attribute)
+                    and split_attr.value is call and split_attr.attr == "split"
+                    and isinstance(split_call, ast.Call) and split_call.func is split_attr
+                    and len(split_call.args) == 2 and not split_call.keywords
+                    and isinstance(split_call.args[0], ast.Constant)
+                    and split_call.args[0].value == b"\0"
+                    and isinstance(split_call.args[1], ast.Constant)
+                    and split_call.args[1].value == 1
+                    and isinstance(subscript, ast.Subscript)
+                    and subscript.value is split_call
+                    and isinstance(subscript.slice, ast.Constant)
+                    and subscript.slice.value == 0
+                    and isinstance(decode_attr, ast.Attribute)
+                    and decode_attr.value is subscript and decode_attr.attr == "decode"
+                    and isinstance(decode_call, ast.Call) and decode_call.func is decode_attr
+                    and not decode_call.args and not decode_call.keywords
+                    and isinstance(path_call, ast.Call)
+                    and isinstance(path_call.func, ast.Name) and path_call.func.id == "Path"
+                    and len(path_call.args) == 1 and path_call.args[0] is decode_call
+                    and not path_call.keywords)
+                if form_ok:
+                    key = f"{owner}:fcntl"
+                    fcntl_effect_counts[key] = fcntl_effect_counts.get(key, 0) + 1
+                else:
+                    violations.append((owner, node.lineno, "unauthorized-fcntl-form"))
+            elif parent.attr == "F_GETPATH":
+                # R119: the F_GETPATH request constant is admitted ONLY as the exact
+                # second positional argument of the authorized fcntl.fcntl staging
+                # resolution above; every other reference is a violation.
+                request_call = parents.get(parent)
+                request_ok = (
+                    isinstance(request_call, ast.Call)
+                    and isinstance(request_call.func, ast.Attribute)
+                    and request_call.func.attr == "fcntl"
+                    and isinstance(request_call.func.value, ast.Name)
+                    and request_call.func.value.id == "fcntl"
+                    and owner == AUTHORIZED_STAGING_RETIREMENT
+                    and len(request_call.args) == 3
+                    and request_call.args[1] is parent)
+                if not request_ok:
+                    violations.append((owner, node.lineno, "unauthorized-fgetpath-request"))
         if isinstance(node, ast.Name) and node.id == "os" and isinstance(node.ctx, ast.Load):
             binding_kind, binding_value = resolve_binding(node)
             if binding_kind == "ambiguous":
@@ -1598,7 +1704,8 @@ def process_shape(text: str) -> dict[str, object]:
     if os_effect_counts not in (LEGACY_EXPECTED_OS_EFFECT_COUNTS,
                                 RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS):
         violations.append(("<module>", 0, f"os-effect-inventory:{os_effect_counts}"))
-    if fcntl_effect_counts != EXPECTED_FCNTL_EFFECT_COUNTS:
+    if fcntl_effect_counts not in (LEGACY_EXPECTED_FCNTL_EFFECT_COUNTS,
+                                   RESULT_KERNEL_EXPECTED_FCNTL_EFFECT_COUNTS):
         violations.append(("<module>", 0, f"fcntl-effect-inventory:{fcntl_effect_counts}"))
     if sys_stream_counts != EXPECTED_SYS_STREAM_COUNTS:
         violations.append(("<module>", 0, f"sys-stream-inventory:{sys_stream_counts}"))
@@ -2421,11 +2528,108 @@ subprocess = object()
         "R115_OS_SYMLINK_DIRFD": "\nos.symlink('a', 'b', dir_fd=1)\n",
         "R115_OS_LSTAT": "\nos.lstat('/private/tmp/h031-r115')\n",
         "R115_OS_SCANDIR": "\nos.scandir('/private/tmp/h031-r115')\n",
+        # R119 authority-expansion negative controls: the single macOS F_GETPATH
+        # staging resolution grant must not authorize the call outside the exact
+        # retirement primitive, a wrong/non-parameter fd, a literal/getattr/aliased
+        # request, a wrong buffer, an untrimmed or non-argumentless-decoded or
+        # non-Path-wrapped return, a second occurrence, a stray F_GETPATH, any
+        # broader fcntl attribute, or the broad-form os primitives it replaces.
+        "R119_FGETPATH_WRONG_FUNCTION_SCOPE": (
+            "\nmoved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_WRONG_FD": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(7, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_NONPARAM_FD": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    other_fd = 7\n"
+            "    moved = Path(fcntl.fcntl(other_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_LITERAL_REQUEST": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, 50, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_GETATTR_REQUEST": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, getattr(fcntl, 'F_GETPATH', 50), "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_WRONG_BUFFER": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 2048).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_UNTRIMMED_RETURN": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).decode())\n"
+        ),
+        "R119_FGETPATH_DECODE_WITH_ARG": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode('utf-8'))\n"
+        ),
+        "R119_FGETPATH_NO_PATH_WRAP": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode()\n"
+        ),
+        "R119_FGETPATH_ALIAS": (
+            "\nh031_fc = fcntl.fcntl\n"
+            "def _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(h031_fc(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_DOUBLE_CALL": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    a = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+            "    b = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R119_FGETPATH_STRAY_CONSTANT": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    stray = fcntl.F_GETPATH\n"
+        ),
+        "R119_FCNTL_BROADER_ATTR": "\nfcntl.fcntl(1, fcntl.F_SETFL, 0)\n",
+        "R119_OS_FSDECODE_REJECT": "\nos.fsdecode(b'/private/tmp/h031-r119')\n",
+        "R119_OS_PATH_ISLINK_REJECT": "\nos.path.islink('/private/tmp/h031-r119')\n",
     }
     for label, suffix in shape_mutants.items():
         mutant_shape = process_shape(source_text + suffix)
         check("J_PROCESS_" + label + "_REJECT", not mutant_shape["boundary_ok"],
               str(mutant_shape["detail"]))
+    # R119: the exact narrow F_GETPATH staging-resolution form is ACCEPTED — one
+    # fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, b"\0" * 1024) whose NUL-trimmed,
+    # argumentlessly decoded, Path-wrapped return is rebound (identity + S_ISDIR)
+    # before shutil.rmtree.  This is the sole new source-form authority; the
+    # negatives above prove it is tight.  When the subject autopilot already
+    # carries the resolution (result-kernel product present), its own accepted
+    # boundary is the positive proof; appending a second copy would double the
+    # frozen single-call fcntl inventory.  When it is absent (TEST_AUTHOR base),
+    # a synthetic _retire_bound_staging exercises the admission directly.
+    if "fcntl.F_GETPATH" in source_text:
+        check("J_R119_FGETPATH_STAGING_RESOLUTION_POSITIVE", bool(shape["boundary_ok"]),
+              str(shape["detail"]))
+    else:
+        r119_positive_source = source_text + (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH,\n"
+            "                             b\"\\0\" * 1024).split(b\"\\0\", 1)[0].decode())\n"
+            "    moved_now = moved.lstat()\n"
+            "    if ((moved_now.st_dev, moved_now.st_ino) == identity\n"
+            "            and stat.S_ISDIR(moved_now.st_mode)):\n"
+            "        shutil.rmtree(moved)\n"
+        )
+        r119_positive_shape = process_shape(r119_positive_source)
+        check("J_R119_FGETPATH_STAGING_RESOLUTION_POSITIVE",
+              r119_positive_source != source_text and bool(r119_positive_shape["boundary_ok"]),
+              str(r119_positive_shape["detail"]))
     missing_api_source = source_text.replace("def status(", "def h031_missing_status(", 1)
     missing_api_shape = process_shape(missing_api_source)
     check("J_REQUIRED_API_MISSING_REJECT",
