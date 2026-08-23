@@ -2762,3 +2762,57 @@ member to its result-kernel import inventory, without new process/filesystem
 authority.
 The round modifies owner gate/spec/docs only and grants no production, provider,
 live, ref, publication, attestation or model authority.
+
+## 2026-08-24 — R126 finite R12 prewarm and failed-provider family cleanup
+
+Two independent effect replays found gate defects in the final R125 owner
+candidate. Neither finding changes the frozen product contract.
+
+The first defect was in R12's judge-owned fresh-interpreter setup. Its generated
+`/usr/bin/python3 -I -S` runner armed the definition-time audit ticket after a
+finite stdlib prewarm that omitted `__future__` and `base64`. With no extra
+prewarm, exact `controller/authority/core.py` raised on the selected loader
+`open` caused by `from __future__ import annotations`. Adding only `__future__`
+advanced to the admitted materializer and raised on the selected loader `open`
+caused by `import base64`. Thus all R12 product cases ended before the genuine
+provider `subprocess.Popen`; product code could not repair core, and removing
+the materializer's base64 import would contradict the frozen patch-decoding
+contract.
+
+R126 adds exactly `__future__` and `base64` to that pre-audit import line.
+`loader_read` is unchanged. Fresh one-defect child interpreters prove that
+omitting `__future__` fails at core, omitting `base64` fails at a
+materializer-shaped import, and both prewarmed reach the genuine
+`subprocess.Popen` with zero selected dependency effects. A broad-loader
+alternative can conceal an unprewarmed import, so a separate exact AST/source
+control rejects that form as well as either missing finite module.
+
+The second defect was a missing provider-failure process-family control. The
+frozen H032 criterion already requires provider-failure cleanup and synchronous
+containment of the production process group and descendants, but R116 exercised
+a same-group closed-stdio survivor only after success. Against the exact
+intended launcher bytes, an un-nested Seatbelt effect probe made the provider
+parent exit 7: the launcher returned NONZERO before its success-only `killpg`,
+while the exact child was reparented to pid 1 in the same PGID and wrote an
+allowed scratch marker after launcher return.
+
+R126 reuses the same success fixture and changes only the provider's terminal
+status for two independent failure cases: explicit exit 7 and provider
+self-SIGTERM. This signal case is distinct from the existing interruption case,
+which signals the controller rather than the provider leader. Each failure case
+must return the exact `Stop:Codex role TEST_AUTHOR failed rc=4;` class, report
+the child PID, bind that child into the observed pid+lstart family while ancestry
+still exists, and prove the child and provider PGIDs equal. Every recorded exact
+pid+lstart identity must then be gone. Both failure cases additionally must
+satisfy the existing complete `rejected_clean` predicate: one real provider
+start, bound journal start, canonical absent, sink/staging/private family absent
+and no retained fd alias. Timeout, controller-interruption and successful cleanup
+controls remain mandatory. The judge cleanup is verdict-later and may target
+only an exact still-matching pid+lstart; no source-pinned `killpg` implementation
+is required.
+
+No top-level check, schema, task authority, allowed-write entry or verdict count
+changes. Product-absent H032 remains 148 PASS / 4 FAIL, owner-skip remains
+151/1 and deterministic green remains 152/0. H031 changes only its exact H032
+digest binding after the R126 bytes freeze. This round owns gates/spec/docs only
+and performs no product, live-provider, ref, publication or attestation action.
