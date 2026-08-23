@@ -2501,3 +2501,49 @@ intended R116 defects). H031 rebinds only the exact final H032 gate digest and
 stays 143/2. Validated on the host, un-nested, no live provider/model call. The
 builder round then adopts the three preserved product changes against published
 R118. Production, H017 and the prior R48-R117 effects remain unchanged.
+
+## 2026-08-23 — R119 H031 F_GETPATH source-form amendment (narrow form)
+
+The R118 builder round adopted the three preserved product changes and reached
+H032 green (146/1 exit 2), but H031 failed: the inode-bound finalizer
+`_retire_bound_staging` resolves the relocated staging directory with the macOS
+F_GETPATH fcntl (`fcntl.fcntl`), which H031's frozen
+`K_PROCESS_BOUNDARY_SOURCE_FORM` never admitted. R116/R117/R118 had validated the
+product only against H032, so H031 had only ever run product-absent — the frozen
+gate was again unsatisfiable by its own intended product. An owner-directed
+diagnosis found the broad finalizer form (dynamic `getattr`, `os.fsdecode`,
+`os.lstat`, `os.path.islink`) far wider than necessary and specified a narrow
+form needing exactly one new source-form authority.
+
+R119 is a TEST_AUTHOR round (H031, task-spec and docs only, no product) that makes
+that single owner-authorized H031 source-form expansion. `fcntl.fcntl` and
+`fcntl.F_GETPATH` are admitted ONLY as one call in `_retire_bound_staging` whose
+first argument is exactly the retirement's `staging_dir_fd` parameter, whose
+request is the direct `fcntl.F_GETPATH` attribute (never a literal, variable,
+alias or getattr), whose buffer is the fixed 1024-byte NUL buffer literal, and
+whose return is NUL-trimmed by `.split`, decoded by an argumentless `.decode()`
+and wrapped in `Path(...)`. A legacy/result-kernel fcntl-effect inventory pair
+pins exactly one such call. There is NO new `ALLOWED_OS_ATTRS` entry (os.lstat
+becomes Path.lstat, os.fsdecode becomes an argumentless bytes decode, and
+os.path.islink is redundant after the identity + `stat.S_ISDIR` rebind), no
+dynamic getattr, and the flock authority is unchanged.
+
+Sixteen source-form self-controls prove the grant exact and tight: one positive
+accepting the narrow form, and fifteen one-defect negatives rejecting a call
+outside `_retire_bound_staging`, a wrong or non-parameter fd, a literal or getattr
+request, a wrong buffer, an untrimmed / argumented-decode / non-Path-wrapped
+return, a second occurrence, a stray F_GETPATH, a broader fcntl attribute, and the
+replaced broad-form `os.fsdecode` / `os.path` primitives. The downstream
+`Path.lstat` identity + `S_ISDIR` rebind before `shutil.rmtree` stays functionally
+enforced by H032's moved-parent-residue and foreign-preservation controls; H032 is
+byte-identical (no h-032-exit change, no digest rebind). H031 goes from 143/2 to
+159 PASS / 2 FAIL — the sixteen new source-form self-controls, with the two
+upstream/product gaps unchanged. Validated on the host, un-nested, no live
+provider/model call; additionally de-risked by running the amended H031 against a
+throwaway narrow-product overlay (the blocker lesson: never freeze a gate without
+running it with the product present). The builder round then narrows
+`_retire_bound_staging` from the broad F_GETPATH form to this exact
+approved-primitive form — a new autopilot hash superseding the preserved one in
+that single function, with the consumer and launcher byte-identical — and
+validates the full deterministic/product matrix. Production, H017 and the prior
+R48-R118 effects remain unchanged.
