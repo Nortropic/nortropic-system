@@ -2477,3 +2477,27 @@ RED for the intended R116 defects. H032 owner-skip stays 146/1 and green 147/0
 (no control count change); H031 rebinds only the exact final H032 gate digest and
 stays 143/2. The preserved builder product resumes against published R117 (its
 allowed_write extended with controller/launch/cli). No live/provider execution.
+
+## 2026-08-23 — R118 builder authority amendment (controller/launch/cli)
+
+R117 reconciled the gate to the confined os.link product but deliberately did not
+extend the builder write authority. R118 is a TEST_AUTHOR round (gates, task-spec
+and docs only, no product) that makes the single owner-authorized authority
+expansion: H-032's allowed_write gains EXACTLY one path, controller/launch/cli, so
+the builder round may write the confined launcher. No controller/launch/**, no
+controller/**, no extra test surface, no other dirfd/filesystem authority;
+owner_author_allowed_write stays empty.
+
+F_H032_EXACT_TASK's exact-list pin is updated to the six-entry allowed_write and is
+now AND-ed with one-defect authority self-controls that prove the exact-list check
+rejects a missing controller/launch/cli, a duplicated entry, a broader
+controller/launch/** or controller/** path, an extra unrelated path, and any
+non-empty owner_author_allowed_write. This adds no visible check and no
+PASS/FAIL-count change, so the public and builder-overlay verdicts are effect-
+identical to R117: the preserved builder overlay stays 146 PASS / 1 FAIL exit 2
+(OWNER_LIVE_PHASE_NOT_RUN, deterministically green to owner-live-pending); the
+absent published product and e167fc0 stay 144 PASS / 3 FAIL exit 1 (RED for the
+intended R116 defects). H031 rebinds only the exact final H032 gate digest and
+stays 143/2. Validated on the host, un-nested, no live provider/model call. The
+builder round then adopts the three preserved product changes against published
+R118. Production, H017 and the prior R48-R117 effects remain unchanged.

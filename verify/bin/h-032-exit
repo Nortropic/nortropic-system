@@ -840,12 +840,52 @@ try:
                 "scripts/nortropic-codex-autopilot.py",
                 "controller/result/**",
                 "tests/controller/result/**",
+                "controller/launch/cli",
                 "docs/05-beslutslogg.md",
                 "docs/loop/drift.md",
             ]
             and row.get("owner_author_allowed_write") == []
         )
-    check("F_H032_EXACT_TASK", h032_row_valid(tasks), "current task identity")
+    # R118 authority amendment: the ONLY allowed_write expansion is the exact
+    # single path controller/launch/cli (for the builder's confined launcher).
+    # These one-defect negatives prove the exact-list check rejects a missing,
+    # duplicated, broader (controller/launch/** or controller/**) or extra path,
+    # and that owner_author_allowed_write stays empty.  No effect on the
+    # public/builder verdicts (F_H032_EXACT_TASK already passed on the exact list).
+    def r118_h032_rows(allowed_write, owner_author=None):
+        mutated = []
+        for item in tasks:
+            if isinstance(item, dict) and item.get("id") == "h-032":
+                clone = dict(item); clone["allowed_write"] = allowed_write
+                if owner_author is not None:
+                    clone["owner_author_allowed_write"] = owner_author
+                mutated.append(clone)
+            else:
+                mutated.append(item)
+        return mutated
+    r118_exact_allowed_write = [
+        "scripts/nortropic-codex-autopilot.py", "controller/result/**",
+        "tests/controller/result/**", "controller/launch/cli",
+        "docs/05-beslutslogg.md", "docs/loop/drift.md"]
+    r118_authority_selfcontrols = (
+        h032_row_valid(r118_h032_rows(r118_exact_allowed_write))
+        and not h032_row_valid(r118_h032_rows(
+            [p for p in r118_exact_allowed_write if p != "controller/launch/cli"]))
+        and not h032_row_valid(r118_h032_rows(
+            r118_exact_allowed_write + ["controller/launch/cli"]))
+        and not h032_row_valid(r118_h032_rows(
+            [p if p != "controller/launch/cli" else "controller/launch/**"
+             for p in r118_exact_allowed_write]))
+        and not h032_row_valid(r118_h032_rows(
+            [p if p != "controller/launch/cli" else "controller/**"
+             for p in r118_exact_allowed_write]))
+        and not h032_row_valid(r118_h032_rows(
+            r118_exact_allowed_write + ["controller/loop/cli"]))
+        and not h032_row_valid(r118_h032_rows(
+            r118_exact_allowed_write, owner_author=["controller/launch/cli"])))
+    check("F_H032_EXACT_TASK",
+          h032_row_valid(tasks) and r118_authority_selfcontrols,
+          f"current task identity; authority_selfcontrols={r118_authority_selfcontrols}")
     h033 = [row for row in tasks if isinstance(row, dict) and row.get("id") == "h-033"]
     check("F_H033_PUBLISHED_DEPENDENCY", len(h033) == 1
           and h033[0].get("exit_test") == "verify/bin/h-033-exit"
