@@ -2575,3 +2575,46 @@ unchanged); H032 is byte-identical (no digest rebind). Validated on the host,
 un-nested, no live call; de-risked against the narrow-product overlay (193/0). The
 builder round then adopts the narrow product against published R120. Production,
 H017 and the prior R48-R119 effects remain unchanged.
+
+## 2026-08-23 — Builder round: confined os.link result-kernel product (against R120)
+
+With the H031 F_GETPATH source-form authority settled (R119 narrow form, R120
+integer-exact), the builder round adopts the confined structured-result product
+against published R120 (e6b9a586). Three product changes, no gate/spec/authority
+edits:
+
+- **controller/result/consumer.py** (new, 5178d8a3…) — the private-result kernel
+  that publishes by os.link no-overwrite (never os.replace), rejecting a
+  concurrent foreign canonical in the pre-publish window with its inode and digest
+  unchanged.
+- **controller/launch/cli** (c2c05862…) — the Seatbelt launcher that binds the
+  exact staging root and pre-created sink from NORTROPIC_STAGING_ROOT /
+  NORTROPIC_RESULT_SINK into a capability-exact deny-writes-under-staging +
+  allow-file-write-data-on-the-sink profile (canonical /private paths), and
+  killpg's the process group on SUCCESS, not only on timeout.
+- **scripts/nortropic-codex-autopilot.py** (ff59526c…) — run_codex hands the
+  staging paths to the launcher, binds the staging directory inode with a
+  retained no-follow CLOEXEC descriptor before the sink and provider, and retires
+  a provider-relocated bound staging directory through the inode-bound finalizer
+  `_retire_bound_staging`. That finalizer uses exactly the R119/R120-approved
+  macOS F_GETPATH form: one `fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH,
+  b"\0" * 1024)`, NUL-trimmed, argumentlessly decoded, Path-wrapped, then a
+  no-follow identity + `stat.S_ISDIR` rebind before `shutil.rmtree`; a
+  non-decodable relocated path fails closed. This autopilot is byte-for-byte the
+  preserved builder-WIP (6324a389…) with ONLY `_retire_bound_staging` narrowed
+  from the broad form (dynamic getattr / os.fsdecode / os.lstat / os.path.islink)
+  to this approved-primitive form; the original WIP and its three hashes are
+  preserved untouched as forensic evidence.
+
+No-live suite (host, un-nested): H032 146 PASS / 1 FAIL exit 2
+(OWNER_LIVE_PHASE_NOT_RUN — every deterministic control incl. staging confinement,
+rename-before-move confinement, moved-parent-residue, foreign-preservation, os.link
+no-overwrite and quiescence PASS; zero unexpected contract failures). H031 193 PASS
+/ 0 FAIL exit 2 (full deterministic/product matrix green, owner-live-pending).
+H034 396/0, H035 311/0, H017 24/0, invariants 8/0. A cross-provider product review
+bound to the exact candidate SHA precedes any guarded product publication; no
+product publication or Condition B before independent READY, and Condition B's
+Seatbelt rule is unchanged. If the real Codex -o writer publishes atomically
+(temp-file plus rename) rather than writing the sink data directly, owner-live
+becomes ODÖMBART at Condition B and the confinement is not broadened. No live
+provider/model execution in this round.
