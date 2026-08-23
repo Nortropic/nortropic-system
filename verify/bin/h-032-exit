@@ -31,7 +31,7 @@ RESULT_KERNEL="$ROOT/controller/result/consumer.py"
 AUTHORITY="$ROOT/config/codex-provider-identity.json"
 SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
 OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
-OWNER_LIVE_HELPER_SHA256="9fdc5faae5a47ad79ab9057623060d1ebd909f48c46bebdf987ac5b5ab90528f"
+OWNER_LIVE_HELPER_SHA256="baf8fc93971ca2324eb7a2771592168834388f2d292df6a2b067fe653824b152"
 if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
   echo "ODÖMBART K0 — owner-live helper identity invalid"
   exit 2
@@ -115,6 +115,8 @@ import sys
 import threading
 import time
 import selectors
+import secrets
+import re
 
 source, result_kernel, authority_source, schema_source, work = map(Path, sys.argv[1:6])
 g20_emit_path = Path(sys.argv[6]) if sys.argv[6] else None
@@ -1098,7 +1100,8 @@ payload={'role':'TEST_AUTHOR','outcome':'READY','summary':'physical result ancho
  'blocking_findings':[],'tests':[],'allowed_write_violation':False,
  'frozen_artifacts_modified':False,'production_files_modified':False,
  'frozen_gate_ready':True,'baseline_red_for_right_reason':True,
- 'owner_decision_required':False,'stop_reason':'NONE','next_action':'BUILD','next_task_id':'h-032'}
+ 'owner_decision_required':False,'stop_reason':'NONE','next_action':'BUILD','next_task_id':'h-032',
+ 'candidate_delta':None}
 mutations={
  'wrong_role':lambda p:p.update(role='BUILDER'),
  'wrong_outcome':lambda p:p.update(outcome='INVALID'),
@@ -7062,6 +7065,7 @@ def run_codex(sink, canonical, invocation, run, role):
             "production_files_modified":False,"frozen_gate_ready":True,
             "baseline_red_for_right_reason":True,"owner_decision_required":False,
             "stop_reason":"NONE","next_action":"BUILD","next_task_id":"h-032",
+            "candidate_delta":None,
         }, separators=(",", ":"))
         program.write_text("#!/usr/bin/python3\n" +
             "import json,pathlib,subprocess,sys,time\n" +
@@ -7215,7 +7219,8 @@ def run_codex(sink, canonical, invocation, run, role):
         "allowed_write_violation":False,"frozen_artifacts_modified":False,
         "production_files_modified":False,"frozen_gate_ready":True,
         "baseline_red_for_right_reason":True,"owner_decision_required":False,
-        "stop_reason":"NONE","next_action":"BUILD","next_task_id":"h-032"}
+        "stop_reason":"NONE","next_action":"BUILD","next_task_id":"h-032",
+        "candidate_delta":None}
     def encoded_report(report):
         return json.dumps(report,ensure_ascii=False,separators=(",",":"),
                           sort_keys=True).encode("utf-8")
@@ -10123,6 +10128,590 @@ class CraftedConcretePath(type(Path())):
               f"sink_intact={conf04_sink.exists()} "
               f"escaped={(conf04_escape / 'escaped-sink').exists()}")
 
+    # ==================== R122 PROTECTED CANDIDATE ARTIFACT ====================
+    # R121 found (owner-confirmed R120-PROD-CODEX-REV-01) that a setsid/double-fork
+    # provider descendant survives success killpg and can write the live scratch
+    # worktree AFTER acceptance, racing candidate materialization.  Owner decision
+    # R2: the accepted artifact (a bounded git-diff-binary-v1 patch inside the
+    # protected result) is the provider's SOLE proposal; every candidate byte is
+    # deterministically derived from the controller-pinned base + that patch in a
+    # controller-owned, launcher-Seatbelt-DENIED private object store/index anchored
+    # beneath the trust root; the live scratch worktree has NO evidentiary role.
+    # This gate freezes the materialization boundary: the reference lane proves the
+    # contract satisfiable and harmless-under-late-scratch-write, while the PRODUCT
+    # materialization kernel is absent (the sole intended new RED).
+    REFERENCE_MATERIALIZE_SOURCE = '"""R122 reference materialization kernel (owner contract).\n\nThe accepted artifact is the provider\'s SOLE proposal.  Every candidate byte is\nderived from the controller-pinned authoritative base + the accepted compact\ngit-diff-binary-v1 patch, applied inside a controller-owned private object store\nand index.  The provider\'s scratch worktree has NO evidentiary role.\n\nTwo-phase transaction:\n  Phase A (raw/schema/base/resource) — before any apply.\n  Phase B (apply) — into an attempt-private object store + index only (no worktree).\n  Phase C (derive+validate) — enumerate paths/modes/final bytes/collisions/allowed_write/\n          budgets from the APPLIED result (never trusted provider fields).\n  Phase D — commit-tree only if every check passes; otherwise NO candidate (fail closed),\n          leaving only unreachable objects.\n\nReturns (candidate_commit_sha, changed_files) on success, or raises Reject.\n"""\nimport base64\nimport os\nimport re\nimport shutil\nimport subprocess\nimport tempfile\nimport unicodedata\n\nFORMAT = "git-diff-binary-v1"\nVERSION = 1\nOPS_MAX_KERNEL = 64\nPATH_MAX_BYTES = 512\nPATH_COMPONENT_MAX_BYTES = 255\nPATCH_MAX_BYTES = 262144\nFILE_MAX_BYTES = 2097152\nDELTA_MAX_BYTES = 8388608\nALLOWED_MODES = {"100644", "100755"}\n\n\nclass Reject(Exception):\n    pass\n\n\ndef _git(args, *, git_dir, index_file=None, cwd=None, input_bytes=None, check=True):\n    env = dict(os.environ)\n    env["GIT_DIR"] = git_dir\n    if index_file is not None:\n        env["GIT_INDEX_FILE"] = index_file\n    env["GIT_TERMINAL_PROMPT"] = "0"\n    proc = subprocess.run(["git", *args], env=env, cwd=cwd, input=input_bytes,\n                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)\n    if check and proc.returncode != 0:\n        raise Reject(f"git {args[0]} failed rc={proc.returncode}: "\n                     f"{proc.stderr.decode(\'utf-8\', \'replace\')[:200]}")\n    return proc\n\n\ndef _casefold_key(path):\n    # macOS APFS default is case-insensitive + Unicode (NFD) normalizing.  Collide\n    # on the OS-effective identity so two distinct patch targets cannot resolve to\n    # the same on-disk object.\n    return unicodedata.normalize("NFC", path).casefold()\n\n\ndef materialize(authoritative_git_dir, pinned_base_commit, candidate_delta,\n                allowed_write_globs, max_changed_files, max_added_lines,\n                effective_ops_max, protected_root):\n    """authoritative_git_dir: the controller\'s own authoritative repo git dir, used\n    ONCE to import the exact base object closure into a self-contained private ODB\n    (NEVER retained as an alternate — the provider is permitted to write the live/\n    common ODB, so a live alternate would be a transitive authority surface).\n    pinned_base_commit: the controller\'s exact authoritative base (40 hex).\n    candidate_delta: the provider\'s proposed artifact (dict or None).\n    protected_root: the controller\'s launcher-Seatbelt-DENIED trust root; the entire\n    materialization surface (private ODB, index, any checkout, candidate refs) is\n    anchored beneath it so a surviving provider descendant cannot write it.  Never\n    the ambient TMPDIR (same-UID ownership is not access control)."""\n    # ---- Phase A: raw / schema / base / resource -------------------------------\n    if candidate_delta is None:\n        raise Reject("missing candidate_delta")\n    if not isinstance(candidate_delta, dict) or set(candidate_delta) != {\n            "version", "format", "base_commit", "patch_b64"}:\n        raise Reject("delta shape")\n    if candidate_delta["version"] != VERSION or candidate_delta["format"] != FORMAT:\n        raise Reject("delta version/format")\n    base_claim = candidate_delta["base_commit"]\n    if (not isinstance(base_claim, str) or len(base_claim) != 40\n            or set(base_claim) > set("0123456789abcdef")):\n        raise Reject("base_commit form")\n    if base_claim != pinned_base_commit:\n        raise Reject("base_commit != controller-pinned base")\n    patch_b64 = candidate_delta["patch_b64"]\n    if not isinstance(patch_b64, str):\n        raise Reject("patch_b64 type")\n    try:\n        patch = base64.b64decode(patch_b64, validate=True)\n    except Exception:\n        raise Reject("patch_b64 invalid base64")\n    if len(patch) == 0:\n        raise Reject("empty patch")\n    if len(patch) > PATCH_MAX_BYTES:\n        raise Reject("patch exceeds PATCH_MAX_BYTES")\n\n    if not os.path.isdir(protected_root):\n        raise Reject("protected materialization root absent")\n    work = tempfile.mkdtemp(prefix="nortropic-materialize-", dir=protected_root)\n    try:\n        git_dir = os.path.join(work, "odb")\n        index_file = os.path.join(work, "index")\n        _git(["init", "-q", "--bare", git_dir], git_dir=git_dir)\n        # Import the exact base object closure into the self-contained private ODB\n        # (content-addressed: a poisoned live object has a different sha and is not\n        # reachable from the pinned commit).  NO alternate to the live/common ODB.\n        revlist = subprocess.run(\n            ["git", "--git-dir", authoritative_git_dir, "rev-list", "--objects",\n             "--no-walk", pinned_base_commit + "^{commit}"],\n            stdout=subprocess.PIPE, stderr=subprocess.PIPE)\n        if revlist.returncode != 0 or not revlist.stdout:\n            raise Reject("base closure enumeration failed")\n        pack = subprocess.run(\n            ["git", "--git-dir", authoritative_git_dir, "pack-objects", "--stdout"],\n            input=revlist.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)\n        if pack.returncode != 0 or not pack.stdout:\n            raise Reject("base closure pack failed")\n        _git(["index-pack", "--stdin", "--fix-thin"], git_dir=git_dir, input_bytes=pack.stdout)\n        if os.path.exists(os.path.join(git_dir, "objects", "info", "alternates")):\n            raise Reject("unexpected alternate on private ODB")\n        # Verify the pinned commit + tree resolve and the closure is complete in the\n        # private ODB (fail closed on any missing object).\n        _git(["cat-file", "-e", pinned_base_commit + "^{commit}"], git_dir=git_dir)\n        base_tree = _git(["rev-parse", "--verify", f"{pinned_base_commit}^{{tree}}"],\n                         git_dir=git_dir).stdout.decode().strip()\n        # Closure completeness: walk the base commit + its tree (no history).  A\n        # successful pack-objects/index-pack already guarantees every listed object\n        # was present; this re-walks trees and fails closed on any gap.\n        _git(["rev-list", "--objects", "--no-walk", pinned_base_commit], git_dir=git_dir)\n        _git(["read-tree", base_tree], git_dir=git_dir, index_file=index_file)\n\n        # ---- Phase B: apply into the private index ONLY (no worktree) ----------\n        _git(["apply", "--cached", "--binary", "--whitespace=nowarn",\n              "--unsafe-paths", "--check", "-"],\n             git_dir=git_dir, index_file=index_file, input_bytes=patch)\n        _git(["apply", "--cached", "--binary", "--whitespace=nowarn",\n              "--unsafe-paths", "-"],\n             git_dir=git_dir, index_file=index_file, input_bytes=patch)\n        cand_tree = _git(["write-tree"], git_dir=git_dir,\n                         index_file=index_file).stdout.decode().strip()\n\n        # ---- Phase C: derive + validate from the APPLIED result ----------------\n        # Collisions are checked over the COMPLETE final tree (changed AND unchanged\n        # base paths): a changed path can collide (case/unicode/dir-prefix) with an\n        # existing base path, ambiguous on a case-insensitive + normalizing FS.\n        _reject_tree_collisions(git_dir, cand_tree)\n        # Kernel-derived change set (NEVER trusted provider fields).\n        raw = _git(["diff-tree", "-r", "--no-commit-id", "-z", base_tree, cand_tree],\n                   git_dir=git_dir).stdout\n        entries = _parse_diff_tree_z(raw)  # list of (old_mode,new_mode,old_sha,new_sha,status,path)\n        if not entries:\n            raise Reject("empty candidate delta (no change vs base)")\n        if len(entries) > min(OPS_MAX_KERNEL, effective_ops_max):\n            raise Reject("changed files exceed effective ops max")\n\n        changed = []\n        seen_case = {}\n        total_bytes = 0\n        added_lines = 0\n        for old_mode, new_mode, old_sha, new_sha, status, path in entries:\n            _validate_path(path)\n            key = _casefold_key(path)\n            if key in seen_case:\n                raise Reject(f"path collision (case/unicode/dup): {path!r} ~ {seen_case[key]!r}")\n            seen_case[key] = path\n            if not _within_allowed(path, allowed_write_globs):\n                raise Reject(f"path outside allowed_write: {path}")\n            if status == "D":\n                if old_mode not in ALLOWED_MODES:\n                    # deleting a non-regular (symlink/gitlink) base object is still a\n                    # change we account, but the target must have existed.\n                    pass\n                if old_sha == "0" * 40 or int(old_mode, 8) == 0:\n                    raise Reject(f"delete of absent path: {path}")\n                added_lines += _added_lines(git_dir, base_tree, cand_tree, path)\n                changed.append(path)\n                continue\n            # add / modify\n            if new_mode not in ALLOWED_MODES:\n                raise Reject(f"disallowed final mode {new_mode} for {path}")\n            size = int(_git(["cat-file", "-s", new_sha], git_dir=git_dir)\n                       .stdout.decode().strip())\n            if size > FILE_MAX_BYTES:\n                raise Reject(f"resulting blob exceeds FILE_MAX_BYTES: {path}")\n            total_bytes += size\n            if total_bytes > DELTA_MAX_BYTES:\n                raise Reject("sum of resulting blobs exceeds DELTA_MAX_BYTES")\n            added_lines += _added_lines(git_dir, base_tree, cand_tree, path)\n            changed.append(path)\n        if added_lines > max_added_lines:\n            raise Reject("added lines exceed budget")\n        if len(changed) > max_changed_files:\n            raise Reject("changed files exceed task budget")\n\n        # ---- Phase D: commit-tree (candidate authority) ------------------------\n        commit = _git(["commit-tree", cand_tree, "-p", pinned_base_commit, "-m",\n                       "nortropic candidate (materialized from protected artifact)"],\n                      git_dir=git_dir,\n                      # deterministic identity/date so materialization is reproducible\n                      ).stdout.decode().strip() if False else _commit_tree(\n                          git_dir, cand_tree, pinned_base_commit)\n        return commit, cand_tree, sorted(changed)\n    finally:\n        shutil.rmtree(work, ignore_errors=True)\n\n\ndef _commit_tree(git_dir, tree, parent):\n    env_extra = {\n        "GIT_AUTHOR_NAME": "nortropic-controller", "GIT_AUTHOR_EMAIL": "controller@nortropic.invalid",\n        "GIT_COMMITTER_NAME": "nortropic-controller", "GIT_COMMITTER_EMAIL": "controller@nortropic.invalid",\n        "GIT_AUTHOR_DATE": "2026-01-01T00:00:00 +0000", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00 +0000",\n    }\n    env = dict(os.environ); env["GIT_DIR"] = git_dir; env.update(env_extra)\n    proc = subprocess.run(["git", "commit-tree", tree, "-p", parent, "-m",\n                           "nortropic candidate (materialized from protected artifact)"],\n                          env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)\n    if proc.returncode != 0:\n        raise Reject("commit-tree failed")\n    return proc.stdout.decode().strip()\n\n\ndef _reject_tree_collisions(git_dir, cand_tree):\n    # Collisions over the COMPLETE final tree, under a case-insensitive + NFC-\n    # normalizing filesystem (macOS APFS default).  Three distinct classes:\n    #   (1) two file paths with the same normalized identity;\n    #   (2) two DIRECTORY spellings with the same normalized identity (e.g.\n    #       Foo/a.py and foo/b.py, which merge on-disk);\n    #   (3) a file path whose normalized identity equals a normalized directory\n    #       prefix used by another path.\n    raw = _git(["ls-tree", "-r", "-z", "--name-only", cand_tree], git_dir=git_dir).stdout\n    paths = [p.decode("utf-8", "surrogateescape") for p in raw.split(b"\\0") if p]\n    nk = lambda comp: unicodedata.normalize("NFC", comp).casefold()\n    files = {}         # normalized full path -> original path\n    dir_spelling = {}  # normalized dir prefix -> original dir prefix\n    dir_norms = set()  # set of normalized dir prefixes\n    for path in paths:\n        comps = path.split("/")\n        norm_comps = [nk(c) for c in comps]\n        norm_full = "/".join(norm_comps)\n        if norm_full in files and files[norm_full] != path:\n            raise Reject(f"final-tree case/unicode file collision: {path!r} ~ {files[norm_full]!r}")\n        files[norm_full] = path\n        orig_prefix = ""\n        norm_prefix = ""\n        for i in range(len(comps) - 1):\n            orig_prefix = comps[i] if not orig_prefix else orig_prefix + "/" + comps[i]\n            norm_prefix = norm_comps[i] if not norm_prefix else norm_prefix + "/" + norm_comps[i]\n            dir_norms.add(norm_prefix)\n            if norm_prefix in dir_spelling:\n                if dir_spelling[norm_prefix] != orig_prefix:\n                    raise Reject(f"final-tree directory alias collision: "\n                                 f"{orig_prefix!r} ~ {dir_spelling[norm_prefix]!r}")\n            else:\n                dir_spelling[norm_prefix] = orig_prefix\n    for norm_full, path in files.items():\n        if norm_full in dir_norms:\n            raise Reject(f"final-tree file/dir prefix collision: {path!r}")\n\n\ndef _parse_diff_tree_z(raw):\n    # git diff-tree -r -z output: repeated ":oldmode newmode oldsha newsha status\\0path\\0"\n    out = []\n    fields = raw.split(b"\\0")\n    i = 0\n    while i < len(fields):\n        meta = fields[i]\n        if not meta:\n            i += 1\n            continue\n        if not meta.startswith(b":"):\n            break\n        parts = meta.decode().lstrip(":").split()\n        old_mode, new_mode, old_sha, new_sha, status = parts[0], parts[1], parts[2], parts[3], parts[4]\n        path = fields[i + 1].decode("utf-8", "surrogateescape")\n        out.append((old_mode, new_mode, old_sha, new_sha, status[0], path))\n        i += 2\n    return out\n\n\ndef _added_lines(git_dir, base_tree, cand_tree, path):\n    raw = _git(["diff", "--numstat", "-z", base_tree, cand_tree, "--", path],\n               git_dir=git_dir).stdout\n    if not raw:\n        return 0\n    field = raw.split(b"\\0")[0].decode()\n    added = field.split("\\t")[0]\n    return 0 if added == "-" else int(added)\n\n\ndef _validate_path(path):\n    if path == "" or path.startswith("/"):\n        raise Reject(f"non-relative path: {path!r}")\n    if len(path.encode("utf-8")) > PATH_MAX_BYTES:\n        raise Reject(f"path too long: {path!r}")\n    if "\\x00" in path:\n        raise Reject("NUL in path")\n    for comp in path.split("/"):\n        if comp in ("", ".", ".."):\n            raise Reject(f"traversal/empty component: {path!r}")\n        if len(comp.encode("utf-8")) > PATH_COMPONENT_MAX_BYTES:\n            raise Reject(f"path component too long: {path!r}")\n        if comp.casefold() == ".git":\n            raise Reject(f".git component: {path!r}")\n\n\ndef _within_allowed(path, globs):\n    import fnmatch\n    for g in globs:\n        if g.endswith("/**"):\n            prefix = g[:-3]\n            if path == prefix or path.startswith(prefix + "/"):\n                return True\n        elif fnmatch.fnmatch(path, g):\n            return True\n    return False\n'
+    _mat_ns = {}
+    exec(compile(REFERENCE_MATERIALIZE_SOURCE, "<r122-reference-materialize>", "exec"), _mat_ns)
+    ref_materialize = _mat_ns["materialize"]
+    MatReject = _mat_ns["Reject"]
+
+    r122 = work / "r122"; r122.mkdir()
+    r122_prot = r122 / "protected"; r122_prot.mkdir()   # stands for the trust-root region
+    R122_ALLOWED = ["controller/result/**", "docs/loop/drift.md"]
+    R122_MAXF, R122_MAXL, R122_OPS = 12, 2200, 12
+
+    # Synthetic authoritative base repo (has an existing controller/result/consumer.py
+    # so changed-vs-unchanged collisions are exercisable).
+    r122_base = r122 / "base"; r122_base.mkdir()
+    def _rg(*args, cwd=r122_base, input_bytes=None):
+        return subprocess.run(["git", *args], cwd=str(cwd), input=input_bytes,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    _rg("init", "-q")
+    _rg("config", "user.name", "h032-r122"); _rg("config", "user.email", "r122@nortropic.invalid")
+    (r122_base / "controller/result").mkdir(parents=True)
+    (r122_base / "controller/result/consumer.py").write_text("# base consumer\n", encoding="utf-8")
+    (r122_base / "specs").mkdir()
+    (r122_base / "specs/tasks.spec.json").write_text(json.dumps({
+        "defaults": {"max_changed_files": 12, "max_added_lines": 2200},
+        "tasks": [{"id": "h-032", "allowed_write": R122_ALLOWED,
+                   "max_changed_files": R122_MAXF, "max_added_lines": R122_MAXL,
+                   "exit_test": "verify/bin/h-032-exit", "depends_on": []}],
+    }, sort_keys=True), encoding="utf-8")
+    (r122_base / "anchor").write_text("r122\n", encoding="utf-8")
+    _rg("add", "."); _rg("commit", "-qm", "r122-base")
+    r122_base_git = str(r122_base / ".git")
+    r122_base_sha = _rg("rev-parse", "HEAD").stdout.decode().strip()
+
+    def r122_blob(content):
+        return _rg("hash-object", "--stdin", input_bytes=content).stdout.decode().strip()
+    def r122_newfile(path, content):
+        h = r122_blob(content)
+        lines = content.split(b"\n")[:-1]
+        body = b"".join(b"+" + ln + b"\n" for ln in lines)
+        p = path.encode("utf-8")
+        return (b"diff --git a/" + p + b" b/" + p + b"\nnew file mode 100644\n"
+                b"index 0000000000000000000000000000000000000000.." + h.encode() + b" 100644\n"
+                b"--- /dev/null\n+++ b/" + p + b"\n@@ -0,0 +1," + str(len(lines)).encode() + b" @@\n" + body)
+    def r122_delta(patch, base=None, version=1, fmt="git-diff-binary-v1"):
+        return {"version": version, "format": fmt,
+                "base_commit": r122_base_sha if base is None else base,
+                "patch_b64": base64.b64encode(patch).decode()}
+
+    # The first reference implementation deliberately materializes in an
+    # attempt-private ODB.  R122 additionally requires a durable candidate Git
+    # identity after the call returns: an ephemeral SHA whose ODB was deleted is
+    # not a candidate.  This controller-side reference promotion independently
+    # reapplies the accepted patch through a private index into the authoritative
+    # (provider-denied) object store, updates no ref, and proves the resulting tree
+    # is byte-identical to the private derivation.  A product may use any
+    # equivalent effect, but its returned commit must likewise resolve afterward.
+    def r122_closed_git(git_dir, *args, index_file=None, input_bytes=None,
+                        commit_identity=False, check=True):
+        env = {
+            "PATH": "/usr/bin:/bin", "HOME": str(r122), "TMPDIR": str(r122),
+            "LANG": "C", "LC_ALL": "C", "GIT_DIR": str(git_dir),
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+        if index_file is not None:
+            env["GIT_INDEX_FILE"] = str(index_file)
+        if commit_identity:
+            env.update({
+                "GIT_AUTHOR_NAME": "nortropic-controller",
+                "GIT_AUTHOR_EMAIL": "controller@nortropic.invalid",
+                "GIT_COMMITTER_NAME": "nortropic-controller",
+                "GIT_COMMITTER_EMAIL": "controller@nortropic.invalid",
+                "GIT_AUTHOR_DATE": "2026-01-01T00:00:00 +0000",
+                "GIT_COMMITTER_DATE": "2026-01-01T00:00:00 +0000",
+            })
+        proc = subprocess.run(["/usr/bin/git", *args], env=env,
+                              input=input_bytes, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
+        if check and proc.returncode != 0:
+            raise MatReject(f"durable git {args[0]} failed rc={proc.returncode}")
+        return proc
+
+    def r122_durable_reference(delta_obj, base=None):
+        pinned = r122_base_sha if base is None else base
+        if (not isinstance(delta_obj, dict)
+                or set(delta_obj) != {"version", "format", "base_commit", "patch_b64"}
+                or type(delta_obj.get("version")) is not int
+                or delta_obj.get("version") != 1
+                or type(R122_MAXF) is not int or R122_MAXF <= 0
+                or type(R122_MAXL) is not int or R122_MAXL <= 0
+                or type(R122_OPS) is not int or R122_OPS <= 0):
+            raise MatReject("strict materialization inputs")
+        volatile_commit, volatile_tree, changed = ref_materialize(
+            r122_base_git, pinned, delta_obj, R122_ALLOWED,
+            R122_MAXF, R122_MAXL, R122_OPS, str(r122_prot))
+        patch = base64.b64decode(delta_obj["patch_b64"], validate=True)
+        index_file = r122_prot / ("index-" + secrets.token_hex(8))
+        try:
+            base_tree = r122_closed_git(
+                r122_base_git, "rev-parse", "--verify", f"{pinned}^{{tree}}"
+            ).stdout.decode().strip()
+            r122_closed_git(r122_base_git, "read-tree", base_tree,
+                            index_file=index_file)
+            r122_closed_git(r122_base_git, "apply", "--cached", "--binary",
+                            "--whitespace=nowarn", "--unsafe-paths", "--check", "-",
+                            index_file=index_file, input_bytes=patch)
+            r122_closed_git(r122_base_git, "apply", "--cached", "--binary",
+                            "--whitespace=nowarn", "--unsafe-paths", "-",
+                            index_file=index_file, input_bytes=patch)
+            durable_tree = r122_closed_git(
+                r122_base_git, "write-tree", index_file=index_file
+            ).stdout.decode().strip()
+            if durable_tree != volatile_tree:
+                raise MatReject("durable tree differs from private derivation")
+            declared_pairs = sorted(re.findall(
+                rb"(?m)^index ([0-9a-f]{40})\.\.([0-9a-f]{40})(?: [0-7]{6})?$",
+                patch))
+            raw_effect = r122_closed_git(
+                r122_base_git, "diff-tree", "-r", "--no-commit-id", "--raw",
+                "--no-renames", base_tree, durable_tree).stdout
+            actual_pairs = sorted(re.findall(
+                rb"(?m)^:[0-7]{6} [0-7]{6} ([0-9a-f]{40}) ([0-9a-f]{40}) [AMDTCUXBR]",
+                raw_effect))
+            if (not declared_pairs or len(declared_pairs) != len(changed)
+                    or declared_pairs != actual_pairs):
+                raise MatReject("patch index preimage/postimage not bound to derived tree")
+            durable_commit = r122_closed_git(
+                r122_base_git, "commit-tree", durable_tree, "-p", pinned,
+                "-m", "nortropic candidate (materialized from protected artifact)",
+                commit_identity=True,
+            ).stdout.decode().strip()
+            resolved_tree = r122_closed_git(
+                r122_base_git, "rev-parse", "--verify",
+                f"{durable_commit}^{{tree}}"
+            ).stdout.decode().strip()
+            if resolved_tree != durable_tree:
+                raise MatReject("durable candidate identity does not resolve")
+            return durable_commit, durable_tree, changed
+        finally:
+            try:
+                index_file.unlink()
+            except FileNotFoundError:
+                pass
+
+    def r122_run(delta_obj, base=None):
+        return r122_durable_reference(delta_obj, base=base)
+
+    # ---- J_MATERIALIZE_RIG: positive tree-exact (scratch-independent) + full
+    # validation/collision/bound negative matrix all reject ----
+    r122_ok_patch = r122_newfile("controller/result/materialize.py", b"# candidate\n")
+    _r122_binary_path = r122_base / "controller/result/forensic.bin"
+    _r122_binary_bytes = b"\x00R122\xff\nBINARY\x00"
+    _r122_binary_path.write_bytes(_r122_binary_bytes)
+    _rg("add", "-N", "controller/result/forensic.bin")
+    r122_binary_patch = _rg(
+        "diff", "--binary", "--full-index", "--", "controller/result/forensic.bin").stdout
+    _rg("reset", "-q", "--", "controller/result/forensic.bin")
+    _r122_binary_path.unlink()
+    try:
+        _c1, _t1, _ch1 = r122_run(r122_delta(r122_ok_patch))
+        _c2, _t2, _ch2 = r122_run(r122_delta(r122_ok_patch))   # independent re-derivation
+        _bc, _bt, _bch = r122_run(r122_delta(r122_binary_patch))
+        _bblob = r122_closed_git(
+            r122_base_git, "show", f"{_bc}:controller/result/forensic.bin"
+        ).stdout
+        r122_positive = (
+            _c1 == _c2 and _t1 == _t2
+            and _ch1 == _ch2 == ["controller/result/materialize.py"]
+            and _bch == ["controller/result/forensic.bin"]
+            and _bblob == _r122_binary_bytes
+            and r122_closed_git(r122_base_git, "cat-file", "-e", f"{_c1}^{{commit}}",
+                                check=False).returncode == 0
+            and r122_closed_git(r122_base_git, "rev-parse", "--verify",
+                                f"{_c1}^{{tree}}").stdout.decode().strip() == _t1
+            and not any(r122_prot.iterdir())
+        )
+    except MatReject:
+        r122_positive = False
+
+    def r122_rejects(delta_obj, base=None):
+        try:
+            r122_run(delta_obj, base=base); return False
+        except MatReject:
+            return True
+
+    r122_longpath = "controller/result/" + "a" * 250 + "/" + "b" * 250 + ".py"
+    r122_negatives = {
+        "missing": None,
+        "wrong_version": r122_delta(r122_ok_patch, version=2),
+        "bool_version": r122_delta(r122_ok_patch, version=True),
+        "wrong_format": r122_delta(r122_ok_patch, fmt="unified"),
+        "base_claim_mismatch": r122_delta(r122_ok_patch, base="0" * 40),
+        "empty_patch": r122_delta(b""),
+        "oversize_patch": r122_delta(b"diff --git a/x b/x\n" + b"+" * (262144 + 10)),
+        "outside_allowed_write": r122_delta(r122_newfile("verify/bin/evil", b"x\n")),
+        "over_changed_budget": r122_delta(b"".join(
+            r122_newfile(f"controller/result/f{i}.py", b"x\n") for i in range(13))),
+        "over_added_lines": r122_delta(r122_newfile("controller/result/big.py", b"x\n" * 2500)),
+        "over_file_max": r122_delta(r122_newfile("controller/result/huge.bin", b"A" * (2097152 + 1))),
+        "over_delta_max": r122_delta(b"".join(
+            r122_newfile(f"controller/result/z{i}.bin", b"\0" * 2097152) for i in range(5))),
+        "over_path_max": r122_delta(r122_newfile(r122_longpath, b"x\n")),
+        "over_component_max": r122_delta(r122_newfile("controller/result/" + "a" * 256 + ".py", b"x\n")),
+        "casefold_collision": r122_delta(
+            r122_newfile("controller/result/Case.py", b"1\n") + r122_newfile("controller/result/case.py", b"2\n")),
+        "unicode_nfd_collision": r122_delta(
+            r122_newfile("controller/result/café.py", b"1\n") + r122_newfile("controller/result/café.py", b"2\n")),
+        "dir_alias_casefold": r122_delta(
+            r122_newfile("controller/result/Foo/a.py", b"1\n") + r122_newfile("controller/result/foo/b.py", b"2\n")),
+        "dir_alias_nfd": r122_delta(
+            r122_newfile("controller/result/Dé/a.py", b"1\n") + r122_newfile("controller/result/Dé/b.py", b"2\n")),
+        "changed_vs_unchanged_collision": r122_delta(
+            r122_newfile("controller/result/Consumer.py", b"x\n")),   # base has consumer.py
+        "dotgit_component": r122_delta(r122_newfile("controller/result/.git/config", b"x\n")),
+        "prefix_collision": r122_delta(
+            r122_newfile("controller/result/p", b"1\n") + r122_newfile("controller/result/p/q", b"2\n")),
+        "traversal_path": r122_delta(
+            b"diff --git a/controller/result/../../etc/x b/controller/result/../../etc/x\n"
+            b"new file mode 100644\nindex 0000000000000000000000000000000000000000..0000000000000000000000000000000000000000\n"
+            b"--- /dev/null\n+++ b/controller/result/../../etc/x\n@@ -0,0 +1 @@\n+x\n"),
+        "gitlink_160000": r122_delta(
+            b"diff --git a/controller/result/sub b/controller/result/sub\n"
+            b"new file mode 160000\nindex 0000000000000000000000000000000000000000..1111111111111111111111111111111111111111\n"
+            b"--- /dev/null\n+++ b/controller/result/sub\n@@ -0,0 +1 @@\n+Subproject commit 1111111111111111111111111111111111111111\n"),
+        "delete_absent": r122_delta(
+            b"diff --git a/controller/result/ghost.py b/controller/result/ghost.py\n"
+            b"deleted file mode 100644\nindex 1111111111111111111111111111111111111111..0000000000000000000000000000000000000000\n"
+            b"--- a/controller/result/ghost.py\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n"),
+    }
+    # A syntactically valid modification whose index header names the wrong
+    # preimage blob must fail at the pinned base rather than apply by context.
+    _r122_consumer = r122_base / "controller/result/consumer.py"
+    _r122_consumer_old = _r122_consumer.read_bytes()
+    _r122_consumer.write_bytes(b"# modified consumer\n")
+    _r122_modify_patch = _rg(
+        "diff", "--binary", "--full-index", "--", "controller/result/consumer.py").stdout
+    _r122_consumer.write_bytes(_r122_consumer_old)
+    _r122_old_blob = r122_blob(_r122_consumer_old).encode()
+    _r122_wrong_blob = r122_blob(b"not-the-base-object\n").encode()
+    r122_negatives["base_blob_mismatch"] = r122_delta(
+        _r122_modify_patch.replace(_r122_old_blob, _r122_wrong_blob, 1))
+    _bad64 = r122_delta(r122_ok_patch); _bad64["patch_b64"] = "@@notbase64@@"
+    r122_negatives["bad_base64"] = _bad64
+    r122_negatives_ok = all(r122_rejects(d) for d in r122_negatives.values())
+    _r122_schema_report = dict(kernel_valid_report)
+    _r122_schema_report["candidate_delta"] = r122_delta(r122_ok_patch)
+    _r122_schema_bool = dict(_r122_schema_report)
+    _r122_schema_bool["candidate_delta"] = dict(_r122_schema_report["candidate_delta"], version=True)
+    _r122_schema_wrong = dict(_r122_schema_report)
+    _r122_schema_wrong["candidate_delta"] = dict(_r122_schema_report["candidate_delta"], version=2)
+    r122_schema_exact = (
+        complete_schema_valid(_r122_schema_report, schema_document)
+        and not complete_schema_valid(_r122_schema_bool, schema_document)
+        and not complete_schema_valid(_r122_schema_wrong, schema_document))
+    r122_symlink_reject = r122_rejects(r122_delta(
+        b"diff --git a/controller/result/link b/controller/result/link\n"
+        b"new file mode 120000\nindex 0000000000000000000000000000000000000000.." + r122_blob(b"target").encode() + b" 120000\n"
+        b"--- /dev/null\n+++ b/controller/result/link\n@@ -0,0 +1 @@\n+target\n\\ No newline at end of file\n"))
+    check("J_MATERIALIZE_RIG",
+          r122_positive and r122_negatives_ok and r122_symlink_reject and r122_schema_exact,
+          f"positive={r122_positive} negatives_ok={r122_negatives_ok} "
+          f"symlink_reject={r122_symlink_reject} schema_exact={r122_schema_exact} "
+          f"rejected={[k for k,d in r122_negatives.items() if r122_rejects(d)]}")
+
+    # ---- K_LATE_SCRATCH_WRITE_HARMLESS_SUCCESS: a real provider subprocess
+    # emits the artifact and a double-fork+setsid escapee survives its successful
+    # leader, then writes live scratch LATE.  The caller consumes that exact result
+    # and invokes materialization once; this is an ordered caller boundary, not a
+    # disconnected integer/helper model. ----
+    r122_scratch = r122 / "scratch"; (r122_scratch / "controller/result").mkdir(parents=True)
+    (r122_scratch / "controller/result/materialize.py").write_text("# LEGIT-BUT-IRRELEVANT\n", encoding="utf-8")
+    r122_inject = r122_scratch / "controller/result/late-injection.py"
+    r122_result_file = r122 / "provider-result.json"
+    r122_provider_source = (
+        "import os,sys,time\n"
+        "result,scratch,payload,exit_text=sys.argv[1:]\n"
+        "open(result,'w').write(payload)\n"
+        "if os.fork()==0:\n"
+        "    if os.fork()!=0: os._exit(0)\n"
+        "    os.setsid(); os.close(0); os.close(1); os.close(2); time.sleep(0.6)\n"
+        "    open(scratch,'w').write('BACKDOOR = attacker()\\n'); os._exit(0)\n"
+        "os.wait(); raise SystemExit(int(exit_text))\n")
+
+    def r122_reference_caller(provider_rc, *, mutant_materialize_nonzero=False):
+        calls = 0
+        candidate = None
+        try:
+            r122_result_file.unlink()
+        except FileNotFoundError:
+            pass
+        proc = subprocess.run(
+            [sys.executable, "-c", r122_provider_source, str(r122_result_file),
+             str(r122_inject), json.dumps(r122_delta(r122_ok_patch), sort_keys=True),
+             str(provider_rc)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if proc.returncode == 0 or mutant_materialize_nonzero:
+            calls += 1
+            accepted = json.loads(r122_result_file.read_text(encoding="utf-8"))
+            candidate = r122_run(accepted)
+        return proc.returncode, calls, candidate
+
+    try:
+        _lrc, _lcalls, (_lc, _lt, _lch) = r122_reference_caller(0)
+        _cc, _ct, _cch = r122_run(r122_delta(r122_ok_patch))       # independent scratch-free derivation
+        r122_late_exact = (_lrc == 0 and _lcalls == 1 and _lt == _ct
+                           and _lch == ["controller/result/materialize.py"])
+    except MatReject:
+        r122_late_exact = False
+    for _w in range(30):
+        if r122_inject.exists():
+            break
+        time.sleep(0.1)
+    r122_escapee_wrote = r122_inject.exists()
+    check("K_LATE_SCRATCH_WRITE_HARMLESS_SUCCESS",
+          r122_late_exact and r122_escapee_wrote,
+          f"artifact_exact_independent_tree={r122_late_exact} escapee_wrote_scratch={r122_escapee_wrote} "
+          f"injected_path_present_in_scratch={r122_inject.exists()} "
+          f"candidate_changed={_lch if r122_late_exact else None}")
+
+    # ---- K_LATE_SCRATCH_WRITE_HARMLESS_NONZERO: the SAME real subprocess/result
+    # caller boundary invokes materialization zero times after nonzero, creates no
+    # candidate/ref/trusted residue, while a one-defect materialize-on-nonzero
+    # caller is causally observed and rejected. ----
+    _r122_refs_before = r122_closed_git(r122_base_git, "show-ref", check=False).stdout
+    _nzrc, _nzcalls, _nzcandidate = r122_reference_caller(7)
+    _r122_refs_after = r122_closed_git(r122_base_git, "show-ref", check=False).stdout
+    r122_nonzero_no_candidate = (
+        _nzrc == 7 and _nzcalls == 0 and _nzcandidate is None
+        and _r122_refs_after == _r122_refs_before and not any(r122_prot.iterdir()))
+    _src, _scalls, _scandidate = r122_reference_caller(0)
+    r122_success_candidate = (_src == 0 and _scalls == 1 and _scandidate is not None)
+    _mrc, _mcalls, _mcandidate = r122_reference_caller(7, mutant_materialize_nonzero=True)
+    r122_mutant_caught = (_mrc == 7 and _mcalls == 1 and _mcandidate is not None)
+    check("K_LATE_SCRATCH_WRITE_HARMLESS_NONZERO",
+          r122_nonzero_no_candidate and r122_success_candidate and r122_mutant_caught,
+          f"nonzero_zero_invocation={r122_nonzero_no_candidate} success_one_invocation={r122_success_candidate} "
+          f"materialize_on_nonzero_mutant_rejected={r122_mutant_caught}")
+
+    # ---- K_MATERIALIZATION_AREA_PROVIDER_DENIED: the materialization surface
+    # (private ODB, index, checkout, refs) is anchored beneath the trust root and
+    # the REAL launcher Seatbelt DENIES a confined provider every write across it —
+    # checkout bytes AND git metadata.  Disclosed paths; path secrecy gets no
+    # credit.  ODÖMBART when nested sandbox-exec is refused, like K_G20. ----
+    r122_area = trust / "r122-materialization"
+    r122_area_odb = r122_area / "odb"; r122_area_idx = r122_area / "index"
+    r122_area_wt = r122_area / "checkout"; r122_area_refs = r122_area / "odb" / "refs"
+    r122_area_ws = r122 / "deny-ws"; r122_area_ws.mkdir()
+    r122_area_staging = r122 / "deny-staging"; r122_area_staging.mkdir()
+    r122_area_sink = r122_area_staging / "result.json"; r122_area_sink.write_text("", encoding="utf-8"); r122_area_sink.chmod(0o600)
+    r122_area_env_file = r122 / "deny-envelope.json"; r122_area_env_file.write_text('{"task_id":"h-032"}\n', encoding="utf-8")
+    r122_area_attack = (
+        'set +e; '
+        'printf x > "$1/odb/injected"; echo ODB=$?; '
+        'printf x > "$1/index"; echo INDEX=$?; '
+        'mkdir -p "$1/checkout" 2>/dev/null; printf x > "$1/checkout/injected.py"; echo CHECKOUT=$?; '
+        'printf x > "$1/odb/refs/injected"; echo REFS=$?')
+    r122_area_launch_env = dict(os.environ, NORTROPIC_TRUST_ROOT=str(trust),
+                                NORTROPIC_STAGING_ROOT=str(r122_area_staging),
+                                NORTROPIC_RESULT_SINK=str(r122_area_sink))
+    # controller pre-creates the (empty) materialization surface under the trust root
+    r122_area_odb.mkdir(parents=True); (r122_area_odb / "refs").mkdir()
+    r122_area_denied_odom = False
+    r122_area_run = subprocess.run(
+        [str(launcher), "run", str(r122_area_ws), str(r122_area_env_file), "30", "--",
+         "/bin/sh", "-c", r122_area_attack, "sh", str(r122_area)],
+        cwd=source.parents[1], env=r122_area_launch_env, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    r122_area_out = r122_area_run.stdout
+    if r122_area_run.returncode == 3 and "sandbox_apply: Operation not permitted" in r122_area_out:
+        r122_area_denied_odom = True
+        check("K_MATERIALIZATION_AREA_PROVIDER_DENIED", False,
+              "ODÖMBART nested sandbox-exec förbjuden; owner-runner krävs")
+    else:
+        r122_area_lines = set(r122_area_out.splitlines())
+        r122_area_denied = ({"ODB=1", "INDEX=1", "CHECKOUT=1", "REFS=1"}.issubset(r122_area_lines)
+                            and not (r122_area_odb / "injected").exists()
+                            and not r122_area_idx.exists()
+                            and not (r122_area_wt / "injected.py").exists()
+                            and not (r122_area_odb / "refs" / "injected").exists())
+        check("K_MATERIALIZATION_AREA_PROVIDER_DENIED", r122_area_denied,
+              f"rc={r122_area_run.returncode} lines={r122_area_out.strip().replace(chr(10), '|')} "
+              f"surface={r122_area}")
+
+    # ---- K_CANDIDATE_MATERIALIZATION_BOUNDARY: the PRODUCT must provide the
+    # materialization kernel AND the real builder_flow must invoke it exactly once
+    # after an accepted success, then use its durable candidate identity.  A
+    # correct-but-dead controller/result/materialize.py is rejected.  On provider
+    # nonzero the same real caller must invoke it zero times and produce no
+    # candidate/ref/trusted residue.  This is the sole intended new RED while the
+    # product is absent. ----
+    r122_product_kernel = source.parents[1] / "controller" / "result" / "materialize.py"
+    materialization_boundary_ok = False
+    r122_boundary_detail = "product controller/result/materialize.py absent"
+    if r122_product_kernel.exists():
+        try:
+            _psrc = r122_product_kernel.read_text(encoding="utf-8")
+            _pns = {}
+            exec(compile(_psrc, "<product-materialize>", "exec"), _pns)
+            _pmat = _pns.get("materialize")
+            _pc, _pt, _pch = _pmat(r122_base_git, r122_base_sha, r122_delta(r122_ok_patch),
+                                   R122_ALLOWED, R122_MAXF, R122_MAXL, R122_OPS, str(r122_prot))
+            _product_direct_positive = (
+                isinstance(_pc, str) and len(_pc) == 40 and _pt == _t1
+                and _pch == ["controller/result/materialize.py"]
+                and r122_closed_git(r122_base_git, "cat-file", "-e", f"{_pc}^{{commit}}",
+                                    check=False).returncode == 0
+                and r122_closed_git(r122_base_git, "rev-parse", "--verify",
+                                    f"{_pc}^{{tree}}").stdout.decode().strip() == _pt
+                and not any(r122_prot.iterdir()))
+
+            def r122_product_rejects(delta_obj):
+                try:
+                    _pmat(r122_base_git, r122_base_sha, delta_obj, R122_ALLOWED,
+                          R122_MAXF, R122_MAXL, R122_OPS, str(r122_prot))
+                    return False
+                except Exception:
+                    return not any(r122_prot.iterdir())
+
+            _product_negatives = (
+                all(r122_product_rejects(d) for d in r122_negatives.values())
+                and r122_product_rejects(r122_delta(
+                    b"diff --git a/controller/result/link b/controller/result/link\n"
+                    b"new file mode 120000\nindex 0000000000000000000000000000000000000000.."
+                    + r122_blob(b"target").encode() + b" 120000\n--- /dev/null\n"
+                    b"+++ b/controller/result/link\n@@ -0,0 +1 @@\n+target\n"
+                    b"\\ No newline at end of file\n")))
+
+            # Load the exact product autopilot as a module, then drive its real
+            # builder_flow through bounded fakes only at external boundaries
+            # (provider, gates, reviewer).  Materialization/candidate selection is
+            # never stubbed.  Reaching a review worktree captures the exact durable
+            # candidate the caller selected.
+            _auto_name = "_h032_r122_product_autopilot_" + secrets.token_hex(6)
+            _auto_spec = importlib.util.spec_from_file_location(_auto_name, source)
+            _auto = importlib.util.module_from_spec(_auto_spec)
+            sys.modules[_auto_name] = _auto
+            _sys_path_added = False
+            if str(source.parents[1]) not in sys.path:
+                sys.path.insert(0, str(source.parents[1])); _sys_path_added = True
+            try:
+                _auto_spec.loader.exec_module(_auto)
+                _flow_root = r122 / "actual-builder-flow"
+                _flow_scratch = _flow_root / "scratch"
+                _flow_wt_root = _flow_root / "worktrees"
+                _flow_root.mkdir(); _flow_wt_root.mkdir()
+                subprocess.run(["/usr/bin/git", "clone", "-q", str(r122_base), str(_flow_scratch)],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                _flow_inject = _flow_scratch / "controller/result/late-injection.py"
+                _flow_divergent = _flow_scratch / "controller/result/materialize.py"
+                _flow_calls = {"n": 0}
+                _flow_candidate = {"sha": None}
+                _flow_gate_calls = {"n": 0}
+                _flow_provider_processes = []
+
+                class _R122Capture(Exception):
+                    pass
+
+                def _flow_run_gate(repo_arg, task_arg):
+                    _flow_gate_calls["n"] += 1
+                    return _auto.Cmd(1 if _flow_gate_calls["n"] == 1 else 0,
+                                     "R122 synthetic external gate result")
+
+                def _flow_agent_success(*_args, **_kwargs):
+                    _flow_divergent.write_text("# SCRATCH MUST NOT WIN\n", encoding="utf-8")
+                    escape_source = (
+                        "import os,time\n"
+                        "if os.fork()==0:\n"
+                        "    if os.fork()!=0: os._exit(0)\n"
+                        "    os.setsid();os.close(0);os.close(1);os.close(2);time.sleep(0.6)\n"
+                        f"    open({str(_flow_inject)!r},'w').write('LATE=1\\n');os._exit(0)\n"
+                        "os.wait();os._exit(0)\n")
+                    leader = subprocess.Popen([sys.executable, "-c", escape_source],
+                                              start_new_session=True)
+                    leader.wait()
+                    return _auto.AgentRun(
+                        {"role": "BUILDER", "outcome": "READY",
+                         "owner_decision_required": False, "blocking_findings": [],
+                         "candidate_delta": r122_delta(r122_ok_patch)},
+                        None, r122 / "events-success", r122_result_file)
+
+                def _flow_capture(_repo, _wt_root, _dirname, ref):
+                    _flow_candidate["sha"] = ref
+                    raise _R122Capture()
+
+                def _flow_stage_forbidden(*_args, **_kwargs):
+                    raise AssertionError("live scratch stage_and_commit used")
+
+                _auto.origin_main = lambda _repo: r122_base_sha
+                _auto.ensure_worktree = lambda *_args, **_kwargs: _flow_scratch
+                _auto.clean = lambda _repo: True
+                _auto.sha = lambda _repo: r122_base_sha
+                _auto.capture_green_gates = lambda _repo: {}
+                _auto.run_gate = _flow_run_gate
+                _auto.run_codex_resolving_architecture = _flow_agent_success
+                _auto.assert_builder_scope = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                    AssertionError("live scratch scope used"))
+                _auto.stage_and_commit = _flow_stage_forbidden
+                _auto.detached_worktree = _flow_capture
+                _auto.journal = lambda *_args, **_kwargs: None
+
+                def _profile(frame, event, arg):
+                    if (event == "call" and frame.f_code.co_name == "materialize"
+                            and Path(frame.f_code.co_filename).name == "materialize.py"):
+                        _flow_calls["n"] += 1
+                    return _profile
+
+                _refs_success_before = r122_closed_git(
+                    r122_base_git, "show-ref", check=False).stdout
+                sys.setprofile(_profile)
+                try:
+                    try:
+                        _auto.builder_flow(r122_base, _flow_wt_root, "h-032", "r122", "r122",
+                                           "r122 candidate")
+                    except _R122Capture:
+                        pass
+                finally:
+                    sys.setprofile(None)
+                for _wait in range(30):
+                    if _flow_inject.exists():
+                        break
+                    time.sleep(0.1)
+                _captured = _flow_candidate["sha"]
+                _captured_tree = (r122_closed_git(
+                    r122_base_git, "rev-parse", "--verify", f"{_captured}^{{tree}}",
+                    check=False).stdout.decode().strip() if isinstance(_captured, str) else "")
+                _actual_success = (
+                    _flow_calls["n"] == 1 and isinstance(_captured, str)
+                    and _captured_tree == _t1 and _flow_inject.exists()
+                    and r122_closed_git(r122_base_git, "show-ref", check=False).stdout
+                        == _refs_success_before)
+
+                # Same actual builder_flow, now with a provider failure before any
+                # accepted report.  It must propagate with zero materializer calls,
+                # zero candidate selection, no ref update and no protected residue.
+                _flow_calls["n"] = 0; _flow_candidate["sha"] = None
+                _flow_gate_calls["n"] = 0
+                def _flow_agent_nonzero(*_args, **_kwargs):
+                    raise _auto.Stop("R122 provider nonzero")
+                _auto.run_codex_resolving_architecture = _flow_agent_nonzero
+                _refs_nonzero_before = r122_closed_git(
+                    r122_base_git, "show-ref", check=False).stdout
+                sys.setprofile(_profile)
+                try:
+                    try:
+                        _auto.builder_flow(r122_base, _flow_wt_root, "h-032", "r122", "r122",
+                                           "r122 candidate")
+                    except _auto.Stop:
+                        pass
+                finally:
+                    sys.setprofile(None)
+                _actual_nonzero = (
+                    _flow_calls["n"] == 0 and _flow_candidate["sha"] is None
+                    and r122_closed_git(r122_base_git, "show-ref", check=False).stdout
+                        == _refs_nonzero_before and not any(r122_prot.iterdir()))
+            finally:
+                sys.modules.pop(_auto_name, None)
+                if _sys_path_added:
+                    sys.path.remove(str(source.parents[1]))
+
+            materialization_boundary_ok = (
+                _product_direct_positive and _product_negatives
+                and _actual_success and _actual_nonzero)
+            r122_boundary_detail = (
+                f"direct={_product_direct_positive} negatives={_product_negatives} "
+                f"actual_success={_actual_success} actual_nonzero={_actual_nonzero} "
+                f"calls={_flow_calls['n']} candidate={_flow_candidate['sha']}")
+        except Exception as _pexc:
+            materialization_boundary_ok = False
+            r122_boundary_detail = f"product kernel present but failed: {_pexc}"
+    check("K_CANDIDATE_MATERIALIZATION_BOUNDARY", materialization_boundary_ok, r122_boundary_detail)
+    # ==================== END R122 ====================
+
+
     # Judge self-controls: one defect per disposable effect mutant. These do
     # not replace the real subject checks above; they prove the oracles have
     # opposite outcomes for the shallow unsafe construction.
@@ -10348,6 +10937,8 @@ class CraftedConcretePath(type(Path())):
         print("CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
     elif material_failed == {"K_CODE_MODE_HOST_IDENTITY_BOUNDARY"}:
         print("CURRENT_RED_REASON=CODE_MODE_HOST_IDENTITY_BOUNDARY_ABSENT")
+    elif material_failed == {"K_CANDIDATE_MATERIALIZATION_BOUNDARY"}:
+        print("CURRENT_RED_REASON=CANDIDATE_MATERIALIZATION_BOUNDARY_ABSENT")
     elif material_failed:
         print("CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:" + ",".join(sorted(material_failed)))
     if g20_odom or h033_odom or confinement_odom or confinement04_odom or owner_live_skip_expected:

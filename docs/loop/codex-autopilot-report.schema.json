@@ -152,6 +152,39 @@
         "string",
         "null"
       ]
+    },
+    "candidate_delta": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "git-diff-binary-v1"
+          ]
+        },
+        "base_commit": {
+          "type": "string"
+        },
+        "patch_b64": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "format",
+        "base_commit",
+        "patch_b64"
+      ]
     }
   },
   "required": [
@@ -169,7 +202,8 @@
     "owner_decision_required",
     "stop_reason",
     "next_action",
-    "next_task_id"
+    "next_task_id",
+    "candidate_delta"
   ],
   "additionalProperties": false
 }
