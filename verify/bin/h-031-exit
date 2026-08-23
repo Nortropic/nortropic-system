@@ -794,6 +794,7 @@ def complete_route_report(role: str) -> dict:
         "stop_reason": "",
         "next_action": None,
         "next_task_id": None,
+        "candidate_delta": None,
     }
 
 
@@ -1840,7 +1841,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "4b32a8be95849cf8fd75e4362fc5826f43f6c05851cc4ac21099d2381ada9865")
+                       == "0ce7b6c3dd2585d7b3548fee1492c00a5c5f2d263c0562bbe58e30d100fb1818")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -2929,10 +2930,11 @@ subprocess = object()
 import hashlib,json,os,pathlib,re,sys
 self_path=pathlib.Path(sys.argv[0]); argv=sys.argv[1:]
 record={'argv0':str(self_path),'sha256':hashlib.sha256(self_path.read_bytes()).hexdigest(),'argv':argv,'codex_home':os.environ.get('CODEX_HOME')}
-with pathlib.Path(os.environ['H031_CAPTURE']).open('a',encoding='utf-8') as handle: handle.write(json.dumps(record,sort_keys=True)+'\\n')
 joined=' '.join(argv); match=re.search(r'H031_GATE_ROLE=([A-Z_]+)',joined); role=match.group(1) if match else 'OVERIFIERAT'
-report={'role':role,'outcome':'READY','summary':'H031 route fixture completed','changed_files':[],'blocking_findings':[],'tests':[],'allowed_write_violation':False,'frozen_artifacts_modified':False,'production_files_modified':False,'frozen_gate_ready':True,'baseline_red_for_right_reason':False,'owner_decision_required':False,'stop_reason':'','next_action':None,'next_task_id':None}
-if 'H031_GATE_PARTIAL_REPORT' in joined: report={'role':role,'outcome':'READY','owner_decision_required':False,'blocking_findings':[]}
+report={'role':role,'outcome':'READY','summary':'H031 route fixture completed','changed_files':[],'blocking_findings':[],'tests':[],'allowed_write_violation':False,'frozen_artifacts_modified':False,'production_files_modified':False,'frozen_gate_ready':True,'baseline_red_for_right_reason':False,'owner_decision_required':False,'stop_reason':'','next_action':None,'next_task_id':None,'candidate_delta':None}
+if 'H031_GATE_PARTIAL_REPORT' in joined: del report['candidate_delta']
+record['report']=report
+with pathlib.Path(os.environ['H031_CAPTURE']).open('a',encoding='utf-8') as handle: handle.write(json.dumps(record,sort_keys=True)+'\\n')
 out=pathlib.Path(argv[argv.index('-o')+1]); out.write_text(json.dumps(report,separators=(',',':')))
 print(json.dumps({'type':'thread.started','thread_id':'h031-'+role.lower()}))
 """, encoding="utf-8")
@@ -3035,8 +3037,12 @@ print(json.dumps({'type':'thread.started','thread_id':'h031-'+role.lower()}))
                     and set(accepted) == {"schema_version", "invocation_id", "run_id", "role",
                                          "result_sha256", "report"}
                     and accepted.get("role") == role
+                    and "candidate_delta" in accepted.get("report", {})
+                    and accepted["report"]["candidate_delta"] is None
                     and accepted.get("report") == complete_route_report(role)
                     for accepted, role in zip(accepted_reports, EXPECTED))
+            and all(record.get("report") == complete_route_report(role)
+                    for record, role in zip(captures, EXPECTED))
         )
         routes_ok = (not errors and accepted_reports_ok and len(captures) == len(EXPECTED)
                      and all(route_ok(record["argv"], EXPECTED[role])
@@ -3086,9 +3092,12 @@ print(json.dumps({'type':'thread.started','thread_id':'h031-'+role.lower()}))
             for name in partial_new_runs
             for path in (module.journal_root(repo) / "runs" / name).rglob("result.json")
         ]
+        partial_expected = complete_route_report("ARCHITECT")
+        del partial_expected["candidate_delta"]
         partial_ok = (
             partial_error is not None
             and len(partial_captures) == partial_capture_before + 1
+            and partial_captures[-1].get("report") == partial_expected
             and len(partial_new_runs) == 1
             and not partial_residue
         )

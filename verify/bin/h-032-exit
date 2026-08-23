@@ -1190,6 +1190,9 @@ args=sys.argv[1:]; out=pathlib.Path(args[args.index('-o')+1])
 mode=os.environ.get('H032_RESULT_MODE','valid')
 hostile_error='NOT_ATTEMPTED'
 live_attacks={}
+same_group_child_pid=None
+same_group_child_pgid=None
+provider_pgid=None
 if mode == 'hostile':
     safe_root=pathlib.Path(os.environ['H032_SAFE_ATTACK_ROOT']).resolve()
     cwd_resolved=pathlib.Path.cwd().resolve()
@@ -1251,11 +1254,11 @@ def gate_pause(sequence):
 if mode == 'fork_descendant':
     marker=out.parent/'late-descendant-residue'
     subprocess.Popen([sys.executable,'-c','import pathlib,sys,time; time.sleep(.5); p=pathlib.Path(sys.argv[1]); p.parent.mkdir(parents=True,exist_ok=True); p.write_text("late")',str(marker)])
-if mode == 'same_group_closed_stdio':
-    # R116 success-path quiescence (E167-REV-03): a descendant in the SAME
+if mode in {'same_group_closed_stdio','same_group_closed_stdio_nonzero','same_group_closed_stdio_signal'}:
+    # R116/R126 terminal-path quiescence: a descendant in the SAME
     # process group (no setsid), with CLOSED stdio so no inherited pipe keeps the
-    # launcher blocked, that outlives the provider's NORMAL exit.  Only a launcher
-    # that killpg's the group on SUCCESS (not just on timeout) leaves it dead.
+    # launcher blocked, that outlives the provider's exit. Only a launcher that
+    # killpg's the group on SUCCESS and NONZERO (not just timeout) leaves it dead.
     marker=out.parent/'late-descendant-residue'
     child=os.fork()
     if child == 0:
@@ -1269,6 +1272,9 @@ if mode == 'same_group_closed_stdio':
             marker.parent.mkdir(parents=True,exist_ok=True); marker.write_text('late')
         except OSError: pass
         os._exit(0)
+    same_group_child_pid=child
+    same_group_child_pgid=os.getpgid(child)
+    provider_pgid=os.getpgrp()
     time.sleep(0.5)
 if mode == 'timeout':
     import time; time.sleep(3)
@@ -1320,6 +1326,8 @@ pathlib.Path(os.environ['H032_CAPTURE']).write_text(json.dumps({
                     'size':output_stat.st_size,'mode':output_stat.st_mode & 0o777,
                     'digest':output_digest} if output_stat else None,
  'mode':mode,'hostile_error':hostile_error,'live_attacks':live_attacks,
+ 'same_group_child_pid':same_group_child_pid,
+ 'same_group_child_pgid':same_group_child_pgid,'provider_pgid':provider_pgid,
  'git_control_env':sorted(key for key in os.environ if key.startswith('GIT_')),
  'complete_environment':dict(os.environ)
      if os.environ.get('H032_CAPTURE_COMPLETE_ENV') == '1' else None,
@@ -1332,6 +1340,8 @@ if mode == 'wrong_thread': thread='foreign-thread'
 if mode != 'missing_thread': print(json.dumps({'type':'thread.started','thread_id':thread}))
 if mode == 'multiple_thread': print(json.dumps({'type':'thread.started','thread_id':'second-thread'}))
 if mode == 'output_then_fail': sys.exit(17)
+if mode == 'same_group_closed_stdio_nonzero': sys.exit(7)
+if mode == 'same_group_closed_stdio_signal': os.kill(os.getpid(),signal.SIGTERM)
 """, encoding="utf-8")
     provider.chmod(0o700)
     good_bytes = provider.read_bytes(); good_hash = hashlib.sha256(good_bytes).hexdigest()
@@ -3718,57 +3728,103 @@ def run_codex(sink, canonical, invocation, run, role):
     # reused PGID sample.  The current launcher killpg's only on timeout, so on a
     # normal success the descendant survives (RED); a launcher that killpg's the
     # group on SUCCESS leaves it dead (GREEN).
-    sg_stop = threading.Event(); sg_threads: list[threading.Thread] = []
-    sg_identities: set[tuple[int, int, str]] = set()
-    sg_original_popen = module.subprocess.Popen
-    def sg_monitor(root_pid: int):
-        while not sg_stop.is_set():
-            rows = process_table(); family = {root_pid}; changed = True
-            while changed:
-                changed = False
-                for pid, (ppid, started) in rows.items():
-                    if ppid in family and pid not in family:
-                        family.add(pid); changed = True
-            for pid in family:
-                if pid in rows: sg_identities.add((pid, rows[pid][0], rows[pid][1]))
-            time.sleep(0.01)
-    def sg_popen(argv, *args, **kwargs):
-        process = sg_original_popen(argv, *args, **kwargs)
-        if "-o" in list(argv):
-            rows = process_table()
-            if process.pid in rows:
-                sg_identities.add((process.pid, rows[process.pid][0], rows[process.pid][1]))
-            thread = threading.Thread(target=sg_monitor, args=(process.pid,), daemon=True)
-            sg_threads.append(thread); thread.start()
-        return process
-    module.subprocess.Popen = sg_popen
-    try:
-        sg_case = result_case("same_group_closed_stdio")
-    finally:
-        module.subprocess.Popen = sg_original_popen
-        sg_stop.set()
-        for thread in sg_threads: thread.join(timeout=1)
-        launch_mode[0] = "valid"
-    time.sleep(3.0)
-    sg_rows_after = process_table()
-    sg_remaining = [ident for ident in sg_identities
-                    if ident[0] in sg_rows_after and sg_rows_after[ident[0]][1] == ident[2]]
-    sg_paths = sg_case[1].get("_gate_output_paths", [])
-    sg_root = Path(sg_paths[-1]).parent if sg_paths else work
-    # The provider run must have SUCCEEDED (the killpg-on-success path); the full
-    # launched family (launcher, provider, and the same-group descendant) must
-    # have been observed while linked (no unbound/empty credit); and no recorded
-    # identity may remain alive, with no staging residue surviving.
+    def same_group_closed_stdio_case(mode: str):
+        stop = threading.Event(); threads: list[threading.Thread] = []
+        identities: set[tuple[int, int, str]] = set()
+        original = module.subprocess.Popen
+        def monitor(root_pid: int):
+            while not stop.is_set():
+                rows = process_table(); family = {root_pid}; changed = True
+                while changed:
+                    changed = False
+                    for pid, (ppid, started) in rows.items():
+                        if ppid in family and pid not in family:
+                            family.add(pid); changed = True
+                for pid in family:
+                    if pid in rows:
+                        identities.add((pid, rows[pid][0], rows[pid][1]))
+                time.sleep(0.01)
+        def observed_popen(argv, *args, **kwargs):
+            process = original(argv, *args, **kwargs)
+            if "-o" in list(argv):
+                rows = process_table()
+                if process.pid in rows:
+                    identities.add((process.pid, rows[process.pid][0], rows[process.pid][1]))
+                thread = threading.Thread(target=monitor, args=(process.pid,), daemon=True)
+                threads.append(thread); thread.start()
+            return process
+        module.subprocess.Popen = observed_popen
+        try:
+            case = result_case(mode)
+        finally:
+            module.subprocess.Popen = original
+            stop.set()
+            for thread in threads:
+                thread.join(timeout=1)
+            launch_mode[0] = "valid"
+        time.sleep(3.0)
+        rows_after = process_table()
+        remaining = [ident for ident in identities
+                     if ident[0] in rows_after and rows_after[ident[0]][1] == ident[2]]
+        paths = case[1].get("_gate_output_paths", [])
+        root_path = Path(paths[-1]).parent if paths else work
+        child_binding = (
+            case[1].get("same_group_child_pid"),
+            case[1].get("same_group_child_pgid"),
+            case[1].get("provider_pgid"))
+        # A failed verdict never earns cleanup credit. Remove only the exact
+        # pid+lstart identities emitted by this disposable fixture afterward.
+        for pid, _ppid, started in remaining:
+            current = process_table().get(pid)
+            if current and current[1] == started:
+                try: os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError: pass
+        return case, identities, remaining, root_path, child_binding
+
+    sg_case, sg_identities, sg_remaining, sg_root, sg_child_binding = \
+        same_group_closed_stdio_case("same_group_closed_stdio")
+    (nonzero_sg_case, nonzero_sg_identities, nonzero_sg_remaining,
+     nonzero_sg_root, nonzero_sg_child_binding) = \
+        same_group_closed_stdio_case("same_group_closed_stdio_nonzero")
+    (signal_sg_case, signal_sg_identities, signal_sg_remaining,
+     signal_sg_root, signal_sg_child_binding) = \
+        same_group_closed_stdio_case("same_group_closed_stdio_signal")
+    def same_group_child_observed(binding, identities):
+        child_pid, child_pgid, provider_pgid = binding
+        return (type(child_pid) is int and child_pid > 0
+            and type(child_pgid) is int and child_pgid > 0
+            and type(provider_pgid) is int and provider_pgid > 0
+            and child_pgid == provider_pgid
+            and any(identity[0] == child_pid for identity in identities))
+    # Success and the two independent provider-failure cases differ only in the
+    # provider's terminal status. All three must observe the linked
+    # launcher/provider/child family, prove every exact pid+lstart identity gone,
+    # and finish without staging residue. Each provider failure additionally
+    # must keep canonical absent and satisfy the same complete rejected-clean
+    # predicate as every negative.
     success_quiescent_ok = (
         sg_case[0][0]
-        and len(sg_identities) >= 2
+        and same_group_child_observed(sg_child_binding, sg_identities)
         and not sg_remaining
         and not sg_root.exists())
-    for pid, _ppid, started in sg_remaining:
-        current = process_table().get(pid)
-        if current and current[1] == started:
-            try: os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError: pass
+    def failed_same_group_quiescent(case, expected_mode, identities,
+                                    remaining, root_path, child_binding):
+        return (not case[0][0]
+            and case[0][1].startswith(
+                "Stop:Codex role TEST_AUTHOR failed rc=4;")
+            and case[1].get("mode") == expected_mode
+            and rejected_clean(case)
+            and same_group_child_observed(child_binding, identities)
+            and not remaining
+            and not root_path.exists())
+    nonzero_quiescent_ok = failed_same_group_quiescent(
+        nonzero_sg_case, "same_group_closed_stdio_nonzero",
+        nonzero_sg_identities, nonzero_sg_remaining, nonzero_sg_root,
+        nonzero_sg_child_binding)
+    signal_quiescent_ok = failed_same_group_quiescent(
+        signal_sg_case, "same_group_closed_stdio_signal",
+        signal_sg_identities, signal_sg_remaining, signal_sg_root,
+        signal_sg_child_binding)
 
     def object_attack(kind: str):
         attack_repo = make_repo(str(provider))
@@ -7454,7 +7510,7 @@ def run_codex(sink, canonical, invocation, run, role):
         "controller/result/materialize.py": "controller.result.materialize"}
         if _r125_uses_result_materialize
         else {"controller/authority/core.py": "core"})
-    r12_runner.write_text("import argparse,datetime,fcntl,fnmatch,hashlib,importlib.util,json,os,pathlib,re,shutil,stat,subprocess,sys,tempfile,time,types,typing,unicodedata,dataclasses\n"
+    r12_runner.write_text("import __future__,argparse,base64,datetime,fcntl,fnmatch,hashlib,importlib.util,json,os,pathlib,re,shutil,stat,subprocess,sys,tempfile,time,types,typing,unicodedata,dataclasses\n"
 "source,repo,wt=map(pathlib.Path,sys.argv[1:4])\n"
 f"expected_digest={_r125_controller_digest!r}\n"
 f"expected_dependencies={_r125_r12_dependency_digests!r}\n"
@@ -7552,6 +7608,141 @@ f"dependency_names={_r125_r12_dependency_names!r}\n"
 " print('R12_OUTCOME=ADMITTED',flush=True)\n"
 "except Exception as exc:\n"
 " print('R12_OUTCOME=REJECTED:'+type(exc).__name__+':'+str(exc),flush=True)\n", encoding="utf-8")
+    # R126: R12 is a fresh ``-I -S`` interpreter, so its finite judge-owned
+    # prewarm must include every stdlib module imported while the dependency
+    # definition ticket is armed.  In particular, core executes
+    # ``from __future__ import annotations`` and the admitted materializer
+    # imports base64.  Loader reads remain narrowly limited to the exact local
+    # dependency files; admitting arbitrary import-loader reads would hide an
+    # unprewarmed candidate-triggered import.
+    _R126_R12_PREWARM = (
+        "__future__", "argparse", "base64", "datetime", "fcntl", "fnmatch",
+        "hashlib", "importlib.util", "json", "os", "pathlib", "re", "shutil",
+        "stat", "subprocess", "sys", "tempfile", "time", "types", "typing",
+        "unicodedata", "dataclasses")
+    _R126_R12_LOADER_SOURCE = (
+        "def loader_read(event,args):\n"
+        " if event not in {'open','os.listdir'} or not args or type(args[0]) not in {str,bytes}: return False\n"
+        " try:\n"
+        "  path=args[0].decode('utf-8') if type(args[0]) is bytes else args[0]\n"
+        " except UnicodeDecodeError: return False\n"
+        " frame=sys._getframe(1)\n"
+        " while frame is not None:\n"
+        "  if frame.f_code.co_filename in definition['subject_files']: return False\n"
+        "  if frame.f_code.co_filename=='<frozen importlib._bootstrap_external>': break\n"
+        "  frame=frame.f_back\n"
+        " if frame is None: return False\n"
+        " if event=='open': return len(args)>=3 and ((type(args[1]) is str and args[1]=='r') or args[1] is None) and type(args[2]) is int and args[2]==os.O_CLOEXEC and path in definition['loader_files']\n"
+        " return path in definition['loader_dirs']\n")
+    _r126_broad_loader_source = (
+        "def loader_read(event,args):\n"
+        " return event in {'open','os.listdir'}\n")
+    _r126_r12_source = r12_runner.read_text(encoding="utf-8")
+    def _r126_r12_source_ok(text):
+        try:
+            tree = ast.parse(text)
+            first = tree.body[0]
+            loaders = [node for node in tree.body
+                       if isinstance(node, ast.FunctionDef)
+                       and node.name == "loader_read"]
+            audit_hooks = [index for index, node in enumerate(tree.body)
+                if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Attribute)
+                and isinstance(node.value.func.value, ast.Name)
+                and node.value.func.value.id == "sys"
+                and node.value.func.attr == "addaudithook"
+                and len(node.value.args) == 1
+                and isinstance(node.value.args[0], ast.Name)
+                and node.value.args[0].id == "definition_audit"]
+            expected_loader = ast.parse(_R126_R12_LOADER_SOURCE).body[0]
+        except (SyntaxError, ValueError, TypeError, IndexError):
+            return False
+        return (isinstance(first, ast.Import)
+            and tuple(alias.name for alias in first.names) == _R126_R12_PREWARM
+            and all(alias.asname is None for alias in first.names)
+            and len(audit_hooks) == 1
+            and [node for node in tree.body[:audit_hooks[0]]
+                 if isinstance(node, (ast.Import, ast.ImportFrom))] == [first]
+            and len(loaders) == 1
+            and ast.dump(loaders[0], include_attributes=False)
+                == ast.dump(expected_loader, include_attributes=False))
+    _r126_missing_future_source = _r126_r12_source.replace(
+        "import __future__,", "import ", 1)
+    _r126_missing_base64_source = _r126_r12_source.replace(
+        ",base64,", ",", 1)
+    _r126_broad_loader_mutant = _r126_r12_source.replace(
+        _R126_R12_LOADER_SOURCE, _r126_broad_loader_source, 1)
+    _r126_r12_source_controls = (
+        _r126_r12_source.count(_R126_R12_LOADER_SOURCE) == 1
+        and _r126_r12_source_ok(_r126_r12_source)
+        and not _r126_r12_source_ok(_r126_missing_future_source)
+        and not _r126_r12_source_ok(_r126_missing_base64_source)
+        and not _r126_r12_source_ok(_r126_broad_loader_mutant))
+
+    # Causal judge controls run in separate fresh system interpreters.  Each
+    # missing-module case differs from the positive by one prewarm omission.
+    # The broad-loader alternative demonstrates why swallowing unprewarmed
+    # loader effects is unsafe, but the exact source predicate above rejects it.
+    _r126_base64_dependency = work / "r126-base64-dependency.py"
+    _r126_base64_dependency.write_text("import base64\n", encoding="utf-8")
+    def _r126_prewarm_case(omitted=(), *, broad_loader=False):
+        modules = tuple(name for name in _R126_R12_PREWARM if name not in omitted)
+        loader_source = (_r126_broad_loader_source if broad_loader
+                         else _R126_R12_LOADER_SOURCE)
+        probe = work / ("r126-prewarm-" + "-".join(omitted or ("exact",))
+                        + ("-broad" if broad_loader else "") + ".py")
+        probe.write_text(
+            "import " + ",".join(modules) + "\n"
+            "core_path=pathlib.Path(sys.argv[1]);base64_path=pathlib.Path(sys.argv[2])\n"
+            "sources=(('core',core_path,core_path.read_text(encoding='utf-8')),('base64',base64_path,base64_path.read_text(encoding='utf-8')))\n"
+            "class DefinitionEffect(RuntimeError): pass\n"
+            "definition={'active':False,'events':[],'loader':[],'subject_files':tuple(str(item[1]) for item in sources),'loader_files':tuple(str(item[1]) for item in sources),'loader_dirs':tuple(sorted({str(item[1].parent) for item in sources}|{str(item[1].parent.parent) for item in sources}))}\n"
+            "selected={'open','os.chmod','os.mkdir','os.remove','os.rmdir','os.rename','os.replace','os.link','os.symlink','os.listdir','os.scandir','os.putenv','os.unsetenv','subprocess.Popen','os.system','os.posix_spawn','os.fork','os.forkpty','pty.spawn'}\n"
+            + loader_source +
+            "def definition_audit(event,args):\n"
+            " if definition['active'] and (event in selected or event.startswith('os.exec') or event.startswith('os.spawn')):\n"
+            "  if loader_read(event,args): definition['loader'].append(event);return\n"
+            "  definition['events'].append(event);raise DefinitionEffect(event)\n"
+            "sys.addaudithook(definition_audit)\n"
+            "for name,path,text in sources:\n"
+            " module=types.ModuleType('r126_'+name);definition['active']=True\n"
+            " try: exec(compile(text,str(path),'exec'),module.__dict__)\n"
+            " except DefinitionEffect as exc:\n"
+            "  print('R126_DEPENDENCY_EFFECT='+name+':'+str(exc),flush=True);raise SystemExit(61 if name=='core' else 62)\n"
+            " finally: definition['active']=False\n"
+            "print('R126_EFFECT_COUNTS=%d:%d'%(len(definition['events']),len(definition['loader'])),flush=True)\n"
+            "print('R126_POPEN_TYPE='+subprocess.Popen.__module__+'.'+subprocess.Popen.__qualname__,flush=True)\n"
+            "proc=subprocess.Popen(['/usr/bin/true'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);raise SystemExit(proc.wait())\n",
+            encoding="utf-8")
+        process = system_popen(
+            ["/usr/bin/python3", "-I", "-S", "-u", str(probe),
+             str(_r125_core_path), str(_r126_base64_dependency)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        try:
+            stdout, _ = process.communicate(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill(); stdout, _ = process.communicate()
+            return 124, stdout
+        return process.returncode, stdout
+    _r126_prewarm_positive = _r126_prewarm_case()
+    _r126_missing_future = _r126_prewarm_case(("__future__",))
+    _r126_missing_base64 = _r126_prewarm_case(("base64",))
+    _r126_broad_unprewarmed = _r126_prewarm_case(
+        ("__future__", "base64"), broad_loader=True)
+    _r126_r12_prewarm_controls_ok = (
+        _r126_r12_source_controls
+        and _r126_prewarm_positive == (
+            0, "R126_EFFECT_COUNTS=0:0\nR126_POPEN_TYPE=subprocess.Popen\n")
+        and _r126_missing_future[0] == 61
+        and "R126_DEPENDENCY_EFFECT=core:open" in _r126_missing_future[1]
+        and "R126_POPEN_TYPE=" not in _r126_missing_future[1]
+        and _r126_missing_base64[0] == 62
+        and "R126_DEPENDENCY_EFFECT=base64:open" in _r126_missing_base64[1]
+        and "R126_POPEN_TYPE=" not in _r126_missing_base64[1]
+        and _r126_broad_unprewarmed[0] == 0
+        and "R126_POPEN_TYPE=subprocess.Popen" in _r126_broad_unprewarmed[1]
+        and re.search(r"R126_EFFECT_COUNTS=0:[1-9][0-9]*",
+                      _r126_broad_unprewarmed[1]) is not None)
     def r12_provider(case: str) -> Path:
         directory = work / f"r12-provider-{case}-{len(list(work.glob('r12-provider-*')))}"; directory.mkdir()
         host = directory / "codex-code-mode-host"
@@ -9335,7 +9526,8 @@ class CraftedConcretePath(type(Path())):
         selector.close()
         return bounded,outcome,sink is not None,stable_absent
     r12_real_boundary_ok = (
-        r12_once[0] == "ADMITTED" and r12_once[1] == "subprocess.Popen"
+        _r126_r12_prewarm_controls_ok
+        and r12_once[0] == "ADMITTED" and r12_once[1] == "subprocess.Popen"
         and len(r12_once[2]) == 1 and r12_once[2][0][13]
         and r12_once[2][0][:6] == r12_once[2][0][6:12] and r12_once[3]
         and r12_once[4] is not None and r12_once[4][7]
@@ -9426,7 +9618,8 @@ class CraftedConcretePath(type(Path())):
         and moved_parent_residue_ok
         and setup_spawn_faults_ok
         and journal_faults_ok and preexisting_journal_positive
-        and interruption_quiescent and tracked_quiescent and success_quiescent_ok
+        and interruption_quiescent and tracked_quiescent
+        and success_quiescent_ok and nonzero_quiescent_ok and signal_quiescent_ok
         and valid_output.is_absolute()
         and valid_output != valid_canonical
         and repo not in valid_output.parents and valid_repo not in valid_output.parents
@@ -9700,7 +9893,7 @@ class CraftedConcretePath(type(Path())):
     def cleanup_detail(case):
         return (case[:4], case[4], len(case[5]), case[6], len(case[7]))
     check("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY", result_delivery_ok,
-          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} concurrent={concurrent_canonical_ok,concurrent_selfcontrols_ok,concurrent_product_case.get('accepted') if isinstance(concurrent_product_case,dict) else None,concurrent_product_case.get('concurrent_canonical') if isinstance(concurrent_product_case,dict) else None} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup), cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} substitution={cleanup_detail(staging_cross_parent_move), staging_cross_parent_move[15], cleanup_detail(staging_root_symlink), staging_root_symlink[15], staging_substitution_ok} r105_cleanup={(rollback_fault_controls_ok,rollback_identity_controls_ok,[(len(case[8]),len(case[9]),len(case[10]),case[11]) for case in (rollback_path_persistent,rollback_os_unlink_persistent,rollback_os_remove_persistent,rollback_first_failure,rollback_final_retry)],[(case[12],case[13],case[10]) for case in (rollback_symlink_replacement,rollback_hardlink_replacement)])} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
+          f"kernel_structure={kernel_structure_ok,kernel_structure_detail} integration={kernel_integration_structure_ok,kernel_integration_structure_detail,integration_dynamic_ok,integration_calls} direct={kernel_direct_ok,kernel_direct_detail} fresh={product_fresh_ok,product_fresh_cases} concurrent={concurrent_canonical_ok,concurrent_selfcontrols_ok,concurrent_product_case.get('accepted') if isinstance(concurrent_product_case,dict) else None,concurrent_product_case.get('concurrent_canonical') if isinstance(concurrent_product_case,dict) else None} r12_real={r12_once,r12_two,r12_promote,r12_real_boundary_ok} r126_prewarm={_r126_r12_source_controls,_r126_prewarm_positive,_r126_missing_future,_r126_missing_base64,_r126_broad_unprewarmed} r126_nonzero_quiescence={(nonzero_quiescent_ok,nonzero_sg_child_binding,len(nonzero_sg_identities),nonzero_sg_remaining,nonzero_sg_root.exists(),nonzero_sg_case[0])} r126_signal_quiescence={(signal_quiescent_ok,signal_sg_child_binding,len(signal_sg_identities),signal_sg_remaining,signal_sg_root.exists(),signal_sg_case[0])} valid_output={valid_output} canonical={valid_canonical} schema={valid_schema} staging={staging, staging_ok} causal_effects={effect_once, effect_once_ok, effect_two_values, effect_two_values_observed, effect_two_promotions, effect_two_promotions_caught, effect_sink_mutation, effect_sink_swap, effect_sink_attacks_caught} reader_variants={reader_variants, reader_variants_ok} stale={stale_case, stale_rejects} replay={replay_case, replay_rejects} external_replay={external_replay_case, external_replay_ok} atomic={atomic_box, len(partial_visible), atomic_ok} timeout={timeout_case, timeout_ok} cleanup={cleanup_detail(transient_cleanup), cleanup_detail(persistent_cleanup), cleanup_detail(repeated_publication_cleanup),cleanup_detail(hardlink_publication_cleanup), cleanup_detail(stale_canonical_cleanup), cleanup_rig_ok, cleanup_error_ok} substitution={cleanup_detail(staging_cross_parent_move), staging_cross_parent_move[15], cleanup_detail(staging_root_symlink), staging_root_symlink[15], staging_substitution_ok} r105_cleanup={(rollback_fault_controls_ok,rollback_identity_controls_ok,[(len(case[8]),len(case[9]),len(case[10]),case[11]) for case in (rollback_path_persistent,rollback_os_unlink_persistent,rollback_os_remove_persistent,rollback_first_failure,rollback_final_retry)],[(case[12],case[13],case[10]) for case in (rollback_symlink_replacement,rollback_hardlink_replacement)])} setup_spawn={r57_setup_effect_summary,r59_post_retained_effect_summary,setup_spawn_faults_ok,r59_variant_detail} journal_attempt={r58_journal_fault_summary,journal_faults_ok,preexisting_journal_positive} objects={object_attacks, object_attacks_ok} oversized_positive={oversized_positive[0]} physical={physical_case, physical_output, physical_canonical,physical_topology_ok} git_environment={physical_git_case,physical_git_start_delta,physical_git_capture.get('mode'),physical_git_capture.get('git_control_env'),environment_fingerprint(physical_git_capture.get('complete_environment')),environment_fingerprint(physical_git_expected_environment),physical_git_environment_relation,r72_dynamic_literals_absent,r72_variant_observations,physical_git_capture_bound,physical_git_canonical_valid,physical_git_records,physical_git_new_runs,product_git_snapshot_mutants,product_git_decoy_before==product_git_decoy_after,physical_git_environment_ok} negatives={negative_cases}")
     check("K1", family_absent or (valid[0] and valid[2] == 1), f"valid={valid}")
     check("K2", not shadow_marker.exists(), f"path_shadow_ran={shadow_marker.exists()}")
     check("K3", family_absent or (argv0.is_absolute() and argv0 != provider and cap.get("sha256") == good_hash),
