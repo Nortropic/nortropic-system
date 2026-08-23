@@ -2430,3 +2430,50 @@ current-RED reason as a legitimate pre-builder no-live state (helper bridge
 updated to match); H031 baseline remains 143 PASS / 2 FAIL for the sole upstream
 product gap. The subsequent builder round extends allowed_write exactly with
 controller/launch/cli. No live/provider execution is performed.
+
+## 2026-08-23 — R117 confined os.link product gate reconciliation
+
+The R116 builder round produced a correct confined os.link product (all five R116
+controls green) but revealed that R116 had frozen the new controls without
+reconciling five PRE-EXISTING controls with the confined os.link architecture
+those controls require — so the published gate was not satisfiable by its own
+intended product. R117 is a TEST_AUTHOR round (gates, task-spec and docs only, no
+product) that applies five minimal, effect-based reconciliations from the
+owner-verified reconciliation spec, each with a positive control and separate
+one-defect negatives, none removing a control or making it conditionally green.
+Each was validated on the host, un-nested, against the preserved builder overlay
+(read-only), the absent published product and e167fc0; no live provider/model call.
+
+1. Cleanup fault model (product_fresh/kernel_direct): a fault in the os.link
+   publish itself must reject with the canonical absent and no temp, while a
+   transient temp-unlink fault after a successful publish is judged by result —
+   an exactly-valid canonical and temp absent — via bounded retry. Temp residue,
+   a partial/invalid canonical or a leaked fd is never acceptable. A new
+   cleanup_link_publish_fault fixture faults the publish and must reject;
+   persistent os.link cleanup semantics are unchanged.
+2. r12 publish-transition observation: records exactly one os.link transition
+   only when the destination is exactly the canonical and the published
+   inode/digest are bound; zero, double or mis-bound transitions stay RED.
+3. Provider environment relation (J_R72/J_R73/physical_git): exactly the two
+   launcher-handoff variables NORTROPIC_STAGING_ROOT and NORTROPIC_RESULT_SINK
+   are excepted from the expected provider environment as launcher-consumed and
+   provider-absent; a leak of either into the provider env still fails
+   observed==expected, and every other environment guarantee is unchanged.
+4. tracked_quiescent: PASS requires every bound pid+lstart identity of the family
+   to be actually gone before the sample and the staging residue-free —
+   marker-absence or an observed killpg alone are insufficient. A confined +
+   killpg-on-success fork run may be admitted when it is left dead and clean;
+   interruption and timeout still reject cleanly; the lingering closed-stdio
+   descendant stays covered by success_quiescent.
+5. object_attacks parent_swap: the moved BOUND staging object and all private
+   content must be gone, while an empty, non-bound replacement directory is
+   PRESERVED (control 01: no blind deletion). Any file, non-empty or symlink
+   residue, remaining private content, guard damage or a blind-deleting finalizer
+   stays RED.
+
+Builder overlay: 146 PASS / 1 FAIL exit 2 (OWNER_LIVE_PHASE_NOT_RUN), all
+deterministic and confinement controls green. Published/e167fc0: 144/3 exit 1,
+RED for the intended R116 defects. H032 owner-skip stays 146/1 and green 147/0
+(no control count change); H031 rebinds only the exact final H032 gate digest and
+stays 143/2. The preserved builder product resumes against published R117 (its
+allowed_write extended with controller/launch/cli). No live/provider execution.
