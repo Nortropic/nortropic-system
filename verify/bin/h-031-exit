@@ -27,7 +27,7 @@ SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
 SPEC="$ROOT/specs/tasks.spec.json"
 H032_GATE="$ROOT/verify/bin/h-032-exit"
 OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
-OWNER_LIVE_HELPER_SHA256="9fdc5faae5a47ad79ab9057623060d1ebd909f48c46bebdf987ac5b5ab90528f"
+OWNER_LIVE_HELPER_SHA256="baf8fc93971ca2324eb7a2771592168834388f2d292df6a2b067fe653824b152"
 if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
   echo "ODÖMBART K0 — owner-live helper identity invalid"
   exit 2
@@ -154,6 +154,7 @@ RESULT_KERNEL_EXPECTED_IMPORT_INVENTORY = sorted([
     "F:0:controller.authority.core:permits:",
     "F:0:controller.authority.core:strict_json_bytes:",
     "F:0:controller.result.consumer:consume_private_result:",
+    "F:0:controller.result.materialize:materialize:",
 ])
 SENSITIVE_MODULE_PROXIES = {
     "os", "sys", "subprocess", "builtins", "ctypes", "importlib", "pty",
@@ -426,8 +427,8 @@ def odombart(key: str, detail: str) -> None:
     raise SystemExit(2)
 
 
-H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 146 PASS / 1 FAIL"
-H032_GREEN_SUMMARY = "SAMMANFATTNING 147 PASS / 0 FAIL"
+H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 151 PASS / 1 FAIL"
+H032_GREEN_SUMMARY = "SAMMANFATTNING 152 PASS / 0 FAIL"
 H032_GREEN_PASS_LABELS = frozenset("""
 J_R89_SPLIT_OWNER_CALL_RIG
 J_R93_PRODUCT_OWNED_LIFETIME
@@ -576,19 +577,27 @@ K_H033_FRESH_UPSTREAM_PROVENANCE
 J_AUTHORITATIVE_LIVE_GIT_UNCHANGED
 K_PROVIDER_STAGING_CONFINEMENT
 K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT
+J_MATERIALIZE_RIG
+K_LATE_SCRATCH_WRITE_HARMLESS_SUCCESS
+K_LATE_SCRATCH_WRITE_HARMLESS_NONZERO
+K_MATERIALIZATION_AREA_PROVIDER_DENIED
+K_CANDIDATE_MATERIALIZATION_BOUNDARY
 """.split())
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
-# R116: the current H032 dependency runs against an unconfined launcher, so its
-# provider-confinement effect-tests are legitimately RED alongside the absent
-# result boundary.  This is the exact expected pre-builder RED reason; a confined
-# launcher (builder round) flips these two checks to PASS.  The owner-live-skip
-# fixture is derived by flipping exactly these confinement FAILs to PASS.
-H032_CONFINEMENT_LABELS = ("K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT",
-                           "K_PROVIDER_STAGING_CONFINEMENT")
+# R122: the current H032 dependency has neither the confined launcher/result
+# kernel nor the protected-artifact materializer.  Exactly those three product
+# boundaries are legitimately RED alongside the result boundary.  The builder
+# flips all three to PASS; owner-live derivation therefore flips exactly this
+# frozen product-absent set and nothing else.
+H032_PRODUCT_ABSENT_LABELS = (
+    "K_CANDIDATE_MATERIALIZATION_BOUNDARY",
+    "K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT",
+    "K_PROVIDER_STAGING_CONFINEMENT",
+)
 H032_CONFINEMENT_RED_REASON = (
     "CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:"
-    + ",".join(sorted(H032_CONFINEMENT_LABELS
+    + ",".join(sorted(H032_PRODUCT_ABSENT_LABELS
                       + ("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY",))))
 H032_OWNER_LIVE_EXECUTION = "OWNER_LIVE_EXECUTION=SKIPPED"
 H032_OWNER_LIVE_START_DELTA = "OWNER_LIVE_START_DELTA=0"
@@ -643,13 +652,13 @@ def owner_skip_fixture_from_observed_h032(returncode: int, stdout: str) -> str:
             confinement_fail = sorted(
                 line[5:].split(" — ", 1)[0] for line in lines
                 if line.startswith("FAIL ")
-                and line[5:].split(" — ", 1)[0] in H032_CONFINEMENT_LABELS)
-            if confinement_fail != sorted(H032_CONFINEMENT_LABELS):
+                and line[5:].split(" — ", 1)[0] in H032_PRODUCT_ABSENT_LABELS)
+            if confinement_fail != sorted(H032_PRODUCT_ABSENT_LABELS):
                 return ""
             flipped = []
             for line in lines:
                 if (line.startswith("FAIL ")
-                        and line[5:].split(" — ", 1)[0] in H032_CONFINEMENT_LABELS):
+                        and line[5:].split(" — ", 1)[0] in H032_PRODUCT_ABSENT_LABELS):
                     flipped.append("PASS " + line[5:])
                 elif line.startswith("SAMMANFATTNING "):
                     flipped.append(H032_OWNER_LIVE_SKIP_SUMMARY)
@@ -673,7 +682,7 @@ def owner_skip_fixture_from_observed_h032(returncode: int, stdout: str) -> str:
                           "PASS K_STRUCTURED_RESULT_DELIVERY_BOUNDARY —")]
     summary_lines = [line for line in lines if line.startswith("SAMMANFATTNING ")]
     green_ok = (
-        len(H032_GREEN_PASS_LABELS) == 147
+        len(H032_GREEN_PASS_LABELS) == 152
         and len(pass_labels) == len(H032_GREEN_PASS_LABELS)
         and len(pass_labels) == len(set(pass_labels))
         and set(pass_labels) == H032_GREEN_PASS_LABELS
@@ -1831,7 +1840,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "28b03e72dc3daa14bdd68f7c20ca63447bc318ac09d91a3d65257cbaaac0c2e7")
+                       == "4b32a8be95849cf8fd75e4362fc5826f43f6c05851cc4ac21099d2381ada9865")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -3224,8 +3233,9 @@ if not failed:
     print("H031_GATE_RESULT=PASS")
     raise SystemExit(h031_terminal_exit(False, failed))
 if (failed == {"K_H032_FRESH_UPSTREAM", "K_PRODUCT_EXECUTION"}
-        and "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
-            in getattr(locals().get("upstream"), "stdout", "")):
+        and any(reason in getattr(upstream, "stdout", "")
+                for reason in (H032_STRUCTURED_RESULT_REASON,
+                               H032_CONFINEMENT_RED_REASON))):
     print("CURRENT_RED_REASON=UPSTREAM_STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
 elif failed == EXPECTED_PREBUILDER_RED:
     print("CURRENT_RED_REASON=EXPLICIT_ROLE_MODEL_ROUTING_ABSENT")
