@@ -154,6 +154,7 @@ RESULT_KERNEL_EXPECTED_IMPORT_INVENTORY = sorted([
     "F:0:controller.authority.core:permits:",
     "F:0:controller.authority.core:strict_json_bytes:",
     "F:0:controller.result.consumer:consume_private_result:",
+    "F:0:controller.result.materialize:materialize:",
 ])
 SENSITIVE_MODULE_PROXIES = {
     "os", "sys", "subprocess", "builtins", "ctypes", "importlib", "pty",
@@ -1839,7 +1840,7 @@ try:
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "785d7c01164a8502b5906caa85cb381f1e3d0007ef017b00e1e49f6d81339b14")
+                       == "34e2dee72d3b10cbbd77cacd529a70c9116ca60346bb391c757a161dd20e9e09")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")

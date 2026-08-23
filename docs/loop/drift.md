@@ -2714,3 +2714,51 @@ No schema, task authority or top-level label changes. Product-absent H032 stays
 148/4, owner-skip stays 151/1 and deterministic green stays 152/0. H031 rebinds
 only the final H032 digest. R124 writes owner gate/spec/docs only; product,
 provider, live, ref, publication and attestation authority remain absent.
+
+## 2026-08-23 — R125 definition-time capability and native re-diff closure
+
+Final R124 falsification established three independent gaps. Controller source
+could execute defaults, decorators, annotations, class construction hooks and
+module assignments before the connected observer was armed; Python audit does
+not expose every native or shared-state effect, so imported, builtin and bound
+filesystem capabilities could be captured and relayed under ordinary local
+names. Separately, per-entry patch replay admitted noncanonical whole artifacts
+and rejected native file-to-directory or directory-to-file transitions. The ODB
+metadata oracle also derived creation modes from the existing object-root mode,
+although native Git derives them from the active process umask.
+
+R125 captures every controller and local dependency as strict UTF-8 once,
+statically checks the exact text before its first execution, and compiles that
+same text at every execution site under a fail-closed definition-time observer.
+The judge's exact finite standard-library dependency set is warmed before local
+dependency tickets are armed, so import-machinery reads remain judge-owned while
+the dependency module body itself stays observed.
+The source inventory is phase- and provenance-aware across functions, lambdas,
+classes, comprehensions, exception/for/with targets, globals, aliases and
+rebinding history. Executable defaults/decorators/annotations/class hooks,
+environment or imported-module mutation, raw native/process/filesystem access
+and imported/builtin/bound-method transfer reject. Direct required operations,
+capability-equivalent import formatting and aliases, lexical shadows, pure
+helpers and inert local values remain admitted. The result materializer import
+is detected structurally; its causal relay mutant is generated from the exact
+local `asname or name`, so legacy sources, formatting variants and aliases are
+tested by semantic origin rather than source spelling.
+
+The materializer now performs one whole apply against one protected private
+index, then consumes the exact raw output of
+`/usr/bin/git diff --cached --binary --full-index --no-renames <base_tree> --`
+from that same index before any authoritative object write. Byte inequality,
+including a trailing LF or a same-length mutated stdout, rejects without ODB or
+protected-root residue. Native file-to-directory and directory-to-file patches
+are explicit positives. New fanout/object modes are derived from the exact
+process umask; existing fanout metadata and APFS direct-child nlink increments
+remain exact, with wrong modes, owners, links, digests or residue rejected.
+
+R125 changes no task schema, allowed-write authority, top-level label or verdict
+count. Product-absent H032 remains 148 PASS / 4 FAIL, owner-skip remains 151/1
+and deterministic green remains 152/0. H031 rebinds the final H032 digest and
+adds exactly the intended unaliased `controller.result.materialize.materialize`
+member to its result-kernel import inventory, without new process/filesystem
+authority.
+The round modifies owner gate/spec/docs only and grants no production, provider,
+live, ref, publication, attestation or model authority.

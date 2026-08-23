@@ -102,6 +102,7 @@ import ast
 import builtins
 from datetime import datetime
 import fcntl
+import fnmatch
 import io
 import json
 import mmap
@@ -115,9 +116,123 @@ import subprocess
 import sys
 import threading
 import time
+import types
+import unicodedata
 import selectors
 import secrets
 import re
+
+# One fail-closed ticket exists before the first candidate-controller exec.
+# Source/pyc reads and compilation are judge-owned and occur before activation;
+# only effects caused while candidate definitions execute are ticketed.
+class R125DefinitionEffect(RuntimeError):
+    pass
+
+_r125_definition_observer = {
+    "events": None, "loader_events": None, "subject_files": (),
+    "loader_files": (), "loader_dirs": ()}
+_r125_definition_selected = {
+    "open", "os.chmod", "os.mkdir", "os.remove", "os.rmdir", "os.rename",
+    "os.replace", "os.link", "os.symlink", "os.listdir", "os.scandir",
+    "os.putenv", "os.unsetenv",
+    "subprocess.Popen", "os.system", "os.posix_spawn", "os.fork",
+    "os.forkpty", "pty.spawn"}
+def _r125_freeze_definition_args(value):
+    if value is None or type(value) in {bool, int, str, bytes}:
+        return value
+    if type(value) in {tuple, list}:
+        return tuple(_r125_freeze_definition_args(item) for item in value)
+    if type(value) is dict:
+        if any(type(key) is not str for key in value):
+            raise TypeError("non-string audit mapping key")
+        return tuple(sorted((key, _r125_freeze_definition_args(child))
+                            for key, child in value.items()))
+    raise TypeError("unfreezable definition audit value")
+def _r125_import_loader_read(event, args):
+    if event not in {"open", "os.listdir"} or not args:
+        return False
+    path = args[0]
+    if type(path) not in {str, bytes}:
+        return False
+    try:
+        lexical = path.decode("utf-8") if type(path) is bytes else path
+    except UnicodeDecodeError:
+        return False
+    frame = sys._getframe(1)
+    origin = None
+    while frame is not None:
+        frame_name = frame.f_code.co_filename
+        if frame_name in _r125_definition_observer["subject_files"]:
+            origin = "subject"
+            break
+        if frame_name == "<frozen importlib._bootstrap_external>":
+            origin = "loader"
+            break
+        frame = frame.f_back
+    if origin != "loader":
+        return False
+    if event == "open":
+        if (len(args) < 3
+                or not ((type(args[1]) is str and args[1] == "r")
+                        or args[1] is None)):
+            return False
+        if type(args[2]) is not int or args[2] != os.O_CLOEXEC:
+            return False
+        return lexical in _r125_definition_observer["loader_files"]
+    return lexical in _r125_definition_observer["loader_dirs"]
+def _r125_definition_audit(event, _args):
+    target = _r125_definition_observer["events"]
+    if (target is not None and (event in _r125_definition_selected
+            or event.startswith("os.exec") or event.startswith("os.spawn"))):
+        if _r125_import_loader_read(event, _args):
+            try:
+                frozen = _r125_freeze_definition_args(_args)
+            except TypeError:
+                frozen = ("INVALID",)
+            _r125_definition_observer["loader_events"].append((event, frozen))
+            return
+        try:
+            frozen = _r125_freeze_definition_args(_args)
+        except TypeError:
+            frozen = ("INVALID",)
+        target.append((event, frozen))
+        if event == "open" and _args and type(_args[0]) is int:
+            return
+        raise R125DefinitionEffect(event)
+sys.addaudithook(_r125_definition_audit)
+def r125_observed_definition_exec(source_value, namespace, filename,
+                                  dependency_files=()):
+    if type(source_value) is not str:
+        raise TypeError("definition ticket requires prechecked Unicode source")
+    code = compile(source_value, filename, "exec")
+    events = []
+    loader_events = []
+    rejected = None
+    if (type(filename) is not str or type(dependency_files) not in {tuple, list}
+            or any(type(path) is not str for path in dependency_files)):
+        raise TypeError("invalid definition ticket identity")
+    subject_files = (filename, *dependency_files)
+    loader_files = tuple(dependency_files)
+    loader_dirs = tuple(sorted({str(Path(path).parent)
+                                for path in dependency_files}
+                               | {str(Path(path).parent.parent)
+                                  for path in dependency_files}))
+    _r125_definition_observer["subject_files"] = subject_files
+    _r125_definition_observer["loader_files"] = loader_files
+    _r125_definition_observer["loader_dirs"] = loader_dirs
+    _r125_definition_observer["events"] = events
+    _r125_definition_observer["loader_events"] = loader_events
+    try:
+        exec(code, namespace)
+    except R125DefinitionEffect as exc:
+        rejected = str(exc)
+    finally:
+        _r125_definition_observer["events"] = None
+        _r125_definition_observer["loader_events"] = None
+        _r125_definition_observer["subject_files"] = ()
+        _r125_definition_observer["loader_files"] = ()
+        _r125_definition_observer["loader_dirs"] = ()
+    return tuple(events), rejected, tuple(loader_events)
 
 source, result_kernel, authority_source, schema_source, work = map(Path, sys.argv[1:6])
 g20_emit_path = Path(sys.argv[6]) if sys.argv[6] else None
@@ -1262,9 +1377,257 @@ if mode == 'output_then_fail': sys.exit(17)
         return repo
     nonlocal_counter = [counter]
 
+    # The exact controller bytes are capability-checked before their first
+    # execution.  Reuse the gate's single later source predicate by extracting
+    # its own frozen AST definition and all `_R123_CONTROLLER_*` constants;
+    # this avoids a second, drifting analyzer while preserving pre-execution
+    # ordering.  All later controller executions reuse these captured bytes or
+    # first prove byte identity to them.
+    _r125_controller_bytes = source.read_bytes()
+    _r125_controller_digest = hashlib.sha256(_r125_controller_bytes).hexdigest()
+    try:
+        _r125_controller_text = _r125_controller_bytes.decode("utf-8")
+    except UnicodeDecodeError as _r125_decode_error:
+        raise RuntimeError("candidate controller is not UTF-8") from _r125_decode_error
+    _r125_gate_text = h032_gate.read_text(encoding="utf-8")
+    _r125_py_start = _r125_gate_text.index("<<'PY'\n") + len("<<'PY'\n")
+    _r125_py_end = _r125_gate_text.rindex("\nPY\n")
+    _r125_gate_tree = ast.parse(_r125_gate_text[_r125_py_start:_r125_py_end])
+    _r125_inventory_nodes = []
+    for _r125_node in ast.walk(_r125_gate_tree):
+        if isinstance(_r125_node, ast.Assign) and all(
+                isinstance(target, ast.Name)
+                and target.id.startswith("_R123_CONTROLLER_")
+                for target in _r125_node.targets):
+            _r125_inventory_nodes.append(_r125_node)
+        elif (isinstance(_r125_node, ast.FunctionDef)
+              and _r125_node.name == "r123_controller_native_source_ok"):
+            _r125_inventory_nodes.append(_r125_node)
+    _r125_inventory_nodes.sort(key=lambda node: (node.lineno, node.col_offset))
+    _r125_inventory_ns = {"ast": ast}
+    exec(compile(ast.fix_missing_locations(ast.Module(
+        body=_r125_inventory_nodes, type_ignores=[])),
+        "<r125-early-controller-inventory>", "exec"), _r125_inventory_ns)
+    _r125_early_controller_source_ok = _r125_inventory_ns.get(
+        "r123_controller_native_source_ok")
+    if (not callable(_r125_early_controller_source_ok)
+            or not _r125_early_controller_source_ok(_r125_controller_text)):
+        raise RuntimeError("candidate controller early capability inventory")
+
+    def _r125_dependency_literal(node, *, allow_set=False):
+        if isinstance(node, ast.Constant):
+            return True
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            return all(_r125_dependency_literal(item, allow_set=allow_set)
+                       for item in node.elts)
+        if isinstance(node, ast.Dict):
+            return all(key is not None
+                       and _r125_dependency_literal(key, allow_set=allow_set)
+                       and _r125_dependency_literal(value, allow_set=allow_set)
+                       for key, value in zip(node.keys, node.values))
+        return (allow_set and isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name) and node.func.id == "set"
+                and len(node.args) == 1 and not node.keywords
+                and _r125_dependency_literal(node.args[0], allow_set=False))
+    def _r125_dependency_source_ok(text, expected_imports, *, allow_set=False,
+                                   postponed_annotations=False):
+        if type(text) is not str:
+            return False
+        try:
+            dependency_tree = ast.parse(text)
+        except (SyntaxError, ValueError, TypeError):
+            return False
+        if allow_set and any(
+                (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                   ast.ClassDef)) and node.name == "set")
+                or (isinstance(node, ast.Name) and node.id == "set"
+                    and isinstance(node.ctx, (ast.Store, ast.Del)))
+                or (isinstance(node, (ast.Import, ast.ImportFrom))
+                    and any((alias.asname or alias.name.split(".", 1)[0])
+                            == "set" for alias in node.names))
+                for node in ast.walk(dependency_tree)):
+            return False
+        imports = []
+        for node in dependency_tree.body:
+            if isinstance(node, ast.Import):
+                imports.extend(f"I:{alias.name}" for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                imports.extend(f"F:{node.level}:{node.module or ''}:{alias.name}"
+                               for alias in node.names)
+        if imports != expected_imports or len(imports) != len(set(imports)):
+            return False
+        for node in dependency_tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                continue
+            if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+                    and isinstance(node.value.value, str)):
+                continue
+            if isinstance(node, ast.Assign):
+                if (not all(isinstance(target, ast.Name) for target in node.targets)
+                        or not _r125_dependency_literal(
+                            node.value, allow_set=allow_set)):
+                    return False
+                continue
+            if isinstance(node, ast.AnnAssign):
+                if (not isinstance(node.target, ast.Name)
+                        or not postponed_annotations
+                        or (node.value is not None
+                            and not _r125_dependency_literal(
+                                node.value, allow_set=allow_set))):
+                    return False
+                continue
+            if isinstance(node, ast.ClassDef):
+                if (node.decorator_list or node.keywords
+                        or any(not isinstance(base, ast.Name)
+                               or base.id not in {"Exception", "ValueError"}
+                               for base in node.bases)):
+                    return False
+                if any(not (isinstance(child, ast.Pass)
+                            or (isinstance(child, ast.Expr)
+                                and isinstance(child.value, ast.Constant)
+                                and isinstance(child.value.value, str)))
+                       for child in node.body):
+                    return False
+                continue
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                definition_values = (
+                    *node.args.defaults,
+                    *(value for value in node.args.kw_defaults
+                      if value is not None))
+                if (node.decorator_list
+                        or (not postponed_annotations
+                            and (any(arg.annotation is not None for arg in (
+                                *node.args.posonlyargs, *node.args.args,
+                                *node.args.kwonlyargs))
+                                 or (node.args.vararg is not None
+                                     and node.args.vararg.annotation is not None)
+                                 or (node.args.kwarg is not None
+                                     and node.args.kwarg.annotation is not None)
+                                 or node.returns is not None))
+                        or any(not _r125_dependency_literal(value)
+                               for value in definition_values)):
+                    return False
+                continue
+            return False
+        return True
+    _r125_core_path = repo / "controller/authority/core.py"
+    _r125_dependency_specs = [(_r125_core_path, [
+        "F:0:__future__:annotations", "I:json", "I:re", "I:subprocess",
+        "F:0:pathlib:Path", "F:0:typing:Iterable"], False, True)]
+    if "controller.result.materialize" in _r125_controller_text:
+        _r125_dependency_specs.extend([
+            (repo / "controller/result/consumer.py", [
+                "I:fcntl", "I:hashlib", "I:json", "I:os",
+                "F:0:pathlib:Path", "I:stat", "I:tempfile"], False, False),
+            (repo / "controller/result/materialize.py", [
+                "I:base64", "I:fnmatch", "I:os", "F:0:pathlib:Path",
+                "I:re", "I:subprocess", "I:tempfile", "I:unicodedata"],
+             True, False)])
+    _r125_dependency_texts = {}
+    for (_r125_dependency_path, _r125_expected_imports, _r125_allow_set,
+         _r125_postponed_annotations) in \
+            _r125_dependency_specs:
+        try:
+            _r125_dependency_raw = _r125_dependency_path.read_bytes()
+            _r125_dependency_text = _r125_dependency_raw.decode("utf-8")
+        except (OSError, UnicodeDecodeError) as _r125_dependency_error:
+            raise RuntimeError("candidate dependency source unavailable") \
+                from _r125_dependency_error
+        if not _r125_dependency_source_ok(
+                _r125_dependency_text, _r125_expected_imports,
+                allow_set=_r125_allow_set,
+                postponed_annotations=_r125_postponed_annotations):
+            raise RuntimeError("candidate dependency early capability inventory")
+        _r125_dependency_texts[str(_r125_dependency_path)] = (
+            _r125_dependency_text,
+            hashlib.sha256(_r125_dependency_raw).hexdigest())
+    _r125_dependency_files = tuple(_r125_dependency_texts)
+    _r125_dependency_plain_positive = "import os\nVALUE = 1\ndef f(value):\n return value\n"
+    _r125_dependency_set_positive = "import os\nHEX = set('abc')\n"
+    _r125_dependency_source_rig = (
+        _r125_dependency_source_ok(
+            _r125_dependency_plain_positive, ["I:os"])
+        and _r125_dependency_source_ok(
+            _r125_dependency_set_positive, ["I:os"], allow_set=True)
+        and not _r125_dependency_source_ok(
+            _r125_dependency_plain_positive
+            + "def escaped(value: os.write(9, b'x')):\n pass\n",
+            ["I:os"])
+        and not _r125_dependency_source_ok(
+            _r125_dependency_plain_positive
+            + "escaped: os.write(9, b'x') = 1\n", ["I:os"])
+        and not _r125_dependency_source_ok(
+            "import os\ndef set(value):\n os.write(9, b'x')\n return value\n"
+            "HEX = set('abc')\n", ["I:os"], allow_set=True))
+
+    def _r125_install_namespace(name, directory):
+        if name in sys.modules:
+            raise RuntimeError("candidate dependency namespace preloaded")
+        package = types.ModuleType(name)
+        package.__file__ = None
+        package.__package__ = name
+        package.__path__ = [str(directory)]
+        package.__spec__ = importlib.util.spec_from_loader(
+            name, loader=None, is_package=True)
+        sys.modules[name] = package
+        if "." in name:
+            parent_name, child_name = name.rsplit(".", 1)
+            setattr(sys.modules[parent_name], child_name, package)
+        return package
+    def _r125_install_dependency(name, path):
+        if name in sys.modules:
+            raise RuntimeError("candidate dependency module preloaded")
+        dependency_text = _r125_dependency_texts[str(path)][0]
+        dependency_module = types.ModuleType(name)
+        dependency_module.__file__ = str(path)
+        dependency_module.__package__ = name.rpartition(".")[0]
+        dependency_module.__loader__ = None
+        dependency_module.__spec__ = importlib.util.spec_from_loader(
+            name, loader=None, origin=str(path))
+        sys.modules[name] = dependency_module
+        if "." in name:
+            parent_name, child_name = name.rsplit(".", 1)
+            setattr(sys.modules[parent_name], child_name, dependency_module)
+        events, rejection, loader_events = r125_observed_definition_exec(
+            dependency_text, dependency_module.__dict__, str(path))
+        if rejection is not None or events or loader_events:
+            raise RuntimeError("candidate dependency definition-time effect")
+        return dependency_module
+
+    # Import-machinery reads are judge-owned, not candidate effects.  Warm the
+    # exact finite stdlib dependency set before arming a dependency definition
+    # ticket; each dependency body still executes only while that ticket is
+    # armed, and its source/import inventory above remains independently bound.
+    import argparse as _r125_argparse  # noqa: F401
+    import dataclasses as _r125_dataclasses  # noqa: F401
+    import tempfile as _r125_tempfile  # noqa: F401
+    import typing as _r125_typing  # noqa: F401
+    if not all(_r125_name in sys.modules for _r125_name in (
+            "argparse", "dataclasses", "tempfile", "typing")):
+        raise RuntimeError("judge dependency prewarm incomplete")
+    if "controller.result.materialize" in _r125_controller_text:
+        _r125_install_namespace("controller", repo / "controller")
+        _r125_install_namespace("controller.authority", repo / "controller/authority")
+        _r125_install_namespace("controller.result", repo / "controller/result")
+        _r125_install_dependency(
+            "controller.authority.core", repo / "controller/authority/core.py")
+        _r125_install_dependency(
+            "controller.result.consumer", repo / "controller/result/consumer.py")
+        _r125_install_dependency(
+            "controller.result.materialize", repo / "controller/result/materialize.py")
+    else:
+        _r125_install_dependency("core", repo / "controller/authority/core.py")
+
     spec = importlib.util.spec_from_file_location("h032_subject", source)
     if spec is None or spec.loader is None: raise RuntimeError("cannot import subject")
-    module = importlib.util.module_from_spec(spec); sys.modules[spec.name] = module; spec.loader.exec_module(module)
+    module = importlib.util.module_from_spec(spec); sys.modules[spec.name] = module
+    (_r125_subject_events, _r125_subject_rejection,
+     _r125_subject_loader_events) = r125_observed_definition_exec(
+        _r125_controller_text, module.__dict__, str(source))
+    if _r125_subject_rejection is not None or _r125_subject_events:
+        raise RuntimeError(
+            "candidate controller definition-time effect: "
+            f"{_r125_subject_events}/{_r125_subject_rejection}")
     def kernel_structure_inventory(tree, raw_text):
         expected_args=["sink_fd","canonical_destination","invocation_id","run_id","role"]
         consumers=[node for node in tree.body if isinstance(node,ast.FunctionDef)
@@ -5363,8 +5726,13 @@ def run_codex(sink, canonical, invocation, run, role):
                 sys.modules[variant_name] = variant_module
                 saved_module = module
                 try:
-                    exec(compile(variant_text, str(source), "exec"),
-                         variant_module.__dict__)
+                    if not _r125_early_controller_source_ok(variant_text):
+                        raise RuntimeError("R59 variant capability inventory")
+                    (_r125_variant_events, _r125_variant_rejection,
+                     _r125_variant_loaders) = r125_observed_definition_exec(
+                        variant_text, variant_module.__dict__, str(source))
+                    if _r125_variant_rejection is not None or _r125_variant_events:
+                        raise RuntimeError("R59 variant definition-time effect")
                     variant_module.now_id = fixture_now_id
                     module = variant_module
                     if inject_ordinal is None:
@@ -6134,7 +6502,32 @@ def run_codex(sink, canonical, invocation, run, role):
     if physical_spec is None or physical_spec.loader is None:
         raise RuntimeError("cannot import isolated physical controller")
     physical_module = importlib.util.module_from_spec(physical_spec)
-    sys.modules[physical_spec.name] = physical_module; physical_spec.loader.exec_module(physical_module)
+    sys.modules[physical_spec.name] = physical_module
+    _r125_physical_source = (
+        physical_repo / "scripts/nortropic-codex-autopilot.py").read_bytes()
+    if hashlib.sha256(_r125_physical_source).hexdigest() != _r125_controller_digest:
+        raise RuntimeError("physical controller bytes differ from prechecked source")
+    try:
+        _r125_physical_text = _r125_physical_source.decode("utf-8")
+    except UnicodeDecodeError as _r125_physical_decode_error:
+        raise RuntimeError("physical controller is not UTF-8") from _r125_physical_decode_error
+    if _r125_physical_text != _r125_controller_text:
+        raise RuntimeError("physical controller text differs from prechecked source")
+    _r125_physical_dependency_files = []
+    for _r125_dependency_file in _r125_dependency_files:
+        _r125_relative_dependency = Path(_r125_dependency_file).relative_to(repo)
+        _r125_physical_dependency = physical_repo / _r125_relative_dependency
+        _r125_expected_dependency_digest = _r125_dependency_texts[
+            _r125_dependency_file][1]
+        if sha256(_r125_physical_dependency) != _r125_expected_dependency_digest:
+            raise RuntimeError("physical controller dependency drift")
+        _r125_physical_dependency_files.append(str(_r125_physical_dependency))
+    (_r125_physical_events, _r125_physical_rejection,
+     _r125_physical_loader_events) = r125_observed_definition_exec(
+        _r125_physical_text, physical_module.__dict__, str(
+            physical_repo / "scripts/nortropic-codex-autopilot.py"))
+    if _r125_physical_rejection is not None or _r125_physical_events:
+        raise RuntimeError("physical controller definition-time effect")
     launch_mode[0] = "valid"
     physical_runs_root=physical_module.journal_root(physical_repo)/"runs"
     def r89_clock_value(value: object):
@@ -7023,10 +7416,86 @@ def run_codex(sink, canonical, invocation, run, role):
     # intrinsic to a separately hashed provider authority; neither environment
     # modes nor monkeypatch state crosses into the subject process.
     r12_runner = work / "r12-real-popen-runner.py"
-    r12_runner.write_text("import importlib.util,json,pathlib,sys\n"
+    _r125_r12_dependency_digests = {
+        str(Path(path).relative_to(repo)): value[1]
+        for path, value in _r125_dependency_texts.items()}
+    _r125_r12_dependency_names = ({
+        "controller/authority/core.py": "controller.authority.core",
+        "controller/result/consumer.py": "controller.result.consumer",
+        "controller/result/materialize.py": "controller.result.materialize"}
+        if "controller.result.materialize" in _r125_controller_text
+        else {"controller/authority/core.py": "core"})
+    r12_runner.write_text("import argparse,datetime,fcntl,fnmatch,hashlib,importlib.util,json,os,pathlib,re,shutil,stat,subprocess,sys,tempfile,time,types,typing,unicodedata,dataclasses\n"
 "source,repo,wt=map(pathlib.Path,sys.argv[1:4])\n"
+f"expected_digest={_r125_controller_digest!r}\n"
+f"expected_dependencies={_r125_r12_dependency_digests!r}\n"
+f"dependency_names={_r125_r12_dependency_names!r}\n"
+"class DefinitionEffect(RuntimeError): pass\n"
+"dependency_files=tuple(str(source.parents[1]/relative) for relative in expected_dependencies)\n"
+"for relative,digest in expected_dependencies.items():\n"
+" raw_dependency=(source.parents[1]/relative).read_bytes()\n"
+" if hashlib.sha256(raw_dependency).hexdigest()!=digest: raise RuntimeError('controller dependency drift')\n"
+" try: raw_dependency.decode('utf-8')\n"
+" except UnicodeDecodeError as exc: raise RuntimeError('controller dependency is not UTF-8') from exc\n"
+"definition={'active':False,'events':[],'loader':[],'subject_files':(str(source),*dependency_files),'loader_files':dependency_files,'loader_dirs':tuple(sorted({str(pathlib.Path(path).parent) for path in dependency_files}|{str(pathlib.Path(path).parent.parent) for path in dependency_files}))}\n"
+"selected={'open','os.chmod','os.mkdir','os.remove','os.rmdir','os.rename','os.replace','os.link','os.symlink','os.listdir','os.scandir','os.putenv','os.unsetenv','subprocess.Popen','os.system','os.posix_spawn','os.fork','os.forkpty','pty.spawn'}\n"
+"def loader_read(event,args):\n"
+" if event not in {'open','os.listdir'} or not args or type(args[0]) not in {str,bytes}: return False\n"
+" try:\n"
+"  path=args[0].decode('utf-8') if type(args[0]) is bytes else args[0]\n"
+" except UnicodeDecodeError: return False\n"
+" frame=sys._getframe(1)\n"
+" while frame is not None:\n"
+"  if frame.f_code.co_filename in definition['subject_files']: return False\n"
+"  if frame.f_code.co_filename=='<frozen importlib._bootstrap_external>': break\n"
+"  frame=frame.f_back\n"
+" if frame is None: return False\n"
+" if event=='open': return len(args)>=3 and ((type(args[1]) is str and args[1]=='r') or args[1] is None) and type(args[2]) is int and args[2]==os.O_CLOEXEC and path in definition['loader_files']\n"
+" return path in definition['loader_dirs']\n"
+"def definition_audit(event,args):\n"
+" if definition['active'] and (event in selected or event.startswith('os.exec') or event.startswith('os.spawn')):\n"
+"  if loader_read(event,args): definition['loader'].append(event);return\n"
+"  definition['events'].append(event)\n"
+"  if event=='open' and args and type(args[0]) is int: return\n"
+"  raise DefinitionEffect(event)\n"
+"sys.addaudithook(definition_audit)\n"
+"site_marker=repo/'r125-r12-definition-marker'\n"
+"site_rejected=False;definition['active']=True\n"
+"try: exec(compile(\"if __name__ == 'r12_exact_subject':\\n open(%r, 'w').write('hidden')\\n\"%str(site_marker),str(source),'exec'),{'__name__':'r12_exact_subject'})\n"
+"except DefinitionEffect: site_rejected=True\n"
+"finally: definition['active']=False\n"
+"if not site_rejected or not definition['events'] or site_marker.exists(): raise RuntimeError('R12 definition ticket disconnected')\n"
+"definition['events'].clear()\n"
+"def install_namespace(name,directory):\n"
+" package=types.ModuleType(name);package.__file__=None;package.__package__=name;package.__path__=[str(directory)];package.__spec__=importlib.util.spec_from_loader(name,loader=None,is_package=True);sys.modules[name]=package\n"
+" if '.' in name:\n"
+"  parent,child=name.rsplit('.',1);setattr(sys.modules[parent],child,package)\n"
+"def install_dependency(relative,name):\n"
+" path=source.parents[1]/relative;raw=path.read_bytes();text=raw.decode('utf-8');module=types.ModuleType(name);module.__file__=str(path);module.__package__=name.rpartition('.')[0];module.__loader__=None;module.__spec__=importlib.util.spec_from_loader(name,loader=None,origin=str(path));sys.modules[name]=module\n"
+" if '.' in name:\n"
+"  parent,child=name.rsplit('.',1);setattr(sys.modules[parent],child,module)\n"
+" definition['active']=True\n"
+" try: exec(compile(text,str(path),'exec'),module.__dict__)\n"
+" except DefinitionEffect as exc: raise RuntimeError('dependency definition-time effect:'+str(exc))\n"
+" finally: definition['active']=False\n"
+"if 'controller.result.materialize' in dependency_names.values():\n"
+" install_namespace('controller',source.parents[1]/'controller');install_namespace('controller.authority',source.parents[1]/'controller/authority');install_namespace('controller.result',source.parents[1]/'controller/result')\n"
+"for relative,name in dependency_names.items(): install_dependency(relative,name)\n"
+"if definition['events']: raise RuntimeError('dependency definition-time effect')\n"
+"raw=source.read_bytes()\n"
+"if hashlib.sha256(raw).hexdigest()!=expected_digest: raise RuntimeError('controller digest drift')\n"
+"try: checked_text=raw.decode('utf-8')\n"
+"except UnicodeDecodeError as exc: raise RuntimeError('controller is not UTF-8') from exc\n"
+"code=compile(checked_text,str(source),'exec')\n"
 "spec=importlib.util.spec_from_file_location('r12_exact_subject',source)\n"
-"mod=importlib.util.module_from_spec(spec);sys.modules[spec.name]=mod;spec.loader.exec_module(mod)\n"
+"mod=importlib.util.module_from_spec(spec);sys.modules[spec.name]=mod\n"
+"definition['active']=True\n"
+"try:\n"
+" exec(code,mod.__dict__)\n"
+"except DefinitionEffect as exc:\n"
+" raise RuntimeError('controller definition-time effect:'+str(exc))\n"
+"finally: definition['active']=False\n"
+"if definition['events']: raise RuntimeError('controller definition-time effect')\n"
 "if len(sys.argv)==5: mod.CODEX_RUN_TIMEOUT_SECONDS=int(sys.argv[4])\n"
 "import subprocess\n"
 "held_transition_fds=[]\n"
@@ -10275,6 +10744,9 @@ class CraftedConcretePath(type(Path())):
     (r122_base / "controller/result/empty-base.py").write_bytes(b"")
     (r122_base / "controller/result/empty-exec-base.py").write_bytes(b"")
     (r122_base / "controller/result/empty-exec-base.py").chmod(0o755)
+    (r122_base / "controller/result/base-dir").mkdir()
+    (r122_base / "controller/result/base-dir/child.py").write_text(
+        "BASE_DIR_CHILD = True\n", encoding="utf-8")
     (r122_base / "controller/result/@@ mode path.py").write_text(
         "MODE_PATH = True\n", encoding="utf-8")
     os.symlink("consumer.py", r122_base / "controller/result/base-link")
@@ -10402,98 +10874,66 @@ class CraftedConcretePath(type(Path())):
             raise MatReject(f"durable git {args[0]} failed rc={proc.returncode}")
         return proc
 
-    def r123_entry_index_pairs(patch, git_dir, base_tree):
+    def r123_entry_index_pairs(patch):
         """Return one exact full pre/post identity per canonical diff entry.
 
         R123 freezes the provider artifact as the no-rename form of
         git-diff-binary-v1.  Rename/copy effects remain supported as canonical
         delete/add entries; native similarity-only entries are rejected because
-        Git emits no per-entry full-index identity for them.  Each block is also
-        applied alone to a fresh base index: this binds its own extended-header
-        identity to its own derived path/status effect instead of comparing an
-        unpositioned patch-global multiset.
+        Git emits no per-entry full-index identity for them.  Entry identities
+        are parsed block-locally, while authority comes from one byte-exact
+        native re-diff of the complete applied patch.  Applying blocks alone is
+        intentionally forbidden as an oracle: a native file-to-directory or
+        directory-to-file transition can be valid only as a whole patch.
         """
         starts = [match.start() for match in re.finditer(rb"(?m)^diff --git ", patch)]
         if not starts or patch[:starts[0]].strip():
             raise MatReject("patch preamble or missing diff entry")
         starts.append(len(patch))
         pairs = []
-        for ordinal, (left, right) in enumerate(zip(starts, starts[1:])):
+        for left, right in zip(starts, starts[1:]):
             block = patch[left:right]
             indexish = re.findall(rb"(?m)^index [^\n]*$", block)
             exact = re.findall(
                 rb"(?m)^index ([0-9a-f]{40})\.\.([0-9a-f]{40})(?: [0-7]{6})?$",
                 block)
-            entry_index = r122_prot / (
-                "entry-index-" + str(ordinal) + "-" + secrets.token_hex(8))
-            try:
-                r122_closed_git(git_dir, "read-tree", base_tree,
-                                index_file=entry_index)
-                r122_closed_git(
-                    git_dir, "apply", "--cached", "--binary",
-                    "--whitespace=nowarn", "--unsafe-paths", "--check", "-",
-                    index_file=entry_index, input_bytes=block)
-                r122_closed_git(
-                    git_dir, "apply", "--cached", "--binary",
-                    "--whitespace=nowarn", "--unsafe-paths", "-",
-                    index_file=entry_index, input_bytes=block)
-                entry_tree = r122_closed_git(
-                    git_dir, "write-tree", index_file=entry_index
-                ).stdout.decode().strip()
-                canonical_block = r122_closed_git(
-                    git_dir, "diff", "--cached", "--binary", "--full-index",
-                    "--no-renames", base_tree, "--",
-                    index_file=entry_index).stdout
-                if block != canonical_block:
-                    raise MatReject("entry is not canonical native full-index output")
-                entry_raw = r122_closed_git(
-                    git_dir, "diff-tree", "-r", "--no-commit-id", "--raw",
-                    "--no-renames", base_tree, entry_tree).stdout
-                effects = re.findall(
-                    rb"(?m)^:([0-7]{6}) ([0-7]{6}) ([0-9a-f]{40}) ([0-9a-f]{40}) ([AMDTCUXBR])\t",
-                    entry_raw)
-                if len(effects) != 1:
-                    raise MatReject("entry identity is not bound to its own effect")
-                old_mode, new_mode, old_id, new_id, _status = effects[0]
-                if len(indexish) == 1 and len(exact) == 1:
-                    index_match = re.search(rb"(?m)^index [^\n]*\n", block)
-                    payload_match = re.search(
-                        rb"(?m)^(?:--- |@@ |GIT binary patch$)", block)
-                    empty_blob = b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-                    empty_transition = (
-                        (old_mode == b"000000"
-                         and new_mode in {b"100644", b"100755"}
-                         and old_id == b"0" * 40 and new_id == empty_blob)
-                        or (old_mode in {b"100644", b"100755"}
-                            and new_mode == b"000000"
-                            and old_id == empty_blob and new_id == b"0" * 40))
-                    if (index_match is None
-                            or (payload_match is None and not empty_transition)
-                            or (payload_match is not None
-                                and index_match.end() > payload_match.start())
-                            or exact[0] != (old_id, new_id)):
-                        raise MatReject("entry full-index identity is misplaced or misbound")
-                elif not indexish and not exact:
-                    old_modes = re.findall(rb"(?m)^old mode ([0-7]{6})$", block)
-                    new_modes = re.findall(rb"(?m)^new mode ([0-7]{6})$", block)
-                    if (len(old_modes) != 1 or len(new_modes) != 1
-                            or old_modes[0] != old_mode or new_modes[0] != new_mode
-                            or old_mode == new_mode
-                            or {old_mode, new_mode} - {b"100644", b"100755"}
-                            or old_id != new_id or old_id == b"0" * 40
-                            or re.search(
-                                rb"(?m)^(?:--- |@@ |GIT binary patch$)",
-                                block) is not None):
-                        raise MatReject("noncanonical mode-only entry")
-                else:
-                    raise MatReject("each content entry needs one exact full-index line")
+            if len(indexish) == 1 and len(exact) == 1:
+                old_id, new_id = exact[0]
+                index_match = re.search(rb"(?m)^index [^\n]*\n", block)
+                payload_match = re.search(
+                    rb"(?m)^(?:--- |@@ |GIT binary patch$)", block)
+                empty_blob = b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+                add_modes = re.findall(rb"(?m)^new file mode ([0-7]{6})$", block)
+                delete_modes = re.findall(
+                    rb"(?m)^deleted file mode ([0-7]{6})$", block)
+                empty_transition = (
+                    (add_modes in [[b"100644"], [b"100755"]]
+                     and not delete_modes and old_id == b"0" * 40
+                     and new_id == empty_blob)
+                    or (delete_modes in [[b"100644"], [b"100755"]]
+                        and not add_modes and old_id == empty_blob
+                        and new_id == b"0" * 40))
+                if (index_match is None
+                        or (payload_match is None and not empty_transition)
+                        or (payload_match is not None
+                            and index_match.end() > payload_match.start())):
+                    raise MatReject("entry full-index identity is misplaced")
                 pairs.append((old_id, new_id))
-            finally:
-                try:
-                    entry_index.unlink()
-                except FileNotFoundError:
-                    pass
-        return sorted(pairs)
+            elif not indexish and not exact:
+                old_modes = re.findall(rb"(?m)^old mode ([0-7]{6})$", block)
+                new_modes = re.findall(rb"(?m)^new mode ([0-7]{6})$", block)
+                if (len(old_modes) != 1 or len(new_modes) != 1
+                        or old_modes[0] == new_modes[0]
+                        or {old_modes[0], new_modes[0]}
+                            - {b"100644", b"100755"}
+                        or re.search(
+                            rb"(?m)^(?:--- |@@ |GIT binary patch$)",
+                            block) is not None):
+                    raise MatReject("noncanonical mode-only entry")
+                pairs.append(None)
+            else:
+                raise MatReject("each content entry needs one exact full-index line")
+        return pairs
 
     def r122_durable_reference(delta_obj, base=None):
         pinned = r122_base_sha if base is None else base
@@ -10532,16 +10972,20 @@ class CraftedConcretePath(type(Path())):
                 "--no-renames", base_tree, "--", index_file=index_file).stdout
             if patch != canonical_patch:
                 raise MatReject("patch is not complete canonical native output")
-            declared_pairs = r123_entry_index_pairs(
-                patch, r122_base_git, base_tree)
+            declared_pairs = r123_entry_index_pairs(patch)
             raw_effect = r122_closed_git(
                 r122_base_git, "diff-tree", "-r", "--no-commit-id", "--raw",
                 "--no-renames", base_tree, durable_tree).stdout
-            actual_pairs = sorted(re.findall(
+            actual_pairs = list(re.findall(
                 rb"(?m)^:[0-7]{6} [0-7]{6} ([0-9a-f]{40}) ([0-9a-f]{40}) [AMDTCUXBR]",
                 raw_effect))
-            if (len(declared_pairs) != len(changed)
-                    or declared_pairs != actual_pairs):
+            ordered_pairs_ok = (
+                len(declared_pairs) == len(actual_pairs)
+                and all(declared == actual or (
+                        declared is None and actual[0] == actual[1])
+                        for declared, actual
+                        in zip(declared_pairs, actual_pairs)))
+            if (len(declared_pairs) != len(changed) or not ordered_pairs_ok):
                 raise MatReject("patch index preimage/postimage not bound to derived tree")
             durable_commit = r122_closed_git(
                 r122_base_git, "commit-tree", durable_tree, "-p", pinned,
@@ -10744,15 +11188,22 @@ class CraftedConcretePath(type(Path())):
         except OSError:
             return None
 
-    def r123_odb_delta_ok(before, after, added_ids, root_binding):
+    def r123_odb_delta_ok(before, after, added_ids, root_binding,
+                          creation_umask=0o077):
         if (before is None or after is None
                 or not isinstance(added_ids, (set, frozenset))
                 or not isinstance(root_binding, tuple)
                 or len(root_binding) != 6
-                or not stat.S_ISDIR(root_binding[2])):
+                or not stat.S_ISDIR(root_binding[2])
+                or type(creation_umask) is not int
+                or creation_umask < 0 or creation_umask > 0o777):
             return False
-        root_mode = stat.S_IMODE(root_binding[2])
-        object_mode = root_mode & 0o444
+        # Git creates new fanouts and loose objects under the process umask; it
+        # does not inherit the mode of a pre-existing objects root.  The gate
+        # itself fixes umask 077, while explicit 022 controls prove that this is
+        # an effect relation rather than another hard-coded permission value.
+        fanout_mode = 0o777 & ~creation_umask
+        object_mode = 0o444 & ~creation_umask
         root_uid, root_gid = root_binding[3], root_binding[4]
         before_map = {row[0]: row[1:] for row in before}
         after_map = {row[0]: row[1:] for row in after}
@@ -10803,7 +11254,7 @@ class CraftedConcretePath(type(Path())):
                     for candidate in actual_files)
                 if (len(value) != 5 or value[4] != "D"
                         or not stat.S_ISDIR(value[0])
-                        or stat.S_IMODE(value[0]) != root_mode
+                        or stat.S_IMODE(value[0]) != fanout_mode
                         or value[1] != root_uid or value[2] != root_gid
                         or value[3] != 2 + direct_children):
                     return False
@@ -10901,6 +11352,23 @@ class CraftedConcretePath(type(Path())):
     _r123_odb_delta_positive = r123_odb_delta_ok(
         _r123_probe_layout_before, _r123_probe_layout_object,
         frozenset({_r123_probe_object_id}), _r123_odb_probe_positive)
+    _r123_root_0755_binding = (
+        *_r123_odb_probe_positive[:2],
+        (_r123_odb_probe_positive[2] & ~0o7777) | 0o755,
+        *_r123_odb_probe_positive[3:])
+    _r123_root_0755_umask077_positive = r123_odb_delta_ok(
+        _r123_probe_layout_before, _r123_probe_layout_object,
+        frozenset({_r123_probe_object_id}), _r123_root_0755_binding,
+        creation_umask=0o077)
+    _r123_layout_umask022 = tuple(
+        ((row[0], (row[1] & ~0o7777)
+                    | (0o755 if row[0] == "aa" else 0o444), *row[2:])
+         if row[0] in {"aa", "aa/" + "a" * 38} else row)
+        for row in _r123_probe_layout_object)
+    _r123_umask022_positive = r123_odb_delta_ok(
+        _r123_probe_layout_before, _r123_layout_umask022,
+        frozenset({_r123_probe_object_id}), _r123_root_0755_binding,
+        creation_umask=0o022)
     _r123_probe_object_rel = "aa/" + "a" * 38
     _r123_new_object_mode_rejected = not r123_odb_delta_ok(
         _r123_probe_layout_before, tuple(
@@ -10997,7 +11465,10 @@ class CraftedConcretePath(type(Path())):
         and _r123_odb_probe_positive is not None
         and _r123_odb_symlink_rejected and _r123_odb_alternate_rejected
         and _r123_odb_residue_detected and _r123_odb_layout_restored
-        and _r123_odb_delta_positive and _r123_odb_delta_residue_rejected
+        and _r123_odb_delta_positive
+        and _r123_root_0755_umask077_positive
+        and _r123_umask022_positive
+        and _r123_odb_delta_residue_rejected
         and _r123_new_object_mode_rejected
         and _r123_new_object_fixed_0444_rejected
         and _r123_new_object_owner_rejected
@@ -11119,11 +11590,15 @@ class CraftedConcretePath(type(Path())):
                                          "--no-renames"]
                         and hex40(tail[4]) and hex40(tail[5])))
         if command == "diff":
-            return (len(tail) == 6 and tail[:2] == ["--numstat", "-z"]
-                    and hex40(tail[2]) and hex40(tail[3]) and tail[4] == "--"
-                    and tail[5] and not tail[5].startswith("-")
-                    and "/../" not in "/" + tail[5] + "/"
-                    and not tail[5].startswith("/"))
+            return ((len(tail) == 6 and tail[:2] == ["--numstat", "-z"]
+                     and hex40(tail[2]) and hex40(tail[3]) and tail[4] == "--"
+                     and tail[5] and not tail[5].startswith("-")
+                     and "/../" not in "/" + tail[5] + "/"
+                     and not tail[5].startswith("/"))
+                    or (len(tail) == 6
+                        and tail[:4] == ["--cached", "--binary", "--full-index",
+                                         "--no-renames"]
+                        and hex40(tail[4]) and tail[5] == "--"))
         if command == "commit-tree":
             return (len(tail) == 5 and hex40(tail[0]) and tail[1] == "-p"
                     and hex40(tail[2]) and tail[3] == "-m"
@@ -11139,6 +11614,7 @@ class CraftedConcretePath(type(Path())):
         scratch_text = os.path.realpath(os.fspath(forbidden_scratch))
         saw_private = False; saw_authoritative_commit = False
         saw_protected_create = False
+        git_trace = []
         pending_pipe_fdopens = []
         read_pipe_flags = os.O_RDONLY | os.O_CLOEXEC
         write_pipe_flags = (os.O_WRONLY | os.O_CREAT | os.O_TRUNC
@@ -11197,6 +11673,10 @@ class CraftedConcretePath(type(Path())):
                         or cwd not in (None, "")):
                     return False
                 command = argv[1]
+                indexed_diff = (
+                    command == "diff" and len(argv) == 8
+                    and list(argv[2:6]) == [
+                        "--cached", "--binary", "--full-index", "--no-renames"])
                 expected_pipe_fdopens = (
                     [ ("w", write_pipe_flags),
                       ("r", read_pipe_flags), ("r", read_pipe_flags) ]
@@ -11217,7 +11697,7 @@ class CraftedConcretePath(type(Path())):
                     "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL",
                     "GIT_TERMINAL_PROMPT", "GIT_NO_REPLACE_OBJECTS",
                     "GIT_ALTERNATE_OBJECT_DIRECTORIES"}
-                if command in {"read-tree", "apply", "write-tree"}:
+                if command in {"read-tree", "apply", "write-tree"} or indexed_diff:
                     expected_keys.add("GIT_INDEX_FILE")
                 if command == "commit-tree":
                     expected_keys.update(identity)
@@ -11244,7 +11724,8 @@ class CraftedConcretePath(type(Path())):
                             "write-tree", "commit-tree", "cat-file", "rev-parse",
                             "ls-tree", "diff", "diff-tree"}:
                         return False
-                    if command in {"read-tree", "apply", "write-tree"} and not r123_under(
+                    if (command in {"read-tree", "apply", "write-tree"}
+                            or indexed_diff) and not r123_under(
                             environment.get("GIT_INDEX_FILE", ""), protected):
                         return False
                     saw_authoritative_commit |= command == "commit-tree"
@@ -11257,11 +11738,53 @@ class CraftedConcretePath(type(Path())):
                         return False
                 else:
                     return False
+                git_trace.append((
+                    command, tuple(argv[2:]), git_dir,
+                    environment.get("GIT_INDEX_FILE")))
             else:
                 return False
-        return (not pending_pipe_fdopens and (not require_complete
-                or (saw_private and saw_authoritative_commit
-                    and saw_protected_create)))
+        if pending_pipe_fdopens:
+            return False
+        if not require_complete:
+            return True
+        canonical = [
+            (ordinal, row) for ordinal, row in enumerate(git_trace)
+            if row[0] == "diff" and len(row[1]) == 6
+            and row[1][:4] == (
+                "--cached", "--binary", "--full-index", "--no-renames")]
+        if len(canonical) != 1:
+            return False
+        canonical_ordinal, canonical_row = canonical[0]
+        _command, canonical_tail, canonical_git, canonical_index = canonical_row
+        if (not r123_under(canonical_git, protected)
+                or canonical_git == authoritative
+                or not r123_under(canonical_index, protected)):
+            return False
+        prior_same_index = [row for row in git_trace[:canonical_ordinal]
+                            if row[2] == canonical_git
+                            and row[3] == canonical_index]
+        required_suffix = [
+            ("read-tree", (canonical_tail[4],)),
+            ("apply", ("--cached", "--binary", "--whitespace=nowarn",
+                       "--unsafe-paths", "--check", "-")),
+            ("apply", ("--cached", "--binary", "--whitespace=nowarn",
+                       "--unsafe-paths", "-")),
+        ]
+        ordered_prior = [(row[0], row[1]) for row in prior_same_index]
+        if len(ordered_prior) < len(required_suffix) or (
+                ordered_prior[-len(required_suffix):] != required_suffix):
+            return False
+        if any(row[2] == canonical_git and row[3] == canonical_index
+               and row[0] in {"read-tree", "apply"}
+               for row in git_trace[canonical_ordinal + 1:]):
+            return False
+        authoritative_writes = {
+            "index-pack", "apply", "write-tree", "commit-tree"}
+        if any(row[2] == authoritative and row[0] in authoritative_writes
+               for row in git_trace[:canonical_ordinal]):
+            return False
+        return (saw_private and saw_authoritative_commit
+                and saw_protected_create)
 
     def r123_controller_prelude_effects_ok(events, task_root, protected_root):
         """Bind the legitimate controller work immediately before materialize.
@@ -11374,6 +11897,9 @@ class CraftedConcretePath(type(Path())):
         "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_NO_REPLACE_OBJECTS": "1", "GIT_ALTERNATE_OBJECT_DIRECTORIES": "",
     }
+    _r123_effect_index = _r123_clean_root / "effect-index"
+    _r123_effect_index_env = dict(
+        _r123_effect_env, GIT_INDEX_FILE=str(_r123_effect_index))
     _r123_effect_auth_env = dict(
         _r123_effect_env, GIT_DIR=r122_base_git,
         GIT_AUTHOR_NAME="nortropic-controller",
@@ -11399,6 +11925,25 @@ class CraftedConcretePath(type(Path())):
         ("subprocess.Popen", ("/usr/bin/git", ["/usr/bin/git", "init", "-q", "--bare",
                                                    str(_r123_effect_private)], None,
                               _r123_effect_env)),
+        *r123_pipe_fdopens(14),
+        ("subprocess.Popen", ("/usr/bin/git", ["/usr/bin/git", "read-tree",
+                                                   "b" * 40], None,
+                              _r123_effect_index_env)),
+        *r123_pipe_fdopens(16, with_input=True),
+        ("subprocess.Popen", ("/usr/bin/git", ["/usr/bin/git", "apply", "--cached",
+                                                   "--binary", "--whitespace=nowarn",
+                                                   "--unsafe-paths", "--check", "-"], None,
+                              _r123_effect_index_env)),
+        *r123_pipe_fdopens(19, with_input=True),
+        ("subprocess.Popen", ("/usr/bin/git", ["/usr/bin/git", "apply", "--cached",
+                                                   "--binary", "--whitespace=nowarn",
+                                                   "--unsafe-paths", "-"], None,
+                              _r123_effect_index_env)),
+        *r123_pipe_fdopens(22),
+        ("subprocess.Popen", ("/usr/bin/git", ["/usr/bin/git", "diff", "--cached",
+                                                   "--binary", "--full-index", "--no-renames",
+                                                   "b" * 40, "--"], None,
+                              _r123_effect_index_env)),
         *r123_pipe_fdopens(20),
         ("subprocess.Popen", ("/usr/bin/git", ["/usr/bin/git", "commit-tree", "a" * 40,
                                                    "-p", "b" * 40, "-m",
@@ -11408,6 +11953,29 @@ class CraftedConcretePath(type(Path())):
     _r123_effect_private_popen = next(
         i for i, value in enumerate(_r123_effect_positive)
         if value[0] == "subprocess.Popen")
+    _r125_effect_diff_popen = next(
+        i for i, value in enumerate(_r123_effect_positive)
+        if (value[0] == "subprocess.Popen"
+            and value[1][1][1:6] == [
+                "diff", "--cached", "--binary", "--full-index", "--no-renames"]))
+    _r125_effect_missing_rediff = (
+        _r123_effect_positive[:_r125_effect_diff_popen - 2]
+        + _r123_effect_positive[_r125_effect_diff_popen + 1:])
+    _r125_effect_wrong_index = list(_r123_effect_positive)
+    _r125_diff_event = _r125_effect_wrong_index[_r125_effect_diff_popen]
+    _r125_effect_wrong_index[_r125_effect_diff_popen] = (
+        "subprocess.Popen", (*_r125_diff_event[1][:3],
+         dict(_r125_diff_event[1][3],
+              GIT_INDEX_FILE=str(_r123_clean_root / "other-index"))))
+    _r125_effect_rediff_retry = list(_r123_effect_positive)
+    _r125_effect_rediff_retry[_r125_effect_diff_popen + 1:_r125_effect_diff_popen + 1] = [
+        *r123_pipe_fdopens(90), _r125_diff_event]
+    _r125_effect_post_rediff_apply = list(_r123_effect_positive)
+    _r125_effect_post_rediff_apply[_r125_effect_diff_popen + 1:_r125_effect_diff_popen + 1] = [
+        *r123_pipe_fdopens(93, with_input=True),
+        ("subprocess.Popen", ("/usr/bin/git", ["/usr/bin/git", "apply", "--cached",
+             "--binary", "--whitespace=nowarn", "--unsafe-paths", "-"], None,
+         _r123_effect_index_env))]
     _r123_effect_tmp_mutant = list(_r123_effect_positive)
     _r123_effect_tmp_mutant[_r123_effect_private_popen] = (
         "subprocess.Popen",
@@ -11478,6 +12046,18 @@ class CraftedConcretePath(type(Path())):
             _r123_effect_scratch)
         and not r123_materializer_effects_ok(
             _r123_effect_wrong_pipe_mutant, r122_base_git, _r123_clean_root,
+            _r123_effect_scratch)
+        and not r123_materializer_effects_ok(
+            _r125_effect_missing_rediff, r122_base_git, _r123_clean_root,
+            _r123_effect_scratch)
+        and not r123_materializer_effects_ok(
+            _r125_effect_wrong_index, r122_base_git, _r123_clean_root,
+            _r123_effect_scratch)
+        and not r123_materializer_effects_ok(
+            _r125_effect_rediff_retry, r122_base_git, _r123_clean_root,
+            _r123_effect_scratch)
+        and not r123_materializer_effects_ok(
+            _r125_effect_post_rediff_apply, r122_base_git, _r123_clean_root,
             _r123_effect_scratch))
     _r123_connected_task_root = r122 / "effect-controller-repo"
     _r123_connected_prelude = [
@@ -11952,6 +12532,24 @@ class CraftedConcretePath(type(Path())):
         "time": {"sleep"},
     }
     _R123_CONTROLLER_GETATTR_FLAGS = {"O_CLOEXEC", "O_NOFOLLOW"}
+    _R123_CONTROLLER_BOUND_CAPABILITY_ATTRIBUTES = {
+        "absolute", "chmod", "cwd", "expanduser", "glob", "group", "home",
+        "hardlink_to", "exists", "is_block_device", "is_char_device",
+        "is_dir", "is_fifo", "is_file", "is_mount", "is_socket",
+        "is_symlink", "iterdir",
+        "lchmod", "link_to", "lstat", "mkdir", "open", "owner",
+        "read_bytes", "read_text", "readlink", "rename", "replace",
+        "resolve", "rglob", "rmdir", "samefile", "stat", "symlink_to",
+        "touch", "unlink", "walk", "write_bytes", "write_text"}
+    _R123_CONTROLLER_IMPORTED_VALUE_PATHS = {
+        ("fcntl", "F_GETPATH"), ("fcntl", "LOCK_EX"),
+        ("fcntl", "LOCK_NB"),
+        ("os", "O_CREAT"), ("os", "O_EXCL"), ("os", "O_RDONLY"),
+        ("os", "O_WRONLY"), ("os", "X_OK"), ("os", "sep"),
+        ("subprocess", "PIPE"), ("subprocess", "STDOUT"),
+        ("sys", "dont_write_bytecode"),
+        ("sys", "version_info"), ("dt", "timezone", "utc"),
+    }
     _R123_CONTROLLER_COMMON_IMPORTS = {
         "F:0:__future__:annotations",
         "I:argparse", "I:datetime", "I:fcntl", "I:hashlib",
@@ -11979,6 +12577,7 @@ class CraftedConcretePath(type(Path())):
             return False
         import_inventory = []
         module_bindings = {}
+        from_bindings = {}
         for node in tree.body:
             if isinstance(node, ast.Import):
                 for alias in node.names:
@@ -11992,6 +12591,12 @@ class CraftedConcretePath(type(Path())):
                 import_inventory.extend(
                     f"F:{node.level}:{node.module or ''}:{alias.name}"
                     for alias in node.names)
+                for alias in node.names:
+                    local = alias.asname or alias.name
+                    if local in from_bindings:
+                        return False
+                    from_bindings[local] = (
+                        node.level, node.module or "", alias.name)
         if frozenset(import_inventory) not in {
                 frozenset(_R123_CONTROLLER_LEGACY_IMPORTS),
                 frozenset(_R123_CONTROLLER_RESULT_IMPORTS)}:
@@ -12075,21 +12680,213 @@ class CraftedConcretePath(type(Path())):
                     return False
                 cursor = parents.get(id(cursor))
             return False
+        def inside_nested_class_body(node, function_scope):
+            cursor = parents.get(id(node))
+            while cursor is not None and cursor is not function_scope:
+                if isinstance(cursor, ast.ClassDef):
+                    definition_roots = (
+                        *cursor.decorator_list, *cursor.bases,
+                        *(keyword.value for keyword in cursor.keywords))
+                    if any(is_descendant(node, root)
+                           for root in definition_roots):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    return True
+                cursor = parents.get(id(cursor))
+            return False
+        def r125_class_statement_effect(statement, name):
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                      ast.ClassDef)):
+                return "bind" if statement.name == name else None
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                if isinstance(statement, ast.AnnAssign) \
+                        and statement.value is None:
+                    return None
+                targets = (statement.targets if isinstance(statement, ast.Assign)
+                           else (statement.target,))
+                if any(name in {target.id for target in ast.walk(item)
+                                if isinstance(target, ast.Name)
+                                and isinstance(target.ctx, ast.Store)}
+                       for item in targets):
+                    return "bind"
+                return None
+            if isinstance(statement, ast.Delete):
+                if any(name in {target.id for target in ast.walk(item)
+                                if isinstance(target, ast.Name)
+                                and isinstance(target.ctx, ast.Del)}
+                       for item in statement.targets):
+                    return "delete"
+                return None
+            if isinstance(statement, ast.Import):
+                return ("bind" if any(
+                    (alias.asname or alias.name.split(".", 1)[0]) == name
+                    for alias in statement.names) else None)
+            if isinstance(statement, ast.ImportFrom):
+                return ("bind" if any((alias.asname or alias.name) == name
+                                      for alias in statement.names) else None)
+            if isinstance(statement, ast.Try):
+                handlers = [handler for handler in statement.handlers
+                            if handler.name == name]
+                if handlers:
+                    deterministic_cleanup = (
+                        len(statement.body) == 1
+                        and isinstance(statement.body[0], ast.Raise)
+                        and isinstance(statement.body[0].exc, ast.Call)
+                        and isinstance(statement.body[0].exc.func, ast.Name)
+                        and len(handlers) == 1
+                        and isinstance(handlers[0].type, ast.Name)
+                        and handlers[0].type.id
+                            == statement.body[0].exc.func.id
+                        and not statement.orelse and not statement.finalbody)
+                    return "delete" if deterministic_cleanup else "ambiguous"
+            # Conditional/loop/try/match bindings are path-dependent.  A
+            # possible prior bind is fail-closed; comprehension targets and
+            # nested function/class bodies do not leak into the class mapping.
+            for candidate in ast.walk(statement):
+                if candidate is statement:
+                    continue
+                cursor = parents.get(id(candidate))
+                nested = False
+                while cursor is not None and cursor is not statement:
+                    if isinstance(cursor, (*function_types, ast.ClassDef,
+                                           *comprehension_types)):
+                        nested = True
+                        break
+                    cursor = parents.get(id(cursor))
+                if nested:
+                    continue
+                if (isinstance(candidate, ast.Name)
+                        and candidate.id == name
+                        and isinstance(candidate.ctx, (ast.Store, ast.Del))):
+                    return "ambiguous"
+                if (isinstance(candidate, ast.ExceptHandler)
+                        and candidate.name == name):
+                    return "ambiguous"
+                if (isinstance(candidate, (ast.FunctionDef,
+                                           ast.AsyncFunctionDef,
+                                           ast.ClassDef))
+                        and candidate.name == name):
+                    return "ambiguous"
+            return None
+        def r125_active_class_binding(node, name, class_statement):
+            cursor = parents.get(id(node))
+            while cursor is not None:
+                if (isinstance(cursor, ast.ExceptHandler)
+                        and cursor.name == name
+                        and any(is_descendant(node, statement)
+                                for statement in cursor.body)):
+                    return True
+                if isinstance(cursor, (ast.For, ast.AsyncFor)):
+                    targets = {target.id for target in ast.walk(cursor.target)
+                               if isinstance(target, ast.Name)
+                               and isinstance(target.ctx, ast.Store)}
+                    if (name in targets and any(is_descendant(node, statement)
+                                                for statement in cursor.body)):
+                        return True
+                if isinstance(cursor, (ast.With, ast.AsyncWith)):
+                    targets = {
+                        target.id for item in cursor.items
+                        if item.optional_vars is not None
+                        for target in ast.walk(item.optional_vars)
+                        if isinstance(target, ast.Name)
+                        and isinstance(target.ctx, ast.Store)}
+                    if (name in targets and any(is_descendant(node, statement)
+                                                for statement in cursor.body)):
+                        return True
+                if type(cursor).__name__ == "match_case":
+                    targets = {target.id for target in ast.walk(cursor.pattern)
+                               if isinstance(target, ast.Name)
+                               and isinstance(target.ctx, ast.Store)}
+                    # Match capture names are represented by strings on
+                    # MatchAs/MatchStar rather than Name(Store).
+                    targets |= {target.name for target in ast.walk(cursor.pattern)
+                                if isinstance(target,
+                                              (ast.MatchAs, ast.MatchStar))
+                                and isinstance(target.name, str)}
+                    if name in targets:
+                        return True
+                if cursor is class_statement:
+                    break
+                cursor = parents.get(id(cursor))
+            return False
+        def r125_class_scope_state(node, name):
+            cursor = parents.get(id(node))
+            while cursor is not None:
+                if isinstance(cursor, comprehension_types):
+                    # CPython evaluates only the outermost iterable in the
+                    # enclosing namespace.  The element, filters and later
+                    # iterables execute in the comprehension's implicit
+                    # function and cannot see class locals.
+                    if (cursor.generators
+                            and is_descendant(node,
+                                              cursor.generators[0].iter)):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    return "absent"
+                if isinstance(cursor, function_types):
+                    if any(is_descendant(node, root)
+                           for root in definition_time_roots(cursor)):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    return "absent"
+                if isinstance(cursor, ast.ClassDef):
+                    definition_roots = (
+                        *cursor.decorator_list, *cursor.bases,
+                        *(keyword.value for keyword in cursor.keywords))
+                    if any(is_descendant(node, root)
+                           for root in definition_roots):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    child = direct_child_under(node, cursor)
+                    if child not in cursor.body:
+                        return "absent"
+                    bound = False
+                    ambiguous = False
+                    for statement in cursor.body:
+                        if statement is child:
+                            break
+                        effect = r125_class_statement_effect(statement, name)
+                        if effect == "bind":
+                            bound = True
+                            ambiguous = False
+                        elif effect == "ambiguous":
+                            bound = False
+                            ambiguous = True
+                        elif effect == "delete":
+                            bound = False
+                            ambiguous = False
+                    if r125_active_class_binding(node, name, child):
+                        return "bound"
+                    if ambiguous:
+                        return "ambiguous"
+                    return "bound" if bound else "absent"
+                cursor = parents.get(id(cursor))
+            return "absent"
+        def r125_class_scope_shadows(node, name):
+            return r125_class_scope_state(node, name) == "bound"
         for candidate in ast.walk(tree):
             scope = nearest_function(candidate)
             if isinstance(candidate, ast.Nonlocal):
                 return False
             if isinstance(candidate, ast.Global) and scope is not None:
-                scope_globals[id(scope)].update(candidate.names)
+                if any(name in module_bindings or name in from_bindings
+                       or name in {"getattr", "globals", "input", "open",
+                                   "print"}
+                       for name in candidate.names):
+                    return False
+                if not inside_nested_class_body(candidate, scope):
+                    scope_globals[id(scope)].update(candidate.names)
             elif (isinstance(candidate, ast.Name)
                   and isinstance(candidate.ctx, ast.Store)
                   and scope is not None
+                  and not inside_nested_class_body(candidate, scope)
                   and (not inside_comprehension(candidate)
                        or (isinstance(parents.get(id(candidate)), ast.NamedExpr)
                            and parents[id(candidate)].target is candidate))):
                 scope_locals[id(scope)].add(candidate.id)
             elif (isinstance(candidate, ast.ExceptHandler)
-                  and isinstance(candidate.name, str) and scope is not None):
+                  and isinstance(candidate.name, str) and scope is not None
+                  and not inside_nested_class_body(candidate, scope)):
                 scope_locals[id(scope)].add(candidate.name)
             elif (isinstance(candidate,
                              (ast.FunctionDef, ast.AsyncFunctionDef,
@@ -12098,9 +12895,44 @@ class CraftedConcretePath(type(Path())):
                 # A nested definition binds its name in the containing
                 # function, just like an ordinary assignment.  Its own body
                 # remains a distinct scope and is not flattened here.
-                scope_locals[id(scope)].add(candidate.name)
+                if not inside_nested_class_body(candidate, scope):
+                    scope_locals[id(scope)].add(candidate.name)
+        r125_scope_binding_counts = {}
+        for scope in function_scopes:
+            for argument in (*scope.args.posonlyargs, *scope.args.args,
+                             *scope.args.kwonlyargs,
+                             *((scope.args.vararg,) if scope.args.vararg else ()),
+                             *((scope.args.kwarg,) if scope.args.kwarg else ())):
+                key = (id(scope), argument.arg)
+                r125_scope_binding_counts[key] = (
+                    r125_scope_binding_counts.get(key, 0) + 1)
+        for candidate in ast.walk(tree):
+            scope = nearest_function(candidate)
+            if scope is None or inside_nested_class_body(candidate, scope):
+                continue
+            name = None
+            if (isinstance(candidate, ast.Name)
+                    and isinstance(candidate.ctx, (ast.Store, ast.Del))
+                    and (not inside_comprehension(candidate)
+                         or (isinstance(parents.get(id(candidate)),
+                                        ast.NamedExpr)
+                             and parents[id(candidate)].target is candidate))):
+                name = candidate.id
+            elif (isinstance(candidate, ast.ExceptHandler)
+                  and isinstance(candidate.name, str)):
+                name = candidate.name
+            elif isinstance(candidate, (ast.FunctionDef,
+                                        ast.AsyncFunctionDef,
+                                        ast.ClassDef)):
+                name = candidate.name
+            if name is not None:
+                key = (id(scope), name)
+                r125_scope_binding_counts[key] = (
+                    r125_scope_binding_counts.get(key, 0) + 1)
         def is_shadowed(node, name):
             if comprehension_shadows(node, name):
+                return True
+            if r125_class_scope_shadows(node, name):
                 return True
             scope = nearest_function(node)
             while scope is not None:
@@ -12132,11 +12964,652 @@ class CraftedConcretePath(type(Path())):
             for descendant in ast.walk(root)}
         def in_inert_annotation(node):
             return id(node) in inert_annotation_ids
+        def r125_literal_data(node):
+            if isinstance(node, ast.Constant):
+                return True
+            if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+                return all(r125_literal_data(item) for item in node.elts)
+            if isinstance(node, ast.Dict):
+                return all(key is not None and r125_literal_data(key)
+                           and r125_literal_data(value)
+                           for key, value in zip(node.keys, node.values))
+            return False
+        # Definition-time helper calls are admitted by bounded purity and
+        # provenance, never by their spelling.  This keeps ordinary identity
+        # factories/decorators/class selectors legitimate without allowing a
+        # helper to relay an imported module, fd, path or other ambient
+        # capability into the pre-observer window.
+        r125_module_definitions = {}
+        r125_module_values = {}
+        r125_module_binding_counts = {}
+        def r125_record_module_binding(name):
+            if isinstance(name, str):
+                r125_module_binding_counts[name] = (
+                    r125_module_binding_counts.get(name, 0) + 1)
+        def r125_target_names(target):
+            if isinstance(target, ast.Name):
+                return (target.id,)
+            if isinstance(target, (ast.Tuple, ast.List)):
+                return tuple(name for item in target.elts
+                             for name in r125_target_names(item))
+            return ()
+        def r125_module_scope_binding(node):
+            cursor = parents.get(id(node))
+            while cursor is not None:
+                if isinstance(cursor, function_types):
+                    if any(is_descendant(node, root)
+                           for root in definition_time_roots(cursor)):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    return False
+                if isinstance(cursor, ast.ClassDef):
+                    definition_roots = (
+                        *cursor.decorator_list, *cursor.bases,
+                        *(keyword.value for keyword in cursor.keywords))
+                    if any(is_descendant(node, root)
+                           for root in definition_roots):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    return False
+                if isinstance(cursor, comprehension_types):
+                    named_expression = parents.get(id(node))
+                    while (named_expression is not None
+                           and named_expression is not cursor
+                           and not isinstance(named_expression, ast.NamedExpr)):
+                        named_expression = parents.get(id(named_expression))
+                    if (not isinstance(named_expression, ast.NamedExpr)
+                            or not is_descendant(
+                                node, named_expression.target)):
+                        return False
+                cursor = parents.get(id(cursor))
+            return True
+        for statement in ast.walk(tree):
+            if (isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                       ast.ClassDef))
+                    and r125_module_scope_binding(statement)):
+                r125_record_module_binding(statement.name)
+                r125_module_definitions.setdefault(statement.name, statement)
+            elif (isinstance(statement, ast.Import)
+                  and r125_module_scope_binding(statement)):
+                for alias in statement.names:
+                    r125_record_module_binding(
+                        alias.asname or alias.name.split(".", 1)[0])
+            elif (isinstance(statement, ast.ImportFrom)
+                  and r125_module_scope_binding(statement)):
+                for alias in statement.names:
+                    r125_record_module_binding(alias.asname or alias.name)
+            elif (isinstance(statement, ast.Name)
+                  and isinstance(statement.ctx, (ast.Store, ast.Del))):
+                scope = nearest_function(statement)
+                if (r125_module_scope_binding(statement)
+                        or (scope is not None
+                            and statement.id in scope_globals[id(scope)])):
+                    r125_record_module_binding(statement.id)
+            elif (isinstance(statement, ast.ExceptHandler)
+                  and isinstance(statement.name, str)
+                  and r125_module_scope_binding(statement)):
+                r125_record_module_binding(statement.name)
+        for statement in tree.body:
+            if (isinstance(statement, ast.Assign)
+                    and len(statement.targets) == 1
+                    and isinstance(statement.targets[0], ast.Name)
+                    and r125_module_binding_counts.get(
+                        statement.targets[0].id) == 1):
+                r125_module_values[statement.targets[0].id] = statement.value
+            elif (type(statement).__name__ in {"MatchAs", "MatchStar"}
+                  and isinstance(statement.name, str)
+                  and r125_module_scope_binding(statement)):
+                r125_record_module_binding(statement.name)
+        def r125_inert_local_class(node, visiting):
+            if not isinstance(node, ast.ClassDef) or node.decorator_list \
+                    or node.keywords:
+                return False
+            if any(not r125_pure_definition_value(base, frozenset(), visiting)
+                   for base in node.bases):
+                return False
+            for statement in node.body:
+                if isinstance(statement, ast.Pass):
+                    continue
+                if (isinstance(statement, ast.Expr)
+                        and isinstance(statement.value, ast.Constant)
+                        and isinstance(statement.value.value, str)):
+                    continue
+                if (isinstance(statement, ast.Assign)
+                        and all(isinstance(target, ast.Name)
+                                for target in statement.targets)
+                        and r125_pure_definition_value(
+                            statement.value, frozenset(), visiting)):
+                    continue
+                if (isinstance(statement, ast.AnnAssign)
+                        and isinstance(statement.target, ast.Name)
+                        and (statement.value is None
+                             or r125_pure_definition_value(
+                                 statement.value, frozenset(), visiting))):
+                    continue
+                return False
+            return True
+        def r125_pure_local_function(node, visiting):
+            if (not isinstance(node, ast.FunctionDef) or node.decorator_list
+                    or node.name in visiting):
+                return False
+            statements = list(node.body)
+            if (statements and isinstance(statements[0], ast.Expr)
+                    and isinstance(statements[0].value, ast.Constant)
+                    and isinstance(statements[0].value.value, str)):
+                statements = statements[1:]
+            if len(statements) != 1 or not isinstance(statements[0], ast.Return):
+                return False
+            parameters = frozenset(arg.arg for arg in (
+                *node.args.posonlyargs, *node.args.args,
+                *node.args.kwonlyargs,
+                *((node.args.vararg,) if node.args.vararg else ()),
+                *((node.args.kwarg,) if node.args.kwarg else ())))
+            return r125_pure_definition_value(
+                statements[0].value, parameters, visiting | {node.name})
+        def r125_pure_local_call(node, visiting=frozenset()):
+            if (not isinstance(node.func, ast.Name)
+                    or any(keyword.arg is None for keyword in node.keywords)):
+                return False
+            name = node.func.id
+            function = r125_module_definitions.get(name)
+            if r125_module_binding_counts.get(name) != 1:
+                return False
+            local_value = r125_module_values.get(name)
+            if isinstance(local_value, ast.Lambda):
+                if (any(isinstance(argument, ast.Starred)
+                        for argument in node.args)
+                        or any(keyword.arg is None for keyword in node.keywords)
+                        or not r125_pure_definition_value(
+                            local_value, frozenset(), visiting | {name})
+                        or any(not r125_pure_definition_value(
+                            value, frozenset(), visiting | {name})
+                               for value in (*node.args,
+                                   *(keyword.value for keyword in node.keywords)))):
+                    return False
+                regular = [*local_value.args.posonlyargs,
+                           *local_value.args.args]
+                if (len(node.args) > len(regular)
+                        and local_value.args.vararg is None):
+                    return False
+                allowed_keywords = {arg.arg for arg in (
+                    *regular, *local_value.args.kwonlyargs)}
+                if (local_value.args.kwarg is None
+                        and any(keyword.arg not in allowed_keywords
+                                for keyword in node.keywords)):
+                    return False
+                return True
+            if isinstance(function, ast.ClassDef):
+                return (not node.args and not node.keywords
+                        and r125_inert_local_class(function, visiting | {name}))
+            if not r125_pure_local_function(function, visiting):
+                return False
+            parameters = [*function.args.posonlyargs, *function.args.args]
+            positional = len(node.args)
+            if positional > len(parameters) and function.args.vararg is None:
+                return False
+            parameter_names = {arg.arg for arg in (
+                *parameters, *function.args.kwonlyargs)}
+            if (function.args.kwarg is None
+                    and any(keyword.arg not in parameter_names
+                            for keyword in node.keywords)):
+                return False
+            supplied = {arg.arg for arg in parameters[:positional]} | {
+                keyword.arg for keyword in node.keywords}
+            defaults = {
+                arg.arg: value for arg, value in zip(
+                    parameters[len(parameters) - len(function.args.defaults):],
+                    function.args.defaults)}
+            defaults.update({
+                arg.arg: value for arg, value in zip(
+                    function.args.kwonlyargs, function.args.kw_defaults)
+                if value is not None})
+            if any(arg.arg not in supplied and arg.arg not in defaults
+                   for arg in (*parameters, *function.args.kwonlyargs)):
+                return False
+            values = [*node.args, *(keyword.value for keyword in node.keywords),
+                      *(value for key, value in defaults.items()
+                        if key not in supplied)]
+            return all(r125_pure_definition_value(
+                       value, frozenset(), visiting | {name})
+                       for value in values)
+        def r125_pure_definition_value(node, parameters=frozenset(),
+                                       visiting=frozenset()):
+            if node is None or isinstance(node, ast.Constant):
+                return True
+            if isinstance(node, ast.Name):
+                if node.id in parameters:
+                    return True
+                if node.id in {"object", "Exception", "RuntimeError",
+                               "ValueError"} and r125_module_binding_counts.get(
+                                   node.id, 0) == 0:
+                    return True
+                definition = r125_module_definitions.get(node.id)
+                return (r125_module_binding_counts.get(node.id) == 1
+                        and r125_inert_local_class(definition, visiting))
+            if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+                return all(r125_pure_definition_value(
+                           item, parameters, visiting) for item in node.elts)
+            if isinstance(node, ast.Dict):
+                return all(key is not None
+                           and r125_pure_definition_value(
+                               key, parameters, visiting)
+                           and r125_pure_definition_value(
+                               value, parameters, visiting)
+                           for key, value in zip(node.keys, node.values))
+            if isinstance(node, ast.Lambda):
+                if node.args.vararg is not None or node.args.kwarg is not None:
+                    return False
+                lambda_parameters = parameters | frozenset(arg.arg for arg in (
+                    *node.args.posonlyargs, *node.args.args,
+                    *node.args.kwonlyargs))
+                return (all(r125_pure_definition_value(
+                            value, parameters, visiting)
+                            for value in (*node.args.defaults,
+                                *(value for value in node.args.kw_defaults
+                                  if value is not None)))
+                        and r125_pure_definition_value(
+                            node.body, lambda_parameters, visiting))
+            if isinstance(node, ast.UnaryOp):
+                return r125_pure_definition_value(
+                    node.operand, parameters, visiting)
+            if isinstance(node, ast.BinOp):
+                return (r125_pure_definition_value(
+                            node.left, parameters, visiting)
+                        and r125_pure_definition_value(
+                            node.right, parameters, visiting))
+            if isinstance(node, ast.BoolOp):
+                return all(r125_pure_definition_value(
+                           value, parameters, visiting)
+                           for value in node.values)
+            if isinstance(node, ast.Compare):
+                return (r125_pure_definition_value(
+                            node.left, parameters, visiting)
+                        and all(r125_pure_definition_value(
+                                value, parameters, visiting)
+                                for value in node.comparators))
+            if isinstance(node, ast.IfExp):
+                return all(r125_pure_definition_value(
+                           value, parameters, visiting)
+                           for value in (node.test, node.body, node.orelse))
+            if isinstance(node, ast.Call):
+                return r125_pure_local_call(node, visiting)
+            return False
+        def r125_allowed_definition_call(node):
+            if (isinstance(node.func, ast.Name)
+                    and node.func.id == "RoadmapSlice"
+                    and r125_module_binding_counts.get("RoadmapSlice") == 1
+                    and isinstance(r125_module_definitions.get("RoadmapSlice"),
+                                   ast.ClassDef)
+                    and not r125_module_definitions["RoadmapSlice"].bases
+                    and not r125_module_definitions["RoadmapSlice"].keywords
+                    and len(r125_module_definitions[
+                        "RoadmapSlice"].decorator_list) == 1
+                    and isinstance(r125_module_definitions[
+                        "RoadmapSlice"].decorator_list[0], ast.Call)
+                    and isinstance(r125_module_definitions[
+                        "RoadmapSlice"].decorator_list[0].func, ast.Name)
+                    and from_bindings.get(r125_module_definitions[
+                        "RoadmapSlice"].decorator_list[0].func.id)
+                        == (0, "dataclasses", "dataclass")
+                    and r125_module_binding_counts.get(
+                        r125_module_definitions["RoadmapSlice"]
+                            .decorator_list[0].func.id) == 1
+                    and all(isinstance(statement, (ast.AnnAssign, ast.Expr))
+                            and (not isinstance(statement, ast.Expr)
+                                 or (isinstance(statement.value, ast.Constant)
+                                     and isinstance(statement.value.value, str)))
+                            for statement in r125_module_definitions[
+                                "RoadmapSlice"].body)
+                    and not node.keywords
+                    and all(r125_literal_data(value) for value in node.args)):
+                return True
+            if (isinstance(node.func, ast.Name)
+                    and r125_module_binding_counts.get(node.func.id) == 1
+                    and from_bindings.get(node.func.id)
+                        == (0, "dataclasses", "dataclass")
+                    and not node.args and len(node.keywords) == 1
+                    and node.keywords[0].arg == "frozen"
+                    and isinstance(node.keywords[0].value, ast.Constant)
+                    and node.keywords[0].value.value is True):
+                return True
+            if (isinstance(node.func, ast.Name)
+                    and r125_module_binding_counts.get(node.func.id) == 1
+                    and from_bindings.get(node.func.id)
+                        == (0, "pathlib", "Path")
+                    and len(node.args) == 1 and not node.keywords
+                    and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id == "__file__"):
+                return True
+            if (isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "resolve" and not node.args
+                    and not node.keywords and isinstance(node.func.value, ast.Call)
+                    and r125_allowed_definition_call(node.func.value)):
+                return True
+            if (isinstance(node.func, ast.Name) and node.func.id == "str"
+                    and r125_module_binding_counts.get("str", 0) == 0
+                    and len(node.args) == 1 and not node.keywords
+                    and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id in {"AUTHORITY_LIB", "REPOSITORY_ROOT"}):
+                return True
+            if r125_pure_local_call(node):
+                return True
+            return (isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "insert"
+                    and isinstance(node.func.value, ast.Attribute)
+                    and node.func.value.attr == "path"
+                    and isinstance(node.func.value.value, ast.Name)
+                    and module_bindings.get(node.func.value.value.id) == "sys"
+                    and r125_module_binding_counts.get(
+                        node.func.value.value.id) == 1
+                    and len(node.args) == 2 and not node.keywords
+                    and isinstance(node.args[0], ast.Constant)
+                    and node.args[0].value == 0
+                    and isinstance(node.args[1], ast.Call)
+                    and r125_allowed_definition_call(node.args[1]))
+        def r125_definition_time_call(node):
+            cursor = parents.get(id(node))
+            while cursor is not None:
+                if (isinstance(cursor, ast.If)
+                        and isinstance(cursor.test, ast.Compare)
+                        and isinstance(cursor.test.left, ast.Name)
+                        and cursor.test.left.id == "__name__"
+                        and len(cursor.test.ops) == len(cursor.test.comparators) == 1
+                        and isinstance(cursor.test.ops[0], ast.Eq)
+                        and isinstance(cursor.test.comparators[0], ast.Constant)
+                        and cursor.test.comparators[0].value == "__main__"
+                        and any(is_descendant(node, statement)
+                                for statement in cursor.body)):
+                    return False
+                if isinstance(cursor, function_types):
+                    if any(is_descendant(node, root)
+                           for root in definition_time_roots(cursor)):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    return False
+                cursor = parents.get(id(cursor))
+            return True
+        def r125_definition_statement_executes(node):
+            cursor = parents.get(id(node))
+            while cursor is not None:
+                if (isinstance(cursor, ast.If)
+                        and isinstance(cursor.test, ast.Compare)
+                        and isinstance(cursor.test.left, ast.Name)
+                        and cursor.test.left.id == "__name__"
+                        and len(cursor.test.ops) == len(cursor.test.comparators) == 1
+                        and isinstance(cursor.test.ops[0], ast.Eq)
+                        and isinstance(cursor.test.comparators[0], ast.Constant)
+                        and cursor.test.comparators[0].value == "__main__"
+                        and any(is_descendant(node, statement)
+                                for statement in cursor.body)):
+                    return False
+                if isinstance(cursor, function_types):
+                    return False
+                cursor = parents.get(id(cursor))
+            return True
+        def r125_inside_allowed_definition_call(node):
+            cursor = parents.get(id(node))
+            while cursor is not None:
+                if (isinstance(cursor, ast.Call)
+                        and r125_definition_time_call(cursor)
+                        and r125_allowed_definition_call(cursor)):
+                    return True
+                if isinstance(cursor, function_types):
+                    if any(is_descendant(node, root)
+                           for root in definition_time_roots(cursor)):
+                        cursor = parents.get(id(cursor))
+                        continue
+                    return False
+                cursor = parents.get(id(cursor))
+            return False
+        def r125_imported_capability_root(node):
+            root = node
+            while isinstance(root, (ast.Attribute, ast.Subscript)):
+                root = root.value
+            if not isinstance(root, ast.Name) or is_shadowed(root, root.id):
+                return None
+            if root.id in module_bindings or root.id in from_bindings:
+                return root.id
+            return None
+        def r125_path_constructor(node):
+            return (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and not is_shadowed(node.func, node.func.id)
+                    and from_bindings.get(node.func.id)
+                        == (0, "pathlib", "Path")
+                    and r125_module_binding_counts.get(node.func.id) == 1)
+        def r125_path_annotation(node):
+            return any(isinstance(candidate, ast.Name)
+                       and from_bindings.get(candidate.id)
+                           == (0, "pathlib", "Path")
+                       for candidate in ast.walk(node))
+        r125_path_names = set()
+        for function in function_scopes:
+            for argument in (*function.args.posonlyargs, *function.args.args,
+                             *function.args.kwonlyargs,
+                             *((function.args.vararg,)
+                               if function.args.vararg else ()),
+                             *((function.args.kwarg,)
+                               if function.args.kwarg else ())):
+                if (argument.annotation is not None
+                        and r125_path_annotation(argument.annotation)):
+                    r125_path_names.add((id(function), argument.arg))
+        def r125_path_name(node):
+            if comprehension_shadows(node, node.id):
+                cursor = parents.get(id(node))
+                while cursor is not None:
+                    if isinstance(cursor, comprehension_types):
+                        for generator in cursor.generators:
+                            targets = {
+                                target.id for target in ast.walk(generator.target)
+                                if isinstance(target, ast.Name)
+                                and isinstance(target.ctx, ast.Store)}
+                            if (node.id in targets
+                                    and r125_path_collection(generator.iter)):
+                                return True
+                    cursor = parents.get(id(cursor))
+                return False
+            scope = nearest_function(node)
+            while scope is not None:
+                if (id(scope), node.id) in r125_path_names:
+                    return True
+                if node.id in scope_locals[id(scope)]:
+                    return False
+                scope = nearest_function(scope)
+            return (None, node.id) in r125_path_names
+        def r125_path_expression(node):
+            if r125_path_constructor(node):
+                return True
+            if isinstance(node, ast.Name):
+                return r125_path_name(node)
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+                return r125_path_expression(node.left)
+            if isinstance(node, ast.Attribute):
+                return (node.attr == "parent"
+                        and r125_path_expression(node.value))
+            if (isinstance(node, ast.Subscript)
+                    and isinstance(node.value, ast.Attribute)
+                    and node.value.attr == "parents"):
+                return r125_path_expression(node.value.value)
+            if isinstance(node, ast.IfExp):
+                return (r125_path_expression(node.body)
+                        and r125_path_expression(node.orelse))
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if (isinstance(node.func.value, ast.Name)
+                        and from_bindings.get(node.func.value.id)
+                            == (0, "pathlib", "Path")
+                        and not is_shadowed(node.func.value,
+                                            node.func.value.id)
+                        and node.func.attr in {"cwd", "home"}):
+                    return True
+                return (node.func.attr in {
+                            "absolute", "expanduser", "resolve", "with_name",
+                            "with_stem", "with_suffix"}
+                        and r125_path_expression(node.func.value))
+            if (isinstance(node, ast.Subscript)
+                    and isinstance(node.value, (ast.Tuple, ast.List))
+                    and isinstance(node.slice, ast.Constant)
+                    and type(node.slice.value) is int):
+                index = node.slice.value
+                values = node.value.elts
+                return (-len(values) <= index < len(values)
+                        and r125_path_expression(values[index]))
+            return False
+        def r125_path_collection(node):
+            return (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr in {"glob", "iterdir", "rglob"}
+                    and r125_path_expression(node.func.value))
+        changed = True
+        while changed:
+            changed = False
+            for candidate in ast.walk(tree):
+                value = None
+                targets = ()
+                if isinstance(candidate, ast.Assign):
+                    value, targets = candidate.value, candidate.targets
+                elif isinstance(candidate, ast.AnnAssign):
+                    value, targets = candidate.value, (candidate.target,)
+                if value is None or not r125_path_expression(value):
+                    continue
+                for target in targets:
+                    for name_node in ast.walk(target):
+                        if (isinstance(name_node, ast.Name)
+                                and isinstance(name_node.ctx, ast.Store)):
+                            scope = nearest_function(name_node)
+                            if (scope is not None
+                                    and inside_nested_class_body(
+                                        name_node, scope)):
+                                continue
+                            key = (id(scope) if scope is not None else None,
+                                   name_node.id)
+                            if key not in r125_path_names:
+                                r125_path_names.add(key)
+                                changed = True
+        r125_inert_names = set()
+        def r125_inert_name(node):
+            scope = nearest_function(node)
+            while scope is not None:
+                if node.id in scope_globals[id(scope)]:
+                    scope = nearest_function(scope)
+                    continue
+                key = (id(scope), node.id)
+                if key in r125_inert_names:
+                    return r125_scope_binding_counts.get(key) == 1
+                if node.id in scope_locals[id(scope)]:
+                    return False
+                scope = nearest_function(scope)
+            return ((None, node.id) in r125_inert_names
+                    and r125_module_binding_counts.get(node.id) == 1)
+        def r125_inert_receiver(node):
+            if isinstance(node, ast.Constant):
+                return True
+            if isinstance(node, ast.Name):
+                if r125_inert_name(node):
+                    return True
+                return (r125_module_binding_counts.get(node.id) == 1
+                        and r125_inert_local_class(
+                            r125_module_definitions.get(node.id), frozenset()))
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and not node.args and not node.keywords
+                    and r125_module_binding_counts.get(node.func.id) == 1):
+                return r125_inert_local_class(
+                    r125_module_definitions.get(node.func.id), frozenset())
+            if isinstance(node, ast.NamedExpr):
+                return r125_inert_receiver(node.value)
+            return False
+        changed = True
+        while changed:
+            changed = False
+            for candidate in ast.walk(tree):
+                value = None
+                targets = ()
+                if isinstance(candidate, ast.Assign):
+                    value, targets = candidate.value, candidate.targets
+                elif isinstance(candidate, ast.AnnAssign):
+                    value, targets = candidate.value, (candidate.target,)
+                elif isinstance(candidate, ast.NamedExpr):
+                    value, targets = candidate.value, (candidate.target,)
+                if value is None or not r125_inert_receiver(value):
+                    continue
+                for target in targets:
+                    for name_node in ast.walk(target):
+                        if (isinstance(name_node, ast.Name)
+                                and isinstance(name_node.ctx, ast.Store)):
+                            scope = nearest_function(name_node)
+                            if (scope is not None
+                                    and inside_nested_class_body(
+                                        name_node, scope)):
+                                continue
+                            key = (id(scope) if scope is not None else None,
+                                   name_node.id)
+                            if key not in r125_inert_names:
+                                r125_inert_names.add(key)
+                                changed = True
+        for definition in ast.walk(tree):
+            if (not isinstance(definition, (ast.FunctionDef,
+                                            ast.AsyncFunctionDef,
+                                            ast.ClassDef))
+                    or not r125_definition_statement_executes(definition)):
+                continue
+            for decorator in definition.decorator_list:
+                if isinstance(decorator, ast.Call):
+                    continue
+                if (isinstance(decorator, ast.Name)
+                        and r125_module_binding_counts.get(decorator.id) == 1
+                        and from_bindings.get(decorator.id)
+                            == (0, "dataclasses", "dataclass")):
+                    continue
+                if (not isinstance(decorator, ast.Name)
+                        or r125_module_binding_counts.get(decorator.id) != 1
+                        or not r125_pure_local_function(
+                            r125_module_definitions.get(decorator.id),
+                            frozenset())):
+                    return False
+            if isinstance(definition, ast.ClassDef):
+                for base in definition.bases:
+                    if isinstance(base, ast.Call):
+                        continue
+                    if (isinstance(base, ast.Name)
+                            and base.id in {"object", "Exception",
+                                            "RuntimeError", "ValueError"}
+                            and r125_module_binding_counts.get(base.id, 0) == 0):
+                        continue
+                    if (not isinstance(base, ast.Name)
+                            or r125_module_binding_counts.get(base.id) != 1
+                            or not r125_inert_local_class(
+                                r125_module_definitions.get(base.id),
+                                frozenset())):
+                        return False
+                if definition.keywords:
+                    return False
         for node in ast.walk(tree):
             # The exact controller import set requires postponed annotations;
             # these ASTs are stored as strings and grant no runtime capability.
             if in_inert_annotation(node):
                 continue
+            if (isinstance(node, ast.Call) and r125_definition_time_call(node)
+                    and not r125_allowed_definition_call(node)):
+                return False
+            if (isinstance(node, ast.Subscript)
+                    and isinstance(node.ctx, (ast.Store, ast.Del))
+                    and r125_definition_time_call(node)):
+                return False
+            if (isinstance(node, ast.Attribute)
+                    and isinstance(node.ctx, (ast.Store, ast.Del))
+                    and r125_definition_time_call(node)):
+                parent = parents.get(id(node))
+                exact_bytecode_guard = (
+                    isinstance(node.ctx, ast.Store)
+                    and isinstance(node.value, ast.Name)
+                    and module_bindings.get(node.value.id) == "sys"
+                    and r125_module_binding_counts.get(node.value.id) == 1
+                    and node.attr == "dont_write_bytecode"
+                    and isinstance(parent, ast.Assign)
+                    and len(parent.targets) == 1 and parent.targets[0] is node
+                    and isinstance(parent.value, ast.Constant)
+                    and parent.value.value is True)
+                if not exact_bytecode_guard:
+                    return False
             if isinstance(node, ast.Import):
                 if (not isinstance(parents.get(id(node)), ast.Module)
                         or any(alias.name.split(".", 1)[0]
@@ -12149,7 +13622,26 @@ class CraftedConcretePath(type(Path())):
                         in _R123_CONTROLLER_FORBIDDEN_IMPORT_ROOTS):
                     return False
             if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                if r125_class_scope_state(node, node.id) == "ambiguous":
+                    return False
                 shadowed = is_shadowed(node, node.id)
+                exact_bare_dataclass = (
+                    from_bindings.get(node.id)
+                        == (0, "dataclasses", "dataclass")
+                    and r125_module_binding_counts.get(node.id) == 1
+                    and isinstance(parents.get(id(node)), ast.ClassDef)
+                    and node in parents[id(node)].decorator_list)
+                if (r125_definition_time_call(node) and not shadowed
+                        and ((node.id in from_bindings
+                              and not exact_bare_dataclass)
+                             or node.id in {"open", "input"})
+                        and not r125_inside_allowed_definition_call(node)):
+                    return False
+                if node.id in {"open", "input"} and not shadowed:
+                    parent = parents.get(id(node))
+                    if not (isinstance(parent, ast.Call)
+                            and parent.func is node):
+                        return False
                 if node.id in _R123_CONTROLLER_AMBIENT_NAMES and not shadowed:
                     return False
                 if node.id == "globals" and not shadowed:
@@ -12172,7 +13664,8 @@ class CraftedConcretePath(type(Path())):
                     if not (isinstance(call, ast.Call) and call.func is node
                             and len(call.args) == 3 and not call.keywords
                             and isinstance(call.args[0], ast.Name)
-                            and call.args[0].id == "os"
+                            and module_bindings.get(call.args[0].id) == "os"
+                            and not is_shadowed(call.args[0], call.args[0].id)
                             and isinstance(call.args[1], ast.Constant)
                             and call.args[1].value
                                 in _R123_CONTROLLER_GETATTR_FLAGS
@@ -12199,8 +13692,54 @@ class CraftedConcretePath(type(Path())):
                              and parent.value is node)
                             or safe_getattr_os_arg):
                         return False
+                if node.id in from_bindings and not shadowed:
+                    parent = parents.get(id(node))
+                    exception_type = False
+                    cursor = parent
+                    while cursor is not None:
+                        if (isinstance(cursor, ast.ExceptHandler)
+                                and cursor.type is not None
+                                and is_descendant(node, cursor.type)):
+                            exception_type = True
+                            break
+                        if isinstance(cursor, (ast.stmt, function_types)):
+                            break
+                        cursor = parents.get(id(cursor))
+                    direct_call = (isinstance(parent, ast.Call)
+                                   and parent.func is node)
+                    attribute_root = (isinstance(parent, ast.Attribute)
+                                      and parent.value is node)
+                    exact_dataclass = (
+                        from_bindings.get(node.id)
+                            == (0, "dataclasses", "dataclass")
+                        and r125_module_binding_counts.get(node.id) == 1
+                        and isinstance(parent, ast.ClassDef)
+                        and node in parent.decorator_list)
+                    if not (direct_call or attribute_root or exception_type
+                            or exact_dataclass):
+                        return False
             if not isinstance(node, ast.Attribute):
+                if (isinstance(node, ast.Subscript)
+                        and isinstance(node.ctx, ast.Load)
+                        and r125_definition_time_call(node)
+                        and r125_imported_capability_root(node) is not None
+                        and not r125_inside_allowed_definition_call(node)):
+                    return False
                 continue
+            if (node.attr in _R123_CONTROLLER_BOUND_CAPABILITY_ATTRIBUTES
+                    and not r125_inert_receiver(node.value)):
+                parent = parents.get(id(node))
+                if not (isinstance(parent, ast.Call) and parent.func is node):
+                    return False
+            if (node.attr == "open" and r125_path_constructor(node.value)):
+                parent = parents.get(id(node))
+                if not (isinstance(parent, ast.Call) and parent.func is node):
+                    return False
+            if (isinstance(node.ctx, ast.Load)
+                    and r125_definition_time_call(node)
+                    and r125_imported_capability_root(node) is not None
+                    and not r125_inside_allowed_definition_call(node)):
+                return False
             root = node
             parts = []
             while isinstance(root, ast.Attribute):
@@ -12209,10 +13748,35 @@ class CraftedConcretePath(type(Path())):
             imported_root = (isinstance(root, ast.Name)
                              and root.id in module_bindings
                              and not is_shadowed(root, root.id))
+            from_imported_root = (
+                isinstance(root, ast.Name) and root.id in from_bindings
+                and not is_shadowed(root, root.id))
             if (imported_root
                     and parts[-1] not in _R123_CONTROLLER_MODULE_FIRST_HOPS[
                         module_bindings[root.id]]):
                 return False
+            parent = parents.get(id(node))
+            if imported_root or from_imported_root:
+                direct_call = (isinstance(parent, ast.Call)
+                               and parent.func is node)
+                intermediate = (isinstance(parent, ast.Attribute)
+                                and parent.value is node)
+                value_path = ((module_bindings[root.id], *reversed(parts))
+                              if imported_root else None)
+                exact_stderr_sink = (
+                    value_path == ("sys", "stderr")
+                    and isinstance(parent, ast.keyword)
+                    and parent.arg == "file"
+                    and isinstance(parents.get(id(parent)), ast.Call)
+                    and isinstance(parents[id(parent)].func, ast.Name)
+                    and parents[id(parent)].func.id == "print"
+                    and not is_shadowed(parents[id(parent)].func, "print")
+                    and r125_module_binding_counts.get("print", 0) == 0)
+                if (not direct_call and not intermediate
+                        and value_path not in
+                            _R123_CONTROLLER_IMPORTED_VALUE_PATHS
+                        and not exact_stderr_sink):
+                    return False
             if node.attr in _R123_CONTROLLER_FRAME_ATTRIBUTES:
                 return False
             if (imported_root
@@ -12242,7 +13806,7 @@ class CraftedConcretePath(type(Path())):
                     return False
         return True
 
-    _r123_controller_source_positive = source.read_text(encoding="utf-8")
+    _r123_controller_source_positive = _r125_controller_text
     _r123_controller_source_mutants = {
         "ctypes_import": "\nimport ctypes\nctypes.CDLL(None)\n",
         "sys_modules": "\ndef materialize_escape():\n return sys.modules['ctypes'].CDLL(None)\n",
@@ -12269,6 +13833,175 @@ class CraftedConcretePath(type(Path())):
         "function_decorator_sys": "\ndef r123_decorate(value):\n return lambda function: function\n@r123_decorate(sys.meta_path)\ndef materialize_escape(sys):\n return sys\n",
         "lambda_default_sys": "\nmaterialize_escape = lambda sys=sys: sys.meta_path\n",
         "pathlib_private_module_relay": "\ndef materialize_escape():\n return Path('.')._flavour.pathmod.os.system\n",
+        "definition_fd_write": "\nr125_definition_effect = os.write(9, b'hidden')\n",
+        "definition_fd_fcntl": "\nr125_definition_effect = fcntl.fcntl(9, fcntl.F_GETFD)\n",
+        "definition_name_guard":
+            "\nif __name__.startswith('h032_r59_'):\n os.write(9, b'hidden')\n",
+        "definition_os_attribute_store":
+            "\ndef r125_fake(*args, **kwargs): return None\nos.write = r125_fake\n",
+        "definition_subprocess_attribute_store":
+            "\ndef r125_fake(*args, **kwargs): return None\nsubprocess.run = r125_fake\n",
+        "definition_sys_path_store":
+            "\nsys.path[0] = '/private/tmp/r125-shadow'\n",
+        "definition_default_comprehension_store":
+            "\ndef escaped(value=[None for sys.path[0] in "
+            "['/private/tmp/r125-shadow']]):\n pass\n",
+        "definition_os_write_transfer":
+            "\nR125_WRITE = os.write\n",
+        "definition_os_fstat_transfer":
+            "\nR125_FSTAT = os.fstat\n",
+        "definition_fcntl_transfer":
+            "\nR125_FCNTL = fcntl.fcntl\n",
+        "definition_subprocess_run_transfer":
+            "\nR125_RUN = subprocess.run\n",
+        "definition_path_open_transfer":
+            "\nR125_PATH_OPEN = Path.open\n",
+        "definition_builtin_open_transfer":
+            "\nR125_OPEN = open\n",
+        "definition_default_capability_transfer":
+            "\ndef escaped(fd, data, cap=os.write):\n return cap(fd, data)\n",
+        "definition_environment_read":
+            "\nR125_CAPTURED = os.environ['PATH']\n",
+        "function_os_write_transfer":
+            "\ndef escaped(fd, data):\n call = os.write\n return call(fd, data)\n",
+        "function_os_write_return":
+            "\ndef escaped():\n return os.write\n",
+        "function_os_write_container":
+            "\ndef escaped(fd, data):\n calls = (os.write,)\n return calls[0](fd, data)\n",
+        "function_fcntl_transfer":
+            "\ndef escaped(fd):\n call = fcntl.fcntl\n"
+            " return call(fd, fcntl.F_GETPATH)\n",
+        "function_subprocess_transfer":
+            "\ndef escaped(argv):\n call = subprocess.run\n return call(argv)\n",
+        "function_materialize_transfer":
+            "\ndef escaped(*args):\n call = materialize\n return call(*args)\n",
+        "function_identity_capability_transfer":
+            "\ndef identity(value):\n return value\n"
+            "def escaped(fd, data):\n return identity(os.write)(fd, data)\n",
+        "function_stderr_return":
+            "\ndef escaped():\n return sys.stderr\n",
+        "function_stderr_local":
+            "\ndef escaped():\n stream = sys.stderr\n return stream.write('hidden')\n",
+        "function_stderr_container":
+            "\ndef escaped():\n streams = (sys.stderr,)\n"
+            " return streams[0].write('hidden')\n",
+        "function_stderr_parameter_shadow":
+            "\ndef escaped(print):\n print('hidden', file=sys.stderr)\n",
+        "function_stderr_local_shadow":
+            "\ndef escaped(function):\n print = function\n"
+            " return print('hidden', file=sys.stderr)\n",
+        "function_stderr_comprehension_shadow":
+            "\ndef escaped(functions):\n"
+            " return [print('hidden', file=sys.stderr) for print in functions]\n",
+        "function_stderr_global_shadow":
+            "\ndef set_print(function):\n global print\n print = function\n"
+            "def escaped():\n return print('hidden', file=sys.stderr)\n",
+        "function_builtin_open_return":
+            "\ndef escaped():\n return open\n",
+        "function_builtin_open_container":
+            "\ndef escaped():\n return [open]\n",
+        "function_builtin_open_argument":
+            "\ndef identity(value):\n return value\n"
+            "def escaped():\n return identity(open)\n",
+        "nested_class_os_false_shadow":
+            "\ndef escaped():\n class Innocent:\n  os = 'safe'\n"
+            " return os.write\n",
+        "nested_class_sys_false_shadow":
+            "\ndef escaped():\n class Innocent:\n  sys = 'safe'\n"
+            " return sys.stderr\n",
+        "nested_class_path_false_shadow":
+            "\ndef escaped():\n class Innocent:\n  Path = 'safe'\n"
+            " return Path.open\n",
+        "bound_path_open_return":
+            "\ndef escaped(path):\n return Path(path).open\n",
+        "bound_path_open_local":
+            "\ndef escaped(path):\n call = Path(path).open\n return call('rb')\n",
+        "bound_path_open_container":
+            "\ndef escaped(path):\n calls = [Path(path).open]\n"
+            " return calls[0]('rb')\n",
+        "bound_path_open_argument":
+            "\ndef identity(value):\n return value\n"
+            "def escaped(path):\n return identity(Path(path).open)('rb')\n",
+        "bound_path_open_local_variable":
+            "\ndef escaped(path):\n value = Path(path)\n return value.open\n",
+        "bound_path_open_derived":
+            "\ndef escaped(path):\n return (Path(path) / 'child').open\n",
+        "bound_path_open_iteration":
+            "\ndef escaped(path):\n"
+            " return [item.open for item in Path(path).iterdir()]\n",
+        "bound_path_exists_return":
+            "\ndef escaped(path):\n return Path(path).exists\n",
+        "bound_path_is_dir_local":
+            "\ndef escaped(path):\n value = Path(path)\n return value.is_dir\n",
+        "bound_path_helper_argument":
+            "\ndef take(value):\n return value.open\n"
+            "def escaped(path):\n return take(Path(path))\n",
+        "bound_path_lambda_argument":
+            "\ndef escaped(path):\n return (lambda value: value.open)(Path(path))\n",
+        "bound_path_conditional":
+            "\ndef escaped(path, flag, other):\n"
+            " return (Path(path) if flag else other).open\n",
+        "bound_path_walrus":
+            "\ndef escaped(path):\n return (value := Path(path)).open\n",
+        "bound_path_unpack":
+            "\ndef escaped(path):\n value, = (Path(path),)\n return value.open\n",
+        "bound_path_factory":
+            "\ndef make(path):\n return Path(path)\n"
+            "def escaped(path):\n return make(path).open\n",
+        "bound_path_inert_rebind":
+            "\ndef escaped(path):\n value = 'safe'\n"
+            " value = Path(path)\n return value.open\n",
+        "bound_path_global_rebind":
+            "\nR125_SAFE_VALUE = 'safe'\n"
+            "def poison(path):\n global R125_SAFE_VALUE\n"
+            " R125_SAFE_VALUE = Path(path)\n"
+            "def escaped():\n return R125_SAFE_VALUE.open\n",
+        "bound_path_parameter_order":
+            "\ndef escaped(value):\n return value.open\n"
+            " value = 'safe'\n",
+        "nested_class_comprehension_outer_iterable":
+            "\ndef escaped():\n class Innocent:\n"
+            "  print = lambda *args, **kwargs: ()\n"
+            "  value = [item for item in print('hidden', file=sys.stderr)]\n"
+            " return Innocent\n",
+        "nested_class_conditional_os_binding":
+            "\ndef escaped(flag):\n class Innocent:\n"
+            "  if flag:\n   os = 'safe'\n  value = os.write\n"
+            " return Innocent\n",
+        "nested_class_empty_loop_os_binding":
+            "\ndef escaped(values):\n class Innocent:\n"
+            "  for os in values:\n   pass\n  value = os.write\n"
+            " return Innocent\n",
+        "nested_class_conditional_os_delete":
+            "\ndef escaped(flag):\n class Innocent:\n  os = 'safe'\n"
+            "  if flag:\n   del os\n  value = os.write\n"
+            " return Innocent\n",
+        "nested_class_annotation_without_value":
+            "\ndef escaped():\n class Innocent:\n"
+            "  os: str\n  value = os.write\n return Innocent\n",
+        "nested_class_exception_target_active":
+            "\ndef escaped():\n class CallableError(ValueError):\n"
+            "  def __call__(self, *args, **kwargs):\n"
+            "   return kwargs['file'].write('hidden')\n"
+            " class Innocent:\n  try:\n   raise CallableError()\n"
+            "  except CallableError as print:\n"
+            "   value = print('hidden', file=sys.stderr)\n"
+            " return Innocent\n",
+        "nested_class_exception_target_cleanup":
+            "\ndef escaped():\n class Innocent:\n  os = 'safe'\n"
+            "  try:\n   raise ValueError('x')\n"
+            "  except ValueError as os:\n   pass\n"
+            "  value = os.write\n return Innocent\n",
+        "nested_class_active_for_stderr":
+            "\ndef escaped(functions):\n class Innocent:\n"
+            "  for print in functions:\n"
+            "   value = print('hidden', file=sys.stderr)\n"
+            " return Innocent\n",
+        "nested_class_active_with_stderr":
+            "\ndef escaped(manager):\n class Innocent:\n"
+            "  with manager as print:\n"
+            "   value = print('hidden', file=sys.stderr)\n"
+            " return Innocent\n",
     }
     _r123_controller_shadow_positive = (
         _r123_controller_source_positive
@@ -12296,18 +14029,223 @@ class CraftedConcretePath(type(Path())):
           " [(sys := 'safe') for _ in (0,)]\n"
           " return sys.upper()\n"
           "\ndef r123_harmless_postponed_annotation(value: os.PathLike):\n"
-          " return value\n")
+          " return value\n"
+          "\ndef r125_pure_varargs(*values):\n"
+          " return 'safe'\n"
+          "def r125_use_varargs(value=r125_pure_varargs('a', 'b')):\n"
+          " return value\n"
+          "\ndef r125_pure_kwargs(**values):\n"
+          " return 'safe'\n"
+          "def r125_use_kwargs(value=r125_pure_kwargs(a='b')):\n"
+          " return value\n"
+          "\nr125_identity_lambda = lambda value: value\n"
+          "def r125_use_lambda(value=r125_identity_lambda('safe')):\n"
+          " return value\n"
+          "\nclass R125InertToken:\n"
+          " pass\n"
+          "def r125_use_inert_class(value=R125InertToken()):\n"
+          " return value\n"
+          "\nclass R125HarmlessAttributes:\n"
+          " open = 'safe'\n"
+          " stat = 'safe'\n"
+          "def r125_harmless_attribute_values(value):\n"
+          " return (R125HarmlessAttributes.open,\n"
+          "         R125HarmlessAttributes().stat,\n"
+          "         'safe'.replace)\n"
+          "def r125_harmless_local_attribute():\n"
+          " value = 'safe'\n"
+          " return value.replace\n"
+          "def r125_harmless_walrus_attribute():\n"
+          " return (value := 'safe').replace\n"
+          "\ndef r125_direct_bound_path_open(path):\n"
+          " return Path(path).open('rb')\n"
+          "\ndef r125_class_print_ordering():\n"
+          " class BeforeLaterBinding:\n"
+          "  value = print('safe', file=sys.stderr)\n"
+          "  print = lambda *args, **kwargs: None\n"
+          " class DeletedBinding:\n"
+          "  print = lambda *args, **kwargs: None\n"
+          "  del print\n"
+          "  value = print('safe', file=sys.stderr)\n"
+          " class ComprehensionBody:\n"
+          "  print = lambda *args, **kwargs: None\n"
+          "  value = [print('safe', file=sys.stderr) for _ in ()]\n"
+          " class AfterExceptionTarget:\n"
+          "  try:\n"
+          "   raise ValueError('safe')\n"
+          "  except ValueError as print:\n"
+          "   pass\n"
+          "  value = print('safe', file=sys.stderr)\n"
+          " class ActiveForShadow:\n"
+          "  for os in ('safe',):\n"
+          "   value = os.upper()\n"
+          " class ActiveWithShadow:\n"
+          "  with manager as os:\n"
+          "   value = os\n"
+          " return (BeforeLaterBinding, DeletedBinding, ComprehensionBody,\n"
+          "         AfterExceptionTarget, ActiveForShadow,\n"
+          "         ActiveWithShadow)\n")
     _r123_controller_alias_positive = (
         _r123_controller_source_positive
         .replace("import hashlib\n", "import hashlib as hashing\n", 1)
         .replace("hashlib.sha256", "hashing.sha256"))
+    _r125_controller_path_alias_positive = (
+        _r123_controller_source_positive.replace("Path", "FilePath")
+        .replace("from pathlib import FilePath",
+                 "from pathlib import Path as FilePath", 1))
+    _r125_controller_dataclass_alias_positive = (
+        _r123_controller_source_positive.replace(
+            "from dataclasses import dataclass",
+            "from dataclasses import dataclass as record", 1)
+        .replace("@dataclass", "@record"))
+    _r125_controller_os_alias_positive = (
+        _r123_controller_source_positive.replace(
+            "import os\n", "import os as ops\n", 1).replace("os.", "ops.")
+        .replace("getattr(os,", "getattr(ops,"))
+    _r125_controller_sys_alias_positive = (
+        _r123_controller_source_positive.replace(
+            "import sys\n", "import sys as runtime_sys\n", 1)
+        .replace("sys.", "runtime_sys."))
+    _r125_controller_materialize_alias_positive = (
+        _r123_controller_source_positive
+        if ("from controller.result.materialize import materialize"
+            not in _r123_controller_source_positive
+            or any(alias.name == "materialize" and alias.asname is not None
+                   for node in ast.parse(
+                       _r123_controller_source_positive).body
+                   if isinstance(node, ast.ImportFrom)
+                   and node.module == "controller.result.materialize"
+                   for alias in node.names))
+        else re.sub(r"\bmaterialize(?=\s*\()", "materialize_impl",
+                    _r123_controller_source_positive.replace(
+                        "from controller.result.materialize import materialize",
+                        "from controller.result.materialize import "
+                        "materialize as materialize_impl", 1)))
+    _r125_dataclass_origin_mutant = (
+        _r123_controller_source_positive.replace(
+            "from dataclasses import dataclass",
+            "from dataclasses import dataclass as r125_real_dataclass", 1)
+        + "\ndef dataclass(cls=None, **kwargs):\n"
+          " os.write(9, b'hidden')\n"
+          " return r125_real_dataclass(**kwargs) if cls is None else "
+          "r125_real_dataclass(cls, **kwargs)\n")
     r123_controller_source_rig = (
         r123_controller_native_source_ok(_r123_controller_source_positive)
         and r123_controller_native_source_ok(_r123_controller_shadow_positive)
         and r123_controller_native_source_ok(_r123_controller_alias_positive)
+        and r123_controller_native_source_ok(
+            _r125_controller_path_alias_positive)
+        and r123_controller_native_source_ok(
+            _r125_controller_dataclass_alias_positive)
+        and r123_controller_native_source_ok(
+            _r125_controller_os_alias_positive)
+        and r123_controller_native_source_ok(
+            _r125_controller_sys_alias_positive)
+        and r123_controller_native_source_ok(
+            _r125_controller_materialize_alias_positive)
+        and not r123_controller_native_source_ok(
+            _r125_dataclass_origin_mutant)
+        and all(not r123_controller_native_source_ok(
+                    _r123_controller_source_positive
+                    + _r123_controller_source_mutants[
+                        "function_materialize_transfer"].replace(
+                            "call = materialize",
+                            f"call = {alias.asname or alias.name}", 1))
+                for node in ast.parse(
+                    _r123_controller_source_positive).body
+                if isinstance(node, ast.ImportFrom)
+                and node.level == 0
+                and node.module == "controller.result.materialize"
+                for alias in node.names if alias.name == "materialize")
         and all(not r123_controller_native_source_ok(
                     _r123_controller_source_positive + mutant)
-                for mutant in _r123_controller_source_mutants.values()))
+                for name, mutant in _r123_controller_source_mutants.items()
+                if name != "function_materialize_transfer"))
+
+    # R125: module definition/import time is part of the controller boundary.
+    # The native-capability inventory above closes effects hidden below Python's
+    # audit surface; this independent ticket records every selected Python
+    # filesystem/process effect while definitions actually execute.  Ordinary
+    # literal defaults, inert decorators, postponed annotations and class bodies
+    # remain legitimate because they produce no selected effect.
+    _r125_definition_positive = """\
+from __future__ import annotations
+def inert(value):
+    return value
+@inert
+class Legitimate:
+    value: str = "safe"
+def function(value="literal"):
+    return value
+lambda_value = lambda value="literal": value
+"""
+    _r125_definition_effect_root = r122 / "definition-effect-rig"
+    _r125_definition_effect_root.mkdir()
+    _r125_definition_mutants = {
+        "function_default":
+            "def effect(value=open(%r, 'w').write('hidden')):\n pass\n",
+        "lambda_default":
+            "effect = lambda value=open(%r, 'w').write('hidden'): value\n",
+        "function_decorator":
+            "def deco(value):\n return lambda fn: fn\n"
+            "@deco(open(%r, 'w').write('hidden'))\ndef effect():\n pass\n",
+        "class_body":
+            "class Effect:\n value=open(%r, 'w').write('hidden')\n",
+        "class_base":
+            "class Base: pass\n"
+            "class Effect((open(%r, 'w').write('hidden'), Base)[1]):\n pass\n",
+        "module_assignment":
+            "effect=open(%r, 'w').write('hidden')\n",
+        "process_default":
+            "import subprocess\n"
+            "def effect(value=subprocess.run(['/usr/bin/true'])):\n pass\n",
+        "environment_store":
+            "import os\nos.environ['R125_DEFINITION_ESCAPE'] = 'YES'\n",
+    }
+    (_r125_definition_positive_events, _r125_definition_positive_rejection,
+     _r125_definition_positive_loaders) = r125_observed_definition_exec(
+        _r125_definition_positive, {}, "<r125-definition-positive>")
+    _r125_definition_negative_events = {}
+    for _r125_name, _r125_template in _r125_definition_mutants.items():
+        _r125_marker = _r125_definition_effect_root / _r125_name
+        _r125_text = (_r125_template % str(_r125_marker)
+                      if "%r" in _r125_template else _r125_template)
+        (_r125_events, _r125_rejection,
+         _r125_loaders) = r125_observed_definition_exec(
+            _r125_text, {}, "<r125-definition-negative>")
+        _r125_definition_negative_events[_r125_name] = (
+            _r125_events, _r125_marker.exists(), _r125_rejection)
+        if _r125_marker.exists():
+            _r125_marker.unlink()
+    _r125_definition_effect_root.rmdir()
+    _r125_definition_site_results = {}
+    for _r125_site_name in (
+            "h032_subject", "h032_physical_subject", "r12_exact_subject",
+            "_h032_r122_product_autopilot_site", "h032_r59_site"):
+        _r125_site_marker = r122 / ("definition-site-" + _r125_site_name)
+        _r125_site_source = (
+            f"if __name__ == {_r125_site_name!r}:\n"
+            f" open({str(_r125_site_marker)!r}, 'w').write('hidden')\n")
+        (_r125_site_events, _r125_site_rejection,
+         _r125_site_loaders) = r125_observed_definition_exec(
+            _r125_site_source, {"__name__": _r125_site_name}, str(source))
+        _r125_definition_site_results[_r125_site_name] = (
+            _r125_site_events, _r125_site_rejection,
+            _r125_site_marker.exists())
+        if _r125_site_marker.exists():
+            _r125_site_marker.unlink()
+    r125_definition_site_rig = all(
+        events and rejection is not None and not created
+        for events, rejection, created in _r125_definition_site_results.values())
+    r125_definition_effect_rig = (
+        not _r125_definition_positive_events
+        and _r125_definition_positive_rejection is None
+        and all(events and rejected is not None
+                and not created
+                for name, (events, created, rejected)
+                in _r125_definition_negative_events.items())
+        and "R125_DEFINITION_ESCAPE" not in os.environ
+        and r125_definition_site_rig)
 
     _r123_source_positive = """\
 import base64
@@ -12570,6 +14508,28 @@ def materialize(a, b, c, d, e, f, g, h):
     _r123_empty_rename_patch = _rg(
         "diff", "--cached", "--binary", "--full-index", "--no-renames").stdout
     _rg("reset", "-q")
+    # Whole-patch positives that cannot be validated by applying each entry in
+    # isolation.  The deletion and addition jointly change a file into a
+    # directory, or an existing directory into a regular file.
+    _r123_file_dir_blob = r122_blob(b"FILE_TO_DIR_CHILD = True\n")
+    _rg("update-index", "--force-remove", "--",
+        "controller/result/consumer.py")
+    _rg("update-index", "--add", "--cacheinfo",
+        f"100644,{_r123_file_dir_blob},controller/result/consumer.py/child.py")
+    _r123_file_to_dir_patch = _rg(
+        "diff", "--cached", "--binary", "--full-index", "--no-renames").stdout
+    _rg("reset", "-q")
+    _r123_base_dir = r122_base / "controller/result/base-dir"
+    _r123_base_dir_child = _r123_base_dir / "child.py"
+    _r123_base_dir_child_bytes = _r123_base_dir_child.read_bytes()
+    _r123_base_dir_child.unlink(); _r123_base_dir.rmdir()
+    _r123_base_dir.write_bytes(b"DIR_TO_FILE = True\n")
+    _rg("add", "-A", "--", "controller/result/base-dir")
+    _r123_dir_to_file_patch = _rg(
+        "diff", "--cached", "--binary", "--full-index", "--no-renames").stdout
+    _rg("reset", "-q")
+    _r123_base_dir.unlink(); _r123_base_dir.mkdir()
+    _r123_base_dir_child.write_bytes(_r123_base_dir_child_bytes)
     _r123_semantic_positive_deltas = {
         "add": r122_delta(r122_ok_patch),
         "marker_path": r122_delta(r122_newfile(
@@ -12588,6 +14548,8 @@ def materialize(a, b, c, d, e, f, g, h):
         "binary": r122_delta(r122_binary_patch),
         "rename": r122_delta(_r123_rename_patch),
         "copy": r122_delta(_r123_copy_patch),
+        "file_to_dir": r122_delta(_r123_file_to_dir_patch),
+        "dir_to_file": r122_delta(_r123_dir_to_file_patch),
         "mixed": r122_delta(_r122_modify_patch + r122_ok_patch),
     }
     _r123_semantic_expected = {}
@@ -12638,6 +14600,7 @@ def materialize(a, b, c, d, e, f, g, h):
         + _r122_full_index)
     r122_negatives["reversed_block_order"] = r122_delta(
         _r122_second_patch + r122_ok_patch)
+    r122_negatives["extra_trailing_lf"] = r122_delta(r122_ok_patch + b"\n")
     _r123_add_mode_line = re.search(rb"(?m)^new file mode [0-7]{6}\n", r122_ok_patch)
     _r123_add_old_header = re.search(rb"(?m)^--- [^\n]+\n", r122_ok_patch)
     _r123_add_new_header = re.search(rb"(?m)^\+\+\+ [^\n]+\n", r122_ok_patch)
@@ -12716,6 +14679,7 @@ def materialize(a, b, c, d, e, f, g, h):
           and r123_controller_prelude_rig
           and r123_connected_effect_oracle_rig
           and r123_source_inventory_rig and r123_controller_source_rig
+          and r125_definition_effect_rig and _r125_dependency_source_rig
           and _r123_hostile_reference_ok,
           f"positive={r122_positive} negatives_ok={r122_negatives_ok} "
           f"semantic_positive={r123_semantic_positive} "
@@ -12730,6 +14694,8 @@ def materialize(a, b, c, d, e, f, g, h):
           f"connected_effects={r123_connected_effect_oracle_rig} "
           f"source_inventory={r123_source_inventory_rig} "
           f"controller_source={r123_controller_source_rig} "
+          f"definition_effects={r125_definition_effect_rig} "
+          f"dependency_source={_r125_dependency_source_rig} "
           f"closed_reference={_r123_hostile_reference_ok} "
           f"rejected={[k for k,d in r122_negatives.items() if r122_rejects(d)]}")
 
@@ -12984,7 +14950,7 @@ def materialize(a, b, c, d, e, f, g, h):
                 raise MatReject("materializer source capability inventory")
             _product_source_ok = True
             _controller_source_ok = r123_controller_native_source_ok(
-                source.read_text(encoding="utf-8"))
+                _r125_controller_text)
             if not _controller_source_ok:
                 raise MatReject("controller native capability inventory")
             _product_root_text = str(source.parents[1])
@@ -13130,24 +15096,49 @@ def materialize(a, b, c, d, e, f, g, h):
             _product_objects_after_semantics = r123_object_ids(_product_git)
             _product_layout_after_semantics = r123_odb_layout(_product_git)
 
-            def r122_product_rejects(delta_obj):
+            def r122_product_rejects(delta_obj, mutate_rediff=False):
                 control_before_case = r123_git_control_snapshot(_product_git)
                 objects_before_case = r123_object_ids(_product_git)
                 odb_before_case = r123_odb_binding(_product_git)
                 layout_before_case = r123_odb_layout(_product_git)
                 rejected = False
                 case_events = []
+                rediff_mutations = {"n": 0}
+                real_product_run = subprocess.run
+                def mutating_product_run(*args, **kwargs):
+                    completed = real_product_run(*args, **kwargs)
+                    argv = args[0] if args else kwargs.get("args")
+                    if (mutate_rediff and isinstance(argv, (list, tuple))
+                            and len(argv) == 8
+                            and list(argv[:6]) == [
+                                "/usr/bin/git", "diff", "--cached", "--binary",
+                                "--full-index", "--no-renames"]
+                            and completed.returncode == 0
+                            and isinstance(completed.stdout, bytes)
+                            and completed.stdout):
+                        changed = bytearray(completed.stdout)
+                        changed[-1] ^= 1
+                        rediff_mutations["n"] += 1
+                        return subprocess.CompletedProcess(
+                            completed.args, completed.returncode,
+                            bytes(changed), completed.stderr)
+                    return completed
                 _r123_observer["events"] = case_events
                 _r123_observer["invalid"] = False
                 try:
+                    if mutate_rediff:
+                        subprocess.run = mutating_product_run
                     r123_call_materialize(_pmat, (
                         _product_git, r122_base_sha, delta_obj, R122_ALLOWED,
                         R122_MAXF, R122_MAXL, R122_OPS, str(_product_protected)))
                 except Exception:
                     rejected = True
                 finally:
+                    subprocess.run = real_product_run
                     _r123_observer["events"] = None
-                return (rejected and not _r123_observer["invalid"]
+                return (rejected
+                        and (not mutate_rediff or rediff_mutations["n"] == 1)
+                        and not _r123_observer["invalid"]
                         and r123_materializer_effects_ok(
                             case_events, _product_git, _product_protected,
                             r122_base, require_complete=False)
@@ -13159,6 +15150,8 @@ def materialize(a, b, c, d, e, f, g, h):
 
             _product_negatives = (
                 all(r122_product_rejects(d) for d in r122_negatives.values())
+                and r122_product_rejects(
+                    r122_delta(r122_ok_patch), mutate_rediff=True)
                 and r122_product_rejects(r122_delta(
                     b"diff --git a/controller/result/link b/controller/result/link\n"
                     b"new file mode 120000\nindex 0000000000000000000000000000000000000000.."
@@ -13236,7 +15229,15 @@ def materialize(a, b, c, d, e, f, g, h):
             sys.modules[_auto_name] = _auto
             _flow_path_patched = False
             try:
-                _auto_spec.loader.exec_module(_auto)
+                # Execute the exact already-read controller bytes under the
+                # definition-time ticket.  Using compile+exec avoids crediting
+                # loader/pyc reads owned by the judge itself; every effect here
+                # is caused by the candidate module body.
+                (_auto_import_events, _auto_import_rejection,
+                 _auto_import_loader_events) = r125_observed_definition_exec(
+                    _r123_controller_source_positive, _auto.__dict__, str(source))
+                _actual_import_effects_ok = (
+                    not _auto_import_events and _auto_import_rejection is None)
                 if getattr(_auto, "materialize", None) is not _recording_materialize:
                     raise AssertionError("builder_flow imported a different materialize capability")
                 _flow_root = r122 / "actual-builder-flow"
@@ -13530,6 +15531,7 @@ def materialize(a, b, c, d, e, f, g, h):
                 and not any(_product_protected.iterdir()))
             materialization_boundary_ok = (
                 _product_source_ok and _controller_source_ok
+                and _actual_import_effects_ok
                 and _product_direct_positive and _product_semantic_positive
                 and _product_negatives
                 and _actual_success and _connected_decoy_rejected
@@ -13539,6 +15541,9 @@ def materialize(a, b, c, d, e, f, g, h):
                 f"direct={_product_direct_positive} semantic={_product_semantic_positive} "
                 f"source_inventory={_product_source_ok} "
                 f"controller_source={_controller_source_ok} "
+                f"definition_effects={_actual_import_effects_ok} "
+                f"definition_event_names={_auto_import_events} "
+                f"definition_rejection={_auto_import_rejection} "
                 f"negatives={_product_negatives} "
                 f"actual_success={_actual_success} decoy={_connected_decoy_rejected} "
                 f"actual_nonzero={_actual_nonzero} "
