@@ -1390,6 +1390,10 @@ def process_shape(text: str) -> dict[str, object]:
                     and isinstance(call.args[2].left, ast.Constant)
                     and call.args[2].left.value == b"\0"
                     and isinstance(call.args[2].right, ast.Constant)
+                    # R120: exact integer literal 1024 — type(...) is int rejects
+                    # 1024.0 and the bool variants True/False (bool is an int
+                    # subclass, so isinstance/== alone would admit them).
+                    and type(call.args[2].right.value) is int
                     and call.args[2].right.value == 1024)
                 split_attr = parents.get(call) if args_ok else None
                 split_call = (parents.get(split_attr)
@@ -1411,10 +1415,14 @@ def process_shape(text: str) -> dict[str, object]:
                     and isinstance(split_call.args[0], ast.Constant)
                     and split_call.args[0].value == b"\0"
                     and isinstance(split_call.args[1], ast.Constant)
+                    # R120: exact integer maxsplit 1 (rejects 1.0 and True).
+                    and type(split_call.args[1].value) is int
                     and split_call.args[1].value == 1
                     and isinstance(subscript, ast.Subscript)
                     and subscript.value is split_call
                     and isinstance(subscript.slice, ast.Constant)
+                    # R120: exact integer index 0 (rejects 0.0 and False).
+                    and type(subscript.slice.value) is int
                     and subscript.slice.value == 0
                     and isinstance(decode_attr, ast.Attribute)
                     and decode_attr.value is subscript and decode_attr.attr == "decode"
@@ -2599,6 +2607,35 @@ subprocess = object()
         "R119_FCNTL_BROADER_ATTR": "\nfcntl.fcntl(1, fcntl.F_SETFL, 0)\n",
         "R119_OS_FSDECODE_REJECT": "\nos.fsdecode(b'/private/tmp/h031-r119')\n",
         "R119_OS_PATH_ISLINK_REJECT": "\nos.path.islink('/private/tmp/h031-r119')\n",
+        # R120: the buffer size, split maxsplit and subscript index must each be an
+        # exact integer literal (type(...) is int).  A float literal (1024.0 / 1.0 /
+        # 0.0) or a bool literal (True at maxsplit, False at the index — bool is an
+        # int subclass, so a bare == would admit them) must reject.
+        "R120_FGETPATH_BUFFER_FLOAT": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024.0).split(b\"\\0\", 1)[0].decode())\n"
+        ),
+        "R120_FGETPATH_SPLIT_FLOAT": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1.0)[0].decode())\n"
+        ),
+        "R120_FGETPATH_INDEX_FLOAT": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[0.0].decode())\n"
+        ),
+        "R120_FGETPATH_SPLIT_BOOL": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", True)[0].decode())\n"
+        ),
+        "R120_FGETPATH_INDEX_BOOL": (
+            "\ndef _retire_bound_staging(staging_dir_fd, root, identity):\n"
+            "    moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH, "
+            "b\"\\0\" * 1024).split(b\"\\0\", 1)[False].decode())\n"
+        ),
     }
     for label, suffix in shape_mutants.items():
         mutant_shape = process_shape(source_text + suffix)

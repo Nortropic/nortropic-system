@@ -2547,3 +2547,31 @@ approved-primitive form — a new autopilot hash superseding the preserved one i
 that single function, with the consumer and launcher byte-identical — and
 validates the full deterministic/product matrix. Production, H017 and the prior
 R48-R118 effects remain unchanged.
+
+## 2026-08-23 — R120 H031 integer-exact narrowing of the F_GETPATH form
+
+The independent adversarial review of R119 returned BLOCKING_FINDINGS=NONE but
+flagged one non-exploitable deviation it had itself introduced: the buffer size,
+the split maxsplit and the subscript index were checked by numeric equality alone
+(`== 1024` / `== 1` / `== 0`), and because `bool` is an `int` subclass and
+`1024.0 == 1024`, those three positions also admitted the float literals
+`1024.0`/`1.0`/`0.0` and the bool literals `True`/`False`. `b"\0" * 1024.0` is a
+runtime `TypeError` (fail-closed — the product would crash, not delete), so this
+was never exploitable, but R119's authority promised an exact integer literal.
+
+R120 is a pure owner-authorized authority-narrowing (H031, task-spec and docs only,
+no product): each of the three positions must now additionally satisfy
+`type(value) is int`, so `1024.0`, `1.0`, `0.0`, `True` and `False` all reject
+while the legitimate narrow product form (the one `fcntl.fcntl` F_GETPATH
+resolution with the fixed 1024-byte buffer, split maxsplit 1 and index 0,
+NUL-trimmed, argumentlessly decoded and Path-wrapped) still passes. Five separate
+one-defect negatives cover the buffer float, the maxsplit float, the index float,
+the maxsplit bool and the index bool. The pre-existing `fcntl` name-matching and
+unqualified-owner-attribution behaviours (also flagged non-blocking) are
+deliberately left unchanged — out of this round's narrow scope.
+
+H031 goes from 159/2 to 164 PASS / 2 FAIL (the two upstream/product gaps
+unchanged); H032 is byte-identical (no digest rebind). Validated on the host,
+un-nested, no live call; de-risked against the narrow-product overlay (193/0). The
+builder round then adopts the narrow product against published R120. Production,
+H017 and the prior R48-R119 effects remain unchanged.
