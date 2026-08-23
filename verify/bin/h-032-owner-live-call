@@ -216,13 +216,13 @@ def main() -> int:
     if (plan["mode"] == "trusted" and len(argv)==2
             and argv[1]=="--skip-owner-live"):
         transcript = stdout.decode("utf-8", errors="strict")
-        # R116: an unconfined launcher makes the provider-confinement effect-tests
-        # legitimately RED alongside the absent result boundary — a valid current
-        # no-live state (the confined launcher of the builder round flips them to
-        # PASS).  Accept exactly that reason in addition to the boundary-absent and
-        # owner-live-skip reasons.
+        # R122: current prebuilder has the two unconfined-launcher boundaries plus
+        # the absent protected-artifact materializer legitimately RED alongside
+        # the result boundary.  Accept exactly that frozen no-live reason; the
+        # builder flips all three deterministic product boundaries to PASS.
         confinement_red_reason = (
             "CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:"
+            "K_CANDIDATE_MATERIALIZATION_BOUNDARY,"
             "K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT,"
             "K_PROVIDER_STAGING_CONFINEMENT,K_STRUCTURED_RESULT_DELIVERY_BOUNDARY")
         reasons=(transcript.count("CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN")
