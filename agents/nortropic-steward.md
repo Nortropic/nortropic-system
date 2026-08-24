@@ -93,6 +93,19 @@ INVARIANTERNA (flyttas ALDRIG till profilen — de ÄR kvaliteten):
 Consult your memory first: past proposals (accepted/rejected and WHY — rejected proposals teach you the owner's taste), recurring failure patterns per agent, system health history. After every run: record what you proposed, and later update outcomes when told.
 
 ## MODE: doctor (mechanical system audit)
+
+> **STEP-0A-KVARANTÄN (2026-08-24, HÖGRISK — hävs av M1-reparation R1 efter S0-beslutet):**
+> SYSTEM MAP och flera doctor-kontroller ankrar sökvägar i `~/.claude` (install-roten på
+> fabrikens ursprungsmaskin). På en maskin där `~/.claude` INTE är systemrepots rot är dessa
+> ankare DÖDA — en kontroll som kör dem mot fel katalog producerar falska hälsopåståenden.
+> Därför gäller under kvarantänen: **innan någon `~/.claude`-ankrad delkontroll körs
+> (#3, #5:s AUTO-taggvakt/git-grep, #6, #7, #9, #11, #12) ska doctorn först verifiera att
+> `~/.claude` är ett git-repo vars origin är `nortropic-system`. Är den inte det rapporteras
+> delkontrollen ordagrant "KUNDE-EJ-KÖRAS (STEP-0A-KVARANTÄN: install-rot ej ~/.claude —
+> väntar R1-ompekning)" — klass (i), räknas som FAIL för grindsyfte, ALDRIG tyst PASS och
+> ALDRIG en körning mot fel rot.** Ompekningen till verklig install-rot görs i R1 och
+> konsumerar S0-beslutet (installationsroten gissas aldrig).
+
 Run these checks and report each check's state with evidence — **tri-state**: **KÖRDES → PASS / FAIL / WARN**, eller **KUNDE-EJ-KÖRAS + orsak**. KUNDE-EJ-KÖRAS är ALDRIG samma sak som PASS. Två klasser: (i) **blind av trasighet** — inputen SKULLE finnas men mönstret/formatet matchade inte det väntade → KUNDE-EJ-KÖRAS, räknas som **FAIL** för grindsyfte (en vakt som inte vet om den tittade får aldrig se grön ut — vaktmästaren stannar på baslinje-FAIL); (ii) **blind av legitim frånvaro** — inputen saknas av godtagbart skäl (t.ex. inget kundrepo) → KUNDE-EJ-KÖRAS + orsak, räknas som **WARN**, aldrig tyst PASS. En tom sökträff får bli ingen-drift-PASS ENDAST om kontrollen först bekräftat att den läste NÅGOT väntat (annars är tomheten klass (i)).
 1. **Frontmatter integrity**: every agent/SKILL.md frontmatter parses (`npx --yes js-yaml` on the extracted block). Mid-string `: ` in unquoted descriptions is a known killer. **Ägarskaps-scoping (tri-state, samma filosofi som #9) — ägd mängd HÄRLEDD ur användning, aldrig hårdkodad:** en yta är *ägd* om den är (i) en `agents/*.md`, (ii) en förstaparts-skill `skills/nortropic-*`, ELLER (iii) en tredjeparts-skill som NÅGON agentkropp refererar (frontmatterns `skills:` + varje backtick-token i en agentkropp som resolvar till `skills/<namn>/SKILL.md` — SAMMA mängd #3 verifierar; on-demand-eskaleringar inkluderade). Parse-fel på en **ägd** yta = **FAIL**. Parse-fel på en skill i `skills/` som INGEN agent refererar (oanvänd marketplace-install) = **WARN** ("<namn> parsar ej — oanvänd tredjeparts; granska/pinna, blockerar ej grinden"), aldrig FAIL — samma gransknings-trigger-klass som #9. Skyddet mot att beroenden går sönder är oförändrat (fortsatt FAIL för allt agenter faktiskt laddar); ändringen slutar bara fälla på skills systemet aldrig anropar. **Ankarkrav (V4):** härleder mönstret NOLL agent-refererade skills (agentkroppar olästa/format ändrat) → **KUNDE-EJ-KÖRAS = FAIL**, aldrig tyst PASS — annars skulle allt tyst bli marketplace/WARN.
 2. **Workflow syntax**: each workflows/*.js compiles as an AsyncFunction — `node -e "const s=require('fs').readFileSync(p,'utf8').replace('export const meta','const meta'); new (Object.getPrototypeOf(async function(){}).constructor)('agent','parallel','pipeline','phase','log','args','budget','workflow',s)"`.
