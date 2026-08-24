@@ -47,9 +47,112 @@ Canonical authoritative operation ignores caller-selected spec or registry paths
 
 Normal accepted `controller/taskval/cli` claim and `controller/policy/cli` check execution must preserve the immutable repository filesystem. Shared parser loading may use any provider-neutral mechanism, but with `PYTHONDONTWRITEBYTECODE` and `PYTHONPYCACHEPREFIX` absent it creates no repository-local `__pycache__`, `.pyc`, ignored, untracked or tracked runtime byte. Taskval's authorized state effect remains in its configured disposable state root. Disposable clone snapshots measure every non-`.git` path and byte before and after each real consumer; an environment switch that merely hides the write is not acceptance. This does not redefine the separately frozen evidence semantics for a rejected policy decision.
 
-## Strict registry v1
+## Strict registry v1 and frozen v2 migration
 
-The registry is a duplicate-aware JSON object with exactly seven keys: `schema_version`, `path_grammar`, `authority_source`, `self_digest_is_authority`, `owner_production_paths`, `prospective_ordinary_protected_paths`, and `owner_author_global_denied_paths`. Version is exactly `1`; the two authority strings and `false` self-digest value are exact. Each path list is non-empty, contains only canonical grammar paths, and has no duplicates after canonicalization. `owner_production_paths` has exact v1 membership: `controller/h034-native/**`, `verify/h034/kernel`, `verify/h034/build-recipe.json`, and `verify/h034/identity-manifest.json`. Missing, altered, duplicated, or additional membership rejects. A separately owner-reviewed future version requires a new versioned parser and is not accepted as v1.
+The registry is a duplicate-aware JSON object with exactly seven keys: `schema_version`, `path_grammar`, `authority_source`, `self_digest_is_authority`, `owner_production_paths`, `prospective_ordinary_protected_paths`, and `owner_author_global_denied_paths`. The initial published state is exactly version `1`; the two authority strings and `false` self-digest value are exact. Each path list is non-empty, contains only canonical grammar paths, and has no duplicates after canonicalization. `owner_production_paths` has exact v1 membership: `controller/h034-native/**`, `verify/h034/kernel`, `verify/h034/build-recipe.json`, and `verify/h034/identity-manifest.json`. Missing, altered, duplicated, or additional membership rejects. A separately owner-reviewed future version requires a new versioned parser and is not accepted as v1.
+
+H-035 R14 is that separately frozen parser migration. It preserves the canonical locator
+`specs/owner-production-paths.v1.json`; the locator is not permission to infer a schema version.
+The parser may accept exactly these two version/member pairs:
+
+1. built-in integer `schema_version: 1` with exactly the four H-034 owner-production members above;
+2. built-in integer `schema_version: 2` with exactly those same four members plus exactly
+   `controller/launch/cli`, `controller/launch/runtime_snapshot.py`, and
+   `config/python-runtime-authority-v2.json`.
+
+No other version/member pair is valid. Version `1` plus any H-036 member, version `2` without all
+seven exact members, versions `0`/`3`, string/bool/float/null/list/object values, a partial +1/+2 transition,
+H-036-only membership, missing or substituted old members, arbitrary additions, duplicates,
+backslash/leading-dot aliases, neighboring paths and broader prefixes all reject. Membership order
+remains immaterial, preserving the v1 set semantics. All six non-owner-production fields and every
+consumer of the returned registry retain their prior strict semantics.
+
+Every hostile registry fixture traverses the real `validate-registry`, `validate-task`, Git-derived
+`check-candidate`, `owner-author`, `record-review`, `owner-freeze`, and normal prospective-task
+policy consumers. Every expected rejection must leave persisted state, bounded workspace and
+local-bare-remote refs byte-identical, catching a parser fixed for only one command. The membership
+matrix applies omission, substitution, duplicate, backslash alias, leading-dot alias and the
+applicable broader prefix separately to each of the four old members under v1 and each of all seven
+old-plus-new members under v2. Arbitrary-addition, new-only and partial-transition controls remain
+separate. The version/type matrix crosses both legal membership sets with integers 0/3,
+string/bool/float/null/list/object values and the two integer cross-pairs. Mechanical cardinalities
+are 66 per-member one-defect states plus four additional membership controls, 24 version/type and
+membership cross-cases, and 52 retained non-owner-semantic defect states.
+
+Each of the five retained non-owner semantics—exact `path_grammar`, exact `authority_source`, exact
+false `self_digest_is_authority`, and the two non-empty canonical unique path lists—is defect-tested
+under both legal version/membership states. Type, empty, malformed path, non-string value, simple
+duplicate, canonical backslash-alias duplicate, wrong scalar value and duplicate JSON-key cases
+apply where meaningful. Positive alternate list values prove that list membership remains registry
+authority rather than parser constants; overlapping/reordered canonical entries and a valid
+backslash spelling remain accepted exactly as before. Under both legal states, every canonical list entry
+and every entry in a separate pairwise-non-overlapping distinguishing fixture is causally
+consumed through its own singleton task and distinguishing changed path. Each prospective-protected
+entry must independently cause exact protected-authority rejection in ordinary validate-task,
+ordinary changed-candidate checking and normal policy. Each global-denied entry must independently
+cause exact global-deny rejection in owner validate-task and changed-candidate checking with actor `owner_authority`.
+Every rejected call preserves persisted state, bounded workspace and bare-remote
+refs. The arbitrary prospective probes are disjoint from owner production, while every arbitrary
+global-deny probe remains otherwise permitted by owner production; removing its intended list entry
+therefore reaches acceptance rather than a secondary outside-owner rejection. The legitimate
+overlapping/reordered and single-backslash variants remain separate positives,
+never evidence that one overlapping entry caused another entry's denial.
+
+Exact and reordered v1/v2 positives traverse the same material consumers. Under both exact and
+reordered v2, retained H-034 separately proves validate-task, the base-only owner chain, changed
+H-034 candidate checking with one candidate touching all four retained members, plus one
+singleton-surface ordinary-policy H-034 protection control per member; H-036 new3 has the corresponding full-surface
+positive chain. Owner-author/review/freeze use `candidate_sha == base_sha`, while separate changed
+H-034/H-036 candidates exercise owner `check-candidate`. Ordinary/TEST_AUTHOR changed-candidate,
+neighboring, parent and prospective ordinary-policy controls reject for their exact post-parser
+reasons.
+
+The preproduct invocation is exactly `verify/bin/h-035-exit --r14-registry-migration`. Its nonzero
+result is authorized only when the sole failed top-level label is
+`A_R14_EXACT_TWO_STATE_REGISTRY_OPERATIONAL`, the reason is exactly
+`V1_ONLY_CORE_REJECTS_EXACT_SCHEMA_V2_AND_ACCEPTS_BOOL_FLOAT_VERSION_ALIASES`, and the failure
+signature is exactly the frozen v2-positive, v2-causal, v1-bool and v1-float gaps. Every additional,
+missing, reordered or differently caused failure is `UNEXPECTED_RED`; a zero-failure invocation
+without product identity is `PRODUCT_IDENTITY_REQUIRED`, never product credit.
+
+This H-035 contract candidate does not edit the canonical registry and creates no H-036 task or
+product byte. TEST_AUTHOR is bounded to `specs/tasks.spec.json`, `verify/bin/h-035-exit`, this
+document, `docs/05-beslutslogg.md`, and `docs/loop/drift.md`. The separate product candidate's
+actual changed-file set is exactly `controller/authority/core.py`, even though H-035's historical
+bootstrap `allowed_write` remains broader. The later H-034 downstream rebind/refreeze alone owns
+changing the canonical registry to the exact v2 state and must be independently reviewed and
+guardedly published before H-036 proceeds. `verify/bin/h-036-exit` remains a TEST_AUTHOR/global-deny
+contract path, never an owner-production member.
+
+The product-bound invocation is exactly
+`verify/bin/h-035-exit --r14-registry-migration <base-sha> <candidate-sha>`. PASS requires a clean
+checkout whose HEAD is that exact lowercase candidate commit, whose sole parent is the reviewed
+base, whose no-renames Git changed-file list is exactly `controller/authority/core.py`, and whose
+candidate-tree task spec and H-035 gate bytes equal the executing bytes. A disposable positive plus
+explicit core-and-CLI out-of-scope, safe-only and stacked-candidate mutants mechanically test this
+predicate. Independent product review and guarded publication bind the same base/candidate pair and
+successful product invocation; inert metadata or the legacy broad H-035 `allowed_write` grants no
+product publication authority. Standard and product-bound modes run the same complete membership,
+version/type and retained-non-owner operational matrix before product scope can receive credit.
+
+The concrete bounded-prerequisite proof binds all standing conditions. BP01/BP02 are the v1-only
+parser's reproducible rejection of the exact v2 state; BP03/BP04 restrict the migration to making the
+already-authorized H-036 representable without changing Seatbelt, confinement or the trust
+objective; BP05 binds task, dependency, paths, TEST_AUTHOR/product surfaces, the versioned
+transition and effects; BP06/BP07 require two literal states and the full hostile membership matrix;
+BP08 retains exact v1 behavior; BP09 freezes this contract before product; BP10/BP11 require separate
+exact-identity gate and product reviews; BP12 permits only the named preproduct R14 RED while all
+other applicable checks remain green; BP13 requires the existing guarded non-force publications;
+and BP14 requires the published H-034 v2 refreeze before continuation.
+
+The exact serial order is:
+
+`H035 R14 TEST_AUTHOR freeze → independent gate review → guarded contract publication → core.py-only BUILDER product → independent product review → guarded product publication → H034 registry-v2 refreeze → independent review → guarded publication → H036 TEST_AUTHOR freeze → independent gate review → H036 BUILDER implementation → independent product review → guarded publication → H032 refreeze against published H036 → independent review and guarded publication → H031 rebind`.
+
+Any registry mutation during H-035, H-036 task/product creation during H-035, generic,
+caller-selected, wildcard, parent or neighboring authority, Seatbelt/confinement bypass,
+unconfined execution, a native broker, or broader filesystem/process/network/credential authority
+is outside this contract and fails closed.
 
 ## Production traceability
 

@@ -677,6 +677,241 @@
           "POSTPUBLICATION_GATE_VERIFICATION"
         ],
         "fail_closed": true
+      },
+      "r14_two_state_owner_production_registry": {
+        "contract_id": "H035_TWO_STATE_OWNER_PRODUCTION_REGISTRY_V2",
+        "standing_delegation": {
+          "contract_id": "BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION",
+          "source_sha256": "b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84",
+          "condition_operator": "ALL",
+          "hard_stop_matches": "NO_ONLY_WHILE_EVERY_EXACT_BOUND_AND_BP01_THROUGH_BP14_HOLDS"
+        },
+        "task_identity": "h-035",
+        "migration_family": "MIGRATE_STRICT_REGISTRY_OR_SCHEMA_TO_EXPLICITLY_VERSIONED_EXACT_STATE",
+        "dependency_change": [
+          "H035_PARSER_PUBLICATION_PRECEDES_H034_REGISTRY_V2_REFREEZE",
+          "H034_REGISTRY_V2_REFREEZE_PUBLICATION_PRECEDES_H036",
+          "H036_BECOMES_H032_EXPLICIT_PREREQUISITE_BEFORE_H032_REFREEZE"
+        ],
+        "registry_path": "specs/owner-production-paths.v1.json",
+        "preproduct_evidence": {
+          "base_sha": "fe23d062efba06b8ab539bf91e8221dfa04d6126",
+          "core_sha256": "0349acbedd8916bbc598cd4d89dc1261d5bc27f528431a011445609f34e527cb",
+          "registry_sha256": "403190cca83436d0b8c6849b9fc24220c088eed212aa180bf6fe3f25efa71170",
+          "expected_red_label": "A_R14_EXACT_TWO_STATE_REGISTRY_OPERATIONAL",
+          "expected_reason": "V1_ONLY_CORE_REJECTS_EXACT_SCHEMA_V2_AND_ACCEPTS_BOOL_FLOAT_VERSION_ALIASES",
+          "expected_failure_signature": [
+            {
+              "observation": "V2_EXACT_POSITIVE_MATERIAL_CONSUMERS",
+              "reason": "V1_ONLY_REJECTS_SCHEMA_V2"
+            },
+            {
+              "observation": "V2_CAUSAL_NEGATIVE_CONTROLS",
+              "reason": "V1_ONLY_REJECTS_SCHEMA_V2_BEFORE_REQUIRED_CAUSAL_REASON"
+            },
+            {
+              "observation": "V1_BOOL_HOSTILE_MATERIAL_CONSUMERS",
+              "reason": "NUMERIC_ALIAS_ACCEPTED"
+            },
+            {
+              "observation": "V1_FLOAT_HOSTILE_MATERIAL_CONSUMERS",
+              "reason": "NUMERIC_ALIAS_ACCEPTED"
+            }
+          ]
+        },
+        "current_state": {
+          "schema_version": 1,
+          "owner_production_paths": [
+            "controller/h034-native/**",
+            "verify/h034/kernel",
+            "verify/h034/build-recipe.json",
+            "verify/h034/identity-manifest.json"
+          ]
+        },
+        "prospective_state": {
+          "schema_version": 2,
+          "owner_production_paths": [
+            "controller/h034-native/**",
+            "verify/h034/kernel",
+            "verify/h034/build-recipe.json",
+            "verify/h034/identity-manifest.json",
+            "controller/launch/cli",
+            "controller/launch/runtime_snapshot.py",
+            "config/python-runtime-authority-v2.json"
+          ]
+        },
+        "h034_task_owner_author_allowed_write_after_v2": [
+          "controller/h034-native/**",
+          "verify/h034/kernel",
+          "verify/h034/build-recipe.json",
+          "verify/h034/identity-manifest.json"
+        ],
+        "test_author_allowed_write": [
+          "specs/tasks.spec.json",
+          "verify/bin/h-035-exit",
+          "docs/loop/owner-author-workflow-v1.md",
+          "docs/05-beslutslogg.md",
+          "docs/loop/drift.md"
+        ],
+        "builder_actual_changed_files": [
+          "controller/authority/core.py"
+        ],
+        "operational_matrix": {
+          "material_consumers": [
+            "validate-registry",
+            "validate-task",
+            "check-candidate",
+            "owner-author",
+            "record-review",
+            "owner-freeze",
+            "ordinary-policy"
+          ],
+          "v2_positive_owner_surfaces": [
+            "H034_OLD4_EXACT_AND_REORDERED",
+            "H036_NEW3_EXACT_AND_REORDERED"
+          ],
+          "member_quantifier": "EACH_H034_OLD4_AND_H036_NEW3_MEMBER",
+          "member_state_coverage": [
+            "V1_EACH_OLD4_MEMBER",
+            "V2_EACH_UNION7_MEMBER"
+          ],
+          "member_one_defect_families": [
+            "OMISSION",
+            "SUBSTITUTION",
+            "DUPLICATE",
+            "BACKSLASH_ALIAS",
+            "LEADING_DOT_ALIAS",
+            "APPLICABLE_BROADER_PREFIX"
+          ],
+          "member_one_defect_count": 66,
+          "additional_membership_hostile_count": 4,
+          "version_type_membership_cross_product": "EVERY_FROZEN_INVALID_VERSION_TYPE_WITH_BOTH_LEGAL_MEMBERSHIP_SETS_IN_STANDARD_AND_PRODUCT_MODE",
+          "version_type_cross_count": 24,
+          "retained_non_owner_semantics": [
+            "path_grammar",
+            "authority_source",
+            "self_digest_is_authority",
+            "prospective_ordinary_protected_paths",
+            "owner_author_global_denied_paths"
+          ],
+          "non_owner_state_quantifier": "EACH_DEFECT_IN_BOTH_LEGAL_VERSION_MEMBERSHIP_STATES",
+          "non_owner_semantic_defect_count": 52,
+          "non_owner_list_positive_semantics": "ALTERNATIVE_OVERLAPPING_REORDERED_AND_BACKSLASH_VALUES_REMAIN_REGISTRY_AUTHORITY",
+          "non_owner_list_entry_quantifier": "EVERY_CANONICAL_AND_DISTINGUISHING_FIXTURE_ENTRY_IN_BOTH_LEGAL_STATES",
+          "non_owner_list_causal_isolation": "SINGLETON_TASK_AND_PAIRWISE_NON_OVERLAPPING_DISTINGUISHING_PATHS",
+          "prospective_list_entry_consumers": "VALIDATE_TASK_CHECK_CANDIDATE_AND_ORDINARY_POLICY_WITH_EXACT_PROTECTED_REASONS",
+          "global_denied_list_entry_consumers": "VALIDATE_TASK_AND_OWNER_AUTHORITY_CHECK_CANDIDATE_WITH_EXACT_GLOBAL_DENY_REASONS",
+          "prospective_list_causal_anchor": "DISTINGUISHING_ENTRIES_ARE_DISJOINT_FROM_OWNER_PRODUCTION",
+          "global_denied_causal_anchor": "DISTINGUISHING_ENTRIES_ARE_OWNER_PRODUCTION_PERMITTED_WITHOUT_GLOBAL_DENY",
+          "overlap_reorder_backslash_separation": "LEGITIMATE_VARIANTS_ARE_SEPARATE_FROM_CAUSAL_DISTINGUISHING_FIXTURES",
+          "list_entry_rejection_effects": "UNCHANGED_PERSISTED_STATE_BOUNDED_WORKSPACE_AND_BARE_REMOTE_REFS",
+          "rejection_effects": "ALL_SEVEN_CONSUMERS_AND_UNCHANGED_STATE_WORKSPACE_REFS"
+        },
+        "product_acceptance": {
+          "command": "verify/bin/h-035-exit --r14-registry-migration BASE_SHA CANDIDATE_SHA",
+          "candidate_identity": "CLEAN_HEAD_EQUALS_EXACT_CANDIDATE_COMMIT",
+          "base_candidate_relation": "CANDIDATE_HAS_EXACTLY_BASE_AS_ITS_SINGLE_PARENT",
+          "exact_git_diff": [
+            "controller/authority/core.py"
+          ],
+          "candidate_contract_bytes": [
+            "specs/tasks.spec.json",
+            "verify/bin/h-035-exit"
+          ],
+          "operational_matrix": "SAME_FROZEN_R14_MATRIX_RUNS_BEFORE_PRODUCT_SCOPE_BINDING",
+          "publication_binding": "GUARDED_PRODUCT_PUBLICATION_REQUIRES_ZERO_EXIT_FOR_EXACT_REVIEWED_BASE_AND_CANDIDATE"
+        },
+        "registry_mutation_owner": "H034_DOWNSTREAM_REBIND_OR_REFREEZE_NOT_H035",
+        "expected_effects": [
+          "SCHEMA_V1_ACCEPTS_EXACT_H034_MEMBERSHIP",
+          "SCHEMA_V2_ACCEPTS_EXACT_H034_PLUS_H036_MEMBERSHIP",
+          "EVERY_OTHER_VERSION_OR_OWNER_PRODUCTION_MEMBERSHIP_REJECTS",
+          "ALL_NON_OWNER_PRODUCTION_REGISTRY_SEMANTICS_REMAIN_UNCHANGED"
+        ],
+        "bp01_bp14_bindings": [
+          {
+            "id": "BP01",
+            "binding": "CURRENT_V1_ONLY_PARSER_BLOCKS_REPRESENTATION_OF_AUTHORIZED_H036_OWNER_PATHS"
+          },
+          {
+            "id": "BP02",
+            "binding": "BLACK_BOX_VALIDATE_REGISTRY_REJECTS_EXACT_SCHEMA_V2_PROSPECTIVE_STATE_BEFORE_PRODUCT_MIGRATION"
+          },
+          {
+            "id": "BP03",
+            "binding": "MIGRATION_ONLY_MAKES_ALREADY_AUTHORIZED_H036_PREREQUISITE_REPRESENTABLE"
+          },
+          {
+            "id": "BP04",
+            "binding": "OWNER_PRODUCTION_REMAINS_EXACT_DENY_BY_DEFAULT_WITH_NO_SEATBELT_OR_CONFINEMENT_CHANGE"
+          },
+          {
+            "id": "BP05",
+            "binding": "TASK_DEPENDENCY_PATH_SURFACE_TRANSITION_AND_EXPECTED_EFFECTS_ARE_EXACTLY_BOUND_HERE"
+          },
+          {
+            "id": "BP06",
+            "binding": "ONLY_TWO_LITERAL_VERSION_MEMBERSHIP_PAIRS_NO_CALLER_SELECTED_AUTHORITY"
+          },
+          {
+            "id": "BP07",
+            "binding": "PARTIAL_MIXED_ARBITRARY_MISSING_SUBSTITUTED_BROADER_DUPLICATE_AND_ALIASED_MEMBERSHIP_REJECTS"
+          },
+          {
+            "id": "BP08",
+            "binding": "EXACT_SCHEMA_V1_H034_STATE_REMAINS_ACCEPTED_WITH_EXISTING_AUTHORITY_SEMANTICS"
+          },
+          {
+            "id": "BP09",
+            "binding": "THIS_TEST_AUTHOR_CANDIDATE_FREEZES_ONLY_CONTRACT_SURFACES_BEFORE_CORE_PRODUCT"
+          },
+          {
+            "id": "BP10",
+            "binding": "EXACT_IMMUTABLE_CONTRACT_CANDIDATE_REQUIRES_INDEPENDENT_GATE_FALSIFICATION"
+          },
+          {
+            "id": "BP11",
+            "binding": "SEPARATE_CORE_ONLY_PRODUCT_CANDIDATE_REQUIRES_INDEPENDENT_EXACT_IDENTITY_REVIEW"
+          },
+          {
+            "id": "BP12",
+            "binding": "HISTORICAL_GATES_INVARIANTS_SCOPE_AND_IDENTITY_STAY_GREEN_EXCEPT_EXACT_PREPRODUCT_R14_RED"
+          },
+          {
+            "id": "BP13",
+            "binding": "CONTRACT_AND_PRODUCT_PUBLICATIONS_USE_GUARDED_NONFORCE_EXACT_IDENTITY_TRANSITIONS"
+          },
+          {
+            "id": "BP14",
+            "binding": "H034_MUST_REFREEZE_AND_GUARDEDLY_PUBLISH_SCHEMA_V2_REGISTRY_BEFORE_H036_CONTINUES"
+          }
+        ],
+        "serial_transitions": [
+          "H035_R14_TEST_AUTHOR_FREEZE",
+          "H035_R14_INDEPENDENT_GATE_REVIEW",
+          "H035_R14_GUARDED_CONTRACT_PUBLICATION",
+          "H035_R14_CORE_ONLY_BUILDER_PRODUCT",
+          "H035_R14_INDEPENDENT_PRODUCT_REVIEW",
+          "H035_R14_GUARDED_PRODUCT_PUBLICATION",
+          "H034_REGISTRY_V2_REFREEZE",
+          "H034_INDEPENDENT_REVIEW",
+          "H034_GUARDED_PUBLICATION",
+          "H036_TEST_AUTHOR_FREEZE",
+          "H036_INDEPENDENT_GATE_REVIEW",
+          "H036_BUILDER_IMPLEMENTATION",
+          "H036_INDEPENDENT_PRODUCT_REVIEW",
+          "H036_GUARDED_PUBLICATION",
+          "H032_REFREEZE_AGAINST_PUBLISHED_H036",
+          "H032_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+          "H031_REBIND"
+        ],
+        "forbidden_effects": [
+          "REGISTRY_MUTATION_IN_H035",
+          "H036_TASK_OR_PRODUCT_CREATION_IN_H035",
+          "GENERIC_CALLER_SELECTED_WILDCARD_PARENT_OR_NEIGHBORING_AUTHORITY",
+          "SEATBELT_BYPASS_UNCONFINED_EXECUTION_NATIVE_BROKER_OR_BROADER_FILESYSTEM_PROCESS_NETWORK_CREDENTIAL_AUTHORITY"
+        ],
+        "fail_closed": true
       }
     }
   ],
