@@ -2857,3 +2857,147 @@ The exact 143-line owner attachment is now retained byte-for-byte in the canonic
 This is standing authority only for mechanically necessary, narrowly bounded prerequisites inside an already-approved remaining-bootstrap objective. It creates no generic, caller-selected, neighboring, wildcard or unconfined authority; broadening beyond the approved objective remains forbidden, as do credential/external-trust-root changes that require a human ceremony or cannot be safely automated, privileged brokers with a new trust model and mandate redefinition. Each future use must itself freeze and independently falsify concrete BP01–BP14 evidence and exact paths/effects. The older Stop-boundary phrases for proven architectural impossibility and novel material authority expansion are superseded only under the exact no-hard-stop/all-BP conjunction; objective-level impossibility and beyond-objective expansion remain human stops. The contract and product remain separate immutable candidates with separate reviews and guarded publications, and any affected downstream rebind/refreeze must itself be canonical before continuation.
 
 The literal `BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION=ACTIVE` is a conditional post-publication report value, not candidate state. Activation requires guarded publication to authoritative main followed by exact canonical commit, tree, delegation-document digest and gate verification. Until that evidence exists this candidate remains inactive. Existing H-035 guarded publication behavior and all prior controls remain intact; this five-file TEST_AUTHOR round changes only gate/spec/docs and performs no product, provider, live, network, ref, commit, push or merge action.
+
+## 2026-08-24 — H-035 R14 exact two-state authority-registry migration
+
+The now-canonical bounded-prerequisite delegation is applied to the exact representability blocker
+between H-035 and the already-authorized H-036. At base
+`fe23d062efba06b8ab539bf91e8221dfa04d6126`, `controller/authority/core.py` has SHA-256
+`0349acbedd8916bbc598cd4d89dc1261d5bc27f528431a011445609f34e527cb` and accepts only
+schema v1 plus the four H-034 owner-production members. The unchanged canonical registry has SHA-256
+`403190cca83436d0b8c6849b9fc24220c088eed212aa180bf6fe3f25efa71170`. A black-box call
+through the operational authority CLI therefore rejects the exact prospective state before any
+H-036 owner path can be represented. That is the reproducible BP01/BP02 blocker, not model judgment.
+
+R14 freezes two and only two version/member pairs. Built-in integer v1 maps to the exact existing
+H-034 set: `controller/h034-native/**`, `verify/h034/kernel`,
+`verify/h034/build-recipe.json`, `verify/h034/identity-manifest.json`. Built-in integer v2 maps to
+that same set plus exactly `controller/launch/cli`, `controller/launch/runtime_snapshot.py`, and
+`config/python-runtime-authority-v2.json`. The canonical locator remains
+`specs/owner-production-paths.v1.json`; the schema field, not the filename, selects one of the two
+closed states. Exact set reordering remains valid for compatibility. Cross-paired versions,
+versions 0/3/string/bool/float, partial +1/+2, new-only, missing/substituted/additional,
+duplicate, alias, neighboring and broader-prefix memberships reject.
+
+The operational aggregate sends these states through `validate-registry`, `validate-task`, actual
+Git-derived `check-candidate`, the complete H-036-shaped owner-author → candidate check → review →
+owner-freeze transition, and the normal policy consumer in a disposable repository. The old product
+must be RED only on `A_R14_EXACT_TWO_STATE_REGISTRY_OPERATIONAL`; the gate-local strict oracle and
+contract self-mutations cannot supply product credit. The positive v1 path proves backward
+compatibility, the v2 H-034/H-036 tasks prove both exact owner surfaces, and ordinary/TEST_AUTHOR,
+neighbor and parent controls remain denied.
+
+The task binding instantiates all BP01–BP14 requirements and fixes the actual TEST_AUTHOR surface to
+the five owner-authorized spec/gate/docs files. It separately fixes the future BUILDER candidate's
+entire changed-file set to `controller/authority/core.py`; H-035's older broad bootstrap
+`allowed_write` is not reused as migration authority. This round does not edit the registry, create
+H-036, or change any product byte. After guarded contract publication, a separately reviewed
+core-only product and guarded publication must occur. Only then may H-034 refreeze and guardedly
+publish the exact v2 registry while retaining its own old four-path task surface. H-036 freeze,
+review, implementation, review and publication follow; H-032 is then refrozen/published against
+published H-036 before H-031 rebinds.
+
+No Seatbelt or confinement weakening, unconfined execution, raw fallback, native broker, generic or
+caller-selected authority, or broader filesystem/process/network/credential authority is admitted.
+Any need for a fourth H-036 production member or a product change outside `controller/authority/core.py`
+is a new owner stop under this contract.
+
+### R14 independent-gate-review remediation
+
+Independent gate and architecture review rejected the first frozen R14 bytes for four concrete
+reasons. The owner chain supplied a changed candidate to `owner-author`, although the production
+protocol requires `candidate_sha == base_sha`; expected preproduct RED accepted any failure; the
+core-only builder scope existed only as metadata; and hostile registry states reached only
+`validate-registry`, permitting command-special-cased implementations.
+
+The refrozen contract advances the base candidate through owner-author, base candidate check,
+review and final freeze, then separately sends a changed H-036 candidate through owner
+`check-candidate`. Every representative hostile state now reaches `validate-registry`,
+`validate-task`, `check-candidate`, owner-author, record-review, owner-freeze and the normal
+prospective-task policy consumer, with every expected rejection additionally requiring unchanged
+persisted state, bounded workspace and bare-remote refs.
+
+The no-argument targeted gate authorizes only the sole exact R14 label, exact frozen reason and exact
+four-part causal failure signature; another RED is unexpected and a green unbound run requires
+product identity. Product acceptance takes exact base and candidate SHAs and requires clean
+candidate HEAD, candidate-tree spec/gate byte identity, the candidate's single parent to be that
+base, and the actual no-renames Git diff to contain only `controller/authority/core.py`. Core-plus-
+CLI, safe-only and stacked-candidate mutants prove that check. Independent product review and
+guarded publication must bind the same successful invocation. The publisher, registry, product,
+two allowed states, five-file TEST_AUTHOR scope, BP01–BP14 sequence and all forbidden-authority
+boundaries remain unchanged in this remediation.
+
+### R14 exhaustive registry-composition remediation
+
+The second independent review produced two concrete full-gate escapes. A core-only parser mutant
+that accepted v1/v2 while omitting `verify/h034/kernel` from its required membership passed product
+mode and the full gate. A separate mutant that removed exact `authority_source` validation also
+passed both. The review additionally required an explicit retained-H034 v2 positive and removal of
+the remaining ambiguity between standard and product-bound version/type coverage.
+
+The member matrix is now exhaustive rather than representative. Under v1, each of the four H-034
+members independently receives omission, substitution, duplicate, backslash alias, leading-dot
+alias and applicable broader-prefix mutations (24 states). Under v2, each of all seven old4+new3
+members receives the same six one-defect mutations (42 states). Every state traverses the real
+registry validator, task validator, candidate checker, owner-author, review, final-freeze and normal
+prospective policy consumers; every rejection additionally preserves state, workspace and refs.
+Arbitrary addition, new-only and partial-transition controls remain separate.
+
+Both exact and reordered v2 states now run independent H-034 and H-036 positive owner surfaces.
+The retained H-034 path covers validate-task, a protocol-correct base candidate through the complete
+owner chain, one separate changed H-034 candidate touching all four retained members through owner
+check-candidate, safe ordinary policy and one ordinary-policy H-034 protection control per member.
+Each protection control has a singleton task surface, so no earlier member can cause a later
+member's denial.
+The new3 path carries the corresponding full-surface H-036 proof. These
+positives are folded into the existing v2-positive failure component, so the preproduct signature is
+unchanged.
+
+The version matrix crosses integers 0/3, strings 1/2, both booleans, floats 1/2, null, array and
+object values with each legal membership set, plus integer-1/union7 and integer-2/old4 cross-pairs
+(24 states). Only true/old4 and float-1/old4 remain the two frozen numeric-alias baseline gaps.
+Standard and product-bound invocations execute this same self-contained matrix before product scope
+credit.
+
+Each retained non-owner field is now tested under both v1/old4 and v2/union7. Exact
+`path_grammar`, exact `authority_source`, exact-false `self_digest_is_authority`, and both canonical
+non-empty unique path lists receive every meaningful type, empty, malformed, non-string value,
+wrong scalar, exact duplicate, canonical backslash-alias duplicate and duplicate-key defect (26 per
+legal state). All reach the same seven consumers with no-effect rejection proofs. Complementary v1
+and v2 positives independently replace each registry-owned list with alternative values,
+overlapping/reordered canonical entries and valid backslash spellings. The alternative prospective
+values actively deny ordinary task, changed-candidate and policy use; the alternative global-deny
+values actively deny the applicable owner task and changed-candidate use. This prevents a product
+from replacing validation with frozen list contents or accepting values it does not actually use.
+
+The five-file TEST_AUTHOR surface, exact core-only product predicate, sole label/reason/four-part RED
+signature, unchanged canonical registry and product bytes, publisher, BP01–BP14 bindings and serial
+H035 → H034 → H036 → H032 → H031 trust transitions remain unchanged.
+
+### R14 per-entry registry-list causality remediation
+
+Independent product-bound review found GR-08 after the exhaustive composition refreeze. A clean
+core-only mutant validated every legal registry byte strictly but returned only the first
+`owner_author_global_denied_paths` entry. It passed product-bound 76/0 and the historical matrix
+because the alternate fixture used an overlapping exact-child/recursive-parent pair and only its
+first value reached the owner effect check. The corresponding prospective pair could likewise let
+one entry cause another entry's denial.
+
+The refrozen gate now exercises every canonical entry of both registry-owned lists under v1/old4
+and v2/union7. It additionally replaces each list independently with three pairwise-non-overlapping
+arbitrary entries and consumes every entry. Each prospective-protected entry has its own singleton
+ordinary task and distinguishing candidate; validate-task, ordinary check-candidate and normal
+policy must reject for their exact protected-authority reasons. Each global-denied entry has its own
+singleton owner task and distinguishing candidate; validate-task and check-candidate with actor
+`owner_authority` must reject for their exact global-deny reasons. All rejected authority calls
+leave persisted state, bounded workspace and bare-remote refs unchanged. Arbitrary prospective
+probes are disjoint from owner production; arbitrary global-deny probes remain permitted by the
+H-034 owner-production surface if their intended deny entry is removed, so no outside-owner fallback
+can impersonate the global-deny effect.
+
+Overlapping/reordered list values and valid single-backslash values remain separate compatibility
+positives, but no overlapping fixture supplies per-entry causal credit. Canonical JSON candidates
+are changed only by valid whitespace when an exact protected registry/spec path must be the measured
+Git diff, so parser failure cannot impersonate protected-path enforcement. The exact four-part RED,
+five-file TEST_AUTHOR scope, core-only product predicate, canonical registry and product bytes,
+publisher, BP01–BP14 bindings and serial trust transitions remain unchanged.
