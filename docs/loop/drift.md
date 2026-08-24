@@ -3044,3 +3044,17 @@ H-036 gate review → H-036 BUILDER implementation → independent H-036 product
 H-036 publication → H-032 refreeze against published H-036 → independent H-032 review and guarded
 publication → H-031 rebind. Existing confinement, no-unconfined-fallback, no-generic-authority,
 exact-identity independent review and guarded non-force publication machinery remain unchanged.
+
+### R15 independent-gate-review remediation
+
+Independent review rejected immutable candidate `d9f73246924dd3e55759e43acd6fa4c0912f88bf`
+on H034-R15-GR-01. Its serial-order vector was inert: appending one valid-looking H-036
+owner-authority task with exact new3 surface, H-034 dependency and canonical H-036 gate still left
+the targeted gate at 72 PASS / 0 FAIL. The rejected candidate remains immutable evidence and is not
+publication authority.
+
+The remediated R15 phase predicate now requires exactly zero canonical `h-036` task rows before
+H-034 review/publication. Connected judge controls clone the actual canonical spec, append one such
+valid-looking early row, then append a duplicate pair; both must reject through the same predicate.
+This changes no registry, owner surface, H-035 product/gate, H-034 production byte, publication
+mechanism or downstream authority. The final targeted H-034 inventory is 75 PASS / 0 FAIL.

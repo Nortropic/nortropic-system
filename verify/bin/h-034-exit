@@ -262,6 +262,11 @@ def member_broader(path):
  parent=core.rsplit("/",1)[0]
  return parent+"/**"
 
+def r15_h036_phase_clear(spec):
+ return (type(spec) is dict and type(spec.get("tasks")) is list
+  and not any(type(task) is dict and task.get("id")=="h-036"
+              for task in spec["tasks"]))
+
 def r15_registry_controls(spec):
  try:registry=strict(REG.read_bytes())
  except Exception as exc:
@@ -284,6 +289,17 @@ def r15_registry_controls(spec):
   and task.get("owner_author_allowed_write")==H034_OWNER
   and task.get("r15_registry_v2_refreeze")==R15_TASK_CONTRACT,
   "F_R15_H034_TASK_OLD4_AND_SERIAL_ORDER")
+ check(r15_h036_phase_clear(spec),"F_R15_H036_TASK_NOT_MATERIALIZED_BEFORE_H034_PUBLICATION")
+ early_task={"id":"h-036","slice":"H036_RUNTIME_AUTHORITY_PREREQUISITE",
+  "authority_class":"owner_authority","title":"early H036 mutant",
+  "summary":"valid-looking early task must not satisfy the H034 phase",
+  "allowed_write":[],"owner_author_allowed_write":H036_OWNER,
+  "exit_test":"verify/bin/h-036-exit","exit_criterion":"early mutant",
+  "docs_impact":[],"depends_on":["h-034"],"max_changed_files":3,"max_added_lines":1}
+ early=json.loads(json.dumps(spec));early["tasks"].append(early_task)
+ duplicate=json.loads(json.dumps(spec));duplicate["tasks"].extend((early_task,early_task))
+ check(not r15_h036_phase_clear(early),"J_R15_EARLY_H036_TASK_REJECT")
+ check(not r15_h036_phase_clear(duplicate),"J_R15_DUPLICATE_EARLY_H036_TASK_REJECT")
 
  prospective_task={"id":"h-036-prospective-fixture","authority_class":"owner_authority",
   "allowed_write":[],"owner_author_allowed_write":H036_OWNER,"docs_impact":[]}
