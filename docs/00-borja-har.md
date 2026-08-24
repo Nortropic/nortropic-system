@@ -143,3 +143,18 @@ Det som **inte** delegeras är Trust Kernel: task authority, allowed_write, G20,
 Kanoniskt owner-kontrakt: `docs/loop/harness-substitution-contract-v1.md`.
 
 Efter S3 h-003/h-004 byggs SUB-1…SUB-4 före återstående S2/S4–S13. Verkstadsgolvet blir senare kontrollrummet över den verkliga event/read-projektionen men aldrig trust authority.
+
+<!-- R1-REPO-NATIV-FABRIK -->
+## Fabriken bor nu i repot (S0/R1, 2026-08-24)
+
+Fabriken körs nu på den här Macen, och dess hem är GIT-REPOT SJÄLVT — inte någon särskild
+mapp på datorn. Varje verktyg som behöver fabriken hittar den genom att fråga git var
+repot börjar, och kontrollerar att det verkligen ÄR rätt repo (rätt GitHub-adress, grundlagen
+och strömbrytaren på plats) innan något används. Gissa aldrig var fabriken bor.
+
+Två saker till hände samtidigt: (1) det gamla skrivbordets arbetsmaterial (`~/Workflow`) är
+PENSIONERAT — de gamla "facit-sajterna" som kvalitetsnätet jämförde mot är nu historiska
+dokument, inte bevis, och nya facit klipps av dig enligt `tests/fixtures/FIXTURE-REGIME-
+CHANGE-2026-08-24.md`; tills dess säger kvalitetsnätet ärligt "väntar på ny regim" i stället
+för grönt. (2) Fabrikens kladd och löpande anteckningar (förslag, digest, usage-logg) bor nu
+i `~/.nortropic/factory/` — anteckningar är inte kunskap, så de bor utanför repot.

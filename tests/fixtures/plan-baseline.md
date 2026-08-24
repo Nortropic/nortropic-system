@@ -1,3 +1,7 @@
+> **HISTORISK URKUND — EJ AKTUELL TRUST-EVIDENS (FIXTURE_REGIME_CHANGE 2026-08-24, §A6).**
+> Legacy-regimens baseline; retirerad genom ägarbeslut S0. Konsumeras av ingen grind/probe.
+> Se FIXTURE-REGIME-CHANGE-2026-08-24.md. Jämförelser över regimgränsen är ogiltiga.
+
 # Plan-baseline — §5+§7 ur torrtestkörning 2026-07-28 (v16-kontraktet)
 
 > **HÅLET SOM DETTA SNITT STÄNGER:** verify-körningen 2026-07-28 (commit `a3fb91a`) var GRÖN **delvis för att kriterierna inte täckte de nya bildfälten — inte för att fälten verifierades**. §5:s Bildinventering/Bildspår/Bildbehandling/Slot-tabell och §7.9 passerade ODÖMDA mot v15-baselinen ("utanför Ekvivalenskriterierna"). Grönt den dagen betydde: det gamla kontraktet höll; det nya var oskyddat. Kriterierna 7–10 (§5) och 9 (§7) nedan stänger hålet.
