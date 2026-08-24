@@ -104,6 +104,268 @@ REQUIRED_OWNER = {
     "verify/h034/build-recipe.json", "verify/h034/identity-manifest.json",
 }
 
+BPAM_AMENDMENT = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_AMENDMENT_V1 -->\n"
+BPAM_CONTRACT_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_BEGIN -->\n```json\n"; BPAM_CONTRACT_END = b"```\n<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_END -->\n"
+BPAM_SOURCE_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_SOURCE_BEGIN -->\n"; BPAM_SOURCE_END = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_SOURCE_END -->\n"
+BPAM_SECTION_DIGESTS = {"prefix":"b00717bc90ad6bfcf8e72cdc3f2498c638ce1ed36867d32ac71152cf3cf8af42", "preamble":"fa296b02e5a417022b4d704605aa5f7cfafede24d5696878786769d0c83d5772",
+    "contract":"e8ee5a8321c0a73469ac305803a7b10e14e78845ad27eb0473fdbe9a87692c7f", "bridge":"b4d5b24db445fa77b8cb1dfb87424759207421b259f9580807651912c4482e09",
+    "source":"b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84"}
+BPAM_CONDITIONS = (
+    ("BP01","EXISTING_FROZEN_ARCHITECTURE_BLOCKS_APPROVED_OBJECTIVE"),
+    ("BP02","REPRODUCIBLE_TECHNICAL_EVIDENCE_PROVES_BLOCKER"),
+    ("BP03","PREREQUISITE_ONLY_MAKES_APPROVED_OBJECTIVE_EXECUTABLE_OR_JUDGEABLE"),
+    ("BP04","SECURITY_AND_TRUST_OBJECTIVE_PRESERVED_OR_STRENGTHENED"),
+    ("BP05","CHANGE_BOUND_BY_ALL_SIX_EXACT_DIMENSIONS"),
+    ("BP06","NO_GENERIC_OR_CALLER_SELECTED_AUTHORITY"),
+    ("BP07","ARBITRARY_NEIGHBORING_AUTHORITY_REJECTED"),
+    ("BP08","BACKWARD_COMPATIBLE_AUTHORITY_SEMANTICS_PRESERVED_WHERE_REQUIRED"),
+    ("BP09","TEST_AUTHOR_FREEZES_CONTRACT_BEFORE_PRODUCT_IMPLEMENTATION"),
+    ("BP10","INDEPENDENT_GATE_REVIEWER_FALSIFIES_EXACT_FROZEN_CANDIDATE"),
+    ("BP11","SEPARATE_PRODUCT_CANDIDATE_RECEIVES_INDEPENDENT_EXACT_IDENTITY_REVIEW"),
+    ("BP12","HISTORICAL_GATES_INVARIANTS_SCOPE_IDENTITY_AND_REGRESSIONS_GREEN_OR_EXPLICIT_AUTHORIZED_RED"),
+    ("BP13","PUBLICATION_USES_GUARDED_NONFORCE_EXACT_IDENTITY_TRANSITION"),
+    ("BP14","AFFECTED_DOWNSTREAM_GATE_EXPLICITLY_REBOUND_OR_REFROZEN"),
+)
+BPAM_MIGRATIONS = (
+    "INTRODUCE_PREREQUISITE_TASK_REQUIRED_BY_ALREADY_AUTHORIZED_TASK",
+    "ADD_EXACT_DEPENDENCY_EDGE",
+    "MIGRATE_STRICT_REGISTRY_OR_SCHEMA_TO_EXPLICITLY_VERSIONED_EXACT_STATE",
+    "ADD_EXACT_NEW_AUTHORITY_PATHS_REQUIRED_BY_PREREQUISITE",
+    "REFREEZE_DOWNSTREAM_GATES_TO_CONSUME_NEWLY_PUBLISHED_PREREQUISITE",
+    "MINIMAL_BOOTSTRAP_ORDER_OR_DOCUMENTATION_CHANGE_REQUIRED_BY_DEPENDENCY",
+    "MINIMAL_ALLOWED_WRITE_EXPANSION_LOGICALLY_REQUIRED_AND_EFFECT_BOUND",
+    "REPLACE_IMPOSSIBLE_MECHANISM_WHILE_PRESERVING_APPROVED_SECURITY_OBJECTIVE",
+)
+BPAM_HARD_STOPS = (
+    "CHANGE_HUMAN_OWNED_OR_HUMAN_ONLY_AUTHORITY",
+    "WEAKEN_FUNDAMENTAL_TRUST_OR_SECURITY_OBJECTIVE",
+    "BYPASS_REQUIRED_CONFINEMENT",
+    "ALLOW_UNCONFINED_EXECUTION_FOR_CONVENIENCE",
+    "MATERIALLY_BROADEN_FILESYSTEM_PROCESS_NETWORK_OR_CREDENTIAL_AUTHORITY_BEYOND_APPROVED_OBJECTIVE_REQUIREMENTS",
+    "INTRODUCE_PRIVILEGED_OR_NATIVE_BROKER_WITH_MATERIALLY_NEW_TRUST_MODEL",
+    "GRANT_GENERIC_OR_SELF_SELECTED_OWNER_AUTHORITY",
+    "PROVISION_OR_CHANGE_EXTERNAL_CREDENTIAL_SECRET_GITHUB_IDENTITY_OR_TRUST_ROOT_REQUIRING_HUMAN_CEREMONY_OR_NOT_SAFELY_AUTOMATABLE",
+    "DESTRUCTIVE_EXTERNAL_EFFECT_OUTSIDE_GUARDED_PUBLICATION",
+    "UNRESOLVED_CONTRADICTION_BETWEEN_HIGHER_AUTHORITIES",
+    "MATERIALLY_EXPAND_PRODUCT_OR_ROADMAP_SCOPE",
+    "MIGRATION_CANNOT_BE_MECHANICALLY_FROZEN_AND_INDEPENDENTLY_FALSIFIED",
+    "REPEATED_NO_PROGRESS_REACHES_CANONICAL_HARD_STOP_THRESHOLD",
+)
+BPAM_TRANSITIONS = ("PROVEN_BLOCKER", "ARCHITECT_DIAGNOSIS", "NARROW_PREREQUISITE_DESIGN", "TEST_AUTHOR", "FROZEN_GATE",
+    "INDEPENDENT_GATE_REVIEW", "GUARDED_CONTRACT_PUBLICATION", "SEPARATE_BUILDER_PRODUCT_CANDIDATE", "INDEPENDENT_PRODUCT_REVIEW", "GUARDED_PRODUCT_PUBLICATION",
+    "DOWNSTREAM_REBIND_OR_REFREEZE", "CONTINUE_ORIGINAL_BOOTSTRAP_OBJECTIVE",
+)
+BPAM_FORBIDDEN = (
+    "GENERIC_AUTHORITY",
+    "CALLER_SELECTED_TASK_AUTHORITY_PATH_DEPENDENCY_EFFECT_OR_OBJECTIVE",
+    "WILDCARD_ROOT_PARENT_OR_NEIGHBORING_PATH_AUTHORITY",
+    "GENERIC_OR_SELF_SELECTED_OWNER_AUTHORITY",
+    "FILESYSTEM_PROCESS_NETWORK_OR_CREDENTIAL_BROADENING_BEYOND_APPROVED_OBJECTIVE_REQUIREMENTS",
+    "EXTERNAL_CREDENTIAL_SECRET_GITHUB_IDENTITY_OR_TRUST_ROOT_PROVISIONING_REQUIRING_HUMAN_CEREMONY_OR_NOT_SAFELY_AUTOMATABLE",
+    "PRIVILEGED_OR_NATIVE_BROKER_WITH_MATERIALLY_NEW_TRUST_MODEL",
+    "CONFINEMENT_BYPASS_OR_UNCONFINED_FALLBACK",
+    "OBJECTIVE_SECURITY_MODEL_CONSTITUTION_OR_FUNDAMENTAL_AUTHORITY_REDEFINITION",
+)
+BPAM_SPEC_BINDING = {
+    "contract_id":"BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION",
+    "delegation_path":"docs/loop/remaining-bootstrap-delegation-v1.md",
+    "source_sha256":BPAM_SECTION_DIGESTS["source"],
+    "contract_sha256":BPAM_SECTION_DIGESTS["contract"],
+    "condition_ids":[row[0] for row in BPAM_CONDITIONS],
+    "condition_operator":"ALL", "true_human_hard_stop_count":13,
+    "authorized_internal_migration_count":8, "required_serial_transition_count":12,
+    "activation_trigger":"VERIFIED_CANONICAL_PUBLICATION",
+    "candidate_bytes_activate":False,
+    "activation_evidence":["EXACT_CANONICAL_COMMIT","EXACT_CANONICAL_TREE",
+                           "EXACT_DELEGATION_DOCUMENT_SHA256","POSTPUBLICATION_GATE_VERIFICATION"],
+    "fail_closed":True,
+}
+H035_R13_FROZEN_AUTHORITY = {
+    "authority_class":"ordinary",
+    "allowed_write":[
+        "controller/authority/**","controller/policy/**","controller/taskval/**","controller/envelope/**",
+        "controller/state/**","controller/attest/**","controller/loop/**","tests/controller/authority/**",
+        "tests/controller/policy/**","tests/controller/taskval/**","tests/controller/envelope/**",
+        "tests/controller/state/**","tests/controller/attest/**","tests/controller/loop/**",
+        "scripts/nortropic-codex-autopilot.py","tests/scripts/nortropic-codex-autopilot/**",
+        "scripts/check-invariants.mjs","docs/05-beslutslogg.md","docs/loop/drift.md",
+        "docs/loop/owner-author-workflow-v1.md","AGENTS.md","docs/loop/codex-autopilot-v3-full-roadmap.md",
+        "docs/loop/remaining-bootstrap-delegation-v1.md",
+    ],
+    "owner_author_allowed_write":[],
+    "docs_impact":["docs/05-beslutslogg.md","docs/loop/drift.md","docs/loop/owner-author-workflow-v1.md","AGENTS.md","docs/loop/codex-autopilot-v3-full-roadmap.md",
+                   "docs/loop/remaining-bootstrap-delegation-v1.md"],
+    "depends_on":["h-017"], "exit_test":"verify/bin/h-035-exit",
+    "max_changed_files":35, "max_added_lines":4600,
+    "bootstrap_exception":{"kind":"frozen_v1_allowed_write_once","prospective_task_id_bypass":False},
+}
+
+
+def strict_json_bytes(raw: bytes) -> object:
+    def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
+        out: dict[str, object] = {}
+        for key, value in items:
+            if key in out: raise ValueError(f"duplicate key {key}")
+            out[key] = value
+        return out
+    return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=pairs)
+
+
+def exact_value(actual: object, expected: object) -> bool:
+    if type(actual) is not type(expected): return False
+    if isinstance(expected, dict): return tuple(actual) == tuple(expected) and all(exact_value(actual[key],value) for key,value in expected.items())
+    if isinstance(expected, list):
+        return len(actual) == len(expected) and all(exact_value(a,b) for a,b in zip(actual,expected))
+    return actual == expected
+
+
+def validate_bpam_contract(doc: object) -> tuple[bool, str]:
+    keys = (
+        "schema_version","contract_id","source_sha256","scope","condition_operator",
+        "hard_stop_precedence","incomplete_proof_result","owner_decision_required","delegation_predicate",
+        "legacy_stop_boundary_precedence","conditions",
+        "bp05_exact_dimensions","authorized_internal_migrations","authorized_migrations_require",
+        "true_human_hard_stops","required_serial_transitions","sequence_rule",
+        "downstream_rebind_rule","review_binding","preproduct_red_rule","forbidden_authorities",
+        "activation_condition","fail_closed",
+    )
+    if not isinstance(doc, dict) or tuple(doc) != keys: return False, "top-level keys/order"
+    scalars = (
+        type(doc["schema_version"]) is int and doc["schema_version"] == 1,
+        doc["contract_id"] == "BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION",
+        doc["source_sha256"] == BPAM_SECTION_DIGESTS["source"],
+        doc["scope"] == "REMAINING_NORTROPIC_BOOTSTRAP_INSIDE_ALREADY_APPROVED_OBJECTIVES",
+        doc["condition_operator"] == "ALL",
+        doc["hard_stop_precedence"] == "BEFORE_DELEGATED_AUTHORITY",
+        doc["incomplete_proof_result"] == "NO_DELEGATED_AUTHORITY",
+        doc["owner_decision_required"] == "INTERNAL_ARCHITECT_ORCHESTRATOR_SIGNAL_ONLY_WHEN_HARD_STOP_MATCHES_NO_AND_ALL_CONDITIONS_HOLD",
+        doc["delegation_predicate"] == "HARD_STOP_MATCHES=NO_AND_BP01_THROUGH_BP14=ALL_TRUE_IMPLIES_OWNER_DECISION_REQUIRED=INTERNAL_ARCHITECT_ORCHESTRATOR_SIGNAL",
+        doc["authorized_migrations_require"] == "HARD_STOP_MATCHES_NO_AND_BP01_THROUGH_BP14_ALL_TRUE",
+        doc["sequence_rule"] == "STRICT_HAPPENS_BEFORE_WITH_ADDITIONAL_REMEDIATION_STEPS_PERMITTED",
+        doc["downstream_rebind_rule"] == "CHANGED_DOWNSTREAM_REBIND_MUST_BE_GUARDEDLY_PUBLISHED_BEFORE_CONTINUATION",
+        doc["review_binding"] == "INDEPENDENT_EXACT_IMMUTABLE_CANDIDATE_IDENTITY_NO_SAME_SUBJECT_REVIEW",
+        doc["preproduct_red_rule"] == "ONLY_EXACT_FROZEN_GATE_LABEL_AND_REASON_MAY_AUTHORIZE_EXPLICIT_PREPRODUCT_RED",
+        type(doc["fail_closed"]) is bool and doc["fail_closed"] is True,
+    )
+    if not all(scalars): return False, "scalar contract"
+    precedence = {"superseded_terms":["PROVEN_ARCHITECTURAL_IMPOSSIBILITY","NOVEL_MATERIAL_AUTHORITY_EXPANSION"],
+        "superseded_only_when":"HARD_STOP_MATCHES_NO_AND_BP01_THROUGH_BP14_ALL_TRUE",
+        "remaining_human_stops":["OBJECTIVE_LEVEL_IMPOSSIBILITY","AUTHORITY_EXPANSION_BEYOND_APPROVED_OBJECTIVE_REQUIREMENTS"]}
+    if not exact_value(doc["legacy_stop_boundary_precedence"],precedence): return False, "legacy stop precedence"
+    rows = doc["conditions"]
+    if not isinstance(rows, list) or any(not isinstance(row, dict) or tuple(row) != ("id","requirement") for row in rows):
+        return False, "condition shape"
+    if tuple((row["id"],row["requirement"]) for row in rows) != BPAM_CONDITIONS: return False, "conditions"
+    if doc["bp05_exact_dimensions"] != ["TASK_IDENTITY","DEPENDENCY_CHANGE","FILE_PATH_AUTHORITY",
+        "ALLOWED_WRITE_SURFACE","AUTHORITY_TRANSITION","EXPECTED_EFFECTS"]: return False, "BP05 dimensions"
+    if tuple(doc["authorized_internal_migrations"]) != BPAM_MIGRATIONS: return False, "migrations"
+    if tuple(doc["true_human_hard_stops"]) != BPAM_HARD_STOPS: return False, "hard stops"
+    if tuple(doc["required_serial_transitions"]) != BPAM_TRANSITIONS: return False, "transitions"
+    if tuple(doc["forbidden_authorities"]) != BPAM_FORBIDDEN: return False, "forbidden authority"
+    activation = doc["activation_condition"]
+    expected_activation = {"trigger":"VERIFIED_CANONICAL_PUBLICATION", "candidate_bytes_activate":False,
+        "required_evidence":["EXACT_CANONICAL_COMMIT","EXACT_CANONICAL_TREE",
+                             "EXACT_DELEGATION_DOCUMENT_SHA256","POSTPUBLICATION_GATE_VERIFICATION"],
+        "report":"BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION=ACTIVE", "report_only_after_evidence":True}
+    if activation != expected_activation or any(type(activation[k]) is not bool for k in ("candidate_bytes_activate","report_only_after_evidence")):
+        return False, "activation"
+    return True, "ok"
+
+
+def bpam_document(raw: bytes) -> tuple[bool, str, object | None]:
+    markers = (BPAM_AMENDMENT,BPAM_CONTRACT_BEGIN,BPAM_CONTRACT_END,BPAM_SOURCE_BEGIN,BPAM_SOURCE_END)
+    if any(raw.count(marker) != 1 for marker in markers): return False, "marker count", None
+    prefix, tail = raw.split(BPAM_AMENDMENT, 1); preamble, tail = tail.split(BPAM_CONTRACT_BEGIN, 1)
+    contract_raw, tail = tail.split(BPAM_CONTRACT_END, 1); bridge, tail = tail.split(BPAM_SOURCE_BEGIN, 1)
+    source, trailing = tail.split(BPAM_SOURCE_END, 1)
+    sections = {"prefix":prefix,"preamble":preamble,"contract":contract_raw,"bridge":bridge,"source":source}
+    if trailing: return False, "trailing bytes", None
+    if any(hashlib.sha256(value).hexdigest() != BPAM_SECTION_DIGESTS[name] for name,value in sections.items()):
+        return False, "section digest", None
+    try: contract = strict_json_bytes(contract_raw)
+    except (UnicodeError, ValueError, json.JSONDecodeError) as exc: return False, f"contract parse {exc}", None
+    ok, why = validate_bpam_contract(contract)
+    return ok, why, contract
+
+
+def bpam_selftests(raw: bytes, contract: dict[str, object]) -> None:
+    def clone() -> dict[str, object]: return json.loads(json.dumps(contract))
+    def reject(doc: object) -> bool: return not validate_bpam_contract(doc)[0]
+    check(validate_bpam_contract(contract) == (True,"ok"), "J_BPAM_MACHINE_CONTRACT_POSITIVE")
+    missing = []
+    for key in tuple(contract): mutant=clone(); mutant.pop(key); missing.append(mutant)
+    check(all(reject(mutant) for mutant in missing), "J_BPAM_EACH_TOP_LEVEL_KEY_REQUIRED")
+    mutant=clone(); mutant["extra"]=True
+    check(reject(mutant), "J_BPAM_EXTRA_TOP_LEVEL_KEY_REJECT")
+    condition_mutants = []
+    for index in range(len(BPAM_CONDITIONS)):
+        mutant=clone(); del mutant["conditions"][index]; condition_mutants.append(mutant)
+    for action in ("duplicate","substitute","reorder","type"):
+        mutant=clone()
+        if action == "duplicate": mutant["conditions"][1] = dict(mutant["conditions"][0])
+        elif action == "substitute": mutant["conditions"][0]["requirement"] = "MODEL_JUDGMENT"
+        elif action == "reorder": mutant["conditions"][0],mutant["conditions"][1] = mutant["conditions"][1],mutant["conditions"][0]
+        else: mutant["conditions"][0]["id"] = 1
+        condition_mutants.append(mutant)
+    check(all(reject(mutant) for mutant in condition_mutants), "J_BPAM_BP01_BP14_MISSING_DUPLICATE_SUBSTITUTE_ORDER_TYPE_REJECT")
+    def vector_mutants(key: str) -> list[dict[str, object]]:
+        rows=[]
+        for index in range(len(contract[key])):
+            mutant=clone(); del mutant[key][index]; rows.append(mutant)
+        for index in range(len(contract[key])-1):
+            mutant=clone(); mutant[key][index],mutant[key][index+1] = mutant[key][index+1],mutant[key][index]; rows.append(mutant)
+        for action in ("extra","duplicate","substitute","type"):
+            mutant=clone(); value=mutant[key]
+            if action == "extra": value.append("EXTRA")
+            elif action == "duplicate": value[1] = value[0]
+            elif action == "substitute": value[0] = "SUBSTITUTE"
+            else: mutant[key] = {"wrong":"type"}
+            rows.append(mutant)
+        return rows
+    for key,label in (("bp05_exact_dimensions","BP05_DIMENSIONS"),("authorized_internal_migrations","MIGRATIONS"),
+                      ("true_human_hard_stops","HARD_STOPS"),("required_serial_transitions","TRANSITIONS"),
+                      ("forbidden_authorities","FORBIDDEN_AUTHORITY")):
+        check(all(reject(mutant) for mutant in vector_mutants(key)), f"J_BPAM_{label}_EXACT_VECTOR_REJECT")
+    qualifier_mutants=[]
+    for key,index,value in (
+        ("true_human_hard_stops",4,"MATERIALLY_BROADEN_FILESYSTEM_PROCESS_NETWORK_OR_CREDENTIAL_AUTHORITY"), ("true_human_hard_stops",7,"PROVISION_OR_CHANGE_EXTERNAL_CREDENTIAL_SECRET_GITHUB_IDENTITY_OR_TRUST_ROOT"),
+        ("forbidden_authorities",4,"FILESYSTEM_PROCESS_NETWORK_OR_CREDENTIAL_BROADENING"), ("forbidden_authorities",5,"EXTERNAL_CREDENTIAL_SECRET_GITHUB_IDENTITY_OR_TRUST_ROOT_PROVISIONING")):
+        mutant=clone(); mutant[key][index]=value; qualifier_mutants.append(mutant)
+    check(all(reject(mutant) for mutant in qualifier_mutants), "J_BPAM_OBJECTIVE_AND_HUMAN_CEREMONY_QUALIFIERS_REQUIRED")
+    precedence_mutants=[]
+    mutant=clone(); mutant.pop("legacy_stop_boundary_precedence"); precedence_mutants.append(mutant)
+    mutant=clone(); mutant["legacy_stop_boundary_precedence"]["superseded_only_when"]="OBJECTIVE_LEVEL_IMPOSSIBILITY"; precedence_mutants.append(mutant)
+    mutant=clone(); mutant["legacy_stop_boundary_precedence"]["remaining_human_stops"].reverse(); precedence_mutants.append(mutant)
+    check(all(reject(mutant) for mutant in precedence_mutants), "J_BPAM_SCOPED_LEGACY_STOP_PRECEDENCE_REQUIRED")
+    scalar_mutants=[]
+    for key,value in (("scope","EXPANDED_OBJECTIVE"),("condition_operator","ANY"),
+                      ("condition_operator","THRESHOLD_13"),("condition_operator","OPTIONAL"),
+                      ("hard_stop_precedence","AFTER_DELEGATED_AUTHORITY"),("incomplete_proof_result","PARTIAL_AUTHORITY"),
+                      ("owner_decision_required","HUMAN_STOP"),("delegation_predicate","ANY_BP_IMPLIES_AUTHORITY"),
+                      ("authorized_migrations_require","CALLER_SELECTED"),("sequence_rule","OPTIONAL"),
+                      ("downstream_rebind_rule","SILENT_INHERITANCE"),("review_binding","SAME_SUBJECT"),
+                      ("preproduct_red_rule","MODEL_PROSE"),("fail_closed",False)):
+        mutant=clone(); mutant[key]=value; scalar_mutants.append(mutant)
+    for key,value in (("candidate_bytes_activate",True),("report_only_after_evidence",False),
+                      ("trigger","CANDIDATE_BYTES"),("report","ACTIVE_BEFORE_PUBLICATION")):
+        mutant=clone(); mutant["activation_condition"][key]=value; scalar_mutants.append(mutant)
+    for index in range(4):
+        mutant=clone(); del mutant["activation_condition"]["required_evidence"][index]; scalar_mutants.append(mutant)
+    check(all(reject(mutant) for mutant in scalar_mutants), "J_BPAM_GRANT_REVIEW_RED_ACTIVATION_FAIL_CLOSED_REJECT")
+    duplicate = raw.replace(b'{\n  "schema_version": 1,', b'{\n  "schema_version": 1,\n  "schema_version": 1,', 1)
+    duplicate_contract = duplicate.split(BPAM_CONTRACT_BEGIN,1)[1].split(BPAM_CONTRACT_END,1)[0]
+    try: strict_json_bytes(duplicate_contract); duplicate_rejected=False
+    except ValueError: duplicate_rejected=True
+    check(duplicate_rejected and not bpam_document(duplicate)[0], "J_BPAM_DUPLICATE_JSON_KEY_REJECT")
+    binding_mutants=[]
+    for key,value in (("candidate_bytes_activate",0),("fail_closed",1),("true_human_hard_stop_count",13.0)):
+        mutant=json.loads(json.dumps(BPAM_SPEC_BINDING)); mutant[key]=value; binding_mutants.append(mutant)
+    check(all(not exact_value(mutant,BPAM_SPEC_BINDING) for mutant in binding_mutants), "J_BPAM_TASK_BINDING_REJECTS_BOOL_INT_FLOAT_EQUALITY")
+    for label,mutant in (("PREFIX",b"X"+raw),("PREAMBLE",raw.replace(b"inactive in candidate form",b"active in candidate form",1)),
+                         ("SOURCE",raw.replace(b"I am adding a standing owner-delegation",b"I am altering a standing owner-delegation",1)),
+                         ("TRAILING",raw+b"claim\n")):
+        check(not bpam_document(mutant)[0], f"J_BPAM_{label}_MUTATION_REJECT")
+
 
 def validate_registry(doc: object) -> tuple[bool, str]:
     if not isinstance(doc, dict): return False, "top-level type"
@@ -1634,7 +1896,8 @@ def frozen_checks() -> None:
     check(all(term in task_contract for term in r12_terms),
           "F_R12_PATHSPEC_IMMUTABLE_GIT_OBJECT_COMPOSITION_CONTRACT")
     owner_workflow = (ROOT / "docs/loop/owner-author-workflow-v1.md").read_text(encoding="utf-8")
-    delegation = (ROOT / "docs/loop/remaining-bootstrap-delegation-v1.md").read_text(encoding="utf-8")
+    delegation_path = ROOT / "docs/loop/remaining-bootstrap-delegation-v1.md"
+    delegation_raw = delegation_path.read_bytes(); delegation = delegation_raw.decode("utf-8", errors="strict")
     delegation_terms = (
         "OWNER_MANUAL_FINAL_APPROVAL_REQUIRED=NO",
         "Missing evidence rejects",
@@ -1648,6 +1911,14 @@ def frozen_checks() -> None:
           and "guarded normal merge" in owner_workflow
           and "exactly two parents in order" in owner_workflow,
           "F_CURRENT_AUTHORITY_BOUNDED_DELEGATION_AND_NORMAL_MERGE_CONTRACT")
+    bpam_ok,bpam_why,bpam_contract = bpam_document(delegation_raw)
+    check(bpam_ok, "F_R13_BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION", bpam_why)
+    if bpam_ok and isinstance(bpam_contract, dict): bpam_selftests(delegation_raw,bpam_contract)
+    else: check(False, "J_BPAM_MACHINE_CONTRACT_POSITIVE", bpam_why)
+    check(len(hits) == 1 and exact_value(hits[0].get("r13_bounded_prerequisite_authority_migration"),BPAM_SPEC_BINDING),
+          "F_R13_EXACT_TASK_BINDING")
+    check(len(hits) == 1 and all(exact_value(hits[0].get(key),value) for key,value in H035_R13_FROZEN_AUTHORITY.items()),
+          "F_R13_H035_EXISTING_AUTHORITY_UNCHANGED")
     python_authority = {
         "config/python-interpreter-authority-v1.json":"2c609508a082d7068ca85182382988f89a9e29148831fc12f2bd8ddc207e5986",
         "verify/bin/python-interpreter-authority-v1-exit":"edc84d899b09decd9eafd90a78094f86c72a8b1ce221a4adbd93636cb99a462a",
