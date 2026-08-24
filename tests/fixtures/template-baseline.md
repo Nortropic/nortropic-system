@@ -1,3 +1,7 @@
+> **HISTORISK URKUND — EJ AKTUELL TRUST-EVIDENS (FIXTURE_REGIME_CHANGE 2026-08-24, §A6).**
+> Legacy-regimens baseline; retirerad genom ägarbeslut S0. Konsumeras av ingen grind/probe.
+> Se FIXTURE-REGIME-CHANGE-2026-08-24.md. Jämförelser över regimgränsen är ogiltiga.
+
 # Template-test-baseline — fryst preview (verify-suitens facit)
 
 Fryst: 2026-07-19 · Preview: https://rorjour-stockholm.vercel.app · Design-blocklist per commit `dd92a26` (`skills/nortropic-antislop/references/design-blocklist.md`, v14) · Källkod: `~/Workflow/rorjour-stockholm/src/`

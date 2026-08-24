@@ -1,3 +1,7 @@
+> **HISTORISK URKUND — EJ AKTUELL TRUST-EVIDENS (FIXTURE_REGIME_CHANGE 2026-08-24, §A6).**
+> Legacy-regimens baseline; retirerad genom ägarbeslut S0. Konsumeras av ingen grind/probe.
+> Se FIXTURE-REGIME-CHANGE-2026-08-24.md. Jämförelser över regimgränsen är ogiltiga.
+
 # Eval-baseline — fryst preview (verify-suitens facit)
 
 Fryst: 2026-07-28 · **Rubrikversion: v3.0.0** · Preview: https://rorjour-stockholm.vercel.app (fryst publikt alias; ALDRIG en levande kunds rörliga preview) · Faktakälla: `~/Workflow/test-rorjour/research.md` · Byggrepo: `~/Workflow/rorjour-stockholm` @ commit `07c1d0d`
