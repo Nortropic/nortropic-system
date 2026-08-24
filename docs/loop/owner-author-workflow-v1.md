@@ -154,6 +154,115 @@ caller-selected, wildcard, parent or neighboring authority, Seatbelt/confinement
 unconfined execution, a native broker, or broader filesystem/process/network/credential authority
 is outside this contract and fails closed.
 
+<!-- H037_VERIFY_SUITE_REGISTER_REBIND_CONTRACT_V1 -->
+## H-037 exact verify-suite register rebind
+
+After the R14 product was published, the human-owned constitution-v18 transition changed the exact
+bytes of `workflows/nortropic-verify-suite.js` to SHA-256
+`7c02f12ef7d4f6991fafa0c9a19753ccfb2b8d785c746212025864a4158a3373`, while
+`controller/verify/register.json` retained
+`ac1e21d1c5097c2b087054ef44ca7339e1a4aa78b8f3f8dc207b17633e5983ab`. The real command
+`./controller/verify/cli preflight` therefore exits 4 with `hash_mismatch` before the bootstrap can
+use its ordinary live route. H-017's published 24/0 fixture result does not satisfy H-037: the new
+gate invokes this real preflight and binds its actual exit, stderr and register digest.
+
+H-037 is the narrow standing bounded-prerequisite exception for this blocker. H-037 depends exactly on H-035
+and its builder `allowed_write` is exactly `controller/verify/register.json`. Normal
+`roadmap_candidate_scope` continues to protect that path; neither the autopilot nor its protected
+set is changed or bypassed. Candidate construction is a direct clean candidate under the standing
+BP01–BP14 migration authority, followed by the existing exact-identity independent review and guarded
+non-force publisher. This is not a generic roadmap exception and grants no caller-selected path,
+digest, runner, startbar or verifier authority.
+
+The sole product effect replaces that one old digest token with the exact new digest token. The
+register SHA-256 changes from
+`c99f3b37411c9e3acc7a6f26cead51afddb3b80729e98a4d77a5f16460bc1442` to
+`a87869be0bcfcd1e04cbd494f99e132fde1ce282dd75801cd9b1b33968b14460` without changing length.
+Every other byte, key, key order and entry semantic remains identical, including the complete
+`check-invariants` entry and the suite entry's path, runner, startbar, description and non-digest
+fields. Workflow, fixture, constitution-v18, real preflight CLI, H-017, check-invariants and
+autopilot bytes are unchanged.
+
+The preproduct command is exactly `verify/bin/h-037-exit`. Its only authorized RED is label
+`A_H037_EXACT_VERIFY_SUITE_REGISTER_REBIND_OPERATIONAL`, reason
+`CANONICAL_PREFLIGHT_HASH_MISMATCH_SUITE_SHA256_STALE`, and the frozen four-part old/new real-
+preflight signature. After the exact product it is a normal green no-argument gate. Product
+acceptance is exactly
+`verify/bin/h-037-exit --product <base-sha> <candidate-sha>` and additionally requires a clean exact
+candidate, its single parent equal to the reviewed base, the no-renames Git diff equal to the one
+register path, candidate-tree spec/gate identity, the exact raw-byte transition and real preflight
+exit 0 returning the exact post-register digest. The real suite `check` also exits 0 with the new
+digest, while a real suite `run` remains refused with exit 3 as `ej startbar`. Wrong digest, path,
+runner, startbar, check-invariants, extra, duplicate, reformat, out-of-scope, workflow and stacked
+mutants reject.
+Any second product path is a fail-closed stop.
+
+H037-RV-01 closes the product-identity observation boundary without broadening product or publisher
+authority. Every product-identity Git invocation uses the pinned absolute executable `/usr/bin/git`
+(SHA-256 `506cb2ddd061e2992c8ee7c53853340688b53d9fcec94c3aa936524cea5b40cb`, clean-launcher
+attestation `git version 2.50.1 (Apple Git-155)`). The invocation receives an exact closed allowlist
+with a private `DARWIN_USER_TEMP_DIR`: no ambient Git, config, attribute, pager, trace, loader,
+`GIT_TEST_*`, `DEVELOPER_DIR`, `TOOLCHAINS` or `SDKROOT` value survives. It uses explicit
+`--no-replace-objects`, `--no-pager`, `--literal-pathspecs`, canonical per-worktree git-dir,
+common-dir and physical work-tree. Canonical literal candidate commit headers bind the one parent
+and must agree exactly with the closed, no-replace Git graph; a direct candidate-tree/physical-
+worktree comparison—not status/index claims—binds HEAD cleanliness. The real verifier effect uses
+the same closed process environment.
+
+Connected disposable actual-Git controls accept the legitimate publisher shape—a two-parent guarded
+contract-merge base followed by its exact direct one-file product—and reject a replace mapping on a
+genuine stacked SHA, `GIT_WORK_TREE` redirection, a skip-worktree crafted index hiding dirty bytes,
+graft and shallow topology rewrites, config/attribute injection, a PATH-shadowed `git` parent lie,
+the genuine stack and an extra-parent product. The PATH control separately proves that the shim is
+not executed by identity observation. This is a judge hardening only: it creates no generic roadmap
+exception, changes no publisher behavior, and grants no second production path.
+
+H037-RV-02 closes the raw object-identity boundary. Commit objects must contain one tree header,
+one contiguous parent block before exactly one valid author and committer, and then only legitimate
+encoding, `gpgsig`, `gpgsig-sha256` or `mergetag` headers with canonical continuations. The closed
+no-replace graph must exactly match every literal parent block. The exact validated set from
+`rev-list --objects --no-object-names <base> <candidate>` is fed as literal OIDs—not revisions—to a
+no-reuse, zero-window pack and imported into a fresh ref-free SHA-1 quarantine. Promoted strict
+index checks, self-contained/connected validation, isolated strict fsck and batch-all object-set
+equality precede raw parsing of every reachable commit and tree. Tree entries require Git's
+canonical byte ordering, unique safe names and canonical modes. Every non-gitlink target must be
+present with exact mode/type agreement; a locally present gitlink must be a commit, while an absent
+external submodule commit remains legitimate. The ambient object database is never fsck credit.
+
+Connected `hash-object --literally` controls reject late parents after committer or signature even
+where Git fsck is blind, missing author/committer, duplicate tree/author, unsorted or duplicate
+trees, bad modes/names and missing trees/entries. Both the ordinary two-parent publisher merge and
+a legitimate signed/encoding two-parent publisher merge followed by an exact direct product remain
+positive; there is no blanket rejection of signing, encoding or gitlinks.
+
+H037-RV-03 binds the product path from raw trees rather than revision/path shorthand. Base and
+candidate each must contain exactly one literal `controller/verify/register.json` record reached
+through exact `40000 tree` parent entries; the leaf must be exactly `100644 blob`, its object must
+exist as a blob, and its bytes/digests must equal the frozen pre/post register identities. Connected
+literal-tree mutants reject a `100755` leaf, symlink, gitlink, tree, missing or duplicate record,
+invalid mode and mode/type mismatch. RV-02/RV-03 remain within the same judge assertion, so the
+sole preproduct result stays 35 PASS / 1 authorized FAIL and explicit product mode stays 38/0.
+
+This contract publication does not alter the currently green downstream lifecycle assertions:
+H-034 remains exactly dependent on H-035, and both `verify/bin/h-034-exit` and
+`verify/bin/h-035-exit` remain byte-identical. Only after the H-037 product has been independently
+reviewed and guardedly published may the separate H-034 TEST_AUTHOR refreeze change H-034's exact
+dependency to H-037 and update the affected H-034/H-035 lifecycle assertions. That refreeze itself
+requires independent review and guarded publication before H-036 begins. The objective order is
+therefore exactly `H-037 → H-034 → H-036`; no silently red H-034 gate and no inherited fixture
+credit are permitted.
+
+The BP01–BP14 proof is concrete: BP01/BP02 are the reproduced real-preflight blocker; BP03/BP04
+restrict the change to restoring exact hash-bound judgeability; BP05 binds task, dependency, path,
+allowed-write, transition and effect; BP06/BP07 deny generic and neighboring authority with the
+exact-byte/mutant matrix; BP08 preserves all other registry and historical semantics; BP09 freezes
+this contract before product; BP10/BP11 require separate immutable contract/product reviews; BP12
+allows only the named preproduct RED while H-017 24/0 supplies no H-037 product credit; BP13 keeps
+both publications guarded and non-force; and BP14 requires the later explicit H-034 rebind before
+H-036. The serial happens-before chain is H037 TEST_AUTHOR, gate review, contract publication,
+register-only BUILDER, product review, product publication, H034 refreeze/review/publication, then
+H036 TEST_AUTHOR/build/review/publication.
+
 ## Production traceability
 
 ```text
