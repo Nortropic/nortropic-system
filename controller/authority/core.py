@@ -23,6 +23,10 @@ REQUIRED_OWNER_PATHS = {
     "controller/h034-native/**", "verify/h034/kernel",
     "verify/h034/build-recipe.json", "verify/h034/identity-manifest.json",
 }
+PROSPECTIVE_OWNER_PATHS = REQUIRED_OWNER_PATHS | {
+    "controller/launch/cli", "controller/launch/runtime_snapshot.py",
+    "config/python-runtime-authority-v2.json",
+}
 
 
 class AuthorityError(ValueError):
@@ -96,7 +100,8 @@ def permitted(path: object, patterns: Iterable[object]) -> bool:
 def validate_registry(document: object) -> dict[str, object]:
     if not isinstance(document, dict) or set(document) != REGISTRY_KEYS:
         raise AuthorityError("registry top-level membership")
-    if document.get("schema_version") != 1:
+    version = document.get("schema_version")
+    if type(version) is not int or version not in (1, 2):
         raise AuthorityError("registry schema_version")
     if document.get("path_grammar") != "repo-tree-exact-or-terminal-recursive-prefix-v1":
         raise AuthorityError("registry path_grammar")
@@ -112,7 +117,9 @@ def validate_registry(document: object) -> dict[str, object]:
         canonical = [canonical_path(value) for value in values]
         if len(canonical) != len(set(canonical)):
             raise AuthorityError(f"registry {key} duplicate")
-    if set(document["owner_production_paths"]) != REQUIRED_OWNER_PATHS:
+    required_owner_paths = (REQUIRED_OWNER_PATHS if version == 1
+                            else PROSPECTIVE_OWNER_PATHS)
+    if set(document["owner_production_paths"]) != required_owner_paths:
         raise AuthorityError("registry owner_production_paths membership")
     return document
 
