@@ -3001,3 +3001,46 @@ are changed only by valid whitespace when an exact protected registry/spec path 
 Git diff, so parser failure cannot impersonate protected-path enforcement. The exact four-part RED,
 five-file TEST_AUTHOR scope, core-only product predicate, canonical registry and product bytes,
 publisher, BP01–BP14 bindings and serial trust transitions remain unchanged.
+
+## 2026-08-24 — H-034 R15 canonical registry-v2 downstream refreeze
+
+Published H-035 R14 product main `566027bc26789db0fdb59933d4a9dd32db182edb`
+(tree `4e6d030d2dc40fc9cbc604f70f3cd7426bfa646f`) operationally accepts two and only
+two owner-production registry states, but canonical
+`specs/owner-production-paths.v1.json` still selected v1/old4. This H-034 TEST_AUTHOR
+refreeze performs BP14's downstream adoption without changing any product byte.
+
+The canonical locator remains unchanged. Its built-in integer `schema_version` becomes exactly
+`2`, and its raw ordered `owner_production_paths` becomes the existing H-034 old4 followed by
+exactly `controller/launch/cli`, `controller/launch/runtime_snapshot.py`, and
+`config/python-runtime-authority-v2.json`. The other five registry fields remain byte-semantically
+unchanged. H-034 itself keeps `allowed_write=[]` and exact old4
+`owner_author_allowed_write`; the registry's union7 reservation does not widen the H-034 task.
+`verify/bin/h-036-exit` remains globally denied through `verify/bin/**` and is not owner
+production. No H-036 task, gate, runtime snapshot, authority JSON or other H-036 product byte is
+created by this refreeze.
+
+The frozen targeted subgate uses the published H-035 registry parser as its operational subject and
+separately binds the canonical registry's raw v2/union7 order. It preserves v1/old4 and v2/union7
+order-insensitive operational positives. For every union7 member, one-defect omission,
+substitution, duplicate, backslash alias, leading-dot alias, broader-prefix and neighboring-path
+states reject. Wrong built-in version/type, v1/union7 and v2/old4 cross-pairs, new3-only, partial
++1/+2, arbitrary addition and H-036-gate addition reject. A synthetic owner task proves exactly
+the new3 is prospectively representable while the gate remains globally denied. H-034 evidence,
+receipt, allowlist, build-recipe and identity-manifest schemas remain their separately frozen v1
+contracts; registry v2 does not reinterpret any native-kernel input schema.
+
+Before the canonical registry edit, `verify/bin/h-034-exit --r15-registry-refreeze` produced
+exactly 71 PASS / 1 FAIL, with the sole failure
+`F_R15_CANONICAL_REGISTRY_V2_UNION7`. After the exact registry transition the same targeted gate
+is 72 PASS / 0 FAIL. H-035's own R14-only disposable matrix against the canonical v2 checkout is
+75 PASS / 0 FAIL; its unbound wrapper then returns the required
+`H035_R14_TARGET_RESULT=PRODUCT_IDENTITY_REQUIRED`, not product PASS. Full/live/H017/network/ref/
+publication checks are deliberately outside this TEST_AUTHOR round.
+
+The machine-pinned order is H-035 R14 core guarded publication → H-034 registry-v2 refreeze →
+independent H-034 gate review → guarded H-034 publication → H-036 TEST_AUTHOR freeze → independent
+H-036 gate review → H-036 BUILDER implementation → independent H-036 product review → guarded
+H-036 publication → H-032 refreeze against published H-036 → independent H-032 review and guarded
+publication → H-031 rebind. Existing confinement, no-unconfined-fallback, no-generic-authority,
+exact-identity independent review and guarded non-force publication machinery remain unchanged.
