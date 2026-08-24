@@ -798,6 +798,14 @@ function compareSemver(a, b) {
 }
 
 async function fetchLatestSkillVersion() {
+  // STEP-0A CONTAINMENT (2026-08-24): sjaelvuppdateringsvaegen aer avstaengd.
+  // En vendorerad, lastbaerande skill faar aldrig ringa hem eller foeresla
+  // `npx impeccable update` (opinnad) in i produktionsauktoritet. Uppstroems-
+  // aendringar naar Nortropic endast via Radar -> kandidat -> diff -> promotion.
+  // Aterstaells medvetet av M1-reparation R4 (fork-and-freeze-beslutet), aldrig
+  // genom att ta bort denna guard i foerbifarten.
+  return null;
+  /* neutraliserad uppstroems-kod (behaallen foer diff-sparbarhet):
   try {
     const res = await fetch(`${UPDATE_HOST}/api/version`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) return null;
@@ -806,6 +814,7 @@ async function fetchLatestSkillVersion() {
   } catch {
     return null; // offline, sandboxed, timed out, or bad JSON: all non-fatal
   }
+  */
 }
 
 function buildUpdateDirective(localVersion, latestVersion) {

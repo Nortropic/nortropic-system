@@ -33,6 +33,15 @@ Läs `content/profile.ts` FÖRST: `primaraktion` + `gate1Test` definierar vad so
 > **Täckningsnot (deskriptiv arkitekturfakta):** puls-routen (`/api/puls`, förslag 07) övervakar löpande att sändinfrastrukturen levererar — den kör INTE server action-vägen i `lead.ts`. Den vägen täcks av Gate 1:s end-to-end-leveranstest ovan (orört, alltid till skarpa `LEAD_TO_EMAIL`); ett fel isolerat DIT fångas inte av pulsen mellan lanseringar utan först vid nästa körning av denna grind. (Dygnlig Playwright mot det riktiga formuläret skulle täcka glappet men skicka testmejl till kunden — därför pulsen i stället.) Detta beskriver vad övervakningen täcker; det är INGEN förhandsfriskrivning för fynd på server action-vägen — varje sådant fynd bedöms på egna meriter.
 
 ## Gate 2 — Performance (details: `references/lighthouse-targets.md`)
+
+> **STEP-0A-DEMOTERING (2026-08-24, HÖGRISK — hävs av M1-reparation R7):** Lighthouse-körningar
+> i denna grind har hittills varit opinnade (`npx lighthouse`), och Lighthouse 13 bytte
+> audit-taxonomi mot 12 — opinnade körningar kan tyst byta mätsystem under trösklarna.
+> Tills R7 pinnat EN kanonisk, maskin-tillgänglig, exakt-versionsidentifierad körväg gäller:
+> varje Lighthouse-rad nedan måste rapportera exakt verktygversion i evidensen; en körning
+> utan pinnad/rapporterad version är **ODÖMBART — inte auktoritativ PASS** (grinden sänks
+> inte: ODÖMBART blockerar som vanligt).
+
 - [ ] Lighthouse mobile: **Performance ≥90, Accessibility ≥95, Best Practices ≥95, SEO ≥95**
 - [ ] **LCP < 2.5s · CLS < 0.1 · INP < 200ms** on 4G-throttled mobile
 - [ ] Images WebP/AVIF with explicit dimensions; hero `priority`; total page weight < 1MB on Hem
@@ -44,6 +53,15 @@ Läs `content/profile.ts` FÖRST: `primaraktion` + `gate1Test` definierar vad so
 - [ ] Favicon + OG images render (test a share preview)
 
 ## Gate 4 — Accessibility (escalate to `a11y-audit` for the deep pass)
+
+> **STEP-0A-DEMOTERING (2026-08-24, HÖGRISK — hävs av M1-reparation R6):** axe-core-raden
+> nedan har INGEN körväg i repot (inget skript, inget npm-beroende, ingen CLI-rad) — den har
+> varit en obackad grindutsaga där exekveringen improviserats. Tills R6 gett raden en verklig,
+> pinnad, deterministisk körväg (minsta bevisade implementation; en NY kandidat som AccessLint
+> blir aldrig produktionsauktoritativ via reparationen) gäller: axe-raden rapporteras
+> **ODÖMBART (obackad grind — ingen körväg)**, aldrig PASS. De manuella kontrollerna ovan/nedan
+> står oförändrade i full kraft — grinden sänks inte, dess obackade del slutar bara låtsas.
+
 - [ ] Every image has meaningful Swedish alt text (empty `alt=""` only for decorative)
 - [ ] Form labels visible + programmatically associated; error messages announced
 - [ ] Keyboard-only pass: nav, accordion, form all operable; focus visible; skip-link works
