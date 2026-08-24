@@ -1,0 +1,636 @@
+#!/usr/bin/env python3
+"""Frozen H-037 verify-suite register rebind gate.
+
+0=PASS, 1=the one authorized preproduct RED, 2=rig/unexpected RED.
+The product is exactly one byte-preserving digest-token substitution in
+controller/verify/register.json.  The gate invokes the real preflight; fixture
+or H-017 credit is never accepted as the product effect.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+GATE = ROOT / "verify/bin/h-037-exit"
+REGISTER = ROOT / "controller/verify/register.json"
+VERIFY = ROOT / "controller/verify/cli"
+SUITE = ROOT / "workflows/nortropic-verify-suite.js"
+INVARIANTS = ROOT / "scripts/check-invariants.mjs"
+CONSTITUTION = ROOT / "docs/07-konstitution.md"
+AUTOPILOT = ROOT / "scripts/nortropic-codex-autopilot.py"
+H017_GATE = ROOT / "verify/bin/h-017-exit"
+OWNER_WORKFLOW = ROOT / "docs/loop/owner-author-workflow-v1.md"
+DECISION_LOG = ROOT / "docs/05-beslutslogg.md"
+DRIFT = ROOT / "docs/loop/drift.md"
+
+OLD_SUITE_SHA = "ac1e21d1c5097c2b087054ef44ca7339e1a4aa78b8f3f8dc207b17633e5983ab"
+NEW_SUITE_SHA = "7c02f12ef7d4f6991fafa0c9a19753ccfb2b8d785c746212025864a4158a3373"
+PRE_REGISTER_SHA = "c99f3b37411c9e3acc7a6f26cead51afddb3b80729e98a4d77a5f16460bc1442"
+POST_REGISTER_SHA = "a87869be0bcfcd1e04cbd494f99e132fde1ce282dd75801cd9b1b33968b14460"
+VERIFY_SHA = "516f679f5e65426e224709dbcfbc6431bf1a1e2aa8064a5978b7bfccd2d5c6a2"
+INVARIANTS_SHA = "d37e45b46cdc92a016022b80e7f1ea32661cd33a4f1b97af61962bc7cb0bf3ba"
+CONSTITUTION_SHA = "1bda41f6e26291d70a93b51ff53bd583c052b40631e72c368ce564ffc2816837"
+AUTOPILOT_SHA = "4237eda9fd4554ed3d7ed78fc33c0e5f27f5d270ae21ff9e9d9f0d9467caa9fc"
+H017_GATE_SHA = "78b9d1f4fed9fa0d4c9e587dfc0069e9532a5cd8653a697b29a275a4d46ea983"
+FIXTURES_TREE = "d77af8aae40144558450d9e45a699ad93e68c7a4"
+PRODUCT_PATH = "controller/verify/register.json"
+LABEL = "A_H037_EXACT_VERIFY_SUITE_REGISTER_REBIND_OPERATIONAL"
+REASON = "CANONICAL_PREFLIGHT_HASH_MISMATCH_SUITE_SHA256_STALE"
+TASK_SUMMARY = (
+    "A standing bounded-prerequisite exception restores the real verifier-register preflight "
+    "after the human-owned constitutional verify-suite changed bytes. The product is a direct "
+    "clean child changing only controller/verify/register.json by replacing the suite entry's "
+    "one stale SHA-256 token with the exact current suite digest; every other registry byte and "
+    "all workflow, fixture, constitution, verifier, H-017, invariant and autopilot bytes remain "
+    "unchanged. Normal roadmap candidate scope remains protected and is not broadened."
+)
+EXIT_CRITERION = (
+    "PREPRODUCT: the no-argument gate must be RED only on the exact label "
+    f"{LABEL} with reason {REASON}, proven by the real ./controller/verify/cli preflight exiting "
+    f"4 on the exact {OLD_SUITE_SHA} to {NEW_SUITE_SHA} mismatch. PRODUCT: explicit "
+    "--product BASE_SHA CANDIDATE_SHA mode requires clean HEAD equal to the exact candidate, the "
+    "candidate to be the base's direct single child, an exact no-renames Git changed-file set of "
+    "only controller/verify/register.json, frozen candidate spec/gate bytes, the exact raw-byte "
+    f"transition {PRE_REGISTER_SHA} to {POST_REGISTER_SHA}, real preflight exit 0 with that "
+    "post-register digest, suite check exit 0 on the new digest, and suite run refusal exit 3 as "
+    "not startable. Wrong digest/path/runner/startbar/check-invariants/extra/duplicate/"
+    "reformat/out-of-scope/workflow/stacked mutants reject. H-017 fixture credit is insufficient. "
+    "Normal roadmap scope/autopilot authority is never widened. H-034 stays on H-035 during this "
+    "publication and moves to H-037 only in a later explicit reviewed and guardedly published "
+    "downstream refreeze before H-036."
+)
+FAILURE_SIGNATURE = [
+    "REAL_PREFLIGHT_EXIT_4",
+    "REAL_PREFLIGHT_HASH_MISMATCH_WORKFLOWS_NORTROPIC_VERIFY_SUITE_JS",
+    "REGISTERED_SUITE_SHA256_AC1E21D1C5097C2B087054EF44CA7339E1A4AA78B8F3F8DC207B17633E5983AB",
+    "ACTUAL_SUITE_SHA256_7C02F12EF7D4F6991FAFA0C9A19753CCFB2B8D785C746212025864A4158A3373",
+]
+EXPECTED_PREFLIGHT_RED = (
+    "hash_mismatch: workflows/nortropic-verify-suite.js\n"
+    f"  registrerad: {OLD_SUITE_SHA}\n"
+    f"  på disk:     {NEW_SUITE_SHA}"
+)
+
+TEST_AUTHOR_SURFACE = [
+    "specs/tasks.spec.json",
+    "verify/bin/h-037-exit",
+    "docs/loop/owner-author-workflow-v1.md",
+    "docs/05-beslutslogg.md",
+    "docs/loop/drift.md",
+]
+BP_BINDINGS = [
+    {"id": "BP01", "binding": "STALE_SUITE_DIGEST_BLOCKS_THE_REQUIRED_REAL_CONTROLLER_PREFLIGHT"},
+    {"id": "BP02", "binding": "EXACT_REAL_PREFLIGHT_REPRODUCES_EXIT_4_AND_THE_OLD_TO_NEW_HASH_MISMATCH"},
+    {"id": "BP03", "binding": "H037_ONLY_REBINDS_THE_EXISTING_SUITE_ENTRY_TO_RESTORE_JUDGEABILITY"},
+    {"id": "BP04", "binding": "EXACT_HASH_BINDING_IS_RESTORED_WITHOUT_WEAKENING_PREFLIGHT_OR_CONSTITUTION_V18"},
+    {"id": "BP05", "binding": "TASK_DEPENDENCY_PATH_ALLOWED_WRITE_TRANSITION_AND_EFFECT_ARE_EXACTLY_BOUND"},
+    {"id": "BP06", "binding": "NO_CALLER_SELECTED_PATH_DIGEST_RUNNER_STARTBAR_OR_VERIFIER_AUTHORITY"},
+    {"id": "BP07", "binding": "EVERY_WRONG_OR_NEIGHBORING_REGISTER_MUTATION_REJECTS_EXACT_PRODUCT_IDENTITY"},
+    {"id": "BP08", "binding": "ALL_OTHER_REGISTER_BYTES_KEYS_ORDER_ENTRIES_AND_CHECK_INVARIANTS_SEMANTICS_STAY_IDENTICAL"},
+    {"id": "BP09", "binding": "THIS_TEST_AUTHOR_CANDIDATE_FREEZES_H037_BEFORE_REGISTER_PRODUCT_BYTES"},
+    {"id": "BP10", "binding": "EXACT_IMMUTABLE_H037_CONTRACT_CANDIDATE_REQUIRES_INDEPENDENT_GATE_FALSIFICATION"},
+    {"id": "BP11", "binding": "SEPARATE_REGISTER_ONLY_DIRECT_CHILD_PRODUCT_REQUIRES_INDEPENDENT_IDENTITY_REVIEW"},
+    {"id": "BP12", "binding": "H017_24_0_IS_HISTORICAL_ONLY_AND_H037_REQUIRES_REAL_PREFLIGHT_WITH_ONLY_THE_EXACT_PREPRODUCT_RED"},
+    {"id": "BP13", "binding": "CONTRACT_AND_PRODUCT_USE_GUARDED_NONFORCE_EXACT_IDENTITY_PUBLICATIONS"},
+    {"id": "BP14", "binding": "H034_DEPENDENCY_MOVES_TO_H037_ONLY_IN_A_LATER_EXPLICIT_REVIEWED_PUBLISHED_REFREEZE"},
+]
+SERIAL_TRANSITIONS = [
+    "H037_TEST_AUTHOR_FREEZE",
+    "H037_INDEPENDENT_GATE_REVIEW",
+    "H037_GUARDED_CONTRACT_PUBLICATION",
+    "H037_REGISTER_ONLY_BUILDER_PRODUCT",
+    "H037_INDEPENDENT_PRODUCT_REVIEW",
+    "H037_GUARDED_PRODUCT_PUBLICATION",
+    "H034_DEPENDENCY_REFREEZE_TO_H037",
+    "H034_INDEPENDENT_REVIEW",
+    "H034_GUARDED_PUBLICATION",
+    "H036_TEST_AUTHOR_FREEZE",
+    "H036_INDEPENDENT_GATE_REVIEW",
+    "H036_BUILDER_IMPLEMENTATION",
+    "H036_INDEPENDENT_PRODUCT_REVIEW",
+    "H036_GUARDED_PUBLICATION",
+]
+
+H037_CONTRACT = {
+    "contract_id": "H037_VERIFY_SUITE_REGISTER_REBIND_V1",
+    "standing_delegation": {
+        "contract_id": "BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION",
+        "source_sha256": "b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84",
+        "condition_operator": "ALL",
+        "hard_stop_matches": "NO_ONLY_WHILE_EVERY_EXACT_BOUND_AND_BP01_THROUGH_BP14_HOLDS",
+    },
+    "task_identity": "h-037",
+    "migration_family": "INTRODUCE_PREREQUISITE_TASK_REQUIRED_BY_ALREADY_AUTHORIZED_TASK",
+    "dependency_change": {
+        "h037_now_depends_exactly_on": ["h-035"],
+        "h034_contract_publication_stays_exactly_on": ["h-035"],
+        "h034_later_refreeze_depends_exactly_on": ["h-037"],
+        "serial_objectives": ["H037", "H034", "H036"],
+    },
+    "test_author_surface": TEST_AUTHOR_SURFACE,
+    "product_allowed_write": [PRODUCT_PATH],
+    "execution_path": {
+        "normal_roadmap_candidate_scope": "REMAINS_PROTECTED_AND_IS_NOT_USED",
+        "candidate_construction": "DIRECT_CLEAN_CANDIDATE_UNDER_STANDING_BP_MIGRATION",
+        "generic_roadmap_exception": False,
+        "autopilot_product_edit": False,
+        "publication": "EXISTING_GUARDED_NONFORCE_EXACT_IDENTITY_PUBLISHER",
+    },
+    "exact_product_transition": {
+        "path": PRODUCT_PATH,
+        "old_suite_sha256": OLD_SUITE_SHA,
+        "new_suite_sha256": NEW_SUITE_SHA,
+        "pre_register_sha256": PRE_REGISTER_SHA,
+        "post_register_sha256": POST_REGISTER_SHA,
+        "replacement_count": 1,
+        "preserved_byte_semantics": [
+            "EVERY_NON_REPLACED_REGISTER_BYTE",
+            "ALL_KEYS_AND_KEY_ORDER",
+            "CHECK_INVARIANTS_ENTRY_BYTE_IDENTICAL",
+            "SUITE_PATH_RUNNER_STARTBAR_AND_DESCRIPTION_BYTE_IDENTICAL",
+        ],
+    },
+    "preproduct_evidence": {
+        "base_sha": "139d3c7c8fe55cea5287fcff4d330745d5e0838d",
+        "command": "./controller/verify/cli preflight",
+        "exit": 4,
+        "expected_red_label": LABEL,
+        "expected_reason": REASON,
+        "failure_signature": FAILURE_SIGNATURE,
+    },
+    "product_acceptance": {
+        "command": "verify/bin/h-037-exit --product BASE_SHA CANDIDATE_SHA",
+        "candidate_identity": "CLEAN_HEAD_EQUALS_EXACT_CANDIDATE_COMMIT",
+        "base_candidate_relation": "CANDIDATE_HAS_EXACTLY_BASE_AS_ITS_SINGLE_PARENT",
+        "exact_git_diff": [PRODUCT_PATH],
+        "candidate_contract_bytes": ["specs/tasks.spec.json", "verify/bin/h-037-exit"],
+        "effects": [
+            "REAL_CONTROLLER_VERIFY_PREFLIGHT_EXITS_0_WITH_EXACT_POST_REGISTER_DIGEST",
+            "REAL_CONTROLLER_VERIFY_CHECK_SUITE_EXITS_0_WITH_EXACT_NEW_SUITE_DIGEST",
+            "REAL_CONTROLLER_VERIFY_RUN_SUITE_EXITS_3_AS_NOT_STARTABLE",
+        ],
+    },
+    "bp01_bp14_bindings": BP_BINDINGS,
+    "serial_transitions": SERIAL_TRANSITIONS,
+    "forbidden_effects": [
+        "ANY_SECOND_PRODUCT_PATH",
+        "WORKFLOW_FIXTURE_CONSTITUTION_VERIFY_CLI_OR_CHECK_INVARIANTS_MUTATION",
+        "REGISTER_REFORMAT_KEY_REORDER_EXTRA_DUPLICATE_OR_ENTRY_SEMANTIC_CHANGE",
+        "WRONG_PATH_DIGEST_RUNNER_STARTBAR_OR_CHECK_INVARIANTS_ENTRY",
+        "H034_DEPENDENCY_CHANGE_BEFORE_EXPLICIT_DOWNSTREAM_REFREEZE",
+        "GENERIC_CALLER_SELECTED_WILDCARD_PARENT_OR_NEIGHBORING_AUTHORITY",
+    ],
+    "fail_closed": True,
+}
+
+passed = 0
+failed = 0
+failed_labels: list[tuple[str, str]] = []
+
+
+class Rig(Exception):
+    pass
+
+
+def sha(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def check(ok: bool, label: str, detail: object = "") -> None:
+    global passed, failed
+    if ok:
+        passed += 1
+        print(f"PASS {label}")
+    else:
+        failed += 1
+        rendered = detail if isinstance(detail, str) else json.dumps(detail, sort_keys=True)
+        failed_labels.append((label, rendered))
+        print(f"FAIL {label}: {rendered}")
+
+
+def strict_json(raw: bytes) -> object:
+    def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
+        out: dict[str, object] = {}
+        for key, value in items:
+            if key in out:
+                raise ValueError(f"duplicate JSON key: {key}")
+            out[key] = value
+        return out
+
+    return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=pairs)
+
+
+def register_states() -> tuple[bytes, bytes]:
+    raw = REGISTER.read_bytes()
+    current = sha(raw)
+    old = OLD_SUITE_SHA.encode()
+    new = NEW_SUITE_SHA.encode()
+    if current == PRE_REGISTER_SHA:
+        if raw.count(old) != 1 or new in raw:
+            raise Rig("pre-register token cardinality")
+        pre, post = raw, raw.replace(old, new)
+    elif current == POST_REGISTER_SHA:
+        if raw.count(new) != 1 or old in raw:
+            raise Rig("post-register token cardinality")
+        pre, post = raw.replace(new, old), raw
+    else:
+        raise Rig(f"unfrozen register bytes: {current}")
+    if sha(pre) != PRE_REGISTER_SHA or sha(post) != POST_REGISTER_SHA:
+        raise Rig("register transition digest mismatch")
+    return pre, post
+
+
+def run_verify(register_raw: bytes, *arguments: str,
+               suite_raw: bytes | None = None,
+               invariants_raw: bytes | None = None,
+               constitution_raw: bytes | None = None) -> subprocess.CompletedProcess[str]:
+    with tempfile.TemporaryDirectory(prefix="h037-real-preflight-") as raw:
+        root = Path(raw)
+        files = {
+            PRODUCT_PATH: register_raw,
+            "workflows/nortropic-verify-suite.js": SUITE.read_bytes() if suite_raw is None else suite_raw,
+            "scripts/check-invariants.mjs": INVARIANTS.read_bytes() if invariants_raw is None else invariants_raw,
+            "docs/07-konstitution.md": CONSTITUTION.read_bytes() if constitution_raw is None else constitution_raw,
+        }
+        for relative, content in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        env = dict(os.environ)
+        env["NORTROPIC_VERIFY_AUTHORITY_ROOT"] = str(root)
+        return subprocess.run(
+            [str(VERIFY), *arguments], cwd=ROOT, env=env, text=True,
+            capture_output=True, shell=False, timeout=10,
+        )
+
+
+def run_preflight(register_raw: bytes, **kwargs) -> subprocess.CompletedProcess[str]:
+    return run_verify(register_raw, "preflight", **kwargs)
+
+
+def product_effect(raw: bytes) -> tuple[bool, str]:
+    preflight = run_preflight(raw)
+    suite_check = run_verify(raw, "check", "nortropic-verify-suite")
+    suite_run = run_verify(raw, "run", "nortropic-verify-suite")
+    expected_stdout = json.dumps(
+        {"status": "ok", "register_sha256": POST_REGISTER_SHA}, sort_keys=True
+    ) + "\n"
+    expected_check = (
+        "ok: nortropic-verify-suite workflows/nortropic-verify-suite.js "
+        f"{NEW_SUITE_SHA}\n"
+    )
+    ok = (
+        preflight.returncode == 0 and preflight.stdout == expected_stdout
+        and preflight.stderr == ""
+        and suite_check.returncode == 0 and suite_check.stdout == expected_check
+        and suite_check.stderr == ""
+        and suite_run.returncode == 3 and suite_run.stdout == ""
+        and "ej startbar: nortropic-verify-suite" in suite_run.stderr
+    )
+    return ok, json.dumps({
+        "preflight": {"returncode": preflight.returncode,
+                      "stdout": preflight.stdout, "stderr": preflight.stderr},
+        "suite_check": {"returncode": suite_check.returncode,
+                        "stdout": suite_check.stdout, "stderr": suite_check.stderr},
+        "suite_run": {"returncode": suite_run.returncode,
+                      "stdout": suite_run.stdout, "stderr": suite_run.stderr},
+    }, sort_keys=True)
+
+
+def identity_oracle(*, base: str, parents: list[str], changed: list[str],
+                    base_register: bytes, candidate_register: bytes,
+                    base_contract_equal: bool = True,
+                    candidate_contract_equal: bool = True,
+                    protected_bytes_equal: bool = True) -> tuple[bool, str]:
+    pre, post = register_states()
+    predicates = {
+        "direct_child": parents == [base],
+        "exact_changed_files": changed == [PRODUCT_PATH],
+        "exact_pre_register": base_register == pre,
+        "exact_post_register": candidate_register == post,
+        "base_contract": base_contract_equal,
+        "candidate_contract": candidate_contract_equal,
+        "protected_bytes": protected_bytes_equal,
+    }
+    return all(predicates.values()), json.dumps(predicates, sort_keys=True)
+
+
+def git(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *args], text=True, capture_output=True,
+        shell=False, timeout=15,
+    )
+
+
+def exact_commit(value: str) -> bool:
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        return False
+    result = git("rev-parse", "--verify", "--quiet", f"{value}^{{commit}}")
+    return result.returncode == 0 and result.stdout.strip() == value
+
+
+def git_blob(commit: str, path: str) -> bytes:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f"{commit}:{path}"],
+        capture_output=True, shell=False, timeout=15,
+    )
+    if result.returncode:
+        raise Rig(f"missing candidate blob {commit}:{path}: {result.stderr.decode(errors='replace')}")
+    return result.stdout
+
+
+def product_identity(base: str, candidate: str) -> tuple[bool, str]:
+    if not exact_commit(base) or not exact_commit(candidate):
+        return False, "base/candidate is not an exact existing lowercase commit"
+    head = git("rev-parse", "HEAD")
+    status = git("status", "--porcelain", "--untracked-files=all")
+    parents_result = git("rev-list", "--parents", "-n", "1", candidate)
+    changed_result = git(
+        "diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames",
+        base, candidate,
+    )
+    if any(item.returncode for item in (head, status, parents_result, changed_result)):
+        return False, "git identity observation failed"
+    parent_tokens = parents_result.stdout.strip().split()
+    parents = parent_tokens[1:] if parent_tokens and parent_tokens[0] == candidate else []
+    changed = [line for line in changed_result.stdout.splitlines() if line]
+    contract_paths = ("specs/tasks.spec.json", "verify/bin/h-037-exit")
+    base_contract_equal = all(git_blob(base, path) == (ROOT / path).read_bytes()
+                              for path in contract_paths)
+    candidate_contract_equal = all(git_blob(candidate, path) == (ROOT / path).read_bytes()
+                                   for path in contract_paths)
+    protected = {
+        "workflows/nortropic-verify-suite.js": NEW_SUITE_SHA,
+        "scripts/check-invariants.mjs": INVARIANTS_SHA,
+        "controller/verify/cli": VERIFY_SHA,
+        "docs/07-konstitution.md": CONSTITUTION_SHA,
+        "scripts/nortropic-codex-autopilot.py": AUTOPILOT_SHA,
+        "verify/bin/h-017-exit": H017_GATE_SHA,
+    }
+    protected_bytes_equal = all(
+        sha(git_blob(base, path)) == digest
+        and git_blob(candidate, path) == git_blob(base, path)
+        for path, digest in protected.items()
+    )
+    fixture_base = git("rev-parse", f"{base}:tests/fixtures")
+    fixture_candidate = git("rev-parse", f"{candidate}:tests/fixtures")
+    protected_bytes_equal = (
+        protected_bytes_equal
+        and fixture_base.returncode == fixture_candidate.returncode == 0
+        and fixture_base.stdout.strip() == fixture_candidate.stdout.strip() == FIXTURES_TREE
+    )
+    relation_ok, why = identity_oracle(
+        base=base, parents=parents, changed=changed,
+        base_register=git_blob(base, PRODUCT_PATH),
+        candidate_register=git_blob(candidate, PRODUCT_PATH),
+        base_contract_equal=base_contract_equal,
+        candidate_contract_equal=candidate_contract_equal,
+        protected_bytes_equal=protected_bytes_equal,
+    )
+    checkout_ok = head.stdout.strip() == candidate and status.stdout == ""
+    return relation_ok and checkout_ok, json.dumps({
+        "relation": json.loads(why),
+        "head": head.stdout.strip(),
+        "expected_head": candidate,
+        "clean": status.stdout == "",
+    }, sort_keys=True)
+
+
+def json_mutant(post: bytes, mutate) -> bytes:
+    value = strict_json(post)
+    if not isinstance(value, dict):
+        raise Rig("register fixture top level")
+    mutate(value)
+    return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode()
+
+
+def exact_transition_selftests() -> None:
+    pre, post = register_states()
+    base = "1" * 40
+    positive, why = identity_oracle(
+        base=base, parents=[base], changed=[PRODUCT_PATH],
+        base_register=pre, candidate_register=post,
+    )
+    check(positive, "J_EXACT_DIRECT_CHILD_ONE_FILE_TRANSITION_POSITIVE", why)
+
+    result = run_preflight(post)
+    check(result.returncode == 0 and result.stderr == "",
+          "J_REAL_PREFLIGHT_EXACT_POSTPRODUCT_POSITIVE", result.stderr)
+    old_result = run_preflight(pre)
+    check(old_result.returncode == 4 and old_result.stdout == ""
+          and old_result.stderr.strip() == EXPECTED_PREFLIGHT_RED,
+          "J_REAL_PREFLIGHT_EXACT_PREPRODUCT_CAUSAL_RED",
+          {"returncode": old_result.returncode, "stdout": old_result.stdout,
+           "stderr": old_result.stderr})
+
+    def suite_entry(document: dict) -> dict:
+        return document["verifiers"]["nortropic-verify-suite"]
+
+    mutants: list[tuple[str, bytes, int]] = []
+    mutants.append(("WRONG_DIGEST", json_mutant(
+        post, lambda d: suite_entry(d).__setitem__("sha256", "0" * 64)), 4))
+    mutants.append(("WRONG_PATH", json_mutant(
+        post, lambda d: (suite_entry(d).__setitem__("path", "docs/07-konstitution.md"),
+                         suite_entry(d).__setitem__("sha256", CONSTITUTION_SHA))), 0))
+    mutants.append(("WRONG_RUNNER", json_mutant(
+        post, lambda d: suite_entry(d).__setitem__("runner", "node")), 0))
+    mutants.append(("WRONG_STARTBAR", json_mutant(
+        post, lambda d: (suite_entry(d).__setitem__("runner", "node"),
+                         suite_entry(d).__setitem__("startbar", True))), 0))
+    mutants.append(("CHECK_INVARIANTS_ENTRY", json_mutant(
+        post, lambda d: d["verifiers"]["check-invariants"].__setitem__(
+            "beskrivning", d["verifiers"]["check-invariants"]["beskrivning"] + " MUTANT")), 0))
+    mutants.append(("EXTRA_KEY", json_mutant(
+        post, lambda d: suite_entry(d).__setitem__("extra", "mutant")), 0))
+    duplicate = post.replace(
+        f'"sha256": "{NEW_SUITE_SHA}"'.encode(),
+        (f'"sha256": "{NEW_SUITE_SHA}",\n'
+         f'      "sha256": "{NEW_SUITE_SHA}"').encode(), 1,
+    )
+    mutants.append(("DUPLICATE_KEY", duplicate, 4))
+    reformatted = json.dumps(strict_json(post), ensure_ascii=False,
+                             separators=(",", ":")).encode() + b"\n"
+    mutants.append(("REFORMAT", reformatted, 0))
+
+    for name, raw, expected_rc in mutants:
+        accepted, why = identity_oracle(
+            base=base, parents=[base], changed=[PRODUCT_PATH],
+            base_register=pre, candidate_register=raw,
+        )
+        check(not accepted, f"J_{name}_MUTANT_EXACT_IDENTITY_REJECT", why)
+        effect = run_preflight(raw)
+        check(effect.returncode == expected_rc,
+              f"J_{name}_MUTANT_REAL_PREFLIGHT_CLASS",
+              {"expected": expected_rc, "actual": effect.returncode,
+               "stdout": effect.stdout, "stderr": effect.stderr})
+
+    out_of_scope, why = identity_oracle(
+        base=base, parents=[base],
+        changed=[PRODUCT_PATH, "docs/05-beslutslogg.md"],
+        base_register=pre, candidate_register=post,
+    )
+    check(not out_of_scope, "J_OUT_OF_SCOPE_SECOND_PRODUCT_PATH_REJECT", why)
+    workflow, why = identity_oracle(
+        base=base, parents=[base],
+        changed=[PRODUCT_PATH, "workflows/nortropic-verify-suite.js"],
+        base_register=pre, candidate_register=post,
+        protected_bytes_equal=False,
+    )
+    check(not workflow, "J_WORKFLOW_MUTANT_REJECT", why)
+    workflow_effect = run_preflight(post, suite_raw=SUITE.read_bytes() + b"\n// mutant\n")
+    check(workflow_effect.returncode == 4 and "hash_mismatch" in workflow_effect.stderr,
+          "J_WORKFLOW_MUTANT_REAL_PREFLIGHT_REJECT", workflow_effect.stderr)
+    stacked, why = identity_oracle(
+        base=base, parents=["2" * 40], changed=[PRODUCT_PATH],
+        base_register=pre, candidate_register=post,
+    )
+    check(not stacked, "J_STACKED_OR_WRONG_PARENT_PRODUCT_REJECT", why)
+    wrong_base, why = identity_oracle(
+        base=base, parents=[base], changed=[PRODUCT_PATH],
+        base_register=post, candidate_register=post,
+    )
+    check(not wrong_base, "J_ALREADY_REBOUND_BASE_REJECT", why)
+
+
+def frozen_contract_checks() -> None:
+    pre, post = register_states()
+    check(sha(pre) == PRE_REGISTER_SHA and sha(post) == POST_REGISTER_SHA
+          and len(pre) == len(post),
+          "F_EXACT_ONE_TOKEN_BYTE_PRESERVING_REGISTER_TRANSITION")
+    check(sha(SUITE.read_bytes()) == NEW_SUITE_SHA,
+          "F_SUITE_EXACT_NEW_DIGEST")
+    check(sha(INVARIANTS.read_bytes()) == INVARIANTS_SHA,
+          "F_CHECK_INVARIANTS_BYTES_PRESERVED")
+    check(sha(VERIFY.read_bytes()) == VERIFY_SHA,
+          "F_REAL_PREFLIGHT_RUNNER_BYTES_PRESERVED")
+    check(sha(CONSTITUTION.read_bytes()) == CONSTITUTION_SHA,
+          "F_CONSTITUTION_V18_BYTES_PRESERVED")
+    check(sha(AUTOPILOT.read_bytes()) == AUTOPILOT_SHA
+          and sha(H017_GATE.read_bytes()) == H017_GATE_SHA,
+          "F_AUTOPILOT_SCOPE_AND_H017_BYTES_PRESERVED")
+
+    spec = strict_json(SPEC.read_bytes())
+    if not isinstance(spec, dict) or not isinstance(spec.get("tasks"), list):
+        raise Rig("task spec shape")
+    tasks = spec["tasks"]
+    h037 = [task for task in tasks if isinstance(task, dict) and task.get("id") == "h-037"]
+    exact_task = {
+        "id": "h-037",
+        "slice": "H037_VERIFY_SUITE_REGISTER_REBIND",
+        "authority_class": "ordinary",
+        "title": "Rebind the verify-suite registry digest to its exact constitutional bytes",
+        "summary": TASK_SUMMARY,
+        "allowed_write": [PRODUCT_PATH],
+        "owner_author_allowed_write": [],
+        "exit_test": "verify/bin/h-037-exit",
+        "exit_criterion": EXIT_CRITERION,
+        "docs_impact": [],
+        "depends_on": ["h-035"],
+        "max_changed_files": 1,
+        "max_added_lines": 1,
+        "h037_verify_suite_register_rebind": H037_CONTRACT,
+    }
+    check(len(h037) == 1 and h037[0] == exact_task,
+          "F_H037_EXACT_ORDINARY_TASK_AND_CONTRACT")
+
+    h034 = [task for task in tasks if isinstance(task, dict) and task.get("id") == "h-034"]
+    h035 = [task for task in tasks if isinstance(task, dict) and task.get("id") == "h-035"]
+    check(len(h035) == 1 and len(h034) == 1
+          and h034[0].get("depends_on") in (["h-035"], ["h-037"])
+          and h034[0].get("exit_test") == "verify/bin/h-034-exit",
+          "F_H037_H034_EXACT_TWO_PHASE_DEPENDENCY_STATE")
+
+    owner = OWNER_WORKFLOW.read_text(encoding="utf-8")
+    decision = DECISION_LOG.read_text(encoding="utf-8")
+    drift = DRIFT.read_text(encoding="utf-8")
+    required_owner_terms = (
+        "<!-- H037_VERIFY_SUITE_REGISTER_REBIND_CONTRACT_V1 -->",
+        OLD_SUITE_SHA, NEW_SUITE_SHA, PRE_REGISTER_SHA, POST_REGISTER_SHA,
+        "H-037 depends exactly on H-035",
+        "H-034 remains exactly dependent on H-035",
+        "H-037 → H-034 → H-036",
+        LABEL, REASON,
+        "verify/bin/h-037-exit --product <base-sha> <candidate-sha>",
+        "controller/verify/register.json",
+    )
+    check(all(term in owner for term in required_owner_terms),
+          "F_OWNER_WORKFLOW_H037_BP_AND_SERIAL_CONTRACT")
+    check(decision.count("H-037 exact verify-suite register rebind") == 1,
+          "F_DECISION_LOG_H037_SINGLE_ENTRY")
+    check(drift.count("## 2026-08-25 — H-037 exact verify-suite register rebind") == 1,
+          "F_DRIFT_H037_SINGLE_ENTRY")
+    exact_transition_selftests()
+
+
+def main() -> int:
+    product_bound = sys.argv[1:2] == ["--product"] and len(sys.argv) == 4
+    preproduct = len(sys.argv) == 1
+    if not (preproduct or product_bound):
+        print("RIG_ERROR: usage: h-037-exit [--product BASE_SHA CANDIDATE_SHA]", file=sys.stderr)
+        return 2
+    try:
+        frozen_contract_checks()
+        _pre, post = register_states()
+        effect_ok, effect_detail = product_effect(REGISTER.read_bytes())
+        if effect_ok:
+            check(True, LABEL)
+        else:
+            check(False, LABEL, {
+                "reason": REASON,
+                "failure_signature": FAILURE_SIGNATURE,
+                "effect": json.loads(effect_detail),
+            })
+        if product_bound:
+            identity_ok, identity_detail = product_identity(sys.argv[2], sys.argv[3])
+            check(identity_ok, "A_H037_EXACT_DIRECT_CHILD_REGISTER_ONLY_PRODUCT_IDENTITY",
+                  identity_detail)
+            candidate_effect_ok = False
+            if identity_ok:
+                candidate_effect_ok, _ = product_effect(post)
+            check(candidate_effect_ok,
+                  "A_H037_PRODUCT_CANDIDATE_REAL_PREFLIGHT_EFFECT")
+    except (OSError, ValueError, subprocess.SubprocessError, Rig) as error:
+        print(f"RIG_ERROR: {error}", file=sys.stderr)
+        return 2
+
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+    print(f"H037_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    if failed:
+        exact_red = False
+        if preproduct and len(failed_labels) == 1:
+            label, detail = failed_labels[0]
+            try:
+                payload = json.loads(detail)
+            except ValueError:
+                payload = None
+            exact_red = (
+                label == LABEL and isinstance(payload, dict)
+                and payload.get("reason") == REASON
+                and payload.get("failure_signature") == FAILURE_SIGNATURE
+                and payload.get("effect", {}).get("preflight", {}).get("returncode") == 4
+                and payload.get("effect", {}).get("preflight", {}).get("stdout") == ""
+                and payload.get("effect", {}).get("preflight", {}).get("stderr", "").strip()
+                    == EXPECTED_PREFLIGHT_RED
+            )
+        if exact_red:
+            print(f"H037_PREPRODUCT_RED_LABEL={LABEL}")
+            print(f"H037_PREPRODUCT_RED_REASON={REASON}")
+            print("H037_GATE_RESULT=EXPECTED_PREPRODUCT_RED")
+            return 1
+        print("H037_GATE_RESULT=UNEXPECTED_RED")
+        return 2
+    print("H037_GATE_RESULT=PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -154,6 +154,69 @@ caller-selected, wildcard, parent or neighboring authority, Seatbelt/confinement
 unconfined execution, a native broker, or broader filesystem/process/network/credential authority
 is outside this contract and fails closed.
 
+<!-- H037_VERIFY_SUITE_REGISTER_REBIND_CONTRACT_V1 -->
+## H-037 exact verify-suite register rebind
+
+After the R14 product was published, the human-owned constitution-v18 transition changed the exact
+bytes of `workflows/nortropic-verify-suite.js` to SHA-256
+`7c02f12ef7d4f6991fafa0c9a19753ccfb2b8d785c746212025864a4158a3373`, while
+`controller/verify/register.json` retained
+`ac1e21d1c5097c2b087054ef44ca7339e1a4aa78b8f3f8dc207b17633e5983ab`. The real command
+`./controller/verify/cli preflight` therefore exits 4 with `hash_mismatch` before the bootstrap can
+use its ordinary live route. H-017's published 24/0 fixture result does not satisfy H-037: the new
+gate invokes this real preflight and binds its actual exit, stderr and register digest.
+
+H-037 is the narrow standing bounded-prerequisite exception for this blocker. H-037 depends exactly on H-035
+and its builder `allowed_write` is exactly `controller/verify/register.json`. Normal
+`roadmap_candidate_scope` continues to protect that path; neither the autopilot nor its protected
+set is changed or bypassed. Candidate construction is a direct clean candidate under the standing
+BP01–BP14 migration authority, followed by the existing exact-identity independent review and guarded
+non-force publisher. This is not a generic roadmap exception and grants no caller-selected path,
+digest, runner, startbar or verifier authority.
+
+The sole product effect replaces that one old digest token with the exact new digest token. The
+register SHA-256 changes from
+`c99f3b37411c9e3acc7a6f26cead51afddb3b80729e98a4d77a5f16460bc1442` to
+`a87869be0bcfcd1e04cbd494f99e132fde1ce282dd75801cd9b1b33968b14460` without changing length.
+Every other byte, key, key order and entry semantic remains identical, including the complete
+`check-invariants` entry and the suite entry's path, runner, startbar, description and non-digest
+fields. Workflow, fixture, constitution-v18, real preflight CLI, H-017, check-invariants and
+autopilot bytes are unchanged.
+
+The preproduct command is exactly `verify/bin/h-037-exit`. Its only authorized RED is label
+`A_H037_EXACT_VERIFY_SUITE_REGISTER_REBIND_OPERATIONAL`, reason
+`CANONICAL_PREFLIGHT_HASH_MISMATCH_SUITE_SHA256_STALE`, and the frozen four-part old/new real-
+preflight signature. After the exact product it is a normal green no-argument gate. Product
+acceptance is exactly
+`verify/bin/h-037-exit --product <base-sha> <candidate-sha>` and additionally requires a clean exact
+candidate, its single parent equal to the reviewed base, the no-renames Git diff equal to the one
+register path, candidate-tree spec/gate identity, the exact raw-byte transition and real preflight
+exit 0 returning the exact post-register digest. The real suite `check` also exits 0 with the new
+digest, while a real suite `run` remains refused with exit 3 as `ej startbar`. Wrong digest, path,
+runner, startbar, check-invariants, extra, duplicate, reformat, out-of-scope, workflow and stacked
+mutants reject.
+Any second product path is a fail-closed stop.
+
+This contract publication does not alter the currently green downstream lifecycle assertions:
+H-034 remains exactly dependent on H-035, and both `verify/bin/h-034-exit` and
+`verify/bin/h-035-exit` remain byte-identical. Only after the H-037 product has been independently
+reviewed and guardedly published may the separate H-034 TEST_AUTHOR refreeze change H-034's exact
+dependency to H-037 and update the affected H-034/H-035 lifecycle assertions. That refreeze itself
+requires independent review and guarded publication before H-036 begins. The objective order is
+therefore exactly `H-037 → H-034 → H-036`; no silently red H-034 gate and no inherited fixture
+credit are permitted.
+
+The BP01–BP14 proof is concrete: BP01/BP02 are the reproduced real-preflight blocker; BP03/BP04
+restrict the change to restoring exact hash-bound judgeability; BP05 binds task, dependency, path,
+allowed-write, transition and effect; BP06/BP07 deny generic and neighboring authority with the
+exact-byte/mutant matrix; BP08 preserves all other registry and historical semantics; BP09 freezes
+this contract before product; BP10/BP11 require separate immutable contract/product reviews; BP12
+allows only the named preproduct RED while H-017 24/0 supplies no H-037 product credit; BP13 keeps
+both publications guarded and non-force; and BP14 requires the later explicit H-034 rebind before
+H-036. The serial happens-before chain is H037 TEST_AUTHOR, gate review, contract publication,
+register-only BUILDER, product review, product publication, H034 refreeze/review/publication, then
+H036 TEST_AUTHOR/build/review/publication.
+
 ## Production traceability
 
 ```text
