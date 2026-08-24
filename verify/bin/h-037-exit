@@ -12,10 +12,13 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +34,11 @@ H017_GATE = ROOT / "verify/bin/h-017-exit"
 OWNER_WORKFLOW = ROOT / "docs/loop/owner-author-workflow-v1.md"
 DECISION_LOG = ROOT / "docs/05-beslutslogg.md"
 DRIFT = ROOT / "docs/loop/drift.md"
+TRUSTED_GIT = Path("/usr/bin/git")
+TRUSTED_GIT_SHA = "506cb2ddd061e2992c8ee7c53853340688b53d9fcec94c3aa936524cea5b40cb"
+TRUSTED_GIT_VERSION = "git version 2.50.1 (Apple Git-155)"
+CLOSED_PATH = "/usr/bin:/bin"
+VERIFY_CLOSED_PATH = "/opt/homebrew/bin:/usr/bin:/bin"
 
 OLD_SUITE_SHA = "ac1e21d1c5097c2b087054ef44ca7339e1a4aa78b8f3f8dc207b17633e5983ab"
 NEW_SUITE_SHA = "7c02f12ef7d4f6991fafa0c9a19753ccfb2b8d785c746212025864a4158a3373"
@@ -59,7 +67,14 @@ EXIT_CRITERION = (
     f"4 on the exact {OLD_SUITE_SHA} to {NEW_SUITE_SHA} mismatch. PRODUCT: explicit "
     "--product BASE_SHA CANDIDATE_SHA mode requires clean HEAD equal to the exact candidate, the "
     "candidate to be the base's direct single child, an exact no-renames Git changed-file set of "
-    "only controller/verify/register.json, frozen candidate spec/gate bytes, the exact raw-byte "
+    "only controller/verify/register.json, frozen candidate spec/gate bytes, and every identity "
+    "observation to use attested pinned /usr/bin/git with a closed launcher environment, all "
+    "ambient Git/config/attribute/pager/trace/loader/toolchain controls removed, explicit no-"
+    "replace/no-pager/literal-pathspec options, and canonical git-dir/common-dir/work-tree binding. "
+    "Raw commit parent headers and a physical index-independent checkout comparison are authoritative. Connected actual-"
+    "Git controls reject replace-object, GIT_WORK_TREE, PATH-shadow and genuine stacked/extra-"
+    "parent bypasses while accepting a publisher-shaped two-parent contract-merge base followed "
+    "by its exact direct product child. The required raw-byte "
     f"transition {PRE_REGISTER_SHA} to {POST_REGISTER_SHA}, real preflight exit 0 with that "
     "post-register digest, suite check exit 0 on the new digest, and suite run refusal exit 3 as "
     "not startable. Wrong digest/path/runner/startbar/check-invariants/extra/duplicate/"
@@ -173,6 +188,26 @@ H037_CONTRACT = {
         "base_candidate_relation": "CANDIDATE_HAS_EXACTLY_BASE_AS_ITS_SINGLE_PARENT",
         "exact_git_diff": [PRODUCT_PATH],
         "candidate_contract_bytes": ["specs/tasks.spec.json", "verify/bin/h-037-exit"],
+        "git_identity_boundary": {
+            "trusted_executable": "/usr/bin/git",
+            "trusted_executable_sha256": TRUSTED_GIT_SHA,
+            "trusted_executable_version": TRUSTED_GIT_VERSION,
+            "environment": "CLOSED_ALLOWLIST_WITH_PRIVATE_DARWIN_TEMP_NO_AMBIENT_GIT_LOADER_OR_TOOLCHAIN_CONTROLS",
+            "global_options": ["--no-replace-objects", "--no-pager", "--literal-pathspecs"],
+            "repository_binding": "EXPLICIT_CANONICAL_PER_WORKTREE_GIT_DIR_COMMON_DIR_AND_PHYSICAL_WORK_TREE",
+            "topology_and_cleanliness": "RAW_COMMIT_PARENT_HEADERS_PLUS_INDEX_INDEPENDENT_PHYSICAL_CHECKOUT",
+            "connected_actual_git_controls": [
+                "PUBLISHER_SHAPED_TWO_PARENT_CONTRACT_MERGE_BASE_PLUS_EXACT_DIRECT_PRODUCT_ACCEPTS",
+                "REPLACE_MAPPING_ON_GENUINE_STACKED_SHA_REJECTS",
+                "GIT_WORK_TREE_REDIRECTION_CANNOT_HIDE_DIRTY_CHECKOUT",
+                "PATH_SHADOWED_GIT_CANNOT_LIE_ABOUT_REV_LIST_PARENTS",
+                "PATH_SHIM_NEVER_EXECUTES_DURING_IDENTITY_OBSERVATION",
+                "CRAFTED_SKIP_WORKTREE_INDEX_CANNOT_HIDE_DIRTY_CHECKOUT",
+                "GRAFT_OR_SHALLOW_PARENT_REWRITE_REJECTS",
+                "CONFIG_AND_ATTRIBUTE_INJECTION_REJECTS",
+                "GENUINE_STACK_AND_EXTRA_PARENT_REJECT",
+            ],
+        },
         "effects": [
             "REAL_CONTROLLER_VERIFY_PREFLIGHT_EXITS_0_WITH_EXACT_POST_REGISTER_DIGEST",
             "REAL_CONTROLLER_VERIFY_CHECK_SUITE_EXITS_0_WITH_EXACT_NEW_SUITE_DIGEST",
@@ -203,6 +238,21 @@ class Rig(Exception):
 
 def sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def closed_process_environment(private_temp: Path, *, verify_runtime: bool = False) -> dict[str, str]:
+    canonical_temp = private_temp.resolve(strict=True)
+    if not canonical_temp.is_dir() or canonical_temp.is_symlink():
+        raise Rig("non-canonical private runtime temp")
+    return {
+        "PATH": VERIFY_CLOSED_PATH if verify_runtime else CLOSED_PATH,
+        "HOME": "/var/empty",
+        "XDG_CONFIG_HOME": "/var/empty",
+        "TMPDIR": str(canonical_temp),
+        "DARWIN_USER_TEMP_DIR": str(canonical_temp),
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
 
 
 def check(ok: bool, label: str, detail: object = "") -> None:
@@ -253,8 +303,13 @@ def run_verify(register_raw: bytes, *arguments: str,
                suite_raw: bytes | None = None,
                invariants_raw: bytes | None = None,
                constitution_raw: bytes | None = None) -> subprocess.CompletedProcess[str]:
-    with tempfile.TemporaryDirectory(prefix="h037-real-preflight-") as raw:
+    with tempfile.TemporaryDirectory(
+        prefix="h037-real-preflight-", dir="/private/tmp",
+    ) as raw:
         root = Path(raw)
+        root.chmod(0o700)
+        runtime_temp = root / "runtime-temp"
+        runtime_temp.mkdir(mode=0o700)
         files = {
             PRODUCT_PATH: register_raw,
             "workflows/nortropic-verify-suite.js": SUITE.read_bytes() if suite_raw is None else suite_raw,
@@ -265,7 +320,7 @@ def run_verify(register_raw: bytes, *arguments: str,
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content)
-        env = dict(os.environ)
+        env = closed_process_environment(runtime_temp, verify_runtime=True)
         env["NORTROPIC_VERIFY_AUTHORITY_ROOT"] = str(root)
         return subprocess.run(
             [str(VERIFY), *arguments], cwd=ROOT, env=env, text=True,
@@ -324,49 +379,326 @@ def identity_oracle(*, base: str, parents: list[str], changed: list[str],
     return all(predicates.values()), json.dumps(predicates, sort_keys=True)
 
 
-def git(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(ROOT), *args], text=True, capture_output=True,
-        shell=False, timeout=15,
+class GitBinding(NamedTuple):
+    work_tree: Path
+    git_dir: Path
+    common_dir: Path
+
+
+def git_identity_environment(private_temp: Path) -> dict[str, str]:
+    environment = closed_process_environment(private_temp)
+    environment.update({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": "",
+    })
+    return environment
+
+
+def identity_git(
+    binding: GitBinding,
+    *args: str,
+    ambient: dict[str, str] | None = None,
+    text: bool = True,
+) -> subprocess.CompletedProcess:
+    # ambient is deliberately never projected. It exists only so connected controls can
+    # supply hostile process state and prove that the closed launcher ignores it.
+    del ambient
+    with tempfile.TemporaryDirectory(
+        prefix="h037-git-runtime-", dir="/private/tmp",
+    ) as raw:
+        private_temp = Path(raw)
+        private_temp.chmod(0o700)
+        return subprocess.run(
+            [
+                str(TRUSTED_GIT),
+                "--no-pager",
+                "--literal-pathspecs",
+                "--no-replace-objects",
+                "-c", "core.attributesFile=/dev/null",
+                "-c", "core.excludesFile=/dev/null",
+                "-c", "core.fsmonitor=false",
+                f"--git-dir={binding.git_dir}",
+                f"--work-tree={binding.work_tree}",
+                *args,
+            ],
+            cwd=binding.work_tree,
+            env=git_identity_environment(private_temp),
+            text=text,
+            capture_output=True,
+            shell=False,
+            timeout=15,
+        )
+
+
+def canonical_git_binding(
+    work_tree: Path,
+    ambient: dict[str, str] | None = None,
+) -> GitBinding:
+    canonical_work_tree = work_tree.resolve(strict=True)
+    if not canonical_work_tree.is_dir() or work_tree.is_symlink():
+        raise Rig(f"non-canonical Git work tree: {work_tree}")
+    dot_git = canonical_work_tree / ".git"
+    if dot_git.is_symlink():
+        raise Rig("symlinked .git binding")
+    if dot_git.is_dir():
+        git_dir = dot_git.resolve(strict=True)
+    elif dot_git.is_file():
+        marker = dot_git.read_text(encoding="utf-8", errors="strict")
+        match = re.fullmatch(r"gitdir: ([^\r\n]+)\r?\n?", marker)
+        if match is None:
+            raise Rig("invalid .git worktree binding")
+        candidate = Path(match.group(1))
+        if not candidate.is_absolute():
+            candidate = dot_git.parent / candidate
+        git_dir = candidate.resolve(strict=True)
+    else:
+        raise Rig("missing .git binding")
+    if not git_dir.is_dir():
+        raise Rig("canonical Git dir is not a directory")
+    head_file = git_dir / "HEAD"
+    if head_file.is_symlink() or not head_file.is_file():
+        raise Rig("per-worktree Git dir has no regular HEAD")
+    common_marker = git_dir / "commondir"
+    if common_marker.is_symlink():
+        raise Rig("symlinked Git common-dir marker")
+    if common_marker.is_file():
+        raw_common = common_marker.read_text(encoding="utf-8", errors="strict")
+        if re.fullmatch(r"[^\r\n]+\r?\n?", raw_common) is None:
+            raise Rig("invalid Git common-dir marker")
+        common_candidate = Path(raw_common.strip())
+        if not common_candidate.is_absolute():
+            common_candidate = git_dir / common_candidate
+        common_dir = common_candidate.resolve(strict=True)
+    else:
+        common_dir = git_dir
+    if not common_dir.is_dir():
+        raise Rig("canonical Git common dir is not a directory")
+    worktree_backlink = git_dir / "gitdir"
+    if worktree_backlink.exists():
+        if worktree_backlink.is_symlink() or not worktree_backlink.is_file():
+            raise Rig("invalid linked-worktree backlink")
+        backlink = worktree_backlink.read_text(encoding="utf-8", errors="strict").strip()
+        if Path(backlink).resolve(strict=True) != dot_git.resolve(strict=True):
+            raise Rig("linked-worktree backlink does not bind the physical worktree")
+    forbidden_metadata = (
+        common_dir / "objects/info/alternates",
+        common_dir / "info/grafts",
+        git_dir / "info/grafts",
+        common_dir / "shallow",
+        git_dir / "shallow",
     )
+    if any(path.exists() or path.is_symlink() for path in forbidden_metadata):
+        raise Rig("alternate, graft, or shallow identity metadata is forbidden")
+    binding = GitBinding(canonical_work_tree, git_dir, common_dir)
+    top = identity_git(binding, "rev-parse", "--show-toplevel", ambient=ambient)
+    observed_git_dir = identity_git(binding, "rev-parse", "--absolute-git-dir", ambient=ambient)
+    observed_common_dir = identity_git(binding, "rev-parse", "--git-common-dir", ambient=ambient)
+    observed_head = identity_git(binding, "rev-parse", "--git-path", "HEAD", ambient=ambient)
+    if (
+        top.returncode != 0
+        or observed_git_dir.returncode != 0
+        or observed_common_dir.returncode != 0
+        or observed_head.returncode != 0
+        or Path(top.stdout.strip()).resolve(strict=True) != canonical_work_tree
+        or Path(observed_git_dir.stdout.strip()).resolve(strict=True) != git_dir
+        or Path(observed_common_dir.stdout.strip()).resolve(strict=True) != common_dir
+        or Path(observed_head.stdout.strip()).resolve(strict=True) != head_file.resolve(strict=True)
+    ):
+        raise Rig("Git rejected the explicit canonical repo/common/worktree/HEAD binding")
+    return binding
 
 
-def exact_commit(value: str) -> bool:
+def trusted_git_valid() -> bool:
+    try:
+        metadata = TRUSTED_GIT.lstat()
+        file_ok = (
+            stat.S_ISREG(metadata.st_mode)
+            and not TRUSTED_GIT.is_symlink()
+            and TRUSTED_GIT.resolve(strict=True) == TRUSTED_GIT
+            and sha(TRUSTED_GIT.read_bytes()) == TRUSTED_GIT_SHA
+        )
+        with tempfile.TemporaryDirectory(
+            prefix="h037-git-attest-", dir="/private/tmp",
+        ) as raw:
+            private_temp = Path(raw)
+            private_temp.chmod(0o700)
+            version = subprocess.run(
+                [str(TRUSTED_GIT), "--version"],
+                env=git_identity_environment(private_temp),
+                cwd="/var/empty",
+                text=True,
+                capture_output=True,
+                shell=False,
+                timeout=15,
+            )
+        return (
+            file_ok and version.returncode == 0 and version.stderr == ""
+            and version.stdout.strip() == TRUSTED_GIT_VERSION
+        )
+    except OSError:
+        return False
+
+
+def exact_commit(
+    value: str,
+    binding: GitBinding,
+    ambient: dict[str, str] | None = None,
+) -> bool:
     if re.fullmatch(r"[0-9a-f]{40}", value) is None:
         return False
-    result = git("rev-parse", "--verify", "--quiet", f"{value}^{{commit}}")
-    return result.returncode == 0 and result.stdout.strip() == value
+    result = identity_git(binding, "cat-file", "-t", value, ambient=ambient)
+    return result.returncode == 0 and result.stdout == "commit\n" and result.stderr == ""
 
 
-def git_blob(commit: str, path: str) -> bytes:
-    result = subprocess.run(
-        ["git", "-C", str(ROOT), "show", f"{commit}:{path}"],
-        capture_output=True, shell=False, timeout=15,
-    )
+def raw_commit_parents(
+    binding: GitBinding,
+    commit: str,
+    ambient: dict[str, str] | None = None,
+) -> list[str]:
+    result = identity_git(binding, "cat-file", "commit", commit, ambient=ambient, text=False)
+    if result.returncode:
+        raise Rig(f"cannot read literal commit object {commit}")
+    header = result.stdout.split(b"\n\n", 1)[0]
+    lines = header.splitlines()
+    if not lines or re.fullmatch(rb"tree [0-9a-f]{40}", lines[0]) is None:
+        raise Rig("malformed raw commit tree header")
+    parents: list[str] = []
+    for line in lines[1:]:
+        if line.startswith(b"parent "):
+            if re.fullmatch(rb"parent [0-9a-f]{40}", line) is None:
+                raise Rig("malformed raw commit parent header")
+            parents.append(line[7:].decode("ascii"))
+    return parents
+
+
+def git_blob(
+    binding: GitBinding,
+    commit: str,
+    path: str,
+    ambient: dict[str, str] | None = None,
+) -> bytes:
+    result = identity_git(binding, "show", f"{commit}:{path}", ambient=ambient, text=False)
     if result.returncode:
         raise Rig(f"missing candidate blob {commit}:{path}: {result.stderr.decode(errors='replace')}")
     return result.stdout
 
 
-def product_identity(base: str, candidate: str) -> tuple[bool, str]:
-    if not exact_commit(base) or not exact_commit(candidate):
-        return False, "base/candidate is not an exact existing lowercase commit"
-    head = git("rev-parse", "HEAD")
-    status = git("status", "--porcelain", "--untracked-files=all")
-    parents_result = git("rev-list", "--parents", "-n", "1", candidate)
-    changed_result = git(
-        "diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames",
-        base, candidate,
+def physical_checkout_identity(
+    binding: GitBinding,
+    candidate: str,
+    ambient: dict[str, str] | None = None,
+) -> tuple[bool, dict[str, object]]:
+    listing = identity_git(
+        binding, "ls-tree", "-r", "-z", "--full-tree", candidate,
+        ambient=ambient, text=False,
     )
-    if any(item.returncode for item in (head, status, parents_result, changed_result)):
+    if listing.returncode:
+        return False, {"error": "candidate tree enumeration failed"}
+    expected: dict[str, tuple[str, str, bytes]] = {}
+    for entry in listing.stdout.split(b"\0"):
+        if not entry:
+            continue
+        try:
+            metadata, raw_path = entry.split(b"\t", 1)
+            mode, object_type, object_id = metadata.decode("ascii").split(" ")
+            path = raw_path.decode("utf-8", errors="strict")
+        except (ValueError, UnicodeDecodeError):
+            return False, {"error": "malformed or non-UTF8 candidate tree entry"}
+        if (
+            object_type != "blob"
+            or mode not in {"100644", "100755", "120000"}
+            or re.fullmatch(r"[0-9a-f]{40}", object_id) is None
+            or path.startswith("/")
+            or any(part in {"", ".", "..", ".git"} for part in path.split("/"))
+            or path in expected
+        ):
+            return False, {"error": "unsafe candidate tree entry", "path": path}
+        blob = identity_git(binding, "cat-file", "blob", object_id, ambient=ambient, text=False)
+        if blob.returncode:
+            return False, {"error": "candidate blob read failed", "path": path}
+        expected[path] = (mode, object_id, blob.stdout)
+
+    physical: set[str] = set()
+    for directory, dirnames, filenames in os.walk(binding.work_tree, followlinks=False):
+        current = Path(directory)
+        if current == binding.work_tree:
+            dirnames[:] = [name for name in dirnames if name != ".git"]
+            filenames = [name for name in filenames if name != ".git"]
+        for dirname in list(dirnames):
+            child = current / dirname
+            if child.is_symlink():
+                physical.add(child.relative_to(binding.work_tree).as_posix())
+                dirnames.remove(dirname)
+        for filename in filenames:
+            physical.add((current / filename).relative_to(binding.work_tree).as_posix())
+    missing = sorted(set(expected) - physical)
+    extra = sorted(physical - set(expected))
+    mismatched: list[str] = []
+    for path in sorted(set(expected) & physical):
+        mode, _object_id, content = expected[path]
+        leaf = binding.work_tree / path
+        metadata = leaf.lstat()
+        if mode == "120000":
+            matches = stat.S_ISLNK(metadata.st_mode) and os.fsencode(os.readlink(leaf)) == content
+        else:
+            matches = (
+                stat.S_ISREG(metadata.st_mode)
+                and leaf.read_bytes() == content
+                and bool(metadata.st_mode & 0o111) == (mode == "100755")
+            )
+        if not matches:
+            mismatched.append(path)
+    ok = not missing and not extra and not mismatched
+    return ok, {
+        "expected_leaf_count": len(expected),
+        "physical_leaf_count": len(physical),
+        "missing": missing[:10],
+        "extra": extra[:10],
+        "mismatched": mismatched[:10],
+    }
+
+
+def product_identity(
+    base: str,
+    candidate: str,
+    *,
+    binding: GitBinding | None = None,
+    ambient: dict[str, str] | None = None,
+) -> tuple[bool, str]:
+    if not trusted_git_valid():
+        return False, "trusted absolute Git executable identity mismatch"
+    try:
+        observed = canonical_git_binding(ROOT if binding is None else binding.work_tree, ambient)
+    except (OSError, ValueError, Rig, subprocess.SubprocessError) as error:
+        return False, f"canonical Git binding rejected: {error}"
+    if binding is not None and binding != observed:
+        return False, "supplied Git binding differs from fresh physical binding"
+    if not exact_commit(base, observed, ambient) or not exact_commit(candidate, observed, ambient):
+        return False, "base/candidate is not an exact existing lowercase commit"
+    head = identity_git(observed, "rev-parse", "--verify", "HEAD", ambient=ambient)
+    changed_result = identity_git(
+        observed,
+        "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--no-renames",
+        "--no-ext-diff", "--no-textconv", base, candidate, ambient=ambient, text=False,
+    )
+    if head.returncode or changed_result.returncode:
         return False, "git identity observation failed"
-    parent_tokens = parents_result.stdout.strip().split()
-    parents = parent_tokens[1:] if parent_tokens and parent_tokens[0] == candidate else []
-    changed = [line for line in changed_result.stdout.splitlines() if line]
+    parents = raw_commit_parents(observed, candidate, ambient)
+    try:
+        changed = [path.decode("utf-8", errors="strict")
+                   for path in changed_result.stdout.split(b"\0") if path]
+    except UnicodeDecodeError:
+        return False, "non-UTF8 changed path"
     contract_paths = ("specs/tasks.spec.json", "verify/bin/h-037-exit")
-    base_contract_equal = all(git_blob(base, path) == (ROOT / path).read_bytes()
+    base_contract_equal = all(git_blob(observed, base, path, ambient) == (ROOT / path).read_bytes()
                               for path in contract_paths)
-    candidate_contract_equal = all(git_blob(candidate, path) == (ROOT / path).read_bytes()
+    candidate_contract_equal = all(
+        git_blob(observed, candidate, path, ambient) == (ROOT / path).read_bytes()
                                    for path in contract_paths)
     protected = {
         "workflows/nortropic-verify-suite.js": NEW_SUITE_SHA,
@@ -377,12 +709,14 @@ def product_identity(base: str, candidate: str) -> tuple[bool, str]:
         "verify/bin/h-017-exit": H017_GATE_SHA,
     }
     protected_bytes_equal = all(
-        sha(git_blob(base, path)) == digest
-        and git_blob(candidate, path) == git_blob(base, path)
+        sha(git_blob(observed, base, path, ambient)) == digest
+        and git_blob(observed, candidate, path, ambient) == git_blob(observed, base, path, ambient)
         for path, digest in protected.items()
     )
-    fixture_base = git("rev-parse", f"{base}:tests/fixtures")
-    fixture_candidate = git("rev-parse", f"{candidate}:tests/fixtures")
+    fixture_base = identity_git(observed, "rev-parse", f"{base}:tests/fixtures", ambient=ambient)
+    fixture_candidate = identity_git(
+        observed, "rev-parse", f"{candidate}:tests/fixtures", ambient=ambient,
+    )
     protected_bytes_equal = (
         protected_bytes_equal
         and fixture_base.returncode == fixture_candidate.returncode == 0
@@ -390,19 +724,351 @@ def product_identity(base: str, candidate: str) -> tuple[bool, str]:
     )
     relation_ok, why = identity_oracle(
         base=base, parents=parents, changed=changed,
-        base_register=git_blob(base, PRODUCT_PATH),
-        candidate_register=git_blob(candidate, PRODUCT_PATH),
+        base_register=git_blob(observed, base, PRODUCT_PATH, ambient),
+        candidate_register=git_blob(observed, candidate, PRODUCT_PATH, ambient),
         base_contract_equal=base_contract_equal,
         candidate_contract_equal=candidate_contract_equal,
         protected_bytes_equal=protected_bytes_equal,
     )
-    checkout_ok = head.stdout.strip() == candidate and status.stdout == ""
+    physical_ok, physical_detail = physical_checkout_identity(observed, candidate, ambient)
+    checkout_ok = head.stdout.strip() == candidate and physical_ok
     return relation_ok and checkout_ok, json.dumps({
         "relation": json.loads(why),
         "head": head.stdout.strip(),
         "expected_head": candidate,
-        "clean": status.stdout == "",
+        "physical_checkout": physical_detail,
+        "trusted_git": str(TRUSTED_GIT),
+        "git_dir": str(observed.git_dir),
+        "common_dir": str(observed.common_dir),
+        "work_tree": str(observed.work_tree),
+        "git_environment": "CLOSED_ALLOWLIST_PRIVATE_DARWIN_TEMP_NO_AMBIENT_GIT_LOADER_OR_TOOLCHAIN",
+        "topology": "LITERAL_RAW_COMMIT_PARENT_HEADERS",
+        "cleanliness": "PHYSICAL_WORKTREE_VS_CANDIDATE_TREE_WITHOUT_INDEX",
     }, sort_keys=True)
+
+
+def fixture_git(
+    work_tree: Path,
+    *args: str,
+    input_text: str | None = None,
+    allow_replacements: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    fixture_runtime = work_tree.parent / "fixture-git-runtime"
+    fixture_runtime.mkdir(mode=0o700, exist_ok=True)
+    fixture_runtime.chmod(0o700)
+    environment = closed_process_environment(fixture_runtime)
+    environment.update({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": "",
+    })
+    if not allow_replacements:
+        environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    replacement_option = [] if allow_replacements else ["--no-replace-objects"]
+    return subprocess.run(
+        [
+            str(TRUSTED_GIT),
+            "--no-pager", "--literal-pathspecs", *replacement_option,
+            "-C", str(work_tree),
+            "-c", "user.name=H037 actual-Git control",
+            "-c", "user.email=h037@example.invalid",
+            *args,
+        ],
+        input=input_text,
+        text=True,
+        capture_output=True,
+        cwd=work_tree,
+        env=environment,
+        shell=False,
+        timeout=15,
+    )
+
+
+def fixture_git_value(work_tree: Path, *args: str, input_text: str | None = None) -> str:
+    result = fixture_git(work_tree, *args, input_text=input_text)
+    if result.returncode:
+        raise Rig(f"actual-Git fixture command failed {args}: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def commit_tree(work_tree: Path, tree: str, parents: list[str], message: str) -> str:
+    arguments = ["commit-tree", tree]
+    for parent in parents:
+        arguments.extend(["-p", parent])
+    return fixture_git_value(work_tree, *arguments, input_text=message + "\n")
+
+
+def actual_git_identity_controls() -> tuple[bool, str]:
+    pre, post = register_states()
+    with tempfile.TemporaryDirectory(
+        prefix="h037-actual-git-identity-", dir="/private/tmp",
+    ) as raw:
+        temp = Path(raw)
+        temp.chmod(0o700)
+        repo = temp / "repo"
+        repo.mkdir()
+        fixture_paths = [
+            "specs/tasks.spec.json",
+            "verify/bin/h-037-exit",
+            PRODUCT_PATH,
+            "workflows/nortropic-verify-suite.js",
+            "scripts/check-invariants.mjs",
+            "controller/verify/cli",
+            "docs/07-konstitution.md",
+            "scripts/nortropic-codex-autopilot.py",
+            "verify/bin/h-017-exit",
+        ]
+        for relative in fixture_paths:
+            source = ROOT / relative
+            target = repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        (repo / PRODUCT_PATH).write_bytes(pre)
+        shutil.copytree(ROOT / "tests/fixtures", repo / "tests/fixtures")
+
+        fixture_git_value(repo, "init", "--quiet")
+        fixture_git_value(repo, "add", "--all")
+        pre_tree = fixture_git_value(repo, "write-tree")
+        origin_base = commit_tree(repo, pre_tree, [], "publisher first parent")
+        contract_candidate = commit_tree(
+            repo, pre_tree, [origin_base], "frozen H037 contract candidate",
+        )
+        contract_merge = commit_tree(
+            repo, pre_tree, [origin_base, contract_candidate], "guarded contract publication merge",
+        )
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", contract_merge)
+        if (repo / PRODUCT_PATH).read_bytes() != pre:
+            raise Rig("actual-Git fixture pre-register bytes")
+        (repo / PRODUCT_PATH).write_bytes(post)
+        fixture_git_value(repo, "add", "--", PRODUCT_PATH)
+        post_tree = fixture_git_value(repo, "write-tree")
+        product = commit_tree(repo, post_tree, [contract_merge], "exact register-only product")
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", product)
+        binding = canonical_git_binding(repo)
+
+        merge_parents = raw_commit_parents(binding, contract_merge)
+        product_parents = raw_commit_parents(binding, product)
+        positive, positive_detail = product_identity(
+            contract_merge, product, binding=binding,
+        )
+
+        stack = commit_tree(repo, post_tree, [product], "genuine stacked product")
+        replacement_target = commit_tree(
+            repo, post_tree, [contract_merge], "replacement parent lie",
+        )
+        fixture_git_value(repo, "replace", stack, replacement_target)
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", stack)
+        replacement_probe = fixture_git(
+            repo, "rev-list", "--parents", "-n", "1", stack, allow_replacements=True,
+        )
+        replacement_accepted, replacement_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+        fixture_git_value(repo, "replace", "-d", stack)
+
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", product)
+        clean_redirect = temp / "redirect-clean"
+        shutil.copytree(repo, clean_redirect, ignore=shutil.ignore_patterns(".git"))
+        dirty_target = repo / "specs/tasks.spec.json"
+        dirty_target.write_bytes(dirty_target.read_bytes() + b"\n")
+        redirect_environment = closed_process_environment(temp)
+        redirect_environment["GIT_DIR"] = str(repo / ".git")
+        redirect_environment["GIT_WORK_TREE"] = str(clean_redirect)
+        redirected_status = subprocess.run(
+            [str(TRUSTED_GIT), "status", "--porcelain", "--untracked-files=all"],
+            cwd=repo, env=redirect_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        redirect_accepted, redirect_detail = product_identity(
+            contract_merge, product, binding=binding, ambient=redirect_environment,
+        )
+
+        fixture_git_value(repo, "update-index", "--skip-worktree", "specs/tasks.spec.json")
+        crafted_index_status = fixture_git(
+            repo, "status", "--porcelain", "--untracked-files=all",
+        )
+        crafted_index_accepted, crafted_index_detail = product_identity(
+            contract_merge, product, binding=binding,
+        )
+        fixture_git_value(repo, "update-index", "--no-skip-worktree", "specs/tasks.spec.json")
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", stack)
+
+        grafts = repo / ".git/info/grafts"
+        grafts.parent.mkdir(parents=True, exist_ok=True)
+        grafts.write_text(f"{stack} {contract_merge}\n", encoding="ascii")
+        graft_probe = fixture_git(
+            repo, "rev-list", "--parents", "-n", "1", stack, allow_replacements=True,
+        )
+        graft_accepted, graft_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+        grafts.unlink()
+
+        shallow = repo / ".git/shallow"
+        shallow.write_text(stack + "\n", encoding="ascii")
+        shallow_probe = fixture_git(
+            repo, "rev-list", "--parents", "-n", "1", stack, allow_replacements=True,
+        )
+        shallow_accepted, shallow_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+        shallow.unlink()
+
+        shadow = temp / "shadow-bin"
+        shadow.mkdir()
+        fake_git = shadow / "git"
+        fake_git.write_text(
+            "#!/bin/sh\n: > \"$PWD/.path-shim-executed\"\n"
+            "printf '%s\\n' '" + stack + " " + contract_merge + "'\n",
+            encoding="utf-8",
+        )
+        fake_git.chmod(0o755)
+        shadow_environment = closed_process_environment(temp)
+        shadow_environment["PATH"] = str(shadow) + os.pathsep + shadow_environment.get("PATH", "")
+        shadow_probe = subprocess.run(
+            ["git", "rev-list", "--parents", "-n", "1", stack],
+            cwd=repo, env=shadow_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        shadow_marker = repo / ".path-shim-executed"
+        shadow_probe_executed = shadow_marker.is_file()
+        if shadow_marker.exists():
+            shadow_marker.unlink()
+        shadow_accepted, shadow_detail = product_identity(
+            contract_merge, stack, binding=binding, ambient=shadow_environment,
+        )
+        shadow_identity_executed = shadow_marker.exists()
+        stack_accepted, stack_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", product)
+        config_hidden = repo / "config-hidden.txt"
+        config_hidden.write_text("hostile config should hide this\n", encoding="utf-8")
+        hostile_attributes = temp / "hostile.attributes"
+        hostile_attributes.write_text("* h037-injected\n", encoding="utf-8")
+        config_environment = closed_process_environment(temp)
+        config_environment.update({
+            "GIT_CONFIG_COUNT": "2",
+            "GIT_CONFIG_KEY_0": "status.showUntrackedFiles",
+            "GIT_CONFIG_VALUE_0": "no",
+            "GIT_CONFIG_KEY_1": "core.attributesFile",
+            "GIT_CONFIG_VALUE_1": str(hostile_attributes),
+            "GIT_ATTR_SOURCE": product,
+            "DEVELOPER_DIR": str(temp / "hostile-developer"),
+            "TOOLCHAINS": "hostile-toolchain",
+            "SDKROOT": str(temp / "hostile-sdk"),
+            "DYLD_INSERT_LIBRARIES": str(temp / "hostile.dylib"),
+            "LD_PRELOAD": str(temp / "hostile.so"),
+        })
+        config_probe_environment = dict(config_environment)
+        # The connected config/attribute probe must reach the real default launcher; the
+        # deliberately invalid toolchain/loader controls are reserved for the closed identity call.
+        for key in ("DEVELOPER_DIR", "TOOLCHAINS", "SDKROOT", "DYLD_INSERT_LIBRARIES", "LD_PRELOAD"):
+            config_probe_environment.pop(key, None)
+        config_status_probe = subprocess.run(
+            [str(TRUSTED_GIT), "-C", str(repo), "status", "--porcelain"],
+            cwd=repo, env=config_probe_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        attribute_probe = subprocess.run(
+            [
+                str(TRUSTED_GIT), "-C", str(repo),
+                "check-attr", "h037-injected", "--", config_hidden.name,
+            ],
+            cwd=repo, env=config_probe_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        config_accepted, config_detail = product_identity(
+            contract_merge, product, binding=binding, ambient=config_environment,
+        )
+        config_hidden.unlink()
+
+        extra_parent = commit_tree(
+            repo, post_tree, [contract_merge, product], "genuine extra-parent product",
+        )
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", extra_parent)
+        extra_accepted, extra_detail = product_identity(
+            contract_merge, extra_parent, binding=binding,
+        )
+
+        expected_lie = f"{stack} {contract_merge}"
+        closed_environment = git_identity_environment(temp)
+        expected_environment_keys = {
+            "PATH", "HOME", "XDG_CONFIG_HOME", "TMPDIR", "DARWIN_USER_TEMP_DIR", "LANG", "LC_ALL",
+            "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT",
+            "GIT_TERMINAL_PROMPT", "GIT_NO_REPLACE_OBJECTS", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        }
+        controls = {
+            "publisher_shaped_two_parent_base": merge_parents == [origin_base, contract_candidate],
+            "exact_direct_product_positive": (
+                product_parents == [contract_merge] and positive
+            ),
+            "replacement_mapping_connected": (
+                replacement_probe.returncode == 0
+                and replacement_probe.stdout.strip() == expected_lie
+            ),
+            "replacement_mapping_on_genuine_stack_rejected": not replacement_accepted,
+            "git_work_tree_redirection_connected": (
+                redirected_status.returncode == 0 and redirected_status.stdout == ""
+            ),
+            "git_work_tree_cannot_hide_dirty_checkout": not redirect_accepted,
+            "crafted_skip_worktree_index_lies_clean": (
+                crafted_index_status.returncode == 0 and crafted_index_status.stdout == ""
+            ),
+            "crafted_skip_worktree_index_rejected": not crafted_index_accepted,
+            "graft_parent_rewrite_connected": (
+                graft_probe.returncode == 0 and graft_probe.stdout.strip() == expected_lie
+            ),
+            "graft_parent_rewrite_rejected": not graft_accepted,
+            "shallow_parent_rewrite_connected": (
+                shallow_probe.returncode == 0 and shallow_probe.stdout.strip() == stack
+            ),
+            "shallow_parent_rewrite_rejected": not shallow_accepted,
+            "path_shadow_parent_lie_connected": (
+                shadow_probe.returncode == 0 and shadow_probe.stdout.strip() == expected_lie
+                and shadow_probe_executed
+            ),
+            "path_shadow_parent_lie_rejected": not shadow_accepted,
+            "path_shadow_shim_never_executes_for_identity": not shadow_identity_executed,
+            "config_status_injection_connected": (
+                config_status_probe.returncode == 0 and config_status_probe.stdout == ""
+            ),
+            "attribute_injection_connected": (
+                attribute_probe.returncode == 0
+                and attribute_probe.stdout.strip()
+                == f"{config_hidden.name}: h037-injected: set"
+            ),
+            "config_attribute_loader_toolchain_injection_rejected": not config_accepted,
+            "closed_environment_exact": (
+                set(closed_environment) == expected_environment_keys
+                and closed_environment["PATH"] == CLOSED_PATH
+                and closed_environment["HOME"] == "/var/empty"
+                and closed_environment["GIT_NO_REPLACE_OBJECTS"] == "1"
+                and closed_environment["GIT_ALTERNATE_OBJECT_DIRECTORIES"] == ""
+                and not any(key.startswith(("DYLD_", "LD_", "GIT_TEST_"))
+                            for key in closed_environment)
+                and not ({"DEVELOPER_DIR", "TOOLCHAINS", "SDKROOT"} & set(closed_environment))
+            ),
+            "genuine_stack_rejected": not stack_accepted,
+            "genuine_extra_parent_rejected": not extra_accepted,
+        }
+        return all(controls.values()), json.dumps({
+            "controls": controls,
+            "positive": json.loads(positive_detail),
+            "replacement": json.loads(replacement_detail),
+            "redirect": json.loads(redirect_detail),
+            "crafted_index": json.loads(crafted_index_detail),
+            "graft": graft_detail,
+            "shallow": shallow_detail,
+            "path_shadow": json.loads(shadow_detail),
+            "config_attribute": json.loads(config_detail),
+            "stack": json.loads(stack_detail),
+            "extra_parent": json.loads(extra_detail),
+        }, sort_keys=True)
 
 
 def json_mutant(post: bytes, mutate) -> bytes:
@@ -420,7 +1086,12 @@ def exact_transition_selftests() -> None:
         base=base, parents=[base], changed=[PRODUCT_PATH],
         base_register=pre, candidate_register=post,
     )
-    check(positive, "J_EXACT_DIRECT_CHILD_ONE_FILE_TRANSITION_POSITIVE", why)
+    actual_git_ok, actual_git_detail = actual_git_identity_controls()
+    check(
+        positive and actual_git_ok,
+        "J_EXACT_DIRECT_CHILD_ONE_FILE_TRANSITION_POSITIVE",
+        {"pure_oracle": json.loads(why), "actual_git": json.loads(actual_git_detail)},
+    )
 
     result = run_preflight(post)
     check(result.returncode == 0 and result.stderr == "",
@@ -504,7 +1175,7 @@ def exact_transition_selftests() -> None:
 def frozen_contract_checks() -> None:
     pre, post = register_states()
     check(sha(pre) == PRE_REGISTER_SHA and sha(post) == POST_REGISTER_SHA
-          and len(pre) == len(post),
+          and len(pre) == len(post) and trusted_git_valid(),
           "F_EXACT_ONE_TOKEN_BYTE_PRESERVING_REGISTER_TRANSITION")
     check(sha(SUITE.read_bytes()) == NEW_SUITE_SHA,
           "F_SUITE_EXACT_NEW_DIGEST")

@@ -3053,3 +3053,32 @@ second H-037 product file proves necessary, this contract fails closed rather th
 The five TEST_AUTHOR files are `specs/tasks.spec.json`, new `verify/bin/h-037-exit`,
 `docs/loop/owner-author-workflow-v1.md`, `docs/05-beslutslogg.md` and this drift record. No product,
 full/live/H-017 execution, network, remote-ref, push or merge action belongs to this lane.
+
+### H037-RV-01 — product-identity Git isolation
+
+Independent falsification found that three ambient Git channels could make a rejected identity look
+accepted: a replacement ref could rewrite a genuine stacked commit's observed parent, an ambient
+`GIT_WORK_TREE` could redirect status away from a dirty checkout, and PATH shadowing could make
+`rev-list` report a fabricated direct parent. The refreeze therefore pins the trusted absolute
+`/usr/bin/git` bytes at SHA-256
+`506cb2ddd061e2992c8ee7c53853340688b53d9fcec94c3aa936524cea5b40cb` and attests `git version
+2.50.1 (Apple Git-155)` under the clean launcher environment. Each call receives a private
+`DARWIN_USER_TEMP_DIR` and an exact allowlist that omits ambient Git/config/attribute/pager/trace,
+loader, `GIT_TEST_*`, `DEVELOPER_DIR`, `TOOLCHAINS` and `SDKROOT` controls. Explicit
+`--no-replace-objects`, `--no-pager`, `--literal-pathspecs`, per-worktree git-dir, common-dir and
+physical work-tree bind the repository. Candidate parents come from literal raw commit headers with
+replacements disabled; HEAD cleanliness comes from direct candidate-tree comparison to the physical
+worktree and therefore never trusts a caller-crafted index. The real verifier runner receives the
+same closed process environment.
+
+The gate's connected disposable actual-Git control constructs the legitimate publisher-shaped
+two-parent contract-merge base and its exact direct register-only child as the positive. Against the
+same repository it proves rejection of replacement mapping on a genuine stacked SHA,
+`GIT_WORK_TREE` dirty-checkout hiding, a skip-worktree crafted index, graft/shallow parent rewrites,
+config/attribute injection, PATH-shadowed parent lies, the genuine stack itself, and an extra-parent
+product. It separately proves the PATH shim does not execute during identity observation. The
+connected probes first demonstrate that each hostile mechanism produces the intended lie, so an
+inert fixture cannot earn rejection credit. These controls are folded into
+the existing identity assertion: the sole preproduct result remains 35 PASS / 1 authorized FAIL,
+and explicit exact product mode remains 38/0. The five-file TEST_AUTHOR scope, one-file product,
+publisher, H-034/H-035 pins, BP01–BP14 and H037 → H034 → H036 order are unchanged.

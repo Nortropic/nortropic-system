@@ -197,6 +197,25 @@ runner, startbar, check-invariants, extra, duplicate, reformat, out-of-scope, wo
 mutants reject.
 Any second product path is a fail-closed stop.
 
+H037-RV-01 closes the product-identity observation boundary without broadening product or publisher
+authority. Every product-identity Git invocation uses the pinned absolute executable `/usr/bin/git`
+(SHA-256 `506cb2ddd061e2992c8ee7c53853340688b53d9fcec94c3aa936524cea5b40cb`, clean-launcher
+attestation `git version 2.50.1 (Apple Git-155)`). The invocation receives an exact closed allowlist
+with a private `DARWIN_USER_TEMP_DIR`: no ambient Git, config, attribute, pager, trace, loader,
+`GIT_TEST_*`, `DEVELOPER_DIR`, `TOOLCHAINS` or `SDKROOT` value survives. It uses explicit
+`--no-replace-objects`, `--no-pager`, `--literal-pathspecs`, canonical per-worktree git-dir,
+common-dir and physical work-tree. Literal raw candidate commit headers—not `rev-list` topology—bind
+the one parent, and a direct candidate-tree/physical-worktree comparison—not status/index claims—
+binds HEAD cleanliness. The real verifier effect uses the same closed process environment.
+
+Connected disposable actual-Git controls accept the legitimate publisher shape—a two-parent guarded
+contract-merge base followed by its exact direct one-file product—and reject a replace mapping on a
+genuine stacked SHA, `GIT_WORK_TREE` redirection, a skip-worktree crafted index hiding dirty bytes,
+graft and shallow topology rewrites, config/attribute injection, a PATH-shadowed `git` parent lie,
+the genuine stack and an extra-parent product. The PATH control separately proves that the shim is
+not executed by identity observation. This is a judge hardening only: it creates no generic roadmap
+exception, changes no publisher behavior, and grants no second production path.
+
 This contract publication does not alter the currently green downstream lifecycle assertions:
 H-034 remains exactly dependent on H-035, and both `verify/bin/h-034-exit` and
 `verify/bin/h-035-exit` remain byte-identical. Only after the H-037 product has been independently
