@@ -204,9 +204,10 @@ attestation `git version 2.50.1 (Apple Git-155)`). The invocation receives an ex
 with a private `DARWIN_USER_TEMP_DIR`: no ambient Git, config, attribute, pager, trace, loader,
 `GIT_TEST_*`, `DEVELOPER_DIR`, `TOOLCHAINS` or `SDKROOT` value survives. It uses explicit
 `--no-replace-objects`, `--no-pager`, `--literal-pathspecs`, canonical per-worktree git-dir,
-common-dir and physical work-tree. Literal raw candidate commit headers—not `rev-list` topology—bind
-the one parent, and a direct candidate-tree/physical-worktree comparison—not status/index claims—
-binds HEAD cleanliness. The real verifier effect uses the same closed process environment.
+common-dir and physical work-tree. Canonical literal candidate commit headers bind the one parent
+and must agree exactly with the closed, no-replace Git graph; a direct candidate-tree/physical-
+worktree comparison—not status/index claims—binds HEAD cleanliness. The real verifier effect uses
+the same closed process environment.
 
 Connected disposable actual-Git controls accept the legitimate publisher shape—a two-parent guarded
 contract-merge base followed by its exact direct one-file product—and reject a replace mapping on a
@@ -215,6 +216,32 @@ graft and shallow topology rewrites, config/attribute injection, a PATH-shadowed
 the genuine stack and an extra-parent product. The PATH control separately proves that the shim is
 not executed by identity observation. This is a judge hardening only: it creates no generic roadmap
 exception, changes no publisher behavior, and grants no second production path.
+
+H037-RV-02 closes the raw object-identity boundary. Commit objects must contain one tree header,
+one contiguous parent block before exactly one valid author and committer, and then only legitimate
+encoding, `gpgsig`, `gpgsig-sha256` or `mergetag` headers with canonical continuations. The closed
+no-replace graph must exactly match every literal parent block. The exact validated set from
+`rev-list --objects --no-object-names <base> <candidate>` is fed as literal OIDs—not revisions—to a
+no-reuse, zero-window pack and imported into a fresh ref-free SHA-1 quarantine. Promoted strict
+index checks, self-contained/connected validation, isolated strict fsck and batch-all object-set
+equality precede raw parsing of every reachable commit and tree. Tree entries require Git's
+canonical byte ordering, unique safe names and canonical modes. Every non-gitlink target must be
+present with exact mode/type agreement; a locally present gitlink must be a commit, while an absent
+external submodule commit remains legitimate. The ambient object database is never fsck credit.
+
+Connected `hash-object --literally` controls reject late parents after committer or signature even
+where Git fsck is blind, missing author/committer, duplicate tree/author, unsorted or duplicate
+trees, bad modes/names and missing trees/entries. Both the ordinary two-parent publisher merge and
+a legitimate signed/encoding two-parent publisher merge followed by an exact direct product remain
+positive; there is no blanket rejection of signing, encoding or gitlinks.
+
+H037-RV-03 binds the product path from raw trees rather than revision/path shorthand. Base and
+candidate each must contain exactly one literal `controller/verify/register.json` record reached
+through exact `40000 tree` parent entries; the leaf must be exactly `100644 blob`, its object must
+exist as a blob, and its bytes/digests must equal the frozen pre/post register identities. Connected
+literal-tree mutants reject a `100755` leaf, symlink, gitlink, tree, missing or duplicate record,
+invalid mode and mode/type mismatch. RV-02/RV-03 remain within the same judge assertion, so the
+sole preproduct result stays 35 PASS / 1 authorized FAIL and explicit product mode stays 38/0.
 
 This contract publication does not alter the currently green downstream lifecycle assertions:
 H-034 remains exactly dependent on H-035, and both `verify/bin/h-034-exit` and

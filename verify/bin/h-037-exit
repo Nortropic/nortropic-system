@@ -71,10 +71,16 @@ EXIT_CRITERION = (
     "observation to use attested pinned /usr/bin/git with a closed launcher environment, all "
     "ambient Git/config/attribute/pager/trace/loader/toolchain controls removed, explicit no-"
     "replace/no-pager/literal-pathspec options, and canonical git-dir/common-dir/work-tree binding. "
-    "Raw commit parent headers and a physical index-independent checkout comparison are authoritative. Connected actual-"
-    "Git controls reject replace-object, GIT_WORK_TREE, PATH-shadow and genuine stacked/extra-"
-    "parent bypasses while accepting a publisher-shaped two-parent contract-merge base followed "
-    "by its exact direct product child. The required raw-byte "
+    "Canonical raw commit grammar, literal parent headers cross-checked against the closed no-"
+    "replace Git graph, and a physical index-independent checkout comparison are authoritative. "
+    "The exact base/candidate reachable object set must survive an exact-OID, no-reuse pack into "
+    "a fresh ref-free SHA-1 quarantine, promoted strict index validation, isolated fsck, all-object "
+    "set equality, and raw commit/tree closure parsing. Both trees must resolve exactly one literal "
+    "controller/verify/register.json entry through 40000 tree parents to a 100644 blob with the "
+    "exact pre/post bytes. Connected actual-Git controls reject replace-object, GIT_WORK_TREE, "
+    "PATH-shadow, malformed commit/tree, register mode/type/cardinality and genuine stacked/extra-"
+    "parent bypasses while accepting ordinary and signed/encoding publisher-shaped two-parent "
+    "contract-merge bases followed by their exact direct product children. The required raw-byte "
     f"transition {PRE_REGISTER_SHA} to {POST_REGISTER_SHA}, real preflight exit 0 with that "
     "post-register digest, suite check exit 0 on the new digest, and suite run refusal exit 3 as "
     "not startable. Wrong digest/path/runner/startbar/check-invariants/extra/duplicate/"
@@ -195,9 +201,18 @@ H037_CONTRACT = {
             "environment": "CLOSED_ALLOWLIST_WITH_PRIVATE_DARWIN_TEMP_NO_AMBIENT_GIT_LOADER_OR_TOOLCHAIN_CONTROLS",
             "global_options": ["--no-replace-objects", "--no-pager", "--literal-pathspecs"],
             "repository_binding": "EXPLICIT_CANONICAL_PER_WORKTREE_GIT_DIR_COMMON_DIR_AND_PHYSICAL_WORK_TREE",
-            "topology_and_cleanliness": "RAW_COMMIT_PARENT_HEADERS_PLUS_INDEX_INDEPENDENT_PHYSICAL_CHECKOUT",
+            "topology_and_cleanliness": "CANONICAL_RAW_COMMIT_HEADERS_CLOSED_GRAPH_CROSSCHECK_PLUS_INDEX_INDEPENDENT_PHYSICAL_CHECKOUT",
+            "reachable_object_closure": "EXACT_VALIDATED_OIDS_NO_REUSE_PACKED_TO_FRESH_REF_FREE_SHA1_QUARANTINE_STRICT_INDEX_FSCK_BATCH_ALL_EQUALITY_AND_RAW_PARSE",
+            "commit_grammar": "ONE_TREE_CONTIGUOUS_PARENT_BLOCK_ONE_VALID_AUTHOR_THEN_COMMITTER_AND_ONLY_LEGITIMATE_ENCODING_SIGNATURE_OR_MERGETAG_HEADERS",
+            "tree_grammar": "GIT_CANONICAL_ORDER_UNIQUE_SAFE_NAMES_CANONICAL_MODES_NON_GITLINK_TARGETS_PRESENT_AND_MODE_MATCHED_LOCAL_GITLINK_IF_PRESENT_IS_COMMIT",
+            "register_tree_binding": "EXACTLY_ONE_LITERAL_CONTROLLER_VERIFY_REGISTER_JSON_100644_BLOB_WITH_EXACT_PRE_POST_BYTES",
             "connected_actual_git_controls": [
                 "PUBLISHER_SHAPED_TWO_PARENT_CONTRACT_MERGE_BASE_PLUS_EXACT_DIRECT_PRODUCT_ACCEPTS",
+                "SIGNED_ENCODING_PUBLISHER_MERGE_BASE_PLUS_EXACT_DIRECT_PRODUCT_ACCEPTS",
+                "LATE_PARENT_AFTER_COMMITTER_OR_SIGNATURE_REJECTS_EVEN_WHEN_FSCK_BLIND",
+                "MISSING_IDENTITIES_DUPLICATE_TREE_OR_AUTHOR_REJECT",
+                "UNSORTED_DUPLICATE_BAD_MODE_BAD_NAME_MISSING_TREE_OR_ENTRY_REJECT",
+                "REGISTER_100755_SYMLINK_GITLINK_TREE_MISSING_DUPLICATE_INVALID_MODE_OR_TYPE_REJECT",
                 "REPLACE_MAPPING_ON_GENUINE_STACKED_SHA_REJECTS",
                 "GIT_WORK_TREE_REDIRECTION_CANNOT_HIDE_DIRTY_CHECKOUT",
                 "PATH_SHADOWED_GIT_CANNOT_LIE_ABOUT_REV_LIST_PARENTS",
@@ -404,6 +419,7 @@ def identity_git(
     *args: str,
     ambient: dict[str, str] | None = None,
     text: bool = True,
+    input_data: str | bytes | None = None,
 ) -> subprocess.CompletedProcess:
     # ambient is deliberately never projected. It exists only so connected controls can
     # supply hostile process state and prove that the closed launcher ignores it.
@@ -429,6 +445,7 @@ def identity_git(
             cwd=binding.work_tree,
             env=git_identity_environment(private_temp),
             text=text,
+            input=input_data,
             capture_output=True,
             shell=False,
             timeout=15,
@@ -555,25 +572,408 @@ def exact_commit(
     return result.returncode == 0 and result.stdout == "commit\n" and result.stderr == ""
 
 
-def raw_commit_parents(
+class CommitRecord(NamedTuple):
+    tree: str
+    parents: list[str]
+    signed_headers: list[str]
+    encoding: str | None
+
+
+class TreeEntry(NamedTuple):
+    mode: str
+    name: bytes
+    object_id: str
+
+
+class ClosureAttestation(NamedTuple):
+    base: CommitRecord
+    candidate: CommitRecord
+    base_register: bytes
+    candidate_register: bytes
+    object_count: int
+    commit_count: int
+    tree_count: int
+
+
+COMMIT_IDENT_RE = re.compile(
+    rb"(?:author|committer) [^\x00\n<>]+ <[^\x00\n<>]+> [0-9]+ "
+    rb"[+-](?:(?:0[0-9]|1[0-3])[0-5][0-9]|1400)"
+)
+TREE_MODES = {"100644", "100755", "120000", "40000", "160000"}
+TREE_OBJECT_TYPES = {
+    "100644": "blob",
+    "100755": "blob",
+    "120000": "blob",
+    "40000": "tree",
+    "160000": "commit",
+}
+
+
+def parse_canonical_commit(raw: bytes) -> CommitRecord:
+    if b"\x00" in raw or b"\r" in raw:
+        raise Rig("raw commit contains NUL or CR")
+    if b"\n\n" not in raw:
+        raise Rig("raw commit has no header/message separator")
+    header, _message = raw.split(b"\n\n", 1)
+    lines = header.split(b"\n")
+    if not lines or re.fullmatch(rb"tree [0-9a-f]{40}", lines[0]) is None:
+        raise Rig("raw commit must begin with exactly one canonical tree header")
+    tree = lines[0][5:].decode("ascii")
+    cursor = 1
+    parents: list[str] = []
+    while cursor < len(lines) and lines[cursor].startswith(b"parent "):
+        if re.fullmatch(rb"parent [0-9a-f]{40}", lines[cursor]) is None:
+            raise Rig("malformed raw commit parent header")
+        parents.append(lines[cursor][7:].decode("ascii"))
+        cursor += 1
+    if cursor >= len(lines) or not lines[cursor].startswith(b"author "):
+        raise Rig("raw commit must have one author immediately after its parent block")
+    if COMMIT_IDENT_RE.fullmatch(lines[cursor]) is None:
+        raise Rig("malformed raw commit author identity")
+    cursor += 1
+    if cursor >= len(lines) or not lines[cursor].startswith(b"committer "):
+        raise Rig("raw commit must have one committer immediately after its author")
+    if COMMIT_IDENT_RE.fullmatch(lines[cursor]) is None:
+        raise Rig("malformed raw commit committer identity")
+    cursor += 1
+
+    encoding: str | None = None
+    signed_headers: list[str] = []
+    singleton_signatures: set[str] = set()
+    while cursor < len(lines):
+        line = lines[cursor]
+        if line.startswith(b" "):
+            raise Rig("orphan raw commit header continuation")
+        try:
+            header_name, value = line.split(b" ", 1)
+        except ValueError as error:
+            raise Rig("malformed raw commit extension header") from error
+        if header_name == b"encoding":
+            if encoding is not None or re.fullmatch(rb"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+                raise Rig("duplicate or malformed raw commit encoding")
+            encoding = value.decode("ascii")
+            cursor += 1
+            continue
+        if header_name not in {b"gpgsig", b"gpgsig-sha256", b"mergetag"} or not value:
+            raise Rig("noncanonical or repeated core raw commit header")
+        decoded_name = header_name.decode("ascii")
+        if decoded_name != "mergetag" and decoded_name in singleton_signatures:
+            raise Rig("duplicate raw commit signature header")
+        singleton_signatures.add(decoded_name)
+        continuation_count = 0
+        cursor += 1
+        while cursor < len(lines) and lines[cursor].startswith(b" "):
+            continuation_count += 1
+            cursor += 1
+        if continuation_count == 0:
+            raise Rig("signature or mergetag header has no canonical continuation")
+        signed_headers.append(decoded_name)
+    return CommitRecord(tree, parents, signed_headers, encoding)
+
+
+def strict_commit_record(
     binding: GitBinding,
     commit: str,
     ambient: dict[str, str] | None = None,
-) -> list[str]:
+) -> CommitRecord:
     result = identity_git(binding, "cat-file", "commit", commit, ambient=ambient, text=False)
     if result.returncode:
         raise Rig(f"cannot read literal commit object {commit}")
-    header = result.stdout.split(b"\n\n", 1)[0]
-    lines = header.splitlines()
-    if not lines or re.fullmatch(rb"tree [0-9a-f]{40}", lines[0]) is None:
-        raise Rig("malformed raw commit tree header")
-    parents: list[str] = []
-    for line in lines[1:]:
-        if line.startswith(b"parent "):
-            if re.fullmatch(rb"parent [0-9a-f]{40}", line) is None:
-                raise Rig("malformed raw commit parent header")
-            parents.append(line[7:].decode("ascii"))
-    return parents
+    record = parse_canonical_commit(result.stdout)
+    graph = identity_git(
+        binding, "rev-list", "--parents", "-n", "1", commit, ambient=ambient,
+    )
+    expected = " ".join([commit, *record.parents]) + "\n"
+    if graph.returncode or graph.stdout != expected or graph.stderr:
+        raise Rig("closed no-replace Git graph differs from literal commit parent headers")
+    return record
+
+
+def parse_canonical_tree(raw: bytes) -> list[TreeEntry]:
+    entries: list[TreeEntry] = []
+    offset = 0
+    prior_key: bytes | None = None
+    names: set[bytes] = set()
+    while offset < len(raw):
+        space = raw.find(b" ", offset)
+        nul = raw.find(b"\x00", space + 1) if space >= 0 else -1
+        if space <= offset or nul <= space + 1 or nul + 21 > len(raw):
+            raise Rig("truncated or malformed raw tree entry")
+        raw_mode = raw[offset:space]
+        raw_name = raw[space + 1:nul]
+        raw_oid = raw[nul + 1:nul + 21]
+        try:
+            mode = raw_mode.decode("ascii")
+        except UnicodeDecodeError:
+            raise Rig("non-ASCII raw tree mode")
+        if mode not in TREE_MODES:
+            raise Rig("noncanonical raw tree mode")
+        if (
+            b"/" in raw_name
+            or raw_name in {b".", b".."}
+            or raw_name.lower() == b".git"
+            or raw_name in names
+        ):
+            raise Rig("unsafe or duplicate raw tree name")
+        object_id = raw_oid.hex()
+        key = raw_name + (b"/" if mode == "40000" else b"\x00")
+        if prior_key is not None and key <= prior_key:
+            raise Rig("unsorted or duplicate raw tree entry")
+        prior_key = key
+        names.add(raw_name)
+        entries.append(TreeEntry(mode, raw_name, object_id))
+        offset = nul + 21
+    return entries
+
+
+def tree_bytes(entries: list[TreeEntry]) -> bytes:
+    return b"".join(
+        entry.mode.encode("ascii") + b" " + entry.name + b"\x00"
+        + bytes.fromhex(entry.object_id)
+        for entry in entries
+    )
+
+
+def batch_objects(
+    binding: GitBinding,
+    object_ids: list[str],
+    ambient: dict[str, str] | None = None,
+) -> dict[str, tuple[str, bytes]]:
+    if not object_ids:
+        return {}
+    result = identity_git(
+        binding, "cat-file", "--batch", ambient=ambient, text=False,
+        input_data=("\n".join(object_ids) + "\n").encode("ascii"),
+    )
+    if result.returncode:
+        raise Rig("closed object batch read failed")
+    observed: dict[str, tuple[str, bytes]] = {}
+    cursor = 0
+    for requested in object_ids:
+        line_end = result.stdout.find(b"\n", cursor)
+        if line_end < 0:
+            raise Rig("truncated object batch header")
+        header = result.stdout[cursor:line_end]
+        cursor = line_end + 1
+        try:
+            object_id_raw, object_type_raw, size_raw = header.split(b" ")
+            object_id = object_id_raw.decode("ascii")
+            object_type = object_type_raw.decode("ascii")
+            size = int(size_raw.decode("ascii"))
+        except (ValueError, UnicodeDecodeError) as error:
+            raise Rig("missing or malformed object batch header") from error
+        if object_id != requested or re.fullmatch(r"[0-9a-f]{40}", object_id) is None:
+            raise Rig("object batch identity mismatch")
+        content_end = cursor + size
+        if content_end >= len(result.stdout) or result.stdout[content_end:content_end + 1] != b"\n":
+            raise Rig("truncated object batch content")
+        observed[object_id] = (object_type, result.stdout[cursor:content_end])
+        cursor = content_end + 1
+    if cursor != len(result.stdout) or len(observed) != len(object_ids):
+        raise Rig("duplicate or trailing object batch result")
+    return observed
+
+
+def validate_reachable_objects(
+    binding: GitBinding,
+    base: str,
+    candidate: str,
+) -> tuple[dict[str, CommitRecord], dict[str, list[TreeEntry]], dict[str, tuple[str, bytes]]]:
+    graph = identity_git(binding, "rev-list", "--parents", base, candidate)
+    objects_result = identity_git(
+        binding, "rev-list", "--objects", "--no-object-names", "--missing=print",
+        base, candidate,
+    )
+    if graph.returncode or graph.stderr or objects_result.returncode or objects_result.stderr:
+        raise Rig("closed reachable graph/object enumeration failed")
+    graph_parents: dict[str, list[str]] = {}
+    for line in graph.stdout.splitlines():
+        tokens = line.split(" ")
+        if (
+            not tokens
+            or any(re.fullmatch(r"[0-9a-f]{40}", token) is None for token in tokens)
+            or tokens[0] in graph_parents
+        ):
+            raise Rig("malformed or duplicate closed reachable graph row")
+        graph_parents[tokens[0]] = tokens[1:]
+    object_ids = objects_result.stdout.splitlines()
+    if (
+        not object_ids
+        or len(object_ids) != len(set(object_ids))
+        or any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in object_ids)
+    ):
+        raise Rig("missing, duplicate, or malformed reachable object identity")
+    objects = batch_objects(binding, object_ids)
+    commits: dict[str, CommitRecord] = {}
+    trees: dict[str, list[TreeEntry]] = {}
+    for object_id, (object_type, content) in objects.items():
+        if object_type == "commit":
+            record = parse_canonical_commit(content)
+            if object_id not in graph_parents or record.parents != graph_parents[object_id]:
+                raise Rig("literal commit parents differ from closed reachable Git graph")
+            commits[object_id] = record
+        elif object_type == "tree":
+            trees[object_id] = parse_canonical_tree(content)
+        elif object_type != "blob":
+            raise Rig("unexpected reachable object type")
+    if set(commits) != set(graph_parents) or base not in commits or candidate not in commits:
+        raise Rig("reachable commit closure differs from closed Git graph")
+    for commit in commits.values():
+        if commit.tree not in trees:
+            raise Rig("commit tree is missing from the reachable closure")
+    for entries in trees.values():
+        for entry in entries:
+            target = objects.get(entry.object_id)
+            if entry.mode == "160000":
+                if target is not None and target[0] != "commit":
+                    raise Rig("locally present gitlink target is not a commit")
+                continue
+            if target is None or target[0] != TREE_OBJECT_TYPES[entry.mode]:
+                raise Rig("tree entry is missing or has a mode/type mismatch")
+    return commits, trees, objects
+
+
+def literal_path_blob(
+    root_tree: str,
+    path: str,
+    trees: dict[str, list[TreeEntry]],
+    objects: dict[str, tuple[str, bytes]],
+    *,
+    required_mode: str = "100644",
+) -> bytes:
+    current = root_tree
+    components = [component.encode("utf-8") for component in path.split("/")]
+    for position, component in enumerate(components):
+        matches = [entry for entry in trees.get(current, []) if entry.name == component]
+        if len(matches) != 1:
+            raise Rig(f"literal path component cardinality mismatch: {path}")
+        entry = matches[0]
+        last = position == len(components) - 1
+        if not last:
+            if entry.mode != "40000" or objects.get(entry.object_id, (None,))[0] != "tree":
+                raise Rig(f"literal path intermediate is not one tree: {path}")
+            current = entry.object_id
+            continue
+        if entry.mode != required_mode or objects.get(entry.object_id, (None,))[0] != "blob":
+            raise Rig(f"literal path leaf mode/type mismatch: {path}")
+        return objects[entry.object_id][1]
+    raise Rig("empty literal path")
+
+
+_CLOSURE_CACHE: dict[tuple[str, str, str], ClosureAttestation] = {}
+
+
+def isolated_reachable_closure(
+    binding: GitBinding,
+    base: str,
+    candidate: str,
+    ambient: dict[str, str] | None = None,
+) -> ClosureAttestation:
+    del ambient
+    cache_key = (str(binding.common_dir), base, candidate)
+    cached = _CLOSURE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    source_ids = identity_git(
+        binding, "rev-list", "--objects", "--no-object-names", "--missing=print",
+        base, candidate,
+    )
+    object_ids = source_ids.stdout.splitlines()
+    if (
+        source_ids.returncode or source_ids.stderr or not object_ids
+        or len(object_ids) != len(set(object_ids))
+        or any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in object_ids)
+    ):
+        raise Rig("closed exact reachable object export list is invalid")
+    pack = identity_git(
+        binding, "pack-objects", "--stdout", "--no-reuse-object", "--no-reuse-delta",
+        "--window=0", text=False,
+        input_data=("\n".join(object_ids) + "\n").encode("ascii"),
+    )
+    if pack.returncode or pack.stderr:
+        raise Rig("closed no-replace reachable pack construction failed")
+    with tempfile.TemporaryDirectory(
+        prefix="h037-isolated-object-closure-", dir="/private/tmp",
+    ) as raw:
+        quarantine = Path(raw)
+        quarantine.chmod(0o700)
+        bare = quarantine / "objects.git"
+        empty_work_tree = quarantine / "physical-worktree"
+        init_host = quarantine / "init-host"
+        empty_work_tree.mkdir(mode=0o700)
+        init_host.mkdir(mode=0o700)
+        fixture_git_value(
+            init_host, "init", "--quiet", "--bare", "--object-format=sha1", str(bare),
+        )
+        isolated_binding = GitBinding(
+            empty_work_tree.resolve(strict=True), bare.resolve(strict=True), bare.resolve(strict=True),
+        )
+        format_probe = identity_git(isolated_binding, "rev-parse", "--show-object-format")
+        refs_probe = identity_git(
+            isolated_binding, "for-each-ref", "--format=%(objectname)",
+        )
+        if (
+            format_probe.returncode or format_probe.stdout != "sha1\n" or format_probe.stderr
+            or refs_probe.returncode or refs_probe.stdout or refs_probe.stderr
+        ):
+            raise Rig("isolated quarantine is not a ref-free SHA-1 object store")
+        strict_messages = ",".join(
+            f"{message}=error" for message in (
+                "badFilemode", "emptyName", "fullPathname", "hasDot", "hasDotdot",
+                "hasDotgit", "nullSha1", "zeroPaddedFilemode",
+            )
+        )
+        indexed = identity_git(
+            isolated_binding, "index-pack", "--stdin", f"--strict={strict_messages}",
+            "--check-self-contained-and-connected", text=False,
+            input_data=pack.stdout,
+        )
+        if indexed.returncode:
+            raise Rig("strict isolated reachable pack validation failed")
+        isolated_ids = identity_git(
+            isolated_binding, "rev-list", "--objects", "--no-object-names", "--missing=print",
+            base, candidate,
+        )
+        batch_all = identity_git(
+            isolated_binding, "cat-file", "--batch-all-objects",
+            "--batch-check=%(objectname)",
+        )
+        if (
+            isolated_ids.returncode or isolated_ids.stderr
+            or batch_all.returncode or batch_all.stderr
+            or set(source_ids.stdout.splitlines()) != set(isolated_ids.stdout.splitlines())
+            or set(object_ids) != set(batch_all.stdout.splitlines())
+            or len(object_ids) != len(batch_all.stdout.splitlines())
+        ):
+            raise Rig("isolated reachable object identities differ from the pinned source")
+        fsck = identity_git(
+            isolated_binding, "fsck", "--strict", "--no-reflogs", "--no-dangling",
+            base, candidate,
+        )
+        if fsck.returncode:
+            raise Rig("strict isolated reachable object fsck failed")
+        commits, trees, objects = validate_reachable_objects(isolated_binding, base, candidate)
+        base_record = commits[base]
+        candidate_record = commits[candidate]
+        base_register = literal_path_blob(
+            base_record.tree, PRODUCT_PATH, trees, objects, required_mode="100644",
+        )
+        candidate_register = literal_path_blob(
+            candidate_record.tree, PRODUCT_PATH, trees, objects, required_mode="100644",
+        )
+        pre, post = register_states()
+        if (
+            base_register != pre or candidate_register != post
+            or sha(base_register) != PRE_REGISTER_SHA
+            or sha(candidate_register) != POST_REGISTER_SHA
+        ):
+            raise Rig("literal register blob bytes/digests are not the exact pre/post transition")
+        attestation = ClosureAttestation(
+            base_record, candidate_record, base_register, candidate_register,
+            len(objects), len(commits), len(trees),
+        )
+    _CLOSURE_CACHE[cache_key] = attestation
+    return attestation
 
 
 def git_blob(
@@ -678,59 +1078,71 @@ def product_identity(
         return False, f"canonical Git binding rejected: {error}"
     if binding is not None and binding != observed:
         return False, "supplied Git binding differs from fresh physical binding"
-    if not exact_commit(base, observed, ambient) or not exact_commit(candidate, observed, ambient):
-        return False, "base/candidate is not an exact existing lowercase commit"
-    head = identity_git(observed, "rev-parse", "--verify", "HEAD", ambient=ambient)
-    changed_result = identity_git(
-        observed,
-        "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--no-renames",
-        "--no-ext-diff", "--no-textconv", base, candidate, ambient=ambient, text=False,
-    )
-    if head.returncode or changed_result.returncode:
-        return False, "git identity observation failed"
-    parents = raw_commit_parents(observed, candidate, ambient)
     try:
+        if not exact_commit(base, observed, ambient) or not exact_commit(candidate, observed, ambient):
+            return False, "base/candidate is not an exact existing lowercase commit"
+        closure = isolated_reachable_closure(observed, base, candidate, ambient)
+        # Re-read the two boundary commits in the bound source and cross-check each literal
+        # parent block against the same closed/no-replace Git graph used by product identity.
+        base_boundary = strict_commit_record(observed, base, ambient)
+        candidate_boundary = strict_commit_record(observed, candidate, ambient)
+        if base_boundary != closure.base or candidate_boundary != closure.candidate:
+            return False, "source boundary commits differ from isolated reachable closure"
+        head = identity_git(observed, "rev-parse", "--verify", "HEAD", ambient=ambient)
+        changed_result = identity_git(
+            observed,
+            "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--no-renames",
+            "--no-ext-diff", "--no-textconv", base, candidate, ambient=ambient, text=False,
+        )
+        if head.returncode or changed_result.returncode:
+            return False, "git identity observation failed"
         changed = [path.decode("utf-8", errors="strict")
                    for path in changed_result.stdout.split(b"\0") if path]
-    except UnicodeDecodeError:
-        return False, "non-UTF8 changed path"
-    contract_paths = ("specs/tasks.spec.json", "verify/bin/h-037-exit")
-    base_contract_equal = all(git_blob(observed, base, path, ambient) == (ROOT / path).read_bytes()
-                              for path in contract_paths)
-    candidate_contract_equal = all(
-        git_blob(observed, candidate, path, ambient) == (ROOT / path).read_bytes()
-                                   for path in contract_paths)
-    protected = {
-        "workflows/nortropic-verify-suite.js": NEW_SUITE_SHA,
-        "scripts/check-invariants.mjs": INVARIANTS_SHA,
-        "controller/verify/cli": VERIFY_SHA,
-        "docs/07-konstitution.md": CONSTITUTION_SHA,
-        "scripts/nortropic-codex-autopilot.py": AUTOPILOT_SHA,
-        "verify/bin/h-017-exit": H017_GATE_SHA,
-    }
-    protected_bytes_equal = all(
-        sha(git_blob(observed, base, path, ambient)) == digest
-        and git_blob(observed, candidate, path, ambient) == git_blob(observed, base, path, ambient)
-        for path, digest in protected.items()
-    )
-    fixture_base = identity_git(observed, "rev-parse", f"{base}:tests/fixtures", ambient=ambient)
-    fixture_candidate = identity_git(
-        observed, "rev-parse", f"{candidate}:tests/fixtures", ambient=ambient,
-    )
-    protected_bytes_equal = (
-        protected_bytes_equal
-        and fixture_base.returncode == fixture_candidate.returncode == 0
-        and fixture_base.stdout.strip() == fixture_candidate.stdout.strip() == FIXTURES_TREE
-    )
-    relation_ok, why = identity_oracle(
-        base=base, parents=parents, changed=changed,
-        base_register=git_blob(observed, base, PRODUCT_PATH, ambient),
-        candidate_register=git_blob(observed, candidate, PRODUCT_PATH, ambient),
-        base_contract_equal=base_contract_equal,
-        candidate_contract_equal=candidate_contract_equal,
-        protected_bytes_equal=protected_bytes_equal,
-    )
-    physical_ok, physical_detail = physical_checkout_identity(observed, candidate, ambient)
+        contract_paths = ("specs/tasks.spec.json", "verify/bin/h-037-exit")
+        base_contract_equal = all(
+            git_blob(observed, base, path, ambient) == (ROOT / path).read_bytes()
+            for path in contract_paths
+        )
+        candidate_contract_equal = all(
+            git_blob(observed, candidate, path, ambient) == (ROOT / path).read_bytes()
+            for path in contract_paths
+        )
+        protected = {
+            "workflows/nortropic-verify-suite.js": NEW_SUITE_SHA,
+            "scripts/check-invariants.mjs": INVARIANTS_SHA,
+            "controller/verify/cli": VERIFY_SHA,
+            "docs/07-konstitution.md": CONSTITUTION_SHA,
+            "scripts/nortropic-codex-autopilot.py": AUTOPILOT_SHA,
+            "verify/bin/h-017-exit": H017_GATE_SHA,
+        }
+        protected_bytes_equal = all(
+            sha(git_blob(observed, base, path, ambient)) == digest
+            and git_blob(observed, candidate, path, ambient)
+                == git_blob(observed, base, path, ambient)
+            for path, digest in protected.items()
+        )
+        fixture_base = identity_git(
+            observed, "rev-parse", f"{base}:tests/fixtures", ambient=ambient,
+        )
+        fixture_candidate = identity_git(
+            observed, "rev-parse", f"{candidate}:tests/fixtures", ambient=ambient,
+        )
+        protected_bytes_equal = (
+            protected_bytes_equal
+            and fixture_base.returncode == fixture_candidate.returncode == 0
+            and fixture_base.stdout.strip() == fixture_candidate.stdout.strip() == FIXTURES_TREE
+        )
+        relation_ok, why = identity_oracle(
+            base=base, parents=candidate_boundary.parents, changed=changed,
+            base_register=closure.base_register,
+            candidate_register=closure.candidate_register,
+            base_contract_equal=base_contract_equal,
+            candidate_contract_equal=candidate_contract_equal,
+            protected_bytes_equal=protected_bytes_equal,
+        )
+        physical_ok, physical_detail = physical_checkout_identity(observed, candidate, ambient)
+    except (OSError, UnicodeDecodeError, ValueError, Rig, subprocess.SubprocessError) as error:
+        return False, f"strict canonical product identity rejected: {error}"
     checkout_ok = head.stdout.strip() == candidate and physical_ok
     return relation_ok and checkout_ok, json.dumps({
         "relation": json.loads(why),
@@ -742,7 +1154,14 @@ def product_identity(
         "common_dir": str(observed.common_dir),
         "work_tree": str(observed.work_tree),
         "git_environment": "CLOSED_ALLOWLIST_PRIVATE_DARWIN_TEMP_NO_AMBIENT_GIT_LOADER_OR_TOOLCHAIN",
-        "topology": "LITERAL_RAW_COMMIT_PARENT_HEADERS",
+        "topology": "CANONICAL_LITERAL_COMMIT_HEADERS_CLOSED_GRAPH_CROSSCHECK",
+        "object_closure": {
+            "isolation": "STRICT_REACHABLE_PACK_WITH_NO_REPLACE_PINNED_GIT",
+            "objects": closure.object_count,
+            "commits": closure.commit_count,
+            "trees": closure.tree_count,
+        },
+        "register_identity": "ONE_LITERAL_100644_BLOB_ENTRY_EXACT_PRE_POST_BYTES",
         "cleanliness": "PHYSICAL_WORKTREE_VS_CANDIDATE_TREE_WITHOUT_INDEX",
     }, sort_keys=True)
 
@@ -751,8 +1170,11 @@ def fixture_git(
     work_tree: Path,
     *args: str,
     input_text: str | None = None,
+    input_bytes: bytes | None = None,
     allow_replacements: bool = False,
-) -> subprocess.CompletedProcess[str]:
+) -> subprocess.CompletedProcess:
+    if input_text is not None and input_bytes is not None:
+        raise Rig("actual-Git fixture accepts only one input representation")
     fixture_runtime = work_tree.parent / "fixture-git-runtime"
     fixture_runtime.mkdir(mode=0o700, exist_ok=True)
     fixture_runtime.chmod(0o700)
@@ -777,8 +1199,8 @@ def fixture_git(
             "-c", "user.email=h037@example.invalid",
             *args,
         ],
-        input=input_text,
-        text=True,
+        input=input_text if input_bytes is None else input_bytes,
+        text=input_bytes is None,
         capture_output=True,
         cwd=work_tree,
         env=environment,
@@ -794,11 +1216,165 @@ def fixture_git_value(work_tree: Path, *args: str, input_text: str | None = None
     return result.stdout.strip()
 
 
+def literal_object(work_tree: Path, object_type: str, raw: bytes) -> str:
+    result = fixture_git(
+        work_tree, "hash-object", "--literally", "-w", "-t", object_type, "--stdin",
+        input_bytes=raw,
+    )
+    if result.returncode:
+        stderr = result.stderr.decode(errors="replace")
+        raise Rig(f"literal {object_type} fixture write failed: {stderr.strip()}")
+    try:
+        object_id = result.stdout.decode("ascii").strip()
+    except UnicodeDecodeError as error:
+        raise Rig("literal object fixture returned non-ASCII identity") from error
+    if re.fullmatch(r"[0-9a-f]{40}", object_id) is None:
+        raise Rig("literal object fixture returned malformed identity")
+    return object_id
+
+
 def commit_tree(work_tree: Path, tree: str, parents: list[str], message: str) -> str:
     arguments = ["commit-tree", tree]
     for parent in parents:
         arguments.extend(["-p", parent])
     return fixture_git_value(work_tree, *arguments, input_text=message + "\n")
+
+
+def commit_fixture_bytes(
+    tree: str,
+    parents: list[str],
+    *,
+    extension_headers: bytes = b"",
+    author: bool = True,
+    committer: bool = True,
+    duplicate_tree: bool = False,
+    duplicate_author: bool = False,
+    late_parent: str | None = None,
+    message: bytes = b"H037 literal commit fixture\n",
+) -> bytes:
+    lines = [f"tree {tree}\n".encode("ascii")]
+    if duplicate_tree:
+        lines.append(f"tree {tree}\n".encode("ascii"))
+    lines.extend(f"parent {parent}\n".encode("ascii") for parent in parents)
+    identity = b"H037 actual-Git control <h037@example.invalid> 1700000000 +0000\n"
+    if author:
+        lines.append(b"author " + identity)
+    if duplicate_author:
+        lines.append(b"author " + identity)
+    if committer:
+        lines.append(b"committer " + identity)
+    if extension_headers:
+        lines.append(extension_headers)
+    if late_parent is not None:
+        lines.append(f"parent {late_parent}\n".encode("ascii"))
+    lines.append(b"\n")
+    lines.append(message)
+    return b"".join(lines)
+
+
+def literal_commit_is_canonical(binding: GitBinding, object_id: str) -> bool:
+    try:
+        strict_commit_record(binding, object_id)
+        return True
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def literal_tree_is_canonical(binding: GitBinding, object_id: str) -> bool:
+    try:
+        object_type = identity_git(binding, "cat-file", "-t", object_id)
+        raw = identity_git(binding, "cat-file", "tree", object_id, text=False)
+        if object_type.returncode or object_type.stdout != "tree\n" or raw.returncode:
+            return False
+        entries = parse_canonical_tree(raw.stdout)
+        for entry in entries:
+            target = identity_git(binding, "cat-file", "-t", entry.object_id)
+            if entry.mode == "160000" and target.returncode:
+                continue
+            if (
+                target.returncode
+                or target.stdout.strip() != TREE_OBJECT_TYPES[entry.mode]
+                or target.stderr
+            ):
+                return False
+        return True
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def literal_commit_tree_is_canonical(binding: GitBinding, object_id: str) -> bool:
+    try:
+        record = strict_commit_record(binding, object_id)
+        return literal_tree_is_canonical(binding, record.tree)
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def read_literal_tree(binding: GitBinding, object_id: str) -> list[TreeEntry]:
+    result = identity_git(binding, "cat-file", "tree", object_id, text=False)
+    if result.returncode:
+        raise Rig(f"cannot read literal tree object {object_id}")
+    return parse_canonical_tree(result.stdout)
+
+
+def literal_register_from_git(
+    binding: GitBinding,
+    root_tree: str,
+    expected: bytes,
+) -> bool:
+    try:
+        current = root_tree
+        for position, component in enumerate(PRODUCT_PATH.encode("utf-8").split(b"/")):
+            entries = read_literal_tree(binding, current)
+            matches = [entry for entry in entries if entry.name == component]
+            if len(matches) != 1:
+                return False
+            entry = matches[0]
+            target_type = identity_git(binding, "cat-file", "-t", entry.object_id)
+            if target_type.returncode or target_type.stderr:
+                return False
+            if position < len(PRODUCT_PATH.split("/")) - 1:
+                if entry.mode != "40000" or target_type.stdout != "tree\n":
+                    return False
+                current = entry.object_id
+                continue
+            if entry.mode != "100644" or target_type.stdout != "blob\n":
+                return False
+            blob = identity_git(binding, "cat-file", "blob", entry.object_id, text=False)
+            return blob.returncode == 0 and blob.stderr == b"" and blob.stdout == expected
+        return False
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def mutate_register_tree(
+    work_tree: Path,
+    binding: GitBinding,
+    root_tree: str,
+    mutate,
+) -> str:
+    components = PRODUCT_PATH.encode("utf-8").split(b"/")
+
+    def descend(tree_id: str, position: int) -> str:
+        entries = read_literal_tree(binding, tree_id)
+        matches = [index for index, entry in enumerate(entries)
+                   if entry.name == components[position]]
+        if len(matches) != 1:
+            raise Rig("register fixture source path cardinality")
+        index = matches[0]
+        if position == len(components) - 1:
+            replacement = mutate(list(entries), index)
+        else:
+            child = entries[index]
+            if child.mode != "40000":
+                raise Rig("register fixture source intermediate mode")
+            replacement = list(entries)
+            replacement[index] = TreeEntry(
+                "40000", child.name, descend(child.object_id, position + 1),
+            )
+        return literal_object(work_tree, "tree", tree_bytes(replacement))
+
+    return descend(root_tree, 0)
 
 
 def actual_git_identity_controls() -> tuple[bool, str]:
@@ -849,11 +1425,86 @@ def actual_git_identity_controls() -> tuple[bool, str]:
         fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", product)
         binding = canonical_git_binding(repo)
 
-        merge_parents = raw_commit_parents(binding, contract_merge)
-        product_parents = raw_commit_parents(binding, product)
+        merge_parents = strict_commit_record(binding, contract_merge).parents
+        product_parents = strict_commit_record(binding, product).parents
         positive, positive_detail = product_identity(
             contract_merge, product, binding=binding,
         )
+
+        signed_extensions = (
+            b"encoding UTF-8\n"
+            b"gpgsig -----BEGIN PGP SIGNATURE-----\n"
+            b" Version: H037 canonical-object positive\n"
+            b" \n"
+            b" aGVsbG8=\n"
+            b" -----END PGP SIGNATURE-----\n"
+        )
+        signed_merge = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                pre_tree, [origin_base, contract_candidate],
+                extension_headers=signed_extensions,
+                message=b"signed publisher contract merge\n",
+            ),
+        )
+        signed_product = commit_tree(
+            repo, post_tree, [signed_merge], "exact product after signed publisher merge",
+        )
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", signed_product)
+        signed_positive, signed_positive_detail = product_identity(
+            signed_merge, signed_product, binding=binding,
+        )
+        signed_record = strict_commit_record(binding, signed_merge)
+
+        late_parent = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                post_tree, [], late_parent=contract_merge,
+                message=b"late parent after committer\n",
+            ),
+        )
+        late_parent_fsck = fixture_git(
+            repo, "fsck", "--strict", "--no-reflogs", "--no-dangling", late_parent,
+        )
+        late_after_signature = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                post_tree, [], extension_headers=(
+                    b"gpgsig -----BEGIN PGP SIGNATURE-----\n"
+                    b" aGVsbG8=\n"
+                    b" -----END PGP SIGNATURE-----\n"
+                ), late_parent=contract_merge,
+                message=b"late parent after signature\n",
+            ),
+        )
+        late_signature_fsck = fixture_git(
+            repo, "fsck", "--strict", "--no-reflogs", "--no-dangling", late_after_signature,
+        )
+        malformed_commits = {
+            "late_parent_after_committer": late_parent,
+            "late_parent_after_signature": late_after_signature,
+            "missing_author": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], author=False,
+                ),
+            ),
+            "missing_committer": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], committer=False,
+                ),
+            ),
+            "duplicate_tree": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], duplicate_tree=True,
+                ),
+            ),
+            "duplicate_author": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], duplicate_author=True,
+                ),
+            ),
+        }
+        malformed_commit_rejections = {
+            name: not literal_commit_is_canonical(binding, object_id)
+            for name, object_id in malformed_commits.items()
+        }
 
         stack = commit_tree(repo, post_tree, [product], "genuine stacked product")
         replacement_target = commit_tree(
@@ -995,6 +1646,93 @@ def actual_git_identity_controls() -> tuple[bool, str]:
             contract_merge, extra_parent, binding=binding,
         )
 
+        register_blob = fixture_git_value(repo, "rev-parse", f"{contract_merge}:{PRODUCT_PATH}")
+        bad_trees = {
+            "unsorted": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"z-last", register_blob),
+                TreeEntry("100644", b"a-first", register_blob),
+            ])),
+            "duplicate": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"duplicate", register_blob),
+                TreeEntry("100644", b"duplicate", register_blob),
+            ])),
+            "bad_mode": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100600", b"bad-mode", register_blob),
+            ])),
+            "bad_name": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"bad/name", register_blob),
+            ])),
+            "missing_entry_object": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"missing", "0" * 40),
+            ])),
+        }
+        bad_tree_rejections = {
+            name: not literal_tree_is_canonical(binding, object_id)
+            for name, object_id in bad_trees.items()
+        }
+        legitimate_gitlink_tree = literal_object(repo, "tree", tree_bytes([
+            TreeEntry("160000", b"legitimate-submodule", "f" * 40),
+        ]))
+        legitimate_gitlink_tree_positive = literal_tree_is_canonical(
+            binding, legitimate_gitlink_tree,
+        )
+        missing_tree_commit = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                "0" * 40, [contract_merge], message=b"missing commit tree\n",
+            ),
+        )
+        missing_tree_rejected = not literal_commit_tree_is_canonical(
+            binding, missing_tree_commit,
+        )
+
+        def register_variant(mode: str | None = None, object_id: str | None = None,
+                             *, remove: bool = False, duplicate: bool = False):
+            def mutate(entries: list[TreeEntry], index: int) -> list[TreeEntry]:
+                if remove:
+                    return entries[:index] + entries[index + 1:]
+                source = entries[index]
+                replacement = TreeEntry(
+                    source.mode if mode is None else mode,
+                    source.name,
+                    source.object_id if object_id is None else object_id,
+                )
+                entries[index] = replacement
+                if duplicate:
+                    entries.insert(index + 1, replacement)
+                return entries
+            return mutate
+
+        register_tree_variants = {
+            "executable_100755": mutate_register_tree(
+                repo, binding, post_tree, register_variant("100755"),
+            ),
+            "symlink_120000": mutate_register_tree(
+                repo, binding, post_tree, register_variant("120000"),
+            ),
+            "gitlink_160000": mutate_register_tree(
+                repo, binding, post_tree, register_variant("160000", contract_merge),
+            ),
+            "tree_40000": mutate_register_tree(
+                repo, binding, post_tree, register_variant("40000", pre_tree),
+            ),
+            "missing": mutate_register_tree(
+                repo, binding, post_tree, register_variant(remove=True),
+            ),
+            "duplicate": mutate_register_tree(
+                repo, binding, post_tree, register_variant(duplicate=True),
+            ),
+            "invalid_mode": mutate_register_tree(
+                repo, binding, post_tree, register_variant("100600"),
+            ),
+            "invalid_type": mutate_register_tree(
+                repo, binding, post_tree, register_variant("100644", pre_tree),
+            ),
+        }
+        register_tree_rejections = {
+            name: not literal_register_from_git(binding, root, post)
+            for name, root in register_tree_variants.items()
+        }
+
         expected_lie = f"{stack} {contract_merge}"
         closed_environment = git_identity_environment(temp)
         expected_environment_keys = {
@@ -1006,6 +1744,37 @@ def actual_git_identity_controls() -> tuple[bool, str]:
             "publisher_shaped_two_parent_base": merge_parents == [origin_base, contract_candidate],
             "exact_direct_product_positive": (
                 product_parents == [contract_merge] and positive
+            ),
+            "signed_encoding_publisher_merge_positive": (
+                signed_record.parents == [origin_base, contract_candidate]
+                and signed_record.encoding == "UTF-8"
+                and signed_record.signed_headers == ["gpgsig"]
+                and signed_positive
+            ),
+            "late_parent_after_committer_is_fsck_blind_but_parser_rejects": (
+                late_parent_fsck.returncode == 0
+                and malformed_commit_rejections["late_parent_after_committer"]
+            ),
+            "late_parent_after_signature_is_fsck_blind_but_parser_rejects": (
+                late_signature_fsck.returncode == 0
+                and malformed_commit_rejections["late_parent_after_signature"]
+            ),
+            "missing_duplicate_identity_and_tree_headers_reject": all(
+                malformed_commit_rejections[name]
+                for name in (
+                    "missing_author", "missing_committer", "duplicate_tree", "duplicate_author",
+                )
+            ),
+            "unsorted_duplicate_bad_mode_bad_name_missing_tree_entry_reject": (
+                all(bad_tree_rejections.values()) and missing_tree_rejected
+                and legitimate_gitlink_tree_positive
+            ),
+            "literal_register_pre_post_positive": (
+                literal_register_from_git(binding, pre_tree, pre)
+                and literal_register_from_git(binding, post_tree, post)
+            ),
+            "literal_register_mode_type_cardinality_mutants_reject": all(
+                register_tree_rejections.values()
             ),
             "replacement_mapping_connected": (
                 replacement_probe.returncode == 0
@@ -1059,6 +1828,22 @@ def actual_git_identity_controls() -> tuple[bool, str]:
         return all(controls.values()), json.dumps({
             "controls": controls,
             "positive": json.loads(positive_detail),
+            "signed_positive": json.loads(signed_positive_detail),
+            "malformed_commit_rejections": malformed_commit_rejections,
+            "bad_tree_rejections": bad_tree_rejections,
+            "missing_tree_rejected": missing_tree_rejected,
+            "legitimate_gitlink_tree_positive": legitimate_gitlink_tree_positive,
+            "register_tree_rejections": register_tree_rejections,
+            "late_parent_fsck": {
+                "returncode": late_parent_fsck.returncode,
+                "stdout": late_parent_fsck.stdout,
+                "stderr": late_parent_fsck.stderr,
+            },
+            "late_signature_fsck": {
+                "returncode": late_signature_fsck.returncode,
+                "stdout": late_signature_fsck.stdout,
+                "stderr": late_signature_fsck.stderr,
+            },
             "replacement": json.loads(replacement_detail),
             "redirect": json.loads(redirect_detail),
             "crafted_index": json.loads(crafted_index_detail),
@@ -1232,12 +2017,21 @@ def frozen_contract_checks() -> None:
         LABEL, REASON,
         "verify/bin/h-037-exit --product <base-sha> <candidate-sha>",
         "controller/verify/register.json",
+        "H037-RV-02 closes the raw object-identity boundary",
+        "H037-RV-03 binds the product path from raw trees",
+        "fresh ref-free SHA-1 quarantine",
+        "exactly `100644 blob`",
     )
     check(all(term in owner for term in required_owner_terms),
           "F_OWNER_WORKFLOW_H037_BP_AND_SERIAL_CONTRACT")
-    check(decision.count("H-037 exact verify-suite register rebind") == 1,
+    check(
+        decision.count("H-037 exact verify-suite register rebind") == 1
+        and decision.count("H037-RV-02/RV-03 canonical object and literal register-tree identity") == 1,
           "F_DECISION_LOG_H037_SINGLE_ENTRY")
-    check(drift.count("## 2026-08-25 — H-037 exact verify-suite register rebind") == 1,
+    check(
+        drift.count("## 2026-08-25 — H-037 exact verify-suite register rebind") == 1
+        and drift.count("### H037-RV-02 — canonical reachable object closure") == 1
+        and drift.count("### H037-RV-03 — literal register-tree identity") == 1,
           "F_DRIFT_H037_SINGLE_ENTRY")
     exact_transition_selftests()
 

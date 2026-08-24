@@ -3082,3 +3082,44 @@ inert fixture cannot earn rejection credit. These controls are folded into
 the existing identity assertion: the sole preproduct result remains 35 PASS / 1 authorized FAIL,
 and explicit exact product mode remains 38/0. The five-file TEST_AUTHOR scope, one-file product,
 publisher, H-034/H-035 pins, BP01–BP14 and H037 → H034 → H036 order are unchanged.
+
+### H037-RV-02 — canonical reachable object closure
+
+Raw-object falsification found an adjacent identity boundary beyond RV-01: Git topology alone can
+accept noncanonical commit headers, and checking an ambient object database lets unrelated or
+replacement-influenced state contaminate product evidence. The refrozen gate parses every reachable
+commit as bytes: exactly one tree header, one contiguous parent block before exactly one valid
+author and committer, followed only by legitimate encoding/signature/mergetag headers and their
+continuations. Literal parent blocks must exactly equal the pinned closed/no-replace Git graph.
+
+The source exports the exact duplicate-free lowercase OID set from closed
+`rev-list --objects --no-object-names BASE CANDIDATE`. Those literal OIDs are sent to
+`pack-objects` without revision interpretation, reuse or a delta window. A new ref-free SHA-1
+quarantine must accept that self-contained pack under strict index validation with filemode/name/
+path/null-OID warnings promoted to errors. Only that quarantine receives strict fsck. Its
+batch-all object set must equal the exported set exactly before every reachable commit/tree is raw-
+parsed, each commit tree is required present, and each tree entry is required sorted, uniquely and
+safely named and canonically moded. Non-gitlink targets must be present and mode/type matched; an
+absent external submodule commit is legitimate, while a locally present gitlink must be a commit.
+
+Connected actual-Git objects created by `hash-object --literally` prove rejection of late parents
+after committer and signature even where fsck returns success, missing author/committer, duplicate
+tree/author, unsorted and duplicate trees, bad modes/names, missing trees and missing entry targets.
+The ordinary two-parent publisher merge remains positive, and a signed/UTF-8-encoding two-parent
+publisher merge followed by an exact direct product is a separate positive, preventing a blanket
+signature, encoding or gitlink rejection.
+
+### H037-RV-03 — literal register-tree identity
+
+Revision/path shorthand did not by itself freeze the raw tree representation of the one product
+file. The refreeze now walks the base and candidate root trees by the literal byte components
+`controller`, `verify`, `register.json`. Each parent component must occur exactly once as mode
+`40000` and actual type `tree`; the leaf must occur exactly once as mode `100644` and actual type
+`blob`. Its bytes and SHA-256 must equal the exact frozen preproduct/postproduct register identities.
+
+Connected literal-tree mutants prove rejection of a `100755` executable leaf, `120000` symlink,
+`160000` gitlink, `40000` tree, missing or duplicate entry, invalid mode, and a nominal `100644`
+entry pointing to a tree. RV-02/RV-03 change only the five TEST_AUTHOR files and remain folded into
+the existing direct-product assertion. The exact preproduct result remains 35/1, postproduct no-arg
+36/0, and explicit product 38/0; product scope, publisher, H-034/H-035 bytes/dependencies,
+BP01–BP14 and the H037 → H034 → H036 order remain unchanged.
