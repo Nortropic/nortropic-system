@@ -5,7 +5,7 @@ Verifieringsomfång: fullverifierad — 27 påståenden mot HEAD (2135d0e) plus 
 
 Nortropic är ett system av Claude Code-agenter, skills och workflows som planerar, bygger, granskar och lanserar konverterande webbplatser för svenska egenföretagare och lokala småföretag — hantverkare, frisörer, hunddagis, blomsterhandlare... (kalibrering per kund via briefens §7 Kalibreringsprofil; scope-gränserna i [docs/06-scope.md](docs/06-scope.md)). Det är byggt för en operatör som kör en sajt i taget: människan fattar besluten vid de hårda stoppen, agenterna gör arbetet däremellan. Kvaliteten mäts med en versionerad eval-rubrik, och systemet förbättrar sig självt via en steward som föreslår — och som sedan v15 dessutom självapplicerar en strikt avgränsad ändringsklass under konstitutionen ([docs/07-konstitution.md](docs/07-konstitution.md)), grindat av kill-switchen `AUTOPILOT` (default `off`); allt annat kräver mänskligt godkännande.
 
-Det här repot är systemets källa till sanning: i drift är repo-roten operatörens `~/.claude`, och `.gitignore` är en vitlista som spårar enbart systemfilerna.
+Det här repot är systemets källa till sanning: fabriken är REPO-NATIV (S0/R1 2026-08-24) — roten upplöses mekaniskt (`git rev-parse --show-toplevel`) och identitetsverifieras (origin `Nortropic/nortropic-system` + ankarfilerna docs/07 och AUTOPILOT) innan något konsumeras; ingen hemkatalog hårdkodas. Muterbar körtidsstat bor i `~/.nortropic/factory/`. `.gitignore` är en vitlista som spårar enbart systemfilerna.
 
 ## Flödet
 
