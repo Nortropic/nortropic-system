@@ -1254,6 +1254,48 @@ def gate_pause(sequence):
 if mode == 'fork_descendant':
     marker=out.parent/'late-descendant-residue'
     subprocess.Popen([sys.executable,'-c','import pathlib,sys,time; time.sleep(.5); p=pathlib.Path(sys.argv[1]); p.parent.mkdir(parents=True,exist_ok=True); p.write_text("late")',str(marker)])
+if mode == 'managed_first':
+    managed_root=pathlib.Path(os.environ['H032_MANAGED_ROOT']).resolve()
+    managed_workspace=pathlib.Path.cwd().resolve()
+    managed_execution=self_path.parent.parent.resolve()
+    managed_current={managed_workspace,self_path.parent.resolve(),out.parent.resolve()}
+    managed_log=managed_workspace/'r128-managed-late.log'
+    first=os.fork()
+    if first == 0:
+        second=os.fork()
+        if second == 0:
+            os.setsid()
+            devnull=os.open(os.devnull,os.O_RDWR)
+            for stream in (0,1,2): os.dup2(devnull,stream)
+            if devnull>2: os.close(devnull)
+            seen=set(); deadline=time.monotonic()+10
+            def attempt(label,target):
+                key=(label,str(target))
+                if key in seen: return
+                try: target.parent.mkdir(parents=True,exist_ok=True); target.open('a').write('X')
+                except Exception: verdict='DENIED'
+                else: verdict='WRITTEN'
+                managed_log.open('a').write(label+'\\t'+str(target)+'\\t'+verdict+'\\n')
+                seen.add(key)
+            while time.monotonic()<deadline:
+                attempt('ATTEMPT',managed_root/'r128-p0-cross')
+                for scan_root,label,name in (
+                        (managed_root/'isolated-provider-scratch','WORKSPACE','r128-p0-cross'),
+                        (managed_execution,'SNAPSHOT','provider'),
+                        (managed_execution,'RESULT','result.json')):
+                    try: children=list(scan_root.iterdir())
+                    except OSError: children=[]
+                    for child in children:
+                        if child.resolve() not in managed_current and (
+                                label=='WORKSPACE'
+                                or label=='SNAPSHOT' and child.name.startswith('nortropic-provider-')
+                                or label=='RESULT' and child.name.startswith('nortropic-result-')):
+                            attempt(label,child/name)
+                time.sleep(.02)
+            managed_log.open('a').write('STATE\\tDONE\\tOK\\n')
+            os._exit(0)
+        os._exit(0)
+    os.waitpid(first,0)
 if mode in {'same_group_closed_stdio','same_group_closed_stdio_nonzero','same_group_closed_stdio_signal'}:
     # R116/R126 terminal-path quiescence: a descendant in the SAME
     # process group (no setsid), with CLOSED stdio so no inherited pipe keeps the
@@ -2315,6 +2357,7 @@ def run_codex(sink, canonical, invocation, run, role):
     launch_environment_mode: list[str | None] = [None]
     launch_environment_additions: list[dict[str, str]] = [{}]
     launch_environment_inputs: dict[str, dict[str, str]] = {}
+    managed_launch_observations: list[dict[str, str]] = []
     def fixture_provider_environment(mode: str, incoming: dict[str,str]) -> dict[str,str]:
         env={key:value for key,value in incoming.items()
              if not key.startswith("GIT_")
@@ -2483,6 +2526,15 @@ def run_codex(sink, canonical, invocation, run, role):
             observation=observe_launcher_argv(flat,child_env)
             output=observation.get("output")
             if isinstance(output,str): launch_observations[output]=observation
+            if "NORTROPIC_ATTEMPT_ROOT" in child_env:
+                provider_argv=[str(item) for item in flat[9:]]
+                managed_launch_observations.append({
+                    "attempt":child_env["NORTROPIC_ATTEMPT_ROOT"],
+                    "staging":child_env.get("NORTROPIC_STAGING_ROOT",""),
+                    "sink":child_env.get("NORTROPIC_RESULT_SINK",""),
+                    "trust":child_env.get("NORTROPIC_TRUST_ROOT",""),
+                    "workspace":str(flat[5]), "snapshot":provider_argv[0],
+                })
         process = system_popen(argv, *args, **kwargs)
         if "-o" in flat:
             provider_process_starts[0] += 1
@@ -2779,7 +2831,7 @@ def run_codex(sink, canonical, invocation, run, role):
                         dev, ino = current.st_dev, current.st_ino
                         if stat.S_ISREG(current.st_mode) and not path.is_symlink():
                             digest = sha256(path)
-                    except Exception:
+                    except _product_module.Reject:
                         pass
                     # Identical path/dev/inode/digest values are intentionally
                     # appended again after an intervening absence.  Cardinality
@@ -7130,6 +7182,88 @@ def run_codex(sink, canonical, invocation, run, role):
         "exact",remove_current_effect=True)
     r74_decoy_after_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r73_split_variant=r72_environment_variants["exact"]
+    managed_seams=all(callable(getattr(physical_module,name,None)) for name in ("isolated_provider_scratch","run_codex","quarantine_provider_scratch"))
+    # Two consecutive real managed run_codex calls bind the actual product
+    # snapshot/result roots and launcher handoff.  P0 leaves a setsid writer
+    # confined by its launch profile; P1 is created only after P0 returns.
+    managed_root=work/"physical-managed-provider-root"; managed_root.mkdir(mode=0o700)
+    managed_head=git_repository_head(physical_repo)
+    managed_execution=managed_root/"nortropic-controller-execution"
+    managed_launch_before=len(managed_launch_observations)
+    managed_cases=[]; managed_captures=[]; managed_scratches=[]
+    managed_original_now=physical_module.now_id
+    managed_ids=iter(("20980101-000001","20980101-000002"))
+    physical_module.now_id=lambda:next(managed_ids)
+    try:
+        for ordinal,mode in enumerate(("managed_first","valid") if managed_seams else ()):
+            scratch=physical_module.isolated_provider_scratch(
+                physical_repo,managed_root,"h-032",f"R128-P{ordinal}",managed_head)
+            managed_scratches.append(scratch)
+            runs_before=(set(physical_runs_root.iterdir())
+                         if physical_runs_root.is_dir() else set())
+            journal_before=(physical_events.read_bytes()
+                            if physical_events.is_file() else b"")
+            if capture.exists(): capture.unlink()
+            launch_mode[0]=mode
+            launch_extra.update({"H032_CAPTURE_COMPLETE_ENV":"1",
+                                 "H032_MANAGED_ROOT":str(managed_root)})
+            launch_expected_context[0]={"repo":physical_repo,"worktree":scratch,
+                "journal_common":git_repository_common_dir(physical_repo),
+                "runs_before":frozenset(runs_before),"journal_before":journal_before}
+            try:
+                result=physical_module.run_codex(
+                    physical_repo,scratch,"TEST_AUTHOR",f"H032-MANAGED-P{ordinal}",
+                    managed_root)
+                managed_cases.append(isinstance(result,dict)
+                    and isinstance(result.get("report"),dict)
+                    and result["report"].get("outcome")=="READY")
+            except Exception:
+                managed_cases.append(False)
+            finally:
+                launch_expected_context[0]=None; launch_mode[0]="valid"
+                launch_extra.pop("H032_CAPTURE_COMPLETE_ENV",None)
+                launch_extra.pop("H032_MANAGED_ROOT",None)
+            managed_captures.append(safe_capture())
+            physical_module.quarantine_provider_scratch(
+                physical_repo,scratch,"h-032",f"R128-P{ordinal}",managed_head)
+    finally:
+        physical_module.now_id=managed_original_now; launch_mode[0]="valid"
+    managed_launches=managed_launch_observations[managed_launch_before:]
+    managed_log=(managed_scratches[0]/"r128-managed-late.log" if managed_seams else managed_root/"absent")
+    managed_deadline=time.monotonic()+12
+    while time.monotonic()<managed_deadline:
+        try:
+            managed_log_raw=managed_log.read_text(encoding="utf-8")
+        except (OSError,UnicodeError):
+            managed_log_raw=""
+        if "STATE\tDONE\tOK\n" in managed_log_raw: break
+        time.sleep(.02)
+    managed_rows=set(managed_log_raw.splitlines())
+    managed_real_ok=(
+        managed_cases==[True,True] and len(managed_launches)==2
+        and len(set(map(str,managed_scratches)))==2
+        and all(launch["attempt"]==str(managed_root)
+            and launch["workspace"]==str(scratch)
+            and launch["snapshot"]==capture_row.get("argv0")
+            and launch["sink"]==capture_row.get("output_path")
+            and launch["trust"]==str(Path(launch["snapshot"]).parent)
+            and launch["staging"]==str(Path(launch["sink"]).parent)
+            and Path(launch["snapshot"]).parent.parent==managed_execution
+            and Path(launch["sink"]).parent.parent==managed_execution
+            and not Path(launch["snapshot"]).parent.exists()
+            and not Path(launch["sink"]).parent.exists()
+            and all(name not in (capture_row.get("complete_environment") or {})
+                    for name in ("NORTROPIC_ATTEMPT_ROOT","NORTROPIC_STAGING_ROOT",
+                                 "NORTROPIC_RESULT_SINK"))
+            for launch,capture_row,scratch in zip(
+                managed_launches,managed_captures,managed_scratches))
+        and f"ATTEMPT\t{managed_root/'r128-p0-cross'}\tDENIED" in managed_rows
+        and f"WORKSPACE\t{managed_scratches[1]/'r128-p0-cross'}\tDENIED" in managed_rows
+        and f"SNAPSHOT\t{managed_launches[1]['snapshot']}\tDENIED" in managed_rows
+        and f"RESULT\t{managed_launches[1]['sink']}\tDENIED" in managed_rows
+        and "STATE\tDONE\tOK" in managed_rows
+        and not (managed_root/"r128-p0-cross").exists()
+        and not (managed_scratches[1]/"r128-p0-cross").exists())
 
     physical_output = Path(physical_capture.get("output_path", "/private/tmp/h032-missing-physical-output"))
     physical_canonical = (physical_new_runs[0]/"result.json" if len(physical_new_runs)==1
@@ -11296,10 +11430,22 @@ class CraftedConcretePath(type(Path())):
     _rg("reset", "-q", "--", "controller/result/forensic.bin")
     _r122_binary_path.unlink()
     _c1 = _t1 = _c2 = _t2 = _bc = _bt = None
-    _ch1 = _ch2 = _bch = []
+    _r128_c2 = _r128_t2 = _r128_overflow_c = _r128_overflow_t = None
+    _ch1 = _ch2 = _bch = _r128_ch2 = _r128_overflow_ch = []
     try:
         _c1, _t1, _ch1 = r122_run(r122_delta(r122_ok_patch))
         _c2, _t2, _ch2 = r122_run(r122_delta(r122_ok_patch))   # independent re-derivation
+        _r128_patch2 = r122_newfile(
+            "controller/result/remediation.py", b"R128_REMEDIATED = True\n")
+        _r128_delta2 = r122_delta(_r128_patch2, base=_c1)
+        _r128_c2, _r128_t2, _r128_ch2 = r122_run(_r128_delta2, base=_c1)
+        _r128_overflow_patch = r122_newfiles([
+            (f"controller/result/overflow-{ordinal:02d}.py", b"X = 1\n")
+            for ordinal in range(R122_MAXF)
+        ])
+        _r128_overflow_delta = r122_delta(_r128_overflow_patch, base=_c1)
+        (_r128_overflow_c, _r128_overflow_t,
+         _r128_overflow_ch) = r122_run(_r128_overflow_delta, base=_c1)
         _bc, _bt, _bch = r122_run(r122_delta(r122_binary_patch))
         _bblob = r122_closed_git(
             r122_base_git, "show", f"{_bc}:controller/result/forensic.bin"
@@ -11307,6 +11453,8 @@ class CraftedConcretePath(type(Path())):
         r122_positive = (
             _c1 == _c2 and _t1 == _t2
             and _ch1 == _ch2 == ["controller/result/materialize.py"]
+            and _r128_ch2 == ["controller/result/remediation.py"]
+            and len(_r128_overflow_ch) == R122_MAXF
             and _bch == ["controller/result/forensic.bin"]
             and _bblob == _r122_binary_bytes
             and r122_closed_git(r122_base_git, "cat-file", "-e", f"{_c1}^{{commit}}",
@@ -15088,6 +15236,551 @@ def materialize(a, b, c, d, e, f, g, h):
             values.add(token.decode())
         return frozenset(values)
 
+    def r128_git(cwd, *args, check=True):
+        env = {
+            "PATH": "/usr/bin:/bin", "HOME": str(r122), "TMPDIR": str(r122),
+            "LANG": "C", "LC_ALL": "C", "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_TERMINAL_PROMPT": "0",
+            "GIT_NO_REPLACE_OBJECTS": "1", "GIT_ALTERNATE_OBJECT_DIRECTORIES": "",
+        }
+        proc = subprocess.run(["/usr/bin/git", *args], cwd=str(cwd), env=env,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if check and proc.returncode != 0:
+            raise MatReject(f"R128 git {args[0]} failed rc={proc.returncode}")
+        return proc
+
+    def r128_lexical_identity(path, kind=None):
+        """Return a no-follow identity for one exact absolute spelling.
+
+        realpath/Path.resolve are deliberately not an identity oracle here: a
+        symlink alias must not become equivalent to the controller-owned path.
+        Every existing component is lstat-bound before the leaf is credited.
+        """
+        try:
+            raw = os.fspath(path)
+            if isinstance(raw, bytes):
+                raw = os.fsdecode(raw)
+            if (not isinstance(raw, str) or not os.path.isabs(raw)
+                    or os.path.normpath(raw) != raw):
+                return None
+            current = Path(raw).anchor
+            identities = []
+            for part in Path(raw).parts[1:]:
+                current = os.path.join(current, part)
+                opened = os.lstat(current)
+                if stat.S_ISLNK(opened.st_mode):
+                    return None
+                identities.append((opened.st_dev, opened.st_ino, opened.st_mode,
+                                   opened.st_uid, opened.st_gid, opened.st_nlink))
+            if not identities:
+                return None
+            mode = identities[-1][2]
+            if ((kind == "dir" and not stat.S_ISDIR(mode))
+                    or (kind == "file" and not stat.S_ISREG(mode))):
+                return None
+            return (raw, tuple(identities))
+        except (OSError, TypeError, ValueError, UnicodeError):
+            return None
+
+    def r128_exact_regular(path, expected=None):
+        identity = r128_lexical_identity(path, "file")
+        if identity is None:
+            return None
+        opened = identity[1][-1]
+        try:
+            raw = Path(identity[0]).read_bytes()
+        except OSError:
+            return None
+        if (opened[3] != os.getuid() or opened[5] != 1
+                or opened[2] & 0o022
+                or (expected is not None and raw != expected)):
+            return None
+        return (identity, raw)
+
+    def r128_strict_tree(root, allow_root=True):
+        root_identity = r128_lexical_identity(root, "dir")
+        if root_identity is None:
+            return None
+        rows = []
+        try:
+            stack = [(Path(root_identity[0]), "")]
+            while stack:
+                parent, prefix = stack.pop()
+                for entry in sorted(os.scandir(parent), key=lambda item: item.name):
+                    rel = entry.name if not prefix else prefix + "/" + entry.name
+                    opened = entry.stat(follow_symlinks=False)
+                    if (opened.st_uid != os.getuid() or opened.st_mode & 0o022
+                            or stat.S_ISLNK(opened.st_mode)):
+                        return None
+                    if stat.S_ISDIR(opened.st_mode):
+                        rows.append((rel, "D", opened.st_dev, opened.st_ino,
+                                     opened.st_mode, opened.st_nlink))
+                        stack.append((Path(entry.path), rel))
+                    elif stat.S_ISREG(opened.st_mode) and opened.st_nlink == 1:
+                        rows.append((rel, "F", opened.st_dev, opened.st_ino,
+                                     opened.st_mode, opened.st_nlink,
+                                     hashlib.sha256(Path(entry.path).read_bytes()).hexdigest()))
+                    else:
+                        return None
+        except OSError:
+            return None
+        return (root_identity, tuple(rows)) if allow_root else tuple(rows)
+
+    def r128_worktree_rows(git_dir):
+        proc = r122_closed_git(
+            git_dir, "worktree", "list", "--porcelain", check=False)
+        if proc.returncode != 0:
+            return None
+        rows = []
+        try:
+            decoded = proc.stdout.decode("utf-8", "strict")
+        except UnicodeDecodeError:
+            return None
+        for block in decoded.strip().split("\n\n"):
+            if not block:
+                continue
+            row = {}
+            for line in block.splitlines():
+                key, _, value = line.partition(" ")
+                if key in row:
+                    return None
+                row[key] = value
+            keys = set(row)
+            if keys not in ({"worktree", "HEAD", "branch"},
+                            {"worktree", "HEAD", "detached"}):
+                return None
+            if (not os.path.isabs(row["worktree"])
+                    or os.path.normpath(row["worktree"]) != row["worktree"]
+                    or re.fullmatch(r"[0-9a-f]{40}", row["HEAD"]) is None
+                    or ("detached" in row and row["detached"] != "")):
+                return None
+            rows.append(row)
+        return tuple(rows)
+
+    def r128_object_inodes(git_dir):
+        root = Path(git_dir) / "objects"
+        rows = set()
+        try:
+            root_opened = root.lstat()
+            if (root.is_symlink() or not stat.S_ISDIR(root_opened.st_mode)
+                    or root_opened.st_uid != os.getuid()
+                    or root_opened.st_mode & 0o022):
+                return None
+            for path in root.rglob("*"):
+                opened = path.lstat()
+                if path.is_symlink() or opened.st_uid != os.getuid():
+                    return None
+                if stat.S_ISREG(opened.st_mode):
+                    if opened.st_nlink != 1 or opened.st_mode & 0o022:
+                        return None
+                    rows.add((opened.st_dev, opened.st_ino))
+                elif (not stat.S_ISDIR(opened.st_mode)
+                      or opened.st_mode & 0o022):
+                    return None
+        except OSError:
+            return None
+        return frozenset(rows) if rows else None
+
+    def r128_control_path_leak(git_dir, needle):
+        root = Path(git_dir)
+        try:
+            root_opened = root.lstat()
+            if (root.is_symlink() or not stat.S_ISDIR(root_opened.st_mode)
+                    or root_opened.st_uid != os.getuid()
+                    or root_opened.st_mode & 0o022):
+                return True
+            for path in root.rglob("*"):
+                if path == root / "objects" or root / "objects" in path.parents:
+                    continue
+                opened = path.lstat()
+                if (path.is_symlink() or opened.st_uid != os.getuid()
+                        or opened.st_mode & 0o022
+                        or (not stat.S_ISDIR(opened.st_mode)
+                            and not stat.S_ISREG(opened.st_mode))):
+                    return True
+                if (stat.S_ISREG(opened.st_mode)
+                        and (opened.st_nlink != 1 or opened.st_size > 1024 * 1024
+                             or needle in path.read_bytes())):
+                    return True
+        except OSError:
+            return True
+        return False
+
+    def r128_checkout_matches_tree(root, authority_git, expected):
+        root = Path(root)
+        actual = r128_git(root, "ls-files", "-s", "-z", check=False)
+        wanted = r122_closed_git(
+            authority_git, "ls-tree", "-r", "-z", "--full-tree",
+            expected, check=False)
+        if actual.returncode != 0 or wanted.returncode != 0:
+            return False
+        def parse(rows, index):
+            result = []
+            try:
+                for raw in rows.split(b"\0"):
+                    if not raw:
+                        continue
+                    meta, path = raw.split(b"\t", 1)
+                    fields = meta.split()
+                    mode, oid = fields[0], fields[1 if index else 2]
+                    if index and fields[2] != b"0":
+                        return None
+                    result.append((mode, oid, path))
+            except (IndexError, ValueError):
+                return None
+            return tuple(result)
+        indexed = parse(actual.stdout, True); tree = parse(wanted.stdout, False)
+        if indexed is None or indexed != tree:
+            return False
+        for mode, oid, raw_path in indexed:
+            try:
+                rel = raw_path.decode("utf-8", "strict")
+                cursor = root
+                for component in Path(rel).parts[:-1]:
+                    cursor /= component; parent_opened = cursor.lstat()
+                    if (not stat.S_ISDIR(parent_opened.st_mode)
+                            or stat.S_ISLNK(parent_opened.st_mode)
+                            or parent_opened.st_uid != os.getuid()):
+                        return False
+                leaf = root / rel; opened = leaf.lstat()
+                if opened.st_uid != os.getuid():
+                    return False
+                if mode in {b"100644", b"100755"}:
+                    if (not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                            or stat.S_IMODE(opened.st_mode)
+                                != (0o755 if mode == b"100755" else 0o644)):
+                        return False
+                    payload = leaf.read_bytes()
+                elif mode == b"120000":
+                    if not stat.S_ISLNK(opened.st_mode):
+                        return False
+                    payload = os.fsencode(os.readlink(leaf))
+                elif mode == b"160000":
+                    if (not stat.S_ISDIR(opened.st_mode)
+                            or any(os.scandir(leaf))):
+                        return False
+                    continue
+                else:
+                    return False
+                git_oid = hashlib.sha1(
+                    b"blob " + str(len(payload)).encode() + b"\0" + payload
+                ).hexdigest().encode()
+                if git_oid != oid:
+                    return False
+            except (OSError, UnicodeError):
+                return False
+        return True
+
+    def r128_isolated_provider(path, expected, authority_git, attempt_root,
+                               forbidden_inodes):
+        raw_path = os.fspath(path); raw_attempt = os.fspath(attempt_root)
+        path_identity = r128_lexical_identity(raw_path, "dir")
+        attempt_identity = r128_lexical_identity(raw_attempt, "dir")
+        if path_identity is None or attempt_identity is None:
+            return None
+        path = Path(path_identity[0]); attempt = Path(attempt_identity[0])
+        opened = path_identity[1][-1]; attempt_opened = attempt_identity[1][-1]
+        dotgit = path / ".git"
+        git_identity = r128_lexical_identity(dotgit, "dir")
+        head_file = r128_exact_regular(dotgit / "HEAD")
+        config_file = r128_exact_regular(dotgit / "config")
+        index_file = r128_exact_regular(dotgit / "index")
+        if (git_identity is None or head_file is None or config_file is None
+                or index_file is None):
+            return None
+        git_opened = git_identity[1][-1]
+        if (path.parent.parent != attempt
+                or opened.st_uid != os.getuid()
+                or git_opened.st_uid != os.getuid()
+                or attempt_opened.st_uid != os.getuid()
+                or stat.S_IMODE(attempt_opened.st_mode) != 0o700
+                or stat.S_IMODE(opened.st_mode) != 0o700
+                or stat.S_IMODE(git_opened.st_mode) != 0o700):
+            return None
+        common = r128_git(path, "rev-parse", "--git-common-dir", check=False)
+        top = r128_git(path, "rev-parse", "--show-toplevel", check=False)
+        head = r128_git(path, "rev-parse", "HEAD", check=False)
+        symbolic = r128_git(path, "symbolic-ref", "-q", "HEAD", check=False)
+        refs = r128_git(path, "for-each-ref", "--format=%(refname)", check=False)
+        remotes = r128_git(path, "remote", check=False)
+        status = r128_git(path, "status", "--porcelain=v1", "--ignored=matching",
+                          "--untracked-files=all", check=False)
+        fsck = r128_git(path, "fsck", "--strict", "--no-reflogs", check=False)
+        all_objects = r128_git(
+            path, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)",
+            check=False)
+        expected_objects = r122_closed_git(
+            authority_git, "rev-list", "--objects", "--no-object-names",
+            expected, check=False)
+        if any(proc.returncode != 0 for proc in (
+                common, top, head, refs, remotes, status, fsck,
+                all_objects, expected_objects)):
+            return None
+        object_ids = set(expected_objects.stdout.splitlines())
+        all_ids = set(all_objects.stdout.splitlines())
+        if (not object_ids or len(object_ids) != len(expected_objects.stdout.splitlines())
+                or any(re.fullmatch(rb"[0-9a-f]{40}", oid) is None
+                       for oid in object_ids | all_ids)):
+            return None
+        config = r128_git(path, "config", "--local", "--null", "--list",
+                          check=False).stdout.decode().split("\0")
+        config_map = dict(record.split("\n", 1) for record in config if "\n" in record)
+        forbidden_config = (set(config_map) - {
+            "core.repositoryformatversion", "core.filemode", "core.bare",
+            "core.logallrefupdates", "core.ignorecase", "core.precomposeunicode",
+            "core.hookspath", "core.fsmonitor", "core.untrackedcache"})
+        forbidden_metadata = [
+            dotgit / "objects/info/alternates",
+            dotgit / "objects/info/http-alternates", dotgit / "info/grafts",
+            dotgit / "shallow",
+        ]
+        logs = dotgit / "logs"
+        raw_refs = dotgit / "refs"
+        raw_ref_tree = r128_strict_tree(raw_refs)
+        inodes = r128_object_inodes(dotgit)
+        auth_rows = r128_worktree_rows(authority_git)
+        return inodes if (
+            common.stdout == b".git\n" and top.stdout.decode().strip() == str(path)
+            and head.stdout.decode().strip() == expected and symbolic.returncode != 0
+            and not refs.stdout.strip() and not remotes.stdout.strip()
+            and not status.stdout.strip() and object_ids == all_ids
+            and not forbidden_config
+            and config_map.get("core.logallrefupdates") == "false"
+            and config_map.get("core.hookspath") == "/dev/null"
+            and config_map.get("core.fsmonitor") == "false"
+            and config_map.get("core.untrackedcache") == "false"
+            and not any(os.path.lexists(item) for item in forbidden_metadata)
+            and not any(dotgit.glob("objects/pack/*.promisor"))
+            and not os.path.lexists(dotgit / "FETCH_HEAD")
+            and not (logs.exists() and any(logs.rglob("*")))
+            and not os.path.lexists(dotgit / "packed-refs")
+            and raw_ref_tree is not None
+            and not any(row[1] != "D" for row in raw_ref_tree[1])
+            and not os.path.lexists(raw_refs / "replace")
+            and not r128_control_path_leak(
+                dotgit, os.fsencode(str(Path(authority_git).parent)))
+            and r128_checkout_matches_tree(path, authority_git, expected)
+            and inodes is not None and not (set(inodes) & set(forbidden_inodes))
+            and auth_rows is not None
+            and all(row.get("worktree") != str(path)
+                    for row in auth_rows)) else None
+
+    def r128_authority_worktree(path, expected, expected_tree, authority_git,
+                                protected_root, branch_name):
+        path_identity = r128_lexical_identity(path, "dir")
+        protected_identity = r128_lexical_identity(protected_root, "dir")
+        authority_identity = r128_lexical_identity(authority_git, "dir")
+        if (path_identity is None or protected_identity is None
+                or authority_identity is None):
+            return False
+        path = Path(path_identity[0]); protected = Path(protected_identity[0])
+        authority_git = Path(authority_identity[0])
+        marker = r128_exact_regular(path / ".git")
+        if marker is None or not marker[1].startswith(b"gitdir: "):
+            return False
+        try:
+            admin_text = marker[1][len(b"gitdir: "):].rstrip(b"\n").decode("utf-8")
+        except UnicodeDecodeError:
+            return False
+        admin_identity = r128_lexical_identity(admin_text, "dir")
+        if (admin_identity is None
+                or Path(admin_text).parent != authority_git / "worktrees"):
+            return False
+        admin = Path(admin_text)
+        admin_head = r128_exact_regular(admin / "HEAD")
+        admin_gitdir = r128_exact_regular(
+            admin / "gitdir", os.fsencode(str(path / ".git")) + b"\n")
+        admin_common = r128_exact_regular(admin / "commondir", b"../..\n")
+        admin_index = r128_exact_regular(admin / "index")
+        if any(item is None for item in (
+                admin_head, admin_gitdir, admin_common, admin_index)):
+            return False
+        common = r128_git(path, "rev-parse", "--git-common-dir", check=False)
+        absolute = r128_git(path, "rev-parse", "--absolute-git-dir", check=False)
+        head = r128_git(path, "rev-parse", "HEAD", check=False)
+        tree = r128_git(path, "rev-parse", "HEAD^{tree}", check=False)
+        symbolic = r128_git(path, "symbolic-ref", "-q", "HEAD", check=False)
+        status = r128_git(path, "status", "--porcelain=v1", "--ignored=matching",
+                          "--untracked-files=all", check=False)
+        cached = r128_git(path, "diff-index", "--quiet", expected, "--", check=False)
+        files = r128_git(path, "diff-files", "--quiet", check=False)
+        rows = r128_worktree_rows(authority_git)
+        matches = [] if rows is None else [row for row in rows
+                    if row.get("worktree") == str(path)]
+        branch_ref = None if branch_name is None else f"refs/heads/{branch_name}"
+        return (path.parent == protected and common.returncode == 0
+                and absolute.returncode == 0
+                and common.stdout.decode().strip() == str(authority_git)
+                and absolute.stdout.decode().strip() == str(admin)
+                and head.returncode == tree.returncode == status.returncode == 0
+                and head.stdout.decode().strip() == expected
+                and tree.stdout.decode().strip() == expected_tree
+                and not status.stdout.strip() and cached.returncode == files.returncode == 0
+                and r128_checkout_matches_tree(path, authority_git, expected)
+                and len(matches) == 1 and matches[0].get("HEAD") == expected
+                and ((branch_ref is None and symbolic.returncode != 0
+                      and admin_head[1] == expected.encode() + b"\n"
+                      and "detached" in matches[0] and "branch" not in matches[0])
+                     or (branch_ref is not None and symbolic.returncode == 0
+                         and admin_head[1] == (b"ref: " + branch_ref.encode() + b"\n")
+                         and symbolic.stdout.decode().strip() == branch_ref
+                         and matches[0].get("branch") == branch_ref)))
+
+    def r128_refs(git_dir):
+        proc = r122_closed_git(
+            git_dir, "for-each-ref", "--format=%(refname)%00%(objectname)",
+            check=False)
+        return (tuple(sorted(proc.stdout.splitlines()))
+                if proc.returncode == 0 else None)
+
+    def r128_cumulative_scope(git_dir, base, candidate):
+        names = r122_closed_git(
+            git_dir, "diff", "--name-only", "--no-renames", "-z",
+            base, candidate, "--", check=False)
+        nums = r122_closed_git(
+            git_dir, "diff", "--numstat", "--no-renames", "-z",
+            base, candidate, "--", check=False)
+        paths = [value.decode() for value in names.stdout.split(b"\0") if value]
+        additions = 0
+        try:
+            for row in (value for value in nums.stdout.split(b"\0") if value):
+                added, _deleted, _path = row.split(b"\t", 2)
+                additions += int(added)
+        except (ValueError, UnicodeDecodeError):
+            return False
+        return (names.returncode == nums.returncode == 0
+                and len(paths) <= R122_MAXF and additions <= R122_MAXL
+                and all(any(fnmatch.fnmatchcase(path, pattern)
+                            for pattern in R122_ALLOWED) for path in paths))
+
+    def r128_regular_bytes(path, limit=8 * 1024 * 1024):
+        path = Path(path)
+        try:
+            opened = path.lstat()
+            raw = path.read_bytes()
+        except OSError:
+            return None
+        return (raw if not path.is_symlink() and stat.S_ISREG(opened.st_mode)
+                and opened.st_uid == os.getuid() and opened.st_nlink == 1
+                and not opened.st_mode & 0o022 and len(raw) <= limit else None)
+
+    def r128_control_state(git_dir, protected_root, branch_wt, branch_name):
+        git_id = r128_lexical_identity(git_dir, "dir")
+        branch_id = r128_lexical_identity(branch_wt, "dir")
+        protected_id = r128_lexical_identity(protected_root, "dir")
+        worktrees_id = r128_lexical_identity(Path(git_dir) / "worktrees", "dir")
+        if any(item is None for item in (
+                git_id, branch_id, protected_id, worktrees_id)):
+            return None
+        git_dir = Path(git_id[0]); branch_wt = Path(branch_id[0])
+        protected = Path(protected_id[0])
+        admin_proc = r128_git(branch_wt, "rev-parse", "--absolute-git-dir",
+                              check=False)
+        paths = {}
+        try:
+            admin = Path(admin_proc.stdout.decode().strip())
+            admin_id = r128_lexical_identity(admin, "dir")
+            if admin_id is None or admin.parent != git_dir / "worktrees":
+                return None
+            admin_rel = str(admin.relative_to(git_dir))
+            protected_rel = str(protected.relative_to(git_dir))
+            paths = {
+                "branch_ref": git_dir / "refs/heads" / branch_name,
+                "branch_log": git_dir / "logs/refs/heads" / branch_name,
+                "head_log": admin / "logs/HEAD", "orig": admin / "ORIG_HEAD",
+                "index": admin / "index", "admin": admin,
+            }
+        except (OSError, ValueError):
+            return None
+        raw = {name: r128_regular_bytes(path) for name, path in paths.items()
+               if name not in {"admin", "index"}}
+        if (admin_proc.returncode != 0
+                or any(value is None for name, value in raw.items()
+                       if name != "orig")):
+            return None
+        return {"snapshot": r123_git_control_snapshot(git_dir),
+                "admin_rel": admin_rel, "protected_rel": protected_rel,
+                "paths": paths, "raw": raw,
+                "ids": (git_id, protected_id, branch_id, worktrees_id, admin_id),
+                "rows": r128_worktree_rows(git_dir),
+                "admin_tree": r128_strict_tree(admin)}
+
+    def r128_ff_reflog(before, after, transitions):
+        if not isinstance(before, bytes) or not isinstance(after, bytes) \
+                or not after.startswith(before):
+            return False
+        lines = after[len(before):].splitlines(keepends=True)
+        if len(lines) != len(transitions):
+            return False
+        pattern = re.compile(
+            rb"^([0-9a-f]{40}) ([0-9a-f]{40}) [^\t\r\n]+\t"
+            rb"merge ([0-9a-f]{40}): Fast-forward\n$")
+        for line, (old, new) in zip(lines, transitions):
+            match = pattern.fullmatch(line)
+            if match is None or match.groups() != (
+                    old.encode(), new.encode(), new.encode()):
+                return False
+        return True
+
+    def r128_final_control(before, git_dir, protected_root, branch_wt,
+                           branch_name, c0, c1, c2, c2_tree, gates):
+        after = r128_control_state(git_dir, protected_root, branch_wt, branch_name)
+        if (before is None or after is None
+                or before["admin_rel"] != after["admin_rel"]
+                or before["ids"] != after["ids"]):
+            return False
+        protected_rel = before["protected_rel"]
+        mutable = {
+            f"refs/heads/{branch_name}", f"logs/refs/heads/{branch_name}",
+            f"{before['admin_rel']}/logs/HEAD",
+            f"{before['admin_rel']}/ORIG_HEAD", f"{before['admin_rel']}/index",
+        }
+        def immutable(state):
+            return tuple(row for row in state["snapshot"]
+                if row[0] not in mutable
+                and row[0] != protected_rel
+                and not row[0].startswith(protected_rel + "/"))
+        def admin_immutable(state):
+            return tuple(row for row in state["admin_tree"][1]
+                if row[0] not in {"index", "ORIG_HEAD", "logs/HEAD"})
+        transitions = ((c0, c2),) if c1 is None else ((c0, c1), (c1, c2))
+        paths = after["paths"]
+        protected = Path(os.fspath(protected_root)); branch_wt = Path(os.fspath(branch_wt))
+        try:
+            entries = sorted(protected.iterdir())
+        except OSError:
+            return False
+        dry = r128_git(branch_wt, "clean", "-nffdx", "--", ".", check=False)
+        write_tree = r128_git(branch_wt, "write-tree", check=False)
+        symbolic = r128_git(branch_wt, "symbolic-ref", "-q", "HEAD", check=False)
+        return (
+            immutable(before) == immutable(after)
+            and admin_immutable(before) == admin_immutable(after)
+            and before["protected_rel"] == after["protected_rel"]
+            and entries == [branch_wt] and branch_wt.parent == protected
+            and all(not os.path.lexists(path) and not os.path.lexists(admin)
+                    for path, _head, admin in gates[1:])
+            and after["raw"]["branch_ref"] == c2.encode() + b"\n"
+            and after["raw"]["orig"] == (c0 if c1 is None else c1).encode() + b"\n"
+            and r128_ff_reflog(before["raw"]["branch_log"],
+                              after["raw"]["branch_log"], transitions)
+            and r128_ff_reflog(before["raw"]["head_log"],
+                              after["raw"]["head_log"], transitions)
+            and write_tree.returncode == symbolic.returncode == dry.returncode == 0
+            and write_tree.stdout.decode().strip() == c2_tree
+            and symbolic.stdout.decode().strip() == f"refs/heads/{branch_name}"
+            and not dry.stdout.strip()
+            and r128_authority_worktree(
+                branch_wt, c2, c2_tree, git_dir, protected, branch_name)
+            and before["rows"] is not None and after["rows"] is not None
+            and len(before["rows"]) == len(after["rows"])
+            and all((old == new) or (
+                    old.get("worktree") == new.get("worktree") == str(branch_wt)
+                    and old.get("HEAD") == c0 and new.get("HEAD") == c2
+                    and old.get("branch") == new.get("branch")
+                        == f"refs/heads/{branch_name}")
+                for old, new in zip(before["rows"], after["rows"])))
+
     if r122_product_kernel.exists():
         try:
             # One immutable-at-capture observer spans every product call.  Audit
@@ -15095,7 +15788,8 @@ def materialize(a, b, c, d, e, f, g, h):
             # copy only exact built-in values at hook time.  pathlib's two
             # admitted stat predicates are wrapped before the product module is
             # imported; source validation forbids transferring either method.
-            _r123_observer = {"events": None, "invalid": False}
+            _r123_observer = {"events": None, "invalid": False, "forbid": (),
+                              "processes": [], "control_roots": (), "control": []}
             _r123_path_type = type(Path("."))
             def _r123_freeze_audit(value):
                 if type(value) in {str, bytes, int, float, bool, type(None)}:
@@ -15115,8 +15809,50 @@ def materialize(a, b, c, d, e, f, g, h):
                 "os.replace", "os.link", "os.symlink", "os.listdir",
                 "os.scandir", "subprocess.Popen", "os.system",
                 "os.posix_spawn", "os.fork", "os.forkpty", "pty.spawn"}
+            def _r128_forbidden_effect(value):
+                if isinstance(value, (str, bytes)):
+                    decoded = os.path.abspath(os.fsdecode(value))
+                    for root in _r123_observer["forbid"]:
+                        if os.path.commonpath((decoded, root)) == root:
+                            return True
+                        physical = _r128_physical_path(decoded)
+                        root_physical = _r128_physical_path(root)
+                        if (physical is None or root_physical is None
+                                or os.path.commonpath((physical, root_physical))
+                                    == root_physical):
+                            return True
+                        try:
+                            opened = _r128_os_original["stat"](decoded)
+                        except OSError:
+                            continue
+                        if (opened.st_dev, opened.st_ino) in _r128_tree_inodes(root):
+                            return True
+                    return False
+                if isinstance(value, (tuple, list)):
+                    return any(_r128_forbidden_effect(item) for item in value)
+                if isinstance(value, dict):
+                    return any(_r128_forbidden_effect(item)
+                               for pair in value.items() for item in pair)
+                return False
             def _r123_product_audit(event, args):
                 target = _r123_observer["events"]
+                mutating = event in {"os.mkdir", "os.remove", "os.rmdir", "os.rename",
+                                     "os.replace", "os.link", "os.symlink"}
+                if event == "open" and len(args) > 2 and isinstance(args[2], int):
+                    mutating = bool(args[2] & (os.O_WRONLY | os.O_RDWR | os.O_CREAT
+                                               | os.O_TRUNC | os.O_APPEND))
+                if mutating and _r123_observer["control_roots"]:
+                    try:
+                        frozen = _r123_freeze_audit(args)
+                        paths = [os.path.abspath(os.fsdecode(item)) for item in args[:2]
+                                 if isinstance(item, (str, bytes))]
+                        if any(os.path.commonpath((path, root)) == root
+                               for path in paths
+                               for root in _r123_observer["control_roots"]):
+                            _r123_observer["control"].append(
+                                (event, frozen, target is _flow_audit_events))
+                    except (TypeError, ValueError, OSError):
+                        _r123_observer["invalid"] = True
                 if target is None:
                     return
                 if (event in _r123_selected_events
@@ -15124,31 +15860,283 @@ def materialize(a, b, c, d, e, f, g, h):
                         or event.startswith("os.spawn")):
                     try:
                         target.append((event, _r123_freeze_audit(args)))
+                        if _r128_forbidden_effect(args):
+                            raise RuntimeError("post-provider scratch effect")
                     except (TypeError, ValueError, OverflowError):
                         _r123_observer["invalid"] = True
             sys.addaudithook(_r123_product_audit)
-            _r123_path_exists = Path.exists
-            _r123_path_is_dir = Path.is_dir
-            def _r123_recording_path_exists(path_self):
-                target = _r123_observer["events"]
-                if target is not None:
+            _r128_os_names = ("stat", "lstat", "access", "readlink", "listdir",
+                              "scandir", "open", "fstat", "read", "pread",
+                              "fdopen", "fchdir")
+            _r128_os_original = {name: getattr(os, name) for name in _r128_os_names}
+            _r128_path_names = tuple(dict.fromkeys((
+                "stat", "lstat", "exists", "resolve", "iterdir", "glob", "rglob",
+                "read_bytes", "read_text", "open", "readlink", "samefile",
+                "owner", "group", "walk",
+                *(name for name in dir(Path) if name.startswith("is_")))))
+            _r128_path_original = {name: getattr(Path, name) for name in _r128_path_names
+                                   if hasattr(Path, name)}
+            _r128_builtin_open, _r128_io_open = builtins.open, io.open
+            _r128_fcntl, _r128_popen = fcntl.fcntl, subprocess.Popen
+
+            def _r128_physical_path(value):
+                try:
+                    pending = list(Path(os.path.abspath(os.fsdecode(value))).parts[1:])
+                    resolved = os.path.sep; links = 0
+                    while pending:
+                        part = pending.pop(0)
+                        candidate = os.path.join(resolved, part)
+                        try:
+                            opened = _r128_os_original["lstat"](candidate)
+                        except FileNotFoundError:
+                            return os.path.normpath(os.path.join(
+                                candidate, *pending))
+                        if stat.S_ISLNK(opened.st_mode):
+                            links += 1
+                            if links > 40:
+                                return None
+                            target = _r128_os_original["readlink"](candidate)
+                            target = (target if os.path.isabs(target)
+                                      else os.path.join(resolved, target))
+                            rebuilt = Path(os.path.normpath(target))
+                            pending = list(rebuilt.parts[1:]) + pending
+                            resolved = rebuilt.anchor
+                        else:
+                            resolved = candidate
+                    return os.path.normpath(resolved)
+                except (OSError, TypeError, ValueError, UnicodeError):
+                    return None
+
+            def _r128_tree_inodes(root):
+                rows = set(); stack = [os.path.abspath(os.fspath(root))]
+                try:
+                    while stack and len(rows) <= 10000:
+                        current = stack.pop()
+                        opened = _r128_os_original["lstat"](current)
+                        rows.add((opened.st_dev, opened.st_ino))
+                        if stat.S_ISDIR(opened.st_mode):
+                            stack.extend(entry.path for entry in
+                                         _r128_os_original["scandir"](current))
+                except (OSError, TypeError, ValueError):
+                    return frozenset()
+                return frozenset(rows) if len(rows) <= 10000 else frozenset()
+
+            def _r128_fd_path(fd):
+                if type(fd) is not int:
+                    return None
+                try:
+                    raw = _r128_fcntl(fd, fcntl.F_GETPATH, b"\0" * 1024)
+                    return os.path.abspath(os.fsdecode(raw.split(b"\0", 1)[0]))
+                except (AttributeError, OSError, ValueError):
                     try:
-                        target.append(("r123.path.exists", (
-                            os.path.realpath(os.fspath(path_self)),)))
-                    except (TypeError, ValueError, OSError):
-                        _r123_observer["invalid"] = True
-                return _r123_path_exists(path_self)
-            def _r123_recording_path_is_dir(path_self):
-                target = _r123_observer["events"]
-                if target is not None:
+                        return os.path.abspath(_r128_os_original["readlink"](
+                            f"/proc/self/fd/{fd}"))
+                    except OSError:
+                        return None
+
+            def _r128_guard(value, label):
+                if type(value) is int:
+                    path = _r128_fd_path(value)
+                elif isinstance(value, (str, bytes)):
+                    path = value
+                else:
                     try:
-                        target.append(("r123.path.is_dir", (
-                            os.path.realpath(os.fspath(path_self)),)))
-                    except (TypeError, ValueError, OSError):
-                        _r123_observer["invalid"] = True
-                return _r123_path_is_dir(path_self)
-            Path.exists = _r123_recording_path_exists
-            Path.is_dir = _r123_recording_path_is_dir
+                        path = os.fspath(value)
+                    except TypeError as exc:
+                        raise RuntimeError(
+                            f"unbound filesystem observation: {label}") from exc
+                if path is not None and _r128_forbidden_effect((path,)):
+                    target = _r123_observer["events"]
+                    if target is not None:
+                        target.append((f"r128.guard.{label}", (os.fsdecode(path),)))
+                    raise RuntimeError(f"post-provider scratch observation: {label}")
+
+            def _r128_os_wrapper(name, function):
+                def guarded(*args, **kwargs):
+                    _r128_guard(args[0] if args else ".", f"os.{name}")
+                    if kwargs.get("dir_fd") is not None:
+                        _r128_guard(kwargs["dir_fd"], f"os.{name}.dir_fd")
+                    return function(*args, **kwargs)
+                return guarded
+
+            def _r128_path_wrapper(name, function):
+                def guarded(path_self, *args, **kwargs):
+                    _r128_guard(path_self, f"Path.{name}")
+                    if name == "samefile" and args:
+                        _r128_guard(args[0], "Path.samefile.other")
+                    return function(path_self, *args, **kwargs)
+                return guarded
+
+            def _r128_open_wrapper(label, function):
+                def guarded(file, *args, **kwargs):
+                    _r128_guard(file, label)
+                    return function(file, *args, **kwargs)
+                return guarded
+
+            def _r128_fcntl_wrapper(fd, *args, **kwargs):
+                _r128_guard(fd, "fcntl.fcntl")
+                return _r128_fcntl(fd, *args, **kwargs)
+
+            def _r128_inherited_fd_paths(kwargs):
+                paths = []
+                pass_fds = kwargs.get("pass_fds", ())
+                try:
+                    candidates = set(pass_fds)
+                except TypeError:
+                    return None
+                if kwargs.get("close_fds", True) is False:
+                    try:
+                        directory = "/dev/fd" if os.path.isdir("/dev/fd") \
+                            else "/proc/self/fd"
+                        for entry in _r128_os_original["scandir"](directory):
+                            if entry.name.isdecimal():
+                                fd = int(entry.name)
+                                if fd > 2 and os.get_inheritable(fd):
+                                    candidates.add(fd)
+                    except (OSError, ValueError):
+                        return None
+                for name in ("stdin", "stdout", "stderr"):
+                    value = kwargs.get(name)
+                    if type(value) is int and value >= 0:
+                        candidates.add(value)
+                for fd in candidates:
+                    if type(fd) is not int or fd < 0:
+                        return None
+                    paths.append((fd, _r128_fd_path(fd)))
+                return tuple(sorted(paths))
+
+            def _r128_popen_wrapper(*args, **kwargs):
+                argv = args[0] if args else kwargs.get("args")
+                cwd = kwargs.get("cwd")
+                effective_env = kwargs.get("env")
+                if effective_env is None:
+                    effective_env = dict(os.environ)
+                inherited = _r128_inherited_fd_paths(kwargs)
+                capabilities = {
+                    "env": effective_env, "fds": inherited,
+                    "pass_fds": kwargs.get("pass_fds", ()),
+                    "close_fds": kwargs.get("close_fds", True),
+                    "stdin": kwargs.get("stdin"), "stdout": kwargs.get("stdout"),
+                    "stderr": kwargs.get("stderr"),
+                }
+                if inherited is None or _r128_forbidden_effect(
+                        (argv, cwd, effective_env,
+                         tuple(path for _fd, path in inherited))):
+                    raise RuntimeError("process receives quarantined scratch capability")
+                process = _r128_popen(*args, **kwargs)
+                _r123_observer["processes"].append(
+                    (process, _r123_freeze_audit(argv),
+                     _r123_freeze_audit(cwd),
+                     _r123_freeze_audit(capabilities)))
+                return process
+
+            for _name, _function in _r128_os_original.items():
+                setattr(os, _name, _r128_os_wrapper(_name, _function))
+            for _name, _function in _r128_path_original.items():
+                setattr(Path, _name, _r128_path_wrapper(_name, _function))
+            builtins.open = _r128_open_wrapper("builtins.open", _r128_builtin_open)
+            io.open = _r128_open_wrapper("io.open", _r128_io_open)
+            fcntl.fcntl = _r128_fcntl_wrapper
+            subprocess.Popen = _r128_popen_wrapper
+
+            def _r128_restore_observers():
+                for name, function in _r128_os_original.items():
+                    setattr(os, name, function)
+                for name, function in _r128_path_original.items():
+                    setattr(Path, name, function)
+                builtins.open = _r128_builtin_open; io.open = _r128_io_open
+                fcntl.fcntl = _r128_fcntl; subprocess.Popen = _r128_popen
+
+            def _r128_no_scratch_fds(scratch):
+                try:
+                    entries = tuple(_r128_os_original["scandir"]("/dev/fd"))
+                except OSError:
+                    entries = tuple(_r128_os_original["scandir"]("/proc/self/fd"))
+                return not any(entry.name.isdecimal()
+                    and _r128_forbidden_effect((_r128_fd_path(int(entry.name)),))
+                    for entry in entries)
+
+            def _r128_no_scratch_processes(scratch):
+                return all(process.poll() is not None
+                    or not _r128_forbidden_effect((argv, cwd, capabilities))
+                    for process, argv, cwd, capabilities
+                    in _r123_observer["processes"])
+
+            def _r128_quarantine_oracle_rig(scratch):
+                saved_forbid = _r123_observer["forbid"]
+                saved_events = _r123_observer["events"]
+                scratch = os.path.abspath(os.fspath(scratch))
+                fd = _r128_os_original["open"](scratch, os.O_RDONLY)
+                fd_reject = False
+                try:
+                    _r123_observer["forbid"] = (scratch,)
+                    fd_reject = not _r128_no_scratch_fds(scratch)
+                finally:
+                    os.close(fd); _r123_observer["forbid"] = ()
+                process = subprocess.Popen(["/bin/sleep", "10"], cwd=scratch,
+                                           stdout=subprocess.DEVNULL,
+                                           stderr=subprocess.DEVNULL)
+                authority = os.path.join(os.path.dirname(scratch),
+                                         "r128-controller-authority")
+                _r123_observer["forbid"] = (authority,)
+                own_process_positive = _r128_no_scratch_processes(authority)
+                process.terminate(); process.wait(timeout=5)
+                alias_root = Path(scratch).parent / "r128-quarantine-alias"
+                alias_file = Path(scratch).parent / "r128-quarantine-hardlink"
+                target_file = Path(scratch) / "r128-alias-target"
+                target_file.write_bytes(b"alias\n")
+                os.symlink(scratch, alias_root); os.link(target_file, alias_file)
+                _r123_observer["forbid"] = (scratch,)
+                metadata = []
+                for operation in (lambda: os.stat(scratch),
+                                  lambda: Path(scratch).lstat(),
+                                  lambda: Path(scratch).stat(),
+                                  lambda: Path(scratch).resolve()):
+                    try:
+                        operation(); metadata.append(False)
+                    except RuntimeError:
+                        metadata.append(True)
+                for operation in (lambda: Path(alias_root).resolve(),
+                                  lambda: Path(alias_file).lstat()):
+                    try:
+                        operation(); metadata.append(False)
+                    except RuntimeError:
+                        metadata.append(True)
+                fds_after = _r128_no_scratch_fds(scratch)
+                _r123_observer["forbid"] = ()
+                alias_root.unlink(); alias_file.unlink()
+                nonforbidden = Path(scratch).parent.stat().st_uid == os.getuid()
+                capability_results = []
+                capability_file = Path(scratch) / "r128-capability"
+                capability_file.write_bytes(b"capability\n")
+                authority_file = Path(authority); authority_file.write_bytes(b"authority\n")
+                inherited_fd = _r128_os_original["open"](authority_file, os.O_RDONLY)
+                os.set_inheritable(inherited_fd, True)
+                for kwargs in (
+                        {"env": dict(os.environ, R128_AUTHORITY=authority)},
+                        {"pass_fds": (inherited_fd,)},
+                        {"close_fds": False}):
+                    _r123_observer["forbid"] = ()
+                    child = subprocess.Popen(
+                        ["/bin/sleep", "10"], stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL, **kwargs)
+                    _r123_observer["forbid"] = (authority,)
+                    capability_results.append(
+                        not _r128_no_scratch_processes(authority))
+                    child.terminate(); child.wait(timeout=5)
+                own_fd = _r128_os_original["open"](capability_file, os.O_RDONLY)
+                neutral = subprocess.Popen(
+                    ["/bin/sleep", "10"], cwd=scratch, pass_fds=(own_fd,),
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    env={"PATH": "/usr/bin:/bin", "R128_SCRATCH": scratch})
+                neutral_positive = _r128_no_scratch_processes(authority)
+                neutral.terminate(); neutral.wait(timeout=5)
+                os.close(inherited_fd); os.close(own_fd); authority_file.unlink()
+                _r123_observer["forbid"] = saved_forbid
+                _r123_observer["events"] = saved_events
+                return (fd_reject and fds_after and own_process_positive
+                        and all(metadata) and all(capability_results)
+                        and neutral_positive and nonforbidden)
             def _r123_observed_materialize(function, values):
                 events = []
                 _r123_observer["events"] = events
@@ -15393,7 +16381,7 @@ def materialize(a, b, c, d, e, f, g, h):
             _flow_call_args = []
             _flow_call_results = []
             _flow_materializer_spans = []
-            _flow_return_mode = {"decoy": False}
+            _flow_return_mode = {"value": None}
             _pmat_signature = inspect.signature(_pmat)
             _pmat_parameters = tuple(_pmat_signature.parameters.values())
             _pmat_defaults = _pmat.__defaults__
@@ -15413,6 +16401,7 @@ def materialize(a, b, c, d, e, f, g, h):
                 # executes before/after, never concurrently with, the product
                 # callable; suppress only those two exact judge-owned reads.
                 observed_target = _r123_observer["events"]
+                _r123_observer["forbid"] = ()
                 _r123_observer["events"] = None
                 try:
                     bound_before = _pmat_still_bound()
@@ -15428,28 +16417,29 @@ def materialize(a, b, c, d, e, f, g, h):
                     raise AssertionError("unbounded materialize signature")
                 values = tuple(bound.arguments[parameter.name]
                                for parameter in _pmat_parameters)
+                if "trace" in _flow_context: _flow_context["trace"] += "M"
                 _flow_calls["n"] += 1
                 _flow_call_args.append(values)
+                _r123_observer["events"] = _flow_audit_events
                 event_start = len(_flow_audit_events)
                 try:
                     result = _pmat(*args, **kwargs)
                 finally:
                     _flow_materializer_spans.append(
                         (event_start, len(_flow_audit_events)))
-                _r123_observer["events"] = None
+                    _r123_observer["events"] = observed_target
                 try:
                     bound_after = _pmat_still_bound()
                 finally:
                     _r123_observer["events"] = observed_target
                 if not bound_after:
                     raise AssertionError("materialize callable changed during call")
-                if _flow_return_mode["decoy"]:
+                if _flow_return_mode["value"] == "decoy":
                     result = (r122_base_sha, result[1], result[2])
                 _flow_call_results.append(result)
                 return result
             _product_module.materialize = _recording_materialize
             sys.modules[_auto_name] = _auto
-            _flow_path_patched = False
             try:
                 # Execute the exact already-read controller bytes under the
                 # definition-time ticket.  Using compile+exec avoids crediting
@@ -15462,283 +16452,1198 @@ def materialize(a, b, c, d, e, f, g, h):
                     not _auto_import_events and _auto_import_rejection is None)
                 if getattr(_auto, "materialize", None) is not _recording_materialize:
                     raise AssertionError("builder_flow imported a different materialize capability")
-                _flow_root = r122 / "actual-builder-flow"
-                _flow_repo = r122 / "flow-authoritative"
-                _flow_git = r123_clone_authoritative(_flow_repo)
-                _flow_scratch = _flow_root / "scratch"
-                _flow_wt_root = _flow_root / "worktrees"
-                _flow_root.mkdir(); _flow_wt_root.mkdir()
-                subprocess.run(["/usr/bin/git", "clone", "-q", str(r122_base), str(_flow_scratch)],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-                _flow_inject = _flow_scratch / "controller/result/late-injection.py"
-                _flow_divergent = _flow_scratch / "controller/result/materialize.py"
-                # The actual caller's protected root is an exact controller-owned
-                # child of the authoritative Git control plane.  The same real
-                # launcher invocation below receives that parent as its disclosed
-                # NORTROPIC_TRUST_ROOT, causally connecting call arguments to OS
-                # denial instead of crediting a separate synthetic surface.
-                _flow_trust_parent = Path(_flow_git).resolve()
-                _flow_expected_protected = (
-                    _flow_trust_parent / "nortropic-candidate-materialization")
-                _flow_expected_protected.mkdir()
-                _flow_attack = _flow_expected_protected / "provider-marker"
-                _flow_attack_status = _flow_scratch / "r122-provider-attack-status"
-                _flow_staging = _flow_root / "provider-staging"; _flow_staging.mkdir()
-                _flow_sink = _flow_staging / "result.json"
-                _flow_sink.write_text("", encoding="utf-8"); _flow_sink.chmod(0o600)
-                _flow_envelope = _flow_root / "provider-envelope.json"
-                _flow_envelope.write_text('{"task_id":"h-032-r122"}\n', encoding="utf-8")
-                _flow_candidate = {"sha": None}
-                _flow_gate_calls = {"n": 0}
-                _flow_provider_processes = []
+                _flow_root = r122 / "actual-builder-flow"; _flow_root.mkdir(mode=0o700)
+                _flow_context = {}
+                _flow_audit_events = []
+                _launcher_text = launcher.read_text(encoding="utf-8")
 
-                class _R122Capture(Exception):
+                def _flow_source_closed(launcher_text, controller_text):
+                    launcher_need = (
+                        'ATTEMPT_ROOT_ENV = "NORTROPIC_ATTEMPT_ROOT"',
+                        'attempt == ws or attempt not in ws.parents',
+                        '(literal (param "ATTEMPT_ROOT"))',
+                        '(require-not (subpath (param "WORKSPACE")))',
+                        'attempt_root not in staging.parents', 'if not linked_live:',
+                        'git_objects = ws / ".nortropic-inga-live-objekt"')
+                    controller_need = (
+                        'attempt_root = provider_attempt_root(repo, wt, wt_root)',
+                        'execution_root = provider_execution_root(attempt_root)',
+                        'prefix="nortropic-provider-", dir=execution_root',
+                        'prefix="nortropic-result-", dir=execution_root',
+                        'env[ATTEMPT_ROOT_ENV] = str(attempt_root)',
+                        'UNTRUSTED_RESIDUE_NOT_READ')
+                    quarantine = (controller_text.split(
+                        "def quarantine_provider_scratch", 1)[1].split("\ndef ", 1)[0]
+                        if "def quarantine_provider_scratch" in controller_text else "")
+                    run_body = (controller_text.split("def run_codex(", 1)[1].split(
+                        "\ndef ", 1)[0] if "def run_codex(" in controller_text else "")
+                    return (all(x in launcher_text for x in launcher_need)
+                            and all(x in controller_text for x in controller_need)
+                            and not any(x in quarantine for x in (
+                                "sha(", ".exists(", "clean(", ".stat(", ".lstat(", "open("))
+                            and 0 <= run_body.find("provider_attempt_root(")
+                                < run_body.find("subprocess.Popen("))
+
+                def _r128_routing_topology(text):
+                    try:
+                        tree = ast.parse(text)
+                    except (SyntaxError, TypeError, ValueError):
+                        return False
+                    functions = (ast.FunctionDef, ast.AsyncFunctionDef)
+                    parent = {child: node for node in ast.walk(tree)
+                              for child in ast.iter_child_nodes(node)}
+                    defs = [node for node in ast.walk(tree) if isinstance(node, functions)]
+                    def unique(name):
+                        rows = [node for node in defs if node.name == name]
+                        return rows[0] if len(rows) == 1 else None
+                    def owner(node):
+                        node = parent.get(node)
+                        while node is not None and not isinstance(node, functions):
+                            node = parent.get(node)
+                        return node
+                    def calls(name, root=tree):
+                        return [node for node in ast.walk(root) if isinstance(node, ast.Call)
+                                and isinstance(node.func, ast.Name) and node.func.id == name]
+                    def argv(node):
+                        return None if node.keywords else [ast.unparse(x) for x in node.args]
+                    adapter, isolated, resolver, invoke, selftest = (
+                        unique(name) for name in ("_run_codex_agent", "isolated_role_run",
+                            "run_codex_resolving_architecture", "invoke", "selftest"))
+                    if any(node is None or node.decorator_list for node in
+                           (adapter, isolated, resolver, invoke, selftest)):
+                        return False
+                    names = ("run_codex", "_run_codex_agent",
+                             "isolated_provider_scratch", "quarantine_provider_scratch")
+                    groups = [calls(name) for name in names]
+                    if any(len(group) != 1 for group in groups):
+                        return False
+                    direct, routed, scratch_call, quarantine = [group[0] for group in groups]
+                    expected = ((direct, adapter, ["repo", "wt", "role", "prompt", "wt_root"]),
+                        (routed, invoke, ["repo", "scratch", "invocation_role",
+                                         "invocation_prompt", "wt_root"]),
+                        (scratch_call, invoke, ["repo", "wt_root", "task_id",
+                                                "scratch_role", "current"]),
+                        (quarantine, invoke, ["repo", "scratch", "task_id",
+                                              "scratch_role", "current"]))
+                    admitted = {call.func for call, _scope, _args in expected}
+                    if (owner(invoke) is not isolated
+                            or any(owner(call) is not scope or argv(call) != values
+                                   for call, scope, values in expected)
+                            or any(node.id in names and (not isinstance(node.ctx, ast.Load)
+                                   or node not in admitted) for node in ast.walk(tree)
+                                   if isinstance(node, ast.Name))):
+                        return False
+                    scratch_assign = parent.get(scratch_call); routed_assign = parent.get(routed)
+                    quarantine_expr = parent.get(quarantine)
+                    scratch_stores = [node for node in ast.walk(invoke)
+                        if isinstance(node, ast.Name) and node.id == "scratch"
+                        and isinstance(node.ctx, ast.Store)]
+                    tries = [node for node in invoke.body if isinstance(node, ast.Try)]
+                    if (not isinstance(scratch_assign, ast.Assign)
+                            or scratch_stores != scratch_assign.targets
+                            or not isinstance(routed_assign, ast.Assign)
+                            or [getattr(x, "id", None) for x in routed_assign.targets] != ["result"]
+                            or not isinstance(quarantine_expr, ast.Expr)
+                            or len(tries) != 1 or invoke.body[-1] is not tries[0]
+                            or scratch_assign not in invoke.body
+                            or invoke.body.index(scratch_assign) + 1 != invoke.body.index(tries[0])):
+                        return False
+                    guarded = tries[0]
+                    if (guarded.handlers or guarded.orelse or guarded.body[:1] != [routed_assign]
+                            or len(guarded.body) != 2 or not isinstance(guarded.body[1], ast.Return)
+                            or ast.unparse(guarded.body[1].value) != "result"
+                            or guarded.finalbody != [quarantine_expr]):
+                        return False
+                    resolver_calls = [call for call in calls("isolated_role_run")
+                                      if owner(call) is resolver]
+                    snapshots = calls("_python_snapshot", selftest)
+                    runs = [call for call in calls("run", selftest) if call.args
+                            and isinstance(call.args[0], ast.List)]
+                    return (len(resolver.body) == len(resolver_calls) == 1
+                        and isinstance(resolver.body[0], ast.Return)
+                        and resolver.body[0].value is resolver_calls[0]
+                        and argv(resolver_calls[0]) == ["repo", "wt_root", "wt", "task_id",
+                            "branch(wt) or None", "role", "sha(wt)", "prompt", "stage", "context"]
+                        and len(snapshots) == len(runs) == 1
+                        and ast.unparse(snapshots[0]) == "_python_snapshot(audit_root)"
+                        and [ast.unparse(x) for x in runs[0].args[0].elts] ==
+                            ["str(python)", "'-I'", "'-S'",
+                             "str(checker_root / 'controller/result/routing_ast.py')", "str(audited)"]
+                        and [(x.arg, ast.unparse(x.value)) for x in runs[0].keywords]
+                            == [("check", "False")])
+
+                def _r128_helper_digest(text):
+                    try:
+                        tree = ast.parse(text)
+                    except (SyntaxError, TypeError, ValueError):
+                        return None
+                    values = [node.value for node in ast.walk(tree)
+                              if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                              and re.fullmatch(r"[0-9a-f]{64}", node.value)]
+                    if len(values) != 1:
+                        return None
+                    digest = values[0]
+                    canonical = ("import ast, hashlib, sys\n"
+                        "tree = ast.parse(open(sys.argv[1], encoding=\"utf-8\").read(), mode=\"exec\")\n"
+                        "actual = hashlib.sha256(ast.dump(tree, annotate_fields=True, include_attributes=False).encode(\"utf-8\")).hexdigest()\n"
+                        f"if actual != \"{digest}\": raise SystemExit(\"ROUTING_AST=FAIL\")\n"
+                        "print(\"ROUTING_AST=PASS\")\n")
+                    return digest if ast.dump(tree, include_attributes=False) == ast.dump(
+                        ast.parse(canonical), include_attributes=False) else None
+
+                def _r128_routing_probe(controller_text, helper_text, label):
+                    root = Path(_r125_tempfile.mkdtemp(prefix=f"r128-ast-{label}-", dir=_flow_root))
+                    try:
+                        candidate = root / "candidate.py"; helper = root / "routing_ast.py"
+                        judge = root / "digest.py"
+                        candidate.write_text(controller_text, encoding="utf-8")
+                        helper.write_text(helper_text, encoding="utf-8")
+                        judge.write_text("import ast,hashlib,sys\n"
+                            "assert sys.version_info[:3]==(3,12,13)\n"
+                            "t=ast.parse(open(sys.argv[1],encoding='utf-8').read(),mode='exec')\n"
+                            "print(hashlib.sha256(ast.dump(t,annotate_fields=True,include_attributes=False).encode('utf-8')).hexdigest())\n",
+                            encoding="utf-8")
+                        python, _snapshot_digest = _auto._python_snapshot(root)
+                        env = {"PATH": "/usr/bin:/bin", "HOME": "/var/empty",
+                               "LANG": "C", "LC_ALL": "C"}
+                        dig = subprocess.run([str(python), "-I", "-S", str(judge),
+                            str(candidate)], env=env, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+                        run = subprocess.run([str(python), "-I", "-S", str(helper),
+                            str(candidate)], env=env, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+                        value = dig.stdout.decode("ascii", "strict").strip()
+                        return (value if dig.returncode == 0 and re.fullmatch(
+                            r"[0-9a-f]{64}", value) else None,
+                            run.returncode, run.stdout.decode("utf-8", "strict").strip())
+                    except (OSError, UnicodeError, ValueError):
+                        return (None, -1, "")
+                    finally:
+                        shutil.rmtree(root, ignore_errors=True)
+
+                _routing_helper = source.parents[1] / "controller/result/routing_ast.py"
+                _routing_text = _routing_helper.read_text(encoding="utf-8")
+                _routing_probe = _r128_routing_probe(
+                    _r125_controller_text, _routing_text, "positive")
+                _auto.selftest()
+                def _r128_once(text, old, new):
+                    return text.replace(old, new, 1) if text.count(old) == 1 else ""
+                _route = "        try:\n            result = _run_codex_agent(\n"
+                _routing_mutants = (
+                    _r128_once(_r125_controller_text, _route,
+                        "        scratch = authority_wt\n" + _route),
+                    _r128_once(_r125_controller_text, "def _run_codex_agent(repo:",
+                        "@(lambda f: f)\ndef _run_codex_agent(repo:"),
+                    _r128_once(_r125_controller_text, _route,
+                        "        alias = _run_codex_agent\n        try:\n            result = alias(\n"),
+                    _r128_once(_r125_controller_text, _route,
+                        "        _run_codex_agent = run_codex\n" + _route),
+                    _r128_once(_r125_controller_text, _route,
+                        "        if False:\n            _run_codex_agent(repo, scratch, invocation_role, invocation_prompt, wt_root)\n" + _route),
+                    _r128_once(_r125_controller_text,
+                        'str(checker_root / "controller/result/routing_ast.py"), str(audited)',
+                        "str(audited)"))
+                _recomputed = []
+                for _ordinal, _mutant in enumerate(_routing_mutants):
+                    _digest = _r128_routing_probe(_mutant, _routing_text,
+                        f"digest-{_ordinal}")[0] if _mutant else None
+                    _helper = (_routing_text.replace(_r128_helper_digest(_routing_text), _digest)
+                               if _digest and _r128_helper_digest(_routing_text) else "")
+                    _probe = _r128_routing_probe(_mutant, _helper, f"mutant-{_ordinal}")
+                    _recomputed.append(bool(_mutant and _probe[1:] == (0, "ROUTING_AST=PASS")
+                                            and not _r128_routing_topology(_mutant)))
+                _actual_digest = _r128_helper_digest(_routing_text)
+                _helper_mutants = (_routing_text.replace(
+                    f'actual != "{_actual_digest}"', "actual != actual"),
+                    'print("ROUTING_AST=PASS")\n', "")
+                _helper_results = [_r128_routing_probe(
+                    _r125_controller_text, text, f"helper-{index}")[1:]
+                    for index, text in enumerate(_helper_mutants)]
+                _flow_ast_ownership = (
+                    _r128_routing_topology(_r125_controller_text)
+                    and _actual_digest == _routing_probe[0]
+                    and _routing_probe[1:] == (0, "ROUTING_AST=PASS")
+                    and all(_recomputed)
+                    and all(_r128_helper_digest(text) is None for text in _helper_mutants)
+                    and _helper_results == [(0, "ROUTING_AST=PASS"),
+                                            (0, "ROUTING_AST=PASS"), (0, "")])
+
+                _flow_profile_ok = (
+                    _flow_source_closed(_launcher_text, _r125_controller_text)
+                    and not _flow_source_closed(_launcher_text.replace(
+                        '(require-not (subpath (param "WORKSPACE")))', '', 1),
+                        _r125_controller_text)
+                    and not _flow_source_closed(_launcher_text.replace(
+                        'if not linked_live:', 'if linked_live:', 1),
+                        _r125_controller_text)
+                    and not _flow_source_closed(_launcher_text.replace(
+                        'attempt_root not in staging.parents', 'False', 1),
+                        _r125_controller_text)
+                    and not _flow_source_closed(_launcher_text,
+                        _r125_controller_text.replace(
+                            'if wt_root is not None:', 'if True:', 1))
+                    and not _flow_source_closed(_launcher_text,
+                        _r125_controller_text.replace(
+                            'run_codex(repo, wt, role, prompt, wt_root)',
+                            'run_codex(repo, wt, role, prompt)', 1)))
+
+                class _R128Capture(Exception):
                     pass
 
-                def _flow_run_gate(repo_arg, task_arg):
-                    _flow_gate_calls["n"] += 1
-                    return _auto.Cmd(1 if _flow_gate_calls["n"] == 1 else 0,
-                                     "R122 synthetic external gate result")
+                class _R128A2Boundary(Exception):
+                    pass
 
-                def _flow_agent_success(*_args, **_kwargs):
-                    _flow_controller_active["value"] = False
-                    _r123_observer["events"] = None
-                    _flow_divergent.write_text("# SCRATCH MUST NOT WIN\n", encoding="utf-8")
-                    escape_source = (
-                        "import os,sys,time\n"
-                        "if os.fork()==0:\n"
-                        "    if os.fork()!=0: os._exit(0)\n"
-                        "    os.setsid();os.close(0);os.close(1);os.close(2);time.sleep(0.8)\n"
-                        f"    status={str(_flow_attack_status)!r}\n"
-                        f"    target={str(_flow_attack)!r}\n"
-                        "    try: open(target,'w').write('PROVIDER-WROTE\\n'); verdict='WROTE'\n"
-                        "    except Exception: verdict='DENIED'\n"
-                        f"    open({str(_flow_inject)!r},'w').write('LATE=1\\n')\n"
-                        "    open(status,'w').write(verdict+'\\n');os._exit(0)\n"
-                        "os.wait();os._exit(0)\n")
-                    _flow_launch_env = dict(
-                        os.environ,
-                        NORTROPIC_TRUST_ROOT=str(_flow_trust_parent),
-                        NORTROPIC_STAGING_ROOT=str(_flow_staging),
-                        NORTROPIC_RESULT_SINK=str(_flow_sink))
+                def _flow_owned_root(path, parent):
+                    try:
+                        opened = Path(path).lstat()
+                    except OSError:
+                        return False
+                    return (not Path(path).is_symlink()
+                            and stat.S_ISDIR(opened.st_mode)
+                            and stat.S_IMODE(opened.st_mode) == 0o700
+                            and opened.st_uid == os.getuid()
+                            and Path(path).resolve().parent == Path(parent).resolve())
+
+                _flow_escape_source = (
+                    "import os,sys,time\n"
+                    "sink,workspace,attempt,branch,ref,odb,targets,stop=sys.argv[1:]\n"
+                    "if os.fork()==0:\n"
+                    " if os.fork()!=0: os._exit(0)\n"
+                    " os.setsid();os.close(0);os.close(1);os.close(2);seen=set()\n"
+                    " def note(label,path,verdict):\n"
+                    "  key=(label,path,verdict)\n"
+                    "  if key not in seen:\n"
+                    "   seen.add(key);open(sink,'a').write(label+':'+path+'='+verdict+'\\n')\n"
+                    " def attack(label,path):\n"
+                    "  try: open(path,'a').write('R128\\n'); verdict='OK'\n"
+                    "  except Exception: verdict='DENIED'\n"
+                    "  note(label,path,verdict)\n"
+                    " note('ENV','NORTROPIC_ATTEMPT_ROOT',"
+                    "'LEAKED' if 'NORTROPIC_ATTEMPT_ROOT' in os.environ else 'ABSENT')\n"
+                    " note('STATE','writer','ACTIVE')\n"
+                    " for cycle in range(900):\n"
+                    "  if os.path.exists(stop): break\n"
+                    "  attack('SELF',os.path.join(workspace,'r128-self-write'))\n"
+                    "  attack('ROOT',os.path.join(attempt,'r128-root-write'))\n"
+                    "  attack('BRANCH',branch);attack('REF',ref);attack('ODB',odb)\n"
+                    "  try:\n"
+                    "   for root,dirs,_files in os.walk(attempt):\n"
+                    "    for name in dirs:\n"
+                    "     path=os.path.join(root,name)\n"
+                    "     if path!=workspace and not path.startswith(workspace+os.sep):\n"
+                    "      attack('CROSS',os.path.join(path,'r128-cross-write'))\n"
+                    "  except Exception: pass\n"
+                    "  try: dynamic=open(targets).read().splitlines()\n"
+                    "  except Exception: dynamic=[]\n"
+                    "  for path in dynamic: attack('TARGET',path)\n"
+                    "  time.sleep(.02)\n"
+                    " note('STATE','writer','DONE');os._exit(0)\n"
+                    "os.wait();os._exit(0)\n")
+
+                def _flow_wait(writer, token):
+                    for _wait in range(160):
+                        try:
+                            if token in writer["sink"].read_text(encoding="utf-8"):
+                                return True
+                        except (FileNotFoundError, UnicodeDecodeError):
+                            pass
+                        time.sleep(0.025)
+                    return False
+
+                def _flow_start_writer(ctx, workspace, tag):
+                    execution = ctx["execution_root"]
+                    staging = execution / f"nortropic-result-rig-{tag}"
+                    staging.mkdir(mode=0o700)
+                    sink = staging / "result.json"; sink.write_text("", encoding="utf-8")
+                    sink.chmod(0o600)
+                    snapshot_root = execution / f"nortropic-provider-rig-{tag}"
+                    snapshot_root.mkdir(mode=0o700)
+                    snapshot = snapshot_root / "provider"
+                    snapshot.write_bytes(b"R128 provider snapshot\n"); snapshot.chmod(0o500)
+                    envelope = execution / f"envelope-{tag}.json"
+                    envelope.write_text('{"task_id":"h-032-r128"}\n', encoding="utf-8")
+                    prior = [item[key] for item in ctx["surfaces"]
+                             for key in ("snapshot", "sink")]
+                    targets = Path(workspace) / "r128-targets"
+                    targets.write_text("".join(str(item) + "\n" for item in prior),
+                                       encoding="utf-8")
+                    stop = execution / f"stop-{tag}"
+                    branch_target = ctx["branch_wt"] / "controller/result/consumer.py"
+                    ref_target = Path(ctx["git"]) / "refs/heads" / ctx["branch"]
+                    odb_target = Path(ctx["git"]) / "objects" / f"r128-{tag}-marker"
+                    env = dict(os.environ, NORTROPIC_TRUST_ROOT=str(ctx["git"]),
+                               NORTROPIC_ATTEMPT_ROOT=str(ctx["wt_root"]),
+                               NORTROPIC_STAGING_ROOT=str(staging),
+                               NORTROPIC_RESULT_SINK=str(sink))
                     leader = subprocess.run(
-                        [str(launcher), "run", str(_flow_scratch), str(_flow_envelope), "30", "--",
-                         sys.executable, "-c", escape_source],
-                        cwd=source.parents[1], env=_flow_launch_env,
+                        [str(launcher), "run", str(workspace), str(envelope), "30", "--",
+                         sys.executable, "-c", _flow_escape_source, str(sink),
+                         str(workspace), str(ctx["wt_root"]), str(branch_target),
+                         str(ref_target), str(odb_target), str(targets), str(stop)],
+                        cwd=source.parents[1], env=env,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    if leader.returncode != 0:
-                        raise AssertionError(f"R122 connected launcher rc={leader.returncode}")
-                    _flow_controller_active["value"] = True
-                    _r123_observer["events"] = _flow_audit_events
-                    return _auto.AgentRun(
-                        {"role": "BUILDER", "outcome": "READY",
-                         "owner_decision_required": False, "blocking_findings": [],
-                         "candidate_delta": r122_delta(r122_ok_patch)},
-                        None, r122 / "events-success", r122_result_file)
+                    writer = {"workspace": Path(workspace).resolve(), "sink": sink,
+                              "targets": targets, "stop": stop}
+                    required = (
+                        "ENV:NORTROPIC_ATTEMPT_ROOT=ABSENT",
+                        "STATE:writer=ACTIVE",
+                        f"SELF:{Path(workspace) / 'r128-self-write'}=OK",
+                        f"ROOT:{ctx['wt_root'] / 'r128-root-write'}=DENIED",
+                        f"BRANCH:{branch_target}=DENIED", f"REF:{ref_target}=DENIED",
+                        f"ODB:{odb_target}=DENIED",
+                        *(f"TARGET:{item}=DENIED" for item in prior))
+                    if leader.returncode != 0 or not all(
+                            _flow_wait(writer, item) for item in required):
+                        raise AssertionError("R128 connected writer confinement failed")
+                    ctx["writers"].append(writer)
+                    for old in ctx["writers"][:-1]:
+                        with old["targets"].open("a", encoding="utf-8") as stream:
+                            stream.write(f"{snapshot}\n{sink}\n")
+                    if not all(_flow_wait(old, f"TARGET:{item}=DENIED")
+                               for old in ctx["writers"][:-1]
+                               for item in (snapshot, sink)):
+                        raise AssertionError("R128 future execution surface escaped")
+                    ctx["surfaces"].append({"snapshot": snapshot, "sink": sink})
+                    return writer
 
-                def _flow_capture(_repo, _wt_root, _dirname, ref):
-                    _flow_candidate["sha"] = ref
-                    _flow_controller_active["value"] = False
+                def _flow_cross_denied(ctx, workspace):
+                    marker = str(Path(workspace).resolve() / "r128-cross-write")
+                    return all(writer["workspace"] == Path(workspace).resolve()
+                               or _flow_wait(writer, f"CROSS:{marker}=DENIED")
+                               for writer in ctx["writers"])
+
+                def _flow_target_denied(ctx, gate_wt):
+                    target = str(Path(gate_wt) / "controller/result/consumer.py")
+                    for writer in ctx["writers"]:
+                        with writer["targets"].open("a", encoding="utf-8") as stream:
+                            stream.write(target + "\n")
+                    return all(_flow_wait(writer, f"TARGET:{target}=DENIED")
+                               for writer in ctx["writers"])
+
+                def _flow_stop_writers(ctx):
+                    for writer in ctx["writers"]:
+                        try:
+                            writer["stop"].write_text("stop\n", encoding="utf-8")
+                        except OSError:
+                            pass
+                    return all(_flow_wait(writer, "STATE:writer=DONE")
+                               for writer in ctx["writers"])
+
+                def _flow_branch(ctx, expected):
+                    rows = r128_worktree_rows(ctx["git"])
+                    matches = [] if rows is None else [row for row in rows
+                        if row.get("branch") == f"refs/heads/{ctx['branch']}"]
+                    if len(matches) != 1:
+                        return False
+                    path = Path(matches[0]["worktree"]).resolve()
+                    tree = r122_closed_git(
+                        ctx["git"], "rev-parse", f"{expected}^{{tree}}",
+                        check=False).stdout.decode().strip()
+                    ctx["branch_wt"] = path
+                    ctx["authority_root"] = path.parent
+                    return r128_authority_worktree(
+                        path, expected, tree, ctx["git"], path.parent, ctx["branch"])
+
+                def _flow_gates_retired(ctx):
+                    rows = r128_worktree_rows(ctx["git"])
+                    return rows is not None and all(
+                        not os.path.lexists(path) and not os.path.lexists(admin)
+                        and all(Path(row.get("worktree", "")).resolve() != path
+                                for row in rows)
+                        for path, _head, admin in ctx["gates"][1:])
+
+                def _flow_arm_hostile(ctx, scratch, delete=False):
+                    scratch_text = os.path.abspath(os.fspath(scratch))
+                    _r123_observer["forbid"] = (scratch_text,)
+                    fds_clean = _r128_no_scratch_fds(scratch_text)
+                    processes_clean = _r128_no_scratch_processes(scratch_text)
+                    _r123_observer["forbid"] = ()
+                    if delete:
+                        shutil.rmtree(scratch)
+                    else:
+                        head = Path(scratch) / ".git/HEAD"; head.unlink(); os.mkfifo(head)
+                    record = {"scratch": scratch_text, "events": [],
+                              "fds_clean": fds_clean,
+                              "processes_clean": processes_clean}
+                    ctx["post"].append(record)
+                    _r123_observer["events"] = record["events"]
+                    _r123_observer["forbid"] = (record["scratch"],)
+
+                def _flow_identity_rejects(ctx, scratch, expected, forbidden):
+                    labels = ("extra-object", "objects-symlink", "config-hardlink",
+                              "index-hardlink", "raw-ref-fifo", "checkout-hardlink")
+                    if ctx["identity_rigs"]:
+                        return
+                    git_dir = Path(scratch) / ".git"
+                    for index, label in enumerate(labels):
+                        backup = ctx["root"] / f"identity-{index}"
+                        parent_was = True
+                        if label == "extra-object":
+                            proc = r122_closed_git(git_dir, "hash-object", "--stdin",
+                                                   input_bytes=b"R128 unreachable object\n")
+                            oid = proc.stdout.decode().strip()
+                            target = git_dir / "objects" / oid[:2] / oid[2:]
+                            parent_was = target.parent.exists()
+                            r122_closed_git(git_dir, "hash-object", "-w", "--stdin",
+                                            input_bytes=b"R128 unreachable object\n")
+                        elif label == "raw-ref-fifo":
+                            target = git_dir / "refs/.r128-ghost"; os.mkfifo(target)
+                        else:
+                            target = ({"objects-symlink": git_dir / "objects",
+                                       "config-hardlink": git_dir / "config",
+                                       "index-hardlink": git_dir / "index",
+                                       "checkout-hardlink": Path(scratch) /
+                                           "controller/result/consumer.py"}[label])
+                            target.rename(backup)
+                            (os.symlink if label == "objects-symlink" else os.link)(backup, target)
+                        rejected = r128_isolated_provider(
+                            scratch, expected, ctx["git"], ctx["wt_root"], forbidden) is None
+                        target.unlink()
+                        if label not in {"extra-object", "raw-ref-fifo"}:
+                            backup.rename(target)
+                        elif label == "extra-object" and not parent_was:
+                            target.parent.rmdir()
+                        if not rejected:
+                            return
+                        ctx["identity_rigs"].append(label)
+                    if r128_isolated_provider(
+                            scratch, expected, ctx["git"], ctx["wt_root"], forbidden) is None:
+                        ctx["identity_rigs"].clear()
+
+                def _flow_release_observer(ctx):
                     _r123_observer["events"] = None
-                    raise _R122Capture()
+                    clean_post = True
+                    for record in ctx["post"]:
+                        _r123_observer["forbid"] = (record["scratch"],)
+                        clean_post &= not any(_r128_forbidden_effect(args)
+                                              for _event, args in record["events"])
+                        clean_post &= (record["fds_clean"]
+                                       and record["processes_clean"]
+                                       and _r128_no_scratch_fds(record["scratch"])
+                                       and _r128_no_scratch_processes(record["scratch"]))
+                    _r123_observer["forbid"] = ()
+                    return clean_post
 
-                def _flow_stage_forbidden(*_args, **_kwargs):
-                    raise AssertionError("live scratch stage_and_commit used")
+                def _flow_agent(repo_arg, scratch, role, prompt, wt_root_arg):
+                    ctx = _flow_context
+                    ctx["post_clean"] &= _flow_release_observer(ctx)
+                    if (repo_arg != ctx["repo"] or Path(wt_root_arg) != ctx["wt_root"]
+                            or role not in {"BUILDER", "REVIEWER", "ARCHITECT"}
+                            or not _flow_gates_retired(ctx)):
+                        raise AssertionError("R128 provider authority mismatch")
+                    expected = r128_git(
+                        ctx["branch_wt"], "rev-parse", "HEAD").stdout.decode().strip()
+                    if expected not in {r122_base_sha, _c1, _r128_c2}:
+                        raise AssertionError("R128 provider received unknown authority")
+                    attempt_root = ctx["wt_root"]
+                    forbidden = set(r128_object_inodes(ctx["git"]) or ())
+                    forbidden.update(ctx["scratch_inodes"])
+                    inodes = r128_isolated_provider(
+                        scratch, expected, ctx["git"], attempt_root, forbidden)
+                    if inodes is None or Path(scratch).resolve() in ctx["scratches"]:
+                        raise AssertionError("R128 provider scratch not isolated")
+                    ctx["scratch_inodes"].update(inodes); ctx["scratches"].add(Path(scratch).resolve())
+                    if not _flow_branch(ctx, expected) or not _flow_cross_denied(ctx, scratch):
+                        raise AssertionError("R128 protected/provider sequencing mismatch")
+                    ctx["agents"].append((role, expected, Path(scratch).resolve(), prompt))
+                    if not ctx["refs_before"]:
+                        ctx["refs_before"] = r128_refs(ctx["git"])
+                        ctx["control_before"] = r128_control_state(
+                            ctx["git"], ctx["authority_root"], ctx["branch_wt"], ctx["branch"])
+                        ctx["objects_before"] = r123_object_ids(ctx["git"])
+                        ctx["odb_before"] = r123_odb_binding(ctx["git"])
+                        ctx["layout_before"] = r123_odb_layout(ctx["git"])
+                    if ctx["mode"] == "positive":
+                        if ctx["quarantine_rig"] is None:
+                            ctx["quarantine_rig"] = _r128_quarantine_oracle_rig(scratch)
+                        _flow_identity_rejects(ctx, scratch, expected, forbidden)
+                        _flow_start_writer(ctx, scratch, f"role-{len(ctx['writers'])}")
+                        if not all(_flow_cross_denied(ctx, item) for item in
+                                   ctx["scratches"] | {ctx["linked_provider"]}):
+                            raise AssertionError("isolated writer reached linked provider")
+                    if ctx["mode"] == "nonzero":
+                        _flow_arm_hostile(ctx, scratch)
+                        raise _auto.Stop("R128 provider nonzero")
+                    prior_roles = [item[0] for item in ctx["agents"][:-1]]
+                    if ctx["mode"] == "positive" and not prior_roles:
+                        report = {"role": "BUILDER", "outcome": "OWNER_DECISION_REQUIRED",
+                                  "owner_decision_required": True,
+                                  "summary": "R128 isolated decision", "stop_reason": "R128_SIGNAL",
+                                  "blocking_findings": [], "candidate_delta": None}
+                    elif role == "ARCHITECT":
+                        report = {"role": "ARCHITECT", "outcome": "READY",
+                                  "owner_decision_required": False, "blocking_findings": [],
+                                  "next_action": "BUILD", "summary": "R128_ARCH_GUIDANCE",
+                                  "candidate_delta": None}
+                    elif role == "BUILDER" and expected == r122_base_sha:
+                        ctx["guidance_bound"] = (ctx["mode"] != "positive" or
+                            "AUTONOMOUS_ARCHITECT_RESOLUTIONS" in prompt
+                            and "R128_ARCH_GUIDANCE" in prompt)
+                        report = {"role": "BUILDER", "outcome": "READY",
+                                  "owner_decision_required": False,
+                                  "blocking_findings": [],
+                                  "candidate_delta": r122_delta(r122_ok_patch)}
+                        ctx["builder_sources"].append(Path(scratch).resolve())
+                    elif role == "BUILDER" and expected == _c1:
+                        report = {"role": "BUILDER", "outcome": "READY",
+                                  "owner_decision_required": False,
+                                  "blocking_findings": [],
+                                  "candidate_delta": (_r128_overflow_delta
+                                      if ctx["mode"] == "overflow" else _r128_delta2)}
+                        ctx["builder_sources"].append(Path(scratch).resolve())
+                    elif role == "REVIEWER" and expected == _c1:
+                        report = {"role": "REVIEWER", "outcome": "NEEDS_REMEDIATION",
+                                  "owner_decision_required": False,
+                                  "blocking_findings": [{"id": "R128_FIXTURE",
+                                      "summary": "one exact remediation"}],
+                                  "candidate_delta": None}
+                    elif role == "REVIEWER" and expected == _r128_c2:
+                        report = {"role": "REVIEWER", "outcome": "READY",
+                                  "owner_decision_required": False,
+                                  "blocking_findings": [], "candidate_delta": None}
+                    else:
+                        raise AssertionError("R128 provider role sequence mismatch")
+                    _flow_arm_hostile(ctx, scratch,
+                                      delete=(role == "REVIEWER" and expected == _c1))
+                    return _auto.AgentRun(report, None, r122 / "events-r128", r122_result_file)
 
-                _auto.origin_main = lambda _repo: r122_base_sha
-                _auto.ensure_worktree = lambda *_args, **_kwargs: _flow_scratch
-                _auto.clean = lambda _repo: True
-                _auto.sha = lambda _repo: r122_base_sha
-                _auto.capture_green_gates = lambda _repo: {}
-                _auto.run_gate = _flow_run_gate
-                _auto.run_codex_resolving_architecture = _flow_agent_success
-                _auto.assert_builder_scope = lambda *_args, **_kwargs: (_ for _ in ()).throw(
-                    AssertionError("live scratch scope used"))
-                _auto.stage_and_commit = _flow_stage_forbidden
-                _auto.detached_worktree = _flow_capture
-                _auto.journal = lambda *_args, **_kwargs: None
-                _auto.common_git_dir = lambda _repo: _flow_git
+                def _flow_run_gate(repo_arg, task_arg):
+                    ctx = _flow_context; ctx["post_clean"] &= _flow_release_observer(ctx)
+                    if task_arg != "h-032":
+                        raise AssertionError("R128 wrong task gate")
+                    current = r128_git(repo_arg, "rev-parse", "HEAD").stdout.decode().strip()
+                    admin = Path(r128_git(
+                        repo_arg, "rev-parse", "--git-dir").stdout.decode().strip()).resolve()
+                    ctx["gates"].append((Path(repo_arg).resolve(), current, admin))
+                    if len(ctx["gates"]) == 1:
+                        if not _flow_branch(ctx, r122_base_sha):
+                            raise AssertionError("R128 baseline escaped protected branch")
+                        _flow_start_writer(ctx, ctx["linked_provider"], "linked")
+                        return _auto.Cmd(1, "R128 baseline RED")
+                    expected = (_c1 if len(ctx["gates"]) == 2 else
+                                _r128_overflow_c if ctx["mode"] == "overflow"
+                                else _r128_c2)
+                    tree = r122_closed_git(ctx["git"], "rev-parse",
+                                           f"{expected}^{{tree}}").stdout.decode().strip()
+                    if (current != expected
+                            or not r128_authority_worktree(
+                                repo_arg, expected, tree, ctx["git"],
+                                ctx["authority_root"], None)
+                            or not _flow_target_denied(ctx, repo_arg)):
+                        raise AssertionError("R128 candidate gate topology mismatch")
+                    scope = r128_cumulative_scope(ctx["git"], r122_base_sha, expected)
+                    if ctx["mode"] == "overflow" or not scope:
+                        raise AssertionError("R128 cumulative scope oracle mismatch")
+                    return _auto.Cmd(0, "R128 protected candidate GREEN")
+                _real_assert_scope = _auto.assert_builder_scope
+                _real_cumulative_scope = _auto.assert_materialized_cumulative_scope
+                def _flow_scope(repo_arg, task_id, base):
+                    ctx = _flow_context
+                    current = r128_git(repo_arg, "rev-parse", "HEAD").stdout.decode().strip()
+                    ctx["scope"].append((Path(repo_arg).resolve(), current,
+                                         r128_cumulative_scope(ctx["git"], base, current)))
+                    return _real_assert_scope(repo_arg, task_id, base)
+                def _flow_cumulative(repo_arg, task_id, base, candidate):
+                    ctx = _flow_context
+                    ctx["cumulative"].append((candidate,
+                        r128_cumulative_scope(ctx["git"], base, candidate)))
+                    return _real_cumulative_scope(repo_arg, task_id, base, candidate)
+                def _flow_final(wt, task_id, _baseline):
+                    ctx = _flow_context; ctx["post_clean"] &= _flow_release_observer(ctx)
+                    if (ctx["mode"] != "positive" or task_id != "h-032"
+                            or not _flow_branch(ctx, _r128_c2)):
+                        raise AssertionError("R128 final gate received wrong candidate")
+                    ctx["captured"] = _r128_c2
+                    raise _R128Capture()
 
-                _flow_controller_active = {"value": False}
-                _flow_audit_events = []
+                def _flow_forbidden(*_args, **_kwargs):
+                    raise AssertionError("R128 live scratch staging/publication used")
 
-                _control_success_before = r123_git_control_snapshot(_flow_git)
-                _objects_success_before = r123_object_ids(_flow_git)
-                _odb_success_before = r123_odb_binding(_flow_git)
-                _layout_success_before = r123_odb_layout(_flow_git)
-                _flow_controller_active["value"] = True
-                _r123_observer["invalid"] = False
-                _r123_observer["events"] = _flow_audit_events
-                try:
+                _real_closed_git = _auto.closed_worktree_git
+                def _flow_closed_git(repo_arg, *args, **kwargs):
+                    if tuple(args[:2]) != ("merge", "--ff-only"):
+                        return _real_closed_git(repo_arg, *args, **kwargs)
+                    ctx = _flow_context
+                    if Path(repo_arg).resolve() != Path(ctx["branch_wt"]).resolve():
+                        raise AssertionError("R128 adoption escaped protected branch worktree")
+                    before = r128_git(repo_arg, "rev-parse", "HEAD").stdout.decode().strip()
+                    candidate = args[2] if len(args) == 3 else None
+                    retired = _flow_gates_retired(ctx)
+                    if not retired:
+                        raise AssertionError("R128 gate survived until adoption")
+                    result = _real_closed_git(repo_arg, *args, **kwargs)
+                    after = r128_git(repo_arg, "rev-parse", "HEAD").stdout.decode().strip()
+                    ctx["adoptions"].append((before, after, candidate, retired))
+                    return result
+                _auto.closed_worktree_git = _flow_closed_git
+
+                def _flow_drive(mode):
+                    root = _flow_root / mode; root.mkdir(mode=0o700)
+                    repo = root / "authority"; git_dir = r123_clone_authoritative(repo)
+                    wt_root = root / "provider-workspaces"; wt_root.mkdir(mode=0o700)
+                    execution_root = _auto.provider_execution_root(wt_root)
+                    linked = wt_root / "linked-provider-control"
+                    r128_git(repo, "worktree", "add", "--detach", str(linked), r122_base_sha)
+                    ctx = {"mode": mode, "root": root, "repo": repo, "git": git_dir,
+                           "wt_root": wt_root, "branch": "r122", "branch_wt": None,
+                           "execution_root": execution_root,
+                           "authority_root": None, "linked_provider": linked.resolve(),
+                           "writers": [], "surfaces": [], "agents": [], "gates": [], "scope": [],
+                           "cumulative": [],
+                           "post": [], "post_clean": True, "scratches": set(),
+                           "scratch_inodes": set(), "refs_before": None,
+                           "control_before": None, "objects_before": None,
+                           "odb_before": None, "layout_before": None,
+                           "identity_rigs": [],
+                           "quarantine_rig": None,
+                           "builder_sources": [], "adoptions": [], "guidance_bound": False,
+                           "captured": None,
+                           "stopped": False, "writer_stopped": False}
+                    _flow_context.clear(); _flow_context.update(ctx)
+                    ctx = _flow_context
+                    _r123_observer["control"] = []
+                    _r123_observer["control_roots"] = (
+                        str(git_dir), str(Path(git_dir) / "nortropic-candidate-materialization"),
+                        str(Path(git_dir) / "nortropic-controller-worktrees"))
+                    _flow_calls["n"] = 0; _flow_call_args.clear(); _flow_call_results.clear()
+                    _flow_materializer_spans.clear(); _flow_audit_events.clear()
+                    _flow_return_mode["value"] = mode if mode == "decoy" else None
+                    _auto.origin_main = lambda _repo: r122_base_sha
+                    _auto.capture_green_gates = lambda _repo: {}
+                    _auto.run_gate = _flow_run_gate
+                    _auto._run_codex_agent = _flow_agent
+                    _auto.assert_builder_scope = _flow_scope
+                    _auto.assert_materialized_cumulative_scope = _flow_cumulative
+                    _auto.assert_final_gates = _flow_final
+                    _auto.stage_and_commit = _flow_forbidden
+                    _auto.publish = _flow_forbidden
+                    _auto.journal = lambda *_args, **_kwargs: None
+                    _r123_observer["invalid"] = False
                     try:
-                        _auto.builder_flow(_flow_repo, _flow_wt_root, "h-032", "r122", "r122",
-                                           "r122 candidate")
-                    except _R122Capture:
+                        _auto.builder_flow(repo, wt_root, "h-032", "r122", "r122",
+                                           f"R128 {mode}")
+                    except _R128Capture:
                         pass
-                finally:
-                    _flow_controller_active["value"] = False
-                    _r123_observer["events"] = None
-                _flow_success_events_invalid = _r123_observer["invalid"]
-                for _wait in range(30):
-                    if _flow_inject.exists() and _flow_attack_status.exists():
-                        break
-                    time.sleep(0.1)
-                _captured = _flow_candidate["sha"]
-                _captured_tree = (r122_closed_git(
-                    _flow_git, "rev-parse", "--verify", f"{_captured}^{{tree}}",
-                    check=False).stdout.decode().strip() if isinstance(_captured, str) else "")
-                _actual_args = (
-                    len(_flow_call_args) == 1
-                    and r123_actual_args_ok(
-                        _flow_call_args[0], _flow_trust_parent, r122_base_sha,
-                        r122_delta(r122_ok_patch), R122_ALLOWED, R122_MAXF,
-                        R122_MAXL, R122_OPS, _flow_expected_protected))
-                _actual_surface_denied = (
-                    r123_protected_clean(_flow_expected_protected)
-                    and not _flow_attack.exists()
-                    and _flow_attack_status.exists()
-                    and _flow_attack_status.read_text(encoding="utf-8") == "DENIED\n")
-                _control_success_after = r123_git_control_snapshot(_flow_git)
-                _objects_success_after = r123_object_ids(_flow_git)
-                _odb_success_after = r123_odb_binding(_flow_git)
-                _layout_success_after = r123_odb_layout(_flow_git)
-                _expected_success_objects = r123_reachable_delta(
-                    _flow_git, _captured, r122_base_sha) if isinstance(_captured, str) else None
-                _actual_effects = False
-                _actual_effect_detail = {"spans": tuple(_flow_materializer_spans),
-                                         "events": [event for event, _args
-                                                    in _flow_audit_events]}
-                if len(_flow_materializer_spans) == 1:
-                    _material_start, _material_end = _flow_materializer_spans[0]
-                    _actual_effect_detail.update({
-                        "prelude": r123_controller_prelude_effects_ok(
-                            _flow_audit_events[:_material_start], _flow_repo,
-                            _flow_expected_protected),
-                        "materializer": r123_materializer_effects_ok(
-                            _flow_audit_events[_material_start:_material_end],
-                            _flow_git, _flow_expected_protected, _flow_scratch),
-                        "post": len(_flow_audit_events[_material_end:]),
-                        "prelude_events": _flow_audit_events[:_material_start]})
-                    _actual_effects = (
-                        r123_connected_materializer_effects_ok(
-                            _flow_audit_events,
-                            (_material_start, _material_end), _flow_git,
-                            _flow_expected_protected, _flow_repo,
-                            _flow_scratch)
-                        and not _flow_success_events_invalid)
-                _actual_return_bound = (
-                    len(_flow_call_results) == 1
-                    and _flow_call_results[0]
-                        == (_captured, _captured_tree,
-                            ["controller/result/materialize.py"]))
-                _actual_success = (
-                    _flow_calls["n"] == 1
-                    and _actual_return_bound
-                    and _pmat_still_bound()
-                    and r122_candidate_identity_ok(_flow_git, _captured, _c1, _t1)
-                    and _captured_tree == _t1 and _flow_inject.exists()
-                    and _actual_args and _actual_surface_denied and _actual_effects
-                    and _control_success_after == _control_success_before
-                    and r123_odb_identity_equal(
-                        _odb_success_before, _odb_success_after)
-                    and _expected_success_objects is not None
-                    and _objects_success_after - _objects_success_before
-                        == _expected_success_objects
-                    and r123_odb_delta_ok(
-                        _layout_success_before, _layout_success_after,
-                        _objects_success_after - _objects_success_before,
-                        _odb_success_before))
-
-                # Connected return mutant: the exact recorder installed before
-                # autopilot import delegates the real materializer but returns a
-                # different valid ref.  The same builder_flow must select that
-                # decoy, proving candidate selection consumes this exact call
-                # result rather than independently deriving an equal candidate.
-                _flow_calls["n"] = 0; _flow_candidate["sha"] = None
-                _flow_call_args.clear(); _flow_call_results.clear()
-                _flow_materializer_spans.clear()
-                _flow_audit_events.clear(); _flow_gate_calls["n"] = 0
-                _flow_return_mode["decoy"] = True
-                _decoy_control_before = r123_git_control_snapshot(_flow_git)
-                _decoy_objects_before = r123_object_ids(_flow_git)
-                _decoy_layout_before = r123_odb_layout(_flow_git)
-                _flow_controller_active["value"] = True
-                _r123_observer["invalid"] = False
-                _r123_observer["events"] = _flow_audit_events
+                    except _auto.Stop:
+                        ctx["stopped"] = True
+                    finally:
+                        ctx["post_clean"] &= _flow_release_observer(ctx)
+                        ctx["writer_stopped"] = _flow_stop_writers(ctx)
+                        _r123_observer["events"] = None; _r123_observer["forbid"] = ()
+                        ctx["call_args"] = tuple(_flow_call_args)
+                        ctx["call_results"] = tuple(_flow_call_results)
+                        ctx["spans"] = tuple(_flow_materializer_spans)
+                        ctx["events"] = tuple(_flow_audit_events)
+                        ctx["control"] = tuple(_r123_observer["control"])
+                        _r123_observer["control_roots"] = ()
+                        ctx["invalid"] = _r123_observer["invalid"]
+                    return dict(ctx)
+                # Direct-launch omission remains the H009/H017 compatibility
+                # behavior; a supplied but unrelated attempt root fails closed.
+                _compat = _flow_root / "compat"; _compat.mkdir()
+                _compat_ws = _compat / "workspace"; _compat_ws.mkdir()
+                _compat_neutral = _compat / "neutral"; _compat_neutral.mkdir()
+                _compat_marker = _compat_neutral / "marker"
+                _compat_envfile = _compat / "envelope.json"
+                _compat_envfile.write_text('{"task_id":"h-032-r128"}\n', encoding="utf-8")
+                _compat_trust = _compat / "trust"; _compat_trust.mkdir()
+                _compat_env = dict(os.environ, NORTROPIC_TRUST_ROOT=str(_compat_trust))
+                _compat_run = subprocess.run(
+                    [str(launcher), "run", str(_compat_ws), str(_compat_envfile), "30", "--",
+                     "/bin/sh", "-c", 'printf OK > "$1"', "sh", str(_compat_marker)],
+                    cwd=source.parents[1], env=_compat_env,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                _wrong_root = _flow_root / "unrelated-attempt"; _wrong_root.mkdir()
+                _spoof_run = subprocess.run(
+                    [str(launcher), "run", str(_compat_ws), str(_compat_envfile), "30", "--",
+                     "/usr/bin/true"], cwd=source.parents[1],
+                    env=dict(_compat_env, NORTROPIC_ATTEMPT_ROOT=str(_wrong_root)),
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                _flow_launcher_compat = (
+                    _compat_run.returncode == 0 and _compat_marker.read_bytes() == b"OK"
+                    and _spoof_run.returncode == 3)
+                _positive = _flow_drive("positive")
+                _wrong_adoption_head = r128_git(
+                    _positive["linked_provider"], "rev-parse", "HEAD").stdout
                 try:
-                    try:
-                        _auto.builder_flow(
-                            _flow_repo, _flow_wt_root, "h-032", "r122", "r122",
-                            "r122 candidate decoy")
-                    except _R122Capture:
-                        pass
-                finally:
-                    _flow_controller_active["value"] = False
-                    _r123_observer["events"] = None
-                    _flow_return_mode["decoy"] = False
-                _decoy_effects = False
-                if len(_flow_materializer_spans) == 1:
-                    _decoy_start, _decoy_end = _flow_materializer_spans[0]
-                    _decoy_effects = r123_connected_materializer_effects_ok(
-                        _flow_audit_events, (_decoy_start, _decoy_end),
-                        _flow_git, _flow_expected_protected, _flow_repo,
-                        _flow_scratch)
-                _connected_decoy_rejected = (
-                    not _r123_observer["invalid"]
-                    and _flow_calls["n"] == 1
-                    and len(_flow_call_results) == 1
-                    and _flow_call_results[0][0] == r122_base_sha
-                    and _flow_candidate["sha"] == r122_base_sha
-                    and _decoy_effects
-                    and r123_git_control_snapshot(_flow_git) == _decoy_control_before
-                    and r123_object_ids(_flow_git) == _decoy_objects_before
-                    and r123_odb_layout(_flow_git) == _decoy_layout_before)
-
-                # Same actual builder_flow, now with a provider failure before any
-                # accepted report.  It must propagate with zero materializer calls,
-                # zero candidate selection, no ref update and no protected residue.
-                _flow_calls["n"] = 0; _flow_candidate["sha"] = None
-                _flow_call_args.clear()
-                _flow_call_results.clear()
-                _flow_materializer_spans.clear()
-                _flow_audit_events.clear()
-                _flow_gate_calls["n"] = 0
-                def _flow_agent_nonzero(*_args, **_kwargs):
-                    _flow_controller_active["value"] = False
-                    _r123_observer["events"] = None
-                    raise _auto.Stop("R122 provider nonzero")
-                _auto.run_codex_resolving_architecture = _flow_agent_nonzero
-                _control_nonzero_before = r123_git_control_snapshot(_flow_git)
-                _objects_nonzero_before = r123_object_ids(_flow_git)
-                _odb_nonzero_before = r123_odb_binding(_flow_git)
-                _layout_nonzero_before = r123_odb_layout(_flow_git)
-                _flow_controller_active["value"] = True
-                _r123_observer["invalid"] = False
-                _r123_observer["events"] = _flow_audit_events
+                    _flow_closed_git(_positive["linked_provider"],
+                                     "merge", "--ff-only", _r128_c2)
+                    _wrong_adoption_rejected = False
+                except AssertionError:
+                    _wrong_adoption_rejected = (r128_git(
+                        _positive["linked_provider"], "rev-parse", "HEAD").stdout
+                        == _wrong_adoption_head)
                 try:
+                    _auto.provider_attempt_root(
+                        _positive["repo"], _positive["branch_wt"],
+                        _positive["authority_root"])
+                    _managed_unsafe_rejected = False
+                except _auto.Stop:
+                    _managed_unsafe_rejected = True
+                _unsafe_mode = _flow_root / "unsafe-mode"; _unsafe_mode.mkdir(mode=0o700)
+                _unsafe_mode.chmod(0o777)
+                _unsafe_link = _flow_root / "unsafe-link"
+                _unsafe_link.symlink_to(_positive["wt_root"], target_is_directory=True)
+                for _unsafe in (_unsafe_mode, _unsafe_link):
                     try:
-                        _auto.builder_flow(_flow_repo, _flow_wt_root, "h-032", "r122", "r122",
-                                           "r122 candidate")
+                        _auto.managed_provider_root(_unsafe)
+                        _managed_unsafe_rejected = False
                     except _auto.Stop:
                         pass
-                finally:
-                    _flow_controller_active["value"] = False
-                    _r123_observer["events"] = None
-                _flow_nonzero_events_invalid = _r123_observer["invalid"]
+                _flow_git = _positive["git"]
+                _flow_expected_protected = Path(_flow_git) / "nortropic-candidate-materialization"
+                _flow_authority_root = _positive["authority_root"]
+                _captured = _positive["captured"]
+                _objects_success_after = r123_object_ids(_flow_git)
+                _layout_success_after = r123_odb_layout(_flow_git)
+                _expected_success_objects = r123_reachable_delta(
+                    _flow_git, _r128_c2, r122_base_sha)
+                _actual_args = (
+                    len(_positive["call_args"]) == 2
+                    and r123_actual_args_ok(
+                        _positive["call_args"][0], _flow_git, r122_base_sha,
+                        r122_delta(r122_ok_patch), R122_ALLOWED, R122_MAXF,
+                        R122_MAXL, R122_OPS, _flow_expected_protected)
+                    and r123_actual_args_ok(
+                        _positive["call_args"][1], _flow_git, _c1,
+                        _r128_delta2, R122_ALLOWED, R122_MAXF,
+                        R122_MAXL, R122_OPS, _flow_expected_protected))
+                _actual_effects = (
+                    len(_positive["spans"]) == 2 and not _positive["invalid"]
+                    and all(r123_materializer_effects_ok(
+                        _positive["events"][start:end], _flow_git,
+                        _flow_expected_protected, _positive["builder_sources"][index])
+                        for index, (start, end) in enumerate(_positive["spans"])))
+                _actual_return_bound = _positive["call_results"] == (
+                    (_c1, _t1, ["controller/result/materialize.py"]),
+                    (_r128_c2, _r128_t2, ["controller/result/remediation.py"]))
+                _refs_before_map = dict(row.split(b"\0", 1)
+                                        for row in _positive["refs_before"])
+                _refs_after = r128_refs(_flow_git)
+                _refs_after_map = (dict(row.split(b"\0", 1) for row in _refs_after)
+                                   if _refs_after is not None else {})
+                _refs_exact = (
+                    set(_refs_before_map) == set(_refs_after_map)
+                    and _refs_after_map.get(b"refs/heads/r122") == _r128_c2.encode()
+                    and all(_refs_after_map[key] == value for key, value in _refs_before_map.items()
+                            if key != b"refs/heads/r122"))
+                _roots_exact = (
+                    _flow_owned_root(_flow_expected_protected, _flow_git)
+                    and _flow_owned_root(_flow_authority_root, _flow_git)
+                    and _flow_expected_protected != _flow_authority_root
+                    and _flow_expected_protected not in _flow_authority_root.parents
+                    and _flow_authority_root not in _flow_expected_protected.parents)
+                _actual_success = (
+                    not _positive["stopped"] and _captured == _r128_c2
+                    and _positive["writer_stopped"] and _positive["post_clean"]
+                    and _positive["quarantine_rig"] is True
+                    and _wrong_adoption_rejected
+                    and _positive["identity_rigs"] == [
+                        "extra-object", "objects-symlink", "config-hardlink",
+                        "index-hardlink", "raw-ref-fifo", "checkout-hardlink"]
+                    and _positive["guidance_bound"]
+                    and _pmat_still_bound()
+                    and _actual_args and _actual_effects and _actual_return_bound
+                    and [item[0] for item in _positive["agents"]] ==
+                        ["BUILDER", "ARCHITECT", "BUILDER", "REVIEWER",
+                         "BUILDER", "REVIEWER"]
+                    and [item[1] for item in _positive["agents"]] ==
+                        [r122_base_sha] * 3 + [_c1, _c1, _r128_c2]
+                    and len({item[2] for item in _positive["agents"]}) == 6
+                    and len(_positive["surfaces"]) == len(_positive["writers"]) == 7
+                    and all(item.parent.parent == _positive["execution_root"]
+                            for surface in _positive["surfaces"]
+                            for item in (surface["snapshot"], surface["sink"]))
+                    and [item[1] for item in _positive["gates"]]
+                        == [r122_base_sha, _c1, _r128_c2]
+                    and _flow_gates_retired(_positive)
+                    and _positive["adoptions"] == [
+                        (r122_base_sha, _c1, _c1, True),
+                        (_c1, _r128_c2, _r128_c2, True)]
+                    and [item[1] for item in _positive["scope"]]
+                        == [_c1, _r128_c2]
+                    and all(item[2] for item in _positive["scope"])
+                    and _positive["cumulative"] == [(_c1, True), (_r128_c2, True)]
+                    and _refs_exact and _roots_exact
+                    and r128_final_control(
+                        _positive["control_before"], _flow_git,
+                        _flow_authority_root, _positive["branch_wt"], "r122",
+                        r122_base_sha, _c1, _r128_c2, _r128_t2,
+                        _positive["gates"])
+                    and _objects_success_after - _positive["objects_before"]
+                        == _expected_success_objects
+                    and r123_odb_identity_equal(
+                        _positive["odb_before"], r123_odb_binding(_flow_git))
+                    and r123_odb_delta_ok(
+                        _positive["layout_before"], _layout_success_after,
+                        _objects_success_after - _positive["objects_before"],
+                        _positive["odb_before"])
+                    and r123_protected_clean(_flow_expected_protected)
+                    and _flow_branch(_positive, _r128_c2))
+                _decoy = _flow_drive("decoy")
+                _connected_decoy_rejected = (
+                    _decoy["stopped"] and len(_decoy["call_results"]) == 1
+                    and _decoy["call_results"][0][0] == r122_base_sha
+                    and [item[1] for item in _decoy["gates"]] == [r122_base_sha]
+                    and not _decoy["adoptions"]
+                    and _flow_branch(_decoy, r122_base_sha))
+                _overflow = _flow_drive("overflow")
+                _cumulative_rejected = (
+                    _overflow["stopped"] and len(_overflow["call_results"]) == 2
+                    and (_r128_overflow_c, False) in _overflow["cumulative"]
+                    and [item[1] for item in _overflow["gates"]] == [r122_base_sha, _c1]
+                    and len(_overflow["adoptions"]) == 1
+                    and _flow_branch(_overflow, _c1))
+                _nonzero = _flow_drive("nonzero")
                 _actual_nonzero = (
-                    _flow_calls["n"] == 0 and not _flow_call_args
-                    and not _flow_call_results
-                    and not _flow_materializer_spans
-                    and _flow_candidate["sha"] is None
-                    and not _flow_audit_events and not _flow_nonzero_events_invalid
-                    and r123_git_control_snapshot(_flow_git) == _control_nonzero_before
-                    and r123_object_ids(_flow_git) == _objects_nonzero_before
-                    and r123_odb_binding(_flow_git) == _odb_nonzero_before
-                    and r123_odb_layout(_flow_git) == _layout_nonzero_before
-                    and r123_protected_clean(_flow_expected_protected))
+                    _nonzero["stopped"] and not _nonzero["call_results"]
+                    and not _nonzero["spans"] and _nonzero["post_clean"]
+                    and [item[1] for item in _nonzero["gates"]] == [r122_base_sha]
+                    and not _nonzero["adoptions"]
+                    and _flow_branch(_nonzero, r122_base_sha))
+                def _owner_delta(repo, base, changes):
+                    root = Path(_r125_tempfile.mkdtemp(prefix="r128-owner-delta-", dir=_flow_root))
+                    clone = root / "repo"; index = root / "index"
+                    env = dict(os.environ, PATH="/usr/bin:/bin", HOME=str(r122),
+                               GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null",
+                               GIT_NO_REPLACE_OBJECTS="1", GIT_ALTERNATE_OBJECT_DIRECTORIES="")
+                    subprocess.run(["/usr/bin/git", "clone", "--no-local", "--no-hardlinks",
+                                    "-q", str(repo), str(clone)], env=env, check=True)
+                    env.update(GIT_DIR=str(clone / ".git"), GIT_INDEX_FILE=str(index))
+                    try:
+                        subprocess.run(["/usr/bin/git", "read-tree", base], env=env, check=True)
+                        for rel, value in changes.items():
+                            payload, replace = value if isinstance(value, tuple) else (value, False)
+                            prior = subprocess.run(["/usr/bin/git", "show", f"{base}:{rel}"],
+                                env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
+                            row = subprocess.run(["/usr/bin/git", "ls-tree", base, "--", rel],
+                                env=env, stdout=subprocess.PIPE, check=True).stdout.split(None, 1)
+                            mode = row[0] if row else b"100755"
+                            blob = subprocess.run(["/usr/bin/git", "hash-object", "-w", "--stdin"],
+                                env=env, input=payload if replace else prior + payload,
+                                stdout=subprocess.PIPE, check=True).stdout.strip()
+                            subprocess.run(["/usr/bin/git", "update-index", "--add", "--cacheinfo",
+                                mode + b"," + blob + b"," + rel.encode()], env=env, check=True)
+                        patch = subprocess.run(["/usr/bin/git", "diff", "--cached", "--binary",
+                            "--full-index", "--no-renames", base, "--", *changes], env=env,
+                            stdout=subprocess.PIPE, check=True).stdout
+                        return r122_delta(patch, base=base)
+                    finally:
+                        shutil.rmtree(root)
+                def _owner_state(ctx):
+                    git_dir = ctx["git"]
+                    return (r123_git_control_snapshot(git_dir), r128_refs(git_dir),
+                        r123_object_ids(git_dir), r123_odb_binding(git_dir), r123_odb_layout(git_dir),
+                        r128_control_state(git_dir, ctx["authority_root"], ctx["branch_wt"], ctx["branch"]))
+                def _owner_red(repo, current, path, kind):
+                    prior = r128_git(repo, "show", f"{current}:{path}", check=False).stdout
+                    if kind == "h003" and prior.count(b"\nsummera\n") == 1:
+                        return (prior.replace(b"\nsummera\n", b"\nno 'K8 R128 reviewed owner RED' "
+                            b"'production boundary absent'\nsummera\n", 1), True)
+                    label = "R128_ROADMAP_RED" if kind == "roadmap" else "R128_LOOP_RED"
+                    return (("#!/bin/sh\n" + f"printf 'PASS  {label}_STRUCTURE\\n"
+                        f"FAIL  {label} — production boundary absent\\n\\n1 PASS, 1 FAIL\\n'\n"
+                        "exit 1\n").encode(), True)
+                _real_task_limits = _auto.task_limits
+                _real_test_author_allowed = frozenset(_auto.TEST_AUTHOR_ALLOWED)
+                # A1a stops at the nonexecuting A2 boundary; A1b/A2 remain mandatory.
+                def _owner_drive(kind, mode="positive"):
+                    root = _flow_root / f"owner-{kind}-{mode}"; root.mkdir(mode=0o700)
+                    repo = root / "authority"; git_dir = r123_clone_authoritative(repo)
+                    base = r128_git(repo, "rev-parse", "HEAD").stdout.decode().strip()
+                    wt_root = root / "provider-workspaces"; wt_root.mkdir(mode=0o700)
+                    sl = _auto.ROADMAP[0] if kind == "roadmap" else None
+                    label = "h-003" if kind == "h003" else (sl.task_id if sl else "L")
+                    path = ("verify/bin/h-003-exit" if kind == "h003" else sl.gate_path
+                            if sl else _auto.EMPIRICAL_GATE_PATH)
+                    allowed = (_real_test_author_allowed if kind == "h003" else
+                        _auto.roadmap_test_author_allowed(sl) if sl else _auto.EMPIRICAL_GATE_ALLOWED)
+                    surface = tuple(sorted(set(allowed) | ({"docs/r128-*"} if mode == "nine" else set())))
+                    spec = json.loads(r128_git(repo, "show", f"{base}:specs/tasks.spec.json").stdout)
+                    rows = [row for row in spec["tasks"] if row.get("id") == label]; task = rows[0] if len(rows) == 1 else {}
+                    defaults = spec.get("defaults", {})
+                    frozen_limits = (int(task.get("max_changed_files", defaults.get("max_changed_files", 8))),
+                                     int(task.get("max_added_lines", defaults.get("max_added_lines", 600))))
+                    expected_limits = (7, 599) if mode == "dynamic-limit" else frozen_limits
+                    branch_name = ({"h003": "owner/h-003-attestation-validity-",
+                                    "roadmap": "owner/roadmap-s2-contract-",
+                                    "L": "owner/empirical-loop-gate-L-"}[kind] + base[:12])
+                    authority_root = Path(git_dir) / "nortropic-controller-worktrees"
+                    authority_root.mkdir(mode=0o700); branch_wt = authority_root / f"{kind}-{mode}"
+                    r128_git(repo, "worktree", "add", "-b", branch_name, str(branch_wt), base)
+                    ctx = {"kind": kind, "mode": mode, "root": root, "repo": repo, "git": git_dir,
+                        "wt_root": wt_root, "branch": branch_name, "base": base, "path": path,
+                        "label": label, "surface": surface, "frozen_limits": frozen_limits,
+                        "expected_limits": expected_limits, "limit_return": None, "trace": "",
+                        "branch_wt": branch_wt, "authority_root": authority_root, "scratches": set(),
+                        "scratch_inodes": set(), "roles": [], "deltas": [], "pre": None,
+                        "limits": [], "reviews": [], "review_run": None, "forbidden": [], "final": None,
+                        "blocker_token": "R128-A1A-" + secrets.token_hex(16),
+                        "call_args": (), "call_results": (), "calls": 0, "spans": (), "events": (),
+                        "invalid": False, "boundary": [], "stop": None}
+                    _flow_context.clear(); _flow_context.update(ctx)
+                    ctx = _flow_context
+                    if not _flow_branch(ctx, base): raise AssertionError("owner C0 setup mismatch")
+                    ctx["pre"] = _owner_state(ctx)
+                    review_count = {"n": 0}
+                    wide = json.loads(r128_git(repo, "show", f"{base}:specs/tasks.spec.json").stdout)
+                    next(row for row in wide["tasks"] if row.get("id") == "h-003")[
+                        "max_added_lines"] = 999999
+                    bad = {"wide": {"specs/tasks.spec.json": (json.dumps(wide, ensure_ascii=False,
+                        separators=(",", ":")).encode() + b"\n", True), path: b"R128=1\n" * 601},
+                        "nine": {f"docs/r128-{n}": b"x\n" for n in range(9)}}.get(mode)
+                    first_delta = _owner_delta(repo, base, bad or {path: b"\n# R128 C1\n"})
+                    def agent(repo_arg, scratch, role, _prompt, wt_root_arg):
+                        current = r128_git(scratch, "rev-parse", "HEAD").stdout.decode().strip()
+                        forbidden = set(r128_object_inodes(git_dir) or ()) | ctx["scratch_inodes"]
+                        inodes = r128_isolated_provider(
+                            scratch, current, git_dir, wt_root_arg, forbidden)
+                        if (repo_arg != repo or Path(wt_root_arg) != wt_root or inodes is None
+                                or Path(scratch).resolve() in ctx["scratches"]):
+                            raise AssertionError("owner provider not freshly isolated")
+                        ctx["trace"] += role[0]
+                        prior = [(item[0], item[1]) for item in ctx["roles"]]
+                        parent = r128_git(repo, "rev-list", "--parents", "-n", "1",
+                                          current).stdout.decode().split()
+                        sequence = (("TEST_AUTHOR", base, None), ("GATE_REVIEWER", current, [current, base]),
+                            ("TEST_AUTHOR", prior[1][1] if len(prior) > 1 else "", None),
+                            ("GATE_REVIEWER", current, [current, prior[1][1]] if len(prior) > 1 else []))
+                        if len(prior) > 3 or (role, current) != sequence[len(prior)][:2] or (
+                                sequence[len(prior)][2] is not None and parent != sequence[len(prior)][2]):
+                            raise AssertionError("owner review/remediation lineage mismatch")
+                        ctx["scratch_inodes"].update(inodes); ctx["scratches"].add(Path(scratch).resolve())
+                        ctx["roles"].append((role, current, Path(scratch).resolve(),
+                                             r128_refs(git_dir), _prompt))
+                        if role == "TEST_AUTHOR":
+                            delta = first_delta if current == base else _owner_delta(repo, current,
+                                {path: _owner_red(repo, current, path, kind)})
+                            ctx["deltas"].append(delta)
+                            report = {"role": role, "outcome": "READY", "frozen_gate_ready": True,
+                                "baseline_red_for_right_reason": True, "owner_decision_required": False,
+                                "blocking_findings": [], "candidate_delta": delta}
+                        elif role == "GATE_REVIEWER":
+                            review_count["n"] += 1
+                            blocked = review_count["n"] == 1 and mode != "first-ready"
+                            report = {"role": role, "outcome": "NEEDS_REMEDIATION" if blocked else "READY",
+                                "owner_decision_required": False, "blocking_findings":
+                                ([{"id": "R128-OWNER", "summary": ctx["blocker_token"]}] if blocked else []),
+                                "candidate_delta": None}
+                        else:
+                            raise AssertionError("unexpected owner role")
+                        subject = base if mode == "stale-final" and review_count["n"] == 2 else current
+                        run = _auto.AgentRun(report, None, r122 / "owner-events",
+                                             r122_result_file, subject_sha=subject)
+                        if role == "GATE_REVIEWER":
+                            ctx["review_run"] = run; ctx["reviews"].append(run)
+                        if mode == "skip-final" and review_count["n"] == 2: ctx["roles"].pop()
+                        return run
+                    def closed(repo_arg, *args, **kwargs):
+                        if tuple(args[:2]) == ("merge", "--ff-only"):
+                            ctx["forbidden"].append("adoption"); raise _auto.Stop("R128 A2 gate dependency")
+                        return _real_closed_git(repo_arg, *args, **kwargs)
+                    def no_gate(label):
+                        def blocked(*_args, **_kwargs):
+                            ctx["forbidden"].append(label); raise _auto.Stop("R128 forbidden " + label)
+                        return blocked
+                    def a2_boundary(repo_arg, wt_root_arg, label_arg, task_base,
+                                    candidate, review_run, sl_arg=None):
+                        expected_sl = sl if kind == "roadmap" else None
+                        expected_roles = 2 if mode == "first-ready" else 4
+                        if mode == "candidate-ref": r128_git(repo, "update-ref", "refs/heads/r128-mutant", candidate)
+                        if mode == "forbidden-adopt": return closed(branch_wt, "merge", "--ff-only", candidate)
+                        if mode == "arbitrary-stop": raise _auto.Stop("R128 A2 gate dependency")
+                        if (repo_arg != repo or Path(wt_root_arg) != wt_root
+                                or label_arg != label or task_base != base
+                                or len(ctx["roles"]) != expected_roles or candidate != ctx["roles"][-1][1]
+                                or review_run is not ctx["review_run"]
+                                or review_run.subject_sha != candidate or sl_arg != expected_sl
+                                or review_run.report.get("role") != "GATE_REVIEWER"
+                                or review_run.report.get("outcome") != "READY"
+                                or _auto.report_blockers(review_run.report)
+                                or review_run.report.get("candidate_delta") is not None):
+                            raise _auto.Stop("R128 invalid A2 boundary")
+                        ctx["boundary"].append((kind, candidate))
+                        raise _R128A2Boundary("R128 A2 gate dependency")
+                    def limits(repo_arg, task):
+                        value = _real_task_limits(repo_arg, task)
+                        if value != frozen_limits: raise AssertionError("owner canonical limits drift")
+                        if mode == "dynamic-limit": value = expected_limits
+                        head = r128_git(repo_arg, "rev-parse", "HEAD").stdout.decode().strip()
+                        ctx["trace"] += "L"; ctx["limit_return"] = value
+                        ctx["limits"].append((head, task.get("id"), value)); return value
+                    _auto.origin_main = lambda _repo: base; _auto._run_codex_agent = agent
+                    _auto.run_reviewed_owner_gates = a2_boundary
+                    _auto.run_gate = no_gate("legacy-gate"); _auto.run_invariants = no_gate("invariants")
+                    _auto.closed_worktree_git = closed; _auto.publish = no_gate("publication")
+                    _auto.ensure_roadmap_plan = lambda _repo: None
+                    _auto.ensure_substitution_authority = lambda _repo: None
+                    _auto.assert_materialized_cumulative_scope = _real_cumulative_scope
+                    _auto.assert_builder_scope = _real_assert_scope
+                    _auto.task_limits = limits; _auto.stage_and_commit = no_gate("scratch-staging")
+                    _flow_calls["n"] = 0; _flow_call_args.clear(); _flow_call_results.clear()
+                    _flow_materializer_spans.clear(); _flow_audit_events.clear()
+                    _flow_return_mode["value"] = "decoy" if mode == "wrong-result" else None
+                    _auto.TEST_AUTHOR_ALLOWED = (set(_real_test_author_allowed) |
+                        ({"docs/r128-*"} if mode == "nine" else set()))
+                    _r123_observer["invalid"] = False
+                    try:
+                        (_auto.test_author_flow(repo, wt_root) if kind == "h003" else
+                         _auto.roadmap_contract_flow(repo, wt_root, sl) if kind == "roadmap" else
+                         _auto.empirical_gate_contract_flow(repo, wt_root))
+                    except _R128A2Boundary as exc:
+                        ctx["stop"] = ("A2", str(exc))
+                    except _auto.Stop as exc:
+                        ctx["stop"] = ("STOP", str(exc))
+                    finally:
+                        if mode == "extra-call" and ctx["stop"] and ctx["stop"][0] == "A2":
+                            _recording_materialize(*_flow_call_args[-1])
+                        ctx["final"] = _owner_state(ctx)
+                        ctx["call_args"] = tuple(_flow_call_args); ctx["call_results"] = tuple(_flow_call_results)
+                        ctx["calls"] = _flow_calls["n"]; ctx["spans"] = tuple(_flow_materializer_spans)
+                        ctx["events"] = tuple(_flow_audit_events)
+                        ctx["invalid"] = _r123_observer["invalid"]
+                        _auto.TEST_AUTHOR_ALLOWED = set(_real_test_author_allowed)
+                    return dict(ctx)
+                def _owner_scope(repo, old, new):
+                    names = r128_git(repo, "diff", "--name-only", "--no-renames", "-z",
+                                     old, new, "--", check=False)
+                    nums = r128_git(repo, "diff", "--numstat", "--no-renames", "-z",
+                                    old, new, "--", check=False)
+                    try:
+                        paths = tuple(sorted(x.decode() for x in names.stdout.split(b"\0") if x))
+                        added = sum(int(row.split(b"\t", 1)[0]) for row in nums.stdout.split(b"\0") if row)
+                    except (UnicodeDecodeError, ValueError):
+                        return None
+                    return (paths, added) if names.returncode == nums.returncode == 0 else None
+                def _owner_endpoint(ctx, added):
+                    pre, state = ctx["pre"], ctx["final"]
+                    return (not ctx["invalid"] and isinstance(added, (set, frozenset)) and state is not None
+                        and state[0] == pre[0] and state[1] == pre[1]
+                        and state[2] == pre[2] | added
+                        and r123_odb_identity_equal(pre[3], state[3])
+                        and r123_odb_delta_ok(pre[4], state[4], added, pre[3])
+                        and state[5] == pre[5] and _flow_branch(ctx, ctx["base"])
+                        and r123_protected_clean(Path(ctx["git"]) /
+                                                 "nortropic-candidate-materialization"))
+                def _owner_materialized(ctx, candidates):
+                    if not (ctx["calls"] == len(ctx["call_args"]) == len(ctx["call_results"])
+                            == len(ctx["spans"]) == len(ctx["deltas"]) == len(candidates)):
+                        return False
+                    protected = Path(ctx["git"]) / "nortropic-candidate-materialization"
+                    parents = (ctx["base"],) + tuple(candidates[:-1])
+                    return (not ctx["invalid"] and all(
+                        r123_actual_args_ok(ctx["call_args"][n], ctx["git"], parents[n],
+                            ctx["deltas"][n], ctx["surface"], *ctx["expected_limits"],
+                            ctx["expected_limits"][0], protected)
+                        and tuple(ctx["call_results"][n]) == (candidate,
+                            r128_git(ctx["repo"], "rev-parse", f"{candidate}^{{tree}}").stdout.decode().strip(),
+                            [ctx["path"]])
+                        and r123_materializer_effects_ok(
+                            ctx["events"][ctx["spans"][n][0]:ctx["spans"][n][1]],
+                            ctx["git"], protected, ctx["roles"][n * 2][2])
+                        for n, candidate in enumerate(candidates)))
+                def _owner_ok(ctx, blocked=True):
+                    count = 4 if blocked else 2
+                    if len(ctx["roles"]) != count or ctx["pre"] is None:
+                        return False
+                    base = ctx["base"]; candidates = tuple(ctx["roles"][n][1] for n in range(1, count, 2))
+                    c1, final = candidates[0], candidates[-1]
+                    added = r123_reachable_delta(ctx["git"], final, base)
+                    scope = _owner_scope(ctx["repo"], base, final)
+                    expected_roles = [("TEST_AUTHOR", base), ("GATE_REVIEWER", c1)]
+                    if blocked: expected_roles += [("TEST_AUTHOR", c1), ("GATE_REVIEWER", final)]
+                    first = ctx["reviews"][0] if ctx["reviews"] else None
+                    first_blockers = _auto.report_blockers(first.report) if first is not None else None
+                    return (ctx["stop"] == ("A2", "R128 A2 gate dependency")
+                        and ctx["boundary"] == [(ctx["kind"], final)] and not ctx["forbidden"]
+                        and added is not None and _owner_endpoint(ctx, added)
+                        and [row[:2] for row in ctx["roles"]] == expected_roles
+                        and len({row[2] for row in ctx["roles"]}) == count
+                        and all(row[3] == ctx["pre"][1] for row in ctx["roles"])
+                        and len(ctx["reviews"]) == len(candidates) and first is not None
+                        and first.report.get("role") == "GATE_REVIEWER"
+                        and all(run.subject_sha == candidate and
+                                run.report.get("candidate_delta") is None
+                                for run, candidate in zip(ctx["reviews"], candidates))
+                        and ((blocked and first.report.get("outcome") == "NEEDS_REMEDIATION"
+                              and first_blockers == [{"id": "R128-OWNER",
+                                  "summary": ctx["blocker_token"]}]
+                              and json.dumps(first_blockers, ensure_ascii=False, indent=2) in ctx["roles"][2][4]
+                              and ctx["roles"][2][4].count(ctx["blocker_token"]) == 1)
+                             or (not blocked and first.report.get("outcome") == "READY"
+                                 and not first_blockers))
+                        and ctx["trace"] == ("LTMGTMG" if blocked else "LTMG")
+                        and all(r128_git(ctx["repo"], "rev-list", "--parents", "-n", "1",
+                            candidate).stdout.split() == [candidate.encode(), parent.encode()]
+                            for candidate, parent in zip(candidates, (base,) + candidates[:-1]))
+                        and scope is not None and scope[0] == (ctx["path"],)
+                        and scope[1] <= ctx["expected_limits"][1]
+                        and r128_git(ctx["repo"], "show", f"{c1}:{ctx['path']}").stdout
+                            == r128_git(ctx["repo"], "show", f"{base}:{ctx['path']}", check=False).stdout + b"\n# R128 C1\n"
+                        and (not blocked or r128_git(ctx["repo"], "show", f"{final}:{ctx['path']}").stdout
+                            == _owner_red(ctx["repo"], c1, ctx["path"], ctx["kind"])[0])
+                        and ctx["limit_return"] == ctx["expected_limits"]
+                        and ctx["limits"] == [(base, None if ctx["kind"] == "L" else ctx["label"],
+                                                ctx["expected_limits"])]
+                        and _owner_materialized(ctx, candidates))
+                _owner_cases = tuple(_owner_drive(kind) for kind in ("h003", "roadmap", "L"))
+                _dynamic_limit = _owner_drive("h003", "dynamic-limit")
+                _first_ready = _owner_drive("h003", "first-ready")
+                _owner_composition = (all(_owner_ok(ctx) for ctx in _owner_cases)
+                    and _owner_ok(_dynamic_limit) and _owner_ok(_first_ready, blocked=False))
+                _limit_cases = (_owner_drive("h003", "wide"), _owner_drive("h003", "nine"))
+                _owner_limits_closed = all(ctx["stop"] and ctx["stop"][0] == "STOP"
+                    and not ctx["boundary"] and not ctx["forbidden"]
+                    and len(ctx["roles"]) == 1 and ctx["calls"] == 1 and ctx["trace"] == "LTM"
+                    and ctx["roles"][0][3] == ctx["pre"][1] and not ctx["call_results"]
+                    and ctx["limits"] == [(ctx["base"], "h-003", (8, 600))]
+                    and len(ctx["call_args"]) == len(ctx["spans"]) == len(ctx["deltas"]) == 1
+                    and r123_actual_args_ok(ctx["call_args"][0], ctx["git"], ctx["base"],
+                        ctx["deltas"][0], ctx["surface"], 8, 600, 8,
+                        Path(ctx["git"]) / "nortropic-candidate-materialization")
+                    and r123_materializer_effects_ok(
+                        ctx["events"][ctx["spans"][0][0]:ctx["spans"][0][1]], ctx["git"],
+                        Path(ctx["git"]) / "nortropic-candidate-materialization",
+                        ctx["roles"][0][2], require_complete=False) and not ctx["invalid"]
+                    and _owner_endpoint(ctx, frozenset())
+                    for ctx in _limit_cases)
+                _owner_mutants = {mode: _owner_drive("h003", mode) for mode in (
+                    "arbitrary-stop", "skip-final", "stale-final", "wrong-result",
+                    "extra-call", "candidate-ref", "forbidden-adopt")}
+                _owner_mutants_closed = (all(not _owner_ok(ctx) for ctx in _owner_mutants.values())
+                    and _owner_mutants["arbitrary-stop"]["stop"] ==
+                        ("STOP", "R128 A2 gate dependency")
+                    and not _owner_mutants["arbitrary-stop"]["boundary"]
+                    and len(_owner_mutants["skip-final"]["roles"]) == 3
+                    and _owner_mutants["stale-final"]["review_run"].subject_sha ==
+                        _owner_mutants["stale-final"]["base"]
+                    and not _owner_mutants["stale-final"]["boundary"]
+                    and len(_owner_mutants["wrong-result"]["roles"]) == 1
+                    and _owner_mutants["wrong-result"]["call_results"][0][0] ==
+                        _owner_mutants["wrong-result"]["base"]
+                    and _owner_mutants["extra-call"]["calls"] == 3
+                    and _owner_mutants["candidate-ref"]["final"][1] !=
+                        _owner_mutants["candidate-ref"]["pre"][1]
+                    and _owner_mutants["forbidden-adopt"]["forbidden"] == ["adoption"])
+                _actual_surface_denied = (
+                    _flow_profile_ok and _flow_launcher_compat
+                    and _flow_ast_ownership
+                    and _owner_composition and _owner_limits_closed and _owner_mutants_closed
+                    and frozenset(_auto.TEST_AUTHOR_ALLOWED) == _real_test_author_allowed
+                    and _managed_unsafe_rejected
+                    and all(ctx["writer_stopped"] for ctx in
+                            (_positive, _decoy, _overflow, _nonzero)))
+                _actual_effect_detail = {
+                    "spans": _positive["spans"], "agents": _positive["agents"],
+                    "gates": _positive["gates"], "scope": _positive["scope"],
+                    "post_clean": _positive["post_clean"], "roots": _roots_exact,
+                    "owner": _owner_composition, "ast": _flow_ast_ownership,
+                    "limits": _owner_limits_closed, "mutants": _owner_mutants_closed,
+                    "a1a": "endpoint-only; A1b required"}
             finally:
-                Path.exists = _r123_path_exists
-                Path.is_dir = _r123_path_is_dir
+                _r128_restore_observers()
+                if "_real_closed_git" in locals():
+                    _auto.closed_worktree_git = _real_closed_git
                 _product_module.materialize = _pmat
                 sys.modules.pop(_auto_name, None)
                 if _sys_path_added:
@@ -15756,8 +17661,10 @@ def materialize(a, b, c, d, e, f, g, h):
                 and _actual_import_effects_ok
                 and _product_direct_positive and _product_semantic_positive
                 and _product_negatives
+                and managed_real_ok
                 and _actual_success and _connected_decoy_rejected
-                and _actual_nonzero
+                and _cumulative_rejected
+                and _actual_nonzero and _actual_surface_denied
                 and r122_identity_oracle_rig and _product_final_unchanged)
             r122_boundary_detail = (
                 f"direct={_product_direct_positive} semantic={_product_semantic_positive} "
@@ -15767,18 +17674,19 @@ def materialize(a, b, c, d, e, f, g, h):
                 f"definition_event_names={_auto_import_events} "
                 f"definition_rejection={_auto_import_rejection} "
                 f"negatives={_product_negatives} "
+                f"managed_real={managed_real_ok} "
                 f"actual_success={_actual_success} decoy={_connected_decoy_rejected} "
+                f"cumulative={_cumulative_rejected} "
                 f"actual_nonzero={_actual_nonzero} "
                 f"identity_rig={r122_identity_oracle_rig} final_unchanged={_product_final_unchanged} "
                 f"actual_args={_actual_args} effects={_actual_effects} "
                 f"effect_detail={_actual_effect_detail} "
                 f"semantic_failures={_product_semantic_failures} "
                 f"surface_denied={_actual_surface_denied} "
-                f"calls={_flow_calls['n']} candidate={_flow_candidate['sha']}")
+                f"calls={_flow_calls['n']} candidate={_captured}")
         except Exception as _pexc:
-            if "_r123_path_exists" in locals():
-                Path.exists = _r123_path_exists
-                Path.is_dir = _r123_path_is_dir
+            if "_r128_restore_observers" in locals():
+                _r128_restore_observers()
             if ("_product_module" in locals() and "_pmat" in locals()
                     and "_recording_materialize" in locals()
                     and getattr(_product_module, "materialize", None)
