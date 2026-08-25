@@ -1,0 +1,1851 @@
+#!/usr/bin/env python3
+"""Frozen H-036 owner prerequisite gate.
+
+No argument is the canonical gate.  Before product bytes exist it is RED only
+for the exact runtime-supervisor absence.  After product publication the same
+command runs the subject through the public launcher.  ``--product`` adds an
+object-derived direct-child identity proof.  ``--reference-host`` is a
+judge-only architecture satisfiability lane and can never credit the subject.
+"""
+
+from __future__ import annotations
+
+import sys
+
+sys.dont_write_bytecode = True
+
+import array
+import errno
+import hashlib
+import json
+import os
+import plistlib
+import re
+import shutil
+import signal
+import socket
+import stat
+import struct
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+GATE = ROOT / "verify/bin/h-036-exit"
+CLI = ROOT / "controller/launch/cli"
+HELPER = ROOT / "controller/launch/runtime_snapshot.py"
+CONFIG = ROOT / "config/python-runtime-authority-v2.json"
+V1_CONFIG = ROOT / "config/python-interpreter-authority-v1.json"
+REGISTRY = ROOT / "specs/owner-production-paths.v1.json"
+OWNER_WORKFLOW = ROOT / "docs/loop/owner-author-workflow-v1.md"
+DECISION_LOG = ROOT / "docs/05-beslutslogg.md"
+DRIFT = ROOT / "docs/loop/drift.md"
+H017_GATE = ROOT / "verify/bin/h-017-exit"
+H034_GATE = ROOT / "verify/bin/h-034-exit"
+H035_GATE = ROOT / "verify/bin/h-035-exit"
+H037_GATE = ROOT / "verify/bin/h-037-exit"
+DELEGATION = ROOT / "docs/loop/remaining-bootstrap-delegation-v1.md"
+CONSTITUTION = ROOT / "docs/07-konstitution.md"
+AUTOPILOT = ROOT / "scripts/nortropic-codex-autopilot.py"
+AUTHORITY_CORE = ROOT / "controller/authority/core.py"
+
+TRUSTED_GIT = Path("/usr/bin/git")
+TRUSTED_GIT_SHA256 = "506cb2ddd061e2992c8ee7c53853340688b53d9fcec94c3aa936524cea5b40cb"
+TRUSTED_GIT_VERSION = "git version 2.50.1 (Apple Git-155)"
+SANDBOX_EXEC = Path("/usr/bin/sandbox-exec")
+SANDBOX_EXEC_SHA256 = "2f447acfae7a954ccb5a1bcf3a1955f69b1a8549c434ddff643df98fd3cb33ba"
+SANDBOX_EXEC_CDHASH = "b79517f5e794aa918ea253d144534e6aa21b5970"
+PYTHON_SOURCE = Path(
+    "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/"
+    "Python.framework/Versions/3.12/bin/python3.12"
+)
+PYTHON_SHA256 = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+PYTHON_VERSION = "3.12.13"
+V1_CONFIG_SHA256 = "2c609508a082d7068ca85182382988f89a9e29148831fc12f2bd8ddc207e5986"
+
+PUBLISHED_H034_SHA = "b17d0941f9376505f2bf76f4ce10b3019d978054"
+PUBLISHED_H034_TREE = "4a22c991b2bba098239f492bd9fc1e06cc8cd1c6"
+PUBLISHED_H034_PARENTS = [
+    "deee79550fa1a4762d1b3cda06192b7940d05ff0",
+    "e60fbc40e5f7b1b08ad3427f2ab00eff4744a00e",
+]
+H034_REVIEW_SHA256 = "2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474"
+H034_REVIEW_CANDIDATE = "e60fbc40e5f7b1b08ad3427f2ab00eff4744a00e"
+H034_REVIEW_TREE = PUBLISHED_H034_TREE
+REGISTRY_SHA256 = "3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256"
+OLD_CLI_SHA256 = "cb1cf372ccedec2eb0e8e379ca2da766671c40347749b807068114f23668cf0e"
+
+PINNED_UNCHANGED = {
+    "verify/bin/h-017-exit": "78b9d1f4fed9fa0d4c9e587dfc0069e9532a5cd8653a697b29a275a4d46ea983",
+    "verify/bin/h-034-exit": "e2b8ec23a85105e07573c4c4806fb26ea1414840bf1c36d1356bd642fdf5f350",
+    "verify/bin/h-035-exit": "cae895110129f5066be9ae7f770e7f4e96594698ef5500d586820fea472d27e2",
+    "verify/bin/h-037-exit": "814deb69fbc6e34e57ebc89b62bf7d54281bc95a4207332ff94792d90d0e6dc3",
+    "docs/loop/remaining-bootstrap-delegation-v1.md": "0ad4cbc03b3b70c6b61ef6adc76a31decd4300f2b6a8a2b9f632c3f6719ac36f",
+    "docs/07-konstitution.md": "1bda41f6e26291d70a93b51ff53bd583c052b40631e72c368ce564ffc2816837",
+    "scripts/nortropic-codex-autopilot.py": "4237eda9fd4554ed3d7ed78fc33c0e5f27f5d270ae21ff9e9d9f0d9467caa9fc",
+    "controller/authority/core.py": "a56398870ca9716b79c701c69e1eda401452c03471c977ebdfe4e210b9b6b1a2",
+    "config/python-interpreter-authority-v1.json": V1_CONFIG_SHA256,
+    "specs/owner-production-paths.v1.json": REGISTRY_SHA256,
+}
+
+PRODUCT_PATHS = [
+    "controller/launch/cli",
+    "controller/launch/runtime_snapshot.py",
+    "config/python-runtime-authority-v2.json",
+]
+PRODUCT_MODES = {
+    "controller/launch/cli": "100755",
+    "controller/launch/runtime_snapshot.py": "100644",
+    "config/python-runtime-authority-v2.json": "100644",
+}
+TEST_AUTHOR_SURFACE = [
+    "specs/tasks.spec.json",
+    "verify/bin/h-036-exit",
+    "docs/loop/owner-author-workflow-v1.md",
+    "docs/05-beslutslogg.md",
+    "docs/loop/drift.md",
+]
+MAX_ADDED_LINES = 2400
+TASK_CANONICAL_SHA256 = "65d35885194590c5d4ab54a79508000b57a1bad3a19ab01aa607a003b96a36ec"
+H032_TASK_CANONICAL_SHA256 = "436d4ff0a7323e8f682325db308237c0018b7a5037303a17c26aae9b7df6c864"
+H034_TASK_CANONICAL_SHA256 = "6d65b38f7f91bfba468334beb89f1deeeb460ab497c98ea6267b6fd8234f2935"
+H035_TASK_CANONICAL_SHA256 = "f854ddc0b5ca05b87cbaf15431f58c59803be586d6d9ff67d14e40e8a5970f22"
+H037_TASK_CANONICAL_SHA256 = "63662e129fb0b223f84669814cef70f331c5fd39441dad0bd79712d7e3dc3efb"
+
+LABEL = "A_H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_OPERATIONAL"
+REASON = "RUNTIME_SNAPSHOT_AND_V2_AUTHORITY_ABSENT"
+FAILURE_SIGNATURE = [
+    "CURRENT_LAUNCHER_SHA256_CB1CF372CCED",
+    "RUNTIME_SNAPSHOT_ABSENT",
+    "PYTHON_RUNTIME_AUTHORITY_V2_ABSENT",
+    "NESTED_SANDBOX_EXEC_EXIT_71_SANDBOX_APPLY_OPERATION_NOT_PERMITTED",
+]
+H034_TEMPORAL_RED_LABELS = [
+    "F_R15_H036_TASK_NOT_MATERIALIZED_BEFORE_H034_PUBLICATION",
+    "F_R15_H036_TASK_GATE_PRODUCT_EXACT_ZERO_BEFORE_H034_PUBLICATION",
+]
+
+EXPECTED_REGISTRY = {
+    "schema_version": 2,
+    "path_grammar": "repo-tree-exact-or-terminal-recursive-prefix-v1",
+    "authority_source": "git-candidate-plus-independent-gate-review-plus-owner-final-freeze",
+    "self_digest_is_authority": False,
+    "owner_production_paths": [
+        "controller/h034-native/**",
+        "verify/h034/kernel",
+        "verify/h034/build-recipe.json",
+        "verify/h034/identity-manifest.json",
+        *PRODUCT_PATHS,
+    ],
+    "prospective_ordinary_protected_paths": [
+        "specs/tasks.spec.json",
+        "specs/owner-production-paths.v1.json",
+        "verify/bin/**",
+        "controller/authority/**",
+        "controller/policy/**",
+        "controller/taskval/**",
+        "controller/envelope/**",
+        "controller/state/**",
+        "controller/attest/**",
+        "controller/loop/**",
+        "scripts/nortropic-codex-autopilot.py",
+        "scripts/check-invariants.mjs",
+    ],
+    "owner_author_global_denied_paths": [
+        "specs/**",
+        "verify/bin/**",
+        "tests/**",
+        "controller/authority/**",
+        "controller/policy/**",
+        "controller/taskval/**",
+        "controller/envelope/**",
+        "controller/state/**",
+        "controller/attest/**",
+        "controller/loop/**",
+        "scripts/nortropic-codex-autopilot.py",
+        "scripts/check-invariants.mjs",
+    ],
+}
+
+CONFIG_STATIC = {
+    "schema_version": 2,
+    "authority_version": "python-runtime-supervisor-v2",
+    "inherits": {
+        "path": "config/python-interpreter-authority-v1.json",
+        "sha256": V1_CONFIG_SHA256,
+    },
+    "python": {
+        "canonical_path": str(PYTHON_SOURCE),
+        "python_version": PYTHON_VERSION,
+        "executable_sha256": PYTHON_SHA256,
+        "isolated_flags": ["-I", "-S"],
+        "child_flags": ["-I", "-S", "-B"],
+        "bytecode_disabled_before_sibling_import": True,
+        "accepted_runtime": "canonical-or-private-0500-same-bytes-snapshot",
+        "stable_open_nofollow": True,
+        "path_lookup_allowed": False,
+        "requester_override_allowed": False,
+        "usr_bin_env_allowed": False,
+        "system_python_3_9_allowed": False,
+    },
+    "products": {
+        "launcher": {
+            "path": "controller/launch/cli",
+            "git_mode": "100755",
+        },
+        "runtime_snapshot": {
+            "path": "controller/launch/runtime_snapshot.py",
+            "git_mode": "100644",
+        },
+    },
+    "seatbelt": {
+        "path": "/usr/bin/sandbox-exec",
+        "sha256": SANDBOX_EXEC_SHA256,
+        "cdhash": SANDBOX_EXEC_CDHASH,
+        "profile_id": "H036_MONOTONIC_WORKSPACE_SUBSET_V1",
+        "parameter_order": [
+            "LIVE_ROOT",
+            "LIVE_GIT",
+            "GIT_OBJECTS",
+            "GIT_OBJECTS_INFO",
+            "WORKTREE_GITDIR",
+            "WORKTREE_COMMDIR",
+            "WORKTREE_GITFILE",
+            "WORKTREE_CONFIG",
+            "TRUST_ROOT",
+            "RUNTIME_ROOT",
+            "ANCESTOR_WORKSPACE",
+            "CURRENT_WORKSPACE",
+            "CURRENT_WORKSPACE_DOTGIT",
+            "STAGING_ROOT",
+            "RESULT_SINK",
+        ],
+        "caller_profile_allowed": False,
+        "already_sandboxed_equivalence_allowed": False,
+        "raw_fallback_allowed": False,
+    },
+    "protocol": {
+        "id": "H036_AF_UNIX_CAPABILITY_V1",
+        "socket_family": "AF_UNIX",
+        "socket_type": "SOCK_STREAM",
+        "peer_options": ["LOCAL_PEERPID", "LOCAL_PEERTOKEN"],
+        "peer_claim_fields": ["peer_euid", "peer_pid"],
+        "peer_identity_role": "current-connection-anti-spoof-not-profile-authority",
+        "original_outer_leader_pid_equality": False,
+        "authority_source": "capability-to-server-owned-profile-state",
+        "frame": "u32be-length-strict-json-or-raw-bytes",
+        "schema_version": 1,
+        "operation": "launch-v1",
+        "header_keys": [
+            "argv", "capability", "cwd_relative_components", "envelope_length",
+            "environment", "operation", "peer_euid", "peer_pid", "request_nonce",
+            "schema_version", "session_id", "timeout_milliseconds",
+        ],
+        "request_limit_bytes": 1048576,
+        "envelope_limit_bytes": 1048576,
+        "response_limit_bytes": 1048576,
+        "runtime_root_parent": "/private/tmp",
+        "runtime_root_prefix": ".nortropic-h036-runtime-",
+        "runtime_root_mode": "0500",
+        "socket_mode": "0600",
+        "max_depth": 16,
+        "max_active_children": 32,
+        "handshake_timeout_seconds": 5.0,
+        "termination_grace_seconds": 2.0,
+        "reap_timeout_seconds": 5.0,
+    },
+    "supervisor_environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin",
+    },
+    "target_environment": {
+        "strip_prefixes": ["DYLD_", "GIT_", "GH_", "GITHUB_", "PYTHON", "SLACK_"],
+        "strip_exact": [
+            "LD_LIBRARY_PATH", "LD_PRELOAD", "NORTROPIC_TRUST_ROOT",
+            "NORTROPIC_STAGING_ROOT", "NORTROPIC_RESULT_SINK",
+            "__PYVENV_LAUNCHER__",
+        ],
+        "reserved_prefix": "NORTROPIC_H036_",
+        "add_exact": [
+            "NORTROPIC_KUVERT",
+            "NORTROPIC_H036_CAPABILITY",
+            "NORTROPIC_H036_LEVEL",
+            "NORTROPIC_H036_SESSION_ID",
+            "NORTROPIC_H036_SOCKET",
+        ],
+    },
+    "authority": {
+        "config_override_allowed": False,
+        "live_root_override_allowed": False,
+        "runtime_root_override_allowed": False,
+        "socket_path_override_allowed": False,
+        "profile_override_allowed": False,
+        "helper_override_allowed": False,
+        "credential_delegation_allowed": False,
+        "native_broker_allowed": False,
+    },
+}
+
+passed = 0
+failed = 0
+failed_labels: list[tuple[str, str]] = []
+
+
+class Rig(Exception):
+    pass
+
+
+class Undecidable(Exception):
+    pass
+
+
+def sha(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def path_sha(path: Path) -> str:
+    return sha(path.read_bytes())
+
+
+def strict_json(raw: bytes) -> Any:
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in items:
+            if key in result:
+                raise Rig(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        text = raw.decode("utf-8")
+        value = json.loads(text, object_pairs_hook=pairs)
+    except (UnicodeError, ValueError) as exc:
+        raise Rig(f"strict JSON rejected: {exc}") from exc
+    return value
+
+
+def canonical_sha(value: Any) -> str:
+    return sha(json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8"))
+
+
+def check(condition: bool, label: str, detail: Any = "") -> None:
+    global passed, failed
+    if condition:
+        passed += 1
+        print(f"PASS {label}")
+    else:
+        failed += 1
+        if not isinstance(detail, str):
+            detail = json.dumps(detail, ensure_ascii=False, sort_keys=True)
+        failed_labels.append((label, detail))
+        print(f"FAIL {label}" + (f" — {detail}" if detail else ""))
+
+
+def closed_git_env(temp: Path | None = None) -> dict[str, str]:
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "HOME": "/var/empty",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_PAGER": "cat",
+        "PAGER": "cat",
+    }
+    if temp is not None:
+        env["TMPDIR"] = str(temp.resolve(strict=True))
+    return env
+
+
+def trusted_git_valid() -> bool:
+    if not TRUSTED_GIT.is_file() or TRUSTED_GIT.is_symlink():
+        return False
+    if path_sha(TRUSTED_GIT) != TRUSTED_GIT_SHA256:
+        return False
+    run = subprocess.run(
+        [str(TRUSTED_GIT), "--version"], env=closed_git_env(), cwd=ROOT,
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, timeout=5, check=False,
+    )
+    return run.returncode == 0 and run.stdout.strip() == TRUSTED_GIT_VERSION
+
+
+def git(*args: str, text: bool = False, check_result: bool = True) -> bytes | str:
+    argv = [
+        str(TRUSTED_GIT), "--no-replace-objects", "--no-pager",
+        "--literal-pathspecs", *args,
+    ]
+    run = subprocess.run(
+        argv, cwd=ROOT, env=closed_git_env(), stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
+        check=False,
+    )
+    if check_result and run.returncode != 0:
+        raise Rig(
+            f"trusted git failed rc={run.returncode} argv={args!r}: "
+            f"{run.stderr.decode('utf-8', 'replace')[:300]}"
+        )
+    return run.stdout.decode("utf-8") if text else run.stdout
+
+
+def raw_commit(oid: str) -> tuple[str, list[str]]:
+    raw = git("cat-file", "commit", oid)
+    assert isinstance(raw, bytes)
+    header = raw.split(b"\n\n", 1)[0].splitlines()
+    trees = [line[5:].decode("ascii") for line in header if line.startswith(b"tree ")]
+    parents = [line[7:].decode("ascii") for line in header if line.startswith(b"parent ")]
+    if len(trees) != 1 or not all(re.fullmatch(r"[0-9a-f]{40}", x) for x in [*trees, *parents]):
+        raise Rig(f"noncanonical commit core: {oid}")
+    return trees[0], parents
+
+
+def git_blob(commit: str, path: str, *, optional: bool = False) -> tuple[str, str, bytes] | None:
+    listing = git("ls-tree", "-z", commit, "--", path)
+    assert isinstance(listing, bytes)
+    entries = [item for item in listing.split(b"\0") if item]
+    if not entries and optional:
+        return None
+    if len(entries) != 1:
+        raise Rig(f"tree cardinality for {commit}:{path}: {len(entries)}")
+    meta, raw_path = entries[0].split(b"\t", 1)
+    mode, kind, oid = meta.decode("ascii").split(" ")
+    if raw_path.decode("utf-8") != path or kind != "blob":
+        raise Rig(f"tree identity for {commit}:{path}")
+    blob = git("cat-file", "blob", oid)
+    assert isinstance(blob, bytes)
+    return mode, oid, blob
+
+
+def published_h034_identity() -> bool:
+    tree, parents = raw_commit(PUBLISHED_H034_SHA)
+    if tree != PUBLISHED_H034_TREE or parents != PUBLISHED_H034_PARENTS:
+        return False
+    candidate_tree, candidate_parents = raw_commit(H034_REVIEW_CANDIDATE)
+    if candidate_tree != H034_REVIEW_TREE or candidate_parents != [PUBLISHED_H034_PARENTS[0]]:
+        return False
+    h034 = git_blob(PUBLISHED_H034_SHA, "verify/bin/h-034-exit")
+    registry = git_blob(PUBLISHED_H034_SHA, "specs/owner-production-paths.v1.json")
+    if h034 is None or registry is None:
+        return False
+    return sha(h034[2]) == PINNED_UNCHANGED["verify/bin/h-034-exit"] \
+        and sha(registry[2]) == REGISTRY_SHA256
+
+
+def config_oracle(
+    document: Any, expected_launcher_sha: str, expected_helper_sha: str,
+) -> tuple[bool, str]:
+    if not isinstance(document, dict):
+        return False, "config is not object"
+    expected = json.loads(json.dumps(CONFIG_STATIC))
+    products = document.get("products")
+    seatbelt = document.get("seatbelt")
+    if not isinstance(products, dict) or not isinstance(seatbelt, dict):
+        return False, "missing product or seatbelt section"
+    launcher = products.get("launcher")
+    helper = products.get("runtime_snapshot")
+    if not isinstance(launcher, dict) or not isinstance(helper, dict):
+        return False, "bad product section"
+    launcher_sha = launcher.get("sha256")
+    helper_sha = helper.get("sha256")
+    profile_sha = seatbelt.get("profile_sha256")
+    if not all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+               for value in (launcher_sha, helper_sha, profile_sha)):
+        return False, "dynamic digest format"
+    expected["products"]["launcher"]["sha256"] = launcher_sha
+    expected["products"]["runtime_snapshot"]["sha256"] = helper_sha
+    expected["seatbelt"]["profile_sha256"] = profile_sha
+    if document != expected:
+        return False, "strict config shape/value mismatch"
+    if launcher_sha != expected_launcher_sha or helper_sha != expected_helper_sha:
+        return False, "config product digest mismatch"
+    forbidden_fragments = (
+        str(ROOT), "/Users/", "session_id_value", "requester_path_value",
+        "profile_override_path_value", "config_self_sha256",
+    )
+    serialized = json.dumps(document, sort_keys=True, separators=(",", ":"))
+    if any(fragment in serialized for fragment in forbidden_fragments):
+        return False, "config contains live/session/socket/requester/self authority"
+    return True, profile_sha
+
+
+def exact_config(raw: bytes) -> tuple[bool, str]:
+    try:
+        document = strict_json(raw)
+    except Rig as exc:
+        return False, str(exc)
+    return config_oracle(document, path_sha(CLI), path_sha(HELPER))
+
+
+def config_oracle_selftests() -> bool:
+    launcher_sha = "11" * 32
+    helper_sha = "22" * 32
+    profile_sha = "33" * 32
+    good = json.loads(json.dumps(CONFIG_STATIC))
+    good["products"]["launcher"]["sha256"] = launcher_sha
+    good["products"]["runtime_snapshot"]["sha256"] = helper_sha
+    good["seatbelt"]["profile_sha256"] = profile_sha
+    if not config_oracle(good, launcher_sha, helper_sha)[0]:
+        return False
+    mutants: list[dict[str, Any]] = []
+    for flags in (["-I", "-S"], ["-I", "-S", "-B", "-B"], ["-B", "-I", "-S"]):
+        mutant = json.loads(json.dumps(good))
+        mutant["python"]["child_flags"] = flags
+        mutants.append(mutant)
+    v1_drift = json.loads(json.dumps(good))
+    v1_drift["python"]["isolated_flags"] = ["-I", "-S", "-B"]
+    mutants.append(v1_drift)
+    self_digest = json.loads(json.dumps(good))
+    self_digest["config_self_sha256"] = "44" * 32
+    mutants.append(self_digest)
+    live = json.loads(json.dumps(good))
+    live["live_root"] = str(ROOT)
+    mutants.append(live)
+    override = json.loads(json.dumps(good))
+    override["authority"]["profile_override_allowed"] = True
+    mutants.append(override)
+    inherited = json.loads(json.dumps(good))
+    inherited["inherits"]["sha256"] = "00" * 32
+    mutants.append(inherited)
+    return all(not config_oracle(mutant, launcher_sha, helper_sha)[0] for mutant in mutants)
+
+
+def task_rows(spec: dict[str, Any], task_id: str) -> list[dict[str, Any]]:
+    tasks = spec.get("tasks")
+    if not isinstance(tasks, list):
+        raise Rig("task spec lacks tasks list")
+    return [row for row in tasks if isinstance(row, dict) and row.get("id") == task_id]
+
+
+def static_contract_checks() -> None:
+    check(trusted_git_valid(), "F_H036_TRUSTED_GIT_IDENTITY")
+    check(published_h034_identity(), "F_H036_PUBLISHED_H034_MERGE_TREE_AND_ORDERED_PARENTS")
+    check(
+        H034_REVIEW_SHA256 == "2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474"
+        and H034_REVIEW_CANDIDATE == PUBLISHED_H034_PARENTS[1]
+        and H034_REVIEW_TREE == PUBLISHED_H034_TREE,
+        "F_H036_H034_INDEPENDENT_READY_REVIEW_IDENTITY_PINNED",
+    )
+    check(
+        all((ROOT / path).is_file() and not (ROOT / path).is_symlink()
+            and path_sha(ROOT / path) == digest
+            for path, digest in PINNED_UNCHANGED.items()),
+        "F_H036_H017_H034_H035_H037_DELEGATION_CONSTITUTION_AUTOPILOT_AUTHORITY_PRESERVED",
+    )
+    registry = strict_json(REGISTRY.read_bytes())
+    check(registry == EXPECTED_REGISTRY, "F_H036_REGISTRY_V2_EXACT_ORDERED_UNION7")
+    check(config_oracle_selftests(),
+          "J_H036_STRICT_V2_V1_INHERITANCE_B_FLAG_AND_NO_OVERRIDE_CONFIG_ORACLE")
+
+    spec = strict_json(SPEC.read_bytes())
+    if not isinstance(spec, dict):
+        raise Rig("task spec is not object")
+    h036 = task_rows(spec, "h-036")
+    check(len(h036) == 1, "F_H036_EXACTLY_ONE_TASK")
+    if len(h036) != 1:
+        raise Rig("H036 task cardinality prevents exact checks")
+    task = h036[0]
+    check(
+        task.get("authority_class") == "owner_authority"
+        and task.get("allowed_write") == []
+        and task.get("owner_author_allowed_write") == PRODUCT_PATHS
+        and task.get("docs_impact") == []
+        and task.get("depends_on") == ["h-034"]
+        and task.get("exit_test") == "verify/bin/h-036-exit"
+        and task.get("max_changed_files") == 3
+        and task.get("max_added_lines") == MAX_ADDED_LINES,
+        "F_H036_EXACT_OWNER_TASK_DEPENDENCY_SURFACE_AND_BUDGET",
+    )
+    observed_task_sha = canonical_sha(task)
+    check(observed_task_sha == TASK_CANONICAL_SHA256,
+          "F_H036_EXACT_FROZEN_TASK_AND_RUNTIME_CONTRACT",
+          {"expected": TASK_CANONICAL_SHA256, "observed": observed_task_sha})
+    contract = task.get("h036_pre_sandbox_runtime_supervisor")
+    check(
+        isinstance(contract, dict)
+        and contract.get("product_identity", {}).get("paths_and_modes")
+            == [[path, PRODUCT_MODES[path]] for path in PRODUCT_PATHS]
+        and contract.get("future_dependency_transition", {}).get("h032_later_depends_exactly_on")
+            == ["h-036"]
+        and contract.get("prerequisite_publication", {}).get("completed_phase_gate_transition", {})
+            .get("after_h036_expected_red_labels") == H034_TEMPORAL_RED_LABELS
+        and contract.get("prerequisite_publication", {}).get("completed_phase_gate_transition", {})
+            .get("post_h036_green_claim_forbidden") is True,
+        "F_H036_THREE_PATH_RUNTIME_AND_TEMPORAL_DEPENDENCY_CONTRACT",
+    )
+    protocol = contract.get("handoff_protocol", {}) if isinstance(contract, dict) else {}
+    check(
+        protocol.get("peer_identity_is_authority") is False
+        and protocol.get("original_outer_leader_pid_equality") is False
+        and protocol.get("authority_source")
+            == "UNFORGEABLE_CAPABILITY_TO_SERVER_OWNED_PROFILE_STATE_ONLY",
+        "J_H036_DESCENDANT_PEER_IDENTITY_NOT_OUTER_LEADER_AUTHORITY",
+    )
+    expected_task_shas = {
+        "h-032": H032_TASK_CANONICAL_SHA256,
+        "h-034": H034_TASK_CANONICAL_SHA256,
+        "h-035": H035_TASK_CANONICAL_SHA256,
+        "h-037": H037_TASK_CANONICAL_SHA256,
+    }
+    check(all(len(task_rows(spec, task_id)) == 1
+              and canonical_sha(task_rows(spec, task_id)[0]) == digest
+              for task_id, digest in expected_task_shas.items()),
+          "F_H036_H032_H034_H035_H037_TASK_ROWS_PRESERVED")
+
+    owner = OWNER_WORKFLOW.read_text(encoding="utf-8")
+    decision = DECISION_LOG.read_text(encoding="utf-8")
+    drift = DRIFT.read_text(encoding="utf-8")
+    owner_terms = (
+        "<!-- H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_CONTRACT_V1 -->",
+        PUBLISHED_H034_SHA,
+        H034_REVIEW_SHA256,
+        "H-036 depends exactly on published H-034",
+        "LOCAL_PEERTOKEN",
+        "post-profile syscall proof",
+        "verify/bin/h-036-exit --product <base-sha> <candidate-sha>",
+        "H-032 later depends exactly on published H-036",
+        "not a post-H-036 green",
+    )
+    check(all(term in owner for term in owner_terms),
+          "F_H036_OWNER_WORKFLOW_AUTHORITY_AND_LIFECYCLE_CONTRACT")
+    check(decision.count("H-036 pre-sandbox runtime supervisor contract") == 1,
+          "F_H036_DECISION_LOG_SINGLE_ENTRY")
+    check(drift.count("## 2026-08-25 — H-036 pre-sandbox runtime supervisor contract") == 1,
+          "F_H036_DRIFT_SINGLE_ENTRY")
+
+
+def product_phase() -> str:
+    helper = HELPER.exists()
+    config = CONFIG.exists()
+    if not helper and not config and path_sha(CLI) == OLD_CLI_SHA256:
+        return "preproduct"
+    if helper and config and path_sha(CLI) != OLD_CLI_SHA256:
+        if not HELPER.is_file() or HELPER.is_symlink() or not CONFIG.is_file() or CONFIG.is_symlink():
+            raise Rig("product path type is not regular no-symlink")
+        ok, detail = exact_config(CONFIG.read_bytes())
+        if not ok:
+            raise Rig(f"runtime authority v2 rejected: {detail}")
+        return "product"
+    raise Rig("partial, unchanged, or path-type-invalid H036 product state")
+
+
+def diff_entries(base: str, candidate: str) -> list[tuple[str, str]]:
+    raw = git("diff-tree", "-r", "--no-commit-id", "--name-status", "-z",
+              "--no-renames", base, candidate)
+    assert isinstance(raw, bytes)
+    fields = raw.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    if len(fields) % 2:
+        raise Rig("malformed diff-tree output")
+    result: list[tuple[str, str]] = []
+    for index in range(0, len(fields), 2):
+        status_text = fields[index].decode("ascii")
+        path = fields[index + 1].decode("utf-8")
+        if status_text not in {"A", "M"}:
+            raise Rig(f"unexpected product status: {status_text}")
+        result.append((status_text, path))
+    return result
+
+
+def added_lines(base: str, candidate: str) -> tuple[int, dict[str, int]]:
+    raw = git("diff", "--numstat", "-z", "--no-renames", base, candidate,
+              "--", *PRODUCT_PATHS)
+    assert isinstance(raw, bytes)
+    rows = [row for row in raw.split(b"\0") if row]
+    per_path: dict[str, int] = {}
+    for row in rows:
+        fields = row.decode("utf-8").split("\t")
+        if len(fields) != 3 or fields[0] == "-" or fields[1] == "-":
+            raise Rig("binary or malformed numstat product")
+        per_path[fields[2]] = int(fields[0])
+    return sum(per_path.values()), per_path
+
+
+def checkout_clean(candidate: str) -> bool:
+    head = str(git("rev-parse", "--verify", "HEAD", text=True)).strip()
+    if head != candidate:
+        return False
+    status_raw = git("status", "--porcelain=v2", "-z", "--untracked-files=all")
+    assert isinstance(status_raw, bytes)
+    if status_raw:
+        return False
+    flags = git("ls-files", "-v", "-z")
+    assert isinstance(flags, bytes)
+    # Lowercase prefix means assume-unchanged; S/s means skip-worktree.
+    for item in [x for x in flags.split(b"\0") if x]:
+        prefix = item[:1]
+        if prefix.islower() or prefix in {b"S", b"s"}:
+            return False
+    return True
+
+
+def product_identity(base: str, candidate: str) -> tuple[bool, dict[str, Any]]:
+    detail: dict[str, Any] = {"base": base, "candidate": candidate}
+    if not re.fullmatch(r"[0-9a-f]{40}", base) or not re.fullmatch(r"[0-9a-f]{40}", candidate):
+        return False, {**detail, "reason": "noncanonical oid"}
+    try:
+        _base_tree, _base_parents = raw_commit(base)
+        _candidate_tree, candidate_parents = raw_commit(candidate)
+        detail["candidate_parents"] = candidate_parents
+        if candidate_parents != [base]:
+            return False, {**detail, "reason": "not direct single child"}
+        if not checkout_clean(candidate):
+            return False, {**detail, "reason": "HEAD or physical/index state not clean"}
+        changed = diff_entries(base, candidate)
+        detail["changed"] = changed
+        if changed != [
+            ("M", "controller/launch/cli"),
+            ("A", "controller/launch/runtime_snapshot.py"),
+            ("A", "config/python-runtime-authority-v2.json"),
+        ]:
+            return False, {**detail, "reason": "wrong exact no-renames diff"}
+        for path in PRODUCT_PATHS:
+            before = git_blob(base, path, optional=True)
+            after = git_blob(candidate, path)
+            if after is None or after[0] != PRODUCT_MODES[path]:
+                return False, {**detail, "reason": f"wrong candidate mode/type {path}"}
+            if path == "controller/launch/cli":
+                if before is None or before[0] != "100755" or sha(before[2]) != OLD_CLI_SHA256:
+                    return False, {**detail, "reason": "wrong preproduct launcher identity"}
+            elif before is not None:
+                return False, {**detail, "reason": f"new path already exists at base: {path}"}
+            if after[2] != (ROOT / path).read_bytes():
+                return False, {**detail, "reason": f"checkout/object mismatch: {path}"}
+        total, per_path = added_lines(base, candidate)
+        detail["added_lines"] = total
+        detail["added_by_path"] = per_path
+        if set(per_path) != set(PRODUCT_PATHS) or total > MAX_ADDED_LINES:
+            return False, {**detail, "reason": "cumulative product line budget"}
+        for path in ("specs/tasks.spec.json", "verify/bin/h-036-exit"):
+            before = git_blob(base, path)
+            after = git_blob(candidate, path)
+            if before is None or after is None or before[1] != after[1] \
+                    or after[2] != (ROOT / path).read_bytes():
+                return False, {**detail, "reason": f"frozen contract changed: {path}"}
+        ok, why = exact_config(CONFIG.read_bytes())
+        if not ok:
+            return False, {**detail, "reason": why}
+        if git_blob(candidate, "config/python-runtime-authority-v2.json")[2] != CONFIG.read_bytes():
+            return False, {**detail, "reason": "config not candidate object"}
+    except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
+        return False, {**detail, "reason": str(exc)}
+    return True, detail
+
+
+def host_preflight() -> None:
+    if sys.platform != "darwin":
+        raise Undecidable("H036 requires the authorized macOS host")
+    if not SANDBOX_EXEC.is_file() or SANDBOX_EXEC.is_symlink() \
+            or path_sha(SANDBOX_EXEC) != SANDBOX_EXEC_SHA256:
+        raise Undecidable("pinned /usr/bin/sandbox-exec unavailable")
+    if not PYTHON_SOURCE.is_file() or PYTHON_SOURCE.is_symlink() \
+            or path_sha(PYTHON_SOURCE) != PYTHON_SHA256:
+        raise Undecidable("pinned Python 3.12.13 unavailable")
+    version = subprocess.run(
+        [str(PYTHON_SOURCE), "-I", "-S", "-B", "-c",
+         "import sys;print(sys.version.split()[0])"],
+        env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, timeout=5, check=False,
+    )
+    if version.returncode != 0 or version.stdout.strip() != PYTHON_VERSION:
+        raise Undecidable("pinned Python version mismatch")
+    probe = subprocess.run(
+        [str(SANDBOX_EXEC), "-p", "(version 1)\n(allow default)", "/usr/bin/true"],
+        env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, timeout=5, check=False,
+    )
+    if probe.returncode == 71 and "sandbox_apply: Operation not permitted" in probe.stderr:
+        raise Undecidable("gate itself is already Seatbelt-confined; un-nested host required")
+    if probe.returncode != 0:
+        raise Undecidable(f"Seatbelt availability probe rc={probe.returncode}: {probe.stderr[:200]}")
+
+
+def runtime_roots() -> set[str]:
+    parent = Path("/private/tmp")
+    try:
+        return {str(path) for path in parent.iterdir()
+                if path.name.startswith(".nortropic-h036-runtime-")}
+    except OSError as exc:
+        raise Undecidable(f"cannot inspect fixed runtime parent: {exc}") from exc
+
+
+def make_python_snapshot(root: Path) -> Path:
+    snapshot_root = root / "python-authority"
+    snapshot_root.mkdir(mode=0o700)
+    snapshot = snapshot_root / "python3.12"
+    source_fd = os.open(PYTHON_SOURCE, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    try:
+        opened = os.fstat(source_fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise Rig("pinned Python source is not regular")
+        with os.fdopen(os.dup(source_fd), "rb", closefd=True) as source, \
+                snapshot.open("xb") as target:
+            shutil.copyfileobj(source, target)
+            target.flush()
+            os.fsync(target.fileno())
+    finally:
+        os.close(source_fd)
+    snapshot.chmod(0o500)
+    snapshot_root.chmod(0o500)
+    if path_sha(snapshot) != PYTHON_SHA256:
+        raise Rig("gate private Python snapshot digest mismatch")
+    return snapshot
+
+
+def subject_effects() -> tuple[bool, dict[str, Any]]:
+    """Run only the actual three-file product through the public launcher.
+
+    The fixture scripts are gate data.  They report observations, while credit
+    comes from controller-owned path state and real syscall outcomes inspected
+    by this gate.  No source-form match or subject marker can replace effects.
+    """
+    host_preflight()
+    return run_subject_matrix()
+
+
+def closed_subject_env(trust: Path, shim: Path, canary: str) -> dict[str, str]:
+    return {
+        "PATH": f"{shim}:/usr/bin:/bin",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "NORTROPIC_TRUST_ROOT": str(trust),
+        "H036_GATE_PRESERVE": "preserved-exact-value",
+        "H036_GATE_SUPERVISOR_CANARY": canary,
+        "GH_TOKEN": "must-not-reach-target",
+        "GITHUB_TOKEN": "must-not-reach-target",
+        "SLACK_TOKEN": "must-not-reach-target",
+        "GIT_CONFIG_GLOBAL": "/forbidden/git-config",
+        "GIT_DIR": "/forbidden/git-dir",
+        "DYLD_INSERT_LIBRARIES": "/forbidden/loader.dylib",
+        "DYLD_LIBRARY_PATH": "/forbidden/dyld",
+        "PYTHONPATH": "/forbidden/pythonpath",
+        "PYTHONHOME": "/forbidden/pythonhome",
+        "PYTHONDONTWRITEBYTECODE": "0",
+        "LD_PRELOAD": "/forbidden/preload.so",
+        "LD_LIBRARY_PATH": "/forbidden/ld",
+        "__PYVENV_LAUNCHER__": "/forbidden/launcher",
+    }
+
+
+def launch(
+    python: Path,
+    workspace: Path,
+    envelope: Path,
+    timeout_seconds: str,
+    command: list[str],
+    env: dict[str, str],
+    *,
+    outer_timeout: float = 30.0,
+) -> subprocess.CompletedProcess[bytes]:
+    if not workspace.is_dir() or not envelope.is_file():
+        raise Rig("gate launch fixture must preexist")
+    return subprocess.run(
+        [str(python), "-I", "-S", "-B", str(CLI), "run", str(workspace),
+         str(envelope), timeout_seconds, "--", *command],
+        cwd=workspace, env=env, stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=outer_timeout,
+        check=False,
+    )
+
+
+def pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def wait_pid_gone(pid: int, seconds: float = 6.0) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if not pid_alive(pid):
+            return True
+        time.sleep(0.05)
+    return not pid_alive(pid)
+
+
+def wait_file(path: Path, seconds: float = 6.0) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if path.is_file():
+            return True
+        time.sleep(0.05)
+    return path.is_file()
+
+
+def repo_pycache_state() -> dict[str, tuple[int, int, str]]:
+    result: dict[str, tuple[int, int, str]] = {}
+    for path in ROOT.rglob("*"):
+        try:
+            if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}:
+                opened = path.lstat()
+                digest = path_sha(path) if stat.S_ISREG(opened.st_mode) else ""
+                result[str(path.relative_to(ROOT))] = (opened.st_mode, opened.st_size, digest)
+        except OSError:
+            continue
+    return result
+
+
+def safe_remove_tree(path: Path) -> None:
+    if not path.exists():
+        return
+    for current, dirs, _files in os.walk(path, topdown=False):
+        for name in dirs:
+            try:
+                (Path(current) / name).chmod(0o700)
+            except OSError:
+                pass
+    try:
+        path.chmod(0o700)
+    except OSError:
+        pass
+    shutil.rmtree(path)
+
+
+INNER_FIXTURE = r'''import errno,json,os,pathlib,socket,struct,subprocess,sys
+data=json.loads(sys.stdin.buffer.read())
+def attempt(kind,*parts):
+    try:
+        if kind=="create":
+            fd=os.open(parts[0],os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(fd)
+        elif kind=="write":
+            fd=os.open(parts[0],os.O_WRONLY);os.write(fd,b"MUTATE");os.close(fd)
+        elif kind=="rename":os.rename(parts[0],parts[1])
+        elif kind=="unlink":os.unlink(parts[0])
+        elif kind=="hardlink":os.link(parts[0],parts[1])
+        elif kind=="mkdir":os.mkdir(parts[0],0o700)
+        elif kind=="chmod":os.chmod(parts[0],0o777)
+        elif kind=="rmdir":os.rmdir(parts[0])
+        return 0
+    except OSError as exc:return exc.errno
+effects={}
+for family,ops in data["protected_ops"].items():
+    for kind,args in ops.items():effects[family+"_"+kind]=attempt(kind,*args)
+for kind,args in data["runtime_ops"].items():effects["runtime_"+kind]=attempt(kind,*args)
+for kind,args in data["ancestor_ops"].items():effects["ancestor_"+kind]=attempt(kind,*args)
+for kind,args in data["staging_ops"].items():effects["staging_"+kind]=attempt(kind,*args)
+effects["scratch_create"]=attempt("create",data["scratch"])
+effects["sink_hardlink"]=attempt("hardlink",data["sink"],data["sink_hardlink"])
+effects["sink_rename"]=attempt("rename",data["sink"],data["sink_rename"])
+effects["sink_unlink"]=attempt("unlink",data["sink"])
+effects["sink_chmod"]=attempt("chmod",data["sink"])
+effects["staging_root_rename"]=attempt("rename",data["staging_root"],data["staging_root_rename"])
+effects["staging_root_chmod"]=attempt("chmod",data["staging_root"])
+effects["staging_root_rmdir"]=attempt("rmdir",data["staging_root"])
+effects["sink_write"]=attempt("write",data["sink"])
+nested=subprocess.run(["/usr/bin/sandbox-exec","-p","(version 1)\n(allow default)","/usr/bin/true"],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+bad=[key for key in os.environ if key.startswith(("DYLD_","GIT_","GH_","GITHUB_","PYTHON","SLACK_")) or key in {"LD_PRELOAD","LD_LIBRARY_PATH","NORTROPIC_TRUST_ROOT","NORTROPIC_STAGING_ROOT","NORTROPIC_RESULT_SINK","__PYVENV_LAUNCHER__"}]
+internal=sorted(key for key in os.environ if key.startswith("NORTROPIC_H036_"))
+fds=[]
+for number in range(3,128):
+    try:os.fstat(number);fds.append(number)
+    except OSError:pass
+out={"pid":os.getpid(),"effects":effects,"nested_rc":nested.returncode,"nested_stderr":nested.stderr.decode("utf-8","replace"),"bad_env":sorted(bad),"internal_env":internal,"preserved":os.environ.get("H036_GATE_PRESERVE"),"path":os.environ.get("PATH"),"open_fds":fds}
+sys.stdout.write(json.dumps(out,sort_keys=True,separators=(",",":")))
+'''
+
+
+OUTER_FIXTURE = r'''import json,os,pathlib,socket,struct,subprocess,sys
+data=json.loads(sys.stdin.buffer.read())
+def attempt(path):
+    try:
+        fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(fd);return 0
+    except OSError as exc:return exc.errno
+outer={"live_create":attempt(data["live_create"]),"trust_create":attempt(data["trust_create"]),"sibling_before":attempt(data["outer_before"])}
+outer["control_env_leak"]=sorted(key for key in ("NORTROPIC_TRUST_ROOT","NORTROPIC_STAGING_ROOT","NORTROPIC_RESULT_SINK") if key in os.environ)
+sock_path=os.environ["NORTROPIC_H036_SOCKET"];runtime=pathlib.Path(sock_path).parent
+outer["runtime_mode"]=oct(runtime.stat().st_mode&0o777);outer["socket_mode"]=oct(pathlib.Path(sock_path).stat().st_mode&0o777)
+inner_payload=json.loads(pathlib.Path(data["child_envelope"]).read_text())
+runtime_source=next((p for p in runtime.rglob("*") if p.is_file() and not p.is_symlink()),None)
+if runtime_source is None:raise RuntimeError("runtime snapshot regular file absent")
+inner_payload["runtime_ops"]={"create":[str(runtime/"created")],"write":[str(runtime_source)],"rename":[str(runtime_source),str(runtime/"rename-target")],"unlink":[str(runtime_source)],"hardlink":[str(runtime_source),str(runtime/"hardlink-target")],"mkdir":[str(runtime/"new-dir")],"chmod":[str(runtime_source)]}
+pathlib.Path(data["child_envelope"]).write_text(json.dumps(inner_payload,sort_keys=True))
+def recv_frame(s):
+    lead=b""
+    while len(lead)<4:
+        part=s.recv(4-len(lead))
+        if not part:return None
+        lead+=part
+    size=struct.unpack(">I",lead)[0];raw=b""
+    while len(raw)<size:
+        part=s.recv(size-len(raw))
+        if not part:return None
+        raw+=part
+    return json.loads(raw.decode())
+def raw_request(header,fd_count=3,disconnect=False):
+    s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(4);s.connect(sock_path)
+    raw=json.dumps(header,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode();fds=[]
+    for index in range(fd_count):fds.append(os.open("/dev/null",os.O_RDONLY if index==0 else os.O_WRONLY))
+    ancillary=[(socket.SOL_SOCKET,socket.SCM_RIGHTS,struct.pack(str(fd_count)+"i",*fds))] if fds else []
+    s.sendmsg([struct.pack(">I",len(raw))+raw],ancillary)
+    if disconnect:
+        s.close();result="disconnected"
+    else:
+        s.sendall(struct.pack(">I",2)+b"{}");result=recv_frame(s);s.close()
+    for fd in fds:os.close(fd)
+    return result
+def malformed_request(first,second=b""):
+    s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(2);s.connect(sock_path);fds=[os.open("/dev/null",os.O_RDONLY),os.open("/dev/null",os.O_WRONLY),os.open("/dev/null",os.O_WRONLY)]
+    try:
+        s.sendmsg([first],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,struct.pack("3i",*fds))])
+        if second:s.sendall(second)
+        s.shutdown(socket.SHUT_WR)
+        try:return recv_frame(s)
+        except Exception as exc:return "rejected:"+type(exc).__name__
+    finally:
+        s.close()
+        for fd in fds:os.close(fd)
+base={"argv":[data["python"],"-I","-S","-B","-c",data["direct_code"]],"capability":os.environ["NORTROPIC_H036_CAPABILITY"],"cwd_relative_components":["child"],"envelope_length":2,"environment":[["PATH","/usr/bin:/bin"]],"operation":"launch-v1","peer_euid":os.geteuid(),"peer_pid":os.getpid(),"request_nonce":"12"*32,"schema_version":1,"session_id":os.environ["NORTROPIC_H036_SESSION_ID"],"timeout_milliseconds":3000}
+protocol={}
+protocol["valid"]=raw_request(dict(base))
+protocol["replay"]=raw_request(dict(base))
+for name,change in (("forged",{"capability":"00"*32,"request_nonce":"13"*32}),("cross_session",{"session_id":"ff"*32,"request_nonce":"18"*32}),("wrong_peer_claim",{"peer_pid":os.getppid(),"request_nonce":"19"*32}),("root_key",{"root":"/","request_nonce":"14"*32}),("profile_key",{"profile":"(allow default)","request_nonce":"15"*32}),("caller_path",{"result_path":data["caller_path_canary"],"request_nonce":"16"*32}),("outside",{"cwd_relative_components":[".."],"request_nonce":"17"*32}),("missing_cwd",{"cwd_relative_components":["missing-cwd"],"request_nonce":"1a"*32})):
+    value=dict(base);value.update(change)
+    try:protocol[name]=raw_request(value)
+    except Exception as exc:protocol[name]="rejected:"+type(exc).__name__
+for count in (0,2,4):
+    value=dict(base);value["request_nonce"]=("2"+str(count))*32
+    try:protocol["fd_"+str(count)]=raw_request(value,count)
+    except Exception as exc:protocol["fd_"+str(count)]="rejected:"+type(exc).__name__
+duplicate_header=dict(base);duplicate_header["request_nonce"]="35"*32
+canonical=json.dumps(duplicate_header,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+duplicate=canonical.replace(b'{"argv":',b'{"argv":[],"argv":',1)
+protocol["duplicate_json"]=malformed_request(struct.pack(">I",len(duplicate))+duplicate,struct.pack(">I",2)+b"{}")
+protocol["oversize_header"]=malformed_request(struct.pack(">I",1048577))
+protocol["partial_header"]=malformed_request(b"\x00\x00")
+partial_header=dict(base);partial_header["request_nonce"]="36"*32
+partial_raw=json.dumps(partial_header,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+protocol["partial_envelope"]=malformed_request(struct.pack(">I",len(partial_raw))+partial_raw,struct.pack(">I",2)+b"{")
+trailing_header=dict(base);trailing_header["request_nonce"]="37"*32
+trailing_raw=json.dumps(trailing_header,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+protocol["trailing_bytes"]=malformed_request(struct.pack(">I",len(trailing_raw))+trailing_raw,struct.pack(">I",2)+b"{}TRAIL")
+value=dict(base);value["request_nonce"]="34"*32
+try:protocol["disconnect"]=raw_request(value,3,True)
+except Exception as exc:protocol["disconnect"]="rejected:"+type(exc).__name__
+child_env=dict(os.environ)
+nested=subprocess.run([data["python"],"-I","-S","-B",data["cli"],"run",data["child"],data["child_envelope"],"8","--",data["python"],"-I","-S","-B",data["inner"]],cwd=data["child"],env=child_env,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+missing=dict(os.environ);missing.pop("NORTROPIC_H036_CAPABILITY",None)
+wrong=dict(os.environ);wrong["NORTROPIC_H036_CAPABILITY"]="ff"*32
+negative={}
+for name,env in (("missing",missing),("wrong",wrong)):
+    run=subprocess.run([data["python"],"-I","-S","-B",data["cli"],"run",data["child"],data["child_envelope"],"3","--","/usr/bin/true"],cwd=data["child"],env=env,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    negative[name]={"rc":run.returncode,"stdout":run.stdout.decode("utf-8","replace")}
+out={"pid":os.getpid(),"outer":outer,"protocol":protocol,"nested_rc":nested.returncode,"nested_stdout":nested.stdout.decode("utf-8","replace"),"nested_stderr":nested.stderr.decode("utf-8","replace"),"negative":negative,"stale":{"socket":sock_path,"session":os.environ["NORTROPIC_H036_SESSION_ID"],"capability":os.environ["NORTROPIC_H036_CAPABILITY"],"level":os.environ["NORTROPIC_H036_LEVEL"]}}
+sys.stdout.write(json.dumps(out,sort_keys=True,separators=(",",":")))
+'''
+
+
+def rejected_response(value: Any) -> bool:
+    if value is None or isinstance(value, str):
+        return True
+    return isinstance(value, dict) and value.get("class") != "success"
+
+
+def primary_composition_case(
+    base: Path, python: Path, workspace: Path, child: Path, trust: Path,
+    envelope: Path, env: dict[str, str], live_canary: Path,
+) -> tuple[bool, dict[str, Any]]:
+    outer_script = workspace / "outer.py"
+    inner_script = child / "inner.py"
+    child_envelope = child / "envelope.json"
+    outer_script.write_text(OUTER_FIXTURE, encoding="utf-8")
+    inner_script.write_text(INNER_FIXTURE, encoding="utf-8")
+    child_envelope.write_text("{}", encoding="utf-8")
+    def denied_ops(root: Path, prefix: str) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
+        for name in ("write", "rename", "unlink", "hardlink"):
+            source = root / f"{prefix}-{name}-source"
+            source.write_text("ORIGINAL", encoding="utf-8")
+            source.chmod(0o600)
+            if name == "write":
+                result[name] = [str(source)]
+            elif name == "rename":
+                result[name] = [str(source), str(root / f"{prefix}-rename-target")]
+            elif name == "unlink":
+                result[name] = [str(source)]
+            else:
+                result[name] = [str(source), str(root / f"{prefix}-hardlink-target")]
+        result["create"] = [str(root / f"{prefix}-created")]
+        result["mkdir"] = [str(root / f"{prefix}-new-dir")]
+        result["chmod"] = [result["write"][0]]
+        return result
+    protected_ops = {
+        "live": denied_ops(live_canary, "inner"),
+        "trust": denied_ops(trust, "inner"),
+    }
+    outer_sibling = workspace / "outer-sibling"
+    outer_sibling.mkdir()
+    ancestor_sources: dict[str, list[str]] = {}
+    for name in ("write", "rename", "unlink", "hardlink"):
+        source = outer_sibling / f"{name}-source"
+        source.write_text("ORIGINAL", encoding="utf-8")
+        source.chmod(0o600)
+        if name == "write":
+            ancestor_sources[name] = [str(source)]
+        elif name == "rename":
+            ancestor_sources[name] = [str(source), str(outer_sibling / "rename-target")]
+        elif name == "unlink":
+            ancestor_sources[name] = [str(source)]
+        else:
+            ancestor_sources[name] = [str(source), str(outer_sibling / "hardlink-target")]
+    ancestor_sources["create"] = [str(outer_sibling / "created")]
+    ancestor_sources["mkdir"] = [str(outer_sibling / "new-dir")]
+    ancestor_sources["chmod"] = [ancestor_sources["write"][0]]
+    staging = Path(env["NORTROPIC_STAGING_ROOT"])
+    sink = Path(env["NORTROPIC_RESULT_SINK"])
+    if sink.parent != staging or not staging.is_dir():
+        raise Rig("gate staging/sink fixture identity")
+    sink.write_text("EMPTY", encoding="utf-8")
+    sink.chmod(0o600)
+    sink_initial = sink.stat()
+    staging_mode_before = staging.stat().st_mode & 0o777
+    if (not stat.S_ISREG(sink_initial.st_mode) or sink.is_symlink()
+            or sink_initial.st_nlink != 1):
+        raise Rig("gate sink fixture must be nofollow regular nlink1")
+    staging_sources: dict[str, list[str]] = {}
+    for name in ("write", "rename", "unlink", "hardlink"):
+        source = staging / f"{name}-source"
+        source.write_text("ORIGINAL", encoding="utf-8")
+        source.chmod(0o600)
+        if name == "write":
+            staging_sources[name] = [str(source)]
+        elif name == "rename":
+            staging_sources[name] = [str(source), str(staging / "rename-target")]
+        elif name == "unlink":
+            staging_sources[name] = [str(source)]
+        else:
+            staging_sources[name] = [str(source), str(staging / "hardlink-target")]
+    staging_sources["create"] = [str(staging / "created")]
+    staging_sources["mkdir"] = [str(staging / "new-dir")]
+    staging_sources["chmod"] = [staging_sources["write"][0]]
+    direct_marker = child / "direct-marker"
+    caller_path_canary = trust / "caller-selected-result"
+    direct_code = (
+        "import errno,pathlib;target=pathlib.Path(" + repr(str(outer_sibling / "direct-escape")) + ");"
+        "marker=pathlib.Path(" + repr(str(direct_marker)) + ");"
+        "\ntry: target.write_text('BAD');value=0"
+        "\nexcept OSError as exc:value=exc.errno"
+        "\nmarker.write_text(marker.read_text()+'x' if marker.exists() else 'x');"
+        "assert value==errno.EPERM"
+    )
+    inner_payload = {
+        "protected_ops": protected_ops,
+        "ancestor_ops": ancestor_sources,
+        "staging_ops": staging_sources,
+        "scratch": str(child / "scratch-created"),
+        "sink": str(sink),
+        "sink_hardlink": str(staging / "sink-hardlink"),
+        "sink_rename": str(staging / "sink-renamed"),
+        "staging_root": str(staging),
+        "staging_root_rename": str(run_root / "staging-renamed"),
+        "python": str(python),
+    }
+    child_envelope.write_text(json.dumps(inner_payload, sort_keys=True), encoding="utf-8")
+    payload = {
+        "live_create": str(live_canary / "outer-create"),
+        "trust_create": str(trust / "outer-create"),
+        "outer_before": str(outer_sibling / "outer-before"),
+        "python": str(python),
+        "cli": str(CLI),
+        "child": str(child),
+        "child_envelope": str(child_envelope),
+        "inner": str(inner_script),
+        "direct_code": direct_code,
+        "caller_path_canary": str(caller_path_canary),
+    }
+    envelope.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    before_roots = runtime_roots()
+    run = launch(python, workspace, envelope, "15", [str(python), "-I", "-S", "-B", str(outer_script)], env)
+    after_roots = runtime_roots()
+    detail: dict[str, Any] = {
+        "rc": run.returncode,
+        "stderr": run.stderr.decode("utf-8", "replace")[:500],
+        "runtime_root_delta": sorted(after_roots - before_roots),
+    }
+    try:
+        observed = strict_json(run.stdout)
+    except Rig as exc:
+        detail["stdout"] = run.stdout[:500].decode("utf-8", "replace")
+        detail["parse"] = str(exc)
+        return False, detail
+    if not isinstance(observed, dict):
+        return False, detail
+    outer = observed.get("outer", {})
+    protocol = observed.get("protocol", {})
+    negative = observed.get("negative", {})
+    try:
+        inner = strict_json(observed.get("nested_stdout", "").encode())
+    except (AttributeError, Rig):
+        inner = {}
+    stale = observed.get("stale", {})
+    detail["observed_summary"] = {
+        "outer": outer,
+        "protocol_classes": {
+            key: (value.get("class") if isinstance(value, dict) else str(value)[:60])
+            for key, value in protocol.items()
+        } if isinstance(protocol, dict) else {},
+        "nested_rc": observed.get("nested_rc"),
+        "negative": negative,
+    }
+    stale_socket = Path(stale.get("socket", "/nonexistent")) if isinstance(stale, dict) else Path("/nonexistent")
+    stale_connect_rejected = not stale_socket.exists()
+    if stale_socket.exists():
+        try:
+            probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            probe.settimeout(1)
+            probe.connect(str(stale_socket))
+        except OSError:
+            stale_connect_rejected = True
+        else:
+            stale_connect_rejected = False
+            probe.close()
+    stale_env = dict(env)
+    if isinstance(stale, dict):
+        stale_env.update({
+            "NORTROPIC_H036_SOCKET": str(stale.get("socket", "")),
+            "NORTROPIC_H036_SESSION_ID": str(stale.get("session", "")),
+            "NORTROPIC_H036_CAPABILITY": str(stale.get("capability", "")),
+            "NORTROPIC_H036_LEVEL": str(stale.get("level", "")),
+        })
+    stale_run = launch(python, child, child_envelope, "2", ["/usr/bin/true"], stale_env, outer_timeout=8)
+    denied_effect_keys = [
+        f"{family}_{operation}"
+        for family in ("live", "trust", "runtime", "ancestor", "staging")
+        for operation in ("create", "write", "rename", "unlink", "hardlink", "mkdir", "chmod")
+    ] + [
+        "sink_hardlink", "sink_rename", "sink_unlink", "sink_chmod",
+        "staging_root_rename", "staging_root_chmod", "staging_root_rmdir",
+    ]
+    all_denied = isinstance(inner, dict) and all(
+        inner.get("effects", {}).get(key) == errno.EPERM for key in denied_effect_keys
+    )
+    def ops_unchanged(ops: dict[str, list[str]]) -> bool:
+        source_keys = ("write", "rename", "unlink", "hardlink")
+        return (
+            all(Path(ops[key][0]).read_text(encoding="utf-8") == "ORIGINAL"
+                for key in source_keys)
+            and not Path(ops["create"][0]).exists()
+            and not Path(ops["mkdir"][0]).exists()
+            and not Path(ops["rename"][1]).exists()
+            and not Path(ops["hardlink"][1]).exists()
+            and (Path(ops["chmod"][0]).stat().st_mode & 0o777) == 0o600
+        )
+    protected_unchanged = (
+        all(ops_unchanged(ops) for ops in protected_ops.values())
+        and ops_unchanged(ancestor_sources)
+        and ops_unchanged(staging_sources)
+        and sink.read_text(encoding="utf-8") == "MUTATE"
+        and (sink.stat().st_mode & 0o777) == 0o600
+        and sink.stat().st_nlink == 1
+        and not (staging / "sink-hardlink").exists()
+        and not (staging / "sink-renamed").exists()
+        and staging.is_dir()
+        and (staging.stat().st_mode & 0o777) == staging_mode_before
+        and not (run_root / "staging-renamed").exists()
+    )
+    protocol_ok = isinstance(protocol, dict) \
+        and isinstance(protocol.get("valid"), dict) \
+        and protocol["valid"].get("class") == "success" \
+        and all(rejected_response(protocol.get(name)) for name in (
+            "replay", "forged", "cross_session", "wrong_peer_claim", "root_key",
+            "profile_key", "caller_path",
+            "outside", "missing_cwd", "fd_0", "fd_2", "fd_4", "duplicate_json",
+            "oversize_header", "partial_header", "partial_envelope",
+            "trailing_bytes",
+        )) \
+        and protocol.get("disconnect") == "disconnected" \
+        and direct_marker.read_text(encoding="utf-8") == "x"
+    env_ok = isinstance(inner, dict) \
+        and inner.get("bad_env") == [] \
+        and inner.get("internal_env") == CONFIG_STATIC["target_environment"]["add_exact"][1:] \
+        and inner.get("preserved") == "preserved-exact-value" \
+        and inner.get("path") == env["PATH"] \
+        and inner.get("open_fds") == []
+    ok = (
+        run.returncode == 0
+        and observed.get("nested_rc") == 0
+        and outer.get("live_create") == errno.EPERM
+        and outer.get("trust_create") == errno.EPERM
+        and outer.get("sibling_before") == 0
+        and outer.get("control_env_leak") == []
+        and outer.get("runtime_mode") == "0o500"
+        and outer.get("socket_mode") == "0o600"
+        and all_denied
+        and protected_unchanged
+        and inner.get("effects", {}).get("scratch_create") == 0
+        and inner.get("effects", {}).get("sink_write") == 0
+        and inner.get("nested_rc") == 71
+        and "sandbox_apply: Operation not permitted" in inner.get("nested_stderr", "")
+        and type(observed.get("pid")) is int and type(inner.get("pid")) is int
+        and observed.get("pid") != inner.get("pid")
+        and protocol_ok
+        and all(isinstance(negative.get(name), dict) and negative[name].get("rc") == 3
+                for name in ("missing", "wrong"))
+        and not caller_path_canary.exists()
+        and stale_connect_rejected
+        and stale_run.returncode == 3
+        and after_roots == before_roots
+        and not (live_canary / "outer-create").exists()
+        and not (trust / "outer-create").exists()
+        and not (child / "missing-cwd").exists()
+    )
+    detail.update({
+        "profile_lineage_effects": all_denied,
+        "protected_effects_unchanged": protected_unchanged,
+        "strict_protocol": protocol_ok,
+        "closed_target_env_fds": env_ok,
+        "stale_rejected": stale_connect_rejected and stale_run.returncode == 3,
+    })
+    return ok and env_ok, detail
+
+
+def simple_lifecycle_cases(
+    base: Path, python: Path, workspace: Path, envelope: Path, env: dict[str, str], trust: Path,
+) -> tuple[bool, dict[str, Any]]:
+    scripts = base / "lifecycle"
+    scripts.mkdir()
+    exact = scripts / "exact.py"
+    exact.write_text("import sys;sys.stdout.buffer.write(b'H036-STDOUT-\\x00-\\xff\\n')\n", encoding="utf-8")
+    success = launch(python, workspace, envelope, "5", [str(python), "-I", "-S", "-B", str(exact)], env)
+    nonzero = launch(python, workspace, envelope, "5", ["/bin/sh", "-c", "exit 7"], env)
+    signaled = launch(python, workspace, envelope, "5", ["/bin/sh", "-c", "kill -TERM $$"], env)
+    missing = launch(python, workspace, envelope, "5", [str(base / "absent-command")], env)
+    group_script = scripts / "group.py"
+    group_script.write_text(
+        "import subprocess,sys; p=subprocess.Popen(['/bin/sleep','30'],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,close_fds=True);print(p.pid,flush=True)\n",
+        encoding="utf-8",
+    )
+    group = launch(python, workspace, envelope, "5", [str(python), "-I", "-S", "-B", str(group_script)], env)
+    try:
+        group_pid = int(group.stdout.strip())
+    except ValueError:
+        group_pid = -1
+    timeout_script = scripts / "timeout.py"
+    timeout_script.write_text(
+        "import os,time,pathlib;pathlib.Path(" + repr(str(workspace / "timeout-pid")) + ").write_text(str(os.getpid()));time.sleep(30)\n",
+        encoding="utf-8",
+    )
+    timeout = launch(python, workspace, envelope, "0.4", [str(python), "-I", "-S", "-B", str(timeout_script)], env)
+    timeout_pid = int((workspace / "timeout-pid").read_text()) if (workspace / "timeout-pid").exists() else -1
+    escaped_marker = workspace / "setsid-result.json"
+    escaped = scripts / "setsid.py"
+    escaped.write_text(
+        "import json,os,pathlib,time\n"
+        "pid=os.fork()\n"
+        "if pid:\n print(pid,flush=True);raise SystemExit(0)\n"
+        "os.setsid();null=os.open('/dev/null',os.O_RDWR)\n"
+        "for fd in (0,1,2):os.dup2(null,fd)\n"
+        "if null>2:os.close(null)\n"
+        "time.sleep(0.8);out={}\n"
+        "for key,path in " + repr({
+            "trust": str(trust / "setsid-bad"),
+            "live": str(ROOT / ".h036-setsid-bad"),
+        }) + ".items():\n"
+        " try:pathlib.Path(path).write_text('BAD');out[key]=0\n"
+        " except OSError as exc:out[key]=exc.errno\n"
+        "out['socket_exists']=pathlib.Path(os.environ.get('NORTROPIC_H036_SOCKET','/absent')).exists()\n"
+        "pathlib.Path(" + repr(str(escaped_marker)) + ").write_text(json.dumps(out,sort_keys=True))\n",
+        encoding="utf-8",
+    )
+    setsid_run = launch(python, workspace, envelope, "5", [str(python), "-I", "-S", "-B", str(escaped)], env)
+    try:
+        escaped_pid = int(setsid_run.stdout.strip())
+    except ValueError:
+        escaped_pid = -1
+    harmless_ready = wait_file(escaped_marker)
+    harmless = strict_json(escaped_marker.read_bytes()) if harmless_ready else {}
+    if escaped_pid > 0:
+        wait_pid_gone(escaped_pid)
+    detail = {
+        "success_rc": success.returncode,
+        "success_stdout_sha256": sha(success.stdout),
+        "nonzero_rc": nonzero.returncode,
+        "signal_rc": signaled.returncode,
+        "launch_rc": missing.returncode,
+        "group_pid": group_pid,
+        "timeout_rc": timeout.returncode,
+        "timeout_pid": timeout_pid,
+        "setsid_pid": escaped_pid,
+        "setsid_effect": harmless,
+    }
+    ok = (
+        success.returncode == 0 and success.stdout == b"H036-STDOUT-\x00-\xff\n"
+        and nonzero.returncode == 4 and b"nonzero_exit:" in nonzero.stdout
+        and signaled.returncode == 4 and b"nonzero_exit:" in signaled.stdout
+        and missing.returncode == 3 and b"launch_failed:" in missing.stdout
+        and group.returncode == 0 and group_pid > 0 and wait_pid_gone(group_pid)
+        and timeout.returncode == 5 and b"timeout:" in timeout.stdout
+        and timeout_pid > 0 and wait_pid_gone(timeout_pid)
+        and setsid_run.returncode == 0 and harmless_ready
+        and harmless == {"live": errno.EPERM, "socket_exists": False, "trust": errno.EPERM}
+    )
+    return ok, detail
+
+
+def negative_identity_and_overlap_cases(
+    base: Path, python: Path, workspace: Path, envelope: Path, env: dict[str, str], trust: Path,
+    live_canary: Path,
+) -> tuple[bool, dict[str, Any]]:
+    marker = workspace / "negative-marker"
+    command = [str(python), "-I", "-S", "-B", "-c",
+               "import pathlib;pathlib.Path(" + repr(str(marker)) + ").write_text('BAD')"]
+    overlap_env = dict(env)
+    overlap_env["NORTROPIC_TRUST_ROOT"] = str(workspace)
+    overlap = launch(python, workspace, envelope, "3", command, overlap_env)
+    no_sink_env = dict(env)
+    no_sink_env.pop("NORTROPIC_STAGING_ROOT", None)
+    no_sink_env.pop("NORTROPIC_RESULT_SINK", None)
+    no_sink = launch(python, workspace, envelope, "3", ["/usr/bin/true"], no_sink_env)
+    trust_sink = trust / "overlap-result"
+    trust_sink.write_text("ORIGINAL", encoding="utf-8")
+    staging_trust_env = dict(env)
+    staging_trust_env["NORTROPIC_STAGING_ROOT"] = str(trust)
+    staging_trust_env["NORTROPIC_RESULT_SINK"] = str(trust_sink)
+    staging_trust = launch(python, workspace, envelope, "3", command, staging_trust_env)
+    workspace_sink = workspace / "overlap-result"
+    workspace_sink.write_text("ORIGINAL", encoding="utf-8")
+    staging_workspace_env = dict(env)
+    staging_workspace_env["NORTROPIC_STAGING_ROOT"] = str(workspace)
+    staging_workspace_env["NORTROPIC_RESULT_SINK"] = str(workspace_sink)
+    staging_workspace = launch(python, workspace, envelope, "3", command, staging_workspace_env)
+    valid_staging = base / "negative-staging"
+    valid_staging.mkdir()
+    outside_sink = base / "outside-staging-result"
+    outside_sink.write_text("ORIGINAL", encoding="utf-8")
+    outside_sink_env = dict(env)
+    outside_sink_env["NORTROPIC_STAGING_ROOT"] = str(valid_staging)
+    outside_sink_env["NORTROPIC_RESULT_SINK"] = str(outside_sink)
+    outside_sink_run = launch(python, workspace, envelope, "3", command, outside_sink_env)
+    symlink_target = base / "symlink-target"
+    symlink_target.write_text("ORIGINAL", encoding="utf-8")
+    symlink_sink = valid_staging / "symlink-result"
+    symlink_sink.symlink_to(symlink_target)
+    symlink_sink_env = dict(env)
+    symlink_sink_env["NORTROPIC_STAGING_ROOT"] = str(valid_staging)
+    symlink_sink_env["NORTROPIC_RESULT_SINK"] = str(symlink_sink)
+    symlink_sink_run = launch(python, workspace, envelope, "3", command, symlink_sink_env)
+    missing_sink_env = dict(env)
+    missing_sink_env["NORTROPIC_STAGING_ROOT"] = str(valid_staging)
+    missing_sink_env["NORTROPIC_RESULT_SINK"] = str(valid_staging / "missing-result")
+    missing_sink_run = launch(python, workspace, envelope, "3", command, missing_sink_env)
+    directory_sink = valid_staging / "directory-result"
+    directory_sink.mkdir()
+    directory_sink_env = dict(env)
+    directory_sink_env["NORTROPIC_STAGING_ROOT"] = str(valid_staging)
+    directory_sink_env["NORTROPIC_RESULT_SINK"] = str(directory_sink)
+    directory_sink_run = launch(python, workspace, envelope, "3", command, directory_sink_env)
+    hardlink_source = valid_staging / "hardlink-source"
+    hardlink_source.write_text("ORIGINAL", encoding="utf-8")
+    hardlink_sink = valid_staging / "hardlink-result"
+    os.link(hardlink_source, hardlink_sink)
+    hardlink_sink_env = dict(env)
+    hardlink_sink_env["NORTROPIC_STAGING_ROOT"] = str(valid_staging)
+    hardlink_sink_env["NORTROPIC_RESULT_SINK"] = str(hardlink_sink)
+    hardlink_sink_run = launch(python, workspace, envelope, "3", command, hardlink_sink_env)
+    live_overlap_sink = live_canary / "staging-overlap-result"
+    live_overlap_sink.write_text("ORIGINAL", encoding="utf-8")
+    live_overlap_env = dict(env)
+    live_overlap_env["NORTROPIC_STAGING_ROOT"] = str(live_canary)
+    live_overlap_env["NORTROPIC_RESULT_SINK"] = str(live_overlap_sink)
+    live_overlap_run = launch(python, workspace, envelope, "3", command, live_overlap_env)
+    outside = base / "outside-workspace"
+    outside.mkdir()
+    # A complete inherited marker with no capability is fail-closed and may
+    # never become a fresh raw bootstrap.
+    incomplete_env = dict(env)
+    incomplete_env.update({
+        "NORTROPIC_H036_SESSION_ID": "11" * 32,
+        "NORTROPIC_H036_SOCKET": str(base / "missing.sock"),
+        "NORTROPIC_H036_LEVEL": "1",
+    })
+    incomplete = launch(python, workspace, envelope, "3", command, incomplete_env)
+    relocated = base / "relocated-cli"
+    shutil.copyfile(CLI, relocated)
+    relocated.chmod(0o500)
+    relocated_run = subprocess.run(
+        [str(python), "-I", "-S", "-B", str(relocated), "run", str(workspace),
+         str(envelope), "3", "--", *command],
+        cwd=workspace, env=env, stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8, check=False,
+    )
+    system_python = subprocess.run(
+        ["/usr/bin/python3", "-I", "-S", "-B", str(CLI), "run", str(workspace),
+         str(envelope), "3", "--", *command],
+        cwd=workspace, env=env, stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8, check=False,
+    )
+    alias_parent = Path("/private/var/tmp")
+    alias_result: int | None = None
+    if alias_parent.is_dir():
+        alias_root = Path(tempfile.mkdtemp(prefix="h036-var-alias-", dir=alias_parent))
+        try:
+            alias_workspace = alias_root / "workspace"
+            alias_workspace.mkdir()
+            alias_staging = alias_root / "staging"
+            alias_staging.mkdir()
+            alias_sink = alias_staging / "result.json"
+            alias_sink.write_text("ORIGINAL", encoding="utf-8")
+            alias_sink.chmod(0o600)
+            alias_envelope = alias_root / "envelope.json"
+            alias_envelope.write_text("{}", encoding="utf-8")
+            alias_arg = Path(str(alias_workspace).replace("/private/var/", "/var/", 1))
+            alias_env = dict(env)
+            alias_env["NORTROPIC_STAGING_ROOT"] = str(alias_staging).replace(
+                "/private/var/", "/var/", 1)
+            alias_env["NORTROPIC_RESULT_SINK"] = str(alias_sink).replace(
+                "/private/var/", "/var/", 1)
+            alias_run = launch(
+                python, alias_arg, alias_envelope, "3", ["/usr/bin/true"], alias_env,
+            )
+            alias_result = alias_run.returncode
+        finally:
+            safe_remove_tree(alias_root)
+    negative_sinks_unchanged = (
+        all(path.read_text(encoding="utf-8") == "ORIGINAL" for path in (
+            trust_sink, workspace_sink, outside_sink, symlink_target,
+            hardlink_source, hardlink_sink, live_overlap_sink,
+        ))
+        and symlink_sink.is_symlink()
+        and not (valid_staging / "missing-result").exists()
+        and directory_sink.is_dir()
+        and hardlink_source.stat().st_nlink == 2
+        and hardlink_sink.stat().st_nlink == 2
+    )
+    detail = {
+        "overlap": overlap.returncode,
+        "optional_sink_absent": no_sink.returncode,
+        "staging_trust_overlap": staging_trust.returncode,
+        "staging_workspace_overlap": staging_workspace.returncode,
+        "sink_outside_staging": outside_sink_run.returncode,
+        "sink_symlink": symlink_sink_run.returncode,
+        "sink_missing": missing_sink_run.returncode,
+        "sink_nonregular": directory_sink_run.returncode,
+        "sink_hardlink": hardlink_sink_run.returncode,
+        "staging_live_overlap": live_overlap_run.returncode,
+        "negative_sinks_unchanged": negative_sinks_unchanged,
+        "incomplete": incomplete.returncode,
+        "relocated": relocated_run.returncode,
+        "system_python": system_python.returncode,
+        "var_alias": alias_result,
+        "marker": marker.exists(),
+    }
+    return (
+        overlap.returncode == 3
+        and no_sink.returncode == 0
+        and staging_trust.returncode == 3
+        and staging_workspace.returncode == 3
+        and outside_sink_run.returncode == 3
+        and symlink_sink_run.returncode == 3
+        and missing_sink_run.returncode == 3
+        and directory_sink_run.returncode == 3
+        and hardlink_sink_run.returncode == 3
+        and live_overlap_run.returncode == 3
+        and negative_sinks_unchanged
+        and incomplete.returncode == 3
+        and relocated_run.returncode != 0
+        and system_python.returncode != 0
+        and alias_result == 0
+        and not marker.exists()
+    ), detail
+
+
+def supervisor_death_case(
+    python: Path, workspace: Path, envelope: Path, env: dict[str, str], base: Path,
+) -> tuple[bool, dict[str, Any]]:
+    ready = workspace / "supervisor-death-ready.json"
+    worker = base / "supervisor-death.py"
+    worker.write_text(
+        "import json,os,pathlib,socket,time\n"
+        "s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.connect(os.environ['NORTROPIC_H036_SOCKET'])\n"
+        "server=int.from_bytes(s.getsockopt(0,2,4),'little',signed=True);s.close()\n"
+        "pathlib.Path(" + repr(str(ready)) + ").write_text(json.dumps({'worker':os.getpid(),'supervisor':server,'socket':os.environ['NORTROPIC_H036_SOCKET']}));time.sleep(30)\n",
+        encoding="utf-8",
+    )
+    before = runtime_roots()
+    proc = subprocess.Popen(
+        [str(python), "-I", "-S", "-B", str(CLI), "run", str(workspace),
+         str(envelope), "30", "--", str(python), "-I", "-S", "-B", str(worker)],
+        cwd=workspace, env=env, stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
+    )
+    if not wait_file(ready, 8):
+        try: os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        proc.wait(timeout=5)
+        return False, {"reason": "worker did not become ready"}
+    record = strict_json(ready.read_bytes())
+    supervisor = int(record["supervisor"])
+    worker_pid = int(record["worker"])
+    ps = subprocess.run(
+        ["/bin/ps", "eww", "-p", str(supervisor), "-o", "command="],
+        env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, timeout=5, check=False,
+    )
+    os.kill(supervisor, signal.SIGTERM)
+    try:
+        stdout, stderr = proc.communicate(timeout=12)
+    except subprocess.TimeoutExpired:
+        try: os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        stdout, stderr = proc.communicate(timeout=5)
+    worker_gone = wait_pid_gone(worker_pid)
+    supervisor_gone = wait_pid_gone(supervisor)
+    after = runtime_roots()
+    process_text = ps.stdout
+    detail = {
+        "launcher_rc": proc.returncode,
+        "stdout": stdout.decode("utf-8", "replace")[:300],
+        "stderr": stderr.decode("utf-8", "replace")[:300],
+        "worker_gone": worker_gone,
+        "supervisor_gone": supervisor_gone,
+        "root_delta": sorted(after - before),
+        "supervisor_command": process_text[:500],
+    }
+    closed_env = (
+        ps.returncode == 0
+        and "H036_GATE_SUPERVISOR_CANARY" not in process_text
+        and "must-not-reach-target" not in process_text
+        and "/forbidden/" not in process_text
+        and "preserved-exact-value" not in process_text
+        and not any(name + "=" in process_text for name in (
+            "GH_TOKEN", "GITHUB_TOKEN", "SLACK_TOKEN", "GIT_CONFIG_GLOBAL",
+            "GIT_DIR", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH",
+            "PYTHONPATH", "PYTHONHOME", "PYTHONDONTWRITEBYTECODE",
+            "LD_PRELOAD", "LD_LIBRARY_PATH", "__PYVENV_LAUNCHER__",
+            "NORTROPIC_TRUST_ROOT", "NORTROPIC_STAGING_ROOT",
+            "NORTROPIC_RESULT_SINK",
+        ))
+        and str(HELPER) in process_text
+        and "supervise-v1" in process_text
+    )
+    return (
+        proc.returncode != 0 and worker_gone and supervisor_gone
+        and after == before and not Path(record["socket"]).exists() and closed_env
+    ), {**detail, "closed_supervisor_env": closed_env}
+
+
+def run_subject_matrix() -> tuple[bool, dict[str, Any]]:
+    run_root = Path(tempfile.mkdtemp(prefix="h036-subject-gate-", dir="/private/tmp"))
+    live_canary = ROOT / f".h036-live-canary-{os.getpid()}-{time.monotonic_ns()}"
+    before_pycache = repo_pycache_state()
+    before_runtime = runtime_roots()
+    detail: dict[str, Any] = {}
+    try:
+        workspace = run_root / "workspace"
+        child = workspace / "child"
+        trust = run_root / "trust"
+        staging = run_root / "staging"
+        shim = run_root / "shim"
+        for path in (workspace, child, trust, staging, shim, live_canary):
+            path.mkdir()
+        (trust / "protected").write_text("ORIGINAL", encoding="utf-8")
+        envelope = run_root / "envelope.json"
+        envelope.write_text("{}", encoding="utf-8")
+        shim_marker = run_root / "path-shim-ran"
+        shim_exec = shim / "sandbox-exec"
+        shim_exec.write_text("#!/bin/sh\nprintf BAD > " + str(shim_marker) + "\nexit 99\n", encoding="utf-8")
+        shim_exec.chmod(0o700)
+        canary = "h036-supervisor-secret-" + hashlib.sha256(os.urandom(32)).hexdigest()
+        env = closed_subject_env(trust, shim, canary)
+        env["NORTROPIC_STAGING_ROOT"] = str(staging)
+        env["NORTROPIC_RESULT_SINK"] = str(staging / "result.json")
+        python_one = make_python_snapshot(run_root)
+        primary_ok, primary = primary_composition_case(
+            run_root, python_one, workspace, child, trust, envelope, env, live_canary,
+        )
+        detail["connected_subject_profile_protocol_env"] = primary
+        lifecycle_ok, lifecycle = simple_lifecycle_cases(
+            run_root, python_one, workspace, envelope, env, trust,
+        )
+        detail["lifecycle_and_harmless_survivor"] = lifecycle
+        negatives_ok, negatives = negative_identity_and_overlap_cases(
+            run_root, python_one, workspace, envelope, env, trust, live_canary,
+        )
+        detail["identity_overlap_alias_negatives"] = negatives
+        death_ok, death = supervisor_death_case(
+            python_one, workspace, envelope, env, run_root,
+        )
+        detail["supervisor_death_closed_env"] = death
+        # Mechanism-neutral positive: a second independently created 0500
+        # same-byte private runtime is accepted; no relocated launcher/helper
+        # is.  This is the only authorized relocation class.
+        second_root = run_root / "second-authority"
+        second_root.mkdir()
+        python_two = make_python_snapshot(second_root)
+        second = launch(python_two, workspace, envelope, "3", ["/usr/bin/true"], env)
+        second_ok = second.returncode == 0
+        detail["second_private_snapshot"] = {
+            "rc": second.returncode,
+            "digest": path_sha(python_two),
+            "root_mode": oct(python_two.parent.stat().st_mode & 0o777),
+        }
+        after_pycache = repo_pycache_state()
+        pycache_ok = after_pycache == before_pycache
+        detail["repository_pycache_delta"] = sorted(set(after_pycache) ^ set(before_pycache))
+        detail["path_shim_executed"] = shim_marker.exists()
+        detail["groups"] = {
+            "connected_actual_subject_chain": primary_ok,
+            "profile_lineage_syscalls_and_reopen_negatives": primary_ok,
+            "strict_protocol_fd_replay_cross_session": primary_ok,
+            "closed_environment_fd_and_no_caller_path_effect": primary_ok and death_ok,
+            "snapshot_relocation_identity_and_no_pyc": negatives_ok and second_ok and pycache_ok,
+            "lifecycle_revoke_and_harmless_setsid": lifecycle_ok and death_ok,
+            "mechanism_neutral_private_snapshot_positive": second_ok,
+        }
+        return (
+            primary_ok and lifecycle_ok and negatives_ok and death_ok and second_ok
+            and pycache_ok and not shim_marker.exists()
+            and runtime_roots() == before_runtime
+        ), detail
+    finally:
+        safe_remove_tree(live_canary)
+        safe_remove_tree(run_root)
+        # The subject must normally own this cleanup.  Gate cleanup is only a
+        # bounded fail-safe and never turns residue into PASS.
+        for residue in runtime_roots() - before_runtime:
+            try:
+                safe_remove_tree(Path(residue))
+            except OSError:
+                pass
+
+
+REFERENCE_SCRIPT = r'''import errno,json,os,secrets,shutil,socket,struct,subprocess,sys,tempfile
+PY=sys.argv[1];SANDBOX="/usr/bin/sandbox-exec";SELF=os.path.realpath(__file__)
+def profile(*roots):return "\n".join(["(version 1)","(allow default)",*[f'(deny file-write* (subpath {json.dumps(root)}))' for root in roots]])
+def effect(path):
+ try:open(os.path.join(path,"effect"),"w").write("x");return 0
+ except OSError as exc:return exc.errno
+mode=sys.argv[2] if len(sys.argv)>2 else "main"
+if mode=="outer":
+ outer,inner,sock_path,cap=sys.argv[3:7];before=[effect(outer),effect(inner)]
+ nested=subprocess.run([SANDBOX,"-p","(version 1)\n(allow default)","/usr/bin/true"],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(5);s.connect(sock_path);s.sendall((cap+"\n").encode());raw=b""
+ while not raw.endswith(b"\n"):raw+=s.recv(65536)
+ print(json.dumps({"before":before,"nested_rc":nested.returncode,"nested_stderr":nested.stderr.decode(),"response":json.loads(raw)}));raise SystemExit(0)
+if mode=="inner":
+ outer,inner,allowed=sys.argv[3:6];print(json.dumps({"outer":effect(outer),"inner":effect(inner),"allowed":effect(allowed)}));raise SystemExit(0)
+base=tempfile.mkdtemp(prefix="h036-reference-",dir="/private/tmp")
+try:
+ outer=os.path.join(base,"outer");inner=os.path.join(base,"inner");allowed=os.path.join(base,"allowed")
+ for path in (outer,inner,allowed):os.mkdir(path)
+ sock_path=os.path.join(base,"s");listen=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);listen.bind(sock_path);listen.listen(1);listen.settimeout(5);cap=secrets.token_hex(32)
+ proc=subprocess.Popen([SANDBOX,"-p",profile(outer),PY,"-I","-S","-B",SELF,PY,"outer",outer,inner,sock_path,cap],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
+ try:conn,_=listen.accept()
+ except Exception as exc:
+  out,err=proc.communicate(timeout=2);raise RuntimeError(f"outer did not connect rc={proc.returncode} out={out!r} err={err!r}") from exc
+ conn.settimeout(5);peer=struct.unpack("i",conn.getsockopt(0,2,4))[0];token=struct.unpack("=8I",conn.getsockopt(0,6,32));got=b""
+ while not got.endswith(b"\n"):got+=conn.recv(65536)
+ authenticated=peer==proc.pid and token[5]==proc.pid and secrets.compare_digest(got.decode().strip(),cap)
+ child=subprocess.run([SANDBOX,"-p",profile(outer,inner),PY,"-I","-S","-B",SELF,PY,"inner",outer,inner,allowed],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=8)
+ response={"authenticated":authenticated,"peer_pid":peer==proc.pid,"audit_pid":token[5]==proc.pid,"child_rc":child.returncode,"effects":json.loads(child.stdout)}
+ conn.sendall((json.dumps(response)+"\n").encode());conn.close();out,err=proc.communicate(timeout=8);outer_result=json.loads(out)
+ result={"outer_rc":proc.returncode,"outer":outer_result,"response":response};print(json.dumps(result,sort_keys=True))
+ ok=proc.returncode==0 and outer_result["before"]==[errno.EPERM,0] and outer_result["nested_rc"]==71 and "sandbox_apply: Operation not permitted" in outer_result["nested_stderr"] and authenticated and response["effects"]=={"outer":errno.EPERM,"inner":errno.EPERM,"allowed":0}
+ raise SystemExit(0 if ok else 1)
+finally:shutil.rmtree(base)
+'''
+
+
+def reference_host_effect() -> tuple[bool, dict[str, Any]]:
+    root = Path(tempfile.mkdtemp(prefix="h036-reference-host-", dir="/private/tmp"))
+    try:
+        script = root / "reference.py"
+        script.write_text(REFERENCE_SCRIPT, encoding="utf-8")
+        run = subprocess.run(
+            [str(PYTHON_SOURCE), "-I", "-S", "-B", str(script), str(PYTHON_SOURCE)],
+            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=20, check=False,
+        )
+        detail = {
+            "returncode": run.returncode,
+            "stderr": run.stderr.decode("utf-8", "replace")[:2000],
+            "script_sha256": sha(REFERENCE_SCRIPT.encode()),
+        }
+        try:
+            detail["effect"] = strict_json(run.stdout)
+        except Rig:
+            detail["stdout"] = run.stdout.decode("utf-8", "replace")[:500]
+        return run.returncode == 0, detail
+    finally:
+        safe_remove_tree(root)
+
+
+def finish(phase: str, *, reference_only: bool = False) -> int:
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=" +
+          ("REFERENCE_HOST_NOT_SUBJECT" if reference_only else "NONE"))
+    print(f"H036_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    if failed == 0:
+        print("H036_GATE_RESULT=PASS")
+        return 0
+    if phase == "preproduct" and failed == 1 and failed_labels == [(LABEL, json.dumps({
+        "failure_signature": FAILURE_SIGNATURE,
+        "reason": REASON,
+    }, ensure_ascii=False, sort_keys=True))]:
+        print(f"H036_GATE_RESULT=RED_EXPECTED label={LABEL} reason={REASON}")
+        return 1
+    print("H036_GATE_RESULT=FAIL")
+    return 1
+
+
+def main(argv: list[str]) -> int:
+    preproduct = not argv
+    product_mode = len(argv) == 3 and argv[0] == "--product"
+    reference_mode = argv == ["--reference-host"]
+    if not (preproduct or product_mode or reference_mode):
+        print("RIG_ERROR: usage: h-036-exit [--product BASE_SHA CANDIDATE_SHA|--reference-host]",
+              file=sys.stderr)
+        return 2
+    try:
+        static_contract_checks()
+        phase = product_phase()
+        if reference_mode:
+            host_preflight()
+            ok, detail = reference_host_effect()
+            check(ok, "J_H036_REFERENCE_PRE_SANDBOX_TOPOLOGY_SATISFIABLE", detail)
+            return finish("reference", reference_only=True)
+        if product_mode:
+            identity_ok, identity_detail = product_identity(argv[1], argv[2])
+            check(identity_ok, "A_H036_EXACT_DIRECT_CHILD_THREE_FILE_PRODUCT_IDENTITY",
+                  identity_detail)
+            if phase != "product":
+                raise Rig("--product requires all three product bytes")
+            effect_ok = False
+            effect_detail: dict[str, Any] = {"reason": "identity rejected before execution"}
+            if identity_ok:
+                effect_ok, effect_detail = subject_effects()
+            check(effect_ok, LABEL, effect_detail)
+        elif phase == "preproduct":
+            check(False, LABEL, {
+                "failure_signature": FAILURE_SIGNATURE,
+                "reason": REASON,
+            })
+        else:
+            effect_ok, effect_detail = subject_effects()
+            check(effect_ok, LABEL, effect_detail)
+        return finish(phase)
+    except Undecidable as exc:
+        print(f"ODÖMBART H036_HOST_ENVIRONMENT — {exc}")
+        print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+        return 2
+    except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
+        print(f"RIG_ERROR: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

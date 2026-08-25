@@ -3159,3 +3159,50 @@ duplicate-row, early-gate, early-product and launch-substitution mutants reject.
 No H-034 or H-036 production byte, H-037 task/gate/register byte, authority core, publisher,
 workflow or delegation document is changed. Full/live/H-017, network, remote-ref, push and merge
 actions remain outside this refreeze lane.
+
+## 2026-08-25 — H-036 pre-sandbox runtime supervisor contract
+
+The exact published starting point is origin/main `b17d0941f9376505f2bf76f4ce10b3019d978054`
+(tree `4a22c991b2bba098239f492bd9fc1e06cc8cd1c6`). Its H-034 merge has ordered parents
+`deee7955…`, `e60fbc40…`; the latter's independent READY review artifact hashes to
+`2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474`. The exact v2 owner
+registry is already published. H-034's early-H036 absence checks are temporal publication evidence:
+the new task/gate deliberately make them RED, and no post-freeze H-034 green regression is claimed.
+
+The baseline causal failure was reproduced in a bounded disposable host probe: a real outer
+Seatbelt child denied its protected root, but its direct nested `/usr/bin/sandbox-exec` exited 71
+with `sandbox_apply: Operation not permitted`. An AF_UNIX request authenticated by a random
+capability, `LOCAL_PEERPID` and the 32-byte `LOCAL_PEERTOKEN` then reached the original
+pre-sandbox owner. That owner installed one fresh combined profile; the child retained the outer
+EPERM, gained the inner EPERM, and wrote only permitted scratch/sink paths. The probe returned zero
+and its temporary script/root were removed. This establishes feasibility, not product credit.
+
+The frozen solution is one controller-owned Python supervisor created by the exact protected
+Python 3.12/live launcher before the first sandbox. V2 inherits the exact existing v1 interpreter
+authority (`2c609508…`, Python 3.12.13, source `94be2db6…`, v1 flags `-I -S`) and adds a distinct
+`-B`/early-`dont_write_bytecode` invariant. The config has no self-digest and no absolute live-root,
+session, socket or requester override; it binds final launcher/helper/profile/protocol identities.
+Only a same-byte protected private Python snapshot may relocate. The live launcher and helper may
+not.
+
+The gate's actual-subject matrix is separated from its judge-only reference lane and maps seven
+dynamic families: connected pre-sandbox supervisor to confined helper to target; cumulative
+outer/inner syscall and allow-reopen/raw/nested-attempt effects, including an external protected
+staging root whose one preopened regular nlink-1 sink allows only read-back-proven data writes while
+sibling/sink/root create/write/rename/unlink/move/hardlink/mkdir/chmod and every missing,
+nonregular, hardlink, overlap or symlink escape stay denied before launch; strict frames, exact stdio FD
+cardinality, duplicate/oversize/partial framing, replay/forgery/stale/cross-session/wrong-peer
+handling, including a successful nested caller whose PID differs from the outer leader; closed
+supervisor environment, stripping of trust/staging/sink paths from targets, and no
+caller-path or descriptor leakage; same-opened Python/live identities, final rehash, relocation and
+zero-pyc constraints; success/nonzero/timeout/SIGTERM/disconnect/supervisor-death revocation with a
+harmless rather than nonexistent setsid survivor; and a second legitimate protected same-byte
+Python snapshot as mechanism-neutral positive. Profile strings, subject markers and reference
+results alone cannot satisfy the operation.
+
+The TEST_AUTHOR candidate changes exactly five files: `specs/tasks.spec.json`, new
+`verify/bin/h-036-exit`, `docs/loop/owner-author-workflow-v1.md`, `docs/05-beslutslogg.md`, and
+this drift record. It writes no production, H-032 or autopilot byte. Product authority is exactly
+the three paths reserved by H-034 and capped at 2400 cumulative added lines. H-032 later refreezes
+to depend exactly on published H-036 and H-031 follows. Full/live/H-017, network, ref, push and
+merge work remain outside this lane.
