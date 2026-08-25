@@ -3123,3 +3123,39 @@ entry pointing to a tree. RV-02/RV-03 change only the five TEST_AUTHOR files and
 the existing direct-product assertion. The exact preproduct result remains 35/1, postproduct no-arg
 36/0, and explicit product 38/0; product scope, publisher, H-034/H-035 bytes/dependencies,
 BP01–BP14 and the H037 → H034 → H036 order remain unchanged.
+
+## 2026-08-25 — H-034 post-H037 registry-v2 refreeze
+
+Published main `deee79550fa1a4762d1b3cda06192b7940d05ff0` (tree
+`6ba35d5a62ae5b18d45daeca1b314e38700d9503`) contains the reviewed H-035 R14
+two-state parser and the completed H-037 product, but the canonical registry still selects v1/old4
+and H-034 still points directly to H-035. This fresh TEST_AUTHOR candidate consumes the already
+declared H037 → H034 → H036 transition without adopting history from the earlier R15 candidates.
+
+`specs/owner-production-paths.v1.json` keeps its locator and all non-owner fields, changes its
+built-in integer schema to 2, and appends exactly `controller/launch/cli`,
+`controller/launch/runtime_snapshot.py`, and `config/python-runtime-authority-v2.json` after the
+four H-034 members. H-034 itself keeps `allowed_write=[]` and the exact old four-member
+`owner_author_allowed_write`, changes `depends_on` to exactly `["h-037"]`, and has empty
+`docs_impact`. The latter is operationally necessary: the published `task_authority` rejects any
+H-034 documentation path outside its applicable owner surface. The targeted gate invokes that real
+parser, not a shape-only substitute. H-035 changes only its downstream lifecycle predicate from the
+old H-034 dependency to the new one; its R13/R14 and publisher mechanisms are otherwise untouched.
+
+The R15-derived targeted gate binds canonical raw v2/union7 order while retaining the published
+parser's order-insensitive v1/old4 and v2/union7 positives. For each of seven members it rejects one
+omission, substitution, duplicate, backslash alias, leading-dot alias, broader prefix and neighbor;
+wrong versions/types, cross-pairs, partial unions, new-only and arbitrary additions also reject.
+H-034 evidence, receipt, allowlist, recipe and identity-manifest schemas remain exact v1.
+
+Before editing, the reviewed R15 judge executed in memory against this exact base and returned
+73 PASS / 2 FAIL, solely the absent canonical v2 union and absent post-H037 H-034 task contract.
+The frozen target returns 86 PASS / 0 FAIL. It additionally requires zero canonical H-036 task
+rows, no `verify/bin/h-036-exit`, no runtime snapshot or runtime-authority JSON, and the unchanged
+pre-existing `controller/launch/cli` SHA-256
+`cb1cf372ccedec2eb0e8e379ca2da766671c40347749b807068114f23668cf0e`; connected one-row,
+duplicate-row, early-gate, early-product and launch-substitution mutants reject.
+
+No H-034 or H-036 production byte, H-037 task/gate/register byte, authority core, publisher,
+workflow or delegation document is changed. Full/live/H-017, network, remote-ref, push and merge
+actions remain outside this refreeze lane.

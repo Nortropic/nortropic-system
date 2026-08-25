@@ -6,10 +6,66 @@ import hashlib, json, os, re, secrets, shutil, signal, socket, stat, subprocess,
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
+sys.dont_write_bytecode=True
+sys.path.insert(0,str(ROOT/"controller/authority"))
+from core import (AuthorityError as AuthorityRegistryError,
+                  overlaps as authority_overlaps,
+                  permitted as authority_permitted,
+                  task_authority as authority_task,
+                  validate_registry as authority_validate_registry)
 SPEC=ROOT/"specs/tasks.spec.json"; REG=ROOT/"specs/owner-production-paths.v1.json"
 KERNEL=ROOT/"verify/h034/kernel"; RECIPE=ROOT/"verify/h034/build-recipe.json"
 MANIFEST=ROOT/"verify/h034/identity-manifest.json"; SOURCE=ROOT/"controller/h034-native"
-OWNER=["controller/h034-native/**","verify/h034/kernel","verify/h034/build-recipe.json","verify/h034/identity-manifest.json"]
+H034_OWNER=["controller/h034-native/**","verify/h034/kernel","verify/h034/build-recipe.json","verify/h034/identity-manifest.json"]
+H036_OWNER=["controller/launch/cli","controller/launch/runtime_snapshot.py","config/python-runtime-authority-v2.json"]
+OWNER=H034_OWNER; REGISTRY_OWNER=[*H034_OWNER,*H036_OWNER]
+H036_GATE=ROOT/"verify/bin/h-036-exit"
+H036_RUNTIME_SNAPSHOT=ROOT/"controller/launch/runtime_snapshot.py"
+H036_RUNTIME_AUTHORITY=ROOT/"config/python-runtime-authority-v2.json"
+H036_LAUNCH_CLI=ROOT/"controller/launch/cli"
+H036_LAUNCH_CLI_SHA256="cb1cf372ccedec2eb0e8e379ca2da766671c40347749b807068114f23668cf0e"
+REGISTRY_KEYS={"schema_version","path_grammar","authority_source","self_digest_is_authority","owner_production_paths","prospective_ordinary_protected_paths","owner_author_global_denied_paths"}
+RETAINED_REGISTRY={
+ "path_grammar":"repo-tree-exact-or-terminal-recursive-prefix-v1",
+ "authority_source":"git-candidate-plus-independent-gate-review-plus-owner-final-freeze",
+ "self_digest_is_authority":False,
+ "prospective_ordinary_protected_paths":[
+  "specs/tasks.spec.json","specs/owner-production-paths.v1.json","verify/bin/**",
+  "controller/authority/**","controller/policy/**","controller/taskval/**",
+  "controller/envelope/**","controller/state/**","controller/attest/**",
+  "controller/loop/**","scripts/nortropic-codex-autopilot.py","scripts/check-invariants.mjs"],
+ "owner_author_global_denied_paths":[
+  "specs/**","verify/bin/**","tests/**","controller/authority/**",
+  "controller/policy/**","controller/taskval/**","controller/envelope/**",
+  "controller/state/**","controller/attest/**","controller/loop/**",
+  "scripts/nortropic-codex-autopilot.py","scripts/check-invariants.mjs"]}
+R15_ORDER=[
+ "H035_R14_CORE_GUARDED_PUBLICATION",
+ "H037_GUARDED_PRODUCT_PUBLICATION",
+ "H034_REGISTRY_V2_REFREEZE",
+ "H034_INDEPENDENT_GATE_REVIEW",
+ "H034_GUARDED_PUBLICATION",
+ "H036_TEST_AUTHOR_FREEZE",
+ "H036_INDEPENDENT_GATE_REVIEW",
+ "H036_BUILDER_IMPLEMENTATION",
+ "H036_INDEPENDENT_PRODUCT_REVIEW",
+ "H036_GUARDED_PUBLICATION",
+ "H032_REFREEZE_AGAINST_PUBLISHED_H036",
+ "H032_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+ "H031_REBIND"]
+R15_TASK_CONTRACT={
+ "canonical_registry_locator":"specs/owner-production-paths.v1.json",
+ "canonical_registry_schema_version":2,
+ "h035_accepted_registry_states":[
+  {"schema_version":1,"owner_production_paths":H034_OWNER},
+  {"schema_version":2,"owner_production_paths":REGISTRY_OWNER}],
+ "h034_task_owner_author_allowed_write":H034_OWNER,
+ "h034_task_docs_impact":[],
+ "h034_task_depends_on":["h-037"],
+ "h036_prospective_owner_production_paths":H036_OWNER,
+ "h036_gate_path":"verify/bin/h-036-exit",
+ "h036_gate_is_owner_production":False,
+ "required_serial_order":R15_ORDER}
 E_KEYS=("schema_version","producer_authority","task","candidate_sha","task_spec_sha256","gate_sha256","probe_identity","request_id","result","effect_sha256")
 R_KEYS=("schema_version","observer_authority","request_id","candidate_sha","probe_identity","probe_path","probe_sha256","effect_marker")
 A_KEYS=("schema_version","probes"); P_KEYS=("probe_identity","probe_path","probe_sha256","effect_marker","result")
@@ -197,13 +253,183 @@ const char*h=strstr(e,"effect_sha256\":\"");if(!h)return 1;h+=16;for(int i=0;i<6
   check(positive.returncode==0 and positive.stdout==expected,"J_PERMISSIVE_C_POSITIVE")
   check(malformed_e.returncode==0 and malformed_a.returncode==0 and not evidence_ok(decoy),"J_PERMISSIVE_C_EVIDENCE_ALLOWLIST_MUTANT_CAUGHT")
 
+def registry_accepted(document):
+ try:return authority_validate_registry(document)==document
+ except AuthorityRegistryError:return False
+
+def registry_state(version,owner_paths):
+ return {"schema_version":version,**RETAINED_REGISTRY,
+         "owner_production_paths":list(owner_paths)}
+
+def member_neighbor(path,index):
+ if path.endswith("/**"):return path[:-3]+f"-neighbor-{index}/**"
+ return path+f".neighbor-{index}"
+
+def member_broader(path):
+ core=path[:-3] if path.endswith("/**") else path
+ parent=core.rsplit("/",1)[0]
+ return parent+"/**"
+
+def path_object_count(path):return int(os.path.lexists(path))
+
+def launch_cli_digest():
+ if not H036_LAUNCH_CLI.is_file() or H036_LAUNCH_CLI.is_symlink():return None
+ try:return sha(H036_LAUNCH_CLI.read_bytes())
+ except OSError:return None
+
+def h036_phase_state(spec):
+ tasks=spec.get("tasks",[]) if type(spec) is dict else []
+ return {
+  "h036_task_rows":sum(type(task) is dict and task.get("id")=="h-036" for task in tasks)
+   if type(tasks) is list else -1,
+  "h036_gate_objects":path_object_count(H036_GATE),
+  "runtime_snapshot_objects":path_object_count(H036_RUNTIME_SNAPSHOT),
+  "runtime_authority_objects":path_object_count(H036_RUNTIME_AUTHORITY),
+  "launch_cli_sha256":launch_cli_digest()}
+
+def r15_h036_phase_clear(spec,state=None):
+ phase=h036_phase_state(spec) if state is None else state
+ return (phase=={
+  "h036_task_rows":0,
+  "h036_gate_objects":0,
+  "runtime_snapshot_objects":0,
+  "runtime_authority_objects":0,
+  "launch_cli_sha256":H036_LAUNCH_CLI_SHA256})
+
+def r15_h034_task_ok(spec):
+ rows=[task for task in spec.get("tasks",[]) if type(task) is dict and task.get("id")=="h-034"] if type(spec) is dict else []
+ if len(rows)!=1:return False
+ task=rows[0]
+ return (task.get("authority_class")=="owner_authority"
+  and task.get("allowed_write")==[]
+  and task.get("owner_author_allowed_write")==H034_OWNER
+  and task.get("docs_impact")==[]
+  and task.get("depends_on")==["h-037"]
+  and task.get("exit_test")=="verify/bin/h-034-exit"
+  and task.get("r15_registry_v2_refreeze")==R15_TASK_CONTRACT)
+
+def operational_task_authority(spec,registry):
+ try:
+  _task,authority,surface=authority_task(spec,"h-034")
+  return (authority=="owner_authority" and surface==H034_OWNER
+   and all(authority_permitted(path,registry["owner_production_paths"])
+           for path in surface)
+   and not any(authority_overlaps(path,guard) for path in surface
+               for guard in registry["owner_author_global_denied_paths"]))
+ except (AuthorityRegistryError,KeyError,TypeError):return False
+
+def r15_registry_controls(spec):
+ try:registry=strict(REG.read_bytes())
+ except Exception as exc:
+  check(False,"F_R15_CANONICAL_REGISTRY_V2_UNION7",exc);registry=None
+ canonical=(type(registry) is dict and set(registry)==REGISTRY_KEYS
+  and type(registry.get("schema_version")) is int and registry.get("schema_version")==2
+  and registry.get("owner_production_paths")==REGISTRY_OWNER
+  and all(registry.get(key)==value for key,value in RETAINED_REGISTRY.items())
+  and registry_accepted(registry)
+  and all(authority_permitted(path,registry["owner_production_paths"]) for path in H036_OWNER)
+  and "verify/bin/h-036-exit" not in registry["owner_production_paths"]
+  and any(authority_overlaps("verify/bin/h-036-exit",guard)
+          for guard in registry["owner_author_global_denied_paths"])) if registry is not None else False
+ check(canonical,"F_R15_CANONICAL_REGISTRY_V2_UNION7",
+       registry.get("owner_production_paths") if type(registry) is dict else registry)
+
+ check(r15_h034_task_ok(spec),"F_R15_H034_TASK_OLD4_H037_AND_SERIAL_ORDER")
+ check(type(registry) is dict and operational_task_authority(spec,registry),
+       "F_R15_H034_TASK_AUTHORITY_SATISFIABLE")
+ for label,mutate in (
+  ("H035_DEPENDENCY",lambda task:task.__setitem__("depends_on",["h-035"])),
+  ("NONEMPTY_DOCS",lambda task:task.__setitem__("docs_impact",["docs/loop/drift.md"])),
+  ("UNION7_TASK_SURFACE",lambda task:task.__setitem__("owner_author_allowed_write",REGISTRY_OWNER))):
+  mutant=json.loads(json.dumps(spec));task=next(row for row in mutant["tasks"] if type(row) is dict and row.get("id")=="h-034");mutate(task)
+  check(not r15_h034_task_ok(mutant),"J_R15_H034_TASK_"+label+"_REJECT")
+  if label=="NONEMPTY_DOCS":
+   check(type(registry) is dict and not operational_task_authority(mutant,registry),
+         "J_R15_H034_NONEMPTY_DOCS_OPERATIONAL_REJECT")
+
+ phase=h036_phase_state(spec)
+ check(phase.get("h036_task_rows")==0,"F_R15_H036_TASK_NOT_MATERIALIZED_BEFORE_H034_PUBLICATION")
+ check(r15_h036_phase_clear(spec,phase),
+       "F_R15_H036_TASK_GATE_PRODUCT_EXACT_ZERO_BEFORE_H034_PUBLICATION",phase)
+ early_task={"id":"h-036","slice":"H036_RUNTIME_AUTHORITY_PREREQUISITE",
+  "authority_class":"owner_authority","title":"early H036 mutant",
+  "summary":"valid-looking early task must not satisfy the H034 phase",
+  "allowed_write":[],"owner_author_allowed_write":H036_OWNER,
+  "exit_test":"verify/bin/h-036-exit","exit_criterion":"early mutant",
+  "docs_impact":[],"depends_on":["h-034"],"max_changed_files":3,"max_added_lines":1}
+ early=json.loads(json.dumps(spec));early["tasks"].append(early_task)
+ duplicate=json.loads(json.dumps(spec));duplicate["tasks"].extend((early_task,early_task))
+ check(not r15_h036_phase_clear(early),"J_R15_EARLY_H036_TASK_REJECT")
+ check(not r15_h036_phase_clear(duplicate),"J_R15_DUPLICATE_EARLY_H036_TASK_REJECT")
+ for label,key,value in (
+  ("GATE","h036_gate_objects",1),
+  ("RUNTIME_SNAPSHOT","runtime_snapshot_objects",1),
+  ("RUNTIME_AUTHORITY","runtime_authority_objects",1),
+  ("LAUNCH_CLI_SUBSTITUTION","launch_cli_sha256","0"*64)):
+  mutant=dict(phase);mutant[key]=value
+  check(not r15_h036_phase_clear(spec,mutant),"J_R15_EARLY_H036_"+label+"_REJECT")
+
+ prospective_task={"id":"h-036-prospective-fixture","authority_class":"owner_authority",
+  "allowed_write":[],"owner_author_allowed_write":H036_OWNER,"docs_impact":[]}
+ try:
+  _task,authority,surface=authority_task(
+   {"spec_version":"2.0.0","tasks":[prospective_task]},"h-036-prospective-fixture")
+  prospective=(authority=="owner_authority" and surface==H036_OWNER
+   and all(authority_permitted(path,REGISTRY_OWNER) for path in surface)
+   and not any(authority_overlaps(path,guard) for path in surface
+               for guard in RETAINED_REGISTRY["owner_author_global_denied_paths"])
+   and "verify/bin/h-036-exit" not in REGISTRY_OWNER)
+ except AuthorityRegistryError:prospective=False
+ check(prospective,"J_R15_H036_NEW3_PROSPECTIVE_GATE_GLOBALLY_DENIED")
+
+ v1=registry_state(1,H034_OWNER);v2=registry_state(2,REGISTRY_OWNER)
+ for label,document in (("V1_OLD4",v1),("V1_OLD4_REORDERED",{**v1,"owner_production_paths":list(reversed(H034_OWNER))}),
+                        ("V2_UNION7",v2),("V2_UNION7_REORDERED",{**v2,"owner_production_paths":list(reversed(REGISTRY_OWNER))})):
+  check(registry_accepted(document),"J_R15_H035_TWO_STATE_"+label)
+
+ for index,path in enumerate(REGISTRY_OWNER,1):
+  substitutions={
+   "OMISSION":[item for item in REGISTRY_OWNER if item!=path],
+   "SUBSTITUTION":[("r15/substitution-%d"%index) if item==path else item for item in REGISTRY_OWNER],
+   "DUPLICATE":[*REGISTRY_OWNER,path],
+   "BACKSLASH_ALIAS":[path.replace("/","\\") if item==path else item for item in REGISTRY_OWNER],
+   "LEADING_DOT_ALIAS":["./"+path if item==path else item for item in REGISTRY_OWNER],
+   "BROADER_PREFIX":[member_broader(path) if item==path else item for item in REGISTRY_OWNER],
+   "NEIGHBOR":[member_neighbor(path,index) if item==path else item for item in REGISTRY_OWNER]}
+  for family,paths in substitutions.items():
+   check(not registry_accepted(registry_state(2,paths)),
+         f"J_R15_V2_MEMBER_{index}_{family}_REJECT")
+
+ for label,version in (("ZERO",0),("V1_CROSS_PAIR",1),("THREE",3),("STRING","2"),
+                       ("BOOL",True),("FLOAT",2.0),("NULL",None),("LIST",[]),("OBJECT",{})):
+  check(not registry_accepted(registry_state(version,REGISTRY_OWNER)),
+        "J_R15_VERSION_"+label+"_REJECT")
+ check(not registry_accepted(registry_state(2,H034_OWNER)),"J_R15_V2_OLD4_CROSS_PAIR_REJECT")
+ check(not registry_accepted(registry_state(2,H036_OWNER)),"J_R15_V2_NEW3_ONLY_REJECT")
+ for count in (1,2):
+  check(not registry_accepted(registry_state(2,[*H034_OWNER,*H036_OWNER[:count]])),
+        f"J_R15_V2_PARTIAL_PLUS_{count}_REJECT")
+ check(not registry_accepted(registry_state(2,[*REGISTRY_OWNER,"verify/h036/neighbor"])),
+       "J_R15_V2_ARBITRARY_ADDITION_REJECT")
+ check(not registry_accepted(registry_state(2,[*REGISTRY_OWNER,"verify/bin/h-036-exit"])),
+       "J_R15_H036_GATE_OWNER_PRODUCTION_REJECT")
+ duplicate_key_raw=REG.read_bytes().replace(b"{\n",b'{\n  "schema_version": 2,\n',1)
+ try:strict(duplicate_key_raw);duplicate_key_rejected=False
+ except Exception:duplicate_key_rejected=True
+ check(duplicate_key_rejected,"J_R15_REGISTRY_DUPLICATE_JSON_KEY_REJECT")
+ try:recipe=strict(RECIPE.read_bytes());manifest=strict(MANIFEST.read_bytes())
+ except Exception:recipe=manifest=None
+ check(all(type(document) is dict and type(document.get("schema_version")) is int
+           and document.get("schema_version")==1 for document in
+           (*documents(),recipe,manifest)),"J_R15_H034_NATIVE_PRODUCT_SCHEMAS_REMAIN_V1")
+
 def judge_controls():
- spec=json.load(open(SPEC)); rows=[t for t in spec["tasks"] if t.get("id")=="h-034"]
+ spec=strict(SPEC.read_bytes()); rows=[t for t in spec["tasks"] if t.get("id")=="h-034"]
  check(len(rows)==1,"F_H034_SINGLE_TASK")
  if rows:
-  t=rows[0];check(t.get("authority_class")=="owner_authority" and t.get("depends_on")==["h-035"],"F_H034_OWNER_AFTER_H035")
+  t=rows[0];check(t.get("authority_class")=="owner_authority" and t.get("depends_on")==["h-037"],"F_H034_OWNER_AFTER_H037")
   check(t.get("allowed_write")==[] and t.get("owner_author_allowed_write")==OWNER and t.get("exit_test")=="verify/bin/h-034-exit","F_H034_EXACT_OWNER_SURFACE")
- reg=json.load(open(REG));check(reg.get("owner_production_paths")==OWNER,"F_REGISTRY_EXACT_H034_RESERVATION")
+ r15_registry_controls(spec)
  h033=[t for t in spec["tasks"] if t.get("id")=="h-033"]
  check(len(h033)==1,"F_H033_EXACTLY_ONE_MATERIALIZED")
  if h033:
@@ -491,7 +717,10 @@ def semantic_contract():
  q=kernel_call(er,rr,ar,e,extra=("--unknown","x"));check(q.returncode==1 and q.stdout=="","K_UNKNOWN_ARGUMENT_REJECT")
 
 def main():
- try:judge_controls();toolchain_anchor();production_contract()
+ try:
+  if sys.argv[1:]==["--r15-registry-refreeze"]:r15_registry_controls(strict(SPEC.read_bytes()))
+  elif len(sys.argv)==1:judge_controls();toolchain_anchor();production_contract()
+  else:raise Rig("usage: h-034-exit [--r15-registry-refreeze]")
  except (OSError,ValueError,subprocess.SubprocessError,Rig) as e:print("RIG_ERROR:",e,file=sys.stderr);return 2
  print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
  print(f"H034_GATE_SUMMARY={passed} PASS {failed} FAIL")
