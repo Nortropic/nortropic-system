@@ -113,8 +113,5 @@ No `(site)` route group — header/footer/phone live in the root `app/layout.tsx
 - Every page exports `generateMetadata` with Swedish title/description per `nortropic-seo-lokal` templates
 
 ## On-Demand Escalation
-- `spec-to-repo` / `saas-scaffolder` — scaffold mechanics beyond this skill
-- `react-best-practices` / `composition-patterns` — component architecture decisions
-- `senior-frontend` — hard frontend problems
-- `vercel-geist-design` — Vercel platform conventions
+- Scaffold-mekanik utanför denna skill, komponentarkitektur, svåra frontendproblem och plattformskonventioner är byggarens eget ansvar — inga skill-eskalationer finns för dem (legacy-namnen från installationstiden är retirerade; R10)
 - `shadcn-ui` MCP + `context7` MCP — component installs and current library docs
