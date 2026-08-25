@@ -15,7 +15,7 @@ Två fixturfamiljer efterträder legacy-kedjan, båda §A6 (människoklippta):
 
 1. **`foundation/`** — FOUNDATION SMOKE FIXTURE: minimal, portabel, med FOUNDATION_REPAIR_GATE
    som ENDA konsument. Bevisar den reparerade NUVARANDE fabriksgrunden — inte universell
-   webbkvalitet. Kandidat + exakta klippinstruktioner: `foundation/README.md`.
+   webbkvalitet. KLIPPT 2026-08-25 (§A6) — status, ceremoni och evidenssemantik: `foundation/README.md`.
 2. **Universalregimens fixturer** (FIX-A lokal positiv kontroll · FIX-B B2B-SaaS negativ
    kontroll · FIX-NOBUILD · FIX-MIGRATION) — hör till S1/S3/S5-banan enligt den DESIGN-FRUSNA
    masterplanen, klipps senare, blockerar INTE R1/gaten.

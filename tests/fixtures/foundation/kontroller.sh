@@ -1,5 +1,5 @@
 #!/bin/sh
-# FOUNDATION SMOKE — mekaniska kontroller (KANDIDAT, §A6; enda konsument: FOUNDATION_REPAIR_GATE)
+# FOUNDATION SMOKE — mekaniska kontroller (KLIPPT 2026-08-25, §A6; enda konsument: FOUNDATION_REPAIR_GATE)
 # Verdiktalgebra per verify/bin/_lib.sh-disciplinen: exit 0=PASS, 1=FAIL, 2=ODÖMBART.
 # Ankarkrav (V4-läxan): en tom grep-träff är PASS endast om ankaret först bevisats existera.
 set -u
