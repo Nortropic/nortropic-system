@@ -88,6 +88,34 @@ done)
 [ -n "$TRAFF" ] && fail "K5b: mutable-fetch-instruktion utanför kvarantän: $TRAFF"
 echo "K5b PASS: $ANTAL skill-filer kanari-rena"
 
+# ---- K6: kanonisk pinnad axe-väg (R6) — mätstickan pinnad + kontraktet helt --
+RAX="$ROT/scripts/run-axe-gate.mjs"
+WQP="$ROT/tools/web-quality/package.json"
+WQL="$ROT/tools/web-quality/package-lock.json"
+[ -f "$RAX" ] || fail "K6: kanoniska axe-runnern saknas"
+[ -f "$WQP" ] || fail "K6: verktygsrotens package.json saknas"
+[ -f "$WQL" ] || fail "K6: verktygsrotens package-lock.json saknas"
+RAX_PIN="a1d9b85cd80400c32e32e0f18902d734fac7c1bc45211539e5f329fa64e2f326"
+WQP_PIN="7be7ff4351e6252376059389a5f6378dfaedaa7d6bfa3ac2fdcbdfe29f99d001"
+WQL_PIN="a965056e6a752ac2d1c730e3bdb2260f6ed550640a4b2334ee90378f91893174"
+[ "$(shasum -a 256 "$RAX" | awk '{print $1}')" = "$RAX_PIN" ] || fail "K6: runnerkällan avviker från foundation-pinnen — mätstickan ändrad utan skyddad transition"
+[ "$(shasum -a 256 "$WQP" | awk '{print $1}')" = "$WQP_PIN" ] || fail "K6: verktygskontraktet avviker från foundation-pinnen"
+[ "$(shasum -a 256 "$WQL" | awk '{print $1}')" = "$WQL_PIN" ] || fail "K6: lockfilen avviker från foundation-pinnen"
+grep -q '"@axe-core/cli": "4.13.0"' "$WQP" || fail "K6: @axe-core/cli inte exakt-pinnad 4.13.0"
+grep -q '"axe-core": "4.13.0"' "$WQP" || fail "K6: axe-core inte exakt-pinnad 4.13.0"
+grep -q -- '--axe-source' "$RAX" || fail "K6: --axe-source-bindningen saknas (ankarkrav) — kundens motor får aldrig vinna"
+grep -q -- '--chromedriver-path' "$RAX" || fail "K6: --chromedriver-path-bindningen saknas (ankarkrav)"
+grep -q "REQUIRED_AXE_VERSION = '4.13.0'" "$RAX" || fail "K6: förväntad motoridentitet 4.13.0 saknas i runnern"
+grep -q 'testEngine' "$RAX" || fail "K6: resultatets motoridentitetskontroll saknas (ankarkrav)"
+grep -qE "execFileSync\('npm|execSync\(|spawn\('npm|spawnSync\('npm" "$RAX" && fail "K6: installations-/kommandoväg återinförd i runnern"
+grep 'npx' "$RAX" | grep -vi 'aldrig\|never\|inget' | grep -q . && fail "K6: aktiv npx-väg återinförd i runnern"
+# Sluten förbudsmängd (ägarregel R6-härdning): webbläsarsäkerhet stängs ALDRIG av
+# i den kanoniska runnern — flaggorna får inte förekomma alls i runnerkällan.
+grep -qE 'no-sandbox|disable-setuid-sandbox|disable-web-security' "$RAX" && fail "K6: webbläsarsäkerhets-bypass återinförd i runnern (förbjuden mängd: no-sandbox/disable-setuid-sandbox/disable-web-security)"
+grep -q 'run-axe-gate.mjs' "$ROT/skills/nortropic-prelaunch/SKILL.md" || fail "K6: Gate 4 pekar inte på den kanoniska runnern"
+grep -q 'AccessLint eller annan kandidat blir aldrig produktionsauktoritativ' "$ROT/skills/nortropic-prelaunch/SKILL.md" || fail "K6: kandidatspärren saknas i Gate 4 (ankarkrav)"
+echo "K6 PASS: axe-mätstickan pinnad, kontraktet exakt och Gate 4 bunden till kanoniska runnern"
+
 # ---- K5c: NY_REGIM_KLIPPT-flaggan kan inte ge grönt på tomhet ---------------
 VS="$ROT/workflows/nortropic-verify-suite.js"
 grep -q "NY_REGIM_KLIPPT = false" "$VS" && { echo "K5c PASS: regimen oklippt och suiten kortsluter till icke-grönt"; exit 0; }
