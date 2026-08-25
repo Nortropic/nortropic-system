@@ -54,13 +54,24 @@ Läs `content/profile.ts` FÖRST: `primaraktion` + `gate1Test` definierar vad so
 
 ## Gate 4 — Accessibility (escalate to `a11y-audit` for the deep pass)
 
-> **STEP-0A-DEMOTERING (2026-08-24, HÖGRISK — hävs av M1-reparation R6):** axe-core-raden
-> nedan har INGEN körväg i repot (inget skript, inget npm-beroende, ingen CLI-rad) — den har
-> varit en obackad grindutsaga där exekveringen improviserats. Tills R6 gett raden en verklig,
-> pinnad, deterministisk körväg (minsta bevisade implementation; en NY kandidat som AccessLint
-> blir aldrig produktionsauktoritativ via reparationen) gäller: axe-raden rapporteras
-> **ODÖMBART (obackad grind — ingen körväg)**, aldrig PASS. De manuella kontrollerna ovan/nedan
-> står oförändrade i full kraft — grinden sänks inte, dess obackade del slutar bara låtsas.
+> **KANONISK AXE-KÖRVÄG (R6 2026-08-25 — STEP-0A-demoteringen hävd):** axe-raden körs ENDAST via
+> `node scripts/run-axe-gate.mjs <mål-URL>` i nortropic-system-repot — den pinnade kedjan
+> @axe-core/cli@4.13.0 + axe-core@4.13.0 ur den kanoniska verktygsroten `tools/web-quality/`
+> (motorn binds explicit med `--axe-source`, chromedriver med `--chromedriver-path`; kundens
+> node_modules kan aldrig definiera motorn). Verdiktalgebra: exit 0 = PASS (noll violations),
+> exit 1 = FAIL (sajtfynd), exit 2 = **ODÖMBART** (verktygs-/pin-/driver-/mål-/auth-fel —
+> verktygsfel är ALDRIG sajt-PASS). Saknas verktygsinstallationen svarar skriptet ODÖMBART med
+> provisioneringsinstruktionen (`cd tools/web-quality && npm ci` — explicit operatörshandling;
+> grinden installerar aldrig själv). Skyddad preview autentiseras enligt bypass-noten överst;
+> skriptet sanerar hemligheten ur ALL evidens. **Exekveringsmiljö:** webbläsarkörningen kräver
+> lokala loopback-sockets; i den kanoniska Mac-sandlådan (som strukturellt nekar listen())
+> körs anropet under den ägar-ratificerade kapaciteten **BROWSER_VERIFICATION_EXECUTION**
+> (identitetsceremoni före varje körning: runner-/package-/lock-hashar + exakta versioner, se
+> foundation-K6), och Claude Code-harnessens egen godkännandegräns respekteras — kan
+> kapaciteten inte beviljas/godkännas vid körningstillfället är axe-komponenten **ODÖMBART**
+> och lansering förblir blockerad. Axe hoppas ALDRIG över tyst. `incomplete`-regler i
+> resultatet är inte bevis på uppfyllda kriterier — de går till de manuella punkterna nedan.
+> AccessLint eller annan kandidat blir aldrig produktionsauktoritativ via denna rad.
 
 - [ ] Every image has meaningful Swedish alt text (empty `alt=""` only for decorative)
 - [ ] Form labels visible + programmatically associated; error messages announced
@@ -68,7 +79,7 @@ Läs `content/profile.ts` FÖRST: `primaraktion` + `gate1Test` definierar vad so
 - [ ] Contrast ≥4.5:1 body, ≥3:1 large text; `prefers-reduced-motion` respected
 - [ ] `<html lang="sv">`; heading order sane (one `h1`/page)
 - [ ] **Klickytor ≥24×24 px** (WCAG 2.2 Target Size), helst 44×44 på mobil — för hantverkstjänster köpta av äldre är detta en konverteringsfråga, inte en formalitet
-- [ ] **axe-core: noll violations** (`wcag2a`/`wcag2aa`/`wcag21aa`/`wcag22aa`) — mekanisk komplettering; axe täcker ~1/3 av kriterierna och ersätter inte de manuella punkterna ovan
+- [ ] **axe-core: noll violations** (`wcag2a`/`wcag2aa`/`wcag21aa`/`wcag22aa`) via `node scripts/run-axe-gate.mjs <mål-URL>` (kanoniska körvägen i noten ovan; exit 0 krävs — exit 2/ODÖMBART blockerar) — mekanisk komplettering; axe täcker ~1/3 av kriterierna och ersätter inte de manuella punkterna ovan; `incompleteRuleIds` i resultatet redovisas i evidensen för manuell bedömning
 
 ## Gate 5 — SEO Launch Readiness (deep pass via `nortropic-seo-lokal`)
 - [ ] Unique Swedish title + meta description on every page (`[Tjänst] i [Stad] | Företag` pattern)
