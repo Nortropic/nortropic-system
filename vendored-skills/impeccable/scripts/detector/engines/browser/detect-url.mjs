@@ -119,7 +119,7 @@ async function detectUrl(url, options = {}) {
         target: url,
       }, () => import('puppeteer'));
     } catch {
-      throw new Error('puppeteer is required for URL scanning. Install: npm install puppeteer');
+      throw new Error('URL browser scan unavailable: puppeteer is not present in this project. Fail closed — report the browser scan as unavailable and continue without it. Dependency installation is out-of-band (Nortropic instrument/dependency lifecycle); never install dependencies autonomously.');
     }
   }
 
@@ -246,7 +246,7 @@ async function createBrowserDetector(options = {}) {
   try {
     puppeteer = await import('puppeteer');
   } catch {
-    throw new Error('puppeteer is required for URL scanning. Install: npm install puppeteer');
+    throw new Error('URL browser scan unavailable: puppeteer is not present in this project. Fail closed — report the browser scan as unavailable and continue without it. Dependency installation is out-of-band (Nortropic instrument/dependency lifecycle); never install dependencies autonomously.');
   }
   const launchArgs = options.launchArgs || (process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : []);
   const browser = options.browser || await puppeteer.default.launch({

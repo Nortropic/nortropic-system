@@ -47,13 +47,21 @@ else
   echo "K3 PASS: pinnade bytes @ e3d624ba med verifierad payloadhash + proveniens"
 fi
 
-# ---- K4: impeccable kan inte självuppdatera ---------------------------------
+# ---- K4: impeccable är en frusen lokal fork utan själv-/auto-auktoritet -----
 IMP="$ROT/vendored-skills/impeccable/SKILL.md"
 CTX="$ROT/vendored-skills/impeccable/scripts/context.mjs"
+DUR="$ROT/vendored-skills/impeccable/scripts/detector/engines/browser/detect-url.mjs"
+LIV="$ROT/vendored-skills/impeccable/scripts/live-inject.mjs"
 grep -q 'npx impeccable' "$IMP" && fail "K4: förauktoriserad självuppdatering återinförd i frontmattern"
-grep -q "STEP-0A CONTAINMENT" "$CTX" || fail "K4: uppdaterings-guarden saknas i context.mjs (ankarkrav)"
-awk '/fetchLatestSkillVersion/,/^}/' "$CTX" | grep -q 'return null' || fail "K4: fetchLatestSkillVersion returnerar inte null först"
-echo "K4 PASS: självuppdateringsvägen neutraliserad"
+grep -q 'LOCAL_NORTROPIC_FORK' "$IMP" || fail "K4: fork-identiteten saknas i SKILL.md (ankarkrav)"
+grep -q 'R4 FORK-AND-FREEZE' "$CTX" || fail "K4: R4-markören saknas i context.mjs (ankarkrav)"
+grep -q 'impeccable\.style\|UPDATE_AVAILABLE\|UPDATE_HOST\|npx impeccable update' "$CTX" && fail "K4: uppdateringsmaskineri återinfört i context.mjs"
+grep -q 'out-of-band' "$DUR" || fail "K4: fail-closed-semantiken saknas i detect-url.mjs (ankarkrav)"
+grep -q 'npm install' "$DUR" && fail "K4: beroende-installationsinstruktion återinförd i detect-url.mjs"
+grep -q 'CSP_REQUIRES_EXPLICIT_DEV_AUTHORITY' "$LIV" || fail "K4: CSP-grinden saknas i live-inject.mjs (ankarkrav)"
+grep -q 'appendOriginToDirective\|function patchCspMeta' "$LIV" && fail "K4: automatisk CSP-breddning återinförd i live-inject.mjs"
+[ -f "$ROT/vendored-skills/impeccable/LICENSE" ] || fail "K4: Apache-licensen saknas i forken"
+echo "K4 PASS: frusen lokal fork — inget uppdaterings-, beroende- eller CSP-självmandat"
 
 # ---- K5b: drift-kanari — inga mutable-fetch-instruktioner i skill-kroppar ----
 # Ankarkrav: kanarin kräver att minst en skill-fil lästes.
