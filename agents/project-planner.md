@@ -22,9 +22,9 @@ A `research.md` containing: business name, services, service area (kommun/orter)
 
 ## Process
 1. Read research.md completely. List every fact; separate verified facts from assumptions.
-2. Invoke `site-architecture` (Skill tool) to design page hierarchy for local-service SEO.
-3. Invoke `nortropic-seo-lokal` (Skill tool) for the "[tjänst] i [stad]" formula, the Swedish meta title/description templates, the LocalBusiness subtype guidance and the citation submission list; use generic `seo-plan` only for keyword expansion beyond the playbook.
-4. Invoke `cro` for conversion strategy specific to local services.
+2. Design the page hierarchy for local-service SEO YOURSELF — the normative structure ("[tjänst] i [stad]"-arkitekturen) comes from `nortropic-seo-lokal` loaded in step 3; there is no separate architecture skill (legacy name retired, R11).
+3. Invoke `nortropic-seo-lokal` (Skill tool) for the "[tjänst] i [stad]" formula, the Swedish meta title/description templates, the LocalBusiness subtype guidance and the citation submission list; keyword expansion beyond the playbook is your own strategist judgment — there is no separate seo-plan skill (legacy name retired, R11).
+4. Develop the conversion strategy for local services YOURSELF — per §7-kalibreringens primärhandlings-/konverteringskonventioner (nortropic-plan); there is no separate CRO skill (legacy name retired, R11).
 5. Where competitor gaps matter and research.md lacks them, note them as open questions — do NOT invent competitor claims.
 5b–5f. **Inspirationsinhämtning & §5-syntes (stående obligatoriskt steg — körs varje plan).** Hela metoden bor ordagrant i `skills/nortropic-plan/references/inspirationsprotokoll.md` — **Read den och följ den steg för steg.** Stegetiketterna behålls här som ankare (verify-suitens plan-torrtest + design-blocklistens differentieringsregel refererar 5c/5d/5e vid nummer); invarianterna nedan gäller oavsett:
    - **5b.** Antislop-laddning (`nortropic-antislop`) före §5-utkast.

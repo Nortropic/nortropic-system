@@ -63,7 +63,7 @@ Läs `content/profile.ts` FÖRST: `primaraktion` + `gate1Test` definierar vad so
 - [ ] `not-found.tsx` + `error.tsx` in Swedish, styled, with phone
 - [ ] Favicon + OG images render (test a share preview)
 
-## Gate 4 — Accessibility (escalate to `a11y-audit` for the deep pass)
+## Gate 4 — Accessibility (den pinnade axe-körningen + de manuella punkterna ÄR djuppasset)
 
 > **KANONISK AXE-KÖRVÄG (R6 2026-08-25 — STEP-0A-demoteringen hävd):** axe-raden körs ENDAST via
 > `node scripts/run-axe-gate.mjs <mål-URL>` i nortropic-system-repot — den pinnade kedjan
@@ -136,4 +136,4 @@ Launch only when 0–5 and 7 all ✅ and a human has signed off 6.
 ```
 
 ## On-Demand Escalation
-`a11y-audit` (WCAG deep scan) · `ship-gate` (generic launch gate) · `pw` (Playwright E2E for the form flow) · `seo-technical` / `seo-page` (SEO deep checks) · `security-review` (deep security pass) · `dependency-auditor` (dependency deep-dive) · chrome-devtools/playwright MCP for live viewport + network testing.
+`seo-optimizer`-agenten (SEO-djupkontroller — Audit mode äger crawl/indexering; normerna i `nortropic-seo-lokal`) · chrome-devtools/playwright MCP for live viewport, E2E and network testing. WCAG-djupet är Gate 4:s manuella punkter + den pinnade axe-körningen; grind-, säkerhets- och beroendeansvaret ligger i grindarna själva (Gate 7 äger säkerhetsevidensen) — legacy-skillnamnen från installationstiden är retirerade (R11).
