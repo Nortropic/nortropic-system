@@ -158,3 +158,42 @@ dokument, inte bevis, och nya facit klipps av dig enligt `tests/fixtures/FIXTURE
 CHANGE-2026-08-24.md`; tills dess säger kvalitetsnätet ärligt "väntar på ny regim" i stället
 för grönt. (2) Fabrikens kladd och löpande anteckningar (förslag, digest, usage-logg) bor nu
 i `~/.nortropic/factory/` — anteckningar är inte kunskap, så de bor utanför repot.
+
+## Fabriken börjar föra anteckningar om sig själv (S1-min + K4, 2026-08-25)
+
+Fram tills nu kunde fabriken bygga sajter — men den kunde inte svara på frågan "blir vi
+bättre?" Den här ändringen ger den fyra enkla anteckningsböcker, och inget mer. Inga
+mätpaneler, inga automatiska system, ingen ny nattkörning: fyra dokument som en människa
+fyller i.
+
+**1. En mognadslista.** I `docs/06-scope.md` står nu vad varje paket klarar, med fem
+lägen: beskrivet · byggt · under prövning · bevisat · medvetet utanför. Vårt enda paket
+idag (svenska lokala företag) står på UNDER PRÖVNING — och kan inte nå "bevisat" på
+övningar, bara på två riktiga kunder i rad som gått bra. Simulering ger skala,
+verkligheten ger sanning.
+
+**2. En lärdomsbok per kund** (`LEARNING-RECORD.md`, fylls på tio minuter i den månatliga
+genomgången). Där skrivs vad vi TRODDE skulle hända (den hypotesen står numera sist i
+kundens överlämningsdokument), och sedan vad som faktiskt hände — i råa antal, aldrig
+procent, för procent på dussintals besök är påhitt med decimaler. Tre saker hålls isär:
+fungerar sajten · klarar besökaren sitt ärende · får kunden affär. Det är tre olika
+frågor, och en grön bock på den första har aldrig svarat på de andra två.
+
+**3. En erfarenhetssektion i systemets egen rapport.** Efter varje projekt skriver
+förmannen ned vad som gick fel, vad kunden rättade oss om, och vilka lärdomar som är
+KANDIDATER. En lärdom blir aldrig en regel för att den kändes klok en gång — den måste
+synas hos en andra kund först.
+
+**4. En kursplan och ett kompetensregister** (`docs/kursplan.md`, `docs/kompetensregister.md`).
+Kursplanen säger vad varje roll LADDAR för ett jobb — det den alltid kan, plus det som
+bara gäller vissa kunder. Registret säger vad vi kan BEVISA att vi är bra på. Två regler
+håller dem ärliga: en modul som ingen citerat på två projekt i rad föreslås bli
+"hämtas vid behov" i stället för alltid-laddad (kontexten växer bara mot belägg), och
+registret får inte skriva "bevisat" på övningar — bara riktiga kunder räknas. Registret
+är med flit nästan tomt: vid en enda datapunkt är "går inte att bedöma" det ärliga
+svaret, och ett register som ser välfyllt ut när bevis saknas ljuger.
+
+Den viktigaste regeln i hela ändringen är var lärdomsboken INTE får användas: den får
+aldrig avgöra om något godkänns. Så fort siffror från verkligheten får bestämma vem som
+blir befordrad, börjar någon jaga siffran i stället för kvaliteten. Anteckningarna är
+till för att TÄNKA med, inte för att grinda med.
