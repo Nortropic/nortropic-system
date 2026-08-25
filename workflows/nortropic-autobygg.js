@@ -10,7 +10,7 @@ export const meta = {
     { title: 'Content',                 detail: 'content-designer fyller TODO-COPY + Humanisera; TODO-FACT lämnas; F1-fasgränscommit (fixkontraktet)' },
     { title: 'Review',                  detail: 'full review → EN fixloop (fixkontrakt: deklaration → unionscommit) → diff-review → CRITICAL-parse' },
     { title: 'Villkorat stopp (review)',detail: 'CRITICAL kvar efter EN fixloop => överlämna med FINAL-TOUCHES' },
-    { title: 'Grind-torrkörning',       detail: '7 linser read-only, INGEN deploy, INGEN fix-loop, INGEN handover' },
+    { title: 'Grind-torrkörning',       detail: '8 linser read-only, INGEN deploy, INGEN fix-loop, INGEN handover' },
     { title: 'Avslut',                  detail: 'FINAL-TOUCHES + AUTOBYGG-LOG + slutstatusrad' },
   ],
 }
@@ -108,7 +108,7 @@ const GATE = {
       required: ['severity', 'title', 'location', 'why', 'fix', 'category'],
       properties: { severity: { type: 'string', enum: ['CRITICAL', 'HIGH', 'MEDIUM'] },
         title: { type: 'string' }, location: { type: 'string' }, why: { type: 'string' }, fix: { type: 'string' },
-        category: { type: 'string', enum: ['technical','leadgen','visual','trust','seo','security','legal'] } } } } },
+        category: { type: 'string', enum: ['technical','leadgen','visual','trust','seo','security','legal','journeys'] } } } } },
 }
 
 // ─────────── BATCH-005-fixkontrakt (DEL 2, autobygg): returkontrakt för ändrade filer ───────────
@@ -386,11 +386,12 @@ if (reviewStop.stop) {
     criticals: triage.criticals, contentCommit, fixCommit, gates: [] }
 }
 
-phase('Grind-torrkörning')  // reproducerar launch.js:s 7 linser READ-ONLY: ingen deploy, ingen fix-loop, ingen handover
+phase('Grind-torrkörning')  // reproducerar launch.js:s 8 linser (S5: journeys tillagd) READ-ONLY: ingen deploy, ingen fix-loop, ingen handover
 const GATE_LENSES = [
   { key: 'technical', agentType: 'qa-launcher',     lens: 'Gates 0/2/3/4 (build, Lighthouse, responsive+SSL+links, a11y)' },
   { key: 'leadgen',   agentType: 'qa-launcher',     lens: 'Gate 1 primärhandlingsgrinden — läs content/profile.ts FÖRST; SAKNAS => FAIL' },
   { key: 'seo',       agentType: 'seo-optimizer',   lens: 'audit mode + launch readiness (sitemap/robots/canonicals/schema/NAP mot business.ts)' },
+  { key: 'journeys',  agentType: 'qa-launcher',     lens: 'S5-reselins: läs obligatoriskaResor + toppuppgifter i content/profile.ts och pröva VARJE kontrakterad resa end-to-end (375px + desktop, riktig interaktion). Saknas obligatoriskaResor (v1-profil) = PASS med en MEDIUM-rad (SAKNAS_I_V1), aldrig FAIL. Dubbelrapportera inte primärhandlingen — den ägs av leadgen-linsen. Category: journeys' },
   { key: 'visual',    agentType: 'design-reviewer', lens: 'anti-slop visuell QA som launch-grind' },
   { key: 'trust',     agentType: 'design-reviewer', lens: 'trust: kvitton per profile.ts, omdömen/betyg/NAP mot content' },
   { key: 'security',  agentType: 'qa-launcher',     lens: 'Gate 7 (npm audit, servade headers via curl, formulärmissbruk, hemligheter)' },

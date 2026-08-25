@@ -17,7 +17,7 @@ Pipelinen är tolv noder. Kommandona är de tre pipeline-skillsen (som bara män
 | 4 | Init | `/nortropic-init <PROJECT-BRIEF.md>` | stack-builder (opus · max) | GitHub-repo + Vercel-preview |
 | 5 | Innehåll | inget eget kommando — huvudsessionen kör agenten | content-designer (opus · max) | copy, bilder (anskaffningen skriver `BILDRAPPORT.json`), varumärkeslagret (app/-ikonerna + `public/brand/` via brand.mjs), `TODO-COPY` fylld, Humanisera-passet, klientfyllda `fotouppdrag-klient.md` (vid `saknas` på ersättningsprio 1–2) |
 | 6 | Review | `/nortropic-review` (kadens full → `--diff` → full) | workflow: design-reviewer (opus · max) + seo-optimizer (opus · high) + kodlins, 2 skeptiker per fynd | `REVIEW-REPORT.md` med commit-meta |
-| 7 | Launch | `/nortropic-launch` | workflow: 7 linser över qa-launcher (opus · high), seo-optimizer (opus · high), design-reviewer (opus · max); fixar via stack-builder/seo-optimizer | verdikt, `EVAL-RESULT.md`, `HANDOVER.md`, `gbp-checklist-klient.md`, `gsc-steg-klient.md` |
+| 7 | Launch | `/nortropic-launch` | workflow: 8 linser (S5: reselinsen tillagd) över qa-launcher (opus · high), seo-optimizer (opus · high), design-reviewer (opus · max); fixar via stack-builder/seo-optimizer | verdikt, `EVAL-RESULT.md`, `HANDOVER.md`, `gbp-checklist-klient.md`, `gsc-steg-klient.md` |
 | 8 | Juridik | **HÅRT STOPP** | människa | sign-off på Gate 6-fynden |
 | 9 | Deploy | `/vercel:deploy` | människa/huvudsession | produktionssajt |
 | 10 | Efterarbete | `/nortropic-cutover` (fas 1–3: förkontroll → noindex → GSC; fas 4–7 — Bing/IndexNow, uppetid, GBP, citations — fortsatt manuella ur checklistorna) | människa (+ klient) | GBP live, GSC verifierad, citations |

@@ -291,3 +291,39 @@ av en migrering och väcker ingen mitt i natten.
 **Bygget delas i två lager.** Kärnan byggs alltid. Det paketspecifika — för svenska
 lokala företag är det ortssidorna — byggs bara när paketet faktiskt är belagt. En sajt
 utan ortssidor är därför ibland helt korrekt, inte en lucka någon glömt.
+
+## Grindarna läser kundens kontrakt i stället för att anta (S5, 2026-08-26)
+
+Fram tills nu antog kvalitetskontrollen att varje sajt var en svensk lokal
+tjänsteverksamhet. Det stämde för alla kunder vi haft — men ett antagande som
+råkar stämma är fortfarande ett antagande, och det syns först den dag det inte
+gör det.
+
+Nu läser grindarna sajtens eget kontrakt (`content/profile.ts`) och dömer mot vad
+DEN sajten lovat: vilken primärhandling som gäller, vilka resor som måste fungera,
+vad sajten aldrig får påstå och vilket paket som är belagt.
+
+**SEO-grinden är delad i två.** Den tekniska kärnan — sitemap, canonicals, schema,
+titlar, indexerbarhet — prövas alltid, för varje sajt. Det lokala lagret —
+ortssidor, NAP-kontroll, Google Företagsprofil — prövas bara när kunden faktiskt
+hör till det paketet. För en kund utan ortspaket är frånvaron av ortssidor
+**korrekt**, inte en brist någon glömt.
+
+**En ny lins prövar resorna.** Inte bara "går det att ringa" utan varje resa
+kunden kontrakterat, klickad på riktigt i mobil och på desktop. En resa som bara
+ser rätt ut är inte prövad. Har kunden ett äldre kontrakt utan resor blockerar det
+ingenting — det redovisas som en lucka, inte som ett fel.
+
+**Den andra skeptikern har slutat gissa.** När två granskare ska motbevisa ett
+fynd frågade den ena tidigare "spelar det här roll för en svensk lokal
+tjänstesajt?" — en fråga som var inbakad i koden. Nu frågar den "spelar det roll
+för DEN HÄR sajten enligt dess kontrakt?", och den får aldrig hitta på ett krav
+kontraktet inte bär.
+
+**Överlämningen och domänbytet följer också paketet.** En kund utan ortspaket får
+inte en Google Företagsprofil-checklista hen aldrig kan följa — hen får en mening
+om varför den inte gäller.
+
+Det som INTE ändrats: hur många fixrundor som tillåts, att juridiken aldrig
+auto-fixas, att en grind måste vara grön för att släppa igenom. De reglerna är
+grundlagsskyddade och rörs inte av att grindarna blivit smartare på vad de läser.

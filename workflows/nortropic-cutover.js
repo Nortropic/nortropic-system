@@ -81,7 +81,11 @@ const GSC = {
 phase('Förkontroll')
 const pre = await agent(
   `Förkontroll inför GSC-cutover av ${domain ? `domänen ${domain}` : 'kundsajten'} (repo: ${clientDir}). Läs ENDAST, rör ingenting skarpt.\n` +
-  `1. cd ${clientDir}; läs business.ts (src/content/ eller content/): returnera testklient-flaggan och domain-fältet.\n` +
+  `1. cd ${clientDir}; läs business.ts (src/content/ eller content/): returnera testklient-flaggan och domain-fältet. `+
+  `Läs OCKSÅ content/profile.ts: \`paket\` avgör vilka cutover-steg som gäller. Vid \`core-only\` är de `+
+  `lokal-se-specifika stegen (GBP-koppling, ortssidornas indexering) INTE tillämpliga — hoppa dem och säg `+
+  `varför i rapporten; kärnstegen (domän, kanonisk variant, sitemap, noindex-borttagning) gäller alltid. `+
+  `Saknas profile.ts eller \`paket\`: behandla som core-only och notera det — gissa ALDRIG ett paket.\n` +
   `2. Kanonisk kontroll i BÅDA riktningar (samma logik som scripts/gsc-setup.mjs assertCanonical):\n` +
   `   (a) curl -sIL https://${domain || '<domän ur business.ts>'}/ — svarar den 200 och landar på SAMMA host, dvs ingen redirect BORT?\n` +
   `   (b) hämta den MOTSATTA varianten (www↔apex av ${domain || '<domän>'}) — 301:ar den HIT till ${domain || 'den angivna domänen'}?\n` +
