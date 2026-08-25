@@ -20,12 +20,35 @@ A `research.md` **written against the canonical research contract** — `skills/
 
 Den innehåller i substans: organisation & typade kontaktvägar, erbjudande, användare, toppuppgifter + primärhandlingskandidat, geografi & språk, förtroende/evidens, innehåll + bildmaterial, röst/varumärke, transaktions-/dataobservationer, integrationer, juridik-/riskobservationer, konkurrenter, designreferenser, framgångsmått, kapacitetssignaler, öppna frågor och kontrollraden. **En äldre research.md tolkas ALDRIG om** — saknade nyare fält läses som `OSÄKER`, aldrig som `nej`.
 
-**INPUT GATE — run first.** Required minimum: business name, phone number, at least one service, at least one ort/service area, something usable as a USP. Bär filen `status=OFULLSTÄNDIG` är grinden redan fälld av producenten och du planerar inte vidare. `pack=core-only` är däremot ett GILTIGT läge och aldrig i sig ett grindfel.
+**INPUT GATE — run first.** Required minimum: business name, phone number, at least one service, at least one ort/service area, something usable as a USP. Bär filen `status=OFULLSTÄNDIG` är grinden redan fälld av producenten och du planerar inte vidare. `pack=core-only` är däremot ett GILTIGT läge och aldrig i sig ett grindfel. If any is missing: STOP. Output only the numbered list of missing items with a one-line explanation of why each is needed. Do not plan on guesses — a brief built on invented facts poisons every downstream agent.
 
-**Känd avvikelse (S1, medvetet oförändrad här):** denna grind är fortfarande `lokal-se`-formad och sammanfaller INTE med kontraktets universella kontrollrad. Kontrollraden bär `org · kontaktvag · erbjudande · geografi · primarhandling · framgangsmatt` — den har inget USP-fält, och den kräver en TYPAD kontaktväg (telefon · formulär · DM · bokningssystem · fysisk plats), inte telefon specifikt; obligatorisk telefon är en `lokal-se`-SKÄRPNING, inte ett universellt krav. Följden är verklig: en giltig `pack=core-only`-fil kan vara `status=KOMPLETT` med enbart formulär som kontaktväg och ändå stoppas här för saknat telefonnummer. Grinden lämnas oförändrad i S1 med avsikt — grindparameterisering hör till S5/H-2. Möter du fallet: stoppa enligt grinden, men skriv ut att stoppet är en paketformad grind mot en universellt komplett fil, aldrig att researchen är bristfällig. If any is missing: STOP. Output only the numbered list of missing items with a one-line explanation of why each is needed. Do not plan on guesses — a brief built on invented facts poisons every downstream agent.
+**Känd avvikelse (S1, medvetet oförändrad här):** denna grind är fortfarande `lokal-se`-formad och sammanfaller INTE med kontraktets universella kontrollrad. Kontrollraden bär `org · kontaktvag · erbjudande · geografi · primarhandling · framgangsmatt` — den har inget USP-fält, och den kräver en TYPAD kontaktväg (telefon · formulär · DM · bokningssystem · fysisk plats), inte telefon specifikt; obligatorisk telefon är en `lokal-se`-SKÄRPNING, inte ett universellt krav. Följden är verklig: en giltig `pack=core-only`-fil kan vara `status=KOMPLETT` med enbart formulär som kontaktväg och ändå stoppas här för saknat telefonnummer. Grinden lämnas oförändrad i S1 med avsikt — grindparameterisering hör till S5/H-2. Möter du fallet: stoppa enligt grinden, men skriv ut att stoppet är en paketformad grind mot en universellt komplett fil, aldrig att researchen är bristfällig.
 
 ## Process
-1. Read research.md completely. List every fact; separate verified facts from assumptions.
+
+**0. INTERVENTIONSBESLUT (körs FÖRE all planering — S3).** Innan du antar att svaret är
+"en ny sajt": läs researchen och avgör vilken åtgärd som faktiskt löser kundens problem.
+Systemet måste kunna komma fram till att **en ny webbplats inte är det kunden behöver.**
+Fyra utfall, och du skriver ut vilket som gäller:
+- **NY SAJT** — det befintliga går inte att rädda, eller finns inte.
+- **FÖRBÄTTRA BEFINTLIG** — sajten fungerar i grunden; problemet är innehåll, struktur
+  eller en trasig primärhandling. En omskrivning kastar då bort upparbetat SEO-värde.
+- **ICKE-SAJT-ÅTGÄRD** — problemet ligger utanför sajten (Google Företagsprofil,
+  svarstider, prissättning, att telefonen inte besvaras). Säg det rakt ut.
+- **AVRÅD** — vi är fel leverantör för det kunden faktiskt behöver.
+
+Läs FÖRST det som redan finns (read-only estate-genomgång) innan du föreslår att ersätta
+det. **Kundens önskemål ≠ användarens behov, och affärsutfall ≠ användarutfall** — håll
+isär dem i motiveringen. Utfallet skrivs i briefens §7.12. **Är utfallet något annat än `NY SAJT` registreras det
+ALLTID OCKSÅ som en STRATEGISK öppen fråga** (samma mekanik som en ohanterad
+juridikflagga) — annars passerar ett obemannat flöde beslutet och bygger just den sajt
+du avrått från. Briefen säger då varför, i stället för att planera en sajt ändå.
+
+1. Read research.md completely. List every fact; separate verified facts from assumptions. **Läs kontraktsversionen och kontrollraden (sektion 17) först** — den säger vilken kontraktsversion filen är skriven mot, vilket paket som gäller och hur många `[OSÄKER]`/konflikter den bär. En äldre kontraktsversion tolkas ALDRIG om; saknade nyare fält läses som `OSÄKER`, aldrig som `nej`.
+1b. **Kompilera kapacitetssignaler mot katalogen** ([`docs/kapacitetskatalog.md`](../docs/kapacitetskatalog.md)): läs researchens sektion 15 + aktiveringssignalerna, avgör vilka kapaciteter jobbet kräver, och routa utfallet:
+   - **`ROUTE-OUT`** → planera ALDRIG runt gränsen; briefen rekommenderar hänvisning (Ring 3).
+   - **`DECLARED` som krävs men inte är byggd** → **STOPP** som STRATEGISK öppen fråga ("kräver kapacitet X som inte finns — beslut vid nod 3"). Du planerar aldrig vidare på en kapacitet som inte existerar.
+   - Aktiverade kapaciteter skrivs i §7.10 med sin katalogstatus.
 2. Design the page hierarchy for local-service SEO YOURSELF — the normative structure ("[tjänst] i [stad]"-arkitekturen) comes from `nortropic-seo-lokal` loaded in step 3; there is no separate architecture skill (legacy name retired, R11).
 3. Invoke `nortropic-seo-lokal` (Skill tool) for the "[tjänst] i [stad]" formula, the Swedish meta title/description templates, the LocalBusiness subtype guidance and the citation submission list; keyword expansion beyond the playbook is your own strategist judgment — there is no separate seo-plan skill (legacy name retired, R11).
 4. Develop the conversion strategy for local services YOURSELF — per §7-kalibreringens primärhandlings-/konverteringskonventioner (nortropic-plan); there is no separate CRO skill (legacy name retired, R11).
@@ -34,7 +57,7 @@ Den innehåller i substans: organisation & typade kontaktvägar, erbjudande, anv
    - **5b.** Antislop-laddning (`nortropic-antislop`) före §5-utkast.
    - **5c.** ui-ux-pro-max/frontend-design-uppslag per bransch/målgrupp + differentieringsregeln mot de två senaste ANDRA kundernas §5 (regel 19 + `design-blocklist.md`; KONTINUITET vid re-plan, aldrig tvingad divergens).
    - **5d.** Inspirationsinhämtning (5d.1–5d.5, inkl. bildinventeringen) — **read-only mot främmande sajter (regel 18); aldrig fabricerade observationer eller betyg/omdömen (regel 15)**; källbibliotek `inspirationskallor.md`.
-   - **5e.** Kalibreringsprofil §7 (bevisregeln; profilbiblioteket `~/Workflow/profiler/`; juridikflaggor ur registret).
+   - **5e.** Kalibreringsprofil §7 (bevisregeln; branschprofiler i paketets strategimodul `packs/lokal-se/strategi/` — det retirerade `~/Workflow/profiler/` är ersatt, S3; juridikflaggor ur registret).
    - **5f.** Tvåpass-syntes av §5 med självtestet "samma plan för vilken liknande brief som helst?".
 6. Write `PROJECT-BRIEF.md` next to the research file.
 
@@ -87,6 +110,13 @@ Kalibreringskontraktet nedströms: agenter, grindar och eval läser detta i stä
 7. **Juridikflaggor**: sätts ur research mot `references/juridikflaggor.md` i nortropic-plan-skillen. Ohanterad flagga → öppen fråga i briefen: "kräver juridikmodul X som inte finns — beslut vid nod 3: bygg modulen (offereras som eget arbete) eller tacka nej." Scope-nej-flagga → briefen rekommenderar hänvisning. En ohanterad eller scope-nej flagga registreras dessutom som en STRATEGISK öppen fråga (se Rules — frågeklassningen) så obemannat läge alltid stoppar på den.
 8. **Motion-nivå**: värdet sätts i §5 (en plats) — §7 korsrefererar dit.
 9. **Bildspår & Bildbehandling**: värdena sätts i §5 (en plats) — §7 korsrefererar dit.
+10. **Kapaciteter** (S3, obligatoriskt): vilka kapaciteter jobbet aktiverar, var och en med sitt katalog-ID och sin status ur [`docs/kapacitetskatalog.md`](../docs/kapacitetskatalog.md). `ROUTE-OUT` skrivs som hänvisning, aldrig som plan. En krävd men obyggd kapacitet står här OCH som STRATEGISK öppen fråga — aldrig bara i den ena.
+11. **Toppuppgifter & resor** (S3, obligatoriskt): de 2–4 uppgifter besökaren faktiskt kommer för att utföra (research sektion 4), och resan för var och en — var den börjar, vad som kan stoppa den, var den slutar. **Användarens behov är inte samma sak som kundens önskemål**; när de skiljer sig skriver du ut båda och motiverar vilken sajten optimeras för.
+12. **Interventionsbeslut** (S3, obligatoriskt): utfallet ur processteg 0 — `NY SAJT` | `FÖRBÄTTRA BEFINTLIG` | `ICKE-SAJT-ÅTGÄRD` | `AVRÅD` — med en motivering som citerar research. Är utfallet inte `NY SAJT` är det briefens viktigaste rad, OCH det registreras som STRATEGISK öppen fråga så orkestreringen stoppar i stället för att bygga vidare.
+13. **Framgångsmått** (S3, obligatoriskt): kundens mått ur research sektion 14, ordagrant nog för att kunna visa sig fel. **Detta fält föder HANDOVER:s Utfallshypotes och därmed kundens LEARNING-RECORD.** Skilj **affärsutfall** (leads, bokningar) från **användarutfall** (klarade besökaren sitt ärende) — de kollapsas aldrig till ett tal.
+14. **Förbjudna påståenden & olösta okändheter** (S3, obligatoriskt): två listor. (a) Vad denna sajt ALDRIG får påstå — obelagda superlativ, lånade meriter, certifikat vi inte sett, betyg utan källa. (b) Vad vi fortfarande inte vet, med vem som kan svara. **Domänauktoritetsfrågor** märks `DOMÄNEXPERT` (kund-SME är auktoritet på SAKFAKTA, aldrig på UX); rena UX-antaganden märks `ANVÄNDARE`. Klassen sätts per rad — aldrig som tyst default.
+
+**Assuranceprofil (S3):** varje uppdrag bär `STANDARD` som default. **En `STANDARD`-leverans får aldrig samla på sig extra ceremoni utan ett NAMNGIVET skäl** — varje extra grind, extra granskningsrunda eller extra godkännandesteg måste peka på den juridikflagga, den kapacitetslucka eller det ägarbeslut som kräver den. Nivån skrivs ALLTID ut som en märkt rad i §7 — `Assurance: STANDARD` när inget höjer den, annars `Assurance: <nivå> — skäl: <namngivet skäl>`. Ett tomt fält är inte STANDARD, det är en oskriven rad; ceremoni utan namngivet skäl är kostnad utan skydd.
 
 ## Rules
 - Swedish market only; all customer-facing copy suggestions in Swedish
