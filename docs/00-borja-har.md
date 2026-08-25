@@ -197,3 +197,36 @@ Den viktigaste regeln i hela ändringen är var lärdomsboken INTE får använda
 aldrig avgöra om något godkänns. Så fort siffror från verkligheten får bestämma vem som
 blir befordrad, börjar någon jaga siffran i stället för kvaliteten. Anteckningarna är
 till för att TÄNKA med, inte för att grinda med.
+
+## Researchen får ett kontrakt (S1, 2026-08-25)
+
+Research är steget där vi tar reda på fakta om en ny kund innan något byggs. Fram tills
+nu bodde frågelistan i kontrollrummets app — och en frågelista som bor hos den som
+använder den kan ändras utan att någon märker det. Nu finns EN kanonisk lista i
+systemrepot. **Halva jobbet är gjort i den här ändringen:** listan, paketmodulen, låset
+och proven finns — men kontrollrummets app har ännu INTE kopplats om till dem, så den
+bär fortfarande sin egen kopia. Den omkopplingen är ett eget steg i ett annat repo, och
+tills den är gjord är det bara systemrepot som har den sanna listan.
+
+**Ryggraden är sjutton punkter** som alltid är desamma och alltid numrerade lika: vilka
+de är och hur man når dem, vad de erbjuder, vilka som besöker, vad besökaren kommer för
+att göra, var de finns, vilka bevis på förtroende som finns, vilket innehåll och vilka
+bilder, hur de låter, om pengar eller persondata är inblandade, vilka tjänster de
+använder, juridiska observationer, konkurrenter, designreferenser, vad kunden vill ska
+hända, kapacitetssignaler, öppna frågor — och sist en maskinläsbar kontrollrad.
+
+**Paket får skärpa, aldrig lätta.** Svenska lokala företag (`lokal-se`) kräver till
+exempel telefonnummer och minst en belagd ort. Ett paket kan lägga till krav; det kan
+aldrig ta bort ett universellt krav. Och om vi bara GISSAR vilken bransch det är kör vi
+grundlistan — en gissning aktiverar aldrig ett paket.
+
+**Färskhet får bara komma in en väg:** någon upptäcker en ändring → den blir en kandidat
+→ den verifieras → en människa godkänner. Aldrig "hämta senaste versionen" vid körning.
+Den som använder kontraktet ska låsa fast en version och en kontrollsumma och vägra köra
+om summan inte stämmer — hellre stopp än att bygga på en text ingen granskat. Låset och
+dess prov finns nu; i dag är det ett kommando en människa kör, inte något som sitter i en
+grind. Att sätta det i en grind hör till ett senare steg.
+
+Det viktigaste ordet i hela kontraktet är fortfarande `[OSÄKER]`. Det vi inte kan belägga
+markeras, räknas och syns i kontrollraden. En ofullständig research som SER komplett ut
+är dyrare än ingen research alls.
