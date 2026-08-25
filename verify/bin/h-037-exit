@@ -1,0 +1,2101 @@
+#!/usr/bin/env python3
+"""Frozen H-037 verify-suite register rebind gate.
+
+0=PASS, 1=the one authorized preproduct RED, 2=rig/unexpected RED.
+The product is exactly one byte-preserving digest-token substitution in
+controller/verify/register.json.  The gate invokes the real preflight; fixture
+or H-017 credit is never accepted as the product effect.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import NamedTuple
+
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+GATE = ROOT / "verify/bin/h-037-exit"
+REGISTER = ROOT / "controller/verify/register.json"
+VERIFY = ROOT / "controller/verify/cli"
+SUITE = ROOT / "workflows/nortropic-verify-suite.js"
+INVARIANTS = ROOT / "scripts/check-invariants.mjs"
+CONSTITUTION = ROOT / "docs/07-konstitution.md"
+AUTOPILOT = ROOT / "scripts/nortropic-codex-autopilot.py"
+H017_GATE = ROOT / "verify/bin/h-017-exit"
+OWNER_WORKFLOW = ROOT / "docs/loop/owner-author-workflow-v1.md"
+DECISION_LOG = ROOT / "docs/05-beslutslogg.md"
+DRIFT = ROOT / "docs/loop/drift.md"
+TRUSTED_GIT = Path("/usr/bin/git")
+TRUSTED_GIT_SHA = "506cb2ddd061e2992c8ee7c53853340688b53d9fcec94c3aa936524cea5b40cb"
+TRUSTED_GIT_VERSION = "git version 2.50.1 (Apple Git-155)"
+CLOSED_PATH = "/usr/bin:/bin"
+VERIFY_CLOSED_PATH = "/opt/homebrew/bin:/usr/bin:/bin"
+
+OLD_SUITE_SHA = "ac1e21d1c5097c2b087054ef44ca7339e1a4aa78b8f3f8dc207b17633e5983ab"
+NEW_SUITE_SHA = "7c02f12ef7d4f6991fafa0c9a19753ccfb2b8d785c746212025864a4158a3373"
+PRE_REGISTER_SHA = "c99f3b37411c9e3acc7a6f26cead51afddb3b80729e98a4d77a5f16460bc1442"
+POST_REGISTER_SHA = "a87869be0bcfcd1e04cbd494f99e132fde1ce282dd75801cd9b1b33968b14460"
+VERIFY_SHA = "516f679f5e65426e224709dbcfbc6431bf1a1e2aa8064a5978b7bfccd2d5c6a2"
+INVARIANTS_SHA = "d37e45b46cdc92a016022b80e7f1ea32661cd33a4f1b97af61962bc7cb0bf3ba"
+CONSTITUTION_SHA = "1bda41f6e26291d70a93b51ff53bd583c052b40631e72c368ce564ffc2816837"
+AUTOPILOT_SHA = "4237eda9fd4554ed3d7ed78fc33c0e5f27f5d270ae21ff9e9d9f0d9467caa9fc"
+H017_GATE_SHA = "78b9d1f4fed9fa0d4c9e587dfc0069e9532a5cd8653a697b29a275a4d46ea983"
+FIXTURES_TREE = "d77af8aae40144558450d9e45a699ad93e68c7a4"
+PRODUCT_PATH = "controller/verify/register.json"
+LABEL = "A_H037_EXACT_VERIFY_SUITE_REGISTER_REBIND_OPERATIONAL"
+REASON = "CANONICAL_PREFLIGHT_HASH_MISMATCH_SUITE_SHA256_STALE"
+TASK_SUMMARY = (
+    "A standing bounded-prerequisite exception restores the real verifier-register preflight "
+    "after the human-owned constitutional verify-suite changed bytes. The product is a direct "
+    "clean child changing only controller/verify/register.json by replacing the suite entry's "
+    "one stale SHA-256 token with the exact current suite digest; every other registry byte and "
+    "all workflow, fixture, constitution, verifier, H-017, invariant and autopilot bytes remain "
+    "unchanged. Normal roadmap candidate scope remains protected and is not broadened."
+)
+EXIT_CRITERION = (
+    "PREPRODUCT: the no-argument gate must be RED only on the exact label "
+    f"{LABEL} with reason {REASON}, proven by the real ./controller/verify/cli preflight exiting "
+    f"4 on the exact {OLD_SUITE_SHA} to {NEW_SUITE_SHA} mismatch. PRODUCT: explicit "
+    "--product BASE_SHA CANDIDATE_SHA mode requires clean HEAD equal to the exact candidate, the "
+    "candidate to be the base's direct single child, an exact no-renames Git changed-file set of "
+    "only controller/verify/register.json, frozen candidate spec/gate bytes, and every identity "
+    "observation to use attested pinned /usr/bin/git with a closed launcher environment, all "
+    "ambient Git/config/attribute/pager/trace/loader/toolchain controls removed, explicit no-"
+    "replace/no-pager/literal-pathspec options, and canonical git-dir/common-dir/work-tree binding. "
+    "Canonical raw commit grammar, literal parent headers cross-checked against the closed no-"
+    "replace Git graph, and a physical index-independent checkout comparison are authoritative. "
+    "The exact base/candidate reachable object set must survive an exact-OID, no-reuse pack into "
+    "a fresh ref-free SHA-1 quarantine, promoted strict index validation, isolated fsck, all-object "
+    "set equality, and raw commit/tree closure parsing. Both trees must resolve exactly one literal "
+    "controller/verify/register.json entry through 40000 tree parents to a 100644 blob with the "
+    "exact pre/post bytes. Connected actual-Git controls reject replace-object, GIT_WORK_TREE, "
+    "PATH-shadow, malformed commit/tree, register mode/type/cardinality and genuine stacked/extra-"
+    "parent bypasses while accepting ordinary and signed/encoding publisher-shaped two-parent "
+    "contract-merge bases followed by their exact direct product children. The required raw-byte "
+    f"transition {PRE_REGISTER_SHA} to {POST_REGISTER_SHA}, real preflight exit 0 with that "
+    "post-register digest, suite check exit 0 on the new digest, and suite run refusal exit 3 as "
+    "not startable. Wrong digest/path/runner/startbar/check-invariants/extra/duplicate/"
+    "reformat/out-of-scope/workflow/stacked mutants reject. H-017 fixture credit is insufficient. "
+    "Normal roadmap scope/autopilot authority is never widened. H-034 stays on H-035 during this "
+    "publication and moves to H-037 only in a later explicit reviewed and guardedly published "
+    "downstream refreeze before H-036."
+)
+FAILURE_SIGNATURE = [
+    "REAL_PREFLIGHT_EXIT_4",
+    "REAL_PREFLIGHT_HASH_MISMATCH_WORKFLOWS_NORTROPIC_VERIFY_SUITE_JS",
+    "REGISTERED_SUITE_SHA256_AC1E21D1C5097C2B087054EF44CA7339E1A4AA78B8F3F8DC207B17633E5983AB",
+    "ACTUAL_SUITE_SHA256_7C02F12EF7D4F6991FAFA0C9A19753CCFB2B8D785C746212025864A4158A3373",
+]
+EXPECTED_PREFLIGHT_RED = (
+    "hash_mismatch: workflows/nortropic-verify-suite.js\n"
+    f"  registrerad: {OLD_SUITE_SHA}\n"
+    f"  på disk:     {NEW_SUITE_SHA}"
+)
+
+TEST_AUTHOR_SURFACE = [
+    "specs/tasks.spec.json",
+    "verify/bin/h-037-exit",
+    "docs/loop/owner-author-workflow-v1.md",
+    "docs/05-beslutslogg.md",
+    "docs/loop/drift.md",
+]
+BP_BINDINGS = [
+    {"id": "BP01", "binding": "STALE_SUITE_DIGEST_BLOCKS_THE_REQUIRED_REAL_CONTROLLER_PREFLIGHT"},
+    {"id": "BP02", "binding": "EXACT_REAL_PREFLIGHT_REPRODUCES_EXIT_4_AND_THE_OLD_TO_NEW_HASH_MISMATCH"},
+    {"id": "BP03", "binding": "H037_ONLY_REBINDS_THE_EXISTING_SUITE_ENTRY_TO_RESTORE_JUDGEABILITY"},
+    {"id": "BP04", "binding": "EXACT_HASH_BINDING_IS_RESTORED_WITHOUT_WEAKENING_PREFLIGHT_OR_CONSTITUTION_V18"},
+    {"id": "BP05", "binding": "TASK_DEPENDENCY_PATH_ALLOWED_WRITE_TRANSITION_AND_EFFECT_ARE_EXACTLY_BOUND"},
+    {"id": "BP06", "binding": "NO_CALLER_SELECTED_PATH_DIGEST_RUNNER_STARTBAR_OR_VERIFIER_AUTHORITY"},
+    {"id": "BP07", "binding": "EVERY_WRONG_OR_NEIGHBORING_REGISTER_MUTATION_REJECTS_EXACT_PRODUCT_IDENTITY"},
+    {"id": "BP08", "binding": "ALL_OTHER_REGISTER_BYTES_KEYS_ORDER_ENTRIES_AND_CHECK_INVARIANTS_SEMANTICS_STAY_IDENTICAL"},
+    {"id": "BP09", "binding": "THIS_TEST_AUTHOR_CANDIDATE_FREEZES_H037_BEFORE_REGISTER_PRODUCT_BYTES"},
+    {"id": "BP10", "binding": "EXACT_IMMUTABLE_H037_CONTRACT_CANDIDATE_REQUIRES_INDEPENDENT_GATE_FALSIFICATION"},
+    {"id": "BP11", "binding": "SEPARATE_REGISTER_ONLY_DIRECT_CHILD_PRODUCT_REQUIRES_INDEPENDENT_IDENTITY_REVIEW"},
+    {"id": "BP12", "binding": "H017_24_0_IS_HISTORICAL_ONLY_AND_H037_REQUIRES_REAL_PREFLIGHT_WITH_ONLY_THE_EXACT_PREPRODUCT_RED"},
+    {"id": "BP13", "binding": "CONTRACT_AND_PRODUCT_USE_GUARDED_NONFORCE_EXACT_IDENTITY_PUBLICATIONS"},
+    {"id": "BP14", "binding": "H034_DEPENDENCY_MOVES_TO_H037_ONLY_IN_A_LATER_EXPLICIT_REVIEWED_PUBLISHED_REFREEZE"},
+]
+SERIAL_TRANSITIONS = [
+    "H037_TEST_AUTHOR_FREEZE",
+    "H037_INDEPENDENT_GATE_REVIEW",
+    "H037_GUARDED_CONTRACT_PUBLICATION",
+    "H037_REGISTER_ONLY_BUILDER_PRODUCT",
+    "H037_INDEPENDENT_PRODUCT_REVIEW",
+    "H037_GUARDED_PRODUCT_PUBLICATION",
+    "H034_DEPENDENCY_REFREEZE_TO_H037",
+    "H034_INDEPENDENT_REVIEW",
+    "H034_GUARDED_PUBLICATION",
+    "H036_TEST_AUTHOR_FREEZE",
+    "H036_INDEPENDENT_GATE_REVIEW",
+    "H036_BUILDER_IMPLEMENTATION",
+    "H036_INDEPENDENT_PRODUCT_REVIEW",
+    "H036_GUARDED_PUBLICATION",
+]
+
+H037_CONTRACT = {
+    "contract_id": "H037_VERIFY_SUITE_REGISTER_REBIND_V1",
+    "standing_delegation": {
+        "contract_id": "BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION",
+        "source_sha256": "b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84",
+        "condition_operator": "ALL",
+        "hard_stop_matches": "NO_ONLY_WHILE_EVERY_EXACT_BOUND_AND_BP01_THROUGH_BP14_HOLDS",
+    },
+    "task_identity": "h-037",
+    "migration_family": "INTRODUCE_PREREQUISITE_TASK_REQUIRED_BY_ALREADY_AUTHORIZED_TASK",
+    "dependency_change": {
+        "h037_now_depends_exactly_on": ["h-035"],
+        "h034_contract_publication_stays_exactly_on": ["h-035"],
+        "h034_later_refreeze_depends_exactly_on": ["h-037"],
+        "serial_objectives": ["H037", "H034", "H036"],
+    },
+    "test_author_surface": TEST_AUTHOR_SURFACE,
+    "product_allowed_write": [PRODUCT_PATH],
+    "execution_path": {
+        "normal_roadmap_candidate_scope": "REMAINS_PROTECTED_AND_IS_NOT_USED",
+        "candidate_construction": "DIRECT_CLEAN_CANDIDATE_UNDER_STANDING_BP_MIGRATION",
+        "generic_roadmap_exception": False,
+        "autopilot_product_edit": False,
+        "publication": "EXISTING_GUARDED_NONFORCE_EXACT_IDENTITY_PUBLISHER",
+    },
+    "exact_product_transition": {
+        "path": PRODUCT_PATH,
+        "old_suite_sha256": OLD_SUITE_SHA,
+        "new_suite_sha256": NEW_SUITE_SHA,
+        "pre_register_sha256": PRE_REGISTER_SHA,
+        "post_register_sha256": POST_REGISTER_SHA,
+        "replacement_count": 1,
+        "preserved_byte_semantics": [
+            "EVERY_NON_REPLACED_REGISTER_BYTE",
+            "ALL_KEYS_AND_KEY_ORDER",
+            "CHECK_INVARIANTS_ENTRY_BYTE_IDENTICAL",
+            "SUITE_PATH_RUNNER_STARTBAR_AND_DESCRIPTION_BYTE_IDENTICAL",
+        ],
+    },
+    "preproduct_evidence": {
+        "base_sha": "139d3c7c8fe55cea5287fcff4d330745d5e0838d",
+        "command": "./controller/verify/cli preflight",
+        "exit": 4,
+        "expected_red_label": LABEL,
+        "expected_reason": REASON,
+        "failure_signature": FAILURE_SIGNATURE,
+    },
+    "product_acceptance": {
+        "command": "verify/bin/h-037-exit --product BASE_SHA CANDIDATE_SHA",
+        "candidate_identity": "CLEAN_HEAD_EQUALS_EXACT_CANDIDATE_COMMIT",
+        "base_candidate_relation": "CANDIDATE_HAS_EXACTLY_BASE_AS_ITS_SINGLE_PARENT",
+        "exact_git_diff": [PRODUCT_PATH],
+        "candidate_contract_bytes": ["specs/tasks.spec.json", "verify/bin/h-037-exit"],
+        "git_identity_boundary": {
+            "trusted_executable": "/usr/bin/git",
+            "trusted_executable_sha256": TRUSTED_GIT_SHA,
+            "trusted_executable_version": TRUSTED_GIT_VERSION,
+            "environment": "CLOSED_ALLOWLIST_WITH_PRIVATE_DARWIN_TEMP_NO_AMBIENT_GIT_LOADER_OR_TOOLCHAIN_CONTROLS",
+            "global_options": ["--no-replace-objects", "--no-pager", "--literal-pathspecs"],
+            "repository_binding": "EXPLICIT_CANONICAL_PER_WORKTREE_GIT_DIR_COMMON_DIR_AND_PHYSICAL_WORK_TREE",
+            "topology_and_cleanliness": "CANONICAL_RAW_COMMIT_HEADERS_CLOSED_GRAPH_CROSSCHECK_PLUS_INDEX_INDEPENDENT_PHYSICAL_CHECKOUT",
+            "reachable_object_closure": "EXACT_VALIDATED_OIDS_NO_REUSE_PACKED_TO_FRESH_REF_FREE_SHA1_QUARANTINE_STRICT_INDEX_FSCK_BATCH_ALL_EQUALITY_AND_RAW_PARSE",
+            "commit_grammar": "ONE_TREE_CONTIGUOUS_PARENT_BLOCK_ONE_VALID_AUTHOR_THEN_COMMITTER_AND_ONLY_LEGITIMATE_ENCODING_SIGNATURE_OR_MERGETAG_HEADERS",
+            "tree_grammar": "GIT_CANONICAL_ORDER_UNIQUE_SAFE_NAMES_CANONICAL_MODES_NON_GITLINK_TARGETS_PRESENT_AND_MODE_MATCHED_LOCAL_GITLINK_IF_PRESENT_IS_COMMIT",
+            "register_tree_binding": "EXACTLY_ONE_LITERAL_CONTROLLER_VERIFY_REGISTER_JSON_100644_BLOB_WITH_EXACT_PRE_POST_BYTES",
+            "connected_actual_git_controls": [
+                "PUBLISHER_SHAPED_TWO_PARENT_CONTRACT_MERGE_BASE_PLUS_EXACT_DIRECT_PRODUCT_ACCEPTS",
+                "SIGNED_ENCODING_PUBLISHER_MERGE_BASE_PLUS_EXACT_DIRECT_PRODUCT_ACCEPTS",
+                "LATE_PARENT_AFTER_COMMITTER_OR_SIGNATURE_REJECTS_EVEN_WHEN_FSCK_BLIND",
+                "MISSING_IDENTITIES_DUPLICATE_TREE_OR_AUTHOR_REJECT",
+                "UNSORTED_DUPLICATE_BAD_MODE_BAD_NAME_MISSING_TREE_OR_ENTRY_REJECT",
+                "REGISTER_100755_SYMLINK_GITLINK_TREE_MISSING_DUPLICATE_INVALID_MODE_OR_TYPE_REJECT",
+                "REPLACE_MAPPING_ON_GENUINE_STACKED_SHA_REJECTS",
+                "GIT_WORK_TREE_REDIRECTION_CANNOT_HIDE_DIRTY_CHECKOUT",
+                "PATH_SHADOWED_GIT_CANNOT_LIE_ABOUT_REV_LIST_PARENTS",
+                "PATH_SHIM_NEVER_EXECUTES_DURING_IDENTITY_OBSERVATION",
+                "CRAFTED_SKIP_WORKTREE_INDEX_CANNOT_HIDE_DIRTY_CHECKOUT",
+                "GRAFT_OR_SHALLOW_PARENT_REWRITE_REJECTS",
+                "CONFIG_AND_ATTRIBUTE_INJECTION_REJECTS",
+                "GENUINE_STACK_AND_EXTRA_PARENT_REJECT",
+            ],
+        },
+        "effects": [
+            "REAL_CONTROLLER_VERIFY_PREFLIGHT_EXITS_0_WITH_EXACT_POST_REGISTER_DIGEST",
+            "REAL_CONTROLLER_VERIFY_CHECK_SUITE_EXITS_0_WITH_EXACT_NEW_SUITE_DIGEST",
+            "REAL_CONTROLLER_VERIFY_RUN_SUITE_EXITS_3_AS_NOT_STARTABLE",
+        ],
+    },
+    "bp01_bp14_bindings": BP_BINDINGS,
+    "serial_transitions": SERIAL_TRANSITIONS,
+    "forbidden_effects": [
+        "ANY_SECOND_PRODUCT_PATH",
+        "WORKFLOW_FIXTURE_CONSTITUTION_VERIFY_CLI_OR_CHECK_INVARIANTS_MUTATION",
+        "REGISTER_REFORMAT_KEY_REORDER_EXTRA_DUPLICATE_OR_ENTRY_SEMANTIC_CHANGE",
+        "WRONG_PATH_DIGEST_RUNNER_STARTBAR_OR_CHECK_INVARIANTS_ENTRY",
+        "H034_DEPENDENCY_CHANGE_BEFORE_EXPLICIT_DOWNSTREAM_REFREEZE",
+        "GENERIC_CALLER_SELECTED_WILDCARD_PARENT_OR_NEIGHBORING_AUTHORITY",
+    ],
+    "fail_closed": True,
+}
+
+passed = 0
+failed = 0
+failed_labels: list[tuple[str, str]] = []
+
+
+class Rig(Exception):
+    pass
+
+
+def sha(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def closed_process_environment(private_temp: Path, *, verify_runtime: bool = False) -> dict[str, str]:
+    canonical_temp = private_temp.resolve(strict=True)
+    if not canonical_temp.is_dir() or canonical_temp.is_symlink():
+        raise Rig("non-canonical private runtime temp")
+    return {
+        "PATH": VERIFY_CLOSED_PATH if verify_runtime else CLOSED_PATH,
+        "HOME": "/var/empty",
+        "XDG_CONFIG_HOME": "/var/empty",
+        "TMPDIR": str(canonical_temp),
+        "DARWIN_USER_TEMP_DIR": str(canonical_temp),
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+
+
+def check(ok: bool, label: str, detail: object = "") -> None:
+    global passed, failed
+    if ok:
+        passed += 1
+        print(f"PASS {label}")
+    else:
+        failed += 1
+        rendered = detail if isinstance(detail, str) else json.dumps(detail, sort_keys=True)
+        failed_labels.append((label, rendered))
+        print(f"FAIL {label}: {rendered}")
+
+
+def strict_json(raw: bytes) -> object:
+    def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
+        out: dict[str, object] = {}
+        for key, value in items:
+            if key in out:
+                raise ValueError(f"duplicate JSON key: {key}")
+            out[key] = value
+        return out
+
+    return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=pairs)
+
+
+def register_states() -> tuple[bytes, bytes]:
+    raw = REGISTER.read_bytes()
+    current = sha(raw)
+    old = OLD_SUITE_SHA.encode()
+    new = NEW_SUITE_SHA.encode()
+    if current == PRE_REGISTER_SHA:
+        if raw.count(old) != 1 or new in raw:
+            raise Rig("pre-register token cardinality")
+        pre, post = raw, raw.replace(old, new)
+    elif current == POST_REGISTER_SHA:
+        if raw.count(new) != 1 or old in raw:
+            raise Rig("post-register token cardinality")
+        pre, post = raw.replace(new, old), raw
+    else:
+        raise Rig(f"unfrozen register bytes: {current}")
+    if sha(pre) != PRE_REGISTER_SHA or sha(post) != POST_REGISTER_SHA:
+        raise Rig("register transition digest mismatch")
+    return pre, post
+
+
+def run_verify(register_raw: bytes, *arguments: str,
+               suite_raw: bytes | None = None,
+               invariants_raw: bytes | None = None,
+               constitution_raw: bytes | None = None) -> subprocess.CompletedProcess[str]:
+    with tempfile.TemporaryDirectory(
+        prefix="h037-real-preflight-", dir="/private/tmp",
+    ) as raw:
+        root = Path(raw)
+        root.chmod(0o700)
+        runtime_temp = root / "runtime-temp"
+        runtime_temp.mkdir(mode=0o700)
+        files = {
+            PRODUCT_PATH: register_raw,
+            "workflows/nortropic-verify-suite.js": SUITE.read_bytes() if suite_raw is None else suite_raw,
+            "scripts/check-invariants.mjs": INVARIANTS.read_bytes() if invariants_raw is None else invariants_raw,
+            "docs/07-konstitution.md": CONSTITUTION.read_bytes() if constitution_raw is None else constitution_raw,
+        }
+        for relative, content in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        env = closed_process_environment(runtime_temp, verify_runtime=True)
+        env["NORTROPIC_VERIFY_AUTHORITY_ROOT"] = str(root)
+        return subprocess.run(
+            [str(VERIFY), *arguments], cwd=ROOT, env=env, text=True,
+            capture_output=True, shell=False, timeout=10,
+        )
+
+
+def run_preflight(register_raw: bytes, **kwargs) -> subprocess.CompletedProcess[str]:
+    return run_verify(register_raw, "preflight", **kwargs)
+
+
+def product_effect(raw: bytes) -> tuple[bool, str]:
+    preflight = run_preflight(raw)
+    suite_check = run_verify(raw, "check", "nortropic-verify-suite")
+    suite_run = run_verify(raw, "run", "nortropic-verify-suite")
+    expected_stdout = json.dumps(
+        {"status": "ok", "register_sha256": POST_REGISTER_SHA}, sort_keys=True
+    ) + "\n"
+    expected_check = (
+        "ok: nortropic-verify-suite workflows/nortropic-verify-suite.js "
+        f"{NEW_SUITE_SHA}\n"
+    )
+    ok = (
+        preflight.returncode == 0 and preflight.stdout == expected_stdout
+        and preflight.stderr == ""
+        and suite_check.returncode == 0 and suite_check.stdout == expected_check
+        and suite_check.stderr == ""
+        and suite_run.returncode == 3 and suite_run.stdout == ""
+        and "ej startbar: nortropic-verify-suite" in suite_run.stderr
+    )
+    return ok, json.dumps({
+        "preflight": {"returncode": preflight.returncode,
+                      "stdout": preflight.stdout, "stderr": preflight.stderr},
+        "suite_check": {"returncode": suite_check.returncode,
+                        "stdout": suite_check.stdout, "stderr": suite_check.stderr},
+        "suite_run": {"returncode": suite_run.returncode,
+                      "stdout": suite_run.stdout, "stderr": suite_run.stderr},
+    }, sort_keys=True)
+
+
+def identity_oracle(*, base: str, parents: list[str], changed: list[str],
+                    base_register: bytes, candidate_register: bytes,
+                    base_contract_equal: bool = True,
+                    candidate_contract_equal: bool = True,
+                    protected_bytes_equal: bool = True) -> tuple[bool, str]:
+    pre, post = register_states()
+    predicates = {
+        "direct_child": parents == [base],
+        "exact_changed_files": changed == [PRODUCT_PATH],
+        "exact_pre_register": base_register == pre,
+        "exact_post_register": candidate_register == post,
+        "base_contract": base_contract_equal,
+        "candidate_contract": candidate_contract_equal,
+        "protected_bytes": protected_bytes_equal,
+    }
+    return all(predicates.values()), json.dumps(predicates, sort_keys=True)
+
+
+class GitBinding(NamedTuple):
+    work_tree: Path
+    git_dir: Path
+    common_dir: Path
+
+
+def git_identity_environment(private_temp: Path) -> dict[str, str]:
+    environment = closed_process_environment(private_temp)
+    environment.update({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": "",
+    })
+    return environment
+
+
+def identity_git(
+    binding: GitBinding,
+    *args: str,
+    ambient: dict[str, str] | None = None,
+    text: bool = True,
+    input_data: str | bytes | None = None,
+) -> subprocess.CompletedProcess:
+    # ambient is deliberately never projected. It exists only so connected controls can
+    # supply hostile process state and prove that the closed launcher ignores it.
+    del ambient
+    with tempfile.TemporaryDirectory(
+        prefix="h037-git-runtime-", dir="/private/tmp",
+    ) as raw:
+        private_temp = Path(raw)
+        private_temp.chmod(0o700)
+        return subprocess.run(
+            [
+                str(TRUSTED_GIT),
+                "--no-pager",
+                "--literal-pathspecs",
+                "--no-replace-objects",
+                "-c", "core.attributesFile=/dev/null",
+                "-c", "core.excludesFile=/dev/null",
+                "-c", "core.fsmonitor=false",
+                f"--git-dir={binding.git_dir}",
+                f"--work-tree={binding.work_tree}",
+                *args,
+            ],
+            cwd=binding.work_tree,
+            env=git_identity_environment(private_temp),
+            text=text,
+            input=input_data,
+            capture_output=True,
+            shell=False,
+            timeout=15,
+        )
+
+
+def canonical_git_binding(
+    work_tree: Path,
+    ambient: dict[str, str] | None = None,
+) -> GitBinding:
+    canonical_work_tree = work_tree.resolve(strict=True)
+    if not canonical_work_tree.is_dir() or work_tree.is_symlink():
+        raise Rig(f"non-canonical Git work tree: {work_tree}")
+    dot_git = canonical_work_tree / ".git"
+    if dot_git.is_symlink():
+        raise Rig("symlinked .git binding")
+    if dot_git.is_dir():
+        git_dir = dot_git.resolve(strict=True)
+    elif dot_git.is_file():
+        marker = dot_git.read_text(encoding="utf-8", errors="strict")
+        match = re.fullmatch(r"gitdir: ([^\r\n]+)\r?\n?", marker)
+        if match is None:
+            raise Rig("invalid .git worktree binding")
+        candidate = Path(match.group(1))
+        if not candidate.is_absolute():
+            candidate = dot_git.parent / candidate
+        git_dir = candidate.resolve(strict=True)
+    else:
+        raise Rig("missing .git binding")
+    if not git_dir.is_dir():
+        raise Rig("canonical Git dir is not a directory")
+    head_file = git_dir / "HEAD"
+    if head_file.is_symlink() or not head_file.is_file():
+        raise Rig("per-worktree Git dir has no regular HEAD")
+    common_marker = git_dir / "commondir"
+    if common_marker.is_symlink():
+        raise Rig("symlinked Git common-dir marker")
+    if common_marker.is_file():
+        raw_common = common_marker.read_text(encoding="utf-8", errors="strict")
+        if re.fullmatch(r"[^\r\n]+\r?\n?", raw_common) is None:
+            raise Rig("invalid Git common-dir marker")
+        common_candidate = Path(raw_common.strip())
+        if not common_candidate.is_absolute():
+            common_candidate = git_dir / common_candidate
+        common_dir = common_candidate.resolve(strict=True)
+    else:
+        common_dir = git_dir
+    if not common_dir.is_dir():
+        raise Rig("canonical Git common dir is not a directory")
+    worktree_backlink = git_dir / "gitdir"
+    if worktree_backlink.exists():
+        if worktree_backlink.is_symlink() or not worktree_backlink.is_file():
+            raise Rig("invalid linked-worktree backlink")
+        backlink = worktree_backlink.read_text(encoding="utf-8", errors="strict").strip()
+        if Path(backlink).resolve(strict=True) != dot_git.resolve(strict=True):
+            raise Rig("linked-worktree backlink does not bind the physical worktree")
+    forbidden_metadata = (
+        common_dir / "objects/info/alternates",
+        common_dir / "info/grafts",
+        git_dir / "info/grafts",
+        common_dir / "shallow",
+        git_dir / "shallow",
+    )
+    if any(path.exists() or path.is_symlink() for path in forbidden_metadata):
+        raise Rig("alternate, graft, or shallow identity metadata is forbidden")
+    binding = GitBinding(canonical_work_tree, git_dir, common_dir)
+    top = identity_git(binding, "rev-parse", "--show-toplevel", ambient=ambient)
+    observed_git_dir = identity_git(binding, "rev-parse", "--absolute-git-dir", ambient=ambient)
+    observed_common_dir = identity_git(binding, "rev-parse", "--git-common-dir", ambient=ambient)
+    observed_head = identity_git(binding, "rev-parse", "--git-path", "HEAD", ambient=ambient)
+    if (
+        top.returncode != 0
+        or observed_git_dir.returncode != 0
+        or observed_common_dir.returncode != 0
+        or observed_head.returncode != 0
+        or Path(top.stdout.strip()).resolve(strict=True) != canonical_work_tree
+        or Path(observed_git_dir.stdout.strip()).resolve(strict=True) != git_dir
+        or Path(observed_common_dir.stdout.strip()).resolve(strict=True) != common_dir
+        or Path(observed_head.stdout.strip()).resolve(strict=True) != head_file.resolve(strict=True)
+    ):
+        raise Rig("Git rejected the explicit canonical repo/common/worktree/HEAD binding")
+    return binding
+
+
+def trusted_git_valid() -> bool:
+    try:
+        metadata = TRUSTED_GIT.lstat()
+        file_ok = (
+            stat.S_ISREG(metadata.st_mode)
+            and not TRUSTED_GIT.is_symlink()
+            and TRUSTED_GIT.resolve(strict=True) == TRUSTED_GIT
+            and sha(TRUSTED_GIT.read_bytes()) == TRUSTED_GIT_SHA
+        )
+        with tempfile.TemporaryDirectory(
+            prefix="h037-git-attest-", dir="/private/tmp",
+        ) as raw:
+            private_temp = Path(raw)
+            private_temp.chmod(0o700)
+            version = subprocess.run(
+                [str(TRUSTED_GIT), "--version"],
+                env=git_identity_environment(private_temp),
+                cwd="/var/empty",
+                text=True,
+                capture_output=True,
+                shell=False,
+                timeout=15,
+            )
+        return (
+            file_ok and version.returncode == 0 and version.stderr == ""
+            and version.stdout.strip() == TRUSTED_GIT_VERSION
+        )
+    except OSError:
+        return False
+
+
+def exact_commit(
+    value: str,
+    binding: GitBinding,
+    ambient: dict[str, str] | None = None,
+) -> bool:
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        return False
+    result = identity_git(binding, "cat-file", "-t", value, ambient=ambient)
+    return result.returncode == 0 and result.stdout == "commit\n" and result.stderr == ""
+
+
+class CommitRecord(NamedTuple):
+    tree: str
+    parents: list[str]
+    signed_headers: list[str]
+    encoding: str | None
+
+
+class TreeEntry(NamedTuple):
+    mode: str
+    name: bytes
+    object_id: str
+
+
+class ClosureAttestation(NamedTuple):
+    base: CommitRecord
+    candidate: CommitRecord
+    base_register: bytes
+    candidate_register: bytes
+    object_count: int
+    commit_count: int
+    tree_count: int
+
+
+COMMIT_IDENT_RE = re.compile(
+    rb"(?:author|committer) [^\x00\n<>]+ <[^\x00\n<>]+> [0-9]+ "
+    rb"[+-](?:(?:0[0-9]|1[0-3])[0-5][0-9]|1400)"
+)
+TREE_MODES = {"100644", "100755", "120000", "40000", "160000"}
+TREE_OBJECT_TYPES = {
+    "100644": "blob",
+    "100755": "blob",
+    "120000": "blob",
+    "40000": "tree",
+    "160000": "commit",
+}
+
+
+def parse_canonical_commit(raw: bytes) -> CommitRecord:
+    if b"\x00" in raw or b"\r" in raw:
+        raise Rig("raw commit contains NUL or CR")
+    if b"\n\n" not in raw:
+        raise Rig("raw commit has no header/message separator")
+    header, _message = raw.split(b"\n\n", 1)
+    lines = header.split(b"\n")
+    if not lines or re.fullmatch(rb"tree [0-9a-f]{40}", lines[0]) is None:
+        raise Rig("raw commit must begin with exactly one canonical tree header")
+    tree = lines[0][5:].decode("ascii")
+    cursor = 1
+    parents: list[str] = []
+    while cursor < len(lines) and lines[cursor].startswith(b"parent "):
+        if re.fullmatch(rb"parent [0-9a-f]{40}", lines[cursor]) is None:
+            raise Rig("malformed raw commit parent header")
+        parents.append(lines[cursor][7:].decode("ascii"))
+        cursor += 1
+    if cursor >= len(lines) or not lines[cursor].startswith(b"author "):
+        raise Rig("raw commit must have one author immediately after its parent block")
+    if COMMIT_IDENT_RE.fullmatch(lines[cursor]) is None:
+        raise Rig("malformed raw commit author identity")
+    cursor += 1
+    if cursor >= len(lines) or not lines[cursor].startswith(b"committer "):
+        raise Rig("raw commit must have one committer immediately after its author")
+    if COMMIT_IDENT_RE.fullmatch(lines[cursor]) is None:
+        raise Rig("malformed raw commit committer identity")
+    cursor += 1
+
+    encoding: str | None = None
+    signed_headers: list[str] = []
+    singleton_signatures: set[str] = set()
+    while cursor < len(lines):
+        line = lines[cursor]
+        if line.startswith(b" "):
+            raise Rig("orphan raw commit header continuation")
+        try:
+            header_name, value = line.split(b" ", 1)
+        except ValueError as error:
+            raise Rig("malformed raw commit extension header") from error
+        if header_name == b"encoding":
+            if encoding is not None or re.fullmatch(rb"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+                raise Rig("duplicate or malformed raw commit encoding")
+            encoding = value.decode("ascii")
+            cursor += 1
+            continue
+        if header_name not in {b"gpgsig", b"gpgsig-sha256", b"mergetag"} or not value:
+            raise Rig("noncanonical or repeated core raw commit header")
+        decoded_name = header_name.decode("ascii")
+        if decoded_name != "mergetag" and decoded_name in singleton_signatures:
+            raise Rig("duplicate raw commit signature header")
+        singleton_signatures.add(decoded_name)
+        continuation_count = 0
+        cursor += 1
+        while cursor < len(lines) and lines[cursor].startswith(b" "):
+            continuation_count += 1
+            cursor += 1
+        if continuation_count == 0:
+            raise Rig("signature or mergetag header has no canonical continuation")
+        signed_headers.append(decoded_name)
+    return CommitRecord(tree, parents, signed_headers, encoding)
+
+
+def strict_commit_record(
+    binding: GitBinding,
+    commit: str,
+    ambient: dict[str, str] | None = None,
+) -> CommitRecord:
+    result = identity_git(binding, "cat-file", "commit", commit, ambient=ambient, text=False)
+    if result.returncode:
+        raise Rig(f"cannot read literal commit object {commit}")
+    record = parse_canonical_commit(result.stdout)
+    graph = identity_git(
+        binding, "rev-list", "--parents", "-n", "1", commit, ambient=ambient,
+    )
+    expected = " ".join([commit, *record.parents]) + "\n"
+    if graph.returncode or graph.stdout != expected or graph.stderr:
+        raise Rig("closed no-replace Git graph differs from literal commit parent headers")
+    return record
+
+
+def parse_canonical_tree(raw: bytes) -> list[TreeEntry]:
+    entries: list[TreeEntry] = []
+    offset = 0
+    prior_key: bytes | None = None
+    names: set[bytes] = set()
+    while offset < len(raw):
+        space = raw.find(b" ", offset)
+        nul = raw.find(b"\x00", space + 1) if space >= 0 else -1
+        if space <= offset or nul <= space + 1 or nul + 21 > len(raw):
+            raise Rig("truncated or malformed raw tree entry")
+        raw_mode = raw[offset:space]
+        raw_name = raw[space + 1:nul]
+        raw_oid = raw[nul + 1:nul + 21]
+        try:
+            mode = raw_mode.decode("ascii")
+        except UnicodeDecodeError:
+            raise Rig("non-ASCII raw tree mode")
+        if mode not in TREE_MODES:
+            raise Rig("noncanonical raw tree mode")
+        if (
+            b"/" in raw_name
+            or raw_name in {b".", b".."}
+            or raw_name.lower() == b".git"
+            or raw_name in names
+        ):
+            raise Rig("unsafe or duplicate raw tree name")
+        object_id = raw_oid.hex()
+        key = raw_name + (b"/" if mode == "40000" else b"\x00")
+        if prior_key is not None and key <= prior_key:
+            raise Rig("unsorted or duplicate raw tree entry")
+        prior_key = key
+        names.add(raw_name)
+        entries.append(TreeEntry(mode, raw_name, object_id))
+        offset = nul + 21
+    return entries
+
+
+def tree_bytes(entries: list[TreeEntry]) -> bytes:
+    return b"".join(
+        entry.mode.encode("ascii") + b" " + entry.name + b"\x00"
+        + bytes.fromhex(entry.object_id)
+        for entry in entries
+    )
+
+
+def batch_objects(
+    binding: GitBinding,
+    object_ids: list[str],
+    ambient: dict[str, str] | None = None,
+) -> dict[str, tuple[str, bytes]]:
+    if not object_ids:
+        return {}
+    result = identity_git(
+        binding, "cat-file", "--batch", ambient=ambient, text=False,
+        input_data=("\n".join(object_ids) + "\n").encode("ascii"),
+    )
+    if result.returncode:
+        raise Rig("closed object batch read failed")
+    observed: dict[str, tuple[str, bytes]] = {}
+    cursor = 0
+    for requested in object_ids:
+        line_end = result.stdout.find(b"\n", cursor)
+        if line_end < 0:
+            raise Rig("truncated object batch header")
+        header = result.stdout[cursor:line_end]
+        cursor = line_end + 1
+        try:
+            object_id_raw, object_type_raw, size_raw = header.split(b" ")
+            object_id = object_id_raw.decode("ascii")
+            object_type = object_type_raw.decode("ascii")
+            size = int(size_raw.decode("ascii"))
+        except (ValueError, UnicodeDecodeError) as error:
+            raise Rig("missing or malformed object batch header") from error
+        if object_id != requested or re.fullmatch(r"[0-9a-f]{40}", object_id) is None:
+            raise Rig("object batch identity mismatch")
+        content_end = cursor + size
+        if content_end >= len(result.stdout) or result.stdout[content_end:content_end + 1] != b"\n":
+            raise Rig("truncated object batch content")
+        observed[object_id] = (object_type, result.stdout[cursor:content_end])
+        cursor = content_end + 1
+    if cursor != len(result.stdout) or len(observed) != len(object_ids):
+        raise Rig("duplicate or trailing object batch result")
+    return observed
+
+
+def validate_reachable_objects(
+    binding: GitBinding,
+    base: str,
+    candidate: str,
+) -> tuple[dict[str, CommitRecord], dict[str, list[TreeEntry]], dict[str, tuple[str, bytes]]]:
+    graph = identity_git(binding, "rev-list", "--parents", base, candidate)
+    objects_result = identity_git(
+        binding, "rev-list", "--objects", "--no-object-names", "--missing=print",
+        base, candidate,
+    )
+    if graph.returncode or graph.stderr or objects_result.returncode or objects_result.stderr:
+        raise Rig("closed reachable graph/object enumeration failed")
+    graph_parents: dict[str, list[str]] = {}
+    for line in graph.stdout.splitlines():
+        tokens = line.split(" ")
+        if (
+            not tokens
+            or any(re.fullmatch(r"[0-9a-f]{40}", token) is None for token in tokens)
+            or tokens[0] in graph_parents
+        ):
+            raise Rig("malformed or duplicate closed reachable graph row")
+        graph_parents[tokens[0]] = tokens[1:]
+    object_ids = objects_result.stdout.splitlines()
+    if (
+        not object_ids
+        or len(object_ids) != len(set(object_ids))
+        or any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in object_ids)
+    ):
+        raise Rig("missing, duplicate, or malformed reachable object identity")
+    objects = batch_objects(binding, object_ids)
+    commits: dict[str, CommitRecord] = {}
+    trees: dict[str, list[TreeEntry]] = {}
+    for object_id, (object_type, content) in objects.items():
+        if object_type == "commit":
+            record = parse_canonical_commit(content)
+            if object_id not in graph_parents or record.parents != graph_parents[object_id]:
+                raise Rig("literal commit parents differ from closed reachable Git graph")
+            commits[object_id] = record
+        elif object_type == "tree":
+            trees[object_id] = parse_canonical_tree(content)
+        elif object_type != "blob":
+            raise Rig("unexpected reachable object type")
+    if set(commits) != set(graph_parents) or base not in commits or candidate not in commits:
+        raise Rig("reachable commit closure differs from closed Git graph")
+    for commit in commits.values():
+        if commit.tree not in trees:
+            raise Rig("commit tree is missing from the reachable closure")
+    for entries in trees.values():
+        for entry in entries:
+            target = objects.get(entry.object_id)
+            if entry.mode == "160000":
+                if target is not None and target[0] != "commit":
+                    raise Rig("locally present gitlink target is not a commit")
+                continue
+            if target is None or target[0] != TREE_OBJECT_TYPES[entry.mode]:
+                raise Rig("tree entry is missing or has a mode/type mismatch")
+    return commits, trees, objects
+
+
+def literal_path_blob(
+    root_tree: str,
+    path: str,
+    trees: dict[str, list[TreeEntry]],
+    objects: dict[str, tuple[str, bytes]],
+    *,
+    required_mode: str = "100644",
+) -> bytes:
+    current = root_tree
+    components = [component.encode("utf-8") for component in path.split("/")]
+    for position, component in enumerate(components):
+        matches = [entry for entry in trees.get(current, []) if entry.name == component]
+        if len(matches) != 1:
+            raise Rig(f"literal path component cardinality mismatch: {path}")
+        entry = matches[0]
+        last = position == len(components) - 1
+        if not last:
+            if entry.mode != "40000" or objects.get(entry.object_id, (None,))[0] != "tree":
+                raise Rig(f"literal path intermediate is not one tree: {path}")
+            current = entry.object_id
+            continue
+        if entry.mode != required_mode or objects.get(entry.object_id, (None,))[0] != "blob":
+            raise Rig(f"literal path leaf mode/type mismatch: {path}")
+        return objects[entry.object_id][1]
+    raise Rig("empty literal path")
+
+
+_CLOSURE_CACHE: dict[tuple[str, str, str], ClosureAttestation] = {}
+
+
+def isolated_reachable_closure(
+    binding: GitBinding,
+    base: str,
+    candidate: str,
+    ambient: dict[str, str] | None = None,
+) -> ClosureAttestation:
+    del ambient
+    cache_key = (str(binding.common_dir), base, candidate)
+    cached = _CLOSURE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    source_ids = identity_git(
+        binding, "rev-list", "--objects", "--no-object-names", "--missing=print",
+        base, candidate,
+    )
+    object_ids = source_ids.stdout.splitlines()
+    if (
+        source_ids.returncode or source_ids.stderr or not object_ids
+        or len(object_ids) != len(set(object_ids))
+        or any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in object_ids)
+    ):
+        raise Rig("closed exact reachable object export list is invalid")
+    pack = identity_git(
+        binding, "pack-objects", "--stdout", "--no-reuse-object", "--no-reuse-delta",
+        "--window=0", text=False,
+        input_data=("\n".join(object_ids) + "\n").encode("ascii"),
+    )
+    if pack.returncode or pack.stderr:
+        raise Rig("closed no-replace reachable pack construction failed")
+    with tempfile.TemporaryDirectory(
+        prefix="h037-isolated-object-closure-", dir="/private/tmp",
+    ) as raw:
+        quarantine = Path(raw)
+        quarantine.chmod(0o700)
+        bare = quarantine / "objects.git"
+        empty_work_tree = quarantine / "physical-worktree"
+        init_host = quarantine / "init-host"
+        empty_work_tree.mkdir(mode=0o700)
+        init_host.mkdir(mode=0o700)
+        fixture_git_value(
+            init_host, "init", "--quiet", "--bare", "--object-format=sha1", str(bare),
+        )
+        isolated_binding = GitBinding(
+            empty_work_tree.resolve(strict=True), bare.resolve(strict=True), bare.resolve(strict=True),
+        )
+        format_probe = identity_git(isolated_binding, "rev-parse", "--show-object-format")
+        refs_probe = identity_git(
+            isolated_binding, "for-each-ref", "--format=%(objectname)",
+        )
+        if (
+            format_probe.returncode or format_probe.stdout != "sha1\n" or format_probe.stderr
+            or refs_probe.returncode or refs_probe.stdout or refs_probe.stderr
+        ):
+            raise Rig("isolated quarantine is not a ref-free SHA-1 object store")
+        strict_messages = ",".join(
+            f"{message}=error" for message in (
+                "badFilemode", "emptyName", "fullPathname", "hasDot", "hasDotdot",
+                "hasDotgit", "nullSha1", "zeroPaddedFilemode",
+            )
+        )
+        indexed = identity_git(
+            isolated_binding, "index-pack", "--stdin", f"--strict={strict_messages}",
+            "--check-self-contained-and-connected", text=False,
+            input_data=pack.stdout,
+        )
+        if indexed.returncode:
+            raise Rig("strict isolated reachable pack validation failed")
+        isolated_ids = identity_git(
+            isolated_binding, "rev-list", "--objects", "--no-object-names", "--missing=print",
+            base, candidate,
+        )
+        batch_all = identity_git(
+            isolated_binding, "cat-file", "--batch-all-objects",
+            "--batch-check=%(objectname)",
+        )
+        if (
+            isolated_ids.returncode or isolated_ids.stderr
+            or batch_all.returncode or batch_all.stderr
+            or set(source_ids.stdout.splitlines()) != set(isolated_ids.stdout.splitlines())
+            or set(object_ids) != set(batch_all.stdout.splitlines())
+            or len(object_ids) != len(batch_all.stdout.splitlines())
+        ):
+            raise Rig("isolated reachable object identities differ from the pinned source")
+        fsck = identity_git(
+            isolated_binding, "fsck", "--strict", "--no-reflogs", "--no-dangling",
+            base, candidate,
+        )
+        if fsck.returncode:
+            raise Rig("strict isolated reachable object fsck failed")
+        commits, trees, objects = validate_reachable_objects(isolated_binding, base, candidate)
+        base_record = commits[base]
+        candidate_record = commits[candidate]
+        base_register = literal_path_blob(
+            base_record.tree, PRODUCT_PATH, trees, objects, required_mode="100644",
+        )
+        candidate_register = literal_path_blob(
+            candidate_record.tree, PRODUCT_PATH, trees, objects, required_mode="100644",
+        )
+        pre, post = register_states()
+        if (
+            base_register != pre or candidate_register != post
+            or sha(base_register) != PRE_REGISTER_SHA
+            or sha(candidate_register) != POST_REGISTER_SHA
+        ):
+            raise Rig("literal register blob bytes/digests are not the exact pre/post transition")
+        attestation = ClosureAttestation(
+            base_record, candidate_record, base_register, candidate_register,
+            len(objects), len(commits), len(trees),
+        )
+    _CLOSURE_CACHE[cache_key] = attestation
+    return attestation
+
+
+def git_blob(
+    binding: GitBinding,
+    commit: str,
+    path: str,
+    ambient: dict[str, str] | None = None,
+) -> bytes:
+    result = identity_git(binding, "show", f"{commit}:{path}", ambient=ambient, text=False)
+    if result.returncode:
+        raise Rig(f"missing candidate blob {commit}:{path}: {result.stderr.decode(errors='replace')}")
+    return result.stdout
+
+
+def physical_checkout_identity(
+    binding: GitBinding,
+    candidate: str,
+    ambient: dict[str, str] | None = None,
+) -> tuple[bool, dict[str, object]]:
+    listing = identity_git(
+        binding, "ls-tree", "-r", "-z", "--full-tree", candidate,
+        ambient=ambient, text=False,
+    )
+    if listing.returncode:
+        return False, {"error": "candidate tree enumeration failed"}
+    expected: dict[str, tuple[str, str, bytes]] = {}
+    for entry in listing.stdout.split(b"\0"):
+        if not entry:
+            continue
+        try:
+            metadata, raw_path = entry.split(b"\t", 1)
+            mode, object_type, object_id = metadata.decode("ascii").split(" ")
+            path = raw_path.decode("utf-8", errors="strict")
+        except (ValueError, UnicodeDecodeError):
+            return False, {"error": "malformed or non-UTF8 candidate tree entry"}
+        if (
+            object_type != "blob"
+            or mode not in {"100644", "100755", "120000"}
+            or re.fullmatch(r"[0-9a-f]{40}", object_id) is None
+            or path.startswith("/")
+            or any(part in {"", ".", "..", ".git"} for part in path.split("/"))
+            or path in expected
+        ):
+            return False, {"error": "unsafe candidate tree entry", "path": path}
+        blob = identity_git(binding, "cat-file", "blob", object_id, ambient=ambient, text=False)
+        if blob.returncode:
+            return False, {"error": "candidate blob read failed", "path": path}
+        expected[path] = (mode, object_id, blob.stdout)
+
+    physical: set[str] = set()
+    for directory, dirnames, filenames in os.walk(binding.work_tree, followlinks=False):
+        current = Path(directory)
+        if current == binding.work_tree:
+            dirnames[:] = [name for name in dirnames if name != ".git"]
+            filenames = [name for name in filenames if name != ".git"]
+        for dirname in list(dirnames):
+            child = current / dirname
+            if child.is_symlink():
+                physical.add(child.relative_to(binding.work_tree).as_posix())
+                dirnames.remove(dirname)
+        for filename in filenames:
+            physical.add((current / filename).relative_to(binding.work_tree).as_posix())
+    missing = sorted(set(expected) - physical)
+    extra = sorted(physical - set(expected))
+    mismatched: list[str] = []
+    for path in sorted(set(expected) & physical):
+        mode, _object_id, content = expected[path]
+        leaf = binding.work_tree / path
+        metadata = leaf.lstat()
+        if mode == "120000":
+            matches = stat.S_ISLNK(metadata.st_mode) and os.fsencode(os.readlink(leaf)) == content
+        else:
+            matches = (
+                stat.S_ISREG(metadata.st_mode)
+                and leaf.read_bytes() == content
+                and bool(metadata.st_mode & 0o111) == (mode == "100755")
+            )
+        if not matches:
+            mismatched.append(path)
+    ok = not missing and not extra and not mismatched
+    return ok, {
+        "expected_leaf_count": len(expected),
+        "physical_leaf_count": len(physical),
+        "missing": missing[:10],
+        "extra": extra[:10],
+        "mismatched": mismatched[:10],
+    }
+
+
+def product_identity(
+    base: str,
+    candidate: str,
+    *,
+    binding: GitBinding | None = None,
+    ambient: dict[str, str] | None = None,
+) -> tuple[bool, str]:
+    if not trusted_git_valid():
+        return False, "trusted absolute Git executable identity mismatch"
+    try:
+        observed = canonical_git_binding(ROOT if binding is None else binding.work_tree, ambient)
+    except (OSError, ValueError, Rig, subprocess.SubprocessError) as error:
+        return False, f"canonical Git binding rejected: {error}"
+    if binding is not None and binding != observed:
+        return False, "supplied Git binding differs from fresh physical binding"
+    try:
+        if not exact_commit(base, observed, ambient) or not exact_commit(candidate, observed, ambient):
+            return False, "base/candidate is not an exact existing lowercase commit"
+        closure = isolated_reachable_closure(observed, base, candidate, ambient)
+        # Re-read the two boundary commits in the bound source and cross-check each literal
+        # parent block against the same closed/no-replace Git graph used by product identity.
+        base_boundary = strict_commit_record(observed, base, ambient)
+        candidate_boundary = strict_commit_record(observed, candidate, ambient)
+        if base_boundary != closure.base or candidate_boundary != closure.candidate:
+            return False, "source boundary commits differ from isolated reachable closure"
+        head = identity_git(observed, "rev-parse", "--verify", "HEAD", ambient=ambient)
+        changed_result = identity_git(
+            observed,
+            "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--no-renames",
+            "--no-ext-diff", "--no-textconv", base, candidate, ambient=ambient, text=False,
+        )
+        if head.returncode or changed_result.returncode:
+            return False, "git identity observation failed"
+        changed = [path.decode("utf-8", errors="strict")
+                   for path in changed_result.stdout.split(b"\0") if path]
+        contract_paths = ("specs/tasks.spec.json", "verify/bin/h-037-exit")
+        base_contract_equal = all(
+            git_blob(observed, base, path, ambient) == (ROOT / path).read_bytes()
+            for path in contract_paths
+        )
+        candidate_contract_equal = all(
+            git_blob(observed, candidate, path, ambient) == (ROOT / path).read_bytes()
+            for path in contract_paths
+        )
+        protected = {
+            "workflows/nortropic-verify-suite.js": NEW_SUITE_SHA,
+            "scripts/check-invariants.mjs": INVARIANTS_SHA,
+            "controller/verify/cli": VERIFY_SHA,
+            "docs/07-konstitution.md": CONSTITUTION_SHA,
+            "scripts/nortropic-codex-autopilot.py": AUTOPILOT_SHA,
+            "verify/bin/h-017-exit": H017_GATE_SHA,
+        }
+        protected_bytes_equal = all(
+            sha(git_blob(observed, base, path, ambient)) == digest
+            and git_blob(observed, candidate, path, ambient)
+                == git_blob(observed, base, path, ambient)
+            for path, digest in protected.items()
+        )
+        fixture_base = identity_git(
+            observed, "rev-parse", f"{base}:tests/fixtures", ambient=ambient,
+        )
+        fixture_candidate = identity_git(
+            observed, "rev-parse", f"{candidate}:tests/fixtures", ambient=ambient,
+        )
+        protected_bytes_equal = (
+            protected_bytes_equal
+            and fixture_base.returncode == fixture_candidate.returncode == 0
+            and fixture_base.stdout.strip() == fixture_candidate.stdout.strip() == FIXTURES_TREE
+        )
+        relation_ok, why = identity_oracle(
+            base=base, parents=candidate_boundary.parents, changed=changed,
+            base_register=closure.base_register,
+            candidate_register=closure.candidate_register,
+            base_contract_equal=base_contract_equal,
+            candidate_contract_equal=candidate_contract_equal,
+            protected_bytes_equal=protected_bytes_equal,
+        )
+        physical_ok, physical_detail = physical_checkout_identity(observed, candidate, ambient)
+    except (OSError, UnicodeDecodeError, ValueError, Rig, subprocess.SubprocessError) as error:
+        return False, f"strict canonical product identity rejected: {error}"
+    checkout_ok = head.stdout.strip() == candidate and physical_ok
+    return relation_ok and checkout_ok, json.dumps({
+        "relation": json.loads(why),
+        "head": head.stdout.strip(),
+        "expected_head": candidate,
+        "physical_checkout": physical_detail,
+        "trusted_git": str(TRUSTED_GIT),
+        "git_dir": str(observed.git_dir),
+        "common_dir": str(observed.common_dir),
+        "work_tree": str(observed.work_tree),
+        "git_environment": "CLOSED_ALLOWLIST_PRIVATE_DARWIN_TEMP_NO_AMBIENT_GIT_LOADER_OR_TOOLCHAIN",
+        "topology": "CANONICAL_LITERAL_COMMIT_HEADERS_CLOSED_GRAPH_CROSSCHECK",
+        "object_closure": {
+            "isolation": "STRICT_REACHABLE_PACK_WITH_NO_REPLACE_PINNED_GIT",
+            "objects": closure.object_count,
+            "commits": closure.commit_count,
+            "trees": closure.tree_count,
+        },
+        "register_identity": "ONE_LITERAL_100644_BLOB_ENTRY_EXACT_PRE_POST_BYTES",
+        "cleanliness": "PHYSICAL_WORKTREE_VS_CANDIDATE_TREE_WITHOUT_INDEX",
+    }, sort_keys=True)
+
+
+def fixture_git(
+    work_tree: Path,
+    *args: str,
+    input_text: str | None = None,
+    input_bytes: bytes | None = None,
+    allow_replacements: bool = False,
+) -> subprocess.CompletedProcess:
+    if input_text is not None and input_bytes is not None:
+        raise Rig("actual-Git fixture accepts only one input representation")
+    fixture_runtime = work_tree.parent / "fixture-git-runtime"
+    fixture_runtime.mkdir(mode=0o700, exist_ok=True)
+    fixture_runtime.chmod(0o700)
+    environment = closed_process_environment(fixture_runtime)
+    environment.update({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": "",
+    })
+    if not allow_replacements:
+        environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    replacement_option = [] if allow_replacements else ["--no-replace-objects"]
+    return subprocess.run(
+        [
+            str(TRUSTED_GIT),
+            "--no-pager", "--literal-pathspecs", *replacement_option,
+            "-C", str(work_tree),
+            "-c", "user.name=H037 actual-Git control",
+            "-c", "user.email=h037@example.invalid",
+            *args,
+        ],
+        input=input_text if input_bytes is None else input_bytes,
+        text=input_bytes is None,
+        capture_output=True,
+        cwd=work_tree,
+        env=environment,
+        shell=False,
+        timeout=15,
+    )
+
+
+def fixture_git_value(work_tree: Path, *args: str, input_text: str | None = None) -> str:
+    result = fixture_git(work_tree, *args, input_text=input_text)
+    if result.returncode:
+        raise Rig(f"actual-Git fixture command failed {args}: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def literal_object(work_tree: Path, object_type: str, raw: bytes) -> str:
+    result = fixture_git(
+        work_tree, "hash-object", "--literally", "-w", "-t", object_type, "--stdin",
+        input_bytes=raw,
+    )
+    if result.returncode:
+        stderr = result.stderr.decode(errors="replace")
+        raise Rig(f"literal {object_type} fixture write failed: {stderr.strip()}")
+    try:
+        object_id = result.stdout.decode("ascii").strip()
+    except UnicodeDecodeError as error:
+        raise Rig("literal object fixture returned non-ASCII identity") from error
+    if re.fullmatch(r"[0-9a-f]{40}", object_id) is None:
+        raise Rig("literal object fixture returned malformed identity")
+    return object_id
+
+
+def commit_tree(work_tree: Path, tree: str, parents: list[str], message: str) -> str:
+    arguments = ["commit-tree", tree]
+    for parent in parents:
+        arguments.extend(["-p", parent])
+    return fixture_git_value(work_tree, *arguments, input_text=message + "\n")
+
+
+def commit_fixture_bytes(
+    tree: str,
+    parents: list[str],
+    *,
+    extension_headers: bytes = b"",
+    author: bool = True,
+    committer: bool = True,
+    duplicate_tree: bool = False,
+    duplicate_author: bool = False,
+    late_parent: str | None = None,
+    message: bytes = b"H037 literal commit fixture\n",
+) -> bytes:
+    lines = [f"tree {tree}\n".encode("ascii")]
+    if duplicate_tree:
+        lines.append(f"tree {tree}\n".encode("ascii"))
+    lines.extend(f"parent {parent}\n".encode("ascii") for parent in parents)
+    identity = b"H037 actual-Git control <h037@example.invalid> 1700000000 +0000\n"
+    if author:
+        lines.append(b"author " + identity)
+    if duplicate_author:
+        lines.append(b"author " + identity)
+    if committer:
+        lines.append(b"committer " + identity)
+    if extension_headers:
+        lines.append(extension_headers)
+    if late_parent is not None:
+        lines.append(f"parent {late_parent}\n".encode("ascii"))
+    lines.append(b"\n")
+    lines.append(message)
+    return b"".join(lines)
+
+
+def literal_commit_is_canonical(binding: GitBinding, object_id: str) -> bool:
+    try:
+        strict_commit_record(binding, object_id)
+        return True
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def literal_tree_is_canonical(binding: GitBinding, object_id: str) -> bool:
+    try:
+        object_type = identity_git(binding, "cat-file", "-t", object_id)
+        raw = identity_git(binding, "cat-file", "tree", object_id, text=False)
+        if object_type.returncode or object_type.stdout != "tree\n" or raw.returncode:
+            return False
+        entries = parse_canonical_tree(raw.stdout)
+        for entry in entries:
+            target = identity_git(binding, "cat-file", "-t", entry.object_id)
+            if entry.mode == "160000" and target.returncode:
+                continue
+            if (
+                target.returncode
+                or target.stdout.strip() != TREE_OBJECT_TYPES[entry.mode]
+                or target.stderr
+            ):
+                return False
+        return True
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def literal_commit_tree_is_canonical(binding: GitBinding, object_id: str) -> bool:
+    try:
+        record = strict_commit_record(binding, object_id)
+        return literal_tree_is_canonical(binding, record.tree)
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def read_literal_tree(binding: GitBinding, object_id: str) -> list[TreeEntry]:
+    result = identity_git(binding, "cat-file", "tree", object_id, text=False)
+    if result.returncode:
+        raise Rig(f"cannot read literal tree object {object_id}")
+    return parse_canonical_tree(result.stdout)
+
+
+def literal_register_from_git(
+    binding: GitBinding,
+    root_tree: str,
+    expected: bytes,
+) -> bool:
+    try:
+        current = root_tree
+        for position, component in enumerate(PRODUCT_PATH.encode("utf-8").split(b"/")):
+            entries = read_literal_tree(binding, current)
+            matches = [entry for entry in entries if entry.name == component]
+            if len(matches) != 1:
+                return False
+            entry = matches[0]
+            target_type = identity_git(binding, "cat-file", "-t", entry.object_id)
+            if target_type.returncode or target_type.stderr:
+                return False
+            if position < len(PRODUCT_PATH.split("/")) - 1:
+                if entry.mode != "40000" or target_type.stdout != "tree\n":
+                    return False
+                current = entry.object_id
+                continue
+            if entry.mode != "100644" or target_type.stdout != "blob\n":
+                return False
+            blob = identity_git(binding, "cat-file", "blob", entry.object_id, text=False)
+            return blob.returncode == 0 and blob.stderr == b"" and blob.stdout == expected
+        return False
+    except (OSError, ValueError, Rig, subprocess.SubprocessError):
+        return False
+
+
+def mutate_register_tree(
+    work_tree: Path,
+    binding: GitBinding,
+    root_tree: str,
+    mutate,
+) -> str:
+    components = PRODUCT_PATH.encode("utf-8").split(b"/")
+
+    def descend(tree_id: str, position: int) -> str:
+        entries = read_literal_tree(binding, tree_id)
+        matches = [index for index, entry in enumerate(entries)
+                   if entry.name == components[position]]
+        if len(matches) != 1:
+            raise Rig("register fixture source path cardinality")
+        index = matches[0]
+        if position == len(components) - 1:
+            replacement = mutate(list(entries), index)
+        else:
+            child = entries[index]
+            if child.mode != "40000":
+                raise Rig("register fixture source intermediate mode")
+            replacement = list(entries)
+            replacement[index] = TreeEntry(
+                "40000", child.name, descend(child.object_id, position + 1),
+            )
+        return literal_object(work_tree, "tree", tree_bytes(replacement))
+
+    return descend(root_tree, 0)
+
+
+def actual_git_identity_controls() -> tuple[bool, str]:
+    pre, post = register_states()
+    with tempfile.TemporaryDirectory(
+        prefix="h037-actual-git-identity-", dir="/private/tmp",
+    ) as raw:
+        temp = Path(raw)
+        temp.chmod(0o700)
+        repo = temp / "repo"
+        repo.mkdir()
+        fixture_paths = [
+            "specs/tasks.spec.json",
+            "verify/bin/h-037-exit",
+            PRODUCT_PATH,
+            "workflows/nortropic-verify-suite.js",
+            "scripts/check-invariants.mjs",
+            "controller/verify/cli",
+            "docs/07-konstitution.md",
+            "scripts/nortropic-codex-autopilot.py",
+            "verify/bin/h-017-exit",
+        ]
+        for relative in fixture_paths:
+            source = ROOT / relative
+            target = repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        (repo / PRODUCT_PATH).write_bytes(pre)
+        shutil.copytree(ROOT / "tests/fixtures", repo / "tests/fixtures")
+
+        fixture_git_value(repo, "init", "--quiet")
+        fixture_git_value(repo, "add", "--all")
+        pre_tree = fixture_git_value(repo, "write-tree")
+        origin_base = commit_tree(repo, pre_tree, [], "publisher first parent")
+        contract_candidate = commit_tree(
+            repo, pre_tree, [origin_base], "frozen H037 contract candidate",
+        )
+        contract_merge = commit_tree(
+            repo, pre_tree, [origin_base, contract_candidate], "guarded contract publication merge",
+        )
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", contract_merge)
+        if (repo / PRODUCT_PATH).read_bytes() != pre:
+            raise Rig("actual-Git fixture pre-register bytes")
+        (repo / PRODUCT_PATH).write_bytes(post)
+        fixture_git_value(repo, "add", "--", PRODUCT_PATH)
+        post_tree = fixture_git_value(repo, "write-tree")
+        product = commit_tree(repo, post_tree, [contract_merge], "exact register-only product")
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", product)
+        binding = canonical_git_binding(repo)
+
+        merge_parents = strict_commit_record(binding, contract_merge).parents
+        product_parents = strict_commit_record(binding, product).parents
+        positive, positive_detail = product_identity(
+            contract_merge, product, binding=binding,
+        )
+
+        signed_extensions = (
+            b"encoding UTF-8\n"
+            b"gpgsig -----BEGIN PGP SIGNATURE-----\n"
+            b" Version: H037 canonical-object positive\n"
+            b" \n"
+            b" aGVsbG8=\n"
+            b" -----END PGP SIGNATURE-----\n"
+        )
+        signed_merge = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                pre_tree, [origin_base, contract_candidate],
+                extension_headers=signed_extensions,
+                message=b"signed publisher contract merge\n",
+            ),
+        )
+        signed_product = commit_tree(
+            repo, post_tree, [signed_merge], "exact product after signed publisher merge",
+        )
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", signed_product)
+        signed_positive, signed_positive_detail = product_identity(
+            signed_merge, signed_product, binding=binding,
+        )
+        signed_record = strict_commit_record(binding, signed_merge)
+
+        late_parent = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                post_tree, [], late_parent=contract_merge,
+                message=b"late parent after committer\n",
+            ),
+        )
+        late_parent_fsck = fixture_git(
+            repo, "fsck", "--strict", "--no-reflogs", "--no-dangling", late_parent,
+        )
+        late_after_signature = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                post_tree, [], extension_headers=(
+                    b"gpgsig -----BEGIN PGP SIGNATURE-----\n"
+                    b" aGVsbG8=\n"
+                    b" -----END PGP SIGNATURE-----\n"
+                ), late_parent=contract_merge,
+                message=b"late parent after signature\n",
+            ),
+        )
+        late_signature_fsck = fixture_git(
+            repo, "fsck", "--strict", "--no-reflogs", "--no-dangling", late_after_signature,
+        )
+        malformed_commits = {
+            "late_parent_after_committer": late_parent,
+            "late_parent_after_signature": late_after_signature,
+            "missing_author": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], author=False,
+                ),
+            ),
+            "missing_committer": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], committer=False,
+                ),
+            ),
+            "duplicate_tree": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], duplicate_tree=True,
+                ),
+            ),
+            "duplicate_author": literal_object(
+                repo, "commit", commit_fixture_bytes(
+                    post_tree, [contract_merge], duplicate_author=True,
+                ),
+            ),
+        }
+        malformed_commit_rejections = {
+            name: not literal_commit_is_canonical(binding, object_id)
+            for name, object_id in malformed_commits.items()
+        }
+
+        stack = commit_tree(repo, post_tree, [product], "genuine stacked product")
+        replacement_target = commit_tree(
+            repo, post_tree, [contract_merge], "replacement parent lie",
+        )
+        fixture_git_value(repo, "replace", stack, replacement_target)
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", stack)
+        replacement_probe = fixture_git(
+            repo, "rev-list", "--parents", "-n", "1", stack, allow_replacements=True,
+        )
+        replacement_accepted, replacement_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+        fixture_git_value(repo, "replace", "-d", stack)
+
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", product)
+        clean_redirect = temp / "redirect-clean"
+        shutil.copytree(repo, clean_redirect, ignore=shutil.ignore_patterns(".git"))
+        dirty_target = repo / "specs/tasks.spec.json"
+        dirty_target.write_bytes(dirty_target.read_bytes() + b"\n")
+        redirect_environment = closed_process_environment(temp)
+        redirect_environment["GIT_DIR"] = str(repo / ".git")
+        redirect_environment["GIT_WORK_TREE"] = str(clean_redirect)
+        redirected_status = subprocess.run(
+            [str(TRUSTED_GIT), "status", "--porcelain", "--untracked-files=all"],
+            cwd=repo, env=redirect_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        redirect_accepted, redirect_detail = product_identity(
+            contract_merge, product, binding=binding, ambient=redirect_environment,
+        )
+
+        fixture_git_value(repo, "update-index", "--skip-worktree", "specs/tasks.spec.json")
+        crafted_index_status = fixture_git(
+            repo, "status", "--porcelain", "--untracked-files=all",
+        )
+        crafted_index_accepted, crafted_index_detail = product_identity(
+            contract_merge, product, binding=binding,
+        )
+        fixture_git_value(repo, "update-index", "--no-skip-worktree", "specs/tasks.spec.json")
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", stack)
+
+        grafts = repo / ".git/info/grafts"
+        grafts.parent.mkdir(parents=True, exist_ok=True)
+        grafts.write_text(f"{stack} {contract_merge}\n", encoding="ascii")
+        graft_probe = fixture_git(
+            repo, "rev-list", "--parents", "-n", "1", stack, allow_replacements=True,
+        )
+        graft_accepted, graft_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+        grafts.unlink()
+
+        shallow = repo / ".git/shallow"
+        shallow.write_text(stack + "\n", encoding="ascii")
+        shallow_probe = fixture_git(
+            repo, "rev-list", "--parents", "-n", "1", stack, allow_replacements=True,
+        )
+        shallow_accepted, shallow_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+        shallow.unlink()
+
+        shadow = temp / "shadow-bin"
+        shadow.mkdir()
+        fake_git = shadow / "git"
+        fake_git.write_text(
+            "#!/bin/sh\n: > \"$PWD/.path-shim-executed\"\n"
+            "printf '%s\\n' '" + stack + " " + contract_merge + "'\n",
+            encoding="utf-8",
+        )
+        fake_git.chmod(0o755)
+        shadow_environment = closed_process_environment(temp)
+        shadow_environment["PATH"] = str(shadow) + os.pathsep + shadow_environment.get("PATH", "")
+        shadow_probe = subprocess.run(
+            ["git", "rev-list", "--parents", "-n", "1", stack],
+            cwd=repo, env=shadow_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        shadow_marker = repo / ".path-shim-executed"
+        shadow_probe_executed = shadow_marker.is_file()
+        if shadow_marker.exists():
+            shadow_marker.unlink()
+        shadow_accepted, shadow_detail = product_identity(
+            contract_merge, stack, binding=binding, ambient=shadow_environment,
+        )
+        shadow_identity_executed = shadow_marker.exists()
+        stack_accepted, stack_detail = product_identity(
+            contract_merge, stack, binding=binding,
+        )
+
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", product)
+        config_hidden = repo / "config-hidden.txt"
+        config_hidden.write_text("hostile config should hide this\n", encoding="utf-8")
+        hostile_attributes = temp / "hostile.attributes"
+        hostile_attributes.write_text("* h037-injected\n", encoding="utf-8")
+        config_environment = closed_process_environment(temp)
+        config_environment.update({
+            "GIT_CONFIG_COUNT": "2",
+            "GIT_CONFIG_KEY_0": "status.showUntrackedFiles",
+            "GIT_CONFIG_VALUE_0": "no",
+            "GIT_CONFIG_KEY_1": "core.attributesFile",
+            "GIT_CONFIG_VALUE_1": str(hostile_attributes),
+            "GIT_ATTR_SOURCE": product,
+            "DEVELOPER_DIR": str(temp / "hostile-developer"),
+            "TOOLCHAINS": "hostile-toolchain",
+            "SDKROOT": str(temp / "hostile-sdk"),
+            "DYLD_INSERT_LIBRARIES": str(temp / "hostile.dylib"),
+            "LD_PRELOAD": str(temp / "hostile.so"),
+        })
+        config_probe_environment = dict(config_environment)
+        # The connected config/attribute probe must reach the real default launcher; the
+        # deliberately invalid toolchain/loader controls are reserved for the closed identity call.
+        for key in ("DEVELOPER_DIR", "TOOLCHAINS", "SDKROOT", "DYLD_INSERT_LIBRARIES", "LD_PRELOAD"):
+            config_probe_environment.pop(key, None)
+        config_status_probe = subprocess.run(
+            [str(TRUSTED_GIT), "-C", str(repo), "status", "--porcelain"],
+            cwd=repo, env=config_probe_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        attribute_probe = subprocess.run(
+            [
+                str(TRUSTED_GIT), "-C", str(repo),
+                "check-attr", "h037-injected", "--", config_hidden.name,
+            ],
+            cwd=repo, env=config_probe_environment, text=True, capture_output=True,
+            shell=False, timeout=15,
+        )
+        config_accepted, config_detail = product_identity(
+            contract_merge, product, binding=binding, ambient=config_environment,
+        )
+        config_hidden.unlink()
+
+        extra_parent = commit_tree(
+            repo, post_tree, [contract_merge, product], "genuine extra-parent product",
+        )
+        fixture_git_value(repo, "checkout", "--detach", "--force", "--quiet", extra_parent)
+        extra_accepted, extra_detail = product_identity(
+            contract_merge, extra_parent, binding=binding,
+        )
+
+        register_blob = fixture_git_value(repo, "rev-parse", f"{contract_merge}:{PRODUCT_PATH}")
+        bad_trees = {
+            "unsorted": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"z-last", register_blob),
+                TreeEntry("100644", b"a-first", register_blob),
+            ])),
+            "duplicate": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"duplicate", register_blob),
+                TreeEntry("100644", b"duplicate", register_blob),
+            ])),
+            "bad_mode": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100600", b"bad-mode", register_blob),
+            ])),
+            "bad_name": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"bad/name", register_blob),
+            ])),
+            "missing_entry_object": literal_object(repo, "tree", tree_bytes([
+                TreeEntry("100644", b"missing", "0" * 40),
+            ])),
+        }
+        bad_tree_rejections = {
+            name: not literal_tree_is_canonical(binding, object_id)
+            for name, object_id in bad_trees.items()
+        }
+        legitimate_gitlink_tree = literal_object(repo, "tree", tree_bytes([
+            TreeEntry("160000", b"legitimate-submodule", "f" * 40),
+        ]))
+        legitimate_gitlink_tree_positive = literal_tree_is_canonical(
+            binding, legitimate_gitlink_tree,
+        )
+        missing_tree_commit = literal_object(
+            repo, "commit", commit_fixture_bytes(
+                "0" * 40, [contract_merge], message=b"missing commit tree\n",
+            ),
+        )
+        missing_tree_rejected = not literal_commit_tree_is_canonical(
+            binding, missing_tree_commit,
+        )
+
+        def register_variant(mode: str | None = None, object_id: str | None = None,
+                             *, remove: bool = False, duplicate: bool = False):
+            def mutate(entries: list[TreeEntry], index: int) -> list[TreeEntry]:
+                if remove:
+                    return entries[:index] + entries[index + 1:]
+                source = entries[index]
+                replacement = TreeEntry(
+                    source.mode if mode is None else mode,
+                    source.name,
+                    source.object_id if object_id is None else object_id,
+                )
+                entries[index] = replacement
+                if duplicate:
+                    entries.insert(index + 1, replacement)
+                return entries
+            return mutate
+
+        register_tree_variants = {
+            "executable_100755": mutate_register_tree(
+                repo, binding, post_tree, register_variant("100755"),
+            ),
+            "symlink_120000": mutate_register_tree(
+                repo, binding, post_tree, register_variant("120000"),
+            ),
+            "gitlink_160000": mutate_register_tree(
+                repo, binding, post_tree, register_variant("160000", contract_merge),
+            ),
+            "tree_40000": mutate_register_tree(
+                repo, binding, post_tree, register_variant("40000", pre_tree),
+            ),
+            "missing": mutate_register_tree(
+                repo, binding, post_tree, register_variant(remove=True),
+            ),
+            "duplicate": mutate_register_tree(
+                repo, binding, post_tree, register_variant(duplicate=True),
+            ),
+            "invalid_mode": mutate_register_tree(
+                repo, binding, post_tree, register_variant("100600"),
+            ),
+            "invalid_type": mutate_register_tree(
+                repo, binding, post_tree, register_variant("100644", pre_tree),
+            ),
+        }
+        register_tree_rejections = {
+            name: not literal_register_from_git(binding, root, post)
+            for name, root in register_tree_variants.items()
+        }
+
+        expected_lie = f"{stack} {contract_merge}"
+        closed_environment = git_identity_environment(temp)
+        expected_environment_keys = {
+            "PATH", "HOME", "XDG_CONFIG_HOME", "TMPDIR", "DARWIN_USER_TEMP_DIR", "LANG", "LC_ALL",
+            "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT",
+            "GIT_TERMINAL_PROMPT", "GIT_NO_REPLACE_OBJECTS", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        }
+        controls = {
+            "publisher_shaped_two_parent_base": merge_parents == [origin_base, contract_candidate],
+            "exact_direct_product_positive": (
+                product_parents == [contract_merge] and positive
+            ),
+            "signed_encoding_publisher_merge_positive": (
+                signed_record.parents == [origin_base, contract_candidate]
+                and signed_record.encoding == "UTF-8"
+                and signed_record.signed_headers == ["gpgsig"]
+                and signed_positive
+            ),
+            "late_parent_after_committer_is_fsck_blind_but_parser_rejects": (
+                late_parent_fsck.returncode == 0
+                and malformed_commit_rejections["late_parent_after_committer"]
+            ),
+            "late_parent_after_signature_is_fsck_blind_but_parser_rejects": (
+                late_signature_fsck.returncode == 0
+                and malformed_commit_rejections["late_parent_after_signature"]
+            ),
+            "missing_duplicate_identity_and_tree_headers_reject": all(
+                malformed_commit_rejections[name]
+                for name in (
+                    "missing_author", "missing_committer", "duplicate_tree", "duplicate_author",
+                )
+            ),
+            "unsorted_duplicate_bad_mode_bad_name_missing_tree_entry_reject": (
+                all(bad_tree_rejections.values()) and missing_tree_rejected
+                and legitimate_gitlink_tree_positive
+            ),
+            "literal_register_pre_post_positive": (
+                literal_register_from_git(binding, pre_tree, pre)
+                and literal_register_from_git(binding, post_tree, post)
+            ),
+            "literal_register_mode_type_cardinality_mutants_reject": all(
+                register_tree_rejections.values()
+            ),
+            "replacement_mapping_connected": (
+                replacement_probe.returncode == 0
+                and replacement_probe.stdout.strip() == expected_lie
+            ),
+            "replacement_mapping_on_genuine_stack_rejected": not replacement_accepted,
+            "git_work_tree_redirection_connected": (
+                redirected_status.returncode == 0 and redirected_status.stdout == ""
+            ),
+            "git_work_tree_cannot_hide_dirty_checkout": not redirect_accepted,
+            "crafted_skip_worktree_index_lies_clean": (
+                crafted_index_status.returncode == 0 and crafted_index_status.stdout == ""
+            ),
+            "crafted_skip_worktree_index_rejected": not crafted_index_accepted,
+            "graft_parent_rewrite_connected": (
+                graft_probe.returncode == 0 and graft_probe.stdout.strip() == expected_lie
+            ),
+            "graft_parent_rewrite_rejected": not graft_accepted,
+            "shallow_parent_rewrite_connected": (
+                shallow_probe.returncode == 0 and shallow_probe.stdout.strip() == stack
+            ),
+            "shallow_parent_rewrite_rejected": not shallow_accepted,
+            "path_shadow_parent_lie_connected": (
+                shadow_probe.returncode == 0 and shadow_probe.stdout.strip() == expected_lie
+                and shadow_probe_executed
+            ),
+            "path_shadow_parent_lie_rejected": not shadow_accepted,
+            "path_shadow_shim_never_executes_for_identity": not shadow_identity_executed,
+            "config_status_injection_connected": (
+                config_status_probe.returncode == 0 and config_status_probe.stdout == ""
+            ),
+            "attribute_injection_connected": (
+                attribute_probe.returncode == 0
+                and attribute_probe.stdout.strip()
+                == f"{config_hidden.name}: h037-injected: set"
+            ),
+            "config_attribute_loader_toolchain_injection_rejected": not config_accepted,
+            "closed_environment_exact": (
+                set(closed_environment) == expected_environment_keys
+                and closed_environment["PATH"] == CLOSED_PATH
+                and closed_environment["HOME"] == "/var/empty"
+                and closed_environment["GIT_NO_REPLACE_OBJECTS"] == "1"
+                and closed_environment["GIT_ALTERNATE_OBJECT_DIRECTORIES"] == ""
+                and not any(key.startswith(("DYLD_", "LD_", "GIT_TEST_"))
+                            for key in closed_environment)
+                and not ({"DEVELOPER_DIR", "TOOLCHAINS", "SDKROOT"} & set(closed_environment))
+            ),
+            "genuine_stack_rejected": not stack_accepted,
+            "genuine_extra_parent_rejected": not extra_accepted,
+        }
+        return all(controls.values()), json.dumps({
+            "controls": controls,
+            "positive": json.loads(positive_detail),
+            "signed_positive": json.loads(signed_positive_detail),
+            "malformed_commit_rejections": malformed_commit_rejections,
+            "bad_tree_rejections": bad_tree_rejections,
+            "missing_tree_rejected": missing_tree_rejected,
+            "legitimate_gitlink_tree_positive": legitimate_gitlink_tree_positive,
+            "register_tree_rejections": register_tree_rejections,
+            "late_parent_fsck": {
+                "returncode": late_parent_fsck.returncode,
+                "stdout": late_parent_fsck.stdout,
+                "stderr": late_parent_fsck.stderr,
+            },
+            "late_signature_fsck": {
+                "returncode": late_signature_fsck.returncode,
+                "stdout": late_signature_fsck.stdout,
+                "stderr": late_signature_fsck.stderr,
+            },
+            "replacement": json.loads(replacement_detail),
+            "redirect": json.loads(redirect_detail),
+            "crafted_index": json.loads(crafted_index_detail),
+            "graft": graft_detail,
+            "shallow": shallow_detail,
+            "path_shadow": json.loads(shadow_detail),
+            "config_attribute": json.loads(config_detail),
+            "stack": json.loads(stack_detail),
+            "extra_parent": json.loads(extra_detail),
+        }, sort_keys=True)
+
+
+def json_mutant(post: bytes, mutate) -> bytes:
+    value = strict_json(post)
+    if not isinstance(value, dict):
+        raise Rig("register fixture top level")
+    mutate(value)
+    return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode()
+
+
+def exact_transition_selftests() -> None:
+    pre, post = register_states()
+    base = "1" * 40
+    positive, why = identity_oracle(
+        base=base, parents=[base], changed=[PRODUCT_PATH],
+        base_register=pre, candidate_register=post,
+    )
+    actual_git_ok, actual_git_detail = actual_git_identity_controls()
+    check(
+        positive and actual_git_ok,
+        "J_EXACT_DIRECT_CHILD_ONE_FILE_TRANSITION_POSITIVE",
+        {"pure_oracle": json.loads(why), "actual_git": json.loads(actual_git_detail)},
+    )
+
+    result = run_preflight(post)
+    check(result.returncode == 0 and result.stderr == "",
+          "J_REAL_PREFLIGHT_EXACT_POSTPRODUCT_POSITIVE", result.stderr)
+    old_result = run_preflight(pre)
+    check(old_result.returncode == 4 and old_result.stdout == ""
+          and old_result.stderr.strip() == EXPECTED_PREFLIGHT_RED,
+          "J_REAL_PREFLIGHT_EXACT_PREPRODUCT_CAUSAL_RED",
+          {"returncode": old_result.returncode, "stdout": old_result.stdout,
+           "stderr": old_result.stderr})
+
+    def suite_entry(document: dict) -> dict:
+        return document["verifiers"]["nortropic-verify-suite"]
+
+    mutants: list[tuple[str, bytes, int]] = []
+    mutants.append(("WRONG_DIGEST", json_mutant(
+        post, lambda d: suite_entry(d).__setitem__("sha256", "0" * 64)), 4))
+    mutants.append(("WRONG_PATH", json_mutant(
+        post, lambda d: (suite_entry(d).__setitem__("path", "docs/07-konstitution.md"),
+                         suite_entry(d).__setitem__("sha256", CONSTITUTION_SHA))), 0))
+    mutants.append(("WRONG_RUNNER", json_mutant(
+        post, lambda d: suite_entry(d).__setitem__("runner", "node")), 0))
+    mutants.append(("WRONG_STARTBAR", json_mutant(
+        post, lambda d: (suite_entry(d).__setitem__("runner", "node"),
+                         suite_entry(d).__setitem__("startbar", True))), 0))
+    mutants.append(("CHECK_INVARIANTS_ENTRY", json_mutant(
+        post, lambda d: d["verifiers"]["check-invariants"].__setitem__(
+            "beskrivning", d["verifiers"]["check-invariants"]["beskrivning"] + " MUTANT")), 0))
+    mutants.append(("EXTRA_KEY", json_mutant(
+        post, lambda d: suite_entry(d).__setitem__("extra", "mutant")), 0))
+    duplicate = post.replace(
+        f'"sha256": "{NEW_SUITE_SHA}"'.encode(),
+        (f'"sha256": "{NEW_SUITE_SHA}",\n'
+         f'      "sha256": "{NEW_SUITE_SHA}"').encode(), 1,
+    )
+    mutants.append(("DUPLICATE_KEY", duplicate, 4))
+    reformatted = json.dumps(strict_json(post), ensure_ascii=False,
+                             separators=(",", ":")).encode() + b"\n"
+    mutants.append(("REFORMAT", reformatted, 0))
+
+    for name, raw, expected_rc in mutants:
+        accepted, why = identity_oracle(
+            base=base, parents=[base], changed=[PRODUCT_PATH],
+            base_register=pre, candidate_register=raw,
+        )
+        check(not accepted, f"J_{name}_MUTANT_EXACT_IDENTITY_REJECT", why)
+        effect = run_preflight(raw)
+        check(effect.returncode == expected_rc,
+              f"J_{name}_MUTANT_REAL_PREFLIGHT_CLASS",
+              {"expected": expected_rc, "actual": effect.returncode,
+               "stdout": effect.stdout, "stderr": effect.stderr})
+
+    out_of_scope, why = identity_oracle(
+        base=base, parents=[base],
+        changed=[PRODUCT_PATH, "docs/05-beslutslogg.md"],
+        base_register=pre, candidate_register=post,
+    )
+    check(not out_of_scope, "J_OUT_OF_SCOPE_SECOND_PRODUCT_PATH_REJECT", why)
+    workflow, why = identity_oracle(
+        base=base, parents=[base],
+        changed=[PRODUCT_PATH, "workflows/nortropic-verify-suite.js"],
+        base_register=pre, candidate_register=post,
+        protected_bytes_equal=False,
+    )
+    check(not workflow, "J_WORKFLOW_MUTANT_REJECT", why)
+    workflow_effect = run_preflight(post, suite_raw=SUITE.read_bytes() + b"\n// mutant\n")
+    check(workflow_effect.returncode == 4 and "hash_mismatch" in workflow_effect.stderr,
+          "J_WORKFLOW_MUTANT_REAL_PREFLIGHT_REJECT", workflow_effect.stderr)
+    stacked, why = identity_oracle(
+        base=base, parents=["2" * 40], changed=[PRODUCT_PATH],
+        base_register=pre, candidate_register=post,
+    )
+    check(not stacked, "J_STACKED_OR_WRONG_PARENT_PRODUCT_REJECT", why)
+    wrong_base, why = identity_oracle(
+        base=base, parents=[base], changed=[PRODUCT_PATH],
+        base_register=post, candidate_register=post,
+    )
+    check(not wrong_base, "J_ALREADY_REBOUND_BASE_REJECT", why)
+
+
+def frozen_contract_checks() -> None:
+    pre, post = register_states()
+    check(sha(pre) == PRE_REGISTER_SHA and sha(post) == POST_REGISTER_SHA
+          and len(pre) == len(post) and trusted_git_valid(),
+          "F_EXACT_ONE_TOKEN_BYTE_PRESERVING_REGISTER_TRANSITION")
+    check(sha(SUITE.read_bytes()) == NEW_SUITE_SHA,
+          "F_SUITE_EXACT_NEW_DIGEST")
+    check(sha(INVARIANTS.read_bytes()) == INVARIANTS_SHA,
+          "F_CHECK_INVARIANTS_BYTES_PRESERVED")
+    check(sha(VERIFY.read_bytes()) == VERIFY_SHA,
+          "F_REAL_PREFLIGHT_RUNNER_BYTES_PRESERVED")
+    check(sha(CONSTITUTION.read_bytes()) == CONSTITUTION_SHA,
+          "F_CONSTITUTION_V18_BYTES_PRESERVED")
+    check(sha(AUTOPILOT.read_bytes()) == AUTOPILOT_SHA
+          and sha(H017_GATE.read_bytes()) == H017_GATE_SHA,
+          "F_AUTOPILOT_SCOPE_AND_H017_BYTES_PRESERVED")
+
+    spec = strict_json(SPEC.read_bytes())
+    if not isinstance(spec, dict) or not isinstance(spec.get("tasks"), list):
+        raise Rig("task spec shape")
+    tasks = spec["tasks"]
+    h037 = [task for task in tasks if isinstance(task, dict) and task.get("id") == "h-037"]
+    exact_task = {
+        "id": "h-037",
+        "slice": "H037_VERIFY_SUITE_REGISTER_REBIND",
+        "authority_class": "ordinary",
+        "title": "Rebind the verify-suite registry digest to its exact constitutional bytes",
+        "summary": TASK_SUMMARY,
+        "allowed_write": [PRODUCT_PATH],
+        "owner_author_allowed_write": [],
+        "exit_test": "verify/bin/h-037-exit",
+        "exit_criterion": EXIT_CRITERION,
+        "docs_impact": [],
+        "depends_on": ["h-035"],
+        "max_changed_files": 1,
+        "max_added_lines": 1,
+        "h037_verify_suite_register_rebind": H037_CONTRACT,
+    }
+    check(len(h037) == 1 and h037[0] == exact_task,
+          "F_H037_EXACT_ORDINARY_TASK_AND_CONTRACT")
+
+    h034 = [task for task in tasks if isinstance(task, dict) and task.get("id") == "h-034"]
+    h035 = [task for task in tasks if isinstance(task, dict) and task.get("id") == "h-035"]
+    check(len(h035) == 1 and len(h034) == 1
+          and h034[0].get("depends_on") in (["h-035"], ["h-037"])
+          and h034[0].get("exit_test") == "verify/bin/h-034-exit",
+          "F_H037_H034_EXACT_TWO_PHASE_DEPENDENCY_STATE")
+
+    owner = OWNER_WORKFLOW.read_text(encoding="utf-8")
+    decision = DECISION_LOG.read_text(encoding="utf-8")
+    drift = DRIFT.read_text(encoding="utf-8")
+    required_owner_terms = (
+        "<!-- H037_VERIFY_SUITE_REGISTER_REBIND_CONTRACT_V1 -->",
+        OLD_SUITE_SHA, NEW_SUITE_SHA, PRE_REGISTER_SHA, POST_REGISTER_SHA,
+        "H-037 depends exactly on H-035",
+        "H-034 remains exactly dependent on H-035",
+        "H-037 → H-034 → H-036",
+        LABEL, REASON,
+        "verify/bin/h-037-exit --product <base-sha> <candidate-sha>",
+        "controller/verify/register.json",
+        "H037-RV-02 closes the raw object-identity boundary",
+        "H037-RV-03 binds the product path from raw trees",
+        "fresh ref-free SHA-1 quarantine",
+        "exactly `100644 blob`",
+    )
+    check(all(term in owner for term in required_owner_terms),
+          "F_OWNER_WORKFLOW_H037_BP_AND_SERIAL_CONTRACT")
+    check(
+        decision.count("H-037 exact verify-suite register rebind") == 1
+        and decision.count("H037-RV-02/RV-03 canonical object and literal register-tree identity") == 1,
+          "F_DECISION_LOG_H037_SINGLE_ENTRY")
+    check(
+        drift.count("## 2026-08-25 — H-037 exact verify-suite register rebind") == 1
+        and drift.count("### H037-RV-02 — canonical reachable object closure") == 1
+        and drift.count("### H037-RV-03 — literal register-tree identity") == 1,
+          "F_DRIFT_H037_SINGLE_ENTRY")
+    exact_transition_selftests()
+
+
+def main() -> int:
+    product_bound = sys.argv[1:2] == ["--product"] and len(sys.argv) == 4
+    preproduct = len(sys.argv) == 1
+    if not (preproduct or product_bound):
+        print("RIG_ERROR: usage: h-037-exit [--product BASE_SHA CANDIDATE_SHA]", file=sys.stderr)
+        return 2
+    try:
+        frozen_contract_checks()
+        _pre, post = register_states()
+        effect_ok, effect_detail = product_effect(REGISTER.read_bytes())
+        if effect_ok:
+            check(True, LABEL)
+        else:
+            check(False, LABEL, {
+                "reason": REASON,
+                "failure_signature": FAILURE_SIGNATURE,
+                "effect": json.loads(effect_detail),
+            })
+        if product_bound:
+            identity_ok, identity_detail = product_identity(sys.argv[2], sys.argv[3])
+            check(identity_ok, "A_H037_EXACT_DIRECT_CHILD_REGISTER_ONLY_PRODUCT_IDENTITY",
+                  identity_detail)
+            candidate_effect_ok = False
+            if identity_ok:
+                candidate_effect_ok, _ = product_effect(post)
+            check(candidate_effect_ok,
+                  "A_H037_PRODUCT_CANDIDATE_REAL_PREFLIGHT_EFFECT")
+    except (OSError, ValueError, subprocess.SubprocessError, Rig) as error:
+        print(f"RIG_ERROR: {error}", file=sys.stderr)
+        return 2
+
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+    print(f"H037_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    if failed:
+        exact_red = False
+        if preproduct and len(failed_labels) == 1:
+            label, detail = failed_labels[0]
+            try:
+                payload = json.loads(detail)
+            except ValueError:
+                payload = None
+            exact_red = (
+                label == LABEL and isinstance(payload, dict)
+                and payload.get("reason") == REASON
+                and payload.get("failure_signature") == FAILURE_SIGNATURE
+                and payload.get("effect", {}).get("preflight", {}).get("returncode") == 4
+                and payload.get("effect", {}).get("preflight", {}).get("stdout") == ""
+                and payload.get("effect", {}).get("preflight", {}).get("stderr", "").strip()
+                    == EXPECTED_PREFLIGHT_RED
+            )
+        if exact_red:
+            print(f"H037_PREPRODUCT_RED_LABEL={LABEL}")
+            print(f"H037_PREPRODUCT_RED_REASON={REASON}")
+            print("H037_GATE_RESULT=EXPECTED_PREPRODUCT_RED")
+            return 1
+        print("H037_GATE_RESULT=UNEXPECTED_RED")
+        return 2
+    print("H037_GATE_RESULT=PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
