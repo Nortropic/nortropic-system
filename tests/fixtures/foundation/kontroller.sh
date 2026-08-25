@@ -63,6 +63,21 @@ grep -q 'appendOriginToDirective\|function patchCspMeta' "$LIV" && fail "K4: aut
 [ -f "$ROT/vendored-skills/impeccable/LICENSE" ] || fail "K4: Apache-licensen saknas i forken"
 echo "K4 PASS: frusen lokal fork — inget uppdaterings-, beroende- eller CSP-självmandat"
 
+# ---- K5a: kanonisk vendored-integritet (R5) — skyddad mätsticka + mätning ---
+# Foundation-pinnarna binder mätstickan: payload + manifest + en eftergiven
+# verifierare kan aldrig tyst tillverka grönt, för pinnarna här ändras endast
+# i samma ägargranskade förtroende-transition som manifestet.
+VVI="$ROT/scripts/verify-vendored-integrity.mjs"
+VIM="$ROT/config/vendored-integrity.v1.json"
+[ -f "$VVI" ] || fail "K5a: verifieraren saknas"
+[ -f "$VIM" ] || fail "K5a: integritetsmanifestet saknas"
+VVI_PIN="7d589d27ac86097682ae817b6b2801f994085accb9e170cf55a73fe48bb16626"
+VIM_PIN="a9d0263524d2abb83d90c02cd424d0528aa4fa96408f1dbbbbb44a9c31390133"
+[ "$(shasum -a 256 "$VVI" | awk '{print $1}')" = "$VVI_PIN" ] || fail "K5a: verifierarkällan avviker från foundation-pinnen — mätstickan ändrad utan skyddad transition"
+[ "$(shasum -a 256 "$VIM" | awk '{print $1}')" = "$VIM_PIN" ] || fail "K5a: manifestet avviker från foundation-pinnen — mätstickan ändrad utan skyddad transition"
+node "$VVI" >/dev/null 2>&1 || fail "K5a: kanonisk vendored-integritet icke-grön (kör verifieraren för detaljer)"
+echo "K5a PASS: mätstickan pinnad och 9/9 kanoniska träd matchar manifestet"
+
 # ---- K5b: drift-kanari — inga mutable-fetch-instruktioner i skill-kroppar ----
 # Ankarkrav: kanarin kräver att minst en skill-fil lästes.
 ANTAL=$(find "$ROT/skills" "$ROT/vendored-skills" -name 'SKILL.md' | wc -l | tr -d ' ')
