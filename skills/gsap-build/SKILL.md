@@ -70,4 +70,4 @@ export function RevealSection({ children }: { children: React.ReactNode }) {
 
 Good uses: hero headline + subhead staggered reveal, service cards entering on scroll, a trust-number counter (years in business, jobs done), a subtle sticky-CTA emphasis. Bad uses (anti-slop): parallax everything, spinning logos, scroll-jacking that fights the user, motion that delays the phone number.
 
-See also: `nortropic-antislop`, `nortropic-prelaunch`, `improve-animations` (motion-craft review), `apple-design` (easing/physics taste).
+See also: `nortropic-antislop`, `nortropic-prelaunch` — motion-craft review of the built result belongs to `design-reviewer`'s canon, `apple-design` (easing/physics taste).
