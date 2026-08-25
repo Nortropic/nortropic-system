@@ -34,16 +34,27 @@ Läs `content/profile.ts` FÖRST: `primaraktion` + `gate1Test` definierar vad so
 
 ## Gate 2 — Performance (details: `references/lighthouse-targets.md`)
 
-> **STEP-0A-DEMOTERING (2026-08-24, HÖGRISK — hävs av M1-reparation R7):** Lighthouse-körningar
-> i denna grind har hittills varit opinnade (`npx lighthouse`), och Lighthouse 13 bytte
-> audit-taxonomi mot 12 — opinnade körningar kan tyst byta mätsystem under trösklarna.
-> Tills R7 pinnat EN kanonisk, maskin-tillgänglig, exakt-versionsidentifierad körväg gäller:
-> varje Lighthouse-rad nedan måste rapportera exakt verktygversion i evidensen; en körning
-> utan pinnad/rapporterad version är **ODÖMBART — inte auktoritativ PASS** (grinden sänks
-> inte: ODÖMBART blockerar som vanligt).
+> **KANONISK LIGHTHOUSE-KÖRVÄG (R7 2026-08-25 — STEP-0A-demoteringen hävd):** Lighthouse-raderna
+> körs ENDAST via `node scripts/run-lighthouse-gate.mjs <mål-URL>` i nortropic-system-repot —
+> pinnade `lighthouse@13.4.1` (exakt version i evidensen) ur samma kanoniska verktygsrot
+> `tools/web-quality/` som axe-grinden (ETT verktygsauktoritet; materialisering = explicit
+> `cd tools/web-quality && npm ci`, grinden installerar ALDRIG själv). Webbläsaren är den
+> kanoniska Macens Chrome, mekaniskt resolvad (ärvd CHROME_PATH/kund-PATH väljer aldrig) med
+> **Chromes egen sandlåda PÅ** — inga säkerhets-bypass-flaggor. Körningen är MOBIL navigation
+> med Lighthouse-defaultens simulerade långsamma 4G (`throttlingMethod: simulate`); resultatet
+> rapporterar exakta resolverade formFactor/screenEmulation/throttling-inställningar i
+> evidensen. Verdiktalgebra: exit 0 = navigationskomponenten PASS · exit 1 = tröskel-FAIL ·
+> exit 2 = **ODÖMBART** (verktyg/version/Chrome/mål/auth/runtimeError — aldrig sajt-PASS;
+> 401 = ODÖMBAR auth). Webbläsarkörningen kräver BROWSER_VERIFICATION_EXECUTION i den
+> kanoniska Mac-sandlådan (samma kapacitet + harness-godkännande som Gate 4:s axe-rad) — kan
+> den inte beviljas är Lighthouse-komponenten ODÖMBART och lansering blockerad, aldrig tyst
+> hoppad. **INP-SANNINGSGRÄNS:** navigations-Lighthouse interagerar inte och mäter därför
+> ALDRIG verklig INP — den bevisar poängen + LCP + CLS och redovisar TBT som INP-relaterad
+> labbproxy (`inp.status=NOT_MEASURED_BY_NAVIGATION_LIGHTHOUSE`); TBT blir aldrig INP-PASS.
+> MCP-/DevTools-Lighthouse förblir observationsinstrument, aldrig kanonisk Gate 2-evidens.
 
-- [ ] Lighthouse mobile: **Performance ≥90, Accessibility ≥95, Best Practices ≥95, SEO ≥95**
-- [ ] **LCP < 2.5s · CLS < 0.1 · INP < 200ms** on 4G-throttled mobile
+- [ ] Lighthouse mobile via kanoniska runnern: **Performance ≥90, Accessibility ≥95, Best Practices ≥95, SEO ≥95** (exit 0 krävs; evidensen bär version 13.4.1 + webbläsar- + inställningsidentitet)
+- [ ] **LCP < 2.5s · CLS < 0.1** bevisas av samma körning (simulerad långsam 4G-mobil). **INP < 200ms kvarstår som separat krav**: utan giltig fältdata eller ett godkänt user-flow-mätsteg är INP-delkravet **ODÖMBART — aldrig PASS** (TBT ur körningen är endast proxy-evidens för manuell bedömning)
 - [ ] Images WebP/AVIF with explicit dimensions; hero `priority`; total page weight < 1MB on Hem
 
 ## Gate 3 — Responsive & Robustness
