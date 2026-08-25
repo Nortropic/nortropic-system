@@ -45,7 +45,7 @@ Never on a Swedish site, and never in meta tags either: unlock, elevate, seamles
 - Org.nr + F-skatt in footer (invariant för näringsidkare)
 - Every trust claim backed by a kvitto per the brief's §7.4 attributionsregler
 
-Bransch-specific required elements (ROT/RUT-avdrag, restidslöfte above fold, jour-mönster osv.) live in the bransch profile (`~/Workflow/profiler/`), carried into each build by the brief's §7 — not here.
+Bransch-specific required elements (ROT/RUT-avdrag, restidslöfte above fold, jour-mönster osv.) live in the pack's strategy module (`packs/<paket>/strategi/`), carried into each build by the brief's §7 — not here.
 
 ## Meta/SEO copy
 - Title: `[Tjänst] i [Stad] | [Företag]` — ≤60 chars, no superlatives

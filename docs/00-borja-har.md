@@ -230,3 +230,35 @@ grind. Att sätta det i en grind hör till ett senare steg.
 Det viktigaste ordet i hela kontraktet är fortfarande `[OSÄKER]`. Det vi inte kan belägga
 markeras, räknas och syns i kontrollraden. En ofullständig research som SER komplett ut
 är dyrare än ingen research alls.
+
+## Fabriken frågar först: behöver du ens en ny sajt? (S3, 2026-08-25)
+
+Fram tills nu började planeringen med antagandet att svaret var en ny webbplats. Nu inleds
+den — direkt efter att researchen visat sig komplett nog — med ett **interventionsbeslut**: läs vad kunden redan har, och avgör vad som
+faktiskt löser problemet. Fyra svar är tillåtna — bygg nytt · förbättra det befintliga ·
+gör något som inte är en sajt alls (svara i telefon, fixa Google-profilen, ändra priset)
+· eller avråd, för vi är fel leverantör. **Systemet måste kunna säga att en ny sajt inte
+är det du behöver.** En byrå som aldrig kan säga det säljer alltid en sajt.
+
+Två skillnader hålls isär genom hela planeringen, för att de ständigt blandas ihop:
+vad KUNDEN vill ha är inte samma sak som vad BESÖKAREN behöver, och att företaget får
+fler leads är inte samma sak som att besökaren klarade sitt ärende.
+
+**Kapacitetskatalogen** (`docs/kapacitetskatalog.md`) listar vad fabriken kan leverera
+OCH bevisa — varje rad har en signal som gör den relevant, ett krav som går att pröva,
+och en plats där beviset finns. Två rader står som "medvetet utanför" (e-handel och egen
+inloggning): de saknas inte, de hänvisas bort — hela nej-listan, inklusive föreningssajter,
+står i ringmodellen i `docs/06-scope.md`. Behöver ett jobb en
+kapacitet som inte är byggd **stannar planeringen** — den planerar aldrig vidare på
+något som inte finns. Ingen rad står som "bevisad" ännu, eftersom det kräver riktiga
+kunder.
+
+**Branschprofilerna har flyttat hem.** De bodde i en mapp utanför repot
+(`~/Workflow/profiler/`) som pensionerades i somras; nu bor de i paketets egen
+strategimodul (`packs/lokal-se/strategi/`), där de versioneras och granskas som allt
+annat. Mappen är avsiktligt tom: profiler skrivs när riktiga kunder visar vad som
+återkommer.
+
+Och en regel som sparar pengar: **en vanlig leverans får inte samla på sig extra
+ceremoni utan ett namngivet skäl.** Varje extra kontroll måste peka på vad den skyddar
+mot — annars är den kostnad utan skydd.
