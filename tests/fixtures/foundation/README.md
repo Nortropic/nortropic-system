@@ -23,23 +23,38 @@ bli FIX-A/FIX-B · införa v4-poäng · tunas mot legacy-utdata.
 | 7 | Bygg-/granskningsmaskineri fungerar på liten fabricerad TESTKLIENT utan desktop-beroenden | Klippet skapar `foundation/testklient/` — en MINIMAL fabricerad-märkt sida (statisk, en sida, FABRICERAD-banner, noindex) byggd för att verktygskedjan (axe + Lighthouse + template-lins-läsning) ska ha ett verkligt mål; INTE en kundsajt, INTE rorjour-formad, inga §7-anspråk | EFTER KLIPP |
 | 8 | Uppströmsdrift kan inte förbi promotiongränsen | K5-negativer: (a) R5 GENOMFÖRD (2026-08-25): K5a pinnar mätstickan (sha256 av `scripts/verify-vendored-integrity.mjs` + `config/vendored-integrity.v1.json`) och kör verifieraren — varje muterad vendored-byte, tillagd/raderad/omdöpt fil, exekveringsbitsändring, symlänk eller manifestmanipulation fäller mekaniskt, och payload+manifest ändrade tillsammans utan pinn-transition fälls av pinnarna; (b) plantera en mutable-fetch-instruktion i en skill-kropp → kanarin fäller; (c) `NY_REGIM_KLIPPT=true` utan klippta fixturer → suiten dömer aldrig GRÖN på tomhet (ankarkrav) | KÖRBAR NU (full) |
 
-## Klippceremonin (människan, HÖGRISK — exakta steg)
+## Klippceremonin (människan, HÖGRISK — exakta steg; PRECUT-rekonciliering 2026-08-25)
 
-1. Granska denna kandidat + `kontroller.sh` (ingen kontroll får vara vacuös — kör medvetet
-   mot en planterad defekt och se den fälla).
-2. Installera pinnade verktyg: `cd tests/fixtures/foundation/verktyg && npm init -y &&
-   npm install --save-exact @axe-core/cli@4.13.0 lighthouse@13.4.1` — committa package.json +
-   package-lock.json (exakta versioner är §A6-yta när de blivit grind-facit).
-3. Skapa den minimala testklient-sidan (steg 7) — fabricerad-märkt, en sida.
-4. Kör `kontroller.sh` + verktygskörningarna; alla KÖRBAR-NU-kontroller ska PASSA och
-   versionsidentiteterna ska matcha pinnarna exakt.
-5. Ändra STATUS-raden överst till `KLIPPT <datum>` och committa allt i EN HÖGRISK-märkt
-   commit tillsammans med beslutslogg-rad.
-6. Först därefter kan den oberoende FOUNDATION_REPAIR_GATE-granskningen (aldrig
-   självcertifierad av reparationssessionerna) förklara gaten GRÖN — förutsatt att även
-   R2–R11-kriterierna håller.
+**ETT VERKTYGSAUKTORITET:** klippet skapar ALDRIG någon `tests/fixtures/foundation/verktyg/` —
+den kanoniska, redan granskade verktygsroten är `tools/web-quality/` (R6/R7; package.json +
+package-lock committade och K6-/K7-pinnade). Ett andra package.json/lock är ett klippfel.
+
+1. Verifiera exakt auktoritativ bas och den granskade Foundation-kandidaten (commit/träd).
+2. Kör och FALSIFIERA `kontroller.sh` före förtroende-transitionen (ingen kontroll får vara
+   vacuös — kör medvetet mot en planterad defekt och se den fälla; återställ).
+3. Materialisera de BEFINTLIGA kanoniska verktygen: `cd tools/web-quality && npm ci` — och
+   bevisa att package.json-/package-lock-hasharna är oförändrade (K6-/K7-pinnarna gäller;
+   node_modules committas aldrig).
+4. Skapa den minimala TESTKLIENT-sidan (claim 7) under den kanoniska foundation-fixturvägen —
+   fabricerad-märkt, statisk, en sida, noindex.
+5. Kör de kanoniska runnarna mot fixturen under BROWSER_VERIFICATION_EXECUTION med
+   identitetsceremonin (K6/K7): `scripts/run-axe-gate.mjs` tar testklienten som `file://`-mål
+   (mekaniskt bevisat R6); `scripts/run-lighthouse-gate.mjs` kräver http(s) — lighthouse@13.4.1
+   tillåter endast `https:/http:/chrome:` (mekaniskt verifierat i `core/lib/url-utils.js`), så
+   testklienten servas då via en minimal lokal engångs-statisk server i samma
+   kapabilitetsmiljö (listen() finns där; servern är klipptillfällets verktyg, aldrig repoyta).
+6. Genomför den föreskrivna gransknings-/mallinläsningsvägen för Foundation-fixturen.
+7. FÖRST när hela klippkandidaten passerar: ändra STATUS-raden överst till `KLIPPT <datum>`.
+8. EN ägar-HÖGRISK-commit med klippartefakterna + beslutslogg-rad — inget mer.
+9. **Foundation-smoke-klippet vänder ALDRIG `NY_REGIM_KLIPPT`** — flaggan tillhör den SENARE
+   ägar-styrda universalregim-transitionen (två separata §A6-familjer, se nedan) och förblir
+   `false` tills det kontraktet finns och klipps.
+10. Först efter publicering av klipp-commiten får en OBEROENDE
+    FOUNDATION_REPAIR_GATE-granskning (aldrig självcertifierad av reparations- eller
+    klippsessionen) värdera gaten — förutsatt att även R2–R11-kriterierna håller.
 
 ## Vad som INTE ingår
 
 Universalregimens fixturer (FIX-A/FIX-B/FIX-NOBUILD/FIX-MIGRATION) — de hör till S1/S3/S5 och
-blockerar inte gaten. Gym-banker, holdouts, Director-fall — senare lanes per masterplanen.
+blockerar inte gaten; deras klipp är en EGEN senare §A6-transition och är det ENDA som får
+vända `NY_REGIM_KLIPPT`. Gym-banker, holdouts, Director-fall — senare lanes per masterplanen.
