@@ -291,3 +291,37 @@ av en migrering och väcker ingen mitt i natten.
 **Bygget delas i två lager.** Kärnan byggs alltid. Det paketspecifika — för svenska
 lokala företag är det ortssidorna — byggs bara när paketet faktiskt är belagt. En sajt
 utan ortssidor är därför ibland helt korrekt, inte en lucka någon glömt.
+
+## Så tar systemet in kunskap utifrån (K0–K3, 2026-08-26)
+
+Världen ändrar sig: tillgänglighetskrav skärps, Google flyttar ett tröskelvärde, en
+plattform byter API. Frågan är inte OM sådant ska nå fabriken utan HUR — och svaret
+är att det aldrig får ske i tysthet.
+
+**Fyra delar, en grundlag.** Grundlagen är att kunskapsbanan bara får **föreslå**.
+Den skriver aldrig i en standard. Skälet är konkret: en källa som får skriva direkt i
+våra normer blir en kanal där någon annans ändring tyst blir vår policy — och den dag
+någon frågar "varför gör vi så här?" finns inget beslut att peka på.
+
+**Källregistret** listar var vi tittar: vilken fråga varje källa har auktoritet över,
+hur ofta den brukar ändras, hur en ändring faktiskt upptäcks, och vem som läser
+utfallet. Ingen källa har auktoritet över allt — WCAG avgör tillgänglighet, inte
+copy; kunden avgör fakta om sin verksamhet, aldrig hur besökaren tänker.
+
+**Anspråksstegen** är hur en idé blir en regel: sedd en gång → sedd igen oberoende →
+reproducerad hos oss → höll över tid → antagen som norm. Sista steget tas bara av en
+människa. Varje anspråk måste bära sitt giltighetsomfång — vilka kunder det gäller —
+och "vet inte" är ett godkänt svar medan tomrum inte är det. Ett anspråk som råkar
+stämma för en kund blir annars tyst en regel för alla.
+
+**Radarn** är ett månatligt matsmältningsorgan, inte ett notisflöde till. Du startar
+den; den startar aldrig sig själv. Den letar upp vad som faktiskt ändrats, **citerar
+det ordagrant** (en sammanfattning bär redan vår tolkning in i beslutet), frågar om
+det ens rör något vi gör — och landar i ett av fyra utfall: ett förslag, ett nytt
+anspråk, ett experiment, eller "bevaka". **En tom radarkörning är ett fullgott
+resultat.** Att leta upp något att föreslå för att körningen ska kännas värd sin tid
+är precis motsatsen till vad organet är till för.
+
+Och det femte steget — första riktiga radarkörningen mot ett riktigt kundprojekt —
+byggs inte i förväg. Det kräver en första riktig kund, och vi hittar inte på underlag
+för att kunna säga att banan är färdig.
