@@ -78,7 +78,98 @@ No `(site)` route group — header/footer/phone live in the root `app/layout.tsx
 
 `content/business.ts` also carries `testklient: boolean` (from the brief's Klienttyp). When `true`, the site is built non-indexable: `robots.ts` reads a `noindex` flag (driven by `NEXT_PUBLIC_NOINDEX=1` in Vercel) and disallows all crawling, and page metadata sets `robots: { index: false, follow: false }`. A fictional/demo business must never be indexable or claimable. This flag + env var are the canonical way any agent detects a TESTKLIENT.
 
-**`content/profile.ts` is the calibration facit** — written by stack-builder at init from the brief's §7 Kalibreringsprofil (grindar och eval arbetar i byggrepot och kan inte läsa briefen; profile.ts är transporten, samma mönster som business.ts). Typed fields: `primaraktion` (typ `'ring' | 'boka' | 'platsforfragan' | 'offert' | 'besok'` + `etikett` för CTA-text, t.ex. "Få kostnadsfri offert"/"Boka tid"), `gate1Test` (klartext: vad som testas end-to-end, t.ex. "formulär → mejl levererat till LEAD_TO_EMAIL"), `kvitton` (lista över förtroendekvitton + attributionsregler), `schemaTyp` (LocalBusiness-subtyp eller annan typ), `seoLage` (`'lokal' | 'varumarke' | 'hybrid'`), `juridikflaggor` (string-array), `rostregister` (adjektiv + exempelmeningar + legitimt bransch-vernacular ur §7.2), `branschAntislop` (string-array ur §7.3 — adderas till bas-blocklistan), `motionNiva` (`'ingen' | 'subtil' | 'uttrycksfull'`, speglar §5). De tre sista bär röst-/motion-kalibreringen så att design-reviewer och eval kan döma i byggrepot utan briefen — §5:s Vald riktning transporteras däremot INTE (den bedöms mot den renderade sajten). Komponenter importerar den (CTA-etiketter, formulärrubrik, schema-typ); grindar och eval läser den som facit. business.ts förblir NAP-facit; profile.ts är kalibreringsfacit — de blandas aldrig. **`noindexCutover`** (valfritt, ENDAST skarp klient) transporterar en AVSIKTLIG pre-cutover-noindex: `{ avsiktlig: true; checklista: string; cutoverSenast: 'YYYY-MM-DD' }` — `checklista` är en repo-path till en verklig cutover-checklista, `cutoverSenast` sista dagen noindex får gälla. Fältets närvaro (+ att checklista-pathen existerar) är det typade, versionerade beviset att en skarp klients noindex är avsiktlig, inte staging-läckage (se `seo-optimizer` audit-läge). **profile.ts-kontraktsversion: v1.1.0** — kontraktet ovan (fältlistan/typerna/enum-värdena) är versionerat (semver; bumpa vid tillägg/ändring/borttagning av fält, typ eller enum-värde). Varje profile.ts bär därför ett additivt fält `profilKontraktVersion: 'v1.1.0'` (v1.1.0 lade till valfritt `noindexCutover`; befintliga pre-versioneringsrepon backfillas till aktuell version, samma mönster som pre-v13-backfillen); doctor #5 vaktar stämpeln **semver-medvetet** mot denna kontraktsversion (samma MAJOR + stämpel-(minor,patch) ≤ kontraktets = kompatibel). Skyddar gamla frysta fixtures/kundrepon mot tyst schemadrift, precis som eval-rubrikens versionering skyddar mätkontraktet.
+**`content/profile.ts` is the calibration facit** — written by stack-builder at init from the brief's §7 Kalibreringsprofil (grindar och eval arbetar i byggrepot och kan inte läsa briefen; profile.ts är transporten, samma mönster som business.ts). Typed fields: `primaraktion` (typ `'ring' | 'boka' | 'platsforfragan' | 'offert' | 'besok'` + `etikett` för CTA-text, t.ex. "Få kostnadsfri offert"/"Boka tid"), `gate1Test` (klartext: vad som testas end-to-end, t.ex. "formulär → mejl levererat till LEAD_TO_EMAIL"), `kvitton` (lista över förtroendekvitton + attributionsregler), `schemaTyp` (LocalBusiness-subtyp eller annan typ), `seoLage` (`'lokal' | 'varumarke' | 'hybrid'`), `juridikflaggor` (string-array), `rostregister` (adjektiv + exempelmeningar + legitimt bransch-vernacular ur §7.2), `branschAntislop` (string-array ur §7.3 — adderas till bas-blocklistan), `motionNiva` (`'ingen' | 'subtil' | 'uttrycksfull'`, speglar §5). De tre sista bär röst-/motion-kalibreringen så att design-reviewer och eval kan döma i byggrepot utan briefen — §5:s Vald riktning transporteras däremot INTE (den bedöms mot den renderade sajten). Komponenter importerar den (CTA-etiketter, formulärrubrik, schema-typ); grindar och eval läser den som facit. business.ts förblir NAP-facit; profile.ts är kalibreringsfacit — de blandas aldrig. **`noindexCutover`** (valfritt, ENDAST skarp klient) transporterar en AVSIKTLIG pre-cutover-noindex: `{ avsiktlig: true; checklista: string; cutoverSenast: 'YYYY-MM-DD' }` — `checklista` är en repo-path till en verklig cutover-checklista, `cutoverSenast` sista dagen noindex får gälla. Fältets närvaro (+ att checklista-pathen existerar) är det typade, versionerade beviset att en skarp klients noindex är avsiktlig, inte staging-läckage (se `seo-optimizer` audit-läge). **profile.ts-kontraktsversion: v1.2.0** — kontraktet ovan (fältlistan/typerna/enum-värdena) är versionerat (semver; bumpa vid tillägg/ändring/borttagning av fält, typ eller enum-värde). Varje profile.ts bär därför ett additivt fält `profilKontraktVersion: 'v1.2.0'` (v1.1.0 lade till valfritt `noindexCutover`; v1.2.0 lade till Site Quality Contract v2:s fältgrupper — alla VALFRIA, inget v1-fält ändrat eller borttaget; befintliga pre-versioneringsrepon backfillas till aktuell version, samma mönster som pre-v13-backfillen); doctor #5 vaktar stämpeln **semver-medvetet** mot denna kontraktsversion (samma MAJOR + stämpel-(minor,patch) ≤ kontraktets = kompatibel). Skyddar gamla frysta fixtures/kundrepon mot tyst schemadrift, precis som eval-rubrikens versionering skyddar mätkontraktet.
+
+### SITE QUALITY CONTRACT v2 — profile.ts (S4, semver-stämpel v1.2.0)
+
+**`content/profile.ts` ÄR Site Quality Contract-bäraren.** Det finns INGEN
+syskon-JSON, ingen parallell organisationsprofil, ingen separat kapacitetsplan och
+inget user-needs-paket vid sidan av. En andra sanning om samma sajt driftar, och
+driften upptäcks först när grindarna dömer mot fel fil. Allt bor här.
+
+**TVÅ VERSIONSAXLAR — blanda dem aldrig.**
+
+- **Kontraktsgeneration: Site Quality Contract v2.** Fältmängden i §7:s mening.
+- **Semver-stämpel: `profilKontraktVersion: 'v1.2.0'`** — den ENDA deklarationen
+  (ovan) och den doctor #5 läser.
+
+**Varför MINOR och inte MAJOR:** semver MAJOR betyder BRYTANDE ändring. Här har
+inget v1-fält ändrats, ingen typ smalnats och inget enum-värde tagits bort —
+samtliga v2-fältgrupper är VALFRIA tillägg. Ett tillägg är per definition en MINOR.
+Och en MAJOR-bump vore inte bara fel utan direkt skadlig: doctor #5 fäller
+**"annan MAJOR än kontraktet = FAIL"**, så varje befintligt kundrepo hade fallit
+över natten utan att en enda byte i deras schema blivit ogiltig. Bakåtkompatibilitet
+är ett KRAV i denna skiva, inte en förhoppning — och den vilar på att versionen är
+ärlig, inte på en fotnot som ber grinden titta bort.
+
+**Samtliga v1.1.0-fält står kvar oförändrade** (`primaraktion`, `gate1Test`,
+`kvitton`, `schemaTyp`, `seoLage`, `juridikflaggor`, `rostregister`,
+`branschAntislop`, `motionNiva`, `noindexCutover`).
+
+#### BAKÅTKOMPATIBILITETSLAGEN (bindande)
+
+1. **En v1.x-profil är GILTIG.** Grindar, eval och granskning FAILar ALDRIG enbart
+   för att en profil bär `profilKontraktVersion: 'v1.x.y'`.
+2. **Saknade v2-fält läses som `SAKNAS_I_V1` — aldrig som tomt, falskt eller noll.**
+   En frånvaro är okänd, inte ett negativt svar. En konsument som behandlar ett
+   saknat fält som `false` uppfinner ett påstående kunden aldrig gjort.
+3. **Migrering är additiv och en egen handling.** Ett äldre repo backfillas av
+   stack-builder ur briefen (samma mönster som pre-v13-backfillen) — aldrig tyst
+   under ett bygge, aldrig genom att gissa värden.
+4. **Doctor #5:s semver-vakt gäller oförändrad — och är UPPFYLLD.** Stämpeln
+   `v1.1.0` och kontraktet `v1.2.0` har samma MAJOR, och `1.1.0 ≤ 1.2.0`, alltså
+   kompatibel enligt vaktens egen regel. Lagen ovan är därför inget undantag från
+   grinden; den beskriver varför grinden aldrig behöver göra ett.
+
+#### v2-fälten
+
+| Fält | Semantik |
+|---|---|
+| `profilKontraktVersion` | `'v1.2.0'` — semver-stämpeln doctor #5 läser (fanns i v1) |
+| `katalogVersion` | Vilken version av `docs/kapacitetskatalog.md` kapacitetsraderna dömdes mot |
+| `paket` | Aktiva paket, t.ex. `['lokal-se']`. Tom lista = `core-only` — ett GILTIGT läge |
+| `primaraktion` | Primärhandlingen (fanns i v1) |
+| `anvandare` | Vilka som faktiskt använder sajten — ur briefens §7.11, aldrig önsketänkt |
+| `toppuppgifter` | De 2–4 uppgifter besökaren kommer för att utföra |
+| `kapaciteter` | Aktiverade kapaciteter med katalog-ID och status; `ROUTE-OUT` står som hänvisning |
+| `interventionsbeslut` | `'NY SAJT' \| 'FÖRBÄTTRA BEFINTLIG' \| 'ICKE-SAJT-ÅTGÄRD' \| 'AVRÅD'` ur §7.12 |
+| `kvitton` | Förtroendekrav och attributionsregler (fanns i v1) |
+| `obligatoriskaResor` | Resor som MÅSTE fungera end-to-end; Gate 1 testar primärhandlingens |
+| `forbjudnaPastaenden` | Vad sajten ALDRIG får påstå (§7.14a) — läses av antislop och granskning |
+| `kvalitetsnivaer` | Assuranceprofil: `'STANDARD'` som default; höjd nivå bär `skal` |
+| `integrationer` | Externa tjänster sajten integrerar mot (bokning, kassa, karta) |
+| `framgangsmatt` | Kundens mått ur §7.13 — föder HANDOVER:s Utfallshypotes |
+| `olostaOkandheter` | Öppna okändheter med `verklighetsklass` per rad (`DOMÄNEXPERT`/`ANVÄNDARE`) |
+| `godkannandeTillstand` | `{ godkandAv, datum, briefSha }` — vem godkände vilken brief, när |
+| `belaggspekare` | Per fältvärde: var belägget står (research-rad, 5d-kandidat, briefsektion) |
+| `statelesshet` | D8-vakten: `{ hallerTillstand: boolean }` — se STATELESS-VAKTEN nedan |
+
+#### STATELESS-VAKTEN (D8 — bevarad, nu typad)
+
+Fältet `statelesshet` bär den MEKANISKA gränsfrågan ordagrant:
+
+> **Håller sajtrepot tillstånd som operatören måste förvalta?**
+
+`{ hallerTillstand: false }` = innanför vallgraven. `{ hallerTillstand: true, ... }`
+är per definition **utanför** — det är en mjukvaruprodukt, en Ring 3-hänvisning eller
+ett eget scope, aldrig en Nortropic-sajt. **Detta är en DISKVALIFIKATION, inte en
+rekommendation:** sajten byggs inte ändå efter en bedömning, och vakten får aldrig
+omformuleras till ett råd. **Att en EXTERN SaaS håller tillståndet och sajten enbart
+integrerar, länkar eller bäddar in bryter INTE vallgraven** — men att sajtrepot SJÄLVT
+håller tillståndet (egen databas, egen inloggning, egen medlemsdata) bryter den alltid — det är
+just därför `integrationer` är ett eget fält. Vallgraven är en säkerhetsegenskap:
+en sajt utan eget tillstånd kan inte läcka persondata den inte har, går inte ner av
+en migrering och väcker ingen klockan tre.
+
+#### KÄRNA vs PAKET i scaffolden
+
+Scaffolden delas i två lager. **Kärnan** byggs för varje sajt oavsett paket:
+`business.ts` (NAP-facit), `profile.ts` (detta kontrakt), `services.ts`, `faq.ts`,
+`lib/send-lead.ts`, `lib/seo.ts`, primärhandlingens komponenter. **Paketvillkorat**
+byggs endast när paketet är BELAGT: för `lokal-se` är det `areas.ts` (ortssidor),
+ortsarkitekturen `[tjänst] i [stad]` och de lokala schemadelarna. **`paket: []`
+(core-only) är ett GILTIGT bygge** — frånvaron av ortssidor är då korrekt, aldrig
+ett granskningsfynd.
 
 ## URL Conventions
 - Swedish slugs, å/ä/ö transliterated: `tjanster/varmepumpar`, `omraden/taby`

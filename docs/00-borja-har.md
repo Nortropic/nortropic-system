@@ -262,3 +262,32 @@ annat. Mappen är avsiktligt tom: profiler skrivs när riktiga kunder visar vad 
 Och en regel som sparar pengar: **en vanlig leverans får inte samla på sig extra
 ceremoni utan ett namngivet skäl.** Varje extra kontroll måste peka på vad den skyddar
 mot — annars är den kostnad utan skydd.
+
+## Sajtens kvalitetskontrakt bor i EN fil (S4, 2026-08-25)
+
+Varje kundsajt har en fil, `content/profile.ts`, som säger vad just den sajten lovar:
+vilken primärhandling den driver, vilka kvitton den får luta sig mot, vad den ALDRIG
+får påstå, vilka resor som måste fungera, vad kunden vill ska hända och var varje
+uppgift har sitt belägg. Grindarna och granskningen läser den filen — de kan inte läsa
+briefen, så det är hit allting transporteras.
+
+**Det finns med flit ingen andra fil.** Ingen sido-JSON, ingen parallell kapacitetsplan,
+ingen separat användarprofil. Två filer om samma sajt glider isär, och glidningen märks
+först när en grind dömer mot fel fil.
+
+**Gamla sajter fortsätter fungera.** Kontraktet är nu version 2, men en sajt byggd mot
+version 1 är fortfarande giltig — ingen grind underkänner en sajt bara för att den är
+äldre. Saknas ett av de nya fälten läses det som *"det vet vi inte"*, aldrig som *"nej"*.
+Skillnaden är viktig: en frånvaro är okunskap, inte ett påstående kunden gjort.
+
+**Vallgraven står kvar, nu utskriven i kontraktet.** Frågan är mekanisk: håller
+sajtrepot något tillstånd som du måste förvalta? Är svaret ja är det inte en
+Nortropic-sajt — det är en mjukvaruprodukt, och den hänvisas vidare. Att kunden
+använder en extern bokningstjänst som sajten länkar eller bäddar in bryter INGENTING:
+tillståndet bor då hos tjänsten, inte hos oss. Poängen är säkerhet, inte renlärighet —
+en sajt utan eget tillstånd kan inte läcka uppgifter den aldrig haft, går inte sönder
+av en migrering och väcker ingen mitt i natten.
+
+**Bygget delas i två lager.** Kärnan byggs alltid. Det paketspecifika — för svenska
+lokala företag är det ortssidorna — byggs bara när paketet faktiskt är belagt. En sajt
+utan ortssidor är därför ibland helt korrekt, inte en lucka någon glömt.
