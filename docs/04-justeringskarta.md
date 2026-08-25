@@ -1,7 +1,7 @@
 # Justeringskartan — ändra med öppna ögon
 
-Senast verifierad mot systemet: 2026-07-31 · v17 (denna commit)
-Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE: check-invariants.mjs INV-001–005, verify-suite doctor 1–13 + OGILTIG-status, design-reviewer Bash→BLOCKED, NRT-007-blocket i agenterna, docs/100-dagar); 0 påståenden i denna fil ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Senast verifierad mot systemet: 2026-08-25 · v17 (denna commit)
+Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE) samt mot S1-min+K4-batchen 2026-08-25 (statustabell respektive Paket-arkitekturen); hela filen läst i denna batch, 0 påståenden i den ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 Varje större designval i systemet kostar något och köper något. Det här dokumentet finns för att du ska kunna skruva — eller ta bort — ett val medvetet: här står vad det kostar, vad det köper, exakt var man skruvar, och vad som sannolikt händer utan det. Ändringar går som vanligt via steward-förslag och commit; historiken bakom varje val finns i [05-beslutslogg.md](05-beslutslogg.md).
 
@@ -70,6 +70,18 @@ Varje större designval i systemet kostar något och köper något. Det här dok
 **Regeln som håller det:** enkla lagret läses FÖRE och uppdateras i samma commit som teknisk dokumentation ändras (regel 22); doctor #12(e) WARN:ar om det avancerade lagret drivit ifrån det enkla; `CLAUDE.md` pekar mot ingången (aldrig förklarar — den laddas varje tur och kostar kontextbudget).
 **Exakt fil att skruva i:** `docs/00-borja-har.md` (enkla lagret), `CLAUDE.md` (pekaren), regel 22 i `docs/03-regelverk.md`, och doctor #12(e) i `agents/nortropic-steward.md`.
 **Gränsen:** regel 22 är en dokumentationsregel, INTE en konstitutionsinvariant — den skyddar inte kundlöften eller kvalitet, bara begriplighet. Därför ligger den bland de vanliga reglerna, aldrig i konstitutionens §A.
+
+## Paket-arkitekturen (ETT kalibrerbart paket, aldrig en kopia per bransch)
+
+**Vad det kostar:** allt måste uttryckas som kalibrering i stället för som kod — varje ny bransch tvingas in i briefens §7 (primärhandling, röst, kvitton, schema, SEO-läge) och `content/profile.ts` i stället för att få en egen gren att skruva fritt i. Det gör enskilda specialfall omständligare, och paketets yta växer med varje bransch den ska rymma. Statustabellen i [06-scope.md](06-scope.md) blir dessutom en egen sak att hålla ärlig.
+
+**Vad det köper:** en måttstock i stället för N. Ett paket (`lokal-se`) betyder att en förbättring av granskning, grindar eller copy-kanon når ALLA kunder samtidigt, att evidens ackumuleras på samma yta i stället för att splittras per bransch, och att kompetens går att uttala sig om alls — `kompetens = konfiguration × yta` är meningslöst om ytan är en annan för varje kund. En kopia per bransch är hur ett system tappar förmågan att svara på "är vi bättre än förra kvartalet".
+
+**Exakt fil att skruva i:** [06-scope.md](06-scope.md) (ringmodellen + statustabellen — vilka paket som finns och var de står), `agents/project-planner.md` (§7-kalibreringen som ersätter kopiering) och `content/profile.ts`-kontraktet i kundrepot (transporten av kalibreringen). Nya paket får INTE födas som kopior: de deklareras i statustabellen som DECLARED och byggs vid första ja.
+
+**Gränsen mot §A:** detta är paket i betydelsen KAPACITETSPAKET (`lokal-se` — den repo-nativa `packs/`-ytan som docs/07 §A7 pekar mot). Kundvända PAKET i affärsbemärkelse — priser, paketinnehåll, kundlöften — är §A5 och rörs aldrig här.
+
+**Om det tas bort:** väljer man i stället en gren eller ett repo per bransch försvinner den delade måttstocken först och kvaliteten sedan: grindar och kanon driftar isär per kopia, en fix måste appliceras N gånger (och blir det inte), evidens blir n≈1 överallt i stället för ackumulerande på ett ställe, och PROVEN blir ett påstående ingen kan belägga. Vinsten — friheten i enskilda specialfall — betalas med systemets förmåga att veta om det blir bättre.
 
 ## En-biblioteksregeln (Motion ELLER GSAP, aldrig båda)
 
