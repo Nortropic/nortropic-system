@@ -8,7 +8,7 @@
 | Best Practices | **≥95** | Usually breaks on console errors or mixed content |
 | SEO | **≥95** | Usually breaks on missing meta description or illegible font sizes |
 
-Run: chrome-devtools MCP `lighthouse_audit`, or `npx lighthouse <url> --preset=mobile --view`. Run **3 times, take the median** — single runs vary ±5 points.
+Run: den ENDA auktoritativa mätningen är den kanoniska runnern `node scripts/run-lighthouse-gate.mjs <mål-URL>` i nortropic-system (pinnade lighthouse@13.4.1 ur `tools/web-quality/`; hela kontraktet i Gate 2-noten i SKILL.md). Enstaka körningar varierar ±5 poäng — kör gärna flera och bedöm mot runnerns tröskelalgebra; identiteten (verktyg/inställningar/webbläsare) är det deterministiska, aldrig exakta poäng. chrome-devtools-MCP:ns `lighthouse_audit` är observationsinstrument, aldrig kanonisk evidens; `npx lighthouse` är retirerat (R7-kanon).
 
 ## Core Web Vitals (lab, mobile 4G throttle)
 | Metric | Gate | Typical Nortropic fix when failing |
@@ -46,7 +46,9 @@ overlay) — extra uppmärksamhet på hero-storleken där.
 ## Verification commands
 ```bash
 pnpm build && pnpm start                 # prod build locally
-npx lighthouse http://localhost:3000 --preset=mobile --output=json --output-path=./lh.json
-node -e "const r=require('./lh.json').categories;console.table(Object.fromEntries(Object.entries(r).map(([k,v])=>[k,Math.round(v.score*100)])))"
+# kanoniska mätningen (körs från nortropic-system-repot; BROWSER_VERIFICATION_EXECUTION gäller):
+node scripts/run-lighthouse-gate.mjs http://localhost:3000
 ```
+Runnern skriver det normaliserade resultatobjektet (kategorier 0–100, LCP/CLS, TBT-proxy,
+INP-sanningsgräns) till stdout — ingen egen JSON-parsning behövs.
 On Vercel: check the deployment's Speed Insights tab after launch; lab gates above still decide.

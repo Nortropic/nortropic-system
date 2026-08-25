@@ -139,9 +139,13 @@ grep -q 'MCP-/DevTools-Lighthouse förblir observationsinstrument, aldrig kanoni
 grep -q 'NOT_MEASURED_BY_NAVIGATION_LIGHTHOUSE\|aldrig PASS' "$ROT/skills/nortropic-prelaunch/SKILL.md" || fail "K7: INP-sanningsgränsen saknas i Gate 2-dokumentationen"
 echo "K7 PASS: Lighthouse-mätstickan pinnad, kontraktet exakt, INP-sanningsgränsen intakt och Gate 2 bunden"
 
-# ---- K5c: NY_REGIM_KLIPPT-flaggan kan inte ge grönt på tomhet ---------------
+# ---- K5c: NY_REGIM_KLIPPT kan inte ge grönt — och härleds ALDRIG ur foundation-smoke
+# PRECUT-rekonciliering 2026-08-25: två separata §A6-familjer. Foundation-smoke-klippet
+# (STATUS → KLIPPT i denna katalog) vänder ALDRIG universalregim-flaggan; flaggan förblir
+# false tills den SENARE universalregim-transitionen (FIX-A/B/NOBUILD/MIGRATION, S1/S3/S5)
+# har eget klippkontrakt — den transitionen uppdaterar denna vakt medvetet. En andra
+# verktygsrot (foundation/verktyg) är förbjuden och bevisar ingenting.
 VS="$ROT/workflows/nortropic-verify-suite.js"
-grep -q "NY_REGIM_KLIPPT = false" "$VS" && { echo "K5c PASS: regimen oklippt och suiten kortsluter till icke-grönt"; exit 0; }
+grep -q "NY_REGIM_KLIPPT = false" "$VS" && { echo "K5c PASS: universalregimen oklippt (legitimt nuläge — foundation-smoke får oberoende vara KANDIDAT eller KLIPPT); suiten kortsluter till icke-grönt"; exit 0; }
 grep -q "NY_REGIM_KLIPPT = true" "$VS" || odombar "K5c: flaggan oläsbar (ankarkrav)"
-[ -f "$ROT/tests/fixtures/foundation/verktyg/package-lock.json" ] || fail "K5c: NY_REGIM_KLIPPT=true utan klippta verktyg — flaggan vänd utan människans klipp"
-echo "K5c PASS: flagga och klipp konsistenta"
+fail "K5c: NY_REGIM_KLIPPT=true utan existerande universalregim-klippkontrakt — flaggan får aldrig härledas ur foundation-smoke-artefakter eller en verktygskatalogs existens"

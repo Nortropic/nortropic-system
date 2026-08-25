@@ -38,7 +38,13 @@ Before starting: check memory for per-bransch voice patterns and phrases that wo
 
 Anskaffningen görs av ett script, inte av dig direkt (skriptet bor i skillen — BYGGTID kopieras, ANSKAFFNINGSTID gör det inte; körs med byggrepots rot som cwd):
 
-    node ~/.claude/skills/nortropic-bild/scripts/fetch-images.mjs --slots=SLOTS.json
+    node <nortropic-bild-skill-bas>/scripts/fetch-images.mjs --slots=SLOTS.json
+
+där `<nortropic-bild-skill-bas>` är katalogen som `nortropic-bild`-skillen laddades från —
+repo-nativt `skills/nortropic-bild/` i nortropic-system (samma `<skill-base-dir>`-konvention
+som impeccable R4). En ambient installkopia under `~/.claude/skills/` är HÄRLEDD och aldrig
+körauktoritet (R1-lagen, doctor #9); skriptet bor kvar i skillen och körs alltid därifrån,
+med byggrepots rot som cwd.
 
 Scriptet gör hela kedjan: biblioteksuppslag → generering vid miss → normalisering → mekanisk gallring → cacheskrivning → `public/images/ref/`. Skälet till att det är ett script och inte verktygsanrop är att kod är deterministisk och att bildpayloads aldrig ska passera kontextfönstret. Läs `BILDRAPPORT.json` efteråt och redovisa utfallet.
 

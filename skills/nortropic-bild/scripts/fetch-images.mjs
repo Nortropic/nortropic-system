@@ -17,7 +17,7 @@
  *
  * Körs från byggrepots rot (skriptet bor i skillen — BYGGTID kopieras,
  * ANSKAFFNINGSTID gör det inte; models.json löses relativt skriptets EGEN fil):
- *   node ~/.claude/skills/nortropic-bild/scripts/fetch-images.mjs --slots=SLOTS.json
+ *   node <nortropic-bild-skill-bas>/scripts/fetch-images.mjs   (skill-bas = katalogen skillen laddades från; repo-nativa skills/nortropic-bild/ — aldrig en ambient installkopia) --slots=SLOTS.json
  *   node ... fetch-images.mjs --dry-run          visa plan, generera inget
  */
 
