@@ -145,6 +145,33 @@ Output (JSON):
     console.error(JSON.stringify({ ok: false, error: 'missing_port' }));
     process.exit(1);
   }
+  // R4 (Nortropic fork): CSP compatibility gate BEFORE any mutation — including
+  // the git-ignore write. Live mode NEVER broadens a security policy
+  // automatically; if the source CSP would need new origins/directives the run
+  // blocks structurally instead of rewriting it. Legacy markers are judged
+  // post-restore so a historically patched policy is evaluated by its ORIGINAL
+  // bytes.
+  if (!svelteKit) {
+    const blocking = [];
+    for (const relFile of resolvedFiles) {
+      const absFile = path.resolve(process.cwd(), relFile);
+      if (!fs.existsSync(absFile)) continue;
+      const restored = revertCspMeta(fs.readFileSync(absFile, 'utf-8'));
+      const check = checkCspMetaCompatibility(restored, port);
+      if (!check.compatible) blocking.push({ file: relFile, missing: check.missing });
+    }
+    if (blocking.length > 0) {
+      console.error(JSON.stringify({
+        ok: false,
+        error: 'CSP_REQUIRES_EXPLICIT_DEV_AUTHORITY',
+        port,
+        blocking,
+        note: 'Live mode would require broadening a source-level Content-Security-Policy. ' +
+          'Nothing was modified. Broadening a CSP for dev use is an explicit human/dev-authority change, never automatic.',
+      }));
+      process.exit(1);
+    }
+  }
   const gitIgnore = ensureLiveGitIgnores(process.cwd());
 
   if (svelteKit) {
@@ -162,12 +189,11 @@ Output (JSON):
     if (withTag === withoutOld) {
       return { file: relFile, error: 'insertion_point_not_found', anchor: config.insertBefore || config.insertAfter };
     }
-    const updated = patchCspMeta(withTag, port);
-    fs.writeFileSync(absFile, updated, 'utf-8');
+    fs.writeFileSync(absFile, withTag, 'utf-8');
     return {
       file: relFile,
       inserted: true,
-      cspPatched: updated !== withTag,
+      cspRewritten: false,
     };
   });
   const anyInserted = results.some((r) => r.inserted);
@@ -447,23 +473,26 @@ function removeTag(content, _syntax) {
 }
 
 // ---------------------------------------------------------------------------
-// Content-Security-Policy meta-tag patcher
+// Content-Security-Policy meta-tag COMPATIBILITY CHECK (R4, Nortropic fork)
 //
 // When the user's HTML carries `<meta http-equiv="Content-Security-Policy">`,
 // the cross-origin load of /live.js (and the SSE/POST connection back to
-// localhost:PORT) is blocked unless the CSP explicitly allows that origin.
+// localhost:PORT) is blocked unless the CSP already allows that origin.
 //
-// On insert: append `http://localhost:PORT` to `script-src` and `connect-src`,
-// and stash the original `content` value in a `data-impeccable-csp-original`
-// attribute (base64) so revert is exact.
+// Upstream auto-appended the localhost origin to script-src/connect-src and
+// `blob:` to img-src, stashing the original in `data-impeccable-csp-original`.
+// The Nortropic fork REMOVED that auto-broadening: a security policy in
+// project source is never weakened automatically. Instead the insert path
+// runs `checkCspMetaCompatibility` BEFORE any mutation and blocks with
+// `CSP_REQUIRES_EXPLICIT_DEV_AUTHORITY` (exact missing directives/origins)
+// when the policy would need broadening.
 //
-// On remove: detect the marker attribute, decode it, restore the original
-// content value verbatim, drop the marker.
+// `revertCspMeta` is retained for LEGACY CLEANUP ONLY: it restores the exact
+// original policy bytes from a historical `data-impeccable-csp-original`
+// marker left by prior upstream runs. Restore, never broaden.
 //
 // Header-based CSP (Next.js headers, Nuxt routeRules, SvelteKit kit.csp,
-// shared helpers) is NOT patched here — those need framework-specific config
-// edits and are handled via the existing detect-csp.mjs reference output.
-// Only the in-source meta-tag form gets the auto-patch.
+// shared helpers) is untouched here exactly as before — see detect-csp.mjs.
 // ---------------------------------------------------------------------------
 
 const CSP_MARKER_ATTR = 'data-impeccable-csp-original';
@@ -486,61 +515,64 @@ function getAttr(attrs, name) {
   return m ? { quote: m[1], value: m[2], full: m[0] } : null;
 }
 
-function appendOriginToDirective(csp, directive, origin) {
-  const re = new RegExp(`(^|;)(\\s*)(${directive})\\s+([^;]*)`, 'i');
+function parseDirectiveTokens(csp, directive) {
+  const re = new RegExp(`(^|;)\\s*${directive}\\s+([^;]*)`, 'i');
   const m = csp.match(re);
-  if (m) {
-    const tokens = m[4].trim().split(/\s+/);
-    if (tokens.includes(origin)) return csp;
-    return csp.replace(re, `${m[1]}${m[2]}${m[3]} ${[...tokens, origin].join(' ')}`);
-  }
-  // Directive missing — add it. Use 'self' + origin so we don't inadvertently
-  // narrow the policy compared to the default-src fallback (most users with
-  // an explicit CSP have 'self' there).
-  return csp.trim().replace(/;?\s*$/, '') + `; ${directive} 'self' ${origin}`;
+  return m ? m[2].trim().split(/\s+/).filter(Boolean) : null;
 }
 
-export function patchCspMeta(content, port) {
+/**
+ * Does this CSP policy already allow `required` under `directive`?
+ * CSP fallback semantics: a missing fetch directive falls back to default-src;
+ * when default-src is also absent the fetch is unrestricted → allowed.
+ * Conservative source matching: an origin is allowed by its exact token, a
+ * host/port wildcard for the same host, a bare `*`, or its scheme source
+ * (`http:`). `blob:` is allowed ONLY by an explicit `blob:` token — per the
+ * CSP spec, `*` does not match blob:/data: schemes.
+ */
+function directiveAllows(csp, directive, required) {
+  let tokens = parseDirectiveTokens(csp, directive);
+  if (tokens === null) tokens = parseDirectiveTokens(csp, 'default-src');
+  if (tokens === null) return true;
+  const lower = tokens.map((t) => t.toLowerCase());
+  if (required === 'blob:') return lower.includes('blob:');
+  const url = new URL(required);
+  const accepted = [
+    required.toLowerCase(),
+    `${url.protocol}//${url.hostname}:*`,
+    `${url.hostname}:${url.port}`,
+    `${url.hostname}:*`,
+    '*',
+    url.protocol,
+  ];
+  return accepted.some((tok) => lower.includes(tok));
+}
+
+/**
+ * Pre-mutation gate for the insert path. Returns { compatible, missing }
+ * where `missing` lists the exact { directive, required } pairs the policy
+ * would have to gain for live mode to work. Every CSP meta tag must allow
+ * every requirement (multiple policies intersect). Never mutates anything.
+ */
+export function checkCspMetaCompatibility(content, port) {
   const tags = findCspMetaTags(content);
-  if (tags.length === 0) return content;
+  if (tags.length === 0) return { compatible: true, missing: [] };
   const origin = `http://localhost:${port}`;
-
-  // Walk last-to-first so prior splices don't invalidate later indices.
-  let result = content;
-  for (let i = tags.length - 1; i >= 0; i--) {
-    const tag = tags[i];
-    const attrs = tag.attrs;
-    if (getAttr(attrs, CSP_MARKER_ATTR)) continue; // already patched
-    const contentAttr = getAttr(attrs, 'content');
+  const missing = [];
+  for (const tag of tags) {
+    const contentAttr = getAttr(tag.attrs, 'content');
     if (!contentAttr) continue;
-
-    const original = contentAttr.value;
-    let patched = original;
-    patched = appendOriginToDirective(patched, 'script-src', origin);
-    patched = appendOriginToDirective(patched, 'connect-src', origin);
-    // The shader overlay during 'generating' creates a screenshot via
-    // URL.createObjectURL, producing a `blob:` URL — img-src 'self' rejects
-    // those. Add `blob:` so the overlay doesn't throw a CSP violation.
-    patched = appendOriginToDirective(patched, 'img-src', 'blob:');
-    if (patched === original) continue;
-
-    const newContentAttr = `content=${contentAttr.quote}${patched}${contentAttr.quote}`;
-    const marker = `${CSP_MARKER_ATTR}="${Buffer.from(original, 'utf-8').toString('base64')}"`;
-    // The tagRe captures any whitespace between the last attribute and the
-    // closing `/>` as part of `attrs`. Naively appending ` ${marker}` after
-    // a replace would land it BEFORE that trailing space, leaving a double
-    // space inside attrs and clobbering the space before `/>`. Split off
-    // the trailing whitespace, splice the marker into the attribute body,
-    // and re-append the original trailing whitespace so a self-closing
-    // `<meta … />` round-trips byte-for-byte.
-    const trailingWs = (attrs.match(/[ \t]*$/) || [''])[0];
-    const attrsBody = attrs.slice(0, attrs.length - trailingWs.length);
-    const newAttrs = attrsBody.replace(contentAttr.full, newContentAttr) + ' ' + marker + trailingWs;
-    const newTag = tag.full.replace(attrs, newAttrs);
-
-    result = result.slice(0, tag.start) + newTag + result.slice(tag.end);
+    for (const [directive, required] of [
+      ['script-src', origin],
+      ['connect-src', origin],
+      ['img-src', 'blob:'],
+    ]) {
+      if (!directiveAllows(contentAttr.value, directive, required)) {
+        missing.push({ directive, required });
+      }
+    }
   }
-  return result;
+  return { compatible: missing.length === 0, missing };
 }
 
 export function revertCspMeta(content) {
@@ -580,4 +612,6 @@ if (_running?.endsWith('live-inject.mjs') || _running?.endsWith('live-inject.mjs
 }
 
 export { insertTag, removeTag, validateConfig, buildTagBlock };
-// patchCspMeta + revertCspMeta are exported above where they're defined.
+// checkCspMetaCompatibility + revertCspMeta are exported above where they're
+// defined. patchCspMeta (upstream's automatic CSP broadening) was removed in
+// the R4 Nortropic fork — see the CSP section comment.

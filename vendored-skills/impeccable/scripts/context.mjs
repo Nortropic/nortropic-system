@@ -43,19 +43,14 @@ const WORKSPACE_DISCOVERY_IGNORED_DIRS = new Set([
   'coverage',
 ]);
 
-// ─── Update check ──────────────────────────────────────────────────────────
-// Piggyback a lightweight skill-version check on the once-per-session boot.
-// When a newer skill ships, append an UPDATE_AVAILABLE directive so the agent
-// can offer `npx impeccable update`. Everything here is best-effort and
-// silent on failure: a network problem, sandbox, or missing cache must never
-// block context output or print an error.
-
-const UPDATE_HOST = (process.env.IMPECCABLE_UPDATE_HOST || 'https://impeccable.style').replace(/\/$/, '');
-const UPDATE_CACHE_PATH =
-  process.env.IMPECCABLE_UPDATE_CACHE || path.join(os.homedir(), '.impeccable', 'update-check.json');
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // throttle the network poll to once a day
-const RENOTIFY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // don't re-surface the same version for a week
-const FETCH_TIMEOUT_MS = 1200;
+// ─── R4 FORK-AND-FREEZE (2026-08-25) ───────────────────────────────────────
+// Upstream's update-check machinery (the version poll against the project
+// homepage, the update directive appended to boot output, the home-directory
+// check cache and all their helpers) is REMOVED — not sleeping — in the
+// Nortropic fork. A vendored, load-bearing skill has no operational path to
+// update itself into production authority. Upstream changes reach Nortropic
+// only via Radar → kandidat → diff → granskning → promotion (VENDORED.md
+// bears the fork provenance).
 
 export function resolveContextDir(cwd = process.cwd(), options = {}) {
   return resolveContext(cwd, options).contextDir;
@@ -752,135 +747,6 @@ export function extractPlatform(product) {
   return null;
 }
 
-/**
- * Read the installed skill's own version from the sibling SKILL.md frontmatter
- * (this file lives at `<skill>/scripts/context.mjs`). Returns null when the
- * frontmatter is missing or unreadable.
- */
-function readLocalSkillVersion() {
-  try {
-    const here = path.dirname(fileURLToPath(import.meta.url));
-    const skillMd = path.join(here, '..', 'SKILL.md');
-    const content = fs.readFileSync(skillMd, 'utf-8');
-    const match = content.match(/^version:\s*(.+)$/m);
-    return match ? match[1].trim().replace(/^["']|["']$/g, '') : null;
-  } catch {
-    return null;
-  }
-}
-
-function readUpdateCache() {
-  try {
-    return JSON.parse(fs.readFileSync(UPDATE_CACHE_PATH, 'utf-8'));
-  } catch {
-    return {};
-  }
-}
-
-function writeUpdateCache(cache) {
-  try {
-    fs.mkdirSync(path.dirname(UPDATE_CACHE_PATH), { recursive: true });
-    fs.writeFileSync(UPDATE_CACHE_PATH, JSON.stringify(cache));
-  } catch {
-    // Best-effort: a read-only home dir just means we re-poll next session.
-  }
-}
-
-/** Compare dotted numeric versions. Returns >0 when a is newer than b. */
-function compareSemver(a, b) {
-  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
-  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
-
-async function fetchLatestSkillVersion() {
-  // STEP-0A CONTAINMENT (2026-08-24): sjaelvuppdateringsvaegen aer avstaengd.
-  // En vendorerad, lastbaerande skill faar aldrig ringa hem eller foeresla
-  // `npx impeccable update` (opinnad) in i produktionsauktoritet. Uppstroems-
-  // aendringar naar Nortropic endast via Radar -> kandidat -> diff -> promotion.
-  // Aterstaells medvetet av M1-reparation R4 (fork-and-freeze-beslutet), aldrig
-  // genom att ta bort denna guard i foerbifarten.
-  return null;
-  /* neutraliserad uppstroems-kod (behaallen foer diff-sparbarhet):
-  try {
-    const res = await fetch(`${UPDATE_HOST}/api/version`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return typeof data?.skills === 'string' ? data.skills : null;
-  } catch {
-    return null; // offline, sandboxed, timed out, or bad JSON: all non-fatal
-  }
-  */
-}
-
-function buildUpdateDirective(localVersion, latestVersion) {
-  return (
-    `UPDATE_AVAILABLE: A newer Impeccable skill is available ` +
-    `(installed v${localVersion}, latest v${latestVersion}). ` +
-    `Before continuing, ask the user once: "A newer Impeccable (v${latestVersion}) is available. ` +
-    `Update now? It runs \`npx impeccable update\`." ` +
-    `If they agree, run \`npx impeccable update\` (the update applies to the next session, not this one). ` +
-    `Either way, continue the current task without waiting, and do not raise this again.`
-  );
-}
-
-/**
- * Best-effort update directive for the boot output. Returns a string to append
- * or null. Polls the version endpoint at most once per day (cached globally in
- * the user's home dir) and re-surfaces a given version at most once per week so
- * the agent never nags. Opt out entirely with IMPECCABLE_NO_UPDATE_CHECK=1.
- */
-// Read the unified config's top-level `updateCheck` (local overrides shared).
-// Inlined rather than importing hook-lib so the boot path stays lightweight.
-function updateCheckDisabledByConfig(cwd = process.cwd()) {
-  let value;
-  for (const name of ['config.json', 'config.local.json']) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(path.join(cwd, '.impeccable', name), 'utf-8'));
-      if (raw && typeof raw === 'object' && typeof raw.updateCheck === 'boolean') value = raw.updateCheck;
-    } catch { /* missing or malformed: ignore */ }
-  }
-  return value === false;
-}
-
-async function computeUpdateDirective(now = Date.now()) {
-  try {
-    if (process.env.IMPECCABLE_NO_UPDATE_CHECK) return null;
-    if (updateCheckDisabledByConfig()) return null;
-    const localVersion = readLocalSkillVersion();
-    if (!localVersion) return null;
-
-    const cache = readUpdateCache();
-
-    // Poll the network only when the throttle window has elapsed. Stamp
-    // lastCheck even on failure so an offline machine doesn't poll every boot.
-    if (!cache.lastCheck || now - cache.lastCheck > CHECK_INTERVAL_MS) {
-      const latest = await fetchLatestSkillVersion();
-      cache.lastCheck = now;
-      if (latest) cache.latestVersion = latest;
-      writeUpdateCache(cache);
-    }
-
-    const latest = cache.latestVersion;
-    if (!latest || compareSemver(latest, localVersion) <= 0) return null;
-
-    // Anti-nag: surface a given version at most once per RENOTIFY window.
-    if (cache.notifiedVersion === latest && cache.notifiedAt && now - cache.notifiedAt < RENOTIFY_INTERVAL_MS) {
-      return null;
-    }
-    cache.notifiedVersion = latest;
-    cache.notifiedAt = now;
-    writeUpdateCache(cache);
-
-    return buildUpdateDirective(localVersion, latest);
-  } catch {
-    return null;
-  }
-}
 
 async function cli() {
   let cliOptions;
@@ -901,7 +767,6 @@ async function cli() {
     process.exit(0);
   }
   const ctx = loadContext(process.cwd(), cliOptions);
-  const updateDirective = await computeUpdateDirective();
 
   if (!ctx.hasProduct) {
     // Direct stdout message instead of relying on empty output as a signal
@@ -918,7 +783,6 @@ async function cli() {
     if (shouldWarnMissingTarget(ctx, targetProvided, targetExists)) {
       parts.push(buildMissingTargetDirective());
     }
-    if (updateDirective) parts.push(updateDirective);
     process.stdout.write(parts.join('\n\n---\n\n') + '\n');
     process.exit(0);
   }
@@ -955,7 +819,6 @@ async function cli() {
       );
     }
   }
-  if (updateDirective) parts.push(updateDirective);
   process.stdout.write(parts.join('\n\n---\n\n') + '\n');
 }
 
