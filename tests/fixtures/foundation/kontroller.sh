@@ -34,9 +34,17 @@ if grep -q "KVARANTÄN" "$WDG"; then
   grep -q 'raw.githubusercontent.com/[^ ]*@\?main\|Use WebFetch to retrieve' "$WDG" && fail "K3: kvarantänen innehåller kvarlevande hämtnings-instruktion"
   echo "K3 PASS: kvarantän inert (fullt innehåll återställs som pinnade bytes i R3)"
 else
-  grep -q 'raw.githubusercontent\|WebFetch' "$WDG" && fail "K3: efter R3 får ingen hämtnings-instruktion finnas"
-  grep -q 'commit' "$ROT/vendored-skills/web-design-guidelines/VENDORED.md" || fail "K3: R3-innehåll utan pinnad commit-proveniens"
-  echo "K3 PASS: pinnade bytes med proveniens"
+  # R3-läget: pinnade lokala bytes. Fyra mekaniska krav, alla fail-closed.
+  grep -q 'raw.githubusercontent\|WebFetch\|@main\|curl \|wget \|latest' "$WDG" && fail "K3: efter R3 får ingen hämtnings-/latest-instruktion finnas i adaptern"
+  REF="$ROT/vendored-skills/web-design-guidelines/references/upstream-command.md"
+  VMD="$ROT/vendored-skills/web-design-guidelines/VENDORED.md"
+  [ -s "$REF" ] || fail "K3: pinnade regelbytes saknas (references/upstream-command.md)"
+  grep -q 'e3d624baaf29dc1fc645aff3e38f03e564d2d6b1' "$VMD" || fail "K3: VENDORED.md saknar den ägar-utpekade commit-SHA:n"
+  VANTAD=$(sed -n 's/.*R3-PAYLOAD-SHA256: \([0-9a-f]\{64\}\).*/\1/p' "$VMD" | head -1)
+  [ -n "$VANTAD" ] || fail "K3: VENDORED.md saknar R3-PAYLOAD-SHA256-ankare (ankarkrav)"
+  FAKTISK=$(shasum -a 256 "$REF" | awk '{print $1}')
+  [ "$FAKTISK" = "$VANTAD" ] || fail "K3: payloadbytes matchar inte registrerad hash ($FAKTISK != $VANTAD)"
+  echo "K3 PASS: pinnade bytes @ e3d624ba med verifierad payloadhash + proveniens"
 fi
 
 # ---- K4: impeccable kan inte självuppdatera ---------------------------------
