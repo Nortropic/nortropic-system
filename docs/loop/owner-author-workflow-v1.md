@@ -439,3 +439,115 @@ single parser in `controller/authority/core.py`. Publication is implemented by t
 `publication_authority` object is mandatory rather than inferred from session prose. It performs no
 push or merge unless every pre-publication identity check succeeds, and it returns success only
 after its own fetched-main, ordered-parent and tree proof succeeds.
+
+<!-- H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_CONTRACT_V1 -->
+## H-036 pre-sandbox runtime supervisor
+
+H-036 depends exactly on published H-034. The prerequisite publication is merge
+`b17d0941f9376505f2bf76f4ce10b3019d978054`, tree
+`4a22c991b2bba098239f492bd9fc1e06cc8cd1c6`, with ordered parents `deee7955…` then
+reviewed candidate `e60fbc40…`. The persisted independent READY review is bound by SHA-256
+`2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474`; H-034's gate and
+registry remain exact published bytes. Its `--r15-registry-refreeze` checks were intentionally
+time-scoped to require H-036 absent before H-034 publication. Once this task and gate exist those
+two early-phase labels are expected RED: that completed-phase result is not a post-H-036 green
+regression, cannot mask drift, and does not authorize editing H-034.
+
+The only owner product surface is `controller/launch/cli`,
+`controller/launch/runtime_snapshot.py`, and `config/python-runtime-authority-v2.json`. The
+TEST_AUTHOR surface is only the task spec, new gate, this authority record, decision log and drift
+record. Product acceptance is `verify/bin/h-036-exit --product <base-sha> <candidate-sha>` on an
+un-nested authorized macOS host. It binds a clean direct single child from raw Git objects, exactly
+those three paths and modes `100755`, `100644`, `100644`, no renames, at most 2400 cumulative added
+lines, and unchanged frozen task/gate bytes. Once any product byte exists, an unbound no-argument
+checkout returns `PRODUCT_IDENTITY_REQUIRED`; only the exact object-bound invocation can earn
+subject credit. H-017 is preserved historical evidence only and never
+credits the runtime subject.
+
+The first authoritative call is the protected same-byte Python 3.12.13 snapshot with exact
+`-I -S -B`, the live launcher and the existing `run <workspace> <envelope> <timeout> -- <argv>`
+interface. V2 inherits the exact v1 authority file and digest; `-B` is a distinct additive no-pyc
+invariant, not a reinterpretation of v1's `-I -S`. The launcher stable-opens and nofollow-binds the
+v1 Python source, live launcher/helper/config and live Git root by bytes, mode, dev/ino and adjacent
+final rehash. It creates a fresh `/private/tmp/.nortropic-h036-runtime-*` family, copies the exact
+Python bytes into it, protects root and snapshot as `0500`, binds the socket `0600`, and starts the
+exact live Python helper as the sole pre-sandbox supervisor. System Python 3.9, a relocated
+launcher/helper, path lookup, config/session/socket override, and a native or external broker are
+not equivalent mechanisms. The dynamic gate proves private-runtime mode/digest/symlink and ignored
+helper/config/profile/live-root override negatives. It does not overclaim a universal same-UID
+pre-sandbox race experiment: reachability and order of same-opened live-root/config/helper identity
+and final-use rehash are mandatory immutable-object review findings.
+
+The supervisor receives a closed controller-derived environment (`LANG=C`, `LC_ALL=C`,
+`PATH=/usr/bin:/bin`), exactly its control/ready descriptors under `close_fds`, and no ambient
+credential, loader, Git, Python or requester path authority. Requests contain strict bounded framed
+bytes and exactly three already-open stdio descriptors through `SCM_RIGHTS`; they never name a log,
+request or result path. Caller cwd must already exist. The supervisor neither creates it nor
+PATH-resolves a target. Target resolution, sanitized environment installation and exec happen only
+inside the exact confined helper. At the top-level bootstrap only, the launcher may consume the
+preexisting nofollow-bound `NORTROPIC_STAGING_ROOT` and exact regular
+`NORTROPIC_RESULT_SINK`; both names, their paths and `NORTROPIC_TRUST_ROOT` are stripped from every
+target environment and become immutable supervisor-owned profile state, never nested request data.
+The same sanitizer applies at top level and every nested level; target `PATH` is exactly
+`/usr/bin:/bin`, while DYLD/PYTHON/Git/GH/GitHub/Slack/loader secrets never reach either target.
+
+Each target receives a fresh session capability through the protected AF_UNIX endpoint. A request
+must bind the inherited session, capability and fresh nonce. `LOCAL_PEERPID` and
+`LOCAL_PEERTOKEN` PID/euid/pidversion must equal the current connection's claimed peer identity;
+they are anti-spoof evidence, not profile or ancestry authority. A legitimate nested CLI or
+code-mode-host is a different descendant PID, so equality with the originally launched outer
+leader is explicitly forbidden. The capability selects one supervisor-owned root/profile state.
+Clients can send only a same-or-descendant workspace selector, argv, environment and envelope
+bytes; they cannot send profile text/digest, trust/live/runtime roots, Git/sink exceptions or
+authority paths. Missing, forged, replayed, stale, cross-session, wrong-peer-claim, malformed,
+wrong-FD-cardinality, partial or unknown-key requests reject before a worker effect. Direct
+provider use of the socket therefore can only preserve or narrow the server-owned policy bound to
+that capability, never create broker or host authority.
+
+The cumulative profile is an exact two-member family, never an open-ended optional template. The
+base bytes (SHA-256 `848f5f8b13b6773d9a8b6780838c3bb31e82c06915d762ce47d5a8c97acd4844`) are selected iff both
+staging and sink are absent. The base-plus-exact-staging-suffix bytes (SHA-256
+`0e543357a7ac4f14b5f8b1a04973c267180ee0fa6e5606d41034ade2a42cd33d`) are selected iff both
+prevalidated values are present. Partial state, another digest or another selection rejects. Both
+keep every ancestor live/trust/runtime/Git/workspace denial, never grow a Git or sink exception,
+and narrow nested writes to the nofollow-resolved child workspace. The staging variant permits
+file data at only the already-open exact sink;
+the root is denied `file-write*` and only `file-write-data` on one existing regular nofollow nlink-1
+literal sink is reallowed. Readback must equal the target bytes. Sibling create/write, sink or root
+rename/unlink/move, mkdir, hardlink and chmod/metadata remain denied. Sink-outside-staging,
+missing/nonregular/symlink/hardlink sink and staging overlap with live/trust/Git/runtime/workspace all
+reject before launch. `/var` and `/private` aliases bind the same dev/ino; overlaps and escape
+components reject. Duplicate, oversized, partial or trailing request frames spawn no child, and the
+connection plus every controller-owned resource is cleaned on rejection. The
+pre-sandbox supervisor invokes the pinned absolute `/usr/bin/sandbox-exec`, private Python and live
+helper under a closed environment. The post-profile syscall proof is mandatory: the exact helper
+argv is `confined-exec-v1 --proof-fd <decimal>`. Before target env or exec, that helper must
+demonstrate real permitted scratch/exact-sink writes and denied
+create/write/rename/unlink/hardlink/mkdir/chmod operations at every cumulative protected boundary.
+It returns the exact `profile-proof-v1` receipt, including child PID/euid/pidversion, session,
+request nonce, selected profile digest, effect map and canonical proof digest, then pauses. The
+supervisor sends `go-v1` only after independently validating the receipt; the gate observes the
+paused helper command, allowed bytes, unchanged protected canaries and absence of `TARGET_STARTED`
+before releasing the barrier. Both top-level and nested passive targets must start with that record,
+receive a fresh 64-hex capability in the same session at parent level plus one, receive a private
+regular nofollow `NORTROPIC_KUVERT` containing exactly stdin bytes, and see only stdio. A direct
+sandbox-exec target or proof/receipt claim without those effects cannot pass. An inner direct
+sandbox-exec control still returns 71 with
+`sandbox_apply: Operation not permitted`, while the supervisor-owned combined child succeeds.
+There is no EPERM-to-Popen fallback and no generic "already sandboxed" equivalence.
+
+Success preserves target stdout byte-for-byte. Nonzero, self-SIGTERM and timeout each create and
+report a same-process-group child; controller SIGTERM and supervisor death do the same. Every known
+leader and child must be gone. Success, launch failure, nonzero, timeout, SIGTERM, disconnect and
+supervisor death each revoke handoff and clean the known leader/process group plus
+all controller-owned socket, snapshot, handshake, profile and runtime-root resources. H-036 does
+not claim complete absence of an escaped same-UID descendant on macOS. Instead a setsid survivor
+must retain the installed policy and be unable to mutate live, trust or runtime roots; the later
+H-032 protected materialization boundary closes late workspace effects.
+
+The no-argument preproduct gate has one authorized RED only:
+`A_H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_OPERATIONAL` /
+`RUNTIME_SNAPSHOT_AND_V2_AUTHORITY_ABSENT`. Its reference-host lane proves architecture
+satisfiability but is always `JUDGE_ONLY` and cannot credit product. H-032 is byte-preserved during
+H-036. H-032 later depends exactly on published H-036, drops ordinary launcher write authority,
+and refreezes its provider effects before H-031 is rebound.
