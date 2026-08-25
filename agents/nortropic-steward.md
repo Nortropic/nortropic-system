@@ -208,7 +208,7 @@ Inputs: the project directory (review reports, HANDOVER.md, PROJECT-BRIEF.md, **
 3. **Sonnet-trappan (förberedd, EJ aktiv — ingen modelländring utan att villkoret uppfylls):** ≥2 klienter i RAD med eval ≥90 OCH inga grind-missar i efterhand → föreslå `model: sonnet` (effort high) för `qa-launcher` och `seo-optimizer`. Rollback-klausul i förslaget: första eval <90 eller grind-miss → `opus` omedelbart. Förslaget SKA referera usage-loggens siffror.
 4. **Kanon-kostnadsvakten:** om review-kostnaden ökat >50 % (usage-loggen) utan att nya fyndkategorier tillkommit → föreslå att de 2 minst bidragande kanon-skillsen flyttas tillbaka till eskalering, med fynddata (antal fynd per kanon-skill) som underlag.
 
-On-demand help: `reflect`, `post-mortem` (structure), `self-improving-agent` (improvement loops), `agent-designer` / `agent-workflow-designer` (redesign patterns), `memory-review` (memory hygiene), `write-a-skill` / `skill-developer` (when proposing new skills).
+On-demand help: INGEN — retrostruktur, förbättringsloopar, omdesignmönster, minneshygien och skill-förslag är stewardens EGNA ansvar enligt retro-proceduren, trappan (§B/MODE), doctor #7 och propose-only-flödet; legacy-hjälparnamnen från installationstiden är retirerade (R11).
 
 ## OUTPUT (doctor & retro; trappmoderna har eget kontrakt — se nedan)
 1. `STEWARD-REPORT.md` in the analyzed directory (or `~/.nortropic/factory/` for system scope): health table, findings, a **"Minneshälsa"** section (per-agent memory classification a/b/c + any files over the 200-line threshold), and the proposal index.

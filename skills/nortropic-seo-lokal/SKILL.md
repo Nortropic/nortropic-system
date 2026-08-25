@@ -53,4 +53,4 @@ Priority order: Google Företagsprofil → hitta.se → eniro.se → reco.se →
 DNS TXT verification BEFORE launch → sitemap submitted at cutover → URL-inspect Hem + top service pages → watch Page indexing report for 2 weeks → then monthly: Performance query mining (new FAQ/area page ideas from real queries).
 
 ## On-Demand Escalation
-`seo-local` (general local SEO) · `seo-schema` (schema deep work) · `seo-technical` (crawl/index issues) · `seo-sitemap` · `seo-page` (per-page optimization) · `seo-content` (content briefs) · `seo-images` · `seo-hreflang` (only if multi-language actually exists) · `local-seo-manager` (GBP management practices) · `seo-google` / `seo-maps` (Google surface specifics)
+INGA — denna skill ÄR normkällan: lokal SEO, schema, crawl/index, sitemap, per-sida-optimering, innehållsbriefer, bild-SEO, GBP-praxis och Google-ytor täcks av referensmaterialet här och exekveras av `seo-optimizer`-agenten; legacy-subskillnamnen från installationstiden är retirerade (R11)

@@ -36,7 +36,7 @@ Before starting: read your project memory — target keywords already chosen, de
 - AI-crawlers i robots: `GPTBot`/`PerplexityBot`/`ClaudeBot`/`OAI-SearchBot` under `Disallow` på **skarp klient** = HIGH — stänger dörren till AI-svar för en kund som vill bli hittad. På TESTKLIENT: inget fynd (total blockering är där korrekt).
 
 ## On-demand escalation
-`seo-local` (local-pack ranking factors) · `seo-schema` (deep structured-data) · `seo-technical` (crawl/indexing/perf-SEO) · `seo-sitemap` (sitemap/robots edge cases) · `seo-page` (single-page on-page optimization) · `seo-content` (content-gap/keyword expansion) · `seo-images` (image SEO/alt) · `local-seo-manager` (multi-location/GBP ops) · `seo-google` (Google SERP features) · `seo-maps` (Maps/GBP ranking) · `seo-hreflang` (only if real language variants exist)
+INGA — local-pack-faktorer, strukturerad data, crawl/indexering, sitemap/robots, on-page-optimering, innehålls-/nyckelordsexpansion, bild-SEO, GBP/Maps-drift och SERP-ytor är denna agents EGNA ansvarsområden (Optimize/Audit/Deliverables/Fix-lägena ovan) med normerna i `nortropic-seo-lokal`; legacy-subskillnamnen från installationstiden är retirerade (R11). Hreflang endast om verkliga språkvarianter finns — då är det ditt eget arbete, ingen hjälpskill.
 
 ## Report format
 Findings as CRITICAL/HIGH/MEDIUM with file:line and concrete fix; audits end with the PASS/FAIL table per page; deliverables mode ends with the two filled documents' paths.
