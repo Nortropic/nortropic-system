@@ -204,6 +204,38 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Nu ser juristen vilka tjänster sajten pratar med (2026-08-26)
+
+Varje sajt vi bygger använder någon utomstående tjänst — en karta, ett bokningsverktyg, en
+företagsprofil. **Lagen kräver att integritetspolicyn räknar upp dem vid namn**, och att
+varje anrop till en utomstående går att förklara.
+
+**Hittills har den som ska kontrollera det fått lista ut det själv** genom att läsa den
+färdiga sajten. Men sajtens egen beskrivningsfil vet det redan — den har bara inte sagt det
+på ett användbart sätt.
+
+**Nu gör den det.** Varje utomstående tjänst bär numera tre saker som avgör om den är ett
+juridiskt ärende:
+
+- **Vilket läge:** är det en *länk ut* (besökaren klickar sig bort), en *inbäddning* (tjänsten
+  laddas in på vår sida och kan sätta kakor), eller bara en *närvaro* som inte laddar
+  någonting alls? Att slå ihop de tre är det farligaste man kan göra — **inbäddningen är
+  den enda som verkligen kostar**, och den försvinner i mängden om alla kallas "extern".
+- **Når besökarens personuppgifter tredje part?**
+- **Krävs samtycke?**
+
+Kontrollen skriver ut en **arbetslista** och stannar där. **Den avgör ingenting juridiskt** —
+det är och förblir en människas beslut, och systemet får aldrig godkänna sig självt på den
+punkten.
+
+**Direkt utfall:** vår egen provsajt visade sig ha en Google Maps-karta inbäddad — precis
+den sortens sak checklistan varnar för. Den står nu på arbetslistan i stället för att
+upptäckas i efterhand.
+
+**Ärligt om gränsen:** beskrivningsfilen är ett *påstående*. Kontrollen fäller om påståendet
+motsäger sig självt, men den kan inte veta vad en tjänst faktiskt gör. Det kräver att man
+mäter den byggda sajtens verkliga trafik.
+
 ## Tre nya provfall: när svaret INTE är en ny sajt (2026-08-26)
 
 Hittills har alla våra provfall handlat om att bygga. Det är en blind fläck: **en fabrik som
