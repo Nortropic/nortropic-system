@@ -176,6 +176,34 @@ uppstädning, det vore ett bortglömt krav.
 **Ärligt om gränsen:** vakten bevakar sex namngivna saker. Att kärnan nu är universell i
 stort är inte bevisat — bara att de sex är på rätt plats.
 
+## Regler för hur fabrikens robotar får byta hjärna (2026-08-26)
+
+Robotarna drivs av olika AI-modeller. Förr eller senare kommer en nyare modell, och frågan
+blir: är den bättre? Det låter enkelt och är det inte — för den som svarar på frågan är
+samma system som ska bytas ut.
+
+**Därför finns nu skrivna regler**, hämtade ur den frusna planen: elva lagar för hur en
+sådan jämförelse får gå till. De viktigaste i klartext:
+
+- **Eleven får inte flytta målstolparna.** Facit ligger i skyddade filer som bara du kan
+  ändra. Jämförelsen läser dem; den kan inte skriva om dem.
+- **Räkna först, tyck sen.** Det som går att mäta med en siffra ska mätas så. En
+  bedömning får bara användas där ingen siffra finns.
+- **Oenighet bevaras.** Om två bedömare tycker olika blir svaret "oense" — aldrig ett
+  medelvärde som döljer att de var det.
+- **Slut budget är inte godkänt.** Att pengarna tog slut betyder att provet inte gick att
+  avgöra, inte att det gick bra.
+- **Jämförelsen befordrar aldrig.** Den lämnar ett underlag. Beslutet är ditt.
+
+**Och en ärlighet som är hela poängen:** av elva lagar går bara fem att kontrollera
+mekaniskt. Tre handlar om bedömningar en maskin inte kan göra, och tre kan bara kontrolleras
+till formen — att rapporten har rätt rubriker, inte att det som står under dem verkligen
+hände. Det står utskrivet i kontraktet, och en kontroll faller om någon senare skulle
+skriva om en svår lag till en lätt.
+
+**Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
+pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
+
 ## Vill du djupare?
 
 Det här var översikten. Vill du förstå exakt hur något fungerar, fortsätt till det tekniska lagret:
