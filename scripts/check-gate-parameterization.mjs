@@ -144,7 +144,10 @@ check('Reselinsen prövar VARJE resa end-to-end, inte bara primärhandlingen',
 check('Reselinsen kräver riktig interaktion, inte utseende',
   /en resa som bara ser rätt ut\s*är inte prövad/i.test(flat(resGate)), 'kravet saknas')
 check('v1-profil utan resor blockerar INTE (SAKNAS_I_V1)',
-  /Saknas `obligatoriskaResor`[\s\S]{0,80}INTE ett fynd/.test(flat(resGate)) &&
+  // Backtickarna i källan är ESCAPADE (\`) sedan parsgrinden avslöjade att oescapade
+  // backticks inuti mall-literaler bröt filen. Mönstret måste därför tåla båda formerna
+  // — annars vaktar det stavningen i stället för regeln.
+  /Saknas \\?`obligatoriskaResor\\?`[\s\S]{0,80}INTE ett fynd/.test(flat(resGate)) &&
   /SAKNAS_I_V1/.test(resGate),
   'bakåtkompatibiliteten saknas i reselinsen')
 check('Reselinsen dubbelrapporterar inte primärhandlingen',

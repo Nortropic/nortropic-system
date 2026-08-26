@@ -520,6 +520,69 @@ forbudOmArtefaktSaknas({
   }
 }
 
+// ── I. LÄGESDEFAULTEN (S12) ───────────────────────────────────────────────────
+// Bunden till en KÄLLNIVÅMARKÖR för defaulten — inte till grindens exekverade beteende.
+// Det beteendet bevisas av W2b–W2e i `check-autobygg-delegation`. Skillnaden är verklig:
+// en omskrivning som lämnar den ankrade raden orörd men skuggar defaulten ovanför passerar
+// här och dödas där. Kontrollerna delar arbete med avsikt; att bygga en andra
+// grindexekverare i en dokumentationsvakt vore en till sak att hålla synkad.
+{
+  const wf2 = 'workflows/nortropic-autobygg.js'
+  const kod2 = utanKodkommentar(readFileSync(join(ROT, wf2), 'utf8'))
+  const blocket = kod2.slice(kod2.indexOf('function obemannatGate'), kod2.indexOf('function beslutEfterPlan'))
+  if (!blocket) { console.error('ODÖMBART: obemannatGate kunde inte avgränsas'); process.exit(2) }
+  const defaultObemannad = /angivet === ''\s*\|\|\s*angivet === 'obemannat'\s*\)\s*return \{ stop: false/.test(blocket)
+  // YTLISTAN DELAS MED SYSTERGRUPPEN H. Grupp I utelämnade `docs/02-agenter.md` medan H
+  // redan behandlade den som operatörsyta — och den enda kvarvarande falska utsagan om
+  // lägesdefaulten satt precis i filen de två listorna var oense om. Att rätta raden
+  // rättar raden; att dela listan stänger klassen.
+  for (const yta of ['docs/01-oversikt.md', 'docs/00-guide.md', 'docs/02-agenter.md', 'agents/project-planner.md']) {
+    const t = yta.startsWith('agents') ? ren(las(yta)) : YTOR[yta]
+    if (defaultObemannad) {
+      if (/default\s+\*{0,2}`?obemannat`?|[Ss]aknas[^.]{0,60}obemannat|obemannat är (numera )?normalvägen/i.test(t))
+        ja(`I-default [${yta}]: den vända defaulten är utskriven`)
+      else nej(`I-default [${yta}]`, `koden defaultar till obemannat men ${yta} säger det inte`)
+    } else {
+      if (/default\s+\*{0,2}`?obemannat`?|obemannat är (numera )?normalvägen/i.test(t))
+        nej(`I-default [${yta}]`, `${yta} påstår att obemannat är default men koden gör det inte — ÖVERDOKUMENTATION`)
+      else ja(`I-default [${yta}]: koden defaultar inte till obemannat och ${yta} påstår det inte`)
+    }
+  }
+  // INGEN YTA FÅR PÅSTÅ DEN GAMLA DEFAULTEN. Grupp I prövade bara NÄRVARON av det nya
+  // påståendet — samma blindhet som fälldes i grupp H, och som jag rättade där men inte
+  // här. En yta kan därför bära båda utsagorna samtidigt och passera. Meningsskopat:
+  // en historisk rad ("förut var defaulten bemannat") ska inte fällas.
+  if (defaultObemannad) {
+    for (const yta of ['docs/01-oversikt.md', 'docs/00-guide.md', 'docs/02-agenter.md', 'agents/project-planner.md']) {
+      const rat = yta.startsWith('agents') ? las(yta) : RATEXT[yta]
+      const varg = meningar(rat).find((m) =>
+        /default\w*\s+(är\s+)?\*{0,2}`?bemannat`?|utelämnad[^.]{0,40}=\s*\*{0,2}`?bemannat`?/i.test(m) &&
+        // Undantaget gäller ÄKTA historik, inte versionsmarkörer. `v16` stod först med i
+        // listan och matchade rubriken "**v16:** plannern läser…" — alltså den mening som
+        // BAR det falska påståendet. Ett undantag som råkar täcka fallet det ska fånga är
+        // värre än inget undantag.
+        //
+        // ÄRLIG GRÄNS: ventilen är ordbaserad och kan bäras av ett LEVANDE påstående i samma
+        // mening — "Defaulten är bemannat, som tidigare nämnts" passerar. Det är samma FORM
+        // som v16-buggen men en svagare instans: den kräver en författarsammanträffning i
+        // stället för att täcka fallet med säkerhet. Meningsskopningen är bekräftad: ett
+        // `tidigare` i GRANNMENINGEN skyddar inte.
+        !/\bförut\b|\btidigare\b|före S12|historisk|fram till S12/i.test(m))
+      if (varg) nej(`I-ingen-gammal-default [${yta}]`,
+        `påstår att defaulten är bemannat, men koden defaultar till obemannat. Meningen: "${varg.slice(0, 100)}…"`)
+      else ja(`I-ingen-gammal-default [${yta}]: ingen förlegad defaultutsaga`)
+    }
+  } else {
+    for (const yta of ['docs/01-oversikt.md', 'docs/00-guide.md', 'docs/02-agenter.md', 'agents/project-planner.md'])
+      ja(`I-ingen-gammal-default [${yta}]: koden defaultar inte till obemannat — utsagan är då SANN`)
+  }
+
+  // Fail-closed på okänt läge måste stå kvar — en vänd default utan den vore en gissning.
+  if (/oklassificerat: true[\s\S]{0,200}okänt lägesvärde|okänt lägesvärde[\s\S]{0,200}oklassificerat/.test(blocket))
+    ja('I-oklassificerat-läge: ett okänt lägesvärde fail-closar')
+  else nej('I-oklassificerat-läge', 'ett okänt lägesvärde fail-closar inte längre — en vänd default utan fail-closed är en gissning')
+}
+
 // ── G. VAKTERNAS EGEN ÄRLIGHET ────────────────────────────────────────────────
 // Kontrollskripten är inte grindkopplade. Så länge det är sant måste README säga
 // det, annars läser en ny operatör en handkörd kontroll som en grind.
@@ -574,7 +637,7 @@ forbudOmArtefaktSaknas({
 // över en. FORVANTAT är därför skriven för hand och jämförs mot faktiskt antal.
 // Faller de isär är körningen ODÖMBAR: en vakt som tappat kontroller vet inte längre
 // vad dess grönt betyder, och får då inte påstå någonting alls.
-const FASTA = 57   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12
+const FASTA = 66   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)

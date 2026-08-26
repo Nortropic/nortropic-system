@@ -120,7 +120,22 @@ function toppnycklar(block) {
         || /^([A-Za-zÅÄÖåäö_$][\w$]*)\s*:/.exec(bit)
         || /^['"]([^'"]+)['"]\s*:/.exec(bit)
         || /^([A-Za-zÅÄÖåäö_$][\w$]*)\s*(?=[,}])/.exec(bit)
-      if (m && (k === 0 || /[{,\s]/.test(block[k - 1]))) {
+      // SHORTHAND-GRENEN FÅR INTE MATCHA ETT VÄRDE. `stop: true,` gav annars nyckeln
+      // "true", så två `: true`-VÄRDEN i samma literal rapporterades som duplicerad
+      // NYCKEL — ett falskt positivt som legat latent sedan S10 och som slog till först
+      // när ett skeppat literal fick två booleska fält. Ett värde föregås av `:`;
+      // JS-literalerna är dessutom aldrig shorthand-nycklar.
+      // TITTA BAKÅT PÅ KOD, INTE PÅ KOMMENTAR. Första versionen läste rå text, så en
+      // radkommentar som SLUTADE med kolon — vilket den här kodbasen gör hela tiden
+      // ("Tre utfall, och det tredje är det som gör vändningen säker:") — fick nästa
+      // nyckel att se ut som ett värde och försvinna ur mängden. Då tappades ÄKTA
+      // dubbletter, inte bara det falska positivet. Kommentarer strippas därför först.
+      const foreKod = block.slice(0, k)
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
+      const foreg = foreKod.replace(/\s+$/, '').slice(-1)
+      const arVarde = foreg === ':' || ['true', 'false', 'null', 'undefined'].includes(m && m[1])
+      if (m && !arVarde && (k === 0 || /[{,\s]/.test(block[k - 1]))) {
         ut.push(m[2] !== undefined ? m[2] : m[1]); k += m[0].length - 1
       }
     }
@@ -358,10 +373,25 @@ check('W2 obemannatGate är inkopplad före plan-beslutet',
   /const modeStop = obemannatGate\(plan && plan\.lage\)/.test(src) &&
   /modeStop\.stop[\s\S]{0,120}decision: HARD_STOP/.test(src),
   'lägesgrinden är bortkopplad eller ger inte HARD_STOP')
-check('W2b obemannatGate stoppar bemannat och släpper obemannat',
-  obemannatGate('bemannat').stop === true && obemannatGate(undefined).stop === true &&
-  obemannatGate('obemannat').stop === false,
-  'lägesgrindens beteende är fel')
+// S12: DEFAULTEN ÄR VÄND. Den gamla kontrollen krävde att en SAKNAD rad stoppade;
+// den ersätts av en starkare som prövar alla tre grenarna, inklusive fail-closed på
+// okänt värde. Att bara vända den gamla hade lämnat skräpvärden otestade — och en
+// vänd default utan fail-closed byter ett stopp mot en gissning.
+check('W2b saknad `Läge:`-rad ⇒ obemannat (ny default)',
+  obemannatGate(undefined).stop === false && obemannatGate('').stop === false &&
+  obemannatGate('   ').stop === false && obemannatGate(null).stop === false,
+  'en saknad eller tom lägesrad släpper inte igenom obemannat')
+check('W2c `bemannat` stoppar fortfarande vid nod 3',
+  obemannatGate('bemannat').stop === true && obemannatGate('bemannat').oklassificerat === false,
+  'uttryckligen begärt bemannat stoppar inte, eller markeras felaktigt som oklassificerat')
+check('W2d `obemannat` släpps igenom',
+  obemannatGate('obemannat').stop === false, 'uttryckligt obemannat släpps inte igenom')
+check('W2e okänt lägesvärde ⇒ ODÖMBART stopp, aldrig den autonoma vägen',
+  ['obeman', 'BEMANNAT', 'auto', 'obemannat!', 'x', 0, {}, []].every(v => {
+    const r = obemannatGate(v)
+    return r.stop === true && r.oklassificerat === true
+  }),
+  'ett okänt lägesvärde tolkas som ett läge i stället för att fail-closa')
 
 // W3 — Del-C: ouppfyllt förkrav HARD_STOPar, stateful glidning ROUTAR, och båda avbryter.
 check('W3 Del-C skiljer ouppfyllt förkrav (HARD_STOP) från stateful glidning (ROUTE)',
@@ -552,7 +582,7 @@ check('W7d deferredQuestions utesluter blockerande frågor',
   // EXAKT ANTAL, inte golv. `>= 12` mot faktiska 38 var 26 i marginal — samma defekt
   // som W5 och W7b just rättats för, upprepad i samma commit. Ett golv släpper igenom
   // att en literal FÖRSVINNER ur mängden, vilket är precis hur `return ( {` undkom.
-  const LITERAL_FORVANTAT = 38
+  const LITERAL_FORVANTAT = 39
   check('D1 objektliteraler i returer/loggskrivningar har hittats (ankaret bevisat)',
     block.length === LITERAL_FORVANTAT,
     `${block.length} literaler hittade, ${LITERAL_FORVANTAT} förväntades — mängden har ändrats eller mönstret tappat ankaret`)
@@ -570,7 +600,7 @@ check('W7d deferredQuestions utesluter blockerande frågor',
 // kontroll per härlett fält, så nämnaren beror på den VAKTADE filen. `FALT_FORVANTAT`
 // låser den delen separat, men den som ändrar beslutsfunktionens fältmängd måste ändra
 // TVÅ tal medvetet, inte ett.
-const FORVANTAT = 107
+const FORVANTAT = 110
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)

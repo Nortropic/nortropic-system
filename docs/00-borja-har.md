@@ -440,3 +440,24 @@ Och deploy är precis som förut. Juridiksigneringen och publicera-knappen är d
 
 Skillnaden i en mening: **det är inte gränserna som flyttades, det är väntandet som togs
 bort.**
+
+## Obemannat är numera normalvägen (S12, 2026-08-26)
+
+Förut fungerade det så här: fabriken körde **bemannat** om du inte sa något annat, och
+obemannat fick du be om genom att skriva en särskild rad i kundpappret. Autonom drift var
+alltså undantaget.
+
+Nu är det tvärtom. **Saknas raden kör fabriken obemannat.** Vill du ha det gamla flödet —
+med stoppet där du godkänner strategin innan bygget — skriver du `Läge: bemannat`.
+
+Det låter som en liten sak men det ändrar vad som är standard: förut behövde autonomin
+begäras, nu behöver den avbrytas.
+
+**Det som INTE ändrades:** juridiksigneringen och publicera-knappen är fortfarande dina, i
+båda lägena. Fabriken deployar aldrig själv.
+
+**Och en detalj som är viktigare än den låter:** skriver du något annat än `obemannat`
+eller `bemannat` — en felstavning, ett tomt tecken, vad som helst — så stannar fabriken och
+säger till. Den gissar inte, och den väljer absolut inte den mer självgående vägen bara för
+att den inte förstod. Att vända en standard utan den regeln vore att byta ett stopp mot en
+gissning.
