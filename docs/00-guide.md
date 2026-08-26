@@ -39,12 +39,13 @@ Från operatörsstolen märks det på tre ställen.
 **Plannern kan komma fram till att en sajt inte är svaret.** Före all planering fäller den
 ett interventionsbeslut med fyra möjliga utfall: NY SAJT, FÖRBÄTTRA BEFINTLIG,
 ICKE-SAJT-ÅTGÄRD eller AVRÅD. Utfallet står i briefens §7.12, och **är det något annat än
-NY SAJT registreras det ALLTID OCKSÅ som en STRATEGISK öppen fråga** — annars hade ett
-obemannat flöde passerat beslutet och byggt just den sajt plannern avrådde från.
+NY SAJT ROUTAR obemannat bort från ny-sajt-lanen i stället för att bygga, och utfallet
+registreras ALLTID OCKSÅ som en STRATEGISK öppen fråga med `blocking: false`.** Beslutet
+läses ur fältet `interventionsbeslut` — inte ur frågan. Registreringen finns för att du
+ska se det, inte för att styra routningen.
 
-Den frågan är dock ICKE-blockerande. **Ingen sajt byggs** — obemannat ROUTAR bort från
-ny-sajt-lanen, registrerar skälet och ger dig ett rekommenderat nästa steg — men det väntar
-inte på ditt godkännande: att inte bygga är ett korrekt beslut systemet redan har mandat
+Den frågan är dock ICKE-blockerande. **Ingen sajt byggs** — skälet registreras och du får
+ett rekommenderat nästa steg — men det väntar inte på ditt godkännande: att inte bygga är ett korrekt beslut systemet redan har mandat
 att fatta. Se **Owner attention ≠ owner approval** ovan.
 
 Det här är den mest värdefulla raden i briefen och den lättaste att skumma förbi. En kund
