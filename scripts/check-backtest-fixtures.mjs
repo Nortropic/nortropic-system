@@ -28,6 +28,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { las as lasFalt, jaNejOkant, foreV2, FUNNET, SAKNAS, SAKNAS_I_V1, ODOMBAR, V1_FALT } from './profil-las.mjs'
 import { join } from 'node:path'
 
 console.log('VAKT: check-backtest-fixtures.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så även en ODÖMBAR körning identifierar sig
@@ -78,7 +79,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '13a2d6199b5ce5ad'
+const FORVANTAD_SIGNATUR = '161517fc1ed84972'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -360,8 +361,17 @@ for (const fx of FIXTURER) {
   }
 
   const profil = profilRatt
+  // VERSIONSVILLKORAT enligt bakåtkompatibilitetslagen. Kravet på v2-fälten gäller
+  // profiler som PÅSTÅR sig vara v2. En v1.x-profil får aldrig fällas enbart på sin
+  // stämpel — det är lagens första led, och en vakt som bröt mot det vore själv den
+  // konsument lagen är skriven mot.
+  const stampel = (falt(profil, 'profilKontraktVersion') || '').replace(/['",\s]/g, '')
+  const gammal = foreV2(stampel)
+  check(P('profile.ts bär en TOLKBAR kontraktsstämpel'), gammal !== null,
+    `stämpeln "${stampel}" går inte att tolka — en otolkbar version får aldrig bortförklara ett saknat fält som legacy`)
   const saknadeV2 = v2Falt.filter((f) => !falt(profil, f))
-  check(P('profile.ts bär samtliga v2-fält som TOPPNIVÅFÄLT'), saknadeV2.length === 0, `saknar ${saknadeV2}`)
+  check(P('profile.ts bär samtliga v2-fält som TOPPNIVÅFÄLT (gäller v1.2.0+)'),
+    gammal === true || saknadeV2.length === 0, `saknar ${saknadeV2}`)
   check(P('profile.ts bär samtliga bevarade v1-fält'),
     v1Falt.every((f) => falt(profil, f)), `saknar ${v1Falt.filter((f) => !falt(profil, f))}`)
   const stateless = falt(profil, 'statelesshet')
@@ -417,6 +427,94 @@ check('B-M6: KAP-LOKAL-SEO aktiveras INTE — SKOPAT, citatagnostiskt',
 check('B-T4: forbjudnaPastaenden är icke-tom och namnger konkreta påståenden',
   (bF('forbjudnaPastaenden').match(/'/g) || []).length >= 8, 'urholkad lista — A-D7/B-T5:s facit försvinner')
 
+// ---- CASE A-LEGACY: kompatibilitetsvägen (A-GAP-3) ------------------------
+// §26 kräver TVÅ vägar för Case A. Detta är den första: ett kundrepo byggt före Site
+// Quality Contract v2. Det svåra ledet är att en FRÅNVARO är okänd, aldrig ett nej.
+const LEG = 'backtests/case-a-legacy'
+const legP = las(`${LEG}/profile.ts`)
+const legR = las(`${LEG}/research.md`)
+const legF = las(`${LEG}/FORVANTAT.md`)
+const legStampel = (falt(legP, 'profilKontraktVersion') || '').replace(/['",\s]/g, '')
+check('AL-1: legacyprofilen bär stämpeln v1.1.0', legStampel === 'v1.1.0',
+  `stämpeln är "${legStampel}" — fixturens hela uppgift är att vara en v1-profil`)
+check('AL-9: doctor #5:s semver-vakt är UPPFYLLD (samma MAJOR, 1.1.0 ≤ 1.3.0)',
+  foreV2(legStampel) === true,
+  'stämpeln tolkas inte som en pre-v2-profil — då prövar fixturen ingenting')
+
+// AL-2: samtliga obligatoriska v1-fält finns.
+const saknadeV1 = V1_FALT.filter((f) => f !== 'noindexCutover' && !falt(legP, f))
+check('AL-2: samtliga obligatoriska v1.1.0-fält finns och är oförändrade', saknadeV1.length === 0,
+  `saknar ${saknadeV1} — en trasig v1-profil prövar bakåtkompatibilitet lika lite som en v2-profil gör`)
+
+// AL-3: v2-fälten SAKNAS — det är poängen, inte ett slarv.
+const v2IFixturen = v2Falt.filter((f) => !V1_FALT.includes(f) && falt(legP, f))
+check('AL-3: v2-fältgrupperna SAKNAS i legacyprofilen', v2IFixturen.length === 0,
+  `${v2IFixturen} finns — en legacyfixtur med v2-fält är ingen legacyfixtur`)
+const saknadeV2Leg = v2Falt.filter((f) => !V1_FALT.includes(f) && !falt(legP, f))
+check('AL-3b: och de är MINST tio till antalet (ankaret bevisat)', saknadeV2Leg.length >= 10,
+  `bara ${saknadeV2Leg.length} v2-fält saknas — hittar detektorn inget att sakna prövar AL-4 ingenting`)
+
+// AL-4/AL-5: LAGENS ANDRA LED. Beteendeprov mot varje faktiskt saknat v2-fält.
+const v1obj = { profilKontraktVersion: 'v1.1.0', primaraktion: {}, gate1Test: 'x', kvitton: [],
+  schemaTyp: [], seoLage: 'lokal', juridikflaggor: [], rostregister: {}, branschAntislop: [], motionNiva: 'subtil' }
+const felaktiga = saknadeV2Leg.filter((f) => lasFalt(v1obj, f, 'v1.1.0').status !== SAKNAS_I_V1)
+check('AL-4: VARJE saknat v2-fält läses som SAKNAS_I_V1', felaktiga.length === 0,
+  `${felaktiga} lästes som något annat — en frånvaro som blir ett svar uppfinner ett påstående kunden aldrig gjort`)
+const somNej = saknadeV2Leg.filter((f) => jaNejOkant(lasFalt(v1obj, f, 'v1.1.0')) !== 'OKÄNT')
+check('AL-5: och jaNejOkant ger OKÄNT för vart och ett — aldrig false', somNej.length === 0,
+  `${somNej} gav ett booleskt svar. false är här det GYNNSAMMA svaret, så felet ser ut som ett godkännande`)
+// Det farligaste enskilda fältet, utpekat: en frånvaro tolkad som "håller inget tillstånd".
+check('AL-5b: statelesshet specifikt ger OKÄNT, inte false',
+  jaNejOkant(lasFalt(v1obj, 'statelesshet', 'v1.1.0')) === 'OKÄNT' &&
+  lasFalt(v1obj, 'statelesshet', 'v1.1.0').status === SAKNAS_I_V1,
+  '"kunden håller inget tillstånd" låter som ett godkännande — det är därför just det här fältet måste vara OKÄNT')
+
+// AL-6/AL-7: SAKNAS är inte SAKNAS_I_V1, och valfritt är inte trasigt.
+const utanGate = { ...v1obj }
+delete utanGate.gate1Test
+check('AL-6: saknat OBLIGATORISKT v1-fält ger SAKNAS, aldrig SAKNAS_I_V1',
+  lasFalt(utanGate, 'gate1Test', 'v1.1.0').status === SAKNAS,
+  'en trasig profil bortförklarad som gammal är en tyst regression')
+check('AL-7: saknat VALFRITT v1-fält (noindexCutover) är ett giltigt tillstånd',
+  lasFalt(v1obj, 'noindexCutover', 'v1.1.0').status === SAKNAS_I_V1,
+  'ett valfritt fält som saknas är inget fel')
+
+// AL-8: en otolkbar stämpel får aldrig bli en ursäkt.
+for (const dalig of ['', 'v1', '1.1.0', 'senaste', 'v2.0.0', undefined]) {
+  check(`AL-8: otolkbar/annan-MAJOR stämpel ${JSON.stringify(dalig)} ger ODÖMBAR`,
+    lasFalt(v1obj, 'statelesshet', dalig).status === ODOMBAR,
+    'en version som inte går att tolka skulle annars bortförklara VARJE saknat fält som legacy')
+}
+check('AL-4b: ett FUNNET fält läses som FUNNET med sitt värde',
+  lasFalt({ seoLage: 'lokal' }, 'seoLage', 'v1.1.0').status === FUNNET &&
+  lasFalt({ seoLage: 'lokal' }, 'seoLage', 'v1.1.0').varde === 'lokal',
+  'läsaren måste kunna svara ja också — annars är den bara en nekmaskin')
+check('AL-5c: jaNejOkant ger true/false för FUNNA booleska värden',
+  jaNejOkant(lasFalt({ x: true }, 'x', 'v1.1.0')) === true &&
+  jaNejOkant(lasFalt({ x: false }, 'x', 'v1.1.0')) === false,
+  'ett funnet false är ett riktigt nej och ska INTE bli OKÄNT — annars blir läsaren värdelös')
+check('AL-4c: läsaren kraschar aldrig på skräp',
+  [null, undefined, 0, 'x', []].every((x) => typeof lasFalt(x, 'seoLage', 'v1.1.0').status === 'string'),
+  'en läsare som kastar är odömbar, inte sträng')
+
+// Fixturens egna dokument
+check('AL: legacyresearchen är skriven mot v3.0.0, inte v3.1.0',
+  /researchkontrakt v3\.0\.0/.test(legR),
+  'är den skriven mot nuvarande kontrakt prövas ingen kompatibilitet')
+check('AL: legacyfixturen är märkt SYNTETISK', /SYNTETISK FIXTUR/.test(legR), 'omärkt fixtur')
+check('AL: legacyfixturen är samma KUND som case-a-lokal',
+  /Ekbergs Rör AB/.test(legR) && /Ekbergs Rör AB/.test(las('backtests/case-a-lokal/research.md')),
+  'olika kunder gör det omöjligt att veta om ett utfall beror på versionen eller på datan')
+check('AL: profilen bär testklient: true (regel 14)', /testklient:\s*true/.test(legP), 'saknas')
+for (const id of ['AL-4', 'AL-5', 'AL-11', 'AL-12', 'AL-GAP-1', 'AL-GAP-2', 'AL-GAP-3'])
+  check(`AL: FORVANTAT namnger ${id}`, new RegExp(`\`${id}\``).test(legF), 'saknas i facit')
+check('AL: FORVANTAT säger ut att AL-11/AL-12 är ODÖMBARA, aldrig gröna',
+  /ODÖMBARA, aldrig gröna/.test(legF),
+  'de två som skulle bevisa drift är EJ KÖRDA — utan den meningen läses en grön körning som ett bevis')
+check('AL-GAP-2: FORVANTAT erkänner att ingen konsument använder läsaren ännu',
+  /prövbar men inte påtvingad/.test(legF),
+  'en lag som är körbar men inte anropad är inte en lag som gäller')
+
 // ---- BETEENDEPROV: backtestköraren mot de riktiga fixturerna ---------------
 // Formkontroller ovan säger inget om beteende. Här KÖRS `kor-backtest.mjs` och dess
 // utfall prövas. Ett utfall som bara SKRIVS UT är ingen kontroll — det ska hävdas.
@@ -446,6 +544,33 @@ if (caseA && caseB) {
     'kravmängden har krympt — då blir Case A:s passage billigare än den ska vara')
   // POSITIVT KONTROLLPROV: skiljer körningen ÖVER HUVUD TAGET på fallen? Två identiska
   // utfall vore ett tecken på att grinden inte läser fixturen.
+  // AL-10: kompatibilitetsvägen körs och dess utfall HÄVDAS. Samma kund, äldre kontrakt.
+  const caseAL = /── CASE AL[\s\S]*?(?=── CASE B)/.exec(kbUt)
+  check('AL-10: kompatibilitetsvägen körs av backtestköraren', !!caseAL,
+    'utan den körs bara en av §26:s TVÅ vägar för Case A')
+  check('AL-10: v1.1.0-profilen når SAMMA utfall som v1.2.0-profilen',
+    /AL-10 KOMPATIBILITETSVÄGEN: v1\.1\.0-profilen når SAMMA utfall/.test(kbUt),
+    'samma kund, olika utfall, och den enda skillnaden är kontraktsversionen — det ÄR bruten bakåtkompatibilitet')
+  // POSITIVT KONTROLLPROV på jämförelsen själv. Att rapporten SÄGER "SAMMA utfall" bevisar
+  // ingenting om jämförelsen alltid säger det — den mutationen överlevde första versionen
+  // av den här kontrollen, som prövade meningen i stället för mekanismen.
+  const sjalvprov = spawnSync(process.execPath, [join(ROT, 'scripts/kor-backtest.mjs'), '--sjalvprov'], { cwd: ROT, encoding: 'utf8' })
+  check('AL-10: jämförelsen klarar sitt POSITIVA kontrollprov (kan säga NEJ)',
+    sjalvprov.status === 0 && /kan skilja likvärdigt från olikvärdigt/.test(sjalvprov.stdout || ''),
+    'en jämförelse som inte kan säga NEJ kan inte heller säga JA — "SAMMA utfall" vore då en tom mening')
+  // ...och att den prövade funktionen faktiskt ANROPAS. Att kontrollprova en funktion som
+  // kringgås på anropsstället är att pröva död kod — `const lika = true` överlevde
+  // kontrollprovet ovan, eftersom provet nådde funktionen men inte anropet.
+  const kbKalla = las('scripts/kor-backtest.mjs')
+  check('AL-10: och jämförelsen ANROPAS på anropsstället',
+    /const lika = likvardiga\(rA, rAL\)/.test(kbKalla),
+    'en kontrollprövad funktion som kringgås är död kod — provet prövar då ingenting som körs')
+  check('AL-12: rapporten skiljer BESLUTSutfall från BYGGT resultat',
+    /jämför BESLUTSUTFALL, inte byggda sajter/.test(kbUt),
+    'utan den meningen läses två lika beslut som bevis för två lika sajter')
+  check('KÖR: rapportens etikett på kapacitetsgrinden är inte längre "EJ i kedjan"',
+    !/EJ i kedjan/.test(kbUt),
+    'KOR-GAP-1 är stängd — en etikett som säger att grinden saknas i kedjan är nu ett falskt påstående i utdata')
   check('KÖR: de två fallen får OLIKA utfall (kontrollprov)',
     /UTFALL: passerar/.test(caseA[0]) !== /UTFALL: passerar/.test(caseB[0]),
     'samma utfall för en lokal kund och en B2B-negativkontroll betyder att indata inte läses')
@@ -538,8 +663,12 @@ check('A: varje planterad defekt namnger en VERKLIG fällare', utanFallare.lengt
 const btReadme = las('backtests/README.md')
 check('§26-GAP-1: de tredje negativkontrollerna redovisade som lucka',
   /§26-GAP-1/.test(btReadme) && /NO-BUILD/.test(btReadme) && /NOT_STARTED/.test(btReadme), 'tyst utelämnad')
-check('A-GAP-3: kompatibilitetsvägen redovisad som lucka',
-  /A-GAP-3/.test(aFor) && /compatibility route/.test(aFor), 'saknas')
+check('A-GAP-3: kompatibilitetsvägen är STÄNGD och pekar på fixturen som stängde den',
+  /A-GAP-3/.test(aFor) && /STÄNGD/.test(aFor) && /case-a-legacy/.test(aFor),
+  'en stängd lucka utan pekare till det som stängde den går inte att kontrollera')
+check('A-GAP-3: och den KVARVARANDE halvan är namngiven, inte struken',
+  /AL-GAP-2/.test(aFor) && /prövbar, inte påtvingad/.test(aFor),
+  'läsaren finns men ingen konsument använder den — att tiga om det gör en halv stängning till en hel')
 check('B-GAP-2: fixturens egen förhandsbesvarade fällor redovisade som lucka',
   /B-GAP-2/.test(las('backtests/case-b-saas/FORVANTAT.md')),
   'att researchen skriver ut svaret på fyra av sex fällor är en verklig svaghet och får inte utelämnas tyst')
