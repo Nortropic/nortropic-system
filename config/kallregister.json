@@ -1,0 +1,95 @@
+{
+  "schema": "nortropic.kallregister/v1",
+  "kommentar": "K1 — kallregistret. En kalla ar ett OBSERVANDUM, aldrig ett direktiv. Registret ar propose-only: radarn far foresla, aldrig skriva i en standard. Se docs/kunskapsbanan.md for styrningen.",
+  "faltdefinitioner": {
+    "id": "Stabil identitet. Byter en kalla innebord far den ett NYTT id.",
+    "klass": "NORMATIV (standard/lag som binder) | PRAXIS (branschrekommendation) | LEVERANTOR (plattformens egen dokumentation) | FORSKNING (studier/matningar)",
+    "styrdaDomaner": "Vilka FRAGOR kallan har auktoritet over — aldrig 'allt'. Auktoritet ar fragberoende.",
+    "operativaVagar": "De repo-vagar kallans andringar faktiskt paverkar. Tom lista = kallan bevakas men styr ingen yta annu.",
+    "volatilitet": "LAG (arlig eller mer sallan) | MEDEL (kvartal) | HOG (manad eller oftare)",
+    "andringsdetektering": "Hur en andring UPPTACKS — konkret metod, aldrig 'bevakas'.",
+    "konsument": "Vem som laser kallans utfall nar den andrats.",
+    "kallstartsniva": "TIER-1 (bindande, foljs) | TIER-2 (stark praxis) | TIER-3 (informerar, avgor inte). BEDOMNING gjord innan vi matt nagot — uttryckligen inte en matning.",
+    "kallaAlfa": "SOM FOR SENARE: uppmatt traffsakerhet nar vi har historik. null = OMATT, aldrig noll."
+  },
+  "lagar": [
+    "PROPOSE-ONLY: en andring i en kalla blir ett FORSLAG, aldrig en skrivning i en standard.",
+    "FRAGEBEROENDE AUKTORITET: ingen kalla vinner alla fragor. styrdaDomaner ar gransen.",
+    "OMATT AR INTE NOLL: kallaAlfa=null betyder att vi inte vet, inte att kallan ar vardelos.",
+    "REGISTRET AR INTE KUNSKAPEN: raderna sager var vi tittar, aldrig vad som ar sant."
+  ],
+  "kallor": [
+    {
+      "id": "wcag-22",
+      "namn": "WCAG 2.2 (W3C Recommendation)",
+      "klass": "NORMATIV",
+      "styrdaDomaner": ["tillganglighet"],
+      "operativaVagar": ["skills/nortropic-prelaunch/", "agents/qa-launcher.md"],
+      "volatilitet": "LAG",
+      "andringsdetektering": "W3C publicerar numrerad rekommendation; jamfor publiceringsdatum och errata-lista mot senast noterad version",
+      "konsument": "qa-launcher (Gate 4), nortropic-prelaunch",
+      "kallstartsniva": "TIER-1",
+      "kallaAlfa": null
+    },
+    {
+      "id": "eu-gdpr-praxis",
+      "namn": "GDPR-praxis for svenska smaforetagssajter (IMY-vagledning)",
+      "klass": "NORMATIV",
+      "styrdaDomaner": ["persondata", "cookies-och-samtycke"],
+      "operativaVagar": ["skills/nortropic-prelaunch/", "agents/qa-launcher.md"],
+      "volatilitet": "MEDEL",
+      "andringsdetektering": "IMY:s vagledningssidor: publiceringsdatum + rubrikdiff mot senast noterad",
+      "konsument": "qa-launcher (Gate 6 — OBSERVE AND REPORT ONLY, juridik ar alltid human-only)",
+      "kallstartsniva": "TIER-1",
+      "kallaAlfa": null
+    },
+    {
+      "id": "core-web-vitals",
+      "namn": "Core Web Vitals troskelvarden (Google)",
+      "klass": "LEVERANTOR",
+      "styrdaDomaner": ["prestanda"],
+      "operativaVagar": ["skills/nortropic-prelaunch/references/lighthouse-targets.md"],
+      "volatilitet": "MEDEL",
+      "andringsdetektering": "web.dev-dokumentationens troskeltabell: jamfor varden mot de pinnade i lighthouse-targets",
+      "konsument": "qa-launcher (Gate 2) — troskelANDRING ar ALLTID ett forslag, aldrig en automatisk justering av matkontraktet",
+      "kallstartsniva": "TIER-2",
+      "kallaAlfa": null
+    },
+    {
+      "id": "schema-org-localbusiness",
+      "namn": "schema.org LocalBusiness och dess subtyper",
+      "klass": "NORMATIV",
+      "styrdaDomaner": ["strukturerad-data"],
+      "operativaVagar": ["skills/nortropic-seo-lokal/", "packs/lokal-se/"],
+      "volatilitet": "LAG",
+      "andringsdetektering": "schema.org releasenotes: nya/avvecklade subtyper och faltandringar",
+      "konsument": "seo-optimizer",
+      "kallstartsniva": "TIER-1",
+      "kallaAlfa": null
+    },
+    {
+      "id": "nextjs-app-router",
+      "namn": "Next.js App Router-dokumentation",
+      "klass": "LEVERANTOR",
+      "styrdaDomaner": ["byggstack"],
+      "operativaVagar": ["skills/nortropic-stack/"],
+      "volatilitet": "HOG",
+      "andringsdetektering": "major-/minorrelease + upgrade guide; breaking changes lasta mot vart pinnade stackkontrakt",
+      "konsument": "stack-builder",
+      "kallstartsniva": "TIER-2",
+      "kallaAlfa": null
+    },
+    {
+      "id": "nortropic-knowledge",
+      "namn": "nortropic-knowledge (eget bakland)",
+      "klass": "PRAXIS",
+      "styrdaDomaner": [],
+      "operativaVagar": [],
+      "volatilitet": "MEDEL",
+      "andringsdetektering": "manuell genomgang vid radarkorning",
+      "konsument": "INGEN vid korning — RADGIVANDE BAKLAND, aldrig korauktoritet. Far informera ett forslag, aldrig konsulteras av en grind, en agent eller ett bygge.",
+      "kallstartsniva": "TIER-3",
+      "kallaAlfa": null
+    }
+  ]
+}

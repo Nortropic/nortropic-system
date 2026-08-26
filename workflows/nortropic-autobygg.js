@@ -1,12 +1,12 @@
 export const meta = {
   name: 'nortropic-autobygg',
-  description: 'Obemannat kund-flöde (v17): orkestrerar plan→init→innehåll→granskning→grind-torrkörning för en research.md märkt "Läge: obemannat", med villkorade stopp (bemannat / ohanterad-scope-nej-juridik-eller-STRATEGISK / CRITICAL-efter-en-fixloop / brutet fixkontrakt i fasgränscommit eller fixcommit — BATCH-005) som lämnar över till människa. Deployar ALDRIG — nod 8 (juridik-signoff) och nod 9 (/vercel:deploy) förblir mänskliga.',
-  whenToUse: 'Kör manuellt när en research.md bär raden "Läge: obemannat" och ägaren vill att systemet bygger sajten utan mänskligt nod-3-stopp — fram till FINAL-TOUCHES + grind-torrkörning. Faller ALLTID tillbaka till mänskligt stopp vid ohanterad/scope-nej juridikflagga, kvarstående STRATEGISK öppen fråga, CRITICAL efter EN fixloop, eller brutet fixkontrakt (BATCH-005: agentdeklaration ≠ delta-snapshot). Bemannat (default, ingen Läge-rad) => kör /nortropic-plan manuellt i stället.',
+  description: 'Obemannat kund-flöde (v18): orkestrerar plan→init→innehåll→granskning→grind-torrkörning för en research.md märkt "Läge: obemannat". Beslutstaxonomi CONTINUE / ATTENTION_CONTINUE / ROUTE / HARD_STOP — owner attention ≠ owner approval: en icke-blockerande strategisk fråga och ett interventionsutfall ≠ NY SAJT stoppar INTE flödet på ägarens svar, de routar respektive noteras. HARD_STOP bevaras för ohanterad juridik, obyggd krävd capability, CRITICAL efter EN fixloop, brutet fixkontrakt och oklassificerade utfall. Deployar ALDRIG — nod 8 (juridik-signoff) och nod 9 (/vercel:deploy) förblir mänskliga.',
+  whenToUse: 'Kör manuellt när en research.md bär raden "Läge: obemannat" och ägaren vill att systemet bygger sajten utan mänskligt nod-3-stopp — fram till FINAL-TOUCHES + grind-torrkörning. HARD_STOP vid ohanterad juridikflagga, blockerande strategisk fråga (kräver nytt mandat), oklassificerat plan-utfall, CRITICAL efter EN fixloop eller brutet fixkontrakt (BATCH-005). ROUTE — utan att invänta ägaren — vid interventionsutfall ≠ NY SAJT och vid scope-nej. Bemannat (default, ingen Läge-rad) => kör /nortropic-plan manuellt i stället.',
   phases: [
     { title: 'Plan',                    detail: 'project-planner → PROJECT-BRIEF.md + maskinläsbart plan-utfall (schema)' },
-    { title: 'Villkorat stopp (plan)',  detail: 'bemannat, ohanterad/scope-nej juridik eller STRATEGISK fråga => överlämna (inget byggt)' },
+    { title: 'Beslut (plan)',           detail: 'CONTINUE / ATTENTION_CONTINUE fortsätter; ROUTE avslutar lanen utan ägarberoende; HARD_STOP lämnar över' },
     { title: 'Init',                    detail: 'stack-builder skapar privat repo + Vercel-preview' },
-    { title: 'Del-C static-first',      detail: 'Ring-1 stateless bekräftas; stateful/Ring 2-3-behov => överlämna (docs/06)' },
+    { title: 'Del-C static-first',      detail: 'Ring-1 stateless bekräftas; stateful glidning => ROUTE (Ring 3); ouppfyllt Del-C-förkrav => HARD_STOP (obyggd capability)' },
     { title: 'Content',                 detail: 'content-designer fyller TODO-COPY + Humanisera; TODO-FACT lämnas; F1-fasgränscommit (fixkontraktet)' },
     { title: 'Review',                  detail: 'full review → EN fixloop (fixkontrakt: deklaration → unionscommit) → diff-review → CRITICAL-parse' },
     { title: 'Villkorat stopp (review)',detail: 'CRITICAL kvar efter EN fixloop => överlämna med FINAL-TOUCHES' },
@@ -23,20 +23,177 @@ function obemannatGate(lage) {
   return { stop: false }
 }
 
-function shouldStopAfterPlan(plan) {
-  if (!plan) return { stop: true, reason: 'plan-steget returnerade inget utfall' }
-  if (plan.inputGatePassed === false)
-    return { stop: true, reason: `INPUT GATE: research saknar ${(plan.missingFields || []).join(', ') || 'obligatoriska fält'}` }
+/* ── BESLUTSTAXONOMI ────────────────────────────────────────────────────────────
+ * OWNER ATTENTION ≠ OWNER APPROVAL. Kanonisk hemvist: docs/00-guide.md,
+ * §"Owner attention ≠ owner approval". Kortformen som runtime behöver:
+ *
+ *   CONTINUE           arbetet fortsätter; ingen ägarrespons behövs
+ *   ATTENTION_CONTINUE arbetet fortsätter; beslutet registreras synligt för ägaren
+ *   ROUTE              denna lane ska inte fortsätta med fel produkt — routa/avsluta
+ *                      korrekt, registrera varför, VÄNTA INTE på ägaren
+ *   HARD_STOP          fortsatt arbete vore faktiskt otillåtet eller obevisbart
+ *
+ * Ett beslut blockerar ENDAST om fortsatt arbete skulle överskrida delegerat mandat,
+ * kräva en otillåten/obyggd capability, skapa en otillåten irreversibel effekt eller
+ * kräva ett obevisbart påstående. STRATEGISK BETYDELSE I SIG ÄR INTE ETT STOPPVILLKOR.
+ */
+const CONTINUE = 'CONTINUE'
+const ATTENTION_CONTINUE = 'ATTENTION_CONTINUE'
+const ROUTE = 'ROUTE'
+const HARD_STOP = 'HARD_STOP'
+const RANG = { CONTINUE: 0, ATTENTION_CONTINUE: 1, ROUTE: 2, HARD_STOP: 3 }
+
+// Interventionsutfall → taxonomi. Ett utfall som INTE står här är okänt och
+// fail-closar; tabellen får aldrig läsas med `||` eller default-gren.
+const INTERVENTION = {
+  'NY SAJT':             CONTINUE,
+  'FÖRBÄTTRA BEFINTLIG': ROUTE,
+  'ICKE-SAJT-ÅTGÄRD':    ROUTE,
+  'AVRÅD':               ROUTE,
+}
+
+function attentionEvent(o) {
+  return {
+    severity: o.severity, decision: o.decision, reason: o.reason,
+    evidence: Array.isArray(o.evidence) ? o.evidence : [],
+    actionTaken: o.actionTaken, ownerActionRequired: o.ownerActionRequired === true,
+  }
+}
+
+/**
+ * Plan-utfallets beslut. Returnerar ALLTID { decision, reason, attention[], nextStep }.
+ * Alla regler utvärderas; svåraste utfallet vinner (RANG), men varje attention-event
+ * samlas oavsett — ett stopp får aldrig radera de upplysningar som föregick det.
+ */
+function beslutEfterPlan(plan) {
+  if (!plan) {
+    return { decision: HARD_STOP, reason: 'plan-steget returnerade inget utfall — odömbart', attention: [], nextStep: null }
+  }
+  const ev = []
+  let decision = CONTINUE
+  let reason = 'inga blockerande utfall — obemannat fortsätter'
+  let nextStep = null
+  const hoj = (d, r, n) => {
+    if (RANG[d] > RANG[decision]) { decision = d; reason = r; nextStep = n || null }
+  }
+
+  // 0. KLASSIFICERINGSFÄLTEN MÅSTE VARA GILTIGA. Utan detta fail-openar etiketterna:
+  //    `kind: 'strategisk'` (fel skiftläge) föll ur STRATEGISK-filtret och blev CONTINUE
+  //    utan att någon disposition ens efterfrågades, och `status: 'OHANTERAD'` gled förbi
+  //    juridikstoppet. Etiketten bär nu ett `blocking`-fält — då måste etiketten själv
+  //    valideras, annars flyttas hålet bara ett steg upp.
+  if (typeof plan.inputGatePassed !== 'boolean') {
+    const r = `inputGatePassed är inte booleskt (${JSON.stringify(plan.inputGatePassed)}) — oklassificerat`
+    ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAT', reason: r,
+      evidence: [String(plan.inputGatePassed)], actionTaken: 'inget byggt', ownerActionRequired: true }))
+    hoj(HARD_STOP, r, 'kör om planeringen mot nuvarande kontrakt')
+  }
+  if (typeof plan.scopeNej !== 'boolean') {
+    const r = `scopeNej är inte booleskt (${JSON.stringify(plan.scopeNej)}) — oklassificerat`
+    ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAT', reason: r,
+      evidence: [String(plan.scopeNej)], actionTaken: 'inget byggt', ownerActionRequired: true }))
+    hoj(HARD_STOP, r, 'kör om planeringen mot nuvarande kontrakt')
+  }
+  // Icke-itererbara listor kastade TypeError och bröt löftet att ALLTID returnera ett
+  // beslut. En vakt som kraschar är odömbar, inte sträng.
+  if (!Array.isArray(plan.openQuestions) || !Array.isArray(plan.juridikflaggor)) {
+    const r = 'openQuestions/juridikflaggor är inte listor — oklassificerat planutfall'
+    ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAT', reason: r,
+      evidence: [], actionTaken: 'inget byggt', ownerActionRequired: true }))
+    return { decision: HARD_STOP, reason: r, attention: ev, nextStep: 'kör om planeringen' }
+  }
+  const KIND = ['STRATEGISK', 'FAKTA', 'BESLUT']
+  const STATUS = ['hanterad', 'ohanterad', 'scope-nej']
+  for (const q of (plan.openQuestions || [])) {
+    if (!q || typeof q.kind !== 'string' || !KIND.includes(q.kind)) {
+      const r = `öppen fråga med okänd klass (${JSON.stringify(q && q.kind)}) — oklassificerat, fail-closed`
+      ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAT', reason: r,
+        evidence: [String(q && q.text)], actionTaken: 'inget byggt', ownerActionRequired: true }))
+      hoj(HARD_STOP, r, 'klassa varje fråga STRATEGISK/FAKTA/BESLUT exakt')
+    }
+  }
+  for (const f of (plan.juridikflaggor || [])) {
+    if (!f || typeof f.status !== 'string' || !STATUS.includes(f.status)) {
+      const r = `juridikflagga med okänd status (${JSON.stringify(f && f.status)}) — oklassificerat, fail-closed`
+      ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAT', reason: r,
+        evidence: [String(f && f.flagga)], actionTaken: 'inget byggt', ownerActionRequired: true }))
+      hoj(HARD_STOP, r, 'sätt status hanterad/ohanterad/scope-nej exakt')
+    }
+  }
+
+  // 1. INPUT GATE — oförändrad i denna skiva (parameterisering är en egen semantisk fråga).
+  if (plan.inputGatePassed === false) {
+    const r = `INPUT GATE: research saknar ${(plan.missingFields || []).join(', ') || 'obligatoriska fält'}`
+    ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'INPUT_GATE', reason: r,
+      evidence: plan.missingFields || [], actionTaken: 'planeringen avbröts', ownerActionRequired: true }))
+    hoj(HARD_STOP, r, 'komplettera research.md och kör om')
+  }
+
+  // 2. Ohanterad juridik — HARD_STOP BEVARAS. Human-only i alla lägen (§A4).
   const ohanterad = (plan.juridikflaggor || []).filter(f => f && f.status === 'ohanterad')
-  if (ohanterad.length)   // hälsa/kropp/medicin m.fl. har registerstatus 'ohanterad' → fångas här
-    return { stop: true, reason: `ohanterad juridikflagga (${ohanterad.map(f => f.flagga).join(', ')}) — beslut vid nod 3: bygg modulen som eget arbete eller tacka nej` }
+  if (ohanterad.length) {
+    const r = `ohanterad juridikflagga (${ohanterad.map(f => f.flagga).join(', ')}) — juridik är human-only i ALLA lägen`
+    ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'JURIDIK_OHANTERAD', reason: r,
+      evidence: ohanterad.map(f => f.flagga), actionTaken: 'inget byggt', ownerActionRequired: true }))
+    hoj(HARD_STOP, r, 'bygg juridikmodulen som eget arbete eller tacka nej')
+  }
+
+  // 3. INTERVENTIONSBESLUTET. Saknas fältet är planutfallet oklassificerat — äldre
+  //    artefakter får ALDRIG mer auktoritet genom frånvaro av ett nytt fält.
+  const iv = plan.interventionsbeslut
+  if (typeof iv !== 'string' || !Object.prototype.hasOwnProperty.call(INTERVENTION, iv)) {
+    const r = `interventionsbeslut saknas eller är okänt (${JSON.stringify(iv)}) — oklassificerat planutfall, fail-closed`
+    ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAT', reason: r,
+      evidence: [String(iv)], actionTaken: 'inget byggt', ownerActionRequired: true }))
+    hoj(HARD_STOP, r, 'kör om planeringen mot nuvarande kontrakt')
+  } else if (INTERVENTION[iv] === ROUTE) {
+    const r = `interventionsbeslut ${iv} — en ny sajt är inte åtgärden`
+    ev.push(attentionEvent({ severity: 'HIGH', decision: iv, reason: r,
+      evidence: [plan.interventionsmotiv || 'motiv i briefens §7.12'],
+      actionTaken: 'ny-sajt-lanen avslutades utan bygge', ownerActionRequired: false }))
+    hoj(ROUTE, r, iv === 'FÖRBÄTTRA BEFINTLIG'
+      ? 'förbättringslane saknas ännu — offereras som eget arbete mot den befintliga sajten'
+      : 'briefen bär rekommendationen; ingen sajt ska byggas')
+  }
+
+  // 4. scope-nej → ROUTE. Gränsen bevaras; det är APPROVAL-STOPPET som tas bort.
   const scopeNej = (plan.juridikflaggor || []).filter(f => f && f.status === 'scope-nej')
-  if (plan.scopeNej || scopeNej.length)
-    return { stop: true, reason: `scope-nej-flagga (${scopeNej.map(f => f.flagga).join(', ') || 'scope-nej'}) — briefen rekommenderar hänvisning (docs/06 Ring 3)` }
-  const strat = (plan.openQuestions || []).filter(q => q && q.kind === 'STRATEGISK')
-  if (strat.length)
-    return { stop: true, reason: `STRATEGISK öppen fråga kvarstår: ${strat.map(q => q.text).join(' | ')}` }
-  return { stop: false }   // enbart FAKTA/BESLUT-frågor kvar → fortsätt (de skjuts till FINAL-TOUCHES)
+  if (plan.scopeNej || scopeNej.length) {
+    const r = `scope-nej (${scopeNej.map(f => f.flagga).join(', ') || 'utanför Ring 1–2'}) — hänvisning enligt docs/06 Ring 3`
+    ev.push(attentionEvent({ severity: 'HIGH', decision: 'SCOPE_NEJ', reason: r,
+      evidence: scopeNej.map(f => f.flagga), actionTaken: 'ingen sajt byggd; capability-gränsen kringgicks aldrig',
+      ownerActionRequired: false }))
+    hoj(ROUTE, r, 'hänvisa enligt Ring 3 — bygg aldrig runt gränsen')
+  }
+
+  // 5. STRATEGISKA FRÅGOR. Etiketten avgör INTE längre; `blocking` gör det.
+  //    Saknad eller icke-boolesk disposition är oklassificerad → fail-closed.
+  for (const q of (plan.openQuestions || []).filter(q => q && q.kind === 'STRATEGISK')) {
+    if (typeof q.blocking !== 'boolean') {
+      const r = `STRATEGISK fråga saknar maskinläsbar disposition (blocking): "${q.text}"`
+      ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAD_FRÅGA', reason: r,
+        evidence: [q.text], actionTaken: 'inget byggt', ownerActionRequired: true }))
+      hoj(HARD_STOP, r, 'klassificera frågan som blocking true/false och kör om')
+    } else if (q.blocking) {
+      const r = `blockerande strategisk fråga — kräver nytt mandat: "${q.text}"${q.blockingReason ? ` (${q.blockingReason})` : ''}`
+      ev.push(attentionEvent({ severity: 'CRITICAL', decision: 'MANDAT_SAKNAS', reason: r,
+        evidence: [q.blockingReason || q.text], actionTaken: 'inget byggt', ownerActionRequired: true }))
+      hoj(HARD_STOP, r, 'ägaren utvidgar mandatet eller avgör frågan')
+    } else {
+      ev.push(attentionEvent({ severity: 'MEDIUM', decision: 'STRATEGISK_ICKE_BLOCKERANDE', reason: `strategisk fråga noterad: "${q.text}"`,
+        evidence: [q.text], actionTaken: 'arbetet fortsatte inom befintligt mandat', ownerActionRequired: false }))
+      hoj(ATTENTION_CONTINUE, 'strategiska frågor noterade utan att blockera')
+    }
+  }
+
+  return { decision, reason, attention: ev, nextStep }
+}
+
+// Behålls som tunn adapter: `stop` betyder nu ENBART "arbetet ska inte fortsätta i
+// denna lane" och skiljer inte HARD_STOP från ROUTE. Anroparen måste läsa `decision`.
+function shouldStopAfterPlan(plan) {
+  const b = beslutEfterPlan(plan)
+  return { stop: b.decision === HARD_STOP || b.decision === ROUTE, reason: b.reason, decision: b.decision, attention: b.attention, nextStep: b.nextStep }
 }
 
 function shouldStopAfterReview(criticalCount) {
@@ -53,7 +210,7 @@ function scopeStr(dir) {
 
 const PLAN_OUTCOME = {
   type: 'object',
-  required: ['briefPath', 'lage', 'inputGatePassed', 'juridikflaggor', 'scopeNej', 'openQuestions'],
+  required: ['briefPath', 'lage', 'inputGatePassed', 'juridikflaggor', 'scopeNej', 'openQuestions', 'interventionsbeslut'],
   properties: {
     briefPath:        { type: 'string' },
     repoNameSuggested:{ type: 'string' },
@@ -61,13 +218,22 @@ const PLAN_OUTCOME = {
     klienttyp:        { type: 'string', enum: ['SKARP', 'TESTKLIENT'] },
     inputGatePassed:  { type: 'boolean' },
     missingFields:    { type: 'array', items: { type: 'string' } },
+    // §7.12-utfallet, maskinläsbart. Tidigare nådde det autobygg ENBART som en
+    // STRATEGISK fråga, vilket gjorde att alla fyra utfallen stoppade likadant.
+    interventionsbeslut: { type: 'string', enum: ['NY SAJT', 'FÖRBÄTTRA BEFINTLIG', 'ICKE-SAJT-ÅTGÄRD', 'AVRÅD'] },
+    interventionsmotiv:  { type: 'string' },
     juridikflaggor:   { type: 'array', items: { type: 'object', required: ['flagga', 'status'],
                           properties: { flagga: { type: 'string' },
                             status: { type: 'string', enum: ['hanterad', 'ohanterad', 'scope-nej'] } } } },
     scopeNej:         { type: 'boolean' },
+    // `blocking` är OBLIGATORISK på STRATEGISK-frågor (fail-closed i beslutEfterPlan).
+    // Den kan inte göras schema-required utan att tvinga fram den även på FAKTA/BESLUT,
+    // så koden bär kravet — och en saknad disposition blir HARD_STOP, aldrig CONTINUE.
     openQuestions:    { type: 'array', items: { type: 'object', required: ['text', 'kind'],
                           properties: { text: { type: 'string' },
-                            kind: { type: 'string', enum: ['STRATEGISK', 'FAKTA', 'BESLUT'] } } } },
+                            kind: { type: 'string', enum: ['STRATEGISK', 'FAKTA', 'BESLUT'] },
+                            blocking: { type: 'boolean' },
+                            blockingReason: { type: 'string' } } } },
   },
 }
 
@@ -83,8 +249,12 @@ const INIT_OUTCOME = {
 }
 
 const STATICGUARD = {
-  type: 'object', required: ['stateful', 'evidence'],
+  type: 'object', required: ['stateful', 'evidence', 'unmetPrerequisite'],
   properties: { stateful: { type: 'boolean' },
+    // Guarden fångade tidigare TVÅ olika saker under en flagga: en stateful glidning
+    // (Ring 3 → ROUTE-OUT, routing) och ett OUPPFYLLT Del-C/Railway-förkrav (en krävd
+    // men obyggd capability → HARD_STOP). De har olika taxonomi och får inte slås ihop.
+    unmetPrerequisite: { type: 'boolean' },
     evidence: { type: 'array', items: { type: 'string' } }, note: { type: 'string' } },
 }
 
@@ -213,7 +383,15 @@ async function writeAutobyggLog(buildDir, fields) {
     `Uppdatera AUTOBYGG-LOG.md i ${buildDir}. Kör FÖRST \`cd "${buildDir}" && git rev-parse HEAD\` och \`date +%F\`. ` +
     `Om filen saknas: skapa den och INLED med detta meta-block; om den finns: appenda en ny fas-rad och uppdatera status-raden i meta-blocket:\n` +
     `<!-- nortropic-autobygg-meta\ncommit: <hash>\ndate: <YYYY-MM-DD>\nlage: obemannat\nstatus: ${fields.status}\nstage: ${fields.stage}\n-->\n` +
-    `Därefter, i markdown: en fas-för-fas-spårningstabell (tidsstämpel via date, fas, utfall, ev. stopporsak) och slutstatusraden. Rådata (hitta inte på något utöver detta):\n\n` +
+    `Därefter, i markdown: en fas-för-fas-spårningstabell (tidsstämpel via date, fas, utfall, ev. stopporsak) och slutstatusraden. ` +
+    // S10-UPPFÖLJNING: attention låg i loggen som rå JSON utan att loggagenten visste vad
+    // `ownerActionRequired: false` BETYDER. En upplysning som läses som en fråga blir ett
+    // mutex i praktiken, hur korrekt fältet än är satt.
+    `Finns fältet \`attention\`: rendera det som ett eget avsnitt "## Owner attention", en rad per event med severity, decision, reason, evidence, actionTaken. ` +
+    `Rader med \`ownerActionRequired: false\` INLEDS med "INGET SVAR KRÄVS —" och rader med \`true\` med "ÄGARÅTGÄRD KRÄVS —". ` +
+    `Skriv aldrig om ett false-event som något ägaren ska besvara: det är en upplysning om ett beslut som redan är fattat inom mandat. ` +
+    `Status \`ROUTAD\` betyder att lanen avslutades korrekt utan ägarberoende; \`ÖVERLÄMNAD\` betyder att något faktiskt väntar. Blanda aldrig ihop dem. ` +
+    `Rådata (hitta inte på något utöver detta):\n\n` +
     JSON.stringify(fields, null, 2),
     { label: 'autobygg-log', phase: 'Avslut' }
   )
@@ -225,22 +403,52 @@ phase('Plan')
 // Plannern kör sin egen INPUT GATE, läser research-radens Läge (saknas ⇒ bemannat) och returnerar utfallet maskinläsbart.
 const plan = await agent(
   `Follow your FULL project-planner process against the research file at ${researchPath}. Write PROJECT-BRIEF.md next to it (all 7 sections). ` +
-  `Read the research row \`Läge:\` (missing => bemannat) and write it into §6 next to Klienttyp — never into content/profile.ts. ` +
+  `Read the research row \`Läge:\` (missing => bemannat), write it into §6 next to Klienttyp — never into content/profile.ts — AND return it as the field \`lage\` (obemannat|bemannat). ` +
+  // `lage` grindar HARD_STOP via obemannatGate. Utan att den BEGÄRS som returfält kan en
+  // planner skriva den i §6 och utelämna den i utfallet, vilket ger `bemannat` och stoppar
+  // körningen — samma "tillstånd oftare"-inversion som skivan finns för att ta bort.
   `Run your INPUT GATE first; if fields are missing, set inputGatePassed=false + missingFields and do not plan further. ` +
   `Klassa VARJE öppen fråga STRATEGISK/FAKTA/BESLUT per your Rules; a ohanterad/scope-nej juridikflagga is ALWAYS STRATEGISK. ` +
+  `Return \`juridikflaggor\` as [{flagga, status}] with status EXACTLY one of hanterad|ohanterad|scope-nej, \`scopeNej\` as a real boolean, and \`openQuestions\` as [{text, kind, ...}] with kind EXACTLY one of STRATEGISK|FAKTA|BESLUT — case and spelling are load-bearing; a mis-cased label is UNCLASSIFIED and fails closed. ` +
+  // S10-UPPFÖLJNING: fälten nedan är BÄRANDE för beslutstaxonomin och måste begäras HÄR.
+  // Utan detta stycke följde en planner prompten korrekt, utelämnade `blocking`, och varje
+  // bygge med en strategisk fråga HARD-stoppade — alltså "tillstånd oftare", raka motsatsen
+  // till skivans syfte. Ett fält som avgör ett beslut men aldrig efterfrågas är en tyst grind.
+  `Run processteg 0 and return the outcome as \`interventionsbeslut\` (NY SAJT | FÖRBÄTTRA BEFINTLIG | ICKE-SAJT-ÅTGÄRD | AVRÅD) with \`interventionsmotiv\`. ` +
+  `EVERY STRATEGISK question MUST carry \`blocking: true|false\`. Set \`blocking: true\` ONLY when continuing would need a NEW MANDATE, an unbuilt/forbidden capability, a forbidden irreversible effect, or a claim you cannot substantiate — then add \`blockingReason\`. Otherwise \`blocking: false\`: the question is noted for the owner and the work continues. Strategic significance ALONE is never a stop. A non-NY-SAJT interventionsbeslut and a scope-nej flag are \`blocking: false\` (they route); an ohanterad juridikflagga and a required-but-unbuilt capability are \`blocking: true\`. ` +
+  `Omitting \`interventionsbeslut\` or a \`blocking\` value makes the outcome UNCLASSIFIED and the run fails closed — never guess, but never leave them out either. ` +
   `Return the machine-readable outcome per the schema.`,
   { label: 'plan', phase: 'Plan', agentType: 'project-planner', schema: PLAN_OUTCOME }
 )
 
-phase('Villkorat stopp (plan)')
+phase('Beslut (plan)')
 const modeStop = obemannatGate(plan && plan.lage)
-const planStop = modeStop.stop ? modeStop : shouldStopAfterPlan(plan)
-if (planStop.stop) {
-  log(`ÖVERLÄMNAD vid plan: ${planStop.reason}`)
-  // Inget repo skapat ännu — rent stopp; ingen AUTOBYGG-LOG (byggrepot finns inte).
-  return { status: 'ÖVERLÄMNAD', stage: 'plan', reason: planStop.reason,
-    briefPath: plan && plan.briefPath, openQuestions: (plan && plan.openQuestions) || [], buildDir: null, gates: [] }
+const planBeslut = modeStop.stop
+  ? { decision: HARD_STOP, reason: modeStop.reason, attention: [], nextStep: 'kör /nortropic-plan bemannat' }
+  : beslutEfterPlan(plan)
+
+for (const a of planBeslut.attention) {
+  log(`OWNER ATTENTION — ${a.ownerActionRequired ? 'ÄGARÅTGÄRD KRÄVS' : 'inget svar krävs'} | ${a.severity} | ${a.decision}: ${a.reason}`)
 }
+
+// ROUTE och HARD_STOP avslutar båda ny-sajt-lanen, men de betyder OLIKA saker och får
+// aldrig rapporteras likadant: ROUTE är ett korrekt workflow-utfall utan ägarberoende,
+// HARD_STOP är en authority-/bevisbarhetsgräns som kräver människa.
+if (planBeslut.decision === ROUTE || planBeslut.decision === HARD_STOP) {
+  const routad = planBeslut.decision === ROUTE
+  const status = routad ? 'ROUTAD' : 'ÖVERLÄMNAD'
+  log(`${status} vid plan: ${planBeslut.reason}${planBeslut.nextStep ? ` → nästa steg: ${planBeslut.nextStep}` : ''}`)
+  // Inget repo skapat ännu — rent utfall; ingen AUTOBYGG-LOG (byggrepot finns inte).
+  return {
+    status, stage: 'plan', decision: planBeslut.decision, reason: planBeslut.reason,
+    ownerActionRequired: !routad, nextStep: planBeslut.nextStep,
+    attention: planBeslut.attention,
+    briefPath: plan && plan.briefPath, openQuestions: (plan && plan.openQuestions) || [], buildDir: null, gates: [],
+  }
+}
+// CONTINUE eller ATTENTION_CONTINUE → bygget fortsätter. Attention bärs vidare till
+// slutrapporten; den får aldrig fungera som ett mutex.
+const planAttention = planBeslut.attention
 
 phase('Init')
 const init = await agent(
@@ -259,9 +467,15 @@ let fixCommit = null       // { files, byAgent } för fixrundans unionscommit (l
 // BATCH-005 DEL 2: kontraktsbrott → ÖVERLÄMNAD via exakt samma maskineri som övriga stopp
 // (AUTOBYGG-LOG + return) — aldrig svepande fallback, aldrig improvisation i obemannat läge.
 async function overlamnadKontrakt(stage, reason) {
+  // HARD_STOP: bevisbarheten brast. Detta är inte attention — det är en gräns.
   log(`FIXKONTRAKT BRUTET (${stage}): ${reason} — obemannat lämnar över till människa.`)
-  await writeAutobyggLog(buildDir, { status: 'ÖVERLÄMNAD', stage, reason, contentCommit, fixCommit, previewUrl })
-  return { status: 'ÖVERLÄMNAD', stage, reason, buildDir, previewUrl, contentCommit, fixCommit, gates: [] }
+  const ev = attentionEvent({ severity: 'CRITICAL', decision: 'FIXKONTRAKT_BRUTET', reason,
+    evidence: [stage], actionTaken: 'arbetet avbröts; ingen svepande staging som fallback',
+    ownerActionRequired: true })
+  await writeAutobyggLog(buildDir, { status: 'ÖVERLÄMNAD', stage, reason, contentCommit, fixCommit, previewUrl,
+    attention: [...planAttention, ev] })
+  return { status: 'ÖVERLÄMNAD', stage, decision: HARD_STOP, reason, ownerActionRequired: true,
+    attention: [...planAttention, ev], buildDir, previewUrl, contentCommit, fixCommit, gates: [] }
 }
 
 // BATCH-005 DEL 2 (U): den mekaniska kontraktsrundan EFTER att agenterna kört — prövar deklarationen
@@ -316,13 +530,47 @@ async function kontraktsCommit(dslPhase, commitMsg, agentReturns, preSnap) {
 phase('Del-C static-first')  // docs/06 Ring 3-guard — obemannat får aldrig tyst bygga stateful/Railway-klass infra
 const guard = await agent(
   `Mechanical static-first guard in ${buildDir}. cd there. Confirm the scaffold is Ring-1 stateless per docs/06-scope: the ONLY server code is app/actions/lead.ts; NO database client (prisma/drizzle/pg/mongoose), NO auth, NO railway/render config, NO stateful booking built in-repo (external booking via link/embed is OK). ` +
-  `Also flag if the approved brief §6 states an UNMET Del-C/Railway/cutover prerequisite. grep the repo. Return stateful=true with evidence if anything stateful slipped in or a Del-C prerequisite is unmet; else stateful=false.`,
+  `Return stateful=true with evidence if anything stateful slipped into the scaffold. SEPARATELY: return unmetPrerequisite=true if the approved brief §6 states an UNMET Del-C/Railway/cutover prerequisite — that is a required-but-unbuilt capability, not a scope route-out, and it is reported on its OWN flag. grep the repo. Both default to false.`,
   { label: 'del-c', phase: 'Del-C static-first', schema: STATICGUARD }
 )
+// OUPPFYLLT FÖRKRAV = krävd men obyggd capability ⇒ HARD_STOP (bevarad gräns).
+// Prövas FÖRE stateful-grenen: en körning som bär bådadera måste stoppa, inte routa.
+if (guard.unmetPrerequisite === true || typeof guard.unmetPrerequisite !== 'boolean') {
+  const okand = typeof guard.unmetPrerequisite !== 'boolean'
+  const reason = okand
+    ? `Del-C-guarden returnerade ingen boolesk unmetPrerequisite (${JSON.stringify(guard.unmetPrerequisite)}) — oklassificerat, fail-closed`
+    : `ouppfyllt Del-C/Railway-förkrav: ${(guard.evidence || []).join('; ')} — krävd capability saknas`
+  const evF = attentionEvent({ severity: 'CRITICAL', decision: okand ? 'OKLASSIFICERAT' : 'FÖRKRAV_SAKNAS', reason,
+    evidence: guard.evidence || [], actionTaken: 'bygget avbröts; ingen capability byggdes runt',
+    ownerActionRequired: true })
+  log(`ÖVERLÄMNAD vid del-c: ${reason}`)
+  await writeAutobyggLog(buildDir, { status: 'ÖVERLÄMNAD', stage: 'del-c', reason, previewUrl, attention: [...planAttention, evF] })
+  return { status: 'ÖVERLÄMNAD', stage: 'del-c', decision: HARD_STOP, reason, ownerActionRequired: true,
+    attention: [...planAttention, evF], buildDir, previewUrl, gates: [] }
+}
+if (typeof guard.stateful !== 'boolean') {
+  // Bara `unmetPrerequisite` typvaliderades; syskonflaggan lästes som bar sanningshalt,
+  // så `stateful: null` byggde vidare. Samma fält, samma stränghet.
+  const reason = `Del-C-guarden returnerade ingen boolesk stateful (${JSON.stringify(guard.stateful)}) — oklassificerat, fail-closed`
+  const evS = attentionEvent({ severity: 'CRITICAL', decision: 'OKLASSIFICERAT', reason,
+    evidence: guard.evidence || [], actionTaken: 'bygget avbröts', ownerActionRequired: true })
+  log(`ÖVERLÄMNAD vid del-c: ${reason}`)
+  await writeAutobyggLog(buildDir, { status: 'ÖVERLÄMNAD', stage: 'del-c', reason, previewUrl, attention: [...planAttention, evS] })
+  return { status: 'ÖVERLÄMNAD', stage: 'del-c', decision: HARD_STOP, reason, ownerActionRequired: true,
+    attention: [...planAttention, evS], buildDir, previewUrl, gates: [] }
+}
 if (guard.stateful) {
-  const reason = `Ring 2/3-behov (stateful eller ouppfyllt Del-C/Railway-krav): ${(guard.evidence || []).join('; ')} — obemannat överlämnar (offereras som eget arbete, docs/06 Ring 3)`
-  await writeAutobyggLog(buildDir, { status: 'ÖVERLÄMNAD', stage: 'del-c', reason, previewUrl })
-  return { status: 'ÖVERLÄMNAD', stage: 'del-c', reason, buildDir, previewUrl, gates: [] }
+  // Ring 3 är ROUTE-OUT: en medveten gräns med hänvisning, inte en authority-fråga.
+  // Lanen avslutas korrekt utan att någon väntar på ägaren — men gränsen kringgås aldrig.
+  const reason = `Ring 2/3-behov (stateful glidning): ${(guard.evidence || []).join('; ')} — offereras som eget arbete (docs/06 Ring 3)`
+  const ev = attentionEvent({ severity: 'HIGH', decision: 'RING3_ROUTE_OUT', reason,
+    evidence: guard.evidence || [], actionTaken: 'bygget avslutades; ingen stateful capability byggdes',
+    ownerActionRequired: false })
+  log(`OWNER ATTENTION — inget svar krävs | HIGH | RING3_ROUTE_OUT: ${reason}`)
+  await writeAutobyggLog(buildDir, { status: 'ROUTAD', stage: 'del-c', reason, previewUrl, attention: [...planAttention, ev] })
+  return { status: 'ROUTAD', stage: 'del-c', decision: ROUTE, reason, ownerActionRequired: false,
+    nextStep: 'hänvisa enligt Ring 3 eller offerera stateful arbete separat',
+    attention: [...planAttention, ev], buildDir, previewUrl, gates: [] }
 }
 
 phase('Content')
@@ -379,10 +627,15 @@ if ((triage.criticalCount || 0) > 0 || (triage.highs || []).length) {
 phase('Villkorat stopp (review)')
 const reviewStop = shouldStopAfterReview(triage.criticalCount || 0)
 if (reviewStop.stop) {
+  // HARD_STOP BEVARAT: kvarstående CRITICAL efter den ENA tillåtna autonoma fixloopen.
+  const ev = attentionEvent({ severity: 'CRITICAL', decision: 'CRITICAL_KVARSTÅR', reason: reviewStop.reason,
+    evidence: (triage.criticals || []).map(c => c.title || String(c)),
+    actionTaken: 'FINAL-TOUCHES skrevs; ingen ytterligare autonom fixrunda', ownerActionRequired: true })
   await workflow('nortropic-final-touches', { clientDir: buildDir, openQuestions: plan.openQuestions })
   await writeAutobyggLog(buildDir, { status: 'ÖVERLÄMNAD', stage: 'review', reason: reviewStop.reason,
-    criticals: triage.criticals, contentCommit, fixCommit, previewUrl })
-  return { status: 'ÖVERLÄMNAD', stage: 'review', reason: reviewStop.reason, buildDir, previewUrl,
+    criticals: triage.criticals, contentCommit, fixCommit, previewUrl, attention: [...planAttention, ev] })
+  return { status: 'ÖVERLÄMNAD', stage: 'review', decision: HARD_STOP, reason: reviewStop.reason,
+    ownerActionRequired: true, attention: [...planAttention, ev], buildDir, previewUrl,
     criticals: triage.criticals, contentCommit, fixCommit, gates: [] }
 }
 
@@ -414,11 +667,16 @@ const gateRows = GATE_LENSES.map(g => ({ gate: g.key,
   status: g.key === 'legal' ? '⚠️ HUMAN SIGN-OFF' : (gates[g.key].status === 'PASS' ? '✅' : '❌'),
   findings: (gates[g.key].findings || []).length }))
 await writeAutobyggLog(buildDir, { status: 'BYGGD-OBEMANNAD', stage: 'complete', gateRows, previewUrl,
-  contentCommit, fixCommit,
-  deferredQuestions: (plan.openQuestions || []).filter(q => q.kind !== 'STRATEGISK') })
+  contentCommit, fixCommit, attention: planAttention,
+  // Icke-blockerande STRATEGISKA frågor bärs nu vidare som uppskjutna frågor i stället
+  // för att ha stoppat bygget. Blockerande frågor kom aldrig hit — de är HARD_STOP.
+  deferredQuestions: (plan.openQuestions || []).filter(q => q.kind !== 'STRATEGISK' || q.blocking === false) })
 
 log(`Preview klar: ${previewUrl || '(ingen preview-url returnerad)'}. FINAL-TOUCHES.md väntar. Deploy sker aldrig obemannat.`)
 return {
   status: 'BYGGD-OBEMANNAD — väntar på människa: FINAL-TOUCHES (fakta, beslut, juridik-signoff nod 8), sedan /nortropic-launch + /vercel:deploy (nod 9)',
+  decision: planAttention.length ? ATTENTION_CONTINUE : CONTINUE,
+  ownerActionRequired: false,   // FINAL-TOUCHES/nod 8–9 är den ordinarie mänskliga kedjan, inte ett attention-mutex
+  attention: planAttention,
   buildDir, previewUrl, gates: gateRows, legalFindings, contentCommit, fixCommit,
 }

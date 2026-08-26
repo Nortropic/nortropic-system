@@ -1,7 +1,7 @@
 # Översikt — nodkartan, stoppen och artefaktkedjan
 
-Senast verifierad mot systemet: 2026-07-31 · v17 (denna commit)
-Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE: check-invariants.mjs INV-001–005, verify-suite doctor 1–13 + OGILTIG-status, design-reviewer Bash→BLOCKED, NRT-007-blocket i agenterna, docs/100-dagar); 0 påståenden i denna fil ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; nodkartans rader 1–2, artefaktkedjan och paketavsnittet lästa mot `agents/project-planner.md`, `skills/nortropic-plan/references/research-kontrakt-v3.md`, `docs/kapacitetskatalog.md` och `packs/lokal-se/manifest.md`. **S5 (grindparameterisering) är nu inräknad** — mergad i samma batch som denna stämpel (PR #129); nodkartans launch-rad bär därför åtta granskningslinser inklusive reselinsen. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 > **Ny här?** Läs [00-borja-har.md](00-borja-har.md) först — hela systemet förklarat från noll utan interna termer. Den här filen och 02–07 är det djupare, tekniska lagret.
 
@@ -11,8 +11,8 @@ Pipelinen är tolv noder. Kommandona är de tre pipeline-skillsen (som bara män
 
 | Nod | Steg | Kommando | Utförare (modell · effort) | Artefakt |
 |---|---|---|---|---|
-| 1 | Research | inget — operatören skriver filen | människa | `research.md` (5 obligatoriska fält) |
-| 2 | Plan | `/nortropic-plan <research.md>` | project-planner (fable · max) | `PROJECT-BRIEF.md` (7 sektioner + öppna frågor) |
+| 1 | Research | inget — operatören skriver filen mot researchkontrakt v3 | människa | `research.md` (universell kärna sektion 1–17 + ev. paketmodul; kontrollraden i §17) |
+| 2 | Plan | `/nortropic-plan <research.md>` | project-planner (fable · max) | `PROJECT-BRIEF.md` (7 sektioner + öppna frågor) — föregås av **interventionsbeslutet** |
 | 3 | Briefgodkännande | **HÅRT STOPP** | människa | godkänd brief, besvarade frågor |
 | 4 | Init | `/nortropic-init <PROJECT-BRIEF.md>` | stack-builder (opus · max) | GitHub-repo + Vercel-preview |
 | 5 | Innehåll | inget eget kommando — huvudsessionen kör agenten | content-designer (opus · max) | copy, bilder (anskaffningen skriver `BILDRAPPORT.json`), varumärkeslagret (app/-ikonerna + `public/brand/` via brand.mjs), `TODO-COPY` fylld, Humanisera-passet, klientfyllda `fotouppdrag-klient.md` (vid `saknas` på ersättningsprio 1–2) |
@@ -26,9 +26,62 @@ Pipelinen är tolv noder. Kommandona är de tre pipeline-skillsen (som bara män
 
 Källor: `skills/nortropic-plan/SKILL.md`, `skills/nortropic-init/SKILL.md`, `workflows/nortropic-review.js`, `workflows/nortropic-launch.js`, `skills/nortropic-retro/SKILL.md` samt agenternas frontmatter i `agents/`.
 
+## Kärna och paket — vad nod 2 avgör innan den planerar
+
+Systemet är **universellt i kärnan och specialiserat i paket.** Kärnan bär det som gäller
+varje kund; ett paket bär det som gäller en kundtyp. `lokal-se` (svenska lokala
+förtroendetjänster) är det **första** paketet, inte systemets natur. Mognadsläget per
+paket står i [06-scope.md](06-scope.md).
+
+**Paket får SKÄRPA, aldrig lätta.** Ett paket kan lägga till krav på kärnan; det kan
+aldrig ta bort ett. Skärpningslagen bor i `skills/nortropic-plan/references/research-kontrakt-v3.md`.
+
+Nod 2 gör därför två saker före all planering:
+
+**Processteg 0 — interventionsbeslutet (S3).** Innan plannern antar att svaret är "en ny
+sajt" avgör den vilken åtgärd som faktiskt löser problemet. Fyra utfall: **NY SAJT** ·
+**FÖRBÄTTRA BEFINTLIG** (sajten fungerar i grunden — en omskrivning kastar bort upparbetat
+SEO-värde) · **ICKE-SAJT-ÅTGÄRD** (problemet ligger utanför sajten: Google Företagsprofil,
+svarstider, prissättning) · **AVRÅD** (vi är fel leverantör). Utfallet skrivs i briefens
+§7.12, och **är det något annat än NY SAJT ROUTAR obemannat bort från ny-sajt-lanen utan att
+invänta ägaren, och utfallet registreras ALLTID OCKSÅ som en STRATEGISK öppen fråga med
+`blocking: false`.** Routningen avgörs av fältet `interventionsbeslut` — inte av frågan.
+Registreringen är en upplysning till ägaren, inte routningens orsak.
+
+**Dispositionen, inte etiketten, avgör (S10).** Varje STRATEGISK öppen fråga bär ett
+obligatoriskt `blocking: true|false`. `true` endast när fortsatt arbete kräver nytt mandat,
+en otillåten eller obyggd capability, en otillåten irreversibel effekt, eller ett obevisbart
+påstående — annars `false`, och arbetet fortsätter med frågan noterad. Utelämnas
+dispositionen är utfallet OKLASSIFICERAT och körningen fail-closar. Principen och de fyra
+utfallen `CONTINUE` / `ATTENTION_CONTINUE` / `ROUTE` / `HARD_STOP` bor i
+[00-guide.md](00-guide.md), "Owner attention ≠ owner approval".
+
+**Steg 1b — kapacitetskompilering.** Researchens signaler vägs mot
+[kapacitetskatalogen](kapacitetskatalog.md). En kapacitet som är `ROUTE-OUT` planeras
+aldrig runt — det är routing, inte ägargodkännande; en som krävs men är `DECLARED`
+(beskriven, ej byggd) är ett HARD STOPP som blockerande STRATEGISK öppen fråga. Systemet planerar aldrig vidare på en kapacitet som inte finns.
+
+**Känd avvikelse — INPUT GATE sammanfaller inte med kontraktet.** Plannerns minimigrind
+kräver fortfarande telefonnummer och USP. Kontraktets kontrollrad bär `org · kontaktvag ·
+erbjudande · geografi · primarhandling · framgangsmatt` och accepterar en TYPAD kontaktväg
+(telefon · formulär · DM · bokningssystem · fysisk plats). De två kraven avviker på olika
+sätt, och skillnaden spelar roll:
+
+- **Obligatorisk telefon är en `lokal-se`-SKÄRPNING** — paketmodulen skärper kontrollraden
+  där (`packs/lokal-se/research-module.md`).
+- **USP finns varken i kontraktet eller i paketet.** Grinden kräver det ändå, oavsett
+  paket. Det är alltså ett grindkrav utan hemvist i kontraktsvärlden — inte en
+  paketskärpning.
+
+Följden är verklig — en giltig `pack=core-only`-fil kan vara `status=KOMPLETT` och ändå
+stoppas både för saknat telefonnummer och för saknad USP. Avvikelsen är **medvetet
+oförändrad** i S1; grindparameterisering hör till S5/H-2. Möter du stoppet: det är en
+paketformad grind mot en universellt komplett fil, aldrig bristfällig research
+(`agents/project-planner.md`, Känd avvikelse).
+
 ## Lägesväxeln — obemannat (v16)
 
-Research-filens valfria rad `Läge: obemannat` byter körsätt. I `obemannat` orkestrerar `/nortropic-autobygg` noderna **2→7** utan att stanna vid nod 3, så länge briefen är ren — inga ohanterade/scope-nej juridikflaggor i §7 och inga STRATEGISKA öppna frågor. **Nod 8 (juridik) och nod 9 (deploy) är fortfarande hårda mänskliga stopp** — obemannat rör dem aldrig, och deployar aldrig. Faller något av de tre villkoren ut (bemannat/ohanterad-juridik-eller-STRATEGISK/CRITICAL-efter-en-fixloop) lämnas bygget över med `FINAL-TOUCHES.md` som punch-list. Utelämnad `Läge:`-rad = `bemannat` = nodkartan ovan oförändrad. Detaljer i [00-guide.md](00-guide.md) (Obemannat läge).
+Research-filens valfria rad `Läge: obemannat` byter körsätt. I `obemannat` orkestrerar `/nortropic-autobygg` noderna **2→7** utan att stanna vid nod 3, och stannar bara när det faktiskt måste. **Nod 8 (juridik) och nod 9 (deploy) är fortfarande hårda mänskliga stopp** — obemannat rör dem aldrig, och deployar aldrig. Utfallen är `CONTINUE` · `ATTENTION_CONTINUE` · `ROUTE` · `HARD_STOP`: en icke-blockerande strategisk fråga noteras men stoppar inte, ett interventionsutfall ≠ NY SAJT och scope-nej **routar** bort utan att invänta ägaren, medan ohanterad juridik, obyggd krävd kapacitet, kvarstående CRITICAL, brutet fixkontrakt och varje oklassificerat utfall lämnar över med `FINAL-TOUCHES.md` som punch-list. Principen och tabellen bor i [00-guide.md](00-guide.md), "Owner attention ≠ owner approval". Utelämnad `Läge:`-rad = `bemannat` = nodkartan ovan oförändrad. Detaljer i [00-guide.md](00-guide.md) (Obemannat läge).
 
 ## De tre hårda stoppen
 
@@ -44,7 +97,7 @@ Två ligger i pipelinen, ett i systemunderhållet. De är systemets **beslutsgri
 
 ## Artefaktkedjan
 
-Allt börjar med `research.md` — kundens faktakälla och det enda dokument som faktapåståenden får spåras till. `/nortropic-plan` förädlar den till `PROJECT-BRIEF.md`, som efter godkännande blir auktoritet för allt nedströms — tillsammans med `SLOTS.json` bredvid briefen: §5-slot-tabellens maskinläsbara spegel (bildspår, bildbehandling, en rad per bildplats), som bildanskaffningen och behandlingssteget läser. `/nortropic-init` materialiserar briefen som ett GitHub-repo med Vercel-preview.
+Allt börjar med `research.md` — kundens faktakälla och det enda dokument som faktapåståenden får spåras till. Filen skrivs mot **researchkontrakt v3**, vars enda hemvist är `skills/nortropic-plan/references/research-kontrakt-v3.md` och vars identitet är pinnad i `config/research-contract.v3.json`; en producent som bär sin egen kopia är en mutabel körtidskälla och därmed ett kontraktsbrott. Kontrollraden i sektion 17 läses FÖRST — den säger kontraktsversion, paket och antal `[OSÄKER]`/konflikter. En äldre kontraktsversion tolkas ALDRIG om: saknade nyare fält läses som `OSÄKER`, aldrig som `nej`. `/nortropic-plan` förädlar den till `PROJECT-BRIEF.md`, som efter godkännande blir auktoritet för allt nedströms — tillsammans med `SLOTS.json` bredvid briefen: §5-slot-tabellens maskinläsbara spegel (bildspår, bildbehandling, en rad per bildplats), som bildanskaffningen och behandlingssteget läser. `/nortropic-init` materialiserar briefen som ett GitHub-repo med Vercel-preview.
 
 Granskningarna producerar `REVIEW-REPORT.md`, vars meta-block (commit, datum, scope, mode) är det freshness-grinden i launch läser; kalibreringskörningar skriver i stället `REVIEW-REPORT-CALIBRATION.md` och rör aldrig metan (`workflows/nortropic-review.js`). Launchen producerar fyra saker: `EVAL-RESULT.md` (poängkortet — informativt, aldrig blockerande; grindarna blockerar, evalen mäter), den svenska kundöverlämningen `HANDOVER.md`, samt de klientfyllda `gbp-checklist-klient.md` och `gsc-steg-klient.md` (`workflows/nortropic-launch.js`).
 

@@ -1,7 +1,7 @@
 # Operatörsguiden
 
-Senast verifierad mot systemet: 2026-07-31 · v17 (denna commit)
-Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE: check-invariants.mjs INV-001–005, verify-suite doctor 1–13 + OGILTIG-status, design-reviewer Bash→BLOCKED, NRT-007-blocket i agenterna, docs/100-dagar); 0 påståenden i denna fil ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Kärna, paket och interventionsbeslutet" skrivet mot `agents/project-planner.md` och `docs/kapacitetskatalog.md`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 Det här är guiden för dig som kör Nortropic-systemet: en operatör, en sajt i taget. Den är författad ur systemfilerna själva — varje avsnitt pekar på filen där regeln faktiskt bor, och när guiden och en systemfil säger olika saker är det systemfilen som gäller. Guiden förklarar hur du använder systemet och varför det ser ut som det gör; den exakta nodkartan finns i [01-oversikt.md](01-oversikt.md), agenterna i [02-agenter.md](02-agenter.md) och de hårda reglerna med källhänvisningar i [03-regelverk.md](03-regelverk.md).
 
@@ -17,7 +17,7 @@ Den tredje är att **varje faktapåstående ska vara spårbart**. Ett påståend
 
 Pipelinen är tolv noder — tabellen finns i [01-oversikt.md](01-oversikt.md). Så här ser den ut från operatörsstolen:
 
-Du börjar med att skriva `research.md` om kunden. Fem fält är obligatoriska: företagsnamn, telefonnummer, minst en tjänst, minst en ort och något som duger som USP. Saknas något stannar planeringen med en numrerad lista över vad som fattas — systemet planerar aldrig på gissningar (`agents/project-planner.md`, INPUT GATE). Sedan kör du `/nortropic-plan`, som ger dig en `PROJECT-BRIEF.md` med exakt sju sektioner (§7 Kalibreringsprofil är kalibreringskontraktet nedströms), en lista öppna frågor och ett fält **Klienttyp**: `SKARP` eller `TESTKLIENT`. Plannern gör alltid en egen inspirationsinhämtning ur källbiblioteket (`skills/nortropic-plan/references/inspirationskallor.md` — omdömesjakten först, gallerierna som smaklyft, koncept sist; budget max 6 egna kandidater/~10 sidhämtningar) och väger dina eventuella Designreferenser i research.md likvärdigt med sina egna fynd — frasen "hoppa över inspirationsjakt" i research.md stänger av den egna jakten. Smakgrinden är briefgodkännandet: §5:s Referensöversättning visar per rad om ett val kom från din research eller plannerns jakt, och det är där du accepterar eller vänder riktningen (`agents/project-planner.md`, steg 5d). En testklient byggs icke-indexerbar och får aldrig verkliga GBP-, citation- eller DNS-åtgärder (`agents/project-planner.md` §6, `skills/nortropic-stack/SKILL.md`).
+Du börjar med att skriva `research.md` om kunden, mot researchkontrakt v3. Fem fält är obligatoriska i plannerns minimigrind: företagsnamn, telefonnummer, minst en tjänst, minst en ort och något som duger som USP. Saknas något stannar planeringen med en numrerad lista över vad som fattas — systemet planerar aldrig på gissningar (`agents/project-planner.md`, INPUT GATE). **Två av de fem sammanfaller inte med kontraktets kontrollrad** — se "Kärna, paket och interventionsbeslutet" nedan innan du drar slutsatsen att en fil är bristfällig. Sedan kör du `/nortropic-plan`, som ger dig en `PROJECT-BRIEF.md` med exakt sju sektioner (§7 Kalibreringsprofil är kalibreringskontraktet nedströms), en lista öppna frågor och ett fält **Klienttyp**: `SKARP` eller `TESTKLIENT`. Plannern gör alltid en egen inspirationsinhämtning ur källbiblioteket (`skills/nortropic-plan/references/inspirationskallor.md` — omdömesjakten först, gallerierna som smaklyft, koncept sist; budget max 6 egna kandidater/~10 sidhämtningar) och väger dina eventuella Designreferenser i research.md likvärdigt med sina egna fynd — frasen "hoppa över inspirationsjakt" i research.md stänger av den egna jakten. Smakgrinden är briefgodkännandet: §5:s Referensöversättning visar per rad om ett val kom från din research eller plannerns jakt, och det är där du accepterar eller vänder riktningen (`agents/project-planner.md`, steg 5d). En testklient byggs icke-indexerbar och får aldrig verkliga GBP-, citation- eller DNS-åtgärder (`agents/project-planner.md` §6, `skills/nortropic-stack/SKILL.md`).
 
 **Första hårda stoppet är briefgodkännandet.** Läs briefen, svara på de öppna frågorna, godkänn. Granska särskilt **§7 Kalibreringsprofil** — primärhandlingen (det enda sajten ska driva), röstregistret, kvittolistan och framför allt **juridikflaggorna**: en ohanterad flagga är ett beslut som bara du kan ta (bygg modulen som eget arbete, eller tacka nej — `skills/nortropic-plan/references/juridikflaggor.md`). Allt nedströms — bygge, copy, granskning, grindar, eval — behandlar briefen som auktoritet, så en slarvigt godkänd brief blir en slarvig sajt.
 
@@ -27,11 +27,114 @@ Granskning och launch beskrivs i egna avsnitt nedan. Efter launch återstår tre
 
 När fixloopen i launch hittar åtgärdbara fynd routas de per kategori: seo-fynd går till `seo-optimizer`, allt annat till `stack-builder`, sekventiellt så att två agenter aldrig skriver i repot samtidigt — och juridik går aldrig in i loopen alls (`workflows/nortropic-launch.js`, Fix loop).
 
+## Kärna, paket och interventionsbeslutet
+
+Systemet är **universellt i kärnan och specialiserat i paket** — `lokal-se` är det första
+paketet, inte systemets natur. Riktningen är enkelriktad: **ett paket kan lägga till krav
+på kärnan, aldrig ta bort ett.** Skärpningslagen är det som gör paket ofarliga — ett paket
+som fick lätta hade blivit en bakväg runt kärnans regler.
+
+Från operatörsstolen märks det på tre ställen.
+
+**Plannern kan komma fram till att en sajt inte är svaret.** Före all planering fäller den
+ett interventionsbeslut med fyra möjliga utfall: NY SAJT, FÖRBÄTTRA BEFINTLIG,
+ICKE-SAJT-ÅTGÄRD eller AVRÅD. Utfallet står i briefens §7.12, och **är det något annat än
+NY SAJT ROUTAR obemannat bort från ny-sajt-lanen i stället för att bygga, och utfallet
+registreras ALLTID OCKSÅ som en STRATEGISK öppen fråga med `blocking: false`.** Beslutet
+läses ur fältet `interventionsbeslut` — inte ur frågan. Registreringen finns för att du
+ska se det, inte för att styra routningen.
+
+Den frågan är dock ICKE-blockerande. **Ingen sajt byggs** — skälet registreras och du får
+ett rekommenderat nästa steg — men det väntar inte på ditt godkännande: att inte bygga är ett korrekt beslut systemet redan har mandat
+att fatta. Se **Owner attention ≠ owner approval** ovan.
+
+Det här är den mest värdefulla raden i briefen och den lättaste att skumma förbi. En kund
+vars problem är att telefonen inte besvaras blir inte hjälpt av en ny sajt, och systemet
+ska säga det i stället för att sälja ett bygge.
+
+**Kapaciteter stoppar innan de gissas.** Plannern väger researchens signaler mot
+[kapacitetskatalogen](kapacitetskatalog.md). Krävs en kapacitet som är `DECLARED`
+(beskriven men inte byggd) stannar planeringen med en STRATEGISK öppen fråga i stället för
+att planera runt den. Är den `ROUTE-OUT` rekommenderar briefen hänvisning. Du får alltså
+beslutet i knäet vid nod 3 — vilket är rätt plats för det.
+
+**INPUT GATE sammanfaller inte med kontraktet — och det är en känd avvikelse.**
+Minimigrinden (de fem fälten ovan) kräver telefonnummer och USP. Kontraktets kontrollrad
+accepterar vilken typad kontaktväg som helst — telefon, formulär, DM, bokningssystem eller
+fysisk plats — och har inget USP-fält alls.
+
+De två kraven avviker på olika sätt, och det är värt att hålla isär:
+
+- **Telefonkravet är en paketskärpning.** `lokal-se` skärper kontrollraden där, vilket
+  paket får göra.
+- **USP-kravet har ingen hemvist alls** — varken i kontraktet eller i något paket.
+  Grinden kräver det oavsett paket. Tro alltså inte att `core-only` gör dig fri från
+  USP, och inte heller att `lokal-se` är det som kräver den.
+
+Konsekvensen är verklig: en research-fil som är universellt komplett med enbart formulär
+som kontaktväg stoppas ändå här.
+
+Möter du det: stoppet är korrekt utfört, men det säger att grinden **ännu inte är
+parameteriserad** — inte att researchen är bristfällig. Avvikelsen är medvetet oförändrad
+tills grindparameteriseringen körs som egen ceremoni (`agents/project-planner.md`, Känd
+avvikelse).
+
+## Owner attention ≠ owner approval
+
+**Detta är principens kanoniska hemvist.** Andra ytor refererar hit och bär bara den
+minsta text runtime behöver.
+
+> Ett beslut **blockerar** endast om fortsatt arbete skulle överskrida delegerat mandat,
+> kräva en otillåten eller obyggd capability, skapa en otillåten irreversibel effekt,
+> eller kräva ett påstående systemet inte kan belägga.
+>
+> **Strategisk betydelse i sig är inte ett stoppvillkor.**
+
+Systemet ska be om **uppmärksamhet ofta, tillstånd sällan**, och stanna bara när det
+faktiskt måste. Fyra utfall, och skillnaden mellan dem är hela poängen:
+
+| Utfall | Betyder | Väntar på dig? |
+|---|---|---|
+| `CONTINUE` | arbetet fortsätter | nej |
+| `ATTENTION_CONTINUE` | arbetet fortsätter, beslutet registreras synligt | **nej** |
+| `ROUTE` | denna lane ska inte fortsätta med fel produkt — den avslutas korrekt | **nej** |
+| `HARD_STOP` | fortsatt arbete vore otillåtet eller obevisbart | ja |
+
+**Det som ändrades var inte gränserna — det var väntandet.** Tidigare stoppade
+`/nortropic-autobygg` och lämnade över så fort en fråga var märkt `STRATEGISK`, oavsett
+om den faktiskt krävde ett nytt mandat. Etiketten avgjorde. Nu avgör den verkliga
+authority- och effektrisken, uttryckt som `blocking: true|false` på varje strategisk
+fråga.
+
+Ett interventionsutfall som inte är `NY SAJT` — förbättra befintlig, icke-sajt-åtgärd
+eller avråd — **routar** numera. Ingen sajt byggs, skälet registreras, och du får ett
+rekommenderat nästa steg. Men systemet står inte och väntar på att du ska godkänna att
+dess korrekta beslut var korrekt.
+
+**Vad som fortfarande stoppar helt:** ohanterad juridik (human-only i alla lägen), en
+krävd men obyggd capability, kvarstående CRITICAL efter den ena tillåtna autonoma
+fixloopen, brutet fix-/proveniens-kontrakt, och varje **oklassificerat** utfall. Det
+sista är avsiktligt strängt: en saknad disposition blir aldrig tyst ett fortsättningsbeslut,
+och en äldre plan-artefakt får aldrig mer auktoritet genom att ett nytt fält saknas.
+
+Deploy ändras inte alls. Nod 8 (juridik-signoff) och nod 9 (`/vercel:deploy`) är dina,
+i alla lägen.
+
+**Attention får aldrig fungera som ett mutex.** Ser du raden
+
+```
+OWNER ATTENTION — inget svar krävs | HIGH | AVRÅD: ...
+Owner action required: false
+```
+
+så är det en upplysning, inte en fråga. Bara `ownerActionRequired: true` betyder att
+något faktiskt väntar på dig.
+
 ## Obemannat läge (v16)
 
 Bär research-filen raden `Läge: obemannat` kan du köra `/nortropic-autobygg` — orkestreringen som gör plan→init→innehåll→granskning→**grind-torrkörning** utan det mänskliga nod-3-stoppet. Det primära användningsfallet är **gratis-bygge-motorn**: låt systemet bygga en färdig preview åt en låginsatskund utan att du sitter med i varje nod (rekommendationen står i research-mallen: obemannat för gratis-byggen och låginsatskunder, bemannat för betalande — briefgodkännandet är billig försäkring). Utelämnad `Läge:`-rad = `bemannat` = dagens flöde, oförändrat.
 
-Det är ett förtroende med bromsar. Körningen **överlämnar alltid till människa** vid (a) en ohanterad eller scope-nej juridikflagga i §7, (b) en kvarstående STRATEGISK öppen fråga (plannern klassar varje öppen fråga STRATEGISK/FAKTA/BESLUT — STRATEGISK påverkar riktning/arkitektur, FAKTA/BESLUT kan skjutas upp), (c) CRITICAL kvar efter EN autonom fixloop, eller (d) ett brutet fixkontrakt (BATCH-005: en agents deklarerade filmängd motsäger delta-snapshoten, eller commit-utfallet avviker från den stageade kända mängden — i fasgränscommiten efter Content eller i fixrundans unionscommit). Den **deployar aldrig** — nod 8 (juridik-signoff) och nod 9 (`/vercel:deploy`) förblir dina. Sista steget skriver `FINAL-TOUCHES.md` (fakta att fylla, beslut att fatta, juridik att signera, avslutsreceptet) och för en spårningsrad till `AUTOBYGG-LOG.md` i kundmappen. Samma `FINAL-TOUCHES.md` kan en bemannad ägare generera med `/nortropic-final-touches <kundmapp>` efter `/nortropic-launch`.
+Det är ett förtroende med bromsar, och bromsarna är av två slag — se avsnittet **Owner attention ≠ owner approval** ovan för principen. Körningen **HARD-stoppar och överlämnar till människa** vid (a) en OHANTERAD juridikflagga i §7, (b) en strategisk fråga som är märkt `blocking: true` — alltså en som kräver nytt mandat, inte varje fråga som råkar vara strategisk, (c) CRITICAL kvar efter EN autonom fixloop, (d) ett brutet fixkontrakt (BATCH-005: en agents deklarerade filmängd motsäger delta-snapshoten, eller commit-utfallet avviker från den stageade kända mängden — i fasgränscommiten efter Content eller i fixrundans unionscommit), (e) ett ouppfyllt Del-C-förkrav, alltså en krävd men obyggd capability, och (f) varje OKLASSIFICERAT utfall. Den **ROUTAR** däremot bort — utan att invänta dig — vid `scope-nej`, vid ett interventionsutfall som inte är NY SAJT, och vid en stateful glidning (Ring 3). Ingen sajt byggs då, skälet registreras, och du får ett rekommenderat nästa steg. Den **deployar aldrig** — nod 8 (juridik-signoff) och nod 9 (`/vercel:deploy`) förblir dina. Sista steget skriver `FINAL-TOUCHES.md` (fakta att fylla, beslut att fatta, juridik att signera, avslutsreceptet) och för en spårningsrad till `AUTOBYGG-LOG.md` i kundmappen. Samma `FINAL-TOUCHES.md` kan en bemannad ägare generera med `/nortropic-final-touches <kundmapp>` efter `/nortropic-launch`.
 
 **Obemannat är inte "autopilot".** `AUTOPILOT`/självförbättringstrappan ([07-konstitution.md](07-konstitution.md) §B) styr systemets självförbättring — aldrig kund-flödet. Obemannat kund-bygge styrs enbart av research-radens `Läge:`, en helt separat brytare. Blanda aldrig ihop dem.
 

@@ -1,7 +1,7 @@
 # Börja här — Nortropic från noll
 
-Senast verifierad mot systemet: 2026-08-07 · v17 (denna commit)
-Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE: check-invariants.mjs INV-001–005, verify-suite doctor 1–13 + OGILTIG-status, design-reviewer Bash→BLOCKED, NRT-007-blocket i agenterna, docs/100-dagar); 0 påståenden i denna fil ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 Det här är ingången för dig som aldrig sett systemet förut. Läs den i ett svep, så förstår du vad Nortropic är och hur det hänger ihop — utan en enda insider-term. Det här dokumentet ersätter inte den tekniska dokumentationen (docs/01–07 och README); det är kartan du läser innan du dyker ner i den. Vill du veta exakt hur något fungerar finns länkar sist.
 
@@ -327,3 +327,116 @@ om varför den inte gäller.
 Det som INTE ändrats: hur många fixrundor som tillåts, att juridiken aldrig
 auto-fixas, att en grind måste vara grön för att släppa igenom. De reglerna är
 grundlagsskyddade och rörs inte av att grindarna blivit smartare på vad de läser.
+
+## Så tar systemet in kunskap utifrån (K0–K3, 2026-08-26)
+
+Världen ändrar sig: tillgänglighetskrav skärps, Google flyttar ett tröskelvärde, en
+plattform byter API. Frågan är inte OM sådant ska nå fabriken utan HUR — och svaret
+är att det aldrig får ske i tysthet.
+
+**Fyra delar, en grundlag.** Grundlagen är att kunskapsbanan bara får **föreslå**.
+Den skriver aldrig i en standard. Skälet är konkret: en källa som får skriva direkt i
+våra normer blir en kanal där någon annans ändring tyst blir vår policy — och den dag
+någon frågar "varför gör vi så här?" finns inget beslut att peka på.
+
+**Källregistret** listar var vi tittar: vilken fråga varje källa har auktoritet över,
+hur ofta den brukar ändras, hur en ändring faktiskt upptäcks, och vem som läser
+utfallet. Ingen källa har auktoritet över allt — WCAG avgör tillgänglighet, inte
+copy; kunden avgör fakta om sin verksamhet, aldrig hur besökaren tänker.
+
+**Anspråksstegen** är hur en idé blir en regel: sedd en gång → sedd igen oberoende →
+reproducerad hos oss → höll över tid → antagen som norm. Sista steget tas bara av en
+människa. Varje anspråk måste bära sitt giltighetsomfång — vilka kunder det gäller —
+och "vet inte" är ett godkänt svar medan tomrum inte är det. Ett anspråk som råkar
+stämma för en kund blir annars tyst en regel för alla.
+
+**Radarn** är ett månatligt matsmältningsorgan, inte ett notisflöde till. Du startar
+den; den startar aldrig sig själv. Den letar upp vad som faktiskt ändrats, **citerar
+det ordagrant** (en sammanfattning bär redan vår tolkning in i beslutet), frågar om
+det ens rör något vi gör — och landar i ett av fyra utfall: ett förslag, ett nytt
+anspråk, ett experiment, eller "bevaka". **En tom radarkörning är ett fullgott
+resultat.** Att leta upp något att föreslå för att körningen ska kännas värd sin tid
+är precis motsatsen till vad organet är till för.
+
+Och det femte steget — första riktiga radarkörningen mot ett riktigt kundprojekt —
+byggs inte i förväg. Det kräver en första riktig kund, och vi hittar inte på underlag
+för att kunna säga att banan är färdig.
+
+## Dokumentationen hann inte med bygget (S9, 2026-08-26)
+
+Systemet har två dokumentationslager: ett för dig som är ny (den här filen) och ett
+tekniskt för den som ska ändra i systemet. Regel 22 kräver att det FÖRSTA uppdateras
+varje gång något tekniskt ändras — och det har fungerat. Den här filen är aktuell.
+
+Följden blev att det ANDRA lagret gled. `docs/01-oversikt.md` och `docs/00-guide.md`
+stod kvar på en stämpel från 31 juli, utan ett enda omnämnande av paket,
+kapacitetskatalog eller interventionsbeslut — trots att fem ändringar sedan dess hade
+byggt om precis de delarna. En regel som skyddar ett lager kan alltså få det andra att
+se välskött ut medan det driver.
+
+**Tre saker rättades.**
+
+Ingressen i README beskrev systemet som byggt "för svenska egenföretagare och lokala
+småföretag". Det var sant en gång, men sedan i somras är arkitekturen en universell
+kärna med paket ovanpå — och `lokal-se` är systemets FÖRSTA kundtyp, inte dess natur.
+Skillnaden är inte kosmetisk: den som läser den gamla meningen tror att en kund utanför
+den beskrivningen ligger utanför systemet.
+
+Nodkartan sa fortfarande att research är "5 obligatoriska fält". Den skrivs numera mot
+ett researchkontrakt med sjutton sektioner, och plannern läser kontrollraden först.
+
+Och det viktigaste: **ingenstans i operatörsdokumentationen stod det att plannern kan
+komma fram till att en ny sajt inte är svaret.** Den fäller ett interventionsbeslut med
+fyra utfall — bygg nytt, förbättra det som finns, gör något som inte är en sajt alls,
+eller avråd — och det står i briefen. Nu står det där du faktiskt läser.
+
+**En vakt som märker nästa gång.** `scripts/check-docs-coherence.mjs` jämför vad som
+finns byggt i repot med vad dokumentationen säger. Finns det paket men ingen text om
+paket, faller den. Och åt andra hållet: **beskriver dokumentationen en byggdel som inte
+finns i repot, faller den också.** Det senare är det ovanligare och farligare felet — att
+beskriva arbete som ännu inte är klart som om det vore det.
+
+Att säga att något ännu INTE är klart är däremot alltid tillåtet. Ett tidigare utkast av
+vakten fällde meningen "detta är ännu inte landat" — alltså precis den ärlighet den var
+byggd för att skydda. En vakt som förbjuder sanningen om vad som saknas driver fram
+tystnad i stället för redovisning.
+
+**Vakten hade själv exakt det fel den letar efter.** Första versionen lät en kontroll
+"utgå" när det den vaktade försvann — och räknade sedan bara de kontroller som blev kvar.
+Att döpa om en enda fil tog bort tjugo kontroller, och vakten skrev ut "allt grönt" över
+hålet. Den rapporterade sin egen blindhet som ett godkänt resultat. Nu räknas varje
+kontroll alltid, och stämmer inte antalet vägrar den döma alls.
+
+Vakten kan säga att en sak är NÄMND. Den kan inte säga att den är väl beskriven, och den
+körs för hand — inte automatiskt. Det står i README, och vakten fäller om den meningen
+försvinner medan skripten står kvar i listan.
+
+## Fabriken frågar dig oftare, men ber om lov mer sällan (S10, 2026-08-26)
+
+Förut fanns bara två lägen: antingen körde fabriken vidare, eller så stannade den och
+väntade på dig. Det lät försiktigt, men det gjorde något dumt — den stannade även när den
+redan hade fattat rätt beslut.
+
+Säg att planeraren kommer fram till att kunden inte behöver en ny sajt: det som saknas är
+att telefonen inte besvaras. Det är precis den insikt vi vill att systemet ska ha. Men
+förut markerades den som "strategisk", och allt strategiskt stoppade bygget och lade sig
+och väntade på ditt godkännande. **Du fick alltså sitta och godkänna att systemet hade
+rätt.**
+
+**Nu skiljer fabriken på fyra saker:** den kan fortsätta; den kan fortsätta men tala om
+för dig vad den gjorde; den kan lägga ned det här spåret för att det är fel produkt; eller
+den kan faktiskt stanna.
+
+Bara det sista väntar på dig. Att lägga ned ett spår räknas nu som ett korrekt beslut, inte
+som något du måste låsa upp.
+
+**Vad som fortfarande stoppar helt** är oförändrat, och det är avsiktligt: juridik som
+ingen hanterat, något som kräver en förmåga fabriken inte har byggt, allvarliga fel som
+står kvar efter det enda automatiska fixförsöket, ett brutet spårbarhetskontrakt — och
+allt som är **oklassificerat**. Det sista är den viktigaste raden: om fabriken inte vet
+vilken sorts beslut något är, stannar den. Ett okänt läge blir aldrig tyst ett "kör på".
+
+Och deploy är precis som förut. Juridiksigneringen och publicera-knappen är dina.
+
+Skillnaden i en mening: **det är inte gränserna som flyttades, det är väntandet som togs
+bort.**
