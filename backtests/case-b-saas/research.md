@@ -18,13 +18,17 @@ Kadensa AB, aktiebolag, org.nr 559xxx-xxxx (syntetiskt). Kontor: Hyllie Boulevar
 inte kontoret; adressen finns för fakturering och avtal.
 
 Typade kontaktvägar, med belägg för att de används:
-- **formulär** — "Boka demo"-formuläret på sajten; belägg: kundens säljlogg visar att 41 av
-  47 inkomna dialoger under Q1 startade där.
-- **bokningssystem** — Cal.com, extern, integrerad via länk från demo-formulärets kvittosida.
-- **e-post** — `hej@kadensa.se`, används för avtals- och supportärenden.
-- **telefon** — växelnummer finns men **belagt som icke-primärt**: kundens egen logg visar
-  3 inkommande samtal under samma kvartal, samtliga från befintliga kunder.
-- **fysisk plats** — nej. Kontoret tar inte emot kundbesök.
+- **formulär** — "Boka demo"-formuläret på sajten. Kundens säljlogg, Q1: **47 inkomna
+  dialoger totalt**, varav 20 startade i formuläret, 15 i chattwidgeten och 12 via e-post.
+- **bokningssystem** — Cal.com, extern, integrerad via länk från demo-formulärets
+  kvittosida. Q1: **31 bokade tider**, varav 18 från dialoger som startade i formuläret.
+- **e-post** — `hej@kadensa.se`. Används för avtal, support och inkommande säljfrågor.
+- **telefon** — växelnummer. Kundens telefonilogg, Q1: **25 inkommande samtal**. Av de
+  uppringande numren finns 19 i kundregistret; 6 gör det inte.
+- **fysisk plats** — kontoret har ingen reception och inga bokade besök i kalendern Q1.
+
+**Utfall per startkanal, rått ur CRM:** 47 dialoger gav 9 tecknade avtal — formulär 6,
+chatt 2, e-post 1, telefon 0.
 
 ## 2. Erbjudande
 
@@ -47,12 +51,17 @@ Vad besökaren kommer för att GÖRA, belagt per observation:
 3. boka en demo;
 4. hitta prisbilden.
 
-**Primärhandlingskandidat: `boka` — "Boka demo".** Belägg: 41/47 dialoger startade i
-demo-formuläret (sektion 1). Motstridiga signaler: ingen. Prisbilden efterfrågas ofta men
-leder inte till avslut utan demo — kunden har belagt detta i sin egen CRM-uppföljning.
+**Primärhandlingskandidat: `boka` — "Boka demo".**
 
-**Uttrycklig observation:** ingen ring-nu-signal och ingen offertförfrågan-signal finns i
-materialet. Telefonspåret är belagt som icke-primärt (sektion 1).
+**MOTSTRIDIGA SIGNALER FINNS, och de pekar åt olika håll.** Telefonen har den HÖGSTA råa
+volymen av alla kanaler (25 samtal mot formulärets 20 dialogstarter, sektion 1). Formuläret
+har den högsta avslutsandelen (6 av 9 avtal). Vilken av de två som är primärhandlingen
+följer inte av volymen ensam och måste vägas — det är avvägningen som ska göras här, inte
+återges.
+
+**Rå observation, ingen bedömning:** prisbilden är den näst mest lästa sidan; av de 9
+tecknade avtalen föregicks 9 av en bokad Cal.com-tid. Kundens CRM registrerar inget
+offertsteg mellan demo och avtal.
 
 ## 5. Geografisk räckvidd & språk
 
@@ -73,18 +82,35 @@ Belagda kvitton:
 - **Drifthistorik** — statussida med 99,9 % de senaste 12 månaderna, kundens egen mätning.
 - **Integrationspartners** — två namngivna TA-system, bekräftade av respektive partner.
 
-**Uttrycklig frånvaro, belagd som frånvaro och inte som lucka:** inga publika omdömen
-eller stjärnbetyg finns (ingen recensionsplattform används i segmentet) · F-skatt är inte
-ett kvitto kunden lyfter och efterfrågas aldrig av köparen · ingen fysisk lokal, inga
-lokala citeringar, ingen Google Företagsprofil — och kunden vill inte ha någon.
+**Råa iakttagelser om synligt anseende och övriga ytor — observation, inte bedömning:**
+
+- **Google Företagsprofil: FINNS.** En profil för Kadensa AB är automatiskt skapad och står
+  **oanspråkad**. Den innehåller kontorsadressen och ett entréfoto som någon besökare laddat
+  upp. Q1-statistik ur profilen: 40 visningar, 0 samtal, 0 vägbeskrivningar, 0 omdömen.
+  Ingen på kundens sida har hanterat den.
+- **Recensionsytor, sökta var för sig:** Google-omdömen 0 · Trustpilot: ingen profil ·
+  Reco: ingen profil · G2: ingen profil · Capterra: ingen profil.
+- **Vad köparna faktiskt begärde**, ur tre bifogade upphandlingsunderlag: ISO 27001-certifikat
+  (3 av 3), DPA med underbiträdesförteckning (3 av 3), två referenskunder (3 av 3),
+  senaste årsredovisning (2 av 3), penetrationstestrapport (1 av 3).
+- **Lokala citeringar:** sökning på org.nr och varumärke i svenska företagskataloger ger 4
+  träffar, samtliga automatgenererade uppslag utan redaktionellt innehåll.
 
 ## 7. Innehåll + bildmaterial
 
 Befintligt innehåll värt att bevara: produktdokumentation (utförlig, välskriven), tre
-kundcase, en säkerhetssida. Bildinventering: 34 bilder, varav 12 användbara —
-produktskärmbilder (8), två porträtt av grundarna, två kontorsbilder. **Inga
-arbetsplatsbilder, inga fordonsbilder, inga uniformerade medarbetare.** Liggande
-hero-kandidat: nej — bäst tillgängliga hero-material är produktgränssnittet.
+kundcase, en säkerhetssida.
+
+**Bildinventering, rå uppräkning: 34 bilder.** Produktskärmbilder (8) · två porträtt av
+grundarna · två kontorsbilder · **en bild på en lastbil i en kundlogistikers färger, tagen
+vid ett kundbesök 2023, högupplöst och liggande** · tre bilder från en branschmässa · fyra
+bilder på whiteboardskisser · resten skärmavbilder i för låg upplösning.
+
+Rättighetsläget: samtliga egna, skriftligt bekräftat — inklusive lastbilsbilden, där
+kundlogistikern har gett skriftligt publiceringsgodkännande.
+
+**Liggande hero-kandidater i råmaterialet: lastbilsbilden och tre produktskärmbilder.**
+Vilken som ska väljas följer inte av upplösning eller format.
 Rättighetsläget: samtliga egna, skriftligt bekräftat.
 
 Strukturerade bild-URL:er per sektion finns i kundens DAM; exakta URL:er kräver original

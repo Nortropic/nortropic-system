@@ -35,6 +35,50 @@ ett formulerat påstående — den bevisar ingenting om hur systemet beter sig.
 | `B-T5` | *B2B trust comes from product/case/security/expertise* | Förtroendekvitton ska vara ISO 27001, kundcase, DPA, drifthistorik och integrationspartners — aldrig stjärnbetyg, aldrig F-skatt, aldrig lokala citeringar | `MEKANISK` (`kvitton` + `forbjudnaPastaenden`) + `EJ KÖRD` (renderad kvittosektion) |
 | `B-T6` | *no F-skatt/local-review/truck/carpenter assumptions* | Ingen hantverkarsemantik får läcka in: inga F-skatt-kvitton, inga omdömesstjärnor, inga fordons- eller arbetsplatsbilder, inget hantverkarvernacular i copyn | `MEKANISK` (fixturens fält) + `EJ KÖRD` (copy och bildval) |
 
+## `B-GAP-2` — ÅTGÄRDAT 2026-08-26: fixturen ger nu SIGNALER, inte SLUTSATSER
+
+Fyra av sex fällor gick inte att spänna, eftersom researchen levererade svaret.
+`§6` sa *"uttrycklig frånvaro … kunden vill inte ha någon Google Företagsprofil"* (T3),
+`§4` sa *"ingen ring-nu-signal … finns"* (T4), `§7` sa *"inga fordonsbilder"* (T5/T6).
+**Case B prövade då att systemet kan KOPIERA en slutsats, inte att det kan DRA den** — samma
+svaghet §26 varnar för på utsidan, en sajt som klarar varje fälla genom att vara
+innehållslös, fast flyttad in i indata.
+
+Researchen bär nu råmaterialet. **Slutsatserna står här, där de hör hemma**, som det
+systemet SKA komma fram till — och som det går att ha fel om.
+
+| Signal i researchen (rå) | Slutsats systemet ska DRA | Vad ett fel ser ut som |
+|---|---|---|
+| §6: en Google Företagsprofil **finns och är oanspråkad**, med 40 visningar, 0 samtal, 0 vägbeskrivningar, 0 omdömen | Profilen är ingen förtroendeyta för den här kunden och ska inte aktiveras. `KAP-LOKAL-SEO` förblir inaktiv | Handover får en GFP-checklista därför att en profil "finns" — precis fälla `B-T3` |
+| §1/§4: telefon 25 samtal mot formulärets 20 dialogstarter, men avsluten 6 av 9 via formuläret och 9 av 9 föregångna av bokad Cal.com-tid | Primärhandlingen är `boka`, trots att telefonen är störst i råtal | `primaraktion` blir `ring` på volymen — precis fälla `B-T4` |
+| §6: köparnas upphandlingsunderlag begär ISO 27001, DPA, referenser, årsredovisning, pentest | Kvittona är produkt-/säkerhets-/casebaserade. **F-skatt nämns inte i indata alls** | F-skatt dyker upp som kvitto — då är det UPPFUNNET, precis fälla `B-T5` |
+| §6: 0 träffar på Google-omdömen, ingen profil på Trustpilot/Reco/G2/Capterra, 4 automatgenererade katalogträffar | Inget synligt anseende att visa; frånvaron skrivs ut som observation, aldrig som lucka att fylla | Stjärnbetyg eller "omdömen kommer snart" — precis fälla `B-T6` |
+| §7: en högupplöst, liggande **lastbilsbild** ligger i inventeringen med publiceringsgodkännande, bland fyra liggande hero-kandidater | Lastbilen väljs BORT som hero. Formatet kvalificerar den; semantiken diskvalificerar den | Fordonsbild som hero därför att den är den bästa liggande bilden — precis fälla `B-T6` |
+
+**Den svåraste raden är telefonraden.** De övriga går att klara genom att avstå; den
+kräver ett aktivt val mellan två kanaler där den förlorande har högst volym.
+
+**Vad som fortfarande INTE prövas:** samtliga fem slutsatser är `EJ KÖRDA`. Att signalerna
+nu är råa gör fällorna spännbara — det gör dem inte spända.
+
+## `B-GAP-1` — det FÖRVÄNTADE stoppet, bokfört i förväg
+
+`KAP-EXTERN-BOKNING` står `DECLARED`. Autobyggs beslutstaxonomi HARD-stoppar på obyggd
+krävd capability, så en verklig Case B-körning **stannar innan `B-P2a` går att avgöra**.
+
+**Det stoppet är härmed det FÖRVÄNTADE utfallet av en Case B-körning, inte en överraskning.**
+Ett korrekt HARD_STOP är också ett prov: det prövar att taxonomin stannar på rätt ställe i
+stället för att bygga vidare på en capability som inte finns.
+
+| Utfall av en Case B-körning | Tolkning |
+|---|---|
+| HARD_STOP på `KAP-EXTERN-BOKNING`, med capabilityn namngiven i stoppskälet | **Förväntat.** `B-P2a` förblir `EJ KÖRD`; `B-P1`, `B-P2b`–`B-P2d` kan bedömas fram till stoppet |
+| Körningen passerar och bygger en demokedja | **FYND.** Taxonomin har byggt på en `DECLARED` capability — allvarligare än ett uteblivet Case B |
+| HARD_STOP på något annat | **FYND.** Stoppskälet är inte det förväntade och måste utredas före något annat |
+
+Att lyfta `KAP-EXTERN-BOKNING` till `BUILT` är ett eget arbete och byter inte plats med
+det här. Tills dess är stoppet utfallet.
+
 ## `B-T7` — DELVIS ÅTGÄRDAT 2026-08-26
 
 Case B avslöjade att den universella kärnan själv bar lokala antaganden — fixturen gick
@@ -80,8 +124,8 @@ som bara undviker lokalt läckage har inte passerat — den har låtit bli att g
 
 | ID | Lucka | Status | Nästa transition |
 |---|---|---|---|
-| `B-GAP-2` | **Fixturen skriver ut svaret på fyra av sex fällor.** §26 kräver att SYSTEMET producerar *"explicit absence of local leakage"* — men researchen levererar redan slutsatsen: §6 säger *"Uttrycklig frånvaro … kunden vill inte ha någon Google Företagsprofil"* (T3), §4 säger *"ingen ring-nu-signal och ingen offertförfrågan-signal finns"* (T4), §7 säger *"Inga arbetsplatsbilder, inga fordonsbilder"* (T5/T6). **Case B prövar då att systemet kan KOPIERA en slutsats, inte att det kan DRA den.** Genuint spänd är bara T1 (Malmöadressen finns på riktigt) och `B-T7`. Det är samma svaghet §26 varnar för på utsidan — en sajt som klarar varje fälla genom att vara innehållslös — fast flyttad in i indata | `NOT_STARTED` | Råa signaler i stället för dragna slutsatser: en oanspråkad Google Företagsprofil som FINNS men inte används · telefonvolym 20 mot 25 i stället för 3 mot 41, så primärhandlingen kräver en avvägning · en fordonsbild i inventeringen som ska väljas bort. Slutsatserna flyttas till den här filen, där de hör hemma. Kontraktets §11-disciplin — *"RÅ observation … aldrig bedömning"* — pekar åt samma håll |
-| `B-GAP-1` | Case B:s primärhandling är demobokning via Cal.com, och `KAP-EXTERN-BOKNING` står `DECLARED` i kapacitetskatalogen — beskriven, inte byggd. Autobyggs beslutstaxonomi HARD-stoppar på *obyggd krävd capability*. **En verklig körning stannar därför INNAN `B-P2a` går att avgöra**, och det är den tyngsta av de fem positiva villkoren | `NOT_STARTED` | Antingen bygg `KAP-EXTERN-BOKNING` till `BUILT`, eller kör Case B medvetet till stoppet och bokför stoppet SOM utfallet — ett korrekt HARD_STOP är också ett prov, men det måste vara det förväntade och inte en överraskning |
+| `B-GAP-2` | **Fixturen skrev ut svaret på fyra av sex fällor** — Case B prövade då kopiering, inte härledning | `ÅTGÄRDAT 2026-08-26` | Researchen bär nu råa signaler (oanspråkad GFP med noll värde · telefon 25 mot formulär 20 · lastbilsbild bland hero-kandidaterna · inget omnämnande av F-skatt); slutsatserna står i avsnittet `B-GAP-2` ovan. **Kvarstår:** samtliga fem slutsatser är `EJ KÖRDA` — spännbara, inte spända |
+| `B-GAP-1` | `KAP-EXTERN-BOKNING` är `DECLARED`, så en körning HARD-stoppar innan `B-P2a` går att avgöra | `BOKFÖRT 2026-08-26` | Stoppet är nu det FÖRVÄNTADE utfallet med en utskriven tolkningstabell (se avsnittet `B-GAP-1` ovan) — ett korrekt HARD_STOP är också ett prov. **Kvarstår:** att lyfta capabilityn till `BUILT` är ett eget arbete |
 
 **`B-P2` är den halva som är lättast att glömma** — en sajt kan klara varje fälla genom att
 vara innehållslös. Den är därför uppdelad i fem rader med namngiven fällare, samma form som

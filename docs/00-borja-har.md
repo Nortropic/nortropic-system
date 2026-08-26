@@ -204,6 +204,28 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Provfallet som gav bort svaret (2026-08-26)
+
+Vi har ett provfall som ska visa att fabriken INTE klistrar på lokala vanor där de inte
+hör hemma — ett påhittat mjukvaruföretag utan butik, utan kundbesök, utan rörmokarlogik.
+Sex fällor är utlagda.
+
+**Vid en genomgång visade det sig att provet gav bort svaret på fyra av de sex.** Underlaget
+sa rakt ut "kunden vill inte ha någon Google-företagsprofil" och "det finns inga
+fordonsbilder". Fabriken behövde alltså inte KOMMA FRAM till något — den behövde bara
+skriva av. Ett prov som ger bort svaret mäter ingenting.
+
+**Underlaget är omskrivet till råmaterial.** Nu finns det en Google-företagsprofil på
+riktigt — övergiven, med noll samtal och noll omdömen — och fabriken måste själv avgöra att
+den inte är värd något här. Nu ringer telefonen FLER gånger än formuläret får ifyllningar,
+så valet av vad besökaren ska göra kräver en verklig avvägning i stället för en avläsning.
+Nu ligger det en högupplöst bild på en lastbil bland de bilder som formatmässigt duger som
+toppbild — och den ska väljas bort på vad den betyder, inte på hur den ser ut.
+
+**Facit finns kvar**, men det står numera i provets facitfil där det hör hemma, med en rad
+per fälla. Och det står utskrivet att fällorna nu **går att utlösa** — inte att de har
+utlösts. Provet är förberett, inte genomfört.
+
 ## Vem vaktar vakterna? (2026-08-26)
 
 Fabriken har femton kontroller som ska fälla när något är fel. En obehaglig fråga fick ett

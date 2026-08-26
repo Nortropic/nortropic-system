@@ -57,14 +57,14 @@ const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
-const SJALVPIN = '9c90ae69782dbe78'
+const SJALVPIN = 'ec95bb5b1aeb0196'
 
 // ---- PINNTABELL: BÖRJAN (normaliseras ut ur självankaret) -------------------
 // sha256 över vaktens HELA källtext, första 16 hex. Ändras en vakt legitimt uppdateras
 // raden i SAMMA commit — det är hela poängen att den ändringen syns här.
 const PINNAR = {
   'check-autobygg-delegation.mjs': 'fdb981e1432787be',
-  'check-backtest-fixtures.mjs': 'b865919cc0c9c9a9',
+  'check-backtest-fixtures.mjs': '643dc750167f5fc5',
   'check-docs-coherence.mjs': 'ae02760dfefd3f8e',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
   'check-gym-contract.mjs': '3bdf293c3aa7e1f7',
@@ -110,9 +110,7 @@ if (process.argv.includes('--pinna-om')) {
   let ny = ny0
   if (!SJALVRAD.test(ny)) { console.error('AVBRUTET: självpinnens deklaration har fel form'); process.exit(2) }
   const h = createHash('sha256').update(ny.replace(TABELL, '<TABELL>').replace(SJALVRAD, "const SJALVPIN = '<PINNE>'")).digest('hex').slice(0, 16)
-  const fore = ny
   ny = ny.replace(SJALVRAD, `const SJALVPIN = '${h}'`)
-  if (ny === fore) { console.error('AVBRUTET: självpinnen ersattes inte'); process.exit(2) }
   writeFileSync(MIG, ny)
   console.log(`OMPINNAD: ${rader.length} vakter · logikhash ${h}`)
   process.exit(0)

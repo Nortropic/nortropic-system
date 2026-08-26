@@ -78,7 +78,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '6b1be51d486e2148'
+const FORVANTAD_SIGNATUR = '2f1002ccb51cd6ae'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -299,11 +299,55 @@ for (const fx of FIXTURER) {
       !!s5 && /(inget arbetsområde|inga orter|ingen restid)/i.test(s5), 'tyst frånvaro')
     check('B-T1: research §1 beskriver adressen som kontor, inte upptagningsområde',
       !!s1 && !/upptagningsområde|[Aa]rbetsområde/.test(s1), 'lokal formulering i §1')
-    check('B-T5/B-T6: research §6 bär INGA lokala kvitton som belagda',
-      !!s6 && !/F-skatt registrerad|Google Företagsprofil finns|lokala citeringar:/i.test(s6),
-      'lokalt kvitto belagt i negativkontrollens §6')
-    check('B-T6: research §6 skriver ut frånvaron av omdömen och F-skatt',
-      !!s6 && /[Uu]ttrycklig frånvaro/.test(s6), 'frånvaron är tyst')
+    // B-GAP-2:s rättning ändrar vad §6 ska bära. FÖRR krävde vakten att researchen skrev
+    // ut SLUTSATSEN ("uttrycklig frånvaro … kunden vill inte ha någon Google
+    // Företagsprofil"). Då prövade Case B att systemet kan KOPIERA en slutsats, inte att
+    // det kan DRA den. Nu krävs RÅA signaler, och slutsatsen ska saknas.
+    const kvittolista = s6 ? s6.split(/\*\*Råa iakttagelser/)[0] : ''
+    check('B-T5/B-T6: §6:s BELAGDA KVITTON bär inga lokala kvitton',
+      !!s6 && !/F-skatt|Google Företagsprofil|lokala citeringar/i.test(kvittolista),
+      'ett lokalt kvitto står i kvittolistan — i den RÅA iakttagelsedelen är det däremot tillåtet, för där är det en observation systemet ska väga')
+    check('B-GAP-2: §6 bär RÅA iakttagelser, inte en dragen slutsats',
+      !!s6 && /Råa iakttagelser/.test(s6) && !/[Uu]ttrycklig frånvaro/.test(s6),
+      'researchen levererar slutsatsen i stället för signalen — då prövas kopiering, inte härledning')
+    check('B-T3: en OANSPRÅKAD Google Företagsprofil FINNS i råmaterialet',
+      !!s6 && /Google Företagsprofil: FINNS/.test(s6) && /oanspråkad/.test(s6),
+      'utan en profil som faktiskt finns går fälla T3 inte att spänna — att avstå från något som inte finns är ingen prestation')
+    check('B-T3: profilens frånvaro av VÄRDE är rå statistik, inte en bedömning',
+      !!s6 && /0 samtal/.test(s6) && /0 vägbeskrivningar/.test(s6) && !/vill inte ha/.test(s6),
+      'slutsatsen står kvar i researchen')
+    check('B-T5: §6 namnger INTE F-skatt någonstans',
+      !!s6 && !/F-skatt/i.test(s6),
+      'ett system som skriver ut F-skatt som kvitto ska UPPFINNA det — står ordet i indata prövas ingenting')
+    check('B-T6: recensionsytorna är räknade var för sig, inte sammanfattade',
+      !!s6 && /Trustpilot/.test(s6) && /Capterra/.test(s6),
+      'en sammanfattning ("inga omdömen finns") är en slutsats; en uppräkning per yta är en observation')
+    // §4: avvägningen måste vara KVAR att göra. Fälla T4 kan inte spännas om researchen
+    // redan har eliminerat motsignalen.
+    const s4 = sektion(research, 4)
+    check('B-T4: §4 namnger en MOTSTRIDIG signal i stället för att förneka den',
+      !!s4 && /MOTSTRIDIGA SIGNALER FINNS/.test(s4) && !/Motstridiga signaler: ingen/.test(s4),
+      '"motstridiga signaler: ingen" gör valet av primärhandling till en avskrift')
+    check('B-T4: telefonens RÅA volym är HÖGRE än formulärets',
+      !!s4 && /25 samtal mot formulärets 20/.test(s4),
+      'är den vinnande kanalen också störst i råtal finns ingen avvägning kvar — och T4 (BOOK_DEMO får inte bli ring/offert) kan inte falla')
+    // §7: en fordonsbild ska LIGGA i inventeringen och väljas bort.
+    const s7 = sektion(research, 7)
+    // Ordet "lastbil" NÅGONSTANS i §7 räcker inte: en mutation som strök bilden ur
+    // INVENTERINGEN passerade på en kvarlämnad mening om rättighetsläget. Bilden måste
+    // stå både i uppräkningen och bland hero-kandidaterna — det är där valet uppstår.
+    const heroRad = s7 ? (/[Ll]iggande hero-kandidater[^\n]*(\n[^\n]+)*?\./.exec(s7) || [''])[0] : ''
+    check('B-T5/B-T6: §7 bär en FORDONSBILD i BILDINVENTERINGEN',
+      !!s7 && /bild på en lastbil/i.test(s7),
+      'utan en lokal bildsignal i råmaterialet prövar bildvalet ingenting')
+    check('B-T5/B-T6: fordonsbilden är en av HERO-KANDIDATERNA',
+      /lastbil/i.test(heroRad),
+      'ligger bilden i inventeringen men inte bland hero-kandidaterna uppstår inget val — och fällan spänns inte')
+    check('B-T5/B-T6: hero-valet följer INTE av format eller upplösning',
+      !!s7 && /följer inte av upplösning eller format/.test(s7),
+      'är den lokala bilden sämst i format väljs den bort av teknik, inte av semantik — och fällan prövar teknikvalet i stället')
+    check('B-T6: §7 påstår INTE att fordonsbilder saknas',
+      !!s7 && !/[Ii]nga fordonsbilder/.test(s7), 'förnekelsen är kvar och gör valet till en avskrift')
     check('B-T2: research §15 aktiverar INTE KAP-LOKAL-SEO',
       !!s15 && /KAP-LOKAL-SEO\` aktiveras INTE|KAP-LOKAL-SEO aktiveras INTE/.test(s15), 'ortssignal i §15')
     // Närvaron av rätt mening räcker inte: den POSITIVA formen måste också saknas. En
@@ -372,6 +416,43 @@ check('B-M6: KAP-LOKAL-SEO aktiveras INTE — SKOPAT, citatagnostiskt',
   !/['"]KAP-LOKAL-SEO['"]/.test(bF('kapaciteter')), 'aktiverad i core-only')
 check('B-T4: forbjudnaPastaenden är icke-tom och namnger konkreta påståenden',
   (bF('forbjudnaPastaenden').match(/'/g) || []).length >= 8, 'urholkad lista — A-D7/B-T5:s facit försvinner')
+
+// ---- B-GAP-2/B-GAP-1: slutsatserna ska stå i FORVANTAT, inte i researchen --
+// Flyttades slutsatserna bara BORT ur researchen utan att landa någonstans vore de
+// borttappade, inte flyttade — och Case B skulle sakna facit helt.
+const bFv = las('backtests/case-b-saas/FORVANTAT.md')
+const harledning = /## `B-GAP-2` — ÅTGÄRDAT[\s\S]*?(?=^## )/m.exec(bFv)
+check('B-GAP-2: härledningstabellen finns i FORVANTAT', !!harledning,
+  'slutsatserna är borttagna ur researchen utan att landa i facit — då är de borttappade')
+if (harledning) {
+  const rader = harledning[0].split('\n').filter((r) => /^\| §/.test(r))
+  check('B-GAP-2: varje rå signal har en slutsats OCH ett felutseende', rader.length === 5,
+    `${rader.length} rader — fem råa signaler infördes i researchen (GFP, telefonvolym, upphandlingskrav, recensionsytor, lastbilsbild)`)
+  const utanFalla = rader.filter((r) => !/B-T[1-6]/.test(r))
+  check('B-GAP-2: varje slutsats pekar på den fälla den gör spännbar', utanFalla.length === 0,
+    `${utanFalla.length} rader utan fällhänvisning — en slutsats utan fälla är prosa, inte facit`)
+  for (const t of ['B-T3', 'B-T4', 'B-T5', 'B-T6']) {
+    check(`B-GAP-2: fälla ${t} täcks av en härledningsrad`, rader.some((r) => r.includes(t)),
+      `${t} var en av de fyra fällor som gick att kopiera sig förbi — den måste ha en rå signal nu`)
+  }
+  check('B-GAP-2: den svåraste raden är UTPEKAD, inte gömd i tabellen',
+    /svåraste raden är telefonraden/.test(harledning[0]),
+    'de fyra andra går att klara genom att AVSTÅ; bara telefonraden kräver ett aktivt val mellan två kanaler')
+  check('B-GAP-2: spännbart förväxlas INTE med spänt',
+    /spännbara, inte spända|Att signalerna\s*\n?nu är råa gör fällorna spännbara/.test(harledning[0]),
+    'en åtgärdad lucka som låter som en genomförd körning är värre än en öppen lucka')
+}
+const stopp = /## `B-GAP-1` — det FÖRVÄNTADE stoppet[\s\S]*?(?=^## )/m.exec(bFv)
+check('B-GAP-1: det förväntade stoppet är bokfört I FÖRVÄG', !!stopp,
+  'ett HARD_STOP som inte är bokfört före körningen går inte att skilja från ett misslyckande')
+if (stopp) {
+  check('B-GAP-1: både det förväntade och de TVÅ fynden är utskrivna',
+    (stopp[0].match(/\*\*FYND\.\*\*/g) || []).length === 2 && /\*\*Förväntat\.\*\*/.test(stopp[0]),
+    'en tolkningstabell som bara namnger det förväntade utfallet gör varje annat utfall tolkningsbart i efterhand')
+  check('B-GAP-1: att bygga capabilityn byter INTE plats med provet',
+    /byter inte plats med\s*\n?det här|Tills dess är stoppet utfallet/.test(stopp[0]),
+    'annars läses stoppet som en TODO i stället för som det utfall det är')
+}
 
 // ---- B-T7: ankrat i KONTRAKTET, aldrig i filen som gör påståendet ----------
 // B-T7 är ÅTGÄRDAT. Kontrollerna är därför INVERTERADE: de prövar att läckaget är BORTA
