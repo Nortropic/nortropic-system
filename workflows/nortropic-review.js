@@ -125,7 +125,7 @@ const results = await pipeline(
     return parallel(found.map(f => () =>
       parallel([0, 1].map(i => () =>
         agent(
-          `You are an adversarial verifier with a distinct lens (${i === 0 ? 'is this factually true in the code? Read the actual files at the stated location' : 'does this actually matter for a Swedish local-service lead-gen site, or is it pedantry/already mitigated elsewhere?'}). Try to REFUTE this ${r.key} review finding about ${scope}:\n\nTitle: ${f.title}\nLocation: ${f.location}\nClaim: ${f.why}\nProposed fix: ${f.fix}\n\nInvestigate the code yourself. Default to refuted=true if you cannot confirm it.`,
+          `You are an adversarial verifier with a distinct lens (${i === 0 ? 'is this factually true in the code? Read the actual files at the stated location' : 'does this actually matter FOR THIS SITE PER ITS CONTRACT? Read content/profile.ts: primaraktion, toppuppgifter, obligatoriskaResor, forbjudnaPastaenden, kvalitetsnivaer and paket. Judge the finding against what THAT contract promises — not against a hardcoded site type. If profile.ts is missing or a field is SAKNAS_I_V1, say the contract cannot decide it and judge on general conversion harm instead; never invent a requirement the contract does not carry.'}). Try to REFUTE this ${r.key} review finding about ${scope}:\n\nTitle: ${f.title}\nLocation: ${f.location}\nClaim: ${f.why}\nProposed fix: ${f.fix}\n\nInvestigate the code yourself. Default to refuted=true if you cannot confirm it.`,
           { label: `verify:${f.title.slice(0, 40)}`, phase: 'Verify', schema: VERDICT }
         )
       )).then(votes => {

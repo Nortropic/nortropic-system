@@ -1,12 +1,12 @@
 export const meta = {
   name: 'nortropic-launch',
-  description: 'Pre-launch gate for a Nortropic site: 7 parallel audit lenses, bounded fix-loop (legal always stops for human), final sweep that re-anchors the verdict in a fresh full measurement when fixes were committed (NRT-001 PASS-invariant, BATCH-006), Swedish handover doc, launch readiness report',
+  description: 'Pre-launch gate for a Nortropic site: 8 parallel audit lenses, bounded fix-loop (legal always stops for human), final sweep that re-anchors the verdict in a fresh full measurement when fixes were committed (NRT-001 PASS-invariant, BATCH-006), Swedish handover doc, launch readiness report',
   whenToUse: 'Run when a Nortropic client site is believed ready to launch, before /vercel:deploy',
   phases: [
     { title: 'Freshness', detail: 'block launch if the last FULL review predates changes on the main pages' },
-    { title: 'Gates', detail: '7 parallel audit lenses' },
+    { title: 'Gates', detail: '8 parallel audit lenses' },
     { title: 'Fix loop', detail: 'max 3 rounds via stack-builder; legal never auto-fixed' },
-    { title: 'Final sweep', detail: '≥1 committad fixrunda + pre-svep-PASS → alla 6 icke-legal-grindar körs om EN gång mot bevisat färsk preview; verdiktet ankras här (NRT-001). Obevisbar deploy → ODÖMBART, aldrig tyst grönt' },
+    { title: 'Final sweep', detail: '≥1 committad fixrunda + pre-svep-PASS → alla 7 icke-legal-grindar körs om EN gång mot bevisat färsk preview; verdiktet ankras här (NRT-001). Obevisbar deploy → ODÖMBART, aldrig tyst grönt' },
     { title: 'Eval', detail: 'non-blocking quality score via nortropic-eval (informs report only)' },
     { title: 'Handover', detail: 'GBP/GSC deliverables + Swedish client handover doc' },
     { title: 'Report', detail: 'launch readiness verdict' },
@@ -29,7 +29,7 @@ const GATE = {
           location: { type: 'string' },
           why: { type: 'string' },
           fix: { type: 'string' },
-          category: { type: 'string', enum: ['technical', 'leadgen', 'visual', 'trust', 'seo', 'security', 'legal'] },
+          category: { type: 'string', enum: ['technical', 'leadgen', 'visual', 'trust', 'seo', 'security', 'legal', 'journeys'] },
         },
       },
     },
@@ -184,10 +184,44 @@ if (!fresh || fresh.status !== 'FRESH') {
   }
 }
 
+// ---- S5: grindparameterisering ------------------------------------------------
+// Grindmotorn är OFÖRÄNDRAD. Det som parameteriseras är VAD grindarna läser:
+// Site Quality Contract (content/profile.ts), paketlinser, kontrakterade resor
+// och toppuppgifter, juridikflaggor och kapacitetskrav.
+//
+// KATEGORI-ALIAS: kategorimängden i GATE-schemat är UNIVERSELL och sluten. En
+// paketlins får ALDRIG hitta på en egen kategori — den aliasar in på en universell.
+// Skälet är §10:s "No generated per-project rubric authority": en kategori som föds
+// per paket blir en mätstock ingen granskat, och rapporter från olika kunder slutar
+// gå att jämföra. Paketidentiteten bär linsen i sin titel, aldrig i schemat.
+const CATEGORY_ALIAS = {
+  'lokal-se:orter': 'seo',        // ortssidor/lokal SEO → universell seo-kategori
+  'lokal-se:gbp': 'trust',        // Google Företagsprofil-konsistens → trust
+  'lokal-se:jour': 'leadgen',     // jour-/svarstidslöften → leadgen
+}
+const aliasKategori = (k) => CATEGORY_ALIAS[k] || k
+
+// Kontraktsläsningen är FAIL-CLOSED i grindens mening: grinden gissar aldrig ett
+// paket. Saknas profile.ts äger Gate 1 den domen (oförändrat); saknas `paket` läses
+// det som core-only, vilket är ett GILTIGT läge — aldrig ett fynd i sig.
+const kontraktsInstruktion = `SITE QUALITY CONTRACT (S5): läs FÖRST \`content/profile.ts\`. `
+  + `\`paket\` avgör vilka PAKETLINSER som gäller — tom lista eller saknat fält = core-only, `
+  + `ett GILTIGT läge och aldrig ett fynd i sig. \`obligatoriskaResor\` och \`toppuppgifter\` `
+  + `avgör resorna som måste fungera. \`forbjudnaPastaenden\` är facit för vad sajten ALDRIG `
+  + `får påstå. \`juridikflaggor\` och \`kapaciteter\` styr vilka extra kravlistor som gäller. `
+  + `KONTRAKTSFÄRSKHET: bär profilen \`profilKontraktVersion\` med annan MAJOR än kontraktet i `
+  + `nortropic-stack, eller en stämpel NYARE än kontraktet, rapportera det som ett technical-fynd `
+  + `(HIGH) — grinden dömer aldrig mot ett schema den inte känner. En ÄLDRE men samma-MAJOR-stämpel `
+  + `är GILTIG; saknade v2-fält läses som SAKNAS_I_V1 och redovisas som okänt, ALDRIG som tomt eller `
+  + `falskt. En paketlins vars kategori inte finns i schemat aliasar in på sin universella kategori `
+  + `(t.ex. lokal-se:orter → seo) — hitta ALDRIG på en ny kategori.`
+
 const GATES = [
   { key: 'technical', agentType: 'qa-launcher', prompt: `Run Gates 0, 2, 3 and 4 of your prelaunch process (build integrity; Lighthouse/Core Web Vitals with real median-of-3 numbers; responsive 375/390/768/1280/1920 + link crawl + SSL; accessibility — keyboard-only operability, focus visibility, skip-link, contrast ≥4.5:1, meaningful Swedish alt text, prefers-reduced-motion, heading order / one h1; klickytor/target size ≥24×24 px per WCAG 2.2, helst 44×44 på mobil; axe-core noll violations mot wcag2a/wcag2aa/wcag21aa/wcag22aa som mekanisk komplettering, ersätter inte de manuella punkterna) against ${site}.\n\nINGÅR (din gate): build-integritet, Lighthouse/Core Web Vitals, responsivitet, länkcrawl, SSL, döda länkar, tillgänglighet (Gate 4, inkl. target size ≥24×24 + axe-core noll violations).\nINGÅR INTE (annan gate äger): lead-kedjan formulär→mejl, tel-länkar, CTA → leadgen-gaten; visuellt utseende → visual-gaten.\nCategory for findings: technical. ${structured}` },
   { key: 'leadgen', agentType: 'qa-launcher', prompt: `Run Gate 1 (primärhandlingsgrinden) of your prelaunch process against ${site}. Läs FÖRST content/profile.ts i byggrepot: primaraktion + gate1Test definierar exakt vad som testas end-to-end. SAKNAS content/profile.ts = Gate 1 FAIL med tydligt meddelande — kör aldrig på gissad default. Invarianter oavsett primärhandling: primärhandlingen nåbar above fold på varje sida, mobilergonomisk, testad PÅ RIKTIGT end-to-end, fallback vid fel, konverteringsevent avfyras. OFFERT/SAMTAL-FALLET (hantverkar-defaulten) = exakt: tel: links at mobile viewport, phone in sticky header everywhere, floating call button, quote form submitted end-to-end with [TEST] data and EMAIL DELIVERY verified (Resend status — a 200 is not delivery), form error fallback shows phone, CTA above fold per page, phone_click/quote_submit events fire, 404/error pages show phone. BOKA/PLATSFÖRFRÅGAN/BESÖK: motsvarande kedja per gate1Test (t.ex. boka-flödet når extern bokning och fungerar, event spåras, felväg visar kontaktväg) — kravnivån identisk, genomförandet är testet.\n\nINGÅR (din gate): HELA primärhandlingskedjan per profile.ts — för offert/samtal: tel-länkar, sticky nummer, flytande ringknapp, offertformulär end-to-end + verifierad e-postleverans, CTA above fold, konverteringsevent, telefon på 404/error.\nINGÅR INTE (annan gate äger): prestanda/CWV → technical-gaten; visuellt utseende → visual-gaten; schema/meta → seo-gaten.\nCategory: leadgen. ${structured}` },
-  { key: 'seo', agentType: 'seo-optimizer', prompt: `Final pre-launch SEO audit of ${site}: audit mode across all pages + launch readiness (sitemap/robots served, canonicals, schema validates, NAP consistency, GSC DNS verification status; robots.txt blockerar inte AI-crawlers på skarp klient (GPTBot/PerplexityBot/ClaudeBot/OAI-SearchBot under Disallow = HIGH; TESTKLIENT undantaget); address.publik→PostalAddress-konsistens och postalCode-format enligt dina hårda regler (false+PostalAddress=CRITICAL, true-utan-PostalAddress=HIGH, fel postalCode-format=CRITICAL); Bing Webmaster-property importerad från GSC med sitemap inskickad; IndexNow-nyckelfil svarar 200 i webbroten — ask nothing, report what you can verify).\n\nINGÅR (din gate): meta/titles/canonicals, schema-validitet, NAP-konsistens, sitemap/robots, GSC DNS-status, AI-crawler-robots, address.publik→PostalAddress + postalCode-format, Bing Webmaster, IndexNow.\nINGÅR INTE (annan gate äger): copykvalitet och slop → visual-gaten; prestanda → technical-gaten.\nCategory: seo. ${structured}` },
+  { key: 'seo', agentType: 'seo-optimizer', prompt: `${kontraktsInstruktion}\n\nGATE 5 ÄR DELAD (S5). **UNIVERSELL SEO-TEKNISK KÄRNA — gäller ALLTID, oavsett paket:** sitemap/robots servas, canonicals, schema validerar, titel/meta/H1-integritet, indexerbarhet (oavsiktlig noindex), döda interna länkar, strukturerad data utan TODO-markörer. **PAKETLINS — körs ENDAST när paketet är belagt i `paket`:** för `lokal-se` gäller därutöver NAP-konsistens mot business.ts, ortssidornas kvalitet (tunna ortssidor), `address.publik`→PostalAddress-konsistens, postalCode-format, GBP-/Bing-/IndexNow-stegen. Vid `core-only` är frånvaron av ortssidor och lokala schemadelar KORREKT — rapportera det ALDRIG som ett fynd. Paketlinsens fynd aliasar in på universell kategori (lokal-se:orter → seo).\n\nFinal pre-launch SEO audit of ${site}: audit mode across all pages + launch readiness (sitemap/robots served, canonicals, schema validates, NAP consistency, GSC DNS verification status; robots.txt blockerar inte AI-crawlers på skarp klient (GPTBot/PerplexityBot/ClaudeBot/OAI-SearchBot under Disallow = HIGH; TESTKLIENT undantaget); address.publik→PostalAddress-konsistens och postalCode-format enligt dina hårda regler (false+PostalAddress=CRITICAL, true-utan-PostalAddress=HIGH, fel postalCode-format=CRITICAL); Bing Webmaster-property importerad från GSC med sitemap inskickad; IndexNow-nyckelfil svarar 200 i webbroten — ask nothing, report what you can verify).\n\nINGÅR (din gate): meta/titles/canonicals, schema-validitet, NAP-konsistens, sitemap/robots, GSC DNS-status, AI-crawler-robots, address.publik→PostalAddress + postalCode-format, Bing Webmaster, IndexNow.\nINGÅR INTE (annan gate äger): copykvalitet och slop → visual-gaten; prestanda → technical-gaten.\nCategory: seo. ${structured}` },
+  // S5: resorna som lins — samma grindmaskineri, ingen ny motor.
+  { key: 'journeys', agentType: 'qa-launcher', prompt: `${kontraktsInstruktion}\n\nRESELINS (S5): läs `obligatoriskaResor` och `toppuppgifter` ur content/profile.ts och pröva VARJE kontrakterad resa end-to-end mot ${site} — inte bara primärhandlingen. En resa är: var den börjar, vad besökaren gör, vad som kan stoppa den, och att den faktiskt slutar där kontraktet säger. Testa PÅ RIKTIGT (klick, inmatning, navigering) på 375px och desktop; en resa som bara ser rätt ut är inte prövad. Saknas `obligatoriskaResor` (t.ex. en v1-profil) är det INTE ett fynd — rapportera status PASS med en findings-rad av severity MEDIUM som säger att resorna inte är kontrakterade ännu (SAKNAS_I_V1), så luckan syns utan att blockera en äldre kund.\n\nINGÅR (din gate): varje kontrakterad resa end-to-end, toppuppgifternas genomförbarhet.\nINGÅR INTE (annan gate äger): primärhandlingens egen kedja → leadgen-gaten (dubbelrapportera inte); prestanda → technical; utseende → visual.\nCategory: journeys. ${structured}` },
   { key: 'visual', agentType: 'design-reviewer', prompt: `Final visual QA of ${site}: run your anti-slop review as a launch gate. FAIL on any CRITICAL conversion blocker or instant-fail slop pattern.\n\nINGÅR (din gate): visuell layout/hierarki, responsivitet, typografi, bildrendering, slop/AI-mönster.\nINGÅR INTE (annan gate äger): INNEHÅLLET/sanningen i förtroendesignaler (stämmer omdömen/betyg/certifikat/NAP) → trust-gaten; meta/schema → seo-gaten.\nCategories: visual (design issues) or leadgen (conversion blockers). ${structured}` },
   { key: 'trust', agentType: 'design-reviewer', prompt: `Trust audit of ${site} — a distinct lens from visual QA: verify every trust element is real and consistent. KVITTOLISTAN i content/profile.ts är facit för VILKA förtroendekvitton denna kund har (F-skatt/certifikat, utbildningar, portfolio, omdömen, försäkring, fysisk plats) och dess attributionsregler styr bedömningen (t.ex. utbildning redovisas som utbildning, aldrig som utfall). Verifiera: omdömen have namn+ort and match content/testimonials.ts, betyg matches content/business.ts rating, certifikat/kvitton badges correspond to business.ts/profile.ts, NAP in footer = business.ts exactly, garanti/tillgänglighets-/tidsclaims appear only where the content files back them, org.nr + F-skatt present (invariant för näringsidkare).\n\nINGÅR (din gate): INNEHÅLLET/sanningen i förtroendesignaler — kvitton per profile.ts kvittolista + attributionsregler, omdömen (namn+ort, matchar testimonials.ts), betyg matchar business.ts, NAP=business.ts exakt, claims backade i content, org.nr+F-skatt.\nINGÅR INTE (annan gate äger): HUR de ser ut → visual-gaten; juridisk fullständighet (integritetspolicy/cookies) → legal-gaten.\nCategory: trust. ${structured}` },
   { key: 'security', agentType: 'qa-launcher', prompt: `Run Gate 7 (säkerhet) of your prelaunch process against ${site}: npm audit --omit=dev (FAIL on high/critical in PROD dependencies only); verify security headers ACTUALLY SERVED via curl -sI against the preview URL (Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, frame-ancestors 'none' or X-Frame-Options: DENY — canonical fix is headers() in next.config.ts per your security-checklist reference); form-abuse protection on the quote endpoint (honeypot silent-200, time-trap on a client-measured elapsedMs duration (single clock, never a client timestamp vs the server clock; missing/0 fails open), server-side validation with length caps + email format, recipient hardcoded from env LEAD_TO_EMAIL — NEVER from request body = CRITICAL open spam relay, generic client errors with no env names/stacks/Resend responses; platform-level rate limiting is an optional NOTE, never a DB-based limiter); secrets (no key values in .next/static or repo/git history, .env* git-ignored, API keys server-code only); Deployment Protection på preview: en NAKEN .vercel.app-URL (ingen bypass) ger 401 — noindex räcker inte, en indexerbar preview-URL kan ranka mot kundens riktiga domän (denna check gör medvetet en naken förfrågan; alla andra URL-kontroller använder bypass per noten); /api/puls-kontraktet: mottagare LEAD_TEST_TO ur env (aldrig request body), token PULS_TOKEN ur env, saknad/fel token → 404 (samma öppna-spamrelä-krav som lead-endpointen).\n\nINGÅR (din gate): npm audit prod-beroenden, servade säkerhetsheaders, formulärmissbruk (honeypot/tidsfälla/validering/fast mottagare/generiska fel), hemligheter i bundle/repo, Deployment Protection-401 på preview, /api/puls-kontraktet.\nINGÅR INTE (annan gate äger): SSL/länkcrawl → technical-gaten; att formuläret LEVERERAR mejl → leadgen-gaten; cookies/samtycke → legal-gaten.\nCategory: security. ${structured}` },
@@ -195,7 +229,7 @@ const GATES = [
 ]
 
 phase('Gates')
-log('Running 7 audit lenses in parallel')
+log('Running 8 audit lenses in parallel')
 let gateResults = await parallel(GATES.map(g => () =>
   agent(g.prompt + bypass, { label: `gate:${g.key}`, phase: 'Gates', schema: GATE })
 ))
@@ -383,7 +417,7 @@ if (!contractStop && fixLog.length >= 1 && preSweepPass) {
   // för-fix-bygget. Bevis i tre led: (1) sista committade rundans release repointade freshUrl
   // (JS-spårat via lastFreshRound), (2) mekanisk scout hämtar deployens skapelsetid + slut-
   // commitens tid som rådata, (3) deployBevis kräver deploy EFTER commit. Faller något led är
-  // svepet ODÖMBART → FAIL-fallback på alla sex grindar med ärlig orsak — samma form som
+  // svepet ODÖMBART → FAIL-fallback på alla sju icke-legal-grindar med ärlig orsak — samma form som
   // contractStop och doctors OGILTIG: odömbart blir aldrig tyst grönt.
   let bevisFel = null
   const lastCommittedRound = fixLog[fixLog.length - 1].round
@@ -412,7 +446,7 @@ if (!contractStop && fixLog.length >= 1 && preSweepPass) {
     SWEEP_GATES.forEach(g => { gates[g.key] = { status: 'FAIL', findings: [{ severity: 'CRITICAL', title: `final sweep odömbar (${g.key})`, location: 'workflow', why: `PASS-invarianten (NRT-001) kräver färsk helmätning mot BEVISAD deploy: ${bevisFel}`, fix: 'deploya den slutliga committen och kör /nortropic-launch igen', category: g.key }] } })
     sweep = { verdict: 'ODÖMBAR', reason: bevisFel, finalCommit: lastHead, url: freshUrl }
   } else {
-    log(`Final sweep: alla sex icke-legal-grindar körs om mot den slutliga previewn (${lastHead.slice(0, 12)}) — verdiktet ankras i denna mätning`)
+    log(`Final sweep: alla sju icke-legal-grindar körs om mot den slutliga previewn (${lastHead.slice(0, 12)}) — verdiktet ankras i denna mätning`)
     const sweepResults = await parallel(SWEEP_GATES.map(g => () =>
       agent(g.prompt + ` This is the FINAL SWEEP after the fix loop — the launch verdict is anchored in THIS measurement (NRT-001 PASS-invariant). All fixes are committed (final commit ${lastHead.slice(0, 12)}) and THIS preview URL is mechanically verified fresh: ${freshUrl}. Any preview or dev URL mentioned ANYWHERE earlier in this prompt is SUPERSEDED by that URL — never contact it and do not start a dev server; EVERY URL-based check (Lighthouse, curl, crawl, form submits, the naked-request assertion) runs against exactly that preview. Run your FULL gate from scratch; assume NOTHING from earlier results in this run.` + bypass,
         { label: `sweep:${g.key}`, phase: 'Final sweep', agentType: g.agentType, schema: GATE })
@@ -474,7 +508,7 @@ if (nonLegalPass || round >= 3) {
     { label: 'handover:seo-deliverables', phase: 'Handover', agentType: 'seo-optimizer' }
   )
   handover = await agent(
-    `Write the Swedish client handover document for the Nortropic site in the current working directory as HANDOVER.md in the project root. Audience: the business owner (not technical). Sections: 1) Din nya webbplats (pages, what each does), 2) Så får du dina leads (where quote emails arrive, what a lead looks like, what to do), 3) Uppdatera innehåll (how to request changes via Nortropic; which facts live where), 4) Google Företagsprofil — din checklista (incorporate gbp-checklist-klient.md), 5) Google Search Console — de första 2 veckorna (incorporate gsc-steg-klient.md), 6) Support & kontakt, 7) Utfallshypotes. Section 7 is ONE short block, 1–3 lines, derived STRICTLY from the brief's §7 framgångsmått: what we expect this site to change for the business, stated so it could turn out to be wrong. Promise nothing the brief does not back, invent no numbers, and give no date beyond what the brief states. It is a hypothesis, not a guarantee — write it in that voice. This exact block is the row a human later copies into the client repo's LEARNING-RECORD.md under "## Hypotes" (contract: skills/nortropic-retro/references/learning-record.md). Voice: clear, warm, zero jargon. Context from SEO deliverables: ${typeof seoDeliverables === 'string' ? seoDeliverables.slice(0, 3000) : JSON.stringify(seoDeliverables).slice(0, 3000)}`,
+    `Write the Swedish client handover document for the Nortropic site in the current working directory as HANDOVER.md in the project root. Audience: the business owner (not technical). Sections: 1) Din nya webbplats (pages, what each does), 2) Så får du dina leads (where quote emails arrive, what a lead looks like, what to do), 3) Uppdatera innehåll (how to request changes via Nortropic; which facts live where), 4) Google Företagsprofil — din checklista (incorporate gbp-checklist-klient.md), 5) Google Search Console — de första 2 veckorna (incorporate gsc-steg-klient.md), 6) Support & kontakt, 7) Utfallshypotes. **PAKETVILLKORAT (S5):** läs `paket` i content/profile.ts. Sektion 4 och 5 (GBP + GSC-ortsstegen) hör till `lokal-se`-paketet — vid `core-only` UTELÄMNAS de och du säger i stället en mening om varför de inte gäller för den här kunden, i stället för att leverera en checklista hen aldrig kan följa. Sektionerna 1, 2, 3, 6 och 7 är KÄRNA och skrivs alltid. Section 7 is ONE short block, 1–3 lines, derived STRICTLY from the brief's §7 framgångsmått: what we expect this site to change for the business, stated so it could turn out to be wrong. Promise nothing the brief does not back, invent no numbers, and give no date beyond what the brief states. It is a hypothesis, not a guarantee — write it in that voice. This exact block is the row a human later copies into the client repo's LEARNING-RECORD.md under "## Hypotes" (contract: skills/nortropic-retro/references/learning-record.md). Voice: clear, warm, zero jargon. Context from SEO deliverables: ${typeof seoDeliverables === 'string' ? seoDeliverables.slice(0, 3000) : JSON.stringify(seoDeliverables).slice(0, 3000)}`,
     { label: 'handover:doc', phase: 'Handover', agentType: 'content-designer' }
   )
 }

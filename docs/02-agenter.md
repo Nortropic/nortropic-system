@@ -1,7 +1,7 @@
 # Agenterna
 
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
-Verifieringsomfång: delta-verifierad mot S9/S10 + S10-uppföljningen (publicerat i `main` t.o.m. PR #133); project-planner-avsnittet läst mot `agents/project-planner.md` och `workflows/nortropic-autobygg.js`. **S5 är INTE inräknad** — den ligger i öppen PR. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Verifieringsomfång: delta-verifierad mot S9/S10 + S10-uppföljningen (publicerat i `main` t.o.m. PR #133); project-planner-avsnittet läst mot `agents/project-planner.md` och `workflows/nortropic-autobygg.js`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 Systemet har sju agenter. Tabellen nedan är härledd ur varje agents frontmatter i `agents/`; avsnitten därunder ur agentkropparna. Stegnumren är agentfilernas egna. Varje agents **obligatoriska steg** (t.ex. INPUT GATE, processteg, grind-ordning) står i dess prosaavsnitt nedan — medvetet INTE som tabellkolumn: stegen bor i agentkroppen, inte frontmattern tabellen projicerar, och en kolumn skulle drifta från kroppen utan mekanisk vakt (S4).
 

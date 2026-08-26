@@ -1,7 +1,7 @@
 # Översikt — nodkartan, stoppen och artefaktkedjan
 
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
-Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; nodkartans rader 1–2, artefaktkedjan och paketavsnittet lästa mot `agents/project-planner.md`, `skills/nortropic-plan/references/research-kontrakt-v3.md`, `docs/kapacitetskatalog.md` och `packs/lokal-se/manifest.md`. **S5 (grindparameterisering) är INTE inräknad** — den ligger i öppen PR och nodkartans launch-rad beskriver därför läget före S5. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; nodkartans rader 1–2, artefaktkedjan och paketavsnittet lästa mot `agents/project-planner.md`, `skills/nortropic-plan/references/research-kontrakt-v3.md`, `docs/kapacitetskatalog.md` och `packs/lokal-se/manifest.md`. **S5 (grindparameterisering) är nu inräknad** — mergad i samma batch som denna stämpel (PR #129); nodkartans launch-rad bär därför åtta granskningslinser inklusive reselinsen. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 > **Ny här?** Läs [00-borja-har.md](00-borja-har.md) först — hela systemet förklarat från noll utan interna termer. Den här filen och 02–07 är det djupare, tekniska lagret.
 
@@ -17,7 +17,7 @@ Pipelinen är tolv noder. Kommandona är de tre pipeline-skillsen (som bara män
 | 4 | Init | `/nortropic-init <PROJECT-BRIEF.md>` | stack-builder (opus · max) | GitHub-repo + Vercel-preview |
 | 5 | Innehåll | inget eget kommando — huvudsessionen kör agenten | content-designer (opus · max) | copy, bilder (anskaffningen skriver `BILDRAPPORT.json`), varumärkeslagret (app/-ikonerna + `public/brand/` via brand.mjs), `TODO-COPY` fylld, Humanisera-passet, klientfyllda `fotouppdrag-klient.md` (vid `saknas` på ersättningsprio 1–2) |
 | 6 | Review | `/nortropic-review` (kadens full → `--diff` → full) | workflow: design-reviewer (opus · max) + seo-optimizer (opus · high) + kodlins, 2 skeptiker per fynd | `REVIEW-REPORT.md` med commit-meta |
-| 7 | Launch | `/nortropic-launch` | workflow: 7 linser över qa-launcher (opus · high), seo-optimizer (opus · high), design-reviewer (opus · max); fixar via stack-builder/seo-optimizer | verdikt, `EVAL-RESULT.md`, `HANDOVER.md`, `gbp-checklist-klient.md`, `gsc-steg-klient.md` |
+| 7 | Launch | `/nortropic-launch` | workflow: 8 linser (S5: reselinsen tillagd) över qa-launcher (opus · high), seo-optimizer (opus · high), design-reviewer (opus · max); fixar via stack-builder/seo-optimizer | verdikt, `EVAL-RESULT.md`, `HANDOVER.md`, `gbp-checklist-klient.md`, `gsc-steg-klient.md` |
 | 8 | Juridik | **HÅRT STOPP** | människa | sign-off på Gate 6-fynden |
 | 9 | Deploy | `/vercel:deploy` | människa/huvudsession | produktionssajt |
 | 10 | Efterarbete | `/nortropic-cutover` (fas 1–3: förkontroll → noindex → GSC; fas 4–7 — Bing/IndexNow, uppetid, GBP, citations — fortsatt manuella ur checklistorna) | människa (+ klient) | GBP live, GSC verifierad, citations |

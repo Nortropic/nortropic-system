@@ -1,7 +1,7 @@
 # Börja här — Nortropic från noll
 
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
-Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är INTE inräknad** — den ligger i öppen PR. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 Det här är ingången för dig som aldrig sett systemet förut. Läs den i ett svep, så förstår du vad Nortropic är och hur det hänger ihop — utan en enda insider-term. Det här dokumentet ersätter inte den tekniska dokumentationen (docs/01–07 och README); det är kartan du läser innan du dyker ner i den. Vill du veta exakt hur något fungerar finns länkar sist.
 
@@ -291,6 +291,42 @@ av en migrering och väcker ingen mitt i natten.
 **Bygget delas i två lager.** Kärnan byggs alltid. Det paketspecifika — för svenska
 lokala företag är det ortssidorna — byggs bara när paketet faktiskt är belagt. En sajt
 utan ortssidor är därför ibland helt korrekt, inte en lucka någon glömt.
+
+## Grindarna läser kundens kontrakt i stället för att anta (S5, 2026-08-26)
+
+Fram tills nu antog kvalitetskontrollen att varje sajt var en svensk lokal
+tjänsteverksamhet. Det stämde för alla kunder vi haft — men ett antagande som
+råkar stämma är fortfarande ett antagande, och det syns först den dag det inte
+gör det.
+
+Nu läser grindarna sajtens eget kontrakt (`content/profile.ts`) och dömer mot vad
+DEN sajten lovat: vilken primärhandling som gäller, vilka resor som måste fungera,
+vad sajten aldrig får påstå och vilket paket som är belagt.
+
+**SEO-grinden är delad i två.** Den tekniska kärnan — sitemap, canonicals, schema,
+titlar, indexerbarhet — prövas alltid, för varje sajt. Det lokala lagret —
+ortssidor, NAP-kontroll, Google Företagsprofil — prövas bara när kunden faktiskt
+hör till det paketet. För en kund utan ortspaket är frånvaron av ortssidor
+**korrekt**, inte en brist någon glömt.
+
+**En ny lins prövar resorna.** Inte bara "går det att ringa" utan varje resa
+kunden kontrakterat, klickad på riktigt i mobil och på desktop. En resa som bara
+ser rätt ut är inte prövad. Har kunden ett äldre kontrakt utan resor blockerar det
+ingenting — det redovisas som en lucka, inte som ett fel.
+
+**Den andra skeptikern har slutat gissa.** När två granskare ska motbevisa ett
+fynd frågade den ena tidigare "spelar det här roll för en svensk lokal
+tjänstesajt?" — en fråga som var inbakad i koden. Nu frågar den "spelar det roll
+för DEN HÄR sajten enligt dess kontrakt?", och den får aldrig hitta på ett krav
+kontraktet inte bär.
+
+**Överlämningen och domänbytet följer också paketet.** En kund utan ortspaket får
+inte en Google Företagsprofil-checklista hen aldrig kan följa — hen får en mening
+om varför den inte gäller.
+
+Det som INTE ändrats: hur många fixrundor som tillåts, att juridiken aldrig
+auto-fixas, att en grind måste vara grön för att släppa igenom. De reglerna är
+grundlagsskyddade och rörs inte av att grindarna blivit smartare på vad de läser.
 
 ## Så tar systemet in kunskap utifrån (K0–K3, 2026-08-26)
 
