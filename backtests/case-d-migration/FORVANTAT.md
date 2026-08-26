@@ -50,4 +50,4 @@ Samma skäl som Case C: en profil är kalibreringsfacit för ett bygge. Frånvar
 | ID | Avvikelse | Läge |
 |---|---|---|
 | `D-GAP-1` | Härledningen görs av PLANNERN. Fixturen prövar ROUTNINGEN, inte beslutet | `NAMNGIVEN` |
-| `D-GAP-2` | **Förbättringslanen finns inte.** `ROUTE` leder till en offert, inte till ett arbetsflöde. Det är ärligt men det betyder att Case D:s utfall är ett avslut, inte en leverans | `NAMNGIVEN` |
+| `D-GAP-2` | **Förbättringslanen finns inte.** `ROUTE` leder till en offert, inte till ett arbetsflöde | `DELVIS ÅTGÄRDAT 2026-08-27` | Destinationens KONTRAKT finns nu — `docs/forbattringskontrakt.md` med två lagar (bevarandebördan ligger på FÖRÄNDRINGEN; en förbättring utan eftermätning är en ÄNDRING) och en **mekanisk** gräns mot nybygge: ändras fler än hälften av de rankande URL:erna, eller byts stacken, är det per definition ett nybygge oavsett vad det kallas. **Kvarstår som `FK-GAP-1`:** ingen körbar lane. Case D:s utfall är fortfarande ett avslut, inte en leverans — men gränsen är nu skriven INNAN förmågan finns, vilket är den ordning som gör gränsen värd något |
