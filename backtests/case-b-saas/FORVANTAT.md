@@ -35,29 +35,42 @@ ett formulerat påstående — den bevisar ingenting om hur systemet beter sig.
 | `B-T5` | *B2B trust comes from product/case/security/expertise* | Förtroendekvitton ska vara ISO 27001, kundcase, DPA, drifthistorik och integrationspartners — aldrig stjärnbetyg, aldrig F-skatt, aldrig lokala citeringar | `MEKANISK` (`kvitton` + `forbjudnaPastaenden`) + `EJ KÖRD` (renderad kvittosektion) |
 | `B-T6` | *no F-skatt/local-review/truck/carpenter assumptions* | Ingen hantverkarsemantik får läcka in: inga F-skatt-kvitton, inga omdömesstjärnor, inga fordons- eller arbetsplatsbilder, inget hantverkarvernacular i copyn | `MEKANISK` (fixturens fält) + `EJ KÖRD` (copy och bildval) |
 
-## `B-T7` — fyndet fixturen gjorde INNAN den kördes
+## `B-T7` — DELVIS ÅTGÄRDAT 2026-08-26
 
-Case B avslöjade att **den universella kärnan själv bär lokala antaganden.** Det är inte en
-fälla ur §26 — det är en observation fixturen tvingade fram genom att inte gå att fylla i
-utan avvikelse. Inventeringen nedan är gjord med `fil:rad`, och den är **inte komplett**:
-den listar de ställen som hittats, aldrig alla som finns.
+Case B avslöjade att den universella kärnan själv bar lokala antaganden — fixturen gick
+inte att fylla i utan tyst avvikelse. Fyndet är nu **rättat i kontrakten**, inte bara
+bokfört.
 
 | ID | Var | Vad | Läge |
 |---|---|---|---|
-| `B-T7a` | `skills/nortropic-plan/references/research-kontrakt-v3.md` — den UNIVERSELLA ryggraden | §6 kräver **`F-skatt`** som första förtroendekvitto — och §26 fälla 6 lyder ordagrant *"no **F-skatt**/local-review/... assumptions"*. §6 kräver även **omdömen (betyg + exakt antal + plattform)**; §26 namnger `local-review`. §1 kräver **NAP**; §26 fälla 1 handlar om NAP-prominens. §5:s substanskolumn är *"Belagda arbetsområden/orter"* — Case B måste svara med en förnekelse. §6 bär arketypen *"NYSTARTAD — person-först"*. §12 kräver *"2–3 **lokala** konkurrenter"*. §16 frågar efter *"omdömen … med **namn+ort**"* | `MEKANISK` — ankrad mot kontraktstexten, faller när ägaren rättar den |
-| `B-T7b` | `skills/nortropic-stack/SKILL.md` — Site Quality Contract v2 | `primaraktion`-enumet är `'ring' \| 'boka' \| 'platsforfragan' \| 'offert' \| 'besok'` — **ord för ord `lokal-se`:s slutna mängd.** Det finns ingen `BOOK_DEMO`, ingen `prova gratis`, ingen `ladda ner`, och exempeletiketterna är *"Få kostnadsfri offert"/"Boka tid"*. **§26 fälla 4 lyder *"BOOK_DEMO must not turn into ring/offert"* — fällan går inte att spänna, för kärnan har ingen BOOK_DEMO att bli.** Kadensa tvingas mappa demobokning på `boka`. Därtill: `schemaTyp` definieras som *"(LocalBusiness-subtyp eller annan typ)"* — lokal typ först, allt annat restkategori · kärnscaffolden bygger `business.ts` (NAP-facit) för VARJE sajt, även `core-only` · lead-backendens ämnesrad interpolerar **`i <ort>` villkorslöst**, så en Kadensa-lead får *"Ny demobokning — \<tjänst\> i \<ort\>"* utan att någon ort finns | `MEKANISK` — ankrad mot kontraktstexten |
+| `B-T7a` | Researchkontraktet, universella ryggraden | §1 krävde `NAP` · §5 krävde belagda arbetsområden · §6 räknade upp `F-skatt`, omdömen med exakt antal och arketypen `NYSTARTAD — person-först` · §12 krävde `2–3 lokala` · §16 frågade efter `namn+ort`. **§26 fälla 6 lyder ordagrant *"no F-skatt/local-review/... assumptions"* — antagandet fällan finns för att fånga stod i kärnan.** Samtliga flyttade till `packs/lokal-se/research-module.md` v1.1.0, oförändrade i sak. Kontraktet är v3.1.0 | `DELVIS ÅTGÄRDAT` |
+| `B-T7b` | Site Quality Contract v2 | `primaraktion`-enumet var ord för ord `lokal-se`:s slutna mängd, så **§26 fälla 4 (*"BOOK_DEMO must not turn into ring/offert"*) inte gick att spänna — kärnan hade ingen BOOK_DEMO att bli.** Enumet är utvidgat med `demo`, `prova`, `nedladdning`, `kontakt`; `lokal-se` skärper tillbaka. `schemaTyp` har ingen lokal default. Lead-ämnesradens `i <ort>` är villkorad. Kontraktet är v1.3.0 | `DELVIS ÅTGÄRDAT` |
 
-**Varför detta är fyndet och inte en anmärkning:** systemet kallar sin kärna universell och
-sina paket specialiserande. Om kärnan bär `F-skatt`, `NAP`, ortsinterpolation och
-`lokal-se`:s primärhandlingsenum är beskrivningen fel — och varje nytt paket byggs ovanpå
-en lutning. Rättningen är en kontraktsövergång (researchkontrakt v3→v3.1, profilkontrakt
-v1.2→v1.3) med pinnebump, och den är ägarens att beställa.
+**VAD SOM ÅTERSTÅR — och varför det inte är mitt att stänga.** Kontrakten är
+universaliserade; deras PRODUCENT är det inte. `agents/project-planner.md`:s INPUT GATE
+kräver fortfarande **`≥1 ort`** — och det kravet är **regel 5 i `docs/03-regelverk.md`,
+en §A1-invariant**, mekaniskt nekad för agentredigering. En nationell eller
+gränsöverskridande kund som Kadensa stoppas alltså vid nod 2, oavsett hur universellt
+kontraktet är formulerat. Därtill står `LocalBusiness` kvar som schemaexempel i kärnans
+SEO-block, `business.ts` beskrivs som NAP-facit mot Google Företagsprofil, och
+`KAP-SCHEMA`:s kravkolumn kräver NAP-identitet.
 
-**Kontrollerna är ankrade i KONTRAKTEN, inte i den här filen.** När ägaren rättar dem
-FÄLLER vakten och tvingar fram att raderna stryks — ett fynd får inte överleva sin egen
-åtgärd.
+**Nästa transition är en ägarhandling:** regel 5:s femte fält behöver bli
+paketvillkorat — `≥1 ort` när ett ortspaket är belagt, annars belagd räckvidd i någon
+form. Det är en §A1-ändring och kräver HÖGRISK-ceremoni.
+
+**Regressionen i det som ÄR stängt är mekaniskt vaktad.** `scripts/check-karn-universalitet.mjs` fäller om
+någon av de sex flyttade termerna återvänder till ryggraden — och lika hårt om en term
+försvunnit ur BÅDA, eftersom det inte är en universalisering utan ett lättat krav.
+
+**Ärlig gräns:** vakten prövar sex namngivna termer. Att kärnan är universell i stort är
+inte bevisat — mängden är uppräknad, inte uttömmande.
 
 ## De två PASS-villkoren
+
+§26: *"PASS requires both: explicit absence of local leakage; positive activation of
+appropriate B2B/product/demo/trust/search semantics."* **Två villkor, inte ett.** En sajt
+som bara undviker lokalt läckage har inte passerat — den har låtit bli att göra fel.
 
 | ID | Villkor | Läge |
 |---|---|---|

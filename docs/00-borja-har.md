@@ -141,6 +141,41 @@ skelett som bär en sådan teori är sämre än inget paket alls, för det ser f
 **Paketen byggs den dag det finns en namngiven källa per flagga.** Formen finns redan —
 bygget blir litet när underlaget finns. Det är en ordningsfråga, inte ett nej.
 
+## Kärnan var inte så universell som vi trodde (2026-08-26)
+
+Fabriken beskrivs som **universell i kärnan, specialiserad i paket**: kärnan gäller alla
+kunder, paketet gäller en kundtyp. Det visade sig inte stämma.
+
+Låtsaskunden Kadensa — mjukvarubolaget som med flit är fel för alla lokala antaganden —
+gick inte att fylla i utan att svara fel. När vi frågade varför visade det sig att
+**kärnan själv bar antaganden om lokala företag**:
+
+- Frågeformuläret krävde **F-skatt** som förtroendebevis av ALLA kunder. Ett mjukvarubolag
+  som säljer till åkerier blir aldrig bedömt på F-skatt — köparen frågar aldrig.
+- Det krävde **belagda arbetsområden**, så en kund som säljer i hela Norden tvingades
+  svara "vi har inga orter" i stället för att beskriva sin faktiska räckvidd.
+- Det bad om **tre lokala konkurrenter**, när det verkliga alternativet ofta är Excel.
+- Och listan över vad besökaren ska göra på sajten hade **fem alternativ, alla från
+  hantverksvärlden**: ring, boka tid, platsförfrågan, offert, besök. **Det fanns inget
+  "boka demo".** Så en kund vars hela affär är demobokningar fick knuffas in i "boka tid".
+
+Det sista är värt att stanna vid, för det fanns en kontroll som skulle fånga just det —
+att en demobokning aldrig får förvandlas till ett offertformulär. **Kontrollen kunde aldrig
+falla, eftersom systemet inte hade något "demo" att förvandla.**
+
+**Vad som gjorts:** de kraven har flyttats från kärnan till lokalpaketet, ord för ord
+oförändrade. En rörmokare möter alltså exakt samma krav som förut. Skillnaden är att en
+kund som INTE är lokal slipper dem. Listan över vad besökaren ska göra har fått fyra nya
+alternativ — demo, prova, ladda ner, kontakt — och lokalpaketet smalnar tillbaka till sina
+fem.
+
+**Och en vakt ser till att det inte kryper tillbaka.** Den faller både om ett krav
+återvänder till kärnan OCH om ett krav försvunnit ur båda — för det vore inte en
+uppstädning, det vore ett bortglömt krav.
+
+**Ärligt om gränsen:** vakten bevakar sex namngivna saker. Att kärnan nu är universell i
+stort är inte bevisat — bara att de sex är på rätt plats.
+
 ## Vill du djupare?
 
 Det här var översikten. Vill du förstå exakt hur något fungerar, fortsätt till det tekniska lagret:

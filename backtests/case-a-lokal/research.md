@@ -59,7 +59,7 @@ entydigt. Det som skiljer är kundens ÖNSKAN om framtiden mot dagens BETEENDE, 
 konfliktbegrepp gäller motstridiga FAKTA. Att önskan finns är i sig ett belagt faktum och
 det är noterat här; hade den varit dold hade primärhandlingen sett självklar ut.
 
-## 5. Geografi & språk
+## 5. Geografisk räckvidd & språk
 
 Belagda arbetsområden: **Uppsala** (huvudort, 71/78 uppdrag) och **Storvreta** (7/78,
 belagt med fakturaunderlag). Ingen annan ort har belagt arbete. Rörlighetsläget: **vi åker

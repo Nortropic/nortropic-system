@@ -76,7 +76,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '76c9fc5ea7c83c55'
+const FORVANTAD_SIGNATUR = '6b1be51d486e2148'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -186,8 +186,6 @@ const MEKANISKA = new Map([
   ['B-T4', ['B-T4: primärhandlingen är `boka` — läst i sitt EGET fält']],
   ['B-T5', ['B-T5/B-T6: F-skatt och omdömen står i forbjudnaPastaenden — SKOPAT']],
   ['B-T6', ['B-T6: kvittolistan bär INGA lokala kvitton — SKOPAT till kvitton']],
-  ['B-T7a', ['B-T7a: läckaget FINNS ännu i researchkontraktets universella ryggrad']],
-  ['B-T7b', ['B-T7b: läckaget FINNS ännu i Site Quality Contract v2']],
   ['B-M1', ['Case B: bär INGA paketmodulsektioner — core-only']],
   ['B-M2', ['Case B: lag 1: KOMPLETT kräver att alla obligatoriska fält är `ja`']],
   ['B-M3', ['Case B: varje [OSÄKER] i filen är registrerad i sektion 16']],
@@ -374,12 +372,21 @@ check('B-T4: forbjudnaPastaenden är icke-tom och namnger konkreta påståenden'
   (bF('forbjudnaPastaenden').match(/'/g) || []).length >= 8, 'urholkad lista — A-D7/B-T5:s facit försvinner')
 
 // ---- B-T7: ankrat i KONTRAKTET, aldrig i filen som gör påståendet ----------
-check('B-T7a: läckaget FINNS ännu i researchkontraktets universella ryggrad',
-  /\| 12 \|[^|]*\|[^|]*lokala/.test(karnkontrakt) && /namn\+ort/.test(karnkontrakt) && /F-skatt/.test(karnkontrakt),
-  'kontraktet är rättat — då ska B-T7a strykas ur FORVANTAT.md, inte stå kvar som levande fynd')
-check('B-T7b: läckaget FINNS ännu i Site Quality Contract v2',
-  /'ring' \| 'boka' \| 'platsforfragan' \| 'offert' \| 'besok'/.test(stack) && /i <ort>/.test(stack),
-  'profilkontraktet är rättat — då ska B-T7b strykas')
+// B-T7 är ÅTGÄRDAT. Kontrollerna är därför INVERTERADE: de prövar att läckaget är BORTA
+// och att fyndet är bokfört som åtgärdat i stället för som levande. Den stående
+// regressionsvakten bor i scripts/check-karn-universalitet.mjs.
+check('B-T7a: läckaget är BORTA ur researchkontraktets ryggrad',
+  !/F-skatt/.test([...karnkontrakt.matchAll(/^\| \d+ \| \*\*.+?\*\* \|(.*)$/gm)].map((m) => m[1]).join('\n')),
+  'F-skatt har återvänt till den universella ryggraden')
+check('B-T7b: primärhandlingsenumet bär minst en icke-lokal handling',
+  /'demo'/.test(stack), 'enumet har smalnat tillbaka till lokal-se:s slutna mängd')
+// DELVIS, inte helt: kontrakten är universaliserade men deras PRODUCENT inte —
+// INPUT GATE:s `≥1 ort` är regel 5, en §A1-invariant som kräver ägarhand. Ett fynd som
+// märks helt åtgärdat medan halva orsaken står kvar underdriver för den som ska besluta.
+check('B-T7: fyndet är bokfört som DELVIS ÅTGÄRDAT med den ostängda halvan namngiven',
+  /DELVIS ÅTGÄRDAT/.test(las('backtests/case-b-saas/FORVANTAT.md')) &&
+  /§A1-invariant/.test(las('backtests/case-b-saas/FORVANTAT.md')),
+  'antingen saknas DELVIS-märkningen eller så namnges inte §A1-blockeraren')
 
 // ---- Case A ----------------------------------------------------------------
 const aP = las('backtests/case-a-lokal/profile.ts')
