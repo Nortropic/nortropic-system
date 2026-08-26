@@ -60,7 +60,15 @@ check('Read-only estate-genomgång före ersättning',
 
 check('Utfall ≠ NY SAJT registreras som STRATEGISK öppen fråga (annars bygger obemannat ändå)',
   /annat än `NY SAJT` registreras det[\s\S]{0,120}STRATEGISK öppen fråga/.test(flat(planner)),
-  'kopplingen till orkestreringens stopp saknas')
+  'kopplingen till orkestreringens routing saknas')
+// S10: registreringen räcker inte — dispositionen måste vara icke-blockerande, annars
+// blir routingen ett ägargodkännande-stopp igen.
+check('Interventionsfrågan är ICKE-blockerande (ROUTE, inte owner approval)',
+  /blocking: false[\s\S]{0,200}routa bort från en ny sajt|routa bort från en ny sajt[\s\S]{0,200}blocking: false/.test(flat(planner)),
+  'interventionsfrågan saknar blocking:false — routing skulle bli ett approval-stopp')
+check('Interventionsbeslutet returneras maskinläsbart',
+  /returneras maskinläsbart som[\s\S]{0,40}interventionsbeslut/.test(flat(planner)),
+  'interventionsbeslut saknas som maskinläsbart fält')
 
 // ---- Reality-Layer-distinktioner -------------------------------------------
 check('Kundens önskemål ≠ användarens behov',
@@ -73,9 +81,13 @@ check('Kapacitetssignaler kompileras mot katalogen',
   /Kompilera kapacitetssignaler mot katalogen/.test(planner), 'steg 1b saknas')
 check('ROUTE-OUT routas bort, planeras aldrig runt',
   /planera ALDRIG runt gränsen/.test(flat(planner)), 'ROUTE-OUT-regeln saknas')
-check('Krävd men obyggd kapacitet ⇒ STOPP som STRATEGISK',
-  /DECLARED.*krävs men inte är byggd.*STOPP.*STRATEGISK/s.test(flat(planner)),
-  'stoppregeln saknas eller är inte STRATEGISK')
+// Giriga `.*` under /s spände tidigare 17 806 tecken: `blocking: true` bands till en
+// helt annan mening 11 kB bort, så bulleten kunde flippas till `blocking: false` — vilket
+// gör en obyggd krävd capability icke-blockerande — med 64/64 fortsatt grönt. Fönstret
+// är nu bundet till samma mening.
+check('Krävd men obyggd kapacitet ⇒ HARD STOPP som STRATEGISK med blocking:true',
+  /DECLARED[^.]{0,80}krävs men inte är byggd[^.]{0,60}HARD STOPP[^.]{0,80}STRATEGISK[^.]{0,60}blocking: true/.test(flat(planner)),
+  'stoppregeln saknas, är inte STRATEGISK, eller saknar blocking:true i samma mening')
 
 // ---- §7.10–14 --------------------------------------------------------------
 const sektioner = {
@@ -154,6 +166,10 @@ check('Plan-skillen kör interventionsbeslutet före planeringen',
   /2b\.[\s\S]{0,200}INTERVENTIONSBESLUT/i.test(skill), 'steg 2b saknas i plan-skillen')
 check('Plan-skillen kräver STRATEGISK vid utfall ≠ NY SAJT',
   /annat än `NY SAJT` registreras dessutom som STRATEGISK/.test(flat(skill)), 'kopplingen saknas')
+check('Plan-skillen sätter interventionsfrågan icke-blockerande',
+  /STRATEGISK öppen fråga med `blocking: false`/.test(flat(skill)), 'blocking:false saknas i skillen')
+check('Plan-skillen HARD-stoppar på obyggd krävd kapacitet',
+  /HARD STOPP som STRATEGISK öppen fråga med `blocking: true`/.test(flat(skill)), 'blocking:true saknas i skillen')
 check('Plan-skillen kompilerar kapaciteter mot katalogen',
   /2c\.[\s\S]{0,160}kapacitetssignaler mot/i.test(skill), 'steg 2c saknas')
 check('Plan-skillen routar ROUTE-OUT bort',

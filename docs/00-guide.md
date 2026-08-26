@@ -38,10 +38,14 @@ Från operatörsstolen märks det på tre ställen.
 
 **Plannern kan komma fram till att en sajt inte är svaret.** Före all planering fäller den
 ett interventionsbeslut med fyra möjliga utfall: NY SAJT, FÖRBÄTTRA BEFINTLIG,
-ICKE-SAJT-ÅTGÄRD eller AVRÅD. Utfallet står i briefens §7.12. **Är det något annat än NY
-SAJT får du det också som en STRATEGISK öppen fråga** — vilket betyder att ett obemannat
-flöde stannar och lämnar över. Det är avsiktligt: utan den regeln hade obemannat byggt
-just den sajt plannern avrådde från.
+ICKE-SAJT-ÅTGÄRD eller AVRÅD. Utfallet står i briefens §7.12, och **är det något annat än
+NY SAJT registreras det ALLTID OCKSÅ som en STRATEGISK öppen fråga** — annars hade ett
+obemannat flöde passerat beslutet och byggt just den sajt plannern avrådde från.
+
+Den frågan är dock ICKE-blockerande. **Ingen sajt byggs** — obemannat ROUTAR bort från
+ny-sajt-lanen, registrerar skälet och ger dig ett rekommenderat nästa steg — men det väntar
+inte på ditt godkännande: att inte bygga är ett korrekt beslut systemet redan har mandat
+att fatta. Se **Owner attention ≠ owner approval** ovan.
 
 Det här är den mest värdefulla raden i briefen och den lättaste att skumma förbi. En kund
 vars problem är att telefonen inte besvaras blir inte hjälpt av en ny sajt, och systemet
@@ -74,11 +78,62 @@ parameteriserad** — inte att researchen är bristfällig. Avvikelsen är medve
 tills grindparameteriseringen körs som egen ceremoni (`agents/project-planner.md`, Känd
 avvikelse).
 
+## Owner attention ≠ owner approval
+
+**Detta är principens kanoniska hemvist.** Andra ytor refererar hit och bär bara den
+minsta text runtime behöver.
+
+> Ett beslut **blockerar** endast om fortsatt arbete skulle överskrida delegerat mandat,
+> kräva en otillåten eller obyggd capability, skapa en otillåten irreversibel effekt,
+> eller kräva ett påstående systemet inte kan belägga.
+>
+> **Strategisk betydelse i sig är inte ett stoppvillkor.**
+
+Systemet ska be om **uppmärksamhet ofta, tillstånd sällan**, och stanna bara när det
+faktiskt måste. Fyra utfall, och skillnaden mellan dem är hela poängen:
+
+| Utfall | Betyder | Väntar på dig? |
+|---|---|---|
+| `CONTINUE` | arbetet fortsätter | nej |
+| `ATTENTION_CONTINUE` | arbetet fortsätter, beslutet registreras synligt | **nej** |
+| `ROUTE` | denna lane ska inte fortsätta med fel produkt — den avslutas korrekt | **nej** |
+| `HARD_STOP` | fortsatt arbete vore otillåtet eller obevisbart | ja |
+
+**Det som ändrades var inte gränserna — det var väntandet.** Tidigare stoppade
+`/nortropic-autobygg` och lämnade över så fort en fråga var märkt `STRATEGISK`, oavsett
+om den faktiskt krävde ett nytt mandat. Etiketten avgjorde. Nu avgör den verkliga
+authority- och effektrisken, uttryckt som `blocking: true|false` på varje strategisk
+fråga.
+
+Ett interventionsutfall som inte är `NY SAJT` — förbättra befintlig, icke-sajt-åtgärd
+eller avråd — **routar** numera. Ingen sajt byggs, skälet registreras, och du får ett
+rekommenderat nästa steg. Men systemet står inte och väntar på att du ska godkänna att
+dess korrekta beslut var korrekt.
+
+**Vad som fortfarande stoppar helt:** ohanterad juridik (human-only i alla lägen), en
+krävd men obyggd capability, kvarstående CRITICAL efter den ena tillåtna autonoma
+fixloopen, brutet fix-/proveniens-kontrakt, och varje **oklassificerat** utfall. Det
+sista är avsiktligt strängt: en saknad disposition blir aldrig tyst ett fortsättningsbeslut,
+och en äldre plan-artefakt får aldrig mer auktoritet genom att ett nytt fält saknas.
+
+Deploy ändras inte alls. Nod 8 (juridik-signoff) och nod 9 (`/vercel:deploy`) är dina,
+i alla lägen.
+
+**Attention får aldrig fungera som ett mutex.** Ser du raden
+
+```
+OWNER ATTENTION — inget svar krävs | HIGH | AVRÅD: ...
+Owner action required: false
+```
+
+så är det en upplysning, inte en fråga. Bara `ownerActionRequired: true` betyder att
+något faktiskt väntar på dig.
+
 ## Obemannat läge (v16)
 
 Bär research-filen raden `Läge: obemannat` kan du köra `/nortropic-autobygg` — orkestreringen som gör plan→init→innehåll→granskning→**grind-torrkörning** utan det mänskliga nod-3-stoppet. Det primära användningsfallet är **gratis-bygge-motorn**: låt systemet bygga en färdig preview åt en låginsatskund utan att du sitter med i varje nod (rekommendationen står i research-mallen: obemannat för gratis-byggen och låginsatskunder, bemannat för betalande — briefgodkännandet är billig försäkring). Utelämnad `Läge:`-rad = `bemannat` = dagens flöde, oförändrat.
 
-Det är ett förtroende med bromsar. Körningen **överlämnar alltid till människa** vid (a) en ohanterad eller scope-nej juridikflagga i §7, (b) en kvarstående STRATEGISK öppen fråga (plannern klassar varje öppen fråga STRATEGISK/FAKTA/BESLUT — STRATEGISK påverkar riktning/arkitektur, FAKTA/BESLUT kan skjutas upp), (c) CRITICAL kvar efter EN autonom fixloop, eller (d) ett brutet fixkontrakt (BATCH-005: en agents deklarerade filmängd motsäger delta-snapshoten, eller commit-utfallet avviker från den stageade kända mängden — i fasgränscommiten efter Content eller i fixrundans unionscommit). Den **deployar aldrig** — nod 8 (juridik-signoff) och nod 9 (`/vercel:deploy`) förblir dina. Sista steget skriver `FINAL-TOUCHES.md` (fakta att fylla, beslut att fatta, juridik att signera, avslutsreceptet) och för en spårningsrad till `AUTOBYGG-LOG.md` i kundmappen. Samma `FINAL-TOUCHES.md` kan en bemannad ägare generera med `/nortropic-final-touches <kundmapp>` efter `/nortropic-launch`.
+Det är ett förtroende med bromsar, och bromsarna är av två slag — se avsnittet **Owner attention ≠ owner approval** ovan för principen. Körningen **HARD-stoppar och överlämnar till människa** vid (a) en OHANTERAD juridikflagga i §7, (b) en strategisk fråga som är märkt `blocking: true` — alltså en som kräver nytt mandat, inte varje fråga som råkar vara strategisk, (c) CRITICAL kvar efter EN autonom fixloop, (d) ett brutet fixkontrakt (BATCH-005: en agents deklarerade filmängd motsäger delta-snapshoten, eller commit-utfallet avviker från den stageade kända mängden — i fasgränscommiten efter Content eller i fixrundans unionscommit), (e) ett ouppfyllt Del-C-förkrav, alltså en krävd men obyggd capability, och (f) varje OKLASSIFICERAT utfall. Den **ROUTAR** däremot bort — utan att invänta dig — vid `scope-nej`, vid ett interventionsutfall som inte är NY SAJT, och vid en stateful glidning (Ring 3). Ingen sajt byggs då, skälet registreras, och du får ett rekommenderat nästa steg. Den **deployar aldrig** — nod 8 (juridik-signoff) och nod 9 (`/vercel:deploy`) förblir dina. Sista steget skriver `FINAL-TOUCHES.md` (fakta att fylla, beslut att fatta, juridik att signera, avslutsreceptet) och för en spårningsrad till `AUTOBYGG-LOG.md` i kundmappen. Samma `FINAL-TOUCHES.md` kan en bemannad ägare generera med `/nortropic-final-touches <kundmapp>` efter `/nortropic-launch`.
 
 **Obemannat är inte "autopilot".** `AUTOPILOT`/självförbättringstrappan ([07-konstitution.md](07-konstitution.md) §B) styr systemets självförbättring — aldrig kund-flödet. Obemannat kund-bygge styrs enbart av research-radens `Läge:`, en helt separat brytare. Blanda aldrig ihop dem.
 

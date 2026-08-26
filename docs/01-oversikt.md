@@ -45,12 +45,14 @@ SEO-värde) · **ICKE-SAJT-ÅTGÄRD** (problemet ligger utanför sajten: Google 
 svarstider, prissättning) · **AVRÅD** (vi är fel leverantör). Utfallet skrivs i briefens
 §7.12, och **är det något annat än NY SAJT registreras det ALLTID OCKSÅ som en STRATEGISK
 öppen fråga** — annars passerar ett obemannat flöde beslutet och bygger just den sajt
-plannern avrådde från.
+plannern avrådde från. Den frågan är ICKE-blockerande: obemannat **routar** då bort från
+ny-sajt-lanen utan att invänta ägaren (se [00-guide.md](00-guide.md), "Owner attention ≠
+owner approval").
 
 **Steg 1b — kapacitetskompilering.** Researchens signaler vägs mot
 [kapacitetskatalogen](kapacitetskatalog.md). En kapacitet som är `ROUTE-OUT` planeras
-aldrig runt; en som krävs men är `DECLARED` (beskriven, ej byggd) stoppar som STRATEGISK
-öppen fråga. Systemet planerar aldrig vidare på en kapacitet som inte finns.
+aldrig runt — det är routing, inte ägargodkännande; en som krävs men är `DECLARED`
+(beskriven, ej byggd) är ett HARD STOPP som blockerande STRATEGISK öppen fråga. Systemet planerar aldrig vidare på en kapacitet som inte finns.
 
 **Känd avvikelse — INPUT GATE sammanfaller inte med kontraktet.** Plannerns minimigrind
 kräver fortfarande telefonnummer och USP. Kontraktets kontrollrad bär `org · kontaktvag ·
@@ -72,7 +74,7 @@ paketformad grind mot en universellt komplett fil, aldrig bristfällig research
 
 ## Lägesväxeln — obemannat (v16)
 
-Research-filens valfria rad `Läge: obemannat` byter körsätt. I `obemannat` orkestrerar `/nortropic-autobygg` noderna **2→7** utan att stanna vid nod 3, så länge briefen är ren — inga ohanterade/scope-nej juridikflaggor i §7 och inga STRATEGISKA öppna frågor. **Nod 8 (juridik) och nod 9 (deploy) är fortfarande hårda mänskliga stopp** — obemannat rör dem aldrig, och deployar aldrig. Faller något av de tre villkoren ut (bemannat/ohanterad-juridik-eller-STRATEGISK/CRITICAL-efter-en-fixloop) lämnas bygget över med `FINAL-TOUCHES.md` som punch-list. Utelämnad `Läge:`-rad = `bemannat` = nodkartan ovan oförändrad. Detaljer i [00-guide.md](00-guide.md) (Obemannat läge).
+Research-filens valfria rad `Läge: obemannat` byter körsätt. I `obemannat` orkestrerar `/nortropic-autobygg` noderna **2→7** utan att stanna vid nod 3, och stannar bara när det faktiskt måste. **Nod 8 (juridik) och nod 9 (deploy) är fortfarande hårda mänskliga stopp** — obemannat rör dem aldrig, och deployar aldrig. Utfallen är `CONTINUE` · `ATTENTION_CONTINUE` · `ROUTE` · `HARD_STOP`: en icke-blockerande strategisk fråga noteras men stoppar inte, ett interventionsutfall ≠ NY SAJT och scope-nej **routar** bort utan att invänta ägaren, medan ohanterad juridik, obyggd krävd kapacitet, kvarstående CRITICAL, brutet fixkontrakt och varje oklassificerat utfall lämnar över med `FINAL-TOUCHES.md` som punch-list. Principen och tabellen bor i [00-guide.md](00-guide.md), "Owner attention ≠ owner approval". Utelämnad `Läge:`-rad = `bemannat` = nodkartan ovan oförändrad. Detaljer i [00-guide.md](00-guide.md) (Obemannat läge).
 
 ## De tre hårda stoppen
 
