@@ -204,6 +204,27 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Första riktiga provkörningen — och vad den visade (2026-08-26)
+
+De två provfallen har hittills bara granskats till formen. Nu har de för första gången
+**körts** genom den del av kedjan som går att köra utan att bygga en riktig sajt: den del
+som fattar beslut om huruvida bygget ens ska starta.
+
+**Utfallet blev det som var förutsagt, och det är den goda nyheten.** Rörmokarfallet
+passerar — allt det behöver finns byggt. Mjukvarufallet **stoppar**, därför att det kräver
+en bokningsfunktion som är beskriven men inte byggd. Stoppet var nedskrivet som det
+förväntade utfallet innan körningen, så det är ett godkänt prov och inte ett fel.
+
+**Men körningen visade också något som ingen hade skrivit ned.** Stoppet kom från en
+kontroll som finns i provkörarens kod — **inte i den riktiga kedjan.** I den riktiga kedjan
+uppstår stoppet bara om den planerande AI:n själv råkar flagga att funktionen saknas.
+Ingen kod jämför "vad kunden behöver" mot "vad vi faktiskt har byggt".
+
+**Det betyder att stoppet i dag hänger på en bedömning, inte på en spärr.** Missar
+bedömningen fortsätter bygget in i något som inte kan levereras. Bristen har fått ett namn
+och nästa steg är att flytta in spärren i kedjan, så att AI:n blir ett andra lager i
+stället för det enda.
+
 ## Provfallet som gav bort svaret (2026-08-26)
 
 Vi har ett provfall som ska visa att fabriken INTE klistrar på lokala vanor där de inte

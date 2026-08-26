@@ -79,6 +79,32 @@ stället för att bygga vidare på en capability som inte finns.
 Att lyfta `KAP-EXTERN-BOKNING` till `BUILT` är ett eget arbete och byter inte plats med
 det här. Tills dess är stoppet utfallet.
 
+### `KOR-GAP-1` — stoppet är MODELLBEROENDE i den skeppade kedjan
+
+En körning av `scripts/kor-backtest.mjs` mot den här fixturen ger HARD_STOP på
+`KAP-EXTERN-BOKNING`. **Men den grind som fäller är deterministisk och finns inte i
+kedjan.** Källan i `workflows/nortropic-autobygg.js` ger stoppet på två vägar, och båda
+går genom en modell:
+
+1. **Plannern** måste klassa den obyggda capabilityn som en STRATEGISK fråga med
+   `blocking: true`. Prompten föreskriver det (*"a required-but-unbuilt capability are
+   `blocking: true`"*), men föreskriften är text till en modell, inte en grind.
+2. **Del-C-vakten** rapporterar `unmetPrerequisite` — men den frågan gäller
+   Del-C/Railway-förkrav, inte kapacitetskatalogens status i allmänhet.
+
+**Ingen kod läser `docs/kapacitetskatalog.md` och jämför mot researchens §15.** Missar
+plannern klassificeringen fortsätter kedjan in i ett bygge som kräver en capability som
+inte finns.
+
+| | Läge |
+|---|---|
+| Det deterministiska utfallet | **HARD_STOP, verifierat** — `kor-backtest.mjs`, prövat av `check-backtest-fixtures.mjs` |
+| Den skeppade kedjans utfall | **ODÖMBART** — beror på plannerns klassificering, som inte har körts |
+
+**Nästa transition:** lyft kapacitetsgrinden ur `kor-backtest.mjs` in i kedjan som ett
+deterministiskt led FÖRE plannerns klassificering, så att modellen blir ett andra lager i
+stället för det enda.
+
 ## `B-T7` — DELVIS ÅTGÄRDAT 2026-08-26
 
 Case B avslöjade att den universella kärnan själv bar lokala antaganden — fixturen gick

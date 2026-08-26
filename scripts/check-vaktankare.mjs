@@ -57,14 +57,14 @@ const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
-const SJALVPIN = 'ec95bb5b1aeb0196'
+const SJALVPIN = '3c88dd99fdb8e0ee'
 
 // ---- PINNTABELL: BÖRJAN (normaliseras ut ur självankaret) -------------------
 // sha256 över vaktens HELA källtext, första 16 hex. Ändras en vakt legitimt uppdateras
 // raden i SAMMA commit — det är hela poängen att den ändringen syns här.
 const PINNAR = {
   'check-autobygg-delegation.mjs': 'fdb981e1432787be',
-  'check-backtest-fixtures.mjs': '643dc750167f5fc5',
+  'check-backtest-fixtures.mjs': '67dfc86f07f96a2e',
   'check-docs-coherence.mjs': 'ae02760dfefd3f8e',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
   'check-gym-contract.mjs': '3bdf293c3aa7e1f7',
@@ -77,6 +77,8 @@ const PINNAR = {
   'check-research-contract.mjs': '4aa0aa5b5f281092',
   'check-v4-utkast.mjs': '3c107f8e300336f9',
   'check-workflow-parse.mjs': '575a45e74cc23eec',
+  'kor-backtest.mjs': 'f5472709a1351ba2',
+  'kor-vakter.mjs': 'aa17a3fefd53a27d',
 }
 // ---- PINNTABELL: SLUT -------------------------------------------------------
 
@@ -131,7 +133,12 @@ function vaktlista() {
   // `.map(basename)` vore fel: Array.map skickar indexet som andra argument, och basename
   // tolkar det som `suffix` — vilket kastar på första elementet.
   return [...new Set(filer.map((f) => basename(f)))]
-    .filter((f) => /^check-.+\.mjs$/.test(f))
+    // Både VAKTER (`check-*`) och KÖRARE (`kor-*`) pinnas. Att bara pinna vakterna lämnade
+    // `kor-vakter.mjs` opinnad — och just den filen är den enda som märker att en vakt
+    // skrivits över. Nu låser de två varandra: skrivs köraren över fäller den här vakten,
+    // skrivs den här vakten över fäller köraren. Två samtidiga överskrivningar är kvar som
+    // gräns, men en ensam är det inte längre.
+    .filter((f) => /^(check|kor)-.+\.mjs$/.test(f))
     .filter((f) => existsSync(join(ROT, 'scripts', f)))
     .sort()
 }

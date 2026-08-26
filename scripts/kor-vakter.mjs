@@ -52,6 +52,8 @@ try {
   odombart('git ls-files misslyckades — vaktmängden går inte att avgränsa')
 }
 const vakter = [...new Set(filer.map((f) => basename(f)))]
+  // Köraren kör VAKTER. `kor-*` är körare, inte vakter, och kvitteras i stället av
+  // ankarvaktens pinntabell — annars skulle köraren köra sig själv.
   .filter((f) => /^check-.+\.mjs$/.test(f))
   .filter((f) => existsSync(join(ROT, 'scripts', f)))
   .sort()

@@ -27,7 +27,7 @@
 
 import { readFileSync, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 
 console.log('VAKT: check-backtest-fixtures.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så även en ODÖMBAR körning identifierar sig
@@ -78,7 +78,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '2f1002ccb51cd6ae'
+const FORVANTAD_SIGNATUR = '9add8f4e394d9b6f'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -416,6 +416,43 @@ check('B-M6: KAP-LOKAL-SEO aktiveras INTE — SKOPAT, citatagnostiskt',
   !/['"]KAP-LOKAL-SEO['"]/.test(bF('kapaciteter')), 'aktiverad i core-only')
 check('B-T4: forbjudnaPastaenden är icke-tom och namnger konkreta påståenden',
   (bF('forbjudnaPastaenden').match(/'/g) || []).length >= 8, 'urholkad lista — A-D7/B-T5:s facit försvinner')
+
+// ---- BETEENDEPROV: backtestköraren mot de riktiga fixturerna ---------------
+// Formkontroller ovan säger inget om beteende. Här KÖRS `kor-backtest.mjs` och dess
+// utfall prövas. Ett utfall som bara SKRIVS UT är ingen kontroll — det ska hävdas.
+const kb = spawnSync(process.execPath, [join(ROT, 'scripts/kor-backtest.mjs')], { cwd: ROT, encoding: 'utf8' })
+const kbUt = `${kb.stdout || ''}${kb.stderr || ''}`
+if (kb.status === null) odombart('kor-backtest.mjs kunde inte startas — beteendet går inte att pröva')
+if (kb.status === 2) odombart(`kor-backtest.mjs blev ODÖMBAR: ${kbUt.split('\n').find((r) => r.startsWith('ODÖMBART')) || ''}`)
+const caseA = /── CASE A[\s\S]*?(?=── CASE B)/.exec(kbUt)
+const caseB = /── CASE B[\s\S]*?(?=\nVAD DEN)/.exec(kbUt)
+check('KÖR: backtestköraren producerade båda fallen', !!caseA && !!caseB,
+  'ett saknat fall får aldrig läsas som ett passerat fall')
+if (caseA && caseB) {
+  check('KÖR/B-GAP-1: Case B HARD-stoppar på KAP-EXTERN-BOKNING',
+    /HARD_STOP — KAP-EXTERN-BOKNING är DECLARED/.test(caseB[0]),
+    'det FÖRVÄNTADE utfallet uteblev — antingen har capabilityns status ändrats eller så har grinden slutat fälla')
+  check('KÖR/B-GAP-1: stoppet inträffar FÖRE bygget, inte efter',
+    /allt efter det här steget är EJ KÖRT/.test(caseB[0]),
+    'ett stopp som rapporteras efter att arbete utförts är inte samma stopp')
+  check('KÖR/B-T2: Case B avstår UTTRYCKLIGEN från KAP-LOKAL-SEO',
+    /uttryckligen avstådda: KAP-LOKAL-SEO/.test(caseB[0]),
+    'en negativkontroll som inte KAN aktivera lokal-SEO prövar ingenting — avståendet måste vara ett val')
+  check('KÖR: Case A passerar beslutslagret',
+    /UTFALL: passerar beslutslagret/.test(caseA[0]),
+    'stoppar även den lokala fixturen är grinden för sträng och skiljer inte fallen åt')
+  check('KÖR: Case A kräver de fem lokala kapaciteterna',
+    ['KAP-LOKAL-SEO', 'KAP-SCHEMA', 'KAP-KVITTON', 'KAP-BILD', 'KAP-PRIMARHANDLING'].every((k) => caseA[0].includes(k)),
+    'kravmängden har krympt — då blir Case A:s passage billigare än den ska vara')
+  // POSITIVT KONTROLLPROV: skiljer körningen ÖVER HUVUD TAGET på fallen? Två identiska
+  // utfall vore ett tecken på att grinden inte läser fixturen.
+  check('KÖR: de två fallen får OLIKA utfall (kontrollprov)',
+    /UTFALL: passerar/.test(caseA[0]) !== /UTFALL: passerar/.test(caseB[0]),
+    'samma utfall för en lokal kund och en B2B-negativkontroll betyder att indata inte läses')
+}
+check('KÖR: rapporten säger ut att kapacitetsgrinden INTE finns i kedjan',
+  /MODELLBEROENDE/.test(kbUt) && /Se KOR-GAP-1/.test(kbUt),
+  'utan den meningen läses ett deterministiskt stopp som bevis för att den skeppade kedjan stoppar')
 
 // ---- B-GAP-2/B-GAP-1: slutsatserna ska stå i FORVANTAT, inte i researchen --
 // Flyttades slutsatserna bara BORT ur researchen utan att landa någonstans vore de
