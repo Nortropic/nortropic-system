@@ -112,6 +112,34 @@ fel. En kontroll (`scripts/check-backtest-fixtures.mjs`) prövar att underlaget 
 form, och den skriver själv ut hur många frågor som ännu är obesvarade. **Ett förberett
 prov är inte ett godkänt prov**, och kontrollen är byggd för att aldrig kunna läsas som om
 det vore det.
+## En form för paketen — och ett bygge som drogs tillbaka (2026-08-26)
+
+Fabriken har en **kärna** som gäller alla kunder och ett **paket** ovanpå för den kundtyp
+man bygger åt. Problemet var att det bara fanns ETT paket — och ett enda exempel är ingen
+form, bara ett exempel. Nästa paket hade ärvt vad som råkade stå i det första.
+
+**Därför finns nu en skriven form.** `docs/paketkontrakt.md` säger vad ett paket måste
+bestå av och vilka regler det aldrig får bryta. En kontroll prövar varje paket mot den, och
+det befintliga paketet används som facit: klarar inte `lokal-se` sitt eget kontrakt är
+kontraktet fel, inte paketet.
+
+**Fem nya paket påbörjades — och drogs tillbaka.** Hälsa, livsmedel, finans, barn som
+målgrupp, alkohol/tobak: precis de fem kundtyper där lagen ställer extra krav. Avsikten var
+att bygga strukturen och frågorna, men aldrig vad lagen kräver — det sistnämnda kräver en
+jurist eller en myndighetstext, inte en gissning.
+
+**Den gränsen höll inte.** En oberoende granskning visade att juridiken smugit in på minst
+fem ställen. Det tydligaste: en rad sa *"saknas samtycke är bilden inte användbar — det är
+en observation, inte en bedömning."* Men "bilden är inte användbar" ÄR en bedömning av
+rättsläget. Observationen är bara att samtycke saknas; resten hör till dig.
+
+Orsaken är strukturell och värd att förstå: **att välja vilka frågor som ska ställas kodar
+redan en uppfattning om vad som är juridiskt viktigt.** Det går inte att bygga "bara
+frågorna" åt en reglerad bransch utan att samtidigt bygga en tyst teori om lagen. Ett
+skelett som bär en sådan teori är sämre än inget paket alls, för det ser färdigt ut.
+
+**Paketen byggs den dag det finns en namngiven källa per flagga.** Formen finns redan —
+bygget blir litet när underlaget finns. Det är en ordningsfråga, inte ett nej.
 
 ## Vill du djupare?
 

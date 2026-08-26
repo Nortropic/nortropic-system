@@ -34,6 +34,20 @@ Svenska egenföretagare och lokala småföretag vars sajt ska driva EN primärha
 
 ## Ring 2 — nya arketyper och juridikmoduler (BYGGS VID FÖRSTA JA)
 
+**Ägarbeslut 2026-08-26 att bygga Ring 2-paketens STRUKTUR i förväg — och varför försöket
+DROGS TILLBAKA.** Fem paketskelett byggdes med avsikten att bära struktur och
+observationskrav men aldrig juridiskt sakinnehåll. Oberoende granskning visade att gränsen
+inte hölls: kapacitetsradernas kravkolumn — definierad som *"vad som ska vara sant vid
+leverans"* — kom att bära materiella leveransregler härledda ur lag, och en modulrad
+formulerade en rättslig slutsats och kallade den observation. **Att välja vad som ska
+observeras kodar redan en teori om vad som är juridiskt relevant.** Ett skelett som tyst
+bär den teorin är sämre än inget paket, eftersom det ser auktoritativt ut.
+
+Paketen byggs därför när det finns en **namngiven källa** — myndighetstext eller jurist —
+för respektive flaggas krav. Det är en sekvensfråga, inte ett nej. Formen finns redan
+byggd och vaktad i [`docs/paketkontrakt.md`](paketkontrakt.md), så bygget är litet den dag
+källan finns.
+
 Arketyper och juridikmoduler som inte finns ännu (hälsa/kropp, livsmedel, finans, barn som målgrupp, alkohol/tobak) byggs först när första sådana kunden säger ja — efterfrågan före bygge — och **offereras som eget arbete**, inte som del av standardleveransen. Ohanterad flagga stannar alltid vid nod 3: bygg modulen eller tacka nej.
 
 **Obemannat läge (v16) respekterar ringen.** En ohanterad juridikflagga (Ring 2-arketyp) stoppar alltid `/nortropic-autobygg` vid plan-steget och lämnar över vid nod 3 — obemannat auto-bygger aldrig en Ring 2-modul. Scope-nej (Ring 3 — e-handel/distansavtal, eget tillstånd/databas/Railway-klass) stoppar likaså; static-first-grinden (Del-C) fångar dessutom om ett stateful behov slunkit in i scaffolden. Obemannat rekommenderas alltså inte för Ring 2-fall — flaggkunder stoppar ändå villkorat.
