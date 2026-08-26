@@ -1,7 +1,7 @@
 # Börja här — Nortropic från noll
 
-Senast verifierad mot systemet: 2026-08-07 · v17 (denna commit)
-Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE: check-invariants.mjs INV-001–005, verify-suite doctor 1–13 + OGILTIG-status, design-reviewer Bash→BLOCKED, NRT-007-blocket i agenterna, docs/100-dagar); 0 påståenden i denna fil ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är INTE inräknad** — den ligger i öppen PR. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 Det här är ingången för dig som aldrig sett systemet förut. Läs den i ett svep, så förstår du vad Nortropic är och hur det hänger ihop — utan en enda insider-term. Det här dokumentet ersätter inte den tekniska dokumentationen (docs/01–07 och README); det är kartan du läser innan du dyker ner i den. Vill du veta exakt hur något fungerar finns länkar sist.
 
@@ -325,3 +325,52 @@ resultat.** Att leta upp något att föreslå för att körningen ska kännas v�
 Och det femte steget — första riktiga radarkörningen mot ett riktigt kundprojekt —
 byggs inte i förväg. Det kräver en första riktig kund, och vi hittar inte på underlag
 för att kunna säga att banan är färdig.
+
+## Dokumentationen hann inte med bygget (S9, 2026-08-26)
+
+Systemet har två dokumentationslager: ett för dig som är ny (den här filen) och ett
+tekniskt för den som ska ändra i systemet. Regel 22 kräver att det FÖRSTA uppdateras
+varje gång något tekniskt ändras — och det har fungerat. Den här filen är aktuell.
+
+Följden blev att det ANDRA lagret gled. `docs/01-oversikt.md` och `docs/00-guide.md`
+stod kvar på en stämpel från 31 juli, utan ett enda omnämnande av paket,
+kapacitetskatalog eller interventionsbeslut — trots att fem ändringar sedan dess hade
+byggt om precis de delarna. En regel som skyddar ett lager kan alltså få det andra att
+se välskött ut medan det driver.
+
+**Tre saker rättades.**
+
+Ingressen i README beskrev systemet som byggt "för svenska egenföretagare och lokala
+småföretag". Det var sant en gång, men sedan i somras är arkitekturen en universell
+kärna med paket ovanpå — och `lokal-se` är systemets FÖRSTA kundtyp, inte dess natur.
+Skillnaden är inte kosmetisk: den som läser den gamla meningen tror att en kund utanför
+den beskrivningen ligger utanför systemet.
+
+Nodkartan sa fortfarande att research är "5 obligatoriska fält". Den skrivs numera mot
+ett researchkontrakt med sjutton sektioner, och plannern läser kontrollraden först.
+
+Och det viktigaste: **ingenstans i operatörsdokumentationen stod det att plannern kan
+komma fram till att en ny sajt inte är svaret.** Den fäller ett interventionsbeslut med
+fyra utfall — bygg nytt, förbättra det som finns, gör något som inte är en sajt alls,
+eller avråd — och det står i briefen. Nu står det där du faktiskt läser.
+
+**En vakt som märker nästa gång.** `scripts/check-docs-coherence.mjs` jämför vad som
+finns byggt i repot med vad dokumentationen säger. Finns det paket men ingen text om
+paket, faller den. Och åt andra hållet: **beskriver dokumentationen en byggdel som inte
+finns i repot, faller den också.** Det senare är det ovanligare och farligare felet — att
+beskriva arbete som ännu inte är klart som om det vore det.
+
+Att säga att något ännu INTE är klart är däremot alltid tillåtet. Ett tidigare utkast av
+vakten fällde meningen "detta är ännu inte landat" — alltså precis den ärlighet den var
+byggd för att skydda. En vakt som förbjuder sanningen om vad som saknas driver fram
+tystnad i stället för redovisning.
+
+**Vakten hade själv exakt det fel den letar efter.** Första versionen lät en kontroll
+"utgå" när det den vaktade försvann — och räknade sedan bara de kontroller som blev kvar.
+Att döpa om en enda fil tog bort tjugo kontroller, och vakten skrev ut "allt grönt" över
+hålet. Den rapporterade sin egen blindhet som ett godkänt resultat. Nu räknas varje
+kontroll alltid, och stämmer inte antalet vägrar den döma alls.
+
+Vakten kan säga att en sak är NÄMND. Den kan inte säga att den är väl beskriven, och den
+körs för hand — inte automatiskt. Det står i README, och vakten fäller om den meningen
+försvinner medan skripten står kvar i listan.
