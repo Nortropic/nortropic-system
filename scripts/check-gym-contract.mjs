@@ -28,6 +28,8 @@ import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+console.log('VAKT: check-gym-contract.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så även en ODÖMBAR körning identifierar sig
+
 let ROT
 try {
   ROT = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
@@ -46,7 +48,7 @@ const flat = (s) => s.replace(/\s+/g, ' ')
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '416718d082e30fa2'
+const FORVANTAD_KALLHASH = '794fe86a728ec814'
 
 const k = las('docs/gymkontrakt.md')
 const konst = las('docs/07-konstitution.md')

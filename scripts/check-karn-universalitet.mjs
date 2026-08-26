@@ -40,6 +40,8 @@ import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+console.log('VAKT: check-karn-universalitet.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så även en ODÖMBAR körning identifierar sig
+
 let ROT
 try {
   ROT = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
@@ -60,7 +62,7 @@ const norm = (s) => s.replace(/[‐‑‒–—]/g, '-').replace(/\s+/g, ' ')
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '5eb8fe61600a2639'
+const FORVANTAD_KALLHASH = 'a013150c169b4230'
 
 const karna = las('skills/nortropic-plan/references/research-kontrakt-v3.md')
 const modul = las('packs/lokal-se/research-module.md')
@@ -134,8 +136,13 @@ check('Den ostängda halvan är utskriven i vaktens egen text',
   'vakten döljer att kärnans PRODUCENT fortfarande stoppar en icke-lokal kund vid nod 2')
 
 // ---- Verdikt: hash över VAKTENS EGEN KÄLLTEXT ------------------------------
-const egen = readFileSync(fileURLToPath(import.meta.url), 'utf8')
-  .split('\n').filter((r) => !r.includes('FORVANTAD_KALLHASH =')).join('\n')
+// Hashen täcker VARJE rad; endast pinnens literal normaliseras. Formen som UTELÄMNADE
+// rader som bar markören var ett bevisat kringgående: `process.exit(0) // FORVANTAD_KALLHASH = `
+// föll ur hashen och avslutade vakten grön utan att pinnen rörde sig.
+const kalltext = readFileSync(fileURLToPath(import.meta.url), 'utf8')
+const PINNRAD = /^const FORVANTAD_KALLHASH = '[0-9a-f]{16}'$/m
+if (!PINNRAD.test(kalltext)) odombart('pinndeklarationen har fel form — ankaret går inte att normalisera')
+const egen = kalltext.replace(PINNRAD, "const FORVANTAD_KALLHASH = '<PINNE>'")
 const kallhash = createHash('sha256').update(egen).digest('hex').slice(0, 16)
 if (kallhash !== FORVANTAD_KALLHASH) {
   console.error(`ODÖMBART: vaktens källhash är ${kallhash}, förväntad ${FORVANTAD_KALLHASH} — vakten har redigerats. En hash över KONTROLLNAMN fäller inte ett utbytt predikat; den här hashar källtexten. Uppdatera pinnen medvetet i samma commit.`)
