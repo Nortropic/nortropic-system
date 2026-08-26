@@ -129,6 +129,11 @@ const RATEXT = {
   'README.md': las('README.md'),
   'docs/01-oversikt.md': las('docs/01-oversikt.md'),
   'docs/00-guide.md': las('docs/00-guide.md'),
+  // S11: agentbeskrivningarna var en BLIND YTA. `docs/02-agenter.md` beskrev fortfarande
+  // att ett interventionsutfall ≠ NY SAJT fick obemannat att STOPPA — falskt sedan S10,
+  // där det ROUTAR. Ytan ingår därför i H-gruppen nedan (inte i A–G, som handlar om
+  // arkitekturramning och inte om agenternas skyldigheter).
+  'docs/02-agenter.md': las('docs/02-agenter.md'),
 }
 const YTOR = Object.fromEntries(Object.entries(RATEXT).map(([k, v]) => [k, ren(v)]))
 
@@ -410,6 +415,111 @@ forbudOmArtefaktSaknas({
   beskrivning: 'kategorialias-tabellen',
 })
 
+// ── H. DELEGATIONSSEMANTIKEN FÅR INTE BESKRIVAS SOM DEN VAR FÖRE S10 ──────────
+// Bunden till taxonomins existens i workflowkällan: finns ROUTE i interventionstabellen
+// har S10 landat, och då är varje beskrivning av "stoppar och lämnar över" vid ett
+// icke-NY-SAJT-utfall ett FALSKT påstående — inte bara en utelämnad uppdatering.
+{
+  const wf = 'workflows/nortropic-autobygg.js'
+  if (!finns(wf)) { console.error(`ODÖMBART: ${wf} saknas — delegationssemantiken kan inte prövas`); process.exit(2) }
+  // Kommentarer strippas — annars räcker det att kommentera bort mappningen och lägga
+  // till en `CONTINUE`-rad för att `s10` ska stanna sann. Samma fel som fälldes i
+  // workflowvaktens kodsida och som infördes på nytt här.
+  const kod = utanKodkommentar(readFileSync(join(ROT, wf), 'utf8'))
+  const s10 = /'FÖRBÄTTRA BEFINTLIG':\s*ROUTE/.test(kod)
+  const YTOR_H = ['docs/02-agenter.md', 'docs/01-oversikt.md', 'docs/00-guide.md']
+  // SYMMETRI. Grupp H fällde bara "dokumentationen säger STOPP medan koden ROUTAR" och
+  // var strukturellt oförmögen att fälla motsatsen. Att byta mappningen till CONTINUE lät
+  // därför koden sluta routa medan alla tre ytorna fortsatte påstå ROUTAR — och vakten
+  // intygade det. Fjärde gången samma signatur i det här programmet: nämnaren eller
+  // kravet slocknar samtidigt som utsagan blir falsk.
+  for (const yta of YTOR_H) {
+    const t = YTOR[yta]
+    if (!s10) {
+      // Koden routar INTE. Då får ingen yta påstå att den gör det.
+      // MENINGSSKOPAT, inte styckeskopat. En styckeskopad variant blandade ihop
+      // INTERVENTIONS-routning med den orelaterade `ROUTE-OUT`-routningen (kapaciteter),
+      // som råkar stå i samma megastycke i `02-agenter`. Följden var att en KORREKT
+      // pre-S10-beskrivning fälldes som överdokumentation. Samma sammanblandning som
+      // skopningsfel (4) — återinförd av rättningen av (1), och rättad genom att SNÄVA IN.
+      const pastarRoutning = meningar(RATEXT[yta]).some(m =>
+        /\brouta\w*\b/i.test(m) && /NY SAJT|interventionsutfall|interventionsbeslut/i.test(m))
+      if (pastarRoutning) nej(`H-taxonomi [${yta}]`,
+        `${yta} påstår att ett icke-NY-SAJT-utfall ROUTAR, men ${wf} bär ingen ROUTE-mappning — ÖVERDOKUMENTATION`)
+      else ja(`H-taxonomi [${yta}]: S10 ej landad och ingen yta påstår routning — koherent`)
+      continue
+    }
+    // (a) dispositionen måste nämnas där plannerns skyldigheter beskrivs
+    if (/\bblocking\b/.test(t)) ja(`H-disposition [${yta}]: dispositionen blocking är namngiven`)
+    else nej(`H-disposition [${yta}]`, `taxonomin finns i ${wf} men ${yta} nämner inte dispositionen \`blocking\``)
+  }
+  // De tre kontrollerna nedan gällde TIDIGARE ovillkorligt, vilket gjorde påståendet
+  // "landar inte S10 vilar kravet" falskt OCH straffade en korrekt beskrivning av det
+  // verkliga (pre-S10) beteendet. De vilar nu tillsammans med resten av gruppen.
+  if (!s10) {
+    for (const yta of YTOR_H) {
+      ja(`H-routning-namngiven [${yta}]: S10 ej landad — kravet vilar`)
+      ja(`H-premiss-routar [${yta}]: S10 ej landad — kravet vilar`)
+      ja(`H-ingen-falsk-stopputsaga [${yta}]: S10 ej landad — stopputsagan är då SANN`)
+    }
+  } else {
+  // (b) INGEN yta får påstå att ett icke-NY-SAJT-utfall stoppar och väntar på ägaren.
+  //     STYCKESKOPAD, inte meningsskopad: en falsk följdsats står ofta i meningen EFTER
+  //     den som nämner utfallet ("Den frågan gör att obemannat stannar…"). Meningsskopning
+  //     missade det, och konsekvensen hör till samma stycke som premissen.
+  for (const yta of YTOR_H) {
+    //     FÖNSTER ±1 BLOCK. Följdsatsen står ofta i stycket OMEDELBART EFTER premissen
+    //     ("…annat än NY SAJT registreras som STRATEGISK." / "Den frågan gör att obemannat
+    //     stannar…"), och det stycket nämner inte premissen. Fönstret är avgränsat till
+    //     ett block FRAMÅT (n, n+1) — inte dokumentglobalt, som en gång gjorde sex
+    //     kontroller strukturellt ofällbara.
+    const blk = blockdela(RATEXT[yta])
+    const PREMISS = /annat än\s+`?NY SAJT`?|icke-NY-SAJT|inte\s+NY SAJT/i
+    const STOPP = /\bstoppar\b|\bstannar\b|lämnar över|inväntar|väntar på/i
+    let falskt = null
+    for (let n = 0; n < blk.length && !falskt; n++) {
+      if (!PREMISS.test(blk[n])) continue
+      const fonster = blk.slice(n, n + 2)
+      const bar = fonster.join(' ')
+      if (STOPP.test(bar) && !/\brouta\w*\b/i.test(bar)) {
+        falskt = fonster.find(x => STOPP.test(x)) || blk[n]
+      }
+    }
+    // (c) POSITIVT KRAV. Negationen ensam räcker inte: premissen och den falska
+    //     följdsatsen kan ligga i ANGRÄNSANDE stycken, och då ser (b) dem inte. Att
+    //     kräva routningsutsagan gör en ERSÄTTNING detekterbar — byter någon ut
+    //     routningsstycket mot ett stoppstycke faller detta krav även om (b) tiger.
+    const harRoutning = blockdela(RATEXT[yta]).some(b =>
+      /\brouta\w*\b/i.test(b) &&
+      /NY SAJT|interventionsutfall|interventionsbeslut/i.test(b))
+    if (harRoutning) ja(`H-routning-namngiven [${yta}]: routningen är utskriven`)
+    else nej(`H-routning-namngiven [${yta}]`,
+      `taxonomin ROUTAR vid icke-NY-SAJT men ${yta} beskriver ingenstans routningen — en ersatt utsaga syns annars inte`)
+
+    // (d) MENINGSSKOPAT POSITIVT KRAV. Ett långt stycke kan bära BÅDE ett orelaterat
+    //     "routas bort" (om ROUTE-OUT) OCH en falsk stopputsaga om interventionsutfallet —
+    //     då tiger både (b) och (c). Varje MENING som bär premissen måste därför själv,
+    //     eller i meningen direkt efter, namnge routningen.
+    const men = meningar(RATEXT[yta])
+    let premissUtanRoutning = null
+    for (let n = 0; n < men.length && !premissUtanRoutning; n++) {
+      if (!PREMISS.test(men[n])) continue
+      // SAMMA MENING, inget fönster. Ett ±1-fönster uppfylldes av ett ORELATERAT
+      // "ROUTE-OUT routas bort" i nästa mening — en helt annan routning. Premissen och
+      // dess följd hör ihop i en mening, och alla tre ytorna skriver det så.
+      if (!/\brouta\w*\b/i.test(men[n])) premissUtanRoutning = men[n]
+    }
+    if (premissUtanRoutning) nej(`H-premiss-routar [${yta}]`,
+      `meningen som bär icke-NY-SAJT-premissen namnger inte routningen. Meningen: "${premissUtanRoutning.slice(0, 110)}…"`)
+    else ja(`H-premiss-routar [${yta}]: premissen bär sin routningsutsaga`)
+
+    if (falskt) nej(`H-ingen-falsk-stopputsaga [${yta}]`,
+      `påstår att ett icke-NY-SAJT-utfall stoppar/väntar, men taxonomin ROUTAR. Meningen: "${falskt.slice(0, 110)}…"`)
+    else ja(`H-ingen-falsk-stopputsaga [${yta}]: ingen förlegad stopputsaga`)
+  }
+  }
+}
+
 // ── G. VAKTERNAS EGEN ÄRLIGHET ────────────────────────────────────────────────
 // Kontrollskripten är inte grindkopplade. Så länge det är sant måste README säga
 // det, annars läser en ny operatör en handkörd kontroll som en grind.
@@ -464,7 +574,7 @@ forbudOmArtefaktSaknas({
 // över en. FORVANTAT är därför skriven för hand och jämförs mot faktiskt antal.
 // Faller de isär är körningen ODÖMBAR: en vakt som tappat kontroller vet inte längre
 // vad dess grönt betyder, och får då inte påstå någonting alls.
-const FASTA = 45   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1
+const FASTA = 57   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)

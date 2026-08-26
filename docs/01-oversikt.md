@@ -43,11 +43,18 @@ sajt" avgör den vilken åtgärd som faktiskt löser problemet. Fyra utfall: **N
 **FÖRBÄTTRA BEFINTLIG** (sajten fungerar i grunden — en omskrivning kastar bort upparbetat
 SEO-värde) · **ICKE-SAJT-ÅTGÄRD** (problemet ligger utanför sajten: Google Företagsprofil,
 svarstider, prissättning) · **AVRÅD** (vi är fel leverantör). Utfallet skrivs i briefens
-§7.12, och **är det något annat än NY SAJT registreras det ALLTID OCKSÅ som en STRATEGISK
-öppen fråga** — annars passerar ett obemannat flöde beslutet och bygger just den sajt
-plannern avrådde från. Den frågan är ICKE-blockerande: obemannat **routar** då bort från
-ny-sajt-lanen utan att invänta ägaren (se [00-guide.md](00-guide.md), "Owner attention ≠
-owner approval").
+§7.12, och **är det något annat än NY SAJT ROUTAR obemannat bort från ny-sajt-lanen utan att
+invänta ägaren, och utfallet registreras ALLTID OCKSÅ som en STRATEGISK öppen fråga med
+`blocking: false`.** Routningen avgörs av fältet `interventionsbeslut` — inte av frågan.
+Registreringen är en upplysning till ägaren, inte routningens orsak.
+
+**Dispositionen, inte etiketten, avgör (S10).** Varje STRATEGISK öppen fråga bär ett
+obligatoriskt `blocking: true|false`. `true` endast när fortsatt arbete kräver nytt mandat,
+en otillåten eller obyggd capability, en otillåten irreversibel effekt, eller ett obevisbart
+påstående — annars `false`, och arbetet fortsätter med frågan noterad. Utelämnas
+dispositionen är utfallet OKLASSIFICERAT och körningen fail-closar. Principen och de fyra
+utfallen `CONTINUE` / `ATTENTION_CONTINUE` / `ROUTE` / `HARD_STOP` bor i
+[00-guide.md](00-guide.md), "Owner attention ≠ owner approval".
 
 **Steg 1b — kapacitetskompilering.** Researchens signaler vägs mot
 [kapacitetskatalogen](kapacitetskatalog.md). En kapacitet som är `ROUTE-OUT` planeras
