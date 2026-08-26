@@ -81,6 +81,38 @@ större än det ska vara, eller om det ändrar systemet utan att uppdatera beskr
 systemet i samma andetag. Vakten kan bara stoppa förslag — den kan aldrig släppa igenom
 något åt dig. Den sista knappen är fortfarande din.
 
+## Två låtsaskunder som ska bevisa att fabriken inte gissar (S7/S8, 2026-08-26)
+
+Fabriken är byggd för svenska lokala företag men ska klara vilken kund som helst. Det är
+lätt att säga och svårt att veta. Ett antagande som råkar stämma för alla kunder du haft
+ser likadant ut som en sanning — ända tills det inte gör det.
+
+Därför finns nu två påhittade kunder i `backtests/`:
+
+**Ekbergs Rör i Uppsala** — en rörmokare, precis den sortens kund fabriken byggdes för.
+Hen finns för att BEVARA: om fabriken blir mer allmän får den inte samtidigt bli sämre på
+det den redan kunde. Till den kunden hör en lista på tio medvetet inbyggda fel — fel
+telefonnummer i sidfoten, en ortssida som bara är en annan ortssida med namnet utbytt, ett
+påstått dygnet-runt-jour som kunden inte har — och för varje fel står det i förväg vem som
+ska upptäcka det.
+
+**Kadensa i Malmö** — ett mjukvaruföretag som säljer schemaläggning till åkerier i hela
+Norden. Hen är **med flit fel** för allt fabriken brukar anta: kontoret i Malmö är en
+adress och inget upptagningsområde, det finns inga ortssidor att bygga, ingen Google
+Företagsprofil att fylla i, inga stjärnbetyg, och besökaren ska boka en demo — inte ringa
+och inte begära offert. Om fabriken behandlar Kadensa som en rörmokare syns det direkt.
+
+**Och här är det viktiga:** att inte göra fel räcker inte. Kadensa räknas som godkänd
+först när fabriken både låter bli att bygga det lokala OCH faktiskt bygger det rätta —
+produktinnehåll, integrationer, säkerhetssidan, demobokningen.
+
+**Vad som INTE är gjort:** ingen av de här kunderna har körts genom fabriken. Det som
+finns är underlaget och facit — vad som ska hända, skrivet i förväg så att det går att ha
+fel. En kontroll (`scripts/check-backtest-fixtures.mjs`) prövar att underlaget har rätt
+form, och den skriver själv ut hur många frågor som ännu är obesvarade. **Ett förberett
+prov är inte ett godkänt prov**, och kontrollen är byggd för att aldrig kunna läsas som om
+det vore det.
+
 ## Vill du djupare?
 
 Det här var översikten. Vill du förstå exakt hur något fungerar, fortsätt till det tekniska lagret:
