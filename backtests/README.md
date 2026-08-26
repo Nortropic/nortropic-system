@@ -45,13 +45,14 @@ Det steget kräver ägarens beslut om kostnad och körning. Det är inte gjort h
 
 ## Namngivna luckor mot §26
 
-Planens §26 har tre underrubriker. Två är byggda här. Den tredje är det inte, och den
-utelämnas INTE tyst — §35:s inventeringsmetod tillåter ingen sådan status.
+Planens §26 har tre underrubriker. **Samtliga tre är nu byggda här.** Luckorna nedan står
+kvar som rader även när de stängts — en stängd lucka utan spår går inte att kontrollera,
+och §35:s inventeringsmetod tillåter ingen tyst status.
 
 | ID | Lucka | Status | Nästa transition |
 |---|---|---|---|
-| `§26-GAP-1` | *"Additional reality fixtures: NO-BUILD / MIGRATION / STANDARD-zero-ceremony negative controls are used to prove the architecture does not assume every engagement is 'build a new local site.'"* Ingen av de tre finns. De prövar `interventionsbeslut` (S3) — att systemet kan komma fram till FÖRBÄTTRA BEFINTLIG, ICKE-SAJT-ÅTGÄRD eller AVRÅD, och att en STANDARD-leverans inte drar på sig extra ceremoni utan namngivet skäl (§20) | `NOT_STARTED` | Tre fixturer till: `case-c-no-build/` (kunden behöver ingen ny sajt), `case-d-migration/` (befintlig sajt ska förbättras, inte ersättas), `case-e-standard/` (nollceremoni). Var och en med `FORVANTAT.md` i samma form |
-| `A-GAP-3` | Case A:s **kompatibilitetsväg** — se `case-a-lokal/FORVANTAT.md` | `NOT_STARTED` | En `case-a-legacy/`-fixtur med v1-profil |
+| `§26-GAP-1` | *"Additional reality fixtures: NO-BUILD / MIGRATION / STANDARD-zero-ceremony negative controls are used to prove the architecture does not assume every engagement is 'build a new local site.'"* | `STÄNGD 2026-08-26` | Tre fixturer byggda: `case-c-no-build/` (Nordvik — sajten fungerar, 247 av 412 samtal går obesvarade) · `case-d-migration/` (Alvestas Måleri — rankar 2,1 med gröna CWV, problemet är innehåll och CTA) · `case-e-standard/` (Bergqvists Fönsterputs — den mest ordinära Ring 1-kunden som går att konstruera). Var och en med `FORVANTAT.md` och en härledningstabell **rå signal → slutsats som ska dras → vad ett fel ser ut som**. `kor-backtest.mjs` kör alla tre: `ICKE-SAJT-ÅTGÄRD` och `FÖRBÄTTRA BEFINTLIG` ger `ROUTE` utan ägarberoende, `NY SAJT` ger `CONTINUE` med **noll ägarkrävande händelser**. **Kvarstår, namngivet:** härledningen rå signal → beslut görs av PLANNERN (`C-GAP-1`/`D-GAP-1`) — fixturerna prövar ROUTNINGEN, inte beslutet. Och `E-GAP-1`: ceremoni mäts vid INGÅNGEN; att inget extra uppstår under körningen är `EJ KÖRT` |
+| `A-GAP-3` | Case A:s **kompatibilitetsväg** | `STÄNGD 2026-08-26` | `case-a-legacy/` byggd: samma kund, `profilKontraktVersion: 'v1.1.0'` utan v2-fältgrupperna, research mot researchkontrakt v3.0.0. Bakåtkompatibilitetslagen är kod i `scripts/profil-las.mjs`. **Kvarstår som `AL-GAP-2`:** läsaren finns men ingen konsument använder den ännu |
 
 ## Avgränsningar som är lätta att missa
 
