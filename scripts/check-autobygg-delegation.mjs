@@ -128,6 +128,10 @@ function toppnycklar(block) {
   return ut
 }
 
+// Samma strippning som workflowsidan använder: rad- och blockkommentarer bort, men
+// `https://` skyddas av `[^:]`-vakten.
+const utanKodkommentar = (t) => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
+
 const fails = []
 const pass = []
 const check = (namn, ok, skal) => ok ? pass.push(namn) : fails.push(`${namn} — ${skal}`)
@@ -441,6 +445,87 @@ check('W7d deferredQuestions utesluter blockerande frågor',
   /deferredQuestions: \(plan\.openQuestions \|\| \[\]\)\.filter\(q => q\.kind !== 'STRATEGISK' \|\| q\.blocking === false\)/.test(src),
   'deferredQuestions filtrerar inte bort blockerande strategiska frågor')
 
+/* ─────────── PROMPTEN MÅSTE BEGÄRA DET BESLUTET LÄSER ────────────────────────
+ * Ett fält kan vara schema-obligatoriskt, valideras hårt och ändå aldrig efterfrågas
+ * vid anropsstället. Så blev det: `blocking` gjordes bärande utan att plan-prompten
+ * nämnde den, så en planner som följde prompten KORREKT utelämnade fältet och varje
+ * bygge med en strategisk fråga HARD-stoppade. Alltså "tillstånd oftare" — raka
+ * motsatsen till skivans syfte — orsakat av ett fält som avgör ett beslut men aldrig
+ * begärs. Kontrollen härleder fälten UR beslutsfunktionen och kräver dem i prompten.
+ */
+{
+  const promptM = /const plan = await agent\(\s*([\s\S]*?)\{ label: 'plan'/.exec(src)
+  if (!promptM) {
+    console.error('ODÖMBART: plan-anropet kunde inte hittas — prompt/schema-bindningen kan inte prövas')
+    process.exit(2)
+  }
+  // KOMMENTARER STRIPPAS. Utdraget är RÅ källtext, så en kommenterad rad är omöjlig att
+  // skilja från levande mall-literal. Att sätta `// ` framför de nya raderna neutraliserade
+  // hela skivan medan vakten skrev 103/103. Det som aldrig når agenten instruerar ingenting
+  // — samma regel som docs-coherence bär för HTML-kommentarer.
+  const prompt = utanKodkommentar(promptM[1])
+  // Fält som beslutEfterPlan faktiskt läser ur plan-utfallet, härledda ur källan.
+  // NÄSTLADE LÄSNINGAR MÅSTE MED. Första versionen härledde bara `plan.X`, vilket gav sex
+  // toppnivåfält — och lämnade `q.blocking`, `q.kind`, `f.status` osynliga. Vakten hade
+  // alltså INTE fångat den defekt den skrevs för. `blocking` avgör hela semantiken.
+  const toppniva = [...block.matchAll(/\bplan\.([A-Za-zÅÄÖåäö_$][\w$]*)/g)].map(m => m[1])
+  const nastlade = [...block.matchAll(/\b[qf]\.([A-Za-zÅÄÖåäö_$][\w$]*)/g)].map(m => m[1])
+  const lasta = [...new Set([...toppniva, ...nastlade])]
+    // `missingFields` bärs vidare men styr inget beslut; `text`/`flagga` är bevisbärare
+    // i attention-event, inte grindfält. (`briefPath` behövde aldrig uteslutas — den ligger
+    // utanför det extraherade blocket och kom aldrig in i mängden.)
+    .filter(f => !['missingFields', 'text', 'flagga', 'blockingReason'].includes(f))
+  // EXAKT ANTAL, inte golv — samma disciplin som D1/W5/W7b.
+  const FALT_FORVANTAT = 9
+  check('P1 beslutsfunktionens lästa fält har hittats (ankaret bevisat)',
+    lasta.length === FALT_FORVANTAT,
+    `${lasta.length} fält härledda, ${FALT_FORVANTAT} förväntades — mängden har ändrats eller mönstret tappat ankaret`)
+  for (const f of lasta) {
+    check(`P2 prompten begär \`${f}\``, prompt.includes(f),
+      `beslutEfterPlan läser plan.${f} men prompten nämner den aldrig — tyst grind`)
+  }
+  // Dispositionen är den som lättast glöms, och den som vänder hela semantiken.
+  check('P3 prompten kräver blocking på VARJE strategisk fråga',
+    /EVERY STRATEGISK question MUST carry/.test(prompt) && /blocking: (?:true\|false)/.test(prompt),
+    'kravet på disposition per fråga saknas i prompten')
+  // Band tidigare till skiftlägesmeningen i stället — en helt annan regel. En kontroll
+  // vars namn säger UTELÄMNANDE måste binda till utelämnande.
+  check('P4 prompten säger att UTELÄMNADE fält fail-closar',
+    /Omitting[\s\S]{0,140}fails closed/.test(prompt),
+    'prompten varnar inte för att utelämnande stoppar körningen')
+  // `lage` läses inte av beslutEfterPlan utan av obemannatGate, så härledningen missar
+  // den — men den grindar HARD_STOP och måste därför begäras som RETURFÄLT, inte bara
+  // skrivas in i briefen.
+  check('P6 prompten begär `lage` som returfält (obemannatGate grindar på den)',
+    /return it as the field \\?`lage\\?`/.test(prompt),
+    'lage grindar HARD_STOP men begärs aldrig som returfält — tyst grind')
+  check('P5 prompten säger att strategisk betydelse ensam aldrig stoppar',
+    /[Ss]trategic significance ALONE is never a stop/.test(prompt),
+    'prompten saknar den bärande regeln — plannern skulle blocka defensivt')
+}
+
+/* ─────────── LOGGEN MÅSTE SKILJA UPPLYSNING FRÅN FRÅGA ────────────────────────
+ * Attention kan vara korrekt satt i datan och ändå läsas som ett krav. En upplysning
+ * som ser ut som en fråga ÄR ett mutex i praktiken.
+ */
+{
+  const loggM = /async function writeAutobyggLog\([\s\S]*?return agent\(([\s\S]*?)\{ label:/.exec(src)
+  if (!loggM) {
+    console.error('ODÖMBART: loggagentens prompt kunde inte hittas')
+    process.exit(2)
+  }
+  const lp = utanKodkommentar(loggM[1])
+  check('L1 loggprompten renderar attention som eget avsnitt',
+    /Owner attention/.test(lp), 'attention lämnas som rå JSON i loggen')
+  check('L2 loggprompten skiljer INGET SVAR KRÄVS från ÄGARÅTGÄRD KRÄVS',
+    /INGET SVAR KRÄVS/.test(lp) && /ÄGARÅTGÄRD KRÄVS/.test(lp),
+    'de två lägena renderas likadant — upplysning blir oskiljbar från fråga')
+  check('L3 loggprompten förbjuder att skriva om ett false-event som en fråga',
+    /aldrig om ett false-event/.test(lp), 'skyddet mot att attention blir ett mutex saknas')
+  check('L4 loggprompten skiljer ROUTAD från ÖVERLÄMNAD',
+    /ROUTAD[\s\S]{0,200}ÖVERLÄMNAD/.test(lp), 'de två statusarna förklaras inte isär')
+}
+
 /* ─────────── DUPLICERADE NYCKLAR ────────────────────────────────────────────────
  * Varje fältnärvaro-regex i W1–W7 kan besegras av EN rad: lägg till nyckeln igen senare
  * i samma objektliteral. Sista nyckeln vinner vid körning medan den vaktade literalen
@@ -480,7 +565,12 @@ check('W7d deferredQuestions utesluter blockerande frågor',
 // FAST NÄMNARE — samma försvar som `check-docs-coherence.mjs` bär. Utan den kunde hela
 // fail-closed-blocket raderas och skriptet skriva ut `PASS 31/31` med exit 0: en vakt
 // vars nämnare krymper när den slutar vakta rapporterar sin egen blindhet som grönt.
-const FORVANTAT = 89
+//
+// ÄRLIG NOT: talet är inte längre en ren egenskap hos vaktens egen text — P2 avger en
+// kontroll per härlett fält, så nämnaren beror på den VAKTADE filen. `FALT_FORVANTAT`
+// låser den delen separat, men den som ändrar beslutsfunktionens fältmängd måste ändra
+// TVÅ tal medvetet, inte ett.
+const FORVANTAT = 107
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)
