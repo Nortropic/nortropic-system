@@ -107,9 +107,45 @@ function lage(research) {
   return m ? m[1].trim() : undefined
 }
 
+// Jämförelsen bor i en egen funktion av ETT skäl: den måste gå att PRÖVA. En jämförelse
+// som bara står inline går att göra alltid-sann, och en alltid-sann jämförelse rapporterar
+// "SAMMA utfall" lika glatt för två fall som skiljer sig åt. Den mutationen överlevde
+// första versionen av vakten, eftersom vakten prövade MENINGEN i rapporten och inte
+// jämförelsen bakom den.
+function likvardiga(a, b) {
+  return (!!a.stoppade) === (!!b.stoppade) &&
+    a.krav.slice().sort().join() === b.krav.slice().sort().join()
+}
+
+// POSITIVT KONTROLLPROV: kan jämförelsen över huvud taget säga NEJ? Ett prov som bara kan
+// säga ja är inget prov. Körs med `--sjalvprov` och av check-backtest-fixtures.mjs.
+if (process.argv.includes('--sjalvprov')) {
+  const p1 = { stoppade: null, krav: ['KAP-SCHEMA', 'KAP-BILD'] }
+  const p2 = { stoppade: null, krav: ['KAP-BILD', 'KAP-SCHEMA'] }
+  const p3 = { stoppade: null, krav: ['KAP-SCHEMA'] }
+  const p4 = { stoppade: ['x', 'y', 'HARD_STOP'], krav: ['KAP-SCHEMA', 'KAP-BILD'] }
+  const prov = [
+    ['lika kravmängder i olika ordning är LIKVÄRDIGA', likvardiga(p1, p2) === true],
+    ['olika kravmängder är INTE likvärdiga', likvardiga(p1, p3) === false],
+    ['olika stoppstatus är INTE likvärdig', likvardiga(p1, p4) === false],
+  ]
+  const fel = prov.filter(([, ok]) => !ok)
+  for (const [namn, ok] of prov) console.log(`${ok ? 'PASS' : 'FAIL'}: självprov — ${namn}`)
+  if (fel.length) {
+    console.error(`ODÖMBART: jämförelsen klarar inte sitt eget kontrollprov (${fel.length} av ${prov.length}) — en jämförelse som inte kan säga NEJ kan inte heller säga JA`)
+    process.exit(2)
+  }
+  console.log('\nRESULTAT: PASS — jämförelsen kan skilja likvärdigt från olikvärdigt')
+  process.exit(0)
+}
+
 // ---- Körning per fall ------------------------------------------------------
 const FALL = [
   { id: 'A', namn: 'Ekbergs Rör AB (lokal)', dir: 'backtests/case-a-lokal' },
+  // KOMPATIBILITETSVÄGEN (§26:s första väg för Case A). Samma kund, äldre kontrakt — så
+  // att en skillnad i utfall bara kan bero på VERSIONEN. Når den inte samma utfall som
+  // `A` är bakåtkompatibiliteten bruten, och det ska synas här.
+  { id: 'AL', namn: 'Ekbergs Rör AB (v1.1.0-profil, kompatibilitetsvägen)', dir: 'backtests/case-a-legacy' },
   { id: 'B', namn: 'Kadensa AB (B2B SaaS, negativkontroll)', dir: 'backtests/case-b-saas' },
 ]
 const valt = process.argv[2]
@@ -132,7 +168,7 @@ for (const f of korda) {
   const okanda = krav.filter((k) => !(k in STATUS))
   if (okanda.length) odombart(`${f.id}: §15 kräver ${okanda.join(', ')} som saknas i kapacitetskatalogen — kravet går inte att bedöma`)
   const blockerande = krav.filter((k) => !KORBAR.has(STATUS[k]))
-  rader.push(['2. Kapacitetsgrinden (deterministisk, EJ i kedjan)',
+  rader.push(['2. Kapacitetsgrinden (deterministisk; i kedjan sedan KOR-GAP-1, men där via agent)',
     blockerande.length
       ? `HARD_STOP — ${blockerande.map((k) => `${k} är ${STATUS[k]}`).join(', ')}`
       : `alla ${krav.length} krävda är körbara`,
@@ -170,6 +206,23 @@ for (const { f, rader, krav, avstadda, blockerande, stoppade } of rapport) {
   console.log('')
 }
 
+// AL-10: kompatibilitetsvägen måste nå SAMMA utfall som v2-vägen. En skillnad kan bara
+// bero på kontraktsversionen, eftersom kunden är densamma — och en versionsberoende
+// skillnad ÄR den brutna bakåtkompatibiliteten.
+const rA = rapport.find((r) => r.f.id === 'A')
+const rAL = rapport.find((r) => r.f.id === 'AL')
+if (rA && rAL) {
+  const lika = likvardiga(rA, rAL)
+  console.log(`AL-10 KOMPATIBILITETSVÄGEN: v1.1.0-profilen når ${lika ? 'SAMMA' : 'ETT ANNAT'} utfall som v1.2.0-profilen`)
+  if (!lika) {
+    console.error('FAIL: bakåtkompatibiliteten är bruten — samma kund, olika utfall, och den enda skillnaden är kontraktsversionen')
+    console.error(`  v2-vägen:     ${rA.stoppade ? rA.stoppade[2] : 'passerar'} · krav ${rA.krav.join(', ')}`)
+    console.error(`  legacy-vägen: ${rAL.stoppade ? rAL.stoppade[2] : 'passerar'} · krav ${rAL.krav.join(', ')}`)
+    nagotFel = true
+  }
+  console.log('')
+}
+
 console.log('VAD DEN HÄR KÖRNINGEN INTE BEVISAR — och det är merparten:')
 console.log('· Ingen sajt är byggd. Nod 3 och framåt kräver riktigt repo och preview.')
 console.log('· Kapacitetsgrinden finns NU i kedjan (KOR-GAP-1 stängd), men läser katalogen')
@@ -177,5 +230,7 @@ console.log('  via en AGENT medan den här körningen läser den från disk. En 
 console.log('  agent passerar därför kedjans grind men inte den här. Kedjans grind är')
 console.log('  MODELLBEROENDE I SIN INDATA, deterministisk i sitt beslut.')
 console.log('· §26:s fällor prövas inte här. De kräver en byggd sajt.')
+console.log('· AL-10 jämför BESLUTSUTFALL, inte byggda sajter. Att två profiler leder till')
+console.log('  samma beslut betyder inte att de bygger samma sajt — AL-12 är EJ KÖRD.')
 
 process.exit(nagotFel ? 1 : 0)

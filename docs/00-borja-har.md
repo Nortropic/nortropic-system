@@ -204,6 +204,28 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Gamla kundsajter får inte gå sönder (2026-08-26)
+
+Vi har utökat vad en kundsajt beskriver om sig själv. Kunder som byggdes tidigare bär den
+gamla, kortare beskrivningen. **Regeln har hela tiden varit att en sådan sajt fortfarande
+är giltig** — och att det som saknas ska läsas som *"vi vet inte"*, aldrig som *"nej"*.
+
+**Skillnaden är inte akademisk.** Om en gammal sajt saknar fältet "håller kunden på med
+något som kräver inloggning?" och vi läser tomheten som ett nej, då har vi påstått något
+kunden aldrig sagt. Och just det påståendet är det **bekväma** — det ser ut som ett
+godkännande. Fel som ser ut som godkännanden hittas inte av den som hoppas att allt är bra.
+
+**Regeln stod bara i text. Nu är den kod.** Den som läser en sådan sajt får aldrig ett
+värde rakt av, utan alltid ett svar i två delar: *vad står det* och *vet vi det över huvud
+taget*. Det gör det omöjligt att av misstag använda en tomhet som ett svar.
+
+**Och nu finns ett provfall som kör den vägen:** samma påhittade rörfirma som förut, fast
+med den gamla, kortare beskrivningen. Provet visar att den når **samma utfall** som den nya.
+
+**Ärligt om gränsen:** läsaren finns, men de delar av systemet som granskar sajter använder
+den inte ännu — de läser fortfarande beskrivningen direkt. Regeln går alltså att pröva, men
+den är inte påtvingad. Det är namngivet.
+
 ## Första riktiga provkörningen — och vad den visade (2026-08-26)
 
 De två provfallen har hittills bara granskats till formen. Nu har de för första gången
