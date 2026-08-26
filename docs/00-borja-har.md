@@ -220,10 +220,17 @@ kontroll som finns i provkörarens kod — **inte i den riktiga kedjan.** I den 
 uppstår stoppet bara om den planerande AI:n själv råkar flagga att funktionen saknas.
 Ingen kod jämför "vad kunden behöver" mot "vad vi faktiskt har byggt".
 
-**Det betyder att stoppet i dag hänger på en bedömning, inte på en spärr.** Missar
-bedömningen fortsätter bygget in i något som inte kan levereras. Bristen har fått ett namn
-och nästa steg är att flytta in spärren i kedjan, så att AI:n blir ett andra lager i
-stället för det enda.
+**Det betydde att stoppet hängde på en bedömning, inte på en spärr.** Missar bedömningen
+fortsätter bygget in i något som inte kan levereras.
+
+**Spärren är nu inflyttad i kedjan.** Den fungerar så här: AI:n får i uppdrag att LÄSA AV —
+vilka funktioner kunden behöver, och vad vår egen lista säger om var och en — och skriva av
+svaret ordagrant. Sedan är det vanlig kod, inte AI, som avgör om bygget får starta. **En AI
+som skriver "inte byggd" kan därmed inte välja att fortsätta ändå.**
+
+**Ärligt om vad som är kvar:** AI:n läser fortfarande av listan, och läser den fel går den
+förbi spärren. Provköraren läser listan direkt från disk och skulle fånga det — men den
+körs för hand. Den luckan är namngiven, inte stängd.
 
 ## Provfallet som gav bort svaret (2026-08-26)
 

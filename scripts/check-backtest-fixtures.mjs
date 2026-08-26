@@ -78,7 +78,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '9add8f4e394d9b6f'
+const FORVANTAD_SIGNATUR = '13a2d6199b5ce5ad'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -450,9 +450,13 @@ if (caseA && caseB) {
     /UTFALL: passerar/.test(caseA[0]) !== /UTFALL: passerar/.test(caseB[0]),
     'samma utfall för en lokal kund och en B2B-negativkontroll betyder att indata inte läses')
 }
-check('KÖR: rapporten säger ut att kapacitetsgrinden INTE finns i kedjan',
-  /MODELLBEROENDE/.test(kbUt) && /Se KOR-GAP-1/.test(kbUt),
-  'utan den meningen läses ett deterministiskt stopp som bevis för att den skeppade kedjan stoppar')
+// KOR-GAP-1 är STÄNGD: grinden finns nu i kedjan. Kravet på brasklapp försvinner INTE
+// med den — det byter innehåll. Kedjans grind läser katalogen via en AGENT medan den här
+// körningen läser den från disk, så en felrapporterande agent passerar kedjans grind men
+// inte den här. Att sluta säga det vore att låta en stängd lucka radera en kvarvarande.
+check('KÖR: rapporten skiljer kedjans grind från körarens',
+  /KOR-GAP-1 stängd/.test(kbUt) && /MODELLBEROENDE I SIN INDATA/.test(kbUt),
+  'utan den skillnaden läses en grön körning som bevis för att kedjan är immun mot en felrapporterande agent')
 
 // ---- B-GAP-2/B-GAP-1: slutsatserna ska stå i FORVANTAT, inte i researchen --
 // Flyttades slutsatserna bara BORT ur researchen utan att landa någonstans vore de

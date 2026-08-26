@@ -8,13 +8,18 @@ console.log('VAKT: kor-backtest.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så �
 // går att köra mot riktiga fixturer utan en enda extern effekt. Det är vad den här filen
 // gör, och den är noga med att inte påstå mer.
 //
-// DEN VIKTIGASTE UPPTÄCKTEN LIGGER I KAPACITETSGRINDEN. `B-GAP-1` påstår att
-// "autobyggs beslutstaxonomi HARD-stoppar på obyggd krävd capability". Källan säger något
-// mer försiktigt: stoppet uppstår om PLANNERN sätter `blocking: true` på en strategisk
-// fråga, eller om Del-C-vakten rapporterar `unmetPrerequisite`. **Det finns ingen
-// deterministisk grind som läser kapacitetskatalogen.** Stoppet är alltså modellberoende.
-// Grinden här nere är deterministisk och visar vad utfallet BLIR med en sådan grind — den
-// bevisar inte att den skeppade kedjan stoppar. Skillnaden står i rapporten.
+// KAPACITETSGRINDEN VAR DEN HÄR FILENS FYND, OCH ÄR NU KEDJANS. Körningen visade att
+// `B-GAP-1`:s påstående — "autobyggs beslutstaxonomi HARD-stoppar på obyggd krävd
+// capability" — bara höll via en modell: plannern måste sätta `blocking: true`, eller
+// Del-C-vakten rapportera `unmetPrerequisite`. Ingen kod läste kapacitetskatalogen.
+// `KOR-GAP-1` är nu STÄNGD: `kapacitetsgrind()` i `workflows/nortropic-autobygg.js` är ett
+// deterministiskt led FÖRE plannerns klassificering, och en agent RAPPORTERAR statusen
+// medan koden fattar beslutet.
+//
+// GRINDEN HÄR SPEGLAR DEN, den ersätter den inte. Skillnaden som kvarstår: här läses
+// katalogen direkt från disk, i kedjan läses den av en agent. **En felrapporterande agent
+// kan alltså fortfarande passera kedjans grind men inte den här** — och det är precis den
+// skillnaden som gör den här körningen värd att köra.
 //
 // AKTIVERAD ≠ OMNÄMND. §15 skriver både "→ `KAP-LOKAL-SEO` aktiveras INTE" och
 // "pekar mot `KAP-EXTERN-BOKNING`". En grind som söker `KAP-` skulle kräva den kapacitet
@@ -167,11 +172,10 @@ for (const { f, rader, krav, avstadda, blockerande, stoppade } of rapport) {
 
 console.log('VAD DEN HÄR KÖRNINGEN INTE BEVISAR — och det är merparten:')
 console.log('· Ingen sajt är byggd. Nod 3 och framåt kräver riktigt repo och preview.')
-console.log('· Kapacitetsgrinden i steg 2 är DETERMINISTISK och finns INTE i den skeppade')
-console.log('  kedjan. Där uppstår stoppet bara om PLANNERN sätter blocking: true, eller om')
-console.log('  Del-C-vakten rapporterar unmetPrerequisite. Stoppet är alltså MODELLBEROENDE.')
-console.log('  Steg 2 visar vad utfallet BLIR med en deterministisk grind — inte att kedjan')
-console.log('  stoppar. Se KOR-GAP-1.')
+console.log('· Kapacitetsgrinden finns NU i kedjan (KOR-GAP-1 stängd), men läser katalogen')
+console.log('  via en AGENT medan den här körningen läser den från disk. En felrapporterande')
+console.log('  agent passerar därför kedjans grind men inte den här. Kedjans grind är')
+console.log('  MODELLBEROENDE I SIN INDATA, deterministisk i sitt beslut.')
 console.log('· §26:s fällor prövas inte här. De kräver en byggd sajt.')
 
 process.exit(nagotFel ? 1 : 0)

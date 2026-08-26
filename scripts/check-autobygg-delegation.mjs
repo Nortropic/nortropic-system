@@ -41,12 +41,12 @@ const block = src.slice(i, j)
 
 let M
 try {
-  M = new Function(`${block}\nreturn { beslutEfterPlan, shouldStopAfterPlan, shouldStopAfterReview, obemannatGate, attentionEvent, INTERVENTION, CONTINUE, ATTENTION_CONTINUE, ROUTE, HARD_STOP }`)()
+  M = new Function(`${block}\nreturn { beslutEfterPlan, shouldStopAfterPlan, shouldStopAfterReview, obemannatGate, attentionEvent, INTERVENTION, CONTINUE, ATTENTION_CONTINUE, ROUTE, HARD_STOP, kapacitetsgrind, strangast }`)()
 } catch (e) {
   console.error(`ODÖMBART: funktionsblocket kunde inte utvärderas isolerat — ${e.message}`)
   process.exit(2)
 }
-for (const n of ['beslutEfterPlan', 'shouldStopAfterReview', 'obemannatGate', 'CONTINUE', 'ATTENTION_CONTINUE', 'ROUTE', 'HARD_STOP']) {
+for (const n of ['kapacitetsgrind', 'strangast', 'beslutEfterPlan', 'shouldStopAfterReview', 'obemannatGate', 'CONTINUE', 'ATTENTION_CONTINUE', 'ROUTE', 'HARD_STOP']) {
   if (M[n] === undefined) { console.error(`ODÖMBART: ${n} saknas i det extraherade blocket`); process.exit(2) }
 }
 const { beslutEfterPlan, shouldStopAfterReview, obemannatGate, CONTINUE, ATTENTION_CONTINUE, ROUTE, HARD_STOP } = M
@@ -358,16 +358,88 @@ check('V-stateful typvalideras som sin syskonflagga',
  * `beslutEfterPlan` som returnerar ROUTE är värdelöst om ingenting verkställer det.
  * Kontrollerna nedan binder därför ORDNINGEN och FÖRGRENINGEN i källan, inte prosan.
  */
+// ---- KAPACITETSGRINDEN (KOR-GAP-1): BETEENDEPROV --------------------------
+// Grinden är byggd mot ett fynd ur en faktisk körning: stoppet på "krävd men obyggd
+// capability" gick bara genom en modell. Här prövas att koden, inte modellen, avgör.
+const K = (rader) => M.kapacitetsgrind({ kravda: rader })
+const rad = (id, aktivering, status) => ({ id, aktivering, status, citat: 'x' })
+
+check('K1 aktiverad + DECLARED ⇒ HARD_STOP',
+  K([rad('KAP-EXTERN-BOKNING', 'AKTIVERAD', 'DECLARED')]).decision === M.HARD_STOP,
+  'en obyggd krävd capability måste stoppa i KODEN, inte hoppas stoppa i plannern')
+check('K1b och den obyggda NAMNGES i utfallet',
+  K([rad('KAP-EXTERN-BOKNING', 'AKTIVERAD', 'DECLARED')]).obyggda.join() === 'KAP-EXTERN-BOKNING',
+  'ett stopp utan namn går inte att åtgärda')
+check('K2 AVSTÅDD + DECLARED ⇒ CONTINUE (aktiverad ≠ omnämnd)',
+  K([rad('KAP-LOKAL-SEO', 'AVSTÅDD', 'DECLARED'), rad('KAP-SCHEMA', 'AKTIVERAD', 'VALIDATING')]).decision === M.CONTINUE,
+  'en kapacitet som §15 uttryckligen AVSTÅR från får aldrig krävas — annars krävs lokal-SEO av en B2B-kund')
+for (const st of ['BUILT', 'VALIDATING', 'PROVEN'])
+  check(`K3 aktiverad + ${st} ⇒ CONTINUE`, K([rad('KAP-SCHEMA', 'AKTIVERAD', st)]).decision === M.CONTINUE,
+    `${st} är körbart och får inte stoppa`)
+check('K4 aktiverad + ROUTE-OUT ⇒ ROUTE, inte HARD_STOP',
+  K([rad('KAP-EHANDEL', 'AKTIVERAD', 'ROUTE-OUT')]).decision === M.ROUTE,
+  'ett medvetet nej är ett korrekt hänvisningsbeslut utan ägarberoende — att slå ihop det med en obyggd capability gör ett rätt beslut till ett fel')
+check('K5 TOM rapport ⇒ HARD_STOP (ankarkravet)',
+  K([]).decision === M.HARD_STOP,
+  'KAP-PRESTANDA krävs alltid vid leverans — en tom kravmängd betyder misslyckad rapportering, aldrig frånvaro av krav')
+check('K6 saknad rapport ⇒ HARD_STOP', M.kapacitetsgrind(undefined).decision === M.HARD_STOP, 'fail-open')
+check('K6b rapport utan lista ⇒ HARD_STOP', M.kapacitetsgrind({ kravda: 'KAP-SCHEMA' }).decision === M.HARD_STOP, 'sträng svald som lista')
+check('K7 okänd aktiveringsetikett ⇒ HARD_STOP',
+  K([rad('KAP-SCHEMA', 'avstådd', 'VALIDATING')]).decision === M.HARD_STOP,
+  'fel skiftläge fick etiketter att fail-openA i beslutEfterPlan — samma hål får inte öppnas här')
+check('K8 okänd katalogstatus ⇒ HARD_STOP',
+  K([rad('KAP-SCHEMA', 'AKTIVERAD', 'byggd')]).decision === M.HARD_STOP,
+  'en statussträng utanför vokabulären är oklassificerad, aldrig körbar')
+check('K9 ogiltigt id ⇒ HARD_STOP',
+  K([rad('LOKAL-SEO', 'AKTIVERAD', 'VALIDATING')]).decision === M.HARD_STOP, 'id utan KAP-prefix svaldes')
+check('K10 grinden kraschar aldrig på skräp',
+  [null, 0, 'x', [], {}].every((x) => { try { return typeof M.kapacitetsgrind(x).decision === 'string' } catch { return false } }),
+  'en grind som kastar är odömbar, inte sträng')
+// Blandad rapport: EN obyggd bland flera körbara får inte drunkna.
+check('K11 EN obyggd bland fyra körbara stoppar ändå',
+  K([rad('KAP-SCHEMA', 'AKTIVERAD', 'VALIDATING'), rad('KAP-BILD', 'AKTIVERAD', 'VALIDATING'),
+     rad('KAP-EXTERN-BOKNING', 'AKTIVERAD', 'DECLARED'), rad('KAP-KVITTON', 'AKTIVERAD', 'PROVEN')]).decision === M.HARD_STOP,
+  'majoritet körbara får aldrig rösta ned en saknad capability')
+
+check('K12 strangast: det strängaste beslutet vinner',
+  M.strangast({ decision: M.CONTINUE, attention: [] }, { decision: M.HARD_STOP, reason: 'r', attention: [] }).decision === M.HARD_STOP &&
+  M.strangast({ decision: M.ROUTE, reason: 'r', attention: [] }, { decision: M.CONTINUE, attention: [] }).decision === M.ROUTE,
+  'ett CONTINUE får aldrig överrösta ett stopp')
+check('K12b strangast: SKÄLET följer med det vinnande beslutet',
+  M.strangast({ decision: M.CONTINUE, reason: 'allt bra', attention: [] },
+    { decision: M.HARD_STOP, reason: 'capability saknas', attention: [] }).reason === 'capability saknas',
+  'ett HARD_STOP rapporterat med ett CONTINUE-skäl är obegripligt för mottagaren')
+check('K12c strangast: BÅDAS attention bevaras',
+  M.strangast({ decision: M.CONTINUE, attention: [{ a: 1 }] }, { decision: M.HARD_STOP, reason: 'r', attention: [{ b: 2 }] }).attention.length === 2,
+  'en förlorande grens observationer försvinner tyst')
+
+// Grinden måste vara KOPPLAD, inte bara byggd. En funktion som aldrig anropas är prosa.
+check('K13 kapacitetsgrinden är ANROPAD i flödet', /const kapBeslut = kapacitetsgrind\(kapRapport\)/.test(src),
+  'grinden finns men körs inte')
+check('K13b och dess utfall VÄGS IN i planbeslutet',
+  /const planBeslutVagt = strangast\(planBeslut, kapBeslut\)/.test(src),
+  'grinden körs men resultatet används inte — det vore en dekoration')
+check('K13c och det är det SAMMANVÄGDA beslutet som verkställs',
+  /if \(planBeslutVagt\.decision === ROUTE \|\| planBeslutVagt\.decision === HARD_STOP\)/.test(src) &&
+  !/\bplanBeslut\.(decision|reason|attention|nextStep)/.test(src.slice(src.indexOf('const planBeslutVagt'))),
+  'nedströms läses det OVÄGDA beslutet — då är kapacitetsgrinden verkningslös')
+check('K14 rapporteringsuppdraget är formulerat som AVLÄSNING, inte bedömning',
+  /This is a REPORTING task, not a judgement task/.test(src) && /copied VERBATIM — never inferred/.test(src),
+  'en agent som ombeds AVGÖRA om något är byggt kan svara fel på ett sätt som ser rimligt ut')
+check('K14b och agenten förbjuds utelämna rader för snygghets skull',
+  /Never omit a row to make the report tidy/.test(src),
+  'en utelämnad rad blir en tom kravmängd, och en tom kravmängd är just det ankarkravet fäller på')
+
 const idx = (s) => src.indexOf(s)
 const efter = (a, b) => idx(a) >= 0 && idx(b) >= 0 && idx(a) < idx(b)
 
 // W1 — plan-beslutet måste avbryta BÅDE på ROUTE och HARD_STOP, och göra det före Init.
-const planGren = /if \(planBeslut\.decision === ROUTE \|\| planBeslut\.decision === HARD_STOP\)/.test(src)
+const planGren = /if \(planBeslutVagt\.decision === ROUTE \|\| planBeslutVagt\.decision === HARD_STOP\)/.test(src)
 check('W1 plan-grenen avbryter på både ROUTE och HARD_STOP', planGren,
   'förgreningen testar inte längre båda utfallen — ett av dem faller igenom till bygget')
 check('W1b och den returnerar FÖRE phase(Init)',
-  planGren && efter("planBeslut.decision === ROUTE", "phase('Init')") &&
-  /planBeslut\.decision === ROUTE[\s\S]{0,900}?\n  return \{[\s\S]{0,400}?\n\}/.test(src),
+  planGren && efter("planBeslutVagt.decision === ROUTE", "phase('Init')") &&
+  /planBeslutVagt\.decision === ROUTE[\s\S]{0,900}?\n  return \{[\s\S]{0,400}?\n\}/.test(src),
   'ROUTE/HARD_STOP-grenen saknar return före Init — beslutet fattas men verkställs inte')
 
 // W2 — lägesgrinden måste fortfarande gälla: en `bemannat`-brief får inte köras obemannat.
@@ -468,7 +540,7 @@ check('W7 slutrapporten bär attention och kräver inget ägarsvar',
 // ROUTE och HARD_STOP får ALDRIG rapporteras under samma status — distinktionen är
 // hela skivans syfte. En hårdkodad status kollapsar dem till ett odifferentierat stopp.
 check('W7c plan-grenens status och ownerActionRequired härleds ur beslutet',
-  /const routad = planBeslut\.decision === ROUTE/.test(src) &&
+  /const routad = planBeslutVagt\.decision === ROUTE/.test(src) &&
   /const status = routad \? 'ROUTAD' : 'ÖVERLÄMNAD'/.test(src) &&
   /ownerActionRequired: !routad/.test(src),
   'ROUTAD/ÖVERLÄMNAD eller ownerActionRequired är hårdkodad — distinktionen är borta')
@@ -584,7 +656,7 @@ check('W7d deferredQuestions utesluter blockerande frågor',
   // EXAKT ANTAL, inte golv. `>= 12` mot faktiska 38 var 26 i marginal — samma defekt
   // som W5 och W7b just rättats för, upprepad i samma commit. Ett golv släpper igenom
   // att en literal FÖRSVINNER ur mängden, vilket är precis hur `return ( {` undkom.
-  const LITERAL_FORVANTAT = 39
+  const LITERAL_FORVANTAT = 42
   check('D1 objektliteraler i returer/loggskrivningar har hittats (ankaret bevisat)',
     block.length === LITERAL_FORVANTAT,
     `${block.length} literaler hittade, ${LITERAL_FORVANTAT} förväntades — mängden har ändrats eller mönstret tappat ankaret`)
@@ -602,7 +674,7 @@ check('W7d deferredQuestions utesluter blockerande frågor',
 // kontroll per härlett fält, så nämnaren beror på den VAKTADE filen. `FALT_FORVANTAT`
 // låser den delen separat, men den som ändrar beslutsfunktionens fältmängd måste ändra
 // TVÅ tal medvetet, inte ett.
-const FORVANTAT = 110
+const FORVANTAT = 133
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)
