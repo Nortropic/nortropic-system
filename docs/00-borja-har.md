@@ -1,7 +1,7 @@
 # Börja här — Nortropic från noll
 
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
-Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad. Avsnittet om betygssystemets utkast (2026-08-26) är skrivet mot `docs/utkast/eval-rubrik-v4-UTKAST.md` och `scripts/check-v4-utkast.mjs`; det beskriver ett UTKAST utan konsument — ingen mätning i drift har ändrats.
 
 Det här är ingången för dig som aldrig sett systemet förut. Läs den i ett svep, så förstår du vad Nortropic är och hur det hänger ihop — utan en enda insider-term. Det här dokumentet ersätter inte den tekniska dokumentationen (docs/01–07 och README); det är kartan du läser innan du dyker ner i den. Vill du veta exakt hur något fungerar finns länkar sist.
 
@@ -461,3 +461,45 @@ eller `bemannat` — en felstavning, ett tomt tecken, vad som helst — så stan
 säger till. Den gissar inte, och den väljer absolut inte den mer självgående vägen bara för
 att den inte förstod. Att vända en standard utan den regeln vore att byta ett stopp mot en
 gissning.
+
+## Ett förslag på ett bättre betygssystem — som ingen använder än (2026-08-26)
+
+Fabriken sätter betyg på varje färdig sajt: 0–100 poäng fördelade på elva punkter. Det
+är hur kvalitet mäts över tid, och det är därför siffran måste betyda samma sak för alla
+kunder.
+
+**Problemet är att den inte gör det längre.** Tjugofyra av de hundra poängen mäter saker
+som bara gäller lokala företag: att adressen står likadant överallt, att det finns
+ortssidor, att den lokala företagsinformationen är rätt uppmärkt för Google. För en
+rörmokare i Uppsala är det precis rätt. För ett företag som säljer i hela landet mäter de
+poängen ingenting — och sajten får dem ändå, för att den korrekt låtit bli att bygga
+ortssidor. Poäng för en frånvaro är inte ett betyg, det är utfyllnad.
+
+Grindarna löste redan sin del av det här (avsnittet om S5 ovan): de vet numera att en
+kund utan ortspaket ska mätas på annat. **Betygssystemet hann inte med.**
+
+**Det andra felet går åt motsatt håll.** Ett fel som borde vara diskvalificerande kostar
+i dag bara några poäng. Har en sajt olika telefonnummer i sidfoten och i
+kontaktuppgifterna tappar den högst åtta poäng — och kan fortfarande landa på 88, vilket
+läses som "nästan klar, fixa listan". Åtta poäng är fel svar på ett fel som gör att
+kunden inte går att nå.
+
+**Vad som gjorts nu:** ett förslag är skrivet — `docs/utkast/eval-rubrik-v4-UTKAST.md`.
+Det delar betyget i två delar som aldrig läggs ihop: en **kärna** som gäller varje sajt,
+och ett **påbyggnadsmått** som bara körs för de kunder påbyggnaden faktiskt gäller. Krav
+som inte gäller en kund ger varken plus eller minus — de lämnar mätningen. Och en
+handfull fel är inte poängavdrag alls utan **fällning**: sajten underkänns oavsett hur
+bra resten är.
+
+**Vad som INTE gjorts:** ingenting har ändrats. Det gamla betygssystemet är kvar,
+oförändrat — kontrollen jämför det mot ett fruset fingeravtryck, så minsta ändring syns.
+Förslaget ligger i en egen mapp för utkast, ingen del av fabriken läser det, och samma
+kontroll (`scripts/check-v4-utkast.mjs`) går igenom varenda fil i repot och faller om
+någon av dem börjar peka på förslaget. Två filer får nämna det: den här texten och
+beslutsloggen — de beskriver förslaget för en läsare, aldrig för en körning. Att byta betygssystem är ett eget, större beslut som du
+fattar — bland annat för att alla befintliga kundmappar behöver kompletteras först,
+annars blir de omätbara över en natt. Det står utskrivet i förslaget, för det är den
+sortens pris man helst upptäcker innan man byter, inte efteråt.
+
+Och en sak värd att säga rakt ut: siffrorna i förslaget är förslag. Ingen kund har
+poängsatts med dem. Det är därför det heter utkast och inte version 4.
