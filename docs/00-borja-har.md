@@ -204,6 +204,37 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Reglerna för att förbättra någon annans sajt (2026-08-27)
+
+Ett av provfallen — Alvestas Måleri — slutar med att vi säger *"vi bygger inte nytt, vi
+förbättrar det som finns"*. **Men det fanns inget arbetssätt att hänvisa till.** Systemet
+skickade kunden vidare till en dörr som inte fanns bakom.
+
+**Nu finns reglerna.** Och de handlar mest om vad man INTE får göra, av ett skäl:
+
+**En förbättring är svårare än ett nybygge, för den har något att förstöra.** Alvestas
+ligger tvåa på sin viktigaste sökning och har fyra års upparbetat värde. Frestelsen att
+bygga nytt och lägga in vidarelänkar är stark — nybygget är det vi är bra på, och det ser
+bättre ut i en före/efter-bild. **Kostnaden syns inte förrän placeringarna börjar röra sig,
+och då är den svår att koppla tillbaka.**
+
+**Två regler bär hela dokumentet:**
+
+- **Den som vill ÄNDRA något ska motivera det — inte den som vill behålla.** Saknas skäl är
+  svaret nej. Utan den ordningen blir varje ändring tillåten tills någon hinner invända.
+- **En förbättring utan eftermätning är en ändring.** Den får inte kallas förbättring — inte
+  i en rapport, inte i en offert och inte i ett kundsamtal. Det sista är viktigast, för det
+  är där det sägs som stannar hos kunden.
+
+**Och en gräns som inte går att prata sig förbi:** ändras mer än hälften av de sidor som
+rankar, eller byts tekniken ut, **är det ett nybygge — oavsett vad vi kallar det.** Ett
+nybygge kräver ett eget beslut; det får inte glida in som "en omfattande förbättring".
+
+**Ärligt om läget:** det här är reglerna, inte förmågan. Det finns ännu inget körbart
+arbetssätt, vi har ingen egen mätning av placeringar, och därför är regeln om eftermätning
+i dag ett löfte och inte en spärr. **Gränsen är skriven innan förmågan finns** — det är
+avsiktligt, för då byggs förmågan mot en gräns i stället för mot en möjlighet.
+
 ## Fabriken kan nu ta emot kunder utan en ort (2026-08-27)
 
 Det här var den sista stora resten av en gammal snedvridning: fabriken var byggd för

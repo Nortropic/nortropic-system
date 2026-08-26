@@ -173,7 +173,7 @@ function beslutEfterPlan(plan) {
       evidence: [plan.interventionsmotiv || 'motiv i briefens §7.12'],
       actionTaken: 'ny-sajt-lanen avslutades utan bygge', ownerActionRequired: false }))
     hoj(ROUTE, r, iv === 'FÖRBÄTTRA BEFINTLIG'
-      ? 'förbättringslane saknas ännu — offereras som eget arbete mot den befintliga sajten'
+      ? 'förbättringslane saknas ännu (FK-GAP-1) — gränserna står i docs/forbattringskontrakt.md; arbetet offereras mot den befintliga sajten'
       : 'briefen bär rekommendationen; ingen sajt ska byggas')
   }
 
