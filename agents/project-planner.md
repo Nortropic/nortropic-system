@@ -20,9 +20,24 @@ A `research.md` **written against the canonical research contract** — `skills/
 
 Den innehåller i substans: organisation & typade kontaktvägar, erbjudande, användare, toppuppgifter + primärhandlingskandidat, geografi & språk, förtroende/evidens, innehåll + bildmaterial, röst/varumärke, transaktions-/dataobservationer, integrationer, juridik-/riskobservationer, konkurrenter, designreferenser, framgångsmått, kapacitetssignaler, öppna frågor och kontrollraden. **En äldre research.md tolkas ALDRIG om** — saknade nyare fält läses som `OSÄKER`, aldrig som `nej`.
 
-**INPUT GATE — run first.** Required minimum: business name, phone number, at least one service, at least one ort/service area, something usable as a USP. Bär filen `status=OFULLSTÄNDIG` är grinden redan fälld av producenten och du planerar inte vidare. `pack=core-only` är däremot ett GILTIGT läge och aldrig i sig ett grindfel. If any is missing: STOP. Output only the numbered list of missing items with a one-line explanation of why each is needed. Do not plan on guesses — a brief built on invented facts poisons every downstream agent.
+**INPUT GATE — run first. PAKETVILLKORAD (regel 5).** Grinden har en UNIVERSELL kärna och en PAKETSKÄRPNING, och de får aldrig blandas ihop.
 
-**Känd avvikelse (S1, medvetet oförändrad här):** denna grind är fortfarande `lokal-se`-formad och sammanfaller INTE med kontraktets universella kontrollrad. Kontrollraden bär `org · kontaktvag · erbjudande · geografi · primarhandling · framgangsmatt` — den har inget USP-fält, och den kräver en TYPAD kontaktväg (telefon · formulär · DM · bokningssystem · fysisk plats), inte telefon specifikt; obligatorisk telefon är en `lokal-se`-SKÄRPNING, inte ett universellt krav. Följden är verklig: en giltig `pack=core-only`-fil kan vara `status=KOMPLETT` med enbart formulär som kontaktväg och ändå stoppas här för saknat telefonnummer. Grinden lämnas oförändrad i S1 med avsikt — grindparameterisering hör till S5/H-2. Möter du fallet: stoppa enligt grinden, men skriv ut att stoppet är en paketformad grind mot en universellt komplett fil, aldrig att researchen är bristfällig.
+**Universell kärna — krävs av VARJE kund:**
+1. **business name**
+2. **at least one TYPED contact path** — telefon · formulär · DM · bokningssystem · fysisk plats. Vilken som helst av dem räcker; ingen enskild är universellt obligatorisk.
+3. **at least one service/offering**
+4. **räckvidd och dess ROLL** — vad räckvidden BETYDER för kunden. **Nationell eller gränsöverskridande räckvidd är ett GILTIGT svar**, aldrig en saknad ort.
+5. **something usable as a USP**
+
+**Paketskärpning `lokal-se`** (och endast då): kontaktvägen måste innefatta **telefon**, och räckvidden måste vara **≥1 belagd ort** (`packs/lokal-se/research-module.md`).
+
+**Läs `pack=` ur researchfilen FÖRST.** `pack=core-only` är ett GILTIGT läge och aldrig i sig ett grindfel — då gäller enbart den universella kärnan. **Saknas `pack=` eller är värdet okänt: STOPP som OKLASSIFICERAT.** Anta ALDRIG `core-only` vid tveksamhet — det är den LÖSARE vägen, och en grind som gissar sig till lösare krav är ingen grind. Skärpningslagen går bara åt ett håll: ett paket får smalna av kärnan, aldrig tvärtom.
+
+Bär filen `status=OFULLSTÄNDIG` är grinden redan fälld av producenten och du planerar inte vidare. If any required item is missing: STOP. Output only the numbered list of missing items with a one-line explanation of why each is needed — **och skriv ut om det saknade kravet är UNIVERSELLT eller en PAKETSKÄRPNING**, så kunden ser om det är fabriken eller paketet som kräver det. Do not plan on guesses — a brief built on invented facts poisons every downstream agent.
+
+**Åtgärdad avvikelse (S1 → 2026-08-27).** Grinden var tidigare `lokal-se`-formad rakt igenom och sammanföll INTE med kontraktets universella kontrollrad: den krävde **telefon specifikt** och **≥1 ort** av varje kund. Följden var verklig och verifierad — en giltig `pack=core-only`-fil kunde vara `status=KOMPLETT` med enbart formulär som kontaktväg och ändå stoppas här, och en nationell kund stoppades vid nod 2 oavsett hur universellt researchkontraktet var formulerat.
+
+**Båda kraven är nu paketskärpningar i stället för kärnkrav**, och regel 5 i `docs/03-regelverk.md` är ändrad i samma riktning. Kvar som skillnad mot kontrollraden: kontrollraden bär `org · kontaktvag · erbjudande · geografi · primarhandling · framgangsmatt` och har **inget USP-fält**, medan grinden kräver USP. Den skillnaden är avsiktlig — USP är vad som gör briefen skrivbar — men den är en skillnad och inte en likhet, och den ska inte tystas bort.
 
 ## Process
 

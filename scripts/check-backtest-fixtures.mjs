@@ -79,7 +79,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '2df2dbdcbd1f2c32'
+const FORVANTAD_SIGNATUR = '9fd913f80b2ce7e2'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -427,6 +427,32 @@ check('B-M6: KAP-LOKAL-SEO aktiveras INTE — SKOPAT, citatagnostiskt',
 check('B-T4: forbjudnaPastaenden är icke-tom och namnger konkreta påståenden',
   (bF('forbjudnaPastaenden').match(/'/g) || []).length >= 8, 'urholkad lista — A-D7/B-T5:s facit försvinner')
 
+// Sektionsnamnen EXTRAHERAS ur det skeppade researchkontraktet vid körning. En handskriven
+// kopia här skulle bevisa kopian, och driva isär tyst när kontraktet ändras.
+const KANON = [...karnkontrakt.matchAll(/^\| (\d+) \| \*\*([^*]+)\*\*/gm)].map((m) => [Number(m[1]), m[2].trim()])
+if (KANON.length !== 17) odombart(`kontraktets sektionstabell gav ${KANON.length} rader, väntade 17 — namnen går inte att pröva`)
+
+// SEKTIONSNAMNEN PRÖVAS FÖR SAMTLIGA fixturer, inte bara de nya. Att bara pröva de tre
+// senaste vore att låta de äldsta stå okontrollerade just för att de är äldst.
+// EN enda avvikelse är tillåten och den är NAMNGIVEN: `case-a-legacy` bär `§1. NAP`,
+// eftersom fixturen är skriven mot researchkontrakt v3.0.0 där §1 hette så. Kärnan
+// universaliserades i v3.1.0 och §1 heter nu "Organisation & typade kontaktvägar" —
+// att tvinga legacyfixturen till det nya namnet vore att radera det den finns för att visa.
+const NAMNUNDANTAG = new Map([['backtests/case-a-legacy/research.md', new Map([[1, 'NAP']])]])
+for (const dir of ['backtests/case-a-lokal', 'backtests/case-b-saas', 'backtests/case-a-legacy']) {
+  const R = las(`${dir}/research.md`)
+  const undantag = NAMNUNDANTAG.get(`${dir}/research.md`) || new Map()
+  const fel = KANON.filter(([n, namn]) => {
+    const vantat = undantag.has(n) ? undantag.get(n) : namn
+    return !new RegExp(`^## ${n}\\. ${vantat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').test(R)
+  })
+  check(`${dir.split('/').pop()}: sektionsnamnen följer kontraktet (undantag namngivna)`,
+    fel.length === 0, `avviker: ${fel.map(([n, namn]) => `§${n} ska heta "${namn}"`).join(' · ')}`)
+}
+check('Namnundantaget är MOTIVERAT i legacyfixturens facit',
+  /v3\.0\.0/.test(las('backtests/case-a-legacy/FORVANTAT.md')),
+  'ett undantag utan skäl i facit är en tyst dispens, och nästa läsare kan inte skilja den från ett slarv')
+
 // ---- §26-GAP-1: de tre verklighetsfixturerna ------------------------------
 // §26: *"NO-BUILD / MIGRATION / STANDARD-zero-ceremony negative controls are used to prove
 // the architecture does not assume every engagement is 'build a new local site.'"*
@@ -443,6 +469,16 @@ for (const v of VERKLIGHET) {
   check(P('researchen bär samtliga 17 sektioner'),
     Array.from({ length: 17 }, (_, i) => i + 1).every((n) => sekt.includes(n)),
     `hittade ${sekt.length} — en fixtur i halv kontraktsform prövar en halv form`)
+  // NUMMER RÄCKER INTE. En kontroll som bara räknar sektioner släppte igenom fixturer med
+  // helt andra rubriker — §16 hette "Belägg och attribution" och §17 "Olösta okändheter",
+  // medan kontraktet säger "Öppna frågor" och "Maskinläsbar kontrollrad". Formen såg hel
+  // ut och var det inte. Namnen EXTRAHERAS ur det skeppade kontraktet, aldrig ur en kopia.
+  const felNamn = KANON.filter(([n, namn]) =>
+    !new RegExp(`^## ${n}\\. ${namn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').test(R))
+  check(P('och sektionernas NAMN följer kontraktet'), felNamn.length === 0,
+    `avviker: ${felNamn.map(([n, namn]) => `§${n} ska heta "${namn}"`).join(' · ')}`)
+  check(P('bär den maskinläsbara kontrollraden'), /RESEARCH-CONTROL v3\.\d+\.\d+ \| pack=/.test(R),
+    'utan kontrollraden vet INPUT GATE inte vilket paket som gäller — och en grind som inte vet vilket paket som gäller kan inte tillämpa rätt skärpning')
   check(P('är märkt SYNTETISK'), /SYNTETISK FIXTUR/.test(R), 'omärkt fixtur kan förväxlas med kundevidens')
   check(P('bär Läge-raden'), /^Läge:\s*obemannat$/m.test(R), 'utan läge kan lägesgrinden inte köras')
 
@@ -645,6 +681,27 @@ if (caseA && caseB) {
   // ingenting om jämförelsen alltid säger det — den mutationen överlevde första versionen
   // av den här kontrollen, som prövade meningen i stället för mekanismen.
   const sjalvprov = spawnSync(process.execPath, [join(ROT, 'scripts/kor-backtest.mjs'), '--sjalvprov'], { cwd: ROT, encoding: 'utf8' })
+  // B-T7:s KVARVARANDE HALVA. Kontraktet universaliserades i v3.1.0, men producenten —
+  // plannerns INPUT GATE — krävde fortfarande `≥1 ort` och `telefon` av VARJE kund, så en
+  // icke-lokal kund stoppades vid nod 2 oavsett hur universellt kontraktet var formulerat.
+  // Grinden är paketvillkorad sedan 2026-08-27 och utfallet prövas här.
+  check('B-T7b: Case B (core-only, ingen ort) PASSERAR INPUT GATE',
+    !!caseB && /1b\. INPUT GATE.*PASSERAR — pack=core-only/.test(caseB[0]),
+    'en icke-lokal kund stoppas fortfarande vid grinden — kontraktet är då universellt men producenten inte')
+  check('B-T7b: och Case A (lokal-se) passerar på SIN skärpning',
+    !!caseA && /1b\. INPUT GATE.*PASSERAR — pack=lokal-se/.test(caseA[0]),
+    'skärpningen får inte ha försvunnit i universaliseringen — då vore lättnaden generell')
+  for (const [namn, frag] of [
+    ['core-only UTAN ort passerar', 'core-only UTAN ort PASSERAR'],
+    ['lokal-se UTAN ort stoppar', 'lokal-se UTAN belagd ort STOPPAR'],
+    ['core-only UTAN telefon passerar', 'core-only UTAN telefon PASSERAR'],
+    ['lokal-se UTAN telefon stoppar', 'lokal-se UTAN telefon STOPPAR'],
+    ['okänt pack ger OKLASSIFICERAT', 'okänt pack ger OKLASSIFICERAT'],
+    ['ofullständig research stoppar', 'status=OFULLSTÄNDIG stoppar'],
+  ]) check(`B-T7b: INPUT GATE:s kontrollprov — ${namn}`,
+    new RegExp(`PASS: självprov — INPUT GATE: ${frag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(sjalvprov.stdout || ''),
+    'grinden bevisar inte att skärpningen biter OCH att kärnan är fri — utan båda är "passerar" en tom mening')
+
   check('§26-GAP-1: förväntanskontrollen klarar sitt POSITIVA kontrollprov',
     /förväntanskontrollen FLAGGAR när utfallet avviker/.test(sjalvprov.stdout || '') &&
     sjalvprov.status === 0,

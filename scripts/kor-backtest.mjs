@@ -118,6 +118,55 @@ function motsvarar(vantat, faktiskt) {
   return vantat === faktiskt ? null : `väntade ${vantat}, fick ${faktiskt}`
 }
 
+// ---- INPUT GATE, deterministisk spegel (regel 5) --------------------------
+// Grinden är PAKETVILLKORAD sedan 2026-08-27: en universell kärna plus en skärpning som
+// bara `lokal-se` lägger på. Den kördes tidigare av plannern med `≥1 ort` och `telefon`
+// som KÄRNKRAV, vilket stoppade varje icke-lokal kund vid nod 2 oavsett hur universellt
+// researchkontraktet var formulerat. Speglingen här visar utfallet deterministiskt.
+//
+// SAMMA ÄRLIGA GRÄNS SOM KAPACITETSGRINDEN: i kedjan körs grinden av en modell mot
+// prosan. Här prövas kontrollradens maskinläsbara fält plus §1:s kontaktvägar. En
+// research som ljuger i kontrollraden passerar båda.
+const KANDA_PACK = ['core-only', 'lokal-se']
+function inputGate(research) {
+  // `\w` är [A-Za-z0-9_] och matchar INTE Å/Ä/Ö. `status=OFULLSTÄNDIG` fångades som
+  // "OFULLST", jämförelsen slog aldrig till, och en OFULLSTÄNDIG research hade PASSERAT
+  // grinden. Fångat av kontrollprovet, inte av en genomläsning — precis det ett
+  // kontrollprov finns för.
+  // `\\w` är [A-Za-z0-9_] och matchar INTE Å/Ä/Ö. `status=OFULLSTÄNDIG` fångades som
+  // "OFULLST", jämförelsen slog aldrig till, och en OFULLSTÄNDIG research hade PASSERAT
+  // grinden. Fångat av kontrollprovet, inte av en genomläsning — precis det ett
+  // kontrollprov finns för.
+  const rad = /RESEARCH-CONTROL v[\d.]+ \| pack=([\w-]+)[\s\S]*?status=([^\s|`]+)/.exec(research)
+  if (!rad) return { utfall: 'STOPP', skal: 'kontrollraden saknas — paketet går inte att läsa, och grinden vet då inte vilken skärpning som gäller' }
+  const [, pack, status] = rad
+  // FAIL-CLOSED: ett okänt paket får ALDRIG falla tillbaka på core-only. Det är den
+  // LÖSARE vägen, och en grind som gissar sig till lösare krav är ingen grind.
+  if (!KANDA_PACK.includes(pack)) return { utfall: 'OKLASSIFICERAT', skal: `okänt pack=${pack}` }
+  if (status === 'OFULLSTÄNDIG') return { utfall: 'STOPP', skal: 'producenten har redan fällt grinden (status=OFULLSTÄNDIG)' }
+
+  const s1 = /^## 1\.[\s\S]*?(?=^## 2\.)/m.exec(research)
+  const kontaktvagar = ['telefon', 'formulär', 'DM', 'bokningssystem', 'fysisk plats']
+    .filter((k) => s1 && new RegExp(`\\*\\*${k}`, 'i').test(s1[0]))
+  const universellt = []
+  if (kontaktvagar.length === 0) universellt.push('minst EN typad kontaktväg')
+  // Räckviddens ROLL: §5 måste säga något om räckvidden. Nationell räckvidd är ett
+  // giltigt svar — frånvaron av ORT är därför aldrig i sig ett grindfel.
+  const s5 = /^## 5\.[\s\S]*?(?=^## 6\.)/m.exec(research)
+  if (!s5 || s5[0].trim().split('\n').length < 2) universellt.push('räckvidd och dess roll')
+
+  const paketskarpning = []
+  if (pack === 'lokal-se') {
+    if (!kontaktvagar.includes('telefon')) paketskarpning.push('telefon (lokal-se-skärpning)')
+    if (!s5 || !/belagt|belagd|huvudort/i.test(s5[0])) paketskarpning.push('≥1 belagd ort (lokal-se-skärpning)')
+  }
+  if (universellt.length || paketskarpning.length) {
+    return { utfall: 'STOPP', pack, kontaktvagar,
+      skal: [...universellt.map((x) => `UNIVERSELLT: ${x}`), ...paketskarpning.map((x) => `PAKET: ${x}`)].join(' · ') }
+  }
+  return { utfall: 'PASSERAR', pack, kontaktvagar, skal: `pack=${pack}; kontaktvägar: ${kontaktvagar.join(', ')}` }
+}
+
 // Jämförelsen bor i en egen funktion av ETT skäl: den måste gå att PRÖVA. En jämförelse
 // som bara står inline går att göra alltid-sann, och en alltid-sann jämförelse rapporterar
 // "SAMMA utfall" lika glatt för två fall som skiljer sig åt. Den mutationen överlevde
@@ -135,6 +184,29 @@ if (process.argv.includes('--sjalvprov')) {
   const p2 = { stoppade: null, krav: ['KAP-BILD', 'KAP-SCHEMA'] }
   const p3 = { stoppade: null, krav: ['KAP-SCHEMA'] }
   const p4 = { stoppade: ['x', 'y', 'HARD_STOP'], krav: ['KAP-SCHEMA', 'KAP-BILD'] }
+  // INPUT GATE:s kontrollprov. Att sex fixturer PASSERAR bevisar ingenting om grinden
+  // släpper igenom allt. Den måste bevisa att den STOPPAR — och, lika viktigt, att
+  // ortskravet INTE längre är universellt.
+  const byggR = (pack, extra) =>
+    `## 1. Organisation & typade kontaktvägar\n\n${extra.kontakt || '**telefon** 019-00 00 00 · **formulär**'}` +
+    `\n\n## 2. E\n\n## 5. Geografisk räckvidd & språk\n\n${extra.geo || 'Örebro (huvudort, belagt med fakturaunderlag).\nrad två'}` +
+    `\n\n## 6. F\n\nRESEARCH-CONTROL v3.0.0 | pack=${pack} | pack_module=x\n  status=${extra.status || 'KOMPLETT'}\n`
+  const ig = (pack, extra = {}) => inputGate(byggR(pack, extra)).utfall
+  const igProv = [
+    ['INPUT GATE: core-only UTAN ort PASSERAR (ortskravet är inte universellt)',
+      ig('core-only', { geo: 'Nationell räckvidd; ingen ort är ett verksamhetsställe.\nrad två' }) === 'PASSERAR'],
+    ['INPUT GATE: lokal-se UTAN belagd ort STOPPAR (skärpningen biter)',
+      ig('lokal-se', { geo: 'Nationell räckvidd.\nrad två' }) === 'STOPP'],
+    ['INPUT GATE: lokal-se UTAN telefon STOPPAR (skärpningen biter)',
+      ig('lokal-se', { kontakt: '**formulär** på sajten' }) === 'STOPP'],
+    ['INPUT GATE: core-only UTAN telefon PASSERAR (telefon är inte universellt)',
+      ig('core-only', { kontakt: '**formulär** på sajten' }) === 'PASSERAR'],
+    ['INPUT GATE: UTAN kontaktväg STOPPAR universellt',
+      ig('core-only', { kontakt: 'ingen kontaktväg alls' }) === 'STOPP'],
+    ['INPUT GATE: okänt pack ger OKLASSIFICERAT, aldrig core-only', ig('nyttpaket') === 'OKLASSIFICERAT'],
+    ['INPUT GATE: status=OFULLSTÄNDIG stoppar', ig('core-only', { status: 'OFULLSTÄNDIG' }) === 'STOPP'],
+    ['INPUT GATE: saknad kontrollrad stoppar', inputGate('## 1. x').utfall === 'STOPP'],
+  ]
   const prov = [
     ['lika kravmängder i olika ordning är LIKVÄRDIGA', likvardiga(p1, p2) === true],
     ['olika kravmängder är INTE likvärdiga', likvardiga(p1, p3) === false],
@@ -156,6 +228,7 @@ if (process.argv.includes('--sjalvprov')) {
   prov.push(['kapacitetsgrinden FÄLLER på en ROUTE-OUT kapacitet', gBlock(['KAP-X-ROUTEOUT']).length === 1])
   prov.push(['kapacitetsgrinden SLÄPPER IGENOM en byggd kapacitet', gBlock(['KAP-X-BYGGD']).length === 0])
 
+  prov.push(...igProv)
   const fel = prov.filter(([, ok]) => !ok)
   for (const [namn, ok] of prov) console.log(`${ok ? 'PASS' : 'FAIL'}: självprov — ${namn}`)
   if (fel.length) {
@@ -195,6 +268,11 @@ for (const f of korda) {
   // Steg 1: lägesgrinden, SKEPPAD funktion
   const g = M.obemannatGate(lage(research))
   rader.push(['1. Lägesgrinden (skeppad)', g.stop ? `STOPP — ${g.lage}` : `fortsätter — ${g.lage}`, g.stop ? 'STOPP' : 'OK'])
+
+  // Steg 1b: INPUT GATE, deterministisk spegel av regel 5:s paketvillkorade grind.
+  const ig = inputGate(research)
+  rader.push(['1b. INPUT GATE (paketvillkorad, spegel)', `${ig.utfall} — ${ig.skal}`,
+    ig.utfall === 'PASSERAR' ? 'OK' : ig.utfall === 'OKLASSIFICERAT' ? 'ODÖMBART' : 'STOPP'])
 
   // Steg 2: kapacitetsgrinden, DETERMINISTISK — finns INTE i den skeppade kedjan
   const { krav, avstadda } = kravda(research, f.id)

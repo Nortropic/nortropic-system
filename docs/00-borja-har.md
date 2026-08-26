@@ -204,6 +204,31 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Fabriken kan nu ta emot kunder utan en ort (2026-08-27)
+
+Det här var den sista stora resten av en gammal snedvridning: fabriken var byggd för
+lokala tjänsteföretag, och **krävde en ort av alla** — även av en kund som säljer över hela
+landet. Kontrakten skrevs om i går. Men **den grind som tar emot kunden var inte omskriven**,
+så en rikstäckande kund stoppades ändå direkt, med motiveringen att orten saknades.
+
+**Nu är grinden delad i två lager.** Alla kunder måste ha: namn, minst *ett* sätt att bli
+kontaktad på (telefon, formulär, DM, bokning eller besöksadress — vilket som helst), minst
+en tjänst, ett svar på **vad räckvidden betyder** för dem, och något som duger som USP.
+**Att svara "vi jobbar i hela landet" är ett giltigt svar, inte en saknad ort.**
+
+**Ovanpå det ligger paketet.** Väljer kunden vårt lokalpaket krävs dessutom telefon och
+minst en belagd ort — precis som förut. Skärpningen finns kvar; den gäller bara inte alla.
+
+**Bevisat, inte påstått.** Provfallet med mjukvaruföretaget — inget kontor att besöka, ingen
+ort — går nu igenom. Och åtta motprov visar att grinden fortfarande säger nej där den ska:
+lokalpaket utan ort stoppar, utan telefon stoppar, ingen kontaktväg alls stoppar, och ett
+okänt paketnamn ger "går inte att avgöra" i stället för att glida igenom på den lösare vägen.
+
+**Ett verkligt fel hittades av det sista motprovet.** En kontroll skulle stoppa en research
+märkt OFULLSTÄNDIG — men jämförelsen bröts av bokstaven Ä och matchade aldrig. **En
+ofullständig research hade alltså passerat.** Det upptäcktes för att provet fanns, inte för
+att någon läste koden.
+
 ## Nu ser juristen vilka tjänster sajten pratar med (2026-08-26)
 
 Varje sajt vi bygger använder någon utomstående tjänst — en karta, ett bokningsverktyg, en

@@ -46,7 +46,7 @@ med enstaka uppdrag · akuta jourärenden.
 **Primärhandlingskandidat: `ring`.** Rå observation: telefonen är den kanal kunderna
 faktiskt väljer (412 mot 38), och den är också den som fallerar.
 
-## 5. Belagda arbetsområden
+## 5. Geografisk räckvidd & språk
 
 Örebro (huvudort, belagt) · Kumla · Hallsberg.
 
@@ -64,7 +64,7 @@ användbara. Rättighetsläget: egna.
 
 Sakligt, driftinriktat. Vernacular: OVK, stamspolning, jouravtal, ronderingsprotokoll.
 
-## 9. Funktionella behov
+## 9. Transaktions-/dataobservationer
 
 Inga nya. Befintlig sajt har offertformulär och klickbart nummer.
 
@@ -72,22 +72,22 @@ Inga nya. Befintlig sajt har offertformulär och klickbart nummer.
 
 Inga.
 
-## 11. Juridik
+## 11. Juridik-/riskobservationer
 
 Inga juridikflaggor.
 
-## 12. Konkurrensbild
+## 12. Konkurrenter/alternativ
 
 Tre lokala aktörer i Örebro med belagda URL:er: Örebro Fastighetsdrift (4,4 av 5, 61
 omdömen) · Servicepartner Mellansverige (4,0 av 5, 132 omdömen) · Bergslagens Fastighet
 (URL belagd, inga synliga omdömen).
 
-## 13. Framgångsmått
+## 13. Designreferenser
 
 Kundens eget uttalade mål: *"Vi vill inte tappa fler avtal."* Kundens egen siffra: två
 uppsagda avtal under Q1, båda med skriftlig motivering som nämner tillgänglighet.
 
-## 14. Kvalitetsnivåer
+## 14. Framgångsmått
 
 Ej tillämpligt i det här läget.
 
@@ -101,12 +101,16 @@ aktiveras med `LocalBusiness`-subtyp.
 Att kapaciteterna kan aktiveras säger ingenting om huruvida en ny sajt är åtgärden — det
 är en helt annan fråga, och den avgörs i §2 och §13.
 
-## 16. Belägg och attribution
-
-Samtalsstatistiken är kundens växellogg. Omdömesbetyget attribueras "Nordvik
-Fastighetsservice AB, Örebro". Sajtsiffrorna är kundens egen analys.
-
-## 17. Olösta okändheter
+## 16. Öppna frågor
 
 Om de obesvarade samtalen leder till förlorade uppdrag är inte mätt — kunden har ingen
 uppföljning på missade samtal.
+
+## 17. Maskinläsbar kontrollrad
+
+```
+RESEARCH-CONTROL v3.0.0 | pack=lokal-se | pack_module=1.0.0
+  org=ja | kontaktvag=ja | erbjudande=ja | geografi=ja
+  primarhandling=kandidat | framgangsmatt=ja
+  osakra=2 | konflikter=0 | status=KOMPLETT
+```

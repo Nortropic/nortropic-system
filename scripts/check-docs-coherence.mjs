@@ -375,26 +375,41 @@ kravOmArtefakt({
   beskrivning: 'kontrollraden (sektion 17) läses först',
 })
 
-// ── E. DEN KÄNDA AVVIKELSEN (S1) ──────────────────────────────────────────────
-// En medvetet oförändrad avvikelse måste synas för den som möter den. Rättas
-// avvikelsen i plannern fäller kontrollen i stället på att dokumentationen fortfarande
-// redovisar den — en rättad brist får inte stå kvar som brist.
+// ── E. DEN KÄNDA AVVIKELSEN — ÅTGÄRDAD 2026-08-27 ────────────────────────────
+// Kontrollen skrevs med sin egen efterföljare inbyggd: *"Rättas avvikelsen i plannern
+// fäller kontrollen i stället på att dokumentationen fortfarande redovisar den — en rättad
+// brist får inte stå kvar som brist."* Det har nu hänt. INPUT GATE är paketvillkorad, och
+// kraven är därför VÄNDA i stället för strukna: dokumentationen måste redovisa RÄTTNINGEN,
+// och den gamla bristformuleringen får inte stå kvar någonstans.
 kravOmArtefakt({
-  namn: 'E-avvikelse',
+  namn: 'E-avvikelse-åtgärdad',
   artefakt: 'agents/project-planner.md',
-  ankare: /Känd avvikelse/i,
+  ankare: /Åtgärdad avvikelse/i,
   ytor: TEKNISKA,
-  krav: /känd avvikelse|paketformad grind|paketformad/i,
-  beskrivning: 'den paketformade INPUT GATE-avvikelsen är redovisad',
+  krav: /paketvillkorad|paketskärpning/i,
+  beskrivning: 'INPUT GATE:s paketvillkorande är redovisat i de tekniska lagren',
 })
 kravOmArtefakt({
-  namn: 'E-inte-bristfällig-research',
+  namn: 'E-kvarvarande-skillnad-namngiven',
   artefakt: 'agents/project-planner.md',
-  ankare: /Känd avvikelse/i,
+  ankare: /Åtgärdad avvikelse/i,
   ytor: TEKNISKA,
-  krav: /aldrig\s+(att\s+)?(researchen\s+är\s+)?bristfällig|inte\s+att\s+researchen\s+är\s+bristfällig/i,
-  beskrivning: 'stoppet får inte läsas som bristfällig research',
+  krav: /USP/i,
+  beskrivning: 'den KVARVARANDE skillnaden mot kontrollraden (USP-fältet) är namngiven, inte tystad',
 })
+// En rättad brist får inte stå kvar som brist — vare sig i plannern eller i något
+// tekniskt lager. Den gamla formuleringen sa att grinden ÄR paketformad; står den kvar
+// någonstans läser nästa läsare en åtgärdad avvikelse som öppen.
+{
+  const kvarKravsTelefon = /grind är fortfarande `lokal-se`-formad|obligatorisk telefon är en `lokal-se`-SKÄRPNING, inte ett universellt krav/i
+  const planner = las('agents/project-planner.md')
+  if (kvarKravsTelefon.test(planner)) {
+    nej('E-gamla-bristformuleringen-är-borta',
+      'plannern påstår fortfarande att grinden är paketformad — en åtgärdad brist som står kvar som brist läses som öppen')
+  } else {
+    ja('E-gamla-bristformuleringen-är-borta')
+  }
+}
 
 // ── F. ANTI-ÖVERDOKUMENTATION (S5 ligger i öppen PR) ──────────────────────────
 // Detta är gruppens skarpaste kontroll: den fäller om dokumentationen beskriver
@@ -639,7 +654,7 @@ forbudOmArtefaktSaknas({
 // över en. FORVANTAT är därför skriven för hand och jämförs mot faktiskt antal.
 // Faller de isär är körningen ODÖMBAR: en vakt som tappat kontroller vet inte längre
 // vad dess grönt betyder, och får då inte påstå någonting alls.
-const FASTA = 66   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9
+const FASTA = 67   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)

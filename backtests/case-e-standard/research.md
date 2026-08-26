@@ -41,7 +41,7 @@ Villaägare 40–75 (störst volym) · lägenhetsinnehavare · mindre kontor med
 **Primärhandlingskandidat: `ring`.** Rå observation: 91 av 118 uppdrag startade med ett
 samtal, och kundens egen logg visar att 84 av dessa avslutades samma samtal.
 
-## 5. Belagda arbetsområden
+## 5. Geografisk räckvidd & språk
 
 Örebro (huvudort, belagt med fakturaunderlag) · Kumla · Hallsberg.
 Restid utanför dessa: kunden åker inte längre än 30 minuter.
@@ -61,7 +61,7 @@ hero-kandidat: ja, en arbetsbild i full upplösning. Rättighetsläget: samtliga
 
 Enkelt, vänligt, utan säljprat. Vernacular: putsning, karmtvätt, spröjs, abonnemang.
 
-## 9. Funktionella behov
+## 9. Transaktions-/dataobservationer
 
 Offertformulär (≤5 fält), klickbart telefonnummer, områdeslista, prisexempel. Ingen
 bokning, ingen inloggning, ingen e-handel — sajten förblir stateless.
@@ -70,22 +70,22 @@ bokning, ingen inloggning, ingen e-handel — sajten förblir stateless.
 
 Inga.
 
-## 11. Juridik
+## 11. Juridik-/riskobservationer
 
 Inga juridikflaggor. Fönsterputs är Ring 1. RUT-avdraget beskrivs som en möjlighet, aldrig
 som ett löfte om belopp.
 
-## 12. Konkurrensbild
+## 12. Konkurrenter/alternativ
 
 Tre lokala aktörer med belagda URL:er: Örebro Fönsterservice (4,5 av 5, 33 omdömen) ·
 Glansen Städ & Fönster (4,2 av 5, 78 omdömen) · Putsarna i Närke (URL belagd, inga
 synliga omdömen).
 
-## 13. Framgångsmått
+## 13. Designreferenser
 
 Antal samtal per månad; andel som blir abonnemang.
 
-## 14. Kvalitetsnivåer
+## 14. Framgångsmått
 
 Lanseringsklar nivå på samtliga grindar. Inga särskilda krav utöver standard.
 
@@ -97,11 +97,15 @@ Belagd ort + `seoLage=lokal` → `KAP-LOKAL-SEO` aktiveras · organisationstyp k
 `KAP-PRIMARHANDLING`. **Paketet `lokal-se` är BELAGT, inte antaget** — orten är belagd med
 fakturaunderlag.
 
-## 16. Belägg och attribution
-
-Samtalsstatistiken är kundens egen logg. Omdömesbetyget attribueras "Bergqvists
-Fönsterputs AB, Örebro".
-
-## 17. Olösta okändheter
+## 16. Öppna frågor
 
 Exakt prisexempel för abonnemang kräver kundens original.
+
+## 17. Maskinläsbar kontrollrad
+
+```
+RESEARCH-CONTROL v3.0.0 | pack=lokal-se | pack_module=1.0.0
+  org=ja | kontaktvag=ja | erbjudande=ja | geografi=ja
+  primarhandling=kandidat | framgangsmatt=ja
+  osakra=1 | konflikter=0 | status=KOMPLETT
+```

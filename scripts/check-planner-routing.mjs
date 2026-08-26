@@ -164,6 +164,43 @@ for (const universell of ['faktatrohet', 'tillgänglighet', 'wcag', 'säkerhet',
 
 // ---- Plan-skillen (måste inte drifta isär från plannern) -------------------
 const skill = read('skills/nortropic-plan/SKILL.md')
+
+// ---- REGEL 5: INPUT GATE:s PAKETVILLKORANDE (2026-08-27) -------------------
+// Doktrin och implementation måste bindas. En mutationsprövning visade att regel 5:s TEXT
+// gick att rulla tillbaka till `≥1 ort`, och plannerns kärnkrav till `phone number`, utan
+// att någon vakt fällde — den deterministiska spegeln i `kor-backtest.mjs` fortsatte göra
+// rätt medan regelverket sa fel. **Det är precis den drift jag höll inne ändringen för att
+// undvika**, fast åt andra hållet. Här binds de tre ytorna ihop.
+const regelverk = read('docs/03-regelverk.md')
+const regel5 = /^\| 5 \|.*$/m.exec(regelverk)
+if (!regel5) { console.error('ODÖMBART: regel 5 kunde inte läsas ur regelverket'); process.exit(2) }
+check('R5: regel 5 kräver RÄCKVIDD OCH DESS ROLL, inte ≥1 ort universellt',
+  /räckvidd och dess ROLL/i.test(regel5[0]) && !/\(namn, telefon, ≥1 tjänst, ≥1 ort/.test(regel5[0]),
+  'ett ortskrav i KÄRNAN stoppar en icke-lokal kund vid nod 2 oavsett hur universellt researchkontraktet är formulerat')
+check('R5: regel 5 säger UT att femte fältet är PAKETVILLKORAT',
+  /PAKETVILLKORAT/.test(regel5[0]) && /lokal-se/.test(regel5[0]),
+  'utan paketvillkorandet är lättnaden generell i stället för kärnuniversell — skärpningslagen går bara åt ett håll')
+check('R5: regel 5 säger UT att nationell räckvidd är ett GILTIGT svar',
+  /nationell eller gränsöverskridande räckvidd (är )?ett GILTIGT svar/i.test(regel5[0]),
+  'utan den meningen läses en saknad ort som en brist i stället för som ett svar')
+check('R5: plannerns INPUT GATE kräver en TYPAD kontaktväg, inte telefon specifikt',
+  /at least one TYPED contact path/.test(planner) && !/Required minimum: business name, phone number/.test(planner),
+  'obligatorisk telefon är en `lokal-se`-SKÄRPNING, inte ett universellt krav — en core-only-kund med enbart formulär stoppades annars')
+check('R5: plannern bär BÅDA lagren namngivna (universell kärna + paketskärpning)',
+  /Universell kärna/.test(planner) && /Paketskärpning `lokal-se`/.test(planner),
+  'slås lagren ihop går det inte att se om ett stopp kommer från fabriken eller från paketet')
+check('R5: plannern fail-closar på okänt eller saknat `pack=`',
+  /STOPP som OKLASSIFICERAT/.test(planner) && /Anta ALDRIG `core-only`/.test(planner),
+  'att gissa `core-only` är att gissa sig till LÖSARE krav — en grind som gör det är ingen grind')
+check('R5: plannern skriver ut OM ett saknat krav är universellt eller en paketskärpning',
+  /om det saknade kravet är UNIVERSELLT eller en PAKETSKÄRPNING/i.test(planner),
+  'kunden ska se om det är fabriken eller paketet som kräver något')
+check('R5: plan-skillen bär samma paketvillkorande som plannern',
+  /PAKETVILLKORAD \(regel 5\)/.test(skill) && /minst EN typad kontaktväg/.test(skill) && /≥1 belagd ort/.test(skill),
+  'skill och agent måste säga samma sak — annars beror utfallet på vilken väg som kördes')
+check('R5: den KVARVARANDE skillnaden mot kontrollraden är namngiven',
+  /inget USP-fält/.test(planner),
+  'kontrollraden har inget USP-fält medan grinden kräver USP — den skillnaden är avsiktlig men ska inte tystas bort')
 check('Plan-skillen kör interventionsbeslutet före planeringen',
   /2b\.[\s\S]{0,200}INTERVENTIONSBESLUT/i.test(skill), 'steg 2b saknas i plan-skillen')
 check('Plan-skillen kräver STRATEGISK vid utfall ≠ NY SAJT',
