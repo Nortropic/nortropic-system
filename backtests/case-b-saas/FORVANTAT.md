@@ -79,7 +79,7 @@ stället för att bygga vidare på en capability som inte finns.
 Att lyfta `KAP-EXTERN-BOKNING` till `BUILT` är ett eget arbete och byter inte plats med
 det här. Tills dess är stoppet utfallet.
 
-### `KOR-GAP-1` — stoppet är MODELLBEROENDE i den skeppade kedjan
+### `KOR-GAP-1` — STÄNGD 2026-08-26: grinden är flyttad in i kedjan
 
 En körning av `scripts/kor-backtest.mjs` mot den här fixturen ger HARD_STOP på
 `KAP-EXTERN-BOKNING`. **Men den grind som fäller är deterministisk och finns inte i
@@ -92,18 +92,27 @@ går genom en modell:
 2. **Del-C-vakten** rapporterar `unmetPrerequisite` — men den frågan gäller
    Del-C/Railway-förkrav, inte kapacitetskatalogens status i allmänhet.
 
-**Ingen kod läser `docs/kapacitetskatalog.md` och jämför mot researchens §15.** Missar
-plannern klassificeringen fortsätter kedjan in i ett bygge som kräver en capability som
-inte finns.
+Ingen kod läste `docs/kapacitetskatalog.md` och jämförde mot researchens §15.
+
+**Detta är nu åtgärdat.** `kapacitetsgrind()` i `workflows/nortropic-autobygg.js` är ett
+deterministiskt led som körs FÖRE plannerns klassificering, och dess utfall vägs samman med
+planbeslutet där **det strängaste vinner**.
+
+**Rolldelningen är hela poängen.** Workflow-DSL:en har ingen filsystemsåtkomst, så katalogen
+måste läsas av en agent — men agenten **rapporterar fakta** (id, aktiverad/avstådd, status
+ordagrant, citat) och **koden fattar beslutet**. En modell som rapporterar `DECLARED` kan
+därmed inte välja att fortsätta.
 
 | | Läge |
 |---|---|
-| Det deterministiska utfallet | **HARD_STOP, verifierat** — `kor-backtest.mjs`, prövat av `check-backtest-fixtures.mjs` |
-| Den skeppade kedjans utfall | **ODÖMBART** — beror på plannerns klassificering, som inte har körts |
+| Grindens BESLUT | **Deterministiskt** — 24 beteendekontroller i `check-autobygg-delegation.mjs`, nio mutationer dödade |
+| Grindens INDATA | **Modellberoende** — en agent som rapporterar fel status passerar grinden |
+| `KAP-EXTERN-BOKNING`-stoppet | **HARD_STOP, verifierat i båda lagren** |
 
-**Nästa transition:** lyft kapacitetsgrinden ur `kor-backtest.mjs` in i kedjan som ett
-deterministiskt led FÖRE plannerns klassificering, så att modellen blir ett andra lager i
-stället för det enda.
+**Kvarvarande lucka, namngiven i stället för stängd:** en felrapporterande agent passerar
+kedjans grind. `scripts/kor-backtest.mjs` läser katalogen direkt från disk och fångar det —
+men den körs för hand, inte i kedjan. Nästa transition vore att låta kedjan verifiera
+agentens rapport mot en andra avläsning.
 
 ## `B-T7` — DELVIS ÅTGÄRDAT 2026-08-26
 

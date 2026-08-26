@@ -210,6 +210,111 @@ function beslutEfterPlan(plan) {
   return { decision, reason, attention: ev, nextStep }
 }
 
+/**
+ * KAPACITETSGRINDEN (KOR-GAP-1). Deterministiskt led FÖRE plannerns klassificering.
+ *
+ * VARFÖR DEN FINNS. Stoppet på "krävd men obyggd capability" fanns bara på två vägar och
+ * båda gick genom en modell: plannern måste sätta `blocking: true`, eller Del-C-vakten
+ * måste rapportera `unmetPrerequisite` — och den senare gäller Del-C/Railway-förkrav, inte
+ * kapacitetskatalogens status i allmänhet. **Ingen kod jämförde researchens §15 mot
+ * `docs/kapacitetskatalog.md`.** Missade plannern klassificeringen fortsatte kedjan in i
+ * ett bygge som krävde något som inte fanns. Det fyndet kom ur en faktisk körning av
+ * §26:s fixturer (`scripts/kor-backtest.mjs`), inte ur en genomläsning.
+ *
+ * ROLLDELNINGEN ÄR HELA POÄNGEN. Workflow-DSL:en har ingen filsystemsåtkomst, så
+ * katalogen måste läsas av en agent. Men agenten **rapporterar fakta** — vilka `KAP-`
+ * §15 namnger, om vart och ett är aktiverat eller avstått, och vad katalogen säger — och
+ * **den här funktionen fattar beslutet**. En modell som rapporterar `DECLARED` kan därmed
+ * inte välja att fortsätta. Modellen blir ett andra lager, inte det enda.
+ *
+ * AKTIVERAD ÄR INTE OMNÄMND. §15 skriver både "`KAP-LOKAL-SEO` aktiveras INTE" och
+ * "pekar mot `KAP-EXTERN-BOKNING`". En grind som räknade omnämnanden skulle kräva den
+ * kapacitet som uttryckligen INTE aktiveras — alltså kräva lokal-SEO av en B2B-kund.
+ *
+ * FAIL-CLOSED I VARJE LED: okänd aktiveringsetikett, okänd status, saknat id och en TOM
+ * rapport ger alla HARD_STOP. Den tomma rapporten är inte en formalitet — `KAP-PRESTANDA`
+ * krävs "alltid vid leverans av sajt", så en kravmängd utan poster betyder att
+ * rapporteringen misslyckats, aldrig att inga krav finns. En tom mängd får bli grön först
+ * när ankaret är bevisat.
+ */
+const KAP_KORBAR = ['BUILT', 'VALIDATING', 'PROVEN']
+const KAP_KANDA = ['DECLARED', 'BUILT', 'VALIDATING', 'PROVEN', 'ROUTE-OUT']
+const KAP_AKTIVERING = ['AKTIVERAD', 'AVSTÅDD']
+
+function kapacitetsgrind(rapport) {
+  const ev = []
+  const stopp = (reason, evidence, nextStep, decision) => ({
+    decision: decision || HARD_STOP, reason,
+    attention: [attentionEvent({ severity: 'CRITICAL', decision: decision === ROUTE ? 'SCOPE_NEJ' : 'KAPACITET_SAKNAS',
+      reason, evidence: evidence || [], actionTaken: 'inget byggt; capability-gränsen kringgicks aldrig',
+      ownerActionRequired: decision !== ROUTE })],
+    nextStep, obyggda: [],
+  })
+
+  if (!rapport || !Array.isArray(rapport.kravda)) {
+    return stopp('kapacitetsrapporten saknas eller är inte en lista — oklassificerat, fail-closed',
+      [JSON.stringify(rapport && rapport.kravda)], 'kör om kapacitetsrapporteringen mot docs/kapacitetskatalog.md')
+  }
+  // ANKARKRAVET: en tom mängd är ett bevisat resultat först när något har hittats.
+  if (rapport.kravda.length === 0) {
+    return stopp('kapacitetsrapporten är TOM — KAP-PRESTANDA krävs alltid vid leverans av sajt, så en tom kravmängd betyder att rapporteringen misslyckats',
+      [], 'kör om kapacitetsrapporteringen; en tom lista får aldrig läsas som ett rent resultat')
+  }
+  for (const k of rapport.kravda) {
+    if (!k || typeof k.id !== 'string' || !/^KAP-[A-ZÅÄÖ0-9-]+$/.test(k.id)) {
+      return stopp(`kapacitetspost utan giltigt id (${JSON.stringify(k && k.id)}) — oklassificerat, fail-closed`,
+        [JSON.stringify(k)], 'rapportera varje post med id, aktivering och status')
+    }
+    if (!KAP_AKTIVERING.includes(k.aktivering)) {
+      return stopp(`${k.id} har okänd aktiveringsetikett (${JSON.stringify(k.aktivering)}) — AKTIVERAD/AVSTÅDD krävs exakt, fail-closed`,
+        [k.id], 'klassa varje omnämnande i §15 som AKTIVERAD eller AVSTÅDD')
+    }
+    if (!KAP_KANDA.includes(k.status)) {
+      return stopp(`${k.id} har okänd katalogstatus (${JSON.stringify(k.status)}) — oklassificerat, fail-closed`,
+        [k.id], 'läs statusen ur docs/kapacitetskatalog.md ordagrant')
+    }
+  }
+
+  const aktiva = rapport.kravda.filter((k) => k.aktivering === 'AKTIVERAD')
+  // ROUTE-OUT är ett MEDVETET nej och en annan sak än en obyggd capability: det routar
+  // enligt Ring 3 i stället för att lämna över till ägaren. Att slå ihop dem vore att
+  // göra ett korrekt hänvisningsbeslut till ett fel.
+  const routeOut = aktiva.filter((k) => k.status === 'ROUTE-OUT')
+  if (routeOut.length) {
+    return stopp(`scope-nej: ${routeOut.map((k) => k.id).join(', ')} är ROUTE-OUT i kapacitetskatalogen — hänvisning enligt docs/06 Ring 3`,
+      routeOut.map((k) => k.id), 'hänvisa enligt Ring 3 — bygg aldrig runt gränsen', ROUTE)
+  }
+  const obyggda = aktiva.filter((k) => !KAP_KORBAR.includes(k.status))
+  if (obyggda.length) {
+    const r = `krävd men obyggd capability: ${obyggda.map((k) => `${k.id} (${k.status})`).join(', ')}`
+    return {
+      decision: HARD_STOP, reason: r,
+      attention: [attentionEvent({ severity: 'CRITICAL', decision: 'KAPACITET_SAKNAS', reason: r,
+        evidence: obyggda.map((k) => k.id), actionTaken: 'inget byggt; capability-gränsen kringgicks aldrig',
+        ownerActionRequired: true })],
+      nextStep: 'bygg capabilityn som eget arbete, eller tacka nej — bygg den aldrig runt',
+      obyggda: obyggda.map((k) => k.id),
+    }
+  }
+  return {
+    decision: CONTINUE,
+    reason: `samtliga ${aktiva.length} aktiverade kapaciteter är körbara`,
+    attention: [], nextStep: null, obyggda: [],
+  }
+}
+
+/**
+ * Sammanvägning av två oberoende beslut. Det STRÄNGASTE vinner, och skälet följer med det
+ * beslut som vann — annars kunde ett HARD_STOP rapporteras med ett CONTINUE-skäl.
+ */
+function strangast(a, b) {
+  const vinnare = RANG[b.decision] > RANG[a.decision] ? b : a
+  return {
+    decision: vinnare.decision, reason: vinnare.reason, nextStep: vinnare.nextStep,
+    attention: [...(a.attention || []), ...(b.attention || [])],
+  }
+}
+
 // Behålls som tunn adapter: `stop` betyder nu ENBART "arbetet ska inte fortsätta i
 // denna lane" och skiljer inte HARD_STOP från ROUTE. Anroparen måste läsa `decision`.
 function shouldStopAfterPlan(plan) {
@@ -228,6 +333,27 @@ function scopeStr(dir) {
 }
 
 /* ─────────── SCHEMAS ─────────── */
+
+const KAPACITETSRAPPORT = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['kravda'],
+  properties: {
+    kravda: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false,
+        required: ['id', 'aktivering', 'status', 'citat'],
+        properties: {
+          id: { type: 'string', description: 'Kapacitetens id exakt som i katalogen, t.ex. KAP-EXTERN-BOKNING' },
+          aktivering: { type: 'string', enum: ['AKTIVERAD', 'AVSTÅDD'], description: 'AVSTÅDD när §15 uttryckligen säger att den INTE aktiveras' },
+          status: { type: 'string', enum: ['DECLARED', 'BUILT', 'VALIDATING', 'PROVEN', 'ROUTE-OUT'], description: 'Statusen ORDAGRANT ur docs/kapacitetskatalog.md — aldrig en bedömning' },
+          citat: { type: 'string', description: 'Den mening i §15 som omnämnandet står i, ordagrant' },
+        },
+      },
+    },
+  },
+}
 
 const PLAN_OUTCOME = {
   type: 'object',
@@ -443,6 +569,22 @@ const plan = await agent(
   { label: 'plan', phase: 'Plan', agentType: 'project-planner', schema: PLAN_OUTCOME }
 )
 
+// KAPACITETSRAPPORTEN (KOR-GAP-1). Agenten RAPPORTERAR fakta; `kapacitetsgrind` fattar
+// beslutet. Uppdraget är medvetet formulerat som avläsning och inte som bedömning — den
+// agent som ombeds AVGÖRA om något är byggt kan svara fel på ett sätt som ser rimligt ut.
+const kapRapport = await agent(
+  `Read the research file at ${researchPath}, section 15 (Kapacitetssignaler), and the capability catalogue at docs/kapacitetskatalog.md. ` +
+  `This is a REPORTING task, not a judgement task. Do not decide anything; do not recommend anything. ` +
+  `For EVERY \`KAP-\`-identifier mentioned in section 15, return one row with: (a) the id verbatim, ` +
+  `(b) \`aktivering\`: AVSTÅDD when the sentence says the capability is NOT activated (e.g. "aktiveras INTE"), AKTIVERAD otherwise, ` +
+  `(c) \`status\`: the status column for that id in docs/kapacitetskatalog.md, copied VERBATIM — never inferred, never updated, never guessed, ` +
+  `(d) \`citat\`: the sentence in section 15 the mention appears in, verbatim. ` +
+  `If an id in section 15 is absent from the catalogue, or a sentence cannot be classified as activated/abstained, still return the row with your best verbatim copy — the downstream gate fails closed on it. Never omit a row to make the report tidy.`,
+  { label: 'kapacitetsrapport', phase: 'Beslut (plan)', schema: KAPACITETSRAPPORT }
+)
+const kapBeslut = kapacitetsgrind(kapRapport)
+if (kapBeslut.obyggda.length) log(`KAPACITETSGRIND: ${kapBeslut.reason}`)
+
 phase('Beslut (plan)')
 const modeStop = obemannatGate(plan && plan.lage)
 const planBeslut = modeStop.stop
@@ -456,29 +598,30 @@ const planBeslut = modeStop.stop
         ? 'rätta `Läge:`-raden till obemannat eller bemannat, eller utelämna den (default: obemannat)'
         : 'kör /nortropic-plan bemannat och godkänn briefen vid nod 3' }
   : beslutEfterPlan(plan)
+const planBeslutVagt = strangast(planBeslut, kapBeslut)
 
-for (const a of planBeslut.attention) {
+for (const a of planBeslutVagt.attention) {
   log(`OWNER ATTENTION — ${a.ownerActionRequired ? 'ÄGARÅTGÄRD KRÄVS' : 'inget svar krävs'} | ${a.severity} | ${a.decision}: ${a.reason}`)
 }
 
 // ROUTE och HARD_STOP avslutar båda ny-sajt-lanen, men de betyder OLIKA saker och får
 // aldrig rapporteras likadant: ROUTE är ett korrekt workflow-utfall utan ägarberoende,
 // HARD_STOP är en authority-/bevisbarhetsgräns som kräver människa.
-if (planBeslut.decision === ROUTE || planBeslut.decision === HARD_STOP) {
-  const routad = planBeslut.decision === ROUTE
+if (planBeslutVagt.decision === ROUTE || planBeslutVagt.decision === HARD_STOP) {
+  const routad = planBeslutVagt.decision === ROUTE
   const status = routad ? 'ROUTAD' : 'ÖVERLÄMNAD'
-  log(`${status} vid plan: ${planBeslut.reason}${planBeslut.nextStep ? ` → nästa steg: ${planBeslut.nextStep}` : ''}`)
+  log(`${status} vid plan: ${planBeslutVagt.reason}${planBeslutVagt.nextStep ? ` → nästa steg: ${planBeslutVagt.nextStep}` : ''}`)
   // Inget repo skapat ännu — rent utfall; ingen AUTOBYGG-LOG (byggrepot finns inte).
   return {
-    status, stage: 'plan', decision: planBeslut.decision, reason: planBeslut.reason,
-    ownerActionRequired: !routad, nextStep: planBeslut.nextStep,
-    attention: planBeslut.attention,
+    status, stage: 'plan', decision: planBeslutVagt.decision, reason: planBeslutVagt.reason,
+    ownerActionRequired: !routad, nextStep: planBeslutVagt.nextStep,
+    attention: planBeslutVagt.attention,
     briefPath: plan && plan.briefPath, openQuestions: (plan && plan.openQuestions) || [], buildDir: null, gates: [],
   }
 }
 // CONTINUE eller ATTENTION_CONTINUE → bygget fortsätter. Attention bärs vidare till
 // slutrapporten; den får aldrig fungera som ett mutex.
-const planAttention = planBeslut.attention
+const planAttention = planBeslutVagt.attention
 
 phase('Init')
 const init = await agent(
