@@ -1,7 +1,7 @@
 # Operatörsguiden
 
-Senast verifierad mot systemet: 2026-07-31 · v17 (denna commit)
-Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE: check-invariants.mjs INV-001–005, verify-suite doctor 1–13 + OGILTIG-status, design-reviewer Bash→BLOCKED, NRT-007-blocket i agenterna, docs/100-dagar); 0 påståenden i denna fil ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
+Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
+Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Kärna, paket och interventionsbeslutet" skrivet mot `agents/project-planner.md` och `docs/kapacitetskatalog.md`. **S5 är INTE inräknad** — grindavsnittet beskriver läget före S5, som ligger i öppen PR. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
 Det här är guiden för dig som kör Nortropic-systemet: en operatör, en sajt i taget. Den är författad ur systemfilerna själva — varje avsnitt pekar på filen där regeln faktiskt bor, och när guiden och en systemfil säger olika saker är det systemfilen som gäller. Guiden förklarar hur du använder systemet och varför det ser ut som det gör; den exakta nodkartan finns i [01-oversikt.md](01-oversikt.md), agenterna i [02-agenter.md](02-agenter.md) och de hårda reglerna med källhänvisningar i [03-regelverk.md](03-regelverk.md).
 
@@ -17,7 +17,7 @@ Den tredje är att **varje faktapåstående ska vara spårbart**. Ett påståend
 
 Pipelinen är tolv noder — tabellen finns i [01-oversikt.md](01-oversikt.md). Så här ser den ut från operatörsstolen:
 
-Du börjar med att skriva `research.md` om kunden. Fem fält är obligatoriska: företagsnamn, telefonnummer, minst en tjänst, minst en ort och något som duger som USP. Saknas något stannar planeringen med en numrerad lista över vad som fattas — systemet planerar aldrig på gissningar (`agents/project-planner.md`, INPUT GATE). Sedan kör du `/nortropic-plan`, som ger dig en `PROJECT-BRIEF.md` med exakt sju sektioner (§7 Kalibreringsprofil är kalibreringskontraktet nedströms), en lista öppna frågor och ett fält **Klienttyp**: `SKARP` eller `TESTKLIENT`. Plannern gör alltid en egen inspirationsinhämtning ur källbiblioteket (`skills/nortropic-plan/references/inspirationskallor.md` — omdömesjakten först, gallerierna som smaklyft, koncept sist; budget max 6 egna kandidater/~10 sidhämtningar) och väger dina eventuella Designreferenser i research.md likvärdigt med sina egna fynd — frasen "hoppa över inspirationsjakt" i research.md stänger av den egna jakten. Smakgrinden är briefgodkännandet: §5:s Referensöversättning visar per rad om ett val kom från din research eller plannerns jakt, och det är där du accepterar eller vänder riktningen (`agents/project-planner.md`, steg 5d). En testklient byggs icke-indexerbar och får aldrig verkliga GBP-, citation- eller DNS-åtgärder (`agents/project-planner.md` §6, `skills/nortropic-stack/SKILL.md`).
+Du börjar med att skriva `research.md` om kunden, mot researchkontrakt v3. Fem fält är obligatoriska i plannerns minimigrind: företagsnamn, telefonnummer, minst en tjänst, minst en ort och något som duger som USP. Saknas något stannar planeringen med en numrerad lista över vad som fattas — systemet planerar aldrig på gissningar (`agents/project-planner.md`, INPUT GATE). **Två av de fem sammanfaller inte med kontraktets kontrollrad** — se "Kärna, paket och interventionsbeslutet" nedan innan du drar slutsatsen att en fil är bristfällig. Sedan kör du `/nortropic-plan`, som ger dig en `PROJECT-BRIEF.md` med exakt sju sektioner (§7 Kalibreringsprofil är kalibreringskontraktet nedströms), en lista öppna frågor och ett fält **Klienttyp**: `SKARP` eller `TESTKLIENT`. Plannern gör alltid en egen inspirationsinhämtning ur källbiblioteket (`skills/nortropic-plan/references/inspirationskallor.md` — omdömesjakten först, gallerierna som smaklyft, koncept sist; budget max 6 egna kandidater/~10 sidhämtningar) och väger dina eventuella Designreferenser i research.md likvärdigt med sina egna fynd — frasen "hoppa över inspirationsjakt" i research.md stänger av den egna jakten. Smakgrinden är briefgodkännandet: §5:s Referensöversättning visar per rad om ett val kom från din research eller plannerns jakt, och det är där du accepterar eller vänder riktningen (`agents/project-planner.md`, steg 5d). En testklient byggs icke-indexerbar och får aldrig verkliga GBP-, citation- eller DNS-åtgärder (`agents/project-planner.md` §6, `skills/nortropic-stack/SKILL.md`).
 
 **Första hårda stoppet är briefgodkännandet.** Läs briefen, svara på de öppna frågorna, godkänn. Granska särskilt **§7 Kalibreringsprofil** — primärhandlingen (det enda sajten ska driva), röstregistret, kvittolistan och framför allt **juridikflaggorna**: en ohanterad flagga är ett beslut som bara du kan ta (bygg modulen som eget arbete, eller tacka nej — `skills/nortropic-plan/references/juridikflaggor.md`). Allt nedströms — bygge, copy, granskning, grindar, eval — behandlar briefen som auktoritet, så en slarvigt godkänd brief blir en slarvig sajt.
 
@@ -26,6 +26,53 @@ Du börjar med att skriva `research.md` om kunden. Fem fält är obligatoriska: 
 Granskning och launch beskrivs i egna avsnitt nedan. Efter launch återstår tre saker: **andra hårda stoppet** (juridiken — du signerar Gate 6-fynden själv), `/vercel:deploy`, och efterarbetet: `/nortropic-cutover` kör fas 1–3 (förkontroll → noindex-verifiering → GSC-preflight; den irreversibla GSC-skrivningen förblir din hand), och resten — GBP, citations m.m. — kör du ur de klientfyllda checklistorna `gbp-checklist-klient.md` och `gsc-steg-klient.md` under de första två veckorna (`workflows/nortropic-cutover.js` + `workflows/nortropic-launch.js`, Handover-fasen). Sist kör du `/nortropic-retro` och når **tredje hårda stoppet**: du läser stewardens förslag och säger "applicera förslag N" till huvudsessionen.
 
 När fixloopen i launch hittar åtgärdbara fynd routas de per kategori: seo-fynd går till `seo-optimizer`, allt annat till `stack-builder`, sekventiellt så att två agenter aldrig skriver i repot samtidigt — och juridik går aldrig in i loopen alls (`workflows/nortropic-launch.js`, Fix loop).
+
+## Kärna, paket och interventionsbeslutet
+
+Systemet är **universellt i kärnan och specialiserat i paket** — `lokal-se` är det första
+paketet, inte systemets natur. Riktningen är enkelriktad: **ett paket kan lägga till krav
+på kärnan, aldrig ta bort ett.** Skärpningslagen är det som gör paket ofarliga — ett paket
+som fick lätta hade blivit en bakväg runt kärnans regler.
+
+Från operatörsstolen märks det på tre ställen.
+
+**Plannern kan komma fram till att en sajt inte är svaret.** Före all planering fäller den
+ett interventionsbeslut med fyra möjliga utfall: NY SAJT, FÖRBÄTTRA BEFINTLIG,
+ICKE-SAJT-ÅTGÄRD eller AVRÅD. Utfallet står i briefens §7.12. **Är det något annat än NY
+SAJT får du det också som en STRATEGISK öppen fråga** — vilket betyder att ett obemannat
+flöde stannar och lämnar över. Det är avsiktligt: utan den regeln hade obemannat byggt
+just den sajt plannern avrådde från.
+
+Det här är den mest värdefulla raden i briefen och den lättaste att skumma förbi. En kund
+vars problem är att telefonen inte besvaras blir inte hjälpt av en ny sajt, och systemet
+ska säga det i stället för att sälja ett bygge.
+
+**Kapaciteter stoppar innan de gissas.** Plannern väger researchens signaler mot
+[kapacitetskatalogen](kapacitetskatalog.md). Krävs en kapacitet som är `DECLARED`
+(beskriven men inte byggd) stannar planeringen med en STRATEGISK öppen fråga i stället för
+att planera runt den. Är den `ROUTE-OUT` rekommenderar briefen hänvisning. Du får alltså
+beslutet i knäet vid nod 3 — vilket är rätt plats för det.
+
+**INPUT GATE sammanfaller inte med kontraktet — och det är en känd avvikelse.**
+Minimigrinden (de fem fälten ovan) kräver telefonnummer och USP. Kontraktets kontrollrad
+accepterar vilken typad kontaktväg som helst — telefon, formulär, DM, bokningssystem eller
+fysisk plats — och har inget USP-fält alls.
+
+De två kraven avviker på olika sätt, och det är värt att hålla isär:
+
+- **Telefonkravet är en paketskärpning.** `lokal-se` skärper kontrollraden där, vilket
+  paket får göra.
+- **USP-kravet har ingen hemvist alls** — varken i kontraktet eller i något paket.
+  Grinden kräver det oavsett paket. Tro alltså inte att `core-only` gör dig fri från
+  USP, och inte heller att `lokal-se` är det som kräver den.
+
+Konsekvensen är verklig: en research-fil som är universellt komplett med enbart formulär
+som kontaktväg stoppas ändå här.
+
+Möter du det: stoppet är korrekt utfört, men det säger att grinden **ännu inte är
+parameteriserad** — inte att researchen är bristfällig. Avvikelsen är medvetet oförändrad
+tills grindparameteriseringen körs som egen ceremoni (`agents/project-planner.md`, Känd
+avvikelse).
 
 ## Obemannat läge (v16)
 
