@@ -204,6 +204,35 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Tre nya provfall: när svaret INTE är en ny sajt (2026-08-26)
+
+Hittills har alla våra provfall handlat om att bygga. Det är en blind fläck: **en fabrik som
+bara tränar på att bygga kommer att bygga även när det är fel svar.**
+
+Nu finns tre fall till, och två av dem ska sluta med att vi *avstår*:
+
+**Nordvik Fastighetsservice** har redan en sajt som fungerar — den konverterar, den rankar,
+den är snabb. Men **247 av 412 samtal går obesvarade**, och de fjorton senaste låga
+omdömena säger alla samma sak: går inte att få tag på. En ny sajt skulle inte flytta en
+enda av de siffrorna. Rätt svar är att säga det.
+
+**Alvestas Måleri** har en sajt som rankar tvåa på sin viktigaste sökning, med fyra års
+upparbetat värde. Problemet är innehållet och knapparna. Att bygga om från grunden vore att
+riskera det som redan fungerar för att fixa det som inte gör det. Rätt svar är att förbättra.
+
+**Bergqvists Fönsterputs** är det tredje och det svåraste att bedöma: **den är helt vanlig.**
+Ingen befintlig sajt, en ort, inga juridikfrågor, ett tydligt sätt att ta kontakt. Provet
+är inverterat — här mäter vi att systemet **inte gör något extra.** Varje extra fråga till
+dig, varje extra granskningsrunda "för säkerhets skull", är ett fel och inte en omsorg.
+
+**Alla tre körs, och alla tre gör rätt.** Nordvik och Alvesta avslutas utan bygge och utan
+att fråga dig om något. Bergqvists går vidare med noll frågor.
+
+**Ärligt om gränsen:** provet visar att systemet gör rätt *med ett givet beslut*. Att det
+kommer FRAM till rätt beslut från underlaget är AI:ns jobb, och det är inte prövat här.
+Och ceremonin mäts vid ingången — att inget extra uppstår längs vägen kräver en riktig
+körning.
+
 ## Nu kan fabriken bygga bokning (2026-08-26)
 
 Provfallet med det påhittade mjukvaruföretaget stoppade tidigare på att kunden ville ha

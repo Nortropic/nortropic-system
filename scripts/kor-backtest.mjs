@@ -40,6 +40,8 @@ try {
   process.exit(2)
 }
 const odombart = (skal) => { console.error(`ODÖMBART: ${skal}`); process.exit(2) }
+const ROUTE_F = 'ROUTE'
+const CONTINUE_F = 'CONTINUE'
 const las = (p) => {
   const f = join(ROT, p)
   if (!existsSync(f)) odombart(`ankarfilen saknas — ${p}`)
@@ -107,13 +109,22 @@ function lage(research) {
   return m ? m[1].trim() : undefined
 }
 
+// Förväntanskontrollen bor i en egen funktion av samma skäl som `likvardiga`: den måste
+// gå att kontrollprova. En kontroll som bara står inline går att göra alltid-tyst, och en
+// alltid-tyst kontroll skriver "som förväntat" lika glatt när utfallet är ett annat. Den
+// mutationen överlevde första versionen, eftersom vakten prövade RAPPORTENS MENING.
+function motsvarar(vantat, faktiskt) {
+  if (!vantat) return null
+  return vantat === faktiskt ? null : `väntade ${vantat}, fick ${faktiskt}`
+}
+
 // Jämförelsen bor i en egen funktion av ETT skäl: den måste gå att PRÖVA. En jämförelse
 // som bara står inline går att göra alltid-sann, och en alltid-sann jämförelse rapporterar
 // "SAMMA utfall" lika glatt för två fall som skiljer sig åt. Den mutationen överlevde
 // första versionen av vakten, eftersom vakten prövade MENINGEN i rapporten och inte
 // jämförelsen bakom den.
 function likvardiga(a, b) {
-  return (!!a.stoppade) === (!!b.stoppade) &&
+  return (a.stoppade ? a.stoppade[2] : 'PASS') === (b.stoppade ? b.stoppade[2] : 'PASS') &&
     a.krav.slice().sort().join() === b.krav.slice().sort().join()
 }
 
@@ -128,6 +139,13 @@ if (process.argv.includes('--sjalvprov')) {
     ['lika kravmängder i olika ordning är LIKVÄRDIGA', likvardiga(p1, p2) === true],
     ['olika kravmängder är INTE likvärdiga', likvardiga(p1, p3) === false],
     ['olika stoppstatus är INTE likvärdig', likvardiga(p1, p4) === false],
+    ['förväntanskontrollen är TYST när utfallet stämmer', motsvarar('ROUTE', 'ROUTE') === null],
+    ['förväntanskontrollen FLAGGAR när utfallet avviker', typeof motsvarar('ROUTE', 'CONTINUE') === 'string'],
+    ['förväntanskontrollen FLAGGAR även åt andra hållet', typeof motsvarar('CONTINUE', 'ROUTE') === 'string'],
+    ['utan förväntan flaggas ingenting', motsvarar(undefined, 'HARD_STOP') === null],
+    ['ROUTE och HARD_STOP är INTE likvärdiga', likvardiga(
+      { stoppade: ['x', 'y', 'ROUTE'], krav: ['KAP-SCHEMA'] },
+      { stoppade: ['x', 'y', 'HARD_STOP'], krav: ['KAP-SCHEMA'] }) === false],
   ]
   // KAPACITETSGRINDENS EGET KONTROLLPROV. Sedan KAP-EXTERN-BOKNING lyftes till BUILT
   // passerar samtliga tre fall. **En grind som inte längre fäller på något fall går inte
@@ -151,6 +169,12 @@ if (process.argv.includes('--sjalvprov')) {
 // ---- Körning per fall ------------------------------------------------------
 const FALL = [
   { id: 'A', namn: 'Ekbergs Rör AB (lokal)', dir: 'backtests/case-a-lokal' },
+  // §26-GAP-1:s tre verklighetsfixturer. C och D BYGGS ALDRIG — de prövar att arkitekturen
+  // inte antar att varje uppdrag är "bygg en ny lokal sajt". E prövar motsatsen: att en
+  // helt vanlig leverans inte drar på sig extra ceremoni (§20).
+  { id: 'C', namn: 'Nordvik Fastighetsservice (NO-BUILD)', dir: 'backtests/case-c-no-build', beslut: 'ICKE-SAJT-ÅTGÄRD', vantatUtfall: ROUTE_F },
+  { id: 'D', namn: 'Alvestas Måleri (MIGRATION)', dir: 'backtests/case-d-migration', beslut: 'FÖRBÄTTRA BEFINTLIG', vantatUtfall: ROUTE_F },
+  { id: 'E', namn: 'Bergqvists Fönsterputs (STANDARD-nollceremoni)', dir: 'backtests/case-e-standard', beslut: 'NY SAJT', vantatUtfall: CONTINUE_F },
   // KOMPATIBILITETSVÄGEN (§26:s första väg för Case A). Samma kund, äldre kontrakt — så
   // att en skillnad i utfall bara kan bero på VERSIONEN. Når den inte samma utfall som
   // `A` är bakåtkompatibiliteten bruten, och det ska synas här.
@@ -194,13 +218,28 @@ for (const f of korda) {
       blocking: true, blockingReason: `${k} måste vara byggd innan bygget kan fortsätta`,
     })),
     juridikflaggor: [],
-    interventionsbeslut: 'NY SAJT',
+    // Interventionsbeslutet är PLANNERNS utfall, inte researchens. Fixturen deklarerar
+    // vilket beslut som ska routas, och det som prövas här är ROUTNINGEN — att taxonomin
+    // gör rätt sak med ett givet beslut. Att beslutet BLIR rätt är plannerns jobb och
+    // står som `C-GAP-1`/`D-GAP-1`, EJ KÖRT.
+    interventionsbeslut: f.beslut || 'NY SAJT',
   }
   const b = M.beslutEfterPlan(plan)
-  rader.push(['3. Planbeslutet (skeppad)', `${b.decision} — ${b.reason}`, b.decision === M.HARD_STOP ? 'HARD_STOP' : 'OK'])
+  rader.push(['3. Planbeslutet (skeppad)', `${b.decision} — ${b.reason}`,
+    b.decision === M.HARD_STOP ? 'HARD_STOP' : b.decision === M.ROUTE ? 'ROUTE' : 'OK'])
 
+  // §26-GAP-1: fixturer med ett DEKLARERAT förväntat utfall prövas mot det. Ett fall som
+  // bara KÖRS och rapporteras prövar ingenting — förväntan måste stå före körningen.
+  let avvikelse = motsvarar(f.vantatUtfall, b.decision)
+  if (avvikelse) nagotFel = true
+  // E-2: nollceremoni mäts som noll ägarkrävande händelser.
+  const agarkrav = (b.attention || []).filter((a) => a && a.ownerActionRequired)
+  if (f.id === 'E' && agarkrav.length) {
+    avvikelse = `${agarkrav.length} ägarkrävande händelse(r) i en STANDARD-leverans: ${agarkrav.map((a) => a.decision).join(', ')}`
+    nagotFel = true
+  }
   const stoppade = rader.find((r) => r[2] !== 'OK')
-  rapport.push({ f, rader, krav, avstadda, blockerande, stoppade })
+  rapport.push({ f, rader, krav, avstadda, blockerande, stoppade, beslut: b, agarkrav, avvikelse })
 }
 
 // ---- Rapport ---------------------------------------------------------------
@@ -210,7 +249,15 @@ for (const { f, rader, krav, avstadda, blockerande, stoppade } of rapport) {
   console.log(`   krävda kapaciteter: ${krav.map((k) => `${k}(${STATUS[k]})`).join(' · ') || 'inga'}`)
   console.log(`   uttryckligen avstådda: ${avstadda.join(' · ') || 'inga'}`)
   for (const [steg, utfall] of rader) console.log(`   ${steg}: ${utfall}`)
-  console.log(`   UTFALL: ${stoppade ? `${stoppade[2]} vid "${stoppade[0]}"` : 'passerar beslutslagret'}`)
+  const utfallstext = !stoppade ? 'passerar beslutslagret'
+    : stoppade[2] === 'ROUTE' ? 'ROUTAD — lanen avslutas korrekt utan bygge och utan ägarberoende'
+    : `${stoppade[2]} vid "${stoppade[0]}"`
+  console.log(`   UTFALL: ${utfallstext}`)
+  const r = rapport.find((x) => x.f.id === f.id)
+  if (f.vantatUtfall) {
+    console.log(`   FÖRVÄNTAT: ${f.beslut} ⇒ ${f.vantatUtfall} · UTFALL: ${r.beslut.decision}${r.avvikelse ? ` — AVVIKELSE: ${r.avvikelse}` : ' — som förväntat'}`)
+    console.log(`   ägarkrävande händelser: ${r.agarkrav.length}${f.id === 'E' ? ' (STANDARD-nollceremoni kräver noll)' : ''}`)
+  }
   if (blockerande.length) console.log(`   → allt efter det här steget är EJ KÖRT, och det är det FÖRVÄNTADE utfallet enligt ${f.dir}/FORVANTAT.md`)
   console.log('')
 }

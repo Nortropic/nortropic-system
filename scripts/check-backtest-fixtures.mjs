@@ -79,7 +79,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '825ea3aa2cb58e56'
+const FORVANTAD_SIGNATUR = '2df2dbdcbd1f2c32'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -427,6 +427,65 @@ check('B-M6: KAP-LOKAL-SEO aktiveras INTE — SKOPAT, citatagnostiskt',
 check('B-T4: forbjudnaPastaenden är icke-tom och namnger konkreta påståenden',
   (bF('forbjudnaPastaenden').match(/'/g) || []).length >= 8, 'urholkad lista — A-D7/B-T5:s facit försvinner')
 
+// ---- §26-GAP-1: de tre verklighetsfixturerna ------------------------------
+// §26: *"NO-BUILD / MIGRATION / STANDARD-zero-ceremony negative controls are used to prove
+// the architecture does not assume every engagement is 'build a new local site.'"*
+const VERKLIGHET = [
+  { id: 'C', dir: 'backtests/case-c-no-build', beslut: 'ICKE-SAJT-ÅTGÄRD', byggs: false, krav: ['C-1', 'C-2', 'C-3', 'C-4', 'C-5', 'C-GAP-1'] },
+  { id: 'D', dir: 'backtests/case-d-migration', beslut: 'FÖRBÄTTRA BEFINTLIG', byggs: false, krav: ['D-1', 'D-2', 'D-3', 'D-4', 'D-5', 'D-GAP-1', 'D-GAP-2'] },
+  { id: 'E', dir: 'backtests/case-e-standard', beslut: 'NY SAJT', byggs: true, krav: ['E-1', 'E-2', 'E-3', 'E-4', 'E-5', 'E-6', 'E-7', 'E-8', 'E-9', 'E-GAP-1', 'E-GAP-2'] },
+]
+for (const v of VERKLIGHET) {
+  const R = las(`${v.dir}/research.md`)
+  const F = las(`${v.dir}/FORVANTAT.md`)
+  const P = (t) => `Case ${v.id}: ${t}`
+  const sekt = [...R.matchAll(/^## (\d+)\./gm)].map((m) => Number(m[1]))
+  check(P('researchen bär samtliga 17 sektioner'),
+    Array.from({ length: 17 }, (_, i) => i + 1).every((n) => sekt.includes(n)),
+    `hittade ${sekt.length} — en fixtur i halv kontraktsform prövar en halv form`)
+  check(P('är märkt SYNTETISK'), /SYNTETISK FIXTUR/.test(R), 'omärkt fixtur kan förväxlas med kundevidens')
+  check(P('bär Läge-raden'), /^Läge:\s*obemannat$/m.test(R), 'utan läge kan lägesgrinden inte köras')
+
+  // DEN VIKTIGASTE KONTROLLEN: researchen får INTE skriva ut interventionsbeslutet.
+  // Gör den det prövar fixturen att systemet kan KOPIERA en slutsats (B-GAP-2:s fel).
+  check(P('researchen skriver INTE ut interventionsbeslutet'),
+    !new RegExp(`interventionsbeslut\\s*=|interventionsbeslut:\\s*\`?${v.beslut}`, 'i').test(R) &&
+    !new RegExp(`belägget för[^.]*${v.beslut}`, 'i').test(R),
+    'researchen levererar slutsatsen — då prövas kopiering, inte härledning (samma fel som B-GAP-2)')
+  check(P('facit bär härledningstabellen rå signal → slutsats → fel'),
+    /Rå signal i researchen \| Slutsats som ska dras \| Vad ett fel ser ut som/.test(F),
+    'utan "vad ett fel ser ut som" är facit en förhoppning, inte ett prov')
+  const harledRader = F.split('\n').filter((r) => /^\| §\d/.test(r))
+  check(P('och den bär minst fem härledningsrader'), harledRader.length >= 5,
+    `${harledRader.length} rader — färre gör slutsatsen härledbar ur en enda signal, och då prövas ingen avvägning`)
+  check(P(`facit namnger förväntat interventionsbeslut ${v.beslut}`),
+    new RegExp(`Förväntat \`?interventionsbeslut\`?: \`${v.beslut}\``).test(F) ||
+    new RegExp(`interventionsbeslut\` är \`${v.beslut}\``).test(F),
+    'förväntan måste stå FÖRE körningen, annars är utfallet alltid det förväntade')
+  for (const id of v.krav) check(P(`facit namnger ${id}`), new RegExp(`\`${id}\``).test(F), 'saknas')
+
+  // C och D BYGGS ALDRIG — en profil skulle påstå att ett bygge planeras.
+  const harProfil = existsSync(join(ROT, `${v.dir}/profile.ts`))
+  check(P(`profile.ts ${v.byggs ? 'FINNS' : 'saknas — och det är avsiktligt'}`), harProfil === v.byggs,
+    v.byggs ? 'en STANDARD-fixtur som byggs behöver sitt kalibreringsfacit'
+      : 'profile.ts är kalibreringsfacit för en sajt som BYGGS — en NO-BUILD/MIGRATION-fixtur med profil påstår att ett bygge planeras')
+  if (!v.byggs) check(P('facit säger UT varför profile.ts saknas'),
+    /INGEN profile\.ts/.test(F), 'en tyst frånvaro läses som ett slarv i stället för som ett prov')
+}
+
+// Case E:s nollceremoni prövas mot PROFILEN, inte bara mot facit.
+const eP = las('backtests/case-e-standard/profile.ts')
+check('E-3: Case E bär NOLL juridikflaggor', /juridikflaggor: \[\] as string\[\]/.test(eP),
+  'en juridikflagga i den mest ordinära Ring 1-kunden är ett FYND, inte en försiktighetsåtgärd')
+check('E-6: Case E:s kvalitetsnivå är STANDARD', /niva: 'STANDARD'/.test(eP),
+  'en uppskruvad nivå utan att researchen begärt den är precis den ceremoni §20 förbjuder')
+check('E-7: Case E bär INGET noindexCutover (undantagssignal)', !/noindexCutover/.test(eP),
+  'ett undantagsfält i en nollceremonifixtur gör den till ett undantagsfall')
+check('E-1: Case E:s interventionsbeslut är NY SAJT', /interventionsbeslut: 'NY SAJT'/.test(eP), 'fel beslut')
+check('Case E: profilen är HÄRLEDD ur sin egen research, inte kopierad',
+  !/Plumber|stambyte|Säker Vatten|Ekbergs/.test(eP),
+  'en profil som bär en ANNAN fixturs specifika innehåll är en kopia, och då prövar den den andra fixturen')
+
 // ---- CASE A-LEGACY: kompatibilitetsvägen (A-GAP-3) ------------------------
 // §26 kräver TVÅ vägar för Case A. Detta är den första: ett kundrepo byggt före Site
 // Quality Contract v2. Det svåra ledet är att en FRÅNVARO är okänd, aldrig ett nej.
@@ -549,6 +608,34 @@ if (caseA && caseB) {
   // utfall vore ett tecken på att grinden inte läser fixturen.
   // AL-10: kompatibilitetsvägen körs och dess utfall HÄVDAS. Samma kund, äldre kontrakt.
   const caseAL = /── CASE AL[\s\S]*?(?=── CASE B)/.exec(kbUt)
+  // §26-GAP-1: de tre verklighetsfixturernas UTFALL hävdas, inte bara skrivs ut.
+  for (const [id, beslut, vantat, ord] of [
+    ['C', 'ICKE-SAJT-ÅTGÄRD', 'ROUTE', 'ROUTAD — lanen avslutas korrekt utan bygge'],
+    ['D', 'FÖRBÄTTRA BEFINTLIG', 'ROUTE', 'ROUTAD — lanen avslutas korrekt utan bygge'],
+    ['E', 'NY SAJT', 'CONTINUE', 'passerar beslutslagret'],
+  ]) {
+    const blk = new RegExp(`── CASE ${id}:[\\s\\S]*?(?=── CASE |\\nAL-10)`).exec(kbUt)
+    check(`§26-GAP-1: Case ${id} körs av backtestköraren`, !!blk, 'fixturen körs inte — då prövar den ingenting')
+    if (!blk) continue
+    check(`§26-GAP-1: Case ${id} ger ${vantat} på ${beslut}`,
+      new RegExp(`FÖRVÄNTAT: ${beslut} ⇒ ${vantat} · UTFALL: ${vantat} — som förväntat`).test(blk[0]),
+      `taxonomin gör inte det förväntade med ${beslut} — och förväntan stod skriven före körningen`)
+    check(`§26-GAP-1: Case ${id}:s utfallsrad säger ${vantat === 'ROUTE' ? 'ROUTAD' : 'passerar'}`,
+      blk[0].includes(ord),
+      'ett ROUTE som rapporteras som "passerar beslutslagret" är ett falskt påstående — lanen avslutas, den fortsätter inte')
+    if (id !== 'E') check(`§26-GAP-1: Case ${id} kräver INGET ägarsvar`,
+      /ägarkrävande händelser: 0/.test(blk[0]),
+      'ROUTE är ett korrekt workflow-utfall utan ägarberoende — kräver det ägarens hand har det blivit ett HARD_STOP i förklädnad')
+  }
+  const eBlk = /── CASE E:[\s\S]*?(?=── CASE |\nAL-10)/.exec(kbUt)
+  check('E-2: STANDARD-leveransen har NOLL ägarkrävande händelser',
+    !!eBlk && /ägarkrävande händelser: 0 \(STANDARD-nollceremoni kräver noll\)/.test(eBlk[0]),
+    'varje ägarfråga i den mest ordinära Ring 1-kunden är ett FYND, inte en försiktighetsåtgärd — §20')
+  // KONTROLLPROV: skiljer köraren på ROUTE och CONTINUE över huvud taget?
+  check('§26-GAP-1: köraren skiljer ROUTE från CONTINUE (kontrollprov)',
+    /UTFALL: ROUTAD/.test(kbUt) && /UTFALL: passerar beslutslagret/.test(kbUt),
+    'får alla fall samma utfallsrad prövar rapporten ingenting')
+
   check('AL-10: kompatibilitetsvägen körs av backtestköraren', !!caseAL,
     'utan den körs bara en av §26:s TVÅ vägar för Case A')
   check('AL-10: v1.1.0-profilen når SAMMA utfall som v1.2.0-profilen',
@@ -558,6 +645,14 @@ if (caseA && caseB) {
   // ingenting om jämförelsen alltid säger det — den mutationen överlevde första versionen
   // av den här kontrollen, som prövade meningen i stället för mekanismen.
   const sjalvprov = spawnSync(process.execPath, [join(ROT, 'scripts/kor-backtest.mjs'), '--sjalvprov'], { cwd: ROT, encoding: 'utf8' })
+  check('§26-GAP-1: förväntanskontrollen klarar sitt POSITIVA kontrollprov',
+    /förväntanskontrollen FLAGGAR när utfallet avviker/.test(sjalvprov.stdout || '') &&
+    sjalvprov.status === 0,
+    'en kontroll som inte kan flagga en avvikelse skriver "som förväntat" lika glatt när utfallet är ett annat')
+  check('§26-GAP-1: och den ANROPAS på anropsstället',
+    /const avvikelse = motsvarar\(f\.vantatUtfall, b\.decision\)/.test(las('scripts/kor-backtest.mjs')) ||
+    /let avvikelse = motsvarar\(f\.vantatUtfall, b\.decision\)/.test(las('scripts/kor-backtest.mjs')),
+    'en kontrollprövad funktion som kringgås är död kod')
   check('AL-10: jämförelsen klarar sitt POSITIVA kontrollprov (kan säga NEJ)',
     sjalvprov.status === 0 && /kan skilja likvärdigt från olikvärdigt/.test(sjalvprov.stdout || ''),
     'en jämförelse som inte kan säga NEJ kan inte heller säga JA — "SAMMA utfall" vore då en tom mening')
@@ -679,8 +774,16 @@ check('A: varje planterad defekt namnger en VERKLIG fällare', utanFallare.lengt
 
 // ---- Luckorna --------------------------------------------------------------
 const btReadme = las('backtests/README.md')
-check('§26-GAP-1: de tredje negativkontrollerna redovisade som lucka',
-  /§26-GAP-1/.test(btReadme) && /NO-BUILD/.test(btReadme) && /NOT_STARTED/.test(btReadme), 'tyst utelämnad')
+check('§26-GAP-1: de tre negativkontrollerna är STÄNGDA och pekar på fixturerna',
+  /§26-GAP-1/.test(btReadme) && /STÄNGD/.test(btReadme) &&
+  ['case-c-no-build', 'case-d-migration', 'case-e-standard'].every((d) => btReadme.includes(d)),
+  'en stängd lucka utan pekare till det som stängde den går inte att kontrollera')
+check('§26-GAP-1: och de KVARVARANDE halvorna är namngivna, inte strukna',
+  /C-GAP-1/.test(btReadme) && /E-GAP-1/.test(btReadme) && /prövar ROUTNINGEN, inte beslutet/.test(btReadme),
+  'härledningen görs av plannern och ceremoni mäts bara vid ingången — att tiga om det gör en halv stängning till en hel')
+check('§26-GAP-1: README säger UT att stängda luckor står kvar som rader',
+  /en stängd lucka utan spår går inte att kontrollera/.test(btReadme),
+  'utan den regeln städas stängda luckor bort, och då försvinner spåret av vad som en gång saknades')
 check('A-GAP-3: kompatibilitetsvägen är STÄNGD och pekar på fixturen som stängde den',
   /A-GAP-3/.test(aFor) && /STÄNGD/.test(aFor) && /case-a-legacy/.test(aFor),
   'en stängd lucka utan pekare till det som stängde den går inte att kontrollera')
