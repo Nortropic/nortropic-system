@@ -39,6 +39,8 @@ import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+console.log('VAKT: check-pack-contract.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så även en ODÖMBAR körning identifierar sig
+
 let ROT
 try {
   ROT = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
@@ -59,7 +61,7 @@ const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
 const REFERENS = 'lokal-se'
-const FORVANTAD_KALLHASH = '592f337701b618b7'
+const FORVANTAD_KALLHASH = 'fda1ac0a9ac09bce'
 
 const kontrakt = las('docs/paketkontrakt.md')
 const scope = las('docs/06-scope.md')
@@ -215,10 +217,15 @@ check('Referensen exponeras för samma kontrollmängd som övriga paket',
   `referensen fick ${referensKorda}, mest exponerade paket fick ${maxKorda} — kontraktets §6-krav bärs då INTE av referensen, och påståendet att varje krav redan bärs av lokal-se är falskt för skillnaden`)
 
 // ---- Verdikt: signaturen hashar VAKTENS EGEN KÄLLTEXT ----------------------
-const egenKalla = readFileSync(fileURLToPath(import.meta.url), 'utf8')
-  .split('\n').filter((r) => !r.includes('FORVANTAD_KALLHASH =')).join('\n')
+// Hashen täcker VARJE rad; endast pinnens literal normaliseras. Formen som UTELÄMNADE
+// rader som bar markören var ett bevisat kringgående: `process.exit(0) // FORVANTAD_KALLHASH = `
+// föll ur hashen och avslutade vakten grön utan att pinnen rörde sig.
+const kalltext = readFileSync(fileURLToPath(import.meta.url), 'utf8')
+const PINNRAD = /^const FORVANTAD_KALLHASH = '[0-9a-f]{16}'$/m
+if (!PINNRAD.test(kalltext)) odombart('pinndeklarationen har fel form — ankaret går inte att normalisera')
+const egenKalla = kalltext.replace(PINNRAD, "const FORVANTAD_KALLHASH = '<PINNE>'")
 const kallhash = createHash('sha256').update(egenKalla).digest('hex').slice(0, 16)
-if (FORVANTAD_KALLHASH !== 'SATTS' && kallhash !== FORVANTAD_KALLHASH) {
+if (kallhash !== FORVANTAD_KALLHASH) {
   console.error(`ODÖMBART: vaktens källhash är ${kallhash}, förväntad ${FORVANTAD_KALLHASH} — vakten har redigerats. En hash över KONTROLLNAMN fällde inte ett utbytt predikat: namnet kunde stå kvar ordagrant medan villkoret byttes mot true. Uppdatera pinnen medvetet i samma commit.`)
   process.exit(2)
 }

@@ -30,6 +30,8 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 
+console.log('VAKT: check-backtest-fixtures.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så även en ODÖMBAR körning identifierar sig
+
 let ROT
 try {
   ROT = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
@@ -425,7 +427,7 @@ check('B-GAP-1: KAP-EXTERN-BOKNING:s DECLARED-stopp redovisat',
 
 // ---- Verdikt ---------------------------------------------------------------
 const signatur = createHash('sha256').update([...namn].sort().join('\n')).digest('hex').slice(0, 16)
-if (FORVANTAD_SIGNATUR !== 'SATTS_EFTER_FORSTA_KORNING' && signatur !== FORVANTAD_SIGNATUR) {
+if (signatur !== FORVANTAD_SIGNATUR) {
   console.error(`ODÖMBART: kontrollsignaturen är ${signatur}, förväntad ${FORVANTAD_SIGNATUR} — en kontroll har lagts till, tagits bort ELLER BYTTS UT. Ett antal binder bara kardinaliteten; identiteten binds här. Uppdatera pinnen medvetet i samma commit.`)
   process.exit(2)
 }

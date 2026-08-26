@@ -204,6 +204,28 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Vem vaktar vakterna? (2026-08-26)
+
+Fabriken har femton kontroller som ska fälla när något är fel. En obehaglig fråga fick ett
+obehagligt svar: **nio av dem gick att tömma i tysthet.** Byter man ut villkoret i en
+kontroll mot "sant" står namnet kvar, antalet står kvar, och rapporten skriver fortfarande
+"alla godkända". Kontrollen finns — den prövar bara ingenting längre.
+
+**Nu har varje kontroll ett fingeravtryck**, och alla femton avtrycken ligger samlade i EN
+fil. Ändras en kontroll ändras dess avtryck, och det syns som en rad i ändringen. Det
+hindrar inte någon från att ändra en kontroll — det gör ändringen omöjlig att göra tyst.
+
+**Och en sak till, som kom ur ett verkligt misstag under bygget.** En av kontrollfilerna
+skrevs av misstag över av en kopia av en annan. Den påträngande filen körde sina egna
+kontroller, sa "godkänt", och allt såg grönt ut i flera steg innan felet upptäcktes.
+Lärdomen är enkel och obehaglig: **ett program kan inte intyga att det fortfarande är sig
+självt.** Därför säger varje kontroll numera sitt eget namn högt när den kör, och en
+körare utanför kontrollerar att rätt namn kom från rätt fil. Kommer fel namn blir svaret
+"går inte att avgöra" — aldrig "godkänt".
+
+**Ärligt om gränsen:** skrivs både köraren och en kontroll över samtidigt finns ingen
+mekanism kvar som märker det. Det sista ledet är en människa som läser ändringen.
+
 ## Vill du djupare?
 
 Det här var översikten. Vill du förstå exakt hur något fungerar, fortsätt till det tekniska lagret:
