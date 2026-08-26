@@ -64,8 +64,8 @@ const SJALVPIN = '3c88dd99fdb8e0ee'
 // raden i SAMMA commit — det är hela poängen att den ändringen syns här.
 const PINNAR = {
   'check-autobygg-delegation.mjs': '8f186bba47978877',
-  'check-backtest-fixtures.mjs': 'b43a5eda33e5fc0c',
-  'check-docs-coherence.mjs': 'ae02760dfefd3f8e',
+  'check-backtest-fixtures.mjs': '260de218b3509ffd',
+  'check-docs-coherence.mjs': 'f06850dc1ec19b15',
   'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
   'check-gym-contract.mjs': '3bdf293c3aa7e1f7',
@@ -74,12 +74,12 @@ const PINNAR = {
   'check-karn-universalitet.mjs': 'd9dff3487cfca7e1',
   'check-knowledge-lane.mjs': '2b9bb187a92b6866',
   'check-pack-contract.mjs': 'd6b8395bfb1bfd2d',
-  'check-planner-routing.mjs': '7b5fc9ae3a556a0d',
+  'check-planner-routing.mjs': '8524b3da1901c5eb',
   'check-profile-contract.mjs': '5da81cc32582b46c',
   'check-research-contract.mjs': '4aa0aa5b5f281092',
   'check-v4-utkast.mjs': '3c107f8e300336f9',
   'check-workflow-parse.mjs': '575a45e74cc23eec',
-  'kor-backtest.mjs': 'c6fd0e7b16c39072',
+  'kor-backtest.mjs': '1f5959f7648d9967',
   'kor-vakter.mjs': 'aa17a3fefd53a27d',
 }
 // ---- PINNTABELL: SLUT -------------------------------------------------------

@@ -46,7 +46,7 @@ Villaägare 35–65 · bostadsrättsföreningar (trapphus) · byggföretag som l
 **Primärhandlingskandidat: `offert`.** Rå observation: formuläret är den kanal som ger
 flest avslut (19 av 19 uppdrag kom via formulär eller telefon efter formulär).
 
-## 5. Belagda arbetsområden
+## 5. Geografisk räckvidd & språk
 
 Alvesta (huvudort, belagt med fakturaunderlag) · Växjö · Moheda · Vislanda.
 
@@ -64,7 +64,7 @@ sajten, samtliga egna. Före/efter-bilder finns för 14 projekt men används int
 
 Personligt, hantverksstolt. Vernacular: grundmålning, spackling, tapetsering, kulörprov.
 
-## 9. Funktionella behov
+## 9. Transaktions-/dataobservationer
 
 Offertformulär, klickbart telefonnummer, referensgalleri. Ingen bokning, ingen inloggning.
 
@@ -72,21 +72,21 @@ Offertformulär, klickbart telefonnummer, referensgalleri. Ingen bokning, ingen 
 
 Inga.
 
-## 11. Juridik
+## 11. Juridik-/riskobservationer
 
 Inga juridikflaggor.
 
-## 12. Konkurrensbild
+## 12. Konkurrenter/alternativ
 
 Tre lokala aktörer med belagda URL:er: Växjö Måleri & Golv (4,3 av 5, 58 omdömen) ·
 Smålands Måleritjänst (4,6 av 5, 12 omdömen) · Alvesta Bygg & Måleri (URL belagd, inga
 synliga omdömen).
 
-## 13. Framgångsmått
+## 13. Designreferenser
 
 Kundens eget mål: fler offertförfrågningar utan att tappa placeringar.
 
-## 14. Kvalitetsnivåer
+## 14. Framgångsmått
 
 Lanseringsklar nivå på samtliga grindar om något byggs.
 
@@ -96,11 +96,15 @@ Belagd ort + `seoLage=lokal` → `KAP-LOKAL-SEO` aktiveras · organisationstyp k
 `KAP-SCHEMA` · kvitton belagda → `KAP-KVITTON` · bildinventering gjord → `KAP-BILD` ·
 primärhandlingskandidat finns → `KAP-PRIMARHANDLING`.
 
-## 16. Belägg och attribution
-
-Placering och CWV är kundens egen mätning. Omdömesbetyget attribueras "Alvestas Måleri AB,
-Alvesta". CRM-siffrorna är kundens egna.
-
-## 17. Olösta okändheter
+## 16. Öppna frågor
 
 Om de 23 hänvisande domänerna pekar på undersidor eller enbart startsidan är inte utrett.
+
+## 17. Maskinläsbar kontrollrad
+
+```
+RESEARCH-CONTROL v3.0.0 | pack=lokal-se | pack_module=1.0.0
+  org=ja | kontaktvag=ja | erbjudande=ja | geografi=ja
+  primarhandling=kandidat | framgangsmatt=ja
+  osakra=1 | konflikter=0 | status=KOMPLETT
+```

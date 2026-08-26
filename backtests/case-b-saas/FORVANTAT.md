@@ -122,7 +122,26 @@ kedjans grind. `scripts/kor-backtest.mjs` läser katalogen direkt från disk och
 men den körs för hand, inte i kedjan. Nästa transition vore att låta kedjan verifiera
 agentens rapport mot en andra avläsning.
 
-## `B-T7` — DELVIS ÅTGÄRDAT 2026-08-26
+## `B-T7` — ÅTGÄRDAT 2026-08-27: kontraktet OCH dess producent
+
+**`B-T7a` (kontraktet) stängdes 2026-08-26. `B-T7b` (producenten) stängdes 2026-08-27.**
+
+Kontraktet universaliserades i v3.1.0, men **producenten var kvar**: plannerns INPUT GATE
+krävde `≥1 ort` och `telefon` av VARJE kund, så en icke-lokal kund stoppades vid nod 2
+oavsett hur universellt kontraktet var formulerat. Grinden är nu **paketvillkorad**
+(`docs/03-regelverk.md` regel 5): universell kärna + en skärpning som bara `lokal-se`
+lägger på.
+
+**Bevisat, inte påstått.** `kor-backtest.mjs` speglar grinden deterministiskt, och
+Case B — `pack=core-only`, ingen ort — **PASSERAR**. Åtta kontrollprov visar att grinden
+fortfarande STOPPAR där den ska: `lokal-se` utan belagd ort stoppar, `lokal-se` utan
+telefon stoppar, saknad kontaktväg stoppar universellt, okänt `pack` ger `OKLASSIFICERAT`
+(aldrig core-only — det vore att gissa sig till lösare krav), och en `status=OFULLSTÄNDIG`
+research stoppar.
+
+**Ett verkligt fel hittades av just det sista kontrollprovet:** `\w` i speglingens regex
+matchar inte Å/Ä/Ö, så `status=OFULLSTÄNDIG` fångades som `OFULLST` och **en ofullständig
+research hade passerat grinden**. Rättat.
 
 Case B avslöjade att den universella kärnan själv bar lokala antaganden — fixturen gick
 inte att fylla i utan tyst avvikelse. Fyndet är nu **rättat i kontrakten**, inte bara

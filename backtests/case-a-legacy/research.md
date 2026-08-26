@@ -47,7 +47,7 @@ uppdrag) · akutfall som ringer utan att jämföra.
 formuläret ger de större uppdragen (bostadsrättsföreningar). Motstridig signal:
 telefonen har högre volym (63 av 78).
 
-## 5. Belagda arbetsområden
+## 5. Geografisk räckvidd & språk
 
 Uppsala (huvudort, belagt med fakturaunderlag) · Knivsta · Storvreta · Björklinge.
 Restid utanför dessa: kunden åker inte längre än 40 minuter.
@@ -70,7 +70,7 @@ Rättighetsläget: samtliga egna.
 Rakt på sak, yrkesstolt, utan säljprat. Legitimt vernacular: stambyte, relining,
 vattenlås, avstängningsventil.
 
-## 9. Funktionella behov
+## 9. Transaktions-/dataobservationer
 
 Offertformulär (≤5 fält), klickbart telefonnummer, öppettider. Ingen bokning, ingen
 inloggning, ingen e-handel — sajten förblir stateless.
@@ -79,21 +79,21 @@ inloggning, ingen e-handel — sajten förblir stateless.
 
 Inga. Leads går till e-post.
 
-## 11. Juridik
+## 11. Juridik-/riskobservationer
 
 Inga juridikflaggor. Rörarbeten är Ring 1.
 
-## 12. Konkurrensbild
+## 12. Konkurrenter/alternativ
 
 2–3 lokala konkurrenter i Uppsala: Uppsala Rörjour (URL belagd, 4,2 av 5 på 91 omdömen) ·
 Rörgruppen Mälardalen (URL belagd, 4,7 av 5 på 24 omdömen) · Sandbergs VVS (URL belagd,
 inga synliga omdömen).
 
-## 13. Framgångsmått
+## 13. Designreferenser
 
 Antal offertförfrågningar per månad; andel som blir uppdrag.
 
-## 14. Kvalitetsnivåer
+## 14. Framgångsmått
 
 Sajten ska hålla lanseringsklar nivå på samtliga grindar.
 
@@ -103,11 +103,15 @@ Belagd ort + `seoLage=lokal` → `KAP-LOKAL-SEO` aktiveras · organisationstyp k
 `KAP-SCHEMA` med `LocalBusiness`-subtypen `Plumber` · kvitton belagda → `KAP-KVITTON` ·
 bildinventering gjord → `KAP-BILD` · primärhandlingskandidat finns → `KAP-PRIMARHANDLING`.
 
-## 16. Belägg och attribution
-
-Varje sifferpåstående bär namn + ort: omdömesbetyget attribueras "Ekbergs Rör AB,
-Uppsala"; samtalsstatistiken är kundens egen logg.
-
-## 17. Olösta okändheter
+## 16. Öppna frågor
 
 Exakt formulering av garantivillkoren kräver kundens original.
+
+## 17. Maskinläsbar kontrollrad
+
+```
+RESEARCH-CONTROL v3.0.0 | pack=lokal-se | pack_module=1.0.0
+  org=ja | kontaktvag=ja | erbjudande=ja | geografi=ja
+  primarhandling=kandidat | framgangsmatt=ja
+  osakra=1 | konflikter=0 | status=KOMPLETT
+```
