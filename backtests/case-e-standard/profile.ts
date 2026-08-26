@@ -100,7 +100,8 @@ export const profile = {
   kvalitetsnivaer: { niva: 'STANDARD' as const },
 
   integrationer: [
-    { tjanst: 'Google Företagsprofil', roll: 'lokal närvaro', hallerTillstand: true, extern: true },
+    { tjanst: 'Google Företagsprofil', roll: 'lokal närvaro', extern: true, hallerTillstand: true,
+      lage: 'ingen-sidintegration' as const, personuppgifter: false, samtyckeKravs: false },
   ],
 
   framgangsmatt: [

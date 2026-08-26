@@ -117,9 +117,12 @@ export const profile = {
   kvalitetsnivaer: { niva: 'STANDARD' as const },
 
   integrationer: [
-    { tjanst: 'Cal.com', roll: 'demobokning', hallerTillstand: true, extern: true },
-    { tjanst: 'HubSpot', roll: 'CRM, tar emot leads via e-post', hallerTillstand: true, extern: true },
-    { tjanst: 'statuspage.io', roll: 'drifthistorik', hallerTillstand: true, extern: true },
+    { tjanst: 'Cal.com', roll: 'demobokning', extern: true, hallerTillstand: true,
+      lage: 'lank' as const, personuppgifter: true, samtyckeKravs: false },
+    { tjanst: 'HubSpot', roll: 'CRM, tar emot leads via e-post', extern: true, hallerTillstand: true,
+      lage: 'ingen-sidintegration' as const, personuppgifter: true, samtyckeKravs: false },
+    { tjanst: 'statuspage.io', roll: 'drifthistorik', extern: true, hallerTillstand: true,
+      lage: 'lank' as const, personuppgifter: false, samtyckeKravs: false },
   ],
 
   framgangsmatt: [

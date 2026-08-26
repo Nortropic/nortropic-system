@@ -69,6 +69,7 @@ const PINNAR = {
   'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
   'check-gym-contract.mjs': '3bdf293c3aa7e1f7',
+  'check-integrationer.mjs': '6ac685656bd60406',
   'check-invariants.mjs': 'dbdf696d7cefd335',
   'check-karn-universalitet.mjs': 'd9dff3487cfca7e1',
   'check-knowledge-lane.mjs': '2b9bb187a92b6866',

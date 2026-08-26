@@ -101,8 +101,13 @@ export const profile = {
   kvalitetsnivaer: { niva: 'STANDARD' as const },
 
   integrationer: [
-    { tjanst: 'Google Företagsprofil', roll: 'lokal närvaro', hallerTillstand: true, extern: true },
-    { tjanst: 'Kartinbäddning', roll: 'vägbeskrivning på kontaktsidan', hallerTillstand: true, extern: true },
+    { tjanst: 'Google Företagsprofil', roll: 'lokal närvaro', extern: true, hallerTillstand: true,
+      lage: 'ingen-sidintegration' as const, personuppgifter: false, samtyckeKravs: false },
+    // INBÄDDNING: kartan gör en tredjepartsförfrågan FRÅN sajten och kan sätta kakor.
+    // Gate 6:s checklista §2 nämner just detta fall. Beslutet är människans; fälten finns
+    // för att hon ska se att beslutet behöver fattas.
+    { tjanst: 'Google Maps (kartinbäddning)', roll: 'vägbeskrivning på kontaktsidan', extern: true, hallerTillstand: true,
+      lage: 'inbaddning' as const, personuppgifter: true, samtyckeKravs: true },
   ],
 
   framgangsmatt: [
