@@ -383,7 +383,15 @@ async function writeAutobyggLog(buildDir, fields) {
     `Uppdatera AUTOBYGG-LOG.md i ${buildDir}. Kör FÖRST \`cd "${buildDir}" && git rev-parse HEAD\` och \`date +%F\`. ` +
     `Om filen saknas: skapa den och INLED med detta meta-block; om den finns: appenda en ny fas-rad och uppdatera status-raden i meta-blocket:\n` +
     `<!-- nortropic-autobygg-meta\ncommit: <hash>\ndate: <YYYY-MM-DD>\nlage: obemannat\nstatus: ${fields.status}\nstage: ${fields.stage}\n-->\n` +
-    `Därefter, i markdown: en fas-för-fas-spårningstabell (tidsstämpel via date, fas, utfall, ev. stopporsak) och slutstatusraden. Rådata (hitta inte på något utöver detta):\n\n` +
+    `Därefter, i markdown: en fas-för-fas-spårningstabell (tidsstämpel via date, fas, utfall, ev. stopporsak) och slutstatusraden. ` +
+    // S10-UPPFÖLJNING: attention låg i loggen som rå JSON utan att loggagenten visste vad
+    // `ownerActionRequired: false` BETYDER. En upplysning som läses som en fråga blir ett
+    // mutex i praktiken, hur korrekt fältet än är satt.
+    `Finns fältet \`attention\`: rendera det som ett eget avsnitt "## Owner attention", en rad per event med severity, decision, reason, evidence, actionTaken. ` +
+    `Rader med \`ownerActionRequired: false\` INLEDS med "INGET SVAR KRÄVS —" och rader med \`true\` med "ÄGARÅTGÄRD KRÄVS —". ` +
+    `Skriv aldrig om ett false-event som något ägaren ska besvara: det är en upplysning om ett beslut som redan är fattat inom mandat. ` +
+    `Status \`ROUTAD\` betyder att lanen avslutades korrekt utan ägarberoende; \`ÖVERLÄMNAD\` betyder att något faktiskt väntar. Blanda aldrig ihop dem. ` +
+    `Rådata (hitta inte på något utöver detta):\n\n` +
     JSON.stringify(fields, null, 2),
     { label: 'autobygg-log', phase: 'Avslut' }
   )
@@ -395,9 +403,20 @@ phase('Plan')
 // Plannern kör sin egen INPUT GATE, läser research-radens Läge (saknas ⇒ bemannat) och returnerar utfallet maskinläsbart.
 const plan = await agent(
   `Follow your FULL project-planner process against the research file at ${researchPath}. Write PROJECT-BRIEF.md next to it (all 7 sections). ` +
-  `Read the research row \`Läge:\` (missing => bemannat) and write it into §6 next to Klienttyp — never into content/profile.ts. ` +
+  `Read the research row \`Läge:\` (missing => bemannat), write it into §6 next to Klienttyp — never into content/profile.ts — AND return it as the field \`lage\` (obemannat|bemannat). ` +
+  // `lage` grindar HARD_STOP via obemannatGate. Utan att den BEGÄRS som returfält kan en
+  // planner skriva den i §6 och utelämna den i utfallet, vilket ger `bemannat` och stoppar
+  // körningen — samma "tillstånd oftare"-inversion som skivan finns för att ta bort.
   `Run your INPUT GATE first; if fields are missing, set inputGatePassed=false + missingFields and do not plan further. ` +
   `Klassa VARJE öppen fråga STRATEGISK/FAKTA/BESLUT per your Rules; a ohanterad/scope-nej juridikflagga is ALWAYS STRATEGISK. ` +
+  `Return \`juridikflaggor\` as [{flagga, status}] with status EXACTLY one of hanterad|ohanterad|scope-nej, \`scopeNej\` as a real boolean, and \`openQuestions\` as [{text, kind, ...}] with kind EXACTLY one of STRATEGISK|FAKTA|BESLUT — case and spelling are load-bearing; a mis-cased label is UNCLASSIFIED and fails closed. ` +
+  // S10-UPPFÖLJNING: fälten nedan är BÄRANDE för beslutstaxonomin och måste begäras HÄR.
+  // Utan detta stycke följde en planner prompten korrekt, utelämnade `blocking`, och varje
+  // bygge med en strategisk fråga HARD-stoppade — alltså "tillstånd oftare", raka motsatsen
+  // till skivans syfte. Ett fält som avgör ett beslut men aldrig efterfrågas är en tyst grind.
+  `Run processteg 0 and return the outcome as \`interventionsbeslut\` (NY SAJT | FÖRBÄTTRA BEFINTLIG | ICKE-SAJT-ÅTGÄRD | AVRÅD) with \`interventionsmotiv\`. ` +
+  `EVERY STRATEGISK question MUST carry \`blocking: true|false\`. Set \`blocking: true\` ONLY when continuing would need a NEW MANDATE, an unbuilt/forbidden capability, a forbidden irreversible effect, or a claim you cannot substantiate — then add \`blockingReason\`. Otherwise \`blocking: false\`: the question is noted for the owner and the work continues. Strategic significance ALONE is never a stop. A non-NY-SAJT interventionsbeslut and a scope-nej flag are \`blocking: false\` (they route); an ohanterad juridikflagga and a required-but-unbuilt capability are \`blocking: true\`. ` +
+  `Omitting \`interventionsbeslut\` or a \`blocking\` value makes the outcome UNCLASSIFIED and the run fails closed — never guess, but never leave them out either. ` +
   `Return the machine-readable outcome per the schema.`,
   { label: 'plan', phase: 'Plan', agentType: 'project-planner', schema: PLAN_OUTCOME }
 )
