@@ -374,3 +374,33 @@ kontroll alltid, och stämmer inte antalet vägrar den döma alls.
 Vakten kan säga att en sak är NÄMND. Den kan inte säga att den är väl beskriven, och den
 körs för hand — inte automatiskt. Det står i README, och vakten fäller om den meningen
 försvinner medan skripten står kvar i listan.
+
+## Fabriken frågar dig oftare, men ber om lov mer sällan (S10, 2026-08-26)
+
+Förut fanns bara två lägen: antingen körde fabriken vidare, eller så stannade den och
+väntade på dig. Det lät försiktigt, men det gjorde något dumt — den stannade även när den
+redan hade fattat rätt beslut.
+
+Säg att planeraren kommer fram till att kunden inte behöver en ny sajt: det som saknas är
+att telefonen inte besvaras. Det är precis den insikt vi vill att systemet ska ha. Men
+förut markerades den som "strategisk", och allt strategiskt stoppade bygget och lade sig
+och väntade på ditt godkännande. **Du fick alltså sitta och godkänna att systemet hade
+rätt.**
+
+**Nu skiljer fabriken på fyra saker:** den kan fortsätta; den kan fortsätta men tala om
+för dig vad den gjorde; den kan lägga ned det här spåret för att det är fel produkt; eller
+den kan faktiskt stanna.
+
+Bara det sista väntar på dig. Att lägga ned ett spår räknas nu som ett korrekt beslut, inte
+som något du måste låsa upp.
+
+**Vad som fortfarande stoppar helt** är oförändrat, och det är avsiktligt: juridik som
+ingen hanterat, något som kräver en förmåga fabriken inte har byggt, allvarliga fel som
+står kvar efter det enda automatiska fixförsöket, ett brutet spårbarhetskontrakt — och
+allt som är **oklassificerat**. Det sista är den viktigaste raden: om fabriken inte vet
+vilken sorts beslut något är, stannar den. Ett okänt läge blir aldrig tyst ett "kör på".
+
+Och deploy är precis som förut. Juridiksigneringen och publicera-knappen är dina.
+
+Skillnaden i en mening: **det är inte gränserna som flyttades, det är väntandet som togs
+bort.**
