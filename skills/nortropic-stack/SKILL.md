@@ -21,7 +21,7 @@ How every Nortropic site is built. Deviations require an explicit reason written
 | Hosting | **Vercel** | Linked at scaffold time, deploys from `main` |
 | Package manager | **pnpm** | Never npm/yarn in a Nortropic repo |
 
-**NO DATABASE.** Services, service areas, testimonials, FAQ — all typed TS/MDX content in the repo. The quote form posts to one server action that emails the lead. If a client ever needs lead history or bookings, that is a brief-level decision, not a default.
+**NO DATABASE.** Services, service areas, testimonials, FAQ — all typed TS/MDX content in the repo. The quote form posts to one server action that emails the lead. Lead history is a brief-level decision, never a default. **Bokning är däremot en BYGGD kapacitet** (`KAP-EXTERN-BOKNING`): tjänsten är extern, sajten länkar ut och tar aldrig emot bokningsdata — se [`references/extern-bokning.md`](references/extern-bokning.md).
 
 ## GitHub-First Workflow (never local-only)
 
@@ -139,7 +139,7 @@ Och en MAJOR-bump vore inte bara fel utan direkt skadlig: doctor #5 fäller
 | `obligatoriskaResor` | Resor som MÅSTE fungera end-to-end; Gate 1 testar primärhandlingens |
 | `forbjudnaPastaenden` | Vad sajten ALDRIG får påstå (§7.14a) — läses av antislop och granskning |
 | `kvalitetsnivaer` | Assuranceprofil: `'STANDARD'` som default; höjd nivå bär `skal` |
-| `integrationer` | Externa tjänster sajten integrerar mot (bokning, kassa, karta) |
+| `integrationer` | Externa tjänster sajten integrerar mot (bokning, kassa, karta). Varje post bär `{ typ, tjanst, url, lage: 'lank' \| 'inbaddning', samtyckeKravs }`. **Bokning: se [`references/extern-bokning.md`](references/extern-bokning.md)** — länk ut är normalvägen, inbäddning ett undantag som kostar samtycke, prestanda och en juridikflagga; sajten tar ALDRIG emot bokningsdata (ingen webhook, ingen server action), och **kvittosidan får inte påstå att något är bekräftat** — en stateless sajt kan inte veta det |
 | `framgangsmatt` | Kundens mått ur §7.13 — föder HANDOVER:s Utfallshypotes |
 | `olostaOkandheter` | Öppna okändheter med `verklighetsklass` per rad (`DOMÄNEXPERT`/`ANVÄNDARE`) |
 | `godkannandeTillstand` | `{ godkandAv, datum, briefSha }` — vem godkände vilken brief, när |

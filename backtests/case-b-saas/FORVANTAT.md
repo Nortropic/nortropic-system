@@ -61,23 +61,31 @@ kräver ett aktivt val mellan två kanaler där den förlorande har högst volym
 **Vad som fortfarande INTE prövas:** samtliga fem slutsatser är `EJ KÖRDA`. Att signalerna
 nu är råa gör fällorna spännbara — det gör dem inte spända.
 
-## `B-GAP-1` — det FÖRVÄNTADE stoppet, bokfört i förväg
+## `B-GAP-1` — STÄNGD 2026-08-26 genom alternativ (a): capabilityn är byggd
 
-`KAP-EXTERN-BOKNING` står `DECLARED`. Autobyggs beslutstaxonomi HARD-stoppar på obyggd
-krävd capability, så en verklig Case B-körning **stannar innan `B-P2a` går att avgöra**.
+Luckan gav två vägar: *"Antingen bygg `KAP-EXTERN-BOKNING` till `BUILT`, eller kör Case B
+medvetet till stoppet och bokför stoppet SOM utfallet."* **Båda togs, i den ordningen.**
 
-**Det stoppet är härmed det FÖRVÄNTADE utfallet av en Case B-körning, inte en överraskning.**
-Ett korrekt HARD_STOP är också ett prov: det prövar att taxonomin stannar på rätt ställe i
-stället för att bygga vidare på en capability som inte finns.
+Stoppet bokfördes först i förväg och verifierades i en körning — `HARD_STOP` på
+`KAP-EXTERN-BOKNING (DECLARED)`, exakt som förutsagt. **Sedan byggdes capabiliteten**
+(`skills/nortropic-stack/references/extern-bokning.md`, `scripts/check-extern-bokning.mjs`),
+och raden lyftes till `BUILT` med belägg enligt §A9:s regel att radernas innehåll får
+ändras med belägg medan semantiken är skyddad.
 
-| Utfall av en Case B-körning | Tolkning |
-|---|---|
-| HARD_STOP på `KAP-EXTERN-BOKNING`, med capabilityn namngiven i stoppskälet | **Förväntat.** `B-P2a` förblir `EJ KÖRD`; `B-P1`, `B-P2b`–`B-P2d` kan bedömas fram till stoppet |
-| Körningen passerar och bygger en demokedja | **FYND.** Taxonomin har byggt på en `DECLARED` capability — allvarligare än ett uteblivet Case B |
-| HARD_STOP på något annat | **FYND.** Stoppskälet är inte det förväntade och måste utredas före något annat |
+**Case B passerar därför nu beslutslagret.** `B-P2a` är inte längre spärrad av en obyggd
+capability — den är fortfarande `EJ KÖRD`, men av rätt skäl: den kräver ett bygge.
 
-Att lyfta `KAP-EXTERN-BOKNING` till `BUILT` är ett eget arbete och byter inte plats med
-det här. Tills dess är stoppet utfallet.
+**En konsekvens som är värd att skriva ut:** sedan capabiliteten byggdes fäller inget av de
+tre fallen kapacitetsgrinden längre. **En grind som inte fäller på något fall går inte att
+skilja från en grind som slutat fungera.** Grinden bevisar därför sin förmåga separat, i
+`kor-backtest.mjs --sjalvprov`: den måste fälla på en `DECLARED` och på en `ROUTE-OUT`
+kapacitet och släppa igenom en byggd. Av samma skäl flyttades fixturernas kontrollprov från
+VERDIKTET till det som LÄSTES — Case A läser `KAP-LOKAL-SEO`, Case B läser
+`KAP-EXTERN-BOKNING` och ingen av dem läser den andras. Ett kontrollprov som passerar av
+sig självt är inget kontrollprov.
+
+**Taket är `BUILT`, inte högre.** Att bokningsvägen NÅR tjänsten kräver Gate 1 mot en
+deployad preview, och den evidensen finns inte.
 
 ### `KOR-GAP-1` — STÄNGD 2026-08-26: grinden är flyttad in i kedjan
 
@@ -160,7 +168,7 @@ som bara undviker lokalt läckage har inte passerat — den har låtit bli att g
 | ID | Lucka | Status | Nästa transition |
 |---|---|---|---|
 | `B-GAP-2` | **Fixturen skrev ut svaret på fyra av sex fällor** — Case B prövade då kopiering, inte härledning | `ÅTGÄRDAT 2026-08-26` | Researchen bär nu råa signaler (oanspråkad GFP med noll värde · telefon 25 mot formulär 20 · lastbilsbild bland hero-kandidaterna · inget omnämnande av F-skatt); slutsatserna står i avsnittet `B-GAP-2` ovan. **Kvarstår:** samtliga fem slutsatser är `EJ KÖRDA` — spännbara, inte spända |
-| `B-GAP-1` | `KAP-EXTERN-BOKNING` är `DECLARED`, så en körning HARD-stoppar innan `B-P2a` går att avgöra | `BOKFÖRT 2026-08-26` | Stoppet är nu det FÖRVÄNTADE utfallet med en utskriven tolkningstabell (se avsnittet `B-GAP-1` ovan) — ett korrekt HARD_STOP är också ett prov. **Kvarstår:** att lyfta capabilityn till `BUILT` är ett eget arbete |
+| `B-GAP-1` | `KAP-EXTERN-BOKNING` var `DECLARED`, så en körning HARD-stoppade innan `B-P2a` gick att avgöra | `STÄNGD 2026-08-26` | Stoppet bokfördes i förväg och verifierades i en körning; sedan byggdes capabiliteten och raden lyftes till `BUILT` med belägg. **Kvarstår:** `B-P2a` är `EJ KÖRD` — men av rätt skäl, den kräver ett bygge |
 
 **`B-P2` är den halva som är lättast att glömma** — en sajt kan klara varje fälla genom att
 vara innehållslös. Den är därför uppdelad i fem rader med namngiven fällare, samma form som

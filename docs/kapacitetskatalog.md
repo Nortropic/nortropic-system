@@ -36,7 +36,7 @@ medvetet ligger utanför — den hänvisas bort, den saknas inte.
 | `KAP-KVITTON` | Förtroendekvitton belagda (sektion 6) | Varje kvitto attribueras korrekt; inga lånade meriter | §7.4 (§A7-skyddad); trust-linsen i review | VALIDATING |
 | `KAP-BILD` | Bildinventering gjord (sektion 7) | Bildspår + behandling härledda ur inventeringen, budget hålls | `nortropic-bild`; `BILDRAPPORT.json`; LCP-budget i Gate 2 | VALIDATING |
 | `KAP-PRESTANDA` | Alltid vid leverans av sajt | Gate 2:s trösklar hålls på deployad preview | `scripts/run-lighthouse-gate.mjs` (kanonisk runner) | VALIDATING |
-| `KAP-EXTERN-BOKNING` | Extern bokningstjänst används (sektion 10 / L3) | Bokningsvägen når tjänsten; sajten förblir stateless | §7.1 `gate1Test`; Gate 1 | DECLARED |
+| `KAP-EXTERN-BOKNING` | Extern bokningstjänst används (sektion 10 / L3) | Bokningsvägen når tjänsten; sajten förblir stateless | §7.1 `gate1Test`; Gate 1; `skills/nortropic-stack/references/extern-bokning.md`; `scripts/check-extern-bokning.mjs` | BUILT |
 | `KAP-EHANDEL` | Kunden vill sälja online (sektion 9/11) | — | Ring 3 i [06-scope.md](06-scope.md): hänvisas till handelsplattform | ROUTE-OUT |
 | `KAP-EGET-TILLSTAND` | Inloggning/medlemsdata/databas efterfrågas (sektion 9/11) | — | Ring 3: offereras som separat systemutveckling | ROUTE-OUT |
 | `KAP-RING2-JURIDIK` | Ohanterad juridikflagga (sektion 11) | Modulen finns innan bygget påbörjas | Ring 2: byggs vid första ja, offereras som eget arbete | DECLARED |

@@ -64,8 +64,9 @@ const SJALVPIN = '3c88dd99fdb8e0ee'
 // raden i SAMMA commit — det är hela poängen att den ändringen syns här.
 const PINNAR = {
   'check-autobygg-delegation.mjs': '8f186bba47978877',
-  'check-backtest-fixtures.mjs': 'a9d8c3fc7beb725e',
+  'check-backtest-fixtures.mjs': '1688061ff4262fc1',
   'check-docs-coherence.mjs': 'ae02760dfefd3f8e',
+  'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
   'check-gym-contract.mjs': '3bdf293c3aa7e1f7',
   'check-invariants.mjs': 'dbdf696d7cefd335',
@@ -77,7 +78,7 @@ const PINNAR = {
   'check-research-contract.mjs': '4aa0aa5b5f281092',
   'check-v4-utkast.mjs': '3c107f8e300336f9',
   'check-workflow-parse.mjs': '575a45e74cc23eec',
-  'kor-backtest.mjs': 'd72f4c423f39db05',
+  'kor-backtest.mjs': '6e1caed1b6c82884',
   'kor-vakter.mjs': 'aa17a3fefd53a27d',
 }
 // ---- PINNTABELL: SLUT -------------------------------------------------------

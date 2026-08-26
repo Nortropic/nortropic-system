@@ -79,7 +79,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '161517fc1ed84972'
+const FORVANTAD_SIGNATUR = '825ea3aa2cb58e56'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -527,12 +527,15 @@ const caseB = /── CASE B[\s\S]*?(?=\nVAD DEN)/.exec(kbUt)
 check('KÖR: backtestköraren producerade båda fallen', !!caseA && !!caseB,
   'ett saknat fall får aldrig läsas som ett passerat fall')
 if (caseA && caseB) {
-  check('KÖR/B-GAP-1: Case B HARD-stoppar på KAP-EXTERN-BOKNING',
-    /HARD_STOP — KAP-EXTERN-BOKNING är DECLARED/.test(caseB[0]),
-    'det FÖRVÄNTADE utfallet uteblev — antingen har capabilityns status ändrats eller så har grinden slutat fälla')
-  check('KÖR/B-GAP-1: stoppet inträffar FÖRE bygget, inte efter',
-    /allt efter det här steget är EJ KÖRT/.test(caseB[0]),
-    'ett stopp som rapporteras efter att arbete utförts är inte samma stopp')
+  // B-GAP-1 ÄR STÄNGD GENOM ALTERNATIV (a): capabilityn är byggd. Case B stoppar därför
+  // INTE längre här. Kravet vänds i stället till att capabilityn faktiskt är körbar — och
+  // att grindens förmåga att fälla bevisas separat, eftersom inget fall längre fäller den.
+  check('KÖR/B-GAP-1: Case B kräver KAP-EXTERN-BOKNING och den är BUILT',
+    /KAP-EXTERN-BOKNING\(BUILT\)/.test(caseB[0]),
+    'antingen har capabilityns status ändrats tillbaka eller så har kravet försvunnit ur §15 — båda gör Case B till ett annat prov')
+  check('KÖR/B-GAP-1: Case B passerar nu beslutslagret',
+    /UTFALL: passerar beslutslagret/.test(caseB[0]),
+    'stoppet skulle vara borta sedan capabilityn byggdes — står det kvar har något annat börjat fälla')
   check('KÖR/B-T2: Case B avstår UTTRYCKLIGEN från KAP-LOKAL-SEO',
     /uttryckligen avstådda: KAP-LOKAL-SEO/.test(caseB[0]),
     'en negativkontroll som inte KAN aktivera lokal-SEO prövar ingenting — avståendet måste vara ett val')
@@ -571,9 +574,13 @@ if (caseA && caseB) {
   check('KÖR: rapportens etikett på kapacitetsgrinden är inte längre "EJ i kedjan"',
     !/EJ i kedjan/.test(kbUt),
     'KOR-GAP-1 är stängd — en etikett som säger att grinden saknas i kedjan är nu ett falskt påstående i utdata')
-  check('KÖR: de två fallen får OLIKA utfall (kontrollprov)',
-    /UTFALL: passerar/.test(caseA[0]) !== /UTFALL: passerar/.test(caseB[0]),
-    'samma utfall för en lokal kund och en B2B-negativkontroll betyder att indata inte läses')
+  check('KÖR: de två fallen läser OLIKA kravmängder (kontrollprov)',
+    /KAP-LOKAL-SEO\(VALIDATING\)/.test(caseA[0]) && !/KAP-LOKAL-SEO\(/.test(caseB[0]) &&
+    /KAP-EXTERN-BOKNING/.test(caseB[0]) && !/KAP-EXTERN-BOKNING/.test(caseA[0]),
+    'sedan capabilityn byggdes får alla tre fall samma VERDIKT, så kontrollprovet måste läsa det som LÄSTES i stället för det som beslutades — annars passerar det av sig självt')
+  check('KÖR: kapacitetsgrinden bevisar att den fortfarande KAN fälla',
+    /kapacitetsgrinden kan fortfarande fälla/.test(sjalvprov.stdout || ''),
+    'inget fall fäller grinden längre — en grind som inte fäller på något går inte att skilja från en grind som slutat fungera')
 }
 // KOR-GAP-1 är STÄNGD: grinden finns nu i kedjan. Kravet på brasklapp försvinner INTE
 // med den — det byter innehåll. Kedjans grind läser katalogen via en AGENT medan den här
@@ -608,16 +615,27 @@ if (harledning) {
     /spännbara, inte spända|Att signalerna\s*\n?nu är råa gör fällorna spännbara/.test(harledning[0]),
     'en åtgärdad lucka som låter som en genomförd körning är värre än en öppen lucka')
 }
-const stopp = /## `B-GAP-1` — det FÖRVÄNTADE stoppet[\s\S]*?(?=^## )/m.exec(bFv)
-check('B-GAP-1: det förväntade stoppet är bokfört I FÖRVÄG', !!stopp,
-  'ett HARD_STOP som inte är bokfört före körningen går inte att skilja från ett misslyckande')
+// B-GAP-1 är STÄNGD. Kraven vänds — men de FÖRSVINNER inte, och det är poängen: när den
+// här sektionen döptes om tog tre kontroller som låg innanför `if (stopp)` med sig i
+// fallet, tyst. En kontroll som villkoras av en rubrik försvinner när rubriken gör det.
+// Ankaret prövas därför separat, FÖRE de villkorade kontrollerna.
+const stopp = /## `B-GAP-1` — STÄNGD[\s\S]*?(?=^### |^## )/m.exec(bFv)
+check('B-GAP-1: stängningen är dokumenterad i facit', !!stopp,
+  'ankaret saknas — och en saknad rubrik tar villkorade kontroller med sig i fallet i stället för att fälla dem')
 if (stopp) {
-  check('B-GAP-1: både det förväntade och de TVÅ fynden är utskrivna',
-    (stopp[0].match(/\*\*FYND\.\*\*/g) || []).length === 2 && /\*\*Förväntat\.\*\*/.test(stopp[0]),
-    'en tolkningstabell som bara namnger det förväntade utfallet gör varje annat utfall tolkningsbart i efterhand')
-  check('B-GAP-1: att bygga capabilityn byter INTE plats med provet',
-    /byter inte plats med\s*\n?det här|Tills dess är stoppet utfallet/.test(stopp[0]),
-    'annars läses stoppet som en TODO i stället för som det utfall det är')
+  check('B-GAP-1: BÅDA vägarna redovisas — först bokfört stopp, sedan byggd capability',
+    /Båda togs, i den ordningen/.test(stopp[0]) &&
+    /verifierades i en körning/.test(stopp[0]),
+    'att bara redovisa bygget döljer att stoppet faktiskt prövades först — då är luckan stängd utan att ha varit öppen')
+  check('B-GAP-1: konsekvensen att INGET fall längre fäller grinden är utskriven',
+    /inte fäller på något fall går inte att\s*\n?skilja från en grind som slutat fungera/.test(stopp[0]),
+    'en grind som slutat fälla ser identisk ut med en grind som slutat fungera — tigs det om läses tystnaden som hälsa')
+  check('B-GAP-1: och grindens förmåga bevisas SEPARAT',
+    /--sjalvprov/.test(stopp[0]) && /DECLARED/.test(stopp[0]) && /ROUTE-OUT/.test(stopp[0]),
+    'utan ett separat förmågeprov vilar grindens trovärdighet på att den en gång fällde')
+  check('B-GAP-1: taket BUILT motiveras, det påstås inte',
+    /kräver Gate 1 mot en\s*\n?deployad preview/.test(stopp[0]),
+    'en capability vars tak inte motiveras glider uppåt vid nästa läsning')
 }
 
 // ---- B-T7: ankrat i KONTRAKTET, aldrig i filen som gör påståendet ----------
