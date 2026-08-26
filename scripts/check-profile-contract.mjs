@@ -148,15 +148,26 @@ const prelaunch = las('skills/nortropic-prelaunch/SKILL.md')
 const qa = las('agents/qa-launcher.md')
 const struktur = las('skills/nortropic-stack/references/file-structure.md')
 
-check('stack-builder stämplar v1.2.0 (inte en MAJOR som fäller gamla repon)',
-  /profilKontraktVersion: 'v1\.2\.0'/.test(flat(builder)) && /Site Quality Contract v2/.test(flat(builder)),
-  'byggaren stämplar fel version eller nämner inte kontraktsgenerationen')
+// VERSIONSAGNOSTISK INOM MAJOR. En fryst siffra tvingar fram en vaktändring vid varje
+// legitim MINOR och säger inget om det som faktiskt betyder något: att MAJOR står stilla
+// (annars fäller doctor #5 varje befintligt kundrepo) och att byggarens stämpel är SAMMA
+// version som kontraktet deklarerar. Drift MELLAN dem är det verkliga felet.
+const byggarStampel = /profilKontraktVersion: 'v(\d+)\.(\d+)\.(\d+)'/.exec(flat(builder))
+check('Ankare: stack-builders versionsstämpel kunde läsas', !!byggarStampel, 'stämpeln saknas i byggaren')
+check('stack-builder stämplar MAJOR v1 (en MAJOR-bump fäller varje v1-repo i doctor #5)',
+  !!byggarStampel && byggarStampel[1] === '1' && /Site Quality Contract v2/.test(flat(builder)),
+  `byggaren stämplar v${byggarStampel ? byggarStampel[1] : '?'} eller nämner inte kontraktsgenerationen`)
 // EN deklaration: doctor #5 läser den literala token — två deklarationer vore odömbart.
 const deklarationer = [...stack.matchAll(/profile\.ts-kontraktsversion: v[0-9]+\.[0-9]+\.[0-9]+/g)]
 check('Exakt EN deklarerad kontraktsversion i nortropic-stack',
   deklarationer.length === 1, `hittade ${deklarationer.length} deklarationer — doctor #5 kan inte parsa entydigt`)
-check('Den deklarerade versionen är v1.2.0 (samma MAJOR som befintliga repon)',
-  /profile\.ts-kontraktsversion: v1\.2\.0/.test(stack), 'MAJOR-bump skulle fälla varje v1-repo i doctor #5')
+const kontraktsVersion = /profile\.ts-kontraktsversion: v(\d+)\.(\d+)\.(\d+)/.exec(stack)
+check('Ankare: kontraktsversionen kunde läsas', !!kontraktsVersion, 'deklarationen saknas')
+check('Den deklarerade versionen står på MAJOR v1 (samma MAJOR som befintliga repon)',
+  !!kontraktsVersion && kontraktsVersion[1] === '1', 'MAJOR-bump skulle fälla varje v1-repo i doctor #5')
+check('Byggarens stämpel är SAMMA version som kontraktet deklarerar',
+  !!byggarStampel && !!kontraktsVersion && byggarStampel[0].includes(`v${kontraktsVersion[1]}.${kontraktsVersion[2]}.${kontraktsVersion[3]}`),
+  `byggaren stämplar ${byggarStampel ? byggarStampel[0] : '?'} medan kontraktet deklarerar v${kontraktsVersion ? kontraktsVersion.slice(1).join('.') : '?'} — drift mellan deklaration och stämpel`)
 check('Motiveringen till MINOR står utskriven',
   /annan MAJOR än kontraktet = FAIL/.test(flat(v2)) && /varje befintligt kundrepo hade fallit/.test(flat(v2)),
   'skälet till att det INTE är en MAJOR saknas')

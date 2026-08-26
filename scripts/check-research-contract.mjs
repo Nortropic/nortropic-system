@@ -60,10 +60,18 @@ const sektioner = [...karna.matchAll(/^\| (\d{1,2}) \| \*\*/gm)].map(m => Number
 check('Ryggraden har 17 sektioner', sektioner.length === 17, `hittade ${sektioner.length}`)
 check('Numreringen är 1..17 i ordning',
   sektioner.every((n, i) => n === i + 1), `fick [${sektioner.join(',')}]`)
-check('Kontraktsversionen deklarerad', /KONTRAKTSVERSION: 3\.0\.0/.test(karna), 'saknas')
+// Versionsagnostisk inom MAJOR 3, men INTERN KONSISTENS krävs: kontrollradens version
+// måste vara samma som den deklarerade. Drift mellan dem är det verkliga felet.
+const kv = /KONTRAKTSVERSION: (\d+)\.(\d+)\.(\d+)/.exec(karna)
+check('Kontraktsversionen deklarerad', !!kv, 'saknas')
+check('Kontraktet står på MAJOR 3', !!kv && kv[1] === '3', `MAJOR ${kv ? kv[1] : '?'} — en MAJOR-bump är en egen ceremoni`)
 check('Färskhetslagen finns', /radar → kandidat → verifiering → granskad promotion/.test(karna), 'saknas')
 check('latest/main förbjuds explicit', /ALDRIG genom/.test(karna) && /latest\/main/.test(karna), 'saknas')
-check('Kontrollraden definierad', /RESEARCH-CONTROL v3\.0\.0/.test(karna), 'saknas')
+const krv = /RESEARCH-CONTROL v(\d+\.\d+\.\d+)/.exec(karna)
+check('Kontrollraden definierad', !!krv, 'saknas')
+check('Kontrollradens version är SAMMA som den deklarerade',
+  !!kv && !!krv && krv[1] === `${kv[1]}.${kv[2]}.${kv[3]}`,
+  `kontrollraden säger v${krv ? krv[1] : '?'}, deklarationen v${kv ? kv.slice(1).join('.') : '?'}`)
 check('ODÖMBART blir aldrig grönt', /ODÖMBART blir aldrig grönt/i.test(karna), 'saknas')
 check('Fakta ≠ strategi bevarad', /Fakta ≠ strategi/.test(karna), 'saknas')
 check('[OSÄKER]-disciplinen bevarad', /\[OSÄKER\]/.test(karna), 'saknas')
@@ -92,7 +100,7 @@ const lokal = moduler.find(m => m.pack === 'lokal-se')
 check('FALL lokal: paketmodulen finns och är pinnad', !!lokal, 'lokal-se saknas i manifestet')
 if (lokal) {
   check('FALL lokal: modulen skärper kontrollraden',
-    /pack_module=1\.0\.0/.test(lokal.text), 'modulen tillför inget pack_module-fält')
+    /pack_module=\d+\.\d+\.\d+/.test(lokal.text), 'modulen tillför inget pack_module-fält')
   check('FALL lokal: telefon obligatoriskt (skärpning)',
     /[Tt]elefonnummer är OBLIGATORISKT/.test(lokal.text), 'skärpningen saknas')
 }

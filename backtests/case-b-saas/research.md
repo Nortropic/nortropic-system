@@ -54,7 +54,7 @@ leder inte till avslut utan demo — kunden har belagt detta i sin egen CRM-uppf
 **Uttrycklig observation:** ingen ring-nu-signal och ingen offertförfrågan-signal finns i
 materialet. Telefonspåret är belagt som icke-primärt (sektion 1).
 
-## 5. Geografi & språk
+## 5. Geografisk räckvidd & språk
 
 **Nationellt och EU.** Kunder i Sverige, Danmark, Norge och Nederländerna. Tjänsten
 levereras över nät — **inget arbetsområde, inga orter, ingen restid.** Kontorsorten Malmö
