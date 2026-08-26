@@ -204,6 +204,34 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Nu kan fabriken bygga bokning (2026-08-26)
+
+Provfallet med det påhittade mjukvaruföretaget stoppade tidigare på att kunden ville ha
+demobokning — en funktion vi hade **beskrivit men inte byggt**. Nu är den byggd.
+
+**Så här fungerar den, och valet är medvetet:** sajten *länkar ut* till bokningstjänsten i
+stället för att bädda in den. En inbäddning ser mer sömlös ut men drar in tredjepartskakor
+(alltså en samtyckesruta), tredjepartsskript (alltså sämre prestanda) och personuppgifter i
+vår kontext (alltså en juridikfråga). Inbäddning är därför något kunden får **begära**, inte
+något vi väljer för att det ser snyggare ut.
+
+**Sajten tar aldrig emot bokningsdata.** Ingen mottagare, ingen historik, inga kakor från
+oss. Bokningen bor hos tjänsten.
+
+**Och en regel som är lätt att missa men viktig:** vår kvittosida får inte säga *"tack, din
+tid är bokad!"* — **för det kan sajten omöjligt veta.** Bekräftelsen sker hos
+bokningstjänsten, och besökaren kan ha avbrutit halvvägs. Sidan säger vad som händer
+härnäst och var bekräftelsen kommer ifrån. De förbjudna formuleringarna står uppräknade en
+och en, för ett råd går att tolka bort medan en lista inte gör det.
+
+**Ärligt om nivån:** funktionen är **byggd**, inte **bevisad**. Att bokningsvägen faktiskt
+når fram kräver en riktig testsajt, och den körningen har inte gjorts.
+
+**En bieffekt värd att nämna:** eftersom funktionen nu finns stoppar inget av våra provfall
+längre på spärren. En spärr som aldrig slår till ser precis likadan ut som en spärr som
+gått sönder — så spärren har fått ett eget prov som tvingar den att visa att den fortfarande
+kan säga nej.
+
 ## Gamla kundsajter får inte gå sönder (2026-08-26)
 
 Vi har utökat vad en kundsajt beskriver om sig själv. Kunder som byggdes tidigare bär den

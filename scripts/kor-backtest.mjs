@@ -129,13 +129,22 @@ if (process.argv.includes('--sjalvprov')) {
     ['olika kravmängder är INTE likvärdiga', likvardiga(p1, p3) === false],
     ['olika stoppstatus är INTE likvärdig', likvardiga(p1, p4) === false],
   ]
+  // KAPACITETSGRINDENS EGET KONTROLLPROV. Sedan KAP-EXTERN-BOKNING lyftes till BUILT
+  // passerar samtliga tre fall. **En grind som inte längre fäller på något fall går inte
+  // att skilja från en grind som slutat fungera** — så den måste bevisa att den kan fälla.
+  const gStatus = { 'KAP-X-DECLARED': 'DECLARED', 'KAP-X-ROUTEOUT': 'ROUTE-OUT', 'KAP-X-BYGGD': 'BUILT' }
+  const gBlock = (ids) => ids.filter((k) => !KORBAR.has(gStatus[k]))
+  prov.push(['kapacitetsgrinden FÄLLER på en DECLARED kapacitet', gBlock(['KAP-X-DECLARED', 'KAP-X-BYGGD']).length === 1])
+  prov.push(['kapacitetsgrinden FÄLLER på en ROUTE-OUT kapacitet', gBlock(['KAP-X-ROUTEOUT']).length === 1])
+  prov.push(['kapacitetsgrinden SLÄPPER IGENOM en byggd kapacitet', gBlock(['KAP-X-BYGGD']).length === 0])
+
   const fel = prov.filter(([, ok]) => !ok)
   for (const [namn, ok] of prov) console.log(`${ok ? 'PASS' : 'FAIL'}: självprov — ${namn}`)
   if (fel.length) {
     console.error(`ODÖMBART: jämförelsen klarar inte sitt eget kontrollprov (${fel.length} av ${prov.length}) — en jämförelse som inte kan säga NEJ kan inte heller säga JA`)
     process.exit(2)
   }
-  console.log('\nRESULTAT: PASS — jämförelsen kan skilja likvärdigt från olikvärdigt')
+  console.log('\nRESULTAT: PASS — jämförelsen kan skilja likvärdigt från olikvärdigt, och kapacitetsgrinden kan fortfarande fälla')
   process.exit(0)
 }
 
