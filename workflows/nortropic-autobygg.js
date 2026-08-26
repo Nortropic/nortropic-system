@@ -1,7 +1,7 @@
 export const meta = {
   name: 'nortropic-autobygg',
-  description: 'Obemannat kund-flöde (v18): orkestrerar plan→init→innehåll→granskning→grind-torrkörning för en research.md märkt "Läge: obemannat". Beslutstaxonomi CONTINUE / ATTENTION_CONTINUE / ROUTE / HARD_STOP — owner attention ≠ owner approval: en icke-blockerande strategisk fråga och ett interventionsutfall ≠ NY SAJT stoppar INTE flödet på ägarens svar, de routar respektive noteras. HARD_STOP bevaras för ohanterad juridik, obyggd krävd capability, CRITICAL efter EN fixloop, brutet fixkontrakt och oklassificerade utfall. Deployar ALDRIG — nod 8 (juridik-signoff) och nod 9 (/vercel:deploy) förblir mänskliga.',
-  whenToUse: 'Kör manuellt när en research.md bär raden "Läge: obemannat" och ägaren vill att systemet bygger sajten utan mänskligt nod-3-stopp — fram till FINAL-TOUCHES + grind-torrkörning. HARD_STOP vid ohanterad juridikflagga, blockerande strategisk fråga (kräver nytt mandat), oklassificerat plan-utfall, CRITICAL efter EN fixloop eller brutet fixkontrakt (BATCH-005). ROUTE — utan att invänta ägaren — vid interventionsutfall ≠ NY SAJT och vid scope-nej. Bemannat (default, ingen Läge-rad) => kör /nortropic-plan manuellt i stället.',
+  description: 'Obemannat kund-flöde (v18): orkestrerar plan→init→innehåll→granskning→grind-torrkörning för en research.md där `Läge:` saknas eller är obemannat (S12: obemannat är default). Beslutstaxonomi CONTINUE / ATTENTION_CONTINUE / ROUTE / HARD_STOP — owner attention ≠ owner approval: en icke-blockerande strategisk fråga och ett interventionsutfall ≠ NY SAJT stoppar INTE flödet på ägarens svar, de routar respektive noteras. HARD_STOP bevaras för ohanterad juridik, obyggd krävd capability, CRITICAL efter EN fixloop, brutet fixkontrakt och oklassificerade utfall. Deployar ALDRIG — nod 8 (juridik-signoff) och nod 9 (/vercel:deploy) förblir mänskliga.',
+  whenToUse: 'Kör manuellt när en research.md bär raden "Läge: obemannat" och ägaren vill att systemet bygger sajten utan mänskligt nod-3-stopp — fram till FINAL-TOUCHES + grind-torrkörning. HARD_STOP vid ohanterad juridikflagga, blockerande strategisk fråga (kräver nytt mandat), oklassificerat plan-utfall, CRITICAL efter EN fixloop eller brutet fixkontrakt (BATCH-005). ROUTE — utan att invänta ägaren — vid interventionsutfall ≠ NY SAJT och vid scope-nej. Bemannat begärs uttryckligen med raden "Läge: bemannat" och kör då /nortropic-plan med nod-3-stoppet. Saknas raden gäller obemannat (S12).',
   phases: [
     { title: 'Plan',                    detail: 'project-planner → PROJECT-BRIEF.md + maskinläsbart plan-utfall (schema)' },
     { title: 'Beslut (plan)',           detail: 'CONTINUE / ATTENTION_CONTINUE fortsätter; ROUTE avslutar lanen utan ägarberoende; HARD_STOP lämnar över' },
@@ -17,10 +17,31 @@ export const meta = {
 
 /* ─────────── LOAD-BEARING PURE FUNCTIONS (isolerat testbara, inga globals, före allt await) ─────────── */
 
+/**
+ * Lägesgrinden. DEFAULTEN ÄR VÄND (S12, ägarbeslut 2026-08-26): obemannat är numera
+ * normalvägen, och `bemannat` är det man BEGÄR. Tidigare var det tvärtom — en saknad
+ * `Läge:`-rad gav bemannat, vilket gjorde autonom drift till undantaget.
+ *
+ * Tre utfall, och det tredje är det som gör vändningen säker:
+ *   saknad/tom rad  → obemannat (den nya defaulten)
+ *   'bemannat'      → stopp vid nod 3, precis som förr när det begärs
+ *   allt annat      → ODÖMBART. En felstavning får ALDRIG tolkas som ett läge, och
+ *                     absolut inte som den mer autonoma vägen. Att vända en default
+ *                     utan att fail-closa på skräp vore att byta ett stopp mot en gissning.
+ */
 function obemannatGate(lage) {
-  if (lage !== 'obemannat')
-    return { stop: true, reason: `Läge=${lage || 'bemannat'} — obemannat ej begärt; briefen är klar, stoppar vid nod 3 (briefgodkännande) enligt dagens bemannade flöde` }
-  return { stop: false }
+  // SAKNAD är inte samma sak som SKRÄP. Endast `undefined`/`null` och en tom sträng
+  // räknas som "raden finns inte". Ett tal, ett objekt eller en lista i lägesfältet är
+  // ett trasigt utfall och får aldrig tolkas som den nya defaulten — annars vore
+  // vändningen ett sätt att göra skräp till autonomi.
+  const saknas = lage === undefined || lage === null
+  const angivet = typeof lage === 'string' ? lage.trim() : (saknas ? '' : '\u0000SKRÄP')
+  if (angivet === '' || angivet === 'obemannat') return { stop: false, lage: 'obemannat' }
+  if (angivet === 'bemannat')
+    return { stop: true, oklassificerat: false, lage: 'bemannat',
+      reason: 'Läge=bemannat — bemannat UTTRYCKLIGEN begärt; briefen är klar, stoppar vid nod 3 (briefgodkännande)' }
+  return { stop: true, oklassificerat: true, lage: null,
+    reason: `Läge=${JSON.stringify(lage)} — okänt lägesvärde, varken obemannat eller bemannat. Oklassificerat, fail-closed: en felstavning tolkas aldrig som ett läge.` }
 }
 
 /* ── BESLUTSTAXONOMI ────────────────────────────────────────────────────────────
@@ -400,13 +421,14 @@ async function writeAutobyggLog(buildDir, fields) {
 /* ═════════════════════════ NODKEDJAN ═════════════════════════ */
 
 phase('Plan')
-// Plannern kör sin egen INPUT GATE, läser research-radens Läge (saknas ⇒ bemannat) och returnerar utfallet maskinläsbart.
+// Plannern kör sin egen INPUT GATE, läser research-radens Läge (saknas ⇒ OBEMANNAT, S12) och returnerar utfallet maskinläsbart.
 const plan = await agent(
   `Follow your FULL project-planner process against the research file at ${researchPath}. Write PROJECT-BRIEF.md next to it (all 7 sections). ` +
-  `Read the research row \`Läge:\` (missing => bemannat), write it into §6 next to Klienttyp — never into content/profile.ts — AND return it as the field \`lage\` (obemannat|bemannat). ` +
+  `Read the research row \`Läge:\` — MISSING OR EMPTY MEANS \`obemannat\` (S12: unmanned is the default; \`bemannat\` is what one asks for). Any other value is UNCLASSIFIED and fails closed — never guess a mode. Write it into §6 next to Klienttyp — never into content/profile.ts — AND return it as the field \`lage\` (obemannat|bemannat). ` +
   // `lage` grindar HARD_STOP via obemannatGate. Utan att den BEGÄRS som returfält kan en
-  // planner skriva den i §6 och utelämna den i utfallet, vilket ger `bemannat` och stoppar
-  // körningen — samma "tillstånd oftare"-inversion som skivan finns för att ta bort.
+  // planner skriva den i §6 och utelämna den i utfallet. **Efter S12 ger ett utelämnat `lage` OBEMANNAT** — alltså tyst
+  // autonomi i stället för ett tyst stopp. Kravet att fältet BEGÄRS skyddar därför numera
+  // åt motsatt håll mot när det skrevs, och är viktigare, inte mindre viktigt.
   `Run your INPUT GATE first; if fields are missing, set inputGatePassed=false + missingFields and do not plan further. ` +
   `Klassa VARJE öppen fråga STRATEGISK/FAKTA/BESLUT per your Rules; a ohanterad/scope-nej juridikflagga is ALWAYS STRATEGISK. ` +
   `Return \`juridikflaggor\` as [{flagga, status}] with status EXACTLY one of hanterad|ohanterad|scope-nej, \`scopeNej\` as a real boolean, and \`openQuestions\` as [{text, kind, ...}] with kind EXACTLY one of STRATEGISK|FAKTA|BESLUT — case and spelling are load-bearing; a mis-cased label is UNCLASSIFIED and fails closed. ` +
@@ -424,7 +446,15 @@ const plan = await agent(
 phase('Beslut (plan)')
 const modeStop = obemannatGate(plan && plan.lage)
 const planBeslut = modeStop.stop
-  ? { decision: HARD_STOP, reason: modeStop.reason, attention: [], nextStep: 'kör /nortropic-plan bemannat' }
+  ? { decision: HARD_STOP, reason: modeStop.reason,
+      attention: [attentionEvent({
+        severity: modeStop.oklassificerat ? 'CRITICAL' : 'MEDIUM',
+        decision: modeStop.oklassificerat ? 'OKLASSIFICERAT' : 'BEMANNAT_BEGÄRT',
+        reason: modeStop.reason, evidence: [String(plan && plan.lage)],
+        actionTaken: 'inget byggt', ownerActionRequired: true })],
+      nextStep: modeStop.oklassificerat
+        ? 'rätta `Läge:`-raden till obemannat eller bemannat, eller utelämna den (default: obemannat)'
+        : 'kör /nortropic-plan bemannat och godkänn briefen vid nod 3' }
   : beslutEfterPlan(plan)
 
 for (const a of planBeslut.attention) {
