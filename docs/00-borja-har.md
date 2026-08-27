@@ -1045,3 +1045,25 @@ och en kontroll fäller nu om någon skyddad yta börjar förneka sitt eget skyd
 de säger rätt sak. Att en lucka som står "stängd" faktiskt är stängd prövas av den kontroll
 som äger sakfrågan — och för de två luckor där det saknades kopplades raden ihop med
 maskineriet, så en återöppning nu kräver att mekanismen faktiskt slutat fungera.
+
+## Ett gammalt kontrakt fanns bara i minnet (2026-08-27)
+
+En av testfixturerna finns för att bevisa att fabriken fortfarande klarar kunder som
+byggdes mot ett **äldre** regelverk. Den fixturen prövades mot det NUVARANDE regelverket
+plus en handskriven anteckning om vad som var annorlunda förr.
+
+**Anteckningen var fel — åt två håll.** Den sa att en viss rubrik hette "NAP" i den gamla
+versionen. Det gjorde den inte; den hette samma sak som i dag. Och fixturen använde
+samtidigt en rubrik från det NYA regelverket i just den fil som finns för att visa det
+gamla. Ingen kontroll kunde upptäcka något av det, eftersom kontrollen jämförde mot
+anteckningen — och en anteckning kan inte upptäcka att den minns fel.
+
+**Vad som gjordes:** den gamla versionen hämtades ur historiken och ligger nu som en exakt
+kopia i repot, bevisad identisk med originalet. Fixturen prövas mot den, och den
+handskrivna anteckningen är borta. Båda rubrikerna är rättade. Kopian får inte användas av
+något som bygger — bara av kontrollen som prövar fixturen — och en kontroll fäller om
+någon börjar läsa den någon annanstans ifrån.
+
+**Ärligt om vad detta INTE gör:** att fixturens FORM nu prövas mot rätt version säger
+ingenting om att den BETER sig rätt. Att två regelverksversioner leder till samma färdiga
+sajt kräver två riktiga byggen och är fortfarande oprövat.
