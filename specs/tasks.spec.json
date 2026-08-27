@@ -1192,6 +1192,496 @@
         ],
         "fail_closed": true
       }
+    },
+    {
+      "id": "h-036",
+      "slice": "H036_PRE_SANDBOX_RUNTIME_SUPERVISOR",
+      "authority_class": "owner_authority",
+      "title": "Pre-sandbox owner for monotonic Seatbelt child composition",
+      "summary": "Replace the impossible nested Seatbelt install with one controller-owned supervisor established by the exact protected Python 3.12 launcher before any worker sandbox. Confined descendants can request only a same-or-smaller workspace child through a causally inherited, peer-bound capability; the supervisor installs a freshly composed profile that preserves every ancestor denial, and an exact confined helper proves real allowed and denied syscalls before it execs the target. No already-sandboxed shortcut, raw fallback, native broker, caller-selected profile/root/exception, ambient credential delegation or unconfined worker is permitted.",
+      "allowed_write": [],
+      "owner_author_allowed_write": [
+        "controller/launch/cli",
+        "controller/launch/runtime_snapshot.py",
+        "config/python-runtime-authority-v2.json"
+      ],
+      "exit_test": "verify/bin/h-036-exit",
+      "exit_criterion": "PREPRODUCT: the no-argument gate is RED only on A_H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_OPERATIONAL with reason RUNTIME_SNAPSHOT_AND_V2_AUTHORITY_ABSENT while the published launcher still reproduces nested sandbox_apply EPERM; judge/reference topology cannot earn product credit. IDENTITY: --product BASE_SHA CANDIDATE_SHA requires an un-nested macOS host, clean exact HEAD, a direct single child, object-derived no-renames changes of exactly the three owner product paths with modes 100755/100644/100644, cumulative additions at most 2400, unchanged frozen spec/gate, strict v2 config and final launcher/helper digests bound without a config self-digest. RUNTIME: the first exact protected Python 3.12.13 -I -S -B live-launcher call occurs before Seatbelt, requires stable nofollow Python/live/config identities with immutable-object review of same-opened reachability/final-rehash ordering and dynamic private-runtime mode/digest/symlink negatives, creates a bounded 0500 private runtime root and protected same-byte Python snapshot, and starts one controller-owned Python supervisor under a closed environment. At every proof barrier the gate independently discovers the sole new runtime root and binds both supervisor and confined helper to the same direct internal regular nofollow 0500 Python snapshot by exact digest/devino and NUL-preserved KERN_PROCARGS2 argv; caller canonical/private Python paths remain inputs, never the internal execution identity. Two identical complete libproc descriptor tables bind every paused-helper fd by role/type/access/devino, target `/dev/fd` enumeration is bounded by the inherited RLIMIT, and an actual subject call occupies caller fds 3-14 yet must expose an accepted internal fd in 10-29 without leaking fillers. The required host exposes no cross-process NUL envp through KERN_PROCARGS2 and `ps eww` is noninjective, so neither can earn exact environment credit: exact closed supervisor/helper environment construction and close_fds/exact-pass_fds reachability remain mandatory immutable-object-review obligations, while target-side sanitization and stdio-only exec state are dynamically effect-proven. A later confined exact launcher uses only its inherited session capability over the protected AF_UNIX protocol; the supervisor verifies that LOCAL_PEERPID/euid/audit-token pidversion equal the current request's claimed peer identity, never the original outer leader, while authority comes only from the capability's server-owned profile state and never from peer ancestry or caller profile/root/exception/path claims. It deterministically installs one of two exact digest-bound cumulative Seatbelt templates outside the parent sandbox: base iff staging/sink are both absent, or base plus the exact staging suffix iff both are prevalidated and starts the exact live helper under the exact snapshot. Only after that helper proves real allowed scratch/sink writes and denied live/trust/runtime/ancestor-workspace/staging create/write/rename/unlink/hardlink/mkdir/chmod effects may it install the sanitized target environment and exec the target. Every child gets a CSPRNG-fresh canonical 64-hex capability distinct from every sibling and parent, the same session and exactly parent level plus one; BASE, WITH_STAGING and a later top-level launch use pairwise-distinct sessions, capabilities, runtime roots and socket identities. Forged fixed/random guesses, replayed, stale, every-missing-header, nonfinite, malformed-go-v1 and direct-socket requests cannot weaken server-owned policy or start a raw worker. Internal launches use absolute pinned sandbox/Python/helper paths, -B or dont_write_bytecode before sibling imports, the exact closed environment, close_fds and exact pass_fds; every decimal descriptor token is canonical and numerically at least 3, including valid 10-29 values. The supervisor receives only bounded framed bytes and already-open stdio, never caller-named log/request/result paths, never creates caller cwd and never resolves a target before confinement. Success preserves stdout bytes; launch, nonzero, timeout and interruption remain distinct. Nonzero, self-SIGTERM, timeout, controller SIGTERM and supervisor death each expose a known leader plus same-process-group child; success and every failure clean all known members, supervisor, socket, snapshot, handshake/profile resources and revoke handoff. Complete same-UID escaped-descendant absence is not claimed; a tracked setsid survivor must retain confinement, be unable to mutate trusted/runtime/live roots, then disappear under its exact PID/pidversion/start/lineage identity. The judge reference runner owns one direct Popen session/group on every outcome, uses waitid WNOWAIT as the exited-leader PID/PGID reservation even when ps omits a zombie, treats ps only as live-remainder evidence, KILLs only exact bound live members before final communicate/reap, closes sockets before dirfd-relative nofollow root removal, and proves forced postspawn hang/error are non-PASS with two stable absence samples and no process, zombie, socket or root residue. Gate and Git cleanup bind stable parent/root devino, never chmod/follow a subject-swapped symlink, and preserve hostile external bytes/mode/devino. Real positives cover outer plus a distinct descendant-PID nested caller whose direct attempt against an outer-writable sibling is EPERM with readback, /var to /private canonicalization and exact sink/workspace allowance. Negatives cover bidirectional canonical/devino staging overlap with live/trust/Git/runtime/workspace, exception reopen, system Python 3.9, relocated/swapped launcher/helper/config/runtime, private root0500/file0700, PATH/loader/Python/Git/credential injection, descriptor/root/config leakage, supervisor death and residue. H-017 is preservation-only; published H-034 phase evidence is pinned and its early-H036 gate is expected to turn RED after this completed phase, never rerun as a post-H036 green regression. H-032 is not edited now and later refreezes to depend exactly on published H-036. JSON OBJECT ORDER: every protocol JSON object is member-order-insensitive and duplicate-free; the gate consumes the supervisor's exact proof wire bytes and proves the canonical order-insensitive proof-digest relation with exact key sets and value bindings, never raw textual layout, while the primary valid session sends materially reversed launch/go-v1 member order as a connected positive and every materially ordered array stays exact. SUPERVISOR DESCRIPTOR ACCOUNTING: at each paused barrier the complete supervisor descriptor table is accounted under closed classes only (AF_UNIX stream sockets, non-regular stdio, the paused helper's libproc-measured stdio pipe identities, entropy devices, lane-known sealed-root directory and lane-known regular identities); the control descriptor is a bound AF_UNIX stream socket, the ready descriptor is closed, and any unaccounted retained descriptor - foreign socket family, credential or config-bearing file, unknown pipe or directory, alias or high-numbered descriptor - fails closed number-agnostically, with a dual-process gate probe falsifying the enumerator and cross-process libproc-identity classifier before subject credit. MATERIAL_PROPERTIES_JUDGE_ONLY=NONE.",
+      "docs_impact": [],
+      "depends_on": [
+        "h-034"
+      ],
+      "max_changed_files": 3,
+      "max_added_lines": 2400,
+      "h036_pre_sandbox_runtime_supervisor": {
+        "contract_id": "H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_V1",
+        "standing_delegation": {
+          "contract_id": "BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION",
+          "source_sha256": "b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84",
+          "condition_operator": "ALL",
+          "hard_stop_matches": "NO_ONLY_WHILE_EVERY_EXACT_BOUND_AND_BP01_THROUGH_BP14_HOLDS"
+        },
+        "prerequisite_publication": {
+          "published_origin_main": "b17d0941f9376505f2bf76f4ce10b3019d978054",
+          "published_tree": "4a22c991b2bba098239f492bd9fc1e06cc8cd1c6",
+          "ordered_parents": [
+            "deee79550fa1a4762d1b3cda06192b7940d05ff0",
+            "e60fbc40e5f7b1b08ad3427f2ab00eff4744a00e"
+          ],
+          "reviewed_h034_candidate": "e60fbc40e5f7b1b08ad3427f2ab00eff4744a00e",
+          "reviewed_h034_candidate_tree": "4a22c991b2bba098239f492bd9fc1e06cc8cd1c6",
+          "independent_review_artifact_sha256": "2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474",
+          "independent_review_outcome": "READY",
+          "h034_gate_sha256": "e2b8ec23a85105e07573c4c4806fb26ea1414840bf1c36d1356bd642fdf5f350",
+          "registry_path": "specs/owner-production-paths.v1.json",
+          "registry_sha256": "3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256",
+          "registry_schema_version": 2,
+          "registry_owner_union": [
+            "controller/h034-native/**",
+            "verify/h034/kernel",
+            "verify/h034/build-recipe.json",
+            "verify/h034/identity-manifest.json",
+            "controller/launch/cli",
+            "controller/launch/runtime_snapshot.py",
+            "config/python-runtime-authority-v2.json"
+          ],
+          "completed_phase_gate_transition": {
+            "gate": "verify/bin/h-034-exit --r15-registry-refreeze",
+            "before_h036": "86_PASS_0_FAIL",
+            "after_h036_expected_red_labels": [
+              "F_R15_H036_TASK_NOT_MATERIALIZED_BEFORE_H034_PUBLICATION",
+              "F_R15_H036_TASK_GATE_PRODUCT_EXACT_ZERO_BEFORE_H034_PUBLICATION"
+            ],
+            "post_h036_green_claim_forbidden": true
+          }
+        },
+        "test_author_surface": [
+          "specs/tasks.spec.json",
+          "verify/bin/h-036-exit",
+          "docs/loop/owner-author-workflow-v1.md",
+          "docs/05-beslutslogg.md",
+          "docs/loop/drift.md"
+        ],
+        "product_identity": {
+          "paths_and_modes": [
+            [
+              "controller/launch/cli",
+              "100755"
+            ],
+            [
+              "controller/launch/runtime_snapshot.py",
+              "100644"
+            ],
+            [
+              "config/python-runtime-authority-v2.json",
+              "100644"
+            ]
+          ],
+          "candidate_relation": "DIRECT_SINGLE_CHILD_OF_EXACT_PUBLISHED_CONTRACT_BASE",
+          "changed_file_source": "RAW_GIT_OBJECTS_NO_RENAMES_NO_REPLACE",
+          "cumulative_max_added_lines": 2400,
+          "unbound_product_checkout_credit": false,
+          "config_binds_final_launcher_and_helper_sha256": true,
+          "config_self_digest": false
+        },
+        "runtime_authority": {
+          "config_locator": "LIVE_ROOT/config/python-runtime-authority-v2.json",
+          "config_override": false,
+          "inherited_v1_locator": "config/python-interpreter-authority-v1.json",
+          "inherited_v1_sha256": "2c609508a082d7068ca85182382988f89a9e29148831fc12f2bd8ddc207e5986",
+          "single_python_authority": "V2_MUST_EMBED_OR_EXACTLY_REFERENCE_AND_VERIFY_V1_WITHOUT_DRIFT",
+          "python_source_path": "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12",
+          "python_source_sha256": "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941",
+          "python_version": "3.12.13",
+          "python_argv_flags": [
+            "-I",
+            "-S",
+            "-B"
+          ],
+          "accepted_interpreter": "CANONICAL_SOURCE_OR_0500_PRIVATE_REGULAR_NOFOLLOW_SAME_BYTES_SNAPSHOT",
+          "system_python_3_9": "REJECT",
+          "launcher_locator": "LIVE_ROOT/controller/launch/cli",
+          "helper_locator": "LIVE_ROOT/controller/launch/runtime_snapshot.py",
+          "relocated_launcher_or_helper": "REJECT",
+      "live_identity": "STABLE_OPEN_NOFOLLOW_DIRFD_DEV_INO_MODE_SHA256_AND_FINAL_ADJACENT_REHASH_REQUIRED_AND_PROVEN_BY_IMMUTABLE_OBJECT_REVIEW;_GATE_DYNAMIC_NEGATIVES_COVER_PRIVATE_RUNTIME_MODE_SYMLINK_DIGEST_AND_IGNORED_OVERRIDES_BUT_DO_NOT_CLAIM_UNIVERSAL_SAME_UID_RACE_PROOF",
+          "private_runtime_parent": "/private/tmp",
+        "private_runtime_prefix": ".nortropic-h036-runtime-",
+        "private_runtime_mode": "0500",
+        "private_python_mode": "0500",
+        "barrier_runtime_identity": "SOLE_NEW_RUNTIME_ROOT_WITH_SUPERVISOR_AND_HELPER_SHARING_ONE_DIRECT_INTERNAL_REGULAR_NOFOLLOW_0500_PYTHON_SNAPSHOT_EXACT_DIGEST_AND_DEV_INO",
+        "caller_interpreter_role": "CANONICAL_OR_PRIVATE_CALLER_SOURCE_IS_INPUT_ONLY_AND_MUST_NOT_BE_CONFUSED_WITH_INTERNAL_SUPERVISOR_HELPER_SNAPSHOT",
+        "private_mode_negatives": "ROOT_WRONG_MODE_AND_ROOT_0500_FILE_0700_REJECT_INDEPENDENTLY",
+          "sandbox_exec_path": "/usr/bin/sandbox-exec",
+          "sandbox_exec_sha256": "2f447acfae7a954ccb5a1bcf3a1955f69b1a8549c434ddff643df98fd3cb33ba",
+          "sandbox_exec_cdhash": "b79517f5e794aa918ea253d144534e6aa21b5970",
+      "bytecode_rule": "PYTHON_DONT_WRITE_BYTECODE_TRUE_BEFORE_SIBLING_IMPORTS_AND_EXACT_CHILD_FLAG_B",
+      "v1_isolated_flags_preserved_exactly": [
+        "-I",
+        "-S"
+      ],
+          "repository_pycache_delta": "EXACT_ZERO"
+        },
+        "entrypoint_contract": {
+          "public_argv": "PYTHON_SNAPSHOT -I -S -B LIVE_ROOT/controller/launch/cli run PREEXISTING_WORKSPACE PREEXISTING_ENVELOPE TIMEOUT_SECONDS -- COMMAND_ARGV",
+          "top_level": "ABSENT_H036_SESSION_STARTS_EXACTLY_ONE_PRE_SANDBOX_SUPERVISOR",
+          "nested": "COMPLETE_H036_SESSION_USES_ONLY_CAUSALLY_INHERITED_HANDOFF",
+          "workspace": "TOP_LEVEL_STABLE_ABSOLUTE_DIRECTORY_NESTED_NOFOLLOW_DESCENDANT_OR_SAME_RELATIVE_TO_CAPABILITY_WORKSPACE",
+          "cwd_creation": false,
+          "envelope_transport": "BOUNDED_FRAME_BYTES_MUST_EQUAL_PRELOADED_STDIN_FD_BYTES_NEVER_A_SUPERVISOR_PATH",
+          "stdio_transport": "EXACT_THREE_ALREADY_OPEN_SCM_RIGHTS_DESCRIPTORS_FD0_READ_PIPE_PRELOADED_WITH_ENVELOPE_FD1_CAPTURED_TARGET_STDOUT_FD2_CAPTURED_TARGET_STDERR",
+          "target_resolution": "ONLY_INSIDE_POST_PROOF_CONFINED_HELPER",
+          "command_hardcoded": false
+        },
+        "supervisor_contract": {
+          "implementation": "EXACT_LIVE_RUNTIME_SNAPSHOT_PY_UNDER_EXACT_PRIVATE_PYTHON",
+          "native_or_privileged_broker": false,
+          "argv": "PRIVATE_PYTHON -I -S -B LIVE_HELPER supervise-v1 --control-fd DECIMAL_FD --ready-fd DECIMAL_FD",
+          "environment_exact": {
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin"
+          },
+          "close_fds": true,
+        "pass_fds": "CONTROL_AND_READY_ONLY",
+        "dynamic_argv_evidence": "NUL_PRESERVED_KERN_PROCARGS2_EXACT_TOKEN_VECTOR",
+        "dynamic_environment_credit": false,
+        "environment_review_boundary": "REQUIRED_HOST_KERN_PROCARGS2_HAS_NO_CROSS_PROCESS_ENV_TAIL_AND_PS_EWW_IS_NONINJECTIVE;_EXACT_ENVIRONMENT_CONSTRUCTION_IS_MANDATORY_IMMUTABLE_OBJECT_REVIEW_ONLY",
+        "dynamic_descriptor_evidence": "LIBPROC_QUERY_OVERALLOCATE_AUTHORITATIVE_BYTE_COUNT_RETRY_ON_GROWTH_AND_TWO_IDENTICAL_COMPLETE_ROLE_TYPE_ACCESS_DEV_INO_TABLES_AT_EACH_PAUSED_BARRIER",
+        "supervisor_descriptor_accounting": "AT_EACH_PAUSED_BARRIER_THE_COMPLETE_SUPERVISOR_LIBPROC_TABLE_IS_ACCOUNTED:_EVERY_RETAINED_DESCRIPTOR_MUST_CLASSIFY_UNDER_THE_CLOSED_CLASSES_AF_UNIX_STREAM_SOCKET_NONREGULAR_STDIO_HELPER_STDIO_PIPE_IDENTITY_MEASURED_BY_THE_SAME_LIBPROC_OBSERVER_ENTROPY_DEVICE_LANE_KNOWN_SEALED_ROOT_DIRECTORY_IDENTITY_OR_LANE_KNOWN_REGULAR_IDENTITY;_THE_CONTROL_DESCRIPTOR_IS_A_BOUND_AF_UNIX_STREAM_SOCKET_THE_READY_DESCRIPTOR_IS_CLOSED_AND_ANY_UNACCOUNTED_DESCRIPTOR_INCLUDING_FOREIGN_SOCKET_FAMILY_CREDENTIAL_OR_CONFIG_BEARING_FILE_UNKNOWN_PIPE_UNKNOWN_DIRECTORY_ALIAS_OR_HIGH_NUMBERED_DESCRIPTOR_FAILS_CLOSED_NUMBER_AGNOSTICALLY;_A_DUAL_PROCESS_GATE_PROBE_WITH_AF_INET_REGULAR_FILE_AF_UNIX_AND_DESCRIPTOR_200_FIXTURES_FALSIFIES_THE_ENUMERATOR_AND_CROSS_PROCESS_LIBPROC_IDENTITY_CLASSIFIER_BEFORE_SUBJECT_CREDIT",
+        "descriptor_reachability_review": "IMMUTABLE_OBJECT_REVIEW_PROVES_CLOSE_FDS_AND_EXACT_PASS_FDS_CONSTRUCTION_FOR_SUPERVISOR_AND_HELPER",
+        "descriptor_token_grammar": "CANONICAL_UNSIGNED_DECIMAL_INTEGER_VALUE_AT_LEAST_3;_3_9_10_29_AND_LARGE_VALID;_0_1_2_NEGATIVE_PREFIXED_PADDED_FLOAT_OR_NONDECIMAL_INVALID",
+          "ambient_environment_inherited": false,
+          "caller_named_log_request_result_paths": false,
+          "caller_cwd_open_or_create": false,
+          "caller_target_path_resolution": false,
+          "authority_retained": "STABLE_OPEN_ROOT_IDENTITIES_PROFILE_LINEAGE_NONCES_AND_CHILD_AUDIT_TOKENS_ONLY"
+        },
+        "handoff_protocol": {
+          "protocol_id": "H036_AF_UNIX_CAPABILITY_V1",
+          "socket_family": "AF_UNIX",
+          "socket_type": "SOCK_STREAM",
+          "runtime_socket_mode": "0600",
+          "runtime_root_mode": "0500_AFTER_BIND",
+          "peer_binding": [
+            "LOCAL_PEERPID_EQUALS_CURRENT_REQUEST_CLAIMED_PID",
+            "LOCAL_PEERTOKEN_EUID_EQUALS_CURRENT_REQUEST_CLAIMED_EUID",
+            "LOCAL_PEERTOKEN_PIDVERSION_BINDS_CURRENT_CONNECTION"
+          ],
+          "peer_identity_is_authority": false,
+          "original_outer_leader_pid_equality": false,
+          "legitimate_nested_descendant_pid": "MUST_DIFFER_FROM_AND_NOT_BE_CONSTRAINED_TO_OUTER_LEADER",
+          "authority_source": "UNFORGEABLE_CAPABILITY_TO_SERVER_OWNED_PROFILE_STATE_ONLY",
+          "frame": "FOUR_BYTE_BIG_ENDIAN_LENGTH_THEN_STRICT_DUPLICATE_FREE_UTF8_JSON_OR_RAW_ENVELOPE",
+          "json_object_member_order": "INSENSITIVE_FOR_EVERY_PROTOCOL_JSON_OBJECT;_REORDERED_DUPLICATE_FREE_SEMANTICALLY_IDENTICAL_OBJECTS_ARE_LEGITIMATE_POSITIVES_WHILE_DUPLICATE_MISSING_EXTRA_WRONG_TYPED_AND_NONFINITE_MEMBERS_REJECT",
+          "json_array_order": "MATERIAL_AND_EXACT_FOR_ARGV_ENVIRONMENT_PAIRS_STDIO_ROLE_ORDER_HEADER_KEY_LISTS_ORDERED_PARENTS_AND_SEATBELT_PARAMETER_ORDER",
+          "reordered_object_positive": "THE_PRIMARY_VALID_RAW_SESSION_SENDS_ITS_LAUNCH_HEADER_AND_GO_V1_FRAMES_WITH_MATERIALLY_REVERSED_MEMBER_ORDER_AND_MUST_SUCCEED_WHILE_THE_BASE_SESSION_SENDS_SORTED_ORDER",
+          "header_keys_exact": [
+            "argv",
+            "capability",
+            "cwd_relative_components",
+            "envelope_length",
+            "environment",
+            "operation",
+        "peer_euid",
+        "peer_pid",
+        "peer_pidversion",
+        "request_nonce",
+            "schema_version",
+            "session_id",
+            "timeout_milliseconds"
+          ],
+          "operation": "launch-v1",
+          "schema_version": 1,
+          "request_limit_bytes": 1048576,
+          "envelope_limit_bytes": 1048576,
+          "response_limit_bytes": 1048576,
+          "stdio_ancillary": "EXACTLY_THREE_SCM_RIGHTS_DESCRIPTORS_ON_FIRST_HEADER_SENDMSG_IN_ORDER_STDIN_READ_STDOUT_WRITE_STDERR_WRITE",
+          "stdio_causal_effect": "FD0_BYTES_EXACTLY_EQUAL_SEPARATELY_FRAMED_ENVELOPE_ALL_THREE_TARGET_DEV_INO_IDENTITIES_EQUAL_THE_PASSED_DESCRIPTORS_AND_FD1_FD2_DELIVER_EXACT_BINARY_TARGET_SENTINELS_AND_EOF",
+          "header_types": "EXACT_JSON_TYPES_BOOL_IS_NOT_INT_FLOAT_IS_NOT_INT_NONFINITE_NUMBERS_REJECT",
+          "missing_or_wrong_operation": "REJECT_BEFORE_EFFECT_WITH_FRESH_NONCE",
+          "root_profile_exception_or_path_keys": "REJECT_UNKNOWN_KEY_BEFORE_EFFECT",
+        "nonce_reuse": "REJECT_BEFORE_EFFECT",
+        "missing_header_matrix": "EVERY_ONE_OF_THE_EXACT_13_REQUIRED_KEYS_IS_REMOVED_UNDER_ITS_OWN_FRESH_NONCE_AND_REJECTS_WITH_ZERO_EFFECT",
+        "nonfinite_request_numbers": "NAN_POSITIVE_INFINITY_AND_NEGATIVE_INFINITY_REJECT",
+        "go_v1_negative_matrix": "EVERY_MISSING_GO_KEY_WRONG_OPERATION_NONCE_DIGEST_SCHEMA_BOOL_EXTRA_DUPLICATE_AND_NONFINITE_FRAME_REJECTS_AFTER_PROOF_BEFORE_TARGET",
+        "fresh_child_capability": true,
+          "fresh_child_lineage_observation": "EVERY_SIBLING_AND_PARENT_CAPABILITY_PAIRWISE_DISTINCT_CANONICAL_64_HEX; SESSION_EXACT_PARENT; LEVEL_EXACT_PARENT_PLUS_ONE; PARENT_CAPABILITY_NOT_DELEGATED",
+          "peer_ancestry_profile_inference": false,
+          "capability_policy_relation": "REQUEST_CAN_ONLY_PRESERVE_OR_NARROW_THE_SERVER_OWNED_PROFILE_BOUND_TO_THAT_CAPABILITY",
+          "forged_missing_stale_or_post_shutdown_capability": "REJECT_BEFORE_EFFECT",
+        "provider_direct_socket_use": "CAN_REQUEST_ONLY_SAME_OR_STRONGER_CONFINED_CHILD",
+        "freshness_scope": "BASE_WITH_STAGING_AND_LATER_TOP_LEVEL_SESSIONS_RUNTIME_ROOTS_SOCKET_IDENTITIES_AND_ALL_REPORTED_CAPABILITIES_PAIRWISE_DISTINCT_WITH_FIXED_AND_CSPRNG_RANDOM_GUESSES_REJECTED"
+        },
+        "profile_composition": {
+          "profile_id": "H036_MONOTONIC_WORKSPACE_SUBSET_V1",
+      "source_shape": "EXACT_TWO_MEMBER_ALLOW_DEFAULT_TEMPLATE_FAMILY_WITH_CONTROLLER_DERIVED_DENY_PARAMETERS_AND_DETERMINISTIC_SERVER_SELECTION",
+      "template_variants": {
+        "without_staging": {
+          "selection": "IFF_BOTH_STAGING_ROOT_AND_RESULT_SINK_ARE_ABSENT",
+          "sha256": "848f5f8b13b6773d9a8b6780838c3bb31e82c06915d762ce47d5a8c97acd4844",
+          "dynamic_receipt": "SEPARATE_ACTUAL_SUBJECT_SESSION_MUST_REPORT_THIS_DIGEST_AND_EXACT_BASE_PROOF_EFFECT_KEYS_BEFORE_GO"
+        },
+        "with_staging": {
+          "selection": "IFF_BOTH_STAGING_ROOT_AND_RESULT_SINK_ARE_PRESENT_AND_PREVALIDATED",
+          "sha256": "0e543357a7ac4f14b5f8b1a04973c267180ee0fa6e5606d41034ade2a42cd33d",
+          "dynamic_receipt": "ACTUAL_SUBJECT_SESSION_MUST_REPORT_THIS_DIGEST_AND_EXACT_BASE_PLUS_STAGING_PROOF_EFFECT_KEYS_BEFORE_GO"
+        }
+      },
+      "partial_or_unbound_variant_selection": "STAGING_ONLY_SINK_ONLY_STAGING_SYMLINK_OR_UNBOUND_DIGEST_REJECT_PRELAUNCH",
+          "caller_profile_bytes_or_digest": false,
+          "caller_authority_roots_or_exceptions": false,
+          "top_level_root_sealing": "CONTROLLER_STABLE_OPENS_LIVE_GIT_TRUST_RUNTIME_WORKSPACE_AND_OPTIONAL_PREOPENED_SINK_BEFORE_SUPERVISOR",
+        "nested_workspace": "NOFOLLOW_PREEXISTING_SAME_OR_DESCENDANT_OF_CAPABILITY_WORKSPACE",
+        "optional_staging_root": "TOP_LEVEL_ONLY_PREEXISTING_CANONICAL_NOFOLLOW_DIRECTORY_DISJOINT_FROM_LIVE_TRUST_GIT_RUNTIME_AND_WORKSPACE",
+        "optional_result_sink": "EXISTING_NOFOLLOW_REGULAR_NLINK1_DIRECT_CHILD_OF_STAGING_ROOT",
+        "staging_profile": "DENY_FILE_WRITE_STAR_ON_ROOT_THEN_REALLOW_ONLY_FILE_WRITE_DATA_ON_LITERAL_SINK",
+        "staging_denied_effects": [
+          "SIBLING_CREATE_WRITE_RENAME_UNLINK_HARDLINK_MKDIR_CHMOD",
+          "SINK_RENAME_UNLINK_HARDLINK_CHMOD_OR_METADATA",
+          "STAGING_ROOT_RENAME_UNLINK_CHMOD_OR_MOVE"
+        ],
+        "invalid_sink_states": "MISSING_NONREGULAR_SYMLINK_HARDLINK_OUTSIDE_STAGING_OR_ANY_CUMULATIVE_ROOT_OVERLAP_REJECT_PRELAUNCH",
+          "ordered_rule_ids": [
+            "DENY_LIVE_ROOT_EXCEPT_SEALED_INITIAL_GIT_OBJECTS_AND_WORKTREE_ADMIN",
+            "DENY_GIT_OBJECTS_INFO_COMMDIR_GITFILE_AND_WORKTREE_CONFIG",
+            "DENY_TRUST_ROOT",
+            "DENY_PRIVATE_RUNTIME_ROOT",
+            "DENY_WORKSPACE_ROOT_AND_DOTGIT_METADATA",
+            "DENY_ANCESTOR_WORKSPACE_EXCEPT_CURRENT_DESCENDANT",
+            "DENY_OPTIONAL_STAGING_ROOT_EXCEPT_EXACT_PREOPENED_SINK"
+          ],
+          "git_exception_growth": "REJECT",
+          "deny_set_relation": "EVERY_CHILD_PRESERVES_ALL_ANCESTOR_DENIES_AND_MAY_ONLY_ADD_DENIES",
+          "allow_set_relation": "EVERY_CHILD_ALLOWED_WRITE_SET_IS_SUBSET_OF_PARENT",
+      "var_private_canonicalization": "REALPATH_PLUS_DEV_INO_IDENTITY",
+        "overlap_or_alias_ambiguity": "REJECT_CANONICAL_AND_DEV_INO_EQUAL_ANCESTOR_OR_DESCENDANT_IN_BOTH_DIRECTIONS_ACROSS_LIVE_TRUST_GIT_PRIVATE_RUNTIME_AND_WORKSPACE;_REAL_VAR_PRIVATE_ALLOWED_READBACK_AND_ALIAS_OVERLAP_NEGATIVE",
+          "sandbox_check_as_authority": false,
+          "already_sandboxed_equivalence": false,
+          "nested_sandbox_apply": false,
+          "eperm_direct_popen_fallback": false
+        },
+    "post_profile_helper": {
+          "argv": "/usr/bin/sandbox-exec FIXED_D_PARAMETERS -p FIXED_PROFILE PRIVATE_PYTHON -I -S -B LIVE_HELPER confined-exec-v1 --proof-fd DECIMAL_FD",
+          "initial_environment": "SUPERVISOR_CLOSED_ENV_ONLY",
+      "proof_peer": "SUPERVISOR_BINDS_LAUNCHED_PID_AND_AUDIT_TOKEN",
+      "proof_response_keys_exact": [
+        "child_euid",
+        "child_pid",
+        "child_pidversion",
+        "class",
+        "effects",
+        "profile_sha256",
+        "proof_digest",
+        "request_nonce",
+        "schema_version",
+        "session_id"
+      ],
+      "proof_class": "profile-proof-v1",
+      "proof_object_member_order": "INSENSITIVE;_THE_GATE_VALIDATES_THE_EXACT_SUPERVISOR_PROOF_WIRE_BYTES_DUPLICATE_FREE_WITH_EXACT_KEY_SET_EXACT_BINDINGS_AND_THE_CANONICAL_ORDER_INSENSITIVE_PROOF_DIGEST_RELATION_NEVER_RAW_TEXTUAL_EQUALITY_OR_A_PRESCRIBED_MEMBER_SEQUENCE",
+      "proof_payload": "UTF8_H036_PROFILE_PROOF_V1_COLON_REQUEST_NONCE",
+      "proof_path_prefix": ".nortropic-h036-proof-{request_nonce}",
+      "go_request_keys_exact": [
+        "operation",
+        "proof_digest",
+        "request_nonce",
+        "schema_version"
+      ],
+      "go_operation": "go-v1",
+      "required_syscall_effects_before_target": [
+            "ALLOWED_CURRENT_WORKSPACE_SCRATCH_WRITE",
+            "ALLOWED_EXACT_PREOPENED_SINK_WRITE_WHEN_PRESENT",
+        "DENIED_LIVE_TRUST_RUNTIME_ANCESTOR_AND_STAGING_CREATE_WRITE_RENAME_UNLINK_HARDLINK_MKDIR_CHMOD",
+        "DENIED_SINK_RENAME_UNLINK_HARDLINK_CHMOD_AND_STAGING_ROOT_RENAME_CHMOD_RMDIR"
+      ],
+      "profile_effect_key_sets": "BASE_EXACTLY_DENIED_LIVE_TRUST_RUNTIME_ANCESTOR_MATRIX_PLUS_SCRATCH_DIGEST; WITH_STAGING_EXACTLY_BASE_PLUS_STAGING_SINK_ROOT_MATRIX_AND_SINK_DIGEST",
+    "process_observation": "AT_EACH_PROOF_BARRIER_DISCOVER_SOLE_RUNTIME_ROOT;_KERN_PROCARGS2_NUL_ARGV_BINDS_SUPERVISOR_AND_HELPER_TO_SHARED_DIRECT_INTERNAL_SNAPSHOT_WITH_CANONICAL_NUMERIC_FDS_AND_NO_CALLER_PATH_ARGUMENTS;_TWO_IDENTICAL_COMPLETE_LIBPROC_TABLES_BIND_HELPER_STDIO_AND_PROOF_FD_ROLES_TYPE_ACCESS_DEV_INO;_NO_DYNAMIC_CROSS_PROCESS_ENVIRONMENT_CREDIT",
+    "occupied_fd_positive": "ACTUAL_SUBJECT_CALL_OCCUPIES_CALLER_FDS_3_THROUGH_14;_HELPER_INTERNAL_FD_10_THROUGH_29_ACCEPTED;_TARGET_DEV_FD_ENUMERATION_TO_INHERITED_RLIMIT_EXPOSES_ONLY_STDIO_AND_NO_FILLER",
+        "runtime_canary_readback": "GATE_INDEPENDENTLY_READS_THE_DISCOVERED_RUNTIME_ROOT_PRE_GO_AND_PROVES_ORIGINAL_REGULAR_MODE0600_NLINK1_SOURCES_PLUS_ABSENT_CREATE_RENAME_HARDLINK_MKDIR_TARGETS_FOR_THE_FULL_RUNTIME_EFFECT_MATRIX",
+          "proof_marker_alone_sufficient": false,
+          "go_before_complete_real_effect_proof": "REJECT",
+          "target_environment_install": "ONLY_AFTER_SUPERVISOR_GO",
+          "target_exec": "ONLY_AFTER_PROOF_FD_AND_ALL_INTERNAL_FDS_ARE_CLOSED",
+          "target_fd_set": "STDIN_STDOUT_STDERR_ONLY",
+      "trust_config_profile_dirfd_leak": "REJECT"
+    },
+    "evidence_authority": {
+    "dynamic_subject_credit": "REAL_PUBLIC_LAUNCHER_PROTOCOL_PROFILE_SYSCALL_LINEAGE_STDIO_TARGET_SANITIZER_COMPLETE_FD_GIT_AND_LIFECYCLE_EFFECTS_ONLY;_NO_SUPERVISOR_OR_HELPER_ENVIRONMENT_BYTE_EXACT_DYNAMIC_CREDIT",
+      "source_spelling_or_ast_oracle": "NON_CREDIT_SUPPORTING_DIAGNOSTIC_ONLY_NOT_IN_EXECUTABLE_ACCEPTANCE_OR_SUMMARY_AND_CANNOT_FAIL_A_SOUND_PRODUCT",
+    "immutable_object_review": "INDEPENDENT_REVIEW_PROVES_REACHABLE_STABLE_OPEN_NOFOLLOW_FINAL_REHASH_EXACT_TEMPLATE_SELECTION_ORDERING_CSPRNG_CAPABILITY_CREATION_ONE_UNIFIED_POST_PROFILE_HELPER_PATH_SHARED_BY_BOOTSTRAP_PUBLIC_AND_RAW_HANDOFFS_EXACT_CLOSED_SUPERVISOR_HELPER_ENVIRONMENT_CONSTRUCTION_AND_CLOSE_FDS_EXACT_PASS_FDS_REACHABILITY"
+    },
+    "target_environment": {
+          "preserve": "EVERY_NON_RESERVED_NON_SENSITIVE_REQUEST_KEY_VALUE_EXACTLY",
+          "strip_prefixes": [
+            "DYLD_",
+            "GIT_",
+            "GH_",
+            "GITHUB_",
+            "PYTHON",
+            "SLACK_"
+          ],
+          "strip_exact": [
+            "LD_LIBRARY_PATH",
+            "LD_PRELOAD",
+            "NORTROPIC_TRUST_ROOT",
+            "NORTROPIC_STAGING_ROOT",
+            "NORTROPIC_RESULT_SINK",
+            "__PYVENV_LAUNCHER__"
+          ],
+          "reserved_prefix": "NORTROPIC_H036_",
+          "add_exact": [
+            "NORTROPIC_KUVERT",
+            "NORTROPIC_H036_CAPABILITY",
+            "NORTROPIC_H036_LEVEL",
+            "NORTROPIC_H036_SESSION_ID",
+            "NORTROPIC_H036_SOCKET"
+          ],
+      "ancestor_capability_removed_before_fresh_add": true,
+      "path_exact": "/usr/bin:/bin",
+      "top_level_and_nested_apply_same_sanitizer": true,
+          "supervisor_ambient_secret_reachable_by_target": false
+        },
+        "lifecycle": {
+          "success_stdout": "TARGET_BYTES_UNCHANGED",
+          "exit_classes": {
+            "argument": 1,
+            "launch_failed": 3,
+            "nonzero": 4,
+            "timeout": 5,
+            "internal": 8
+          },
+      "known_leader_and_process_group": "SIGTERM_THEN_SIGKILL_AND_REAP_ON_SUCCESS_NONZERO_TIMEOUT_SIGNAL_OR_SUPERVISOR_DEATH",
+      "known_child_matrix": "NONZERO_SELF_SIGTERM_TIMEOUT_CONTROLLER_SIGTERM_AND_SUPERVISOR_DEATH_EACH_PROVE_RECORDED_LEADER_AND_SAME_PROCESS_GROUP_CHILD_GONE",
+          "controller_resources": "SOCKET_SNAPSHOT_HANDSHAKE_PROFILE_STATE_AND_RUNTIME_ROOT_REMOVED",
+          "handoff": "REVOKED_BEFORE_RETURN",
+          "complete_same_uid_descendant_absence_claimed": false,
+        "setsid_survivor_requirement": "RETAINS_PROFILE_AND_CANNOT_MUTATE_LIVE_TRUST_OR_RUNTIME_ROOTS",
+        "setsid_tracking": "SEPARATE_PID_PIDVERSION_START_EUID_PGID_SID_LINEAGE_CAPABILITY_SESSION_IDENTITY_THEN_TWO_ABSENCE_SAMPLES",
+    "reference_gate_runner": "DIRECT_POPEN_IS_ALWAYS_CLEANUP_AUTHORITY;_WAITID_WNOWAIT_EXITED_IS_THE_UNREAPED_PID_PGID_RESERVATION_EVEN_IF_PS_OMITS_ZOMBIE;_PS_CLASSIFIES_ONLY_LIVE_REMAINDERS;_KILL_BEFORE_FINAL_COMMUNICATE_REAP_ONLY_FOR_EXACT_BOUND_LIVE_MEMBERS;_SOCKETS_CLOSE_BEFORE_ROOTS;_FORCED_POSTSPAWN_HANG_AND_ABRUPT_ERROR_REMAIN_NONPASS_WITH_TWO_ABSENCE_SAMPLES",
+    "gate_cleanup": "STABLE_PARENT_AND_ROOT_DEV_INO_DIRFD_RELATIVE_O_NOFOLLOW_TRAVERSAL;_NEVER_CHMOD_FOLLOW_OR_RESTORE_A_SUBJECT_REPLACED_PATH_OR_SYMLINK;_HOSTILE_ROOT_CHILD_AND_CONFIG_SYMLINK_EXTERNAL_MODE_BYTES_DEV_INO_UNCHANGED;_GIT_OBJECT_FANOUT_ADMIN_CONFIG_AND_REF_STATE_EXACTLY_RESTORED",
+          "later_h032_boundary": "PROTECTED_MATERIALIZATION_CLOSES_LATE_WORKSPACE_EFFECTS"
+        },
+        "subject_effect_acceptance": [
+      "REAL_OUTER_DENIAL_AND_INNER_ADDITIONAL_DENIAL_WITH_ALLOWED_CHILD_SCRATCH_AND_EXACT_SINK",
+      "EXTERNAL_STAGING_ROOT_DENIES_ALL_WRITE_METADATA_AND_MOVE_EFFECTS_EXCEPT_READ_BACK_EXACT_SINK_FILE_DATA",
+      "REAL_NESTED_SANDBOX_EXEC_CONTROL_RETURNS_71_EPERM_WHILE_SUPERVISOR_COMPOSED_CHILD_RUNS",
+      "CONFINED_PUBLIC_CLI_WITH_ALL_H036_SESSION_KEYS_ABSENT_ATTEMPTS_BOOTSTRAP_THEN_FAILS_RC3_ON_NESTED_SEATBELT_WITH_ZERO_TARGET_OR_RUNTIME_RESIDUE",
+          "NO_RAW_OR_UNCONFINED_WORKER_CAN_SATISFY_DENIAL_EFFECTS",
+      "FORGED_REPLAYED_STALE_MISSING_ANCESTOR_AND_MALFORMED_HANDOFFS_REJECT_NO_EFFECT",
+      "DUPLICATE_OVERSIZE_PARTIAL_AND_TRAILING_FRAMES_SPAWN_ZERO_CHILDREN_AND_CLEAN_ALL_SESSION_RESOURCES",
+      "WRONG_OVERLAP_ALIAS_EXCEPTION_REOPEN_AND_OUTSIDE_DESCENDANT_ROOTS_REJECT",
+      "PREEXISTING_SAME_WORKSPACE_AND_DESCENDANT_WORKSPACE_NESTED_POSITIVES_PLUS_PUBLIC_MISSING_WORKSPACE_NO_CREATE_AND_CANONICAL_PYTHON_SOURCE_POSITIVE",
+        "BASE_AND_WITH_STAGING_DIGESTS_EACH_EARN_SEPARATE_CAUSAL_PRE_GO_EFFECT_RECEIPTS_AND_PARTIAL_SELECTION_REJECTS",
+        "SOLE_INTERNAL_RUNTIME_SNAPSHOT_AND_FULL_RUNTIME_CANARY_READBACK_AT_EACH_BASE_AND_WITH_STAGING_BARRIER",
+        "EVERY_REQUIRED_HEADER_AND_GO_V1_FIELD_NONFINITE_DUPLICATE_WRONG_AND_MISSING_MATRIX_WITH_CSPRNG_GUESSES_AND_THREE_SESSION_SEPARATION",
+        "DISTINCT_DESCENDANT_DENIES_AN_OUTER_WRITABLE_SIBLING_WHILE_SAME_WORKSPACE_POSITIVE_RETAINS_IT",
+      "SUBJECT_GIT_ALLOWS_ONLY_NEW_LOOSE_OBJECT_AND_OWN_INDEX_WHILE_OBJECTS_INFO_COMMDIR_GITFILES_CONFIG_WORKTREE_AND_SIBLING_ADMIN_DENY_WITH_EXACT_FANOUT_ADMIN_REF_CLEANUP",
+          "PYTHON_LAUNCHER_HELPER_CONFIG_SANDBOX_PATH_DIGEST_MODE_DEV_INO_AND_REHASH_BINDINGS",
+    "DYNAMIC_TARGET_SANITIZER_STDIO_ONLY_ZERO_PYC_AND_COMPLETE_FD_ROLE_EFFECTS_PLUS_IMMUTABLE_REVIEW_OF_EXACT_SUPERVISOR_HELPER_ENV_AND_PASS_FDS_CONSTRUCTION",
+          "SUCCESS_NONZERO_TIMEOUT_SIGTERM_SUPERVISOR_DEATH_AND_SETSID_HARMLESSNESS_LIFECYCLE"
+        ],
+        "future_dependency_transition": {
+          "h032_current_task_sha256_preserved": "436d4ff0a7323e8f682325db308237c0018b7a5037303a17c26aae9b7df6c864",
+          "h032_not_edited_by_h036": true,
+          "h032_later_depends_exactly_on": [
+            "h-036"
+          ],
+          "h032_later_removes_launcher_from_ordinary_allowed_write": true,
+          "h031_rebind_after_h032": true
+        },
+        "bp01_bp14_bindings": [
+          {
+            "id": "BP01",
+            "binding": "REAL_OUTER_SEATBELT_MAKES_THE_CURRENT_MANDATORY_NESTED_SANDBOX_APPLY_FAIL_EPERM"
+          },
+          {
+            "id": "BP02",
+            "binding": "BOUNDED_HOST_PROOF_ESTABLISHES_PEER_BOUND_PRE_SANDBOX_SUPERVISOR_COMPOSITION"
+          },
+          {
+            "id": "BP03",
+            "binding": "H036_IS_THE_EXACT_PREREQUISITE_BEFORE_H032_CAN_COMPLETE_ITS_REAL_PROVIDER_EFFECTS"
+          },
+          {
+            "id": "BP04",
+            "binding": "COMBINED_CHILD_CONFINEMENT_IS_EFFECT_PROVEN_EQUAL_OR_STRONGER_THAN_EVERY_ANCESTOR"
+          },
+          {
+            "id": "BP05",
+            "binding": "TASK_DEPENDENCY_THREE_PATH_AUTHORITY_LINE_BUDGET_TRANSITION_AND_EFFECT_ARE_EXACT"
+          },
+          {
+            "id": "BP06",
+            "binding": "NO_CALLER_SELECTED_PROFILE_ROOT_EXCEPTION_RUNTIME_PATH_DIGEST_ENVIRONMENT_OR_TRUST_AUTHORITY"
+          },
+          {
+            "id": "BP07",
+            "binding": "FORGERY_REPLAY_STALE_CAPABILITY_REOPEN_OVERLAP_SWAP_INJECTION_AND_LIFECYCLE_MUTANTS_REJECT"
+          },
+          {
+            "id": "BP08",
+            "binding": "H017_H034_H035_H037_REGISTRY_DELEGATION_AUTOPILOT_AND_UNRELATED_BYTES_REMAIN_PRESERVED"
+          },
+          {
+            "id": "BP09",
+            "binding": "THIS_CANDIDATE_FREEZES_ONLY_H036_TASK_GATE_AND_MINIMAL_DECISION_AUTHORITY_DRIFT_DOCS"
+          },
+          {
+            "id": "BP10",
+            "binding": "THE_EXACT_H036_CONTRACT_REQUIRES_INDEPENDENT_GATE_ARCHITECTURE_AND_FALSIFICATION_REVIEW"
+          },
+          {
+            "id": "BP11",
+            "binding": "THE_SEPARATE_THREE_FILE_OWNER_PRODUCT_REQUIRES_INDEPENDENT_IDENTITY_AND_EFFECT_REVIEW"
+          },
+          {
+            "id": "BP12",
+            "binding": "H017_IS_HISTORICAL_PRESERVATION_ONLY_AND_CANNOT_CREDIT_THE_RUNTIME_SUBJECT"
+          },
+          {
+            "id": "BP13",
+            "binding": "CONTRACT_AND_PRODUCT_REQUIRE_GUARDED_NONFORCE_EXACT_IDENTITY_PUBLICATIONS"
+          },
+          {
+            "id": "BP14",
+            "binding": "PUBLISHED_H034_PRECEDES_H036_AND_ONLY_PUBLISHED_H036_AUTHORIZES_THE_LATER_H032_REFREEZE"
+          }
+        ],
+        "serial_transitions": [
+          "H034_GUARDED_PUBLICATION_PROVEN",
+          "H036_TEST_AUTHOR_FREEZE",
+          "H036_INDEPENDENT_GATE_REVIEW",
+          "H036_GUARDED_CONTRACT_PUBLICATION",
+          "H036_THREE_FILE_OWNER_BUILDER_IMPLEMENTATION",
+          "H036_INDEPENDENT_PRODUCT_REVIEW",
+          "H036_GUARDED_PRODUCT_PUBLICATION",
+          "H032_REFREEZE_AGAINST_PUBLISHED_H036",
+          "H032_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+          "H031_REBIND"
+        ],
+        "forbidden_effects": [
+          "SEATBELT_WEAKENING_BYPASS_OR_ALREADY_SANDBOXED_EQUIVALENCE",
+          "EPERM_CATCH_TO_DIRECT_POPEN_RAW_OR_UNCONFINED_WORKER",
+          "NATIVE_PRIVILEGED_EXTERNAL_OR_FOURTH_PATH_BROKER",
+          "BROADER_FILESYSTEM_PROCESS_NETWORK_CREDENTIAL_OR_GENERIC_TRUST_AUTHORITY",
+          "CALLER_SELECTED_PROFILE_ROOT_EXCEPTION_CONFIG_HELPER_RUNTIME_OR_RECEIPT_PATH",
+          "SUPERVISOR_AMBIENT_ENVIRONMENT_OR_DESCRIPTOR_DELEGATION",
+          "SYSTEM_PYTHON_3_9_OR_RELOCATED_LAUNCHER_HELPER_ROUTE",
+          "POST_H036_H034_GREEN_REGRESSION_CLAIM_OR_H034_GATE_EDIT",
+          "H032_AUTOPILOT_OR_ANY_FOURTH_PRODUCT_PATH_EDIT"
+        ],
+        "preproduct_red": {
+          "label": "A_H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_OPERATIONAL",
+          "reason": "RUNTIME_SNAPSHOT_AND_V2_AUTHORITY_ABSENT",
+          "failure_signature": [
+            "CURRENT_LAUNCHER_SHA256_CB1CF372CCED",
+            "RUNTIME_SNAPSHOT_ABSENT",
+            "PYTHON_RUNTIME_AUTHORITY_V2_ABSENT",
+            "NESTED_SANDBOX_EXEC_EXIT_71_SANDBOX_APPLY_OPERATION_NOT_PERMITTED"
+          ],
+          "reference_or_judge_credit": false
+        },
+        "fail_closed": true
+      }
     }
   ],
   "human_only": {
