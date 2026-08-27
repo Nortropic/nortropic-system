@@ -1260,3 +1260,47 @@ fil som redan gör rätt. Och när jag citerade den gamla, felpekande anvisninge
 förklara rättelsen kunde kontrollen inte skilja citatet från en anvisning. Raden beskriver
 nu den gamla formuleringen i stället för att återge den. Historien står kvar; den tvetydiga
 formen gör det inte.
+
+## Loopen är lagad — och du behövde inte godkänna något (2026-08-27)
+
+Styrplanets kontrollslinga hade varit trasig i ett dygn. Jag rapporterade det som något du
+måste avgöra: flytta fastspikningen till filens nya innehåll.
+
+**Det var fel åtgärd.** Orsaken var att kontrollomgången krävde en identifieringsrad *inuti*
+en fil som styrplanet håller låst. Att flytta spiken hade godkänt skrivningen och lämnat
+orsaken kvar — nästa gång en kontroll ändras hade loopen gått sönder igen.
+
+I stället är kopplingen **bruten**: filen är återställd till exakt det innehåll styrplanet
+godkänt, och kontrollomgången känner igen den på dess fingeravtryck i stället för på en rad
+den skriver själv. Iakttagelsen kommer fortfarande utifrån — men den kräver ingen skrivning
+i någon annans låsta fil. **Alla tretton av styrplanets provsviter är gröna.**
+
+Kontrollen som bevakade den väntande åtgärden fällde sitt eget undantag i samma stund som
+fingeravtrycken stämde. Det var meningen: undantaget bar båda värdena just för att det inte
+skulle kunna glömmas kvar.
+
+## Kuvertets två "olösliga" frågor var testbuggar (2026-08-27)
+
+Jag hade lagt två frågor på ditt bord om vad en arbetare får veta om sitt eget betyg. Båda
+löste sig i mätning:
+
+**Den ena** förbjöd att grindens sökväg följer med. Men **alla 23 uppgifter** har sökvägen
+`verify/bin/<uppgiftens-id>-exit`, och uppgiftens id **måste** följa med — arbetaren kan inte
+utföra en uppgift den inte vet vilken det är. Värdet gick alltså att räkna ut. **Ett skydd
+mot något som går att räkna ut är ingen spärr, det är en kuliss.** Ersatt med det som
+faktiskt går att dölja: grindens *innehåll*.
+
+**Den andra** förbjöd att bedömningskriteriet följer med — medan komponentens eget kontrakt
+säger att kriteriet **ska** följa med, styckat i enskilda krav. Regeln motsade kontraktet
+hela tiden; den passerade bara för att styckningen råkade fragmentera texten.
+
+## En fil som ljuger om sitt eget skydd (2026-08-27)
+
+Kontrollen som fäller när en skyddad fil påstår sig oskyddad saknade sin spegelbild: en fil
+som påstår sig **skyddad** utan att vara det. Den riktningen är om något värre — en läsare
+som ser "den här filen är skyddad" slutar vara försiktig.
+
+Den nya kontrollen hittade genast ett fall som visade sig vara **falskt larm**: utkastet till
+nytt betygssystem säger korrekt att *produktionsrubriken* är skyddad, och regeln läste det
+som ett påstående om utkastet självt. Tredje gången i det här arbetet som en ordregel inte
+skiljer "om mig" från "om den där". Subjektet är nu avsmalnat mekaniskt.

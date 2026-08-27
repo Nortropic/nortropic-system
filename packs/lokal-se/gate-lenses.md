@@ -4,10 +4,17 @@ Masterplanens §6 räknar upp sex paketdelar: manifest · research module · str
 **eval module** · **gate lenses** · **agent fragments**. `PK-GAP-3` namnger att kontraktet
 bara kräver de tre första. **Detta är den femte.**
 
-**Filen är INTE §A7-skyddad kalibreringsyta.** §A7 zonar `manifest.md`,
-`research-module.md` och `strategi/*` eftersom de bär kvittolistor och juridikflaggor
-(§7.4/§7.7). Grindlinser bär ingen av delarna — de säger vilken universell kategori en
-paketspecifik iakttagelse hör hemma i.
+**Filen ÄR §A7-skyddad kalibreringsyta sedan 2026-08-27.** Den var det inte tidigare, och
+skälet som stod här var korrekt så långt det gick: §A7 zonade `manifest.md`,
+`research-module.md` och `strategi/*` för att de bär kvittolistor och juridikflaggor
+(§7.4/§7.7), och grindlinser bär ingen av delarna — de säger bara vilken universell
+kategori en paketspecifik iakttagelse hör hemma i.
+
+**Det argumentet missade vad `GL-GAP-1`:s stängning gjorde med filen.** Kategoritabellen i
+det §A3-skyddade `workflows/nortropic-launch.js` GENERERAS numera härifrån. Filen bär alltså
+inte kvittolistor — men den SKRIVER in i en skyddad yta, och en oskyddad fil som genererar
+in i en skyddad vänder skyddsriktningen. Zoneringen följer av vad filen GÖR, inte av vad den
+innehåller.
 
 ---
 
@@ -66,4 +73,4 @@ grindens prompt, inte här (`GL-GAP-2`). Den här filen binder kategorin, inte g
 | ID | Lucka | Nästa transition |
 |---|---|---|
 | `GL-GAP-1` | **STÄNGD 2026-08-27 genom GENERERING.** Workflow-DSL:en har ingen filsystemsåtkomst, så `nortropic-launch.js` KAN inte läsa den här filen vid körning — och att låta en agent rapportera kategorimappningen vore värre än problemet, eftersom kategorimängden måste vara sluten och universell (§10) och en modellrapporterad mapping är varken. **Paketen är nu KÄLLAN och workflowets tabell är UTDATA:** `node scripts/check-paketlinser.mjs --generera` skriver den, och vakten räknar fram tabellen i minnet och kräver att den committade är IDENTISK. Drift är därmed inte längre något att upptäcka utan något som inte kan committas | — |
-| `GL-GAP-2` | **NAMNGIVEN.** Linsernas INNEHÅLL (vad de tittar efter) står i grindens prompt, inte här. Den här filen binder KATEGORIN — vilken universell kategori en paketspecifik iakttagelse aliasar in på — aldrig kravet | **RÄTTAD TRANSITION 2026-08-27. Stod tidigare som en ren hänvisning till `GL-GAP-1`:s väg, och det var aktivt vilseledande:** att stänga den här luckan på `GL-GAP-1`:s sätt — generera innehållet ur paketet in i workflowet — skulle GÖRA SKYDDET SVAGARE, inte starkare. Linsinnehållet för `lokal-se` (*"NAP-konsistens mot business.ts, ortssidornas kvalitet, `address.publik`→PostalAddress, postalCode-format, GBP-/Bing-/IndexNow-stegen"*) är grindens KRAVNIVÅ och ligger i `workflows/nortropic-launch.js`, alltså på **§A3-ytan**. Den här filen är **inte** §A-zonad: §A7 räknar upp `packs/*/manifest.md`, `packs/*/research-module.md` och `packs/*/strategi/*` — inte `gate-lenses.md`. **En generering hade därför låtit en OSKYDDAD fil bestämma vad en SKYDDAD grind kräver**, och riktningen är hela poängen: §A finns för att en agent inte ska kunna sänka ett krav genom att redigera något den får redigera. **Skillnaden mot `GL-GAP-1`:** där genereras KATEGORIMAPPNINGEN, alltså routning — vilken universell hink ett fynd hamnar i. Här skulle KRAVET självt genereras. Routning är inte kravnivå. **Vad som skulle behöva hända först är ägarens hand, inte min:** att `packs/*/gate-lenses.md` zonas under §A. Först då är riktningen skyddad-till-skyddad, och först då är generering rätt väg |
+| `GL-GAP-2` | **NAMNGIVEN.** Linsernas INNEHÅLL (vad de tittar efter) står i grindens prompt, inte här. Den här filen binder KATEGORIN — vilken universell kategori en paketspecifik iakttagelse aliasar in på — aldrig kravet | **SPÄRREN ÄR BORTA 2026-08-27 (HÖGRISK, ägarinstruktion *"du kan röra konstitutionen också"*).** Transitionen sa först *"följ `GL-GAP-1`:s väg"*, vilket var vilseledande: den vägen hade låtit en OSKYDDAD fil bestämma vad en SKYDDAD grind kräver. **Skälet gäller inte längre.** §A7 zonar nu `packs/*/gate-lenses.md`, så riktningen är skyddad-till-skyddad. Generering är därmed RÄTT väg, och luckan är byggbar. **DEN GÖRS ÄNDÅ INTE HÄR, och skälet är sekvens, inte förmåga:** att generera linsinnehåll ändrar vad SEO-grinden letar efter, och nästa steg är systemets FÖRSTA fullständiga körning. **Man byter inte mätinstrument och tar den första mätningen i samma drag** — då går det inte att veta vilket som orsakade vad. Byggs som egen skiva EFTER att första körningen gett grindens nuvarande beteende en baslinje. **Skillnaden mot `GL-GAP-1` står kvar och är fortfarande skälet till att zoneringen behövdes:** där genereras ROUTNINGEN — vilken universell hink ett fynd hamnar i. Här genereras KRAVET. Routning är inte kravnivå |

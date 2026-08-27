@@ -10,8 +10,6 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
-console.log('VAKT: check-invariants.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, så även en ODÖMBAR körning identifierar sig
-
 const CHECKS = ['INV-001', 'INV-002', 'INV-003', 'INV-004', 'INV-005', 'INV-006', 'INV-007', 'INV-008'];
 const violations = [];               // { id, line }
 const invalid = new Set();           // checks som inte kunde bedomas -> FAIL, aldrig PASS

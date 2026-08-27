@@ -749,6 +749,54 @@ forbudOmArtefaktSaknas({
   const fornekare = zonadeFiler.filter((f) => FORNEKELSE.test(ren(las(f))))
   if (fornekare.length === 0) ja('J-förnekelse: ingen §A-zonad yta påstår om sig själv att den är oskyddad')
   else nej('J-förnekelse', `${fornekare.join(', ')} säger om sig själv att den inte är §A-skyddad medan konstitutionen zonar den — en agent som söker vad den får ändra läser ytan, inte grundlagen`)
+
+  // SYMMETRIN SAKNADES, och en mutation visade det: att stryka `packs/*/gate-lenses.md`
+  // ur §A7 fällde INGENTING. Gruppen fångade bara den ena riktningen — en skyddad fil som
+  // förnekar sitt skydd — och lämnade den andra öppen: **en fil som HÄVDAR ett skydd den
+  // inte har.** Den riktningen är om något värre. En läsare som ser "den här filen är
+  // §A-skyddad" slutar vara försiktig, och zoneringen kan under tiden ha rullats tillbaka
+  // i grundlagen utan att någon märkte det. Skyddet blir då ett löfte i fel fil.
+  //
+  // Samma symmetriprincip som resten av vakten vilar på: koherens betyder att
+  // dokumentationen och trädet säger samma sak, och en saknad artefakt får aldrig i sig
+  // släcka en kontroll — den VÄNDER den.
+  const ANSPRAK = /(den|filen|tabellen|katalogen|paketet|dokumentet|listan|registret|modulen|ytan)\s+(är|står)\s+(numera\s+|sedan\s+\S+\s+)?§A[0-9]*-?(skyddad|zonad)/i
+  const kandidater = (() => {
+    try {
+      // OSPÅRADE FILER RÄKNAS MED. `git ls-files` ensamt lät en NY fil hävda §A-skydd om
+      // sig själv utan att fällas — den var ju inte tillagd än. En fil som ljuger om sitt
+      // skydd gör det redan innan någon committar den, och det är just innan den läses av
+      // den som ska bestämma om den får ändras. Samma uppräkning som resten av repot.
+      return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'],
+        { cwd: ROT, encoding: 'utf8' }).split('\n')
+        .filter((f) => f.endsWith('.md') && f !== 'docs/07-konstitution.md' && f !== 'docs/05-beslutslogg.md')
+    } catch { return [] }
+  })()
+  if (kandidater.length === 0) {
+    console.error('ODÖMBART: kandidatmängden för §A-anspråk kunde inte räknas upp — en tom mängd får aldrig läsas som frånvaro av anspråk')
+    process.exit(2)
+  }
+  // SUBJEKTET MÅSTE VARA FILEN SJÄLV — och första formen klarade inte det. Utkastrubriken
+  // skriver *"Produktionsmåttet är och förblir `…/eval-rubric.md`. **Den filen** är
+  // §A2-skyddad"*, alltså ett korrekt påstående om en ANNAN fil, och den lästes som ett
+  // självanspråk. **Tredje gången i samma bygge att en lexikal regel inte skiljer "om mig"
+  // från "om den där"**, och motmedlet är detsamma som förut: smalna av subjektet
+  // mekaniskt i stället för att lita på ordvalet.
+  //
+  // Regeln: nämns en ANNAN sökväg strax före anspråket är anspråket om den sökvägen.
+  const SOKVAG = /[A-Za-z0-9_][A-Za-z0-9_./-]*\.(md|js|mjs|json)/g
+  const omAnnanFil = (text, traff, migSjalv) => {
+    const fonster = text.slice(Math.max(0, traff.index - 140), traff.index)
+    return (fonster.match(SOKVAG) || []).some((v) => v !== migSjalv && !migSjalv.endsWith(v))
+  }
+  const falskaAnsprak = kandidater.filter((f) => {
+    if (!finns(f) || zonadeFiler.includes(f)) return false
+    const text = ren(las(f))
+    const traff = new RegExp(ANSPRAK.source, 'i').exec(text)
+    return !!traff && !omAnnanFil(text, traff, f)
+  })
+  if (falskaAnsprak.length === 0) ja('J-anspråk: ingen fil hävdar ett §A-skydd som grundlagen inte ger den')
+  else nej('J-anspråk', `${falskaAnsprak.join(', ')} säger om sig själv att den ÄR §A-skyddad men står inte i §A — en läsare som tror på raden slutar vara försiktig, och zoneringen kan ha rullats tillbaka utan att någon märkte det`)
 }
 
 // ── Verdikt ───────────────────────────────────────────────────────────────────
@@ -757,7 +805,7 @@ forbudOmArtefaktSaknas({
 // över en. FORVANTAT är därför skriven för hand och jämförs mot faktiskt antal.
 // Faller de isär är körningen ODÖMBAR: en vakt som tappat kontroller vet inte längre
 // vad dess grönt betyder, och får då inte påstå någonting alls.
-const FASTA = 75   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9 · J 3
+const FASTA = 76   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9 · J 4
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)

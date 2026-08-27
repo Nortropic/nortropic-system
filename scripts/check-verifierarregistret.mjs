@@ -62,7 +62,7 @@ const las = (p) => {
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '04c6183db3f91d33'
+const FORVANTAD_KALLHASH = 'ba7cebc923811ea4'
 
 const REGISTER = 'controller/verify/register.json'
 const ANKARE = 'scripts/check-vaktankare.mjs'
@@ -72,13 +72,19 @@ const ANKARE = 'scripts/check-vaktankare.mjs'
 // inte heller repareras härifrån, eftersom registrets rebindning är människohand. Raden
 // nedan bär BÅDA hasharna, så den beskriver EXAKT ett tillstånd: den drift som redan fanns
 // när vakten skrevs. Varje annan drift, i endera riktningen, är ny och fäller.
-const VANTAR_PA_AGARHAND = {
-  'check-invariants': {
-    registrerad: 'd37e45b46cdc92a016022b80e7f1ea32661cd33a4f1b97af61962bc7cb0bf3ba',
-    faktisk: 'dbdf696d7cefd33549bb96159f620b77d5d1f38b455c291b0f46a6a5cee064e5',
-    orsak: 'commit 1c206173 lade batterikörarens kvittensrad i filen utan att rebinda registret',
-  },
-}
+// TOM — OCH DEN TOMHETEN ÄR RESULTATET, inte en oskriven rad.
+//
+// Den enda posten här var `check-invariants`, och den ströks 2026-08-27 utan att någon
+// rebindade registret. **Driften togs bort i stället för att godkännas:**
+// `scripts/check-invariants.mjs` är återställd till exakt de bytes registret pinnar
+// (`d37e45b4…`), och `kor-vakter.mjs` identifierar den numera på sin HASH mot
+// ankarvaktens pinntabell i stället för att kräva en kvittensrad inuti filen.
+//
+// **Kravet på en kvittensrad var en skrivning i någon annans låsta yta.** Att i stället
+// rebinda registret hade godkänt skrivningen och lämnat orsaken kvar — nästa vaktändring
+// hade brutit loopen igen. Vakten som skrev den här raden fällde den själv så snart
+// hasharna stämde, vilket är hela poängen med att ett undantag bär BÅDA värdena.
+const VANTAR_PA_AGARHAND = {}
 
 // ---- MEKANISMEN, FAKTORISERAD UT -------------------------------------------
 // `jamfor` tar registret, en filläsare och undantagstabellen och avgör allt. Den rör inget
