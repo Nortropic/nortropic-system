@@ -1144,3 +1144,30 @@ namnger filen och faktiskt startar den.
 **Listan över det som förlitar sig på att du kommer ihåg** skrivs ut vid varje grön körning
 i stället för att gömmas. Det är den klassen som redan kostat oss ett dygn, och den ska
 synas, inte sorteras undan.
+
+## Ett prov som bytt fråga utan att byta namn (2026-08-27)
+
+Ett av styrplanets prov hette "för många argument" och prövade att kommandot avvisar fem
+argument. Det var rätt när provet skrevs. Sedan dess har du själv utökat kommandot med ett
+femte, valfritt argument — så fem är numera ett giltigt anrop, och provet mätte i själva
+verket något helt annat än sitt eget namn.
+
+**Ett prov som bytt fråga utan att byta namn är värre än ett som fallit**, för dess röda rad
+pekar åt fel håll. Rättat till sex argument, vilket är otvetydigt för många.
+
+**De fyra kvarvarande felen i samma svit är TVÅ frågor, inte en** — och förra rapporten hade
+fel om det. Vi mätte i stället för att anta:
+
+**Tre av dem:** ett fält som aldrig får följa med till arbetaren är en sökväg, och den
+sökvägen står ordagrant inne i den TEXT som legitimt följer med — skriven dit av den som
+författade uppgiften. Läckaget är alltså inte byggarens verk. Frågan är om en
+uppgiftsbeskrivning får nämna sin egen slutkontroll.
+
+**Den fjärde:** en beskrivning på 534 tecken i en enda mening. Ett krav säger att arbetaren
+ska få den fullständigt, ett annat att just den texten aldrig får finnas i kuvertet. Båda
+kraven är rimliga, båda står i samma fil, och för en mening som inte går att dela kan de
+inte hållas samtidigt.
+
+Ingen av de två avgörs av mig — den ena rör din egen uppgiftsyta, den andra flyttar gränsen
+för hur mycket en arbetare får veta om sitt eget betyg. Vad som gjorts är att skilja dem åt
+och mäta dem, så att beslutet blir en rad i stället för en utredning.
