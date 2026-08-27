@@ -64,7 +64,7 @@ const SJALVPIN = '3c88dd99fdb8e0ee'
 // raden i SAMMA commit — det är hela poängen att den ändringen syns här.
 const PINNAR = {
   'check-autobygg-delegation.mjs': '8f186bba47978877',
-  'check-backtest-fixtures.mjs': '260de218b3509ffd',
+  'check-backtest-fixtures.mjs': 'fc5ddc31237b9d66',
   'check-docs-coherence.mjs': 'f06850dc1ec19b15',
   'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-forbattring.mjs': '8ebe9f9e2b6a1170',
@@ -75,6 +75,7 @@ const PINNAR = {
   'check-karn-universalitet.mjs': 'd9dff3487cfca7e1',
   'check-knowledge-lane.mjs': '2b9bb187a92b6866',
   'check-pack-contract.mjs': 'd6b8395bfb1bfd2d',
+  'check-paketlinser.mjs': '6ecbb9e7d62ac561',
   'check-planner-routing.mjs': '8524b3da1901c5eb',
   'check-profile-contract.mjs': '5da81cc32582b46c',
   'check-research-contract.mjs': '4aa0aa5b5f281092',

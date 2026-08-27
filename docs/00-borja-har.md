@@ -204,6 +204,36 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Regler som bodde på fel ställe (2026-08-27)
+
+Två saker som såg färdiga ut visade sig ligga fel — och båda av samma skäl.
+
+**Det första: vårt lokalpaket ägde inte sina egna kontroller.** När fabriken granskar en
+lokal sajt tittar den extra på ortssidor, Google-profilen och jourlöften. De tre
+kontrollerna hörde till paketet — men låg **inbakade i granskningsmaskineriet** i stället
+för i paketet. **Följden är att ett andra paket inte kan tillföra en egen kontroll utan att
+någon går in och ändrar i maskineriet.** Ett paket som inte bär sina egna delar är inte
+riktigt ett paket.
+
+Paketet listar dem nu själv, och en kontroll fäller om listan och maskineriet börjar säga
+olika saker — **åt båda hållen**, så en kontroll inte kan läggas till på ena stället och
+glömmas på det andra.
+
+**Det andra: jag hade beskrivit ett problem fel.** Jag har skrivit att regeln om gamla
+kundsajter — att tomhet betyder *"vi vet inte"* och aldrig *"nej"* — inte används av någon.
+**Det stämde inte.** Regeln står i båda granskningsmaskinerierna och i tre andra filer.
+Det som faktiskt saknades var något som hindrar den från att **tyst falla bort** nästa gång
+någon skriver om texten. Det finns nu.
+
+**Och en läxa om kontroller:** min första version krävde att regeln skulle stå med *exakt*
+en viss formulering — och fällde då en fil som redan gjorde helt rätt, med andra ord. **En
+kontroll som kräver en formulering tvingar fram sämre text i en fil som var rätt.** Den
+prövar nu innebörden.
+
+**Ärligt om gränsen:** paketets lista är en *spegel* av maskineriet, inte en koppling till
+det. Maskineriet läser fortfarande inte paketet — att ändra det rör en skyddad yta och är
+ditt beslut.
+
 ## Reglerna för att förbättra någon annans sajt (2026-08-27)
 
 Ett av provfallen — Alvestas Måleri — slutar med att vi säger *"vi bygger inte nytt, vi
