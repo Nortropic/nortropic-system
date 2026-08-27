@@ -1,7 +1,9 @@
 # Agentöverlämning — läs detta först i en ny session
 
-Senast verifierad mot systemet: 2026-08-27 · v1 (denna commit)
-Verifieringsomfång: nyskapad. Filen finns för att en session ska kunna rensas utan att
+Senast verifierad mot systemet: 2026-08-27 · v2 (denna commit)
+Verifieringsomfång: v2 lade till luckornas STATUSVOKABULÄR i §4 — metod, inte status —
+efter en inventering som fann statuslagret helt oguardat. Filen finns för att en session
+ska kunna rensas utan att
 arbetssättet går förlorat. **Den bär METODEN och ÄGARENS ARBETSSÄTT — aldrig teknisk
 status.** Statusen bor i `docs/05-beslutslogg.md` och i luckornas egna rader; att duplicera
 den här vore att skapa en andra sanning som driftar.
@@ -79,6 +81,29 @@ svenska teckenklasser.
   går stängningen inte att kontrollera, och en halv stängning läses som hel.
 - **Syntetisk evidens bär aldrig något till `PROVEN`.**
 
+### Luckornas statusvokabulär — sluten, och den bor här för att den är METOD
+
+En lucka bär sin status på sin egen **rad-av-protokoll**: en tabellrad vars FÖRSTA cell
+namnger luckan, eller en rubrik som INLEDS med luckans id. Statusen står i den raden och
+ingen annanstans; mängden är sluten och `check-luckregister.mjs` läser den härifrån.
+
+<!-- LUCKSTATUS: BÖRJAN — check-luckregister.mjs extraherar vokabulären ur den här tabellen -->
+
+| Status | Betyder |
+|---|---|
+| `NOT_STARTED` | Erkänd, men ingen väg fram är ens formulerad |
+| `NAMNGIVEN` | Öppen och medvetet accepterad — gränsen är utskriven, inte gömd |
+| `DELVIS ÅTGÄRDAT` | En halva är gjord och den andra halvan är NAMNGIVEN i samma rad |
+| `ÅTGÄRDAT` | Felet är borta, men kravet står kvar som vänt krav |
+| `STÄNGD` | Kravet är uppfyllt och bevisat; raden står kvar VÄND |
+| `ÖPPEN` | Återöppnad efter att ha stått stängd — aldrig ett förstaläge |
+
+<!-- LUCKSTATUS: SLUT -->
+
+**Varför inget luckregister byggs.** Ett register vore en ANDRA sanning om status, och den
+driftar. Vakten jämför i stället raderna-av-protokoll **mot varandra** — två rader som säger
+olika om samma lucka fäller, och en lucka utan rad fäller. Det kräver ingen andra yta.
+
 ## 5. Vad som INTE ska byggas, och varför
 
 **Paketets eval-modul.** Den skarpa rubriken har ingen paketdel; att lägga till en är en
@@ -93,7 +118,7 @@ en människa.** Detta är inte "hann inte" — det är "ska inte förrän ägare
 | Vad som beslutats och varför | `docs/05-beslutslogg.md` (nyast sist) |
 | Vad som är byggt, i klarspråk | `docs/00-borja-har.md` |
 | Vilka vakter som finns | `README.md`:s skriptrad · `node scripts/kor-vakter.mjs` |
-| Öppna luckor | sök `-GAP-` i trädet; varje har en rad med nästa transition |
+| Öppna luckor | sök `-GAP-` i trädet; varje har en rad med nästa transition — `check-luckregister.mjs` fäller om en saknas eller om två rader säger olika |
 | Kapaciteternas mognad | `docs/kapacitetskatalog.md` |
 
 **Ingen status upprepas här.** Den enda uppgiften som inte finns någon annanstans: nästa

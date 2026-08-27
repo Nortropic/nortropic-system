@@ -104,8 +104,8 @@ torrkörning till noll kostnad; verdiktet är `ODÖMBART`, aldrig PASS. Vad som 
 | ID | Lucka | Nästa transition |
 |---|---|---|
 | `GYM-GAP-1` | **DELVIS ÅTGÄRDAT 2026-08-27.** Luckans nästa transition sa *"ägarbeslut om budgettak, sedan en runner"* — **ordningen var fel.** Budgeten behövdes bara för de led som ANROPAR modeller. `scripts/kor-gym.mjs` bygger och PRÖVAR `G1`, `G4`, `G7`, `G9` och `G10` för noll kronor, och producerar rapportformen som torrkörning. Femton kontrollprov tvingar varje lag att bevisa att den FÄLLER. **Torrkörningen ger `ODÖMBART`, aldrig PASS.** **Kvarstår:** modelladaptern är inte byggd — utan den gör `--budget` ingenting, och scriptet säger det i klartext i stället för att låtsas | Modelladapter + ett tak i kronor. **Men budgeten är inte det som blockerar mest:** `GYM-GAP-2` (held-out-repot) gör led 2 `ODÖMBART` även med obegränsad budget, och det kan inte köpas bort |
-| `GYM-GAP-2` | Held-out-repot finns inte, så `G6` och led 2 är oprövbara | Ägarceremoni enligt `docs/kompetensregister.md` |
-| `GYM-GAP-3` | GYM-EXP-1 är designad (§6) men aldrig körd | Följer `GYM-GAP-1` |
+| `GYM-GAP-2` | **NAMNGIVEN.** Held-out-repot finns inte, så `G6` och led 2 är oprövbara | Ägarceremoni enligt `docs/kompetensregister.md` |
+| `GYM-GAP-3` | **NAMNGIVEN.** GYM-EXP-1 är designad (§6) men aldrig körd | Följer `GYM-GAP-1` |
 
 ## 6. GYM-EXP-1 — designen, med kontrollen som gör den ärlig
 

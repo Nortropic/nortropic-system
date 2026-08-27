@@ -163,6 +163,15 @@ just därför `integrationer` är ett eget fält. Vallgraven är en säkerhetseg
 en sajt utan eget tillstånd kan inte läcka persondata den inte har, går inte ner av
 en migrering och väcker ingen klockan tre.
 
+#### INTEGRATIONSREGISTRETS KÄNDA LUCKA
+
+`scripts/check-integrationer.mjs` prövar att UNDERLAGET till Gate 6 är fullständigt.
+Den avgör ingenting juridiskt (§A4), och den kan inte veta vad en tjänst faktiskt gör.
+
+| ID | Lucka | Nästa transition |
+|---|---|---|
+| `INT-GAP-1` | **NAMNGIVEN.** **Profilen är en DEKLARATION, inte en mätning.** Vakten fäller när deklarationen motsäger SIG SJÄLV — heter posten "kartinbäddning" och `lage` säger `lank` är minst ett av fälten fel — men **en inbäddning som deklareras som `lank` och vars namn inte avslöjar det passerar fortfarande.** Det är verifierat i ett eget mutationsprov (`I1b`), inte antaget: åtta av nio mutationer dödades, och den nionde är den här | Kräver den byggda sajtens FAKTISKA tredjepartsförfrågningar — Gate 2/Gate 6 mot en deployad preview. Går inte att stänga från repot |
+
 #### KÄRNA vs PAKET i scaffolden
 
 Scaffolden delas i två lager. **Kärnan** byggs för varje sajt oavsett paket:

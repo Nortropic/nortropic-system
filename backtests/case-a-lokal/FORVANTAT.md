@@ -71,9 +71,9 @@ tio har fällt åtta av tio, och de två som slapp igenom ska namnges.
 
 | ID | Avvikelse |
 |---|---|
-| `A-GAP-1` | §26 säger *"historical/frozen local-service fixture"*. Detta är en FRUSEN SYNTETISK fixtur med lokal-se-kontraktets fulla form, **inte den historiska kundens repo** — det ligger inte i `nortropic-system` och har inte konsulterats. Bevarandet prövas därför mot kontraktet, inte mot historisk kundevidens. Att stänga avvikelsen kräver ägarens beslut om att ta in det historiska repot som fixtur |
+| `A-GAP-1` | **NAMNGIVEN.** §26 säger *"historical/frozen local-service fixture"*. Detta är en FRUSEN SYNTETISK fixtur med lokal-se-kontraktets fulla form, **inte den historiska kundens repo** — det ligger inte i `nortropic-system` och har inte konsulterats. Bevarandet prövas därför mot kontraktet, inte mot historisk kundevidens. Att stänga avvikelsen kräver ägarens beslut om att ta in det historiska repot som fixtur |
 | `A-GAP-3` | **STÄNGD 2026-08-26.** §26:s TVÅ vägar finns nu båda: `case-a-lokal/` (universell kärna + paket) och `case-a-legacy/` (kompatibilitetsvägen — samma kund, `profilKontraktVersion: 'v1.1.0'`, utan v2-fältgrupperna). Bakåtkompatibilitetslagens andra led — *saknade v2-fält läses som `SAKNAS_I_V1`, aldrig som tomt, falskt eller noll* — stod bara som prosa i `skills/nortropic-stack/SKILL.md` och är nu KOD i `scripts/profil-las.mjs`. `kor-backtest.mjs` kör båda vägarna och jämför: **v1.1.0-profilen når samma utfall som v1.2.0-profilen.** Kvarvarande, namngivet som `AL-GAP-2`: läsaren finns men ingen konsument använder den ännu — lagen är prövbar, inte påtvingad. Se `backtests/case-a-legacy/FORVANTAT.md` |
-| `A-GAP-2` | §26:s diagnostik *"numeric v3↔v4 total equality"* kan inte köras: v4 är `NOT_PRODUCTION` och saknar konsument, och v4:s nämnare varierar per sajt. Diagnostiken hör till S7/S8:s AKTIVERADE läge, efter S6 — inte hit |
+| `A-GAP-2` | **NAMNGIVEN.** §26:s diagnostik *"numeric v3↔v4 total equality"* kan inte köras: v4 är `NOT_PRODUCTION` och saknar konsument, och v4:s nämnare varierar per sajt. Diagnostiken hör till S7/S8:s AKTIVERADE läge, efter S6 — inte hit |
 
 ## Vad denna fixtur ALDRIG får användas till
 

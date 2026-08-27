@@ -4,9 +4,26 @@ Senast verifierad mot systemet: 2026-08-25 · v1 (denna commit)
 Verifieringsomfång: nyskapad i S3-skivan; inga tidigare påståenden att verifiera.
 
 En **kapacitet** är en enhet av webbkompetens som fabriken kan **leverera och
-oberoende verifiera**. Katalogen är VANLIG DOKUMENTATION: ingen mekanisk grind läser
-den, och den är inte §A-skyddad. Dess värde ligger i att den tvingar fram frågan
-"hur vet vi att detta blev gjort?" innan något utlovas.
+oberoende verifiera**. Dess värde ligger i att den tvingar fram frågan "hur vet vi att
+detta blev gjort?" innan något utlovas.
+
+> **HÖGRISK-RÄTTELSE 2026-08-27 (ägarinstruktion: *"Fixa och bygg vidare allt vi ska och
+> kan"*).** Filen påstod om sig själv att *"ingen mekanisk grind läser den, och den är inte
+> §A-skyddad"*. **Båda leden var falska**, och riktningen var den farliga: en fil som säger
+> till sin läsare — inklusive en agent — att den är oskyddad inbjuder till autonoma
+> ändringar av en människoägd mätstock.
+>
+> - **`docs/07-konstitution.md` §A9 zonar den här filen uttryckligen.** Zoneringen kom med
+>   H-2 (2026-08-26), efter att texten ovan skrevs (S3, 2026-08-25); påståendet var sant när
+>   det skrevs och blev falskt utan att någon rörde meningen.
+> - **Sju mekanismer läser filen:** `check-planner-routing.mjs` · `check-pack-contract.mjs` ·
+>   `check-forbattring.mjs` · `check-extern-bokning.mjs` · `check-profile-contract.mjs` ·
+>   `check-docs-coherence.mjs` · `kor-backtest.mjs` (kapacitetsgrinden, `KOR-GAP-1`).
+>
+> **Vad §A9 faktiskt skyddar, ordagrant ur konstitutionen:** *"Innehållet i tabellernas RADER
+> (att en viss kapacitet står VALIDATING) är vanlig dokumentation och får ändras med belägg;
+> det som är §A-skyddat är SEMANTIKEN — vad lägena betyder och vad de kräver."* En rad flyttas
+> alltså med belägg; att ändra vad `PROVEN` KRÄVER är människans hand.
 
 **Universella alltid-på-egenskaper är KÄRNREGLER, inte katalograder.** Faktatrohet,
 tillgänglighet och säkerhet gäller varje leverans och får aldrig se ut som ett

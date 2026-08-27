@@ -60,9 +60,14 @@ självförtroende utan belägg som resten av systemet finns för att förhindra.
 profil för branschen är det inget fel: plannern syntetiserar §7 ur research + 5d-fynden
 enligt bevisregeln, precis som den gör i dag.
 
-**Zonstatus:** paketet är **ÄNNU INTE §A-zonat.** Nattskiftets Zon 1
-(bransch-antislop-skörd) förblir VILANDE tills konstitutionen uttryckligen zonar
-`packs/` — den zoningen är en mänsklig §A-handling (H-2), aldrig en agenthandling.
+**Zonstatus (HÖGRISK-RÄTTELSE 2026-08-27, ägarinstruktion *"Fixa och bygg vidare allt vi
+ska och kan"*):** paketet **ÄR §A-zonat sedan H-2, 2026-08-26.** Raden sa tidigare *"ÄNNU
+INTE §A-zonat"* och beskrev zoningen som något som ännu skulle ske — den hade redan skett.
+`docs/07-konstitution.md` §A7 lyder: *"skyddet har följt med till den repo-nativa paketytan
+`packs/` — `packs/*/manifest.md`, `packs/*/research-module.md` och `packs/*/strategi/*` är
+härmed §A-skyddad kalibreringsyta."* Nattskiftets Zon 1 (bransch-antislop-skörd) förblir
+**VILANDE**, och det är en SEPARAT sak: konstitutionen säger uttryckligen att *"att en yta är
+§A-skyddad och att trappan släpps in på den är två skilda beslut."*
 §7.4 (kvittolista & attribution) och §7.7 (juridikflaggor) är §A7-skyddade och rörs
 aldrig av skörd.
 

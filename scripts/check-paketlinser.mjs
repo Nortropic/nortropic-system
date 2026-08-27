@@ -48,7 +48,7 @@ const las = (p) => {
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '01e2660e3d07d3cb'
+const FORVANTAD_KALLHASH = 'e975f77c908625d7'
 
 // ---- --generera: GL-GAP-1 stängd genom GENERERING, inte genom läsning ------
 // Workflow-DSL:en har INGEN filsystemsåtkomst, så `nortropic-launch.js` kan inte läsa
@@ -149,6 +149,19 @@ check('Luckan `GL-GAP-1` står som TABELLRAD med sin transition',
   paket.some((p) => existsSync(join(ROT, `packs/${p}/gate-lenses.md`)) &&
     /^\| `GL-GAP-1` \|[^|]+\|[^|]+\|$/m.test(las(`packs/${p}/gate-lenses.md`))),
   'ett omnämnande i prosan räcker inte — raden kan strykas medan ordet står kvar, och då läses spegeln som en koppling')
+
+// RADEN BINDS TILL MEKANISMEN, inte bara till de andra raderna. En mutation som vände
+// `GL-GAP-1` från STÄNGD till ÖPPEN överlevde hela batteriet 2026-08-27: luckan har bara
+// EN rad, så konsistenskontrollen i `check-luckregister.mjs` hade ingenting att jämföra
+// med, och `ÖPPEN` är ett giltigt vokabulärord. Konsistens är inte korrekthet.
+// Kontrollen ovan bevisar att den genererade linstabellen ÄR den committade — alltså att
+// GENERERINGEN, som var stängningens hela substans, fortfarande håller. Då får raden inte
+// säga att luckan är öppen: statusen och maskineriet skulle peka åt olika håll, och den
+// som läser raden skulle tro att en byggd väg saknas.
+check('`GL-GAP-1`:s status STÄMMER med mekanismen som stängde den',
+  paket.every((p) => !existsSync(join(ROT, `packs/${p}/gate-lenses.md`)) ||
+    /^\| `GL-GAP-1` \|[^|]*STÄNGD/m.test(las(`packs/${p}/gate-lenses.md`))),
+  'linstabellen genereras fortfarande — stängningens substans håller — men luckans egen rad säger något annat. En återöppning kräver att mekanismen FAKTISKT slutat gälla, inte att raden skrivs om')
 
 // ---- PK-GAP-3: agentfragmenten, masterplanens §6:s SJÄTTE paketdel --------
 // Samma fynd som med linserna: paketets skärpningar av agenternas beteende fanns redan —
