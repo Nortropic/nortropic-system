@@ -74,7 +74,7 @@ const PINNAR = {
   'check-invariants.mjs': 'dbdf696d7cefd335',
   'check-karn-universalitet.mjs': 'd9dff3487cfca7e1',
   'check-knowledge-lane.mjs': '2b9bb187a92b6866',
-  'check-pack-contract.mjs': '36bcd52b5b6c3807',
+  'check-pack-contract.mjs': '69ad96b062b02161',
   'check-paketlinser.mjs': '7d7ad50e703e9007',
   'check-planner-routing.mjs': '8524b3da1901c5eb',
   'check-profile-contract.mjs': '5da81cc32582b46c',
