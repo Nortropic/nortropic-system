@@ -14,7 +14,7 @@ eller på datan.
 
 ---
 
-## 1. NAP
+## 1. Organisation & typade kontaktvägar
 
 Ekbergs Rör AB, aktiebolag, org.nr 556xxx-xxxx (syntetiskt). F-skatt: registrerad, belagt.
 NAP: Ekbergs Rör AB · Kungsängsgatan 62, 753 22 Uppsala · 018-14 22 90.
@@ -47,7 +47,7 @@ uppdrag) · akutfall som ringer utan att jämföra.
 formuläret ger de större uppdragen (bostadsrättsföreningar). Motstridig signal:
 telefonen har högre volym (63 av 78).
 
-## 5. Geografisk räckvidd & språk
+## 5. Geografi & språk
 
 Uppsala (huvudort, belagt med fakturaunderlag) · Knivsta · Storvreta · Björklinge.
 Restid utanför dessa: kunden åker inte längre än 40 minuter.

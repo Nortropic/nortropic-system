@@ -79,7 +79,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '5daad30268dbab9a'
+const FORVANTAD_SIGNATUR = '90bebe6b8ce188b4'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -434,24 +434,95 @@ if (KANON.length !== 17) odombart(`kontraktets sektionstabell gav ${KANON.length
 
 // SEKTIONSNAMNEN PRÖVAS FÖR SAMTLIGA fixturer, inte bara de nya. Att bara pröva de tre
 // senaste vore att låta de äldsta stå okontrollerade just för att de är äldst.
-// EN enda avvikelse är tillåten och den är NAMNGIVEN: `case-a-legacy` bär `§1. NAP`,
-// eftersom fixturen är skriven mot researchkontrakt v3.0.0 där §1 hette så. Kärnan
-// universaliserades i v3.1.0 och §1 heter nu "Organisation & typade kontaktvägar" —
-// att tvinga legacyfixturen till det nya namnet vore att radera det den finns för att visa.
-const NAMNUNDANTAG = new Map([['backtests/case-a-legacy/research.md', new Map([[1, 'NAP']])]])
+//
+// ---- AL-GAP-3 STÄNGD: legacyfixturen prövas mot SIN EGEN version -------------
+// FÖRR stod här ett HANDSKRIVET undantag: `case-a-legacy` fick bära `§1. NAP` med
+// motiveringen *"fixturen är skriven mot v3.0.0 där §1 hette så"*. Fixturen prövades
+// alltså mot v3.1.0 plus ett minne, och det var hela `AL-GAP-3`.
+//
+// **MINNET VAR FEL I BÅDA RIKTNINGARNA, och det syntes först när v3.0.0 frystes:**
+//   (i)  v3.0.0:s §1 hette `Organisation & typade kontaktvägar` — IDENTISKT med v3.1.0.
+//        `NAP` stod i §1:s BESKRIVNING, aldrig som sektionsnamn. Undantaget var en
+//        dispens på en falsk premiss, och det kan ett minne inte upptäcka om sig självt.
+//   (ii) Fixturen bar `## 5. Geografisk räckvidd & språk` — v3.1.0:s namn. v3.0.0 säger
+//        `Geografi & språk`. Filen som finns för att bevisa det GAMLA kontraktet bar
+//        alltså det NYA kontraktets rubrik, och ingen kontroll kunde se det.
+//
+// Varje fixtur prövas nu mot den version den SÄGER sig vara skriven mot, och den
+// versionen finns som byte-oförändrad kopia i `config/frusna-kontrakt/`.
+const FRUSEN_V300 = 'config/frusna-kontrakt/research-kontrakt-v3.0.0.md'
+const FRUSEN_V300_BLOB = '6e7a94e56ec32a8c2de00f3033a8aadaf019cf40'
+// BYTE-BEVISET: `git hash-object` är deterministiskt över innehållet, så en träff bevisar
+// att kopian ÄR den historiska bloben. Ett sha256 i en JSON-fil hade bevisat att kopian
+// matchar sin egen pinne — inte att den matchar historien.
+let frusetBlob
+try {
+  frusetBlob = execFileSync('git', ['hash-object', join(ROT, FRUSEN_V300)], { cwd: ROT, encoding: 'utf8' }).trim()
+} catch { odombart(`${FRUSEN_V300} kunde inte hashas — den frusna versionen går inte att verifiera mot historien`) }
+check('AL-GAP-3: den frusna v3.0.0 ÄR den historiska bloben, byte för byte',
+  frusetBlob === FRUSEN_V300_BLOB,
+  `blob ${frusetBlob}, pinnen säger ${FRUSEN_V300_BLOB} — en "frusen" version som redigerats är ett minne med bättre typsnitt`)
+// KONSUMENTDETEKTORN, med POSITIVT KONTROLLPROV. Att svepa efter noll träffar och kalla
+// det rent är samma tomma-mängd-fel som vakten straffar på andra ställen: en trasig
+// svepning ger också noll. Detektorn måste först BEVISA att den hittar de tillåtna
+// omnämnandena, och först därefter får dess tystnad betyda något.
+let sparadeFiler = []
+try {
+  sparadeFiler = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'],
+    { cwd: ROT, encoding: 'utf8' }).split('\n').filter(Boolean)
+} catch { odombart('git ls-files misslyckades — konsumentmängden går inte att avgränsa') }
+const NAMNER_FRUSEN = (f) => {
+  try { return readFileSync(join(ROT, f), 'utf8').includes('frusna-kontrakt/research-kontrakt-v3.0.0') } catch { return false }
+}
+// Fyra ytor FÅR nämna den: vakten som prövar den, katalogens egen läsanvisning, och de två
+// dokumentationslagren som beskriver den för en människa. Ingen av dem är en producent.
+const TILLATNA_OMNAMNANDEN = ['scripts/check-backtest-fixtures.mjs', 'config/frusna-kontrakt/README.md',
+  'docs/05-beslutslogg.md', 'README.md', 'docs/00-borja-har.md']
+const hittadeTillatna = TILLATNA_OMNAMNANDEN.filter((f) => sparadeFiler.includes(f) && NAMNER_FRUSEN(f))
+if (hittadeTillatna.length < 2) odombart(`konsumentdetektorn hittade bara ${hittadeTillatna.length} av de KÄNDA omnämnandena — svepningen är trasig, och dess tystnad får då inte läsas som frånvaro av konsumenter`)
+const otillatna = sparadeFiler.filter((f) => !TILLATNA_OMNAMNANDEN.includes(f) && NAMNER_FRUSEN(f))
+check('AL-GAP-3: den frusna kopian har INGEN konsument i kedjan',
+  otillatna.length === 0,
+  `${otillatna.join(', ')} läser den frusna versionen — en frusen version som får producera är en ANDRA auktoritet, och kontraktets färskhetslag finns för att förhindra exakt det`)
+
+// PROVENIENSKRAVET. En frusen fil vars härkomst inte står skriven är exakt det
+// minnesproblem katalogen finns för att lösa — bara flyttat ett steg. Varje fil i
+// `config/frusna-kontrakt/` (utom läsanvisningen själv) måste namnges i den, med sitt
+// blob-id, så att nästa läsare kan verifiera kopian mot historien utan att fråga någon.
+const frusnaFiler = sparadeFiler.filter((f) => f.startsWith('config/frusna-kontrakt/') && f !== 'config/frusna-kontrakt/README.md')
+check('AL-GAP-3: katalogen bär minst en frusen version (ankare)', frusnaFiler.length > 0,
+  'tom katalog — då prövar provenienskravet ingenting, och en tom mängd är aldrig ett rent resultat')
+const frusetLasanvisning = las('config/frusna-kontrakt/README.md')
+const utanProveniens = frusnaFiler.filter((f) => {
+  let blob
+  try { blob = execFileSync('git', ['hash-object', join(ROT, f)], { cwd: ROT, encoding: 'utf8' }).trim() } catch { return true }
+  return !(frusetLasanvisning.includes(f) && frusetLasanvisning.includes(blob))
+})
+check('AL-GAP-3: varje frusen fil har sin PROVENIENS utskriven (sökväg + blob-id)',
+  utanProveniens.length === 0,
+  `${utanProveniens.join(', ')} saknar sökväg eller blob-id i config/frusna-kontrakt/README.md — en frusen kopia utan härkomst är ett minne, inte en version`)
+
+const KANON_V300 = [...las(FRUSEN_V300).matchAll(/^\| (\d+) \| \*\*([^*]+)\*\*/gm)].map((m) => [Number(m[1]), m[2].trim()])
+if (KANON_V300.length !== 17) odombart(`den frusna v3.0.0 gav ${KANON_V300.length} sektionsrader, väntade 17 — extraktionen är trasig`)
+// POSITIVT KONTROLLPROV på att de två versionerna FAKTISKT skiljer sig. Vore de identiska
+// prövade legacyvägen ingenting alls, och kontrollen nedan vore grön av tomhet.
+const skiljer = KANON.filter(([n, namn]) => (KANON_V300.find(([m]) => m === n) || [])[1] !== namn)
+check('AL-GAP-3: v3.0.0 och v3.1.0 skiljer sig FAKTISKT i sektionsnamn (ankare)',
+  skiljer.length > 0,
+  'de två versionerna har identiska sektionsnamn — då prövar kompatibilitetsvägen ingen versionsskillnad, och en grön körning betyder ingenting')
+
+const KANON_PER_FIXTUR = new Map([['backtests/case-a-legacy', KANON_V300]])
 for (const dir of ['backtests/case-a-lokal', 'backtests/case-b-saas', 'backtests/case-a-legacy']) {
   const R = las(`${dir}/research.md`)
-  const undantag = NAMNUNDANTAG.get(`${dir}/research.md`) || new Map()
-  const fel = KANON.filter(([n, namn]) => {
-    const vantat = undantag.has(n) ? undantag.get(n) : namn
-    return !new RegExp(`^## ${n}\\. ${vantat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').test(R)
-  })
-  check(`${dir.split('/').pop()}: sektionsnamnen följer kontraktet (undantag namngivna)`,
+  const kanon = KANON_PER_FIXTUR.get(dir) || KANON
+  const fel = kanon.filter(([n, namn]) =>
+    !new RegExp(`^## ${n}\\. ${namn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').test(R))
+  check(`${dir.split('/').pop()}: sektionsnamnen följer SIN EGEN kontraktsversion`,
     fel.length === 0, `avviker: ${fel.map(([n, namn]) => `§${n} ska heta "${namn}"`).join(' · ')}`)
 }
-check('Namnundantaget är MOTIVERAT i legacyfixturens facit',
+check('AL-GAP-3: legacyfixturens versionsval är MOTIVERAT i facit',
   /v3\.0\.0/.test(las('backtests/case-a-legacy/FORVANTAT.md')),
-  'ett undantag utan skäl i facit är en tyst dispens, och nästa läsare kan inte skilja den från ett slarv')
+  'en fixtur som prövas mot en annan version än de andra utan skäl i facit är en tyst dispens')
 
 // ---- §26-GAP-1: de tre verklighetsfixturerna ------------------------------
 // §26: *"NO-BUILD / MIGRATION / STANDARD-zero-ceremony negative controls are used to prove
