@@ -44,5 +44,5 @@ lättar ett universellt krav är ogiltigt oavsett hur väl det passar branschen.
 
 | ID | Lucka | Nästa transition |
 |---|---|---|
-| `AF-1` `AF-GAP-1` | **Registret är en spegel, inte en koppling.** Agenterna läser inte den här filen; fragmenten står inline. Till skillnad från grindlinserna går de inte att generera — de är prosa inuti längre instruktioner, och att generera prosa in i en agentfil vore att låta ett paket skriva om en agents text | Kräver att agentinstruktionerna byggs av delar i stället för att skrivas som löptext. Det är en omskrivning av agentlagret, inte en städning — ägarbeslut |
-| `AF-GAP-2` | **Ankarfraserna är LEXIKALA.** Vakten prövar att frasen står i agenten, inte att agenten BETER sig enligt den. Samma gräns som `PK-GAP-2` | Kräver en körning som mäter beteende |
+| `AF-1` `AF-GAP-1` | **NAMNGIVEN.** **Registret är en spegel, inte en koppling.** Agenterna läser inte den här filen; fragmenten står inline. Till skillnad från grindlinserna går de inte att generera — de är prosa inuti längre instruktioner, och att generera prosa in i en agentfil vore att låta ett paket skriva om en agents text | Kräver att agentinstruktionerna byggs av delar i stället för att skrivas som löptext. Det är en omskrivning av agentlagret, inte en städning — ägarbeslut |
+| `AF-GAP-2` | **NAMNGIVEN.** **Ankarfraserna är LEXIKALA.** Vakten prövar att frasen står i agenten, inte att agenten BETER sig enligt den. Samma gräns som `PK-GAP-2` | Kräver en körning som mäter beteende |

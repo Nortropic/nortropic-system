@@ -71,9 +71,9 @@ det per definition ett nybygge oavsett vad det kallas.
 
 | ID | Lucka | Nästa transition |
 |---|---|---|
-| `FK-GAP-1` | **Ingen körbar förbättringslane finns.** Kontraktet är formen; körningen kräver läsning av en befintlig sajt, mätdata och modellorkestrering | Bygg lanen när en verklig kund finns — kontraktet först, så lanen byggs mot en gräns i stället för mot en möjlighet |
-| `FK-GAP-2` | **Mätvärdena är kundens egna.** Vi har ingen egen mätning av placeringar eller trafik, så utgångsvärdet är alltid ett andrahandsuppgift | Egen mätning kräver GSC-åtkomst per kund — en ägarceremoni |
-| `FK-GAP-3` | **Ingen eftermätning är automatiserad.** Lag 2 är därmed ett löfte, inte en grind | Följer `FK-GAP-1` |
+| `FK-GAP-1` | **NAMNGIVEN.** **Ingen körbar förbättringslane finns.** Kontraktet är formen; körningen kräver läsning av en befintlig sajt, mätdata och modellorkestrering | Bygg lanen när en verklig kund finns — kontraktet först, så lanen byggs mot en gräns i stället för mot en möjlighet |
+| `FK-GAP-2` | **NAMNGIVEN.** **Mätvärdena är kundens egna.** Vi har ingen egen mätning av placeringar eller trafik, så utgångsvärdet är alltid ett andrahandsuppgift | Egen mätning kräver GSC-åtkomst per kund — en ägarceremoni |
+| `FK-GAP-3` | **NAMNGIVEN.** **Ingen eftermätning är automatiserad.** Lag 2 är därmed ett löfte, inte en grind | Följer `FK-GAP-1` |
 
 ## 6. Vad kontraktet INTE gör
 

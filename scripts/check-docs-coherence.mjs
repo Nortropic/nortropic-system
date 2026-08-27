@@ -393,7 +393,10 @@ kravOmArtefakt({
     // Mekaniska statusspår: antal kontroller, stängda luckor, versionsnummer.
     const statusspar = [
       [/\b\d+\/\d+ (kontroller|vakter)/, 'ett kontrollantal'],
-      [/\b[A-ZÅÄÖ]+-GAP-\d+[^|\n]{0,40}(STÄNGD|ÅTGÄRDAT)/, 'en luckstatus'],
+      // `§` HÖR TILL ID-ALFABETET. Formen `[A-ZÅÄÖ]+-GAP-` missade `§26-GAP-1` helt, så
+      // överlämningen hade kunnat bära *"§26-GAP-1 STÄNGD"* utan att spåret slog till —
+      // samma klass av blindhet som `\w` mot Å/Ä/Ö, två gånger tidigare i det här bygget.
+      [/(?:§\d+|[A-ZÅÄÖ][A-ZÅÄÖ0-9]*)-GAP-\d+[^|\n]{0,40}(STÄNGD|ÅTGÄRDAT|NAMNGIVEN|NOT_STARTED)/, 'en luckstatus'],
       [/\bv\d+\.\d+\.\d+\b/, 'ett versionsnummer'],
       [/\b(nitton|arton|sjutton|femton|fjorton)\s+(vakter|skivor)/i, 'ett räknat läge'],
     ]
@@ -640,7 +643,12 @@ forbudOmArtefaktSaknas({
   const readme = YTOR['README.md']
   let skript
   try {
-    skript = readdirSync(join(ROT, 'scripts')).filter((f) => f.startsWith('check-') && f.endsWith('.mjs'))
+    // VARJE .mjs, inte bara `check-`. Mönstret `check-*` lämnade TRE riktiga skript
+    // odokumenterade utan att någon kontroll märkte det: `run-axe-gate.mjs` och
+    // `run-lighthouse-gate.mjs` — den senare är `KAP-PRESTANDA`:s KANONISKA runner enligt
+    // kapacitetskatalogen — samt `verify-vendored-integrity.mjs`, som doctor #9A anropar.
+    // En operatör som läser README fick veta om vakterna men inte om grindkörarna.
+    skript = readdirSync(join(ROT, 'scripts')).filter((f) => f.endsWith('.mjs'))
   } catch (e) {
     // Utan denna fångst kastade readdirSync ett ohanterat ENOENT: exit 1 med stackspår
     // och ingen verdiktrad — alltså omöjligt att skilja från FAIL. Samma
@@ -649,7 +657,7 @@ forbudOmArtefaktSaknas({
     process.exit(2)
   }
   if (skript.length === 0) {
-    console.error('ODÖMBART: inga check-*.mjs i scripts/ — kan inte pröva README:s skriptrad')
+    console.error('ODÖMBART: inga .mjs i scripts/ — kan inte pröva README:s skriptrad')
     process.exit(2)
   }
   // G-listad har RÖRLIG kardinalitet — en rad per kontrollskript. Den räknas därför
@@ -664,7 +672,7 @@ forbudOmArtefaktSaknas({
   // signatur som gruppen A–F byggdes om för att stänga. Unionen prövas nu åt båda håll.
   // `i` och `_` med: utan dem kändes `check-Zzz.mjs` inte igen ens när den var korrekt
   // listad, och föll som UNDERDOKUMENTATION. Säker riktning, men fortfarande fel dom.
-  const namndaIReadme = [...new Set((readme.match(/check-[a-z0-9_-]+\.mjs/gi) ?? []))]
+  const namndaIReadme = [...new Set((readme.match(/[a-z][a-z0-9_-]*\.mjs/gi) ?? []))]
   const union = [...new Set([...skript, ...namndaIReadme])].sort()
   ROrLIGA = union.length
   for (const s of union) {
@@ -681,13 +689,75 @@ forbudOmArtefaktSaknas({
   }
 }
 
+// ── J. EN §A-YTA FÅR ALDRIG FÖRNEKA SITT EGET SKYDD ───────────────────────────
+// H-2 (2026-08-26) zonade tre ytor i konstitutionen men rörde inte ytornas EGNA
+// självbeskrivningar. Alla tre stod därför kvar och sa motsatsen till grundlagen:
+//
+//   docs/kapacitetskatalog.md   *"den är inte §A-skyddad"*
+//   docs/06-scope.md            *"den är inte §A-skyddad"*   (om STATUSTABELLEN, §A9)
+//   packs/lokal-se/manifest.md  *"paketet är ÄNNU INTE §A-zonat"*  (§A7)
+//
+// Varje mening var SANN när den skrevs och blev falsk utan att någon redigerade den.
+// RIKTNINGEN ÄR DET FARLIGA: en fil som säger till sin läsare — inklusive en agent som
+// söker efter vad den får ändra — att den är oskyddad inbjuder till precis den autonoma
+// ändring av en människoägd mätstock som §A finns för att förhindra. Ett skydd som bara
+// står i grundlagen men motsägs på ytan är ett skydd som förlitar sig på att ingen läser
+// ytan först. Konstitutionen läses sällan; filen man ska ändra läses alltid.
+//
+// LISTAN EXTRAHERAS UR §A, den skrivs inte av. En handskriven kopia av zonlistan vore en
+// andra sanning om vad som är skyddat — exakt det fel gruppen finns för att fånga.
+{
+  const grundlag = las('docs/07-konstitution.md')
+  const aBlock = /^Fynd i §A[\s\S]*?(?=^## §B)/m.exec(grundlag)
+  if (!aBlock) {
+    console.error('ODÖMBART: §A-blocket går inte att avgränsa i konstitutionen — zonlistan kan inte härledas, och att gissa den vore att gissa sig till LÖSARE krav')
+    process.exit(2)
+  }
+  // UNDANTAGEN MÅSTE BORT FÖRST. §A9 nämner `docs/kompetensregister.md` uttryckligen för
+  // att säga att den INTE zonas här. En rå backtick-svepning hade zonat den ändå — och
+  // fällt en fil som gör rätt, vilket är samma felriktning som en formuleringsvakt.
+  const utanUndantag = aBlock[0].replace(/\([^()]*zonas INTE[^()]*\)/g, ' ')
+  const zonade = [...new Set((utanUndantag.match(/`([A-Za-zÅÄÖåäö0-9_./*-]+\.(?:md|js|mjs|json))`/g) || [])
+    .map((x) => x.replace(/`/g, '')))]
+  // Glob expanderas mot disk; en zonrad som inte träffar något är inte tyst tom.
+  const zonadeFiler = []
+  for (const m of zonade) {
+    if (!m.includes('*')) { if (finns(m)) zonadeFiler.push(m); continue }
+    const [pre, post] = m.split('*')
+    const kat = pre.replace(/\/$/, '')
+    try {
+      for (const d of readdirSync(join(ROT, kat))) if (finns(join(kat, d, post.replace(/^\//, '')))) zonadeFiler.push(join(kat, d, post.replace(/^\//, '')))
+    } catch { /* katalogen finns inte — ingen träff, och det är inte ett fel här */ }
+  }
+
+  // ANKARE + POSITIVT KONTROLLPROV. En tom eller stympad zonlista skulle göra gruppen
+  // grön av frånvaro. Extraktionen måste bevisligen hitta den yta som avslöjade felet,
+  // och uteslutningslogiken måste bevisligen hålla kompetensregistret UTANFÖR.
+  if (zonadeFiler.length < 5) {
+    console.error(`ODÖMBART: bara ${zonadeFiler.length} §A-zonade filer härledda — extraktionen är trasig, och en kort lista ser ut som få skyddade ytor`)
+    process.exit(2)
+  }
+  if (zonadeFiler.includes('docs/kapacitetskatalog.md')) ja('J-ankare: zonlistan innehåller kapacitetskatalogen (§A9)')
+  else nej('J-ankare', 'extraktionen hittade inte docs/kapacitetskatalog.md, som §A9 namnger ordagrant — detektorn är trasig, inte trädet')
+  if (!zonadeFiler.includes('docs/kompetensregister.md')) ja('J-uteslutning: kompetensregistret zonas INTE och räknas inte som zonat')
+  else nej('J-uteslutning', '§A9 säger uttryckligen att docs/kompetensregister.md INTE zonas här — att zona den ändå fäller en fil som gör rätt')
+
+  // SJÄLVBESKRIVNING, inte varje förekomst av "inte §A". Konstitutionen säger på ett annat
+  // ställe att obemannat kund-bygge *"rör ingen §A-yta"* — sant, och inget påstående om
+  // filens eget skydd. Kravet är därför ett SUBJEKT som pekar på ytan själv.
+  const FORNEKELSE = /(den|filen|tabellen|katalogen|paketet|dokumentet|listan|registret|modulen|ytan)\s+(är|står)\s+(ännu\s+)?(inte|icke)\s+§A/i
+  const fornekare = zonadeFiler.filter((f) => FORNEKELSE.test(ren(las(f))))
+  if (fornekare.length === 0) ja('J-förnekelse: ingen §A-zonad yta påstår om sig själv att den är oskyddad')
+  else nej('J-förnekelse', `${fornekare.join(', ')} säger om sig själv att den inte är §A-skyddad medan konstitutionen zonar den — en agent som söker vad den får ändra läser ytan, inte grundlagen`)
+}
+
 // ── Verdikt ───────────────────────────────────────────────────────────────────
 // FAST NÄMNARE. Varje kontroll ovan avger alltid ett utfall, oavsett om artefakten
 // finns — men det räcker inte som garanti, eftersom en framtida gren kan råka hoppa
 // över en. FORVANTAT är därför skriven för hand och jämförs mot faktiskt antal.
 // Faller de isär är körningen ODÖMBAR: en vakt som tappat kontroller vet inte längre
 // vad dess grönt betyder, och får då inte påstå någonting alls.
-const FASTA = 72   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9
+const FASTA = 75   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9 · J 3
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)

@@ -1007,3 +1007,41 @@ sortens pris man helst upptäcker innan man byter, inte efteråt.
 
 Och en sak värd att säga rakt ut: siffrorna i förslaget är förslag. Ingen kund har
 poängsatts med dem. Det är därför det heter utkast och inte version 4.
+
+## När en lucka sa olika saker på två ställen (2026-08-27)
+
+Fabriken håller reda på vad den ännu inte kan. Varje sådan sak får ett namn — en
+**lucka** — och en rad som säger var den står: öppen, halvt åtgärdad eller stängd.
+Poängen är att man ska kunna lita på raden i stället för att gissa.
+
+**Problemet var att ingenting kontrollerade raderna.** Vi vände fem luckor från
+"stängd" till "öppen", en i taget, i fem olika filer. Alla kontroller fortsatte visa
+grönt varje gång. En lucka kunde alltså stå som stängd på ett ställe och öppen på ett
+annat utan att någon märkte det.
+
+Den kontroll som såg ut att bevaka detta letade efter ordet "STÄNGD" **någonstans i
+filen**. Så länge någon annan rad i samma fil sa stängd godkändes hela filen — även
+när just den lucka man frågade om hade vänts till öppen. Det är samma fel som återkommit
+genom hela bygget: att pröva vad texten *säger* i stället för vad den *gör*.
+
+**Två luckor hade ingen rad alls.** Den ena bodde inne i en annan luckas beskrivning,
+den andra fanns bara i en kontrolls utskrift. Båda stod som stängda respektive kända i
+beslutsloggen. Ingen av dem gick att kontrollera.
+
+**Vad som byggdes:** en kontroll som läser statusen ur luckans EGEN rad och fäller om två
+rader säger olika, om en rad saknar status, om en rad säger två saker, eller om en lucka
+saknar rad. Vi byggde medvetet INGET register över luckorna — en sammanställande fil vore
+en andra sanning som skulle drifta från raderna den sammanfattar. Kontrollen jämför
+raderna med varandra i stället.
+
+**Tre filer sa fel om sig själva.** Katalogen över vad fabriken kan, statustabellen och
+paketets manifest påstod alla att de "inte är skyddade" av grundlagen. Alla tre var
+skyddade sedan den 26 augusti; meningarna var sanna när de skrevs och blev falska utan
+att någon rörde dem. Riktningen är det farliga: en fil som säger till sin läsare att den
+är oskyddad bjuder in till precis den ändring skyddet finns för att hindra. De är rättade,
+och en kontroll fäller nu om någon skyddad yta börjar förneka sitt eget skydd igen.
+
+**Ärligt om vad detta INTE gör:** kontrollen bevisar att raderna säger samma sak, inte att
+de säger rätt sak. Att en lucka som står "stängd" faktiskt är stängd prövas av den kontroll
+som äger sakfrågan — och för de två luckor där det saknades kopplades raden ihop med
+maskineriet, så en återöppning nu kräver att mekanismen faktiskt slutat fungera.

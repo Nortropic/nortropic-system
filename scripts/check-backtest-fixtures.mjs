@@ -79,7 +79,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = 'bc0947b914937c25'
+const FORVANTAD_SIGNATUR = '5daad30268dbab9a'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -835,11 +835,21 @@ check('A: varje planterad defekt namnger en VERKLIG fällare', utanFallare.lengt
   `${utanFallare.length} defekter med tom eller TBD-fällare`)
 
 // ---- Luckorna --------------------------------------------------------------
+// RADSKOPAT, INTE FILVIDT — rättat 2026-08-27 efter en mutation som överlevde.
+// Formen var `/§26-GAP-1/.test(fil) && /STÄNGD/.test(fil)`: två oberoende frågor om SAMMA
+// FIL, aldrig om samma RAD. Vändes just den luckans rad till `ÖPPEN` passerade kontrollen
+// ändå, eftersom en ANNAN rad i filen fortfarande sa `STÄNGD`. Det är det återkommande
+// felet ordagrant: kontrollen prövade vad utdata SÄGER, inte vad mekanismen GÖR.
+// `luckstatus` läser statusen ur luckans EGEN rad — den rad vars första cell namnger den.
+const luckstatus = (text, id) => {
+  const rader = text.split('\n').filter((r) => r.startsWith('|') && (r.split('|')[1] || '').includes(id))
+  return rader.length === 1 ? rader[0] : null   // noll eller flera rader = odömbart, aldrig grönt
+}
 const btReadme = las('backtests/README.md')
 check('§26-GAP-1: de tre negativkontrollerna är STÄNGDA och pekar på fixturerna',
-  /§26-GAP-1/.test(btReadme) && /STÄNGD/.test(btReadme) &&
+  /STÄNGD/.test(luckstatus(btReadme, '§26-GAP-1') || '') &&
   ['case-c-no-build', 'case-d-migration', 'case-e-standard'].every((d) => btReadme.includes(d)),
-  'en stängd lucka utan pekare till det som stängde den går inte att kontrollera')
+  'en stängd lucka utan pekare till det som stängde den går inte att kontrollera — och statusen läses ur luckans EGEN rad, inte ur filen i stort')
 check('§26-GAP-1: och de KVARVARANDE halvorna är namngivna, inte strukna',
   /C-GAP-1/.test(btReadme) && /E-GAP-1/.test(btReadme) && /prövar ROUTNINGEN, inte beslutet/.test(btReadme),
   'härledningen görs av plannern och ceremoni mäts bara vid ingången — att tiga om det gör en halv stängning till en hel')
@@ -847,8 +857,11 @@ check('§26-GAP-1: README säger UT att stängda luckor står kvar som rader',
   /en stängd lucka utan spår går inte att kontrollera/.test(btReadme),
   'utan den regeln städas stängda luckor bort, och då försvinner spåret av vad som en gång saknades')
 check('A-GAP-3: kompatibilitetsvägen är STÄNGD och pekar på fixturen som stängde den',
-  /A-GAP-3/.test(aFor) && /STÄNGD/.test(aFor) && /case-a-legacy/.test(aFor),
-  'en stängd lucka utan pekare till det som stängde den går inte att kontrollera')
+  /STÄNGD/.test(luckstatus(aFor, 'A-GAP-3') || '') && /case-a-legacy/.test(luckstatus(aFor, 'A-GAP-3') || ''),
+  'en stängd lucka utan pekare till det som stängde den går inte att kontrollera — statusen OCH pekaren måste stå i luckans egen rad')
+check('A-GAP-3: statusen är densamma i BÅDA filerna som bär den',
+  /STÄNGD/.test(luckstatus(btReadme, 'A-GAP-3') || ''),
+  'backtests/README.md och case-a-lokal/FORVANTAT.md bär båda A-GAP-3 — säger de olika är en av dem en lögn, och en halv stängning läses som hel')
 check('A-GAP-3: och den KVARVARANDE halvan är namngiven, inte struken',
   /AL-GAP-2/.test(aFor) && /prövbar, inte påtvingad/.test(aFor),
   'läsaren finns men ingen konsument använder den — att tiga om det gör en halv stängning till en hel')

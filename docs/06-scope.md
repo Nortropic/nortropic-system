@@ -7,8 +7,18 @@ Vad Nortropic bygger, vad som byggs vid efterfrågan, och vad som är nej. Princ
 
 ## Statustabell — paketens mognad
 
-**Detta är VANLIG DOKUMENTATION.** Tabellen beskriver var varje paket står; den är
-inte §A-skyddad och statusvärdena bär ingen mekanisk grind i denna skiva. Att göra
+> **HÖGRISK-RÄTTELSE 2026-08-27 (ägarinstruktion: *"Fixa och bygg vidare allt vi ska och
+> kan"*).** Raden nedan sa att tabellen *"inte är §A-skyddad"*. **Det var sant när det skrevs
+> (S1-min) och blev falskt vid H-2 (2026-08-26)** utan att någon rörde meningen.
+> `docs/07-konstitution.md` §A9 zonar uttryckligen `docs/06-scope.md`:s STATUSTABELL och
+> säger till och med varför: *"Statustabellen infördes med avsikt som vanlig dokumentation
+> (S1-min) och skyddas först här, vid H-2."*
+>
+> **Gränsen går mellan RAD och SEMANTIK.** Att flytta ett paket från `DECLARED` till `BUILT`
+> med belägg är vanlig dokumentation. Att ändra vad `BUILT` KRÄVER är §A9 och människans hand.
+
+**Statusvärdena bär ingen mekanisk grind i denna skiva** — men VOKABULÄREN och dess krav är
+§A9-skyddad semantik. Tabellen beskriver var varje paket står. Att göra
 statussemantiken §A-skyddad är en SENARE och egen ceremoni (H-2) — aldrig här.
 
 Statusvokabulär (samma fem lägen som kapacitetsstatusarna): **DECLARED** (beskrivet,

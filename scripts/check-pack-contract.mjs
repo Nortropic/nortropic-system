@@ -61,7 +61,7 @@ const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
 const REFERENS = 'lokal-se'
-const FORVANTAD_KALLHASH = '648aceae36f194aa'
+const FORVANTAD_KALLHASH = '83b7441de0b97e42'
 
 const kontrakt = las('docs/paketkontrakt.md')
 const scope = las('docs/06-scope.md')
@@ -165,6 +165,29 @@ for (const id of paket) {
     check(P('varje SKÄRPER-rad har en motsvarighet i researchmodulen'),
       skarpta.length === 0 || /## Skärpningar av den universella kärnan/.test(modul),
       'paketet påstår skärpningar men modulen bär ingen skärpningstabell')
+  }
+}
+
+// ---- PK-GAP-1/PK-GAP-4: raderna binds till MEKANISMEN, inte bara till varandra --
+// Två mutationer som vände `PK-GAP-1` respektive `GL-GAP-1` från STÄNGD till ÖPPEN
+// överlevde hela batteriet 2026-08-27. Skälet var strukturellt: en lucka med bara EN rad
+// har ingenting att vara inkonsistent MED, och `ÖPPEN` är ett giltigt vokabulärord.
+// `check-luckregister.mjs` prövar att raderna säger samma sak; den kan inte pröva att de
+// säger rätt sak. Det kan bara den vakt som äger sakfrågan.
+//
+// Kontrollerna nedan i den här filen bevisar att kompositionen FINNS med slutna roller
+// (PK-GAP-1:s substans) och att den HÄRLEDS ur fixturerna (PK-GAP-4:s substans). Håller
+// substansen får raden inte påstå motsatsen. En återöppning ska kosta att mekanismen
+// faktiskt slutat gälla — aldrig bara att någon skriver om en cell.
+{
+  const pk = las('docs/paketkontrakt.md')
+  for (const id of ['PK-GAP-1', 'PK-GAP-4']) {
+    const rad = pk.split('\n').filter((r) => r.startsWith('|') && (r.split('|')[1] || '').includes(id))
+    check(`${id} äger exakt EN rad-av-protokoll i paketkontraktet`, rad.length === 1,
+      `${rad.length} rader äger ${id} — noll gör stängningen okontrollerbar, flera gör den tvetydig`)
+    check(`${id}:s status STÄMMER med mekanismen som stängde den`,
+      rad.length === 1 && /STÄNGD/.test(rad[0]),
+      `kompositionen finns och härleds fortfarande ur fixturerna — stängningens substans håller — men ${id}:s rad säger något annat`)
   }
 }
 

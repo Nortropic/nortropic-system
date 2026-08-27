@@ -57,15 +57,15 @@ const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
-const SJALVPIN = '3c88dd99fdb8e0ee'
+const SJALVPIN = '800fedd99fa8acc7'
 
 // ---- PINNTABELL: BÖRJAN (normaliseras ut ur självankaret) -------------------
 // sha256 över vaktens HELA källtext, första 16 hex. Ändras en vakt legitimt uppdateras
 // raden i SAMMA commit — det är hela poängen att den ändringen syns här.
 const PINNAR = {
   'check-autobygg-delegation.mjs': '8f186bba47978877',
-  'check-backtest-fixtures.mjs': 'fc5ddc31237b9d66',
-  'check-docs-coherence.mjs': 'b58f8873bd616fb1',
+  'check-backtest-fixtures.mjs': '4ec7b41b0ee0d1e1',
+  'check-docs-coherence.mjs': '902b6afb0538becf',
   'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-forbattring.mjs': '8ebe9f9e2b6a1170',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
@@ -74,8 +74,9 @@ const PINNAR = {
   'check-invariants.mjs': 'dbdf696d7cefd335',
   'check-karn-universalitet.mjs': 'd9dff3487cfca7e1',
   'check-knowledge-lane.mjs': '2b9bb187a92b6866',
-  'check-pack-contract.mjs': '9803f2438a8ef109',
-  'check-paketlinser.mjs': '4c829ac67f918431',
+  'check-luckregister.mjs': '317aa1f1d93acca5',
+  'check-pack-contract.mjs': 'ba3e08fda308e430',
+  'check-paketlinser.mjs': '41d9acdf80cae81a',
   'check-planner-routing.mjs': '8524b3da1901c5eb',
   'check-profile-contract.mjs': '5da81cc32582b46c',
   'check-research-contract.mjs': '4aa0aa5b5f281092',
@@ -84,6 +85,7 @@ const PINNAR = {
   'kor-backtest.mjs': '1f5959f7648d9967',
   'kor-gym.mjs': 'a7b636fff3032ed4',
   'kor-vakter.mjs': 'aa17a3fefd53a27d',
+  'profil-las.mjs': '20905b4525778540',
 }
 // ---- PINNTABELL: SLUT -------------------------------------------------------
 
@@ -137,15 +139,33 @@ function vaktlista() {
   }
   // `.map(basename)` vore fel: Array.map skickar indexet som andra argument, och basename
   // tolkar det som `suffix` — vilket kastar på första elementet.
-  return [...new Set(filer.map((f) => basename(f)))]
-    // Både VAKTER (`check-*`) och KÖRARE (`kor-*`) pinnas. Att bara pinna vakterna lämnade
-    // `kor-vakter.mjs` opinnad — och just den filen är den enda som märker att en vakt
-    // skrivits över. Nu låser de två varandra: skrivs köraren över fäller den här vakten,
-    // skrivs den här vakten över fäller köraren. Två samtidiga överskrivningar är kvar som
-    // gräns, men en ensam är det inte längre.
-    .filter((f) => /^(check|kor)-.+\.mjs$/.test(f))
+  const namn = [...new Set(filer.map((f) => basename(f)))]
     .filter((f) => existsSync(join(ROT, 'scripts', f)))
-    .sort()
+  // Både VAKTER (`check-*`) och KÖRARE (`kor-*`) pinnas. Att bara pinna vakterna lämnade
+  // `kor-vakter.mjs` opinnad — och just den filen är den enda som märker att en vakt
+  // skrivits över. Nu låser de två varandra: skrivs köraren över fäller den här vakten,
+  // skrivs den här vakten över fäller köraren. Två samtidiga överskrivningar är kvar som
+  // gräns, men en ensam är det inte längre.
+  const efterNamn = namn.filter((f) => /^(check|kor)-.+\.mjs$/.test(f))
+
+  // ---- LASTBÄRANDE MODULER: härledda, aldrig handlistade ---------------------
+  // NAMNMÖNSTRET RÄCKTE INTE, och det visades av en mutation som ÖVERLEVDE. `profil-las.mjs`
+  // bär bakåtkompatibilitetslagen som `A-GAP-3`:s stängning vilar på och IMPORTERAS av två
+  // vakter — men den heter varken `check-` eller `kor-`, så den stod opinnad. Att kollapsa
+  // `SAKNAS_I_V1` till `SAKNAS` — alltså radera lagens tredje utfall, det som skiljer OKÄNT
+  // från NEJ — lämnade batteriet grönt 19/19. Fem andra mutationer i samma fil dödades av
+  // beteendeproven; just den här klassen kan bara ett byteankare se.
+  //
+  // MÄNGDEN HÄRLEDS UR IMPORTERNA i stället för att listas. En handlista hade behövt komma
+  // ihåg nästa modul; det här kravet uppstår av sig självt så snart en vakt importerar
+  // något. En modul som vakterna litar på ska bära samma ankare som vakterna själva.
+  const importerade = new Set()
+  for (const v of efterNamn) {
+    const kalltext = readFileSync(join(ROT, 'scripts', v), 'utf8')
+    for (const m of kalltext.matchAll(/from\s+'\.\/([A-Za-z0-9._-]+\.mjs)'/g)) importerade.add(m[1])
+  }
+  const lastbarande = [...importerade].filter((f) => !/^(check|kor)-/.test(f) && namn.includes(f))
+  return [...new Set([...efterNamn, ...lastbarande])].sort()
 }
 const vakter = vaktlista()
 check('Ankare: minst en vakt kunde räknas upp', vakter.length > 0,
@@ -155,6 +175,27 @@ if (vakter.length === 0) odombart('tom vaktmängd — en grön körning vore men
 // POSITIVT KONTROLLPROV: hittar uppräkningen inte den här filen är detektorn trasig,
 // inte trädet. Ett tyst tomt resultat får aldrig läsas som ett rent resultat.
 if (!vakter.includes(migSjalv)) odombart(`uppräkningen hittade inte ${migSjalv} — detektorn är trasig`)
+
+// ---- 1b. LASTBÄRANDE-HÄRLEDNINGEN MÅSTE FAKTISKT HÄRLEDA NÅGOT --------------
+// En härledning som tyst ger tomma mängden ser ut som "inga lastbärande moduler finns" och
+// är omöjlig att skilja från "mönstret slutade träffa". Går importsvepningen sönder blir
+// den mängden tom, ankarhålet öppnar sig igen och ingenting säger till.
+const lastbarandeNu = vakter.filter((v) => !/^(check|kor)-/.test(v))
+check('Ankare: importhärledningen hittar minst en lastbärande modul', lastbarandeNu.length > 0,
+  'noll lastbärande moduler härledda — antingen importerar ingen vakt något, eller så har svepningen slutat träffa. Det första går att verifiera; det andra är ett tyst hål')
+
+// KOPPLINGSKONTROLL: varje modul som en vakt FAKTISKT importerar måste ha nått pinntabellen.
+// Härledningen kan vara korrekt och ändå kringgås — filtreras en modul bort på vägen är den
+// opinnad utan att någon kontroll märker det.
+const importeradeNu = new Set()
+for (const v of vakter.filter((f) => /^(check|kor)-/.test(f))) {
+  for (const m of readFileSync(join(ROT, 'scripts', v), 'utf8').matchAll(/from\s+'\.\/([A-Za-z0-9._-]+\.mjs)'/g)) {
+    if (existsSync(join(ROT, 'scripts', m[1]))) importeradeNu.add(m[1])
+  }
+}
+const oankrade = [...importeradeNu].filter((m) => m !== migSjalv && !(m in PINNAR))
+check('Varje modul en vakt importerar är ankrad', oankrade.length === 0,
+  `${oankrade.join(', ')} importeras av en vakt men saknar pinne — en lastbärande modul utan ankare kan tömmas tyst, och exakt det överlevde i profil-las.mjs`)
 
 // ---- 2. Varje funnen vakt måste vara PINNAD ---------------------------------
 const opinnade = vakter.filter((v) => v !== migSjalv && !(v in PINNAR))

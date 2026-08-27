@@ -66,4 +66,4 @@ grindens prompt, inte här (`GL-GAP-2`). Den här filen binder kategorin, inte g
 | ID | Lucka | Nästa transition |
 |---|---|---|
 | `GL-GAP-1` | **STÄNGD 2026-08-27 genom GENERERING.** Workflow-DSL:en har ingen filsystemsåtkomst, så `nortropic-launch.js` KAN inte läsa den här filen vid körning — och att låta en agent rapportera kategorimappningen vore värre än problemet, eftersom kategorimängden måste vara sluten och universell (§10) och en modellrapporterad mapping är varken. **Paketen är nu KÄLLAN och workflowets tabell är UTDATA:** `node scripts/check-paketlinser.mjs --generera` skriver den, och vakten räknar fram tabellen i minnet och kräver att den committade är IDENTISK. Drift är därmed inte längre något att upptäcka utan något som inte kan committas | — |
-| `GL-GAP-2` | Linsernas INNEHÅLL (vad de tittar efter) står i grindens prompt, inte här. Den här filen binder bara kategorin | Följer `GL-GAP-1` |
+| `GL-GAP-2` | **NAMNGIVEN.** Linsernas INNEHÅLL (vad de tittar efter) står i grindens prompt, inte här. Den här filen binder bara kategorin | Följer `GL-GAP-1` |
