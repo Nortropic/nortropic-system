@@ -3159,3 +3159,191 @@ duplicate-row, early-gate, early-product and launch-substitution mutants reject.
 No H-034 or H-036 production byte, H-037 task/gate/register byte, authority core, publisher,
 workflow or delegation document is changed. Full/live/H-017, network, remote-ref, push and merge
 actions remain outside this refreeze lane.
+
+## 2026-08-25 — H-036 pre-sandbox runtime supervisor contract
+
+The exact published starting point is origin/main `b17d0941f9376505f2bf76f4ce10b3019d978054`
+(tree `4a22c991b2bba098239f492bd9fc1e06cc8cd1c6`). Its H-034 merge has ordered parents
+`deee7955…`, `e60fbc40…`; the latter's independent READY review artifact hashes to
+`2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474`. The exact v2 owner
+registry is already published. H-034's early-H036 absence checks are temporal publication evidence:
+the new task/gate deliberately make them RED, and no post-freeze H-034 green regression is claimed.
+
+The baseline causal failure was reproduced in a bounded disposable host probe: a real outer
+Seatbelt child denied its protected root, but its direct nested `/usr/bin/sandbox-exec` exited 71
+with `sandbox_apply: Operation not permitted`. An AF_UNIX request authenticated by a random
+capability, `LOCAL_PEERPID` and the 32-byte `LOCAL_PEERTOKEN` then reached the original
+pre-sandbox owner. That owner installed one fresh combined profile; the child retained the outer
+EPERM, gained the inner EPERM, and wrote only permitted scratch/sink paths. The probe returned zero
+and its temporary script/root were removed. This establishes feasibility, not product credit.
+
+The frozen solution is one controller-owned Python supervisor created by the exact protected
+Python 3.12/live launcher before the first sandbox. V2 inherits the exact existing v1 interpreter
+authority (`2c609508…`, Python 3.12.13, source `94be2db6…`, v1 flags `-I -S`) and adds a distinct
+`-B`/early-`dont_write_bytecode` invariant. The config has no self-digest and no absolute live-root,
+session, socket or requester override; it binds final launcher/helper/profile/protocol identities.
+Only a same-byte protected private Python snapshot may relocate. The live launcher and helper may
+not.
+
+The gate's actual-subject matrix is separated from its judge-only reference lane and maps seven
+dynamic families: connected pre-sandbox supervisor to confined helper to target; cumulative
+outer/inner syscall and allow-reopen/raw/nested-attempt effects, including an external protected
+staging root whose one preopened regular nlink-1 sink allows only read-back-proven data writes while
+sibling/sink/root create/write/rename/unlink/move/hardlink/mkdir/chmod and every missing,
+nonregular, hardlink, overlap or symlink escape stay denied before launch; strict frames, exact stdio FD
+cardinality, duplicate/oversize/partial framing, replay/forgery/stale/cross-session/wrong-peer
+handling, including a successful nested caller whose PID differs from the outer leader; exact
+kernel argv and complete paused descriptor roles, stripping of trust/staging/sink paths from
+targets, and no caller-path or descriptor leakage, while closed supervisor/helper env construction
+remains immutable review; dynamic Python/runtime identity negatives, relocation and zero-pyc
+constraints, with same-opened live reachability/final rehash reserved to immutable review;
+success/nonzero/timeout/SIGTERM/disconnect/supervisor-death revocation with a
+harmless rather than nonexistent setsid survivor; and a second legitimate protected same-byte
+Python snapshot as mechanism-neutral positive. Profile strings, subject markers and reference
+results alone cannot satisfy the operation.
+
+Independent review of the first immutable candidate rejected marker-only and underbound portions
+of that matrix. The replacement freezes an exact two-member profile family: base digest
+`848f5f8b13b6773d9a8b6780838c3bb31e82c06915d762ce47d5a8c97acd4844` iff staging and sink are both
+absent, and base-plus-staging digest
+`0e543357a7ac4f14b5f8b1a04973c267180ee0fa6e5606d41034ade2a42cd33d` iff both are present and
+prevalidated. The live helper must pause in exact `confined-exec-v1 --proof-fd` mode after real
+syscalls and before `TARGET_STARTED`; the gate observes exact scratch/sink proof bytes, unchanged
+protected canaries, its canonical profile receipt and process argv before sending `go-v1`.
+Top-level, raw nested and public nested paths expose actual 64-hex capability/session/level values:
+each child gets a different capability, the same session and exactly parent level plus one. Current
+connection PID/euid/pidversion are checked separately; outer-leader equality remains forbidden.
+
+The strict mutant family now includes bool-vs-int, scalar lengths/types, nested containers,
+duplicate/reserved/sensitive environment names, wrong PID/euid/pidversion, exact FD cardinality,
+malformed/partial/trailing/oversize frames and a preexisting symlink cwd escape with no outside
+effect. Both target levels prove the exact private `NORTROPIC_KUVERT` bytes, sanitized environment
+and stdio-only post-exec descriptors. Nonzero, self-SIGTERM, timeout, real controller SIGTERM and
+supervisor death each report a leader plus same-process-group child and require all known processes,
+handoff and controller resources gone; the setsid case proves live/trust/runtime harmlessness rather
+than unmeasurable global absence. A real initial Git blob-object and own-worktree index mutation
+proves the fixed Git exception while refs and every cleanup identity remain unchanged.
+
+The gate dynamically rejects private Python wrong mode/digest/symlink, relocated launcher/system
+Python and caller authority overrides, and accepts both a second exact 0500 snapshot and
+quote/newline/Unicode profile parameters. It intentionally does not label a universal same-UID
+live-path race as dynamically proven. Same-opened live launcher/helper/config/root reachability and
+the adjacent final-use rehash are instead explicit immutable-object review obligations, combined
+with the dynamic identity/effect negatives; narrowing that evidence claim avoids a false gate
+promise without narrowing the product requirement.
+
+The R3 closure makes transport and both profile choices causal. A valid raw handoff passes a pipe
+preloaded with the exact separately framed envelope on fd 0 and capture pipes on fd 1/fd 2; exact
+binary stdout/stderr sentinels plus EOF and all three matching target dev/ino identities must return
+through those descriptors, and a same-length
+stdin/frame mismatch rejects without a marker. Missing/wrong operation and required keys,
+equal-valued floats, booleans and malformed containers all reject under distinct nonces. Raw,
+descendant-public and same-workspace-public children expose four pairwise-distinct capabilities,
+one session and exact level increments. A confined public invocation with every H036 session key
+removed reaches the bootstrap branch, reproduces nested Seatbelt failure as rc 3 and leaves no
+target or runtime residue.
+
+A separate no-staging actual-subject session now pauses at the helper barrier and earns the base
+digest from the exact base effect map; the staging session separately earns the with-staging digest
+and effect map. Both helper paths and the supervisor require exact NUL-preserved
+`KERN_PROCARGS2` argv bound to the independently discovered internal Python snapshot. Two
+identical complete libproc tables bind every helper fd by role/type/access/dev-ino. Cross-process
+`KERN_PROCARGS2` exposes no env tail on the required host and `ps eww` is noninjective, so neither
+earns exact environment credit; exact closed exec-environment construction and
+`close_fds`/`pass_fds` reachability are mandatory immutable-object review, while target sanitizer
+effects remain dynamic. Staging-only, sink-only, staging-root symlink, workspace-descendant and
+`/var`/`/private` alias overlaps reject; the legitimate alias case proves actual workspace and sink
+bytes through canonical `/private` readback. Public missing-workspace does not create cwd, and the
+canonical Python source remains a positive beside private same-byte snapshots.
+
+The subject Git lane now proves its narrow exception and its boundaries in one disposable pair of
+worktrees: a loose object and own index update succeed, while `objects/info`, `commondir`, both
+gitfile surfaces, `config.worktree` and sibling admin writes return EPERM with exact readback. The
+gate restores and compares loose-object fanout, worktree-list/admin and refs. The earlier executable
+AST/source-spelling oracle has been removed from subject acceptance and summary; its retained
+helper is dormant, explicitly non-credit, and cannot fail a sound implementation. Reachable
+stable-open and final-rehash ordering remain independent immutable-object review obligations.
+
+R3 was rejected after its own timed reference run stranded the gate-created reference outer: the
+recorded process was not a harmless product survivor but a lifecycle falsification of the judge.
+R4c gives every reference profile run one direct-`Popen`-owned session/group on every outcome.
+`waitid(WNOWAIT)` supplies the exited-leader PID/PGID reservation even when `ps` omits that zombie;
+`ps` classifies only exact live remainders. Connections/listeners close before roots, TERM precedes
+classification, KILL targets only a still-bound live member before final `communicate`/reap, and
+two stable absence samples follow. Forced postspawn hang and abrupt error remain non-PASS and must
+leave no member, zombie, socket or root; the tracked setsid fixture likewise disappears under its
+exact identity. Gate and Git cleanup use stable parent/root dev-ino dirfds with `O_NOFOLLOW`, never
+chmod or follow subject-swapped symlinks, and prove hostile external bytes/mode/dev-ino plus exact
+Git fanout/admin/config/ref state unchanged.
+
+The same refreeze closes the remaining product-observation gaps. BASE and WITH_STAGING barriers
+independently discover the sole private runtime root and bind supervisor/helper tokenized argv to
+its same direct nofollow `0500` exact-digest Python dev/ino. Descriptor tokens are parsed canonical
+integers at least 3, including 10–29; an actual call occupies caller fds 3–14, complete libproc
+tables bind paused-helper roles/dev-inos, and `/dev/fd` proves no filler survives target exec. All
+thirteen request-header omissions, NaN/infinities and the
+complete missing/wrong/extra/duplicate/nonfinite `go-v1` family reject before target start. BASE,
+WITH_STAGING and a later launch must have distinct sessions, all capabilities, runtime roots and
+socket identities. Deterministic runtime canaries receive full denied-operation readback, a
+root-`0500`/file-`0700` snapshot rejects, and BASE reports its own exact PATH/internal-env/stdin/FD
+identities. A distinct public nested child is denied an outer-writable sibling with readback, while
+staging ancestor/descendant/dev-ino overlaps are rejected in both directions across trust, live,
+Git, runtime and workspace. Immutable review binds CSPRNG generation, exact closed
+supervisor/helper environments, `close_fds`/exact `pass_fds` construction and a single reachable
+post-profile helper path for bootstrap, public nesting and raw handoff.
+
+The R4c dual review found two contract defects. First, proof acceptance spelled a fixed
+alphabetical member order for the proof and effect objects even though the proof digest is
+canonical and order-insensitive, and the gate's own fixtures re-serialized the supervisor's
+response with sorted keys, so no wire member order was ever observed. R4d validates the exact
+proof wire bytes through the barrier, compares key sets rather than sequences, keeps every
+duplicate/missing/extra/wrong rejection, sends the primary valid session's launch header and
+go-v1 in materially reversed member order as a connected positive beside the sorted base session,
+and leaves every materially ordered array exact. Second, the supervisor's retained descriptors
+were underconstrained: the check was subset containment over stdio plus the control descriptor
+with a single ready-fd absence, the occupied-filler exclusion applied in one lane only, and the
+computed complete role table was never asserted. R4d accounts the complete supervisor table at
+each paused barrier under closed classes only — AF_UNIX stream sockets, non-regular stdio, the
+paused helper's libproc-measured stdio pipe identities, entropy devices, lane-known sealed-root
+directory and lane-known regular identities — binds the control descriptor as a live AF_UNIX
+stream socket, requires the ready descriptor closed, and fails closed on every unaccounted
+retained descriptor including foreign socket families, credential/config-bearing files, unknown
+pipes and directories and high-numbered descriptors, with a dual-process gate probe (AF_INET
+socket, regular file, AF_UNIX pair, descriptor 200) falsifying the enumerator and the
+cross-process libproc-identity classifier before any subject credit. The probe already earned its
+keep: it refuted a first fstat-based pipe-identity design, because a pipe's parent-side fstat
+identity does not equal its libproc vinfo identity; the frozen classifier therefore matches pipes
+only inside the one libproc observation domain.
+
+R4d is refrozen as a fresh TEST_AUTHOR direct child of published main
+`7cab432cb72c65a867ce286f2cf50828343382a2` (tree `be88db1ba5753fd59393f803e1f78e0de9203f00`)
+after 117 unrelated product-lane commits. The only control-plane byte drift since `b17d0941` is
+the human-owned `docs/07-konstitution.md` (packs/measurement zoning), whose pinned digest follows
+the new base; every H-034 prerequisite identity remains byte-true and prior H036 candidates remain
+evidence only.
+
+R4e closes the one blocking finding of R4d's own independent dual review. The runtime-contract
+reviewer proved that `supervisor_fd_exact` still carried a residual descriptor-number term —
+`not (supervisor_fd_numbers & occupied)`, where `occupied` is the caller's `3..14` filler set —
+inside the very check whose R4d purpose is number-agnostic accounting. A supervisor written
+straightforwardly to the frozen contract, spawned with `close_fds` and only its control/ready
+descriptors passed, reopens its listener, accepted connection and helper descriptors at POSIX
+lowest-available numbers 3–14 and would deterministically false-fail that term. The term was also
+redundant: a genuinely leaked caller filler is a `/dev/null` character device (non-entropy) at
+`fd>=3` and is already unaccounted under the complete classifier, so leak detection is fully
+served by descriptor identity/type. R4e removes the number term; the classifier's `not
+unaccounted_fds` remains the sole, number-agnostic leak detector, and the classifier selftest now
+explicitly asserts that legitimate descriptors are accounted at both low (`<10`) and high (`200`)
+numbers while only the foreign AF_INET socket stays unaccounted. The caller-occupied fixture is
+retained as informational low-fd pressure that exercises the classifier under descriptor reuse.
+The two non-blocking review observations are held unchanged: a per-peer AF_UNIX binding is a
+larger design change out of this lane's scope, and a lane-known-regular access-mode tightening
+would itself risk false-failing a supervisor that legitimately holds the result sink read-write —
+the same over-constraint class this round removed.
+
+The TEST_AUTHOR candidate changes exactly five files: `specs/tasks.spec.json`, new
+`verify/bin/h-036-exit`, `docs/loop/owner-author-workflow-v1.md`, `docs/05-beslutslogg.md`, and
+this drift record. It writes no production, H-032 or autopilot byte. Product authority is exactly
+the three paths reserved by H-034 and capped at 2400 cumulative added lines. H-032 later refreezes
+to depend exactly on published H-036 and H-031 follows. Full/live/H-017, network, ref, push and
+merge work remain outside this lane.
