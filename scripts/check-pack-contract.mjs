@@ -61,7 +61,7 @@ const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
 const REFERENS = 'lokal-se'
-const FORVANTAD_KALLHASH = 'd0c1a71063a9bc8a'
+const FORVANTAD_KALLHASH = '648aceae36f194aa'
 
 const kontrakt = las('docs/paketkontrakt.md')
 const scope = las('docs/06-scope.md')
@@ -73,7 +73,7 @@ const flaggregister = las('skills/nortropic-plan/references/juridikflaggor.md')
 const delRader = [...kontrakt.matchAll(/^\| \*\*(.+?)\*\* \| (.+?) \| (.+?) \|$/gm)]
 if (delRader.length < 6) odombart(`paketkontraktets deltabell gav ${delRader.length} rader — kraven går inte att härleda ur dokumentet`)
 const DELAR = delRader.map((m) => ({ namn: m[1].trim(), hemvist: m[2].replace(/`/g, '').trim() }))
-check('Kontraktet kräver ÅTTA obligatoriska delar', DELAR.length === 8,
+check('Kontraktet kräver NIO obligatoriska delar', DELAR.length === 9,
   `hittade ${DELAR.length}: ${DELAR.map((d) => d.namn).join(', ')}`)
 
 // Varje extraherad del MÅSTE ha en implementerad kontroll. Utan detta var extraheringen
@@ -89,6 +89,7 @@ const IMPLEMENTERADE = {
   // en NAMNGIVEN komposition pekar manifestet på katalogen i allmänhet.
   'Kapacitetskomposition': (id) => kompositionen(id).length > 0,
   'Grindlinser': (id) => existsSync(join(ROT, `packs/${id}/gate-lenses.md`)),
+  'Agentfragment': (id) => existsSync(join(ROT, `packs/${id}/agent-fragments.md`)),
 }
 
 // Kompositionen läses ur manifestets tabell. Rollerna är slutna: ÄGER · SKÄRPER · ÄRVER.
