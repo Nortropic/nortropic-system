@@ -1117,3 +1117,30 @@ människa får göra det, och att låta en agent flytta båda spikarna vore att 
 en tom formulering. Den väntande åtgärden står i stället inskriven i kontrollen med **båda**
 fingeravtrycken — rör läget sig igen faller kontrollen, och när du flyttar spiken blir
 undantaget falskt och faller också. Det kan alltså inte glömmas bort.
+
+## Fjorton prov som ingen körde (2026-08-27)
+
+Vi letade efter **anropare** i stället för efter kontroller, och svaret var sämre än väntat:
+fjorton provfiler hade ingen alls. Grundvalssviten, styrplanets åtta kontraktssviter, fyra
+proveniensprov och publiceringsvägens auktoritetsprov.
+
+Det var inte teoretiskt. En av dem hade varit röd i ett dygn utan att någon visste det.
+
+**Vad som byggdes:** en körare som faktiskt kör styrplanets sviter, och en kontroll som
+fäller när en provfil inte är någons ansvar.
+
+**Att skilja "gick sönder" från "gick inte att köra här".** Flera sviter kräver rättigheter
+som en agent inte har. Att bara anta att de faller av den anledningen hade blivit en
+ursäktsmaskin — den hade dolt ett verkligt fel i samma svit dagen efter. Köraren provar
+därför rättigheterna först, och kräver dessutom att svitens egen utdata säger att den blev
+nekad. Båda villkoren. På riktig data skiljer det de fyra miljöblockerade från de två
+verkligt trasiga, och de två klassas som fel även i den begränsade miljön.
+
+**Kontrollen fällde sin egen första version.** Den lät en fil räknas som "körd" om något
+annat nämnde dess namn — varpå kontrollens EGEN lista över okörda filer förklarade dem
+körda, eftersom listan nämner dem. Att nämna är inte att köra. Kravet är nu att källan både
+namnger filen och faktiskt startar den.
+
+**Listan över det som förlitar sig på att du kommer ihåg** skrivs ut vid varje grön körning
+i stället för att gömmas. Det är den klassen som redan kostat oss ett dygn, och den ska
+synas, inte sorteras undan.
