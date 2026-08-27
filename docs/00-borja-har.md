@@ -1092,3 +1092,28 @@ räcker det att sviten går sönder tyst för att allt ska se grönt ut.
 
 Kontrollen **kör** sviten men ändrar den aldrig — den ligger på människoägd mark, och det
 är oförändrat.
+
+## Två system pinnade samma fil, och det ena visste inte om det andra (2026-08-27)
+
+Systemet har två halvor: **webbförvaltningen**, som bygger kundsajter, och **styrplanet**,
+som kör arbetet automatiskt. De byggdes vid olika tidpunkter och prövas av olika
+kontroller.
+
+**En kontrollfil hörde till båda.** Webbförvaltningen ändrade den — två rader, helt
+korrekt, så att den nya kontrollomgången skulle känna igen den. Styrplanet hade samma fil
+fastspikad vid ett exakt fingeravtryck, med regeln att bara en människa får flytta spiken.
+
+Styrplanet gjorde precis rätt: det **vägrade starta**. Det är så det ska bete sig.
+
+**Ingen såg det på en dag.** Styrplanets egna provsviter kördes inte av något — samma
+problem som foundation-sviten ovan. Vi körde dem, hittade den röda, och letade oss bakåt
+genom 106 ändringar till den som orsakade det.
+
+**Vad som byggdes:** en kontroll som jämför styrplanets fastspikade fingeravtryck mot
+filerna varje gång. Kollisionen syns nu i samma körning som den uppstår.
+
+**Vad som INTE gjordes, och varför:** spiken är inte flyttad. Regeln säger att bara en
+människa får göra det, och att låta en agent flytta båda spikarna vore att göra regeln till
+en tom formulering. Den väntande åtgärden står i stället inskriven i kontrollen med **båda**
+fingeravtrycken — rör läget sig igen faller kontrollen, och när du flyttar spiken blir
+undantaget falskt och faller också. Det kan alltså inte glömmas bort.

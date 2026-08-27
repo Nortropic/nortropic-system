@@ -82,6 +82,7 @@ const PINNAR = {
   'check-profile-contract.mjs': '5da81cc32582b46c',
   'check-research-contract.mjs': '4aa0aa5b5f281092',
   'check-v4-utkast.mjs': '3c107f8e300336f9',
+  'check-verifierarregistret.mjs': 'fd7985f07b1665e6',
   'check-workflow-parse.mjs': '575a45e74cc23eec',
   'kor-backtest.mjs': '1f5959f7648d9967',
   'kor-gym.mjs': 'a7b636fff3032ed4',
