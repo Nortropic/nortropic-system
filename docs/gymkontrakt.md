@@ -35,22 +35,43 @@ göra mekaniska. Den risken kan bara en människa granska.
 | ID | Lag (planens ord) | Operativ innebörd | Läge |
 |---|---|---|---|
 | `G1` | *student cannot move goalposts* | Gymmet får läsa `tests/fixtures/**` men aldrig skriva dem. En körning som vill ändra en baseline avbryts och rapporterar det som ett FYND | `MEKANISK` |
-| `G2` | *deterministic evidence first* | Varje påstående ska först prövas deterministiskt (exit-koder, diffar, räkningar). En domare får åberopas endast för det som inte går att avgöra så | `MEKANISK` delvis — vakten prövar att rapporten BÄR ett deterministiskt led före varje domarled, aldrig att deterministiken faktiskt försöktes först |
+| `G2` | *deterministic evidence first* | Varje påstående ska först prövas deterministiskt (exit-koder, diffar, räkningar). En domare får åberopas endast för det som inte går att avgöra så | `MEKANISK` (2026-08-27) — `bevisordning()` i `kor-gym.mjs` FÄLLER ett påstående som har BÅDE ett deterministiskt utfall och ett domarutfall (två svar på samma fråga, och det mjukare citeras när de skiljer sig), FÄLLER ett domarled utan angivet skäl (utan skäl går *"gick inte att avgöra deterministiskt"* inte att skilja från *"frågade en domare i stället"*) och ger ODÖMBART för ett oprövat påstående. **Kvarstår:** att deterministiken FÖRSÖKTES först går inte att se ur utfallet — bara att den inte kringgicks |
 | `G3` | *calibrated judge only where deterministic evidence is insufficient* | Domaren måste vara kalibrerad mot ett känt facit, och kalibreringen redovisas i samma rapport | `EJ MEKANISK` — kalibreringens KVALITET är en bedömning |
 | `G4` | *disagreement preserved, not averaged away* | Två domare som är oense ger `OENIG`, aldrig ett medelvärde. `OENIG` blir aldrig grönt | `MEKANISK` |
-| `G5` | *provider family preference measured* | Rapporten ska redovisa utfall per leverantörsfamilj, så en familjepreferens syns i stället för att gömmas i ett snitt | `MEKANISK` delvis — endast fältets närvaro; att mätningen gjorts går inte att avgöra ur rapporten |
+| `G5` | *provider family preference measured* | Rapporten ska redovisa utfall per leverantörsfamilj, så en familjepreferens syns i stället för att gömmas i ett snitt | `MEKANISK` (2026-08-27) — `familjeutfall()` i `kor-gym.mjs` sammanväger familjerna genom `domslut`, ALDRIG genom ett medel, så en skillnad blir ett FYND i stället för brus. **EN ENDA familj ger ODÖMBART:** en mätning per familj över en familj mäter ingen preferens men rapporten ser likadan ut, och det är den farligaste formen. En körning utan familjeetikett bucketas aldrig in i en default. **Kvarstår:** att familjerna är RÄTT etiketterade är indata, inte något funktionen kan pröva |
 | `G6` | *hidden holdouts protected* | Held-out-fall får aldrig läsas av kandidaten och aldrig citeras i rapporten med innehåll — bara med utfall | `EJ MEKANISK` — held-out-repot finns inte (se §4) |
 | `G7` | *synthetic evidence never yields PROVEN* | En gymkörning kan aldrig lyfta något över `VALIDATING` (§A9) | `MEKANISK` |
 | `G8` | *optimizer-invisible measurement where reward-hacking risk exists* | Där kandidaten kan optimera mot måttet ska måttet inte finnas i kandidatens kontext. Rapporten namnger vilka mått som hölls osynliga | `EJ MEKANISK` — osynligheten kan inte bevisas av samma system som döljer |
 | `G9` | *bounded budget* | Varje körning bär ett tak i antal anrop och kostnad, satt FÖRE start | `MEKANISK` |
 | `G10` | *budget exhaustion ≠ PASS* | Slut budget ger `ODÖMBART`, aldrig `PASS` och aldrig `FAIL` | `MEKANISK` |
-| `G11` | *promotion uses normal owner/trust path* | Gymmet befordrar aldrig. Rapporten är ett förslag i det vanliga flödet | `MEKANISK` delvis — vakten prövar att KONTRAKTET saknar befordransväg, aldrig att en körning avstår från att befordra |
+| `G11` | *promotion uses normal owner/trust path* | Gymmet befordrar aldrig. Rapporten är ett förslag i det vanliga flödet | `MEKANISK` (2026-08-27) — `rapportform()` i `kor-gym.mjs` prövar KÖRNINGENS EGEN rapport: befordransfält på båda språken (`befordrad`/`promoted`/`godkand`/`approved`/`signoff`) fäller, ett `PROVEN`-påstående fäller, och en okänd status ger ODÖMBART i stället för den lösare vägen. Torrkörningen anropar den på sin egen rapport och avbryter om svaret inte är `FÖRSLAG`. **Kvarstår:** en befordran som sker UTANFÖR rapporten — i ett samtal, i en commit — ser den här funktionen aldrig |
 
-**Sex av elva är EJ MEKANISKA eller delvis så.** Det är inte en brist som ska döljas.
-`G3`, `G6` och `G8` är helt icke-mekaniska: de handlar om en bedömning, om ett repo som
-inte finns, respektive om en egenskap ett system inte kan bevisa om sig självt. `G2`, `G5`
-och `G11` prövas bara till FORMEN — att rapporten bär rätt fält, aldrig att beteendet
-bakom fältet inträffade. **Endast fem av elva lagar är verkligt mekaniskt bundna.**
+**Tre av elva är EJ MEKANISKA.** Det är inte en brist som ska döljas. `G3`, `G6` och `G8`
+handlar om en bedömning, om ett repo som inte finns, respektive om en egenskap ett system
+inte kan bevisa om sig självt. **Åtta av elva lagar är verkligt mekaniskt bundna.**
+
+> **OMKLASSIFICERINGEN 2026-08-27 — och varför den inte är en tyst uppgradering.** `G2`,
+> `G5` och `G11` stod som *delvis* mekaniska med skälet att de bara prövades till FORMEN:
+> att rapporten bär rätt fält, aldrig att beteendet bakom fältet inträffade. Det är nu
+> ändrat, och **`check-gym-contract.mjs` fällde det första försöket** — den kräver att
+> prosans antal stämmer med tabellen, med motiveringen att *"en tyst omklassificering av en
+> svår lag till mekanisk är exakt det författaren har intresse av"*. Kontrollen fungerade
+> mot den som skrev den.
+>
+> Vad som faktiskt byggdes, och vad som INTE gjorde det:
+>
+> - **`G5`** sammanväger familjer genom `domslut`, aldrig genom ett medel — och **EN ENDA
+>   familj ger ODÖMBART**, eftersom en mätning per familj över en familj mäter ingen
+>   preferens fast rapporten ser likadan ut. *Kvarstår:* att etiketterna är rätt är indata.
+> - **`G2`** fäller ett påstående som har BÅDE ett deterministiskt utfall och ett
+>   domarutfall, och ett domarled utan skäl. *Kvarstår:* att deterministiken FÖRSÖKTES
+>   först syns inte i utfallet — bara att den inte kringgicks.
+> - **`G11`** prövar körningens EGEN rapport, inte kontraktet. *Kvarstår:* en befordran som
+>   sker utanför rapporten ser funktionen aldrig.
+>
+> **De tre kvarvarande köps inte av kod.** `G3` kräver en kalibrerad domare, `G6` ett
+> held-out-repo (`GYM-GAP-2`) och `G8` att ett system bevisar något om sin egen blindhet.
+> Att kalla någon av dem mekanisk vore att flytta måttet i stället för att nå det.
 
 ## 2. §17 Modellkandidatregelns fyra led
 
@@ -103,7 +124,7 @@ torrkörning till noll kostnad; verdiktet är `ODÖMBART`, aldrig PASS. Vad som 
 
 | ID | Lucka | Nästa transition |
 |---|---|---|
-| `GYM-GAP-1` | **DELVIS ÅTGÄRDAT 2026-08-27.** Luckans nästa transition sa *"ägarbeslut om budgettak, sedan en runner"* — **ordningen var fel.** Budgeten behövdes bara för de led som ANROPAR modeller. `scripts/kor-gym.mjs` bygger och PRÖVAR `G1`, `G4`, `G7`, `G9` och `G10` för noll kronor, och producerar rapportformen som torrkörning. Femton kontrollprov tvingar varje lag att bevisa att den FÄLLER. **Torrkörningen ger `ODÖMBART`, aldrig PASS.** **Kvarstår:** modelladaptern är inte byggd — utan den gör `--budget` ingenting, och scriptet säger det i klartext i stället för att låtsas | Modelladapter + ett tak i kronor. **Men budgeten är inte det som blockerar mest:** `GYM-GAP-2` (held-out-repot) gör led 2 `ODÖMBART` även med obegränsad budget, och det kan inte köpas bort |
+| `GYM-GAP-1` | **DELVIS ÅTGÄRDAT 2026-08-27 (utökat samma dag: `G2`, `G5` och `G11` gick från `MEKANISK delvis` till `MEKANISK` — åtta av elva lagar är nu kod, och de tre kvarvarande kräver en domare, ett held-out-repo respektive en kandidatkontext, alltså modelladaptern).** Luckans nästa transition sa *"ägarbeslut om budgettak, sedan en runner"* — **ordningen var fel.** Budgeten behövdes bara för de led som ANROPAR modeller. `scripts/kor-gym.mjs` bygger och PRÖVAR `G1`, `G4`, `G7`, `G9` och `G10` för noll kronor, och producerar rapportformen som torrkörning. Femton kontrollprov tvingar varje lag att bevisa att den FÄLLER. **Torrkörningen ger `ODÖMBART`, aldrig PASS.** **Kvarstår:** modelladaptern är inte byggd — utan den gör `--budget` ingenting, och scriptet säger det i klartext i stället för att låtsas | Modelladapter + ett tak i kronor. **Men budgeten är inte det som blockerar mest:** `GYM-GAP-2` (held-out-repot) gör led 2 `ODÖMBART` även med obegränsad budget, och det kan inte köpas bort |
 | `GYM-GAP-2` | **NAMNGIVEN.** Held-out-repot finns inte, så `G6` och led 2 är oprövbara | Ägarceremoni enligt `docs/kompetensregister.md` |
 | `GYM-GAP-3` | **NAMNGIVEN.** GYM-EXP-1 är designad (§6) men aldrig körd | Följer `GYM-GAP-1` |
 

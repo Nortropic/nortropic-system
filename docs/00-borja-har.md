@@ -1171,3 +1171,33 @@ inte hållas samtidigt.
 Ingen av de två avgörs av mig — den ena rör din egen uppgiftsyta, den andra flyttar gränsen
 för hur mycket en arbetare får veta om sitt eget betyg. Vad som gjorts är att skilja dem åt
 och mäta dem, så att beslutet blir en rad i stället för en utredning.
+
+## Tre gymlagar som bara prövades till formen (2026-08-27)
+
+Gymmet — den bana där en modellkandidat ska mätas innan den får något ansvar — vilar på
+elva frusna lagar. Fem var kod. Sex stod som "delvis" eller "inte alls" mekaniska.
+
+Tre av de sex gick att bygga för noll kronor, och de handlar alla om samma sak: **att en
+rapport kan se ut som en mätning utan att vara det.**
+
+- **Utfall per leverantörsfamilj.** Förut räckte det att fältet fanns. Nu vägs familjerna
+  samman på ett sätt som bevarar oenighet i stället för att jämna ut den — och **en enda
+  familj ger "går inte att döma"**, eftersom en mätning per familj över en familj inte mäter
+  någon skillnad alls, fast rapporten ser exakt likadan ut. Det är den farliga formen.
+- **Deterministiskt bevis först.** Ett påstående som har både ett maskinellt svar och ett
+  bedömarsvar fälls nu: två svar på samma fråga, och det mjukare är det som citeras när de
+  skiljer sig. Ett bedömarsvar utan angivet skäl fälls också — utan skäl går "gick inte att
+  mäta" inte att skilja från "frågade en bedömare i stället".
+- **Gymmet befordrar aldrig.** Förut prövades att *kontraktet* saknar befordringsväg. Nu
+  prövas *körningens egen rapport* — bär den ett godkännandefält, på svenska eller engelska,
+  eller påstår den högsta betyget, så fälls den.
+
+**Kontrollen fällde två av mina försök under vägen**, och det är värt att säga rakt ut. Först
+när jag räknade om lagarna utan att uppdatera texten som säger hur många som inte är
+mekaniska — kontrollen finns just för att en tyst uppgradering är vad författaren har
+intresse av. Sedan när min egen kopplingskontroll prövade vad *utskriften sa* i stället för
+att lagen *anropades*; en rad med rätt text passerade utan att lagen kördes.
+
+**De tre kvarvarande köps inte av kod** och ska inte kallas mekaniska: en av dem kräver en
+kalibrerad bedömare, en kräver ett testrepo som inte finns, och en kräver att ett system
+bevisar något om sin egen blindhet.
