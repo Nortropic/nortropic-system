@@ -69,7 +69,7 @@ const PINNAR = {
   'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-forbattring.mjs': '8ebe9f9e2b6a1170',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
-  'check-gym-contract.mjs': '3bdf293c3aa7e1f7',
+  'check-gym-contract.mjs': '531b09840d9f24fb',
   'check-integrationer.mjs': '6ac685656bd60406',
   'check-invariants.mjs': 'dbdf696d7cefd335',
   'check-karn-universalitet.mjs': 'd9dff3487cfca7e1',
@@ -82,6 +82,7 @@ const PINNAR = {
   'check-v4-utkast.mjs': '3c107f8e300336f9',
   'check-workflow-parse.mjs': '575a45e74cc23eec',
   'kor-backtest.mjs': '1f5959f7648d9967',
+  'kor-gym.mjs': 'a7b636fff3032ed4',
   'kor-vakter.mjs': 'aa17a3fefd53a27d',
 }
 // ---- PINNTABELL: SLUT -------------------------------------------------------
