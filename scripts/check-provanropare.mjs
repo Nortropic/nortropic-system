@@ -49,12 +49,13 @@ const odombart = (skal) => { console.error(`ODÖMBART: ${skal}`); process.exit(2
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = 'f3d2ac5dac9af8b0'
+const FORVANTAD_KALLHASH = 'fbd406fcc9c78556'
 
 // ---- DET SOM FÖRLITAR SIG PÅ MÄNSKLIGT MINNE, utskrivet ---------------------
 // Varje rad är en skuld, inte ett undantag. Skälet måste säga VEM som kör och NÄR.
 const UTAN_ANROPARE = {
   'scripts/kor-vakter.mjs': 'körare — körs avsiktligt före varje commit (arbetsloopens steg 5)',
+  'scripts/kor-mutationsprov.mjs': 'körare — körs avsiktligt när en vakt byggs eller ändras; mäter om vakterna försvarar sina egna ankare och tar några minuter',
   'scripts/kor-styrprov.mjs': 'körare — körs avsiktligt; kan inte ligga i batteriet så länge loop/envelope är röda, eftersom ett rött batteri slutar vara en grind',
   'scripts/gsc-setup.mjs': 'operatörskört — den irreversibla GSC-skrivningen är alltid en människas hand',
   'scripts/run-axe-gate.mjs': 'grindkörare — Gate 4 mot ett mål som inte finns i repot',
