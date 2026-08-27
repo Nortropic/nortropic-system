@@ -1201,3 +1201,33 @@ att lagen *anropades*; en rad med rätt text passerade utan att lagen kördes.
 **De tre kvarvarande köps inte av kod** och ska inte kallas mekaniska: en av dem kräver en
 kalibrerad bedömare, en kräver ett testrepo som inte finns, och en kräver att ett system
 bevisar något om sin egen blindhet.
+
+## Hur vet vi att en kontroll faktiskt kontrollerar något? (2026-08-27)
+
+Elva av kontrollerna hade ett **fingeravtryck** — ett sätt att upptäcka att någon ändrat
+dem — men inget eget prov på att de fungerar. Ett fingeravtryck säger bara att filen är
+oförändrad, aldrig att den gör sitt jobb. **En kontroll som föddes trasig förblir trasig
+och fastspikad**, och "23 av 23 gröna" är då en räkning av kontroller som inte kan falla.
+
+Alternativet hade varit att skriva elva handgjorda prov — alltså elva listor att glömma
+eller vattna ur. I stället **härleds** frågan: varje filnamn en kontroll nämner i sin egen
+kod är något den påstår sig bevaka. Kontrollen körs sedan i en **tillfällig kopia av repot**
+där ett sådant filnamn i taget tömts.
+
+Frågan är smal med avsikt: *kan den här kontrollen vara grön i en värld där allt den nämner
+är tomt?* Kan den det bevakar den ingenting.
+
+**Verdiktet är lika smalt.** Att ett enskilt filnamn överlever är inget fel — en kontroll som
+kräver att något ALDRIG står i en fil blir förstås grönare när filen töms. Det som fälls är
+kontrollen som försvarar noll. En rapport full av falska fynd lär man sig att ignorera, och
+då bevakar den ingenting den heller.
+
+**Utfallet:** 21 av 23 kontroller går att mäta så här, och de försvarar 85 av 104 filnamn.
+Ingen försvarar noll. De två som inte går att mäta räknar upp sina mål vid körning i stället
+för att nämna dem — att säga det rakt ut är hela skillnaden mot att räkna dem som gröna.
+
+**Fyra av mina egna skyddsmekanismer visade sig gå att radera osynligt**, och det är
+kvittot på att måttet är värt något. De gällde bara i lägen som inte inträffar i dag — ingen
+kontroll är röd från början, ingen fladdrar — så att ta bort dem ändrade ingenting i
+utfallet. Ett skydd som bara gäller i ett läge som aldrig inträffar är inte prövat, bara
+ostört. De prövas nu vid varje start.
