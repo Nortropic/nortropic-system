@@ -48,7 +48,7 @@ const las = (p) => {
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '519bdfc01bdbf485'
+const FORVANTAD_KALLHASH = '01e2660e3d07d3cb'
 
 // ---- --generera: GL-GAP-1 stängd genom GENERERING, inte genom läsning ------
 // Workflow-DSL:en har INGEN filsystemsåtkomst, så `nortropic-launch.js` kan inte läsa
@@ -149,6 +149,46 @@ check('Luckan `GL-GAP-1` står som TABELLRAD med sin transition',
   paket.some((p) => existsSync(join(ROT, `packs/${p}/gate-lenses.md`)) &&
     /^\| `GL-GAP-1` \|[^|]+\|[^|]+\|$/m.test(las(`packs/${p}/gate-lenses.md`))),
   'ett omnämnande i prosan räcker inte — raden kan strykas medan ordet står kvar, och då läses spegeln som en koppling')
+
+// ---- PK-GAP-3: agentfragmenten, masterplanens §6:s SJÄTTE paketdel --------
+// Samma fynd som med linserna: paketets skärpningar av agenternas beteende fanns redan —
+// men inline i `agents/*.md`, inte i paketet. Skillnaden är att fragmenten **inte går att
+// generera**: de är prosa inuti längre instruktioner, och att generera prosa in i en
+// agentfil vore att låta ett paket skriva om en agents text. **Spegeln är taket här**, och
+// den prövas i BÅDA riktningar precis som linsspegeln.
+for (const p of paket) {
+  const fil = `packs/${p}/agent-fragments.md`
+  check(`Paketet \`${p}\` deklarerar sina agentfragment`, existsSync(join(ROT, fil)),
+    'masterplanens §6 räknar upp agent fragments som en av sex paketdelar — utan filen bor skärpningen bara i agenten')
+  if (!existsSync(join(ROT, fil))) continue
+  const af = las(fil)
+  const rader = [...af.matchAll(/^\| `(AF-\d+)` \| `([^`]+)` \| (.+?) \| `(.+?)` \|$/gm)]
+  check(`\`${p}\`: fragmenttabellen kunde läsas`, rader.length > 0, 'inga fragmentrader')
+  for (const [, id, agent, vad, ankare] of rader) {
+    check(`\`${p}\`/${id}: agenten \`${agent}\` finns`, existsSync(join(ROT, agent)),
+      'ett fragment som pekar på en agent som inte finns är en spegel av ingenting')
+    if (!existsSync(join(ROT, agent))) continue
+    // Ankarfrasen måste stå i agenten. Backticks i tabellcellen är markdown-escapade.
+    const fras = ankare.replace(/\\`/g, '`')
+    check(`\`${p}\`/${id}: ankarfrasen står i ${agent.split('/').pop()}`,
+      las(agent).includes(fras),
+      `frasen "${fras.slice(0, 50)}" saknas — spegeln har glidit, och paketet påstår en skärpning agenten inte bär`)
+    check(`\`${p}\`/${id}: fragmentet säger UT vad som skärps`, vad.trim().length >= 25,
+      'ett fragment utan innehåll är en pekare, och pekare driftar utan att någon märker det')
+  }
+  check(`\`${p}\`: skärpningslagen står i fragmentregistret`,
+    /bara SMALNA av kärnan/.test(af) && /lättar ett universellt krav är ogiltigt/.test(af),
+    'utan lagen kan ett fragment lätta ett universellt krav genom att kalla det branschanpassning')
+  check(`\`${p}\`: registret säger UT vad som INTE är ett fragment`,
+    /Universella krav är aldrig fragment/.test(af),
+    'att lista ett universellt krav som paketets gör det valbart genom att knyta det till ett paket')
+  check(`\`${p}\`: spegelgränsen är namngiven (AF-GAP-1)`,
+    /^\| `AF-1` `AF-GAP-1` \|[^|]+\|[^|]+\|$/m.test(af) || /AF-GAP-1/.test(af),
+    'utan luckan läses registret som en koppling')
+  check(`\`${p}\`: den LEXIKALA gränsen är namngiven (AF-GAP-2)`,
+    /AF-GAP-2/.test(af) && /inte att agenten BETER sig/.test(af),
+    'vakten prövar att frasen står där, aldrig att agenten följer den — samma gräns som PK-GAP-2')
+}
 
 // ---- FALL 2: bakåtkompatibilitetslagen får inte falla ur en prompt --------
 // KONSUMENTMÄNGDEN HÄRLEDS, den hand-kureras inte: varje fil som instruerar läsning av

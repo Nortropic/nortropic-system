@@ -204,6 +204,33 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Fem av sex paketdelar klara — och den sjätte ska inte byggas (2026-08-27)
+
+Planen säger att ett paket består av sex delar. Vi hade tre. Nu har vi **fem**.
+
+Den nya delen: **paketets skärpningar av hur robotarna beter sig**. De fanns redan — men
+inskrivna i robotarnas egna instruktioner, inte i paketet. Precis samma sak som med
+granskningskontrollerna i går. Paketet pekar nu ut var varje skärpning står, och en kontroll
+fäller om texten försvinner ur roboten.
+
+**Skillnaden mot i går:** granskningskontrollerna kunde *genereras* ur paketet. Det kan inte
+de här — de är löptext inuti längre instruktioner, och att låta ett paket skriva om en robots
+text vore fel sorts lösning. Registret är alltså en spegel, och det står utskrivet.
+
+**Den sjätte delen — paketets egna kvalitetskriterier — bygger jag medvetet INTE.** Skälet
+är strukturellt: vår skarpa kvalitetsmall har ingen paketdel alls, och att lägga till en är
+en ändring av **måttstocken** — och måttstocken ägs av dig, inte av systemet. Det finns ett
+utkast till en ny mall som har en paketdel, men det utkastet är avsiktligt hållet utanför
+drift.
+
+**Att bygga en tredje yta med kvalitetskriterier vore att skapa en andra måttstock.** Då
+slutar rapporter från olika kunder gå att jämföra. Rätt ordning är att du först avgör den
+nya mallens öde; paketets del blir då antingen dess paketdel eller ingenting.
+
+**Systemet fällde mig på just den punkten under bygget:** jag råkade referera utkastet från
+paketkontraktet, och kontrollen som ska hålla utkastet utanför drift stoppade det direkt.
+Den hade rätt.
+
 ## Innehållsförteckningen kontrolleras nu mot innehållet (2026-08-27)
 
 I går skrev jag in vad vårt lokalpaket består av. **Men det var bara en lista jag skrivit** —
