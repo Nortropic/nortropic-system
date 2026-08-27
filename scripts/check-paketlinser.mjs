@@ -48,7 +48,7 @@ const las = (p) => {
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = 'cdc426268a7fb633'
+const FORVANTAD_KALLHASH = '02143f6a8c0488da'
 
 // ---- --generera: GL-GAP-1 stängd genom GENERERING, inte genom läsning ------
 // Workflow-DSL:en har INGEN filsystemsåtkomst, så `nortropic-launch.js` kan inte läsa
@@ -167,7 +167,15 @@ const utanEmfas = (t) => t.replace(/[*`]/g, '')
 check('GL-GAP-2: luckans transition säger UT varför generering vore fel väg',
   paket.every((p) => !existsSync(join(ROT, `packs/${p}/gate-lenses.md`)) || (() => {
     const t = utanEmfas(las(`packs/${p}/gate-lenses.md`))
-    return /inte §A-zonad/.test(t) && /OSKYDDAD fil bestämma vad en SKYDDAD grind kräver/.test(t) && /Routning är inte kravnivå/.test(t)
+    // KRAVET ÄR VÄNT, INTE STRUKET (2026-08-27). Filen är sedan §A7-zoneringen SKYDDAD,
+    // så det gamla kravet — att raden säger "inte §A-zonad" — är nu ett krav på ett
+    // FALSKT påstående. Raden måste i stället redovisa att spärren är borta OCH varför
+    // luckan ändå inte stängs här: man byter inte mätinstrument och tar den första
+    // mätningen i samma drag. Skillnaden routning/kravnivå står kvar, eftersom den är
+    // skälet till att zoneringen över huvud taget behövdes.
+    return /SPÄRREN ÄR BORTA/.test(t) && /Routning är inte kravnivå/.test(t) &&
+      /OSKYDDAD fil bestämma vad en SKYDDAD grind kräver/.test(t) &&
+      /första mätningen i samma drag/.test(t)
   })()),
   'transitionen sa tidigare "Följer GL-GAP-1", vilket hade lett rakt in i en sänkning av skyddet — skälet måste stå i raden, inte i ett minne')
 // DEN VILSELEDANDE FRASEN FÅR INTE STÅ KVAR BREDVID DEN RÄTTA. En mutation som la tillbaka

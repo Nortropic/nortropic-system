@@ -35,9 +35,32 @@ ANROP = 1
 FALT = {"run_id", "task_id", "base_sha", "spec_sha256", "title", "description",
         "allowed_write", "denied_write", "candidate_requirements"}
 
-# Fält ur specens task-post som ALDRIG får följa med: certifieringssteget och
-# controllerns schemaläggning.
-FORBJUDNA_NYCKLAR = {"exit_test", "exit_criterion", "depends_on", "slice", "docs_impact"}
+# Fält ur specens task-post som ALDRIG får följa med: controllerns schemaläggning.
+#
+# TVÅ NYCKLAR STRÖKS 2026-08-27, och båda av MÄTNING — inte av omdöme. Listan hade fem
+# poster och två av dem prövade något som inte går att skydda:
+#
+#   `exit_test`  — SAMTLIGA 23 tasks bär exakt `verify/bin/<task_id>-exit`. Ingen avviker.
+#                  `task_id` är ett av v4.1 §12:s NIO OBLIGATORISKA kuvertfält och måste
+#                  följa med — workern kan inte utföra en task den inte vet vilken det är.
+#                  Värdet är alltså HÄRLEDBART ur något kuvertet är tvunget att bära, och
+#                  att stryka sökvägen ur kriterietexten hindrar ingen som kan skriva
+#                  `verify/bin/${task_id}-exit`. **Ett skydd mot något som går att räkna ut
+#                  är ingen spärr, det är en kuliss** — och kulissen fällde tre tasks
+#                  (h-031/h-032/h-035) vars kriterier nämner sin egen grind i löptext.
+#
+#   `exit_criterion` — komponentens EGET kontrakt säger ordagrant att
+#                  `candidate_requirements.utfall` *"bär `exit_criterion` styckat i
+#                  enskilda krav: samma text"*. Kriteriet SKA alltså följa med; det är
+#                  hela poängen med fältet. Kontrollen passerade för 22 tasks bara därför
+#                  att styckningen fragmenterade strängen — **en slump i segmenteringen,
+#                  inte ett skydd.** För h-010, vars kriterium är 534 tecken i EN mening,
+#                  gav samma regel FAIL. Regeln motsade komponentens kontrakt hela tiden.
+#
+# KVAR STÅR DET SOM FAKTISKT GÅR ATT HÅLLA HEMLIGT: controllerns schemaläggning. Och den
+# verkliga reward-hacking-ytan för grinden — dess INNEHÅLL, inte dess sökväg — prövas
+# separat nedan. Innehållet går att dölja; namnet gör det inte.
+FORBJUDNA_NYCKLAR = {"depends_on", "slice", "docs_impact"}
 
 
 def git(*argv: str) -> str:
@@ -139,6 +162,40 @@ def main() -> int:
                 continue
             doma(f"{task_id}/lackage-{nyckel}", varde not in text, f"{nyckel} i kuvertet",
                  f"{nyckel} får aldrig följa med")
+
+        # GRINDENS INNEHÅLL — den yta som FAKTISKT går att dölja.
+        # Sökvägen till grinden är härledbar ur `task_id` och därför ingen hemlighet (se
+        # FORBJUDNA_NYCKLAR ovan). Vad grinden PRÖVAR är däremot inte härledbart, och det
+        # är den kunskap som gör reward hacking möjlig: en kandidat som vet exakt vilka
+        # strängar grinden greppar efter kan producera dem utan att lösa uppgiften.
+        # Kontrollen ersätter den strukna sökvägskontrollen med den fråga den borde ha
+        # ställt hela tiden.
+        grind = ROT / f"verify/bin/{task_id}-exit"
+        if not grind.exists():
+            print(f"SKIP  {task_id}/grindinnehall — {grind.name} finns inte; ingen grind att läcka")
+        else:
+            # Distinktiva rader: långa nog att inte kollidera av slump, och inte bara
+            # skiljetecken eller indrag. Hittas inga är ANKARET obevisat och kontrollen
+            # får inte läsas som ren — samma disciplin som en tom kravmängd.
+            rader = [r.strip() for r in grind.read_text(encoding="utf-8", errors="replace").splitlines()]
+            distinkta = [r for r in rader if len(r) >= 40 and any(c.isalpha() for c in r)]
+            if len(distinkta) < 5:
+                print(f"SKIP  {task_id}/grindinnehall — bara {len(distinkta)} distinktiva rader; ankaret obevisat")
+            else:
+                # DELAD DATA ÄR INTE LÄCKAGE. Grinden och kuvertet läser BÅDA specens
+                # task-post, så rader som `"docs/loop/remaining-bootstrap-delegation-v1.md"],`
+                # står i grindens källa utan att komma DÄRIFRÅN. Två sådana gav falskt FAIL
+                # på h-035 i första formen. En rad räknas därför bara som läckt om dess
+                # innehåll INTE redan finns i taskens egen specpost — då är grinden den
+                # enda möjliga källan.
+                specpost = json.dumps(tasks[task_id], ensure_ascii=False)
+                def ur_specen(rad):
+                    kärna = rad.strip(' ,[]{}"')
+                    return bool(kärna) and kärna in specpost
+                lackta = [r for r in distinkta if r in text and not ur_specen(r)]
+                doma(f"{task_id}/grindinnehall", not lackta,
+                     f"{len(lackta)} rad(er) ur grinden i kuvertet: {lackta[:1]}",
+                     "ingen rad ur grindens källa får följa med — sökvägen är härledbar, innehållet är det inte")
 
     # run_id ska faktiskt användas — två olika run_id ger olika kuvert.
     a = kor("build", "run-alfa", "h-001", base)[1]

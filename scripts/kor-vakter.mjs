@@ -24,7 +24,8 @@
 //
 // Verdiktalgebra: exit 0 = PASS, 1 = FAIL, 2 = ODÖMBART. ODÖMBART blir ALDRIG grönt.
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { join, basename } from 'node:path'
 
@@ -44,6 +45,45 @@ const odombart = (skal) => { console.error(`ODÖMBART: ${skal}`); process.exit(2
 // Varje vakt skriver i stället `VAKT: <sitt eget filnamn>` som sin FÖRSTA utdatarad.
 // Filnamn är unika per konstruktion, och en överskriven vakt skriver grannens namn.
 const signatur = (v) => `VAKT: ${v}`
+
+// ---- NÄR KVITTENSRADEN INTE FÅR SKRIVAS: identitet UTIFRÅN i stället ---------
+// EN VERKLIG KOLLISION MELLAN TVÅ SPÅR, funnen 2026-08-27. `scripts/check-invariants.mjs`
+// är en REGISTRERAD VERIFIERARE i styrplanet: `controller/verify/register.json` pinnar den
+// vid sha256, och dess not lyder *"uppdateras endast av MÄNNISKOHAND"*. Filen står dessutom
+// i `docs/loop/byggplan-v3.md` §3.1:s §A-mängd.
+//
+// Att lägga kvittensraden i den filen — vilket den här körarens första version krävde —
+// bröt registrets pinne och gjorde styrplanets loop fail-closed-bruten i ett dygn, utan att
+// någon såg det. **Kravet på en kvittensrad var alltså en skrivning i någon annans låsta
+// yta**, och det går inte att lösa genom att pinna om båda: då är människohandskravet bara
+// en formulering.
+//
+// LÖSNINGEN ÄR ATT BEHÅLLA IAKTTAGELSEN UTIFRÅN MEN BYTA DESS FORM. Kvittensraden finns
+// därför att *"ett program inte kan intyga att det fortfarande är sig självt"* — men en
+// HASH räknad av köraren och jämförd mot ankarvaktens pinntabell är precis en sådan
+// iakttagelse utifrån, och den kräver ingen skrivning i den vaktade filen.
+//
+// MÄNGDEN HÄRLEDS ur registret, aldrig handlistad: blir en annan vakt registrerad i
+// styrplanet får den samma behandling automatiskt.
+const EXTERNT_PINNADE = (() => {
+  try {
+    const reg = JSON.parse(readFileSync(join(ROT, 'controller/verify/register.json'), 'utf8'))
+    return new Set(Object.values(reg.verifiers || {})
+      .map((v) => v && v.path).filter((p) => typeof p === 'string' && p.startsWith('scripts/'))
+      .map((p) => basename(p)))
+  } catch { return null }   // null ≠ tom mängd: se ODÖMBART-grenen nedan
+})()
+if (EXTERNT_PINNADE === null) odombart('controller/verify/register.json går inte att läsa — mängden externt pinnade vakter är okänd, och att gissa den tomma vore att kräva en kvittensrad i en låst fil')
+
+// Pinntabellen läses ur ankarvaktens KÄLLA. Saknas den kan identiteten inte fastställas
+// utifrån för de externt pinnade vakterna — och då är körningen ODÖMBAR, aldrig grön.
+const PINNAR_UTIFRAN = (() => {
+  const kalla = existsSync(join(ROT, 'scripts/check-vaktankare.mjs'))
+    ? readFileSync(join(ROT, 'scripts/check-vaktankare.mjs'), 'utf8') : ''
+  const t = new Map()
+  for (const m of kalla.matchAll(/^\s*'([a-z0-9._-]+\.mjs)':\s*'([0-9a-f]{16})',$/gm)) t.set(m[1], m[2])
+  return t
+})()
 
 // ---- Vaktmängden: spårade OCH ospårade, korsad mot disk ---------------------
 let filer
@@ -70,10 +110,19 @@ let harOdombart = false
 for (const v of vakter) {
   const r = spawnSync(process.execPath, [join(ROT, 'scripts', v)], { cwd: ROT, encoding: 'utf8' })
   const ut = `${r.stdout || ''}${r.stderr || ''}`
-  const kvitterad = new RegExp(`^${signatur(v)}$`, 'm').test(ut)
+  // Externt pinnade vakter identifieras på sin HASH mot pinntabellen — en iakttagelse
+  // utifrån som inte kräver att köraren skriver i en fil någon annan har låst.
+  const kvitterad = EXTERNT_PINNADE.has(v)
+    ? (PINNAR_UTIFRAN.get(v) === createHash('sha256').update(readFileSync(join(ROT, 'scripts', v), 'utf8')).digest('hex').slice(0, 16))
+    : new RegExp(`^${signatur(v)}$`, 'm').test(ut)
   const kod = r.status
   let verdikt
-  if (!kvitterad) { verdikt = 'ODÖMBART (skrev inte sin signaturfras)'; harOdombart = true }
+  if (!kvitterad) {
+    verdikt = EXTERNT_PINNADE.has(v)
+      ? 'ODÖMBART (hash stämmer inte mot pinntabellen — identiteten går inte att fastställa utifrån)'
+      : 'ODÖMBART (skrev inte sin signaturfras)'
+    harOdombart = true
+  }
   else if (kod === 0) verdikt = 'PASS'
   else if (kod === 1) { verdikt = 'FAIL'; harFail = true }
   else { verdikt = `ODÖMBART (exit ${kod})`; harOdombart = true }
