@@ -1231,3 +1231,32 @@ kvittot på att måttet är värt något. De gällde bara i lägen som inte intr
 kontroll är röd från början, ingen fladdrar — så att ta bort dem ändrade ingenting i
 utfallet. Ett skydd som bara gäller i ett läge som aldrig inträffar är inte prövat, bara
 ostört. De prövas nu vid varje start.
+
+## En lucka vars anvisning pekade åt fel håll (2026-08-27)
+
+En kvarvarande lucka sa att paketets granskningslinser bara binder KATEGORIN — vilken
+sorts fynd något räknas som — medan själva KRAVET, vad granskaren ska titta efter, står i
+grindens instruktion. Nästa steg stod som "gör som med den föregående luckan": generera
+innehållet ur paketet in i grinden.
+
+**Det hade gjort skyddet svagare, inte starkare.** Grindens instruktion ligger på en yta som
+grundlagen skyddar; paketets linsfil gör den inte. Att generera därifrån dit hade låtit en
+**oskyddad** fil bestämma vad en **skyddad** grind kräver — precis den riktning skyddet
+finns för att förhindra.
+
+Skillnaden mot den föregående luckan är verklig: där genereras vilken hink ett fynd hamnar
+i. **Routning är inte kravnivå.**
+
+Anvisningen är rättad, och det som skulle behöva hända först är ditt beslut, inte mitt: att
+paketets linsfil förs in under grundlagens skydd. Först då pekar generering åt rätt håll.
+
+En kontroll hindrar nu att genereringen växer: varje genererad rad måste vara en ren
+kategorirad, och blocket får inte bli längre än antalet linser. Kryper kravtext in där,
+faller den.
+
+**Två saker fällde mig under vägen**, båda värda att nämna. Kontrollen krävde en formulering
+ordagrant och föll på att texten hade fetstil mitt i meningen — en kontroll som fäller en
+fil som redan gör rätt. Och när jag citerade den gamla, felpekande anvisningen för att
+förklara rättelsen kunde kontrollen inte skilja citatet från en anvisning. Raden beskriver
+nu den gamla formuleringen i stället för att återge den. Historien står kvar; den tvetydiga
+formen gör det inte.

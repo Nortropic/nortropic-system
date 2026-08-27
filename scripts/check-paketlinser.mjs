@@ -48,7 +48,7 @@ const las = (p) => {
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = 'e975f77c908625d7'
+const FORVANTAD_KALLHASH = 'cdc426268a7fb633'
 
 // ---- --generera: GL-GAP-1 stängd genom GENERERING, inte genom läsning ------
 // Workflow-DSL:en har INGEN filsystemsåtkomst, så `nortropic-launch.js` kan inte läsa
@@ -129,6 +129,66 @@ const UNIVERSELLA = ['seo', 'trust', 'leadgen', 'technical', 'visual', 'content'
 const oknda = [...deklarerade.values()].filter((v) => !UNIVERSELLA.includes(v))
 check('Varje lins aliasar in på en UNIVERSELL kategori', oknda.length === 0,
   `${oknda.join(', ')} är inte universella — §10: ingen per-projekt-rubrikauktoritet`)
+// ---- GL-GAP-2: GENERERINGEN FÅR ALDRIG VÄXA IN I KRAVNIVÅN ------------------
+// `GL-GAP-1` stängdes genom GENERERING: kategorimappningen härleds ur paketet och skrivs
+// in i `workflows/nortropic-launch.js`. Det är försvarbart därför att en mappning är
+// ROUTNING — vilken universell hink ett fynd hamnar i — och routning är inte kravnivå.
+//
+// **MEN `packs/*/gate-lenses.md` ÄR INTE §A-ZONAD.** §A7 räknar upp `packs/*/manifest.md`,
+// `packs/*/research-module.md` och `packs/*/strategi/*`; den här filen står inte där.
+// Workflowet är däremot §A3. Varje rad som genereras härifrån dit går alltså från OSKYDDAD
+// till SKYDDAD yta, och den riktningen är precis vad §A finns för att förhindra: en agent
+// ska inte kunna sänka ett krav genom att redigera något den får redigera.
+//
+// Så länge det som genereras är `'<paket>:<lins>': '<universell kategori>',` är mängden
+// sluten och prövbar. Växer genereringen till att bära KRAVTEXT — vad linsen ska titta
+// efter — har en oskyddad fil börjat bestämma vad en skyddad grind kräver. Kontrollen
+// nedan gör den glidningen omöjlig att göra tyst: varje genererad rad måste ha exakt
+// alias-formen, och kommentaren efter den får bara vara ETT skäl på EN rad.
+{
+  const kropp = tabell ? tabell[1] : null
+  check('GL-GAP-2: det genererade blocket kunde läsas (ankare)', !!kropp,
+    'utan blocket prövas ingen glidning, och en oläsbar tabell får aldrig läsas som en tom')
+  if (kropp) {
+    const RAD = /^\s*'[a-z0-9-]+:[a-z0-9-]+':\s*'[a-z]+',\s*(\/\/[^\n]*)?$/
+    const avvikande = kropp.split('\n').filter(Boolean).filter((r) => !RAD.test(r))
+    check('GL-GAP-2: varje genererad rad är en ren ALIAS-rad, aldrig kravtext',
+      avvikande.length === 0,
+      `${avvikande.map((r) => r.trim().slice(0, 60)).join(' · ')} — en oskyddad paketfil har börjat generera något annat än routning in i §A3-ytan`)
+    check('GL-GAP-2: blocket bär inte fler rader än det finns linser',
+      kropp.split('\n').filter(Boolean).length <= deklarerade.size,
+      `${kropp.split('\n').filter(Boolean).length} rader mot ${deklarerade.size} linser — blocket har vuxit bortom mappningen`)
+  }
+}
+// PRÖVAS PÅ MENINGEN, INTE PÅ EMFASEN. Första formen krävde `inte §A-zonad` ordagrant och
+// föll på att texten skriver `inte** §A-zonad` — en formuleringsvakt som fäller en fil som
+// redan gör rätt. Markdown-emfasen strippas därför bort före provet.
+const utanEmfas = (t) => t.replace(/[*`]/g, '')
+check('GL-GAP-2: luckans transition säger UT varför generering vore fel väg',
+  paket.every((p) => !existsSync(join(ROT, `packs/${p}/gate-lenses.md`)) || (() => {
+    const t = utanEmfas(las(`packs/${p}/gate-lenses.md`))
+    return /inte §A-zonad/.test(t) && /OSKYDDAD fil bestämma vad en SKYDDAD grind kräver/.test(t) && /Routning är inte kravnivå/.test(t)
+  })()),
+  'transitionen sa tidigare "Följer GL-GAP-1", vilket hade lett rakt in i en sänkning av skyddet — skälet måste stå i raden, inte i ett minne')
+// DEN VILSELEDANDE FRASEN FÅR INTE STÅ KVAR BREDVID DEN RÄTTA. En mutation som la tillbaka
+// hänvisningen FÖRE motiveringen överlevde första formen: de tre krävda fraserna stod ju
+// kvar. En rad som säger både "följ den vägen" och "den vägen sänker skyddet" är värre än
+// en som bara säger fel — nästa läsare väljer den kortare meningen.
+//
+// KONTROLLEN SKILJER INTE ETT CITAT FRÅN EN ANVISNING, och det fällde raden när den
+// CITERADE sin egen gamla lydelse för att förklara rättelsen. Att lära kontrollen se
+// skillnaden vore att bygga en tolkare av citattecken; i stället är raden omformulerad så
+// att den beskriver den gamla hänvisningen utan att återge den ordagrant. **Historien står
+// kvar — kravet är vänt, inte struket — men den harmlösa formen valdes framför den
+// tvetydiga.** En läsare som skummar, eller en agent som greppar, ser annars en anvisning
+// där det stod ett citat.
+check('GL-GAP-2: den gamla, felpekande transitionen står INTE kvar',
+  paket.every((p) => !existsSync(join(ROT, `packs/${p}/gate-lenses.md`)) || (() => {
+    const rad = las(`packs/${p}/gate-lenses.md`).split('\n').find((r) => r.startsWith('| `GL-GAP-2`')) || ''
+    return !/Följer `?GL-GAP-1`?/.test(rad)
+  })()),
+  'raden pekar tillbaka på GL-GAP-1:s väg samtidigt som den förklarar varför den vägen sänker skyddet — två motstridiga anvisningar i samma rad, och den kortare vinner')
+
 // Ett omnämnande VAR SOM HELST räcker inte — luckan måste stå som TABELLRAD med sin
 // transition, annars kan raden strykas medan ordet står kvar i prosan.
 // GENERERINGEN ÄR INTE FRIVILLIG. Att `--generera` finns hjälper inte om ingen kör den.
