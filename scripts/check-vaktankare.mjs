@@ -68,6 +68,7 @@ const PINNAR = {
   'check-docs-coherence.mjs': '902b6afb0538becf',
   'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-forbattring.mjs': '8ebe9f9e2b6a1170',
+  'check-foundation-smoke.mjs': '91817873a3de3fe0',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
   'check-gym-contract.mjs': '531b09840d9f24fb',
   'check-integrationer.mjs': '6ac685656bd60406',
