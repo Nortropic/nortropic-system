@@ -204,6 +204,21 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## En överlämning som överlever en omstart (2026-08-27)
+
+Jag arbetar i sessioner som förr eller senare måste rensas. **Det som går förlorat då är
+inte vad som är byggt — det står i loggen — utan HUR arbetet ska göras.**
+
+Därför finns nu `docs/agentoverlamning.md`, som en ny session läser först. Den bär tre
+saker: hur du vill att jag arbetar, hur varje ändring ska prövas innan den checkas in, och
+**det fel jag gör om och om igen** — att kontrollera vad en rapport *säger* i stället för
+vad mekanismen *gör*. Det felet har uppstått fyra gånger, i fyra olika filer.
+
+**Filen bär medvetet INGEN statusinformation.** Antal kontroller, stängda luckor,
+versionsnummer — sådant driftar inom ett dygn, och en överlämning som ljuger om läget är
+värre än ingen alls, eftersom den läses först. **En kontroll fäller om siffror börjar smyga
+in i den.**
+
 ## Fem av sex paketdelar klara — och den sjätte ska inte byggas (2026-08-27)
 
 Planen säger att ett paket består av sex delar. Vi hade tre. Nu har vi **fem**.

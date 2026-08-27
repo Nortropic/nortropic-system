@@ -65,7 +65,7 @@ const SJALVPIN = '3c88dd99fdb8e0ee'
 const PINNAR = {
   'check-autobygg-delegation.mjs': '8f186bba47978877',
   'check-backtest-fixtures.mjs': 'fc5ddc31237b9d66',
-  'check-docs-coherence.mjs': 'f06850dc1ec19b15',
+  'check-docs-coherence.mjs': 'b58f8873bd616fb1',
   'check-extern-bokning.mjs': '7198e8e1502d8915',
   'check-forbattring.mjs': '8ebe9f9e2b6a1170',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
