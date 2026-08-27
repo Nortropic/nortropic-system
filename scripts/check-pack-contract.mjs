@@ -61,7 +61,7 @@ const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
 const REFERENS = 'lokal-se'
-const FORVANTAD_KALLHASH = '53b67ba5f5f8e3b9'
+const FORVANTAD_KALLHASH = 'd0c1a71063a9bc8a'
 
 const kontrakt = las('docs/paketkontrakt.md')
 const scope = las('docs/06-scope.md')
@@ -165,6 +165,63 @@ for (const id of paket) {
       skarpta.length === 0 || /## Skärpningar av den universella kärnan/.test(modul),
       'paketet påstår skärpningar men modulen bär ingen skärpningstabell')
   }
+}
+
+// ---- PK-GAP-4: kompositionen HÄRLEDS, den tros inte på sitt ord -------------
+// Kompositionen var en DEKLARATION: inget hindrade att en rad utelämnades, och kontrollen
+// kunde bara pröva att de rader som STOD där var giltiga. **En lista som bara granskas för
+// det den innehåller kan alltid krympas.**
+//
+// Kravet härleds nu ur något som INTE är manifestet: paketets egna fixturer. En fixtur som
+// bär `paket: ['lokal-se']` deklarerar i `kapaciteter` vad bygget faktiskt aktiverar.
+// **Kompositionen måste täcka varje sådan kapacitet** — annars påstår paketet att det
+// består av mindre än vad det levererar.
+//
+// Riktningen är MEDVETET ensidig. En komposition får bära en rad ingen fixtur ännu övar
+// (en kapacitet kan vara paketets utan att finnas i just dessa sex fall) — men den får
+// ALDRIG sakna en som övas. Oövade rader rapporteras i stället för att fällas, så de syns.
+const btDir = join(ROT, 'backtests')
+const aktiveratPerPaket = new Map()
+if (existsSync(btDir)) {
+  for (const d of readdirSync(btDir)) {
+    const f = join(btDir, d, 'profile.ts')
+    if (!existsSync(f)) continue
+    const t = readFileSync(f, 'utf8')
+    const pk = /^ {2}paket:\s*\[([^\]]*)\]/m.exec(t)
+    if (!pk) continue
+    const ids = [...pk[1].matchAll(/'([\w-]+)'/g)].map((m) => m[1])
+    const kapBlock = /^ {2}kapaciteter:\s*\[([\s\S]*?)\n {2}\]/m.exec(t)
+    if (!kapBlock) continue
+    const kaps = [...kapBlock[1].matchAll(/id:\s*'(KAP-[\w-]+)'/g)].map((m) => m[1])
+    for (const id of ids) {
+      if (!aktiveratPerPaket.has(id)) aktiveratPerPaket.set(id, new Map())
+      for (const k of kaps) {
+        if (!aktiveratPerPaket.get(id).has(k)) aktiveratPerPaket.get(id).set(k, [])
+        aktiveratPerPaket.get(id).get(k).push(d)
+      }
+    }
+  }
+}
+const oovade = []
+for (const id of paket) {
+  const komp = kompositionen(id)
+  const aktivt = aktiveratPerPaket.get(id) || new Map()
+  const P = (t) => `${id}: ${t}`
+  // ANKARKRAVET: en tom aktiveringsmängd är inget bevis. Har paketet inga fixturer går
+  // härledningen inte att göra, och det ska sägas — inte tolkas som "allt stämmer".
+  check(P('minst en fixtur övar paketet (ankaret för härledningen)'), aktivt.size > 0,
+    'inget fixturunderlag — kompositionen kan då bara tros på sitt ord, och PK-GAP-4 är öppen för det här paketet')
+  if (aktivt.size === 0) continue
+  const deklarerade = new Set(komp.map((r) => r.kap))
+  const saknade = [...aktivt.keys()].filter((k) => !deklarerade.has(k))
+  check(P('kompositionen TÄCKER varje kapacitet fixturerna aktiverar'), saknade.length === 0,
+    `${saknade.map((k) => `${k} (aktiveras av ${aktivt.get(k).join(', ')})`).join(' · ')} — paketet påstår att det består av mindre än vad det levererar`)
+  for (const r of komp) if (!aktivt.has(r.kap)) oovade.push(`${id}/${r.kap} (${r.roll})`)
+}
+if (oovade.length) {
+  console.log(`NOT: ${oovade.length} kompositionsrad(er) övas inte av någon fixtur — ${oovade.join(', ')}`)
+  console.log('     Det är tillåtet (en kapacitet kan vara paketets utan att finnas i just dessa fall)')
+  console.log('     men det betyder att raden är oprövad. Den syns här i stället för att tigas ihjäl.')
 }
 
 if (!paket.includes(REFERENS)) odombart(`referenspaketet \`${REFERENS}\` saknas — kontraktet kan inte prövas mot något`)

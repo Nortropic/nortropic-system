@@ -204,6 +204,24 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Innehållsförteckningen kontrolleras nu mot innehållet (2026-08-27)
+
+I går skrev jag in vad vårt lokalpaket består av. **Men det var bara en lista jag skrivit** —
+och en lista som bara granskas för det den *innehåller* kan alltid krympas. Ingen hade
+märkt om en rad försvann.
+
+**Nu jämförs listan mot verkligheten.** Provfallen säger själva vilka förmågor bygget
+faktiskt använder. Saknas någon av dem i paketets lista fälls det: **paketet påstår då att
+det består av mindre än vad det levererar.**
+
+Åt andra hållet är kravet medvetet mildare — paketet får lista en förmåga som inget provfall
+råkar använda ännu. Men den **rapporteras som oprövad**, så den syns i stället för att
+glömmas bort.
+
+**Och en detalj som är lätt att missa:** ett paket helt utan provfall ger *underkänt*, inte
+grönt. Utan underlag går jämförelsen inte att göra — och "ingenting att jämföra med" får
+aldrig se ut som "allt stämmer".
+
 ## Budgetfrågan var inte det som stod i vägen (2026-08-27)
 
 Jag har skrivit flera gånger att jämförelsen mellan AI-modeller *"väntar på ett kostnadstak
