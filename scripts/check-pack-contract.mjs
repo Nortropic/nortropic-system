@@ -61,7 +61,7 @@ const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
 const REFERENS = 'lokal-se'
-const FORVANTAD_KALLHASH = 'fda1ac0a9ac09bce'
+const FORVANTAD_KALLHASH = '53b67ba5f5f8e3b9'
 
 const kontrakt = las('docs/paketkontrakt.md')
 const scope = las('docs/06-scope.md')
@@ -73,7 +73,7 @@ const flaggregister = las('skills/nortropic-plan/references/juridikflaggor.md')
 const delRader = [...kontrakt.matchAll(/^\| \*\*(.+?)\*\* \| (.+?) \| (.+?) \|$/gm)]
 if (delRader.length < 6) odombart(`paketkontraktets deltabell gav ${delRader.length} rader — kraven går inte att härleda ur dokumentet`)
 const DELAR = delRader.map((m) => ({ namn: m[1].trim(), hemvist: m[2].replace(/`/g, '').trim() }))
-check('Kontraktet kräver sex obligatoriska delar', DELAR.length === 6,
+check('Kontraktet kräver ÅTTA obligatoriska delar', DELAR.length === 8,
   `hittade ${DELAR.length}: ${DELAR.map((d) => d.namn).join(', ')}`)
 
 // Varje extraherad del MÅSTE ha en implementerad kontroll. Utan detta var extraheringen
@@ -85,6 +85,27 @@ const IMPLEMENTERADE = {
   'Kapacitetsrader': () => /^\| `KAP-[\w-]+` \|/m.test(katalog),
   'Statusrad': (id) => new RegExp(`^\\| \`${id}\``, 'm').test(scope),
   'Pinne': (id) => !!pin.paketmoduler.find((m) => m.pack === id),
+  // PK-GAP-1:s stängning. D2: *"packs are named compositions of capabilities"* — utan
+  // en NAMNGIVEN komposition pekar manifestet på katalogen i allmänhet.
+  'Kapacitetskomposition': (id) => kompositionen(id).length > 0,
+  'Grindlinser': (id) => existsSync(join(ROT, `packs/${id}/gate-lenses.md`)),
+}
+
+// Kompositionen läses ur manifestets tabell. Rollerna är slutna: ÄGER · SKÄRPER · ÄRVER.
+const ROLLER = ['ÄGER', 'SKÄRPER', 'ÄRVER']
+// `\w` är [A-Za-z0-9_] och matchar INTE Å/Ä/Ö, så `**ÄGER**` fångades aldrig och
+// kompositionen lästes som TOM. Samma fel som i INPUT GATE-spegelns status-regex två
+// skivor tidigare — gjort om, i en annan fil, inom två dygn. Rollerna är svenska ord;
+// teckenklassen måste vara det också.
+// `\w` är [A-Za-z0-9_] och matchar INTE Å/Ä/Ö, så `**ÄGER**` fångades aldrig och
+// kompositionen lästes som TOM. Samma fel som i INPUT GATE-spegelns status-regex två
+// skivor tidigare — gjort om, i en annan fil, inom två dygn. Rollerna är svenska ord;
+// teckenklassen måste vara det också.
+function kompositionen(id) {
+  const f = join(ROT, `packs/${id}/manifest.md`)
+  if (!existsSync(f)) return []
+  return [...readFileSync(f, 'utf8').matchAll(/^\| `(KAP-[\w-]+)` \| \*\*([A-ZÅÄÖ]+)\*\* \| (.+?) \|$/gm)]
+    .map((m) => ({ kap: m[1], roll: m[2], innebord: m[3] }))
 }
 const utanKontroll = DELAR.filter((d) => !(d.namn in IMPLEMENTERADE))
 check('Varje extraherad kontraktsdel har en implementerad kontroll', utanKontroll.length === 0,
@@ -106,6 +127,46 @@ check('Ankare: §A4-registrets flaggor kunde läsas', FLAGGOR.length >= 5, `${FL
 const packsDir = join(ROT, 'packs')
 if (!existsSync(packsDir)) odombart('packs/ saknas')
 const paket = readdirSync(packsDir).filter((d) => statSync(join(packsDir, d)).isDirectory()).sort()
+
+// ---- PK-GAP-1: kompositionen prövas, inte bara dess närvaro -----------------
+for (const id of paket) {
+  const komp = kompositionen(id)
+  const P = (t) => `${id}: ${t}`
+  check(P('kapacitetskompositionen kunde läsas'), komp.length > 0,
+    'manifestet namnger ingen enskild KAP-rad — då pekar det på katalogen i allmänhet och paketet är inte en NAMNGIVEN komposition (D2)')
+  if (komp.length === 0) continue
+  const felRoll = komp.filter((r) => !ROLLER.includes(r.roll))
+  check(P('varje rad bär en KÄND roll (ÄGER · SKÄRPER · ÄRVER)'), felRoll.length === 0,
+    `${felRoll.map((r) => `${r.kap}=${r.roll}`).join(', ')} — en okänd roll är oklassificerad, aldrig ofarlig`)
+  const okandaKap = komp.filter((r) => !new RegExp(`^\\| \`${r.kap}\`\\s*\\|`, 'm').test(katalog))
+  check(P('varje komponerad kapacitet FINNS i katalogen'), okandaKap.length === 0,
+    `${okandaKap.map((r) => r.kap).join(', ')} står i manifestet men inte i kapacitetskatalogen — en komposition av något som inte finns`)
+  const utanInnebord = komp.filter((r) => r.innebord.trim().length < 20)
+  check(P('varje rad säger UT vad rollen innebär'), utanInnebord.length === 0,
+    `${utanInnebord.map((r) => r.kap).join(', ')} — en roll utan innebörd är en etikett, och etiketter driftar utan att någon märker det`)
+  // ÄRVER måste finnas som roll. Utan den går "gäller oförändrad" inte att skilja från
+  // "glömdes bort", och kompositionen vore ofullständig utan att någon kunde se det.
+  check(P('rollen ÄRVER används — tystnad är inte ett giltigt svar'),
+    komp.some((r) => r.roll === 'ÄRVER') && /`ÄRVER` är en egen rad och inte en tystnad/.test(las(`packs/${id}/manifest.md`)),
+    'en kapacitet som varken ägs eller skärps måste stå med ändå')
+  // SKÄRPER är ett PÅSTÅENDE om researchmodulen — det ska gå att slå upp.
+  const modul = existsSync(join(ROT, `packs/${id}/research-module.md`)) ? las(`packs/${id}/research-module.md`) : ''
+  check(P('paketet ÄGER minst en kapacitet'), komp.some((r) => r.roll === 'ÄGER'),
+    'ett paket som bara skärper och ärver är en konfiguration, inte en komposition')
+  check(P('kompositionen namnger vad paketet INTE komponerar'),
+    /Kapaciteter paketet INTE komponerar/.test(las(`packs/${id}/manifest.md`)),
+    'utan avgränsningen läses varje ny katalograd som paketets, och kompositionen växer av sig själv')
+  check(P('och avgränsningen namnger Ring 3-raderna'),
+    ['KAP-EHANDEL', 'KAP-EGET-TILLSTAND'].every((k) => las(`packs/${id}/manifest.md`).includes(k)),
+    'Ring 3-kapaciteterna måste stå som uttryckligen INTE komponerade — annars är gränsen tyst')
+  if (modul) {
+    const skarpta = komp.filter((r) => r.roll === 'SKÄRPER')
+    check(P('varje SKÄRPER-rad har en motsvarighet i researchmodulen'),
+      skarpta.length === 0 || /## Skärpningar av den universella kärnan/.test(modul),
+      'paketet påstår skärpningar men modulen bär ingen skärpningstabell')
+  }
+}
+
 if (!paket.includes(REFERENS)) odombart(`referenspaketet \`${REFERENS}\` saknas — kontraktet kan inte prövas mot något`)
 
 const referensFel = []

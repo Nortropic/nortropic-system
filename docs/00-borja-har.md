@@ -204,6 +204,33 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Paketet är nu en riktig paketering (2026-08-27)
+
+Ett "paket" hos oss ska vara en **namngiven sammansättning av förmågor** — som en
+utrustningsnivå på en bil: du ska kunna se exakt vad som ingår. **Vårt lokalpaket kunde
+inte det.** Manifestet pekade på förmågelistan i allmänhet och sa inte vilka rader som var
+paketets.
+
+**Nu står det utskrivet, med tre roller:**
+
+- **ÄGER** — förmågan har ingen mening utan paketet (lokal sökoptimering).
+- **SKÄRPER** — förmågan gäller alla kunder, men paketet kräver mer (t.ex. att omdömen
+  alltid visas med exakt antal, inte bara betyget).
+- **ÄRVER** — gäller oförändrad.
+
+**Den tredje raden är den som är lätt att hoppa över, och den viktigaste.** Om en förmåga
+som gäller oförändrad bara utelämnas går det inte att skilja *"den gäller som vanligt"* från
+*"någon glömde den"*. Tystnad är inget svar.
+
+**Och paketets granskningskontroller ägs nu av paketet.** Förut låg de inbakade i
+granskningsmaskineriet, så ett andra paket inte kunde tillföra en egen. Nu är paketet
+källan och maskineriets tabell **genereras** ur det — en handredigerad tabell går inte
+längre att checka in.
+
+**En sak att veta:** manifestet är en skyddad fil som normalt bara ändras av dig. Jag har
+ändrat den på din uttryckliga instruktion, och ändringen är märkt HÖGRISK så den syns i
+historiken.
+
 ## Regler som bodde på fel ställe (2026-08-27)
 
 Två saker som såg färdiga ut visade sig ligga fel — och båda av samma skäl.

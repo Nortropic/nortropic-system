@@ -13,7 +13,36 @@ paketinnehåll och kundlöften är `docs/07-konstitution.md` §A5 och bor aldrig
 |---|---|---|
 | **Researchmodul** | [`research-module.md`](research-module.md) | SKÄRPER den universella researchkärnan (sektion 1–17) |
 | **Strategimodul** | `strategi/` (nedan) | Branschprofiler: tonmönster, kvittolistor, bransch-antislop |
-| **Kapacitetsrader** | [kapacitetskatalogen](../../docs/kapacitetskatalog.md) | Vad paketet kan levereras OCH verifieras på |
+| **Kapacitetsrader** | [kapacitetskatalogen](../../docs/kapacitetskatalog.md) + tabellen nedan | Vad paketet kan levereras OCH verifieras på |
+| **Grindlinser** | [`gate-lenses.md`](gate-lenses.md) | Vilken universell kategori en paketspecifik iakttagelse hör hemma i |
+
+## Kapacitetskompositionen — vad `lokal-se` FAKTISKT består av
+
+Masterplanens D2: *"packs are named compositions of capabilities."* **Denna tabell är
+namngivningen.** Utan den pekade manifestet på katalogen i allmänhet och band ingen enskild
+rad till paket-id:t — `PK-GAP-1`.
+
+**Två roller, och de får aldrig blandas ihop.** Ett paket ÄGER en kapacitet när kapaciteten
+saknar mening utan paketet. Det SKÄRPER en universell kapacitet när kapaciteten gäller varje
+kund men paketet kräver mer. **Skärpningslagen går bara åt ett håll:** ett paket får smalna
+av kärnan, aldrig lätta den.
+
+| Kapacitet | Paketets roll | Vad rollen innebär |
+|---|---|---|
+| `KAP-LOKAL-SEO` | **ÄGER** | Kapaciteten har ingen mening utan paketet. Vid `core-only` aktiveras den aldrig, och dess frånvaro är KORREKT |
+| `KAP-SCHEMA` | **SKÄRPER** | Kärnan kräver korrekt schematyp; paketet kräver en `LocalBusiness`-subtyp och NAP identisk med `business.ts` |
+| `KAP-KVITTON` | **SKÄRPER** | Kärnan kräver belagda kvitton med attribution; paketet kräver betyg + EXAKT antal + plattform tillsammans, aldrig betyget ensamt |
+| `KAP-PRIMARHANDLING` | **SKÄRPER** | Kärnan kräver en primärhandling som fungerar; paketet smalnar enumet till `ring · boka · platsforfragan · offert · besok` |
+| `KAP-BILD` | **ÄRVER** | Gäller oförändrad. Raden står här för att kompositionen ska vara fullständig, inte för att något ändras |
+| `KAP-PRESTANDA` | **ÄRVER** | Alltid vid leverans, oavsett paket |
+
+**`ÄRVER` är en egen rad och inte en tystnad.** En kapacitet som varken ägs eller skärps
+måste ändå stå med — annars går det inte att skilja "gäller oförändrad" från "glömdes bort",
+och kompositionen vore ofullständig utan att någon kunde se det.
+
+**Kapaciteter paketet INTE komponerar:** `KAP-EXTERN-BOKNING` (aktiveras av kundens egen
+bokningstjänst, oberoende av paket) · `KAP-EHANDEL` och `KAP-EGET-TILLSTAND` (Ring 3,
+`ROUTE-OUT`) · `KAP-RING2-JURIDIK` (Ring 2, egen ceremoni).
 
 ## Strategimodulen — den repo-nativa hemvisten för branschprofiler
 
