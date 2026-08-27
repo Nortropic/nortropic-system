@@ -204,6 +204,31 @@ skriva om en svår lag till en lätt.
 **Vad som INTE är byggt:** det finns ingen körbar jämförelse ännu. Att köra en kostar
 pengar, och taket är ditt beslut. Det som finns är reglerna och en kontroll som vaktar dem.
 
+## Budgetfrågan var inte det som stod i vägen (2026-08-27)
+
+Jag har skrivit flera gånger att jämförelsen mellan AI-modeller *"väntar på ett kostnadstak
+från dig"*. **Det var att skjuta över en fråga som mest var min.**
+
+Pengarna behövs bara för de steg som faktiskt anropar en modell. Allt annat — reglerna för
+hur en jämförelse får gå till — går att bygga och **prova för noll kronor**. Det är gjort nu:
+
+- **Ett tak måste vara satt innan start.** Saknas det, eller är det skräp, blir svaret "går
+  inte att avgöra". **Ett glömt tak betyder aldrig "obegränsat"** — då hade glömska blivit
+  den dyraste vägen.
+- **Slut budget är varken godkänt eller underkänt.** Det senare är lika viktigt: annars
+  skulle en dyr modell se sämre ut än en billig utan att någon mätt kvalitet.
+- **Oenighet bevaras.** Två av tre är fortfarande oenighet, inte majoritet.
+- **Jämförelsen kan aldrig befordra något.**
+
+Femton prov tvingar varje regel att visa att den **säger nej** där den ska. En torrkörning
+producerar hela rapporten utan att kosta något — och svarar alltid **"går inte att avgöra"**,
+aldrig "godkänt".
+
+**Och det viktigaste jag upptäckte när jag byggde det:** pengarna var inte det största
+hindret. Den delen av bevisningen som kräver ett separat "facit-arkiv" saknas fortfarande,
+och **den kan inte köpas bort.** Även med obegränsad budget skulle en tredjedel av provet
+förbli oavgjort. Det hade jag inte sett förrän jag byggde resten.
+
 ## Paketet är nu en riktig paketering (2026-08-27)
 
 Ett "paket" hos oss ska vara en **namngiven sammansättning av förmågor** — som en

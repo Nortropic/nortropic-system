@@ -24,7 +24,7 @@
 
 import { readFileSync, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -48,7 +48,7 @@ const flat = (s) => s.replace(/\s+/g, ' ')
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '794fe86a728ec814'
+const FORVANTAD_KALLHASH = '62211825eb8e629b'
 
 const k = las('docs/gymkontrakt.md')
 const konst = las('docs/07-konstitution.md')
@@ -159,13 +159,61 @@ for (const id of ['GYM-GAP-1', 'GYM-GAP-2', 'GYM-GAP-3']) {
   check(`Luckan \`${id}\` är namngiven med nästa transition`,
     new RegExp(`^\\| \`${id}\` \\|.*\\|.*\\|$`, 'm').test(k), 'luckan saknas eller saknar transition')
 }
-check('Kontraktet säger ut att ingen körbar runner finns',
-  /Ingen körbar gymrunner finns/.test(k), 'en läsare tror annars att gymmet kan köras')
+check('Kontraktet skiljer TORRKÖRNING från SKARP körning',
+  /Ingen SKARP gymrunner finns/.test(k) && /torrkörning till noll kostnad/.test(k) &&
+  /`ODÖMBART`, aldrig PASS/.test(k),
+  'en torrkörning som inte skiljs från en skarp körning läses som att gymmet kan köras')
+check('Kontraktet namnger vad som återstår för en SKARP körning',
+  /modelladaptern/i.test(k) && /tak i kronor/.test(k),
+  'utan det läses den gröna torrkörningen som att bara pengar saknas')
 
 // Självreflektionen om intressekonflikten
 check('Kontraktet erkänner att det är skrivet av eleven',
   /skrevs av eleven|Den agent som skriver det här\s*\n?kontraktet/.test(k),
   'intressekonflikten är inte namngiven — och den löses inte av goda intentioner')
+
+// ---- GYM-GAP-1: budgetlagarna är KOD, inte prosa --------------------------
+// Luckans nästa transition sa *"ägarbeslut om budgettak, sedan en runner"*. **Ordningen
+// var fel:** budgeten behövdes bara för de led som ANROPAR modeller. G1, G4, G7, G9 och
+// G10 går att bygga och pröva för noll kronor, och gör man det visar sig budgeten inte
+// vara det som blockerar mest.
+const gym = spawnSync(process.execPath, [join(ROT, 'scripts/kor-gym.mjs'), '--sjalvprov'], { cwd: ROT, encoding: 'utf8' })
+check('GYM-GAP-1: budgetlagarnas kontrollprov körs och är grönt',
+  gym.status === 0 && /budgetlagar fäller där de ska/.test(gym.stdout || ''),
+  'lagarna är prosa igen om de inte kan bevisa att de FÄLLER')
+for (const [lag, frag] of [
+  ['G9 saknat tak, med rätt skäl', 'G9: saknat tak ⇒ ODÖMBART MED RÄTT SKÄL'],
+  ['G9 tak 0 är giltigt', 'G9: tak 0 är GILTIGT och betyder torrkörning'],
+  ['G10 uttömd ⇒ aldrig PASS', 'G10: uttömd budget ⇒ ODÖMBART, aldrig PASS'],
+  ['G10 uttömd ⇒ aldrig FAIL', 'G10: uttömd budget ⇒ ODÖMBART, aldrig FAIL'],
+  ['G4 två av tre är oenighet', 'G4: två av tre är FORTFARANDE oenighet'],
+  ['G4 ODÖMBART smittar', 'G4: ODÖMBART smittar uppåt'],
+  ['G7 befordran aldrig tillåten', 'G7: befordran är ALDRIG tillåten'],
+]) check(`GYM-GAP-1: ${lag} bevisas av kontrollprovet`,
+  (gym.stdout || '').includes(`PASS: självprov — ${frag}`),
+  'lagen prövas inte — och en lag utan prov är ett löfte')
+
+// TORRKÖRNINGEN FÅR ALDRIG BLI GRÖN. Den bevisar harnesset, inte någon modell.
+const torr = spawnSync(process.execPath, [join(ROT, 'scripts/kor-gym.mjs')], { cwd: ROT, encoding: 'utf8' })
+check('GYM-GAP-1: torrkörningen ger ODÖMBART, aldrig PASS', torr.status === 2,
+  'en torrkörning som avslutar 0 läses som en genomförd gymkörning')
+check('GYM-GAP-1: torrkörningen redovisar VERDIKT: ODÖMBART',
+  /VERDIKT: ODÖMBART/.test(torr.stdout || ''), 'rapportformen bär inte sitt eget verdikt')
+check('GYM-GAP-1: och säger UT att den inte bevisar något om någon modell',
+  /Ingenting om någon modell/.test(torr.stdout || ''),
+  'utan den meningen läses gröna budgetlagar som ett modellomdöme')
+check('GYM-GAP-1: rapporten namnger att MODELLADAPTERN saknas',
+  /MODELLADAPTERN är inte byggd/.test(torr.stdout || ''),
+  'en runner som påstår sig kunna köra men inte kan flyttar felet från "saknas" till "verkar fungera"')
+check('GYM-GAP-1: rapporten säger att budgeten INTE var det som blockerade mest',
+  /BUDGETEN VAR ALDRIG DET SOM BLOCKERADE MEST/.test(torr.stdout || '') && /kan inte köpas bort/.test(torr.stdout || ''),
+  'held-out-repot (GYM-GAP-2) saknas även med obegränsad budget — att tiga om det gör budgeten till hela hindret')
+// Ett skräptak får aldrig tolkas som obegränsat.
+for (const [namn, a] of [['skräptak', 'abc'], ['negativt tak', '-5']]) {
+  const r = spawnSync(process.execPath, [join(ROT, 'scripts/kor-gym.mjs'), '--budget', a], { cwd: ROT, encoding: 'utf8' })
+  check(`GYM-GAP-1: ${namn} ger ODÖMBART`, r.status === 2,
+    'ett otolkbart tak som tolkas som obegränsat gör glömska till den dyraste vägen')
+}
 
 // ---- Verdikt ---------------------------------------------------------------
 // Ankaret hashar HELA källtexten med enbart PINNENS LITERAL utbytt mot en platshållare.
