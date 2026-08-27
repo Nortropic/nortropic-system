@@ -1067,3 +1067,28 @@ någon börjar läsa den någon annanstans ifrån.
 **Ärligt om vad detta INTE gör:** att fixturens FORM nu prövas mot rätt version säger
 ingenting om att den BETER sig rätt. Att två regelverksversioner leder till samma färdiga
 sajt kräver två riktiga byggen och är fortfarande oprövat.
+
+## En provsvit som ingen körde (2026-08-27)
+
+Systemet har en liten svit som prövar grundvalarna — att repot vet vem det är, att inget
+tredjepartsverktyg kan uppdatera sig självt in i produktion, att mätverktygen är fastspikade
+vid exakta versioner. Nio kontroller.
+
+**Ingen körde den.** Sviten var skriven, skyddad och färdig, och dess egen instruktion var
+"kör den innan du litar på något" — riktad till en människa. En kontroll som ingen kör är en
+kontroll som inte finns; skillnaden märks först den dagen den skulle ha fällt något.
+
+Nu ingår den i den vanliga kontrollomgången. Två detaljer var värda att tänka på:
+
+**Antalet står hos kontrollen, inte hos sviten.** Om kontrollen räknade sviten själv skulle
+en struken kontroll sänka både förväntan och utfall — "9 av 9" blir "8 av 8", fortfarande
+grönt, med mindre täckning. Talet nio står därför i kontrollens egen fil. Tas en kontroll
+bort ur sviten faller den nya kontrollen, och den som gör ändringen medvetet uppdaterar
+talet där i stället.
+
+**Att avsluta utan fel är inte samma sak som att ha kontrollerat något.** En svit som når
+slutet utan att skriva sina kvittensrader har inte kört sina kontroller. Utan den regeln
+räcker det att sviten går sönder tyst för att allt ska se grönt ut.
+
+Kontrollen **kör** sviten men ändrar den aldrig — den ligger på människoägd mark, och det
+är oförändrat.
