@@ -164,7 +164,13 @@ def main() -> int:
             ("ogiltigt-sha", ("build", "run-alfa", "h-001", "0" * 40)),
             ("tom-run-id", ("build", "", "h-001", base)),
             ("utan-argument", ("build",)),
-            ("for-manga", ("build", "a", "h-001", base, "extra")),
+            # SEX argument, inte fem. Fallet hette "for-manga" och prövade FEM tills
+            # `917cb6d2` ([LOOP] ÄGARHAND) vidgade ariteten medvetet: `build <run-id>
+            # <task-id> <base-sha> [spec-fil]` — systrarna får målet som indata. Fem
+            # argument är sedan dess ett GILTIGT anrop, och fallet prövade i praktiken
+            # hur en oläsbar spec-fil klassas (INTERNT=8), inte arity. Ett prov som
+            # bytt fråga utan att byta namn är värre än ett som fallit.
+            ("for-manga", ("build", "a", "h-001", base, "extra", "extra2")),
             ("okant-kommando", ("blaha", "a", "h-001", base))]
     if tagg:
         # Ett taggobjekt får aldrig peelas till en annan commit och tyst bli bas.
