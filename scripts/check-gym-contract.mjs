@@ -48,7 +48,7 @@ const flat = (s) => s.replace(/\s+/g, ' ')
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '62211825eb8e629b'
+const FORVANTAD_KALLHASH = '549f5ef1fdce48ab'
 
 const k = las('docs/gymkontrakt.md')
 const konst = las('docs/07-konstitution.md')
@@ -189,6 +189,18 @@ for (const [lag, frag] of [
   ['G4 två av tre är oenighet', 'G4: två av tre är FORTFARANDE oenighet'],
   ['G4 ODÖMBART smittar', 'G4: ODÖMBART smittar uppåt'],
   ['G7 befordran aldrig tillåten', 'G7: befordran är ALDRIG tillåten'],
+  // OMKLASSIFICERINGEN 2026-08-27 PRÖVAS, den tros inte på tabellens ord. G2, G5 och G11
+  // står nu som MEKANISKA i kontraktet. Att en cell säger MEKANISK är ett påstående; det
+  // som gör det sant är att lagen kan FÄLLA, och just de fallen krävs här. Utan dem hade
+  // uppgraderingen bara varit en redigering av statuskolumnen.
+  ['G5 EN familj mäter ingen preferens', 'G5: EN ENDA familj ⇒ ODÖMBART'],
+  ['G5 saknad familjeetikett bucketas aldrig', 'G5: körning UTAN familjeetikett ⇒ ODÖMBART'],
+  ['G5 olika familjer ger SYNLIG preferens', 'G5: TVÅ familjer som dömer OLIKA ger SYNLIG preferens'],
+  ['G2 domare på redan avgjort fälls', 'G2: domare åberopad för något REDAN deterministiskt avgjort ⇒ FÄLLD'],
+  ['G2 domarled utan skäl fälls', 'G2: domarled UTAN skäl ⇒ FÄLLD'],
+  ['G11 befordransfält fälls', 'G11: rapport med `befordrad` ⇒ FÄLLD'],
+  ['G11 engelskt promoted fälls också', 'G11: rapport med engelskt `promoted` ⇒ FÄLLD'],
+  ['G11 PROVEN-påstående fälls', 'G11: rapport som påstår PROVEN ⇒ FÄLLD'],
 ]) check(`GYM-GAP-1: ${lag} bevisas av kontrollprovet`,
   (gym.stdout || '').includes(`PASS: självprov — ${frag}`),
   'lagen prövas inte — och en lag utan prov är ett löfte')
@@ -202,6 +214,30 @@ check('GYM-GAP-1: torrkörningen redovisar VERDIKT: ODÖMBART',
 check('GYM-GAP-1: och säger UT att den inte bevisar något om någon modell',
   /Ingenting om någon modell/.test(torr.stdout || ''),
   'utan den meningen läses gröna budgetlagar som ett modellomdöme')
+// KOPPLINGSKONTROLLEN LÄSER KÄLLAN, INTE UTDATAN — och den första versionen gjorde fel.
+// Den krävde att torrkörningens UTSKRIFT bar `Per leverantörsfamilj: ODÖMBART`, vilket en
+// mutation som bytte anropet mot en hårdkodad literal med samma text passerade obehindrat.
+// Utskriften bevisar att någon SKREV raden, aldrig att lagen kördes. Bara källhashen fällde
+// den, och en hash säger "något ändrades" — inte "lagen kringgicks".
+const gymKalla = las('scripts/kor-gym.mjs')
+for (const [lag, anrop] of [
+  ['G5', /const g5 = familjeutfall\(/],
+  ['G2', /const g2 = bevisordning\(/],
+  ['G11', /const g11 = rapportform\(/],
+]) check(`GYM-GAP-1: ${lag} ANROPAS i torrkörningen, bevisat ur källan`,
+  anrop.test(gymKalla),
+  'en lag som bevisats kunna fälla men aldrig anropas är död kod — och att pröva utskriften i stället för anropet är samma fel en gång till')
+check('GYM-GAP-1: torrkörningen AVBRYTER om dess egen rapport inte är ett förslag',
+  /if \(g11\.lage !== 'FÖRSLAG'\)/.test(gymKalla) && /process\.exit\(2\)/.test(gymKalla),
+  'G11:s utfall måste VÄGAS IN — ett verdikt som skrivs ut men inte verkställs är en dekoration')
+check('GYM-GAP-1: de tre lagarnas rader står i torrkörningens utdata',
+  /Per leverantörsfamilj: ODÖMBART/.test(torr.stdout || '') &&
+  /Bevisordning: ODÖMBART/.test(torr.stdout || '') &&
+  /Rapportform: FÖRSLAG/.test(torr.stdout || ''),
+  'raderna saknas — läsaren ser inte att lagarna kördes')
+check('GYM-GAP-1: torrkörningens EGEN rapport prövas mot G11',
+  /rapporten är ett förslag; taket är VALIDATING/.test(torr.stdout || ''),
+  'G11 måste dömas om körningens egen utdata, annars prövar den bara kontraktet igen')
 check('GYM-GAP-1: rapporten namnger att MODELLADAPTERN saknas',
   /MODELLADAPTERN är inte byggd/.test(torr.stdout || ''),
   'en runner som påstår sig kunna köra men inte kan flyttar felet från "saknas" till "verkar fungera"')
