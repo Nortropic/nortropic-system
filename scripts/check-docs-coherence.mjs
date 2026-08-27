@@ -375,6 +375,39 @@ kravOmArtefakt({
   beskrivning: 'kontrollraden (sektion 17) läses först',
 })
 
+// ── H. AGENTÖVERLÄMNINGEN FÅR INTE BLI EN ANDRA SANNING ──────────────────────
+// `docs/agentoverlamning.md` finns för att en session ska kunna rensas utan att
+// arbetssättet går förlorat. **Den enda vägen den kan bli skadlig är att börja bära
+// STATUS** — antal kontroller, stängda luckor, versionsnummer. Sådant driftar inom en
+// dag, och en överlämning som ljuger om läget är värre än ingen överlämning, eftersom
+// den läses FÖRST i en ny session.
+{
+  const oPath = 'docs/agentoverlamning.md'
+  if (!existsSync(join(ROT, oPath))) {
+    nej('H-överlämning-finns', 'docs/agentoverlamning.md saknas men CLAUDE.md pekar på den')
+  } else {
+    const o = las(oPath)
+    ja('H-överlämning-finns')
+    if (/aldrig teknisk/.test(o) && /METODEN och ÄGARENS ARBETSSÄTT/.test(o)) ja('H-överlämning-avsäger-sig-status')
+    else nej('H-överlämning-avsäger-sig-status', 'filen säger inte ut att den INTE bär status — då börjar den bära den')
+    // Mekaniska statusspår: antal kontroller, stängda luckor, versionsnummer.
+    const statusspar = [
+      [/\b\d+\/\d+ (kontroller|vakter)/, 'ett kontrollantal'],
+      [/\b[A-ZÅÄÖ]+-GAP-\d+[^|\n]{0,40}(STÄNGD|ÅTGÄRDAT)/, 'en luckstatus'],
+      [/\bv\d+\.\d+\.\d+\b/, 'ett versionsnummer'],
+      [/\b(nitton|arton|sjutton|femton|fjorton)\s+(vakter|skivor)/i, 'ett räknat läge'],
+    ]
+    const funna = statusspar.filter(([m]) => m.test(o))
+    if (funna.length === 0) ja('H-överlämning-bär-ingen-status')
+    else nej('H-överlämning-bär-ingen-status',
+      `${funna.map(([, v]) => v).join(', ')} står i överlämningen — status driftar inom en dag, och en överlämning som ljuger om läget läses FÖRST i en ny session`)
+    if (/docs\/05-beslutslogg\.md/.test(o)) ja('H-överlämning-pekar-på-statusens-hemvist')
+    else nej('H-överlämning-pekar-på-statusens-hemvist', 'utan pekaren vet nästa session inte var läget faktiskt står')
+    if (/CLAUDE\.md/.test(las('CLAUDE.md')) || /agentoverlamning/.test(las('CLAUDE.md'))) ja('H-CLAUDE-pekar-på-överlämningen')
+    else nej('H-CLAUDE-pekar-på-överlämningen', 'en överlämning ingen pekar på läses inte')
+  }
+}
+
 // ── E. DEN KÄNDA AVVIKELSEN — ÅTGÄRDAD 2026-08-27 ────────────────────────────
 // Kontrollen skrevs med sin egen efterföljare inbyggd: *"Rättas avvikelsen i plannern
 // fäller kontrollen i stället på att dokumentationen fortfarande redovisar den — en rättad
@@ -654,7 +687,7 @@ forbudOmArtefaktSaknas({
 // över en. FORVANTAT är därför skriven för hand och jämförs mot faktiskt antal.
 // Faller de isär är körningen ODÖMBAR: en vakt som tappat kontroller vet inte längre
 // vad dess grönt betyder, och får då inte påstå någonting alls.
-const FASTA = 67   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9
+const FASTA = 72   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)
