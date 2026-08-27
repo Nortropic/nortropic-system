@@ -66,7 +66,7 @@ att kompatibilitetsvägen fungerar i drift; resten bevisar att LÄSNINGEN är r�
 | ID | Avvikelse | Läge |
 |---|---|---|
 | `AL-GAP-1` | Fixturen är SYNTETISK. §26 säger *"historical/frozen"* — detta är inte ett historiskt kundrepo utan en konstruerad v1-profil. Samma avvikelse som `A-GAP-1` | `NAMNGIVEN` |
-| `AL-GAP-2` | **Läsaren finns, men ingen konsument använder den ännu.** `profil-las.mjs` gör lagen körbar; grindar, eval och granskning läser fortfarande profilen direkt. Lagen är därmed prövbar men inte påtvingad | `NOT_STARTED` — nästa transition: låt `check-profile-contract.mjs` och gate-linserna gå genom läsaren |
+| `AL-GAP-2` | **RÄTTAD BESKRIVNING 2026-08-27.** Jag skrev att *"ingen konsument använder läsaren"*. **Det var fel.** Lagens text — *saknade v2-fält läses som `SAKNAS_I_V1` … ALDRIG som tomt eller falskt* — står i BÅDA grindworkflowen, i `qa-launcher` och i två skills. **Konsumenterna bär regeln som prompttext.** Det som faktiskt saknades var att något hindrar den från att tyst falla ur en prompt vid nästa omskrivning | `DELVIS ÅTGÄRDAT` | `scripts/check-paketlinser.mjs` HÄRLEDER konsumentmängden (varje fil som instruerar läsning av `content/profile.ts`) och kräver att var och en bär lagen — uttryckt som OKÄND, aldrig som ett negativt svar. **Kvarstår:** ingen kodkonsument går genom `profil-las.mjs`; grindarna är agenter som följer text. Att en agent FÖLJER regeln går inte att pröva här — det kräver en körning |
 | `AL-GAP-3` | Researchen är skriven mot **v3.0.0** men det finns ingen frusen kopia av v3.0.0 att pröva den mot — kontraktet i repot är v3.1.0. Formen prövas alltså mot minnet av en version, inte mot versionen | `NAMNGIVEN` |
 
 ## Vad fixturen ALDRIG får användas till

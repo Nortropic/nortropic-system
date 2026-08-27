@@ -79,7 +79,7 @@ const check = (n, ok, detalj) => { namn.push(n); ok ? passes.push(n) : fails.pus
 // IDENTITETSANKRAD nämnare. Ett antal binder bara kardinaliteten: en kontroll kunde bytas
 // mot `check('TRIVIALT', 1===1)` och banderollen stod ordagrant kvar. Signaturen är en
 // hash över de SORTERADE kontrollnamnen — då fäller både radering och utbyte.
-const FORVANTAD_SIGNATUR = '9fd913f80b2ce7e2'
+const FORVANTAD_SIGNATUR = 'bc0947b914937c25'
 
 // ---- 0. PINNEN -------------------------------------------------------------
 const pin = JSON.parse(las('config/research-contract.v3.json'))
@@ -606,9 +606,14 @@ for (const id of ['AL-4', 'AL-5', 'AL-11', 'AL-12', 'AL-GAP-1', 'AL-GAP-2', 'AL-
 check('AL: FORVANTAT säger ut att AL-11/AL-12 är ODÖMBARA, aldrig gröna',
   /ODÖMBARA, aldrig gröna/.test(legF),
   'de två som skulle bevisa drift är EJ KÖRDA — utan den meningen läses en grön körning som ett bevis')
-check('AL-GAP-2: FORVANTAT erkänner att ingen konsument använder läsaren ännu',
-  /prövbar men inte påtvingad/.test(legF),
-  'en lag som är körbar men inte anropad är inte en lag som gäller')
+// Beskrivningen var FEL och är rättad: konsumenterna BÄR lagen som prompttext. Kravet
+// vänds till att facit redovisar rättelsen OCH den kvarvarande halvan.
+check('AL-GAP-2: FORVANTAT redovisar den RÄTTADE beskrivningen',
+  /RÄTTAD BESKRIVNING/.test(legF) && /bär regeln som prompttext/.test(legF),
+  'min ursprungliga formulering "ingen konsument använder läsaren" var FEL — lagen står i båda grindworkflowen, i qa-launcher och i två skills')
+check('AL-GAP-2: och den KVARVARANDE halvan är namngiven',
+  /ingen kodkonsument går genom `profil-las\.mjs`/.test(legF) && /kräver en körning/.test(legF),
+  'att en AGENT följer en regel i sin prompt går inte att pröva mekaniskt — att tiga om det gör en halv stängning till en hel')
 
 // ---- BETEENDEPROV: backtestköraren mot de riktiga fixturerna ---------------
 // Formkontroller ovan säger inget om beteende. Här KÖRS `kor-backtest.mjs` och dess
