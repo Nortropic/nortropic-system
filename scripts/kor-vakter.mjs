@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// TÄCKER: scripts/check-*.mjs
+//
 // BATTERIKÖRAREN: kör varje vakt och kräver att den identifierar SIG SJÄLV i sitt utfall.
 //
 // VARFÖR DEN HÄR FILEN FINNS — en verklig incident, inte ett tankeexperiment. Under bygget
