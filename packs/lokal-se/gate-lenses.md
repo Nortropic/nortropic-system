@@ -54,12 +54,16 @@ planeringen.
 
 ## Vad den här filen INTE gör
 
-**Grindworkflowet läser den inte.** Tabellen ovan är i dag en DEKLARATION som måste stämma
-med den hårdkodade, och `scripts/check-paketlinser.mjs` fäller om de glider isär. Att låta
-workflowet läsa paketet i stället kräver en ändring i `workflows/nortropic-launch.js`,
-vars kategorimängd gränsar till §A3 — det är ett ägarbeslut, inte en städning.
+**Grindworkflowet läser den inte — och kan inte.** Workflow-DSL:en saknar
+filsystemsåtkomst. Tabellen ovan är därför **källan**, och workflowets `CATEGORY_ALIAS` är
+**genererad utdata**: `node scripts/check-paketlinser.mjs --generera`. Vakten räknar fram
+tabellen i minnet och fäller om den committade avviker, så en handredigerad utdata går inte
+att committa.
+
+**Vad som fortfarande INTE gäller:** linsernas INNEHÅLL — vad de tittar efter — står i
+grindens prompt, inte här (`GL-GAP-2`). Den här filen binder kategorin, inte granskningen.
 
 | ID | Lucka | Nästa transition |
 |---|---|---|
-| `GL-GAP-1` | Workflowet läser inte paketet; tabellen är en spegel som kan glida | Låt `nortropic-launch.js` bygga `CATEGORY_ALIAS` ur `packs/*/gate-lenses.md` — §A3-angränsande, ägarbeslut |
+| `GL-GAP-1` | **STÄNGD 2026-08-27 genom GENERERING.** Workflow-DSL:en har ingen filsystemsåtkomst, så `nortropic-launch.js` KAN inte läsa den här filen vid körning — och att låta en agent rapportera kategorimappningen vore värre än problemet, eftersom kategorimängden måste vara sluten och universell (§10) och en modellrapporterad mapping är varken. **Paketen är nu KÄLLAN och workflowets tabell är UTDATA:** `node scripts/check-paketlinser.mjs --generera` skriver den, och vakten räknar fram tabellen i minnet och kräver att den committade är IDENTISK. Drift är därmed inte längre något att upptäcka utan något som inte kan committas | — |
 | `GL-GAP-2` | Linsernas INNEHÅLL (vad de tittar efter) står i grindens prompt, inte här. Den här filen binder bara kategorin | Följer `GL-GAP-1` |

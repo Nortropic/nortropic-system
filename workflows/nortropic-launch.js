@@ -195,9 +195,9 @@ if (!fresh || fresh.status !== 'FRESH') {
 // per paket blir en mätstock ingen granskat, och rapporter från olika kunder slutar
 // gå att jämföra. Paketidentiteten bär linsen i sin titel, aldrig i schemat.
 const CATEGORY_ALIAS = {
-  'lokal-se:orter': 'seo',        // ortssidor/lokal SEO → universell seo-kategori
-  'lokal-se:gbp': 'trust',        // Google Företagsprofil-konsistens → trust
-  'lokal-se:jour': 'leadgen',     // jour-/svarstidslöften → leadgen
+  'lokal-se:orter': 'seo',        // Ortssidornas kvalitet — tunna ortssidor, meta/H1-integritet per ort
+  'lokal-se:gbp': 'trust',        // Google Företagsprofil-konsistens, NAP mot `business.ts`, `address.publik`→PostalAddress
+  'lokal-se:jour': 'leadgen',     // Jour-/svarstidslöften: att de finns i researchen innan de står på sajten
 }
 const aliasKategori = (k) => CATEGORY_ALIAS[k] || k
 

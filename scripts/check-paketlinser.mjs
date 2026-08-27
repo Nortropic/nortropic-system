@@ -25,7 +25,7 @@ console.log('VAKT: check-paketlinser.mjs')  // SJÄLVKVITTERING: skrivs FÖRST, 
 //
 // Verdiktalgebra: exit 0 = PASS, 1 = FAIL, 2 = ODÖMBART. ODÖMBART blir ALDRIG grönt.
 
-import { readFileSync, existsSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
@@ -48,7 +48,33 @@ const las = (p) => {
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = '75113e73f0ad5390'
+const FORVANTAD_KALLHASH = '519bdfc01bdbf485'
+
+// ---- --generera: GL-GAP-1 stängd genom GENERERING, inte genom läsning ------
+// Workflow-DSL:en har INGEN filsystemsåtkomst, så `nortropic-launch.js` kan inte läsa
+// `packs/*/gate-lenses.md` vid körning. Att låta en agent rapportera kategorimappningen
+// vore värre än problemet: kategorimängden måste vara sluten och universell (§10), och en
+// modellrapporterad mapping är varken. **Kvar står generering:** paketen är källan,
+// tabellen i workflowet är utdata, och `--generera` skriver den. Drift blir då inte
+// "något att upptäcka" utan "något som inte kan uppstå utan att någon kör kommandot".
+if (process.argv.includes('--generera')) {
+  const paketNu = readdirSync(join(ROT, 'packs')).filter((d) => existsSync(join(ROT, 'packs', d, 'gate-lenses.md')))
+  const rader = []
+  for (const p of paketNu) {
+    for (const m of las(`packs/${p}/gate-lenses.md`).matchAll(/^\| `([\w-]+:[\w-]+)` \| `(\w+)` \| ([^|]+?) \|/gm)) {
+      rader.push(`  '${m[1]}': '${m[2]}',`.padEnd(34) + `// ${m[3].trim()}`)
+    }
+  }
+  if (rader.length === 0) { console.error('AVBRUTET: inga linser att generera — en tom tabell får aldrig skrivas över en icke-tom'); process.exit(2) }
+  const kalla = las('workflows/nortropic-launch.js')
+  const TAB = /(const CATEGORY_ALIAS = \{\n)[\s\S]*?(\n\})/
+  if (!TAB.test(kalla)) { console.error('AVBRUTET: CATEGORY_ALIAS-tabellens form känns inte igen'); process.exit(2) }
+  const ny = kalla.replace(TAB, (_, f, sl) => f + rader.join('\n') + sl)
+  if (ny === kalla) { console.log('OFÖRÄNDRAD: tabellen var redan i synk'); process.exit(0) }
+  writeFileSync(join(ROT, 'workflows/nortropic-launch.js'), ny)
+  console.log(`GENERERAD: ${rader.length} linser ur ${paketNu.length} paket → workflows/nortropic-launch.js`)
+  process.exit(0)
+}
 
 // ---- FALL 1: paketets linser mot workflowets hårdkodade tabell -------------
 const launch = las('workflows/nortropic-launch.js')
@@ -105,6 +131,20 @@ check('Varje lins aliasar in på en UNIVERSELL kategori', oknda.length === 0,
   `${oknda.join(', ')} är inte universella — §10: ingen per-projekt-rubrikauktoritet`)
 // Ett omnämnande VAR SOM HELST räcker inte — luckan måste stå som TABELLRAD med sin
 // transition, annars kan raden strykas medan ordet står kvar i prosan.
+// GENERERINGEN ÄR INTE FRIVILLIG. Att `--generera` finns hjälper inte om ingen kör den.
+// Vakten räknar fram tabellen i minnet och kräver att den COMMITTADE är identisk — då är
+// drift inte längre "något att upptäcka" utan något som inte kan committas.
+{
+  const raderNu = []
+  for (const p of paket) {
+    if (!existsSync(join(ROT, `packs/${p}/gate-lenses.md`))) continue
+    for (const m of las(`packs/${p}/gate-lenses.md`).matchAll(/^\| `([\w-]+:[\w-]+)` \| `(\w+)` \| ([^|]+?) \|/gm)) {
+      raderNu.push(`  '${m[1]}': '${m[2]}',`.padEnd(34) + `// ${m[3].trim()}`)
+    }
+  }
+  check('Den committade linstabellen ÄR den genererade', tabell[1].trim() === raderNu.join('\n').trim(),
+    'kör `node scripts/check-paketlinser.mjs --generera` — paketen är källan, workflowets tabell är utdata, och en handredigerad utdata är drift som väntar på att hända')
+}
 check('Luckan `GL-GAP-1` står som TABELLRAD med sin transition',
   paket.some((p) => existsSync(join(ROT, `packs/${p}/gate-lenses.md`)) &&
     /^\| `GL-GAP-1` \|[^|]+\|[^|]+\|$/m.test(las(`packs/${p}/gate-lenses.md`))),
