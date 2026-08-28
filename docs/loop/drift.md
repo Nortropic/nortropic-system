@@ -3347,3 +3347,86 @@ this drift record. It writes no production, H-032 or autopilot byte. Product aut
 the three paths reserved by H-034 and capped at 2400 cumulative added lines. H-032 later refreezes
 to depend exactly on published H-036 and H-031 follows. Full/live/H-017, network, ref, push and
 merge work remain outside this lane.
+
+The contract-and-product remediation closes four product-side gate defects that review never
+caught because the published gate's `--product` lane was never executed. This round co-develops the
+corrected gate and a passing three-file product in one worktree and validates them together with a
+real sandbox-disabled `--product` run. (D1) `product_identity` now compares the exact three-path
+changed set order-insensitively as a set in git diff-tree path order, so the object-order the diff
+happens to emit can no longer false-fail a correct product. (D2) `make_python_snapshot` creates its
+snapshot root with `parents=True`, so the wrong-mode/wrong-file-mode/wrong-digest private-runtime
+negatives can be constructed. (D3) is the core fix: the pinned canonical stub always re-execs its
+framework app binary, so a process launched through the stub (or any copy of it) has
+`KERN_PROCARGS2` argv0 equal to the app binary and never the snapshot — an in-process argv0 binding
+the re-execing stub can never satisfy. The internal execution identity is therefore re-pinned from
+the stub to the stub's mechanically-proven re-exec target, the framework app binary
+(`9ea12d11e0573548d6d8b0added1740b2d6377366081dbca05c19746ce7c616e`, distinct from the v1 stub
+`94be2db6…`), which runs standalone from a private `0500` snapshot with argv0 equal to its own path.
+`config/python-interpreter-authority-v1.json` is not edited: v2 keeps inheriting v1's interpreter
+identity (version, `-I -S` isolation, framework identity) and snapshot-and-final-rehash discipline
+and replaces only the snapshot subject, verified by proving in `host_preflight` that the stub
+re-execs to exactly this app binary. (D4) launching the target with
+`DYLD_INSERT_LIBRARIES=/forbidden/loader.dylib` hard-wedges the process on this macOS (dyld
+termination plus crash-reporter) before it can sanitize, so that specific variable's stripping is
+an immutable-object-review obligation under the same `strip_prefixes` `DYLD_` rule, while the
+non-wedging `DYLD_LIBRARY_PATH=/forbidden/dyld` keeps the `DYLD_` strip dynamically effect-proven
+with an empty target `bad_env`. The exit_criterion text and `TASK_CANONICAL_SHA256` follow these
+corrections; `docs/07-konstitution.md` stays pinned at its published base digest.
+
+Actually executing the `--product` lane surfaced further defects in the same never-run
+runtime-observation layer, corrected as forced, non-weakening interpretations of what the host and
+libproc really report (co-developed, flagged for owner review). Darwin libproc exposes a pipe's and a
+socket's vinfo dev/ino as `[0,0]`, so the paused-helper descriptor distinctness and the runtime
+snapshot binding use the per-type kernel object handle libproc actually populates (`pipe_handle` for
+each FIFO stdio, `socket_handle` for the proof descriptor); this is the D5 the earlier review only
+suspected. libproc's `proc_fileinfo` openflags are the kernel `fp_flags` (FREAD/FWRITE: read=1,
+write=2, read/write=3) for every fd type, not the `O_RDONLY/O_WRONLY/O_RDWR` (0/1/2) access-mode
+encoding, so the helper stdio/proof access-mode assertions compare against `fp_flags`. The SCM stdin
+(fd0) cannot be both drained for the `stdin_mismatch` verification and re-read by the target while
+keeping the client pipe's identity, so the supervisor drains-and-verifies fd0 against the framed
+envelope, rejects on mismatch, and re-provisions the verified envelope on a fresh stdin pipe; the
+gate therefore binds fd0 by content (`same_stdin`/kuvert) and fd1/fd2 by identity. The
+supervisor-death lane binds the live supervisor's snapshot with `stable_runtime_python` before the
+kill, because the SIGTERM tears the session (and its snapshot) down and the same lane also requires
+the runtime root reclaimed afterwards. Correspondingly the product supervisor reclaims its private
+runtime root on every teardown path (including when the launcher is killed and its own teardown never
+runs), passes the ready descriptor high so its number is not reused after close, rejects malformed
+`go-v1` frames instead of dropping them, and resolves its own authorized interpreter by
+`KERN_PROCARGS2` argv0 rather than the `__PYVENV_LAUNCHER__`-poisonable `sys.executable`.
+
+An independent adversarial review then proved the supervisor descriptor classifier was still vacuous:
+because libproc reports `[0,0]` vinfo dev/ino for every pipe and socket, keying `passed_stdio_pipe`
+on dev/ino admitted any FIFO and accounting AF_UNIX sockets by class alone admitted any stream
+socket, so a supervisor retaining an extra `os.pipe()` or an extra `socketpair()` still passed
+17/0. The classifier is hardened to the kernel objects libproc actually populates: a retained FIFO is
+an SCM-passed stdio pipe only if its libproc pipe handle — or its peer handle, since a forwarded copy
+shares the description and a re-provisioned stdin write-end is the peer of the helper's read-end — is
+one of the helper's three stdio pipe handles.
+
+A final completeness round closes the AF_UNIX residual: "AF_UNIX is local-only" is NOT sufficient
+containment — an arbitrary local peer can itself hold network/credential/filesystem/privileged
+authority and relay it — so a stream socket is never accounted merely for its address family. An
+earlier iteration derived the authorized-client set from the launcher-Popen subtree, but review proved
+that trusts processes the SUPERVISOR ITSELF spawns: a supervisor that forks its own child and connects
+to it was wrongly accounted a client. The binding is therefore by CONNECTION DIRECTION using the
+address libproc exposes on this host (socket_fdinfo local bound sun_path and remote/peer sun_path,
+which `process_fd_roles` now parses): `af_unix_server` is a peerless socket LOCALLY BOUND to the
+supervisor's own runtime socket file; `af_unix_client_connection` is an accept-side socket also locally
+bound to that runtime socket (a process that dialed the public listener — its target is confined by the
+supervisor); `af_unix_helper_control` is the pathless internal socketpair whose peer control block is
+the observed confined helper's proof socket. A dial-out socket (empty local bound path), a
+co-conspirator socketpair to a spawned child (pathless or dialed elsewhere), an internal socketpair, or
+any socket neither on our own listener nor the helper channel is UNACCOUNTED and fails closed; exactly
+one server and one helper-control channel are required. The launcher control descriptor (argv
+`--control-fd`, a pathless socketpair) is verified separately by the barrier and excluded from the
+address classifier so it is never conflated with a spawned co-conspirator. The subtree-pcb derivation
+(and its third-process observation) is removed. So the supervisor never retains a half-open helper
+channel from a nested in-flight request, the product closes each helper-control socketpair once its go
+is delivered. The dual-process classifier selftest exercises a peerless server, an accept-side client,
+a dial-out end, a co-conspirator socketpair, an internal socketpair and an AF_INET socket, asserting
+only the first three accounted. Foreign socket families, regular files, directories and char devices
+keep their real-identity fail-closed. The gate also gains a `sys.version_info < (3,12)` fail-safe
+(deterministic ODÖMBART under the system 3.9 interpreter) and a pinned framework-Python shebang. This
+closes the supervisor FD-accounting property: the co-conspirator/dial-out relay, the unrelated-local
+peer, the internal socketpair, the leaked pipe, foreign families, credential/config files, directories
+and number-relocated descriptors are all bound by role/direction and fail closed number-agnostically.
