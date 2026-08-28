@@ -3430,3 +3430,62 @@ keep their real-identity fail-closed. The gate also gains a `sys.version_info < 
 closes the supervisor FD-accounting property: the co-conspirator/dial-out relay, the unrelated-local
 peer, the internal socketpair, the leaked pipe, foreign families, credential/config files, directories
 and number-relocated descriptors are all bound by role/direction and fail closed number-agnostically.
+
+## 2026-08-28 — H-032 refreeze against published H-036
+
+With H-036 fully published (contract PR#170 + product PR#171), the serial step
+`H032_REFREEZE_AGAINST_PUBLISHED_H036` refreezes H-032 against it before independent review and guarded
+publication, and before H-031 is rebound. TEST_AUTHOR only: exactly `specs/tasks.spec.json` (the h-032
+row), `verify/bin/h-032-exit`, the owner workflow record, the decision log and this drift change; no
+product, launcher, registry, published-gate, live, ref, push or merge effect.
+
+Launcher handoff. The confined launcher `controller/launch/cli` is now owner-production owned by
+published H-036, so H-032's ordinary `allowed_write` drops it to exactly the five entries
+`scripts/nortropic-codex-autopilot.py`, `controller/result/**`, `tests/controller/result/**`,
+`docs/05-beslutslogg.md` and `docs/loop/drift.md`; `owner_author_allowed_write` stays empty.
+`F_H032_EXACT_TASK` re-pins those five and its one-defect authority self-controls now reject re-adding
+any `controller/launch/*` path, a broader `controller/launch/**` or `controller/**` path, a duplicated
+existing entry, an extra unrelated path, and any non-empty `owner_author_allowed_write`. This is folded
+into the single `F_H032_EXACT_TASK` check, so there is no PASS/FAIL count change.
+
+Structural dependency. H-032 now `depends_on` exactly `["h-036"]` and its exit_criterion reads "depends
+exactly on published H-036". The former `F_H033_PUBLISHED_DEPENDENCY` is renamed and repointed to
+`F_H036_PUBLISHED_DEPENDENCY`, which verifies the dependency STRUCTURALLY — exactly one h-036 row
+present, its `exit_test` is `verify/bin/h-036-exit`, and `verify/bin/h-036-exit` is a file — rather than
+by executing the H-036 gate. The published H-036 gate intentionally pins the pre-refreeze H-032
+canonical sha `436d4ff0` and is a completed-phase artifact that is not re-executed green after this
+refreeze; executing it would be a stale-artifact regression, exactly as H-034's early-H036 absence
+checks are treated. The repoint is a label rename of one existing check, not a count change.
+
+Fresh upstream unchanged. `K_H033_FRESH_UPSTREAM_PROVENANCE` keeps executing the green published
+`verify/bin/h-033-exit` sibling gate to verify the shared H-034 foundation chain; the stale H-036 gate
+is deliberately not nested and the label name is stable. `J_H032_WRONG_DEPENDENCY_REJECT` keeps its
+non-`["h-036"]` rejected mutant, and the positive accepts `["h-036"]`. The launcher argv/path/sha pins
+stay (the path is unchanged and the sha is computed dynamically, absorbing the H-036 launcher). The
+frozen result kernel, G20, H017 and H031 route criteria and the deterministic-green 152 PASS / 0 FAIL
+count are unchanged; the sole prebuilder product RED remains
+`STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT`.
+
+R125 static set-union acceptance. Refreezing against the published main also required accepting the
+current published `controller/authority/core.py`, whose H-035 change defines
+`PROSPECTIVE_OWNER_PATHS = REQUIRED_OWNER_PATHS | {...}`. The frozen R125 definition-time capability
+inventory (`_r125_dependency_literal`) admitted only Constant/Tuple/List/Set/Dict literals and the
+`set(...)` call, so it rejected that legitimate `ast.BinOp` set-union and made the whole H-032 gate
+ODÖMBART before its check phase. The narrow, non-weakening fix extends `_r125_dependency_literal` to
+also admit a `BinOp` whose operator is exactly `ast.BitOr` and whose left and right are each EITHER a
+literal (recursively) OR a bare module-level `Name(Load)` — safe because the inventory module is
+validated literal-only top-to-bottom, so any `Name` resolves to an already-defined literal set. This
+admits `Name | {...}`, `{...} | {...}` and chained `A | B | C`, while every dynamic form still rejects:
+a `Call` other than the allowed `set()` form, any `Attribute` (e.g. `os.environ`), a non-BitOr operator
+(e.g. `+`), a comprehension or an f-string; a bare standalone `Name` value is accepted only as a BitOr
+operand, so a `X = ALIAS` bare-Name assignment still rejects. Verified by a positive/negative source
+matrix (real core.py and the three union shapes accept; twelve dynamic/invalid variants reject). This
+is a static-form acceptance of existing published content, not a new capability; it turns the ODÖMBART
+into the already-counted R125 checks passing and adds/removes no `check()` call.
+
+Serial rebind. H-031 rebinds the final H-032 gate digest and its h-032 `depends_on`/summary pins after
+this refreeze, so H-031 is temporarily RED between this publication and the H031_REBIND step — an
+expected serial transition, not a regression. The new h-032 row field
+`r129_h036_dependency_and_launcher_handoff_refreeze` supersedes the launcher/`allowed_write` and
+H-033-execution assumptions of the frozen r116–r118, r60 and r69 prose where they conflict; that frozen
+prose is not rewritten.

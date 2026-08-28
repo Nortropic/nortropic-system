@@ -952,24 +952,25 @@ try:
         return (
             row.get("slice") == "H032_EXACT_CODEX_PROVIDER_IDENTITY"
             and row.get("authority_class") == "ordinary"
-            and row.get("depends_on") == ["h-033"]
+            and row.get("depends_on") == ["h-036"]
             and row.get("exit_test") == "verify/bin/h-032-exit"
             and row.get("allowed_write") == [
                 "scripts/nortropic-codex-autopilot.py",
                 "controller/result/**",
                 "tests/controller/result/**",
-                "controller/launch/cli",
                 "docs/05-beslutslogg.md",
                 "docs/loop/drift.md",
             ]
             and row.get("owner_author_allowed_write") == []
         )
-    # R118 authority amendment: the ONLY allowed_write expansion is the exact
-    # single path controller/launch/cli (for the builder's confined launcher).
-    # These one-defect negatives prove the exact-list check rejects a missing,
-    # duplicated, broader (controller/launch/** or controller/**) or extra path,
-    # and that owner_author_allowed_write stays empty.  No effect on the
-    # public/builder verdicts (F_H032_EXACT_TASK already passed on the exact list).
+    # R129 launcher handoff: controller/launch/cli is now owner-production owned
+    # by published H-036, so H-032's ordinary allowed_write is EXACTLY the five
+    # entries below (the launcher is dropped).  These one-defect negatives prove
+    # the exact-list check re-pins those five and rejects re-adding any
+    # controller/launch/* path, a broader controller/launch/** or controller/**
+    # path, a duplicated existing entry, an extra unrelated path, and any
+    # non-empty owner_author_allowed_write.  Folded into F_H032_EXACT_TASK, so no
+    # PASS/FAIL count change (the label already passed on the exact list).
     def r118_h032_rows(allowed_write, owner_author=None):
         mutated = []
         for item in tasks:
@@ -983,20 +984,18 @@ try:
         return mutated
     r118_exact_allowed_write = [
         "scripts/nortropic-codex-autopilot.py", "controller/result/**",
-        "tests/controller/result/**", "controller/launch/cli",
+        "tests/controller/result/**",
         "docs/05-beslutslogg.md", "docs/loop/drift.md"]
     r118_authority_selfcontrols = (
         h032_row_valid(r118_h032_rows(r118_exact_allowed_write))
         and not h032_row_valid(r118_h032_rows(
-            [p for p in r118_exact_allowed_write if p != "controller/launch/cli"]))
-        and not h032_row_valid(r118_h032_rows(
             r118_exact_allowed_write + ["controller/launch/cli"]))
         and not h032_row_valid(r118_h032_rows(
-            [p if p != "controller/launch/cli" else "controller/launch/**"
-             for p in r118_exact_allowed_write]))
+            r118_exact_allowed_write + ["controller/launch/**"]))
         and not h032_row_valid(r118_h032_rows(
-            [p if p != "controller/launch/cli" else "controller/**"
-             for p in r118_exact_allowed_write]))
+            r118_exact_allowed_write + ["controller/**"]))
+        and not h032_row_valid(r118_h032_rows(
+            r118_exact_allowed_write + ["controller/result/**"]))
         and not h032_row_valid(r118_h032_rows(
             r118_exact_allowed_write + ["controller/loop/cli"]))
         and not h032_row_valid(r118_h032_rows(
@@ -1004,10 +1003,15 @@ try:
     check("F_H032_EXACT_TASK",
           h032_row_valid(tasks) and r118_authority_selfcontrols,
           f"current task identity; authority_selfcontrols={r118_authority_selfcontrols}")
-    h033 = [row for row in tasks if isinstance(row, dict) and row.get("id") == "h-033"]
-    check("F_H033_PUBLISHED_DEPENDENCY", len(h033) == 1
-          and h033[0].get("exit_test") == "verify/bin/h-033-exit"
-          and h033_gate.is_file(), f"h033_rows={len(h033)} gate={h033_gate.is_file()}")
+    # R129: H-032 now depends EXACTLY on published H-036, verified STRUCTURALLY
+    # (h-036 row present + verify/bin/h-036-exit present) rather than by executing
+    # the H-036 gate, which is a completed-phase artifact intentionally pinning the
+    # pre-refreeze H-032 canonical sha and is not re-run green after this refreeze.
+    h036 = [row for row in tasks if isinstance(row, dict) and row.get("id") == "h-036"]
+    h036_gate = repo / "verify/bin/h-036-exit"
+    check("F_H036_PUBLISHED_DEPENDENCY", len(h036) == 1
+          and h036[0].get("exit_test") == "verify/bin/h-036-exit"
+          and h036_gate.is_file(), f"h036_rows={len(h036)} gate={h036_gate.is_file()}")
     check("J_H032_ABSENT_REJECT", not h032_row_valid(
           [row for row in tasks if not isinstance(row, dict) or row.get("id") != "h-032"]),
           "absence must reject")
@@ -1506,6 +1510,25 @@ if mode == 'same_group_closed_stdio_signal': os.kill(os.getpid(),signal.SIGTERM)
                        and _r125_dependency_literal(key, allow_set=allow_set)
                        and _r125_dependency_literal(value, allow_set=allow_set)
                        for key, value in zip(node.keys, node.values))
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+            # R129: static set-union of literal sets, as in the H-035 core.py
+            # `PROSPECTIVE_OWNER_PATHS = REQUIRED_OWNER_PATHS | {...}`.  Each `|`
+            # operand must be EITHER a literal (Set/Dict/List/Tuple/Constant, or
+            # the set() call when allow_set) OR a bare module-level Name(Load) —
+            # safe because the whole inventory module is validated literal-only
+            # top-to-bottom, so any Name resolves to an already-defined literal.
+            # Chained `A | B | C` recurses through the left BinOp.  Every dynamic
+            # form still rejects: a Call other than the allowed set() form, any
+            # Attribute (e.g. os.environ), a non-BitOr operator (e.g. `+`), a
+            # comprehension or f-string.  A bare standalone Name value is NOT
+            # accepted here (only as a BitOr operand), so a `X = ALIAS` bare-Name
+            # assignment still rejects.
+            def _r125_union_operand(operand):
+                return (_r125_dependency_literal(operand, allow_set=allow_set)
+                        or (isinstance(operand, ast.Name)
+                            and isinstance(operand.ctx, ast.Load)))
+            return (_r125_union_operand(node.left)
+                    and _r125_union_operand(node.right))
         return (allow_set and isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Name) and node.func.id == "set"
                 and len(node.args) == 1 and not node.keywords
