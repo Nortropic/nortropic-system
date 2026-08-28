@@ -3563,3 +3563,30 @@ session shape summary) so this class of runtime-value assumption is visible in t
 lesson recorded: for a contract that observes H-036 runtime behaviour, static/constructed-effect review
 READY does NOT imply real-host READY — a bare-host positive is required before publication eligibility.
 `e309` and `188dbe36` are both preserved immutable as failed candidates.
+
+### r4 — KUVERT causal binding + truthful PREBUILDER_PRODUCT_ABSENT (child of r3 09656396)
+
+r3's bare-host V4 confirmed level `"0"`, the four session shapes and the 43-key non-session set, but the
+diagnostic isolated the sole remaining diff to the `NORTROPIC_KUVERT` VALUE. Root cause: `build_target_env`
+(`controller/launch/runtime_snapshot.py:324`) unconditionally rebinds `NORTROPIC_KUVERT = setup["kuvert_path"]`,
+which `_write_kuvert` (`:851-852`) sets to `<runtime_root>/k/kuvert-<nonce>` — a per-launch supervisor-generated
+path, not the submitted envelope the r3 oracle modelled. Because the launcher OVERWRITES any inbound value, the
+caller cannot select it. r4 treats `NORTROPIC_KUVERT` as a supervisor-owned runtime key (like the four
+`NORTROPIC_H036_*`): it is removed from the modelled `expected_base` and bound in `h036_env_relation` by shape +
+causal origin — basename `kuvert-*`, parent directory `k`, under the SAME launcher-owned `.nortropic-h036-runtime-*`
+root as the control socket — never by value, with one-defect negatives (forged-outside, wrong-parent,
+wrong-basename, sibling-runtime, and the exact r3 envelope-value bug). r4 also re-anchors the `h036_relation_strict`
+one-defect suite on the valid `r73_exact` variant expected (the PHYSICAL expected is `None` product-absent because
+its launch observation does not admit, which had made the r2/r3 physical anchor unconditionally false and would have
+blocked J_R72 independently of KUVERT).
+
+Reason semantics corrected: `OWNER_LIVE_PHASE_NOT_RUN` is mechanically UNREACHABLE product-absent (it requires
+`deterministic_result_ok`, whose first conjunct `kernel_structure_ok` is false when the product kernel is absent).
+It is kept for its original product-present, deterministic-green, owner-live-skipped meaning and is NOT widened.
+A separate, non-count-based branch reports the legitimate product-absent state as `CURRENT_RED_REASON=
+PREBUILDER_PRODUCT_ABSENT`, gated on the gate's own ABSENCE sentinels — `not r122_product_kernel.exists()` AND
+`kernel_structure_detail["absent"] is True` — plus exactly the two product-absence labels
+`{K_CANDIDATE_MATERIALIZATION_BOUNDARY, K_STRUCTURED_RESULT_DELIVERY_BOUNDARY}` and no ODÖMBART/K-RIGG, so a
+defective-but-present product can never be mislabelled as absent. conf04 rename reconciliation and launcher/H-036
+ownership are unchanged. Target product-absent state: 150 PASS / 2 FAIL, `PREBUILDER_PRODUCT_ABSENT`. `188dbe36`,
+`e309` and `09656396` are all preserved immutable as failed candidates. Security objective unchanged.

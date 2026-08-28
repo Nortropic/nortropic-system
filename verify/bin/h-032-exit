@@ -7376,7 +7376,6 @@ def run_codex(sink, canonical, invocation, run, role):
                   and not key.endswith(_H036_STRIP_SUFFIXES)}
         expected.update({
             "PATH":"/usr/bin:/bin",
-            "NORTROPIC_KUVERT":str(launch_observation["envelope"]),
             "H032_RESULT_MODE":"valid",
             "H032_CAPTURE":str(capture),
             "H032_LOCKED_SOURCE":str(provider),
@@ -7401,6 +7400,10 @@ def run_codex(sink, canonical, invocation, run, role):
                 "mapping_sha256":hashlib.sha256(encoded).hexdigest()}
     _H036_SESSION_KEYS={"NORTROPIC_H036_CAPABILITY","NORTROPIC_H036_LEVEL",
                         "NORTROPIC_H036_SESSION_ID","NORTROPIC_H036_SOCKET"}
+    # r4: supervisor-generated runtime keys whose values are per-launch random and are
+    # bound by shape+origin, never modelled by value (NORTROPIC_KUVERT = the framed-kuvert
+    # path build_target_env re-binds; the four NORTROPIC_H036_* session keys).
+    _H036_RUNTIME_KEYS=_H036_SESSION_KEYS | {"NORTROPIC_KUVERT"}
     def h036_env_relation(observed, expected_base) -> bool:
         # r2 post-H-036 provider-environment relation. The provider environment must
         # equal the modelled non-session base (expected_base) PLUS exactly the four
@@ -7415,30 +7418,47 @@ def run_codex(sink, canonical, invocation, run, role):
         # inbound NORTROPIC_H036_* values is H-036's own (reserved-prefix) mechanism.
         if not (isinstance(observed, dict) and isinstance(expected_base, dict)):
             return False
-        non_session={k:v for k,v in observed.items()
-                     if not k.startswith("NORTROPIC_H036_")}
-        if non_session!=expected_base:
+        # r4: every NON-runtime key must equal the modelled base exactly; the runtime
+        # keys (4 session + NORTROPIC_KUVERT) are supervisor-generated and bound by
+        # shape+origin below. build_target_env unconditionally overwrites NORTROPIC_KUVERT
+        # (build_target_env:324 = setup["kuvert_path"]), so a caller cannot select it.
+        non_runtime={k:v for k,v in observed.items()
+                     if k not in _H036_RUNTIME_KEYS
+                     and not k.startswith("NORTROPIC_H036_")}
+        if non_runtime!=expected_base:
             return False
-        session={k:v for k,v in observed.items()
-                 if k.startswith("NORTROPIC_H036_")}
-        if set(session)!=_H036_SESSION_KEYS:
+        session={k for k in observed if k.startswith("NORTROPIC_H036_")}
+        if session!=_H036_SESSION_KEYS:
             return False
-        cap=session["NORTROPIC_H036_CAPABILITY"]
-        lvl=session["NORTROPIC_H036_LEVEL"]
-        sid=session["NORTROPIC_H036_SESSION_ID"]
-        sock=session["NORTROPIC_H036_SOCKET"]
-        # r3: the H-036 supervisor mints child_level = requester_level + 1
-        # (controller/launch/runtime_snapshot.py:700); the caller presents the root
-        # capability whose level is -1 (runtime_snapshot.py:378), so the top-level
-        # provider this gate launches runs at level "0" (NOT "1"). The socket is
-        # <runtime_root>/control.sock (controller/launch/cli:625) whose parent is the
-        # launcher-owned .nortropic-h036-runtime-* root (cli:66,671-673).
-        return (isinstance(cap,str) and len(cap)==64
+        if "NORTROPIC_KUVERT" not in observed:
+            return False
+        cap=observed["NORTROPIC_H036_CAPABILITY"]
+        lvl=observed["NORTROPIC_H036_LEVEL"]
+        sid=observed["NORTROPIC_H036_SESSION_ID"]
+        sock=observed["NORTROPIC_H036_SOCKET"]
+        kuvert=observed["NORTROPIC_KUVERT"]
+        # Session shapes: capability 64-hex token_hex(32); level "0" (top-level provider,
+        # child_level=requester(-1)+1, runtime_snapshot.py:378,700); session-id non-empty;
+        # socket <runtime_root>/control.sock under the launcher-owned .nortropic-h036-
+        # runtime-* root (cli:625,66,671-673).
+        if not (isinstance(cap,str) and len(cap)==64
                     and set(cap)<=set("0123456789abcdef")
                 and lvl=="0"
                 and isinstance(sid,str) and sid!=""
                 and isinstance(sock,str) and Path(sock).is_absolute()
-                    and Path(sock).parent.name.startswith(".nortropic-h036-runtime"))
+                    and Path(sock).parent.name.startswith(".nortropic-h036-runtime")):
+            return False
+        # KUVERT causal origin: <runtime_root>/k/kuvert-<nonce> under the SAME launcher-
+        # owned runtime root as the socket (Path(sock).parent, cli:625,851-852). The caller
+        # cannot forge the random per-launch runtime root, so forged/sibling/stale/wrong-
+        # parent kuvert paths reject while the legitimate per-run private path passes
+        # without hardcoding the temp name.
+        if not isinstance(kuvert,str):
+            return False
+        kpath=Path(kuvert)
+        return (kpath.is_absolute() and kpath.name.startswith("kuvert-")
+                and kpath.parent.name=="k"
+                and kpath.parent.parent==Path(sock).parent)
     physical_git_capture_bound=current_provider_capture_binding_admits(
         physical_git_capture,physical_git_start_delta,stale_capture_output)
     physical_git_expected_environment=expected_provider_environment(
@@ -7583,27 +7603,44 @@ def run_codex(sink, canonical, invocation, run, role):
     # r2 one-defect oracle negatives: prove h036_env_relation restores AND tightens
     # contract fidelity rather than introducing a generic exemption. Each mutant of the
     # real provider capture injects exactly one defect that MUST break the relation.
-    _h036_real_env=physical_git_capture.get("complete_environment")
-    _h036_positive=h036_env_relation(_h036_real_env,physical_git_expected_environment)
+    # r4: anchor the one-defect negatives on the EXACT variant (r73_exact), whose expected
+    # is a valid dict — the PHYSICAL expected is None product-absent (its launch observation
+    # does not admit), which made the r2/r3 physical anchor unconditionally False. Each
+    # mutant of the real variant capture injects exactly one defect that MUST break the
+    # relation, proving h036_env_relation tightens fidelity without a generic exemption.
+    _h036_real_env=(r73_exact_capture.get("complete_environment")
+                    if isinstance(r73_exact_capture,dict) else {})
+    _h036_real_env=_h036_real_env if isinstance(_h036_real_env,dict) else {}
+    _h036_exp=r73_exact_expected if isinstance(r73_exact_expected,dict) else {}
+    _h036_positive=h036_env_relation(_h036_real_env,_h036_exp)
     def _h036_mutant(**changes):
-        base=dict(_h036_real_env) if isinstance(_h036_real_env,dict) else {}
+        base=dict(_h036_real_env)
         for key,value in changes.items():
             if value is None: base.pop(key,None)
             else: base[key]=value
         return base
+    # launcher-owned runtime root of the real capture (parent of the control socket), used
+    # to construct causal KUVERT negatives without hardcoding the random per-launch name.
+    _h036_rt=Path(_h036_real_env.get("NORTROPIC_H036_SOCKET","/none/control.sock")).parent
     h036_negative_controls={
-        "fifth_h036_key":h036_env_relation(_h036_mutant(NORTROPIC_H036_EXTRA="0"*64),physical_git_expected_environment),
-        "dropped_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY=None),physical_git_expected_environment),
-        "nonhex_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY="z"*64),physical_git_expected_environment),
-        "wrong_level":h036_env_relation(_h036_mutant(NORTROPIC_H036_LEVEL="9"),physical_git_expected_environment),
-        "wrong_level_one":h036_env_relation(_h036_mutant(NORTROPIC_H036_LEVEL="1"),physical_git_expected_environment),  # e309 V3 counterexample: real level is "0"
-        "socket_outside_runtime":h036_env_relation(_h036_mutant(NORTROPIC_H036_SOCKET="/private/tmp/evil/provider.sock"),physical_git_expected_environment),
-        "trust_root_leak":h036_env_relation(_h036_mutant(NORTROPIC_TRUST_ROOT="/private/tmp/leak"),physical_git_expected_environment),
-        "staging_leak":h036_env_relation(_h036_mutant(NORTROPIC_STAGING_ROOT="/private/tmp/leak"),physical_git_expected_environment),
-        "result_leak":h036_env_relation(_h036_mutant(NORTROPIC_RESULT_SINK="/private/tmp/leak"),physical_git_expected_environment),
-        "python_leak":h036_env_relation(_h036_mutant(PYTHONPATH="/private/tmp/leak"),physical_git_expected_environment),
-        "git_leak":h036_env_relation(_h036_mutant(GIT_DIR="/private/tmp/leak"),physical_git_expected_environment),
-        "wrong_path":h036_env_relation(_h036_mutant(PATH="/usr/bin:/bin:/opt/homebrew/bin"),physical_git_expected_environment),
+        "fifth_h036_key":h036_env_relation(_h036_mutant(NORTROPIC_H036_EXTRA="0"*64),_h036_exp),
+        "dropped_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY=None),_h036_exp),
+        "nonhex_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY="z"*64),_h036_exp),
+        "wrong_level":h036_env_relation(_h036_mutant(NORTROPIC_H036_LEVEL="9"),_h036_exp),
+        "wrong_level_one":h036_env_relation(_h036_mutant(NORTROPIC_H036_LEVEL="1"),_h036_exp),  # e309 V3 counterexample: real level is "0"
+        "socket_outside_runtime":h036_env_relation(_h036_mutant(NORTROPIC_H036_SOCKET="/private/tmp/evil/provider.sock"),_h036_exp),
+        "trust_root_leak":h036_env_relation(_h036_mutant(NORTROPIC_TRUST_ROOT="/private/tmp/leak"),_h036_exp),
+        "staging_leak":h036_env_relation(_h036_mutant(NORTROPIC_STAGING_ROOT="/private/tmp/leak"),_h036_exp),
+        "result_leak":h036_env_relation(_h036_mutant(NORTROPIC_RESULT_SINK="/private/tmp/leak"),_h036_exp),
+        "python_leak":h036_env_relation(_h036_mutant(PYTHONPATH="/private/tmp/leak"),_h036_exp),
+        "git_leak":h036_env_relation(_h036_mutant(GIT_DIR="/private/tmp/leak"),_h036_exp),
+        "wrong_path":h036_env_relation(_h036_mutant(PATH="/usr/bin:/bin:/opt/homebrew/bin"),_h036_exp),
+        # r4 KUVERT causal negatives (V4 counterexample: only the KUVERT value differed):
+        "kuvert_forged_outside":h036_env_relation(_h036_mutant(NORTROPIC_KUVERT="/private/tmp/evil/k/kuvert-forged"),_h036_exp),
+        "kuvert_wrong_parent":h036_env_relation(_h036_mutant(NORTROPIC_KUVERT=str(_h036_rt/"notk"/"kuvert-x")),_h036_exp),
+        "kuvert_wrong_basename":h036_env_relation(_h036_mutant(NORTROPIC_KUVERT=str(_h036_rt/"k"/"forged-x")),_h036_exp),
+        "kuvert_sibling_runtime":h036_env_relation(_h036_mutant(NORTROPIC_KUVERT=str(_h036_rt.parent/".nortropic-h036-runtime-SIBLING"/"k"/"kuvert-x")),_h036_exp),
+        "kuvert_envelope_value":h036_env_relation(_h036_mutant(NORTROPIC_KUVERT=str(r73_exact_launch.get("envelope","/none"))),_h036_exp),  # the r3 wrong model
     }
     h036_relation_strict=(_h036_positive and not any(h036_negative_controls.values()))
     # r3 non-secret diagnostic on the exact variant: key-name-level non-session diff
@@ -7612,8 +7649,10 @@ def run_codex(sink, canonical, invocation, run, role):
                if isinstance(r73_exact_capture,dict) else {})
     _diag_obs=_diag_obs if isinstance(_diag_obs,dict) else {}
     _diag_exp=r73_exact_expected if isinstance(r73_exact_expected,dict) else {}
-    _diag_ns={k:v for k,v in _diag_obs.items() if not k.startswith("NORTROPIC_H036_")}
+    _diag_ns={k:v for k,v in _diag_obs.items()
+              if k not in _H036_RUNTIME_KEYS and not k.startswith("NORTROPIC_H036_")}
     _diag_sess={k:v for k,v in _diag_obs.items() if k.startswith("NORTROPIC_H036_")}
+    _diag_kuvert=Path(_diag_obs.get("NORTROPIC_KUVERT","/none/none"))
     h036_diag={
         "ns_count":len(_diag_ns),"exp_count":len(_diag_exp),
         "obs_only":sorted(set(_diag_ns)-set(_diag_exp)),
@@ -7625,6 +7664,10 @@ def run_codex(sink, canonical, invocation, run, role):
         "cap_len":len(_diag_sess.get("NORTROPIC_H036_CAPABILITY","")),
         "cap_hex":set(_diag_sess.get("NORTROPIC_H036_CAPABILITY",""))
                   <=set("0123456789abcdef"),
+        "kuvert_basename_ok":_diag_kuvert.name.startswith("kuvert-"),
+        "kuvert_parent":_diag_kuvert.parent.name,
+        "kuvert_root_is_socket_root":_diag_kuvert.parent.parent==Path(
+            _diag_sess.get("NORTROPIC_H036_SOCKET","/none/none")).parent,
         "socket_parent":Path(_diag_sess.get(
             "NORTROPIC_H036_SOCKET","/none")).parent.name,
     }
@@ -18068,19 +18111,37 @@ def materialize(a, b, c, d, e, f, g, h):
     # anything else is a real contract failure. This does not relax any security check —
     # it only corrects which material failures are recognized as the expected pre-product
     # state so CURRENT_RED_REASON is truthful after H-036.
+    # r4: OWNER_LIVE_PHASE_NOT_RUN keeps its ORIGINAL product-present meaning (deterministic
+    # green, owner-live intentionally skipped) — it is mechanically UNREACHABLE product-absent
+    # because deterministic_result_ok requires the product kernel (kernel_structure_ok), and
+    # it must NOT be widened/bypassed to cover product absence. The legitimate product-absent
+    # prebuilder state is reported truthfully by a SEPARATE, non-count-based branch.
     PRODUCT_ABSENT_PREBUILDER_REDS = {
-        "K_STRUCTURED_RESULT_DELIVERY_BOUNDARY",
         "K_CANDIDATE_MATERIALIZATION_BOUNDARY",
+        "K_STRUCTURED_RESULT_DELIVERY_BOUNDARY",
     }
     owner_live_skip_expected = (owner_live_mode == "skip"
         and deterministic_result_ok
-        and bool(material_failed)
-        and material_failed <= PRODUCT_ABSENT_PREBUILDER_REDS)
+        and material_failed == {"K_STRUCTURED_RESULT_DELIVERY_BOUNDARY"})
+    # PREBUILDER_PRODUCT_ABSENT is gated on the gate's own structural ABSENCE sentinels — the
+    # materializer product file genuinely absent AND the result kernel structurally absent —
+    # not merely on the failure count, so a defective-but-PRESENT product can never be
+    # mislabelled as product-absent; it also requires exactly the two product-absence labels
+    # (no third failure) and no ODÖMBART/K-RIGG.
+    prebuilder_product_absent = (
+        owner_live_mode == "skip"
+        and material_failed == PRODUCT_ABSENT_PREBUILDER_REDS
+        and not r122_product_kernel.exists()
+        and isinstance(kernel_structure_detail, dict)
+        and kernel_structure_detail.get("absent") is True
+        and not (g20_odom or h033_odom or confinement_odom or confinement04_odom))
     if owner_live_mode == "skip":
         print("OWNER_LIVE_EXECUTION=SKIPPED")
         print("OWNER_LIVE_START_DELTA=0")
     if owner_live_skip_expected:
         print("CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN")
+    elif prebuilder_product_absent:
+        print("CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT")
     elif material_failed == {"K_STRUCTURED_RESULT_DELIVERY_BOUNDARY"}:
         print("CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
     elif material_failed == {"K_CODE_MODE_HOST_IDENTITY_BOUNDARY"}:
