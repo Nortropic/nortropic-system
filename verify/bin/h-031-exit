@@ -435,7 +435,7 @@ J_R93_PRODUCT_OWNED_LIFETIME
 J_ENVIRONMENT_CLOSED_CANDIDATE_HEAD
 J_COMPOSED_GATE_GIT_ENVIRONMENT_CLOSURE
 F_H032_EXACT_TASK
-F_H033_PUBLISHED_DEPENDENCY
+F_H036_PUBLISHED_DEPENDENCY
 J_H032_ABSENT_REJECT
 J_H032_DUPLICATE_REJECT
 J_H032_WRONG_DEPENDENCY_REJECT
@@ -1837,11 +1837,17 @@ try:
 
     h032 = [row for row in tasks if isinstance(row, dict) and row.get("id") == "h-032"]
     h032_static = (len(h032) == 1 and h032[0].get("authority_class") == "ordinary"
-                   and h032[0].get("depends_on") == ["h-033"]
+                   # r1 rebind to published H-032 refreeze (main 52d6b069, tree 11aa4a41): the
+                   # H-032 task now depends on H-036 (not H-033) and its exit gate is the r4
+                   # candidate bffae93a (verify/bin/h-032-exit blob 0e0dfb9e). depends_on/exit_test
+                   # and the gate digest are the only upstream H-032 identity pins that moved; the
+                   # F_H036_PUBLISHED_DEPENDENCY green label (was F_H033) is rebound in
+                   # H032_GREEN_PASS_LABELS above. No semantic authority change.
+                   and h032[0].get("depends_on") == ["h-036"]
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "6f3ba0f82d1a35c3b8044490ead7d356761fa347b14c004bca0e09b407a79255")
+                       == "bffae93a92ed5908b169811379f1f7f556d2796ee209bdfc712028e570948fdd")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")

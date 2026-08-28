@@ -3590,3 +3590,28 @@ PREBUILDER_PRODUCT_ABSENT`, gated on the gate's own ABSENCE sentinels — `not r
 defective-but-present product can never be mislabelled as absent. conf04 rename reconciliation and launcher/H-036
 ownership are unchanged. Target product-absent state: 150 PASS / 2 FAIL, `PREBUILDER_PRODUCT_ABSENT`. `188dbe36`,
 `e309` and `09656396` are all preserved immutable as failed candidates. Security objective unchanged.
+
+## 2026-08-28 — H-031 rebind to published H-032 refreeze (main 52d6b069)
+
+After the H-032 refreeze published (PR #172, main `52d6b06931a0c8b7e75e1ea78ad744520fa3d75f`, tree
+`11aa4a41`), H-031 was temporarily stale against the new upstream H-032 identity — the expected serial
+transition noted above. Mechanical inventory of `verify/bin/h-031-exit` against published main found the
+delta is a NARROW upstream-identity rebind (case A gate-digest + case B H-036 compatibility), not a
+semantic-authority change and not a rewrite. Exactly three pins moved, all in H-031's
+`F_H032_EXACT_PUBLISHED_DEPENDENCY` binding and its `H032_GREEN_PASS_LABELS` set:
+
+- the pinned H-032 gate digest `6f3ba0f8…` → the published r4 gate `bffae93a…` (blob `0e0dfb9e`);
+- the expected H-032 task `depends_on` `["h-033"]` → `["h-036"]` (the refreeze made H-032 depend on H-036);
+- the expected green PASS label `F_H033_PUBLISHED_DEPENDENCY` → `F_H036_PUBLISHED_DEPENDENCY` (the
+  published H-032 gate now emits `F_H036_PUBLISHED_DEPENDENCY` at check line 1012).
+
+Unchanged: the `K_H033_FRESH_UPSTREAM_PROVENANCE` provenance sub-gate and its `H033_GATE_SUMMARY=55 PASS
+0 FAIL`/`H033_GATE_RESULT=PASS` fixtures (the published H-032 still emits them — that check is H-032's
+embedded provenance, distinct from the F_H03x dependency label); H-031's own `depends_on ["h-032"]`,
+`exit_test`, authority_class, allowed_write, process/syscall/source/result/materializer/Git authority,
+and the `WRONG_DEPENDENCY`/`WRONG_GATE`/`WRONG_AUTHORITY` negative controls. No H-032/H-036 product bytes,
+no `controller/launch/cli`. This is the TEST_AUTHOR/prebuilder rebind only: FINAL H-031 NORMAL PASS still
+requires the actual H-032 PRODUCT green (152/0) via the owner-live upstream call — the product is still
+legitimately absent (`PREBUILDER_PRODUCT_ABSENT`), so H-031 does not pretend upstream dependency PASS
+exists. `specs/tasks.spec.json` is unchanged (h-032 already `depends_on ["h-036"]` on published main).
+Security objective unchanged.
