@@ -668,3 +668,48 @@ stay within the same TEST_AUTHOR surface (task spec, gate, this record, decision
 The exit_criterion and `TASK_CANONICAL_SHA256` follow these corrections, the preproduct RED label and
 reason and all other frozen pins are unchanged, and `docs/07-konstitution.md` stays pinned at its
 published base digest.
+
+## H-032 refreeze against published H-036
+
+With H-036 fully published (contract PR#170 + product PR#171), the serial step
+`H032_REFREEZE_AGAINST_PUBLISHED_H036` refreezes H-032 against it before independent review and
+guarded publication, and before H-031 is rebound. This is a TEST_AUTHOR-only change touching exactly
+`specs/tasks.spec.json` (the h-032 row), `verify/bin/h-032-exit`, this workflow record, the decision
+log and drift; no product, launcher, registry, published-gate, live, ref, push or merge effect occurs.
+
+The launcher `controller/launch/cli` is now owner-production owned by H-036, so H-032's ordinary
+`allowed_write` drops it to exactly the five entries `scripts/nortropic-codex-autopilot.py`,
+`controller/result/**`, `tests/controller/result/**`, `docs/05-beslutslogg.md` and
+`docs/loop/drift.md`; `owner_author_allowed_write` stays empty and `F_H032_EXACT_TASK` re-pins those
+five under one-defect authority self-controls that reject re-adding any `controller/launch/*` path, a
+broader `controller/launch/**` or `controller/**` path, a duplicated existing entry, an extra
+unrelated path, and any non-empty `owner_author_allowed_write`.
+
+H-032 now `depends_on` exactly `["h-036"]` and its exit_criterion reads "depends exactly on published
+H-036". The dependency is verified STRUCTURALLY by `F_H036_PUBLISHED_DEPENDENCY` — exactly one h-036
+row present, its `exit_test` is `verify/bin/h-036-exit`, and `verify/bin/h-036-exit` is a file —
+rather than by executing the H-036 gate: the published H-036 gate intentionally pins the pre-refreeze
+H-032 canonical sha (`436d4ff0`) and is a completed-phase artifact that is not re-executed green after
+this refreeze, exactly as H-034's early-H036 absence checks are treated. The executed
+fresh-upstream-foundation provenance `K_H033_FRESH_UPSTREAM_PROVENANCE` continues to execute the green
+published `verify/bin/h-033-exit` sibling gate to verify the shared H-034 foundation chain; the stale
+H-036 gate is deliberately not nested. The frozen result kernel, G20, H017 and H031 route criteria and
+the 152 PASS / 0 FAIL deterministic green count are unchanged, and the sole prebuilder product RED
+remains `STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT`.
+
+Refreezing against the published main also required the H-032 gate to accept the published
+`controller/authority/core.py`, whose H-035 change defines
+`PROSPECTIVE_OWNER_PATHS = REQUIRED_OWNER_PATHS | {...}`. The frozen R125 definition-time capability
+inventory admitted only literal collections and the `set(...)` call, so it rejected that legitimate
+static `BinOp` set-union and made the whole gate ODÖMBART before its check phase. The narrow,
+non-weakening fix extends `_r125_dependency_literal` to also admit a `BinOp` whose operator is exactly
+`ast.BitOr` and whose operands are each either a literal (recursively) or a bare module-level
+`Name(Load)`; every dynamic form (a `Call` other than the allowed `set()`, any `Attribute`, a non-BitOr
+operator, a comprehension or f-string, and a bare standalone `Name` value) still rejects. This is a
+static-form acceptance of existing published content, not a new capability, and adds or removes no
+`check()` call.
+
+H-031 then rebinds the final H-032 gate digest and its h-032 `depends_on`/summary pins after this
+refreeze, so H-031 is temporarily RED between this publication and the H031_REBIND step — an expected
+serial transition, not a regression. This record supersedes the launcher/`allowed_write` and
+H-033-execution assumptions of the frozen H-032 r116–r118, r60 and r69 prose where they conflict.

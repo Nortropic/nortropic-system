@@ -3430,3 +3430,163 @@ keep their real-identity fail-closed. The gate also gains a `sys.version_info < 
 closes the supervisor FD-accounting property: the co-conspirator/dial-out relay, the unrelated-local
 peer, the internal socketpair, the leaked pipe, foreign families, credential/config files, directories
 and number-relocated descriptors are all bound by role/direction and fail closed number-agnostically.
+
+## 2026-08-28 — H-032 refreeze against published H-036
+
+With H-036 fully published (contract PR#170 + product PR#171), the serial step
+`H032_REFREEZE_AGAINST_PUBLISHED_H036` refreezes H-032 against it before independent review and guarded
+publication, and before H-031 is rebound. TEST_AUTHOR only: exactly `specs/tasks.spec.json` (the h-032
+row), `verify/bin/h-032-exit`, the owner workflow record, the decision log and this drift change; no
+product, launcher, registry, published-gate, live, ref, push or merge effect.
+
+Launcher handoff. The confined launcher `controller/launch/cli` is now owner-production owned by
+published H-036, so H-032's ordinary `allowed_write` drops it to exactly the five entries
+`scripts/nortropic-codex-autopilot.py`, `controller/result/**`, `tests/controller/result/**`,
+`docs/05-beslutslogg.md` and `docs/loop/drift.md`; `owner_author_allowed_write` stays empty.
+`F_H032_EXACT_TASK` re-pins those five and its one-defect authority self-controls now reject re-adding
+any `controller/launch/*` path, a broader `controller/launch/**` or `controller/**` path, a duplicated
+existing entry, an extra unrelated path, and any non-empty `owner_author_allowed_write`. This is folded
+into the single `F_H032_EXACT_TASK` check, so there is no PASS/FAIL count change.
+
+Structural dependency. H-032 now `depends_on` exactly `["h-036"]` and its exit_criterion reads "depends
+exactly on published H-036". The former `F_H033_PUBLISHED_DEPENDENCY` is renamed and repointed to
+`F_H036_PUBLISHED_DEPENDENCY`, which verifies the dependency STRUCTURALLY — exactly one h-036 row
+present, its `exit_test` is `verify/bin/h-036-exit`, and `verify/bin/h-036-exit` is a file — rather than
+by executing the H-036 gate. The published H-036 gate intentionally pins the pre-refreeze H-032
+canonical sha `436d4ff0` and is a completed-phase artifact that is not re-executed green after this
+refreeze; executing it would be a stale-artifact regression, exactly as H-034's early-H036 absence
+checks are treated. The repoint is a label rename of one existing check, not a count change.
+
+Fresh upstream unchanged. `K_H033_FRESH_UPSTREAM_PROVENANCE` keeps executing the green published
+`verify/bin/h-033-exit` sibling gate to verify the shared H-034 foundation chain; the stale H-036 gate
+is deliberately not nested and the label name is stable. `J_H032_WRONG_DEPENDENCY_REJECT` keeps its
+non-`["h-036"]` rejected mutant, and the positive accepts `["h-036"]`. The launcher argv/path/sha pins
+stay (the path is unchanged and the sha is computed dynamically, absorbing the H-036 launcher). The
+frozen result kernel, G20, H017 and H031 route criteria and the deterministic-green 152 PASS / 0 FAIL
+count are unchanged; the sole prebuilder product RED remains
+`STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT`.
+
+R125 static set-union acceptance. Refreezing against the published main also required accepting the
+current published `controller/authority/core.py`, whose H-035 change defines
+`PROSPECTIVE_OWNER_PATHS = REQUIRED_OWNER_PATHS | {...}`. The frozen R125 definition-time capability
+inventory (`_r125_dependency_literal`) admitted only Constant/Tuple/List/Set/Dict literals and the
+`set(...)` call, so it rejected that legitimate `ast.BinOp` set-union and made the whole H-032 gate
+ODÖMBART before its check phase. The narrow, non-weakening fix extends `_r125_dependency_literal` to
+also admit a `BinOp` whose operator is exactly `ast.BitOr` and whose left and right are each EITHER a
+literal (recursively) OR a bare module-level `Name(Load)` — safe because the inventory module is
+validated literal-only top-to-bottom, so any `Name` resolves to an already-defined literal set. This
+admits `Name | {...}`, `{...} | {...}` and chained `A | B | C`, while every dynamic form still rejects:
+a `Call` other than the allowed `set()` form, any `Attribute` (e.g. `os.environ`), a non-BitOr operator
+(e.g. `+`), a comprehension or an f-string; a bare standalone `Name` value is accepted only as a BitOr
+operand, so a `X = ALIAS` bare-Name assignment still rejects. Verified by a positive/negative source
+matrix (real core.py and the three union shapes accept; twelve dynamic/invalid variants reject). This
+is a static-form acceptance of existing published content, not a new capability; it turns the ODÖMBART
+into the already-counted R125 checks passing and adds/removes no `check()` call.
+
+Serial rebind. H-031 rebinds the final H-032 gate digest and its h-032 `depends_on`/summary pins after
+this refreeze, so H-031 is temporarily RED between this publication and the H031_REBIND step — an
+expected serial transition, not a regression. The new h-032 row field
+`r129_h036_dependency_and_launcher_handoff_refreeze` supersedes the launcher/`allowed_write` and
+H-033-execution assumptions of the frozen r116–r118, r60 and r69 prose where they conflict; that frozen
+prose is not rewritten.
+
+## 2026-08-28 — H-032 refreeze r129 candidate 188dbe36 failed on a healthy host; r2 gate reconciliation
+
+The r129 refreeze candidate `188dbe36…` was run on a proven-healthy bare host (the earlier
+`147/5 ↔ 148/4` symptom was an owner-live-lane artifact, not host nondeterminism). Post-reboot host
+health is clean: the previously wedged exec-validation process family is absent; `sandbox-exec` is
+available and enforcing (the frozen H-036 allow-default preflight passes while a deny-default profile
+is correctly refused); the pinned tool/candidate identities match; and `h-032-exit --skip-owner-live`
+returns one identical semantic signature across six repetitions with no `K-RIGG` and owner-live
+skipped. On that healthy host `188dbe36` is stably **147 PASS / 5 FAIL** — but for the wrong reason
+(`CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES`), so it is treated as a FAILED immutable TEST_AUTHOR
+candidate and is NOT published. It is preserved unchanged as historical evidence; remediation is a new
+immutable child candidate (no amend/reset/rebase/force).
+
+Mechanically classified, the five failures are three gate-fidelity defects plus the two genuine
+product-absence REDs:
+
+- **J_R72 / J_R73** — a stale pre-H-036 provider-environment oracle. Published H-036's
+  `runtime_snapshot.build_target_env` (contract `config/python-runtime-authority-v2.json`) injects four
+  controller-owned session keys `NORTROPIC_H036_CAPABILITY/LEVEL/SESSION_ID/SOCKET`, strips
+  `NORTROPIC_TRUST_ROOT` (it is launcher-consumed) plus the `PYTHON` prefix and the `*_OVERRIDE`
+  suffixes, and forces `PATH=/usr/bin:/bin`. The refreeze's `expected_provider_environment` still
+  modelled the pre-H-036 relation, so the real 47-key provider env failed exact equality against the
+  44-key model. The keys are supervisor-injected and inbound-stripped, so they are product-independent.
+- **K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT** — an overconstrained `conf04` fixture. The
+  rename-before-move confinement property holds (rename-within-staging denied, cross-parent move-out
+  never succeeds, sink intact with its exact bytes, nothing escapes; the sibling
+  `K_PROVIDER_STAGING_CONFINEMENT` passes on the identical launcher + Seatbelt staging profile). Only
+  the fixture's exact `sorted(iterdir())==["result.json"]` assertion failed, because the H-036
+  supervisor keeps legitimate private bookkeeping inside the staging/runtime mechanism.
+- **K_CANDIDATE_MATERIALIZATION_BOUNDARY** and **K_STRUCTURED_RESULT_DELIVERY_BOUNDARY** — the two
+  genuine product-absence REDs, both graded on the absent `controller/result/materialize.py` product.
+
+Correct post-H-036 product-absent prebuilder RED set (labels + missing mechanisms are authority, not a
+count): `{K_CANDIDATE_MATERIALIZATION_BOUNDARY, K_STRUCTURED_RESULT_DELIVERY_BOUNDARY}` =
+**150 PASS / 2 FAIL**, `CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN`; deterministic green with the
+product present remains 152/0. The historical R120/R125-era `148/4` figures above describe the
+pre-refreeze gate and are left unchanged as history; H-036 now supplies one former product-absent
+confinement mechanism before the H-032 product exists.
+
+The r2 reconciliation edits ONLY the H-032 gate oracle (`verify/bin/h-032-exit`) and this record. It
+does not touch production/product bytes and does not resurrect `controller/launch/cli`; H-036 remains
+launcher/supervisor authority. `expected_provider_environment` now models the exact published H-036
+target-environment transform and returns the non-session base; the four session keys are bound by
+`h036_env_relation` by SHAPE + causal origin (capability 64-hex, level `"1"`, non-empty session id,
+socket under the launcher-owned `.nortropic-h036-runtime*` root) — never by hardcoded random values —
+with eleven one-defect oracle negatives (fifth key, dropped/non-hex/wrong-level session, socket outside
+the runtime root, `TRUST_ROOT`/staging/result/`PYTHON`/Git leak, wrong PATH) all required to reject.
+`conf04` retains every effect proof and replaces the exact-enumeration requirement with a strictly
+stronger causal control (the escape directory must be empty). The `--skip-owner-live` expected set and
+`CURRENT_RED_REASON` are widened to the two product-absence REDs. The underlying security objective is
+unchanged and, for provider-environment hygiene, strengthened: the oracle now also rejects a
+`NORTROPIC_TRUST_ROOT`/`PYTHON`/`*_OVERRIDE` leak the stale relation would have admitted, with no
+generic `NORTROPIC_*` exemption and no caller-selected authority.
+
+### r3 — level root cause (e309 failed on the bare host; child correction)
+
+The r2 candidate `e309d496…` passed independent static review but the bare-host `--skip-owner-live`
+run stably reproduced 148/4: `K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT` flipped GREEN (conf04
+reconciliation effect-valid on the real host), but `J_R72`/`J_R73` stayed RED. Forensic cause: the
+`h036_env_relation` session-shape check hard-coded `NORTROPIC_H036_LEVEL=="1"`, an assumption never
+traced to the supervisor. The published supervisor mints `child_level = requester_level + 1`
+(`controller/launch/runtime_snapshot.py:700`) and the caller presents the root capability whose level
+is `-1` (`:378`), so the top-level provider this gate launches runs at level **"0"**. The non-session
+base and the other session shapes (capability = 64-hex `token_hex(32)`, non-empty session id, socket =
+`<runtime_root>/control.sock` under the launcher-owned `.nortropic-h036-runtime-*` root,
+`controller/launch/cli:625,671-673`) were correct; only the level constant was wrong (observed
+non-session count 43 == expected 43, all one-defect negatives already reject). The r3 child of `e309`
+corrects `lvl=="0"` (documented from source), adds an explicit `wrong_level_one` negative encoding the
+exact V3 counterexample, and adds a non-secret J_R72 diagnostic (key-name-level non-session diff +
+session shape summary) so this class of runtime-value assumption is visible in the evidence. Process
+lesson recorded: for a contract that observes H-036 runtime behaviour, static/constructed-effect review
+READY does NOT imply real-host READY — a bare-host positive is required before publication eligibility.
+`e309` and `188dbe36` are both preserved immutable as failed candidates.
+
+### r4 — KUVERT causal binding + truthful PREBUILDER_PRODUCT_ABSENT (child of r3 09656396)
+
+r3's bare-host V4 confirmed level `"0"`, the four session shapes and the 43-key non-session set, but the
+diagnostic isolated the sole remaining diff to the `NORTROPIC_KUVERT` VALUE. Root cause: `build_target_env`
+(`controller/launch/runtime_snapshot.py:324`) unconditionally rebinds `NORTROPIC_KUVERT = setup["kuvert_path"]`,
+which `_write_kuvert` (`:851-852`) sets to `<runtime_root>/k/kuvert-<nonce>` — a per-launch supervisor-generated
+path, not the submitted envelope the r3 oracle modelled. Because the launcher OVERWRITES any inbound value, the
+caller cannot select it. r4 treats `NORTROPIC_KUVERT` as a supervisor-owned runtime key (like the four
+`NORTROPIC_H036_*`): it is removed from the modelled `expected_base` and bound in `h036_env_relation` by shape +
+causal origin — basename `kuvert-*`, parent directory `k`, under the SAME launcher-owned `.nortropic-h036-runtime-*`
+root as the control socket — never by value, with one-defect negatives (forged-outside, wrong-parent,
+wrong-basename, sibling-runtime, and the exact r3 envelope-value bug). r4 also re-anchors the `h036_relation_strict`
+one-defect suite on the valid `r73_exact` variant expected (the PHYSICAL expected is `None` product-absent because
+its launch observation does not admit, which had made the r2/r3 physical anchor unconditionally false and would have
+blocked J_R72 independently of KUVERT).
+
+Reason semantics corrected: `OWNER_LIVE_PHASE_NOT_RUN` is mechanically UNREACHABLE product-absent (it requires
+`deterministic_result_ok`, whose first conjunct `kernel_structure_ok` is false when the product kernel is absent).
+It is kept for its original product-present, deterministic-green, owner-live-skipped meaning and is NOT widened.
+A separate, non-count-based branch reports the legitimate product-absent state as `CURRENT_RED_REASON=
+PREBUILDER_PRODUCT_ABSENT`, gated on the gate's own ABSENCE sentinels — `not r122_product_kernel.exists()` AND
+`kernel_structure_detail["absent"] is True` — plus exactly the two product-absence labels
+`{K_CANDIDATE_MATERIALIZATION_BOUNDARY, K_STRUCTURED_RESULT_DELIVERY_BOUNDARY}` and no ODÖMBART/K-RIGG, so a
+defective-but-present product can never be mislabelled as absent. conf04 rename reconciliation and launcher/H-036
+ownership are unchanged. Target product-absent state: 150 PASS / 2 FAIL, `PREBUILDER_PRODUCT_ABSENT`. `188dbe36`,
+`e309` and `09656396` are all preserved immutable as failed candidates. Security objective unchanged.
