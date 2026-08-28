@@ -3635,3 +3635,31 @@ textually via r89, not by literal sha). Security objective unchanged. Sequencing
 completes the r4 authority contract; the H-031 rebind (a5707e54, preserved immutable, correct-but-blocked)
 must re-base on this published r5 and re-pin the new helper sha before its bare-host PREBUILDER evidence
 can pass.
+
+## H-031 rebind (fresh child of published H-032 r5 main e3fbcece)
+
+The H-031 rebind is re-authored as a fresh TEST_AUTHOR candidate on the published r5 main
+`e3fbcece` (merge of r5 `a3fb1a1c`; ordered parents `[52d6b069, a3fb1a1c]`, tree `04d30136`).
+Two prior H-031 candidates are preserved immutable as historical evidence, NOT publication targets:
+`90497a65` (correct-but-incomplete identity-pin only) and `a5707e54` (complete output-state-model +
+identity pins, independently reviewed READY, but authored on 52d6b069 with the pre-r5 helper — its
+bare-host run blocked at `ODÖMBART K_H032_FRESH_UPSTREAM — owner-live helper failed rc=2` because it
+still pinned the stale helper `baf8fc93`). Because r5 changed ONLY the H-032 gate bytes (helper re-pin
+line) and the helper bytes — not H-032's product-absent OUTPUT behaviour (still exit 1, 150/2,
+`PREBUILDER_PRODUCT_ABSENT`, FAIL {K_CANDIDATE_MATERIALIZATION_BOUNDARY,
+K_STRUCTURED_RESULT_DELIVERY_BOUNDARY}) — the reviewed `a5707e54` output-state model is carried forward
+VERBATIM. The complete minimum delta vs `a5707e54` is exactly two mechanical re-pins (+ their
+comments): the owner-live-call helper pin `h-031-exit:30` `baf8fc93…`→`c18d6e51…` (r5 helper content
+sha256) and the H-032 gate digest `F_H032_EXACT_PUBLISHED_DEPENDENCY` `bffae93a…`→`9281e718…` (r5
+`verify/bin/h-032-exit` content sha256). Both pins are verified to match the actual r5 bytes present in
+this tree (GATE_PIN_MATCHES_TREE, HELPER_PIN_MATCHES_TREE) — the exact correctness `a5707e54` lacked.
+Changed vs published main = `verify/bin/h-031-exit` + docs only; specs/tasks.spec.json unchanged
+(fcac4b22; H-031 binds the spec identity unchanged), no product/launcher/H-036 bytes. State model
+unchanged: product-absent = development state only (final H-031 dependency PASS remains RED until the
+H-032 product exists and H-032 itself is green); product-present forms (owner-live-skip 151/1
+`OWNER_LIVE_PHASE_NOT_RUN`; full-green 152/0) are frozen as CONTRACT fixtures with
+`H031_PRODUCT_PRESENT_RUNTIME_VERIFICATION=DEFERRED_UNTIL_H032_PRODUCT_BY_DESIGN` (NOT PASS). The r5
+transport (`K_H032_FRESH_UPSTREAM`) now accepts the exact real `PREBUILDER_PRODUCT_ABSENT` transcript at
+helper rc=0 (proven on bare host in the r5 evidence), so H-031's freshness path can consume the live
+upstream instead of ODÖMBART-ing at the helper. `90497a65` and `a5707e54` preserved immutable; no
+amend/rebase/reset.

@@ -27,7 +27,7 @@ SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
 SPEC="$ROOT/specs/tasks.spec.json"
 H032_GATE="$ROOT/verify/bin/h-032-exit"
 OWNER_LIVE_HELPER="$ROOT/verify/bin/h-032-owner-live-call"
-OWNER_LIVE_HELPER_SHA256="baf8fc93971ca2324eb7a2771592168834388f2d292df6a2b067fe653824b152"
+OWNER_LIVE_HELPER_SHA256="c18d6e51aa770094e6dfd58c4d141b36a6c6f0d9ecdeee57f2059ffdf95ad071"
 if [[ -L "$OWNER_LIVE_HELPER" || ! -f "$OWNER_LIVE_HELPER" || ! -x "$OWNER_LIVE_HELPER" ]]; then
   echo "ODÖMBART K0 — owner-live helper identity invalid"
   exit 2
@@ -435,7 +435,7 @@ J_R93_PRODUCT_OWNED_LIFETIME
 J_ENVIRONMENT_CLOSED_CANDIDATE_HEAD
 J_COMPOSED_GATE_GIT_ENVIRONMENT_CLOSURE
 F_H032_EXACT_TASK
-F_H033_PUBLISHED_DEPENDENCY
+F_H036_PUBLISHED_DEPENDENCY
 J_H032_ABSENT_REJECT
 J_H032_DUPLICATE_REJECT
 J_H032_WRONG_DEPENDENCY_REJECT
@@ -585,20 +585,19 @@ K_CANDIDATE_MATERIALIZATION_BOUNDARY
 """.split())
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
-# R122: the current H032 dependency has neither the confined launcher/result
-# kernel nor the protected-artifact materializer.  Exactly those three product
-# boundaries are legitimately RED alongside the result boundary.  The builder
-# flips all three to PASS; owner-live derivation therefore flips exactly this
-# frozen product-absent set and nothing else.
+# rebind to published H-032 r5 (main e3fbcece): published H-036 now supplies
+# the confined launcher/staging + rename-before-move confinement, so those two are GREEN
+# product-absent and are NO LONGER product-absent RED (obsolete pre-H-036 expectation
+# dropped).  The SOLE product-flippable RED product-absent is the materializer boundary.
+# Product-absent H-032 is exactly 150/2 with FAIL {K_CANDIDATE_MATERIALIZATION_BOUNDARY,
+# K_STRUCTURED_RESULT_DELIVERY_BOUNDARY} and CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT.
+# The product build flips materialization to PASS (→ 151/1 owner-live-skip); owner-live
+# then flips the structured-result boundary (→ 152/0 full green).  Owner-live derivation
+# therefore flips exactly the materialization boundary and nothing else.
 H032_PRODUCT_ABSENT_LABELS = (
     "K_CANDIDATE_MATERIALIZATION_BOUNDARY",
-    "K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT",
-    "K_PROVIDER_STAGING_CONFINEMENT",
 )
-H032_CONFINEMENT_RED_REASON = (
-    "CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:"
-    + ",".join(sorted(H032_PRODUCT_ABSENT_LABELS
-                      + ("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY",))))
+H032_CONFINEMENT_RED_REASON = "CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT"
 H032_OWNER_LIVE_EXECUTION = "OWNER_LIVE_EXECUTION=SKIPPED"
 H032_OWNER_LIVE_START_DELTA = "OWNER_LIVE_START_DELTA=0"
 H032_OWNER_LIVE_SKIP_MARKER = (
@@ -1837,11 +1836,18 @@ try:
 
     h032 = [row for row in tasks if isinstance(row, dict) and row.get("id") == "h-032"]
     h032_static = (len(h032) == 1 and h032[0].get("authority_class") == "ordinary"
-                   and h032[0].get("depends_on") == ["h-033"]
+                   # rebind to published H-032 r5 (main e3fbcece): the H-032 task depends on
+                   # H-036 (not H-033) and its exit gate is the r5-published verify/bin/h-032-exit
+                   # (blob 29ab9c7e, content sha256 9281e718…), which re-pins the owner-live-call
+                   # helper to the r5 transport (c18d6e51…, pinned at line 30). depends_on/exit_test
+                   # and the gate digest are the only upstream H-032 identity pins that moved; the
+                   # F_H036_PUBLISHED_DEPENDENCY green label (was F_H033) is rebound in
+                   # H032_GREEN_PASS_LABELS above. No semantic authority change.
+                   and h032[0].get("depends_on") == ["h-036"]
                    and h032[0].get("exit_test") == "verify/bin/h-032-exit"
                    and h032_gate.is_file()
                    and sha256_bytes(h032_gate.read_bytes())
-                       == "6f3ba0f82d1a35c3b8044490ead7d356761fa347b14c004bca0e09b407a79255")
+                       == "9281e7182c21ee5758e3e56c26e40d05bbe04f752d5e8da72a05fafa496dcf59")
     check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
 
     source_text = source.read_text(encoding="utf-8")
@@ -3245,7 +3251,7 @@ if (failed == {"K_H032_FRESH_UPSTREAM", "K_PRODUCT_EXECUTION"}
         and any(reason in getattr(upstream, "stdout", "")
                 for reason in (H032_STRUCTURED_RESULT_REASON,
                                H032_CONFINEMENT_RED_REASON))):
-    print("CURRENT_RED_REASON=UPSTREAM_STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
+    print("CURRENT_RED_REASON=UPSTREAM_PREBUILDER_PRODUCT_ABSENT")
 elif failed == EXPECTED_PREBUILDER_RED:
     print("CURRENT_RED_REASON=EXPLICIT_ROLE_MODEL_ROUTING_ABSENT")
 else:
