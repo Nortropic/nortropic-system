@@ -3543,3 +3543,23 @@ stronger causal control (the escape directory must be empty). The `--skip-owner-
 unchanged and, for provider-environment hygiene, strengthened: the oracle now also rejects a
 `NORTROPIC_TRUST_ROOT`/`PYTHON`/`*_OVERRIDE` leak the stale relation would have admitted, with no
 generic `NORTROPIC_*` exemption and no caller-selected authority.
+
+### r3 — level root cause (e309 failed on the bare host; child correction)
+
+The r2 candidate `e309d496…` passed independent static review but the bare-host `--skip-owner-live`
+run stably reproduced 148/4: `K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT` flipped GREEN (conf04
+reconciliation effect-valid on the real host), but `J_R72`/`J_R73` stayed RED. Forensic cause: the
+`h036_env_relation` session-shape check hard-coded `NORTROPIC_H036_LEVEL=="1"`, an assumption never
+traced to the supervisor. The published supervisor mints `child_level = requester_level + 1`
+(`controller/launch/runtime_snapshot.py:700`) and the caller presents the root capability whose level
+is `-1` (`:378`), so the top-level provider this gate launches runs at level **"0"**. The non-session
+base and the other session shapes (capability = 64-hex `token_hex(32)`, non-empty session id, socket =
+`<runtime_root>/control.sock` under the launcher-owned `.nortropic-h036-runtime-*` root,
+`controller/launch/cli:625,671-673`) were correct; only the level constant was wrong (observed
+non-session count 43 == expected 43, all one-defect negatives already reject). The r3 child of `e309`
+corrects `lvl=="0"` (documented from source), adds an explicit `wrong_level_one` negative encoding the
+exact V3 counterexample, and adds a non-secret J_R72 diagnostic (key-name-level non-session diff +
+session shape summary) so this class of runtime-value assumption is visible in the evidence. Process
+lesson recorded: for a contract that observes H-036 runtime behaviour, static/constructed-effect review
+READY does NOT imply real-host READY — a bare-host positive is required before publication eligibility.
+`e309` and `188dbe36` are both preserved immutable as failed candidates.

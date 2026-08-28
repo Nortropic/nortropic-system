@@ -7427,9 +7427,15 @@ def run_codex(sink, canonical, invocation, run, role):
         lvl=session["NORTROPIC_H036_LEVEL"]
         sid=session["NORTROPIC_H036_SESSION_ID"]
         sock=session["NORTROPIC_H036_SOCKET"]
+        # r3: the H-036 supervisor mints child_level = requester_level + 1
+        # (controller/launch/runtime_snapshot.py:700); the caller presents the root
+        # capability whose level is -1 (runtime_snapshot.py:378), so the top-level
+        # provider this gate launches runs at level "0" (NOT "1"). The socket is
+        # <runtime_root>/control.sock (controller/launch/cli:625) whose parent is the
+        # launcher-owned .nortropic-h036-runtime-* root (cli:66,671-673).
         return (isinstance(cap,str) and len(cap)==64
                     and set(cap)<=set("0123456789abcdef")
-                and lvl=="1"
+                and lvl=="0"
                 and isinstance(sid,str) and sid!=""
                 and isinstance(sock,str) and Path(sock).is_absolute()
                     and Path(sock).parent.name.startswith(".nortropic-h036-runtime"))
@@ -7590,6 +7596,7 @@ def run_codex(sink, canonical, invocation, run, role):
         "dropped_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY=None),physical_git_expected_environment),
         "nonhex_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY="z"*64),physical_git_expected_environment),
         "wrong_level":h036_env_relation(_h036_mutant(NORTROPIC_H036_LEVEL="9"),physical_git_expected_environment),
+        "wrong_level_one":h036_env_relation(_h036_mutant(NORTROPIC_H036_LEVEL="1"),physical_git_expected_environment),  # e309 V3 counterexample: real level is "0"
         "socket_outside_runtime":h036_env_relation(_h036_mutant(NORTROPIC_H036_SOCKET="/private/tmp/evil/provider.sock"),physical_git_expected_environment),
         "trust_root_leak":h036_env_relation(_h036_mutant(NORTROPIC_TRUST_ROOT="/private/tmp/leak"),physical_git_expected_environment),
         "staging_leak":h036_env_relation(_h036_mutant(NORTROPIC_STAGING_ROOT="/private/tmp/leak"),physical_git_expected_environment),
@@ -7599,6 +7606,28 @@ def run_codex(sink, canonical, invocation, run, role):
         "wrong_path":h036_env_relation(_h036_mutant(PATH="/usr/bin:/bin:/opt/homebrew/bin"),physical_git_expected_environment),
     }
     h036_relation_strict=(_h036_positive and not any(h036_negative_controls.values()))
+    # r3 non-secret diagnostic on the exact variant: key-name-level non-session diff
+    # + session shape summary (never dumps the capability/session-id values).
+    _diag_obs=(r73_exact_capture.get("complete_environment")
+               if isinstance(r73_exact_capture,dict) else {})
+    _diag_obs=_diag_obs if isinstance(_diag_obs,dict) else {}
+    _diag_exp=r73_exact_expected if isinstance(r73_exact_expected,dict) else {}
+    _diag_ns={k:v for k,v in _diag_obs.items() if not k.startswith("NORTROPIC_H036_")}
+    _diag_sess={k:v for k,v in _diag_obs.items() if k.startswith("NORTROPIC_H036_")}
+    h036_diag={
+        "ns_count":len(_diag_ns),"exp_count":len(_diag_exp),
+        "obs_only":sorted(set(_diag_ns)-set(_diag_exp)),
+        "exp_only":sorted(set(_diag_exp)-set(_diag_ns)),
+        "val_diff":sorted(k for k in (set(_diag_ns)&set(_diag_exp))
+                          if _diag_ns.get(k)!=_diag_exp.get(k)),
+        "session_keys":sorted(_diag_sess),
+        "level":_diag_sess.get("NORTROPIC_H036_LEVEL"),
+        "cap_len":len(_diag_sess.get("NORTROPIC_H036_CAPABILITY","")),
+        "cap_hex":set(_diag_sess.get("NORTROPIC_H036_CAPABILITY",""))
+                  <=set("0123456789abcdef"),
+        "socket_parent":Path(_diag_sess.get(
+            "NORTROPIC_H036_SOCKET","/none")).parent.name,
+    }
     check("J_R72_COMPLETE_PROVIDER_ENVIRONMENT_RELATION",
           r72_dynamic_literals_absent and capture_binding_mutants_reject
           and r72_variant_observations.get("exact",{}).get("relation") is True
@@ -7610,6 +7639,7 @@ def run_codex(sink, canonical, invocation, run, role):
           and h036_relation_strict,
           f"source_absent={r72_dynamic_literals_absent} "
           f"h036_relation_strict={h036_relation_strict} h036_positive={_h036_positive} "
+          f"h036_diag={h036_diag} "
           f"h036_negatives={h036_negative_controls} "
           f"binding_mutants={capture_binding_mutants_reject} "
           f"actual_observed={environment_fingerprint(physical_git_capture.get('complete_environment'))} "
