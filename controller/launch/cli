@@ -1,95 +1,81 @@
 #!/usr/bin/env python3.12
-"""controller/launch/cli — skiva 6c: worker-launch, processtart med timeout.
+"""controller/launch/cli — H-036 pre-sandbox launcher.
 
     run <workspace> <kuvertfil> <timeout-s> -- <kommando...>
         0   processens stdout OFÖRÄNDRAD
         ≠0  failure-klass på stdout
 
-Kommandot är KONFIGURATION, aldrig hårdkodat. Komponenten startar vad den
-får efter `--`; att just Claude Code startar rätt är en konfigurationsfråga
-som prövas av människa. Det som är logik — workspace, kuvert, timeout,
-processgrupp och rest — prövas mekaniskt.
+Skiva 6c startade workern direkt bakom en Seatbelt-gräns.  H-036 lyfter in en
+PRE-sandbox körtidssupervisor: launchern bootstrappar en privat session (privat
+runtime-rot, 0500-Python-snapshot, AF_UNIX-socket, unconfined supervisor) och
+lämnar varje mål till supervisorn över kapabilitetsprotokollet.  Kapslade anrop
+(de fyra NORTROPIC_H036_*-nycklarna finns) återansluter i stället den ärvda
+sessionen och begär ett barn på nivå+1.
 
-**Processgruppen är hela poängen.** `subprocess.run(timeout=)` dödar barnet,
-inte gruppen. h-005 mätte samma klass av fel: `worktree add` startar en egen
-utcheckningsprocess, och att döda bara git lämnade barnbarnet skrivande i
-katalogen. Här startar workern lika gärna bakgrundsjobb. Därför
-`start_new_session` — barnet blir gruppledare — och `killpg` på HELA gruppen
-vid timeout: SIGTERM, nådetid, sedan SIGKILL.
-
-**Komponenten hänger aldrig.** Varje väntan har en frist. Går gruppen inte
-att skörda inom fristen lämnas rören och timeout-klassen rapporteras ändå —
-ett svar som dröjer för evigt är värre än ett svar som medger att det inte
-kunde städa.
-
-**Kuvertet når processen på två vägar**, ingen av dem via workspacet: miljö-
-variabeln `NORTROPIC_KUVERT` med absolut sökväg, och innehållet på stdin.
-Att lägga kuvertet i workspacet vore fel — workern kör `git add -A` där, och
-kuvertet hade följt med in i kandidaten.
-
-Failure-klasserna hålls isär för att controllern klassar och räknar fel
-(v4.1 §13 `classify`, §16 breaker). `timeout` och `nonzero_exit` är SKILDA:
-"processen dog" och "processen misslyckades" är olika utfall och kräver
-olika åtgärd.
-
-Exitkoden bär klassen: 0 rapport · 1 anropsfel · 3 launch_failed ·
-4 nonzero_exit · 5 timeout · 8 internt fel. **2 används aldrig** —
-`verify/bin/_lib.sh` rad 2 binder det till ODÖMBART.
+Exitkoden bär klassen precis som förut: 0 rapport · 1 anropsfel ·
+3 launch_failed · 4 nonzero_exit · 5 timeout · 8 internt fel.  **2 används
+aldrig** — verify/bin/_lib.sh binder det till ODÖMBART.
 """
 
-import json
-import os
-import shutil
-import signal
-import subprocess
+from __future__ import annotations
+
 import sys
-from pathlib import Path
 
 if sys.version_info < (3, 12):
     sys.exit(f"controller/launch/cli kräver Python 3.12+, kördes på {sys.version.split()[0]}")
 
+import ctypes
+import ctypes.util
+import hashlib
+import json
+import os
+import re
+import secrets
+import select
+import shutil
+import signal
+import socket
+import stat
+import struct
+import subprocess
+import threading
+import time
+from pathlib import Path
+
 ANROP, LAUNCH, NONZERO, TIMEOUT, INTERNT = 1, 3, 4, 5, 8
 ROT = Path(__file__).resolve().parents[2]
-SANDBOX_EXEC = Path("/usr/bin/sandbox-exec")
+HELPER = ROT / "controller/launch/runtime_snapshot.py"
+CONFIG = ROT / "config/python-runtime-authority-v2.json"
+SANDBOX_EXEC = "/usr/bin/sandbox-exec"
+PYTHON_SOURCE = Path(
+    "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/"
+    "Python.framework/Versions/3.12/bin/python3.12"
+)
+PYTHON_SHA256 = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+# The canonical v1 stub above always re-execs its framework app binary, so a
+# process launched through the stub has KERN_PROCARGS2 argv0 equal to the app
+# binary, never the stub/snapshot.  The in-process argv0 identity binding is
+# therefore satisfied only by snapshotting that mechanically-proven re-exec
+# target (the app binary), which runs standalone with argv0 == its own path.
+PYTHON_APP_BINARY = PYTHON_SOURCE.parent.parent / "Resources/Python.app/Contents/MacOS/Python"
+PYTHON_APP_SHA256 = "9ea12d11e0573548d6d8b0added1740b2d6377366081dbca05c19746ce7c616e"
 TRUST_ROOT_ENV = "NORTROPIC_TRUST_ROOT"
-
-# LOOP-ÄGARHAND-44: buildern får skriva kandidatdata och neutral scratch, men
-# aldrig live control plane eller controllerns pre-task-authority. `allow
-# default` bevarar launchs kommandoagnostiska kontrakt. Git-exceptionen är
-# uppmätt mot h-016: en detached självcommit behöver common objects och sitt
-# EGET worktree-admin, men inte config, hooks, refs eller andra worktrees.
-# Parametrar håller sökvägar ur Scheme-källan så filnamn aldrig blir syntax.
-SEATBELT_PROFIL = """(version 1)
-(allow default)
-(deny file-write*
-  (require-all
-    (subpath (param "LIVE_ROOT"))
-    (require-not (subpath (param "LIVE_GIT")))))
-(deny file-write*
-  (require-all
-    (subpath (param "LIVE_GIT"))
-    (require-not
-      (require-any
-        (subpath (param "GIT_OBJECTS"))
-        (subpath (param "WORKTREE_GITDIR"))))))
-(deny file-write* (subpath (param "GIT_OBJECTS_INFO")))
-(deny file-write* (subpath (param "WORKTREE_COMMDIR")))
-(deny file-write* (subpath (param "WORKTREE_GITFILE")))
-(deny file-write* (subpath (param "WORKTREE_CONFIG")))
-(deny file-write* (literal (param "WORKSPACE")))
-(deny file-write* (literal (param "WORKSPACE_DOTGIT")))
-(deny file-write* (subpath (param "TRUST_ROOT")))
-"""
-
-# Nådetid mellan SIGTERM och SIGKILL, och frist för att skörda gruppen.
-NADETID = 2.0
-SKORDEFRIST = 5.0
-
-# v4.1 §10: worker-env får aldrig bära GH_*, GITHUB_* eller SLACK_*.
-# Exakt de tre prefixen, inget bredare: paragrafens vidare formulering om
-# deploy- och cloudcredentials kräver en allowlist som hör till sandbox-skivan,
-# och ett bredare filter här hade kunnat strypa workerns egna referenser.
-KANSLIGA_PREFIX = ("GH_", "GITHUB_", "SLACK_")
+STAGING_ROOT_ENV = "NORTROPIC_STAGING_ROOT"
+RESULT_SINK_ENV = "NORTROPIC_RESULT_SINK"
+RUNTIME_PARENT = "/private/tmp"
+RUNTIME_PREFIX = ".nortropic-h036-runtime-"
+FRAME_LIMIT = 1048576
+HANDSHAKE_TIMEOUT = 5.0
+STRIP_PREFIXES = ("DYLD_", "GIT_", "GH_", "GITHUB_", "PYTHON", "SLACK_")
+STRIP_EXACT = frozenset({
+    "LD_LIBRARY_PATH", "LD_PRELOAD", "NORTROPIC_TRUST_ROOT",
+    "NORTROPIC_STAGING_ROOT", "NORTROPIC_RESULT_SINK", "__PYVENV_LAUNCHER__",
+})
+RESERVED_PREFIX = "NORTROPIC_H036_"
+EPHEMERAL_KEYS = (
+    "NORTROPIC_H036_CAPABILITY", "NORTROPIC_H036_LEVEL",
+    "NORTROPIC_H036_SESSION_ID", "NORTROPIC_H036_SOCKET",
+)
 
 
 def svar(text: str, kod: int) -> int:
@@ -97,39 +83,177 @@ def svar(text: str, kod: int) -> int:
     return kod
 
 
-def worker_miljo(kuvertfil: Path) -> dict[str, str]:
-    miljo = {n: v for n, v in os.environ.items()
-             if not n.startswith(KANSLIGA_PREFIX)}
-    miljo["NORTROPIC_KUVERT"] = str(kuvertfil)
-    return miljo
+def audit_pidversion() -> int:
+    pair_a, pair_b = socket.socketpair()
+    try:
+        return struct.unpack("=8I", pair_a.getsockopt(0, 6, 32))[7]
+    finally:
+        pair_a.close()
+        pair_b.close()
 
 
-def gitdir(root: Path) -> Path | None:
-    """Löser en vanlig .git-katalog/-pekare utan att köra Git."""
-    punktgit = root / ".git"
-    if punktgit.is_symlink():
-        return None
-    if punktgit.is_dir():
-        return punktgit.resolve()
-    if not punktgit.is_file():
-        return None
+# ---------------------------------------------------------------------------
+# Interpreter authority: canonical pinned Python or a private 0500 snapshot.
+# ---------------------------------------------------------------------------
+
+def self_exec_path() -> Path | None:
+    """Return the launcher's real interpreter path from KERN_PROCARGS2 argv0.
+
+    ``sys.executable`` is unreliable here: on macOS framework builds the app
+    binary honours ``__PYVENV_LAUNCHER__`` from the environment and rewrites
+    ``sys.executable`` to whatever that variable names.  The kernel's argv0 is
+    the exec path the launcher was actually started with (the app-binary
+    snapshot, or the app binary itself when the canonical stub re-execs), and
+    cannot be poisoned by the environment.
+    """
     try:
-        rader = punktgit.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeError):
+        libc = ctypes.CDLL(
+            ctypes.util.find_library("c") or "/usr/lib/libSystem.B.dylib",
+            use_errno=True,
+        )
+        sysctl = libc.sysctl
+        sysctl.argtypes = [
+            ctypes.POINTER(ctypes.c_int), ctypes.c_uint, ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_size_t), ctypes.c_void_p, ctypes.c_size_t,
+        ]
+        sysctl.restype = ctypes.c_int
+        argmax = ctypes.c_int()
+        argmax_size = ctypes.c_size_t(ctypes.sizeof(argmax))
+        argmax_mib = (ctypes.c_int * 2)(1, 8)  # CTL_KERN, KERN_ARGMAX
+        if sysctl(argmax_mib, 2, ctypes.byref(argmax), ctypes.byref(argmax_size),
+                  None, 0) != 0 or not 4096 <= argmax.value <= 16 * 1024 * 1024:
+            return None
+        buffer = ctypes.create_string_buffer(argmax.value)
+        size = ctypes.c_size_t(len(buffer))
+        procargs_mib = (ctypes.c_int * 3)(1, 49, os.getpid())  # KERN_PROCARGS2
+        if sysctl(procargs_mib, 3, buffer, ctypes.byref(size), None, 0) != 0 \
+                or size.value < ctypes.sizeof(ctypes.c_int):
+            return None
+        raw = buffer.raw[:size.value]
+        argc = struct.unpack_from("=i", raw)[0]
+        if argc < 1:
+            return None
+        position = ctypes.sizeof(ctypes.c_int)
+        executable_end = raw.find(b"\0", position)  # skip exec_path string
+        if executable_end < 0:
+            return None
+        position = executable_end
+        while position < len(raw) and raw[position] == 0:
+            position += 1
+        argv0_end = raw.find(b"\0", position)
+        if argv0_end < 0:
+            return None
+        return Path(raw[position:argv0_end].decode("utf-8", "strict"))
+    except (OSError, ValueError, UnicodeError):
         return None
-    if len(rader) != 1 or not rader[0].startswith("gitdir: "):
-        return None
-    text = rader[0][len("gitdir: "):]
-    if not text:
-        return None
-    p = Path(text)
-    if not p.is_absolute():
-        p = root / p
+
+
+def authorized_interpreter() -> bool:
+    """The launcher must itself run an authorized runtime before it bootstraps.
+
+    Accepted identities (by kernel argv0, not the poisonable sys.executable):
+    the canonical framework app binary (the stub's proven re-exec target), the
+    canonical v1 stub itself, or a private 0500 snapshot of the app binary
+    (0500 file, 0500 parent directory, not a symlink).  System Python and any
+    other interpreter are rejected — a launcher that resolves the app binary
+    independently must still refuse to run under an unauthorized runtime.
+    """
+    exe = self_exec_path()
+    if exe is None:
+        return False
     try:
-        p = p.resolve(strict=True)
+        info = exe.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            return False
+        fd = os.open(exe, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    except OSError:
+        return False
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            return False
+        digest = hashlib.sha256()
+        while True:
+            block = os.read(fd, 1024 * 1024)
+            if not block:
+                break
+            digest.update(block)
+    finally:
+        os.close(fd)
+    observed = digest.hexdigest()
+    if exe == PYTHON_SOURCE and observed == PYTHON_SHA256:
+        return True
+    if exe == PYTHON_APP_BINARY and observed == PYTHON_APP_SHA256:
+        return True
+    if observed != PYTHON_APP_SHA256:
+        return False
+    if (opened.st_mode & 0o777) != 0o500:
+        return False
+    try:
+        parent = exe.parent.stat()
+    except OSError:
+        return False
+    return (parent.st_mode & 0o777) == 0o500
+
+
+def app_binary_bytes() -> bytes | None:
+    """Stable-open the framework app binary (the canonical stub's proven
+    re-exec target) and return its bytes for the private 0500 snapshot."""
+    exe = PYTHON_APP_BINARY
+    try:
+        if exe.is_symlink():
+            return None
+        fd = os.open(exe, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
     except OSError:
         return None
-    return p if p.is_dir() else None
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            return None
+        digest = hashlib.sha256()
+        raw = b""
+        while True:
+            block = os.read(fd, 1024 * 1024)
+            if not block:
+                break
+            digest.update(block)
+            raw += block
+    finally:
+        os.close(fd)
+    if digest.hexdigest() != PYTHON_APP_SHA256:
+        return None
+    return raw
+
+
+# ---------------------------------------------------------------------------
+# Git plumbing (live control-plane roots).
+# ---------------------------------------------------------------------------
+
+def gitdir(root: Path) -> Path | None:
+    dotgit = root / ".git"
+    if dotgit.is_symlink():
+        return None
+    if dotgit.is_dir():
+        return dotgit.resolve()
+    if not dotgit.is_file():
+        return None
+    try:
+        lines = dotgit.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
+        return None
+    if len(lines) != 1 or not lines[0].startswith("gitdir: "):
+        return None
+    text = lines[0][len("gitdir: "):]
+    if not text:
+        return None
+    path = Path(text)
+    if not path.is_absolute():
+        path = root / path
+    try:
+        path = path.resolve(strict=True)
+    except OSError:
+        return None
+    return path if path.is_dir() else None
 
 
 def common_gitdir(worktree_gitdir: Path) -> Path:
@@ -138,117 +262,483 @@ def common_gitdir(worktree_gitdir: Path) -> Path:
         return worktree_gitdir
     try:
         text = commondir.read_text(encoding="utf-8").strip()
-        p = Path(text)
-        if not p.is_absolute():
-            p = worktree_gitdir / p
-        p = p.resolve(strict=True)
-    except (OSError, UnicodeError) as e:
-        raise OSError(f"live Git common-dir kunde inte lösas: {e}") from e
-    if not p.is_dir():
-        raise OSError(f"live Git common-dir är ingen katalog: {p}")
-    return p
+        path = Path(text)
+        if not path.is_absolute():
+            path = worktree_gitdir / path
+        path = path.resolve(strict=True)
+    except (OSError, UnicodeError) as exc:
+        raise OSError(f"live Git common-dir kunde inte lösas: {exc}") from exc
+    if not path.is_dir():
+        raise OSError(f"live Git common-dir är ingen katalog: {path}")
+    return path
 
 
-def seatbelt_prefix(ws: Path) -> list[str]:
-    """Bygger den bindande macOS-gränsen före workerstart.
+def overlaps(a: Path, b: Path) -> bool:
+    sa, sb = str(a), str(b)
+    return sa == sb or sa.startswith(sb + os.sep) or sb.startswith(sa + os.sep)
 
-    Loopkörningen anger sin controller-ägda run-root i miljön. Direkta
-    h-009-anrop saknar den och skyddar ändå hela live-repot. Workspace och
-    trust/live får aldrig överlappa: då kan kraven skrivbart respektive
-    skrivskyddat inte båda vara sanna.
-    """
+
+# ---------------------------------------------------------------------------
+# Frame helpers over the AF_UNIX socket / control fd.
+# ---------------------------------------------------------------------------
+
+def _read_exact(conn: socket.socket, count: int) -> bytes:
+    out = b""
+    while len(out) < count:
+        chunk = conn.recv(count - len(out))
+        if not chunk:
+            break
+        out += chunk
+    return out
+
+
+def recv_frame(conn: socket.socket):
+    head = _read_exact(conn, 4)
+    if len(head) != 4:
+        return None
+    size = struct.unpack(">I", head)[0]
+    if size > FRAME_LIMIT:
+        return None
+    body = _read_exact(conn, size)
+    if len(body) != size:
+        return None
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (ValueError, UnicodeError):
+        return None
+
+
+def send_frame(conn: socket.socket, value) -> None:
+    body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    conn.sendall(struct.pack(">I", len(body)) + body)
+
+
+def fd_send_frame(fd: int, value) -> None:
+    body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    payload = struct.pack(">I", len(body)) + body
+    view = memoryview(payload)
+    while view:
+        view = view[os.write(fd, view):]
+
+
+def fd_recv_frame(fd: int):
+    head = b""
+    while len(head) < 4:
+        chunk = os.read(fd, 4 - len(head))
+        if not chunk:
+            return None
+        head += chunk
+    size = struct.unpack(">I", head)[0]
+    body = b""
+    while len(body) < size:
+        chunk = os.read(fd, size - len(body))
+        if not chunk:
+            return None
+        body += chunk
+    return json.loads(body.decode("utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# Client: submit one launch request and drive proof -> go -> final.
+# ---------------------------------------------------------------------------
+
+def run_client(socket_path: str, capability: str, session_id: str,
+               components: list[str], envelope: bytes, timeout_ms: int,
+               argv: list[str], env_pairs: list[list[str]]):
+    conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    conn.settimeout(30.0)
+    try:
+        conn.connect(socket_path)
+    except OSError:
+        # A stale/revoked session (dead or removed socket) is a launch failure,
+        # not an internal error: return no final so the caller maps it to
+        # launch_failed (exit 3).
+        try:
+            conn.close()
+        except OSError:
+            pass
+        return None, b"", b""
+    stdin_r, stdin_w = os.pipe()
+    view = memoryview(envelope)
+    while view:
+        view = view[os.write(stdin_w, view):]
+    os.close(stdin_w)
+    stdout_r, stdout_w = os.pipe()
+    stderr_r, stderr_w = os.pipe()
+    header = {
+        "argv": argv,
+        "capability": capability,
+        "cwd_relative_components": components,
+        "envelope_length": len(envelope),
+        "environment": env_pairs,
+        "operation": "launch-v1",
+        "peer_euid": os.geteuid(),
+        "peer_pid": os.getpid(),
+        "peer_pidversion": audit_pidversion(),
+        "request_nonce": secrets.token_hex(32),
+        "schema_version": 1,
+        "session_id": session_id,
+        "timeout_milliseconds": timeout_ms,
+    }
+    body = json.dumps(header, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False).encode("utf-8")
+    captured: dict[str, bytes] = {}
+
+    def drain(fd: int, key: str) -> None:
+        out = b""
+        while True:
+            try:
+                chunk = os.read(fd, 65536)
+            except OSError:
+                break
+            if not chunk:
+                break
+            out += chunk
+        captured[key] = out
+        os.close(fd)
+
+    threads = [
+        threading.Thread(target=drain, args=(stdout_r, "stdout"), daemon=True),
+        threading.Thread(target=drain, args=(stderr_r, "stderr"), daemon=True),
+    ]
+    try:
+        conn.sendmsg(
+            [struct.pack(">I", len(body)) + body],
+            [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
+              struct.pack("3i", stdin_r, stdout_w, stderr_w))],
+        )
+        os.close(stdin_r)
+        os.close(stdout_w)
+        os.close(stderr_w)
+        conn.sendall(struct.pack(">I", len(envelope)) + envelope)
+        for thread in threads:
+            thread.start()
+        proof = recv_frame(conn)
+        if not isinstance(proof, dict) or "proof_digest" not in proof:
+            for thread in threads:
+                thread.join(timeout=5)
+            conn.close()
+            return None, captured.get("stdout", b""), captured.get("stderr", b"")
+        send_frame(conn, {
+            "operation": "go-v1",
+            "proof_digest": proof["proof_digest"],
+            "request_nonce": header["request_nonce"],
+            "schema_version": 1,
+        })
+        final = recv_frame(conn)
+        for thread in threads:
+            thread.join(timeout=10)
+        conn.close()
+        return final, captured.get("stdout", b""), captured.get("stderr", b"")
+    except OSError:
+        for fd in (stdin_r, stdout_w, stderr_w):
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        for thread in threads:
+            thread.join(timeout=5)
+        try:
+            conn.close()
+        except OSError:
+            pass
+        return None, captured.get("stdout", b""), captured.get("stderr", b"")
+
+
+def classify_final(final, stdout: bytes, timeout_arg: str) -> int:
+    if not isinstance(final, dict):
+        return svar("launch_failed: körtidssupervisorn avvisade eller tappade begäran", LAUNCH)
+    klass = final.get("class")
+    if klass == "success" and final.get("exit_status") == 0:
+        sys.stdout.buffer.write(stdout)
+        sys.stdout.buffer.flush()
+        return 0
+    if klass == "timeout":
+        return svar(f"timeout: processen överskred {timeout_arg} s och dödades "
+                    "med hela sin processgrupp", TIMEOUT)
+    if klass == "failure":
+        return svar(f"nonzero_exit: processen avslutade med kod "
+                    f"{final.get('exit_status')}", NONZERO)
+    return svar("launch_failed: körtidssupervisorn avvisade begäran", LAUNCH)
+
+
+# ---------------------------------------------------------------------------
+# Environment passed to the target (server sanitizes; here we only forward).
+# ---------------------------------------------------------------------------
+
+def env_pairs_for_target() -> list[list[str]]:
+    pairs: list[list[str]] = []
+    for name, value in os.environ.items():
+        if name.startswith(STRIP_PREFIXES) or name in STRIP_EXACT:
+            continue
+        if name.startswith(RESERVED_PREFIX):
+            continue
+        pairs.append([name, value])
+    return pairs
+
+
+# ---------------------------------------------------------------------------
+# Nested dispatch.
+# ---------------------------------------------------------------------------
+
+def nested_launch(ws: Path, envelope: bytes, timeout_ms: int, kommando: list[str],
+                  timeout_arg: str) -> int:
+    for key in EPHEMERAL_KEYS:
+        value = os.environ.get(key)
+        if not value:
+            return svar("launch_failed: ofullständig ärvd körtidskapabilitet", LAUNCH)
+    capability = os.environ["NORTROPIC_H036_CAPABILITY"]
+    session_id = os.environ["NORTROPIC_H036_SESSION_ID"]
+    socket_path = os.environ["NORTROPIC_H036_SOCKET"]
+    if re.fullmatch(r"[0-9a-f]{64}", capability) is None:
+        return svar("launch_failed: ogiltig ärvd kapabilitet", LAUNCH)
+    root = Path(socket_path).parent
+    try:
+        session_top = Path((root / "session-top").read_text(encoding="utf-8").strip())
+    except OSError:
+        return svar("launch_failed: sessionens rotworkspace är oåtkomligt", LAUNCH)
+    try:
+        rel = os.path.relpath(str(ws), str(session_top))
+    except ValueError:
+        return svar("launch_failed: workspace utanför sessionen", LAUNCH)
+    components = [] if rel == "." else rel.split(os.sep)
+    final, stdout, _stderr = run_client(
+        socket_path, capability, session_id, components, envelope, timeout_ms,
+        kommando, env_pairs_for_target(),
+    )
+    return classify_final(final, stdout, timeout_arg)
+
+
+# ---------------------------------------------------------------------------
+# Top-level bootstrap.
+# ---------------------------------------------------------------------------
+
+def sandbox_probe() -> tuple[bool, str]:
+    try:
+        run = subprocess.run(
+            [SANDBOX_EXEC, "-p", "(version 1)\n(allow default)", "/usr/bin/true"],
+            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, timeout=HANDSHAKE_TIMEOUT, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)
+    if run.returncode != 0:
+        return False, run.stderr.strip() or f"sandbox-exec rc={run.returncode}"
+    return True, ""
+
+
+def remove_runtime_root(root: Path) -> None:
+    def onerror(func, path, _exc):
+        try:
+            os.chmod(path, 0o700)
+            func(path)
+        except OSError:
+            pass
+    try:
+        os.chmod(root, 0o700)
+    except OSError:
+        pass
+    for base, dirs, _files in os.walk(root):
+        for name in dirs:
+            try:
+                os.chmod(os.path.join(base, name), 0o700)
+            except OSError:
+                pass
+    shutil.rmtree(root, onerror=onerror)
+
+
+def top_level_launch(ws: Path, envelope: bytes, timeout_ms: int, kommando: list[str],
+                     timeout_arg: str, python_bytes: bytes) -> int:
+    ok, detail = sandbox_probe()
+    if not ok:
+        return svar(f"launch_failed: Seatbelt-gränsen kunde inte installeras — {detail}", LAUNCH)
+    if not HELPER.is_file() or not CONFIG.is_file():
+        return svar("launch_failed: körtidssupervisorns produkt saknas", LAUNCH)
+
     live_worktree_git = gitdir(ROT)
     if live_worktree_git is None:
-        raise OSError(f"live control plane saknar säker .git-pekare: {ROT / '.git'}")
-    live_git = common_gitdir(live_worktree_git)
+        return svar("launch_failed: live control plane saknar säker .git-pekare", LAUNCH)
+    try:
+        live_git = common_gitdir(live_worktree_git)
+    except OSError as exc:
+        return svar(f"launch_failed: {exc}", LAUNCH)
 
-    trust_angiven = TRUST_ROOT_ENV in os.environ
-    if trust_angiven:
+    trust_given = TRUST_ROOT_ENV in os.environ
+    if trust_given:
         trust_arg = os.environ[TRUST_ROOT_ENV]
         trust = Path(trust_arg)
-        if not trust_arg or not trust.is_absolute():
-            raise OSError(f"{TRUST_ROOT_ENV} måste vara en explicit absolut katalog")
-        if not trust.is_dir():
-            raise OSError(f"{TRUST_ROOT_ENV} är ingen katalog: {trust_arg}")
+        if not trust_arg or not trust.is_absolute() or not trust.is_dir():
+            return svar(f"launch_failed: {TRUST_ROOT_ENV} måste vara en absolut katalog", LAUNCH)
         trust = trust.resolve(strict=True)
     else:
-        # Live-repot är redan nekat. Samma rot som trustparameter skapar ingen
-        # bredare spärr och håller profilformen statisk för direkta h-009-anrop.
         trust = ROT
+    for protected in (ROT, trust):
+        if overlaps(ws, protected):
+            return svar(f"launch_failed: workspace {ws} överlappar skyddad rot {protected}", LAUNCH)
 
-    for skyddad in (ROT, trust):
-        if ws == skyddad or ws in skyddad.parents or skyddad in ws.parents:
-            raise OSError(
-                f"workspace {ws} överlappar skrivskyddad rot {skyddad}"
-            )
+    profile, staging, sink = "base", None, None
+    staging_present = STAGING_ROOT_ENV in os.environ
+    sink_present = RESULT_SINK_ENV in os.environ
+    if staging_present != sink_present:
+        return svar("launch_failed: staging och sink måste anges tillsammans", LAUNCH)
+    if staging_present:
+        ok, why = validate_staging(ws, trust, live_git)
+        if not ok:
+            return svar(f"launch_failed: {why}", LAUNCH)
+        profile, staging, sink = ok
 
-    aktuell_git = gitdir(ws)
-    if aktuell_git is None or aktuell_git == live_git or live_git not in aktuell_git.parents:
-        # En icke-Git-workspace behöver ingen write-exception inne i live Git.
-        aktuell_git = ws / ".nortropic-ingen-live-git-exception"
-
-    parametrar = {
-        "LIVE_ROOT": ROT,
-        "LIVE_GIT": live_git,
-        "GIT_OBJECTS": live_git / "objects",
-        "GIT_OBJECTS_INFO": live_git / "objects/info",
-        "WORKTREE_GITDIR": aktuell_git,
-        "WORKTREE_COMMDIR": aktuell_git / "commondir",
-        "WORKTREE_GITFILE": aktuell_git / "gitdir",
-        "WORKTREE_CONFIG": aktuell_git / "config.worktree",
-        "WORKSPACE": ws,
-        "WORKSPACE_DOTGIT": ws / ".git",
-        "TRUST_ROOT": trust,
-    }
-
-    argv = [str(SANDBOX_EXEC)]
-    for namn, path in parametrar.items():
-        argv.extend(("-D", f"{namn}={path}"))
-    argv.extend(("-p", SEATBELT_PROFIL))
-    return argv
-
-
-def kommando_finns(namn: str, ws: Path, miljo: dict[str, str]) -> bool:
-    """Bevarar Popens launch_failed för både PATH- och pathkommandon."""
-    if os.sep not in namn:
-        return shutil.which(namn, path=miljo.get("PATH")) is not None
-    p = Path(namn)
-    if not p.is_absolute():
-        p = ws / p
-    return p.is_file() and os.access(p, os.X_OK)
-
-
-def doda_gruppen(p: subprocess.Popen) -> str:
-    """Dödar HELA processgruppen och skördar den. Returnerar hur det gick.
-
-    Att döda p ensam räcker inte: bakgrundsjobb workern startat är egna
-    processer i samma grupp och överlever sin förälder.
-    """
+    # Private runtime root.
     try:
-        grupp = os.getpgid(p.pid)
-    except ProcessLookupError:
-        return "processen var redan borta"
+        root = Path(_mkroot())
+    except OSError as exc:
+        return svar(f"launch_failed: kunde inte skapa runtime-rot: {exc}", LAUNCH)
+    supervisor = None
+    control_parent = None
+    ready_read = None
+    try:
+        snapshot = root / "python3.12"
+        fd = os.open(snapshot, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o500)
+        view = memoryview(python_bytes)
+        while view:
+            view = view[os.write(fd, view):]
+        os.fsync(fd)
+        os.close(fd)
+        os.chmod(snapshot, 0o500)
+        (root / "session-top").write_text(str(ws), encoding="utf-8")
 
-    for sig, namn, frist in ((signal.SIGTERM, "SIGTERM", NADETID),
-                             (signal.SIGKILL, "SIGKILL", SKORDEFRIST)):
+        control_parent, control_child = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        ready_read, ready_write = os.pipe()
+        # Relocate the ready write-end to a high descriptor.  The supervisor
+        # closes it during bootstrap; a low number would then be reused by its
+        # own listener/connection/helper sockets (POSIX lowest-available), and
+        # the barrier requires the ready descriptor number to be absent.  A high
+        # number is never reached by the supervisor's ordinary allocation.
+        ready_high = 250
+        os.dup2(ready_write, ready_high)
+        os.close(ready_write)
+        ready_write = ready_high
+        cfd = control_child.fileno()
+        rfd = ready_write
+        os.set_inheritable(cfd, True)
+        os.set_inheritable(rfd, True)
+        socket_path = str(root / "control.sock")
+        supervisor = subprocess.Popen(
+            [str(snapshot), "-I", "-S", "-B", str(HELPER),
+             "supervise-v1", "--control-fd", str(cfd), "--ready-fd", str(rfd)],
+            env={"LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"},
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            pass_fds=(cfd, rfd), close_fds=True, start_new_session=True,
+        )
+        control_child.close()
+        os.close(ready_write)
+
+        bootstrap = {
+            "root": str(root), "socket_path": socket_path,
+            "live_root": str(ROT), "live_git": str(live_git),
+            "git_objects": str(live_git / "objects"),
+            "git_objects_info": str(live_git / "objects/info"),
+            "trust_root": str(trust), "ancestor_workspace": str(ws),
+            "staging_root": staging, "result_sink": sink,
+            "profile": profile, "helper": str(HELPER),
+            "runtime_python": str(snapshot),
+        }
+        fd_send_frame(control_parent.fileno(), bootstrap)
+        readable, _, _ = select.select([control_parent.fileno()], [], [], HANDSHAKE_TIMEOUT * 3)
+        if not readable:
+            raise OSError("supervisorn blev inte klar i tid")
+        ready = fd_recv_frame(control_parent.fileno())
+        if not isinstance(ready, dict) or "root_capability" not in ready:
+            raise OSError("supervisorn blev inte klar")
         try:
-            os.killpg(grupp, sig)
-        except (ProcessLookupError, PermissionError):
-            return f"gruppen var borta vid {namn}"
+            os.close(ready_read)
+        except OSError:
+            pass
+        ready_read = None
+
+        final, stdout, _stderr = run_client(
+            socket_path, ready["root_capability"], ready["session_id"], [],
+            envelope, timeout_ms, kommando, env_pairs_for_target(),
+        )
+        rc = classify_final(final, stdout, timeout_arg)
+    except (OSError, ValueError) as exc:
+        rc = svar(f"launch_failed: bootstrap misslyckades: {exc}", LAUNCH)
+    finally:
+        _teardown(root, supervisor, control_parent, ready_read)
+    return rc
+
+
+def _mkroot() -> str:
+    import tempfile
+    return tempfile.mkdtemp(prefix=RUNTIME_PREFIX, dir=RUNTIME_PARENT)
+
+
+def _teardown(root: Path, supervisor, control_parent, ready_read) -> None:
+    if control_parent is not None:
         try:
-            p.communicate(timeout=frist)
-            return f"gruppen dog på {namn}"
+            control_parent.sendall(b"shutdown\n")
+        except OSError:
+            pass
+    if supervisor is not None:
+        try:
+            supervisor.wait(timeout=3.0)
         except subprocess.TimeoutExpired:
-            continue
-    return "gruppen svarade inte ens på SIGKILL — rören lämnades"
+            try:
+                os.killpg(os.getpgid(supervisor.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
+            try:
+                supervisor.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                pass
+    if control_parent is not None:
+        try:
+            control_parent.close()
+        except OSError:
+            pass
+    if ready_read is not None:
+        try:
+            os.close(ready_read)
+        except OSError:
+            pass
+    try:
+        remove_runtime_root(root)
+    except OSError:
+        pass
 
 
-def kort(text: bytes | None, tecken: int = 200) -> str:
-    if not text:
-        return ""
-    rad = text.decode("utf-8", "replace").strip().replace("\n", " · ")
-    return rad[:tecken]
+def validate_staging(ws: Path, trust: Path, live_git: Path):
+    staging_arg = os.environ[STAGING_ROOT_ENV]
+    sink_arg = os.environ[RESULT_SINK_ENV]
+    staging = Path(staging_arg)
+    sink = Path(sink_arg)
+    if not staging.is_absolute() or not sink.is_absolute():
+        return False, "staging/sink måste vara absoluta"
+    if staging.is_symlink() or not staging.is_dir():
+        return False, "staging är ingen riktig katalog"
+    if sink.is_symlink():
+        return False, "sink får inte vara en symlänk"
+    if sink.parent.resolve() != staging.resolve():
+        return False, "sink måste ligga direkt i staging"
+    try:
+        info = sink.lstat()
+    except OSError:
+        return False, "sink saknas"
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        return False, "sink måste vara en vanlig fil med nlink 1"
+    canonical_staging = staging.resolve()
+    for other in (trust.resolve(), ws.resolve(), ROT.resolve(), live_git.resolve()):
+        if overlaps(canonical_staging, other):
+            return False, "staging överlappar en skyddad rot"
+    parent = str(canonical_staging)
+    if parent == RUNTIME_PARENT or RUNTIME_PARENT.startswith(parent + os.sep):
+        return False, "staging omsluter runtime-föräldern"
+    return ("staging", str(canonical_staging), str(sink.resolve())), ""
 
+
+# ---------------------------------------------------------------------------
+# run dispatch.
+# ---------------------------------------------------------------------------
 
 def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str]) -> int:
     ws = Path(ws_arg).expanduser()
@@ -258,13 +748,12 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
 
     kuvertfil = Path(kuvert_arg).expanduser()
     try:
-        ra = kuvertfil.read_bytes()
-        json.loads(ra)
-    except OSError as e:
-        return svar(f"anropsfel: kan inte läsa kuvertet {kuvert_arg}: {e.strerror or e}", ANROP)
-    except ValueError as e:
-        return svar(f"anropsfel: kuvertet {kuvert_arg} är inte giltig JSON: {e}", ANROP)
-    kuvertfil = kuvertfil.resolve()
+        envelope = kuvertfil.read_bytes()
+        json.loads(envelope)
+    except OSError as exc:
+        return svar(f"anropsfel: kan inte läsa kuvertet {kuvert_arg}: {exc.strerror or exc}", ANROP)
+    except ValueError as exc:
+        return svar(f"anropsfel: kuvertet {kuvert_arg} är inte giltig JSON: {exc}", ANROP)
 
     try:
         sekunder = float(timeout_arg)
@@ -272,56 +761,33 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
         return svar(f"anropsfel: timeout {timeout_arg!r} är inget tal", ANROP)
     if sekunder <= 0:
         return svar(f"anropsfel: timeout måste vara större än noll, fick {timeout_arg}", ANROP)
+    timeout_ms = max(1, min(86400000, round(sekunder * 1000)))
 
-    miljo = worker_miljo(kuvertfil)
-    try:
-        if not kommando_finns(kommando[0], ws, miljo):
-            raise OSError(f"kommandot finns inte eller är inte körbart: {kommando[0]}")
-        prefix = seatbelt_prefix(ws)
-        # Profilen kompileras och installeras FÖRE buildern. Ett saknat binär,
-        # en ogiltig profil eller en värd som vägrar Seatbelt blir launch_failed
-        # och ingen rå workerfallback finns.
-        prov = subprocess.run(
-            [*prefix, "/usr/bin/true"], cwd=str(ws), env=miljo,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=SKORDEFRIST, check=False,
-        )
-        if prov.returncode != 0:
-            raise OSError(
-                "controllerns Seatbelt-gräns kunde inte installeras"
-                + (f" — {kort(prov.stderr)}" if prov.stderr else "")
-            )
-        p = subprocess.Popen(
-            [*prefix, *kommando], cwd=str(ws), env=miljo,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            start_new_session=True,          # barnet blir gruppledare — se doda_gruppen
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        orsak = getattr(e, "strerror", None) or e
-        return svar(f"launch_failed: kunde inte starta {kommando[0]}: {orsak}", LAUNCH)
+    if not command_exists(kommando[0], ws):
+        return svar(f"launch_failed: kommandot finns inte eller är inte körbart: {kommando[0]}", LAUNCH)
 
-    try:
-        ut, fel = p.communicate(input=ra, timeout=sekunder)
-    except subprocess.TimeoutExpired:
-        utfall = doda_gruppen(p)
-        return svar(f"timeout: processen överskred {timeout_arg} s och dödades "
-                    f"med hela sin processgrupp ({utfall})", TIMEOUT)
-    except BrokenPipeError:
-        # Processen läste aldrig kuvertet och dog innan vi skrivit klart.
-        # Det är inte ett fel i sig — utfallet avgörs av dess exitkod.
-        ut, fel = p.stdout.read() if p.stdout else b"", p.stderr.read() if p.stderr else b""
-        p.wait(timeout=SKORDEFRIST)
+    if any(os.environ.get(key) for key in EPHEMERAL_KEYS):
+        return nested_launch(ws, envelope, timeout_ms, kommando, timeout_arg)
 
-    if p.returncode != 0:
-        anm = kort(fel)
-        return svar(f"nonzero_exit: processen avslutade med kod {p.returncode}"
-                    + (f" — stderr: {anm}" if anm else ""), NONZERO)
+    if not authorized_interpreter():
+        return svar("launch_failed: launchern kör inte den auktoriserade Python-runtimen", LAUNCH)
+    python_bytes = app_binary_bytes()
+    if python_bytes is None:
+        return svar("launch_failed: den auktoriserade app-binären kunde inte öppnas", LAUNCH)
+    return top_level_launch(ws, envelope, timeout_ms, kommando, timeout_arg, python_bytes)
 
-    # Rapporten går ut OFÖRÄNDRAD. Ingen rad läggs till, ingen tas bort:
-    # h-006 parsar den mekaniskt och en enda extra byte gör den oparsbar.
-    sys.stdout.buffer.write(ut)
-    sys.stdout.buffer.flush()
-    return 0
+
+def command_exists(name: str, ws: Path) -> bool:
+    if os.sep not in name:
+        for directory in ("/usr/bin", "/bin"):
+            candidate = Path(directory) / name
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return True
+        return False
+    path = Path(name)
+    if not path.is_absolute():
+        path = ws / path
+    return path.is_file() and os.access(path, os.X_OK)
 
 
 def main(argv: list[str]) -> int:
@@ -329,7 +795,6 @@ def main(argv: list[str]) -> int:
         return svar("anropsfel: run <workspace> <kuvertfil> <timeout-s> -- <kommando...>", ANROP)
     if "--" not in argv:
         return svar("anropsfel: kommandot måste stå efter --", ANROP)
-
     delare = argv.index("--")
     fore, kommando = argv[1:delare], argv[delare + 1:]
     if len(fore) != 3:
@@ -340,16 +805,15 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    # Kriteriet kräver klassning, inte krasch. Inget stackspår når stderr.
     try:
         kod = main(sys.argv[1:])
     except BrokenPipeError:
         kod = INTERNT
     except SystemExit:
         raise
-    except BaseException as e:
+    except BaseException as exc:
         try:
-            kod = svar(f"internt fel: {type(e).__name__}: {e}", INTERNT)
+            kod = svar(f"internt fel: {type(exc).__name__}: {exc}", INTERNT)
         except BrokenPipeError:
             kod = INTERNT
     try:
