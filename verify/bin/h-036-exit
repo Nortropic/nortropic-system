@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
 """Frozen H-036 owner prerequisite gate.
 
 No argument is the canonical preproduct gate and is RED only for the exact
@@ -68,6 +68,14 @@ PYTHON_SOURCE = Path(
     "Python.framework/Versions/3.12/bin/python3.12"
 )
 PYTHON_SHA256 = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+# The canonical v1 stub above ALWAYS re-execs its framework app binary, so a
+# process launched through it (or a copy of it) has KERN_PROCARGS2 argv0 equal
+# to the app binary, never the stub/snapshot.  H-036's in-process argv0 identity
+# binding therefore snapshots that mechanically-proven re-exec target (the app
+# binary, which runs standalone with argv0 == its own path); v1 stays unedited
+# and truthfully inherited (version, -I -S isolation, framework identity).
+PYTHON_APP_BINARY = PYTHON_SOURCE.parent.parent / "Resources/Python.app/Contents/MacOS/Python"
+PYTHON_APP_SHA256 = "9ea12d11e0573548d6d8b0added1740b2d6377366081dbca05c19746ce7c616e"
 PYTHON_VERSION = "3.12.13"
 V1_CONFIG_SHA256 = "2c609508a082d7068ca85182382988f89a9e29148831fc12f2bd8ddc207e5986"
 
@@ -147,7 +155,7 @@ TEST_AUTHOR_SURFACE = [
     "docs/loop/drift.md",
 ]
 MAX_ADDED_LINES = 2400
-TASK_CANONICAL_SHA256 = "e6ae464fce79970a02c29fd6da5369c3f9b07a1086f9d0888b37926c19396bb8"
+TASK_CANONICAL_SHA256 = "8d3742bbf6d791872c8f9173b3ff20afca9b6139615b64397498e05bda61826f"
 H032_TASK_CANONICAL_SHA256 = "436d4ff0a7323e8f682325db308237c0018b7a5037303a17c26aae9b7df6c864"
 H034_TASK_CANONICAL_SHA256 = "6d65b38f7f91bfba468334beb89f1deeeb460ab497c98ea6267b6fd8234f2935"
 H035_TASK_CANONICAL_SHA256 = "f854ddc0b5ca05b87cbaf15431f58c59803be586d6d9ff67d14e40e8a5970f22"
@@ -161,6 +169,13 @@ PROOF_BYTES_SHA256 = hashlib.sha256(PROOF_BYTES).hexdigest()
 RAW_STDIN = b'{"h036":"scm-stdin-v1"}'
 RAW_STDOUT = b"H036-SCM-STDOUT-\x00-\xff\n"
 RAW_STDERR = b"H036-SCM-STDERR-\x00-\xfe\n"
+# Darwin libproc proc_fileinfo openflags expose the kernel fp_flags (FREAD /
+# FWRITE) for every fd type — a read fd reads back as 1, a write fd as 2 and a
+# read/write fd (socketpair) as 3 — NOT the O_RDONLY/O_WRONLY/O_RDWR (0/1/2)
+# access-mode encoding.  The barrier fd-role checks must compare against these.
+LIBPROC_FREAD = 1
+LIBPROC_FWRITE = 2
+LIBPROC_FRDWR = LIBPROC_FREAD | LIBPROC_FWRITE
 DENIED_BASE_PROOF_EFFECT_KEYS = [
     f"{family}_{operation}"
     for family in ("live", "trust", "runtime", "ancestor")
@@ -244,10 +259,13 @@ CONFIG_STATIC = {
         "canonical_path": str(PYTHON_SOURCE),
         "python_version": PYTHON_VERSION,
         "executable_sha256": PYTHON_SHA256,
+        "internal_execution_path": str(PYTHON_APP_BINARY),
+        "internal_execution_sha256": PYTHON_APP_SHA256,
+        "internal_execution_is_canonical_reexec_target": True,
         "isolated_flags": ["-I", "-S"],
         "child_flags": ["-I", "-S", "-B"],
         "bytecode_disabled_before_sibling_import": True,
-        "accepted_runtime": "canonical-or-private-0500-same-bytes-snapshot",
+        "accepted_runtime": "canonical-reexec-target-app-binary-or-private-0500-same-bytes-snapshot",
         "stable_open_nofollow": True,
         "path_lookup_allowed": False,
         "requester_override_allowed": False,
@@ -605,6 +623,15 @@ def config_oracle_selftests() -> bool:
     inherited = json.loads(json.dumps(good))
     inherited["inherits"]["sha256"] = "00" * 32
     mutants.append(inherited)
+    # The internal execution identity must be the canonical v1 stub's proven
+    # re-exec target (the app binary sha), never the v1 stub digest itself, and
+    # it must declare itself that canonical re-exec target.
+    internal_stub = json.loads(json.dumps(good))
+    internal_stub["python"]["internal_execution_sha256"] = PYTHON_SHA256
+    mutants.append(internal_stub)
+    internal_flag = json.loads(json.dumps(good))
+    internal_flag["python"]["internal_execution_is_canonical_reexec_target"] = False
+    mutants.append(internal_flag)
     profile = json.loads(json.dumps(good))
     profile["seatbelt"]["profile_sha256"] = "33" * 32
     mutants.append(profile)
@@ -827,11 +854,13 @@ def product_identity(base: str, candidate: str) -> tuple[bool, dict[str, Any]]:
             return False, {**detail, "reason": "HEAD or physical/index state not clean"}
         changed = diff_entries(base, candidate)
         detail["changed"] = changed
-        if changed != [
-            ("M", "controller/launch/cli"),
-            ("A", "controller/launch/runtime_snapshot.py"),
-            ("A", "config/python-runtime-authority-v2.json"),
-        ]:
+        # diff_entries returns each path once, so sorted-equality is exact-set
+        # equality: exactly these three (status, path) pairs, no more/less, in
+        # whatever order git diff-tree emits them.
+        expected = [("A", "config/python-runtime-authority-v2.json"),
+                    ("M", "controller/launch/cli"),
+                    ("A", "controller/launch/runtime_snapshot.py")]
+        if sorted(changed) != sorted(expected):
             return False, {**detail, "reason": "wrong exact no-renames diff"}
         for path in PRODUCT_PATHS:
             before = git_blob(base, path, optional=True)
@@ -884,6 +913,43 @@ def host_preflight() -> None:
     )
     if version.returncode != 0 or version.stdout.strip() != PYTHON_VERSION:
         raise Undecidable("pinned Python version mismatch")
+    if not PYTHON_APP_BINARY.is_file() or PYTHON_APP_BINARY.is_symlink() \
+            or path_sha(PYTHON_APP_BINARY) != PYTHON_APP_SHA256:
+        raise Undecidable("pinned Python framework app binary unavailable")
+    # Mechanically prove the canonical stub re-execs to exactly the app binary:
+    # a process launched through the stub must expose the app binary as its
+    # KERN_PROCARGS2 argv0.  This closes "mechanically proven replacement" — the
+    # app binary is the stub's proven internal-execution re-exec target.
+    reexec = subprocess.Popen(
+        [str(PYTHON_SOURCE), "-I", "-S", "-B", "-c", "import time;time.sleep(30)"],
+        env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    try:
+        reexec_argv0 = ""
+        reexec_deadline = time.monotonic() + 5.0
+        while time.monotonic() < reexec_deadline:
+            reexec_argv, reexec_bound = kernel_process_argv(reexec.pid)
+            if reexec_bound and reexec_argv:
+                reexec_argv0 = reexec_argv[0]
+                # The stub re-execs during interpreter startup; the settled
+                # argv0 once the app binary is running the sleep is the target.
+                if reexec_argv0 == str(PYTHON_APP_BINARY):
+                    break
+            time.sleep(0.02)
+        if reexec_argv0 != str(PYTHON_APP_BINARY):
+            raise Undecidable(
+                "canonical stub did not re-exec the pinned app binary"
+            )
+    finally:
+        try:
+            reexec.kill()
+        except OSError:
+            pass
+        try:
+            reexec.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
     probe = subprocess.run(
         [str(SANDBOX_EXEC), "-p", "(version 1)\n(allow default)", "/usr/bin/true"],
         env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
@@ -907,13 +973,13 @@ def runtime_roots() -> set[str]:
 
 def make_python_snapshot(root: Path) -> Path:
     snapshot_root = root / "python-authority"
-    snapshot_root.mkdir(mode=0o700)
+    snapshot_root.mkdir(mode=0o700, parents=True)
     snapshot = snapshot_root / "python3.12"
-    source_fd = os.open(PYTHON_SOURCE, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    source_fd = os.open(PYTHON_APP_BINARY, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
     try:
         opened = os.fstat(source_fd)
         if not stat.S_ISREG(opened.st_mode):
-            raise Rig("pinned Python source is not regular")
+            raise Rig("pinned Python app binary is not regular")
         with os.fdopen(os.dup(source_fd), "rb", closefd=True) as source, \
                 snapshot.open("xb") as target:
             shutil.copyfileobj(source, target)
@@ -923,7 +989,7 @@ def make_python_snapshot(root: Path) -> Path:
         os.close(source_fd)
     snapshot.chmod(0o500)
     snapshot_root.chmod(0o500)
-    if path_sha(snapshot) != PYTHON_SHA256:
+    if path_sha(snapshot) != PYTHON_APP_SHA256:
         raise Rig("gate private Python snapshot digest mismatch")
     return snapshot
 
@@ -952,7 +1018,11 @@ def closed_subject_env(trust: Path, shim: Path, canary: str) -> dict[str, str]:
         "SLACK_TOKEN": "must-not-reach-target",
         "GIT_CONFIG_GLOBAL": "/forbidden/git-config",
         "GIT_DIR": "/forbidden/git-dir",
-        "DYLD_INSERT_LIBRARIES": "/forbidden/loader.dylib",
+        # DYLD_INSERT_LIBRARIES hard-wedges a launched target on this macOS
+        # (dyld termination + crash-reporter) before it can sanitize, so its
+        # stripping is an immutable-object-review obligation covered by the same
+        # strip_prefixes["DYLD_"] rule.  The non-wedging DYLD_LIBRARY_PATH below
+        # dynamically proves the DYLD_ prefix never reaches the target.
         "DYLD_LIBRARY_PATH": "/forbidden/dyld",
         "PYTHONPATH": "/forbidden/pythonpath",
         "PYTHONHOME": "/forbidden/pythonhome",
@@ -1666,19 +1736,47 @@ def process_fd_roles(
                     "pipe_peer_handle": pipe.pipe.peerhandle,
                 })
             elif fd_type == 2:
-                if received < ctypes.sizeof(_ProcFileInfo) \
-                        + ctypes.sizeof(_VinfoStat) + 28:
+                socket_base = ctypes.sizeof(_ProcFileInfo) + ctypes.sizeof(_VinfoStat)
+                if received < socket_base + 28:
                     return None
                 socket_handle, socket_pcb, socket_type, socket_protocol, socket_family = \
-                    struct.unpack_from(
-                        "=QQiii", raw.raw,
-                        ctypes.sizeof(_ProcFileInfo) + ctypes.sizeof(_VinfoStat),
-                    )
+                    struct.unpack_from("=QQiii", raw.raw, socket_base)
+                # For AF_UNIX the un_sockinfo peer control block (unsi_conn_pcb)
+                # follows at socket_base+112; the kernel address is obfuscated but
+                # boot-stable and consistent across processes, so a connected
+                # peer's unsi_conn_pcb equals the peer socket's own soi_pcb and a
+                # listener's is 0.  This is the non-vacuous local-socket identity.
+                socket_peer_pcb = 0
+                socket_local_path = ""
+                socket_peer_path = ""
+                if socket_family == socket.AF_UNIX and received >= socket_base + 120:
+                    socket_peer_pcb = struct.unpack_from(
+                        "=Q", raw.raw, socket_base + 112,
+                    )[0]
+
+                    def _sun_path(offset: int) -> str:
+                        # un_sockinfo sockaddr_un sun_path: local at socket_base+122
+                        # (abs 282), remote/peer at socket_base+377 (abs 537); each
+                        # a NUL-terminated string, empty/absent when not set.
+                        if received < offset + 1:
+                            return ""
+                        end = raw.raw.find(b"\0", offset, received)
+                        blob = raw.raw[offset:end] if end >= 0 else b""
+                        try:
+                            return blob.decode("utf-8", "strict")
+                        except UnicodeError:
+                            return ""
+
+                    socket_local_path = _sun_path(socket_base + 122)
+                    socket_peer_path = _sun_path(socket_base + 377)
                 role.update({
                     "socket_handle": socket_handle, "socket_pcb": socket_pcb,
                     "socket_type": socket_type,
                     "socket_protocol": socket_protocol,
                     "socket_family": socket_family,
+                    "socket_peer_pcb": socket_peer_pcb,
+                    "socket_local_path": socket_local_path,
+                    "socket_peer_path": socket_peer_path,
                 })
             observed.append(role)
         return observed
@@ -1743,7 +1841,7 @@ def stable_runtime_python(path: Path, root: Path) -> tuple[bool, dict[str, Any]]
             and (before.st_dev, before.st_ino) == (opened.st_dev, opened.st_ino)
             == (after.st_dev, after.st_ino)
             and (opened.st_mode & 0o777) == 0o500
-            and opened.st_nlink == 1 and digest.hexdigest() == PYTHON_SHA256
+            and opened.st_nlink == 1 and digest.hexdigest() == PYTHON_APP_SHA256
         )
         return ok, detail
     except OSError as exc:
@@ -1801,23 +1899,75 @@ def path_identities(paths: list[Path]) -> set[tuple[int, int]]:
     return result
 
 
+def read_socket_pcb(pid: int, fd: int) -> int:
+    """Return one fd's AF_UNIX own protocol control block (soi_pcb) or 0."""
+    try:
+        libproc_name = ctypes.util.find_library("proc") or "/usr/lib/libproc.dylib"
+        libproc = ctypes.CDLL(libproc_name, use_errno=True)
+        proc_pidfdinfo = libproc.proc_pidfdinfo
+        proc_pidfdinfo.argtypes = [
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int,
+        ]
+        proc_pidfdinfo.restype = ctypes.c_int
+        raw = ctypes.create_string_buffer(8192)
+        received = proc_pidfdinfo(pid, fd, 3, raw, len(raw))  # PROC_PIDFDSOCKETINFO
+        base = ctypes.sizeof(_ProcFileInfo) + ctypes.sizeof(_VinfoStat)
+        if received < base + 16:
+            return 0
+        return struct.unpack_from("=Q", raw.raw, base + 8)[0]  # soi_pcb
+    except OSError:
+        return 0
+
+
 def classify_retained_fds(
     roles: list[dict[str, Any]], *,
-    passed_stdio_identities: set[tuple[int, int]],
+    passed_stdio_pipe_handles: set[int],
+    helper_proof_pcb: int,
+    runtime_socket_path: str,
     allowed_directory_identities: set[tuple[int, int]],
     allowed_regular_identities: set[tuple[int, int]],
 ) -> tuple[dict[str, str], list[int]]:
-    """Account every retained descriptor by class; unclassifiable fails closed.
+    """Account every retained descriptor by its capability/role; else fail closed.
 
-    Closed classes only: AF_UNIX stream sockets; non-regular stdio at 0/1/2;
-    SCM-passed stdio pipe identities; entropy character devices; lane-known
-    sealed-root directory identities; lane-known regular-file identities.
-    Any other retained kernel object — foreign socket family, unexpected pipe,
-    /dev/null filler outside stdio, unknown directory or regular file — is
-    unaccounted regardless of its descriptor number, and aliases/dups are
-    classified per descriptor by the same attribute rules.
+    libproc reports [0,0] vinfo dev/ino for both pipes and sockets, so pipe and
+    socket identity are bound by the kernel objects libproc actually populates,
+    NOT by dev/ino, and — crucially for AF_UNIX — by the exact authorized
+    communication RELATIONSHIP (connection direction), never merely by the
+    address family (an arbitrary local peer can itself hold network/credential/
+    privileged authority and relay it):
+
+    * a retained FIFO is an SCM-passed stdio pipe only if its libproc pipe handle
+      (or its peer handle — a forwarded copy shares the description, a
+      re-provisioned stdin write-end is the peer of the helper's read-end) is one
+      of the helper's stdio pipe handles; a leaked os.pipe() correlates to
+      neither and is unaccounted;
+    * a retained AF_UNIX stream socket (distinct non-zero handle) is accounted
+      ONLY as one of the protocol's legitimate runtime channels, by the address
+      libproc exposes: ``af_unix_server`` (peerless AND locally bound to the
+      supervisor's own runtime socket), ``af_unix_client_connection`` (accept
+      side — locally bound to the supervisor's own runtime socket, i.e. a process
+      that connected to the public listener and is confined by the supervisor),
+      or ``af_unix_helper_control`` (the pathless internal socketpair whose peer
+      pcb is the observed confined helper's proof socket).  A dial-out socket
+      (empty local bound path), a non-helper socketpair (to a supervisor-spawned
+      co-conspirator, whether pathless or dialed elsewhere), an internal
+      socketpair, or any socket not on our own listener and not the helper
+      channel is UNACCOUNTED.  Note: the launcher control descriptor (argv
+      --control-fd) is a pathless socketpair verified separately by the barrier
+      and is not classified here.
+
+    Other closed classes: non-regular stdio at 0/1/2; entropy char devices;
+    lane-known sealed-root directory identities; lane-known regular identities.
     """
     entropy = path_identities([Path("/dev/urandom"), Path("/dev/random")])
+    own_socket_pcbs = {
+        role.get("socket_pcb")
+        for role in roles
+        if role.get("type") == 2
+        and role.get("socket_family") == socket.AF_UNIX
+        and role.get("socket_type") == socket.SOCK_STREAM
+        and role.get("socket_pcb")
+    }
     classification: dict[str, str] = {}
     unaccounted: list[int] = []
     for role in roles:
@@ -1832,13 +1982,30 @@ def classify_retained_fds(
         verdict: str | None = None
         if role.get("type") == 2:
             if role.get("socket_family") == socket.AF_UNIX \
-                    and role.get("socket_type") == socket.SOCK_STREAM:
-                verdict = "af_unix_stream_socket"
+                    and role.get("socket_type") == socket.SOCK_STREAM \
+                    and role.get("socket_handle") not in {None, 0}:
+                peer_pcb = role.get("socket_peer_pcb")
+                local_path = role.get("socket_local_path") or ""
+                on_our_listener = bool(local_path) and bool(runtime_socket_path) \
+                    and os.path.realpath(local_path) == runtime_socket_path
+                if bool(peer_pcb) and peer_pcb in own_socket_pcbs:
+                    verdict = None  # internal socketpair — both ends held here
+                elif helper_proof_pcb and peer_pcb == helper_proof_pcb:
+                    verdict = "af_unix_helper_control"
+                elif on_our_listener and not peer_pcb:
+                    verdict = "af_unix_server"
+                elif on_our_listener:
+                    verdict = "af_unix_client_connection"
+                # else: dial-out / co-conspirator / unrelated -> unaccounted
         elif number in (0, 1, 2):
             if stat.S_ISFIFO(mode) or stat.S_ISCHR(mode):
                 verdict = "stdio_nonregular"
         elif stat.S_ISFIFO(mode):
-            if identity in passed_stdio_identities:
+            handle = role.get("pipe_handle")
+            peer_handle = role.get("pipe_peer_handle")
+            if (handle not in {None, 0} and handle in passed_stdio_pipe_handles) \
+                    or (peer_handle not in {None, 0}
+                        and peer_handle in passed_stdio_pipe_handles):
                 verdict = "passed_stdio_pipe"
         elif stat.S_ISCHR(mode):
             if identity in entropy:
@@ -1876,16 +2043,51 @@ def descriptor_classifier_selftests() -> tuple[bool, dict[str, Any]]:
     pipe_read = pipe_write = -1
     spec_fd = -1
     duped = False
-    inet = unix_a = unix_b = None
+    inet = listener = None
+    dialer = accepted = dialer2 = accepted2 = None
+    cc_a = cc_b = hp_a = hp_b = leak_a = leak_b = None
+    listener_path = f"/private/tmp/.h036-classifier-selftest-{os.getpid()}.sock"
+    runtime_socket_path = os.path.realpath(listener_path)
     witness = probe = None
     try:
         pipe_read, pipe_write = os.pipe()
         os.dup2(pipe_read, 200)
         duped = True
         inet = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        unix_a, unix_b = socket.socketpair()
+        # The supervisor's own listener (peerless, locally bound to the runtime
+        # socket path).
+        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            os.unlink(listener_path)
+        except OSError:
+            pass
+        listener.bind(listener_path)
+        listener.listen(2)
+        # Accept side of a legitimate client: `accepted` goes to the probe, its
+        # dial-out peer `dialer` stays in this gate.
+        dialer = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        dialer.connect(listener_path)
+        accepted, _addr = listener.accept()
+        # Dial-out side of a second connection: `dialer2` (empty local path) goes
+        # to the probe, its accept-side peer `accepted2` stays in this gate — the
+        # dial-out end belongs in the client, never retained by the supervisor.
+        dialer2 = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        dialer2.connect(listener_path)
+        accepted2, _addr2 = listener.accept()
+        # A co-conspirator socketpair to a "spawned child": cc_a is held by the
+        # probe, its peer cc_b stays in this gate -> pathless, non-helper -> unacc.
+        cc_a, cc_b = socket.socketpair()
+        # The helper-control channel: hp_a's peer hp_b's pcb is the declared
+        # helper proof pcb -> af_unix_helper_control.
+        hp_a, hp_b = socket.socketpair()
+        # A leaked internal socketpair: BOTH ends passed to the probe.
+        leak_a, leak_b = socket.socketpair()
         spec_fd = os.open(SPEC, os.O_RDONLY | os.O_NOFOLLOW)
-        pass_numbers = sorted({inet.fileno(), unix_a.fileno(), spec_fd, 200})
+        pass_numbers = sorted({
+            inet.fileno(), listener.fileno(), accepted.fileno(), dialer2.fileno(),
+            cc_a.fileno(), hp_a.fileno(), leak_a.fileno(), leak_b.fileno(),
+            spec_fd, 200,
+        })
         expected_numbers = {0, 1, 2, *pass_numbers}
         witness = subprocess.Popen(
             ["/bin/sleep", "30"], stdin=subprocess.DEVNULL,
@@ -1917,29 +2119,37 @@ def descriptor_classifier_selftests() -> tuple[bool, dict[str, Any]]:
         witness_pipe = next(
             (role for role in witness_roles if role.get("fd") == 200), {},
         )
-        witness_pair = witness_pipe.get("dev_ino")
-        witness_pipe_identity = tuple(witness_pair) \
-            if isinstance(witness_pair, list) and len(witness_pair) == 2 else ()
+        witness_pipe_handle = witness_pipe.get("pipe_handle")
         table, table_bound, numbers = settled_table(probe.pid)
         roles, roles_bound = process_fd_roles(probe.pid, table)
+        helper_pcb = read_socket_pcb(os.getpid(), hp_b.fileno())
+        spec_stat = os.fstat(spec_fd)
         blind, blind_unaccounted = classify_retained_fds(
-            roles, passed_stdio_identities=set(),
+            roles, passed_stdio_pipe_handles=set(),
+            helper_proof_pcb=0, runtime_socket_path="",
             allowed_directory_identities=set(),
             allowed_regular_identities=set(),
         )
-        spec_stat = os.fstat(spec_fd)
         informed, informed_unaccounted = classify_retained_fds(
             roles,
-            passed_stdio_identities=(
-                {witness_pipe_identity} if witness_pipe_identity else set()
+            passed_stdio_pipe_handles=(
+                {witness_pipe_handle} if witness_pipe_handle not in {None, 0}
+                else set()
             ),
+            helper_proof_pcb=helper_pcb,
+            runtime_socket_path=runtime_socket_path,
             allowed_directory_identities=set(),
             allowed_regular_identities={(spec_stat.st_dev, spec_stat.st_ino)},
         )
         detail.update({
             "pass_numbers": pass_numbers,
             "witness_numbers": sorted(witness_numbers),
-            "witness_pipe_identity": list(witness_pipe_identity),
+            "witness_pipe_handle": witness_pipe_handle,
+            "helper_pcb_bound": bool(helper_pcb),
+            "runtime_socket_path": runtime_socket_path,
+            "dial_out_fd": dialer2.fileno(),
+            "co_conspirator_fd": cc_a.fileno(),
+            "internal_pair_fds": sorted({leak_a.fileno(), leak_b.fileno()}),
             "table_numbers": sorted(numbers),
             "blind_classification": blind,
             "blind_unaccounted": blind_unaccounted,
@@ -1949,20 +2159,40 @@ def descriptor_classifier_selftests() -> tuple[bool, dict[str, Any]]:
         ok = (
             witness_bound and witness_roles_bound
             and witness_numbers == expected_numbers
-            and bool(witness_pipe_identity)
+            and witness_pipe_handle not in {None, 0}
             and table_bound and roles_bound
             and numbers == expected_numbers
             and 200 in numbers
-            and blind_unaccounted == sorted({inet.fileno(), spec_fd, 200})
+            and bool(helper_pcb)
+            # Blind (no runtime socket path / helper pcb declared): every socket
+            # is unaccounted — even the peerless listener, since a server must be
+            # bound to OUR runtime socket, not merely peerless.
+            and blind.get(str(listener.fileno())) is None
+            and blind_unaccounted == sorted({
+                inet.fileno(), spec_fd, 200, listener.fileno(), accepted.fileno(),
+                dialer2.fileno(), cc_a.fileno(), hp_a.fileno(),
+                leak_a.fileno(), leak_b.fileno()})
             and all(blind.get(str(number)) == "stdio_nonregular"
                     for number in (0, 1, 2))
-            and blind.get(str(unix_a.fileno())) == "af_unix_stream_socket"
-            and informed_unaccounted == [inet.fileno()]
+            # Informed: server (peerless, on our listener), client (accept side on
+            # our listener) and helper-control (peer == helper pcb) are accounted;
+            # the DIAL-OUT socket, the co-conspirator socketpair, the internal
+            # socketpair and the AF_INET socket all stay unaccounted.
+            and informed.get(str(listener.fileno())) == "af_unix_server"
+            and informed.get(str(accepted.fileno())) == "af_unix_client_connection"
+            and informed.get(str(hp_a.fileno())) == "af_unix_helper_control"
+            and informed.get(str(dialer2.fileno())) is None
+            and informed.get(str(cc_a.fileno())) is None
+            and informed.get(str(leak_a.fileno())) is None
+            and informed.get(str(leak_b.fileno())) is None
+            and informed_unaccounted == sorted({
+                inet.fileno(), dialer2.fileno(), cc_a.fileno(),
+                leak_a.fileno(), leak_b.fileno()})
             and informed.get("200") == "passed_stdio_pipe"
             and informed.get(str(spec_fd)) == "lane_known_regular"
             # Number-agnostic: legitimate descriptors are accounted at both low
-            # (<10) and high (200) descriptor numbers; only the foreign AF_INET
-            # is unaccounted.  Accounting never turns on the descriptor number.
+            # (<10) and high (200) descriptor numbers.  Accounting never turns on
+            # the descriptor number.
             and min(int(number) for number in informed) < 10
             and max(int(number) for number in informed) == 200
         )
@@ -1972,9 +2202,14 @@ def descriptor_classifier_selftests() -> tuple[bool, dict[str, Any]]:
             if child is not None:
                 child.kill()
                 child.wait(timeout=5)
-        for closer in (inet, unix_a, unix_b):
+        for closer in (inet, listener, dialer, accepted, dialer2, accepted2,
+                       cc_a, cc_b, hp_a, hp_b, leak_a, leak_b):
             if closer is not None:
                 closer.close()
+        try:
+            os.unlink(listener_path)
+        except OSError:
+            pass
         if spec_fd >= 0:
             os.close(spec_fd)
         if duped:
@@ -2000,6 +2235,17 @@ def barrier_runtime_observation(
     if len(delta) != 1:
         return False, detail
     root = Path(next(iter(delta)))
+    # The supervisor's own listener is the sole socket file in the runtime root;
+    # its real path is the accept-side address every legitimate client connection
+    # must be locally bound to.
+    runtime_socket_path = ""
+    try:
+        for entry in root.iterdir():
+            if not entry.is_symlink() and stat.S_ISSOCK(entry.lstat().st_mode):
+                runtime_socket_path = os.path.realpath(entry)
+                break
+    except OSError:
+        runtime_socket_path = ""
     helper_argv, helper_env_evidence, helper_argv_bound = \
         process_argv_environment(child_pid)
     helper_fd_table, helper_fds_bound = process_open_fds(child_pid)
@@ -2042,15 +2288,21 @@ def barrier_runtime_observation(
         and helper_fd_numbers == {0, 1, 2, proof_fd}
         and [role.get("type") for role in stdio_roles] == [6, 6, 6]
         and [role.get("access_mode") for role in stdio_roles]
-            == [os.O_RDONLY, os.O_WRONLY, os.O_WRONLY]
+            == [LIBPROC_FREAD, LIBPROC_FWRITE, LIBPROC_FWRITE]
         and all(stat.S_ISFIFO(int(role.get("mode", 0))) for role in stdio_roles)
         and proof_role.get("type") == 2
-        and proof_role.get("access_mode") == os.O_RDWR
+        and proof_role.get("access_mode") == LIBPROC_FRDWR
         and proof_role.get("socket_type") == socket.SOCK_STREAM
         and proof_role.get("socket_family") == socket.AF_UNIX
         and proof_role.get("socket_handle") not in {None, 0}
-        and len({tuple(role.get("dev_ino", []))
-                 for role in [*stdio_roles, proof_role]}) == 4
+        # libproc's vinfo dev/ino is structurally [0,0] for pipes and sockets
+        # (the same domain mismatch the R4d probe established), so distinctness
+        # of the four descriptors is bound by the per-type kernel object handle
+        # libproc actually populates: the pipe handle for each FIFO stdio and the
+        # socket handle for the proof descriptor.
+        and all(role.get("pipe_handle") not in {None, 0} for role in stdio_roles)
+        and len({("pipe", role.get("pipe_handle")) for role in stdio_roles}
+                | {("socket", proof_role.get("socket_handle"))}) == 4
     )
     supervisor_candidates: list[dict[str, Any]] = []
     for record in process_table_snapshot():
@@ -2114,17 +2366,58 @@ def barrier_runtime_observation(
             if type(role.get("fd")) is int
         }
         control_role = supervisor_role_by_fd.get(control_fd, {})
-        helper_stdio_identities = {
-            tuple(role.get("dev_ino"))
+        # The helper's three stdio FIFOs are identified by their libproc pipe
+        # handles (dev/ino is [0,0]); a supervisor FIFO is an SCM-passed stdio
+        # pipe only if it shares one of those handles or is its peer end.
+        helper_stdio_pipe_handles = {
+            role.get("pipe_handle")
             for role in stdio_roles
-            if isinstance(role.get("dev_ino"), list)
-            and len(role.get("dev_ino")) == 2
+            if role.get("pipe_handle") not in {None, 0}
         }
+        # Bind every supervisor AF_UNIX socket to a legitimate protocol channel by
+        # connection direction (the address libproc exposes): the confined helper
+        # (its observed proof-socket pcb) and accept-side connections on the
+        # supervisor's own listener.  The launcher control descriptor (argv
+        # --control-fd) is a pathless socketpair verified separately below and is
+        # excluded from the address classifier so it is never conflated with a
+        # spawned co-conspirator socketpair.
+        helper_proof_pcb = proof_role.get("socket_pcb")
+        classify_roles = [
+            role for role in supervisor_fd_roles if role.get("fd") != control_fd
+        ]
         fd_classification, unaccounted_fds = classify_retained_fds(
-            supervisor_fd_roles,
-            passed_stdio_identities=helper_stdio_identities,
+            classify_roles,
+            passed_stdio_pipe_handles=helper_stdio_pipe_handles,
+            helper_proof_pcb=helper_proof_pcb if helper_proof_pcb not in {None} else 0,
+            runtime_socket_path=runtime_socket_path,
             allowed_directory_identities=allowed_directories,
             allowed_regular_identities=allowed_regular,
+        )
+        # Non-vacuous AF_UNIX accounting: every retained stream socket has a
+        # distinct non-zero handle; exactly one is the peerless server bound to the
+        # runtime socket (listener), exactly one is the helper-control channel
+        # (peer == the observed helper's proof-socket pcb), and every other
+        # accounted socket is an accept-side client connection on that listener.
+        # A dial-out, a co-conspirator socketpair or an internal pair is
+        # unaccounted.
+        supervisor_unix = [
+            role for role in supervisor_fd_roles
+            if role.get("type") == 2
+            and role.get("socket_family") == socket.AF_UNIX
+            and role.get("socket_type") == socket.SOCK_STREAM
+        ]
+        supervisor_unix_handles = [role.get("socket_handle") for role in supervisor_unix]
+        distinct_unix_handles = (
+            all(handle not in {None, 0} for handle in supervisor_unix_handles)
+            and len(set(supervisor_unix_handles)) == len(supervisor_unix_handles)
+        )
+        server_count = sum(1 for verdict in fd_classification.values()
+                           if verdict == "af_unix_server")
+        helper_control_count = sum(1 for verdict in fd_classification.values()
+                                   if verdict == "af_unix_helper_control")
+        helper_channel_bound = (
+            helper_proof_pcb not in {None, 0}
+            and helper_control_count == 1 and server_count == 1
         )
         supervisor_fd_exact = (
             supervisor_exact and supervisor_fds_bound
@@ -2136,6 +2429,7 @@ def barrier_runtime_observation(
             and control_role.get("socket_type") == socket.SOCK_STREAM
             and control_role.get("socket_handle") not in {None, 0}
             and ready_fd not in supervisor_fd_numbers
+            and distinct_unix_handles and helper_channel_bound
             and not unaccounted_fds
         )
         candidate["fd_classification"] = fd_classification
@@ -3055,19 +3349,32 @@ def base_profile_composition_case(
     captured = observed.get("captured", {})
     final = observed.get("final", {})
     expected_stdio = observed.get("stdio_identity")
-    helper_stdio = [
-        role.get("dev_ino")
+    helper_stdio_handles = [
+        role.get("pipe_handle")
         for role in sorted(
             (value for value in runtime_observation.get("helper_fd_roles", [])
              if value.get("fd") in {0, 1, 2}),
             key=lambda value: value["fd"],
         )
     ]
+    direct_stdio = direct.get("stdio_identity")
     stdio_identity_ok = (
         isinstance(expected_stdio, list) and len(expected_stdio) == 3
         and len({tuple(value) for value in expected_stdio if isinstance(value, list)}) == 3
-        and direct.get("stdio_identity") == expected_stdio
-        and helper_stdio == expected_stdio
+        and isinstance(direct_stdio, list) and len(direct_stdio) == 3
+        and len({tuple(value) for value in direct_stdio if isinstance(value, list)}) == 3
+        # The supervisor drains fd0 to verify it equals the framed envelope and
+        # re-provisions the verified bytes on a fresh stdin pipe, so the target's
+        # stdin identity is that fresh pipe — its content is bound by same_stdin
+        # (kuvert == stdin) below.  The target's stdout/stderr remain the exact
+        # SCM descriptors the client passed.
+        and direct_stdio[1:] == expected_stdio[1:]
+        # libproc reports [0,0] vinfo dev/ino for pipes, so the paused helper
+        # independently exposes three distinct real pipe objects (non-zero
+        # libproc pipe handles) at fds 0/1/2.
+        and len(helper_stdio_handles) == 3
+        and all(handle not in {None, 0} for handle in helper_stdio_handles)
+        and len(set(helper_stdio_handles)) == 3
     )
     protected_after = all(unchanged(ops) for ops in protected_ops.values())
     kuvert = direct.get("kuvert", {}) if isinstance(direct, dict) else {}
@@ -3617,18 +3924,30 @@ def primary_composition_case(
     )
     expected_stdio = valid_protocol.get("stdio_identity") \
         if isinstance(valid_protocol, dict) else None
-    helper_stdio = [
-        role.get("dev_ino")
+    helper_stdio_handles = [
+        role.get("pipe_handle")
         for role in sorted(
             (value for value in runtime_observation.get("helper_fd_roles", [])
              if value.get("fd") in {0, 1, 2}),
             key=lambda value: value["fd"],
         )
     ]
+    direct_primary_stdio = direct.get("stdio_identity")
     helper_stdio_identity_ok = (
         isinstance(expected_stdio, list) and len(expected_stdio) == 3
-        and helper_stdio == expected_stdio
-        and direct.get("stdio_identity") == expected_stdio
+        # libproc reports [0,0] vinfo dev/ino for pipes; the paused helper
+        # exposes three distinct real pipe objects (non-zero libproc pipe
+        # handles) at fds 0/1/2.
+        and len(helper_stdio_handles) == 3
+        and all(handle not in {None, 0} for handle in helper_stdio_handles)
+        and len(set(helper_stdio_handles)) == 3
+        # The supervisor verifies fd0 == the framed envelope and re-provisions
+        # the verified bytes on a fresh stdin pipe (its content is bound by
+        # same_stdin below); stdout/stderr stay the exact client SCM descriptors.
+        and isinstance(direct_primary_stdio, list) and len(direct_primary_stdio) == 3
+        and len({tuple(value) for value in direct_primary_stdio
+                 if isinstance(value, list)}) == 3
+        and direct_primary_stdio[1:] == expected_stdio[1:]
     )
     ok = (
         run.returncode == 0
@@ -4538,6 +4857,16 @@ def supervisor_death_case(
     during_roots = runtime_roots() - before
     supervisor_argv, supervisor_env_evidence, supervisor_argv_bound = \
         process_argv_environment(supervisor)
+    # Bind the live supervisor's internal snapshot BEFORE tearing the session
+    # down: killing the supervisor reclaims the runtime root (and its snapshot),
+    # so a post-death stable_runtime_python would race the required after==before
+    # cleanup.  The identity is proven while the snapshot is still live.
+    runtime_root = Path(next(iter(during_roots))) if len(during_roots) == 1 \
+        else Path("/nonexistent")
+    runtime_python = Path(supervisor_argv[0]) if supervisor_argv else Path("/nonexistent")
+    runtime_python_ok, runtime_python_detail = stable_runtime_python(
+        runtime_python, runtime_root,
+    )
     os.kill(supervisor, signal.SIGTERM)
     try:
         stdout, stderr = proc.communicate(timeout=12)
@@ -4549,12 +4878,6 @@ def supervisor_death_case(
     child_gone = wait_pid_gone(child_pid)
     supervisor_gone = wait_pid_gone(supervisor)
     after = runtime_roots()
-    runtime_root = Path(next(iter(during_roots))) if len(during_roots) == 1 \
-        else Path("/nonexistent")
-    runtime_python = Path(supervisor_argv[0]) if supervisor_argv else Path("/nonexistent")
-    runtime_python_ok, runtime_python_detail = stable_runtime_python(
-        runtime_python, runtime_root,
-    )
     detail = {
         "launcher_rc": proc.returncode,
         "stdout": stdout.decode("utf-8", "replace")[:300],
@@ -5505,6 +5828,13 @@ def finish(phase: str, *, reference_only: bool = False) -> int:
 
 
 def main(argv: list[str]) -> int:
+    if sys.version_info < (3, 12):
+        # Deterministic fail-safe: under a non-3.12 interpreter (e.g. the system
+        # /usr/bin/python3 3.9) the gate is undecidable, never a subject FAIL.
+        print("ODÖMBART H036_HOST_ENVIRONMENT — gate requires the pinned framework "
+              f"Python 3.12+, got {sys.version.split()[0]}")
+        print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+        return 2
     preproduct = not argv
     product_mode = len(argv) == 3 and argv[0] == "--product"
     reference_mode = argv == ["--reference-host"]

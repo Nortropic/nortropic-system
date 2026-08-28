@@ -635,3 +635,36 @@ The no-argument preproduct gate has one authorized RED only:
 satisfiability but is always `JUDGE_ONLY` and cannot credit product. H-032 is byte-preserved during
 H-036. H-032 later depends exactly on published H-036, drops ordinary launcher write authority,
 and refreezes its provider effects before H-031 is rebound.
+
+### Contract remediation (co-developed corrected gate and passing product)
+
+The published gate was reviewed but its `--product` acceptance lane was never executed, so four
+product-side defects survived to publication. This remediation co-develops the corrected gate and a
+passing three-file product in one worktree and validates them together with a real sandbox-disabled
+`--product` run — the root process defect was exactly "reviewed but never executed". The corrections
+stay within the same TEST_AUTHOR surface (task spec, gate, this record, decision log, drift):
+
+- Product identity compares the exact three-path changed set order-insensitively as a set in git
+  diff-tree path order; it still requires exactly those three `(status, path)` pairs and their
+  `100755`/`100644`/`100644` modes, with no renames.
+- `make_python_snapshot` creates its private snapshot root with `parents=True` so the dynamic
+  wrong-mode/wrong-file-mode/wrong-digest private-runtime negatives can be built.
+- The internal execution identity is the canonical v1 stub's mechanically-proven re-exec target —
+  the framework app binary (sha `9ea12d11e0573548d6d8b0added1740b2d6377366081dbca05c19746ce7c616e`,
+  distinct from the v1 stub sha `94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941`).
+  The pinned stub always re-execs that app binary, so a process launched through the stub or a copy
+  of it has `KERN_PROCARGS2` argv0 equal to the app binary, never the snapshot; the in-process argv0
+  identity binding can therefore only be satisfied by snapshotting the app binary, which runs
+  standalone from a private `0500` root with argv0 equal to its own path. This is a
+  mechanically-proven replacement of the impossible re-execing-stub snapshot: `host_preflight` spawns
+  the stub and asserts its `KERN_PROCARGS2` argv0 equals the app binary. `config/python-interpreter-authority-v1.json`
+  is not edited — v2 keeps inheriting v1's interpreter identity (version, `-I -S` isolation, framework
+  identity) and its snapshot-and-final-rehash discipline and replaces only the snapshot subject.
+- `DYLD_INSERT_LIBRARIES` hard-wedges a launched target on this macOS before it can sanitize, so its
+  stripping is an immutable-object-review obligation under the same `strip_prefixes` `DYLD_` rule,
+  while the non-wedging `DYLD_LIBRARY_PATH` keeps the `DYLD_` prefix strip dynamically effect-proven
+  with an empty target `bad_env`; `DYLD_` must never reach the target.
+
+The exit_criterion and `TASK_CANONICAL_SHA256` follow these corrections, the preproduct RED label and
+reason and all other frozen pins are unchanged, and `docs/07-konstitution.md` stays pinned at its
+published base digest.
