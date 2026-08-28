@@ -585,20 +585,19 @@ K_CANDIDATE_MATERIALIZATION_BOUNDARY
 """.split())
 H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
 H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
-# R122: the current H032 dependency has neither the confined launcher/result
-# kernel nor the protected-artifact materializer.  Exactly those three product
-# boundaries are legitimately RED alongside the result boundary.  The builder
-# flips all three to PASS; owner-live derivation therefore flips exactly this
-# frozen product-absent set and nothing else.
+# r2 rebind to published H-032 refreeze (main 52d6b069): published H-036 now supplies
+# the confined launcher/staging + rename-before-move confinement, so those two are GREEN
+# product-absent and are NO LONGER product-absent RED (obsolete pre-H-036 expectation
+# dropped).  The SOLE product-flippable RED product-absent is the materializer boundary.
+# Product-absent H-032 is exactly 150/2 with FAIL {K_CANDIDATE_MATERIALIZATION_BOUNDARY,
+# K_STRUCTURED_RESULT_DELIVERY_BOUNDARY} and CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT.
+# The product build flips materialization to PASS (→ 151/1 owner-live-skip); owner-live
+# then flips the structured-result boundary (→ 152/0 full green).  Owner-live derivation
+# therefore flips exactly the materialization boundary and nothing else.
 H032_PRODUCT_ABSENT_LABELS = (
     "K_CANDIDATE_MATERIALIZATION_BOUNDARY",
-    "K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT",
-    "K_PROVIDER_STAGING_CONFINEMENT",
 )
-H032_CONFINEMENT_RED_REASON = (
-    "CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:"
-    + ",".join(sorted(H032_PRODUCT_ABSENT_LABELS
-                      + ("K_STRUCTURED_RESULT_DELIVERY_BOUNDARY",))))
+H032_CONFINEMENT_RED_REASON = "CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT"
 H032_OWNER_LIVE_EXECUTION = "OWNER_LIVE_EXECUTION=SKIPPED"
 H032_OWNER_LIVE_START_DELTA = "OWNER_LIVE_START_DELTA=0"
 H032_OWNER_LIVE_SKIP_MARKER = (
@@ -3251,7 +3250,7 @@ if (failed == {"K_H032_FRESH_UPSTREAM", "K_PRODUCT_EXECUTION"}
         and any(reason in getattr(upstream, "stdout", "")
                 for reason in (H032_STRUCTURED_RESULT_REASON,
                                H032_CONFINEMENT_RED_REASON))):
-    print("CURRENT_RED_REASON=UPSTREAM_STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
+    print("CURRENT_RED_REASON=UPSTREAM_PREBUILDER_PRODUCT_ABSENT")
 elif failed == EXPECTED_PREBUILDER_RED:
     print("CURRENT_RED_REASON=EXPLICIT_ROLE_MODEL_ROUTING_ABSENT")
 else:

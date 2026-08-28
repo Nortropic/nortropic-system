@@ -3615,3 +3615,34 @@ requires the actual H-032 PRODUCT green (152/0) via the owner-live upstream call
 legitimately absent (`PREBUILDER_PRODUCT_ABSENT`), so H-031 does not pretend upstream dependency PASS
 exists. `specs/tasks.spec.json` is unchanged (h-032 already `depends_on ["h-036"]` on published main).
 Security objective unchanged.
+
+### r2 — complete H-032 output-model rebind (the identity pins alone were insufficient)
+
+Bare-host review of the identity-pin candidate `90497a65` (preserved immutable) surfaced that H-031 also
+models the H-032 *output state machine* — it runs the H-032 gate as its upstream and validates the exact
+output shape — and that model was stale against the r4 refreeze. Two coupled constants drove everything
+(the product-absent recognition, the owner-live-skip derivation, and the terminal reason all key off them):
+
+- `H032_PRODUCT_ABSENT_LABELS` was `{K_PROVIDER_STAGING_CONFINEMENT, K_PROVIDER_RENAME_BEFORE_MOVE_
+  CONFINEMENT, K_CANDIDATE_MATERIALIZATION_BOUNDARY}` (3). Published H-036 now supplies the confined
+  launcher/staging + rename-before-move confinement, so those two are GREEN product-absent; the sole
+  product-flippable RED is the materializer. → `("K_CANDIDATE_MATERIALIZATION_BOUNDARY",)`.
+- `H032_CONFINEMENT_RED_REASON` was the computed `UNEXPECTED_CONTRACT_FAILURES:{3 labels + structured}`
+  → the literal `CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT`.
+- H-031's terminal upstream-product-absent reason `UPSTREAM_STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT`
+  → `UPSTREAM_PREBUILDER_PRODUCT_ABSENT` (truthful to the current upstream state).
+
+The fixtures (`owner_skip_fixture`, `owner_green_fixture`, and their adversarial mutants) and the terminal
+recognition all derive from those constants, so they rebind together. Verified locally: the r4 H-032
+`--skip-owner-live` product-absent output (150/2, `PREBUILDER_PRODUCT_ABSENT`, exactly
+{K_CANDIDATE_MATERIALIZATION_BOUNDARY, K_STRUCTURED_RESULT_DELIVERY_BOUNDARY}) transforms into the valid
+151/1 owner-live-skip contract form and is accepted, while a third failure, a wrong reason, and the stale
+148/4 three-confinement-label form are each rejected. Obsolete pre-H-036 staging/rename product-absent RED
+expectations are dropped.
+
+Verification split (per owner direction): the PREBUILDER form is authoritatively verified NOW on the bare
+host (H-031 `--skip-owner-live` against published H-032). The product-present forms (151/1 owner-live-skip,
+152/0 green) are frozen NOW as CONTRACT fixtures + adversarial negatives, but their real runtime
+verification is `H031_PRODUCT_PRESENT_RUNTIME_VERIFICATION=DEFERRED_UNTIL_H032_PRODUCT_BY_DESIGN` — H-031
+NORMAL/FINAL PASS remains RED until the actual H-032 product exists and passes on the same candidate.
+Security objective unchanged; authority-contract-before-product ordering preserved (R118/R119 lesson).
