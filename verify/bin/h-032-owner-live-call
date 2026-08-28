@@ -216,16 +216,24 @@ def main() -> int:
     if (plan["mode"] == "trusted" and len(argv)==2
             and argv[1]=="--skip-owner-live"):
         transcript = stdout.decode("utf-8", errors="strict")
-        # R122: current prebuilder has the two unconfined-launcher boundaries plus
-        # the absent protected-artifact materializer legitimately RED alongside
-        # the result boundary.  Accept exactly that frozen no-live reason; the
-        # builder flips all three deterministic product boundaries to PASS.
+        # R122/r4: exactly one legitimate frozen no-live upstream reason may appear
+        # for an H-032 --skip-owner-live RED that this transport will record:
+        #   PREBUILDER_PRODUCT_ABSENT   product structurally absent (150/2); r4 replaced
+        #                               the pre-H036 four-label UNEXPECTED confinement
+        #                               reason (retained below only as a harmless
+        #                               historical accept the current gate never emits)
+        #   OWNER_LIVE_PHASE_NOT_RUN    product present, deterministic controls green,
+        #                               owner-live phase skipped (151/1)
+        #   STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT   degraded result-delivery state
+        # This transport gate stays coarse; the H-031 judge enforces the exact labels,
+        # counts and no-unexpected/no-K-RIGG contract downstream.
         confinement_red_reason = (
             "CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:"
             "K_CANDIDATE_MATERIALIZATION_BOUNDARY,"
             "K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT,"
             "K_PROVIDER_STAGING_CONFINEMENT,K_STRUCTURED_RESULT_DELIVERY_BOUNDARY")
         reasons=(transcript.count("CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN")
+                 +transcript.count("CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT")
                  +transcript.count("CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
                  +transcript.count(confinement_red_reason))
         if (proc.returncode not in {1,2}

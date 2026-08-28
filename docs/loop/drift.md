@@ -3590,3 +3590,48 @@ PREBUILDER_PRODUCT_ABSENT`, gated on the gate's own ABSENCE sentinels — `not r
 defective-but-present product can never be mislabelled as absent. conf04 rename reconciliation and launcher/H-036
 ownership are unchanged. Target product-absent state: 150 PASS / 2 FAIL, `PREBUILDER_PRODUCT_ABSENT`. `188dbe36`,
 `e309` and `09656396` are all preserved immutable as failed candidates. Security objective unchanged.
+
+### r5 — owner-live-call transport reason reconciliation (child of published main 52d6b069)
+
+The r4 refreeze (published as `52d6b069`) changed H-032's product-absent reason to
+`CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT` in `verify/bin/h-032-exit`, but did NOT update the
+co-pinned transport `verify/bin/h-032-owner-live-call`, which independently encodes the accepted
+H-032 `--skip-owner-live` reason set. That helper is a hard precondition of BOTH gates
+(`h-032-exit:34` and `h-031-exit:30` pin its sha256), so it is an H-032-domain artifact even though
+only H-031's dependency call exercises its `trusted`/`--skip-owner-live` acceptance block; H-032's own
+`--skip-owner-live` runs skip that block, which is why r4's bare-host V5 was clean and the gap stayed
+latent. It surfaced only on the first H-031 rebind bare-host run
+(`host-evidence-h031-20260828T202045Z`): `ODÖMBART K_H032_FRESH_UPSTREAM — owner-live helper failed
+rc=2`, emitted at `h-031-exit:3277` because the helper returned 2 BEFORE H-031's (correctly rebound)
+Python output-model ran. Decomposed: HELPER_RC=2 while the mediated H-032 child itself exits 1 (150/2
+`PREBUILDER_PRODUCT_ABSENT`), so the helper was NOT propagating the child exit — it applied its own
+stale reason contract. Root cause class: STALE_H032_REASON_MODEL at the transport layer. The helper's
+`reasons` sum (`h-032-owner-live-call` ~228) counted only the three pre-r4 reasons
+(`OWNER_LIVE_PHASE_NOT_RUN`, `STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT`, and the pre-H036 four-label
+`UNEXPECTED_CONTRACT_FAILURES` confinement string); r4's `PREBUILDER_PRODUCT_ABSENT` matched none, so
+`reasons==0 != 1` → `return 2`. Ground truth confirmed against V5 bytes
+(`host-evidence-h032-v5-20260828T181211Z/run-1.stdout`): the r4 product-absent transcript carries
+`OWNER_LIVE_EXECUTION=SKIPPED` ×1, `OWNER_LIVE_START_DELTA=0` ×1, rc=1 — so the ONLY unmet condition was
+the reason string.
+
+Fix (minimum, non-weakening): add `CURRENT_RED_REASON=PREBUILDER_PRODUCT_ABSENT` to the accepted
+`reasons` sum (union). The existing reasons are RETAINED — `STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT`
+because `h-032-exit`'s own `J_R93_PRODUCT_OWNED_LIFETIME` transport fixture (`h-032-exit` ~763) drives
+the helper with exactly that reason and requires acceptance; `OWNER_LIVE_PHASE_NOT_RUN` because it is the
+legitimate product-PRESENT skip state (151/1) H-031 must still accept once the H-032 product exists; the
+pre-H036 four-label string as a harmless historical accept the current gate never emits. The transport
+gate stays coarse (reason + `OWNER_LIVE_EXECUTION=SKIPPED`/`OWNER_LIVE_START_DELTA=0` markers + rc∈{1,2},
+exactly one reason); the EXACT product-absent contract (150/2, the two labels, no unexpected/no-K-RIGG,
+transform to 151/1) remains enforced by the H-031 Python judge downstream — the helper is NOT loosened to
+accept generic exit 1. The helper's Popen block and forbidden-token source guards
+(`h-032-exit` `trusted_source_ok`) are untouched, so `J_R93` stays green. New helper sha256
+`c18d6e51aa770094e6dfd58c4d141b36a6c6f0d9ecdeee57f2059ffdf95ad071` re-pinned at `h-032-exit:34` (this
+refreeze); `h-031-exit:30` re-pins in the subsequent H-031 rebind child. Targeted falsifier (real new
+helper, 9 synthetic H-032 transcripts): PREBUILDER_PRODUCT_ABSENT / STRUCTURED_..._ABSENT /
+OWNER_LIVE_PHASE_NOT_RUN accepted (rc=0, result recorded with child rc=1); bogus-reason, no-reason,
+missing-SKIPPED-marker, two-reasons, exit-0 all rejected (rc=2). Scope = `verify/bin/h-032-owner-live-call`
++ `verify/bin/h-032-exit` pin + docs; no product, no launcher, no spec pin (the spec binds the helper
+textually via r89, not by literal sha). Security objective unchanged. Sequencing consequence: this
+completes the r4 authority contract; the H-031 rebind (a5707e54, preserved immutable, correct-but-blocked)
+must re-base on this published r5 and re-pin the new helper sha before its bare-host PREBUILDER evidence
+can pass.
