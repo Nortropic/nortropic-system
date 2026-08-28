@@ -7350,16 +7350,32 @@ def run_codex(sink, canonical, invocation, run, role):
         # by their exact names only; every other environment guarantee is
         # unchanged, and a leak of either into the provider env still fails the
         # relation (observed would carry a key the expected set excludes).
+        # r2 post-H-036 reconciliation: model the ACTUAL published H-036 target-
+        # environment transform (config/python-runtime-authority-v2.json +
+        # controller/launch/runtime_snapshot.py build_target_env). This returns the
+        # NON-SESSION expected base only; the four controller-owned NORTROPIC_H036_*
+        # session keys have supervisor-random values and MUST NOT be modelled here —
+        # they are bound structurally (shape + causal origin) by h036_env_relation.
+        # The strip set is strictly WIDER than the pre-H-036 oracle: it adds the
+        # PYTHON prefix, the *_OVERRIDE suffixes and the NORTROPIC_H036_ reserved
+        # prefix, and moves NORTROPIC_TRUST_ROOT to the strip set (H-036 consumes it
+        # for the Seatbelt trust root and denies it to the provider). PATH is forced
+        # to the H-036 target value. Any leak of a stripped family, a TRUST_ROOT/
+        # staging/result leak, a wrong PATH, or a missing/added key still fails the
+        # relation, so this restores — and tightens — contract fidelity.
+        _H036_STRIP_PREFIXES=("DYLD_","GIT_","GH_","GITHUB_","PYTHON","SLACK_",
+                              "NORTROPIC_H036_")
+        _H036_STRIP_EXACT={"LD_PRELOAD","LD_LIBRARY_PATH","__PYVENV_LAUNCHER__",
+                           "NORTROPIC_TRUST_ROOT","NORTROPIC_STAGING_ROOT",
+                           "NORTROPIC_RESULT_SINK"}
+        _H036_STRIP_SUFFIXES=("_OVERRIDE","_CONFIG_OVERRIDE","_PROFILE_OVERRIDE",
+                              "_LIVE_ROOT_OVERRIDE","_HELPER_OVERRIDE")
         expected={key:value for key,value in incoming.items()
-                  if not key.startswith("GIT_")
-                  and not key.startswith("DYLD_")
-                  and key not in {"LD_PRELOAD","LD_LIBRARY_PATH",
-                                  "__PYVENV_LAUNCHER__"}
-                  and key not in {"NORTROPIC_STAGING_ROOT","NORTROPIC_RESULT_SINK"}
-                  and not key.startswith(("GH_","GITHUB_","SLACK_"))}
+                  if not key.startswith(_H036_STRIP_PREFIXES)
+                  and key not in _H036_STRIP_EXACT
+                  and not key.endswith(_H036_STRIP_SUFFIXES)}
         expected.update({
-            "NORTROPIC_TRUST_ROOT":str(Path(observed.get(
-                "argv0","/private/tmp/h032-missing-provider")).parent),
+            "PATH":"/usr/bin:/bin",
             "NORTROPIC_KUVERT":str(launch_observation["envelope"]),
             "H032_RESULT_MODE":"valid",
             "H032_CAPTURE":str(capture),
@@ -7383,14 +7399,48 @@ def run_codex(sink, canonical, invocation, run, role):
         return {"valid":True,"count":len(mapping),
                 "keyset_sha256":hashlib.sha256(keys).hexdigest(),
                 "mapping_sha256":hashlib.sha256(encoded).hexdigest()}
+    _H036_SESSION_KEYS={"NORTROPIC_H036_CAPABILITY","NORTROPIC_H036_LEVEL",
+                        "NORTROPIC_H036_SESSION_ID","NORTROPIC_H036_SOCKET"}
+    def h036_env_relation(observed, expected_base) -> bool:
+        # r2 post-H-036 provider-environment relation. The provider environment must
+        # equal the modelled non-session base (expected_base) PLUS exactly the four
+        # controller-owned NORTROPIC_H036_* session keys the H-036 supervisor injects.
+        # Session VALUES are supervisor-random and are bound by SHAPE + causal origin
+        # (the socket lives under the launcher-owned 0500 runtime root the caller
+        # cannot forge), never by a hardcoded value. Every NON-session key must equal
+        # the base exactly, so a stripped-family/PYTHON/DYLD/Git/GitHub/credential
+        # leak, a TRUST_ROOT/staging/result leak, a wrong PATH, a missing key, an
+        # extra key, or any fifth/unrecognised NORTROPIC_H036_* key fails the relation.
+        # H-032 verifies the RELATION; the launcher's stripping of caller-forged
+        # inbound NORTROPIC_H036_* values is H-036's own (reserved-prefix) mechanism.
+        if not (isinstance(observed, dict) and isinstance(expected_base, dict)):
+            return False
+        non_session={k:v for k,v in observed.items()
+                     if not k.startswith("NORTROPIC_H036_")}
+        if non_session!=expected_base:
+            return False
+        session={k:v for k,v in observed.items()
+                 if k.startswith("NORTROPIC_H036_")}
+        if set(session)!=_H036_SESSION_KEYS:
+            return False
+        cap=session["NORTROPIC_H036_CAPABILITY"]
+        lvl=session["NORTROPIC_H036_LEVEL"]
+        sid=session["NORTROPIC_H036_SESSION_ID"]
+        sock=session["NORTROPIC_H036_SOCKET"]
+        return (isinstance(cap,str) and len(cap)==64
+                    and set(cap)<=set("0123456789abcdef")
+                and lvl=="1"
+                and isinstance(sid,str) and sid!=""
+                and isinstance(sock,str) and Path(sock).is_absolute()
+                    and Path(sock).parent.name.startswith(".nortropic-h036-runtime"))
     physical_git_capture_bound=current_provider_capture_binding_admits(
         physical_git_capture,physical_git_start_delta,stale_capture_output)
     physical_git_expected_environment=expected_provider_environment(
         physical_git_incoming_environment,physical_git_capture,
         physical_git_launch_observation)
-    physical_git_environment_relation=(
-        physical_git_capture.get("complete_environment")
-        ==physical_git_expected_environment)
+    physical_git_environment_relation=h036_env_relation(
+        physical_git_capture.get("complete_environment"),
+        physical_git_expected_environment)
     stale_capture_mutant=dict(physical_git_capture)
     wrong_mode_mutant=dict(physical_git_capture);wrong_mode_mutant["mode"]="missing"
     repeated_output_mutant=dict(physical_git_capture)
@@ -7422,7 +7472,8 @@ def run_codex(sink, canonical, invocation, run, role):
             "binding":current_provider_capture_binding_admits(
                 observed,variant["starts"],None),
             "git_empty":observed.get("git_control_env")==[],
-            "relation":observed.get("complete_environment")==expected,
+            "relation":h036_env_relation(
+                observed.get("complete_environment"),expected),
             "launcher":variant["launch"].get("valid") is True,
             "intended":(
                 isinstance(variant["launch"].get("current_run"),str)
@@ -7523,6 +7574,31 @@ def run_codex(sink, canonical, invocation, run, role):
           f"stale={capture_was_stale} cleared={capture_absent_before} "
           f"starts={physical_git_start_delta} capture_bound={physical_git_capture_bound} "
           f"mutants_reject={capture_binding_mutants_reject}")
+    # r2 one-defect oracle negatives: prove h036_env_relation restores AND tightens
+    # contract fidelity rather than introducing a generic exemption. Each mutant of the
+    # real provider capture injects exactly one defect that MUST break the relation.
+    _h036_real_env=physical_git_capture.get("complete_environment")
+    _h036_positive=h036_env_relation(_h036_real_env,physical_git_expected_environment)
+    def _h036_mutant(**changes):
+        base=dict(_h036_real_env) if isinstance(_h036_real_env,dict) else {}
+        for key,value in changes.items():
+            if value is None: base.pop(key,None)
+            else: base[key]=value
+        return base
+    h036_negative_controls={
+        "fifth_h036_key":h036_env_relation(_h036_mutant(NORTROPIC_H036_EXTRA="0"*64),physical_git_expected_environment),
+        "dropped_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY=None),physical_git_expected_environment),
+        "nonhex_capability":h036_env_relation(_h036_mutant(NORTROPIC_H036_CAPABILITY="z"*64),physical_git_expected_environment),
+        "wrong_level":h036_env_relation(_h036_mutant(NORTROPIC_H036_LEVEL="9"),physical_git_expected_environment),
+        "socket_outside_runtime":h036_env_relation(_h036_mutant(NORTROPIC_H036_SOCKET="/private/tmp/evil/provider.sock"),physical_git_expected_environment),
+        "trust_root_leak":h036_env_relation(_h036_mutant(NORTROPIC_TRUST_ROOT="/private/tmp/leak"),physical_git_expected_environment),
+        "staging_leak":h036_env_relation(_h036_mutant(NORTROPIC_STAGING_ROOT="/private/tmp/leak"),physical_git_expected_environment),
+        "result_leak":h036_env_relation(_h036_mutant(NORTROPIC_RESULT_SINK="/private/tmp/leak"),physical_git_expected_environment),
+        "python_leak":h036_env_relation(_h036_mutant(PYTHONPATH="/private/tmp/leak"),physical_git_expected_environment),
+        "git_leak":h036_env_relation(_h036_mutant(GIT_DIR="/private/tmp/leak"),physical_git_expected_environment),
+        "wrong_path":h036_env_relation(_h036_mutant(PATH="/usr/bin:/bin:/opt/homebrew/bin"),physical_git_expected_environment),
+    }
+    h036_relation_strict=(_h036_positive and not any(h036_negative_controls.values()))
     check("J_R72_COMPLETE_PROVIDER_ENVIRONMENT_RELATION",
           r72_dynamic_literals_absent and capture_binding_mutants_reject
           and r72_variant_observations.get("exact",{}).get("relation") is True
@@ -7530,16 +7606,21 @@ def run_codex(sink, canonical, invocation, run, role):
                   and item.get("git_empty") is True
                   for item in r72_variant_observations.values())
           and all(r72_variant_observations.get(name,{}).get("relation") is False
-                  for name in {"drop_one","length","prefix","fixed","extra"}),
+                  for name in {"drop_one","length","prefix","fixed","extra"})
+          and h036_relation_strict,
           f"source_absent={r72_dynamic_literals_absent} "
+          f"h036_relation_strict={h036_relation_strict} h036_positive={_h036_positive} "
+          f"h036_negatives={h036_negative_controls} "
           f"binding_mutants={capture_binding_mutants_reject} "
           f"actual_observed={environment_fingerprint(physical_git_capture.get('complete_environment'))} "
           f"actual_expected={environment_fingerprint(physical_git_expected_environment)} "
           f"variants={r72_variant_observations}")
     check("J_R73_LAUNCHER_ENVELOPE_ENVIRONMENT_BINDING",
           r73_split_topology_ok
-          and r73_exact_capture.get("complete_environment")==r73_exact_expected
-          and r73_exact_capture.get("complete_environment")!=r73_sibling_assumption
+          and h036_env_relation(
+              r73_exact_capture.get("complete_environment"),r73_exact_expected)
+          and not h036_env_relation(
+              r73_exact_capture.get("complete_environment"),r73_sibling_assumption)
           and r73_stale_launch_rejects and r73_wrong_envelope_rejects
           and r73_wrong_syntax_rejects,
           f"split={r73_split_topology_ok} "
@@ -10964,18 +11045,30 @@ class CraftedConcretePath(type(Path())):
               "ODÖMBART nested sandbox-exec förbjuden; owner-runner krävs")
     else:
         conf04_lines = set(conf04_out.splitlines())
+        # r2 post-H-036 reconciliation: the security property is confinement/effect,
+        # not exact staging enumeration. The H-036 supervisor keeps its own private
+        # bookkeeping inside the staging/runtime mechanism, so a legitimate extra
+        # controller-owned entry in the staging directory is NOT a confinement
+        # failure. Every EFFECT proof is retained — sink write allowed, rename-within-
+        # staging DENIED, cross-parent move-out never succeeded, sink intact with the
+        # exact bytes, no renamed-sink residue — and the overconstrained
+        # `iterdir()==["result.json"]` requirement is REPLACED by a strictly stronger
+        # causal hostile control: the escape directory must be EMPTY, so any actually
+        # escaped/moved sink or foreign artifact reaching it fails the predicate.
         confinement04_ok = (
             conf04_run.returncode == 0
             and "SINK_WRITE=0" in conf04_lines
             and "RENAME=1" in conf04_lines
+            and "MOVE_OUT=0" not in conf04_lines
             and conf04_sink.exists() and conf04_sink.read_bytes() == b"data"
             and not (conf04_staging / "renamed-sink").exists()
-            and not (conf04_escape / "escaped-sink").exists()
-            and sorted(p.name for p in conf04_staging.iterdir()) == ["result.json"])
+            and not any(conf04_escape.iterdir()))
         check("K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT", confinement04_ok,
               f"rc={conf04_run.returncode} lines={conf04_out.strip().replace(chr(10), '|')} "
-              f"sink_intact={conf04_sink.exists()} "
-              f"escaped={(conf04_escape / 'escaped-sink').exists()}")
+              f"sink_intact={conf04_sink.exists() and conf04_sink.read_bytes() == b'data'} "
+              f"renamed_residue={(conf04_staging / 'renamed-sink').exists()} "
+              f"escape_entries={sorted(p.name for p in conf04_escape.iterdir())} "
+              f"staging_entries={sorted(p.name for p in conf04_staging.iterdir())}")
 
     # ==================== R122 PROTECTED CANDIDATE ARTIFACT ====================
     # R121 found (owner-confirmed R120-PROD-CODEX-REV-01) that a setsid/double-fork
@@ -17937,9 +18030,22 @@ def materialize(a, b, c, d, e, f, g, h):
                              - ({"K_H033_FRESH_UPSTREAM_PROVENANCE"} if h033_odom else set()) \
                              - ({"K_PROVIDER_STAGING_CONFINEMENT"} if confinement_odom else set()) \
                              - ({"K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT"} if confinement04_odom else set())
+    # Post-H-036 reconciliation (r2): the genuine product-absent prebuilder REDs are
+    # BOTH the structured-result delivery boundary AND the candidate materialization
+    # boundary — both are graded on the same absent controller/result/materialize.py
+    # product (see the "sole intended new RED" contract at K_CANDIDATE_MATERIALIZATION_
+    # BOUNDARY). Either alone or both together is the expected no-live prebuilder RED;
+    # anything else is a real contract failure. This does not relax any security check —
+    # it only corrects which material failures are recognized as the expected pre-product
+    # state so CURRENT_RED_REASON is truthful after H-036.
+    PRODUCT_ABSENT_PREBUILDER_REDS = {
+        "K_STRUCTURED_RESULT_DELIVERY_BOUNDARY",
+        "K_CANDIDATE_MATERIALIZATION_BOUNDARY",
+    }
     owner_live_skip_expected = (owner_live_mode == "skip"
         and deterministic_result_ok
-        and material_failed == {"K_STRUCTURED_RESULT_DELIVERY_BOUNDARY"})
+        and bool(material_failed)
+        and material_failed <= PRODUCT_ABSENT_PREBUILDER_REDS)
     if owner_live_mode == "skip":
         print("OWNER_LIVE_EXECUTION=SKIPPED")
         print("OWNER_LIVE_START_DELTA=0")

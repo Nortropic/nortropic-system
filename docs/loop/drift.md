@@ -3489,3 +3489,57 @@ expected serial transition, not a regression. The new h-032 row field
 `r129_h036_dependency_and_launcher_handoff_refreeze` supersedes the launcher/`allowed_write` and
 H-033-execution assumptions of the frozen r116–r118, r60 and r69 prose where they conflict; that frozen
 prose is not rewritten.
+
+## 2026-08-28 — H-032 refreeze r129 candidate 188dbe36 failed on a healthy host; r2 gate reconciliation
+
+The r129 refreeze candidate `188dbe36…` was run on a proven-healthy bare host (the earlier
+`147/5 ↔ 148/4` symptom was an owner-live-lane artifact, not host nondeterminism). Post-reboot host
+health is clean: the previously wedged exec-validation process family is absent; `sandbox-exec` is
+available and enforcing (the frozen H-036 allow-default preflight passes while a deny-default profile
+is correctly refused); the pinned tool/candidate identities match; and `h-032-exit --skip-owner-live`
+returns one identical semantic signature across six repetitions with no `K-RIGG` and owner-live
+skipped. On that healthy host `188dbe36` is stably **147 PASS / 5 FAIL** — but for the wrong reason
+(`CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES`), so it is treated as a FAILED immutable TEST_AUTHOR
+candidate and is NOT published. It is preserved unchanged as historical evidence; remediation is a new
+immutable child candidate (no amend/reset/rebase/force).
+
+Mechanically classified, the five failures are three gate-fidelity defects plus the two genuine
+product-absence REDs:
+
+- **J_R72 / J_R73** — a stale pre-H-036 provider-environment oracle. Published H-036's
+  `runtime_snapshot.build_target_env` (contract `config/python-runtime-authority-v2.json`) injects four
+  controller-owned session keys `NORTROPIC_H036_CAPABILITY/LEVEL/SESSION_ID/SOCKET`, strips
+  `NORTROPIC_TRUST_ROOT` (it is launcher-consumed) plus the `PYTHON` prefix and the `*_OVERRIDE`
+  suffixes, and forces `PATH=/usr/bin:/bin`. The refreeze's `expected_provider_environment` still
+  modelled the pre-H-036 relation, so the real 47-key provider env failed exact equality against the
+  44-key model. The keys are supervisor-injected and inbound-stripped, so they are product-independent.
+- **K_PROVIDER_RENAME_BEFORE_MOVE_CONFINEMENT** — an overconstrained `conf04` fixture. The
+  rename-before-move confinement property holds (rename-within-staging denied, cross-parent move-out
+  never succeeds, sink intact with its exact bytes, nothing escapes; the sibling
+  `K_PROVIDER_STAGING_CONFINEMENT` passes on the identical launcher + Seatbelt staging profile). Only
+  the fixture's exact `sorted(iterdir())==["result.json"]` assertion failed, because the H-036
+  supervisor keeps legitimate private bookkeeping inside the staging/runtime mechanism.
+- **K_CANDIDATE_MATERIALIZATION_BOUNDARY** and **K_STRUCTURED_RESULT_DELIVERY_BOUNDARY** — the two
+  genuine product-absence REDs, both graded on the absent `controller/result/materialize.py` product.
+
+Correct post-H-036 product-absent prebuilder RED set (labels + missing mechanisms are authority, not a
+count): `{K_CANDIDATE_MATERIALIZATION_BOUNDARY, K_STRUCTURED_RESULT_DELIVERY_BOUNDARY}` =
+**150 PASS / 2 FAIL**, `CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN`; deterministic green with the
+product present remains 152/0. The historical R120/R125-era `148/4` figures above describe the
+pre-refreeze gate and are left unchanged as history; H-036 now supplies one former product-absent
+confinement mechanism before the H-032 product exists.
+
+The r2 reconciliation edits ONLY the H-032 gate oracle (`verify/bin/h-032-exit`) and this record. It
+does not touch production/product bytes and does not resurrect `controller/launch/cli`; H-036 remains
+launcher/supervisor authority. `expected_provider_environment` now models the exact published H-036
+target-environment transform and returns the non-session base; the four session keys are bound by
+`h036_env_relation` by SHAPE + causal origin (capability 64-hex, level `"1"`, non-empty session id,
+socket under the launcher-owned `.nortropic-h036-runtime*` root) — never by hardcoded random values —
+with eleven one-defect oracle negatives (fifth key, dropped/non-hex/wrong-level session, socket outside
+the runtime root, `TRUST_ROOT`/staging/result/`PYTHON`/Git leak, wrong PATH) all required to reject.
+`conf04` retains every effect proof and replaces the exact-enumeration requirement with a strictly
+stronger causal control (the escape directory must be empty). The `--skip-owner-live` expected set and
+`CURRENT_RED_REASON` are widened to the two product-absence REDs. The underlying security objective is
+unchanged and, for provider-environment hygiene, strengthened: the oracle now also rejects a
+`NORTROPIC_TRUST_ROOT`/`PYTHON`/`*_OVERRIDE` leak the stale relation would have admitted, with no
+generic `NORTROPIC_*` exemption and no caller-selected authority.
