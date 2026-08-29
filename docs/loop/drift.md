@@ -3663,3 +3663,38 @@ transport (`K_H032_FRESH_UPSTREAM`) now accepts the exact real `PREBUILDER_PRODU
 helper rc=0 (proven on bare host in the r5 evidence), so H-031's freshness path can consume the live
 upstream instead of ODÖMBART-ing at the helper. `90497a65` and `a5707e54` preserved immutable; no
 amend/rebase/reset.
+
+## H-032 final product (result-kernel) — builder candidate on published main 0c379f8e
+
+The H-032 product makes the two product-absence boundaries real:
+`K_CANDIDATE_MATERIALIZATION_BOUNDARY` (controller/result/materialize.py) and
+`K_STRUCTURED_RESULT_DELIVERY_BOUNDARY` (controller/result/consumer.py). Built by RECOVERING the
+historically de-risked lineage verbatim rather than reimplementing (bytes banked at
+`~/nortropic/forensics-h036-20260827/h032-recovered-product-r128/`): `controller/result/consumer.py`
+(sha256 f51dd6d4, KEEP-VERIFIED against the current r5 gate's own kernel_structure_inventory +
+_r125_dependency_source_ok — exact imports {fcntl,hashlib,json,os,pathlib.Path,stat,tempfile},
+signature `consume_private_result(sink_fd, canonical_destination, invocation_id, run_id, role)`, `__all__`,
+MAX_RESULT_BYTES, schema semantic-equal to the pinned external schema, no subprocess/network authority);
+`controller/result/materialize.py` (sha256 f811022f, KEEP-VERIFIED — exact imports
+{base64,fnmatch,os,pathlib.Path,re,subprocess,tempfile,unicodedata}, 8-arg materialize signature,
+literal-const top level); `controller/result/routing_ast.py` (sha256 5e91608e, the bootstrap routing
+self-audit helper — in allowed_write, not gate-referenced); and the autopilot wiring
+`scripts/nortropic-codex-autopilot.py` recovered `73c07ed6` placed on the identical current base
+`fcf89dbf` (the delta is all PRODUCT_WIRING_KEEP — zero old-launcher hunks: the base already invokes the
+published H-036 launcher `controller/launch/cli` 17c1ec52 + supervisor runtime_snapshot.py cb9a4ab1, and
+`run_codex` already emits NORTROPIC_TRUST_ROOT/STAGING_ROOT/RESULT_SINK + the `run <ws> <kuvert> <timeout>
+-- <cmd>` argv the launcher expects). Provider output remains a PROPOSAL: run_codex → private result sink
+→ `consume_private_result` (trusted consumer) → validated report → `materialize` (trusted candidate
+materializer, native git, private-vs-durable tree equality) → immutable candidate object → policy/gate.
+Frozen surfaces untouched (verify/bin/h-03{1,2}-exit, h-032-owner-live-call, specs/tasks.spec.json,
+controller/launch/**); H-036 owns the launcher (historical H-032 launcher overlay 23753c09 is OBSOLETE,
+NOT ported). Change set = exactly the H-032 allowed_write product surface:
+scripts/nortropic-codex-autopilot.py + controller/result/{consumer,materialize,routing_ast}.py + docs.
+Structural self-verification: all four files py_compile clean; result-kernel imports unaliased; process
+inventory run=1/run_codex-Popen=1/clear-os.system=1; os-effect totals reconcile with the frozen
+RESULT_KERNEL per-function inventory (open 11/close 8/fsync 3/urandom 2/chmod 6, F_GETPATH 1, unlink 1);
+role routing gpt-5.6-sol only. Product-absent baseline 150/2 → deterministic-green target 152/0 (derive
+from the gate). NOTE: routing_ast.py's baked AST-dump hash is a bootstrap-time self-audit the H-032/H-031
+gates do NOT run; its coherence with the final autopilot bytes is a pre-supervisor/operational item, not a
+gate predicate. Real H-032 (152/0) + H-031 product-present green + adversarial product review + required
+owner-live remain to be proven on a bare host before guarded product publication.
