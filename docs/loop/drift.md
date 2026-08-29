@@ -3694,9 +3694,9 @@ Structural self-verification: all four files py_compile clean; result-kernel imp
 inventory run=1/run_codex-Popen=1/clear-os.system=1; os-effect totals reconcile with the frozen
 RESULT_KERNEL per-function inventory (open 11/close 8/fsync 3/urandom 2/chmod 6, F_GETPATH 1, unlink 1);
 role routing gpt-5.6-sol only. Product-absent baseline 150/2 → deterministic-green target 152/0 (derive
-from the gate). NOTE: routing_ast.py's baked AST-dump hash is a bootstrap-time self-audit the H-032/H-031
-gates do NOT run; its coherence with the final autopilot bytes is a pre-supervisor/operational item, not a
-gate predicate. Real H-032 (152/0) + H-031 product-present green + adversarial product review + required
+from the gate). CORRECTION after exact frozen-gate inspection: H-032 executes routing_ast.py and folds it
+into `K_CANDIDATE_MATERIALIZATION_BOUNDARY`; its digest must therefore match the final autopilot AST in
+the product candidate, not be deferred to supervisor readiness. Real H-032 + H-031 product-present +
 owner-live remain to be proven on a bare host before guarded product publication.
 
 ### R109 connected-consumer-seam remediation (child of caab2e4f)
@@ -3752,3 +3752,24 @@ no new os/subprocess/fcntl/socket; run=1/Popen=1/os.system=1). Canary handling =
 FINAL_CLEANUP (recognize the trusted residue; the existing staging-root cleanup retires the private root).
 consumer.py/materialize.py/routing_ast.py/gates/spec/launcher untouched. caab2e4f + 99099d52 preserved
 immutable.
+
+### Isolated raw-checkout mode remediation (child of ff09e3c4)
+
+The candidate's `isolated_provider_scratch` Stop text said “aliased byte”, but the host observer found
+`objects_alias=[]`, index/config nlink one, and 435 regular single-link checkout leaves. The sole true
+guard arm was `_single_link_checkout_tree`: frozen gate `umask 077` made Git create regular/executable
+leaves as `0600/0700`, while the unchanged oracle and commit tree require physical `0644/0755`. No
+provider started; H036, materialization, APFS aliasing and later runtime activity were non-causal.
+
+The minimum product repair gives only `raw_checkout=True` Git child processes a fixed `umask 022` through
+the existing sole `subprocess.run`; every other child inherits the controller mask. This creates the
+canonical modes directly inside an already-private `0700` root, grants no group/world write, changes no
+process-global umask and introduces no chmod/path-following race. All existing object/index/config,
+inode/nlink, symlink, exact-tree, ref, alternate, clean-state and source-authority checks remain intact.
+The runner exposes only a boolean inherited-or-022 choice, never a caller-selected numeric mask.
+
+Focused locked-Python controls under parent masks 077 and 022 both produce `0644/0755`, preserve distinct
+single-link object identity and exact checkout reconstruction, and prove a later non-raw child still
+inherits the parent mask. After the final autopilot bytes, routing_ast.py is rebound to AST digest
+`2268bc18803173dbf175e1eaab901eaad5547baed75ab33321e104e43f073a01`; its self-audit passes. Frozen H032,
+actual H031 product-present, independent review and owner-live remain mandatory trust transitions.

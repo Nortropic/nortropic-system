@@ -240,7 +240,7 @@ def now_id() -> str:
     return dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def run(argv: list[str], cwd: Path | None = None, *, check: bool = True, timeout: int | None = None, env: dict[str, str] | None = None, input_text: str | None = None) -> Cmd:
+def run(argv: list[str], cwd: Path | None = None, *, check: bool = True, timeout: int | None = None, env: dict[str, str] | None = None, input_text: str | None = None, checkout_modes: bool = False) -> Cmd:
     if not argv or not all(isinstance(x, str) and x for x in argv):
         raise Stop(f"invalid argv: {argv!r}")
     if argv[0].rsplit(os.sep, 1)[-1].casefold() == "codex":
@@ -263,6 +263,7 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True, timeout
         timeout=timeout,
         env=process_environment,
         input=input_text,
+        umask=0o022 if checkout_modes else -1,
     )
     if check and p.returncode != 0:
         raise Stop(f"command failed rc={p.returncode}: {' '.join(argv)}\n{p.stdout}")
@@ -581,6 +582,7 @@ def closed_worktree_git(repo: Path, *args: str, check: bool = True, timeout: int
          "-c", "protocol.ssh.allow=always", *args],
         cwd=repo, check=check, timeout=timeout, env=environment,
         input_text="* diff\n" if raw_attributes else None,
+        checkout_modes=raw_checkout,
     )
 def _owned_real_directory(path: Path) -> bool:
     try:
