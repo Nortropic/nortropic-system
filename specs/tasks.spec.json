@@ -1682,6 +1682,257 @@
         },
         "fail_closed": true
       }
+    },
+    {
+      "id": "h-038",
+      "slice": "H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT",
+      "authority_class": "owner_authority",
+      "title": "Bind each managed H-032 worker to its exact attempt workspace",
+      "summary": "Close the published H-036 cross-attempt gap without weakening Seatbelt: a controller-bound canonical attempt root adds one deny-only profile suffix so a still-living P0 descendant may write only inside P0's exact current workspace and can never mutate the attempt root, a future P1 workspace, or future trust/staging/result surfaces. Legacy nonmanaged BASE and WITH_STAGING launches stay byte-for-byte compatible. No caller or nested request may select, omit, widen or override this authority.",
+      "allowed_write": [],
+      "owner_author_allowed_write": [
+        "controller/launch/cli",
+        "controller/launch/runtime_snapshot.py",
+        "config/python-runtime-authority-v2.json"
+      ],
+      "exit_test": "verify/bin/h-038-exit",
+      "exit_criterion": "PREPRODUCT: no-argument execution on an un-nested authorized macOS host has exactly one RED label A_H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT_OPERATIONAL with reason PUBLISHED_H036_CROSS_ATTEMPT_CONFINEMENT_ABSENT. The causal fixture launches real published-H036 product through the public launcher with a canonical managed attempt root; P0 double-forks and setsid, the public launch returns, and its independently identity-bound writer receives the attempt/P1/future paths through explicit argv independent of environment and remains alive until the gate later creates P1 and the future trust/staging/sink paths. The published product writes those forbidden siblings while leaking NORTROPIC_ATTEMPT_ROOT to the target. A marker, profile digest, source token, early writer death or judge-only Seatbelt probe earns no product credit. IDENTITY: --product BASE_SHA CANDIDATE_SHA requires a clean exact direct single child, raw no-replace/no-renames Git identity, exactly the existing three owner-production paths with modes 100755/100644/100644, cumulative additions at most 320, exact candidate-tree task/gate bytes, and a strict config binding final launcher/helper digests without self-digest. The base must contain the exact published H-036 product, registry, H-035/H-036/H-037 gates, delegation and constitutional identities. RUNTIME: legacy BASE sha256 848f5f8b13b6773d9a8b6780838c3bb31e82c06915d762ce47d5a8c97acd4844 and legacy BASE+STAGING sha256 0e543357a7ac4f14b5f8b1a04973c267180ee0fa6e5606d41034ade2a42cd33d remain byte-identical and publicly effect-positive. Managed H-032 requires attempt+staging+sink together and selects only BASE+ATTEMPT_DENY_SUFFIX+STAGING_SUFFIX sha256 679eb17b78168dabc080fd9c0b4940c62e0cd746cc2db6af517e2b4e3b812aa6. ATTEMPT_DENY_SUFFIX denies the literal ATTEMPT_ROOT and every descendant except the exact CURRENT_WORKSPACE subtree. The attempt root is preexisting, absolute, canonical, nofollow, current-uid, mode 0700 and controller-bound to the exact workspace/trust/staging/sink topology; canonical/dev-ino alias, ancestor/descendant overlap, equality, symlink, substitution, post-validation swap, unsafe mode, unrelated root, protected-root or runtime-parent-enclosing root, partial state and topology ambiguity reject before target effect. The connected raw managed barrier binds the exact profile-proof wire, digest, profile/session/child identities, full effect-key family, nofollow scratch/sink identities and receipts, and target absence before go-v1; separate real P0 syscalls bind the claimed EPERM effects. New H038 attempt sources exist only in one exact server-CSPRNG-named neutral direct child of ATTEMPT_ROOT and are identity-bound at the synchronized proof barrier. A valid implementation may clean that directory before target exec or retain it only through the outer target lifetime; barrier observation proves creation, and every exact controller-created H038 identity must be absent after every terminal return. Success, nonzero, timeout and disconnect lanes plus post-barrier source/directory replacement dynamically bind cleanup and foreign type/mode/nlink/dev-ino/bytes preservation. An unknown server-nonce collision is not dynamically injectable through the closed API: nofollow/O_EXCL collision-before-mutation ordering, collision preservation and exact identity-bound cleanup reachability remain config one-defect plus immutable-object-review obligations, never caller/test nonce credit. Frozen H036 legacy source residues remain permitted exactly as H036 requires. In the connected two-attempt product run P0 stays alive through P1 creation and records EPERM for attempt-root, P1, future trust, staging and sink mutations while retaining allowed P0-local logging; P1 starts, writes only its own workspace and exact sink, and succeeds. NORTROPIC_ATTEMPT_ROOT is stripped from every target, cannot be reintroduced through nested environment or protocol, and no request field selects profile/root/exception authority. BASE/WITH_STAGING protocol, stdio, environment sanitizer, profile proof, capability freshness/peer binding, lifecycle cleanup and no-raw-fallback semantics remain those frozen by H-036. Invalid topology/alias/swap/root/caller-override mutants start no target and preserve external canaries. Safe fixtures dynamically prove total protected-root-invalid states reject; the exact live/common-Git disjoint predicate cannot be isolated without mutating protected roots and remains an immutable-object-review obligation rather than false one-defect effect credit. Direct-launch nonmanaged compatibility remains accepted only when NORTROPIC_ATTEMPT_ROOT is absent. H-032 is later explicitly refrozen to depend exactly on published H-038 and to use CURRENT_WORKSPACE, never the stale WORKSPACE spelling. Independent immutable review remains mandatory for stable-open/final-rehash ordering and its effect-plan/syscall binding, server CSPRNG generation, exact closed environments/pass_fds and the single reachable confined-helper path. MATERIAL_PROPERTIES_JUDGE_ONLY=NONE.",
+      "docs_impact": [],
+      "depends_on": [
+        "h-036"
+      ],
+      "max_changed_files": 3,
+      "max_added_lines": 320,
+      "h038_managed_attempt_root_confinement": {
+        "contract_id": "H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT_V1",
+        "standing_delegation": {
+          "contract_id": "BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION",
+          "delegation_document_sha256": "0ad4cbc03b3b70c6b61ef6adc76a31decd4300f2b6a8a2b9f632c3f6719ac36f",
+          "source_sha256": "b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84",
+          "condition_operator": "ALL",
+          "hard_stop_matches": "NO_ONLY_WHILE_EVERY_EXACT_BOUND_AND_BP01_THROUGH_BP14_HOLDS"
+        },
+        "contract_authority_base": {
+          "commit": "0c379f8ea9dc39ee006d9d3a4f852839d4d39ca7",
+          "tree": "a417ddfaff4a3410fd7c46a6d0e5ae6dbee74c90",
+          "test_author_candidate_relation": "DIRECT_SINGLE_CHILD_WITH_EXACT_FIVE_FILE_SURFACE",
+          "guarded_publication_merge": {
+            "ordered_parents": [
+              "CONTRACT_AUTHORITY_BASE",
+              "EXACT_REVIEWED_TEST_AUTHOR_CANDIDATE"
+            ],
+            "tree": "EXACT_TEST_AUTHOR_CANDIDATE_TREE",
+            "origin_main_must_equal_merge_before_product_review": true
+          }
+        },
+        "published_h036_authority": {
+          "product_commit": "18aeff690a11d72d878eb0e3b7880ccf5b7d4882",
+          "product_tree": "0999ed1ae9a9899279bb4135b4a0313e7f0b6909",
+          "published_merge": "e71dfbbd6a1dcb0792031764370f264dd63ebbf2",
+          "ordered_parents": [
+            "8be493de757b5f7fea2bf5ac64d6087adaa28d59",
+            "18aeff690a11d72d878eb0e3b7880ccf5b7d4882"
+          ],
+          "product_sha256": {
+            "controller/launch/cli": "65571892948b9f7a9260ee88abb2cf5c575eda245fe1874f8ade3c7a8b202ba3",
+            "controller/launch/runtime_snapshot.py": "35ca9dff3355bcfbd4d7536cb9658fe3342f143745547ec55f2b2cb25223eca7",
+            "config/python-runtime-authority-v2.json": "460d4a89f2160ed947ed513bebc5e25de41899a9aabda613d0a233f2150ef963"
+          },
+          "gate_sha256": "55e9d8648be128f0841659b0d8598029109967a947ec6719df52f7cb97f45049",
+          "registry_sha256": "3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256"
+        },
+        "blocker_evidence": {
+          "candidate": "49af17a9c5f98775ef633b852cbfc19adb7dc2e1",
+          "tree": "b0e075aa24d967bb21e4014b965fe86c9f34e669",
+          "record": "diag-h032-alias-49af17a-20260829T084318Z/diag-alias.txt",
+          "record_sha256": "bad76f4c145ae65069874348c6586b0c1bb4b6d1957bbf9a08a03c127cf4de27",
+          "observed_role": "R128-P1",
+          "first_five_guards": true,
+          "checkout_guard": false,
+          "offending_path": "r128-p0-cross",
+          "offending_mode": "0600",
+          "offending_nlink": 1,
+          "classification": "LIVE_P0_DESCENDANT_WROTE_FUTURE_P1_WORKSPACE"
+        },
+        "test_author_surface": [
+          "specs/tasks.spec.json",
+          "verify/bin/h-038-exit",
+          "docs/loop/owner-author-workflow-v1.md",
+          "docs/05-beslutslogg.md",
+          "docs/loop/drift.md"
+        ],
+        "product_identity": {
+          "paths_and_modes": [
+            [
+              "controller/launch/cli",
+              "100755"
+            ],
+            [
+              "controller/launch/runtime_snapshot.py",
+              "100644"
+            ],
+            [
+              "config/python-runtime-authority-v2.json",
+              "100644"
+            ]
+          ],
+          "candidate_relation": "DIRECT_SINGLE_CHILD_OF_EXACT_PUBLISHED_H038_CONTRACT_BASE",
+          "remote_origin_main_states": [
+            "PREPUBLICATION_EXACT_H038_CONTRACT_BASE",
+            "POSTPUBLICATION_EXACT_TWO_PARENT_PRODUCT_MERGE_WITH_CANDIDATE_TREE"
+          ],
+          "changed_file_source": "RAW_GIT_OBJECTS_NO_RENAMES_NO_REPLACE",
+          "cumulative_max_added_lines": 320,
+          "unbound_product_checkout_credit": false,
+          "config_binds_final_launcher_and_helper_sha256": true,
+          "config_self_digest": false
+        },
+        "profile_family": {
+          "profile_id": "H038_MONOTONIC_ATTEMPT_WORKSPACE_SUBSET_V1",
+          "encoding": "UTF8_EXACT_DETERMINISTIC_THREE_MEMBER_FAMILY_V2",
+          "legacy_base_sha256": "848f5f8b13b6773d9a8b6780838c3bb31e82c06915d762ce47d5a8c97acd4844",
+          "legacy_with_staging_sha256": "0e543357a7ac4f14b5f8b1a04973c267180ee0fa6e5606d41034ade2a42cd33d",
+          "managed_attempt_with_staging_sha256": "679eb17b78168dabc080fd9c0b4940c62e0cd746cc2db6af517e2b4e3b812aa6",
+          "attempt_deny_suffix_utf8": "(deny file-write* (literal (param \"ATTEMPT_ROOT\")))\n(deny file-write*\n  (require-all\n    (subpath (param \"ATTEMPT_ROOT\"))\n    (require-not (subpath (param \"CURRENT_WORKSPACE\")))))\n",
+          "composition_order": [
+            "H036_BASE",
+            "H038_ATTEMPT_DENY_SUFFIX",
+            "H036_STAGING_SUFFIX"
+          ],
+          "selection": {
+            "BASE": "ATTEMPT_STAGING_SINK_ALL_ABSENT",
+            "WITH_STAGING": "ATTEMPT_ABSENT_AND_STAGING_SINK_BOTH_PRESENT_VALID",
+            "MANAGED_ATTEMPT_WITH_STAGING": "ATTEMPT_STAGING_SINK_ALL_PRESENT_VALID"
+          },
+          "attempt_only_or_partial": "REJECT_BEFORE_TARGET",
+          "caller_profile_or_digest_selection": false
+        },
+        "attempt_root_authority": {
+          "top_level_environment_key": "NORTROPIC_ATTEMPT_ROOT",
+          "source": "CONTROLLER_BOUND_TOP_LEVEL_STATE_ONLY",
+        "canonical_state": "ABSOLUTE_PREEXISTING_NOFOLLOW_DIRECTORY_CURRENT_UID_MODE0700_STABLE_DEV_INO",
+        "workspace_exception_parameter": "CURRENT_WORKSPACE",
+        "workspace_exception_scope": "EXACT_SELECTED_CURRENT_WORKSPACE_SUBTREE_ONLY",
+        "trust_states": [
+          "EXPLICIT_TRUST_STRICT_MANAGED_DESCENDANT_OF_ATTEMPT_ROOT",
+          "DEFAULT_TRUST_EQUALS_LIVE_ROOT_AND_ATTEMPT_ROOT_IS_BIDIRECTIONALLY_DISJOINT"
+        ],
+          "future_sibling_authority": false,
+          "nested_or_protocol_override": false,
+        "target_environment_visible": false,
+        "neutral_attempt_proof_directory": {
+          "name_pattern": ".nortropic-h038-proof-{controller_nonce_64_lowerhex}",
+          "parent": "ATTEMPT_ROOT_DIRECT_CHILD",
+          "nonce_source": "SERVER_CSPRNG_SECRETS_TOKEN_HEX_32_NEVER_REQUEST_OR_CALLER",
+          "mode": "0700",
+          "source_members": [
+            "write-source",
+            "rename-source",
+            "unlink-source",
+            "hardlink-source"
+          ],
+          "source_state": "NOFOLLOW_REGULAR_CURRENT_UID_MODE0600_NLINK1_DISTINCT_BOUND_DEV_INO_ORIGINAL_BYTES",
+          "collision": "NOFOLLOW_O_EXCL_REJECT_BEFORE_ANY_MUTATION_AND_PRESERVE_FOREIGN",
+          "cleanup": "EXACT_CREATED_DEV_INO_ONLY_EVERY_OUTCOME_NO_PREFIX_GLOB_CHMOD_FOLLOW_OR_FOREIGN_DELETE",
+          "preexisting_unknown_csprng_collision_test": "IMMUTABLE_OBJECT_REVIEW_PLUS_CONFIG_ONE_DEFECT_ONLY_NO_CALLER_TEST_NONCE",
+          "post_barrier_replacement_test": "DYNAMIC_PRODUCT_EFFECT_REQUIRED"
+        },
+          "invalid_matrix": [
+            "MISSING_PARTIAL_OR_UNRELATED",
+            "FILE_SYMLINK_UNSAFE_MODE_OR_ROOT",
+            "WORKSPACE_NOT_EXACT_MANAGED_DESCENDANT",
+            "TRUST_STAGING_OR_SINK_NOT_EXACT_DISJOINT_MANAGED_DESCENDANTS",
+            "CANONICAL_OR_DEV_INO_ALIAS",
+            "ANCESTOR_DESCENDANT_OVERLAP",
+            "PATH_SWAP_OR_IDENTITY_SUBSTITUTION",
+            "CALLER_OR_NESTED_REQUEST_OVERRIDE"
+          ]
+        },
+        "causal_product_effect": {
+          "p0_path_authority_transport": "EXPLICIT_TARGET_ARGV_NOT_NORTROPIC_ATTEMPT_ROOT",
+          "p0_writer_liveness": "READY_BEFORE_P1_CREATION_AND_DONE_AFTER_ALL_ATTEMPTS",
+          "p0_allowed": "WRITE_OWN_P0_LOG_INSIDE_EXACT_CURRENT_WORKSPACE",
+          "p0_denied_errno": "EPERM",
+          "p0_denied_targets": [
+            "ATTEMPT_ROOT_LITERAL",
+            "FUTURE_P1_WORKSPACE",
+            "FUTURE_P1_TRUST_ROOT",
+            "FUTURE_P1_STAGING_ROOT",
+            "FUTURE_P1_RESULT_SINK"
+          ],
+          "p1_positive": "OWN_WORKSPACE_AND_EXACT_RESULT_SINK_SUCCEED",
+          "environment_strip_separate_from_path_authority": true,
+          "early_writer_exit_credit": false,
+          "marker_or_claim_credit": false
+        },
+        "h036_preservation": {
+          "legacy_base_and_with_staging_public_effects": "PASS_REQUIRED",
+          "protocol_stdio_capability_peer_proof_lifecycle": "UNCHANGED",
+          "raw_fallback_allowed": false,
+          "nested_seatbelt_bypass_allowed": false,
+          "unconfined_execution_allowed": false,
+          "native_broker_allowed": false,
+          "broader_filesystem_process_network_credential_authority": false
+        },
+        "future_dependency_transition": {
+          "h032_not_edited_by_h038_contract_or_product": true,
+          "h032_later_depends_exactly_on": [
+            "h-038"
+          ],
+          "h032_stale_parameter_spelling": "WORKSPACE",
+          "h032_refrozen_parameter_spelling": "CURRENT_WORKSPACE",
+          "h031_rebind_after_h032": true
+        },
+        "bp01_bp14_bindings": [
+          {"id": "BP01", "binding": "PUBLISHED_H036_ALLOWS_A_LIVING_P0_DESCENDANT_TO_MUTATE_FUTURE_P1"},
+          {"id": "BP02", "binding": "R128_P1_RECORD_AND_CAUSAL_PUBLIC_LAUNCHER_PREPRODUCT_FIXTURE_REPRODUCE_THE_GAP"},
+          {"id": "BP03", "binding": "H038_ONLY_MAKES_ALREADY_AUTHORIZED_H032_CROSS_ATTEMPT_RETRY_SAFE"},
+          {"id": "BP04", "binding": "NEW_AUTHORITY_IS_DENY_ONLY_AND_PRESERVES_OR_STRENGTHENS_H036_CONFINEMENT"},
+          {"id": "BP05", "binding": "TASK_DEPENDENCY_THREE_PATH_SURFACE_320_LINE_BUDGET_TRANSITION_AND_EFFECTS_ARE_EXACT"},
+          {"id": "BP06", "binding": "NO_CALLER_NESTED_PROFILE_ROOT_DIGEST_EXCEPTION_OR_PATH_AUTHORITY"},
+          {"id": "BP07", "binding": "PARTIAL_NEIGHBOR_ALIAS_TOPOLOGY_SWAP_AND_OVERRIDE_MUTANTS_REJECT"},
+          {"id": "BP08", "binding": "H036_BASE_WITH_STAGING_PROTOCOL_EFFECTS_LIFECYCLE_AND_LEGACY_NONMANAGED_COMPATIBILITY_REMAIN"},
+          {"id": "BP09", "binding": "THIS_CANDIDATE_FREEZES_ONLY_H038_TASK_GATE_AND_MINIMAL_OWNER_WORKFLOW_DECISION_DRIFT_DOCS"},
+          {"id": "BP10", "binding": "EXACT_H038_CONTRACT_REQUIRES_INDEPENDENT_GATE_FALSIFICATION_REVIEW"},
+          {"id": "BP11", "binding": "SEPARATE_EXACT_THREE_FILE_OWNER_PRODUCT_REQUIRES_INDEPENDENT_IDENTITY_AND_EFFECT_REVIEW"},
+          {"id": "BP12", "binding": "ONLY_THE_NAMED_CAUSAL_PREPRODUCT_RED_IS_AUTHORIZED_AND_HISTORICAL_IDENTITIES_STAY_PINNED"},
+          {"id": "BP13", "binding": "CONTRACT_AND_PRODUCT_REQUIRE_GUARDED_NONFORCE_EXACT_IDENTITY_PUBLICATION"},
+          {"id": "BP14", "binding": "H032_IS_EXPLICITLY_REFROZEN_TO_PUBLISHED_H038_BEFORE_H031_REBIND"}
+        ],
+        "serial_transitions": [
+          "H038_TEST_AUTHOR_FREEZE",
+          "H038_INDEPENDENT_GATE_REVIEW",
+          "H038_GUARDED_CONTRACT_PUBLICATION",
+          "H038_EXACT_THREE_FILE_OWNER_PRODUCT",
+          "H038_INDEPENDENT_PRODUCT_REVIEW",
+          "H038_GUARDED_PRODUCT_PUBLICATION",
+          "H032_REFREEZE_AGAINST_PUBLISHED_H038",
+          "H032_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+          "H031_REBIND"
+        ],
+        "forbidden_effects": [
+          "SEATBELT_WEAKENING_BYPASS_OR_ALREADY_SANDBOXED_EQUIVALENCE",
+          "RAW_DIRECT_POPEN_OR_UNCONFINED_WORKER_FALLBACK",
+          "NATIVE_PRIVILEGED_EXTERNAL_OR_FOURTH_PATH_BROKER",
+          "BROADER_FILESYSTEM_PROCESS_NETWORK_CREDENTIAL_OR_GENERIC_TRUST_AUTHORITY",
+          "CALLER_OR_NESTED_SELECTED_ATTEMPT_PROFILE_ROOT_EXCEPTION_OR_DIGEST",
+          "REGISTRY_EXPANSION_OR_ANY_FOURTH_PRODUCT_PATH",
+          "H032_H031_H036_GATE_OR_TASK_EDIT_DURING_H038",
+          "STALE_WORKSPACE_PARAMETER_ACCEPTANCE"
+        ],
+        "preproduct_red": {
+          "label": "A_H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT_OPERATIONAL",
+          "reason": "PUBLISHED_H036_CROSS_ATTEMPT_CONFINEMENT_ABSENT",
+          "failure_signature": [
+            "P0_WRITER_READY_AND_ALIVE_THROUGH_P1_CREATION",
+            "P0_WRITES_ATTEMPT_ROOT_AND_FUTURE_P1_SURFACES",
+            "P1_TARGET_RECEIVES_NORTROPIC_ATTEMPT_ROOT",
+            "PUBLISHED_H036_BASE_AND_WITH_STAGING_COMPATIBILITY_PASS"
+          ],
+          "reference_or_marker_credit": false
+        },
+        "fail_closed": true
+      }
     }
   ],
   "human_only": {

@@ -713,3 +713,84 @@ H-031 then rebinds the final H-032 gate digest and its h-032 `depends_on`/summar
 refreeze, so H-031 is temporarily RED between this publication and the H031_REBIND step — an expected
 serial transition, not a regression. This record supersedes the launcher/`allowed_write` and
 H-033-execution assumptions of the frozen H-032 r116–r118, r60 and r69 prose where they conflict.
+
+<!-- H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT_CONTRACT_V1 -->
+## H-038 managed attempt-root confinement prerequisite
+
+The published H-036 supervisor correctly installs Seatbelt before releasing a worker, but its
+workspace exception is selected per launch and does not confine a descendant that remains alive
+after that launch. The pinned host record
+`diag-h032-alias-49af17a-20260829T084318Z/diag-alias.txt` (sha256
+`bad76f4c145ae65069874348c6586b0c1bb4b6d1957bbf9a08a03c127cf4de27`) names the resulting
+cross-attempt effect: the R128-P1 checkout oracle's first five guards were true while
+`r128-p0-cross`, a regular `0600`/nlink-one byte created by the still-living P0 descendant, made the
+checkout guard false. This is evidence for a missing deny boundary, never authority to bypass or
+weaken Seatbelt.
+
+H-038 is therefore a bounded `owner_authority` prerequisite depending exactly on published H-036.
+Its ordinary `allowed_write` is empty. Its owner-author production surface is exactly the existing
+three-member H-036 set: `controller/launch/cli`, `controller/launch/runtime_snapshot.py`, and
+`config/python-runtime-authority-v2.json`; the product candidate must be their exact direct-child
+three-file change, preserve modes `100755`/`100644`/`100644`, and add no more than 320 lines. Any
+fourth path or greater budget requires an explicit contract refreeze. The H-035 authority registry
+is unchanged. The standing delegation is bound independently to the canonical published document
+sha256 `0ad4cbc03b3b70c6b61ef6adc76a31decd4300f2b6a8a2b9f632c3f6719ac36f` and its embedded
+lossless source-mandate sha256 `b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84`.
+
+The profile language remains a closed three-member family. The historical H-036 BASE bytes
+(`848f5f8b13b6773d9a8b6780838c3bb31e82c06915d762ce47d5a8c97acd4844`) and BASE+STAGING bytes
+(`0e543357a7ac4f14b5f8b1a04973c267180ee0fa6e5606d41034ade2a42cd33d`) are unchanged. Only a
+managed H-032 launch may select BASE + the exact deny-only attempt suffix + the unchanged staging
+suffix (`679eb17b78168dabc080fd9c0b4940c62e0cd746cc2db6af517e2b4e3b812aa6`). The suffix denies the
+literal `ATTEMPT_ROOT` and every descendant except the exact `CURRENT_WORKSPACE` subtree. Attempt
+only, staging only, partial tuples, caller-selected roots/profiles/digests, nested overrides, stale
+`WORKSPACE`, unrelated roots and roots equal to or enclosing live/Git/runtime or `/private/tmp`,
+aliases, symlinks, unsafe modes, ancestor overlaps, topology ambiguity and identity swaps all reject
+before target effect. An arbitrary canonical private `0700` ancestor satisfying every exact topology
+predicate is not falsely claimed distinguishable: it only adds denial. Explicit trust is a strict
+managed descendant of the attempt root; the preserved default-trust branch instead has trust equal
+to the live root and requires the attempt root bidirectionally disjoint from live and common Git.
+Safe fixtures prove that complete protected-root-invalid states reject without target effect; they do
+not pretend to isolate that disjointness predicate by placing writable fixture state under live or
+common Git. Its exact implementation is therefore also a mandatory immutable-object review item.
+`NORTROPIC_ATTEMPT_ROOT` is
+controller-bound state and is stripped from targets; stripping is tested separately from authority,
+because the P0 attacker receives the forbidden paths through explicit target argv.
+
+The operational product criterion is causal. A real P0 target double-forks, calls `setsid`, closes
+stdio, and returns the public P0 launch while its exact argv/process-start identity remains bound; only
+then does the judge create P1 and its future workspace, trust, staging and result paths. P0 must
+retain its own-workspace log but record real `EPERM` for the attempt root and all future P1 surfaces;
+early death cannot pass. P1 must write its own workspace and exact sink, and a nested launch must
+neither see nor override the attempt root. A connected valid raw managed request freezes the exact
+proof wire, digest, managed profile/session/child identities, complete effect-key family, scratch and
+sink receipts, target absence before `go-v1`, exact final success and post-go target effect. Separate
+real P0 syscalls bind the EPERM effects. New attempt-family sources exist only in one server-CSPRNG
+named neutral `0700` directory directly under the attempt root; their nofollow identities are bound
+at the synchronized proof barrier. The directory may be cleaned before target exec or retained only
+through the outer target lifetime; either way, every exact controller-created H-038 identity is
+absent after terminal success, nonzero, timeout and disconnect. Post-barrier source/directory
+replacements remain type/mode/nlink/byte/dev-ino preserved and are never blindly deleted. Because an unknown server nonce cannot be deterministically pre-created through the
+closed public API, collision-before-mutation ordering is an explicit config/selftest and immutable
+object-review obligation, never false dynamic credit. Legacy public BASE and WITH_STAGING effects, H-036
+protocol/stdio/environment/proof/capability/peer/lifecycle behaviour, cleanup, fail-closed errors and
+no-raw-fallback semantics remain mandatory. Direct profile probes are judge-only and no source
+substring, digest, marker or claim earns product credit.
+
+The frozen Git graph has two serial guarded transitions. Contract candidate `C_contract` is the exact
+five-file direct child of authority `0c379f8e…`; published contract base `B` is the exact guarded merge
+with ordered parents `[0c379f8e…, C_contract]` and tree equal to `C_contract`. Product `P` is the exact
+three-file direct child of `B`. During product review `origin/main` may be only `B`; after publication
+it may be only merge `M_product` with ordered parents `[B, P]` and tree equal to `P`. No other remote
+state, parent order or tree receives identity credit.
+
+The frozen no-argument preproduct state is RED only at
+`A_H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT_OPERATIONAL` /
+`PUBLISHED_H036_CROSS_ATTEMPT_CONFINEMENT_ABSENT`; every static identity, one-defect mutant, legacy
+compatibility control and causal-fixture guard is otherwise green. The exact trust sequence is:
+freeze this H-038 contract; independently falsify/review it; guardedly publish it; implement the
+exact three-file product; independently review its identity and effects; guardedly publish it;
+refreeze H-032 to depend exactly on published H-038 and use `CURRENT_WORKSPACE`; independently
+review/publish H-032; then rebind H-031. There is no owner-live/provider-live/supervisor start in the
+contract freeze and no later transition may broaden filesystem, process, network or credential
+authority, add an unconfined worker, raw fallback, native broker or Seatbelt bypass.
