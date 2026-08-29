@@ -1,0 +1,2805 @@
+#!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
+"""Frozen H-038 managed-attempt-root confinement gate.
+
+No arguments run the causal preproduct lane. Product credit is possible only
+through ``--product BASE_SHA CANDIDATE_SHA`` with exact object/checkout identity.
+Gate-owned direct Seatbelt probes prove satisfiability only; the material verdict
+comes from the real public launcher and a living P0 descendant observed across P1.
+"""
+
+from __future__ import annotations
+
+import copy
+import errno
+import hashlib
+import json
+import os
+import re
+import runpy
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+from typing import Any
+
+sys.dont_write_bytecode = True
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+GATE = ROOT / "verify/bin/h-038-exit"
+CLI = ROOT / "controller/launch/cli"
+HELPER = ROOT / "controller/launch/runtime_snapshot.py"
+CONFIG = ROOT / "config/python-runtime-authority-v2.json"
+REGISTRY = ROOT / "specs/owner-production-paths.v1.json"
+OWNER_WORKFLOW = ROOT / "docs/loop/owner-author-workflow-v1.md"
+DECISION_LOG = ROOT / "docs/05-beslutslogg.md"
+DRIFT = ROOT / "docs/loop/drift.md"
+H035_GATE = ROOT / "verify/bin/h-035-exit"
+H036_GATE = ROOT / "verify/bin/h-036-exit"
+H037_GATE = ROOT / "verify/bin/h-037-exit"
+DELEGATION = ROOT / "docs/loop/remaining-bootstrap-delegation-v1.md"
+CONSTITUTION = ROOT / "docs/07-konstitution.md"
+
+TRUSTED_GIT = Path("/usr/bin/git")
+PYTHON_SOURCE = Path(
+    "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/"
+    "Python.framework/Versions/3.12/bin/python3.12"
+)
+PYTHON_APP = PYTHON_SOURCE.parent.parent / "Resources/Python.app/Contents/MacOS/Python"
+SANDBOX_EXEC = Path("/usr/bin/sandbox-exec")
+
+PRODUCT_PATHS = [
+    "controller/launch/cli",
+    "controller/launch/runtime_snapshot.py",
+    "config/python-runtime-authority-v2.json",
+]
+PRODUCT_MODES = {
+    "controller/launch/cli": "100755",
+    "controller/launch/runtime_snapshot.py": "100644",
+    "config/python-runtime-authority-v2.json": "100644",
+}
+TEST_AUTHOR_SURFACE = [
+    "specs/tasks.spec.json",
+    "verify/bin/h-038-exit",
+    "docs/loop/owner-author-workflow-v1.md",
+    "docs/05-beslutslogg.md",
+    "docs/loop/drift.md",
+]
+MAX_ADDED_LINES = 320
+CONTRACT_AUTHORITY_BASE = "0c379f8ea9dc39ee006d9d3a4f852839d4d39ca7"
+CONTRACT_AUTHORITY_TREE = "a417ddfaff4a3410fd7c46a6d0e5ae6dbee74c90"
+
+PUBLISHED_H036_PRODUCT = "18aeff690a11d72d878eb0e3b7880ccf5b7d4882"
+PUBLISHED_H036_PRODUCT_TREE = "0999ed1ae9a9899279bb4135b4a0313e7f0b6909"
+PUBLISHED_H036_MERGE = "e71dfbbd6a1dcb0792031764370f264dd63ebbf2"
+PUBLISHED_H036_MERGE_PARENTS = [
+    "8be493de757b5f7fea2bf5ac64d6087adaa28d59",
+    PUBLISHED_H036_PRODUCT,
+]
+OLD_PRODUCT_SHA256 = {
+    "controller/launch/cli": "65571892948b9f7a9260ee88abb2cf5c575eda245fe1874f8ade3c7a8b202ba3",
+    "controller/launch/runtime_snapshot.py": "35ca9dff3355bcfbd4d7536cb9658fe3342f143745547ec55f2b2cb25223eca7",
+    "config/python-runtime-authority-v2.json": "460d4a89f2160ed947ed513bebc5e25de41899a9aabda613d0a233f2150ef963",
+}
+PINNED_UNCHANGED = {
+    "verify/bin/h-035-exit": "cae895110129f5066be9ae7f770e7f4e96594698ef5500d586820fea472d27e2",
+    "verify/bin/h-036-exit": "55e9d8648be128f0841659b0d8598029109967a947ec6719df52f7cb97f45049",
+    "verify/bin/h-037-exit": "814deb69fbc6e34e57ebc89b62bf7d54281bc95a4207332ff94792d90d0e6dc3",
+    "specs/owner-production-paths.v1.json": "3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256",
+    "docs/loop/remaining-bootstrap-delegation-v1.md": "0ad4cbc03b3b70c6b61ef6adc76a31decd4300f2b6a8a2b9f632c3f6719ac36f",
+    "docs/07-konstitution.md": "2e7f04cca9eb00d24b264b91a0678aaee68c97441d79846d81aeff2f8d7b4432",
+}
+TASK_SHA256 = "c133ae2b9a7524c69108ccc7e6c8b5630dc3cde78c345159bbfcfd8e712a2171"
+H035_TASK_SHA256 = "f854ddc0b5ca05b87cbaf15431f58c59803be586d6d9ff67d14e40e8a5970f22"
+H036_TASK_SHA256 = "8d3742bbf6d791872c8f9173b3ff20afca9b6139615b64397498e05bda61826f"
+H037_TASK_SHA256 = "63662e129fb0b223f84669814cef70f331c5fd39441dad0bd79712d7e3dc3efb"
+DELEGATION_DOCUMENT_SHA256 = PINNED_UNCHANGED[
+    "docs/loop/remaining-bootstrap-delegation-v1.md"
+]
+DELEGATION_SOURCE_SHA256 = "b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84"
+
+PROFILE_BASE = """(version 1)
+(allow default)
+(deny file-write*
+  (require-all
+    (subpath (param "LIVE_ROOT"))
+    (require-not (subpath (param "LIVE_GIT")))))
+(deny file-write*
+  (require-all
+    (subpath (param "LIVE_GIT"))
+    (require-not
+      (require-any
+        (subpath (param "GIT_OBJECTS"))
+        (subpath (param "WORKTREE_GITDIR"))))))
+(deny file-write* (subpath (param "GIT_OBJECTS_INFO")))
+(deny file-write* (subpath (param "WORKTREE_COMMDIR")))
+(deny file-write* (subpath (param "WORKTREE_GITFILE")))
+(deny file-write* (subpath (param "WORKTREE_CONFIG")))
+(deny file-write* (subpath (param "TRUST_ROOT")))
+(deny file-write* (subpath (param "RUNTIME_ROOT")))
+(deny file-write* (literal (param "CURRENT_WORKSPACE")))
+(deny file-write* (literal (param "CURRENT_WORKSPACE_DOTGIT")))
+(deny file-write*
+  (require-all
+    (subpath (param "ANCESTOR_WORKSPACE"))
+    (require-not (subpath (param "CURRENT_WORKSPACE")))))
+"""
+ATTEMPT_DENY_SUFFIX = """(deny file-write* (literal (param "ATTEMPT_ROOT")))
+(deny file-write*
+  (require-all
+    (subpath (param "ATTEMPT_ROOT"))
+    (require-not (subpath (param "CURRENT_WORKSPACE")))))
+"""
+STAGING_SUFFIX = """(deny file-write* (subpath (param "STAGING_ROOT")))
+(allow file-write-data (literal (param "RESULT_SINK")))
+"""
+PROFILE_BASE_SHA256 = "848f5f8b13b6773d9a8b6780838c3bb31e82c06915d762ce47d5a8c97acd4844"
+PROFILE_STAGING_SHA256 = "0e543357a7ac4f14b5f8b1a04973c267180ee0fa6e5606d41034ade2a42cd33d"
+PROFILE_MANAGED_SHA256 = "679eb17b78168dabc080fd9c0b4940c62e0cd746cc2db6af517e2b4e3b812aa6"
+PROFILE_STAGING = PROFILE_BASE + STAGING_SUFFIX
+PROFILE_MANAGED = PROFILE_BASE + ATTEMPT_DENY_SUFFIX + STAGING_SUFFIX
+
+BASE_PARAM_ORDER = [
+    "LIVE_ROOT", "LIVE_GIT", "GIT_OBJECTS", "GIT_OBJECTS_INFO",
+    "WORKTREE_GITDIR", "WORKTREE_COMMDIR", "WORKTREE_GITFILE",
+    "WORKTREE_CONFIG", "TRUST_ROOT", "RUNTIME_ROOT",
+    "ANCESTOR_WORKSPACE", "CURRENT_WORKSPACE", "CURRENT_WORKSPACE_DOTGIT",
+]
+STAGING_PARAM_ORDER = BASE_PARAM_ORDER + ["STAGING_ROOT", "RESULT_SINK"]
+MANAGED_PARAM_ORDER = BASE_PARAM_ORDER + [
+    "ATTEMPT_ROOT", "STAGING_ROOT", "RESULT_SINK",
+]
+DENIED_BASE_KEYS = sorted([
+    f"{family}_{operation}"
+    for family in ("live", "trust", "runtime", "ancestor")
+    for operation in ("create", "write", "rename", "unlink", "hardlink", "mkdir", "chmod")
+])
+DENIED_STAGING_KEYS = sorted([
+    *(f"staging_{operation}" for operation in
+      ("create", "write", "rename", "unlink", "hardlink", "mkdir", "chmod")),
+    "sink_hardlink", "sink_rename", "sink_unlink", "sink_chmod",
+    "staging_root_rename", "staging_root_chmod", "staging_root_rmdir",
+])
+DENIED_ATTEMPT_KEYS = sorted([
+    *(f"attempt_{operation}" for operation in
+      ("create", "write", "rename", "unlink", "hardlink", "mkdir", "chmod")),
+    "attempt_root_rename", "attempt_root_chmod", "attempt_root_rmdir",
+])
+BASE_EFFECT_KEYS = sorted([*DENIED_BASE_KEYS, "scratch_write_sha256"])
+STAGING_EFFECT_KEYS = sorted([
+    *DENIED_BASE_KEYS, *DENIED_STAGING_KEYS,
+    "scratch_write_sha256", "sink_write_sha256",
+])
+MANAGED_EFFECT_KEYS = sorted([*STAGING_EFFECT_KEYS, *DENIED_ATTEMPT_KEYS])
+PROOF_RESPONSE_KEYS = [
+    "child_euid", "child_pid", "child_pidversion", "class", "effects",
+    "profile_sha256", "proof_digest", "request_nonce", "schema_version",
+    "session_id",
+]
+PROOF_NONCE = "12" * 32
+PROOF_BYTES = f"H036-PROFILE-PROOF-V1:{PROOF_NONCE}".encode()
+PROOF_BYTES_SHA256 = hashlib.sha256(PROOF_BYTES).hexdigest()
+
+LABEL = "A_H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT_OPERATIONAL"
+REASON = "PUBLISHED_H036_CROSS_ATTEMPT_CONFINEMENT_ABSENT"
+FAILURE_SIGNATURE = [
+    "P0_WRITER_READY_AND_ALIVE_THROUGH_P1_CREATION",
+    "P0_WRITES_ATTEMPT_ROOT_AND_FUTURE_P1_SURFACES",
+    "P1_TARGET_RECEIVES_NORTROPIC_ATTEMPT_ROOT",
+    "PUBLISHED_H036_BASE_AND_WITH_STAGING_COMPATIBILITY_PASS",
+]
+
+passed = 0
+failed = 0
+failed_labels: list[tuple[str, str]] = []
+
+
+class Rig(Exception):
+    pass
+
+
+class Undecidable(Exception):
+    pass
+
+
+def sha(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def path_sha(path: Path) -> str:
+    return sha(path.read_bytes())
+
+
+def canonical_sha(value: Any) -> str:
+    return sha(json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8"))
+
+
+def strict_json(raw: bytes) -> Any:
+    def pairs(items):
+        out: dict[str, Any] = {}
+        for key, value in items:
+            if key in out:
+                raise Rig(f"duplicate JSON key {key}")
+            out[key] = value
+        return out
+    try:
+        return json.loads(
+            raw.decode("utf-8"), object_pairs_hook=pairs,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                Rig(f"non-finite JSON value {value}")),
+        )
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise Rig(f"invalid strict JSON: {exc}") from exc
+
+
+def check(ok: bool, label: str, detail: Any = "") -> None:
+    global passed, failed
+    rendered = detail if isinstance(detail, str) else json.dumps(
+        detail, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    if ok:
+        passed += 1
+        print(f"PASS {label}")
+    else:
+        failed += 1
+        failed_labels.append((label, rendered))
+        print(f"FAIL {label}" + (f" — {rendered}" if rendered else ""))
+
+
+def load_frozen_helpers() -> tuple[dict[str, Any], dict[str, Any]]:
+    if path_sha(H036_GATE) != PINNED_UNCHANGED["verify/bin/h-036-exit"]:
+        raise Rig("H036 helper gate identity drift")
+    if path_sha(H037_GATE) != PINNED_UNCHANGED["verify/bin/h-037-exit"]:
+        raise Rig("H037 identity helper gate drift")
+    return (
+        runpy.run_path(str(H036_GATE), run_name="h038_frozen_h036"),
+        runpy.run_path(str(H037_GATE), run_name="h038_frozen_h037"),
+    )
+
+
+def task_rows(spec: dict[str, Any], task_id: str) -> list[dict[str, Any]]:
+    tasks = spec.get("tasks")
+    if not isinstance(tasks, list):
+        raise Rig("tasks is not a list")
+    return [row for row in tasks if isinstance(row, dict) and row.get("id") == task_id]
+
+
+def expected_config(old: dict[str, Any], launcher_sha: str, helper_sha: str) -> dict[str, Any]:
+    value = copy.deepcopy(old)
+    value["products"]["launcher"]["sha256"] = launcher_sha
+    value["products"]["runtime_snapshot"]["sha256"] = helper_sha
+    value["authority"]["attempt_root_override_allowed"] = False
+    value["protocol"]["managed_attempt_root"] = {
+        "environment_key": "NORTROPIC_ATTEMPT_ROOT",
+        "source": "controller-bound-top-level-state-only",
+        "state_transport": "private-bootstrap-path-and-stable-dev-ino",
+        "workspace_parameter": "CURRENT_WORKSPACE",
+        "target_environment_visible": False,
+        "request_override_allowed": False,
+        "nested_override_allowed": False,
+        "required_with": ["NORTROPIC_STAGING_ROOT", "NORTROPIC_RESULT_SINK"],
+        "neutral_attempt_proof_directory": {
+            "name_pattern": ".nortropic-h038-proof-{controller_nonce_64_lowerhex}",
+            "parent": "ATTEMPT_ROOT_DIRECT_CHILD",
+            "nonce_source": "server-secrets-token-hex-32-not-request-or-caller",
+            "mode": "0700",
+            "uid": "current-euid",
+            "nofollow": True,
+            "disjoint_from": [
+                "CURRENT_WORKSPACE", "TRUST_ROOT", "STAGING_ROOT", "RESULT_SINK",
+                "LIVE_ROOT", "LIVE_GIT", "RUNTIME_ROOT",
+            ],
+            "source_members": [
+                "write-source", "rename-source", "unlink-source", "hardlink-source",
+            ],
+            "source_state": "regular-current-euid-mode0600-nlink1-distinct-bound-dev-ino-original-bytes",
+            "collision": "nofollow-o_excl-reject-before-any-mutation-preserve-foreign",
+            "cleanup": "exact-created-dev-ino-only-every-outcome-no-glob-chmod-follow-or-foreign-delete",
+        },
+        "canonical_requirements": [
+            "absolute", "preexisting", "nofollow-directory", "canonical-path",
+            "current-euid", "mode-0700", "stable-dev-ino-through-profile-install",
+        ],
+        "topology_requirements": [
+            "exact-current-workspace-managed-descendant",
+            "trust-explicit-managed-descendant-or-default-live-root-disjoint",
+            "exact-staging-sink-managed-descendants",
+            "workspace-trust-staging-mutually-disjoint",
+            "attempt-root-live-and-common-git-bidirectionally-disjoint",
+            "runtime-root-and-private-tmp-not-enclosed",
+            "no-canonical-dev-ino-alias-or-ancestor-substitution",
+        ],
+    }
+    value["protocol"]["proof_effect_keys_by_profile_sha256"][
+        PROFILE_MANAGED_SHA256
+    ] = MANAGED_EFFECT_KEYS
+    seatbelt = value["seatbelt"]
+    seatbelt["profile_encoding"] = "utf8-exact-deterministic-three-member-family-v2"
+    seatbelt["profile_id"] = "H038_MONOTONIC_ATTEMPT_WORKSPACE_SUBSET_V1"
+    seatbelt["profile_with_attempt_and_staging_sha256"] = PROFILE_MANAGED_SHA256
+    seatbelt["profile_selection_by_controller_state"] = {
+        "attempt_absent_staging_absent_sink_absent": PROFILE_BASE_SHA256,
+        "attempt_absent_staging_present_sink_present": PROFILE_STAGING_SHA256,
+        "attempt_present_staging_present_sink_present": PROFILE_MANAGED_SHA256,
+        "all_other_presence_states": "reject-before-runtime-root-supervisor-or-target",
+    }
+    seatbelt["parameter_order_by_profile_sha256"][
+        PROFILE_MANAGED_SHA256
+    ] = MANAGED_PARAM_ORDER
+    strip_exact = value["target_environment"]["strip_exact"]
+    insertion = strip_exact.index("NORTROPIC_STAGING_ROOT")
+    strip_exact.insert(insertion, "NORTROPIC_ATTEMPT_ROOT")
+    return value
+
+
+def config_oracle(document: Any, old: dict[str, Any], launcher_sha: str,
+                  helper_sha: str) -> tuple[bool, str]:
+    if not isinstance(document, dict):
+        return False, "config is not object"
+    expected = expected_config(old, launcher_sha, helper_sha)
+    return document == expected, "exact" if document == expected else "config mismatch"
+
+
+def config_selftests(old: dict[str, Any]) -> bool:
+    good = expected_config(old, "11" * 32, "22" * 32)
+    ok, _ = config_oracle(good, old, "11" * 32, "22" * 32)
+    mutants: list[dict[str, Any]] = []
+    for mutate in (
+        lambda d: d["authority"].update(attempt_root_override_allowed=True),
+        lambda d: d["seatbelt"].pop("profile_with_attempt_and_staging_sha256"),
+        lambda d: d["seatbelt"].update(profile_id="H036_MONOTONIC_WORKSPACE_SUBSET_V1"),
+        lambda d: d["seatbelt"]["profile_selection_by_controller_state"].update(
+            all_other_presence_states=PROFILE_BASE_SHA256),
+        lambda d: d["seatbelt"].update(profile_without_staging_sha256="33" * 32),
+        lambda d: d["seatbelt"].update(profile_sha256="44" * 32),
+        lambda d: d["seatbelt"]["parameter_order_by_profile_sha256"]
+            [PROFILE_MANAGED_SHA256].remove("ATTEMPT_ROOT"),
+        lambda d: d["protocol"]["proof_effect_keys_by_profile_sha256"]
+            [PROFILE_MANAGED_SHA256].remove("attempt_create"),
+        lambda d: d["protocol"]["managed_attempt_root"].update(
+            request_override_allowed=True),
+        lambda d: d["protocol"]["managed_attempt_root"]
+            ["neutral_attempt_proof_directory"].update(
+                nonce_source="caller-request-nonce"),
+        lambda d: d["protocol"]["managed_attempt_root"]
+            ["neutral_attempt_proof_directory"].update(
+                cleanup="prefix-glob-delete"),
+        lambda d: d["protocol"]["managed_attempt_root"]
+            ["neutral_attempt_proof_directory"].update(
+                collision="delete-and-recreate"),
+        lambda d: d["protocol"]["managed_attempt_root"]
+            ["neutral_attempt_proof_directory"].update(
+                parent="CURRENT_WORKSPACE"),
+        lambda d: d["protocol"]["managed_attempt_root"]
+            ["neutral_attempt_proof_directory"]["source_members"].append(
+                "arbitrary-source"),
+        lambda d: d["protocol"]["managed_attempt_root"]["canonical_requirements"]
+            .remove("stable-dev-ino-through-profile-install"),
+        lambda d: d["protocol"]["managed_attempt_root"]["topology_requirements"]
+            .remove("trust-explicit-managed-descendant-or-default-live-root-disjoint"),
+        lambda d: d["protocol"]["header_keys"].append("attempt_root"),
+        lambda d: d["target_environment"]["strip_exact"].remove(
+            "NORTROPIC_ATTEMPT_ROOT"),
+        lambda d: d.update(unexpected="authority"),
+    ):
+        candidate = copy.deepcopy(good)
+        mutate(candidate)
+        mutants.append(candidate)
+    return ok and all(
+        not config_oracle(value, old, "11" * 32, "22" * 32)[0]
+        for value in mutants
+    )
+
+
+def identity_oracle(*, parents: list[str], changes: list[tuple[str, str, str]],
+                    added: int, base_pins: bool, contract_equal: bool,
+                    checkout_equal: bool, contract_publication: bool,
+                    remote_publication_state: bool) -> bool:
+    expected = [("M", path, PRODUCT_MODES[path]) for path in PRODUCT_PATHS]
+    return (
+        len(parents) == 1
+        and len(changes) == len(expected)
+        and set(changes) == set(expected)
+        and 0 <= added <= MAX_ADDED_LINES
+        and base_pins and contract_equal and checkout_equal
+        and contract_publication and remote_publication_state
+    )
+
+
+def identity_selftests() -> bool:
+    parent = ["11" * 20]
+    changes = [("M", path, PRODUCT_MODES[path]) for path in PRODUCT_PATHS]
+    good = dict(parents=parent, changes=changes, added=MAX_ADDED_LINES,
+                base_pins=True, contract_equal=True, checkout_equal=True,
+                contract_publication=True, remote_publication_state=True)
+    reordered = copy.deepcopy(good)
+    reordered["changes"] = list(reversed(changes))
+    if not identity_oracle(**good) or not identity_oracle(**reordered):
+        return False
+    mutants = []
+    for key, value in (
+        ("parents", []), ("parents", parent + ["22" * 20]),
+        ("changes", changes[:-1]),
+        ("changes", changes + [("M", "controller/launch/neighbor.py", "100644")]),
+        ("changes", [("M", PRODUCT_PATHS[0], "100644"), *changes[1:]]),
+        ("added", MAX_ADDED_LINES + 1), ("base_pins", False),
+        ("contract_equal", False), ("checkout_equal", False),
+        ("contract_publication", False), ("remote_publication_state", False),
+    ):
+        candidate = copy.deepcopy(good)
+        candidate[key] = value
+        mutants.append(candidate)
+    return all(not identity_oracle(**value) for value in mutants)
+
+
+def historical_config(h37: dict[str, Any], binding: Any) -> dict[str, Any]:
+    raw = h37["git_blob"](
+        binding, PUBLISHED_H036_PRODUCT,
+        "config/python-runtime-authority-v2.json",
+    )
+    value = strict_json(raw)
+    if not isinstance(value, dict) or sha(raw) != OLD_PRODUCT_SHA256[
+        "config/python-runtime-authority-v2.json"
+    ]:
+        raise Rig("published H036 config identity mismatch")
+    return value
+
+
+def static_contract_checks(h37: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    check(
+        all((ROOT / path).is_file() and not (ROOT / path).is_symlink()
+            and path_sha(ROOT / path) == digest
+            for path, digest in PINNED_UNCHANGED.items()),
+        "F_H038_H035_H036_H037_REGISTRY_DELEGATION_CONSTITUTION_PRESERVED",
+    )
+    check(
+        DELEGATION_DOCUMENT_SHA256 == path_sha(DELEGATION)
+        and DELEGATION_SOURCE_SHA256 in DELEGATION.read_text(encoding="utf-8"),
+        "F_H038_CANONICAL_DELEGATION_DOCUMENT_AND_EMBEDDED_SOURCE_IDENTITIES",
+    )
+    try:
+        binding = h37["canonical_git_binding"](ROOT)
+    except Exception as exc:
+        raise Rig(f"canonical Git binding failed: {exc}") from exc
+    product_record = h37["strict_commit_record"](binding, PUBLISHED_H036_PRODUCT)
+    merge_record = h37["strict_commit_record"](binding, PUBLISHED_H036_MERGE)
+    authority_record = h37["strict_commit_record"](binding, CONTRACT_AUTHORITY_BASE)
+    product_tree = h37["identity_git"](
+        binding, "rev-parse", f"{PUBLISHED_H036_PRODUCT}^{{tree}}",
+    )
+    published_ok = (
+        product_tree.returncode == 0
+        and product_tree.stdout.strip() == PUBLISHED_H036_PRODUCT_TREE
+        and authority_record.tree == CONTRACT_AUTHORITY_TREE
+        and merge_record.parents == PUBLISHED_H036_MERGE_PARENTS
+        and all(
+            sha(h37["git_blob"](binding, PUBLISHED_H036_PRODUCT, path)) == digest
+            for path, digest in OLD_PRODUCT_SHA256.items()
+        )
+    )
+    check(published_ok, "F_H038_EXACT_PUBLISHED_H036_PRODUCT_MERGE_AND_THREE_BYTES")
+
+    spec = strict_json(SPEC.read_bytes())
+    if not isinstance(spec, dict):
+        raise Rig("task spec is not object")
+    rows = {task_id: task_rows(spec, task_id) for task_id in
+            ("h-035", "h-036", "h-037", "h-038")}
+    if any(len(value) != 1 for value in rows.values()):
+        raise Rig("H035-H038 task cardinality drift")
+    task = rows["h-038"][0]
+    contract = task.get("h038_managed_attempt_root_confinement")
+    bp = contract.get("bp01_bp14_bindings") if isinstance(contract, dict) else None
+    contract_base = contract.get("contract_authority_base", {}) \
+        if isinstance(contract, dict) else {}
+    attempt_authority = contract.get("attempt_root_authority", {}) \
+        if isinstance(contract, dict) else {}
+    check(
+        task.get("authority_class") == "owner_authority"
+        and task.get("allowed_write") == []
+        and task.get("owner_author_allowed_write") == PRODUCT_PATHS
+        and task.get("docs_impact") == []
+        and task.get("depends_on") == ["h-036"]
+        and task.get("exit_test") == "verify/bin/h-038-exit"
+        and task.get("max_changed_files") == 3
+        and task.get("max_added_lines") == MAX_ADDED_LINES
+        and isinstance(contract, dict)
+        and contract.get("test_author_surface") == TEST_AUTHOR_SURFACE
+        and contract_base.get("commit") == CONTRACT_AUTHORITY_BASE
+        and contract_base.get("tree") == CONTRACT_AUTHORITY_TREE
+        and contract_base.get("test_author_candidate_relation")
+            == "DIRECT_SINGLE_CHILD_WITH_EXACT_FIVE_FILE_SURFACE"
+        and contract_base.get("guarded_publication_merge", {}).get("ordered_parents")
+            == ["CONTRACT_AUTHORITY_BASE", "EXACT_REVIEWED_TEST_AUTHOR_CANDIDATE"]
+        and contract_base.get("guarded_publication_merge", {}).get("tree")
+            == "EXACT_TEST_AUTHOR_CANDIDATE_TREE"
+        and contract_base.get("guarded_publication_merge", {})
+            .get("origin_main_must_equal_merge_before_product_review") is True
+        and contract.get("product_identity", {}).get("candidate_relation")
+            == "DIRECT_SINGLE_CHILD_OF_EXACT_PUBLISHED_H038_CONTRACT_BASE"
+        and contract.get("product_identity", {}).get("remote_origin_main_states")
+            == [
+                "PREPUBLICATION_EXACT_H038_CONTRACT_BASE",
+                "POSTPUBLICATION_EXACT_TWO_PARENT_PRODUCT_MERGE_WITH_CANDIDATE_TREE",
+            ]
+        and attempt_authority.get("canonical_state")
+            == "ABSOLUTE_PREEXISTING_NOFOLLOW_DIRECTORY_CURRENT_UID_MODE0700_STABLE_DEV_INO"
+        and attempt_authority.get("trust_states") == [
+            "EXPLICIT_TRUST_STRICT_MANAGED_DESCENDANT_OF_ATTEMPT_ROOT",
+            "DEFAULT_TRUST_EQUALS_LIVE_ROOT_AND_ATTEMPT_ROOT_IS_BIDIRECTIONALLY_DISJOINT",
+        ]
+        and attempt_authority.get("neutral_attempt_proof_directory", {}).get(
+            "nonce_source"
+        ) == "SERVER_CSPRNG_SECRETS_TOKEN_HEX_32_NEVER_REQUEST_OR_CALLER"
+        and attempt_authority.get("neutral_attempt_proof_directory", {}).get(
+            "cleanup"
+        ) == "EXACT_CREATED_DEV_INO_ONLY_EVERY_OUTCOME_NO_PREFIX_GLOB_CHMOD_FOLLOW_OR_FOREIGN_DELETE"
+        and attempt_authority.get("neutral_attempt_proof_directory", {}).get(
+            "post_barrier_replacement_test"
+        ) == "DYNAMIC_PRODUCT_EFFECT_REQUIRED"
+        and contract.get("future_dependency_transition", {})
+            .get("h032_later_depends_exactly_on") == ["h-038"]
+        and [item.get("id") for item in bp] == [f"BP{index:02d}" for index in range(1, 15)]
+        and contract.get("standing_delegation", {})
+            .get("delegation_document_sha256") == DELEGATION_DOCUMENT_SHA256
+        and contract.get("standing_delegation", {})
+            .get("source_sha256") == DELEGATION_SOURCE_SHA256,
+        "F_H038_EXACT_OWNER_TASK_DEPENDENCY_SURFACE_BUDGET_BP01_BP14",
+    )
+    observed = {task_id: canonical_sha(value[0]) for task_id, value in rows.items()}
+    check(
+        observed == {
+            "h-035": H035_TASK_SHA256, "h-036": H036_TASK_SHA256,
+            "h-037": H037_TASK_SHA256, "h-038": TASK_SHA256,
+        },
+        "F_H038_EXACT_FROZEN_TASK_AND_HISTORICAL_TASK_IDENTITIES",
+        observed,
+    )
+    check(
+        sha(PROFILE_BASE.encode()) == PROFILE_BASE_SHA256
+        and sha(PROFILE_STAGING.encode()) == PROFILE_STAGING_SHA256
+        and sha(PROFILE_MANAGED.encode()) == PROFILE_MANAGED_SHA256
+        and contract.get("profile_family", {}).get("attempt_deny_suffix_utf8")
+            == ATTEMPT_DENY_SUFFIX
+        and contract.get("profile_family", {}).get("profile_id")
+            == "H038_MONOTONIC_ATTEMPT_WORKSPACE_SUBSET_V1"
+        and contract.get("profile_family", {})
+            .get("managed_attempt_with_staging_sha256") == PROFILE_MANAGED_SHA256,
+        "F_H038_EXACT_CLOSED_THREE_PROFILE_FAMILY_AND_SUFFIX_ORDER",
+    )
+    old = historical_config(h37, binding)
+    check(config_selftests(old) and identity_selftests(),
+          "J_H038_STRICT_CONFIG_AND_PRODUCT_IDENTITY_ONE_DEFECT_MUTANTS")
+    owner = OWNER_WORKFLOW.read_text(encoding="utf-8")
+    decision = DECISION_LOG.read_text(encoding="utf-8")
+    drift = DRIFT.read_text(encoding="utf-8")
+    check(
+        owner.count("<!-- H038_MANAGED_ATTEMPT_ROOT_CONFINEMENT_CONTRACT_V1 -->") == 1
+        and decision.count("H-038 managed attempt-root confinement contract") == 1
+        and drift.count("## 2026-08-29 — H-038 managed attempt-root confinement contract") == 1,
+        "F_H038_MINIMAL_OWNER_WORKFLOW_DECISION_AND_DRIFT_RECORDS",
+    )
+    return binding, old
+
+
+def product_phase(old: dict[str, Any]) -> str:
+    try:
+        current = {path: path_sha(ROOT / path) for path in PRODUCT_PATHS}
+    except OSError as exc:
+        raise Rig(f"product path unavailable: {exc}") from exc
+    if current == OLD_PRODUCT_SHA256:
+        return "preproduct"
+    document = strict_json(CONFIG.read_bytes())
+    ok, detail = config_oracle(document, old, current[PRODUCT_PATHS[0]],
+                               current[PRODUCT_PATHS[1]])
+    if ok:
+        return "product"
+    raise Rig(f"partial or unauthorized H038 product state: {detail}")
+
+
+def commit_changes(h37: dict[str, Any], binding: Any, before: str,
+                   after: str) -> list[tuple[str, str, str]]:
+    changed_run = h37["identity_git"](
+        binding, "diff-tree", "--no-commit-id", "--name-status", "-r", "-z",
+        "--no-renames", "--no-ext-diff", before, after, text=False,
+    )
+    if changed_run.returncode:
+        raise Rig("Git changed-path observation failed")
+    fields = [value for value in changed_run.stdout.split(b"\0") if value]
+    if len(fields) % 2:
+        raise Rig("malformed changed paths")
+    changes: list[tuple[str, str, str]] = []
+    for index in range(0, len(fields), 2):
+        status_text = fields[index].decode("ascii")
+        path = fields[index + 1].decode("utf-8")
+        if status_text not in {"A", "M"}:
+            raise Rig(f"unexpected changed-path status {status_text}")
+        mode_run = h37["identity_git"](
+            binding, "ls-tree", after, "--", path,
+        )
+        match = re.fullmatch(r"([0-9]{6}) blob [0-9a-f]{40}\t(.+)\n",
+                             mode_run.stdout)
+        if mode_run.returncode or match is None or match.group(2) != path:
+            raise Rig("candidate mode observation failed")
+        changes.append((status_text, path, match.group(1)))
+    return changes
+
+
+def product_identity(h37: dict[str, Any], binding: Any, old: dict[str, Any],
+                     base: str, candidate: str) -> tuple[bool, dict[str, Any]]:
+    detail: dict[str, Any] = {"base": base, "candidate": candidate}
+    try:
+        if re.fullmatch(r"[0-9a-f]{40}", base) is None \
+                or re.fullmatch(r"[0-9a-f]{40}", candidate) is None:
+            return False, {**detail, "reason": "noncanonical commit"}
+        base_record = h37["strict_commit_record"](binding, base)
+        candidate_record = h37["strict_commit_record"](binding, candidate)
+        head = h37["identity_git"](binding, "rev-parse", "--verify", "HEAD")
+        published_base = h37["identity_git"](
+            binding, "rev-parse", "--verify", "refs/remotes/origin/main",
+        )
+        if head.returncode or published_base.returncode:
+            return False, {**detail, "reason": "Git observation failed"}
+        remote_oid = published_base.stdout.strip()
+        remote_publication_state = remote_oid == base
+        if not remote_publication_state \
+                and re.fullmatch(r"[0-9a-f]{40}", remote_oid) is not None:
+            remote_record = h37["strict_commit_record"](binding, remote_oid)
+            remote_publication_state = (
+                remote_record.parents == [base, candidate]
+                and remote_record.tree == candidate_record.tree
+            )
+        changes = commit_changes(h37, binding, base, candidate)
+        contract_publication = False
+        contract_candidate = ""
+        contract_changes: list[tuple[str, str, str]] = []
+        if len(base_record.parents) == 2 \
+                and base_record.parents[0] == CONTRACT_AUTHORITY_BASE:
+            contract_candidate = base_record.parents[1]
+            contract_record = h37["strict_commit_record"](
+                binding, contract_candidate,
+            )
+            contract_changes = commit_changes(
+                h37, binding, CONTRACT_AUTHORITY_BASE, contract_candidate,
+            )
+            expected_contract_changes = {
+                ("M", "specs/tasks.spec.json", "100644"),
+                ("A", "verify/bin/h-038-exit", "100755"),
+                ("M", "docs/loop/owner-author-workflow-v1.md", "100644"),
+                ("M", "docs/05-beslutslogg.md", "100644"),
+                ("M", "docs/loop/drift.md", "100644"),
+            }
+            contract_bytes_equal = all(
+                h37["git_blob"](binding, contract_candidate, path)
+                    == h37["git_blob"](binding, base, path)
+                    == (ROOT / path).read_bytes()
+                for path in TEST_AUTHOR_SURFACE
+            )
+            contract_publication = (
+                contract_record.parents == [CONTRACT_AUTHORITY_BASE]
+                and contract_record.tree == base_record.tree
+                and len(contract_changes) == len(expected_contract_changes)
+                and set(contract_changes) == expected_contract_changes
+                and contract_bytes_equal
+            )
+        numstat = h37["identity_git"](
+            binding, "diff", "--numstat", "--no-renames", "--no-ext-diff",
+            base, candidate, "--", *PRODUCT_PATHS,
+        )
+        added = 0
+        if numstat.returncode:
+            return False, {**detail, "reason": "numstat failed"}
+        for line in numstat.stdout.splitlines():
+            left, _right, _path = line.split("\t", 2)
+            if not left.isdecimal():
+                return False, {**detail, "reason": "binary product delta"}
+            added += int(left)
+        base_pins = all(
+            sha(h37["git_blob"](binding, base, path)) == digest
+            for path, digest in OLD_PRODUCT_SHA256.items()
+        ) and all(
+            h37["git_blob"](binding, base, path)
+                == h37["git_blob"](binding, candidate, path)
+            and sha(h37["git_blob"](binding, base, path)) == digest
+            for path, digest in PINNED_UNCHANGED.items()
+        )
+        contract_equal = all(
+            h37["git_blob"](binding, base, path)
+                == h37["git_blob"](binding, candidate, path)
+                == (ROOT / path).read_bytes()
+            for path in TEST_AUTHOR_SURFACE
+        )
+        checkout_equal, checkout_detail = h37["physical_checkout_identity"](
+            binding, candidate,
+        )
+        checkout_equal = checkout_equal and head.stdout.strip() == candidate
+        relation = identity_oracle(
+            parents=candidate_record.parents, changes=changes, added=added,
+            base_pins=base_pins, contract_equal=contract_equal,
+            checkout_equal=checkout_equal,
+            contract_publication=contract_publication,
+            remote_publication_state=remote_publication_state,
+        ) and candidate_record.parents == [base]
+        document = strict_json(h37["git_blob"](
+            binding, candidate, "config/python-runtime-authority-v2.json",
+        ))
+        candidate_config, config_detail = config_oracle(
+            document, old,
+            sha(h37["git_blob"](binding, candidate, PRODUCT_PATHS[0])),
+            sha(h37["git_blob"](binding, candidate, PRODUCT_PATHS[1])),
+        )
+        detail.update({
+            "parents": candidate_record.parents,
+            "base_parents": base_record.parents,
+            "contract_candidate": contract_candidate,
+            "contract_changes": contract_changes,
+            "contract_publication": contract_publication,
+            "remote_origin_main": remote_oid,
+            "remote_publication_state": remote_publication_state,
+            "changes": changes,
+            "added_lines": added,
+            "base_pins": base_pins,
+            "contract_equal": contract_equal,
+            "physical_checkout": checkout_detail,
+            "config": config_detail,
+        })
+        return relation and candidate_config, detail
+    except Exception as exc:
+        return False, {**detail, "reason": f"identity exception: {type(exc).__name__}: {exc}"}
+
+
+def ensure_directory(path: Path, mode: int = 0o700) -> Path:
+    path.mkdir(parents=True, mode=mode, exist_ok=False)
+    path.chmod(mode)
+    return path
+
+
+def write_file(path: Path, raw: bytes, mode: int) -> None:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+    try:
+        view = memoryview(raw)
+        while view:
+            view = view[os.write(fd, view):]
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    path.chmod(mode)
+
+
+def exact_tree_snapshot(root: Path) -> dict[str, tuple[Any, ...]]:
+    result: dict[str, tuple[Any, ...]] = {}
+    total = 0
+
+    def visit(path: Path, relative: str) -> None:
+        nonlocal total
+        if len(result) >= 8192:
+            raise Rig("attempt snapshot member budget exceeded")
+        observed = path.lstat()
+        common = (
+            stat.S_IMODE(observed.st_mode), observed.st_dev, observed.st_ino,
+            observed.st_nlink,
+        )
+        if stat.S_ISDIR(observed.st_mode):
+            result[relative] = ("directory", *common)
+            with os.scandir(path) as iterator:
+                names = sorted(entry.name for entry in iterator)
+            for name in names:
+                visit(path / name, name if relative == "." else f"{relative}/{name}")
+        elif stat.S_ISREG(observed.st_mode):
+            if observed.st_size > 64 * 1024 * 1024:
+                raise Rig("attempt snapshot file budget exceeded")
+            total += observed.st_size
+            if total > 128 * 1024 * 1024:
+                raise Rig("attempt snapshot total budget exceeded")
+            result[relative] = (
+                "regular", *common, observed.st_size, path_sha(path),
+            )
+        elif stat.S_ISLNK(observed.st_mode):
+            result[relative] = ("symlink", *common, os.readlink(path))
+        else:
+            result[relative] = ("other", *common)
+
+    visit(root, ".")
+    return result
+
+
+def profile_proof_residue(root: Path) -> list[str]:
+    return sorted(
+        relative for relative in exact_tree_snapshot(root)
+        if any(
+            re.fullmatch(
+                r"\.nortropic-h0(?:36|38)-proof-[0-9a-f]{64}(?:[.-].*)?",
+                component,
+            ) is not None
+            for component in relative.split("/")
+        )
+    )
+
+
+def h038_neutral_proof_residue(root: Path) -> list[str]:
+    return sorted(
+        relative for relative in exact_tree_snapshot(root)
+        if any(
+            re.fullmatch(r"\.nortropic-h038-proof-[0-9a-f]{64}", component)
+                is not None
+            for component in relative.split("/")
+        )
+    )
+
+
+LEGACY_RESIDUE_NAME = re.compile(
+    r"\.nortropic-h036-proof-(?P<nonce>[0-9a-f]{64})-"
+    r"(?P<family>staging|ancestor)-(?P<leaf>"
+    r"(?:write|rename|unlink|hardlink)-source|"
+    r"created|hardlink-target|new-dir|rename-target)"
+)
+
+
+def legacy_proof_residue_exact(
+    root: Path,
+    relatives: list[str],
+    expected_parent_families: dict[str, str],
+) -> bool:
+    """Admit only the two exact frozen-H036 terminal source shapes.
+
+    A matching component is not authority: every residue must itself be one
+    expected leaf at one fixture-owned parent and have the exact type, bytes,
+    mode, link and inode relations produced by frozen H036.
+    """
+    groups: dict[tuple[str, str, str], dict[str, Path]] = {}
+    for relative in relatives:
+        candidate = Path(relative)
+        parent = candidate.parent.as_posix()
+        match = LEGACY_RESIDUE_NAME.fullmatch(candidate.name)
+        if match is None or expected_parent_families.get(parent) != match["family"]:
+            return False
+        key = (parent, match["nonce"], match["family"])
+        if match["leaf"] in groups.setdefault(key, {}):
+            return False
+        groups[key][match["leaf"]] = root / candidate
+    if {key[0] for key in groups} != set(expected_parent_families):
+        return False
+
+    def regular(path: Path, mode: int, nlink: int, raw: bytes) -> os.stat_result | None:
+        try:
+            observed = path.lstat()
+            value = path.read_bytes()
+        except OSError:
+            return None
+        return observed if (
+            stat.S_ISREG(observed.st_mode) and not path.is_symlink()
+            and observed.st_uid == os.geteuid()
+            and stat.S_IMODE(observed.st_mode) == mode
+            and observed.st_nlink == nlink and value == raw
+        ) else None
+
+    untouched = {
+        "write-source", "rename-source", "unlink-source", "hardlink-source",
+    }
+    exercised = {
+        "created", "hardlink-source", "hardlink-target", "new-dir",
+        "rename-target", "write-source",
+    }
+    for (_parent, _nonce, family), leaves in groups.items():
+        if family == "staging" or set(leaves) == untouched:
+            if set(leaves) != untouched:
+                return False
+            states = [regular(leaves[name], 0o600, 1, b"ORIGINAL")
+                      for name in sorted(untouched)]
+            if any(value is None for value in states) or len({
+                (value.st_dev, value.st_ino) for value in states if value is not None
+            }) != 4:
+                return False
+            continue
+        if set(leaves) != exercised:
+            return False
+        created = regular(leaves["created"], 0o600, 1, b"")
+        hard_source = regular(
+            leaves["hardlink-source"], 0o600, 2, b"ORIGINAL",
+        )
+        hard_target = regular(
+            leaves["hardlink-target"], 0o600, 2, b"ORIGINAL",
+        )
+        renamed = regular(leaves["rename-target"], 0o600, 1, b"ORIGINAL")
+        written = regular(leaves["write-source"], 0o644, 1, b"")
+        try:
+            directory = leaves["new-dir"].lstat()
+            with os.scandir(leaves["new-dir"]) as iterator:
+                directory_empty = next(iterator, None) is None
+        except OSError:
+            return False
+        if (
+            any(value is None for value in
+                (created, hard_source, hard_target, renamed, written))
+            or not stat.S_ISDIR(directory.st_mode)
+            or leaves["new-dir"].is_symlink()
+            or directory.st_uid != os.geteuid()
+            or directory.st_nlink < 2
+            or stat.S_IMODE(directory.st_mode) not in {0o700, 0o755}
+            or not directory_empty
+            or (hard_source.st_dev, hard_source.st_ino)
+                != (hard_target.st_dev, hard_target.st_ino)
+        ):
+            return False
+    return True
+
+
+def wait_for(path: Path, token: str, seconds: float = 8.0) -> str:
+    deadline = time.monotonic() + seconds
+    raw = ""
+    while time.monotonic() < deadline:
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            raw = ""
+        if token in raw:
+            return raw
+        time.sleep(0.02)
+    return raw
+
+
+PROCESS_IDENTITY_KEYS = ("pid", "pgid", "sid", "euid", "start", "command")
+
+
+def bound_process(h36: dict[str, Any], identity: dict[str, Any] | None,
+                  *, live: bool) -> bool:
+    if not isinstance(identity, dict) or type(identity.get("pid")) is not int:
+        return False
+    current = h36["process_start_record"](identity["pid"])
+    return (
+        isinstance(current, dict)
+        and all(current.get(key) == identity.get(key) for key in PROCESS_IDENTITY_KEYS)
+        and (not live or not str(current.get("state", "")).startswith("Z"))
+    )
+
+
+P0_PROGRAM = r'''import errno,json,os,pathlib,sys,time
+attempt,p1,trust1,staging1,sink1,log,trigger,attack_raw=sys.argv[1:]
+attack=json.loads(attack_raw)
+log=pathlib.Path(log); trigger=pathlib.Path(trigger)
+first=os.fork()
+if first:
+ _,status=os.waitpid(first,0)
+ print(json.dumps({"attempt_env":os.environ.get("NORTROPIC_ATTEMPT_ROOT"),"double_forked":os.waitstatus_to_exitcode(status)==0},sort_keys=True,separators=(",",":")))
+ raise SystemExit(0 if os.waitstatus_to_exitcode(status)==0 else 90)
+second=os.fork()
+if second: os._exit(0)
+os.setsid()
+devnull=os.open(os.devnull,os.O_RDWR)
+for stream in (0,1,2): os.dup2(devnull,stream)
+if devnull>2: os.close(devnull)
+def note(key,value):
+ with log.open("a") as handle: handle.write(key+"\t"+str(value)+"\n"); handle.flush(); os.fsync(handle.fileno())
+note("READY",os.getpid())
+deadline=time.monotonic()+12
+while time.monotonic()<deadline and (not pathlib.Path(p1).is_dir() or not trigger.exists()): time.sleep(.01)
+note("ALIVE",1)
+def attempt_effect(label,fn):
+ try: fn()
+ except OSError as exc: value=exc.errno if exc.errno is not None else 999
+ else: value=0
+ note(label,value)
+attempt_effect("ATTEMPT_LITERAL",lambda:os.chmod(attempt,0o700))
+attempt_effect("ATTEMPT_CHILD",lambda:open(os.path.join(attempt,"r128-p0-root-cross"),"xb").close())
+def rewrite():
+ fd=os.open(attack["write"],os.O_WRONLY|os.O_TRUNC);os.write(fd,b"P0-WRITE");os.fsync(fd);os.close(fd)
+attempt_effect("ATTEMPT_WRITE",rewrite)
+attempt_effect("ATTEMPT_RENAME_WITHIN",lambda:os.rename(attack["rename_within_src"],attack["rename_within_dst"]))
+attempt_effect("ATTEMPT_RENAME_OUT",lambda:os.rename(attack["rename_out_src"],attack["rename_out_dst"]))
+attempt_effect("ATTEMPT_RENAME_IN",lambda:os.rename(attack["rename_in_src"],attack["rename_in_dst"]))
+attempt_effect("ATTEMPT_UNLINK",lambda:os.unlink(attack["unlink"]))
+attempt_effect("ATTEMPT_HARDLINK_OUT",lambda:os.link(attack["hardlink_out_src"],attack["hardlink_out_dst"]))
+attempt_effect("ATTEMPT_HARDLINK_IN",lambda:os.link(attack["hardlink_in_src"],attack["hardlink_in_dst"]))
+attempt_effect("ATTEMPT_MKDIR",lambda:os.mkdir(attack["mkdir"],0o700))
+attempt_effect("ATTEMPT_CHMOD",lambda:os.chmod(attack["chmod"],0o777))
+attempt_effect("P1_WORKSPACE",lambda:open(os.path.join(p1,"r128-p0-cross"),"xb").close())
+attempt_effect("P1_TRUST",lambda:open(os.path.join(trust1,"r128-p0-cross"),"xb").close())
+attempt_effect("P1_STAGING",lambda:open(os.path.join(staging1,"r128-p0-cross"),"xb").close())
+def sink_write():
+ fd=os.open(sink1,os.O_WRONLY|os.O_TRUNC); os.write(fd,b"P0-CROSS"); os.fsync(fd); os.close(fd)
+attempt_effect("P1_SINK",sink_write)
+attempt_effect("ATTEMPT_ROOT_RENAME_SELF",lambda:os.rename(attempt,attempt))
+attempt_effect("ATTEMPT_ROOT_RMDIR",lambda:os.rmdir(attempt))
+note("DONE",1)
+'''
+
+P1_PROGRAM = r'''import hashlib,json,os,pathlib,re,secrets,socket,stat,struct,subprocess,sys,time
+workspace,envelope,cli,python_app,sibling,sink,attempt=sys.argv[1:]
+progress=pathlib.Path(workspace)/"p1-progress"
+def progressed(value):progress.write_text(value)
+own=pathlib.Path(workspace)/"p1-own"; own.write_bytes(b"P1-OWN")
+sink_before=pathlib.Path(sink).read_bytes().decode()
+if sink_before!="ORIGINAL-P1": raise SystemExit(92)
+def regular_identity(path):
+ try:s=os.lstat(path)
+ except OSError:return None
+ return {"dev":s.st_dev,"ino":s.st_ino,"mode":s.st_mode&0o777,"nlink":s.st_nlink,"uid":s.st_uid,"regular":stat.S_ISREG(s.st_mode),"symlink":stat.S_ISLNK(s.st_mode)}
+def file_sha(path):
+ try:return hashlib.sha256(path.read_bytes()).hexdigest()
+ except OSError:return None
+sink_initial_identity=regular_identity(pathlib.Path(sink))
+def neutral_directories():
+ root=pathlib.Path(attempt);return sorted(path.name for path in root.iterdir() if re.fullmatch(r"\.nortropic-h038-proof-[0-9a-f]{64}",path.name))
+def exact_neutral(name,request_nonce):
+ if name==(".nortropic-h038-proof-"+request_nonce):return False
+ root=pathlib.Path(attempt)/name
+ try:
+  rs=os.lstat(root);members=sorted(path.name for path in root.iterdir())
+  if not stat.S_ISDIR(rs.st_mode) or stat.S_ISLNK(rs.st_mode) or rs.st_uid!=os.geteuid() or (rs.st_mode&0o777)!=0o700:return False
+  if members!="hardlink-source rename-source unlink-source write-source".split():return False
+  identities=[]
+  for member in members:
+   path=root/member;s=os.lstat(path)
+   if not stat.S_ISREG(s.st_mode) or stat.S_ISLNK(s.st_mode) or s.st_uid!=os.geteuid() or (s.st_mode&0o777)!=0o600 or s.st_nlink!=1 or path.read_bytes()!=b"ORIGINAL":return False
+   identities.append((s.st_dev,s.st_ino))
+  return len(identities)==len(set(identities))
+ except OSError:return False
+outer_proof_baseline=neutral_directories()
+outer_proof_baseline_valid=outer_proof_baseline==[] or (len(outer_proof_baseline)==1 and exact_neutral(outer_proof_baseline[0],""))
+nested=pathlib.Path(workspace)/"nested"; nested.mkdir(); pathlib.Path(envelope).write_text("{}")
+env=dict(os.environ); env["NORTROPIC_ATTEMPT_ROOT"]="/"
+script='if printf X > "$1" 2>/dev/null; then v=WRITTEN; else v=DENIED; fi; printf "%s|%s" "$v" "${NORTROPIC_ATTEMPT_ROOT-unset}"'
+run=subprocess.run([python_app,"-I","-S","-B",cli,"run",str(nested),envelope,"20","--","/bin/sh","-c",script,"sh",sibling],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+progressed("nested")
+proof_after_nested=neutral_directories()
+last_frame_raw=[b""]
+def recv_frame(sock):
+ lead=b""
+ while len(lead)<4:
+  part=sock.recv(4-len(lead))
+  if not part:return None
+  lead+=part
+ size=struct.unpack(">I",lead)[0]
+ if size>1048576:raise ValueError("oversized")
+ body=b""
+ while len(body)<size:
+  part=sock.recv(size-len(body))
+  if not part:return None
+  body+=part
+ last_frame_raw[0]=body
+ return json.loads(body.decode())
+def valid_managed_proof():
+ payload=b"{}"; nonce="12"*32
+ raw_child=pathlib.Path(workspace)/"raw-valid-child"; raw_child.mkdir()
+ marker=raw_child/"managed-proof-target-started"
+ pair_a,pair_b=socket.socketpair();audit=struct.unpack("=8I",pair_a.getsockopt(0,6,32));pair_a.close();pair_b.close()
+ header={"argv":[python_app,"-I","-S","-B","-c","import pathlib,sys;pathlib.Path(sys.argv[1]).write_bytes(b'VALID')",str(marker)],"capability":os.environ["NORTROPIC_H036_CAPABILITY"],"cwd_relative_components":["raw-valid-child"],"envelope_length":len(payload),"environment":[["PATH","/usr/bin:/bin"]],"operation":"launch-v1","peer_euid":os.geteuid(),"peer_pid":os.getpid(),"peer_pidversion":audit[7],"request_nonce":nonce,"schema_version":1,"session_id":os.environ["NORTROPIC_H036_SESSION_ID"],"timeout_milliseconds":3000}
+ neutral_before=neutral_directories();body=json.dumps(header,sort_keys=True,separators=(",",":")).encode();sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);sock.settimeout(10)
+ stdin_r,stdin_w=os.pipe();os.write(stdin_w,payload);os.close(stdin_w);stdout_r,stdout_w=os.pipe();stderr_r,stderr_w=os.pipe();fds=[stdin_r,stdout_w,stderr_w]
+ try:
+  sock.connect(os.environ["NORTROPIC_H036_SOCKET"]);sock.sendmsg([struct.pack(">I",len(body))+body],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,struct.pack("3i",*fds))])
+  for fd in fds:os.close(fd)
+  fds=[];sock.sendall(struct.pack(">I",len(payload))+payload);proof=recv_frame(sock);proof_wire=last_frame_raw[0]
+  target_before=marker.exists();scratch=raw_child/(".nortropic-h036-proof-"+nonce+".allowed")
+  neutral_during=neutral_directories();neutral_delta=sorted(set(neutral_during)-set(neutral_before));neutral_state={"delta":neutral_delta,"valid":False}
+  if len(neutral_delta)==1:
+   neutral=pathlib.Path(attempt)/neutral_delta[0];st=neutral.lstat();members=sorted(path.name for path in neutral.iterdir());source_names=["hardlink-source","rename-source","unlink-source","write-source"];source_state=[]
+   for name in source_names:
+    path=neutral/name
+    try:s=path.lstat();source_state.append([name,oct(s.st_mode&0o777),s.st_uid,s.st_nlink,s.st_dev,s.st_ino,path.read_bytes().decode()])
+    except OSError:source_state.append([name,"MISSING"])
+   identities=[row[4:6] for row in source_state if len(row)==7]
+   neutral_state={"delta":neutral_delta,"valid":(oct(st.st_mode&0o777)=="0o700" and st.st_uid==os.geteuid() and not neutral.is_symlink() and members==source_names and all(len(row)==7 and row[1]=="0o600" and row[2]==os.geteuid() and row[3]==1 and row[6]=="ORIGINAL" for row in source_state) and len(identities)==len(set(map(tuple,identities))) and exact_neutral(neutral_delta[0],nonce)),"directory_identity":[st.st_dev,st.st_ino],"members":members,"sources":source_state}
+  scratch_identity=regular_identity(scratch);sink_proof_identity=regular_identity(pathlib.Path(sink))
+  scratch_sha=hashlib.sha256(scratch.read_bytes()).hexdigest() if isinstance(scratch_identity,dict) and scratch_identity["regular"] and not scratch_identity["symlink"] else None
+  sink_sha=hashlib.sha256(pathlib.Path(sink).read_bytes()).hexdigest()
+  go={"operation":"go-v1","proof_digest":proof["proof_digest"],"request_nonce":nonce,"schema_version":1};go_raw=json.dumps(go,sort_keys=True,separators=(",",":")).encode();sock.sendall(struct.pack(">I",len(go_raw))+go_raw);final=recv_frame(sock)
+  deadline=time.monotonic()+2
+  while scratch.exists() and time.monotonic()<deadline:time.sleep(.01)
+  marker_value=marker.read_bytes().decode() if marker.is_file() else None
+  sink_after=pathlib.Path(sink).read_bytes().decode()
+  return {"proof":proof,"proof_wire_hex":proof_wire.hex(),"target_before_go":target_before,"scratch_sha256_before_go":scratch_sha,"scratch_identity_before_go":scratch_identity,"sink_sha256_before_go":sink_sha,"sink_initial_identity":sink_initial_identity,"sink_proof_identity":sink_proof_identity,"sink_after_identity":regular_identity(pathlib.Path(sink)),"final":final,"target_after_go":marker_value,"scratch_absent_after_final":not scratch.exists() and not scratch.is_symlink(),"sink_after_final":sink_after,"session":os.environ["NORTROPIC_H036_SESSION_ID"],"neutral_before":neutral_before,"neutral_during":neutral_during,"neutral_after":neutral_directories(),"neutral_state":neutral_state}
+ finally:
+  sock.close()
+  for fd in fds:
+   try:os.close(fd)
+   except OSError:pass
+  os.close(stdout_r);os.close(stderr_r)
+valid_proof=valid_managed_proof()
+progressed("valid")
+proof_after_valid=neutral_directories()
+def managed_outcome(name,nonce,timeout_ms,argv):
+ payload=b"{}";raw_child=pathlib.Path(workspace)/("raw-outcome-"+name);raw_child.mkdir();pair_a,pair_b=socket.socketpair();audit=struct.unpack("=8I",pair_a.getsockopt(0,6,32));pair_a.close();pair_b.close();header={"argv":argv,"capability":os.environ["NORTROPIC_H036_CAPABILITY"],"cwd_relative_components":[raw_child.name],"envelope_length":len(payload),"environment":[["PATH","/usr/bin:/bin"]],"operation":"launch-v1","peer_euid":os.geteuid(),"peer_pid":os.getpid(),"peer_pidversion":audit[7],"request_nonce":nonce,"schema_version":1,"session_id":os.environ["NORTROPIC_H036_SESSION_ID"],"timeout_milliseconds":timeout_ms};before=neutral_directories();sink_identity_before=regular_identity(pathlib.Path(sink));sink_sha_before=file_sha(pathlib.Path(sink));body=json.dumps(header,sort_keys=True,separators=(",",":")).encode();sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);sock.settimeout(10);stdin_r,stdin_w=os.pipe();os.write(stdin_w,payload);os.close(stdin_w);stdout_r,stdout_w=os.pipe();stderr_r,stderr_w=os.pipe();fds=[stdin_r,stdout_w,stderr_w]
+ try:
+  sock.connect(os.environ["NORTROPIC_H036_SOCKET"]);sock.sendmsg([struct.pack(">I",len(body))+body],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,struct.pack("3i",*fds))])
+  for fd in fds:os.close(fd)
+  fds=[];sock.sendall(struct.pack(">I",len(payload))+payload);proof=recv_frame(sock);during=neutral_directories();delta=sorted(set(during)-set(before));neutral_valid=len(delta)==1 and exact_neutral(delta[0],nonce);scratch=raw_child/(".nortropic-h036-proof-"+nonce+".allowed");scratch_identity=regular_identity(scratch);scratch_sha=file_sha(scratch);sink_identity_during=regular_identity(pathlib.Path(sink));sink_sha_during=file_sha(pathlib.Path(sink));go={"operation":"go-v1","proof_digest":proof["proof_digest"],"request_nonce":nonce,"schema_version":1};go_raw=json.dumps(go,sort_keys=True,separators=(",",":")).encode();sock.sendall(struct.pack(">I",len(go_raw))+go_raw);final=recv_frame(sock)
+ finally:
+  sock.close()
+  for fd in fds:
+   try:os.close(fd)
+   except OSError:pass
+  os.close(stdout_r);os.close(stderr_r)
+ deadline=time.monotonic()+3
+ while neutral_directories()!=before and time.monotonic()<deadline:time.sleep(.01)
+ return {"request_nonce":nonce,"before":before,"during":during,"after":neutral_directories(),"neutral_valid":neutral_valid,"profile":proof.get("profile_sha256") if isinstance(proof,dict) else None,"proof_scratch_sha256":proof.get("effects",{}).get("scratch_write_sha256") if isinstance(proof,dict) else None,"proof_sink_sha256":proof.get("effects",{}).get("sink_write_sha256") if isinstance(proof,dict) else None,"final":final,"scratch_identity_during":scratch_identity,"scratch_sha256_during":scratch_sha,"scratch_absent":not scratch.exists() and not scratch.is_symlink(),"sink_identity_before":sink_identity_before,"sink_identity_during":sink_identity_during,"sink_identity_after":regular_identity(pathlib.Path(sink)),"sink_sha256_before":sink_sha_before,"sink_sha256_during":sink_sha_during,"sink_sha256_after":file_sha(pathlib.Path(sink)),"sink_restored":pathlib.Path(sink).read_bytes().decode()=="ORIGINAL-P1"}
+managed_nonzero=managed_outcome("nonzero","15"*32,3000,["/bin/sh","-c","exit 7"])
+managed_timeout=managed_outcome("timeout","16"*32,100,["/bin/sh","-c","sleep 2"])
+progressed("outcomes")
+proof_after_outcomes=neutral_directories()
+def raw_attempt_override():
+ payload=b"{}"; raw_child=pathlib.Path(workspace)/"raw-child"; raw_child.mkdir()
+ marker=pathlib.Path(workspace)/"raw-attempt-override-target-started"
+ pair_a,pair_b=socket.socketpair();audit=struct.unpack("=8I",pair_a.getsockopt(0,6,32));pair_a.close();pair_b.close()
+ header={"argv":[python_app,"-I","-S","-B","-c","import pathlib,sys;pathlib.Path(sys.argv[1]).write_text('BAD')",str(marker)],"capability":os.environ["NORTROPIC_H036_CAPABILITY"],"cwd_relative_components":["raw-child"],"envelope_length":len(payload),"environment":[["PATH","/usr/bin:/bin"],["NORTROPIC_ATTEMPT_ROOT","/"]],"operation":"launch-v1","peer_euid":os.geteuid(),"peer_pid":os.getpid(),"peer_pidversion":audit[7],"request_nonce":secrets.token_hex(32),"schema_version":1,"session_id":os.environ["NORTROPIC_H036_SESSION_ID"],"timeout_milliseconds":3000}
+ body=json.dumps(header,sort_keys=True,separators=(",",":")).encode();sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);sock.settimeout(8)
+ stdin_r,stdin_w=os.pipe();os.write(stdin_w,payload);os.close(stdin_w);stdout_r,stdout_w=os.pipe();stderr_r,stderr_w=os.pipe();fds=[stdin_r,stdout_w,stderr_w]
+ try:
+  sock.connect(os.environ["NORTROPIC_H036_SOCKET"]);sock.sendmsg([struct.pack(">I",len(body))+body],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,struct.pack("3i",*fds))])
+  for fd in fds:os.close(fd)
+  fds=[];sock.sendall(struct.pack(">I",len(payload))+payload);first=recv_frame(sock)
+  accepted=isinstance(first,dict) and first.get("class")=="profile-proof-v1"
+ except Exception:
+  accepted=False
+ finally:
+  sock.close()
+  for fd in fds:
+   try:os.close(fd)
+   except OSError:pass
+  os.close(stdout_r);os.close(stderr_r)
+ time.sleep(.05)
+ return ("ACCEPTED_PROOF" if accepted else "REJECTED"),marker.exists()
+raw_override,raw_marker=raw_attempt_override()
+progressed("override")
+proof_after_rejected_override=neutral_directories()
+def replacement_disconnect(kind,nonce):
+ payload=b"{}";raw_child=pathlib.Path(workspace)/("raw-replacement-"+kind);raw_child.mkdir();pair_a,pair_b=socket.socketpair();audit=struct.unpack("=8I",pair_a.getsockopt(0,6,32));pair_a.close();pair_b.close();sink_identity_before=regular_identity(pathlib.Path(sink));sink_sha_before=file_sha(pathlib.Path(sink))
+ header={"argv":["/usr/bin/true"],"capability":os.environ["NORTROPIC_H036_CAPABILITY"],"cwd_relative_components":[raw_child.name],"envelope_length":len(payload),"environment":[["PATH","/usr/bin:/bin"]],"operation":"launch-v1","peer_euid":os.geteuid(),"peer_pid":os.getpid(),"peer_pidversion":audit[7],"request_nonce":nonce,"schema_version":1,"session_id":os.environ["NORTROPIC_H036_SESSION_ID"],"timeout_milliseconds":3000}
+ before=neutral_directories();body=json.dumps(header,sort_keys=True,separators=(",",":")).encode();sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);sock.settimeout(10);stdin_r,stdin_w=os.pipe();os.write(stdin_w,payload);os.close(stdin_w);stdout_r,stdout_w=os.pipe();stderr_r,stderr_w=os.pipe();fds=[stdin_r,stdout_w,stderr_w]
+ try:
+  sock.connect(os.environ["NORTROPIC_H036_SOCKET"]);sock.sendmsg([struct.pack(">I",len(body))+body],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,struct.pack("3i",*fds))])
+  for fd in fds:os.close(fd)
+  fds=[];sock.sendall(struct.pack(">I",len(payload))+payload);proof=recv_frame(sock);during=neutral_directories();delta=sorted(set(during)-set(before));neutral=str(pathlib.Path(attempt)/delta[0]) if len(delta)==1 else None;scratch=raw_child/(".nortropic-h036-proof-"+nonce+".allowed");scratch_identity=regular_identity(scratch);scratch_sha=file_sha(scratch);sink_identity_during=regular_identity(pathlib.Path(sink));sink_sha_during=file_sha(pathlib.Path(sink))
+  barrier=pathlib.Path(workspace)/("replacement-"+kind+"-barrier.json");barrier.write_text(json.dumps({"before":before,"during":during,"delta":delta,"neutral":neutral,"neutral_valid":len(delta)==1 and exact_neutral(delta[0],nonce),"proof_class":proof.get("class") if isinstance(proof,dict) else None,"profile_sha256":proof.get("profile_sha256") if isinstance(proof,dict) else None,"proof_scratch_sha256":proof.get("effects",{}).get("scratch_write_sha256") if isinstance(proof,dict) else None,"proof_sink_sha256":proof.get("effects",{}).get("sink_write_sha256") if isinstance(proof,dict) else None,"scratch_identity_during":scratch_identity,"scratch_sha256_during":scratch_sha,"sink_identity_before":sink_identity_before,"sink_identity_during":sink_identity_during,"sink_sha256_before":sink_sha_before,"sink_sha256_during":sink_sha_during,"child_pid":proof.get("child_pid") if isinstance(proof,dict) else None,"child_pidversion":proof.get("child_pidversion") if isinstance(proof,dict) else None},sort_keys=True,separators=(",",":")))
+  deadline=time.monotonic()+10;mutated=pathlib.Path(workspace)/("replacement-"+kind+"-mutated")
+  while not mutated.is_file() and time.monotonic()<deadline:time.sleep(.01)
+  if not mutated.is_file():raise TimeoutError("replacement mutation barrier absent")
+ finally:
+  sock.close()
+  for fd in fds:
+   try:os.close(fd)
+   except OSError:pass
+ os.close(stdout_r);os.close(stderr_r)
+ disconnected=pathlib.Path(workspace)/("replacement-"+kind+"-disconnected");disconnected.write_text("DISCONNECTED")
+ deadline=time.monotonic()+3
+ while time.monotonic()<deadline and (scratch.exists() or scratch.is_symlink() or regular_identity(pathlib.Path(sink))!=sink_identity_before or file_sha(pathlib.Path(sink))!=sink_sha_before):time.sleep(.01)
+ terminal={"scratch_absent":not scratch.exists() and not scratch.is_symlink(),"sink_identity_after":regular_identity(pathlib.Path(sink)),"sink_sha256_after":file_sha(pathlib.Path(sink))}
+ (pathlib.Path(workspace)/("replacement-"+kind+"-terminal.json")).write_text(json.dumps(terminal,sort_keys=True,separators=(",",":")))
+ deadline=time.monotonic()+10;cleaned=pathlib.Path(workspace)/("replacement-"+kind+"-judge-cleaned")
+ while not cleaned.is_file() and time.monotonic()<deadline:time.sleep(.01)
+ if not cleaned.is_file():raise TimeoutError("replacement judge cleanup barrier absent")
+ return {"before":before,"after":neutral_directories(),"delta":delta,"terminal":terminal}
+replacement_source=replacement_disconnect("source","13"*32)
+progressed("source")
+replacement_directory=replacement_disconnect("directory","14"*32)
+progressed("directory")
+pathlib.Path(sink).write_bytes(b"P1-SINK")
+print(json.dumps({"attempt_env":os.environ.get("NORTROPIC_ATTEMPT_ROOT"),"nested_rc":run.returncode,"nested_stdout":run.stdout.decode(),"raw_override":raw_override,"raw_marker":raw_marker,"sink_before":sink_before,"valid_managed_proof":valid_proof,"outer_proof_baseline":outer_proof_baseline,"outer_proof_baseline_valid":outer_proof_baseline_valid,"proof_after_nested":proof_after_nested,"proof_after_valid":proof_after_valid,"managed_nonzero":managed_nonzero,"managed_timeout":managed_timeout,"proof_after_outcomes":proof_after_outcomes,"proof_after_rejected_override":proof_after_rejected_override,"replacement_source":replacement_source,"replacement_directory":replacement_directory},sort_keys=True,separators=(",",":")))
+raise SystemExit(0 if run.returncode==0 else 91)
+'''
+
+P1_ENVELOPE_LOADER = (
+    "import json,sys;"
+    "exec(json.load(sys.stdin)['program'],{'__name__':'__main__'})"
+)
+
+
+def make_interpreter(h36: dict[str, Any], trust: Path) -> Path:
+    interpreter = h36["make_python_snapshot"](trust)
+    trust.chmod(0o500)
+    return interpreter
+
+
+def launch_env(trust: Path | None, *, attempt: Path | None = None,
+               staging: Path | None = None, sink: Path | None = None) -> dict[str, str]:
+    env = {
+        "PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C",
+        "H038_PRESERVE": "exact-value",
+    }
+    if trust is not None:
+        env["NORTROPIC_TRUST_ROOT"] = str(trust)
+    if attempt is not None:
+        env["NORTROPIC_ATTEMPT_ROOT"] = str(attempt)
+    if staging is not None:
+        env["NORTROPIC_STAGING_ROOT"] = str(staging)
+    if sink is not None:
+        env["NORTROPIC_RESULT_SINK"] = str(sink)
+    return env
+
+
+def legacy_effects(h36: dict[str, Any], root: Path) -> tuple[bool, dict[str, Any]]:
+    detail: dict[str, Any] = {}
+    base = ensure_directory(root / "legacy-base")
+    base_ws = ensure_directory(base / "workspace")
+    base_trust = ensure_directory(base / "trust")
+    base_python = make_interpreter(h36, base_trust)
+    base_env = base / "envelope.json"
+    write_file(base_env, b"{}\n", 0o600)
+    base_run = h36["launch"](
+        base_python, base_ws, base_env, "20",
+        ["/bin/sh", "-c", "printf H038-BASE-OK"], launch_env(base_trust),
+    )
+
+    staged = ensure_directory(root / "legacy-staging")
+    staged_ws = ensure_directory(staged / "workspace")
+    staged_trust = ensure_directory(staged / "trust")
+    staged_python = make_interpreter(h36, staged_trust)
+    staging = ensure_directory(staged / "result")
+    sink = staging / "result.json"
+    write_file(sink, b"", 0o600)
+    staged_env = staged / "envelope.json"
+    write_file(staged_env, b"{}\n", 0o600)
+    staged_run = h36["launch"](
+        staged_python, staged_ws, staged_env, "20",
+        ["/bin/sh", "-c",
+         "printf H038-STAGING-OK; printf LEGACY-SINK > \"$1\"",
+         "sh", str(sink)],
+        launch_env(staged_trust, staging=staging, sink=sink),
+    )
+    detail.update({
+        "base_rc": base_run.returncode,
+        "base_stdout": base_run.stdout.decode("utf-8", "replace"),
+        "staging_rc": staged_run.returncode,
+        "staging_stdout": staged_run.stdout.decode("utf-8", "replace"),
+        "sink": sink.read_bytes().decode("utf-8", "replace"),
+    })
+    return (
+        base_run.returncode == 0 and base_run.stdout == b"H038-BASE-OK"
+        and staged_run.returncode == 0 and staged_run.stdout == b"H038-STAGING-OK"
+        and sink.read_bytes() == b"LEGACY-SINK"
+    ), detail
+
+
+def default_trust_managed_effect(
+    h36: dict[str, Any], root: Path,
+) -> tuple[bool, bool, dict[str, Any]]:
+    attempt = ensure_directory(root / "default-trust-attempt")
+    workspace = ensure_directory(attempt / "scratch" / "workspace")
+    staging = ensure_directory(attempt / "execution" / "staging")
+    sink = staging / "result.json"
+    write_file(sink, b"DEFAULT-ORIGINAL", 0o600)
+    envelope = workspace / "envelope.json"
+    write_file(envelope, b"{}\n", 0o600)
+    own = workspace / "default-trust-own"
+    forbidden = attempt / "default-trust-forbidden"
+    target = (
+        "import errno,json,os,pathlib,sys;own,sink,forbidden=sys.argv[1:];"
+        "pathlib.Path(own).write_bytes(b'DEFAULT');"
+        "pathlib.Path(sink).write_bytes(b'DEFAULT-SINK');"
+        "\ntry:fd=os.open(forbidden,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)"
+        "\nexcept OSError as exc:denied=exc.errno"
+        "\nelse:os.close(fd);denied=0"
+        "\nprint(json.dumps({'attempt_env':os.environ.get('NORTROPIC_ATTEMPT_ROOT'),"
+        "'trust_env':os.environ.get('NORTROPIC_TRUST_ROOT'),'denied':denied},"
+        "sort_keys=True,separators=(',',':')))"
+    )
+    run = h36["launch"](
+        PYTHON_SOURCE, workspace, envelope, "20",
+        [str(PYTHON_APP), "-I", "-S", "-B", "-c", target,
+         str(own), str(sink), str(forbidden)],
+        launch_env(None, attempt=attempt, staging=staging, sink=sink),
+    )
+    observed = parse_json_stdout(run)
+    residue = profile_proof_residue(attempt)
+    neutral_residue = h038_neutral_proof_residue(attempt)
+    legacy_residue_exact = legacy_proof_residue_exact(
+        attempt, residue, {
+            "scratch/workspace": "ancestor",
+            "execution/staging": "staging",
+        },
+    )
+    detail = {
+        "rc": run.returncode,
+        "stdout_raw": run.stdout.decode("utf-8", "replace")[:1000],
+        "stderr_raw": run.stderr.decode("utf-8", "replace")[:1000],
+        "observed": observed,
+        "own": own.read_bytes().decode("utf-8", "replace") if own.is_file() else None,
+        "sink": sink.read_bytes().decode("utf-8", "replace"),
+        "forbidden_exists": forbidden.exists(),
+        "profile_proof_residue": residue,
+        "neutral_proof_residue": neutral_residue,
+        "attempt_disjoint_from_live": not (
+            str(attempt).startswith(str(ROOT) + os.sep)
+            or str(ROOT).startswith(str(attempt) + os.sep)
+            or attempt == ROOT
+        ),
+    }
+    common = (
+        run.returncode == 0 and detail["own"] == "DEFAULT"
+        and detail["sink"] == "DEFAULT-SINK"
+        and detail["attempt_disjoint_from_live"] is True
+        and set(observed) == {"attempt_env", "trust_env", "denied"}
+        and legacy_residue_exact
+    )
+    product = (
+        common and observed == {
+            "attempt_env": None, "trust_env": None, "denied": errno.EPERM,
+        }
+        and not forbidden.exists() and neutral_residue == []
+    )
+    return common, product, detail
+
+
+def parse_json_stdout(run: subprocess.CompletedProcess[bytes]) -> dict[str, Any]:
+    try:
+        value = strict_json(run.stdout.strip())
+    except Rig:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def managed_proof_oracle(managed: dict[str, Any]) -> tuple[bool, bool]:
+    p1 = managed.get("p1_stdout", {})
+    value = p1.get("valid_managed_proof", {}) if isinstance(p1, dict) else {}
+    if not isinstance(value, dict):
+        return False, False
+    proof = value.get("proof")
+    wire_hex = value.get("proof_wire_hex")
+    wire_equal = False
+    if isinstance(proof, dict) and isinstance(wire_hex, str):
+        try:
+            wire_equal = strict_json(bytes.fromhex(wire_hex)) == proof
+        except (ValueError, Rig):
+            wire_equal = False
+    common = (
+        wire_equal
+        and value.get("target_before_go") is False
+        and value.get("scratch_sha256_before_go") == PROOF_BYTES_SHA256
+        and value.get("sink_sha256_before_go") == PROOF_BYTES_SHA256
+        and value.get("target_after_go") == "VALID"
+        and value.get("scratch_absent_after_final") is True
+        and value.get("sink_after_final") == "ORIGINAL-P1"
+        and value.get("final") == {"class": "success", "exit_status": 0}
+        and isinstance(proof, dict)
+        and proof.get("class") == "profile-proof-v1"
+    )
+    if not common:
+        return False, False
+    proof_core = dict(proof)
+    proof_digest = proof_core.pop("proof_digest", None)
+    effects = proof.get("effects")
+    nonzero = p1.get("managed_nonzero", {})
+    timeout = p1.get("managed_timeout", {})
+    baseline = p1.get("outer_proof_baseline")
+    baseline_valid = (
+        isinstance(baseline, list) and len(baseline) <= 1
+        and p1.get("outer_proof_baseline_valid") is True
+        and (
+            baseline == []
+            or re.fullmatch(
+                r"\.nortropic-h038-proof-[0-9a-f]{64}", baseline[0],
+            ) is not None
+        )
+    )
+    scratch_identity = value.get("scratch_identity_before_go", {})
+    sink_identity = value.get("sink_initial_identity")
+    proof_object_identity = (
+        isinstance(scratch_identity, dict)
+        and scratch_identity.get("regular") is True
+        and scratch_identity.get("symlink") is False
+        and scratch_identity.get("uid") == os.geteuid()
+        and scratch_identity.get("mode") == 0o600
+        and scratch_identity.get("nlink") == 1
+        and isinstance(sink_identity, dict)
+        and sink_identity.get("regular") is True
+        and sink_identity.get("symlink") is False
+        and sink_identity.get("uid") == os.geteuid()
+        and sink_identity.get("mode") == 0o600
+        and sink_identity.get("nlink") == 1
+        and value.get("sink_proof_identity") == sink_identity
+        and value.get("sink_after_identity") == sink_identity
+    )
+    original_sink_sha = sha(b"ORIGINAL-P1")
+
+    def exact_outcome(candidate: Any, nonce: str) -> bool:
+        expected_proof_sha = sha(
+            f"H036-PROFILE-PROOF-V1:{nonce}".encode("ascii"),
+        )
+        scratch = candidate.get("scratch_identity_during", {}) \
+            if isinstance(candidate, dict) else {}
+        return (
+            isinstance(candidate, dict)
+            and candidate.get("request_nonce") == nonce
+            and candidate.get("before") == baseline
+            and len(candidate.get("during", [])) == len(baseline) + 1
+            and candidate.get("after") == baseline
+            and candidate.get("neutral_valid") is True
+            and candidate.get("profile") == PROFILE_MANAGED_SHA256
+            and candidate.get("proof_scratch_sha256") == expected_proof_sha
+            and candidate.get("proof_sink_sha256") == expected_proof_sha
+            and isinstance(scratch, dict)
+            and scratch.get("regular") is True
+            and scratch.get("symlink") is False
+            and scratch.get("uid") == os.geteuid()
+            and scratch.get("mode") == 0o600
+            and scratch.get("nlink") == 1
+            and candidate.get("scratch_sha256_during") == expected_proof_sha
+            and candidate.get("scratch_absent") is True
+            and candidate.get("sink_identity_before") == sink_identity
+            and candidate.get("sink_identity_during") == sink_identity
+            and candidate.get("sink_identity_after") == sink_identity
+            and candidate.get("sink_sha256_before") == original_sink_sha
+            and candidate.get("sink_sha256_during") == expected_proof_sha
+            and candidate.get("sink_sha256_after") == original_sink_sha
+            and candidate.get("sink_restored") is True
+        )
+
+    outcome_cleanup = (
+        baseline_valid
+        and exact_outcome(nonzero, "15" * 32)
+        and exact_outcome(timeout, "16" * 32)
+        and (
+        nonzero.get("final") == {"class": "failure", "exit_status": 7}
+        and timeout.get("final") == {"class": "timeout"}
+        )
+    )
+    exact = (
+        sorted(proof) == PROOF_RESPONSE_KEYS
+        and type(proof.get("schema_version")) is int
+        and proof.get("schema_version") == 1
+        and proof.get("profile_sha256") == PROFILE_MANAGED_SHA256
+        and proof.get("request_nonce") == PROOF_NONCE
+        and proof.get("session_id") == value.get("session")
+        and type(proof.get("child_euid")) is int
+        and proof.get("child_euid") == os.geteuid()
+        and type(proof.get("child_pid")) is int and proof.get("child_pid", -1) > 1
+        and type(proof.get("child_pidversion")) is int
+        and proof.get("child_pidversion", -1) >= 0
+        and isinstance(proof_digest, str)
+        and re.fullmatch(r"[0-9a-f]{64}", proof_digest) is not None
+        and canonical_sha(proof_core) == proof_digest
+        and isinstance(effects, dict)
+        and sorted(effects) == MANAGED_EFFECT_KEYS
+        and all(
+            type(effects.get(key)) is int and effects.get(key) == errno.EPERM
+            for key in [*DENIED_BASE_KEYS, *DENIED_STAGING_KEYS, *DENIED_ATTEMPT_KEYS]
+        )
+        and effects.get("scratch_write_sha256") == PROOF_BYTES_SHA256
+        and effects.get("sink_write_sha256") == PROOF_BYTES_SHA256
+        and proof_object_identity
+        and baseline_valid
+        and value.get("neutral_before") == baseline
+        and value.get("neutral_state", {}).get("valid") is True
+        and len(value.get("neutral_state", {}).get("delta", [])) == 1
+        and value.get("neutral_after") == baseline
+        and p1.get("proof_after_nested") == baseline
+        and p1.get("proof_after_valid") == baseline
+        and p1.get("proof_after_outcomes") == baseline
+        and outcome_cleanup
+        and p1.get("proof_after_rejected_override") == baseline
+    )
+    return True, exact
+
+
+def managed_effect(h36: dict[str, Any], root: Path) -> dict[str, Any]:
+    attempt = ensure_directory(root / "attempt")
+    scratch = ensure_directory(attempt / "isolated-provider-scratch")
+    execution = ensure_directory(attempt / "nortropic-controller-execution")
+    # Frozen H036 intentionally preserves its proof-source fixtures in each
+    # request's ancestor workspace.  Give the serial attempts distinct
+    # ancestors so that preservation cannot collide before H038 is exercised.
+    p0 = ensure_directory(scratch / "p0-ancestor" / "p0")
+    trust0 = ensure_directory(execution / "trust-p0")
+    python0 = make_interpreter(h36, trust0)
+    staging0 = ensure_directory(execution / "staging-p0")
+    sink0 = staging0 / "result.json"
+    write_file(sink0, b"", 0o600)
+    envelope0 = p0 / "envelope.json"
+    write_file(envelope0, b"{}\n", 0o600)
+    log = p0 / "writer.log"
+    trigger = p0 / "go"
+    p1 = scratch / "p1-ancestor" / "p1"
+    trust1 = execution / "trust-p1"
+    staging1 = execution / "staging-p1"
+    sink1 = staging1 / "result.json"
+    attack_root = ensure_directory(attempt / "p0-attack-fixtures")
+    attack_paths = {
+        "write": attack_root / "write-existing",
+        "rename_within_src": attack_root / "rename-within-source",
+        "rename_within_dst": attack_root / "rename-within-destination",
+        "rename_out_src": attack_root / "rename-out-source",
+        "rename_out_dst": p0 / "rename-out-destination",
+        "rename_in_src": p0 / "rename-in-source",
+        "rename_in_dst": attack_root / "rename-in-destination",
+        "unlink": attack_root / "unlink-existing",
+        "hardlink_out_src": p0 / "hardlink-out-source",
+        "hardlink_out_dst": attack_root / "hardlink-out-destination",
+        "hardlink_in_src": attack_root / "hardlink-in-source",
+        "hardlink_in_dst": p0 / "hardlink-in-destination",
+        "mkdir": attack_root / "mkdir-new",
+        "chmod": attack_root / "chmod-existing",
+    }
+    for key in (
+        "write", "rename_within_src", "rename_out_src", "rename_in_src",
+        "unlink", "hardlink_out_src", "hardlink_in_src", "chmod",
+    ):
+        write_file(attack_paths[key], f"ORIGINAL-{key}".encode(), 0o600)
+    attack_argument = json.dumps(
+        {key: str(value) for key, value in attack_paths.items()},
+        sort_keys=True, separators=(",", ":"),
+    )
+    writer_pid = -1
+    writer_identity: dict[str, Any] | None = None
+    writer_argv: list[str] = []
+    writer_authorized = False
+    p0_target_argv = [
+        str(PYTHON_APP), "-I", "-S", "-B", "-c", P0_PROGRAM,
+        str(attempt), str(p1), str(trust1), str(staging1), str(sink1),
+        str(log), str(trigger), attack_argument,
+    ]
+    pre_p0_tree = exact_tree_snapshot(attempt)
+    try:
+        p0_run = h36["launch"](
+            python0, p0, envelope0, "20",
+            p0_target_argv,
+            launch_env(trust0, attempt=attempt, staging=staging0, sink=sink0),
+            outer_timeout=30.0,
+        )
+        ready_raw = wait_for(log, "READY\t")
+        match = re.search(r"^READY\t([1-9][0-9]*)$", ready_raw, re.MULTILINE)
+        writer_pid = int(match.group(1)) if match else -1
+        writer_identity = h36["process_start_record"](writer_pid) \
+            if writer_pid > 1 else None
+        writer_argv, writer_argv_bound = h36["kernel_process_argv"](writer_pid) \
+            if writer_pid > 1 else ([], False)
+        writer_authorized = (
+            writer_argv_bound and writer_argv == p0_target_argv
+            and isinstance(writer_identity, dict)
+            and writer_identity.get("euid") == os.geteuid()
+            and writer_identity.get("pgid") == writer_pid
+            and writer_identity.get("sid") == writer_pid
+        )
+        post_p0_tree = exact_tree_snapshot(attempt)
+        log_relative = log.relative_to(attempt).as_posix()
+        log_record = post_p0_tree.pop(log_relative, None)
+        post_p0_common = {
+            relative: value for relative, value in post_p0_tree.items()
+            if relative in pre_p0_tree
+        }
+        post_p0_extra = sorted(set(post_p0_tree) - set(pre_p0_tree))
+        common_exact = all(
+            post_p0_common.get(relative) == value
+            or (
+                value[0] == "directory"
+                and isinstance(post_p0_common.get(relative), tuple)
+                and post_p0_common[relative][:4] == value[:4]
+                and any(extra.startswith(
+                    "" if relative == "." else relative + "/",
+                ) for extra in post_p0_extra)
+            )
+            for relative, value in pre_p0_tree.items()
+        )
+        p0_fixture_integrity = (
+            common_exact
+            and isinstance(log_record, tuple) and len(log_record) == 7
+            and log_record[0] == "regular" and log_record[4] == 1
+            and re.fullmatch(r"READY\t[1-9][0-9]*\n", ready_raw) is not None
+        )
+        p0_legacy_parents = {
+            "isolated-provider-scratch/p0-ancestor/p0": "ancestor",
+            "nortropic-controller-execution/staging-p0": "staging",
+        }
+        p0_published_legacy_proof_shape = (
+            p0_fixture_integrity
+            and profile_proof_residue(attempt) == post_p0_extra
+            and legacy_proof_residue_exact(
+                attempt, post_p0_extra, p0_legacy_parents,
+            )
+        )
+        p0_neutral_proof_residue_absent = (
+            p0_fixture_integrity
+            and legacy_proof_residue_exact(
+                attempt, post_p0_extra, p0_legacy_parents,
+            )
+            and h038_neutral_proof_residue(attempt) == []
+        )
+        ready_alive_after_p0_return = bound_process(
+            h36, writer_identity, live=True,
+        ) and writer_authorized
+
+        ensure_directory(p1)
+        ensure_directory(trust1)
+        python1 = make_interpreter(h36, trust1)
+        trust1.chmod(0o700)
+        ensure_directory(staging1)
+        write_file(sink1, b"ORIGINAL-P1", 0o600)
+        alive_after_p1_creation = bound_process(h36, writer_identity, live=True)
+        write_file(trigger, b"GO", 0o600)
+        done_raw = wait_for(log, "DONE\t1", 14.0)
+        rows: dict[str, int] = {}
+        for line in done_raw.splitlines():
+            key, separator, value = line.partition("\t")
+            if separator and key not in {"READY", "ALIVE", "DONE"} \
+                    and value.isdecimal():
+                rows[key] = int(value)
+        writer_done = "ALIVE\t1" in done_raw and "DONE\t1" in done_raw
+        deadline = time.monotonic() + 3
+        while bound_process(h36, writer_identity, live=True) \
+                and time.monotonic() < deadline:
+            time.sleep(0.02)
+    finally:
+        if writer_authorized and bound_process(h36, writer_identity, live=True):
+            try:
+                os.kill(writer_pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+        deadline = time.monotonic() + 3
+        while bound_process(h36, writer_identity, live=False) \
+                and time.monotonic() < deadline:
+            time.sleep(0.02)
+
+    cross_paths = [
+        attempt / "r128-p0-root-cross", p1 / "r128-p0-cross",
+        trust1 / "r128-p0-cross", staging1 / "r128-p0-cross",
+    ]
+    cross_exists = [path.exists() for path in cross_paths]
+    sink_after_writer = sink1.read_bytes()
+
+    def optional_bytes(path: Path) -> str | None:
+        try:
+            return path.read_bytes().decode("utf-8", "replace")
+        except OSError:
+            return None
+
+    def same_regular_identity(left: Path, right: Path) -> bool:
+        try:
+            left_stat = left.lstat()
+            right_stat = right.lstat()
+        except OSError:
+            return False
+        return (
+            stat.S_ISREG(left_stat.st_mode) and stat.S_ISREG(right_stat.st_mode)
+            and (left_stat.st_dev, left_stat.st_ino)
+                == (right_stat.st_dev, right_stat.st_ino)
+        )
+
+    attack_state = {
+        "write": optional_bytes(attack_paths["write"]),
+        "rename_within_src": attack_paths["rename_within_src"].exists(),
+        "rename_within_dst": attack_paths["rename_within_dst"].exists(),
+        "rename_out_src": attack_paths["rename_out_src"].exists(),
+        "rename_out_dst": attack_paths["rename_out_dst"].exists(),
+        "rename_in_src": attack_paths["rename_in_src"].exists(),
+        "rename_in_dst": attack_paths["rename_in_dst"].exists(),
+        "unlink": attack_paths["unlink"].exists(),
+        "hardlink_out": same_regular_identity(
+            attack_paths["hardlink_out_src"], attack_paths["hardlink_out_dst"]),
+        "hardlink_in": same_regular_identity(
+            attack_paths["hardlink_in_src"], attack_paths["hardlink_in_dst"]),
+        "mkdir": attack_paths["mkdir"].is_dir(),
+        "chmod": (
+            oct(stat.S_IMODE(attack_paths["chmod"].lstat().st_mode))
+            if attack_paths["chmod"].exists() else None
+        ),
+    }
+    for path in cross_paths:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+    sink1.write_bytes(b"ORIGINAL-P1")
+    sink1.chmod(0o600)
+    trust1.chmod(0o500)
+    envelope1 = p1 / "envelope.json"
+    # The frozen H036 transport already requires valid JSON and binds its exact
+    # envelope bytes to both SCM stdin and NORTROPIC_KUVERT.  Carry this larger
+    # fixture program in one strict JSON member: macOS rejects the same bytes as
+    # one oversized `-c` argv item before the target can start.
+    p1_envelope_bytes = json.dumps(
+        {"program": P1_PROGRAM}, ensure_ascii=False,
+        sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")
+    write_file(envelope1, p1_envelope_bytes, 0o600)
+    envelope1_identity_before = envelope1.lstat()
+
+    def p1_envelope_exact() -> bool:
+        try:
+            observed = envelope1.lstat()
+            raw = envelope1.read_bytes()
+        except OSError:
+            return False
+        return (
+            stat.S_ISREG(observed.st_mode) and not envelope1.is_symlink()
+            and observed.st_uid == os.geteuid()
+            and stat.S_IMODE(observed.st_mode) == 0o600
+            and observed.st_nlink == 1
+            and (observed.st_dev, observed.st_ino)
+                == (envelope1_identity_before.st_dev,
+                    envelope1_identity_before.st_ino)
+            and raw == p1_envelope_bytes
+            and sha(raw) == sha(p1_envelope_bytes)
+        )
+
+    if not p1_envelope_exact():
+        raise Rig("P1 JSON program envelope changed before launch")
+    sink1_identity_before_p1 = sink1.lstat()
+    nested_envelope = p1 / "nested-envelope.json"
+    sibling = scratch / "nested-sibling-cross"
+    p1_box: dict[str, Any] = {}
+
+    def launch_p1() -> None:
+        try:
+            if not p1_envelope_exact():
+                raise Rig("P1 JSON program envelope changed at launch")
+            p1_box["run"] = h36["launch"](
+                python1, p1, envelope1, "35",
+                [str(PYTHON_APP), "-I", "-S", "-B", "-c", P1_ENVELOPE_LOADER,
+                 str(p1), str(nested_envelope), str(CLI), str(PYTHON_APP),
+                 str(sibling), str(sink1), str(attempt)],
+                launch_env(
+                    trust1, attempt=attempt, staging=staging1, sink=sink1,
+                ),
+                outer_timeout=50.0,
+            )
+        except BaseException as exc:
+            p1_box["error"] = exc
+
+    p1_thread = threading.Thread(target=launch_p1, name="h038-p1-launch")
+    p1_thread.start()
+    replacement_controls: dict[str, Any] = {}
+    for kind in ("source", "directory"):
+        barrier_path = p1 / f"replacement-{kind}-barrier.json"
+        barrier_raw = wait_for(barrier_path, "proof_class", 12.0)
+        try:
+            barrier = strict_json(barrier_raw.encode("utf-8"))
+        except Rig:
+            barrier = {}
+        neutral_text = barrier.get("neutral") if isinstance(barrier, dict) else None
+        neutral = Path(neutral_text) if isinstance(neutral_text, str) else None
+        valid_neutral = (
+            neutral is not None and neutral.is_absolute()
+            and neutral.parent == attempt
+            and re.fullmatch(r"\.nortropic-h038-proof-[0-9a-f]{64}", neutral.name)
+                is not None
+            and barrier.get("delta") == [neutral.name]
+            and barrier.get("neutral_valid") is True
+            and barrier.get("proof_class") == "profile-proof-v1"
+            and barrier.get("profile_sha256") == PROFILE_MANAGED_SHA256
+            and neutral.is_dir() and not neutral.is_symlink()
+        )
+        child_pid = barrier.get("child_pid") if isinstance(barrier, dict) else None
+        child_record = h36["process_start_record"](child_pid) \
+            if type(child_pid) is int and child_pid > 1 else None
+        child_argv, child_argv_bound = h36["kernel_process_argv"](child_pid) \
+            if type(child_pid) is int and child_pid > 1 else ([], False)
+        runtime_children = h36["runtime_roots"]()
+        runtime_child_bound = (
+            child_argv_bound and len(child_argv) == 8
+            and Path(child_argv[0]).name == "python3.12"
+            and str(Path(child_argv[0]).parent) in runtime_children
+            and child_argv[1:5] == ["-I", "-S", "-B", str(HELPER)]
+            and child_argv[5:7] == ["confined-exec-v1", "--proof-fd"]
+            and child_argv[7].isdecimal()
+            and isinstance(child_record, dict)
+            and child_record.get("pid") == child_pid
+            and child_record.get("euid") == os.geteuid()
+            and type(barrier.get("child_pidversion")) is int
+            and barrier.get("child_pidversion", -1) >= 0
+        )
+        control: dict[str, Any] = {
+            "barrier_ready": bool(barrier_raw),
+            "valid_neutral": valid_neutral,
+            "runtime_child_bound": runtime_child_bound,
+            "runtime_child_argv": child_argv,
+            "barrier": barrier,
+        }
+        foreign_path: Path | None = None
+        foreign_before: os.stat_result | None = None
+        foreign_canary_path: Path | None = None
+        foreign_canary_before: os.stat_result | None = None
+        parked: Path | None = None
+        if valid_neutral and neutral is not None:
+            if kind == "source":
+                source = neutral / "write-source"
+                parked = neutral / "write-source-created-parked"
+                source_before = source.lstat()
+                if not stat.S_ISREG(source_before.st_mode) \
+                        or source_before.st_nlink != 1 \
+                        or source.read_bytes() != b"ORIGINAL":
+                    valid_neutral = False
+                    control["valid_neutral"] = False
+                else:
+                    source.rename(parked)
+                    foreign_path = source
+                    write_file(foreign_path, b"FOREIGN-SOURCE", 0o400)
+                    foreign_before = foreign_path.lstat()
+                    control["created_source_identity"] = [
+                        source_before.st_dev, source_before.st_ino,
+                    ]
+            else:
+                neutral_before = neutral.lstat()
+                parked = attempt / f"{neutral.name}-created-parked"
+                neutral.rename(parked)
+                foreign_path = neutral
+                ensure_directory(foreign_path)
+                canary = foreign_path / "foreign-directory-canary"
+                write_file(canary, b"FOREIGN-DIRECTORY", 0o400)
+                foreign_before = foreign_path.lstat()
+                foreign_canary_path = canary
+                foreign_canary_before = canary.lstat()
+                control["created_directory_identity"] = [
+                    neutral_before.st_dev, neutral_before.st_ino,
+                ]
+                control["foreign_canary_identity"] = [
+                    canary.lstat().st_dev, canary.lstat().st_ino,
+                ]
+        write_file(p1 / f"replacement-{kind}-mutated", b"MUTATED", 0o600)
+        disconnected = wait_for(
+            p1 / f"replacement-{kind}-disconnected", "DISCONNECTED", 12.0,
+        )
+        terminal_raw = wait_for(
+            p1 / f"replacement-{kind}-terminal.json", "scratch_absent", 5.0,
+        )
+        try:
+            terminal = strict_json(terminal_raw.encode("utf-8"))
+        except Rig:
+            terminal = {}
+        nonce = ("13" if kind == "source" else "14") * 32
+        expected_proof_sha = sha(
+            f"H036-PROFILE-PROOF-V1:{nonce}".encode("ascii"),
+        )
+        scratch_identity = barrier.get("scratch_identity_during", {}) \
+            if isinstance(barrier, dict) else {}
+        sink_identity = barrier.get("sink_identity_before") \
+            if isinstance(barrier, dict) else None
+        proof_objects_bound = (
+            isinstance(scratch_identity, dict)
+            and scratch_identity.get("regular") is True
+            and scratch_identity.get("symlink") is False
+            and scratch_identity.get("uid") == os.geteuid()
+            and scratch_identity.get("mode") == 0o600
+            and scratch_identity.get("nlink") == 1
+            and barrier.get("scratch_sha256_during") == expected_proof_sha
+            and barrier.get("proof_scratch_sha256") == expected_proof_sha
+            and isinstance(sink_identity, dict)
+            and sink_identity.get("regular") is True
+            and sink_identity.get("symlink") is False
+            and sink_identity.get("uid") == os.geteuid()
+            and sink_identity.get("mode") == 0o600
+            and sink_identity.get("nlink") == 1
+            and barrier.get("sink_identity_during") == sink_identity
+            and barrier.get("sink_sha256_before") == sha(b"ORIGINAL-P1")
+            and barrier.get("sink_sha256_during") == expected_proof_sha
+            and barrier.get("proof_sink_sha256") == expected_proof_sha
+        )
+        terminal_receipts_bound = (
+            isinstance(terminal, dict)
+            and terminal.get("scratch_absent") is True
+            and terminal.get("sink_identity_after") == sink_identity
+            and terminal.get("sink_sha256_after") == sha(b"ORIGINAL-P1")
+        )
+        control.update({
+            "proof_objects_bound": proof_objects_bound,
+            "terminal_receipts_bound": terminal_receipts_bound,
+            "terminal": terminal,
+        })
+        deadline = time.monotonic() + 4
+        parked_present = True
+        while valid_neutral and parked is not None and time.monotonic() < deadline:
+            try:
+                parked.lstat()
+            except FileNotFoundError:
+                parked_present = False
+                break
+            except OSError:
+                break
+            time.sleep(0.02)
+        if valid_neutral and neutral is not None and foreign_path is not None \
+                and foreign_before is not None:
+            try:
+                foreign_after = foreign_path.lstat()
+                foreign_metadata_preserved = (
+                    (foreign_after.st_dev, foreign_after.st_ino)
+                        == (foreign_before.st_dev, foreign_before.st_ino)
+                    and stat.S_IFMT(foreign_after.st_mode)
+                        == stat.S_IFMT(foreign_before.st_mode)
+                    and stat.S_IMODE(foreign_after.st_mode)
+                        == stat.S_IMODE(foreign_before.st_mode)
+                    and foreign_after.st_nlink == foreign_before.st_nlink
+                    and foreign_after.st_uid == foreign_before.st_uid
+                    and foreign_after.st_gid == foreign_before.st_gid
+                )
+                if kind == "source":
+                    foreign_preserved = (
+                        foreign_metadata_preserved
+                        and stat.S_ISREG(foreign_after.st_mode)
+                        and foreign_path.read_bytes() == b"FOREIGN-SOURCE"
+                    )
+                else:
+                    if foreign_canary_path is None \
+                            or foreign_canary_before is None:
+                        raise OSError("foreign canary identity missing")
+                    canary_after = foreign_canary_path.lstat()
+                    foreign_preserved = (
+                        foreign_metadata_preserved
+                        and stat.S_ISDIR(foreign_after.st_mode)
+                        and (canary_after.st_dev, canary_after.st_ino)
+                            == (foreign_canary_before.st_dev,
+                                foreign_canary_before.st_ino)
+                        and stat.S_IFMT(canary_after.st_mode)
+                            == stat.S_IFMT(foreign_canary_before.st_mode)
+                        and stat.S_IMODE(canary_after.st_mode)
+                            == stat.S_IMODE(foreign_canary_before.st_mode)
+                        and canary_after.st_nlink
+                            == foreign_canary_before.st_nlink
+                        and canary_after.st_uid == foreign_canary_before.st_uid
+                        and canary_after.st_gid == foreign_canary_before.st_gid
+                        and stat.S_ISREG(canary_after.st_mode)
+                        and foreign_canary_path.read_bytes()
+                            == b"FOREIGN-DIRECTORY"
+                    )
+            except OSError:
+                foreign_preserved = False
+            try:
+                remaining = sorted(path.name for path in neutral.iterdir())
+            except OSError:
+                remaining = []
+            created_cleanup = parked is not None and not parked_present and (
+                remaining == ["write-source"] if kind == "source"
+                else remaining == ["foreign-directory-canary"]
+            )
+            control.update({
+                "disconnect_observed": bool(disconnected),
+                "foreign_preserved": foreign_preserved,
+                "created_identities_cleaned": created_cleanup,
+                "remaining_before_judge_cleanup": remaining,
+            })
+            if neutral.exists() or neutral.is_symlink():
+                h36["safe_remove_tree"](neutral)
+            if parked is not None and (parked.exists() or parked.is_symlink()):
+                h36["safe_remove_tree"](parked)
+        else:
+            control.update({
+                "disconnect_observed": bool(disconnected),
+                "foreign_preserved": False,
+                "created_identities_cleaned": False,
+            })
+        replacement_controls[kind] = control
+        write_file(
+            p1 / f"replacement-{kind}-judge-cleaned", b"CLEANED", 0o600,
+        )
+    p1_thread.join(20)
+    if p1_thread.is_alive():
+        raise Rig("P1 replacement-control launch did not finish")
+    if "error" in p1_box:
+        raise p1_box["error"]
+    p1_run = p1_box.get("run")
+    if not isinstance(p1_run, subprocess.CompletedProcess):
+        raise Rig("P1 launch returned no result")
+    post_p1_proof_residue = profile_proof_residue(attempt)
+    post_p1_neutral_residue = h038_neutral_proof_residue(attempt)
+    raw_override_marker = p1 / "raw-attempt-override-target-started"
+    try:
+        raw_override_marker.lstat()
+    except FileNotFoundError:
+        raw_override_marker_absent_after_outer_teardown = True
+    except OSError:
+        raw_override_marker_absent_after_outer_teardown = False
+    else:
+        raw_override_marker_absent_after_outer_teardown = False
+    post_p1_legacy_proof_shape = legacy_proof_residue_exact(
+        attempt, post_p1_proof_residue, {
+            "isolated-provider-scratch/p0-ancestor/p0": "ancestor",
+            "isolated-provider-scratch/p1-ancestor/p1": "ancestor",
+            "nortropic-controller-execution/staging-p0": "staging",
+            "nortropic-controller-execution/staging-p1": "staging",
+        },
+    )
+    sink1_identity_after_p1 = sink1.lstat()
+    sink1_identity_preserved = (
+        stat.S_ISREG(sink1_identity_before_p1.st_mode)
+        and stat.S_ISREG(sink1_identity_after_p1.st_mode)
+        and not sink1.is_symlink()
+        and sink1_identity_before_p1.st_uid == os.geteuid()
+        and sink1_identity_after_p1.st_uid == os.geteuid()
+        and sink1_identity_before_p1.st_nlink
+            == sink1_identity_after_p1.st_nlink == 1
+        and stat.S_IMODE(sink1_identity_before_p1.st_mode)
+            == stat.S_IMODE(sink1_identity_after_p1.st_mode) == 0o600
+        and (sink1_identity_before_p1.st_dev, sink1_identity_before_p1.st_ino)
+            == (sink1_identity_after_p1.st_dev, sink1_identity_after_p1.st_ino)
+    )
+    return {
+        "p0_rc": p0_run.returncode,
+        "p0_stdout": parse_json_stdout(p0_run),
+        "writer_pid": writer_pid,
+        "writer_argv_bound_to_exact_fixture": writer_authorized,
+        "p0_published_legacy_proof_shape": p0_published_legacy_proof_shape,
+        "p0_neutral_proof_residue_absent_before_p1":
+            p0_neutral_proof_residue_absent,
+        "p0_launch_returned_before_p1_creation": True,
+        "writer_ready_alive_through_p1_creation": (
+            ready_alive_after_p0_return and alive_after_p1_creation
+        ),
+        "writer_done_after_attempts": writer_done,
+        "writer_rows": rows,
+        "attack_state": attack_state,
+        "cross_exists_before_cleanup": cross_exists,
+        "sink_after_writer": sink_after_writer.decode("utf-8", "replace"),
+        "p1_rc": p1_run.returncode,
+        "p1_stdout_raw": p1_run.stdout.decode("utf-8", "replace")[:1000],
+        "p1_stderr": p1_run.stderr.decode("utf-8", "replace")[:1000],
+        "p1_progress": optional_bytes(p1 / "p1-progress"),
+        "p1_stdout": parse_json_stdout(p1_run),
+        "raw_override_marker_absent_after_outer_teardown":
+            raw_override_marker_absent_after_outer_teardown,
+        "p1_envelope_identity_and_bytes_preserved": p1_envelope_exact(),
+        "p1_own": (p1 / "p1-own").read_bytes().decode("utf-8", "replace")
+            if (p1 / "p1-own").is_file() else "",
+        "nested_sibling_exists": sibling.exists(),
+        "sink1_after_p1": sink1.read_bytes().decode("utf-8", "replace"),
+        "sink1_identity_preserved": sink1_identity_preserved,
+        "post_p1_and_raw_abort_proof_residue": post_p1_proof_residue,
+        "post_p1_legacy_proof_shape": post_p1_legacy_proof_shape,
+        "post_p1_neutral_proof_residue": post_p1_neutral_residue,
+        "replacement_controls": replacement_controls,
+        "attempt_mode": oct(stat.S_IMODE(attempt.lstat().st_mode)),
+    }
+
+
+def direct_profile_effect(h36: dict[str, Any], root: Path) -> tuple[bool, dict[str, Any]]:
+    base = ensure_directory(root / "profile")
+    live = ensure_directory(base / "live")
+    live_git = ensure_directory(live / ".git")
+    objects = ensure_directory(live_git / "objects")
+    objects_info = ensure_directory(objects / "info")
+    worktree = ensure_directory(live_git / "worktrees")
+    admin = ensure_directory(worktree / "proof")
+    trust = ensure_directory(base / "trust")
+    runtime = ensure_directory(base / "runtime")
+    attempt = ensure_directory(base / "attempt")
+    scratch = ensure_directory(attempt / "scratch")
+    current = ensure_directory(scratch / "current")
+    ensure_directory(current / ".git")
+    future = ensure_directory(scratch / "future")
+    staging = ensure_directory(attempt / "execution" / "staging")
+    sink = staging / "result"
+    write_file(sink, b"ORIGINAL", 0o600)
+    for name in ("commondir", "gitdir", "config.worktree"):
+        write_file(admin / name, b"ORIGINAL", 0o600)
+    parameters = {
+        "LIVE_ROOT": live, "LIVE_GIT": live_git, "GIT_OBJECTS": objects,
+        "GIT_OBJECTS_INFO": objects_info, "WORKTREE_GITDIR": admin,
+        "WORKTREE_COMMDIR": admin / "commondir", "WORKTREE_GITFILE": admin / "gitdir",
+        "WORKTREE_CONFIG": admin / "config.worktree", "TRUST_ROOT": trust,
+        "RUNTIME_ROOT": runtime, "ANCESTOR_WORKSPACE": current,
+        "CURRENT_WORKSPACE": current, "CURRENT_WORKSPACE_DOTGIT": current / ".git",
+        "ATTEMPT_ROOT": attempt, "STAGING_ROOT": staging, "RESULT_SINK": sink,
+    }
+    target = r'''import errno,json,os,sys
+p=json.loads(sys.argv[1]); out={}
+def effect(name,kind):
+ try:
+  if kind=="create": fd=os.open(p[name],os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.write(fd,b"X");os.close(fd)
+  elif kind=="write": fd=os.open(p[name],os.O_WRONLY|os.O_TRUNC);os.write(fd,b"X");os.close(fd)
+  else: os.chmod(p[name],0o700)
+ except OSError as exc: return exc.errno
+ return 0
+for name,kind in (("current","create"),("future","create"),("attempt","chmod"),("sink","write")):out[name]=effect(name,kind)
+print(json.dumps(out,sort_keys=True,separators=(",",":")))
+'''
+    paths = {
+        "current": str(current / "allowed"), "future": str(future / "denied"),
+        "attempt": str(attempt), "sink": str(sink),
+    }
+    argv = [str(SANDBOX_EXEC)]
+    for name in MANAGED_PARAM_ORDER:
+        argv.extend(["-D", f"{name}={parameters[name]}"])
+    argv.extend(["-p", PROFILE_MANAGED, str(PYTHON_SOURCE), "-I", "-S", "-B",
+                 "-c", target, json.dumps(paths, sort_keys=True, separators=(",", ":"))])
+    run = subprocess.run(
+        argv, cwd=current,
+        env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        timeout=10, check=False,
+    )
+    observed = parse_json_stdout(run)
+    expected = {"current": 0, "future": errno.EPERM,
+                "attempt": errno.EPERM, "sink": 0}
+    detail = {
+        "rc": run.returncode, "observed": observed,
+        "profile_sha256": sha(PROFILE_MANAGED.encode()),
+        "current_exists": (current / "allowed").is_file(),
+        "future_exists": (future / "denied").exists(),
+        "sink": sink.read_bytes().decode("utf-8", "replace"),
+    }
+    return (
+        run.returncode == 0 and observed == expected
+        and (current / "allowed").read_bytes() == b"X"
+        and not (future / "denied").exists() and sink.read_bytes() == b"X"
+    ), detail
+
+
+def build_managed_layout(h36: dict[str, Any], root: Path, name: str) -> dict[str, Path]:
+    case = ensure_directory(root / name)
+    attempt = ensure_directory(case / "attempt")
+    scratch = ensure_directory(attempt / "scratch")
+    workspace = ensure_directory(scratch / "workspace")
+    execution = ensure_directory(attempt / "execution")
+    trust = ensure_directory(execution / "trust")
+    interpreter = make_interpreter(h36, trust)
+    staging = ensure_directory(execution / "staging")
+    sink = staging / "result"
+    write_file(sink, b"", 0o600)
+    envelope = workspace / "envelope.json"
+    write_file(envelope, b"{}\n", 0o600)
+    return {"case": case, "attempt": attempt, "workspace": workspace,
+            "trust": trust, "interpreter": interpreter, "staging": staging,
+            "sink": sink, "envelope": envelope}
+
+
+def invalid_topology_matrix(
+    h36: dict[str, Any], root: Path, common_git: Path,
+) -> tuple[bool, dict[str, Any]]:
+    outcomes: dict[str, dict[str, Any]] = {}
+    external = ensure_directory(root / "external-canary")
+    external_canary = external / "preserve"
+    write_file(external_canary, b"EXTERNAL-H038-CANARY", 0o600)
+    external_before = external_canary.lstat()
+
+    def execute(name: str, layout: dict[str, Path], env: dict[str, str],
+                workspace: Path | None = None,
+                swap_roots: tuple[Path, Path] | None = None) -> None:
+        marker = (workspace or layout["workspace"]) / f"{name}-target-started"
+        before_roots = h36["runtime_roots"]()
+        box: dict[str, Any] = {}
+        swap_detail: dict[str, Any] = {"required": swap_roots is not None}
+
+        def invoke() -> None:
+            try:
+                box["run"] = h36["launch"](
+                    layout["interpreter"], workspace or layout["workspace"],
+                    layout["envelope"], "10",
+                    ["/bin/sh", "-c",
+                     "printf X > \"$1\"; sleep 0.4", "sh", str(marker)], env,
+                    outer_timeout=20.0,
+                )
+            except BaseException as exc:
+                box["error"] = exc
+
+        thread = threading.Thread(target=invoke, name=f"h038-invalid-{name}")
+        thread.start()
+        transient_roots: set[str] = set()
+        while thread.is_alive():
+            current_roots = h36["runtime_roots"]() - before_roots
+            transient_roots.update(str(value) for value in current_roots)
+            if swap_roots is not None and current_roots \
+                    and not swap_detail.get("completed", False):
+                original, replacement = swap_roots
+                parked = original.parent / f"{original.name}-accepted-before-swap"
+                before = original.lstat()
+                substitute = replacement.lstat()
+                original.rename(parked)
+                replacement.rename(original)
+                after = original.lstat()
+                swap_detail.update({
+                    "completed": True,
+                    "parked": str(parked),
+                    "replacement": str(replacement),
+                    "before_dev_ino": [before.st_dev, before.st_ino],
+                    "substitute_dev_ino": [substitute.st_dev, substitute.st_ino],
+                    "after_dev_ino": [after.st_dev, after.st_ino],
+                    "identity_changed": (
+                        (before.st_dev, before.st_ino)
+                        != (after.st_dev, after.st_ino)
+                        == (substitute.st_dev, substitute.st_ino)
+                    ),
+                })
+            thread.join(0.002)
+        thread.join()
+        if "error" in box:
+            raise box["error"]
+        run = box.get("run")
+        if not isinstance(run, subprocess.CompletedProcess):
+            raise Rig("invalid-state public launcher returned no result")
+        after_roots = h36["runtime_roots"]()
+        target_started = marker.exists()
+        if swap_roots is not None and swap_detail.get("completed") is True:
+            original, replacement = swap_roots
+            parked = Path(swap_detail["parked"])
+            replacement_marker = marker.exists()
+            original.rename(replacement)
+            parked.rename(original)
+            swap_detail["target_started_in_substitute"] = replacement_marker
+            swap_detail["restored_original_identity"] = (
+                [original.lstat().st_dev, original.lstat().st_ino]
+                == swap_detail["before_dev_ino"]
+            )
+        outcomes[name] = {
+            "rc": run.returncode,
+            "target_started": target_started,
+            "stdout": run.stdout.decode("utf-8", "replace"),
+            "transient_runtime_roots": sorted(transient_roots),
+            "runtime_roots_restored": after_roots == before_roots,
+            "swap": swap_detail,
+        }
+
+    layout = build_managed_layout(h36, root, "partial")
+    execute("attempt_only", layout, launch_env(layout["trust"], attempt=layout["attempt"]))
+
+    layout = build_managed_layout(h36, root, "partial-no-sink")
+    execute("attempt_staging_no_sink", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"], staging=layout["staging"]))
+
+    layout = build_managed_layout(h36, root, "partial-no-staging")
+    execute("attempt_sink_no_staging", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "partial-staging")
+    execute("staging_without_sink", layout, launch_env(
+        layout["trust"], staging=layout["staging"]))
+
+    layout = build_managed_layout(h36, root, "partial-sink")
+    execute("sink_without_staging", layout, launch_env(
+        layout["trust"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "unrelated")
+    unrelated = ensure_directory(layout["case"] / "unrelated-root")
+    execute("unrelated_root", layout, launch_env(
+        layout["trust"], attempt=unrelated, staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "workspace-outside-attempt")
+    outside_workspace = ensure_directory(layout["case"] / "outside-workspace")
+    outside_envelope = outside_workspace / "envelope.json"
+    write_file(outside_envelope, b"{}\n", 0o600)
+    layout["envelope"] = outside_envelope
+    execute("workspace_outside_otherwise_valid_attempt", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]), outside_workspace)
+
+    layout = build_managed_layout(h36, root, "attempt-equals-workspace")
+    execute("attempt_equals_workspace", layout, launch_env(
+        layout["trust"], attempt=layout["workspace"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "attempt-equals-trust")
+    layout["trust"].chmod(0o700)
+    execute("attempt_equals_explicit_trust", layout, launch_env(
+        layout["trust"], attempt=layout["trust"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "attempt-equals-staging")
+    execute("attempt_equals_staging", layout, launch_env(
+        layout["trust"], attempt=layout["staging"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "workspace-equals-trust")
+    workspace_trust_python = make_interpreter(h36, layout["workspace"])
+    layout["workspace"].chmod(0o700)
+    layout["interpreter"] = workspace_trust_python
+    execute("workspace_equals_trust", layout, launch_env(
+        layout["workspace"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "workspace-equals-staging")
+    workspace_sink = layout["workspace"] / "equality-result"
+    write_file(workspace_sink, b"", 0o600)
+    execute("workspace_equals_staging", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["workspace"], sink=workspace_sink))
+
+    layout = build_managed_layout(h36, root, "trust-equals-staging")
+    layout["trust"].chmod(0o700)
+    trust_sink = layout["trust"] / "equality-result"
+    write_file(trust_sink, b"", 0o600)
+    execute("trust_equals_staging", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["trust"], sink=trust_sink))
+
+    layout = build_managed_layout(h36, root, "missing-attempt")
+    execute("missing_attempt", layout, launch_env(
+        layout["trust"], attempt=layout["case"] / "absent-attempt",
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "empty-attempt")
+    empty_attempt_env = launch_env(
+        layout["trust"], staging=layout["staging"], sink=layout["sink"],
+    )
+    empty_attempt_env["NORTROPIC_ATTEMPT_ROOT"] = ""
+    execute("present_empty_attempt", layout, empty_attempt_env)
+
+    layout = build_managed_layout(h36, root, "relative-attempt")
+    relative_attempt_env = launch_env(
+        layout["trust"], staging=layout["staging"], sink=layout["sink"],
+    )
+    relative_attempt_env["NORTROPIC_ATTEMPT_ROOT"] = "../.."
+    execute("relative_attempt_resolves_to_valid_root", layout, relative_attempt_env)
+
+    layout = build_managed_layout(h36, root, "unsafe-mode-0777")
+    layout["attempt"].chmod(0o777)
+    execute("unsafe_mode_0777", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]))
+    layout["attempt"].chmod(0o700)
+
+    for mode in (0o755, 0o710, 0o702, 0o770):
+        layout = build_managed_layout(h36, root, f"unsafe-mode-{mode:o}")
+        layout["attempt"].chmod(mode)
+        execute(f"unsafe_mode_{mode:o}", layout, launch_env(
+            layout["trust"], attempt=layout["attempt"],
+            staging=layout["staging"], sink=layout["sink"]))
+        layout["attempt"].chmod(0o700)
+
+    layout = build_managed_layout(h36, root, "symlink")
+    alias = layout["case"] / "attempt-alias"
+    alias.symlink_to(layout["attempt"], target_is_directory=True)
+    execute("symlink_alias", layout, launch_env(
+        layout["trust"], attempt=alias, staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "canonical-alias")
+    dotdot_alias = layout["attempt"] / ".." / layout["attempt"].name
+    execute("canonical_dotdot_alias", layout, launch_env(
+        layout["trust"], attempt=dotdot_alias,
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "symlinked-parent")
+    parent_alias = layout["case"] / "parent-alias"
+    parent_alias.symlink_to(layout["case"], target_is_directory=True)
+    execute("symlinked_parent_alias", layout, launch_env(
+        layout["trust"], attempt=parent_alias / "attempt",
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "file-root")
+    attempt_file = layout["case"] / "attempt-file"
+    write_file(attempt_file, b"NOT-A-DIRECTORY", 0o600)
+    execute("attempt_regular_file", layout, launch_env(
+        layout["trust"], attempt=attempt_file,
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "external-symlink")
+    external_alias = layout["case"] / "external-attempt-alias"
+    external_alias.symlink_to(external, target_is_directory=True)
+    execute("external_symlink_alias", layout, launch_env(
+        layout["trust"], attempt=external_alias,
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "private-tmp-root")
+    execute("private_tmp_root", layout, launch_env(
+        layout["trust"], attempt=Path("/private/tmp"),
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "filesystem-root")
+    execute("filesystem_root", layout, launch_env(
+        layout["trust"], attempt=Path("/"),
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "live-root")
+    execute("live_root", layout, launch_env(
+        layout["trust"], attempt=ROOT,
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "default-trust-live-overlap")
+    layout["interpreter"] = PYTHON_SOURCE
+    execute("default_trust_attempt_equals_live_root", layout, launch_env(
+        None, attempt=ROOT, staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "default-trust-git-overlap")
+    layout["interpreter"] = PYTHON_SOURCE
+    execute("default_trust_attempt_equals_common_git", layout, launch_env(
+        None, attempt=common_git,
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "trust-outside")
+    outside_trust = ensure_directory(layout["case"] / "outside-trust")
+    outside_python = make_interpreter(h36, outside_trust)
+    layout["interpreter"] = outside_python
+    execute("trust_outside", layout, launch_env(
+        outside_trust, attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "trust-symlink")
+    trust_alias = layout["case"] / "trust-alias"
+    trust_alias.symlink_to(layout["trust"], target_is_directory=True)
+    execute("trust_symlink", layout, launch_env(
+        trust_alias, attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "trust-workspace-overlap")
+    overlap_trust = ensure_directory(layout["workspace"] / "trust-overlap")
+    layout["interpreter"] = make_interpreter(h36, overlap_trust)
+    execute("trust_workspace_overlap", layout, launch_env(
+        overlap_trust, attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "workspace-under-trust")
+    layout["trust"].chmod(0o700)
+    workspace_under_trust = ensure_directory(layout["trust"] / "nested-workspace")
+    envelope_under_trust = workspace_under_trust / "envelope.json"
+    write_file(envelope_under_trust, b"{}\n", 0o600)
+    layout["trust"].chmod(0o500)
+    layout["envelope"] = envelope_under_trust
+    execute("workspace_under_trust", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]), workspace_under_trust)
+
+    layout = build_managed_layout(h36, root, "trust-contains-staging")
+    layout["trust"].chmod(0o700)
+    trust_staging = ensure_directory(layout["trust"] / "nested-staging")
+    trust_sink = trust_staging / "result"
+    write_file(trust_sink, b"", 0o600)
+    layout["trust"].chmod(0o500)
+    execute("trust_contains_staging", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=trust_staging, sink=trust_sink))
+
+    layout = build_managed_layout(h36, root, "staging-contains-trust")
+    staging_trust = ensure_directory(layout["staging"] / "nested-trust")
+    staging_python = make_interpreter(h36, staging_trust)
+    layout["interpreter"] = staging_python
+    execute("staging_contains_trust", layout, launch_env(
+        staging_trust, attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "staging-outside")
+    outside_staging = ensure_directory(layout["case"] / "outside-staging")
+    outside_sink = outside_staging / "result"
+    write_file(outside_sink, b"", 0o600)
+    execute("staging_outside", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=outside_staging, sink=outside_sink))
+
+    layout = build_managed_layout(h36, root, "staging-symlink")
+    staging_alias = layout["case"] / "staging-alias"
+    staging_alias.symlink_to(layout["staging"], target_is_directory=True)
+    execute("staging_symlink", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=staging_alias, sink=layout["sink"]))
+
+    layout = build_managed_layout(h36, root, "staging-workspace-overlap")
+    overlap_staging = ensure_directory(layout["workspace"] / "staging-overlap")
+    overlap_sink = overlap_staging / "result"
+    write_file(overlap_sink, b"", 0o600)
+    execute("staging_workspace_overlap", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=overlap_staging, sink=overlap_sink))
+
+    layout = build_managed_layout(h36, root, "workspace-under-staging")
+    workspace_under_staging = ensure_directory(layout["staging"] / "nested-workspace")
+    envelope_under_staging = workspace_under_staging / "envelope.json"
+    write_file(envelope_under_staging, b"{}\n", 0o600)
+    layout["envelope"] = envelope_under_staging
+    execute("workspace_under_staging", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]), workspace_under_staging)
+
+    layout = build_managed_layout(h36, root, "sink-outside")
+    outside_sink = layout["case"] / "outside-sink"
+    write_file(outside_sink, b"", 0o600)
+    execute("sink_outside_staging", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=outside_sink))
+
+    layout = build_managed_layout(h36, root, "sink-nested")
+    nested_sink_parent = ensure_directory(layout["staging"] / "nested")
+    nested_sink = nested_sink_parent / "result"
+    write_file(nested_sink, b"", 0o600)
+    execute("sink_nested_below_staging", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=nested_sink))
+
+    layout = build_managed_layout(h36, root, "sink-symlink")
+    sink_alias = layout["staging"] / "result-alias"
+    sink_alias.symlink_to(layout["sink"])
+    execute("sink_symlink", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=sink_alias))
+
+    layout = build_managed_layout(h36, root, "sink-hardlink")
+    sink_hardlink = layout["staging"] / "result-hardlink"
+    os.link(layout["sink"], sink_hardlink, follow_symlinks=False)
+    execute("sink_hardlink", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=sink_hardlink))
+
+    layout = build_managed_layout(h36, root, "workspace-symlink")
+    workspace_alias = layout["case"] / "workspace-alias"
+    workspace_alias.symlink_to(layout["workspace"], target_is_directory=True)
+    execute("workspace_symlink", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]), workspace_alias)
+
+    # The accepted attempt object is replaced only after the public launcher
+    # has created its private runtime root.  Both trees have the complete valid
+    # topology, so absence or malformed-fixture rejection cannot earn credit:
+    # only a post-validation stable-identity bind may prevent target effect.
+    layout = build_managed_layout(h36, root, "post-validation-swap")
+    replacement = ensure_directory(layout["case"] / "replacement-attempt")
+    replacement_workspace = ensure_directory(
+        ensure_directory(replacement / "scratch") / "workspace",
+    )
+    replacement_trust = ensure_directory(
+        ensure_directory(replacement / "execution") / "trust",
+    )
+    make_interpreter(h36, replacement_trust)
+    replacement_staging = ensure_directory(replacement / "execution" / "staging")
+    write_file(replacement_staging / "result", b"", 0o600)
+    write_file(replacement_workspace / "envelope.json", b"{}\n", 0o600)
+    swap_canary = replacement_workspace / "substitute-canary"
+    write_file(swap_canary, b"SUBSTITUTE-UNCHANGED", 0o600)
+    swap_canary_before = swap_canary.lstat()
+    execute("post_validation_attempt_dev_ino_swap", layout, launch_env(
+        layout["trust"], attempt=layout["attempt"],
+        staging=layout["staging"], sink=layout["sink"]),
+        swap_roots=(layout["attempt"], replacement))
+    try:
+        swap_canary_after = swap_canary.lstat()
+        swap_canary_preserved = (
+            (swap_canary_after.st_dev, swap_canary_after.st_ino)
+                == (swap_canary_before.st_dev, swap_canary_before.st_ino)
+            and stat.S_IMODE(swap_canary_after.st_mode) == 0o600
+            and swap_canary.read_bytes() == b"SUBSTITUTE-UNCHANGED"
+        )
+    except OSError:
+        swap_canary_preserved = False
+    outcomes["post_validation_attempt_dev_ino_swap"][
+        "substitute_canary_preserved"
+    ] = swap_canary_preserved
+
+    try:
+        external_after = external_canary.lstat()
+        canary_preserved = (
+            stat.S_ISREG(external_after.st_mode)
+            and (external_after.st_dev, external_after.st_ino)
+                == (external_before.st_dev, external_before.st_ino)
+            and stat.S_IMODE(external_after.st_mode) == 0o600
+            and external_canary.read_bytes() == b"EXTERNAL-H038-CANARY"
+        )
+    except OSError:
+        canary_preserved = False
+    swap_outcome = outcomes["post_validation_attempt_dev_ino_swap"]
+    ordinary = {
+        key: value for key, value in outcomes.items()
+        if key != "post_validation_attempt_dev_ino_swap"
+    }
+    ok = all(
+        value["rc"] == 3 and not value["target_started"]
+        and value["transient_runtime_roots"] == []
+        and value["runtime_roots_restored"] is True
+        for value in ordinary.values()
+    ) and (
+        swap_outcome["rc"] == 3
+        and not swap_outcome["target_started"]
+        and swap_outcome["transient_runtime_roots"] != []
+        and swap_outcome["runtime_roots_restored"] is True
+        and swap_outcome["swap"].get("completed") is True
+        and swap_outcome["swap"].get("identity_changed") is True
+        and swap_outcome["swap"].get("restored_original_identity") is True
+        and swap_outcome["swap"].get("target_started_in_substitute") is False
+        and swap_outcome["substitute_canary_preserved"] is True
+    ) and canary_preserved
+    outcomes["external_canary"] = {"preserved": canary_preserved}
+    return ok, outcomes
+
+
+def runtime_matrix(
+    h36: dict[str, Any], common_git: Path, *, product: bool,
+) -> tuple[bool, bool, dict[str, Any]]:
+    try:
+        h36["host_preflight"]()
+    except Exception as exc:
+        if type(exc).__name__ == "Undecidable":
+            raise Undecidable(str(exc)) from exc
+        raise
+    preservation_ok, preservation = h36["run_subject_matrix"]()
+    before_roots = h36["runtime_roots"]()
+    root = Path(tempfile.mkdtemp(prefix="h038-gate-", dir="/private/tmp"))
+    try:
+        root.chmod(0o700)
+        legacy_ok, legacy = legacy_effects(h36, root)
+        default_common, default_product, default_trust = \
+            default_trust_managed_effect(h36, root)
+        reference_ok, reference = direct_profile_effect(h36, root)
+        managed = managed_effect(h36, root)
+        invalid_ok, invalid = (invalid_topology_matrix(h36, root, common_git)
+                               if product else (True, {"not_run": "preproduct"}))
+    finally:
+        h36["safe_remove_tree"](root)
+    after_roots = h36["runtime_roots"]()
+    rows = managed["writer_rows"]
+    proof_common, managed_proof_exact = managed_proof_oracle(managed)
+    expected_labels = {
+        "ATTEMPT_LITERAL", "ATTEMPT_CHILD", "ATTEMPT_WRITE",
+        "ATTEMPT_RENAME_WITHIN", "ATTEMPT_RENAME_OUT", "ATTEMPT_RENAME_IN",
+        "ATTEMPT_UNLINK", "ATTEMPT_HARDLINK_OUT", "ATTEMPT_HARDLINK_IN",
+        "ATTEMPT_MKDIR", "ATTEMPT_CHMOD", "P1_WORKSPACE",
+        "P1_TRUST", "P1_STAGING", "P1_SINK",
+        "ATTEMPT_ROOT_RENAME_SELF", "ATTEMPT_ROOT_RMDIR",
+    }
+    preproduct_attack = {
+        "write": "P0-WRITE",
+        "rename_within_src": False, "rename_within_dst": True,
+        "rename_out_src": False, "rename_out_dst": True,
+        "rename_in_src": False, "rename_in_dst": True,
+        "unlink": False, "hardlink_out": True, "hardlink_in": True,
+        "mkdir": True, "chmod": "0o777",
+    }
+    product_attack = {
+        "write": "ORIGINAL-write",
+        "rename_within_src": True, "rename_within_dst": False,
+        "rename_out_src": True, "rename_out_dst": False,
+        "rename_in_src": True, "rename_in_dst": False,
+        "unlink": True, "hardlink_out": False, "hardlink_in": False,
+        "mkdir": False, "chmod": "0o600",
+    }
+    common = (
+        preservation_ok and legacy_ok and default_common
+        and reference_ok and proof_common
+        and managed["p0_rc"] == 0 and managed["p1_rc"] == 0
+        and managed["p0_launch_returned_before_p1_creation"] is True
+        and managed["p0_stdout"].get("double_forked") is True
+        and managed["writer_argv_bound_to_exact_fixture"] is True
+        and (
+            managed["p0_neutral_proof_residue_absent_before_p1"] is True
+            if product else managed["p0_published_legacy_proof_shape"] is True
+        )
+        and managed["writer_ready_alive_through_p1_creation"] is True
+        and managed["writer_done_after_attempts"] is True
+        and set(rows) == expected_labels
+        and managed["p1_own"] == "P1-OWN"
+        and managed["p1_stdout"].get("nested_rc") == 0
+        and managed["p1_stdout"].get("sink_before") == "ORIGINAL-P1"
+        and managed["p1_stdout"].get("raw_marker") is False
+        and managed["raw_override_marker_absent_after_outer_teardown"] is True
+        and managed["p1_envelope_identity_and_bytes_preserved"] is True
+        and managed["sink1_after_p1"] == "P1-SINK"
+        and managed["sink1_identity_preserved"] is True
+        and managed["post_p1_legacy_proof_shape"] is True
+        and managed["post_p1_neutral_proof_residue"] == []
+        and managed["attempt_mode"] == "0o700"
+        and before_roots == after_roots
+    )
+    preproduct_gap = (
+        common and rows == {
+            **{key: 0 for key in expected_labels if key != "ATTEMPT_ROOT_RMDIR"},
+            "ATTEMPT_ROOT_RMDIR": errno.ENOTEMPTY,
+        }
+        and managed["attack_state"] == preproduct_attack
+        and managed["cross_exists_before_cleanup"] == [True, True, True, True]
+        and managed["sink_after_writer"] == "P0-CROSS"
+        and managed["p0_stdout"].get("attempt_env") is not None
+        and managed["p1_stdout"].get("attempt_env") is not None
+        and managed["p1_stdout"].get("nested_stdout") == "WRITTEN|/"
+        and managed["p1_stdout"].get("raw_override") == "ACCEPTED_PROOF"
+        and managed["nested_sibling_exists"] is True
+    )
+    product_ok = (
+        common and invalid_ok and default_product and managed_proof_exact
+        and all(
+            managed["replacement_controls"].get(kind, {}).get(key) is True
+            for kind in ("source", "directory")
+            for key in (
+                "valid_neutral", "disconnect_observed", "foreign_preserved",
+                "created_identities_cleaned", "runtime_child_bound",
+                "proof_objects_bound", "terminal_receipts_bound",
+            )
+        )
+        and set(rows.values()) == {errno.EPERM}
+        and managed["attack_state"] == product_attack
+        and managed["cross_exists_before_cleanup"] == [False, False, False, False]
+        and managed["sink_after_writer"] == "ORIGINAL-P1"
+        and managed["p0_stdout"].get("attempt_env") is None
+        and managed["p1_stdout"].get("attempt_env") is None
+        and managed["p1_stdout"].get("nested_stdout") == "DENIED|unset"
+        and managed["p1_stdout"].get("raw_override") == "REJECTED"
+        and managed["nested_sibling_exists"] is False
+    )
+    return preproduct_gap, product_ok, {
+        "h036_full_preservation": preservation,
+        "legacy": legacy, "default_trust_managed": default_trust,
+        "managed": managed,
+        "managed_profile_proof_exact": managed_proof_exact,
+        "judge_only_exact_managed_profile": reference,
+        "invalid_topology_matrix": invalid,
+        "runtime_roots_before": sorted(before_roots),
+        "runtime_roots_after": sorted(after_roots),
+    }
+
+
+def runtime_matrix_with_bound_umask(
+    h36: dict[str, Any], common_git: Path, *, product: bool,
+) -> tuple[bool, bool, dict[str, Any]]:
+    """Make H036's intentionally unnormalized proof fixtures deterministic."""
+    previous = os.umask(0o022)
+    try:
+        return runtime_matrix(h36, common_git, product=product)
+    finally:
+        os.umask(previous)
+
+
+def finish(phase: str) -> int:
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+    print(f"H038_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    if failed == 0:
+        print("H038_GATE_RESULT=PASS")
+        return 0
+    expected_detail = json.dumps({
+        "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
+    }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if phase == "preproduct" and failed_labels == [(LABEL, expected_detail)]:
+        print(f"H038_GATE_RESULT=RED_EXPECTED label={LABEL} reason={REASON}")
+        return 1
+    print("H038_GATE_RESULT=FAIL")
+    return 1
+
+
+def main(argv: list[str]) -> int:
+    if sys.version_info[:2] != (3, 12):
+        print(f"ODÖMBART H038_HOST_ENVIRONMENT — pinned Python 3.12 required, got {sys.version.split()[0]}")
+        print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+        return 2
+    preproduct_mode = not argv
+    product_mode = len(argv) == 3 and argv[0] == "--product"
+    if not (preproduct_mode or product_mode):
+        print("RIG_ERROR: usage: h-038-exit [--product BASE_SHA CANDIDATE_SHA]", file=sys.stderr)
+        return 2
+    helper_rig_types: tuple[type[BaseException], ...] = ()
+    helper_undecidable_types: tuple[type[BaseException], ...] = ()
+    try:
+        h36, h37 = load_frozen_helpers()
+        helper_rig_types = tuple(
+            value for value in (h36.get("Rig"), h37.get("Rig"))
+            if isinstance(value, type) and issubclass(value, BaseException)
+        )
+        helper_undecidable_types = tuple(
+            value for value in (h36.get("Undecidable"), h37.get("Undecidable"))
+            if isinstance(value, type) and issubclass(value, BaseException)
+        )
+        binding, old = static_contract_checks(h37)
+        phase = product_phase(old)
+        if product_mode:
+            identity_ok, identity_detail = product_identity(
+                h37, binding, old, argv[1], argv[2],
+            )
+            check(identity_ok, "A_H038_EXACT_DIRECT_CHILD_THREE_FILE_PRODUCT_IDENTITY",
+                  identity_detail)
+            if phase != "product":
+                raise Rig("--product requires exact H038 product config and three bytes")
+            if not identity_ok:
+                return finish(phase)
+            preproduct_gap, product_ok, runtime = runtime_matrix_with_bound_umask(
+                h36, binding.common_dir, product=True,
+            )
+            check(not preproduct_gap and product_ok, LABEL, runtime)
+        elif phase == "preproduct":
+            preproduct_gap, product_ok, runtime = runtime_matrix_with_bound_umask(
+                h36, binding.common_dir, product=False,
+            )
+            if not preproduct_gap or product_ok:
+                raise Rig(
+                    "published H036 did not reproduce the exact causal H038 gap: "
+                    + json.dumps(runtime, sort_keys=True, separators=(",", ":"))
+                )
+            check(False, LABEL, {
+                "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
+            })
+        else:
+            print("H038_GATE_RESULT=PRODUCT_IDENTITY_REQUIRED")
+            print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+            return 2
+        return finish(phase)
+    except Undecidable as exc:
+        print(f"ODÖMBART H038_HOST_ENVIRONMENT — {exc}")
+        print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+        return 2
+    except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
+        print(f"RIG_ERROR: {exc}", file=sys.stderr)
+        return 2
+    except BaseException as exc:
+        if helper_undecidable_types and isinstance(exc, helper_undecidable_types):
+            print(f"ODÖMBART H038_HOST_ENVIRONMENT — {exc}")
+            print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+            return 2
+        if helper_rig_types and isinstance(exc, helper_rig_types):
+            print(f"RIG_ERROR: {exc}", file=sys.stderr)
+            return 2
+        raise
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

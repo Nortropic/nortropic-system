@@ -3663,3 +3663,54 @@ transport (`K_H032_FRESH_UPSTREAM`) now accepts the exact real `PREBUILDER_PRODU
 helper rc=0 (proven on bare host in the r5 evidence), so H-031's freshness path can consume the live
 upstream instead of ODÖMBART-ing at the helper. `90497a65` and `a5707e54` preserved immutable; no
 amend/rebase/reset.
+
+## 2026-08-29 — H-038 managed attempt-root confinement contract
+
+Drift found after published H-036 is bounded to cross-attempt lifetime, not profile-install failure.
+The exact R128-P1 observer record shows the first five checkout guards true and the checkout guard
+false solely because the still-living P0 descendant created `r128-p0-cross` in the future P1
+workspace (`0600`, nlink one). Standalone Git construction did not reproduce a physical alias. The
+new prerequisite therefore strengthens the installed Seatbelt policy; it does not reinterpret the
+observer as permission for raw fallback, nested bypass or unconfined execution.
+
+H-038 freezes a controller-owned attempt root for managed H-032 launches. Its exact deny-only suffix
+denies the root and all descendants except the current launch's exact `CURRENT_WORKSPACE`; it is
+inserted between byte-identical H-036 BASE and STAGING suffixes. The closed profile family has exactly
+three states: legacy BASE, legacy WITH_STAGING, and managed ATTEMPT+STAGING. Attempt-only or any
+partial, unrelated, protected/runtime-enclosing, aliased, swapped, unsafe or caller/nested-selected
+topology fails before target start. A generic valid private `0700` ancestor is not falsely treated as
+distinguishable and only strengthens denial. Managed explicit trust is a strict attempt descendant;
+the preserved default trust equals the live root and requires attempt/live/common-Git disjointness.
+Safe dynamic fixtures prove complete protected-root-invalid states reject, while the isolated
+live/common-Git disjoint predicate remains immutable-object review because exercising it alone would
+require writable test state inside those protected roots.
+The attempt path is not target authority: `NORTROPIC_ATTEMPT_ROOT` is stripped, while
+the adversarial writer receives all attack paths explicitly in argv and must remain alive through
+the public P0 launch returning and future P1 creation. The writer is a double-forked `setsid` orphan
+bound to exact kernel argv/start identity. Product credit requires observed EPERM for
+attempt/P1/future trust/staging/sink, plus P0-local, P1-own and exact-sink success and legacy
+compatibility. A connected raw managed barrier binds the exact proof wire/effects/digest/profile,
+scratch and sink receipts, target absence before go and exact post-go success. New attempt sources are
+confined to one direct-child neutral directory named by a server CSPRNG nonce. Dynamic success,
+nonzero, timeout and disconnect lanes require exact created-identity cleanup after terminal return;
+cleanup before target exec and retention only through the outer target lifetime are both valid when
+the synchronized barrier observed creation. Post-barrier source and directory replacements preserve
+foreign type/identity/mode/nlink/bytes. Unpredictable-name pre-collision
+ordering remains truthfully static/config plus mandatory immutable review because the closed API has
+no caller/test nonce. The direct profile oracle remains judge-only.
+
+Authority remains exact: H-038 depends only on H-036; ordinary writes are empty; owner production is
+only the existing launcher, runtime helper and v2 config; the registry does not expand; a product is
+an exact direct-child three-file candidate capped at 320 added lines. This TEST_AUTHOR freeze changes
+only task spec, new gate, owner workflow, decision log and this drift record. H-032/H-031 and all
+published gates/products remain byte-identical. The no-argument product-absent baseline must be one
+causally reproduced RED and no other failure. Independent gate review precedes guarded contract
+publication; independent product review precedes guarded product publication; only then is H-032
+refrozen to depend exactly on H-038 before H-031 is rebound.
+
+The authority graph is now explicit rather than inferred from a moving remote. The five-file contract
+candidate is a direct child of `0c379f8e…`; guarded contract base `B` has ordered parents
+`[0c379f8e…, C_contract]` and the candidate tree. Product `P` is a direct three-file child of `B`.
+Product verification accepts exactly two `origin/main` lifecycle states: prepublication `B`, or the
+guarded product merge with ordered parents `[B, P]` and tree equal to `P`. This keeps authoritative
+postpublication verification possible without admitting arbitrary remote movement.
