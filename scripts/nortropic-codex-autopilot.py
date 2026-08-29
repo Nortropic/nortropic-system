@@ -1476,6 +1476,40 @@ def _retire_bound_staging(staging_dir_fd, root, identity):
     except (OSError, ValueError):
         pass
     return False
+def _h036_staging_membership_ok(names: list[str], sink_name: str) -> bool:
+    # After a published-H036 provider launch the staging root legitimately holds the trusted
+    # controller-owned proof source canaries the supervisor seeds before the confined run
+    # (controller/launch/runtime_snapshot.py _effect_plan/family(seed=True)): exactly one
+    # 64-lowercase-hex request nonce carrying the four suffixes {write,rename,unlink,hardlink}-source,
+    # plus the result sink. Any other entry (a provider-created sibling, a succeeded forbidden proof
+    # effect such as -created/-rename-target/-hardlink-target/-new-dir, a partial or mixed-nonce
+    # family, an arbitrary file, or a malformed nonce) is unexplained residue and must reject.
+    if sink_name not in names:
+        return False
+    others = [name for name in names if name != sink_name]
+    if len(others) != 4:
+        return False
+    prefix = ".nortropic-h036-proof-"
+    marker = "-staging-"
+    required_suffixes = {"write-source", "rename-source", "unlink-source", "hardlink-source"}
+    hex_digits = set("0123456789abcdef")
+    nonces: set[str] = set()
+    suffixes: set[str] = set()
+    for name in others:
+        if not name.startswith(prefix):
+            return False
+        rest = name[len(prefix):]
+        if rest.find(marker) != 64:
+            return False
+        nonce = rest[:64]
+        suffix = rest[64 + len(marker):]
+        if not nonce or not all(character in hex_digits for character in nonce):
+            return False
+        if suffix not in required_suffixes:
+            return False
+        nonces.add(nonce)
+        suffixes.add(suffix)
+    return len(nonces) == 1 and suffixes == required_suffixes
 def run_codex(repo: Path, wt: Path, role: str, prompt: str, wt_root: Path | None = None) -> dict[str, Any]:
     global _LAST_AGENT_CONTEXT
     route = AUTOPILOT_ROLE_POLICY.get(role)
@@ -1631,8 +1665,9 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str, wt_root: Path | None
                     or path_identity.st_nlink != 1
                     or (path_identity.st_dev, path_identity.st_ino)
                         != (opened_identity.st_dev, opened_identity.st_ino)
-                    or sorted(path.name for path in result_root.iterdir())
-                        != [result_sink.name]):
+                    or not _h036_staging_membership_ok(
+                        sorted(path.name for path in result_root.iterdir()),
+                        result_sink.name)):
                 raise Stop("provider result transport identity changed")
         except FileNotFoundError:
             substituted = True

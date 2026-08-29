@@ -3722,3 +3722,33 @@ site) / integration ok=True (result_connected=True). H031_AUTHORITY_DELTA=0 — 
 os/subprocess/fcntl/socket primitives (pure control-flow relocation); process inventory run=1/Popen=1/
 os.system=1 unchanged. consumer.py/materialize.py/gates/spec/launcher all untouched. caab2e4f preserved
 immutable.
+
+### Transport-guard staging-membership remediation (child of 99099d52)
+
+The 99099d52 bare-host run cleared R109 but the product's own transport-identity guard (run_codex)
+stopped the legitimate H-036 provider launch before consume with `Stop:provider result transport identity
+changed`. A settrace observer over the UNMODIFIED candidate frame (no candidate byte change) isolated the
+sole failing sub-condition: the retained sink is the SAME object (dev/ino/nlink/mode identical, not a
+symlink, regular) — `cond_devino_mismatch=False` — and the ONLY blocker is `cond_iterdir_extra=True`. The
+staging root legitimately held four trusted controller-owned H-036 proof source-canaries plus result.json:
+`.nortropic-h036-proof-<nonce>-staging-{write,rename,unlink,hardlink}-source` for one 64-lowercase-hex
+request nonce. Provenance verified against the published launcher: `controller/launch/runtime_snapshot.py`
+`_effect_plan`/`family("staging", staging, "", seed=True)` seeds exactly those four sources before the
+confined run; the confined provider CANNOT create staging siblings (Seatbelt denies file-write* under
+STAGING_ROOT except the sink data), and the canaries are NOT removed before control returns to H-032. So
+the recovered product's `iterdir() == [result.json]` predicate is a pre-H036 assumption. Root cause:
+PRODUCT_STAGING_MEMBERSHIP_ASSUMPTION_OBSOLETE_AFTER_H036 (REAL_TRANSPORT_SUBSTITUTION=NO, H036/gate/
+consumer/materializer all correct). Minimum remediation (autopilot only): replace the obsolete predicate
+with a bounded family check `_h036_staging_membership_ok(names, sink_name)` — result sink present exactly
+once, exactly four other entries, each `.nortropic-h036-proof-<64-lowercase-hex>-staging-<suffix>` with
+suffix in {write,rename,unlink,hardlink}-source, all sharing ONE nonce, the suffix set exactly the four.
+This still rejects any provider-created sibling, a succeeded forbidden proof effect
+(-created/-rename-target/-hardlink-target/-new-dir), partial/mixed-nonce families, malformed nonces, and
+arbitrary residue — preserving substitution protection. The retained-fd dev/ino/nlink/symlink/regular
+checks are untouched. Verified: predicate matrix 16/16 (positive + 15 negatives incl. the real observed
+nonce); R109 stays CONNECTED (SINGLE_ASSIGN_RETURN, consumer_sites=1); H031_AUTHORITY_DELTA=0 /
+IMPORT_DELTA=0 / PROCESS_DELTA=0 (bounded string parsing, no new import — `re` already imported but unused;
+no new os/subprocess/fcntl/socket; run=1/Popen=1/os.system=1). Canary handling = VALIDATE_THEN_EXISTING_
+FINAL_CLEANUP (recognize the trusted residue; the existing staging-root cleanup retires the private root).
+consumer.py/materialize.py/routing_ast.py/gates/spec/launcher untouched. caab2e4f + 99099d52 preserved
+immutable.
