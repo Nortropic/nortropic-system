@@ -1663,9 +1663,6 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str, wt_root: Path | None
             raise Stop("retained result sink lost its handoff identity")
         _LAST_AGENT_CONTEXT = (thread_id, events, result)
         accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
-        if (role not in {"BUILDER", "TEST_AUTHOR"}
-                and accepted["report"].get("candidate_delta") is not None):
-            raise Stop(f"report-only role returned candidate_delta: {role}")
         return accepted
     finally:
         cleanup_errors: list[OSError] = []
@@ -1717,6 +1714,9 @@ def _run_codex_agent(repo: Path, wt: Path, role: str, prompt: str, wt_root: Path
                                  "result_sha256", "report"}
             or not isinstance(accepted.get("report"), dict)):
         raise Stop("structured result kernel returned an invalid controller envelope")
+    if (role not in {"BUILDER", "TEST_AUTHOR"}
+            and accepted["report"].get("candidate_delta") is not None):
+        raise Stop(f"report-only role returned candidate_delta: {role}")
     thread_id, events, result = context
     report = accepted["report"]
     journal(repo, "AGENT_END", role=role, outcome=report.get("outcome"),

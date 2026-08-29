@@ -3698,3 +3698,27 @@ from the gate). NOTE: routing_ast.py's baked AST-dump hash is a bootstrap-time s
 gates do NOT run; its coherence with the final autopilot bytes is a pre-supervisor/operational item, not a
 gate predicate. Real H-032 (152/0) + H-031 product-present green + adversarial product review + required
 owner-live remain to be proven on a bare host before guarded product publication.
+
+### R109 connected-consumer-seam remediation (child of caab2e4f)
+
+The first bare-host run of caab2e4f did NOT falsify either product mechanism — it stopped at
+`ODÖMBART K-RIGG — RuntimeError: R109 connected consumer seam is present but structurally ambiguous`,
+before the gate adjudicated the two boundaries. Root cause (proven by running the gate's own
+`r109_transform_tree` analyzer against the recovered autopilot): `run_codex`'s outer try body had, between
+the publication assign `accepted = consume_private_result(...)` and `return accepted`, an `If` guard
+(`report-only role returned candidate_delta`). R109's bounded structural move permits ONLY flag `Assign`
+statements in that slice, so the seam was present but non-transformable → `transform_available=False` →
+RIG_ODOMBART. Class: PRODUCT_HAS_ONE_REAL_PATH_BUT_AST_SHAPE_CHANGED (the recovered 73c07ed6 was never
+R109-green against the current r5 gate). Security property behind R109: exactly one trusted consumer seam,
+uniquely structurally identifiable so the gate can verify the consume→cleanup ordering — the role-guard is
+orthogonal (role authorization on the consumed report), so relocating it out of the analyzed slice without
+changing its effect is legitimate. Minimum product remediation (autopilot only): move the role-guard from
+`run_codex` into its SOLE caller `_run_codex_agent`, immediately after the existing post-consumption
+envelope validation — the natural home for report validation, firing at the same logical point with the
+same `Stop`. `run_codex` becomes the canonical `accepted = consume_private_result(...)` → `return accepted`
+(direct_mode, SINGLE_ASSIGN_RETURN). Verified with the gate's OWN extracted analyzers: parent caab2e4f =
+RIG_ODOMBART(ambiguous)/integration ok=False; child = CONNECTED (transform_available=True, one consumer
+site) / integration ok=True (result_connected=True). H031_AUTHORITY_DELTA=0 — the delta contains zero
+os/subprocess/fcntl/socket primitives (pure control-flow relocation); process inventory run=1/Popen=1/
+os.system=1 unchanged. consumer.py/materialize.py/gates/spec/launcher all untouched. caab2e4f preserved
+immutable.
