@@ -4146,3 +4146,45 @@ requires the supplied contract merge to equal observed origin/main and validates
 publication receipt before the connected matrix. The alias negative retains zero loop-sentinel calls,
 zero artifact residue and source continuity. No runtime, product, deletion, Seatbelt, process, network,
 credential or filesystem authority changes.
+
+## H-035 R24 — parallel-finalizer timing and diagnostic drift boundary
+
+Fresh post-R23 product `d32d4051…` remains immutable NO-CREDIT. Its formal review failed in the exact
+reference case for two identical concurrent finalizers, but the frozen detail collapsed the result to
+`" | "`: it discarded return codes, stdout and timeout identity. The outer parallel harness and the
+inner product finalizer both used 30 seconds. Twelve exact two-child diagnostic repetitions completed
+successfully with all 24 children returning zero, exact accepted/merged/published stdout, empty stderr
+and byte-identical durable state. The observed failure is therefore classified as fixture/host timing
+nondeterminism; no product defect is inferred.
+
+R24 admits one fixed gate-owned 60-second common deadline after lock release, strictly later than the
+unchanged 30-second inner deadline while remaining finite. It is a group deadline, never a separate
+60 seconds per child and never caller-selected. The pre-release two-live-child barrier is unchanged.
+The exact idempotence case binds each child's rc, stdout, stderr, timeout flag and relative timing in
+canonical failure evidence, and it requires complete pre/post equality of attest, state, workspace and
+repository/remote authority snapshots. Timing or diagnostic text alone cannot satisfy the verdict.
+No controller byte, product timeout, runtime, registry/member, deletion, publication, Seatbelt,
+filesystem, process, network or credential authority changes.
+
+## H-035 R25 — unique evidence and bounded process-group cleanup drift boundary
+
+R24 `c0ddd003…` remains immutable NO-CREDIT. Its proposed publication identities collided with the
+published R23 evidence namespace. Its timeout arm terminated only the current child, followed by an
+unbounded `communicate`, while a later spawn, stdin or pre-release liveness failure did not clean all
+already started peers. The candidate wrote no evidence and never reached publication.
+
+R25 alone may replace those live successor identities with the four exact fixed `h035-r25-*` paths,
+R25 leaf/aggregate record types and guarded-publication phase. No arbitrary, caller-selected, aliased
+or neighboring artifact identity is admitted. Each parallel fixture child uses
+`start_new_session=True`, is tracked before stdin handling and owns only the process group equal to its
+registered, not-yet-reaped PID. Failure signals all such owned groups with fixed `SIGKILL` before any
+poll or reap under one shared five-second cleanup deadline; held-lock failure cleanup completes before
+lock release. No post-signal `communicate` or `wait` lacks a timeout. Non-ESRCH signal failure or
+incomplete reap is a rig failure, never product failure or success. The common 60-second verdict
+deadline and 8192-byte stdin envelope are fixed gate values, not caller authority. Synthetic rc 124
+is result compatibility only; diagnostics retain the direct child's actual wait status.
+
+This drift boundary covers only TEST_AUTHOR-owned fixture processes during a live verifier. It does
+not claim cleanup if the outer verifier receives `SIGKILL`, does not authorize a watchdog or broker,
+and changes no controller/product bytes, registry member, publication rule, Seatbelt objective or
+filesystem/network/credential/owner authority.
