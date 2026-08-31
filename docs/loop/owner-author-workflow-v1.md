@@ -1080,3 +1080,27 @@ absent mode-0600 artifact using an exclusive nofollow retained-parent open and r
 source and full retained artifact ancestry.
 This amendment grants no owner-live, publication, network or credential use and no weakening or bypass
 of Seatbelt, unconfined execution, raw fallback, native broker or broader filesystem/process authority.
+
+### H-035 R18 macOS retained-known-hosts transport repair
+
+The R17 production-remote observer retained the authenticated `known_hosts` descriptor but passed
+`/dev/fd/<fd>` to `/usr/bin/ssh`. On the target macOS host, SSH cannot reopen that path and fails with
+`fopen: Bad file descriptor`; the same exact SSH command succeeds when the authenticated bytes are
+presented through a plain path. R18 changes only that gate-owned transport. It retains a nofollow
+ancestor chain and the source descriptor, opens the source with `O_NONBLOCK`, requires the exact stable
+bounded bytes through a complete short-read loop, and creates one CSPRNG-named mode-0700 directory
+below the OS-derived current-UID mode-0700 private temp root. The single `known_hosts` copy is created
+descriptor-relative with `O_EXCL|O_NOFOLLOW|O_CLOEXEC`, mode 0600 and nlink one, then fsynced and bound
+to the exact source digest, full leaf identity, directory identity and retained temp-root chain.
+
+Source, copy, directory and ancestor identities and bytes are revalidated immediately before and after
+the Git observation. Cleanup is descriptor-relative, identity-checked and mandatory on success,
+nonzero child exit and timeout; substitution, link, disappearance or residue is failure. The Git child
+receives `close_fds=True` and exact `pass_fds=()`: source and copy descriptors remain parent-only.
+`StrictHostKeyChecking=yes`, the sole exact `UserKnownHostsFile`, disabled global host file, proxy,
+password and keyboard-interactive paths, and every other frozen SSH hardening token are unchanged.
+Child-isolated causal controls force seven-byte source reads, early EOF before `st_size`, and an exact
+stat-to-open FIFO swap that requires `O_NONBLOCK`; all require rejection or exact reconstruction and
+zero new temp residue. Serialized gate execution grants no concurrent writer to the unpredictable
+gate-private directory. R18 adds no product credit, owner-production member, filesystem/process/network
+or credential authority and does not weaken Seatbelt, admit unconfined/raw fallback or add a broker.

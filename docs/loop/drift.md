@@ -4020,3 +4020,29 @@ dev/inode-disjoint from all authenticated source roots, independent of lexical a
 creates an absent exclusive nofollow mode-0600 artifact followed by complete reauthentication. No
 product, registry, owner-production membership, Seatbelt
 objective or filesystem/process/network/credential authority is widened.
+
+### H-035 R18 macOS retained-known-hosts transport drift boundary
+
+The R17 remote observer's positive production route was first exercised on the target Mac and proved
+a gate/host incompatibility: `/usr/bin/ssh` returns `fopen: Bad file descriptor` for its frozen
+`UserKnownHostsFile=/dev/fd/<fd>` argument, while the identical hardening and authenticated
+`known_hosts` bytes work through a plain path. R18 admits no alternate trust source and changes only
+that presentation. The parent retains the nofollow source and private-temp ancestor chains, exact
+source/copy descriptors and full identities; source open is nonblocking and its bounded read must
+reconstruct exactly `st_size`. One unpredictable private directory contains one exclusive nofollow
+mode-0600/nlink-one copy. Exact bytes and identities are checked before and after the Git child, which
+inherits no descriptor, and identity-bound descriptor-relative cleanup is required on every outcome.
+
+The frozen SSH binary, remote identity, strict host-key check, sole user host file, disabled global
+host file, disabled proxy/password/keyboard-interactive paths and credential projection do not change.
+Gate selftests run fault injection in isolated pinned-Python children: forced seven-byte reads must
+reconstruct the whole source, premature EOF must reject without residue, and a stat-to-open FIFO swap
+must observe `O_NONBLOCK` and reject without blocking. Serialized gate execution leaves no authorized
+concurrent writer to the CSPRNG directory. The pre-R18 three-CLI candidate `c668ab96…` remains immutable
+NO-CREDIT; any product after publication is generated fresh from the published R18 parent.
+
+Separately, the takeover reauthenticated and terminated only the pre-existing PPID-1 H-031 owner-live
+poller PID 37935 after proving it had no child, socket or surviving source/worktree authority and was
+polling forever after a durable exit-2 record. No process group was signalled and no gate acquired
+cleanup or owner-live authority. R18 does not widen Seatbelt, filesystem/process/network/credential
+authority, permit unconfined or raw fallback, or add a native broker.

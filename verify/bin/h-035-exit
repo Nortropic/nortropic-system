@@ -344,7 +344,7 @@ H035_R14_TWO_STATE_REGISTRY = {
     "fail_closed":True,
 }
 
-H035_R15_CONTRACT_SHA256 = "99e2c1f35b6899c7563cf97a16130a8d5850e9c0d9edb8b1de7710d4b0bfc740"
+H035_R15_CONTRACT_SHA256 = "91a2c11b6e467e6dce68464a7a0c7ff0fc53a855b910762cd8c3087884d329fe"
 H035_R15_BASE = "408923a445d081ebb6309e57dfe80423844ce927"
 H035_R15_BASE_TREE = "b306ba137cb348b18df98e895b21ef47e4980e51"
 H035_R15_AST_PYTHON = Path(
@@ -359,11 +359,11 @@ H035_R15_GATE_BASE_DEF_AGGREGATE = "77413d5497b92ed8eb4df7bd805a269ab9a7249c76ce
 H035_R15_GATE_BASE_DEF_NAME_DIGEST = "8cbe0238247d014964f8d23cccf74fb6179fb81099200473b870a9693bf4d2ee"
 H035_R15_GATE_UNCHANGED_DEF_AGGREGATE = "b9b40ec354682bcee4bc5c1077deb02c03aa91c22dcbd5423be9644054567dc6"
 H035_R15_GATE_BASE_NONDEF_DIGEST = "6b69304fa7fed17d29a1460d11ecf64e43a5675e0da28636db4e52af1e6bea4a"
-H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "7010221be641c245aaefd0bfe4a54ef3e8bed0bd706738bb644555b9bc9f6105"
-H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "3e219c8d68d7b7facf8977faa83af1133d0323649b978cb99bf7052f721d4ddf"
-H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "631d511a9492c2e59b584f8ae5ff5afa1452ee38c2802588ed6b64c3736de54f"
+H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "83b5d79b807127e094dfac50ce4ec250f275e7fa9b8746f03396d15739ee1774"
+H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "4b6db4b79066f48480ffab649722b411e7774bc2d089e681337d9954ac24d7b1"
+H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "005db50fda2ee7959afdde212d9f5a46f64dfa262e4552e54cfdcd5ea4b1904e"
 H035_R15_ENV_REVIEWED_AST_SHA256 = {
-    "r15_remote_boundary_selftests":"8bc3acc0247ec91ceef75dcf2251d7eeb0fdb3f52ef6303d5a29531d0f92b5fe",
+    "r15_remote_boundary_selftests":"7fa65898c7b5165f168ff608abb89eb47ec8d805459bf5f666d044f6bee9ac75",
     "r15_product_scope_selftests":"2f8dc93a25518fd7c5bd00aaa25cb7862269f90ea8db9798310927f376d824a5",
 }
 H035_R15_PROCESS_STATE_REVIEWED_AST_SHA256 = {
@@ -2290,8 +2290,10 @@ def r15_retained_known_hosts(path: Path) -> dict[str,object]:
     if (not path.is_absolute() or Path(os.path.normpath(str(path)))!=path
             or str(path).startswith("//")):
         raise Rig("known-hosts path authority")
-    flags=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
-    fds=[];links=[];leaf_fd=-1
+    flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC
+    fds=[];links=[];copy_root_fds=[];copy_root_links=[]
+    leaf_fd=-1;copy_root_fd=-1;copy_dir_fd=-1;copy_fd=-1
+    copy_dir_name=None;copy_dir_created=False
     try:
         parent=os.open(path.anchor,flags);fds.append(parent)
         for part in path.parts[1:-1]:
@@ -2308,19 +2310,121 @@ def r15_retained_known_hosts(path: Path) -> dict[str,object]:
                 or before.st_nlink!=1 or stat.S_IMODE(before.st_mode) not in (0o600,0o644)
                 or before.st_size>1024*1024):
             raise Rig("unsafe SSH known-host authority")
-        leaf_fd=os.open(name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)
-                        |getattr(os,"O_CLOEXEC",0),dir_fd=parent)
+        leaf_fd=os.open(name,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW|os.O_CLOEXEC,
+                        dir_fd=parent)
         opened=os.fstat(leaf_fd)
-        fields=("st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-                "st_mtime_ns","st_ctime_ns")
-        if tuple(getattr(before,k) for k in fields)!=tuple(getattr(opened,k) for k in fields):
-            raise Rig("known-hosts open race")
-        raw=os.pread(leaf_fd,1024*1024+1,0)
-        if len(raw)>1024*1024:raise Rig("known-hosts size")
+        before_identity=(before.st_dev,before.st_ino,before.st_mode,before.st_uid,
+                         before.st_nlink,before.st_size,before.st_mtime_ns,before.st_ctime_ns)
+        opened_identity=(opened.st_dev,opened.st_ino,opened.st_mode,opened.st_uid,
+                         opened.st_nlink,opened.st_size,opened.st_mtime_ns,opened.st_ctime_ns)
+        if before_identity!=opened_identity:raise Rig("known-hosts open race")
+        raw=b""
+        while len(raw)<opened.st_size:
+            part=os.pread(leaf_fd,min(65536,opened.st_size-len(raw)),len(raw))
+            if not part:raise Rig("known-hosts short read")
+            raw+=part
+        after_read=os.fstat(leaf_fd)
+        after_named=os.stat(name,dir_fd=parent,follow_symlinks=False)
+        if (len(raw)!=opened.st_size
+                or (after_read.st_dev,after_read.st_ino,after_read.st_mode,after_read.st_uid,
+                    after_read.st_nlink,after_read.st_size,after_read.st_mtime_ns,
+                    after_read.st_ctime_ns)!=opened_identity
+                or (after_named.st_dev,after_named.st_ino,after_named.st_mode,
+                    after_named.st_uid,after_named.st_nlink,after_named.st_size,
+                    after_named.st_mtime_ns,after_named.st_ctime_ns)!=opened_identity):
+            raise Rig("known-hosts changed during exact read")
+        source_digest=hashlib.sha256(raw).hexdigest()
+        copy_root_path=r15_private_tmpdir()
+        if (not re.fullmatch(r"/[A-Za-z0-9._/-]+",copy_root_path)
+                or Path(os.path.normpath(copy_root_path))!=Path(copy_root_path)):
+            raise Rig("known-hosts copy root grammar")
+        copy_root=Path(copy_root_path)
+        copy_parent=os.open(copy_root.anchor,flags);copy_root_fds.append(copy_parent)
+        for part in copy_root.parts[1:]:
+            root_before=os.stat(part,dir_fd=copy_parent,follow_symlinks=False)
+            root_child=os.open(part,flags,dir_fd=copy_parent);root_opened=os.fstat(root_child)
+            if (not stat.S_ISDIR(root_opened.st_mode)
+                    or (root_before.st_dev,root_before.st_ino,root_before.st_mode)
+                    !=(root_opened.st_dev,root_opened.st_ino,root_opened.st_mode)):
+                raise Rig("known-hosts copy root ancestor race")
+            copy_root_links.append((copy_parent,part,root_child,
+                                    (root_opened.st_dev,root_opened.st_ino,root_opened.st_mode)))
+            copy_root_fds.append(root_child);copy_parent=root_child
+        copy_root_fd=copy_parent;copy_root_named=os.lstat(copy_root_path)
+        copy_root_open=os.fstat(copy_root_fd)
+        copy_root_identity=(copy_root_open.st_dev,copy_root_open.st_ino,
+                            copy_root_open.st_mode,copy_root_open.st_uid)
+        if ((copy_root_named.st_dev,copy_root_named.st_ino,copy_root_named.st_mode,
+             copy_root_named.st_uid)!=copy_root_identity
+                or not stat.S_ISDIR(copy_root_open.st_mode)
+                or copy_root_open.st_uid!=os.getuid()
+                or stat.S_IMODE(copy_root_open.st_mode)!=0o700):
+            raise Rig("known-hosts copy root authority")
+        copy_dir_name="r15-known-hosts-"+secrets.token_hex(16)
+        os.mkdir(copy_dir_name,0o700,dir_fd=copy_root_fd);copy_dir_created=True
+        copy_dir_path=os.path.join(copy_root_path,copy_dir_name)
+        copy_dir_fd=os.open(copy_dir_name,flags,dir_fd=copy_root_fd)
+        copy_name="known_hosts";copy_path=os.path.join(copy_dir_path,copy_name)
+        if (not re.fullmatch(r"/[A-Za-z0-9._/-]+",copy_path)
+                or Path(os.path.normpath(copy_path))!=Path(copy_path)):
+            raise Rig("known-hosts copy path grammar")
+        copy_fd=os.open(copy_name,os.O_RDWR|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW
+                        |os.O_CLOEXEC,0o600,dir_fd=copy_dir_fd)
+        offset=0
+        while offset<len(raw):
+            written=os.write(copy_fd,raw[offset:])
+            if written<=0:raise Rig("known-hosts copy short write")
+            offset+=written
+        os.fsync(copy_fd)
+        copy_open=os.fstat(copy_fd)
+        copy_named=os.stat(copy_name,dir_fd=copy_dir_fd,follow_symlinks=False)
+        copy_absolute=os.lstat(copy_path)
+        copy_identity=(copy_open.st_dev,copy_open.st_ino,copy_open.st_mode,
+                       copy_open.st_uid,copy_open.st_nlink,copy_open.st_size,
+                       copy_open.st_mtime_ns,copy_open.st_ctime_ns)
+        if ((copy_named.st_dev,copy_named.st_ino,copy_named.st_mode,copy_named.st_uid,
+             copy_named.st_nlink,copy_named.st_size,copy_named.st_mtime_ns,
+             copy_named.st_ctime_ns)!=copy_identity
+                or (copy_absolute.st_dev,copy_absolute.st_ino,copy_absolute.st_mode,
+                    copy_absolute.st_uid,copy_absolute.st_nlink,copy_absolute.st_size,
+                    copy_absolute.st_mtime_ns,copy_absolute.st_ctime_ns)!=copy_identity
+                or not stat.S_ISREG(copy_open.st_mode) or copy_open.st_uid!=os.getuid()
+                or copy_open.st_nlink!=1 or stat.S_IMODE(copy_open.st_mode)!=0o600
+                or copy_open.st_size!=len(raw)
+                or hashlib.sha256(os.pread(copy_fd,1024*1024+1,0)).hexdigest()!=source_digest):
+            raise Rig("known-hosts copy authority")
+        copy_dir_named=os.stat(copy_dir_name,dir_fd=copy_root_fd,follow_symlinks=False)
+        copy_dir_open=os.fstat(copy_dir_fd);copy_dir_absolute=os.lstat(copy_dir_path)
+        copy_dir_identity=(copy_dir_open.st_dev,copy_dir_open.st_ino,
+                           copy_dir_open.st_mode,copy_dir_open.st_uid,copy_dir_open.st_nlink)
+        if ((copy_dir_named.st_dev,copy_dir_named.st_ino,copy_dir_named.st_mode,
+             copy_dir_named.st_uid,copy_dir_named.st_nlink)!=copy_dir_identity
+                or (copy_dir_absolute.st_dev,copy_dir_absolute.st_ino,
+                    copy_dir_absolute.st_mode,copy_dir_absolute.st_uid,
+                    copy_dir_absolute.st_nlink)!=copy_dir_identity
+                or not stat.S_ISDIR(copy_dir_open.st_mode)
+                or copy_dir_open.st_uid!=os.getuid()
+                or stat.S_IMODE(copy_dir_open.st_mode)!=0o700
+                or os.listdir(copy_dir_fd)!=[copy_name]):
+            raise Rig("known-hosts copy directory authority")
         return {"path":path,"fd":leaf_fd,"parents":fds,"links":links,
-                "identity":tuple(getattr(opened,k) for k in fields),
-                "sha256":hashlib.sha256(raw).hexdigest()}
+                "identity":opened_identity,"sha256":source_digest,
+                "copy_root_path":copy_root_path,"copy_root_fd":copy_root_fd,
+                "copy_root_fds":copy_root_fds,"copy_root_links":copy_root_links,
+                "copy_root_identity":copy_root_identity,"copy_dir_name":copy_dir_name,
+                "copy_dir_path":copy_dir_path,"copy_dir_fd":copy_dir_fd,
+                "copy_dir_identity":copy_dir_identity,"copy_name":copy_name,
+                "copy_path":copy_path,"copy_fd":copy_fd,"copy_identity":copy_identity}
     except Exception:
+        if copy_fd>=0:os.close(copy_fd)
+        if copy_dir_fd>=0:
+            try:os.unlink("known_hosts",dir_fd=copy_dir_fd)
+            except OSError:pass
+            os.close(copy_dir_fd)
+        if copy_dir_created and copy_root_fd>=0 and isinstance(copy_dir_name,str):
+            try:os.rmdir(copy_dir_name,dir_fd=copy_root_fd)
+            except OSError:pass
+        for descriptor in reversed(copy_root_fds):os.close(descriptor)
         if leaf_fd>=0:os.close(leaf_fd)
         for descriptor in reversed(fds):os.close(descriptor)
         raise
@@ -2330,31 +2434,157 @@ def r15_validate_retained_known_hosts(handle: dict[str,object]) -> None:
     path=handle["path"];leaf_fd=handle["fd"];links=handle["links"]
     if not isinstance(path,Path) or not isinstance(leaf_fd,int) or not isinstance(links,list):
         raise Rig("known-hosts retained handle")
-    fields=("st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-            "st_mtime_ns","st_ctime_ns")
     final=os.fstat(leaf_fd);final_path=os.lstat(path)
-    if (tuple(getattr(final,k) for k in fields)!=handle["identity"]
-            or tuple(getattr(final_path,k) for k in fields)!=handle["identity"]
-            or hashlib.sha256(os.pread(leaf_fd,1024*1024+1,0)).hexdigest()!=handle["sha256"]):
+    if ((final.st_dev,final.st_ino,final.st_mode,final.st_uid,final.st_nlink,
+         final.st_size,final.st_mtime_ns,final.st_ctime_ns)!=handle["identity"]
+            or (final_path.st_dev,final_path.st_ino,final_path.st_mode,final_path.st_uid,
+                final_path.st_nlink,final_path.st_size,final_path.st_mtime_ns,
+                final_path.st_ctime_ns)!=handle["identity"]
+            ):
         raise Rig("known-hosts identity changed")
+    source_raw=b""
+    while len(source_raw)<final.st_size:
+        part=os.pread(leaf_fd,min(65536,final.st_size-len(source_raw)),len(source_raw))
+        if not part:raise Rig("known-hosts validation short read")
+        source_raw+=part
+    source_after=os.fstat(leaf_fd);source_path_after=os.lstat(path)
+    if (len(source_raw)!=final.st_size
+            or (source_after.st_dev,source_after.st_ino,source_after.st_mode,
+                source_after.st_uid,source_after.st_nlink,source_after.st_size,
+                source_after.st_mtime_ns,source_after.st_ctime_ns)!=handle["identity"]
+            or (source_path_after.st_dev,source_path_after.st_ino,source_path_after.st_mode,
+                source_path_after.st_uid,source_path_after.st_nlink,source_path_after.st_size,
+                source_path_after.st_mtime_ns,source_path_after.st_ctime_ns)!=handle["identity"]
+            or hashlib.sha256(source_raw).hexdigest()!=handle["sha256"]):
+        raise Rig("known-hosts exact bytes changed")
     for parent,part,child,want in links:
         linked=os.stat(part,dir_fd=parent,follow_symlinks=False);opened=os.fstat(child)
         if ((linked.st_dev,linked.st_ino,linked.st_mode)!=want
                 or (opened.st_dev,opened.st_ino,opened.st_mode)!=want):
             raise Rig("known-hosts ancestor changed")
+    copy_root_path=handle["copy_root_path"];copy_root_fd=handle["copy_root_fd"]
+    copy_root_fds=handle["copy_root_fds"];copy_root_links=handle["copy_root_links"]
+    copy_dir_name=handle["copy_dir_name"];copy_dir_path=handle["copy_dir_path"]
+    copy_dir_fd=handle["copy_dir_fd"];copy_name=handle["copy_name"]
+    copy_path=handle["copy_path"];copy_fd=handle["copy_fd"]
+    if (not isinstance(copy_root_path,str) or not isinstance(copy_root_fd,int)
+            or not isinstance(copy_root_fds,list) or not isinstance(copy_root_links,list)
+            or not isinstance(copy_dir_name,str) or not isinstance(copy_dir_path,str)
+            or not isinstance(copy_dir_fd,int) or copy_name!="known_hosts"
+            or not isinstance(copy_path,str) or not isinstance(copy_fd,int)
+            or not re.fullmatch(r"/[A-Za-z0-9._/-]+",copy_path)
+            or Path(os.path.normpath(copy_path))!=Path(copy_path)
+            or copy_path!=os.path.join(copy_dir_path,copy_name)
+            or copy_dir_path!=os.path.join(copy_root_path,copy_dir_name)):
+        raise Rig("known-hosts copy handle")
+    copy_root_named=os.lstat(copy_root_path);copy_root_open=os.fstat(copy_root_fd)
+    if ((copy_root_named.st_dev,copy_root_named.st_ino,copy_root_named.st_mode,
+         copy_root_named.st_uid)!=handle["copy_root_identity"]
+            or (copy_root_open.st_dev,copy_root_open.st_ino,copy_root_open.st_mode,
+                copy_root_open.st_uid)!=handle["copy_root_identity"]
+            or not stat.S_ISDIR(copy_root_open.st_mode)
+            or copy_root_open.st_uid!=os.getuid()
+            or stat.S_IMODE(copy_root_open.st_mode)!=0o700):
+        raise Rig("known-hosts copy root changed")
+    for parent,part,child,want in copy_root_links:
+        linked=os.stat(part,dir_fd=parent,follow_symlinks=False);opened=os.fstat(child)
+        if ((linked.st_dev,linked.st_ino,linked.st_mode)!=want
+                or (opened.st_dev,opened.st_ino,opened.st_mode)!=want):
+            raise Rig("known-hosts copy root ancestor changed")
+    copy_dir_named=os.stat(copy_dir_name,dir_fd=copy_root_fd,follow_symlinks=False)
+    copy_dir_open=os.fstat(copy_dir_fd);copy_dir_absolute=os.lstat(copy_dir_path)
+    if ((copy_dir_named.st_dev,copy_dir_named.st_ino,copy_dir_named.st_mode,
+         copy_dir_named.st_uid,copy_dir_named.st_nlink)!=handle["copy_dir_identity"]
+            or (copy_dir_open.st_dev,copy_dir_open.st_ino,copy_dir_open.st_mode,
+                copy_dir_open.st_uid,copy_dir_open.st_nlink)!=handle["copy_dir_identity"]
+            or (copy_dir_absolute.st_dev,copy_dir_absolute.st_ino,
+                copy_dir_absolute.st_mode,copy_dir_absolute.st_uid,
+                copy_dir_absolute.st_nlink)!=handle["copy_dir_identity"]
+            or not stat.S_ISDIR(copy_dir_open.st_mode)
+            or copy_dir_open.st_uid!=os.getuid()
+            or stat.S_IMODE(copy_dir_open.st_mode)!=0o700
+            or os.listdir(copy_dir_fd)!=[copy_name]):
+        raise Rig("known-hosts copy directory changed")
+    copy_named=os.stat(copy_name,dir_fd=copy_dir_fd,follow_symlinks=False)
+    copy_absolute=os.lstat(copy_path);copy_open=os.fstat(copy_fd)
+    if ((copy_named.st_dev,copy_named.st_ino,copy_named.st_mode,copy_named.st_uid,
+         copy_named.st_nlink,copy_named.st_size,copy_named.st_mtime_ns,
+         copy_named.st_ctime_ns)!=handle["copy_identity"]
+            or (copy_absolute.st_dev,copy_absolute.st_ino,copy_absolute.st_mode,
+                copy_absolute.st_uid,copy_absolute.st_nlink,copy_absolute.st_size,
+                copy_absolute.st_mtime_ns,copy_absolute.st_ctime_ns)!=handle["copy_identity"]
+            or (copy_open.st_dev,copy_open.st_ino,copy_open.st_mode,copy_open.st_uid,
+                copy_open.st_nlink,copy_open.st_size,copy_open.st_mtime_ns,
+                copy_open.st_ctime_ns)!=handle["copy_identity"]
+            or not stat.S_ISREG(copy_open.st_mode) or copy_open.st_uid!=os.getuid()
+            or stat.S_IMODE(copy_open.st_mode)!=0o600 or copy_open.st_nlink!=1
+            or hashlib.sha256(os.pread(copy_fd,1024*1024+1,0)).hexdigest()!=handle["sha256"]):
+        raise Rig("known-hosts copy changed")
 
 
 def r15_close_retained_known_hosts(handle: dict[str,object] | None) -> None:
     if handle is None:return
+    errors=[];copy_name=handle.get("copy_name");copy_dir_fd=handle.get("copy_dir_fd")
+    copy_fd=handle.get("copy_fd");copy_dir_name=handle.get("copy_dir_name")
+    copy_root_fd=handle.get("copy_root_fd");copy_root_fds=handle.get("copy_root_fds",[])
+    copy_path=handle.get("copy_path")
+    copy_dir_path=handle.get("copy_dir_path")
+    if isinstance(copy_name,str) and isinstance(copy_dir_fd,int):
+        try:
+            copy_open=os.fstat(copy_fd) if isinstance(copy_fd,int) else None
+            try:copy_named=os.stat(copy_name,dir_fd=copy_dir_fd,follow_symlinks=False)
+            except FileNotFoundError:
+                if copy_open is None or copy_open.st_nlink!=0:errors.append("copy missing while linked")
+            else:
+                if (copy_open is None
+                        or (copy_named.st_dev,copy_named.st_ino)
+                            !=(copy_open.st_dev,copy_open.st_ino)):
+                    errors.append("copy cleanup identity")
+                else:
+                    os.unlink(copy_name,dir_fd=copy_dir_fd);os.fsync(copy_dir_fd)
+                    if os.fstat(copy_fd).st_nlink!=0:errors.append("copy retained links")
+        except OSError as exc:errors.append("copy unlink:"+str(exc))
+    else:errors.append("copy unlink handle")
+    if isinstance(copy_fd,int):
+        try:os.close(copy_fd)
+        except OSError as exc:errors.append("copy fd close:"+str(exc))
+    else:errors.append("copy fd handle")
+    if isinstance(copy_dir_name,str) and isinstance(copy_root_fd,int):
+        try:
+            copy_dir_open=os.fstat(copy_dir_fd) if isinstance(copy_dir_fd,int) else None
+            copy_dir_named=os.stat(copy_dir_name,dir_fd=copy_root_fd,follow_symlinks=False)
+            if (copy_dir_open is None
+                    or (copy_dir_named.st_dev,copy_dir_named.st_ino)
+                        !=(copy_dir_open.st_dev,copy_dir_open.st_ino)):
+                errors.append("copy dir cleanup identity")
+            elif os.listdir(copy_dir_fd):errors.append("copy dir cleanup entries")
+            else:os.rmdir(copy_dir_name,dir_fd=copy_root_fd)
+        except OSError as exc:errors.append("copy dir remove:"+str(exc))
+    else:errors.append("copy dir handle")
+    if isinstance(copy_dir_fd,int):
+        try:os.close(copy_dir_fd)
+        except OSError as exc:errors.append("copy dir fd close:"+str(exc))
+    if isinstance(copy_root_fds,list):
+        for parent in reversed(copy_root_fds):
+            if isinstance(parent,int):
+                try:os.close(parent)
+                except OSError as exc:errors.append("copy root fd close:"+str(exc))
+    if isinstance(copy_path,str) and os.path.lexists(copy_path):errors.append("copy residue")
+    if isinstance(copy_dir_path,str) and os.path.lexists(copy_dir_path):errors.append("copy dir residue")
     descriptor=handle.get("fd");parents=handle.get("parents",[])
-    if isinstance(descriptor,int):os.close(descriptor)
+    if isinstance(descriptor,int):
+        try:os.close(descriptor)
+        except OSError as exc:errors.append("source fd close:"+str(exc))
     if isinstance(parents,list):
         for parent in reversed(parents):
-            if isinstance(parent,int):os.close(parent)
+            if isinstance(parent,int):
+                try:os.close(parent)
+                except OSError as exc:errors.append("source ancestor close:"+str(exc))
+    if errors:raise Rig("known-hosts cleanup failure: "+" | ".join(errors))
 
 
 def r15_remote_setup(origin: str) -> tuple[dict[str,str],list[str],dict[str,object] | None,tuple[object,...] | None]:
-    """Closed remote observation with an FD-pinned host-key authority."""
+    """Closed remote observation with a retained-identity plain host-key copy."""
     env={
         "HOME":"/private/var/empty","XDG_CONFIG_HOME":"/private/var/empty",
         "PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C",
@@ -2385,7 +2615,7 @@ def r15_remote_setup(origin: str) -> tuple[dict[str,str],list[str],dict[str,obje
         command=("/usr/bin/ssh -F /dev/null -oBatchMode=yes -oStrictHostKeyChecking=yes "
                  "-oProxyCommand=none -oProxyJump=none -oCanonicalizeHostname=no "
                  "-oIdentitiesOnly=no -oIdentityFile=none "
-                 "-oUserKnownHostsFile=/dev/fd/"+str(known_handle["fd"])+
+                 "-oUserKnownHostsFile="+str(known_handle["copy_path"])+
                  " -oGlobalKnownHostsFile=/dev/null -oPasswordAuthentication=no "
                  "-oKbdInteractiveAuthentication=no")
         arguments=["-c",f"core.sshCommand={command}"]
@@ -2429,24 +2659,28 @@ def r15_remote_environment(origin: str) -> tuple[dict[str,str], list[str]]:
 
 def r15_observed_remote_main(repo: Path) -> tuple[str, str]:
     config_path,config_raw,config_info,origin=r15_local_config_snapshot(repo)
-    config_before=(tuple(getattr(config_info,key) for key in (
-        "st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-        "st_mtime_ns","st_ctime_ns")),hashlib.sha256(config_raw).hexdigest())
+    config_before=((config_info.st_dev,config_info.st_ino,config_info.st_mode,
+                    config_info.st_uid,config_info.st_nlink,config_info.st_size,
+                    config_info.st_mtime_ns,config_info.st_ctime_ns),
+                   hashlib.sha256(config_raw).hexdigest())
     env,remote_args,known_handle,agent_identity=r15_remote_setup(origin)
-    pass_fds=(() if known_handle is None else (int(known_handle["fd"]),))
     try:
-        result=subprocess.run(
-            ["/usr/bin/git","--no-replace-objects",*remote_args,
-             "-c","core.hooksPath=/dev/null",
-             "ls-remote","--refs",origin,"refs/heads/main"],
-            cwd=Path("/private/var/empty"),env=env,text=True,capture_output=True,
-            shell=False,check=False,timeout=45,pass_fds=pass_fds,close_fds=True)
         if known_handle is not None:r15_validate_retained_known_hosts(known_handle)
+        try:
+            result=subprocess.run(
+                ["/usr/bin/git","--no-replace-objects",*remote_args,
+                 "-c","core.hooksPath=/dev/null",
+                 "ls-remote","--refs",origin,"refs/heads/main"],
+                cwd=Path("/private/var/empty"),env=env,text=True,capture_output=True,
+                shell=False,check=False,timeout=45,pass_fds=(),close_fds=True)
+        finally:
+            if known_handle is not None:r15_validate_retained_known_hosts(known_handle)
     finally:r15_close_retained_known_hosts(known_handle)
     config_after_raw,config_info=r15_stable_regular_bytes(config_path,max_bytes=1024*1024)
-    config_after=(tuple(getattr(config_info,key) for key in (
-        "st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-        "st_mtime_ns","st_ctime_ns")),hashlib.sha256(config_after_raw).hexdigest())
+    config_after=((config_info.st_dev,config_info.st_ino,config_info.st_mode,
+                   config_info.st_uid,config_info.st_nlink,config_info.st_size,
+                   config_info.st_mtime_ns,config_info.st_ctime_ns),
+                  hashlib.sha256(config_after_raw).hexdigest())
     if config_after!=config_before: raise Rig("local Git config changed during remote observation")
     if agent_identity is not None:
         agent=Path(str(agent_identity[0]));socket_info=os.lstat(agent);parent=os.lstat(agent.parent)
@@ -2463,6 +2697,231 @@ def r15_observed_remote_main(repo: Path) -> tuple[str, str]:
 
 
 def r15_remote_boundary_selftests(tmp: Path) -> None:
+    def known_hosts_copy_selftests() -> tuple[bool,str]:
+        kh_root=tmp/"kh-fixture";kh_root.mkdir(mode=0o700)
+        kh_path=kh_root/"known_hosts"
+        kh_bytes=b"github.com ssh-ed25519 AAAAExampleFixtureKey\n"
+        kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+        controls=[]
+        handle=r15_retained_known_hosts(kh_path)
+        copy_path=Path(str(handle["copy_path"]));copy_dir=Path(str(handle["copy_dir_path"]))
+        retained=(int(handle["fd"]),int(handle["copy_root_fd"]),
+                  int(handle["copy_dir_fd"]),int(handle["copy_fd"]))
+        try:
+            r15_validate_retained_known_hosts(handle)
+            copy_info=os.lstat(copy_path);dir_info=os.lstat(copy_dir)
+            positive=(str(handle["copy_root_path"])==r15_private_tmpdir()
+                      and copy_path.is_absolute()
+                      and Path(os.path.normpath(str(copy_path)))==copy_path
+                      and re.fullmatch(r"/[A-Za-z0-9._/-]+",str(copy_path)) is not None
+                      and "/dev/fd/" not in str(copy_path)
+                      and stat.S_ISREG(copy_info.st_mode) and copy_info.st_uid==os.getuid()
+                      and stat.S_IMODE(copy_info.st_mode)==0o600 and copy_info.st_nlink==1
+                      and copy_info.st_size==len(kh_bytes)
+                      and stat.S_ISDIR(dir_info.st_mode) and dir_info.st_uid==os.getuid()
+                      and stat.S_IMODE(dir_info.st_mode)==0o700
+                      and copy_path.read_bytes()==kh_bytes
+                      and hashlib.sha256(copy_path.read_bytes()).hexdigest()==handle["sha256"]
+                      and all(not os.get_inheritable(descriptor) for descriptor in retained))
+            controls.append(("POSITIVE_RETAINED_PLAIN_COPY",positive))
+        finally:r15_close_retained_known_hosts(handle)
+        descriptors_closed=True
+        for descriptor in retained:
+            try:os.fstat(descriptor)
+            except OSError:pass
+            else:descriptors_closed=False
+        controls.append(("POSITIVE_CLEANUP_AND_DESCRIPTOR_CLOSURE",
+                         descriptors_closed and not os.path.lexists(copy_path)
+                         and not os.path.lexists(copy_dir)))
+        known_fault_program=r'''
+import hashlib,os,runpy,stat,sys,time
+from pathlib import Path
+gate=Path(sys.argv[1]);source=Path(sys.argv[2]);mode=sys.argv[3]
+ns=runpy.run_path(str(gate),run_name="h035_r18_known_hosts_fault")
+open_known=ns["r15_retained_known_hosts"]
+validate_known=ns["r15_validate_retained_known_hosts"]
+close_known=ns["r15_close_retained_known_hosts"]
+Rig=ns["Rig"]
+private_tmpdir=ns["r15_private_tmpdir"]
+source_info=os.lstat(source);source_identity=(source_info.st_dev,source_info.st_ino)
+residue_before=set(Path(private_tmpdir()).glob("r15-known-hosts-*"))
+if mode in ("short","early-eof"):
+ original=os.pread;calls=[]
+ def changed(descriptor,amount,offset):
+  opened=os.fstat(descriptor)
+  if (opened.st_dev,opened.st_ino)==source_identity:
+   calls.append((amount,offset))
+   if mode=="early-eof" and offset>=7:return b""
+   amount=min(amount,7 if mode=="short" else 7-offset)
+  return original(descriptor,amount,offset)
+ os.pread=changed;handle=None;accepted=False;rejected=False
+ try:
+  try:
+   handle=open_known(source)
+   if mode=="short":
+    validate_known(handle)
+    accepted=(Path(handle["copy_path"]).read_bytes()==source.read_bytes()
+              and hashlib.sha256(source.read_bytes()).hexdigest()==handle["sha256"])
+  except (Rig,OSError):rejected=True
+ finally:
+  os.pread=original
+  if handle is not None:close_known(handle)
+ ok=(mode=="short" and accepted and not rejected and len(calls)>2
+     or mode=="early-eof" and rejected and len(calls)==2)
+elif mode=="fifo-swap":
+ original=os.open;held=source.with_name(source.name+"-before-fifo-swap")
+ swapped=[];nonblock=[];would_block=[];rejected=False
+ def changed(path,flags,mode_bits=0o777,*,dir_fd=None):
+  if not swapped and path==source.name and dir_fd is not None:
+   parent=os.fstat(dir_fd);source_parent=os.lstat(source.parent)
+   if (parent.st_dev,parent.st_ino)==(source_parent.st_dev,source_parent.st_ino):
+    nonblock.append(bool(flags & os.O_NONBLOCK))
+    os.rename(source,held);os.mkfifo(source,0o600);swapped.append(True)
+    if not flags & os.O_NONBLOCK:
+     would_block.append(True);raise TimeoutError("known-hosts FIFO open would block")
+  return original(path,flags,mode_bits,dir_fd=dir_fd)
+ os.open=changed;started=time.monotonic()
+ try:
+  try:open_known(source)
+  except (Rig,OSError):rejected=True
+ finally:
+  os.open=original
+  if os.path.lexists(source):os.unlink(source)
+  if os.path.lexists(held):os.rename(held,source)
+ ok=(rejected and swapped==[True] and nonblock==[True] and not would_block
+     and time.monotonic()-started<1.0)
+else:ok=False
+residue_after=set(Path(private_tmpdir()).glob("r15-known-hosts-*"))
+if not ok or residue_after!=residue_before:raise SystemExit(1)
+print("PASS")
+'''
+        fault_env={"HOME":"/private/var/empty","XDG_CONFIG_HOME":"/private/var/empty",
+                   "PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C",
+                   "TMPDIR":r15_private_tmpdir(),
+                   "DARWIN_USER_TEMP_DIR":r15_private_tmpdir(),
+                   "PYTHONDONTWRITEBYTECODE":"1","GIT_CONFIG_NOSYSTEM":"1",
+                   "GIT_CONFIG_GLOBAL":"/dev/null","GIT_CONFIG_SYSTEM":"/dev/null",
+                   "GIT_ATTR_NOSYSTEM":"1","GIT_TERMINAL_PROMPT":"0"}
+        def known_fault(mode: str) -> bool:
+            result=subprocess.run(
+                [str(H035_R15_AST_PYTHON),"-I","-S","-B","-c",known_fault_program,
+                 str(ROOT/"verify/bin/h-035-exit"),str(kh_path),mode],
+                cwd=Path("/private/var/empty"),env=fault_env,text=True,capture_output=True,
+                shell=False,check=False,timeout=5,pass_fds=(),close_fds=True)
+            return result.returncode==0 and result.stdout=="PASS\n" and result.stderr==""
+
+        multi_bytes=(kh_bytes*3000)[:131073]
+        kh_path.write_bytes(multi_bytes);os.chmod(kh_path,0o600)
+        controls.append(("SOURCE_MULTICHUNK_EXACT_COPY",known_fault("short")))
+
+        kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+        controls.append(("SOURCE_EARLY_EOF_REJECTS_AND_CLEANS",known_fault("early-eof")))
+
+        controls.append(("SOURCE_STAT_OPEN_FIFO_SWAP_REJECTS_WITHOUT_BLOCK",
+                         known_fault("fifo-swap")))
+        tampers=("COPY_BYTE_MUTATION","COPY_TRUNCATION","COPY_MODE_DRIFT",
+                 "COPY_HARDLINK_NLINK","COPY_SYMLINK_SUBSTITUTION",
+                 "COPY_SAME_BYTE_INODE_SUBSTITUTION","COPY_DIR_MODE_DRIFT",
+                 "COPY_DIR_PATH_SUBSTITUTION","SOURCE_BYTE_MUTATION",
+                 "SOURCE_TRUNCATION","SOURCE_MODE_DRIFT","SOURCE_HARDLINK_NLINK",
+                 "SOURCE_PATH_SUBSTITUTION","SOURCE_FIFO_SUBSTITUTION","SOURCE_ANCESTOR_MODE",
+                 "SOURCE_ANCESTOR_PATH_SUBSTITUTION")
+        for label in tampers:
+            if not kh_root.exists():kh_root.mkdir(mode=0o700)
+            kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600);os.chmod(kh_root,0o700)
+            handle=r15_retained_known_hosts(kh_path)
+            copy_path=Path(str(handle["copy_path"]));copy_dir=Path(str(handle["copy_dir_path"]))
+            extra=None;held=None;replacement=False;rejected=False;cleaned=False
+            try:
+                if label=="COPY_BYTE_MUTATION":copy_path.write_bytes(b"TAMPERED\n")
+                elif label=="COPY_TRUNCATION":os.truncate(copy_path,8)
+                elif label=="COPY_MODE_DRIFT":os.chmod(copy_path,0o644)
+                elif label=="COPY_HARDLINK_NLINK":
+                    extra=copy_dir.with_name(copy_dir.name+"-hardlink");os.link(copy_path,extra)
+                elif label in ("COPY_SYMLINK_SUBSTITUTION","COPY_SAME_BYTE_INODE_SUBSTITUTION"):
+                    held=copy_dir.with_name(copy_dir.name+"-held-file");os.rename(copy_path,held)
+                    if label=="COPY_SYMLINK_SUBSTITUTION":os.symlink(held,copy_path)
+                    else:copy_path.write_bytes(kh_bytes);os.chmod(copy_path,0o600)
+                elif label=="COPY_DIR_MODE_DRIFT":os.chmod(copy_dir,0o755)
+                elif label=="COPY_DIR_PATH_SUBSTITUTION":
+                    held=copy_dir.with_name(copy_dir.name+"-held-dir");os.rename(copy_dir,held)
+                    copy_dir.mkdir(mode=0o700);(copy_dir/"known_hosts").write_bytes(kh_bytes)
+                    os.chmod(copy_dir/"known_hosts",0o600);replacement=True
+                elif label=="SOURCE_BYTE_MUTATION":kh_path.write_bytes(kh_bytes+b"INJECTED\n")
+                elif label=="SOURCE_TRUNCATION":os.truncate(kh_path,8)
+                elif label=="SOURCE_MODE_DRIFT":os.chmod(kh_path,0o644)
+                elif label=="SOURCE_HARDLINK_NLINK":
+                    extra=kh_root/"known_hosts-hardlink";os.link(kh_path,extra)
+                elif label=="SOURCE_PATH_SUBSTITUTION":
+                    held=kh_root/"known_hosts-held";os.rename(kh_path,held)
+                    kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+                elif label=="SOURCE_FIFO_SUBSTITUTION":
+                    held=kh_root/"known_hosts-held";os.rename(kh_path,held)
+                    os.mkfifo(kh_path,0o600)
+                elif label=="SOURCE_ANCESTOR_MODE":os.chmod(kh_root,0o755)
+                elif label=="SOURCE_ANCESTOR_PATH_SUBSTITUTION":
+                    held=kh_root.with_name("kh-fixture-held");os.rename(kh_root,held)
+                    kh_root.mkdir(mode=0o700);kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+                    replacement=True
+                try:r15_validate_retained_known_hosts(handle)
+                except (Rig,OSError):rejected=True
+            finally:
+                if label=="COPY_MODE_DRIFT" and os.path.lexists(copy_path):os.chmod(copy_path,0o600)
+                if label=="COPY_DIR_MODE_DRIFT" and os.path.lexists(copy_dir):os.chmod(copy_dir,0o700)
+                if label in ("COPY_SYMLINK_SUBSTITUTION","COPY_SAME_BYTE_INODE_SUBSTITUTION"):
+                    if os.path.lexists(copy_path):os.unlink(copy_path)
+                    if held is not None:os.rename(held,copy_path)
+                if label=="COPY_DIR_PATH_SUBSTITUTION" and held is not None:
+                    if replacement:
+                        if os.path.lexists(copy_dir/"known_hosts"):os.unlink(copy_dir/"known_hosts")
+                        if os.path.lexists(copy_dir):os.rmdir(copy_dir)
+                    os.rename(held,copy_dir)
+                if label=="SOURCE_MODE_DRIFT" and os.path.lexists(kh_path):os.chmod(kh_path,0o600)
+                if label=="SOURCE_ANCESTOR_MODE" and os.path.lexists(kh_root):os.chmod(kh_root,0o700)
+                if label in ("SOURCE_PATH_SUBSTITUTION","SOURCE_FIFO_SUBSTITUTION") and held is not None:
+                    if os.path.lexists(kh_path):os.unlink(kh_path)
+                    os.rename(held,kh_path)
+                if label=="SOURCE_ANCESTOR_PATH_SUBSTITUTION" and held is not None:
+                    if replacement:
+                        if os.path.lexists(kh_path):os.unlink(kh_path)
+                        if os.path.lexists(kh_root):os.rmdir(kh_root)
+                    os.rename(held,kh_root)
+                if extra is not None and os.path.lexists(extra):os.unlink(extra)
+                try:r15_close_retained_known_hosts(handle);cleaned=True
+                except (Rig,OSError):cleaned=False
+            controls.append((label+"_REJECT_AND_CLEAN",rejected and cleaned
+                             and not os.path.lexists(copy_path) and not os.path.lexists(copy_dir)))
+        kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600);os.chmod(kh_root,0o700)
+        handle=r15_retained_known_hosts(kh_path)
+        copy_dir=Path(str(handle["copy_dir_path"]));held=copy_dir.with_name(copy_dir.name+"-held-dir")
+        os.rename(copy_dir,held);copy_dir.mkdir(mode=0o700)
+        try:
+            try:r15_close_retained_known_hosts(handle)
+            except (Rig,OSError):cleanup_failure=True
+            else:cleanup_failure=False
+        finally:
+            if os.path.lexists(copy_dir):os.rmdir(copy_dir)
+            if os.path.lexists(held):os.rmdir(held)
+        controls.append(("CLEANUP_SUBSTITUTION_REPORTS_FAILURE_AND_RESIDUE",cleanup_failure))
+        for label,command,timeout in (
+                ("NONZERO_CHILD_CLEANUP",["/usr/bin/false"],5),
+                ("TIMEOUT_CHILD_CLEANUP",["/bin/sleep","1"],0.01)):
+            kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+            handle=r15_retained_known_hosts(kh_path)
+            copy_path=Path(str(handle["copy_path"]));copy_dir=Path(str(handle["copy_dir_path"]))
+            outcome=False
+            try:
+                try:
+                    child=subprocess.run(command,capture_output=True,check=False,timeout=timeout,
+                                         close_fds=True,pass_fds=())
+                    outcome=(label=="NONZERO_CHILD_CLEANUP" and child.returncode!=0)
+                except subprocess.TimeoutExpired:outcome=(label=="TIMEOUT_CHILD_CLEANUP")
+            finally:r15_close_retained_known_hosts(handle)
+            controls.append((label,outcome and not os.path.lexists(copy_path)
+                             and not os.path.lexists(copy_dir)))
+        failures=[name for name,result in controls if not result]
+        return len(controls)==24 and not failures,repr(failures)
+
     hostile_keys=("GIT_SSH","GIT_SSH_COMMAND","SSH_ASKPASS","GIT_ASKPASS",
                   "GIT_TERMINAL_PROMPT","HOME","GIT_CONFIG_GLOBAL")
     local_origin=tmp/"origin.git"
@@ -2477,6 +2936,13 @@ def r15_remote_boundary_selftests(tmp: Path) -> None:
     try:
         ssh_env,ssh_args,handle,agent_identity=r15_remote_setup(
             "git@github.com:Nortropic/nortropic-system.git")
+        copy_argument="-oUserKnownHostsFile="+str(handle["copy_path"])
+        exact_ssh=["/usr/bin/ssh","-F","/dev/null","-oBatchMode=yes",
+                   "-oStrictHostKeyChecking=yes","-oProxyCommand=none","-oProxyJump=none",
+                   "-oCanonicalizeHostname=no","-oIdentitiesOnly=no","-oIdentityFile=none",
+                   copy_argument,"-oGlobalKnownHostsFile=/dev/null",
+                   "-oPasswordAuthentication=no","-oKbdInteractiveAuthentication=no"]
+        observed_ssh=shlex.split(ssh_args[1].removeprefix("core.sshCommand="))
         ssh_ok=(ssh_env.get("SSH_AUTH_SOCK")==R15_INITIAL_SSH_AUTH_SOCK
                 and all(key not in ssh_env for key in (
                     "GIT_SSH","GIT_SSH_COMMAND","SSH_ASKPASS","GIT_ASKPASS"))
@@ -2484,13 +2950,11 @@ def r15_remote_boundary_selftests(tmp: Path) -> None:
                 and ssh_env.get("GIT_CONFIG_GLOBAL")=="/dev/null"
                 and ssh_env.get("GIT_TERMINAL_PROMPT")=="0"
                 and len(ssh_args)==2 and ssh_args[0]=="-c"
-                and ssh_args[1].startswith("core.sshCommand=/usr/bin/ssh ")
-                and " -F /dev/null " in ssh_args[1]
-                and "StrictHostKeyChecking=yes" in ssh_args[1]
-                and "ProxyCommand=none" in ssh_args[1]
-                and "ProxyJump=none" in ssh_args[1]
+                and ssh_args[1].startswith("core.sshCommand=")
+                and observed_ssh==exact_ssh
                 and isinstance(handle,dict) and isinstance(agent_identity,tuple)
-                and f"UserKnownHostsFile=/dev/fd/{handle['fd']}" in ssh_args[1])
+                and observed_ssh.count(copy_argument)==1
+                and all("/dev/fd/" not in token for token in observed_ssh))
     finally:
         r15_close_retained_known_hosts(handle)
         for key,value in prior.items():
@@ -2512,8 +2976,10 @@ def r15_remote_boundary_selftests(tmp: Path) -> None:
         try: r15_remote_environment(hostile)
         except Rig: url_rejections.append(True)
         else: url_rejections.append(False)
-    check(ssh_ok and changed_agent_rejected and all(url_rejections),
-          "J_R15_SSH_REMOTE_PRESERVES_ONLY_INITIAL_AGENT_AND_FD_PINNED_KNOWN_HOSTS")
+    copy_ok,copy_detail=known_hosts_copy_selftests()
+    check(ssh_ok and changed_agent_rejected and all(url_rejections) and copy_ok,
+          "J_R15_SSH_REMOTE_PRESERVES_ONLY_INITIAL_AGENT_AND_RETAINED_PLAIN_KNOWN_HOSTS",
+          copy_detail)
 
 
 def git_object_bytes(repo: Path, sha: str, path: str) -> bytes | None:
@@ -16065,7 +16531,8 @@ def repo_shape(repo):
   else:raise Stop("bare alternate")
  return str(remote.resolve(strict=True))
 def known_open(path):
- df=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0);fds=[];links=[];fd=-1
+ df=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC;fds=[];links=[];tfds=[];tlinks=[]
+ fd=-1;tfd=-1;dfd=-1;cfd=-1;dname=None;made=False
  try:
   parent=os.open(path.anchor,df);fds.append(parent)
   for part in path.parts[1:-1]:
@@ -16074,19 +16541,109 @@ def known_open(path):
    links.append((parent,part,child,(b.st_dev,b.st_ino,b.st_mode)));fds.append(child);parent=child
   name=path.name;a=os.stat(name,dir_fd=parent,follow_symlinks=False)
   if not stat.S_ISREG(a.st_mode) or a.st_uid!=os.getuid() or a.st_nlink!=1 or stat.S_IMODE(a.st_mode) not in (0o600,0o644) or a.st_size>1048576:raise Stop("known-host file")
-  fd=os.open(name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0),dir_fd=parent);b=os.fstat(fd)
+  fd=os.open(name,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW|os.O_CLOEXEC,dir_fd=parent);b=os.fstat(fd)
   identity=(b.st_dev,b.st_ino,b.st_mode,b.st_uid,b.st_nlink,b.st_size,b.st_mtime_ns,b.st_ctime_ns)
   if identity!=(a.st_dev,a.st_ino,a.st_mode,a.st_uid,a.st_nlink,a.st_size,a.st_mtime_ns,a.st_ctime_ns):raise Stop("known-host open race")
-  digest=F(os.pread(fd,1048577,0))
-  return {"fd":fd,"fds":fds,"links":links,"path":path,"identity":identity,"digest":digest}
+  raw=b''
+  while len(raw)<b.st_size:
+   part=os.pread(fd,min(65536,b.st_size-len(raw)),len(raw))
+   if not part:raise Stop("known-host short read")
+   raw+=part
+  br=os.fstat(fd);bn=os.stat(name,dir_fd=parent,follow_symlinks=False)
+  if len(raw)!=b.st_size or (br.st_dev,br.st_ino,br.st_mode,br.st_uid,br.st_nlink,br.st_size,br.st_mtime_ns,br.st_ctime_ns)!=identity or (bn.st_dev,bn.st_ino,bn.st_mode,bn.st_uid,bn.st_nlink,bn.st_size,bn.st_mtime_ns,bn.st_ctime_ns)!=identity:raise Stop("known-host changed during exact read")
+  digest=F(raw);troot=Path(private_tmpdir());troot_text=str(troot)
+  if not re.fullmatch(r"/[A-Za-z0-9._/-]+",troot_text) or Path(os.path.normpath(troot_text))!=troot:raise Stop("known-host copy root grammar")
+  tp=os.open(troot.anchor,df);tfds.append(tp)
+  for part in troot.parts[1:]:
+   ta=os.stat(part,dir_fd=tp,follow_symlinks=False);tc=os.open(part,df,dir_fd=tp);tb=os.fstat(tc)
+   if not stat.S_ISDIR(tb.st_mode) or (ta.st_dev,ta.st_ino,ta.st_mode)!=(tb.st_dev,tb.st_ino,tb.st_mode):raise Stop("known-host copy root ancestor")
+   tlinks.append((tp,part,tc,(tb.st_dev,tb.st_ino,tb.st_mode)));tfds.append(tc);tp=tc
+  tfd=tp;tn=os.lstat(troot);to=os.fstat(tfd);tidentity=(to.st_dev,to.st_ino,to.st_mode,to.st_uid)
+  if (tn.st_dev,tn.st_ino,tn.st_mode,tn.st_uid)!=tidentity or not stat.S_ISDIR(to.st_mode) or to.st_uid!=os.getuid() or stat.S_IMODE(to.st_mode)!=0o700:raise Stop("known-host copy root")
+  dname="r15-known-hosts-"+secrets.token_hex(16);os.mkdir(dname,0o700,dir_fd=tfd);made=True
+  dpath=os.path.join(troot_text,dname);dfd=os.open(dname,df,dir_fd=tfd);cname="known_hosts";cpath=os.path.join(dpath,cname)
+  if not re.fullmatch(r"/[A-Za-z0-9._/-]+",cpath) or Path(os.path.normpath(cpath))!=Path(cpath):raise Stop("known-host copy path grammar")
+  cfd=os.open(cname,os.O_RDWR|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW|os.O_CLOEXEC,0o600,dir_fd=dfd);offset=0
+  while offset<len(raw):
+   written=os.write(cfd,raw[offset:])
+   if written<=0:raise Stop("known-host copy write")
+   offset+=written
+  os.fsync(cfd);co=os.fstat(cfd);cn=os.stat(cname,dir_fd=dfd,follow_symlinks=False);ca=os.lstat(cpath)
+  cidentity=(co.st_dev,co.st_ino,co.st_mode,co.st_uid,co.st_nlink,co.st_size,co.st_mtime_ns,co.st_ctime_ns)
+  if (cn.st_dev,cn.st_ino,cn.st_mode,cn.st_uid,cn.st_nlink,cn.st_size,cn.st_mtime_ns,cn.st_ctime_ns)!=cidentity or (ca.st_dev,ca.st_ino,ca.st_mode,ca.st_uid,ca.st_nlink,ca.st_size,ca.st_mtime_ns,ca.st_ctime_ns)!=cidentity or not stat.S_ISREG(co.st_mode) or co.st_uid!=os.getuid() or co.st_nlink!=1 or stat.S_IMODE(co.st_mode)!=0o600 or co.st_size!=len(raw) or F(os.pread(cfd,1048577,0))!=digest:raise Stop("known-host copy")
+  do=os.fstat(dfd);dn=os.stat(dname,dir_fd=tfd,follow_symlinks=False);da=os.lstat(dpath);didentity=(do.st_dev,do.st_ino,do.st_mode,do.st_uid,do.st_nlink)
+  if (dn.st_dev,dn.st_ino,dn.st_mode,dn.st_uid,dn.st_nlink)!=didentity or (da.st_dev,da.st_ino,da.st_mode,da.st_uid,da.st_nlink)!=didentity or not stat.S_ISDIR(do.st_mode) or do.st_uid!=os.getuid() or stat.S_IMODE(do.st_mode)!=0o700 or os.listdir(dfd)!=[cname]:raise Stop("known-host copy dir")
+  return {"fd":fd,"fds":fds,"links":links,"path":path,"identity":identity,"digest":digest,"troot":troot_text,"tfds":tfds,"tlinks":tlinks,"tfd":tfd,"tidentity":tidentity,"dname":dname,"dpath":dpath,"dfd":dfd,"didentity":didentity,"cname":cname,"cpath":cpath,"cfd":cfd,"cidentity":cidentity}
  except Exception:
+  if cfd>=0:os.close(cfd)
+  if dfd>=0:
+   try:os.unlink("known_hosts",dir_fd=dfd)
+   except OSError:pass
+   os.close(dfd)
+  if made and tfd>=0 and isinstance(dname,str):
+   try:os.rmdir(dname,dir_fd=tfd)
+   except OSError:pass
+  for x in reversed(tfds):os.close(x)
   if fd>=0:os.close(fd)
   for x in reversed(fds):os.close(x)
   raise
+def known_validate(h):
+ z=os.fstat(h["fd"]);q=os.lstat(h["path"])
+ if (z.st_dev,z.st_ino,z.st_mode,z.st_uid,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns)!=h["identity"] or (q.st_dev,q.st_ino,q.st_mode,q.st_uid,q.st_nlink,q.st_size,q.st_mtime_ns,q.st_ctime_ns)!=h["identity"]:raise Stop("known-host changed")
+ raw=b''
+ while len(raw)<z.st_size:
+  part=os.pread(h["fd"],min(65536,z.st_size-len(raw)),len(raw))
+  if not part:raise Stop("known-host validation short read")
+  raw+=part
+ za=os.fstat(h["fd"]);qa=os.lstat(h["path"])
+ if len(raw)!=z.st_size or (za.st_dev,za.st_ino,za.st_mode,za.st_uid,za.st_nlink,za.st_size,za.st_mtime_ns,za.st_ctime_ns)!=h["identity"] or (qa.st_dev,qa.st_ino,qa.st_mode,qa.st_uid,qa.st_nlink,qa.st_size,qa.st_mtime_ns,qa.st_ctime_ns)!=h["identity"] or F(raw)!=h["digest"]:raise Stop("known-host exact bytes changed")
+ for pf,part,child,want in h["links"]:
+  x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
+  if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host ancestor changed")
+ tn=os.lstat(h["troot"]);to=os.fstat(h["tfd"])
+ if (tn.st_dev,tn.st_ino,tn.st_mode,tn.st_uid)!=h["tidentity"] or (to.st_dev,to.st_ino,to.st_mode,to.st_uid)!=h["tidentity"] or not stat.S_ISDIR(to.st_mode) or to.st_uid!=os.getuid() or stat.S_IMODE(to.st_mode)!=0o700:raise Stop("known-host copy root changed")
+ for pf,part,child,want in h["tlinks"]:
+  x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
+  if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host copy root ancestor changed")
+ dn=os.stat(h["dname"],dir_fd=h["tfd"],follow_symlinks=False);do=os.fstat(h["dfd"]);da=os.lstat(h["dpath"])
+ if (dn.st_dev,dn.st_ino,dn.st_mode,dn.st_uid,dn.st_nlink)!=h["didentity"] or (do.st_dev,do.st_ino,do.st_mode,do.st_uid,do.st_nlink)!=h["didentity"] or (da.st_dev,da.st_ino,da.st_mode,da.st_uid,da.st_nlink)!=h["didentity"] or not stat.S_ISDIR(do.st_mode) or do.st_uid!=os.getuid() or stat.S_IMODE(do.st_mode)!=0o700 or os.listdir(h["dfd"])!=[h["cname"]]:raise Stop("known-host copy dir changed")
+ cn=os.stat(h["cname"],dir_fd=h["dfd"],follow_symlinks=False);co=os.fstat(h["cfd"]);ca=os.lstat(h["cpath"])
+ if (cn.st_dev,cn.st_ino,cn.st_mode,cn.st_uid,cn.st_nlink,cn.st_size,cn.st_mtime_ns,cn.st_ctime_ns)!=h["cidentity"] or (co.st_dev,co.st_ino,co.st_mode,co.st_uid,co.st_nlink,co.st_size,co.st_mtime_ns,co.st_ctime_ns)!=h["cidentity"] or (ca.st_dev,ca.st_ino,ca.st_mode,ca.st_uid,ca.st_nlink,ca.st_size,ca.st_mtime_ns,ca.st_ctime_ns)!=h["cidentity"] or not stat.S_ISREG(co.st_mode) or co.st_uid!=os.getuid() or co.st_nlink!=1 or stat.S_IMODE(co.st_mode)!=0o600 or F(os.pread(h["cfd"],1048577,0))!=h["digest"]:raise Stop("known-host copy changed")
 def known_close(h):
  if not h:return
- os.close(h["fd"])
- for x in reversed(h["fds"]):os.close(x)
+ errors=[]
+ try:
+  co=os.fstat(h["cfd"])
+  try:cn=os.stat(h["cname"],dir_fd=h["dfd"],follow_symlinks=False)
+  except FileNotFoundError:
+   if co.st_nlink!=0:errors.append("copy missing while linked")
+  else:
+   if (cn.st_dev,cn.st_ino)!=(co.st_dev,co.st_ino):errors.append("copy cleanup identity")
+   else:
+    os.unlink(h["cname"],dir_fd=h["dfd"]);os.fsync(h["dfd"])
+    if os.fstat(h["cfd"]).st_nlink!=0:errors.append("copy retained links")
+ except OSError as exc:errors.append("copy unlink:"+str(exc))
+ try:os.close(h["cfd"])
+ except OSError as exc:errors.append("copy fd close:"+str(exc))
+ try:
+  dn=os.stat(h["dname"],dir_fd=h["tfd"],follow_symlinks=False);do=os.fstat(h["dfd"])
+  if (dn.st_dev,dn.st_ino)!=(do.st_dev,do.st_ino):errors.append("copy dir cleanup identity")
+  elif os.listdir(h["dfd"]):errors.append("copy dir cleanup entries")
+  else:os.rmdir(h["dname"],dir_fd=h["tfd"])
+ except OSError as exc:errors.append("copy dir remove:"+str(exc))
+ try:os.close(h["dfd"])
+ except OSError as exc:errors.append("copy dir fd close:"+str(exc))
+ for x in reversed(h["tfds"]):
+  try:os.close(x)
+  except OSError as exc:errors.append("copy root fd close:"+str(exc))
+ if os.path.lexists(h["cpath"]):errors.append("copy residue")
+ if os.path.lexists(h["dpath"]):errors.append("copy dir residue")
+ try:os.close(h["fd"])
+ except OSError as exc:errors.append("source fd close:"+str(exc))
+ for x in reversed(h["fds"]):
+  try:os.close(x)
+  except OSError as exc:errors.append("source ancestor close:"+str(exc))
+ if errors:raise Stop("known-host cleanup failure:"+" | ".join(errors))
 def remote_main(repo,origin):
  _dg,_common,cp,config_raw,config_digest,observed=config_origin(repo)
  if observed!=origin:raise Stop("origin changed")
@@ -16096,17 +16653,14 @@ def remote_main(repo,origin):
   ap=Path(INITIAL_AGENT);safe_components(ap);s=os.lstat(ap);parent=os.lstat(ap.parent)
   if not stat.S_ISSOCK(s.st_mode) or s.st_uid!=os.getuid() or s.st_nlink!=1 or not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=os.getuid() or stat.S_IMODE(parent.st_mode)!=0o700:raise Stop("agent authority")
   agent_identity=(s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_nlink,parent.st_dev,parent.st_ino,parent.st_mode);e["SSH_AUTH_SOCK"]=INITIAL_AGENT
-  h=known_open(Path(pwd.getpwuid(os.getuid()).pw_dir)/".ssh/known_hosts");ssh="/usr/bin/ssh -F /dev/null -oBatchMode=yes -oStrictHostKeyChecking=yes -oProxyCommand=none -oProxyJump=none -oCanonicalizeHostname=no -oIdentitiesOnly=no -oIdentityFile=none -oUserKnownHostsFile=/dev/fd/"+str(h["fd"])+" -oGlobalKnownHostsFile=/dev/null -oPasswordAuthentication=no -oKbdInteractiveAuthentication=no";args=["-c","core.sshCommand="+ssh]
- try:p=subprocess.run(["/usr/bin/git","--no-replace-objects",*args,"-c","core.hooksPath=/dev/null","ls-remote","--refs",origin,"refs/heads/main"],cwd="/private/var/empty",env=e,text=True,capture_output=True,shell=False,check=False,timeout=30,pass_fds=(() if h is None else (h["fd"],)),close_fds=True)
+  h=known_open(Path(pwd.getpwuid(os.getuid()).pw_dir)/".ssh/known_hosts");ssh="/usr/bin/ssh -F /dev/null -oBatchMode=yes -oStrictHostKeyChecking=yes -oProxyCommand=none -oProxyJump=none -oCanonicalizeHostname=no -oIdentitiesOnly=no -oIdentityFile=none -oUserKnownHostsFile="+h["cpath"]+" -oGlobalKnownHostsFile=/dev/null -oPasswordAuthentication=no -oKbdInteractiveAuthentication=no";args=["-c","core.sshCommand="+ssh]
+ try:
+  if h:known_validate(h)
+  try:p=subprocess.run(["/usr/bin/git","--no-replace-objects",*args,"-c","core.hooksPath=/dev/null","ls-remote","--refs",origin,"refs/heads/main"],cwd="/private/var/empty",env=e,text=True,capture_output=True,shell=False,check=False,timeout=30,pass_fds=(),close_fds=True)
+  finally:
+   if h:known_validate(h)
  finally:
-  if h:
-   try:
-    z=os.fstat(h["fd"]);q=os.lstat(h["path"])
-    if (z.st_dev,z.st_ino,z.st_mode,z.st_uid,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns)!=h["identity"] or (q.st_dev,q.st_ino,q.st_mode,q.st_uid,q.st_nlink,q.st_size,q.st_mtime_ns,q.st_ctime_ns)!=h["identity"] or F(os.pread(h["fd"],1048577,0))!=h["digest"]:raise Stop("known-host changed")
-    for pf,part,child,want in h["links"]:
-     x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
-     if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host ancestor changed")
-   finally:known_close(h)
+  if h:known_close(h)
  after,after_digest=safe_raw(cp,limit=1048576)
  if after!=config_raw or after_digest!=config_digest:raise Stop("Git config changed")
  if agent_identity:
