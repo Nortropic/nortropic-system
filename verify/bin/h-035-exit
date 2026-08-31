@@ -344,7 +344,7 @@ H035_R14_TWO_STATE_REGISTRY = {
     "fail_closed":True,
 }
 
-H035_R15_CONTRACT_SHA256 = "99e2c1f35b6899c7563cf97a16130a8d5850e9c0d9edb8b1de7710d4b0bfc740"
+H035_R15_CONTRACT_SHA256 = "ab269e6006ccbf76f68437159540f47274016b6ca4e0452c968f4dc5d737ffb3"
 H035_R15_BASE = "408923a445d081ebb6309e57dfe80423844ce927"
 H035_R15_BASE_TREE = "b306ba137cb348b18df98e895b21ef47e4980e51"
 H035_R15_AST_PYTHON = Path(
@@ -359,12 +359,12 @@ H035_R15_GATE_BASE_DEF_AGGREGATE = "77413d5497b92ed8eb4df7bd805a269ab9a7249c76ce
 H035_R15_GATE_BASE_DEF_NAME_DIGEST = "8cbe0238247d014964f8d23cccf74fb6179fb81099200473b870a9693bf4d2ee"
 H035_R15_GATE_UNCHANGED_DEF_AGGREGATE = "b9b40ec354682bcee4bc5c1077deb02c03aa91c22dcbd5423be9644054567dc6"
 H035_R15_GATE_BASE_NONDEF_DIGEST = "6b69304fa7fed17d29a1460d11ecf64e43a5675e0da28636db4e52af1e6bea4a"
-H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "7010221be641c245aaefd0bfe4a54ef3e8bed0bd706738bb644555b9bc9f6105"
-H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "3e219c8d68d7b7facf8977faa83af1133d0323649b978cb99bf7052f721d4ddf"
-H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "631d511a9492c2e59b584f8ae5ff5afa1452ee38c2802588ed6b64c3736de54f"
+H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "058c91a7a6250e97a4158b36db8b47f543be3f0c191a140f4cf158928d29345f"
+H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "ec36c2d16c1a329eb56b6809e79ab8528af967ad6d3b9d0eea17c8e9a43d6df7"
+H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "cd1b1342001c423e45fa0deb98026e1716fe38cb3d4024c4baf43fb736429f2f"
 H035_R15_ENV_REVIEWED_AST_SHA256 = {
-    "r15_remote_boundary_selftests":"8bc3acc0247ec91ceef75dcf2251d7eeb0fdb3f52ef6303d5a29531d0f92b5fe",
-    "r15_product_scope_selftests":"2f8dc93a25518fd7c5bd00aaa25cb7862269f90ea8db9798310927f376d824a5",
+    "r15_remote_boundary_selftests":"7fa65898c7b5165f168ff608abb89eb47ec8d805459bf5f666d044f6bee9ac75",
+    "r15_product_scope_selftests":"717b95a9039b369984c9409c7d87e01b88fd5cb8374b4672ce58916c0d697fe9",
 }
 H035_R15_PROCESS_STATE_REVIEWED_AST_SHA256 = {
     "r15_cli_zero_file_limit":"71348a3492c13570676f6b2a25b427e74b53698e3cf8fc3d36d9c07d1373631a",
@@ -485,7 +485,7 @@ H035_R15_SOURCE_CAPABILITY_ENVELOPE = {
                 "bindings":{"top_level_def_or_class_count":10,"main_capture_once":True,
                             "non_main_rebinds":[]}}}},
     "reference":{
-        "derivation":"TRUSTED_GATE_GENERATOR_FROM_BOUND_BASE_GIT_BLOBS_NOT_CALLER_OR_WORKTREE_BYTES",
+        "derivation":"TRUSTED_GATE_GENERATOR_FROM_STATE_MATCHED_BOUND_CONTRACT_MERGE_AND_BASE_GIT_BLOBS_NOT_CALLER_OR_WORKTREE_BYTES",
         "comparison":"STRICT_UTF8_LINE_INSENSITIVE_NORMALIZED_AST_AND_EXACT_CAPABILITY_SIGNATURE",
         "new_semantic_import_multiset":{
             "controller/attest/cli":[
@@ -497,13 +497,13 @@ H035_R15_SOURCE_CAPABILITY_ENVELOPE = {
             "controller/taskval/cli":["I:fcntl:_r15_fcntl","I:hashlib:_r15_hashlib",
                                        "I:os:_r15_os","I:stat:_r15_stat"]},
         "new_sink_multiset":{
-            "attest_subprocess_run":6,"attest_git":7,"attest_gitb":6,
-            "attest_g":3,"attest_blob":25,"attest_config_origin":2,
+            "attest_subprocess_run":6,"attest_git":9,"attest_gitb":6,
+            "attest_g":3,"attest_blob":29,"attest_config_origin":2,
             "attest_remote_main":4,"sqlite_memory_connect":2,
             "ctypes_cdll_none_use_errno_true":1,"ctypes_get_errno":1,
             "renameatx_np_same_root":6,"renameatx_np_swap":4,
             "renameatx_np_excl":2,"wrapper_compile_exec_pairs":2,
-            "finalizer_compile_exec_pairs":1,"new_path_delete_or_rename":0,
+            "finalizer_compile_exec_pairs":1,"new_path_delete_or_rename":4,
             "direct_socket_or_network":0},
         "finalizer_loader_sha256":"50fb33cb39c6abdbf4d140da92a75cb0b9efccf9d51f75ad27ca05e76da5d390"},
     "policy":{
@@ -513,7 +513,13 @@ H035_R15_SOURCE_CAPABILITY_ENVELOPE = {
         "main_pattern":"BASE_MAIN_ONCE_THEN_CAPTURE_ONCE_THEN_DISPATCH_MAIN_ONCE",
         "nested_or_conditional_imports":False,"definition_time_effects":False,
         "proxy_or_reflection_recovery":False,"observer_disable_or_recovery":False,
-        "new_path_delete_or_rename":0,"direct_network":0,
+        "new_path_delete_or_rename":4,
+        "reviewed_path_cleanup_exact_calls":[
+            "known_open#1|os.rmdir(dname, dir_fd=tfd)",
+            "known_open#1|os.unlink('known_hosts', dir_fd=dfd)",
+            "known_close#1|os.rmdir(h['dname'], dir_fd=h['tfd'])",
+            "known_close#1|os.unlink(h['cname'], dir_fd=h['dfd'])"],
+        "direct_network":0,
         "unknown_capability_transfer":"REJECT"}}
 H035_R15_FINALIZER_FD_LOADER = (
     "import hashlib,json,os,stat,sys\n"
@@ -543,6 +549,32 @@ H035_R15_DOC_APPENDS = {
     "docs/loop/drift.md":(
         25337,"d0f284235ad256bf48e0e257f45f1a6957bf511854467fa7154eeefd2410a4be",
         "\n## H-035 R15 — owner-publication lifecycle drift boundary\n".encode("utf-8")),
+}
+H035_R19_SUCCESSOR = {
+    "authority_base_sha":"580e47115d1e4b3eea004039c72a5de88d2dd2fe",
+    "authority_base_tree":"f72dd93e5aebe508067674f03ff5085cc95c7cc2",
+    "historical_contract_sha256":"99e2c1f35b6899c7563cf97a16130a8d5850e9c0d9edb8b1de7710d4b0bfc740",
+    "historical_candidate_sha":"0c44eaac01726a10e125c2a7514c034fc5035878",
+    "historical_candidate_tree":"f72dd93e5aebe508067674f03ff5085cc95c7cc2",
+    "aggregate_review_path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-dual-gate-review.json",
+    "publication_receipt_path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-contract-publication.json",
+    "review_lanes":[
+        {"lane":"A","path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-gate-review-a.json"},
+        {"lane":"B","path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-gate-review-b.json"},
+    ],
+    "leaf_review_fields":[
+        "schema_version","record_type","role","lane","result","task",
+        "authority_base_sha","contract_candidate_sha","contract_candidate_tree",
+        "changed_files","blocking_findings"],
+    "aggregate_review_fields":[
+        "schema_version","record_type","role","result","task",
+        "authority_base_sha","contract_candidate_sha","contract_candidate_tree",
+        "changed_files","reviews","blocking_findings"],
+    "doc_appends":{
+        "docs/loop/owner-author-workflow-v1.md":[11909,"23fea30aa1e9e5c5bc8b8b95f3c9984561e20f0dae4e0e79448bc4ccec7ba58c","\n### H-035 R18 macOS retained-known-hosts transport repair\n"],
+        "docs/05-beslutslogg.md":[7411,"84802aab6ee90728672760cf546f8b245966d85020ccb94361ad06e702fe06d1","| 2026-08-31 | H-035 R18 macOS retained-known-hosts transport repair |"],
+        "docs/loop/drift.md":[10082,"6459e2ed2f990958c13789b4dc087061bb081b4cc85b2c07f94eab525ec5827f","\n### H-035 R18 macOS retained-known-hosts transport drift boundary\n"],
+    },
 }
 R15_OWNER_PUBLICATION_FIELDS = (
     "record_type", "schema_version", "authority_class", "task", "base_sha",
@@ -890,9 +922,9 @@ def r15_gate_expected_policy() -> dict[str,object]:
         "capability_family_checks_are_supplemental_to_exact_source_aggregate":True,
         "import_effect_oracle_preserves_inherited_callable_identity":True,
         "new_top_level_requires_exact_manifest":True,
-        "manifest_independent_admitted_definition_count":137,
+        "manifest_independent_admitted_definition_count":138,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":70,
+        "manifest_independent_admitted_nondefinition_count":71,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -937,9 +969,9 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     check(isinstance(policy,dict) and exact_value(policy,r15_gate_expected_policy()),
           "J_R15_GATE_INHERITANCE_COMPLETE_POLICY_EXACT")
     normalization_policy={
-        "manifest_independent_admitted_definition_count":137,
+        "manifest_independent_admitted_definition_count":138,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":70,
+        "manifest_independent_admitted_nondefinition_count":71,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -962,8 +994,8 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     for key in normalization_policy:
         value=json.loads(json.dumps(normalization_policy)); value.pop(key); policy_mutants.append(value)
     for key,hostile_values in (
-            ("manifest_independent_admitted_definition_count",(138,137.0,True)),
-            ("manifest_independent_admitted_nondefinition_count",(71,70.0,True)),
+            ("manifest_independent_admitted_definition_count",(139,138.0,True)),
+            ("manifest_independent_admitted_nondefinition_count",(72,71.0,True)),
             ("manifest_independent_admitted_definition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_admitted_nondefinition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_complete_ordered_module_body_aggregate_sha256",("0"*64,True))):
@@ -1211,9 +1243,9 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
           and all(type(budget.get(key)) is int for key in
                   ("max_changed_files","max_added_lines","max_deleted_lines",
                    "max_total_changed_lines"))
-          and budget.get("max_added_lines") == 1958
+          and budget.get("max_added_lines") == 2071
           and budget.get("max_deleted_lines") == 0
-          and budget.get("max_total_changed_lines") == 1958
+          and budget.get("max_total_changed_lines") == 2071
           and isinstance(analysis,dict)
           and set(analysis)==set(H035_R15_PRODUCT_PATHS)|{
               "measured_added_lines","measured_deleted_lines",
@@ -1223,16 +1255,16 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
                   ("measured_added_lines","measured_deleted_lines",
                    "measured_total_changed_lines","integration_reserve"))
           and [analysis.get(path) for path in H035_R15_PRODUCT_PATHS]
-              == [{"added":1644,"deleted":0},{"added":142,"deleted":0},
+              == [{"added":1757,"deleted":0},{"added":142,"deleted":0},
                   {"added":154,"deleted":0}]
           and all(isinstance(analysis.get(path),dict)
                   and set(analysis[path])=={"added","deleted"}
                   and type(analysis[path]["added"]) is int
                   and type(analysis[path]["deleted"]) is int
                   for path in H035_R15_PRODUCT_PATHS)
-          and analysis.get("measured_added_lines") == 1940
+          and analysis.get("measured_added_lines") == 2053
           and analysis.get("measured_deleted_lines") == 0
-          and analysis.get("measured_total_changed_lines") == 1940
+          and analysis.get("measured_total_changed_lines") == 2053
           and analysis.get("integration_reserve") == 18
           and analysis.get("measured_total_changed_lines")+analysis.get("integration_reserve")
               == budget.get("max_added_lines") == budget.get("max_total_changed_lines"),
@@ -1245,6 +1277,30 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     mutant=json.loads(json.dumps(budget)); mutant["reference_transform_measurement"][H035_R15_PRODUCT_PATHS[0]]["deleted"]=1; budget_mutants.append(mutant)
     check(len(budget_mutants)==5 and all(not exact_value(value,budget) for value in budget_mutants),
           "J_R15_STRICT_ADDITIVE_BUDGET_KEYS_TYPES_DELETION_TOTAL_MUTANTS_REJECT")
+    gate_nodes=ast.parse(Path(__file__).read_text(encoding="utf-8")).body
+    refreeze_proof=next((node for node in gate_nodes
+                         if isinstance(node,ast.FunctionDef)
+                         and node.name=="r15_h038_refreeze_proof"),None)
+    reference_assignments=[node for node in ast.walk(refreeze_proof)
+        if isinstance(node,ast.Assign) and len(node.targets)==1
+        and isinstance(node.targets[0],ast.Name)
+        and node.targets[0].id=="reference_sources"
+        and isinstance(node.value,ast.Call) and isinstance(node.value.func,ast.Name)
+        and node.value.func.id=="r15_reference_sources"] if refreeze_proof else []
+    product_scope_calls=[node for node in ast.walk(refreeze_proof)
+        if isinstance(node,ast.Call) and isinstance(node.func,ast.Name)
+        and node.func.id=="r15_product_diff_scope"] if refreeze_proof else []
+    expected_reference=ast.dump(ast.parse(
+        "reference_sources=r15_reference_sources(repo,contract_merge)").body[0],
+        include_attributes=False)
+    expected_scope=ast.dump(ast.parse(
+        "r15_product_diff_scope(repo,contract_merge,product_candidate,reference_sources)",
+        mode="eval").body,include_attributes=False)
+    check(len(reference_assignments)==1
+          and ast.dump(reference_assignments[0],include_attributes=False)==expected_reference
+          and len(product_scope_calls)==1
+          and ast.dump(product_scope_calls[0],include_attributes=False)==expected_scope,
+          "J_R20_H038_OUTER_PROOF_REDERIVES_EXACT_PRODUCT_SOURCE_CAPABILITY_CAUSAL")
     check(contract.get("test_author_allowed_write") == list(H035_R15_TEST_AUTHOR_PATHS),
           "J_R15_TEST_AUTHOR_EXACT_FIVE_FILE_SURFACE")
     bp = contract.get("bp01_bp14_bindings", [])
@@ -1389,20 +1445,164 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     finalization=contract.get("publication_finalization", {})
     preproduct=contract.get("preproduct_evidence", {})
     artifacts=product.get("contract_publication_artifacts", {}) if isinstance(product,dict) else {}
+    historical=artifacts.get("historical_state",{}) if isinstance(artifacts,dict) else {}
+    successor_artifacts=artifacts.get("successor_state",{}) if isinstance(artifacts,dict) else {}
     check(isinstance(finalization,dict)
           and "LOCKED_STATE_ROOT_BOOTSTRAP_MANIFEST_BOUND_FIXED_SIBLING"
               in finalization.get("attest_root_derivation", "")
           and isinstance(preproduct,dict)
           and tuple(preproduct.get("failure_signature", [])) == H035_R15_FAILURE_SIGNATURE
-          and artifacts.get("review_path") == str(H035_R15_CONTRACT_REVIEW_PATH)
-          and artifacts.get("publication_receipt_path")
+          and historical.get("authority_base_sha")==H035_R15_BASE
+          and historical.get("manifest_sha256")
+              == H035_R19_SUCCESSOR["historical_contract_sha256"]
+          and historical.get("contract_candidate_sha")
+              == H035_R19_SUCCESSOR["historical_candidate_sha"]
+          and historical.get("contract_candidate_tree")
+              == H035_R19_SUCCESSOR["historical_candidate_tree"]
+          and historical.get("review_path") == str(H035_R15_CONTRACT_REVIEW_PATH)
+          and historical.get("publication_receipt_path")
               == str(H035_R15_CONTRACT_RECEIPT_PATH)
-          and tuple(artifacts.get("review_exact_fields", []))
+          and tuple(historical.get("review_exact_fields", []))
               == H035_R15_CONTRACT_REVIEW_FIELDS
+          and successor_artifacts.get("authority_base_sha")
+              == H035_R19_SUCCESSOR["authority_base_sha"]
+          and successor_artifacts.get("authority_base_tree")
+              == H035_R19_SUCCESSOR["authority_base_tree"]
+          and successor_artifacts.get("aggregate_review_path")
+              == H035_R19_SUCCESSOR["aggregate_review_path"]
+          and successor_artifacts.get("publication_receipt_path")
+              == H035_R19_SUCCESSOR["publication_receipt_path"]
+          and exact_value(successor_artifacts.get("review_lanes"),
+                          H035_R19_SUCCESSOR["review_lanes"])
+          and tuple(successor_artifacts.get("leaf_review_exact_fields",[]))
+              == tuple(H035_R19_SUCCESSOR["leaf_review_fields"])
+          and tuple(successor_artifacts.get("aggregate_review_exact_fields",[]))
+              == tuple(H035_R19_SUCCESSOR["aggregate_review_fields"])
           and tuple(artifacts.get("receipt_exact_fields", []))
               == H035_R15_CONTRACT_RECEIPT_FIELDS
+          and artifacts.get("two_state_union_only") is True
           and artifacts.get("caller_selected_artifact_or_base") is False,
           "J_R15_CAUSAL_PREPRODUCT_SIGNATURE_STATE_BOUND_ATTEST_AND_CONTRACT_PUBLICATION")
+    sample_base=str(H035_R19_SUCCESSOR["authority_base_sha"])
+    sample_candidate="1"*40;sample_tree="2"*40
+    sample_paths=list(sorted(H035_R15_TEST_AUTHOR_PATHS))
+    sample_leaves=[];sample_bound=[]
+    for index,lane in enumerate(H035_R19_SUCCESSOR["review_lanes"]):
+        leaf={
+            "schema_version":1,
+            "record_type":"nortropic_independent_h035_r19_gate_review",
+            "role":"GATE_REVIEWER","lane":lane["lane"],"result":"PASS",
+            "task":"h-035","authority_base_sha":sample_base,
+            "contract_candidate_sha":sample_candidate,
+            "contract_candidate_tree":sample_tree,"changed_files":sample_paths,
+            "blocking_findings":[],
+        }
+        digest=("a" if index==0 else "b")*64
+        sample_leaves.append((leaf,digest))
+        sample_bound.append({"lane":lane["lane"],"path":lane["path"],"sha256":digest})
+    sample_aggregate={
+        "schema_version":1,"record_type":"nortropic_dual_h035_r19_gate_review_binding",
+        "role":"DUAL_GATE_REVIEW_BINDING","result":"PASS","task":"h-035",
+        "authority_base_sha":sample_base,"contract_candidate_sha":sample_candidate,
+        "contract_candidate_tree":sample_tree,"changed_files":sample_paths,
+        "reviews":sample_bound,"blocking_findings":[],
+    }
+    review_mutants=[]
+    mutant=json.loads(json.dumps(sample_aggregate));mutant["reviews"].pop();review_mutants.append((mutant,sample_leaves))
+    mutant=json.loads(json.dumps(sample_aggregate));mutant["reviews"].reverse();review_mutants.append((mutant,sample_leaves))
+    mutant=json.loads(json.dumps(sample_aggregate));mutant["reviews"][0]["path"]+=".alias";review_mutants.append((mutant,sample_leaves))
+    mutant=json.loads(json.dumps(sample_aggregate));mutant["changed_files"].append("controller/neighbor");review_mutants.append((mutant,sample_leaves))
+    mutant=json.loads(json.dumps(sample_aggregate));mutant["blocking_findings"]=["blocked"];review_mutants.append((mutant,sample_leaves))
+    leaf_mutant=json.loads(json.dumps(sample_leaves[0][0]));leaf_mutant["lane"]="B"
+    review_mutants.append((sample_aggregate,[(leaf_mutant,sample_leaves[0][1]),sample_leaves[1]]))
+    review_mutants.append((sample_aggregate,[sample_leaves[1],sample_leaves[0]]))
+    review_mutants.append((sample_aggregate,[(sample_leaves[0][0],sample_leaves[0][1]),
+                                             (sample_leaves[1][0],sample_leaves[0][1])]))
+    check(r19_dual_review_values(sample_aggregate,sample_leaves,sample_base,
+                                 sample_candidate,sample_tree,sample_paths)
+          and all(not r19_dual_review_values(value,leaves,sample_base,
+                                              sample_candidate,sample_tree,sample_paths)
+                  for value,leaves in review_mutants),
+          "J_R19_DUAL_GATE_REVIEW_EXACT_TWO_LANES_PATH_HASH_SCHEMA_AND_ZERO_BLOCKERS")
+    sample_judge_lanes=[
+        {"lane":"A","path":"/private/tmp/exact-fixture/h035-r19-gate-review-a.json"},
+        {"lane":"B","path":"/private/tmp/exact-fixture/h035-r19-gate-review-b.json"},
+    ]
+    sample_judge_aggregate=json.loads(json.dumps(sample_aggregate))
+    for bound,lane in zip(sample_judge_aggregate["reviews"],sample_judge_lanes):
+        bound["path"]=lane["path"]
+    bad_judge_lanes=json.loads(json.dumps(sample_judge_lanes));bad_judge_lanes.reverse()
+    extra_judge_lanes=json.loads(json.dumps(sample_judge_lanes));extra_judge_lanes[0]["extra"]=True
+    check(r19_dual_review_values(
+              sample_judge_aggregate,sample_leaves,sample_base,
+              sample_candidate,sample_tree,sample_paths,review_lanes=sample_judge_lanes)
+          and not r19_dual_review_values(
+              sample_aggregate,sample_leaves,sample_base,
+              sample_candidate,sample_tree,sample_paths,review_lanes=sample_judge_lanes)
+          and not r19_dual_review_values(
+              sample_judge_aggregate,sample_leaves,sample_base,
+              sample_candidate,sample_tree,sample_paths,review_lanes=bad_judge_lanes)
+          and not r19_dual_review_values(
+              sample_judge_aggregate,sample_leaves,sample_base,
+              sample_candidate,sample_tree,sample_paths,review_lanes=extra_judge_lanes),
+          "J_R19_JUDGE_DUAL_REVIEW_EXACT_LOCAL_TWO_LANES_AND_NO_ALIAS")
+    gate_tree=ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    gate_parents={id(child):parent for parent in ast.walk(gate_tree)
+                  for child in ast.iter_child_nodes(parent)}
+    publication_definition=next((node for node in gate_tree.body
+        if isinstance(node,ast.FunctionDef)
+        and node.name=="r15_contract_publication_proof"),None)
+    publication_calls=[node for node in ast.walk(gate_tree)
+        if isinstance(node,ast.Call) and isinstance(node.func,ast.Name)
+        and node.func.id=="r15_contract_publication_proof"]
+    dual_definition=next((node for node in gate_tree.body
+        if isinstance(node,ast.FunctionDef)
+        and node.name=="r19_dual_review_values"),None)
+    dual_calls=[node for node in ast.walk(gate_tree)
+        if isinstance(node,ast.Call) and isinstance(node.func,ast.Name)
+        and node.func.id=="r19_dual_review_values"]
+    lane_override_calls=[node for node in dual_calls
+        if any(keyword.arg=="review_lanes" for keyword in node.keywords)]
+    judge_calls=[node for node in publication_calls
+        if any(keyword.arg=="judge_fixture_artifacts" for keyword in node.keywords)]
+    def enclosing_name(node: ast.AST) -> str:
+        cursor=gate_parents.get(id(node))
+        while cursor is not None:
+            if isinstance(cursor,(ast.FunctionDef,ast.AsyncFunctionDef)):return cursor.name
+            cursor=gate_parents.get(id(cursor))
+        return ""
+    def guarded_by_name(node: ast.AST, name: str) -> bool:
+        cursor=gate_parents.get(id(node))
+        while cursor is not None:
+            if (isinstance(cursor,ast.If) and isinstance(cursor.test,ast.Name)
+                    and cursor.test.id==name): return True
+            cursor=gate_parents.get(id(cursor))
+        return False
+    judge_keyword=(next((keyword.value for keyword in judge_calls[0].keywords
+                         if keyword.arg=="judge_fixture_artifacts"),None)
+                   if len(judge_calls)==1 else None)
+    check(isinstance(publication_definition,ast.FunctionDef)
+          and [value.arg for value in publication_definition.args.kwonlyargs]
+              == ["observe_remote","judge_fixture_artifacts"]
+          and len(publication_definition.args.kw_defaults)==2
+          and publication_definition.args.kw_defaults[0] is None
+          and isinstance(publication_definition.args.kw_defaults[1],ast.Constant)
+          and publication_definition.args.kw_defaults[1].value is False
+          and len(judge_calls)==1
+          and enclosing_name(judge_calls[0])=="r15_h038_refreeze_proof"
+          and isinstance(judge_keyword,ast.Constant) and judge_keyword.value is True
+          and all(enclosing_name(call)!="r15_product_identity" or call not in judge_calls
+                  for call in publication_calls)
+          and isinstance(dual_definition,ast.FunctionDef)
+          and [value.arg for value in dual_definition.args.kwonlyargs]==["review_lanes"]
+          and len(dual_definition.args.kw_defaults)==1
+          and isinstance(dual_definition.args.kw_defaults[0],ast.Constant)
+          and dual_definition.args.kw_defaults[0].value is None
+          and len(lane_override_calls)==5
+          and sum(enclosing_name(call)=="r15_contract_publication_proof"
+                  and guarded_by_name(call,"judge_fixture_artifacts")
+                  for call in lane_override_calls)==1,
+          "J_R19_JUDGE_FIXTURE_DEFAULT_FALSE_EXACT_TWO_STATE_AND_PRODUCT_UNREACHABLE")
     h038_rows=[row for row in tasks if isinstance(row,dict) and row.get("id")=="h-038"]
     check(len(h038_rows)==1 and h038_rows[0].get("depends_on")==["h-036"]
           and "h035_r15_published_authority" not in h038_rows[0],
@@ -2290,8 +2490,10 @@ def r15_retained_known_hosts(path: Path) -> dict[str,object]:
     if (not path.is_absolute() or Path(os.path.normpath(str(path)))!=path
             or str(path).startswith("//")):
         raise Rig("known-hosts path authority")
-    flags=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
-    fds=[];links=[];leaf_fd=-1
+    flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC
+    fds=[];links=[];copy_root_fds=[];copy_root_links=[]
+    leaf_fd=-1;copy_root_fd=-1;copy_dir_fd=-1;copy_fd=-1
+    copy_dir_name=None;copy_dir_created=False
     try:
         parent=os.open(path.anchor,flags);fds.append(parent)
         for part in path.parts[1:-1]:
@@ -2308,19 +2510,121 @@ def r15_retained_known_hosts(path: Path) -> dict[str,object]:
                 or before.st_nlink!=1 or stat.S_IMODE(before.st_mode) not in (0o600,0o644)
                 or before.st_size>1024*1024):
             raise Rig("unsafe SSH known-host authority")
-        leaf_fd=os.open(name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)
-                        |getattr(os,"O_CLOEXEC",0),dir_fd=parent)
+        leaf_fd=os.open(name,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW|os.O_CLOEXEC,
+                        dir_fd=parent)
         opened=os.fstat(leaf_fd)
-        fields=("st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-                "st_mtime_ns","st_ctime_ns")
-        if tuple(getattr(before,k) for k in fields)!=tuple(getattr(opened,k) for k in fields):
-            raise Rig("known-hosts open race")
-        raw=os.pread(leaf_fd,1024*1024+1,0)
-        if len(raw)>1024*1024:raise Rig("known-hosts size")
+        before_identity=(before.st_dev,before.st_ino,before.st_mode,before.st_uid,
+                         before.st_nlink,before.st_size,before.st_mtime_ns,before.st_ctime_ns)
+        opened_identity=(opened.st_dev,opened.st_ino,opened.st_mode,opened.st_uid,
+                         opened.st_nlink,opened.st_size,opened.st_mtime_ns,opened.st_ctime_ns)
+        if before_identity!=opened_identity:raise Rig("known-hosts open race")
+        raw=b""
+        while len(raw)<opened.st_size:
+            part=os.pread(leaf_fd,min(65536,opened.st_size-len(raw)),len(raw))
+            if not part:raise Rig("known-hosts short read")
+            raw+=part
+        after_read=os.fstat(leaf_fd)
+        after_named=os.stat(name,dir_fd=parent,follow_symlinks=False)
+        if (len(raw)!=opened.st_size
+                or (after_read.st_dev,after_read.st_ino,after_read.st_mode,after_read.st_uid,
+                    after_read.st_nlink,after_read.st_size,after_read.st_mtime_ns,
+                    after_read.st_ctime_ns)!=opened_identity
+                or (after_named.st_dev,after_named.st_ino,after_named.st_mode,
+                    after_named.st_uid,after_named.st_nlink,after_named.st_size,
+                    after_named.st_mtime_ns,after_named.st_ctime_ns)!=opened_identity):
+            raise Rig("known-hosts changed during exact read")
+        source_digest=hashlib.sha256(raw).hexdigest()
+        copy_root_path=r15_private_tmpdir()
+        if (not re.fullmatch(r"/[A-Za-z0-9._/-]+",copy_root_path)
+                or Path(os.path.normpath(copy_root_path))!=Path(copy_root_path)):
+            raise Rig("known-hosts copy root grammar")
+        copy_root=Path(copy_root_path)
+        copy_parent=os.open(copy_root.anchor,flags);copy_root_fds.append(copy_parent)
+        for part in copy_root.parts[1:]:
+            root_before=os.stat(part,dir_fd=copy_parent,follow_symlinks=False)
+            root_child=os.open(part,flags,dir_fd=copy_parent);root_opened=os.fstat(root_child)
+            if (not stat.S_ISDIR(root_opened.st_mode)
+                    or (root_before.st_dev,root_before.st_ino,root_before.st_mode)
+                    !=(root_opened.st_dev,root_opened.st_ino,root_opened.st_mode)):
+                raise Rig("known-hosts copy root ancestor race")
+            copy_root_links.append((copy_parent,part,root_child,
+                                    (root_opened.st_dev,root_opened.st_ino,root_opened.st_mode)))
+            copy_root_fds.append(root_child);copy_parent=root_child
+        copy_root_fd=copy_parent;copy_root_named=os.lstat(copy_root_path)
+        copy_root_open=os.fstat(copy_root_fd)
+        copy_root_identity=(copy_root_open.st_dev,copy_root_open.st_ino,
+                            copy_root_open.st_mode,copy_root_open.st_uid)
+        if ((copy_root_named.st_dev,copy_root_named.st_ino,copy_root_named.st_mode,
+             copy_root_named.st_uid)!=copy_root_identity
+                or not stat.S_ISDIR(copy_root_open.st_mode)
+                or copy_root_open.st_uid!=os.getuid()
+                or stat.S_IMODE(copy_root_open.st_mode)!=0o700):
+            raise Rig("known-hosts copy root authority")
+        copy_dir_name="r15-known-hosts-"+secrets.token_hex(16)
+        os.mkdir(copy_dir_name,0o700,dir_fd=copy_root_fd);copy_dir_created=True
+        copy_dir_path=os.path.join(copy_root_path,copy_dir_name)
+        copy_dir_fd=os.open(copy_dir_name,flags,dir_fd=copy_root_fd)
+        copy_name="known_hosts";copy_path=os.path.join(copy_dir_path,copy_name)
+        if (not re.fullmatch(r"/[A-Za-z0-9._/-]+",copy_path)
+                or Path(os.path.normpath(copy_path))!=Path(copy_path)):
+            raise Rig("known-hosts copy path grammar")
+        copy_fd=os.open(copy_name,os.O_RDWR|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW
+                        |os.O_CLOEXEC,0o600,dir_fd=copy_dir_fd)
+        offset=0
+        while offset<len(raw):
+            written=os.write(copy_fd,raw[offset:])
+            if written<=0:raise Rig("known-hosts copy short write")
+            offset+=written
+        os.fsync(copy_fd)
+        copy_open=os.fstat(copy_fd)
+        copy_named=os.stat(copy_name,dir_fd=copy_dir_fd,follow_symlinks=False)
+        copy_absolute=os.lstat(copy_path)
+        copy_identity=(copy_open.st_dev,copy_open.st_ino,copy_open.st_mode,
+                       copy_open.st_uid,copy_open.st_nlink,copy_open.st_size,
+                       copy_open.st_mtime_ns,copy_open.st_ctime_ns)
+        if ((copy_named.st_dev,copy_named.st_ino,copy_named.st_mode,copy_named.st_uid,
+             copy_named.st_nlink,copy_named.st_size,copy_named.st_mtime_ns,
+             copy_named.st_ctime_ns)!=copy_identity
+                or (copy_absolute.st_dev,copy_absolute.st_ino,copy_absolute.st_mode,
+                    copy_absolute.st_uid,copy_absolute.st_nlink,copy_absolute.st_size,
+                    copy_absolute.st_mtime_ns,copy_absolute.st_ctime_ns)!=copy_identity
+                or not stat.S_ISREG(copy_open.st_mode) or copy_open.st_uid!=os.getuid()
+                or copy_open.st_nlink!=1 or stat.S_IMODE(copy_open.st_mode)!=0o600
+                or copy_open.st_size!=len(raw)
+                or hashlib.sha256(os.pread(copy_fd,1024*1024+1,0)).hexdigest()!=source_digest):
+            raise Rig("known-hosts copy authority")
+        copy_dir_named=os.stat(copy_dir_name,dir_fd=copy_root_fd,follow_symlinks=False)
+        copy_dir_open=os.fstat(copy_dir_fd);copy_dir_absolute=os.lstat(copy_dir_path)
+        copy_dir_identity=(copy_dir_open.st_dev,copy_dir_open.st_ino,
+                           copy_dir_open.st_mode,copy_dir_open.st_uid,copy_dir_open.st_nlink)
+        if ((copy_dir_named.st_dev,copy_dir_named.st_ino,copy_dir_named.st_mode,
+             copy_dir_named.st_uid,copy_dir_named.st_nlink)!=copy_dir_identity
+                or (copy_dir_absolute.st_dev,copy_dir_absolute.st_ino,
+                    copy_dir_absolute.st_mode,copy_dir_absolute.st_uid,
+                    copy_dir_absolute.st_nlink)!=copy_dir_identity
+                or not stat.S_ISDIR(copy_dir_open.st_mode)
+                or copy_dir_open.st_uid!=os.getuid()
+                or stat.S_IMODE(copy_dir_open.st_mode)!=0o700
+                or os.listdir(copy_dir_fd)!=[copy_name]):
+            raise Rig("known-hosts copy directory authority")
         return {"path":path,"fd":leaf_fd,"parents":fds,"links":links,
-                "identity":tuple(getattr(opened,k) for k in fields),
-                "sha256":hashlib.sha256(raw).hexdigest()}
+                "identity":opened_identity,"sha256":source_digest,
+                "copy_root_path":copy_root_path,"copy_root_fd":copy_root_fd,
+                "copy_root_fds":copy_root_fds,"copy_root_links":copy_root_links,
+                "copy_root_identity":copy_root_identity,"copy_dir_name":copy_dir_name,
+                "copy_dir_path":copy_dir_path,"copy_dir_fd":copy_dir_fd,
+                "copy_dir_identity":copy_dir_identity,"copy_name":copy_name,
+                "copy_path":copy_path,"copy_fd":copy_fd,"copy_identity":copy_identity}
     except Exception:
+        if copy_fd>=0:os.close(copy_fd)
+        if copy_dir_fd>=0:
+            try:os.unlink("known_hosts",dir_fd=copy_dir_fd)
+            except OSError:pass
+            os.close(copy_dir_fd)
+        if copy_dir_created and copy_root_fd>=0 and isinstance(copy_dir_name,str):
+            try:os.rmdir(copy_dir_name,dir_fd=copy_root_fd)
+            except OSError:pass
+        for descriptor in reversed(copy_root_fds):os.close(descriptor)
         if leaf_fd>=0:os.close(leaf_fd)
         for descriptor in reversed(fds):os.close(descriptor)
         raise
@@ -2330,31 +2634,157 @@ def r15_validate_retained_known_hosts(handle: dict[str,object]) -> None:
     path=handle["path"];leaf_fd=handle["fd"];links=handle["links"]
     if not isinstance(path,Path) or not isinstance(leaf_fd,int) or not isinstance(links,list):
         raise Rig("known-hosts retained handle")
-    fields=("st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-            "st_mtime_ns","st_ctime_ns")
     final=os.fstat(leaf_fd);final_path=os.lstat(path)
-    if (tuple(getattr(final,k) for k in fields)!=handle["identity"]
-            or tuple(getattr(final_path,k) for k in fields)!=handle["identity"]
-            or hashlib.sha256(os.pread(leaf_fd,1024*1024+1,0)).hexdigest()!=handle["sha256"]):
+    if ((final.st_dev,final.st_ino,final.st_mode,final.st_uid,final.st_nlink,
+         final.st_size,final.st_mtime_ns,final.st_ctime_ns)!=handle["identity"]
+            or (final_path.st_dev,final_path.st_ino,final_path.st_mode,final_path.st_uid,
+                final_path.st_nlink,final_path.st_size,final_path.st_mtime_ns,
+                final_path.st_ctime_ns)!=handle["identity"]
+            ):
         raise Rig("known-hosts identity changed")
+    source_raw=b""
+    while len(source_raw)<final.st_size:
+        part=os.pread(leaf_fd,min(65536,final.st_size-len(source_raw)),len(source_raw))
+        if not part:raise Rig("known-hosts validation short read")
+        source_raw+=part
+    source_after=os.fstat(leaf_fd);source_path_after=os.lstat(path)
+    if (len(source_raw)!=final.st_size
+            or (source_after.st_dev,source_after.st_ino,source_after.st_mode,
+                source_after.st_uid,source_after.st_nlink,source_after.st_size,
+                source_after.st_mtime_ns,source_after.st_ctime_ns)!=handle["identity"]
+            or (source_path_after.st_dev,source_path_after.st_ino,source_path_after.st_mode,
+                source_path_after.st_uid,source_path_after.st_nlink,source_path_after.st_size,
+                source_path_after.st_mtime_ns,source_path_after.st_ctime_ns)!=handle["identity"]
+            or hashlib.sha256(source_raw).hexdigest()!=handle["sha256"]):
+        raise Rig("known-hosts exact bytes changed")
     for parent,part,child,want in links:
         linked=os.stat(part,dir_fd=parent,follow_symlinks=False);opened=os.fstat(child)
         if ((linked.st_dev,linked.st_ino,linked.st_mode)!=want
                 or (opened.st_dev,opened.st_ino,opened.st_mode)!=want):
             raise Rig("known-hosts ancestor changed")
+    copy_root_path=handle["copy_root_path"];copy_root_fd=handle["copy_root_fd"]
+    copy_root_fds=handle["copy_root_fds"];copy_root_links=handle["copy_root_links"]
+    copy_dir_name=handle["copy_dir_name"];copy_dir_path=handle["copy_dir_path"]
+    copy_dir_fd=handle["copy_dir_fd"];copy_name=handle["copy_name"]
+    copy_path=handle["copy_path"];copy_fd=handle["copy_fd"]
+    if (not isinstance(copy_root_path,str) or not isinstance(copy_root_fd,int)
+            or not isinstance(copy_root_fds,list) or not isinstance(copy_root_links,list)
+            or not isinstance(copy_dir_name,str) or not isinstance(copy_dir_path,str)
+            or not isinstance(copy_dir_fd,int) or copy_name!="known_hosts"
+            or not isinstance(copy_path,str) or not isinstance(copy_fd,int)
+            or not re.fullmatch(r"/[A-Za-z0-9._/-]+",copy_path)
+            or Path(os.path.normpath(copy_path))!=Path(copy_path)
+            or copy_path!=os.path.join(copy_dir_path,copy_name)
+            or copy_dir_path!=os.path.join(copy_root_path,copy_dir_name)):
+        raise Rig("known-hosts copy handle")
+    copy_root_named=os.lstat(copy_root_path);copy_root_open=os.fstat(copy_root_fd)
+    if ((copy_root_named.st_dev,copy_root_named.st_ino,copy_root_named.st_mode,
+         copy_root_named.st_uid)!=handle["copy_root_identity"]
+            or (copy_root_open.st_dev,copy_root_open.st_ino,copy_root_open.st_mode,
+                copy_root_open.st_uid)!=handle["copy_root_identity"]
+            or not stat.S_ISDIR(copy_root_open.st_mode)
+            or copy_root_open.st_uid!=os.getuid()
+            or stat.S_IMODE(copy_root_open.st_mode)!=0o700):
+        raise Rig("known-hosts copy root changed")
+    for parent,part,child,want in copy_root_links:
+        linked=os.stat(part,dir_fd=parent,follow_symlinks=False);opened=os.fstat(child)
+        if ((linked.st_dev,linked.st_ino,linked.st_mode)!=want
+                or (opened.st_dev,opened.st_ino,opened.st_mode)!=want):
+            raise Rig("known-hosts copy root ancestor changed")
+    copy_dir_named=os.stat(copy_dir_name,dir_fd=copy_root_fd,follow_symlinks=False)
+    copy_dir_open=os.fstat(copy_dir_fd);copy_dir_absolute=os.lstat(copy_dir_path)
+    if ((copy_dir_named.st_dev,copy_dir_named.st_ino,copy_dir_named.st_mode,
+         copy_dir_named.st_uid,copy_dir_named.st_nlink)!=handle["copy_dir_identity"]
+            or (copy_dir_open.st_dev,copy_dir_open.st_ino,copy_dir_open.st_mode,
+                copy_dir_open.st_uid,copy_dir_open.st_nlink)!=handle["copy_dir_identity"]
+            or (copy_dir_absolute.st_dev,copy_dir_absolute.st_ino,
+                copy_dir_absolute.st_mode,copy_dir_absolute.st_uid,
+                copy_dir_absolute.st_nlink)!=handle["copy_dir_identity"]
+            or not stat.S_ISDIR(copy_dir_open.st_mode)
+            or copy_dir_open.st_uid!=os.getuid()
+            or stat.S_IMODE(copy_dir_open.st_mode)!=0o700
+            or os.listdir(copy_dir_fd)!=[copy_name]):
+        raise Rig("known-hosts copy directory changed")
+    copy_named=os.stat(copy_name,dir_fd=copy_dir_fd,follow_symlinks=False)
+    copy_absolute=os.lstat(copy_path);copy_open=os.fstat(copy_fd)
+    if ((copy_named.st_dev,copy_named.st_ino,copy_named.st_mode,copy_named.st_uid,
+         copy_named.st_nlink,copy_named.st_size,copy_named.st_mtime_ns,
+         copy_named.st_ctime_ns)!=handle["copy_identity"]
+            or (copy_absolute.st_dev,copy_absolute.st_ino,copy_absolute.st_mode,
+                copy_absolute.st_uid,copy_absolute.st_nlink,copy_absolute.st_size,
+                copy_absolute.st_mtime_ns,copy_absolute.st_ctime_ns)!=handle["copy_identity"]
+            or (copy_open.st_dev,copy_open.st_ino,copy_open.st_mode,copy_open.st_uid,
+                copy_open.st_nlink,copy_open.st_size,copy_open.st_mtime_ns,
+                copy_open.st_ctime_ns)!=handle["copy_identity"]
+            or not stat.S_ISREG(copy_open.st_mode) or copy_open.st_uid!=os.getuid()
+            or stat.S_IMODE(copy_open.st_mode)!=0o600 or copy_open.st_nlink!=1
+            or hashlib.sha256(os.pread(copy_fd,1024*1024+1,0)).hexdigest()!=handle["sha256"]):
+        raise Rig("known-hosts copy changed")
 
 
 def r15_close_retained_known_hosts(handle: dict[str,object] | None) -> None:
     if handle is None:return
+    errors=[];copy_name=handle.get("copy_name");copy_dir_fd=handle.get("copy_dir_fd")
+    copy_fd=handle.get("copy_fd");copy_dir_name=handle.get("copy_dir_name")
+    copy_root_fd=handle.get("copy_root_fd");copy_root_fds=handle.get("copy_root_fds",[])
+    copy_path=handle.get("copy_path")
+    copy_dir_path=handle.get("copy_dir_path")
+    if isinstance(copy_name,str) and isinstance(copy_dir_fd,int):
+        try:
+            copy_open=os.fstat(copy_fd) if isinstance(copy_fd,int) else None
+            try:copy_named=os.stat(copy_name,dir_fd=copy_dir_fd,follow_symlinks=False)
+            except FileNotFoundError:
+                if copy_open is None or copy_open.st_nlink!=0:errors.append("copy missing while linked")
+            else:
+                if (copy_open is None
+                        or (copy_named.st_dev,copy_named.st_ino)
+                            !=(copy_open.st_dev,copy_open.st_ino)):
+                    errors.append("copy cleanup identity")
+                else:
+                    os.unlink(copy_name,dir_fd=copy_dir_fd);os.fsync(copy_dir_fd)
+                    if os.fstat(copy_fd).st_nlink!=0:errors.append("copy retained links")
+        except OSError as exc:errors.append("copy unlink:"+str(exc))
+    else:errors.append("copy unlink handle")
+    if isinstance(copy_fd,int):
+        try:os.close(copy_fd)
+        except OSError as exc:errors.append("copy fd close:"+str(exc))
+    else:errors.append("copy fd handle")
+    if isinstance(copy_dir_name,str) and isinstance(copy_root_fd,int):
+        try:
+            copy_dir_open=os.fstat(copy_dir_fd) if isinstance(copy_dir_fd,int) else None
+            copy_dir_named=os.stat(copy_dir_name,dir_fd=copy_root_fd,follow_symlinks=False)
+            if (copy_dir_open is None
+                    or (copy_dir_named.st_dev,copy_dir_named.st_ino)
+                        !=(copy_dir_open.st_dev,copy_dir_open.st_ino)):
+                errors.append("copy dir cleanup identity")
+            elif os.listdir(copy_dir_fd):errors.append("copy dir cleanup entries")
+            else:os.rmdir(copy_dir_name,dir_fd=copy_root_fd)
+        except OSError as exc:errors.append("copy dir remove:"+str(exc))
+    else:errors.append("copy dir handle")
+    if isinstance(copy_dir_fd,int):
+        try:os.close(copy_dir_fd)
+        except OSError as exc:errors.append("copy dir fd close:"+str(exc))
+    if isinstance(copy_root_fds,list):
+        for parent in reversed(copy_root_fds):
+            if isinstance(parent,int):
+                try:os.close(parent)
+                except OSError as exc:errors.append("copy root fd close:"+str(exc))
+    if isinstance(copy_path,str) and os.path.lexists(copy_path):errors.append("copy residue")
+    if isinstance(copy_dir_path,str) and os.path.lexists(copy_dir_path):errors.append("copy dir residue")
     descriptor=handle.get("fd");parents=handle.get("parents",[])
-    if isinstance(descriptor,int):os.close(descriptor)
+    if isinstance(descriptor,int):
+        try:os.close(descriptor)
+        except OSError as exc:errors.append("source fd close:"+str(exc))
     if isinstance(parents,list):
         for parent in reversed(parents):
-            if isinstance(parent,int):os.close(parent)
+            if isinstance(parent,int):
+                try:os.close(parent)
+                except OSError as exc:errors.append("source ancestor close:"+str(exc))
+    if errors:raise Rig("known-hosts cleanup failure: "+" | ".join(errors))
 
 
 def r15_remote_setup(origin: str) -> tuple[dict[str,str],list[str],dict[str,object] | None,tuple[object,...] | None]:
-    """Closed remote observation with an FD-pinned host-key authority."""
+    """Closed remote observation with a retained-identity plain host-key copy."""
     env={
         "HOME":"/private/var/empty","XDG_CONFIG_HOME":"/private/var/empty",
         "PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C",
@@ -2385,7 +2815,7 @@ def r15_remote_setup(origin: str) -> tuple[dict[str,str],list[str],dict[str,obje
         command=("/usr/bin/ssh -F /dev/null -oBatchMode=yes -oStrictHostKeyChecking=yes "
                  "-oProxyCommand=none -oProxyJump=none -oCanonicalizeHostname=no "
                  "-oIdentitiesOnly=no -oIdentityFile=none "
-                 "-oUserKnownHostsFile=/dev/fd/"+str(known_handle["fd"])+
+                 "-oUserKnownHostsFile="+str(known_handle["copy_path"])+
                  " -oGlobalKnownHostsFile=/dev/null -oPasswordAuthentication=no "
                  "-oKbdInteractiveAuthentication=no")
         arguments=["-c",f"core.sshCommand={command}"]
@@ -2429,24 +2859,28 @@ def r15_remote_environment(origin: str) -> tuple[dict[str,str], list[str]]:
 
 def r15_observed_remote_main(repo: Path) -> tuple[str, str]:
     config_path,config_raw,config_info,origin=r15_local_config_snapshot(repo)
-    config_before=(tuple(getattr(config_info,key) for key in (
-        "st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-        "st_mtime_ns","st_ctime_ns")),hashlib.sha256(config_raw).hexdigest())
+    config_before=((config_info.st_dev,config_info.st_ino,config_info.st_mode,
+                    config_info.st_uid,config_info.st_nlink,config_info.st_size,
+                    config_info.st_mtime_ns,config_info.st_ctime_ns),
+                   hashlib.sha256(config_raw).hexdigest())
     env,remote_args,known_handle,agent_identity=r15_remote_setup(origin)
-    pass_fds=(() if known_handle is None else (int(known_handle["fd"]),))
     try:
-        result=subprocess.run(
-            ["/usr/bin/git","--no-replace-objects",*remote_args,
-             "-c","core.hooksPath=/dev/null",
-             "ls-remote","--refs",origin,"refs/heads/main"],
-            cwd=Path("/private/var/empty"),env=env,text=True,capture_output=True,
-            shell=False,check=False,timeout=45,pass_fds=pass_fds,close_fds=True)
         if known_handle is not None:r15_validate_retained_known_hosts(known_handle)
+        try:
+            result=subprocess.run(
+                ["/usr/bin/git","--no-replace-objects",*remote_args,
+                 "-c","core.hooksPath=/dev/null",
+                 "ls-remote","--refs",origin,"refs/heads/main"],
+                cwd=Path("/private/var/empty"),env=env,text=True,capture_output=True,
+                shell=False,check=False,timeout=45,pass_fds=(),close_fds=True)
+        finally:
+            if known_handle is not None:r15_validate_retained_known_hosts(known_handle)
     finally:r15_close_retained_known_hosts(known_handle)
     config_after_raw,config_info=r15_stable_regular_bytes(config_path,max_bytes=1024*1024)
-    config_after=(tuple(getattr(config_info,key) for key in (
-        "st_dev","st_ino","st_mode","st_uid","st_nlink","st_size",
-        "st_mtime_ns","st_ctime_ns")),hashlib.sha256(config_after_raw).hexdigest())
+    config_after=((config_info.st_dev,config_info.st_ino,config_info.st_mode,
+                   config_info.st_uid,config_info.st_nlink,config_info.st_size,
+                   config_info.st_mtime_ns,config_info.st_ctime_ns),
+                  hashlib.sha256(config_after_raw).hexdigest())
     if config_after!=config_before: raise Rig("local Git config changed during remote observation")
     if agent_identity is not None:
         agent=Path(str(agent_identity[0]));socket_info=os.lstat(agent);parent=os.lstat(agent.parent)
@@ -2463,6 +2897,231 @@ def r15_observed_remote_main(repo: Path) -> tuple[str, str]:
 
 
 def r15_remote_boundary_selftests(tmp: Path) -> None:
+    def known_hosts_copy_selftests() -> tuple[bool,str]:
+        kh_root=tmp/"kh-fixture";kh_root.mkdir(mode=0o700)
+        kh_path=kh_root/"known_hosts"
+        kh_bytes=b"github.com ssh-ed25519 AAAAExampleFixtureKey\n"
+        kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+        controls=[]
+        handle=r15_retained_known_hosts(kh_path)
+        copy_path=Path(str(handle["copy_path"]));copy_dir=Path(str(handle["copy_dir_path"]))
+        retained=(int(handle["fd"]),int(handle["copy_root_fd"]),
+                  int(handle["copy_dir_fd"]),int(handle["copy_fd"]))
+        try:
+            r15_validate_retained_known_hosts(handle)
+            copy_info=os.lstat(copy_path);dir_info=os.lstat(copy_dir)
+            positive=(str(handle["copy_root_path"])==r15_private_tmpdir()
+                      and copy_path.is_absolute()
+                      and Path(os.path.normpath(str(copy_path)))==copy_path
+                      and re.fullmatch(r"/[A-Za-z0-9._/-]+",str(copy_path)) is not None
+                      and "/dev/fd/" not in str(copy_path)
+                      and stat.S_ISREG(copy_info.st_mode) and copy_info.st_uid==os.getuid()
+                      and stat.S_IMODE(copy_info.st_mode)==0o600 and copy_info.st_nlink==1
+                      and copy_info.st_size==len(kh_bytes)
+                      and stat.S_ISDIR(dir_info.st_mode) and dir_info.st_uid==os.getuid()
+                      and stat.S_IMODE(dir_info.st_mode)==0o700
+                      and copy_path.read_bytes()==kh_bytes
+                      and hashlib.sha256(copy_path.read_bytes()).hexdigest()==handle["sha256"]
+                      and all(not os.get_inheritable(descriptor) for descriptor in retained))
+            controls.append(("POSITIVE_RETAINED_PLAIN_COPY",positive))
+        finally:r15_close_retained_known_hosts(handle)
+        descriptors_closed=True
+        for descriptor in retained:
+            try:os.fstat(descriptor)
+            except OSError:pass
+            else:descriptors_closed=False
+        controls.append(("POSITIVE_CLEANUP_AND_DESCRIPTOR_CLOSURE",
+                         descriptors_closed and not os.path.lexists(copy_path)
+                         and not os.path.lexists(copy_dir)))
+        known_fault_program=r'''
+import hashlib,os,runpy,stat,sys,time
+from pathlib import Path
+gate=Path(sys.argv[1]);source=Path(sys.argv[2]);mode=sys.argv[3]
+ns=runpy.run_path(str(gate),run_name="h035_r18_known_hosts_fault")
+open_known=ns["r15_retained_known_hosts"]
+validate_known=ns["r15_validate_retained_known_hosts"]
+close_known=ns["r15_close_retained_known_hosts"]
+Rig=ns["Rig"]
+private_tmpdir=ns["r15_private_tmpdir"]
+source_info=os.lstat(source);source_identity=(source_info.st_dev,source_info.st_ino)
+residue_before=set(Path(private_tmpdir()).glob("r15-known-hosts-*"))
+if mode in ("short","early-eof"):
+ original=os.pread;calls=[]
+ def changed(descriptor,amount,offset):
+  opened=os.fstat(descriptor)
+  if (opened.st_dev,opened.st_ino)==source_identity:
+   calls.append((amount,offset))
+   if mode=="early-eof" and offset>=7:return b""
+   amount=min(amount,7 if mode=="short" else 7-offset)
+  return original(descriptor,amount,offset)
+ os.pread=changed;handle=None;accepted=False;rejected=False
+ try:
+  try:
+   handle=open_known(source)
+   if mode=="short":
+    validate_known(handle)
+    accepted=(Path(handle["copy_path"]).read_bytes()==source.read_bytes()
+              and hashlib.sha256(source.read_bytes()).hexdigest()==handle["sha256"])
+  except (Rig,OSError):rejected=True
+ finally:
+  os.pread=original
+  if handle is not None:close_known(handle)
+ ok=(mode=="short" and accepted and not rejected and len(calls)>2
+     or mode=="early-eof" and rejected and len(calls)==2)
+elif mode=="fifo-swap":
+ original=os.open;held=source.with_name(source.name+"-before-fifo-swap")
+ swapped=[];nonblock=[];would_block=[];rejected=False
+ def changed(path,flags,mode_bits=0o777,*,dir_fd=None):
+  if not swapped and path==source.name and dir_fd is not None:
+   parent=os.fstat(dir_fd);source_parent=os.lstat(source.parent)
+   if (parent.st_dev,parent.st_ino)==(source_parent.st_dev,source_parent.st_ino):
+    nonblock.append(bool(flags & os.O_NONBLOCK))
+    os.rename(source,held);os.mkfifo(source,0o600);swapped.append(True)
+    if not flags & os.O_NONBLOCK:
+     would_block.append(True);raise TimeoutError("known-hosts FIFO open would block")
+  return original(path,flags,mode_bits,dir_fd=dir_fd)
+ os.open=changed;started=time.monotonic()
+ try:
+  try:open_known(source)
+  except (Rig,OSError):rejected=True
+ finally:
+  os.open=original
+  if os.path.lexists(source):os.unlink(source)
+  if os.path.lexists(held):os.rename(held,source)
+ ok=(rejected and swapped==[True] and nonblock==[True] and not would_block
+     and time.monotonic()-started<1.0)
+else:ok=False
+residue_after=set(Path(private_tmpdir()).glob("r15-known-hosts-*"))
+if not ok or residue_after!=residue_before:raise SystemExit(1)
+print("PASS")
+'''
+        fault_env={"HOME":"/private/var/empty","XDG_CONFIG_HOME":"/private/var/empty",
+                   "PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C",
+                   "TMPDIR":r15_private_tmpdir(),
+                   "DARWIN_USER_TEMP_DIR":r15_private_tmpdir(),
+                   "PYTHONDONTWRITEBYTECODE":"1","GIT_CONFIG_NOSYSTEM":"1",
+                   "GIT_CONFIG_GLOBAL":"/dev/null","GIT_CONFIG_SYSTEM":"/dev/null",
+                   "GIT_ATTR_NOSYSTEM":"1","GIT_TERMINAL_PROMPT":"0"}
+        def known_fault(mode: str) -> bool:
+            result=subprocess.run(
+                [str(H035_R15_AST_PYTHON),"-I","-S","-B","-c",known_fault_program,
+                 str(ROOT/"verify/bin/h-035-exit"),str(kh_path),mode],
+                cwd=Path("/private/var/empty"),env=fault_env,text=True,capture_output=True,
+                shell=False,check=False,timeout=5,pass_fds=(),close_fds=True)
+            return result.returncode==0 and result.stdout=="PASS\n" and result.stderr==""
+
+        multi_bytes=(kh_bytes*3000)[:131073]
+        kh_path.write_bytes(multi_bytes);os.chmod(kh_path,0o600)
+        controls.append(("SOURCE_MULTICHUNK_EXACT_COPY",known_fault("short")))
+
+        kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+        controls.append(("SOURCE_EARLY_EOF_REJECTS_AND_CLEANS",known_fault("early-eof")))
+
+        controls.append(("SOURCE_STAT_OPEN_FIFO_SWAP_REJECTS_WITHOUT_BLOCK",
+                         known_fault("fifo-swap")))
+        tampers=("COPY_BYTE_MUTATION","COPY_TRUNCATION","COPY_MODE_DRIFT",
+                 "COPY_HARDLINK_NLINK","COPY_SYMLINK_SUBSTITUTION",
+                 "COPY_SAME_BYTE_INODE_SUBSTITUTION","COPY_DIR_MODE_DRIFT",
+                 "COPY_DIR_PATH_SUBSTITUTION","SOURCE_BYTE_MUTATION",
+                 "SOURCE_TRUNCATION","SOURCE_MODE_DRIFT","SOURCE_HARDLINK_NLINK",
+                 "SOURCE_PATH_SUBSTITUTION","SOURCE_FIFO_SUBSTITUTION","SOURCE_ANCESTOR_MODE",
+                 "SOURCE_ANCESTOR_PATH_SUBSTITUTION")
+        for label in tampers:
+            if not kh_root.exists():kh_root.mkdir(mode=0o700)
+            kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600);os.chmod(kh_root,0o700)
+            handle=r15_retained_known_hosts(kh_path)
+            copy_path=Path(str(handle["copy_path"]));copy_dir=Path(str(handle["copy_dir_path"]))
+            extra=None;held=None;replacement=False;rejected=False;cleaned=False
+            try:
+                if label=="COPY_BYTE_MUTATION":copy_path.write_bytes(b"TAMPERED\n")
+                elif label=="COPY_TRUNCATION":os.truncate(copy_path,8)
+                elif label=="COPY_MODE_DRIFT":os.chmod(copy_path,0o644)
+                elif label=="COPY_HARDLINK_NLINK":
+                    extra=copy_dir.with_name(copy_dir.name+"-hardlink");os.link(copy_path,extra)
+                elif label in ("COPY_SYMLINK_SUBSTITUTION","COPY_SAME_BYTE_INODE_SUBSTITUTION"):
+                    held=copy_dir.with_name(copy_dir.name+"-held-file");os.rename(copy_path,held)
+                    if label=="COPY_SYMLINK_SUBSTITUTION":os.symlink(held,copy_path)
+                    else:copy_path.write_bytes(kh_bytes);os.chmod(copy_path,0o600)
+                elif label=="COPY_DIR_MODE_DRIFT":os.chmod(copy_dir,0o755)
+                elif label=="COPY_DIR_PATH_SUBSTITUTION":
+                    held=copy_dir.with_name(copy_dir.name+"-held-dir");os.rename(copy_dir,held)
+                    copy_dir.mkdir(mode=0o700);(copy_dir/"known_hosts").write_bytes(kh_bytes)
+                    os.chmod(copy_dir/"known_hosts",0o600);replacement=True
+                elif label=="SOURCE_BYTE_MUTATION":kh_path.write_bytes(kh_bytes+b"INJECTED\n")
+                elif label=="SOURCE_TRUNCATION":os.truncate(kh_path,8)
+                elif label=="SOURCE_MODE_DRIFT":os.chmod(kh_path,0o644)
+                elif label=="SOURCE_HARDLINK_NLINK":
+                    extra=kh_root/"known_hosts-hardlink";os.link(kh_path,extra)
+                elif label=="SOURCE_PATH_SUBSTITUTION":
+                    held=kh_root/"known_hosts-held";os.rename(kh_path,held)
+                    kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+                elif label=="SOURCE_FIFO_SUBSTITUTION":
+                    held=kh_root/"known_hosts-held";os.rename(kh_path,held)
+                    os.mkfifo(kh_path,0o600)
+                elif label=="SOURCE_ANCESTOR_MODE":os.chmod(kh_root,0o755)
+                elif label=="SOURCE_ANCESTOR_PATH_SUBSTITUTION":
+                    held=kh_root.with_name("kh-fixture-held");os.rename(kh_root,held)
+                    kh_root.mkdir(mode=0o700);kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+                    replacement=True
+                try:r15_validate_retained_known_hosts(handle)
+                except (Rig,OSError):rejected=True
+            finally:
+                if label=="COPY_MODE_DRIFT" and os.path.lexists(copy_path):os.chmod(copy_path,0o600)
+                if label=="COPY_DIR_MODE_DRIFT" and os.path.lexists(copy_dir):os.chmod(copy_dir,0o700)
+                if label in ("COPY_SYMLINK_SUBSTITUTION","COPY_SAME_BYTE_INODE_SUBSTITUTION"):
+                    if os.path.lexists(copy_path):os.unlink(copy_path)
+                    if held is not None:os.rename(held,copy_path)
+                if label=="COPY_DIR_PATH_SUBSTITUTION" and held is not None:
+                    if replacement:
+                        if os.path.lexists(copy_dir/"known_hosts"):os.unlink(copy_dir/"known_hosts")
+                        if os.path.lexists(copy_dir):os.rmdir(copy_dir)
+                    os.rename(held,copy_dir)
+                if label=="SOURCE_MODE_DRIFT" and os.path.lexists(kh_path):os.chmod(kh_path,0o600)
+                if label=="SOURCE_ANCESTOR_MODE" and os.path.lexists(kh_root):os.chmod(kh_root,0o700)
+                if label in ("SOURCE_PATH_SUBSTITUTION","SOURCE_FIFO_SUBSTITUTION") and held is not None:
+                    if os.path.lexists(kh_path):os.unlink(kh_path)
+                    os.rename(held,kh_path)
+                if label=="SOURCE_ANCESTOR_PATH_SUBSTITUTION" and held is not None:
+                    if replacement:
+                        if os.path.lexists(kh_path):os.unlink(kh_path)
+                        if os.path.lexists(kh_root):os.rmdir(kh_root)
+                    os.rename(held,kh_root)
+                if extra is not None and os.path.lexists(extra):os.unlink(extra)
+                try:r15_close_retained_known_hosts(handle);cleaned=True
+                except (Rig,OSError):cleaned=False
+            controls.append((label+"_REJECT_AND_CLEAN",rejected and cleaned
+                             and not os.path.lexists(copy_path) and not os.path.lexists(copy_dir)))
+        kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600);os.chmod(kh_root,0o700)
+        handle=r15_retained_known_hosts(kh_path)
+        copy_dir=Path(str(handle["copy_dir_path"]));held=copy_dir.with_name(copy_dir.name+"-held-dir")
+        os.rename(copy_dir,held);copy_dir.mkdir(mode=0o700)
+        try:
+            try:r15_close_retained_known_hosts(handle)
+            except (Rig,OSError):cleanup_failure=True
+            else:cleanup_failure=False
+        finally:
+            if os.path.lexists(copy_dir):os.rmdir(copy_dir)
+            if os.path.lexists(held):os.rmdir(held)
+        controls.append(("CLEANUP_SUBSTITUTION_REPORTS_FAILURE_AND_RESIDUE",cleanup_failure))
+        for label,command,timeout in (
+                ("NONZERO_CHILD_CLEANUP",["/usr/bin/false"],5),
+                ("TIMEOUT_CHILD_CLEANUP",["/bin/sleep","1"],0.01)):
+            kh_path.write_bytes(kh_bytes);os.chmod(kh_path,0o600)
+            handle=r15_retained_known_hosts(kh_path)
+            copy_path=Path(str(handle["copy_path"]));copy_dir=Path(str(handle["copy_dir_path"]))
+            outcome=False
+            try:
+                try:
+                    child=subprocess.run(command,capture_output=True,check=False,timeout=timeout,
+                                         close_fds=True,pass_fds=())
+                    outcome=(label=="NONZERO_CHILD_CLEANUP" and child.returncode!=0)
+                except subprocess.TimeoutExpired:outcome=(label=="TIMEOUT_CHILD_CLEANUP")
+            finally:r15_close_retained_known_hosts(handle)
+            controls.append((label,outcome and not os.path.lexists(copy_path)
+                             and not os.path.lexists(copy_dir)))
+        failures=[name for name,result in controls if not result]
+        return len(controls)==24 and not failures,repr(failures)
+
     hostile_keys=("GIT_SSH","GIT_SSH_COMMAND","SSH_ASKPASS","GIT_ASKPASS",
                   "GIT_TERMINAL_PROMPT","HOME","GIT_CONFIG_GLOBAL")
     local_origin=tmp/"origin.git"
@@ -2477,6 +3136,13 @@ def r15_remote_boundary_selftests(tmp: Path) -> None:
     try:
         ssh_env,ssh_args,handle,agent_identity=r15_remote_setup(
             "git@github.com:Nortropic/nortropic-system.git")
+        copy_argument="-oUserKnownHostsFile="+str(handle["copy_path"])
+        exact_ssh=["/usr/bin/ssh","-F","/dev/null","-oBatchMode=yes",
+                   "-oStrictHostKeyChecking=yes","-oProxyCommand=none","-oProxyJump=none",
+                   "-oCanonicalizeHostname=no","-oIdentitiesOnly=no","-oIdentityFile=none",
+                   copy_argument,"-oGlobalKnownHostsFile=/dev/null",
+                   "-oPasswordAuthentication=no","-oKbdInteractiveAuthentication=no"]
+        observed_ssh=shlex.split(ssh_args[1].removeprefix("core.sshCommand="))
         ssh_ok=(ssh_env.get("SSH_AUTH_SOCK")==R15_INITIAL_SSH_AUTH_SOCK
                 and all(key not in ssh_env for key in (
                     "GIT_SSH","GIT_SSH_COMMAND","SSH_ASKPASS","GIT_ASKPASS"))
@@ -2484,13 +3150,11 @@ def r15_remote_boundary_selftests(tmp: Path) -> None:
                 and ssh_env.get("GIT_CONFIG_GLOBAL")=="/dev/null"
                 and ssh_env.get("GIT_TERMINAL_PROMPT")=="0"
                 and len(ssh_args)==2 and ssh_args[0]=="-c"
-                and ssh_args[1].startswith("core.sshCommand=/usr/bin/ssh ")
-                and " -F /dev/null " in ssh_args[1]
-                and "StrictHostKeyChecking=yes" in ssh_args[1]
-                and "ProxyCommand=none" in ssh_args[1]
-                and "ProxyJump=none" in ssh_args[1]
+                and ssh_args[1].startswith("core.sshCommand=")
+                and observed_ssh==exact_ssh
                 and isinstance(handle,dict) and isinstance(agent_identity,tuple)
-                and f"UserKnownHostsFile=/dev/fd/{handle['fd']}" in ssh_args[1])
+                and observed_ssh.count(copy_argument)==1
+                and all("/dev/fd/" not in token for token in observed_ssh))
     finally:
         r15_close_retained_known_hosts(handle)
         for key,value in prior.items():
@@ -2512,8 +3176,10 @@ def r15_remote_boundary_selftests(tmp: Path) -> None:
         try: r15_remote_environment(hostile)
         except Rig: url_rejections.append(True)
         else: url_rejections.append(False)
-    check(ssh_ok and changed_agent_rejected and all(url_rejections),
-          "J_R15_SSH_REMOTE_PRESERVES_ONLY_INITIAL_AGENT_AND_FD_PINNED_KNOWN_HOSTS")
+    copy_ok,copy_detail=known_hosts_copy_selftests()
+    check(ssh_ok and changed_agent_rejected and all(url_rejections) and copy_ok,
+          "J_R15_SSH_REMOTE_PRESERVES_ONLY_INITIAL_AGENT_AND_RETAINED_PLAIN_KNOWN_HOSTS",
+          copy_detail)
 
 
 def git_object_bytes(repo: Path, sha: str, path: str) -> bytes | None:
@@ -4486,20 +5152,38 @@ def r15_physical_checkout_exact(repo: Path, commit_sha: str) -> tuple[bool, str]
 
 
 def r15_contract_candidate_scope(repo: Path, candidate_sha: str) -> tuple[bool, str]:
-    base_commit=r15_git(repo,"cat-file","-p",H035_R15_BASE)
-    if base_commit.returncode or [line for line in base_commit.stdout.splitlines()
-                                 if line.startswith("tree ")] != [f"tree {H035_R15_BASE_TREE}"]:
-        return False,"frozen contract authority base/tree missing"
     commit=r15_git(repo,"cat-file","-p",candidate_sha)
     parents=[line.split(" ",1)[1] for line in commit.stdout.splitlines()
              if line.startswith("parent ")]
-    if commit.returncode or parents != [H035_R15_BASE]:
+    successor=H035_R19_SUCCESSOR
+    successor_base=str(successor["authority_base_sha"])
+    if parents==[H035_R15_BASE]:
+        if candidate_sha!=successor["historical_candidate_sha"]:
+            return False,"historical contract candidate identity"
+        authority_base=H035_R15_BASE
+        authority_tree=H035_R15_BASE_TREE
+        contract_sha=str(successor["historical_contract_sha256"])
+        doc_appends=H035_R15_DOC_APPENDS
+        state="historical R15"
+    elif parents==[successor_base]:
+        authority_base=successor_base
+        authority_tree=str(successor["authority_base_tree"])
+        contract_sha=H035_R15_CONTRACT_SHA256
+        doc_appends={path:(int(row[0]),str(row[1]),str(row[2]).encode("utf-8"))
+                     for path,row in dict(successor["doc_appends"]).items()}
+        state="successor R19"
+    else:
         return False,"contract candidate relation"
+    base_commit=r15_git(repo,"cat-file","-p",authority_base)
+    if base_commit.returncode or [line for line in base_commit.stdout.splitlines()
+                                 if line.startswith("tree ")] != [f"tree {authority_tree}"]:
+        return False,"frozen contract authority base/tree missing"
+    if commit.returncode: return False,"contract candidate relation"
     expected=tuple(sorted(H035_R15_TEST_AUTHOR_PATHS))
     names=r15_git(repo,"diff","--name-only","--no-renames","--no-ext-diff",
-                  "--no-textconv",H035_R15_BASE,candidate_sha)
+                  "--no-textconv",authority_base,candidate_sha)
     states=r15_git(repo,"diff","--name-status","--no-renames","--no-ext-diff",
-                   "--no-textconv",H035_R15_BASE,candidate_sha)
+                   "--no-textconv",authority_base,candidate_sha)
     if names.returncode or tuple(names.stdout.splitlines()) != expected:
         return False,"contract five-file scope"
     if states.returncode or states.stdout.splitlines() != [f"M\t{path}" for path in expected]:
@@ -4520,13 +5204,18 @@ def r15_contract_candidate_scope(repo: Path, candidate_sha: str) -> tuple[bool, 
         manifest=rows[0].get("r15_owner_product_lifecycle") if len(rows)==1 else None
     except ValueError:
         manifest=None
-    inheritance_ok,inheritance_why=r15_gate_inheritance_scope(
-        repo,H035_R15_BASE,candidate_sha)
-    if not inheritance_ok: return False,inheritance_why
-    if not isinstance(manifest,dict) or canonical_json_sha256(manifest)!=H035_R15_CONTRACT_SHA256:
+    candidate_tree=r15_git(repo,"rev-parse",f"{candidate_sha}^{{tree}}")
+    if (candidate_tree.returncode or (state=="historical R15"
+            and candidate_tree.stdout.strip()!=successor["historical_candidate_tree"])):
+        return False,"historical contract candidate tree"
+    if state=="successor R19":
+        inheritance_ok,inheritance_why=r15_gate_inheritance_scope(
+            repo,H035_R15_BASE,candidate_sha)
+        if not inheritance_ok: return False,inheritance_why
+    if not isinstance(manifest,dict) or canonical_json_sha256(manifest)!=contract_sha:
         return False,"contract manifest digest"
-    for path,(size,digest,marker) in H035_R15_DOC_APPENDS.items():
-        base_raw=r15_git_object_bytes(repo,H035_R15_BASE,path)
+    for path,(size,digest,marker) in doc_appends.items():
+        base_raw=r15_git_object_bytes(repo,authority_base,path)
         candidate_raw=r15_git_object_bytes(repo,candidate_sha,path)
         if base_raw is None or candidate_raw is None or not candidate_raw.startswith(base_raw):
             return False,"contract documentation is not append-only: "+path
@@ -4535,13 +5224,59 @@ def r15_contract_candidate_scope(repo: Path, candidate_sha: str) -> tuple[bool, 
                 or not suffix.startswith(marker)
                 or not suffix.endswith(b"\n")):
             return False,"contract documentation append mismatch: "+path
-    return True,"exact R15 contract candidate"
+    return True,"exact "+state+" contract candidate"
+
+
+def r19_dual_review_values(aggregate: object,
+                           leaves: list[tuple[object,str]],
+                           authority_base: str, candidate: str,
+                           candidate_tree: str,
+                           expected_paths: list[str], *,
+                           review_lanes: object=None) -> bool:
+    successor=H035_R19_SUCCESSOR
+    lanes=successor["review_lanes"] if review_lanes is None else review_lanes
+    if (not isinstance(lanes,list) or len(lanes)!=2 or len(leaves)!=2
+            or any(not isinstance(row,dict) or tuple(row)!=("lane","path")
+                   or not isinstance(row["path"],str) for row in lanes)
+            or [row["lane"] for row in lanes] != ["A","B"]
+            or len({str(row["path"]) for row in lanes})!=2):
+        return False
+    bound_reviews=[]
+    for lane,(leaf,leaf_sha) in zip(lanes,leaves):
+        expected_leaf={
+            "schema_version":1,
+            "record_type":"nortropic_independent_h035_r19_gate_review",
+            "role":"GATE_REVIEWER","lane":lane["lane"],"result":"PASS",
+            "task":"h-035","authority_base_sha":authority_base,
+            "contract_candidate_sha":candidate,
+            "contract_candidate_tree":candidate_tree,
+            "changed_files":expected_paths,"blocking_findings":[],
+        }
+        if (not isinstance(leaf,dict) or not r15_lower_hex(leaf_sha,64)
+                or set(leaf)!=set(successor["leaf_review_fields"])
+                or not r15_json_equal(leaf,expected_leaf)):
+            return False
+        bound_reviews.append({"lane":lane["lane"],"path":str(lane["path"]),
+                              "sha256":leaf_sha})
+    if len({row["sha256"] for row in bound_reviews})!=2:
+        return False
+    expected_aggregate={
+        "schema_version":1,"record_type":"nortropic_dual_h035_r19_gate_review_binding",
+        "role":"DUAL_GATE_REVIEW_BINDING","result":"PASS","task":"h-035",
+        "authority_base_sha":authority_base,"contract_candidate_sha":candidate,
+        "contract_candidate_tree":candidate_tree,"changed_files":expected_paths,
+        "reviews":bound_reviews,"blocking_findings":[],
+    }
+    return (isinstance(aggregate,dict)
+            and set(aggregate)==set(successor["aggregate_review_fields"])
+            and r15_json_equal(aggregate,expected_aggregate))
 
 
 def r15_contract_publication_proof(repo: Path, publication_sha: str,
                                    review_path: Path,
                                    receipt_path: Path,
-                                   *, observe_remote: bool) -> tuple[bool, str]:
+                                   *, observe_remote: bool,
+                                   judge_fixture_artifacts: bool=False) -> tuple[bool, str]:
     safe,origin=r15_local_config_safe(repo)
     if not safe: return False,origin
     if observe_remote:
@@ -4552,40 +5287,97 @@ def r15_contract_publication_proof(repo: Path, publication_sha: str,
     commit=r15_git(repo,"cat-file","-p",publication_sha)
     parents=[line.split(" ",1)[1] for line in commit.stdout.splitlines()
              if line.startswith("parent ")]
-    if commit.returncode or len(parents)!=2 or parents[0]!=H035_R15_BASE:
+    if commit.returncode or len(parents)!=2 or parents[0] not in {
+            H035_R15_BASE,str(H035_R19_SUCCESSOR["authority_base_sha"])}:
         return False,"contract publication ordered graph"
+    authority_base=parents[0]
     candidate=parents[1]
     scoped,why=r15_contract_candidate_scope(repo,candidate)
     if not scoped: return False,why
+    candidate_commit=r15_git(repo,"cat-file","-p",candidate)
+    candidate_parents=[line.split(" ",1)[1] for line in candidate_commit.stdout.splitlines()
+                       if line.startswith("parent ")]
+    if candidate_commit.returncode or candidate_parents!=[authority_base]:
+        return False,"contract publication/candidate state mismatch"
     publication_tree=r15_git(repo,"rev-parse",f"{publication_sha}^{{tree}}")
     candidate_tree=r15_git(repo,"rev-parse",f"{candidate}^{{tree}}")
     if (publication_tree.returncode or candidate_tree.returncode
             or publication_tree.stdout.strip()!=candidate_tree.stdout.strip()):
         return False,"contract publication tree"
+    expected_paths=list(sorted(H035_R15_TEST_AUTHOR_PATHS))
+    successor=H035_R19_SUCCESSOR
+    judge_lanes=None
+    if judge_fixture_artifacts:
+        evidence_dir=review_path.parent
+        if (not review_path.is_absolute() or not receipt_path.is_absolute()
+                or receipt_path.parent!=evidence_dir
+                or ".." in review_path.parts or ".." in receipt_path.parts):
+            return False,"judge fixture artifact directory substitution"
+        if authority_base==H035_R15_BASE:
+            expected_review_path=evidence_dir/"h035-r15-contract-review.json"
+            expected_receipt_path=evidence_dir/"h035-r15-contract-publication.json"
+        else:
+            expected_review_path=evidence_dir/"h035-r19-dual-gate-review.json"
+            expected_receipt_path=evidence_dir/"h035-r19-contract-publication.json"
+            judge_lanes=[
+                {"lane":"A","path":str(evidence_dir/"h035-r19-gate-review-a.json")},
+                {"lane":"B","path":str(evidence_dir/"h035-r19-gate-review-b.json")},
+            ]
+        if review_path!=expected_review_path or receipt_path!=expected_receipt_path:
+            return False,"judge fixture artifact name substitution"
+    elif authority_base==H035_R15_BASE:
+        if (review_path!=H035_R15_CONTRACT_REVIEW_PATH
+                or receipt_path!=H035_R15_CONTRACT_RECEIPT_PATH):
+            return False,"historical contract artifact path substitution"
+    elif (str(review_path)!=successor["aggregate_review_path"]
+            or str(receipt_path)!=successor["publication_receipt_path"]):
+        return False,"successor contract artifact path substitution"
     try:
         review,_review_raw,review_sha=r15_safe_artifact(review_path)
         receipt,_receipt_raw,_receipt_sha=r15_safe_artifact(receipt_path)
     except (OSError,ValueError,Rig) as exc:
         return False,f"contract publication artifact: {exc}"
-    expected_review={
-        "schema_version":1,"record_type":"nortropic_independent_h035_r15_contract_review",
-        "role":"GATE_REVIEWER","result":"PASS","task":"h-035",
-        "authority_base_sha":H035_R15_BASE,"contract_candidate_sha":candidate,
-        "contract_candidate_tree":candidate_tree.stdout.strip(),"blocking_findings":[],
-    }
+    if authority_base==H035_R15_BASE:
+        expected_review={
+            "schema_version":1,"record_type":"nortropic_independent_h035_r15_contract_review",
+            "role":"GATE_REVIEWER","result":"PASS","task":"h-035",
+            "authority_base_sha":H035_R15_BASE,"contract_candidate_sha":candidate,
+            "contract_candidate_tree":candidate_tree.stdout.strip(),"blocking_findings":[],
+        }
+        review_ok=(set(review)==set(H035_R15_CONTRACT_REVIEW_FIELDS)
+                   and r15_json_equal(review,expected_review))
+        phase="H035_R15_GUARDED_CONTRACT_PUBLICATION"
+    else:
+        leaves=[]
+        try:
+            selected_lanes=(judge_lanes if judge_fixture_artifacts
+                            else successor["review_lanes"])
+            for lane in selected_lanes:
+                lane_path=Path(str(lane["path"]))
+                leaf,_leaf_raw,leaf_sha=r15_safe_artifact(lane_path)
+                leaves.append((leaf,leaf_sha))
+        except (OSError,ValueError,Rig,KeyError,TypeError) as exc:
+            return False,f"successor independent gate review: {exc}"
+        if judge_fixture_artifacts:
+            review_ok=r19_dual_review_values(
+                review,leaves,authority_base,candidate,candidate_tree.stdout.strip(),
+                expected_paths,review_lanes=judge_lanes)
+        else:
+            review_ok=r19_dual_review_values(
+                review,leaves,authority_base,candidate,candidate_tree.stdout.strip(),
+                expected_paths)
+        phase="H035_R19_GUARDED_CONTRACT_PUBLICATION"
     expected_receipt={
         "schema_version":1,"record_type":"nortropic_publication_receipt",
-        "phase":"H035_R15_GUARDED_CONTRACT_PUBLICATION","repository":origin,
-        "task_id":"h-035","base_sha":H035_R15_BASE,"candidate_sha":candidate,
+        "phase":phase,"repository":origin,
+        "task_id":"h-035","base_sha":authority_base,"candidate_sha":candidate,
         "candidate_tree":candidate_tree.stdout.strip(),"merge_sha":publication_sha,
         "merge_tree":candidate_tree.stdout.strip(),
-        "ordered_parents":[H035_R15_BASE,candidate],
+        "ordered_parents":[authority_base,candidate],
         "independent_review_path":str(review_path),
         "independent_review_sha256":review_sha,"force":False,"history_rewrite":False,
     }
-    if (set(review) != set(H035_R15_CONTRACT_REVIEW_FIELDS)
-            or set(receipt) != set(H035_R15_CONTRACT_RECEIPT_FIELDS)
-            or not r15_json_equal(review,expected_review)
+    if (not review_ok or set(receipt) != set(H035_R15_CONTRACT_RECEIPT_FIELDS)
             or not r15_json_equal(receipt,expected_receipt)):
         return False,"contract review/receipt binding"
     return True,candidate
@@ -4603,10 +5395,11 @@ def r15_test_author_identity() -> tuple[bool, str]:
     physical_ok, physical_why = r15_physical_checkout_exact(ROOT, candidate_sha)
     if not physical_ok: return False, physical_why
     expected = tuple(sorted(H035_R15_TEST_AUTHOR_PATHS))
+    authority_base=str(H035_R19_SUCCESSOR["authority_base_sha"])
     names = r15_git(ROOT, "diff", "--name-only", "--no-renames", "--no-ext-diff",
-                    "--no-textconv", H035_R15_BASE, candidate_sha)
+                    "--no-textconv", authority_base, candidate_sha)
     states = r15_git(ROOT, "diff", "--name-status", "--no-renames", "--no-ext-diff",
-                     "--no-textconv", H035_R15_BASE, candidate_sha)
+                     "--no-textconv", authority_base, candidate_sha)
     if names.returncode or tuple(names.stdout.splitlines()) != expected:
         return False, "contract candidate does not change exact five TEST_AUTHOR files"
     if states.returncode or states.stdout.splitlines() != [f"M\t{path}" for path in expected]:
@@ -5670,9 +6463,9 @@ def r15_gate_inheritance_bytes(base_raw: bytes, candidate_raw: bytes,
     if not isinstance(policy,dict) or not exact_value(policy,r15_gate_expected_policy()):
         return False,"exact complete gate inheritance policy"
     normalization_policy={
-        "manifest_independent_admitted_definition_count":137,
+        "manifest_independent_admitted_definition_count":138,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":70,
+        "manifest_independent_admitted_nondefinition_count":71,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -6813,7 +7606,8 @@ def r15_gate_inheritance_selftests() -> None:
                   "J_R15_GATE_INHERITANCE_IMPORT_ORACLE_OBSERVES_DEFINITION_TIME_MUTATION")
 
 
-def r15_gate_inheritance_git_controls(tmp: Path) -> None:
+def r15_gate_inheritance_git_controls(
+        tmp: Path, contract_merge_hint: str | None = None) -> None:
     base_raw=r15_git_object_bytes(ROOT,H035_R15_BASE,"verify/bin/h-035-exit")
     current_gate=Path(__file__).read_bytes(); current_spec=strict_json_bytes(SPEC.read_bytes())
     rows=[row for row in current_spec.get("tasks",[]) if isinstance(row,dict)
@@ -6890,9 +7684,20 @@ def r15_gate_inheritance_git_controls(tmp: Path) -> None:
         check(exact and (accepted if mutant_name is None else not accepted),
               "J_R15_GATE_INHERITANCE_GIT_EXACT_FIVE_"+label,why)
         if mutant_name is None:
-            positive_repo=repo;positive_candidate_sha=candidate_sha
+            positive_repo=repo
     if positive_repo is None:
         raise Rig("R17 owner artifact alias positive fixture")
+    positive_candidate_sha=r15_frozen_contract_candidate(ROOT,contract_merge_hint)
+    current_scoped,current_why=r15_contract_candidate_scope(ROOT,positive_candidate_sha)
+    checkout=git(positive_repo,"checkout","--detach","-q",positive_candidate_sha)
+    copied_scoped,copied_why=r15_contract_candidate_scope(
+        positive_repo,positive_candidate_sha)
+    copied_status=git(positive_repo,"status","--porcelain=v1","--untracked-files=all")
+    if (not current_scoped or checkout.returncode or not copied_scoped
+            or copied_status.returncode or copied_status.stderr or copied_status.stdout):
+        raise Rig("R21 owner artifact alias successor scope: "
+                  +current_why+" | "+copied_why+" | "+checkout.stderr
+                  +copied_status.stderr)
     alias_program=r'''import json,os,runpy,stat,sys
 from pathlib import Path
 gate=Path(sys.argv[1]);candidate=sys.argv[2]
@@ -7234,6 +8039,14 @@ def r15_source_capability_signature(path: str, baseline_raw: bytes,
                         if ((isinstance(node.func, ast.Attribute)
                              and node.func.attr in pathname_delete - {"rename"})
                             or r15_call_name(node) in {"os.rename","os.replace","Path.rename","Path.replace"})]
+    reviewed_cleanup_calls={
+        ("known_open#1","os.rmdir(dname, dir_fd=tfd)"),
+        ("known_open#1","os.unlink('known_hosts', dir_fd=dfd)"),
+        ("known_close#1","os.rmdir(h['dname'], dir_fd=h['tfd'])"),
+        ("known_close#1","os.unlink(h['cname'], dir_fd=h['dfd'])"),
+    } if path=="controller/attest/cli" else set()
+    unexpected_delete=[node for node in forbidden_delete
+                       if (owner(node),ast.unparse(node)) not in reviewed_cleanup_calls]
     def definition_time(node: ast.AST) -> bool:
         cursor=node
         while (parent:=parents.get(id(cursor))) is not None:
@@ -7244,13 +8057,13 @@ def r15_source_capability_signature(path: str, baseline_raw: bytes,
             cursor=parent
         return True
     dangerous_definition_calls=(forbidden_process+forbidden_network+forbidden_ffi
-                                +forbidden_delete+forbidden_dynamic)
+                                +unexpected_delete+forbidden_dynamic)
     if any(definition_time(node) for node in dangerous_definition_calls):
         return None,"definition-time capability effect"
     if forbidden_process: return None,"alternate process capability"
     if forbidden_network: return None,"direct socket/network capability"
     if forbidden_ffi: return None,"alternate FFI/native capability"
-    if forbidden_delete: return None,"new pathname delete/rename capability"
+    if unexpected_delete: return None,"new pathname delete/rename capability"
     if forbidden_dynamic: return None,"dynamic import/eval capability"
 
     rename_calls = [node for node in new_calls if r15_call_name(node) == "renameat"]
@@ -7497,6 +8310,20 @@ def _r15_frame_recovery_escape():
               "alternate FFI/native capability","new pathname delete/rename capability",
               "dynamic import/eval capability"))),
           "J_R15_SOURCE_CAPABILITY_ALTERNATE_PROCESS_NETWORK_FFI_DELETE_DYNAMIC_SINK_REJECT")
+    cleanup_mutants=(
+        sources[0].replace('os.unlink("known_hosts",dir_fd=dfd)',
+                           'os.unlink("/tmp/known_hosts")',1),
+        sources[0].replace('os.unlink("known_hosts",dir_fd=dfd)',
+                           'os.unlink("known_hosts",dir_fd=tfd)',1),
+        sources[0].replace('os.rmdir(h["dname"],dir_fd=h["tfd"])',
+                           'os.rmdir(h["dname"],dir_fd=h["dfd"])',1),
+        sources[0]+'\ndef _r15_extra_cleanup():return os.unlink("known_hosts",dir_fd=dfd)\n',
+    )
+    check(all(value!=sources[0] for value in cleanup_mutants[:3])
+          and all(semantic_rejected(0,value,"new pathname delete/rename capability")
+                  for value in cleanup_mutants[:3])
+          and semantic_rejected(0,cleanup_mutants[3]),
+          "J_R19_EXACT_DESCRIPTOR_RELATIVE_CLEANUP_WRONG_PATH_DIRFD_AND_DUPLICATE_REJECT")
 
     duplicate = sources[0] + "\ndef fel(text):return 0\n"
     capture = sources[0].replace("_r15_legacy_main = main","_r15_legacy_main = lambda argv: main(argv)",1)
@@ -7592,8 +8419,18 @@ def _r15_frame_recovery_escape():
                         if identity_node and 0<=identity_fail_index<len(identity_node.body) else None)
     main_calls=[node.func.id for node in ast.walk(main_node)
                 if isinstance(node,ast.Call) and isinstance(node.func,ast.Name)] if main_node else []
+    inheritance_control_calls=[node for node in ast.walk(main_node)
+                               if isinstance(node,ast.Call)
+                               and isinstance(node.func,ast.Name)
+                               and node.func.id=="r15_gate_inheritance_git_controls"
+                               and ast.dump(node,include_attributes=False)==ast.dump(
+                                   ast.parse("r15_gate_inheritance_git_controls(lanes['inheritance'], sys.argv[2] if product_bound else None)",
+                                             mode="eval").body,
+                                   include_attributes=False)] if main_node else []
     identity_positions=[index for index,name in enumerate(main_calls) if name=="r15_product_identity"]
     matrix_positions=[index for index,name in enumerate(main_calls) if name=="r15_connected_matrix"]
+    check(len(inheritance_control_calls)==1,
+          "J_R22_INHERITANCE_ALIAS_CONTRACT_STATE_EXPLICIT_MODE_BOUND_CAUSAL")
     check(len(identity_positions)==1 and len(matrix_positions)>=1
           and identity_positions[0]<max(matrix_positions)
           and "r15_source_capability_selftests" in main_calls
@@ -7648,7 +8485,7 @@ def _r15_frame_recovery_escape():
                            and isinstance(node.value.func,ast.Name)
                            and node.value.func.id=="r15_reference_satisfiability"
                            and ast.dump(node.value,include_attributes=False)==ast.dump(
-                               ast.parse("r15_reference_satisfiability(lanes['reference'])",
+                               ast.parse("r15_reference_satisfiability(lanes['reference'], sys.argv[2] if product_bound else None)",
                                          mode="eval").body,include_attributes=False)] if main_node else []
     canonical_reference_calls=[node for node in ast.walk(main_node)
                                if isinstance(node,ast.Call) and isinstance(node.func,ast.Name)
@@ -7736,8 +8573,8 @@ else:
           "J_R15_ACTUAL_MATRIX_UNCONDITIONAL_CAUGHT_ELSE_REACHABILITY_MUTANTS_REJECT")
 
 
-def r15_numstat_budget(additions: int, deletions: int, *, max_added: int = 1958,
-                       max_deleted: int = 0, max_total: int = 1958) -> tuple[bool,str]:
+def r15_numstat_budget(additions: int, deletions: int, *, max_added: int = 2071,
+                       max_deleted: int = 0, max_total: int = 2071) -> tuple[bool,str]:
     if deletions > max_deleted:
         return False, f"product deletion/minification forbidden: deleted={deletions}"
     if additions > max_added:
@@ -7820,8 +8657,18 @@ def r15_product_identity(base: str, candidate_sha: str) -> tuple[bool, str]:
     head = r15_git(ROOT, "rev-parse", "--verify", "HEAD")
     if head.returncode or head.stdout.strip() != candidate_sha:
         return False, "checked-out HEAD is not exact product candidate"
+    contract_commit=r15_git(ROOT,"cat-file","-p",base)
+    contract_parents=[line.split(" ",1)[1] for line in contract_commit.stdout.splitlines()
+                      if line.startswith("parent ")]
+    if (not contract_commit.returncode and len(contract_parents)==2
+            and contract_parents[0]==str(H035_R19_SUCCESSOR["authority_base_sha"])):
+        review_path=Path(str(H035_R19_SUCCESSOR["aggregate_review_path"]))
+        receipt_path=Path(str(H035_R19_SUCCESSOR["publication_receipt_path"]))
+    else:
+        review_path=H035_R15_CONTRACT_REVIEW_PATH
+        receipt_path=H035_R15_CONTRACT_RECEIPT_PATH
     publication_ok,publication_why=r15_contract_publication_proof(
-        ROOT,base,H035_R15_CONTRACT_REVIEW_PATH,H035_R15_CONTRACT_RECEIPT_PATH,
+        ROOT,base,review_path,receipt_path,
         observe_remote=True)
     if not publication_ok: return False,publication_why
     physical_ok, physical_why = r15_physical_checkout_exact(ROOT, candidate_sha)
@@ -7881,9 +8728,9 @@ def r15_product_scope_selftests(tmp: Path) -> None:
             target.chmod(0o755)
         return commit_paths(repo,label,*H035_R15_PRODUCT_PATHS)
 
-    exact_cap=additive("exact-cap",(1956,1,1))
-    cap_plus_one=additive("cap-plus-one",(1957,1,1))
-    deletion=additive("deletion",(1922,1,1),delete_first=True)
+    exact_cap=additive("exact-cap",(2069,1,1))
+    cap_plus_one=additive("cap-plus-one",(2070,1,1))
+    deletion=additive("deletion",(2010,1,1),delete_first=True)
     exact_ok,exact_why=r15_product_diff_scope(repo,base,exact_cap)
     over_ok,over_why=r15_product_diff_scope(repo,base,cap_plus_one)
     deletion_ok,deletion_why=r15_product_diff_scope(repo,base,deletion)
@@ -7894,13 +8741,13 @@ def r15_product_scope_selftests(tmp: Path) -> None:
           and not r15_product_diff_scope(repo,base,stacked)[0])
     check(baseline,
           "J_R15_PRODUCT_IDENTITY_SCOPE_MODE_BUDGET_STACK_MUTANTS")
-    check(exact_ok and "1958 added lines" in exact_why
+    check(exact_ok and "2071 added lines" in exact_why
           and not over_ok and "added-line budget exceeded" in over_why
           and not deletion_ok and "deletion/minification forbidden" in deletion_why
-          and not r15_numstat_budget(1959,0,max_total=3000)[0]
-          and "added-line" in r15_numstat_budget(1959,0,max_total=3000)[1]
-          and not r15_numstat_budget(1958,1,max_deleted=1)[0]
-          and "total-changed-line" in r15_numstat_budget(1958,1,max_deleted=1)[1],
+          and not r15_numstat_budget(2072,0,max_total=3000)[0]
+          and "added-line" in r15_numstat_budget(2072,0,max_total=3000)[1]
+          and not r15_numstat_budget(2071,1,max_deleted=1)[0]
+          and "total-changed-line" in r15_numstat_budget(2071,1,max_deleted=1)[1],
           "J_R15_PRODUCT_STRICT_ADDITIVE_EXACT_CAP_PLUS_ONE_DELETION_DERIVED_TOTAL_CAUSAL")
 
     fake = tmp / "r15-fake-path"; fake.mkdir()
@@ -9528,25 +10375,72 @@ def r15_prepare_published_fixture(tmp: Path, product_base: str,
     contract_commit=r15_git(repo,"cat-file","-p",product_base)
     contract_parents=[line.split(" ",1)[1] for line in contract_commit.stdout.splitlines()
                       if line.startswith("parent ")]
-    if contract_commit.returncode or len(contract_parents)!=2 or contract_parents[0]!=H035_R15_BASE:
+    if (contract_commit.returncode or len(contract_parents)!=2
+            or contract_parents[0] not in {
+                H035_R15_BASE,str(H035_R19_SUCCESSOR["authority_base_sha"])}):
         raise Rig("R15 fixture contract publication graph")
+    contract_authority_base=contract_parents[0]
     contract_candidate=contract_parents[1]
-    contract_tree=r15_git(repo,"rev-parse",f"{contract_candidate}^{{tree}}").stdout.strip()
-    contract_review_path=(evidence/"h035-r15-contract-review.json").resolve()
-    write_json(contract_review_path,{
-        "schema_version":1,"record_type":"nortropic_independent_h035_r15_contract_review",
-        "role":"GATE_REVIEWER","result":"PASS","task":"h-035",
-        "authority_base_sha":H035_R15_BASE,"contract_candidate_sha":contract_candidate,
-        "contract_candidate_tree":contract_tree,"blocking_findings":[],
-    }); contract_review_path.chmod(0o600)
+    candidate_commit=r15_git(repo,"cat-file","-p",contract_candidate)
+    candidate_parents=[line.split(" ",1)[1]
+                       for line in candidate_commit.stdout.splitlines()
+                       if line.startswith("parent ")]
+    candidate_tree=r15_git(repo,"rev-parse",f"{contract_candidate}^{{tree}}").stdout.strip()
+    if (candidate_commit.returncode or candidate_parents!=[contract_authority_base]
+            or not r15_lower_hex(candidate_tree,40) or contract_tree!=candidate_tree):
+        raise Rig("R15 fixture contract candidate relation")
+    contract_tree=candidate_tree
+    if contract_authority_base==H035_R15_BASE:
+        contract_review_path=(evidence/"h035-r15-contract-review.json").resolve()
+        write_json(contract_review_path,{
+            "schema_version":1,"record_type":"nortropic_independent_h035_r15_contract_review",
+            "role":"GATE_REVIEWER","result":"PASS","task":"h-035",
+            "authority_base_sha":contract_authority_base,
+            "contract_candidate_sha":contract_candidate,
+            "contract_candidate_tree":contract_tree,"blocking_findings":[],
+        }); contract_review_path.chmod(0o600)
+        contract_phase="H035_R15_GUARDED_CONTRACT_PUBLICATION"
+    else:
+        exact_paths=list(sorted(H035_R15_TEST_AUTHOR_PATHS))
+        lane_bindings=[]
+        for lane,label in (("A","a"),("B","b")):
+            lane_path=(evidence/f"h035-r19-gate-review-{label}.json").resolve()
+            write_json(lane_path,{
+                "schema_version":1,
+                "record_type":"nortropic_independent_h035_r19_gate_review",
+                "role":"GATE_REVIEWER","lane":lane,"result":"PASS","task":"h-035",
+                "authority_base_sha":contract_authority_base,
+                "contract_candidate_sha":contract_candidate,
+                "contract_candidate_tree":contract_tree,
+                "changed_files":exact_paths,"blocking_findings":[],
+            }); lane_path.chmod(0o600)
+            lane_bindings.append({
+                "lane":lane,"path":str(lane_path),
+                "sha256":hashlib.sha256(lane_path.read_bytes()).hexdigest(),
+            })
+        contract_review_path=(evidence/"h035-r19-dual-gate-review.json").resolve()
+        write_json(contract_review_path,{
+            "schema_version":1,
+            "record_type":"nortropic_dual_h035_r19_gate_review_binding",
+            "role":"DUAL_GATE_REVIEW_BINDING","result":"PASS","task":"h-035",
+            "authority_base_sha":contract_authority_base,
+            "contract_candidate_sha":contract_candidate,
+            "contract_candidate_tree":contract_tree,
+            "changed_files":exact_paths,"reviews":lane_bindings,"blocking_findings":[],
+        }); contract_review_path.chmod(0o600)
+        contract_phase="H035_R19_GUARDED_CONTRACT_PUBLICATION"
     contract_review_sha=hashlib.sha256(contract_review_path.read_bytes()).hexdigest()
-    contract_receipt_path=(evidence/"h035-r15-contract-publication.json").resolve()
+    receipt_name=("h035-r15-contract-publication.json"
+                  if contract_authority_base==H035_R15_BASE
+                  else "h035-r19-contract-publication.json")
+    contract_receipt_path=(evidence/receipt_name).resolve()
     write_json(contract_receipt_path,{
         "schema_version":1,"record_type":"nortropic_publication_receipt",
-        "phase":"H035_R15_GUARDED_CONTRACT_PUBLICATION","repository":repository_identity,
-        "task_id":"h-035","base_sha":H035_R15_BASE,"candidate_sha":contract_candidate,
+        "phase":contract_phase,"repository":repository_identity,
+        "task_id":"h-035","base_sha":contract_authority_base,
+        "candidate_sha":contract_candidate,
         "candidate_tree":contract_tree,"merge_sha":product_base,"merge_tree":contract_tree,
-        "ordered_parents":[H035_R15_BASE,contract_candidate],
+        "ordered_parents":[contract_authority_base,contract_candidate],
         "independent_review_path":str(contract_review_path),
         "independent_review_sha256":contract_review_sha,
         "force":False,"history_rewrite":False,
@@ -9746,7 +10640,7 @@ def r15_h038_refreeze_proof(repo: Path, contract_review_path: Path,
         contract_ok,contract_candidate=r15_contract_publication_proof(
             repo,contract_merge,Path(str(binding.get("contract_review_path",""))),
             Path(str(binding.get("contract_publication_receipt_path",""))),
-            observe_remote=False)
+            observe_remote=False,judge_fixture_artifacts=True)
         if not contract_ok or not isinstance(contract_candidate,str):
             return False,"R15_H035_CONTRACT_PUBLICATION:"+str(contract_candidate)
         try:
@@ -9760,7 +10654,9 @@ def r15_h038_refreeze_proof(repo: Path, contract_review_path: Path,
                 or binding.get("contract_publication_receipt_sha256")
                    != bound_contract_receipt_sha):
             return False,"R15_H035_CONTRACT_ARTIFACT_DIGEST"
-        product_ok,_=r15_product_diff_scope(repo,contract_merge,product_candidate)
+        reference_sources=r15_reference_sources(repo,contract_merge)
+        product_ok,_=r15_product_diff_scope(
+            repo,contract_merge,product_candidate,reference_sources)
         product_commit=r15_git(repo,"cat-file","-p",product_publication)
         product_parents=[line.split(" ",1)[1] for line in product_commit.stdout.splitlines()
                          if line.startswith("parent ")]
@@ -13997,15 +14893,18 @@ def r9_task_gate_matrix(tmp: Path) -> None:
 
 
 def r15_document_append_selftests() -> None:
+    doc_appends={path:(int(row[0]),str(row[1]),str(row[2]).encode("utf-8"))
+                 for path,row in dict(H035_R19_SUCCESSOR["doc_appends"]).items()}
+    authority_base=str(H035_R19_SUCCESSOR["authority_base_sha"])
     def valid(path: str, base: bytes, candidate: bytes) -> bool:
-        size,digest,marker=H035_R15_DOC_APPENDS[path]
+        size,digest,marker=doc_appends[path]
         if not candidate.startswith(base): return False
         suffix=candidate[len(base):]
         return (len(suffix)==size and hashlib.sha256(suffix).hexdigest()==digest
                 and suffix.startswith(marker) and suffix.endswith(b"\n"))
     positives=[]; mutants=[]
-    for path in H035_R15_DOC_APPENDS:
-        base=r15_git_object_bytes(ROOT,H035_R15_BASE,path)
+    for path in doc_appends:
+        base=r15_git_object_bytes(ROOT,authority_base,path)
         try: current=(ROOT/path).read_bytes()
         except OSError: current=b""
         positives.append(base is not None and valid(path,base,current))
@@ -14016,13 +14915,13 @@ def r15_document_append_selftests() -> None:
             (path,base,base[:-1]+suffix),
             (path,base,b"hostile prefix\n"+base+suffix),
             (path,base,base+suffix+b"generic delegation\n"),
-            (path,base,base+suffix.replace(b"fail",b"pass",1)),
+            (path,base,base+suffix.replace(b"R19",b"RXX",1)),
         ))
     check(len(positives)==3 and all(positives),
-          "F_R15_THREE_DOCUMENTS_EXACT_BASE_BLOB_PLUS_BOUNDED_APPEND")
+          "F_R19_THREE_DOCUMENTS_EXACT_SUCCESSOR_BASE_BLOB_PLUS_BOUNDED_APPEND")
     check(len(mutants)==15 and all(not valid(path,base,candidate)
                                   for path,base,candidate in mutants),
-          "J_R15_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_CONTRADICTION_REJECT")
+          "J_R19_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_CONTRADICTION_REJECT")
 
 
 def frozen_checks() -> None:
@@ -15871,6 +16770,7 @@ from contextlib import contextmanager
 from pathlib import Path
 sys.dont_write_bytecode=True
 ROOT=Path(__file__).resolve().parents[2]
+R15_BOUND_CONTRACT=<R15_BOUND_CONTRACT_V1>
 INITIAL_AGENT=os.environ.get("SSH_AUTH_SOCK","")
 INITIAL_TMPDIR=Path(os.confstr(65537)).resolve(strict=True)
 STATE=ROOT/"controller/state/cli"
@@ -16065,7 +16965,8 @@ def repo_shape(repo):
   else:raise Stop("bare alternate")
  return str(remote.resolve(strict=True))
 def known_open(path):
- df=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0);fds=[];links=[];fd=-1
+ df=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC;fds=[];links=[];tfds=[];tlinks=[]
+ fd=-1;tfd=-1;dfd=-1;cfd=-1;dname=None;made=False
  try:
   parent=os.open(path.anchor,df);fds.append(parent)
   for part in path.parts[1:-1]:
@@ -16074,19 +16975,109 @@ def known_open(path):
    links.append((parent,part,child,(b.st_dev,b.st_ino,b.st_mode)));fds.append(child);parent=child
   name=path.name;a=os.stat(name,dir_fd=parent,follow_symlinks=False)
   if not stat.S_ISREG(a.st_mode) or a.st_uid!=os.getuid() or a.st_nlink!=1 or stat.S_IMODE(a.st_mode) not in (0o600,0o644) or a.st_size>1048576:raise Stop("known-host file")
-  fd=os.open(name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0),dir_fd=parent);b=os.fstat(fd)
+  fd=os.open(name,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW|os.O_CLOEXEC,dir_fd=parent);b=os.fstat(fd)
   identity=(b.st_dev,b.st_ino,b.st_mode,b.st_uid,b.st_nlink,b.st_size,b.st_mtime_ns,b.st_ctime_ns)
   if identity!=(a.st_dev,a.st_ino,a.st_mode,a.st_uid,a.st_nlink,a.st_size,a.st_mtime_ns,a.st_ctime_ns):raise Stop("known-host open race")
-  digest=F(os.pread(fd,1048577,0))
-  return {"fd":fd,"fds":fds,"links":links,"path":path,"identity":identity,"digest":digest}
+  raw=b''
+  while len(raw)<b.st_size:
+   part=os.pread(fd,min(65536,b.st_size-len(raw)),len(raw))
+   if not part:raise Stop("known-host short read")
+   raw+=part
+  br=os.fstat(fd);bn=os.stat(name,dir_fd=parent,follow_symlinks=False)
+  if len(raw)!=b.st_size or (br.st_dev,br.st_ino,br.st_mode,br.st_uid,br.st_nlink,br.st_size,br.st_mtime_ns,br.st_ctime_ns)!=identity or (bn.st_dev,bn.st_ino,bn.st_mode,bn.st_uid,bn.st_nlink,bn.st_size,bn.st_mtime_ns,bn.st_ctime_ns)!=identity:raise Stop("known-host changed during exact read")
+  digest=F(raw);troot=Path(private_tmpdir());troot_text=str(troot)
+  if not re.fullmatch(r"/[A-Za-z0-9._/-]+",troot_text) or Path(os.path.normpath(troot_text))!=troot:raise Stop("known-host copy root grammar")
+  tp=os.open(troot.anchor,df);tfds.append(tp)
+  for part in troot.parts[1:]:
+   ta=os.stat(part,dir_fd=tp,follow_symlinks=False);tc=os.open(part,df,dir_fd=tp);tb=os.fstat(tc)
+   if not stat.S_ISDIR(tb.st_mode) or (ta.st_dev,ta.st_ino,ta.st_mode)!=(tb.st_dev,tb.st_ino,tb.st_mode):raise Stop("known-host copy root ancestor")
+   tlinks.append((tp,part,tc,(tb.st_dev,tb.st_ino,tb.st_mode)));tfds.append(tc);tp=tc
+  tfd=tp;tn=os.lstat(troot);to=os.fstat(tfd);tidentity=(to.st_dev,to.st_ino,to.st_mode,to.st_uid)
+  if (tn.st_dev,tn.st_ino,tn.st_mode,tn.st_uid)!=tidentity or not stat.S_ISDIR(to.st_mode) or to.st_uid!=os.getuid() or stat.S_IMODE(to.st_mode)!=0o700:raise Stop("known-host copy root")
+  dname="r15-known-hosts-"+secrets.token_hex(16);os.mkdir(dname,0o700,dir_fd=tfd);made=True
+  dpath=os.path.join(troot_text,dname);dfd=os.open(dname,df,dir_fd=tfd);cname="known_hosts";cpath=os.path.join(dpath,cname)
+  if not re.fullmatch(r"/[A-Za-z0-9._/-]+",cpath) or Path(os.path.normpath(cpath))!=Path(cpath):raise Stop("known-host copy path grammar")
+  cfd=os.open(cname,os.O_RDWR|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW|os.O_CLOEXEC,0o600,dir_fd=dfd);offset=0
+  while offset<len(raw):
+   written=os.write(cfd,raw[offset:])
+   if written<=0:raise Stop("known-host copy write")
+   offset+=written
+  os.fsync(cfd);co=os.fstat(cfd);cn=os.stat(cname,dir_fd=dfd,follow_symlinks=False);ca=os.lstat(cpath)
+  cidentity=(co.st_dev,co.st_ino,co.st_mode,co.st_uid,co.st_nlink,co.st_size,co.st_mtime_ns,co.st_ctime_ns)
+  if (cn.st_dev,cn.st_ino,cn.st_mode,cn.st_uid,cn.st_nlink,cn.st_size,cn.st_mtime_ns,cn.st_ctime_ns)!=cidentity or (ca.st_dev,ca.st_ino,ca.st_mode,ca.st_uid,ca.st_nlink,ca.st_size,ca.st_mtime_ns,ca.st_ctime_ns)!=cidentity or not stat.S_ISREG(co.st_mode) or co.st_uid!=os.getuid() or co.st_nlink!=1 or stat.S_IMODE(co.st_mode)!=0o600 or co.st_size!=len(raw) or F(os.pread(cfd,1048577,0))!=digest:raise Stop("known-host copy")
+  do=os.fstat(dfd);dn=os.stat(dname,dir_fd=tfd,follow_symlinks=False);da=os.lstat(dpath);didentity=(do.st_dev,do.st_ino,do.st_mode,do.st_uid,do.st_nlink)
+  if (dn.st_dev,dn.st_ino,dn.st_mode,dn.st_uid,dn.st_nlink)!=didentity or (da.st_dev,da.st_ino,da.st_mode,da.st_uid,da.st_nlink)!=didentity or not stat.S_ISDIR(do.st_mode) or do.st_uid!=os.getuid() or stat.S_IMODE(do.st_mode)!=0o700 or os.listdir(dfd)!=[cname]:raise Stop("known-host copy dir")
+  return {"fd":fd,"fds":fds,"links":links,"path":path,"identity":identity,"digest":digest,"troot":troot_text,"tfds":tfds,"tlinks":tlinks,"tfd":tfd,"tidentity":tidentity,"dname":dname,"dpath":dpath,"dfd":dfd,"didentity":didentity,"cname":cname,"cpath":cpath,"cfd":cfd,"cidentity":cidentity}
  except Exception:
+  if cfd>=0:os.close(cfd)
+  if dfd>=0:
+   try:os.unlink("known_hosts",dir_fd=dfd)
+   except OSError:pass
+   os.close(dfd)
+  if made and tfd>=0 and isinstance(dname,str):
+   try:os.rmdir(dname,dir_fd=tfd)
+   except OSError:pass
+  for x in reversed(tfds):os.close(x)
   if fd>=0:os.close(fd)
   for x in reversed(fds):os.close(x)
   raise
+def known_validate(h):
+ z=os.fstat(h["fd"]);q=os.lstat(h["path"])
+ if (z.st_dev,z.st_ino,z.st_mode,z.st_uid,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns)!=h["identity"] or (q.st_dev,q.st_ino,q.st_mode,q.st_uid,q.st_nlink,q.st_size,q.st_mtime_ns,q.st_ctime_ns)!=h["identity"]:raise Stop("known-host changed")
+ raw=b''
+ while len(raw)<z.st_size:
+  part=os.pread(h["fd"],min(65536,z.st_size-len(raw)),len(raw))
+  if not part:raise Stop("known-host validation short read")
+  raw+=part
+ za=os.fstat(h["fd"]);qa=os.lstat(h["path"])
+ if len(raw)!=z.st_size or (za.st_dev,za.st_ino,za.st_mode,za.st_uid,za.st_nlink,za.st_size,za.st_mtime_ns,za.st_ctime_ns)!=h["identity"] or (qa.st_dev,qa.st_ino,qa.st_mode,qa.st_uid,qa.st_nlink,qa.st_size,qa.st_mtime_ns,qa.st_ctime_ns)!=h["identity"] or F(raw)!=h["digest"]:raise Stop("known-host exact bytes changed")
+ for pf,part,child,want in h["links"]:
+  x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
+  if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host ancestor changed")
+ tn=os.lstat(h["troot"]);to=os.fstat(h["tfd"])
+ if (tn.st_dev,tn.st_ino,tn.st_mode,tn.st_uid)!=h["tidentity"] or (to.st_dev,to.st_ino,to.st_mode,to.st_uid)!=h["tidentity"] or not stat.S_ISDIR(to.st_mode) or to.st_uid!=os.getuid() or stat.S_IMODE(to.st_mode)!=0o700:raise Stop("known-host copy root changed")
+ for pf,part,child,want in h["tlinks"]:
+  x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
+  if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host copy root ancestor changed")
+ dn=os.stat(h["dname"],dir_fd=h["tfd"],follow_symlinks=False);do=os.fstat(h["dfd"]);da=os.lstat(h["dpath"])
+ if (dn.st_dev,dn.st_ino,dn.st_mode,dn.st_uid,dn.st_nlink)!=h["didentity"] or (do.st_dev,do.st_ino,do.st_mode,do.st_uid,do.st_nlink)!=h["didentity"] or (da.st_dev,da.st_ino,da.st_mode,da.st_uid,da.st_nlink)!=h["didentity"] or not stat.S_ISDIR(do.st_mode) or do.st_uid!=os.getuid() or stat.S_IMODE(do.st_mode)!=0o700 or os.listdir(h["dfd"])!=[h["cname"]]:raise Stop("known-host copy dir changed")
+ cn=os.stat(h["cname"],dir_fd=h["dfd"],follow_symlinks=False);co=os.fstat(h["cfd"]);ca=os.lstat(h["cpath"])
+ if (cn.st_dev,cn.st_ino,cn.st_mode,cn.st_uid,cn.st_nlink,cn.st_size,cn.st_mtime_ns,cn.st_ctime_ns)!=h["cidentity"] or (co.st_dev,co.st_ino,co.st_mode,co.st_uid,co.st_nlink,co.st_size,co.st_mtime_ns,co.st_ctime_ns)!=h["cidentity"] or (ca.st_dev,ca.st_ino,ca.st_mode,ca.st_uid,ca.st_nlink,ca.st_size,ca.st_mtime_ns,ca.st_ctime_ns)!=h["cidentity"] or not stat.S_ISREG(co.st_mode) or co.st_uid!=os.getuid() or co.st_nlink!=1 or stat.S_IMODE(co.st_mode)!=0o600 or F(os.pread(h["cfd"],1048577,0))!=h["digest"]:raise Stop("known-host copy changed")
 def known_close(h):
  if not h:return
- os.close(h["fd"])
- for x in reversed(h["fds"]):os.close(x)
+ errors=[]
+ try:
+  co=os.fstat(h["cfd"])
+  try:cn=os.stat(h["cname"],dir_fd=h["dfd"],follow_symlinks=False)
+  except FileNotFoundError:
+   if co.st_nlink!=0:errors.append("copy missing while linked")
+  else:
+   if (cn.st_dev,cn.st_ino)!=(co.st_dev,co.st_ino):errors.append("copy cleanup identity")
+   else:
+    os.unlink(h["cname"],dir_fd=h["dfd"]);os.fsync(h["dfd"])
+    if os.fstat(h["cfd"]).st_nlink!=0:errors.append("copy retained links")
+ except OSError as exc:errors.append("copy unlink:"+str(exc))
+ try:os.close(h["cfd"])
+ except OSError as exc:errors.append("copy fd close:"+str(exc))
+ try:
+  dn=os.stat(h["dname"],dir_fd=h["tfd"],follow_symlinks=False);do=os.fstat(h["dfd"])
+  if (dn.st_dev,dn.st_ino)!=(do.st_dev,do.st_ino):errors.append("copy dir cleanup identity")
+  elif os.listdir(h["dfd"]):errors.append("copy dir cleanup entries")
+  else:os.rmdir(h["dname"],dir_fd=h["tfd"])
+ except OSError as exc:errors.append("copy dir remove:"+str(exc))
+ try:os.close(h["dfd"])
+ except OSError as exc:errors.append("copy dir fd close:"+str(exc))
+ for x in reversed(h["tfds"]):
+  try:os.close(x)
+  except OSError as exc:errors.append("copy root fd close:"+str(exc))
+ if os.path.lexists(h["cpath"]):errors.append("copy residue")
+ if os.path.lexists(h["dpath"]):errors.append("copy dir residue")
+ try:os.close(h["fd"])
+ except OSError as exc:errors.append("source fd close:"+str(exc))
+ for x in reversed(h["fds"]):
+  try:os.close(x)
+  except OSError as exc:errors.append("source ancestor close:"+str(exc))
+ if errors:raise Stop("known-host cleanup failure:"+" | ".join(errors))
 def remote_main(repo,origin):
  _dg,_common,cp,config_raw,config_digest,observed=config_origin(repo)
  if observed!=origin:raise Stop("origin changed")
@@ -16096,17 +17087,14 @@ def remote_main(repo,origin):
   ap=Path(INITIAL_AGENT);safe_components(ap);s=os.lstat(ap);parent=os.lstat(ap.parent)
   if not stat.S_ISSOCK(s.st_mode) or s.st_uid!=os.getuid() or s.st_nlink!=1 or not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=os.getuid() or stat.S_IMODE(parent.st_mode)!=0o700:raise Stop("agent authority")
   agent_identity=(s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_nlink,parent.st_dev,parent.st_ino,parent.st_mode);e["SSH_AUTH_SOCK"]=INITIAL_AGENT
-  h=known_open(Path(pwd.getpwuid(os.getuid()).pw_dir)/".ssh/known_hosts");ssh="/usr/bin/ssh -F /dev/null -oBatchMode=yes -oStrictHostKeyChecking=yes -oProxyCommand=none -oProxyJump=none -oCanonicalizeHostname=no -oIdentitiesOnly=no -oIdentityFile=none -oUserKnownHostsFile=/dev/fd/"+str(h["fd"])+" -oGlobalKnownHostsFile=/dev/null -oPasswordAuthentication=no -oKbdInteractiveAuthentication=no";args=["-c","core.sshCommand="+ssh]
- try:p=subprocess.run(["/usr/bin/git","--no-replace-objects",*args,"-c","core.hooksPath=/dev/null","ls-remote","--refs",origin,"refs/heads/main"],cwd="/private/var/empty",env=e,text=True,capture_output=True,shell=False,check=False,timeout=30,pass_fds=(() if h is None else (h["fd"],)),close_fds=True)
+  h=known_open(Path(pwd.getpwuid(os.getuid()).pw_dir)/".ssh/known_hosts");ssh="/usr/bin/ssh -F /dev/null -oBatchMode=yes -oStrictHostKeyChecking=yes -oProxyCommand=none -oProxyJump=none -oCanonicalizeHostname=no -oIdentitiesOnly=no -oIdentityFile=none -oUserKnownHostsFile="+h["cpath"]+" -oGlobalKnownHostsFile=/dev/null -oPasswordAuthentication=no -oKbdInteractiveAuthentication=no";args=["-c","core.sshCommand="+ssh]
+ try:
+  if h:known_validate(h)
+  try:p=subprocess.run(["/usr/bin/git","--no-replace-objects",*args,"-c","core.hooksPath=/dev/null","ls-remote","--refs",origin,"refs/heads/main"],cwd="/private/var/empty",env=e,text=True,capture_output=True,shell=False,check=False,timeout=30,pass_fds=(),close_fds=True)
+  finally:
+   if h:known_validate(h)
  finally:
-  if h:
-   try:
-    z=os.fstat(h["fd"]);q=os.lstat(h["path"])
-    if (z.st_dev,z.st_ino,z.st_mode,z.st_uid,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns)!=h["identity"] or (q.st_dev,q.st_ino,q.st_mode,q.st_uid,q.st_nlink,q.st_size,q.st_mtime_ns,q.st_ctime_ns)!=h["identity"] or F(os.pread(h["fd"],1048577,0))!=h["digest"]:raise Stop("known-host changed")
-    for pf,part,child,want in h["links"]:
-     x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
-     if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host ancestor changed")
-   finally:known_close(h)
+  if h:known_close(h)
  after,after_digest=safe_raw(cp,limit=1048576)
  if after!=config_raw or after_digest!=config_digest:raise Stop("Git config changed")
  if agent_identity:
@@ -16444,7 +17432,7 @@ def h038_proof(repo,spec_path):
  if len(rows)!=1 or rows[0].get("depends_on")!=["h-035","h-036"]:raise Stop("H038 dependency refreeze")
  b=rows[0].get("h035_r15_published_authority")
  bkeys={"record_type","schema_version","task","contract_merge_sha","contract_tree","contract_manifest_sha256","product_candidate_sha","product_tree","product_publication_sha","ordered_parents","product_paths_and_modes","gate_path","gate_sha256","review_path","review_sha256","review_role","review_result","blocking_findings","publication_receipt_path","publication_receipt_sha256","contract_review_path","contract_review_sha256","contract_publication_receipt_path","contract_publication_receipt_sha256","repository_identity"}
- if not isinstance(b,dict) or set(b)!=bkeys or b["repository_identity"]!=origin:raise Stop("H035 binding fields")
+ if not isinstance(b,dict) or set(b)!=bkeys or b["record_type"]!="h035_r15_published_authority_v1" or type(b["schema_version"]) is not int or b["schema_version"]!=1 or b["task"]!="h-035" or b["repository_identity"]!=origin:raise Stop("H035 binding fields")
  mp=parents(repo,main)
  if len(mp)!=2:raise Stop("H038 publication graph")
  m0,r=mp
@@ -16458,24 +17446,48 @@ def h038_proof(repo,spec_path):
  for p,want in expected.items():
   if blob(repo,r,p)!=want:raise Stop("H038 exact refreeze bytes "+p)
  cm=b["contract_merge_sha"];pc=b["product_candidate_sha"]
- if parents(repo,cm)[0:1]!=["408923a445d081ebb6309e57dfe80423844ce927"] or len(parents(repo,cm))!=2 or tree(repo,cm)!=tree(repo,parents(repo,cm)[1]):raise Stop("contract publication")
- if parents(repo,pc)!=[cm] or parents(repo,m0)!=[cm,pc] or tree(repo,m0)!=tree(repo,pc) or b["product_tree"]!=tree(repo,pc):raise Stop("product publication")
+ bound=R15_BOUND_CONTRACT;boundkeys={"authority_base_sha","candidate_sha","candidate_tree","contract_tree","gate_sha256","manifest_sha256","merge_sha"}
+ if not isinstance(bound,dict) or set(bound)!=boundkeys or cm!=bound["merge_sha"]:raise Stop("bound contract identity")
+ cmps=parents(repo,cm);cb,cc=bound["authority_base_sha"],bound["candidate_sha"];ct=bound["candidate_tree"]
+ if cmps!=[cb,cc] or cb not in ["408923a445d081ebb6309e57dfe80423844ce927","580e47115d1e4b3eea004039c72a5de88d2dd2fe"] or parents(repo,cc)!=[cb] or tree(repo,cc)!=ct or tree(repo,cm)!=ct or bound["contract_tree"]!=ct:raise Stop("contract publication")
+ cs=loadb(blob(repo,cm,"specs/tasks.spec.json"));crows=[x for x in cs.get("tasks",[]) if isinstance(x,dict) and x.get("id")=="h-035"];cmanifest=crows[0].get("r15_owner_product_lifecycle") if len(crows)==1 else None
+ if not isinstance(cmanifest,dict) or D(cmanifest)!=bound["manifest_sha256"] or b["contract_tree"]!=ct or b["contract_manifest_sha256"]!=bound["manifest_sha256"] or b["gate_path"]!="verify/bin/h-035-exit" or b["gate_sha256"]!=bound["gate_sha256"] or F(blob(repo,cm,b["gate_path"]))!=bound["gate_sha256"]:raise Stop("contract manifest/gate binding")
+ pt=tree(repo,pc)
+ if parents(repo,pc)!=[cm] or parents(repo,m0)!=[cm,pc] or tree(repo,m0)!=pt or b["product_tree"]!=pt or b["product_publication_sha"]!=m0 or b["ordered_parents"]!=[cm,pc]:raise Stop("product publication")
  ppaths=["controller/attest/cli","controller/authority/cli","controller/taskval/cli"]
- if git(repo,"diff","--name-status","--no-renames",cm,pc).stdout.splitlines()!=["M\t"+x for x in ppaths] or ls_modes(repo,pc,ppaths)!={x:("100755","blob") for x in ppaths}:raise Stop("product scope")
- cr=Path(b["contract_review_path"]);cp=Path(b["contract_publication_receipt_path"])
- cc=parents(repo,cm)[1];ct=tree(repo,cc)
- crv={"schema_version":1,"record_type":"nortropic_independent_h035_r15_contract_review","role":"GATE_REVIEWER","result":"PASS","task":"h-035","authority_base_sha":"408923a445d081ebb6309e57dfe80423844ce927","contract_candidate_sha":cc,"contract_candidate_tree":ct,"blocking_findings":[]}
+ pst=git(repo,"diff","--name-status","--no-renames",cm,pc).stdout.splitlines();pnum=git(repo,"diff","--numstat","--no-renames",cm,pc,"--",*ppaths).stdout.splitlines()
+ if pst!=["M\t"+x for x in ppaths] or pnum!=["1757\t0\tcontroller/attest/cli","142\t0\tcontroller/authority/cli","154\t0\tcontroller/taskval/cli"] or ls_modes(repo,pc,ppaths)!={x:("100755","blob") for x in ppaths} or b["product_paths_and_modes"]!=[[x,"100755"] for x in ppaths] or any(blob(repo,main,x)!=blob(repo,pc,x) for x in ppaths):raise Stop("product scope/source identity")
+ cpaths=["docs/05-beslutslogg.md","docs/loop/drift.md","docs/loop/owner-author-workflow-v1.md","specs/tasks.spec.json","verify/bin/h-035-exit"]
+ if git(repo,"diff","--name-status","--no-renames",cb,cc).stdout.splitlines()!=["M\t"+x for x in cpaths] or ls_modes(repo,cc,cpaths)!={x:(("100755" if x=="verify/bin/h-035-exit" else "100644"),"blob") for x in cpaths}:raise Stop("contract candidate scope")
+ if origin=="git@github.com:Nortropic/nortropic-system.git":
+  ev=Path("/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence")
+ else:
+  rp=repo.resolve();op=Path(origin)
+  if not op.is_absolute() or str(op.resolve())!=origin or rp.name!="published-repo" or op.name!="published-origin.git" or rp.parent!=op.parent:raise Stop("fixture repository layout")
+  ev=(rp.parent/"evidence").resolve()
+ if cb=="408923a445d081ebb6309e57dfe80423844ce927":
+  cr=(ev/"h035-r15-contract-review.json").resolve();cp=(ev/"h035-r15-contract-publication.json").resolve()
+  crv={"schema_version":1,"record_type":"nortropic_independent_h035_r15_contract_review","role":"GATE_REVIEWER","result":"PASS","task":"h-035","authority_base_sha":cb,"contract_candidate_sha":cc,"contract_candidate_tree":ct,"blocking_findings":[]};phase="H035_R15_GUARDED_CONTRACT_PUBLICATION"
+ else:
+  cr=(ev/"h035-r19-dual-gate-review.json").resolve();cp=(ev/"h035-r19-contract-publication.json").resolve()
+  reviews=[];digests=[]
+  for lane,label in [("A","a"),("B","b")]:
+   lp=cr.parent/f"h035-r19-gate-review-{label}.json";lv={"schema_version":1,"record_type":"nortropic_independent_h035_r19_gate_review","role":"GATE_REVIEWER","lane":lane,"result":"PASS","task":"h-035","authority_base_sha":cb,"contract_candidate_sha":cc,"contract_candidate_tree":ct,"changed_files":cpaths,"blocking_findings":[]};ld=artifact(lp,lv);digests.append(ld);reviews.append({"lane":lane,"path":str(lp),"sha256":ld})
+  if len(set(digests))!=2:raise Stop("successor review identity")
+  crv={"schema_version":1,"record_type":"nortropic_dual_h035_r19_gate_review_binding","role":"DUAL_GATE_REVIEW_BINDING","result":"PASS","task":"h-035","authority_base_sha":cb,"contract_candidate_sha":cc,"contract_candidate_tree":ct,"changed_files":cpaths,"reviews":reviews,"blocking_findings":[]};phase="H035_R19_GUARDED_CONTRACT_PUBLICATION"
+ if b["contract_review_path"]!=str(cr) or b["contract_publication_receipt_path"]!=str(cp):raise Stop("contract artifact path")
  crsha=artifact(cr,crv)
- cpr={"schema_version":1,"record_type":"nortropic_publication_receipt","phase":"H035_R15_GUARDED_CONTRACT_PUBLICATION","repository":origin,"task_id":"h-035","base_sha":"408923a445d081ebb6309e57dfe80423844ce927","candidate_sha":cc,"candidate_tree":ct,"merge_sha":cm,"merge_tree":ct,"ordered_parents":["408923a445d081ebb6309e57dfe80423844ce927",cc],"independent_review_path":str(cr),"independent_review_sha256":crsha,"force":False,"history_rewrite":False}
+ cpr={"schema_version":1,"record_type":"nortropic_publication_receipt","phase":phase,"repository":origin,"task_id":"h-035","base_sha":cb,"candidate_sha":cc,"candidate_tree":ct,"merge_sha":cm,"merge_tree":ct,"ordered_parents":[cb,cc],"independent_review_path":str(cr),"independent_review_sha256":crsha,"force":False,"history_rewrite":False}
  cpsha=artifact(cp,cpr)
  if b["contract_review_sha256"]!=crsha or b["contract_publication_receipt_sha256"]!=cpsha:raise Stop("contract artifact digest")
- pr=Path(b["review_path"]);pp=Path(b["publication_receipt_path"]);pt=tree(repo,pc)
+ pr=(ev/"h035-r15-product-review.json").resolve();pp=(ev/"h035-r15-product-publication.json").resolve();pt=tree(repo,pc)
+ if b["review_path"]!=str(pr) or b["publication_receipt_path"]!=str(pp):raise Stop("product artifact path")
  prv={"schema_version":1,"record_type":"nortropic_independent_owner_product_review","role":"PRODUCT_REVIEWER","result":"PASS","task":"h-035","base_sha":cm,"candidate_sha":pc,"candidate_tree":pt,"blocking_findings":[]}
  prsha=artifact(pr,prv)
  ppr={"schema_version":1,"record_type":"nortropic_publication_receipt","phase":"H035_R15_GUARDED_PRODUCT_PUBLICATION","repository":origin,"task_id":"h-035","base_sha":cm,"candidate_sha":pc,"candidate_tree":pt,"merge_sha":m0,"merge_tree":pt,"ordered_parents":[cm,pc],"independent_review_path":str(pr),"independent_review_sha256":prsha,"force":False,"history_rewrite":False}
  ppsha=artifact(pp,ppr)
  if b["review_sha256"]!=prsha or b["publication_receipt_sha256"]!=ppsha or b["review_role"]!="PRODUCT_REVIEWER" or b["review_result"]!="PASS" or b["blocking_findings"]!=[]:raise Stop("product artifact digest")
- rr=(pr.parent/f"h038-r15-dependency-refreeze-review-{r[:8]}.json").resolve();rp=(pr.parent/f"h038-r15-dependency-refreeze-publication-{main[:8]}.json").resolve()
+ rr=(ev/f"h038-r15-dependency-refreeze-review-{r[:8]}.json").resolve();rp=(ev/f"h038-r15-dependency-refreeze-publication-{main[:8]}.json").resolve()
  rrv={"schema_version":1,"record_type":"nortropic_independent_h038_r15_refreeze_review","role":"GATE_REVIEWER","result":"PASS","task":"h-038","base_sha":m0,"candidate_sha":r,"candidate_tree":tree(repo,r),"changed_files":paths,"blocking_findings":[]}
  rrsha=artifact(rr,rrv)
  rpv={"schema_version":1,"record_type":"nortropic_publication_receipt","phase":"H038_R15_DEPENDENCY_REFREEZE_PUBLICATION","repository":origin,"task_id":"h-038","base_sha":m0,"candidate_sha":r,"candidate_tree":tree(repo,r),"merge_sha":main,"merge_tree":tree(repo,r),"ordered_parents":[m0,r],"independent_review_path":str(rr),"independent_review_sha256":rrsha,"force":False,"history_rewrite":False}
@@ -17466,7 +18478,42 @@ def r15_reference_sources(repo: Path, contract_merge: str) -> tuple[str,str,str]
         try: base_sources.append(raw.decode("utf-8",errors="strict"))
         except UnicodeDecodeError as exc: raise Rig("R15 reference legacy UTF-8") from exc
 
+    contract_commit=r15_git(repo,"cat-file","-p",contract_merge)
+    contract_parents=[line.split(" ",1)[1]
+                      for line in contract_commit.stdout.splitlines()
+                      if line.startswith("parent ")]
+    contract_tree_result=r15_git(repo,"rev-parse",f"{contract_merge}^{{tree}}")
+    if contract_commit.returncode or contract_tree_result.returncode:
+        raise Rig("R15 reference bound contract identity")
+    bound_authority=contract_parents[0] if len(contract_parents)==2 else "0"*40
+    bound_candidate=contract_parents[1] if len(contract_parents)==2 else "0"*40
+    candidate_tree_result=r15_git(repo,"rev-parse",f"{bound_candidate}^{{tree}}")
+    bound_candidate_tree=(candidate_tree_result.stdout.strip()
+                          if not candidate_tree_result.returncode else "0"*40)
+    contract_spec=strict_json_bytes(
+        r15_git_object_bytes(repo,contract_merge,"specs/tasks.spec.json") or b"")
+    contract_rows=[row for row in contract_spec.get("tasks",[])
+                   if isinstance(row,dict) and row.get("id")=="h-035"]
+    contract_manifest=(contract_rows[0].get("r15_owner_product_lifecycle")
+                       if len(contract_rows)==1 else None)
+    bound_manifest=(canonical_json_sha256(contract_manifest)
+                    if isinstance(contract_manifest,dict) else "0"*64)
+    contract_gate=r15_git_object_bytes(repo,contract_merge,"verify/bin/h-035-exit")
+    if contract_gate is None: raise Rig("R15 reference bound contract gate")
+    bound_contract={
+        "authority_base_sha":bound_authority,
+        "candidate_sha":bound_candidate,
+        "candidate_tree":bound_candidate_tree,
+        "contract_tree":contract_tree_result.stdout.strip(),
+        "gate_sha256":hashlib.sha256(contract_gate).hexdigest(),
+        "manifest_sha256":bound_manifest,"merge_sha":contract_merge,
+    }
     engine=R15_REFERENCE_ATTEST_SOURCE
+    bound_token="<R15_BOUND_CONTRACT_V1>"
+    if engine.count(bound_token)!=1:
+        raise Rig("R15 reference bound contract token cardinality")
+    engine=engine.replace(bound_token,json.dumps(
+        bound_contract,sort_keys=True,separators=(",",":")),1)
     terminal='if __name__=="__main__":sys.exit(attest_main(sys.argv[1:]))\n'
     if engine.count(terminal)!=1:
         raise Rig("R15 reference engine terminal cardinality")
@@ -17759,7 +18806,35 @@ def main(argv):
     return attest,authority,taskval
 
 
-def r15_frozen_contract_candidate(repo: Path) -> str:
+def r15_frozen_contract_candidate(repo: Path,
+                                  contract_merge: str | None = None) -> str:
+    if contract_merge is not None:
+        if not r15_lower_hex(contract_merge,40):
+            raise Rig("frozen R15 contract merge identity")
+        commit=r15_git(repo,"cat-file","-p",contract_merge)
+        parents=[line.split(" ",1)[1] for line in commit.stdout.splitlines()
+                 if line.startswith("parent ")]
+        if commit.returncode or len(parents)!=2:
+            raise Rig("frozen R15 contract merge graph")
+        candidate=parents[1]
+        candidate_commit=r15_git(repo,"cat-file","-p",candidate)
+        candidate_parents=[line.split(" ",1)[1]
+                           for line in candidate_commit.stdout.splitlines()
+                           if line.startswith("parent ")]
+        ok,_=r15_contract_candidate_scope(repo,candidate)
+        candidate_tree=r15_git(repo,"rev-parse",f"{candidate}^{{tree}}")
+        merge_tree=r15_git(repo,"rev-parse",f"{contract_merge}^{{tree}}")
+        if (candidate_commit.returncode or len(candidate_parents)!=1
+                or parents!=[candidate_parents[0],candidate]
+                or not ok or candidate_tree.returncode or merge_tree.returncode
+                or candidate_tree.stdout.strip()!=merge_tree.stdout.strip()):
+            raise Rig("frozen R15 contract merge/candidate binding")
+        return candidate
+    head=r15_git(repo,"rev-parse","--verify","HEAD")
+    if not head.returncode and r15_lower_hex(head.stdout.strip(),40):
+        candidate=head.stdout.strip()
+        ok,_=r15_contract_candidate_scope(repo,candidate)
+        if ok:return candidate
     children=r15_git(repo,"rev-list","--all","--children")
     if children.returncode: raise Rig("cannot locate frozen R15 contract candidate")
     candidates=[]
@@ -17786,10 +18861,11 @@ def r15_reference_product(repo: Path, contract_merge: str,
     return candidate
 
 
-def r15_reference_satisfiability(tmp: Path) -> tuple[bool,str,int]:
+def r15_reference_satisfiability(
+        tmp: Path, contract_merge_hint: str | None = None) -> tuple[bool,str,int]:
     """Canonical connected witness plus nine pre-matrix source-capability rejections."""
     try:
-        contract_candidate=r15_frozen_contract_candidate(ROOT)
+        contract_candidate=r15_frozen_contract_candidate(ROOT,contract_merge_hint)
         repo=tmp/"source"
         cloned=run(["/usr/bin/git","clone","--no-hardlinks","-q",str(ROOT),str(repo)],cwd=tmp)
         if cloned.returncode: raise Rig(cloned.stderr)
@@ -17797,9 +18873,45 @@ def r15_reference_satisfiability(tmp: Path) -> tuple[bool,str,int]:
             configured=git(repo,"config",key,value)
             if configured.returncode: raise Rig(configured.stderr)
         contract_tree=r15_git(repo,"rev-parse",f"{contract_candidate}^{{tree}}").stdout.strip()
-        contract_merge=r15_commit_tree(
-            repo,contract_tree,[H035_R15_BASE,contract_candidate],
-            "R15 judge-only guarded contract publication")
+        candidate_record=r15_git(repo,"cat-file","-p",contract_candidate)
+        candidate_parents=[line.split(" ",1)[1]
+                           for line in candidate_record.stdout.splitlines()
+                           if line.startswith("parent ")]
+        if candidate_record.returncode or len(candidate_parents)!=1:
+            raise Rig("R15 reference contract candidate graph")
+        authority_base=candidate_parents[0]
+        if authority_base not in {H035_R15_BASE,
+                str(H035_R19_SUCCESSOR["authority_base_sha"])}:
+            raise Rig("R15 reference contract authority state")
+        if contract_merge_hint is None:
+            contract_merge=r15_commit_tree(
+                repo,contract_tree,[authority_base,contract_candidate],
+                "R15 judge-only guarded state-matched contract publication")
+        else:
+            contract_merge=contract_merge_hint
+            merge_tree=r15_git(repo,"rev-parse",f"{contract_merge}^{{tree}}")
+            merge_record=r15_git(repo,"cat-file","-p",contract_merge)
+            merge_parents=[line.split(" ",1)[1]
+                           for line in merge_record.stdout.splitlines()
+                           if line.startswith("parent ")]
+            if (merge_tree.returncode or merge_record.returncode
+                    or merge_tree.stdout.strip()!=contract_tree
+                    or merge_parents!=[authority_base,contract_candidate]):
+                raise Rig("R15 reference supplied contract publication")
+        mixed_parent=(str(H035_R19_SUCCESSOR["authority_base_sha"])
+                      if authority_base==H035_R15_BASE else H035_R15_BASE)
+        mixed_contract=r15_commit_tree(
+            repo,contract_tree,[mixed_parent,contract_candidate],
+            "R23 mixed-state contract publication mutant")
+        try:
+            r15_frozen_contract_candidate(repo,mixed_contract)
+        except Rig as exc:
+            mixed_rejection=str(exc)
+        else:
+            mixed_rejection="ACCEPTED"
+        check(mixed_rejection=="frozen R15 contract merge/candidate binding",
+              "J_R23_FROZEN_CONTRACT_SELECTOR_MIXED_FIRST_PARENT_REJECTS_CAUSAL",
+              mixed_rejection)
         source_origin=tmp/"source-origin.git"
         made=run(["/usr/bin/git","init","--bare","-q",str(source_origin)],cwd=tmp)
         if made.returncode: raise Rig(made.stderr)
@@ -17820,10 +18932,10 @@ def r15_reference_satisfiability(tmp: Path) -> tuple[bool,str,int]:
             measured_rows[fields[2]]=(int(fields[0]),int(fields[1]))
         measured_pairs=[measured_rows.get(path,(None,None))
                         for path in H035_R15_PRODUCT_PATHS]
-        check(measured.returncode==0 and measured_pairs==[(1644,0),(142,0),(154,0)]
-              and sum(row[0] for row in measured_pairs)==1940
+        check(measured.returncode==0 and measured_pairs==[(1757,0),(142,0),(154,0)]
+              and sum(row[0] for row in measured_pairs)==2053
               and sum(row[1] for row in measured_pairs)==0,
-              "J_R15_REFERENCE_TRANSFORM_NUMSTAT_EXACT_1940_PLUS_18_RESERVE",
+              "J_R15_REFERENCE_TRANSFORM_NUMSTAT_EXACT_2053_PLUS_18_RESERVE",
               measured.stdout)
         branch=git(repo,"branch","-f","r15-reference-product",reference)
         if branch.returncode: raise Rig(branch.stderr)
@@ -17972,23 +19084,23 @@ sys.exit(0)
             (wrong_legacy_attest,reference_sources[1],reference_sources[2])),
         )
         superficial_exact={
-            "EXIT_ZERO_NO_EFFECT":([1646,144,156],1946,
+            "EXIT_ZERO_NO_EFFECT":([1759,144,156],2059,
                 "candidate capability signature differs: controller/attest/cli"),
-            "CANNED_SUCCESS_OUTPUT":([1647,145,156],1948,
+            "CANNED_SUCCESS_OUTPUT":([1760,145,156],2061,
                 "candidate capability signature differs: controller/attest/cli"),
-            "NOMINAL_FILES_NO_VALIDATION":([1650,144,159],1953,
+            "NOMINAL_FILES_NO_VALIDATION":([1763,144,159],2066,
                 "candidate capability signature differs: controller/attest/cli"),
-            "EXACT_EXPORT_DOUBLE_EXECUTION":([1644,148,154],1946,
+            "EXACT_EXPORT_DOUBLE_EXECUTION":([1757,148,154],2059,
                 "candidate capability signature differs: controller/authority/cli"),
-            "TWO_RETAINED_LOADS_OLDER_CALL_PLUS_CURRENT_CALL":([1644,153,154],1951,
+            "TWO_RETAINED_LOADS_OLDER_CALL_PLUS_CURRENT_CALL":([1757,153,154],2064,
                 "candidate capability signature differs: controller/authority/cli"),
-            "EVAL_EXEC_CODE_OLDER_PLUS_EXEC_CURRENT":([1644,157,154],1955,
+            "EVAL_EXEC_CODE_OLDER_PLUS_EXEC_CURRENT":([1757,157,154],2068,
                 "candidate controller/authority/cli: reflection/observer recovery name: eval"),
-            "WRONG_FILENAME_ENGINE_OLDER_PLUS_CURRENT":([1644,157,154],1955,
+            "WRONG_FILENAME_ENGINE_OLDER_PLUS_CURRENT":([1757,157,154],2068,
                 "candidate controller/authority/cli: reflection/observer recovery name: globals"),
-            "COPIED_SAME_NAME_LEGACY_CALLABLE":([1644,142,172],1958,
+            "COPIED_SAME_NAME_LEGACY_CALLABLE":([1757,142,172],2071,
                 "candidate controller/taskval/cli: base definition missing/duplicate/substituted"),
-            "LEGACY_WRONG_ARGS_PARALLEL_READ":([1649,142,154],1945,
+            "LEGACY_WRONG_ARGS_PARALLEL_READ":([1762,142,154],2058,
                 "candidate capability signature differs: controller/attest/cli"),
         }
         for serial,(label,sources) in enumerate(mutants):
@@ -18014,6 +19126,36 @@ sys.exit(0)
                   "J_R15_REFERENCE_REJECTS_"+label,
                   structural_why+" | "+canonical_why+" rows="+repr(rows))
             git(repo,"branch","-f",f"r15-reference-mutant-{serial}",candidate)
+        marker='REQUEST_MARKER={"record_type":"h035_r15_authority_request_v1","schema_version":1}'
+        if reference_sources[0].count(marker)!=1:
+            raise Rig("R20 exact-line source-continuity mutant anchor")
+        nonreference_sources=(reference_sources[0].replace(
+            marker,marker.replace('"schema_version":1','"schema_version":2'),1),
+            reference_sources[1],reference_sources[2])
+        checkout=git(repo,"checkout","--detach","-q",contract_merge)
+        if checkout.returncode:raise Rig(checkout.stderr)
+        for relative,source in zip(H035_R15_PRODUCT_PATHS,nonreference_sources):
+            path=repo/relative;path.write_text(source,encoding="utf-8");path.chmod(0o755)
+        nonreference=commit_paths(
+            repo,"R20 exact-numstat nonreference refreeze mutant",*H035_R15_PRODUCT_PATHS)
+        branch=git(repo,"branch","-f","r20-nonreference-refreeze-mutant",nonreference)
+        if branch.returncode:raise Rig(branch.stderr)
+        structural_ok,structural_why=r15_product_diff_scope(
+            repo,contract_merge,nonreference,None)
+        canonical_ok,canonical_why=r15_product_diff_scope(
+            repo,contract_merge,nonreference,reference_sources)
+        gap_tmp=tmp/"nonreference-refreeze"
+        gap_tmp.mkdir(mode=0o700)
+        gap_fixture=r15_prepare_published_fixture(
+            gap_tmp,contract_merge,nonreference,source_repo=repo)
+        refreeze_ok,refreeze_why=r15_h038_refreeze_proof(
+            gap_fixture["repo"],Path(str(gap_fixture["contract_review_path"])),
+            Path(str(gap_fixture["contract_receipt_path"])))
+        check(structural_ok and not canonical_ok and not refreeze_ok
+              and canonical_why=="candidate capability signature differs: controller/attest/cli"
+              and refreeze_why=="R15_H035_PRODUCT_GRAPH_SCOPE",
+              "J_R20_H038_EXACT_NUMSTAT_NONREFERENCE_PRODUCT_REJECTS_CAUSAL",
+              structural_why+" | "+canonical_why+" | "+refreeze_why)
         return ok,why,count
     except (OSError,subprocess.SubprocessError,ValueError,Rig) as exc:
         return False,str(exc),0
@@ -18069,14 +19211,15 @@ def main() -> int:
                 frozen_checks()
                 r15_historical_regression_floor(lanes["historical"])
                 r15_gate_inheritance_selftests()
-                r15_gate_inheritance_git_controls(lanes["inheritance"])
+                r15_gate_inheritance_git_controls(
+                    lanes["inheritance"],sys.argv[2] if product_bound else None)
                 r15_product_scope_selftests(lanes["product-scope"])
                 r15_source_capability_selftests()
                 r15_remote_boundary_selftests(lanes["remote-boundary"])
                 # The executable reference witness is a judge-only satisfiability
                 # proof and can never contribute candidate acceptance credit.
                 reference_ok,reference_why,reference_count=r15_reference_satisfiability(
-                    lanes["reference"])
+                    lanes["reference"],sys.argv[2] if product_bound else None)
                 reference_verified=(reference_ok and reference_count>0)
                 check(reference_verified,
                       "J_R15_EXECUTABLE_REFERENCE_THREE_CLI_FULL_MATRIX_SATISFIABLE",
