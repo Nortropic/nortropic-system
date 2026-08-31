@@ -794,3 +794,289 @@ refreeze H-032 to depend exactly on published H-038 and use `CURRENT_WORKSPACE`;
 review/publish H-032; then rebind H-031. There is no owner-live/provider-live/supervisor start in the
 contract freeze and no later transition may broaden filesystem, process, network or credential
 authority, add an unconfined worker, raw fallback, native broker or Seatbelt bypass.
+
+## H-035 R15 owner-publication lifecycle prerequisite
+
+H-035 R15 repairs the existing owner-author lifecycle; it grants no new owner-production path.
+The canonical normal claim is bound to one clean repository, the observed remote `main`, the exact
+Git-object spec/registry/task-gate bytes, and the full ordered dependency records. H-035 remains an
+ordinary four-field attestation. An owner dependency is usable only as a strict, non-stale
+`owner_publication_v1` record whose graph, tree, authority bytes, repository identity and durable
+identities revalidate. No builder identity is emitted for an owner-authority claim.
+
+The exact executable-reference numstat is attest `1637/0`, authority `142/0`, and taskval `154/0`
+added/deleted lines. The 1,933 strictly additive lines plus the exact 25-line integration reserve bind
+both the 1,958 added-line and total-changed-line caps; deleted lines are exactly zero, so deletion or
+minification cannot manufacture budget authority.
+
+Every R15 Git-bound lifecycle decision now treats the physical checkout and index as one exact
+authority, rather than trusting clean-looking status output. Closed binary Git observations require
+zero stderr under the canonical current-UID mode-0700 private temp directory derived from Darwin
+`confstr(65537)`, never from caller `TMPDIR`. The bound commit tree, stage-zero index map and uppercase
+`H` flag inventory must agree exactly; skip-worktree, assume-unchanged, corrupt or divergent index
+state rejects. Tree and index paths use the strict canonical UTF-8/NUL grammar. The repository root,
+every worktree directory and every regular leaf are retained through nofollow descriptors until final
+full-stat, name, ancestor, root and exact-inventory revalidation. Root/directories are current-UID
+mode 0755; leaves are current-UID, nlink-one, exact Git mode and complete Git-object bytes. Thus a
+hardlink, symlink, FIFO, socket, mode/UID defect, empty extra directory or live leaf/ancestor/root
+replacement cannot be hidden by index flags or a later pathname restore.
+
+The three product CLIs are also admitted only through the frozen source-capability envelope. The
+gate derives the legacy baseline solely from the bound `408923a4` Git blobs, requires every baseline
+top-level definition/class in its exact order and AST, and requires the sole old-`main` capture before
+one dispatch `main`. AST meaning is frozen to Python 3.12.13 at the absolute regular executable
+`/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12`
+(SHA-256 `94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941`): the gate uses that
+absolute shebang and stably nofollow-reads the exact executable before AST credit. PATH, caller
+environment, another Python version and cross-version AST normalization grant no authority. Strict
+UTF-8, line-insensitive normalized AST and an exact semantic import,
+critical-call-graph and sink signature must equal the gate-generated executable reference. That
+signature permits only the six closed attest Git subprocess sites, two in-memory SQLite connections,
+one `CDLL(None,use_errno=True)` binding of `renameatx_np`, six same-root native rename calls and the
+three retained-byte compile/exec pairs. New pathname deletion/rename, direct socket/network, alternate
+process/FFI/dynamic import, definition-time effects, capability proxies, module/frame recovery and
+trace/profile/monitoring disable-or-restore are rejected even when dead or output-equivalent. Exact
+unchanged legacy functions retain their historical capabilities; R15 cannot transfer or broaden them.
+
+The R15 gate itself inherits H035/R14 authority instead of self-authoring a replacement historical
+floor. Under the same exact Python 3.12.13 AST authority, the immutable `408923a4` gate blob
+`87d5480368363257efe0c25d90803bce5ace0e43` (SHA-256
+`cae895110129f5066be9ae7f770e7f4e96594698ef5500d586820fea472d27e2`) contributes all 64 ordered
+top-level definitions/classes and all 52 ordered nondefinition statements. Fifty-nine definitions are
+AST-identical; only `strict_json_bytes`, `filesystem_snapshot`, `snapshot_selftests`, `frozen_checks` and `main` have exact
+manifested reviewed islands, with every other retained statement normalizing to the base AST. Every
+new top-level node is separately AST-manifested in the task spec. The inherited historical floor is
+only its docstring plus direct ordered calls to path, observer, snapshot, complete R14 migration,
+routing, production, remediation, R6, R9 and publication controls. `frozen_checks()` immediately
+precedes that floor and the pair dominates reference construction and both product/preproduct arms;
+conditional, caught, partial, returning or failure-counter-reset variants reject.
+The exact admitted source binds definition-time decorators, defaults, annotations and class surfaces,
+including the reviewed effect-free forms. Supplemental capability-family checks reject known namespace,
+function-metadata, process-state and environment mutation surfaces in those bytes; they are defense in
+depth and do not claim a general scope-aware Python analysis. Only the exact manifested judge environment
+bookkeeping contexts remain, and an import oracle compares the inherited callable identity with the
+immutable base after module definition.
+
+`owner-author` creates one empty current-UID mode-0700 workspace through retained nofollow ancestry,
+persists its exact path/ancestor/leaf identity, and persists a provisional candidate equal to the
+base. `check-candidate` is a required causal transition: after recomputing the direct nonempty child,
+scope, modes and generic file/line limits, it appends `OWNER_CANDIDATE_CHECKED` with the exact
+candidate tree/change set and unchanged workspace identity. `record-review` cannot skip that event
+or substitute a sibling; it may atomically adopt only the exact current checked candidate. It
+stable-reads one independent `PRODUCT_REVIEWER` PASS artifact and binds its byte
+digest, role and result into the historical `owner_candidate_v1` identity. The canonical review path
+and retained-file stat identity are separate exact state-event bindings revalidated on adoption retry,
+freeze, freeze retry and finalization; they are not falsely claimed as fields in that digest. The
+workspace remains empty and its persisted identity is revalidated at every later transition. A failure
+before any directory is created is unchanged; after either a private temp or final workspace exists,
+the exact observed object is preserved and the result is `INDETERMINATE_PRESERVED`—no pathname
+directory removal is credited.
+`owner-freeze` requires that adopted identity and remains prepublication: it never writes an attestation.
+
+After guarded publication, `record-publication` delegates exactly once to the installed attest CLI.
+The shared runtime retains the exact stable-open CLI inode and full digest from its one loader read;
+publication passes only that descriptor to a fixed `python -I -S -B -c` loader. The child rechecks
+the full descriptor identity and digest, compiles only those retained bytes with the canonical CLI
+path supplied as its file identity, and never reopens executable bytes by pathname. Exact closed
+argv, environment, `pass_fds` and `close_fds` are frozen. Parent pre/post pathname and retained-FD
+checks remain corroboration; uncertainty after child invocation is `INDETERMINATE_PRESERVED`.
+The attest CLI independently rederives the frozen state, review, repository, remote, ordered parents
+`[base,candidate]`, equal publication/candidate trees and frozen authority bytes before atomically
+issuing the one-way rich record. Replay is idempotent only while that exact record remains valid;
+invalidation of either candidate or publication is a durable tombstone and cannot be cleared by a
+legacy write, finalizer replay or historical import. No public raw owner-record writer exists.
+
+All R15 state transitions hold the manifest-bound nofollow state-lock inode across read, validation
+and effect. Any attest-store operation additionally takes the manifest-bound attest-lock inode in the
+sole global order `STATE_LOCK` then `ATTEST_LOCK`; each process exposes the exact flock descriptor
+identity at deterministic gate barriers. Review and publication evidence is read through retained
+nofollow directory descriptors, never a caller-selected alias.
+
+Owner-author creates the exact requested empty workspace by first creating one CSPRNG-private `0700`
+same-parent temp directory, retaining and binding that inode, then publishing it with same-dirfd
+`RENAME_EXCL | RENAME_NOFOLLOW_ANY | RENAME_RESOLVE_BENEATH`. A predictable final-name `mkdir` is not
+the creation authority. Darwin exposes no inode-CAS directory removal. Once either the temp or final
+workspace directory exists, every creation, publication or pre-event state failure therefore preserves
+all observed workspace objects and returns non-success `INDETERMINATE_PRESERVED`; it never pathname-
+removes a temp, final or quarantine and never claims unchanged cleanup. Safety takes precedence over
+recovering from that rare poisoned operation. The private basename contains SHA-256 of the exact final
+workspace path plus a fresh 64-hex nonce; before any later create, any entry of any type with that exact
+target prefix poisons and rejects the retry without adoption or deletion.
+
+State and attest persistence use fixed dual slots whose unordered inode pairs are bound in both
+bootstrap manifests. `events.jsonl` is the state truth: after an in-memory SQLite rebuild is written,
+fsynced and revalidated in the inactive slot, one complete event is appended and fsynced before a
+Darwin `renameatx_np` slot swap. Attest mutation writes and fsyncs the inactive slot, then appends and
+fsyncs an exact hash-chained `PENDING` recovery record before the same swap. Both swaps use one
+retained root descriptor and the bitwise flags `RENAME_SWAP | RENAME_NOFOLLOW_ANY |
+RENAME_RESOLVE_BENEATH`; postvalidation, root fsync and inactive-slot clearing/fsync precede the
+durable `COMMITTED` attest recovery record. Plain rename, `os.replace`, pathname cleanup and a disposable
+unbound destination are forbidden.
+
+This complete-event commit rule narrowly supersedes the older universal event rollback/unchanged
+clause only inside a complete manifest-bound R15 bundle. Historical and non-R15 state CLI behavior
+remains unchanged; the legacy state CLI is never an R15 transition mutation boundary.
+
+Only rejection before a truth or namespace transition may claim byte-identical unchanged authority.
+After a complete event, durable `PENDING`, successful swap or identity-ambiguous cleanup, failure is
+non-success `INDETERMINATE_PRESERVED` and every observed object remains. State has no request journal:
+before evaluating any later R15 request it deterministically repairs the DB orientation from complete
+event truth, fsyncs the root and clears the inactive slot; exact retry is then idempotent. Attest has a
+durable request identity, so a different operation rejects while its final `PENDING` exists and only
+exact replay may finish. An unterminated final event/recovery byte suffix is the only truncatable tail;
+no complete event or `PENDING` record is rolled back. Detecting a continuously
+malicious same-UID actor that restores every byte and metadata field in place on the same frozen inode
+would need an external protected monotonic anchor and is therefore an explicit new-owner stop.
+
+A crash after the bound inactive slot is fsynced but before the first complete event or `PENDING`
+record leaves no request identity. Recovery grants those inactive bytes no truth authority: only when
+the active slot still equals the last complete event or committed recovery truth may the same retained
+lock/root operation clear and fsync that bound inactive slot, fsync the root, and then evaluate a
+request. Any identity, active-truth or cleanup ambiguity is non-success
+`INDETERMINATE_PRESERVED`.
+
+The one historical H-036 import is fixed and argument-free. Its B/P/M graph, tree, three paths/modes,
+spec/registry/gate digests, review and receipt bytes, first-parent ancestry and all derived rich-record
+identities are pinned by the R15 contract. The unpublished bootstrap construction is the sole admission
+of that H-036 record. The public command only revalidates an already-present exact non-stale record as
+a byte/effect-idempotent replay; it cannot reconstruct absence, bypass baseline/recovery continuity or
+import a neighbor.
+
+HR-02 derives that bridge only from the immutable `408923a4` H-038 gate blob
+`053b90a1bd754cc74e6671dd9fc5078d0c124731` and the named Git commit objects. The external review and
+receipt remain separate fixed-path, nofollow, regular current-UID mode-0644 nlink-one artifacts with
+their pinned digests. The dependency migration sentinel is exactly one ordered member with digest
+`2c9eac578bd6fb694f8f111aac11eb6935fd74810265c388f138aff0b7395607`. No current-tip inference,
+relocation, recreation, widening, registry/production authority or retroactive H-038 credit is admitted;
+H-038 still requires its later separate refreeze, review and publication.
+
+Bootstrap is a single initially absent `0700` bundle containing fixed `state` and `attest` siblings.
+It retains the nofollow parent descriptor and publishes with `renameatx_np` using the bitwise flags
+`RENAME_EXCL | RENAME_NOFOLLOW_ANY | RENAME_RESOLVE_BENEATH`; there is no pathname fallback. Both
+identical manifests noncircularly bind the two manifest inodes, roots, locks, event log, state DB slot
+pair, attest-store slot pair and attest recovery log plus exact initial-file baselines. A destination,
+parent, source, final or cleanup race never overwrites or deletes foreign identity; uncertainty after
+EXCL is `INDETERMINATE_PRESERVED` and exact-replay-only. Later serialized evolution validates the
+immutable bootstrap prefixes and the dual-slot/recovery protocols, never by rebasing a baseline.
+Before every temp `mkdir`, the retained parent is rescanned for any reserved `.r15-bootstrap-` entry.
+Any such object poisons the attempt without adoption or deletion. Once this invocation materializes a
+temp object, no failure path removes any leaf, child root or temp directory: pre-EXCL failure and an
+EEXIST loser both retain every observed object and return non-success `INDETERMINATE_PRESERVED`.
+Only a later invocation that observes an already-complete final bundle with no reserved temp residue
+may revalidate it and fsync the same retained parent before success.
+After an independently reviewed and guarded H-038 dependency refreeze binds the published H-035
+product and exact H-036 record, the only normal selection and claim is H-038.
+`bootstrap_serialized` is a serialization status, never proof that a task is done.
+
+Required order remains serial at trust transitions: freeze and independently review/publish this R15
+contract; implement, independently product-review and guardedly publish the exact three-CLI product;
+refreeze, independently review and publish H-038 against published H-035 and H-036; bootstrap and
+complete H-038; publish the H-032 refreeze; publish the H-031 rebind `B`; publish final H-032 product
+`P` as the direct child of `B`; publish `N=[B,P]` with `P`'s tree; and perform exact final verification.
+The R15 bundle is bootstrap-only and never falls through to legacy task/state mutation. There is no
+`release-bootstrap` command and no H-031 enqueue: H-031 is already green at `N`. The canonical first
+launch checkpoint is not established by an empirical report-only or `TASK_ALREADY_GREEN` observation.
+It stays fail-closed until a separately frozen, identity-bound one-shot canonical-loop transition after
+H-027–H-030 names exact dependency attestations and one ordinary target (earliest plausible H-018),
+completes the required selection-through-cleanup chain, and stops before the next selection. R15 neither
+fabricates that transition nor widens into legacy fallback. R15 does not weaken Seatbelt, permit
+unconfined execution or raw fallback, add a
+native broker, or broaden filesystem, process, network or credential authority.
+
+HR-01 freezes the gate's own inherited authority independently of a repinnable candidate manifest.
+The primary authority is the exact independently reviewed admitted source: inherited definitions and
+statements, the altered/new-definition aggregate, the new-nondefinition aggregate, exact binding
+cardinality and the raw preamble. Capability-family analysis is defense in depth for those exact bytes;
+it is not advertised as a general Python scope or abstract-interpretation proof. The reviewed source
+has a top-level-only import set and exact whole-AST bindings for the two balanced parent-environment
+controls and the finite compiled-code consumers.
+All 129 admitted altered-or-new gate definitions are additionally bound by the manifest-independent
+ordered AST aggregate recorded exactly in the contract;
+truthfully repinning the candidate manifest therefore cannot authorize an unreviewed helper or sink.
+The 70 admitted new nondefinition statements are independently bound by the contract's ordered aggregate. Its own
+authority assignment is excluded, and only the exact contract-digest literal is normalized to the named sentinel;
+the digest binding's position, name, type, format, and raw equality remain separately bound.
+The complete ordered module body is independently bound by the contract's exact aggregate.
+Its calculation normalizes only the body, nondefinition, and contract-digest anchor literals to fixed sentinels, requires
+each exact simple assignment once at its reviewed position, and requires parsed literals to equal the
+trusted runtime constants. Definition/nondefinition interleaving therefore cannot be manifest-repinned.
+The raw base and candidate preambles are exact and no PEP-263 encoding override is admitted, so direct
+execution and the UTF-8 AST authority cannot decode identical bytes with different semantics.
+All nine behavior-changing superficial product controls are strict-additive, zero-deletion candidates
+that must reject at the exact canonical source-capability reason before matrix execution. Full normalized
+AST and exact import, sink, call and call-graph equality deliberately make no capability-equivalent dynamic
+mutant claim; only the canonical generated reference and an identity-bound actual product enter the matrix.
+
+Gate-owned physical-race controls distinguish early open/directory races from final rebinds: the final
+leaf, ancestor and root injections occur only at their exact retained-fd EOF, second-listdir and
+single-Git-batch-plus-second-listdir phases and bind both original and distinct replacement identity.
+Late dispatch controls additionally use a call-identity-bound HMAC route transcript over only the exact
+already-derived legacy/export code fingerprints. That transcript is non-authoritative by itself and is
+credited only after canonical source-capability/reference identity; sticky authority/attest cases require
+one R15 export and zero legacy calls, while direct wrapper/taskval cases require no routed call.
+
+### R15 mutation-preflight measurement amendment
+
+The exact nonmutating recovery preflight adds seven strictly additive lines only to the generated
+attest reference. The superseding executable-reference measurement is therefore attest `1644/0`,
+authority `142/0`, and taskval `154/0`: 1,940 added and zero deleted lines, leaving the exact 18-line
+integration reserve under the unchanged 1,958 added/total cap. Deletion or minification still cannot
+manufacture budget authority.
+
+### R15 authenticated nested-interpreter trace repair
+
+The pass1 evidence `/private/tmp/h035-r15-bd31-canonical.webvl9fv` was 278/279: only the exact attest
+finalizer-delegation judge was false. The nested harness subject used its initial Homebrew interpreter
+spelling as finalizer `argv[0]`, while the outer judge compared that spelling to the outer process's
+different canonical spelling after ordinary site initialization. The nested judge now starts exactly
+as `[outer-canonical-sys.executable,-S,-c,program]`; it adds no `-B` and no environment authority.
+It captures its initial executable and three-part version before subject `runpy`, authenticates both
+in the existing single HMAC trace event, and requires the executable to equal both the outer exact
+H035 spelling and finalizer `argv[0]` before the unchanged stable canonical path/version/no-follow
+identity/digest validator can credit it. The FD token is canonical unsigned decimal and the full-stat
+identity token is exact compact JSON. Basename, PATH-member, arbitrary-alias and realpath-only credit
+remain forbidden. Product/reference bytes and authority do not change.
+
+### H-035 R17 standalone historical-fixture isolation and V7 observer
+
+Every historical ordinary, owner, restart and observation route now threads one exact candidate SHA
+through a fresh gate-private standalone repository. Construction is exactly an empty-template `git
+init`, local-only exact-SHA fetch and detached checkout. It never uses clone, shared storage, a linked
+worktree, alternates, a replica remote, network, credentials or fallback to the authority checkout.
+The replica must equal the candidate tree and exact reachable-object closure, with zero loose objects,
+one matched pack/index pair, a closed Git-admin grammar, nlink-one regular files, unique internal file
+identities and global inode disjointness from the authoritative standalone checkout and its single
+physical `.git` directory, whose Git and common-dir identities are equal.
+
+The gate execution source must itself be standalone: `.git` is a current-UID physical directory in
+mode 0700 or 0755, `commondir` is absent, and the common Git directory equals `.git`. A gitfile,
+linked worktree, unsafe `.git` mode or symlinked admin alias rejects before local config or object
+access. The authority checkout, Git directories, config and
+candidate HEAD are nofollow-authenticated with full physical metadata and content. Root, `.git` and
+config descriptors remain continuously retained only within each individual construction/run/cleanup
+route. Within each gate invocation, one exact full baseline is re-compared around every executed route:
+the no-argument gate compares ordinary, owner and restart including both restart runs, while
+owner-acceptance compares around its observe route.
+Controller children receive only the finite private Python 3.12/Git environment and scratch-local
+state, loop, controller, workspace, home, XDG and temp paths. Any source drift, alias, unexpected Git
+state, H-036 runtime/workspace/process residue or cleanup uncertainty is a rig/ODÖMBART owner stop;
+there is no authority-root fallback or verdict recovery. The finite environment contains no caller
+Git/Python injection, credential-bearing variable, replica remote or network-selecting configuration;
+construction is local-only, uses no network or credential, and adds no such authority.
+
+`H035_OWNER_PROVIDER_EXEC_V7` supersedes only the direct-ancestry portion of
+`H035_OWNER_PROVIDER_EXEC_V6`; the V6 readiness, release, timing, lifetime and cleanup constants remain
+unchanged. V7 requires the scratch-local H-036 `runtime_snapshot.py supervise-v1` process between
+launch and the exact `/bin/sh provider nonce` leaf. Its private runtime-Python argv, `-I -S -B`, helper,
+canonical distinct control/ready descriptors at least 3, and process-group leadership are exact.
+Direct legacy launch-to-provider ancestry, an extra persistent sandbox ancestor, mixed/decoy
+controller roots or scripts, and wrong runtime/helper/FD/PGID reject. H-036 still installs Seatbelt;
+its helper execs into the provider and does not create a persistent sandbox ancestor.
+
+Owner acceptance repeats the exact local candidate proof before and after the fixture. Before observe
+or creation, every retained artifact ancestor must be physically dev/inode-disjoint from the
+authenticated checkout and both Git roots, independent of lexical spelling. It then creates only one
+absent mode-0600 artifact using an exclusive nofollow retained-parent open and reauthenticates the
+source and full retained artifact ancestry.
+This amendment grants no owner-live, publication, network or credential use and no weakening or bypass
+of Seatbelt, unconfined execution, raw fallback, native broker or broader filesystem/process authority.
