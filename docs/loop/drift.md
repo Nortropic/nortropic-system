@@ -4020,3 +4020,129 @@ dev/inode-disjoint from all authenticated source roots, independent of lexical a
 creates an absent exclusive nofollow mode-0600 artifact followed by complete reauthentication. No
 product, registry, owner-production membership, Seatbelt
 objective or filesystem/process/network/credential authority is widened.
+
+### H-035 R18 macOS retained-known-hosts transport drift boundary
+
+The R17 remote observer's positive production route was first exercised on the target Mac and proved
+a gate/host incompatibility: `/usr/bin/ssh` returns `fopen: Bad file descriptor` for its frozen
+`UserKnownHostsFile=/dev/fd/<fd>` argument, while the identical hardening and authenticated
+`known_hosts` bytes work through a plain path. R18 admits no alternate trust source and changes only
+that presentation. The parent retains the nofollow source and private-temp ancestor chains, exact
+source/copy descriptors and full identities; source open is nonblocking and its bounded read must
+reconstruct exactly `st_size`. One unpredictable private directory contains one exclusive nofollow
+mode-0600/nlink-one copy. Exact bytes and identities are checked before and after the Git child, which
+inherits no descriptor, and identity-bound descriptor-relative cleanup is required on every outcome.
+
+The frozen SSH binary, remote identity, strict host-key check, sole user host file, disabled global
+host file, disabled proxy/password/keyboard-interactive paths and credential projection do not change.
+Gate selftests run fault injection in isolated pinned-Python children: forced seven-byte reads must
+reconstruct the whole source, premature EOF must reject without residue, and a stat-to-open FIFO swap
+must observe `O_NONBLOCK` and reject without blocking. Serialized gate execution leaves no authorized
+concurrent writer to the CSPRNG directory. The pre-R18 three-CLI candidate `c668ab96…` remains immutable
+NO-CREDIT; any product after publication is generated fresh from the published R18 parent.
+
+Separately, the takeover reauthenticated and terminated only the pre-existing PPID-1 H-031 owner-live
+poller PID 37935 after proving it had no child, socket or surviving source/worktree authority and was
+polling forever after a durable exit-2 record. No process group was signalled and no gate acquired
+cleanup or owner-live authority. R18 does not widen Seatbelt, filesystem/process/network/credential
+authority, permit unconfined or raw fallback, or add a native broker.
+
+## H-035 R19 — exact publication-lineage drift boundary
+
+R18 `6a5035e4…` remains immutable NO-CREDIT. Its retained-known-hosts mechanism is preserved, but its
+historical-only graph proof, 1,958-line cap and zero-cleanup sink inventory are superseded by one exact
+closed migration. Historical R15 acceptance remains exactly base `408923a4…` plus its original fixed
+review and receipt. The only new state is an exact five-file direct child of `580e4711…`, followed by
+an ordered non-force merge with the candidate tree, two fixed and distinct GATE_REVIEWER PASS leaves,
+one exact path-and-digest aggregate, and one fixed publication receipt bound to that aggregate.
+Arbitrary additions, missing or duplicate lanes, aliases, substitutions, broader prefixes, neighboring
+bases, parent reorder, tree drift, stale hashes and caller-selected artifact paths remain outside the
+contract.
+
+The generator instantiates the attest CLI's retained H038 proof with exact contract merge, authority
+base, candidate/tree, manifest and gate identities derived from immutable Git objects. The consumer
+enforces those exact values rather than accepting any direct child with a self-consistent artifact
+family. It also requires the exact five-file contract scope and modes, state-specific sibling artifact
+names and schemas, and for the successor exact ordered A/B leaves with distinct digests bound by the
+aggregate and receipt. Production uses only the canonical evidence paths; only the exact gate-derived
+`published-repo`/`published-origin.git` disposable layout may use its sibling evidence directory.
+Coherent relocation therefore rejects. The three product paths, modes, per-file numstat and
+published-main blob bytes equal the exact reviewed product candidate. Initial source authenticity is
+established earlier by H035's zero-exit exact-reference product acceptance, independent product review
+and guarded publication. The generated H038 consumer propagates that immutable SHA/tree/artifact
+identity and rejects post-publication drift or rebinding mismatch; it is not a self-authenticating
+oracle for coherently replaced arbitrary code. The trusted outer H035 refreeze proof independently
+regenerates the exact source reference from the bound contract merge. Product acceptance still derives only fixed production paths;
+the local siblings exist solely inside the gate-created connected fixture.
+
+The generated product measurement is exactly 2,053 additions and zero deletions; the cap is exactly
+2,071, preserving only the prior 18-line reserve. The only admitted pathname deletion consists of the
+four exact descriptor-relative `known_hosts` copy/directory cleanup calls in their exact reviewed
+functions. Wrong path, descriptor, function, cardinality or any unrelated delete/rename rejects before
+product credit. The migration is bounded by standing-delegation BP01–BP14 and changes no production
+membership or underlying objective. Seatbelt bypass, unconfined execution, raw fallback, a native
+broker, general cleanup, owner-live and broader filesystem/process/network/credential authority remain
+forbidden. A product must be freshly generated from the published R19 merge.
+
+## H-035 R20 — exact product-source continuity drift boundary
+
+Frozen candidate `29d522e0…` receives NO-CREDIT. A same-line-count AST/behavior mutation retained the
+exact three paths, executable modes and `1757/142/154` numstat and therefore passed structural product
+scope, while canonical source-capability validation rejected it. The outer H038 refreeze proof had
+called the same product-scope function without its optional exact-reference argument and accepted the
+self-consistent graph. R20 requires one exact derivation of `r15_reference_sources(repo,
+contract_merge)` and one exact product-scope consumption of that value; generation or validation
+failure rejects. The existing superficial-mutant family supplies runtime causal rejection evidence,
+and an AST oracle prevents the refreeze proof from silently returning to structural-only acceptance.
+Preproduct reference construction selects only the exact scoped clean-HEAD successor candidate and
+builds its state-matched two-parent merge; product-bound construction derives the candidate from the
+explicit supplied contract merge. A retained historical child or ambiguous all-refs discovery cannot
+shadow the successor reference.
+The superficial-mutant label and expectation table now use the same exact key, eliminating the
+pre-verdict `KeyError` that otherwise prevented the remaining causal cases from running.
+
+The generated H038 consumer is deliberately unchanged: its authority begins only after H035 exact
+source acceptance, independent product review and guarded publication, and it binds that immutable
+candidate/tree/publication/artifact identity against later drift. This correction adds no product
+line, budget, production path, deletion, runtime, artifact, network, credential, process or Seatbelt
+authority and does not alter the security objective.
+
+## H-035 R21 — state-matched alias-control drift boundary
+
+R20 `41962140…` remains immutable NO-CREDIT after both formal lanes found the inherited physical-alias
+negative stopped earlier on a synthetic noncanonical historical candidate. R21 does not relax that
+historical identity rule. The negative instead derives the exact current successor candidate from
+clean HEAD, validates the closed contract scope in the source and standalone clone, checks out that
+exact commit with no status delta, and then requires the pre-effect physical-alias rejection through
+the retained path aliases. Wrong candidate state, checkout failure, dirty clone, wrong rejection,
+sentinel execution, artifact creation or source drift rejects. The repair changes test reachability
+only and adds no production, publication, deletion, runtime, Seatbelt, process, network, credential
+or filesystem authority.
+
+## H-035 R22 — explicit contract-state alias drift boundary
+
+R21 `8becc181…` remains immutable NO-CREDIT because product-bound HEAD is the product candidate and
+cannot also be the successor contract candidate. R22 selects no contract identity from ambient
+product HEAD. The inheritance control receives only the mode-bound supplied contract merge, validates
+its exact two-parent/tree relation through the frozen selector, and checks out its scoped second
+parent in the standalone clone; preproduct remains bound to exact scoped clean HEAD. Missing,
+malformed, wrong-parent, wrong-tree, historical/successor-substituted or caller-invented merge state
+rejects before the alias oracle. The sole main dataflow is AST-bound, while the exact physical-alias
+reason, no-effect sentinel, absent artifact and source-continuity requirements remain unchanged. This
+is test-fixture state propagation only and adds no production, runtime, deletion, Seatbelt, process,
+network, credential or filesystem authority.
+
+## H-035 R23 — exact contract-parent drift boundary
+
+R22 `4eba12d1…` remains immutable NO-CREDIT because a mixed historical/successor merge could select
+the successor candidate before the alias control. R23 requires the candidate to have one parent and
+the supplied merge to be ordered exactly `[that parent, candidate]`, in addition to the existing
+candidate-scope and tree-equality checks. A gate-generated mixed-first-parent commit must reject with
+the exact selector binding reason.
+
+This pre-alias check authenticates topology and closed state class, not live publication. A different
+structurally valid direct child cannot obtain product credit: the later product identity independently
+requires the supplied contract merge to equal observed origin/main and validates the fixed review and
+publication receipt before the connected matrix. The alias negative retains zero loop-sentinel calls,
+zero artifact residue and source continuity. No runtime, product, deletion, Seatbelt, process, network,
+credential or filesystem authority changes.
