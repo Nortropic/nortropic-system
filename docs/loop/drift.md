@@ -4020,3 +4020,61 @@ dev/inode-disjoint from all authenticated source roots, independent of lexical a
 creates an absent exclusive nofollow mode-0600 artifact followed by complete reauthentication. No
 product, registry, owner-production membership, Seatbelt
 objective or filesystem/process/network/credential authority is widened.
+
+### H-035 R18 macOS retained-known-hosts transport drift boundary
+
+The R17 remote observer's positive production route was first exercised on the target Mac and proved
+a gate/host incompatibility: `/usr/bin/ssh` returns `fopen: Bad file descriptor` for its frozen
+`UserKnownHostsFile=/dev/fd/<fd>` argument, while the identical hardening and authenticated
+`known_hosts` bytes work through a plain path. R18 admits no alternate trust source and changes only
+that presentation. The parent retains the nofollow source and private-temp ancestor chains, exact
+source/copy descriptors and full identities; source open is nonblocking and its bounded read must
+reconstruct exactly `st_size`. One unpredictable private directory contains one exclusive nofollow
+mode-0600/nlink-one copy. Exact bytes and identities are checked before and after the Git child, which
+inherits no descriptor, and identity-bound descriptor-relative cleanup is required on every outcome.
+
+The frozen SSH binary, remote identity, strict host-key check, sole user host file, disabled global
+host file, disabled proxy/password/keyboard-interactive paths and credential projection do not change.
+Gate selftests run fault injection in isolated pinned-Python children: forced seven-byte reads must
+reconstruct the whole source, premature EOF must reject without residue, and a stat-to-open FIFO swap
+must observe `O_NONBLOCK` and reject without blocking. Serialized gate execution leaves no authorized
+concurrent writer to the CSPRNG directory. The pre-R18 three-CLI candidate `c668ab96…` remains immutable
+NO-CREDIT; any product after publication is generated fresh from the published R18 parent.
+
+Separately, the takeover reauthenticated and terminated only the pre-existing PPID-1 H-031 owner-live
+poller PID 37935 after proving it had no child, socket or surviving source/worktree authority and was
+polling forever after a durable exit-2 record. No process group was signalled and no gate acquired
+cleanup or owner-live authority. R18 does not widen Seatbelt, filesystem/process/network/credential
+authority, permit unconfined or raw fallback, or add a native broker.
+
+## H-035 R19 — exact publication-lineage drift boundary
+
+R18 `6a5035e4…` remains immutable NO-CREDIT. Its retained-known-hosts mechanism is preserved, but its
+historical-only graph proof, 1,958-line cap and zero-cleanup sink inventory are superseded by one exact
+closed migration. Historical R15 acceptance remains exactly base `408923a4…` plus its original fixed
+review and receipt. The only new state is an exact five-file direct child of `580e4711…`, followed by
+an ordered non-force merge with the candidate tree, two fixed and distinct GATE_REVIEWER PASS leaves,
+one exact path-and-digest aggregate, and one fixed publication receipt bound to that aggregate.
+Arbitrary additions, missing or duplicate lanes, aliases, substitutions, broader prefixes, neighboring
+bases, parent reorder, tree drift, stale hashes and caller-selected artifact paths remain outside the
+contract.
+
+The generator instantiates the attest CLI's retained H038 proof with exact contract merge, authority
+base, candidate/tree, manifest and gate identities derived from immutable Git objects. The consumer
+enforces those exact values rather than accepting any direct child with a self-consistent artifact
+family. It also requires the exact five-file contract scope and modes, state-specific sibling artifact
+names and schemas, and for the successor exact ordered A/B leaves with distinct digests bound by the
+aggregate and receipt. Production uses only the canonical evidence paths; only the exact gate-derived
+`published-repo`/`published-origin.git` disposable layout may use its sibling evidence directory.
+Coherent relocation therefore rejects. The three product paths, modes, per-file numstat and
+published-main blob bytes are exact. Product acceptance still derives only fixed production paths;
+the local siblings exist solely inside the gate-created connected fixture.
+
+The generated product measurement is exactly 2,053 additions and zero deletions; the cap is exactly
+2,071, preserving only the prior 18-line reserve. The only admitted pathname deletion consists of the
+four exact descriptor-relative `known_hosts` copy/directory cleanup calls in their exact reviewed
+functions. Wrong path, descriptor, function, cardinality or any unrelated delete/rename rejects before
+product credit. The migration is bounded by standing-delegation BP01–BP14 and changes no production
+membership or underlying objective. Seatbelt bypass, unconfined execution, raw fallback, a native
+broker, general cleanup, owner-live and broader filesystem/process/network/credential authority remain
+forbidden. A product must be freshly generated from the published R19 merge.
