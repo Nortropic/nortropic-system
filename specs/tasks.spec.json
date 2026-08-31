@@ -1829,6 +1829,31 @@
           "legacy_write_rule": "EXACT_PUBLISHED_H017_ORDINARY_BEHAVIOR_ONLY_FOR_A_TASK_WHOSE_UNIQUE_CURRENT_CANONICAL_GIT_OBJECT_SPEC_ROW_HAS_AUTHORITY_CLASS_ORDINARY_INCLUDING_THE_EXACT_H035_BOOTSTRAP_EXCEPTION; IT_REJECTS_UNKNOWN_TASKS_AND_EVERY_OWNER_AUTHORITY_TASK_EVEN_WHEN_NO_RECORD_EXISTS_AND_MAY_NOT_REPLACE_AN_EXISTING_OWNER_PUBLICATION_V1_OR_STALE_TOMBSTONE",
           "whole_store_class_consistency": "EVERY_READ_MODIFICATION_VALIDATES_ALL_RECORDS_NOT_ONLY_THE_REQUESTED_TASK: NO_UNKNOWN_TASK_RECORD_TASK_KEY_MISMATCH_ORDINARY_SCHEMA_FOR_OWNER_TASK_RICH_SCHEMA_FOR_ORDINARY_TASK_DUPLICATE_QUEUE_OR_HISTORY_MEMBER_UNKNOWN_QUEUE_MEMBER_QUEUE_VS_STALE_MISMATCH_OR_NONSTALE_RECORD_INTERSECTING_INVALIDATED_HISTORY",
           "concurrency": "EVERY_TWO_OPERATION_RACE_LINEARIZES_TO_ONE_VALID_SERIAL_ORDER_WITH_NO_LOST_UPDATE_PARTIAL_JSON_DUPLICATE_OWNER_RECORD_OR_STALE_REVIVAL",
+          "parallel_finalizer_fixture": {
+            "inner_product_timeout_milliseconds": 30000,
+            "outer_gate_group_deadline_milliseconds": 60000,
+            "cleanup_group_deadline_milliseconds": 5000,
+            "deadline_origin": "ONE_COMMON_MONOTONIC_DEADLINE_FROM_HELD_AUTHORITATIVE_LOCK_RELEASE_OR_COMPLETED_LAUNCH_WITHOUT_A_HELD_LOCK",
+            "deadline_rule": "FIXED_FINITE_GATE_OWNED_STRICTLY_LATER_THAN_INNER_TIMEOUT_NEVER_CALLER_SELECTED_AND NEVER_RESTARTED_PER_CHILD; POST_RELEASE_COLLECTION_ROUND_ROBINS_PENDING_CHILDREN_WITH_EXACT_50_MILLISECOND_MAXIMUM_QUANTA_BOUNDED_BY_THE_ONE_COMMON_ABSOLUTE_DEADLINE_AND_REAPS_COMPLETED_PEERS_BY_FIXED_INDEX_BEFORE_TIMEOUT_CLEANUP",
+            "pre_release_barrier": "FOR_HELD_LOCK_FIXTURES AN EXACT GATE_ONLY RUNPY HARNESS INTERCEPTS THE FIRST BLOCKING LOCK_EX CALL WHOSE OPEN_FD_DEV_INO_EQUALS THE STABLE_PARENT_OPENED_AUTHORITATIVE_LOCK; EACH CHILD WRITES ONE READY BYTE AND BLOCKS ON ITS PRIVATE RELEASE_FD AT THAT EXACT CALL BOUNDARY; ONLY AFTER ALL EXACT ATTEMPTS ARRIVE DOES THE PARENT RELEASE EVERY PRIVATE BARRIER AND THEN ITS STILL_IDENTITY_BOUND AUTHORITATIVE_LOCK; LIVENESS_ALONE NEVER EARNS BLOCKED_BEFORE_RELEASE_CREDIT",
+            "nonreaping_barrier": "ONE_GATE_OWNED_MACOS_KQUEUE ONLY WHEN HELD_LOCK_OR_STAGGERED; EACH EXACT REGISTERED_CHILD_PID BINDS EVFILT_PROC_EV_ADD_EV_ENABLE_EV_ONESHOT_NOTE_EXIT; READS ACCEPT ONLY KNOWN_UNIQUE_NONERROR_EXACT_EXIT_EVENTS AND NEVER REAP; THE KQUEUE REMAINS OPEN THROUGH NORMAL_COLLECTION_OR_CLEANUP; NO_POPEN_POLL_WAIT_COMMUNICATE_OR_REAP_BEFORE_EXACT_BARRIER_RELEASE",
+            "owned_process_groups": "EACH_CHILD_LITERAL_START_NEW_SESSION_TRUE_TRACKED_IMMEDIATELY_AFTER_POPEN_WITH_OWNED_GROUP_ID_EQUAL_TO_ITS_REGISTERED_PID_AND_NO_CALLER_ENVIRONMENT_OUTPUT_PATH_PROCESS_SEARCH_PID_PGID_FILTER_SIGNAL_OR_DEADLINE_AUTHORITY",
+            "failure_cleanup": "LAUNCH_STDIN_BARRIER_COLLECTION_OR_COMMON_DEADLINE_FAILURE ENTERS EXACTLY_ONE_NONREENTRANT_CLEANUP_EPOCH AND ESTABLISHES ITS ONE_FIXED_CLEANUP_DEADLINE ONCE; IT THEN ATTEMPTS FIXED_SIGKILL_ON_ALL_REGISTERED_PENDING_OWNED_GROUPS BEFORE ANY_POLL_OR_DRAIN; ONLY_ESRCH_IS_ABSENT; EPERM_OR_ANY_OTHER_SIGNAL_FAILURE_IS_RIG_AND RECEIVES BOUNDED_DIRECT_CHILD_KILL_FALLBACK AFTER_ALL_GROUP_ATTEMPTS; DECODE_OR_PIPE_FAILURE AFTER_REAP RECORDS THAT INDEX AS COMPLETED SO ITS RELEASED_PID_DERIVED_PGID IS NEVER RESIGNALLED, WHILE ALL_PENDING_PEERS ARE STILL_CLEANED UNDER_THE_SAME_EPOCH; EVERY_DIRECT_CHILD_IS_REAPED WHILE ANY_PRERELEASE_AUTHORITATIVE_LOCK REMAINS_HELD; PIPE_DRAIN_TIMEOUT_OR_INCOMPLETE_REAP_IS_RIG",
+            "bounded_io": "EVERY_CLEANUP_COMMUNICATE_AND_WAIT_TIMEOUT_IS_MAX_ZERO_POINT_ZERO_OF_EXACT_SHARED_CLEANUP_DEADLINE_MINUS_MONOTONIC_NOW; EVERY_POST_RELEASE_VERDICT_ATTEMPT_IS_MIN_EXACT_50_MILLISECONDS_AND_MAX_ZERO_POINT_ZERO_OF_THE_ONE_COMMON_VERDICT_DEADLINE_MINUS_MONOTONIC_NOW; NO_POSITIVE_FLOOR_OR_RESTART; PARALLEL_STDIN_UTF8_BYTES_AT_MOST_8192; NO_CLAIM_FOR_OUTER_VERIFIER_SIGKILL",
+            "failure_evidence": "CANONICAL_JSON_RETAINS_EACH_CHILD_SYNTHETIC_RESULT_RETURN_CODE_ACTUAL_WAIT_STATUS_STDOUT_STDERR_TIMEOUT_FLAG_CLEANUP_DEADLINE_AND_RELATIVE_LAUNCH_RELEASE_REAP_TIMING_IN_CALL_ORDER",
+            "identical_finalizer_zero_effect": "SUCCESS_REQUIRES_EXACT_PRE_POST_EQUALITY_OF_COMPLETE_ATTEST_STATE_OWNER_WORKSPACE_AND_REPOSITORY_REMOTE_AUTHORITY_SNAPSHOTS",
+            "causal_cleanup_selftests": [
+              "PRE_RELEASE_EXITED_LEADER_WITH_LIVE_SAME_PGID_DESCENDANT_KILLED_BEFORE_LOCK_RELEASE",
+              "ZOMBIE_ONLY_GROUP_EPERM_AFTER_POST_CLOSE_PARSEABLE_PEER_PID_READY_SENTINEL_RIG_AND_ALL_PEERS_CLEANED",
+              "EXACT_LOCK_ATTEMPT_EFFECT_BARRIER_REJECTS_LIVENESS_ONLY_CREDIT",
+              "SECOND_POPEN_FAILURE_CLEANS_REGISTERED_GROUP",
+              "EXHAUSTED_COMMON_DEADLINES_GRANT_ZERO_POSITIVE_FLOOR",
+              "POST_RELEASE_REVERSE_COMPLETION_ORDER_RETURNS_TIMEOUT_AND_SUCCESS_WITH_STABLE_DIAGNOSTICS",
+              "CLEANUP_DECODE_FAILURE_USES_ONE_EPOCH_AND_NEVER_RESIGNALS_A_REAPED_PGID",
+              "POST_REAP_OSERROR_OR_VALUEERROR_EXCLUDES_THE_COMPLETED_INDEX_BEFORE_SINGLE_EPOCH_PEER_CLEANUP"
+            ],
+            "diagnostic_credit": false
+          },
           "residual_same_uid_limit": "THE_CONTRACT_DOES_NOT_CLAIM_DETECTION_OF_A_CONTINUOUSLY_MALICIOUS_SAME_UID_ACTOR_THAT_IN_PLACE_RESTORES_EVERY_BYTE_AND_METADATA_FIELD_ON_THE_SAME_FROZEN_INODE_WITHOUT_AN_EXTERNAL_MONOTONIC_OR_PROTECTED_ANCHOR; ANY_NEED_FOR_THAT_BROADER_AUTHORITY_IS_A_NEW_OWNER_STOP",
           "required_atomicity_cases": [
             "S1_EXACT_RENAMEATX_SWAP_TRACE_SAME_ROOTFD_FIXED_BASENAMES_AND_FLAGS",
@@ -2749,7 +2774,7 @@
               "normalized_base_ast_sha256": "6ed22a81ecac9beaa455a69323dff122da39689544f498bbeb5cacd6854df060"
             },
             "frozen_checks": {
-              "candidate_ast_sha256": "e96fbed4c83ab7aed8539529fd336877bf5c3bbb3be45504d86fa66562acf746",
+              "candidate_ast_sha256": "9e57c16027ca85835880076618b2b9ea203d30f9a497abfddfbdea62cf493eff",
               "normalized_base_ast_sha256": "c29feb13e3380e57e9bca5587dbe4f98d8889ea8693a6e88cbee35fcba5a1080"
             },
             "main": {
@@ -2874,7 +2899,15 @@
               "ast_sha256": "ef6a21835dcda94f400e0bc9d13fb9522d13f8fe2b42fb67be2ee49142905db6"
             },
             {
-              "module_index": 19,
+              "module_index": 16,
+              "kind": "Import",
+              "binding_names": [
+                "select"
+              ],
+              "ast_sha256": "f2f0fc3b60ddb100d265ce3555ff9c527572adf843116ddfb0cc1d738e9145e5"
+            },
+            {
+              "module_index": 20,
               "kind": "Import",
               "binding_names": [
                 "signal"
@@ -2882,7 +2915,7 @@
               "ast_sha256": "3cf2982d679537eedcb8aba5fc8ee366c6a4d23113e31f436f7107ab2cbcf537"
             },
             {
-              "module_index": 20,
+              "module_index": 21,
               "kind": "Import",
               "binding_names": [
                 "socket"
@@ -2890,7 +2923,7 @@
               "ast_sha256": "9df267ed6eef4f61eaaffaebdf9ac9fe93bcf6d1aab9647b1fd045430624c91e"
             },
             {
-              "module_index": 21,
+              "module_index": 22,
               "kind": "Import",
               "binding_names": [
                 "sqlite3"
@@ -2898,7 +2931,7 @@
               "ast_sha256": "f8e24ee9b1b0f58e74fe0f070306d6d3e397283e6726b126540d1c4a2e8d5c1d"
             },
             {
-              "module_index": 39,
+              "module_index": 40,
               "kind": "AnnAssign",
               "binding_names": [
                 "R15_SNAPSHOT_DIGEST_CACHE"
@@ -2906,7 +2939,7 @@
               "ast_sha256": "f61dfaa719fba99aef286ff45b9fe25afb1980233ac4b6624db40978c0706f6a"
             },
             {
-              "module_index": 40,
+              "module_index": 41,
               "kind": "Assign",
               "binding_names": [
                 "R15_INITIAL_SSH_AUTH_SOCK"
@@ -2914,7 +2947,7 @@
               "ast_sha256": "bb0dbb36b4752b94a68d71148810152008eae16cadfa49d2d76b851e5a547798"
             },
             {
-              "module_index": 41,
+              "module_index": 42,
               "kind": "Assign",
               "binding_names": [
                 "R15_INITIAL_TMPDIR"
@@ -2922,7 +2955,7 @@
               "ast_sha256": "87798e7e1bb279e832ba856580dd07544cf48110a46c9ddcc20e2661bcf296c8"
             },
             {
-              "module_index": 72,
+              "module_index": 73,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_CONTRACT_SHA256"
@@ -2930,7 +2963,7 @@
               "ast_sha256": "493dc9ec2f03ec898ad0f49091e318a19e2f0f349ed8b099e838284dfb114e4b"
             },
             {
-              "module_index": 73,
+              "module_index": 74,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_BASE"
@@ -2938,7 +2971,7 @@
               "ast_sha256": "5e0a600f7329b8110bedfc5e15a25af73be68c04eb91754f8d436ff44cca3826"
             },
             {
-              "module_index": 74,
+              "module_index": 75,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_BASE_TREE"
@@ -2946,7 +2979,7 @@
               "ast_sha256": "42143f64abeefbfa7f15baa9d94a28d3c605b7e90626dcca716a693f8c036709"
             },
             {
-              "module_index": 75,
+              "module_index": 76,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_AST_PYTHON"
@@ -2954,7 +2987,7 @@
               "ast_sha256": "6aad984853b3efa43d4a18e9dbb21a461b6c4b104be6df5e0352a5876814baec"
             },
             {
-              "module_index": 76,
+              "module_index": 77,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_AST_PYTHON_SHA256"
@@ -2962,7 +2995,7 @@
               "ast_sha256": "37fc76a18f64a36e58af749af6050b2f62ac833b1c8d1a92debfdf54b3b1a0c3"
             },
             {
-              "module_index": 77,
+              "module_index": 78,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_AST_PYTHON_VERSION"
@@ -2970,7 +3003,7 @@
               "ast_sha256": "80abe116ca3b6b1f54fc395fa344f5a487c9e639635aa6e703ec2e0b0fc35d84"
             },
             {
-              "module_index": 78,
+              "module_index": 79,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_AST_PYTHON_MAX_BYTES"
@@ -2978,7 +3011,7 @@
               "ast_sha256": "8de63b5914e8837fddc8d981ad9ff5ea764e0dfbf843faf391bd4072445eb60b"
             },
             {
-              "module_index": 79,
+              "module_index": 80,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_BASE_BLOB_OID"
@@ -2986,7 +3019,7 @@
               "ast_sha256": "f2c150eebff0a6ff6f015e14302080f95a589a4eec03ffd360172c75c24c173e"
             },
             {
-              "module_index": 80,
+              "module_index": 81,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_BASE_SHA256"
@@ -2994,7 +3027,7 @@
               "ast_sha256": "323aca21ba935fc8c5f47df7b325de88fcd323102b2b0417b66a9324fe1674c8"
             },
             {
-              "module_index": 81,
+              "module_index": 82,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_BASE_DEF_AGGREGATE"
@@ -3002,7 +3035,7 @@
               "ast_sha256": "29e68a4089f38baa221466737630910fa8d9ce8555823bf2555d540766cf47f4"
             },
             {
-              "module_index": 82,
+              "module_index": 83,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_BASE_DEF_NAME_DIGEST"
@@ -3010,7 +3043,7 @@
               "ast_sha256": "1e1a4bd2a3ee14403decbe61bb67bc8f23ac705db8831eef085d3fd5a18b7205"
             },
             {
-              "module_index": 83,
+              "module_index": 84,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_UNCHANGED_DEF_AGGREGATE"
@@ -3018,7 +3051,7 @@
               "ast_sha256": "8d4e3f7e08dd3e7de01c331dc6aa2028cb9c92acd7c6a75096e7e55a29efd9a0"
             },
             {
-              "module_index": 84,
+              "module_index": 85,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_BASE_NONDEF_DIGEST"
@@ -3026,31 +3059,31 @@
               "ast_sha256": "73a7831d1c2098442b5b8a82c799da60286096d3df6568635a89551c2f67b54e"
             },
             {
-              "module_index": 85,
+              "module_index": 86,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE"
               ],
-              "ast_sha256": "928d033fee882581c5814397ca3d908008cf4a2463757b87f72c212e70ce80e7"
-            },
-            {
-              "module_index": 86,
-              "kind": "Assign",
-              "binding_names": [
-                "H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE"
-              ],
-              "ast_sha256": "baf9e7ece46e4dd77a12ef0e8bd4ef3b7e1d21c4254d67bdcdafcbef8d972656"
+              "ast_sha256": "e92dcd48ab3ea1e4df6fe3d0bf112055c7046980041455469684e01ae3bdfe24"
             },
             {
               "module_index": 87,
               "kind": "Assign",
               "binding_names": [
-                "H035_R15_GATE_ADMITTED_BODY_AGGREGATE"
+                "H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE"
               ],
-              "ast_sha256": "b61af548b0abba2293816d03c7cd8def1c75459005583a86d0bce2ea37703d14"
+              "ast_sha256": "fa69d60ecfb84946a5c4a62694d0e0abdb1b527e1c3c309f787ba5043b6eecac"
             },
             {
               "module_index": 88,
+              "kind": "Assign",
+              "binding_names": [
+                "H035_R15_GATE_ADMITTED_BODY_AGGREGATE"
+              ],
+              "ast_sha256": "9cc5a0632354fb329be23967f5cc49a7d83bbd6d50b93862a4985bf9f53619fd"
+            },
+            {
+              "module_index": 89,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_ENV_REVIEWED_AST_SHA256"
@@ -3058,7 +3091,7 @@
               "ast_sha256": "04fbc1bef511c48c6a300ba9afb0b4ebf5ecfed5e54e3aca80306585e66fd65a"
             },
             {
-              "module_index": 89,
+              "module_index": 90,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_PROCESS_STATE_REVIEWED_AST_SHA256"
@@ -3066,7 +3099,7 @@
               "ast_sha256": "bb21cb31dac03b4574873491eb349183dc5f56ca1bacff1e71860e703c98f732"
             },
             {
-              "module_index": 90,
+              "module_index": 91,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_IMPORT_ORACLE_AST_SHA256"
@@ -3074,15 +3107,15 @@
               "ast_sha256": "71013b8010d2d7c609d7b9cc3fcdcbb0e6925083440347a4d75bb9f1d08a1715"
             },
             {
-              "module_index": 91,
+              "module_index": 92,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_CODE_CONSUMER_AST_SHA256"
               ],
-              "ast_sha256": "e40c152dcb2bddfa77da1e8b70212cc3c5d317786225b63dbde342154c9478e4"
+              "ast_sha256": "cfe40e5b442adfd8520f9d5b914ebcda9b0bf8d64f608a6310a2afcc86ebe0c4"
             },
             {
-              "module_index": 92,
+              "module_index": 93,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_GATE_ALTERED_DEFINITIONS"
@@ -3090,7 +3123,7 @@
               "ast_sha256": "f7e145fe8c9f45c4ef1546ae8a772d429c2f74d2a9f114c1db03ab1e51904404"
             },
             {
-              "module_index": 93,
+              "module_index": 94,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_EXPECTED_LABEL"
@@ -3098,7 +3131,7 @@
               "ast_sha256": "99a3b926844f74588ba88900ed6211db99e873ded56ca153ed41ed887875c7d3"
             },
             {
-              "module_index": 94,
+              "module_index": 95,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_EXPECTED_REASON"
@@ -3106,7 +3139,7 @@
               "ast_sha256": "1f784c2dbd1545386a3fe92e76e86734476c887f2960d3e942967dfbe692f645"
             },
             {
-              "module_index": 95,
+              "module_index": 96,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_FAILURE_SIGNATURE"
@@ -3114,7 +3147,7 @@
               "ast_sha256": "c159c18b1d0b2c5752b83c014aec3998c21312623c11d7ef9c519f5f1c100fcb"
             },
             {
-              "module_index": 96,
+              "module_index": 97,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_CONTRACT_REVIEW_PATH"
@@ -3122,7 +3155,7 @@
               "ast_sha256": "f9a2ca9f12b2847cf3695d49d04799a0dd6dea4d4159898957ebd3e8ef5c3584"
             },
             {
-              "module_index": 97,
+              "module_index": 98,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_CONTRACT_RECEIPT_PATH"
@@ -3130,7 +3163,7 @@
               "ast_sha256": "81473d02b58414e954b85ccfd6c16c5cedfcf94ee31ba18d774c725fbe37c1ea"
             },
             {
-              "module_index": 98,
+              "module_index": 99,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_CONTRACT_REVIEW_FIELDS"
@@ -3138,7 +3171,7 @@
               "ast_sha256": "61bb70754bd8b73eef87f029ba4d0359624b59acf1bc1a54d4f2d1e398317baa"
             },
             {
-              "module_index": 99,
+              "module_index": 100,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_CONTRACT_RECEIPT_FIELDS"
@@ -3146,7 +3179,7 @@
               "ast_sha256": "62f16ad0242d3d8f2d6b6deee3974061b1d0d6665518903d7d5907aee69ab1fa"
             },
             {
-              "module_index": 100,
+              "module_index": 101,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_PRODUCT_PATHS"
@@ -3154,7 +3187,7 @@
               "ast_sha256": "8b5adcaa5bd5857ae2739b42670148613ed7532d5c7a1b323713dd0c5af5153b"
             },
             {
-              "module_index": 101,
+              "module_index": 102,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_SOURCE_CAPABILITY_ENVELOPE"
@@ -3162,7 +3195,7 @@
               "ast_sha256": "a551dbee437cb15abbcde5624ddcf6ab6f8b81cafa0114718ed5110d8d84fcde"
             },
             {
-              "module_index": 102,
+              "module_index": 103,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_FINALIZER_FD_LOADER"
@@ -3170,7 +3203,7 @@
               "ast_sha256": "1cd7842d54d64a47700eebeb98af4251b35bbcb609eb84cc1c4c3b556a233b1f"
             },
             {
-              "module_index": 103,
+              "module_index": 104,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_LEGACY_TASKS"
@@ -3178,7 +3211,7 @@
               "ast_sha256": "f7e4bdfbfd2d5e3af9da1fb95ad716222277bec8e9f191a5543087f79b8d5467"
             },
             {
-              "module_index": 104,
+              "module_index": 105,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_TEST_AUTHOR_PATHS"
@@ -3186,7 +3219,7 @@
               "ast_sha256": "432fe3e0ab7c56beea811a06853dee5c6c714cbea3e9790ac33c49b51f2326ee"
             },
             {
-              "module_index": 105,
+              "module_index": 106,
               "kind": "Assign",
               "binding_names": [
                 "H035_R15_DOC_APPENDS"
@@ -3194,15 +3227,15 @@
               "ast_sha256": "37f3eb3832e946878eba82bbcab498e3c90b0cfdbef61db117ad3f28a0d2a955"
             },
             {
-              "module_index": 106,
+              "module_index": 107,
               "kind": "Assign",
               "binding_names": [
-                "H035_R19_SUCCESSOR"
+                "H035_R26_SUCCESSOR"
               ],
-              "ast_sha256": "60258103fefb8a9f76f6bc6d841eb60e6cffa1d776ccd73639ed8fe013e0faeb"
+              "ast_sha256": "93124541d6d755ba003753a358c0b9a8205423c78b532d04aac14c1b76f5ede7"
             },
             {
-              "module_index": 107,
+              "module_index": 108,
               "kind": "Assign",
               "binding_names": [
                 "R15_OWNER_PUBLICATION_FIELDS"
@@ -3210,7 +3243,7 @@
               "ast_sha256": "3af9748caace20e30b76aaf8f6f2af0cec360d2b566584a2d27aa61aae2c07ae"
             },
             {
-              "module_index": 108,
+              "module_index": 109,
               "kind": "Assign",
               "binding_names": [
                 "R15_REVIEW_FIELDS"
@@ -3218,7 +3251,7 @@
               "ast_sha256": "93f0f0119b553f39c6fd72a774d536a2d2d9116ed449450f4d1dcd556092c42b"
             },
             {
-              "module_index": 109,
+              "module_index": 110,
               "kind": "Assign",
               "binding_names": [
                 "R15_CLAIM_FIELDS"
@@ -3226,7 +3259,7 @@
               "ast_sha256": "cc3abe5422854e3188fda72de9eac3f100098c2a98d9dfedece3f2cef6aaa509"
             },
             {
-              "module_index": 110,
+              "module_index": 111,
               "kind": "Assign",
               "binding_names": [
                 "R15_AUTHORITY_REQUEST_MARKER"
@@ -3234,7 +3267,7 @@
               "ast_sha256": "c688f89e654e1436eeaf4bf3f12275c14e8936042d7f06b9954f09868c5c2eea"
             },
             {
-              "module_index": 111,
+              "module_index": 112,
               "kind": "Assign",
               "binding_names": [
                 "R15_PROVISIONAL_FIELDS"
@@ -3242,7 +3275,7 @@
               "ast_sha256": "358f8d5f93099169b08fa17995a13decd9cb1a5cf76be45a9b7ad15873852488"
             },
             {
-              "module_index": 112,
+              "module_index": 113,
               "kind": "Assign",
               "binding_names": [
                 "R15_CHECKED_FIELDS"
@@ -3250,7 +3283,7 @@
               "ast_sha256": "f5173f64a1a7141df6bddb958dc9013fc1233fe04de3ccbf603775f200c54ce9"
             },
             {
-              "module_index": 113,
+              "module_index": 114,
               "kind": "Assign",
               "binding_names": [
                 "R15_ADOPTED_FIELDS"
@@ -3258,7 +3291,7 @@
               "ast_sha256": "2678a8ce2c1e9cc9e7064743cae0f0b55d6002fdc42351e5f42c375154bb2b9b"
             },
             {
-              "module_index": 114,
+              "module_index": 115,
               "kind": "Assign",
               "binding_names": [
                 "R15_H038_BINDING_FIELDS"
@@ -3266,7 +3299,7 @@
               "ast_sha256": "1ec0b1d583d68fc045e32cdee791d18b50c51928cb48bf7e60b5570a6b1bb120"
             },
             {
-              "module_index": 115,
+              "module_index": 116,
               "kind": "Assign",
               "binding_names": [
                 "R15_H036"
@@ -3274,7 +3307,7 @@
               "ast_sha256": "dded0c722c8798723c98840e6cfc6d58702be0466ff4ec83d09cecf662332ee5"
             },
             {
-              "module_index": 116,
+              "module_index": 117,
               "kind": "Assign",
               "binding_names": [
                 "R15_H036_H038_GATE_BLOB_OID"
@@ -3282,7 +3315,7 @@
               "ast_sha256": "4bd5828567ddaeff08b1272963ec72fd767acdf742b3008e0aeb2eb86ca977f1"
             },
             {
-              "module_index": 117,
+              "module_index": 118,
               "kind": "Assign",
               "binding_names": [
                 "R15_H036_REVIEW_PATH"
@@ -3290,7 +3323,7 @@
               "ast_sha256": "aae1b5df17e2c3c603ed6cadb488a92d9314f279fc1ef1a41c001de4df750134"
             },
             {
-              "module_index": 118,
+              "module_index": 119,
               "kind": "Assign",
               "binding_names": [
                 "R15_H036_RECEIPT_PATH"
@@ -3298,7 +3331,7 @@
               "ast_sha256": "13ed7715737131c2edf93af2ab81d9825ff5d7754fdbea199fefc75195b0b971"
             },
             {
-              "module_index": 119,
+              "module_index": 120,
               "kind": "Assign",
               "binding_names": [
                 "R15_H036_PATHS_MODES"
@@ -3306,7 +3339,7 @@
               "ast_sha256": "a2bdc6501396d1c7a60fa31e1bf3a298855bbc713ec311d2b19bdb652a886e05"
             },
             {
-              "module_index": 120,
+              "module_index": 121,
               "kind": "Assign",
               "binding_names": [
                 "R15_H036_REVIEW_B64"
@@ -3314,7 +3347,7 @@
               "ast_sha256": "0481f6305b02a53866a93898e85235f6991f08aabcc1944d9c9666d800a57001"
             },
             {
-              "module_index": 121,
+              "module_index": 122,
               "kind": "Assign",
               "binding_names": [
                 "R15_H036_RECEIPT_B64"
@@ -3322,7 +3355,7 @@
               "ast_sha256": "f45eade6c2e98a18d349b4ed1c7eb63f2178d2a78e3874a4705801ebd88a2e11"
             },
             {
-              "module_index": 124,
+              "module_index": 125,
               "kind": "FunctionDef",
               "binding_names": [
                 "canonical_json_bytes"
@@ -3330,7 +3363,7 @@
               "ast_sha256": "ac4b8e28a3243a3230f99c4f77f7771fab1c0f87f7137bc18b1ddf4dd104f986"
             },
             {
-              "module_index": 125,
+              "module_index": 126,
               "kind": "FunctionDef",
               "binding_names": [
                 "canonical_json_sha256"
@@ -3338,7 +3371,7 @@
               "ast_sha256": "16918bb77a4e88f306b1393f6682c5868786225d27ad3644330770f4b46ed78c"
             },
             {
-              "module_index": 126,
+              "module_index": 127,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_json_equal"
@@ -3346,23 +3379,23 @@
               "ast_sha256": "10625e354aee453ea807e037ea4ae6f2818ad93956df6d5ab91e2772074e47d1"
             },
             {
-              "module_index": 131,
+              "module_index": 132,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_expected_policy"
               ],
-              "ast_sha256": "b643602bfe880f3e73b26159363cd37c02899aa332625b0354c86c7630f7cbc6"
+              "ast_sha256": "a971eacf7a3684a149fed3a80016ee713bcc303efba67772553d303211a89be3"
             },
             {
-              "module_index": 132,
+              "module_index": 133,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_contract_selftests"
               ],
-              "ast_sha256": "f23cccefac713a25eea8014f53562b8f4842d4d513349d9b114940eb84290bf2"
+              "ast_sha256": "cbd2465e7163ddc52399f7a1b8a38858e7da93bc284497cdcff17c983364ad8c"
             },
             {
-              "module_index": 133,
+              "module_index": 134,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_lower_hex"
@@ -3370,7 +3403,7 @@
               "ast_sha256": "6cb01ab258252763c46670abcd09c07dfc746519a9947eb8223e926155ca3d46"
             },
             {
-              "module_index": 134,
+              "module_index": 135,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_candidate_identity"
@@ -3378,7 +3411,7 @@
               "ast_sha256": "280c74c6f3a9b1d48b5f0c8af4aa69c587ac15b46997b7f7b12212191849f692"
             },
             {
-              "module_index": 135,
+              "module_index": 136,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_transition_object"
@@ -3386,7 +3419,7 @@
               "ast_sha256": "ab9f24205d219266e010acdf7e2b9369cf3ad749c5297758e2efcfc92dd3eec4"
             },
             {
-              "module_index": 136,
+              "module_index": 137,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_claim_event"
@@ -3394,7 +3427,7 @@
               "ast_sha256": "ec0216165a4c392004a7f7e7a103f23b81b01bdd4e65098272a589b85f0b1dfe"
             },
             {
-              "module_index": 137,
+              "module_index": 138,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_provisional_event"
@@ -3402,7 +3435,7 @@
               "ast_sha256": "f1789b26977c3f12d48ab958106abb0cc6ec403b58e89010ae3662cee79c7c03"
             },
             {
-              "module_index": 138,
+              "module_index": 139,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_checked_event"
@@ -3410,7 +3443,7 @@
               "ast_sha256": "a679c939dedd9a37374cf80018bd449ad6083216e17f9545fc6aaae8e5fa2180"
             },
             {
-              "module_index": 139,
+              "module_index": 140,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_adopted_event"
@@ -3418,7 +3451,7 @@
               "ast_sha256": "e39b829c12f5f1c7116202f8c4e310da8ca6c876a1da4034e37b7b7af4e4b7ee"
             },
             {
-              "module_index": 140,
+              "module_index": 141,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_owner_publication_valid"
@@ -3426,7 +3459,7 @@
               "ast_sha256": "aa574d43664e860da63bfc13b8aeaf14427e044c1f306f450281febf70800a00"
             },
             {
-              "module_index": 141,
+              "module_index": 142,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_schema_selftests"
@@ -3434,7 +3467,7 @@
               "ast_sha256": "48ed46838dc4344a972bfc6d91c159334136a9c9fb365e1e0b68f001cb079d99"
             },
             {
-              "module_index": 142,
+              "module_index": 143,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_h036_transition_object"
@@ -3442,7 +3475,7 @@
               "ast_sha256": "b8606c7cc316839a2ae43be2e2644a2861ed7a6d6c73bc6757d9f1020db34903"
             },
             {
-              "module_index": 143,
+              "module_index": 144,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_h036_owner_publication"
@@ -3450,7 +3483,7 @@
               "ast_sha256": "b5d4e0ff6b854ffa172b9616cf6bfe3bf824ed5d5c2149f3bc8c27d1719ee46c"
             },
             {
-              "module_index": 144,
+              "module_index": 145,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_h036_derivation_selftests"
@@ -3458,7 +3491,7 @@
               "ast_sha256": "f3a5025e46aee00afeeabe0dbac27b04999633dd3084e8fb6f8b455306c5d4ed"
             },
             {
-              "module_index": 151,
+              "module_index": 152,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_git"
@@ -3466,7 +3499,7 @@
               "ast_sha256": "7c549f04a5bf6d5d45231c91ac8ab42211ef550cb6ec983fda6ce3dbd03ee2e8"
             },
             {
-              "module_index": 152,
+              "module_index": 153,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_git_bytes"
@@ -3474,7 +3507,7 @@
               "ast_sha256": "d2a0a575470c564b9dde462e4a64d442193183d11ce05aeb62aced197ba0eddd"
             },
             {
-              "module_index": 153,
+              "module_index": 154,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_git_object_bytes"
@@ -3482,7 +3515,7 @@
               "ast_sha256": "4f028795b749972ada370bfa989a2955039f0cb764336991fa92aa1496872ecf"
             },
             {
-              "module_index": 154,
+              "module_index": 155,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_private_tmpdir"
@@ -3490,7 +3523,7 @@
               "ast_sha256": "bfe413f6a2c081d644ce15e5c5abdfb7f5fb1c4a9980693c6cff6683390f3a36"
             },
             {
-              "module_index": 155,
+              "module_index": 156,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_nofollow_components"
@@ -3498,7 +3531,7 @@
               "ast_sha256": "0f44bcf0a828d4d0d107165112b3a10993be2c9c6d1e54a1cb18f6d6daf53382"
             },
             {
-              "module_index": 156,
+              "module_index": 157,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_stable_regular_bytes"
@@ -3506,7 +3539,7 @@
               "ast_sha256": "512487769cb631bb35725ca78afe683f50c26dd9d5305062318d39c1866cb735"
             },
             {
-              "module_index": 157,
+              "module_index": 158,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_safe_artifact"
@@ -3514,7 +3547,7 @@
               "ast_sha256": "00a58f005a67b2fbbc755340641e1e08f610fbd28f3a7028e15432b55445bc2f"
             },
             {
-              "module_index": 158,
+              "module_index": 159,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_admin_paths"
@@ -3522,7 +3555,7 @@
               "ast_sha256": "58fce59d2acc50f63b94329e5093c5501de579edc1ba6b975df2b93bcaa709fe"
             },
             {
-              "module_index": 159,
+              "module_index": 160,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_local_config_snapshot"
@@ -3530,7 +3563,7 @@
               "ast_sha256": "29074b084f841b3f47250d6e3e27f78803b0521a05cf151c42e8669d7c1ec867"
             },
             {
-              "module_index": 160,
+              "module_index": 161,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_local_config_safe"
@@ -3538,7 +3571,7 @@
               "ast_sha256": "77ca19895b2f3dbbd01a4b534a56b7678478f4010c5a56b54260030b4d5811f0"
             },
             {
-              "module_index": 161,
+              "module_index": 162,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_retained_known_hosts"
@@ -3546,7 +3579,7 @@
               "ast_sha256": "b3850e86544befef79a6a0eec6814c0474867ee9fefe9234384b25989f49cd3a"
             },
             {
-              "module_index": 162,
+              "module_index": 163,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_validate_retained_known_hosts"
@@ -3554,7 +3587,7 @@
               "ast_sha256": "0e89820244768001f19c47f82265128cec7e0b2b4eb843aa8e58d5b356aad5f5"
             },
             {
-              "module_index": 163,
+              "module_index": 164,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_close_retained_known_hosts"
@@ -3562,7 +3595,7 @@
               "ast_sha256": "b4530867deee0e8c71b1dcc2d1f3f2129c90f525304d26baf13c6509ee4b02bd"
             },
             {
-              "module_index": 164,
+              "module_index": 165,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_remote_setup"
@@ -3570,7 +3603,7 @@
               "ast_sha256": "c8b1d9304266f691f8a5eb28eca95321006940a24dbc2e5c604dbc82b2cf7738"
             },
             {
-              "module_index": 165,
+              "module_index": 166,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_remote_environment"
@@ -3578,7 +3611,7 @@
               "ast_sha256": "d02936afb2dab92e289601b66c6391851dc5472fb97ef92d6de2aea2afb6a4a3"
             },
             {
-              "module_index": 166,
+              "module_index": 167,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_observed_remote_main"
@@ -3586,7 +3619,7 @@
               "ast_sha256": "1c54d3dfd0c728eaec4ec41e27ae98427a3f8d832131f6d526c39f585c76ab4f"
             },
             {
-              "module_index": 167,
+              "module_index": 168,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_remote_boundary_selftests"
@@ -3594,7 +3627,7 @@
               "ast_sha256": "7fa65898c7b5165f168ff608abb89eb47ec8d805459bf5f666d044f6bee9ac75"
             },
             {
-              "module_index": 186,
+              "module_index": 187,
               "kind": "FunctionDef",
               "binding_names": [
                 "r17_standalone_source_topology"
@@ -3602,7 +3635,7 @@
               "ast_sha256": "23365ead7178e68795d94741cf4e8cb8f28ea9ed5ecf14e195649def09dbfee4"
             },
             {
-              "module_index": 187,
+              "module_index": 188,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_loop_repository_state"
@@ -3610,7 +3643,7 @@
               "ast_sha256": "0d65e31996b396c090409070fe84667f737d399294f2e884460fe3859a74eb10"
             },
             {
-              "module_index": 194,
+              "module_index": 195,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_repository_authority_snapshot"
@@ -3618,7 +3651,7 @@
               "ast_sha256": "f1c5c39f59d98951e4d9ccb817ca83efbcb2f0650a5c7dd935424ceb2ece39ea"
             },
             {
-              "module_index": 204,
+              "module_index": 205,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_repository_shape"
@@ -3626,7 +3659,7 @@
               "ast_sha256": "0395cc45ce26eb456f85e8ca98846400c42d7b244171555102de3dc0a2ed439d"
             },
             {
-              "module_index": 205,
+              "module_index": 206,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_physical_checkout_exact"
@@ -3634,39 +3667,39 @@
               "ast_sha256": "956389d6e29a09320a60dddc9c5563795ec2d7bf2cc38fd84482f82265391128"
             },
             {
-              "module_index": 206,
+              "module_index": 207,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_contract_candidate_scope"
               ],
-              "ast_sha256": "f22affe829a5cda40c3603eba70000a81d7e0f93f0a2a79066fe751f897be560"
-            },
-            {
-              "module_index": 207,
-              "kind": "FunctionDef",
-              "binding_names": [
-                "r19_dual_review_values"
-              ],
-              "ast_sha256": "f9d657964482255a782f1d21cca9e8ba3ed56cb39bc53cf7a25175a106a6e16d"
+              "ast_sha256": "391c32586cb37297c152973d3bfa11de5503148f207d04e8bd27e1dc2c636e5e"
             },
             {
               "module_index": 208,
               "kind": "FunctionDef",
               "binding_names": [
-                "r15_contract_publication_proof"
+                "r26_dual_review_values"
               ],
-              "ast_sha256": "14d3a77feb14adb5857a075f3e18f74ccd665c70387b4fd91c2d9babe0039e2b"
+              "ast_sha256": "055bfc3dc72f81758cd6253e8f079af3ad357def2668dbfb6f0c2c168f092a14"
             },
             {
               "module_index": 209,
               "kind": "FunctionDef",
               "binding_names": [
-                "r15_test_author_identity"
+                "r15_contract_publication_proof"
               ],
-              "ast_sha256": "67577524d1b639ec34a961ae8da0eb3020687a227f3128a4dd579f711b9a09d0"
+              "ast_sha256": "568a55d354adf17419839dfba3aa56657306ed3194e2b4b9c8f618b8cac67c53"
             },
             {
               "module_index": 210,
+              "kind": "FunctionDef",
+              "binding_names": [
+                "r15_test_author_identity"
+              ],
+              "ast_sha256": "b9fea7c2a4000f7e6895d29786c743ddce97250a575995a7137cc4212b8d6eab"
+            },
+            {
+              "module_index": 211,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_ast_sha256"
@@ -3674,7 +3707,7 @@
               "ast_sha256": "6a570f888e98a6b4c722805a077f648d5eba982cee016e88b79e892e6474e9e6"
             },
             {
-              "module_index": 211,
+              "module_index": 212,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_ast_interpreter_validate"
@@ -3682,7 +3715,7 @@
               "ast_sha256": "e65e66920e425b3f15cd72ae62ed357ade129427d8aeac64933f17582eb2bc4a"
             },
             {
-              "module_index": 212,
+              "module_index": 213,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_require_ast_interpreter"
@@ -3690,7 +3723,7 @@
               "ast_sha256": "e20218768d78dbc6911224815bba53ec9a43acb56d3d58184cc1dc4eb1dfa45d"
             },
             {
-              "module_index": 213,
+              "module_index": 214,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_definition_row"
@@ -3698,7 +3731,7 @@
               "ast_sha256": "dfe0c4ddf5aa07c8882991638d5797c29f77f7a20a76282163192f28fb0fca95"
             },
             {
-              "module_index": 214,
+              "module_index": 215,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_definition_aggregate"
@@ -3706,7 +3739,7 @@
               "ast_sha256": "bd48833becfcbe7518c467427814deab42fe0a8f878bb834e9ee5da2909366ed"
             },
             {
-              "module_index": 215,
+              "module_index": 216,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_nondefinition_digest"
@@ -3714,7 +3747,7 @@
               "ast_sha256": "c9acbecb687a569647e704dab0d4a74a0f9b21d0375defdf3b5670dfbb9d281e"
             },
             {
-              "module_index": 216,
+              "module_index": 217,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_call_name"
@@ -3722,7 +3755,7 @@
               "ast_sha256": "2e571462d540cba522ba1f407ef1a1c3451af798d5799a51e907808a928508ec"
             },
             {
-              "module_index": 217,
+              "module_index": 218,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_nested_function"
@@ -3730,7 +3763,7 @@
               "ast_sha256": "921ff8d7c0a6fc1aa8b751037006a625d189ab07af4d2530db6d4dafdaaca1bb"
             },
             {
-              "module_index": 218,
+              "module_index": 219,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_regular_branch"
@@ -3738,7 +3771,7 @@
               "ast_sha256": "ba8b443185d67616eedc28d6494b53c832543ee1ad9c16bf1f666043f3643e4d"
             },
             {
-              "module_index": 219,
+              "module_index": 220,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_module_binding_events"
@@ -3746,7 +3779,7 @@
               "ast_sha256": "cbf79c9bec342be7896d799ba959161236ea32a53fdfe62070f389dce2848554"
             },
             {
-              "module_index": 220,
+              "module_index": 221,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_direct_alias"
@@ -3754,7 +3787,7 @@
               "ast_sha256": "d46280d6a67f88be2c61b5db4754590c891c064d0426e8ad607356d66e380c18"
             },
             {
-              "module_index": 221,
+              "module_index": 222,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_definition_time_surface"
@@ -3762,7 +3795,7 @@
               "ast_sha256": "e993f9c6181ff37a58f04510b1a2ea6164d5d37a0906303e50ade963bd6018a5"
             },
             {
-              "module_index": 222,
+              "module_index": 223,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_closed_mutation_family"
@@ -3770,15 +3803,15 @@
               "ast_sha256": "90d8b9c002456e549fab8ea80120d7666a780bb1864a3306f1aadf0abf88a538"
             },
             {
-              "module_index": 223,
+              "module_index": 224,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_normalized_altered_definition"
               ],
-              "ast_sha256": "9871c6c61ed548d9495fa34a543bc9f966c5f3bbac8828eabe4d42a6740de3e3"
+              "ast_sha256": "b140441ce5db461403879147f88296b0acb9faba274ab205ca34e9e879cb41c8"
             },
             {
-              "module_index": 224,
+              "module_index": 225,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_historical_floor"
@@ -3786,7 +3819,7 @@
               "ast_sha256": "8626a78c6f8f8546d4abff0beb51c9280bfb0388fa670e76c907872c8da0c6ec"
             },
             {
-              "module_index": 225,
+              "module_index": 226,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_main_dominance"
@@ -3794,7 +3827,7 @@
               "ast_sha256": "7cde994c4788f431a10511d10004cd962cd2128ca4e3398704b33110b566e160"
             },
             {
-              "module_index": 226,
+              "module_index": 227,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_contract_pin_source_node"
@@ -3802,7 +3835,7 @@
               "ast_sha256": "053fe2bea2d43d47571f7911369d62bd83665a52ea5068d9a7d633dac12dcc3a"
             },
             {
-              "module_index": 227,
+              "module_index": 228,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_top_level_projection"
@@ -3810,7 +3843,7 @@
               "ast_sha256": "3665adb70609644362618518cd866cb674402ca59f89fac234731cc81a707432"
             },
             {
-              "module_index": 228,
+              "module_index": 229,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_definition_inheritance"
@@ -3818,15 +3851,15 @@
               "ast_sha256": "cc468dfc645c17c09ef569a0e1992c91fa5da984ab4f9606a4cedcfe834a76f0"
             },
             {
-              "module_index": 229,
+              "module_index": 230,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_inheritance_bytes"
               ],
-              "ast_sha256": "4584bf8bacb929b60d5640bc51fb3b59f603db169f0aeefd341707ec7549ecab"
+              "ast_sha256": "6ade9ed01271ff91ebc9f5da403feff535f61494f551807705585cc84580e844"
             },
             {
-              "module_index": 230,
+              "module_index": 231,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_inheritance_scope"
@@ -3834,7 +3867,7 @@
               "ast_sha256": "c5f33213052c1d353d96741dca52fd7792c2e94e22ca6c5cfa614878a6e48327"
             },
             {
-              "module_index": 231,
+              "module_index": 232,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_import_callable_identity"
@@ -3842,15 +3875,15 @@
               "ast_sha256": "b4054bf89df374313851d648c1e4365f602a552f244963c35c2f02ffdc846bb8"
             },
             {
-              "module_index": 232,
+              "module_index": 233,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_mutant_source"
               ],
-              "ast_sha256": "e4fd0fe566ebed8baf110b064c83c46501139cecaa2e27e226df6379d2f437a4"
+              "ast_sha256": "b4556330fcfeb7df8feabeeaf2a746a2c0eda827e8270c27913edecd9616c931"
             },
             {
-              "module_index": 233,
+              "module_index": 234,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_repin_manifest"
@@ -3858,7 +3891,7 @@
               "ast_sha256": "945c924b73b7784ee7b8fa280b337b13b52de9bc106d835cae054a53858de6a1"
             },
             {
-              "module_index": 234,
+              "module_index": 235,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_inheritance_selftests"
@@ -3866,7 +3899,7 @@
               "ast_sha256": "26724d2866a5d55cbf067af6b46671b20f136770005708d332fb791efcc70250"
             },
             {
-              "module_index": 235,
+              "module_index": 236,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_gate_inheritance_git_controls"
@@ -3874,7 +3907,7 @@
               "ast_sha256": "c361e8d1494b4d965bd9c2f6c75c6a6e4f6b8c37fd18aa7ee611cef279bd90b5"
             },
             {
-              "module_index": 236,
+              "module_index": 237,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_import_token"
@@ -3882,7 +3915,7 @@
               "ast_sha256": "d775c664cfa70093a4d183f5981b2eaeacf2c89d75829e98ea3fed61d0d82616"
             },
             {
-              "module_index": 237,
+              "module_index": 238,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_subtracted_multiset"
@@ -3890,7 +3923,7 @@
               "ast_sha256": "b3a1d2e146968ad5ad48ead2b34af4640360e482fb7bb08c6b6ddae25b4d3ae3"
             },
             {
-              "module_index": 238,
+              "module_index": 239,
               "kind": "ClassDef",
               "binding_names": [
                 "R15DefinitionSurface"
@@ -3898,7 +3931,7 @@
               "ast_sha256": "64c9f57cb2770569f508964e57dc50a646a636397f5532145f68473424aa95bb"
             },
             {
-              "module_index": 239,
+              "module_index": 240,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_binding_names"
@@ -3906,7 +3939,7 @@
               "ast_sha256": "68284ffa02b278daee8d839318e5341a060d38164e458cd980f6594130232b71"
             },
             {
-              "module_index": 240,
+              "module_index": 241,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_call_name"
@@ -3914,7 +3947,7 @@
               "ast_sha256": "8a232cc9bff363d477105a45b9a50822b54af270442504f1144465e01d0f09b4"
             },
             {
-              "module_index": 241,
+              "module_index": 242,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_source_capability_signature"
@@ -3922,7 +3955,7 @@
               "ast_sha256": "374ed5dafc836b13175b7ad81b2f5e9fddb242d5f4f67b62823c6641d2d79729"
             },
             {
-              "module_index": 242,
+              "module_index": 243,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_source_capability_scope"
@@ -3930,7 +3963,7 @@
               "ast_sha256": "f5e7d52d21883df643bd0b65796bd97d5a441f9134e0d47eb4b0471084d746ca"
             },
             {
-              "module_index": 243,
+              "module_index": 244,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_source_capability_selftests"
@@ -3938,7 +3971,7 @@
               "ast_sha256": "0d1e1a42c6d7d72ac0dc9cd7e684016bec94b93dd8f662ab7925563a792ec769"
             },
             {
-              "module_index": 244,
+              "module_index": 245,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_numstat_budget"
@@ -3946,7 +3979,7 @@
               "ast_sha256": "08cb693e03615a9058861c723466cc5254bfe7dab8d4ad35ccf14b06aecd4981"
             },
             {
-              "module_index": 245,
+              "module_index": 246,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_product_diff_scope"
@@ -3954,15 +3987,15 @@
               "ast_sha256": "7e127fad49d0adea554e71c17c01b1a702515107f950cd49fdcac351c0aa5748"
             },
             {
-              "module_index": 246,
+              "module_index": 247,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_product_identity"
               ],
-              "ast_sha256": "0a2efebcd9e79ea34618d1776da0df2d3fa981906c24ffeaa916a304d9d6269e"
+              "ast_sha256": "7c75d3b928045f6479480f3ccfc981aac27156a5594e1fa2cccae7e3864b0f84"
             },
             {
-              "module_index": 247,
+              "module_index": 248,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_product_scope_selftests"
@@ -3970,7 +4003,7 @@
               "ast_sha256": "717b95a9039b369984c9409c7d87e01b88fd5cb8374b4672ce58916c0d697fe9"
             },
             {
-              "module_index": 248,
+              "module_index": 249,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_cli"
@@ -3978,7 +4011,7 @@
               "ast_sha256": "0bdc804822959f080b2add222acd8390351bb99b8449804f9e21680f1a3d358b"
             },
             {
-              "module_index": 249,
+              "module_index": 250,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_cli_zero_file_limit"
@@ -3986,7 +4019,7 @@
               "ast_sha256": "71348a3492c13570676f6b2a25b427e74b53698e3cf8fc3d36d9c07d1373631a"
             },
             {
-              "module_index": 250,
+              "module_index": 251,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_code_fingerprint"
@@ -3994,7 +4027,7 @@
               "ast_sha256": "3843888ec1e7e63fa3e4eb311333849086d71ec92251daa2aa87726925e45df7"
             },
             {
-              "module_index": 251,
+              "module_index": 252,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_legacy_code_fingerprints"
@@ -4002,7 +4035,7 @@
               "ast_sha256": "01946c463c8a99525546c4ef289d66f7d90753ae137a6d1c863845f25727897e"
             },
             {
-              "module_index": 252,
+              "module_index": 253,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_runtime_export_fingerprints"
@@ -4010,7 +4043,7 @@
               "ast_sha256": "6e3d3c0407f9889e2e9611e04bc72011cfd747ea77813509dc64100c64d37c88"
             },
             {
-              "module_index": 253,
+              "module_index": 254,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_expected_export_trace"
@@ -4018,7 +4051,7 @@
               "ast_sha256": "55555978ab5499740b5ab7fbc31da66b91e5a9fac7197745440ac9e1ee48bd5b"
             },
             {
-              "module_index": 254,
+              "module_index": 255,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_expected_legacy_trace"
@@ -4026,7 +4059,7 @@
               "ast_sha256": "e9f4feb77e9934f3f040f05aa1f91c7a4f750b7463a969bafb5d2b74561465de"
             },
             {
-              "module_index": 255,
+              "module_index": 256,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_cli_runpy_fault"
@@ -4034,7 +4067,7 @@
               "ast_sha256": "408136e5b49e1138395ffc0d9fc2a349dc82674aece99c75abcc7497fb85f598"
             },
             {
-              "module_index": 256,
+              "module_index": 257,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_fault_events"
@@ -4042,7 +4075,7 @@
               "ast_sha256": "1fe0946035768a7f30b78d12f4cdb38a261d5f0d707fb64093bac0ec1aca2545"
             },
             {
-              "module_index": 257,
+              "module_index": 258,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_fault_event_exact"
@@ -4050,7 +4083,7 @@
               "ast_sha256": "0871ec7f7205f2fd8c427d8865922cc886d0491eb206ef49cea0f8d29b717071"
             },
             {
-              "module_index": 258,
+              "module_index": 259,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_attest_trace_invocation_exact"
@@ -4058,7 +4091,7 @@
               "ast_sha256": "4ca001537611511c6ee4f48b0e0e0651626b9f30373e7afacff827f6ee199225"
             },
             {
-              "module_index": 259,
+              "module_index": 260,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_attest_trace_invocation_selftests"
@@ -4066,7 +4099,7 @@
               "ast_sha256": "a31cfa991748b6358a1a8ef4e10e0c7964a59c1a08f405bebf74a2d11cab0d31"
             },
             {
-              "module_index": 260,
+              "module_index": 261,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_fault_answer"
@@ -4074,7 +4107,7 @@
               "ast_sha256": "f916631a620f93531b343d2acdb61164a2bec5c38dceb0b6a23d87e6e955f987"
             },
             {
-              "module_index": 261,
+              "module_index": 262,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_fault_error"
@@ -4082,7 +4115,7 @@
               "ast_sha256": "68764c9bc5a37c296e2be8ab5aa68108712f6eab620285eb5cd6d3135895c610"
             },
             {
-              "module_index": 262,
+              "module_index": 263,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_matrix_authorized"
@@ -4090,7 +4123,7 @@
               "ast_sha256": "36b49df57c895e9dd922e90c53ae3188c9ac1472acd366f1f3e5a6a35c70ce47"
             },
             {
-              "module_index": 263,
+              "module_index": 264,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_authority"
@@ -4098,7 +4131,7 @@
               "ast_sha256": "c71c6e070cf8abb38f91f1f1aa071d8d020fd5d7e1b591b276ada185cc0697a1"
             },
             {
-              "module_index": 264,
+              "module_index": 265,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_commit_tree"
@@ -4106,7 +4139,7 @@
               "ast_sha256": "d89eb362fe45fd4c777077b2a8c1e03e1ebb4ea4a60a41624c7a9838fe8756ec"
             },
             {
-              "module_index": 265,
+              "module_index": 266,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_review_file"
@@ -4114,7 +4147,7 @@
               "ast_sha256": "81357d94ce7c543b7e5a518f981c2f955efdb98a1cc1fecb4694df436bc4b181"
             },
             {
-              "module_index": 266,
+              "module_index": 267,
               "kind": "Assign",
               "binding_names": [
                 "R15_H038_REFREEZE_PATHS"
@@ -4122,7 +4155,7 @@
               "ast_sha256": "39a45fcfeebc18ce3ddbef4b82636317092e279dccb8d18f94477d5d427f04cd"
             },
             {
-              "module_index": 267,
+              "module_index": 268,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_json_task_row_extent"
@@ -4130,7 +4163,7 @@
               "ast_sha256": "6a6fce1dbf330b65a447659d1fa5c1377db3edcf9f6098e086137c66a2e1d0a1"
             },
             {
-              "module_index": 268,
+              "module_index": 269,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_expected_h038_refreeze_bytes"
@@ -4138,15 +4171,15 @@
               "ast_sha256": "d9b3a1c98e48791602d1916e52ac7879b636af8d3f32e808cda5731200bcadfc"
             },
             {
-              "module_index": 269,
+              "module_index": 270,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_prepare_published_fixture"
               ],
-              "ast_sha256": "8d3cc2a7fb500cefcbcf97eeac84cb4d61b411663ed37b146aeae496c8a0a1f8"
+              "ast_sha256": "7566e895c797df875d445785fff6d2a565c7750557bd1a1105afaee8954b8058"
             },
             {
-              "module_index": 270,
+              "module_index": 271,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_events"
@@ -4154,7 +4187,7 @@
               "ast_sha256": "a625ebf6b2c89762fd3c16e4770055b6531aec108a62bd2a094a8411b54c93bf"
             },
             {
-              "module_index": 271,
+              "module_index": 272,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_h038_refreeze_proof"
@@ -4162,7 +4195,7 @@
               "ast_sha256": "28ae5e6e834266bc3961fb216e1bbcfe0d5bc566d88f14b1892f9e34d65100ee"
             },
             {
-              "module_index": 272,
+              "module_index": 273,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_h038_closed_env"
@@ -4170,7 +4203,7 @@
               "ast_sha256": "73352d8354e4a14bd0a795df7c32aa00a6e1d479a61e222fa577fbfda4dd88eb"
             },
             {
-              "module_index": 273,
+              "module_index": 274,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_run_rendered_h038"
@@ -4178,7 +4211,7 @@
               "ast_sha256": "7d352935a0cbc449ea44d3a220283448d960ab1be4373247dd43cea557294e27"
             },
             {
-              "module_index": 274,
+              "module_index": 275,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_h038_rendered_gate_controls"
@@ -4186,7 +4219,7 @@
               "ast_sha256": "5c16070c90db946469b3d097b0c8e9ce87f294262640f48adbea2c83976e40ad"
             },
             {
-              "module_index": 275,
+              "module_index": 276,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_review_stat_identity"
@@ -4194,7 +4227,7 @@
               "ast_sha256": "959d5b1c188ac1e289be13e43c81888b8d6049d939f58e3d40eb2541a529fe9d"
             },
             {
-              "module_index": 276,
+              "module_index": 277,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_workspace_identity"
@@ -4202,7 +4235,7 @@
               "ast_sha256": "4d6f41b8401d275ecdda4d4b0aabb8d90852d5bf5b4c28ff17c03d172eba255d"
             },
             {
-              "module_index": 277,
+              "module_index": 278,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_bootstrap_claim_controls"
@@ -4210,7 +4243,7 @@
               "ast_sha256": "801d912610f3d8bd81eefd429dafdc8f738fc0bdf955a9e929aabc7410d4eee2"
             },
             {
-              "module_index": 278,
+              "module_index": 279,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_material_candidate"
@@ -4218,15 +4251,15 @@
               "ast_sha256": "77b56e8530ec20cedd23c05939568bdffc9389c89b8ece83b483d413b9d60bbf"
             },
             {
-              "module_index": 279,
+              "module_index": 280,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_parallel_cli"
               ],
-              "ast_sha256": "d209bd90585363b7587a721b279a3c81cd33faa49c240f2521ec3a4a8bcb6e56"
+              "ast_sha256": "283bb702d65b1f21ecc6dbc523855a2db49cc82d804c6a9d4fd60575d3b150af"
             },
             {
-              "module_index": 280,
+              "module_index": 281,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_state_attest_lock_order_probe"
@@ -4234,23 +4267,31 @@
               "ast_sha256": "1ee6d0c4419da623469215161d1e8a06619c21bb66711b971723552cde01d243"
             },
             {
-              "module_index": 281,
+              "module_index": 282,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_owner_transition_controls"
               ],
-              "ast_sha256": "bf7177af54ce44169c5053fc84351803866cda20b680539b5672e4c003c4ec67"
+              "ast_sha256": "4e65c3ccfc01a3fe1cf8417faf48c41eb8822aeb99f63b35e5182f50f76911e4"
             },
             {
-              "module_index": 292,
+              "module_index": 293,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_document_append_selftests"
               ],
-              "ast_sha256": "f150dbd68137c7ac00ea0c55af9488e81f506d4dc5ca4d2bb995acaa80feb6bd"
+              "ast_sha256": "ceaf8373d1ef58d971e0b906af83215acd92c846697b3f5d046a8edb4f9baf36"
             },
             {
-              "module_index": 295,
+              "module_index": 294,
+              "kind": "FunctionDef",
+              "binding_names": [
+                "r15_parallel_cli_selftests"
+              ],
+              "ast_sha256": "4106de4fce387e9012ad6aa4ae562a9ea972547d4068c4aef61ce10e9539d134"
+            },
+            {
+              "module_index": 297,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_historical_regression_floor"
@@ -4258,7 +4299,7 @@
               "ast_sha256": "775756fbe1814af36ac4b308d27a7fc12acc56d37cc8328149dd794691b7cbeb"
             },
             {
-              "module_index": 296,
+              "module_index": 298,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_preproduct_absence_probes"
@@ -4266,7 +4307,7 @@
               "ast_sha256": "c320db016e0b77019cbb50e6f434fb138ef23a56244f002b65574a90558515a8"
             },
             {
-              "module_index": 297,
+              "module_index": 299,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_loader_controls"
@@ -4274,7 +4315,7 @@
               "ast_sha256": "4a6547928f28721894f888628e189d12efdb1d496fb1a2aeefe5cf7b68e11832"
             },
             {
-              "module_index": 298,
+              "module_index": 300,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_leaf_state"
@@ -4282,7 +4323,7 @@
               "ast_sha256": "a482959784af0aabae5ed6fd4ca7a245b0e6e26b51e65397949e875600b3ae25"
             },
             {
-              "module_index": 299,
+              "module_index": 301,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_dispatch_controls"
@@ -4290,7 +4331,7 @@
               "ast_sha256": "d0a4e3a3e03038e8a17dde644b17eb52aeae74ff76aeb49142c9de840ec6b4c0"
             },
             {
-              "module_index": 300,
+              "module_index": 302,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_connected_matrix"
@@ -4298,7 +4339,7 @@
               "ast_sha256": "105d55e916622df782ebb7632d8d2794d3d507405654be9f3f52022ccb5e2bb8"
             },
             {
-              "module_index": 301,
+              "module_index": 303,
               "kind": "Assign",
               "binding_names": [
                 "R15_REFERENCE_ATTEST_SOURCE"
@@ -4306,28 +4347,12 @@
               "ast_sha256": "710531e953ede8a9228983432dd3bac70b17ee5bf9d02813fcb227acbdb493ec"
             },
             {
-              "module_index": 302,
-              "kind": "AugAssign",
-              "binding_names": [
-                "R15_REFERENCE_ATTEST_SOURCE"
-              ],
-              "ast_sha256": "37d18eb19f9996624e3d5c735b3a118f43d78b8003f13daaa62e4d5f38799835"
-            },
-            {
-              "module_index": 303,
-              "kind": "AugAssign",
-              "binding_names": [
-                "R15_REFERENCE_ATTEST_SOURCE"
-              ],
-              "ast_sha256": "7b7a341e5ac93c5a0b69dfe5261d04bbb8285cb3c228a795b3f917568e8da0b9"
-            },
-            {
               "module_index": 304,
               "kind": "AugAssign",
               "binding_names": [
                 "R15_REFERENCE_ATTEST_SOURCE"
               ],
-              "ast_sha256": "5ba43ccb6717af6e5b30575688617f201e946a43d6308bf305480873247fe9c4"
+              "ast_sha256": "0f5cf5e3c93f8bf57d2042737fd0101855da07b8433f124b98e330141a6761d3"
             },
             {
               "module_index": 305,
@@ -4335,10 +4360,26 @@
               "binding_names": [
                 "R15_REFERENCE_ATTEST_SOURCE"
               ],
-              "ast_sha256": "f0bb1496560fb579b424c47855c73ee133ab13476805b4df7a2aa1dbcc759d9c"
+              "ast_sha256": "7b7a341e5ac93c5a0b69dfe5261d04bbb8285cb3c228a795b3f917568e8da0b9"
             },
             {
               "module_index": 306,
+              "kind": "AugAssign",
+              "binding_names": [
+                "R15_REFERENCE_ATTEST_SOURCE"
+              ],
+              "ast_sha256": "5ba43ccb6717af6e5b30575688617f201e946a43d6308bf305480873247fe9c4"
+            },
+            {
+              "module_index": 307,
+              "kind": "AugAssign",
+              "binding_names": [
+                "R15_REFERENCE_ATTEST_SOURCE"
+              ],
+              "ast_sha256": "f0bb1496560fb579b424c47855c73ee133ab13476805b4df7a2aa1dbcc759d9c"
+            },
+            {
+              "module_index": 308,
               "kind": "Assign",
               "binding_names": [
                 "R15_REFERENCE_MAIN_ANCHOR"
@@ -4346,7 +4387,7 @@
               "ast_sha256": "93d8afceeee1eb4842e017df540fbfb7242440a0ef634bd54f51d973a050d2c5"
             },
             {
-              "module_index": 307,
+              "module_index": 309,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_reference_insert"
@@ -4354,7 +4395,7 @@
               "ast_sha256": "ca7b76a8f42bb6efd2aa2c5e80b472341a846f8f43ef727c128da4278fe02c3c"
             },
             {
-              "module_index": 308,
+              "module_index": 310,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_reference_sources"
@@ -4362,7 +4403,7 @@
               "ast_sha256": "3b8bf92b61ee5143328fc2e5bff06986471dada2e2108a42f6863b4f5efc8f29"
             },
             {
-              "module_index": 309,
+              "module_index": 311,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_frozen_contract_candidate"
@@ -4370,7 +4411,7 @@
               "ast_sha256": "2a7c49c263600ee426e690632a1f91f6815638ab416076998832a9fafea0b42d"
             },
             {
-              "module_index": 310,
+              "module_index": 312,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_reference_product"
@@ -4378,15 +4419,15 @@
               "ast_sha256": "efc3d7e96fe316e6bf39ffe96d09fd5d9ed01cdf41bc86f7a91ac374882acf55"
             },
             {
-              "module_index": 311,
+              "module_index": 313,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_reference_satisfiability"
               ],
-              "ast_sha256": "a251d898d9e0985701ee71f3a9a2f8d763ae286507994c4f3cd418f9c187d398"
+              "ast_sha256": "5f5d1d12bf1eddb60fb213c61389223fe35209f405c27bd26a3a5b0a3df9ffb6"
             },
             {
-              "module_index": 313,
+              "module_index": 315,
               "kind": "FunctionDef",
               "binding_names": [
                 "r15_finalizer_agent_projection"
@@ -4394,7 +4435,7 @@
               "ast_sha256": "3ffd2f61b72c330387256d96b9d0f1ce0df55dc27f6390fc35f2dc5d7b41a549"
             }
           ],
-          "top_level_layout_sha256": "a712bdc8d2fd0c76fd8a570203e432ec1395a07af210e81066a670060b0f37c0",
+          "top_level_layout_sha256": "60644fabd24b1b5d606a6b4247f39b35af09a9ba80bd09ab12b21a7fcb45e23d",
           "policy": {
             "base_definitions_exact_once_in_order": true,
             "unchanged_definition_count": 53,
@@ -4424,11 +4465,11 @@
             "capability_family_checks_are_supplemental_to_exact_source_aggregate": true,
             "import_effect_oracle_preserves_inherited_callable_identity": true,
             "new_top_level_requires_exact_manifest": true,
-            "manifest_independent_admitted_definition_count": 138,
-            "manifest_independent_admitted_definition_aggregate_sha256": "058c91a7a6250e97a4158b36db8b47f543be3f0c191a140f4cf158928d29345f",
-            "manifest_independent_admitted_nondefinition_count": 71,
-            "manifest_independent_admitted_nondefinition_aggregate_sha256": "ec36c2d16c1a329eb56b6809e79ab8528af967ad6d3b9d0eea17c8e9a43d6df7",
-            "manifest_independent_complete_ordered_module_body_aggregate_sha256": "cd1b1342001c423e45fa0deb98026e1716fe38cb3d4024c4baf43fb736429f2f",
+            "manifest_independent_admitted_definition_count": 139,
+            "manifest_independent_admitted_definition_aggregate_sha256": "5a8f026148cf15239d3e972c94e5a693c9a0cfda33656e88c7260918a9c9aabc",
+            "manifest_independent_admitted_nondefinition_count": 72,
+            "manifest_independent_admitted_nondefinition_aggregate_sha256": "aaad87206acd3af1cb7ed6943e41fcb2ecfd79a427ccc30819ffe125829155c9",
+            "manifest_independent_complete_ordered_module_body_aggregate_sha256": "1f5718b63ca722fbbd8bfaffd23c15f0c23237bd4c609e479044524f2b7bfb35",
             "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals": true,
             "aggregate_anchor_literal_equals_trusted_runtime_constant_and_position_is_bound": true,
             "contract_digest_source_normalization_sentinel": "<H035_R15_CONTRACT_SHA256_AUTHORITY_V1>",
@@ -4482,18 +4523,18 @@
               ]
             },
             "successor_state": {
-              "authority_base_sha": "580e47115d1e4b3eea004039c72a5de88d2dd2fe",
-              "authority_base_tree": "f72dd93e5aebe508067674f03ff5085cc95c7cc2",
-              "aggregate_review_path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-dual-gate-review.json",
-              "publication_receipt_path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-contract-publication.json",
+              "authority_base_sha": "5bfdd9afd075a2431aded52dc21eaa361aaf729e",
+              "authority_base_tree": "0adef8e601cac9d82e60cc5d38997c2d20fe8620",
+              "aggregate_review_path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r26-dual-gate-review.json",
+              "publication_receipt_path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r26-contract-publication.json",
               "review_lanes": [
                 {
                   "lane": "A",
-                  "path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-gate-review-a.json"
+                  "path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r26-gate-review-a.json"
                 },
                 {
                   "lane": "B",
-                  "path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r19-gate-review-b.json"
+                  "path": "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r26-gate-review-b.json"
                 }
               ],
               "leaf_review_exact_fields": [
@@ -4541,7 +4582,7 @@
               "history_rewrite"
             ],
             "stable_read": "ABSOLUTE_CANONICAL_NOFOLLOW_CURRENT_UID_REGULAR_NLINK_ONE_MODE0600_OR0644_BOUNDED_PRE_POST_FSTAT_AND_DIGEST",
-            "graph_rule": "THE_HISTORICAL_STATE_REMAINS_EXACTLY_THE_ORIGINAL_408923A4_GRAPH_AND_FIXED_ARTIFACTS; THE_SUCCESSOR_STATE_IS_EXACTLY_A_DIRECT_FIVE_FILE_CHILD_OF_580E4711_AND_A_GUARDED_NONFORCE_TWO_PARENT_MERGE_ORDERED_580E4711_THEN_CANDIDATE_WITH_TREE_EQUAL_TO_CANDIDATE",
+            "graph_rule": "THE_HISTORICAL_STATE_REMAINS_EXACTLY_THE_ORIGINAL_408923A4_GRAPH_AND_FIXED_ARTIFACTS; THE_CURRENT_SUCCESSOR_STATE_IS_EXACTLY_A_DIRECT_FIVE_FILE_CHILD_OF_PUBLISHED_5BFDD9AF_AND_A_GUARDED_NONFORCE_TWO_PARENT_MERGE_ORDERED_5BFDD9AF_THEN_CANDIDATE_WITH_TREE_EQUAL_TO_CANDIDATE",
             "contract_rule": "THE_SUCCESSOR_REQUIRES_TWO_DISTINCT_FIXED_PATH_GATE_REVIEWER_PASS_LEAVES_BOUND_TO_THE_SAME_BASE_CANDIDATE_TREE_AND_EXACT_FIVE_FILES_WITH_ZERO_BLOCKERS; ONE_EXACT_AGGREGATE_BINDS_BOTH_PATHS_AND_SHA256_DIGESTS_AND_THE_PUBLICATION_RECEIPT_BINDS_THAT_AGGREGATE; HISTORICAL_ARTIFACTS_ARE_NEVER_OVERWRITTEN",
             "two_state_union_only": true,
             "caller_selected_artifact_or_base": false
