@@ -4233,3 +4233,7 @@ temporary runpy harness creates no product/runtime wrapper or fallback path. It 
 enumeration, caller-selected PID/PGID/kqueue filter/signal/deadline, ctypes/native waitid,
 preexec/watchdog/native broker, outer-verifier death cleanup, product or registry changes, Seatbelt
 weakening, or broader filesystem/process/network/credential/owner authority.
+
+## H-038 R15 dependency-refreeze
+
+Exact H-035 product publication `01a1deddedbb0efc0ebafd87b32a30c5613840ba` and binding `8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0` are the acyclic base; only the frozen five-path transform is admitted and the future product is a direct child of guarded refreeze merge M.
