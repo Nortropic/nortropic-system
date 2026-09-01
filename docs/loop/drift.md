@@ -4282,3 +4282,74 @@ Trust transitions remain serial. After H035 R29 contract and product publication
 the registry to v3; H036 is then registry-only refrozen because its frozen gate embeds the v2 bytes;
 only then may H039 be frozen/built/reviewed/published. H038 refreeze/product, H032 and H031 follow.
 No supervisor resume is authorized before the entire chain is green.
+
+## H-035 R33 — request-bound registry consumer boundary
+
+R29 is canonically published at `ff37510254de97c5f931ce3b8670da6cf925bb60`. R30 candidate
+`a42613ee94e921c03f56979704e50500311a83b9` remains immutable NO-CREDIT and is not this
+candidate's parent. Its independent FAIL review artifacts have SHA-256
+`ff8430caac6caf9fc93e82de2c11a2ac323afd3aba0a914f508a7b16d45b8cd6` and
+`77b30b91c6fb8d2dddecfd1c712f589e668f793da485fd99e4b1f9f42c1cf965`. They bind eight blockers:
+ambient-container source coverage, inverse candidate-object decoys, causal NUL framing, exact
+positive effects, nested/reentrant/concurrent interleaving, retained-R15 byte identity, and an exact
+H039-member broad-task control. R31 `b49a99cd25d3c2a85b397cfb9ffb812adb2acfb8`, tree
+`4750d3a5a08ee692e69d3e9e29601fa30eecd797`, is a second non-parent NO-CREDIT candidate. Review
+hashes `fb322f3872529420fa07e33383b8daa4f5b0f84a2a02fd36429744285303312a` and
+`a310b1e60ddc91350fd0188478f8c2c96036847d616ccd132eb43de0c0fb6254` bind its nested-default,
+indirect ambient mutation and invalid empty/owner-author inverse-decoy findings. R29's two product
+attempts remain immutable NO-CREDIT: `8e56d591b7acb184e80e1095e8152343e8549ad4` is bound by artifact
+SHA-256 `04ce654bd6dcea189730e71cb1dd99c2914a1e6f0ec8a0e42d97f58bb997a677`, and
+`f956b60369e826d444dc0dbf71f988d4ed5e4fcb` by
+`c4087bafaa2b822270cc6300ce1bbdc0bdff95e664cff95f7b29297bfe9da860`. The core-only
+impossibility record is bound by
+`1e6b03b6c61fd34baee02039825c6911c73608e2fdb1495b9862651144676fbd`.
+R32 `dcd9360a9869cfd9c95bd71c0f4b3ea557736f43`, tree
+`6acd14bac0a70de773c20c94e31e357b47d3c315`, is likewise immutable NO-CREDIT and not a
+parent. Lane A passed under SHA-256
+`d5328d10338792a63a28b8c1d35f1e46f793fc89b5ba27648b7818b3259cee29`; lane B failed
+under `2355c0ee69bcfe3c2e9efdf5611622c0a22719e522142268e279b1d441d0cfbb`, binding
+`R32-B-001_EXECUTABLE_SHEBANG_OUTSIDE_CLOSED_AST_ORACLE`.
+
+The first drift is Git framing: newline/text output is not an exact path transport. R33 requires
+`--name-only -z`, strict UTF-8 decoding per NUL record, exact empty/termination handling and the
+unchanged canonical path grammar. The second drift is authority dataflow: validate-task used the
+actual registry, but owner check-candidate and transition_context did not validate the selected owner
+surface against it. Core cannot recover request-local registry authority through a static union,
+global, ContextVar, caller frame, custom container or dynamic mutation. The minimum product scope is
+therefore exactly core plus CLI, with explicit local registry flow. This only refreezes the legacy
+request-bound CLI consumers; it neither claims nor changes the separate retained R15 route.
+
+The matrix freezes every registry state against H034, H036, H039 and both forbidden broad prefixes.
+V1 permits only H034; v2 permits H034 and H036; v3 permits all three exact families; neither v3 nor
+any earlier version permits `controller/runtime-cleanup/**` or `verify/h039/**`. Each cell reaches
+validate-task, empty and material owner check-candidate, and independently seeded owner-author,
+record-review and owner-freeze. Rejections require the exact owner-surface reason and unchanged fresh
+state/workspace/refs. Opposite checkout/base registry bytes and caller-claim contradictions prove that
+only the exact candidate-object registry controls the decision. The positive base decoy reaches every
+consumer whose retained semantics permit candidate!=base, including independently seeded review and
+freeze; owner-author preserves candidate-equals-base and uses opposite checkout/caller claims. The inverse decoys reach all five
+legacy request-bound consumers with v1/v2 candidates against v3 checkout, base and caller claims.
+A same-process alternating sequence plus malformed interlude and an isolated nested, reentrant and
+deterministically concurrent interleave reject prior-request, thread-local and cross-request authority.
+The repaired source oracle has no open islands: one whole-module positive AST is derived mechanically
+from exact ff375 core/CLI bytes. It fixes every changed signature, default, decorator, statement,
+callee, load/store and helper placement, causally rejecting nested mutable defaults, imports,
+builtins/operator/list indirection, dynamic lookup/module dictionaries, filesystem ambient state,
+nested definitions/classes/lambdas/named expressions, aliases and registry reassignment.
+The repaired inverse oracle adds 20 independent cases: for each v1/v2 candidate==base==remote-main B,
+H039 rejects and H034 accepts across validate-task, empty check-candidate, owner-author, record-review
+and owner-freeze after only checkout/caller claims widen to v3. Exact positive and negative effects
+prevent dirty-checkout, state-shape or early-short-circuit credit.
+The NUL oracle causally injects empty output, unterminated output, an empty record, invalid UTF-8 and
+canonical aliases, and uses actual newline/backslash and two-path alias commits. Every accepted
+transition has exact hash-bound JSON bytes, modes and directory contents; rejects have no effects.
+The complete retained R15 CLI suffix is byte-exact to `ff375102…`, and all product source outside the
+exact import plus request-bound core/CLI transformation is the closed positive reference AST.
+R33 closes the remaining executable-prefix drift before AST credit: raw bytes zero through the first
+two physical lines of CLI and core must be exact ff375/reference bytes, with LF and no BOM. The exact
+reference passes before causal `env -S`/`-c`, alternate-interpreter/options, line-two coding-cookie,
+core line-one/line-two coding-cookie and BOM mutants reject.
+
+R33 grants no registry mutation, broad prefix or new owner authority. The six TEST_AUTHOR and two
+BUILDER paths are exact. R14/R29/R15 floors and accept-side effect controls remain mandatory. The
+serial downstream order and supervisor-resume prohibition are unchanged.

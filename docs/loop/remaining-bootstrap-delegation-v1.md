@@ -395,3 +395,70 @@ refreeze/product/review/publication → H-032 → H-031. No supervisor resume oc
 green. If the minimum H-039 design requires broader authority, this exception does not apply and a
 new owner stop is mandatory.
 <!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_END -->
+<!-- H035_R33_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_BEGIN -->
+## H-035 R33 minimal core-and-CLI owner decision
+
+**Owner decision:** 2026-09-01. The published H-035 R29 contract is refrozen only because two
+immutable product attempts and the independently recorded core-only architectural impossibility prove
+that the request-bound registry cannot soundly reach all owner consumers through
+`controller/authority/core.py` alone.
+
+R30 `a42613ee94e921c03f56979704e50500311a83b9` is immutable NO-CREDIT, is not a parent, and is
+bound to independent FAIL review artifacts SHA-256
+`ff8430caac6caf9fc93e82de2c11a2ac323afd3aba0a914f508a7b16d45b8cd6` and
+`77b30b91c6fb8d2dddecfd1c712f589e668f793da485fd99e4b1f9f42c1cf965`. R31
+`b49a99cd25d3c2a85b397cfb9ffb812adb2acfb8`, tree
+`4750d3a5a08ee692e69d3e9e29601fa30eecd797`, is likewise immutable NO-CREDIT and not a parent.
+Its independent FAIL review artifacts have SHA-256
+`fb322f3872529420fa07e33383b8daa4f5b0f84a2a02fd36429744285303312a` and
+`a310b1e60ddc91350fd0188478f8c2c96036847d616ccd132eb43de0c0fb6254`, binding exact findings
+`R31-A-001_NESTED_MUTABLE_DEFAULT_AMBIENT_ORACLE_BYPASS`,
+`R31-A-002_VALID_EMPTY_AND_OWNER_AUTHOR_INVERSE_SOURCE_DECOYS_ABSENT` and
+`R31-B-001_INDIRECT_AMBIENT_MUTATION_SOURCE_ORACLE_BYPASS`. R33 must close every recorded
+blocker causally: inverse candidate-registry decoys, complete NUL transport faults, exact
+positive effects, ambient container/store/default/thread rejection, nested/reentrant/concurrent
+interleaving, retained R15 route identity, and broad-v3 material candidates that change exact H039
+members.
+R32 `dcd9360a9869cfd9c95bd71c0f4b3ea557736f43`, tree
+`6acd14bac0a70de773c20c94e31e357b47d3c315`, is also immutable NO-CREDIT and not a
+parent. Its lane-A PASS and lane-B FAIL artifacts are bound respectively by SHA-256
+`d5328d10338792a63a28b8c1d35f1e46f793fc89b5ba27648b7818b3259cee29` and
+`2355c0ee69bcfe3c2e9efdf5611622c0a22719e522142268e279b1d441d0cfbb`. Exact finding
+`R32-B-001_EXECUTABLE_SHEBANG_OUTSIDE_CLOSED_AST_ORACLE` is binding.
+
+TEST_AUTHOR may modify exactly `specs/tasks.spec.json`, `verify/bin/h-035-exit`,
+`docs/loop/owner-author-workflow-v1.md`, this file, `docs/05-beslutslogg.md` and
+`docs/loop/drift.md`. BUILDER may modify exactly `controller/authority/core.py` and
+`controller/authority/cli`. The product may only implement exact v1 old4, v2 union7 and v3 union12,
+strict NUL-delimited UTF-8 Git changed-path decoding, and explicit binding of the owner task surface
+to the request's validated candidate-object registry in owner `check-candidate` and
+`transition_context`.
+
+The candidate-object registry is the sole authority even when mutable checkout bytes, semantically
+applicable base bytes and caller claims all contradict it. Owner-author retains candidate-equals-base;
+record-review and owner-freeze additionally carry the opposite-base positive. Strict NUL framing must reject empty records, unterminated bytes,
+invalid UTF-8 and canonical duplicates while retaining actual newline/backslash filenames. Accepted
+owner transitions create only the exact bound JSON bytes and modes; rejected cases change no state,
+workspace or refs. The retained R15 CLI suffix and route stay byte-identical to `ff375102…`; no new
+behavior is claimed there.
+
+The complete v1/v2/v3 by H034/H036/H039/two-broad-prefix matrix must be falsified through
+`validate-task`, owner `check-candidate`, `owner-author`, `record-review` and `owner-freeze`, including
+empty and material candidate cases where applicable, with independently valid seeded transition
+states and a nested/reentrant/concurrent child interleave. No global, ContextVar, caller-introspection,
+custom container, attribute/subscript store, mutable default, threading/thread-local state,
+dynamic-mutation, caller-selected registry/version, broad prefix, registry mutation, new authority or
+security weakening is admitted. The changed core/CLI source is one closed positive whole-module AST
+derived from exact `ff375102…` bytes; there are no open function islands. Imports, nested definitions,
+classes, lambdas, recursively mutable defaults, builtins/operator/list indirection, dynamic lookup,
+filesystem ambient state, aliases, reassignments and moved helper calls reject. Independent v1 and v2
+candidate==base==remote-main fixtures with a v3 checkout and caller claims reject H039 across all five
+consumers, while paired H034 fixtures accept with exact effects. The executable CLI and imported core
+are raw-byte bound from byte zero through their exact first two physical ff375/reference lines, with
+LF and no BOM. Alternate or option-bearing shebangs, `env -S`/`-c`, line-two coding cookies and core
+line-one/line-two coding-cookie preambles reject causally before AST credit. The exact unmutated
+two-file reference must pass first. Two independent gate reviews, guarded contract publication,
+independent product review and guarded product publication remain serial prerequisites. Then the
+already authorized H034 → H036 → H039 → H038 → H032 → H031 chain continues autonomously. No
+supervisor resume occurs before all are green.
+<!-- H035_R33_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_END -->
