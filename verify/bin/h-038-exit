@@ -87,15 +87,15 @@ OLD_PRODUCT_SHA256 = {
     "config/python-runtime-authority-v2.json": "460d4a89f2160ed947ed513bebc5e25de41899a9aabda613d0a233f2150ef963",
 }
 PINNED_UNCHANGED = {
-    "verify/bin/h-035-exit": "cae895110129f5066be9ae7f770e7f4e96594698ef5500d586820fea472d27e2",
+    "verify/bin/h-035-exit": "18a6a6e4f43c2291170e466fcbc546f47d539acdcefe4558eab2e3ab5df01c37",
     "verify/bin/h-036-exit": "55e9d8648be128f0841659b0d8598029109967a947ec6719df52f7cb97f45049",
     "verify/bin/h-037-exit": "814deb69fbc6e34e57ebc89b62bf7d54281bc95a4207332ff94792d90d0e6dc3",
     "specs/owner-production-paths.v1.json": "3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256",
     "docs/loop/remaining-bootstrap-delegation-v1.md": "0ad4cbc03b3b70c6b61ef6adc76a31decd4300f2b6a8a2b9f632c3f6719ac36f",
     "docs/07-konstitution.md": "2e7f04cca9eb00d24b264b91a0678aaee68c97441d79846d81aeff2f8d7b4432",
 }
-TASK_SHA256 = "c133ae2b9a7524c69108ccc7e6c8b5630dc3cde78c345159bbfcfd8e712a2171"
-H035_TASK_SHA256 = "f854ddc0b5ca05b87cbaf15431f58c59803be586d6d9ff67d14e40e8a5970f22"
+TASK_SHA256 = "a09a07556d38a27706cd2a18239edda95a9a76d3665a8b8f811546faad691419"
+H035_TASK_SHA256 = "cff16e63791acf5e75ca9a9b437a561a683e888f5ea3844201f34b0eb602cdeb"
 H036_TASK_SHA256 = "8d3742bbf6d791872c8f9173b3ff20afca9b6139615b64397498e05bda61826f"
 H037_TASK_SHA256 = "63662e129fb0b223f84669814cef70f331c5fd39441dad0bd79712d7e3dc3efb"
 DELEGATION_DOCUMENT_SHA256 = PINNED_UNCHANGED[
@@ -505,7 +505,7 @@ def static_contract_checks(h37: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
         and task.get("allowed_write") == []
         and task.get("owner_author_allowed_write") == PRODUCT_PATHS
         and task.get("docs_impact") == []
-        and task.get("depends_on") == ["h-036"]
+        and task.get("depends_on") == ["h-035", "h-036"]
         and task.get("exit_test") == "verify/bin/h-038-exit"
         and task.get("max_changed_files") == 3
         and task.get("max_added_lines") == MAX_ADDED_LINES
@@ -522,10 +522,10 @@ def static_contract_checks(h37: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
         and contract_base.get("guarded_publication_merge", {})
             .get("origin_main_must_equal_merge_before_product_review") is True
         and contract.get("product_identity", {}).get("candidate_relation")
-            == "DIRECT_SINGLE_CHILD_OF_EXACT_PUBLISHED_H038_CONTRACT_BASE"
+            == "DIRECT_SINGLE_CHILD_OF_EXACT_GUARDED_H038_R15_DEPENDENCY_REFREEZE_MERGE"
         and contract.get("product_identity", {}).get("remote_origin_main_states")
             == [
-                "PREPUBLICATION_EXACT_H038_CONTRACT_BASE",
+                "PREPUBLICATION_EXACT_GUARDED_H038_R15_DEPENDENCY_REFREEZE_MERGE",
                 "POSTPUBLICATION_EXACT_TWO_PARENT_PRODUCT_MERGE_WITH_CANDIDATE_TREE",
             ]
         and attempt_authority.get("canonical_state")
@@ -631,6 +631,52 @@ def commit_changes(h37: dict[str, Any], binding: Any, before: str,
     return changes
 
 
+
+def r15_refreeze_artifact(path: Path) -> tuple[Any, bytes]:
+    if not path.is_absolute() or Path(os.path.normpath(str(path))) != path:
+        raise Rig("noncanonical R15 refreeze artifact path")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    fds: list[int] = []
+    leaf = -1
+    try:
+        parent = os.open(path.anchor, flags)
+        fds.append(parent)
+        links: list[tuple[int, str, int, tuple[int, int, int]]] = []
+        for part in path.parts[1:-1]:
+            before = os.stat(part, dir_fd=parent, follow_symlinks=False)
+            child = os.open(part, flags, dir_fd=parent)
+            opened = os.fstat(child)
+            identity = (opened.st_dev, opened.st_ino, opened.st_mode)
+            if not stat.S_ISDIR(opened.st_mode) or identity != (before.st_dev, before.st_ino, before.st_mode):
+                raise Rig("R15 refreeze artifact ancestor race")
+            links.append((parent, part, child, identity)); fds.append(child); parent = child
+        before = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        leaf = os.open(path.name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0), dir_fd=parent)
+        opened = os.fstat(leaf)
+        fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+        identity = tuple(getattr(opened, field) for field in fields)
+        if (tuple(getattr(before, field) for field in fields) != identity
+                or not stat.S_ISREG(opened.st_mode) or opened.st_uid != os.getuid()
+                or opened.st_nlink != 1 or stat.S_IMODE(opened.st_mode) not in (0o600, 0o644)
+                or opened.st_size > 262144):
+            raise Rig("unsafe R15 refreeze artifact")
+        raw = b""; offset = 0
+        while offset < opened.st_size:
+            part = os.pread(leaf, min(65536, opened.st_size - offset), offset)
+            if not part: raise Rig("short R15 refreeze artifact read")
+            raw += part; offset += len(part)
+        after = os.fstat(leaf); named = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        if len(raw) != opened.st_size or tuple(getattr(after, field) for field in fields) != identity or tuple(getattr(named, field) for field in fields) != identity:
+            raise Rig("R15 refreeze artifact replacement")
+        for directory, part, child, want in links:
+            current = os.stat(part, dir_fd=directory, follow_symlinks=False); held = os.fstat(child)
+            if (current.st_dev, current.st_ino, current.st_mode) != want or (held.st_dev, held.st_ino, held.st_mode) != want:
+                raise Rig("R15 refreeze artifact ancestor replacement")
+        return strict_json(raw), raw
+    finally:
+        if leaf >= 0: os.close(leaf)
+        for descriptor in reversed(fds): os.close(descriptor)
+
 def product_identity(h37: dict[str, Any], binding: Any, old: dict[str, Any],
                      base: str, candidate: str) -> tuple[bool, dict[str, Any]]:
     detail: dict[str, Any] = {"base": base, "candidate": candidate}
@@ -658,35 +704,77 @@ def product_identity(h37: dict[str, Any], binding: Any, old: dict[str, Any],
         changes = commit_changes(h37, binding, base, candidate)
         contract_publication = False
         contract_candidate = ""
-        contract_changes: list[tuple[str, str, str]] = []
-        if len(base_record.parents) == 2 \
-                and base_record.parents[0] == CONTRACT_AUTHORITY_BASE:
-            contract_candidate = base_record.parents[1]
-            contract_record = h37["strict_commit_record"](
-                binding, contract_candidate,
+        contract_changes = []
+        current_spec = strict_json(SPEC.read_bytes())
+        current_rows = task_rows(current_spec, "h-038") if isinstance(current_spec, dict) else []
+        published_binding = current_rows[0].get("h035_r15_published_authority") if len(current_rows) == 1 else None
+        if len(base_record.parents) == 2 and isinstance(published_binding, dict):
+            published_h035, refreeze_candidate = base_record.parents
+            refreeze_record = h37["strict_commit_record"](binding, refreeze_candidate)
+            refreeze_changes = commit_changes(
+                h37, binding, published_h035, refreeze_candidate,
             )
-            contract_changes = commit_changes(
-                h37, binding, CONTRACT_AUTHORITY_BASE, contract_candidate,
-            )
-            expected_contract_changes = {
+            contract_candidate = refreeze_candidate
+            contract_changes = refreeze_changes
+            expected_refreeze_changes = {
                 ("M", "specs/tasks.spec.json", "100644"),
-                ("A", "verify/bin/h-038-exit", "100755"),
+                ("M", "verify/bin/h-038-exit", "100755"),
                 ("M", "docs/loop/owner-author-workflow-v1.md", "100644"),
                 ("M", "docs/05-beslutslogg.md", "100644"),
                 ("M", "docs/loop/drift.md", "100644"),
             }
-            contract_bytes_equal = all(
-                h37["git_blob"](binding, contract_candidate, path)
+            review_path = Path(published_binding.get("review_path", "")).parent / (
+                f"h038-r15-dependency-refreeze-review-{refreeze_candidate[:8]}.json"
+            )
+            receipt_path = Path(published_binding.get("review_path", "")).parent / (
+                f"h038-r15-dependency-refreeze-publication-{base[:8]}.json"
+            )
+            review, review_raw = r15_refreeze_artifact(review_path)
+            receipt, _receipt_raw = r15_refreeze_artifact(receipt_path)
+            expected_review = {
+                "schema_version": 1, "record_type": "nortropic_independent_h038_r15_refreeze_review",
+                "role": "GATE_REVIEWER", "result": "PASS", "task": "h-038",
+                "base_sha": published_h035, "candidate_sha": refreeze_candidate,
+                "candidate_tree": refreeze_record.tree,
+                "changed_files": sorted(TEST_AUTHOR_SURFACE), "blocking_findings": [],
+            }
+            expected_receipt = {
+                "schema_version": 1, "record_type": "nortropic_publication_receipt",
+                "phase": "H038_R15_DEPENDENCY_REFREEZE_PUBLICATION",
+                "repository": published_binding.get("repository_identity"), "task_id": "h-038",
+                "base_sha": published_h035, "candidate_sha": refreeze_candidate,
+                "candidate_tree": refreeze_record.tree, "merge_sha": base,
+                "merge_tree": refreeze_record.tree,
+                "ordered_parents": [published_h035, refreeze_candidate],
+                "independent_review_path": str(review_path),
+                "independent_review_sha256": sha(review_raw),
+                "force": False, "history_rewrite": False,
+            }
+            h035_runtime = runpy.run_path(
+                str(H035_GATE), run_name="h038_frozen_h035_refreeze_renderer",
+            )
+            expected_refreeze = h035_runtime["r15_expected_h038_refreeze_bytes"](
+                ROOT, published_h035, published_binding,
+            )
+            refreeze_bytes_equal = set(expected_refreeze) == set(TEST_AUTHOR_SURFACE) and all(
+                h37["git_blob"](binding, refreeze_candidate, path)
                     == h37["git_blob"](binding, base, path)
                     == (ROOT / path).read_bytes()
+                    == expected_refreeze[path]
                 for path in TEST_AUTHOR_SURFACE
             )
             contract_publication = (
-                contract_record.parents == [CONTRACT_AUTHORITY_BASE]
-                and contract_record.tree == base_record.tree
-                and len(contract_changes) == len(expected_contract_changes)
-                and set(contract_changes) == expected_contract_changes
-                and contract_bytes_equal
+                published_binding.get("record_type") == "h035_r15_published_authority_v1"
+                and type(published_binding.get("schema_version")) is int
+                and published_binding.get("schema_version") == 1
+                and published_binding.get("task") == "h-035"
+                and published_binding.get("product_publication_sha") == published_h035
+                and refreeze_record.parents == [published_h035]
+                and base_record.tree == refreeze_record.tree
+                and len(refreeze_changes) == len(expected_refreeze_changes)
+                and set(refreeze_changes) == expected_refreeze_changes
+                and refreeze_bytes_equal
+                and review == expected_review and receipt == expected_receipt
             )
         numstat = h37["identity_git"](
             binding, "diff", "--numstat", "--no-renames", "--no-ext-diff",
@@ -2803,3 +2891,5 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
+
+# H035_R15_REFREEZE_BINDING_V1 8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0 01a1deddedbb0efc0ebafd87b32a30c5613840ba

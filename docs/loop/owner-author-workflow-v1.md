@@ -1306,3 +1306,7 @@ inside this gate fixture and grants no product/runtime wrapper or broker authori
 process enumeration, caller PID/PGID/filter/signal/deadline, native FFI, watchdog, native broker,
 product, registry, Seatbelt, network, credential or owner authority and makes no
 outer-verifier-SIGKILL claim. A fresh product is required after guarded R26.
+
+## H-038 R15 dependency-refreeze handoff
+
+Bind H-035 publication `01a1deddedbb0efc0ebafd87b32a30c5613840ba` / `8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0`, review the exact five-byte transform, publish M=[M0,R], then review the H-038 product only as a direct child of M.
