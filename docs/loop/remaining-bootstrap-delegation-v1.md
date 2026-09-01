@@ -395,3 +395,28 @@ refreeze/product/review/publication → H-032 → H-031. No supervisor resume oc
 green. If the minimum H-039 design requires broader authority, this exception does not apply and a
 new owner stop is mandatory.
 <!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_END -->
+<!-- H035_R30_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_BEGIN -->
+## H-035 R30 minimal core-and-CLI owner decision
+
+**Owner decision:** 2026-09-01. The published H-035 R29 contract is refrozen only because two
+immutable product attempts and the independently recorded core-only architectural impossibility prove
+that the request-bound registry cannot soundly reach all owner consumers through
+`controller/authority/core.py` alone.
+
+TEST_AUTHOR may modify exactly `specs/tasks.spec.json`, `verify/bin/h-035-exit`,
+`docs/loop/owner-author-workflow-v1.md`, this file, `docs/05-beslutslogg.md` and
+`docs/loop/drift.md`. BUILDER may modify exactly `controller/authority/core.py` and
+`controller/authority/cli`. The product may only implement exact v1 old4, v2 union7 and v3 union12,
+strict NUL-delimited UTF-8 Git changed-path decoding, and explicit binding of the owner task surface
+to the request's validated candidate-object registry in owner `check-candidate` and
+`transition_context`.
+
+The complete v1/v2/v3 by H034/H036/H039/two-broad-prefix matrix must be falsified through
+`validate-task`, owner `check-candidate`, `owner-author`, `record-review` and `owner-freeze`, including
+empty and material candidate cases where applicable. No global, ContextVar, caller-introspection,
+dynamic-mutation, caller-selected registry/version, broad prefix, registry mutation, new authority or
+security weakening is admitted. Two independent gate reviews, guarded contract publication,
+independent product review and guarded product publication remain serial prerequisites. Then the
+already authorized H034 → H036 → H039 → H038 → H032 → H031 chain continues autonomously. No
+supervisor resume occurs before all are green.
+<!-- H035_R30_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_END -->
