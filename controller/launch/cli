@@ -60,6 +60,7 @@ PYTHON_SHA256 = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf7039394
 PYTHON_APP_BINARY = PYTHON_SOURCE.parent.parent / "Resources/Python.app/Contents/MacOS/Python"
 PYTHON_APP_SHA256 = "9ea12d11e0573548d6d8b0added1740b2d6377366081dbca05c19746ce7c616e"
 TRUST_ROOT_ENV = "NORTROPIC_TRUST_ROOT"
+ATTEMPT_ROOT_ENV = "NORTROPIC_ATTEMPT_ROOT"
 STAGING_ROOT_ENV = "NORTROPIC_STAGING_ROOT"
 RESULT_SINK_ENV = "NORTROPIC_RESULT_SINK"
 RUNTIME_PARENT = "/private/tmp"
@@ -69,7 +70,8 @@ HANDSHAKE_TIMEOUT = 5.0
 STRIP_PREFIXES = ("DYLD_", "GIT_", "GH_", "GITHUB_", "PYTHON", "SLACK_")
 STRIP_EXACT = frozenset({
     "LD_LIBRARY_PATH", "LD_PRELOAD", "NORTROPIC_TRUST_ROOT",
-    "NORTROPIC_STAGING_ROOT", "NORTROPIC_RESULT_SINK", "__PYVENV_LAUNCHER__",
+    "NORTROPIC_ATTEMPT_ROOT", "NORTROPIC_STAGING_ROOT",
+    "NORTROPIC_RESULT_SINK", "__PYVENV_LAUNCHER__",
 })
 RESERVED_PREFIX = "NORTROPIC_H036_"
 EPHEMERAL_KEYS = (
@@ -276,6 +278,104 @@ def common_gitdir(worktree_gitdir: Path) -> Path:
 def overlaps(a: Path, b: Path) -> bool:
     sa, sb = str(a), str(b)
     return sa == sb or sa.startswith(sb + os.sep) or sb.startswith(sa + os.sep)
+
+
+def stable_directory(path: Path, mode: int | None = None):
+    """Nofollow-walk one canonical current-UID directory and bind dev/inode."""
+    text = str(path)
+    if not path.is_absolute() or os.path.normpath(text) != text \
+            or os.path.realpath(text) != text:
+        return None
+    flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+             | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+    fd = -1
+    try:
+        fd = os.open(path.anchor, flags)
+        for component in path.parts[1:]:
+            before = os.stat(component, dir_fd=fd, follow_symlinks=False)
+            child = os.open(component, flags, dir_fd=fd)
+            opened = os.fstat(child)
+            if (not stat.S_ISDIR(opened.st_mode)
+                    or (before.st_dev, before.st_ino, before.st_mode)
+                    != (opened.st_dev, opened.st_ino, opened.st_mode)):
+                os.close(child)
+                return None
+            os.close(fd)
+            fd = child
+        opened = os.fstat(fd)
+        if opened.st_uid != os.geteuid() \
+                or (mode is not None and stat.S_IMODE(opened.st_mode) != mode):
+            return None
+        return (text, opened.st_dev, opened.st_ino)
+    except OSError:
+        return None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def stable_regular(path: Path):
+    if not path.is_absolute() or os.path.normpath(str(path)) != str(path) \
+            or os.path.realpath(path) != str(path):
+        return None
+    try:
+        before = path.lstat()
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    except OSError:
+        return None
+    try:
+        opened = os.fstat(fd)
+        if ((before.st_dev, before.st_ino, before.st_mode)
+                != (opened.st_dev, opened.st_ino, opened.st_mode)
+                or not stat.S_ISREG(opened.st_mode) or opened.st_uid != os.geteuid()
+                or opened.st_nlink != 1):
+            return None
+        return (str(path), opened.st_dev, opened.st_ino)
+    finally:
+        os.close(fd)
+
+
+def strict_child(child: Path, parent: Path) -> bool:
+    return str(child).startswith(str(parent) + os.sep)
+
+
+def validate_managed(ws: Path, trust: Path, trust_given: bool, live_git: Path):
+    attempt = Path(os.environ[ATTEMPT_ROOT_ENV])
+    staging = Path(os.environ[STAGING_ROOT_ENV])
+    sink = Path(os.environ[RESULT_SINK_ENV])
+    attempt_id = stable_directory(attempt, 0o700)
+    workspace_id = stable_directory(ws)
+    trust_source = Path(os.environ[TRUST_ROOT_ENV]) if trust_given else trust
+    trust_id = stable_directory(trust_source)
+    staging_id = stable_directory(staging)
+    sink_id = stable_regular(sink)
+    if None in (attempt_id, workspace_id, trust_id, staging_id, sink_id):
+        return False, "managed roots måste vara kanoniska nofollow-objekt för aktuell uid"
+    attempt = Path(attempt_id[0]); trust = Path(trust_id[0]); staging = Path(staging_id[0])
+    sink = Path(sink_id[0])
+    if sink.parent != staging:
+        return False, "sink måste ligga direkt i staging"
+    if not strict_child(ws, attempt) or not strict_child(staging, attempt):
+        return False, "workspace och staging måste vara strikt hanterade av attempt-root"
+    if trust_given and not strict_child(trust, attempt):
+        return False, "explicit trust måste vara strikt hanterad av attempt-root"
+    if not trust_given and trust != ROT.resolve():
+        return False, "default trust måste vara live-roten"
+    roots = [ws, staging] + ([trust] if trust_given else [])
+    if any(overlaps(left, right) for index, left in enumerate(roots)
+           for right in roots[index + 1:]):
+        return False, "workspace, trust och staging måste vara ömsesidigt disjunkta"
+    if overlaps(attempt, ROT.resolve()) or overlaps(attempt, live_git.resolve()):
+        return False, "attempt-root överlappar live control plane"
+    runtime_parent = Path(RUNTIME_PARENT)
+    if attempt == runtime_parent or strict_child(runtime_parent, attempt):
+        return False, "attempt-root omsluter runtime-föräldern"
+    identities = {(item[1], item[2]) for item in
+                  (attempt_id, workspace_id, trust_id, staging_id)}
+    if len(identities) != 4:
+        return False, "managed roots delar fysisk identitet"
+    return ("managed", str(attempt), str(staging), str(sink),
+            [attempt_id[1], attempt_id[2]]), ""
 
 
 # ---------------------------------------------------------------------------
@@ -577,16 +677,30 @@ def top_level_launch(ws: Path, envelope: bytes, timeout_ms: int, kommando: list[
         if overlaps(ws, protected):
             return svar(f"launch_failed: workspace {ws} överlappar skyddad rot {protected}", LAUNCH)
 
-    profile, staging, sink = "base", None, None
+    profile, attempt, staging, sink, attempt_identity = "base", None, None, None, None
+    attempt_present = ATTEMPT_ROOT_ENV in os.environ
     staging_present = STAGING_ROOT_ENV in os.environ
     sink_present = RESULT_SINK_ENV in os.environ
-    if staging_present != sink_present:
+    if attempt_present:
+        if not (staging_present and sink_present):
+            return svar("launch_failed: attempt, staging och sink måste anges tillsammans", LAUNCH)
+        ok, why = validate_managed(ws, trust, trust_given, live_git)
+        if not ok:
+            return svar(f"launch_failed: {why}", LAUNCH)
+        profile, attempt, staging, sink, attempt_identity = ok
+    elif staging_present != sink_present:
         return svar("launch_failed: staging och sink måste anges tillsammans", LAUNCH)
-    if staging_present:
+    elif staging_present:
         ok, why = validate_staging(ws, trust, live_git)
         if not ok:
             return svar(f"launch_failed: {why}", LAUNCH)
         profile, staging, sink = ok
+    trust_proof_source = HELPER
+    if profile == "managed" and trust_given:
+        trust_proof_source = self_exec_path()
+        if trust_proof_source is None or stable_regular(trust_proof_source) is None \
+                or not strict_child(trust_proof_source, trust):
+            return svar("launch_failed: explicit trust saknar bunden proof-källa", LAUNCH)
 
     # Private runtime root.
     try:
@@ -639,6 +753,8 @@ def top_level_launch(ws: Path, envelope: bytes, timeout_ms: int, kommando: list[
             "git_objects": str(live_git / "objects"),
             "git_objects_info": str(live_git / "objects/info"),
             "trust_root": str(trust), "ancestor_workspace": str(ws),
+            "trust_proof_source": str(trust_proof_source),
+            "attempt_root": attempt, "attempt_identity": attempt_identity,
             "staging_root": staging, "result_sink": sink,
             "profile": profile, "helper": str(HELPER),
             "runtime_python": str(snapshot),
@@ -744,6 +860,10 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
     ws = Path(ws_arg).expanduser()
     if not ws.is_dir():
         return svar(f"anropsfel: workspace {ws_arg} är ingen katalog", ANROP)
+    if ATTEMPT_ROOT_ENV in os.environ \
+            and not any(os.environ.get(key) for key in EPHEMERAL_KEYS) \
+            and stable_directory(ws) is None:
+        return svar("launch_failed: managed workspace måste vara kanonisk nofollow-katalog", LAUNCH)
     ws = ws.resolve()
 
     kuvertfil = Path(kuvert_arg).expanduser()

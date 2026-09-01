@@ -14,7 +14,7 @@ Two roles in one immutable helper, dispatched by argv[1]:
       supervisor's go, sanitizes the target environment and execs the target
       with only stdio {0,1,2}.
 
-The two Seatbelt profile texts are byte-exact and paths reach sandbox-exec only
+The three Seatbelt profile texts are byte-exact and paths reach sandbox-exec only
 through ``-D name=value`` parameters, never interpolated into the Scheme source.
 """
 
@@ -66,9 +66,18 @@ PROFILE_TEMPLATE_BASE = """(version 1)
 PROFILE_TEMPLATE_STAGING_SUFFIX = """(deny file-write* (subpath (param "STAGING_ROOT")))
 (allow file-write-data (literal (param "RESULT_SINK")))
 """
+PROFILE_TEMPLATE_ATTEMPT_SUFFIX = """(deny file-write* (literal (param "ATTEMPT_ROOT")))
+(deny file-write*
+  (require-all
+    (subpath (param "ATTEMPT_ROOT"))
+    (require-not (subpath (param "CURRENT_WORKSPACE")))))
+"""
 PROFILE_TEMPLATE_WITH_STAGING = PROFILE_TEMPLATE_BASE + PROFILE_TEMPLATE_STAGING_SUFFIX
+PROFILE_TEMPLATE_MANAGED = (PROFILE_TEMPLATE_BASE + PROFILE_TEMPLATE_ATTEMPT_SUFFIX
+                            + PROFILE_TEMPLATE_STAGING_SUFFIX)
 PROFILE_BASE_SHA256 = hashlib.sha256(PROFILE_TEMPLATE_BASE.encode("utf-8")).hexdigest()
 PROFILE_SHA256 = hashlib.sha256(PROFILE_TEMPLATE_WITH_STAGING.encode("utf-8")).hexdigest()
+PROFILE_MANAGED_SHA256 = hashlib.sha256(PROFILE_TEMPLATE_MANAGED.encode("utf-8")).hexdigest()
 
 BASE_PARAM_ORDER = [
     "LIVE_ROOT", "LIVE_GIT", "GIT_OBJECTS", "GIT_OBJECTS_INFO",
@@ -77,6 +86,7 @@ BASE_PARAM_ORDER = [
     "ANCESTOR_WORKSPACE", "CURRENT_WORKSPACE", "CURRENT_WORKSPACE_DOTGIT",
 ]
 STAGING_PARAM_ORDER = BASE_PARAM_ORDER + ["STAGING_ROOT", "RESULT_SINK"]
+MANAGED_PARAM_ORDER = BASE_PARAM_ORDER + ["ATTEMPT_ROOT", "STAGING_ROOT", "RESULT_SINK"]
 
 SANDBOX_EXEC = "/usr/bin/sandbox-exec"
 FRAME_LIMIT = 1048576
@@ -89,7 +99,8 @@ REAP_TIMEOUT = 5.0
 STRIP_PREFIXES = ("DYLD_", "GIT_", "GH_", "GITHUB_", "PYTHON", "SLACK_")
 STRIP_EXACT = frozenset({
     "LD_LIBRARY_PATH", "LD_PRELOAD", "NORTROPIC_TRUST_ROOT",
-    "NORTROPIC_STAGING_ROOT", "NORTROPIC_RESULT_SINK", "__PYVENV_LAUNCHER__",
+    "NORTROPIC_ATTEMPT_ROOT", "NORTROPIC_STAGING_ROOT",
+    "NORTROPIC_RESULT_SINK", "__PYVENV_LAUNCHER__",
 })
 RESERVED_PREFIX = "NORTROPIC_H036_"
 EPHEMERAL_KEYS = (
@@ -113,6 +124,10 @@ DENIED_STAGING = [
     "sink_hardlink", "sink_rename", "sink_unlink", "sink_chmod",
     "staging_root_rename", "staging_root_chmod", "staging_root_rmdir",
 ]
+DENIED_ATTEMPT = [
+    f"attempt_{op}"
+    for op in ("create", "write", "rename", "unlink", "hardlink", "mkdir", "chmod")
+] + ["attempt_root_rename", "attempt_root_chmod", "attempt_root_rmdir"]
 
 HEX64 = re.compile(r"[0-9a-f]{64}")
 DECIMAL = re.compile(r"0|[1-9][0-9]*")
@@ -758,6 +773,28 @@ class Supervisor:
             return os.path.join(current, ".nortropic-ingen-live-git-exception")
         return candidate
 
+    def _bound_attempt(self, current: str) -> str:
+        attempt = self.cfg.get("attempt_root")
+        identity = self.cfg.get("attempt_identity")
+        if not isinstance(attempt, str) or not os.path.isabs(attempt) \
+                or os.path.normpath(attempt) != attempt \
+                or os.path.realpath(attempt) != attempt \
+                or not isinstance(identity, list) or len(identity) != 2 \
+                or not all(type(value) is int for value in identity):
+            raise ValueError("unbound managed attempt root")
+        try:
+            opened = os.lstat(attempt)
+        except OSError as exc:
+            raise ValueError("managed attempt root unavailable") from exc
+        if (not stat.S_ISDIR(opened.st_mode) or stat.S_ISLNK(opened.st_mode)
+                or opened.st_uid != os.geteuid()
+                or stat.S_IMODE(opened.st_mode) != 0o700
+                or [opened.st_dev, opened.st_ino] != identity
+                or os.path.realpath(current) != current
+                or not current.startswith(attempt + os.sep)):
+            raise ValueError("managed attempt root identity changed")
+        return attempt
+
     def _profile_params(self, current: str) -> tuple[dict[str, str], str, list[str]]:
         cfg = self.cfg
         wt = self._worktree_gitdir(current)
@@ -776,6 +813,11 @@ class Supervisor:
             "CURRENT_WORKSPACE": current,
             "CURRENT_WORKSPACE_DOTGIT": os.path.join(current, ".git"),
         }
+        if cfg.get("profile") == "managed":
+            params["ATTEMPT_ROOT"] = self._bound_attempt(current)
+            params["STAGING_ROOT"] = cfg["staging_root"]
+            params["RESULT_SINK"] = cfg["result_sink"]
+            return params, PROFILE_TEMPLATE_MANAGED, MANAGED_PARAM_ORDER
         if cfg.get("profile") == "staging":
             params["STAGING_ROOT"] = cfg["staging_root"]
             params["RESULT_SINK"] = cfg["result_sink"]
@@ -794,7 +836,92 @@ class Supervisor:
         except OSError:
             pass
 
-    def _effect_plan(self, nonce: str, current: str, params: dict) -> dict:
+    def _neutral_attempt(self, request_nonce: str, attempt: str):
+        flags = (os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                 | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+        attempt_fd = os.open(attempt, flags)
+        token = secrets.token_hex(32)
+        while token == request_nonce:
+            token = secrets.token_hex(32)
+        name = ".nortropic-h038-proof-" + token
+        state = {"attempt_fd": attempt_fd, "directory_fd": -1,
+                 "directory_identity": None, "source_identities": set()}
+        try:
+            opened_attempt = os.fstat(attempt_fd)
+            if [opened_attempt.st_dev, opened_attempt.st_ino] != self.cfg["attempt_identity"]:
+                raise ValueError("attempt root changed before proof setup")
+            os.mkdir(name, 0o700, dir_fd=attempt_fd)
+            created = os.stat(name, dir_fd=attempt_fd, follow_symlinks=False)
+            state["directory_identity"] = (created.st_dev, created.st_ino)
+            directory_fd = os.open(name, flags, dir_fd=attempt_fd)
+            state["directory_fd"] = directory_fd
+            directory = os.fstat(directory_fd)
+            if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.geteuid()
+                    or stat.S_IMODE(directory.st_mode) != 0o700
+                    or (directory.st_dev, directory.st_ino)
+                    != state["directory_identity"]):
+                raise ValueError("unsafe managed proof directory")
+            for source in ("write-source", "rename-source", "unlink-source",
+                           "hardlink-source"):
+                fd = os.open(source, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                             | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+                             0o600, dir_fd=directory_fd)
+                try:
+                    os.write(fd, b"ORIGINAL")
+                    os.fsync(fd)
+                    item = os.fstat(fd)
+                    if (not stat.S_ISREG(item.st_mode) or item.st_uid != os.geteuid()
+                            or stat.S_IMODE(item.st_mode) != 0o600 or item.st_nlink != 1):
+                        raise ValueError("unsafe managed proof source")
+                    state["source_identities"].add((item.st_dev, item.st_ino))
+                finally:
+                    os.close(fd)
+            if len(state["source_identities"]) != 4:
+                raise ValueError("managed proof sources alias")
+            return os.path.join(attempt, name), state
+        except BaseException:
+            self._cleanup_neutral(state)
+            raise
+
+    def _cleanup_neutral(self, state) -> None:
+        if not isinstance(state, dict):
+            return
+        attempt_fd = state.get("attempt_fd", -1)
+        directory_fd = state.get("directory_fd", -1)
+        identities = state.get("source_identities", set())
+        directory_identity = state.get("directory_identity")
+        try:
+            if directory_fd >= 0:
+                for entry in os.listdir(directory_fd):
+                    try:
+                        item = os.stat(entry, dir_fd=directory_fd, follow_symlinks=False)
+                        if (stat.S_ISREG(item.st_mode) and item.st_nlink == 1
+                                and (item.st_dev, item.st_ino) in identities):
+                            os.unlink(entry, dir_fd=directory_fd)
+                    except OSError:
+                        pass
+            if attempt_fd >= 0 and directory_identity is not None:
+                for entry in os.listdir(attempt_fd):
+                    try:
+                        item = os.stat(entry, dir_fd=attempt_fd, follow_symlinks=False)
+                        if stat.S_ISDIR(item.st_mode) \
+                                and (item.st_dev, item.st_ino) == directory_identity:
+                            os.rmdir(entry, dir_fd=attempt_fd)
+                            break
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+        finally:
+            for descriptor in (directory_fd, attempt_fd):
+                if descriptor >= 0:
+                    try:
+                        os.close(descriptor)
+                    except OSError:
+                        pass
+
+    def _effect_plan(self, nonce: str, current: str, params: dict,
+                     neutral_path: str | None = None) -> dict:
         plan: dict[str, list] = {}
         pfx = f".nortropic-h036-proof-{nonce}"
 
@@ -818,7 +945,9 @@ class Supervisor:
 
         # live: use an existing repo file (denied, never mutated).
         family("live", params["LIVE_ROOT"], self.cfg["helper"], False)
-        family("trust", params["TRUST_ROOT"], "", True)
+        trust_source = self.cfg.get("trust_proof_source") \
+            if self.cfg.get("profile") == "managed" else None
+        family("trust", params["TRUST_ROOT"], trust_source or "", not trust_source)
         family("runtime", params["RUNTIME_ROOT"], "", False)
         # ancestor: a location under ANCESTOR outside CURRENT.
         ancestor = params["ANCESTOR_WORKSPACE"]
@@ -838,6 +967,34 @@ class Supervisor:
             plan["staging_root_rename"] = ["rename", staging, f"{parent}/staging-renamed"]
             plan["staging_root_chmod"] = ["chmod", staging]
             plan["staging_root_rmdir"] = ["rmdir", staging]
+        elif self.cfg.get("profile") == "managed":
+            staging = params["STAGING_ROOT"]
+            family("staging", staging, "", True)
+            sink = params["RESULT_SINK"]
+            plan["sink_hardlink"] = ["hardlink", sink, f"{staging}/sink-hardlink"]
+            plan["sink_rename"] = ["rename", sink, f"{staging}/sink-renamed"]
+            plan["sink_unlink"] = ["unlink", sink]
+            plan["sink_chmod"] = ["chmod", sink]
+            plan["staging_root_rename"] = ["rename", staging, f"{os.path.dirname(staging)}/staging-renamed"]
+            plan["staging_root_chmod"] = ["chmod", staging]
+            plan["staging_root_rmdir"] = ["rmdir", staging]
+            if neutral_path is None:
+                raise ValueError("managed proof directory absent")
+            plan.update({
+                "attempt_create": ["create", f"{neutral_path}/created"],
+                "attempt_write": ["write", f"{neutral_path}/write-source"],
+                "attempt_rename": ["rename", f"{neutral_path}/rename-source",
+                                   f"{neutral_path}/rename-target"],
+                "attempt_unlink": ["unlink", f"{neutral_path}/unlink-source"],
+                "attempt_hardlink": ["hardlink", f"{neutral_path}/hardlink-source",
+                                     f"{neutral_path}/hardlink-target"],
+                "attempt_mkdir": ["mkdir", f"{neutral_path}/new-dir"],
+                "attempt_chmod": ["chmod", f"{neutral_path}/write-source"],
+                "attempt_root_rename": ["rename", params["ATTEMPT_ROOT"],
+                                        params["ATTEMPT_ROOT"] + "-renamed"],
+                "attempt_root_chmod": ["chmod", params["ATTEMPT_ROOT"]],
+                "attempt_root_rmdir": ["rmdir", params["ATTEMPT_ROOT"]],
+            })
         return plan
 
     def _mint_cap(self, session: str, level: int) -> str:
@@ -864,12 +1021,27 @@ class Supervisor:
         with self.lock:
             self.used_nonces.add(nonce)
         current = ctx["current"]
-        params, profile_text, order = self._profile_params(current)
-        child_cap = self._mint_cap(ctx["session"], ctx["child_level"])
-        kuvert_path = self._write_kuvert(nonce, envelope)
-        plan = self._effect_plan(nonce, current, params)
+        managed = self.cfg.get("profile") == "managed"
+        neutral_state = None
+        try:
+            params, profile_text, order = self._profile_params(current)
+            neutral_path = None
+            if managed:
+                neutral_path, neutral_state = self._neutral_attempt(
+                    nonce, params["ATTEMPT_ROOT"],
+                )
+            child_cap = self._mint_cap(ctx["session"], ctx["child_level"])
+            kuvert_path = self._write_kuvert(nonce, envelope)
+            plan = self._effect_plan(nonce, current, params, neutral_path)
+        except (OSError, ValueError):
+            for fd in fds:
+                os.close(fd)
+            self._cleanup_neutral(neutral_state)
+            self.reject(conn)
+            return
         scratch_path = os.path.join(current, f".nortropic-h036-proof-{nonce}.allowed")
-        sink_path = params.get("RESULT_SINK") if self.cfg.get("profile") == "staging" else None
+        sink_path = params.get("RESULT_SINK") if self.cfg.get("profile") \
+            in ("staging", "managed") else None
 
         sup_end, helper_end = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
         proof_fd = helper_end.fileno()
@@ -892,6 +1064,7 @@ class Supervisor:
                 os.close(fd)
             helper_end.close()
             sup_end.close()
+            self._cleanup_neutral(neutral_state)
             self.reject(conn)
             return
         for fd in fds:
@@ -907,8 +1080,9 @@ class Supervisor:
         setup = {
             "request_nonce": nonce,
             "session_id": ctx["session"],
-            "profile_sha256": PROFILE_SHA256 if self.cfg.get("profile") == "staging"
-            else PROFILE_BASE_SHA256,
+            "profile_sha256": PROFILE_MANAGED_SHA256 if managed else
+            PROFILE_SHA256 if self.cfg.get("profile") == "staging" else
+            PROFILE_BASE_SHA256,
             "effect_plan": plan,
             "scratch_path": scratch_path,
             "sink_path": sink_path,
@@ -926,6 +1100,8 @@ class Supervisor:
             proof = recv_fd_frame(sup_end.fileno())
             if not isinstance(proof, dict):
                 raise OSError("no proof")
+            if managed:
+                self._bound_attempt(current)
             sock_send_frame(conn, proof)
             # A malformed go frame (duplicate key, non-finite number, oversize)
             # is a rejected request, not a transport failure: answer it with the
@@ -935,16 +1111,20 @@ class Supervisor:
             except ValueError:
                 go = None
             if not self._valid_go(go, proof["proof_digest"], nonce):
+                self._cleanup_neutral(neutral_state); neutral_state = None
                 sock_send_frame(conn, {"class": "request-rejected-v1"})
                 self._kill_target(proc, pgid)
                 finished = True
                 return
+            if managed:
+                self._bound_attempt(current)
             # Undo the helper's proof write to the sink BEFORE releasing the
             # target, so the target's own permitted sink write (if any) persists
             # and is not clobbered by a post-run restore.
             self._restore_sink()
             released = True
             send_fd_frame(sup_end.fileno(), {"action": "go"})
+            self._cleanup_neutral(neutral_state); neutral_state = None
             # The helper<->supervisor channel is finished once go is delivered
             # (the helper execs the target and closes its end).  Close it now so
             # a nested in-flight request never leaves a half-open helper socket
@@ -972,6 +1152,7 @@ class Supervisor:
             if not released:
                 self._restore_sink()
             self._cleanup_scratch(scratch_path)
+            self._cleanup_neutral(neutral_state)
             with self.lock:
                 self.targets.pop(proc.pid, None)
             try:
@@ -1041,7 +1222,8 @@ class Supervisor:
             pass
 
     def _restore_sink(self):
-        if self.cfg.get("profile") == "staging" and self.sink_original is not None:
+        if self.cfg.get("profile") in ("staging", "managed") \
+                and self.sink_original is not None:
             with self.lock:
                 try:
                     fd = os.open(self.cfg["result_sink"], os.O_WRONLY | os.O_TRUNC)
