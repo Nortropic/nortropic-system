@@ -18,12 +18,22 @@ KERNEL=ROOT/"verify/h034/kernel"; RECIPE=ROOT/"verify/h034/build-recipe.json"
 MANIFEST=ROOT/"verify/h034/identity-manifest.json"; SOURCE=ROOT/"controller/h034-native"
 H034_OWNER=["controller/h034-native/**","verify/h034/kernel","verify/h034/build-recipe.json","verify/h034/identity-manifest.json"]
 H036_OWNER=["controller/launch/cli","controller/launch/runtime_snapshot.py","config/python-runtime-authority-v2.json"]
+H039_OWNER=["controller/runtime-cleanup/install","controller/runtime-cleanup/native/mediator.c",
+ "verify/h039/runtime-cleanup-mediator","verify/h039/build-recipe.json",
+ "verify/h039/identity-manifest.json"]
 OWNER=H034_OWNER; REGISTRY_OWNER=[*H034_OWNER,*H036_OWNER]
+REGISTRY_OWNER_V3=[*H034_OWNER,*H036_OWNER,*H039_OWNER]
 H036_GATE=ROOT/"verify/bin/h-036-exit"
 H036_RUNTIME_SNAPSHOT=ROOT/"controller/launch/runtime_snapshot.py"
 H036_RUNTIME_AUTHORITY=ROOT/"config/python-runtime-authority-v2.json"
 H036_LAUNCH_CLI=ROOT/"controller/launch/cli"
 H036_LAUNCH_CLI_SHA256="cb1cf372ccedec2eb0e8e379ca2da766671c40347749b807068114f23668cf0e"
+H035_CORE=ROOT/"controller/authority/core.py"
+H035_CLI=ROOT/"controller/authority/cli"
+H035_CORE_SHA256="a83e5847b7cdee8543a55d52ef719d232319fdd6c0a33b5bd00b8a77b69e8158"
+H035_CLI_SHA256="b066edaf624f51f837d6c83f2e996e8e5684b8229fa407e3c6cb3f233305de2c"
+H039_GATE=ROOT/"verify/bin/h-039-exit"
+H039_PRODUCT=[ROOT/path for path in H039_OWNER]
 REGISTRY_KEYS={"schema_version","path_grammar","authority_source","self_digest_is_authority","owner_production_paths","prospective_ordinary_protected_paths","owner_author_global_denied_paths"}
 RETAINED_REGISTRY={
  "path_grammar":"repo-tree-exact-or-terminal-recursive-prefix-v1",
@@ -66,6 +76,52 @@ R15_TASK_CONTRACT={
  "h036_gate_path":"verify/bin/h-036-exit",
  "h036_gate_is_owner_production":False,
  "required_serial_order":R15_ORDER}
+V3_ORDER=[
+ "H035_R33_GUARDED_PRODUCT_PUBLICATION",
+ "H034_REGISTRY_V3_REFREEZE",
+ "H034_TWO_INDEPENDENT_GATE_REVIEWS",
+ "H034_GUARDED_PUBLICATION",
+ "H036_REGISTRY_ONLY_REFREEZE",
+ "H036_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+ "H039_CONTRACT_FREEZE_INDEPENDENT_GATE_REVIEW_GUARDED_PUBLICATION",
+ "H039_PRODUCT_AND_INSTALL_REVIEW_GUARDED_PUBLICATION",
+ "H038_REFREEZE_PRODUCT_REVIEW_GUARDED_PUBLICATION",
+ "H032_REFREEZE_REVIEW_GUARDED_PUBLICATION",
+ "H031_REBIND_REVIEW_GUARDED_PUBLICATION",
+ "SUPERVISOR_RESUME_ONLY_AFTER_ALL_GREEN"]
+V3_TEST_AUTHOR_PATHS=[
+ "docs/05-beslutslogg.md","docs/loop/drift.md",
+ "specs/owner-production-paths.v1.json","specs/tasks.spec.json",
+ "verify/bin/h-034-exit","verify/bin/h-035-exit"]
+V3_TASK_CONTRACT={
+ "contract_id":"H034_EXACT_REGISTRY_V3_UNION12_REFREEZE_V1",
+ "authority_base_sha":"843bf368be8ec0a7162f2a9f1d066889fd3e6702",
+ "immutable_no_credit_candidate":{
+  "candidate_sha":"0294dde4cce1440a9e6a1e185306249c3e384599",
+  "candidate_tree":"f35567cb4b431a4ce54d829e69cdbf6fea138f57",
+  "single_parent":"843bf368be8ec0a7162f2a9f1d066889fd3e6702",
+  "formal_h035_result":"457_PASS_1_FAIL",
+  "failure_label":"N_REG_WRONG_VERSION_VALIDATOR",
+  "reason":"GATE_PRIVATE_INVALID_VERSION_FIXTURE_USED_NOW_LEGAL_V3",
+  "disposition":"IMMUTABLE_NO_CREDIT_NOT_PARENT_NOT_PUBLICATION_AUTHORITY"},
+ "canonical_registry_locator":"specs/owner-production-paths.v1.json",
+ "canonical_registry_schema_version":3,
+ "legal_registry_states":[
+  {"schema_version":1,"owner_production_paths":H034_OWNER},
+  {"schema_version":2,"owner_production_paths":REGISTRY_OWNER},
+  {"schema_version":3,"owner_production_paths":REGISTRY_OWNER_V3}],
+ "active_transition":{"from_schema_version":2,"to_schema_version":3,
+  "added_owner_production_paths":H039_OWNER,
+  "all_other_registry_fields":"EXACTLY_RETAINED"},
+ "h034_task_owner_author_allowed_write":H034_OWNER,
+ "h034_task_depends_on":["h-037"],
+ "h036_task_owner_author_allowed_write":H036_OWNER,
+ "h036_task_depends_on":["h-034"],
+ "h039_prospective_owner_production_paths":H039_OWNER,
+ "h039_task_gate_product_install_effect":"EXACTLY_ABSENT_UNTIL_LATER_H039_FREEZE",
+ "test_author_allowed_write":V3_TEST_AUTHOR_PATHS,
+ "required_serial_order":V3_ORDER,
+ "broader_authority":False}
 E_KEYS=("schema_version","producer_authority","task","candidate_sha","task_spec_sha256","gate_sha256","probe_identity","request_id","result","effect_sha256")
 R_KEYS=("schema_version","observer_authority","request_id","candidate_sha","probe_identity","probe_path","probe_sha256","effect_marker")
 A_KEYS=("schema_version","probes"); P_KEYS=("probe_identity","probe_path","probe_sha256","effect_marker","result")
@@ -423,13 +479,170 @@ def r15_registry_controls(spec):
            and document.get("schema_version")==1 for document in
            (*documents(),recipe,manifest)),"J_R15_H034_NATIVE_PRODUCT_SCHEMAS_REMAIN_V1")
 
+def owner_surface_authorized(spec,task_id,registry):
+ try:
+  _task,authority,surface=authority_task(spec,task_id)
+  return (authority=="owner_authority" and bool(surface)
+   and all(authority_permitted(path,registry["owner_production_paths"])
+           for path in surface)
+   and not any(authority_overlaps(path,guard) for path in surface
+               for guard in registry["owner_author_global_denied_paths"]))
+ except (AuthorityRegistryError,KeyError,TypeError):return False
+
+def v3_h034_task_ok(spec):
+ rows=[task for task in spec.get("tasks",[]) if type(task) is dict and task.get("id")=="h-034"] if type(spec) is dict else []
+ if len(rows)!=1:return False
+ task=rows[0]
+ return (task.get("authority_class")=="owner_authority"
+  and task.get("allowed_write")==[]
+  and task.get("owner_author_allowed_write")==H034_OWNER
+  and task.get("docs_impact")==[]
+  and task.get("depends_on")==["h-037"]
+  and task.get("exit_test")=="verify/bin/h-034-exit"
+  and task.get("registry_v3_refreeze")==V3_TASK_CONTRACT)
+
+def v3_h036_task_ok(spec):
+ rows=[task for task in spec.get("tasks",[]) if type(task) is dict and task.get("id")=="h-036"] if type(spec) is dict else []
+ if len(rows)!=1:return False
+ task=rows[0]
+ return (task.get("authority_class")=="owner_authority"
+  and task.get("allowed_write")==[]
+  and task.get("owner_author_allowed_write")==H036_OWNER
+  and task.get("docs_impact")==[]
+  and task.get("depends_on")==["h-034"]
+  and task.get("exit_test")=="verify/bin/h-036-exit")
+
+def v3_registry_controls(spec):
+ try:registry=strict(REG.read_bytes())
+ except Exception as exc:
+  check(False,"F_V3_CANONICAL_REGISTRY_UNION12",exc);registry=None
+ canonical=(type(registry) is dict and set(registry)==REGISTRY_KEYS
+  and type(registry.get("schema_version")) is int
+  and registry.get("schema_version")==3
+  and registry.get("owner_production_paths")==REGISTRY_OWNER_V3
+  and all(registry.get(key)==value for key,value in RETAINED_REGISTRY.items())
+  and registry_accepted(registry)) if registry is not None else False
+ check(canonical,"F_V3_CANONICAL_REGISTRY_UNION12",
+       registry.get("owner_production_paths") if type(registry) is dict else registry)
+
+ check(v3_h034_task_ok(spec),"F_V3_H034_EXACT_TASK_AND_REFREEZE_CONTRACT")
+ check(v3_h036_task_ok(spec),"F_V3_H036_EXACT_PUBLISHED_DEPENDENCY")
+ check(type(registry) is dict and owner_surface_authorized(spec,"h-034",registry),
+       "F_V3_H034_OLD4_AUTHORITY_SATISFIABLE")
+ check(type(registry) is dict and owner_surface_authorized(spec,"h-036",registry),
+       "F_V3_H036_NEW3_AUTHORITY_RETAINED")
+
+ h039_rows=[task for task in spec.get("tasks",[])
+            if type(task) is dict and task.get("id")=="h-039"] \
+            if type(spec) is dict else []
+ h039_absent=(not h039_rows and not os.path.lexists(H039_GATE)
+              and all(not os.path.lexists(path) for path in H039_PRODUCT))
+ check(h039_absent,"F_V3_H039_TASK_GATE_PRODUCT_INSTALL_EXACTLY_ABSENT")
+ prospective={"spec_version":"2.0.0","tasks":[{
+  "id":"h-039-prospective-fixture","authority_class":"owner_authority",
+  "allowed_write":[],"owner_author_allowed_write":H039_OWNER,
+  "docs_impact":[]}]}
+ check(type(registry) is dict and owner_surface_authorized(
+       prospective,"h-039-prospective-fixture",registry),
+       "J_V3_H039_EXACT_NEW5_PROSPECTIVE_SATISFIABLE")
+ for index,surface in enumerate((
+   ["controller/runtime-cleanup/**"],["verify/h039/**"],
+   [*H039_OWNER,"controller/runtime-cleanup/**"],
+   [*H039_OWNER,"verify/h039/**"]),1):
+  mutant=json.loads(json.dumps(prospective))
+  mutant["tasks"][0]["owner_author_allowed_write"]=surface
+  check(type(registry) is dict and not owner_surface_authorized(
+        mutant,"h-039-prospective-fixture",registry),
+        f"J_V3_H039_BROAD_PREFIX_{index}_REJECT")
+
+ product_identity=(H035_CORE.is_file() and not H035_CORE.is_symlink()
+  and H035_CLI.is_file() and not H035_CLI.is_symlink()
+  and stat.S_IMODE(H035_CORE.lstat().st_mode)==0o644
+  and stat.S_IMODE(H035_CLI.lstat().st_mode)==0o755
+  and sha(H035_CORE.read_bytes())==H035_CORE_SHA256
+  and sha(H035_CLI.read_bytes())==H035_CLI_SHA256)
+ check(product_identity,"F_V3_PUBLISHED_H035_CORE_CLI_BYTES_RETAINED")
+
+ v1=registry_state(1,H034_OWNER)
+ v2=registry_state(2,REGISTRY_OWNER)
+ v3=registry_state(3,REGISTRY_OWNER_V3)
+ for label,document in (
+   ("V1_OLD4",v1),("V1_OLD4_REORDERED",{**v1,"owner_production_paths":list(reversed(H034_OWNER))}),
+   ("V2_UNION7",v2),("V2_UNION7_REORDERED",{**v2,"owner_production_paths":list(reversed(REGISTRY_OWNER))}),
+   ("V3_UNION12",v3),("V3_UNION12_REORDERED",{**v3,"owner_production_paths":list(reversed(REGISTRY_OWNER_V3))})):
+  check(registry_accepted(document),"J_V3_H035_LEGAL_STATE_"+label)
+
+ defect_count=0
+ for index,path in enumerate(REGISTRY_OWNER_V3,1):
+  substitutions={
+   "OMISSION":[item for item in REGISTRY_OWNER_V3 if item!=path],
+   "SUBSTITUTION":[member_neighbor(path,index) if item==path else item for item in REGISTRY_OWNER_V3],
+   "DUPLICATE":[*REGISTRY_OWNER_V3,path],
+   "BACKSLASH_ALIAS":[path.replace("/","\\") if item==path else item for item in REGISTRY_OWNER_V3],
+   "LEADING_DOT_ALIAS":["./"+path if item==path else item for item in REGISTRY_OWNER_V3],
+   "BROADER_PREFIX":[member_broader(path) if item==path else item for item in REGISTRY_OWNER_V3],
+   "ARBITRARY_ADDITION":[*REGISTRY_OWNER_V3,member_neighbor(path,index)]}
+  for family,paths in substitutions.items():
+   defect_count+=1
+   check(not registry_accepted(registry_state(3,paths)),
+         f"J_V3_MEMBER_{index}_{family}_REJECT")
+ check(defect_count==84,"J_V3_COMPLETE_UNION12_ONE_DEFECT_CARDINALITY",defect_count)
+
+ cross_pairs=(
+  ("V1_UNION7",1,REGISTRY_OWNER),("V1_UNION12",1,REGISTRY_OWNER_V3),
+  ("V2_OLD4",2,H034_OWNER),("V2_UNION12",2,REGISTRY_OWNER_V3),
+  ("V3_OLD4",3,H034_OWNER),("V3_UNION7",3,REGISTRY_OWNER),
+  ("V3_H039_ONLY",3,H039_OWNER))
+ for label,version,paths in cross_pairs:
+  check(not registry_accepted(registry_state(version,paths)),
+        "J_V3_CROSS_PAIR_"+label+"_REJECT")
+ for label,version in (("ZERO",0),("FOUR",4),("STRING","3"),("BOOL",True),
+                       ("FLOAT",3.0),("NULL",None),("LIST",[]),("OBJECT",{})):
+  check(not registry_accepted(registry_state(version,REGISTRY_OWNER_V3)),
+        "J_V3_VERSION_"+label+"_REJECT")
+ check(not registry_accepted(registry_state(
+       3,[*REGISTRY_OWNER_V3,"controller/runtime-cleanup/**"])),
+       "J_V3_BROAD_RUNTIME_CLEANUP_ADDITION_REJECT")
+ check(not registry_accepted(registry_state(
+       3,[*REGISTRY_OWNER_V3,"verify/h039/**"])),
+       "J_V3_BROAD_VERIFY_H039_ADDITION_REJECT")
+ check(not registry_accepted(registry_state(
+       3,[*REGISTRY_OWNER_V3,"unrelated/arbitrary"])),
+       "J_V3_UNRELATED_ARBITRARY_ADDITION_REJECT")
+
+ duplicate_key_raw=REG.read_bytes().replace(
+  b"{\n",b'{\n  "schema_version": 3,\n',1)
+ try:strict(duplicate_key_raw);duplicate_key_rejected=False
+ except Exception:duplicate_key_rejected=True
+ check(duplicate_key_rejected,"J_V3_REGISTRY_DUPLICATE_JSON_KEY_REJECT")
+
+ for label,task_id,key,value in (
+  ("H034_DEPENDENCY","h-034","depends_on",["h-035"]),
+  ("H034_SURFACE_MISSING","h-034","owner_author_allowed_write",H034_OWNER[:-1]),
+  ("H034_SURFACE_H039","h-034","owner_author_allowed_write",[*H034_OWNER,H039_OWNER[0]]),
+  ("H034_SURFACE_BROAD","h-034","owner_author_allowed_write",["controller/**"]),
+  ("H036_DEPENDENCY","h-036","depends_on",["h-035"]),
+  ("H036_SURFACE_MISSING","h-036","owner_author_allowed_write",H036_OWNER[:-1]),
+  ("H036_SURFACE_H039","h-036","owner_author_allowed_write",[*H036_OWNER,H039_OWNER[0]]),
+  ("H036_SURFACE_BROAD","h-036","owner_author_allowed_write",["controller/**"])):
+  mutant=json.loads(json.dumps(spec))
+  task=next(row for row in mutant["tasks"] if type(row) is dict and row.get("id")==task_id)
+  task[key]=value
+  task_ok=v3_h034_task_ok(mutant) if task_id=="h-034" else v3_h036_task_ok(mutant)
+  check(not task_ok,"J_V3_TASK_LIFECYCLE_"+label+"_REJECT")
+
+ check(all(type(document) is dict and type(document.get("schema_version")) is int
+           and document.get("schema_version")==1 for document in
+           (*documents(),strict(RECIPE.read_bytes()),strict(MANIFEST.read_bytes()))),
+       "J_V3_H034_NATIVE_PRODUCT_SCHEMAS_REMAIN_V1")
+
 def judge_controls():
  spec=strict(SPEC.read_bytes()); rows=[t for t in spec["tasks"] if t.get("id")=="h-034"]
  check(len(rows)==1,"F_H034_SINGLE_TASK")
  if rows:
   t=rows[0];check(t.get("authority_class")=="owner_authority" and t.get("depends_on")==["h-037"],"F_H034_OWNER_AFTER_H037")
   check(t.get("allowed_write")==[] and t.get("owner_author_allowed_write")==OWNER and t.get("exit_test")=="verify/bin/h-034-exit","F_H034_EXACT_OWNER_SURFACE")
- r15_registry_controls(spec)
+ v3_registry_controls(spec)
  h033=[t for t in spec["tasks"] if t.get("id")=="h-033"]
  check(len(h033)==1,"F_H033_EXACTLY_ONE_MATERIALIZED")
  if h033:
@@ -719,8 +932,9 @@ def semantic_contract():
 def main():
  try:
   if sys.argv[1:]==["--r15-registry-refreeze"]:r15_registry_controls(strict(SPEC.read_bytes()))
+  elif sys.argv[1:]==["--registry-v3-refreeze"]:v3_registry_controls(strict(SPEC.read_bytes()))
   elif len(sys.argv)==1:judge_controls();toolchain_anchor();production_contract()
-  else:raise Rig("usage: h-034-exit [--r15-registry-refreeze]")
+  else:raise Rig("usage: h-034-exit [--r15-registry-refreeze|--registry-v3-refreeze]")
  except (OSError,ValueError,subprocess.SubprocessError,Rig) as e:print("RIG_ERROR:",e,file=sys.stderr);return 2
  print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
  print(f"H034_GATE_SUMMARY={passed} PASS {failed} FAIL")

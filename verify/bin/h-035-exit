@@ -135,6 +135,16 @@ H039_OWNER_PATHS = (
 REQUIRED_OWNER = set(H034_OWNER_PATHS)
 PROSPECTIVE_OWNER = set((*H034_OWNER_PATHS, *H036_OWNER_PATHS))
 PROSPECTIVE_OWNER_V3 = {*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS}
+H034_V3_AUTHORITY_BASE = "843bf368be8ec0a7162f2a9f1d066889fd3e6702"
+H034_V3_CONTRACT_SHA256 = "bf6488c116b0b694e53f3b2fb80f792f1650b30dc761c58d0f36c84dbb6b442b"
+H034_V3_DOCUMENT_APPENDS = {
+    "docs/05-beslutslogg.md": (1265,
+        "71f449d5ce1ca927d3378f34d8483534457030875e004367ad7672a3b4da0f70",
+        b"| 2026-09-02 | H-034 exact registry-v3 union12 refreeze |"),
+    "docs/loop/drift.md": (3095,
+        "429f7820bf6e62a76bc96cc1384a68f2bfd0b972fc96e63993b89117e4df739b",
+        b"\n## H-034 registry-v3 refreeze after published H-035 R33"),
+}
 
 BPAM_AMENDMENT = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_AMENDMENT_V1 -->\n"
 BPAM_CONTRACT_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_BEGIN -->\n```json\n"; BPAM_CONTRACT_END = b"```\n<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_END -->\n"
@@ -1759,6 +1769,12 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
         for row in candidate_rows:
             if not isinstance(row,dict): return False
             task_id=row.get("id")
+            if task_id=="h-034":
+                contract=row.pop("registry_v3_refreeze",None)
+                if (not isinstance(contract,dict)
+                        or canonical_json_sha256(contract)
+                            !=H034_V3_CONTRACT_SHA256):
+                    return False
             if task_id=="h-035":
                 base_h035=next((value for value in base_candidate_rows
                                 if isinstance(value,dict)
@@ -1803,6 +1819,22 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
             spec_mutants.append(mutant)
     check(len(spec_mutants)==9 and all(not exact_spec_transform(mutant) for mutant in spec_mutants),
           "J_R17_ROOT_NEIGHBOR_H035_CRITERION_EXTRA_REORDER_LEGACY_SPEC_MUTANTS_REJECT")
+    h034_v3_mutants=[]
+    if isinstance(current_spec,dict):
+        for key,value in (("MISSING",None),("VERSION",2),
+                          ("BASE","0"*40),("BROAD","controller/runtime-cleanup/**")):
+            mutant=json.loads(json.dumps(current_spec))
+            h034=next(row for row in mutant["tasks"] if row.get("id")=="h-034")
+            if key=="MISSING":h034.pop("registry_v3_refreeze")
+            elif key=="VERSION":h034["registry_v3_refreeze"][
+                "canonical_registry_schema_version"]=value
+            elif key=="BASE":h034["registry_v3_refreeze"][
+                "authority_base_sha"]=value
+            else:h034["registry_v3_refreeze"]["h039_prospective_owner_production_paths"].append(value)
+            h034_v3_mutants.append(mutant)
+    check(len(h034_v3_mutants)==4
+          and all(not exact_spec_transform(mutant) for mutant in h034_v3_mutants),
+          "J_H034_V3_SPEC_CONTRACT_MISSING_VERSION_BASE_BROAD_MUTANTS_REJECT")
 
     h035_current=next((row for row in current_spec.get("tasks",[])
                        if isinstance(row,dict) and row.get("id")=="h-035"),{}) \
@@ -2834,7 +2866,7 @@ def validate_registry(doc: object) -> tuple[bool, str]:
     if not isinstance(doc, dict): return False, "top-level type"
     if set(doc) != REG_KEYS: return False, "top-level membership"
     version = doc.get("schema_version")
-    if type(version) is not int or version not in (1, 2): return False, "schema version"
+    if type(version) is not int or version not in (1, 2, 3): return False, "schema version"
     if doc.get("path_grammar") != "repo-tree-exact-or-terminal-recursive-prefix-v1": return False, "grammar"
     if doc.get("authority_source") != "git-candidate-plus-independent-gate-review-plus-owner-final-freeze": return False, "authority source"
     if doc.get("self_digest_is_authority") is not False: return False, "self digest"
@@ -2845,7 +2877,8 @@ def validate_registry(doc: object) -> tuple[bool, str]:
         try: canon = [parse_path(x) for x in value]
         except ValueError as e: return False, f"{key} path {e}"
         if len(canon) != len(set(canon)): return False, f"{key} duplicate"
-    required = REQUIRED_OWNER if version == 1 else PROSPECTIVE_OWNER
+    required = {1: REQUIRED_OWNER, 2: PROSPECTIVE_OWNER,
+                3: PROSPECTIVE_OWNER_V3}[version]
     if set(doc["owner_production_paths"]) != required: return False, "version-bound owner membership"
     return True, "ok"
 
@@ -2858,14 +2891,23 @@ def registry_selftests(good: dict[str, object]) -> None:
     prospective = json.loads(json.dumps(good))
     prospective["schema_version"] = 2
     prospective["owner_production_paths"] = [*H034_OWNER_PATHS, *H036_OWNER_PATHS]
+    activated = json.loads(json.dumps(good))
+    activated["schema_version"] = 3
+    activated["owner_production_paths"] = [*H034_OWNER_PATHS, *H036_OWNER_PATHS,
+                                           *H039_OWNER_PATHS]
     current_reordered = json.loads(json.dumps(current))
     current_reordered["owner_production_paths"] = list(reversed(current_reordered["owner_production_paths"]))
     reordered = json.loads(json.dumps(prospective))
     reordered["owner_production_paths"] = list(reversed(reordered["owner_production_paths"]))
+    activated_reordered = json.loads(json.dumps(activated))
+    activated_reordered["owner_production_paths"] = list(
+        reversed(activated_reordered["owner_production_paths"]))
     ok, why = validate_registry(current); check(ok, "J_R14_REGISTRY_V1_CURRENT_POSITIVE", why)
     ok, why = validate_registry(current_reordered); check(ok, "J_R14_REGISTRY_V1_REORDERED_EXACT_SET_POSITIVE", why)
     ok, why = validate_registry(prospective); check(ok, "J_R14_REGISTRY_V2_PROSPECTIVE_POSITIVE", why)
     ok, why = validate_registry(reordered); check(ok, "J_R14_REGISTRY_V2_REORDERED_EXACT_SET_POSITIVE", why)
+    ok, why = validate_registry(activated); check(ok, "J_R34_REGISTRY_V3_UNION12_POSITIVE", why)
+    ok, why = validate_registry(activated_reordered); check(ok, "J_R34_REGISTRY_V3_REORDERED_EXACT_SET_POSITIVE", why)
     mutants: list[tuple[str, object]] = []
     for name, mutate in (
         ("MISSING_KEY", lambda d: d.pop("path_grammar")),
@@ -2897,7 +2939,7 @@ def registry_selftests(good: dict[str, object]) -> None:
     ):
         mutant = json.loads(json.dumps(prospective)); mutant["owner_production_paths"][-3] = value
         r14_mutants.append(mutant)
-    for version in (0, 3, True, 1.0, 2.0):
+    for version in (0, 4, True, 1.0, 2.0, 3.0):
         mutant = json.loads(json.dumps(prospective)); mutant["schema_version"] = version
         r14_mutants.append(mutant)
     mutant = json.loads(json.dumps(prospective)); mutant["owner_production_paths"].append(H036_OWNER_PATHS[0]); r14_mutants.append(mutant)
@@ -16756,6 +16798,12 @@ def production_matrix(tmp: Path) -> None:
     expect_auth(tmp, "N18_ALTERNATE_SPEC", "validate-task", {**canonical,"alternate_spec":str(alt)}, True, authority_class="ordinary")
     freeze_common = req(review_result="PASS",candidate_sha=base,review_identity="review-1")
     rrepo, rbase, rsha = registry_candidate(tmp, "P05_REGISTRY_RUNTIME", REG.read_text())
+    canonical_v3 = strict_load(REG)
+    check(isinstance(canonical_v3,dict)
+          and canonical_v3.get("schema_version")==3
+          and set(canonical_v3.get("owner_production_paths",[]))
+              ==PROSPECTIVE_OWNER_V3,
+          "J_H034_V3_CANONICAL_RUNTIME_FIXTURE")
     expect_auth(tmp, "P05_REGISTRY_RUNTIME", "validate-registry", {**common,"repo":str(rrepo),"base_sha":rbase,"candidate_sha":rsha}, True)
     good_reg = strict_load(REG)
     malformed: list[tuple[str, str]] = [
@@ -16764,7 +16812,9 @@ def production_matrix(tmp: Path) -> None:
       ("N38_MISSING_KEY", json.dumps({k:v for k,v in good_reg.items() if k != "path_grammar"})),
       ("N39_DUPLICATE_PATH", json.dumps({**good_reg, "owner_production_paths":[*good_reg["owner_production_paths"], good_reg["owner_production_paths"][0]]})),
       ("N40_REQUIRED_REMOVED", json.dumps({**good_reg, "owner_production_paths":good_reg["owner_production_paths"][1:]})),
-      ("N_REG_WRONG_VERSION", json.dumps({**good_reg, "schema_version":3})),
+      # Schema v3 is now the causal P05 positive. The one-defect invalid
+      # version is v4; retaining v3 here would falsely reject the migration.
+      ("N_REG_WRONG_VERSION", json.dumps({**good_reg, "schema_version":4})),
       ("N_REG_WRONG_TOP_TYPE", "[]"),
       ("N_REG_MALFORMED_PATH", json.dumps({**good_reg, "owner_production_paths":["../escape"]})),
     ]
@@ -17485,10 +17535,11 @@ def r15_document_append_selftests() -> None:
     positives=[];mutants=[]
     for path,(_size,_digest,marker) in r33_appends.items():
         base=r15_git_object_bytes(ROOT,r33_base,path)
-        try:current=(ROOT/path).read_bytes()
-        except OSError:current=b""
-        suffix=current[len(base):] if base is not None and current.startswith(base) else b""
-        positives.append(base is not None and r33_valid(path,base,current))
+        published=r15_git_object_bytes(ROOT,H034_V3_AUTHORITY_BASE,path)
+        suffix=published[len(base):] if base is not None and published is not None \
+            and published.startswith(base) else b""
+        positives.append(base is not None and published is not None
+                         and r33_valid(path,base,published))
         if base is None:continue
         mutants.extend(((path,base,base+suffix+b"extra\n"),
                         (path,base,base+suffix[:-1]),
@@ -17500,6 +17551,40 @@ def r15_document_append_selftests() -> None:
     check(len(mutants)==20 and all(not r33_valid(path,base,candidate)
           for path,base,candidate in mutants),
           "J_R33_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
+    h034_positives=[];h034_mutants=[];unchanged=[]
+    for path in r33_appends:
+        published=r15_git_object_bytes(ROOT,H034_V3_AUTHORITY_BASE,path)
+        try:current=(ROOT/path).read_bytes()
+        except OSError:current=b""
+        if path not in H034_V3_DOCUMENT_APPENDS:
+            unchanged.append(published is not None and current==published)
+            continue
+        size,digest,marker=H034_V3_DOCUMENT_APPENDS[path]
+        suffix=current[len(published):] if published is not None \
+            and current.startswith(published) else b""
+        h034_positives.append(published is not None and len(suffix)==size
+            and hashlib.sha256(suffix).hexdigest()==digest
+            and suffix.startswith(marker) and suffix.endswith(b"\n"))
+        if published is not None:
+            h034_mutants.extend(((path,published+suffix+b"extra\n"),
+                                 (path,published+suffix[:-1]),
+                                 (path,published[:-1]+suffix),
+                                 (path,b"rewrite\n"+published+suffix),
+                                 (path,published+suffix.replace(
+                                     marker,b"substitute",1))))
+    def exact_h034_append(path: str,candidate: bytes) -> bool:
+        published=r15_git_object_bytes(ROOT,H034_V3_AUTHORITY_BASE,path)
+        if published is None or not candidate.startswith(published):return False
+        size,digest,marker=H034_V3_DOCUMENT_APPENDS[path]
+        suffix=candidate[len(published):]
+        return (len(suffix)==size and hashlib.sha256(suffix).hexdigest()==digest
+                and suffix.startswith(marker) and suffix.endswith(b"\n"))
+    check(len(h034_positives)==2 and all(h034_positives)
+          and len(unchanged)==2 and all(unchanged),
+          "F_H034_V3_TWO_DOCUMENTS_EXACT_843BF368_PLUS_HASH_BOUND_APPEND")
+    check(len(h034_mutants)==10 and all(not exact_h034_append(path,candidate)
+          for path,candidate in h034_mutants),
+          "J_H034_V3_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
 
 
 def r15_parallel_cli_selftests() -> None:
