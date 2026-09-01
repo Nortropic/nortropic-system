@@ -4237,3 +4237,42 @@ weakening, or broader filesystem/process/network/credential/owner authority.
 ## H-038 R15 dependency-refreeze
 
 Exact H-035 product publication `01a1deddedbb0efc0ebafd87b32a30c5613840ba` and binding `8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0` are the acyclic base; only the frozen five-path transform is admitted and the future product is a direct child of guarded refreeze merge M.
+
+## H-035 R28 — OS-exclusive cleanup registry boundary
+
+H-038 R9 is preserved as immutable NO-CREDIT and its same-euid final-check/name-to-inode race is
+binding architectural evidence. R28 does not attempt another same-UID check/unlink construction and
+does not relax zero residue. It introduces only a frozen H-035 parser prerequisite for the owner's
+new narrow H-039 exception.
+
+R27 `6419bd0c6d03f05a776c6e6640873b9941f51d35` remains immutable NO-CREDIT and is
+not a parent or publication candidate. Its independent review identities are lane A SHA-256
+`555d3284e559cd8eaef2fd29ad87430ea0999cb78fd463f965c6f45233d939e9` and lane B
+SHA-256 `6c19f006a358d3f42a74f0ac2644168ee1bf6ad46558c74af05a3d6de8335c3a`.
+R28 starts again at c161 and closes all three findings: R14 product-scope runs once, exact-file
+neighbor/descendant positives are causal under valid v3, and the complete R14 alternative
+non-owner-list positive family is repeated under valid v3.
+
+The active registry transition is exact v2 union7 → v3 union12. Historical v1 old4 and current v2
+union7 remain legal; every other version/membership pairing rejects. The five additions are exact
+files under `controller/runtime-cleanup` and `verify/h039`; no recursive prefix, alias or neighbor is
+admitted. `specs/owner-production-paths.v1.json` remains byte-identical v2 in this candidate, no
+H-039 task exists yet, and H034/H036/H038 task rows are unchanged. The separate BUILDER surface is
+only `controller/authority/core.py`.
+
+For each H039 exact file, disjoint ordinary sibling and descendant tasks/candidates/policy calls
+must accept; the two owner broad prefixes must reject. Valid distinguishing, overlapping, reordered
+and backslash alternative values for both registry-owned non-owner lists must retain their R14
+consumer/effect behavior. These are positive causal controls, not additional authority members.
+
+The exception is causal and closed: a later H-039 may own only a separate OS identity/root-protected
+namespace and digest-bound cleanup mediator whose server state derives an exact registered object
+from a capability/request identity. General native/root, caller path, general deletion/rename,
+filesystem/process/shell/Git/network/credential/dynamic-code, cross-service and confinement-bypass
+authority remain denied. If those limits are insufficient, the sequence stops for a new owner
+decision.
+
+Trust transitions remain serial. After H035 R28 contract and product publication, H034 alone moves
+the registry to v3; H036 is then registry-only refrozen because its frozen gate embeds the v2 bytes;
+only then may H039 be frozen/built/reviewed/published. H038 refreeze/product, H032 and H031 follow.
+No supervisor resume is authorized before the entire chain is green.
