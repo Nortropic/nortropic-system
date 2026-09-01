@@ -27,6 +27,18 @@ PROSPECTIVE_OWNER_PATHS = REQUIRED_OWNER_PATHS | {
     "controller/launch/cli", "controller/launch/runtime_snapshot.py",
     "config/python-runtime-authority-v2.json",
 }
+RUNTIME_CLEANUP_OWNER_PATHS = {
+    "controller/runtime-cleanup/install",
+    "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/runtime-cleanup-mediator",
+    "verify/h039/build-recipe.json",
+    "verify/h039/identity-manifest.json",
+}
+OWNER_PATHS_BY_VERSION = {
+    1: REQUIRED_OWNER_PATHS,
+    2: PROSPECTIVE_OWNER_PATHS,
+    3: PROSPECTIVE_OWNER_PATHS | RUNTIME_CLEANUP_OWNER_PATHS,
+}
 
 
 class AuthorityError(ValueError):
@@ -101,7 +113,7 @@ def validate_registry(document: object) -> dict[str, object]:
     if not isinstance(document, dict) or set(document) != REGISTRY_KEYS:
         raise AuthorityError("registry top-level membership")
     version = document.get("schema_version")
-    if type(version) is not int or version not in (1, 2):
+    if type(version) is not int or version not in OWNER_PATHS_BY_VERSION:
         raise AuthorityError("registry schema_version")
     if document.get("path_grammar") != "repo-tree-exact-or-terminal-recursive-prefix-v1":
         raise AuthorityError("registry path_grammar")
@@ -117,8 +129,7 @@ def validate_registry(document: object) -> dict[str, object]:
         canonical = [canonical_path(value) for value in values]
         if len(canonical) != len(set(canonical)):
             raise AuthorityError(f"registry {key} duplicate")
-    required_owner_paths = (REQUIRED_OWNER_PATHS if version == 1
-                            else PROSPECTIVE_OWNER_PATHS)
+    required_owner_paths = OWNER_PATHS_BY_VERSION[version]
     if set(document["owner_production_paths"]) != required_owner_paths:
         raise AuthorityError("registry owner_production_paths membership")
     return document
@@ -191,13 +202,34 @@ def regular_blob_at(repo: Path, candidate: str, relative: object) -> tuple[str, 
 def changed_files(repo: Path, base: str, candidate: str) -> list[str]:
     exact_commit(repo, base)
     exact_commit(repo, candidate)
-    result = git(repo, "diff", "--name-only", "--no-renames", base, candidate)
+    result = subprocess.run(
+        ["git", "-C", str(repo), "diff", "--name-only", "--no-renames", "-z",
+         base, candidate],
+        capture_output=True, shell=False, check=False,
+    )
     if result.returncode:
-        raise AuthorityError(f"cannot derive Git changed files: {result.stderr.strip()}")
-    files = [canonical_path(line) for line in result.stdout.splitlines() if line]
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise AuthorityError(f"cannot derive Git changed files: {detail}")
+    if result.stdout and not result.stdout.endswith(b"\x00"):
+        raise AuthorityError("malformed NUL-delimited Git changed files")
+    raw_paths = result.stdout[:-1].split(b"\x00") if result.stdout else []
+    if any(not raw_path for raw_path in raw_paths):
+        raise AuthorityError("malformed NUL-delimited Git changed files")
+    try:
+        files = [canonical_path(raw_path.decode("utf-8", errors="strict"))
+                 for raw_path in raw_paths]
+    except UnicodeDecodeError as exc:
+        raise AuthorityError("Git changed path is not UTF-8") from exc
     if len(files) != len(set(files)):
         raise AuthorityError("duplicate changed path")
     return files
+
+
+def validate_owner_surface(surface: Iterable[object], registry: dict[str, object]) -> None:
+    if any(overlaps(item, guard) for item in surface for guard in registry["owner_author_global_denied_paths"]):
+        raise AuthorityError("owner surface overlaps global deny")
+    if any(not permitted(item, registry["owner_production_paths"]) for item in surface):
+        raise AuthorityError("owner surface outside owner production")
 
 
 def task_authority(spec: object, task_id: str) -> tuple[dict[str, object], str, list[str]]:
