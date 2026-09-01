@@ -17,10 +17,15 @@ if sys.version_info < (3, 12):
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+sys.dont_write_bytecode = True
+_r15_saved_pycache_prefix=sys.pycache_prefix
+sys.pycache_prefix="/dev/null/h035-r15-no-bytecode-cache"
 sys.path.insert(0, str(HERE))
 from core import (AuthorityError, blob_at, changed_files, exact_commit, overlaps,  # noqa: E402
                   permitted, regular_blob_at, strict_json_bytes, strict_json_file,
                   task_authority, validate_registry)
+sys.pycache_prefix=_r15_saved_pycache_prefix
+del _r15_saved_pycache_prefix
 
 SPEC_PATH = ROOT / "specs/tasks.spec.json"
 REGISTRY_PATH = ROOT / "specs/owner-production-paths.v1.json"
@@ -360,5 +365,142 @@ def main(argv: list[str]) -> int:
         return response(False, reason=str(exc))
 
 
+_r15_loader_root=ROOT
+
+import fcntl as _r15_fcntl,hashlib as _r15_hashlib,os as _r15_os,stat as _r15_stat
+_R15_ATTEST_SHA256="4fd59ecc4fc6cb79d4cb229f2895f8cdb0b7e90429e9076ac46aa5fd512d3377"
+def _r15_meta(value):return (value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+class _r15_pairs(dict):
+    def __init__(self,items):self.pairs=list(items);super().__init__(items)
+def _r15_pair_json(raw):return json.loads(raw.decode("utf-8"),object_pairs_hook=_r15_pairs,parse_constant=lambda item:item)
+def _r15_selector_alias(path):
+    path=Path(path);proof=None
+    if path.is_absolute() and len(path.parts)>1 and path.parts[1] in ("var","tmp"):
+        alias="/"+path.parts[1];target="private/"+path.parts[1];root_before=_r15_os.stat("/",follow_symlinks=False);before=_r15_os.lstat(alias)
+        if _r15_stat.S_ISLNK(before.st_mode):
+            if before.st_uid!=0 or before.st_nlink!=1 or _r15_os.readlink(alias)!=target:raise RuntimeError("R15 selector system alias")
+            after=_r15_os.lstat(alias);root_after=_r15_os.stat("/",follow_symlinks=False)
+            root_meta=lambda value:(value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_nlink)
+            if _r15_meta(before)!=_r15_meta(after) or root_meta(root_before)!=root_meta(root_after):raise RuntimeError("R15 selector system alias race")
+            proof=(alias,target,_r15_meta(before),root_meta(root_before));path=Path("/private")/path.parts[1]/Path(*path.parts[2:])
+    return path,proof
+def _r15_selector_alias_recheck(proof):
+    if proof is None:return
+    alias,target,want,want_root=proof;value=_r15_os.lstat(alias);root=_r15_os.stat("/",follow_symlinks=False)
+    if _r15_meta(value)!=want or (root.st_dev,root.st_ino,root.st_mode,root.st_uid,root.st_nlink)!=want_root or _r15_os.readlink(alias)!=target:raise RuntimeError("R15 selector system alias changed")
+def _r15_selector_raw(path,limit=8*1024*1024):
+    path,alias_proof=_r15_selector_alias(Path(path));parts=path.parts;directory_flags=_r15_os.O_RDONLY|getattr(_r15_os,"O_DIRECTORY",0)|getattr(_r15_os,"O_NOFOLLOW",0)|getattr(_r15_os,"O_CLOEXEC",0);fds=[];leaf=-1;observed=False
+    if not parts:return None
+    if path.is_absolute():start=path.anchor;names=parts[1:]
+    else:
+        if any(name in ("",".","..") for name in parts):raise RuntimeError("R15 selector relative path")
+        start=".";names=parts
+    if not names:return None
+    try:
+        fds.append(_r15_os.open(start,directory_flags))
+        for name in names[:-1]:
+            before=_r15_os.stat(name,dir_fd=fds[-1],follow_symlinks=False);child=_r15_os.open(name,directory_flags,dir_fd=fds[-1]);opened=_r15_os.fstat(child)
+            if not _r15_stat.S_ISDIR(opened.st_mode) or (before.st_dev,before.st_ino,before.st_mode,before.st_uid)!=(opened.st_dev,opened.st_ino,opened.st_mode,opened.st_uid):raise RuntimeError("R15 selector ancestor")
+            fds.append(child)
+        before=_r15_os.stat(names[-1],dir_fd=fds[-1],follow_symlinks=False);observed=True
+        if not _r15_stat.S_ISREG(before.st_mode) or before.st_uid!=_r15_os.getuid() or before.st_nlink!=1 or before.st_size>limit:raise RuntimeError("R15 selector leaf")
+        leaf=_r15_os.open(names[-1],_r15_os.O_RDONLY|getattr(_r15_os,"O_NOFOLLOW",0)|getattr(_r15_os,"O_CLOEXEC",0)|getattr(_r15_os,"O_NONBLOCK",0),dir_fd=fds[-1]);opened=_r15_os.fstat(leaf);raw=b"";offset=0
+        if _r15_meta(before)!=_r15_meta(opened):raise RuntimeError("R15 selector open race")
+        while offset<opened.st_size:
+            part=_r15_os.pread(leaf,min(65536,opened.st_size-offset),offset)
+            if not part:raise RuntimeError("R15 selector short read")
+            raw+=part;offset+=len(part)
+        if _r15_meta(_r15_os.fstat(leaf))!=_r15_meta(opened) or _r15_meta(_r15_os.stat(names[-1],dir_fd=fds[-1],follow_symlinks=False))!=_r15_meta(opened):raise RuntimeError("R15 selector leaf replacement")
+        for index,name in enumerate(names[:-1],1):
+            held=_r15_os.fstat(fds[index]);named=_r15_os.stat(name,dir_fd=fds[index-1],follow_symlinks=False)
+            if (held.st_dev,held.st_ino,held.st_mode,held.st_uid)!=(named.st_dev,named.st_ino,named.st_mode,named.st_uid):raise RuntimeError("R15 selector ancestor replacement")
+        _r15_selector_alias_recheck(alias_proof);return raw
+    except FileNotFoundError:
+        if observed:raise RuntimeError("R15 selector disappeared after observation")
+        _r15_selector_alias_recheck(alias_proof)
+        return None
+    finally:
+        if leaf>=0:_r15_os.close(leaf)
+        for descriptor in reversed(fds):_r15_os.close(descriptor)
+def _r15_semantic_store(path):
+    try:
+        raw=_r15_selector_raw(path)
+        if raw is None:return False
+        value=_r15_pair_json(raw)
+        if not isinstance(value,_r15_pairs):return False
+        if any(key=="invalidated_shas" for key,_item in value.pairs):return True
+        for key,records in value.pairs:
+            if key!="attestations" or not isinstance(records,_r15_pairs):continue
+            for _task,record in records.pairs:
+                if isinstance(record,_r15_pairs) and any(field=="record_type" for field,_item in record.pairs):return True
+        return False
+    except (UnicodeError,ValueError,TypeError):return False
+    except OSError:return True
+    except RuntimeError:return True
+def _r15_reserved(path):
+    try:return _r15_selector_raw(path,0) is not None
+    except (OSError,RuntimeError):return True
+def _r15_runtime():
+    target=_r15_loader_root/"controller/attest/cli";parts=target.parts;flags=_r15_os.O_RDONLY|getattr(_r15_os,"O_DIRECTORY",0)|getattr(_r15_os,"O_NOFOLLOW",0)|getattr(_r15_os,"O_CLOEXEC",0);fds=[];retained=-1;prior_cache=sys.pycache_prefix;sys.pycache_prefix="/dev/null/h035-r15-no-bytecode-cache"
+    try:
+        fds.append(_r15_os.open("/",flags))
+        for name in parts[1:-1]:fds.append(_r15_os.open(name,flags,dir_fd=fds[-1]))
+        before=_r15_os.stat(parts[-1],dir_fd=fds[-1],follow_symlinks=False);leaf=_r15_os.open(parts[-1],_r15_os.O_RDONLY|getattr(_r15_os,"O_NOFOLLOW",0)|getattr(_r15_os,"O_CLOEXEC",0)|getattr(_r15_os,"O_NONBLOCK",0),dir_fd=fds[-1]);fds.append(leaf);opened=_r15_os.fstat(leaf);raw=b"";offset=0
+        if (not _r15_stat.S_ISREG(opened.st_mode) or opened.st_uid!=_r15_os.getuid() or opened.st_nlink!=1 or _r15_stat.S_IMODE(opened.st_mode)!=0o755 or _r15_meta(opened)!=_r15_meta(before) or opened.st_size>262144):raise RuntimeError("R15 retained runtime identity")
+        while offset<opened.st_size:
+            part=_r15_os.pread(leaf,min(65536,opened.st_size-offset),offset) or (_ for _ in ()).throw(RuntimeError("R15 retained runtime short read"));raw+=part;offset+=len(part)
+        after=_r15_os.fstat(leaf);named=_r15_os.stat(parts[-1],dir_fd=fds[-2],follow_symlinks=False)
+        if _r15_meta(after)!=_r15_meta(opened) or _r15_meta(named)!=_r15_meta(opened):raise RuntimeError("R15 retained runtime replacement")
+        for index,name in enumerate(parts[1:-1],1):
+            held=_r15_os.fstat(fds[index]);named=_r15_os.stat(name,dir_fd=fds[index-1],follow_symlinks=False)
+            if not _r15_stat.S_ISDIR(held.st_mode) or (held.st_dev,held.st_ino)!=(named.st_dev,named.st_ino):raise RuntimeError("R15 retained runtime ancestor")
+        start=b"# H035_R15_RETAINED_ENGINE_BEGIN_V1\n";finish=b"# H035_R15_RETAINED_ENGINE_END_V1\n"
+        first=raw.find(start);last=raw.find(finish)
+        if _r15_hashlib.sha256(raw).hexdigest()!=_R15_ATTEST_SHA256 or raw.count(start)!=1 or raw.count(finish)!=1 or not 0<=first<last:raise RuntimeError("R15 retained runtime digest/markers")
+        payload=raw[first+len(start):last]
+        if b"__file__" in payload:raise RuntimeError("R15 retained runtime path authority")
+        retained=_r15_fcntl.fcntl(leaf,_r15_fcntl.F_DUPFD_CLOEXEC,3);ns={"_r15_bound_root":_r15_loader_root,"_r15_installed_attest_fd":retained,"_r15_installed_attest_sha256":_R15_ATTEST_SHA256,"_r15_installed_attest_identity":_r15_meta(opened),"__name__":"h035_r15_retained_runtime","__file__":"<h035-r15-retained-attest-engine>"};exec(compile(payload,"<h035-r15-retained-attest-engine>","exec",dont_inherit=True,optimize=0),ns,ns)
+        if ns.get("ROOT")!=_r15_loader_root or not all(callable(ns.get(x)) for x in ("attest_main","authority_value","taskval_main")):raise RuntimeError("R15 retained runtime exports")
+        return ns
+    except Exception:
+        if retained>=0:_r15_os.close(retained)
+        raise
+    finally:
+        for descriptor in reversed(fds):
+            try:_r15_os.close(descriptor)
+            except OSError:pass
+        sys.pycache_prefix=prior_cache
+
+_r15_legacy_main = main
+def _r15_authority_selected(command,value):
+    if command=="record-publication":return True
+    if not isinstance(value,dict):return True
+    if "h035_r15_request" in value:return True
+    state=value.get("state_dir")
+    if isinstance(state,str):
+        try:
+            root=Path(state);attest=root.parent/"attest"
+            residue=(root/"bootstrap-manifest.json",root/".r15-owner.lock",
+                     root/".r15-state-db-shadow",attest/"bootstrap-manifest.json",
+                     attest/".r15-attest.lock",attest/".r15-attest-shadow",
+                     attest/".r15-attest-recovery.jsonl")
+            if (any(_r15_reserved(path) for path in residue)
+                    or _r15_semantic_store(attest/"attestations.json")):return True
+        except OSError:return True
+    return False
+def main(argv):
+    if argv and argv[0] in ("owner-author","check-candidate","record-review","owner-freeze","record-publication"):
+        try:
+            value=strict_json_bytes(sys.stdin.buffer.read())
+            if not isinstance(value,dict):raise AuthorityError("request must be one JSON object")
+            if _r15_authority_selected(argv[0],value):
+                runtime=_r15_runtime()
+                try:return runtime["authority_value"](argv,value)
+                finally:_r15_os.close(runtime["_r15_installed_attest_fd"])
+            if _r15_authority_selected(argv[0],value):raise RuntimeError("R15 authority appeared after legacy selection")
+            return COMMANDS[argv[0]](value)
+        except (AuthorityError,OSError,ValueError,RuntimeError) as exc:
+            return response(False,reason=str(exc))
+    return _r15_legacy_main(argv)
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

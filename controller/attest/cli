@@ -138,5 +138,1762 @@ def main(argv: list[str]) -> int:
     return fel(f"okänt kommando: {kommando}")
 
 
+_r15_bound_root=ROT
+# H035_R15_RETAINED_ENGINE_BEGIN_V1
+import ctypes,errno,fcntl,hashlib,json,os,pwd,re,secrets,sqlite3,stat,subprocess,sys
+from contextlib import contextmanager
+from pathlib import Path
+sys.dont_write_bytecode=True
+ROOT=_r15_bound_root
+R15_BOUND_CONTRACT={"authority_base_sha":"5bfdd9afd075a2431aded52dc21eaa361aaf729e","candidate_sha":"da773a8cebe78ae88956adfc0561abe5dc5093ec","candidate_tree":"e01ee2954219f9f0318147fde6aac660ce70845b","contract_tree":"e01ee2954219f9f0318147fde6aac660ce70845b","gate_sha256":"18a6a6e4f43c2291170e466fcbc546f47d539acdcefe4558eab2e3ab5df01c37","manifest_sha256":"cfc9141239d3448470f73aeaf4f92ad9af7efd7ebfc1f307b19ca49841db9390","merge_sha":"2bbc0eb29e18c4ab4d53c9aa61fdbd29075d5bfa"}
+INITIAL_AGENT=os.environ.get("SSH_AUTH_SOCK","")
+INITIAL_TMPDIR=Path(os.confstr(65537)).resolve(strict=True)
+STATE=ROOT/"controller/state/cli"
+STORE="attestations.json"; ASHADOW=".r15-attest-shadow"; RECOVERY=".r15-attest-recovery.jsonl"
+DB="state.db"; DBSHADOW=".r15-state-db-shadow"; EVENTS="events.jsonl"; SM="bootstrap-manifest.json"
+RENAME_SWAP=0x02;RENAME_EXCL=0x04;RENAME_NOFOLLOW_ANY=0x10;RENAME_RESOLVE_BENEATH=0x20
+MANIFEST_FIELDS={"record_type","schema_version","repository_identity","current_main","bundle_root","bundle_root_dev_ino","state_root","state_root_dev_ino","attest_root","attest_root_dev_ino","state_manifest_dev_ino","attest_manifest_dev_ino","state_lock_dev_ino","attest_lock_dev_ino","state_event_log_dev_ino","state_db_slot_dev_inos","attestation_store_slot_dev_inos","attest_recovery_log_dev_ino","h038_refreeze_binding_sha256","bootstrap_event_stream_sha256","bootstrap_state_db_sha256","bootstrap_state_db_shadow_sha256","bootstrap_attestation_store_sha256","bootstrap_attestation_store_shadow_sha256","bootstrap_attest_recovery_log_sha256"}
+FINALIZER_FD_LOADER=(
+ "import hashlib,json,os,stat,sys\n"
+ "fd=int(sys.argv[1]);expected=sys.argv[2];identity=tuple(json.loads(sys.argv[3]));canonical=sys.argv[4];args=sys.argv[5:]\n"
+ "fields=lambda value:(value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)\n"
+ "opened=os.fstat(fd)\n"
+ "if fields(opened)!=identity or not stat.S_ISREG(opened.st_mode) or opened.st_uid!=os.getuid() or opened.st_nlink!=1 or stat.S_IMODE(opened.st_mode)!=0o755 or opened.st_size>262144:raise SystemExit(126)\n"
+ "raw=b'';offset=0\n"
+ "while offset<opened.st_size:\n part=os.pread(fd,min(65536,opened.st_size-offset),offset)\n if not part:raise SystemExit(126)\n raw+=part;offset+=len(part)\n"
+ "if hashlib.sha256(raw).hexdigest()!=expected or fields(os.fstat(fd))!=identity:raise SystemExit(126)\n"
+ "sys.argv=[canonical,*args];namespace={'__name__':'__main__'};namespace['__'+'file__']=canonical\n"
+ "exec(compile(raw,canonical,'exec',dont_inherit=True,optimize=0),namespace,namespace)\n")
+_R15_CONTEXTS=[]
+HEX40=re.compile(r"^[0-9a-f]{40}$"); HEX64=re.compile(r"^[0-9a-f]{64}$")
+H={"task":"h-036","base_sha":"8be493de757b5f7fea2bf5ac64d6087adaa28d59","candidate_sha":"18aeff690a11d72d878eb0e3b7880ccf5b7d4882","candidate_tree":"0999ed1ae9a9899279bb4135b4a0313e7f0b6909","publication_sha":"e71dfbbd6a1dcb0792031764370f264dd63ebbf2","spec_sha256":"c4bbff795a8d739eea6d43b4086a2724c504b2b31868e6a25a6c854429653486","registry_sha256":"3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256","gate_path":"verify/bin/h-036-exit","gate_sha256":"55e9d8648be128f0841659b0d8598029109967a947ec6719df52f7cb97f45049","review_sha256":"a9b4fdb64c8e1200b63e06366a1fd1f4590c1217bf32a2482a11067577f595b0","receipt_sha256":"87e890362ddd007f202857c1555824a57e1e8db86abfdc7837e76c9b2fd78989","dependency_attestations_sha256":"2c9eac578bd6fb694f8f111aac11eb6935fd74810265c388f138aff0b7395607"}
+HREVIEW=Path("/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h036-product-review-18aeff69.json")
+HRECEIPT=Path("/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h036-product-publication-pr171.json")
+HPATHS=[("config/python-runtime-authority-v2.json","100644"),("controller/launch/cli","100755"),("controller/launch/runtime_snapshot.py","100644")]
+OWNER_FIELDS={"record_type","schema_version","authority_class","task","base_sha","candidate_sha","candidate_tree","publication_sha","invalidates_on","spec_path","spec_sha256","registry_path","registry_sha256","gate_path","gate_sha256","dependency_attestations_sha256","transition_identity","candidate_identity","changed_files","review_identity","review_result","repository_identity","stale"}
+CLAIM_FIELDS=("task","status","authority_class","base_sha","main_sha","spec_path","spec_sha256","registry_path","registry_sha256","gate_path","gate_sha256","repository_identity","dependency_attestations_sha256","transition_identity")
+REQUEST_MARKER={"record_type":"h035_r15_authority_request_v1","schema_version":1}
+def request_marker(value):return isinstance(value,dict) and set(value)=={"record_type","schema_version"} and value.get("record_type")=="h035_r15_authority_request_v1" and type(value.get("schema_version")) is int and value.get("schema_version")==1
+
+class Stop(Exception): pass
+class Indeterminate(Stop): pass
+def pairs(items):
+ d={}
+ for k,v in items:
+  if k in d: raise Stop("duplicate JSON key")
+  d[k]=v
+ return d
+def loadb(raw):
+ def constant(value):raise Stop("non-finite JSON constant "+value)
+ try:
+  value=json.loads(raw.decode("utf-8"),object_pairs_hook=pairs,parse_constant=constant)
+  json.dumps(value,ensure_ascii=False).encode("utf-8")
+  return value
+ except (UnicodeError,json.JSONDecodeError) as e:raise Stop("strict JSON: "+str(e))
+def C(v):return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
+def D(v):return hashlib.sha256(C(v)).hexdigest()
+def F(raw):return hashlib.sha256(raw).hexdigest()
+def die(s):print(s,file=sys.stderr);return 1
+def answer(ok,**kw):print(json.dumps({"accepted":ok,**kw},sort_keys=True));return 0 if ok else 1
+def req():
+ v=loadb(sys.stdin.buffer.read())
+ if not isinstance(v,dict):raise Stop("request object required")
+ return v
+def exact(v,keys):
+ if set(v)!=set(keys):raise Stop("request field membership")
+def env():return {"HOME":"/private/var/empty","XDG_CONFIG_HOME":"/private/var/empty","PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C","GIT_CONFIG_NOSYSTEM":"1","GIT_CONFIG_GLOBAL":"/dev/null","GIT_CONFIG_SYSTEM":"/dev/null","GIT_ATTR_NOSYSTEM":"1","GIT_TERMINAL_PROMPT":"0","GIT_PAGER":"cat","GIT_OPTIONAL_LOCKS":"0","GIT_NO_LAZY_FETCH":"1","TMPDIR":private_tmpdir(),"DARWIN_USER_TEMP_DIR":private_tmpdir()}
+def git(repo,*a,stdin=None):
+ return subprocess.run(["/usr/bin/git","--no-replace-objects","-c","core.attributesFile=/dev/null","-c","core.hooksPath=/dev/null","-c","diff.external=","-C",str(repo),*a],cwd=repo,env=env(),input=stdin,text=True,capture_output=True,shell=False,check=False,timeout=30)
+def gitb(repo,*a,stdin=None):
+ return subprocess.run(["/usr/bin/git","--no-replace-objects","-c","core.attributesFile=/dev/null","-c","core.hooksPath=/dev/null","-c","diff.external=","-c","pager.diff=false","-C",str(repo),*a],cwd=repo,env=env(),input=stdin,capture_output=True,shell=False,check=False,timeout=30)
+def g(repo,*a):
+ p=git(repo,*a)
+ if p.returncode:raise Stop("git: "+p.stderr[-200:])
+ return p.stdout.strip()
+def blob(repo,sha,path):
+ p=subprocess.run(["/usr/bin/git","--no-replace-objects","-c","core.attributesFile=/dev/null","--git-dir",str(repo/".git"),"cat-file","blob",f"{sha}:{path}"],cwd="/private/var/empty",env=env(),capture_output=True,shell=False,check=False,timeout=30)
+ if p.returncode:raise Stop("missing Git blob "+path)
+ return p.stdout
+def safe_components(path,leaf=None):
+ if not path.is_absolute() or path.resolve(strict=True)!=path:raise Stop("noncanonical path")
+ cur=Path(path.anchor)
+ for part in path.parts[1:]:
+  cur/=part; info=os.lstat(cur)
+  if stat.S_ISLNK(info.st_mode):raise Stop("symlink path")
+ if leaf is not None and stat.S_ISDIR(os.lstat(path).st_mode)!=leaf:raise Stop("path type")
+def private_tmpdir():
+ path=INITIAL_TMPDIR
+ if not path.is_absolute() or Path(os.path.normpath(str(path)))!=path:raise Stop("private TMPDIR path")
+ safe_components(path,True);s=os.lstat(path)
+ if s.st_uid!=os.getuid() or stat.S_IMODE(s.st_mode)!=0o700:raise Stop("private TMPDIR identity")
+ return str(path)
+def safe_raw(path,mode=(0o600,0o644),limit=65536,identity=False):
+ path=Path(path)
+ for context in reversed(_R15_CONTEXTS):
+  if path.parent in (context["state"],context["attest"]):return retained_raw(context,path,mode,limit,identity)
+ if Path(os.path.normpath(str(path)))!=path or str(path).startswith("//"):raise Stop("noncanonical path")
+ if path.is_absolute():start=path.anchor;names=path.parts[1:]
+ else:
+  if not path.parts or any(part in ("",".","..") for part in path.parts):raise Stop("noncanonical relative path")
+  start=".";names=path.parts
+ if not names:raise Stop("missing leaf")
+ df=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0);fds=[];links=[];fd=-1;observed=False
+ try:
+  parent=os.open(start,df);fds.append(parent)
+  for part in names[:-1]:
+   a=os.stat(part,dir_fd=parent,follow_symlinks=False);child=os.open(part,df,dir_fd=parent);b=os.fstat(child)
+   if not stat.S_ISDIR(b.st_mode) or (a.st_dev,a.st_ino,a.st_mode)!=(b.st_dev,b.st_ino,b.st_mode):raise Stop("ancestor open race")
+   links.append((parent,part,child,(b.st_dev,b.st_ino,b.st_mode)));fds.append(child);parent=child
+  name=names[-1];a=os.stat(name,dir_fd=parent,follow_symlinks=False);observed=True
+  if not stat.S_ISREG(a.st_mode) or a.st_uid!=os.getuid() or a.st_nlink!=1 or stat.S_IMODE(a.st_mode) not in mode or a.st_size>limit:raise Stop("unsafe file")
+  fd=os.open(name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)|getattr(os,"O_NONBLOCK",0),dir_fd=parent)
+  b=os.fstat(fd); raw=b""
+  if (a.st_dev,a.st_ino,a.st_mode,a.st_uid,a.st_nlink,a.st_size,a.st_mtime_ns,a.st_ctime_ns)!=(b.st_dev,b.st_ino,b.st_mode,b.st_uid,b.st_nlink,b.st_size,b.st_mtime_ns,b.st_ctime_ns):raise Stop("file open race")
+  while True:
+   x=os.read(fd,min(65536,limit+1-len(raw)))
+   if not x:break
+   raw+=x
+   if len(raw)>limit:raise Stop("file too large")
+  c=os.fstat(fd);z=os.lstat(path);q=os.stat(name,dir_fd=parent,follow_symlinks=False)
+  fields=lambda q:(q.st_dev,q.st_ino,q.st_mode,q.st_uid,q.st_nlink,q.st_size,q.st_mtime_ns,q.st_ctime_ns)
+  if fields(b)!=fields(c) or fields(b)!=fields(z) or fields(b)!=fields(q):raise Stop("file replacement")
+  for pf,part,child,want in links:
+   x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
+   if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("ancestor replacement")
+ except FileNotFoundError as exc:
+  if observed:raise Stop("file disappeared after observation") from exc
+  raise
+ finally:
+  if fd>=0:os.close(fd)
+  for x in reversed(fds):os.close(x)
+ return (raw,F(raw),fields(b)) if identity else (raw,F(raw))
+def safe_file(path,mode=(0o600,0o644),limit=65536,identity=False):
+ result=safe_raw(path,mode,limit,identity);return (loadb(result[0]),*result) if identity else (loadb(result[0]),*result)
+def safe_leaf(path,mode=0o600):
+ safe_components(path,False); s=os.lstat(path)
+ if not stat.S_ISREG(s.st_mode) or s.st_uid!=os.getuid() or s.st_nlink!=1 or stat.S_IMODE(s.st_mode)!=mode:raise Stop("unsafe store/state leaf")
+ return s
+def admin(repo):
+ dot=repo/".git";s=os.lstat(dot)
+ if stat.S_ISDIR(s.st_mode):dg=dot
+ elif stat.S_ISREG(s.st_mode):
+  raw,_=safe_raw(dot,limit=4096);text=raw.decode()
+  if not text.startswith("gitdir: ") or text.count("\n")!=1:raise Stop("gitfile")
+  dg=Path(text[8:-1]);dg=dg if dg.is_absolute() else repo/dg
+ else:raise Stop(".git type")
+ dg=dg.resolve(strict=True);safe_components(dg,True);cd=dg/"commondir"
+ try:os.lstat(cd)
+ except FileNotFoundError:common=dg
+ else:
+  raw,_=safe_raw(cd,limit=4096);text=raw.decode()
+  if text.count("\n")!=1 or not text.endswith("\n"):raise Stop("commondir")
+  common=Path(text[:-1]);common=common if common.is_absolute() else dg/common;common=common.resolve(strict=True);safe_components(common,True)
+ return dg,common,common/"config"
+def config_origin(repo):
+ dg,common,cp=admin(repo);raw,digest=safe_raw(cp,limit=1048576)
+ for wc in {dg/"config.worktree",common/"config.worktree"}:
+  try:os.lstat(wc)
+  except FileNotFoundError:pass
+  except OSError as exc:raise Stop("active worktree config observation") from exc
+  else:raise Stop("active config.worktree forbidden")
+ p=subprocess.run(["/usr/bin/git","config","--no-includes","--file","-","--null","--list"],cwd="/private/var/empty",env=env(),input=raw,capture_output=True,shell=False,check=False,timeout=30)
+ if p.returncode:raise Stop("Git config")
+ values={};forbidden=[];allowed={"core.repositoryformatversion","core.filemode","core.bare","core.logallrefupdates","core.ignorecase","core.precomposeunicode","user.name","user.email","remote.origin.url","remote.origin.fetch"}
+ for row in p.stdout.decode().split("\0"):
+  if not row:continue
+  key,sep,value=row.partition("\n");key=key.lower()
+  if not sep:raise Stop("Git config shape")
+  values.setdefault(key,[]).append(value)
+  branch=re.fullmatch(r"branch\.([^.]+)\.(remote|merge|vscode-merge-base)",key)
+  if key not in allowed and branch is None:forbidden.append(key)
+ if forbidden:raise Stop("unsafe Git config")
+ if values.get("core.repositoryformatversion") != ["0"]:raise Stop("repository format")
+ if values.get("remote.origin.fetch") != ["+refs/heads/*:refs/remotes/origin/*"]:raise Stop("origin fetch")
+ if any(len(rows)!=1 for key,rows in values.items() if key in allowed and key!="remote.origin.url"):raise Stop("Git config singleton")
+ for key,rows in values.items():
+  branch=re.fullmatch(r"branch\.([^.]+)\.(remote|merge|vscode-merge-base)",key)
+  if branch is not None and (len(rows)!=1 or branch.group(2)=="remote" and rows[0]!="origin" or branch.group(2)=="merge" and not re.fullmatch(r"refs/heads/[^\s]+",rows[0]) or branch.group(2)=="vscode-merge-base" and rows[0]!="origin/main"):raise Stop("branch config")
+ urls=values.get("remote.origin.url",[])
+ if len(urls)!=1 or not urls[0]:raise Stop("origin cardinality")
+ after,after_digest=safe_raw(cp,limit=1048576)
+ if after!=raw or after_digest!=digest:raise Stop("Git config changed")
+ return dg,common,cp,raw,digest,urls[0]
+def repo_shape(repo):
+ if not isinstance(repo,Path) or not repo.is_absolute() or repo.resolve(strict=True)!=repo:raise Stop("repository path")
+ safe_components(repo,True);dg,common,cp,raw,digest,origin=config_origin(repo)
+ for bad in (dg/"shallow",dg/"info/grafts",common/"objects/info/alternates",common/"objects/info/http-alternates"):
+  try:os.lstat(bad)
+  except FileNotFoundError:pass
+  else:raise Stop("unsafe Git indirection")
+ if (common/"refs/replace").exists() and any((common/"refs/replace").iterdir()):raise Stop("replace refs")
+ if origin=="git@github.com:Nortropic/nortropic-system.git":return origin
+ remote=Path(origin)
+ if not remote.is_absolute():raise Stop("remote identity")
+ safe_components(remote,True)
+ for parent,dirs,files in os.walk(remote,followlinks=False):
+  for name in (*dirs,*files):
+   if stat.S_ISLNK(os.lstat(Path(parent)/name).st_mode):raise Stop("bare symlink")
+ for part,kind in ((remote/"HEAD",False),(remote/"config",False),(remote/"objects",True),(remote/"objects/info",True)):safe_components(part,kind)
+ for bad in (remote/"objects/info/alternates",remote/"objects/info/http-alternates"):
+  try:os.lstat(bad)
+  except FileNotFoundError:pass
+  else:raise Stop("bare alternate")
+ return str(remote.resolve(strict=True))
+def known_open(path):
+ df=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC;fds=[];links=[];tfds=[];tlinks=[]
+ fd=-1;tfd=-1;dfd=-1;cfd=-1;dname=None;made=False
+ try:
+  parent=os.open(path.anchor,df);fds.append(parent)
+  for part in path.parts[1:-1]:
+   a=os.stat(part,dir_fd=parent,follow_symlinks=False);child=os.open(part,df,dir_fd=parent);b=os.fstat(child)
+   if not stat.S_ISDIR(b.st_mode) or (a.st_dev,a.st_ino,a.st_mode)!=(b.st_dev,b.st_ino,b.st_mode):raise Stop("known-host ancestor")
+   links.append((parent,part,child,(b.st_dev,b.st_ino,b.st_mode)));fds.append(child);parent=child
+  name=path.name;a=os.stat(name,dir_fd=parent,follow_symlinks=False)
+  if not stat.S_ISREG(a.st_mode) or a.st_uid!=os.getuid() or a.st_nlink!=1 or stat.S_IMODE(a.st_mode) not in (0o600,0o644) or a.st_size>1048576:raise Stop("known-host file")
+  fd=os.open(name,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW|os.O_CLOEXEC,dir_fd=parent);b=os.fstat(fd)
+  identity=(b.st_dev,b.st_ino,b.st_mode,b.st_uid,b.st_nlink,b.st_size,b.st_mtime_ns,b.st_ctime_ns)
+  if identity!=(a.st_dev,a.st_ino,a.st_mode,a.st_uid,a.st_nlink,a.st_size,a.st_mtime_ns,a.st_ctime_ns):raise Stop("known-host open race")
+  raw=b''
+  while len(raw)<b.st_size:
+   part=os.pread(fd,min(65536,b.st_size-len(raw)),len(raw))
+   if not part:raise Stop("known-host short read")
+   raw+=part
+  br=os.fstat(fd);bn=os.stat(name,dir_fd=parent,follow_symlinks=False)
+  if len(raw)!=b.st_size or (br.st_dev,br.st_ino,br.st_mode,br.st_uid,br.st_nlink,br.st_size,br.st_mtime_ns,br.st_ctime_ns)!=identity or (bn.st_dev,bn.st_ino,bn.st_mode,bn.st_uid,bn.st_nlink,bn.st_size,bn.st_mtime_ns,bn.st_ctime_ns)!=identity:raise Stop("known-host changed during exact read")
+  digest=F(raw);troot=Path(private_tmpdir());troot_text=str(troot)
+  if not re.fullmatch(r"/[A-Za-z0-9._/-]+",troot_text) or Path(os.path.normpath(troot_text))!=troot:raise Stop("known-host copy root grammar")
+  tp=os.open(troot.anchor,df);tfds.append(tp)
+  for part in troot.parts[1:]:
+   ta=os.stat(part,dir_fd=tp,follow_symlinks=False);tc=os.open(part,df,dir_fd=tp);tb=os.fstat(tc)
+   if not stat.S_ISDIR(tb.st_mode) or (ta.st_dev,ta.st_ino,ta.st_mode)!=(tb.st_dev,tb.st_ino,tb.st_mode):raise Stop("known-host copy root ancestor")
+   tlinks.append((tp,part,tc,(tb.st_dev,tb.st_ino,tb.st_mode)));tfds.append(tc);tp=tc
+  tfd=tp;tn=os.lstat(troot);to=os.fstat(tfd);tidentity=(to.st_dev,to.st_ino,to.st_mode,to.st_uid)
+  if (tn.st_dev,tn.st_ino,tn.st_mode,tn.st_uid)!=tidentity or not stat.S_ISDIR(to.st_mode) or to.st_uid!=os.getuid() or stat.S_IMODE(to.st_mode)!=0o700:raise Stop("known-host copy root")
+  dname="r15-known-hosts-"+secrets.token_hex(16);os.mkdir(dname,0o700,dir_fd=tfd);made=True
+  dpath=os.path.join(troot_text,dname);dfd=os.open(dname,df,dir_fd=tfd);cname="known_hosts";cpath=os.path.join(dpath,cname)
+  if not re.fullmatch(r"/[A-Za-z0-9._/-]+",cpath) or Path(os.path.normpath(cpath))!=Path(cpath):raise Stop("known-host copy path grammar")
+  cfd=os.open(cname,os.O_RDWR|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW|os.O_CLOEXEC,0o600,dir_fd=dfd);offset=0
+  while offset<len(raw):
+   written=os.write(cfd,raw[offset:])
+   if written<=0:raise Stop("known-host copy write")
+   offset+=written
+  os.fsync(cfd);co=os.fstat(cfd);cn=os.stat(cname,dir_fd=dfd,follow_symlinks=False);ca=os.lstat(cpath)
+  cidentity=(co.st_dev,co.st_ino,co.st_mode,co.st_uid,co.st_nlink,co.st_size,co.st_mtime_ns,co.st_ctime_ns)
+  if (cn.st_dev,cn.st_ino,cn.st_mode,cn.st_uid,cn.st_nlink,cn.st_size,cn.st_mtime_ns,cn.st_ctime_ns)!=cidentity or (ca.st_dev,ca.st_ino,ca.st_mode,ca.st_uid,ca.st_nlink,ca.st_size,ca.st_mtime_ns,ca.st_ctime_ns)!=cidentity or not stat.S_ISREG(co.st_mode) or co.st_uid!=os.getuid() or co.st_nlink!=1 or stat.S_IMODE(co.st_mode)!=0o600 or co.st_size!=len(raw) or F(os.pread(cfd,1048577,0))!=digest:raise Stop("known-host copy")
+  do=os.fstat(dfd);dn=os.stat(dname,dir_fd=tfd,follow_symlinks=False);da=os.lstat(dpath);didentity=(do.st_dev,do.st_ino,do.st_mode,do.st_uid,do.st_nlink)
+  if (dn.st_dev,dn.st_ino,dn.st_mode,dn.st_uid,dn.st_nlink)!=didentity or (da.st_dev,da.st_ino,da.st_mode,da.st_uid,da.st_nlink)!=didentity or not stat.S_ISDIR(do.st_mode) or do.st_uid!=os.getuid() or stat.S_IMODE(do.st_mode)!=0o700 or os.listdir(dfd)!=[cname]:raise Stop("known-host copy dir")
+  return {"fd":fd,"fds":fds,"links":links,"path":path,"identity":identity,"digest":digest,"troot":troot_text,"tfds":tfds,"tlinks":tlinks,"tfd":tfd,"tidentity":tidentity,"dname":dname,"dpath":dpath,"dfd":dfd,"didentity":didentity,"cname":cname,"cpath":cpath,"cfd":cfd,"cidentity":cidentity}
+ except Exception:
+  if cfd>=0:os.close(cfd)
+  if dfd>=0:
+   try:os.unlink("known_hosts",dir_fd=dfd)
+   except OSError:pass
+   os.close(dfd)
+  if made and tfd>=0 and isinstance(dname,str):
+   try:os.rmdir(dname,dir_fd=tfd)
+   except OSError:pass
+  for x in reversed(tfds):os.close(x)
+  if fd>=0:os.close(fd)
+  for x in reversed(fds):os.close(x)
+  raise
+def known_validate(h):
+ z=os.fstat(h["fd"]);q=os.lstat(h["path"])
+ if (z.st_dev,z.st_ino,z.st_mode,z.st_uid,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns)!=h["identity"] or (q.st_dev,q.st_ino,q.st_mode,q.st_uid,q.st_nlink,q.st_size,q.st_mtime_ns,q.st_ctime_ns)!=h["identity"]:raise Stop("known-host changed")
+ raw=b''
+ while len(raw)<z.st_size:
+  part=os.pread(h["fd"],min(65536,z.st_size-len(raw)),len(raw))
+  if not part:raise Stop("known-host validation short read")
+  raw+=part
+ za=os.fstat(h["fd"]);qa=os.lstat(h["path"])
+ if len(raw)!=z.st_size or (za.st_dev,za.st_ino,za.st_mode,za.st_uid,za.st_nlink,za.st_size,za.st_mtime_ns,za.st_ctime_ns)!=h["identity"] or (qa.st_dev,qa.st_ino,qa.st_mode,qa.st_uid,qa.st_nlink,qa.st_size,qa.st_mtime_ns,qa.st_ctime_ns)!=h["identity"] or F(raw)!=h["digest"]:raise Stop("known-host exact bytes changed")
+ for pf,part,child,want in h["links"]:
+  x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
+  if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host ancestor changed")
+ tn=os.lstat(h["troot"]);to=os.fstat(h["tfd"])
+ if (tn.st_dev,tn.st_ino,tn.st_mode,tn.st_uid)!=h["tidentity"] or (to.st_dev,to.st_ino,to.st_mode,to.st_uid)!=h["tidentity"] or not stat.S_ISDIR(to.st_mode) or to.st_uid!=os.getuid() or stat.S_IMODE(to.st_mode)!=0o700:raise Stop("known-host copy root changed")
+ for pf,part,child,want in h["tlinks"]:
+  x=os.stat(part,dir_fd=pf,follow_symlinks=False);y=os.fstat(child)
+  if (x.st_dev,x.st_ino,x.st_mode)!=want or (y.st_dev,y.st_ino,y.st_mode)!=want:raise Stop("known-host copy root ancestor changed")
+ dn=os.stat(h["dname"],dir_fd=h["tfd"],follow_symlinks=False);do=os.fstat(h["dfd"]);da=os.lstat(h["dpath"])
+ if (dn.st_dev,dn.st_ino,dn.st_mode,dn.st_uid,dn.st_nlink)!=h["didentity"] or (do.st_dev,do.st_ino,do.st_mode,do.st_uid,do.st_nlink)!=h["didentity"] or (da.st_dev,da.st_ino,da.st_mode,da.st_uid,da.st_nlink)!=h["didentity"] or not stat.S_ISDIR(do.st_mode) or do.st_uid!=os.getuid() or stat.S_IMODE(do.st_mode)!=0o700 or os.listdir(h["dfd"])!=[h["cname"]]:raise Stop("known-host copy dir changed")
+ cn=os.stat(h["cname"],dir_fd=h["dfd"],follow_symlinks=False);co=os.fstat(h["cfd"]);ca=os.lstat(h["cpath"])
+ if (cn.st_dev,cn.st_ino,cn.st_mode,cn.st_uid,cn.st_nlink,cn.st_size,cn.st_mtime_ns,cn.st_ctime_ns)!=h["cidentity"] or (co.st_dev,co.st_ino,co.st_mode,co.st_uid,co.st_nlink,co.st_size,co.st_mtime_ns,co.st_ctime_ns)!=h["cidentity"] or (ca.st_dev,ca.st_ino,ca.st_mode,ca.st_uid,ca.st_nlink,ca.st_size,ca.st_mtime_ns,ca.st_ctime_ns)!=h["cidentity"] or not stat.S_ISREG(co.st_mode) or co.st_uid!=os.getuid() or co.st_nlink!=1 or stat.S_IMODE(co.st_mode)!=0o600 or F(os.pread(h["cfd"],1048577,0))!=h["digest"]:raise Stop("known-host copy changed")
+def known_close(h):
+ if not h:return
+ errors=[]
+ try:
+  co=os.fstat(h["cfd"])
+  try:cn=os.stat(h["cname"],dir_fd=h["dfd"],follow_symlinks=False)
+  except FileNotFoundError:
+   if co.st_nlink!=0:errors.append("copy missing while linked")
+  else:
+   if (cn.st_dev,cn.st_ino)!=(co.st_dev,co.st_ino):errors.append("copy cleanup identity")
+   else:
+    os.unlink(h["cname"],dir_fd=h["dfd"]);os.fsync(h["dfd"])
+    if os.fstat(h["cfd"]).st_nlink!=0:errors.append("copy retained links")
+ except OSError as exc:errors.append("copy unlink:"+str(exc))
+ try:os.close(h["cfd"])
+ except OSError as exc:errors.append("copy fd close:"+str(exc))
+ try:
+  dn=os.stat(h["dname"],dir_fd=h["tfd"],follow_symlinks=False);do=os.fstat(h["dfd"])
+  if (dn.st_dev,dn.st_ino)!=(do.st_dev,do.st_ino):errors.append("copy dir cleanup identity")
+  elif os.listdir(h["dfd"]):errors.append("copy dir cleanup entries")
+  else:os.rmdir(h["dname"],dir_fd=h["tfd"])
+ except OSError as exc:errors.append("copy dir remove:"+str(exc))
+ try:os.close(h["dfd"])
+ except OSError as exc:errors.append("copy dir fd close:"+str(exc))
+ for x in reversed(h["tfds"]):
+  try:os.close(x)
+  except OSError as exc:errors.append("copy root fd close:"+str(exc))
+ if os.path.lexists(h["cpath"]):errors.append("copy residue")
+ if os.path.lexists(h["dpath"]):errors.append("copy dir residue")
+ try:os.close(h["fd"])
+ except OSError as exc:errors.append("source fd close:"+str(exc))
+ for x in reversed(h["fds"]):
+  try:os.close(x)
+  except OSError as exc:errors.append("source ancestor close:"+str(exc))
+ if errors:raise Stop("known-host cleanup failure:"+" | ".join(errors))
+def remote_main(repo,origin):
+ _dg,_common,cp,config_raw,config_digest,observed=config_origin(repo)
+ if observed!=origin:raise Stop("origin changed")
+ e=env();args=[];h=None;agent_identity=None
+ if origin=="git@github.com:Nortropic/nortropic-system.git":
+  if os.environ.get("SSH_AUTH_SOCK","")!=INITIAL_AGENT or not INITIAL_AGENT or not os.path.isabs(INITIAL_AGENT):raise Stop("agent changed")
+  ap=Path(INITIAL_AGENT);safe_components(ap);s=os.lstat(ap);parent=os.lstat(ap.parent)
+  if not stat.S_ISSOCK(s.st_mode) or s.st_uid!=os.getuid() or s.st_nlink!=1 or not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=os.getuid() or stat.S_IMODE(parent.st_mode)!=0o700:raise Stop("agent authority")
+  agent_identity=(s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_nlink,parent.st_dev,parent.st_ino,parent.st_mode);e["SSH_AUTH_SOCK"]=INITIAL_AGENT
+  h=known_open(Path(pwd.getpwuid(os.getuid()).pw_dir)/".ssh/known_hosts");ssh="/usr/bin/ssh -F /dev/null -oBatchMode=yes -oStrictHostKeyChecking=yes -oProxyCommand=none -oProxyJump=none -oCanonicalizeHostname=no -oIdentitiesOnly=no -oIdentityFile=none -oUserKnownHostsFile="+h["cpath"]+" -oGlobalKnownHostsFile=/dev/null -oPasswordAuthentication=no -oKbdInteractiveAuthentication=no";args=["-c","core.sshCommand="+ssh]
+ try:
+  if h:known_validate(h)
+  try:p=subprocess.run(["/usr/bin/git","--no-replace-objects",*args,"-c","core.hooksPath=/dev/null","ls-remote","--refs",origin,"refs/heads/main"],cwd="/private/var/empty",env=e,text=True,capture_output=True,shell=False,check=False,timeout=30,pass_fds=(),close_fds=True)
+  finally:
+   if h:known_validate(h)
+ finally:
+  if h:known_close(h)
+ after,after_digest=safe_raw(cp,limit=1048576)
+ if after!=config_raw or after_digest!=config_digest:raise Stop("Git config changed")
+ if agent_identity:
+  s=os.lstat(INITIAL_AGENT);parent=os.lstat(Path(INITIAL_AGENT).parent)
+  if (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_nlink,parent.st_dev,parent.st_ino,parent.st_mode)!=agent_identity:raise Stop("agent changed")
+ rows=p.stdout.splitlines()
+ if p.returncode or len(rows)!=1 or rows[0].split("\t")[1:]!=["refs/heads/main"]:raise Stop("remote main")
+ sha=rows[0].split("\t")[0]
+ if not HEX40.fullmatch(sha):raise Stop("remote sha")
+ return sha
+def clean_head(repo,sha):
+ def canonical(raw):
+  value=raw.decode("utf-8",errors="strict")
+  if (not value or value.replace("\\","/")!=value or value.startswith("/")
+   or re.match(r"^[A-Za-z]:",value) or value.startswith("./") or value.endswith("/")
+   or "//" in value or any(x in ("",".","..") for x in value.split("/"))
+   or any(x in value for x in "*?[]{}")):raise Stop("noncanonical checkout path")
+  return value
+ def rows(raw):
+  values=raw.split(b"\0")
+  if not values or values[-1]!=b"":raise Stop("unterminated Git -z output")
+  return values[:-1]
+ def fields(value):return (value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+ if not HEX40.fullmatch(sha):raise Stop("candidate SHA grammar")
+ head=gitb(repo,"rev-parse","--verify","HEAD");status=gitb(repo,"status","--porcelain=v1","-z","--untracked-files=all")
+ listing=gitb(repo,"ls-tree","-r","-z","--full-tree",sha);stage=gitb(repo,"ls-files","--cached","--stage","-z","--full-name");flags=gitb(repo,"ls-files","--cached","-v","-z","--full-name")
+ if (head.returncode or head.stderr or head.stdout!=(sha+"\n").encode() or status.returncode or status.stderr or status.stdout
+  or listing.returncode or listing.stderr or stage.returncode or stage.stderr or flags.returncode or flags.stderr):raise Stop("closed Git HEAD/status/tree/index observation")
+ tracked={};expected_dirs=set();object_order=[]
+ for entry in rows(listing.stdout):
+  header,path_raw=entry.split(b"\t",1);parts=header.split(b" ")
+  if len(parts)!=3:raise Stop("tree header")
+  mode,kind,oid=(x.decode("ascii") for x in parts);path=canonical(path_raw)
+  if path in tracked or kind!="blob" or mode not in ("100644","100755") or not HEX40.fullmatch(oid):raise Stop("tree member")
+  tracked[path]=(mode,oid,b"");object_order.append(oid);parents=path.split("/")[:-1]
+  for end in range(1,len(parents)+1):expected_dirs.add("/".join(parents[:end]))
+ batch=gitb(repo,"cat-file","--batch",stdin=b"".join(oid.encode()+b"\n" for oid in object_order))
+ if batch.returncode or batch.stderr:raise Stop("blob batch read")
+ cursor=0;objects={}
+ for oid in object_order:
+  newline=batch.stdout.find(b"\n",cursor)
+  if newline<0:raise Stop("blob batch header")
+  header=batch.stdout[cursor:newline].split(b" ")
+  if len(header)!=3 or header[0]!=oid.encode() or header[1]!=b"blob" or not header[2].isdigit():raise Stop("blob batch identity")
+  size=int(header[2]);start=newline+1;finish=start+size
+  if finish>=len(batch.stdout) or batch.stdout[finish:finish+1]!=b"\n":raise Stop("blob batch extent")
+  raw=batch.stdout[start:finish];actual=hashlib.sha1(b"blob "+str(len(raw)).encode()+b"\0"+raw).hexdigest()
+  if actual!=oid:raise Stop("blob identity")
+  objects[oid]=raw;cursor=finish+1
+ if cursor!=len(batch.stdout):raise Stop("blob batch trailing bytes")
+ tracked={path:(mode,oid,objects[oid]) for path,(mode,oid,_raw) in tracked.items()}
+ indexed={}
+ for entry in rows(stage.stdout):
+  header,path_raw=entry.split(b"\t",1);parts=header.split(b" ")
+  if len(parts)!=3:raise Stop("index header")
+  mode,oid,slot=(x.decode("ascii") for x in parts);path=canonical(path_raw)
+  if path in indexed or slot!="0" or mode not in ("100644","100755") or not HEX40.fullmatch(oid):raise Stop("index member")
+  indexed[path]=(mode,oid)
+ if indexed!={path:(value[0],value[1]) for path,value in tracked.items()}:raise Stop("tree/index inequality")
+ tagged=set()
+ for entry in rows(flags.stdout):
+  if not entry.startswith(b"H "):raise Stop("index flag")
+  path=canonical(entry[2:])
+  if path in tagged:raise Stop("duplicate index flag")
+  tagged.add(path)
+ if tagged!=set(tracked):raise Stop("index flag inventory")
+ df=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
+ ff=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)|getattr(os,"O_NONBLOCK",0)
+ opened=[];ancestors=[];directories={};leaves={}
+ try:
+  if not repo.is_absolute() or Path(os.path.normpath(str(repo)))!=repo:raise Stop("noncanonical repository root")
+  parent=os.open(repo.anchor,df);opened.append(parent);ancestors.append((None,"",parent,fields(os.fstat(parent))))
+  for part in repo.parts[1:]:
+   before=os.stat(part,dir_fd=parent,follow_symlinks=False);child=os.open(part,df,dir_fd=parent);opened.append(child);after=os.fstat(child)
+   if fields(before)!=fields(after) or not stat.S_ISDIR(after.st_mode):raise Stop("repository ancestor open race")
+   ancestors.append((parent,part,child,fields(after)));parent=child
+  root_fd=parent;root_identity=fields(os.fstat(root_fd));root_view=os.fstat(root_fd)
+  if root_view.st_uid!=os.getuid() or stat.S_IMODE(root_view.st_mode)!=0o755:raise Stop("repository root identity")
+  directories[""]=(root_fd,root_identity,None,"",None);stack=[""]
+  while stack:
+   prefix=stack.pop();descriptor=directories[prefix][0];names=os.listdir(descriptor)
+   for name in names:
+    name.encode("utf-8",errors="strict")
+    if not name or "/" in name or name in (".",".."):raise Stop("directory member")
+   if len(names)!=len(set(names)):raise Stop("directory duplicate")
+   visible=set(names)-({".git"} if not prefix else set());wanted=set()
+   for path in set(tracked)|expected_dirs:
+    if prefix:
+     if not path.startswith(prefix+"/"):continue
+     rest=path[len(prefix)+1:]
+    else:rest=path
+    if "/" not in rest:wanted.add(rest)
+   if visible!=wanted:raise Stop("directory inventory")
+   directories[prefix]=(descriptor,directories[prefix][1],directories[prefix][2],directories[prefix][3],frozenset(names))
+   for name in sorted(visible):
+    relative=name if not prefix else prefix+"/"+name;before=os.stat(name,dir_fd=descriptor,follow_symlinks=False)
+    if relative in expected_dirs:
+     child=os.open(name,df,dir_fd=descriptor);opened.append(child);after=os.fstat(child)
+     if fields(before)!=fields(after) or not stat.S_ISDIR(after.st_mode) or after.st_uid!=os.getuid() or stat.S_IMODE(after.st_mode)!=0o755:raise Stop("directory identity")
+     directories[relative]=(child,fields(after),descriptor,name,None);stack.append(relative)
+    elif relative in tracked:
+     mode,_oid,want_raw=tracked[relative];want_mode=0o755 if mode=="100755" else 0o644
+     if not stat.S_ISREG(before.st_mode) or before.st_uid!=os.getuid() or before.st_nlink!=1 or stat.S_IMODE(before.st_mode)!=want_mode or before.st_size>8*1024*1024:raise Stop("leaf identity")
+     leaf=os.open(name,ff,dir_fd=descriptor);opened.append(leaf);after=os.fstat(leaf)
+     if fields(before)!=fields(after):raise Stop("leaf open race")
+     raw=b"";offset=0
+     while offset<after.st_size:
+      part=os.pread(leaf,min(65536,after.st_size-offset),offset)
+      if not part:raise Stop("leaf short read")
+      raw+=part;offset+=len(part)
+     if os.pread(leaf,1,offset) or raw!=want_raw:raise Stop("leaf bytes")
+     leaves[relative]=(leaf,fields(after),descriptor,name)
+    else:raise Stop("untracked entry")
+  if set(directories)-{""}!=expected_dirs or set(leaves)!=set(tracked):raise Stop("physical inventory inequality")
+  for leaf,want,parent_fd,name in leaves.values():
+   if fields(os.fstat(leaf))!=want or fields(os.stat(name,dir_fd=parent_fd,follow_symlinks=False))!=want:raise Stop("leaf final rebind")
+  for _relative,(descriptor,want,parent_fd,name,names) in reversed(list(directories.items())):
+   if fields(os.fstat(descriptor))!=want or frozenset(os.listdir(descriptor))!=names:raise Stop("directory final identity")
+   if parent_fd is not None and fields(os.stat(name,dir_fd=parent_fd,follow_symlinks=False))!=want:raise Stop("directory final rebind")
+  if fields(os.stat(repo,follow_symlinks=False))!=root_identity:raise Stop("repository root path rebind")
+  for parent_fd,name,descriptor,want in reversed(ancestors):
+   if fields(os.fstat(descriptor))!=want:raise Stop("repository ancestor changed")
+   if parent_fd is not None and fields(os.stat(name,dir_fd=parent_fd,follow_symlinks=False))!=want:raise Stop("repository ancestor rebind")
+ finally:
+  for descriptor in reversed(opened):
+   try:os.close(descriptor)
+   except OSError:pass
+def parents(repo,sha):
+ p=g(repo,"cat-file","-p",sha)
+ return [x.split(" ",1)[1] for x in p.splitlines() if x.startswith("parent ")]
+def tree(repo,sha):return g(repo,"rev-parse",f"{sha}^{{tree}}")
+def first_parent(repo,tip,ancestor):return ancestor in g(repo,"rev-list","--first-parent",tip).splitlines()
+def review_stat(path,s):
+ return D(dict(zip(("record_type","review_path","st_dev","st_ino","st_mode","st_uid","st_nlink","st_size","st_mtime_ns","st_ctime_ns"),("owner_review_stat_v1",str(path),*s))))
+def transition(task,base,ss,rs,gp,gs,origin,ds):return {"record_type":"owner_transition_v1","task":task,"authority_class":"owner_authority","base_sha":base,"main_sha":base,"spec_path":"specs/tasks.spec.json","spec_sha256":ss,"registry_path":"specs/owner-production-paths.v1.json","registry_sha256":rs,"gate_path":gp,"gate_sha256":gs,"repository_identity":origin,"dependency_attestations_sha256":ds}
+def candidate_id(task,base,cand,ct,changed,ti,ri):return D({"record_type":"owner_candidate_v1","task":task,"base_sha":base,"candidate_sha":cand,"candidate_tree":ct,"changed_files":changed,"transition_identity":ti,"review_identity":ri,"review_result":"PASS","reviewer_role":"PRODUCT_REVIEWER"})
+def h036_transition(origin):return {"record_type":"historical_h036_transition_v1","task":"h-036","authority_class":"owner_authority","base_sha":H["base_sha"],"main_sha":H["base_sha"],"candidate_sha":H["candidate_sha"],"candidate_tree":H["candidate_tree"],"publication_sha":H["publication_sha"],"ordered_parents":[H["base_sha"],H["candidate_sha"]],"spec_path":"specs/tasks.spec.json","spec_sha256":H["spec_sha256"],"registry_path":"specs/owner-production-paths.v1.json","registry_sha256":H["registry_sha256"],"gate_path":H["gate_path"],"gate_sha256":H["gate_sha256"],"changed_paths_and_modes":[list(x) for x in HPATHS],"review_identity":H["review_sha256"],"review_artifact_path":str(HREVIEW),"review_artifact_result":"READY","reviewer_role":"PRODUCT_REVIEWER","blocking_findings":[],"publication_receipt_sha256":H["receipt_sha256"],"publication_receipt_path":str(HRECEIPT),"repository_identity":origin,"dependency_attestations_sha256":H["dependency_attestations_sha256"]}
+def h036_record(origin):
+ ti=D(h036_transition(origin)); changed=[x[0] for x in HPATHS]
+ return {"record_type":"owner_publication_v1","schema_version":1,"authority_class":"owner_authority","task":"h-036","base_sha":H["base_sha"],"candidate_sha":H["candidate_sha"],"candidate_tree":H["candidate_tree"],"publication_sha":H["publication_sha"],"invalidates_on":[H["candidate_sha"],H["publication_sha"]],"spec_path":"specs/tasks.spec.json","spec_sha256":H["spec_sha256"],"registry_path":"specs/owner-production-paths.v1.json","registry_sha256":H["registry_sha256"],"gate_path":H["gate_path"],"gate_sha256":H["gate_sha256"],"dependency_attestations_sha256":H["dependency_attestations_sha256"],"transition_identity":ti,"candidate_identity":candidate_id("h-036",H["base_sha"],H["candidate_sha"],H["candidate_tree"],changed,ti,H["review_sha256"]),"changed_files":changed,"review_identity":H["review_sha256"],"review_result":"PASS","repository_identity":origin,"stale":False}
+
+def ls_modes(repo,sha,paths):
+ p=git(repo,"--literal-pathspecs","ls-tree",sha,"--",*paths); out={}
+ for line in p.stdout.splitlines():
+  f=line.split(None,3)
+  if len(f)==4:out[f[3]]=(f[0],f[1])
+ return out
+def artifact(path,expected):
+ value,raw,digest=safe_file(path)
+ if not isinstance(value,dict) or set(value)!=set(expected) or value!=expected:raise Stop("artifact binding")
+ return digest
+def row_extent(raw,task):
+ marker=(f'    {{\n      "id": "{task}",').encode()
+ if raw.count(marker)!=1:raise Stop("task row anchor")
+ start=raw.index(marker);depth=0;quoted=False;escaped=False
+ for i in range(start,len(raw)):
+  x=raw[i]
+  if quoted:
+   if escaped:escaped=False
+   elif x==92:escaped=True
+   elif x==34:quoted=False
+  elif x==34:quoted=True
+  elif x==123:depth+=1
+  elif x==125:
+   depth-=1
+   if depth==0:return start,i+1
+ raise Stop("unterminated task row")
+def expected_refreeze(repo,m0,b):
+ paths=["docs/05-beslutslogg.md","docs/loop/drift.md","docs/loop/owner-author-workflow-v1.md","specs/tasks.spec.json","verify/bin/h-038-exit"]
+ specraw=blob(repo,m0,"specs/tasks.spec.json");spec=loadb(specraw);rows=[x for x in spec.get("tasks",[]) if isinstance(x,dict) and x.get("id")=="h-038"]
+ if len(rows)!=1 or rows[0].get("depends_on")!=["h-036"] or "h035_r15_published_authority" in rows[0]:raise Stop("H038 baseline row")
+ start,end=row_extent(specraw,"h-038")
+ pi=rows[0].get("h038_managed_attempt_root_confinement",{}).get("product_identity")
+ if not isinstance(pi,dict) or pi.get("candidate_relation")!="DIRECT_SINGLE_CHILD_OF_EXACT_PUBLISHED_H038_CONTRACT_BASE" or pi.get("remote_origin_main_states")!=["PREPUBLICATION_EXACT_H038_CONTRACT_BASE","POSTPUBLICATION_EXACT_TWO_PARENT_PRODUCT_MERGE_WITH_CANDIDATE_TREE"]:raise Stop("H038 old product base")
+ row=specraw[start:end]
+ for old,new in ((b'      "depends_on": [\n        "h-036"\n      ],',b'      "depends_on": [\n        "h-035",\n        "h-036"\n      ],'),(b'"candidate_relation": "DIRECT_SINGLE_CHILD_OF_EXACT_PUBLISHED_H038_CONTRACT_BASE"',b'"candidate_relation": "DIRECT_SINGLE_CHILD_OF_EXACT_GUARDED_H038_R15_DEPENDENCY_REFREEZE_MERGE"'),(b'"PREPUBLICATION_EXACT_H038_CONTRACT_BASE",',b'"PREPUBLICATION_EXACT_GUARDED_H038_R15_DEPENDENCY_REFREEZE_MERGE",')):
+  if row.count(old)!=1:raise Stop("H038 spec transform anchor")
+  row=row.replace(old,new,1)
+ insert=b'      "max_changed_files": 3,\n';field=('      "h035_r15_published_authority": '+json.dumps(b,indent=2,ensure_ascii=False).replace("\n","\n      ")+",\n").encode()
+ if row.count(insert)!=1:raise Stop("H038 binding insertion anchor")
+ row=row.replace(insert,field+insert,1);finalspec=specraw[:start]+row+specraw[end:];finaldoc=loadb(finalspec);rows=[x for x in finaldoc.get("tasks",[]) if isinstance(x,dict) and x.get("id")=="h-038"]
+ if len(rows)!=1:raise Stop("H038 transformed row")
+ out={"specs/tasks.spec.json":finalspec};bs=D(b)
+ suffix={"docs/05-beslutslogg.md":f"\n| H-038 R15 dependency refreeze | Exact guarded H-035 product publication {b['product_publication_sha']} and binding {bs}; H-038 product base becomes the guarded refreeze merge M. |\n","docs/loop/drift.md":f"\n## H-038 R15 dependency-refreeze\n\nExact H-035 product publication `{b['product_publication_sha']}` and binding `{bs}` are the acyclic base; only the frozen five-path transform is admitted and the future product is a direct child of guarded refreeze merge M.\n","docs/loop/owner-author-workflow-v1.md":f"\n## H-038 R15 dependency-refreeze handoff\n\nBind H-035 publication `{b['product_publication_sha']}` / `{bs}`, review the exact five-byte transform, publish M=[M0,R], then review the H-038 product only as a direct child of M.\n"}
+ for p,s in suffix.items():
+  base=blob(repo,m0,p)
+  if not base.endswith(b"\n"):raise Stop("H038 doc baseline")
+  out[p]=base+s.encode()
+ gate=blob(repo,m0,"verify/bin/h-038-exit")
+ for old,new in ((b'task.get("depends_on") == ["h-036"]',b'task.get("depends_on") == ["h-035", "h-036"]'),(b'== "DIRECT_SINGLE_CHILD_OF_EXACT_PUBLISHED_H038_CONTRACT_BASE"',b'== "DIRECT_SINGLE_CHILD_OF_EXACT_GUARDED_H038_R15_DEPENDENCY_REFREEZE_MERGE"'),(b'"PREPUBLICATION_EXACT_H038_CONTRACT_BASE",',b'"PREPUBLICATION_EXACT_GUARDED_H038_R15_DEPENDENCY_REFREEZE_MERGE",')):
+  if gate.count(old)!=1:raise Stop("H038 gate anchor")
+  gate=gate.replace(old,new,1)
+ h035=[x for x in finaldoc.get("tasks",[]) if isinstance(x,dict) and x.get("id")=="h-035"]
+ if len(h035)!=1:raise Stop("H035 transformed task cardinality")
+ for old,new in ((b'"verify/bin/h-035-exit": "cae895110129f5066be9ae7f770e7f4e96594698ef5500d586820fea472d27e2"',('"verify/bin/h-035-exit": "'+b["gate_sha256"]+'"').encode()),(b'TASK_SHA256 = "c133ae2b9a7524c69108ccc7e6c8b5630dc3cde78c345159bbfcfd8e712a2171"',('TASK_SHA256 = "'+D(rows[0])+'"').encode()),(b'H035_TASK_SHA256 = "f854ddc0b5ca05b87cbaf15431f58c59803be586d6d9ff67d14e40e8a5970f22"',('H035_TASK_SHA256 = "'+D(h035[0])+'"').encode())):
+  if gate.count(old)!=1:raise Stop("H038 gate pin anchor")
+  gate=gate.replace(old,new,1)
+ artifact_anchor=b'\ndef product_identity(h37: dict[str, Any], binding: Any, old: dict[str, Any],\n'
+ if gate.count(artifact_anchor)!=1:raise Stop("H038 artifact helper anchor")
+ artifact_helper="""
+def r15_refreeze_artifact(path: Path) -> tuple[Any, bytes]:
+    if not path.is_absolute() or Path(os.path.normpath(str(path))) != path:
+        raise Rig("noncanonical R15 refreeze artifact path")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    fds: list[int] = []
+    leaf = -1
+    try:
+        parent = os.open(path.anchor, flags)
+        fds.append(parent)
+        links: list[tuple[int, str, int, tuple[int, int, int]]] = []
+        for part in path.parts[1:-1]:
+            before = os.stat(part, dir_fd=parent, follow_symlinks=False)
+            child = os.open(part, flags, dir_fd=parent)
+            opened = os.fstat(child)
+            identity = (opened.st_dev, opened.st_ino, opened.st_mode)
+            if not stat.S_ISDIR(opened.st_mode) or identity != (before.st_dev, before.st_ino, before.st_mode):
+                raise Rig("R15 refreeze artifact ancestor race")
+            links.append((parent, part, child, identity)); fds.append(child); parent = child
+        before = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        leaf = os.open(path.name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0), dir_fd=parent)
+        opened = os.fstat(leaf)
+        fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+        identity = tuple(getattr(opened, field) for field in fields)
+        if (tuple(getattr(before, field) for field in fields) != identity
+                or not stat.S_ISREG(opened.st_mode) or opened.st_uid != os.getuid()
+                or opened.st_nlink != 1 or stat.S_IMODE(opened.st_mode) not in (0o600, 0o644)
+                or opened.st_size > 262144):
+            raise Rig("unsafe R15 refreeze artifact")
+        raw = b""; offset = 0
+        while offset < opened.st_size:
+            part = os.pread(leaf, min(65536, opened.st_size - offset), offset)
+            if not part: raise Rig("short R15 refreeze artifact read")
+            raw += part; offset += len(part)
+        after = os.fstat(leaf); named = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        if len(raw) != opened.st_size or tuple(getattr(after, field) for field in fields) != identity or tuple(getattr(named, field) for field in fields) != identity:
+            raise Rig("R15 refreeze artifact replacement")
+        for directory, part, child, want in links:
+            current = os.stat(part, dir_fd=directory, follow_symlinks=False); held = os.fstat(child)
+            if (current.st_dev, current.st_ino, current.st_mode) != want or (held.st_dev, held.st_ino, held.st_mode) != want:
+                raise Rig("R15 refreeze artifact ancestor replacement")
+        return strict_json(raw), raw
+    finally:
+        if leaf >= 0: os.close(leaf)
+        for descriptor in reversed(fds): os.close(descriptor)
+""".encode()
+ gate=gate.replace(artifact_anchor,b"\n"+artifact_helper+artifact_anchor,1)
+ topology_start=b"        contract_publication = False\n";topology_end=b'        numstat = h37["identity_git"](\n'
+ if gate.count(topology_start)!=1 or gate.count(topology_end)!=1:raise Stop("H038 product topology anchor")
+ first=gate.index(topology_start);last=gate.index(topology_end,first)
+ topology="""        contract_publication = False
+        contract_candidate = ""
+        contract_changes = []
+        current_spec = strict_json(SPEC.read_bytes())
+        current_rows = task_rows(current_spec, "h-038") if isinstance(current_spec, dict) else []
+        published_binding = current_rows[0].get("h035_r15_published_authority") if len(current_rows) == 1 else None
+        if len(base_record.parents) == 2 and isinstance(published_binding, dict):
+            published_h035, refreeze_candidate = base_record.parents
+            refreeze_record = h37["strict_commit_record"](binding, refreeze_candidate)
+            refreeze_changes = commit_changes(
+                h37, binding, published_h035, refreeze_candidate,
+            )
+            contract_candidate = refreeze_candidate
+            contract_changes = refreeze_changes
+            expected_refreeze_changes = {
+                ("M", "specs/tasks.spec.json", "100644"),
+                ("M", "verify/bin/h-038-exit", "100755"),
+                ("M", "docs/loop/owner-author-workflow-v1.md", "100644"),
+                ("M", "docs/05-beslutslogg.md", "100644"),
+                ("M", "docs/loop/drift.md", "100644"),
+            }
+            review_path = Path(published_binding.get("review_path", "")).parent / (
+                f"h038-r15-dependency-refreeze-review-{refreeze_candidate[:8]}.json"
+            )
+            receipt_path = Path(published_binding.get("review_path", "")).parent / (
+                f"h038-r15-dependency-refreeze-publication-{base[:8]}.json"
+            )
+            review, review_raw = r15_refreeze_artifact(review_path)
+            receipt, _receipt_raw = r15_refreeze_artifact(receipt_path)
+            expected_review = {
+                "schema_version": 1, "record_type": "nortropic_independent_h038_r15_refreeze_review",
+                "role": "GATE_REVIEWER", "result": "PASS", "task": "h-038",
+                "base_sha": published_h035, "candidate_sha": refreeze_candidate,
+                "candidate_tree": refreeze_record.tree,
+                "changed_files": sorted(TEST_AUTHOR_SURFACE), "blocking_findings": [],
+            }
+            expected_receipt = {
+                "schema_version": 1, "record_type": "nortropic_publication_receipt",
+                "phase": "H038_R15_DEPENDENCY_REFREEZE_PUBLICATION",
+                "repository": published_binding.get("repository_identity"), "task_id": "h-038",
+                "base_sha": published_h035, "candidate_sha": refreeze_candidate,
+                "candidate_tree": refreeze_record.tree, "merge_sha": base,
+                "merge_tree": refreeze_record.tree,
+                "ordered_parents": [published_h035, refreeze_candidate],
+                "independent_review_path": str(review_path),
+                "independent_review_sha256": sha(review_raw),
+                "force": False, "history_rewrite": False,
+            }
+            h035_runtime = runpy.run_path(
+                str(H035_GATE), run_name="h038_frozen_h035_refreeze_renderer",
+            )
+            expected_refreeze = h035_runtime["r15_expected_h038_refreeze_bytes"](
+                ROOT, published_h035, published_binding,
+            )
+            refreeze_bytes_equal = set(expected_refreeze) == set(TEST_AUTHOR_SURFACE) and all(
+                h37["git_blob"](binding, refreeze_candidate, path)
+                    == h37["git_blob"](binding, base, path)
+                    == (ROOT / path).read_bytes()
+                    == expected_refreeze[path]
+                for path in TEST_AUTHOR_SURFACE
+            )
+            contract_publication = (
+                published_binding.get("record_type") == "h035_r15_published_authority_v1"
+                and type(published_binding.get("schema_version")) is int
+                and published_binding.get("schema_version") == 1
+                and published_binding.get("task") == "h-035"
+                and published_binding.get("product_publication_sha") == published_h035
+                and refreeze_record.parents == [published_h035]
+                and base_record.tree == refreeze_record.tree
+                and len(refreeze_changes) == len(expected_refreeze_changes)
+                and set(refreeze_changes) == expected_refreeze_changes
+                and refreeze_bytes_equal
+                and review == expected_review and receipt == expected_receipt
+            )
+""".encode()
+ gate=gate[:first]+topology+gate[last:]
+ out["verify/bin/h-038-exit"]=gate+("\n# H035_R15_REFREEZE_BINDING_V1 "+bs+" "+b["product_publication_sha"]+"\n").encode()
+ return out
+def h038_proof(repo,spec_path):
+ origin=repo_shape(repo); main=remote_main(repo,origin); clean_head(repo,main)
+ raw=spec_path.read_bytes()
+ if raw!=blob(repo,main,"specs/tasks.spec.json"):raise Stop("spec Git-object binding")
+ spec=loadb(raw); rows=[x for x in spec.get("tasks",[]) if isinstance(x,dict) and x.get("id")=="h-038"]
+ if len(rows)!=1 or rows[0].get("depends_on")!=["h-035","h-036"]:raise Stop("H038 dependency refreeze")
+ b=rows[0].get("h035_r15_published_authority")
+ bkeys={"record_type","schema_version","task","contract_merge_sha","contract_tree","contract_manifest_sha256","product_candidate_sha","product_tree","product_publication_sha","ordered_parents","product_paths_and_modes","gate_path","gate_sha256","review_path","review_sha256","review_role","review_result","blocking_findings","publication_receipt_path","publication_receipt_sha256","contract_review_path","contract_review_sha256","contract_publication_receipt_path","contract_publication_receipt_sha256","repository_identity"}
+ if not isinstance(b,dict) or set(b)!=bkeys or b["record_type"]!="h035_r15_published_authority_v1" or type(b["schema_version"]) is not int or b["schema_version"]!=1 or b["task"]!="h-035" or b["repository_identity"]!=origin:raise Stop("H035 binding fields")
+ mp=parents(repo,main)
+ if len(mp)!=2:raise Stop("H038 publication graph")
+ m0,r=mp
+ if m0!=b["product_publication_sha"] or parents(repo,r)!=[m0] or tree(repo,main)!=tree(repo,r):raise Stop("H038 graph/tree")
+ paths=["docs/05-beslutslogg.md","docs/loop/drift.md","docs/loop/owner-author-workflow-v1.md","specs/tasks.spec.json","verify/bin/h-038-exit"]
+ st=git(repo,"diff","--name-status","--no-renames","--no-ext-diff","--no-textconv",m0,r)
+ if st.stdout.splitlines()!=["M\t"+x for x in paths]:raise Stop("H038 refreeze scope")
+ modes={x:(("100755" if x=="verify/bin/h-038-exit" else "100644"),"blob") for x in paths}
+ if ls_modes(repo,r,paths)!=modes:raise Stop("H038 refreeze modes")
+ expected=expected_refreeze(repo,m0,b)
+ for p,want in expected.items():
+  if blob(repo,r,p)!=want:raise Stop("H038 exact refreeze bytes "+p)
+ cm=b["contract_merge_sha"];pc=b["product_candidate_sha"]
+ bound=R15_BOUND_CONTRACT;boundkeys={"authority_base_sha","candidate_sha","candidate_tree","contract_tree","gate_sha256","manifest_sha256","merge_sha"}
+ if not isinstance(bound,dict) or set(bound)!=boundkeys or cm!=bound["merge_sha"]:raise Stop("bound contract identity")
+ cmps=parents(repo,cm);cb,cc=bound["authority_base_sha"],bound["candidate_sha"];ct=bound["candidate_tree"]
+ if cmps!=[cb,cc] or cb not in ["408923a445d081ebb6309e57dfe80423844ce927","5bfdd9afd075a2431aded52dc21eaa361aaf729e"] or parents(repo,cc)!=[cb] or tree(repo,cc)!=ct or tree(repo,cm)!=ct or bound["contract_tree"]!=ct:raise Stop("contract publication")
+ cs=loadb(blob(repo,cm,"specs/tasks.spec.json"));crows=[x for x in cs.get("tasks",[]) if isinstance(x,dict) and x.get("id")=="h-035"];cmanifest=crows[0].get("r15_owner_product_lifecycle") if len(crows)==1 else None
+ if not isinstance(cmanifest,dict) or D(cmanifest)!=bound["manifest_sha256"] or b["contract_tree"]!=ct or b["contract_manifest_sha256"]!=bound["manifest_sha256"] or b["gate_path"]!="verify/bin/h-035-exit" or b["gate_sha256"]!=bound["gate_sha256"] or F(blob(repo,cm,b["gate_path"]))!=bound["gate_sha256"]:raise Stop("contract manifest/gate binding")
+ pt=tree(repo,pc)
+ if parents(repo,pc)!=[cm] or parents(repo,m0)!=[cm,pc] or tree(repo,m0)!=pt or b["product_tree"]!=pt or b["product_publication_sha"]!=m0 or b["ordered_parents"]!=[cm,pc]:raise Stop("product publication")
+ ppaths=["controller/attest/cli","controller/authority/cli","controller/taskval/cli"]
+ pst=git(repo,"diff","--name-status","--no-renames",cm,pc).stdout.splitlines();pnum=git(repo,"diff","--numstat","--no-renames",cm,pc,"--",*ppaths).stdout.splitlines()
+ if pst!=["M\t"+x for x in ppaths] or pnum!=["1757\t0\tcontroller/attest/cli","142\t0\tcontroller/authority/cli","154\t0\tcontroller/taskval/cli"] or ls_modes(repo,pc,ppaths)!={x:("100755","blob") for x in ppaths} or b["product_paths_and_modes"]!=[[x,"100755"] for x in ppaths] or any(blob(repo,main,x)!=blob(repo,pc,x) for x in ppaths):raise Stop("product scope/source identity")
+ cpaths=["docs/05-beslutslogg.md","docs/loop/drift.md","docs/loop/owner-author-workflow-v1.md","specs/tasks.spec.json","verify/bin/h-035-exit"]
+ if git(repo,"diff","--name-status","--no-renames",cb,cc).stdout.splitlines()!=["M\t"+x for x in cpaths] or ls_modes(repo,cc,cpaths)!={x:(("100755" if x=="verify/bin/h-035-exit" else "100644"),"blob") for x in cpaths}:raise Stop("contract candidate scope")
+ if origin=="git@github.com:Nortropic/nortropic-system.git":
+  ev=Path("/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence")
+ else:
+  rp=repo.resolve();op=Path(origin)
+  if not op.is_absolute() or str(op.resolve())!=origin or rp.name!="published-repo" or op.name!="published-origin.git" or rp.parent!=op.parent:raise Stop("fixture repository layout")
+  ev=(rp.parent/"evidence").resolve()
+ if cb=="408923a445d081ebb6309e57dfe80423844ce927":
+  cr=(ev/"h035-r15-contract-review.json").resolve();cp=(ev/"h035-r15-contract-publication.json").resolve()
+  crv={"schema_version":1,"record_type":"nortropic_independent_h035_r15_contract_review","role":"GATE_REVIEWER","result":"PASS","task":"h-035","authority_base_sha":cb,"contract_candidate_sha":cc,"contract_candidate_tree":ct,"blocking_findings":[]};phase="H035_R15_GUARDED_CONTRACT_PUBLICATION"
+ else:
+  cr=(ev/"h035-r26-dual-gate-review.json").resolve();cp=(ev/"h035-r26-contract-publication.json").resolve()
+  reviews=[];digests=[]
+  for lane,label in [("A","a"),("B","b")]:
+   lp=cr.parent/f"h035-r26-gate-review-{label}.json";lv={"schema_version":1,"record_type":"nortropic_independent_h035_r26_gate_review","role":"GATE_REVIEWER","lane":lane,"result":"PASS","task":"h-035","authority_base_sha":cb,"contract_candidate_sha":cc,"contract_candidate_tree":ct,"changed_files":cpaths,"blocking_findings":[]};ld=artifact(lp,lv);digests.append(ld);reviews.append({"lane":lane,"path":str(lp),"sha256":ld})
+  if len(set(digests))!=2:raise Stop("successor review identity")
+  crv={"schema_version":1,"record_type":"nortropic_dual_h035_r26_gate_review_binding","role":"DUAL_GATE_REVIEW_BINDING","result":"PASS","task":"h-035","authority_base_sha":cb,"contract_candidate_sha":cc,"contract_candidate_tree":ct,"changed_files":cpaths,"reviews":reviews,"blocking_findings":[]};phase="H035_R26_GUARDED_CONTRACT_PUBLICATION"
+ if b["contract_review_path"]!=str(cr) or b["contract_publication_receipt_path"]!=str(cp):raise Stop("contract artifact path")
+ crsha=artifact(cr,crv)
+ cpr={"schema_version":1,"record_type":"nortropic_publication_receipt","phase":phase,"repository":origin,"task_id":"h-035","base_sha":cb,"candidate_sha":cc,"candidate_tree":ct,"merge_sha":cm,"merge_tree":ct,"ordered_parents":[cb,cc],"independent_review_path":str(cr),"independent_review_sha256":crsha,"force":False,"history_rewrite":False}
+ cpsha=artifact(cp,cpr)
+ if b["contract_review_sha256"]!=crsha or b["contract_publication_receipt_sha256"]!=cpsha:raise Stop("contract artifact digest")
+ pr=(ev/"h035-r15-product-review.json").resolve();pp=(ev/"h035-r15-product-publication.json").resolve();pt=tree(repo,pc)
+ if b["review_path"]!=str(pr) or b["publication_receipt_path"]!=str(pp):raise Stop("product artifact path")
+ prv={"schema_version":1,"record_type":"nortropic_independent_owner_product_review","role":"PRODUCT_REVIEWER","result":"PASS","task":"h-035","base_sha":cm,"candidate_sha":pc,"candidate_tree":pt,"blocking_findings":[]}
+ prsha=artifact(pr,prv)
+ ppr={"schema_version":1,"record_type":"nortropic_publication_receipt","phase":"H035_R15_GUARDED_PRODUCT_PUBLICATION","repository":origin,"task_id":"h-035","base_sha":cm,"candidate_sha":pc,"candidate_tree":pt,"merge_sha":m0,"merge_tree":pt,"ordered_parents":[cm,pc],"independent_review_path":str(pr),"independent_review_sha256":prsha,"force":False,"history_rewrite":False}
+ ppsha=artifact(pp,ppr)
+ if b["review_sha256"]!=prsha or b["publication_receipt_sha256"]!=ppsha or b["review_role"]!="PRODUCT_REVIEWER" or b["review_result"]!="PASS" or b["blocking_findings"]!=[]:raise Stop("product artifact digest")
+ rr=(ev/f"h038-r15-dependency-refreeze-review-{r[:8]}.json").resolve();rp=(ev/f"h038-r15-dependency-refreeze-publication-{main[:8]}.json").resolve()
+ rrv={"schema_version":1,"record_type":"nortropic_independent_h038_r15_refreeze_review","role":"GATE_REVIEWER","result":"PASS","task":"h-038","base_sha":m0,"candidate_sha":r,"candidate_tree":tree(repo,r),"changed_files":paths,"blocking_findings":[]}
+ rrsha=artifact(rr,rrv)
+ rpv={"schema_version":1,"record_type":"nortropic_publication_receipt","phase":"H038_R15_DEPENDENCY_REFREEZE_PUBLICATION","repository":origin,"task_id":"h-038","base_sha":m0,"candidate_sha":r,"candidate_tree":tree(repo,r),"merge_sha":main,"merge_tree":tree(repo,r),"ordered_parents":[m0,r],"independent_review_path":str(rr),"independent_review_sha256":rrsha,"force":False,"history_rewrite":False}
+ artifact(rp,rpv)
+ return origin,main,spec,b
+
+def devino(s):return [s.st_dev,s.st_ino]
+def root_open(path):
+ for context in reversed(_R15_CONTEXTS):
+  if path==context["state"]:_validate_context(context);return os.dup(context["statefd"])
+  if path==context["attest"]:_validate_context(context);return os.dup(context["attestfd"])
+ safe_components(path,True);fd=os.open(path,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0));a=os.fstat(fd);b=os.lstat(path)
+ if devino(a)!=devino(b) or a.st_uid!=os.getuid() or stat.S_IMODE(a.st_mode)!=0o700:os.close(fd);raise Stop("unsafe root identity")
+ return fd
+def leaf_open(rootfd,name):
+ a=os.stat(name,dir_fd=rootfd,follow_symlinks=False)
+ if not stat.S_ISREG(a.st_mode) or a.st_uid!=os.getuid() or a.st_nlink!=1 or stat.S_IMODE(a.st_mode)!=0o600:raise Stop("unsafe bound leaf")
+ fd=os.open(name,os.O_RDWR|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)|getattr(os,"O_NONBLOCK",0),dir_fd=rootfd);b=os.fstat(fd)
+ if devino(a)!=devino(b) or b.st_nlink!=1:os.close(fd);raise Stop("bound leaf open race")
+ return fd
+def slot_pair(rootfd,named,want):
+ seen=[]
+ for name,fd in named:
+  held=os.fstat(fd);current=os.stat(name,dir_fd=rootfd,follow_symlinks=False)
+  if (not stat.S_ISREG(held.st_mode) or held.st_uid!=os.getuid() or held.st_nlink!=1
+   or stat.S_IMODE(held.st_mode)!=0o600 or devino(held)!=devino(current)
+   or current.st_nlink!=1 or stat.S_IMODE(current.st_mode)!=0o600):raise Stop("bound slot name identity")
+  seen.append(devino(held))
+ if sorted(seen)!=want:raise Stop("bound slot pair identity")
+def fdbytes(fd,limit=8*1024*1024):
+ size=os.fstat(fd).st_size
+ if size>limit:raise Stop("bound leaf size")
+ raw=b"";offset=0
+ while offset<size:
+  part=os.pread(fd,min(65536,size-offset),offset)
+  if not part:raise Stop("short retained read")
+  raw+=part;offset+=len(part)
+ return raw
+def fdwrite(fd,raw):
+ os.ftruncate(fd,0);offset=0
+ while offset<len(raw):
+  wrote=os.pwrite(fd,raw[offset:],offset)
+  if wrote<=0:raise Stop("short retained write")
+  offset+=wrote
+ os.fsync(fd)
+ if fdbytes(fd)!=raw:raise Stop("retained write mismatch")
+def fdappend(fd,raw):
+ offset=os.fstat(fd).st_size;start=offset
+ while offset-start<len(raw):
+  wrote=os.pwrite(fd,raw[offset-start:],offset)
+  if wrote<=0:raise Stop("short retained append")
+  offset+=wrote
+def renameat(rootfd,a,b,flags):
+ if flags not in (RENAME_SWAP|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH,RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH):raise Stop("renameatx flags")
+ fn=getattr(ctypes.CDLL(None,use_errno=True),"renameatx_np",None)
+ if fn is None:raise Stop("renameatx_np unavailable")
+ fn.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint];fn.restype=ctypes.c_int
+ if fn(rootfd,os.fsencode(a),rootfd,os.fsencode(b),flags)!=0:raise OSError(ctypes.get_errno(),"renameatx_np")
+def _context_for(state):
+ for context in reversed(_R15_CONTEXTS):
+  if state==context["state"]:return context
+ return None
+def _full(s):return (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+def _validate_context(context):
+ parent=os.lstat(context["parent"]);ph=os.fstat(context["parentfd"]);bundle=os.stat(context["bundle"].name,dir_fd=context["parentfd"],follow_symlinks=False);bh=os.fstat(context["bundlefd"])
+ state=os.stat("state",dir_fd=context["bundlefd"],follow_symlinks=False);sh=os.fstat(context["statefd"]);attest=os.stat("attest",dir_fd=context["bundlefd"],follow_symlinks=False);ah=os.fstat(context["attestfd"])
+ if (devino(parent)!=devino(ph) or devino(bundle)!=devino(bh) or devino(state)!=devino(sh) or devino(attest)!=devino(ah)
+  or devino(bh)!=context["manifest"]["bundle_root_dev_ino"] or devino(sh)!=context["manifest"]["state_root_dev_ino"] or devino(ah)!=context["manifest"]["attest_root_dev_ino"]
+  or any(not stat.S_ISDIR(x.st_mode) or x.st_uid!=os.getuid() or stat.S_IMODE(x.st_mode)!=0o700 for x in (bh,sh,ah))):raise Stop("retained bundle/root replacement")
+ if set(os.listdir(context["bundlefd"]))!={"state","attest"} or set(os.listdir(context["statefd"]))!={".r15-owner.lock",DBSHADOW,SM,EVENTS,DB} or set(os.listdir(context["attestfd"]))!={RECOVERY,ASHADOW,".r15-attest.lock",STORE,SM}:raise Stop("retained bundle inventory")
+ ma=context["manifest"]
+ fixed=((context["statefd"],".r15-owner.lock",ma["state_lock_dev_ino"]),(context["statefd"],EVENTS,ma["state_event_log_dev_ino"]),(context["attestfd"],".r15-attest.lock",ma["attest_lock_dev_ino"]),(context["attestfd"],RECOVERY,ma["attest_recovery_log_dev_ino"]))
+ for rootfd,name,want in fixed:
+  member=os.stat(name,dir_fd=rootfd,follow_symlinks=False)
+  if not stat.S_ISREG(member.st_mode) or member.st_uid!=os.getuid() or member.st_nlink!=1 or stat.S_IMODE(member.st_mode)!=0o600 or devino(member)!=want:raise Stop("retained fixed-leaf identity")
+ for rootfd,names,want in ((context["statefd"],(DB,DBSHADOW),ma["state_db_slot_dev_inos"]),(context["attestfd"],(STORE,ASHADOW),ma["attestation_store_slot_dev_inos"])):
+  members=[os.stat(name,dir_fd=rootfd,follow_symlinks=False) for name in names]
+  if sorted(devino(member) for member in members)!=want or any(not stat.S_ISREG(member.st_mode) or member.st_uid!=os.getuid() or member.st_nlink!=1 or stat.S_IMODE(member.st_mode)!=0o600 for member in members):raise Stop("retained slot-pair identity")
+ for rootfd,name,fd,want,raw in ((context["statefd"],SM,context["state_manifestfd"],context["state_manifest_identity"],context["manifest_raw"]),(context["attestfd"],SM,context["attest_manifestfd"],context["attest_manifest_identity"],context["manifest_raw"])):
+  held=os.fstat(fd);named=os.stat(name,dir_fd=rootfd,follow_symlinks=False)
+  if _full(held)!=want or _full(named)!=want or fdbytes(fd,262144)!=raw:raise Stop("retained manifest replacement")
+def retained_raw(context,path,mode,limit,identity):
+ _validate_context(context);rootfd=context["statefd"] if path.parent==context["state"] else context["attestfd"];name=path.name
+ a=os.stat(name,dir_fd=rootfd,follow_symlinks=False)
+ if not stat.S_ISREG(a.st_mode) or a.st_uid!=os.getuid() or a.st_nlink!=1 or stat.S_IMODE(a.st_mode) not in mode or a.st_size>limit:raise Stop("unsafe retained leaf")
+ fd=os.open(name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)|getattr(os,"O_NONBLOCK",0),dir_fd=rootfd)
+ try:
+  b=os.fstat(fd)
+  if _full(a)!=_full(b):raise Stop("retained leaf open race")
+  raw=fdbytes(fd,limit);c=os.fstat(fd);named=os.stat(name,dir_fd=rootfd,follow_symlinks=False)
+  if _full(b)!=_full(c) or _full(b)!=_full(named):raise Stop("retained leaf replacement")
+  _validate_context(context);return (raw,F(raw),_full(b)) if identity else (raw,F(raw))
+ finally:os.close(fd)
+def manifest_docs(state):
+ context=_context_for(state)
+ if context is not None:_validate_context(context);return context["attest"],context["manifest"]
+ safe_components(state,True);attest=state.parent/"attest";safe_components(attest,True)
+ bundle=state.parent;safe_components(bundle,True)
+ if state.name!="state" or attest.parent!=bundle or set(os.listdir(bundle))!={"state","attest"}:raise Stop("bundle topology")
+ if os.path.lexists(state/"current.json"):raise Stop("current projection forbidden")
+ ma,maraw,_=safe_file(state/SM,(0o600,),262144);mb,mbraw,_=safe_file(attest/SM,(0o600,),262144)
+ if not isinstance(ma,dict) or ma!=mb or set(ma)!=MANIFEST_FIELDS or ma["record_type"]!="h035_r15_bootstrap_roots_v1" or type(ma["schema_version"]) is not int or ma["schema_version"]!=1:raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID")
+ if maraw!=C(ma)+b"\n" or mbraw!=C(mb)+b"\n":raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID canonical bytes")
+ br=os.lstat(bundle);sr=os.lstat(state);ar=os.lstat(attest);sm=os.lstat(state/SM);am=os.lstat(attest/SM)
+ if (ma["bundle_root"]!=str(bundle) or ma["bundle_root_dev_ino"]!=devino(br)
+  or ma["state_root"]!=str(state) or ma["attest_root"]!=str(attest)
+  or ma["state_root_dev_ino"]!=devino(sr) or ma["attest_root_dev_ino"]!=devino(ar)
+  or ma["state_manifest_dev_ino"]!=devino(sm) or ma["attest_manifest_dev_ino"]!=devino(am)
+  or any(not stat.S_ISDIR(x.st_mode) or x.st_uid!=os.getuid() or stat.S_IMODE(x.st_mode)!=0o700 for x in (br,sr,ar))):raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID")
+ if set(os.listdir(state))!={".r15-owner.lock",DBSHADOW,SM,EVENTS,DB} or set(os.listdir(attest))!={RECOVERY,ASHADOW,".r15-attest.lock",STORE,SM}:raise Stop("R15 bootstrap member topology")
+ sl=os.lstat(state/".r15-owner.lock");al=os.lstat(attest/".r15-attest.lock");ev=os.lstat(state/EVENTS);sd=[os.lstat(state/DB),os.lstat(state/DBSHADOW)];ad=[os.lstat(attest/STORE),os.lstat(attest/ASHADOW)];rl=os.lstat(attest/RECOVERY)
+ if ma["state_lock_dev_ino"]!=devino(sl) or ma["attest_lock_dev_ino"]!=devino(al) or ma["state_event_log_dev_ino"]!=devino(ev) or ma["state_db_slot_dev_inos"]!=sorted(devino(x) for x in sd) or ma["attestation_store_slot_dev_inos"]!=sorted(devino(x) for x in ad) or ma["attest_recovery_log_dev_ino"]!=devino(rl):raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID")
+ for p in (state/".r15-owner.lock",state/EVENTS,state/DB,state/DBSHADOW,state/SM,attest/".r15-attest.lock",attest/STORE,attest/ASHADOW,attest/RECOVERY,attest/SM):safe_leaf(p)
+ empty=F(b"")
+ if ma["bootstrap_state_db_shadow_sha256"]!=empty or ma["bootstrap_attestation_store_shadow_sha256"]!=empty or ma["bootstrap_attest_recovery_log_sha256"]!=empty:raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID")
+ return attest,ma
+def _retain_context(state):
+ attest,ma=manifest_docs(state);bundle=state.parent;parent=bundle.parent;fds=[]
+ flags=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)
+ def directory(parentfd,name,want):
+  before=os.stat(name,dir_fd=parentfd,follow_symlinks=False);fd=os.open(name,flags,dir_fd=parentfd);opened=os.fstat(fd)
+  if not stat.S_ISDIR(opened.st_mode) or devino(before)!=devino(opened) or devino(opened)!=want:os.close(fd);raise Stop("retained directory open race")
+  fds.append(fd);return fd
+ def manifest(rootfd,want):
+  before=os.stat(SM,dir_fd=rootfd,follow_symlinks=False);fd=os.open(SM,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0)|getattr(os,"O_NONBLOCK",0),dir_fd=rootfd);opened=os.fstat(fd)
+  if (not stat.S_ISREG(opened.st_mode) or opened.st_uid!=os.getuid() or opened.st_nlink!=1 or stat.S_IMODE(opened.st_mode)!=0o600 or devino(before)!=devino(opened) or devino(opened)!=want):os.close(fd);raise Stop("retained manifest open race")
+  fds.append(fd);return fd,_full(opened),fdbytes(fd,262144)
+ try:
+  parentfd=root_open(parent);fds.append(parentfd);bundlefd=directory(parentfd,bundle.name,ma["bundle_root_dev_ino"]);statefd=directory(bundlefd,"state",ma["state_root_dev_ino"]);attestfd=directory(bundlefd,"attest",ma["attest_root_dev_ino"])
+  smfd,smi,smraw=manifest(statefd,ma["state_manifest_dev_ino"]);amfd,ami,amraw=manifest(attestfd,ma["attest_manifest_dev_ino"])
+  if smraw!=amraw or smraw!=C(ma)+b"\n":raise Stop("retained manifest bytes")
+  context={"parent":parent,"bundle":bundle,"state":state,"attest":attest,"parentfd":parentfd,"bundlefd":bundlefd,"statefd":statefd,"attestfd":attestfd,"state_manifestfd":smfd,"attest_manifestfd":amfd,"state_manifest_identity":smi,"attest_manifest_identity":ami,"manifest_raw":smraw,"manifest":ma,"fds":fds}
+  _validate_context(context);return context
+ except Exception:
+  for fd in reversed(fds):
+   try:os.close(fd)
+   except OSError:pass
+  raise
+def _close_context(context):
+ for fd in reversed(context["fds"]):
+  try:os.close(fd)
+  except OSError:pass
+def lockfile(path):
+ state=(path.parent if path.name==".r15-owner.lock" else path.parent.parent/"state");context=_context_for(state);owned=context is None
+ if owned:context=_retain_context(state)
+ rootfd=context["statefd"] if path.name==".r15-owner.lock" else context["attestfd"];key="state_lock_dev_ino" if path.name==".r15-owner.lock" else "attest_lock_dev_ino"
+ try:fd=leaf_open(rootfd,path.name)
+ except Exception:
+  if owned:_close_context(context)
+  raise
+ if devino(os.fstat(fd))!=context["manifest"][key]:os.close(fd);(_close_context(context) if owned else None);raise Stop("manifest lock identity")
+ return fd,context,context["manifest"][key],owned
+@contextmanager
+def locked(path):
+ fd,context,want,owned=lockfile(path);held=False;body_error=None
+ if owned:_R15_CONTEXTS.append(context)
+ try:
+  fcntl.flock(fd,fcntl.LOCK_EX);held=True;_validate_context(context);rootfd=context["statefd"] if path.name==".r15-owner.lock" else context["attestfd"];q=os.stat(path.name,dir_fd=rootfd,follow_symlinks=False)
+  if devino(os.fstat(fd))!=want or devino(q)!=want:raise Stop("lock replacement after flock")
+  try:yield context
+  except Exception as error:body_error=error
+  try:
+   _validate_context(context);q=os.stat(path.name,dir_fd=rootfd,follow_symlinks=False)
+   if devino(os.fstat(fd))!=want or devino(q)!=want:raise Stop("lock replacement during effect")
+  except Exception as integrity:raise Indeterminate("INDETERMINATE_PRESERVED retained context/lock: "+str(integrity)) from (body_error or integrity)
+  if body_error is not None:raise body_error.with_traceback(body_error.__traceback__)
+ finally:
+  if held:fcntl.flock(fd,fcntl.LOCK_UN)
+  os.close(fd)
+  if owned:
+   if not _R15_CONTEXTS or _R15_CONTEXTS[-1] is not context:raise Stop("retained context stack")
+   _R15_CONTEXTS.pop();_close_context(context)
+def task_classes(attest):
+ state=attest.parent/"state";_repo,bound,ma,doc=manifest_info(state,False)
+ if bound!=attest:raise Stop("attest manifest root substitution")
+ return ({x["id"]:x.get("authority_class","ordinary") for x in doc["tasks"] if isinstance(x,dict) and isinstance(x.get("id"),str)},ma["repository_identity"])
+def store_value(raw,classes,trusted_origin):
+ v=loadb(raw)
+ if raw!=C(v)+b"\n":raise Stop("attestation store canonical bytes")
+ if not isinstance(v,dict) or set(v)!={"attestations","omtest_ko","invalidated_shas"} or not isinstance(v["attestations"],dict) or not isinstance(v["omtest_ko"],list) or len(v["omtest_ko"])!=len(set(v["omtest_ko"])) or not isinstance(v["invalidated_shas"],list) or v["invalidated_shas"]!=sorted(set(v["invalidated_shas"])) or not all(isinstance(x,str) and HEX40.fullmatch(x) for x in v["invalidated_shas"]):raise Stop("attestation store schema")
+ stale_tasks=[]
+ for task,record in v["attestations"].items():
+  if not isinstance(task,str) or not isinstance(record,dict) or record.get("task")!=task or type(record.get("stale")) is not bool:raise Stop("attestation record schema")
+  keys=set(record)
+  if record.get("record_type")=="owner_publication_v1":
+   if keys!=OWNER_FIELDS:raise Stop("owner record schema")
+   if classes is not None and (task not in classes or classes[task]!="owner_authority"):raise Stop("rich record task class")
+   if (type(record.get("schema_version")) is not int or record["schema_version"]!=1
+    or record.get("authority_class")!="owner_authority" or record.get("review_result")!="PASS"
+    or record.get("spec_path")!="specs/tasks.spec.json"
+    or record.get("registry_path")!="specs/owner-production-paths.v1.json"
+    or not isinstance(record.get("gate_path"),str) or not record["gate_path"].startswith("verify/bin/")
+    or not isinstance(record.get("repository_identity"),str) or not record["repository_identity"]
+    or any(not isinstance(record.get(x),str) or not HEX40.fullmatch(record[x]) for x in ("base_sha","candidate_sha","candidate_tree","publication_sha"))
+    or any(not isinstance(record.get(x),str) or not HEX64.fullmatch(record[x]) for x in ("spec_sha256","registry_sha256","gate_sha256","dependency_attestations_sha256","transition_identity","candidate_identity","review_identity"))
+    or not isinstance(record.get("changed_files"),list) or record["changed_files"]!=sorted(set(record["changed_files"]))
+    or not all(isinstance(x,str) and x and not x.startswith("/") and "\\" not in x and "\x00" not in x and all(part not in ("",".","..") for part in x.split("/")) for x in record["changed_files"])
+   or record.get("invalidates_on")!=[record.get("candidate_sha"),record.get("publication_sha")]):raise Stop("owner record value schema")
+   if task=="h-036":
+    expected_h036=h036_record(trusted_origin);expected_h036["stale"]=any(x in v["invalidated_shas"] for x in expected_h036["invalidates_on"])
+    if record!=expected_h036:raise Stop("historical H036 record identity")
+   else:
+    origin=trusted_origin
+    if record["repository_identity"]!=origin:raise Stop("owner record repository identity")
+    specraw=blob(ROOT,record["base_sha"],record["spec_path"]);registryraw=blob(ROOT,record["base_sha"],record["registry_path"]);doc=loadb(specraw);registry=loadb(registryraw);taskrows=[x for x in doc.get("tasks",[]) if isinstance(x,dict) and x.get("id")==task]
+    if len(taskrows)!=1 or taskrows[0].get("authority_class")!="owner_authority" or taskrows[0].get("exit_test")!=record["gate_path"] or F(specraw)!=record["spec_sha256"] or F(registryraw)!=record["registry_sha256"] or F(blob(ROOT,record["base_sha"],record["gate_path"]))!=record["gate_sha256"]:raise Stop("owner record frozen authority")
+    ti=D(transition(task,record["base_sha"],record["spec_sha256"],record["registry_sha256"],record["gate_path"],record["gate_sha256"],origin,record["dependency_attestations_sha256"]))
+    ci=candidate_id(task,record["base_sha"],record["candidate_sha"],record["candidate_tree"],record["changed_files"],ti,record["review_identity"])
+    actual_changed,actual_tree=candidate_scope(ROOT,record["base_sha"],record["candidate_sha"],taskrows[0],registry)
+    if record["transition_identity"]!=ti or record["candidate_identity"]!=ci or actual_changed!=record["changed_files"] or actual_tree!=record["candidate_tree"] or parents(ROOT,record["candidate_sha"])!=[record["base_sha"]] or tree(ROOT,record["candidate_sha"])!=record["candidate_tree"] or parents(ROOT,record["publication_sha"])!=[record["base_sha"],record["candidate_sha"]] or tree(ROOT,record["publication_sha"])!=record["candidate_tree"]:raise Stop("owner record graph/scope/identity")
+  elif keys not in ({"task","candidate_sha","invalidates_on","stale"},{"task","candidate_sha","invalidates_on","stale","grind_id","grind_sha256"}):raise Stop("ordinary record schema")
+  elif classes is not None and (task not in classes or classes[task]=="owner_authority"):raise Stop("ordinary record task class")
+  elif (not isinstance(record.get("candidate_sha"),str) or not HEX40.fullmatch(record["candidate_sha"])
+        or record.get("invalidates_on")!=[record.get("candidate_sha")]
+        or ("grind_id" in record and (not isinstance(record["grind_id"],str) or not record["grind_id"]
+              or not isinstance(record.get("grind_sha256"),str) or not HEX64.fullmatch(record["grind_sha256"])) )):raise Stop("ordinary record value schema")
+  if not isinstance(record.get("invalidates_on"),list) or len(record["invalidates_on"])!=len(set(record["invalidates_on"])) or not all(isinstance(x,str) and HEX40.fullmatch(x) for x in record["invalidates_on"]):raise Stop("attestation invalidation schema")
+  invalid=any(x in v["invalidated_shas"] for x in record["invalidates_on"])
+  if record["stale"] is not invalid:raise Stop("attestation stale history schema")
+  if record["stale"]:stale_tasks.append(task)
+ if set(v["omtest_ko"])!=set(stale_tasks):raise Stop("attestation queue schema")
+ return v
+def store_snapshot(attest):
+ raw,_=safe_raw(attest/STORE,(0o600,),8*1024*1024);classes,trusted_origin=task_classes(attest);return store_value(raw,classes,trusted_origin),raw
+def store_read(attest):return store_snapshot(attest)[0]
+def recovery_rows(raw,ma=None,manifest_sha=None):
+ if raw and not raw.endswith(b"\n"):raise Stop("INDETERMINATE incomplete recovery tail")
+ if len(raw.splitlines())>8192:raise Stop("attest recovery count")
+ rows=[];previous=F(b"");pending=None;last_new=(ma["bootstrap_attestation_store_sha256"] if ma is not None else None)
+ for number,line in enumerate(raw.splitlines(keepends=True),1):
+  value=loadb(line[:-1])
+  if C(value)+b"\n"!=line:raise Stop("attest recovery canonical line")
+  if (not isinstance(value,dict) or set(value)!={"record_type","schema_version","sequence","phase","command","task","manifest_sha256","operation_identity","request_sha256","old_store_sha256","new_store_sha256","previous_record_sha256"}
+   or value["record_type"]!="h035_r15_attest_recovery_v1" or type(value["schema_version"]) is not int or value["schema_version"]!=1
+   or type(value["sequence"]) is not int or value["sequence"]!=number or value["previous_record_sha256"]!=previous
+   or value["command"] not in ("write","invalidate","finalize-owner-publication","import-h036-owner-publication")
+   or value["task"] is not None and (not isinstance(value["task"],str) or not value["task"])
+   or not all(isinstance(value.get(x),str) and HEX64.fullmatch(value[x]) for x in ("manifest_sha256","operation_identity","request_sha256","old_store_sha256","new_store_sha256","previous_record_sha256"))):raise Stop("attest recovery schema")
+  if ((value["command"] in ("write","finalize-owner-publication") and not isinstance(value["task"],str))
+   or (value["command"]=="invalidate" and value["task"] is not None)
+   or (value["command"]=="import-h036-owner-publication" and value["task"]!="h-036")):raise Stop("attest recovery command task domain")
+  if ma is not None:
+   if manifest_sha!=value["manifest_sha256"]:raise Stop("attest recovery manifest identity")
+   expected=attest_operation(value["command"],value["task"],value["request_sha256"],ma,manifest_sha,value["sequence"] if value["phase"]=="PENDING" else value["sequence"]-1,value["old_store_sha256"],value["new_store_sha256"])
+   if D(expected)!=value["operation_identity"]:raise Stop("attest recovery operation identity")
+  if value["phase"]=="PENDING":
+   if number%2!=1 or pending is not None:raise Stop("attest recovery pairing")
+   if value["old_store_sha256"]==value["new_store_sha256"] or last_new is not None and value["old_store_sha256"]!=last_new:raise Stop("attest recovery store continuity")
+   pending=value
+  elif value["phase"]=="COMMITTED":
+   if number%2 or pending is None or any(value[x]!=pending[x] for x in ("command","task","manifest_sha256","operation_identity","request_sha256","old_store_sha256","new_store_sha256")):raise Stop("attest recovery pairing")
+   last_new=value["new_store_sha256"];pending=None
+  else:raise Stop("attest recovery phase")
+  previous=F(line);rows.append(value)
+ return rows,pending,previous
+def recovery_active(rows,pending,active_raw,shadow_raw,ma):
+ digest=F(active_raw);shadow_digest=F(shadow_raw)
+ if pending is None:
+  expected=(rows[-1]["new_store_sha256"] if rows else ma["bootstrap_attestation_store_sha256"])
+  if digest!=expected or shadow_raw!=b"":raise Stop("attest recovery committed slot orientation")
+ elif not ((digest==pending["old_store_sha256"] and shadow_digest==pending["new_store_sha256"])
+           or (digest==pending["new_store_sha256"] and shadow_digest in (pending["old_store_sha256"],F(b"")))):raise Stop("attest pending slot orientation")
+def mutation_preflight(raw,ma,manifest_sha,active_raw,shadow_raw):
+ incomplete=bool(raw and not raw.endswith(b"\n"));complete=(raw[:raw.rfind(b"\n")+1] if incomplete else raw);rows,pending,previous=recovery_rows(complete,ma,manifest_sha)
+ if pending is None and (incomplete or shadow_raw):
+  expected=(rows[-1]["new_store_sha256"] if rows else ma["bootstrap_attestation_store_sha256"])
+  if F(active_raw)!=expected:raise Stop("attest pre-PENDING "+("incomplete-tail" if incomplete else "recovery")+" active mismatch")
+ else:recovery_active(rows,pending,active_raw,shadow_raw,ma)
+ return rows,pending,previous,complete
+def attest_request(command,argv,stdin=None):return {"record_type":"h035_r15_attest_request_v1","command":command,"argv":argv,"stdin":stdin}
+def attest_operation(command,task,reqsha,ma,manifest_sha,sequence,oldsha,newsha):return {"record_type":"h035_r15_attest_operation_v1","command":command,"task":task,"request_sha256":reqsha,"manifest_sha256":manifest_sha,"attest_root_dev_ino":ma["attest_root_dev_ino"],"attest_manifest_dev_ino":ma["attest_manifest_dev_ino"],"attest_lock_dev_ino":ma["attest_lock_dev_ino"],"attestation_store_slot_dev_inos":ma["attestation_store_slot_dev_inos"],"attest_recovery_log_dev_ino":ma["attest_recovery_log_dev_ino"],"pending_sequence":sequence,"old_store_sha256":oldsha,"new_store_sha256":newsha}
+def atomic(path,value,request):
+ attest=path.parent;state=attest.parent/"state";_repo,bound,ma,_doc=manifest_info(state,False)
+ if path.name!=STORE or bound!=attest:raise Stop("store path")
+ rfd=root_open(attest);active=leaf_open(rfd,STORE);shadow=leaf_open(rfd,ASHADOW);recovery=leaf_open(rfd,RECOVERY);pending_written=False;shadow_written=False
+ try:
+  slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"])
+  if devino(os.fstat(recovery))!=ma["attest_recovery_log_dev_ino"]:raise Stop("attest slot identity")
+  if not isinstance(request,dict) or set(request)!={"record_type","command","argv","stdin"} or request["record_type"]!="h035_r15_attest_request_v1" or request["command"] not in ("write","invalidate","finalize-owner-publication","import-h036-owner-publication") or not isinstance(request["argv"],list) or not all(isinstance(x,str) for x in request["argv"]):raise Stop("attest mutation request domain")
+  command=request["command"]
+  if ((command=="write" and (len(request["argv"]) not in (2,4) or request["stdin"] is not None)) or (command=="invalidate" and (len(request["argv"])!=1 or request["stdin"] is not None)) or (command=="finalize-owner-publication" and (request["argv"] or not isinstance(request["stdin"],dict))) or (command=="import-h036-owner-publication" and (request["argv"] or request["stdin"] is not None))):raise Stop("attest mutation request shape")
+  classes,trusted_origin=task_classes(attest);old=fdbytes(active);shadow_initial=fdbytes(shadow);store_value(old,classes,trusted_origin);new=C(value)+b"\n";store_value(new,classes,trusted_origin);rr=fdbytes(recovery);manifest_raw,_=safe_raw(attest/SM,(0o600,),262144);manifest_sha=F(manifest_raw)
+  if rr and not rr.endswith(b"\n"):
+   complete=rr[:rr.rfind(b"\n")+1];_complete_rows,complete_pending,_complete_previous=recovery_rows(complete,ma,manifest_sha)
+   if complete_pending is None:
+    complete_expected=(_complete_rows[-1]["new_store_sha256"] if _complete_rows else ma["bootstrap_attestation_store_sha256"])
+    if F(old)!=complete_expected:raise Stop("attest pre-PENDING incomplete-tail active mismatch")
+   else:recovery_active(_complete_rows,complete_pending,old,shadow_initial,ma)
+   pending_written=True;os.ftruncate(recovery,len(complete));os.fsync(recovery)
+   rr=complete
+  rows,pending,previous=recovery_rows(rr,ma,manifest_sha);shadow_now=fdbytes(shadow)
+  if pending is None and shadow_now:
+   expected=(rows[-1]["new_store_sha256"] if rows else ma["bootstrap_attestation_store_sha256"])
+   if F(old)!=expected:raise Stop("attest pre-PENDING recovery active mismatch")
+   try:
+    slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"]);fdwrite(shadow,b"");os.fsync(rfd);slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"]);shadow_now=b""
+   except Exception as cleanup:raise Indeterminate("INDETERMINATE_PRESERVED attest pre-PENDING recovery: "+str(cleanup))
+  recovery_active(rows,pending,old,shadow_now,ma);reqsha=D(request);task=(request["argv"][0] if command=="write" else (request["stdin"]["task_id"] if command=="finalize-owner-publication" else ("h-036" if command=="import-h036-owner-publication" else None)))
+  if pending:
+   pending_written=True
+   expected=attest_operation(command,task,reqsha,ma,manifest_sha,pending["sequence"],pending["old_store_sha256"],pending["new_store_sha256"])
+   if pending["request_sha256"]!=reqsha or pending["new_store_sha256"]!=F(new) or pending["operation_identity"]!=D(expected):raise Stop("pending attest operation requires exact replay")
+   a=fdbytes(active);s=fdbytes(shadow)
+   slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"])
+   if F(a)==pending["old_store_sha256"] and F(s)==pending["new_store_sha256"]:
+    renameat(rfd,STORE,ASHADOW,RENAME_SWAP|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH);active,shadow=shadow,active;a,s=s,a
+    slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"])
+   if F(a)!=pending["new_store_sha256"] or F(s) not in (pending["old_store_sha256"],F(b"")):raise Stop("INDETERMINATE attest slot recovery")
+   os.fsync(rfd);fdwrite(shadow,b"");phase={**pending,"sequence":len(rows)+1,"phase":"COMMITTED","previous_record_sha256":previous};fdappend(recovery,C(phase)+b"\n");os.fsync(recovery);return
+  if new==old:return
+  if len(rows)+2>8192:raise Stop("attest recovery capacity exhausted")
+  slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"])
+  shadow_written=True;fdwrite(shadow,new);sequence=len(rows)+1;op=attest_operation(command,task,reqsha,ma,manifest_sha,sequence,F(old),F(new))
+  row={"record_type":"h035_r15_attest_recovery_v1","schema_version":1,"sequence":sequence,"phase":"PENDING","command":command,"task":task,"manifest_sha256":manifest_sha,"operation_identity":D(op),"request_sha256":reqsha,"old_store_sha256":F(old),"new_store_sha256":F(new),"previous_record_sha256":previous};pending_written=True;fdappend(recovery,C(row)+b"\n");os.fsync(recovery)
+  renameat(rfd,STORE,ASHADOW,RENAME_SWAP|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH);active,shadow=shadow,active
+  slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"])
+  if F(fdbytes(active))!=F(new) or F(fdbytes(shadow))!=F(old):raise Stop("INDETERMINATE attest swap postcheck")
+  os.fsync(rfd);fdwrite(shadow,b"");phase={**row,"sequence":sequence+1,"phase":"COMMITTED","previous_record_sha256":F(C(row)+b"\n")};fdappend(recovery,C(phase)+b"\n");os.fsync(recovery)
+ except Exception as e:
+  if pending_written:raise Indeterminate("INDETERMINATE_PRESERVED attest mutation: "+str(e))
+  try:
+   slot_pair(rfd,((STORE,active),(ASHADOW,shadow)),ma["attestation_store_slot_dev_inos"])
+   if shadow_written:fdwrite(shadow,shadow_initial)
+  except Exception as cleanup:raise Indeterminate("INDETERMINATE_PRESERVED attest pre-swap cleanup: "+str(cleanup))
+  raise
+ finally:
+  for fd in (active,shadow,recovery):os.close(fd)
+  os.close(rfd)
+def event_rows(state,raw,ma=None):
+ if raw and not raw.endswith(b"\n"):raise Stop("truncated events")
+ rows=[]
+ for line in raw.splitlines(keepends=True):
+  value=loadb(line[:-1])
+  if C(value)+b"\n"!=line:raise Stop("event canonical line")
+  rows.append(value)
+ if len(rows)>8192:raise Stop("event count")
+ if ma is None:_attest,ma=manifest_docs(state)
+ spec=loadb(blob(ROOT,ma["current_main"],"specs/tasks.spec.json"));tasks=[x for x in spec.get("tasks",[]) if isinstance(x,dict) and isinstance(x.get("id"),str)]
+ prefix=[{"task":x["id"],"status":"bootstrap_serialized"} for x in tasks if x["id"]!="h-038"]
+ if rows[:len(prefix)]!=prefix:raise Stop("event bootstrap prefix")
+ suffix=rows[len(prefix):];expected_status=("OWNER_ACTION_REQUIRED","OWNER_CANDIDATE_REVIEW_REQUIRED","OWNER_CANDIDATE_CHECKED","OWNER_FINAL_FREEZE_REQUIRED","OWNER_FROZEN")
+ if len(suffix)>5 or [x.get("status") if isinstance(x,dict) else None for x in suffix]!=list(expected_status[:len(suffix)]):raise Stop("event transition order")
+ taskrow=next((x for x in tasks if x["id"]=="h-038"),None)
+ if not isinstance(taskrow,dict) or taskrow.get("authority_class")!="owner_authority" or not isinstance(taskrow.get("exit_test"),str):raise Stop("event owner task authority")
+ origin=repo_shape(ROOT)
+ if ma["repository_identity"]!=origin:raise Stop("event repository authority")
+ specraw=blob(ROOT,ma["current_main"],"specs/tasks.spec.json");registryraw=blob(ROOT,ma["current_main"],"specs/owner-production-paths.v1.json");gatepath=taskrow["exit_test"];gateraw=blob(ROOT,ma["current_main"],gatepath)
+ h035={"task":"h-035","candidate_sha":ma["current_main"],"invalidates_on":[ma["current_main"]],"stale":False};deps=[{"task":"h-035","authority_class":"ordinary","attestation":h035},{"task":"h-036","authority_class":"owner_authority","attestation":h036_record(origin)}];ds=D(deps)
+ authority={"task":"h-038","status":"OWNER_ACTION_REQUIRED","authority_class":"owner_authority","base_sha":ma["current_main"],"main_sha":ma["current_main"],"spec_path":"specs/tasks.spec.json","spec_sha256":F(specraw),"registry_path":"specs/owner-production-paths.v1.json","registry_sha256":F(registryraw),"gate_path":gatepath,"gate_sha256":F(gateraw),"repository_identity":origin,"dependency_attestations_sha256":ds}
+ authority["transition_identity"]=D(transition("h-038",ma["current_main"],authority["spec_sha256"],authority["registry_sha256"],gatepath,authority["gate_sha256"],origin,ds))
+ if suffix and suffix[0]!=authority:raise Stop("event claim authority")
+ for index,value in enumerate(suffix):
+  if not isinstance(value,dict) or value.get("task")!="h-038" or value.get("authority_class")!="owner_authority" or value.get("base_sha")!=ma["current_main"] or value.get("main_sha")!=ma["current_main"]:raise Stop("event owner binding")
+  fields=(set(CLAIM_FIELDS) if index==0 else set(CLAIM_FIELDS)|{"candidate_sha","workspace_root","workspace_identity"} if index==1 else set(CLAIM_FIELDS)|{"candidate_sha","candidate_tree","changed_files","workspace_root","workspace_identity"} if index==2 else set(CLAIM_FIELDS)|{"candidate_sha","candidate_tree","changed_files","candidate_identity","review_path","review_stat_identity","review_identity","review_result","reviewer_role","workspace_root","workspace_identity"})
+  if set(value)!=fields:raise Stop("event field membership")
+  if any(not isinstance(value.get(x),str) or not HEX64.fullmatch(value[x]) for x in ("spec_sha256","registry_sha256","gate_sha256","dependency_attestations_sha256","transition_identity")):raise Stop("event digest schema")
+  want_transition=D(transition("h-038",ma["current_main"],value["spec_sha256"],value["registry_sha256"],value["gate_path"],value["gate_sha256"],value["repository_identity"],value["dependency_attestations_sha256"]))
+  if value["transition_identity"]!=want_transition:raise Stop("event transition identity")
+  if index>=1 and any(value[k]!=suffix[0][k] for k in CLAIM_FIELDS if k!="status"):raise Stop("event claim carry-forward")
+  if index==1:
+   workspace=Path(value["workspace_root"])
+   if value["candidate_sha"]!=value["base_sha"] or not workspace.is_absolute() or str(workspace)!=value["workspace_root"]:raise Stop("provisional candidate/workspace")
+   workspace_validate(workspace,value.get("workspace_identity"))
+  if index>=2:
+   changed=value.get("changed_files")
+   workspace=Path(value["workspace_root"])
+   if (not isinstance(changed,list) or changed!=sorted(set(changed))
+    or any(not isinstance(path,str) or not path or path.startswith("/") or "\\" in path or any(part in ("",".","..") for part in path.split("/")) for path in changed)
+    or not workspace.is_absolute() or str(workspace)!=value["workspace_root"]
+    or not isinstance(value.get("candidate_sha"),str) or not HEX40.fullmatch(value["candidate_sha"])
+    or not isinstance(value.get("candidate_tree"),str) or not HEX40.fullmatch(value["candidate_tree"])):raise Stop("checked event identity")
+   workspace_validate(workspace,value.get("workspace_identity"))
+   actual_changed,actual_tree=candidate_scope(ROOT,value["base_sha"],value["candidate_sha"],taskrow,loadb(registryraw))
+   if actual_changed!=changed or actual_tree!=value["candidate_tree"]:raise Stop("checked event Git scope")
+   if index==2 and any(value[k]!=suffix[1][k] for k in ("workspace_root","workspace_identity")):raise Stop("checked workspace substitution")
+  if index>=3:
+   review=Path(value["review_path"])
+   if (value.get("review_result")!="PASS" or value.get("reviewer_role")!="PRODUCT_REVIEWER"
+    or not review.is_absolute() or str(review)!=value["review_path"] or review.resolve(strict=True)!=review
+    or not isinstance(value.get("review_identity"),str) or not HEX64.fullmatch(value["review_identity"])
+    or not isinstance(value.get("review_stat_identity"),str) or not HEX64.fullmatch(value["review_stat_identity"])
+    or value.get("candidate_identity")!=candidate_id("h-038",value["base_sha"],value["candidate_sha"],value["candidate_tree"],value["changed_files"],value["transition_identity"],value["review_identity"])):raise Stop("adopted event identity")
+   if any(value[k]!=suffix[2][k] for k in ("candidate_sha","candidate_tree","changed_files","workspace_root","workspace_identity")):raise Stop("adopted checked-candidate substitution")
+   if index==4:
+    expected_frozen=dict(suffix[3]);expected_frozen["status"]="OWNER_FROZEN"
+    if value!=expected_frozen:raise Stop("frozen event substitution")
+ return rows
+def events(state):
+ raw,_=safe_raw(state/EVENTS,(0o600,),8*1024*1024);return event_rows(state,raw)
+def db_build(rows):
+ table={}
+ for x in rows:table[x["task"]]=x["status"]
+ db=sqlite3.connect(":memory:")
+ try:
+  db.execute("CREATE TABLE task_state (task TEXT PRIMARY KEY,status TEXT NOT NULL)")
+  db.executemany("INSERT INTO task_state(task,status) VALUES(?,?)",sorted(table.items()));db.commit();return db.serialize()
+ finally:db.close()
+def db_table(raw):
+ db=sqlite3.connect(":memory:")
+ try:
+  db.deserialize(raw)
+  if db.execute("SELECT type,name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchall()!=[("table","task_state","CREATE TABLE task_state (task TEXT PRIMARY KEY,status TEXT NOT NULL)")]:raise Stop("state DB schema")
+  return dict(db.execute("SELECT task,status FROM task_state").fetchall())
+ finally:db.close()
+def state_projection_ok(state):
+ rows=events(state);raw,_=safe_raw(state/DB,(0o600,),8*1024*1024);shadow,_=safe_raw(state/DBSHADOW,(0o600,),8*1024*1024)
+ return raw==db_build(rows) and db_table(raw)=={x["task"]:x["status"] for x in rows} and shadow==b""
+def state_recover(state):
+ _attest,ma=manifest_docs(state);rfd=root_open(state);active=leaf_open(rfd,DB);shadow=leaf_open(rfd,DBSHADOW);log=leaf_open(rfd,EVENTS)
+ try:
+  slot_pair(rfd,((DB,active),(DBSHADOW,shadow)),ma["state_db_slot_dev_inos"])
+  if devino(os.fstat(log))!=ma["state_event_log_dev_ino"]:raise Stop("state recovery identity")
+  raw=fdbytes(log);complete=raw if not raw or raw.endswith(b"\n") else raw[:raw.rfind(b"\n")+1];rows=event_rows(state,complete,ma);want=db_build(rows);a=fdbytes(active);s=fdbytes(shadow);prefix_count=len([x for x in rows if x.get("status")=="bootstrap_serialized"]);prior=(db_build(rows[:-1]) if len(rows)>prefix_count else None)
+  if complete!=raw:
+   if a!=want:raise Stop("INDETERMINATE state partial-tail projection")
+   os.ftruncate(log,len(complete));os.fsync(log);fdwrite(shadow,b"");os.fsync(rfd);return
+  if a==want:pass
+  else:
+   if prior is None or a!=prior or s!=want:raise Stop("INDETERMINATE state projection recovery")
+   renameat(rfd,DB,DBSHADOW,RENAME_SWAP|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH);active,shadow=shadow,active;slot_pair(rfd,((DB,active),(DBSHADOW,shadow)),ma["state_db_slot_dev_inos"])
+  if fdbytes(active)!=want:raise Stop("INDETERMINATE state recovery postcheck")
+  os.fsync(rfd);fdwrite(shadow,b"")
+ finally:
+  for fd in (active,shadow,log):os.close(fd)
+  os.close(rfd)
+def append(state,event):
+ attest,ma=manifest_docs(state);rfd=root_open(state);active=leaf_open(rfd,DB);shadow=leaf_open(rfd,DBSHADOW);log=leaf_open(rfd,EVENTS);truth=False;shadow_written=False
+ try:
+  slot_pair(rfd,((DB,active),(DBSHADOW,shadow)),ma["state_db_slot_dev_inos"])
+  if devino(os.fstat(log))!=ma["state_event_log_dev_ino"]:raise Stop("state slot identity")
+  raw=fdbytes(log);shadow_initial=fdbytes(shadow);rows=event_rows(state,raw,ma)
+  if raw and not raw.endswith(b"\n"):raise Stop("INDETERMINATE state event tail")
+  line=C(event)+b"\n";prior=next((x for x in reversed(rows) if x.get("task")==event.get("task")),None);same=prior==event;target=rows if same else event_rows(state,raw+line,ma);want=db_build(target);a=fdbytes(active);s=fdbytes(shadow)
+  if same:
+   if a!=want or db_table(a)!={x["task"]:x["status"] for x in rows} or s!=b"":raise Stop("INDETERMINATE state retry projection")
+   return
+  if a!=db_build(rows) or db_table(a)!={x["task"]:x["status"] for x in rows} or s!=b"":raise Stop("state projection mismatch")
+  shadow_written=True;fdwrite(shadow,want);truth=True;fdappend(log,line);os.fsync(log);renameat(rfd,DB,DBSHADOW,RENAME_SWAP|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH);active,shadow=shadow,active
+  slot_pair(rfd,((DB,active),(DBSHADOW,shadow)),ma["state_db_slot_dev_inos"])
+  if fdbytes(active)!=want:raise Stop("state swap postcheck")
+  os.fsync(rfd);fdwrite(shadow,b"")
+ except Exception as e:
+  if truth:raise Indeterminate("INDETERMINATE_PRESERVED state mutation: "+str(e))
+  try:
+   slot_pair(rfd,((DB,active),(DBSHADOW,shadow)),ma["state_db_slot_dev_inos"])
+   if shadow_written:fdwrite(shadow,shadow_initial)
+  except Exception as cleanup:raise Indeterminate("INDETERMINATE_PRESERVED state precommit cleanup: "+str(cleanup))
+  raise
+ finally:
+  for fd in (active,shadow,log):os.close(fd)
+  os.close(rfd)
+def manifest_info(state,check_remote=True):
+ attest,ma=manifest_docs(state);repo=ROOT;origin=repo_shape(repo)
+ if ma["repository_identity"]!=origin:raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID")
+ if check_remote and remote_main(repo,origin)!=ma["current_main"]:raise Stop("remote main drift")
+ specraw=blob(repo,ma["current_main"],"specs/tasks.spec.json");spec=loadb(specraw);row=[x for x in spec["tasks"] if x.get("id")=="h-038"]
+ if len(row)!=1 or ma["h038_refreeze_binding_sha256"]!=D(row[0].get("h035_r15_published_authority")):raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID")
+ expected=b"".join(C({"task":x["id"],"status":"bootstrap_serialized"})+b"\n" for x in spec["tasks"] if x["id"]!="h-038");raw,_=safe_raw(state/EVENTS,(0o600,),8*1024*1024)
+ if not raw.startswith(expected) or ma["bootstrap_event_stream_sha256"]!=F(expected):raise Stop("state bootstrap prefix")
+ initial_rows=[{"task":x["id"],"status":"bootstrap_serialized"} for x in spec["tasks"] if x["id"]!="h-038"]
+ initial_store={"attestations":{"h-035":{"task":"h-035","candidate_sha":ma["current_main"],"invalidates_on":[ma["current_main"]],"stale":False},"h-036":h036_record(ma["repository_identity"])},"omtest_ko":[],"invalidated_shas":[]}
+ if ma["bootstrap_state_db_sha256"]!=F(db_build(initial_rows)) or ma["bootstrap_attestation_store_sha256"]!=F(C(initial_store)+b"\n"):raise Stop("R15_BOOTSTRAP_MANIFEST_INVALID")
+ return repo,attest,ma,spec
+def complete_bundle(state):
+ with locked(state/".r15-owner.lock"):
+  state_recover(state);result=manifest_info(state)
+  with locked(result[1]/".r15-attest.lock"):
+   _store,store_raw=store_snapshot(result[1]);shadow_raw,_=safe_raw(result[1]/ASHADOW,(0o600,),8*1024*1024);recovery_raw,_=safe_raw(result[1]/RECOVERY,(0o600,),8*1024*1024);manifest_raw,_=safe_raw(result[1]/SM,(0o600,),262144);_rows,pending,_previous=recovery_rows(recovery_raw,result[2],F(manifest_raw));recovery_active(_rows,pending,store_raw,shadow_raw,result[2])
+   if pending is not None:raise Stop("pending attest operation blocks bundle retry")
+  return result
+
+def h036_validate(repo,origin,tip):
+ rv,rr,rsha=safe_file(HREVIEW,mode=(0o644,));pv,pr,psha=safe_file(HRECEIPT,mode=(0o644,))
+ if rsha!=H["review_sha256"] or psha!=H["receipt_sha256"] or not isinstance(rv,dict) or rv.get("role")!="PRODUCT_REVIEWER" or rv.get("outcome")!="READY" or rv.get("blocking_findings")!=[] or rv.get("base_sha")!=H["base_sha"] or rv.get("candidate_sha")!=H["candidate_sha"] or rv.get("candidate_tree")!=H["candidate_tree"]:raise Stop("historical H036 review")
+ if not isinstance(pv,dict) or pv.get("task_id")!="h-036" or pv.get("base_sha")!=H["base_sha"] or pv.get("candidate_sha")!=H["candidate_sha"] or pv.get("candidate_tree")!=H["candidate_tree"] or pv.get("merge_sha")!=H["publication_sha"] or pv.get("ordered_parents")!=[H["base_sha"],H["candidate_sha"]] or pv.get("force") is not False or pv.get("history_rewrite") is not False:raise Stop("historical H036 receipt")
+ if parents(repo,H["candidate_sha"])!=[H["base_sha"]] or parents(repo,H["publication_sha"])!=[H["base_sha"],H["candidate_sha"]] or tree(repo,H["candidate_sha"])!=H["candidate_tree"] or tree(repo,H["publication_sha"])!=H["candidate_tree"]:raise Stop("historical H036 graph")
+ paths=[x[0] for x in HPATHS]
+ if git(repo,"diff","--name-status","--no-renames",H["base_sha"],H["candidate_sha"]).stdout.splitlines()!=[("A" if x!="controller/launch/cli" else "M")+"\t"+x for x in paths] or ls_modes(repo,H["candidate_sha"],paths)!={x:(m,"blob") for x,m in HPATHS}:raise Stop("historical H036 scope")
+ if F(blob(repo,H["candidate_sha"],H["gate_path"]))!=H["gate_sha256"]:raise Stop("historical H036 gate")
+ if not first_parent(repo,tip,H["publication_sha"]):raise Stop("historical H036 first-parent ancestry")
+ return h036_record(origin)
+def write_initial(rootfd,name,raw):
+ fd=os.open(name,os.O_RDWR|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0),0o600,dir_fd=rootfd)
+ identity=devino(os.fstat(fd))
+ try:fdwrite(fd,raw);return identity
+ finally:os.close(fd)
+def bootstrap(argv):
+ if len(argv)!=4:return die("usage: bootstrap-serialized SPEC ATTEST STATE")
+ spec,attest,state=map(lambda x:Path(x).absolute(),argv[1:]);bundle=attest.parent
+ parentfd=tempfd=statefd=attestfd=-1;tempname="";temp_identity=state_identity=attest_identity=None;installed=False
+ try:
+  if spec!=ROOT/"specs/tasks.spec.json" or spec.resolve(strict=True)!=spec or attest.name!="attest" or state.name!="state" or state.parent!=bundle or attest==state or bundle.resolve(strict=False)!=bundle or ROOT==bundle or ROOT in bundle.parents or bundle in ROOT.parents:raise Stop("bootstrap topology")
+  safe_components(spec,False);parentfd=root_open(bundle.parent);pi=os.fstat(parentfd)
+  if pi.st_uid!=os.getuid() or stat.S_IMODE(pi.st_mode)&0o022:raise Stop("unsafe bootstrap parent")
+  if any(name.startswith(".r15-bootstrap-") for name in os.listdir(parentfd)):raise Indeterminate("INDETERMINATE_PRESERVED bootstrap temp residue")
+  try:bi=os.stat(bundle.name,dir_fd=parentfd,follow_symlinks=False)
+  except FileNotFoundError:bi=None
+  if bi is not None:
+   if not stat.S_ISDIR(bi.st_mode):raise Stop("bootstrap final substitution")
+   complete_bundle(state);parent_now=os.lstat(bundle.parent);final=os.stat(bundle.name,dir_fd=parentfd,follow_symlinks=False)
+   if devino(parent_now)!=devino(os.fstat(parentfd)) or devino(final)!=devino(bi):raise Indeterminate("INDETERMINATE_PRESERVED completed bootstrap retry identity")
+   try:os.fsync(parentfd)
+   except OSError as e:raise Indeterminate("INDETERMINATE_PRESERVED completed bootstrap retry fsync: "+str(e))
+   return 0
+  origin,main,doc,binding=h038_proof(ROOT,spec)
+  for _ in range(128):
+   if any(name.startswith(".r15-bootstrap-") for name in os.listdir(parentfd)):raise Indeterminate("INDETERMINATE_PRESERVED bootstrap temp residue")
+   candidate=".r15-bootstrap-"+secrets.token_hex(32)
+   try:os.mkdir(candidate,0o700,dir_fd=parentfd);tempname=candidate;break
+   except FileExistsError:continue
+  if not tempname:raise Stop("bootstrap temp allocation")
+  tempfd=os.open(tempname,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0),dir_fd=parentfd);temp_identity=devino(os.fstat(tempfd));os.mkdir("state",0o700,dir_fd=tempfd);state_identity=devino(os.stat("state",dir_fd=tempfd,follow_symlinks=False));os.mkdir("attest",0o700,dir_fd=tempfd);attest_identity=devino(os.stat("attest",dir_fd=tempfd,follow_symlinks=False))
+  statefd=os.open("state",os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0),dir_fd=tempfd);attestfd=os.open("attest",os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0),dir_fd=tempfd)
+  initial=[{"task":row["id"],"status":"bootstrap_serialized"} for row in doc["tasks"] if row["id"]!="h-038"];ev=b"".join(C(x)+b"\n" for x in initial);db=db_build(initial)
+  h035={"task":"h-035","candidate_sha":main,"invalidates_on":[main],"stale":False};h036=h036_validate(ROOT,origin,main);store={"attestations":{"h-035":h035,"h-036":h036},"omtest_ko":[],"invalidated_shas":[]};store_raw=C(store)+b"\n"
+  state_lock=write_initial(statefd,".r15-owner.lock",b"");event_id=write_initial(statefd,EVENTS,ev);db_id=write_initial(statefd,DB,db);db_shadow=write_initial(statefd,DBSHADOW,b"")
+  attest_lock=write_initial(attestfd,".r15-attest.lock",b"");store_id=write_initial(attestfd,STORE,store_raw);store_shadow=write_initial(attestfd,ASHADOW,b"");recovery_id=write_initial(attestfd,RECOVERY,b"")
+  state_manifest=write_initial(statefd,SM,b"");attest_manifest=write_initial(attestfd,SM,b"")
+  manifest={"record_type":"h035_r15_bootstrap_roots_v1","schema_version":1,"repository_identity":origin,"current_main":main,"bundle_root":str(bundle),"bundle_root_dev_ino":temp_identity,"state_root":str(state),"state_root_dev_ino":devino(os.fstat(statefd)),"attest_root":str(attest),"attest_root_dev_ino":devino(os.fstat(attestfd)),"state_manifest_dev_ino":state_manifest,"attest_manifest_dev_ino":attest_manifest,"state_lock_dev_ino":state_lock,"attest_lock_dev_ino":attest_lock,"state_event_log_dev_ino":event_id,"state_db_slot_dev_inos":sorted((db_id,db_shadow)),"attestation_store_slot_dev_inos":sorted((store_id,store_shadow)),"attest_recovery_log_dev_ino":recovery_id,"h038_refreeze_binding_sha256":D(binding),"bootstrap_event_stream_sha256":F(ev),"bootstrap_state_db_sha256":F(db),"bootstrap_state_db_shadow_sha256":F(b""),"bootstrap_attestation_store_sha256":F(store_raw),"bootstrap_attestation_store_shadow_sha256":F(b""),"bootstrap_attest_recovery_log_sha256":F(b"")}
+  mr=C(manifest)+b"\n"
+  for fd in (leaf_open(statefd,SM),leaf_open(attestfd,SM)):
+   try:fdwrite(fd,mr)
+   finally:os.close(fd)
+  for fd in (statefd,attestfd,tempfd):os.fsync(fd)
+  parent_now=os.lstat(bundle.parent);source=os.stat(tempname,dir_fd=parentfd,follow_symlinks=False)
+  if devino(parent_now)!=devino(os.fstat(parentfd)) or devino(source)!=temp_identity or devino(source)!=devino(os.fstat(tempfd)) or set(os.listdir(tempfd))!={"state","attest"}:raise Stop("bootstrap pre-EXCL identity")
+  try:renameat(parentfd,tempname,bundle.name,RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH);installed=True
+  except OSError as conflict:
+   if conflict.errno!=errno.EEXIST:raise
+   raise Indeterminate("INDETERMINATE_PRESERVED bootstrap EEXIST temp retained")
+  parent_now=os.lstat(bundle.parent);final=os.stat(bundle.name,dir_fd=parentfd,follow_symlinks=False)
+  if devino(parent_now)!=devino(os.fstat(parentfd)) or devino(final)!=temp_identity:raise Stop("INDETERMINATE_PRESERVED bootstrap post-EXCL identity")
+  try:os.fsync(parentfd)
+  except OSError as e:raise Indeterminate("INDETERMINATE_PRESERVED bootstrap publication fsync: "+str(e))
+  complete_bundle(state);return 0
+ except (Stop,OSError,ValueError) as e:
+  if installed or tempname:return die("INDETERMINATE_PRESERVED bootstrap retained object: "+str(e))
+  return die(str(e))
+ finally:
+  for fd in (statefd,attestfd,tempfd,parentfd):
+   if fd>=0:
+    try:os.close(fd)
+    except OSError:pass
+def latest(state,task):
+ rows=[x for x in events(state) if isinstance(x,dict) and x.get("task")==task]
+ if not rows:raise Stop("task state missing")
+ return rows[-1]
+def dependency_problem(hprobe,expected_repository):
+ if not isinstance(hprobe,dict):return None
+ if hprobe.get("record_type")!="owner_publication_v1":return "WRONG_RECORD_TYPE"
+ if hprobe.get("task")!="h-036":return "TASK"
+ if set(hprobe)==OWNER_FIELDS:
+  if hprobe==h036_record(expected_repository):return None
+  if hprobe.get("repository_identity")!=expected_repository:return "REPOSITORY"
+  return "GRAPH_OR_IDENTITY"
+ return None
+def claim(argv,mutate=True):
+ if len(argv)!=4:return die("usage: claim SPEC ATTEST STATE")
+ spec,attest,state=map(lambda x:Path(x).absolute(),argv[1:])
+ try:
+  if spec!=ROOT/"specs/tasks.spec.json":raise Stop("canonical spec required")
+  with locked(state/".r15-owner.lock"):
+   state_recover(state)
+   repo,bound_attest,ma,doc=manifest_info(state)
+   if attest!=bound_attest:raise Stop("attest/state substitution")
+   with locked(attest/".r15-attest.lock"):
+    try:store,store_raw=store_snapshot(attest)
+    except Stop:
+     # Translate dependency shape only after manifest_info established the
+     # trusted repository identity; manifest failures propagate untouched.
+     raw,_=safe_raw(attest/STORE,(0o600,),8*1024*1024);probe=loadb(raw);hprobe=(probe.get("attestations",{}).get("h-036") if isinstance(probe,dict) else None)
+     classification=dependency_problem(hprobe,ma.get("repository_identity"))
+     if classification is not None:raise Stop("R15_OWNER_DEPENDENCY_INVALID:"+classification)
+     raise
+    shadow_raw,_=safe_raw(attest/ASHADOW,(0o600,),8*1024*1024);recovery_raw,_=safe_raw(attest/RECOVERY,(0o600,),8*1024*1024);manifest_raw,_=safe_raw(attest/SM,(0o600,),262144);_rows,pending,_previous=recovery_rows(recovery_raw,ma,F(manifest_raw));recovery_active(_rows,pending,store_raw,shadow_raw,ma)
+    if pending is not None:raise Stop("pending attest operation blocks dependency snapshot")
+    clean_head(repo,ma["current_main"])
+    h035=store["attestations"].get("h-035");h036=store["attestations"].get("h-036")
+    exact_h035={"task":"h-035","candidate_sha":ma["current_main"],"invalidates_on":[ma["current_main"]],"stale":False}
+    if h035!=exact_h035:raise Stop("R15_OWNER_DEPENDENCY_INVALID:ORDER_OR_CLASS")
+    if not isinstance(h036,dict) or h036.get("record_type")!="owner_publication_v1":raise Stop("R15_OWNER_DEPENDENCY_INVALID:WRONG_RECORD_TYPE")
+    if h036.get("stale") is not False:raise Stop("R15_OWNER_DEPENDENCY_INVALID:STALE")
+    if h036.get("repository_identity")!=ma["repository_identity"]:raise Stop("R15_OWNER_DEPENDENCY_INVALID:REPOSITORY")
+    if h036.get("task")!="h-036":raise Stop("R15_OWNER_DEPENDENCY_INVALID:TASK")
+    if h036!=h036_record(ma["repository_identity"]):raise Stop("R15_OWNER_DEPENDENCY_INVALID:GRAPH_OR_IDENTITY")
+    deps=[{"task":"h-035","authority_class":"ordinary","attestation":h035},{"task":"h-036","authority_class":"owner_authority","attestation":h036}]
+    owner_rows=[x for x in events(state) if x.get("task")=="h-038"]
+    current=owner_rows[-1] if owner_rows else {"status":"bootstrap_serialized"}
+    if current.get("status")!="bootstrap_serialized":
+     if mutate:append(state,current)
+     return 0
+    main=ma["current_main"];raw=blob(repo,main,"specs/tasks.spec.json");registry=blob(repo,main,"specs/owner-production-paths.v1.json");row=[x for x in doc["tasks"] if x.get("id")=="h-038"][0];gp=row["exit_test"];gate=blob(repo,main,gp);ds=D(deps);tr=transition("h-038",main,F(raw),F(registry),gp,F(gate),ma["repository_identity"],ds)
+    event={"task":"h-038","status":"OWNER_ACTION_REQUIRED","authority_class":"owner_authority","base_sha":main,"main_sha":main,"spec_path":"specs/tasks.spec.json","spec_sha256":F(raw),"registry_path":"specs/owner-production-paths.v1.json","registry_sha256":F(registry),"gate_path":gp,"gate_sha256":F(gate),"repository_identity":ma["repository_identity"],"dependency_attestations_sha256":ds,"transition_identity":D(tr)}
+    if mutate:append(state,event)
+    else:print("h-038")
+    return 0
+ except (Stop,OSError,ValueError) as e:return die(str(e))
+
+def authority_attest_barrier(attest,ma):
+ with locked(attest/".r15-attest.lock"):
+  store,store_raw=store_snapshot(attest);shadow_raw,_=safe_raw(attest/ASHADOW,(0o600,),8*1024*1024);recovery_raw,_=safe_raw(attest/RECOVERY,(0o600,),8*1024*1024);manifest_raw,_=safe_raw(attest/SM,(0o600,),262144);rows,pending,_previous=recovery_rows(recovery_raw,ma,F(manifest_raw));recovery_active(rows,pending,store_raw,shadow_raw,ma)
+  if pending is not None:raise Stop("pending attest operation blocks owner authority")
+def workspace_open(path,create=False):
+ path=Path(path)
+ if not path.is_absolute() or Path(os.path.normpath(str(path)))!=path or str(path).startswith("//"):raise Stop("workspace path")
+ flags=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_CLOEXEC",0);fds=[];links=[];created=False;installed=False;tempname="";leaf=-1
+ try:
+  current=Path(path.anchor);fd=os.open(path.anchor,flags);fds.append(fd);root=os.fstat(fd)
+  if not stat.S_ISDIR(root.st_mode):raise Stop("workspace root type")
+  links.append((None,"",fd,(root.st_dev,root.st_ino,root.st_mode,root.st_uid),str(current)))
+  for part in path.parts[1:-1]:
+   before=os.stat(part,dir_fd=fd,follow_symlinks=False);child=os.open(part,flags,dir_fd=fd);opened=os.fstat(child);current/=part
+   if not stat.S_ISDIR(opened.st_mode) or (before.st_dev,before.st_ino,before.st_mode,before.st_uid)!=(opened.st_dev,opened.st_ino,opened.st_mode,opened.st_uid):raise Stop("workspace ancestor open race")
+   links.append((fd,part,child,(opened.st_dev,opened.st_ino,opened.st_mode,opened.st_uid),str(current)));fds.append(child);fd=child
+  parent=os.fstat(fd)
+  if parent.st_uid!=os.getuid() or stat.S_IMODE(parent.st_mode)!=0o700:raise Stop("workspace parent authority")
+  name=path.name
+  if create:
+   prefix=".r15-owner-workspace-"+F(str(path).encode("utf-8"))+"-"
+   if any(entry.startswith(prefix) for entry in os.listdir(fd)):raise Stop("workspace retained poison")
+   try:os.stat(path.name,dir_fd=fd,follow_symlinks=False)
+   except FileNotFoundError:pass
+   else:raise Stop("workspace final already exists")
+   for _ in range(128):
+    candidate=prefix+secrets.token_hex(32)
+    try:os.mkdir(candidate,0o700,dir_fd=fd);tempname=candidate;break
+    except FileExistsError:continue
+   if not tempname:raise Stop("workspace temp allocation")
+   name=tempname
+  before=os.stat(name,dir_fd=fd,follow_symlinks=False);leaf=os.open(name,flags,dir_fd=fd);opened=os.fstat(leaf);fds.append(leaf)
+  if (not stat.S_ISDIR(opened.st_mode) or opened.st_uid!=os.getuid() or stat.S_IMODE(opened.st_mode)!=0o700
+   or (before.st_dev,before.st_ino,before.st_mode,before.st_uid,before.st_nlink)!=(opened.st_dev,opened.st_ino,opened.st_mode,opened.st_uid,opened.st_nlink)
+   or os.listdir(leaf)):raise Stop("workspace identity/emptiness")
+  if create:
+   named=os.stat(tempname,dir_fd=fd,follow_symlinks=False)
+   if _full(named)!=_full(opened):raise Stop("workspace temp replacement")
+   renameat(fd,tempname,path.name,RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH);installed=True;created=True
+   named=os.stat(path.name,dir_fd=fd,follow_symlinks=False);after=os.fstat(leaf)
+   if (devino(after)!=devino(opened) or _full(named)!=_full(after) or not stat.S_ISDIR(after.st_mode)
+    or after.st_uid!=os.getuid() or stat.S_IMODE(after.st_mode)!=0o700 or after.st_nlink!=opened.st_nlink or os.listdir(leaf)):raise Indeterminate("INDETERMINATE_PRESERVED workspace publication replacement")
+   opened=after
+  identity=D({"record_type":"owner_workspace_v1","workspace_root":str(path),"ancestors":[[item[4],*item[3]] for item in links],"leaf":[opened.st_dev,opened.st_ino,opened.st_mode,opened.st_uid,opened.st_nlink]})
+  return {"path":path,"fds":fds,"links":links,"parentfd":fd,"leaf":leaf,"leaf_identity":_full(opened),"identity":identity,"created":created}
+ except Exception as problem:
+  cleanup=(Indeterminate("INDETERMINATE_PRESERVED workspace object retained after publication failure: "+str(problem)) if installed or tempname else None)
+  for descriptor in reversed(fds):
+   try:os.close(descriptor)
+   except OSError:pass
+  if cleanup is not None:raise cleanup from problem
+  raise
+def workspace_revalidate(context):
+ path=context["path"]
+ for parentfd,name,fd,want,_spelling in context["links"]:
+  held=os.fstat(fd)
+  if (held.st_dev,held.st_ino,held.st_mode,held.st_uid)!=want:raise Stop("workspace ancestor held replacement")
+  if parentfd is not None:
+   named=os.stat(name,dir_fd=parentfd,follow_symlinks=False)
+   if (named.st_dev,named.st_ino,named.st_mode,named.st_uid)!=want:raise Stop("workspace ancestor name replacement")
+ held=os.fstat(context["leaf"]);named=os.stat(path.name,dir_fd=context["parentfd"],follow_symlinks=False)
+ if _full(held)!=context["leaf_identity"] or _full(named)!=context["leaf_identity"] or os.listdir(context["leaf"]):raise Stop("workspace leaf replacement/nonempty")
+ if D({"record_type":"owner_workspace_v1","workspace_root":str(path),"ancestors":[[item[4],*item[3]] for item in context["links"]],"leaf":[held.st_dev,held.st_ino,held.st_mode,held.st_uid,held.st_nlink]})!=context["identity"]:raise Stop("workspace identity drift")
+def workspace_close(context,remove=False):
+ try:
+  workspace_revalidate(context)
+  if remove:
+   raise Indeterminate("INDETERMINATE_PRESERVED workspace retained because inode-CAS directory removal is unavailable")
+ finally:
+  for descriptor in reversed(context["fds"]):
+   try:os.close(descriptor)
+   except OSError:pass
+def workspace_validate(path,want):
+ context=workspace_open(Path(path))
+ try:
+  if not isinstance(want,str) or not HEX64.fullmatch(want) or context["identity"]!=want:raise Stop("workspace persisted identity")
+  workspace_revalidate(context);return want
+ finally:workspace_close(context)
+def authority_context(v,command):
+ exact(v,{"h035_r15_request","repo","task_id","state_dir","workspace_root"} if command=="owner-author" else ({"h035_r15_request","repo","task_id","state_dir","candidate_sha","review_path"} if command=="record-review" else {"h035_r15_request","repo","task_id","state_dir","candidate_sha"}))
+ repo=Path(v["repo"]);state=Path(v["state_dir"]);task_id=v["task_id"]
+ if not request_marker(v["h035_r15_request"]) or repo!=ROOT or not isinstance(task_id,str) or not task_id or state.resolve(strict=True)!=state:raise Stop("authority request binding")
+ r,a,m,doc=manifest_info(state);authority_attest_barrier(a,m);rows=[x for x in doc["tasks"] if isinstance(x,dict) and x.get("id")==task_id];registry=loadb(blob(repo,m["current_main"],"specs/owner-production-paths.v1.json"))
+ if r!=repo or len(rows)!=1 or rows[0].get("authority_class")!="owner_authority" or not isinstance(registry,dict):raise Stop("installed owner authority binding")
+ return repo,state,a,m,rows[0],registry,latest(state,task_id)
+def owner_author(v):
+ state=Path(v.get("state_dir",""))
+ with locked(state/".r15-owner.lock"):
+  state_recover(state)
+  repo,state,attest,ma,task,registry,current=authority_context(v,"owner-author")
+  workspace=Path(v["workspace_root"])
+  clean_head(repo,ma["current_main"])
+  if current.get("status")=="OWNER_CANDIDATE_REVIEW_REQUIRED":
+   if (current.get("workspace_root")!=str(workspace) or current.get("candidate_sha")!=current.get("base_sha")
+    or workspace_validate(workspace,current.get("workspace_identity"))!=current.get("workspace_identity")):raise Stop("owner author retry substitution")
+   append(state,current)
+   return answer(True,state=current["status"])
+  if current.get("status")!="OWNER_ACTION_REQUIRED" or current.get("base_sha")!=ma["current_main"]:raise Stop("owner author state")
+  context=workspace_open(workspace,True)
+  event={k:current[k] for k in CLAIM_FIELDS};event["status"]="OWNER_CANDIDATE_REVIEW_REQUIRED";event["candidate_sha"]=current["base_sha"];event["workspace_root"]=str(workspace);event["workspace_identity"]=context["identity"]
+  try:append(state,event)
+  except Indeterminate:
+   try:workspace_close(context)
+   except Exception as integrity:raise Indeterminate("INDETERMINATE_PRESERVED workspace after state truth uncertainty: "+str(integrity)) from integrity
+   raise
+  except Exception:
+   try:workspace_close(context,True)
+   except Exception as cleanup:raise Indeterminate("INDETERMINATE_PRESERVED workspace pretruth cleanup: "+str(cleanup)) from cleanup
+   raise
+  try:workspace_close(context)
+  except Exception as integrity:raise Indeterminate("INDETERMINATE_PRESERVED workspace after owner-author: "+str(integrity)) from integrity
+  return answer(True,state=event["status"])
+def path_rule(value):
+ if not isinstance(value,str) or not value or value.startswith("/") or "\\" in value or any(x in ("",".","..") for x in value.split("/")) or any(x in value for x in "*?[") and not (value.endswith("/**") and all(x not in value[:-3] for x in "*?[")):raise Stop("owner path rule")
+ return value
+def permits(path,rules):return any(path==rule or rule.endswith("/**") and (path==rule[:-3] or path.startswith(rule[:-3]+"/")) for rule in rules)
+def candidate_scope(repo,base,cand,task,registry):
+ if not HEX40.fullmatch(cand) or parents(repo,cand)!=[base] or tree(repo,cand)==tree(repo,base):raise Stop("candidate direct nonempty child")
+ st=git(repo,"diff","--name-status","--no-renames","--no-ext-diff","--no-textconv",base,cand)
+ rows=st.stdout.splitlines();changed=[]
+ for row in rows:
+  f=row.split("\t")
+  if len(f)!=2 or f[0] not in ("A","M","D"):raise Stop("candidate rename/type")
+  changed.append(f[1])
+ surface=[path_rule(x) for x in task.get("owner_author_allowed_write",[])];denied=[path_rule(x) for x in registry.get("owner_author_global_denied_paths",[])]
+ mf=task.get("max_changed_files");ml=task.get("max_added_lines")
+ if type(mf) is not int or type(ml) is not int or mf<0 or ml<0 or not changed or changed!=sorted(changed) or len(changed)>mf or any(not permits(x,surface) or permits(x,denied) for x in changed):raise Stop("candidate owner surface")
+ ns=git(repo,"diff","--numstat","--no-renames",base,cand)
+ total=0
+ for row in ns.stdout.splitlines():
+  a,d,p=row.split("\t")
+  if not a.isdigit() or not d.isdigit():raise Stop("candidate binary")
+  total+=int(a)
+ if total>ml:raise Stop("candidate line budget")
+ modes=ls_modes(repo,cand,changed)
+ if any(status!="D" and modes.get(path) not in (("100644","blob"),("100755","blob")) or status=="D" and path in modes for status,path in (row.split("\t") for row in rows)):raise Stop("candidate path mode")
+ for path in ("specs/tasks.spec.json","specs/owner-production-paths.v1.json",task["exit_test"]):
+  if blob(repo,base,path)!=blob(repo,cand,path):raise Stop("candidate authority drift")
+ return changed,tree(repo,cand)
+def check_owner_candidate(v):
+ state=Path(v.get("state_dir",""))
+ with locked(state/".r15-owner.lock"):
+  state_recover(state);repo,state,attest,ma,task,registry,current=authority_context(v,"check-candidate");cand=v["candidate_sha"]
+  changed,ct=candidate_scope(repo,current["base_sha"],cand,task,registry);clean_head(repo,cand)
+  workspace_validate(Path(current.get("workspace_root","")),current.get("workspace_identity"))
+  if current.get("status")=="OWNER_CANDIDATE_REVIEW_REQUIRED":
+   event={k:current[k] for k in CLAIM_FIELDS};event["status"]="OWNER_CANDIDATE_CHECKED";event.update({"candidate_sha":cand,"candidate_tree":ct,"changed_files":changed,"workspace_root":current["workspace_root"],"workspace_identity":current["workspace_identity"]});append(state,event)
+  elif current.get("status")=="OWNER_CANDIDATE_CHECKED":
+   if current.get("candidate_sha")!=cand or current.get("candidate_tree")!=ct or current.get("changed_files")!=changed:raise Stop("checked candidate substitution")
+   append(state,current)
+  elif current.get("status") in ("OWNER_FINAL_FREEZE_REQUIRED","OWNER_FROZEN"):
+   if current.get("candidate_sha")!=cand or current.get("candidate_tree")!=ct or current.get("changed_files")!=changed:raise Stop("adopted candidate check substitution")
+  else:raise Stop("candidate check state")
+  return answer(True,authority_class="owner_authority",changed_files=changed,candidate_tree=ct)
+def read_review(path,task,base,cand,ct):
+ value,raw,digest,identity=safe_file(path,identity=True)
+ expected={"schema_version":1,"record_type":"nortropic_independent_owner_product_review","role":"PRODUCT_REVIEWER","result":"PASS","task":task,"base_sha":base,"candidate_sha":cand,"candidate_tree":ct,"blocking_findings":[]}
+ if not isinstance(value,dict) or set(value)!=set(expected) or value!=expected:raise Stop("review semantic binding")
+ return digest,review_stat(path,identity)
+def record_review(v):
+ state=Path(v.get("state_dir",""))
+ with locked(state/".r15-owner.lock"):
+  state_recover(state)
+  repo,state,attest,ma,task,registry,current=authority_context(v,"record-review")
+  cand=v["candidate_sha"];path=Path(v["review_path"]);base=ma["current_main"]
+  changed,ct=candidate_scope(repo,base,cand,task,registry);clean_head(repo,cand);ri,si=read_review(path,task["id"],base,cand,ct)
+  workspace_validate(Path(current.get("workspace_root","")),current.get("workspace_identity"))
+  if current.get("status")=="OWNER_FINAL_FREEZE_REQUIRED":
+   expected_ci=candidate_id(task["id"],base,cand,ct,changed,current["transition_identity"],ri)
+   if (current.get("candidate_sha")!=cand or current.get("candidate_tree")!=ct
+    or current.get("changed_files")!=changed or current.get("review_identity")!=ri
+    or current.get("review_path")!=str(path) or current.get("review_stat_identity")!=si
+    or current.get("candidate_identity")!=expected_ci or current.get("review_result")!="PASS"
+    or current.get("reviewer_role")!="PRODUCT_REVIEWER"):raise Stop("adopted candidate substitution")
+   append(state,current)
+   return answer(True,state=current["status"],published=False,merged=False)
+  if (current.get("status")!="OWNER_CANDIDATE_CHECKED" or current.get("candidate_sha")!=cand
+   or current.get("candidate_tree")!=ct or current.get("changed_files")!=changed):raise Stop("review requires exact persisted checked candidate")
+  event={k:current[k] for k in CLAIM_FIELDS};event["status"]="OWNER_FINAL_FREEZE_REQUIRED";event.update({"candidate_sha":cand,"candidate_tree":ct,"changed_files":changed,"candidate_identity":candidate_id(task["id"],base,cand,ct,changed,current["transition_identity"],ri),"review_path":str(path),"review_stat_identity":si,"review_identity":ri,"review_result":"PASS","reviewer_role":"PRODUCT_REVIEWER","workspace_root":current["workspace_root"],"workspace_identity":current["workspace_identity"]})
+  append(state,event);return answer(True,state=event["status"],published=False,merged=False)
+def owner_freeze(v):
+ state=Path(v.get("state_dir",""))
+ with locked(state/".r15-owner.lock"):
+  state_recover(state)
+  repo,state,attest,ma,task,registry,current=authority_context(v,"owner-freeze")
+  if current.get("candidate_sha")!=v["candidate_sha"]:raise Stop("freeze candidate")
+  workspace_validate(Path(current.get("workspace_root","")),current.get("workspace_identity"))
+  clean_head(repo,v["candidate_sha"])
+  changed,ct=candidate_scope(repo,current["base_sha"],current["candidate_sha"],task,registry);ri,si=read_review(Path(current["review_path"]),task["id"],current["base_sha"],current["candidate_sha"],ct)
+  if changed!=current.get("changed_files") or ct!=current.get("candidate_tree") or ri!=current.get("review_identity") or si!=current.get("review_stat_identity"):raise Stop("freeze review/candidate drift")
+  if current.get("status")=="OWNER_FROZEN":append(state,current);return answer(True,state="OWNER_FROZEN",published=False,merged=False)
+  if current.get("status")!="OWNER_FINAL_FREEZE_REQUIRED" or not current.get("candidate_identity"):raise Stop("freeze state")
+  event=dict(current);event["status"]="OWNER_FROZEN";append(state,event)
+  return answer(True,state="OWNER_FROZEN",published=False,merged=False)
+
+def owner_record_from_state(current,pub):
+ return {"record_type":"owner_publication_v1","schema_version":1,"authority_class":"owner_authority","task":current["task"],"base_sha":current["base_sha"],"candidate_sha":current["candidate_sha"],"candidate_tree":current["candidate_tree"],"publication_sha":pub,"invalidates_on":[current["candidate_sha"],pub],"spec_path":"specs/tasks.spec.json","spec_sha256":current["spec_sha256"],"registry_path":"specs/owner-production-paths.v1.json","registry_sha256":current["registry_sha256"],"gate_path":current["gate_path"],"gate_sha256":current["gate_sha256"],"dependency_attestations_sha256":current["dependency_attestations_sha256"],"transition_identity":current["transition_identity"],"candidate_identity":current["candidate_identity"],"changed_files":current["changed_files"],"review_identity":current["review_identity"],"review_result":"PASS","repository_identity":current["repository_identity"],"stale":False}
+def issue_owner(store,record):
+ task=record["task"];existing=store["attestations"].get(task)
+ if existing is not None:
+  if existing==record and existing.get("stale") is False:return False
+  raise Stop("owner record already exists")
+ if any(x in store["invalidated_shas"] for x in record["invalidates_on"]):raise Stop("owner record permanently invalidated")
+ store["attestations"][task]=record
+ store["omtest_ko"]=[x for x in store["omtest_ko"] if x!=task]
+ return True
+def finalize(attest,v):
+ exact(v,{"repo","task_id","state_dir","publication_sha","review_path","review_sha256"})
+ repo=Path(v["repo"]);state=Path(v["state_dir"]);pub=v["publication_sha"]
+ if repo!=ROOT or not isinstance(v["task_id"],str) or not v["task_id"] or not HEX40.fullmatch(pub):raise Stop("finalizer request")
+ with locked(state/".r15-owner.lock"):
+  state_recover(state)
+  r,bound,ma,doc=manifest_info(state,False)
+  if r!=repo or attest!=bound:raise Stop("finalizer root binding")
+  with locked(attest/".r15-attest.lock"):
+   current=latest(state,v["task_id"])
+   if current.get("status")!="OWNER_FROZEN":raise Stop("finalizer requires frozen state")
+   workspace_validate(Path(current.get("workspace_root","")),current.get("workspace_identity"))
+   if not state_projection_ok(state):raise Stop("state projection mismatch")
+   if v["review_path"]!=current.get("review_path") or v["review_sha256"]!=current.get("review_identity"):raise Stop("finalizer review request")
+   origin=repo_shape(repo)
+   if origin!=current["repository_identity"] or remote_main(repo,origin)!=pub:raise Stop("finalizer remote publication")
+   rows=[x for x in doc["tasks"] if isinstance(x,dict) and x.get("id")==current["task"]];registry=loadb(blob(repo,ma["current_main"],"specs/owner-production-paths.v1.json"))
+   if len(rows)!=1 or rows[0].get("authority_class")!="owner_authority":raise Stop("finalizer task authority")
+   cand=current["candidate_sha"];base=current["base_sha"];clean_head(repo,cand);changed,ct=candidate_scope(repo,base,cand,rows[0],registry)
+   if changed!=current["changed_files"] or ct!=current["candidate_tree"]:raise Stop("finalizer candidate scope")
+   if parents(repo,pub)!=[base,cand] or tree(repo,pub)!=tree(repo,cand) or current["candidate_tree"]!=tree(repo,cand):raise Stop("finalizer publication graph/tree")
+   if blob(repo,base,"specs/tasks.spec.json")!=(repo/"specs/tasks.spec.json").read_bytes() or F(blob(repo,base,"specs/tasks.spec.json"))!=current["spec_sha256"] or F(blob(repo,base,"specs/owner-production-paths.v1.json"))!=current["registry_sha256"] or F(blob(repo,base,current["gate_path"]))!=current["gate_sha256"]:raise Stop("finalizer authority drift")
+   ri,si=read_review(Path(current["review_path"]),current["task"],base,cand,current["candidate_tree"])
+   if ri!=current["review_identity"] or si!=current["review_stat_identity"]:raise Stop("finalizer review drift")
+   expected_ci=candidate_id(current["task"],base,cand,current["candidate_tree"],current["changed_files"],current["transition_identity"],ri)
+   if expected_ci!=current["candidate_identity"]:raise Stop("finalizer candidate identity")
+   recovery_raw,_=safe_raw(attest/RECOVERY,(0o600,),8*1024*1024);manifest_raw,_=safe_raw(attest/SM,(0o600,),262144);store,store_raw=store_snapshot(attest);shadow_raw,_=safe_raw(attest/ASHADOW,(0o600,),8*1024*1024);recovery_history,pending,_previous,_recovery_complete=mutation_preflight(recovery_raw,ma,F(manifest_raw),store_raw,shadow_raw)
+   record=owner_record_from_state(current,pub);issue_owner(store,record)
+   atomic(attest/STORE,store,attest_request("finalize-owner-publication",[],v))
+   return 0
+def installed_attest():
+ try:
+  opened=os.fstat(_r15_installed_attest_fd);raw=fdbytes(_r15_installed_attest_fd,262144);closed=os.fstat(_r15_installed_attest_fd)
+ except OSError as exc:raise Stop("installed attest retained descriptor") from exc
+ pathraw,digest,identity=safe_raw(ROOT/"controller/attest/cli",(0o755,),262144,True)
+ if (_full(opened)!=_r15_installed_attest_identity or _full(closed)!=_r15_installed_attest_identity
+  or F(raw)!=_r15_installed_attest_sha256 or pathraw!=raw or digest!=_r15_installed_attest_sha256
+  or identity!=_r15_installed_attest_identity):raise Stop("installed attest finalizer identity")
+ return _r15_installed_attest_fd
+def record_publication(v):
+ exact(v,{"h035_r15_request","repo","task_id","state_dir","publication_sha"});repo=Path(v["repo"]);state=Path(v["state_dir"])
+ if not request_marker(v["h035_r15_request"]) or repo!=ROOT or not isinstance(v["task_id"],str) or not v["task_id"]:raise Stop("publication request")
+ with locked(state/".r15-owner.lock"):
+  state_recover(state);r,attest,ma,doc=manifest_info(state,False);current=latest(state,v["task_id"])
+  if current.get("status")!="OWNER_FROZEN":raise Stop("publication before freeze")
+  direct={"repo":str(repo),"task_id":v["task_id"],"state_dir":str(state),"publication_sha":v["publication_sha"],"review_path":current["review_path"],"review_sha256":current["review_identity"]}
+  expected=owner_record_from_state(current,v["publication_sha"])
+  with locked(attest/".r15-attest.lock"):
+   before_recovery_raw,_=safe_raw(attest/RECOVERY,(0o600,),8*1024*1024);before_manifest_raw,_=safe_raw(attest/SM,(0o600,),262144);before_store,before_store_raw=store_snapshot(attest);before_shadow_raw,_=safe_raw(attest/ASHADOW,(0o600,),8*1024*1024);before_rows,before_pending,_,before_recovery_complete=mutation_preflight(before_recovery_raw,ma,F(before_manifest_raw),before_store_raw,before_shadow_raw)
+   pending_request=attest_request("finalize-owner-publication",[],direct);pending_store=loadb(C(before_store));issue_owner(pending_store,expected);pending_new=C(pending_store)+b"\n"
+   if before_pending is not None:
+    pending_operation=attest_operation("finalize-owner-publication",v["task_id"],D(pending_request),ma,F(before_manifest_raw),before_pending["sequence"],before_pending["old_store_sha256"],before_pending["new_store_sha256"])
+    if (before_pending.get("command")!="finalize-owner-publication" or before_pending.get("task")!=v["task_id"]
+     or before_pending.get("request_sha256")!=D(pending_request) or before_pending.get("new_store_sha256")!=F(pending_new)
+     or before_pending.get("operation_identity")!=D(pending_operation)):raise Stop("pending attest operation blocks publication")
+ raw=json.dumps(direct,sort_keys=True,separators=(",",":"));finalizer_fd=installed_attest();attempted=False
+ identity_json=json.dumps(list(_r15_installed_attest_identity),separators=(",",":"))
+ finalizer_argv=[sys.executable,"-I","-S","-B","-c",FINALIZER_FD_LOADER,str(finalizer_fd),_r15_installed_attest_sha256,identity_json,str(repo/"controller/attest/cli"),str(attest),"finalize-owner-publication"];finalizer_env=env()
+ if ma["repository_identity"]=="git@github.com:Nortropic/nortropic-system.git" and INITIAL_AGENT:finalizer_env["SSH_AUTH_SOCK"]=INITIAL_AGENT
+ try:attempted=True;p=subprocess.run(finalizer_argv,cwd=repo,env=finalizer_env,input=raw,text=True,capture_output=True,shell=False,check=False,timeout=30,pass_fds=(finalizer_fd,),close_fds=True)
+ finally:
+  if attempted:
+   try:installed_attest()
+   except Exception as identity:raise Indeterminate("INDETERMINATE_PRESERVED installed finalizer identity after invocation: "+str(identity)) from identity
+ if p.returncode:raise Stop(p.stderr.strip() or "attest finalizer rejected")
+ with locked(state/".r15-owner.lock"):
+  state_recover(state);r2,attest2,ma2,_doc2=manifest_info(state,False);current2=latest(state,v["task_id"])
+  if r2!=repo or attest2!=attest or ma2!=ma or current2!=current:raise Stop("finalizer state/manifest drift")
+  with locked(attest/".r15-attest.lock"):
+   after_recovery_raw,_=safe_raw(attest/RECOVERY,(0o600,),8*1024*1024);after_manifest_raw,_=safe_raw(attest/SM,(0o600,),262144);after,after_store_raw=store_snapshot(attest);after_shadow_raw,_=safe_raw(attest/ASHADOW,(0o600,),8*1024*1024);after_rows,after_pending,_=recovery_rows(after_recovery_raw,ma,F(after_manifest_raw));recovery_active(after_rows,after_pending,after_store_raw,after_shadow_raw,ma)
+ if after_pending is not None or after["attestations"].get(v["task_id"])!=expected:raise Stop("finalizer readback")
+ if before_pending is not None:
+  if (len(after_rows)!=len(before_rows)+1 or after_rows[-1].get("phase")!="COMMITTED"
+   or any(after_rows[-1].get(field)!=before_pending.get(field) for field in ("command","task","manifest_sha256","operation_identity","request_sha256","old_store_sha256","new_store_sha256"))
+   or after_shadow_raw!=b""):raise Stop("finalizer pending replay causality")
+ elif before_store["attestations"].get(v["task_id"])==expected:
+  if after_store_raw!=before_store_raw or after_recovery_raw!=before_recovery_complete:raise Stop("finalizer replay effect")
+ else:
+  request_sha=D(attest_request("finalize-owner-publication",[],direct))
+  if (len(after_rows)!=len(before_rows)+2 or after_rows[-2].get("phase")!="PENDING" or after_rows[-1].get("phase")!="COMMITTED"
+   or any(row.get("command")!="finalize-owner-publication" or row.get("task")!=v["task_id"] or row.get("request_sha256")!=request_sha or row.get("old_store_sha256")!=F(before_store_raw) or row.get("new_store_sha256")!=F(after_store_raw) for row in after_rows[-2:])):raise Stop("finalizer recovery causality")
+ return answer(True,published=True,merged=True)
+def legacy_write(attest,task,sha,extra):
+ if re.fullmatch(r"[0-9a-f]{40}",sha,re.IGNORECASE) is None:raise Stop("write sha")
+ sha=sha.lower();extra=([extra[0],extra[1].lower()] if extra else [])
+ with locked(attest/".r15-attest.lock"):
+  s=store_read(attest);old=s["attestations"].get(task)
+  if isinstance(old,dict) and old.get("record_type")=="owner_publication_v1":raise Stop("legacy cannot replace owner")
+  if sha in s["invalidated_shas"]:raise Stop("invalidated sha")
+  value={"task":task,"candidate_sha":sha,"invalidates_on":[sha],"stale":False}
+  if extra:
+   gid,gsha=extra
+   if not gid or not HEX64.fullmatch(gsha):raise Stop("grind")
+   value.update({"grind_id":gid,"grind_sha256":gsha})
+  if old!=value:s["attestations"][task]=value;s["omtest_ko"]=[x for x in s["omtest_ko"] if x!=task]
+  atomic(attest/STORE,s,attest_request("write",[task,sha,*extra]));return 0
+def invalidate(attest,sha):
+ if re.fullmatch(r"[0-9a-f]{40}",sha,re.IGNORECASE) is None:raise Stop("invalidate sha")
+ sha=sha.lower()
+ with locked(attest/".r15-attest.lock"):
+  s=store_read(attest);changed=False;touched=[]
+  if sha not in s["invalidated_shas"]:s["invalidated_shas"].append(sha);s["invalidated_shas"].sort();changed=True
+  for task,v in s["attestations"].items():
+   if sha in v.get("invalidates_on",[]) and v.get("stale") is False:
+    v["stale"]=True;changed=True;touched.append(task)
+    if task not in s["omtest_ko"]:s["omtest_ko"].append(task)
+  atomic(attest/STORE,s,attest_request("invalidate",[sha]))
+  print(f"invaliderade {len(touched)}: {' '.join(touched) if touched else '-'}");return 0
+def import_h036(attest):
+ with locked(attest/".r15-attest.lock"):
+  repo=ROOT;origin=repo_shape(repo);tip=remote_main(repo,origin);record=h036_validate(repo,origin,tip);s=store_read(attest);old=s["attestations"].get("h-036")
+  if old==record and old.get("stale") is False:atomic(attest/STORE,s,attest_request("import-h036-owner-publication",[]));return 0
+  raise Stop("H036 import is exact bootstrap-record replay only")
+def attest_main(argv):
+ if len(argv)<2:return die("usage")
+ attest=Path(argv[0]).absolute();cmd=argv[1];args=argv[2:]
+ try:
+  if cmd=="write" and len(args) in (2,4):return legacy_write(attest,args[0],args[1],args[2:])
+  if cmd=="read" and len(args) in (1,2):
+   with locked(attest/".r15-attest.lock"):
+    _bound,ma=manifest_docs(attest.parent/"state");recovery_raw,_=safe_raw(attest/RECOVERY,(0o600,),8*1024*1024);manifest_raw,_=safe_raw(attest/SM,(0o600,),262144);s,store_raw=store_snapshot(attest);shadow_raw,_=safe_raw(attest/ASHADOW,(0o600,),8*1024*1024);_rows,pending,_previous=recovery_rows(recovery_raw,ma,F(manifest_raw));recovery_active(_rows,pending,store_raw,shadow_raw,ma)
+    if pending is not None:raise Stop("read: pending recovery")
+    v=s["attestations"].get(args[0])
+   if v is None or len(args)==2 and (args[1]!="--require-valid" or v.get("stale")):raise Stop("read: unavailable")
+   print(json.dumps(v,ensure_ascii=False,indent=2,sort_keys=True));return 0
+  if cmd=="invalidate" and len(args)==1:return invalidate(attest,args[0])
+  if cmd=="finalize-owner-publication" and not args:return finalize(attest,req())
+  if cmd=="import-h036-owner-publication" and not args:return import_h036(attest)
+  raise Stop("unknown command")
+ except (Stop,OSError,ValueError,KeyError,sqlite3.Error) as e:return die(str(e))
+def authority_value(argv,v):
+ try:
+  if len(argv)!=1:raise Stop("unknown command")
+  if argv[0]=="owner-author":return owner_author(v)
+  if argv[0]=="check-candidate":return check_owner_candidate(v)
+  if argv[0]=="record-review":return record_review(v)
+  if argv[0]=="owner-freeze":return owner_freeze(v)
+  if argv[0]=="record-publication":return record_publication(v)
+  raise Stop("unknown command")
+ except (Stop,OSError,ValueError,KeyError,sqlite3.Error) as e:return answer(False,reason=str(e))
+def authority_main(argv):
+ try:return authority_value(argv,req())
+ except (Stop,OSError,ValueError,KeyError,sqlite3.Error) as e:return answer(False,reason=str(e))
+def taskval_main(argv):
+ if not argv:return die("usage")
+ if argv[0]=="bootstrap-serialized":return bootstrap(argv)
+ if argv[0]=="select":return claim(argv,False)
+ if argv[0]=="claim":return claim(argv)
+ return die("usage")
+# H035_R15_RETAINED_ENGINE_END_V1
+
+_r15_legacy_main = main
+def _r15_direct_selector_path(path):
+    path=Path(path);proof=None
+    if not path.is_absolute():
+        if any(part in (".","..","") for part in path.parts):raise Stop("selector relative path")
+        return path,None
+    if len(path.parts)>1 and path.parts[1] in ("var","tmp"):
+        alias="/"+path.parts[1];target="private/"+path.parts[1]
+        root_before=os.stat("/",follow_symlinks=False);before=os.lstat(alias)
+        if stat.S_ISLNK(before.st_mode):
+            if before.st_uid!=0 or before.st_nlink!=1 or os.readlink(alias)!=target:raise Stop("selector system alias")
+            after=os.lstat(alias);root_after=os.stat("/",follow_symlinks=False)
+            fields=lambda value:(value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+            root_fields=lambda value:(value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_nlink)
+            if fields(before)!=fields(after) or root_fields(root_before)!=root_fields(root_after):raise Stop("selector system alias race")
+            proof=(alias,target,fields(before),root_fields(root_before))
+            path=Path("/private")/path.parts[1]/Path(*path.parts[2:])
+    return path,proof
+def _r15_direct_alias_recheck(proof):
+    if proof is None:return
+    alias,target,want,want_root=proof;value=os.lstat(alias);root=os.stat("/",follow_symlinks=False)
+    fields=lambda item:(item.st_dev,item.st_ino,item.st_mode,item.st_uid,item.st_nlink,item.st_size,item.st_mtime_ns,item.st_ctime_ns)
+    root_fields=lambda item:(item.st_dev,item.st_ino,item.st_mode,item.st_uid,item.st_nlink)
+    if fields(value)!=want or root_fields(root)!=want_root or os.readlink(alias)!=target:raise Stop("selector system alias changed")
+def _r15_direct_reserved(path):
+    try:path,proof=_r15_direct_selector_path(path)
+    except (Stop,OSError,ValueError):return True
+    try:
+        try:safe_raw(path,(0o600,0o644),8*1024*1024);return True
+        except FileNotFoundError:return False
+        except (Stop,OSError,ValueError):return True
+    finally:_r15_direct_alias_recheck(proof)
+def _r15_direct_store(path):
+    try:path,proof=_r15_direct_selector_path(path)
+    except (Stop,OSError,ValueError):return True
+    try:
+        try:raw,_digest=safe_raw(path,(0o600,0o644),8*1024*1024)
+        except FileNotFoundError:return False
+        except (Stop,OSError,ValueError):return True
+    finally:_r15_direct_alias_recheck(proof)
+    class Pairs(dict):
+        def __init__(self,items):self.pairs=list(items);super().__init__(items)
+    try:value=json.loads(raw.decode("utf-8"),object_pairs_hook=Pairs,parse_constant=lambda item:item)
+    except (ValueError,UnicodeError):return False
+    if not isinstance(value,Pairs):return False
+    if any(key=="invalidated_shas" for key,_item in value.pairs):return True
+    for key,records in value.pairs:
+        if key!="attestations" or not isinstance(records,Pairs):continue
+        for _task,record in records.pairs:
+            if isinstance(record,Pairs) and any(field=="record_type" for field,_item in record.pairs):return True
+    return False
+def _r15_store_selected(argv):
+    if len(argv)<2:return False
+    words=argv[1:]
+    legacy_commands=("write","read","invalidate")
+    if (words and words[0] in ("finalize-owner-publication","import-h036-owner-publication")
+            and (len(words)<2 or words[1] not in legacy_commands)):
+        return True
+    if words and words[0] in legacy_commands:
+        store=ROT/"controller"/"attest"/"state";command=words[0]
+    elif len(words)>=2:
+        store=Path(words[0]);command=words[1]
+    else:return False
+    if command in ("finalize-owner-publication","import-h036-owner-publication"):
+        return True
+    if command not in ("write","read","invalidate"):return False
+    try:
+        state=store.parent/"state"
+        residue=(store/"bootstrap-manifest.json",store/".r15-attest.lock",
+                 store/".r15-attest-shadow",store/".r15-attest-recovery.jsonl",
+                 state/"bootstrap-manifest.json",state/".r15-owner.lock",
+                 state/".r15-state-db-shadow")
+        return (any(_r15_direct_reserved(path) for path in residue)
+                or _r15_direct_store(store/"attestations.json"))
+    except OSError:return True
+def main(argv):
+    if _r15_store_selected(argv):return attest_main(argv[1:])
+    if _r15_store_selected(argv):return fel("R15 attest appeared after legacy selection")
+    return _r15_legacy_main(argv)
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
