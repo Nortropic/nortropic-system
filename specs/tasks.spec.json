@@ -656,6 +656,121 @@
           "H031_REBIND"
         ]
       },
+      "registry_v3_refreeze": {
+        "contract_id": "H034_EXACT_REGISTRY_V3_UNION12_REFREEZE_V1",
+        "authority_base_sha": "843bf368be8ec0a7162f2a9f1d066889fd3e6702",
+        "immutable_no_credit_candidate": {
+          "candidate_sha": "0294dde4cce1440a9e6a1e185306249c3e384599",
+          "candidate_tree": "f35567cb4b431a4ce54d829e69cdbf6fea138f57",
+          "single_parent": "843bf368be8ec0a7162f2a9f1d066889fd3e6702",
+          "formal_h035_result": "457_PASS_1_FAIL",
+          "failure_label": "N_REG_WRONG_VERSION_VALIDATOR",
+          "reason": "GATE_PRIVATE_INVALID_VERSION_FIXTURE_USED_NOW_LEGAL_V3",
+          "disposition": "IMMUTABLE_NO_CREDIT_NOT_PARENT_NOT_PUBLICATION_AUTHORITY"
+        },
+        "canonical_registry_locator": "specs/owner-production-paths.v1.json",
+        "canonical_registry_schema_version": 3,
+        "legal_registry_states": [
+          {
+            "schema_version": 1,
+            "owner_production_paths": [
+              "controller/h034-native/**",
+              "verify/h034/kernel",
+              "verify/h034/build-recipe.json",
+              "verify/h034/identity-manifest.json"
+            ]
+          },
+          {
+            "schema_version": 2,
+            "owner_production_paths": [
+              "controller/h034-native/**",
+              "verify/h034/kernel",
+              "verify/h034/build-recipe.json",
+              "verify/h034/identity-manifest.json",
+              "controller/launch/cli",
+              "controller/launch/runtime_snapshot.py",
+              "config/python-runtime-authority-v2.json"
+            ]
+          },
+          {
+            "schema_version": 3,
+            "owner_production_paths": [
+              "controller/h034-native/**",
+              "verify/h034/kernel",
+              "verify/h034/build-recipe.json",
+              "verify/h034/identity-manifest.json",
+              "controller/launch/cli",
+              "controller/launch/runtime_snapshot.py",
+              "config/python-runtime-authority-v2.json",
+              "controller/runtime-cleanup/install",
+              "controller/runtime-cleanup/native/mediator.c",
+              "verify/h039/runtime-cleanup-mediator",
+              "verify/h039/build-recipe.json",
+              "verify/h039/identity-manifest.json"
+            ]
+          }
+        ],
+        "active_transition": {
+          "from_schema_version": 2,
+          "to_schema_version": 3,
+          "added_owner_production_paths": [
+            "controller/runtime-cleanup/install",
+            "controller/runtime-cleanup/native/mediator.c",
+            "verify/h039/runtime-cleanup-mediator",
+            "verify/h039/build-recipe.json",
+            "verify/h039/identity-manifest.json"
+          ],
+          "all_other_registry_fields": "EXACTLY_RETAINED"
+        },
+        "h034_task_owner_author_allowed_write": [
+          "controller/h034-native/**",
+          "verify/h034/kernel",
+          "verify/h034/build-recipe.json",
+          "verify/h034/identity-manifest.json"
+        ],
+        "h034_task_depends_on": [
+          "h-037"
+        ],
+        "h036_task_owner_author_allowed_write": [
+          "controller/launch/cli",
+          "controller/launch/runtime_snapshot.py",
+          "config/python-runtime-authority-v2.json"
+        ],
+        "h036_task_depends_on": [
+          "h-034"
+        ],
+        "h039_prospective_owner_production_paths": [
+          "controller/runtime-cleanup/install",
+          "controller/runtime-cleanup/native/mediator.c",
+          "verify/h039/runtime-cleanup-mediator",
+          "verify/h039/build-recipe.json",
+          "verify/h039/identity-manifest.json"
+        ],
+        "h039_task_gate_product_install_effect": "EXACTLY_ABSENT_UNTIL_LATER_H039_FREEZE",
+        "test_author_allowed_write": [
+          "docs/05-beslutslogg.md",
+          "docs/loop/drift.md",
+          "specs/owner-production-paths.v1.json",
+          "specs/tasks.spec.json",
+          "verify/bin/h-034-exit",
+          "verify/bin/h-035-exit"
+        ],
+        "required_serial_order": [
+          "H035_R33_GUARDED_PRODUCT_PUBLICATION",
+          "H034_REGISTRY_V3_REFREEZE",
+          "H034_TWO_INDEPENDENT_GATE_REVIEWS",
+          "H034_GUARDED_PUBLICATION",
+          "H036_REGISTRY_ONLY_REFREEZE",
+          "H036_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+          "H039_CONTRACT_FREEZE_INDEPENDENT_GATE_REVIEW_GUARDED_PUBLICATION",
+          "H039_PRODUCT_AND_INSTALL_REVIEW_GUARDED_PUBLICATION",
+          "H038_REFREEZE_PRODUCT_REVIEW_GUARDED_PUBLICATION",
+          "H032_REFREEZE_REVIEW_GUARDED_PUBLICATION",
+          "H031_REBIND_REVIEW_GUARDED_PUBLICATION",
+          "SUPERVISOR_RESUME_ONLY_AFTER_ALL_GREEN"
+        ],
+        "broader_authority": false
+      },
       "exit_test": "verify/bin/h-034-exit",
       "exit_criterion": "AUTHORITY: H-034 follows final H-035 and uses its operational owner-author workflow. Its owner surface is exactly the four registry-reserved H034 paths; the task, registry, gate, tests and control plane remain globally denied. Production is C targeting arm64 macOS. Runtime authority is the exact final signed, loadable, executable, non-symlink Mach-O verify/h034/kernel, bound by SHA-256, codesign -dvvv CDHash, arm64 file identity, nonempty LC_UUID, LC_BUILD_VERSION platform/minOS/SDK fields, dynamic loader, Apple-only dependencies, C sources, closed build recipe and identity manifest. The manifest exact schema includes language=C plus artifact path/digest, recipe digest, complete source digest map and every observed Mach-O/signing/dependency field; every predicate refers to a permitted exact key. Runtime third-party dependency count is zero and Python is never runtime authority. BUILD: compile_argv is a closed argv array, never shell text, containing only the justified C11/O2/warning-as-error/arm64/resolved-isysroot/source inputs; the gate appends the one fixed relative output. It admits no response files, environment extension, linker pass-through, deployment-minimum flag, versioned macOS/Darwin target triple or unlisted source. Current authority selects no arbitrary deployment target; observed Mach-O platform/minOS/SDK must instead agree exactly with the manifest and rebuild. Signing uses one fixed identifier independent of basename. The exact recipe executes in two disposable trees under a closed environment. Two unsigned clean builds at the canonical basename must be byte-identical; semantic/Mach-O/dependency/manifest observations remain stable across rebuilds. Independently ad-hoc-signed outputs need not be byte-identical; the committed final signed artifact digest and CDHash are the exact signed authority. EXECUTION: the only operation is h033-verify with exactly three inherited decimal descriptors for evidence, observer receipt and allowlist plus exact expected task/candidate/spec/gate/probe/request/result flags. Every required descriptor and binding option has missing, duplicate and malformed black-box rejection controls; unknown options reject. The kernel fstat-checks same inherited regular-file descriptions, performs bounded stable reads from those opened objects and never resolves or reopens a pathname; directory, pipe, socket and oversize inputs reject. H-033 remains responsible for protected origin and safe opening. Every gate/tool/kernel child starts in its own process group with a hard timeout, complete-group kill and verified cleanup. Kernel timeout rejects; gate/tool timeout or cleanup failure is ODÖMBART. INPUTS: evidence, receipt and allowlist are strict ordered duplicate-free UTF-8 JSON with exact field sets and types, finite bounds and no trailing data. Every decoded string is compared by explicit decoded byte length plus exact bytes: escaped U+0000, embedded control characters, lone surrogates or any suffix hidden after them reject across every material evidence/receipt/allowlist binding. A full U+0000..U+001F black-box matrix must bind each non-enumerated probe identity/path/effect-marker consistently across every related caller, evidence, receipt and allowlist value, recompute the dependent receipt digest, and still reject, so a mere cross-document mismatch cannot satisfy the parser criterion. Legitimate non-control Unicode remains accepted in the non-enumerated probe identity/path/effect-marker fields. Evidence binds exact integer schema v1, exact _nortropic_provenance, exact h-033, candidate/spec/gate/probe/fresh request/result and a valid 64-hex value equal to SHA-256 of unchanged exact receipt bytes; a different valid digest is a distinct relation failure. Receipt binds exact root-owned-h033-observer-v1, request/candidate/probe, absolute probe path, probe SHA-256 and effect marker. Allowlist binds exact schema v1 and a nonempty unique probe entry to the same path/blob/marker/result. Missing/extra/reordered/duplicate keys, wrong version/constant/top level/type/encoding, empty values, malformed hex, duplicate probes, oversize or trailing bytes and nonregular descriptors reject. Receipt-schema controls recompute evidence.effect_sha256 over each malformed receipt, so strict receipt parsing—not stale digest rejection—is isolated; exact-value and receipt-size/trailing controls also recompute when required, while the digest-relation control deliberately leaves receipt bytes unchanged. Multiple unpredictable gate-generated document families exercise PASS, FAIL and ODÖMBART, valid-looking decoys, every strict evidence/receipt/allowlist schema family, every cross-document and caller binding, cross-result rejection, stale replay, same-open-description pathname replacement/stable reread and recomputed digest relations; gate entropy is fixture input only. Real native permissive consumers that validate only receipt shape or substring evidence while ignoring allowlist/bindings must fail. A receipt-digest-only consumer, finite-fixture matcher, hardcoded result, path-reopen, Python-dispatch, fake shell, unsigned/non-arm64/dependency/recipe/manifest mutant must fail. A real signed loadable LC_UUID fixture and fast/slow/hang controls run before production semantics. MATERIAL_PROPERTIES_JUDGE_ONLY must be NONE.",
       "docs_impact": [],

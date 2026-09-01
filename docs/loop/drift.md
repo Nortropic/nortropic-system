@@ -4353,3 +4353,46 @@ core line-one/line-two coding-cookie and BOM mutants reject.
 R33 grants no registry mutation, broad prefix or new owner authority. The six TEST_AUTHOR and two
 BUILDER paths are exact. R14/R29/R15 floors and accept-side effect controls remain mandatory. The
 serial downstream order and supervisor-resume prohibition are unchanged.
+
+## H-034 registry-v3 refreeze after published H-035 R33
+
+The authority base is the guarded H-035 R33 product merge
+`843bf368be8ec0a7162f2a9f1d066889fd3e6702`. Its tree is
+`62a196e1f6e8c85f2640832cb5f156d72ea8df4b`, with ordered parents
+`8a32a1d4a31e240fa59b5c9f7de0a0b74d48f256` and
+`61a42918ce693e7c2b9117c33a1cad2c90bbf9bb`. The persisted independent product review is bound by
+SHA-256 `b1aa241c5130aa1807213ac200a5f0e60f1b150c68344e45b2c986a9d87b6254`.
+
+This refreeze performs only the already authorized active registry transition: schema v2 union7 to
+schema v3 union12. The five additions are exact files:
+`controller/runtime-cleanup/install`, `controller/runtime-cleanup/native/mediator.c`,
+`verify/h039/runtime-cleanup-mediator`, `verify/h039/build-recipe.json` and
+`verify/h039/identity-manifest.json`. Neither `controller/runtime-cleanup/**` nor `verify/h039/**`
+is admitted. H-034 retains exactly its old4 owner surface and dependency on H-037. Published H-036
+retains exactly its new3 owner surface and dependency on H-034. H-039's task, gate, product and
+installation effects remain absent until its later, separately reviewed freeze.
+
+The active gate mode is `verify/bin/h-034-exit --registry-v3-refreeze`. It accepts exact and
+reordered v1 old4, v2 union7 and v3 union12 through the published H-035 registry parser. For every
+one of the twelve v3 members it rejects omission, substitution, duplicate, backslash alias,
+leading-dot alias, applicable broader prefix and arbitrary-neighbor addition; it separately rejects
+wrong legal version/membership pairs, invalid version types, both forbidden broad prefixes,
+unrelated additions and duplicate JSON keys. It binds the H-034/H-036 task surfaces and dependency
+lifecycle, exact absence of H-039 effects, and the published H-035 core/CLI SHA-256 identities.
+
+The first frozen candidate `0294dde4cce1440a9e6a1e185306249c3e384599`, tree
+`f35567cb4b431a4ce54d829e69cdbf6fea138f57`, is immutable NO-CREDIT and never a parent. Its formal
+standalone host H-035 run reached `457 PASS / 1 FAIL`; the only failure was
+`N_REG_WRONG_VERSION_VALIDATOR`, whose gate-private historical fixture changed canonical v3 to v3
+and still expected rejection. The product correctly accepted the now-legal exact v3 union12 state.
+The fresh successor starts again directly from `843bf368…`, explicitly binds canonical v3 union12
+as the causal runtime positive and changes that one invalid-version fixture to schema v4. Policy and
+owner-transition variants remain in the same negative family, and the published parser/product bytes
+are unchanged.
+
+The exact TEST_AUTHOR write set is only `docs/05-beslutslogg.md`, `docs/loop/drift.md`,
+`specs/owner-production-paths.v1.json`, `specs/tasks.spec.json`, `verify/bin/h-034-exit` and
+`verify/bin/h-035-exit`. There is no builder/product step in H-034. After two independent gate
+reviews and guarded publication, H-036 is refrozen only for the new registry state; then the serial
+chain continues H-039 → H-038 → H-032 → H-031. Supervisor resume remains forbidden until
+all downstream transitions are green.
