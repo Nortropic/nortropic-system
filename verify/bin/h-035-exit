@@ -145,6 +145,9 @@ BPAM_SECTION_DIGESTS = {"prefix":"b00717bc90ad6bfcf8e72cdc3f2498c638ce1ed36867d3
 R29_OWNER_EXCEPTION_BEGIN = b"<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_BEGIN -->\n"
 R29_OWNER_EXCEPTION_END = b"<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_END -->\n"
 R29_OWNER_EXCEPTION_BODY_SHA256 = "8b52669824f0f2b3c9086705ca5d7cc977b853b8381f890f62b2d8f7f34ea251"
+R33_OWNER_DECISION_BEGIN = b"<!-- H035_R33_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_BEGIN -->\n"
+R33_OWNER_DECISION_END = b"<!-- H035_R33_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_END -->\n"
+R33_OWNER_DECISION_BODY_SHA256 = "a3842ced68a94019adecf0a4b945be9028c2fa37b039c5ffe1b54c0bf50cfa8a"
 BPAM_CONDITIONS = (
     ("BP01","EXISTING_FROZEN_ARCHITECTURE_BLOCKS_APPROVED_OBJECTIVE"),
     ("BP02","REPRODUCIBLE_TECHNICAL_EVIDENCE_PROVES_BLOCKER"),
@@ -547,7 +550,264 @@ H035_R29_THREE_STATE_REGISTRY = {
     "fail_closed":True,
 }
 
-H035_R15_CONTRACT_SHA256 = "af6f31be23f4f017d8acdcd3e717d3d329735a510c7e782c1cb5e88e8f4117c8"
+H035_R33_REQUEST_BOUND_REGISTRY = {
+    "contract_id":"H035_R33_COMPLETE_REQUEST_BOUND_THREE_STATE_REGISTRY_CONSUMERS_V1",
+    "owner_decision":{
+        "decision_id":"H035_R33_CORE_AND_CLI_MINIMAL_SCOPE_2026_09_01",
+        "authority_base_sha":"ff37510254de97c5f931ce3b8670da6cf925bb60",
+        "authorized_test_author_paths":[
+            "specs/tasks.spec.json","verify/bin/h-035-exit",
+            "docs/loop/owner-author-workflow-v1.md",
+            "docs/loop/remaining-bootstrap-delegation-v1.md",
+            "docs/05-beslutslogg.md","docs/loop/drift.md"],
+        "authorized_builder_paths":["controller/authority/core.py",
+                                    "controller/authority/cli"],
+        "scope":"COMPLETE_CAUSAL_NUL_GIT_PATHS_AND_EXPLICIT_REQUEST_BOUND_OWNER_REGISTRY_ONLY",
+        "broader_authority":False,
+    },
+    "prior_no_credit_gate_candidate":{
+        "candidate_sha":"a42613ee94e921c03f56979704e50500311a83b9",
+        "candidate_tree":"50c0619040e7f089c519e70e68b0c105ddbcb807",
+        "authority_base_sha":"ff37510254de97c5f931ce3b8670da6cf925bb60",
+        "review_artifacts":[
+            {"lane":"A",
+             "path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r30-gate-review-a.json",
+             "sha256":"ff8430caac6caf9fc93e82de2c11a2ac323afd3aba0a914f508a7b16d45b8cd6",
+             "result":"FAIL"},
+            {"lane":"B",
+             "path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r30-gate-review-b.json",
+             "sha256":"77b30b91c6fb8d2dddecfd1c712f589e668f793da485fd99e4b1f9f42c1cf965",
+             "result":"FAIL"}],
+        "blocking_findings":[
+            "AMBIENT_CONTAINER_SOURCE_ORACLE_INCOMPLETE",
+            "TRANSITION_CANDIDATE_OBJECT_DECOY_INCOMPLETE",
+            "NUL_CHANGED_PATH_CONTRACT_INCOMPLETE",
+            "POSITIVE_TRANSITION_EFFECTS_NOT_BOUND",
+            "INVERSE_WIDENING_DECOYS_ABSENT",
+            "NESTED_REENTRANT_CONCURRENT_INTERLEAVE_ABSENT",
+            "RETAINED_R15_ROUTE_NOT_BYTE_BOUND",
+            "V3_BROAD_TASK_EXACT_H039_MEMBER_CONTROL_ABSENT"],
+        "adoption":"FORBIDDEN_NOT_PARENT_NOT_AUTHORITY",
+    },
+    "intermediate_no_credit_gate_candidate":{
+        "candidate_sha":"b49a99cd25d3c2a85b397cfb9ffb812adb2acfb8",
+        "candidate_tree":"4750d3a5a08ee692e69d3e9e29601fa30eecd797",
+        "authority_base_sha":"ff37510254de97c5f931ce3b8670da6cf925bb60",
+        "review_artifacts":[
+            {"lane":"A",
+             "path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r31-gate-review-a.json",
+             "sha256":"fb322f3872529420fa07e33383b8daa4f5b0f84a2a02fd36429744285303312a",
+             "result":"FAIL"},
+            {"lane":"B",
+             "path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r31-gate-review-b.json",
+             "sha256":"a310b1e60ddc91350fd0188478f8c2c96036847d616ccd132eb43de0c0fb6254",
+             "result":"FAIL"}],
+        "blocking_findings":[
+            "R31-A-001_NESTED_MUTABLE_DEFAULT_AMBIENT_ORACLE_BYPASS: The owner contract explicitly forbids MUTABLE_FUNCTION_DEFAULT and CUSTOM_AMBIENT_CONTAINER, but verify/bin/h-035-exit:5692-5738 examines only direct List/Dict/Set/Call defaults and a finite mutation-method list. The pinned reviewer reproduction passed `def transition_context(req, cache=([],)): list.__iadd__(cache[0], [(req, 1)])` to r31_source_forbidden_rows and obtained `[]`; a filesystem ambient write/read using existing Path/tempfile/json imports likewise obtained `[]`. Because verify/bin/h-035-exit:5764-5775 excludes the named CLI islands from retained AST equality and 5813-5822 constrains only one syntactic validate_owner_surface(surface, registry) call, a product can keep a candidate-keyed registry in that undetected mutable default, retrieve it into local `registry`, pass every serial/nested/concurrent functional result, and still violate the explicit request-local dependency boundary.",
+            "R31-A-002_VALID_EMPTY_AND_OWNER_AUTHOR_INVERSE_SOURCE_DECOYS_ABSENT: The candidate-object authority applies before empty or material owner credit, and owner-author must retain candidate==base. In verify/bin/h-035-exit:16052-16092 the distinguishing positive check-candidate is material, while 16093-16131 makes every inverse check-candidate material and constructs inverse owner-author as a v1/v2 child of a v3 base, so candidate!=base. The aligned cross-product cannot distinguish candidate bytes from checkout bytes. A product can therefore read the existing mutable REGISTRY_PATH only when check-candidate has no changed files, and can choose the widest candidate/checkout registry only when transition_context sees candidate==base; it passes all current cross-product, positive, inverse, sequence and interleave cases, yet a valid v1/v2 empty check-candidate or owner-author request against a v3 checkout admits H039. Add v1 and v2 candidate==base with v3 checkout/caller inverse rejects for empty check-candidate and independently seeded owner-author.",
+            "R31-B-001_INDIRECT_AMBIENT_MUTATION_SOURCE_ORACLE_BYPASS: The R31 contract forbids MUTABLE_FUNCTION_DEFAULT and DYNAMIC_FUNCTION_OR_MODULE_MUTATION, but verify/bin/h-035-exit:5692-5738 rejects only a directly List/Dict/Set/Call-valued default, a Name-call setattr/delattr, selected Attribute-call mutation method names, or Store-context Attribute/Subscript nodes. The exact frozen r31_source_forbidden_rows returns [] for both `def f(cache=({},)): import builtins; builtins.setattr(sys.modules[__name__], chr(65), registry)` and `def f(cache=([None],)): import operator; operator.setitem(cache[0], 0, registry)`. Because validate_task, check_candidate, and transition_context are whole allowed islands at lines 5752-5771, either construction can be added while retaining the required exact validate_owner_surface(surface, registry) call and all operational behavior, so a product can pass the frozen matrices while carrying request registry authority in module or mutable-default ambient state. Minimal repair: reject new imports and indirect mutation capabilities inside the allowed islands, recursively reject defaults containing mutable/stateful descendants, and add causal qualified-setattr plus nested-default/operator-setitem controls (or bind the intended pure request-local function dataflow exactly)."],
+        "adoption":"FORBIDDEN_NOT_PARENT_NOT_AUTHORITY",
+    },
+    "immutable_no_credit_gate_candidate":{
+        "candidate_sha":"dcd9360a9869cfd9c95bd71c0f4b3ea557736f43",
+        "candidate_tree":"6acd14bac0a70de773c20c94e31e357b47d3c315",
+        "authority_base_sha":"ff37510254de97c5f931ce3b8670da6cf925bb60",
+        "review_artifacts":[
+            {"lane":"A",
+             "path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r32-gate-review-a.json",
+             "sha256":"d5328d10338792a63a28b8c1d35f1e46f793fc89b5ba27648b7818b3259cee29",
+             "result":"PASS"},
+            {"lane":"B",
+             "path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r32-gate-review-b.json",
+             "sha256":"2355c0ee69bcfe3c2e9efdf5611622c0a22719e522142268e279b1d441d0cfbb",
+             "result":"FAIL"}],
+        "blocking_findings":[
+            "R32-B-001_EXECUTABLE_SHEBANG_OUTSIDE_CLOSED_AST_ORACLE: R32 product acceptance executes controller/authority/cli directly through authority_call (verify/bin/h-035-exit:5336-5344), but the claimed closed whole-module oracle compares only ast.dump values (5860-5879) and byte-binds only the later retained R15 suffix (5881-5885). Product identity binds the path and 100755 mode but not the executable first line (5583-5623), and the 18 source mutants contain no shebang/preamble case (5899-5967). A gate-private causal input derived from the exact positive reference and differing only in the CLI first line was accepted by the actual frozen r32_source_structure as `(True, 'closed positive reference AST and retained R15 route')`; `/usr/bin/env -S` is available on this host. Consequently a one-line env -S pinned-Python `-c` prelude can perform forbidden process/filesystem/dynamic effects, restore `__file__` and `sys.argv`, then compile/exec the byte-identical Python body so every AST and operational result still passes. This violates CLOSED_POSITIVE_WHOLE_MODULE_AST and the no-extra-capability boundary. Minimal repair: bind the executable CLI shebang byte-for-byte to the derived reference and add a causal shebang mutant; preferably bind the complete interpreter-sensitive preamble, including absence/identity of PEP-263 coding lines for both sources, before AST credit."],
+        "adoption":"FORBIDDEN_NOT_PARENT_NOT_AUTHORITY",
+    },
+    "immutable_no_credit_product_attempts":[
+        {"candidate_sha":"8e56d591b7acb184e80e1095e8152343e8549ad4",
+         "artifact_path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r29-product-r1-no-credit.json",
+         "artifact_sha256":"04ce654bd6dcea189730e71cb1dd99c2914a1e6f0ec8a0e42d97f58bb997a677",
+         "reason":"NON_NUL_GIT_PATH_DECODING"},
+        {"candidate_sha":"f956b60369e826d444dc0dbf71f988d4ed5e4fcb",
+         "artifact_path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r29-product-r2-no-credit.json",
+         "artifact_sha256":"c4087bafaa2b822270cc6300ce1bbdc0bdff95e664cff95f7b29297bfe9da860",
+         "reason":"OWNER_CHECK_CANDIDATE_NOT_BOUND_TO_ACTUAL_REGISTRY"},
+    ],
+    "architectural_impossibility":{
+        "artifact_path":"/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/h035-r29-core-only-architectural-impossibility-20260901.json",
+        "artifact_sha256":"1e6b03b6c61fd34baee02039825c6911c73608e2fdb1495b9862651144676fbd",
+        "result":"OWNER_SCOPE_STOP",
+        "minimum_required_scope_delta":"controller/authority/cli",
+        "rejected_core_only_mechanisms":[
+            "STATIC_UNION12_FILTER","MODULE_GLOBAL","CONTEXTVAR",
+            "CALLER_FRAME_INTROSPECTION","DYNAMIC_MUTATION_OR_SIGNATURE_TRICK"],
+    },
+    "registry_states":"EXACTLY_R29_V1_OLD4_V2_UNION7_V3_UNION12",
+    "registry_path":"specs/owner-production-paths.v1.json",
+    "registry_state_in_this_contract":"UNCHANGED_SCHEMA_V2_UNION7",
+    "preproduct_evidence":{
+        "base_sha":"ff37510254de97c5f931ce3b8670da6cf925bb60",
+        "base_tree":"0cbb2f61843f0f54ae90ceaade4a2ad93c0d38a1",
+        "core_sha256":"a56398870ca9716b79c701c69e1eda401452c03471c977ebdfe4e210b9b6b1a2",
+        "cli_sha256":"954deefea72bdbab92d5fc37f7b7fa4d7fd8edf548da5be16077d609393b548f",
+        "registry_sha256":"3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256",
+        "expected_red_label":"A_R33_REQUEST_BOUND_REGISTRY_AND_NUL_PATH_OPERATIONAL",
+        "expected_reason":"LEGACY_CORE_CLI_LACK_V3_NUL_AND_REQUEST_BOUND_OWNER_SURFACE",
+        "expected_failure_signature":[{
+            "observation":"R33_COMPLETE_R29_PLUS_REQUEST_BOUND_AND_NUL_MATRIX",
+            "reason":"LEGACY_CORE_CLI_LACK_V3_NUL_AND_REQUEST_BOUND_OWNER_SURFACE"}],
+    },
+    "test_author_allowed_write":[
+        "specs/tasks.spec.json","verify/bin/h-035-exit",
+        "docs/loop/owner-author-workflow-v1.md",
+        "docs/loop/remaining-bootstrap-delegation-v1.md",
+        "docs/05-beslutslogg.md","docs/loop/drift.md"],
+    "document_appends":{
+        "docs/loop/owner-author-workflow-v1.md":[9475,
+            "01e9f48661e0bbc048cf6ebba53796039c9a42a6d37151b589b0694ce0b36e14",
+            "\n## H-035 R33 request-bound registry consumer refreeze"],
+        "docs/loop/remaining-bootstrap-delegation-v1.md":[5168,
+            "6009cb5d8eb8614eb994ca2e0f5568395bb068c138fe909276f461a6f862a17e",
+            "<!-- H035_R33_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_BEGIN -->"],
+        "docs/05-beslutslogg.md":[824,
+            "58f6477e2791d1417a7c9c3e5642b0c39ba41c8b0c8b0421241784a6806f9b54",
+            "| 2026-09-01 | H-035 R33 executable-preamble refreeze |"],
+        "docs/loop/drift.md":[5923,
+            "84340c7ebefa23d658714750faea9e1f99b046abe77fa740281d3792ab581a86",
+            "\n## H-035 R33 — request-bound registry consumer boundary"],
+    },
+    "builder_actual_changed_files":["controller/authority/core.py",
+                                    "controller/authority/cli"],
+    "git_changed_path_contract":{
+        "transport":"GIT_DIFF_NAME_ONLY_Z_NUL_DELIMITED_BYTES",
+        "decoding":"EACH_NONEMPTY_RECORD_STRICT_UTF8_THEN_CANONICAL_PATH",
+        "empty_diff":"EXACT_EMPTY_STDOUT_ONLY",
+        "unterminated_nonempty_output":"REJECT",
+        "invalid_utf8":"REJECT_WITH_STRUCTURED_FAIL_CLOSED_RESPONSE",
+        "newline_and_quote_backslash_path":"ACCEPT_WHEN_EXACTLY_AUTHORIZED",
+        "duplicate_after_canonicalization":"REJECT",
+        "causal_faults":["EMPTY_STDOUT","UNTERMINATED_NONEMPTY",
+            "EMPTY_NUL_RECORD","INVALID_UTF8","CANONICAL_ALIAS_DUPLICATE",
+            "ACTUAL_NEWLINE_QUOTE_BACKSLASH","ACTUAL_TWO_PATH_ALIAS_COLLISION"],
+    },
+    "request_bound_owner_surface":{
+        "source":"EXACT_CANDIDATE_OBJECT_REGISTRY_RETURNED_BY_AUTHORITY_DOCUMENTS_IN_THE_SAME_REQUEST",
+        "check_candidate":"OWNER_TASK_SURFACE_VALIDATED_AGAINST_THAT_REGISTRY_BEFORE_EMPTY_OR_MATERIAL_CANDIDATE_CREDIT",
+        "transition_context":"OWNER_TASK_SURFACE_VALIDATED_AGAINST_THAT_REGISTRY_BEFORE_OWNER_AUTHOR_RECORD_REVIEW_OR_OWNER_FREEZE_CREDIT",
+        "ambient_authority_forbidden":[
+            "MODULE_GLOBAL_OR_CACHE","CONTEXTVAR",
+            "CALLER_FRAME_OR_STACK_INTROSPECTION","CUSTOM_AMBIENT_CONTAINER",
+            "ATTRIBUTE_OR_SUBSCRIPT_STORE","THREADING_OR_THREAD_LOCAL",
+            "MUTABLE_FUNCTION_DEFAULT","DYNAMIC_FUNCTION_OR_MODULE_MUTATION",
+            "CALLER_SELECTED_REGISTRY_OR_VERSION",
+            "NESTED_MUTABLE_DEFAULT_DESCENDANT",
+            "IMPORT_OR_IMPORT_FROM_IN_CHANGED_FUNCTION",
+            "CLASS_LAMBDA_NESTED_FUNCTION_OR_CLOSURE_IN_CHANGED_FUNCTION",
+            "BUILTINS_SETATTR_OPERATOR_SETITEM_LIST_IADD_OR_QUALIFIED_MUTATOR",
+            "GETATTR_GLOBALS_LOCALS_VARS_SYS_MODULES_OR_DICT_INDIRECTION",
+            "FILESYSTEM_AMBIENT_STORE_OR_DYNAMIC_CODE_LOADING",
+            "REGISTRY_ALIAS_REASSIGNMENT_OR_MOVED_HELPER_CALL"],
+        "candidate_object_decoys":[
+            "V3_CANDIDATE_WITH_V1_CHECKOUT_CALLER_AND_SEMANTICALLY_APPLICABLE_BASE_WIDENING_POSITIVE",
+            "V1_CANDIDATE_WITH_V3_CHECKOUT_BASE_CALLER_MUST_REJECT_H039",
+            "V2_CANDIDATE_WITH_V3_CHECKOUT_BASE_CALLER_MUST_REJECT_H039",
+            "V1_AND_V2_CANDIDATE_EQUALS_BASE_WITH_V3_CHECKOUT_AND_CALLER_H039_REJECT_2X5",
+            "V1_AND_V2_CANDIDATE_EQUALS_BASE_WITH_V3_CHECKOUT_AND_CALLER_H034_POSITIVE_2X5"],
+        "closed_candidate_base_matrix":{
+            "candidate_registry_versions":[1,2],
+            "candidate_equals_base":True,
+            "configured_remote_main_equals_candidate_base":True,
+            "ambient_checkout_registry_version":3,
+            "caller_claim_registry_version":3,
+            "consumers":["validate-task","check-candidate-empty","owner-author",
+                         "record-review","owner-freeze"],
+            "h039_result":"REJECT_EXACT_OWNER_SURFACE_REASON_AND_UNCHANGED_EFFECTS",
+            "h034_anchor":"ACCEPT_WITH_EXACT_COMMAND_SPECIFIC_EFFECTS"},
+        "interleave":"ISOLATED_CHILD_NESTED_REENTRANT_AND_CONCURRENT_ACTUAL_REGISTRY_V1_REJECT_V3_ACCEPT",
+    },
+    "cross_product":[
+        {"schema_version":1,"allowed_owner_surfaces":["H034_OLD4_EXACT"],
+         "rejected_owner_surfaces":["H036_EXACT","H039_EXACT",
+             "CONTROLLER_RUNTIME_CLEANUP_BROAD","VERIFY_H039_BROAD"]},
+        {"schema_version":2,"allowed_owner_surfaces":["H034_OLD4_EXACT","H036_EXACT"],
+         "rejected_owner_surfaces":["H039_EXACT",
+             "CONTROLLER_RUNTIME_CLEANUP_BROAD","VERIFY_H039_BROAD"]},
+        {"schema_version":3,"allowed_owner_surfaces":["H034_OLD4_EXACT","H036_EXACT","H039_EXACT"],
+         "rejected_owner_surfaces":["CONTROLLER_RUNTIME_CLEANUP_BROAD","VERIFY_H039_BROAD"]},
+    ],
+    "cross_product_consumers":["validate-task","check-candidate-empty",
+        "check-candidate-material","owner-author","record-review","owner-freeze"],
+    "positive_effect_contract":{
+        "validate_task_and_check_candidate":"EXACT_STATE_WORKSPACE_REFS_UNCHANGED",
+        "owner_author":"EXACT_OWNER_CANDIDATE_REVIEW_STATE_AND_OWNER_ATTEMPT_BYTES_ONLY",
+        "record_review":"EXACT_OWNER_FINAL_FREEZE_STATE_BYTES_ONLY",
+        "owner_freeze":"EXACT_OWNER_FROZEN_STATE_BYTES_ONLY",
+        "remote_refs":"ALWAYS_UNCHANGED"},
+    "v3_broad_material_controls":[
+        "CONTROLLER_RUNTIME_CLEANUP_BROAD_WITH_EXACT_REGISTERED_H039_MEMBER_REJECT",
+        "VERIFY_H039_BROAD_WITH_EXACT_REGISTERED_H039_MEMBER_REJECT"],
+    "historical_floors":["UNCHANGED_COMPLETE_R14_OPERATIONAL_MATRIX",
+        "UNCHANGED_COMPLETE_R29_INCREMENTAL_MATRIX",
+        "UNCHANGED_R15_INHERITANCE_AND_HISTORICAL_FLOORS",
+        "UNCHANGED_R29_ACCEPT_SIDE_EFFECT_CAUSAL_ORACLE"],
+    "product_acceptance":{
+        "command":"verify/bin/h-035-exit --r33-registry-migration BASE_SHA CANDIDATE_SHA",
+        "candidate_identity":"CLEAN_HEAD_EQUALS_EXACT_CANDIDATE_COMMIT",
+        "base_candidate_relation":"DIRECT_SINGLE_CHILD_OF_PUBLISHED_R33_CONTRACT_MERGE",
+        "exact_git_diff":["controller/authority/core.py","controller/authority/cli"],
+        "exact_modes":{"controller/authority/core.py":"100644",
+                       "controller/authority/cli":"100755"},
+        "candidate_contract_bytes":["specs/tasks.spec.json","verify/bin/h-035-exit"],
+        "source_capability_oracle":"CLOSED_POSITIVE_WHOLE_MODULE_AST_DERIVED_FROM_EXACT_FF375_BASE_AND_EXACT_REFERENCE_TRANSFORM",
+        "interpreter_sensitive_preamble":{
+            "controller/authority/cli":[
+                "#!/usr/bin/env python3.12\n",
+                "\"\"\"Operational H-035 authority and owner-transition interface.\"\"\"\n"],
+            "controller/authority/core.py":[
+                "\"\"\"Shared H-035 authority primitives.\n","\n"],
+            "encoding":"STRICT_UTF8_NO_BOM",
+            "line_endings":"EXACT_LF",
+            "binding":"BYTE_ZERO_THROUGH_FIRST_TWO_PHYSICAL_LINES_EXACT_TO_FF375_REFERENCE",
+            "causal_mutants":["CLI_ENV_S_C_PRELUDE_SHEBANG",
+                "CLI_ALTERNATE_INTERPRETER_OR_OPTIONS","CLI_LINE_2_CODING_COOKIE",
+                "CORE_LINE_1_CODING_COOKIE","CORE_LINE_2_CODING_COOKIE",
+                "CLI_OR_CORE_UTF8_BOM"]},
+        "source_islands":{
+            "core":["RUNTIME_CLEANUP_OWNER_PATHS","OWNER_PATHS_BY_VERSION",
+                "validate_registry","changed_files","validate_owner_surface"],
+            "cli":["EXACT_CORE_IMPORT","validate_task","check_candidate",
+                "transition_context"],
+            "retained_r15_cli_suffix":"BYTE_EXACT_TO_FF375_BASE",
+            "all_other_core_and_cli":"AST_EXACT_TO_FF375_BASE",
+            "changed_function_headers_defaults_decorators":"EXACT_TO_CLOSED_REFERENCE",
+            "changed_function_bodies":"EXACT_POSITIVE_REFERENCE_AST_NO_CAPABILITY_SLACK"},
+    },
+    "downstream_sequence":["H035_R33_TEST_AUTHOR_FREEZE",
+        "H035_R33_TWO_INDEPENDENT_GATE_REVIEWS","H035_R33_GUARDED_CONTRACT_PUBLICATION",
+        "H035_R33_CORE_AND_CLI_BUILDER_PRODUCT","H035_R33_INDEPENDENT_PRODUCT_REVIEW",
+        "H035_R33_GUARDED_PRODUCT_PUBLICATION","H034_REGISTRY_V3_REFREEZE_REVIEW_PUBLICATION",
+        "H036_REGISTRY_ONLY_REFREEZE_REVIEW_PUBLICATION",
+        "H039_CONTRACT_PRODUCT_INSTALL_REVIEW_PUBLICATION",
+        "H038_REFREEZE_PRODUCT_REVIEW_PUBLICATION","H032_REFREEZE_REVIEW_PUBLICATION",
+        "H031_REBIND_REVIEW_PUBLICATION","SUPERVISOR_RESUME_ONLY_AFTER_ALL_GREEN"],
+    "forbidden_effects":["REGISTRY_MUTATION_IN_H035",
+        "H034_H036_H038_OR_H039_TASK_OR_PRODUCT_CHANGE_IN_H035",
+        "OWNER_SURFACE_ADMITTED_OUTSIDE_EXACT_REQUEST_REGISTRY_MEMBERSHIP",
+        "BROAD_RUNTIME_CLEANUP_OR_VERIFY_H039_PREFIX",
+        "CALLER_SELECTED_REGISTRY_VERSION_PATH_OR_AUTHORITY",
+        "MODULE_GLOBAL_CONTEXTVAR_CALLER_INTROSPECTION_DYNAMIC_MUTATION_OR_SIGNATURE_TRICK",
+        "ATTRIBUTE_SUBSCRIPT_STORE_THREAD_LOCAL_OR_MUTABLE_DEFAULT_AMBIENT_AUTHORITY",
+        "INDIRECT_BUILTINS_OPERATOR_LIST_GETATTR_SYS_MODULES_OR_FILESYSTEM_AMBIENT_MUTATION",
+        "IMPORT_CLASS_LAMBDA_NESTED_FUNCTION_NAMED_EXPR_OR_REGISTRY_REASSIGNMENT_IN_CHANGED_FUNCTION",
+        "RETAINED_R15_ROUTE_OR_UNRELATED_CORE_CLI_CHANGE",
+        "NON_NUL_OR_LOSSY_GIT_PATH_DECODING",
+        "SEATBELT_CONFINEMENT_AUTHORITY_OR_SECURITY_OBJECTIVE_CHANGE"],
+    "fail_closed":True,
+}
+
+H035_R15_CONTRACT_SHA256 = "004d77cba1a4786d0c8cdcd7db029002e43eadf8f9fb8dd2a6421c8c139878d2"
 H035_R15_BASE = "408923a445d081ebb6309e57dfe80423844ce927"
 H035_R15_BASE_TREE = "b306ba137cb348b18df98e895b21ef47e4980e51"
 H035_R15_AST_PYTHON = Path(
@@ -562,9 +822,9 @@ H035_R15_GATE_BASE_DEF_AGGREGATE = "77413d5497b92ed8eb4df7bd805a269ab9a7249c76ce
 H035_R15_GATE_BASE_DEF_NAME_DIGEST = "8cbe0238247d014964f8d23cccf74fb6179fb81099200473b870a9693bf4d2ee"
 H035_R15_GATE_UNCHANGED_DEF_AGGREGATE = "b9b40ec354682bcee4bc5c1077deb02c03aa91c22dcbd5423be9644054567dc6"
 H035_R15_GATE_BASE_NONDEF_DIGEST = "6b69304fa7fed17d29a1460d11ecf64e43a5675e0da28636db4e52af1e6bea4a"
-H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "fb28ed0640eb06fbac41b2762d8d327ec92fa57315f823a8c91de543519cd92a"
-H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "2d99128953dd7d24e4e5af4f34a4367e512788669cf730598e3af36627c5b32c"
-H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "66687e6e71e14cfbd121b2856b0a2d792a146352ae4cac8c6165751cbffcb35b"
+H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "9c925b92724586b253e2a697da696867f29ea5bc8c54ae52c37bc66350858417"
+H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "5bf1dd8651fdba99ecc04f9ee1da96aa6e85ec565e784b3b83ac5612c014bfca"
+H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "21e2f93b4d6c27afdf4ffe316ccb7010c617d259f4e3d519af17c410ddc7d6d2"
 H035_R15_ENV_REVIEWED_AST_SHA256 = {
     "r15_remote_boundary_selftests":"7fa65898c7b5165f168ff608abb89eb47ec8d805459bf5f666d044f6bee9ac75",
     "r15_product_scope_selftests":"717b95a9039b369984c9409c7d87e01b88fd5cb8374b4672ce58916c0d697fe9",
@@ -1110,6 +1370,17 @@ def r14_contract_selftests(contract: object) -> None:
           "J_R14_SERIAL_HARD_STOP_FORBIDDEN_FAIL_CLOSED_REJECT")
 
 
+def r33_owner_decision_split(raw: bytes) -> tuple[bytes,bytes] | None:
+    if (raw.count(R33_OWNER_DECISION_BEGIN)!=1
+            or raw.count(R33_OWNER_DECISION_END)!=1):
+        return None
+    prefix,tail=raw.split(R33_OWNER_DECISION_BEGIN,1)
+    body,trailing=tail.split(R33_OWNER_DECISION_END,1)
+    if trailing or hashlib.sha256(body).hexdigest()!=R33_OWNER_DECISION_BODY_SHA256:
+        return None
+    return prefix,body
+
+
 def r29_contract_selftests(contract: object) -> None:
     def clone() -> dict[str, object]:
         return json.loads(json.dumps(H035_R29_THREE_STATE_REGISTRY))
@@ -1186,11 +1457,12 @@ def r29_contract_selftests(contract: object) -> None:
                b"separate from every existing service",
                b"H-036 registry-only",b"No supervisor resume",
                b"new owner stop is mandatory")
+        decision=r33_owner_decision_split(suffix)
         exact_section=(hashlib.sha256(body).hexdigest()
                        ==R29_OWNER_EXCEPTION_BODY_SHA256
                        and all(term in body for term in terms)
                        and prefix.endswith(BPAM_SOURCE_END)
-                       and suffix==b"")
+                       and decision is not None and decision[0]==b"")
     check(exact_section,"F_R29_CANONICAL_OWNER_EXCEPTION_EXACT_BOUNDARY")
     section_mutants=[]
     if exact_section:
@@ -1227,6 +1499,112 @@ def r29_contract_selftests(contract: object) -> None:
           "F_R29_WORKFLOW_EXACT_BOUNDARY_AND_SERIAL_CONTRACT")
 
 
+def r33_contract_selftests(contract: object) -> None:
+    def clone() -> dict[str,object]:
+        return json.loads(json.dumps(H035_R33_REQUEST_BOUND_REGISTRY))
+    check(exact_value(contract,H035_R33_REQUEST_BOUND_REGISTRY),
+          "J_R33_EXACT_CONTRACT_POSITIVE")
+    mutants=[]
+    for key in H035_R33_REQUEST_BOUND_REGISTRY:
+        mutant=clone();mutant.pop(key);mutants.append(mutant)
+    mutant=clone();mutant["extra_authority"]=True;mutants.append(mutant)
+    mutant=clone();mutant["owner_decision"]["authorized_builder_paths"].pop();mutants.append(mutant)
+    mutant=clone();mutant["owner_decision"]["authorized_builder_paths"].append("controller/**");mutants.append(mutant)
+    mutant=clone();mutant["cross_product"][0]["allowed_owner_surfaces"].append("H036_EXACT");mutants.append(mutant)
+    mutant=clone();mutant["cross_product"][1]["allowed_owner_surfaces"].append("H039_EXACT");mutants.append(mutant)
+    mutant=clone();mutant["cross_product"][2]["rejected_owner_surfaces"].pop();mutants.append(mutant)
+    mutant=clone();mutant["cross_product_consumers"].pop();mutants.append(mutant)
+    mutant=clone();mutant["git_changed_path_contract"]["transport"]="TEXT_LINES";mutants.append(mutant)
+    mutant=clone();mutant["git_changed_path_contract"]["causal_faults"].pop();mutants.append(mutant)
+    mutant=clone();mutant["request_bound_owner_surface"]["source"]="CALLER";mutants.append(mutant)
+    mutant=clone();mutant["request_bound_owner_surface"]["ambient_authority_forbidden"].pop();mutants.append(mutant)
+    mutant=clone();mutant["request_bound_owner_surface"]["candidate_object_decoys"].pop();mutants.append(mutant)
+    mutant=clone();mutant["request_bound_owner_surface"]["closed_candidate_base_matrix"]["consumers"].pop();mutants.append(mutant)
+    mutant=clone();mutant["request_bound_owner_surface"]["closed_candidate_base_matrix"]["candidate_equals_base"]=False;mutants.append(mutant)
+    mutant=clone();mutant["request_bound_owner_surface"]["interleave"]="SERIAL_ONLY";mutants.append(mutant)
+    mutant=clone();mutant["positive_effect_contract"]["owner_author"]="RC_ONLY";mutants.append(mutant)
+    mutant=clone();mutant["v3_broad_material_controls"].pop();mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["exact_git_diff"].pop();mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["exact_git_diff"].append("controller/authority/**");mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["source_islands"]["retained_r15_cli_suffix"]="UNBOUND";mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["source_capability_oracle"]="NEGATIVE_BLACKLIST";mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["source_islands"]["changed_function_bodies"]="OPEN_ISLAND";mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["interpreter_sensitive_preamble"]["controller/authority/cli"][0]="#!/usr/bin/env -S python3.12 -c\n";mutants.append(mutant)
+    mutant=clone();mutant["immutable_no_credit_product_attempts"][0]["artifact_sha256"]="0"*64;mutants.append(mutant)
+    mutant=clone();mutant["architectural_impossibility"]["artifact_sha256"]="0"*64;mutants.append(mutant)
+    mutant=clone();mutant["immutable_no_credit_gate_candidate"]["candidate_sha"]="0"*40;mutants.append(mutant)
+    mutant=clone();mutant["immutable_no_credit_gate_candidate"]["review_artifacts"][0]["sha256"]="0"*64;mutants.append(mutant)
+    mutant=clone();mutant["immutable_no_credit_gate_candidate"]["blocking_findings"].pop();mutants.append(mutant)
+    mutant=clone();mutant["intermediate_no_credit_gate_candidate"]["candidate_sha"]="0"*40;mutants.append(mutant)
+    mutant=clone();mutant["prior_no_credit_gate_candidate"]["candidate_sha"]="0"*40;mutants.append(mutant)
+    mutant=clone();mutant["forbidden_effects"].pop();mutants.append(mutant)
+    mutant=clone();mutant["fail_closed"]=1;mutants.append(mutant)
+    check(all(not exact_value(value,H035_R33_REQUEST_BOUND_REGISTRY)
+              for value in mutants),
+          "J_R33_SCOPE_MATRIX_IDENTITY_AND_FAIL_CLOSED_MUTANTS_REJECT")
+    artifacts=[*H035_R33_REQUEST_BOUND_REGISTRY["immutable_no_credit_product_attempts"],
+               H035_R33_REQUEST_BOUND_REGISTRY["architectural_impossibility"]]
+    artifact_checks=[]
+    for row in artifacts:
+        path=Path(str(row["artifact_path"]))
+        try:raw=path.read_bytes()
+        except OSError:raw=b""
+        artifact_checks.append(hashlib.sha256(raw).hexdigest()==row["artifact_sha256"])
+    review_checks=[];no_credit_identities=[]
+    for key in ("prior_no_credit_gate_candidate",
+                "intermediate_no_credit_gate_candidate",
+                "immutable_no_credit_gate_candidate"):
+        no_credit=H035_R33_REQUEST_BOUND_REGISTRY[key]
+        for row in no_credit["review_artifacts"]:
+            path=Path(str(row["path"]))
+            try:
+                raw=path.read_bytes();value=strict_json_bytes(raw)
+            except (OSError,UnicodeError,ValueError,json.JSONDecodeError):
+                raw=b"";value=None
+            review_checks.append(hashlib.sha256(raw).hexdigest()==row["sha256"]
+                and isinstance(value,dict) and value.get("result")==row["result"]
+                and value.get("role")=="GATE_REVIEWER"
+                and value.get("contract_candidate_sha")==no_credit["candidate_sha"])
+        identity=git(ROOT,"rev-list","--parents","-n","1",
+                     str(no_credit["candidate_sha"]))
+        tree=git(ROOT,"rev-parse",str(no_credit["candidate_sha"])+"^{tree}")
+        no_credit_identities.append(identity.returncode==0
+            and identity.stdout.split()==[
+                no_credit["candidate_sha"],no_credit["authority_base_sha"]]
+            and tree.returncode==0 and tree.stdout.strip()==no_credit["candidate_tree"])
+    check(len(artifact_checks)==3 and all(artifact_checks)
+          and len(review_checks)==6 and all(review_checks)
+          and len(no_credit_identities)==3 and all(no_credit_identities),
+          "F_R33_IMMUTABLE_NO_CREDIT_AND_IMPOSSIBILITY_ARTIFACT_IDENTITIES")
+    delegation=(ROOT/"docs/loop/remaining-bootstrap-delegation-v1.md").read_bytes()
+    decision=r33_owner_decision_split(delegation)
+    terms=(b"controller/authority/core.py",b"controller/authority/cli",
+           b"strict NUL-delimited UTF-8",b"check-candidate",b"transition_context",
+           b"ContextVar",b"caller-introspection",b"not a parent",
+           b"nested/reentrant/concurrent",b"No\nsupervisor resume",
+           b"b49a99cd25d3c2a85b397cfb9ffb812adb2acfb8",
+           b"R31-A-001_NESTED_MUTABLE_DEFAULT_AMBIENT_ORACLE_BYPASS",
+           b"closed positive whole-module AST",b"candidate==base==remote-main")
+    check(decision is not None and all(term in decision[1] for term in terms),
+          "F_R33_EXACT_OWNER_DECISION_BOUNDARY")
+    owner_workflow=(ROOT/"docs/loop/owner-author-workflow-v1.md").read_text(encoding="utf-8")
+    terms=("H-035 R33 request-bound registry consumer refreeze",
+           "git diff --name-only -z","strict UTF-8","candidate-object registry",
+           "legacy request-bound CLI consumers",
+           "Opposite mutable-checkout, semantically applicable base registry bytes",
+           "same-process child sequence","owner surface outside owner production",
+           "nested, reentrant and deterministic concurrent",
+           "exact only files, canonical JSON bytes and 0600 modes",
+           "b49a99cd25d3c2a85b397cfb9ffb812adb2acfb8",
+           "R31-B-001_INDIRECT_AMBIENT_MUTATION_SOURCE_ORACLE_BYPASS",
+           "positive reference mechanically", "additional closed 2×5 matrix",
+           "--r33-registry-migration BASE_SHA CANDIDATE_SHA",
+           "A_R33_REQUEST_BOUND_REGISTRY_AND_NUL_PATH_OPERATIONAL",
+           "Core-only, CLI-only", "third-path and\nstacked")
+    check(all(term in owner_workflow for term in terms),
+          "F_R33_WORKFLOW_DATAFLOW_PATH_AND_IDENTITY_CONTRACT")
+
+
 def r15_gate_expected_policy() -> dict[str,object]:
     return {
         "base_definitions_exact_once_in_order":True,"unchanged_definition_count":53,
@@ -1243,9 +1621,9 @@ def r15_gate_expected_policy() -> dict[str,object]:
         "capability_family_checks_are_supplemental_to_exact_source_aggregate":True,
         "import_effect_oracle_preserves_inherited_callable_identity":True,
         "new_top_level_requires_exact_manifest":True,
-        "manifest_independent_admitted_definition_count":143,
+        "manifest_independent_admitted_definition_count":154,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":78,
+        "manifest_independent_admitted_nondefinition_count":82,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -1290,9 +1668,9 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     check(isinstance(policy,dict) and exact_value(policy,r15_gate_expected_policy()),
           "J_R15_GATE_INHERITANCE_COMPLETE_POLICY_EXACT")
     normalization_policy={
-        "manifest_independent_admitted_definition_count":143,
+        "manifest_independent_admitted_definition_count":154,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":78,
+        "manifest_independent_admitted_nondefinition_count":82,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -1315,8 +1693,8 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     for key in normalization_policy:
         value=json.loads(json.dumps(normalization_policy)); value.pop(key); policy_mutants.append(value)
     for key,hostile_values in (
-            ("manifest_independent_admitted_definition_count",(142,143.0,True)),
-            ("manifest_independent_admitted_nondefinition_count",(77,78.0,True)),
+            ("manifest_independent_admitted_definition_count",(153,154.0,True)),
+            ("manifest_independent_admitted_nondefinition_count",(81,82.0,True)),
             ("manifest_independent_admitted_definition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_admitted_nondefinition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_complete_ordered_module_body_aggregate_sha256",("0"*64,True))):
@@ -1393,6 +1771,8 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
                 row["r15_owner_product_lifecycle"]=base_h035.get(
                     "r15_owner_product_lifecycle")
                 if row.pop("r29_three_state_owner_production_registry",None) is None:
+                    return False
+                if row.pop("r33_request_bound_registry_consumers",None) is None:
                     return False
         return r15_json_equal(candidate_copy,base_copy)
 
@@ -5217,6 +5597,98 @@ def r14_product_identity(base: str, candidate_sha: str) -> tuple[bool, str]:
     return True, "clean exact candidate, contract bytes, and core-only diff bound"
 
 
+def r33_exact_git_names(repo: Path,base: str,candidate_sha: str) -> tuple[list[str] | None,str]:
+    result=subprocess.run(
+        ["git","-C",str(repo),"diff","--name-only","-z","--no-renames",
+         "--no-ext-diff","--no-textconv",base,candidate_sha],
+        capture_output=True,shell=False,check=False)
+    if result.returncode:return None,"cannot derive exact NUL-delimited Git diff"
+    raw=result.stdout
+    if not raw:return [],"exact empty Git diff"
+    if not raw.endswith(b"\0"):return None,"unterminated nonempty Git diff"
+    try:files=[value.decode("utf-8",errors="strict") for value in raw[:-1].split(b"\0")]
+    except UnicodeDecodeError:return None,"Git changed path is not strict UTF-8"
+    if any(not value for value in files) or len(files)!=len(set(files)):
+        return None,"empty or duplicate exact Git changed path"
+    return files,"exact NUL-delimited strict UTF-8 Git changed paths"
+
+
+def r33_product_diff_scope(repo: Path,base: str,candidate_sha: str) -> tuple[bool,str]:
+    if (re.fullmatch(r"[0-9a-f]{40}",base) is None
+            or re.fullmatch(r"[0-9a-f]{40}",candidate_sha) is None):
+        return False,"base/candidate must be exact lowercase commit identities"
+    for identity in (base,candidate_sha):
+        resolved=git(repo,"rev-parse","--verify","--quiet",f"{identity}^{{commit}}")
+        if resolved.returncode or resolved.stdout.strip()!=identity:
+            return False,f"unknown exact commit {identity}"
+    parents=git(repo,"rev-list","--parents","-n","1",candidate_sha)
+    if parents.returncode or parents.stdout.split()!=[candidate_sha,base]:
+        return False,"candidate must have exactly the reviewed R33 base as single parent"
+    files,why=r33_exact_git_names(repo,base,candidate_sha)
+    expected=sorted(H035_R33_REQUEST_BOUND_REGISTRY["builder_actual_changed_files"])
+    if files!=expected:return False,f"R33 product changed set is not exact two-file scope: {files!r} | {why}"
+    tree=git(repo,"--literal-pathspecs","ls-tree",candidate_sha,"--",*expected)
+    observed={}
+    for line in tree.stdout.splitlines():
+        fields=line.split(None,3)
+        if len(fields)==4:observed[fields[3]]=(fields[0],fields[1])
+    wanted={"controller/authority/core.py":("100644","blob"),
+            "controller/authority/cli":("100755","blob")}
+    if tree.returncode or observed!=wanted:return False,"R33 exact product modes/types"
+    return True,"exact direct-child core-and-CLI product diff"
+
+
+def r33_product_identity(base: str,candidate_sha: str) -> tuple[bool,str]:
+    ok,why=r33_product_diff_scope(ROOT,base,candidate_sha)
+    if not ok:return ok,why
+    head=git(ROOT,"rev-parse","HEAD")
+    if head.returncode or head.stdout.strip()!=candidate_sha:
+        return False,"checked-out HEAD is not the exact R33 product candidate"
+    status=git(ROOT,"status","--porcelain=v1","--untracked-files=all")
+    if status.returncode or status.stdout:
+        return False,"R33 product acceptance requires clean immutable checkout"
+    for relative,local in (("specs/tasks.spec.json",SPEC),
+                           ("verify/bin/h-035-exit",Path(__file__))):
+        raw=git_object_bytes(ROOT,candidate_sha,relative)
+        base_raw=git_object_bytes(ROOT,base,relative)
+        if raw is None or base_raw is None or raw!=base_raw or raw!=local.read_bytes():
+            return False,f"R33 candidate frozen contract bytes mismatch: {relative}"
+    return True,"clean exact R33 candidate, frozen contract, core-and-CLI diff bound"
+
+
+def r33_test_author_identity() -> tuple[bool,str]:
+    base=str(H035_R33_REQUEST_BOUND_REGISTRY["preproduct_evidence"]["base_sha"])
+    expected=sorted(H035_R33_REQUEST_BOUND_REGISTRY["test_author_allowed_write"])
+    head=git(ROOT,"rev-parse","--verify","HEAD^{commit}")
+    if head.returncode or re.fullmatch(r"[0-9a-f]{40}",head.stdout.strip()) is None:
+        return False,"R33 exact candidate HEAD"
+    candidate_sha=head.stdout.strip()
+    parents=git(ROOT,"rev-list","--parents","-n","1",candidate_sha)
+    if parents.returncode or parents.stdout.split()!=[candidate_sha,base]:
+        return False,"R33 candidate must be direct child of published ff375 authority"
+    files,why=r33_exact_git_names(ROOT,base,candidate_sha)
+    if files!=expected:return False,"R33 candidate does not change exact six TEST_AUTHOR files: "+why
+    states=git(ROOT,"diff","--name-status","--no-renames","--no-ext-diff",
+               "--no-textconv",base,candidate_sha)
+    if states.returncode or states.stdout.splitlines()!=[f"M\t{path}" for path in expected]:
+        return False,"R33 candidate contains add/delete/rename/type substitution"
+    tree=git(ROOT,"--literal-pathspecs","ls-tree",candidate_sha,"--",*expected)
+    observed={}
+    for line in tree.stdout.splitlines():
+        fields=line.split(None,3)
+        if len(fields)==4:observed[fields[3]]=(fields[0],fields[1])
+    wanted={path:("100755" if path=="verify/bin/h-035-exit" else "100644","blob")
+            for path in expected}
+    if tree.returncode or observed!=wanted:return False,"R33 exact six path modes/types"
+    status=git(ROOT,"status","--porcelain=v1","--untracked-files=all")
+    if status.returncode or status.stdout:return False,"R33 contract checkout not clean"
+    for path in ("specs/owner-production-paths.v1.json","controller/authority/core.py",
+                 "controller/authority/cli"):
+        if git_object_bytes(ROOT,base,path)!=git_object_bytes(ROOT,candidate_sha,path):
+            return False,"R33 contract mutated frozen registry/product path: "+path
+    return True,"clean exact direct-child six-file R33 TEST_AUTHOR candidate"
+
+
 def r29_test_author_identity() -> tuple[bool,str]:
     base=str(H035_R29_THREE_STATE_REGISTRY["preproduct_evidence"]["base_sha"])
     expected=tuple(sorted(H035_R29_THREE_STATE_REGISTRY[
@@ -5277,6 +5749,288 @@ def r14_product_scope_selftests(tmp: Path) -> None:
     stacked_ok = r14_product_diff_scope(repo, base, stacked)[0]
     check(good_ok and not outside_ok and not safe_ok and not stacked_ok,
           "J_R14_PRODUCT_EXACT_BASE_CANDIDATE_CORE_ONLY_DIFF_AND_OUT_OF_SCOPE_MUTANT")
+
+
+def r33_product_scope_selftests(tmp: Path) -> None:
+    repo=tmp/"r33-product-scope";init_repo(repo)
+    core=repo/"controller/authority/core.py";cli=repo/"controller/authority/cli"
+    core.parent.mkdir(parents=True);core.write_text("base core\n")
+    cli.write_text("#!/bin/sh\nexit 1\n");cli.chmod(0o755)
+    base=commit_paths(repo,"R33 product base","controller/authority/core.py",
+                      "controller/authority/cli")
+    core.write_text("product core\n");cli.write_text("#!/bin/sh\nexit 0\n");cli.chmod(0o755)
+    good=commit_paths(repo,"R33 exact two-file product","controller/authority/core.py",
+                      "controller/authority/cli")
+    good_ok=r33_product_diff_scope(repo,base,good)[0]
+    core_only=candidate(repo,base,"controller/authority/core.py",3001)
+    cli_only=candidate(repo,base,"controller/authority/cli",3002)
+    checkout=git(repo,"checkout","-q",base)
+    if checkout.returncode:raise Rig(checkout.stderr)
+    core.write_text("third core\n");cli.write_text("#!/bin/sh\nexit 0\n");cli.chmod(0o755)
+    third=repo/"safe/third";third.parent.mkdir();third.write_text("third\n")
+    third_sha=commit_paths(repo,"R33 forbidden third path","controller/authority/core.py",
+                           "controller/authority/cli","safe/third")
+    stacked=candidate(repo,good,"controller/authority/core.py",3003)
+    check(good_ok and not r33_product_diff_scope(repo,base,core_only)[0]
+          and not r33_product_diff_scope(repo,base,cli_only)[0]
+          and not r33_product_diff_scope(repo,base,third_sha)[0]
+          and not r33_product_diff_scope(repo,base,stacked)[0],
+          "J_R33_PRODUCT_EXACT_TWO_FILE_CORE_CLI_AND_SINGLE_PARENT_SCOPE")
+
+
+def r33_reference_sources(base_raw: dict[str,bytes]) -> dict[str,bytes] | None:
+    paths=("controller/authority/core.py","controller/authority/cli")
+    if any(path not in base_raw for path in paths):
+        return None
+    def exact_replacements(raw: bytes,
+                           replacements: list[tuple[bytes,bytes]]) -> bytes | None:
+        for old,new in replacements:
+            if raw.count(old)!=1:
+                return None
+            raw=raw.replace(old,new,1)
+        return raw
+    core=exact_replacements(base_raw[paths[0]],[
+        (b'    "config/python-runtime-authority-v2.json",\n'
+         b'}\n\n\nclass AuthorityError',
+         b'    "config/python-runtime-authority-v2.json",\n'
+         b'}\n'
+         b'RUNTIME_CLEANUP_OWNER_PATHS = {\n'
+         b'    "controller/runtime-cleanup/install",\n'
+         b'    "controller/runtime-cleanup/native/mediator.c",\n'
+         b'    "verify/h039/runtime-cleanup-mediator",\n'
+         b'    "verify/h039/build-recipe.json",\n'
+         b'    "verify/h039/identity-manifest.json",\n'
+         b'}\n'
+         b'OWNER_PATHS_BY_VERSION = {\n'
+         b'    1: REQUIRED_OWNER_PATHS,\n'
+         b'    2: PROSPECTIVE_OWNER_PATHS,\n'
+         b'    3: PROSPECTIVE_OWNER_PATHS | RUNTIME_CLEANUP_OWNER_PATHS,\n'
+         b'}\n\n\nclass AuthorityError'),
+        (b'    if type(version) is not int or version not in (1, 2):\n',
+         b'    if type(version) is not int or version not in OWNER_PATHS_BY_VERSION:\n'),
+        (b'    required_owner_paths = (REQUIRED_OWNER_PATHS if version == 1\n'
+         b'                            else PROSPECTIVE_OWNER_PATHS)\n',
+         b'    required_owner_paths = OWNER_PATHS_BY_VERSION[version]\n'),
+        (b'def changed_files(repo: Path, base: str, candidate: str) -> list[str]:\n'
+         b'    exact_commit(repo, base)\n'
+         b'    exact_commit(repo, candidate)\n'
+         b'    result = git(repo, "diff", "--name-only", "--no-renames", base, candidate)\n'
+         b'    if result.returncode:\n'
+         b'        raise AuthorityError(f"cannot derive Git changed files: {result.stderr.strip()}")\n'
+         b'    files = [canonical_path(line) for line in result.stdout.splitlines() if line]\n'
+         b'    if len(files) != len(set(files)):\n'
+         b'        raise AuthorityError("duplicate changed path")\n'
+         b'    return files\n',
+         b'def changed_files(repo: Path, base: str, candidate: str) -> list[str]:\n'
+         b'    exact_commit(repo, base)\n'
+         b'    exact_commit(repo, candidate)\n'
+         b'    result = subprocess.run(\n'
+         b'        ["git", "-C", str(repo), "diff", "--name-only", "--no-renames", "-z",\n'
+         b'         base, candidate],\n'
+         b'        capture_output=True, shell=False, check=False,\n'
+         b'    )\n'
+         b'    if result.returncode:\n'
+         b'        detail = result.stderr.decode("utf-8", errors="replace").strip()\n'
+         b'        raise AuthorityError(f"cannot derive Git changed files: {detail}")\n'
+         b'    if result.stdout and not result.stdout.endswith(b"\\x00"):\n'
+         b'        raise AuthorityError("malformed NUL-delimited Git changed files")\n'
+         b'    raw_paths = result.stdout[:-1].split(b"\\x00") if result.stdout else []\n'
+         b'    if any(not raw_path for raw_path in raw_paths):\n'
+         b'        raise AuthorityError("malformed NUL-delimited Git changed files")\n'
+         b'    try:\n'
+         b'        files = [canonical_path(raw_path.decode("utf-8", errors="strict"))\n'
+         b'                 for raw_path in raw_paths]\n'
+         b'    except UnicodeDecodeError as exc:\n'
+         b'        raise AuthorityError("Git changed path is not UTF-8") from exc\n'
+         b'    if len(files) != len(set(files)):\n'
+         b'        raise AuthorityError("duplicate changed path")\n'
+         b'    return files\n'),
+        (b'\n\ndef task_authority(spec: object, task_id: str)',
+         b'\n\ndef validate_owner_surface(surface: Iterable[object], registry: dict[str, object]) -> None:\n'
+         b'    if any(overlaps(item, guard) for item in surface for guard in registry["owner_author_global_denied_paths"]):\n'
+         b'        raise AuthorityError("owner surface overlaps global deny")\n'
+         b'    if any(not permitted(item, registry["owner_production_paths"]) for item in surface):\n'
+         b'        raise AuthorityError("owner surface outside owner production")\n'
+         b'\n\ndef task_authority(spec: object, task_id: str)'),
+    ])
+    cli=exact_replacements(base_raw[paths[1]],[
+        (b'                  task_authority, validate_registry)\n',
+         b'                  task_authority, validate_registry, validate_owner_surface)\n'),
+        (b'    if authority == "owner_authority":\n'
+         b'        if any(overlaps(item, guard) for item in surface\n'
+         b'               for guard in registry["owner_author_global_denied_paths"]):\n'
+         b'            raise AuthorityError("owner surface overlaps global deny")\n'
+         b'        if any(not permitted(item, registry["owner_production_paths"]) for item in surface):\n'
+         b'            raise AuthorityError("owner surface outside owner production")\n',
+         b'    if authority == "owner_authority":\n'
+         b'        validate_owner_surface(surface, registry)\n'),
+        (b'        if any(overlaps(item, guard) for item in files\n'
+         b'               for guard in registry["owner_author_global_denied_paths"]):\n'
+         b'            raise AuthorityError("owner candidate changed global deny")\n'
+         b'        if any(overlaps(item, gate_path) for item in files):\n',
+         b'        if any(overlaps(item, guard) for item in files\n'
+         b'               for guard in registry["owner_author_global_denied_paths"]):\n'
+         b'            raise AuthorityError("owner candidate changed global deny")\n'
+         b'        validate_owner_surface(surface, registry)\n'
+         b'        if any(overlaps(item, gate_path) for item in files):\n'),
+        (b'    repo, candidate, spec_raw, spec, registry_raw, _registry = authority_documents(req)\n',
+         b'    repo, candidate, spec_raw, spec, registry_raw, registry = authority_documents(req)\n'),
+        (b'    task, authority, _surface = task_authority(spec, task_id)\n',
+         b'    task, authority, surface = task_authority(spec, task_id)\n'),
+        (b'    if authority != "owner_authority":\n'
+         b'        raise AuthorityError("owner transition requires canonical owner task")\n'
+         b'    base = exact_commit(repo, req.get("base_sha"))\n',
+         b'    if authority != "owner_authority":\n'
+         b'        raise AuthorityError("owner transition requires canonical owner task")\n'
+         b'    validate_owner_surface(surface, registry)\n'
+         b'    base = exact_commit(repo, req.get("base_sha"))\n'),
+    ])
+    if core is None or cli is None:
+        return None
+    return {paths[0]:core,paths[1]:cli}
+
+
+def r33_source_structure(base_raw: dict[str,bytes],candidate_raw: dict[str,bytes]
+                         ) -> tuple[bool,str,dict[str,ast.Module] | None]:
+    paths=("controller/authority/core.py","controller/authority/cli")
+    expected_raw=r33_reference_sources(base_raw)
+    if expected_raw is None:
+        return False,"R33 exact reference cannot derive from frozen base",None
+    preambles=H035_R33_REQUEST_BOUND_REGISTRY["product_acceptance"][
+        "interpreter_sensitive_preamble"]
+    for path in paths:
+        row=preambles.get(path) if isinstance(preambles,dict) else None
+        if (not isinstance(row,list) or len(row)!=2
+                or not all(isinstance(value,str) for value in row)):
+            return False,"R33 interpreter-sensitive preamble contract",None
+        prefix="".join(row).encode("utf-8")
+        for label,raw in (("base",base_raw.get(path)),
+                          ("reference",expected_raw.get(path)),
+                          ("candidate",candidate_raw.get(path))):
+            if not isinstance(raw,bytes):
+                return False,f"R33 {label} preamble source missing: {path}",None
+            lines=raw.splitlines(keepends=True)
+            if (raw.startswith(b"\xef\xbb\xbf") or len(lines)<2
+                    or b"".join(lines[:2])!=prefix
+                    or any(not line.endswith(b"\n") or line.endswith(b"\r\n")
+                           for line in lines[:2])):
+                return False,f"R33 {label} first two physical lines differ: {path}",None
+    try:
+        base={path:ast.parse(base_raw[path].decode("utf-8",errors="strict"),
+                             filename="base "+path) for path in paths}
+        candidate={path:ast.parse(candidate_raw[path].decode("utf-8",errors="strict"),
+                                  filename="candidate "+path) for path in paths}
+        expected={path:ast.parse(expected_raw[path].decode("utf-8",errors="strict"),
+                                 filename="expected "+path) for path in paths}
+    except (KeyError,UnicodeDecodeError,SyntaxError,ValueError) as exc:
+        return False,"R33 product strict Python AST: "+str(exc),None
+    for path in paths:
+        observed=ast.dump(candidate[path],annotate_fields=True,include_attributes=False)
+        wanted=ast.dump(expected[path],annotate_fields=True,include_attributes=False)
+        if observed!=wanted:
+            return False,"R33 product differs from closed positive reference AST: "+path,None
+    core_path,cli_path=paths
+    marker=b"\n_r15_loader_root=ROOT\n"
+    if (base_raw[cli_path].count(marker)!=1 or candidate_raw[cli_path].count(marker)!=1
+            or base_raw[cli_path].split(marker,1)[1]
+               !=candidate_raw[cli_path].split(marker,1)[1]):
+        return False,"R33 retained R15 CLI suffix is not byte-exact to ff375",None
+    return True,"closed positive reference AST and retained R15 route",candidate
+
+
+def r33_product_source_oracle(repo: Path,base: str,candidate_sha: str) -> tuple[bool,str]:
+    paths=("controller/authority/core.py","controller/authority/cli")
+    base_raw={path:git_object_bytes(repo,base,path) for path in paths}
+    candidate_raw={path:git_object_bytes(repo,candidate_sha,path) for path in paths}
+    if any(value is None for value in (*base_raw.values(),*candidate_raw.values())):
+        return False,"R33 product source Git object missing"
+    ok,why,_trees=r33_source_structure(base_raw,candidate_raw)  # type: ignore[arg-type]
+    return ok,why
+
+
+def r33_source_oracle_selftests() -> None:
+    paths=("controller/authority/core.py","controller/authority/cli")
+    raw={path:git_object_bytes(ROOT,
+        str(H035_R33_REQUEST_BOUND_REGISTRY["preproduct_evidence"]["base_sha"]),path)
+        for path in paths}
+    if any(value is None for value in raw.values()):
+        check(False,"J_R33_CLOSED_POSITIVE_REFERENCE_AST_AND_AMBIENT_MUTANTS_REJECT")
+        return
+    base={path:value for path,value in raw.items() if value is not None}
+    reference=r33_reference_sources(base)
+    if reference is None:
+        check(False,"J_R33_CLOSED_POSITIVE_REFERENCE_AST_AND_AMBIENT_MUTANTS_REJECT")
+        return
+    positive=r33_source_structure(base,reference)[0]
+    core=reference[paths[0]];cli=reference[paths[1]]
+    def mutate(path: str,old: bytes,new: bytes) -> dict[str,bytes]:
+        candidate=dict(reference)
+        if candidate[path].count(old)!=1:
+            return {}
+        candidate[path]=candidate[path].replace(old,new,1)
+        return candidate
+    transition=b"def transition_context(req: dict[str, object]) -> tuple[Path, str, dict[str, object]]:\n"
+    transition_call=(b'    if authority != "owner_authority":\n'
+        b'        raise AuthorityError("owner transition requires canonical owner task")\n'
+        b'    validate_owner_surface(surface, registry)\n')
+    mutants=[
+        mutate(paths[1],transition,
+            b"def transition_context(req: dict[str, object], cache=([],)) -> tuple[Path, str, dict[str, object]]:\n"),
+        mutate(paths[1],transition,transition+
+            b"    import builtins\n    builtins.setattr(sys.modules[__name__], chr(65), registry)\n"),
+        mutate(paths[1],transition,transition+
+            b"    import operator\n    operator.setitem(([None],)[0], 0, registry)\n"),
+        mutate(paths[1],transition,
+            b"def transition_context(req: dict[str, object], cache=([None],)) -> tuple[Path, str, dict[str, object]]:\n"
+            b"    list.__iadd__(cache[0], [(req, 1)])\n"),
+        mutate(paths[1],transition,transition+
+            b"    getattr(sys.modules[__name__], '__dict__')['registry'] = req\n"),
+        mutate(paths[1],transition,transition+
+            b"    Path('/tmp/r33-ambient').write_text(json.dumps(req))\n"),
+        mutate(paths[1],transition,transition+
+            b"    def nested():\n        return req\n"),
+        mutate(paths[1],transition,transition+
+            b"    class Holder:\n        pass\n"),
+        mutate(paths[1],transition,transition+
+            b"    holder = lambda: req\n"),
+        mutate(paths[1],transition,transition+
+            b"    if (holder := req):\n        pass\n"),
+        mutate(paths[1],
+            b"    repo, candidate, spec_raw, spec, registry_raw, registry = authority_documents(req)\n",
+            b"    repo, candidate, spec_raw, spec, registry_raw, registry = authority_documents(req)\n"
+            b"    registry = dict(registry)\n"),
+        mutate(paths[1],transition_call,
+            transition_call.replace(b"surface, registry",b"surface, dict(registry)")),
+        mutate(paths[1],transition_call,
+            transition_call.replace(b"    validate_owner_surface(surface, registry)\n",b"")),
+        mutate(paths[0],
+            b"def changed_files(repo: Path, base: str, candidate: str) -> list[str]:\n",
+            b"def changed_files(repo: Path, base: str, candidate: str, cache=({},)) -> list[str]:\n"),
+        mutate(paths[0],
+            b"def validate_registry(document: object) -> dict[str, object]:\n",
+            b"@staticmethod\ndef validate_registry(document: object) -> dict[str, object]:\n"),
+        mutate(paths[1],b"_R15_ATTEST_SHA256=",b"_R15_ATTEST_SHA257="),
+        mutate(paths[1],b"def digest(raw: bytes)",b"def digest(raw: bytearray)"),
+        mutate(paths[0],b"def parse_path(raw: object)",b"def parse_path(raw: str)"),
+    ]
+    cli_line_1=b"#!/usr/bin/env python3.12\n"
+    cli_line_2=b'"""Operational H-035 authority and owner-transition interface."""\n'
+    preamble_mutants=[
+        mutate(paths[1],cli_line_1,b"#!/usr/bin/env -S python3.12 -c\n"),
+        mutate(paths[1],cli_line_1,b"#!/usr/bin/python3.12\n"),
+        mutate(paths[1],cli_line_1,b"#!/usr/bin/env python3.12 -I\n"),
+        mutate(paths[1],cli_line_1+cli_line_2,
+            cli_line_1+b"# -*- coding: utf-8 -*-\n"+cli_line_2),
+        {**reference,paths[0]:b"# coding: utf-8\n"+reference[paths[0]]},
+        {**reference,paths[0]:b"# preamble\n# coding: utf-8\n"+reference[paths[0]]},
+        {**reference,paths[1]:b"\xef\xbb\xbf"+reference[paths[1]]},
+        {**reference,paths[0]:b"\xef\xbb\xbf"+reference[paths[0]]},
+    ]
+    results=[bool(value) and not r33_source_structure(base,value)[0]
+             for value in (*mutants,*preamble_mutants)]
+    check(positive and len(mutants)==18 and len(preamble_mutants)==8
+          and len(results)==26 and all(results),
+          "J_R33_CLOSED_REFERENCE_AST_PREAMBLES_AND_AMBIENT_MUTANTS_REJECT")
 
 
 def r15_repository_shape(repo: Path) -> tuple[bool, str]:
@@ -6648,6 +7402,17 @@ def r15_gate_normalized_altered_definition(base: ast.AST,
         if r29_targets!=["r29_contract"]:
             return None,"frozen checks R29 contract binding"
         del normalized.body[start:start+3]
+        r33_island=normalized.body[start:start+3]
+        if (len(r33_island)!=3 or not isinstance(r33_island[0],ast.Assign)
+                or [r15_gate_call_name(value) for value in r33_island[1:]]!=[
+                    "check","r33_contract_selftests"]):
+            return None,"frozen checks exact R33 island"
+        r33_targets=[value.id for target in r33_island[0].targets
+                     for value in ast.walk(target)
+                     if isinstance(value,ast.Name) and isinstance(value.ctx,ast.Store)]
+        if r33_targets!=["r33_contract"]:
+            return None,"frozen checks R33 contract binding"
+        del normalized.body[start:start+3]
         island=normalized.body[start:start+6]
         if (len(island)!=6 or not isinstance(island[0],ast.Assign)
                 or [r15_gate_call_name(value) for value in island[1:]] != [
@@ -6700,6 +7465,13 @@ def r15_gate_normalized_altered_definition(base: ast.AST,
                              for value in ast.walk(statement.test))]
         if len(r29_indices)!=1:return None,"main R29 dispatch cardinality"
         del body[r29_indices[0]]
+        r33_indices=[index for index,statement in enumerate(body)
+                     if isinstance(statement,ast.If)
+                     and any(isinstance(value,ast.Constant)
+                             and value.value=="--r33-registry-migration"
+                             for value in ast.walk(statement.test))]
+        if len(r33_indices)!=1:return None,"main R33 dispatch cardinality"
+        del body[r33_indices[0]]
         base_usage=[statement for statement in base_body if isinstance(statement,ast.If)
                     and ast.unparse(statement.test)=="len(sys.argv) != 1"]
         usage_indices=[index for index,statement in enumerate(body)
@@ -6865,9 +7637,9 @@ def r15_gate_inheritance_bytes(base_raw: bytes, candidate_raw: bytes,
     if not isinstance(policy,dict) or not exact_value(policy,r15_gate_expected_policy()):
         return False,"exact complete gate inheritance policy"
     normalization_policy={
-        "manifest_independent_admitted_definition_count":143,
+        "manifest_independent_admitted_definition_count":154,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":78,
+        "manifest_independent_admitted_nondefinition_count":82,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -6902,7 +7674,7 @@ def r15_gate_inheritance_bytes(base_raw: bytes, candidate_raw: bytes,
         and isinstance(node.targets[0],ast.Name)
         and node.targets[0].id=="H035_R15_CONTRACT_SHA256"]
     pin_bindings,pin_deletions=r15_gate_module_binding_events(candidate)
-    if (len(contract_pins)!=1 or contract_pins[0][0]!=79
+    if (len(contract_pins)!=1 or contract_pins[0][0]!=83
             or pin_bindings.count("H035_R15_CONTRACT_SHA256")!=1
             or "H035_R15_CONTRACT_SHA256" in pin_deletions
             or not isinstance(contract_pins[0][1].value,ast.Constant)
@@ -14796,7 +15568,7 @@ def r14_registry_migration_controls(tmp: Path) -> None:
     check(not failures, "A_R14_EXACT_TWO_STATE_REGISTRY_OPERATIONAL", detail)
 
 
-def r29_registry_migration_controls(tmp: Path) -> None:
+def r29_registry_migration_controls(tmp: Path,*,r33: bool=False) -> None:
     """Incremental v3 matrix; R14 remains the complete v1/v2 floor."""
     canonical=strict_load(REG)
     if (not isinstance(canonical,dict)
@@ -15114,7 +15886,7 @@ def r29_registry_migration_controls(tmp: Path) -> None:
         return all(checks),detail
 
     def v3_non_owner_list_positives(
-            template: dict[str,object]) -> tuple[bool,dict[str,dict[str,str]]]:
+            template: dict[str,object]) -> tuple[bool,dict[str,object]]:
         cases: list[tuple[str,str,list[str],bool]]=[
             ("PROSPECTIVE_DISTINGUISHING","prospective_ordinary_protected_paths",
              ["r29-causal/protected/exact-a.txt",
@@ -15142,7 +15914,7 @@ def r29_registry_migration_controls(tmp: Path) -> None:
             ("GLOBAL_DENIED_BACKSLASH","owner_author_global_denied_paths",
              ["controller\\h034-native\\r29-backslash-deny\\**"],True),
         ]
-        results=[];details={}
+        results=[];details={};component_ok={}
         for label,field,values,distinguishing in cases:
             registry=json.loads(json.dumps(template));registry[field]=values
             prospective=field=="prospective_ordinary_protected_paths"
@@ -15157,8 +15929,578 @@ def r29_registry_migration_controls(tmp: Path) -> None:
                 require_protected_entry_independence=(distinguishing and prospective),
                 require_global_denied_entry_independence=(distinguishing and not prospective),
                 global_denied_entries_owner_permitted=(distinguishing and not prospective))
-            results.append(ok);details[label]=detail
+            results.append(ok);details[label]=detail;component_ok[label]=ok
+        details["_component_ok"]=component_ok
         return all(results),details
+
+    def r33_fresh_remote(label: str,repo: Path,base: str,serial: int) -> Path:
+        bare=tmp/f"r33-{label.lower()}-{serial}-origin.git"
+        p=run(["git","init","--bare","-q",str(bare)],cwd=tmp)
+        if p.returncode:raise Rig(p.stderr)
+        set_remote_main(bare,repo,base)
+        return bare
+
+    def r33_exact_json_directory(root: Path,
+                                 expected: dict[str,dict[str,object]]) -> bool:
+        try:
+            if (not root.is_dir()
+                    or sorted(item.name for item in root.iterdir())!=sorted(expected)):
+                return False
+            for name,value in expected.items():
+                path=root/name;info=os.lstat(path)
+                if (not stat.S_ISREG(info.st_mode) or info.st_nlink!=1
+                        or stat.S_IMODE(info.st_mode)!=0o600
+                        or path.read_bytes()!=(json.dumps(
+                            value,sort_keys=True,indent=2)+"\n").encode("utf-8")):
+                    return False
+            return True
+        except (OSError,UnicodeError,ValueError,TypeError):
+            return False
+
+    def r33_positive_effects(command: str,request: dict[str,object],
+                             state: Path,workspace: Path,
+                             before: tuple[dict[str,str],dict[str,str],str],
+                             after: tuple[dict[str,str],dict[str,str],str]) -> bool:
+        if before[2]!=after[2]:return False
+        if command in {"validate-task","check-candidate"}:return before==after
+        context={"task":request["task_id"],"base_sha":request["base_sha"],
+            "main_sha":request["main_sha"],"spec_sha256":request["spec_sha256"],
+            "registry_sha256":request["registry_sha256"],
+            "gate_path":request["gate_path"],"gate_sha256":request["gate_sha256"],
+            "authority_class":"owner_authority"}
+        candidate_sha=request["candidate_sha"]
+        if command=="owner-author":
+            value={**context,"state":"OWNER_CANDIDATE_REVIEW_REQUIRED",
+                   "candidate_sha":candidate_sha,"authority_class":"owner_authority"}
+            value["transition_identity"]=hashlib.sha256(json.dumps(
+                value,sort_keys=True,separators=(",",":")).encode("utf-8")).hexdigest()
+            return (r33_exact_json_directory(state,{"current.json":value})
+                    and r33_exact_json_directory(workspace,{"owner-attempt.json":value}))
+        if command=="record-review":
+            value={"task":request["task_id"],
+                "state":"OWNER_CANDIDATE_REVIEW_REQUIRED",
+                "base_sha":request["base_sha"],"candidate_sha":candidate_sha}
+            value={**value,**context,"state":"OWNER_FINAL_FREEZE_REQUIRED",
+                   "candidate_sha":candidate_sha,
+                   "review_identity":request["review_identity"],"review_result":"PASS"}
+            return (r33_exact_json_directory(state,{"current.json":value})
+                    and not workspace.exists())
+        if command=="owner-freeze":
+            value={"task":request["task_id"],"state":"OWNER_FROZEN",
+                "base_sha":request["base_sha"],"main_sha":request["main_sha"],
+                "candidate_sha":candidate_sha,"spec_sha256":request["spec_sha256"],
+                "registry_sha256":request["registry_sha256"],
+                "gate_path":request["gate_path"],"gate_sha256":request["gate_sha256"],
+                "review_identity":"r9-review","review_result":"PASS"}
+            return (r33_exact_json_directory(state,{"current.json":value})
+                    and not workspace.exists())
+        return False
+
+    def r33_owner_surface_cell(version: int,label: str,surface: list[str],
+                               accept: bool) -> tuple[bool,dict[str,str]]:
+        registry=json.loads(json.dumps(canonical))
+        registry["schema_version"]=version
+        registry["owner_production_paths"]=(list(H034_OWNER_PATHS) if version==1
+            else [*H034_OWNER_PATHS,*H036_OWNER_PATHS] if version==2
+            else [*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS])
+        repo,base,_safe,initial_bare=clone_case(
+            f"R33_V{version}_{label}",registry,surface,protected_paths=[])
+        if version==3 and label=="BROAD_CONTROLLER":
+            material_paths=[H039_OWNER_PATHS[0]]
+        elif version==3 and label=="BROAD_VERIFY":
+            material_paths=[H039_OWNER_PATHS[2]]
+        else:
+            material_paths=[concrete_path(path,3000+index)
+                            for index,path in enumerate(surface)]
+        material=candidate_paths(repo,base,material_paths,3000+version)
+        checks=[];details={}
+        commands=(
+            ("validate-task",base,{"task_id":"r29-owner"},False),
+            ("check-candidate-empty",base,{"task_id":"r29-owner",
+                                            "actor":"owner_authority"},False),
+            ("check-candidate-material",material,{"task_id":"r29-owner",
+                                                   "actor":"owner_authority"},False),
+            ("owner-author",base,{"task_id":"r29-owner"},True),
+            ("record-review",material,{"task_id":"r29-owner",
+                "review_result":"PASS","review_identity":"r33-review"},True),
+            ("owner-freeze",material,{"task_id":"r29-owner",
+                "review_result":"PASS","review_identity":"r9-review"},True),
+        )
+        for serial,(case,candidate_sha,fields,seed) in enumerate(commands):
+            command=case.split("-empty",1)[0].split("-material",1)[0]
+            bare=(initial_bare if serial==0 else
+                  r33_fresh_remote(f"v{version}-{label}-{case}",repo,base,serial))
+            state=tmp/f"r33-v{version}-{label.lower()}-{case}-{serial}-state"
+            workspace=tmp/f"r33-v{version}-{label.lower()}-{case}-{serial}-workspace"
+            request=transition_request(repo,base,"r29-owner",state,workspace,bare,
+                                       candidate_sha=candidate_sha)
+            request.update(fields)
+            request.update({
+                "registry_schema_version":99,
+                "registry_owner_production_paths":["controller/**"],
+                "reported_changed_files":[],
+            })
+            if seed:seed_owner_command_state(state,command,request)
+            before=(filesystem_snapshot(state),filesystem_snapshot(workspace),remote_refs(bare))
+            rc,out,detail=authority_call(tmp,command,request)
+            after=(filesystem_snapshot(state),filesystem_snapshot(workspace),remote_refs(bare))
+            if accept:
+                ok=(rc==0 and out.get("accepted") is True
+                    and r33_positive_effects(command,request,state,workspace,before,after))
+            else:
+                ok=(rc==1 and out.get("accepted") is False
+                    and out.get("reason")=="owner surface outside owner production"
+                    and before==after)
+            checks.append(ok);details[case]=repr({"rc":rc,"out":out,
+                "unchanged":before==after,"detail":detail})
+        return all(checks),details
+
+    def r33_cross_product() -> tuple[bool,dict[str,object]]:
+        surfaces=(
+            ("H034",list(H034_OWNER_PATHS)),
+            ("H036",list(H036_OWNER_PATHS)),
+            ("H039",list(H039_OWNER_PATHS)),
+            ("BROAD_CONTROLLER",["controller/runtime-cleanup/**"]),
+            ("BROAD_VERIFY",["verify/h039/**"]),
+        )
+        allowed={1:{"H034"},2:{"H034","H036"},3:{"H034","H036","H039"}}
+        results=[];details={};component_ok={}
+        for version in (1,2,3):
+            for label,surface in surfaces:
+                ok,detail=r33_owner_surface_cell(
+                    version,label,surface,label in allowed[version])
+                results.append(ok);details[f"V{version}_{label}"]=detail
+        return all(results),details
+
+    def r33_path_transport() -> tuple[bool,dict[str,str]]:
+        path='controller/h034-native/r33-line\nquote"back\\slash.txt'
+        repo,base,_safe,bare=clone_case("R33_PATH_TRANSPORT",canonical,[path],
+                                        protected_paths=[])
+        material=candidate(repo,base,path,3030)
+        state=tmp/"r33-path-positive-state";workspace=tmp/"r33-path-positive-workspace"
+        request=transition_request(repo,base,"r29-owner",state,workspace,bare,
+                                   candidate_sha=material)
+        request.update({"actor":"owner_authority","reported_changed_files":[]})
+        rc,out,why=authority_call(tmp,"check-candidate",request)
+        positive=rc==0 and out.get("accepted") is True \
+            and out.get("changed_files")==[path.replace("\\","/")]
+        raw_relative=b"controller/h034-native/r33-invalid-\xff.txt"
+        fixture_env=os.environ.copy();fixture_env["GIT_INDEX_FILE"]=str(
+            tmp/"r33-invalid-utf8.index")
+        read_tree=subprocess.run(["git","-C",str(repo),"read-tree",base],
+            env=fixture_env,capture_output=True,check=False)
+        blob=subprocess.run(["git","-C",str(repo),"hash-object","-w","--stdin"],
+            input=b"invalid UTF-8 fixture\n",capture_output=True,check=False)
+        oid=blob.stdout.strip()
+        update=subprocess.run([b"git",b"-C",os.fsencode(repo),b"update-index",
+            b"-z",b"--index-info"],env=fixture_env,
+            input=b"100644 "+oid+b"\t"+raw_relative+b"\0",
+            capture_output=True,check=False)
+        tree=subprocess.run(["git","-C",str(repo),"write-tree"],env=fixture_env,
+            text=True,capture_output=True,check=False)
+        commit=subprocess.run(["git","-C",str(repo),"commit-tree",tree.stdout.strip(),
+            "-p",base],env=fixture_env,input="R33 invalid UTF-8 fixture\n",
+            text=True,capture_output=True,check=False)
+        if (read_tree.returncode or blob.returncode or update.returncode
+                or tree.returncode or commit.returncode
+                or re.fullmatch(r"[0-9a-f]{40}",commit.stdout.strip()) is None):
+            raise Rig("R33 invalid UTF-8 Git-plumbing fixture")
+        invalid=commit.stdout.strip()
+        invalid_bare=r33_fresh_remote("invalid-utf8",repo,base,0)
+        invalid_request=transition_request(repo,base,"r29-owner",
+            tmp/"r33-invalid-utf8-state",tmp/"r33-invalid-utf8-workspace",invalid_bare,
+            candidate_sha=invalid)
+        invalid_request.update({"actor":"owner_authority","reported_changed_files":[]})
+        before=(filesystem_snapshot(Path(str(invalid_request["state_dir"]))),
+                filesystem_snapshot(Path(str(invalid_request["workspace_root"]))),
+                remote_refs(invalid_bare))
+        rc2,out2,why2=authority_call(tmp,"check-candidate",invalid_request)
+        after=(filesystem_snapshot(Path(str(invalid_request["state_dir"]))),
+               filesystem_snapshot(Path(str(invalid_request["workspace_root"]))),
+               remote_refs(invalid_bare))
+        invalid_ok=(rc2==1 and out2.get("accepted") is False and before==after
+                    and "UTF-8" in str(out2.get("reason")))
+        alias_paths=["controller/h034-native/r33-alias.txt",
+                     "controller\\h034-native\\r33-alias.txt"]
+        alias_candidate=candidate_paths(repo,base,alias_paths,3031)
+        alias_bare=r33_fresh_remote("canonical-alias-duplicate",repo,base,1)
+        alias_request=transition_request(repo,base,"r29-owner",
+            tmp/"r33-alias-state",tmp/"r33-alias-workspace",alias_bare,
+            candidate_sha=alias_candidate)
+        alias_request.update({"actor":"owner_authority","reported_changed_files":[]})
+        alias_before=(filesystem_snapshot(Path(str(alias_request["state_dir"]))),
+                      filesystem_snapshot(Path(str(alias_request["workspace_root"]))),
+                      remote_refs(alias_bare))
+        rc3,out3,why3=authority_call(tmp,"check-candidate",alias_request)
+        alias_after=(filesystem_snapshot(Path(str(alias_request["state_dir"]))),
+                     filesystem_snapshot(Path(str(alias_request["workspace_root"]))),
+                     remote_refs(alias_bare))
+        alias_ok=(rc3==1 and out3=={"accepted":False,
+                    "reason":"duplicate changed path"} and alias_before==alias_after)
+        fault_cases=[
+            {"label":"EMPTY","raw":"","ok":True,"value":[]},
+            {"label":"SPECIAL","raw":base64.b64encode(
+                (path+"\0").encode("utf-8")).decode("ascii"),"ok":True,
+             "value":[path.replace("\\","/")]},
+            {"label":"UNTERMINATED","raw":base64.b64encode(
+                b"controller/h034-native/r33-unterminated").decode("ascii"),
+             "ok":False,"reason":"malformed NUL-delimited Git changed files"},
+            {"label":"EMPTY_RECORD","raw":base64.b64encode(
+                b"controller/h034-native/r33-empty\0\0").decode("ascii"),
+             "ok":False,"reason":"malformed NUL-delimited Git changed files"},
+            {"label":"INVALID_UTF8","raw":base64.b64encode(
+                b"controller/h034-native/r33-invalid-\xff\0").decode("ascii"),
+             "ok":False,"reason":"Git changed path is not UTF-8"},
+            {"label":"CANONICAL_DUPLICATE","raw":base64.b64encode(
+                b"controller/h034-native/r33-dupe\0controller\\h034-native\\r33-dupe\0").decode("ascii"),
+             "ok":False,"reason":"duplicate changed path"},
+        ]
+        cases_path=tmp/"r33-path-fault-cases.json";write_json(cases_path,fault_cases)
+        harness=tmp/"r33-path-fault-harness.py"
+        harness.write_text(
+            "import base64,importlib.machinery,importlib.util,json,sys,types\n"
+            "loader=importlib.machinery.SourceFileLoader('r33_core_fault',sys.argv[1])\n"
+            "spec=importlib.util.spec_from_loader(loader.name,loader)\n"
+            "module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\n"
+            "module.exact_commit=lambda repo,value:value\n"
+            "cases=json.load(open(sys.argv[2],encoding='utf-8'));rows=[]\n"
+            "for case in cases:\n"
+            " raw=base64.b64decode(case['raw'])\n"
+            " module.subprocess.run=lambda *a,**k:types.SimpleNamespace(returncode=0,stdout=raw,stderr=b'')\n"
+            " try:rows.append({'label':case['label'],'ok':True,'value':module.changed_files(module.Path('.'),'0'*40,'1'*40)})\n"
+            " except Exception as exc:rows.append({'label':case['label'],'ok':False,'reason':str(exc)})\n"
+            "print(json.dumps(rows,sort_keys=True))\n",encoding="utf-8")
+        p=run([str(H035_R15_AST_PYTHON),"-I","-S","-B",str(harness),
+               str(ROOT/"controller/authority/core.py"),str(cases_path)],cwd=tmp,
+              env=ordinary_python_env())
+        try:fault_rows=json.loads(p.stdout)
+        except ValueError:fault_rows=[]
+        faults_ok=(p.returncode==0 and len(fault_rows)==len(fault_cases)
+                   and all(row=={key:value for key,value in case.items()
+                                 if key not in {"raw"}}
+                           for row,case in zip(fault_rows,fault_cases)))
+        return positive and invalid_ok and alias_ok and faults_ok,{
+            "positive":repr((rc,out,why)),
+            "invalid":repr((rc2,out2,why2,before==after)),
+            "actual_alias_duplicate":repr((rc3,out3,why3,alias_before==alias_after)),
+            "causal_fault_rows":repr({"rc":p.returncode,"rows":fault_rows,
+                                       "stderr":p.stderr[-500:]})}
+
+    def r33_candidate_object_decoys() -> tuple[bool,dict[str,str]]:
+        def registry(version: int) -> dict[str,object]:
+            value=json.loads(json.dumps(canonical));value["schema_version"]=version
+            value["owner_production_paths"]=(list(H034_OWNER_PATHS) if version==1
+                else [*H034_OWNER_PATHS,*H036_OWNER_PATHS] if version==2
+                else [*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS])
+            return value
+        commands=("validate-task","check-candidate","owner-author",
+                  "record-review","owner-freeze")
+        results=[];details={};component_ok={}
+        for serial,command in enumerate(commands):
+            initial_version=3 if command in {"owner-author","check-candidate"} else 1
+            repo,base,_safe,bare=clone_case(
+                "R33_DECOY_POSITIVE_"+command,registry(initial_version),
+                list(H039_OWNER_PATHS),protected_paths=[])
+            if command in {"owner-author","check-candidate"}:
+                candidate_sha=base
+            else:
+                checkout=git(repo,"checkout","-q",base)
+                if checkout.returncode:raise Rig(checkout.stderr)
+                write_json(repo/"specs/owner-production-paths.v1.json",registry(3))
+                changed=["specs/owner-production-paths.v1.json"]
+                if command in {"check-candidate","record-review","owner-freeze"}:
+                    for path in H039_OWNER_PATHS:
+                        target=repo/path;target.parent.mkdir(parents=True,exist_ok=True)
+                        target.write_text(f"r33 positive decoy {command}\n")
+                    changed.extend(H039_OWNER_PATHS)
+                candidate_sha=commit_paths(repo,"R33 positive v3 candidate",*changed)
+                checkout=git(repo,"checkout","-q",base)
+                if checkout.returncode:raise Rig(checkout.stderr)
+            write_json(repo/"specs/owner-production-paths.v1.json",registry(1))
+            state=tmp/f"r33-decoy-positive-{command}-state"
+            workspace=tmp/f"r33-decoy-positive-{command}-workspace"
+            request=transition_request(repo,base,"r29-owner",state,workspace,bare,
+                                       candidate_sha=candidate_sha)
+            request.update({"registry_schema_version":1,
+                "registry_owner_production_paths":list(H034_OWNER_PATHS),
+                "reported_changed_files":[]})
+            if command=="check-candidate":request["actor"]="owner_authority"
+            elif command=="record-review":request.update(
+                {"review_result":"PASS","review_identity":"r33-review"})
+            elif command=="owner-freeze":request.update(
+                {"review_result":"PASS","review_identity":"r9-review"})
+            if command in {"owner-author","record-review","owner-freeze"}:
+                seed_owner_command_state(state,command,request)
+            before=(filesystem_snapshot(state),filesystem_snapshot(workspace),remote_refs(bare))
+            rc,out,why=authority_call(tmp,command,request)
+            after=(filesystem_snapshot(state),filesystem_snapshot(workspace),remote_refs(bare))
+            ok=(rc==0 and out.get("accepted") is True
+                and r33_positive_effects(command,request,state,workspace,before,after))
+            key=f"POSITIVE_V3_OVER_V1_{command}"
+            results.append(ok);component_ok[key]=ok;details[key]=repr(
+                {"rc":rc,"out":out,"effects_exact":ok,
+                 "base_decoy":command!="owner-author","detail":why})
+        for version in (1,2):
+            for serial,command in enumerate(commands):
+                repo,base,_safe,bare=clone_case(
+                    f"R33_DECOY_INVERSE_V{version}_"+command,registry(3),
+                    list(H039_OWNER_PATHS),protected_paths=[])
+                checkout=git(repo,"checkout","-q",base)
+                if checkout.returncode:raise Rig(checkout.stderr)
+                write_json(repo/"specs/owner-production-paths.v1.json",registry(version))
+                changed=["specs/owner-production-paths.v1.json"]
+                if command in {"check-candidate","record-review","owner-freeze"}:
+                    for path in H039_OWNER_PATHS:
+                        target=repo/path;target.parent.mkdir(parents=True,exist_ok=True)
+                        target.write_text(f"r33 inverse v{version} {command}\n")
+                    changed.extend(H039_OWNER_PATHS)
+                candidate_sha=commit_paths(repo,f"R33 inverse v{version} candidate",*changed)
+                write_json(repo/"specs/owner-production-paths.v1.json",registry(3))
+                state=tmp/f"r33-decoy-inverse-v{version}-{command}-state"
+                workspace=tmp/f"r33-decoy-inverse-v{version}-{command}-workspace"
+                request=transition_request(repo,base,"r29-owner",state,workspace,bare,
+                                           candidate_sha=candidate_sha)
+                request.update({"registry_schema_version":3,
+                    "registry_owner_production_paths":[*H034_OWNER_PATHS,
+                        *H036_OWNER_PATHS,*H039_OWNER_PATHS],
+                    "reported_changed_files":[]})
+                if command=="check-candidate":request["actor"]="owner_authority"
+                elif command=="record-review":request.update(
+                    {"review_result":"PASS","review_identity":"r33-review"})
+                elif command=="owner-freeze":request.update(
+                    {"review_result":"PASS","review_identity":"r9-review"})
+                if command in {"owner-author","record-review","owner-freeze"}:
+                    seed_owner_command_state(state,command,request)
+                before=(filesystem_snapshot(state),filesystem_snapshot(workspace),remote_refs(bare))
+                rc,out,why=authority_call(tmp,command,request)
+                after=(filesystem_snapshot(state),filesystem_snapshot(workspace),remote_refs(bare))
+                expected_reason=("owner candidate changed global deny"
+                                 if command=="check-candidate"
+                                 else "owner surface outside owner production")
+                ok=(rc==1 and out=={"accepted":False,
+                        "reason":expected_reason}
+                    and before==after)
+                key=f"INVERSE_V{version}_OVER_V3_{command}"
+                results.append(ok);component_ok[key]=ok;details[key]=repr(
+                    {"rc":rc,"out":out,"unchanged":before==after,"detail":why})
+        details["_component_ok"]=component_ok
+        return all(results),details
+
+    def r33_closed_candidate_base_decoys() -> tuple[bool,dict[str,str]]:
+        def registry(version: int) -> dict[str,object]:
+            value=json.loads(json.dumps(canonical));value["schema_version"]=version
+            value["owner_production_paths"]=(list(H034_OWNER_PATHS) if version==1
+                else [*H034_OWNER_PATHS,*H036_OWNER_PATHS])
+            return value
+        caller_v3=[*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS]
+        commands=("validate-task","check-candidate","owner-author",
+                  "record-review","owner-freeze")
+        results=[];details={};component_ok={}
+        for version in (1,2):
+            for surface_label,surface,accept in (
+                    ("H039",list(H039_OWNER_PATHS),False),
+                    ("H034",list(H034_OWNER_PATHS),True)):
+                for serial,command in enumerate(commands):
+                    label=f"V{version}_{surface_label}_{command}"
+                    repo,base,_safe,bare=clone_case(
+                        "R33_CLOSED_BASE_"+label,registry(version),surface,
+                        protected_paths=[])
+                    # The exact Git candidate object and configured remote both
+                    # remain B.  Only ambient checkout and caller claims widen.
+                    write_json(repo/"specs/owner-production-paths.v1.json",v3)
+                    state=tmp/f"r33-closed-base-{label.lower()}-{serial}-state"
+                    workspace=tmp/f"r33-closed-base-{label.lower()}-{serial}-workspace"
+                    request=transition_request(repo,base,"r29-owner",state,workspace,
+                                               bare,candidate_sha=base)
+                    request.update({"registry_schema_version":3,
+                        "registry_owner_production_paths":caller_v3,
+                        "reported_changed_files":[]})
+                    if command=="check-candidate":
+                        request["actor"]="owner_authority"
+                    elif command=="record-review":
+                        request.update({"review_result":"PASS",
+                                        "review_identity":"r33-closed-review"})
+                    elif command=="owner-freeze":
+                        request.update({"review_result":"PASS",
+                                        "review_identity":"r9-review"})
+                    if command in {"owner-author","record-review","owner-freeze"}:
+                        seed_owner_command_state(state,command,request)
+                    before=(filesystem_snapshot(state),
+                            filesystem_snapshot(workspace),remote_refs(bare))
+                    rc,out,why=authority_call(tmp,command,request)
+                    after=(filesystem_snapshot(state),
+                           filesystem_snapshot(workspace),remote_refs(bare))
+                    if accept:
+                        ok=(rc==0 and out.get("accepted") is True
+                            and r33_positive_effects(
+                                command,request,state,workspace,before,after))
+                    else:
+                        ok=(rc==1 and out=={"accepted":False,
+                                "reason":"owner surface outside owner production"}
+                            and before==after)
+                    results.append(ok);component_ok[label]=ok;details[label]=repr({
+                        "candidate_equals_base":request["candidate_sha"]==base,
+                        "candidate_registry_version":version,
+                        "checkout_registry_version":3,
+                        "caller_registry_version":request["registry_schema_version"],
+                        "configured_remote_main":remote_refs(bare),
+                        "rc":rc,"out":out,
+                        "effects_exact":ok if accept else before==after,
+                        "detail":why})
+        details["_component_ok"]=component_ok
+        return len(results)==20 and all(results),details
+
+    def r33_same_process_sequence() -> tuple[bool,object]:
+        def registry(version: int) -> dict[str,object]:
+            value=json.loads(json.dumps(canonical));value["schema_version"]=version
+            value["owner_production_paths"]=(list(H034_OWNER_PATHS) if version==1
+                else [*H034_OWNER_PATHS,*H036_OWNER_PATHS] if version==2
+                else [*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS])
+            return value
+        cases=[]
+        for serial,(label,version,surface,command,accept) in enumerate((
+            ("V3_H039",3,list(H039_OWNER_PATHS),"check-candidate",True),
+            ("V1_H039",1,list(H039_OWNER_PATHS),"check-candidate",False),
+            ("V2_H036",2,list(H036_OWNER_PATHS),"validate-task",True),
+            ("V2_H039",2,list(H039_OWNER_PATHS),"owner-author",False),
+            ("V3_H039_FINAL",3,list(H039_OWNER_PATHS),"owner-author",True),
+        )):
+            repo,base,_safe,bare=clone_case("R33_SEQUENCE_"+label,registry(version),
+                                            surface,protected_paths=[])
+            candidate_sha=(candidate_paths(repo,base,[concrete_path(path,3100+index)
+                           for index,path in enumerate(surface)],3100+serial)
+                           if command=="check-candidate" else base)
+            state=tmp/f"r33-sequence-{serial}-state"
+            workspace=tmp/f"r33-sequence-{serial}-workspace"
+            request=transition_request(repo,base,"r29-owner",state,workspace,bare,
+                                       candidate_sha=candidate_sha)
+            if command=="check-candidate":request["actor"]="owner_authority"
+            if command=="owner-author":seed_owner_command_state(state,command,request)
+            request.update({"registry_schema_version":99,
+                            "registry_owner_production_paths":["controller/**"]})
+            cases.append({"label":label,"command":command,"request":request,
+                          "accept":accept,
+                          "reason":None if accept else
+                                   "owner surface outside owner production"})
+        malformed=json.loads(json.dumps(canonical));malformed["schema_version"]=False
+        repo,base,_safe,bare=clone_case("R33_SEQUENCE_MALFORMED",malformed,
+                                        list(H034_OWNER_PATHS),protected_paths=[])
+        malformed_request=transition_request(repo,base,"r29-owner",
+            tmp/"r33-sequence-malformed-state",tmp/"r33-sequence-malformed-workspace",bare)
+        cases.insert(3,{"label":"MALFORMED","command":"validate-task",
+                        "request":malformed_request,"accept":False,"reason":None})
+        cases_path=tmp/"r33-same-process-cases.json";write_json(cases_path,cases)
+        harness=tmp/"r33-same-process.py"
+        harness.write_text(
+            "import contextlib,importlib.machinery,importlib.util,io,json,sys\n"
+            "loader=importlib.machinery.SourceFileLoader('r33_authority_cli',sys.argv[1])\n"
+            "spec=importlib.util.spec_from_loader(loader.name,loader)\n"
+            "module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\n"
+            "cases=json.load(open(sys.argv[2],encoding='utf-8'));rows=[]\n"
+            "for case in cases:\n"
+            " stream=io.StringIO()\n"
+            " try:\n"
+            "  with contextlib.redirect_stdout(stream):rc=module.COMMANDS[case['command']](case['request'])\n"
+            "  out=json.loads(stream.getvalue().splitlines()[-1])\n"
+            " except Exception as exc:rc=1;out={'accepted':False,'reason':str(exc)}\n"
+            " rows.append({'label':case['label'],'rc':rc,'out':out})\n"
+            "print(json.dumps(rows,sort_keys=True))\n",encoding="utf-8")
+        env=ordinary_python_env();env["PYTHONDONTWRITEBYTECODE"]="1"
+        p=run([str(H035_R15_AST_PYTHON),"-I","-S","-B",str(harness),str(AUTH),
+               str(cases_path)],cwd=tmp,env=env)
+        try:rows=json.loads(p.stdout)
+        except ValueError:rows=[]
+        ok=p.returncode==0 and isinstance(rows,list) and len(rows)==len(cases)
+        if ok:
+            for case,row in zip(cases,rows):
+                expected=case["accept"]
+                ok=ok and (row.get("rc")==0)==expected \
+                    and row.get("out",{}).get("accepted") is expected
+                if case["reason"] is not None:
+                    ok=ok and row.get("out",{}).get("reason")==case["reason"]
+        return ok,{"rc":p.returncode,"rows":rows,"stderr":p.stderr[-500:]}
+
+    def r33_nested_concurrent_interleave() -> tuple[bool,object]:
+        def registry(version: int) -> dict[str,object]:
+            value=json.loads(json.dumps(canonical));value["schema_version"]=version
+            value["owner_production_paths"]=(list(H034_OWNER_PATHS) if version==1
+                else [*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS])
+            return value
+        requests={};roots=[];refs=[]
+        for label,version in (("nested_outer_v1",1),("nested_inner_v3",3),
+                              ("concurrent_v1",1),("concurrent_v3",3)):
+            repo,base,_safe,bare=clone_case("R33_INTERLEAVE_"+label,
+                registry(version),list(H039_OWNER_PATHS),protected_paths=[])
+            material=candidate_paths(repo,base,list(H039_OWNER_PATHS),3200+version)
+            state=tmp/f"r33-interleave-{label}-state"
+            workspace=tmp/f"r33-interleave-{label}-workspace"
+            request=transition_request(repo,base,"r29-owner",state,workspace,bare,
+                                       candidate_sha=material)
+            request.update({"actor":"owner_authority","registry_schema_version":99,
+                            "registry_owner_production_paths":["controller/**"]})
+            requests[label]=request;roots.extend((state,workspace));refs.append(bare)
+        before=([filesystem_snapshot(path) for path in roots],
+                [remote_refs(path) for path in refs])
+        requests_path=tmp/"r33-interleave-requests.json";write_json(requests_path,requests)
+        harness=tmp/"r33-interleave-harness.py"
+        harness.write_text(
+            "import contextlib,importlib.machinery,importlib.util,io,json,sys,threading\n"
+            "loader=importlib.machinery.SourceFileLoader('r33_interleave_cli',sys.argv[1])\n"
+            "spec=importlib.util.spec_from_loader(loader.name,loader)\n"
+            "module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\n"
+            "requests=json.load(open(sys.argv[2],encoding='utf-8'))\n"
+            "def invoke(request):\n"
+            " try:return {'rc':module.check_candidate(request),'accepted':True}\n"
+            " except Exception as exc:return {'rc':1,'accepted':False,'reason':str(exc)}\n"
+            "original=module.task_authority;inside=False;nested={}\n"
+            "def reentrant(*args,**kwargs):\n"
+            " global inside\n"
+            " if not inside:\n"
+            "  inside=True\n"
+            "  try:nested['inner']=invoke(requests['nested_inner_v3'])\n"
+            "  finally:inside=False\n"
+            " return original(*args,**kwargs)\n"
+            "module.task_authority=reentrant\n"
+            "with contextlib.redirect_stdout(io.StringIO()):nested['outer']=invoke(requests['nested_outer_v1'])\n"
+            "module.task_authority=original\n"
+            "local=threading.local();v1_at=threading.Event();v3_at=threading.Event();v1_done=threading.Event();concurrent={}\n"
+            "def interleaved(*args,**kwargs):\n"
+            " label=local.label\n"
+            " if label=='v1':\n"
+            "  v1_at.set()\n"
+            "  if not v3_at.wait(10):raise RuntimeError('concurrent v3 did not reach task authority')\n"
+            " else:\n"
+            "  if not v1_at.wait(10):raise RuntimeError('concurrent v1 did not reach task authority')\n"
+            "  v3_at.set()\n"
+            "  if not v1_done.wait(10):raise RuntimeError('concurrent v1 did not complete')\n"
+            " return original(*args,**kwargs)\n"
+            "module.task_authority=interleaved\n"
+            "def worker(label):\n"
+            " local.label=label\n"
+            " try:concurrent[label]=invoke(requests['concurrent_'+label])\n"
+            " finally:\n"
+            "  if label=='v1':v1_done.set()\n"
+            "threads=[threading.Thread(target=worker,args=(label,)) for label in ('v1','v3')]\n"
+            "with contextlib.redirect_stdout(io.StringIO()):\n"
+            " [value.start() for value in threads];[value.join(12) for value in threads]\n"
+            "print(json.dumps({'nested':nested,'concurrent':concurrent,\n"
+            " 'alive':[value.is_alive() for value in threads]},sort_keys=True))\n",
+            encoding="utf-8")
+        env=ordinary_python_env();env["PYTHONDONTWRITEBYTECODE"]="1"
+        p=run([str(H035_R15_AST_PYTHON),"-I","-S","-B",str(harness),str(AUTH),
+               str(requests_path)],cwd=tmp,env=env)
+        try:result=json.loads(p.stdout)
+        except ValueError:result={}
+        reject={"rc":1,"accepted":False,
+                "reason":"owner surface outside owner production"}
+        accept={"rc":0,"accepted":True}
+        ok=(p.returncode==0 and result.get("alive")==[False,False]
+            and result.get("nested")=={"inner":accept,"outer":reject}
+            and result.get("concurrent")=={"v1":reject,"v3":accept})
+        after=([filesystem_snapshot(path) for path in roots],
+               [remote_refs(path) for path in refs])
+        return ok and before==after,{"rc":p.returncode,"result":result,
+                                    "unchanged":before==after,"stderr":p.stderr[-500:]}
 
     causal_repo,causal_base,causal_safe,causal_bare=clone_case(
         "ACCEPT_EFFECT_CAUSAL",canonical,list(H036_OWNER_PATHS),
@@ -15177,7 +16519,7 @@ def r29_registry_migration_controls(tmp: Path) -> None:
     v3_reordered=json.loads(json.dumps(v3))
     v3_reordered["owner_production_paths"]=list(reversed(
         v3_reordered["owner_production_paths"]))
-    positives=[];positive_details={}
+    positives=[];positive_details={};positive_component_ok={}
     for label,registry,surface in (
         ("H034",v3,list(H034_OWNER_PATHS)),
         ("H036",v3,list(H036_OWNER_PATHS)),
@@ -15185,9 +16527,13 @@ def r29_registry_migration_controls(tmp: Path) -> None:
         ("H039_REORDERED",v3_reordered,list(H039_OWNER_PATHS))):
         ok,detail=positive_material("V3_"+label,registry,surface)
         positives.append(ok);positive_details[label]=detail
+        positive_component_ok[label]=ok
     neighbor_ok,neighbor_detail=h039_exact_neighbor_disjointness_positive(v3)
     non_owner_ok,non_owner_detail=v3_non_owner_list_positives(v3)
     positives.extend((neighbor_ok,non_owner_ok))
+    positive_component_ok["H039_EXACT_NEIGHBOR_DISJOINTNESS"]=neighbor_ok
+    positive_component_ok["V3_NON_OWNER_LIST_ALTERNATIVES"]=non_owner_ok
+    positive_details["_component_ok"]=positive_component_ok
     positive_details["H039_EXACT_NEIGHBOR_DISJOINTNESS"]=neighbor_detail
     positive_details["V3_NON_OWNER_LIST_ALTERNATIVES"]=non_owner_detail
     record("V3_EXACT_POSITIVE_MATERIAL_CONSUMERS",all(positives),
@@ -15311,6 +16657,42 @@ def r29_registry_migration_controls(tmp: Path) -> None:
 
     failures=[{"observation":name,"reason":reason}
               for name,ok,reason,_detail in observations if not ok]
+    if r33:
+        r33_product_scope_selftests(tmp)
+        cross_ok,cross_detail=r33_cross_product()
+        path_ok,path_detail=r33_path_transport()
+        decoy_ok,decoy_detail=r33_candidate_object_decoys()
+        closed_decoy_ok,closed_decoy_detail=r33_closed_candidate_base_decoys()
+        sequence_ok,sequence_detail=r33_same_process_sequence()
+        interleave_ok,interleave_detail=r33_nested_concurrent_interleave()
+        complete=(not failures and cross_ok and path_ok and decoy_ok and closed_decoy_ok
+                  and sequence_ok and interleave_ok)
+        expected=H035_R33_REQUEST_BOUND_REGISTRY["preproduct_evidence"]
+        core_raw=(ROOT/"controller/authority/core.py").read_bytes()
+        cli_raw=(ROOT/"controller/authority/cli").read_bytes()
+        exact_legacy=(hashlib.sha256(core_raw).hexdigest()==expected["core_sha256"]
+            and hashlib.sha256(cli_raw).hexdigest()==expected["cli_sha256"]
+            and exact_value(failures,H035_R29_THREE_STATE_REGISTRY[
+                "preproduct_evidence"]["expected_failure_signature"])
+            and not cross_ok and not path_ok and not decoy_ok and not closed_decoy_ok
+            and not sequence_ok and not interleave_ok)
+        signature=[] if complete else [{
+            "observation":"R33_COMPLETE_R29_PLUS_REQUEST_BOUND_AND_NUL_MATRIX",
+            "reason":expected["expected_reason"] if exact_legacy
+                     else "UNEXPECTED_R33_FAILURE_SIGNATURE"}]
+        detail=json.dumps({
+            "reason":expected["expected_reason"] if exact_legacy
+                     else "UNEXPECTED_R33_FAILURE_SIGNATURE",
+            "failure_signature":signature,
+            "diagnostics":{"r29_failures":failures,
+                "r29_failure_diagnostics":{name:value for name,ok,_reason,value
+                    in observations if not ok},"cross_product":cross_detail,
+                "path_transport":path_detail,"candidate_object_decoys":decoy_detail,
+                "closed_candidate_base_decoys":closed_decoy_detail,
+                "same_process_sequence":sequence_detail,
+                "nested_concurrent_interleave":interleave_detail}},sort_keys=True)
+        check(complete,"A_R33_REQUEST_BOUND_REGISTRY_AND_NUL_PATH_OPERATIONAL",detail)
+        return
     expected=H035_R29_THREE_STATE_REGISTRY["preproduct_evidence"]
     detail=json.dumps({
         "reason":expected["expected_reason"] if exact_value(
@@ -16073,10 +17455,12 @@ def r15_document_append_selftests() -> None:
     r29_positives=[];r29_mutants=[]
     for path,(_size,_digest,marker) in r29_appends.items():
         base=r15_git_object_bytes(ROOT,r29_base,path)
-        try:current=(ROOT/path).read_bytes()
-        except OSError:current=b""
-        suffix=current[len(base):] if base is not None and current.startswith(base) else b""
-        r29_positives.append(base is not None and r29_valid(path,base,current))
+        published=r15_git_object_bytes(
+            ROOT,str(H035_R33_REQUEST_BOUND_REGISTRY["preproduct_evidence"]["base_sha"]),path)
+        suffix=published[len(base):] if base is not None and published is not None \
+            and published.startswith(base) else b""
+        r29_positives.append(base is not None and published is not None
+                             and r29_valid(path,base,published))
         if base is None:continue
         r29_mutants.extend(((path,base,base+suffix+b"extra\n"),
                             (path,base,base+suffix[:-1]),
@@ -16089,6 +17473,33 @@ def r15_document_append_selftests() -> None:
     check(len(r29_mutants)==20 and all(not r29_valid(path,base,candidate)
           for path,base,candidate in r29_mutants),
           "J_R29_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
+    r33_base=str(H035_R33_REQUEST_BOUND_REGISTRY["preproduct_evidence"]["base_sha"])
+    r33_appends={path:(int(row[0]),str(row[1]),str(row[2]).encode("utf-8"))
+        for path,row in H035_R33_REQUEST_BOUND_REGISTRY["document_appends"].items()}
+    def r33_valid(path: str,base: bytes,candidate: bytes) -> bool:
+        size,digest,marker=r33_appends[path]
+        if not candidate.startswith(base):return False
+        suffix=candidate[len(base):]
+        return (len(suffix)==size and hashlib.sha256(suffix).hexdigest()==digest
+                and suffix.startswith(marker) and suffix.endswith(b"\n"))
+    positives=[];mutants=[]
+    for path,(_size,_digest,marker) in r33_appends.items():
+        base=r15_git_object_bytes(ROOT,r33_base,path)
+        try:current=(ROOT/path).read_bytes()
+        except OSError:current=b""
+        suffix=current[len(base):] if base is not None and current.startswith(base) else b""
+        positives.append(base is not None and r33_valid(path,base,current))
+        if base is None:continue
+        mutants.extend(((path,base,base+suffix+b"extra\n"),
+                        (path,base,base+suffix[:-1]),
+                        (path,base,base[:-1]+suffix),
+                        (path,base,b"rewrite\n"+base+suffix),
+                        (path,base,base+suffix.replace(marker,b"substitute",1))))
+    check(len(positives)==4 and all(positives),
+          "F_R33_FOUR_DOCUMENTS_EXACT_FF375_BASE_PLUS_HASH_BOUND_APPEND")
+    check(len(mutants)==20 and all(not r33_valid(path,base,candidate)
+          for path,base,candidate in mutants),
+          "J_R33_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
 
 
 def r15_parallel_cli_selftests() -> None:
@@ -16438,6 +17849,11 @@ def frozen_checks() -> None:
     check(exact_value(r29_contract,H035_R29_THREE_STATE_REGISTRY),
           "F_R29_EXACT_THREE_STATE_REGISTRY_TASK_BINDING")
     r29_contract_selftests(r29_contract)
+    r33_contract=(hits[0].get("r33_request_bound_registry_consumers")
+                  if len(hits)==1 else None)
+    check(exact_value(r33_contract,H035_R33_REQUEST_BOUND_REGISTRY),
+          "F_R33_EXACT_REQUEST_BOUND_REGISTRY_TASK_BINDING")
+    r33_contract_selftests(r33_contract)
     r15_contract = (hits[0].get("r15_owner_product_lifecycle")
                     if len(hits) == 1 else None)
     r15_contract_selftests(r15_contract, tasks, spec)
@@ -20661,6 +22077,49 @@ def main() -> int:
                 return 2
             print("H035_R29_TARGET_RESULT=PASS")
             return 0
+        if (sys.argv[1:2] == ["--r33-registry-migration"]
+                and len(sys.argv) in (2,4)):
+            product_bound=len(sys.argv)==4
+            frozen_checks()
+            if not product_bound:
+                identity_ok,identity_why=r33_test_author_identity()
+                check(identity_ok,
+                      "A_R33_TEST_AUTHOR_EXACT_SIX_FILE_DIRECT_CHILD_IDENTITY",
+                      identity_why)
+            with tempfile.TemporaryDirectory(prefix="h035-r33-registry-") as raw:
+                tmp=Path(raw)
+                r33_source_oracle_selftests()
+                r14_registry_migration_controls(tmp)
+                r29_registry_migration_controls(tmp,r33=True)
+            if product_bound:
+                ok,why=r33_product_identity(sys.argv[2],sys.argv[3])
+                check(ok,"A_R33_PRODUCT_EXACT_CORE_AND_CLI_DIFF_AND_CANDIDATE_IDENTITY",why)
+                source_ok,source_why=r33_product_source_oracle(ROOT,sys.argv[2],sys.argv[3])
+                check(source_ok,"A_R33_PRODUCT_NO_AMBIENT_REGISTRY_AUTHORITY",source_why)
+            print(f"H035_R33_TARGET_SUMMARY={passed} PASS {failed} FAIL")
+            if failed:
+                expected=H035_R33_REQUEST_BOUND_REGISTRY["preproduct_evidence"]
+                exact_red=False
+                if not product_bound and len(failed_labels)==1:
+                    label,detail=failed_labels[0]
+                    try:payload=json.loads(detail)
+                    except (TypeError,ValueError):payload=None
+                    exact_red=(label==expected["expected_red_label"]
+                        and isinstance(payload,dict)
+                        and payload.get("reason")==expected["expected_reason"]
+                        and exact_value(payload.get("failure_signature"),
+                                        expected["expected_failure_signature"]))
+                if exact_red:
+                    print(f"H035_R33_TARGET_REASON={expected['expected_reason']}")
+                    print("H035_R33_TARGET_RESULT=EXPECTED_PREPRODUCT_RED")
+                    return 1
+                print("H035_R33_TARGET_RESULT=UNEXPECTED_RED")
+                return 2
+            if not product_bound:
+                print("H035_R33_TARGET_RESULT=PRODUCT_IDENTITY_REQUIRED")
+                return 2
+            print("H035_R33_TARGET_RESULT=PASS")
+            return 0
         if (sys.argv[1:2] == ["--r15-owner-product-lifecycle"]
                 and len(sys.argv) in (2,4)):
             product_bound=len(sys.argv)==4
@@ -20733,7 +22192,7 @@ def main() -> int:
             print("H035_R15_TARGET_RESULT=PASS")
             return 0
         if len(sys.argv) != 1:
-            raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH|--r14-registry-migration [BASE_SHA CANDIDATE_SHA]|--r29-registry-migration [BASE_SHA CANDIDATE_SHA]|--r15-owner-product-lifecycle [BASE_SHA CANDIDATE_SHA]]")
+            raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH|--r14-registry-migration [BASE_SHA CANDIDATE_SHA]|--r29-registry-migration [BASE_SHA CANDIDATE_SHA]|--r33-registry-migration [BASE_SHA CANDIDATE_SHA]|--r15-owner-product-lifecycle [BASE_SHA CANDIDATE_SHA]]")
         frozen_checks(); path_selftests(); observer_selftests(); snapshot_selftests()
         with tempfile.TemporaryDirectory(prefix="h035-real-effect-") as raw:
             tmp = Path(raw)
@@ -20774,7 +22233,8 @@ def r29_bpam_document(raw: bytes,contract: dict[str,object] | None=None
         base,tail=raw.split(R29_OWNER_EXCEPTION_BEGIN,1)
         body,trailing=tail.split(R29_OWNER_EXCEPTION_END,1)
         why="owner exception exact trailing section"
-        if (trailing or not base.endswith(BPAM_SOURCE_END)
+        decision=r33_owner_decision_split(trailing)
+        if (decision is None or decision[0]!=b"" or not base.endswith(BPAM_SOURCE_END)
                 or hashlib.sha256(body).hexdigest()!=R29_OWNER_EXCEPTION_BODY_SHA256):
             base=None
     if contract is None:
