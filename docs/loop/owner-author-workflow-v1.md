@@ -1383,3 +1383,80 @@ core-only product → independent product review → guarded product publication
 refreeze/review/publication → H036 registry-only refreeze/review/publication → H039 contract and
 product/install review/publication → H038 refreeze/product → H032 → H031. There is no supervisor resume
 before every transition is green. H034, H036, H038 and the registry are unchanged in this candidate.
+
+## H-035 R31 request-bound registry consumer refreeze
+
+Published R29 contract merge `ff37510254de97c5f931ce3b8670da6cf925bb60` remains the exact
+authority base. R30 `a42613ee94e921c03f56979704e50500311a83b9` is immutable NO-CREDIT,
+is not an ancestor, and is bound to independent FAIL review SHA-256 values
+`ff8430caac6caf9fc93e82de2c11a2ac323afd3aba0a914f508a7b16d45b8cd6` and
+`77b30b91c6fb8d2dddecfd1c712f589e668f793da485fd99e4b1f9f42c1cf965`. Its eight binding
+blockers are closed causally here: ambient custom containers/stores/defaults/thread mechanisms;
+inverse v1/v2 candidate-object decoys across every legacy request-bound consumer; malformed NUL
+framing; exact positive transition effects; nested/reentrant/concurrent interleaving; retained R15
+route identity; and broad-v3 tasks whose material candidate changes an exact H039 member.
+Product attempts `8e56d591b7acb184e80e1095e8152343e8549ad4` and
+`f956b60369e826d444dc0dbf71f988d4ed5e4fcb` are immutable NO-CREDIT. Their evidence SHA-256
+identities are respectively `04ce654bd6dcea189730e71cb1dd99c2914a1e6f0ec8a0e42d97f58bb997a677`
+and `c4087bafaa2b822270cc6300ce1bbdc0bdff95e664cff95f7b29297bfe9da860`.
+The binding core-only architectural-impossibility artifact has SHA-256
+`1e6b03b6c61fd34baee02039825c6911c73608e2fdb1495b9862651144676fbd`.
+
+The first attempt proves that line-delimited or quoted Git diff output is not the repository path
+language: changed paths are derived only from `git diff --name-only -z` bytes, split only on NUL,
+decoded per nonempty record as strict UTF-8 and then passed to the unchanged canonical path grammar.
+An empty diff is exactly empty stdout. Nonempty unterminated output, invalid UTF-8, loss, quoting,
+or a duplicate after canonicalization rejects. An exactly authorized filename containing newline,
+quote and backslash bytes remains one filename and accepts.
+The frozen path harness directly invokes the production parser with empty output, unterminated
+nonempty output, an empty NUL record, invalid UTF-8 and a canonical duplicate. Actual Git commits
+exercise newline/backslash names and a two-path canonical-alias collision; reported changed files are
+never authority.
+
+The second attempt proves that `controller/authority/core.py` alone cannot bind an owner task to the
+registry from the same request. R31 therefore authorizes exactly two product files:
+`controller/authority/core.py` and `controller/authority/cli`. Both owner `check-candidate` and
+`transition_context` validate the selected task surface against `owner_production_paths` from the
+exact candidate-object registry returned by that same invocation's authority-document load. This
+scope is explicitly limited to the legacy request-bound CLI consumers authorized here; it does not
+claim or alter the separately retained R15 route. If that route needs new bytes, this scope is
+insufficient and the sequence stops. The validated registry is an explicit local dependency;
+module globals, caches, ContextVars, caller-frame/stack introspection, custom ambient containers,
+attribute/subscript stores, mutable defaults, threading/thread-local state, caller claims, dynamic
+function/module mutation and signature tricks are not authority. The complete CLI suffix beginning at
+the retained R15 loader marker is byte-identical to `ff375102…`; all product source outside the exact
+core import and named legacy request-bound islands is AST-identical to that base.
+
+The frozen cross-product is complete. Under schema v1, H034 old4 accepts while H036 exact, H039
+exact, `controller/runtime-cleanup/**` and `verify/h039/**` reject. Under v2, H034 and H036 accept
+while H039 and both broad prefixes reject. Under v3, H034, H036 and H039 exact surfaces accept while
+both broad prefixes reject. Every cell executes `validate-task`, owner `check-candidate` with both
+empty and material candidates, and independently seeded `owner-author`, `record-review` and
+`owner-freeze`. Every rejection has exact reason `owner surface outside owner production` and leaves
+fresh state, workspace and bare-remote refs unchanged. The H034 recursive member remains a positive.
+Opposite mutable-checkout, semantically applicable base registry bytes and contradictory caller
+registry/version claims cannot change the candidate-object decision. Owner-author retains its frozen
+candidate-equals-base invariant, so its positive decoy uses opposite checkout/caller claims while
+record-review and owner-freeze additionally use the opposite base. A same-process child sequence v3 accept → v1 reject → v2
+accept → malformed reject → v2 H039 reject → v3 accept prevents ambient prior-request authority.
+The opposite-decoy test is also inverted: v1 and v2 candidate registries reject H039 despite v3 bytes
+in checkout/base decoys and contradictory caller claims. Independently seeded owner-author,
+record-review and owner-freeze keep this causal rather than allowing chain short-circuiting. An
+isolated child drives nested, reentrant and deterministic concurrent actual-registry v1/v3 requests;
+v1 rejects and v3 accepts without cross-request contamination. Accepted transitions are bound to the
+exact only files, canonical JSON bytes and 0600 modes they may create; all remote refs stay unchanged.
+
+R14, R29, R15 inheritance and R29's accept-side state/workspace/refs causal oracle remain mandatory.
+Standard preproduct execution is `--r31-registry-migration`; product acceptance is
+`--r31-registry-migration BASE_SHA CANDIDATE_SHA`. The sole preproduct RED is
+`A_R31_REQUEST_BOUND_REGISTRY_AND_NUL_PATH_OPERATIONAL` with reason
+`LEGACY_CORE_CLI_LACK_V3_NUL_AND_REQUEST_BOUND_OWNER_SURFACE`. Product identity is a clean direct
+single child of the published R31 merge, changes exactly the two authorized product files with modes
+100644 and 100755, and preserves the frozen spec and gate bytes. Core-only, CLI-only, third-path and
+stacked product identities reject.
+
+No registry, H034/H036/H038/H039 task or product, broad owner prefix, Seatbelt rule, confinement
+objective or other authority changes here. After two independent gate reviews and guarded contract
+publication, R31 proceeds through an independent two-file product review and guarded publication,
+then the already frozen H034 → H036 → H039 → H038 → H032 → H031 sequence. Supervisor resume remains
+forbidden until the complete chain is green.

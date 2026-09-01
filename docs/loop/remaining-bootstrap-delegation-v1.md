@@ -395,3 +395,47 @@ refreeze/product/review/publication → H-032 → H-031. No supervisor resume oc
 green. If the minimum H-039 design requires broader authority, this exception does not apply and a
 new owner stop is mandatory.
 <!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_END -->
+<!-- H035_R31_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_BEGIN -->
+## H-035 R31 minimal core-and-CLI owner decision
+
+**Owner decision:** 2026-09-01. The published H-035 R29 contract is refrozen only because two
+immutable product attempts and the independently recorded core-only architectural impossibility prove
+that the request-bound registry cannot soundly reach all owner consumers through
+`controller/authority/core.py` alone.
+
+R30 `a42613ee94e921c03f56979704e50500311a83b9` is immutable NO-CREDIT, is not a parent, and is
+bound to independent FAIL review artifacts SHA-256
+`ff8430caac6caf9fc93e82de2c11a2ac323afd3aba0a914f508a7b16d45b8cd6` and
+`77b30b91c6fb8d2dddecfd1c712f589e668f793da485fd99e4b1f9f42c1cf965`. R31 must close every
+recorded blocker causally: inverse candidate-registry decoys, complete NUL transport faults, exact
+positive effects, ambient container/store/default/thread rejection, nested/reentrant/concurrent
+interleaving, retained R15 route identity, and broad-v3 material candidates that change exact H039
+members.
+
+TEST_AUTHOR may modify exactly `specs/tasks.spec.json`, `verify/bin/h-035-exit`,
+`docs/loop/owner-author-workflow-v1.md`, this file, `docs/05-beslutslogg.md` and
+`docs/loop/drift.md`. BUILDER may modify exactly `controller/authority/core.py` and
+`controller/authority/cli`. The product may only implement exact v1 old4, v2 union7 and v3 union12,
+strict NUL-delimited UTF-8 Git changed-path decoding, and explicit binding of the owner task surface
+to the request's validated candidate-object registry in owner `check-candidate` and
+`transition_context`.
+
+The candidate-object registry is the sole authority even when mutable checkout bytes, semantically
+applicable base bytes and caller claims all contradict it. Owner-author retains candidate-equals-base;
+record-review and owner-freeze additionally carry the opposite-base positive. Strict NUL framing must reject empty records, unterminated bytes,
+invalid UTF-8 and canonical duplicates while retaining actual newline/backslash filenames. Accepted
+owner transitions create only the exact bound JSON bytes and modes; rejected cases change no state,
+workspace or refs. The retained R15 CLI suffix and route stay byte-identical to `ff375102…`; no new
+behavior is claimed there.
+
+The complete v1/v2/v3 by H034/H036/H039/two-broad-prefix matrix must be falsified through
+`validate-task`, owner `check-candidate`, `owner-author`, `record-review` and `owner-freeze`, including
+empty and material candidate cases where applicable, with independently valid seeded transition
+states and a nested/reentrant/concurrent child interleave. No global, ContextVar, caller-introspection,
+custom container, attribute/subscript store, mutable default, threading/thread-local state,
+dynamic-mutation, caller-selected registry/version, broad prefix, registry mutation, new authority or
+security weakening is admitted. Two independent gate reviews, guarded contract publication,
+independent product review and guarded product publication remain serial prerequisites. Then the
+already authorized H034 → H036 → H039 → H038 → H032 → H031 chain continues autonomously. No
+supervisor resume occurs before all are green.
+<!-- H035_R31_REQUEST_BOUND_REGISTRY_OWNER_DECISION_V1_END -->
