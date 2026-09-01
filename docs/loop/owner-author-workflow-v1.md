@@ -1226,3 +1226,83 @@ the supplied base to freshly observed origin/main and the exact review/receipt g
 connected-matrix or candidate credit. The physical-alias negative itself still rejects before its
 loop sentinel and creates no artifact or source effect. This layered correction adds no product,
 registry, publication, Seatbelt or filesystem/process/network/credential authority.
+
+## H-035 R24 parallel-finalizer diagnostic and deadline separation
+
+The fresh post-R23 product `d32d4051…` remains immutable NO-CREDIT. Its independent product review
+stopped in the reference arm when the two identical publication finalizers reached the frozen outer
+30-second `communicate` deadline. The product's own retained finalizer invocation has that same
+30-second deadline, leaving the fixture no scheduling, wrapper or readback margin. Twelve faithful
+two-child reproductions completed with exact zero-effect idempotence, so the product defect was not
+reproduced; the frozen failure detail contained only the joined empty stderr strings and could not
+distinguish a timeout, nonzero exit or output mismatch.
+
+R24 keeps the product timeout and every production byte unchanged. The gate-owned parallel wrapper
+uses one fixed finite 60-second group deadline measured from release of the held authoritative lock
+(or completion of launch when no lock is held), rather than one caller-selected or sequential
+deadline per child. Both held-lock children must still be alive behind the same lock before release.
+Every child retains its return code, stdout, stderr, timeout flag and relative launch/release/reap
+timing. The identical-finalizer oracle emits those fields as canonical JSON on failure and requires
+exact pre/post equality of the complete attest root, state root, owner workspace and repository/remote
+authority snapshot—not merely equality of `attestations.json`. The diagnostic metadata grants no
+success credit by itself. This is TEST_AUTHOR fixture determinacy and observability only; it adds no
+product, process lifetime, filesystem, network, credential, publication, Seatbelt or owner authority.
+
+## H-035 R25 unique successor evidence and bounded parallel cleanup
+
+Frozen R24 candidate `c0ddd003…` is immutable NO-CREDIT. Its successor publication state reused the
+already occupied immutable R23 `h035-r19-*` artifact paths, record types and phase. Its parallel
+wrapper also killed only the child whose wait reached the common deadline and then performed an
+unbounded drain; launch, stdin or pre-release liveness failure could leave an earlier child or peer
+running. No R24 review artifact was written and no publication occurred.
+
+R25 gives this successor exactly one fresh fixed `h035-r25-*` two-lane/aggregate/receipt namespace.
+Every gate-launched parallel child is registered immediately in its own new session/process group.
+On a launch, stdin, barrier or common-deadline failure the wrapper signals every registered,
+not-yet-reaped owned group before draining any child, then reaps every direct child under one fixed five-second cleanup deadline;
+all waits and pipe drains remain bounded and cleanup precedes release of a held authoritative lock.
+Only the exact registered, not-yet-reaped child PID may name its group, the signal is fixed to
+`SIGKILL`, all groups are signalled before any poll/drain, and deadline results preserve call
+order plus actual status while exposing synthetic return code 124. Parallel stdin is capped at 8192
+UTF-8 bytes. This authority exists only inside the TEST_AUTHOR fixture for processes it creates and
+does not claim cleanup after the verifier itself is killed. Product bytes/timeouts, registry,
+publication semantics, Seatbelt, and filesystem/network/credential/owner authority remain unchanged;
+a fresh H-035 product is required after guarded R25 publication.
+
+## H-035 R26 nonreaping barrier and exact common deadlines
+
+Frozen R25 candidate `785cd181…` is immutable NO-CREDIT. Both review lanes proved that the positive
+`0.001` timeout floor restarted the verdict/cleanup budgets after expiry. They also reproduced a
+same-process-group descendant surviving because pre-release `Popen.poll()` reaped its leader before
+cleanup selected groups. A further signal-denial control proved that R25 reported Rig without applying
+the safe bounded direct-child fallback. No R25 evidence was written and no publication occurred.
+
+R26 uses one gate-owned macOS `kqueue` only when a held-lock or staggered fixture requires a barrier.
+Each exact `start_new_session=True` child PID is registered immediately for one `EVFILT_PROC` /
+`NOTE_EXIT` event; unknown, duplicate, erroneous or substituted event identities reject, and the
+queue remains open through collection or cleanup. For held-lock races an exact gate-only `runpy`
+harness intercepts only the first blocking `LOCK_EX` whose opened-fd dev/inode equals the parent's
+stable-open authoritative lock. Each child reports one byte and waits on its own private release fd at
+that exact product lock-call boundary. Only after every attempt has arrived does the parent release
+the private barriers and then the still-bound lock; mere liveness can no longer earn contention credit.
+
+Post-release collection round-robins fixed child indexes with at most 50 ms per attempt, always capped
+by the one absolute 60-second deadline, so a completed reverse-order peer is reaped before timeout
+cleanup. Cleanup is one non-reentrant epoch with one five-second deadline: it selects only indexes not
+already present in completed output, attempts fixed `SIGKILL` for every exact saved PGID before any
+poll/drain, and only then applies bounded direct-child fallback after a non-ESRCH signal failure.
+macOS zombie-only `EPERM` remains explicit Rig, never success. Decode/pipe failure after reap records
+that completed index before cleaning all peers and can neither restart the deadline nor re-signal its
+released PID-derived group. Every cleanup timeout is `max(0.0, deadline-now)` and every verdict
+attempt is `min(0.05, max(0.0, deadline-now))`; expiry grants no positive floor.
+
+Gate-owned causal selftests cover the exited leader with a ticking same-PGID descendant, zombie-only
+EPERM after a distinct post-PID-close ready sentinel and strict peer-PID parse with peer cleanup,
+delayed exact-lock arrival, second-Popen
+cleanup, zero-floor AST, reverse-completion timeout/success in both call orders, decode failure under
+one cleanup epoch, and post-reap `OSError`/`ValueError` exclusion of the completed PID-derived group.
+The fresh publication namespace is exactly `h035-r26-*`. The temporary runpy harness exists only
+inside this gate fixture and grants no product/runtime wrapper or broker authority. This adds no
+process enumeration, caller PID/PGID/filter/signal/deadline, native FFI, watchdog, native broker,
+product, registry, Seatbelt, network, credential or owner authority and makes no
+outer-verifier-SIGKILL claim. A fresh product is required after guarded R26.
