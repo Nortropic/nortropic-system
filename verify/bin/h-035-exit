@@ -125,8 +125,16 @@ H036_OWNER_PATHS = (
     "controller/launch/cli", "controller/launch/runtime_snapshot.py",
     "config/python-runtime-authority-v2.json",
 )
+H039_OWNER_PATHS = (
+    "controller/runtime-cleanup/install",
+    "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/runtime-cleanup-mediator",
+    "verify/h039/build-recipe.json",
+    "verify/h039/identity-manifest.json",
+)
 REQUIRED_OWNER = set(H034_OWNER_PATHS)
 PROSPECTIVE_OWNER = set((*H034_OWNER_PATHS, *H036_OWNER_PATHS))
+PROSPECTIVE_OWNER_V3 = {*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS}
 
 BPAM_AMENDMENT = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_AMENDMENT_V1 -->\n"
 BPAM_CONTRACT_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_BEGIN -->\n```json\n"; BPAM_CONTRACT_END = b"```\n<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_END -->\n"
@@ -134,6 +142,9 @@ BPAM_SOURCE_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_SOURCE_BEGIN
 BPAM_SECTION_DIGESTS = {"prefix":"b00717bc90ad6bfcf8e72cdc3f2498c638ce1ed36867d32ac71152cf3cf8af42", "preamble":"fa296b02e5a417022b4d704605aa5f7cfafede24d5696878786769d0c83d5772",
     "contract":"e8ee5a8321c0a73469ac305803a7b10e14e78845ad27eb0473fdbe9a87692c7f", "bridge":"b4d5b24db445fa77b8cb1dfb87424759207421b259f9580807651912c4482e09",
     "source":"b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84"}
+R29_OWNER_EXCEPTION_BEGIN = b"<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_BEGIN -->\n"
+R29_OWNER_EXCEPTION_END = b"<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_END -->\n"
+R29_OWNER_EXCEPTION_BODY_SHA256 = "8b52669824f0f2b3c9086705ca5d7cc977b853b8381f890f62b2d8f7f34ea251"
 BPAM_CONDITIONS = (
     ("BP01","EXISTING_FROZEN_ARCHITECTURE_BLOCKS_APPROVED_OBJECTIVE"),
     ("BP02","REPRODUCIBLE_TECHNICAL_EVIDENCE_PROVES_BLOCKER"),
@@ -345,7 +356,198 @@ H035_R14_TWO_STATE_REGISTRY = {
     "fail_closed":True,
 }
 
-H035_R15_CONTRACT_SHA256 = "cfc9141239d3448470f73aeaf4f92ad9af7efd7ebfc1f307b19ca49841db9390"
+H035_R29_THREE_STATE_REGISTRY = {
+    "contract_id":"H035_R29_THREE_STATE_OWNER_PRODUCTION_REGISTRY_V3",
+    "owner_decision":{
+        "decision_id":"H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_AUTHORITY_2026_09_01",
+        "scope":"MINIMAL_OS_EXCLUSIVE_RUNTIME_CLEANUP_PREREQUISITE_ONLY",
+        "supersedes_hard_stop_only_for":"EXACT_H039_SEPARATE_TRUST_DOMAIN_SEQUENCE",
+        "architectural_evidence":"H038_R9_SAME_EUID_NAME_TO_INODE_REPLACEMENT_AFTER_FINAL_CHECK",
+    },
+    "task_identity":"h-035",
+    "migration_family":"MIGRATE_STRICT_REGISTRY_OR_SCHEMA_TO_EXPLICITLY_VERSIONED_EXACT_STATE",
+    "registry_path":"specs/owner-production-paths.v1.json",
+    "registry_state_in_this_contract":"UNCHANGED_SCHEMA_V2_UNION7",
+    "historical_r26_contract_candidate_sha":"da773a8cebe78ae88956adfc0561abe5dc5093ec",
+    "r27_immutable_no_credit":{
+        "candidate_sha":"6419bd0c6d03f05a776c6e6640873b9941f51d35",
+        "disposition":"IMMUTABLE_NO_CREDIT_NEVER_AMEND_MERGE_PUBLISH_OR_PARENT",
+        "independent_gate_review_sha256":{
+            "lane_a":"555d3284e559cd8eaef2fd29ad87430ea0999cb78fd463f965c6f45233d939e9",
+            "lane_b":"6c19f006a358d3f42a74f0ac2644168ee1bf6ad46558c74af05a3d6de8335c3a",
+        },
+        "blocking_findings":[
+            "DUPLICATE_R14_PRODUCT_SCOPE_FIXED_TEMP_ROOT_EEXIST",
+            "MISSING_VALID_V3_EXACT_NEIGHBOR_DISJOINTNESS_CAUSAL_POSITIVES",
+            "MISSING_VALID_V3_ALTERNATIVE_NON_OWNER_LIST_POSITIVES",
+        ],
+    },
+    "r28_immutable_no_credit":{
+        "candidate_sha":"72c2b9fbd936e855bcc3a99a90d06536ec688361",
+        "disposition":"IMMUTABLE_NO_CREDIT_NEVER_AMEND_MERGE_PUBLISH_OR_PARENT",
+        "independent_gate_review_sha256":{
+            "lane_a":"fbf3ffe2c35497223dbe03770c7c6be3193d2f5e80a13f46141d44efe4035f9f",
+            "lane_b":"1e0923a40017b8f43ed7ec005382de3e870b67428d54b45252ecd06314ab2497",
+        },
+        "blocking_findings":[
+            "R28-B-001_ACCEPT_TRUE_IGNORES_BEFORE_EQUALS_AFTER_ACROSS_POSITIVE_FAMILIES",
+        ],
+    },
+    "preproduct_evidence":{
+        "base_sha":"c161a1c557b58516f3881ac9f49f4e50216c8bc0",
+        "core_sha256":"a56398870ca9716b79c701c69e1eda401452c03471c977ebdfe4e210b9b6b1a2",
+        "registry_sha256":"3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256",
+        "expected_red_label":"A_R29_EXACT_THREE_STATE_REGISTRY_OPERATIONAL",
+        "expected_reason":"V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3",
+        "expected_failure_signature":[
+            {"observation":"V3_EXACT_POSITIVE_MATERIAL_CONSUMERS",
+             "reason":"V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3"},
+        ],
+    },
+    "legal_states":[
+        {"schema_version":1,"owner_production_paths":[*H034_OWNER_PATHS]},
+        {"schema_version":2,
+         "owner_production_paths":[*H034_OWNER_PATHS,*H036_OWNER_PATHS]},
+        {"schema_version":3,
+         "owner_production_paths":[*H034_OWNER_PATHS,*H036_OWNER_PATHS,
+                                   *H039_OWNER_PATHS]},
+    ],
+    "active_transition":{
+        "from_schema_version":2,"to_schema_version":3,
+        "added_owner_production_paths":[*H039_OWNER_PATHS],
+        "all_other_registry_fields":"BYTE_SEMANTICALLY_UNCHANGED",
+    },
+    "test_author_allowed_write":[
+        "specs/tasks.spec.json","verify/bin/h-035-exit",
+        "docs/loop/owner-author-workflow-v1.md",
+        "docs/loop/remaining-bootstrap-delegation-v1.md",
+        "docs/05-beslutslogg.md","docs/loop/drift.md",
+    ],
+    "document_appends":{
+        "docs/loop/owner-author-workflow-v1.md":[5331,
+            "57f6e758a0506df692289d0dfd41894453ff2a7b18dbd1b4e4c83b4d6051e938",
+            "\n## H-035 R29 three-state owner-production registry migration"],
+        "docs/loop/remaining-bootstrap-delegation-v1.md":[2396,
+            "9a8a55923e338a3ca65a69d87368d14eff50611384c795326c66b4f5f94833d4",
+            "<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_BEGIN -->"],
+        "docs/05-beslutslogg.md":[1171,
+            "8254fec94b3b6b29d4491b9b63979bc75b7b021d8234d7f9c9abf70df644827a",
+            "| 2026-09-01 | H-035 R29 exact H-039 registry representability prerequisite |"],
+        "docs/loop/drift.md":[3325,
+            "f5728f7f8495eb172345083e3273214a83c49b780c6d7c47a5287e0539822379",
+            "\n## H-035 R29 — OS-exclusive cleanup registry boundary"],
+    },
+    "builder_actual_changed_files":["controller/authority/core.py"],
+    "operational_matrix":{
+        "historical_v1_v2_floor":"UNCHANGED_COMPLETE_R14_OPERATIONAL_MATRIX",
+        "material_consumers":[
+            "validate-registry","validate-task","check-candidate","owner-author",
+            "record-review","owner-freeze","ordinary-policy",
+        ],
+        "v3_positive_owner_surfaces":[
+            "H034_OLD4_EXACT_AND_REORDERED",
+            "H036_CURRENT3_EXACT_AND_REORDERED",
+            "H039_NEW5_EXACT_AND_REORDERED",
+        ],
+        "h039_exact_file_disjoint_positive_paths":[
+            "controller/runtime-cleanup/install-neighbor",
+            "controller/runtime-cleanup/install/descendant",
+            "controller/runtime-cleanup/native/mediator-neighbor.c",
+            "controller/runtime-cleanup/native/mediator.c/descendant",
+            "verify/h039/runtime-cleanup-mediator-neighbor",
+            "verify/h039/runtime-cleanup-mediator/descendant",
+            "verify/h039/build-recipe-neighbor.json",
+            "verify/h039/build-recipe.json/descendant",
+            "verify/h039/identity-manifest-neighbor.json",
+            "verify/h039/identity-manifest.json/descendant",
+        ],
+        "h039_disjoint_positive_consumers":[
+            "validate-task","check-candidate","ordinary-policy",
+        ],
+        "h039_forbidden_owner_broad_prefixes":[
+            "controller/runtime-cleanup/**","verify/h039/**",
+        ],
+        "h039_owner_broad_prefix_consumers":["validate-task","check-candidate"],
+        "v3_non_owner_list_positive_families":[
+            "PROSPECTIVE_DISTINGUISHING","GLOBAL_DENIED_DISTINGUISHING",
+            "PROSPECTIVE_OVERLAPPING","PROSPECTIVE_REORDERED",
+            "GLOBAL_DENIED_OVERLAPPING","GLOBAL_DENIED_REORDERED",
+            "PROSPECTIVE_BACKSLASH","GLOBAL_DENIED_BACKSLASH",
+        ],
+        "v3_non_owner_list_positive_effects":"R14_CAUSAL_CONSUMERS_AND_UNCHANGED_STATE_WORKSPACE_REFS",
+        "accept_and_reject_effect_oracle":"BOTH_ACCEPT_AND_REJECT_REQUIRE_UNCHANGED_STATE_WORKSPACE_AND_REMOTE_REFS",
+        "accept_effect_causal_mutants":["STATE","WORKSPACE","REMOTE_REFS"],
+        "accept_effect_causal_control":"VALID_SCHEMA_V2_ACCEPT_THEN_GATE_INJECTS_EXACTLY_ONE_DISPOSABLE_EFFECT_BEFORE_AFTER_SNAPSHOT_AND_MUST_REJECT_CREDIT",
+        "r14_product_scope_execution":"EXACTLY_ONCE_PER_COMBINED_R29_RUN_VIA_R14_FLOOR",
+        "v3_member_quantifier":"EACH_UNION12_MEMBER",
+        "v3_member_one_defect_families":[
+            "OMISSION","SUBSTITUTION","DUPLICATE","BACKSLASH_ALIAS",
+            "LEADING_DOT_ALIAS","APPLICABLE_BROADER_PREFIX",
+        ],
+        "v3_member_one_defect_count":72,
+        "active_transition_hostiles":[
+            "ARBITRARY_ADDITION","H039_NEW_ONLY","H039_PARTIAL_PREFIX",
+            "H039_PARTIAL_NONPREFIX","H039_SUBSTITUTED_NEIGHBOR",
+            "V3_WITH_V1_OLD4","V3_WITH_V2_UNION7",
+            "V1_OR_V2_WITH_V3_UNION12",
+        ],
+        "version_type_cross_product":"EVERY_FROZEN_INVALID_VERSION_TYPE_WITH_V3_UNION12_PLUS_EVERY_LEGAL_VERSION_WITH_WRONG_LEGAL_MEMBERSHIP",
+        "retained_non_owner_semantics":[
+            "path_grammar","authority_source","self_digest_is_authority",
+            "prospective_ordinary_protected_paths","owner_author_global_denied_paths",
+        ],
+        "non_owner_semantic_defects":"EACH_R14_DEFECT_FAMILY_UNDER_V3",
+        "rejection_effects":"ALL_MATERIAL_CONSUMERS_AND_UNCHANGED_STATE_WORKSPACE_REFS",
+    },
+    "product_acceptance":{
+        "command":"verify/bin/h-035-exit --r29-registry-migration BASE_SHA CANDIDATE_SHA",
+        "candidate_identity":"CLEAN_HEAD_EQUALS_EXACT_CANDIDATE_COMMIT",
+        "base_candidate_relation":"CANDIDATE_HAS_EXACTLY_BASE_AS_ITS_SINGLE_PARENT",
+        "exact_git_diff":["controller/authority/core.py"],
+        "candidate_contract_bytes":["specs/tasks.spec.json","verify/bin/h-035-exit"],
+        "operational_matrix":"UNCHANGED_R14_FLOOR_THEN_COMPLETE_R29_INCREMENTAL_MATRIX_BEFORE_PRODUCT_SCOPE_BINDING",
+    },
+    "downstream_sequence":[
+        "H035_R29_TEST_AUTHOR_FREEZE",
+        "H035_R29_TWO_INDEPENDENT_GATE_REVIEWS",
+        "H035_R29_GUARDED_CONTRACT_PUBLICATION",
+        "H035_R29_CORE_ONLY_BUILDER_PRODUCT",
+        "H035_R29_INDEPENDENT_PRODUCT_REVIEW",
+        "H035_R29_GUARDED_PRODUCT_PUBLICATION",
+        "H034_REGISTRY_V3_REFREEZE_REVIEW_PUBLICATION",
+        "H036_REGISTRY_ONLY_REFREEZE_REVIEW_PUBLICATION",
+        "H039_CONTRACT_FREEZE_INDEPENDENT_GATE_REVIEW_GUARDED_PUBLICATION",
+        "H039_PRODUCT_AND_INSTALL_REVIEW_GUARDED_PUBLICATION",
+        "H038_REFREEZE_PRODUCT_REVIEW_GUARDED_PUBLICATION",
+        "H032_REFREEZE_REVIEW_GUARDED_PUBLICATION",
+        "H031_REBIND_REVIEW_GUARDED_PUBLICATION",
+        "SUPERVISOR_RESUME_ONLY_AFTER_ALL_GREEN",
+    ],
+    "h039_boundary":{
+        "separate_trust_domain":True,
+        "objectives":["ZERO_RUNTIME_RESIDUE_AFTER_COMPLETED_CLEANUP",
+                      "NO_FOREIGN_DELETE_OR_REPLACE_UNDER_SAME_EUID_RACE"],
+        "request_shape":"CAPABILITY_OR_REQUEST_IDENTITY_NOT_CALLER_SELECTED_PATH",
+        "protected_state_derives_exact_cleanup_object":True,
+        "all_runtime_descendants_terminated_and_reaped_before_destructive_cleanup":True,
+        "required_bindings":["INSTALLATION","BINARY_IDENTITY","UID_GID",
+                             "PROTECTED_NAMESPACE","REQUEST_RECEIPT",
+                             "CRASH_RECOVERY","CLEANUP_EFFECTS"],
+    },
+    "forbidden_effects":[
+        "REGISTRY_MUTATION_IN_H035","H039_TASK_GATE_PRODUCT_INSTALL_OR_RUNTIME_EFFECT_IN_H035",
+        "H034_H036_H038_TASK_ROW_CHANGE_IN_H035",
+        "CALLER_SELECTED_PATH_OR_NEIGHBOR","GENERAL_UNLINK_RMDIR_RENAME_OR_FILESYSTEM_AUTHORITY",
+        "SHELL_OR_GENERAL_COMMAND_EXECUTION","GIT_OR_PUBLICATION_AUTHORITY","NETWORK_AUTHORITY",
+        "CREDENTIAL_ACCESS","GENERAL_PROCESS_AUTHORITY","DYNAMIC_CODE_LOADING",
+        "SEATBELT_OR_CONFINEMENT_BYPASS","GENERAL_NATIVE_OR_ROOT_AUTHORITY",
+        "REUSE_OF_ANOTHER_SERVICE_TRUST_DOMAIN_FOR_CONVENIENCE",
+        "CHECK_THEN_UNLINK_UNDER_SAME_UID","ZERO_RESIDUE_WEAKENING",
+    ],
+    "fail_closed":True,
+}
+
+H035_R15_CONTRACT_SHA256 = "af6f31be23f4f017d8acdcd3e717d3d329735a510c7e782c1cb5e88e8f4117c8"
 H035_R15_BASE = "408923a445d081ebb6309e57dfe80423844ce927"
 H035_R15_BASE_TREE = "b306ba137cb348b18df98e895b21ef47e4980e51"
 H035_R15_AST_PYTHON = Path(
@@ -360,9 +562,9 @@ H035_R15_GATE_BASE_DEF_AGGREGATE = "77413d5497b92ed8eb4df7bd805a269ab9a7249c76ce
 H035_R15_GATE_BASE_DEF_NAME_DIGEST = "8cbe0238247d014964f8d23cccf74fb6179fb81099200473b870a9693bf4d2ee"
 H035_R15_GATE_UNCHANGED_DEF_AGGREGATE = "b9b40ec354682bcee4bc5c1077deb02c03aa91c22dcbd5423be9644054567dc6"
 H035_R15_GATE_BASE_NONDEF_DIGEST = "6b69304fa7fed17d29a1460d11ecf64e43a5675e0da28636db4e52af1e6bea4a"
-H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "5a8f026148cf15239d3e972c94e5a693c9a0cfda33656e88c7260918a9c9aabc"
-H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "aaad87206acd3af1cb7ed6943e41fcb2ecfd79a427ccc30819ffe125829155c9"
-H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "1f5718b63ca722fbbd8bfaffd23c15f0c23237bd4c609e479044524f2b7bfb35"
+H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "fb28ed0640eb06fbac41b2762d8d327ec92fa57315f823a8c91de543519cd92a"
+H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "2d99128953dd7d24e4e5af4f34a4367e512788669cf730598e3af36627c5b32c"
+H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "66687e6e71e14cfbd121b2856b0a2d792a146352ae4cac8c6165751cbffcb35b"
 H035_R15_ENV_REVIEWED_AST_SHA256 = {
     "r15_remote_boundary_selftests":"7fa65898c7b5165f168ff608abb89eb47ec8d805459bf5f666d044f6bee9ac75",
     "r15_product_scope_selftests":"717b95a9039b369984c9409c7d87e01b88fd5cb8374b4672ce58916c0d697fe9",
@@ -908,6 +1110,123 @@ def r14_contract_selftests(contract: object) -> None:
           "J_R14_SERIAL_HARD_STOP_FORBIDDEN_FAIL_CLOSED_REJECT")
 
 
+def r29_contract_selftests(contract: object) -> None:
+    def clone() -> dict[str, object]:
+        return json.loads(json.dumps(H035_R29_THREE_STATE_REGISTRY))
+    check(exact_value(contract,H035_R29_THREE_STATE_REGISTRY),
+          "J_R29_EXACT_CONTRACT_POSITIVE")
+    top_mutants=[]
+    for key in H035_R29_THREE_STATE_REGISTRY:
+        mutant=clone();mutant.pop(key);top_mutants.append(mutant)
+    mutant=clone();mutant["extra_authority"]=True;top_mutants.append(mutant)
+    check(all(not exact_value(mutant,H035_R29_THREE_STATE_REGISTRY)
+              for mutant in top_mutants),
+          "J_R29_MISSING_EXTRA_TOP_LEVEL_REJECT")
+    state_mutants=[]
+    for state_index,member_index,replacement in (
+        (0,0,"controller/**"),(1,4,"controller/launch/**"),
+        (2,7,"controller/runtime-cleanup/**"),
+        (2,8,"controller/runtime-cleanup/native/**"),
+        (2,9,"verify/h039/**")):
+        mutant=clone();mutant["legal_states"][state_index][
+            "owner_production_paths"][member_index]=replacement
+        state_mutants.append(mutant)
+    for state_index in range(3):
+        mutant=clone();mutant["legal_states"][state_index]["schema_version"] \
+            = float(state_index+1);state_mutants.append(mutant)
+    mutant=clone();mutant["legal_states"][2]["owner_production_paths"].pop();state_mutants.append(mutant)
+    mutant=clone();mutant["legal_states"][2]["owner_production_paths"].append(
+        H039_OWNER_PATHS[0]);state_mutants.append(mutant)
+    mutant=clone();mutant["active_transition"]["added_owner_production_paths"].pop();state_mutants.append(mutant)
+    check(all(not exact_value(mutant,H035_R29_THREE_STATE_REGISTRY)
+              for mutant in state_mutants),
+          "J_R29_THREE_VERSION_MEMBERSHIP_AND_TYPE_BINDING_REJECT")
+    scope_mutants=[]
+    for key in ("test_author_allowed_write","builder_actual_changed_files"):
+        mutant=clone();mutant[key].pop();scope_mutants.append(mutant)
+        mutant=clone();mutant[key].append("controller/**");scope_mutants.append(mutant)
+    mutant=clone();mutant["document_appends"][
+        "docs/loop/remaining-bootstrap-delegation-v1.md"][1]="0"*64
+    scope_mutants.append(mutant)
+    mutant=clone();mutant["r27_immutable_no_credit"]["candidate_sha"]="0"*40;scope_mutants.append(mutant)
+    mutant=clone();mutant["r27_immutable_no_credit"]["independent_gate_review_sha256"][
+        "lane_a"]="0"*64;scope_mutants.append(mutant)
+    mutant=clone();mutant["r27_immutable_no_credit"]["blocking_findings"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["r28_immutable_no_credit"]["candidate_sha"]="0"*40;scope_mutants.append(mutant)
+    mutant=clone();mutant["r28_immutable_no_credit"]["independent_gate_review_sha256"][
+        "lane_b"]="0"*64;scope_mutants.append(mutant)
+    mutant=clone();mutant["r28_immutable_no_credit"]["blocking_findings"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["exact_git_diff"].append(
+        "controller/authority/cli");scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["material_consumers"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["v3_member_one_defect_count"]=71;scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["h039_exact_file_disjoint_positive_paths"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["h039_forbidden_owner_broad_prefixes"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["v3_non_owner_list_positive_families"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["accept_and_reject_effect_oracle"]="REJECT_ONLY";scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["accept_effect_causal_mutants"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["r14_product_scope_execution"]="TWICE";scope_mutants.append(mutant)
+    mutant=clone();mutant["preproduct_evidence"]["expected_failure_signature"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["h039_boundary"]["separate_trust_domain"]=False;scope_mutants.append(mutant)
+    mutant=clone();mutant["h039_boundary"]["request_shape"]="CALLER_PATH";scope_mutants.append(mutant)
+    mutant=clone();mutant["forbidden_effects"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["downstream_sequence"].pop(7);scope_mutants.append(mutant)
+    mutant=clone();mutant["fail_closed"]=1;scope_mutants.append(mutant)
+    check(all(not exact_value(mutant,H035_R29_THREE_STATE_REGISTRY)
+              for mutant in scope_mutants),
+          "J_R29_SURFACE_SEQUENCE_BOUNDARY_FORBIDDEN_AND_FAIL_CLOSED_REJECT")
+    delegation=(ROOT/"docs/loop/remaining-bootstrap-delegation-v1.md").read_bytes()
+    exact_section=False
+    if (delegation.count(R29_OWNER_EXCEPTION_BEGIN)==1
+            and delegation.count(R29_OWNER_EXCEPTION_END)==1):
+        prefix,tail=delegation.split(R29_OWNER_EXCEPTION_BEGIN,1)
+        body,suffix=tail.split(R29_OWNER_EXCEPTION_END,1)
+        terms=(b"same-euid name-to-inode",b"zero-runtime-residue",
+               b"server-issued capability/request identity",
+               b"separate from every existing service",
+               b"H-036 registry-only",b"No supervisor resume",
+               b"new owner stop is mandatory")
+        exact_section=(hashlib.sha256(body).hexdigest()
+                       ==R29_OWNER_EXCEPTION_BODY_SHA256
+                       and all(term in body for term in terms)
+                       and prefix.endswith(BPAM_SOURCE_END)
+                       and suffix==b"")
+    check(exact_section,"F_R29_CANONICAL_OWNER_EXCEPTION_EXACT_BOUNDARY")
+    section_mutants=[]
+    if exact_section:
+        section_mutants=[
+            body+b"extra\n",body.replace(b"same-euid",b"caller-euid",1),
+            body.replace(b"No supervisor resume",b"Supervisor resume",1),
+        ]
+    check(len(section_mutants)==3 and all(
+              hashlib.sha256(value).hexdigest()!=R29_OWNER_EXCEPTION_BODY_SHA256
+              for value in section_mutants),
+          "J_R29_OWNER_EXCEPTION_SCOPE_RESUME_AND_EXTRA_MUTANTS_REJECT")
+    owner_workflow=(ROOT/"docs/loop/owner-author-workflow-v1.md").read_text(
+        encoding="utf-8")
+    workflow_terms=(
+        "H-035 R29 three-state owner-production registry migration",
+        "schema_version: 3", "controller/runtime-cleanup/install",
+        "controller/runtime-cleanup/native/mediator.c",
+        "verify/h039/runtime-cleanup-mediator", "verify/h039/build-recipe.json",
+        "verify/h039/identity-manifest.json", "separate trust domain",
+        "same-euid", "caller-selected path", "H034 registry-v3 refreeze",
+        "H036 registry-only refreeze", "no supervisor resume",
+        "--r29-registry-migration BASE_SHA CANDIDATE_SHA",
+        "6419bd0c6d03f05a776c6e6640873b9941f51d35",
+        "555d3284e559cd8eaef2fd29ad87430ea0999cb78fd463f965c6f45233d939e9",
+        "6c19f006a358d3f42a74f0ac2644168ee1bf6ad46558c74af05a3d6de8335c3a",
+        "72c2b9fbd936e855bcc3a99a90d06536ec688361",
+        "fbf3ffe2c35497223dbe03770c7c6be3193d2f5e80a13f46141d44efe4035f9f",
+        "1e0923a40017b8f43ed7ec005382de3e870b67428d54b45252ecd06314ab2497",
+        "R28-B-001", "accept and reject", "state, workspace and refs",
+        "exact sibling and an exact descendant", "product-scope selftest exactly once",
+        "distinguishing, overlapping, reordered and backslash forms",
+    )
+    check(all(term in owner_workflow for term in workflow_terms),
+          "F_R29_WORKFLOW_EXACT_BOUNDARY_AND_SERIAL_CONTRACT")
+
+
 def r15_gate_expected_policy() -> dict[str,object]:
     return {
         "base_definitions_exact_once_in_order":True,"unchanged_definition_count":53,
@@ -924,9 +1243,9 @@ def r15_gate_expected_policy() -> dict[str,object]:
         "capability_family_checks_are_supplemental_to_exact_source_aggregate":True,
         "import_effect_oracle_preserves_inherited_callable_identity":True,
         "new_top_level_requires_exact_manifest":True,
-        "manifest_independent_admitted_definition_count":139,
+        "manifest_independent_admitted_definition_count":143,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":72,
+        "manifest_independent_admitted_nondefinition_count":78,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -971,9 +1290,9 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     check(isinstance(policy,dict) and exact_value(policy,r15_gate_expected_policy()),
           "J_R15_GATE_INHERITANCE_COMPLETE_POLICY_EXACT")
     normalization_policy={
-        "manifest_independent_admitted_definition_count":139,
+        "manifest_independent_admitted_definition_count":143,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":72,
+        "manifest_independent_admitted_nondefinition_count":78,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -996,8 +1315,8 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     for key in normalization_policy:
         value=json.loads(json.dumps(normalization_policy)); value.pop(key); policy_mutants.append(value)
     for key,hostile_values in (
-            ("manifest_independent_admitted_definition_count",(138,139.0,True)),
-            ("manifest_independent_admitted_nondefinition_count",(71,72.0,True)),
+            ("manifest_independent_admitted_definition_count",(142,143.0,True)),
+            ("manifest_independent_admitted_nondefinition_count",(77,78.0,True)),
             ("manifest_independent_admitted_definition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_admitted_nondefinition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_complete_ordered_module_body_aggregate_sha256",("0"*64,True))):
@@ -1042,10 +1361,16 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
         check(mutant.get("authority_class") != "ordinary",
               "J_R15_LEGACY_" + task_id.upper().replace("-", "_") + "_MISSING_CLASS_REJECT")
 
+    r29_base_spec_raw=r15_git_object_bytes(
+        ROOT,str(H035_R29_THREE_STATE_REGISTRY["preproduct_evidence"]["base_sha"]),
+        "specs/tasks.spec.json")
+    try:r29_base_spec=strict_json_bytes(r29_base_spec_raw or b"")
+    except ValueError:r29_base_spec=None
+
     def exact_spec_transform(candidate_spec: object) -> bool:
-        if not isinstance(candidate_spec,dict) or not isinstance(base_spec,dict): return False
+        if not isinstance(candidate_spec,dict) or not isinstance(r29_base_spec,dict): return False
         candidate_copy=json.loads(json.dumps(candidate_spec))
-        base_copy=json.loads(json.dumps(base_spec))
+        base_copy=json.loads(json.dumps(r29_base_spec))
         candidate_rows=candidate_copy.get("tasks")
         base_candidate_rows=base_copy.get("tasks")
         if not isinstance(candidate_rows,list) or not isinstance(base_candidate_rows,list): return False
@@ -1056,19 +1381,19 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
         for row in candidate_rows:
             if not isinstance(row,dict): return False
             task_id=row.get("id")
-            if task_id in H035_R15_LEGACY_TASKS:
-                if row.pop("authority_class",None)!="ordinary": return False
             if task_id=="h-035":
                 base_h035=next((value for value in base_candidate_rows
                                 if isinstance(value,dict)
                                 and value.get("id")=="h-035"),None)
                 criterion=row.get("exit_criterion")
                 if (not isinstance(base_h035,dict) or not isinstance(criterion,str)
-                        or hashlib.sha256(criterion.encode("utf-8")).hexdigest()!=
-                           "cbba05e86bb76145a7c2e41fa423b11454886367f466c40d92dde20cff347836"):
+                        or criterion!=base_h035.get("exit_criterion")
+                        or row.get("r15_owner_product_lifecycle") is None):
                     return False
-                row["exit_criterion"]=base_h035.get("exit_criterion")
-                if row.pop("r15_owner_product_lifecycle",None) is None: return False
+                row["r15_owner_product_lifecycle"]=base_h035.get(
+                    "r15_owner_product_lifecycle")
+                if row.pop("r29_three_state_owner_production_registry",None) is None:
+                    return False
         return r15_json_equal(candidate_copy,base_copy)
 
     check(exact_spec_transform(current_spec),
@@ -1606,8 +1931,11 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
                   for call in lane_override_calls)==1,
           "J_R26_JUDGE_FIXTURE_DEFAULT_FALSE_EXACT_TWO_STATE_AND_PRODUCT_UNREACHABLE")
     h038_rows=[row for row in tasks if isinstance(row,dict) and row.get("id")=="h-038"]
-    check(len(h038_rows)==1 and h038_rows[0].get("depends_on")==["h-036"]
-          and "h035_r15_published_authority" not in h038_rows[0],
+    r29_base_h038=[row for row in r29_base_spec.get("tasks",[])
+        if isinstance(row,dict) and row.get("id")=="h-038"] \
+        if isinstance(r29_base_spec,dict) else []
+    check(len(h038_rows)==len(r29_base_h038)==1
+          and exact_value(h038_rows[0],r29_base_h038[0]),
           "F_R15_CURRENT_H038_UNCHANGED_UNTIL_SEPARATE_REFREEZE")
     check(hashlib.sha256(base64.b64decode(R15_H036_REVIEW_B64)).hexdigest()
               == R15_H036["review_sha256"]
@@ -4889,6 +5217,44 @@ def r14_product_identity(base: str, candidate_sha: str) -> tuple[bool, str]:
     return True, "clean exact candidate, contract bytes, and core-only diff bound"
 
 
+def r29_test_author_identity() -> tuple[bool,str]:
+    base=str(H035_R29_THREE_STATE_REGISTRY["preproduct_evidence"]["base_sha"])
+    expected=tuple(sorted(H035_R29_THREE_STATE_REGISTRY[
+        "test_author_allowed_write"]))
+    head=git(ROOT,"rev-parse","--verify","HEAD^{commit}")
+    if head.returncode or re.fullmatch(r"[0-9a-f]{40}",head.stdout.strip()) is None:
+        return False,"R29 exact candidate HEAD"
+    candidate_sha=head.stdout.strip()
+    parents=git(ROOT,"rev-list","--parents","-n","1",candidate_sha)
+    if parents.returncode or parents.stdout.split()!=[candidate_sha,base]:
+        return False,"R29 candidate must be direct child of exact c161 authority"
+    names=git(ROOT,"diff","--name-only","--no-renames","--no-ext-diff",
+              "--no-textconv",base,candidate_sha)
+    states=git(ROOT,"diff","--name-status","--no-renames","--no-ext-diff",
+               "--no-textconv",base,candidate_sha)
+    if names.returncode or tuple(names.stdout.splitlines())!=expected:
+        return False,"R29 candidate does not change exact six TEST_AUTHOR files"
+    if states.returncode or states.stdout.splitlines()!=[f"M\t{path}" for path in expected]:
+        return False,"R29 candidate contains add/delete/rename/type substitution"
+    tree=git(ROOT,"--literal-pathspecs","ls-tree",candidate_sha,"--",*expected)
+    observed={}
+    for line in tree.stdout.splitlines():
+        fields=line.split(None,3)
+        if len(fields)==4:observed[fields[3]]=(fields[0],fields[1])
+    wanted={path:(("100755" if path=="verify/bin/h-035-exit" else "100644"),
+                  "blob") for path in expected}
+    if tree.returncode or observed!=wanted:
+        return False,"R29 exact six path modes/types"
+    status=git(ROOT,"status","--porcelain=v1","--untracked-files=all")
+    if status.returncode or status.stdout:
+        return False,"R29 contract acceptance requires clean immutable checkout"
+    if git_object_bytes(ROOT,base,"specs/owner-production-paths.v1.json") \
+            !=git_object_bytes(ROOT,candidate_sha,
+                               "specs/owner-production-paths.v1.json"):
+        return False,"R29 contract may not mutate registry"
+    return True,"clean exact direct-child six-file R29 TEST_AUTHOR candidate"
+
+
 def r14_product_scope_selftests(tmp: Path) -> None:
     repo = tmp / "r14-product-scope"; init_repo(repo)
     core = repo / "controller/authority/core.py"
@@ -6253,10 +6619,36 @@ def r15_gate_normalized_altered_definition(base: ast.AST,
     elif name=="frozen_checks":
         if not isinstance(normalized,ast.FunctionDef):
             return None,"frozen checks island type"
+        wrapper_calls=[]
+        for statement in normalized.body:
+            for value in ast.walk(statement):
+                if (isinstance(value,ast.Call) and isinstance(value.func,ast.Name)
+                        and value.func.id=="r29_bpam_document"):
+                    wrapper_calls.append((statement,value))
+        if ([ast.unparse(statement) for statement,_call in wrapper_calls]!=[
+                "bpam_ok, bpam_why, bpam_contract = r29_bpam_document(delegation_raw)",
+                "if bpam_ok and isinstance(bpam_contract, dict):\n"
+                "    r29_bpam_document(delegation_raw, bpam_contract)\n"
+                "else:\n"
+                "    check(False, 'J_BPAM_MACHINE_CONTRACT_POSITIVE', bpam_why)"]):
+            return None,"frozen checks exact R29 BPAM wrapper island"
+        wrapper_calls[0][1].func.id="bpam_document"
+        wrapper_calls[1][1].func.id="bpam_selftests"
         anchors=[index for index,statement in enumerate(normalized.body)
                  if r15_gate_call_name(statement)=="r14_contract_selftests"]
         if len(anchors)!=1: return None,"R14 selftest anchor cardinality"
-        start=anchors[0]+1; island=normalized.body[start:start+6]
+        start=anchors[0]+1;r29_island=normalized.body[start:start+3]
+        if (len(r29_island)!=3 or not isinstance(r29_island[0],ast.Assign)
+                or [r15_gate_call_name(value) for value in r29_island[1:]]!=[
+                    "check","r29_contract_selftests"]):
+            return None,"frozen checks exact R29 island"
+        r29_targets=[value.id for target in r29_island[0].targets
+                     for value in ast.walk(target)
+                     if isinstance(value,ast.Name) and isinstance(value.ctx,ast.Store)]
+        if r29_targets!=["r29_contract"]:
+            return None,"frozen checks R29 contract binding"
+        del normalized.body[start:start+3]
+        island=normalized.body[start:start+6]
         if (len(island)!=6 or not isinstance(island[0],ast.Assign)
                 or [r15_gate_call_name(value) for value in island[1:]] != [
                     "r15_contract_selftests","r15_document_append_selftests",
@@ -6301,6 +6693,13 @@ def r15_gate_normalized_altered_definition(base: ast.AST,
                              for value in ast.walk(statement.test))]
         if len(r15_indices)!=1: return None,"main R15 dispatch cardinality"
         del body[r15_indices[0]]
+        r29_indices=[index for index,statement in enumerate(body)
+                     if isinstance(statement,ast.If)
+                     and any(isinstance(value,ast.Constant)
+                             and value.value=="--r29-registry-migration"
+                             for value in ast.walk(statement.test))]
+        if len(r29_indices)!=1:return None,"main R29 dispatch cardinality"
+        del body[r29_indices[0]]
         base_usage=[statement for statement in base_body if isinstance(statement,ast.If)
                     and ast.unparse(statement.test)=="len(sys.argv) != 1"]
         usage_indices=[index for index,statement in enumerate(body)
@@ -6466,9 +6865,9 @@ def r15_gate_inheritance_bytes(base_raw: bytes, candidate_raw: bytes,
     if not isinstance(policy,dict) or not exact_value(policy,r15_gate_expected_policy()):
         return False,"exact complete gate inheritance policy"
     normalization_policy={
-        "manifest_independent_admitted_definition_count":139,
+        "manifest_independent_admitted_definition_count":143,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":72,
+        "manifest_independent_admitted_nondefinition_count":78,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -6503,7 +6902,7 @@ def r15_gate_inheritance_bytes(base_raw: bytes, candidate_raw: bytes,
         and isinstance(node.targets[0],ast.Name)
         and node.targets[0].id=="H035_R15_CONTRACT_SHA256"]
     pin_bindings,pin_deletions=r15_gate_module_binding_events(candidate)
-    if (len(contract_pins)!=1 or contract_pins[0][0]!=73
+    if (len(contract_pins)!=1 or contract_pins[0][0]!=79
             or pin_bindings.count("H035_R15_CONTRACT_SHA256")!=1
             or "H035_R15_CONTRACT_SHA256" in pin_deletions
             or not isinstance(contract_pins[0][1].value,ast.Constant)
@@ -7298,7 +7697,7 @@ def r15_gate_mutant_source(candidate_raw: bytes, mutant: str) -> bytes:
               and node.value.value==H035_R15_CONTRACT_SHA256]
         single=f"H035_R15_CONTRACT_SHA256 = '{H035_R15_CONTRACT_SHA256}'"
         canonical=f'H035_R15_CONTRACT_SHA256 = "{H035_R15_CONTRACT_SHA256}"'
-        if len(pins)!=1 or pins[0][0]!=73 or rendered.splitlines().count(single)!=1:
+        if len(pins)!=1 or pins[0][0]!=79 or rendered.splitlines().count(single)!=1:
             raise Rig("HR01 contract digest mutant renderer authority")
         rendered=rendered.replace(single,canonical,1)
         if rendered.splitlines().count(canonical)!=1:
@@ -14397,6 +14796,532 @@ def r14_registry_migration_controls(tmp: Path) -> None:
     check(not failures, "A_R14_EXACT_TWO_STATE_REGISTRY_OPERATIONAL", detail)
 
 
+def r29_registry_migration_controls(tmp: Path) -> None:
+    """Incremental v3 matrix; R14 remains the complete v1/v2 floor."""
+    canonical=strict_load(REG)
+    if (not isinstance(canonical,dict)
+            or canonical.get("schema_version")!=2
+            or set(canonical.get("owner_production_paths",[]))!=PROSPECTIVE_OWNER):
+        raise Rig("R29 canonical registry must remain exact schema v2 union7")
+    v3=json.loads(json.dumps(canonical))
+    v3["schema_version"]=3
+    v3["owner_production_paths"]=[*H034_OWNER_PATHS,*H036_OWNER_PATHS,
+                                  *H039_OWNER_PATHS]
+    h039_disjoint_ordinary_paths=tuple(H035_R29_THREE_STATE_REGISTRY[
+        "operational_matrix"]["h039_exact_file_disjoint_positive_paths"])
+    h039_forbidden_owner_prefixes=tuple(H035_R29_THREE_STATE_REGISTRY[
+        "operational_matrix"]["h039_forbidden_owner_broad_prefixes"])
+    observations: list[tuple[str,bool,str,object]]=[]
+
+    def record(name: str,ok: bool,reason: str,detail: object) -> None:
+        observations.append((name,ok,reason,detail))
+
+    def clone_case(name: str,registry: object,owner_surface: list[str],
+                   protected_paths: list[str]|None=None,
+                   global_denied_paths: list[str]|None=None,
+                   ordinary_positive_paths: list[str]|None=None,
+                   owner_rejected_paths: list[str]|None=None
+                   ) -> tuple[Path,str,str,Path]:
+        protected_paths=(list(protected_paths) if protected_paths is not None
+                         else list(H039_OWNER_PATHS))
+        global_denied_paths=(list(global_denied_paths)
+                             if global_denied_paths is not None else [])
+        ordinary_positive_paths=(list(ordinary_positive_paths)
+                                 if ordinary_positive_paths is not None else [])
+        owner_rejected_paths=(list(owner_rejected_paths)
+                              if owner_rejected_paths is not None else [])
+        repo=tmp/("r29-case-"+name.lower().replace("_","-"));init_repo(repo)
+        (repo/"specs").mkdir()
+        registry_path=repo/"specs/owner-production-paths.v1.json"
+        if isinstance(registry,dict):write_json(registry_path,registry)
+        elif isinstance(registry,str):registry_path.write_text(
+            registry+("" if registry.endswith("\n") else "\n"),encoding="utf-8")
+        else:raise Rig("R29 registry fixture type")
+        write_json(repo/"specs/tasks.spec.json",{
+            "spec_version":"2.0.0",
+            "defaults":{"denied_write":[],"max_changed_files":10,
+                        "max_added_lines":100},"tasks":[]})
+        commit_paths(repo,"r29 registry activation without future fixture tasks",
+            "specs/tasks.spec.json","specs/owner-production-paths.v1.json")
+        gate=repo/"verify/bin/h-035-exit";gate.parent.mkdir(parents=True)
+        gate.write_bytes(Path(__file__).read_bytes());gate.chmod(0o755)
+        core=repo/"controller/authority/core.py";core.parent.mkdir(parents=True)
+        core.write_bytes((ROOT/"controller/authority/core.py").read_bytes())
+        policy=repo/"controller/policy/cli";policy.parent.mkdir(parents=True)
+        policy.write_bytes((ROOT/"controller/policy/cli").read_bytes());policy.chmod(0o755)
+        tasks=[ordinary_task("r29-safe",["tests/r29-safe/**"]),
+               owner_task("r29-owner",owner_surface)]
+        tasks.extend(ordinary_task(f"r29-protected-{index}",[path])
+                     for index,path in enumerate(protected_paths))
+        tasks.extend(owner_task(f"r29-global-denied-{index}",[path])
+                     for index,path in enumerate(global_denied_paths))
+        tasks.extend(ordinary_task(f"r29-disjoint-{index}",[path])
+                     for index,path in enumerate(ordinary_positive_paths))
+        tasks.extend(owner_task(f"r29-owner-prefix-{index}",[path])
+                     for index,path in enumerate(owner_rejected_paths))
+        write_json(repo/"specs/tasks.spec.json",{
+            "spec_version":"2.0.0",
+            "defaults":{"denied_write":[],"max_changed_files":10,
+                        "max_added_lines":100},"tasks":tasks})
+        base=commit_paths(repo,"r29 material registry case",
+            "specs/tasks.spec.json","verify/bin/h-035-exit",
+            "controller/authority/core.py","controller/policy/cli")
+        safe=candidate(repo,base,"tests/r29-safe/effect.txt",2700)
+        bare=tmp/("r29-origin-"+name.lower().replace("_","-")+".git")
+        p=run(["git","init","--bare","-q",str(bare)],cwd=tmp)
+        if p.returncode:raise Rig(p.stderr)
+        set_remote_main(bare,repo,base)
+        return repo,base,safe,bare
+
+    def unchanged_call(case: str,repo: Path,base: str,candidate_sha: str,
+                       bare: Path,command: str,fields: dict[str,object],
+                       *,accept: bool,reason: str|None=None,
+                       seed: bool=False,
+                       accept_effect_mutant: str|None=None) -> tuple[bool,str]:
+        serial=len(list(tmp.glob("r29-*-state")))
+        state=tmp/f"r29-{case.lower()}-{serial}-state"
+        workspace=tmp/f"r29-{case.lower()}-{serial}-workspace"
+        request=transition_request(repo,base,str(fields.get("task_id","r29-owner")),
+                                   state,workspace,bare,candidate_sha=candidate_sha)
+        request.update(fields)
+        if seed:seed_owner_command_state(state,command,request)
+        before=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+                remote_refs(bare))
+        rc,out,detail=authority_call(tmp,command,request)
+        if accept_effect_mutant=="STATE":
+            write_json(state/"r29-accept-effect-mutant.json",{"effect":"state"})
+        elif accept_effect_mutant=="WORKSPACE":
+            write_json(workspace/"r29-accept-effect-mutant.json",{"effect":"workspace"})
+        elif accept_effect_mutant=="REMOTE_REFS":
+            effect=git(bare,"update-ref","refs/heads/r29-accept-effect-mutant",base)
+            if effect.returncode:raise Rig(effect.stderr)
+        elif accept_effect_mutant is not None:
+            raise Rig("R29 unknown accept-effect mutant")
+        after=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+               remote_refs(bare))
+        accepted=rc==0 and out.get("accepted") is True
+        rejected=rc!=0 and out.get("accepted") is False
+        reason_ok=reason is None or rc==1 and out.get("reason")==reason
+        ok=(accepted if accept else rejected) and before==after and reason_ok
+        return ok,repr({"rc":rc,"out":out,"unchanged":before==after,
+                        "detail":detail})
+
+    def policy_probe(repo: Path,base: str,candidate_sha: str,task_id: str,
+                     bare: Path,*,accept: bool,reason: str="") -> tuple[bool,str]:
+        state=tmp/f"r29-policy-{task_id}-{candidate_sha}-state"
+        workspace=tmp/f"r29-policy-{task_id}-{candidate_sha}-workspace"
+        before=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+                remote_refs(bare))
+        p=run([str(repo/"controller/policy/cli"),"check",task_id,base,candidate_sha],
+              cwd=repo,env=ordinary_python_env())
+        after=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+               remote_refs(bare))
+        output=p.stdout+p.stderr
+        return ((p.returncode==0) is accept and before==after
+                and (not reason or reason in output)),repr({
+                    "rc":p.returncode,"unchanged":before==after,
+                    "output":output[-500:]})
+
+    def concrete_path(pattern: str,serial: int) -> str:
+        core,recursive=parse_path(pattern)
+        return f"{core}/r29-{serial}.txt" if recursive else core
+
+    def guarded_candidate(repo: Path,base: str,pattern: str,serial: int) -> str:
+        path=concrete_path(pattern,serial)
+        if path not in {"specs/tasks.spec.json",
+                        "specs/owner-production-paths.v1.json"}:
+            return candidate(repo,base,path,serial)
+        checkout=git(repo,"checkout","-q",base)
+        if checkout.returncode:raise Rig(checkout.stderr)
+        target=repo/path;target.write_bytes(target.read_bytes()+b"\n")
+        return commit_paths(repo,f"r29 candidate-{serial}",path)
+
+    def path_permitted(path: str,guards: tuple[str,...]) -> bool:
+        target,target_recursive=parse_path(path)
+        for guard in guards:
+            parent,parent_recursive=parse_path(guard)
+            if target_recursive:
+                if parent_recursive and (target==parent
+                                         or target.startswith(parent+"/")):
+                    return True
+            elif target==parent or (parent_recursive
+                                    and target.startswith(parent+"/")):
+                return True
+        return False
+
+    def require_distinguishing_entries(
+            family: str,paths: list[str],*,owner_relation: str) -> None:
+        owner_paths=(*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS)
+        for index,path in enumerate(paths):
+            material=concrete_path(path,2800+index)
+            if not overlap(material,path):
+                raise Rig(f"R29 {family} entry {index} does not guard its probe")
+            if owner_relation=="disjoint":
+                if any(overlap(path,owner) or overlap(material,owner)
+                       for owner in owner_paths):
+                    raise Rig(f"R29 {family} entry {index} is masked by owner production")
+            elif owner_relation=="permitted":
+                if not (path_permitted(path,owner_paths)
+                        and path_permitted(material,owner_paths)):
+                    raise Rig(f"R29 {family} entry {index} lacks owner-production control")
+            else:raise Rig(f"R29 {family} unknown owner relation")
+            for other_index,other in enumerate(paths):
+                if index!=other_index and (overlap(path,other)
+                                           or overlap(material,other)):
+                    raise Rig(f"R29 {family} entry {index} is masked by {other_index}")
+
+    def positive_material(name: str,registry: dict[str,object],
+                          owner_surface: list[str],
+                          owner_changes: list[str]|None=None,
+                          protected_paths: list[str]|None=None,
+                          global_denied_paths: list[str]|None=None,
+                          *,require_protected_entry_independence: bool=False,
+                          require_global_denied_entry_independence: bool=False,
+                          global_denied_entries_owner_permitted: bool=False
+                          ) -> tuple[bool,dict[str,str]]:
+        protected_paths=(list(protected_paths) if protected_paths is not None
+                         else list(H039_OWNER_PATHS))
+        owner_changes=(list(owner_changes) if owner_changes is not None
+                       else list(owner_surface))
+        global_denied_paths=(list(global_denied_paths)
+                             if global_denied_paths is not None else [])
+        if require_protected_entry_independence:
+            require_distinguishing_entries(
+                "prospective protected",protected_paths,owner_relation="disjoint")
+        if require_global_denied_entry_independence:
+            require_distinguishing_entries(
+                "owner global deny",global_denied_paths,
+                owner_relation=("permitted" if global_denied_entries_owner_permitted
+                                else "disjoint"))
+        repo,base,safe,bare=clone_case(name,registry,owner_surface,
+            protected_paths,global_denied_paths)
+        detail: dict[str,str]={};checks=[]
+        for label,command,candidate_sha,fields in (
+            ("registry","validate-registry",safe,{}),
+            ("task","validate-task",base,{"task_id":"r29-owner"}),
+            ("candidate","check-candidate",safe,
+             {"task_id":"r29-safe","actor":"ordinary"})):
+            ok,why=unchanged_call(name,repo,base,candidate_sha,bare,command,
+                                  fields,accept=True)
+            checks.append(ok);detail[label]=why
+        state=tmp/f"r29-{name.lower()}-chain-state"
+        workspace=tmp/f"r29-{name.lower()}-chain-workspace"
+        write_json(state/"current.json",{
+            "task":"r29-owner","state":"OWNER_ACTION_REQUIRED","base_sha":base})
+        request=transition_request(repo,base,"r29-owner",state,workspace,bare)
+        refs_before=remote_refs(bare);chain=[]
+        for command,fields in (
+            ("owner-author",{}),
+            ("check-candidate",{"actor":"owner_authority"}),
+            ("record-review",{"review_result":"PASS",
+                              "review_identity":"r29-"+name+"-review"}),
+            ("owner-freeze",{"review_result":"PASS",
+                             "review_identity":"r29-"+name+"-review"})):
+            rc,out,why=authority_call(tmp,command,{**request,**fields})
+            chain.append((rc,out,why))
+        chain_ok=(all(rc==0 and out.get("accepted") is True
+                      for rc,out,_why in chain)
+                  and "OWNER_FROZEN" in persisted_state(state)
+                  and remote_refs(bare)==refs_before)
+        checks.append(chain_ok);detail["owner_chain"]=repr(chain)
+        changed_owner=candidate_paths(repo,base,[
+            concrete_path(path,2820+index)
+            for index,path in enumerate(owner_changes)],2820)
+        ok,why=unchanged_call(name+"-changed-owner",repo,base,changed_owner,
+            bare,"check-candidate",{"task_id":"r29-owner",
+            "actor":"owner_authority"},accept=True)
+        checks.append(ok);detail["changed_owner_candidate"]=why
+        ok,why=policy_probe(repo,base,safe,"r29-safe",bare,accept=True)
+        checks.append(ok);detail["ordinary_policy"]=why
+        for index,path in enumerate(protected_paths):
+            protected_task_id=f"r29-protected-{index}"
+            ok,why=unchanged_call(name+f"-protected-task-{index}",repo,base,
+                base,bare,"validate-task",{"task_id":protected_task_id},
+                accept=False,reason="ordinary surface overlaps protected authority")
+            checks.append(ok);detail[f"protected_validate_task_{index}"]=why
+            protected=candidate(repo,base,path,2750+index)
+            ok,why=unchanged_call(name+f"-protected-{index}",repo,base,
+                protected,bare,"check-candidate",
+                {"task_id":protected_task_id,"actor":"ordinary"},accept=False,
+                reason="ordinary candidate overlaps protected authority")
+            checks.append(ok);detail[f"protected_candidate_{index}"]=why
+            ok,why=policy_probe(repo,base,protected,protected_task_id,bare,accept=False,
+                reason=(f"ordinary task {protected_task_id} "
+                        "överlappar skyddad authority-yta"))
+            checks.append(ok);detail[f"protected_policy_{index}"]=why
+        for index,path in enumerate(global_denied_paths):
+            global_task_id=f"r29-global-denied-{index}"
+            ok,why=unchanged_call(name+f"-global-denied-task-{index}",repo,
+                base,base,bare,"validate-task",{"task_id":global_task_id},
+                accept=False,reason="owner surface overlaps global deny")
+            checks.append(ok);detail[f"global_denied_validate_task_{index}"]=why
+            denied=guarded_candidate(repo,base,path,2850+index)
+            ok,why=unchanged_call(name+f"-global-denied-{index}",repo,base,
+                denied,bare,"check-candidate",
+                {"task_id":global_task_id,"actor":"owner_authority"},
+                accept=False,reason="owner candidate changed global deny")
+            checks.append(ok);detail[f"global_denied_candidate_{index}"]=why
+        return all(checks),detail
+
+    def h039_exact_neighbor_disjointness_positive(
+            registry: dict[str,object]) -> tuple[bool,dict[str,str]]:
+        owner_paths=(*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS)
+        if (len(h039_disjoint_ordinary_paths)!=2*len(H039_OWNER_PATHS)
+                or len(set(h039_disjoint_ordinary_paths))
+                   !=len(h039_disjoint_ordinary_paths)):
+            raise Rig("R29 H039 exact neighbor positive cardinality")
+        for index,owner in enumerate(H039_OWNER_PATHS):
+            neighbor=h039_disjoint_ordinary_paths[2*index]
+            descendant=h039_disjoint_ordinary_paths[2*index+1]
+            if (neighbor.rsplit("/",1)[0]!=owner.rsplit("/",1)[0]
+                    or descendant.rsplit("/",1)[0]!=owner
+                    or any(overlap(value,guard) for value in (neighbor,descendant)
+                           for guard in owner_paths)):
+                raise Rig(f"R29 H039 member {index} neighbor/descendant not exact-disjoint")
+        repo,base,safe,bare=clone_case(
+            "V3_H039_EXACT_DISJOINT",registry,list(H039_OWNER_PATHS),
+            protected_paths=[],
+            ordinary_positive_paths=list(h039_disjoint_ordinary_paths),
+            owner_rejected_paths=list(h039_forbidden_owner_prefixes))
+        checks=[];detail={}
+        ok,why=unchanged_call("V3-H039-DISJOINT-REGISTRY",repo,base,safe,
+            bare,"validate-registry",{},accept=True)
+        checks.append(ok);detail["validate_registry"]=why
+        for index,path in enumerate(h039_disjoint_ordinary_paths):
+            task_id=f"r29-disjoint-{index}"
+            ok,why=unchanged_call(f"V3-H039-DISJOINT-TASK-{index}",repo,
+                base,base,bare,"validate-task",{"task_id":task_id},accept=True)
+            checks.append(ok);detail[f"validate_task_{index}"]=why
+            ordinary=guarded_candidate(repo,base,path,2880+index)
+            ok,why=unchanged_call(f"V3-H039-DISJOINT-CANDIDATE-{index}",
+                repo,base,ordinary,bare,"check-candidate",
+                {"task_id":task_id,"actor":"ordinary"},accept=True)
+            checks.append(ok);detail[f"check_candidate_{index}"]=why
+            ok,why=policy_probe(repo,base,ordinary,task_id,bare,accept=True)
+            checks.append(ok);detail[f"ordinary_policy_{index}"]=why
+        for index,path in enumerate(h039_forbidden_owner_prefixes):
+            task_id=f"r29-owner-prefix-{index}"
+            ok,why=unchanged_call(f"V3-H039-OWNER-PREFIX-TASK-{index}",repo,
+                base,base,bare,"validate-task",{"task_id":task_id},
+                accept=False,reason="owner surface outside owner production")
+            checks.append(ok);detail[f"owner_prefix_validate_task_{index}"]=why
+            broad=guarded_candidate(repo,base,path,2910+index)
+            ok,why=unchanged_call(f"V3-H039-OWNER-PREFIX-CANDIDATE-{index}",
+                repo,base,broad,bare,"check-candidate",
+                {"task_id":task_id,"actor":"owner_authority"},accept=False,
+                reason="owner surface outside owner production")
+            checks.append(ok);detail[f"owner_prefix_candidate_{index}"]=why
+        return all(checks),detail
+
+    def v3_non_owner_list_positives(
+            template: dict[str,object]) -> tuple[bool,dict[str,dict[str,str]]]:
+        cases: list[tuple[str,str,list[str],bool]]=[
+            ("PROSPECTIVE_DISTINGUISHING","prospective_ordinary_protected_paths",
+             ["r29-causal/protected/exact-a.txt",
+              "r29-causal/protected/tree-b/**",
+              "r29-causal/protected/exact-c.txt"],True),
+            ("GLOBAL_DENIED_DISTINGUISHING","owner_author_global_denied_paths",
+             ["controller/h034-native/r29-causal-deny/exact-a.txt",
+              "controller/h034-native/r29-causal-deny/tree-b/**",
+              "controller/h034-native/r29-causal-deny/exact-c.txt"],True),
+            ("PROSPECTIVE_OVERLAPPING","prospective_ordinary_protected_paths",
+             ["alternate/protected/**","alternate/protected/child"],False),
+            ("PROSPECTIVE_REORDERED","prospective_ordinary_protected_paths",
+             ["r29-causal/protected/exact-c.txt",
+              "r29-causal/protected/tree-b/**",
+              "r29-causal/protected/exact-a.txt"],True),
+            ("GLOBAL_DENIED_OVERLAPPING","owner_author_global_denied_paths",
+             ["controller/h034-native/r29-overlap-deny/**",
+              "controller/h034-native/r29-overlap-deny/child"],False),
+            ("GLOBAL_DENIED_REORDERED","owner_author_global_denied_paths",
+             ["controller/h034-native/r29-causal-deny/exact-c.txt",
+              "controller/h034-native/r29-causal-deny/tree-b/**",
+              "controller/h034-native/r29-causal-deny/exact-a.txt"],True),
+            ("PROSPECTIVE_BACKSLASH","prospective_ordinary_protected_paths",
+             ["r29-causal\\protected-backslash\\**"],True),
+            ("GLOBAL_DENIED_BACKSLASH","owner_author_global_denied_paths",
+             ["controller\\h034-native\\r29-backslash-deny\\**"],True),
+        ]
+        results=[];details={}
+        for label,field,values,distinguishing in cases:
+            registry=json.loads(json.dumps(template));registry[field]=values
+            prospective=field=="prospective_ordinary_protected_paths"
+            ok,detail=positive_material(
+                "V3_NON_OWNER_"+label,registry,
+                (list(H039_OWNER_PATHS) if prospective
+                 else [H034_OWNER_PATHS[1]]),
+                owner_changes=(list(H039_OWNER_PATHS) if prospective
+                               else [H034_OWNER_PATHS[1]]),
+                protected_paths=(values if prospective else [H039_OWNER_PATHS[0]]),
+                global_denied_paths=([] if prospective else values),
+                require_protected_entry_independence=(distinguishing and prospective),
+                require_global_denied_entry_independence=(distinguishing and not prospective),
+                global_denied_entries_owner_permitted=(distinguishing and not prospective))
+            results.append(ok);details[label]=detail
+        return all(results),details
+
+    causal_repo,causal_base,causal_safe,causal_bare=clone_case(
+        "ACCEPT_EFFECT_CAUSAL",canonical,list(H036_OWNER_PATHS),
+        protected_paths=[])
+    causal_results=[];causal_details={}
+    for effect in ("STATE","WORKSPACE","REMOTE_REFS"):
+        ok,why=unchanged_call("ACCEPT-EFFECT-"+effect,causal_repo,
+            causal_base,causal_safe,causal_bare,"validate-registry",{},
+            accept=True,accept_effect_mutant=effect)
+        causal_results.append(not ok and "'unchanged': False" in why)
+        causal_details[effect]=why
+    record("ACCEPT_SIDE_UNCHANGED_STATE_WORKSPACE_REFS_CAUSAL",
+           all(causal_results),"ACCEPT_SIDE_MUTATION_ORACLE_NOT_CAUSAL",
+           causal_details)
+
+    v3_reordered=json.loads(json.dumps(v3))
+    v3_reordered["owner_production_paths"]=list(reversed(
+        v3_reordered["owner_production_paths"]))
+    positives=[];positive_details={}
+    for label,registry,surface in (
+        ("H034",v3,list(H034_OWNER_PATHS)),
+        ("H036",v3,list(H036_OWNER_PATHS)),
+        ("H039",v3,list(H039_OWNER_PATHS)),
+        ("H039_REORDERED",v3_reordered,list(H039_OWNER_PATHS))):
+        ok,detail=positive_material("V3_"+label,registry,surface)
+        positives.append(ok);positive_details[label]=detail
+    neighbor_ok,neighbor_detail=h039_exact_neighbor_disjointness_positive(v3)
+    non_owner_ok,non_owner_detail=v3_non_owner_list_positives(v3)
+    positives.extend((neighbor_ok,non_owner_ok))
+    positive_details["H039_EXACT_NEIGHBOR_DISJOINTNESS"]=neighbor_detail
+    positive_details["V3_NON_OWNER_LIST_ALTERNATIVES"]=non_owner_detail
+    record("V3_EXACT_POSITIVE_MATERIAL_CONSUMERS",all(positives),
+           "V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3",positive_details)
+
+    def duplicate_key(document: dict[str,object],key: str) -> str:
+        raw=json.dumps(document,indent=2)
+        marker=f'  "{key}": '
+        replacement=marker+json.dumps(document[key],ensure_ascii=False)+",\n"+marker
+        if raw.count(marker)!=1:raise Rig("R29 duplicate-key anchor")
+        return raw.replace(marker,replacement,1)
+
+    descriptors=(
+        (H034_OWNER_PATHS[0],"controller/h034-other/**","controller/**"),
+        (H034_OWNER_PATHS[1],"verify/h034/other-kernel","verify/h034/**"),
+        (H034_OWNER_PATHS[2],"verify/h034/other-recipe.json","verify/h034/**"),
+        (H034_OWNER_PATHS[3],"verify/h034/other-manifest.json","verify/h034/**"),
+        (H036_OWNER_PATHS[0],"controller/launch/other","controller/launch/**"),
+        (H036_OWNER_PATHS[1],"controller/launch/other.py","controller/launch/**"),
+        (H036_OWNER_PATHS[2],"config/python-runtime-authority-v3.json","config/**"),
+        (H039_OWNER_PATHS[0],"controller/runtime-cleanup/other","controller/runtime-cleanup/**"),
+        (H039_OWNER_PATHS[1],"controller/runtime-cleanup/native/other.c","controller/runtime-cleanup/**"),
+        (H039_OWNER_PATHS[2],"verify/h039/other-mediator","verify/h039/**"),
+        (H039_OWNER_PATHS[3],"verify/h039/other-recipe.json","verify/h039/**"),
+        (H039_OWNER_PATHS[4],"verify/h039/other-manifest.json","verify/h039/**"),
+    )
+    hostile: list[tuple[str,object]]=[]
+    for index,(path,substitute,broader) in enumerate(descriptors):
+        member_index=v3["owner_production_paths"].index(path)
+        for defect,replacement in (
+            ("OMISSION",None),("SUBSTITUTION",substitute),
+            ("BACKSLASH_ALIAS",path.replace("/","\\")),
+            ("LEADING_DOT_ALIAS","./"+path),("BROADER_PREFIX",broader)):
+            mutant=json.loads(json.dumps(v3))
+            if replacement is None:del mutant["owner_production_paths"][member_index]
+            else:mutant["owner_production_paths"][member_index]=replacement
+            hostile.append((f"MEMBER_{index}_{defect}",mutant))
+        mutant=json.loads(json.dumps(v3));mutant["owner_production_paths"].append(path)
+        hostile.append((f"MEMBER_{index}_DUPLICATE",mutant))
+    for name,members in (
+        ("ARBITRARY_ADDITION",[*v3["owner_production_paths"],"safe/arbitrary"]),
+        ("H039_NEW_ONLY",list(H039_OWNER_PATHS)),
+        ("H039_PARTIAL_PREFIX",[*H034_OWNER_PATHS,*H036_OWNER_PATHS,H039_OWNER_PATHS[0]]),
+        ("H039_PARTIAL_NONPREFIX",[*H034_OWNER_PATHS,*H036_OWNER_PATHS,
+                                    H039_OWNER_PATHS[1],H039_OWNER_PATHS[4]]),
+        ("V3_WITH_V1_OLD4",list(H034_OWNER_PATHS)),
+        ("V3_WITH_V2_UNION7",[*H034_OWNER_PATHS,*H036_OWNER_PATHS])):
+        mutant=json.loads(json.dumps(v3));mutant["owner_production_paths"]=members
+        hostile.append((name,mutant))
+    for key in tuple(v3):
+        mutant=json.loads(json.dumps(v3));mutant.pop(key)
+        hostile.append(("TOP_LEVEL_MISSING_"+key,mutant))
+    mutant=json.loads(json.dumps(v3));mutant["extra_authority"]=True
+    hostile.append(("TOP_LEVEL_EXTRA",mutant))
+    mutant=json.loads(json.dumps(v3));mutant["owner_production_paths"]={}
+    hostile.append(("OWNER_MEMBERSHIP_TYPE",mutant))
+    hostile.append(("OWNER_MEMBERSHIP_DUPLICATE_KEY",
+                    duplicate_key(v3,"owner_production_paths")))
+    hostile.append(("SCHEMA_VERSION_DUPLICATE_KEY",
+                    duplicate_key(v3,"schema_version")))
+    invalid_versions=(0,4,"1","2","3",False,True,1.0,2.0,3.0,None,[3],{"v":3})
+    for index,value in enumerate(invalid_versions):
+        mutant=json.loads(json.dumps(v3));mutant["schema_version"]=value
+        hostile.append((f"VERSION_TYPE_{index}",mutant))
+    for version in (1,2):
+        mutant=json.loads(json.dumps(v3));mutant["schema_version"]=version
+        hostile.append((f"VERSION_{version}_WITH_UNION12",mutant))
+    for field,wrong in (("path_grammar","grammar-v2"),
+                        ("authority_source","caller-selected")):
+        for defect,value in (("TYPE",[]),("EMPTY",""),("VALUE",wrong)):
+            mutant=json.loads(json.dumps(v3));mutant[field]=value
+            hostile.append((f"NON_OWNER_{field}_{defect}",mutant))
+        hostile.append((f"NON_OWNER_{field}_DUPLICATE_KEY",duplicate_key(v3,field)))
+    for defect,value in (("TYPE_INT",0),("TYPE_STRING","false"),("VALUE_TRUE",True)):
+        mutant=json.loads(json.dumps(v3));mutant["self_digest_is_authority"]=value
+        hostile.append((f"NON_OWNER_SELF_DIGEST_{defect}",mutant))
+    hostile.append(("NON_OWNER_SELF_DIGEST_DUPLICATE_KEY",
+                    duplicate_key(v3,"self_digest_is_authority")))
+    for field in ("prospective_ordinary_protected_paths",
+                  "owner_author_global_denied_paths"):
+        original=v3[field]
+        for defect,value in (
+            ("TYPE",{}),("EMPTY",[]),("MALFORMED",["../escape",*original[1:]]),
+            ("VALUE_TYPE",[7,*original[1:]]),("DUPLICATE",[*original,original[0]]),
+            ("ALIAS_DUPLICATE",[*original,str(original[0]).replace("/","\\")])):
+            mutant=json.loads(json.dumps(v3));mutant[field]=value
+            hostile.append((f"NON_OWNER_{field}_{defect}",mutant))
+        hostile.append((f"NON_OWNER_{field}_DUPLICATE_KEY",duplicate_key(v3,field)))
+    check(len(descriptors)*6==72,"J_R29_EXACT_MEMBER_DEFECT_CARDINALITY")
+
+    def hostile_material(name: str,registry: object) -> tuple[bool,dict[str,str]]:
+        repo,base,safe,bare=clone_case("HOSTILE_"+name,registry,
+                                      list(H039_OWNER_PATHS))
+        details={};checks=[]
+        for label,command,candidate_sha,fields,seed in (
+            ("validate_registry","validate-registry",safe,{},False),
+            ("validate_task","validate-task",base,{"task_id":"r29-safe"},False),
+            ("check_candidate","check-candidate",safe,
+             {"task_id":"r29-safe","actor":"ordinary"},False),
+            ("owner_author","owner-author",base,{"task_id":"r29-owner"},True),
+            ("record_review","record-review",base,{"task_id":"r29-owner",
+             "review_result":"PASS","review_identity":"r29-hostile-review"},True),
+            ("owner_freeze","owner-freeze",base,{"task_id":"r29-owner",
+             "review_result":"PASS","review_identity":"r9-review"},True)):
+            ok,why=unchanged_call("HOSTILE-"+name+"-"+label,repo,base,
+                candidate_sha,bare,command,fields,accept=False,seed=seed)
+            checks.append(ok);details[label]=why
+        ok,why=policy_probe(repo,base,safe,"r29-safe",bare,accept=False,
+                            reason="ogiltig authority contract")
+        checks.append(ok);details["ordinary_policy"]=why
+        return all(checks),details
+
+    hostile_results={}
+    for name,registry in hostile:
+        if name in hostile_results:raise Rig("duplicate R29 hostile case "+name)
+        hostile_results[name]=hostile_material(name,registry)
+    record("V3_ALL_MEMBERS_VERSION_MEMBERSHIP_AND_NON_OWNER_HOSTILES_REJECT",
+           all(ok for ok,_detail in hostile_results.values()),
+           "V3_HOSTILE_REACHED_INCONSISTENT_CONSUMER",
+           {name:detail for name,(ok,detail) in hostile_results.items() if not ok})
+
+    failures=[{"observation":name,"reason":reason}
+              for name,ok,reason,_detail in observations if not ok]
+    expected=H035_R29_THREE_STATE_REGISTRY["preproduct_evidence"]
+    detail=json.dumps({
+        "reason":expected["expected_reason"] if exact_value(
+            failures,expected["expected_failure_signature"])
+            else "UNEXPECTED_R29_FAILURE_SIGNATURE",
+        "failure_signature":failures,
+        "diagnostics":{name:value for name,ok,_reason,value in observations if not ok},
+    },sort_keys=True)
+    check(not failures,"A_R29_EXACT_THREE_STATE_REGISTRY_OPERATIONAL",detail)
+
+
 def production_matrix(tmp: Path) -> None:
     """Future operational CLI contract; every case is black-box, never a named probe."""
     repo, base = authority_repo(tmp, "authority-repo", [
@@ -15107,6 +16032,9 @@ def r15_document_append_selftests() -> None:
     doc_appends={path:(int(row[0]),str(row[1]),str(row[2]).encode("utf-8"))
                  for path,row in dict(H035_R26_SUCCESSOR["doc_appends"]).items()}
     authority_base=str(H035_R26_SUCCESSOR["authority_base_sha"])
+    r26_candidate=str(H035_R29_THREE_STATE_REGISTRY[
+        "historical_r26_contract_candidate_sha"])
+    r29_base=str(H035_R29_THREE_STATE_REGISTRY["preproduct_evidence"]["base_sha"])
     def valid(path: str, base: bytes, candidate: bytes) -> bool:
         size,digest,marker=doc_appends[path]
         if not candidate.startswith(base): return False
@@ -15116,11 +16044,12 @@ def r15_document_append_selftests() -> None:
     positives=[]; mutants=[]
     for path in doc_appends:
         base=r15_git_object_bytes(ROOT,authority_base,path)
-        try: current=(ROOT/path).read_bytes()
-        except OSError: current=b""
-        positives.append(base is not None and valid(path,base,current))
+        published=r15_git_object_bytes(ROOT,r26_candidate,path)
+        positives.append(base is not None and published is not None
+                         and valid(path,base,published))
         if base is None: continue
-        suffix=current[len(base):] if current.startswith(base) else b""
+        suffix=published[len(base):] if published is not None \
+            and published.startswith(base) else b""
         mutants.extend((
             (path,base,b"hostile rewrite\n"),
             (path,base,base[:-1]+suffix),
@@ -15133,6 +16062,33 @@ def r15_document_append_selftests() -> None:
     check(len(mutants)==15 and all(not valid(path,base,candidate)
                                   for path,base,candidate in mutants),
           "J_R26_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_CONTRADICTION_REJECT")
+    r29_appends={path:(int(row[0]),str(row[1]),str(row[2]).encode("utf-8"))
+        for path,row in dict(H035_R29_THREE_STATE_REGISTRY["document_appends"]).items()}
+    def r29_valid(path: str,base: bytes,candidate: bytes) -> bool:
+        size,digest,marker=r29_appends[path]
+        if not candidate.startswith(base):return False
+        suffix=candidate[len(base):]
+        return (len(suffix)==size and hashlib.sha256(suffix).hexdigest()==digest
+                and suffix.startswith(marker) and suffix.endswith(b"\n"))
+    r29_positives=[];r29_mutants=[]
+    for path,(_size,_digest,marker) in r29_appends.items():
+        base=r15_git_object_bytes(ROOT,r29_base,path)
+        try:current=(ROOT/path).read_bytes()
+        except OSError:current=b""
+        suffix=current[len(base):] if base is not None and current.startswith(base) else b""
+        r29_positives.append(base is not None and r29_valid(path,base,current))
+        if base is None:continue
+        r29_mutants.extend(((path,base,base+suffix+b"extra\n"),
+                            (path,base,base+suffix[:-1]),
+                            (path,base,base[:-1]+suffix),
+                            (path,base,b"rewrite\n"+base+suffix),
+                            (path,base,base+suffix.replace(
+                                marker,b"substitute",1))))
+    check(len(r29_positives)==4 and all(r29_positives),
+          "F_R29_FOUR_DOCUMENTS_EXACT_BASE_C161_PLUS_HASH_BOUND_APPEND")
+    check(len(r29_mutants)==20 and all(not r29_valid(path,base,candidate)
+          for path,base,candidate in r29_mutants),
+          "J_R29_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
 
 
 def r15_parallel_cli_selftests() -> None:
@@ -15464,9 +16420,9 @@ def frozen_checks() -> None:
           and "guarded normal merge" in owner_workflow
           and "exactly two parents in order" in owner_workflow,
           "F_CURRENT_AUTHORITY_BOUNDED_DELEGATION_AND_NORMAL_MERGE_CONTRACT")
-    bpam_ok,bpam_why,bpam_contract = bpam_document(delegation_raw)
+    bpam_ok,bpam_why,bpam_contract = r29_bpam_document(delegation_raw)
     check(bpam_ok, "F_R13_BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION", bpam_why)
-    if bpam_ok and isinstance(bpam_contract, dict): bpam_selftests(delegation_raw,bpam_contract)
+    if bpam_ok and isinstance(bpam_contract, dict): r29_bpam_document(delegation_raw,bpam_contract)
     else: check(False, "J_BPAM_MACHINE_CONTRACT_POSITIVE", bpam_why)
     check(len(hits) == 1 and exact_value(hits[0].get("r13_bounded_prerequisite_authority_migration"),BPAM_SPEC_BINDING),
           "F_R13_EXACT_TASK_BINDING")
@@ -15477,6 +16433,11 @@ def frozen_checks() -> None:
     check(exact_value(r14_contract,H035_R14_TWO_STATE_REGISTRY),
           "F_R14_EXACT_TWO_STATE_REGISTRY_TASK_BINDING")
     r14_contract_selftests(r14_contract)
+    r29_contract = (hits[0].get("r29_three_state_owner_production_registry")
+                    if len(hits) == 1 else None)
+    check(exact_value(r29_contract,H035_R29_THREE_STATE_REGISTRY),
+          "F_R29_EXACT_THREE_STATE_REGISTRY_TASK_BINDING")
+    r29_contract_selftests(r29_contract)
     r15_contract = (hits[0].get("r15_owner_product_lifecycle")
                     if len(hits) == 1 else None)
     r15_contract_selftests(r15_contract, tasks, spec)
@@ -19660,6 +20621,46 @@ def main() -> int:
                 return 2
             print("H035_R14_TARGET_RESULT=PASS")
             return 0
+        if (sys.argv[1:2] == ["--r29-registry-migration"]
+                and len(sys.argv) in (2,4)):
+            product_bound=len(sys.argv)==4
+            frozen_checks()
+            if not product_bound:
+                identity_ok,identity_why=r29_test_author_identity()
+                check(identity_ok,
+                      "A_R29_TEST_AUTHOR_EXACT_SIX_FILE_DIRECT_CHILD_IDENTITY",
+                      identity_why)
+            with tempfile.TemporaryDirectory(prefix="h035-r29-registry-") as raw:
+                tmp=Path(raw)
+                r14_registry_migration_controls(tmp)
+                r29_registry_migration_controls(tmp)
+            if product_bound:
+                ok,why=r14_product_identity(sys.argv[2],sys.argv[3])
+                check(ok,"A_R29_PRODUCT_EXACT_CORE_ONLY_DIFF_AND_CANDIDATE_IDENTITY",why)
+            print(f"H035_R29_TARGET_SUMMARY={passed} PASS {failed} FAIL")
+            if failed:
+                expected=H035_R29_THREE_STATE_REGISTRY["preproduct_evidence"]
+                exact_red=False
+                if not product_bound and len(failed_labels)==1:
+                    label,detail=failed_labels[0]
+                    try:payload=json.loads(detail)
+                    except (TypeError,ValueError):payload=None
+                    exact_red=(label==expected["expected_red_label"]
+                        and isinstance(payload,dict)
+                        and payload.get("reason")==expected["expected_reason"]
+                        and exact_value(payload.get("failure_signature"),
+                                        expected["expected_failure_signature"]))
+                if exact_red:
+                    print(f"H035_R29_TARGET_REASON={expected['expected_reason']}")
+                    print("H035_R29_TARGET_RESULT=EXPECTED_PREPRODUCT_RED")
+                    return 1
+                print("H035_R29_TARGET_RESULT=UNEXPECTED_RED")
+                return 2
+            if not product_bound:
+                print("H035_R29_TARGET_RESULT=PRODUCT_IDENTITY_REQUIRED")
+                return 2
+            print("H035_R29_TARGET_RESULT=PASS")
+            return 0
         if (sys.argv[1:2] == ["--r15-owner-product-lifecycle"]
                 and len(sys.argv) in (2,4)):
             product_bound=len(sys.argv)==4
@@ -19732,7 +20733,7 @@ def main() -> int:
             print("H035_R15_TARGET_RESULT=PASS")
             return 0
         if len(sys.argv) != 1:
-            raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH|--r14-registry-migration [BASE_SHA CANDIDATE_SHA]|--r15-owner-product-lifecycle [BASE_SHA CANDIDATE_SHA]]")
+            raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH|--r14-registry-migration [BASE_SHA CANDIDATE_SHA]|--r29-registry-migration [BASE_SHA CANDIDATE_SHA]|--r15-owner-product-lifecycle [BASE_SHA CANDIDATE_SHA]]")
         frozen_checks(); path_selftests(); observer_selftests(); snapshot_selftests()
         with tempfile.TemporaryDirectory(prefix="h035-real-effect-") as raw:
             tmp = Path(raw)
@@ -19762,6 +20763,25 @@ def r15_finalizer_agent_projection(repository_identity: str,
     if not initial_agent or live_agent!=initial_agent:
         raise Rig("R15 finalizer SSH initial-agent authority")
     return {"SSH_AUTH_SOCK":initial_agent}
+
+
+def r29_bpam_document(raw: bytes,contract: dict[str,object] | None=None
+                      ) -> tuple[bool,str,object | None] | None:
+    if (raw.count(R29_OWNER_EXCEPTION_BEGIN)!=1
+            or raw.count(R29_OWNER_EXCEPTION_END)!=1):
+        base=None;why="owner exception marker count"
+    else:
+        base,tail=raw.split(R29_OWNER_EXCEPTION_BEGIN,1)
+        body,trailing=tail.split(R29_OWNER_EXCEPTION_END,1)
+        why="owner exception exact trailing section"
+        if (trailing or not base.endswith(BPAM_SOURCE_END)
+                or hashlib.sha256(body).hexdigest()!=R29_OWNER_EXCEPTION_BODY_SHA256):
+            base=None
+    if contract is None:
+        return bpam_document(base) if base is not None else (False,why,None)
+    check(base is not None,"J_R29_BPAM_EXACT_TRAILING_OWNER_EXCEPTION",why)
+    if base is not None:bpam_selftests(base,contract)
+    return None
 
 
 if __name__ == "__main__":

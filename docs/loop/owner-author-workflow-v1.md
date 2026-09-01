@@ -1310,3 +1310,76 @@ outer-verifier-SIGKILL claim. A fresh product is required after guarded R26.
 ## H-038 R15 dependency-refreeze handoff
 
 Bind H-035 publication `01a1deddedbb0efc0ebafd87b32a30c5613840ba` / `8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0`, review the exact five-byte transform, publish M=[M0,R], then review the H-038 product only as a direct child of M.
+
+## H-035 R29 three-state owner-production registry migration
+
+The H-038 R9 same-euid name→inode replacement proof establishes that userspace
+check-then-unlink cannot simultaneously guarantee foreign-data preservation and zero residue after
+completed cleanup. The 2026-09-01 owner exception therefore permits only a separate H-039 trust
+domain with the minimum OS-exclusive cleanup authority. H-035 R29 does not create H-039, install a
+mediator, change runtime behavior, or mutate the registry. It only freezes the parser contract that
+makes the later exact authority representable.
+
+R27 candidate `6419bd0c6d03f05a776c6e6640873b9941f51d35` is immutable NO-CREDIT and is
+neither amended, merged, published nor used as a parent. Independent gate-review artifacts are
+bound by SHA-256: lane A
+`555d3284e559cd8eaef2fd29ad87430ea0999cb78fd463f965c6f45233d939e9` and lane B
+`6c19f006a358d3f42a74f0ac2644168ee1bf6ad46558c74af05a3d6de8335c3a`. They found a
+duplicate fixed R14 product-scope temp root and missing causal valid-v3 positives. R28 candidate
+`72c2b9fbd936e855bcc3a99a90d06536ec688361` is also immutable NO-CREDIT and is neither
+amended, merged, published nor used as a parent. Its lane-A PASS artifact has SHA-256
+`fbf3ffe2c35497223dbe03770c7c6be3193d2f5e80a13f46141d44efe4035f9f`; its lane-B FAIL
+artifact has SHA-256 `1e0923a40017b8f43ed7ec005382de3e870b67428d54b45252ecd06314ab2497`.
+Blocker R28-B-001 proves that `accept=True` ignored the before/after equality required by the
+unchanged state, workspace and refs contract across the positive families. R29 is a fresh direct
+child of `c161a1c557b58516f3881ac9f49f4e50216c8bc0` and executes the inherited R14
+product-scope selftest exactly once through the R14 floor.
+
+The parser accepts exactly these three built-in integer/membership pairs: `schema_version: 1` with
+the H-034 old four, `schema_version: 2` with those four plus the H-036 current three, and
+`schema_version: 3` with those seven plus exactly:
+
+- `controller/runtime-cleanup/install`
+- `controller/runtime-cleanup/native/mediator.c`
+- `verify/h039/runtime-cleanup-mediator`
+- `verify/h039/build-recipe.json`
+- `verify/h039/identity-manifest.json`
+
+All five are exact files, not prefixes. Missing, partial, additional, substituted, duplicated,
+backslash/leading-dot aliased, broader-prefix or cross-version membership rejects. Every invalid
+version type rejects. All non-owner registry fields and the complete R14 v1/v2 operational floor
+remain unchanged. The R29 BUILDER may change exactly `controller/authority/core.py`; the contract
+candidate changes exactly the six TEST_AUTHOR files named by the task. The canonical registry stays
+byte-identical schema v2 until the later H034 registry-v3 refreeze.
+
+Under a valid v3 registry, ordinary task validation, candidate checking and ordinary policy must
+accept an exact sibling and an exact descendant disjoint from each of the five H039 files. Owner
+tasks requesting `controller/runtime-cleanup/**` or `verify/h039/**` must reject. The valid-v3
+matrix also repeats the historical R14 alternative non-owner-list positives: distinguishing, overlapping, reordered and backslash forms for both prospective ordinary protection and owner
+global deny, with the same causal consumers and unchanged authority state, workspace and refs.
+Every accept and reject `unchanged_call` now requires exact before/after equality for state,
+workspace and remote refs. A valid schema-v2 causal control obtains a real accepted response and then
+injects exactly one disposable state, workspace or remote-ref effect before the after-snapshot; all
+three must be denied credit. This mechanically falsifies an accept-side oracle regression rather
+than relying on static expression shape.
+
+Standard preproduct execution is exactly `--r29-registry-migration`; product acceptance is
+`--r29-registry-migration BASE_SHA CANDIDATE_SHA`. Both run the complete historical R14 matrix and
+the R29 incremental matrix. The only authorized preproduct RED is
+`A_R29_EXACT_THREE_STATE_REGISTRY_OPERATIONAL` with reason
+`V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3` and its exact frozen failure signature. The product mode also
+requires a clean exact HEAD, one direct parent, exact core-only Git diff and candidate-object
+contract bytes.
+
+H-039 must accept a capability/request identity, never a caller-selected path, and derive the exact
+registered cleanup object from protected state in a separate trust domain. It must not grant general
+native/root, unlink/rmdir/rename, filesystem, process, shell, Git/publication, network, credential,
+dynamic-code or Seatbelt/confinement-bypass authority. All relevant runtime descendants are reaped
+before destructive cleanup. Unknown, substituted, stale/replayed or out-of-root state fails closed;
+only exact completed cleanup may assert zero residue.
+
+Serial order is H035 R29 freeze → two independent gate reviews → guarded contract publication →
+core-only product → independent product review → guarded product publication → H034 registry-v3
+refreeze/review/publication → H036 registry-only refreeze/review/publication → H039 contract and
+product/install review/publication → H038 refreeze/product → H032 → H031. There is no supervisor resume
+before every transition is green. H034, H036, H038 and the registry are unchanged in this candidate.

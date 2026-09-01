@@ -4237,3 +4237,48 @@ weakening, or broader filesystem/process/network/credential/owner authority.
 ## H-038 R15 dependency-refreeze
 
 Exact H-035 product publication `01a1deddedbb0efc0ebafd87b32a30c5613840ba` and binding `8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0` are the acyclic base; only the frozen five-path transform is admitted and the future product is a direct child of guarded refreeze merge M.
+
+## H-035 R29 — OS-exclusive cleanup registry boundary
+
+H-038 R9 is preserved as immutable NO-CREDIT and its same-euid final-check/name-to-inode race is
+binding architectural evidence. R29 does not attempt another same-UID check/unlink construction and
+does not relax zero residue. It introduces only a frozen H-035 parser prerequisite for the owner's
+new narrow H-039 exception.
+
+R27 `6419bd0c6d03f05a776c6e6640873b9941f51d35` remains immutable NO-CREDIT and is
+not a parent or publication candidate. Its independent review identities are lane A SHA-256
+`555d3284e559cd8eaef2fd29ad87430ea0999cb78fd463f965c6f45233d939e9` and lane B
+SHA-256 `6c19f006a358d3f42a74f0ac2644168ee1bf6ad46558c74af05a3d6de8335c3a`.
+R28 `72c2b9fbd936e855bcc3a99a90d06536ec688361` is likewise immutable NO-CREDIT and
+not a parent or publication candidate. Lane A passed with artifact SHA-256
+`fbf3ffe2c35497223dbe03770c7c6be3193d2f5e80a13f46141d44efe4035f9f`; lane B failed with
+artifact SHA-256 `1e0923a40017b8f43ed7ec005382de3e870b67428d54b45252ecd06314ab2497` on
+R28-B-001: `accept=True` ignored the before/after equality for state, workspace and refs. R29 starts
+again at c161, retains R28's intended three earlier repairs, and closes this fourth finding.
+
+The active registry transition is exact v2 union7 → v3 union12. Historical v1 old4 and current v2
+union7 remain legal; every other version/membership pairing rejects. The five additions are exact
+files under `controller/runtime-cleanup` and `verify/h039`; no recursive prefix, alias or neighbor is
+admitted. `specs/owner-production-paths.v1.json` remains byte-identical v2 in this candidate, no
+H-039 task exists yet, and H034/H036/H038 task rows are unchanged. The separate BUILDER surface is
+only `controller/authority/core.py`.
+
+For each H039 exact file, disjoint ordinary sibling and descendant tasks/candidates/policy calls
+must accept; the two owner broad prefixes must reject. Valid distinguishing, overlapping, reordered
+and backslash alternative values for both registry-owned non-owner lists must retain their R14
+consumer/effect behavior. These are positive causal controls, not additional authority members.
+Accept and reject results both require unchanged state, workspace and remote refs. One valid-v2
+accepted fixture injects each of the three effect dimensions separately between the before and after
+snapshots and must receive no credit, making the repaired acceptance-side oracle causally testable.
+
+The exception is causal and closed: a later H-039 may own only a separate OS identity/root-protected
+namespace and digest-bound cleanup mediator whose server state derives an exact registered object
+from a capability/request identity. General native/root, caller path, general deletion/rename,
+filesystem/process/shell/Git/network/credential/dynamic-code, cross-service and confinement-bypass
+authority remain denied. If those limits are insufficient, the sequence stops for a new owner
+decision.
+
+Trust transitions remain serial. After H035 R29 contract and product publication, H034 alone moves
+the registry to v3; H036 is then registry-only refrozen because its frozen gate embeds the v2 bytes;
+only then may H039 be frozen/built/reviewed/published. H038 refreeze/product, H032 and H031 follow.
+No supervisor resume is authorized before the entire chain is green.
