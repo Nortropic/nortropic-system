@@ -23,7 +23,7 @@ sys.pycache_prefix="/dev/null/h035-r15-no-bytecode-cache"
 sys.path.insert(0, str(HERE))
 from core import (AuthorityError, blob_at, changed_files, exact_commit, overlaps,  # noqa: E402
                   permitted, regular_blob_at, strict_json_bytes, strict_json_file,
-                  task_authority, validate_registry)
+                  task_authority, validate_registry, validate_owner_surface)
 sys.pycache_prefix=_r15_saved_pycache_prefix
 del _r15_saved_pycache_prefix
 
@@ -89,11 +89,7 @@ def validate_task(req: dict[str, object]) -> int:
     if authority == "ordinary" and any(overlaps(item, guard) for item in surface for guard in protected):
         raise AuthorityError("ordinary surface overlaps protected authority")
     if authority == "owner_authority":
-        if any(overlaps(item, guard) for item in surface
-               for guard in registry["owner_author_global_denied_paths"]):
-            raise AuthorityError("owner surface overlaps global deny")
-        if any(not permitted(item, registry["owner_production_paths"]) for item in surface):
-            raise AuthorityError("owner surface outside owner production")
+        validate_owner_surface(surface, registry)
     base = exact_commit(repo, req.get("base_sha"))
     files = changed_files(repo, base, candidate)
     material = [item for item in files if item not in {
@@ -154,6 +150,7 @@ def check_candidate(req: dict[str, object]) -> int:
         if any(overlaps(item, guard) for item in files
                for guard in registry["owner_author_global_denied_paths"]):
             raise AuthorityError("owner candidate changed global deny")
+        validate_owner_surface(surface, registry)
         if any(overlaps(item, gate_path) for item in files):
             raise AuthorityError("owner candidate changed task gate")
         if any(not permitted(item, surface) for item in files):
@@ -234,13 +231,14 @@ def persist_state(req: dict[str, object], value: dict[str, object]) -> None:
 
 
 def transition_context(req: dict[str, object]) -> tuple[Path, str, dict[str, object]]:
-    repo, candidate, spec_raw, spec, registry_raw, _registry = authority_documents(req)
+    repo, candidate, spec_raw, spec, registry_raw, registry = authority_documents(req)
     task_id = req.get("task_id")
     if not isinstance(task_id, str):
         raise AuthorityError("task_id missing")
-    task, authority, _surface = task_authority(spec, task_id)
+    task, authority, surface = task_authority(spec, task_id)
     if authority != "owner_authority":
         raise AuthorityError("owner transition requires canonical owner task")
+    validate_owner_surface(surface, registry)
     base = exact_commit(repo, req.get("base_sha"))
     main = exact_commit(repo, req.get("main_sha"))
     if req.get("spec_sha256") != digest(spec_raw):
