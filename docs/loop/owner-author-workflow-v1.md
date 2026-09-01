@@ -1310,3 +1310,50 @@ outer-verifier-SIGKILL claim. A fresh product is required after guarded R26.
 ## H-038 R15 dependency-refreeze handoff
 
 Bind H-035 publication `01a1deddedbb0efc0ebafd87b32a30c5613840ba` / `8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0`, review the exact five-byte transform, publish M=[M0,R], then review the H-038 product only as a direct child of M.
+
+## H-035 R27 three-state owner-production registry migration
+
+The H-038 R9 same-euid name→inode replacement proof establishes that userspace
+check-then-unlink cannot simultaneously guarantee foreign-data preservation and zero residue after
+completed cleanup. The 2026-09-01 owner exception therefore permits only a separate H-039 trust
+domain with the minimum OS-exclusive cleanup authority. H-035 R27 does not create H-039, install a
+mediator, change runtime behavior, or mutate the registry. It only freezes the parser contract that
+makes the later exact authority representable.
+
+The parser accepts exactly these three built-in integer/membership pairs: `schema_version: 1` with
+the H-034 old four, `schema_version: 2` with those four plus the H-036 current three, and
+`schema_version: 3` with those seven plus exactly:
+
+- `controller/runtime-cleanup/install`
+- `controller/runtime-cleanup/native/mediator.c`
+- `verify/h039/runtime-cleanup-mediator`
+- `verify/h039/build-recipe.json`
+- `verify/h039/identity-manifest.json`
+
+All five are exact files, not prefixes. Missing, partial, additional, substituted, duplicated,
+backslash/leading-dot aliased, broader-prefix or cross-version membership rejects. Every invalid
+version type rejects. All non-owner registry fields and the complete R14 v1/v2 operational floor
+remain unchanged. The R27 BUILDER may change exactly `controller/authority/core.py`; the contract
+candidate changes exactly the six TEST_AUTHOR files named by the task. The canonical registry stays
+byte-identical schema v2 until the later H034 registry-v3 refreeze.
+
+Standard preproduct execution is exactly `--r27-registry-migration`; product acceptance is
+`--r27-registry-migration BASE_SHA CANDIDATE_SHA`. Both run the complete historical R14 matrix and
+the R27 incremental matrix. The only authorized preproduct RED is
+`A_R27_EXACT_THREE_STATE_REGISTRY_OPERATIONAL` with reason
+`V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3` and its exact frozen failure signature. The product mode also
+requires a clean exact HEAD, one direct parent, exact core-only Git diff and candidate-object
+contract bytes.
+
+H-039 must accept a capability/request identity, never a caller-selected path, and derive the exact
+registered cleanup object from protected state in a separate trust domain. It must not grant general
+native/root, unlink/rmdir/rename, filesystem, process, shell, Git/publication, network, credential,
+dynamic-code or Seatbelt/confinement-bypass authority. All relevant runtime descendants are reaped
+before destructive cleanup. Unknown, substituted, stale/replayed or out-of-root state fails closed;
+only exact completed cleanup may assert zero residue.
+
+Serial order is H035 R27 freeze → two independent gate reviews → guarded contract publication →
+core-only product → independent product review → guarded product publication → H034 registry-v3
+refreeze/review/publication → H036 registry-only refreeze/review/publication → H039 contract and
+product/install review/publication → H038 refreeze/product → H032 → H031. There is no supervisor resume
+before every transition is green. H034, H036, H038 and the registry are unchanged in this candidate.

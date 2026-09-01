@@ -125,8 +125,16 @@ H036_OWNER_PATHS = (
     "controller/launch/cli", "controller/launch/runtime_snapshot.py",
     "config/python-runtime-authority-v2.json",
 )
+H039_OWNER_PATHS = (
+    "controller/runtime-cleanup/install",
+    "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/runtime-cleanup-mediator",
+    "verify/h039/build-recipe.json",
+    "verify/h039/identity-manifest.json",
+)
 REQUIRED_OWNER = set(H034_OWNER_PATHS)
 PROSPECTIVE_OWNER = set((*H034_OWNER_PATHS, *H036_OWNER_PATHS))
+PROSPECTIVE_OWNER_V3 = {*H034_OWNER_PATHS,*H036_OWNER_PATHS,*H039_OWNER_PATHS}
 
 BPAM_AMENDMENT = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_AMENDMENT_V1 -->\n"
 BPAM_CONTRACT_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_BEGIN -->\n```json\n"; BPAM_CONTRACT_END = b"```\n<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_END -->\n"
@@ -134,6 +142,9 @@ BPAM_SOURCE_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_SOURCE_BEGIN
 BPAM_SECTION_DIGESTS = {"prefix":"b00717bc90ad6bfcf8e72cdc3f2498c638ce1ed36867d32ac71152cf3cf8af42", "preamble":"fa296b02e5a417022b4d704605aa5f7cfafede24d5696878786769d0c83d5772",
     "contract":"e8ee5a8321c0a73469ac305803a7b10e14e78845ad27eb0473fdbe9a87692c7f", "bridge":"b4d5b24db445fa77b8cb1dfb87424759207421b259f9580807651912c4482e09",
     "source":"b3cc7d127b5fa42144021642c84b86163e5c358ad1ea711133242fef2ac3ce84"}
+R27_OWNER_EXCEPTION_BEGIN = b"<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_BEGIN -->\n"
+R27_OWNER_EXCEPTION_END = b"<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_END -->\n"
+R27_OWNER_EXCEPTION_BODY_SHA256 = "8b52669824f0f2b3c9086705ca5d7cc977b853b8381f890f62b2d8f7f34ea251"
 BPAM_CONDITIONS = (
     ("BP01","EXISTING_FROZEN_ARCHITECTURE_BLOCKS_APPROVED_OBJECTIVE"),
     ("BP02","REPRODUCIBLE_TECHNICAL_EVIDENCE_PROVES_BLOCKER"),
@@ -345,7 +356,144 @@ H035_R14_TWO_STATE_REGISTRY = {
     "fail_closed":True,
 }
 
-H035_R15_CONTRACT_SHA256 = "cfc9141239d3448470f73aeaf4f92ad9af7efd7ebfc1f307b19ca49841db9390"
+H035_R27_THREE_STATE_REGISTRY = {
+    "contract_id":"H035_THREE_STATE_OWNER_PRODUCTION_REGISTRY_V3",
+    "owner_decision":{
+        "decision_id":"H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_AUTHORITY_2026_09_01",
+        "scope":"MINIMAL_OS_EXCLUSIVE_RUNTIME_CLEANUP_PREREQUISITE_ONLY",
+        "supersedes_hard_stop_only_for":"EXACT_H039_SEPARATE_TRUST_DOMAIN_SEQUENCE",
+        "architectural_evidence":"H038_R9_SAME_EUID_NAME_TO_INODE_REPLACEMENT_AFTER_FINAL_CHECK",
+    },
+    "task_identity":"h-035",
+    "migration_family":"MIGRATE_STRICT_REGISTRY_OR_SCHEMA_TO_EXPLICITLY_VERSIONED_EXACT_STATE",
+    "registry_path":"specs/owner-production-paths.v1.json",
+    "registry_state_in_this_contract":"UNCHANGED_SCHEMA_V2_UNION7",
+    "historical_r26_contract_candidate_sha":"da773a8cebe78ae88956adfc0561abe5dc5093ec",
+    "preproduct_evidence":{
+        "base_sha":"c161a1c557b58516f3881ac9f49f4e50216c8bc0",
+        "core_sha256":"a56398870ca9716b79c701c69e1eda401452c03471c977ebdfe4e210b9b6b1a2",
+        "registry_sha256":"3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256",
+        "expected_red_label":"A_R27_EXACT_THREE_STATE_REGISTRY_OPERATIONAL",
+        "expected_reason":"V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3",
+        "expected_failure_signature":[
+            {"observation":"V3_EXACT_POSITIVE_MATERIAL_CONSUMERS",
+             "reason":"V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3"},
+        ],
+    },
+    "legal_states":[
+        {"schema_version":1,"owner_production_paths":[*H034_OWNER_PATHS]},
+        {"schema_version":2,
+         "owner_production_paths":[*H034_OWNER_PATHS,*H036_OWNER_PATHS]},
+        {"schema_version":3,
+         "owner_production_paths":[*H034_OWNER_PATHS,*H036_OWNER_PATHS,
+                                   *H039_OWNER_PATHS]},
+    ],
+    "active_transition":{
+        "from_schema_version":2,"to_schema_version":3,
+        "added_owner_production_paths":[*H039_OWNER_PATHS],
+        "all_other_registry_fields":"BYTE_SEMANTICALLY_UNCHANGED",
+    },
+    "test_author_allowed_write":[
+        "specs/tasks.spec.json","verify/bin/h-035-exit",
+        "docs/loop/owner-author-workflow-v1.md",
+        "docs/loop/remaining-bootstrap-delegation-v1.md",
+        "docs/05-beslutslogg.md","docs/loop/drift.md",
+    ],
+    "document_appends":{
+        "docs/loop/owner-author-workflow-v1.md":[3184,
+            "1a8055c70de1872751b359e035c8ae1bd74bd032c460c3de66756ea35999671a",
+            "\n## H-035 R27 three-state owner-production registry migration"],
+        "docs/loop/remaining-bootstrap-delegation-v1.md":[2396,
+            "9a8a55923e338a3ca65a69d87368d14eff50611384c795326c66b4f5f94833d4",
+            "<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_BEGIN -->"],
+        "docs/05-beslutslogg.md":[1027,
+            "b9216f6668b293645939599f4bfcefaad22bc2baab7568b96349c54dd6a4cf69",
+            "| 2026-09-01 | H-035 R27 exact H-039 registry representability prerequisite |"],
+        "docs/loop/drift.md":[1784,
+            "0936c432a377298df314c20cce8be4ca4d5e654e4ca09efc71063afe5bc8a45b",
+            "\n## H-035 R27 — OS-exclusive cleanup registry boundary"],
+    },
+    "builder_actual_changed_files":["controller/authority/core.py"],
+    "operational_matrix":{
+        "historical_v1_v2_floor":"UNCHANGED_COMPLETE_R14_OPERATIONAL_MATRIX",
+        "material_consumers":[
+            "validate-registry","validate-task","check-candidate","owner-author",
+            "record-review","owner-freeze","ordinary-policy",
+        ],
+        "v3_positive_owner_surfaces":[
+            "H034_OLD4_EXACT_AND_REORDERED",
+            "H036_CURRENT3_EXACT_AND_REORDERED",
+            "H039_NEW5_EXACT_AND_REORDERED",
+        ],
+        "v3_member_quantifier":"EACH_UNION12_MEMBER",
+        "v3_member_one_defect_families":[
+            "OMISSION","SUBSTITUTION","DUPLICATE","BACKSLASH_ALIAS",
+            "LEADING_DOT_ALIAS","APPLICABLE_BROADER_PREFIX",
+        ],
+        "v3_member_one_defect_count":72,
+        "active_transition_hostiles":[
+            "ARBITRARY_ADDITION","H039_NEW_ONLY","H039_PARTIAL_PREFIX",
+            "H039_PARTIAL_NONPREFIX","H039_SUBSTITUTED_NEIGHBOR",
+            "V3_WITH_V1_OLD4","V3_WITH_V2_UNION7",
+            "V1_OR_V2_WITH_V3_UNION12",
+        ],
+        "version_type_cross_product":"EVERY_FROZEN_INVALID_VERSION_TYPE_WITH_V3_UNION12_PLUS_EVERY_LEGAL_VERSION_WITH_WRONG_LEGAL_MEMBERSHIP",
+        "retained_non_owner_semantics":[
+            "path_grammar","authority_source","self_digest_is_authority",
+            "prospective_ordinary_protected_paths","owner_author_global_denied_paths",
+        ],
+        "non_owner_semantic_defects":"EACH_R14_DEFECT_FAMILY_UNDER_V3",
+        "rejection_effects":"ALL_MATERIAL_CONSUMERS_AND_UNCHANGED_STATE_WORKSPACE_REFS",
+    },
+    "product_acceptance":{
+        "command":"verify/bin/h-035-exit --r27-registry-migration BASE_SHA CANDIDATE_SHA",
+        "candidate_identity":"CLEAN_HEAD_EQUALS_EXACT_CANDIDATE_COMMIT",
+        "base_candidate_relation":"CANDIDATE_HAS_EXACTLY_BASE_AS_ITS_SINGLE_PARENT",
+        "exact_git_diff":["controller/authority/core.py"],
+        "candidate_contract_bytes":["specs/tasks.spec.json","verify/bin/h-035-exit"],
+        "operational_matrix":"UNCHANGED_R14_FLOOR_THEN_COMPLETE_R27_INCREMENTAL_MATRIX_BEFORE_PRODUCT_SCOPE_BINDING",
+    },
+    "downstream_sequence":[
+        "H035_R27_TEST_AUTHOR_FREEZE",
+        "H035_R27_TWO_INDEPENDENT_GATE_REVIEWS",
+        "H035_R27_GUARDED_CONTRACT_PUBLICATION",
+        "H035_R27_CORE_ONLY_BUILDER_PRODUCT",
+        "H035_R27_INDEPENDENT_PRODUCT_REVIEW",
+        "H035_R27_GUARDED_PRODUCT_PUBLICATION",
+        "H034_REGISTRY_V3_REFREEZE_REVIEW_PUBLICATION",
+        "H036_REGISTRY_ONLY_REFREEZE_REVIEW_PUBLICATION",
+        "H039_CONTRACT_FREEZE_INDEPENDENT_GATE_REVIEW_GUARDED_PUBLICATION",
+        "H039_PRODUCT_AND_INSTALL_REVIEW_GUARDED_PUBLICATION",
+        "H038_REFREEZE_PRODUCT_REVIEW_GUARDED_PUBLICATION",
+        "H032_REFREEZE_REVIEW_GUARDED_PUBLICATION",
+        "H031_REBIND_REVIEW_GUARDED_PUBLICATION",
+        "SUPERVISOR_RESUME_ONLY_AFTER_ALL_GREEN",
+    ],
+    "h039_boundary":{
+        "separate_trust_domain":True,
+        "objectives":["ZERO_RUNTIME_RESIDUE_AFTER_COMPLETED_CLEANUP",
+                      "NO_FOREIGN_DELETE_OR_REPLACE_UNDER_SAME_EUID_RACE"],
+        "request_shape":"CAPABILITY_OR_REQUEST_IDENTITY_NOT_CALLER_SELECTED_PATH",
+        "protected_state_derives_exact_cleanup_object":True,
+        "all_runtime_descendants_terminated_and_reaped_before_destructive_cleanup":True,
+        "required_bindings":["INSTALLATION","BINARY_IDENTITY","UID_GID",
+                             "PROTECTED_NAMESPACE","REQUEST_RECEIPT",
+                             "CRASH_RECOVERY","CLEANUP_EFFECTS"],
+    },
+    "forbidden_effects":[
+        "REGISTRY_MUTATION_IN_H035","H039_TASK_GATE_PRODUCT_INSTALL_OR_RUNTIME_EFFECT_IN_H035",
+        "H034_H036_H038_TASK_ROW_CHANGE_IN_H035",
+        "CALLER_SELECTED_PATH_OR_NEIGHBOR","GENERAL_UNLINK_RMDIR_RENAME_OR_FILESYSTEM_AUTHORITY",
+        "SHELL_OR_GENERAL_COMMAND_EXECUTION","GIT_OR_PUBLICATION_AUTHORITY","NETWORK_AUTHORITY",
+        "CREDENTIAL_ACCESS","GENERAL_PROCESS_AUTHORITY","DYNAMIC_CODE_LOADING",
+        "SEATBELT_OR_CONFINEMENT_BYPASS","GENERAL_NATIVE_OR_ROOT_AUTHORITY",
+        "REUSE_OF_ANOTHER_SERVICE_TRUST_DOMAIN_FOR_CONVENIENCE",
+        "CHECK_THEN_UNLINK_UNDER_SAME_UID","ZERO_RESIDUE_WEAKENING",
+    ],
+    "fail_closed":True,
+}
+
+H035_R15_CONTRACT_SHA256 = "020194fa2b42c6cc622bb29ca0cb19ef38a500f17f78e29e4565427ef046db82"
 H035_R15_BASE = "408923a445d081ebb6309e57dfe80423844ce927"
 H035_R15_BASE_TREE = "b306ba137cb348b18df98e895b21ef47e4980e51"
 H035_R15_AST_PYTHON = Path(
@@ -360,9 +508,9 @@ H035_R15_GATE_BASE_DEF_AGGREGATE = "77413d5497b92ed8eb4df7bd805a269ab9a7249c76ce
 H035_R15_GATE_BASE_DEF_NAME_DIGEST = "8cbe0238247d014964f8d23cccf74fb6179fb81099200473b870a9693bf4d2ee"
 H035_R15_GATE_UNCHANGED_DEF_AGGREGATE = "b9b40ec354682bcee4bc5c1077deb02c03aa91c22dcbd5423be9644054567dc6"
 H035_R15_GATE_BASE_NONDEF_DIGEST = "6b69304fa7fed17d29a1460d11ecf64e43a5675e0da28636db4e52af1e6bea4a"
-H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "5a8f026148cf15239d3e972c94e5a693c9a0cfda33656e88c7260918a9c9aabc"
-H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "aaad87206acd3af1cb7ed6943e41fcb2ecfd79a427ccc30819ffe125829155c9"
-H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "1f5718b63ca722fbbd8bfaffd23c15f0c23237bd4c609e479044524f2b7bfb35"
+H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE = "07c6e675c87c9492045d86ea670fd6c45dc9b8abd5b22caa4743c0688e49f63f"
+H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE = "a955a0d4bdad9f4aa89b7cdfa1ea32a03a2d7f7e0943877be79b6c5a21f057c1"
+H035_R15_GATE_ADMITTED_BODY_AGGREGATE = "695207b41f8152cf3340308684be661fdd6422d1a8e66d0c5be1f63bbbb54d31"
 H035_R15_ENV_REVIEWED_AST_SHA256 = {
     "r15_remote_boundary_selftests":"7fa65898c7b5165f168ff608abb89eb47ec8d805459bf5f666d044f6bee9ac75",
     "r15_product_scope_selftests":"717b95a9039b369984c9409c7d87e01b88fd5cb8374b4672ce58916c0d697fe9",
@@ -908,6 +1056,100 @@ def r14_contract_selftests(contract: object) -> None:
           "J_R14_SERIAL_HARD_STOP_FORBIDDEN_FAIL_CLOSED_REJECT")
 
 
+def r27_contract_selftests(contract: object) -> None:
+    def clone() -> dict[str, object]:
+        return json.loads(json.dumps(H035_R27_THREE_STATE_REGISTRY))
+    check(exact_value(contract,H035_R27_THREE_STATE_REGISTRY),
+          "J_R27_EXACT_CONTRACT_POSITIVE")
+    top_mutants=[]
+    for key in H035_R27_THREE_STATE_REGISTRY:
+        mutant=clone();mutant.pop(key);top_mutants.append(mutant)
+    mutant=clone();mutant["extra_authority"]=True;top_mutants.append(mutant)
+    check(all(not exact_value(mutant,H035_R27_THREE_STATE_REGISTRY)
+              for mutant in top_mutants),
+          "J_R27_MISSING_EXTRA_TOP_LEVEL_REJECT")
+    state_mutants=[]
+    for state_index,member_index,replacement in (
+        (0,0,"controller/**"),(1,4,"controller/launch/**"),
+        (2,7,"controller/runtime-cleanup/**"),
+        (2,8,"controller/runtime-cleanup/native/**"),
+        (2,9,"verify/h039/**")):
+        mutant=clone();mutant["legal_states"][state_index][
+            "owner_production_paths"][member_index]=replacement
+        state_mutants.append(mutant)
+    for state_index in range(3):
+        mutant=clone();mutant["legal_states"][state_index]["schema_version"] \
+            = float(state_index+1);state_mutants.append(mutant)
+    mutant=clone();mutant["legal_states"][2]["owner_production_paths"].pop();state_mutants.append(mutant)
+    mutant=clone();mutant["legal_states"][2]["owner_production_paths"].append(
+        H039_OWNER_PATHS[0]);state_mutants.append(mutant)
+    mutant=clone();mutant["active_transition"]["added_owner_production_paths"].pop();state_mutants.append(mutant)
+    check(all(not exact_value(mutant,H035_R27_THREE_STATE_REGISTRY)
+              for mutant in state_mutants),
+          "J_R27_THREE_VERSION_MEMBERSHIP_AND_TYPE_BINDING_REJECT")
+    scope_mutants=[]
+    for key in ("test_author_allowed_write","builder_actual_changed_files"):
+        mutant=clone();mutant[key].pop();scope_mutants.append(mutant)
+        mutant=clone();mutant[key].append("controller/**");scope_mutants.append(mutant)
+    mutant=clone();mutant["document_appends"][
+        "docs/loop/remaining-bootstrap-delegation-v1.md"][1]="0"*64
+    scope_mutants.append(mutant)
+    mutant=clone();mutant["product_acceptance"]["exact_git_diff"].append(
+        "controller/authority/cli");scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["material_consumers"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["operational_matrix"]["v3_member_one_defect_count"]=71;scope_mutants.append(mutant)
+    mutant=clone();mutant["preproduct_evidence"]["expected_failure_signature"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["h039_boundary"]["separate_trust_domain"]=False;scope_mutants.append(mutant)
+    mutant=clone();mutant["h039_boundary"]["request_shape"]="CALLER_PATH";scope_mutants.append(mutant)
+    mutant=clone();mutant["forbidden_effects"].pop();scope_mutants.append(mutant)
+    mutant=clone();mutant["downstream_sequence"].pop(7);scope_mutants.append(mutant)
+    mutant=clone();mutant["fail_closed"]=1;scope_mutants.append(mutant)
+    check(all(not exact_value(mutant,H035_R27_THREE_STATE_REGISTRY)
+              for mutant in scope_mutants),
+          "J_R27_SURFACE_SEQUENCE_BOUNDARY_FORBIDDEN_AND_FAIL_CLOSED_REJECT")
+    delegation=(ROOT/"docs/loop/remaining-bootstrap-delegation-v1.md").read_bytes()
+    exact_section=False
+    if (delegation.count(R27_OWNER_EXCEPTION_BEGIN)==1
+            and delegation.count(R27_OWNER_EXCEPTION_END)==1):
+        prefix,tail=delegation.split(R27_OWNER_EXCEPTION_BEGIN,1)
+        body,suffix=tail.split(R27_OWNER_EXCEPTION_END,1)
+        terms=(b"same-euid name-to-inode",b"zero-runtime-residue",
+               b"server-issued capability/request identity",
+               b"separate from every existing service",
+               b"H-036 registry-only",b"No supervisor resume",
+               b"new owner stop is mandatory")
+        exact_section=(hashlib.sha256(body).hexdigest()
+                       ==R27_OWNER_EXCEPTION_BODY_SHA256
+                       and all(term in body for term in terms)
+                       and prefix.endswith(BPAM_SOURCE_END)
+                       and suffix==b"")
+    check(exact_section,"F_R27_CANONICAL_OWNER_EXCEPTION_EXACT_BOUNDARY")
+    section_mutants=[]
+    if exact_section:
+        section_mutants=[
+            body+b"extra\n",body.replace(b"same-euid",b"caller-euid",1),
+            body.replace(b"No supervisor resume",b"Supervisor resume",1),
+        ]
+    check(len(section_mutants)==3 and all(
+              hashlib.sha256(value).hexdigest()!=R27_OWNER_EXCEPTION_BODY_SHA256
+              for value in section_mutants),
+          "J_R27_OWNER_EXCEPTION_SCOPE_RESUME_AND_EXTRA_MUTANTS_REJECT")
+    owner_workflow=(ROOT/"docs/loop/owner-author-workflow-v1.md").read_text(
+        encoding="utf-8")
+    workflow_terms=(
+        "H-035 R27 three-state owner-production registry migration",
+        "schema_version: 3", "controller/runtime-cleanup/install",
+        "controller/runtime-cleanup/native/mediator.c",
+        "verify/h039/runtime-cleanup-mediator", "verify/h039/build-recipe.json",
+        "verify/h039/identity-manifest.json", "separate trust domain",
+        "same-euid", "caller-selected path", "H034 registry-v3 refreeze",
+        "H036 registry-only refreeze", "no supervisor resume",
+        "--r27-registry-migration BASE_SHA CANDIDATE_SHA",
+    )
+    check(all(term in owner_workflow for term in workflow_terms),
+          "F_R27_WORKFLOW_EXACT_BOUNDARY_AND_SERIAL_CONTRACT")
+
+
 def r15_gate_expected_policy() -> dict[str,object]:
     return {
         "base_definitions_exact_once_in_order":True,"unchanged_definition_count":53,
@@ -924,9 +1166,9 @@ def r15_gate_expected_policy() -> dict[str,object]:
         "capability_family_checks_are_supplemental_to_exact_source_aggregate":True,
         "import_effect_oracle_preserves_inherited_callable_identity":True,
         "new_top_level_requires_exact_manifest":True,
-        "manifest_independent_admitted_definition_count":139,
+        "manifest_independent_admitted_definition_count":143,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":72,
+        "manifest_independent_admitted_nondefinition_count":78,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -971,9 +1213,9 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     check(isinstance(policy,dict) and exact_value(policy,r15_gate_expected_policy()),
           "J_R15_GATE_INHERITANCE_COMPLETE_POLICY_EXACT")
     normalization_policy={
-        "manifest_independent_admitted_definition_count":139,
+        "manifest_independent_admitted_definition_count":143,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":72,
+        "manifest_independent_admitted_nondefinition_count":78,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -996,8 +1238,8 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     for key in normalization_policy:
         value=json.loads(json.dumps(normalization_policy)); value.pop(key); policy_mutants.append(value)
     for key,hostile_values in (
-            ("manifest_independent_admitted_definition_count",(138,139.0,True)),
-            ("manifest_independent_admitted_nondefinition_count",(71,72.0,True)),
+            ("manifest_independent_admitted_definition_count",(142,143.0,True)),
+            ("manifest_independent_admitted_nondefinition_count",(77,78.0,True)),
             ("manifest_independent_admitted_definition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_admitted_nondefinition_aggregate_sha256",("0"*64,True)),
             ("manifest_independent_complete_ordered_module_body_aggregate_sha256",("0"*64,True))):
@@ -1042,10 +1284,16 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
         check(mutant.get("authority_class") != "ordinary",
               "J_R15_LEGACY_" + task_id.upper().replace("-", "_") + "_MISSING_CLASS_REJECT")
 
+    r27_base_spec_raw=r15_git_object_bytes(
+        ROOT,str(H035_R27_THREE_STATE_REGISTRY["preproduct_evidence"]["base_sha"]),
+        "specs/tasks.spec.json")
+    try:r27_base_spec=strict_json_bytes(r27_base_spec_raw or b"")
+    except ValueError:r27_base_spec=None
+
     def exact_spec_transform(candidate_spec: object) -> bool:
-        if not isinstance(candidate_spec,dict) or not isinstance(base_spec,dict): return False
+        if not isinstance(candidate_spec,dict) or not isinstance(r27_base_spec,dict): return False
         candidate_copy=json.loads(json.dumps(candidate_spec))
-        base_copy=json.loads(json.dumps(base_spec))
+        base_copy=json.loads(json.dumps(r27_base_spec))
         candidate_rows=candidate_copy.get("tasks")
         base_candidate_rows=base_copy.get("tasks")
         if not isinstance(candidate_rows,list) or not isinstance(base_candidate_rows,list): return False
@@ -1056,19 +1304,19 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
         for row in candidate_rows:
             if not isinstance(row,dict): return False
             task_id=row.get("id")
-            if task_id in H035_R15_LEGACY_TASKS:
-                if row.pop("authority_class",None)!="ordinary": return False
             if task_id=="h-035":
                 base_h035=next((value for value in base_candidate_rows
                                 if isinstance(value,dict)
                                 and value.get("id")=="h-035"),None)
                 criterion=row.get("exit_criterion")
                 if (not isinstance(base_h035,dict) or not isinstance(criterion,str)
-                        or hashlib.sha256(criterion.encode("utf-8")).hexdigest()!=
-                           "cbba05e86bb76145a7c2e41fa423b11454886367f466c40d92dde20cff347836"):
+                        or criterion!=base_h035.get("exit_criterion")
+                        or row.get("r15_owner_product_lifecycle") is None):
                     return False
-                row["exit_criterion"]=base_h035.get("exit_criterion")
-                if row.pop("r15_owner_product_lifecycle",None) is None: return False
+                row["r15_owner_product_lifecycle"]=base_h035.get(
+                    "r15_owner_product_lifecycle")
+                if row.pop("r27_three_state_owner_production_registry",None) is None:
+                    return False
         return r15_json_equal(candidate_copy,base_copy)
 
     check(exact_spec_transform(current_spec),
@@ -1606,8 +1854,11 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
                   for call in lane_override_calls)==1,
           "J_R26_JUDGE_FIXTURE_DEFAULT_FALSE_EXACT_TWO_STATE_AND_PRODUCT_UNREACHABLE")
     h038_rows=[row for row in tasks if isinstance(row,dict) and row.get("id")=="h-038"]
-    check(len(h038_rows)==1 and h038_rows[0].get("depends_on")==["h-036"]
-          and "h035_r15_published_authority" not in h038_rows[0],
+    r27_base_h038=[row for row in r27_base_spec.get("tasks",[])
+        if isinstance(row,dict) and row.get("id")=="h-038"] \
+        if isinstance(r27_base_spec,dict) else []
+    check(len(h038_rows)==len(r27_base_h038)==1
+          and exact_value(h038_rows[0],r27_base_h038[0]),
           "F_R15_CURRENT_H038_UNCHANGED_UNTIL_SEPARATE_REFREEZE")
     check(hashlib.sha256(base64.b64decode(R15_H036_REVIEW_B64)).hexdigest()
               == R15_H036["review_sha256"]
@@ -4889,6 +5140,44 @@ def r14_product_identity(base: str, candidate_sha: str) -> tuple[bool, str]:
     return True, "clean exact candidate, contract bytes, and core-only diff bound"
 
 
+def r27_test_author_identity() -> tuple[bool,str]:
+    base=str(H035_R27_THREE_STATE_REGISTRY["preproduct_evidence"]["base_sha"])
+    expected=tuple(sorted(H035_R27_THREE_STATE_REGISTRY[
+        "test_author_allowed_write"]))
+    head=git(ROOT,"rev-parse","--verify","HEAD^{commit}")
+    if head.returncode or re.fullmatch(r"[0-9a-f]{40}",head.stdout.strip()) is None:
+        return False,"R27 exact candidate HEAD"
+    candidate_sha=head.stdout.strip()
+    parents=git(ROOT,"rev-list","--parents","-n","1",candidate_sha)
+    if parents.returncode or parents.stdout.split()!=[candidate_sha,base]:
+        return False,"R27 candidate must be direct child of exact c161 authority"
+    names=git(ROOT,"diff","--name-only","--no-renames","--no-ext-diff",
+              "--no-textconv",base,candidate_sha)
+    states=git(ROOT,"diff","--name-status","--no-renames","--no-ext-diff",
+               "--no-textconv",base,candidate_sha)
+    if names.returncode or tuple(names.stdout.splitlines())!=expected:
+        return False,"R27 candidate does not change exact six TEST_AUTHOR files"
+    if states.returncode or states.stdout.splitlines()!=[f"M\t{path}" for path in expected]:
+        return False,"R27 candidate contains add/delete/rename/type substitution"
+    tree=git(ROOT,"--literal-pathspecs","ls-tree",candidate_sha,"--",*expected)
+    observed={}
+    for line in tree.stdout.splitlines():
+        fields=line.split(None,3)
+        if len(fields)==4:observed[fields[3]]=(fields[0],fields[1])
+    wanted={path:(("100755" if path=="verify/bin/h-035-exit" else "100644"),
+                  "blob") for path in expected}
+    if tree.returncode or observed!=wanted:
+        return False,"R27 exact six path modes/types"
+    status=git(ROOT,"status","--porcelain=v1","--untracked-files=all")
+    if status.returncode or status.stdout:
+        return False,"R27 contract acceptance requires clean immutable checkout"
+    if git_object_bytes(ROOT,base,"specs/owner-production-paths.v1.json") \
+            !=git_object_bytes(ROOT,candidate_sha,
+                               "specs/owner-production-paths.v1.json"):
+        return False,"R27 contract may not mutate registry"
+    return True,"clean exact direct-child six-file R27 TEST_AUTHOR candidate"
+
+
 def r14_product_scope_selftests(tmp: Path) -> None:
     repo = tmp / "r14-product-scope"; init_repo(repo)
     core = repo / "controller/authority/core.py"
@@ -6253,10 +6542,36 @@ def r15_gate_normalized_altered_definition(base: ast.AST,
     elif name=="frozen_checks":
         if not isinstance(normalized,ast.FunctionDef):
             return None,"frozen checks island type"
+        wrapper_calls=[]
+        for statement in normalized.body:
+            for value in ast.walk(statement):
+                if (isinstance(value,ast.Call) and isinstance(value.func,ast.Name)
+                        and value.func.id=="r27_bpam_document"):
+                    wrapper_calls.append((statement,value))
+        if ([ast.unparse(statement) for statement,_call in wrapper_calls]!=[
+                "bpam_ok, bpam_why, bpam_contract = r27_bpam_document(delegation_raw)",
+                "if bpam_ok and isinstance(bpam_contract, dict):\n"
+                "    r27_bpam_document(delegation_raw, bpam_contract)\n"
+                "else:\n"
+                "    check(False, 'J_BPAM_MACHINE_CONTRACT_POSITIVE', bpam_why)"]):
+            return None,"frozen checks exact R27 BPAM wrapper island"
+        wrapper_calls[0][1].func.id="bpam_document"
+        wrapper_calls[1][1].func.id="bpam_selftests"
         anchors=[index for index,statement in enumerate(normalized.body)
                  if r15_gate_call_name(statement)=="r14_contract_selftests"]
         if len(anchors)!=1: return None,"R14 selftest anchor cardinality"
-        start=anchors[0]+1; island=normalized.body[start:start+6]
+        start=anchors[0]+1;r27_island=normalized.body[start:start+3]
+        if (len(r27_island)!=3 or not isinstance(r27_island[0],ast.Assign)
+                or [r15_gate_call_name(value) for value in r27_island[1:]]!=[
+                    "check","r27_contract_selftests"]):
+            return None,"frozen checks exact R27 island"
+        r27_targets=[value.id for target in r27_island[0].targets
+                     for value in ast.walk(target)
+                     if isinstance(value,ast.Name) and isinstance(value.ctx,ast.Store)]
+        if r27_targets!=["r27_contract"]:
+            return None,"frozen checks R27 contract binding"
+        del normalized.body[start:start+3]
+        island=normalized.body[start:start+6]
         if (len(island)!=6 or not isinstance(island[0],ast.Assign)
                 or [r15_gate_call_name(value) for value in island[1:]] != [
                     "r15_contract_selftests","r15_document_append_selftests",
@@ -6301,6 +6616,13 @@ def r15_gate_normalized_altered_definition(base: ast.AST,
                              for value in ast.walk(statement.test))]
         if len(r15_indices)!=1: return None,"main R15 dispatch cardinality"
         del body[r15_indices[0]]
+        r27_indices=[index for index,statement in enumerate(body)
+                     if isinstance(statement,ast.If)
+                     and any(isinstance(value,ast.Constant)
+                             and value.value=="--r27-registry-migration"
+                             for value in ast.walk(statement.test))]
+        if len(r27_indices)!=1:return None,"main R27 dispatch cardinality"
+        del body[r27_indices[0]]
         base_usage=[statement for statement in base_body if isinstance(statement,ast.If)
                     and ast.unparse(statement.test)=="len(sys.argv) != 1"]
         usage_indices=[index for index,statement in enumerate(body)
@@ -6466,9 +6788,9 @@ def r15_gate_inheritance_bytes(base_raw: bytes, candidate_raw: bytes,
     if not isinstance(policy,dict) or not exact_value(policy,r15_gate_expected_policy()):
         return False,"exact complete gate inheritance policy"
     normalization_policy={
-        "manifest_independent_admitted_definition_count":139,
+        "manifest_independent_admitted_definition_count":143,
         "manifest_independent_admitted_definition_aggregate_sha256":H035_R15_GATE_ADMITTED_DEFINITION_AGGREGATE,
-        "manifest_independent_admitted_nondefinition_count":72,
+        "manifest_independent_admitted_nondefinition_count":78,
         "manifest_independent_admitted_nondefinition_aggregate_sha256":H035_R15_GATE_ADMITTED_NONDEFINITION_AGGREGATE,
         "manifest_independent_complete_ordered_module_body_aggregate_sha256":H035_R15_GATE_ADMITTED_BODY_AGGREGATE,
         "complete_body_aggregate_normalizes_exactly_body_nondefinition_and_contract_digest_anchor_literals":True,
@@ -6503,7 +6825,7 @@ def r15_gate_inheritance_bytes(base_raw: bytes, candidate_raw: bytes,
         and isinstance(node.targets[0],ast.Name)
         and node.targets[0].id=="H035_R15_CONTRACT_SHA256"]
     pin_bindings,pin_deletions=r15_gate_module_binding_events(candidate)
-    if (len(contract_pins)!=1 or contract_pins[0][0]!=73
+    if (len(contract_pins)!=1 or contract_pins[0][0]!=79
             or pin_bindings.count("H035_R15_CONTRACT_SHA256")!=1
             or "H035_R15_CONTRACT_SHA256" in pin_deletions
             or not isinstance(contract_pins[0][1].value,ast.Constant)
@@ -7298,7 +7620,7 @@ def r15_gate_mutant_source(candidate_raw: bytes, mutant: str) -> bytes:
               and node.value.value==H035_R15_CONTRACT_SHA256]
         single=f"H035_R15_CONTRACT_SHA256 = '{H035_R15_CONTRACT_SHA256}'"
         canonical=f'H035_R15_CONTRACT_SHA256 = "{H035_R15_CONTRACT_SHA256}"'
-        if len(pins)!=1 or pins[0][0]!=73 or rendered.splitlines().count(single)!=1:
+        if len(pins)!=1 or pins[0][0]!=79 or rendered.splitlines().count(single)!=1:
             raise Rig("HR01 contract digest mutant renderer authority")
         rendered=rendered.replace(single,canonical,1)
         if rendered.splitlines().count(canonical)!=1:
@@ -14397,6 +14719,296 @@ def r14_registry_migration_controls(tmp: Path) -> None:
     check(not failures, "A_R14_EXACT_TWO_STATE_REGISTRY_OPERATIONAL", detail)
 
 
+def r27_registry_migration_controls(tmp: Path) -> None:
+    """Incremental v3 matrix; R14 remains the complete v1/v2 floor."""
+    canonical=strict_load(REG)
+    if (not isinstance(canonical,dict)
+            or canonical.get("schema_version")!=2
+            or set(canonical.get("owner_production_paths",[]))!=PROSPECTIVE_OWNER):
+        raise Rig("R27 canonical registry must remain exact schema v2 union7")
+    v3=json.loads(json.dumps(canonical))
+    v3["schema_version"]=3
+    v3["owner_production_paths"]=[*H034_OWNER_PATHS,*H036_OWNER_PATHS,
+                                  *H039_OWNER_PATHS]
+    observations: list[tuple[str,bool,str,object]]=[]
+
+    def record(name: str,ok: bool,reason: str,detail: object) -> None:
+        observations.append((name,ok,reason,detail))
+
+    def clone_case(name: str,registry: object,
+                   owner_surface: list[str]) -> tuple[Path,str,str,Path]:
+        repo=tmp/("r27-case-"+name.lower().replace("_","-"));init_repo(repo)
+        (repo/"specs").mkdir()
+        registry_path=repo/"specs/owner-production-paths.v1.json"
+        if isinstance(registry,dict):write_json(registry_path,registry)
+        elif isinstance(registry,str):registry_path.write_text(
+            registry+("" if registry.endswith("\n") else "\n"),encoding="utf-8")
+        else:raise Rig("R27 registry fixture type")
+        write_json(repo/"specs/tasks.spec.json",{
+            "spec_version":"2.0.0",
+            "defaults":{"denied_write":[],"max_changed_files":10,
+                        "max_added_lines":100},"tasks":[]})
+        commit_paths(repo,"r27 registry activation without future fixture tasks",
+            "specs/tasks.spec.json","specs/owner-production-paths.v1.json")
+        gate=repo/"verify/bin/h-035-exit";gate.parent.mkdir(parents=True)
+        gate.write_bytes(Path(__file__).read_bytes());gate.chmod(0o755)
+        core=repo/"controller/authority/core.py";core.parent.mkdir(parents=True)
+        core.write_bytes((ROOT/"controller/authority/core.py").read_bytes())
+        policy=repo/"controller/policy/cli";policy.parent.mkdir(parents=True)
+        policy.write_bytes((ROOT/"controller/policy/cli").read_bytes());policy.chmod(0o755)
+        tasks=[ordinary_task("r27-safe",["tests/r27-safe/**"]),
+               owner_task("r27-owner",owner_surface)]
+        tasks.extend(ordinary_task(f"r27-protected-{index}",[path])
+                     for index,path in enumerate(H039_OWNER_PATHS))
+        write_json(repo/"specs/tasks.spec.json",{
+            "spec_version":"2.0.0",
+            "defaults":{"denied_write":[],"max_changed_files":10,
+                        "max_added_lines":100},"tasks":tasks})
+        base=commit_paths(repo,"r27 material registry case",
+            "specs/tasks.spec.json","verify/bin/h-035-exit",
+            "controller/authority/core.py","controller/policy/cli")
+        safe=candidate(repo,base,"tests/r27-safe/effect.txt",2700)
+        bare=tmp/("r27-origin-"+name.lower().replace("_","-")+".git")
+        p=run(["git","init","--bare","-q",str(bare)],cwd=tmp)
+        if p.returncode:raise Rig(p.stderr)
+        set_remote_main(bare,repo,base)
+        return repo,base,safe,bare
+
+    def unchanged_call(case: str,repo: Path,base: str,candidate_sha: str,
+                       bare: Path,command: str,fields: dict[str,object],
+                       *,accept: bool,reason: str|None=None,
+                       seed: bool=False) -> tuple[bool,str]:
+        serial=len(list(tmp.glob("r27-*-state")))
+        state=tmp/f"r27-{case.lower()}-{serial}-state"
+        workspace=tmp/f"r27-{case.lower()}-{serial}-workspace"
+        request=transition_request(repo,base,str(fields.get("task_id","r27-owner")),
+                                   state,workspace,bare,candidate_sha=candidate_sha)
+        request.update(fields)
+        if seed:seed_owner_command_state(state,command,request)
+        before=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+                remote_refs(bare))
+        rc,out,detail=authority_call(tmp,command,request)
+        after=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+               remote_refs(bare))
+        accepted=rc==0 and out.get("accepted") is True
+        rejected=rc!=0 and out.get("accepted") is False
+        reason_ok=reason is None or rc==1 and out.get("reason")==reason
+        ok=(accepted if accept else rejected and before==after) and reason_ok
+        return ok,repr({"rc":rc,"out":out,"unchanged":before==after,
+                        "detail":detail})
+
+    def policy_probe(repo: Path,base: str,candidate_sha: str,task_id: str,
+                     bare: Path,*,accept: bool,reason: str="") -> tuple[bool,str]:
+        state=tmp/f"r27-policy-{task_id}-{candidate_sha}-state"
+        workspace=tmp/f"r27-policy-{task_id}-{candidate_sha}-workspace"
+        before=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+                remote_refs(bare))
+        p=run([str(repo/"controller/policy/cli"),"check",task_id,base,candidate_sha],
+              cwd=repo,env=ordinary_python_env())
+        after=(filesystem_snapshot(state),filesystem_snapshot(workspace),
+               remote_refs(bare))
+        output=p.stdout+p.stderr
+        return ((p.returncode==0) is accept and before==after
+                and (not reason or reason in output)),repr({
+                    "rc":p.returncode,"unchanged":before==after,
+                    "output":output[-500:]})
+
+    def positive_material(name: str,registry: dict[str,object],
+                          owner_surface: list[str]) -> tuple[bool,dict[str,str]]:
+        repo,base,safe,bare=clone_case(name,registry,owner_surface)
+        detail: dict[str,str]={};checks=[]
+        for label,command,candidate_sha,fields in (
+            ("registry","validate-registry",safe,{}),
+            ("task","validate-task",base,{"task_id":"r27-owner"}),
+            ("candidate","check-candidate",safe,
+             {"task_id":"r27-safe","actor":"ordinary"})):
+            ok,why=unchanged_call(name,repo,base,candidate_sha,bare,command,
+                                  fields,accept=True)
+            checks.append(ok);detail[label]=why
+        state=tmp/f"r27-{name.lower()}-chain-state"
+        workspace=tmp/f"r27-{name.lower()}-chain-workspace"
+        write_json(state/"current.json",{
+            "task":"r27-owner","state":"OWNER_ACTION_REQUIRED","base_sha":base})
+        request=transition_request(repo,base,"r27-owner",state,workspace,bare)
+        refs_before=remote_refs(bare);chain=[]
+        for command,fields in (
+            ("owner-author",{}),
+            ("check-candidate",{"actor":"owner_authority"}),
+            ("record-review",{"review_result":"PASS",
+                              "review_identity":"r27-"+name+"-review"}),
+            ("owner-freeze",{"review_result":"PASS",
+                             "review_identity":"r27-"+name+"-review"})):
+            rc,out,why=authority_call(tmp,command,{**request,**fields})
+            chain.append((rc,out,why))
+        chain_ok=(all(rc==0 and out.get("accepted") is True
+                      for rc,out,_why in chain)
+                  and "OWNER_FROZEN" in persisted_state(state)
+                  and remote_refs(bare)==refs_before)
+        checks.append(chain_ok);detail["owner_chain"]=repr(chain)
+        ok,why=policy_probe(repo,base,safe,"r27-safe",bare,accept=True)
+        checks.append(ok);detail["ordinary_policy"]=why
+        for index,path in enumerate(H039_OWNER_PATHS):
+            protected_task_id=f"r27-protected-{index}"
+            ok,why=unchanged_call(name+f"-protected-task-{index}",repo,base,
+                base,bare,"validate-task",{"task_id":protected_task_id},
+                accept=False,reason="ordinary surface overlaps protected authority")
+            checks.append(ok);detail[f"protected_validate_task_{index}"]=why
+            protected=candidate(repo,base,path,2750+index)
+            ok,why=unchanged_call(name+f"-protected-{index}",repo,base,
+                protected,bare,"check-candidate",
+                {"task_id":protected_task_id,"actor":"ordinary"},accept=False,
+                reason="ordinary candidate overlaps protected authority")
+            checks.append(ok);detail[f"protected_candidate_{index}"]=why
+            ok,why=policy_probe(repo,base,protected,protected_task_id,bare,accept=False,
+                reason=(f"ordinary task {protected_task_id} "
+                        "överlappar skyddad authority-yta"))
+            checks.append(ok);detail[f"protected_policy_{index}"]=why
+        return all(checks),detail
+
+    v3_reordered=json.loads(json.dumps(v3))
+    v3_reordered["owner_production_paths"]=list(reversed(
+        v3_reordered["owner_production_paths"]))
+    positives=[];positive_details={}
+    for label,registry,surface in (
+        ("H034",v3,list(H034_OWNER_PATHS)),
+        ("H036",v3,list(H036_OWNER_PATHS)),
+        ("H039",v3,list(H039_OWNER_PATHS)),
+        ("H039_REORDERED",v3_reordered,list(H039_OWNER_PATHS))):
+        ok,detail=positive_material("V3_"+label,registry,surface)
+        positives.append(ok);positive_details[label]=detail
+    record("V3_EXACT_POSITIVE_MATERIAL_CONSUMERS",all(positives),
+           "V2_ONLY_CORE_REJECTS_EXACT_SCHEMA_V3",positive_details)
+
+    def duplicate_key(document: dict[str,object],key: str) -> str:
+        raw=json.dumps(document,indent=2)
+        marker=f'  "{key}": '
+        replacement=marker+json.dumps(document[key],ensure_ascii=False)+",\n"+marker
+        if raw.count(marker)!=1:raise Rig("R27 duplicate-key anchor")
+        return raw.replace(marker,replacement,1)
+
+    descriptors=(
+        (H034_OWNER_PATHS[0],"controller/h034-other/**","controller/**"),
+        (H034_OWNER_PATHS[1],"verify/h034/other-kernel","verify/h034/**"),
+        (H034_OWNER_PATHS[2],"verify/h034/other-recipe.json","verify/h034/**"),
+        (H034_OWNER_PATHS[3],"verify/h034/other-manifest.json","verify/h034/**"),
+        (H036_OWNER_PATHS[0],"controller/launch/other","controller/launch/**"),
+        (H036_OWNER_PATHS[1],"controller/launch/other.py","controller/launch/**"),
+        (H036_OWNER_PATHS[2],"config/python-runtime-authority-v3.json","config/**"),
+        (H039_OWNER_PATHS[0],"controller/runtime-cleanup/other","controller/runtime-cleanup/**"),
+        (H039_OWNER_PATHS[1],"controller/runtime-cleanup/native/other.c","controller/runtime-cleanup/**"),
+        (H039_OWNER_PATHS[2],"verify/h039/other-mediator","verify/h039/**"),
+        (H039_OWNER_PATHS[3],"verify/h039/other-recipe.json","verify/h039/**"),
+        (H039_OWNER_PATHS[4],"verify/h039/other-manifest.json","verify/h039/**"),
+    )
+    hostile: list[tuple[str,object]]=[]
+    for index,(path,substitute,broader) in enumerate(descriptors):
+        member_index=v3["owner_production_paths"].index(path)
+        for defect,replacement in (
+            ("OMISSION",None),("SUBSTITUTION",substitute),
+            ("BACKSLASH_ALIAS",path.replace("/","\\")),
+            ("LEADING_DOT_ALIAS","./"+path),("BROADER_PREFIX",broader)):
+            mutant=json.loads(json.dumps(v3))
+            if replacement is None:del mutant["owner_production_paths"][member_index]
+            else:mutant["owner_production_paths"][member_index]=replacement
+            hostile.append((f"MEMBER_{index}_{defect}",mutant))
+        mutant=json.loads(json.dumps(v3));mutant["owner_production_paths"].append(path)
+        hostile.append((f"MEMBER_{index}_DUPLICATE",mutant))
+    for name,members in (
+        ("ARBITRARY_ADDITION",[*v3["owner_production_paths"],"safe/arbitrary"]),
+        ("H039_NEW_ONLY",list(H039_OWNER_PATHS)),
+        ("H039_PARTIAL_PREFIX",[*H034_OWNER_PATHS,*H036_OWNER_PATHS,H039_OWNER_PATHS[0]]),
+        ("H039_PARTIAL_NONPREFIX",[*H034_OWNER_PATHS,*H036_OWNER_PATHS,
+                                    H039_OWNER_PATHS[1],H039_OWNER_PATHS[4]]),
+        ("V3_WITH_V1_OLD4",list(H034_OWNER_PATHS)),
+        ("V3_WITH_V2_UNION7",[*H034_OWNER_PATHS,*H036_OWNER_PATHS])):
+        mutant=json.loads(json.dumps(v3));mutant["owner_production_paths"]=members
+        hostile.append((name,mutant))
+    for key in tuple(v3):
+        mutant=json.loads(json.dumps(v3));mutant.pop(key)
+        hostile.append(("TOP_LEVEL_MISSING_"+key,mutant))
+    mutant=json.loads(json.dumps(v3));mutant["extra_authority"]=True
+    hostile.append(("TOP_LEVEL_EXTRA",mutant))
+    mutant=json.loads(json.dumps(v3));mutant["owner_production_paths"]={}
+    hostile.append(("OWNER_MEMBERSHIP_TYPE",mutant))
+    hostile.append(("OWNER_MEMBERSHIP_DUPLICATE_KEY",
+                    duplicate_key(v3,"owner_production_paths")))
+    hostile.append(("SCHEMA_VERSION_DUPLICATE_KEY",
+                    duplicate_key(v3,"schema_version")))
+    invalid_versions=(0,4,"1","2","3",False,True,1.0,2.0,3.0,None,[3],{"v":3})
+    for index,value in enumerate(invalid_versions):
+        mutant=json.loads(json.dumps(v3));mutant["schema_version"]=value
+        hostile.append((f"VERSION_TYPE_{index}",mutant))
+    for version in (1,2):
+        mutant=json.loads(json.dumps(v3));mutant["schema_version"]=version
+        hostile.append((f"VERSION_{version}_WITH_UNION12",mutant))
+    for field,wrong in (("path_grammar","grammar-v2"),
+                        ("authority_source","caller-selected")):
+        for defect,value in (("TYPE",[]),("EMPTY",""),("VALUE",wrong)):
+            mutant=json.loads(json.dumps(v3));mutant[field]=value
+            hostile.append((f"NON_OWNER_{field}_{defect}",mutant))
+        hostile.append((f"NON_OWNER_{field}_DUPLICATE_KEY",duplicate_key(v3,field)))
+    for defect,value in (("TYPE_INT",0),("TYPE_STRING","false"),("VALUE_TRUE",True)):
+        mutant=json.loads(json.dumps(v3));mutant["self_digest_is_authority"]=value
+        hostile.append((f"NON_OWNER_SELF_DIGEST_{defect}",mutant))
+    hostile.append(("NON_OWNER_SELF_DIGEST_DUPLICATE_KEY",
+                    duplicate_key(v3,"self_digest_is_authority")))
+    for field in ("prospective_ordinary_protected_paths",
+                  "owner_author_global_denied_paths"):
+        original=v3[field]
+        for defect,value in (
+            ("TYPE",{}),("EMPTY",[]),("MALFORMED",["../escape",*original[1:]]),
+            ("VALUE_TYPE",[7,*original[1:]]),("DUPLICATE",[*original,original[0]]),
+            ("ALIAS_DUPLICATE",[*original,str(original[0]).replace("/","\\")])):
+            mutant=json.loads(json.dumps(v3));mutant[field]=value
+            hostile.append((f"NON_OWNER_{field}_{defect}",mutant))
+        hostile.append((f"NON_OWNER_{field}_DUPLICATE_KEY",duplicate_key(v3,field)))
+    check(len(descriptors)*6==72,"J_R27_EXACT_MEMBER_DEFECT_CARDINALITY")
+
+    def hostile_material(name: str,registry: object) -> tuple[bool,dict[str,str]]:
+        repo,base,safe,bare=clone_case("HOSTILE_"+name,registry,
+                                      list(H039_OWNER_PATHS))
+        details={};checks=[]
+        for label,command,candidate_sha,fields,seed in (
+            ("validate_registry","validate-registry",safe,{},False),
+            ("validate_task","validate-task",base,{"task_id":"r27-safe"},False),
+            ("check_candidate","check-candidate",safe,
+             {"task_id":"r27-safe","actor":"ordinary"},False),
+            ("owner_author","owner-author",base,{"task_id":"r27-owner"},True),
+            ("record_review","record-review",base,{"task_id":"r27-owner",
+             "review_result":"PASS","review_identity":"r27-hostile-review"},True),
+            ("owner_freeze","owner-freeze",base,{"task_id":"r27-owner",
+             "review_result":"PASS","review_identity":"r9-review"},True)):
+            ok,why=unchanged_call("HOSTILE-"+name+"-"+label,repo,base,
+                candidate_sha,bare,command,fields,accept=False,seed=seed)
+            checks.append(ok);details[label]=why
+        ok,why=policy_probe(repo,base,safe,"r27-safe",bare,accept=False,
+                            reason="ogiltig authority contract")
+        checks.append(ok);details["ordinary_policy"]=why
+        return all(checks),details
+
+    hostile_results={}
+    for name,registry in hostile:
+        if name in hostile_results:raise Rig("duplicate R27 hostile case "+name)
+        hostile_results[name]=hostile_material(name,registry)
+    record("V3_ALL_MEMBERS_VERSION_MEMBERSHIP_AND_NON_OWNER_HOSTILES_REJECT",
+           all(ok for ok,_detail in hostile_results.values()),
+           "V3_HOSTILE_REACHED_INCONSISTENT_CONSUMER",
+           {name:detail for name,(ok,detail) in hostile_results.items() if not ok})
+
+    r14_product_scope_selftests(tmp)
+    failures=[{"observation":name,"reason":reason}
+              for name,ok,reason,_detail in observations if not ok]
+    expected=H035_R27_THREE_STATE_REGISTRY["preproduct_evidence"]
+    detail=json.dumps({
+        "reason":expected["expected_reason"] if exact_value(
+            failures,expected["expected_failure_signature"])
+            else "UNEXPECTED_R27_FAILURE_SIGNATURE",
+        "failure_signature":failures,
+        "diagnostics":{name:value for name,ok,_reason,value in observations if not ok},
+    },sort_keys=True)
+    check(not failures,"A_R27_EXACT_THREE_STATE_REGISTRY_OPERATIONAL",detail)
+
+
 def production_matrix(tmp: Path) -> None:
     """Future operational CLI contract; every case is black-box, never a named probe."""
     repo, base = authority_repo(tmp, "authority-repo", [
@@ -15107,6 +15719,9 @@ def r15_document_append_selftests() -> None:
     doc_appends={path:(int(row[0]),str(row[1]),str(row[2]).encode("utf-8"))
                  for path,row in dict(H035_R26_SUCCESSOR["doc_appends"]).items()}
     authority_base=str(H035_R26_SUCCESSOR["authority_base_sha"])
+    r26_candidate=str(H035_R27_THREE_STATE_REGISTRY[
+        "historical_r26_contract_candidate_sha"])
+    r27_base=str(H035_R27_THREE_STATE_REGISTRY["preproduct_evidence"]["base_sha"])
     def valid(path: str, base: bytes, candidate: bytes) -> bool:
         size,digest,marker=doc_appends[path]
         if not candidate.startswith(base): return False
@@ -15116,11 +15731,12 @@ def r15_document_append_selftests() -> None:
     positives=[]; mutants=[]
     for path in doc_appends:
         base=r15_git_object_bytes(ROOT,authority_base,path)
-        try: current=(ROOT/path).read_bytes()
-        except OSError: current=b""
-        positives.append(base is not None and valid(path,base,current))
+        published=r15_git_object_bytes(ROOT,r26_candidate,path)
+        positives.append(base is not None and published is not None
+                         and valid(path,base,published))
         if base is None: continue
-        suffix=current[len(base):] if current.startswith(base) else b""
+        suffix=published[len(base):] if published is not None \
+            and published.startswith(base) else b""
         mutants.extend((
             (path,base,b"hostile rewrite\n"),
             (path,base,base[:-1]+suffix),
@@ -15133,6 +15749,33 @@ def r15_document_append_selftests() -> None:
     check(len(mutants)==15 and all(not valid(path,base,candidate)
                                   for path,base,candidate in mutants),
           "J_R26_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_CONTRADICTION_REJECT")
+    r27_appends={path:(int(row[0]),str(row[1]),str(row[2]).encode("utf-8"))
+        for path,row in dict(H035_R27_THREE_STATE_REGISTRY["document_appends"]).items()}
+    def r27_valid(path: str,base: bytes,candidate: bytes) -> bool:
+        size,digest,marker=r27_appends[path]
+        if not candidate.startswith(base):return False
+        suffix=candidate[len(base):]
+        return (len(suffix)==size and hashlib.sha256(suffix).hexdigest()==digest
+                and suffix.startswith(marker) and suffix.endswith(b"\n"))
+    r27_positives=[];r27_mutants=[]
+    for path,(_size,_digest,marker) in r27_appends.items():
+        base=r15_git_object_bytes(ROOT,r27_base,path)
+        try:current=(ROOT/path).read_bytes()
+        except OSError:current=b""
+        suffix=current[len(base):] if base is not None and current.startswith(base) else b""
+        r27_positives.append(base is not None and r27_valid(path,base,current))
+        if base is None:continue
+        r27_mutants.extend(((path,base,base+suffix+b"extra\n"),
+                            (path,base,base+suffix[:-1]),
+                            (path,base,base[:-1]+suffix),
+                            (path,base,b"rewrite\n"+base+suffix),
+                            (path,base,base+suffix.replace(
+                                marker,b"substitute",1))))
+    check(len(r27_positives)==4 and all(r27_positives),
+          "F_R27_FOUR_DOCUMENTS_EXACT_BASE_C161_PLUS_HASH_BOUND_APPEND")
+    check(len(r27_mutants)==20 and all(not r27_valid(path,base,candidate)
+          for path,base,candidate in r27_mutants),
+          "J_R27_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
 
 
 def r15_parallel_cli_selftests() -> None:
@@ -15464,9 +16107,9 @@ def frozen_checks() -> None:
           and "guarded normal merge" in owner_workflow
           and "exactly two parents in order" in owner_workflow,
           "F_CURRENT_AUTHORITY_BOUNDED_DELEGATION_AND_NORMAL_MERGE_CONTRACT")
-    bpam_ok,bpam_why,bpam_contract = bpam_document(delegation_raw)
+    bpam_ok,bpam_why,bpam_contract = r27_bpam_document(delegation_raw)
     check(bpam_ok, "F_R13_BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION", bpam_why)
-    if bpam_ok and isinstance(bpam_contract, dict): bpam_selftests(delegation_raw,bpam_contract)
+    if bpam_ok and isinstance(bpam_contract, dict): r27_bpam_document(delegation_raw,bpam_contract)
     else: check(False, "J_BPAM_MACHINE_CONTRACT_POSITIVE", bpam_why)
     check(len(hits) == 1 and exact_value(hits[0].get("r13_bounded_prerequisite_authority_migration"),BPAM_SPEC_BINDING),
           "F_R13_EXACT_TASK_BINDING")
@@ -15477,6 +16120,11 @@ def frozen_checks() -> None:
     check(exact_value(r14_contract,H035_R14_TWO_STATE_REGISTRY),
           "F_R14_EXACT_TWO_STATE_REGISTRY_TASK_BINDING")
     r14_contract_selftests(r14_contract)
+    r27_contract = (hits[0].get("r27_three_state_owner_production_registry")
+                    if len(hits) == 1 else None)
+    check(exact_value(r27_contract,H035_R27_THREE_STATE_REGISTRY),
+          "F_R27_EXACT_THREE_STATE_REGISTRY_TASK_BINDING")
+    r27_contract_selftests(r27_contract)
     r15_contract = (hits[0].get("r15_owner_product_lifecycle")
                     if len(hits) == 1 else None)
     r15_contract_selftests(r15_contract, tasks, spec)
@@ -19660,6 +20308,46 @@ def main() -> int:
                 return 2
             print("H035_R14_TARGET_RESULT=PASS")
             return 0
+        if (sys.argv[1:2] == ["--r27-registry-migration"]
+                and len(sys.argv) in (2,4)):
+            product_bound=len(sys.argv)==4
+            frozen_checks()
+            if not product_bound:
+                identity_ok,identity_why=r27_test_author_identity()
+                check(identity_ok,
+                      "A_R27_TEST_AUTHOR_EXACT_SIX_FILE_DIRECT_CHILD_IDENTITY",
+                      identity_why)
+            with tempfile.TemporaryDirectory(prefix="h035-r27-registry-") as raw:
+                tmp=Path(raw)
+                r14_registry_migration_controls(tmp)
+                r27_registry_migration_controls(tmp)
+            if product_bound:
+                ok,why=r14_product_identity(sys.argv[2],sys.argv[3])
+                check(ok,"A_R27_PRODUCT_EXACT_CORE_ONLY_DIFF_AND_CANDIDATE_IDENTITY",why)
+            print(f"H035_R27_TARGET_SUMMARY={passed} PASS {failed} FAIL")
+            if failed:
+                expected=H035_R27_THREE_STATE_REGISTRY["preproduct_evidence"]
+                exact_red=False
+                if not product_bound and len(failed_labels)==1:
+                    label,detail=failed_labels[0]
+                    try:payload=json.loads(detail)
+                    except (TypeError,ValueError):payload=None
+                    exact_red=(label==expected["expected_red_label"]
+                        and isinstance(payload,dict)
+                        and payload.get("reason")==expected["expected_reason"]
+                        and exact_value(payload.get("failure_signature"),
+                                        expected["expected_failure_signature"]))
+                if exact_red:
+                    print(f"H035_R27_TARGET_REASON={expected['expected_reason']}")
+                    print("H035_R27_TARGET_RESULT=EXPECTED_PREPRODUCT_RED")
+                    return 1
+                print("H035_R27_TARGET_RESULT=UNEXPECTED_RED")
+                return 2
+            if not product_bound:
+                print("H035_R27_TARGET_RESULT=PRODUCT_IDENTITY_REQUIRED")
+                return 2
+            print("H035_R27_TARGET_RESULT=PASS")
+            return 0
         if (sys.argv[1:2] == ["--r15-owner-product-lifecycle"]
                 and len(sys.argv) in (2,4)):
             product_bound=len(sys.argv)==4
@@ -19732,7 +20420,7 @@ def main() -> int:
             print("H035_R15_TARGET_RESULT=PASS")
             return 0
         if len(sys.argv) != 1:
-            raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH|--r14-registry-migration [BASE_SHA CANDIDATE_SHA]|--r15-owner-product-lifecycle [BASE_SHA CANDIDATE_SHA]]")
+            raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH|--r14-registry-migration [BASE_SHA CANDIDATE_SHA]|--r27-registry-migration [BASE_SHA CANDIDATE_SHA]|--r15-owner-product-lifecycle [BASE_SHA CANDIDATE_SHA]]")
         frozen_checks(); path_selftests(); observer_selftests(); snapshot_selftests()
         with tempfile.TemporaryDirectory(prefix="h035-real-effect-") as raw:
             tmp = Path(raw)
@@ -19762,6 +20450,25 @@ def r15_finalizer_agent_projection(repository_identity: str,
     if not initial_agent or live_agent!=initial_agent:
         raise Rig("R15 finalizer SSH initial-agent authority")
     return {"SSH_AUTH_SOCK":initial_agent}
+
+
+def r27_bpam_document(raw: bytes,contract: dict[str,object] | None=None
+                      ) -> tuple[bool,str,object | None] | None:
+    if (raw.count(R27_OWNER_EXCEPTION_BEGIN)!=1
+            or raw.count(R27_OWNER_EXCEPTION_END)!=1):
+        base=None;why="owner exception marker count"
+    else:
+        base,tail=raw.split(R27_OWNER_EXCEPTION_BEGIN,1)
+        body,trailing=tail.split(R27_OWNER_EXCEPTION_END,1)
+        why="owner exception exact trailing section"
+        if (trailing or not base.endswith(BPAM_SOURCE_END)
+                or hashlib.sha256(body).hexdigest()!=R27_OWNER_EXCEPTION_BODY_SHA256):
+            base=None
+    if contract is None:
+        return bpam_document(base) if base is not None else (False,why,None)
+    check(base is not None,"J_R27_BPAM_EXACT_TRAILING_OWNER_EXCEPTION",why)
+    if base is not None:bpam_selftests(base,contract)
+    return None
 
 
 if __name__ == "__main__":

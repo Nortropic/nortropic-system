@@ -365,3 +365,33 @@ After that point, do not ask the human owner for ordinary scheduling or approval
 
 Continue automatically through them and surface only genuine human-hard-stop conditions defined above.
 <!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_SOURCE_END -->
+<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_BEGIN -->
+## H-038 OS-exclusive runtime-cleanup owner exception
+
+**Owner decision:** 2026-09-01. The demonstrated H-038 R9 same-euid name-to-inode
+replacement after the last userspace check is binding architectural-impossibility evidence.
+Check-then-unlink under the same UID is no longer an admissible implementation, and the
+zero-runtime-residue requirement may not be weakened.
+
+The owner authorizes one prerequisite, H-039, and only the minimum OS-exclusive cleanup authority
+required to make both properties true: completed cleanup leaves zero registered Nortropic runtime
+residue, and completed cleanup cannot delete or replace foreign data through a same-euid race. The
+preferred shape is a separate OS identity and root-protected runtime namespace with a small,
+digest-bound mediator in a trust domain separate from every existing service. Requests use a
+server-issued capability/request identity, never a caller-selected path; protected state derives the
+only registered runtime/attempt object. All relevant runtime descendants are terminated and reaped
+before destructive cleanup. Installation, executable identity, UID/GID, protected namespace,
+request/receipt, crash recovery and cleanup effects must be exact and adversarially verifiable.
+
+This narrow exception supersedes the standing `PRIVILEGED_OR_NATIVE_BROKER_WITH_MATERIALLY_NEW_TRUST_MODEL`
+hard stop only for that exact H-039 trust domain and sequence. It grants no general native/root,
+unlink/rmdir/rename, filesystem, process, shell/command, Git/publication, network, credential,
+dynamic-code, Seatbelt/confinement-bypass, caller-selected, neighboring or cross-service authority.
+H-035 only makes the five exact prospective H-039 owner-production files representable and leaves
+the registry at schema v2. The strict serial continuation is H-035 parser contract/review/product →
+H-034 registry-v3 refreeze/review/publication → mechanically required H-036 registry-only
+refreeze/review/publication → H-039 contract/review/product/install review/publication → H-038
+refreeze/product/review/publication → H-032 → H-031. No supervisor resume occurs before all are
+green. If the minimum H-039 design requires broader authority, this exception does not apply and a
+new owner stop is mandatory.
+<!-- H038_OS_EXCLUSIVE_RUNTIME_CLEANUP_OWNER_EXCEPTION_V1_END -->

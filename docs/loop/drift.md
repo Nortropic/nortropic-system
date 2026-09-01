@@ -4237,3 +4237,29 @@ weakening, or broader filesystem/process/network/credential/owner authority.
 ## H-038 R15 dependency-refreeze
 
 Exact H-035 product publication `01a1deddedbb0efc0ebafd87b32a30c5613840ba` and binding `8d872dcb99984a2f7922cf18eb8c7e83eac9bf07961b2195ceaf15fbfa03a9d0` are the acyclic base; only the frozen five-path transform is admitted and the future product is a direct child of guarded refreeze merge M.
+
+## H-035 R27 — OS-exclusive cleanup registry boundary
+
+H-038 R9 is preserved as immutable NO-CREDIT and its same-euid final-check/name-to-inode race is
+binding architectural evidence. R27 does not attempt another same-UID check/unlink construction and
+does not relax zero residue. It introduces only a frozen H-035 parser prerequisite for the owner's
+new narrow H-039 exception.
+
+The active registry transition is exact v2 union7 → v3 union12. Historical v1 old4 and current v2
+union7 remain legal; every other version/membership pairing rejects. The five additions are exact
+files under `controller/runtime-cleanup` and `verify/h039`; no recursive prefix, alias or neighbor is
+admitted. `specs/owner-production-paths.v1.json` remains byte-identical v2 in this candidate, no
+H-039 task exists yet, and H034/H036/H038 task rows are unchanged. The separate BUILDER surface is
+only `controller/authority/core.py`.
+
+The exception is causal and closed: a later H-039 may own only a separate OS identity/root-protected
+namespace and digest-bound cleanup mediator whose server state derives an exact registered object
+from a capability/request identity. General native/root, caller path, general deletion/rename,
+filesystem/process/shell/Git/network/credential/dynamic-code, cross-service and confinement-bypass
+authority remain denied. If those limits are insufficient, the sequence stops for a new owner
+decision.
+
+Trust transitions remain serial. After H035 R27 contract and product publication, H034 alone moves
+the registry to v3; H036 is then registry-only refrozen because its frozen gate embeds the v2 bytes;
+only then may H039 be frozen/built/reviewed/published. H038 refreeze/product, H032 and H031 follow.
+No supervisor resume is authorized before the entire chain is green.
