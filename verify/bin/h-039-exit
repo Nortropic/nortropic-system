@@ -43,11 +43,11 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "97c9402178148a2361d073ec2c3cca7ba4ec4e22"
-CONTRACT_AUTHORITY_TREE = "7383c11f6cf6aa3ce8851fc44a6b20e1110bb73d"
+CONTRACT_AUTHORITY_BASE = "287c7436b7233ba927274f2d2cb549dc65abc2df"
+CONTRACT_AUTHORITY_TREE = "11946318fe57ae16cf2242788cd06c0dada32787"
 CONTRACT_AUTHORITY_PARENTS = [
-    "f8f046e4aa59dd1facf9c069b543c91c99e0eff1",
-    "6c6c6bad9d0cd2c0633b2575ad9a0c18006b5680",
+    "97c9402178148a2361d073ec2c3cca7ba4ec4e22",
+    "4c1ffed39f867489e312f5b6edbb57bb39060205",
 ]
 PUBLISHED_H036_PRODUCT_MERGE = "e71dfbbd6a1dcb0792031764370f264dd63ebbf2"
 PUBLISHED_H036_LEGACY_BLOBS = {
@@ -221,7 +221,7 @@ FAILURE_SIGNATURE = [
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "51dd6a07fc758fc8315b75c2bb2e9627b18407da3736a856503cf53d48bd1282"
+EXPECTED_H039_ROW_SHA256 = "48f5c868eea1c9c36d6044fc869d60f5f43d07d4c1d1e9c605a9cbf0d95fe82e"
 
 passed = 0
 failed = 0
@@ -557,6 +557,301 @@ def cleanup_state_orientation_valid(state: dict[str, Any]) -> bool:
     )
 
 
+MODEL_CURRENT_FIELDS = {
+    "schema_version", "phase", "runtime_id", "capability_sha256",
+    "create_request_nonce", "cleanup_request_nonce", "sequence",
+    "object_dev", "object_ino", "runtime_dev", "runtime_ino",
+    "fifo_dev", "fifo_ino", "portal_dev", "portal_ino",
+    "socket_dev", "socket_ino", "record_sha256",
+}
+MODEL_PYTHON_DIGEST = "ab" * 32
+
+
+def modeled_fixed_q_members(record: dict[str, Any], progress: int) -> tuple[Any, ...]:
+    full = (
+        ("h", "directory", 0, 0, 0o700, None, None, None),
+        ("h/r", "directory", 501, 20, 0o700,
+         record["runtime_dev"], record["runtime_ino"], None),
+        ("h/l", "fifo", 0, 0, 0o600,
+         record["fifo_dev"], record["fifo_ino"], None),
+        ("p", "directory", 0, 20, 0o550,
+         record["portal_dev"], record["portal_ino"], None),
+        ("p/c", "socket", 0, 20, 0o620,
+         record["socket_dev"], record["socket_ino"], None),
+        ("p/python", "regular", 0, 0, 0o555, None, None, MODEL_PYTHON_DIGEST),
+    )
+    names_by_progress = {
+        0: ("h", "h/r", "h/l", "p", "p/c", "p/python"),
+        1: ("h", "h/l", "p", "p/c", "p/python"),
+        2: ("h", "p", "p/c", "p/python"),
+        3: ("p", "p/c", "p/python"),
+        4: ("p", "p/python"),
+        5: ("p",),
+        6: (),
+    }
+    names = names_by_progress.get(progress)
+    return () if names is None else tuple(item for item in full if item[0] in names)
+
+
+def valid_runtime_tree(members: Any, runtime_dev: int) -> bool:
+    if not isinstance(members, tuple) or len(members) > 4096:
+        return False
+    paths: list[str] = []
+    total = 0
+    for item in members:
+        if not isinstance(item, tuple) or len(item) != 5:
+            return False
+        path, kind, dev, ino, size = item
+        components = path.split("/") if isinstance(path, str) else []
+        if not isinstance(path, str) or not path or path.startswith("/") \
+                or any(part in {"", ".", ".."} or len(part.encode("utf-8")) > 255
+                       for part in components) \
+                or len(components) > 64 \
+                or kind not in {"directory", "regular", "symlink", "fifo", "socket"} \
+                or any(type(value) is not int for value in (dev, ino, size)) \
+                or dev != runtime_dev or ino <= 0 or size < 0:
+            return False
+        paths.append(path)
+        total += size if kind == "regular" else 0
+    if paths != sorted(paths) or len(paths) != len(set(paths)) \
+            or len({(item[2], item[3]) for item in members}) != len(members) \
+            or total > 67108864:
+        return False
+    directories = {
+        item[0] for item in members if item[1] == "directory"
+    }
+    for path in paths:
+        components = path.split("/")
+        for index in range(1, len(components)):
+            parent = "/".join(components[:index])
+            if parent not in directories:
+                return False
+    return True
+
+
+def modeled_current_record(state: dict[str, Any], phase: str, nonce: str) -> dict[str, Any]:
+    record = {
+        "schema_version": 1, "phase": phase,
+        "runtime_id": state["runtime_id"],
+        "capability_sha256": state["capability_sha256"],
+        "create_request_nonce": state["create_request_nonce"],
+        "cleanup_request_nonce": nonce, "sequence": state["sequence"],
+        **state["identity_fields"],
+    }
+    return {**record, "record_sha256": sha(canonical(record))}
+
+
+def valid_modeled_current_record(record: dict[str, Any]) -> bool:
+    if not isinstance(record, dict) or set(record) != MODEL_CURRENT_FIELDS:
+        return False
+    body = {key: value for key, value in record.items() if key != "record_sha256"}
+    identity_keys = {
+        "object_dev", "object_ino", "runtime_dev", "runtime_ino",
+        "fifo_dev", "fifo_ino", "portal_dev", "portal_ino",
+        "socket_dev", "socket_ino",
+    }
+    return (
+        type(record["schema_version"]) is int and record["schema_version"] == 1
+        and isinstance(record["phase"], str)
+        and record["phase"] in {"QUARANTINING", "CLEANING"}
+        and isinstance(record["runtime_id"], str)
+        and re.fullmatch(r"[0-9a-f]{32}", record["runtime_id"]) is not None
+        and valid_hex(record["capability_sha256"])
+        and valid_hex(record["create_request_nonce"])
+        and valid_hex(record["cleanup_request_nonce"])
+        and type(record["sequence"]) is int and record["sequence"] > 0
+        and all(type(record[key]) is int and record[key] > 0 for key in identity_keys)
+        and record["record_sha256"] == sha(canonical(body))
+    )
+
+
+def modeled_predecessor_receipt(state: dict[str, Any]) -> dict[str, Any] | None:
+    if state["sequence"] == 1:
+        return None
+    receipt = {
+        "schema_version": 1, "sequence": state["sequence"] - 1,
+        "runtime_id": "77" * 16,
+        "capability_sha256": "55" * 32,
+        "create_request_nonce": state["last_create_request_nonce"],
+        "cleanup_request_nonce": state["last_cleanup_request_nonce"],
+    }
+    effect = {**receipt, "zero_runtime_residue": True}
+    return {**receipt, "effect_sha256": sha(canonical(effect))}
+
+
+def valid_modeled_predecessor(current: dict[str, Any], predecessor: Any) -> bool:
+    if not isinstance(current, dict) or type(current.get("sequence")) is not int:
+        return False
+    if current["sequence"] == 1:
+        return predecessor is None
+    keys = {
+        "schema_version", "sequence", "runtime_id", "capability_sha256",
+        "create_request_nonce", "cleanup_request_nonce", "effect_sha256",
+    }
+    if not isinstance(predecessor, dict) or set(predecessor) != keys:
+        return False
+    effect = {key: predecessor[key] for key in keys if key != "effect_sha256"}
+    effect["zero_runtime_residue"] = True
+    return (
+        type(predecessor["schema_version"]) is int
+        and predecessor["schema_version"] == 1
+        and type(predecessor["sequence"]) is int
+        and predecessor["sequence"] == current["sequence"] - 1
+        and isinstance(predecessor["runtime_id"], str)
+        and re.fullmatch(r"[0-9a-f]{32}", predecessor["runtime_id"]) is not None
+        and all(valid_hex(predecessor[key]) for key in (
+            "capability_sha256", "create_request_nonce", "cleanup_request_nonce",
+        ))
+        and predecessor["create_request_nonce"]
+        != predecessor["cleanup_request_nonce"]
+        and predecessor["effect_sha256"] == sha(canonical(effect))
+    )
+
+
+def reconcile_current_tmp_model(
+    current: dict[str, Any], temporary: dict[str, Any], *, location: str,
+    receipt_temp: bool, predecessor: dict[str, Any] | None,
+    q_object: dict[str, Any] | None, active_present: bool, q_count: int,
+    current_tmp_fsynced: bool, current_raw: bytes, temporary_raw: bytes,
+    current_meta: dict[str, Any], temporary_meta: dict[str, Any],
+) -> tuple[bool, dict[str, Any]]:
+    before = copy.deepcopy(current)
+    if not valid_modeled_current_record(current) \
+            or not valid_modeled_current_record(temporary) \
+            or not valid_modeled_predecessor(current, predecessor):
+        return False, before
+    def valid_state_file_meta(meta: Any) -> bool:
+        return (
+            isinstance(meta, dict)
+            and set(meta) == {"type", "uid", "gid", "mode", "nlink", "fsynced"}
+            and meta["type"] == "regular"
+            and all(type(meta[key]) is int for key in ("uid", "gid", "mode", "nlink"))
+            and meta["uid"] == 0 and meta["gid"] == 0
+            and meta["mode"] == 0o444 and meta["nlink"] == 1
+            and meta["fsynced"] is True
+        )
+    if not isinstance(current_raw, bytes) or not isinstance(temporary_raw, bytes) \
+            or current_raw != canonical(current) \
+            or temporary_raw != canonical(temporary) \
+            or not valid_state_file_meta(current_meta) \
+            or not valid_state_file_meta(temporary_meta):
+        return False, before
+    if receipt_temp or current_tmp_fsynced is not True or location != "quarantine" \
+            or type(active_present) is not bool or active_present \
+            or type(q_count) is not int or q_count != 1 \
+            or not isinstance(q_object, dict) \
+            or temporary["phase"] != "CLEANING":
+        return False, before
+    if set(q_object) != {
+        "name", "uid", "gid", "mode", "dev", "ino", "progress",
+        "fixed_members", "runtime_members",
+    } \
+            or q_object["name"] != "o-" + current["runtime_id"] \
+            or type(q_object["uid"]) is not int or q_object["uid"] != 0 \
+            or type(q_object["gid"]) is not int or q_object["gid"] != 0 \
+            or type(q_object["mode"]) is not int or q_object["mode"] != 0o555 \
+            or type(q_object["dev"]) is not int or q_object["dev"] <= 0 \
+            or q_object["dev"] != current["object_dev"] \
+            or type(q_object["ino"]) is not int or q_object["ino"] <= 0 \
+            or q_object["ino"] != current["object_ino"] \
+            or type(q_object["progress"]) is not int \
+            or q_object["progress"] not in range(7):
+        return False, before
+    if current["phase"] == "QUARANTINING":
+        if q_object["progress"] != 0:
+            return False, before
+    if q_object["fixed_members"] != modeled_fixed_q_members(
+        current, q_object["progress"],
+    ):
+        return False, before
+    if q_object["progress"] > 0 and q_object["runtime_members"] != ():
+        return False, before
+    if not valid_runtime_tree(q_object["runtime_members"], current["runtime_dev"]):
+        return False, before
+    varying = {"phase", "cleanup_request_nonce", "record_sha256"}
+    if any(current[key] != temporary[key] for key in MODEL_CURRENT_FIELDS - varying):
+        return False, before
+    old_nonce = current["cleanup_request_nonce"]
+    new_nonce = temporary["cleanup_request_nonce"]
+    if not valid_hex(old_nonce) or not valid_hex(new_nonce):
+        return False, before
+    ordinary = current["phase"] == "QUARANTINING" and new_nonce == old_nonce
+    predecessor_nonces = set() if predecessor is None else {
+        predecessor["create_request_nonce"], predecessor["cleanup_request_nonce"],
+    }
+    if old_nonce == current["create_request_nonce"] \
+            or current["create_request_nonce"] in predecessor_nonces \
+            or old_nonce in predecessor_nonces:
+        return False, before
+    collisions = {old_nonce, current["create_request_nonce"], *predecessor_nonces}
+    fresh_resume = new_nonce not in collisions
+    if not (ordinary or fresh_resume):
+        return False, before
+    temporary_bytes = temporary_raw
+    return True, {
+        "current_record": copy.deepcopy(temporary),
+        "current_bytes": temporary_bytes,
+        "current_sha256": sha(temporary_bytes),
+        "current_tmp_present": False,
+        "state_directory_fsynced": True,
+        "recovery_continuation": {
+            "operation": "cleanup-v1",
+            "request_nonce": temporary["cleanup_request_nonce"],
+            "capability_sha256": temporary["capability_sha256"],
+            "current_sha256": sha(temporary_bytes),
+        },
+    }
+
+
+def complete_promoted_cleanup_model(
+    promoted: dict[str, Any], capability: str, request_nonce: str,
+) -> tuple[bool, dict[str, Any]]:
+    if not isinstance(promoted, dict) or set(promoted) != {
+        "current_record", "current_bytes", "current_sha256", "current_tmp_present",
+        "state_directory_fsynced", "recovery_continuation",
+    } or promoted["current_tmp_present"] is not False:
+        return False, copy.deepcopy(promoted)
+    current = promoted["current_record"]
+    if not valid_modeled_current_record(current) \
+            or not isinstance(promoted["current_bytes"], bytes) \
+            or not valid_hex(capability) or not valid_hex(request_nonce):
+        return False, copy.deepcopy(promoted)
+    expected_continuation = {
+        "operation": "cleanup-v1", "request_nonce": request_nonce,
+        "capability_sha256": current.get("capability_sha256"),
+        "current_sha256": promoted.get("current_sha256"),
+    }
+    if promoted["current_bytes"] != canonical(current) \
+            or promoted["current_sha256"] != sha(promoted["current_bytes"]) \
+            or promoted["state_directory_fsynced"] is not True \
+            or promoted["recovery_continuation"] != expected_continuation \
+            or request_nonce != current["cleanup_request_nonce"] \
+            or sha(bytes.fromhex(capability)) != current["capability_sha256"]:
+        return False, copy.deepcopy(promoted)
+    receipt_state = {
+        "sequence": current["sequence"], "runtime_id": current["runtime_id"],
+        "capability_sha256": current["capability_sha256"],
+        "create_request_nonce": current["create_request_nonce"],
+        "cleanup_request_nonce": current["cleanup_request_nonce"],
+    }
+    receipt = modeled_receipt_temp(receipt_state)
+    return True, {
+        "current_present": False, "current_tmp_present": False,
+        "receipt_temp_present": False, "q_present": False, "residue": [],
+        "receipt_record": receipt, "receipt_sha256": sha(canonical(receipt)),
+    }
+
+
+def promoted_pending_disposition(
+    current: dict[str, Any], operation: str, request_nonce: str,
+) -> str:
+    if request_nonce == current["cleanup_request_nonce"]:
+        return "REPLAY"
+    if operation == "cleanup-v1":
+        return "RESUME"
+    return "CAPACITY"
+
+
 def cleanup_model(
     *, request: dict[str, Any], state: dict[str, Any], lease_live: bool,
     attempt_identity: tuple[int, int], observed_identity: tuple[int, int],
@@ -688,7 +983,7 @@ def causal_oracle_selftests() -> None:
     ]
     check(
         exact_contract_change_shape(expected_contract_changes),
-        "A_H039_R4_EXACT_FIVE_EXISTING_FILE_CONTRACT_CHANGE_SHAPE",
+        "A_H039_R5_EXACT_FIVE_EXISTING_FILE_CONTRACT_CHANGE_SHAPE",
     )
     contract_change_mutants: list[
         tuple[str, list[tuple[str, str, str, str]]]
@@ -710,7 +1005,7 @@ def causal_oracle_selftests() -> None:
     for label, mutant in contract_change_mutants:
         check(
             not exact_contract_change_shape(mutant),
-            f"N_H039_R4_CONTRACT_CHANGE_{label}",
+            f"N_H039_R5_CONTRACT_CHANGE_{label}",
         )
 
     check(
@@ -773,7 +1068,13 @@ def causal_oracle_selftests() -> None:
     }
     state = {
         "capability_sha256": sha(bytes.fromhex(cap)), "phase": "ACTIVE",
-        "runtime_id": "88" * 16, "sequence": 1,
+        "runtime_id": "88" * 16, "sequence": 2,
+        "identity_fields": {
+            "object_dev": 1, "object_ino": 2, "runtime_dev": 1,
+            "runtime_ino": 3, "fifo_dev": 1, "fifo_ino": 4,
+            "portal_dev": 1, "portal_ino": 5, "socket_dev": 1,
+            "socket_ino": 6,
+        },
         "create_request_nonce": nonce, "cleanup_request_nonce": "",
         "last_create_request_nonce": "66" * 32,
         "last_cleanup_request_nonce": "77" * 32, "location": "active",
@@ -822,6 +1123,421 @@ def causal_oracle_selftests() -> None:
         args = {**defaults, **delta}
         accepted, after = cleanup_model(**args)
         check(not accepted and after == args["state"], f"N_H039_MODEL_{label}")
+
+    q_nonce = cleanup["request_nonce"]
+    fresh_nonce = "aa" * 32
+    current_q = modeled_current_record(state, "QUARANTINING", q_nonce)
+    ordinary_tmp = modeled_current_record(state, "CLEANING", q_nonce)
+    fresh_tmp = modeled_current_record(state, "CLEANING", fresh_nonce)
+    registered_runtime = (
+        ("alpha", "fifo", 1, 101, 0),
+        ("nested", "directory", 1, 102, 0),
+        ("nested/beta", "socket", 1, 103, 0),
+        ("nested/gamma", "regular", 1, 104, 8),
+        ("omega", "symlink", 1, 105, 0),
+    )
+    reconcile_args = {
+        "location": "quarantine", "receipt_temp": False,
+        "predecessor": modeled_predecessor_receipt(state),
+        "q_object": {
+            "name": "o-" + state["runtime_id"], "uid": 0, "gid": 0,
+            "mode": 0o555, "dev": state["identity_fields"]["object_dev"],
+            "ino": state["identity_fields"]["object_ino"], "progress": 0,
+            "fixed_members": modeled_fixed_q_members(current_q, 0),
+            "runtime_members": registered_runtime,
+        },
+        "active_present": False, "q_count": 1,
+        "current_tmp_fsynced": True,
+        "current_meta": {
+            "type": "regular", "uid": 0, "gid": 0, "mode": 0o444,
+            "nlink": 1, "fsynced": True,
+        },
+        "temporary_meta": {
+            "type": "regular", "uid": 0, "gid": 0, "mode": 0o444,
+            "nlink": 1, "fsynced": True,
+        },
+    }
+    def reconcile_fixture(old_record, next_record, **args):
+        call_args = dict(args)
+        call_args.setdefault("current_raw", canonical(old_record))
+        call_args.setdefault("temporary_raw", canonical(next_record))
+        return reconcile_current_tmp_model(old_record, next_record, **call_args)
+
+    ordinary_ok, ordinary_promoted = reconcile_fixture(
+        current_q, ordinary_tmp, **reconcile_args,
+    )
+    fresh_ok, fresh_promoted = reconcile_fixture(
+        current_q, fresh_tmp, **reconcile_args,
+    )
+    q6_arbitrary_runtime_ok, _q6_arbitrary_promoted = reconcile_fixture(
+        current_q, fresh_tmp, **{
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"], "runtime_members": registered_runtime[1:],
+            },
+        },
+    )
+    current_cleaning = modeled_current_record(state, "CLEANING", q_nonce)
+    cleaning_partial_ok, _cleaning_partial_promoted = reconcile_fixture(
+        current_cleaning, fresh_tmp, **{
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "runtime_members": registered_runtime[1:],
+            },
+        },
+    )
+    cleaning_empty_ok, _cleaning_empty_promoted = reconcile_fixture(
+        current_cleaning, fresh_tmp, **{
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"], "progress": 6,
+                "fixed_members": modeled_fixed_q_members(current_cleaning, 6),
+                "runtime_members": (),
+            },
+        },
+    )
+    cleaning_mid_ok, _cleaning_mid_promoted = reconcile_fixture(
+        current_cleaning, fresh_tmp, **{
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"], "progress": 4,
+                "fixed_members": modeled_fixed_q_members(current_cleaning, 4),
+                "runtime_members": (),
+            },
+        },
+    )
+    cleaning_fresh_ok, cleaning_fresh_promoted = reconcile_fixture(
+        current_cleaning, fresh_tmp, **reconcile_args,
+    )
+    sequence_one_state = {**state, "sequence": 1}
+    sequence_one_current = modeled_current_record(
+        sequence_one_state, "QUARANTINING", q_nonce,
+    )
+    sequence_one_temp = modeled_current_record(
+        sequence_one_state, "CLEANING", fresh_nonce,
+    )
+    sequence_one_ok, _sequence_one_promoted = reconcile_fixture(
+        sequence_one_current, sequence_one_temp, **{
+            **reconcile_args, "predecessor": None,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "fixed_members": modeled_fixed_q_members(sequence_one_current, 0),
+            },
+        },
+    )
+    check(
+        ordinary_ok and ordinary_promoted["current_record"] == ordinary_tmp
+        and ordinary_promoted["current_bytes"] == canonical(ordinary_tmp)
+        and ordinary_promoted["current_sha256"] == sha(canonical(ordinary_tmp))
+        and ordinary_promoted["current_tmp_present"] is False
+        and ordinary_promoted["state_directory_fsynced"] is True
+        and ordinary_promoted["recovery_continuation"]["current_sha256"]
+        == ordinary_promoted["current_sha256"]
+        and fresh_ok and q6_arbitrary_runtime_ok
+        and cleaning_partial_ok and cleaning_mid_ok and cleaning_empty_ok
+        and sequence_one_ok
+        and fresh_promoted["current_record"] == fresh_tmp
+        and fresh_promoted["current_bytes"] == canonical(fresh_tmp)
+        and fresh_promoted["current_sha256"] == sha(canonical(fresh_tmp))
+        and cleaning_fresh_ok and cleaning_fresh_promoted["current_record"] == fresh_tmp,
+        "A_H039_R5_CURRENT_TMP_FSYNC_CRASH_EXACT_PROMOTION_NO_REWRITE",
+    )
+    completed, completion = complete_promoted_cleanup_model(
+        fresh_promoted, cap, fresh_nonce,
+    )
+    ordinary_completed, ordinary_completion = complete_promoted_cleanup_model(
+        ordinary_promoted, cap, q_nonce,
+    )
+    check(
+        completed and ordinary_completed
+        and ordinary_completion["receipt_record"]["cleanup_request_nonce"] == q_nonce
+        and completion["current_present"] is False
+        and completion["current_tmp_present"] is False
+        and completion["receipt_temp_present"] is False
+        and completion["q_present"] is False and completion["residue"] == []
+        and completion["receipt_sha256"]
+        == sha(canonical(completion["receipt_record"]))
+        and promoted_pending_disposition(fresh_tmp, "cleanup-v1", fresh_nonce)
+        == "REPLAY"
+        and promoted_pending_disposition(fresh_tmp, "cleanup-v1", "bb" * 32)
+        == "RESUME"
+        and promoted_pending_disposition(fresh_tmp, "create-v1", fresh_nonce)
+        == "REPLAY"
+        and promoted_pending_disposition(fresh_tmp, "create-v1", "bb" * 32)
+        == "CAPACITY",
+        "A_H039_R5_PROMOTED_N2_COMPLETES_ONE_RECEIPT_ZERO_RESIDUE_AND_PRESERVES_R4_FRESH_RESUME",
+    )
+    for label, key, replacement in (
+        ("OPERATION", "operation", "create-v1"),
+        ("NONCE", "request_nonce", "bb" * 32),
+        ("CAPABILITY", "capability_sha256", "99" * 32),
+        ("CURRENT", "current_sha256", "99" * 32),
+    ):
+        poisoned = copy.deepcopy(fresh_promoted)
+        poisoned["recovery_continuation"][key] = replacement
+        accepted, unchanged = complete_promoted_cleanup_model(
+            poisoned, cap, fresh_nonce,
+        )
+        check(
+            not accepted and unchanged == poisoned,
+            f"N_H039_R5_RECOVERY_CONTINUATION_{label}",
+        )
+    for label, malformed_capability in (
+        ("MALFORMED_CAPABILITY", "0"),
+        ("NONSTRING_CAPABILITY", 7),
+    ):
+        accepted, unchanged = complete_promoted_cleanup_model(
+            fresh_promoted, malformed_capability, fresh_nonce,
+        )
+        check(
+            not accepted and unchanged == fresh_promoted,
+            f"N_H039_R5_RECOVERY_CONTINUATION_{label}",
+        )
+    current_tmp_mutants: list[tuple[str, dict[str, Any], dict[str, Any], dict[str, Any]]] = []
+    for label, key, replacement in (
+        ("RUNTIME", "runtime_id", "99" * 16),
+        ("CAPABILITY", "capability_sha256", "99" * 32),
+        ("CREATE_NONCE", "create_request_nonce", "99" * 32),
+        ("SEQUENCE", "sequence", fresh_tmp["sequence"] + 1),
+        ("OBJECT_IDENTITY", "object_ino", fresh_tmp["object_ino"] + 1),
+        ("RUNTIME_IDENTITY", "runtime_ino", fresh_tmp["runtime_ino"] + 1),
+        ("FIFO_IDENTITY", "fifo_ino", fresh_tmp["fifo_ino"] + 1),
+        ("PORTAL_IDENTITY", "portal_ino", fresh_tmp["portal_ino"] + 1),
+        ("SOCKET_IDENTITY", "socket_ino", fresh_tmp["socket_ino"] + 1),
+    ):
+        mutant = copy.deepcopy(fresh_tmp)
+        mutant[key] = replacement
+        body = {name: value for name, value in mutant.items() if name != "record_sha256"}
+        mutant["record_sha256"] = sha(canonical(body))
+        current_tmp_mutants.append((label, current_q, mutant, reconcile_args))
+    malformed = copy.deepcopy(fresh_tmp)
+    malformed["cleanup_request_nonce"] = "0"
+    malformed["record_sha256"] = sha(canonical({
+        key: value for key, value in malformed.items() if key != "record_sha256"
+    }))
+    wrong_digest = {**fresh_tmp, "record_sha256": "99" * 32}
+    wrong_phase_type = {**fresh_tmp, "phase": []}
+    wrong_phase_type["record_sha256"] = sha(canonical({
+        key: value for key, value in wrong_phase_type.items() if key != "record_sha256"
+    }))
+    wrong_phase = modeled_current_record(state, "ACTIVE", fresh_nonce)
+    missing = copy.deepcopy(fresh_tmp)
+    missing.pop("socket_ino")
+    extra = {**fresh_tmp, "extra": False}
+    current_tmp_mutants.extend([
+        ("MALFORMED_NONCE", current_q, malformed, reconcile_args),
+        ("WRONG_DIGEST", current_q, wrong_digest, reconcile_args),
+        ("WRONG_PHASE_TYPE", current_q, wrong_phase_type, reconcile_args),
+        ("WRONG_PHASE", current_q, wrong_phase, reconcile_args),
+        ("WRONG_CURRENT_PHASE", modeled_current_record(
+            state, "ACTIVE", q_nonce), fresh_tmp, reconcile_args),
+        ("CLEANING_SAME_NONCE_REPLAY", current_cleaning, ordinary_tmp, reconcile_args),
+        ("MISSING_FIELD", current_q, missing, reconcile_args),
+        ("EXTRA_FIELD", current_q, extra, reconcile_args),
+        ("STALE_NONCE", current_q, modeled_current_record(
+            state, "CLEANING", state["last_cleanup_request_nonce"]), reconcile_args),
+        ("CREATE_COLLISION", current_q, modeled_current_record(
+            state, "CLEANING", state["create_request_nonce"]), reconcile_args),
+        ("LAST_CREATE_COLLISION", current_q, modeled_current_record(
+            state, "CLEANING", state["last_create_request_nonce"]), reconcile_args),
+        ("WRONG_LOCATION", current_q, fresh_tmp, {**reconcile_args, "location": "active"}),
+        ("RECEIPT_TEMP_COEXISTS", current_q, fresh_tmp, {**reconcile_args, "receipt_temp": True}),
+        ("TEMP_NOT_FSYNCED", current_q, fresh_tmp, {**reconcile_args, "current_tmp_fsynced": False}),
+        ("TEMP_RAW_WHITESPACE", current_q, fresh_tmp, {
+            **reconcile_args, "temporary_raw": canonical(fresh_tmp) + b" ",
+        }),
+        ("TEMP_RAW_REORDERED", current_q, fresh_tmp, {
+            **reconcile_args,
+            "temporary_raw": json.dumps(fresh_tmp, ensure_ascii=False).encode("utf-8"),
+        }),
+        ("CURRENT_RAW_ALTERED", current_q, fresh_tmp, {
+            **reconcile_args, "current_raw": canonical(current_q) + b"\n",
+        }),
+        ("TEMP_METADATA_MODE", current_q, fresh_tmp, {
+            **reconcile_args,
+            "temporary_meta": {**reconcile_args["temporary_meta"], "mode": 0o644},
+        }),
+        ("TEMP_METADATA_NLINK", current_q, fresh_tmp, {
+            **reconcile_args,
+            "temporary_meta": {**reconcile_args["temporary_meta"], "nlink": 2},
+        }),
+        ("TEMP_METADATA_BOOL_NLINK", current_q, fresh_tmp, {
+            **reconcile_args,
+            "temporary_meta": {**reconcile_args["temporary_meta"], "nlink": True},
+        }),
+        ("CURRENT_METADATA_TYPE", current_q, fresh_tmp, {
+            **reconcile_args,
+            "current_meta": {**reconcile_args["current_meta"], "type": "symlink"},
+        }),
+        ("Q_ABSENT", current_q, fresh_tmp, {**reconcile_args, "q_object": None, "q_count": 0}),
+        ("STILL_ACTIVE", current_q, fresh_tmp, {**reconcile_args, "active_present": True}),
+        ("ACTIVE_AND_Q", current_q, fresh_tmp, {**reconcile_args, "active_present": True, "q_count": 1}),
+        ("Q_REPLACED", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {**reconcile_args["q_object"], "ino": 999},
+        }),
+        ("Q_BOOL_DEV", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {**reconcile_args["q_object"], "dev": True},
+        }),
+        ("Q_WRONG_UID", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {**reconcile_args["q_object"], "uid": 501},
+        }),
+        ("Q_WRONG_GID", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {**reconcile_args["q_object"], "gid": 20},
+        }),
+        ("Q_WRONG_MODE", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {**reconcile_args["q_object"], "mode": 0o755},
+        }),
+        ("Q_DUPLICATE", current_q, fresh_tmp, {**reconcile_args, "q_count": 2}),
+        ("Q_EXTRA_MEMBER", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "fixed_members": reconcile_args["q_object"]["fixed_members"]
+                + (("extra", "regular", 0, 0, 0o600, None, None, "04" * 32),),
+            },
+        }),
+        ("Q_SUBSTITUTED_MEMBER", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "fixed_members": (("wrong", "directory", 0, 0, 0o700,
+                                   None, None, None),)
+                + reconcile_args["q_object"]["fixed_members"][1:],
+            },
+        }),
+        ("Q_MEMBER_WRONG_IDENTITY", current_q, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "fixed_members": reconcile_args["q_object"]["fixed_members"][:1] + (
+                    reconcile_args["q_object"]["fixed_members"][1][:-2]
+                    + (999, reconcile_args["q_object"]["fixed_members"][1][-1]),
+                ) + reconcile_args["q_object"]["fixed_members"][2:],
+            },
+        }),
+        ("Q_REMAINDER_ORDER_INVALID", current_cleaning, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "runtime_members": tuple(reversed(registered_runtime[1:])),
+            },
+        }),
+        ("Q_REMAINDER_ORPHAN_CHILD", current_cleaning, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "runtime_members": (registered_runtime[2],),
+            },
+        }),
+        ("Q_REMAINDER_EXTRA", current_cleaning, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "runtime_members": registered_runtime
+                + (("z", "regular", 2, 200, 1),),
+            },
+        }),
+        ("Q_REMAINDER_SUBSTITUTED", current_cleaning, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "runtime_members": (
+                    registered_runtime[0],
+                    ("ghost/leaf", *registered_runtime[4][1:]),
+                ) + registered_runtime[1:4],
+            },
+        }),
+        ("Q_REMAINDER_WRONG_IDENTITY", current_cleaning, fresh_tmp, {
+            **reconcile_args,
+            "q_object": {
+                **reconcile_args["q_object"],
+                "runtime_members": (
+                    registered_runtime[0],
+                    registered_runtime[1][:3] + (registered_runtime[0][3],)
+                    + registered_runtime[1][4:],
+                ) + registered_runtime[2:],
+            },
+        }),
+    ])
+    current_bad_digest = {**current_q, "record_sha256": "99" * 32}
+    current_missing = copy.deepcopy(current_q)
+    current_missing.pop("fifo_ino")
+    current_extra = {**current_q, "extra": False}
+    current_malformed = copy.deepcopy(current_q)
+    current_malformed["cleanup_request_nonce"] = "0"
+    current_malformed["record_sha256"] = sha(canonical({
+        key: value for key, value in current_malformed.items()
+        if key != "record_sha256"
+    }))
+    current_phase_type = {**current_q, "phase": {}}
+    current_phase_type["record_sha256"] = sha(canonical({
+        key: value for key, value in current_phase_type.items()
+        if key != "record_sha256"
+    }))
+    current_tmp_mutants.extend([
+        ("CURRENT_BAD_DIGEST", current_bad_digest, fresh_tmp, reconcile_args),
+        ("CURRENT_MISSING_FIELD", current_missing, fresh_tmp, reconcile_args),
+        ("CURRENT_EXTRA_FIELD", current_extra, fresh_tmp, reconcile_args),
+        ("CURRENT_MALFORMED", current_malformed, fresh_tmp, reconcile_args),
+        ("CURRENT_PHASE_TYPE", current_phase_type, fresh_tmp, reconcile_args),
+    ])
+    predecessor = reconcile_args["predecessor"]
+    if predecessor is None:
+        raise Rig("R5 predecessor fixture unexpectedly absent")
+    pred_bad_digest = {**predecessor, "effect_sha256": "99" * 32}
+    pred_gap = {**predecessor, "sequence": predecessor["sequence"] + 2}
+    pred_gap["effect_sha256"] = sha(canonical({
+        **{key: value for key, value in pred_gap.items() if key != "effect_sha256"},
+        "zero_runtime_residue": True,
+    }))
+    pred_create_collision = {**predecessor, "create_request_nonce": fresh_nonce}
+    pred_cleanup_collision = {**predecessor, "cleanup_request_nonce": fresh_nonce}
+    pred_cross_operation_collision = {
+        **predecessor,
+        "cleanup_request_nonce": predecessor["create_request_nonce"],
+    }
+    for pred in (
+        pred_create_collision, pred_cleanup_collision, pred_cross_operation_collision,
+    ):
+        pred["effect_sha256"] = sha(canonical({
+            **{key: value for key, value in pred.items() if key != "effect_sha256"},
+            "zero_runtime_residue": True,
+        }))
+    for label, pred in (
+        ("PREDECESSOR_MALFORMED", {**predecessor, "extra": False}),
+        ("PREDECESSOR_BAD_DIGEST", pred_bad_digest),
+        ("PREDECESSOR_ABSENT_SEQUENCE_GT1", None),
+        ("PREDECESSOR_SEQUENCE_GAP", pred_gap),
+        ("PREDECESSOR_CREATE_COLLISION", pred_create_collision),
+        ("PREDECESSOR_CLEANUP_COLLISION", pred_cleanup_collision),
+        ("PREDECESSOR_CROSS_OPERATION_COLLISION", pred_cross_operation_collision),
+    ):
+        current_tmp_mutants.append((
+            label, current_q, fresh_tmp, {**reconcile_args, "predecessor": pred},
+        ))
+    current_tmp_mutants.append((
+        "PREDECESSOR_PRESENT_SEQUENCE_ONE", sequence_one_current,
+        sequence_one_temp, reconcile_args,
+    ))
+    old_create_collision = modeled_current_record(
+        state, "QUARANTINING", state["create_request_nonce"],
+    )
+    current_tmp_mutants.append((
+        "OLD_CLEANUP_EQUALS_CURRENT_CREATE", old_create_collision,
+        fresh_tmp, reconcile_args,
+    ))
+    for label, old_record, next_record, args in current_tmp_mutants:
+        admitted, unchanged = reconcile_fixture(old_record, next_record, **args)
+        check(
+            not admitted and unchanged == old_record,
+            f"N_H039_R5_CURRENT_TMP_{label}",
+        )
     for barrier, expected_phase, expected_location in (
         (1, "QUARANTINING", "active"),
         (2, "QUARANTINING", "quarantine"),

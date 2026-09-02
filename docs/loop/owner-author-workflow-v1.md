@@ -1698,3 +1698,37 @@ not make an open directory FD prevent directory removal. The immutable review
 rejects CLEANING→CLEANING nonce replacement after a temp and binds terminal
 no-current/temp completion. No new path,
 capability, native/root operation or other authority is introduced.
+
+## H-039 R5 durable current-temp reconciliation
+
+R5 consumes guarded R4 `287c7436b7233ba927274f2d2cb549dc65abc2df`
+and preserves the exact five-existing-file `M` contract shape. Failed product
+`b3d76f1` is immutable NO-CREDIT. The deterministic model now represents the
+legitimate crash after `s/.current.tmp` is fully written and fsynced but before
+its rename over `s/current`: both exact records may coexist only as an adjacent
+transition over one transaction, sequence and complete identity set.
+
+Exact Q-only `QUARANTINING/N1 -> CLEANING/N1` remains the ordinary transition.
+Before any receipt temp, Q-only `QUARANTINING/N1 -> CLEANING/N2` and
+`CLEANING/N1 -> CLEANING/N2` additionally admit one valid fresh N2 distinct
+from N1, current create and both predecessor receipt nonces. The registered Q
+must be unique root:wheel 0555 at its recorded dev/inode. QUARANTINING requires
+the full registered membership and runtime tree; CLEANING requires one exact
+finite structural cleanup stage plus the directly observed, parent-closed
+remaining runtime tree, possibly empty and independent of leaf deletion order.
+Descendants may be directories, regulars, symlinks, FIFOs or sockets and are
+constrained by same-device/name/depth/count/regular-byte bounds, not a fictional
+persistent pre-cleanup inventory or invented uid/mode/digest metadata. Recovery validates both closed record shapes
+and digests plus the exact predecessor receipt tri-state, promotes the exact
+serialized temp bytes, fsyncs the state directory and removes only the temp
+name, then an ephemeral same-invocation fact bound to operation, N2, capability
+hash and exact promoted current bytes lets the already accepted N2 operation
+complete to one receipt and zero residue. Without that just-produced fact a
+later generic N2 request is REPLAY and N2 create is REPLAY. A fresh create is
+`CAPACITY`, while a fresh noncolliding cleanup N3 preserves R4 recovery and may
+resume the pre-receipt CLEANING transaction by creating its next exact
+`.current.tmp`. Missing, extra, malformed, stale, colliding, wrong
+phase/location/identity/digest, A-present, A+Q, Q-absent/replaced, unfsynced temp
+or receipt-temp coexistence reject without effect. Independent immutable
+material review remains mandatory; syntax, timing and self-report earn no
+credit and no authority is widened.

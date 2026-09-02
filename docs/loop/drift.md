@@ -4592,6 +4592,11 @@ and exact empty-or-absent Q. It performs no nonce, state or temp rewrite. Fresh
 N2 returns `CAPACITY` without effect; N1 as create remains cross-operation
 `REPLAY`; N1 under either operation after final publication remains replay.
 
+R5 preserves that pre-receipt recovery after `.current.tmp` promotion. Without
+the just-produced ephemeral continuation, the promoted nonce is `REPLAY`, a
+fresh create is `CAPACITY`, and a fresh noncolliding cleanup may resume the
+exact CLEANING transaction and create its next bound state temp.
+
 Model mutants include collisions with current create nonce and both predecessor
 receipt nonces. The deterministic model binds matching current-CLEANING/temp
 states with Q present-empty and Q absent, exact-N1 continuation, one final
@@ -4601,3 +4606,25 @@ replacement. Black-box timing or sampling earns no credit because an open
 directory FD does not prevent Darwin directory removal. Contract authority advances only to R3
 publication `97c9402178148a2361d073ec2c3cca7ba4ec4e22`; no product, registry,
 installation, path, process, network, credential or broader OS authority changes.
+
+### 2026-09-02 — H039 R5 durable current-temp adjacency
+
+Both independent reviews reject product `b3d76f1` as immutable NO-CREDIT. It
+can durably fsync `s/.current.tmp` as CLEANING/N2 while `s/current` remains
+QUARANTINING/N1, but its transition validator rejects that contract-required
+fresh-resume adjacency and strands Q after a crash before rename.
+
+R5 models the two exact records, complete identities and digests, unique
+root:wheel 0555 Q-only orientation (full registered object/runtime tree in
+QUARANTINING and one exact finite structural stage plus the directly observed
+same-device, parent-closed bounded remaining runtime tree in
+CLEANING), predecessor receipt
+tri-state and fsync-before-rename barrier. It
+admits only ordinary Q6/N1→C7/N1, fresh Q6/N1→C7/N2 and fresh C7/N1→C7/N2.
+Recovery promotes exact temp bytes without rewrite, durably removes the temp
+name, and binds an ephemeral same-invocation continuation to exact operation,
+N2, capability and promoted bytes so the accepted N2 reaches one receipt and
+zero residue. Generic later N2 remains replay.
+All other phase, nonce, record, predecessor, namespace and receipt-temp
+coexistence mutants reject. Authority advances only to R4 `287c7436…`; no
+product, registry, install, path or broader OS authority changes.
