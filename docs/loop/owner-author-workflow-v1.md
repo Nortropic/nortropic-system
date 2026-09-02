@@ -1533,3 +1533,93 @@ product and every H-039 byte remain unchanged.
 After two independent reviews and guarded H-036 publication, the order remains
 H-039 → H-038 → H-032 → H-031. Supervisor resume remains forbidden until the
 whole chain is green.
+
+<!-- H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_MEDIATOR_V1 -->
+## H-039 OS-exclusive runtime-cleanup mediator
+
+H-039 consumes published registry-v3/H-036 authority at
+`2fb748b7b9e8ffd0a25eaa034dabd5f4f99f2129`. TEST_AUTHOR may change only this
+workflow, the task spec, `verify/bin/h-039-exit`, the decision log and drift
+record. The later owner product may change only the five exact registry members
+under `controller/runtime-cleanup/` and `verify/h039/`; broad prefixes remain
+unauthorized.
+
+The product is one fixed setuid-root, per-request native mediator in its own
+trust domain. It accepts no path, PID, command, digest or operation argument.
+FD0 carries one bounded strict request; a server capability derives the sole
+registered object under the fixed root-owned namespace. A whole-file Darwin
+`F_OFD_SETLK` lock serializes every recovery, state transition, effect and final
+response. Cleanup first uses the mandatory FIFO-writer co-lifetime invariant,
+then atomically quarantines the retained object and applies descriptor-relative
+`NOFOLLOW_ANY`, `RESOLVE_BENEATH`, `NODELETEBUSY` and non-directory `AT_UNIQUE`
+deletion. Darwin evidence proves that `NODELETEBUSY` protects live FIFO/socket
+leaves but not an open directory; H-038 must therefore give no runtime dirfd or
+listener to an untrusted target, pair every trusted holder with a writer, and
+close that writer only after the holder has terminated and been reaped. The
+same rule covers accepted server streams, and H-038 holds a writer on behalf of
+each managed target client stream until the target family is reaped and both
+stream endpoints are closed; the target itself receives no writer. This is
+required because a connected AF_UNIX stream remains usable after its listener
+name is removed. H-039 receives no signal, scan, wait or general process authority.
+
+Before the first compound object exists, the mediator durably publishes a
+`RESERVING` record with its server-selected identity and zero object identities;
+only then may it create the matching `c/` object. A crash in this interval admits
+only no object or that exact derived empty root-owned object; a fresh create
+recovers it capability-free without issuing a receipt. No `RECEIPT_ONLY`,
+`CLEANED` or other terminal current state exists. `PUBLISHING` and
+`QUARANTINING` each admit exactly one same-inode old/new name, and terminal
+`CLEANING` admits an absent quarantine object only beside the exact fsynced
+receipt temp. Fast durability windows are not credited by timing luck: the
+independent immutable product review must prove their syscall order, recovery
+branches and the closed native/import/install effect surface. Deterministic host
+effects still kill/restart at PREPARED and during resumable CLEANING and exercise
+all create/create, create/cleanup and cleanup/cleanup OFD-lock conflicts.
+
+Managed H-038/H-032 later consumes the separate Option-A contract as amended by
+the owner's 2026-09-02 retained-origin decision. The later H-032 cycle first
+refreezes TEST_AUTHOR authority; after the H-031 rebind, a distinct BUILDER
+product transition may change exactly `scripts/nortropic-codex-autopilot.py`,
+and no other H-032 product, solely to bind the exact controller in-memory envelope bytes,
+length, SHA-256, current eight-field `AGENT_START`, journal-root/run identities,
+and retained read-only envelope capability before managed H-038 starts. H-038
+accepts managed mode only with that complete prebound handoff, reauthenticates
+the retained root, run, event, envelope identity, complete bytes and final name
+rebind without path-reopening the capability, then closes every source FD before
+target exec and sends only the exact bytes on target stdin. Pre-open replay or
+substitution, caller-supplied bindings and partial handoff reject. No envelope path/FD/mapping,
+`NORTROPIC_KUVERT`, or H-039 cleanup capability reaches the target; nested
+portal use carries only the separate H-036/H-038 session capability. Managed nested cwd is resolved only from
+the retained private ancestor-workspace dirfd. H-039 never accepts or creates an
+envelope. Published H-009/H-036 objects stay immutable; H-038 may edit only its
+already authorized descendant files and must preserve reachable legacy
+direct-launch behavior exactly. H-039 still accepts, creates and stores no
+envelope and receives none of the new H-032 capabilities.
+
+The trust transitions are strict and serial: freeze H-039; two independent gate
+reviews; guarded contract publication; exact five-file product; independent
+uninstalled product review; guarded product publication; root install from the
+published object; independent uid501/gid20 installed-effect review; then H-038,
+the H-032 TEST_AUTHOR refreeze, the H-031 rebind, and finally the exact one-file
+H-032 BUILDER product, independent product review, guarded two-parent product
+merge and post-publication verification. Supervisor resume is forbidden until
+the complete chain is green. Any need for caller paths, generic root
+operations, process authority, Git/network/credentials, dynamic loading,
+unconfined execution or Seatbelt weakening is a new owner stop.
+
+Product identity is accepted only against authenticated live production main.
+Every product blob has its exact per-path and aggregate byte cap. Untrusted C
+compilation/signing and installer review run only inside pinned deny-default
+Seatbelt profiles with bounded output and owned process-group cleanup; nested
+Seatbelt refusal is undecidable, never a raw fallback. After product publication,
+root creates only the exclusive `NAMESPACE/.install` fixed layout, copies the two
+published blobs as inert data with root:wheel nlink-one installer mode 0500 and
+mediator mode 0400, fsyncs/stable-opens/rebinds their exact identities,
+and executes only the protected staged installer with empty environment and
+`apply`. The ceremony is crash-recoverable and `.install` must be absent before
+installed review. Installed binary, namespace, fixed children and lock have no
+extended ACL, no unexpected authority xattr or weakening flag and retain their
+fixed identities around every completed rejection/success; only the bounded
+receipt slot may advance. Gate-private temp cleanup additionally requires the
+serialized formal-review assumption that no authorized same-euid writer races
+the unpredictable mode-0700 temp root.

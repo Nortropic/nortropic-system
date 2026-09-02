@@ -4431,3 +4431,84 @@ no raw fallback and lifecycle cleanup. Only `specs/tasks.spec.json`,
 may differ from the base. H-035 changes only its exact H-036 task/document
 compatibility oracles. Review and publication are still separate trust
 transitions; H-039 cannot begin before both complete.
+
+## 2026-09-02 — H-039 native cleanup and managed-Kuvert drift
+
+The earlier H-038 design could not simultaneously remove every runtime object
+and prevent a same-euid attacker from replacing a checked name before ordinary
+unlink. The owner therefore opened one narrow boundary: a separate fixed
+root-protected namespace and digest-bound cleanup mediator, never a general
+broker. Published H-036 and registry-v3 are the immutable base.
+
+Darwin causal probes refined the boundary. `F_OFD_SETLK` has the required
+open-file-description/last-close lifetime. `AT_NODELETEBUSY` rejects deletion of
+live AF_UNIX sockets and FIFOs, and `AT_UNIQUE` rejects hardlinked regular and
+symlink leaves. `AT_NODELETEBUSY|AT_REMOVEDIR`, however, can remove a directory
+while another process retains an open directory FD. The contract therefore does
+not credit it as a global holder preflight: H-038 must pair every trusted
+runtime-dir/listener holder with a FIFO writer until that holder terminates and
+is reaped, while managed targets and their untrusted descendants receive none.
+A second host probe proved that accepted/client AF_UNIX streams remain fully
+usable after the listener closes and its pathname is deleted. H-038 therefore
+also pairs every trusted accepted stream with a writer and holds a writer on
+behalf of each managed target client stream until the target family is reaped
+and both endpoints close. Each busy, replaced or non-unique leaf fails in
+resumable quarantined CLEANING state.
+
+The second drift is managed Kuvert retention. H-039 owns no Kuvert operation or
+file. Independent pre-freeze review proved that H-038 cannot authenticate a
+pre-open replay from only the legacy pathname and eight-field `AGENT_START`:
+opening first and then recording the observed identity merely self-seeds the
+attacker's object. The owner therefore superseded only the prior no-H032-edit
+clause. The later H-032 cycle first refreezes TEST_AUTHOR authority; after the
+H-031 rebind a distinct BUILDER product transition may change exactly
+`scripts/nortropic-codex-autopilot.py` to prebind the exact controller in-memory
+bytes, length, SHA-256, current event and journal/run/envelope identities and to
+retain the read-only capabilities across managed H-038 start. H-038 must reject
+missing, forged, stale, replayed, mutated or rebound handoffs, revalidate the
+complete bytes and final name binding, close every source identity before exec,
+and pass only the exact bytes through stdin.
+It omits `NORTROPIC_KUVERT`; nested managed launches reuse the capability-bound
+in-memory bytes and resolve cwd only through the retained private
+ancestor-workspace dirfd. The distinct H-036/H-038 session capability reaches
+the target protocol, never the H-039 cleanup bearer. This is a descendant-only managed branch:
+historical H-009/H-036 objects and reachable nonmanaged direct-launch behavior
+remain exact.
+
+H-039 freezes strict argv0/FD0 framing, checked uid/getpeereid boundaries,
+immediate receiver-side `FD_CLOEXEC`, exact state/receipt schemas, reproducible
+Mach-O identities, installed uid501/gid20 effects and crash/recovery behavior.
+An initial durable `RESERVING` state removes the otherwise unavoidable
+unregistered-creating window. Recovery admits only no object or the exact
+derived empty root-owned `c/` object and removes it capability-free without a
+receipt; every later recovery ends with no current terminal phase. Product
+identity is authenticated against live production main, product blobs are
+bounded, and all candidate compilation/signing runs under a pinned deny-default
+Seatbelt. Root installation first copies the exact published installer and
+mediator as inert data into the exclusive root-protected `.install` layout,
+reauthenticates and fsyncs those identities, then executes only that fixed staged
+installer; crashes leave only the exact recoverable staged/final orientation.
+Installed fixed objects and compound identities reject extended ACLs,
+unexpected xattrs or authority-weakening flags and are reauthenticated around
+effects. The empty root-owned serialization lock is mode 0600, so uid501 can
+only bind its `lstat` identity/zero size and has no read-lock denial capability
+against the root writer. Root-0600 lock, root-0700 hidden and mode-0620 socket
+entries have flags and ACLs checked dynamically; the independent closed native
+review proves their zero xattrs, the lock's exact empty bytes, hidden exact
+membership, and rejects xattr/ACL/flag mutators because macOS intentionally
+denies uid501 their contents or directory enumeration. Black-box timing cannot deterministically stop
+every short native fsync/rename transition, so only deterministic PREPARED and
+resumable-CLEANING crash effects earn runtime credit; the independent immutable
+product review owns the remaining exact transition order, recovery branches and
+closed native/import/installer authority. Sampling or product self-report is no
+substitute.
+
+Gate-private temporary cleanup assumes the formal owner-serialized review lane:
+no other authorized same-euid writer may race its unpredictable mode-0700 temp
+roots. That assumption applies only to gate fixture cleanup and grants no product
+or general filesystem authority.
+The remaining serial order is H-039 contract → H-039 product/install/effects →
+H-038 → H-032 TEST_AUTHOR refreeze → H-031 rebind → exact one-file H-032
+BUILDER product → independent product review → guarded two-parent final merge →
+post-publication verification. Supervisor resume remains prohibited until all
+are green.
