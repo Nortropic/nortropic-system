@@ -6,6 +6,8 @@ runtime-supervisor absence.  Product credit requires ``--product`` and its
 object-derived direct-child identity proof; an unbound product checkout is
 never subject credit.  ``--reference-host`` is a
 judge-only architecture satisfiability lane and can never credit the subject.
+``--registry-v3-refreeze`` verifies only the completed product's exact bytes,
+the published H-034/H-035/registry identities and the downstream temporal edge.
 """
 
 from __future__ import annotations
@@ -52,6 +54,7 @@ H017_GATE = ROOT / "verify/bin/h-017-exit"
 H034_GATE = ROOT / "verify/bin/h-034-exit"
 H035_GATE = ROOT / "verify/bin/h-035-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
+H039_GATE = ROOT / "verify/bin/h-039-exit"
 DELEGATION = ROOT / "docs/loop/remaining-bootstrap-delegation-v1.md"
 CONSTITUTION = ROOT / "docs/07-konstitution.md"
 AUTOPILOT = ROOT / "scripts/nortropic-codex-autopilot.py"
@@ -121,20 +124,38 @@ PUBLISHED_H034_PARENTS = [
 H034_REVIEW_SHA256 = "2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474"
 H034_REVIEW_CANDIDATE = "e60fbc40e5f7b1b08ad3427f2ab00eff4744a00e"
 H034_REVIEW_TREE = PUBLISHED_H034_TREE
-REGISTRY_SHA256 = "3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256"
+HISTORICAL_H034_GATE_SHA256 = "e2b8ec23a85105e07573c4c4806fb26ea1414840bf1c36d1356bd642fdf5f350"
+HISTORICAL_REGISTRY_SHA256 = "3fc24e10e9b44f70b23534e3a8bde1d34e4513c12c845525852164d7fc017256"
+
+CURRENT_H034_SHA = "35d7fd7c7596df5cb7b8d68f3034cbb7b87df0cf"
+CURRENT_H034_TREE = "fff227e0bf95241310dde87b56fc3d136fe3515e"
+CURRENT_H034_PARENTS = [
+    "843bf368be8ec0a7162f2a9f1d066889fd3e6702",
+    "dd24c6c4d387d49157250835b666486a65d0c13e",
+]
+CURRENT_H034_REVIEW_CANDIDATE = CURRENT_H034_PARENTS[1]
+CURRENT_H034_REVIEW_TREE = CURRENT_H034_TREE
+CURRENT_H034_DUAL_REVIEW_SHA256 = "aa96f2816134611a43eacb7b68fd8b636bf3dfcc4accc046a6666317553b0161"
+CURRENT_H034_GATE_SHA256 = "c5b9439218f90d06bdbe2f814e9024e993412e06af19df8690f9096f820c6cb5"
+CURRENT_H034_H035_GATE_SHA256 = "fdcd4f91d2bbe655af8e9b065839d790b1f05cc282149cca41435429bd707dcc"
+REGISTRY_SHA256 = "7697ee6376e7203350366d6d3ecccff3d605ea1e62beb18c2728bdf29148783e"
 OLD_CLI_SHA256 = "cb1cf372ccedec2eb0e8e379ca2da766671c40347749b807068114f23668cf0e"
 
 PINNED_UNCHANGED = {
     "verify/bin/h-017-exit": "78b9d1f4fed9fa0d4c9e587dfc0069e9532a5cd8653a697b29a275a4d46ea983",
-    "verify/bin/h-034-exit": "e2b8ec23a85105e07573c4c4806fb26ea1414840bf1c36d1356bd642fdf5f350",
-    "verify/bin/h-035-exit": "cae895110129f5066be9ae7f770e7f4e96594698ef5500d586820fea472d27e2",
+    "verify/bin/h-034-exit": CURRENT_H034_GATE_SHA256,
+    "verify/bin/h-035-exit": "76d3bf1049468f31906faf818ce07d0d8c521772d3358021ebc4149432eec578",
     "verify/bin/h-037-exit": "814deb69fbc6e34e57ebc89b62bf7d54281bc95a4207332ff94792d90d0e6dc3",
-    "docs/loop/remaining-bootstrap-delegation-v1.md": "0ad4cbc03b3b70c6b61ef6adc76a31decd4300f2b6a8a2b9f632c3f6719ac36f",
+    "docs/loop/remaining-bootstrap-delegation-v1.md": "d4bcdee01a43613860fd5c26fb4b2095c2a78636d8e05e793d872053c5254d66",
     "docs/07-konstitution.md": "2e7f04cca9eb00d24b264b91a0678aaee68c97441d79846d81aeff2f8d7b4432",
     "scripts/nortropic-codex-autopilot.py": "4237eda9fd4554ed3d7ed78fc33c0e5f27f5d270ae21ff9e9d9f0d9467caa9fc",
-    "controller/authority/core.py": "a56398870ca9716b79c701c69e1eda401452c03471c977ebdfe4e210b9b6b1a2",
+    "controller/authority/core.py": "a83e5847b7cdee8543a55d52ef719d232319fdd6c0a33b5bd00b8a77b69e8158",
+    "controller/authority/cli": "b066edaf624f51f837d6c83f2e996e8e5684b8229fa407e3c6cb3f233305de2c",
     "config/python-interpreter-authority-v1.json": V1_CONFIG_SHA256,
     "specs/owner-production-paths.v1.json": REGISTRY_SHA256,
+    "controller/launch/cli": "65571892948b9f7a9260ee88abb2cf5c575eda245fe1874f8ade3c7a8b202ba3",
+    "controller/launch/runtime_snapshot.py": "35ca9dff3355bcfbd4d7536cb9658fe3342f143745547ec55f2b2cb25223eca7",
+    "config/python-runtime-authority-v2.json": "460d4a89f2160ed947ed513bebc5e25de41899a9aabda613d0a233f2150ef963",
 }
 
 PRODUCT_PATHS = [
@@ -142,6 +163,23 @@ PRODUCT_PATHS = [
     "controller/launch/runtime_snapshot.py",
     "config/python-runtime-authority-v2.json",
 ]
+H034_OWNER_PATHS = [
+    "controller/h034-native/**",
+    "verify/h034/kernel",
+    "verify/h034/build-recipe.json",
+    "verify/h034/identity-manifest.json",
+]
+H039_OWNER_PATHS = [
+    "controller/runtime-cleanup/install",
+    "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/runtime-cleanup-mediator",
+    "verify/h039/build-recipe.json",
+    "verify/h039/identity-manifest.json",
+]
+H039_PRODUCT_PATHS = [ROOT / path for path in H039_OWNER_PATHS]
+REGISTRY_OWNER_V1 = H034_OWNER_PATHS
+REGISTRY_OWNER_V2 = [*H034_OWNER_PATHS, *PRODUCT_PATHS]
+REGISTRY_OWNER_V3 = [*REGISTRY_OWNER_V2, *H039_OWNER_PATHS]
 PRODUCT_MODES = {
     "controller/launch/cli": "100755",
     "controller/launch/runtime_snapshot.py": "100644",
@@ -149,16 +187,17 @@ PRODUCT_MODES = {
 }
 TEST_AUTHOR_SURFACE = [
     "specs/tasks.spec.json",
+    "verify/bin/h-035-exit",
     "verify/bin/h-036-exit",
     "docs/loop/owner-author-workflow-v1.md",
     "docs/05-beslutslogg.md",
     "docs/loop/drift.md",
 ]
 MAX_ADDED_LINES = 2400
-TASK_CANONICAL_SHA256 = "8d3742bbf6d791872c8f9173b3ff20afca9b6139615b64397498e05bda61826f"
-H032_TASK_CANONICAL_SHA256 = "436d4ff0a7323e8f682325db308237c0018b7a5037303a17c26aae9b7df6c864"
-H034_TASK_CANONICAL_SHA256 = "6d65b38f7f91bfba468334beb89f1deeeb460ab497c98ea6267b6fd8234f2935"
-H035_TASK_CANONICAL_SHA256 = "f854ddc0b5ca05b87cbaf15431f58c59803be586d6d9ff67d14e40e8a5970f22"
+TASK_CANONICAL_SHA256 = "f4fadf3e26bf94fcb43c1a704dbcdaa623876c140c570e94e4a8ddf70a3d5db4"
+H032_TASK_CANONICAL_SHA256 = "30aaeb185573a365b583b940cb83b339fee31dc83b1c280db221009444de607a"
+H034_TASK_CANONICAL_SHA256 = "1f22680753df4a100366e2a211d9a4e259b41aead8ad9b534c37f786f063b268"
+H035_TASK_CANONICAL_SHA256 = "20875ff7ed7144a1bf19cdc1e0cd33365c2ddf12941da000e886746e13c452fe"
 H037_TASK_CANONICAL_SHA256 = "63662e129fb0b223f84669814cef70f331c5fd39441dad0bd79712d7e3dc3efb"
 
 LABEL = "A_H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_OPERATIONAL"
@@ -207,17 +246,11 @@ H034_TEMPORAL_RED_LABELS = [
 ]
 
 EXPECTED_REGISTRY = {
-    "schema_version": 2,
+    "schema_version": 3,
     "path_grammar": "repo-tree-exact-or-terminal-recursive-prefix-v1",
     "authority_source": "git-candidate-plus-independent-gate-review-plus-owner-final-freeze",
     "self_digest_is_authority": False,
-    "owner_production_paths": [
-        "controller/h034-native/**",
-        "verify/h034/kernel",
-        "verify/h034/build-recipe.json",
-        "verify/h034/identity-manifest.json",
-        *PRODUCT_PATHS,
-    ],
+    "owner_production_paths": REGISTRY_OWNER_V3,
     "prospective_ordinary_protected_paths": [
         "specs/tasks.spec.json",
         "specs/owner-production-paths.v1.json",
@@ -246,6 +279,60 @@ EXPECTED_REGISTRY = {
         "scripts/nortropic-codex-autopilot.py",
         "scripts/check-invariants.mjs",
     ],
+}
+
+H036_REGISTRY_V3_CONTRACT = {
+    "contract_id": "H036_EXACT_REGISTRY_V3_UNION12_REFREEZE_V1",
+    "authority_base_sha": CURRENT_H034_SHA,
+    "authority_base_tree": CURRENT_H034_TREE,
+    "authority_base_ordered_parents": CURRENT_H034_PARENTS,
+    "h034_publication": {
+        "reviewed_candidate": CURRENT_H034_REVIEW_CANDIDATE,
+        "reviewed_candidate_tree": CURRENT_H034_REVIEW_TREE,
+        "dual_review_artifact_sha256": CURRENT_H034_DUAL_REVIEW_SHA256,
+        "gate_sha256": CURRENT_H034_GATE_SHA256,
+    },
+    "canonical_registry": {
+        "path": "specs/owner-production-paths.v1.json",
+        "sha256": REGISTRY_SHA256,
+        "schema_version": 3,
+        "owner_production_paths": REGISTRY_OWNER_V3,
+    },
+    "historical_legal_registry_states": [
+        {"schema_version": 1, "owner_production_paths": REGISTRY_OWNER_V1},
+        {"schema_version": 2, "owner_production_paths": REGISTRY_OWNER_V2},
+        {"schema_version": 3, "owner_production_paths": REGISTRY_OWNER_V3},
+    ],
+    "h036_owner_author_allowed_write": PRODUCT_PATHS,
+    "h036_depends_on": ["h-034"],
+    "published_h035_product_identity": {
+        "controller/authority/core.py": PINNED_UNCHANGED["controller/authority/core.py"],
+        "controller/authority/cli": PINNED_UNCHANGED["controller/authority/cli"],
+    },
+    "published_h036_product_identity": {
+        "published_merge": "e71dfbbd6a1dcb0792031764370f264dd63ebbf2",
+        "reviewed_candidate": "18aeff690a11d72d878eb0e3b7880ccf5b7d4882",
+        "independent_product_review_sha256": "a9b4fdb64c8e1200b63e06366a1fd1f4590c1217bf32a2482a11067577f595b0",
+        "paths_modes_sha256": [
+            [path, PRODUCT_MODES[path], PINNED_UNCHANGED[path]] for path in PRODUCT_PATHS
+        ],
+    },
+    "h039_reserved_owner_production_paths": H039_OWNER_PATHS,
+    "h039_task_gate_product_install_materialization": "EXACTLY_ABSENT",
+    "test_author_allowed_write": TEST_AUTHOR_SURFACE,
+    "required_serial_order": [
+        "H034_REGISTRY_V3_GUARDED_PUBLICATION",
+        "H036_REGISTRY_V3_REFREEZE",
+        "H036_TWO_INDEPENDENT_GATE_REVIEWS",
+        "H036_GUARDED_PUBLICATION",
+        "H039_CONTRACT_FREEZE_INDEPENDENT_GATE_REVIEW_GUARDED_PUBLICATION",
+        "H039_PRODUCT_AND_INSTALL_REVIEW_GUARDED_PUBLICATION",
+        "H038_REFREEZE_PRODUCT_REVIEW_GUARDED_PUBLICATION",
+        "H032_REFREEZE_REVIEW_GUARDED_PUBLICATION",
+        "H031_REBIND_REVIEW_GUARDED_PUBLICATION",
+        "SUPERVISOR_RESUME_ONLY_AFTER_ALL_GREEN",
+    ],
+    "broader_authority": False,
 }
 
 CONFIG_STATIC = {
@@ -548,8 +635,34 @@ def published_h034_identity() -> bool:
     registry = git_blob(PUBLISHED_H034_SHA, "specs/owner-production-paths.v1.json")
     if h034 is None or registry is None:
         return False
-    return sha(h034[2]) == PINNED_UNCHANGED["verify/bin/h-034-exit"] \
+    return sha(h034[2]) == HISTORICAL_H034_GATE_SHA256 \
+        and sha(registry[2]) == HISTORICAL_REGISTRY_SHA256
+
+
+def current_h034_identity() -> bool:
+    tree, parents = raw_commit(CURRENT_H034_SHA)
+    if tree != CURRENT_H034_TREE or parents != CURRENT_H034_PARENTS:
+        return False
+    candidate_tree, candidate_parents = raw_commit(CURRENT_H034_REVIEW_CANDIDATE)
+    if candidate_tree != CURRENT_H034_REVIEW_TREE \
+            or candidate_parents != [CURRENT_H034_PARENTS[0]]:
+        return False
+    h034 = git_blob(CURRENT_H034_SHA, "verify/bin/h-034-exit")
+    h035 = git_blob(CURRENT_H034_SHA, "verify/bin/h-035-exit")
+    registry = git_blob(CURRENT_H034_SHA, "specs/owner-production-paths.v1.json")
+    core = git_blob(CURRENT_H034_SHA, "controller/authority/core.py")
+    cli = git_blob(CURRENT_H034_SHA, "controller/authority/cli")
+    if any(item is None for item in (h034, h035, registry, core, cli)):
+        return False
+    assert h034 is not None and h035 is not None and registry is not None
+    assert core is not None and cli is not None
+    return (
+        sha(h034[2]) == CURRENT_H034_GATE_SHA256
+        and sha(h035[2]) == CURRENT_H034_H035_GATE_SHA256
         and sha(registry[2]) == REGISTRY_SHA256
+        and sha(core[2]) == PINNED_UNCHANGED["controller/authority/core.py"]
+        and sha(cli[2]) == PINNED_UNCHANGED["controller/authority/cli"]
+    )
 
 
 def config_oracle(
@@ -648,6 +761,134 @@ def task_rows(spec: dict[str, Any], task_id: str) -> list[dict[str, Any]]:
     return [row for row in tasks if isinstance(row, dict) and row.get("id") == task_id]
 
 
+def registry_v3_refreeze_valid(document: Any) -> bool:
+    return (
+        type(document) is dict
+        and type(document.get("schema_version")) is int
+        and document == EXPECTED_REGISTRY
+    )
+
+
+def h036_registry_v3_task_valid(task: Any) -> bool:
+    return (
+        type(task) is dict
+        and task.get("authority_class") == "owner_authority"
+        and task.get("allowed_write") == []
+        and task.get("owner_author_allowed_write") == PRODUCT_PATHS
+        and task.get("docs_impact") == []
+        and task.get("depends_on") == ["h-034"]
+        and task.get("exit_test") == "verify/bin/h-036-exit"
+        and task.get("max_changed_files") == 3
+        and task.get("max_added_lines") == MAX_ADDED_LINES
+        and task.get("h036_registry_v3_refreeze") == H036_REGISTRY_V3_CONTRACT
+    )
+
+
+def h039_materialization_absent(
+    task_present: bool, gate_present: bool, product_present: bool,
+) -> bool:
+    return not task_present and not gate_present and not product_present
+
+
+def registry_v3_refreeze_adversarial_controls(task: dict[str, Any]) -> None:
+    v1 = {**EXPECTED_REGISTRY, "schema_version": 1,
+          "owner_production_paths": REGISTRY_OWNER_V1}
+    v2 = {**EXPECTED_REGISTRY, "schema_version": 2,
+          "owner_production_paths": REGISTRY_OWNER_V2}
+    check(not registry_v3_refreeze_valid(v1),
+          "J_H036_V3_OLD_V1_REGISTRY_IDENTITY_REJECT")
+    check(not registry_v3_refreeze_valid(v2),
+          "J_H036_V3_OLD_V2_REGISTRY_IDENTITY_REJECT")
+    for label, version in (("ZERO", 0), ("FOUR", 4), ("STRING", "3"),
+                           ("BOOL", True), ("FLOAT", 3.0), ("NULL", None)):
+        mutant = {**EXPECTED_REGISTRY, "schema_version": version}
+        check(not registry_v3_refreeze_valid(mutant),
+              f"J_H036_V3_WRONG_VERSION_{label}_REJECT")
+
+    defect_count = 0
+    for index, path in enumerate(H039_OWNER_PATHS, 1):
+        neighbor = f"verify/h039/neighbor-{index}" if path.startswith("verify/") \
+            else f"controller/runtime-cleanup/neighbor-{index}"
+        substitutions = {
+            "MISSING": [item for item in REGISTRY_OWNER_V3 if item != path],
+            "SUBSTITUTED": [neighbor if item == path else item
+                            for item in REGISTRY_OWNER_V3],
+            "DUPLICATE": [*REGISTRY_OWNER_V3, path],
+            "BACKSLASH_ALIAS": [path.replace("/", "\\") if item == path else item
+                                for item in REGISTRY_OWNER_V3],
+            "LEADING_DOT_ALIAS": [f"./{path}" if item == path else item
+                                  for item in REGISTRY_OWNER_V3],
+        }
+        for family, paths in substitutions.items():
+            defect_count += 1
+            mutant = {**EXPECTED_REGISTRY, "owner_production_paths": paths}
+            check(not registry_v3_refreeze_valid(mutant),
+                  f"J_H036_V3_H039_MEMBER_{index}_{family}_REJECT")
+    check(defect_count == 25,
+          "J_H036_V3_H039_MEMBER_DEFECT_CARDINALITY", defect_count)
+    for index, broad in enumerate(("controller/runtime-cleanup/**", "verify/h039/**"), 1):
+        for label, paths in (
+            ("REPLACE", [*REGISTRY_OWNER_V2, broad]),
+            ("ADD", [*REGISTRY_OWNER_V3, broad]),
+        ):
+            mutant = {**EXPECTED_REGISTRY, "owner_production_paths": paths}
+            check(not registry_v3_refreeze_valid(mutant),
+                  f"J_H036_V3_H039_BROAD_{index}_{label}_REJECT")
+    check(not registry_v3_refreeze_valid({
+        **EXPECTED_REGISTRY,
+        "owner_production_paths": [*REGISTRY_OWNER_V3, "unrelated/arbitrary"],
+    }), "J_H036_V3_ARBITRARY_REGISTRY_ADDITION_REJECT")
+
+    duplicate_key_raw = REGISTRY.read_bytes().replace(
+        b"{\n", b'{\n  "schema_version": 3,\n', 1)
+    try:
+        strict_json(duplicate_key_raw)
+        duplicate_key_rejected = False
+    except Rig:
+        duplicate_key_rejected = True
+    check(duplicate_key_rejected,
+          "J_H036_V3_REGISTRY_DUPLICATE_JSON_KEY_REJECT")
+
+    for label, key, value in (
+        ("DEPENDENCY", "depends_on", ["h-035"]),
+        ("SURFACE_MISSING", "owner_author_allowed_write", PRODUCT_PATHS[:-1]),
+        ("SURFACE_H039", "owner_author_allowed_write", [*PRODUCT_PATHS, H039_OWNER_PATHS[0]]),
+        ("SURFACE_BROAD", "owner_author_allowed_write", ["controller/**"]),
+    ):
+        mutant = json.loads(json.dumps(task))
+        mutant[key] = value
+        check(not h036_registry_v3_task_valid(mutant),
+              f"J_H036_V3_TASK_{label}_REJECT")
+    base_mutant = json.loads(json.dumps(task))
+    base_mutant["h036_registry_v3_refreeze"]["authority_base_sha"] = \
+        CURRENT_H034_PARENTS[0]
+    check(not h036_registry_v3_task_valid(base_mutant),
+          "J_H036_V3_WRONG_AUTHORITY_BASE_REJECT")
+
+    for index, path in enumerate(PRODUCT_PATHS, 1):
+        mutant = json.loads(json.dumps(task))
+        rows = mutant["h036_registry_v3_refreeze"]["published_h036_product_identity"] \
+            ["paths_modes_sha256"]
+        rows[index - 1][2] = "00" * 32
+        check(not h036_registry_v3_task_valid(mutant),
+              f"J_H036_V3_CHANGED_PRODUCT_BYTE_IDENTITY_{index}_REJECT")
+
+    h039_absent = h039_materialization_absent(
+        bool(task_rows(strict_json(SPEC.read_bytes()), "h-039")),
+        os.path.lexists(H039_GATE),
+        any(os.path.lexists(path) for path in H039_PRODUCT_PATHS),
+    )
+    check(h039_absent, "F_H036_V3_H039_MATERIALIZATION_EXACTLY_ABSENT")
+    for label, task_present, gate_present, product_present in (
+        ("TASK", True, False, False),
+        ("GATE", False, True, False),
+        ("PRODUCT", False, False, True),
+    ):
+        check(not h039_materialization_absent(
+                  task_present, gate_present, product_present),
+              f"J_H036_V3_H039_{label}_MATERIALIZATION_REJECT")
+
+
 def static_contract_checks() -> None:
     try:
         compile(INNER_FIXTURE, "h036-inner-fixture", "exec")
@@ -657,6 +898,8 @@ def static_contract_checks() -> None:
         raise Rig(f"embedded fixture syntax: {exc}") from exc
     check(trusted_git_valid(), "F_H036_TRUSTED_GIT_IDENTITY")
     check(published_h034_identity(), "F_H036_PUBLISHED_H034_MERGE_TREE_AND_ORDERED_PARENTS")
+    check(current_h034_identity(),
+          "F_H036_V3_CURRENT_H034_MERGE_TREE_REVIEW_REGISTRY_AND_H035_IDENTITY")
     check(
         H034_REVIEW_SHA256 == "2ce3f996eb6d2fd6c338f728d545ed25caea9ba0c99dd3676c17e1e595e27474"
         and H034_REVIEW_CANDIDATE == PUBLISHED_H034_PARENTS[1]
@@ -667,10 +910,11 @@ def static_contract_checks() -> None:
         all((ROOT / path).is_file() and not (ROOT / path).is_symlink()
             and path_sha(ROOT / path) == digest
             for path, digest in PINNED_UNCHANGED.items()),
-        "F_H036_H017_H034_H035_H037_DELEGATION_CONSTITUTION_AUTOPILOT_AUTHORITY_PRESERVED",
+        "F_H036_H017_H034_H035_H037_DELEGATION_CONSTITUTION_AUTOPILOT_PRODUCT_AUTHORITY_PRESERVED",
     )
     registry = strict_json(REGISTRY.read_bytes())
-    check(registry == EXPECTED_REGISTRY, "F_H036_REGISTRY_V2_EXACT_ORDERED_UNION7")
+    check(registry_v3_refreeze_valid(registry),
+          "F_H036_REGISTRY_V3_EXACT_ORDERED_UNION12")
     check(config_oracle_selftests() and fd_token_oracle_selftests(),
           "J_H036_STRICT_V2_V1_INHERITANCE_B_FLAG_AND_NO_OVERRIDE_CONFIG_ORACLE")
 
@@ -682,17 +926,8 @@ def static_contract_checks() -> None:
     if len(h036) != 1:
         raise Rig("H036 task cardinality prevents exact checks")
     task = h036[0]
-    check(
-        task.get("authority_class") == "owner_authority"
-        and task.get("allowed_write") == []
-        and task.get("owner_author_allowed_write") == PRODUCT_PATHS
-        and task.get("docs_impact") == []
-        and task.get("depends_on") == ["h-034"]
-        and task.get("exit_test") == "verify/bin/h-036-exit"
-        and task.get("max_changed_files") == 3
-        and task.get("max_added_lines") == MAX_ADDED_LINES,
-        "F_H036_EXACT_OWNER_TASK_DEPENDENCY_SURFACE_AND_BUDGET",
-    )
+    check(h036_registry_v3_task_valid(task),
+          "F_H036_EXACT_OWNER_TASK_DEPENDENCY_SURFACE_BUDGET_AND_V3_REFREEZE")
     observed_task_sha = canonical_sha(task)
     check(observed_task_sha == TASK_CANONICAL_SHA256,
           "F_H036_EXACT_FROZEN_TASK_AND_RUNTIME_CONTRACT",
@@ -765,6 +1000,11 @@ def static_contract_checks() -> None:
         "verify/bin/h-036-exit --product <base-sha> <candidate-sha>",
         "H-032 later depends exactly on published H-036",
         "not a post-H-036 green",
+        "<!-- H036_REGISTRY_V3_REFREEZE_V1 -->",
+        CURRENT_H034_SHA,
+        CURRENT_H034_DUAL_REVIEW_SHA256,
+        "registry v3 union12",
+        "H-039 materialization remains absent",
     )
     check(all(term in owner for term in owner_terms),
           "F_H036_OWNER_WORKFLOW_AUTHORITY_AND_LIFECYCLE_CONTRACT")
@@ -772,6 +1012,10 @@ def static_contract_checks() -> None:
           "F_H036_DECISION_LOG_SINGLE_ENTRY")
     check(drift.count("## 2026-08-25 — H-036 pre-sandbox runtime supervisor contract") == 1,
           "F_H036_DRIFT_SINGLE_ENTRY")
+    check(decision.count("H-036 registry-v3 union12 refreeze") == 1,
+          "F_H036_V3_DECISION_LOG_SINGLE_ENTRY")
+    check(drift.count("## 2026-09-02 — H-036 registry-v3 union12 refreeze") == 1,
+          "F_H036_V3_DRIFT_SINGLE_ENTRY")
 
 
 def product_phase() -> str:
@@ -5838,13 +6082,26 @@ def main(argv: list[str]) -> int:
     preproduct = not argv
     product_mode = len(argv) == 3 and argv[0] == "--product"
     reference_mode = argv == ["--reference-host"]
-    if not (preproduct or product_mode or reference_mode):
-        print("RIG_ERROR: usage: h-036-exit [--product BASE_SHA CANDIDATE_SHA|--reference-host]",
+    registry_mode = argv == ["--registry-v3-refreeze"]
+    if not (preproduct or product_mode or reference_mode or registry_mode):
+        print("RIG_ERROR: usage: h-036-exit [--product BASE_SHA CANDIDATE_SHA|"
+              "--reference-host|--registry-v3-refreeze]",
               file=sys.stderr)
         return 2
     try:
         static_contract_checks()
         phase = product_phase()
+        if registry_mode:
+            spec = strict_json(SPEC.read_bytes())
+            if not isinstance(spec, dict):
+                raise Rig("task spec is not object")
+            rows = task_rows(spec, "h-036")
+            if len(rows) != 1:
+                raise Rig("H036 task cardinality prevents v3 refreeze checks")
+            registry_v3_refreeze_adversarial_controls(rows[0])
+            if phase != "product":
+                raise Rig("registry-v3 refreeze requires exact published H036 product")
+            return finish("registry-v3-refreeze")
         if reference_mode:
             host_preflight()
             topology_ok, topology = reference_host_effect()

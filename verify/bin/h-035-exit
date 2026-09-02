@@ -145,6 +145,19 @@ H034_V3_DOCUMENT_APPENDS = {
         "429f7820bf6e62a76bc96cc1384a68f2bfd0b972fc96e63993b89117e4df739b",
         b"\n## H-034 registry-v3 refreeze after published H-035 R33"),
 }
+H036_V3_AUTHORITY_BASE = "35d7fd7c7596df5cb7b8d68f3034cbb7b87df0cf"
+H036_V3_CONTRACT_SHA256 = "e15e6a5f33d4ec783ef90486864c321ca09f65ab066ace46db94f0196abf2411"
+H036_V3_DOCUMENT_APPENDS = {
+    "docs/05-beslutslogg.md": (950,
+        "63497580c8ccff1beb39b9070682c50b3816ca5edfd2230b309ed9ac5dc6f3e2",
+        b"| 2026-09-02 | H-036 registry-v3 union12 refreeze |"),
+    "docs/loop/drift.md": (2100,
+        "15072a81866d576422575876116dd99faf25ced01ba56af4d31806b209b27ab9",
+        b"\n## 2026-09-02 \xe2\x80\x94 H-036 registry-v3 union12 refreeze"),
+    "docs/loop/owner-author-workflow-v1.md": (1972,
+        "5185d47c2885c64c480d98f218b4e436afd79cf6df1a17f8c8385735bb1563e8",
+        b"\n<!-- H036_REGISTRY_V3_REFREEZE_V1 -->"),
+}
 
 BPAM_AMENDMENT = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_AMENDMENT_V1 -->\n"
 BPAM_CONTRACT_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_BEGIN -->\n```json\n"; BPAM_CONTRACT_END = b"```\n<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_END -->\n"
@@ -1775,6 +1788,12 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
                         or canonical_json_sha256(contract)
                             !=H034_V3_CONTRACT_SHA256):
                     return False
+            if task_id=="h-036":
+                contract=row.pop("h036_registry_v3_refreeze",None)
+                if (not isinstance(contract,dict)
+                        or canonical_json_sha256(contract)
+                            !=H036_V3_CONTRACT_SHA256):
+                    return False
             if task_id=="h-035":
                 base_h035=next((value for value in base_candidate_rows
                                 if isinstance(value,dict)
@@ -1835,6 +1854,25 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
     check(len(h034_v3_mutants)==4
           and all(not exact_spec_transform(mutant) for mutant in h034_v3_mutants),
           "J_H034_V3_SPEC_CONTRACT_MISSING_VERSION_BASE_BROAD_MUTANTS_REJECT")
+    h036_v3_mutants=[]
+    if isinstance(current_spec,dict):
+        for label in ("MISSING","BASE","VERSION","DEPENDENCY","BROAD","EXTRA_SCOPE"):
+            mutant=json.loads(json.dumps(current_spec))
+            h036=next(row for row in mutant["tasks"] if row.get("id")=="h-036")
+            if label=="MISSING":h036.pop("h036_registry_v3_refreeze")
+            elif label=="BASE":h036["h036_registry_v3_refreeze"][
+                "authority_base_sha"]="0"*40
+            elif label=="VERSION":h036["h036_registry_v3_refreeze"][
+                "canonical_registry"]["schema_version"]=2
+            elif label=="DEPENDENCY":h036["depends_on"]=["h-035"]
+            elif label=="BROAD":h036["h036_registry_v3_refreeze"][
+                "h036_owner_author_allowed_write"]=["controller/**"]
+            else:h036["h036_registry_v3_refreeze"][
+                "test_author_allowed_write"].append("verify/bin/**")
+            h036_v3_mutants.append(mutant)
+    check(len(h036_v3_mutants)==6
+          and all(not exact_spec_transform(mutant) for mutant in h036_v3_mutants),
+          "J_H036_V3_SPEC_CONTRACT_MISSING_BASE_VERSION_DEPENDENCY_BROAD_SCOPE_MUTANTS_REJECT")
 
     h035_current=next((row for row in current_spec.get("tasks",[])
                        if isinstance(row,dict) and row.get("id")=="h-035"),{}) \
@@ -17554,8 +17592,7 @@ def r15_document_append_selftests() -> None:
     h034_positives=[];h034_mutants=[];unchanged=[]
     for path in r33_appends:
         published=r15_git_object_bytes(ROOT,H034_V3_AUTHORITY_BASE,path)
-        try:current=(ROOT/path).read_bytes()
-        except OSError:current=b""
+        current=r15_git_object_bytes(ROOT,H036_V3_AUTHORITY_BASE,path)
         if path not in H034_V3_DOCUMENT_APPENDS:
             unchanged.append(published is not None and current==published)
             continue
@@ -17585,6 +17622,41 @@ def r15_document_append_selftests() -> None:
     check(len(h034_mutants)==10 and all(not exact_h034_append(path,candidate)
           for path,candidate in h034_mutants),
           "J_H034_V3_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
+    h036_positives=[];h036_mutants=[];h036_unchanged=[]
+    for path in r33_appends:
+        published=r15_git_object_bytes(ROOT,H036_V3_AUTHORITY_BASE,path)
+        try:current=(ROOT/path).read_bytes()
+        except OSError:current=b""
+        if path not in H036_V3_DOCUMENT_APPENDS:
+            h036_unchanged.append(published is not None and current==published)
+            continue
+        size,digest,marker=H036_V3_DOCUMENT_APPENDS[path]
+        suffix=current[len(published):] if published is not None \
+            and current.startswith(published) else b""
+        h036_positives.append(published is not None and len(suffix)==size
+            and hashlib.sha256(suffix).hexdigest()==digest
+            and suffix.startswith(marker) and suffix.endswith(b"\n"))
+        if published is not None:
+            h036_mutants.extend(((path,published),
+                                 (path,published+suffix+b"extra\n"),
+                                 (path,published+suffix[:-1]),
+                                 (path,published[:-1]+suffix),
+                                 (path,b"rewrite\n"+published+suffix),
+                                 (path,published+suffix.replace(
+                                     marker,b"substitute",1))))
+    def exact_h036_append(path: str,candidate: bytes) -> bool:
+        published=r15_git_object_bytes(ROOT,H036_V3_AUTHORITY_BASE,path)
+        if published is None or not candidate.startswith(published):return False
+        size,digest,marker=H036_V3_DOCUMENT_APPENDS[path]
+        suffix=candidate[len(published):]
+        return (len(suffix)==size and hashlib.sha256(suffix).hexdigest()==digest
+                and suffix.startswith(marker) and suffix.endswith(b"\n"))
+    check(len(h036_positives)==3 and all(h036_positives)
+          and len(h036_unchanged)==1 and all(h036_unchanged),
+          "F_H036_V3_THREE_DOCUMENTS_EXACT_35D7FD7C_PLUS_HASH_BOUND_APPEND")
+    check(len(h036_mutants)==18 and all(not exact_h036_append(path,candidate)
+          for path,candidate in h036_mutants),
+          "J_H036_V3_DOCUMENT_MISSING_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
 
 
 def r15_parallel_cli_selftests() -> None:

@@ -1498,3 +1498,38 @@ objective or other authority changes here. After two independent gate reviews an
 publication, R33 proceeds through an independent two-file product review and guarded publication,
 then the already frozen H034 → H036 → H039 → H038 → H032 → H031 sequence. Supervisor resume remains
 forbidden until the complete chain is green.
+
+<!-- H036_REGISTRY_V3_REFREEZE_V1 -->
+## H-036 registry-v3 refreeze after published H-034 union12
+
+The exact authority base is the guarded H-034 publication
+`35d7fd7c7596df5cb7b8d68f3034cbb7b87df0cf`, tree
+`fff227e0bf95241310dde87b56fc3d136fe3515e`, with ordered parents
+`843bf368be8ec0a7162f2a9f1d066889fd3e6702` and
+`dd24c6c4d387d49157250835b666486a65d0c13e`. The reviewed H-034 candidate has
+that same tree; its two-review aggregate is bound by SHA-256
+`aa96f2816134611a43eacb7b68fd8b636bf3dfcc4accc046a6666317553b0161`.
+
+This transition recognizes only the already published registry v3 union12 at
+`specs/owner-production-paths.v1.json`, SHA-256
+`7697ee6376e7203350366d6d3ecccff3d605ea1e62beb18c2728bdf29148783e`.
+H-036 keeps exactly the three owner product paths `controller/launch/cli`,
+`controller/launch/runtime_snapshot.py` and
+`config/python-runtime-authority-v2.json`, and it still depends exactly on H-034.
+The published product bytes remain respectively SHA-256 `65571892…`, `35ca9dff…`
+and `460d4a89…`; the frozen Seatbelt, protocol, lifecycle and confinement
+semantics are unchanged.
+
+The targeted command is `verify/bin/h-036-exit --registry-v3-refreeze`. It
+rejects old or wrong canonical registry identity; missing, substituted,
+duplicated, backslash/leading-dot-aliased or broad H-039 membership; a changed
+H-036 product byte identity; wrong dependency or authority base; and any H-039
+task, gate, product or install materialization. H-039 materialization remains absent.
+The exact TEST_AUTHOR write set is the H-036 task, its gate, this workflow, the
+two decision/drift records and `verify/bin/h-035-exit` only for the mechanically
+required current-authority compatibility rebind. Registry, H-035 core/CLI, H-036
+product and every H-039 byte remain unchanged.
+
+After two independent reviews and guarded H-036 publication, the order remains
+H-039 → H-038 → H-032 → H-031. Supervisor resume remains forbidden until the
+whole chain is green.
