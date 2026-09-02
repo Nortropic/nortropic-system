@@ -4569,3 +4569,35 @@ immediately before PREPARED ACK wait with the same EINTR handling. R3 rebases
 only contract authority to guarded R2 main
 `f8f046e4aa59dd1facf9c069b543c91c99e0eff1`; product, registry and installation
 bytes remain untouched.
+
+## 2026-09-02 — H-039 R4 contract-merge and durable receipt-temp recovery
+
+Failed product `87e90b4` remains immutable NO-CREDIT. Independent review proved
+that the R3 gate still expected the initial H-039 contract's added gate file,
+although every R4 contract file already exists. R4 accepts only five fixed
+existing-file modifications: gate 100755→100755 and four 100644→100644 entries,
+all status `M` and in fixed Git order. Causal add, missing, extra, substitution,
+mode and status mutants reject.
+
+The same review proved a late CLEANING contradiction. Durable `.last.tmp`
+contains cleanup nonce N1, while the old replay rule rejects N1 and a fresh N2
+rewrites current; receipt validation then fails after destructive progress and
+can strand an empty or already removed Q. R4 distinguishes incomplete
+continuation from completed replay. Before `.last.tmp`, N1 remains replay and a
+fresh noncolliding nonce may resume while preserving the exact existing name
+orientation; CLEANING never models a reverse Q-to-active move. After an exact temp exists, only cleanup-v1
+with N1 and the matching capability continues, after validating current/temp,
+runtime, capability hash, create nonce, sequence, effect, predecessor receipt
+and exact empty-or-absent Q. It performs no nonce, state or temp rewrite. Fresh
+N2 returns `CAPACITY` without effect; N1 as create remains cross-operation
+`REPLAY`; N1 under either operation after final publication remains replay.
+
+Model mutants include collisions with current create nonce and both predecessor
+receipt nonces. The deterministic model binds matching current-CLEANING/temp
+states with Q present-empty and Q absent, exact-N1 continuation, one final
+receipt and zero residue. Independent immutable source/material review binds
+the native branches and rejects the previously observed CLEANING→CLEANING nonce
+replacement. Black-box timing or sampling earns no credit because an open
+directory FD does not prevent Darwin directory removal. Contract authority advances only to R3
+publication `97c9402178148a2361d073ec2c3cca7ba4ec4e22`; no product, registry,
+installation, path, process, network, credential or broader OS authority changes.
