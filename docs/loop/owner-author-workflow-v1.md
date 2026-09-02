@@ -1537,8 +1537,8 @@ whole chain is green.
 <!-- H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_MEDIATOR_V1 -->
 ## H-039 OS-exclusive runtime-cleanup mediator
 
-H-039 R2 consumes the initial guarded H-039 contract publication at
-`6ff724e6c3dad5dd93ece71a29075a56e67533ab`. TEST_AUTHOR may change only this
+H-039 R3 consumes the guarded H-039 R2 contract publication at
+`f8f046e4aa59dd1facf9c069b543c91c99e0eff1`. TEST_AUTHOR may change only this
 workflow, the task spec, `verify/bin/h-039-exit`, the decision log and drift
 record. The later owner product may change only the five exact registry members
 under `controller/runtime-cleanup/` and `verify/h039/`; broad prefixes remain
@@ -1641,3 +1641,28 @@ Every negative has an exact ordinary denial result; `SIGABRT`, empty output or
 mere absence of an effect earns no credit. File-write, process-exec and network
 authority remain unchanged, and the refreeze is based on the exact first
 contract merge rather than adopting the blocked product worktree.
+
+The next uninstalled product review exposed a second product-independent
+installer-profile omission: exact installer verification must enumerate the
+candidate's bounded `controller/runtime-cleanup` directory, but R2 granted its
+gate-private `H039_TEST_ROOT` only metadata reads. H-039 R3 adds only read-data
+for that exact already-bound private subtree. A pinned fixed tool must enumerate
+an exact two-entry directory inside it, while a sibling outside the root returns
+ordinary `EPERM` with no data; `SIGABRT` earns no credit. Existing write,
+alternate-executable and network negatives remain binding, with no imported
+profile or broader path.
+
+R3 also makes the existing five-second request deadline unambiguously absolute:
+one monotonic budget begins before the first prefix wait and spans prefix, body
+and clean EOF. Receive progress never restarts it. Installed effects drip
+individual request bytes at intervals shorter than five seconds for longer than
+the single budget; the mediator must still exit nonzero with zero response,
+descriptor or namespace effect within the original deadline. A sliding
+`SO_RCVTIMEO` implementation therefore cannot receive credit. Distinct prefix,
+body and cumulative-EOF drips bind every request phase. Immutable source must
+reject `SO_RCVTIMEO` and fixed `poll(5000)` retry semantics, use one
+`CLOCK_MONOTONIC` request deadline with recomputed remaining time across every
+receive/EINTR, and create a separate monotonic deadline immediately before the
+PREPARED ACK wait with the same EINTR-safe recomputation. The existing no-ACK
+effect remains bounded at five seconds. All product, install, root, process,
+exec, write and network boundaries are otherwise unchanged.

@@ -43,11 +43,11 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "6ff724e6c3dad5dd93ece71a29075a56e67533ab"
-CONTRACT_AUTHORITY_TREE = "224eee297f8ef49eef97d10737b3a2d3b4014ec5"
+CONTRACT_AUTHORITY_BASE = "f8f046e4aa59dd1facf9c069b543c91c99e0eff1"
+CONTRACT_AUTHORITY_TREE = "e1f42b61af12c02fced5b532af5f259605220bf9"
 CONTRACT_AUTHORITY_PARENTS = [
-    "2fb748b7b9e8ffd0a25eaa034dabd5f4f99f2129",
-    "cd87e6f53aabf945513d9e87dc17a00ac522560b",
+    "6ff724e6c3dad5dd93ece71a29075a56e67533ab",
+    "ad9c31597b8c2d76f5a9d1af97815823125c027a",
 ]
 PUBLISHED_H036_PRODUCT_MERGE = "e71dfbbd6a1dcb0792031764370f264dd63ebbf2"
 PUBLISHED_H036_LEGACY_BLOBS = {
@@ -120,6 +120,8 @@ SEATBELT_WRITE_PROBE = Path("/usr/bin/touch")
 SEATBELT_WRITE_PROBE_SHA256 = "365bbc3ed30c25cab02339183271a58374b2ad8f69093ca18cc60a529e02801f"
 SEATBELT_EXEC_DENY_PROBE = Path("/bin/echo")
 SEATBELT_EXEC_DENY_PROBE_SHA256 = "fb4aa4544052fd6131a428044cbbe9253d544f3a4a9fd393cfca0b50f0bce380"
+SEATBELT_READ_PROBE = Path("/bin/ls")
+SEATBELT_READ_PROBE_SHA256 = "0056d8fd617b4af3e6f8ec08a08530747962b7392ccd767b275677e8387dac51"
 SEATBELT_NETWORK_PROBE = Path("/usr/bin/nc")
 SEATBELT_NETWORK_PROBE_SHA256 = "0161662df6307e2866284a65593c29022049a53e76301de8f7018165603161a7"
 BUILD_COMPILER = Path("/Library/Developer/CommandLineTools/usr/bin/clang")
@@ -144,6 +146,7 @@ INSTALLER_REVIEW_PROFILE = """(version 1)
     (literal "/")
     (literal (param "H039_EXECUTABLE"))
     (literal (param "H039_MEDIATOR"))
+    (subpath (param "H039_TEST_ROOT"))
     (subpath "/System/Library")
     (subpath "/usr/lib")
     (subpath "/private/var/db/dyld"))
@@ -214,7 +217,7 @@ FAILURE_SIGNATURE = [
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "4761ed4b216069fb485f9456900f858fdb09bfd0d650a511a551bc33cc580384"
+EXPECTED_H039_ROW_SHA256 = "d7e1ce94b85d711597657dd80024aa256209a0d9bad4fcb817d9f0c252268f38"
 
 passed = 0
 failed = 0
@@ -2076,6 +2079,7 @@ def seatbelt_profile_selftests() -> None:
         (SANDBOX_EXEC, SANDBOX_EXEC_SHA256, 0o755, "sandbox-exec"),
         (SEATBELT_WRITE_PROBE, SEATBELT_WRITE_PROBE_SHA256, 0o755, "touch"),
         (SEATBELT_EXEC_DENY_PROBE, SEATBELT_EXEC_DENY_PROBE_SHA256, 0o755, "echo"),
+        (SEATBELT_READ_PROBE, SEATBELT_READ_PROBE_SHA256, 0o755, "ls"),
         (SEATBELT_NETWORK_PROBE, SEATBELT_NETWORK_PROBE_SHA256, 0o555, "nc"),
         (BUILD_COMPILER, BUILD_COMPILER_SHA256, 0o755, "clang"),
         (BUILD_CODESIGN, BUILD_CODESIGN_SHA256, 0o755, "codesign"),
@@ -2100,6 +2104,16 @@ def seatbelt_profile_selftests() -> None:
     temporary = Path(tempfile.mkdtemp(prefix="h039-seatbelt-selftest-", dir="/private/tmp"))
     project = temporary / "project"
     project.mkdir(mode=0o700)
+    installer_test_root = temporary / "installer-review-root"
+    installer_test_root.mkdir(mode=0o700)
+    installer_enumeration = installer_test_root / "enumeration"
+    installer_enumeration.mkdir(mode=0o700)
+    (installer_enumeration / "alpha").write_bytes(b"H039-ALPHA\n")
+    (installer_enumeration / "beta").write_bytes(b"H039-BETA\n")
+    installer_outside = temporary / "outside-review-root"
+    installer_outside.mkdir(mode=0o700)
+    installer_outside_secret = installer_outside / "outside-secret"
+    installer_outside_secret.write_bytes(b"H039-OUTSIDE-SECRET\n")
     installer_fixture = temporary / "mediator-fixture"
     installer_fixture.write_bytes(b"H039-INSTALLER-MEDIATOR-FIXTURE\n")
     installer_fixture.chmod(0o600)
@@ -2127,7 +2141,7 @@ def seatbelt_profile_selftests() -> None:
             str(SANDBOX_EXEC),
             "-D", f"H039_EXECUTABLE={executable}",
             "-D", f"H039_MEDIATOR={installer_fixture}",
-            "-D", f"H039_TEST_ROOT={temporary}",
+            "-D", f"H039_TEST_ROOT={installer_test_root}",
             "-p", INSTALLER_REVIEW_PROFILE,
             *arguments,
         ]
@@ -2325,6 +2339,49 @@ def seatbelt_profile_selftests() -> None:
                 "rc": installer_started.returncode,
                 "stdout": installer_started.stdout.decode("utf-8", "replace"),
                 "stderr": installer_started.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        installer_inside_read = bounded_run(
+            installer_argv(
+                SEATBELT_READ_PROBE,
+                [str(SEATBELT_READ_PROBE), "-1", str(installer_enumeration)],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(installer_inside_read, "installer-review")
+        check(
+            no_sigabrt(installer_inside_read)
+            and installer_inside_read.returncode == 0
+            and installer_inside_read.stdout == b"alpha\nbeta\n"
+            and installer_inside_read.stderr == b"",
+            "A_H039_INSTALLER_SEATBELT_PRIVATE_ROOT_ENUMERATION",
+            {
+                "rc": installer_inside_read.returncode,
+                "stdout": installer_inside_read.stdout.decode("utf-8", "replace"),
+                "stderr": installer_inside_read.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        installer_outside_read = bounded_run(
+            installer_argv(
+                SEATBELT_READ_PROBE,
+                [str(SEATBELT_READ_PROBE), "-1", str(installer_outside)],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(installer_outside_read, "installer-review")
+        check(
+            no_sigabrt(installer_outside_read)
+            and installer_outside_read.returncode == 1
+            and installer_outside_read.stdout == b""
+            and b"Operation not permitted" in installer_outside_read.stderr
+            and installer_outside_secret.read_bytes() == b"H039-OUTSIDE-SECRET\n",
+            "N_H039_INSTALLER_SEATBELT_OUTSIDE_ROOT_READ_DENIED",
+            {
+                "rc": installer_outside_read.returncode,
+                "stdout": installer_outside_read.stdout.decode("utf-8", "replace"),
+                "stderr": installer_outside_read.stderr.decode("utf-8", "replace"),
             },
         )
 
@@ -2816,7 +2873,7 @@ def immutable_source_checks(commit: str | None = None) -> None:
         "SO_PEERCRED", "setuid(", "setreuid(", "setresuid(",
         "setgid(", "setegid(", "setregid(", "setresgid(",
         "setxattr", "removexattr", "acl_set", "chflags(",
-        "flock(", "F_SETLK",
+        "flock(", "F_SETLK", "SO_RCVTIMEO",
     ]
     required = [
         "renameatx_np", "RENAME_EXCL", "RENAME_NOFOLLOW_ANY",
@@ -2824,6 +2881,8 @@ def immutable_source_checks(commit: str | None = None) -> None:
         "AT_SYMLINK_NOFOLLOW_ANY", "AT_RESOLVE_BENEATH", "SCM_RIGHTS",
         "getpeereid", "seteuid", "fsync", "O_NOFOLLOW_ANY", "O_UNIQUE",
         "F_OFD_SETLK", "F_WRLCK", "SO_NOSIGPIPE",
+        "CLOCK_MONOTONIC", "request_deadline", "ack_deadline",
+        "deadline_remaining",
         "RESERVING", "PUBLISHING", "PREPARED", "ACTIVE", "QUARANTINING",
         "CLEANING",
     ]
@@ -2831,6 +2890,10 @@ def immutable_source_checks(commit: str | None = None) -> None:
         raise Rig("forbidden native capability token")
     if any(token not in source for token in required):
         raise Rig("required native primitive token absent")
+    if source.count("CLOCK_MONOTONIC") < 2 \
+            or source.count("deadline_remaining") < 3 \
+            or re.search(r"poll\s*\([^;]*,\s*5000\s*\)", source):
+        raise Rig("native receive/ACK deadline is not absolute and EINTR-safe")
 
 
 
@@ -3830,6 +3893,66 @@ def close_all(fds: tuple[int, ...] | list[int]) -> None:
             TEST_FDS.discard(descriptor)
 
 
+def absolute_request_deadline_effect(
+    label: str, schedule: tuple[tuple[float, bytes], ...], baseline: dict[str, Any],
+    *, minimum_sent_chunks: int,
+) -> None:
+    """Prove one five-second budget spans prefix, body, and missing EOF."""
+    process, parent = start_mediator()
+    received_fds: list[int] = []
+    response: dict[str, Any] | None = None
+    sent_chunks = 0
+    started = time.monotonic()
+    try:
+        if not schedule or schedule[0][0] != 0.0 \
+                or any(not chunk for _offset, chunk in schedule) \
+                or any(left[0] >= right[0] for left, right in zip(schedule, schedule[1:])):
+            raise Rig(f"invalid {label} slow-drip schedule")
+        for offset, chunk in schedule:
+            target = started + offset
+            remaining = target - time.monotonic()
+            if remaining > 0:
+                time.sleep(remaining)
+            try:
+                parent.sendall(chunk)
+            except (BrokenPipeError, ConnectionResetError):
+                break
+            sent_chunks += 1
+        remaining = 6.25 - (time.monotonic() - started)
+        if remaining <= 0:
+            raise Rig("slow-drip request exceeded gate deadline before mediator exit")
+        try:
+            returncode = process.wait(timeout=remaining)
+        except subprocess.TimeoutExpired as exc:
+            raise Rig("slow-drip request restarted the five-second deadline") from exc
+        elapsed = time.monotonic() - started
+        response, received_fds = recv_response(parent)
+        require_terminal_response_eof(parent)
+        stdout = process.stdout.read() if process.stdout is not None else b""
+        stderr = process.stderr.read() if process.stderr is not None else b""
+        if (
+            returncode == 0 or response is not None or received_fds
+            or stdout or stderr or sent_chunks < minimum_sent_chunks
+            or not 4.0 <= elapsed <= 6.25
+            or tree_snapshot(NAMESPACE) != baseline
+        ):
+            raise Rig(
+                f"{label} slow-drip did not enforce one absolute five-second "
+                f"zero-effect deadline: rc={returncode} sent={sent_chunks} "
+                f"elapsed={elapsed:.3f} response={response!r}"
+            )
+    finally:
+        close_all(received_fds)
+        parent.close()
+        if process.poll() is None:
+            process.kill()
+            finish_mediator(process, timeout=5)
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
+
+
 def malformed_stream_effects() -> None:
     baseline = tree_snapshot(NAMESPACE)
     nonce = os.urandom(32).hex()
@@ -3897,6 +4020,23 @@ def malformed_stream_effects() -> None:
                 f"missing {label} did not enforce five-second zero-effect deadline: "
                 f"elapsed={elapsed:.3f}"
             )
+
+    absolute_request_deadline_effect(
+        "PREFIX",
+        tuple((index * 1.8, valid[index:index + 1]) for index in range(4)),
+        baseline, minimum_sent_chunks=3,
+    )
+    absolute_request_deadline_effect(
+        "BODY",
+        ((0.0, valid[:4]),) + tuple(
+            (index * 0.9, valid[3 + index:4 + index]) for index in range(1, 7)
+        ),
+        baseline, minimum_sent_chunks=6,
+    )
+    absolute_request_deadline_effect(
+        "EOF", ((0.0, valid[:1]), (4.5, valid[1:])),
+        baseline, minimum_sent_chunks=2,
+    )
 
     delayed_trailing = valid + b"X"
     rc, responses, fds = raw_mediator_exchange(
