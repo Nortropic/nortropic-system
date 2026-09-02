@@ -1,5 +1,48 @@
 # Owner-author workflow v1 — frozen H-035 effect contract
 
+## H-039 R7 portable bootstrap descriptor closure
+
+R7 begins only from the guarded R6 contract merge `341a42ba…`. The unfinished
+R6 two-file BUILDER draft is immutable no-credit evidence: the pinned macOS
+26.5 SDK cannot link `_closefrom`, although the R6 gate required both that
+undefined import and `closefrom(0)`. The same gate removed `//` as if it were a
+comment even inside a C string and then required the literal `"//"`, making its
+closed absolute-string oracle unsatisfiable. No product candidate was frozen,
+published, installed or executed as root.
+
+R7 changes only the same five TEST_AUTHOR files and preserves R6's complete
+security objective and product surface. Before any descriptor open or install
+effect, bootstrap must first prove fd0 is `EBADF`, then call one no-argument,
+installer-only descriptor helper. That helper uses only `getpid`, bounded and
+aligned `PROC_PIDLISTFDS`, memory allocation and checked `close`: the first
+self-inventory must be exactly fd1/fd2, both closes must succeed, and a second
+self-inventory must be empty. No caller PID, process scan, signal, kill, wait,
+general reap, `closefrom` or other descriptor authority is admitted. The
+controller's already-frozen pre-exec inventory still independently proves that
+only fd1/fd2 were inherited.
+
+The source oracle now uses a bounded C lexer that distinguishes code, strings,
+character literals, escapes, line comments and block comments. It preserves
+comment markers inside literals, replaces real comments without joining tokens,
+and rejects raw carriage returns, unterminated lexical state, line splicing,
+trigraphs, numeric/universal literal escapes and direct adjacent string
+construction. Balanced-brace extraction binds required lexical primitives only
+to the exact named helper and bootstrap bodies; it does not claim compiled
+reachability. The independent immutable material review exclusively proves the
+compiled call graph, conditional/macro expansion, two-pass cap/alignment,
+fd-membership/checked-close/second-empty dataflow and every adjacent, escaped or
+macro-constructed path. The closed direct absolute-literal set is unchanged;
+comment decoys cannot grant credit. `_closefrom` is forbidden, while only the
+already admitted self-`proc_pidinfo`, memory and close imports are required. The
+published R5 runtime mediator remains byte-exact, and every R6 root path, tool, argv,
+Seatbelt, crash/recovery, zero-residue and review requirement remains unchanged.
+
+Freeze and review R7 twice, publish it through the guarded two-parent
+transition, then build a fresh direct-child four-file product. Two independent
+uninstalled product reviews, guarded product publication, the exact first-root
+ceremony and independent uid501/gid20 effect review remain mandatory before
+H038, H032, H031 and supervisor resume.
+
 ## H-039 R6 first-root pre-stage
 
 R6 begins only from published R5 `f190cc57…`. Freeze and independently review
