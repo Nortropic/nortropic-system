@@ -43,12 +43,20 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "287c7436b7233ba927274f2d2cb549dc65abc2df"
-CONTRACT_AUTHORITY_TREE = "11946318fe57ae16cf2242788cd06c0dada32787"
+CONTRACT_AUTHORITY_BASE = "f190cc575f36e6fe97f84b3e1810ca92d7d13401"
+CONTRACT_AUTHORITY_TREE = "1e8d0e7d31f2745bada3a5aeded69a1eecbf7fba"
 CONTRACT_AUTHORITY_PARENTS = [
-    "97c9402178148a2361d073ec2c3cca7ba4ec4e22",
-    "4c1ffed39f867489e312f5b6edbb57bb39060205",
+    "3cd65a97e0ed1c01e68014ab00a8e1ec6b26e6ea",
+    "b1194c04f9ae26e7d2555e98e41b5d571746b50a",
 ]
+PUBLISHED_H039_R5_PRODUCT_MERGE = CONTRACT_AUTHORITY_BASE
+PUBLISHED_H039_R5_PRODUCT_BLOBS = {
+    "controller/runtime-cleanup/install": "7168fc0b85d1bfc8d5398a1d081f56f450329e2a67422f43bbff85e4ae3e2153",
+    "controller/runtime-cleanup/native/mediator.c": "b143804b4d2f1790e9299234f7c2b2211ac9a19a864b8281565bdf910982cb91",
+    "verify/h039/build-recipe.json": "391fd76ffef8e989ed87e8f371a21834868622d02d76ec54f78a3504116373dd",
+    "verify/h039/identity-manifest.json": "6a87e085b7480f577ab2a5e9b346cf4f05710080b998bfbbfef3a379ffea06b3",
+    "verify/h039/runtime-cleanup-mediator": "6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a",
+}
 PUBLISHED_H036_PRODUCT_MERGE = "e71dfbbd6a1dcb0792031764370f264dd63ebbf2"
 PUBLISHED_H036_LEGACY_BLOBS = {
     "controller/launch/cli": "65571892948b9f7a9260ee88abb2cf5c575eda245fe1874f8ade3c7a8b202ba3",
@@ -103,7 +111,6 @@ PRODUCT_GIT_ORDER = [
     "controller/runtime-cleanup/native/mediator.c",
     "verify/h039/build-recipe.json",
     "verify/h039/identity-manifest.json",
-    "verify/h039/runtime-cleanup-mediator",
 ]
 PRODUCT_MODES = {
     "controller/runtime-cleanup/install": "100755",
@@ -114,6 +121,192 @@ PRODUCT_MODES = {
 }
 INSTALLED = Path("/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator")
 NAMESPACE = Path("/private/var/db/nortropic-runtime-cleanup-v1")
+PROTECTED_INSTALLER = (
+    NAMESPACE / ".install/controller/runtime-cleanup/install"
+)
+UNTRUSTED_INSTALLER_SOURCE = Path(
+    "/Users/elinhaggstrom/nortropic/worktrees/h039-r6-product/"
+    "controller/runtime-cleanup/install"
+)
+LAYOUT = ["a", "c", "q", "r", "s"]
+FIRST_ROOT_TOOLS = {
+    "/bin/mkdir": {
+        "sha256": "92c27f353ba8a1167d0e3d31a9219ba169602912d7957e3a89beb610c8ff8eb7",
+        "cdhash": "4eefb0e1198e5eebc41199a188d2039a7639d11e",
+        "size": 101472, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+    "/bin/dd": {
+        "sha256": "3f7e8c6a0abb8a54d38307c6c073a12edf0f2b46a2cc1d443525130babc6e93f",
+        "cdhash": "adfc267bb8f19a3b95ecb311b3a86ce74b282ff4",
+        "size": 152576, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+    "/bin/chmod": {
+        "sha256": "ee0dc238e60ceda42ae25a6185d59070773ad0d2ab5428a6403ae4654caf213c",
+        "cdhash": "3af354ea73105296a97673c8b3c869f5fe5e0a7e",
+        "size": 120656, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+    "/usr/bin/stat": {
+        "sha256": "d34c8133b4e3dbce7c30870675f4352b37007ecffac64457d249c10249754b85",
+        "cdhash": "3de9c31e1a5a43fdfa1013e9be3035704851b7e7",
+        "size": 118768, "mode": 0o755, "nlink": 2, "flags": 524320,
+    },
+    "/usr/bin/openssl": {
+        "sha256": "596112057e5aac725c0a9b0fd96c97c581b0a1b8d453670d02f07cb240afb5bb",
+        "cdhash": "235f72918038f588bb3236d474e66dd75df1fec5",
+        "size": 1113760, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+    "/usr/bin/codesign": {
+        "sha256": "9755ad3afc25a3ce6f8c281425ff732a5819f0b973846b7641a11892a2081abc",
+        "cdhash": "81d2edd1c849bfb349b6ff066ee8cc3f1fb9abfe",
+        "size": 459536, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+    "/usr/bin/env": {
+        "sha256": "540f3b55630775d9b2a3aa08cbbe87928ea62c615cd4d13c11f68e2b4571aebc",
+        "cdhash": "9aa1a3122c44c626e4229fd5c2d338af03ff73bb",
+        "size": 102368, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+    "/usr/bin/find": {
+        "sha256": "927ff09a04069c00d56139c17877a2b0b53835433a84140eba4b84427fc6fafc",
+        "cdhash": "6decb82ab94f5acfd61f3dd14015b34bff6c16eb",
+        "size": 171280, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+    "/bin/ls": {
+        "sha256": "0056d8fd617b4af3e6f8ec08a08530747962b7392ccd767b275677e8387dac51",
+        "cdhash": "4f35b3163233a684d47f496a1e050f518de37621",
+        "size": 154624, "mode": 0o755, "nlink": 1, "flags": 524320,
+    },
+}
+ROOT_EXEC_PREFIX = ["/usr/bin/env", "-i", "-C", "/"]
+FIRST_ROOT_ARGV = [
+    [*ROOT_EXEC_PREFIX, "/bin/mkdir", "-m", "0700", str(NAMESPACE)],
+    [*ROOT_EXEC_PREFIX, "/bin/mkdir", "-m", "0700", str(NAMESPACE / ".install")],
+    [*ROOT_EXEC_PREFIX, "/bin/mkdir", "-m", "0700", str(NAMESPACE / ".install/controller")],
+    [*ROOT_EXEC_PREFIX, "/bin/mkdir", "-m", "0700", str(NAMESPACE / ".install/controller/runtime-cleanup")],
+    [
+        *ROOT_EXEC_PREFIX, "/bin/dd", "bs=4194305",
+        "count=1", "iflag=fullblock", f"of={PROTECTED_INSTALLER}",
+        "conv=fsync", "status=none",
+    ],
+    [*ROOT_EXEC_PREFIX, "/bin/chmod", "0400", str(PROTECTED_INSTALLER)],
+    [
+        *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+        str(PROTECTED_INSTALLER),
+    ],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/openssl", "dgst", "-sha256", "-r", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/codesign", "--verify", "--strict", "--", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/codesign", "-d", "--verbose=4", "--", str(PROTECTED_INSTALLER)],
+    [
+        *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+        str(PROTECTED_INSTALLER),
+    ],
+    [*ROOT_EXEC_PREFIX, "/bin/ls", "-ldeO@", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/bin/chmod", "0500", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/openssl", "dgst", "-sha256", "-r", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/codesign", "--verify", "--strict", "--", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/codesign", "-d", "--verbose=4", "--", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, "/bin/ls", "-ldeO@", str(PROTECTED_INSTALLER)],
+    [*ROOT_EXEC_PREFIX, str(PROTECTED_INSTALLER), "bootstrap"],
+]
+RECOVERY_IDENTITY_PATHS = [
+    "/private/var/db",
+    str(NAMESPACE),
+    str(NAMESPACE / ".install"),
+    str(NAMESPACE / ".install/controller"),
+    str(NAMESPACE / ".install/controller/runtime-cleanup"),
+    str(PROTECTED_INSTALLER),
+    str(NAMESPACE / ".install/mediator"),
+    *[str(NAMESPACE / name) for name in LAYOUT],
+    str(NAMESPACE / "s/lock"),
+    "/Library/PrivilegedHelperTools",
+    str(INSTALLED),
+]
+RECOVERY_MEMBERSHIP_PATHS = [
+    str(NAMESPACE),
+    str(NAMESPACE / ".install"),
+    str(NAMESPACE / ".install/controller"),
+    str(NAMESPACE / ".install/controller/runtime-cleanup"),
+    *[str(NAMESPACE / name) for name in LAYOUT],
+]
+RECOVERY_REGULAR_PATHS = [
+    str(PROTECTED_INSTALLER),
+    str(NAMESPACE / ".install/mediator"),
+    str(NAMESPACE / "s/lock"),
+    str(INSTALLED),
+]
+RECOVERY_EXECUTABLE_PATHS = [
+    str(PROTECTED_INSTALLER),
+    str(NAMESPACE / ".install/mediator"),
+    str(INSTALLED),
+]
+RECOVERY_OUTPUT_CAP = 65536
+FIRST_ROOT_RECOVERY_ARGV = [
+    *[
+        command
+        for path in RECOVERY_IDENTITY_PATHS
+        for command in (
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+            [*ROOT_EXEC_PREFIX, "/bin/ls", "-ldeO@", path],
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+        )
+    ],
+    *[
+        command
+        for path in RECOVERY_REGULAR_PATHS
+        for command in (
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+            [*ROOT_EXEC_PREFIX, "/usr/bin/openssl", "dgst", "-sha256", "-r", path],
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+        )
+    ],
+    *[
+        command
+        for path in RECOVERY_EXECUTABLE_PATHS
+        for command in (
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+            [*ROOT_EXEC_PREFIX, "/usr/bin/codesign", "--verify", "--strict", "--", path],
+            [*ROOT_EXEC_PREFIX, "/usr/bin/codesign", "-d", "--verbose=4", "--", path],
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+        )
+    ],
+    *[
+        command
+        for path in RECOVERY_MEMBERSHIP_PATHS
+        for command in (
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/find", "-P", "-s", "-x", path,
+                "-mindepth", "1", "-maxdepth", "1", "-print0",
+            ],
+            [
+                *ROOT_EXEC_PREFIX, "/usr/bin/stat", "-f", "%d:%i:%p:%u:%g:%l:%z:%f",
+                path,
+            ],
+        )
+    ],
+]
 SANDBOX_EXEC = Path("/usr/bin/sandbox-exec")
 SANDBOX_EXEC_SHA256 = "2f447acfae7a954ccb5a1bcf3a1955f69b1a8549c434ddff643df98fd3cb33ba"
 SEATBELT_WRITE_PROBE = Path("/usr/bin/touch")
@@ -183,10 +376,10 @@ BUILD_REVIEW_PROFILE = """(version 1)
     (subpath "/private/var/db/dyld"))
 (allow file-write* (subpath (param "H039_BUILD_ROOT")))
 """
-LAYOUT = ["a", "c", "q", "r", "s"]
 CLIENT_UID = 501
 CLIENT_GID = 20
 MAX_ADDED_LINES = 2400
+MAX_DELETED_LINES = 2400
 PRODUCT_BYTE_LIMITS = {
     "controller/runtime-cleanup/install": 4194304,
     "controller/runtime-cleanup/native/mediator.c": 262144,
@@ -198,6 +391,9 @@ MAX_AGGREGATE_PRODUCT_BYTES = 9437184
 MAX_CHILD_OUTPUT_BYTES = 1048576
 PRODUCTION_ORIGIN = "git@github.com:Nortropic/nortropic-system.git"
 ALLOWED_NONAUTHORITY_XATTRS = {b"com.apple.provenance"}
+PROVENANCE_XATTR = {
+    "name": "com.apple.provenance", "size": 11,
+}
 MATERIAL_PROPERTIES_JUDGE_ONLY = (
     "INDEPENDENT_IMMUTABLE_PRODUCT_REVIEW_MUST_PROVE_CLOSED_NATIVE_IMPORT_"
     "SYSCALL_ASM_AND_INSTALLER_EFFECT_AUTHORITY_INCLUDING_ZERO_XATTR_ACL_"
@@ -211,17 +407,39 @@ MATERIAL_PROPERTIES_JUDGE_ONLY = (
     "DIRECTORY_REMOVAL;_TOKEN_PRESENCE_TIMING_SAMPLING_OR_PRODUCT_SELF_REPORT_"
     "EARNS_NO_CREDIT"
 )
+R6_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_IMMUTABLE_PRODUCT_REVIEW_MUST_PROVE_BOOTSTRAP_ROOT_ONLY_"
+    "DISPATCH_REACHES_THE_SHARED_AUTHENTICATED_EMBEDDED_EXTRACTOR_AND_"
+    "INTERNAL_APPLY_WITHOUT_DEAD_OR_CONDITIONAL_BYPASS;_EXTERNAL_APPLY_"
+    "REJECTS_FOR_ROOT_AS_WELL_AS_UID501;_EVERY_REACHABLE_INSTALLER_OPEN_"
+    "OPENAT_FSTATAT_RENAMEATX_NP_UNLINKAT_READ_PREAD_WRITE_CHMOD_CHOWN_AND_"
+    "DIRECTORY_ENUMERATION_HAS_EXACT_FIXED_DIRFD_AND_NAME_PROVENANCE;_"
+    "THE_R5_DIRECT_TO_FINAL_ENSURE_INSTALLED_WRITE_IS_ABSENT;_THE_EXACT_"
+    "EMBEDDED_MEDIATOR_IS_EXCLUSIVELY_WRITTEN_AS_DOT_INSTALL_SLASH_MEDIATOR_"
+    "MODE0400_THEN_FSYNCED_REBOUND_AND_FCHMODDED04555_AS_MEDIATOR_READY_"
+    "BEFORE_SAME_DEVICE_RENAMEATX_NP_EXCL_NOFOLLOW_ANY_RESOLVE_BENEATH_TO_"
+    "THE_FIXED_HELPER_NAME_AND_BOTH_PARENTS_ARE_FSYNCED_AND_REBOUND_WITH_NO_"
+    "PARTIAL_FINAL_HELPER_STATE;_A_C_Q_R_S_ARE_CREATED_DIRECTLY_IN_FINAL0555_"
+    "MODE_UNDER_THE_PRIVATE0700_NAMESPACE_USING_PROCESS_LOCAL_UMASK_ZERO_"
+    "RESTORED_TO077_WITH_NO_VISIBLE0700_THEN_CHMOD_WINDOW;_EVERY_RESTAGE_"
+    "REAUTHENTICATES_A_FRESH_UNTRUSTED_SOURCE_IDENTITY_STREAM_DIGEST_EOF_"
+    "DESCRIPTOR_CLOSURE_AND_DIRECT_CHILD_REAP_BEFORE_REEXECUTION;_"
+    "RELATIVE_CONSTRUCTED_CREDENTIAL_NEIGHBOR_CALLER_OR_ENVIRONMENT_PATHS_"
+    "AND_ALL_UNREVIEWED_CONTROL_FLOW_EARN_NO_CREDIT"
+)
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "MEDIATOR_PRODUCT_AND_ROOT_INSTALL_ABSENT"
+REASON = "H039_PROTECTED_BOOTSTRAP_AND_ROOT_INSTALL_ABSENT"
 FAILURE_SIGNATURE = [
-    "EXACT_FIVE_PRODUCT_PATHS_ABSENT",
+    "EXACT_PUBLISHED_R5_FIVE_PRODUCT_BYTES_PRESENT",
     "FIXED_ROOT_INSTALL_AND_NAMESPACE_ABSENT",
+    "EXACT_HASH_PINNED_FIRST_ROOT_PRESTAGE_PREFIX_MODEL_GREEN",
+    "INPUTLESS_EMBEDDED_MEDIATOR_BOOTSTRAP_REQUIRED",
     "PATHLESS_CAPABILITY_AND_MANAGED_OPTION_A_FALSIFICATION_GREEN",
     "F_OFD_SETLK_REFERENCE_FALSIFICATION_GREEN",
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "48f5c868eea1c9c36d6044fc869d60f5f43d07d4c1d1e9c605a9cbf0d95fe82e"
+EXPECTED_H039_ROW_SHA256 = "97225d091814b902949bceccc99f4fd2b48c7d6a6da48d7e2ea6daa416d9f73d"
 
 passed = 0
 failed = 0
@@ -260,6 +478,24 @@ def canonical(value: Any) -> bytes:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     ).encode("utf-8")
+
+
+def recovery_argv_registry() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "command_count": len(FIRST_ROOT_RECOVERY_ARGV),
+        "argv_sha256": sha(canonical(FIRST_ROOT_RECOVERY_ARGV)),
+        "identity_paths": RECOVERY_IDENTITY_PATHS,
+        "regular_digest_paths": RECOVERY_REGULAR_PATHS,
+        "executable_codesign_paths": RECOVERY_EXECUTABLE_PATHS,
+        "membership_paths": RECOVERY_MEMBERSHIP_PATHS,
+        "output_cap_per_stream": RECOVERY_OUTPUT_CAP,
+        "sequence": (
+            "EACH_IDENTITY_STAT_LS_LDEOAT_STAT;_EACH_REGULAR_STAT_OPENSSL_SHA256_"
+            "STAT;_EACH_EXECUTABLE_STAT_CODESIGN_VERIFY_CODESIGN_DETAIL_STAT;_"
+            "EACH_DIRECTORY_STAT_FIND_P_S_X_MINDEPTH1_MAXDEPTH1_PRINT0_STAT"
+        ),
+    }
 
 
 def strict_json(raw: bytes) -> Any:
@@ -387,6 +623,18 @@ def static_contract_checks() -> dict[str, Any]:
           "A_H039_AUTHORITY_BASE_ORDERED_PARENTS")
     check(object_type(PUBLISHED_H036_PRODUCT_MERGE) == "commit",
           "A_H039_PUBLISHED_H036_PRODUCT_MERGE_EXISTS")
+    check(
+        object_type(PUBLISHED_H039_R5_PRODUCT_MERGE) == "commit"
+        and commit_tree(PUBLISHED_H039_R5_PRODUCT_MERGE) == CONTRACT_AUTHORITY_TREE
+        and commit_parents(PUBLISHED_H039_R5_PRODUCT_MERGE)
+        == CONTRACT_AUTHORITY_PARENTS,
+        "A_H039_PUBLISHED_R5_PRODUCT_MERGE_IDENTITY",
+    )
+    for path, digest in PUBLISHED_H039_R5_PRODUCT_BLOBS.items():
+        check(
+            sha(blob(PUBLISHED_H039_R5_PRODUCT_MERGE, path)) == digest,
+            f"A_H039_PUBLISHED_R5_{path.upper().replace('/', '_').replace('.', '_')}",
+        )
     for path, digest in PUBLISHED_H036_LEGACY_BLOBS.items():
         check(
             sha(blob(PUBLISHED_H036_PRODUCT_MERGE, path)) == digest,
@@ -408,14 +656,28 @@ def static_contract_checks() -> dict[str, Any]:
         raise Rig("H039 task multiplicity")
     row = rows[0]
     check(exact_contract(row), "A_H039_EXACT_CONTRACT")
+    first_root = row.get("h039_os_exclusive_runtime_cleanup", {}).get(
+        "first_root_prestage", {},
+    )
+    check(
+        first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
+        and first_root.get("recovery_membership_argv") == recovery_argv_registry(),
+        "A_H039_R6_EXACT_EFFECT_AND_RECOVERY_ARGV_REGISTRIES",
+    )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
         .get("causal_falsification", {})
         .get("material_properties_judge_only") == MATERIAL_PROPERTIES_JUDGE_ONLY
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r6_material_review_extension") == R6_MATERIAL_REVIEW_EXTENSION
         and f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}."
+        in str(row.get("exit_criterion", ""))
+        and f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", "")),
         "A_H039_EXACT_NONEMPTY_IMMUTABLE_REVIEW_BOUNDARY",
     )
+    first_root_tool_checks()
     return row
 
 
@@ -465,6 +727,1314 @@ def contract_selftests(row: dict[str, Any]) -> None:
         mutant = copy.deepcopy(row)
         mutate(mutant)
         check(not exact_contract(mutant), f"N_H039_EXACT_ROW_{label}")
+
+
+def first_root_tool_checks() -> None:
+    observed_stats: dict[str, os.stat_result] = {}
+    for raw_path, expected in FIRST_ROOT_TOOLS.items():
+        path = Path(raw_path)
+        try:
+            value = os.lstat(path)
+        except OSError as exc:
+            raise Undecidable(f"pinned first-root tool unavailable: {raw_path}: {exc}") from exc
+        if (
+            not stat.S_ISREG(value.st_mode) or value.st_uid != 0 or value.st_gid != 0
+            or stat.S_IMODE(value.st_mode) != expected["mode"]
+            or value.st_nlink != expected["nlink"] or value.st_size != expected["size"]
+            or value.st_flags != expected["flags"]
+            or path.is_symlink() or path_sha(path) != expected["sha256"]
+        ):
+            raise Undecidable(f"pinned first-root tool identity drift: {raw_path}")
+        observed_stats[raw_path] = value
+    for raw_path, expected in FIRST_ROOT_TOOLS.items():
+        path = Path(raw_path)
+        try:
+            codesign = tool(
+                ["/usr/bin/codesign", "-d", "--verbose=4", "--", raw_path],
+            ).decode("utf-8", "replace")
+            after = os.lstat(path)
+        except (OSError, Rig) as exc:
+            raise Undecidable(f"pinned first-root code identity unavailable: {raw_path}: {exc}") from exc
+        match = re.search(r"^CDHash=([0-9a-f]{40})$", codesign, re.MULTILINE)
+        before = observed_stats[raw_path]
+        if (
+            match is None or match.group(1) != expected["cdhash"]
+            or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+            != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        ):
+            raise Undecidable(f"pinned first-root code identity drift: {raw_path}")
+    check(True, "A_H039_R6_HASH_PINNED_FIRST_ROOT_TOOL_IDENTITIES")
+
+
+def dd_bounded_stream_selftests() -> None:
+    temporary = Path(tempfile.mkdtemp(prefix="h039-r6-dd-", dir="/private/tmp"))
+    try:
+        reference = b"H039-R6-PUBLISHED-INSTALLER-BYTES"
+        for label, payload in (
+            ("SHORT", reference[:-1]),
+            ("EXACT", reference),
+            ("LONG", reference + b"X"),
+            ("REPLAYED", reference + reference),
+        ):
+            destination = temporary / label.lower()
+            process = subprocess.run(
+                [
+                    "/bin/dd", "bs=4194305", "count=1", "iflag=fullblock",
+                    f"of={destination}", "conv=fsync", "status=none",
+                ],
+                input=payload, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                cwd="/", env={}, close_fds=True, timeout=10, check=False,
+            )
+            check(
+                process.returncode == 0 and process.stdout == b""
+                and process.stderr == b"" and destination.read_bytes() == payload
+                and os.lstat(destination).st_size == len(payload),
+                f"A_H039_R6_DD_MAX_PLUS_ONE_{label}_CAUSAL_LENGTH",
+            )
+        cap_payload = b"C" * 4194306
+        cap_destination = temporary / "max-plus-one-cap"
+        cap_process = subprocess.run(
+            [
+                "/bin/dd", "bs=4194305", "count=1", "iflag=fullblock",
+                f"of={cap_destination}", "conv=fsync", "status=none",
+            ],
+            input=cap_payload, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            cwd="/", env={}, close_fds=True, timeout=10, check=False,
+        )
+        check(
+            cap_process.returncode == 0 and cap_process.stdout == b""
+            and cap_process.stderr == b""
+            and cap_destination.read_bytes() == cap_payload[:4194305]
+            and os.lstat(cap_destination).st_size == 4194305,
+            "A_H039_R6_DD_ACTUAL_4194306_INPUT_CAPS_AT_4194305",
+        )
+    finally:
+        shutil.rmtree(temporary)
+
+
+def prestage_directory_record(path: str, index: int, nlink: int) -> dict[str, Any]:
+    return {
+        "path": path, "type": "directory", "uid": 0, "gid": 0,
+        "mode": 0o700, "nlink": nlink, "flags": 0,
+        "acl": [], "xattrs": [dict(PROVENANCE_XATTR)], "dev": 31, "ino": 50 + index,
+        "rebind_dev": 31, "rebind_ino": 50 + index,
+    }
+
+
+def exact_identity_integer_types(record: Any) -> bool:
+    if not isinstance(record, dict):
+        return False
+    for key in (
+        "uid", "gid", "mode", "nlink", "flags", "dev", "ino",
+        "rebind_dev", "rebind_ino", "size", "mtime_ns", "ctime_ns",
+        "pre_dev", "pre_ino", "post_dev", "post_ino", "read_length",
+    ):
+        if key in record and record[key] is not None and type(record[key]) is not int:
+            return False
+    return True
+
+
+def prestage_source_identity(installer_size: int, installer_sha256: str) -> dict[str, Any]:
+    return {
+        "path": str(UNTRUSTED_INSTALLER_SOURCE),
+        "open_flags": ["O_RDONLY", "O_CLOEXEC", "O_NOFOLLOW_ANY", "O_UNIQUE"],
+        "type": "regular", "uid": 501, "gid": 20, "mode": 0o755,
+        "nlink": 1, "flags": 0, "acl": [],
+        "xattrs": [dict(PROVENANCE_XATTR)],
+        "size": installer_size, "sha256": installer_sha256,
+        "dev": 41, "ino": 42, "pre_dev": 41, "pre_ino": 42,
+        "post_dev": 41, "post_ino": 42,
+        "rebind_dev": 41, "rebind_ino": 42,
+        "mtime_ns": 100, "ctime_ns": 101,
+        "read_length": installer_size, "read_sha256": installer_sha256,
+        "full_read": True, "eof": True, "closed": True,
+        "authority": "UNTRUSTED_SOURCE_OBSERVATION_ONLY",
+    }
+
+
+def prestage_dd_result(success: bool) -> dict[str, Any]:
+    return {
+        "returncode": 0 if success else -15,
+        "stdout": b"", "stderr": b"",
+        "stdout_complete_eof": True, "stderr_complete_eof": True,
+        "conv_fsync_completed": success, "durable": success,
+        "direct_child_reaped": True,
+    }
+
+
+def prestage_prefix_oracle(
+    prefix: int, observed: dict[str, Any], *, installer_size: int,
+    installer_sha256: str, installer_cdhash: str,
+) -> bool:
+    """Closed model for every externally visible first-root crash prefix."""
+    if type(prefix) is not int or not 0 <= prefix <= len(FIRST_ROOT_ARGV):
+        return False
+    if type(installer_size) is not int or not 0 < installer_size <= 4194304 \
+            or not valid_hex(installer_sha256) or not valid_hex(installer_cdhash, 40):
+        return False
+    required_keys = {
+        "argv_prefix", "recovery_argv", "directories", "leaf", "stdin",
+        "verification", "product_exec_count", "product_environment",
+        "product_inherited_fds", "bootstrap_state", "final_layout",
+        "source_path", "source_sha256", "protected_parent",
+        "source_fd_state", "source_identity", "product_stdin", "tool_processes",
+        "product_descriptor_inventory", "recovery_action_argv", "dd_result",
+    }
+    if observed.get("argv_prefix") != FIRST_ROOT_ARGV[:prefix] \
+            or observed.get("recovery_argv") != FIRST_ROOT_RECOVERY_ARGV \
+            or set(observed) != required_keys:
+        return False
+    if observed.get("source_path") != str(UNTRUSTED_INSTALLER_SOURCE) \
+            or observed.get("source_sha256") != installer_sha256:
+        return False
+    protected_parent = observed.get("protected_parent")
+    if (
+        not isinstance(protected_parent, dict)
+        or set(protected_parent) != {
+            "path", "type", "uid", "gid", "mode", "nlink", "flags",
+            "acl", "xattrs", "dev", "ino", "rebind_dev", "rebind_ino",
+        }
+        or not exact_identity_integer_types(protected_parent)
+        or protected_parent["path"] != "/private/var/db"
+        or protected_parent["type"] != "directory"
+        or protected_parent["uid"] != 0 or protected_parent["gid"] != 0
+        or protected_parent["mode"] != 0o755
+        or protected_parent["nlink"] < 2
+        or protected_parent["flags"] != 1048576
+        or protected_parent["acl"] != [] or protected_parent["xattrs"] != []
+        or protected_parent["rebind_dev"] != protected_parent["dev"]
+        or protected_parent["rebind_ino"] != protected_parent["ino"]
+    ):
+        return False
+    source_identity = observed.get("source_identity")
+    if prefix < 5:
+        if source_identity is not None:
+            return False
+    elif (
+        source_identity != prestage_source_identity(installer_size, installer_sha256)
+        or not exact_identity_integer_types(source_identity)
+        or any(type(source_identity.get(key)) is not bool for key in (
+            "full_read", "eof", "closed",
+        ))
+    ):
+        return False
+    directories = [
+        str(NAMESPACE), str(NAMESPACE / ".install"),
+        str(NAMESPACE / ".install/controller"),
+        str(NAMESPACE / ".install/controller/runtime-cleanup"),
+    ]
+    exec_count = observed.get("product_exec_count")
+    if type(exec_count) is not int or exec_count not in {0, 1}:
+        return False
+    common_stdin = observed.get("stdin")
+    if common_stdin is not None and (
+        not isinstance(common_stdin, dict)
+        or any(type(common_stdin.get(key)) is not int for key in ("fd", "stream_count", "length"))
+        or type(common_stdin.get("eof")) is not bool
+    ):
+        return False
+    inherited = observed.get("product_inherited_fds")
+    if inherited is not None and (
+        not isinstance(inherited, list)
+        or any(type(item) is not int for item in inherited)
+    ):
+        return False
+    descriptor_inventory = observed.get("product_descriptor_inventory")
+    if descriptor_inventory is not None and (
+        not isinstance(descriptor_inventory, dict)
+        or set(descriptor_inventory) != {
+            "pre_exec_open_fds", "fd0_closed", "all_fd_ge_3_closed",
+            "bootstrap_closefrom_zero_first",
+        }
+        or not isinstance(descriptor_inventory.get("pre_exec_open_fds"), list)
+        or any(type(item) is not int for item in descriptor_inventory["pre_exec_open_fds"])
+        or any(type(descriptor_inventory.get(key)) is not bool for key in (
+            "fd0_closed", "all_fd_ge_3_closed", "bootstrap_closefrom_zero_first",
+        ))
+    ):
+        return False
+    tool_processes = observed.get("tool_processes")
+    if not isinstance(tool_processes, dict) \
+            or any(type(tool_processes.get(key)) is not int for key in ("launched", "reaped")) \
+            or not isinstance(tool_processes.get("active"), list) \
+            or any(type(item) is not int for item in tool_processes["active"]) \
+            or any(type(tool_processes.get(key)) is not bool for key in (
+                "process_scan", "signal",
+            )):
+        return False
+    dd_result = observed.get("dd_result")
+    if prefix < 5:
+        if dd_result is not None:
+            return False
+        dd_succeeded = False
+    else:
+        if not isinstance(dd_result, dict) or set(dd_result) != {
+            "returncode", "stdout", "stderr", "stdout_complete_eof",
+            "stderr_complete_eof", "conv_fsync_completed", "durable",
+            "direct_child_reaped",
+        } or type(dd_result.get("returncode")) is not int \
+                or any(type(dd_result.get(key)) is not bytes for key in ("stdout", "stderr")) \
+                or any(type(dd_result.get(key)) is not bool for key in (
+                    "stdout_complete_eof", "stderr_complete_eof",
+                    "conv_fsync_completed", "durable", "direct_child_reaped",
+                )):
+            return False
+        dd_succeeded = dd_result == prestage_dd_result(True)
+        dd_failed_closed = dd_result == prestage_dd_result(False)
+        if not dd_succeeded and not (prefix == 5 and dd_failed_closed):
+            return False
+    if prefix < 5:
+        expected_recovery_action = FIRST_ROOT_ARGV[prefix:]
+    elif prefix == 5:
+        exact_stream = (
+            dd_succeeded and isinstance(common_stdin, dict)
+            and common_stdin.get("length") == installer_size
+            and common_stdin.get("sha256") == installer_sha256
+            and common_stdin.get("eof") is True
+        )
+        expected_recovery_action = FIRST_ROOT_ARGV[5 if exact_stream else 4:]
+    else:
+        expected_recovery_action = FIRST_ROOT_ARGV[prefix:]
+    if observed.get("recovery_action_argv") != expected_recovery_action:
+        return False
+    if prefix == len(FIRST_ROOT_ARGV):
+        return (
+            observed.get("directories") == [] and observed.get("leaf") is None
+            and observed.get("stdin") == {
+                "fd": 0, "stream_count": 1, "length": installer_size,
+                "sha256": installer_sha256, "eof": True,
+            }
+            and observed.get("verification") == [
+                "STAT_0400", "SHA256_0400", "CODESIGN_VERIFY_0400",
+                "CDHASH_0400", "NAME_REBIND_0400", "ACL_XATTR_0400", "STAT_0500",
+                "SHA256_0500", "CODESIGN_VERIFY_0500", "CDHASH_0500",
+                "FINAL_NAME_REBIND_0500", "FINAL_ACL_XATTR_0500",
+            ]
+            and exec_count == 1 and observed.get("product_environment") == []
+            and observed.get("product_inherited_fds") == [1, 2]
+            and descriptor_inventory == {
+                "pre_exec_open_fds": [1, 2], "fd0_closed": True,
+                "all_fd_ge_3_closed": True, "bootstrap_closefrom_zero_first": True,
+            }
+            and observed.get("product_stdin") == "CLOSED"
+            and observed.get("source_fd_state") == "CLOSED_BEFORE_EXEC"
+            and observed.get("tool_processes") == {
+                "launched": len(FIRST_ROOT_ARGV),
+                "reaped": len(FIRST_ROOT_ARGV), "active": [],
+                "process_scan": False, "signal": False,
+            }
+            and observed.get("dd_result") == prestage_dd_result(True)
+            and observed.get("bootstrap_state") == "COMPLETE"
+            and observed.get("final_layout") == LAYOUT
+        )
+    expected_directories = directories[:min(prefix, 4)]
+    directory_nlinks = [3 if prefix >= 2 else 2, 3 if prefix >= 3 else 2,
+                        3 if prefix >= 4 else 2, 2]
+    if not isinstance(observed.get("directories"), list) or any(
+        not exact_identity_integer_types(item) for item in observed["directories"]
+    ) or observed.get("directories") != [
+        prestage_directory_record(path, index, directory_nlinks[index])
+        for index, path in enumerate(expected_directories)
+    ]:
+        return False
+    leaf = observed.get("leaf")
+    stdin = observed.get("stdin")
+    if leaf is not None and not exact_identity_integer_types(leaf):
+        return False
+    if leaf is not None and type(leaf.get("protected_parent")) is not bool:
+        return False
+    if stdin is not None and (
+        not isinstance(stdin, dict)
+        or any(type(stdin.get(key)) is not int for key in ("fd", "stream_count", "length"))
+    ):
+        return False
+    if observed.get("product_environment") is not None \
+            or observed.get("product_inherited_fds") is not None \
+            or observed.get("product_stdin") is not None \
+            or observed.get("product_descriptor_inventory") is not None \
+            or observed.get("bootstrap_state") != "NOT_STARTED" \
+            or observed.get("final_layout") != [] or exec_count != 0:
+        return False
+    expected_source_state = "CLOSED_AFTER_BOUNDED_READ" if prefix >= 5 else "NOT_OPENED"
+    if observed.get("source_fd_state") != expected_source_state \
+            or tool_processes != {
+                "launched": prefix, "reaped": prefix, "active": [],
+                "process_scan": False, "signal": False,
+            }:
+        return False
+    if prefix < 5:
+        return leaf is None and stdin is None and observed.get("verification") == []
+    if prefix == 5:
+        return (
+            isinstance(leaf, dict) and set(leaf) == {
+                "path", "type", "uid", "gid", "mode", "nlink", "size",
+                "sha256", "cdhash", "protected_parent", "dev", "ino",
+                "rebind_dev", "rebind_ino", "flags", "acl", "xattrs",
+            }
+            and leaf["path"] == str(PROTECTED_INSTALLER)
+            and leaf["type"] == "regular" and leaf["uid"] == 0 and leaf["gid"] == 0
+            and type(leaf["mode"]) is int and leaf["mode"] & ~0o666 == 0
+            and leaf["nlink"] == 1
+            and leaf["flags"] == 0 and leaf["acl"] == []
+            and leaf["xattrs"] == [PROVENANCE_XATTR]
+            and type(leaf["size"]) is int and 0 <= leaf["size"] <= 4194305
+            and leaf["protected_parent"] is True
+            and type(leaf["dev"]) is int and type(leaf["ino"]) is int
+            and leaf["rebind_dev"] is None and leaf["rebind_ino"] is None
+            and isinstance(stdin, dict) and set(stdin) == {
+                "fd", "stream_count", "length", "sha256", "eof",
+            }
+            and stdin["fd"] == 0 and stdin["stream_count"] == 1
+            and type(stdin["length"]) is int and 0 <= stdin["length"] <= 4194305
+            and leaf["size"] == stdin["length"]
+            and valid_hex(stdin["sha256"])
+            and leaf["sha256"] == stdin["sha256"]
+            and leaf["cdhash"] is None
+            and observed.get("verification") == []
+        )
+    expected_mode = 0o400 if prefix < 13 else 0o500
+    verification_steps = [
+        (7, "STAT_0400"), (8, "SHA256_0400"),
+        (9, "CODESIGN_VERIFY_0400"), (10, "CDHASH_0400"),
+        (11, "NAME_REBIND_0400"), (12, "ACL_XATTR_0400"),
+        (14, "STAT_0500"), (15, "SHA256_0500"),
+        (16, "CODESIGN_VERIFY_0500"), (17, "CDHASH_0500"),
+        (18, "FINAL_NAME_REBIND_0500"), (19, "FINAL_ACL_XATTR_0500"),
+    ]
+    expected_verification = [name for threshold, name in verification_steps if prefix >= threshold]
+    exact_leaf = {
+        "path": str(PROTECTED_INSTALLER), "type": "regular", "uid": 0,
+        "gid": 0, "mode": expected_mode, "nlink": 1,
+        "flags": 0, "acl": [], "xattrs": [PROVENANCE_XATTR],
+        "size": installer_size, "sha256": installer_sha256,
+        "cdhash": installer_cdhash, "protected_parent": True,
+        "dev": 31, "ino": 41, "rebind_dev": 31, "rebind_ino": 41,
+    }
+    return (
+        leaf == exact_leaf
+        and stdin == {
+            "fd": 0, "stream_count": 1, "length": installer_size,
+            "sha256": installer_sha256, "eof": True,
+        }
+        and observed.get("verification") == expected_verification
+    )
+
+
+def prestage_prefix_fixture(
+    prefix: int, *, installer_size: int, installer_sha256: str,
+    installer_cdhash: str,
+) -> dict[str, Any]:
+    directories = [
+        str(NAMESPACE), str(NAMESPACE / ".install"),
+        str(NAMESPACE / ".install/controller"),
+        str(NAMESPACE / ".install/controller/runtime-cleanup"),
+    ]
+    observed: dict[str, Any] = {
+        "argv_prefix": FIRST_ROOT_ARGV[:prefix],
+        "recovery_argv": FIRST_ROOT_RECOVERY_ARGV,
+        "directories": [
+            prestage_directory_record(
+                path, index,
+                [3 if prefix >= 2 else 2, 3 if prefix >= 3 else 2,
+                 3 if prefix >= 4 else 2, 2][index],
+            )
+            for index, path in enumerate(directories[:min(prefix, 4)])
+        ],
+        "leaf": None, "stdin": None, "verification": [],
+        "product_exec_count": 0, "product_environment": None,
+        "product_inherited_fds": None, "bootstrap_state": "NOT_STARTED",
+        "final_layout": [],
+        "source_path": str(UNTRUSTED_INSTALLER_SOURCE),
+        "source_sha256": installer_sha256,
+        "source_fd_state": "CLOSED_AFTER_BOUNDED_READ" if prefix >= 5 else "NOT_OPENED",
+        "source_identity": (
+            prestage_source_identity(installer_size, installer_sha256)
+            if prefix >= 5 else None
+        ),
+        "product_stdin": None,
+        "product_descriptor_inventory": None,
+        "dd_result": prestage_dd_result(True) if prefix >= 5 else None,
+        "recovery_action_argv": FIRST_ROOT_ARGV[prefix:] if prefix != 5 else FIRST_ROOT_ARGV[5:],
+        "tool_processes": {
+            "launched": prefix, "reaped": prefix, "active": [],
+            "process_scan": False, "signal": False,
+        },
+        "protected_parent": {
+            "path": "/private/var/db", "type": "directory", "uid": 0,
+            "gid": 0, "mode": 0o755, "nlink": 136, "flags": 1048576,
+            "acl": [], "xattrs": [],
+            "dev": 31, "ino": 29, "rebind_dev": 31, "rebind_ino": 29,
+        },
+    }
+    if prefix >= 5:
+        partial = prefix == 5
+        observed["leaf"] = {
+            "path": str(PROTECTED_INSTALLER), "type": "regular", "uid": 0,
+            "gid": 0, "mode": 0o644 if partial else (0o400 if prefix < 13 else 0o500),
+            "nlink": 1, "size": installer_size,
+            "sha256": installer_sha256,
+            "cdhash": None if partial else installer_cdhash,
+            "flags": 0, "acl": [], "xattrs": [dict(PROVENANCE_XATTR)],
+            "protected_parent": True, "dev": 31, "ino": 41,
+            "rebind_dev": None if partial else 31,
+            "rebind_ino": None if partial else 41,
+        }
+        observed["stdin"] = {
+            "fd": 0, "stream_count": 1, "length": installer_size,
+            "sha256": installer_sha256, "eof": True,
+        }
+    verification_steps = [
+        (7, "STAT_0400"), (8, "SHA256_0400"),
+        (9, "CODESIGN_VERIFY_0400"), (10, "CDHASH_0400"),
+        (11, "NAME_REBIND_0400"), (12, "ACL_XATTR_0400"),
+        (14, "STAT_0500"), (15, "SHA256_0500"),
+        (16, "CODESIGN_VERIFY_0500"), (17, "CDHASH_0500"),
+        (18, "FINAL_NAME_REBIND_0500"), (19, "FINAL_ACL_XATTR_0500"),
+    ]
+    observed["verification"] = [
+        name for threshold, name in verification_steps if prefix >= threshold
+    ]
+    if prefix == len(FIRST_ROOT_ARGV):
+        observed["directories"] = []
+        observed["leaf"] = None
+        observed["product_exec_count"] = 1
+        observed["product_environment"] = []
+        observed["product_inherited_fds"] = [1, 2]
+        observed["product_descriptor_inventory"] = {
+            "pre_exec_open_fds": [1, 2], "fd0_closed": True,
+            "all_fd_ge_3_closed": True, "bootstrap_closefrom_zero_first": True,
+        }
+        observed["product_stdin"] = "CLOSED"
+        observed["source_fd_state"] = "CLOSED_BEFORE_EXEC"
+        observed["tool_processes"] = {
+            "launched": len(FIRST_ROOT_ARGV),
+            "reaped": len(FIRST_ROOT_ARGV), "active": [],
+            "process_scan": False, "signal": False,
+        }
+        observed["bootstrap_state"] = "COMPLETE"
+        observed["final_layout"] = LAYOUT
+        observed["recovery_action_argv"] = []
+    return observed
+
+
+BOOTSTRAP_CRASH_PHASES = [
+    "PRE_EFFECTS", "MEDIATOR_PARTIAL", "MEDIATOR_DURABLE", "MEDIATOR_READY",
+    "A_DURABLE", "C_DURABLE", "Q_DURABLE", "R_DURABLE",
+    "S_DURABLE", "LOCK_DURABLE", "HELPER_PUBLISHED",
+    "NAMESPACE_PUBLISHED", "INSTALLER_UNLINKED",
+    "RUNTIME_DIR_REMOVED", "CONTROLLER_DIR_REMOVED",
+    "RESTAGE_INSTALLER_PARTIAL", "RESTAGE_INSTALLER_READY", "COMPLETE",
+]
+
+
+def bootstrap_object(
+    kind: str, mode: int, ino: int, *, size: int | None = None,
+    digest: str | None = None, nlink: int = 1,
+) -> dict[str, Any]:
+    value: dict[str, Any] = {
+        "type": kind, "uid": 0, "gid": 0, "mode": mode,
+        "nlink": nlink, "flags": 0, "acl": [],
+        "xattrs": [dict(PROVENANCE_XATTR)],
+        "dev": 31, "ino": ino, "rebind_dev": 31, "rebind_ino": ino,
+    }
+    if kind == "regular":
+        value.update({"size": size, "sha256": digest})
+    return value
+
+
+def recovery_stat_bytes(record: dict[str, Any]) -> bytes:
+    kind_bits = 0o040000 if record["type"] == "directory" else 0o100000
+    return (
+        f'{record["dev"]}:{record["ino"]}:{kind_bits | record["mode"]:o}:'
+        f'{record["uid"]}:{record["gid"]}:{record["nlink"]}:'
+        f'{record.get("size", 0)}:{record["flags"]}\n'
+    ).encode("ascii")
+
+
+def parse_recovery_stat(raw: bytes) -> dict[str, Any] | None:
+    if type(raw) is not bytes or not 0 < len(raw) <= RECOVERY_OUTPUT_CAP:
+        return None
+    match = re.fullmatch(
+        rb"([0-9]+):([0-9]+):([0-7]+):([0-9]+):([0-9]+):"
+        rb"([0-9]+):([0-9]+):([0-9]+)\n",
+        raw,
+    )
+    if match is None:
+        return None
+    dev, ino, raw_mode, uid, gid, nlink, size, flags = (
+        int(value, 8 if index == 2 else 10)
+        for index, value in enumerate(match.groups())
+    )
+    if stat.S_ISDIR(raw_mode):
+        kind = "directory"
+    elif stat.S_ISREG(raw_mode):
+        kind = "regular"
+    else:
+        return None
+    return {
+        "type": kind, "uid": uid, "gid": gid,
+        "mode": stat.S_IMODE(raw_mode), "nlink": nlink,
+        "size": size, "flags": flags, "dev": dev, "ino": ino,
+    }
+
+
+def parse_closed_acl_xattr_ls(raw: bytes, path: str, xattrs: Any) -> bool:
+    if type(raw) is not bytes or not 0 < len(raw) <= RECOVERY_OUTPUT_CAP \
+            or not raw.endswith(b"\n") or b"\0" in raw:
+        return False
+    try:
+        decoded = raw.decode("utf-8")
+    except UnicodeError:
+        return False
+    lines = decoded.splitlines()
+    if not lines or not lines[0].endswith(" " + path):
+        return False
+    mode_token = lines[0].split(None, 1)[0]
+    if xattrs == []:
+        return (
+            len(lines) == 1
+            and re.fullmatch(r"[bcdlps-][rwxStTs-]{9}", mode_token) is not None
+        )
+    return (
+        xattrs == [PROVENANCE_XATTR] and len(lines) == 2
+        and re.fullmatch(r"[bcdlps-][rwxStTs-]{9}@", mode_token) is not None
+        and lines[1] == "\tcom.apple.provenance\t11 "
+    )
+
+
+def parse_recovery_membership(raw: bytes, start: str) -> list[str] | None:
+    if type(raw) is not bytes or len(raw) > RECOVERY_OUTPUT_CAP:
+        return None
+    if raw == b"":
+        return []
+    if not raw.endswith(b"\0"):
+        return None
+    try:
+        paths = [item.decode("utf-8") for item in raw[:-1].split(b"\0")]
+    except UnicodeError:
+        return None
+    if not paths or paths != sorted(paths) or len(paths) != len(set(paths)):
+        return None
+    start_path = Path(start)
+    if any(
+        not path or Path(path).parent != start_path or Path(path).name in {".", ".."}
+        for path in paths
+    ):
+        return None
+    return paths
+
+
+def recovery_absent_stderr(tool: str, path: str) -> bytes:
+    if tool == "stat":
+        return f"stat: {path}: stat: No such file or directory\n".encode()
+    if tool in {"ls", "find"}:
+        return f"{tool}: {path}: No such file or directory\n".encode()
+    if tool in {"openssl", "codesign"}:
+        return f"{path}: No such file or directory\n".encode()
+    raise Rig("unknown recovery observation tool")
+
+
+def recovery_expected_bindings(
+    namespace: dict[str, Any], objects: dict[str, dict[str, Any]],
+    helper: dict[str, Any] | None,
+) -> tuple[dict[str, dict[str, Any] | None], dict[str, list[str] | None]]:
+    parent = bootstrap_object("directory", 0o755, 29, nlink=136)
+    parent["flags"] = 1048576
+    parent["xattrs"] = []
+    helper_parent = bootstrap_object("directory", 0o1755, 28, nlink=8)
+    helper_parent["xattrs"] = []
+    identities: dict[str, dict[str, Any] | None] = {
+        path: None for path in RECOVERY_IDENTITY_PATHS
+    }
+    identities["/private/var/db"] = parent
+    identities[str(NAMESPACE)] = namespace
+    identities["/Library/PrivilegedHelperTools"] = helper_parent
+    identities[str(INSTALLED)] = helper
+    for relative, record in objects.items():
+        absolute = str(NAMESPACE / relative)
+        if absolute in identities:
+            identities[absolute] = record
+    memberships: dict[str, list[str] | None] = {}
+    for path in RECOVERY_MEMBERSHIP_PATHS:
+        record = identities[path]
+        if record is None or record["type"] != "directory":
+            memberships[path] = None
+            continue
+        memberships[path] = sorted(
+            child for child, child_record in identities.items()
+            if child_record is not None and Path(child).parent == Path(path)
+        )
+    return identities, memberships
+
+
+def recovery_observation_fixture(
+    identities: dict[str, dict[str, Any] | None],
+    memberships: dict[str, list[str] | None],
+) -> dict[str, Any]:
+    identity_results: dict[str, dict[str, Any]] = {}
+    for path in RECOVERY_IDENTITY_PATHS:
+        record = identities[path]
+        if record is None:
+            identity_results[path] = {
+                "before_stat_rc": 1, "before_stat_stdout": b"",
+                "before_stat_stderr": recovery_absent_stderr("stat", path),
+                "before_stat_complete_eof": True,
+                "ls_rc": 1, "ls_stdout": b"", "ls_stderr": b"absent\n",
+                "ls_complete_eof": True,
+                "after_stat_rc": 1, "after_stat_stdout": b"",
+                "after_stat_stderr": recovery_absent_stderr("stat", path),
+                "after_stat_complete_eof": True,
+            }
+            identity_results[path]["ls_stderr"] = recovery_absent_stderr("ls", path)
+        else:
+            kind = "d" if record["type"] == "directory" else "-"
+            xattr_marker = "@" if record["xattrs"] else ""
+            xattr_line = "\tcom.apple.provenance\t11 \n" if record["xattrs"] else ""
+            identity_results[path] = {
+                "before_stat_rc": 0, "before_stat_stdout": recovery_stat_bytes(record),
+                "before_stat_stderr": b"", "before_stat_complete_eof": True,
+                "ls_rc": 0,
+                "ls_stdout": (
+                    f"{kind}r--------{xattr_marker} 1 root wheel - 0 Jan 1 00:00 "
+                    f"{path}\n{xattr_line}"
+                ).encode(),
+                "ls_stderr": b"", "ls_complete_eof": True,
+                "after_stat_rc": 0, "after_stat_stdout": recovery_stat_bytes(record),
+                "after_stat_stderr": b"", "after_stat_complete_eof": True,
+            }
+    digest_results: dict[str, dict[str, Any]] = {}
+    for path in RECOVERY_REGULAR_PATHS:
+        record = identities[path]
+        if record is None:
+            digest_results[path] = {
+                "before_stat": b"", "openssl_rc": 1, "openssl_stdout": b"",
+                "openssl_stderr": recovery_absent_stderr("openssl", path),
+                "complete_eof": True, "after_stat": b"",
+            }
+        else:
+            digest_results[path] = {
+                "before_stat": recovery_stat_bytes(record), "openssl_rc": 0,
+                "openssl_stdout": f"{record['sha256']} *{path}\n".encode(),
+                "openssl_stderr": b"", "complete_eof": True,
+                "after_stat": recovery_stat_bytes(record),
+            }
+    executable_results: dict[str, dict[str, Any]] = {}
+    for path in RECOVERY_EXECUTABLE_PATHS:
+        record = identities[path]
+        if record is None:
+            executable_results[path] = {
+                "before_stat": b"", "verify_rc": 1, "verify_stdout": b"",
+                "verify_stderr": recovery_absent_stderr("codesign", path),
+                "display_rc": 1, "display_stdout": b"",
+                "display_stderr": recovery_absent_stderr("codesign", path),
+                "complete_eof": True, "after_stat": b"",
+            }
+        elif record["cdhash"] is None:
+            executable_results[path] = {
+                "before_stat": recovery_stat_bytes(record),
+                "verify_rc": 1, "verify_stdout": b"",
+                "verify_stderr": b"invalid partial code\n",
+                "display_rc": 1, "display_stdout": b"",
+                "display_stderr": b"invalid partial code\n",
+                "complete_eof": True, "after_stat": recovery_stat_bytes(record),
+            }
+        else:
+            identifier = (
+                "se.nortropic.runtime-cleanup-installer"
+                if path == str(PROTECTED_INSTALLER)
+                else "se.nortropic.runtime-cleanup-mediator"
+            )
+            executable_results[path] = {
+                "before_stat": recovery_stat_bytes(record),
+                "verify_rc": 0, "verify_stdout": b"", "verify_stderr": b"",
+                "display_rc": 0, "display_stdout": b"",
+                "display_stderr": (
+                    f"Identifier={identifier}\nCDHash={record['cdhash']}\n"
+                ).encode(),
+                "complete_eof": True, "after_stat": recovery_stat_bytes(record),
+            }
+    membership_results: dict[str, dict[str, Any]] = {}
+    for path in RECOVERY_MEMBERSHIP_PATHS:
+        children = memberships[path]
+        if children is None:
+            membership_results[path] = {
+                "before_stat": b"", "find_rc": 1, "find_stdout": b"",
+                "find_stderr": recovery_absent_stderr("find", path),
+                "complete_eof": True,
+                "after_stat": b"",
+            }
+        else:
+            record = identities[path]
+            assert record is not None
+            encoded = b"".join(child.encode() + b"\0" for child in children)
+            membership_results[path] = {
+                "before_stat": recovery_stat_bytes(record), "find_rc": 0,
+                "find_stdout": encoded, "find_stderr": b"",
+                "complete_eof": True, "after_stat": recovery_stat_bytes(record),
+            }
+    return {
+        "argv": FIRST_ROOT_RECOVERY_ARGV, "identity": identity_results,
+        "digest": digest_results, "executable": executable_results,
+        "membership": membership_results,
+    }
+
+
+def exact_recovery_observation(
+    observed: Any, identities: dict[str, dict[str, Any] | None],
+    memberships: dict[str, list[str] | None],
+) -> bool:
+    if not isinstance(observed, dict) \
+            or set(observed) != {"argv", "identity", "digest", "executable", "membership"} \
+            or observed.get("argv") != FIRST_ROOT_RECOVERY_ARGV \
+            or not isinstance(observed["identity"], dict) \
+            or not isinstance(observed["digest"], dict) \
+            or not isinstance(observed["executable"], dict) \
+            or not isinstance(observed["membership"], dict) \
+            or list(observed["identity"]) != RECOVERY_IDENTITY_PATHS \
+            or list(observed["digest"]) != RECOVERY_REGULAR_PATHS \
+            or list(observed["executable"]) != RECOVERY_EXECUTABLE_PATHS \
+            or list(observed["membership"]) != RECOVERY_MEMBERSHIP_PATHS:
+        return False
+    for path in RECOVERY_IDENTITY_PATHS:
+        result = observed["identity"][path]
+        record = identities[path]
+        if not isinstance(result, dict) or set(result) != {
+            "before_stat_rc", "before_stat_stdout", "before_stat_stderr",
+            "before_stat_complete_eof",
+            "ls_rc", "ls_stdout", "ls_stderr", "ls_complete_eof",
+            "after_stat_rc", "after_stat_stdout", "after_stat_stderr",
+            "after_stat_complete_eof",
+        } or any(type(result[key]) is not int for key in (
+            "before_stat_rc", "ls_rc", "after_stat_rc",
+        )) \
+                or any(type(result[key]) is not bool for key in (
+                    "before_stat_complete_eof", "ls_complete_eof",
+                    "after_stat_complete_eof",
+                )) \
+                or any(type(result[key]) is not bytes for key in (
+                    "before_stat_stdout", "before_stat_stderr", "ls_stdout",
+                    "ls_stderr", "after_stat_stdout", "after_stat_stderr",
+                )) \
+                or any(len(result[key]) > RECOVERY_OUTPUT_CAP for key in (
+                    "before_stat_stdout", "before_stat_stderr", "ls_stdout",
+                    "ls_stderr", "after_stat_stdout", "after_stat_stderr",
+                )):
+            return False
+        if record is None:
+            if not (
+                result["before_stat_rc"] == result["ls_rc"]
+                == result["after_stat_rc"] == 1
+                and result["before_stat_stdout"] == result["ls_stdout"]
+                == result["after_stat_stdout"] == b""
+                and result["before_stat_stderr"]
+                == result["after_stat_stderr"] == recovery_absent_stderr("stat", path)
+                and result["ls_stderr"] == recovery_absent_stderr("ls", path)
+                and result["before_stat_complete_eof"] is True
+                and result["ls_complete_eof"] is True
+                and result["after_stat_complete_eof"] is True
+            ):
+                return False
+            continue
+        before = parse_recovery_stat(result["before_stat_stdout"])
+        after = parse_recovery_stat(result["after_stat_stdout"])
+        if before is None or before != after \
+                or not result["before_stat_complete_eof"] \
+                or not result["ls_complete_eof"] \
+                or not result["after_stat_complete_eof"] \
+                or result["before_stat_rc"] != 0 or result["ls_rc"] != 0 \
+                or result["after_stat_rc"] != 0 \
+                or result["before_stat_stderr"] != b"" \
+                or result["ls_stderr"] != b"" or result["after_stat_stderr"] != b"" \
+                or not parse_closed_acl_xattr_ls(
+                    result["ls_stdout"], path, record.get("xattrs"),
+                ) \
+                or any(before[key] != record[key] for key in (
+                    "type", "uid", "gid", "mode", "nlink", "flags", "dev", "ino",
+                )) \
+                or (record["type"] == "regular" and before["size"] != record["size"]) \
+                or record.get("acl") != [] \
+                or record.get("xattrs") not in ([], [PROVENANCE_XATTR]):
+            return False
+    for path in RECOVERY_REGULAR_PATHS:
+        result = observed["digest"][path]
+        record = identities[path]
+        if not isinstance(result, dict) or set(result) != {
+            "before_stat", "openssl_rc", "openssl_stdout", "openssl_stderr",
+            "complete_eof", "after_stat",
+        } or type(result["openssl_rc"]) is not int \
+                or type(result["complete_eof"]) is not bool \
+                or any(type(result[key]) is not bytes for key in (
+                    "before_stat", "openssl_stdout", "openssl_stderr", "after_stat",
+                )) \
+                or any(len(result[key]) > RECOVERY_OUTPUT_CAP for key in (
+                    "before_stat", "openssl_stdout", "openssl_stderr", "after_stat",
+                )):
+            return False
+        if record is None:
+            if not (
+                result["before_stat"] == result["openssl_stdout"]
+                == result["after_stat"] == b"" and result["openssl_rc"] == 1
+                and result["openssl_stderr"] == recovery_absent_stderr("openssl", path)
+                and result["complete_eof"] is True
+            ):
+                return False
+            continue
+        before = parse_recovery_stat(result["before_stat"])
+        after = parse_recovery_stat(result["after_stat"])
+        digest_match = re.fullmatch(
+            rf"([0-9a-f]{{64}}) \*{re.escape(path)}\n".encode(),
+            result["openssl_stdout"],
+        )
+        if before is None or before != after or before["type"] != "regular" \
+                or result["openssl_rc"] != 0 or result["openssl_stderr"] != b"" \
+                or result["complete_eof"] is not True \
+                or digest_match is None \
+                or (
+                    record["sha256"] is not None
+                    and digest_match.group(1).decode() != record["sha256"]
+                ):
+            return False
+    for path in RECOVERY_EXECUTABLE_PATHS:
+        result = observed["executable"][path]
+        record = identities[path]
+        byte_keys = (
+            "before_stat", "verify_stdout", "verify_stderr", "display_stdout",
+            "display_stderr", "after_stat",
+        )
+        if not isinstance(result, dict) or set(result) != {
+            *byte_keys, "verify_rc", "display_rc", "complete_eof",
+        } or any(type(result[key]) is not int for key in ("verify_rc", "display_rc")) \
+                or type(result["complete_eof"]) is not bool \
+                or any(type(result[key]) is not bytes for key in byte_keys) \
+                or any(len(result[key]) > RECOVERY_OUTPUT_CAP for key in byte_keys):
+            return False
+        if record is None:
+            if not (
+                result["before_stat"] == result["verify_stdout"]
+                == result["display_stdout"] == result["after_stat"] == b""
+                and result["verify_rc"] == result["display_rc"] == 1
+                and result["verify_stderr"] == result["display_stderr"]
+                == recovery_absent_stderr("codesign", path)
+                and result["complete_eof"] is True
+            ):
+                return False
+            continue
+        before = parse_recovery_stat(result["before_stat"])
+        after = parse_recovery_stat(result["after_stat"])
+        if before is None or before != after or result["complete_eof"] is not True:
+            return False
+        if record["cdhash"] is None:
+            if not (
+                result["verify_rc"] != 0 and result["display_rc"] != 0
+                and result["verify_stdout"] == result["display_stdout"] == b""
+                and 0 < len(result["verify_stderr"]) <= RECOVERY_OUTPUT_CAP
+                and 0 < len(result["display_stderr"]) <= RECOVERY_OUTPUT_CAP
+                and result["verify_stderr"].endswith(b"\n")
+                and result["display_stderr"].endswith(b"\n")
+            ):
+                return False
+            continue
+        identifier = (
+            "se.nortropic.runtime-cleanup-installer"
+            if path == str(PROTECTED_INSTALLER)
+            else "se.nortropic.runtime-cleanup-mediator"
+        )
+        try:
+            display = result["display_stderr"].decode("utf-8")
+        except UnicodeError:
+            return False
+        if not (
+            result["verify_rc"] == result["display_rc"] == 0
+            and result["verify_stdout"] == result["verify_stderr"]
+            == result["display_stdout"] == b""
+            and len(re.findall(r"^Identifier=", display, re.MULTILINE)) == 1
+            and len(re.findall(r"^CDHash=", display, re.MULTILINE)) == 1
+            and f"Identifier={identifier}\n" in display
+            and f"CDHash={record['cdhash']}\n" in display
+        ):
+            return False
+    for path in RECOVERY_MEMBERSHIP_PATHS:
+        result = observed["membership"][path]
+        children = memberships[path]
+        if not isinstance(result, dict) or set(result) != {
+            "before_stat", "find_rc", "find_stdout", "find_stderr",
+            "complete_eof", "after_stat",
+        } or type(result["find_rc"]) is not int \
+                or type(result["complete_eof"]) is not bool \
+                or any(type(result[key]) is not bytes for key in (
+                    "before_stat", "find_stdout", "find_stderr", "after_stat",
+                )) \
+                or any(len(result[key]) > RECOVERY_OUTPUT_CAP for key in (
+                    "before_stat", "find_stdout", "find_stderr", "after_stat",
+                )):
+            return False
+        if children is None:
+            if not (
+                result["before_stat"] == result["after_stat"] == result["find_stdout"] == b""
+                and result["find_rc"] == 1 and result["complete_eof"] is True
+                and result["find_stderr"] == recovery_absent_stderr("find", path)
+            ):
+                return False
+            continue
+        before = parse_recovery_stat(result["before_stat"])
+        after = parse_recovery_stat(result["after_stat"])
+        if before is None or before != after or before["type"] != "directory" \
+                or result["find_rc"] != 0 or result["find_stderr"] != b"" \
+                or result["complete_eof"] is not True \
+                or parse_recovery_membership(result["find_stdout"], path) != children:
+            return False
+    return True
+
+
+def bootstrap_recovery_fixture(
+    phase: str, *, mediator_size: int, mediator_sha256: str,
+    mediator_cdhash: str, installer_size: int, installer_sha256: str,
+    installer_cdhash: str,
+) -> dict[str, Any]:
+    index = BOOTSTRAP_CRASH_PHASES.index(phase)
+    restaging = phase in {"RESTAGE_INSTALLER_PARTIAL", "RESTAGE_INSTALLER_READY"}
+    objects: dict[str, dict[str, Any]] = {}
+    if phase != "COMPLETE":
+        objects[".install"] = bootstrap_object(
+            "directory", 0o700, 60,
+            nlink=2 if phase == "CONTROLLER_DIR_REMOVED" else 3,
+        )
+    if index <= BOOTSTRAP_CRASH_PHASES.index("RUNTIME_DIR_REMOVED") or restaging:
+        objects[".install/controller"] = bootstrap_object(
+            "directory", 0o700, 61,
+            nlink=3 if index <= BOOTSTRAP_CRASH_PHASES.index("INSTALLER_UNLINKED") or restaging else 2,
+        )
+    if index <= BOOTSTRAP_CRASH_PHASES.index("INSTALLER_UNLINKED") or restaging:
+        objects[".install/controller/runtime-cleanup"] = bootstrap_object(
+            "directory", 0o700, 62,
+        )
+    if index < BOOTSTRAP_CRASH_PHASES.index("INSTALLER_UNLINKED") or restaging:
+        partial_installer = phase == "RESTAGE_INSTALLER_PARTIAL"
+        objects[".install/controller/runtime-cleanup/install"] = bootstrap_object(
+            "regular", 0o644 if partial_installer else 0o500,
+            42 if restaging else 41,
+            size=installer_size // 2 if partial_installer else installer_size,
+            digest=("02" * 32) if partial_installer else installer_sha256,
+        )
+        objects[".install/controller/runtime-cleanup/install"]["cdhash"] = (
+            None if partial_installer else installer_cdhash
+        )
+        objects[".install/controller/runtime-cleanup/install"]["durable"] = not partial_installer
+    if BOOTSTRAP_CRASH_PHASES.index("MEDIATOR_PARTIAL") <= index \
+            < BOOTSTRAP_CRASH_PHASES.index("HELPER_PUBLISHED"):
+        partial = phase == "MEDIATOR_PARTIAL"
+        objects[".install/mediator"] = bootstrap_object(
+            "regular",
+            0o4555 if index >= BOOTSTRAP_CRASH_PHASES.index("MEDIATOR_READY") else 0o400,
+            63,
+            size=mediator_size // 2 if partial else mediator_size,
+            digest=("01" * 32) if partial else mediator_sha256,
+        )
+        objects[".install/mediator"]["cdhash"] = None if partial else mediator_cdhash
+        objects[".install/mediator"]["durable"] = not partial
+    for offset, name in enumerate(LAYOUT):
+        threshold = BOOTSTRAP_CRASH_PHASES.index(f"{name.upper()}_DURABLE")
+        if index >= threshold:
+            objects[name] = bootstrap_object(
+                "directory", 0o555, 70 + offset,
+                nlink=3 if name == "s" and index >= BOOTSTRAP_CRASH_PHASES.index("LOCK_DURABLE") else 2,
+            )
+    if index >= BOOTSTRAP_CRASH_PHASES.index("LOCK_DURABLE"):
+        objects["s/lock"] = bootstrap_object(
+            "regular", 0o600, 80, size=0, digest=sha(b""),
+        )
+    namespace = bootstrap_object(
+        "directory",
+        0o555 if index >= BOOTSTRAP_CRASH_PHASES.index("NAMESPACE_PUBLISHED") else 0o700,
+        59,
+        nlink=2 + sum(
+            1 for path, value in objects.items()
+            if "/" not in path and value["type"] == "directory"
+        ),
+    )
+    helper = None
+    if index >= BOOTSTRAP_CRASH_PHASES.index("HELPER_PUBLISHED"):
+        helper = bootstrap_object(
+            "regular", 0o4555, 63, size=mediator_size,
+            digest=mediator_sha256,
+        )
+        helper["cdhash"] = mediator_cdhash
+    if phase == "COMPLETE":
+        objects = {
+            path: value for path, value in objects.items()
+            if path in {*LAYOUT, "s/lock"}
+        }
+        namespace["nlink"] = 7
+    if phase == "COMPLETE":
+        recovery_action = "NONE"
+        recovery_argv: list[list[str]] = []
+    elif phase == "CONTROLLER_DIR_REMOVED":
+        recovery_action = "RESTAGE_EXACT_INSTALLER_THEN_BOOTSTRAP"
+        recovery_argv = [FIRST_ROOT_ARGV[2], FIRST_ROOT_ARGV[3], *FIRST_ROOT_ARGV[4:]]
+    elif phase == "RUNTIME_DIR_REMOVED":
+        recovery_action = "RESTAGE_EXACT_INSTALLER_THEN_BOOTSTRAP"
+        recovery_argv = [FIRST_ROOT_ARGV[3], *FIRST_ROOT_ARGV[4:]]
+    elif phase in {"INSTALLER_UNLINKED", "RESTAGE_INSTALLER_PARTIAL"}:
+        recovery_action = "RESTAGE_EXACT_INSTALLER_THEN_BOOTSTRAP"
+        recovery_argv = FIRST_ROOT_ARGV[4:]
+    elif phase == "RESTAGE_INSTALLER_READY":
+        recovery_action = "EXEC_PROTECTED_BOOTSTRAP"
+        recovery_argv = FIRST_ROOT_ARGV[-1:]
+    else:
+        recovery_action = "EXEC_PROTECTED_BOOTSTRAP"
+        recovery_argv = FIRST_ROOT_ARGV[-1:]
+    restage_binding = None
+    if phase in {
+        "INSTALLER_UNLINKED", "RUNTIME_DIR_REMOVED", "CONTROLLER_DIR_REMOVED",
+        "RESTAGE_INSTALLER_PARTIAL", "RESTAGE_INSTALLER_READY",
+    }:
+        if phase == "RESTAGE_INSTALLER_PARTIAL":
+            observed_stream: dict[str, Any] | None = {
+                "fd": 0, "stream_count": 1, "length": installer_size // 2,
+                "sha256": "02" * 32, "eof": False,
+            }
+            attempt_state = "PARTIAL_REAPED"
+            observed_source = prestage_source_identity(installer_size, installer_sha256)
+            source_closed: bool | None = True
+            dd_reaped: bool | None = True
+            dd_result: dict[str, Any] | None = prestage_dd_result(False)
+        elif phase == "RESTAGE_INSTALLER_READY":
+            observed_stream = {
+                "fd": 0, "stream_count": 1, "length": installer_size,
+                "sha256": installer_sha256, "eof": True,
+            }
+            attempt_state = "READY"
+            observed_source = prestage_source_identity(installer_size, installer_sha256)
+            source_closed = True
+            dd_reaped = True
+            dd_result = prestage_dd_result(True)
+        else:
+            observed_stream = None
+            attempt_state = "REQUIRED_NOT_STARTED"
+            observed_source = None
+            source_closed = None
+            dd_reaped = None
+            dd_result = None
+        restage_binding = {
+            "attempt_state": attempt_state,
+            "required_fresh_source_identity": prestage_source_identity(
+                installer_size, installer_sha256,
+            ),
+            "required_stream": {
+                "fd": 0, "stream_count": 1, "length": installer_size,
+                "sha256": installer_sha256, "eof": True,
+            },
+            "observed_source_identity": observed_source,
+            "observed_stream": observed_stream,
+            "source_fd_closed": source_closed, "dd_direct_child_reaped": dd_reaped,
+            "dd_result": dd_result,
+            "second_stream": False, "descriptor_inventory_after_dd": [1, 2],
+        }
+    identities, memberships = recovery_expected_bindings(namespace, objects, helper)
+    return {
+        "phase": phase, "operation": "bootstrap", "caller_inputs": [],
+        "environment": [], "stdin": "CLOSED", "inherited_fds": [1, 2],
+        "embedded_section": "__H039RO,__h039med",
+        "embedded_size": mediator_size, "embedded_sha256": mediator_sha256,
+        "namespace": namespace, "namespace_objects": objects,
+        "installed_helper": helper, "recovery_action": recovery_action,
+        "recovery_argv": recovery_argv,
+        "recovery_observation": recovery_observation_fixture(identities, memberships),
+        "restage_binding": restage_binding,
+        "process_lifecycle": {
+            "active": [], "descendants": [], "root_tool_reaped": True,
+            "process_scan": False, "signal": False,
+        },
+    }
+
+
+def bootstrap_recovery_oracle(
+    state: dict[str, Any], *, mediator_size: int, mediator_sha256: str,
+    mediator_cdhash: str, installer_size: int, installer_sha256: str,
+    installer_cdhash: str,
+) -> bool:
+    if type(mediator_size) is not int or not 0 < mediator_size <= 4194304 \
+            or type(installer_size) is not int or not 0 < installer_size <= 4194304 \
+            or not valid_hex(mediator_sha256) or not valid_hex(installer_sha256) \
+            or not valid_hex(mediator_cdhash, 40) or not valid_hex(installer_cdhash, 40):
+        return False
+    if not isinstance(state, dict) or set(state) != {
+        "phase", "operation", "caller_inputs", "environment", "stdin",
+        "inherited_fds", "embedded_section", "embedded_size",
+        "embedded_sha256", "namespace", "namespace_objects",
+        "installed_helper", "recovery_action", "recovery_argv",
+        "recovery_observation", "restage_binding", "process_lifecycle",
+    }:
+        return False
+    if type(state.get("embedded_size")) is not int \
+            or not isinstance(state.get("inherited_fds"), list) \
+            or any(type(item) is not int for item in state["inherited_fds"]) \
+            or not exact_identity_integer_types(state.get("namespace")) \
+            or not isinstance(state.get("namespace_objects"), dict) \
+            or any(
+                not exact_identity_integer_types(value)
+                for value in state["namespace_objects"].values()
+            ) \
+            or any(
+                "durable" in value and type(value["durable"]) is not bool
+                for value in state["namespace_objects"].values()
+            ) \
+            or (
+                state.get("installed_helper") is not None
+                and not exact_identity_integer_types(state["installed_helper"])
+            ):
+        return False
+    lifecycle = state.get("process_lifecycle")
+    if not isinstance(lifecycle, dict) \
+            or any(
+                not isinstance(lifecycle.get(key), list)
+                or any(type(item) is not int for item in lifecycle[key])
+                for key in ("active", "descendants")
+            ) \
+            or any(type(lifecycle.get(key)) is not bool for key in (
+                "root_tool_reaped", "process_scan", "signal",
+            )):
+        return False
+    phase = state.get("phase")
+    if phase not in BOOTSTRAP_CRASH_PHASES:
+        return False
+    restage_binding = state.get("restage_binding")
+    if restage_binding is not None:
+        if not isinstance(restage_binding, dict) or set(restage_binding) != {
+            "attempt_state", "required_fresh_source_identity", "required_stream",
+            "observed_source_identity", "observed_stream", "source_fd_closed",
+            "dd_direct_child_reaped", "dd_result", "second_stream",
+            "descriptor_inventory_after_dd",
+        } or not exact_identity_integer_types(
+            restage_binding.get("required_fresh_source_identity"),
+        ) or any(type(restage_binding.get(key)) is not bool for key in ("second_stream",)) \
+                or not isinstance(restage_binding.get("descriptor_inventory_after_dd"), list) \
+                or any(
+                    type(item) is not int
+                    for item in restage_binding["descriptor_inventory_after_dd"]
+                ):
+            return False
+        for key in ("required_stream", "observed_stream"):
+            stream = restage_binding.get(key)
+            if stream is not None and (
+                not isinstance(stream, dict)
+                or any(type(stream.get(item)) is not int for item in (
+                    "fd", "stream_count", "length",
+                ))
+                or type(stream.get("eof")) is not bool
+            ):
+                return False
+        observed_source = restage_binding.get("observed_source_identity")
+        if observed_source is not None and (
+            not exact_identity_integer_types(observed_source)
+            or any(type(observed_source.get(key)) is not bool for key in (
+                "full_read", "eof", "closed",
+            ))
+        ):
+            return False
+        for key in ("source_fd_closed", "dd_direct_child_reaped"):
+            if restage_binding.get(key) is not None \
+                    and type(restage_binding[key]) is not bool:
+                return False
+        dd_result = restage_binding.get("dd_result")
+        if dd_result is not None and dd_result not in (
+            prestage_dd_result(False), prestage_dd_result(True),
+        ):
+            return False
+    identities, memberships = recovery_expected_bindings(
+        state["namespace"], state["namespace_objects"], state["installed_helper"],
+    )
+    if not exact_recovery_observation(
+        state.get("recovery_observation"), identities, memberships,
+    ):
+        return False
+    if phase == "MEDIATOR_PARTIAL":
+        partial = state.get("namespace_objects", {}).get(".install/mediator", {})
+        size = partial.get("size")
+        if type(size) is not int or not 0 <= size <= mediator_size \
+                or not valid_hex(partial.get("sha256")) \
+                or partial.get("cdhash") != (
+                    mediator_cdhash
+                    if size == mediator_size and partial.get("sha256") == mediator_sha256
+                    else None
+                ) \
+                or partial.get("durable") is not False:
+            return False
+    if phase == "RESTAGE_INSTALLER_PARTIAL":
+        partial = state.get("namespace_objects", {}).get(
+            ".install/controller/runtime-cleanup/install", {},
+        )
+        size = partial.get("size")
+        partial_mode = partial.get("mode")
+        observed_stream = (
+            restage_binding.get("observed_stream")
+            if isinstance(restage_binding, dict) else None
+        )
+        if type(size) is not int or not 0 <= size <= 4194305 \
+                or type(partial_mode) is not int \
+                or partial_mode & ~0o666 or not valid_hex(partial.get("sha256")) \
+                or partial.get("cdhash") != (
+                    installer_cdhash
+                    if size == installer_size and partial.get("sha256") == installer_sha256
+                    else None
+                ) \
+                or not isinstance(restage_binding, dict) \
+                or restage_binding.get("dd_result") not in (
+                    prestage_dd_result(False), prestage_dd_result(True),
+                ) \
+                or partial.get("durable") is not restage_binding["dd_result"]["durable"]:
+            return False
+        if not isinstance(observed_stream, dict) \
+                or observed_stream.get("fd") != 0 \
+                or observed_stream.get("stream_count") != 1 \
+                or observed_stream.get("length") != size \
+                or partial.get("sha256") != observed_stream.get("sha256") \
+                or not valid_hex(observed_stream.get("sha256")) \
+                or (
+                    size == installer_size
+                    and observed_stream["sha256"] == installer_sha256
+                    and observed_stream.get("eof") is True
+                    and restage_binding["dd_result"] == prestage_dd_result(True)
+                ):
+            return False
+    expected = bootstrap_recovery_fixture(
+        phase, mediator_size=mediator_size, mediator_sha256=mediator_sha256,
+        mediator_cdhash=mediator_cdhash, installer_size=installer_size,
+        installer_sha256=installer_sha256, installer_cdhash=installer_cdhash,
+    )
+    if phase == "MEDIATOR_PARTIAL":
+        expected["namespace_objects"][".install/mediator"]["size"] = size
+        expected["namespace_objects"][".install/mediator"]["sha256"] = partial["sha256"]
+        expected["namespace_objects"][".install/mediator"]["cdhash"] = partial["cdhash"]
+    if phase == "RESTAGE_INSTALLER_PARTIAL":
+        expected["namespace_objects"][
+            ".install/controller/runtime-cleanup/install"
+        ]["size"] = size
+        expected["namespace_objects"][
+            ".install/controller/runtime-cleanup/install"
+        ]["mode"] = partial_mode
+        expected["namespace_objects"][
+            ".install/controller/runtime-cleanup/install"
+        ]["sha256"] = partial["sha256"]
+        expected["namespace_objects"][
+            ".install/controller/runtime-cleanup/install"
+        ]["cdhash"] = partial["cdhash"]
+        expected["namespace_objects"][
+            ".install/controller/runtime-cleanup/install"
+        ]["durable"] = partial["durable"]
+        expected["restage_binding"]["observed_stream"] = copy.deepcopy(observed_stream)
+        expected["restage_binding"]["dd_result"] = copy.deepcopy(
+            restage_binding["dd_result"],
+        )
+    if phase in {"MEDIATOR_PARTIAL", "RESTAGE_INSTALLER_PARTIAL"}:
+        expected_identities, expected_memberships = recovery_expected_bindings(
+            expected["namespace"], expected["namespace_objects"],
+            expected["installed_helper"],
+        )
+        expected["recovery_observation"] = recovery_observation_fixture(
+            expected_identities, expected_memberships,
+        )
+    return state == expected
 
 
 
@@ -972,6 +2542,7 @@ def create_handoff_model(
 
 
 def causal_oracle_selftests() -> None:
+    dd_bounded_stream_selftests()
     expected_contract_changes = [
         (
             path,
@@ -983,7 +2554,7 @@ def causal_oracle_selftests() -> None:
     ]
     check(
         exact_contract_change_shape(expected_contract_changes),
-        "A_H039_R5_EXACT_FIVE_EXISTING_FILE_CONTRACT_CHANGE_SHAPE",
+        "A_H039_R6_EXACT_FIVE_EXISTING_FILE_CONTRACT_CHANGE_SHAPE",
     )
     contract_change_mutants: list[
         tuple[str, list[tuple[str, str, str, str]]]
@@ -1005,8 +2576,480 @@ def causal_oracle_selftests() -> None:
     for label, mutant in contract_change_mutants:
         check(
             not exact_contract_change_shape(mutant),
-            f"N_H039_R5_CONTRACT_CHANGE_{label}",
+            f"N_H039_R6_CONTRACT_CHANGE_{label}",
         )
+
+    expected_product_changes = [
+        (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
+        for path in PRODUCT_GIT_ORDER
+    ]
+    check(
+        exact_product_change_shape(expected_product_changes),
+        "A_H039_R6_EXACT_FOUR_EXISTING_FILE_PRODUCT_CHANGE_SHAPE",
+    )
+    for label, mutate in (
+        ("ADDED", lambda value: value.__setitem__(0, (value[0][0], "000000", value[0][2], "A"))),
+        ("SUBSTITUTED", lambda value: value.__setitem__(0, ("controller/runtime-cleanup/neighbor", *value[0][1:]))),
+        ("OLD_MODE", lambda value: value.__setitem__(0, (value[0][0], "100644", value[0][2], value[0][3]))),
+        ("NEW_MODE", lambda value: value.__setitem__(0, (value[0][0], value[0][1], "100644", value[0][3]))),
+        ("STATUS", lambda value: value.__setitem__(0, (*value[0][:3], "A"))),
+        ("MISSING", lambda value: value.pop()),
+        ("EXTRA", lambda value: value.append(("verify/h039/runtime-cleanup-mediator", "100755", "100755", "M"))),
+        ("REORDERED", lambda value: value.reverse()),
+    ):
+        mutant = copy.deepcopy(expected_product_changes)
+        mutate(mutant)
+        if mutant == expected_product_changes:
+            raise Rig(f"product change mutant did not mutate: {label}")
+        check(
+            not exact_product_change_shape(mutant),
+            f"N_H039_R6_PRODUCT_CHANGE_{label}",
+        )
+    check(
+        MAX_ADDED_LINES == 2400 and MAX_DELETED_LINES == 2400,
+        "A_H039_R6_DISTINCT_ADD_DELETE_LINE_LIMITS",
+    )
+
+    prestage_sha = "ab" * 32
+    prestage_cdhash = "cd" * 20
+    for prefix in range(len(FIRST_ROOT_ARGV) + 1):
+        fixture = prestage_prefix_fixture(
+            prefix, installer_size=123456, installer_sha256=prestage_sha,
+            installer_cdhash=prestage_cdhash,
+        )
+        check(
+            prestage_prefix_oracle(
+                prefix, fixture, installer_size=123456,
+                installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+            ),
+            f"A_H039_R6_FIRST_ROOT_CRASH_PREFIX_{prefix:02d}",
+        )
+    ready = prestage_prefix_fixture(
+        len(FIRST_ROOT_ARGV) - 1, installer_size=123456,
+        installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+    )
+    partial = prestage_prefix_fixture(
+        5, installer_size=123456, installer_sha256=prestage_sha,
+        installer_cdhash=prestage_cdhash,
+    )
+    partial["leaf"]["size"] = 61728
+    partial["leaf"]["sha256"] = "02" * 32
+    partial["leaf"]["cdhash"] = None
+    partial["stdin"] = {
+        "fd": 0, "stream_count": 1, "length": 61728,
+        "sha256": "02" * 32, "eof": False,
+    }
+    partial["dd_result"] = prestage_dd_result(False)
+    partial["recovery_action_argv"] = FIRST_ROOT_ARGV[4:]
+    check(
+        prestage_prefix_oracle(
+            5, partial, installer_size=123456,
+            installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+        ),
+        "A_H039_R6_FIRST_ROOT_INTERRUPTED_DD_PREFIX_RECOVERABLE",
+    )
+    short_clean_eof = copy.deepcopy(partial)
+    short_clean_eof["dd_result"] = prestage_dd_result(True)
+    short_clean_eof["stdin"]["eof"] = True
+    check(
+        prestage_prefix_oracle(
+            5, short_clean_eof, installer_size=123456,
+            installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+        ),
+        "A_H039_R6_FIRST_ROOT_SHORT_CLEAN_EOF_NONADVANCING",
+    )
+    long_stream = prestage_prefix_fixture(
+        5, installer_size=123456, installer_sha256=prestage_sha,
+        installer_cdhash=prestage_cdhash,
+    )
+    long_stream["leaf"]["size"] = 4194305
+    long_stream["leaf"]["sha256"] = "03" * 32
+    long_stream["stdin"] = {
+        "fd": 0, "stream_count": 1, "length": 4194305,
+        "sha256": "03" * 32, "eof": False,
+    }
+    long_stream["recovery_action_argv"] = FIRST_ROOT_ARGV[4:]
+    check(
+        prestage_prefix_oracle(
+            5, long_stream, installer_size=123456,
+            installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+        ),
+        "A_H039_R6_FIRST_ROOT_LONG_DD_OUTPUT_BOUNDED_AND_NONADVANCING",
+    )
+    wrong_full = prestage_prefix_fixture(
+        5, installer_size=123456, installer_sha256=prestage_sha,
+        installer_cdhash=prestage_cdhash,
+    )
+    wrong_full["leaf"]["sha256"] = "01" * 32
+    wrong_full["stdin"]["sha256"] = "01" * 32
+    wrong_full["recovery_action_argv"] = FIRST_ROOT_ARGV[4:]
+    check(
+        prestage_prefix_oracle(
+            5, wrong_full, installer_size=123456,
+            installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+        ),
+        "A_H039_R6_FIRST_ROOT_FULL_LENGTH_WRONG_DIGEST_NONADVANCING",
+    )
+    full_undurable = prestage_prefix_fixture(
+        5, installer_size=123456, installer_sha256=prestage_sha,
+        installer_cdhash=prestage_cdhash,
+    )
+    full_undurable["dd_result"] = prestage_dd_result(False)
+    full_undurable["recovery_action_argv"] = FIRST_ROOT_ARGV[4:]
+    check(
+        prestage_prefix_oracle(
+            5, full_undurable, installer_size=123456,
+            installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+        ),
+        "A_H039_R6_FULL_LENGTH_EXACT_BUT_UNDURABLE_DD_RESTARTS",
+    )
+    prestage_mutants: list[tuple[str, dict[str, Any]]] = []
+    for label, mutate in (
+        ("CALLER_PATH", lambda value: value.__setitem__("source_path", "/tmp/hostile")),
+        ("SOURCE_DIGEST", lambda value: value.__setitem__("source_sha256", "00" * 32)),
+        ("PARENT_PATH", lambda value: value["protected_parent"].__setitem__("path", "/private/var/tmp")),
+        ("PARENT_TYPE", lambda value: value["protected_parent"].__setitem__("type", "symlink")),
+        ("PARENT_UID", lambda value: value["protected_parent"].__setitem__("uid", 501)),
+        ("PARENT_MODE", lambda value: value["protected_parent"].__setitem__("mode", 0o777)),
+        ("PARENT_ACL", lambda value: value["protected_parent"]["acl"].append("user:501:allow:add_file,delete_child")),
+        ("PARENT_XATTR", lambda value: value["protected_parent"]["xattrs"].append("user.hostile")),
+        ("PARENT_BOOL_UID", lambda value: value["protected_parent"].__setitem__("uid", False)),
+        ("SOURCE_BOOL_UID", lambda value: value["source_identity"].__setitem__("uid", False)),
+        ("SOURCE_BOOL_CLOSED", lambda value: value["source_identity"].__setitem__("closed", 1)),
+        ("ARGV", lambda value: value["argv_prefix"][-1].append("hostile")),
+        ("NEIGHBOR_DESTINATION", lambda value: value["leaf"].__setitem__("path", str(PROTECTED_INSTALLER) + ".neighbor")),
+        ("SYMLINK", lambda value: value["leaf"].__setitem__("type", "symlink")),
+        ("HARDLINK", lambda value: value["leaf"].__setitem__("nlink", 2)),
+        ("UID", lambda value: value["leaf"].__setitem__("uid", 501)),
+        ("BOOL_UID", lambda value: value["leaf"].__setitem__("uid", False)),
+        ("GID", lambda value: value["leaf"].__setitem__("gid", 20)),
+        ("MODE", lambda value: value["leaf"].__setitem__("mode", 0o700)),
+        ("FLAGS", lambda value: value["leaf"].__setitem__("flags", 1)),
+        ("ACL", lambda value: value["leaf"]["acl"].append("allow-user-501")),
+        ("XATTR", lambda value: value["leaf"]["xattrs"].append("user.hostile")),
+        ("SIZE", lambda value: value["leaf"].__setitem__("size", 123455)),
+        ("DIGEST", lambda value: value["leaf"].__setitem__("sha256", "00" * 32)),
+        ("CDHASH", lambda value: value["leaf"].__setitem__("cdhash", "00" * 20)),
+        ("ANCESTRY", lambda value: value["leaf"].__setitem__("protected_parent", False)),
+        ("DEV", lambda value: value["leaf"].__setitem__("dev", 32)),
+        ("INO", lambda value: value["leaf"].__setitem__("ino", 42)),
+        ("REBIND_DEV", lambda value: value["leaf"].__setitem__("rebind_dev", 32)),
+        ("REBIND_INO", lambda value: value["leaf"].__setitem__("rebind_ino", 42)),
+        ("STDIN_FD", lambda value: value["stdin"].__setitem__("fd", 4)),
+        ("STDIN_BOOL_FD", lambda value: value["stdin"].__setitem__("fd", False)),
+        ("STDIN_INTEGER_EOF", lambda value: value["stdin"].__setitem__("eof", 1)),
+        ("STDIN_COUNT", lambda value: value["stdin"].__setitem__("stream_count", 2)),
+        ("STDIN_LENGTH", lambda value: value["stdin"].__setitem__("length", 123455)),
+        ("STDIN_DIGEST", lambda value: value["stdin"].__setitem__("sha256", "00" * 32)),
+        ("STDIN_EOF", lambda value: value["stdin"].__setitem__("eof", False)),
+        ("VERIFY_MISSING", lambda value: value["verification"].pop()),
+        ("RECOVERY_ARGV", lambda value: value["recovery_argv"][0].append("hostile")),
+        ("RECOVERY_ACTION_SKIP", lambda value: value.__setitem__("recovery_action_argv", value["recovery_action_argv"][1:])),
+        ("ENVIRONMENT", lambda value: value.__setitem__("product_environment", ["PATH=/tmp"])),
+        ("INHERITED_FD", lambda value: value.__setitem__("product_inherited_fds", [0, 1, 2, 9])),
+        ("INHERITED_BOOL_FLOAT", lambda value: value.__setitem__("product_inherited_fds", [True, 2.0])),
+        ("PRODUCT_STDIN", lambda value: value.__setitem__("product_stdin", "/dev/null")),
+        ("SOURCE_FD", lambda value: value.__setitem__("source_fd_state", "OPEN")),
+        ("LIVE_TOOL", lambda value: value["tool_processes"]["active"].append(99)),
+        ("UNREAPED_TOOL", lambda value: value["tool_processes"].__setitem__("reaped", 16)),
+        ("PROCESS_SCAN", lambda value: value["tool_processes"].__setitem__("process_scan", True)),
+        ("DD_RETURN", lambda value: value["dd_result"].__setitem__("returncode", 1)),
+        ("DD_FSYNC", lambda value: value["dd_result"].__setitem__("conv_fsync_completed", False)),
+        ("DD_DURABLE", lambda value: value["dd_result"].__setitem__("durable", False)),
+        ("DD_UNREAPED", lambda value: value["dd_result"].__setitem__("direct_child_reaped", False)),
+        ("REPLAY", lambda value: value.__setitem__("product_exec_count", 1)),
+        ("EXTRA", lambda value: value.__setitem__("extra", False)),
+    ):
+        mutant = copy.deepcopy(ready)
+        mutate(mutant)
+        prestage_mutants.append((label, mutant))
+    for label, mutant in prestage_mutants:
+        check(
+            not prestage_prefix_oracle(
+                len(FIRST_ROOT_ARGV) - 1, mutant, installer_size=123456,
+                installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+            ),
+            f"N_H039_R6_FIRST_ROOT_{label}",
+        )
+
+    mediator_sha = "ef" * 32
+    mediator_cdhash = "ed" * 20
+    installer_sha = "fa" * 32
+    installer_cdhash = "ac" * 20
+    for phase in BOOTSTRAP_CRASH_PHASES:
+        fixture = bootstrap_recovery_fixture(
+            phase, mediator_size=89392, mediator_sha256=mediator_sha,
+            mediator_cdhash=mediator_cdhash, installer_size=191712,
+            installer_sha256=installer_sha, installer_cdhash=installer_cdhash,
+        )
+        check(
+            bootstrap_recovery_oracle(
+                fixture, mediator_size=89392, mediator_sha256=mediator_sha,
+                mediator_cdhash=mediator_cdhash, installer_size=191712,
+                installer_sha256=installer_sha, installer_cdhash=installer_cdhash,
+            ),
+            f"A_H039_R6_BOOTSTRAP_CRASH_{phase}_EXACT_RECOVERY",
+        )
+    bootstrap_ready = bootstrap_recovery_fixture(
+        "MEDIATOR_READY", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )
+    staged_mediator = bootstrap_ready["namespace_objects"][".install/mediator"]
+    helper_published = bootstrap_recovery_fixture(
+        "HELPER_PUBLISHED", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )["installed_helper"]
+    restaged_installer = bootstrap_recovery_fixture(
+        "RESTAGE_INSTALLER_READY", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )["namespace_objects"][".install/controller/runtime-cleanup/install"]
+    check(
+        staged_mediator is not None and helper_published is not None
+        and all(staged_mediator[key] == helper_published[key] for key in (
+            "dev", "ino", "type", "uid", "gid", "mode", "nlink", "size",
+            "sha256", "flags", "acl", "xattrs",
+        )),
+        "A_H039_R6_ATOMIC_SAME_DEVICE_HELPER_PUBLISH_IDENTITY",
+    )
+    check(
+        restaged_installer["ino"] == 42 and restaged_installer["ino"] != 41,
+        "A_H039_R6_RESTAGED_INSTALLER_HAS_FRESH_IDENTITY",
+    )
+    mediator_full_unverified = bootstrap_recovery_fixture(
+        "MEDIATOR_PARTIAL", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )
+    mediator_full_unverified["namespace_objects"][".install/mediator"].update({
+        "size": 89392, "sha256": mediator_sha, "cdhash": mediator_cdhash,
+    })
+    full_identities, full_memberships = recovery_expected_bindings(
+        mediator_full_unverified["namespace"],
+        mediator_full_unverified["namespace_objects"],
+        mediator_full_unverified["installed_helper"],
+    )
+    mediator_full_unverified["recovery_observation"] = recovery_observation_fixture(
+        full_identities, full_memberships,
+    )
+    check(
+        bootstrap_recovery_oracle(
+            mediator_full_unverified, mediator_size=89392,
+            mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+            installer_size=191712, installer_sha256=installer_sha,
+            installer_cdhash=installer_cdhash,
+        ),
+        "A_H039_R6_FULL_LENGTH_UNVERIFIED_MEDIATOR_RECOVERABLE",
+    )
+    restage_full_undurable = bootstrap_recovery_fixture(
+        "RESTAGE_INSTALLER_PARTIAL", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )
+    undurable_leaf = restage_full_undurable["namespace_objects"][
+        ".install/controller/runtime-cleanup/install"
+    ]
+    undurable_leaf.update({
+        "size": 191712, "sha256": installer_sha, "cdhash": installer_cdhash,
+        "durable": False,
+    })
+    restage_full_undurable["restage_binding"]["observed_stream"] = {
+        "fd": 0, "stream_count": 1, "length": 191712,
+        "sha256": installer_sha, "eof": False,
+    }
+    undurable_identities, undurable_memberships = recovery_expected_bindings(
+        restage_full_undurable["namespace"],
+        restage_full_undurable["namespace_objects"],
+        restage_full_undurable["installed_helper"],
+    )
+    restage_full_undurable["recovery_observation"] = recovery_observation_fixture(
+        undurable_identities, undurable_memberships,
+    )
+    check(
+        bootstrap_recovery_oracle(
+            restage_full_undurable, mediator_size=89392,
+            mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+            installer_size=191712, installer_sha256=installer_sha,
+            installer_cdhash=installer_cdhash,
+        ),
+        "A_H039_R6_FULL_LENGTH_EXACT_BUT_UNDURABLE_RESTAGE_RECOVERABLE",
+    )
+    restage_full_wrong = bootstrap_recovery_fixture(
+        "RESTAGE_INSTALLER_PARTIAL", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )
+    restage_full_wrong["namespace_objects"][
+        ".install/controller/runtime-cleanup/install"
+    ].update({"size": 191712, "sha256": "01" * 32, "durable": True})
+    restage_full_wrong["restage_binding"]["observed_stream"] = {
+        "fd": 0, "stream_count": 1, "length": 191712,
+        "sha256": "01" * 32, "eof": True,
+    }
+    restage_full_wrong["restage_binding"]["dd_result"] = prestage_dd_result(True)
+    full_identities, full_memberships = recovery_expected_bindings(
+        restage_full_wrong["namespace"], restage_full_wrong["namespace_objects"],
+        restage_full_wrong["installed_helper"],
+    )
+    restage_full_wrong["recovery_observation"] = recovery_observation_fixture(
+        full_identities, full_memberships,
+    )
+    check(
+        bootstrap_recovery_oracle(
+            restage_full_wrong, mediator_size=89392,
+            mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+            installer_size=191712, installer_sha256=installer_sha,
+            installer_cdhash=installer_cdhash,
+        ),
+        "A_H039_R6_FULL_LENGTH_WRONG_DIGEST_RESTAGE_RECOVERABLE",
+    )
+    restage_short_clean = bootstrap_recovery_fixture(
+        "RESTAGE_INSTALLER_PARTIAL", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )
+    short_leaf = restage_short_clean["namespace_objects"][
+        ".install/controller/runtime-cleanup/install"
+    ]
+    short_leaf["durable"] = True
+    restage_short_clean["restage_binding"]["observed_stream"]["eof"] = True
+    restage_short_clean["restage_binding"]["dd_result"] = prestage_dd_result(True)
+    short_identities, short_memberships = recovery_expected_bindings(
+        restage_short_clean["namespace"], restage_short_clean["namespace_objects"],
+        restage_short_clean["installed_helper"],
+    )
+    restage_short_clean["recovery_observation"] = recovery_observation_fixture(
+        short_identities, short_memberships,
+    )
+    check(
+        bootstrap_recovery_oracle(
+            restage_short_clean, mediator_size=89392,
+            mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+            installer_size=191712, installer_sha256=installer_sha,
+            installer_cdhash=installer_cdhash,
+        ),
+        "A_H039_R6_RESTAGE_SHORT_CLEAN_EOF_RECOVERABLE",
+    )
+    restage_digest_mismatch = copy.deepcopy(restage_full_wrong)
+    restage_digest_mismatch["namespace_objects"][
+        ".install/controller/runtime-cleanup/install"
+    ]["sha256"] = "03" * 32
+    mismatch_identities, mismatch_memberships = recovery_expected_bindings(
+        restage_digest_mismatch["namespace"],
+        restage_digest_mismatch["namespace_objects"],
+        restage_digest_mismatch["installed_helper"],
+    )
+    restage_digest_mismatch["recovery_observation"] = recovery_observation_fixture(
+        mismatch_identities, mismatch_memberships,
+    )
+    check(
+        not bootstrap_recovery_oracle(
+            restage_digest_mismatch, mediator_size=89392,
+            mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+            installer_size=191712, installer_sha256=installer_sha,
+            installer_cdhash=installer_cdhash,
+        ),
+        "N_H039_R6_RESTAGE_LEAF_STREAM_DIGEST_MISMATCH",
+    )
+    for label, mutate in (
+        ("OPERATION", lambda value: value.__setitem__("operation", "apply")),
+        ("CALLER_PATH", lambda value: value["caller_inputs"].append("/tmp/x")),
+        ("ENVIRONMENT", lambda value: value["environment"].append("PATH=/tmp")),
+        ("STDIN", lambda value: value.__setitem__("stdin", "/dev/null")),
+        ("FD0", lambda value: value["inherited_fds"].insert(0, 0)),
+        ("SECTION", lambda value: value.__setitem__("embedded_section", "__TEXT,__other")),
+        ("EMBEDDED_SIZE", lambda value: value.__setitem__("embedded_size", 89391)),
+        ("EMBEDDED_DIGEST", lambda value: value.__setitem__("embedded_sha256", "00" * 32)),
+        ("INSTALLER_HARDLINK", lambda value: value["namespace_objects"][".install/controller/runtime-cleanup/install"].__setitem__("nlink", 2)),
+        ("STAGE_DIGEST", lambda value: value["namespace_objects"][".install/mediator"].__setitem__("sha256", "00" * 32)),
+        ("STAGE_BOOL_UID", lambda value: value["namespace_objects"][".install/mediator"].__setitem__("uid", False)),
+        ("STAGE_FLOAT_MODE", lambda value: value["namespace_objects"][".install/mediator"].__setitem__("mode", float(0o4555))),
+        ("NAMESPACE_MODE", lambda value: value["namespace"].__setitem__("mode", 0o777)),
+        ("NAMESPACE_BOOL_UID", lambda value: value["namespace"].__setitem__("uid", False)),
+        ("ACL", lambda value: value["namespace_objects"][".install"]["acl"].append("allow-user-501")),
+        ("XATTR", lambda value: value["namespace_objects"][".install"]["xattrs"].append("user.hostile")),
+        ("NEIGHBOR", lambda value: value["namespace_objects"].__setitem__("neighbor", bootstrap_object("regular", 0o400, 99, size=1, digest="11" * 32))),
+        ("CHILD_PROCESS", lambda value: value["process_lifecycle"]["descendants"].append(99)),
+        ("LIVE_PROCESS", lambda value: value["process_lifecycle"]["active"].append(98)),
+        ("PROCESS_SCAN", lambda value: value["process_lifecycle"].__setitem__("process_scan", True)),
+        ("INTEGER_REAPED", lambda value: value["process_lifecycle"].__setitem__("root_tool_reaped", 1)),
+        ("RECOVERY_ACTION", lambda value: value.__setitem__("recovery_action", "GENERAL_ROLLBACK")),
+        ("RECOVERY_ARGV", lambda value: value["recovery_argv"][0].append("hostile")),
+        ("OBSERVATION_ARGV", lambda value: value["recovery_observation"]["argv"][0].append("hostile")),
+        ("RECOVERY_STAT_REBIND", lambda value: value["recovery_observation"]["membership"][str(NAMESPACE)].__setitem__("after_stat", b"31:999:40555:0:0:3:0:0\n")),
+        ("RECOVERY_LS_ACL", lambda value: value["recovery_observation"]["identity"][str(NAMESPACE)].__setitem__("ls_stdout", value["recovery_observation"]["identity"][str(NAMESPACE)]["ls_stdout"].replace(b"dr--------", b"dr--------+", 1))),
+        ("RECOVERY_FIND_UNTERMINATED", lambda value: value["recovery_observation"]["membership"][str(NAMESPACE)].__setitem__("find_stdout", value["recovery_observation"]["membership"][str(NAMESPACE)]["find_stdout"][:-1])),
+        ("RECOVERY_FIND_DUPLICATE", lambda value: value["recovery_observation"]["membership"][str(NAMESPACE)].__setitem__("find_stdout", value["recovery_observation"]["membership"][str(NAMESPACE)]["find_stdout"] * 2)),
+        ("RECOVERY_FIND_EXTRA", lambda value: value["recovery_observation"]["membership"][str(NAMESPACE)].__setitem__("find_stdout", value["recovery_observation"]["membership"][str(NAMESPACE)]["find_stdout"] + (str(NAMESPACE / "neighbor") + "\0").encode())),
+        ("RECOVERY_FIND_OVER_CAP", lambda value: value["recovery_observation"]["membership"][str(NAMESPACE)].__setitem__("find_stdout", b"X" * (RECOVERY_OUTPUT_CAP + 1))),
+        ("RECOVERY_FIND_TRUNCATED", lambda value: value["recovery_observation"]["membership"][str(NAMESPACE)].__setitem__("complete_eof", False)),
+        ("RECOVERY_ABSENT_RC", lambda value: value["recovery_observation"]["identity"][str(INSTALLED)].__setitem__("before_stat_rc", 0)),
+        ("RECOVERY_ABSENT_EACCES", lambda value: value["recovery_observation"]["identity"][str(INSTALLED)].__setitem__("before_stat_stderr", b"stat: permission denied\n")),
+        ("RECOVERY_DIGEST_SUBSTITUTION", lambda value: value["recovery_observation"]["digest"][str(PROTECTED_INSTALLER)].__setitem__("openssl_stdout", ("00" * 32 + " *" + str(PROTECTED_INSTALLER) + "\n").encode())),
+        ("RECOVERY_CDHASH_SUBSTITUTION", lambda value: value["recovery_observation"]["executable"][str(PROTECTED_INSTALLER)].__setitem__("display_stderr", ("Identifier=se.nortropic.runtime-cleanup-installer\nCDHash=" + "00" * 20 + "\n").encode())),
+        ("EXTRA", lambda value: value.__setitem__("extra", False)),
+    ):
+        mutant = copy.deepcopy(bootstrap_ready)
+        mutate(mutant)
+        check(
+            not bootstrap_recovery_oracle(
+                mutant, mediator_size=89392, mediator_sha256=mediator_sha,
+                mediator_cdhash=mediator_cdhash, installer_size=191712,
+                installer_sha256=installer_sha, installer_cdhash=installer_cdhash,
+            ),
+            f"N_H039_R6_BOOTSTRAP_{label}",
+        )
+    restage_ready_state = bootstrap_recovery_fixture(
+        "RESTAGE_INSTALLER_READY", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )
+    for label, mutate in (
+        ("STALE_SOURCE", lambda value: value["restage_binding"]["required_fresh_source_identity"].__setitem__("ino", 99)),
+        ("SECOND_STREAM", lambda value: value["restage_binding"].__setitem__("second_stream", True)),
+        ("OPEN_SOURCE_FD", lambda value: value["restage_binding"].__setitem__("source_fd_closed", False)),
+        ("UNREAPED_DD", lambda value: value["restage_binding"].__setitem__("dd_direct_child_reaped", False)),
+        ("DD_RESULT", lambda value: value["restage_binding"]["dd_result"].__setitem__("returncode", 1)),
+        ("DD_FSYNC", lambda value: value["restage_binding"]["dd_result"].__setitem__("conv_fsync_completed", False)),
+        ("DD_DURABILITY", lambda value: value["restage_binding"]["dd_result"].__setitem__("durable", False)),
+        ("FD_LEAK", lambda value: value["restage_binding"]["descriptor_inventory_after_dd"].append(9)),
+    ):
+        mutant = copy.deepcopy(restage_ready_state)
+        mutate(mutant)
+        check(
+            not bootstrap_recovery_oracle(
+                mutant, mediator_size=89392, mediator_sha256=mediator_sha,
+                mediator_cdhash=mediator_cdhash, installer_size=191712,
+                installer_sha256=installer_sha, installer_cdhash=installer_cdhash,
+            ),
+            f"N_H039_R6_RESTAGE_{label}",
+        )
+    complete = bootstrap_recovery_fixture(
+        "COMPLETE", mediator_size=89392, mediator_sha256=mediator_sha,
+        mediator_cdhash=mediator_cdhash, installer_size=191712,
+        installer_sha256=installer_sha, installer_cdhash=installer_cdhash,
+    )
+    terminal_replay = copy.deepcopy(complete)
+    terminal_replay["operation"] = "bootstrap"
+    terminal_replay["recovery_action"] = "EXEC_PROTECTED_BOOTSTRAP"
+    check(
+        not bootstrap_recovery_oracle(
+            terminal_replay, mediator_size=89392, mediator_sha256=mediator_sha,
+            mediator_cdhash=mediator_cdhash, installer_size=191712,
+            installer_sha256=installer_sha, installer_cdhash=installer_cdhash,
+        ),
+        "N_H039_R6_TERMINAL_BOOTSTRAP_REPLAY",
+    )
 
     check(
         parse_vtool_build("      platform MACOS\n         minos 15.0\n           sdk 26.5\n")
@@ -2725,16 +4768,17 @@ def raw_changes(old: str, new: str) -> list[tuple[str, str, str, str]]:
     return out
 
 
-def additions(old: str, new: str) -> int:
+def line_delta(old: str, new: str) -> tuple[int, int]:
     raw = git(["diff", "--numstat", "--no-renames", old, new]).decode("utf-8")
-    total = 0
+    additions = 0
+    deletions = 0
     for line in raw.splitlines():
         added, deleted, _path = line.split("\t", 2)
         if added != "-":
-            total += int(added)
-        if deleted not in {"0", "-"}:
-            raise Rig("product must be strict additive")
-    return total
+            additions += int(added)
+        if deleted != "-":
+            deletions += int(deleted)
+    return additions, deletions
 
 
 def exact_contract_change_shape(changes: list[tuple[str, str, str, str]]) -> bool:
@@ -2746,6 +4790,13 @@ def exact_contract_change_shape(changes: list[tuple[str, str, str, str]]) -> boo
             "M",
         )
         for path in TEST_AUTHOR_GIT_ORDER
+    ]
+
+
+def exact_product_change_shape(changes: list[tuple[str, str, str, str]]) -> bool:
+    return changes == [
+        (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
+        for path in PRODUCT_GIT_ORDER
     ]
 
 
@@ -2782,11 +4833,13 @@ def product_identity(
         frozen_equal = all(
             blob(candidate, path) == blob(base, path)
             for path in ("specs/tasks.spec.json", "verify/bin/h-039-exit",
-                         "specs/owner-production-paths.v1.json")
+                         "specs/owner-production-paths.v1.json",
+                         "verify/h039/runtime-cleanup-mediator")
         )
         product_sizes = {
             path: blob_size(candidate, path) for path in PRODUCT_PATHS
         }
+        added_lines, deleted_lines = line_delta(base, candidate)
         bounded_product = (
             all(product_sizes[path] <= PRODUCT_BYTE_LIMITS[path]
                 for path in PRODUCT_PATHS)
@@ -2796,12 +4849,9 @@ def product_identity(
             if require_contract_publication else None
         ok = (
             merge_ok and parents == [base]
-            and [path for path, _old, _new, _status in changes] == PRODUCT_GIT_ORDER
-            and all(
-                (old, new, status) == ("000000", PRODUCT_MODES[path], "A")
-                for path, old, new, status in changes
-            )
-            and additions(base, candidate) <= MAX_ADDED_LINES
+            and exact_product_change_shape(changes)
+            and added_lines <= MAX_ADDED_LINES
+            and deleted_lines <= MAX_DELETED_LINES
             and frozen_equal and bounded_product
             and (not require_contract_publication or remote_main == base)
             and (not require_checkout or (head == candidate and status == b""))
@@ -2809,7 +4859,8 @@ def product_identity(
         return ok, {"merge": merge_detail, "parents": parents,
                     "changes": changes, "head": head, "status": status.decode(),
                     "frozen_equal": frozen_equal, "product_sizes": product_sizes,
-                    "bounded_product": bounded_product, "remote_main": remote_main}
+                    "bounded_product": bounded_product, "added_lines": added_lines,
+                    "deleted_lines": deleted_lines, "remote_main": remote_main}
     except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
         return False, {"error": str(exc), "merge": merge_detail}
 
@@ -2873,6 +4924,7 @@ def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str
     recipe = strict_json(recipe_raw)
     manifest = strict_json(manifest_raw)
     mediator_digest = sha(mediator_raw)
+    mediator_size = len(mediator_raw)
     compiler = "/Library/Developer/CommandLineTools/usr/bin/clang"
     sdk = "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
     common_compile = [
@@ -2891,6 +4943,9 @@ def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str
             *common_compile,
             "-DH039_INSTALLER=1",
             f"-DH039_MEDIATOR_SHA256={mediator_digest}",
+            f"-DH039_MEDIATOR_SIZE={mediator_size}",
+            "-Wl,-segprot,__H039RO,r,r",
+            "-Wl,-sectcreate,__H039RO,__h039med,verify/h039/runtime-cleanup-mediator",
             "controller/runtime-cleanup/native/mediator.c",
             "-o", "controller/runtime-cleanup/install",
         ],
@@ -2922,6 +4977,9 @@ def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str
     required = {
         "schema_version", "artifact_path", "artifact_sha256", "source_sha256",
         "installer_path", "installer_sha256", "recipe_sha256",
+        "installer_size", "embedded_mediator_section",
+        "embedded_mediator_sha256", "embedded_mediator_size",
+        "bootstrap_installer_path", "bootstrap_operation",
         "mediator_codesign_cdhash", "installer_codesign_cdhash",
         "mediator_lc_uuid", "installer_lc_uuid", "platform", "minos", "sdk",
         "mediator_dependencies", "installer_dependencies", "installed_path",
@@ -2937,6 +4995,7 @@ def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str
     integer_manifest_keys = {
         "schema_version", "installed_uid", "installed_gid", "namespace_uid",
         "namespace_gid", "authorized_client_uid", "authorized_client_gid",
+        "installer_size", "embedded_mediator_size",
     }
     if any(type(manifest.get(key)) is not int for key in integer_manifest_keys) \
             or manifest.get("zero_entitlements") is not True:
@@ -2948,6 +5007,12 @@ def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str
         "source_sha256": sha(source_raw),
         "installer_path": "controller/runtime-cleanup/install",
         "installer_sha256": sha(installer_raw),
+        "installer_size": len(installer_raw),
+        "embedded_mediator_section": "__H039RO,__h039med",
+        "embedded_mediator_sha256": mediator_digest,
+        "embedded_mediator_size": mediator_size,
+        "bootstrap_installer_path": str(PROTECTED_INSTALLER),
+        "bootstrap_operation": "bootstrap",
         "recipe_sha256": sha(recipe_raw),
         "installed_path": str(INSTALLED), "installed_uid": 0, "installed_gid": 0,
         "installed_mode": "04555", "namespace_path": str(NAMESPACE),
@@ -2971,9 +5036,12 @@ def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str
         raise Rig("identity manifest exact value mismatch")
     for key in (
         "artifact_sha256", "source_sha256", "installer_sha256", "recipe_sha256",
+        "embedded_mediator_sha256",
     ):
         if not valid_hex(manifest.get(key)):
             raise Rig(f"manifest digest malformed: {key}")
+    if installer_raw.count(mediator_raw) != 1:
+        raise Rig("installer does not contain exactly one byte-exact mediator image")
     for key in ("mediator_codesign_cdhash", "installer_codesign_cdhash"):
         if not valid_hex(manifest.get(key), 40):
             raise Rig(f"manifest CDHash malformed: {key}")
@@ -3505,12 +5573,17 @@ def macho_identity(path: Path, identifier: str) -> dict[str, Any]:
         raise Rig("Mach-O has non-Apple dependency")
     build = tool(["/usr/bin/vtool", "-show-build", str(path)]).decode()
     platform, minos, sdk = parse_vtool_build(build)
+    undefined_symbols = sorted({
+        line.strip() for line in
+        tool(["/usr/bin/nm", "-u", str(path)]).decode().splitlines()
+        if line.strip()
+    })
     if not all((match_cd, match_uuid)):
         raise Rig("incomplete Mach-O identity")
     return {
         "cdhash": match_cd.group(1), "uuid": match_uuid.group(1),
         "dependencies": dependencies, "platform": platform,
-        "minos": minos, "sdk": sdk,
+        "minos": minos, "sdk": sdk, "undefined_symbols": undefined_symbols,
     }
 
 
@@ -3534,6 +5607,61 @@ def macho_checks(manifest: dict[str, Any], commit: str | None = None) -> None:
                     or actual["uuid"] != manifest[f"{name}_lc_uuid"] \
                     or actual["dependencies"] != manifest[f"{name}_dependencies"]:
                 raise Rig(f"{name} Mach-O manifest drift")
+        installer_allowed_symbols = {
+            "__NSGetExecutablePath", "___chkstk_darwin", "___error",
+            "___stack_chk_fail", "___stack_chk_guard", "___strcpy_chk",
+            "_bzero", "_chdir", "_close", "_closedir", "_closefrom",
+            "_dup", "_environ", "_fchmod", "_fchown", "_fcntl", "_fdopendir",
+            "_free", "_fstat", "_fstatat", "_fsync", "_getegid",
+            "_geteuid", "_getgid", "_getpid", "_getsectiondata",
+            "_getuid", "_lstat", "_malloc", "_memcmp", "_memcpy",
+            "_mkdirat", "_open", "_openat", "_pread", "_proc_pidinfo",
+            "_readdir", "_renameatx_np", "_snprintf", "_strcmp",
+            "_strlen", "_strrchr", "_strstr", "_umask", "_unlinkat",
+            "_write",
+        }
+        installer_required_symbols = {
+            "_chdir", "_closefrom", "_environ", "_getegid", "_geteuid",
+            "_fcntl", "_getgid", "_getsectiondata", "_getuid", "_renameatx_np",
+            "_umask",
+        }
+        installer_symbols = set(identities["installer"]["undefined_symbols"])
+        if not installer_required_symbols <= installer_symbols \
+                or not installer_symbols <= installer_allowed_symbols:
+            raise Rig("installer imported symbol authority is not exact closed bootstrap set")
+        installer_path = temporary / "installer"
+        installer_load = tool(["/usr/bin/otool", "-l", str(installer_path)]).decode()
+        section_matches = re.findall(
+            r"sectname __h039med\n\s+segname __H039RO\n"
+            r"\s+addr 0x[0-9a-f]+\n\s+size (0x[0-9a-f]+)\n"
+            r"\s+offset ([0-9]+)",
+            installer_load,
+        )
+        read_only_segments = re.findall(
+            r"cmd LC_SEGMENT_64\n\s+cmdsize [0-9]+\n\s+segname __H039RO\n"
+            r"[\s\S]*?\n\s+maxprot (0x[0-9a-f]+)\n"
+            r"\s+initprot (0x[0-9a-f]+)",
+            installer_load,
+        )
+        installer_raw = installer_path.read_bytes()
+        section_ok = False
+        if len(section_matches) == 1:
+            size_raw, offset_raw = section_matches[0]
+            section_size = int(size_raw, 16)
+            section_offset = int(offset_raw, 10)
+            section_ok = (
+                section_size == manifest["embedded_mediator_size"]
+                and 0 <= section_offset <= len(installer_raw) - section_size
+                and sha(installer_raw[section_offset:section_offset + section_size])
+                == manifest["embedded_mediator_sha256"]
+                and installer_raw[section_offset:section_offset + section_size]
+                == product_bytes("verify/h039/runtime-cleanup-mediator", commit)
+            )
+        if (
+            manifest.get("embedded_mediator_section") != "__H039RO,__h039med"
+            or not section_ok or read_only_segments != [("0x00000001", "0x00000001")]
+        ):
+            raise Rig("installer embedded mediator section bytes or read-only mapping mismatch")
         if any(
             identities[name][field] != manifest[field]
             for name in ("mediator", "installer")
@@ -3755,7 +5883,10 @@ def installer_verify_effects(commit: str) -> None:
         positive = invoke(["verify"])
         if positive.returncode != 0 or positive.stdout or positive.stderr:
             raise Rig("uninstalled self-relative installer verify failed")
-        for arguments in ([], ["verify", "extra"], ["hostile"], ["apply", "extra"]):
+        for arguments in (
+            [], ["verify", "extra"], ["hostile"], ["apply", "extra"],
+            ["bootstrap", "extra"],
+        ):
             rejected = invoke(arguments)
             if rejected.returncode == 0:
                 raise Rig(f"installer accepted invalid argv: {arguments!r}")
@@ -3825,6 +5956,9 @@ def installer_verify_effects(commit: str) -> None:
         unprivileged_apply = invoke(["apply"])
         if unprivileged_apply.returncode == 0:
             raise Rig("unprivileged installer apply unexpectedly succeeded")
+        unprivileged_bootstrap = invoke(["bootstrap"])
+        if unprivileged_bootstrap.returncode == 0:
+            raise Rig("unprivileged installer bootstrap unexpectedly succeeded")
         if (
             before_install != (INSTALLED.exists() or INSTALLED.is_symlink())
             or before_namespace != (NAMESPACE.exists() or NAMESPACE.is_symlink())
@@ -3874,14 +6008,16 @@ def immutable_source_checks(commit: str | None = None) -> None:
         source = raw.decode("utf-8")
     except UnicodeError as exc:
         raise Rig("mediator source is not UTF-8") from exc
-    forbidden = [
-        "AF_INET", "AF_INET6", "PF_ROUTE", "PF_SYSTEM", "system(",
-        "execv", "posix_spawn", "fork(", "vfork(", "kill(", "waitpid(",
-        "getenv(", "dlopen(", "dlsym(", "/usr/bin/git", "popen(",
-        "SO_PEERCRED", "setuid(", "setreuid(", "setresuid(",
-        "setgid(", "setegid(", "setregid(", "setresgid(",
-        "setxattr", "removexattr", "acl_set", "chflags(",
-        "flock(", "F_SETLK", "SO_RCVTIMEO",
+    semantic_source = re.sub(r"/\*[\s\S]*?\*/|//[^\n]*", "", source)
+    forbidden_patterns = [
+        r"\bAF_INET6?\b", r"\bPF_(?:ROUTE|SYSTEM)\b", r"\bsystem\s*\(",
+        r"\bexec[a-z0-9_]*\s*\(", r"\bposix_spawn[a-z0-9_]*\s*\(",
+        r"\b(?:v?fork|kill|waitpid|getenv|dlopen|dlsym|popen)\s*\(",
+        r"/usr/bin/git", r"\bSO_PEERCRED\b",
+        r"\bset(?:re|res)?uid\s*\(", r"\bset(?:e|re|res)?gid\s*\(",
+        r"\b(?:setxattr|removexattr|acl_set|chflags|flock)\s*\(",
+        r"\bF_SETLK\b", r"\bSO_RCVTIMEO\b",
+        r"\bensure_installed\s*\(",
     ]
     required = [
         "renameatx_np", "RENAME_EXCL", "RENAME_NOFOLLOW_ANY",
@@ -3893,11 +6029,68 @@ def immutable_source_checks(commit: str | None = None) -> None:
         "deadline_remaining",
         "RESERVING", "PUBLISHING", "PREPARED", "ACTIVE", "QUARANTINING",
         "CLEANING",
+        "getsectiondata", "__H039RO", "__h039med",
+        "H039_MEDIATOR_SIZE", "installer_bootstrap",
+        "stage_embedded_mediator", "publish_staged_mediator",
+        "make_final_directory", "umask(0)", "umask(077)",
+        "fcntl(0,F_GETFD)", "EBADF",
     ]
-    if any(token in source for token in forbidden):
+    if any(re.search(pattern, semantic_source) for pattern in forbidden_patterns):
         raise Rig("forbidden native capability token")
-    if any(token not in source for token in required):
+    if any(token not in semantic_source for token in required):
         raise Rig("required native primitive token absent")
+    absolute_strings = set(re.findall(r'"(/[^"\\]*)"', semantic_source))
+    if absolute_strings != {
+        "/", "/.", "/..", "/../", "/./", "//", "/install",
+        "/.install/controller/runtime-cleanup/install",
+        "/Library/PrivilegedHelperTools",
+        "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator",
+        "/private/var/db/nortropic-runtime-cleanup-v1",
+        "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/"
+        "Versions/3.12/Resources/Python.app/Contents/MacOS/Python",
+        "/a/%s/h/l", "/a/%s/h/r", "/a/%s/p/c",
+    }:
+        raise Rig("native absolute path literal authority is not exact closed set")
+    if (
+        re.search(
+            r"strcmp\s*\(\s*argv\s*\[\s*1\s*\]\s*,\s*\"bootstrap\"\s*\)",
+            semantic_source,
+        ) is None
+        or re.search(r"argc\s*!=\s*2", source) is None
+    ):
+        raise Rig("installer lacks the exact fixed bootstrap operation")
+    if re.search(
+        r"strcmp\s*\(\s*argv\s*\[\s*1\s*\]\s*,\s*\"apply\"\s*\)",
+        semantic_source,
+    ) is not None or '"apply"' in semantic_source:
+        raise Rig("external root apply selector survived R6 bootstrap migration")
+    def function_body(name: str) -> str:
+        match = re.search(
+            rf"static\s+int\s+{name}\s*\([^)]*\)\s*\{{([\s\S]*?)\n\}}",
+            semantic_source,
+        )
+        if match is None:
+            raise Rig(f"exact installer function absent: {name}")
+        return match.group(1)
+
+    embedded_body = function_body("load_embedded_mediator")
+    bootstrap_body = function_body("installer_bootstrap")
+    installer_body = function_body("installer_main")
+    if not all(token in embedded_body for token in (
+        "getsectiondata", "__H039RO", "__h039med", "H039_MEDIATOR_SIZE",
+        "H039_MEDIATOR_SHA256", "digest(",
+    )) or not all(token in bootstrap_body for token in (
+        "getuid(", "geteuid(", "getgid(", "getegid(", "environ=",
+        "chdir(\"/\")", "fcntl(0,F_GETFD)", "EBADF",
+        "closefrom(0)", "umask(077)",
+        "loaded_self(", "load_embedded_mediator(", "apply_install(",
+    )) or not all(token in installer_body for token in (
+        "strcmp(argv[1],\"verify\")", "strcmp(argv[1],\"bootstrap\")",
+        "installer_bootstrap(", "load_embedded_mediator(",
+    )):
+        raise Rig("installer bootstrap extraction dispatch or input closure is not causal")
+    if "load_source(" in bootstrap_body or "load_installed_source(" in bootstrap_body:
+        raise Rig("bootstrap retained an external mediator-source route")
     if source.count("CLOCK_MONOTONIC") < 2 \
             or source.count("deadline_remaining") < 3 \
             or re.search(r"poll\s*\([^;]*,\s*5000\s*\)", source):
@@ -5974,18 +8167,38 @@ def guarded_product_effects() -> dict[str, Any]:
 
 
 
-def product_absence() -> tuple[bool, dict[str, Any]]:
-    repo = {path: (ROOT / path).exists() or (ROOT / path).is_symlink()
-            for path in PRODUCT_PATHS}
+def published_r5_product_uninstalled_baseline() -> tuple[bool, dict[str, Any]]:
+    repo: dict[str, dict[str, Any]] = {}
+    for path in PRODUCT_PATHS:
+        target = ROOT / path
+        try:
+            value = os.lstat(target)
+            observed = {
+                "regular": stat.S_ISREG(value.st_mode) and not target.is_symlink(),
+                "mode": f"100{stat.S_IMODE(value.st_mode):03o}",
+                "nlink": value.st_nlink,
+                "sha256": path_sha(target),
+            }
+        except OSError as exc:
+            observed = {"error": str(exc)}
+        repo[path] = observed
+    repo_ok = all(
+        value == {
+            "regular": True, "mode": PRODUCT_MODES[path], "nlink": 1,
+            "sha256": PUBLISHED_H039_R5_PRODUCT_BLOBS[path],
+        }
+        for path, value in repo.items()
+    )
     installed = INSTALLED.exists() or INSTALLED.is_symlink()
     namespace = NAMESPACE.exists() or NAMESPACE.is_symlink()
-    return not any(repo.values()) and not installed and not namespace, {
+    return repo_ok and not installed and not namespace, {
         "repo": repo, "installed": installed, "namespace": namespace,
     }
 
 
 def finish(phase: str) -> int:
     print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
+    print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         print("H039_GATE_RESULT=PASS")
@@ -6007,10 +8220,12 @@ def main(argv: list[str]) -> int:
             f"got {sys.version.split()[0]}"
         )
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
+        print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
+        print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
     product = len(argv) == 3 and argv[0] == "--product"
@@ -6039,10 +8254,10 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            absent, detail = product_absence()
-            check(absent, "A_H039_EXACT_PREPRODUCT_ABSENCE", detail)
-            if not absent:
-                raise Rig("preproduct product/install effects are not exactly absent")
+            baseline, detail = published_r5_product_uninstalled_baseline()
+            check(baseline, "A_H039_R6_PUBLISHED_R5_PRODUCT_ROOT_UNINSTALLED_BASELINE", detail)
+            if not baseline:
+                raise Rig("R6 preproduct baseline is not exact published R5 with root absent")
             check(False, LABEL, {
                 "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
             })
@@ -6051,7 +8266,7 @@ def main(argv: list[str]) -> int:
         if product:
             identity_ok, identity_detail = product_identity(argv[1], argv[2])
             check(
-                identity_ok, "A_H039_EXACT_DIRECT_CHILD_FIVE_FILE_PRODUCT_IDENTITY",
+                identity_ok, "A_H039_EXACT_DIRECT_CHILD_FOUR_FILE_PRODUCT_IDENTITY",
                 identity_detail,
             )
             if not identity_ok:
@@ -6093,7 +8308,8 @@ def main(argv: list[str]) -> int:
             "sdk": manifest["sdk"],
         }
         check(
-            installed_identity == expected_installed_identity,
+            all(installed_identity.get(key) == value
+                for key, value in expected_installed_identity.items()),
             "A_H039_INSTALLED_MACHO_IDENTITY",
             installed_identity,
         )
@@ -6103,6 +8319,7 @@ def main(argv: list[str]) -> int:
     except Undecidable as exc:
         print(f"ODÖMBART H039_HOST_ENVIRONMENT — {exc}")
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
+        print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)
