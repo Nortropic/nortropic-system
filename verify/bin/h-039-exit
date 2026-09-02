@@ -43,11 +43,11 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "2fb748b7b9e8ffd0a25eaa034dabd5f4f99f2129"
-CONTRACT_AUTHORITY_TREE = "7ad5d38d61fe40a1f16449c74f4b40ca04ddfa13"
+CONTRACT_AUTHORITY_BASE = "6ff724e6c3dad5dd93ece71a29075a56e67533ab"
+CONTRACT_AUTHORITY_TREE = "224eee297f8ef49eef97d10737b3a2d3b4014ec5"
 CONTRACT_AUTHORITY_PARENTS = [
-    "35d7fd7c7596df5cb7b8d68f3034cbb7b87df0cf",
-    "829234ded2d6c9618e97b49ffc11a6725c66b976",
+    "2fb748b7b9e8ffd0a25eaa034dabd5f4f99f2129",
+    "cd87e6f53aabf945513d9e87dc17a00ac522560b",
 ]
 PUBLISHED_H036_PRODUCT_MERGE = "e71dfbbd6a1dcb0792031764370f264dd63ebbf2"
 PUBLISHED_H036_LEGACY_BLOBS = {
@@ -118,6 +118,16 @@ SANDBOX_EXEC = Path("/usr/bin/sandbox-exec")
 SANDBOX_EXEC_SHA256 = "2f447acfae7a954ccb5a1bcf3a1955f69b1a8549c434ddff643df98fd3cb33ba"
 SEATBELT_WRITE_PROBE = Path("/usr/bin/touch")
 SEATBELT_WRITE_PROBE_SHA256 = "365bbc3ed30c25cab02339183271a58374b2ad8f69093ca18cc60a529e02801f"
+SEATBELT_EXEC_DENY_PROBE = Path("/bin/echo")
+SEATBELT_EXEC_DENY_PROBE_SHA256 = "fb4aa4544052fd6131a428044cbbe9253d544f3a4a9fd393cfca0b50f0bce380"
+SEATBELT_NETWORK_PROBE = Path("/usr/bin/nc")
+SEATBELT_NETWORK_PROBE_SHA256 = "0161662df6307e2866284a65593c29022049a53e76301de8f7018165603161a7"
+BUILD_COMPILER = Path("/Library/Developer/CommandLineTools/usr/bin/clang")
+BUILD_COMPILER_SHA256 = "f30550eab15fdf5ab8c0dc54c52679711241e5d4b636b027e18c09fef531775d"
+BUILD_CODESIGN = Path("/usr/bin/codesign")
+BUILD_CODESIGN_SHA256 = "9755ad3afc25a3ce6f8c281425ff732a5819f0b973846b7641a11892a2081abc"
+BUILD_SDK = Path("/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk")
+BUILD_SDK_SETTINGS_SHA256 = "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe"
 INSTALLER_REVIEW_PROFILE = """(version 1)
 (deny default)
 (deny process-fork)
@@ -131,6 +141,7 @@ INSTALLER_REVIEW_PROFILE = """(version 1)
     (subpath "/usr/lib")
     (subpath "/private/var/db/dyld"))
 (allow file-read-data
+    (literal "/")
     (literal (param "H039_EXECUTABLE"))
     (literal (param "H039_MEDIATOR"))
     (subpath "/System/Library")
@@ -145,6 +156,10 @@ BUILD_REVIEW_PROFILE = """(version 1)
     (literal "/usr/bin/touch")
     (subpath "/Library/Developer/CommandLineTools/usr/bin")
     (subpath "/Library/Developer/CommandLineTools/Toolchains/XcodeDefault.xctoolchain/usr/bin"))
+(allow sysctl-read (sysctl-name-prefix "hw."))
+(allow file-read*
+    (literal "/Library")
+    (literal "/Library/Developer"))
 (allow file-read-metadata
     (literal "/")
     (literal "/dev/null")
@@ -156,6 +171,7 @@ BUILD_REVIEW_PROFILE = """(version 1)
     (subpath "/usr/lib")
     (subpath "/private/var/db/dyld"))
 (allow file-read-data
+    (literal "/")
     (literal "/dev/null")
     (subpath (param "H039_BUILD_ROOT"))
     (subpath "/Library/Developer/CommandLineTools")
@@ -198,7 +214,7 @@ FAILURE_SIGNATURE = [
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "c58ae5192318b0ad00272d16648d3a464917319758d505ad19aaaf193ff5c318"
+EXPECTED_H039_ROW_SHA256 = "4761ed4b216069fb485f9456900f858fdb09bfd0d650a511a551bc33cc580384"
 
 passed = 0
 failed = 0
@@ -2052,6 +2068,314 @@ def bounded_run(
         selector.close()
         process.stdout.close()
         process.stderr.close()
+
+
+def seatbelt_profile_selftests() -> None:
+    """Causally bind the two deny-default host-runtime profiles."""
+    expected_host_files = (
+        (SANDBOX_EXEC, SANDBOX_EXEC_SHA256, 0o755, "sandbox-exec"),
+        (SEATBELT_WRITE_PROBE, SEATBELT_WRITE_PROBE_SHA256, 0o755, "touch"),
+        (SEATBELT_EXEC_DENY_PROBE, SEATBELT_EXEC_DENY_PROBE_SHA256, 0o755, "echo"),
+        (SEATBELT_NETWORK_PROBE, SEATBELT_NETWORK_PROBE_SHA256, 0o555, "nc"),
+        (BUILD_COMPILER, BUILD_COMPILER_SHA256, 0o755, "clang"),
+        (BUILD_CODESIGN, BUILD_CODESIGN_SHA256, 0o755, "codesign"),
+        (
+            BUILD_SDK / "SDKSettings.json", BUILD_SDK_SETTINGS_SHA256,
+            0o644, "SDKSettings.json",
+        ),
+    )
+    for path, digest, mode, label in expected_host_files:
+        try:
+            value = os.lstat(path)
+        except OSError as exc:
+            raise Undecidable(f"pinned build-review {label} unavailable") from exc
+        if (
+            not stat.S_ISREG(value.st_mode) or value.st_uid != 0
+            or value.st_gid != 0 or stat.S_IMODE(value.st_mode) != mode
+            or value.st_nlink != 1 or path.is_symlink() or path_sha(path) != digest
+        ):
+            raise Undecidable(f"pinned build-review {label} identity drift")
+    check(True, "A_H039_SEATBELT_PROFILE_PINNED_HOST_IDENTITIES")
+
+    temporary = Path(tempfile.mkdtemp(prefix="h039-seatbelt-selftest-", dir="/private/tmp"))
+    project = temporary / "project"
+    project.mkdir(mode=0o700)
+    installer_fixture = temporary / "mediator-fixture"
+    installer_fixture.write_bytes(b"H039-INSTALLER-MEDIATOR-FIXTURE\n")
+    installer_fixture.chmod(0o600)
+    listener: socket.socket | None = None
+
+    def no_sigabrt(result: subprocess.CompletedProcess[bytes]) -> bool:
+        return result.returncode not in {-signal.SIGABRT, 128 + signal.SIGABRT}
+
+    def nested_refusal(result: subprocess.CompletedProcess[bytes], label: str) -> None:
+        if result.returncode == 71 \
+                and b"sandbox_apply: Operation not permitted" in result.stderr:
+            raise Undecidable(f"outer Seatbelt denied nested {label} sandbox")
+
+    def build_argv(executable: Path, arguments: list[str]) -> list[str]:
+        return [
+            str(SANDBOX_EXEC),
+            "-D", f"H039_BUILD_EXECUTABLE={executable}",
+            "-D", f"H039_BUILD_ROOT={project}",
+            "-p", BUILD_REVIEW_PROFILE,
+            *arguments,
+        ]
+
+    def installer_argv(executable: Path, arguments: list[str]) -> list[str]:
+        return [
+            str(SANDBOX_EXEC),
+            "-D", f"H039_EXECUTABLE={executable}",
+            "-D", f"H039_MEDIATOR={installer_fixture}",
+            "-D", f"H039_TEST_ROOT={temporary}",
+            "-p", INSTALLER_REVIEW_PROFILE,
+            *arguments,
+        ]
+
+    environment = {
+        "HOME": "/var/empty", "TMPDIR": str(project),
+        "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin",
+    }
+    try:
+        inside = project / "inside-write"
+        inside_result = bounded_run(
+            build_argv(
+                SEATBELT_WRITE_PROBE,
+                [str(SEATBELT_WRITE_PROBE), str(inside)],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(inside_result, "build-review")
+        inside_value = os.lstat(inside) if inside.exists() else None
+        check(
+            no_sigabrt(inside_result) and inside_result.returncode == 0
+            and inside_result.stdout == b"" and inside_result.stderr == b""
+            and inside_value is not None and stat.S_ISREG(inside_value.st_mode)
+            and inside_value.st_uid == os.getuid()
+            and inside_value.st_nlink == 1 and inside_value.st_size == 0,
+            "A_H039_BUILD_SEATBELT_INSIDE_WRITE_SUCCEEDS",
+            {
+                "rc": inside_result.returncode,
+                "stdout": inside_result.stdout.decode("utf-8", "replace"),
+                "stderr": inside_result.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        outside = temporary / "outside-write"
+        outside_result = bounded_run(
+            build_argv(
+                SEATBELT_WRITE_PROBE,
+                [str(SEATBELT_WRITE_PROBE), str(outside)],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(outside_result, "build-review")
+        check(
+            no_sigabrt(outside_result) and outside_result.returncode == 1
+            and outside_result.stdout == b""
+            and b"Operation not permitted" in outside_result.stderr
+            and not outside.exists() and not outside.is_symlink(),
+            "N_H039_BUILD_SEATBELT_OUTSIDE_WRITE_DENIED",
+            {
+                "rc": outside_result.returncode,
+                "stdout": outside_result.stdout.decode("utf-8", "replace"),
+                "stderr": outside_result.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        wrong_exec_result = bounded_run(
+            build_argv(
+                SEATBELT_WRITE_PROBE,
+                [str(SEATBELT_EXEC_DENY_PROBE), "H039-FORBIDDEN-EXEC"],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(wrong_exec_result, "build-review")
+        check(
+            no_sigabrt(wrong_exec_result) and wrong_exec_result.returncode == 71
+            and wrong_exec_result.stdout == b""
+            and b"Operation not permitted" in wrong_exec_result.stderr,
+            "N_H039_BUILD_SEATBELT_ARBITRARY_EXEC_DENIED",
+            {
+                "rc": wrong_exec_result.returncode,
+                "stdout": wrong_exec_result.stdout.decode("utf-8", "replace"),
+                "stderr": wrong_exec_result.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            listener.setblocking(False)
+        except OSError as exc:
+            if exc.errno in {errno.EPERM, errno.EACCES}:
+                raise Undecidable("outer sandbox denied build-review network canary") from exc
+            raise
+        port = listener.getsockname()[1]
+        network_result = bounded_run(
+            build_argv(
+                SEATBELT_NETWORK_PROBE,
+                [str(SEATBELT_NETWORK_PROBE), "-z", "-w", "1", "127.0.0.1", str(port)],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(network_result, "build-review")
+        connected = False
+        try:
+            connection, _address = listener.accept()
+        except BlockingIOError:
+            pass
+        else:
+            connected = True
+            connection.close()
+        check(
+            no_sigabrt(network_result) and network_result.returncode == 1
+            and network_result.stdout == b"" and network_result.stderr == b""
+            and not connected and "(allow network" not in BUILD_REVIEW_PROFILE,
+            "N_H039_BUILD_SEATBELT_NETWORK_DENIED",
+            {
+                "rc": network_result.returncode,
+                "stdout": network_result.stdout.decode("utf-8", "replace"),
+                "stderr": network_result.stderr.decode("utf-8", "replace"),
+                "connected": connected,
+            },
+        )
+        listener.close()
+        listener = None
+
+        source = project / "profile-probe.c"
+        binary = project / "profile-probe"
+        source.write_bytes(b"int main(void) { return 0; }\n")
+        compile_argv = [
+            str(BUILD_COMPILER), "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+            "-fstack-protector-strong", "-D_FORTIFY_SOURCE=2", "-arch", "arm64",
+            "-isysroot", str(BUILD_SDK), "-mmacosx-version-min=15.0", "-Wl,-pie",
+            "-Wl,-dead_strip", source.name, "-o", binary.name,
+        ]
+        compile_result = bounded_run(
+            build_argv(BUILD_COMPILER, compile_argv),
+            cwd=project, env=environment, timeout=60,
+        )
+        nested_refusal(compile_result, "build-review")
+        binary_before_sign = os.lstat(binary) if binary.exists() else None
+        check(
+            no_sigabrt(compile_result) and compile_result.returncode == 0
+            and compile_result.stdout == b"" and compile_result.stderr == b""
+            and binary_before_sign is not None
+            and stat.S_ISREG(binary_before_sign.st_mode)
+            and binary_before_sign.st_uid == os.getuid()
+            and binary_before_sign.st_nlink == 1
+            and binary_before_sign.st_size > 0,
+            "A_H039_BUILD_SEATBELT_EXACT_CLANG_COMPILE",
+            {
+                "rc": compile_result.returncode,
+                "stdout": compile_result.stdout.decode("utf-8", "replace"),
+                "stderr": compile_result.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        sign_argv = [
+            str(BUILD_CODESIGN), "--force", "--options", "runtime", "--sign", "-",
+            "--identifier", "se.nortropic.runtime-cleanup-profile-probe",
+            "--timestamp=none", binary.name,
+        ]
+        sign_result = bounded_run(
+            build_argv(BUILD_CODESIGN, sign_argv),
+            cwd=project, env=environment, timeout=60,
+        )
+        nested_refusal(sign_result, "build-review")
+        verify_argv = [str(BUILD_CODESIGN), "--verify", "--strict", binary.name]
+        verify_result = bounded_run(
+            build_argv(BUILD_CODESIGN, verify_argv),
+            cwd=project, env=environment, timeout=60,
+        )
+        nested_refusal(verify_result, "build-review")
+        check(
+            no_sigabrt(sign_result) and no_sigabrt(verify_result)
+            and sign_result.returncode == 0 and verify_result.returncode == 0
+            and verify_result.stdout == b"" and verify_result.stderr == b""
+            and binary.exists() and stat.S_ISREG(os.lstat(binary).st_mode)
+            and os.lstat(binary).st_nlink == 1,
+            "A_H039_BUILD_SEATBELT_EXACT_CODESIGN_SIGN_AND_VERIFY",
+            {
+                "sign_rc": sign_result.returncode,
+                "sign_stdout": sign_result.stdout.decode("utf-8", "replace"),
+                "sign_stderr": sign_result.stderr.decode("utf-8", "replace"),
+                "verify_rc": verify_result.returncode,
+                "verify_stdout": verify_result.stdout.decode("utf-8", "replace"),
+                "verify_stderr": verify_result.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        installer_started = bounded_run(
+            installer_argv(
+                SEATBELT_EXEC_DENY_PROBE,
+                [str(SEATBELT_EXEC_DENY_PROBE), "H039-INSTALLER-PROFILE-STARTED"],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(installer_started, "installer-review")
+        check(
+            no_sigabrt(installer_started) and installer_started.returncode == 0
+            and installer_started.stdout == b"H039-INSTALLER-PROFILE-STARTED\n"
+            and installer_started.stderr == b"",
+            "A_H039_INSTALLER_SEATBELT_EXACT_EXEC_STARTS",
+            {
+                "rc": installer_started.returncode,
+                "stdout": installer_started.stdout.decode("utf-8", "replace"),
+                "stderr": installer_started.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        installer_write = temporary / "installer-write"
+        installer_write_result = bounded_run(
+            installer_argv(
+                SEATBELT_WRITE_PROBE,
+                [str(SEATBELT_WRITE_PROBE), str(installer_write)],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(installer_write_result, "installer-review")
+        check(
+            no_sigabrt(installer_write_result)
+            and installer_write_result.returncode == 1
+            and installer_write_result.stdout == b""
+            and b"Operation not permitted" in installer_write_result.stderr
+            and not installer_write.exists() and not installer_write.is_symlink(),
+            "N_H039_INSTALLER_SEATBELT_WRITE_DENIED",
+            {
+                "rc": installer_write_result.returncode,
+                "stdout": installer_write_result.stdout.decode("utf-8", "replace"),
+                "stderr": installer_write_result.stderr.decode("utf-8", "replace"),
+            },
+        )
+
+        installer_wrong_exec = bounded_run(
+            installer_argv(
+                SEATBELT_EXEC_DENY_PROBE,
+                [str(SEATBELT_WRITE_PROBE), str(installer_write)],
+            ),
+            cwd="/", env=environment, timeout=10,
+        )
+        nested_refusal(installer_wrong_exec, "installer-review")
+        check(
+            no_sigabrt(installer_wrong_exec)
+            and installer_wrong_exec.returncode == 71
+            and installer_wrong_exec.stdout == b""
+            and b"Operation not permitted" in installer_wrong_exec.stderr
+            and not installer_write.exists() and not installer_write.is_symlink(),
+            "N_H039_INSTALLER_SEATBELT_ALTERNATE_EXEC_DENIED",
+            {
+                "rc": installer_wrong_exec.returncode,
+                "stdout": installer_wrong_exec.stdout.decode("utf-8", "replace"),
+                "stderr": installer_wrong_exec.stderr.decode("utf-8", "replace"),
+            },
+        )
+    finally:
+        if listener is not None:
+            listener.close()
+        shutil.rmtree(temporary)
 
 
 def tool(argv: list[str]) -> bytes:
@@ -4553,6 +4877,7 @@ def main(argv: list[str]) -> int:
         row = static_contract_checks()
         contract_selftests(row)
         causal_oracle_selftests()
+        seatbelt_profile_selftests()
         ofd_lock_reference()
         connected_stream_unlink_reference()
         managed_option_a_reference()
