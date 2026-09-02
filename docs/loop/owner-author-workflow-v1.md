@@ -1537,8 +1537,8 @@ whole chain is green.
 <!-- H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_MEDIATOR_V1 -->
 ## H-039 OS-exclusive runtime-cleanup mediator
 
-H-039 R3 consumes the guarded H-039 R2 contract publication at
-`f8f046e4aa59dd1facf9c069b543c91c99e0eff1`. TEST_AUTHOR may change only this
+H-039 R4 consumes the guarded H-039 R3 contract publication at
+`97c9402178148a2361d073ec2c3cca7ba4ec4e22`. TEST_AUTHOR may change only this
 workflow, the task spec, `verify/bin/h-039-exit`, the decision log and drift
 record. The later owner product may change only the five exact registry members
 under `controller/runtime-cleanup/` and `verify/h039/`; broad prefixes remain
@@ -1666,3 +1666,35 @@ receive/EINTR, and create a separate monotonic deadline immediately before the
 PREPARED ACK wait with the same EINTR-safe recomputation. The existing no-ACK
 effect remains bounded at five seconds. All product, install, root, process,
 exec, write and network boundaries are otherwise unchanged.
+
+R4 corrects two independently proven contract defects without adopting failed
+product `87e90b4`. First, a later H-039 contract candidate changes five existing
+files: all statuses are `M`, the gate remains 100755, and the four spec/docs
+files remain 100644. The initial-H039 gate-add shape is no longer admissible;
+causal controls reject add, missing, extra, substituted, wrong-mode and
+wrong-status shapes.
+
+Second, a durable `r/.last.tmp` already binds the accepted cleanup nonce, so a
+fresh retry cannot rewrite `current` without making that receipt irreconcilable.
+Before the temp exists, the current cleanup nonce remains replay and an exact
+fresh noncolliding cleanup request may resume the incomplete transaction. Once
+resumed, it preserves the already durable active-or-quarantine name orientation;
+in particular CLEANING never synthesizes a reverse Q-to-active move. Once
+the exact temp exists, however, only cleanup-v1 carrying the same accepted nonce
+and matching capability may continue. The lock-held continuation first binds
+current, temp, runtime, capability hash, create nonce, sequence, effect digest,
+predecessor receipt and an exact empty-or-absent Q; it changes neither state nor
+temp before continuing. A fresh cleanup nonce returns `CAPACITY` with zero
+effect. The continuation nonce must differ from current create nonce and both
+predecessor receipt nonces; create-v1 with it is cross-operation `REPLAY`, and
+after `last` publication both operations classify it as completed replay.
+
+The deterministic transition model covers both current-CLEANING plus
+matching-temp orientations: exact empty Q present, and Q absent after its
+durable removal. Independent immutable native review must bind those exact
+branches, nonce preservation, one receipt and zero residue. Black-box timing or
+sampling of these ultra-short durability windows earns no credit: Darwin does
+not make an open directory FD prevent directory removal. The immutable review
+rejects CLEANING→CLEANING nonce replacement after a temp and binds terminal
+no-current/temp completion. No new path,
+capability, native/root operation or other authority is introduced.
