@@ -4538,3 +4538,34 @@ installer-profile positive start plus denied write and alternate executable.
 Every negative explicitly rejects `SIGABRT`, and the profile contains no
 network allow. This preserves the original file/process/network confinement
 while making its host-runtime prerequisite observable before product review.
+
+## 2026-09-02 — H-039 R3 installer private-read and absolute request deadline
+
+The first post-R2 product review reached another product-independent gate
+defect. The installer verifier must enumerate the exact bounded candidate
+directory under its gate-private `H039_TEST_ROOT`, but the frozen installer
+profile allowed only metadata there. Bare-host diagnostics showed
+`file-read-data` denial on that exact directory and showed that adding only the
+already parameter-bound subtree makes the complete uninstalled installer
+effects matrix pass.
+
+R3 therefore adds only `(subpath (param "H039_TEST_ROOT"))` to installer
+file-read-data. A pinned `/bin/ls` must return the exact two-entry fixture inside
+that private root. The identical executable against a sibling outside the root
+must return ordinary `EPERM`, no data and no mutation; `SIGABRT` earns no
+credit. Existing write, alternate-executable and network denials remain and no
+write, exec, network, system-profile import or broader read path is added.
+
+The request contract now also states that prefix, declared body and clean EOF
+share one absolute monotonic five-second deadline beginning before the first
+prefix wait. Distinct installed-effects prefix, body and cumulative-EOF slow
+drips keep every individual interval below a sliding receive timeout while the
+aggregate exceeds the single deadline. Credit requires nonzero exit, zero
+response, descriptors and namespace effect, and termination within the original
+bounded window. Immutable source rejects `SO_RCVTIMEO` and fixed `poll(5000)`
+retry semantics, requires one request `CLOCK_MONOTONIC` deadline with remaining
+time recomputed through every receive/EINTR, and a separate monotonic deadline
+immediately before PREPARED ACK wait with the same EINTR handling. R3 rebases
+only contract authority to guarded R2 main
+`f8f046e4aa59dd1facf9c069b543c91c99e0eff1`; product, registry and installation
+bytes remain untouched.
