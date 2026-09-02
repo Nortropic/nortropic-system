@@ -1,5 +1,67 @@
 # Owner-author workflow v1 — frozen H-035 effect contract
 
+## H-039 R6 first-root pre-stage
+
+R6 begins only from published R5 `f190cc57…`. Freeze and independently review
+the exact five TEST_AUTHOR modifications, publish them through the guarded
+two-parent transition, then build a fresh direct-child product modifying only
+installer, installer-only source, recipe and manifest. The published R5
+runtime mediator artifact is the fifth allowed file but remains byte-identical.
+Two independent uninstalled product reviews must precede guarded publication.
+
+The later root transition is distinct and serialized. The owner-controlled
+root entry may launch only the frozen absolute Apple tools and exact argv with
+empty environment and cwd `/`. It creates the fixed 0700 namespace and
+`.install/controller/runtime-cleanup` chain without `-p`; pinned `find -P -s
+-x … -mindepth 1 -maxdepth 1 -print0` and `ls -ldeO@` close identity,
+membership, ACL, xattr and flag state at recovery. Created objects may carry
+only the observed non-authority `com.apple.provenance` xattr of exact size 11
+and have zero ACL; pre-existing system parents have no xattr. Pinned `dd` uses fixed
+`bs=4194305 count=1 iflag=fullblock`, receives the authenticated published
+installer bytes on fd0 and has no input path. The extra byte above the 4 MiB
+limit makes short, exact, long, mixed and replayed input lengths observable.
+Only exact length/digest/EOF plus successful return, empty complete outputs,
+completed `conv=fsync`, durability and direct-child reap advances. Short,
+long, wrong-digest and exact-but-undurable states restart at `dd`. The fixed output is chmod 0400,
+lstat/SHA/code-sign/CDHash
+verified and dev/inode name-rebound, then the same inode is chmod 0500 and
+fully verified again. The source descriptor is closed and every exact child
+tool is waited/reaped while the controller remains alive. Bootstrap inherits
+exactly fd1/fd2; fd0 and every fd at or above 3 are closed, and its first
+runtime check requires `fcntl(0, F_GETFD)` to fail with `EBADF` before
+`closefrom(0)`. No product byte executes before this point. Controller-only
+loss starts no recovery effect: because process discovery, signal, kill and
+general reap are forbidden, reauthentication may resume only after a full
+host restart guarantees that no former child survives.
+
+The only first product invocation is the fixed installer plus literal
+`bootstrap`. It accepts no other data and uses exactly one byte-identical
+mediator embedded in its read-only Mach-O section. It completes the existing
+internal apply logic in-process; the external `apply` selector is rejected.
+The shared extractor is exercised by unprivileged `verify`, and the gate binds
+the extracted `__H039RO,__h039med` bytes in a custom segment whose maximum and
+initial protections are exactly read-only and non-executable. Bootstrap
+stages the mediator as 0400, fsyncs/rebinds it, changes that inode to 04555,
+then performs one same-device exclusive fixed-name publish with both parents
+fsynced/rebound; no partial final helper exists. Directories `a/c/q/r/s` are
+created directly in final 0555 mode under the private 0700 namespace using a
+process-local umask that is restored to 077. Every mediator partial/durable/
+ready, final-directory, lock, helper, namespace-publication, self-unlink,
+parent-removal and fresh installer-restage partial/ready snapshot has one
+closed recovery action; terminal replay rejects. Restage repeats the full
+fresh-source, stream, digest, EOF, descriptor-close and direct-child-reap
+binding. Ambiguity stops with no general rollback.
+
+The 96-command recovery registry and its digest are deterministic contract
+authority. Gate fixtures are normalized reference-model inputs, not claims
+that root effects ran. During the later owner-authorized root ceremony every
+raw return code/stdout/stderr/EOF is captured and the complete transcript is
+hashed; the independent installed-effect reviewer binds it to the published
+contract/product and live post-effect identities. The installed review runs
+separately as uid501/gid20 and requires
+the final helper/namespace plus zero `.install`, bootstrap process or staging
+residue. Only then may H038, H032, H031 and eventual supervisor resume proceed.
+
 H-035 is the one-time ordinary-pipeline bootstrap from one `allowed_write` authority to two mechanically distinct task classes. Its frozen v1 write surface is the exception; no runtime `task == h-035` bypass may survive activation.
 
 ## Canonical authority
@@ -1597,7 +1659,8 @@ direct-launch behavior exactly. H-039 still accepts, creates and stores no
 envelope and receives none of the new H-032 capabilities.
 
 The trust transitions are strict and serial: freeze H-039; two independent gate
-reviews; guarded contract publication; exact five-file product; independent
+reviews; guarded contract publication; exact four-file product with the
+published R5 runtime mediator byte-identical; independent
 uninstalled product review; guarded product publication; root install from the
 published object; independent uid501/gid20 installed-effect review; then H-038,
 the H-032 TEST_AUTHOR refreeze, the H-031 rebind, and finally the exact one-file

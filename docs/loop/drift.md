@@ -1,5 +1,55 @@
 # Att köra loopen
 
+## 2026-09-02 — H-039 R6 first-root installation bootstrap
+
+R5 product publication `f190cc575f36e6fe97f84b3e1810ca92d7d13401`
+is now the exact contract base. Its five product blobs remain present and
+byte-bound in the R6 preproduct lane; only the protected root installation is
+absent.
+
+R6 supersedes only the external two-blob R5 installation ceremony. A fixed
+root:wheel 0700 `.install` chain is created one component at a time by pinned
+Apple tools with empty environment, fixed cwd and exact argv. The untrusted
+published installer reaches root only as one retained fd0 stream with exact
+publication-bound length, SHA-256 and EOF; root never opens its source path.
+The fixed `dd bs=4194305 count=1 iflag=fullblock` reads one byte beyond the
+four-MiB product ceiling, so short, exact, long, mixed and replayed streams
+cannot collapse to the same protected output. Advancing additionally requires
+successful `dd`, empty complete outputs, completed `conv=fsync`, durability
+and direct-child reap. The source FD closes and every exact child tool is
+waited/reaped while the controller is alive before product exec. That exec
+inherits only fd1/fd2; its first runtime check proves fd0 is `EBADF` before
+`closefrom(0)`. Controller-only loss performs no recovery; without forbidden
+process-control authority, a full host restart is required before retry.
+The resulting non-executable 0400 file is stable-identity, digest and
+code-sign verified and name-rebound before that same inode becomes 0500 and is
+reverified. Created objects admit no ACL and only the observed non-authority
+`com.apple.provenance` xattr of exact size 11. The fixed `bootstrap` operation then consumes only its own exact
+embedded mediator image and completes the existing apply effects in-process;
+the external `apply` selector is removed. The common extractor is exercised
+by unprivileged `verify`, while the gate extracts the exact
+`__H039RO,__h039med` file bytes and proves maximum and initial protections are
+exactly read-only and non-executable.
+
+Every pre-stage and bootstrap crash prefix is closed by exact NUL-delimited
+membership, metadata, ACL/xattr/flag and inode checks. The mediator is staged
+0400, made durable and rebound, changed to 04555 and atomically published by a
+same-device exclusive fixed-name rename; final `a/c/q/r/s` directories are
+created directly as 0555 below the private 0700 namespace. Mediator
+partial/durable/ready, individual final directories, lock, helper publication,
+namespace publication, self-unlink, each parent removal and fresh restage
+partial/ready have exact deterministic-model snapshots and recovery actions.
+The 96 exact recovery commands are digest-bound; normalized gate fixtures do
+not claim live root effects. The later root ceremony must retain and hash raw
+rc/stdout/stderr/EOF evidence, which the independent installed-effect review
+binds to the published bytes and live state. Only an exact next step may resume; terminal replay and
+foreign or ambiguous state stops without rollback. Success requires zero
+`.install` residue. Runtime request, cleanup, receipt, current-temp, managed
+Kuvert, H009/H036 legacy and Seatbelt properties remain unchanged. Contract
+changes exactly five existing TEST_AUTHOR files; product changes exactly four
+existing files while the published R5 runtime mediator stays byte-identical.
+They precede the separate guarded root install and uid501/gid20 effect review.
+
 **Skriven 2026-08-09, UR den första verkliga körningen** — inte före den. Varje siffra
 och varje utfall nedan är mätt på `premiar-1`, som körde `p-001` och `p-002` mot main
 `3e781fa` och attesterade båda. En manual skriven i förväg hade varit en gissning.
