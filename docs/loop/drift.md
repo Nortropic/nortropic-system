@@ -4512,3 +4512,29 @@ H-038 → H-032 TEST_AUTHOR refreeze → H-031 rebind → exact one-file H-032
 BUILDER product → independent product review → guarded two-parent final merge →
 post-publication verification. Supervisor resume remains prohibited until all
 are green.
+
+## 2026-09-02 — H-039 R2 deny-default build-review host runtime
+
+The first product-review attempt reached a product-independent gate defect on
+bare macOS. The frozen build profile made both its intended build-root `touch`
+and its denied sibling `touch` terminate with `SIGABRT` and empty output before
+either effect, so the negative was not a denial observation and the positive
+could never succeed. Independent host diagnostics separated the minimum
+runtime needs: literal `/` file-read-data permits dyld ignition; exact literal
+reads of `/Library` and `/Library/Developer` make the pinned clang InstalledDir
+reachable; and read-only `sysctl-read` limited to the `hw.` name prefix is the
+smallest observed set that lets the exact linker finish after six plausible individual sysctl
+sets all failed. Exact codesign then succeeds. The installer profile needs only
+the literal root read. Importing `dyld-support.sb` would be broader and is not
+used.
+
+R2 moves the contract authority base to the guarded initial H-039 merge
+`6ff724e6c3dad5dd93ece71a29075a56e67533ab` and changes no product or registry
+path. Its preproduct matrix pins sandbox-exec, touch, echo, nc, clang, codesign
+and SDKSettings bytes; requires ordinary inside write success; exact outside
+EPERM; process-exec denial of an unrelated fixed tool; no connection to a
+gate-owned loopback listener; the exact hardened compile/sign path; and an
+installer-profile positive start plus denied write and alternate executable.
+Every negative explicitly rejects `SIGABRT`, and the profile contains no
+network allow. This preserves the original file/process/network confinement
+while making its host-runtime prerequisite observable before product review.

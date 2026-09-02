@@ -1537,8 +1537,8 @@ whole chain is green.
 <!-- H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_MEDIATOR_V1 -->
 ## H-039 OS-exclusive runtime-cleanup mediator
 
-H-039 consumes published registry-v3/H-036 authority at
-`2fb748b7b9e8ffd0a25eaa034dabd5f4f99f2129`. TEST_AUTHOR may change only this
+H-039 R2 consumes the initial guarded H-039 contract publication at
+`6ff724e6c3dad5dd93ece71a29075a56e67533ab`. TEST_AUTHOR may change only this
 workflow, the task spec, `verify/bin/h-039-exit`, the decision log and drift
 record. The later owner product may change only the five exact registry members
 under `controller/runtime-cleanup/` and `verify/h039/`; broad prefixes remain
@@ -1623,3 +1623,21 @@ fixed identities around every completed rejection/success; only the bounded
 receipt slot may advance. Gate-private temp cleanup additionally requires the
 serialized formal-review assumption that no authorized same-euid writer races
 the unpredictable mode-0700 temp root.
+
+The first bare-host product review exposed a gate-owned host-runtime defect
+before any product byte could decide the result: both the intended inside-root
+and denied outside-root `touch` controls terminated by `SIGABRT` during dyld
+ignition, with no output and no effect. H-039 R2 keeps both profiles
+deny-default. The build profile adds only literal `/` read-data, literal
+`/Library` and `/Library/Developer` ancestor reads, and read-only
+`sysctl-read` limited to the `hw.` name prefix; the installer-review profile
+adds only literal `/` read-data.
+No Apple support profile is imported. Preproduct now pins every canary,
+compiler, SDK and signer identity and causally requires: inside build-root
+write success; outside write denial; unrelated executable denial; loopback
+network denial; exact hardened clang compile; exact codesign sign/verify; and
+installer-profile positive startup plus denied write and alternate executable.
+Every negative has an exact ordinary denial result; `SIGABRT`, empty output or
+mere absence of an effect earns no credit. File-write, process-exec and network
+authority remain unchanged, and the refreeze is based on the exact first
+contract merge rather than adopting the blocked product worktree.
