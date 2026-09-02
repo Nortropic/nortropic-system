@@ -1,5 +1,38 @@
 # Att köra loopen
 
+## 2026-09-03 — H-039 R7 satisfiable descriptor and C-lexical boundary
+
+The guarded R6 contract `341a42ba…` is product-independently unsatisfiable.
+The pinned macOS 26.5 headers and text-based SDK exports contain no
+`closefrom`, and an exact compiler probe rejects `_closefrom` as undefined,
+while R6 required both the source call and undefined Mach-O import. Separately,
+R6's regex comment remover erased `"//"` inside the required C validation
+literal before comparing the exact absolute-string set. The incomplete
+two-file BUILDER draft is retained as no-credit diagnostic evidence; it created
+no commit, product binary, publication, installation or root effect.
+
+R7 advances only the contract authority to `341a42ba…`. It keeps the exact
+four-file future product shape and independently pins the actual R5 product
+merge `f190cc57…`, its tree, parents and five blobs. Bootstrap's first action
+still proves fd0 `EBADF`; one no-argument installer-only helper then requires a
+bounded, aligned self-`PROC_PIDLISTFDS` inventory exactly `[1,2]`, checks both
+closes, and requires a second self-inventory empty before any descriptor open
+or install effect. `_closefrom` is removed and forbidden, with no caller PID or
+broader process/descriptor authority.
+
+The source judge now performs string/character-aware bounded C comment
+normalization, rejects raw carriage returns, preprocessing ambiguity,
+numeric/universal escapes and direct adjacent strings, and uses balanced
+function-body extraction. Required literals inside strings survive and real
+comments cannot grant token or path credit. Extraction binds lexical structure,
+not compiled reachability: the mandatory independent immutable material review
+alone proves conditional/macro expansion, call graph, exact two-pass descriptor
+dataflow and all adjacent/escaped/macro-constructed paths. New causal mutants
+cover the lexical ambiguities plus wrong PID/flavor, oversized or misaligned
+inventories, fd0/extra FDs, missing/failed closes, nonempty second pass and
+open-before-close. All R6 root tools/argv, embedded mediator, crash recovery,
+Seatbelt, zero residue, legacy H009/H036 and runtime mediator bytes remain unchanged.
+
 ## 2026-09-02 — H-039 R6 first-root installation bootstrap
 
 R5 product publication `f190cc575f36e6fe97f84b3e1810ca92d7d13401`

@@ -43,13 +43,18 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "f190cc575f36e6fe97f84b3e1810ca92d7d13401"
-CONTRACT_AUTHORITY_TREE = "1e8d0e7d31f2745bada3a5aeded69a1eecbf7fba"
+CONTRACT_AUTHORITY_BASE = "341a42ba4a54e3763dbf79587afc246ae399180b"
+CONTRACT_AUTHORITY_TREE = "be03ed65ac046588078a3adc3899972305507efc"
 CONTRACT_AUTHORITY_PARENTS = [
+    "f190cc575f36e6fe97f84b3e1810ca92d7d13401",
+    "fb088a33341bdd07d2fe140052fefeb6e8907e15",
+]
+PUBLISHED_H039_R5_PRODUCT_MERGE = "f190cc575f36e6fe97f84b3e1810ca92d7d13401"
+PUBLISHED_H039_R5_PRODUCT_TREE = "1e8d0e7d31f2745bada3a5aeded69a1eecbf7fba"
+PUBLISHED_H039_R5_PRODUCT_PARENTS = [
     "3cd65a97e0ed1c01e68014ab00a8e1ec6b26e6ea",
     "b1194c04f9ae26e7d2555e98e41b5d571746b50a",
 ]
-PUBLISHED_H039_R5_PRODUCT_MERGE = CONTRACT_AUTHORITY_BASE
 PUBLISHED_H039_R5_PRODUCT_BLOBS = {
     "controller/runtime-cleanup/install": "7168fc0b85d1bfc8d5398a1d081f56f450329e2a67422f43bbff85e4ae3e2153",
     "controller/runtime-cleanup/native/mediator.c": "b143804b4d2f1790e9299234f7c2b2211ac9a19a864b8281565bdf910982cb91",
@@ -125,7 +130,7 @@ PROTECTED_INSTALLER = (
     NAMESPACE / ".install/controller/runtime-cleanup/install"
 )
 UNTRUSTED_INSTALLER_SOURCE = Path(
-    "/Users/elinhaggstrom/nortropic/worktrees/h039-r6-product/"
+    "/Users/elinhaggstrom/nortropic/worktrees/h039-r7-product/"
     "controller/runtime-cleanup/install"
 )
 LAYOUT = ["a", "c", "q", "r", "s"]
@@ -427,6 +432,29 @@ R6_MATERIAL_REVIEW_EXTENSION = (
     "RELATIVE_CONSTRUCTED_CREDENTIAL_NEIGHBOR_CALLER_OR_ENVIRONMENT_PATHS_"
     "AND_ALL_UNREVIEWED_CONTROL_FLOW_EARN_NO_CREDIT"
 )
+R7_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_IMMUTABLE_PRODUCT_REVIEW_MUST_PROVE_THE_BOOTSTRAP_FIRST_"
+    "REQUIRES_FD0_F_GETFD_EBADF_THEN_USES_ONE_NO_ARGUMENT_SELF_GETPID_ONLY_"
+    "BOUNDED_PROC_PIDLISTFDS_INVENTORY_REQUIRING_EXACTLY_FD1_FD2_CLOSES_"
+    "BOTH_WITH_CHECKED_RESULTS_AND_REPEATS_THE_BOUNDED_SELF_INVENTORY_TO_"
+    "REQUIRE_ZERO_DESCRIPTORS_BEFORE_ANY_DESCRIPTOR_OPEN_OR_INSTALL_EFFECT;_"
+    "ACTUAL_COMPILED_CALL_GRAPH_CONDITIONAL_AND_MACRO_EXPANSION_TWO_PASS_"
+    "CAP_ALIGNMENT_EXACT_FD_MEMBERSHIP_CHECKED_CLOSE_AND_SECOND_EMPTY_DATAFLOW_"
+    "PLUS_ADJACENT_ESCAPED_OR_MACRO_CONSTRUCTED_PATHS_ARE_MATERIAL_REVIEW_ONLY;_NO_"
+    "CALLER_PID_PROCESS_SCAN_SIGNAL_KILL_WAIT_GENERAL_REAP_CLOSEFROM_OR_"
+    "OTHER_DESCRIPTOR_AUTHORITY_EARNS_CREDIT;_THE_INSTALLER_ONLY_HELPER_"
+    "MUST_NOT_CHANGE_THE_PUBLISHED_R5_RUNTIME_MEDIATOR_BYTES"
+)
+NATIVE_ABSOLUTE_STRINGS = {
+    "/", "/.", "/..", "/../", "/./", "//", "/install",
+    "/.install/controller/runtime-cleanup/install",
+    "/Library/PrivilegedHelperTools",
+    "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator",
+    "/private/var/db/nortropic-runtime-cleanup-v1",
+    "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/"
+    "Versions/3.12/Resources/Python.app/Contents/MacOS/Python",
+    "/a/%s/h/l", "/a/%s/h/r", "/a/%s/p/c",
+}
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
 REASON = "H039_PROTECTED_BOOTSTRAP_AND_ROOT_INSTALL_ABSENT"
 FAILURE_SIGNATURE = [
@@ -439,7 +467,7 @@ FAILURE_SIGNATURE = [
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "97225d091814b902949bceccc99f4fd2b48c7d6a6da48d7e2ea6daa416d9f73d"
+EXPECTED_H039_ROW_SHA256 = "f17a56091f4747bceb922ac918fe3f2247c3cabc26aa20b68897edc2c05d12ab"
 
 passed = 0
 failed = 0
@@ -625,15 +653,20 @@ def static_contract_checks() -> dict[str, Any]:
           "A_H039_PUBLISHED_H036_PRODUCT_MERGE_EXISTS")
     check(
         object_type(PUBLISHED_H039_R5_PRODUCT_MERGE) == "commit"
-        and commit_tree(PUBLISHED_H039_R5_PRODUCT_MERGE) == CONTRACT_AUTHORITY_TREE
+        and commit_tree(PUBLISHED_H039_R5_PRODUCT_MERGE)
+        == PUBLISHED_H039_R5_PRODUCT_TREE
         and commit_parents(PUBLISHED_H039_R5_PRODUCT_MERGE)
-        == CONTRACT_AUTHORITY_PARENTS,
+        == PUBLISHED_H039_R5_PRODUCT_PARENTS,
         "A_H039_PUBLISHED_R5_PRODUCT_MERGE_IDENTITY",
     )
     for path, digest in PUBLISHED_H039_R5_PRODUCT_BLOBS.items():
         check(
             sha(blob(PUBLISHED_H039_R5_PRODUCT_MERGE, path)) == digest,
             f"A_H039_PUBLISHED_R5_{path.upper().replace('/', '_').replace('.', '_')}",
+        )
+        check(
+            sha(blob(CONTRACT_AUTHORITY_BASE, path)) == digest,
+            f"A_H039_R7_AUTHORITY_RETAINS_R5_{path.upper().replace('/', '_').replace('.', '_')}",
         )
     for path, digest in PUBLISHED_H036_LEGACY_BLOBS.items():
         check(
@@ -671,9 +704,14 @@ def static_contract_checks() -> dict[str, Any]:
         and row.get("h039_os_exclusive_runtime_cleanup", {})
         .get("causal_falsification", {})
         .get("r6_material_review_extension") == R6_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r7_material_review_extension") == R7_MATERIAL_REVIEW_EXTENSION
         and f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}."
         in str(row.get("exit_criterion", ""))
         and f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", "")),
         "A_H039_EXACT_NONEMPTY_IMMUTABLE_REVIEW_BOUNDARY",
     )
@@ -944,13 +982,31 @@ def prestage_prefix_oracle(
         not isinstance(descriptor_inventory, dict)
         or set(descriptor_inventory) != {
             "pre_exec_open_fds", "fd0_closed", "all_fd_ge_3_closed",
-            "bootstrap_closefrom_zero_first",
+            "bootstrap_first_probe", "bootstrap_first_inventory",
+            "bootstrap_closed_fds", "bootstrap_close_results",
+            "bootstrap_second_inventory", "bootstrap_inventory_pid",
+            "bootstrap_inventory_flavor", "bootstrap_inventory_byte_cap",
+            "bootstrap_inventory_aligned", "bootstrap_closure_before_open",
         }
         or not isinstance(descriptor_inventory.get("pre_exec_open_fds"), list)
         or any(type(item) is not int for item in descriptor_inventory["pre_exec_open_fds"])
-        or any(type(descriptor_inventory.get(key)) is not bool for key in (
-            "fd0_closed", "all_fd_ge_3_closed", "bootstrap_closefrom_zero_first",
+        or any(not isinstance(descriptor_inventory.get(key), list) for key in (
+            "bootstrap_first_inventory", "bootstrap_closed_fds",
+            "bootstrap_close_results", "bootstrap_second_inventory",
         ))
+        or any(
+            type(item) is not int
+            for key in (
+                "bootstrap_first_inventory", "bootstrap_closed_fds",
+                "bootstrap_close_results", "bootstrap_second_inventory",
+            )
+            for item in descriptor_inventory[key]
+        )
+        or any(type(descriptor_inventory.get(key)) is not bool for key in (
+            "fd0_closed", "all_fd_ge_3_closed", "bootstrap_inventory_aligned",
+            "bootstrap_closure_before_open",
+        ))
+        or type(descriptor_inventory.get("bootstrap_inventory_byte_cap")) is not int
     ):
         return False
     tool_processes = observed.get("tool_processes")
@@ -1014,7 +1070,17 @@ def prestage_prefix_oracle(
             and observed.get("product_inherited_fds") == [1, 2]
             and descriptor_inventory == {
                 "pre_exec_open_fds": [1, 2], "fd0_closed": True,
-                "all_fd_ge_3_closed": True, "bootstrap_closefrom_zero_first": True,
+                "all_fd_ge_3_closed": True,
+                "bootstrap_first_probe": "FD0_F_GETFD_EBADF",
+                "bootstrap_first_inventory": [1, 2],
+                "bootstrap_closed_fds": [1, 2],
+                "bootstrap_close_results": [0, 0],
+                "bootstrap_second_inventory": [],
+                "bootstrap_inventory_pid": "SELF_GETPID_ONLY",
+                "bootstrap_inventory_flavor": "PROC_PIDLISTFDS",
+                "bootstrap_inventory_byte_cap": 1048576,
+                "bootstrap_inventory_aligned": True,
+                "bootstrap_closure_before_open": True,
             }
             and observed.get("product_stdin") == "CLOSED"
             and observed.get("source_fd_state") == "CLOSED_BEFORE_EXEC"
@@ -1202,7 +1268,17 @@ def prestage_prefix_fixture(
         observed["product_inherited_fds"] = [1, 2]
         observed["product_descriptor_inventory"] = {
             "pre_exec_open_fds": [1, 2], "fd0_closed": True,
-            "all_fd_ge_3_closed": True, "bootstrap_closefrom_zero_first": True,
+            "all_fd_ge_3_closed": True,
+            "bootstrap_first_probe": "FD0_F_GETFD_EBADF",
+            "bootstrap_first_inventory": [1, 2],
+            "bootstrap_closed_fds": [1, 2],
+            "bootstrap_close_results": [0, 0],
+            "bootstrap_second_inventory": [],
+            "bootstrap_inventory_pid": "SELF_GETPID_ONLY",
+            "bootstrap_inventory_flavor": "PROC_PIDLISTFDS",
+            "bootstrap_inventory_byte_cap": 1048576,
+            "bootstrap_inventory_aligned": True,
+            "bootstrap_closure_before_open": True,
         }
         observed["product_stdin"] = "CLOSED"
         observed["source_fd_state"] = "CLOSED_BEFORE_EXEC"
@@ -2543,6 +2619,89 @@ def create_handoff_model(
 
 def causal_oracle_selftests() -> None:
     dd_bounded_stream_selftests()
+    lexical_fixture = (
+        'const char *a="//"; const char *b="/*literal*/"; '
+        'const char *c="\\\"quoted\\\"";\n'
+        '// closefrom(0) "/tmp/comment-path"\n'
+        '/* system("/tmp/block-path"); */ int live = 1;\n'
+    )
+    normalized_fixture = c_semantic_source(lexical_fixture)
+    check(
+        '"//"' in normalized_fixture
+        and '"/*literal*/"' in normalized_fixture
+        and '"\\\"quoted\\\""' in normalized_fixture
+        and "closefrom(0)" not in normalized_fixture
+        and "system(" not in normalized_fixture
+        and native_absolute_strings(lexical_fixture) == {"//", "/*literal*/"},
+        "A_H039_R7_STRING_AWARE_C_COMMENT_NORMALIZATION",
+    )
+    absolute_fixture = "\n".join(
+        f'const char *p{index}="{value}";'
+        for index, value in enumerate(sorted(NATIVE_ABSOLUTE_STRINGS))
+    )
+    check(
+        native_absolute_strings(absolute_fixture) == NATIVE_ABSOLUTE_STRINGS,
+        "A_H039_R7_EXACT_CLOSED_NATIVE_ABSOLUTE_LITERAL_SET",
+    )
+    for label, mutant in (
+        ("ADDED", absolute_fixture + '\nconst char *extra="/tmp/extra";'),
+        ("REMOVED", absolute_fixture.split("\n", 1)[1]),
+        ("SUBSTITUTED", absolute_fixture.replace('="/";', '="/tmp";', 1)),
+    ):
+        check(
+            native_absolute_strings(mutant) != NATIVE_ABSOLUTE_STRINGS,
+            f"N_H039_R7_NATIVE_ABSOLUTE_LITERAL_{label}",
+        )
+    check(
+        native_absolute_strings(
+            absolute_fixture + '\n// const char *commented="/tmp/decoy";\n',
+        ) == NATIVE_ABSOLUTE_STRINGS,
+        "N_H039_R7_COMMENTED_ABSOLUTE_LITERAL_NO_CREDIT",
+    )
+    function_fixture = c_semantic_source(
+        'static int nested(void){\nif(1){return 2;}\nreturn 0;\n}\n',
+    )
+    nested_body = c_function_body(function_fixture, "nested")
+    check(
+        "if(1){return 2;}" in nested_body and "return 0;" in nested_body,
+        "A_H039_R7_BALANCED_FUNCTION_BODY_EXTRACTION",
+    )
+    closure_tokens = (
+        "getpid(", "PROC_PIDLISTFDS", "proc_pidinfo(",
+        "struct proc_fdinfo", "malloc(", "close(", "free(",
+    )
+    decoy_body = c_function_body(
+        c_semantic_source(
+            'static int close_bootstrap_descriptors(void){'
+            'const char *decoy="getpid( PROC_PIDLISTFDS proc_pidinfo( '
+            'struct proc_fdinfo malloc( close( free(";return decoy != 0;}',
+        ),
+        "close_bootstrap_descriptors",
+    )
+    check(
+        not all(token in c_structure_mask(decoy_body) for token in closure_tokens),
+        "N_H039_R7_STRING_LITERAL_HELPER_TOKEN_DECOY_NO_CREDIT",
+    )
+    for label, malformed in (
+        ("STRING", 'const char *x="unterminated'),
+        ("CHARACTER", "int x='unterminated"),
+        ("BLOCK", "int x; /* unterminated"),
+        ("SPLICE", "int x; \\\nint y;"),
+        ("CARRIAGE_RETURN", "int x; // hidden\rint y;"),
+        ("SPLICE_CARRIAGE_RETURN", "int x; \\\rint y;"),
+        ("TRIGRAPH", "int x = ??/ 1;"),
+        ("NUMERIC_SLASH_ESCAPE", 'const char *x="\\x2ftmp";'),
+        ("OCTAL_SLASH_ESCAPE", 'const char *x="\\057tmp";'),
+        ("UNIVERSAL_SLASH_ESCAPE", 'const char *x="\\u002ftmp";'),
+        ("ADJACENT_STRING", 'const char *x="/" "tmp";'),
+        ("PREFIXED_ADJACENT_STRING", 'const char *x="/" u8"tmp";'),
+    ):
+        rejected = False
+        try:
+            c_semantic_source(malformed)
+        except Rig:
+            rejected = True
+        check(rejected, f"N_H039_R7_C_LEXICAL_{label}")
     expected_contract_changes = [
         (
             path,
@@ -2770,6 +2929,32 @@ def causal_oracle_selftests() -> None:
                 installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
             ),
             f"N_H039_R6_FIRST_ROOT_{label}",
+        )
+    descriptor_ready = prestage_prefix_fixture(
+        len(FIRST_ROOT_ARGV), installer_size=123456,
+        installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+    )
+    for label, mutate in (
+        ("PROBE", lambda value: value.__setitem__("bootstrap_first_probe", "FD0_OPEN")),
+        ("FIRST_FD0", lambda value: value["bootstrap_first_inventory"].insert(0, 0)),
+        ("FIRST_EXTRA", lambda value: value["bootstrap_first_inventory"].append(3)),
+        ("CLOSED_MISSING", lambda value: value.__setitem__("bootstrap_closed_fds", [1])),
+        ("CLOSE_FAILURE", lambda value: value.__setitem__("bootstrap_close_results", [0, -1])),
+        ("SECOND_NONEMPTY", lambda value: value["bootstrap_second_inventory"].append(2)),
+        ("FOREIGN_PID", lambda value: value.__setitem__("bootstrap_inventory_pid", "CALLER_PID")),
+        ("WRONG_FLAVOR", lambda value: value.__setitem__("bootstrap_inventory_flavor", "PROC_PIDTASKALLINFO")),
+        ("OVERSIZE", lambda value: value.__setitem__("bootstrap_inventory_byte_cap", 1048577)),
+        ("MISALIGNED", lambda value: value.__setitem__("bootstrap_inventory_aligned", False)),
+        ("OPEN_BEFORE_CLOSE", lambda value: value.__setitem__("bootstrap_closure_before_open", False)),
+    ):
+        mutant = copy.deepcopy(descriptor_ready)
+        mutate(mutant["product_descriptor_inventory"])
+        check(
+            not prestage_prefix_oracle(
+                len(FIRST_ROOT_ARGV), mutant, installer_size=123456,
+                installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
+            ),
+            f"N_H039_R7_BOOTSTRAP_DESCRIPTOR_{label}",
         )
 
     mediator_sha = "ef" * 32
@@ -5610,7 +5795,7 @@ def macho_checks(manifest: dict[str, Any], commit: str | None = None) -> None:
         installer_allowed_symbols = {
             "__NSGetExecutablePath", "___chkstk_darwin", "___error",
             "___stack_chk_fail", "___stack_chk_guard", "___strcpy_chk",
-            "_bzero", "_chdir", "_close", "_closedir", "_closefrom",
+            "_bzero", "_chdir", "_close", "_closedir",
             "_dup", "_environ", "_fchmod", "_fchown", "_fcntl", "_fdopendir",
             "_free", "_fstat", "_fstatat", "_fsync", "_getegid",
             "_geteuid", "_getgid", "_getpid", "_getsectiondata",
@@ -5621,9 +5806,9 @@ def macho_checks(manifest: dict[str, Any], commit: str | None = None) -> None:
             "_write",
         }
         installer_required_symbols = {
-            "_chdir", "_closefrom", "_environ", "_getegid", "_geteuid",
-            "_fcntl", "_getgid", "_getsectiondata", "_getuid", "_renameatx_np",
-            "_umask",
+            "_chdir", "_close", "_environ", "_free", "_getegid", "_geteuid",
+            "_fcntl", "_getgid", "_getpid", "_getsectiondata", "_getuid",
+            "_malloc", "_proc_pidinfo", "_renameatx_np", "_umask",
         }
         installer_symbols = set(identities["installer"]["undefined_symbols"])
         if not installer_required_symbols <= installer_symbols \
@@ -6002,13 +6187,164 @@ def installer_verify_effects(commit: str) -> None:
             raise cleanup_error
 
 
+def c_semantic_source(source: str) -> str:
+    """Remove C comments without treating comment markers in literals as syntax."""
+    if "\r" in source or "\\\n" in source \
+            or re.search(r"\?\?[=/'()!<>-]", source):
+        raise Rig("ambiguous C preprocessing sequence")
+    out: list[str] = []
+    state = "code"
+    index = 0
+    while index < len(source):
+        value = source[index]
+        following = source[index + 1] if index + 1 < len(source) else ""
+        if state == "code":
+            if value == "/" and following == "/":
+                out.extend((" ", " "))
+                index += 2
+                state = "line"
+                continue
+            if value == "/" and following == "*":
+                out.extend((" ", " "))
+                index += 2
+                state = "block"
+                continue
+            out.append(value)
+            if value == '"':
+                state = "string"
+            elif value == "'":
+                state = "character"
+            index += 1
+            continue
+        if state == "line":
+            if value == "\n":
+                out.append(value)
+                state = "code"
+            else:
+                out.append(" ")
+            index += 1
+            continue
+        if state == "block":
+            if value == "*" and following == "/":
+                out.extend((" ", " "))
+                index += 2
+                state = "code"
+                continue
+            out.append("\n" if value == "\n" else " ")
+            index += 1
+            continue
+        if value in {"\n", "\r"}:
+            raise Rig("newline in C literal")
+        out.append(value)
+        if value == "\\":
+            if index + 1 >= len(source):
+                raise Rig("unterminated C literal escape")
+            out.append(source[index + 1])
+            index += 2
+            continue
+        if (state == "string" and value == '"') \
+                or (state == "character" and value == "'"):
+            state = "code"
+        index += 1
+    if state not in {"code", "line"}:
+        raise Rig("unterminated C lexical state")
+    normalized = "".join(out)
+    if re.search(
+        r"\\(?:x[0-9A-Fa-f]+|[0-7]{1,3}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})",
+        normalized,
+    ):
+        raise Rig("numeric or universal C literal escape is forbidden")
+    if re.search(
+        r'(?:u8|u|U|L)?"(?:\\.|[^"\\])*"\s*'
+        r'(?:u8|u|U|L)?"(?:\\.|[^"\\])*"',
+        normalized,
+    ):
+        raise Rig("adjacent C string literal construction is forbidden")
+    return normalized
+
+
+def c_structure_mask(semantic_source: str) -> str:
+    """Mask literal contents while preserving offsets for balanced delimiters."""
+    out = list(semantic_source)
+    state = "code"
+    index = 0
+    while index < len(semantic_source):
+        value = semantic_source[index]
+        if state == "code":
+            if value == '"':
+                out[index] = " "
+                state = "string"
+            elif value == "'":
+                out[index] = " "
+                state = "character"
+            index += 1
+            continue
+        if value == "\\":
+            out[index] = " "
+            if index + 1 >= len(semantic_source):
+                raise Rig("unterminated C structure escape")
+            out[index + 1] = " "
+            index += 2
+            continue
+        if (state == "string" and value == '"') \
+                or (state == "character" and value == "'"):
+            out[index] = " "
+            state = "code"
+        elif value != "\n":
+            out[index] = " "
+        index += 1
+    if state != "code":
+        raise Rig("unterminated C structure literal")
+    return "".join(out)
+
+
+def c_function_body(semantic_source: str, name: str) -> str:
+    mask = c_structure_mask(semantic_source)
+    matches = list(re.finditer(rf"\bstatic\s+int\s+{re.escape(name)}\s*\(", mask))
+    if len(matches) != 1:
+        raise Rig(f"exact installer function absent or duplicated: {name}")
+    opening_parenthesis = mask.find("(", matches[0].start())
+    depth = 0
+    closing_parenthesis = -1
+    for index in range(opening_parenthesis, len(mask)):
+        if mask[index] == "(":
+            depth += 1
+        elif mask[index] == ")":
+            depth -= 1
+            if depth == 0:
+                closing_parenthesis = index
+                break
+    if closing_parenthesis < 0:
+        raise Rig(f"unterminated installer function declaration: {name}")
+    opening_brace = closing_parenthesis + 1
+    while opening_brace < len(mask) and mask[opening_brace].isspace():
+        opening_brace += 1
+    if opening_brace >= len(mask) or mask[opening_brace] != "{":
+        raise Rig(f"installer function is not a definition: {name}")
+    depth = 0
+    for index in range(opening_brace, len(mask)):
+        if mask[index] == "{":
+            depth += 1
+        elif mask[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return semantic_source[opening_brace + 1:index]
+    raise Rig(f"unterminated installer function body: {name}")
+
+
+def native_absolute_strings(source: str) -> set[str]:
+    return set(re.findall(
+        r'(?:u8|u|U|L)?"(/[^"\\]*)"', c_semantic_source(source),
+    ))
+
+
 def immutable_source_checks(commit: str | None = None) -> None:
     raw = product_bytes("controller/runtime-cleanup/native/mediator.c", commit)
     try:
         source = raw.decode("utf-8")
     except UnicodeError as exc:
         raise Rig("mediator source is not UTF-8") from exc
-    semantic_source = re.sub(r"/\*[\s\S]*?\*/|//[^\n]*", "", source)
+    semantic_source = c_semantic_source(source)
     forbidden_patterns = [
         r"\bAF_INET6?\b", r"\bPF_(?:ROUTE|SYSTEM)\b", r"\bsystem\s*\(",
         r"\bexec[a-z0-9_]*\s*\(", r"\bposix_spawn[a-z0-9_]*\s*\(",
@@ -6018,6 +6354,7 @@ def immutable_source_checks(commit: str | None = None) -> None:
         r"\b(?:setxattr|removexattr|acl_set|chflags|flock)\s*\(",
         r"\bF_SETLK\b", r"\bSO_RCVTIMEO\b",
         r"\bensure_installed\s*\(",
+        r"\bclosefrom\s*\(",
     ]
     required = [
         "renameatx_np", "RENAME_EXCL", "RENAME_NOFOLLOW_ANY",
@@ -6033,23 +6370,14 @@ def immutable_source_checks(commit: str | None = None) -> None:
         "H039_MEDIATOR_SIZE", "installer_bootstrap",
         "stage_embedded_mediator", "publish_staged_mediator",
         "make_final_directory", "umask(0)", "umask(077)",
-        "fcntl(0,F_GETFD)", "EBADF",
+        "fcntl(0,F_GETFD)", "EBADF", "close_bootstrap_descriptors",
     ]
     if any(re.search(pattern, semantic_source) for pattern in forbidden_patterns):
         raise Rig("forbidden native capability token")
     if any(token not in semantic_source for token in required):
         raise Rig("required native primitive token absent")
-    absolute_strings = set(re.findall(r'"(/[^"\\]*)"', semantic_source))
-    if absolute_strings != {
-        "/", "/.", "/..", "/../", "/./", "//", "/install",
-        "/.install/controller/runtime-cleanup/install",
-        "/Library/PrivilegedHelperTools",
-        "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator",
-        "/private/var/db/nortropic-runtime-cleanup-v1",
-        "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/"
-        "Versions/3.12/Resources/Python.app/Contents/MacOS/Python",
-        "/a/%s/h/l", "/a/%s/h/r", "/a/%s/p/c",
-    }:
+    absolute_strings = native_absolute_strings(source)
+    if absolute_strings != NATIVE_ABSOLUTE_STRINGS:
         raise Rig("native absolute path literal authority is not exact closed set")
     if (
         re.search(
@@ -6064,36 +6392,51 @@ def immutable_source_checks(commit: str | None = None) -> None:
         semantic_source,
     ) is not None or '"apply"' in semantic_source:
         raise Rig("external root apply selector survived R6 bootstrap migration")
-    def function_body(name: str) -> str:
-        match = re.search(
-            rf"static\s+int\s+{name}\s*\([^)]*\)\s*\{{([\s\S]*?)\n\}}",
-            semantic_source,
-        )
-        if match is None:
-            raise Rig(f"exact installer function absent: {name}")
-        return match.group(1)
-
-    embedded_body = function_body("load_embedded_mediator")
-    bootstrap_body = function_body("installer_bootstrap")
-    installer_body = function_body("installer_main")
-    if not all(token in embedded_body for token in (
-        "getsectiondata", "__H039RO", "__h039med", "H039_MEDIATOR_SIZE",
-        "H039_MEDIATOR_SHA256", "digest(",
-    )) or not all(token in bootstrap_body for token in (
+    embedded_body = c_function_body(semantic_source, "load_embedded_mediator")
+    closure_body = c_function_body(
+        semantic_source, "close_bootstrap_descriptors",
+    )
+    bootstrap_body = c_function_body(semantic_source, "installer_bootstrap")
+    installer_body = c_function_body(semantic_source, "installer_main")
+    embedded_code = c_structure_mask(embedded_body)
+    closure_code = c_structure_mask(closure_body)
+    bootstrap_code = c_structure_mask(bootstrap_body)
+    installer_code = c_structure_mask(installer_body)
+    if not all(token in embedded_code for token in (
+        "getsectiondata", "H039_MEDIATOR_SIZE", "H039_MEDIATOR_SHA256", "digest(",
+    )) or not all(token in embedded_body for token in (
+        '"__H039RO"', '"__h039med"',
+    )) or not all(token in bootstrap_code for token in (
         "getuid(", "geteuid(", "getgid(", "getegid(", "environ=",
-        "chdir(\"/\")", "fcntl(0,F_GETFD)", "EBADF",
-        "closefrom(0)", "umask(077)",
+        "chdir(", "fcntl(0,F_GETFD)", "EBADF",
+        "close_bootstrap_descriptors(", "umask(077)",
         "loaded_self(", "load_embedded_mediator(", "apply_install(",
+    )) or 'chdir("/")' not in bootstrap_body \
+            or not all(token in closure_code for token in (
+        "getpid(", "PROC_PIDLISTFDS", "proc_pidinfo(",
+        "struct proc_fdinfo", "malloc(", "close(", "free(",
+    )) or not all(token in installer_code for token in (
+        "strcmp(argv[1],", "installer_bootstrap(", "load_embedded_mediator(",
     )) or not all(token in installer_body for token in (
-        "strcmp(argv[1],\"verify\")", "strcmp(argv[1],\"bootstrap\")",
-        "installer_bootstrap(", "load_embedded_mediator(",
+        '"verify"', '"bootstrap"',
     )):
         raise Rig("installer bootstrap extraction dispatch or input closure is not causal")
-    if "load_source(" in bootstrap_body or "load_installed_source(" in bootstrap_body:
+    if re.search(
+        r"fcntl\(0,F_GETFD\)[\s\S]*EBADF[\s\S]*"
+        r"close_bootstrap_descriptors\(\)[\s\S]*umask\(077\)",
+        bootstrap_code,
+    ) is None:
+        raise Rig("bootstrap descriptor closure is not ordered before installer effects")
+    if re.search(
+        r"static\s+int\s+close_bootstrap_descriptors\s*\(\s*void\s*\)\s*\{",
+        c_structure_mask(semantic_source),
+    ) is None:
+        raise Rig("bootstrap descriptor closure accepted a caller-selected argument")
+    if "load_source(" in bootstrap_code or "load_installed_source(" in bootstrap_code:
         raise Rig("bootstrap retained an external mediator-source route")
-    if source.count("CLOCK_MONOTONIC") < 2 \
-            or source.count("deadline_remaining") < 3 \
-            or re.search(r"poll\s*\([^;]*,\s*5000\s*\)", source):
+    if semantic_source.count("CLOCK_MONOTONIC") < 2 \
+            or semantic_source.count("deadline_remaining") < 3 \
+            or re.search(r"poll\s*\([^;]*,\s*5000\s*\)", semantic_source):
         raise Rig("native receive/ACK deadline is not absolute and EINTR-safe")
     if not re.search(
         r"!strcmp\s*\(\s*(?:current\.cleanup_nonce\s*,\s*r->nonce|"
@@ -8199,6 +8542,7 @@ def published_r5_product_uninstalled_baseline() -> tuple[bool, dict[str, Any]]:
 def finish(phase: str) -> int:
     print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
     print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         print("H039_GATE_RESULT=PASS")
@@ -8221,11 +8565,13 @@ def main(argv: list[str]) -> int:
         )
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
         print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
         print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
     product = len(argv) == 3 and argv[0] == "--product"
@@ -8320,6 +8666,7 @@ def main(argv: list[str]) -> int:
         print(f"ODÖMBART H039_HOST_ENVIRONMENT — {exc}")
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
         print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)
