@@ -4396,3 +4396,38 @@ The exact TEST_AUTHOR write set is only `docs/05-beslutslogg.md`, `docs/loop/dri
 reviews and guarded publication, H-036 is refrozen only for the new registry state; then the serial
 chain continues H-039 → H-038 → H-032 → H-031. Supervisor resume remains forbidden until
 all downstream transitions are green.
+
+## 2026-09-02 — H-036 registry-v3 union12 refreeze
+
+The guarded authority base is `35d7fd7c7596df5cb7b8d68f3034cbb7b87df0cf`,
+tree `fff227e0bf95241310dde87b56fc3d136fe3515e`, ordered parents
+`843bf368be8ec0a7162f2a9f1d066889fd3e6702` and
+`dd24c6c4d387d49157250835b666486a65d0c13e`. H-034's dual-review aggregate is
+SHA-256 `aa96f2816134611a43eacb7b68fd8b636bf3dfcc4accc046a6666317553b0161`.
+The current H-034 and H-035 gate hashes are pinned, as are published H-035 core
+and CLI bytes.
+
+The canonical registry is unchanged by this candidate: schema v3, exact union12,
+SHA-256 `7697ee6376e7203350366d6d3ecccff3d605ea1e62beb18c2728bdf29148783e`.
+H-036 remains owner-authority with ordinary writes empty, owner production exactly
+the existing launcher, runtime snapshot and v2 config, and dependency exactly
+`h-034`. Its completed product merge/candidate/review and the exact three product
+modes and digests are bound without changing any product byte.
+
+`--registry-v3-refreeze` is a completed-product temporal gate, not a second
+product acceptance route. Pure causal mutants reject canonical v1/v2 and invalid
+versions, each of the five H-039 members omitted, substituted, duplicated,
+backslash- or leading-dot-aliased, both broad cleanup prefixes as replacement or
+addition, arbitrary additions, duplicate JSON keys, H-036 missing/H039/broad
+surface, wrong dependency, wrong authority base and every changed product digest.
+The live tree must contain no H-039 task, gate, mediator/install product or
+identity-manifest materialization.
+
+The original H-036 runtime contract remains intact, including monotonic Seatbelt
+composition, peer-bound capability authority, exact interpreter/runtime identity,
+no raw fallback and lifecycle cleanup. Only `specs/tasks.spec.json`,
+`verify/bin/h-035-exit`, `verify/bin/h-036-exit`,
+`docs/loop/owner-author-workflow-v1.md`, this drift record and the decision log
+may differ from the base. H-035 changes only its exact H-036 task/document
+compatibility oracles. Review and publication are still separate trust
+transitions; H-039 cannot begin before both complete.
