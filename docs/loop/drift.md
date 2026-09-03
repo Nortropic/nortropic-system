@@ -1,5 +1,54 @@
 # Att köra loopen
 
+## 2026-09-03 — H-039 R9 exact xattr type closure
+
+R8 candidate `20f9a19a…` is frozen immutable NO-CREDIT and was never
+published. Two independent review paths reproduced that its structured
+two-state helper accepted `size: 11.0` and list/dict/string subclasses through
+Python equality, and that installed live metadata accepted provenance sizes
+10 and 0 because it filtered only the name. The ordinary formal run remained
+1263 PASS / 1 expected RED because those cases were absent from its causal
+matrix.
+
+R9 is a fresh direct child of unchanged published R7 product merge
+`6d956a3a…`. It requires exact built-in structured container/key/value types
+and integer 11 before normalization or raw-output comparison. Prefix and every
+native recovery phase now carry float, bool and container-subclass mutants.
+Readable installed snapshots accept only an exact empty tuple or one exact
+provenance tuple with bytes name, integer 11 and lowercase SHA-256 digest;
+wrong/zero/float/bool size, foreign/additional names, tuple/list/bytes/digest
+subclasses, malformed digest, non-boolean ACL and non-integer flags all reject.
+
+The candidate still changes exactly five TEST_AUTHOR files and retains the R7
+product, prefix evidence, zero ACL/flags, restricted-object material review and
+all authority limits. No root command or product effect may resume until dual
+R9 review and guarded publication complete.
+
+## 2026-09-03 — H-039 R8 root-created xattr two-state boundary
+
+The exact first-root host transcript, SHA-256
+`2e5650e036d3abcbfcd1afcc91b3e7e805f7ab30b0a51ebaf553f4a085bced3b`,
+proves the first fixed namespace `mkdir` succeeded as an empty root:wheel 0700
+directory with stable dev/inode, nlink two, flags zero, zero ACL and zero
+xattrs. R7 incorrectly required an Apple provenance xattr on every
+root-created object, so the ceremony stopped before the second command. No
+product ran and no additional root effect or rollback occurred.
+
+R8 is TEST_AUTHOR-only and retains exact guarded R7 product publication
+`6d956a3a…`, tree `32be3b63…`, its parents and all five product blobs. The
+deterministic model and raw observation parser admit root-created objects only
+when xattrs are exactly empty or exactly one `com.apple.provenance` item of
+size 11; every other, duplicate, additional or mixed state rejects. ACL and
+flags remain exactly zero, and the untrusted source's exact provenance binding
+is unchanged. Causal controls cover both positive states at every prefix and
+recovery phase plus wrong name, size, duplication and raw-observation
+substitution.
+
+The five-file R8 contract must freeze, pass two independent reviews and publish
+through the guarded transition before the live prefix is reauthenticated and
+the fixed ceremony resumes at command two. There is no R8 product candidate,
+xattr mutation, root cleanup, authority widening or supervisor resume.
+
 ## 2026-09-03 — H-039 R7 satisfiable descriptor and C-lexical boundary
 
 The guarded R6 contract `341a42ba…` is product-independently unsatisfiable.
