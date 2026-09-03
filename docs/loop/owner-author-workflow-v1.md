@@ -1,5 +1,87 @@
 # Owner-author workflow v1 — frozen H-035 effect contract
 
+## H-039 R10 exact metadata-record closure
+
+Frozen R9 candidate `d2a4ba5edca6dbb39fb9ee099ad77d9871bfc9ef`
+is immutable NO-CREDIT and is not a trust parent. Both formal reviews proved
+that its root-created and installed xattr repairs worked, but the separately
+retained untrusted-source record, protected parent and structured empty ACLs
+still used equality-compatible comparisons. Prefix and restage therefore
+accepted float/complex provenance size, scalar/container subclasses and even
+non-list objects comparing equal to an empty list. Its nominal 1309/1 run is
+not publication credit.
+
+R10 is a fresh direct child of guarded R7 `6d956a3a…` and changes only the same
+five TEST_AUTHOR files. One exact untrusted-source validator is used by the
+initial prefix and by both required and observed restage identities. It binds
+built-in outer dict and keys, string/scalar fields, open-flags list, integer
+identity fields, boolean read/EOF/closed fields, exact empty ACL and exact one
+provenance xattr before whole-record equality. A separate exact validator
+binds the pre-existing `/private/var/db` parent. Every root-created prefix and
+recovery record likewise binds exact dict/key/string/integer/boolean types,
+exact empty ACL and the closed xattr two-state before normalization. Raw
+`ls` paths require built-in strings.
+
+Connected tests cover initial and both restage source consumers, parent,
+directory, leaf, namespace and recovery objects with float, complex, bool,
+int/list/dict/string/key/open-flag subclasses and equality-compatible ACL/xattr
+objects. R8 and R9 remain nonparents. Product, prefix 1, root state and all
+authority are unchanged until R10 passes two independent reviews and guarded
+publication.
+
+## H-039 R9 exact structured and installed xattr types
+
+Frozen R8 candidate `20f9a19ae239fba80f62a832ccc698a76a7fd3db`
+is immutable NO-CREDIT and is not a trust parent. Independent review proved
+that ordinary Python equality admitted float `11.0` and built-in-container
+subclasses as exact structured xattr size/type, while the installed live
+metadata predicate checked only the provenance name and admitted wrong sizes.
+Its nominal 1263/1 expected-RED run cannot rescue those omitted falsifiers.
+
+R9 is a fresh direct child of guarded R7 product publication `6d956a3a…` and
+changes only the same five TEST_AUTHOR files. Structured prefix, recovery and
+raw-`ls` xattrs require exact built-in list, dict, key, string and integer
+types, an exact two-key record and integer size 11. Float, bool, complex,
+container/key/value subclasses, extra keys, duplicates, additions and mixed
+states reject. Every readable installed object independently requires either
+an exact built-in empty tuple or one exact built-in tuple containing the exact
+bytes provenance name, integer size 11 and a lowercase SHA-256 digest; ACL is
+exact built-in `False` and flags exact integer zero. Root-inaccessible fixed
+objects retain their existing immutable-source/material-review boundary.
+
+R9 retains the exact R7 product and prefix-1 transcript and causes no product,
+root or installation effect. Only after a new freeze, two independent reviews
+and guarded publication may prefix 1 be reauthenticated and the ceremony
+resume at its second fixed command. No xattr mutator or broader authority is
+introduced.
+
+## H-039 R8 observed root-metadata reconciliation
+
+R8 starts only from guarded R7 product publication
+`6d956a3aed9f8da30cf5443a72ae6ae647974e2f`. The owner ran only the first
+fixed root `mkdir`; the hash-pinned host transcript proves the resulting
+namespace is one empty root:wheel 0700 directory with nlink two, flags zero,
+zero ACL and zero xattrs, stable across both observations. No second root
+command, product execution, rollback or deletion occurred.
+
+The R7 product is retained byte-exact and receives no R8 product change. R8
+changes only the same five TEST_AUTHOR files and corrects the gate's false
+assumption that every root-created object must carry `com.apple.provenance`.
+Every such object now admits exactly one of two closed observations: no xattrs,
+or exactly one non-authority `com.apple.provenance` value of size 11. Raw
+`ls -ldeO@` output must bind the selected state. Any other name, size,
+duplicate, additional or mixed observation rejects; zero ACL and zero flags
+remain mandatory. The untrusted source keeps its separately observed exact
+provenance identity.
+
+After a fresh freeze, two independent adversarial reviews and guarded
+two-parent contract publication, the existing prefix is reauthenticated and
+the ceremony resumes only at the second fixed `mkdir`. The first command is
+never replayed. The retained R7 installer and mediator are then installed and
+receive the already-required independent uid501/gid20 effect review before
+H038, H032, H031 and supervisor resume. R8 adds no xattr mutator, product path,
+root operation, filesystem/process/network/credential authority or rollback.
+
 ## H-039 R7 portable bootstrap descriptor closure
 
 R7 begins only from the guarded R6 contract merge `341a42ba…`. The unfinished
