@@ -2065,3 +2065,61 @@ phase/location/identity/digest, A-present, A+Q, Q-absent/replaced, unfsynced tem
 or receipt-temp coexistence reject without effect. Independent immutable
 material review remains mandatory; syntax, timing and self-report earn no
 credit and no authority is widened.
+## H-039 R14-R2/R9 exit-code-only root-bootstrap diagnostic
+
+Published H-039 R13/R8 main `4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd`
+and its product candidate `936344abd31c27ae50171b94beac8e2afdfeba3d` are
+immutable inputs. The first fixed R8 root bootstrap returned one undifferentiated
+status 1, while complete before/after 96-command transcripts are byte-identical
+at SHA-256 `cd9aa26e88d9f400640251e75fd559000fe722ea9415542b7d52f78c275a9d0c`.
+The protected root therefore remains exactly R8-ready mode 0500 with no mediator,
+helper, final namespace member or other persistent effect. Re-running R8 earns no
+credit.
+
+Frozen R14-R1 `1ac9e7889ab5eab615e9a2b7e50ab3b3f06cf0be` is immutable
+NO-CREDIT and a nonparent. Both reviews proved that its semantic source checks
+could accept noncausal exit dispatch and hidden effect variants, and that its
+`--published` lane could not bind the later root observation and R8 restoration.
+R14-R2 starts fresh and directly from `4bd4257e…`, changing only the same five
+existing TEST_AUTHOR contract files. Its later R9
+diagnostic product changes only installer, installer-only C source, recipe and
+manifest; `verify/h039/runtime-cleanup-mediator` remains byte-exact at SHA-256
+`6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a`.
+The diagnostic installer is inputless and may execute only as the fixed protected
+root:wheel mode-0500 inode through exact argv
+`/usr/bin/env -i -C / <fixed-installer> bootstrap`. It immediately destroys fd0,
+retains the exact fd1/fd2-to-empty inventory, emits no bytes, and exposes only one
+distinct bounded exit status for each frozen sequential predicate from root entry
+through the last read-only check immediately before `.install/mediator` creation.
+
+Only one diagnostic source is accepted: a byte-exact deterministic transform of
+published R8 `mediator.c` that replaces the exact installer bootstrap/main region
+with the frozen diagnostic branch and retains the exact R8 region under the
+opposite compile branch. The diagnostic recipe adds only the frozen define and
+`-Wno-unused-function`, required because the retained exact R8 effect functions
+are unreachable; the final undefined-import set is exact and contains no mutator.
+This closed reference rejects macros, function pointers, inline assembly, raw
+syscalls, caller-selected reads, root-only effects, dead decoys, reordered or
+rotated predicates, early code 0 and code 126. The compiled path checked-closes
+fd0, proves `EBADF`, requires exactly fd1/fd2, checked-closes both and proves the
+inventory empty before any filesystem access. It then uses only the fixed
+open/fstat/fstatat, `proc_pidinfo`, digest, fsync and rebind operations and must
+not reach `apply_install`, `directory_prefix`, `stage_embedded_mediator` or any
+create/write/chmod/chown/link/rename/unlink path.
+
+Trust transitions are serial: freeze R14-R2 from exact `4bd4257e…`; obtain two
+independent adversarial gate reviews; guarded non-force contract publication;
+build fresh R9; obtain two independent product reviews; guarded product
+publication; reauthenticate the current R8 protected inode; stage the exact R9
+bytes onto that same inode; fully reauthenticate mode 0500; execute exactly one
+diagnostic. `--published` is only the pre-root product/publication validation and
+cannot claim completion. A distinct `--post-root` phase consumes four fixed
+canonical evidence files—never caller paths—and requires exactly one fixed root
+execution, one built-in integer code 0..125 with its exact name, empty output,
+byte-identical complete zero-effect snapshots, then same-inode exact published R8
+restoration and full mode-0500 identity/digest/CDHash/membership reauthentication.
+Exact dict/list/key/scalar types, equality proxies and every skipped phase reject.
+The
+diagnostic never performs production installation. Any corrective product change
+requires a new owner decision. H-038, H-032, H-031 and supervisor resume remain
+stopped.
