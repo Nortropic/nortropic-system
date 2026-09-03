@@ -1,5 +1,111 @@
 # Att köra loopen
 
+## 2026-09-03 — H-039 R12 value-preserving causal coverage
+
+R11 `4ab2e95c…` is frozen immutable NO-CREDIT. Independent reviews proved that
+some named type mutants used wrong values, the created-record routes never
+instantiated provenance xattrs, and native routes retained stale recovery
+evidence. Its nominal green selftests therefore did not isolate every claimed
+type boundary.
+
+R12 again starts directly from guarded R7 `6d956a3a…`. Generators now reject
+their own construction unless every alias whole-record compares equal to its
+reference. Connected execution traces the exact target validator result at
+each source and created-record consumer. Created records run in empty and
+provenance states, native evidence is regenerated before mutation, and source
+booleans/strings plus created optional booleans/digests are complete. This adds
+no predicate, product, prefix, root or authority change; R8–R11 are nonparents.
+
+## 2026-09-03 — H-039 R11 connected source/created consumer coverage
+
+Frozen R10 `1c87ca4f…` passed two independent formal gate reviews and its
+validator dataflow is exact, but an independent implementation audit rejected
+publication: the normative connected-test claim covered equality objects and
+the full source category matrix at initial and both restage consumers, while
+the actual connected matrices covered only selected subclasses. Its 1373/1
+nominal result is therefore NO-CREDIT.
+
+R11 starts again directly from guarded R7 `6d956a3a…`. A shared complete source
+mutant family now runs independently through initial, required-restage and
+observed-restage call sites. A corresponding created-record family runs through
+prefix directory/leaf and native namespace/object/helper consumers. This is
+only causal-test completion: predicates, product bytes, prefix-1 evidence, root
+state and authority are unchanged. R8/R9/R10 remain nonparents.
+
+## 2026-09-03 — H-039 R10 exact metadata-record boundary
+
+Dual review rejects frozen R9 `d2a4ba5e…` as immutable NO-CREDIT. Its new
+root-created xattr and installed live tuple predicates are exact, but initial
+and restage source identities still compared whole records without first
+typing provenance and nested containers. Protected-parent and structured ACL
+checks similarly accepted list subclasses or arbitrary equality-compatible
+objects. Both formal gates remained nominally 1309 PASS / 1 expected RED,
+which demonstrates the missing causal family rather than satisfying it.
+
+R10 starts again as a direct child of published R7 `6d956a3a…`. Context-specific
+validators now type the complete untrusted source, protected parent and every
+root-created metadata record before equality or normalization. The identical
+source validator is mandatory for prefix, required fresh restage and observed
+restage records. Raw ACL/xattr output is still checked before normalization,
+and its path must be a built-in string. Exact empty ACL lists join the existing
+exact empty-or-provenance xattr rule.
+
+New connected mutants cover outer records, keys, paths, types, open flags,
+ACL/xattr containers and numeric values including float, complex, bool and
+subclasses at each consumer. R8/R9 are nonparents; R7 product bytes, prefix-1
+evidence, live installed tuple closure, restricted-object material boundary
+and every authority limit remain unchanged. No root/install/publication effect
+precedes fresh R10 dual review.
+
+## 2026-09-03 — H-039 R9 exact xattr type closure
+
+R8 candidate `20f9a19a…` is frozen immutable NO-CREDIT and was never
+published. Two independent review paths reproduced that its structured
+two-state helper accepted `size: 11.0` and list/dict/string subclasses through
+Python equality, and that installed live metadata accepted provenance sizes
+10 and 0 because it filtered only the name. The ordinary formal run remained
+1263 PASS / 1 expected RED because those cases were absent from its causal
+matrix.
+
+R9 is a fresh direct child of unchanged published R7 product merge
+`6d956a3a…`. It requires exact built-in structured container/key/value types
+and integer 11 before normalization or raw-output comparison. Prefix and every
+native recovery phase now carry float, bool and container-subclass mutants.
+Readable installed snapshots accept only an exact empty tuple or one exact
+provenance tuple with bytes name, integer 11 and lowercase SHA-256 digest;
+wrong/zero/float/bool size, foreign/additional names, tuple/list/bytes/digest
+subclasses, malformed digest, non-boolean ACL and non-integer flags all reject.
+
+The candidate still changes exactly five TEST_AUTHOR files and retains the R7
+product, prefix evidence, zero ACL/flags, restricted-object material review and
+all authority limits. No root command or product effect may resume until dual
+R9 review and guarded publication complete.
+
+## 2026-09-03 — H-039 R8 root-created xattr two-state boundary
+
+The exact first-root host transcript, SHA-256
+`2e5650e036d3abcbfcd1afcc91b3e7e805f7ab30b0a51ebaf553f4a085bced3b`,
+proves the first fixed namespace `mkdir` succeeded as an empty root:wheel 0700
+directory with stable dev/inode, nlink two, flags zero, zero ACL and zero
+xattrs. R7 incorrectly required an Apple provenance xattr on every
+root-created object, so the ceremony stopped before the second command. No
+product ran and no additional root effect or rollback occurred.
+
+R8 is TEST_AUTHOR-only and retains exact guarded R7 product publication
+`6d956a3a…`, tree `32be3b63…`, its parents and all five product blobs. The
+deterministic model and raw observation parser admit root-created objects only
+when xattrs are exactly empty or exactly one `com.apple.provenance` item of
+size 11; every other, duplicate, additional or mixed state rejects. ACL and
+flags remain exactly zero, and the untrusted source's exact provenance binding
+is unchanged. Causal controls cover both positive states at every prefix and
+recovery phase plus wrong name, size, duplication and raw-observation
+substitution.
+
+The five-file R8 contract must freeze, pass two independent reviews and publish
+through the guarded transition before the live prefix is reauthenticated and
+the fixed ceremony resumes at command two. There is no R8 product candidate,
+xattr mutation, root cleanup, authority widening or supervisor resume.
+
 ## 2026-09-03 — H-039 R7 satisfiable descriptor and C-lexical boundary
 
 The guarded R6 contract `341a42ba…` is product-independently unsatisfiable.
