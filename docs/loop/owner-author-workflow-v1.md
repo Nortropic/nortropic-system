@@ -1,5 +1,32 @@
 # Owner-author workflow v1 — frozen H-035 effect contract
 
+## H-039 R8 observed root-metadata reconciliation
+
+R8 starts only from guarded R7 product publication
+`6d956a3aed9f8da30cf5443a72ae6ae647974e2f`. The owner ran only the first
+fixed root `mkdir`; the hash-pinned host transcript proves the resulting
+namespace is one empty root:wheel 0700 directory with nlink two, flags zero,
+zero ACL and zero xattrs, stable across both observations. No second root
+command, product execution, rollback or deletion occurred.
+
+The R7 product is retained byte-exact and receives no R8 product change. R8
+changes only the same five TEST_AUTHOR files and corrects the gate's false
+assumption that every root-created object must carry `com.apple.provenance`.
+Every such object now admits exactly one of two closed observations: no xattrs,
+or exactly one non-authority `com.apple.provenance` value of size 11. Raw
+`ls -ldeO@` output must bind the selected state. Any other name, size,
+duplicate, additional or mixed observation rejects; zero ACL and zero flags
+remain mandatory. The untrusted source keeps its separately observed exact
+provenance identity.
+
+After a fresh freeze, two independent adversarial reviews and guarded
+two-parent contract publication, the existing prefix is reauthenticated and
+the ceremony resumes only at the second fixed `mkdir`. The first command is
+never replayed. The retained R7 installer and mediator are then installed and
+receive the already-required independent uid501/gid20 effect review before
+H038, H032, H031 and supervisor resume. R8 adds no xattr mutator, product path,
+root operation, filesystem/process/network/credential authority or rollback.
+
 ## H-039 R7 portable bootstrap descriptor closure
 
 R7 begins only from the guarded R6 contract merge `341a42ba…`. The unfinished
