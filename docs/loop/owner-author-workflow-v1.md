@@ -2065,3 +2065,126 @@ phase/location/identity/digest, A-present, A+Q, Q-absent/replaced, unfsynced tem
 or receipt-temp coexistence reject without effect. Independent immutable
 material review remains mandatory; syntax, timing and self-report earn no
 credit and no authority is widened.
+## H-039 R14-R2/R9 exit-code-only root-bootstrap diagnostic
+
+Published H-039 R13/R8 main `4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd`
+and its product candidate `936344abd31c27ae50171b94beac8e2afdfeba3d` are
+immutable inputs. The first fixed R8 root bootstrap returned one undifferentiated
+status 1, while complete before/after 96-command transcripts are byte-identical
+at SHA-256 `cd9aa26e88d9f400640251e75fd559000fe722ea9415542b7d52f78c275a9d0c`.
+The protected root therefore remains exactly R8-ready mode 0500 with no mediator,
+helper, final namespace member or other persistent effect. Re-running R8 earns no
+credit.
+
+Frozen R14-R1 `1ac9e7889ab5eab615e9a2b7e50ab3b3f06cf0be` is immutable
+NO-CREDIT and a nonparent. Both reviews proved that its semantic source checks
+could accept noncausal exit dispatch and hidden effect variants, and that its
+`--published` lane could not bind the later root observation and R8 restoration.
+R14-R2 starts fresh and directly from `4bd4257e…`, changing only the same five
+existing TEST_AUTHOR contract files. Its later R9
+diagnostic product changes only installer, installer-only C source, recipe and
+manifest; `verify/h039/runtime-cleanup-mediator` remains byte-exact at SHA-256
+`6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a`.
+The diagnostic installer is inputless and may execute only as the fixed protected
+root:wheel mode-0500 inode through exact argv
+`/usr/bin/env -i -C / <fixed-installer> bootstrap`. It immediately destroys fd0,
+retains the exact fd1/fd2-to-empty inventory, emits no bytes, and exposes only one
+distinct bounded exit status for each frozen sequential predicate from root entry
+through the last read-only check immediately before `.install/mediator` creation.
+
+Only one diagnostic source is accepted: a byte-exact deterministic transform of
+published R8 `mediator.c` that replaces the exact installer bootstrap/main region
+with the frozen diagnostic branch and retains the exact R8 region under the
+opposite compile branch. The diagnostic recipe adds only the frozen define and
+`-Wno-unused-function`, required because the retained exact R8 effect functions
+are unreachable; the final undefined-import set is exact and contains no mutator.
+This closed reference rejects macros, function pointers, inline assembly, raw
+syscalls, caller-selected reads, root-only effects, dead decoys, reordered or
+rotated predicates, early code 0 and code 126. The compiled path checked-closes
+fd0, proves `EBADF`, requires exactly fd1/fd2, checked-closes both and proves the
+inventory empty before any filesystem access. It then uses only the fixed
+open/fstat/fstatat, `proc_pidinfo`, digest, fsync and rebind operations and must
+not reach `apply_install`, `directory_prefix`, `stage_embedded_mediator` or any
+create/write/chmod/chown/link/rename/unlink path.
+
+Trust transitions are serial: freeze R14-R2 from exact `4bd4257e…`; obtain two
+independent adversarial gate reviews; guarded non-force contract publication;
+build fresh R9; obtain two independent product reviews; guarded product
+publication; reauthenticate the current R8 protected inode; stage the exact R9
+bytes onto that same inode; fully reauthenticate mode 0500; execute exactly one
+diagnostic. `--published` is only the pre-root product/publication validation and
+cannot claim completion. A distinct `--post-root` phase consumes four fixed
+canonical evidence files—never caller paths—and requires exactly one fixed root
+execution, one built-in integer code 0..125 with its exact name, empty output,
+byte-identical complete zero-effect snapshots, then same-inode exact published R8
+restoration and full mode-0500 identity/digest/CDHash/membership reauthentication.
+Exact dict/list/key/scalar types, equality proxies and every skipped phase reject.
+The
+diagnostic never performs production installation. Any corrective product change
+requires a new owner decision. H-038, H-032, H-031 and supervisor resume remain
+stopped.
+## H-039 R14-R3/R9 compiled-status diagnostic and manual owner ceremony
+
+This section supersedes the operational R14-R2 section above. Frozen R14-R1
+`1ac9e7889ab5eab615e9a2b7e50ab3b3f06cf0be` and frozen R14-R2
+`363f7d7a753fa6bce7ae63dc0ec382b200e193b6` are immutable NO-CREDIT
+nonparents. R14-R2 accepted caller-authored or symlinked fixed-name reports as
+post-root proof, its optimized build removed statuses 28, 29, and 66, and its
+diagnostic admitted unnecessary `umask`. R14-R3 starts freshly from published
+`4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd`.
+
+The only accepted diagnostic is the frozen byte-exact R8-to-R9 source transform
+and its frozen exact `clang -O2` LLVM IR. Reviewers must inspect the compiled
+`main` and `installer_bootstrap` control flow and prove that status 0 is the
+immediate pre-create zero-effect boundary, statuses 1 through 5 remain the main
+dispatch failures, and statuses 6 through 125—including 28, 29, and 66—remain
+causal handler returns. The diagnostic performs the exact fd0 close/EBADF and
+fd1/fd2-to-empty sequence before filesystem access. It has no `umask`, effect,
+output, caller-selected input, alternate source, or runtime-mediator change.
+
+`--published` returns only `PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY`. It binds
+guarded Git/product/rebuild/Mach-O facts and the externally visible preserved
+zero-effect namespace non-traversability prestate. It does not prove live
+protected R8 bytes, root execution, restoration, task completion, dependency
+eligibility, installation, H038 progress, or supervisor resume. There is no
+machine post-root gate phase. Caller-written transcripts and reports are
+`WORKFLOW_REPORT_ONLY` and can never affect PASS.
+
+After guarded R9 publication the owner ceremony is strictly manual and serial:
+full root reauthentication; same-inode R9 staging and full reauthentication;
+exactly one fixed protected `bootstrap` execution with no retry, using only the
+kernel-delivered exit status and empty stdout/stderr; full zero-effect
+observation; then same-inode exact R8 restoration and full root
+reauthentication. An ambiguous or interrupted execution is not retried: restore
+R8 and stop. Every outcome ends in mandatory `OWNER_ADJUDICATION_STOP`; a fresh
+owner decision may later pin the observed code and transcript hashes.
+
+This limitation is explicit: after R8 restoration uid501 cannot mechanically
+distinguish zero, one, or multiple historical zero-effect executions. No report
+can close that observation gap or advance dependencies automatically.
+## H-039 R14-R4 owning-CFG interpretation
+
+This section supersedes only R14-R3's reachability claim. R14-R1 `1ac9e788…`,
+R14-R2 `363f7d7a…`, and R14-R3 `35a7e56f…` are immutable NO-CREDIT
+nonparents. R3's exact source and optimized IR retained every local status
+branch, but its statement that every status was causally reachable from the
+diagnostic call graph was false.
+
+R14-R4 requires each existing check's unique status to remain an
+optimizer-retained predicate-local return in its owning compiled CFG: main owns
+1..5, `installer_bootstrap` owns 6..125, and code 0 occurs only at the exact
+immediate pre-create zero-effect boundary. It does not claim or require every
+status to be executable from process entry. Main first validates the fixed
+argc, argv pointers, argv values, and operation. Its sole direct handler call
+passes unchanged argv with known argc 2 and nonnull argv.
+
+Some defense-in-depth branches are logically dominated. Known examples are 18,
+19, 28, 29, and 62; this is not asserted to be exhaustive. They remain bound
+to their local predicates. Observation of any status contradicting its prior
+invariant is a contract contradiction and requires owner stop. Removed local
+branches, added callers or selectors, indirect calls, changed, reloaded or
+volatile arguments, alternate input, nondeterminism, and manufactured
+reachability reject. Artificial reachability would require a new owner decision.
+
+The exact source/IR bytes, no-umask imports, manual no-retry ceremony, absence
+of machine post-root credit, product scope, and authority remain unchanged.
