@@ -1,5 +1,74 @@
 # Att köra loopen
 
+## 2026-09-03 — H-039 R13-R4 pre-comparison typed closure
+
+Frozen R13-R3 `a57b9a07…` is immutable NO-CREDIT. Before its independent
+reviews completed, TEST_AUTHOR reproduced a self-repairing equality proxy in
+`argv_prefix`: the first ordinary comparison invoked the proxy, which replaced
+itself with the expected list; the later recursive type check then accepted
+the record. The reviews were stopped because the counterexample was decisive.
+
+R13-R4 again starts directly from published R12 `3a351778…`. It invokes the
+existing exact connected source, protected-parent and created-record validators
+first, then recursively closes the complete observation's built-in types before
+any other ordinary comparison. Every node at every crash prefix also receives a
+self-repairing equality proxy and must reject with zero comparison calls. This
+changes only the same five TEST_AUTHOR files; product bytes, protected state,
+runtime mediator and authority remain unchanged.
+
+## 2026-09-03 — H-039 R13-R3 full first-root typed closure
+
+R13-R2 `70bc5284…` is frozen immutable NO-CREDIT. Its six-state migration
+oracle rejected all 3803 typed aliases, but independent review proved the
+older full-bootstrap consumer still accepted value-equal hostile containers
+that concealed fd99, a Kuvert environment variable, or false stdin state.
+
+R13-R3 again starts directly from published R12 `3a351778…`. Every complete
+first-root observation is recursively limited to exact built-in dictionaries,
+lists, string keys and contract scalar types before ordinary equality. For
+every crash prefix, every node and key is replaced by a whole-record-value-
+equal type-different alias and must reject. Existing connected source and
+created-record validators still receive their own traced mutants first. This
+is gate-only remediation in the same five files; root state, product bytes,
+runtime mediator and authority do not change.
+
+## 2026-09-03 — H-039 R13-R2 exact typed recovery records
+
+Frozen R13-R1 `8cb829a9…` is immutable NO-CREDIT. One independent lane found a
+decisive counterexample despite its nominal 1801/1 expected-RED run: ordinary
+nested equality accepted boolean and float aliases for exact installer,
+protected-chain and effect-count integers. The other lane's PASS cannot
+override that mechanically reproduced false positive.
+
+R13-R2 restarts from published R12 `3a351778…` and recursively type-binds every
+container, key and scalar before equality in all six PRE_EFFECTS migration
+states. Each node receives a connected whole-record-value-equal type alias
+control. This is gate-only remediation inside the same five TEST_AUTHOR files;
+no product, root state, path, effect, runtime mediator or authority changes.
+
+## 2026-09-03 — H-039 R13/R8 sudo-PTY fd0 normalization
+
+Published R12 `3a351778…` is now the exact contract parent. The protected
+first-root ceremony reached PRE_EFFECTS with the exact R7 installer staged
+root:wheel 0500 on fixed inode `16777232:126988174`; bootstrap returned one and
+left no mediator, helper or final-layout effect. Independent diagnosis proved
+the frozen R7 assumption—not the cleanup objective—was wrong for the real
+entry: sudo's PTY path supplies fd0 even when the caller closes it.
+
+R13 admits no fd0 data authority. The bootstrap-only handler checked-closes
+the inherited fd0 file object as its first effect, proves post-close EBADF, and
+then retains the exact R7 fd1/fd2-to-empty inventory. A dynamic canary binds no
+read, while independent compiled review binds no parse/mmap/fstat/ioctl/copy,
+alias or indirect consumption. The runtime mediator stays byte-exact.
+
+The fresh R8 product changes only the four installer-related files. Recovery
+is a new one-shot same-inode state machine, separate from the valid later
+post-self-unlink restage model: exact R7 0500 → inert R7 0400 → exact R8-prefix
+0400 → durable/rebound R8 0400 → fully verified R8 0500. No unlink, rename,
+recreation or general rollback can repair a mismatch. Because uid501 cannot
+traverse the protected chain, preproduct explicitly defers live descendant
+credit to mandatory root reauthentication immediately before chmod 0400.
+
 ## 2026-09-03 — H-039 R12 value-preserving causal coverage
 
 R11 `4ab2e95c…` is frozen immutable NO-CREDIT. Independent reviews proved that

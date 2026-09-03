@@ -1,10 +1,11 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
 """Frozen H-039 OS-exclusive runtime-cleanup mediator gate.
 
-No arguments execute R12 pre-install RED while re-reviewing the exact published R7
-product and authenticated prefix-1 host evidence. Only the distinct ``--installed``
-lane exercises the installation, always as uid 501/gid 20. This Python gate never
-runs elevated and never accepts a cleanup path, PID, command, or installation effect.
+No arguments execute R13 pre-product RED while re-reviewing the exact published R7
+product and preserved protected PRE_EFFECTS state. ``--product`` reviews one fresh
+R8 candidate without root effect; only ``--installed`` exercises the installation,
+always as uid 501/gid 20. This Python gate never runs elevated and never accepts a
+cleanup path, PID, command, or installation effect.
 """
 
 from __future__ import annotations
@@ -43,11 +44,11 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "6d956a3aed9f8da30cf5443a72ae6ae647974e2f"
-CONTRACT_AUTHORITY_TREE = "32be3b639bb35c076c1bc9aa42ecbad71a0aad98"
+CONTRACT_AUTHORITY_BASE = "3a351778c13b10c28f751d27a2803a3e30930812"
+CONTRACT_AUTHORITY_TREE = "af499b55c22b3be54ce216a03e906687ad124b5d"
 CONTRACT_AUTHORITY_PARENTS = [
-    "1e8436b8d4fb1d694ca3af92c5401d0430f77318",
-    "0a465c77a8adb42780cfbdcc1673e8edd9e650e0",
+    "6d956a3aed9f8da30cf5443a72ae6ae647974e2f",
+    "0305f8292d7845e3139b00b2a36726ba2b8c3f8c",
 ]
 PUBLISHED_H039_R5_PRODUCT_MERGE = "f190cc575f36e6fe97f84b3e1810ca92d7d13401"
 PUBLISHED_H039_R5_PRODUCT_TREE = "1e8d0e7d31f2745bada3a5aeded69a1eecbf7fba"
@@ -148,7 +149,7 @@ PROTECTED_INSTALLER = (
     NAMESPACE / ".install/controller/runtime-cleanup/install"
 )
 UNTRUSTED_INSTALLER_SOURCE = Path(
-    "/Users/elinhaggstrom/nortropic/worktrees/h039-r7-product/"
+    "/Users/elinhaggstrom/nortropic/worktrees/h039-r8-product/"
     "controller/runtime-cleanup/install"
 )
 LAYOUT = ["a", "c", "q", "r", "s"]
@@ -232,6 +233,48 @@ FIRST_ROOT_ARGV = [
     [*ROOT_EXEC_PREFIX, "/bin/ls", "-ldeO@", str(PROTECTED_INSTALLER)],
     [*ROOT_EXEC_PREFIX, str(PROTECTED_INSTALLER), "bootstrap"],
 ]
+R13_RESTAGE_EFFECT_INDICES = [5, 4, *range(6, len(FIRST_ROOT_ARGV))]
+R13_RESTAGE_ARGV = [FIRST_ROOT_ARGV[index] for index in R13_RESTAGE_EFFECT_INDICES]
+R13_PRESERVED_R7_PRE_EFFECTS = {
+    "namespace": {
+        "path": str(NAMESPACE), "dev": 16777232, "ino": 126958092,
+        "mode": 0o700, "uid": 0, "gid": 0, "nlink": 3, "size": 96,
+        "flags": 0, "acl": [], "xattrs": [],
+        "members": [".install"],
+    },
+    "install": {
+        "path": str(NAMESPACE / ".install"), "dev": 16777232,
+        "ino": 126985553, "mode": 0o700, "uid": 0, "gid": 0,
+        "nlink": 3, "size": 96, "flags": 0, "acl": [], "xattrs": [],
+        "members": ["controller"],
+    },
+    "controller": {
+        "path": str(NAMESPACE / ".install/controller"), "dev": 16777232,
+        "ino": 126985979, "mode": 0o700, "uid": 0, "gid": 0,
+        "nlink": 3, "size": 96, "flags": 0, "acl": [], "xattrs": [],
+        "members": ["runtime-cleanup"],
+    },
+    "runtime_cleanup": {
+        "path": str(NAMESPACE / ".install/controller/runtime-cleanup"),
+        "dev": 16777232, "ino": 126986304, "mode": 0o700,
+        "uid": 0, "gid": 0, "nlink": 3, "size": 96, "flags": 0,
+        "acl": [], "xattrs": [], "members": ["install"],
+    },
+    "installer": {
+        "path": str(PROTECTED_INSTALLER), "dev": 16777232,
+        "ino": 126988174, "mode": 0o500, "uid": 0, "gid": 0,
+        "nlink": 1, "size": 169296, "flags": 0, "acl": [],
+        "xattrs": [],
+        "sha256": "042bb964b6525fc6fadd7503751227ce0fef2502b0ea0fd99c921b348188324e",
+        "cdhash": "a982723b512e7309b6759be798a434218e519823",
+    },
+    "staged_mediator": "ABSENT",
+    "installed_helper": "ABSENT",
+    "final_layout": [],
+    "bootstrap_attempts": 1,
+    "bootstrap_result": 1,
+    "bootstrap_effect": False,
+}
 RECOVERY_IDENTITY_PATHS = [
     "/private/var/db",
     str(NAMESPACE),
@@ -541,6 +584,61 @@ R12_MATERIAL_REVIEW_EXTENSION = (
     "BASELINE;_R11_4AB2E95C_IS_IMMUTABLE_NO_CREDIT_AND_R8_R9_R10_R11_ARE_"
     "NONPARENTS_WITH_NO_PRODUCT_PREFIX1_ROOT_EFFECT_OR_AUTHORITY_CHANGE"
 )
+R13_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_IMMUTABLE_PRODUCT_REVIEW_MUST_PROVE_THE_EXACT_BOOTSTRAP_"
+    "DISPATCH_ENTERS_INSTALLER_BOOTSTRAP_WITH_EXACTLY_THE_INHERITED_STANDARD_"
+    "DESCRIPTORS_FD0_FD1_FD2_AND_THE_FIRST_BOOTSTRAP_HANDLER_EFFECT_IS_"
+    "CHECKED_CLOSE0_FOLLOWED_IMMEDIATELY_BY_ERRNO_ZERO_AND_FCNTL0_F_GETFD_"
+    "MINUS1_EBADF_BEFORE_THE_UNCHANGED_NO_ARGUMENT_SELF_INVENTORY_REQUIRES_"
+    "EXACTLY_FD1_FD2_CHECKED_CLOSES_BOTH_AND_REQUIRES_AN_EMPTY_SECOND_"
+    "INVENTORY_BEFORE_ANY_FILESYSTEM_OPEN_OR_INSTALL_EFFECT;_THE_INHERITED_"
+    "FD0_FILE_OBJECT_IS_NEVER_READ_PARSED_MAPPED_FSTATTED_IOCTLLED_COPIED_"
+    "DUPLICATED_OR_OTHERWISE_CONSUMED_AND_ONLY_CLOSE0_PLUS_THE_POSTCLOSE_"
+    "F_GETFD_EBADF_QUERY_MAY_REFERENCE_IT_WHILE_LATER_REUSE_OF_NUMERIC_SLOT0_"
+    "AFTER_THE_CAPABILITY_IS_DESTROYED_IS_NOT_THE_INHERITED_CAPABILITY;_"
+    "COMPILED_CALL_GRAPH_CONDITIONAL_MACRO_ALIAS_AND_DESCRIPTOR_DATAFLOW_"
+    "REMAIN_MATERIAL_REVIEW_ONLY;_THE_RUNTIME_MEDIATOR_BINARY_IS_BYTE_EXACT_"
+    "TO_PUBLISHED_R7;_THE_ONE_SHOT_PRE_EFFECTS_R7_TO_R8_RESTAGE_PRESERVES_"
+    "THE_EXACT_PROTECTED_INSTALLER_DEV_INO_AND_REQUIRES_R7_REAUTHENTICATION_"
+    "THEN_FIXED_CHMOD0400_THEN_EXACT_PUBLISHED_R8_BYTES_THROUGH_THE_EXISTING_"
+    "FIXED_STDIN_ONLY_DD_WITH_PREFIX_DIGEST_CRASH_RECOVERY_NO_UNLINK_RENAME_"
+    "RECREATE_NEIGHBOR_OR_GENERAL_ROLLBACK_AND_FULL_REVERIFICATION_BEFORE_"
+    "CHMOD0500_AND_ONE_FIXED_BOOTSTRAP"
+)
+R13_TYPED_RECOVERY_REVIEW_EXTENSION = (
+    "INDEPENDENT_GATE_REVIEW_MUST_PROVE_EVERY_R13_PRE_EFFECTS_MIGRATION_"
+    "RECORD_CONTAINER_KEY_AND_SCALAR_HAS_ITS_EXACT_BUILTIN_TYPE_BEFORE_"
+    "VALUE_COMPARISON_AT_EVERY_R7_READY0500_R7_INERT0400_R8_PARTIAL0400_"
+    "R8_FULL_UNCONFIRMED0400_R8_READY0400_AND_R8_READY0500_CONSUMER;_EVERY_"
+    "CONNECTED_DICT_LIST_STRING_INTEGER_BOOLEAN_NULL_AND_KEY_SUBCLASS_FLOAT_"
+    "COMPLEX_BOOLEAN_INTEGER_AND_EQUALITY_OBJECT_ALIAS_MUST_WHOLE_RECORD_"
+    "COMPARE_EQUAL_TO_THE_REFERENCE_AND_STILL_REJECT_AT_THE_TARGET_ORACLE;_"
+    "FROZEN_R13_R1_8CB829A9_IS_IMMUTABLE_NO_CREDIT_FOR_ORDINARY_NESTED_"
+    "PYTHON_EQUALITY_ACCEPTING_NUMERIC_AND_BOOLEAN_ALIASES_WITH_NO_PRODUCT_"
+    "ROOT_PUBLICATION_RUNTIME_MEDIATOR_OR_AUTHORITY_CHANGE"
+)
+R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION = (
+    "INDEPENDENT_GATE_REVIEW_MUST_PROVE_THE_COMPLETE_FIRST_ROOT_OBSERVATION_"
+    "AT_EVERY_CRASH_PREFIX_RECURSIVELY_REQUIRES_EXACT_BUILTIN_DICT_LIST_"
+    "STRING_KEY_INTEGER_BOOLEAN_BYTES_AND_NULL_TYPES_BEFORE_ORDINARY_EQUALITY_"
+    "AFTER_EXISTING_CONNECTED_SOURCE_AND_CREATED_RECORD_VALIDATORS_RUN;_EVERY_"
+    "CONTAINER_KEY_AND_SCALAR_RECEIVES_A_WHOLE_RECORD_VALUE_EQUAL_EXACT_TYPE_"
+    "DIFFERENT_ALIAS_AND_REJECTS_INCLUDING_HOSTILE_HIDDEN_FD_ENVIRONMENT_STDIN_"
+    "DESCRIPTOR_TOOL_DD_AND_FINAL_LAYOUT_STATES;_FROZEN_R13_R2_70BC5284_IS_"
+    "IMMUTABLE_NO_CREDIT_AND_R13_R1_R13_R2_ARE_NONPARENTS_WITH_NO_PRODUCT_"
+    "ROOT_PUBLICATION_RUNTIME_MEDIATOR_OR_AUTHORITY_CHANGE"
+)
+R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION = (
+    "INDEPENDENT_GATE_REVIEW_MUST_PROVE_EXACT_CONNECTED_SOURCE_PROTECTED_"
+    "PARENT_AND_CREATED_RECORD_VALIDATORS_RUN_BEFORE_THE_COMPLETE_FIRST_ROOT_"
+    "OBSERVATION_IS_RECURSIVELY_EXACT_TYPE_CLOSED_AND_THAT_THIS_CLOSURE_"
+    "PRECEDES_EVERY_OTHER_ORDINARY_EQUALITY;_AT_EVERY_CRASH_PREFIX_EVERY_NODE_"
+    "RECEIVES_A_SELF_REPAIRING_VALUE_EQUAL_PROXY_AND_REJECTS_WITHOUT_ITS_"
+    "COMPARISON_METHOD_EXECUTING;_FROZEN_R13_R3_A57B9A07_IS_IMMUTABLE_NO_"
+    "CREDIT_FOR_ACCEPTING_A_MUTATING_ARGV_PREFIX_EQUALITY_PROXY_AND_R13_R1_"
+    "R13_R2_R13_R3_ARE_NONPARENTS_WITH_NO_PRODUCT_ROOT_PUBLICATION_RUNTIME_"
+    "MEDIATOR_OR_AUTHORITY_CHANGE"
+)
 NATIVE_ABSOLUTE_STRINGS = {
     "/", "/.", "/..", "/../", "/./", "//", "/install",
     "/.install/controller/runtime-cleanup/install",
@@ -552,18 +650,21 @@ NATIVE_ABSOLUTE_STRINGS = {
     "/a/%s/h/l", "/a/%s/h/r", "/a/%s/p/c",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_PROTECTED_BOOTSTRAP_AND_ROOT_INSTALL_INCOMPLETE_AT_PREFIX1"
+REASON = "H039_R13_FRESH_R8_PRODUCT_AND_PROTECTED_BOOTSTRAP_INCOMPLETE_AT_PRE_EFFECTS"
 FAILURE_SIGNATURE = [
     "EXACT_PUBLISHED_R7_FIVE_PRODUCT_BYTES_PRESENT",
-    "AUTHENTICATED_EMPTY_ROOT_PREFIX1_PRESENT_AND_FIXED_INSTALL_INCOMPLETE",
+    "PUBLISHED_R12_CONTRACT_IS_THE_EXACT_R13_AUTHORITY_BASE",
+    "OWNER_RECORDED_R7_PRE_EFFECTS_STAGING_PRESERVED_AND_UID501_NONTRAVERSABLE",
+    "FRESH_R8_FOUR_FILE_PRODUCT_NOT_YET_PUBLISHED",
+    "R7_TO_R8_SAME_INODE_INERT_RESTAGE_REQUIRED_BEFORE_BOOTSTRAP",
     "EXACT_HASH_PINNED_FIRST_ROOT_PRESTAGE_PREFIX_MODEL_GREEN",
-    "INPUTLESS_EMBEDDED_MEDIATOR_BOOTSTRAP_REQUIRED",
+    "FD0_ENTRY_CLOSE_POSTCLOSE_EBADF_AND_INPUTLESS_EMBEDDED_BOOTSTRAP_REQUIRED",
     "PATHLESS_CAPABILITY_AND_MANAGED_OPTION_A_FALSIFICATION_GREEN",
     "F_OFD_SETLK_REFERENCE_FALSIFICATION_GREEN",
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "14807e584ce3438cc2b74340b017b2004a7a03ebbaa0b5cd2e6fc4988a6dfcc1"
+EXPECTED_H039_ROW_SHA256 = "c9bc61788cb5d0ed5d59ea426198d4ba98349420248f294633646fdc6267b0b4"
 
 passed = 0
 failed = 0
@@ -772,7 +873,7 @@ def static_contract_checks() -> dict[str, Any]:
         check(
             sha(blob(PUBLISHED_H039_R7_PRODUCT_MERGE, path)) == digest
             and sha(blob(CONTRACT_AUTHORITY_BASE, path)) == digest,
-            f"A_H039_R12_AUTHORITY_RETAINS_R7_{path.upper().replace('/', '_').replace('.', '_')}",
+            f"A_H039_R13_AUTHORITY_RETAINS_R7_{path.upper().replace('/', '_').replace('.', '_')}",
         )
     for path, digest in PUBLISHED_H036_LEGACY_BLOBS.items():
         check(
@@ -800,8 +901,12 @@ def static_contract_checks() -> dict[str, Any]:
     )
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
-        and first_root.get("recovery_membership_argv") == recovery_argv_registry(),
-        "A_H039_R6_EXACT_EFFECT_AND_RECOVERY_ARGV_REGISTRIES",
+        and first_root.get("recovery_membership_argv") == recovery_argv_registry()
+        and first_root.get("r13_restage_effect_indices")
+        == R13_RESTAGE_EFFECT_INDICES
+        and first_root.get("r13_preserved_r7_pre_effects_sha256")
+        == sha(canonical(R13_PRESERVED_R7_PRE_EFFECTS)),
+        "A_H039_R13_EXACT_EFFECT_RECOVERY_AND_PRESERVED_STATE_REGISTRIES",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -828,6 +933,21 @@ def static_contract_checks() -> dict[str, Any]:
         and row.get("h039_os_exclusive_runtime_cleanup", {})
         .get("causal_falsification", {})
         .get("r12_material_review_extension") == R12_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r13_material_review_extension") == R13_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r13_exact_typed_recovery_review_extension")
+        == R13_TYPED_RECOVERY_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r13_full_first_root_exact_typed_review_extension")
+        == R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r13_precomparison_exact_typed_review_extension")
+        == R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION
         and f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}."
         in str(row.get("exit_criterion", ""))
         and f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}."
@@ -843,6 +963,17 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", ""))
         and f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R13_MATERIAL_REVIEW_EXTENSION={R13_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R13_TYPED_RECOVERY_REVIEW_EXTENSION="
+        f"{R13_TYPED_RECOVERY_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION="
+        f"{R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION="
+        f"{R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", "")),
         "A_H039_EXACT_NONEMPTY_IMMUTABLE_REVIEW_BOUNDARY",
     )
@@ -1097,6 +1228,18 @@ def prestage_dd_result(success: bool) -> dict[str, Any]:
     }
 
 
+def exact_closed_observation_types(value: Any) -> bool:
+    """Reject every subclass, equality proxy, and non-contract scalar recursively."""
+    if type(value) is dict:
+        return all(
+            type(key) is str and exact_closed_observation_types(item)
+            for key, item in value.items()
+        )
+    if type(value) is list:
+        return all(exact_closed_observation_types(item) for item in value)
+    return type(value) in {type(None), bool, int, str, bytes}
+
+
 def prestage_prefix_oracle(
     prefix: int, observed: dict[str, Any], *, installer_size: int,
     installer_sha256: str, installer_cdhash: str,
@@ -1106,6 +1249,29 @@ def prestage_prefix_oracle(
         return False
     if type(installer_size) is not int or not 0 < installer_size <= 4194304 \
             or not valid_hex(installer_sha256) or not valid_hex(installer_cdhash, 40):
+        return False
+    if type(observed) is not dict or any(type(key) is not str for key in observed):
+        return False
+    protected_parent = observed.get("protected_parent")
+    if not exact_prestage_protected_parent(protected_parent):
+        return False
+    source_identity = observed.get("source_identity")
+    if prefix < 5:
+        if source_identity is not None:
+            return False
+    elif not exact_prestage_source_identity(
+        source_identity, installer_size, installer_sha256,
+    ):
+        return False
+    typed_directories = observed.get("directories")
+    if type(typed_directories) is not list or any(
+        not exact_created_record_metadata(item) for item in typed_directories
+    ):
+        return False
+    typed_leaf = observed.get("leaf")
+    if typed_leaf is not None and not exact_created_record_metadata(typed_leaf):
+        return False
+    if not exact_closed_observation_types(observed):
         return False
     required_keys = {
         "argv_prefix", "recovery_argv", "directories", "leaf", "stdin",
@@ -1125,17 +1291,6 @@ def prestage_prefix_oracle(
             or observed.get("source_path") != str(UNTRUSTED_INSTALLER_SOURCE) \
             or type(observed.get("source_sha256")) is not str \
             or observed.get("source_sha256") != installer_sha256:
-        return False
-    protected_parent = observed.get("protected_parent")
-    if not exact_prestage_protected_parent(protected_parent):
-        return False
-    source_identity = observed.get("source_identity")
-    if prefix < 5:
-        if source_identity is not None:
-            return False
-    elif not exact_prestage_source_identity(
-        source_identity, installer_size, installer_sha256,
-    ):
         return False
     directories = [
         str(NAMESPACE), str(NAMESPACE / ".install"),
@@ -1162,8 +1317,11 @@ def prestage_prefix_oracle(
     if descriptor_inventory is not None and (
         not isinstance(descriptor_inventory, dict)
         or set(descriptor_inventory) != {
-            "pre_exec_open_fds", "fd0_closed", "all_fd_ge_3_closed",
-            "bootstrap_first_probe", "bootstrap_first_inventory",
+            "pre_exec_open_fds", "fd0_entry_open", "fd0_consumed",
+            "fd0_close_result", "fd0_postclose_probe", "fd0_postclose_errno",
+            "fd0_entry_operations",
+            "fd0_normalization_before_inventory", "all_fd_ge_3_closed",
+            "bootstrap_first_inventory",
             "bootstrap_closed_fds", "bootstrap_close_results",
             "bootstrap_second_inventory", "bootstrap_inventory_pid",
             "bootstrap_inventory_flavor", "bootstrap_inventory_byte_cap",
@@ -1184,9 +1342,15 @@ def prestage_prefix_oracle(
             for item in descriptor_inventory[key]
         )
         or any(type(descriptor_inventory.get(key)) is not bool for key in (
-            "fd0_closed", "all_fd_ge_3_closed", "bootstrap_inventory_aligned",
+            "fd0_entry_open", "fd0_consumed", "fd0_normalization_before_inventory",
+            "all_fd_ge_3_closed", "bootstrap_inventory_aligned",
             "bootstrap_closure_before_open",
         ))
+        or type(descriptor_inventory.get("fd0_close_result")) is not int
+        or type(descriptor_inventory.get("fd0_postclose_probe")) is not str
+        or type(descriptor_inventory.get("fd0_postclose_errno")) is not str
+        or type(descriptor_inventory.get("fd0_entry_operations")) is not list
+        or any(type(item) is not str for item in descriptor_inventory["fd0_entry_operations"])
         or type(descriptor_inventory.get("bootstrap_inventory_byte_cap")) is not int
     ):
         return False
@@ -1249,11 +1413,18 @@ def prestage_prefix_oracle(
                 "FINAL_NAME_REBIND_0500", "FINAL_ACL_XATTR_0500",
             ]
             and exec_count == 1 and observed.get("product_environment") == []
-            and observed.get("product_inherited_fds") == [1, 2]
+            and observed.get("product_inherited_fds") == [0, 1, 2]
             and descriptor_inventory == {
-                "pre_exec_open_fds": [1, 2], "fd0_closed": True,
+                "pre_exec_open_fds": [0, 1, 2],
+                "fd0_entry_open": True, "fd0_consumed": False,
+                "fd0_close_result": 0,
+                "fd0_postclose_probe": "F_GETFD_MINUS1",
+                "fd0_postclose_errno": "EBADF",
+                "fd0_entry_operations": [
+                    "CHECKED_CLOSE", "POSTCLOSE_FCNTL_F_GETFD",
+                ],
+                "fd0_normalization_before_inventory": True,
                 "all_fd_ge_3_closed": True,
-                "bootstrap_first_probe": "FD0_F_GETFD_EBADF",
                 "bootstrap_first_inventory": [1, 2],
                 "bootstrap_closed_fds": [1, 2],
                 "bootstrap_close_results": [0, 0],
@@ -1264,7 +1435,7 @@ def prestage_prefix_oracle(
                 "bootstrap_inventory_aligned": True,
                 "bootstrap_closure_before_open": True,
             }
-            and observed.get("product_stdin") == "CLOSED"
+            and observed.get("product_stdin") == "ENTRY_FD0_CLOSED_UNCONSUMED"
             and observed.get("source_fd_state") == "CLOSED_BEFORE_EXEC"
             and observed.get("tool_processes") == {
                 "launched": len(FIRST_ROOT_ARGV),
@@ -1447,11 +1618,18 @@ def prestage_prefix_fixture(
         observed["leaf"] = None
         observed["product_exec_count"] = 1
         observed["product_environment"] = []
-        observed["product_inherited_fds"] = [1, 2]
+        observed["product_inherited_fds"] = [0, 1, 2]
         observed["product_descriptor_inventory"] = {
-            "pre_exec_open_fds": [1, 2], "fd0_closed": True,
+            "pre_exec_open_fds": [0, 1, 2],
+            "fd0_entry_open": True, "fd0_consumed": False,
+            "fd0_close_result": 0,
+            "fd0_postclose_probe": "F_GETFD_MINUS1",
+            "fd0_postclose_errno": "EBADF",
+            "fd0_entry_operations": [
+                "CHECKED_CLOSE", "POSTCLOSE_FCNTL_F_GETFD",
+            ],
+            "fd0_normalization_before_inventory": True,
             "all_fd_ge_3_closed": True,
-            "bootstrap_first_probe": "FD0_F_GETFD_EBADF",
             "bootstrap_first_inventory": [1, 2],
             "bootstrap_closed_fds": [1, 2],
             "bootstrap_close_results": [0, 0],
@@ -1462,7 +1640,7 @@ def prestage_prefix_fixture(
             "bootstrap_inventory_aligned": True,
             "bootstrap_closure_before_open": True,
         }
-        observed["product_stdin"] = "CLOSED"
+        observed["product_stdin"] = "ENTRY_FD0_CLOSED_UNCONSUMED"
         observed["source_fd_state"] = "CLOSED_BEFORE_EXEC"
         observed["tool_processes"] = {
             "launched": len(FIRST_ROOT_ARGV),
@@ -1473,6 +1651,130 @@ def prestage_prefix_fixture(
         observed["final_layout"] = LAYOUT
         observed["recovery_action_argv"] = []
     return observed
+
+
+R13_RESTAGE_PHASES = [
+    "R7_READY_0500", "R7_INERT_0400", "R8_PARTIAL_0400",
+    "R8_FULL_UNCONFIRMED_0400", "R8_READY_0400", "R8_READY_0500",
+]
+
+
+def exact_typed_tree(observed: Any, expected: Any) -> bool:
+    """Compare an untrusted structured record only after exact recursive typing."""
+    if type(observed) is not type(expected):
+        return False
+    if type(expected) is dict:
+        if len(observed) != len(expected) \
+                or any(type(key) is not str for key in observed) \
+                or any(key not in observed for key in expected):
+            return False
+        return all(
+            exact_typed_tree(observed[key], expected[key]) for key in expected
+        )
+    if type(expected) is list:
+        return len(observed) == len(expected) and all(
+            exact_typed_tree(left, right)
+            for left, right in zip(observed, expected, strict=True)
+        )
+    return observed == expected
+
+
+def r13_preeffects_migration_fixture(
+    phase: str, *, r8_bytes: bytes, r8_cdhash: str,
+    partial_length: int | None = None,
+) -> dict[str, Any]:
+    if type(phase) is not str or phase not in R13_RESTAGE_PHASES \
+            or type(r8_bytes) is not bytes or not r8_bytes \
+            or len(r8_bytes) > 4194304 or type(r8_cdhash) is not str \
+            or not valid_hex(r8_cdhash, 40):
+        raise Rig("invalid R13 migration fixture parameters")
+    index = R13_RESTAGE_PHASES.index(phase)
+    if phase == "R8_PARTIAL_0400":
+        if type(partial_length) is not int or not 0 <= partial_length <= len(r8_bytes):
+            raise Rig("invalid R13 partial prefix length")
+        length = partial_length
+    else:
+        if partial_length is not None:
+            raise Rig("unexpected R13 partial prefix length")
+        length = len(r8_bytes)
+    r7 = R13_PRESERVED_R7_PRE_EFFECTS["installer"]
+    uses_r8 = index >= R13_RESTAGE_PHASES.index("R8_PARTIAL_0400")
+    exact_r8 = phase in {
+        "R8_FULL_UNCONFIRMED_0400", "R8_READY_0400", "R8_READY_0500",
+    }
+    installer = copy.deepcopy(r7)
+    installer["mode"] = 0o500 if phase in {
+        "R7_READY_0500", "R8_READY_0500",
+    } else 0o400
+    if uses_r8:
+        installer["size"] = length
+        installer["sha256"] = sha(r8_bytes[:length])
+        installer["cdhash"] = r8_cdhash if exact_r8 else None
+    if phase == "R7_READY_0500":
+        next_argv = R13_RESTAGE_ARGV
+    elif phase in {
+        "R7_INERT_0400", "R8_PARTIAL_0400", "R8_FULL_UNCONFIRMED_0400",
+    }:
+        next_argv = R13_RESTAGE_ARGV[1:]
+    elif phase == "R8_READY_0400":
+        next_argv = R13_RESTAGE_ARGV[8:]
+    else:
+        next_argv = R13_RESTAGE_ARGV[-1:]
+    dd_result = None
+    if phase in {"R8_PARTIAL_0400", "R8_FULL_UNCONFIRMED_0400"}:
+        dd_result = prestage_dd_result(False)
+    elif phase in {"R8_READY_0400", "R8_READY_0500"}:
+        dd_result = prestage_dd_result(True)
+    return {
+        "phase": phase,
+        "published_r7_product": PUBLISHED_H039_R7_PRODUCT_MERGE,
+        "r13_contract_authority": CONTRACT_AUTHORITY_BASE,
+        "protected_chain": {
+            key: copy.deepcopy(value)
+            for key, value in R13_PRESERVED_R7_PRE_EFFECTS.items()
+            if key not in {"installer", "bootstrap_attempts", "bootstrap_result"}
+        },
+        "installer": installer,
+        "r8_identity": {
+            "size": len(r8_bytes), "sha256": sha(r8_bytes),
+            "cdhash": r8_cdhash,
+        },
+        "partial_prefix_length": length if phase == "R8_PARTIAL_0400" else None,
+        "partial_prefix_sha256": (
+            sha(r8_bytes[:length]) if phase == "R8_PARTIAL_0400" else None
+        ),
+        "reauthenticated_before_effect": True,
+        "same_installer_dev_ino": True,
+        "source_path": str(UNTRUSTED_INSTALLER_SOURCE),
+        "source_fd_closed": None if index < 2 else True,
+        "stdin_streams": 0 if index < 2 else 1,
+        "dd_result": dd_result,
+        "controller_loss_requires_host_restart": True,
+        "root_children_active": [],
+        "next_effect_argv": next_argv,
+        "forbidden_effects": [],
+        "bootstrap_exec_count": 0,
+    }
+
+
+def r13_preeffects_migration_oracle(
+    observed: Any, *, r8_bytes: bytes, r8_cdhash: str,
+) -> bool:
+    if type(observed) is not dict or any(type(key) is not str for key in observed):
+        return False
+    phase = observed.get("phase")
+    if type(phase) is not str or phase not in R13_RESTAGE_PHASES:
+        return False
+    partial_length = observed.get("partial_prefix_length") \
+        if phase == "R8_PARTIAL_0400" else None
+    try:
+        expected = r13_preeffects_migration_fixture(
+            phase, r8_bytes=r8_bytes, r8_cdhash=r8_cdhash,
+            partial_length=partial_length,
+        )
+    except Rig:
+        return False
+    return exact_typed_tree(observed, expected)
 
 
 BOOTSTRAP_CRASH_PHASES = [
@@ -3596,8 +3898,24 @@ def causal_oracle_selftests() -> None:
         installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
     )
     for label, mutate in (
-        ("PROBE", lambda value: value.__setitem__("bootstrap_first_probe", "FD0_OPEN")),
+        ("ENTRY_MISSING_FD0", lambda value: value.__setitem__("pre_exec_open_fds", [1, 2])),
+        ("ENTRY_EXTRA_FD", lambda value: value["pre_exec_open_fds"].append(3)),
+        ("ENTRY_DUPLICATE_FD0", lambda value: value.__setitem__("pre_exec_open_fds", [0, 0, 1, 2])),
+        ("ENTRY_BOOL_ALIAS", lambda value: value.__setitem__("pre_exec_open_fds", [False, 1, 2])),
+        ("FD0_ENTRY_NOT_OPEN", lambda value: value.__setitem__("fd0_entry_open", False)),
+        ("FD0_CONSUMED", lambda value: value.__setitem__("fd0_consumed", True)),
+        ("FD0_CLOSE_FAILURE", lambda value: value.__setitem__("fd0_close_result", -1)),
+        ("FD0_POSTCLOSE_OPEN", lambda value: value.__setitem__("fd0_postclose_probe", "F_GETFD_ZERO")),
+        ("FD0_POSTCLOSE_ERRNO", lambda value: value.__setitem__("fd0_postclose_errno", "EINTR")),
+        ("FD0_FSTAT", lambda value: value["fd0_entry_operations"].insert(0, "FSTAT")),
+        ("FD0_READ", lambda value: value["fd0_entry_operations"].append("READ")),
+        ("FD0_IOCTL", lambda value: value["fd0_entry_operations"].append("IOCTL")),
+        ("FD0_MMAP", lambda value: value["fd0_entry_operations"].append("MMAP")),
+        ("FD0_COPY", lambda value: value["fd0_entry_operations"].append("COPY")),
+        ("NORMALIZE_AFTER_INVENTORY", lambda value: value.__setitem__("fd0_normalization_before_inventory", False)),
         ("FIRST_FD0", lambda value: value["bootstrap_first_inventory"].insert(0, 0)),
+        ("FIRST_MISSING", lambda value: value.__setitem__("bootstrap_first_inventory", [1])),
+        ("FIRST_DUPLICATE", lambda value: value.__setitem__("bootstrap_first_inventory", [1, 2, 2])),
         ("FIRST_EXTRA", lambda value: value["bootstrap_first_inventory"].append(3)),
         ("CLOSED_MISSING", lambda value: value.__setitem__("bootstrap_closed_fds", [1])),
         ("CLOSE_FAILURE", lambda value: value.__setitem__("bootstrap_close_results", [0, -1])),
@@ -3615,7 +3933,237 @@ def causal_oracle_selftests() -> None:
                 len(FIRST_ROOT_ARGV), mutant, installer_size=123456,
                 installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
             ),
-            f"N_H039_R7_BOOTSTRAP_DESCRIPTOR_{label}",
+            f"N_H039_R13_BOOTSTRAP_DESCRIPTOR_{label}",
+        )
+
+    r13_r8_bytes = b"H039-R13-R8-INSTALLER-BYTES"
+    r13_r8_cdhash = "c7" * 20
+    r13_migration_fixtures: dict[str, dict[str, Any]] = {}
+
+    def r13_nodes(value: Any, path: tuple[Any, ...] = ()):  # type: ignore[no-untyped-def]
+        yield path, value
+        if type(value) is dict:
+            for key in value:
+                yield from r13_nodes(value[key], (*path, key))
+        elif type(value) is list:
+            for index, item in enumerate(value):
+                yield from r13_nodes(item, (*path, index))
+
+    def r13_replace(
+        reference: dict[str, Any], path: tuple[Any, ...], replacement: Any,
+    ) -> Any:
+        if not path:
+            return replacement
+        mutant = copy.deepcopy(reference)
+        parent: Any = mutant
+        for component in path[:-1]:
+            parent = parent[component]
+        parent[path[-1]] = replacement
+        return mutant
+
+    def r13_key_replace(
+        reference: dict[str, Any], path: tuple[Any, ...], key: str,
+    ) -> dict[str, Any]:
+        mutant = copy.deepcopy(reference)
+        parent: Any = mutant
+        for component in path:
+            parent = parent[component]
+        value = parent.pop(key)
+        parent[generic_str_subclass(key)] = value
+        return mutant
+
+    def r13_equality_aliases(value: Any) -> list[tuple[str, Any]]:
+        aliases: list[tuple[str, Any]] = [("EQUALITY_OBJECT", equality_alias(value))]
+        if type(value) is dict:
+            aliases.extend((
+                ("DICT_SUBCLASS", record_dict_subclass(copy.deepcopy(value))),
+                ("EQUALITY_DICT_SUBCLASS", equality_record(value)),
+            ))
+        elif type(value) is list:
+            aliases.append((
+                "LIST_SUBCLASS",
+                type("H039R13ListSubclass", (list,), {})(copy.deepcopy(value)),
+            ))
+        elif type(value) is str:
+            aliases.append(("STRING_SUBCLASS", generic_str_subclass(value)))
+        elif type(value) is bool:
+            aliases.extend((
+                ("BOOL_TO_INT", int(value)),
+                ("BOOL_TO_FLOAT", float(value)),
+                ("BOOL_TO_COMPLEX", complex(value, 0)),
+            ))
+        elif type(value) is int:
+            aliases.extend((
+                ("INT_TO_FLOAT", float(value)),
+                ("INT_TO_COMPLEX", complex(value, 0)),
+                ("INT_SUBCLASS", type(structured_int_subclass)(value)),
+            ))
+            if value in {0, 1}:
+                aliases.append(("INT_TO_BOOL", bool(value)))
+        return aliases
+
+    class MutatingEqualityAlias:
+        """A value-equal proxy that repairs its own record if compared."""
+
+        def __init__(
+            self, record: dict[str, Any], path: tuple[Any, ...], expected: Any,
+        ) -> None:
+            self.record = record
+            self.path = path
+            self.expected = copy.deepcopy(expected)
+            self.comparisons = 0
+
+        def __eq__(self, other: Any) -> bool:
+            self.comparisons += 1
+            parent: Any = self.record
+            for component in self.path[:-1]:
+                parent = parent[component]
+            parent[self.path[-1]] = copy.deepcopy(self.expected)
+            return other == self.expected
+
+    for prefix in range(len(FIRST_ROOT_ARGV) + 1):
+        fixture = prestage_prefix_fixture(
+            prefix, installer_size=123456,
+            installer_sha256=prestage_sha,
+            installer_cdhash=prestage_cdhash,
+        )
+        check(
+            prestage_prefix_oracle(
+                prefix, fixture, installer_size=123456,
+                installer_sha256=prestage_sha,
+                installer_cdhash=prestage_cdhash,
+            ),
+            f"A_H039_R13_R3_FIRST_ROOT_TYPED_TREE_PREFIX_{prefix:02d}",
+        )
+        alias_index = 0
+        for path, value in r13_nodes(fixture):
+            for alias_kind, replacement in r13_equality_aliases(value):
+                mutant = r13_replace(fixture, path, replacement)
+                if not mutant == fixture or type(replacement) is type(value):
+                    raise Rig(
+                        "noncausal first-root typed-tree alias "
+                        f"at prefix {prefix} path {path!r}: {alias_kind}"
+                    )
+                check(
+                    not prestage_prefix_oracle(
+                        prefix, mutant, installer_size=123456,
+                        installer_sha256=prestage_sha,
+                        installer_cdhash=prestage_cdhash,
+                    ),
+                    f"N_H039_R13_R3_FIRST_ROOT_TYPED_TREE_"
+                    f"{prefix:02d}_{alias_index:04d}",
+                )
+                alias_index += 1
+            if type(value) is dict:
+                for key in value:
+                    key_mutant = r13_key_replace(fixture, path, key)
+                    if not key_mutant == fixture:
+                        raise Rig(
+                            "noncausal first-root typed-tree key alias "
+                            f"at prefix {prefix} path {path!r}: {key}"
+                        )
+                    check(
+                        not prestage_prefix_oracle(
+                            prefix, key_mutant, installer_size=123456,
+                            installer_sha256=prestage_sha,
+                            installer_cdhash=prestage_cdhash,
+                        ),
+                        f"N_H039_R13_R3_FIRST_ROOT_TYPED_KEY_"
+                        f"{prefix:02d}_{alias_index:04d}",
+                    )
+                    alias_index += 1
+        mutating_index = 0
+        for path, value in r13_nodes(fixture):
+            if not path:
+                continue
+            mutant = copy.deepcopy(fixture)
+            parent: Any = mutant
+            for component in path[:-1]:
+                parent = parent[component]
+            proxy = MutatingEqualityAlias(mutant, path, value)
+            parent[path[-1]] = proxy
+            check(
+                not prestage_prefix_oracle(
+                    prefix, mutant, installer_size=123456,
+                    installer_sha256=prestage_sha,
+                    installer_cdhash=prestage_cdhash,
+                ) and proxy.comparisons == 0,
+                f"N_H039_R13_R4_FIRST_ROOT_PRECOMPARISON_TYPE_CLOSURE_"
+                f"{prefix:02d}_{mutating_index:04d}",
+            )
+            mutating_index += 1
+
+    for phase in R13_RESTAGE_PHASES:
+        fixture = r13_preeffects_migration_fixture(
+            phase, r8_bytes=r13_r8_bytes, r8_cdhash=r13_r8_cdhash,
+            partial_length=7 if phase == "R8_PARTIAL_0400" else None,
+        )
+        r13_migration_fixtures[phase] = fixture
+        check(
+            r13_preeffects_migration_oracle(
+                fixture, r8_bytes=r13_r8_bytes, r8_cdhash=r13_r8_cdhash,
+            ),
+            f"A_H039_R13_PRE_EFFECTS_MIGRATION_{phase}",
+        )
+        alias_index = 0
+        for path, value in r13_nodes(fixture):
+            for alias_kind, replacement in r13_equality_aliases(value):
+                mutant = r13_replace(fixture, path, replacement)
+                if not mutant == fixture or type(replacement) is type(value):
+                    raise Rig(
+                        f"noncausal R13 typed-tree alias at {path!r}: {alias_kind}"
+                    )
+                check(
+                    not r13_preeffects_migration_oracle(
+                        mutant, r8_bytes=r13_r8_bytes,
+                        r8_cdhash=r13_r8_cdhash,
+                    ),
+                    f"N_H039_R13_TYPED_TREE_{phase}_{alias_index:04d}",
+                )
+                alias_index += 1
+            if type(value) is dict:
+                for key in value:
+                    key_mutant = r13_key_replace(fixture, path, key)
+                    if not key_mutant == fixture:
+                        raise Rig(
+                            f"noncausal R13 typed-tree key alias at {path!r}: {key}"
+                        )
+                    check(
+                        not r13_preeffects_migration_oracle(
+                            key_mutant, r8_bytes=r13_r8_bytes,
+                            r8_cdhash=r13_r8_cdhash,
+                        ),
+                        f"N_H039_R13_TYPED_KEY_{phase}_{alias_index:04d}",
+                    )
+                    alias_index += 1
+    for label, phase, mutate in (
+        ("R7_IDENTITY", "R7_READY_0500", lambda value: value["installer"].__setitem__("ino", 9)),
+        ("R7_DIGEST", "R7_READY_0500", lambda value: value["installer"].__setitem__("sha256", "00" * 32)),
+        ("REAUTH", "R7_READY_0500", lambda value: value.__setitem__("reauthenticated_before_effect", False)),
+        ("CHMOD_SKIPPED", "R7_INERT_0400", lambda value: value["installer"].__setitem__("mode", 0o500)),
+        ("PARTIAL_EXECUTABLE", "R8_PARTIAL_0400", lambda value: value["installer"].__setitem__("mode", 0o500)),
+        ("PARTIAL_NONPREFIX", "R8_PARTIAL_0400", lambda value: value["installer"].__setitem__("sha256", "01" * 32)),
+        ("PARTIAL_LENGTH_ALIAS", "R8_PARTIAL_0400", lambda value: value.__setitem__("partial_prefix_length", True)),
+        ("FULL_UNCONFIRMED_EXEC", "R8_FULL_UNCONFIRMED_0400", lambda value: value.__setitem__("bootstrap_exec_count", 1)),
+        ("DD_NOT_DURABLE", "R8_READY_0400", lambda value: value["dd_result"].__setitem__("durable", False)),
+        ("DD_UNREAPED", "R8_READY_0400", lambda value: value["dd_result"].__setitem__("direct_child_reaped", False)),
+        ("SOURCE_FD_OPEN", "R8_READY_0400", lambda value: value.__setitem__("source_fd_closed", False)),
+        ("INODE_REPLACED", "R8_READY_0400", lambda value: value.__setitem__("same_installer_dev_ino", False)),
+        ("CALLER_SOURCE", "R8_READY_0400", lambda value: value.__setitem__("source_path", "/tmp/caller")),
+        ("CALLER_DESTINATION", "R8_READY_0400", lambda value: value["next_effect_argv"][0].append("/tmp/caller")),
+        ("UNLINK", "R8_READY_0400", lambda value: value["forbidden_effects"].append("unlink")),
+        ("RENAME", "R8_READY_0400", lambda value: value["forbidden_effects"].append("rename")),
+        ("RECREATE", "R8_READY_0400", lambda value: value["forbidden_effects"].append("recreate")),
+        ("HELPER_PRESENT", "R8_READY_0500", lambda value: value["protected_chain"].__setitem__("installed_helper", "PRESENT")),
+        ("EXTRA", "R8_READY_0500", lambda value: value.__setitem__("extra", False)),
+    ):
+        mutant = copy.deepcopy(r13_migration_fixtures[phase])
+        mutate(mutant)
+        check(
+            not r13_preeffects_migration_oracle(
+                mutant, r8_bytes=r13_r8_bytes, r8_cdhash=r13_r8_cdhash,
+            ),
+            f"N_H039_R13_PRE_EFFECTS_MIGRATION_{label}",
         )
 
     mediator_sha = "ef" * 32
@@ -5850,10 +6398,16 @@ def product_identity(
         return False, {"error": str(exc), "merge": merge_detail}
 
 
-def retained_product_contract_publication_identity(merge: str) \
-        -> tuple[bool, dict[str, Any]]:
+def product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
     try:
-        contract_ok, contract_detail = exact_contract_merge(merge)
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        contract_merge, candidate = parents
+        product_ok, product_detail = product_identity(
+            contract_merge, candidate, require_checkout=False,
+            require_contract_publication=False,
+        )
         remote_main = observed_production_main()
         head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
         status = git(["status", "--porcelain=v1", "--untracked-files=all"])
@@ -5861,22 +6415,16 @@ def retained_product_contract_publication_identity(merge: str) \
             SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
             and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
         )
-        retained_product = all(
-            sha(blob(merge, path)) == digest
-            and blob(merge, path) == blob(PUBLISHED_H039_R7_PRODUCT_MERGE, path)
-            for path, digest in PUBLISHED_H039_R7_PRODUCT_BLOBS.items()
-        )
         ok = (
-            contract_ok and retained_product
+            product_ok and commit_tree(merge) == commit_tree(candidate)
             and remote_main == merge and head == merge and status == b""
             and executing_bytes_equal
         )
         return ok, {
-            "contract": contract_detail, "tree": commit_tree(merge),
-            "published_r7_product": PUBLISHED_H039_R7_PRODUCT_MERGE,
-            "retained_product": retained_product, "remote_main": remote_main,
+            "parents": parents, "tree": commit_tree(merge),
+            "candidate_tree": commit_tree(candidate), "remote_main": remote_main,
             "head": head, "status": status.decode(),
-            "executing_bytes_equal": executing_bytes_equal,
+            "executing_bytes_equal": executing_bytes_equal, "product": product_detail,
         }
     except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
         return False, {"error": str(exc)}
@@ -5899,7 +6447,9 @@ def product_bytes(path: str, commit: str | None) -> bytes:
     return raw
 
 
-def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+def manifest_checks(
+    commit: str | None = None, *, r13_product: bool = True,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     recipe_raw = product_bytes("verify/h039/build-recipe.json", commit)
     manifest_raw = product_bytes("verify/h039/identity-manifest.json", commit)
     source_raw = product_bytes("controller/runtime-cleanup/native/mediator.c", commit)
@@ -5926,6 +6476,7 @@ def manifest_checks(commit: str | None = None) -> tuple[dict[str, Any], dict[str
         "installer_compile_argv": [
             *common_compile,
             "-DH039_INSTALLER=1",
+            *(["-DH039_ROOT_ENTRY_FD0_NORMALIZATION=1"] if r13_product else []),
             f"-DH039_MEDIATOR_SHA256={mediator_digest}",
             f"-DH039_MEDIATOR_SIZE={mediator_size}",
             "-Wl,-segprot,__H039RO,r,r",
@@ -6750,7 +7301,7 @@ def installer_verify_effects(commit: str) -> None:
     try:
         namespace_before = stable_identity(os.lstat(NAMESPACE))
     except OSError as exc:
-        raise Rig("retained-product review requires the exact prefix-1 namespace") from exc
+        raise Rig("product review requires the preserved PRE_EFFECTS namespace") from exc
     if before_install:
         raise Rig("retained-product review requires the installed helper absent")
 
@@ -6946,11 +7497,43 @@ def installer_verify_effects(commit: str) -> None:
         unprivileged_bootstrap = invoke(["bootstrap"])
         if unprivileged_bootstrap.returncode == 0:
             raise Rig("unprivileged installer bootstrap unexpectedly succeeded")
+        canary = b"H039-R13-INHERITED-FD0-MUST-REMAIN-UNCONSUMED"
+        read_fd, write_fd = os.pipe()
+        try:
+            if os.write(write_fd, canary) != len(canary):
+                raise Rig("fd0 canary write was partial")
+            os.close(write_fd)
+            write_fd = -1
+            before_canary = exact_tree()
+            process = subprocess.Popen(
+                [*sandbox_argv(installer), "bootstrap"], stdin=read_fd,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True,
+                cwd="/", env=environment, start_new_session=True,
+            )
+            try:
+                stdout, stderr = process.communicate(timeout=10)
+            except subprocess.TimeoutExpired as exc:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=5)
+                raise Rig("fd0 non-consumption control timed out") from exc
+            if process.returncode == 71 \
+                    and b"sandbox_apply: Operation not permitted" in stderr:
+                raise Undecidable("outer Seatbelt denied fd0 non-consumption control")
+            retained = os.read(read_fd, len(canary) + 1)
+            clean_eof = os.read(read_fd, 1)
+            if process.returncode == 0 or stdout or stderr \
+                    or retained != canary or clean_eof != b"" \
+                    or exact_tree() != before_canary:
+                raise Rig("bootstrap consumed or changed the inherited fd0 canary")
+        finally:
+            if write_fd >= 0:
+                os.close(write_fd)
+            os.close(read_fd)
         if (
             before_install != (INSTALLED.exists() or INSTALLED.is_symlink())
             or stable_identity(os.lstat(NAMESPACE)) != namespace_before
         ):
-            raise Rig("installer product review changed fixed prefix-1 state")
+            raise Rig("installer product review changed fixed PRE_EFFECTS state")
     finally:
         expected = {
             "controller", "controller/runtime-cleanup",
@@ -7172,6 +7755,7 @@ def immutable_source_checks(commit: str | None = None) -> None:
         "H039_MEDIATOR_SIZE", "installer_bootstrap",
         "stage_embedded_mediator", "publish_staged_mediator",
         "make_final_directory", "umask(0)", "umask(077)",
+        "H039_ROOT_ENTRY_FD0_NORMALIZATION", "close(0)",
         "fcntl(0,F_GETFD)", "EBADF", "close_bootstrap_descriptors",
     ]
     if any(re.search(pattern, semantic_source) for pattern in forbidden_patterns):
@@ -7210,7 +7794,7 @@ def immutable_source_checks(commit: str | None = None) -> None:
         '"__H039RO"', '"__h039med"',
     )) or not all(token in bootstrap_code for token in (
         "getuid(", "geteuid(", "getgid(", "getegid(", "environ=",
-        "chdir(", "fcntl(0,F_GETFD)", "EBADF",
+        "close(0)", "chdir(", "fcntl(0,F_GETFD)", "EBADF",
         "close_bootstrap_descriptors(", "umask(077)",
         "loaded_self(", "load_embedded_mediator(", "apply_install(",
     )) or 'chdir("/")' not in bootstrap_body \
@@ -7223,12 +7807,24 @@ def immutable_source_checks(commit: str | None = None) -> None:
         '"verify"', '"bootstrap"',
     )):
         raise Rig("installer bootstrap extraction dispatch or input closure is not causal")
-    if re.search(
-        r"fcntl\(0,F_GETFD\)[\s\S]*EBADF[\s\S]*"
-        r"close_bootstrap_descriptors\(\)[\s\S]*umask\(077\)",
+    fd0_prefix = (
+        r"\s*if\(close\(0\)!=0\)return 1;errno=0;"
+        r"if\(fcntl\(0,F_GETFD\)!=-1\|\|errno!=EBADF\)return 1;"
+        r"if\(!close_bootstrap_descriptors\(\)\)return 1;"
+    )
+    if re.match(fd0_prefix, bootstrap_code) is None or re.search(
+        fd0_prefix
+        + r"[\s\S]*getuid\(\)[\s\S]*umask\(077\)",
         bootstrap_code,
     ) is None:
-        raise Rig("bootstrap descriptor closure is not ordered before installer effects")
+        raise Rig("R13 fd0 normalization is not the first bootstrap handler effect")
+    inherited_prefix = re.match(fd0_prefix, bootstrap_code)
+    if inherited_prefix is None or re.search(
+        r"\b(?:read|pread|readv|recv|recvmsg|fread|fgets|scanf|getchar|fdopen|"
+        r"dup|dup2|fstat|ioctl|lseek|mmap)\s*\(\s*0\b",
+        bootstrap_code[:inherited_prefix.end()],
+    ) is not None:
+        raise Rig("inherited fd0 was consumed before its capability was destroyed")
     if re.search(
         r"static\s+int\s+close_bootstrap_descriptors\s*\(\s*void\s*\)\s*\{",
         c_structure_mask(semantic_source),
@@ -7246,6 +7842,27 @@ def immutable_source_checks(commit: str | None = None) -> None:
         source,
     ):
         raise Rig("native durable receipt-temp cleanup continuation is not nonce-stable")
+
+
+def published_r7_root_entry_gap_checks() -> None:
+    raw = product_bytes(
+        "controller/runtime-cleanup/native/mediator.c",
+        PUBLISHED_H039_R7_PRODUCT_MERGE,
+    )
+    try:
+        semantic_source = c_semantic_source(raw.decode("utf-8"))
+    except UnicodeError as exc:
+        raise Rig("published R7 source is not UTF-8") from exc
+    bootstrap = c_structure_mask(
+        c_function_body(semantic_source, "installer_bootstrap"),
+    )
+    if re.search(
+        r"fcntl\(0,F_GETFD\)!=-1\|\|errno!=EBADF[\s\S]*"
+        r"close_bootstrap_descriptors\(\)",
+        bootstrap,
+    ) is None or re.search(r"close\(0\)[\s\S]*fcntl\(0,F_GETFD\)", bootstrap):
+        raise Rig("published R7 root-entry fd0 gap is not the exact proven gap")
+    check(True, "A_H039_R13_PUBLISHED_R7_EXACT_FD0_ENTRY_GAP_REPRODUCED")
 
 
 
@@ -9327,7 +9944,9 @@ def guarded_product_effects() -> dict[str, Any]:
 
 
 
-def published_r7_product_prefix1_baseline() -> tuple[bool, dict[str, Any]]:
+def published_r7_product_preeffects_baseline(
+    *, require_repo_r7: bool = True,
+) -> tuple[bool, dict[str, Any]]:
     repo: dict[str, dict[str, Any]] = {}
     for path in PRODUCT_PATHS:
         target = ROOT / path
@@ -9355,10 +9974,10 @@ def published_r7_product_prefix1_baseline() -> tuple[bool, dict[str, Any]]:
         evidence = strict_json(evidence_raw)
         namespace_value = os.lstat(NAMESPACE)
         namespace_stat = (
-            f"{namespace_value.st_dev}:{namespace_value.st_ino}:"
-            f"{namespace_value.st_mode:o}:{namespace_value.st_uid}:"
-            f"{namespace_value.st_gid}:{namespace_value.st_nlink}:"
-            f"{namespace_value.st_size}:{namespace_value.st_flags}"
+            namespace_value.st_dev, namespace_value.st_ino,
+            stat.S_IMODE(namespace_value.st_mode), namespace_value.st_uid,
+            namespace_value.st_gid, namespace_value.st_nlink,
+            namespace_value.st_size, namespace_value.st_flags,
         )
         evidence_ok = (
             sha(evidence_raw) == PREFIX1_EVIDENCE_SHA256
@@ -9372,9 +9991,9 @@ def published_r7_product_prefix1_baseline() -> tuple[bool, dict[str, Any]]:
                 "credential_disclosed_to_agent": False,
             }
             and evidence.get("root_read_only_rebind", {}).get("before_stat")
-            == namespace_stat
+            == "16777232:126958092:40700:0:0:2:64:0"
             and evidence.get("root_read_only_rebind", {}).get("after_stat")
-            == namespace_stat
+            == "16777232:126958092:40700:0:0:2:64:0"
             and evidence.get("root_read_only_rebind", {}).get("stat_exit_codes")
             == [0, 0]
             and evidence.get("root_read_only_rebind", {}).get("ls_exit_code") == 0
@@ -9387,19 +10006,37 @@ def published_r7_product_prefix1_baseline() -> tuple[bool, dict[str, Any]]:
             and evidence.get("continued_root_effect") is False
             and evidence.get("rollback_effect") is False
             and evidence.get("supervisor_resume") is False
-            and stat.S_ISDIR(namespace_value.st_mode)
-            and not NAMESPACE.is_symlink()
-            and namespace_value.st_uid == 0 and namespace_value.st_gid == 0
-            and stat.S_IMODE(namespace_value.st_mode) == 0o700
-            and namespace_value.st_nlink == 2 and namespace_value.st_flags == 0
         )
+        current_namespace_ok = (
+            stat.S_ISDIR(namespace_value.st_mode) and not NAMESPACE.is_symlink()
+            and namespace_stat == (
+                16777232, 126958092, 0o700, 0, 0, 3, 96, 0,
+            )
+        )
+        try:
+            os.lstat(PROTECTED_INSTALLER)
+            protected_descendant_observation = "UNEXPECTEDLY_TRAVERSABLE"
+        except PermissionError:
+            protected_descendant_observation = "EACCES_AS_UID501"
+        except OSError as exc:
+            protected_descendant_observation = f"UNEXPECTED:{exc.errno}"
     except (OSError, Rig, ValueError) as exc:
         evidence_ok = False
         evidence = {"error": str(exc)}
         namespace_stat = "UNAVAILABLE"
-    return repo_ok and not installed and evidence_ok, {
-        "repo": repo, "installed": installed, "prefix1_evidence": evidence,
-        "namespace_stat": namespace_stat, "evidence_ok": evidence_ok,
+        current_namespace_ok = False
+        protected_descendant_observation = "UNAVAILABLE"
+    return (
+        (repo_ok or not require_repo_r7) and not installed and evidence_ok and current_namespace_ok
+        and protected_descendant_observation == "EACCES_AS_UID501"
+    ), {
+        "repo": repo, "repo_r7_required": require_repo_r7,
+        "installed": installed, "prefix1_evidence": evidence,
+        "namespace_stat": namespace_stat, "historical_prefix1_evidence_ok": evidence_ok,
+        "current_namespace_ok": current_namespace_ok,
+        "protected_descendant_observation": protected_descendant_observation,
+        "owner_recorded_preeffects": R13_PRESERVED_R7_PRE_EFFECTS,
+        "live_descendant_claim": "DEFERRED_TO_MANDATORY_ROOT_REAUTH_BEFORE_CHMOD0400",
     }
 
 
@@ -9412,6 +10049,10 @@ def finish(phase: str) -> int:
     print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
     print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
     print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R13_MATERIAL_REVIEW_EXTENSION={R13_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R13_TYPED_RECOVERY_REVIEW_EXTENSION={R13_TYPED_RECOVERY_REVIEW_EXTENSION}")
+    print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
+    print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         print("H039_GATE_RESULT=PASS")
@@ -9440,6 +10081,10 @@ def main(argv: list[str]) -> int:
         print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
         print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
         print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R13_MATERIAL_REVIEW_EXTENSION={R13_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R13_TYPED_RECOVERY_REVIEW_EXTENSION={R13_TYPED_RECOVERY_REVIEW_EXTENSION}")
+        print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
+        print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -9451,21 +10096,26 @@ def main(argv: list[str]) -> int:
         print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
         print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
         print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R13_MATERIAL_REVIEW_EXTENSION={R13_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R13_TYPED_RECOVERY_REVIEW_EXTENSION={R13_TYPED_RECOVERY_REVIEW_EXTENSION}")
+        print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
+        print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
+    product = len(argv) == 3 and argv[0] == "--product"
     installed = len(argv) == 2 and argv[0] == "--installed"
-    if not (preproduct or installed):
+    if not (preproduct or product or installed):
         print(
-            "RIG_ERROR: usage: h-039-exit [--installed "
-            "PUBLISHED_R12_CONTRACT_REBIND_MERGE]",
+            "RIG_ERROR: usage: h-039-exit [--product PUBLISHED_R13_CONTRACT_MERGE "
+            "R8_PRODUCT_CANDIDATE | --installed PUBLISHED_R8_PRODUCT_MERGE]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if installed else []
+    supplied_commits = argv[1:] if product or installed else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
-    phase = "preproduct" if preproduct else "installed"
+    phase = "preproduct" if preproduct else "product" if product else "installed"
     try:
         if any(object_type(value) != "commit" for value in supplied_commits):
             raise Rig("every supplied identity must name a literal commit object")
@@ -9478,27 +10128,58 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            baseline, detail = published_r7_product_prefix1_baseline()
+            baseline, detail = published_r7_product_preeffects_baseline()
             check(
                 baseline,
-                "A_H039_R12_PUBLISHED_R7_PRODUCT_EXACT_PREFIX1_BASELINE",
+                "A_H039_R13_PUBLISHED_R7_PRODUCT_PRESERVED_PRE_EFFECTS_BASELINE",
                 detail,
             )
             if not baseline:
-                raise Rig("R12 preproduct baseline is not exact published R7 prefix 1")
-            recipe, manifest = manifest_checks(PUBLISHED_H039_R7_PRODUCT_MERGE)
-            immutable_source_checks(PUBLISHED_H039_R7_PRODUCT_MERGE)
+                raise Rig("R13 preproduct baseline is not the preserved R7 PRE_EFFECTS state")
+            recipe, manifest = manifest_checks(
+                PUBLISHED_H039_R7_PRODUCT_MERGE, r13_product=False,
+            )
+            published_r7_root_entry_gap_checks()
             reproducible_rebuild(recipe, PUBLISHED_H039_R7_PRODUCT_MERGE)
             macho_checks(manifest, PUBLISHED_H039_R7_PRODUCT_MERGE)
             installer_verify_effects(PUBLISHED_H039_R7_PRODUCT_MERGE)
-            check(True, "A_H039_R12_RETAINED_R7_PRODUCT_REVIEWED_AT_PREFIX1")
+            check(True, "A_H039_R13_RETAINED_R7_PRODUCT_REVIEWED_AT_PRE_EFFECTS")
             check(False, LABEL, {
                 "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
             })
             return finish(phase)
 
-        publication_ok, publication_detail = \
-            retained_product_contract_publication_identity(argv[1])
+        if product:
+            root_before, root_before_detail = \
+                published_r7_product_preeffects_baseline(require_repo_r7=False)
+            check(
+                root_before, "A_H039_R13_PRODUCT_REVIEW_PRE_EFFECTS_BEFORE",
+                root_before_detail,
+            )
+            if not root_before:
+                return finish(phase)
+            identity_ok, identity_detail = product_identity(argv[1], argv[2])
+            check(
+                identity_ok, "A_H039_R13_EXACT_DIRECT_CHILD_FOUR_FILE_R8_IDENTITY",
+                identity_detail,
+            )
+            if not identity_ok:
+                return finish(phase)
+            recipe, manifest = manifest_checks(argv[2])
+            immutable_source_checks(argv[2])
+            reproducible_rebuild(recipe, argv[2])
+            macho_checks(manifest, argv[2])
+            installer_verify_effects(argv[2])
+            root_after, root_after_detail = \
+                published_r7_product_preeffects_baseline(require_repo_r7=False)
+            check(
+                root_after and root_after_detail == root_before_detail,
+                "A_H039_R13_PRODUCT_REVIEW_ZERO_ROOT_EFFECT",
+                {"before": root_before_detail, "after": root_after_detail},
+            )
+            return finish(phase)
+
+        publication_ok, publication_detail = product_publication_identity(argv[1])
         check(
             publication_ok, "A_H039_GUARDED_PRODUCT_PUBLICATION_IDENTITY",
             publication_detail,
@@ -9540,6 +10221,10 @@ def main(argv: list[str]) -> int:
         print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
         print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
         print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R13_MATERIAL_REVIEW_EXTENSION={R13_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R13_TYPED_RECOVERY_REVIEW_EXTENSION={R13_TYPED_RECOVERY_REVIEW_EXTENSION}")
+        print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
+        print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)

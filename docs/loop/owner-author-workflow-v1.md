@@ -1,5 +1,105 @@
 # Owner-author workflow v1 — frozen H-035 effect contract
 
+## H-039 R13-R4 pre-comparison typed closure
+
+Frozen R13-R3 candidate `a57b9a07328bf1e30c668a501c2ebfe83b45a337`
+is immutable NO-CREDIT and not a trust parent. TEST_AUTHOR independently
+constructed a value-equal `argv_prefix` proxy whose equality method replaced
+itself with the exact expected list. Because R3's recursive type check ran only
+after that comparison, the oracle returned true. Both in-flight reviews were
+stopped after this decisive local falsification.
+
+R13-R4 starts fresh from published R12 `3a351778…`. Exact source,
+protected-parent and created-record validators run first so their connected
+traces remain causal; the complete record is then recursively exact-type closed
+before every other ordinary equality. For every node in every crash-prefix
+fixture, a self-repairing equality proxy must reject without `__eq__` being
+called. R13-R1 through R13-R3 remain nonparents. No product, root state,
+runtime mediator, effect, path or authority changes. Fresh dual review remains
+mandatory.
+
+## H-039 R13-R3 full first-root typed closure
+
+Frozen R13-R2 candidate `70bc52842b8ed5848c6f532eb337edad4cf11020`
+is immutable NO-CREDIT and not a trust parent. Its migration-specific repair
+worked, but one independent reviewer proved the complete first-root oracle
+still accepted value-equal hostile list/dict/equality aliases capable of
+hiding fd99, `NORTROPIC_KUVERT`, or a false stdin observation. The other
+reviewer's PASS cannot override that reproduced counterexample.
+
+R13-R3 starts fresh from published R12 `3a351778…`. After the pre-existing
+connected source and created-record validators have run, the entire first-root
+record must recursively contain only exact built-in dictionaries, lists,
+string keys and allowed scalar types before any ordinary equality can earn
+credit. At every crash prefix, connected controls replace every node and key
+with a whole-record-value-equal, exact-type-different alias and require the
+target oracle to reject. R13-R1 and R13-R2 remain nonparents. No product,
+protected root object, runtime mediator, effect, path or authority changes.
+Fresh dual gate review is mandatory before guarded R13 publication.
+
+## H-039 R13-R2 exact typed PRE_EFFECTS recovery
+
+Frozen R13-R1 candidate `8cb829a9dec516349e7c63c57a2b3a758185131a`
+is immutable NO-CREDIT and is not a trust parent. Its nominal preproduct result
+was 1801 PASS / one expected RED, but independent review proved the new
+PRE_EFFECTS migration oracle used ordinary nested Python equality. It accepted
+at least installer nlink `1 → True`, bootstrap count `0 → False`, stdin stream
+count `1 → True`, and protected namespace nlink `3 → 3.0`.
+
+R13-R2 starts again directly from published R12 `3a351778…`. Every dictionary,
+list, key and scalar in every one of the six R7-to-R8 migration phases requires
+its exact built-in type recursively before value comparison. Connected mutants
+replace every such node with whole-record-value-equal subclasses, numeric or
+boolean aliases, or equality objects and must be rejected by the exact target
+oracle. The R13 fd0 contract, same-inode recovery, product scope, runtime
+mediator bytes, root state and authority remain unchanged. Fresh dual review is
+required before guarded R13 publication.
+
+## H-039 R13/R8 root-entry fd0 normalization
+
+Published R12 merge `3a351778c13b10c28f751d27a2803a3e30930812`
+is the sole R13 authority base. Its tree `af499b55…` retains the guarded R7
+product byte-exact. The fixed root ceremony later reached PRE_EFFECTS: the
+complete 0700 root-owned `.install/controller/runtime-cleanup` chain and the
+R7 installer at the fixed path, dev/inode `16777232:126988174`, root:wheel
+0500, nlink one, size 169296, SHA-256 `042bb964…` and CDHash `a982723b…`.
+The one attempted bootstrap returned one before any filesystem effect because
+sudo's PTY entry supplied an open fd0. The helper, final layout and staged
+mediator remain absent. This protected state is preserved; R7 must not run
+again.
+
+R13 changes only the same five TEST_AUTHOR files. Exactly fd0, fd1 and fd2 may
+arrive through the fixed external sudo entry. After the literal bootstrap
+dispatch, the first handler effect is checked `close(0)`, immediately followed
+by `errno = 0` and a required `fcntl(0, F_GETFD) == -1`/`EBADF`. The inherited
+fd0 file object is never read, parsed, mapped, fstat'ed, ioctl'ed, copied,
+duplicated or otherwise consumed. The unchanged no-argument self-inventory
+then requires exactly fd1/fd2, checked-closes both and requires an empty second
+inventory before UID/path checks, any open or install effect. Later reuse of
+numeric slot 0 after the inherited capability has been destroyed is not reuse
+of that file object. Compiled call graph, macros, aliases and descriptor
+dataflow remain mandatory independent material-review properties. Sudo is an
+external owner-controlled launcher, not new product authority.
+
+After guarded R13 publication, a fresh R8 product is built from the R7 bytes
+and changes exactly installer, installer-only source, recipe and manifest. The
+runtime mediator remains byte-exact. Two independent product reviews run with
+zero root effect. Only after guarded product publication may root recovery
+reauthenticate every protected identity and membership, chmod the existing R7
+inode 0400, and overwrite that same fixed inode with exact R8 bytes through the
+existing stdin-only fixed `dd`. A partial state is admissible only when its
+size and digest equal the corresponding R8 byte prefix and it remains 0400.
+Exact but unconfirmed bytes repeat `dd`; exact durable R8 bytes are fully
+rebound before chmod 0500 and fully reverified before one bootstrap. No unlink,
+rename, recreation, neighbor path or general rollback is permitted.
+
+The uid501 gate can prove only the outer namespace identity and that protected
+descendants are non-traversable. It does not promote the owner's pasted root
+transcript into live evidence. Fresh root reauthentication immediately before
+chmod 0400 is mandatory and must produce the independently reviewed transcript.
+Then follow installed effect review, H038, H032, H031 and only finally
+supervisor resume.
+
 ## H-039 R12 value-preserving causal aliases
 
 Frozen R11 `4ab2e95ce805a9a720ecd7dc913473f3b2fa899e` is immutable
