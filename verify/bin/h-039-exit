@@ -1,8 +1,8 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""Frozen H-039 R15 exit-code-only root-bootstrap diagnostic gate.
+"""Frozen H-039 R16/R10 root-bootstrap diagnostic polarity gate.
 
 No arguments execute pre-product RED while re-reviewing exact published R8 bytes
-and the owner-recorded zero-effect state. ``--product`` reviews one fresh R9
+and the owner-recorded zero-effect state. ``--product`` reviews one fresh R10
 diagnostic candidate without root effect. This Python gate never runs elevated,
 installs anything, or accepts a cleanup path, PID, command, descriptor, or effect.
 """
@@ -43,9 +43,15 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "d337f33d2f6a2041fb2403479faaae4de2266cb7"
-CONTRACT_AUTHORITY_TREE = "6b6433ace449a926dde255c8c00b33ff4842718d"
+CONTRACT_AUTHORITY_BASE = "0f717dbf8b729173413524ae032eff8e0a777a1e"
+CONTRACT_AUTHORITY_TREE = "e5d2399157385b78e5fd8d2ed3874d1121c3fe5b"
 CONTRACT_AUTHORITY_PARENTS = [
+    "22abb06fd786a2a7eeb7e873260e6a28668e3109",
+    "175a12978ba9fcf8bbafd0c173d7727694c4f03c",
+]
+R15_CONTRACT_AUTHORITY_BASE = "d337f33d2f6a2041fb2403479faaae4de2266cb7"
+R15_CONTRACT_AUTHORITY_TREE = "6b6433ace449a926dde255c8c00b33ff4842718d"
+R15_CONTRACT_AUTHORITY_PARENTS = [
     "4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd",
     "90ab5983fdb33fac745517d988de7c4604d85ca0",
 ]
@@ -91,6 +97,18 @@ PUBLISHED_H039_R8_PRODUCT_BLOBS = {
     "controller/runtime-cleanup/native/mediator.c": "aef8c54f169eb430544c6e301617330fc9a0dcf775d48e581191a283e54960d2",
     "verify/h039/build-recipe.json": "82ca604e690f8dbfc16867c695a117f7e43a0c56de4b4bfe48b072f04fe1f0ae",
     "verify/h039/identity-manifest.json": "7ee3864e234c2ab5a916b1e97030cd2a84935985bbea3a68c7c11d60f37b0290",
+    "verify/h039/runtime-cleanup-mediator": "6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a",
+}
+PUBLISHED_H039_R9_CONTRACT_MERGE = "22abb06fd786a2a7eeb7e873260e6a28668e3109"
+PUBLISHED_H039_R9_PRODUCT_CANDIDATE = "175a12978ba9fcf8bbafd0c173d7727694c4f03c"
+PUBLISHED_H039_R9_PRODUCT_MERGE = CONTRACT_AUTHORITY_BASE
+PUBLISHED_H039_R9_PRODUCT_TREE = CONTRACT_AUTHORITY_TREE
+PUBLISHED_H039_R9_PRODUCT_PARENTS = CONTRACT_AUTHORITY_PARENTS
+PUBLISHED_H039_R9_PRODUCT_BLOBS = {
+    "controller/runtime-cleanup/install": "d27d41ee40355765f2ac36e292bb4169f30b99ff551355851e332554b06d8374",
+    "controller/runtime-cleanup/native/mediator.c": "c99e69e7fb8738d8fb138499a24152d56fcdd4884e32df277fab69912b895184",
+    "verify/h039/build-recipe.json": "f2cbc6aad1ee1d70cc9f8dcde82c5d2e34f4720a61fc36e72bd13703dabaecdf",
+    "verify/h039/identity-manifest.json": "d48f995854d78ef08e5ae5b569fb98e18dc436912df15905881f51773ad38a5a",
     "verify/h039/runtime-cleanup-mediator": "6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a",
 }
 ZERO_EFFECT_EVIDENCE = Path(
@@ -157,7 +175,6 @@ PRODUCT_PATHS = [
 PRODUCT_GIT_ORDER = [
     "controller/runtime-cleanup/install",
     "controller/runtime-cleanup/native/mediator.c",
-    "verify/h039/build-recipe.json",
     "verify/h039/identity-manifest.json",
 ]
 PRODUCT_MODES = {
@@ -683,6 +700,19 @@ R14_MATERIAL_REVIEW_EXTENSION = (
     "CLAIM_CAN_AFFECT_GATE_PASS_TASK_COMPLETION_OR_DEPENDENCY_ELIGIBILITY;_THE_"
     "ROOT_CEREMONY_IS_MANUAL_OWNER_WORKFLOW_ONLY_AND_ALWAYS_ENDS_AT_OWNER_STOP"
 )
+R16_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_THE_R10_SOURCE_IS_EXACTLY_THE_PUBLISHED_R9_"
+    "SOURCE_WITH_ONLY_ONE_NEGATION_INSERTED_AT_STATUS86_STAGING_RUNTIME_FSYNC_"
+    "AND_ONE_AT_STATUS99_DATABASE_FSYNC;_FLUSH_DIR_REMAINS_EXACTLY_TRUE_IFF_"
+    "FSYNC_RETURNS_ZERO;_RAW_FSYNC_RESULTS0_0_REACH_ONLY_THE_EXISTING_CODE0_"
+    "IMMEDIATE_PRE_CREATE_ZERO_EFFECT_BOUNDARY_MINUS1_0_RETURNS86_0_MINUS1_"
+    "RETURNS99_AND_MINUS1_MINUS1_RETURNS86_BY_SEQUENCE;_THE_EXACT_O2_IR_BINDS_"
+    "EACH_TARGET_FSYNC_ZERO_EDGE_TO_CONTINUATION_AND_NONZERO_EDGE_TO_ITS_EXACT_"
+    "STATUS;_ALL_OTHER_STATUS_ORDER_IMPORT_EFFECT_DESCRIPTOR_PATH_OUTPUT_INPUT_"
+    "AND_MANUAL_ONE_SHOT_OWNER_STOP_INVARIANTS_REMAIN_UNCHANGED;_THE_BUILD_"
+    "RECIPE_AND_RUNTIME_MEDIATOR_ARE_BYTE_EXACT_TO_PUBLISHED_R9_AND_ONLY_A_"
+    "FRESH_DIRECT_CHILD_AFTER_GUARDED_R16_CONTRACT_PUBLICATION_CAN_RECEIVE_CREDIT"
+)
 R14_CFG_INTERPRETATION = (
     "EACH_EXISTING_CHECK_HAS_ONE_OPTIMIZER_RETAINED_PREDICATE_LOCAL_STATUS_IN_ITS_"
     "OWNING_COMPILED_CFG;_MAIN_OWNS1_TO5_INSTALLER_BOOTSTRAP_OWNS6_TO125_AND_CODE0_"
@@ -775,6 +805,46 @@ R14_DIAGNOSTIC_SOURCE_SHA256 = "c99e69e7fb8738d8fb138499a24152d56fcdd4884e32df27
 R14_DIAGNOSTIC_SOURCE_SIZE = 117449
 R14_DIAGNOSTIC_IR_SHA256 = "3acb5b60835c482466b882a71f8373e4b943d70252f41006799e289eb0963b99"
 R14_DIAGNOSTIC_IR_SIZE = 115234
+R16_DIAGNOSTIC_SOURCE_SHA256 = "6a4388c499a8385c6d061a6a5ab539e39d02f13539a538d1d30b4e5b30b2c163"
+R16_DIAGNOSTIC_SOURCE_SIZE = 117451
+R16_DIAGNOSTIC_IR_SHA256 = "d2a121a4b3d3d860bf48d33ab92e3182b47b431df84d00709b034cd58609b3a5"
+R16_DIAGNOSTIC_IR_SIZE = 115234
+R16_FLUSH_TRUTH_TABLE = [
+    [0, 0, 0],
+    [-1, 0, 86],
+    [0, -1, 99],
+    [-1, -1, 86],
+]
+R16_OBSERVED_STATUS = {
+    "status": 86,
+    "name": "STAGING_RUNTIME_FSYNC",
+    "pre_transcript_sha256": "dc132ef8e12a6ef682d867e9630c4ba85c48d58bbfcfd0db9419a94ae9cd82ba",
+    "post_transcript_sha256": "dc132ef8e12a6ef682d867e9630c4ba85c48d58bbfcfd0db9419a94ae9cd82ba",
+    "root_tree_effect": False,
+    "diagnostic_retry": False,
+}
+R16_OLD_PREDICATES = [
+    "if(flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;",
+    "if(flush_dir(database))return H039_DIAG_DATABASE_FSYNC;",
+]
+R16_CORRECTED_PREDICATES = [
+    "if(!flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;",
+    "if(!flush_dir(database))return H039_DIAG_DATABASE_FSYNC;",
+]
+R16_PRODUCT_CHANGE_SHAPE = (
+    "EXACTLY_THREE_EXISTING_M_CHANGES_INSTALL_INSTALLER_ONLY_SOURCE_AND_"
+    "IDENTITY_MANIFEST_WITH_UNCHANGED_MODES;_BUILD_RECIPE_AND_RUNTIME_"
+    "MEDIATOR_ARE_BYTE_EXACT_TO_PUBLISHED_R9;_SPEC_GATE_REGISTRY_AND_ALL_"
+    "OTHER_PATHS_EQUAL_THE_GUARDED_R16_CONTRACT"
+)
+R16_MANUAL_CEREMONY = (
+    "WORKFLOW_REPORT_ONLY_AND_NEVER_MACHINE_GATE_CREDIT;_OWNER_PERFORMS_FULL_"
+    "ROOT_REAUTH_THEN_SAME_INODE_R8_TO_R10_STAGE_FULL_REAUTH_THEN_EXACTLY_ONE_"
+    "FIXED_PROTECTED_BOOTSTRAP_WITH_NO_RETRY_AND_KERNEL_DELIVERED_EXIT_STATUS_"
+    "EMPTY_STDOUT_STDERR_THEN_FULL_ZERO_EFFECT_OBSERVATION_THEN_SAME_INODE_"
+    "EXACT_R8_RESTORE_FULL_ROOT_REAUTH;_EVERY_OUTCOME_REQUIRES_MANDATORY_OWNER_"
+    "ADJUDICATION_WITH_NO_INSTALL_H038_H032_H031_OR_SUPERVISOR_RESUME"
+)
 R14_DIAGNOSTIC_UNDEFINED_SYMBOLS = {
     "__NSGetExecutablePath", "___chkstk_darwin", "___error",
     "___stack_chk_fail", "___stack_chk_guard", "_bzero", "_chdir", "_close",
@@ -821,20 +891,20 @@ R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
     "/.install/controller/runtime-cleanup",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_R14_R9_DIAGNOSTIC_PRODUCT_ABSENT_MANUAL_CEREMONY_NEVER_MACHINE_CREDITABLE"
+REASON = "H039_R16_R10_POLARITY_CORRECTED_DIAGNOSTIC_PRODUCT_ABSENT"
 FAILURE_SIGNATURE = [
-    "EXACT_PUBLISHED_R8_FOUR_CHANGED_PRODUCT_AND_RUNTIME_MEDIATOR_BYTES_PRESENT",
-    "PUBLISHED_R14_CONTRACT_D337F33D_IS_THE_EXACT_R15_AUTHORITY_BASE_AND_RETAINS_R8",
-    "OWNER_RECORDED_R8_BOOTSTRAP_RC1_AND_BYTE_IDENTICAL_PRE_POST_TRANSCRIPTS_PROVE_ZERO_EFFECT",
-    "FRESH_R9_FOUR_FILE_EXIT_CODE_DIAGNOSTIC_NOT_YET_PUBLISHED",
-    "EXACT_0_TO125_LOGICAL_PREDICATE_REGISTRY_AND_MUTATOR_FREE_CALLGRAPH_REQUIRED",
-    "MANUAL_ONE_SHOT_DIAGNOSTIC_R8_RESTORE_AND_OWNER_STOP_NEVER_MACHINE_CREDITABLE",
+    "EXACT_PUBLISHED_R9_DIAGNOSTIC_AND_RUNTIME_MEDIATOR_BYTES_PRESENT",
+    "PUBLISHED_R9_MAIN_0F717DBF_IS_THE_EXACT_R16_AUTHORITY_BASE",
+    "OWNER_RECORDED_R9_STATUS86_AND_BYTE_IDENTICAL_PRE_POST_TRANSCRIPTS_PROVE_ZERO_EFFECT",
+    "FRESH_R10_THREE_FILE_POLARITY_DIAGNOSTIC_NOT_YET_PUBLISHED",
+    "RAW_FSYNC_SUCCESS_FAILURE_POLARITY_MATRIX_AND_EXACT_O2_CFG_REQUIRED",
+    "NEW_MANUAL_ONE_SHOT_R10_DIAGNOSTIC_R8_RESTORE_AND_OWNER_STOP_REQUIRED",
     "PATHLESS_CAPABILITY_AND_MANAGED_OPTION_A_FALSIFICATION_GREEN",
     "F_OFD_SETLK_REFERENCE_FALSIFICATION_GREEN",
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "122ef0c474194aa23c2da40eba763ed7228b5ffdc28dec8d85e7e55baed1e686"
+EXPECTED_H039_ROW_SHA256 = "b513b4e00d4ad97f21018efe0c617ba216cd5e0754227b514c16f2fb753de94e"
 
 passed = 0
 failed = 0
@@ -1017,11 +1087,17 @@ def static_contract_checks() -> dict[str, Any]:
     check(commit_parents(CONTRACT_AUTHORITY_BASE) == CONTRACT_AUTHORITY_PARENTS,
           "A_H039_AUTHORITY_BASE_ORDERED_PARENTS")
     check(
+        commit_tree(R15_CONTRACT_AUTHORITY_BASE) == R15_CONTRACT_AUTHORITY_TREE
+        and commit_parents(R15_CONTRACT_AUTHORITY_BASE)
+        == R15_CONTRACT_AUTHORITY_PARENTS,
+        "A_H039_R15_HISTORICAL_CONTRACT_AUTHORITY_IDENTITY",
+    )
+    check(
         object_type(REJECTED_R14_DIAGNOSTIC_CANDIDATE) == "commit"
         and commit_tree(REJECTED_R14_DIAGNOSTIC_CANDIDATE)
         == REJECTED_R14_DIAGNOSTIC_TREE
         and commit_parents(REJECTED_R14_DIAGNOSTIC_CANDIDATE)
-        == [CONTRACT_AUTHORITY_BASE],
+        == [R15_CONTRACT_AUTHORITY_BASE],
         "A_H039_R15_REJECTED_R14_PRODUCT_IMMUTABLE_NO_CREDIT_IDENTITY",
     )
     check(object_type(PUBLISHED_H036_PRODUCT_MERGE) == "commit",
@@ -1062,9 +1138,21 @@ def static_contract_checks() -> dict[str, Any]:
     )
     for path, digest in PUBLISHED_H039_R8_PRODUCT_BLOBS.items():
         check(
-            sha(blob(PUBLISHED_H039_R8_PRODUCT_MERGE, path)) == digest
-            and sha(blob(CONTRACT_AUTHORITY_BASE, path)) == digest,
+            sha(blob(PUBLISHED_H039_R8_PRODUCT_MERGE, path)) == digest,
             f"A_H039_R14_AUTHORITY_RETAINS_R8_{path.upper().replace('/', '_').replace('.', '_')}",
+        )
+    check(
+        object_type(PUBLISHED_H039_R9_PRODUCT_MERGE) == "commit"
+        and commit_tree(PUBLISHED_H039_R9_PRODUCT_MERGE)
+        == PUBLISHED_H039_R9_PRODUCT_TREE
+        and commit_parents(PUBLISHED_H039_R9_PRODUCT_MERGE)
+        == PUBLISHED_H039_R9_PRODUCT_PARENTS,
+        "A_H039_PUBLISHED_R9_PRODUCT_MERGE_IDENTITY",
+    )
+    for path, digest in PUBLISHED_H039_R9_PRODUCT_BLOBS.items():
+        check(
+            sha(blob(PUBLISHED_H039_R9_PRODUCT_MERGE, path)) == digest,
+            f"A_H039_PUBLISHED_R9_{path.upper().replace('/', '_').replace('.', '_')}",
         )
     for path, digest in PUBLISHED_H036_LEGACY_BLOBS.items():
         check(
@@ -1093,6 +1181,9 @@ def static_contract_checks() -> dict[str, Any]:
     diagnostic = row.get("h039_os_exclusive_runtime_cleanup", {}).get(
         "r14_exit_code_only_root_diagnostic", {},
     )
+    polarity = row.get("h039_os_exclusive_runtime_cleanup", {}).get(
+        "r16_flush_polarity_correction", {},
+    )
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -1104,8 +1195,8 @@ def static_contract_checks() -> dict[str, Any]:
     )
     check(
         type(diagnostic) is dict
-        and diagnostic.get("authority_base") == CONTRACT_AUTHORITY_BASE
-        and diagnostic.get("authority_tree") == CONTRACT_AUTHORITY_TREE
+        and diagnostic.get("authority_base") == R15_CONTRACT_AUTHORITY_BASE
+        and diagnostic.get("authority_tree") == R15_CONTRACT_AUTHORITY_TREE
         and diagnostic.get("rejected_r14_diagnostic_candidate")
         == REJECTED_R14_DIAGNOSTIC_CANDIDATE
         and diagnostic.get("rejected_r14_diagnostic_tree")
@@ -1149,6 +1240,49 @@ def static_contract_checks() -> dict[str, Any]:
         and diagnostic.get("caller_selected_input_path_fd_or_environment") is False
         and diagnostic.get("broader_authority") is False,
         "A_H039_R14_EXACT_EXIT_DIAGNOSTIC_REGISTRY",
+    )
+    check(
+        type(polarity) is dict
+        and polarity.get("schema_version") == 1
+        and type(polarity.get("schema_version")) is int
+        and polarity.get("authority_base") == CONTRACT_AUTHORITY_BASE
+        and polarity.get("authority_tree") == CONTRACT_AUTHORITY_TREE
+        and polarity.get("authority_ordered_parents") == CONTRACT_AUTHORITY_PARENTS
+        and polarity.get("published_r9_contract_merge")
+        == PUBLISHED_H039_R9_CONTRACT_MERGE
+        and polarity.get("published_r9_product_candidate")
+        == PUBLISHED_H039_R9_PRODUCT_CANDIDATE
+        and polarity.get("published_r9_product_merge")
+        == PUBLISHED_H039_R9_PRODUCT_MERGE
+        and polarity.get("published_r9_product_tree")
+        == PUBLISHED_H039_R9_PRODUCT_TREE
+        and polarity.get("observed_status") == R16_OBSERVED_STATUS
+        and polarity.get("flush_dir_definition") == "return fsync(fd)==0;"
+        and polarity.get("old_source_sha256") == R14_DIAGNOSTIC_SOURCE_SHA256
+        and polarity.get("old_source_size") == R14_DIAGNOSTIC_SOURCE_SIZE
+        and polarity.get("old_predicates") == R16_OLD_PREDICATES
+        and polarity.get("corrected_predicates") == R16_CORRECTED_PREDICATES
+        and polarity.get("corrected_source_sha256")
+        == R16_DIAGNOSTIC_SOURCE_SHA256
+        and polarity.get("corrected_source_size") == R16_DIAGNOSTIC_SOURCE_SIZE
+        and polarity.get("corrected_optimized_ir_sha256")
+        == R16_DIAGNOSTIC_IR_SHA256
+        and polarity.get("corrected_optimized_ir_size") == R16_DIAGNOSTIC_IR_SIZE
+        and polarity.get("raw_fsync_truth_table") == R16_FLUSH_TRUTH_TABLE
+        and polarity.get("product_change_shape") == R16_PRODUCT_CHANGE_SHAPE
+        and polarity.get("build_recipe_sha256")
+        == PUBLISHED_H039_R9_PRODUCT_BLOBS["verify/h039/build-recipe.json"]
+        and polarity.get("runtime_mediator_sha256")
+        == PUBLISHED_H039_R9_PRODUCT_BLOBS["verify/h039/runtime-cleanup-mediator"]
+        and polarity.get("status_registry") == "UNCHANGED_0_TO_125"
+        and polarity.get("imports_effects_descriptors_paths_and_order") == "UNCHANGED"
+        and polarity.get("manual_owner_ceremony") == R16_MANUAL_CEREMONY
+        and polarity.get("machine_post_root_credit") is False
+        and polarity.get("diagnostic_retry") is False
+        and polarity.get("production_installation") is False
+        and polarity.get("owner_adjudication_required") is True
+        and polarity.get("broader_authority") is False,
+        "A_H039_R16_EXACT_FLUSH_POLARITY_REGISTRY",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -1196,6 +1330,14 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", "")),
         "A_H039_EXACT_NONEMPTY_IMMUTABLE_REVIEW_BOUNDARY",
+    )
+    check(
+        row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r16_material_review_extension") == R16_MATERIAL_REVIEW_EXTENSION
+        and f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", "")),
+        "A_H039_R16_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -1342,6 +1484,76 @@ def r14_registry_selftests(row: dict[str, Any]) -> None:
         mutant = copy.deepcopy(diagnostic)
         mutate(mutant)
         check(not valid(mutant), f"N_H039_R14_REGISTRY_{label}")
+
+
+def r16_registry_selftests(row: dict[str, Any]) -> None:
+    polarity = row["h039_os_exclusive_runtime_cleanup"][
+        "r16_flush_polarity_correction"
+    ]
+    expected = {
+        "schema_version": 1,
+        "authority_base": CONTRACT_AUTHORITY_BASE,
+        "authority_tree": CONTRACT_AUTHORITY_TREE,
+        "authority_ordered_parents": CONTRACT_AUTHORITY_PARENTS,
+        "published_r9_contract_merge": PUBLISHED_H039_R9_CONTRACT_MERGE,
+        "published_r9_product_candidate": PUBLISHED_H039_R9_PRODUCT_CANDIDATE,
+        "published_r9_product_merge": PUBLISHED_H039_R9_PRODUCT_MERGE,
+        "published_r9_product_tree": PUBLISHED_H039_R9_PRODUCT_TREE,
+        "observed_status": R16_OBSERVED_STATUS,
+        "flush_dir_definition": "return fsync(fd)==0;",
+        "old_source_sha256": R14_DIAGNOSTIC_SOURCE_SHA256,
+        "old_source_size": R14_DIAGNOSTIC_SOURCE_SIZE,
+        "old_predicates": R16_OLD_PREDICATES,
+        "corrected_predicates": R16_CORRECTED_PREDICATES,
+        "corrected_source_sha256": R16_DIAGNOSTIC_SOURCE_SHA256,
+        "corrected_source_size": R16_DIAGNOSTIC_SOURCE_SIZE,
+        "corrected_optimized_ir_sha256": R16_DIAGNOSTIC_IR_SHA256,
+        "corrected_optimized_ir_size": R16_DIAGNOSTIC_IR_SIZE,
+        "raw_fsync_truth_table": R16_FLUSH_TRUTH_TABLE,
+        "product_change_shape": R16_PRODUCT_CHANGE_SHAPE,
+        "build_recipe_sha256": PUBLISHED_H039_R9_PRODUCT_BLOBS[
+            "verify/h039/build-recipe.json"
+        ],
+        "runtime_mediator_sha256": PUBLISHED_H039_R9_PRODUCT_BLOBS[
+            "verify/h039/runtime-cleanup-mediator"
+        ],
+        "status_registry": "UNCHANGED_0_TO_125",
+        "imports_effects_descriptors_paths_and_order": "UNCHANGED",
+        "manual_owner_ceremony": R16_MANUAL_CEREMONY,
+        "machine_post_root_credit": False,
+        "diagnostic_retry": False,
+        "production_installation": False,
+        "owner_adjudication_required": True,
+        "broader_authority": False,
+    }
+
+    def valid(value: Any) -> bool:
+        return type(value) is dict and value == expected
+
+    check(valid(polarity), "A_H039_R16_POLARITY_REGISTRY_SELFTEST_ANCHOR")
+    mutations = (
+        ("KEY_REMOVED", lambda value: value.pop("flush_dir_definition")),
+        ("KEY_ADDED", lambda value: value.__setitem__("alternate", False)),
+        ("BASE_CHANGED", lambda value: value.__setitem__("authority_base", "00" * 20)),
+        ("OBSERVED_RETRY", lambda value: value["observed_status"].__setitem__("diagnostic_retry", True)),
+        ("HELPER_INVERTED", lambda value: value.__setitem__("flush_dir_definition", "return fsync(fd)!=0;")),
+        ("OLD_PREDICATE_NEGATED", lambda value: value["old_predicates"].__setitem__(0, R16_CORRECTED_PREDICATES[0])),
+        ("CORRECTED_PREDICATE_REVERTED", lambda value: value["corrected_predicates"].__setitem__(1, R16_OLD_PREDICATES[1])),
+        ("TRUTH_SUCCESS_RETURNS86", lambda value: value["raw_fsync_truth_table"][0].__setitem__(2, 86)),
+        ("SOURCE_DIGEST_CHANGED", lambda value: value.__setitem__("corrected_source_sha256", "00" * 32)),
+        ("IR_DIGEST_CHANGED", lambda value: value.__setitem__("corrected_optimized_ir_sha256", "00" * 32)),
+        ("PRODUCT_SCOPE_WIDENED", lambda value: value.__setitem__("product_change_shape", R16_PRODUCT_CHANGE_SHAPE + ";_EXTRA")),
+        ("RECIPE_CHANGED", lambda value: value.__setitem__("build_recipe_sha256", "00" * 32)),
+        ("MEDIATOR_CHANGED", lambda value: value.__setitem__("runtime_mediator_sha256", "00" * 32)),
+        ("RETRY_ENABLED", lambda value: value.__setitem__("diagnostic_retry", True)),
+        ("INSTALL_ENABLED", lambda value: value.__setitem__("production_installation", True)),
+        ("OWNER_STOP_REMOVED", lambda value: value.__setitem__("owner_adjudication_required", False)),
+        ("AUTHORITY_WIDENED", lambda value: value.__setitem__("broader_authority", True)),
+    )
+    for label, mutate in mutations:
+        mutant = copy.deepcopy(polarity)
+        mutate(mutant)
+        check(not valid(mutant), f"N_H039_R16_REGISTRY_{label}")
 
 
 def first_root_tool_checks() -> None:
@@ -3933,7 +4145,7 @@ def causal_oracle_selftests() -> None:
     ]
     check(
         exact_product_change_shape(expected_product_changes),
-        "A_H039_R6_EXACT_FOUR_EXISTING_FILE_PRODUCT_CHANGE_SHAPE",
+        "A_H039_R16_EXACT_THREE_EXISTING_FILE_PRODUCT_CHANGE_SHAPE",
     )
     for label, mutate in (
         ("ADDED", lambda value: value.__setitem__(0, (value[0][0], "000000", value[0][2], "A"))),
@@ -6682,6 +6894,7 @@ def product_identity(
             blob(candidate, path) == blob(base, path)
             for path in ("specs/tasks.spec.json", "verify/bin/h-039-exit",
                          "specs/owner-production-paths.v1.json",
+                         "verify/h039/build-recipe.json",
                          "verify/h039/runtime-cleanup-mediator")
         )
         product_sizes = {
@@ -7612,7 +7825,7 @@ def reproducible_rebuild(recipe: dict[str, Any], commit: str | None = None) -> N
 
 def r14_ir_control_flow_valid(ir: bytes, *, exact_image: bool) -> bool:
     if exact_image and (
-        len(ir) != R14_DIAGNOSTIC_IR_SIZE or sha(ir) != R14_DIAGNOSTIC_IR_SHA256
+        len(ir) != R16_DIAGNOSTIC_IR_SIZE or sha(ir) != R16_DIAGNOSTIC_IR_SHA256
     ):
         return False
     try:
@@ -7679,8 +7892,95 @@ def r14_ir_control_flow_selftests(ir: bytes) -> None:
               f"N_H039_R14_R4_IR_{label}")
 
 
+def r16_ir_polarity_valid(ir: bytes, *, exact_image: bool) -> bool:
+    if exact_image and (
+        len(ir) != R16_DIAGNOSTIC_IR_SIZE
+        or sha(ir) != R16_DIAGNOSTIC_IR_SHA256
+    ):
+        return False
+    try:
+        text = ir.decode("utf-8")
+    except UnicodeError:
+        return False
+    function = re.search(
+        r"define range\(i32 0, 126\) i32 @installer_bootstrap\(i32[^\n]*\) #[0-9]+ \{"
+        r"([\s\S]*?)\n\}",
+        text,
+    )
+    if function is None:
+        return False
+    body = function.group(1)
+    sites: dict[int, tuple[int, int]] = {}
+    for phi in re.finditer(
+        r"(?m)^(?P<merge>[0-9]+):[^\n]*\n\s+%[0-9]+ = phi i32 (?P<pairs>[^\n]+)",
+        body,
+    ):
+        merge = int(phi.group("merge"))
+        for status, predecessor in re.findall(
+            r"\[\s*([0-9]+),\s*%([0-9]+)\s*\]", phi.group("pairs"),
+        ):
+            code = int(status)
+            if code in (86, 99):
+                if code in sites:
+                    return False
+                sites[code] = (int(predecessor), merge)
+    if set(sites) != {86, 99}:
+        return False
+    success_blocks: dict[int, int] = {}
+    for code, (predecessor, merge) in sites.items():
+        block = re.search(
+            rf"(?m)^{predecessor}:[^\n]*\n(?P<body>[\s\S]*?)(?=^[0-9]+:)",
+            body,
+        )
+        if block is None:
+            return False
+        edge = re.fullmatch(
+            r"\s*%(?P<call>[0-9]+) = call i32 @\"\\01_fsync\"\([^\n]+\) #[0-9]+\n"
+            r"\s*%(?P<cmp>[0-9]+) = icmp eq i32 %(?P=call), 0\n"
+            r"\s*br i1 %(?P=cmp), label %(?P<success>[0-9]+), label %(?P<failure>[0-9]+)\s*",
+            block.group("body"),
+        )
+        if edge is None or int(edge.group("failure")) != merge:
+            return False
+        success = int(edge.group("success"))
+        if success == merge or success <= predecessor:
+            return False
+        success_blocks[code] = success
+    return sites[86][0] < success_blocks[86] < sites[99][0] < success_blocks[99]
+
+
+def r16_ir_polarity_selftests(ir: bytes) -> None:
+    check(
+        r16_ir_polarity_valid(ir, exact_image=True),
+        "A_H039_R16_O2_FSYNC_SUCCESS_CONTINUES_FAILURE_RETURNS_86_99",
+    )
+    mutants = {
+        "STATUS86_EDGE_INVERTED": ir.replace(
+            b"br i1 %350, label %351, label %598",
+            b"br i1 %350, label %598, label %351", 1,
+        ),
+        "STATUS99_EDGE_INVERTED": ir.replace(
+            b"br i1 %419, label %420, label %590",
+            b"br i1 %419, label %590, label %420", 1,
+        ),
+        "STATUS86_PHI_CHANGED": ir.replace(
+            b"[ 86, %348 ]", b"[ 87, %348 ]", 1,
+        ),
+        "STATUS99_PHI_CHANGED": ir.replace(
+            b"[ 99, %417 ]", b"[ 100, %417 ]", 1,
+        ),
+    }
+    for label, mutant in mutants.items():
+        if mutant == ir:
+            raise Rig(f"noncausal R16 IR polarity mutant: {label}")
+        check(
+            not r16_ir_polarity_valid(mutant, exact_image=False),
+            f"N_H039_R16_IR_POLARITY_{label}",
+        )
+
+
 def r14_reference_rebuild() -> None:
-    """Compile the sole R9 source before freeze; no product bytes are adopted."""
+    """Compile the sole R10 source before freeze; no product bytes are adopted."""
     temporary = Path(tempfile.mkdtemp(prefix="h039-r14-reference-", dir="/private/tmp"))
     project = temporary / "project"
     source_path = project / "controller/runtime-cleanup/native/mediator.c"
@@ -7690,11 +7990,11 @@ def r14_reference_rebuild() -> None:
     try:
         source_path.parent.mkdir(parents=True)
         mediator_path.parent.mkdir(parents=True)
-        source = r14_expected_diagnostic_source()
+        source = r16_expected_diagnostic_source()
         r14_diagnostic_source_checks(source)
         source_path.write_bytes(source)
         mediator = blob(
-            PUBLISHED_H039_R8_PRODUCT_MERGE,
+            PUBLISHED_H039_R9_PRODUCT_MERGE,
             "verify/h039/runtime-cleanup-mediator",
         )
         mediator_path.write_bytes(mediator)
@@ -7748,7 +8048,7 @@ def r14_reference_rebuild() -> None:
             if line.strip()
         }
         if symbols != R14_DIAGNOSTIC_UNDEFINED_SYMBOLS:
-            raise Rig("R14 reference build undefined-import set drift")
+            raise Rig("R16 reference build undefined-import set drift")
         ir_argv = [
             compiler, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
             "-fstack-protector-strong", "-D_FORTIFY_SOURCE=2", "-arch", "arm64",
@@ -7773,16 +8073,22 @@ def r14_reference_rebuild() -> None:
         )
         if ir_result.returncode == 71 \
                 and b"sandbox_apply: Operation not permitted" in ir_result.stderr:
-            raise Undecidable("outer Seatbelt denied R14 IR reference build sandbox")
+            raise Undecidable("outer Seatbelt denied R16 IR reference build sandbox")
         if ir_result.returncode != 0 or ir_result.stdout or ir_result.stderr:
             raise Rig("exact optimized LLVM IR build failed or emitted output")
         ir = ir_path.read_bytes()
-        if not r14_ir_control_flow_valid(ir, exact_image=True):
+        if (
+            len(ir) != R16_DIAGNOSTIC_IR_SIZE
+            or sha(ir) != R16_DIAGNOSTIC_IR_SHA256
+            or not r14_ir_control_flow_valid(ir, exact_image=False)
+            or not r16_ir_polarity_valid(ir, exact_image=True)
+        ):
             raise Rig(
                 "optimized diagnostic IR is not the frozen exact control-flow image: "
                 f"size={len(ir)} sha256={sha(ir)}"
             )
         r14_ir_control_flow_selftests(ir)
+        r16_ir_polarity_selftests(ir)
     finally:
         shutil.rmtree(temporary)
 
@@ -8279,7 +8585,7 @@ def r15_native_absolute_literal_oracle_selftests() -> None:
             f"N_H039_R15_CAUSAL_LITERAL_MEMBERSHIP_{label}",
         )
 
-    source = r14_expected_diagnostic_source()
+    source = r16_expected_diagnostic_source()
     caller_selected = source.replace(
         b"if(close(0)!=0)",
         b"if(open(argv[1],O_RDONLY)<0||close(0)!=0)", 1,
@@ -8552,14 +8858,166 @@ def r14_expected_diagnostic_source() -> bytes:
     )
 
 
-def r14_diagnostic_source_checks(raw: bytes) -> None:
-    expected = r14_expected_diagnostic_source()
+def r16_expected_diagnostic_source() -> bytes:
+    base = blob(
+        PUBLISHED_H039_R9_PRODUCT_MERGE,
+        "controller/runtime-cleanup/native/mediator.c",
+    )
     if (
-        len(expected) != R14_DIAGNOSTIC_SOURCE_SIZE
-        or sha(expected) != R14_DIAGNOSTIC_SOURCE_SHA256
+        len(base) != R14_DIAGNOSTIC_SOURCE_SIZE
+        or sha(base) != R14_DIAGNOSTIC_SOURCE_SHA256
+        or base != r14_expected_diagnostic_source()
+    ):
+        raise Rig("published R9 source is not the frozen R14/R15 diagnostic")
+    old_new = (
+        (
+            b"if(flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;",
+            b"if(!flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;",
+        ),
+        (
+            b"if(flush_dir(database))return H039_DIAG_DATABASE_FSYNC;",
+            b"if(!flush_dir(database))return H039_DIAG_DATABASE_FSYNC;",
+        ),
+    )
+    corrected = base
+    for old, new in old_new:
+        if corrected.count(old) != 1 or corrected.count(new) != 0:
+            raise Rig("published R9 polarity transform anchor drift")
+        corrected = corrected.replace(old, new, 1)
+    if len(corrected) != len(base) + 2:
+        raise Rig("R16 transform is not exactly two inserted negations")
+    return corrected
+
+
+def r16_flush_polarity_outcome(
+    raw: bytes, staging_runtime_fsync_rc: int, database_fsync_rc: int,
+) -> int | None:
+    try:
+        source = c_semantic_source(raw.decode("utf-8"))
+    except (Rig, UnicodeError):
+        return None
+    helper = "static int flush_dir(int fd){return fsync(fd)==0;}"
+    if source.count(helper) != 1:
+        return None
+    patterns = (
+        (
+            "staging_runtime", staging_runtime_fsync_rc,
+            "if(fsync(stable_self))return H039_DIAG_STAGING_SELF_FSYNC;",
+            "if(fstat(stable_self,&stable_after))return H039_DIAG_STAGING_SELF_POST_FSYNC_FSTAT;",
+        ),
+        (
+            "database", database_fsync_rc,
+            "if(fsync(ns))return H039_DIAG_NAMESPACE_FSYNC;",
+            "if(fstat(ns,&namespace_after))return H039_DIAG_NAMESPACE_POST_FSYNC_FSTAT;",
+        ),
+    )
+    positions: list[int] = []
+    for name, raw_rc, predecessor, successor in patterns:
+        match = re.search(
+            rf"if\((?P<negations>!*)flush_dir\({name}\)\)"
+            rf"return H039_DIAG_(?P<status>[A-Z0-9_]+);",
+            source,
+        )
+        if match is None or len(re.findall(
+            rf"if\(!*flush_dir\({name}\)\)return H039_DIAG_[A-Z0-9_]+;",
+            source,
+        )) != 1:
+            return None
+        status = {
+            "STAGING_RUNTIME_FSYNC": 86,
+            "DATABASE_FSYNC": 99,
+        }.get(match.group("status"))
+        if status is None:
+            return None
+        before = source.find(predecessor)
+        after = source.find(successor)
+        if before < 0 or after < 0 or not before < match.start() < after:
+            return None
+        positions.append(match.start())
+        predicate = raw_rc == 0
+        for _ in match.group("negations"):
+            predicate = not predicate
+        if predicate:
+            return status
+    boundary = "return H039_DIAG_IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT;"
+    if source.count(boundary) != 1:
+        return None
+    boundary_position = source.index(boundary)
+    if not positions[0] < positions[1] < boundary_position:
+        return None
+    return 0
+
+
+def r16_flush_polarity_valid(raw: bytes, *, exact_image: bool) -> bool:
+    if exact_image and (
+        len(raw) != R16_DIAGNOSTIC_SOURCE_SIZE
+        or sha(raw) != R16_DIAGNOSTIC_SOURCE_SHA256
+        or raw != r16_expected_diagnostic_source()
+    ):
+        return False
+    return all(
+        r16_flush_polarity_outcome(raw, runtime_rc, database_rc) == status
+        for runtime_rc, database_rc, status in R16_FLUSH_TRUTH_TABLE
+    )
+
+
+def r16_flush_polarity_selftests() -> None:
+    source = r16_expected_diagnostic_source()
+    check(
+        r16_flush_polarity_valid(source, exact_image=True),
+        "A_H039_R16_RAW_FSYNC_POLARITY_TRUTH_TABLE",
+    )
+    runtime = b"if(!flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;"
+    database = b"if(!flush_dir(database))return H039_DIAG_DATABASE_FSYNC;"
+    boundary = b"return H039_DIAG_IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT;"
+    predecessor = b"if(fsync(stable_self))return H039_DIAG_STAGING_SELF_FSYNC;"
+    mutants = {
+        "RUNTIME_REVERTED": source.replace(runtime, runtime.replace(b"!", b"", 1), 1),
+        "DATABASE_REVERTED": source.replace(database, database.replace(b"!", b"", 1), 1),
+        "RUNTIME_CONSTANT_FALSE": source.replace(runtime, b"if(0&&flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;", 1),
+        "DATABASE_CONSTANT_FALSE": source.replace(database, b"if(0&&flush_dir(database))return H039_DIAG_DATABASE_FSYNC;", 1),
+        "HELPER_INVERTED": source.replace(b"return fsync(fd)==0;", b"return fsync(fd)!=0;", 1),
+        "RUNTIME_DOUBLE_NEGATION": source.replace(runtime, runtime.replace(b"!flush", b"!!flush"), 1),
+        "STATUS_SWAPPED": source.replace(
+            runtime, runtime.replace(b"STAGING_RUNTIME_FSYNC", b"DATABASE_FSYNC"), 1,
+        ).replace(
+            database, database.replace(b"DATABASE_FSYNC", b"STAGING_RUNTIME_FSYNC"), 1,
+        ),
+        "RUNTIME_REORDERED": source.replace(predecessor + b"\n  " + runtime, runtime + b"\n  " + predecessor, 1),
+        "BOUNDARY_MOVED_EARLY": source.replace(boundary, b"", 1).replace(runtime, boundary + b"\n  " + runtime, 1),
+    }
+    for label, mutant in mutants.items():
+        if mutant == source:
+            raise Rig(f"noncausal R16 polarity mutant: {label}")
+        check(
+            not r16_flush_polarity_valid(mutant, exact_image=False),
+            f"N_H039_R16_POLARITY_{label}",
+        )
+
+
+def r14_diagnostic_source_checks(
+    raw: bytes, *, corrected_polarity: bool = True,
+) -> None:
+    expected = (
+        r16_expected_diagnostic_source()
+        if corrected_polarity else r14_expected_diagnostic_source()
+    )
+    expected_size = (
+        R16_DIAGNOSTIC_SOURCE_SIZE
+        if corrected_polarity else R14_DIAGNOSTIC_SOURCE_SIZE
+    )
+    expected_sha256 = (
+        R16_DIAGNOSTIC_SOURCE_SHA256
+        if corrected_polarity else R14_DIAGNOSTIC_SOURCE_SHA256
+    )
+    if (
+        len(expected) != expected_size
+        or sha(expected) != expected_sha256
         or raw != expected
     ):
-        raise Rig("diagnostic source is not the sole byte-exact published-R8 transform")
+        raise Rig("diagnostic source is not the exact frozen source image")
+    if corrected_polarity and not r16_flush_polarity_valid(raw, exact_image=True):
+        raise Rig("diagnostic source has invalid fsync polarity")
     source = raw.decode("utf-8")
     diagnostic = source[
         source.index("#if defined(H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC)"):
@@ -8607,7 +9065,7 @@ def r14_diagnostic_source_checks(raw: bytes) -> None:
 
 
 def r14_diagnostic_source_oracle_selftests() -> None:
-    source = r14_expected_diagnostic_source()
+    source = r16_expected_diagnostic_source()
 
     def rejected(value: bytes) -> bool:
         try:
@@ -8718,6 +9176,7 @@ def r14_diagnostic_source_oracle_selftests() -> None:
 
 def immutable_source_checks(
     commit: str | None = None, *, diagnostic_product: bool = False,
+    corrected_polarity: bool = False,
 ) -> None:
     raw = product_bytes("controller/runtime-cleanup/native/mediator.c", commit)
     try:
@@ -8775,7 +9234,9 @@ def immutable_source_checks(
     ) is not None or '"apply"' in semantic_source:
         raise Rig("external root apply selector survived R6 bootstrap migration")
     if diagnostic_product:
-        r14_diagnostic_source_checks(raw)
+        r14_diagnostic_source_checks(
+            raw, corrected_polarity=corrected_polarity,
+        )
         return
     embedded_body = c_function_body(semantic_source, "load_embedded_mediator")
     closure_body = c_function_body(
@@ -11154,6 +11615,7 @@ def finish(phase: str) -> int:
     print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
     print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
     print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         if phase == "published":
@@ -11190,6 +11652,7 @@ def main(argv: list[str]) -> int:
         print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
         print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -11206,14 +11669,15 @@ def main(argv: list[str]) -> int:
         print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
         print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
     product = len(argv) == 3 and argv[0] == "--product"
     published = len(argv) == 2 and argv[0] == "--published"
     if not (preproduct or product or published):
         print(
-            "RIG_ERROR: usage: h-039-exit [--product PUBLISHED_R14_CONTRACT_MERGE "
-            "R9_DIAGNOSTIC_CANDIDATE | --published PUBLISHED_R9_PRODUCT_MERGE]",
+            "RIG_ERROR: usage: h-039-exit [--product PUBLISHED_R16_CONTRACT_MERGE "
+            "R10_DIAGNOSTIC_CANDIDATE | --published PUBLISHED_R10_PRODUCT_MERGE]",
             file=sys.stderr,
         )
         return 2
@@ -11230,8 +11694,10 @@ def main(argv: list[str]) -> int:
         row = static_contract_checks()
         contract_selftests(row)
         r14_registry_selftests(row)
+        r16_registry_selftests(row)
         r15_native_absolute_literal_oracle_selftests()
         r14_diagnostic_source_oracle_selftests()
+        r16_flush_polarity_selftests()
         causal_oracle_selftests()
         seatbelt_profile_selftests()
         ofd_lock_reference()
@@ -11239,23 +11705,36 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            baseline, detail = published_r8_zero_effect_baseline()
+            baseline, detail = published_r8_zero_effect_baseline(
+                require_repo_r8=False,
+            )
             check(
                 baseline,
-                "A_H039_R14_PUBLISHED_R8_ZERO_EFFECT_BASELINE",
+                "A_H039_R16_PUBLISHED_R8_ROOT_ZERO_EFFECT_BASELINE",
                 detail,
             )
             if not baseline:
-                raise Rig("R14 baseline is not the exact published R8 zero-effect state")
+                raise Rig("R16 root baseline is not the exact published R8 zero-effect state")
             recipe, manifest = manifest_checks(
-                PUBLISHED_H039_R8_PRODUCT_MERGE,
+                PUBLISHED_H039_R9_PRODUCT_MERGE,
+                diagnostic_product=True,
             )
-            immutable_source_checks(PUBLISHED_H039_R8_PRODUCT_MERGE)
-            reproducible_rebuild(recipe, PUBLISHED_H039_R8_PRODUCT_MERGE)
+            immutable_source_checks(
+                PUBLISHED_H039_R9_PRODUCT_MERGE,
+                diagnostic_product=True,
+                corrected_polarity=False,
+            )
+            reproducible_rebuild(recipe, PUBLISHED_H039_R9_PRODUCT_MERGE)
             r14_reference_rebuild()
-            macho_checks(manifest, PUBLISHED_H039_R8_PRODUCT_MERGE)
-            installer_verify_effects(PUBLISHED_H039_R8_PRODUCT_MERGE)
-            check(True, "A_H039_R14_RETAINED_R8_PRODUCT_REVIEWED_ZERO_EFFECT")
+            macho_checks(
+                manifest, PUBLISHED_H039_R9_PRODUCT_MERGE,
+                diagnostic_product=True,
+            )
+            installer_verify_effects(
+                PUBLISHED_H039_R9_PRODUCT_MERGE,
+                diagnostic_product=True,
+            )
+            check(True, "A_H039_R16_RETAINED_R9_PRODUCT_REVIEWED_ZERO_EFFECT")
             check(False, LABEL, {
                 "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
             })
@@ -11265,20 +11744,22 @@ def main(argv: list[str]) -> int:
             root_before, root_before_detail = \
                 published_r8_zero_effect_baseline(require_repo_r8=False)
             check(
-                root_before, "A_H039_R14_DIAGNOSTIC_REVIEW_ZERO_EFFECT_BEFORE",
+                root_before, "A_H039_R16_DIAGNOSTIC_REVIEW_ZERO_EFFECT_BEFORE",
                 root_before_detail,
             )
             if not root_before:
                 return finish(phase)
             identity_ok, identity_detail = product_identity(argv[1], argv[2])
             check(
-                identity_ok, "A_H039_R14_EXACT_DIRECT_CHILD_FOUR_FILE_R9_IDENTITY",
+                identity_ok, "A_H039_R16_EXACT_DIRECT_CHILD_THREE_FILE_R10_IDENTITY",
                 identity_detail,
             )
             if not identity_ok:
                 return finish(phase)
             recipe, manifest = manifest_checks(argv[2], diagnostic_product=True)
-            immutable_source_checks(argv[2], diagnostic_product=True)
+            immutable_source_checks(
+                argv[2], diagnostic_product=True, corrected_polarity=True,
+            )
             reproducible_rebuild(recipe, argv[2])
             macho_checks(manifest, argv[2], diagnostic_product=True)
             installer_verify_effects(argv[2], diagnostic_product=True)
@@ -11286,7 +11767,7 @@ def main(argv: list[str]) -> int:
                 published_r8_zero_effect_baseline(require_repo_r8=False)
             check(
                 root_after and root_after_detail == root_before_detail,
-                "A_H039_R14_DIAGNOSTIC_PRODUCT_REVIEW_ZERO_ROOT_EFFECT",
+                "A_H039_R16_DIAGNOSTIC_PRODUCT_REVIEW_ZERO_ROOT_EFFECT",
                 {"before": root_before_detail, "after": root_after_detail},
             )
             return finish(phase)
@@ -11294,20 +11775,22 @@ def main(argv: list[str]) -> int:
         root_before, root_before_detail = \
             published_r8_zero_effect_baseline(require_repo_r8=False)
         check(
-            root_before, "A_H039_R14_PUBLISHED_DIAGNOSTIC_ZERO_EFFECT_BEFORE",
+            root_before, "A_H039_R16_PUBLISHED_DIAGNOSTIC_ZERO_EFFECT_BEFORE",
             root_before_detail,
         )
         if not root_before:
             return finish(phase)
         publication_ok, publication_detail = product_publication_identity(argv[1])
         check(
-            publication_ok, "A_H039_R14_GUARDED_DIAGNOSTIC_PUBLICATION_IDENTITY",
+            publication_ok, "A_H039_R16_GUARDED_DIAGNOSTIC_PUBLICATION_IDENTITY",
             publication_detail,
         )
         if not publication_ok:
             return finish(phase)
         recipe, manifest = manifest_checks(argv[1], diagnostic_product=True)
-        immutable_source_checks(argv[1], diagnostic_product=True)
+        immutable_source_checks(
+            argv[1], diagnostic_product=True, corrected_polarity=True,
+        )
         reproducible_rebuild(recipe, argv[1])
         macho_checks(manifest, argv[1], diagnostic_product=True)
         installer_verify_effects(argv[1], diagnostic_product=True)
@@ -11315,7 +11798,7 @@ def main(argv: list[str]) -> int:
             published_r8_zero_effect_baseline(require_repo_r8=False)
         check(
             root_after and root_after_detail == root_before_detail,
-            "A_H039_R14_PUBLISHED_DIAGNOSTIC_ZERO_ROOT_EFFECT",
+            "A_H039_R16_PUBLISHED_DIAGNOSTIC_ZERO_ROOT_EFFECT",
             {"before": root_before_detail, "after": root_after_detail},
         )
         return finish(phase)
@@ -11334,6 +11817,7 @@ def main(argv: list[str]) -> int:
         print(f"R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION={R13_FULL_FIRST_ROOT_TYPED_REVIEW_EXTENSION}")
         print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)
