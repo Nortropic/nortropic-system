@@ -2188,3 +2188,31 @@ reachability reject. Artificial reachability would require a new owner decision.
 
 The exact source/IR bytes, no-umask imports, manual no-retry ceremony, absence
 of machine post-root credit, product scope, and authority remain unchanged.
+
+## H-039 R15 diagnostic literal-set composition correction
+
+Published R14 contract merge `d337f33d2f6a2041fb2403479faaae4de2266cb7`
+with tree `6b6433ace449a926dde255c8c00b33ff4842718d` is the sole R15
+authority base. The first R14 diagnostic product candidate
+`710e3c0db8d6e534cc657be11745f58d2c8ca671`, tree
+`1fd09c2fe469da78538264762866d2bfae98290e`, is immutable NO-CREDIT:
+the exact 117449-byte diagnostic source contains the fixed read-only parent
+literal `/.install/controller/runtime-cleanup`, while the R14 composition
+checker admitted only the published R8 source's 15-literal set. That candidate
+is a sibling of the R15 contract candidate, never a parent or adoptable product.
+
+R15 changes only that composition defect. The published R8 source continues to
+require exactly its existing 15 absolute path literals. The already frozen
+diagnostic source requires exactly that set plus the single literal
+`/.install/controller/runtime-cleanup`; this is a closed 16-member set, not a
+prefix admission. Removal, substitution, addition, broader prefix, alias or
+caller-selected path rejects, and the exact source oracle independently rejects
+all altered bytes. The source/IR digests and sizes, undefined imports, product
+scope, primitive/effect sets, descriptor rules, fixed invocation, manual
+no-retry ceremony and mandatory owner stop are unchanged.
+
+The serial transition is R15 freeze directly from `d337f33d…`, two independent
+gate reviews, guarded R15 contract publication, then one fresh four-file R9
+product directly from that published contract merge. The rejected `710e3c0d…`
+product is not rebased, amended or adopted. No root execution, installation,
+H038 progress, dependency credit or supervisor resume occurs in R15.
