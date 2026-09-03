@@ -2065,3 +2065,46 @@ phase/location/identity/digest, A-present, A+Q, Q-absent/replaced, unfsynced tem
 or receipt-temp coexistence reject without effect. Independent immutable
 material review remains mandatory; syntax, timing and self-report earn no
 credit and no authority is widened.
+## H-039 R14/R9 exit-code-only root-bootstrap diagnostic
+
+Published H-039 R13/R8 main `4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd`
+and its product candidate `936344abd31c27ae50171b94beac8e2afdfeba3d` are
+immutable inputs. The first fixed R8 root bootstrap returned one undifferentiated
+status 1, while complete before/after 96-command transcripts are byte-identical
+at SHA-256 `cd9aa26e88d9f400640251e75fd559000fe722ea9415542b7d52f78c275a9d0c`.
+The protected root therefore remains exactly R8-ready mode 0500 with no mediator,
+helper, final namespace member or other persistent effect. Re-running R8 earns no
+credit.
+
+R14 changes only the five existing TEST_AUTHOR contract files. Its later R9
+diagnostic product changes only installer, installer-only C source, recipe and
+manifest; `verify/h039/runtime-cleanup-mediator` remains byte-exact at SHA-256
+`6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a`.
+The diagnostic installer is inputless and may execute only as the fixed protected
+root:wheel mode-0500 inode through exact argv
+`/usr/bin/env -i -C / <fixed-installer> bootstrap`. It immediately destroys fd0,
+retains the exact fd1/fd2-to-empty inventory, emits no bytes, and exposes only one
+distinct bounded exit status for each frozen sequential predicate from root entry
+through the last read-only check immediately before `.install/mediator` creation.
+
+The diagnostic build may use only the existing fixed open/read/fstat/fstatat,
+`proc_pidinfo`, digest, fsync and rebind operations. It must not call
+`apply_install`, reach `stage_embedded_mediator`, or invoke any create/write/chmod/
+chown/link/rename/unlink path. The gate causally rejects missing, duplicated,
+reordered or aliased exit codes; combined predicates; output; caller-selected
+argument/path/fd/environment/input; effect-capable calls; a changed runtime
+mediator; and any product file outside the four-file diagnostic set. Actual
+compiled reachability and the absence of hidden or macro-generated effects remain
+mandatory independent immutable-product-review obligations.
+
+Trust transitions are serial: freeze R14 from exact `4bd4257e…`; obtain two
+independent adversarial gate reviews; guarded non-force contract publication;
+build fresh R9; obtain two independent product reviews; guarded product
+publication; reauthenticate the current R8 protected inode; stage the exact R9
+bytes onto that same inode; fully reauthenticate mode 0500; execute exactly one
+diagnostic; and capture only its exit status plus complete zero-effect before/after
+root transcripts. Then make the same inode inert, restore exact published R8 bytes,
+and fully reauthenticate R8 mode 0500 before interpreting the result. The
+diagnostic never performs production installation. Any corrective product change
+requires a new owner decision. H-038, H-032, H-031 and supervisor resume remain
+stopped.

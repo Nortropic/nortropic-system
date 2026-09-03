@@ -4886,3 +4886,31 @@ zero residue. Generic later N2 remains replay.
 All other phase, nonce, record, predecessor, namespace and receipt-temp
 coexistence mutants reject. Authority advances only to R4 `287c7436…`; no
 product, registry, install, path or broader OS authority changes.
+## 2026-09-03 — H-039 R14/R9 exit-code-only root-bootstrap diagnosis
+
+The guarded R13 contract and R8 product are published at `b9d006e3…` and
+`4bd4257e…`. The exact first R8 bootstrap returned status 1. Independent full
+read-only observations before and after it are byte-identical, size 10489 and
+SHA-256 `cd9aa26e88d9f400640251e75fd559000fe722ea9415542b7d52f78c275a9d0c`;
+the protected installer remains the same inode, root:wheel 0500, exact R8 bytes,
+with no `.install/mediator`, final helper or runtime layout. The published image
+collapses all pre-effect branches to status 1, so the exact failing predicate is
+not observable and another R8 execution is forbidden.
+
+The owner authorizes a diagnostic trust transition, not an installation or an
+authority expansion. R14 freezes an exact, distinct bounded exit-code registry for
+the sequential fd, invocation, identity, embedded-image, protected-parent,
+staging, namespace and helper preflight predicates through the boundary immediately
+before first persistent mediator creation. R9 may change only the existing four
+installer-related files; the runtime mediator stays byte-exact. The diagnostic
+uses only existing read-only/stability primitives, emits nothing, accepts nothing,
+and cannot call the installer effect graph. Source-oracle mutations and independent
+compiled-product reviews must reject skipped/combined/reordered/duplicate codes,
+effect calls, output or hidden caller authority.
+
+After guarded contract and diagnostic-product publication, the root ceremony may
+same-inode-stage, authenticate and execute the diagnostic exactly once. Complete
+root observations must prove zero effect. The exact published R8 bytes are then
+same-inode restored and fully reauthenticated before the observed status can route
+a later owner decision. No production install, H-038 transition or supervisor
+resume occurs in R14/R9.
