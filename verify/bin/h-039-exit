@@ -1,10 +1,10 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
 """Frozen H-039 OS-exclusive runtime-cleanup mediator gate.
 
-No arguments execute preproduct RED. ``--product`` reviews an uninstalled candidate.
-Only the distinct ``--installed`` lane exercises a published installation, always as
-uid 501/gid 20. This Python gate never runs elevated and never accepts a cleanup path,
-PID, command, or installation effect.
+No arguments execute R12 pre-install RED while re-reviewing the exact published R7
+product and authenticated prefix-1 host evidence. Only the distinct ``--installed``
+lane exercises the installation, always as uid 501/gid 20. This Python gate never
+runs elevated and never accepts a cleanup path, PID, command, or installation effect.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 sys.dont_write_bytecode = True
 
@@ -43,11 +43,11 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "341a42ba4a54e3763dbf79587afc246ae399180b"
-CONTRACT_AUTHORITY_TREE = "be03ed65ac046588078a3adc3899972305507efc"
+CONTRACT_AUTHORITY_BASE = "6d956a3aed9f8da30cf5443a72ae6ae647974e2f"
+CONTRACT_AUTHORITY_TREE = "32be3b639bb35c076c1bc9aa42ecbad71a0aad98"
 CONTRACT_AUTHORITY_PARENTS = [
-    "f190cc575f36e6fe97f84b3e1810ca92d7d13401",
-    "fb088a33341bdd07d2fe140052fefeb6e8907e15",
+    "1e8436b8d4fb1d694ca3af92c5401d0430f77318",
+    "0a465c77a8adb42780cfbdcc1673e8edd9e650e0",
 ]
 PUBLISHED_H039_R5_PRODUCT_MERGE = "f190cc575f36e6fe97f84b3e1810ca92d7d13401"
 PUBLISHED_H039_R5_PRODUCT_TREE = "1e8d0e7d31f2745bada3a5aeded69a1eecbf7fba"
@@ -62,6 +62,24 @@ PUBLISHED_H039_R5_PRODUCT_BLOBS = {
     "verify/h039/identity-manifest.json": "6a87e085b7480f577ab2a5e9b346cf4f05710080b998bfbbfef3a379ffea06b3",
     "verify/h039/runtime-cleanup-mediator": "6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a",
 }
+PUBLISHED_H039_R7_PRODUCT_MERGE = "6d956a3aed9f8da30cf5443a72ae6ae647974e2f"
+PUBLISHED_H039_R7_PRODUCT_TREE = "32be3b639bb35c076c1bc9aa42ecbad71a0aad98"
+PUBLISHED_H039_R7_PRODUCT_PARENTS = [
+    "1e8436b8d4fb1d694ca3af92c5401d0430f77318",
+    "0a465c77a8adb42780cfbdcc1673e8edd9e650e0",
+]
+PUBLISHED_H039_R7_PRODUCT_BLOBS = {
+    "controller/runtime-cleanup/install": "042bb964b6525fc6fadd7503751227ce0fef2502b0ea0fd99c921b348188324e",
+    "controller/runtime-cleanup/native/mediator.c": "86918bcee3ddd37116aaaef59f681b2bd41f9c2c510450d8fff15c2a3a8f8807",
+    "verify/h039/build-recipe.json": "8dc92f1b7718bbd7d3d82602e7ba9be91a76906c26bbfed8282d15481dd46a7b",
+    "verify/h039/identity-manifest.json": "8d6300339142907b00e7d72c12bd83e06e061cad3c011ab3a601d70f8d40d3a8",
+    "verify/h039/runtime-cleanup-mediator": "6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a",
+}
+PREFIX1_EVIDENCE = Path(
+    "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/"
+    "h039-r7-first-root-prefix1-host-evidence.json"
+)
+PREFIX1_EVIDENCE_SHA256 = "2e5650e036d3abcbfcd1afcc91b3e7e805f7ab30b0a51ebaf553f4a085bced3b"
 PUBLISHED_H036_PRODUCT_MERGE = "e71dfbbd6a1dcb0792031764370f264dd63ebbf2"
 PUBLISHED_H036_LEGACY_BLOBS = {
     "controller/launch/cli": "65571892948b9f7a9260ee88abb2cf5c575eda245fe1874f8ade3c7a8b202ba3",
@@ -395,10 +413,37 @@ PRODUCT_BYTE_LIMITS = {
 MAX_AGGREGATE_PRODUCT_BYTES = 9437184
 MAX_CHILD_OUTPUT_BYTES = 1048576
 PRODUCTION_ORIGIN = "git@github.com:Nortropic/nortropic-system.git"
-ALLOWED_NONAUTHORITY_XATTRS = {b"com.apple.provenance"}
 PROVENANCE_XATTR = {
     "name": "com.apple.provenance", "size": 11,
 }
+
+
+def exact_created_xattrs(value: Any) -> bool:
+    """Root-created objects carry no xattr or one exact nonauthority marker."""
+    if type(value) is not list:
+        return False
+    if len(value) == 0:
+        return True
+    if len(value) != 1 or type(value[0]) is not dict:
+        return False
+    item = value[0]
+    keys = list(item)
+    return (
+        len(keys) == 2
+        and all(type(key) is str for key in keys)
+        and set(keys) == {"name", "size"}
+        and type(item["name"]) is str
+        and item["name"] == "com.apple.provenance"
+        and type(item["size"]) is int
+        and item["size"] == 11
+    )
+
+
+def normalize_created_xattrs(value: dict[str, Any]) -> dict[str, Any]:
+    normalized = copy.deepcopy(value)
+    if exact_created_xattrs(normalized.get("xattrs")):
+        normalized["xattrs"] = []
+    return normalized
 MATERIAL_PROPERTIES_JUDGE_ONLY = (
     "INDEPENDENT_IMMUTABLE_PRODUCT_REVIEW_MUST_PROVE_CLOSED_NATIVE_IMPORT_"
     "SYSCALL_ASM_AND_INSTALLER_EFFECT_AUTHORITY_INCLUDING_ZERO_XATTR_ACL_"
@@ -445,6 +490,57 @@ R7_MATERIAL_REVIEW_EXTENSION = (
     "OTHER_DESCRIPTOR_AUTHORITY_EARNS_CREDIT;_THE_INSTALLER_ONLY_HELPER_"
     "MUST_NOT_CHANGE_THE_PUBLISHED_R5_RUNTIME_MEDIATOR_BYTES"
 )
+R8_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_EVERY_ROOT_CREATED_BOOTSTRAP_OBJECT_HAS_"
+    "ZERO_ACL_ZERO_FLAGS_AND_XATTRS_EXACTLY_EMPTY_OR_ONE_NONAUTHORITY_COM_"
+    "APPLE_PROVENANCE_VALUE_OF_SIZE11_WITH_RAW_LS_OUTPUT_BOUND_TO_THE_CHOSEN_"
+    "STATE;_EVERY_OTHER_NAME_SIZE_DUPLICATE_ADDITIONAL_OR_MIXED_OBSERVATION_"
+    "REJECTS;_THE_UNTRUSTED_SOURCE_RETAINS_ITS_EXACT_OBSERVED_PROVENANCE_"
+    "IDENTITY;_THE_HASH_PINNED_PREFIX1_EVIDENCE_AND_BYTE_EXACT_PUBLISHED_R7_"
+    "PRODUCT_ARE_INHERITED_WITH_NO_PRODUCT_CHANGE_ROOT_ROLLBACK_OR_NEW_AUTHORITY"
+)
+R9_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_STRUCTURED_PREFIX_RECOVERY_AND_RAW_LS_"
+    "XATTR_INPUTS_REQUIRE_EXACT_BUILTIN_LIST_DICT_STRING_AND_INTEGER_TYPES_"
+    "WITH_INTEGER_SIZE11_AND_REJECT_FLOAT_BOOLEAN_COMPLEX_SUBCLASS_EXTRA_"
+    "DUPLICATE_AND_MIXED_EQUIVALENTS;_EVERY_READABLE_INSTALLED_OBJECT_REQUIRES_"
+    "AN_EXACT_BUILTIN_EMPTY_TUPLE_OR_ONE_EXACT_BUILTIN_PROVENANCE_TUPLE_WITH_"
+    "BYTES_NAME_INTEGER_SIZE11_AND_LOWERCASE_SHA256_DIGEST_PLUS_EXACT_BOOLEAN_"
+    "FALSE_ACL_AND_INTEGER_ZERO_FLAGS;_R8_CANDIDATE_20F9A19A_IS_IMMUTABLE_NO_"
+    "CREDIT_AND_THE_R7_PRODUCT_PREFIX1_AND_ALL_AUTHORITY_LIMITS_REMAIN_UNCHANGED"
+)
+R10_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_EVERY_PREFIX_AND_RESTAGE_UNTRUSTED_SOURCE_"
+    "IDENTITY_PROTECTED_PARENT_AND_ROOT_CREATED_METADATA_RECORD_IS_VALIDATED_"
+    "BY_CONTEXT_SPECIFIC_EXACT_BUILTIN_DICT_KEY_STRING_INTEGER_BOOLEAN_LIST_"
+    "ACL_AND_XATTR_TYPES_BEFORE_EQUALITY_OR_NORMALIZATION;_THE_REQUIRED_AND_"
+    "OBSERVED_RESTAGE_SOURCE_IDENTITIES_SHARE_THE_SAME_EXACT_VALIDATOR;_RAW_LS_"
+    "PATHS_REQUIRE_BUILTIN_STRINGS_AND_FLOAT_COMPLEX_BOOLEAN_SUBCLASS_OR_"
+    "EQUALITY_COMPATIBLE_RECORD_ACL_XATTR_PATH_TYPE_OPENFLAG_AND_SOURCE_"
+    "MUTANTS_REJECT;_R8_AND_R9_ARE_IMMUTABLE_NO_CREDIT_NONPARENTS_WITH_NO_"
+    "CHANGE_TO_PRODUCT_PREFIX1_ROOT_EFFECT_OR_AUTHORITY"
+)
+R11_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_THE_SHARED_COMPLETE_SOURCE_MUTANT_FAMILY_"
+    "IS_CONNECTED_SEPARATELY_TO_INITIAL_REQUIRED_RESTAGE_AND_OBSERVED_RESTAGE_"
+    "SOURCE_CONSUMERS_AND_REJECTS_OUTER_RECORD_KEY_PATH_TYPE_OPENFLAG_ACL_"
+    "XATTR_NUMERIC_BOOLEAN_SUBCLASS_AND_EQUALITY_OBJECT_ALIASES;_THE_SHARED_"
+    "CREATED_RECORD_FAMILY_IS_CONNECTED_TO_PREFIX_DIRECTORY_LEAF_NATIVE_"
+    "NAMESPACE_OBJECT_AND_INSTALLED_HELPER_CONSUMERS;_R10_CANDIDATE_1C87CA4F_"
+    "IS_IMMUTABLE_NO_CREDIT_FOR_OVERSTATED_CAUSAL_COVERAGE_AND_R8_R9_R10_ARE_"
+    "NONPARENTS_WITH_NO_PRODUCT_PREFIX1_ROOT_EFFECT_OR_AUTHORITY_CHANGE"
+)
+R12_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_EVERY_CAUSAL_ALIAS_MUTANT_IS_WHOLE_RECORD_"
+    "VALUE_EQUAL_TO_ITS_REFERENCE_WHILE_EXACT_TYPE_DIFFERS_AND_THE_TARGET_"
+    "VALIDATOR_CALL_RETURNS_FALSE_AT_EACH_INITIAL_REQUIRED_RESTAGE_OBSERVED_"
+    "RESTAGE_PREFIX_DIRECTORY_LEAF_NATIVE_NAMESPACE_OBJECT_AND_HELPER_"
+    "CONSUMER;_SOURCE_COVERS_EVERY_BOOLEAN_AND_STRING_GROUP_AND_CREATED_"
+    "RECORDS_COVER_EMPTY_AND_PROVENANCE_XATTR_STATES_OPTIONAL_BOOLEANS_AND_"
+    "DIGESTS_WITH_NATIVE_RECOVERY_EVIDENCE_REGENERATED_FROM_THE_EXACT_SEMANTIC_"
+    "BASELINE;_R11_4AB2E95C_IS_IMMUTABLE_NO_CREDIT_AND_R8_R9_R10_R11_ARE_"
+    "NONPARENTS_WITH_NO_PRODUCT_PREFIX1_ROOT_EFFECT_OR_AUTHORITY_CHANGE"
+)
 NATIVE_ABSOLUTE_STRINGS = {
     "/", "/.", "/..", "/../", "/./", "//", "/install",
     "/.install/controller/runtime-cleanup/install",
@@ -456,10 +552,10 @@ NATIVE_ABSOLUTE_STRINGS = {
     "/a/%s/h/l", "/a/%s/h/r", "/a/%s/p/c",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_PROTECTED_BOOTSTRAP_AND_ROOT_INSTALL_ABSENT"
+REASON = "H039_PROTECTED_BOOTSTRAP_AND_ROOT_INSTALL_INCOMPLETE_AT_PREFIX1"
 FAILURE_SIGNATURE = [
-    "EXACT_PUBLISHED_R5_FIVE_PRODUCT_BYTES_PRESENT",
-    "FIXED_ROOT_INSTALL_AND_NAMESPACE_ABSENT",
+    "EXACT_PUBLISHED_R7_FIVE_PRODUCT_BYTES_PRESENT",
+    "AUTHENTICATED_EMPTY_ROOT_PREFIX1_PRESENT_AND_FIXED_INSTALL_INCOMPLETE",
     "EXACT_HASH_PINNED_FIRST_ROOT_PRESTAGE_PREFIX_MODEL_GREEN",
     "INPUTLESS_EMBEDDED_MEDIATOR_BOOTSTRAP_REQUIRED",
     "PATHLESS_CAPABILITY_AND_MANAGED_OPTION_A_FALSIFICATION_GREEN",
@@ -467,7 +563,7 @@ FAILURE_SIGNATURE = [
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "f17a56091f4747bceb922ac918fe3f2247c3cabc26aa20b68897edc2c05d12ab"
+EXPECTED_H039_ROW_SHA256 = "14807e584ce3438cc2b74340b017b2004a7a03ebbaa0b5cd2e6fc4988a6dfcc1"
 
 passed = 0
 failed = 0
@@ -664,9 +760,19 @@ def static_contract_checks() -> dict[str, Any]:
             sha(blob(PUBLISHED_H039_R5_PRODUCT_MERGE, path)) == digest,
             f"A_H039_PUBLISHED_R5_{path.upper().replace('/', '_').replace('.', '_')}",
         )
+    check(
+        object_type(PUBLISHED_H039_R7_PRODUCT_MERGE) == "commit"
+        and commit_tree(PUBLISHED_H039_R7_PRODUCT_MERGE)
+        == PUBLISHED_H039_R7_PRODUCT_TREE
+        and commit_parents(PUBLISHED_H039_R7_PRODUCT_MERGE)
+        == PUBLISHED_H039_R7_PRODUCT_PARENTS,
+        "A_H039_PUBLISHED_R7_PRODUCT_MERGE_IDENTITY",
+    )
+    for path, digest in PUBLISHED_H039_R7_PRODUCT_BLOBS.items():
         check(
-            sha(blob(CONTRACT_AUTHORITY_BASE, path)) == digest,
-            f"A_H039_R7_AUTHORITY_RETAINS_R5_{path.upper().replace('/', '_').replace('.', '_')}",
+            sha(blob(PUBLISHED_H039_R7_PRODUCT_MERGE, path)) == digest
+            and sha(blob(CONTRACT_AUTHORITY_BASE, path)) == digest,
+            f"A_H039_R12_AUTHORITY_RETAINS_R7_{path.upper().replace('/', '_').replace('.', '_')}",
         )
     for path, digest in PUBLISHED_H036_LEGACY_BLOBS.items():
         check(
@@ -707,11 +813,36 @@ def static_contract_checks() -> dict[str, Any]:
         and row.get("h039_os_exclusive_runtime_cleanup", {})
         .get("causal_falsification", {})
         .get("r7_material_review_extension") == R7_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r8_material_review_extension") == R8_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r9_material_review_extension") == R9_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r10_material_review_extension") == R10_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r11_material_review_extension") == R11_MATERIAL_REVIEW_EXTENSION
+        and row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r12_material_review_extension") == R12_MATERIAL_REVIEW_EXTENSION
         and f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}."
         in str(row.get("exit_criterion", ""))
         and f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", ""))
         and f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R8_MATERIAL_REVIEW_EXTENSION={R8_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R9_MATERIAL_REVIEW_EXTENSION={R9_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", ""))
+        and f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", "")),
         "A_H039_EXACT_NONEMPTY_IMMUTABLE_REVIEW_BOUNDARY",
     )
@@ -854,13 +985,17 @@ def prestage_directory_record(path: str, index: int, nlink: int) -> dict[str, An
     return {
         "path": path, "type": "directory", "uid": 0, "gid": 0,
         "mode": 0o700, "nlink": nlink, "flags": 0,
-        "acl": [], "xattrs": [dict(PROVENANCE_XATTR)], "dev": 31, "ino": 50 + index,
+        "acl": [], "xattrs": [], "dev": 31, "ino": 50 + index,
         "rebind_dev": 31, "rebind_ino": 50 + index,
     }
 
 
+def exact_empty_list(value: Any) -> bool:
+    return type(value) is list and len(value) == 0
+
+
 def exact_identity_integer_types(record: Any) -> bool:
-    if not isinstance(record, dict):
+    if type(record) is not dict or any(type(key) is not str for key in record):
         return False
     for key in (
         "uid", "gid", "mode", "nlink", "flags", "dev", "ino",
@@ -868,6 +1003,24 @@ def exact_identity_integer_types(record: Any) -> bool:
         "pre_dev", "pre_ino", "post_dev", "post_ino", "read_length",
     ):
         if key in record and record[key] is not None and type(record[key]) is not int:
+            return False
+    return True
+
+
+def exact_created_record_metadata(record: Any) -> bool:
+    """Bind every root-created structured metadata record before equality."""
+    if not exact_identity_integer_types(record) \
+            or type(record.get("type")) is not str \
+            or ("path" in record and type(record["path"]) is not str) \
+            or not exact_empty_list(record.get("acl")) \
+            or not exact_created_xattrs(record.get("xattrs")):
+        return False
+    for key in ("sha256", "cdhash"):
+        if key in record and record[key] is not None \
+                and type(record[key]) is not str:
+            return False
+    for key in ("protected_parent", "durable"):
+        if key in record and type(record[key]) is not bool:
             return False
     return True
 
@@ -888,6 +1041,50 @@ def prestage_source_identity(installer_size: int, installer_sha256: str) -> dict
         "full_read": True, "eof": True, "closed": True,
         "authority": "UNTRUSTED_SOURCE_OBSERVATION_ONLY",
     }
+
+
+def exact_prestage_source_identity(
+    value: Any, installer_size: int, installer_sha256: str,
+) -> bool:
+    """Bind the complete untrusted-source observation to exact built-in types."""
+    expected = prestage_source_identity(installer_size, installer_sha256)
+    return (
+        exact_identity_integer_types(value)
+        and type(value.get("open_flags")) is list
+        and all(type(item) is str for item in value["open_flags"])
+        and exact_empty_list(value.get("acl"))
+        and exact_created_xattrs(value.get("xattrs"))
+        and len(value["xattrs"]) == 1
+        and all(type(value.get(key)) is str for key in (
+            "path", "type", "sha256", "read_sha256", "authority",
+        ))
+        and all(type(value.get(key)) is bool for key in (
+            "full_read", "eof", "closed",
+        ))
+        and value == expected
+    )
+
+
+def exact_prestage_protected_parent(value: Any) -> bool:
+    """Bind the pre-existing system parent without equality aliases."""
+    return (
+        exact_identity_integer_types(value)
+        and set(value) == {
+            "path", "type", "uid", "gid", "mode", "nlink", "flags",
+            "acl", "xattrs", "dev", "ino", "rebind_dev", "rebind_ino",
+        }
+        and type(value.get("path")) is str
+        and value["path"] == "/private/var/db"
+        and type(value.get("type")) is str
+        and value["type"] == "directory"
+        and value["uid"] == 0 and value["gid"] == 0
+        and value["mode"] == 0o755 and value["nlink"] >= 2
+        and value["flags"] == 1048576
+        and exact_empty_list(value.get("acl"))
+        and exact_empty_list(value.get("xattrs"))
+        and value["rebind_dev"] == value["dev"]
+        and value["rebind_ino"] == value["ino"]
+    )
 
 
 def prestage_dd_result(success: bool) -> dict[str, Any]:
@@ -918,42 +1115,26 @@ def prestage_prefix_oracle(
         "source_fd_state", "source_identity", "product_stdin", "tool_processes",
         "product_descriptor_inventory", "recovery_action_argv", "dd_result",
     }
-    if observed.get("argv_prefix") != FIRST_ROOT_ARGV[:prefix] \
+    if type(observed) is not dict \
+            or any(type(key) is not str for key in observed) \
+            or observed.get("argv_prefix") != FIRST_ROOT_ARGV[:prefix] \
             or observed.get("recovery_argv") != FIRST_ROOT_RECOVERY_ARGV \
             or set(observed) != required_keys:
         return False
-    if observed.get("source_path") != str(UNTRUSTED_INSTALLER_SOURCE) \
+    if type(observed.get("source_path")) is not str \
+            or observed.get("source_path") != str(UNTRUSTED_INSTALLER_SOURCE) \
+            or type(observed.get("source_sha256")) is not str \
             or observed.get("source_sha256") != installer_sha256:
         return False
     protected_parent = observed.get("protected_parent")
-    if (
-        not isinstance(protected_parent, dict)
-        or set(protected_parent) != {
-            "path", "type", "uid", "gid", "mode", "nlink", "flags",
-            "acl", "xattrs", "dev", "ino", "rebind_dev", "rebind_ino",
-        }
-        or not exact_identity_integer_types(protected_parent)
-        or protected_parent["path"] != "/private/var/db"
-        or protected_parent["type"] != "directory"
-        or protected_parent["uid"] != 0 or protected_parent["gid"] != 0
-        or protected_parent["mode"] != 0o755
-        or protected_parent["nlink"] < 2
-        or protected_parent["flags"] != 1048576
-        or protected_parent["acl"] != [] or protected_parent["xattrs"] != []
-        or protected_parent["rebind_dev"] != protected_parent["dev"]
-        or protected_parent["rebind_ino"] != protected_parent["ino"]
-    ):
+    if not exact_prestage_protected_parent(protected_parent):
         return False
     source_identity = observed.get("source_identity")
     if prefix < 5:
         if source_identity is not None:
             return False
-    elif (
-        source_identity != prestage_source_identity(installer_size, installer_sha256)
-        or not exact_identity_integer_types(source_identity)
-        or any(type(source_identity.get(key)) is not bool for key in (
-            "full_read", "eof", "closed",
-        ))
+    elif not exact_prestage_source_identity(
+        source_identity, installer_size, installer_sha256,
     ):
         return False
     directories = [
@@ -1055,7 +1236,8 @@ def prestage_prefix_oracle(
         return False
     if prefix == len(FIRST_ROOT_ARGV):
         return (
-            observed.get("directories") == [] and observed.get("leaf") is None
+            exact_empty_list(observed.get("directories"))
+            and observed.get("leaf") is None
             and observed.get("stdin") == {
                 "fd": 0, "stream_count": 1, "length": installer_size,
                 "sha256": installer_sha256, "eof": True,
@@ -1096,16 +1278,17 @@ def prestage_prefix_oracle(
     expected_directories = directories[:min(prefix, 4)]
     directory_nlinks = [3 if prefix >= 2 else 2, 3 if prefix >= 3 else 2,
                         3 if prefix >= 4 else 2, 2]
-    if not isinstance(observed.get("directories"), list) or any(
-        not exact_identity_integer_types(item) for item in observed["directories"]
-    ) or observed.get("directories") != [
+    if type(observed.get("directories")) is not list or any(
+        not exact_created_record_metadata(item)
+        for item in observed["directories"]
+    ) or [normalize_created_xattrs(item) for item in observed["directories"]] != [
         prestage_directory_record(path, index, directory_nlinks[index])
         for index, path in enumerate(expected_directories)
     ]:
         return False
     leaf = observed.get("leaf")
     stdin = observed.get("stdin")
-    if leaf is not None and not exact_identity_integer_types(leaf):
+    if leaf is not None and not exact_created_record_metadata(leaf):
         return False
     if leaf is not None and type(leaf.get("protected_parent")) is not bool:
         return False
@@ -1141,8 +1324,7 @@ def prestage_prefix_oracle(
             and leaf["type"] == "regular" and leaf["uid"] == 0 and leaf["gid"] == 0
             and type(leaf["mode"]) is int and leaf["mode"] & ~0o666 == 0
             and leaf["nlink"] == 1
-            and leaf["flags"] == 0 and leaf["acl"] == []
-            and leaf["xattrs"] == [PROVENANCE_XATTR]
+            and leaf["flags"] == 0
             and type(leaf["size"]) is int and 0 <= leaf["size"] <= 4194305
             and leaf["protected_parent"] is True
             and type(leaf["dev"]) is int and type(leaf["ino"]) is int
@@ -1171,13 +1353,13 @@ def prestage_prefix_oracle(
     exact_leaf = {
         "path": str(PROTECTED_INSTALLER), "type": "regular", "uid": 0,
         "gid": 0, "mode": expected_mode, "nlink": 1,
-        "flags": 0, "acl": [], "xattrs": [PROVENANCE_XATTR],
+        "flags": 0, "acl": [], "xattrs": [],
         "size": installer_size, "sha256": installer_sha256,
         "cdhash": installer_cdhash, "protected_parent": True,
         "dev": 31, "ino": 41, "rebind_dev": 31, "rebind_ino": 41,
     }
     return (
-        leaf == exact_leaf
+        normalize_created_xattrs(leaf) == exact_leaf
         and stdin == {
             "fd": 0, "stream_count": 1, "length": installer_size,
             "sha256": installer_sha256, "eof": True,
@@ -1240,7 +1422,7 @@ def prestage_prefix_fixture(
             "nlink": 1, "size": installer_size,
             "sha256": installer_sha256,
             "cdhash": None if partial else installer_cdhash,
-            "flags": 0, "acl": [], "xattrs": [dict(PROVENANCE_XATTR)],
+            "flags": 0, "acl": [], "xattrs": [],
             "protected_parent": True, "dev": 31, "ino": 41,
             "rebind_dev": None if partial else 31,
             "rebind_ino": None if partial else 41,
@@ -1310,12 +1492,38 @@ def bootstrap_object(
     value: dict[str, Any] = {
         "type": kind, "uid": 0, "gid": 0, "mode": mode,
         "nlink": nlink, "flags": 0, "acl": [],
-        "xattrs": [dict(PROVENANCE_XATTR)],
+        "xattrs": [],
         "dev": 31, "ino": ino, "rebind_dev": 31, "rebind_ino": ino,
     }
     if kind == "regular":
         value.update({"size": size, "sha256": digest})
     return value
+
+
+def normalize_bootstrap_created_metadata(state: dict[str, Any]) \
+        -> dict[str, Any] | None:
+    if type(state) is not dict or any(type(key) is not str for key in state):
+        return None
+    normalized = copy.deepcopy(state)
+    records = [normalized.get("namespace")]
+    objects = normalized.get("namespace_objects")
+    if type(objects) is not dict or any(type(key) is not str for key in objects):
+        return None
+    records.extend(objects.values())
+    if normalized.get("installed_helper") is not None:
+        records.append(normalized["installed_helper"])
+    for record in records:
+        if not exact_created_record_metadata(record):
+            return None
+        record["xattrs"] = []
+    identities, memberships = recovery_expected_bindings(
+        normalized["namespace"], normalized["namespace_objects"],
+        normalized["installed_helper"],
+    )
+    normalized["recovery_observation"] = recovery_observation_fixture(
+        identities, memberships,
+    )
+    return normalized
 
 
 def recovery_stat_bytes(record: dict[str, Any]) -> bytes:
@@ -1355,7 +1563,8 @@ def parse_recovery_stat(raw: bytes) -> dict[str, Any] | None:
 
 
 def parse_closed_acl_xattr_ls(raw: bytes, path: str, xattrs: Any) -> bool:
-    if type(raw) is not bytes or not 0 < len(raw) <= RECOVERY_OUTPUT_CAP \
+    if type(raw) is not bytes or type(path) is not str \
+            or not 0 < len(raw) <= RECOVERY_OUTPUT_CAP \
             or not raw.endswith(b"\n") or b"\0" in raw:
         return False
     try:
@@ -1366,13 +1575,15 @@ def parse_closed_acl_xattr_ls(raw: bytes, path: str, xattrs: Any) -> bool:
     if not lines or not lines[0].endswith(" " + path):
         return False
     mode_token = lines[0].split(None, 1)[0]
-    if xattrs == []:
+    if not exact_created_xattrs(xattrs):
+        return False
+    if len(xattrs) == 0:
         return (
             len(lines) == 1
             and re.fullmatch(r"[bcdlps-][rwxStTs-]{9}", mode_token) is not None
         )
     return (
-        xattrs == [PROVENANCE_XATTR] and len(lines) == 2
+        len(lines) == 2
         and re.fullmatch(r"[bcdlps-][rwxStTs-]{9}@", mode_token) is not None
         and lines[1] == "\tcom.apple.provenance\t11 "
     )
@@ -1628,8 +1839,8 @@ def exact_recovery_observation(
                     "type", "uid", "gid", "mode", "nlink", "flags", "dev", "ino",
                 )) \
                 or (record["type"] == "regular" and before["size"] != record["size"]) \
-                or record.get("acl") != [] \
-                or record.get("xattrs") not in ([], [PROVENANCE_XATTR]):
+                or not exact_empty_list(record.get("acl")) \
+                or not exact_created_xattrs(record.get("xattrs")):
             return False
     for path in RECOVERY_REGULAR_PATHS:
         result = observed["digest"][path]
@@ -1934,7 +2145,8 @@ def bootstrap_recovery_oracle(
             or not valid_hex(mediator_sha256) or not valid_hex(installer_sha256) \
             or not valid_hex(mediator_cdhash, 40) or not valid_hex(installer_cdhash, 40):
         return False
-    if not isinstance(state, dict) or set(state) != {
+    if type(state) is not dict or any(type(key) is not str for key in state) \
+            or set(state) != {
         "phase", "operation", "caller_inputs", "environment", "stdin",
         "inherited_fds", "embedded_section", "embedded_size",
         "embedded_sha256", "namespace", "namespace_objects",
@@ -1945,10 +2157,11 @@ def bootstrap_recovery_oracle(
     if type(state.get("embedded_size")) is not int \
             or not isinstance(state.get("inherited_fds"), list) \
             or any(type(item) is not int for item in state["inherited_fds"]) \
-            or not exact_identity_integer_types(state.get("namespace")) \
-            or not isinstance(state.get("namespace_objects"), dict) \
+            or not exact_created_record_metadata(state.get("namespace")) \
+            or type(state.get("namespace_objects")) is not dict \
+            or any(type(key) is not str for key in state["namespace_objects"]) \
             or any(
-                not exact_identity_integer_types(value)
+                not exact_created_record_metadata(value)
                 for value in state["namespace_objects"].values()
             ) \
             or any(
@@ -1957,7 +2170,7 @@ def bootstrap_recovery_oracle(
             ) \
             or (
                 state.get("installed_helper") is not None
-                and not exact_identity_integer_types(state["installed_helper"])
+                and not exact_created_record_metadata(state["installed_helper"])
             ):
         return False
     lifecycle = state.get("process_lifecycle")
@@ -1981,8 +2194,9 @@ def bootstrap_recovery_oracle(
             "observed_source_identity", "observed_stream", "source_fd_closed",
             "dd_direct_child_reaped", "dd_result", "second_stream",
             "descriptor_inventory_after_dd",
-        } or not exact_identity_integer_types(
+        } or not exact_prestage_source_identity(
             restage_binding.get("required_fresh_source_identity"),
+            installer_size, installer_sha256,
         ) or any(type(restage_binding.get(key)) is not bool for key in ("second_stream",)) \
                 or not isinstance(restage_binding.get("descriptor_inventory_after_dd"), list) \
                 or any(
@@ -2001,11 +2215,8 @@ def bootstrap_recovery_oracle(
             ):
                 return False
         observed_source = restage_binding.get("observed_source_identity")
-        if observed_source is not None and (
-            not exact_identity_integer_types(observed_source)
-            or any(type(observed_source.get(key)) is not bool for key in (
-                "full_read", "eof", "closed",
-            ))
+        if observed_source is not None and not exact_prestage_source_identity(
+            observed_source, installer_size, installer_sha256,
         ):
             return False
         for key in ("source_fd_closed", "dd_direct_child_reaped"):
@@ -2110,7 +2321,8 @@ def bootstrap_recovery_oracle(
         expected["recovery_observation"] = recovery_observation_fixture(
             expected_identities, expected_memberships,
         )
-    return state == expected
+    normalized = normalize_bootstrap_created_metadata(state)
+    return normalized is not None and normalized == expected
 
 
 
@@ -2618,6 +2830,366 @@ def create_handoff_model(
 
 
 def causal_oracle_selftests() -> None:
+    structured_list_subclass = type(
+        "H039XattrListSubclass", (list,), {},
+    )([dict(PROVENANCE_XATTR)])
+    structured_dict_subclass = type(
+        "H039XattrDictSubclass", (dict,), {},
+    )(PROVENANCE_XATTR)
+    structured_str_subclass = type(
+        "H039XattrStrSubclass", (str,), {},
+    )("com.apple.provenance")
+    structured_key_subclass = type(
+        "H039XattrKeySubclass", (str,), {},
+    )("name")
+    structured_int_subclass = type(
+        "H039XattrIntSubclass", (int,), {},
+    )(11)
+    empty_list_subclass = type(
+        "H039EmptyListSubclass", (list,), {},
+    )()
+    record_dict_subclass = type(
+        "H039RecordDictSubclass", (dict,), {},
+    )
+    generic_str_subclass = type(
+        "H039GenericStrSubclass", (str,), {},
+    )
+    equal_empty = type(
+        "H039EqualEmpty", (), {
+            "__eq__": lambda self, other: other == [],
+        },
+    )()
+
+    def equality_alias(expected: Any) -> Any:
+        retained = copy.deepcopy(expected)
+        return type(
+            "H039EqualityAlias", (), {
+                "__eq__": lambda self, other: other == retained,
+            },
+        )()
+
+    def equality_record(reference: dict[str, Any]) -> dict[str, Any]:
+        return type(
+            "H039EqualityRecordSubclass", (dict,), {
+                "__eq__": lambda self, other: dict(self) == other,
+            },
+        )(copy.deepcopy(reference))
+
+    def connected_source_mutants(reference: dict[str, Any]) \
+            -> list[tuple[str, Any]]:
+        """One complete exact-type family for every source consumer."""
+        result: list[tuple[str, Any]] = []
+        mutations = (
+            ("XATTR_FLOAT", lambda value: value["xattrs"][0].__setitem__("size", 11.0)),
+            ("XATTR_COMPLEX", lambda value: value["xattrs"][0].__setitem__("size", complex(11, 0))),
+            ("XATTR_INT_SUBCLASS", lambda value: value["xattrs"][0].__setitem__("size", structured_int_subclass)),
+            ("XATTR_LIST_SUBCLASS", lambda value: value.__setitem__("xattrs", structured_list_subclass)),
+            ("XATTR_DICT_SUBCLASS", lambda value: value["xattrs"].__setitem__(0, structured_dict_subclass)),
+            ("XATTR_NAME_SUBCLASS", lambda value: value["xattrs"][0].__setitem__("name", structured_str_subclass)),
+            ("XATTR_EQUALITY_OBJECT", lambda value: value.__setitem__("xattrs", equality_alias(value["xattrs"]))),
+            ("OPEN_FLAGS_LIST_SUBCLASS", lambda value: value.__setitem__("open_flags", type("H039OpenFlagsSubclass", (list,), {})(value["open_flags"]))),
+            ("OPEN_FLAG_STRING_SUBCLASS", lambda value: value["open_flags"].__setitem__(0, generic_str_subclass(value["open_flags"][0]))),
+            ("OPEN_FLAGS_EQUALITY_OBJECT", lambda value: value.__setitem__("open_flags", equality_alias(value["open_flags"]))),
+            ("ACL_LIST_SUBCLASS", lambda value: value.__setitem__("acl", empty_list_subclass)),
+            ("ACL_EQUALITY_OBJECT", lambda value: value.__setitem__("acl", equal_empty)),
+            ("PATH_STRING_SUBCLASS", lambda value: value.__setitem__("path", generic_str_subclass(value["path"]))),
+            ("PATH_EQUALITY_OBJECT", lambda value: value.__setitem__("path", equality_alias(value["path"]))),
+            ("TYPE_STRING_SUBCLASS", lambda value: value.__setitem__("type", generic_str_subclass(value["type"]))),
+            ("TYPE_EQUALITY_OBJECT", lambda value: value.__setitem__("type", equality_alias(value["type"]))),
+            ("UID_FLOAT", lambda value: value.__setitem__("uid", float(value["uid"]))),
+            ("UID_COMPLEX", lambda value: value.__setitem__("uid", complex(value["uid"], 0))),
+            ("UID_INT_SUBCLASS", lambda value: value.__setitem__("uid", type(structured_int_subclass)(value["uid"]))),
+            ("UID_EQUALITY_OBJECT", lambda value: value.__setitem__("uid", equality_alias(value["uid"]))),
+            ("NLINK_BOOL", lambda value: value.__setitem__("nlink", True)),
+            ("FULL_READ_INTEGER", lambda value: value.__setitem__("full_read", 1)),
+            ("EOF_INTEGER", lambda value: value.__setitem__("eof", 1)),
+            ("CLOSED_INTEGER", lambda value: value.__setitem__("closed", 1)),
+            ("SHA256_STRING_SUBCLASS", lambda value: value.__setitem__("sha256", generic_str_subclass(value["sha256"]))),
+            ("SHA256_EQUALITY_OBJECT", lambda value: value.__setitem__("sha256", equality_alias(value["sha256"]))),
+            ("READ_SHA256_STRING_SUBCLASS", lambda value: value.__setitem__("read_sha256", generic_str_subclass(value["read_sha256"]))),
+            ("READ_SHA256_EQUALITY_OBJECT", lambda value: value.__setitem__("read_sha256", equality_alias(value["read_sha256"]))),
+            ("AUTHORITY_STRING_SUBCLASS", lambda value: value.__setitem__("authority", generic_str_subclass(value["authority"]))),
+            ("AUTHORITY_EQUALITY_OBJECT", lambda value: value.__setitem__("authority", equality_alias(value["authority"]))),
+        )
+        for label, mutate in mutations:
+            mutant = copy.deepcopy(reference)
+            mutate(mutant)
+            if not mutant == reference:
+                raise Rig(f"noncausal source mutant changes value: {label}")
+            result.append((label, mutant))
+        xattr_key = copy.deepcopy(reference)
+        xattr_key["xattrs"][0].pop("name")
+        xattr_key["xattrs"][0][structured_key_subclass] = "com.apple.provenance"
+        if not xattr_key == reference:
+            raise Rig("noncausal source xattr-key mutant")
+        result.append(("XATTR_KEY_SUBCLASS", xattr_key))
+        record_key = copy.deepcopy(reference)
+        record_key[generic_str_subclass("path")] = record_key.pop("path")
+        if not record_key == reference:
+            raise Rig("noncausal source record-key mutant")
+        result.append(("RECORD_KEY_SUBCLASS", record_key))
+        result.append(("RECORD_DICT_SUBCLASS", record_dict_subclass(reference)))
+        result.append(("RECORD_EQUALITY_DICT_SUBCLASS", equality_record(reference)))
+        return result
+
+    def connected_created_record_mutants(reference: dict[str, Any]) \
+            -> list[tuple[str, Any]]:
+        """Exercise the same record boundary at every created-object consumer."""
+        result: list[tuple[str, Any]] = []
+        mutations = [
+            ("ACL_LIST_SUBCLASS", lambda value: value.__setitem__("acl", empty_list_subclass)),
+            ("ACL_EQUALITY_OBJECT", lambda value: value.__setitem__("acl", equal_empty)),
+            ("XATTR_LIST_SUBCLASS", lambda value: value.__setitem__("xattrs", type("H039CreatedXattrListSubclass", (list,), {})(value["xattrs"]))),
+            ("XATTR_EQUALITY_OBJECT", lambda value: value.__setitem__("xattrs", equality_alias(value["xattrs"]))),
+            ("TYPE_STRING_SUBCLASS", lambda value: value.__setitem__("type", generic_str_subclass(value["type"]))),
+            ("TYPE_EQUALITY_OBJECT", lambda value: value.__setitem__("type", equality_alias(value["type"]))),
+            ("UID_BOOL", lambda value: value.__setitem__("uid", False)),
+            ("UID_FLOAT", lambda value: value.__setitem__("uid", float(value["uid"]))),
+            ("UID_COMPLEX", lambda value: value.__setitem__("uid", complex(value["uid"], 0))),
+            ("UID_INT_SUBCLASS", lambda value: value.__setitem__("uid", type(structured_int_subclass)(value["uid"]))),
+            ("UID_EQUALITY_OBJECT", lambda value: value.__setitem__("uid", equality_alias(value["uid"]))),
+            ("FLAGS_BOOL", lambda value: value.__setitem__("flags", False)),
+        ]
+        if "path" in reference:
+            mutations.extend((
+                ("PATH_STRING_SUBCLASS", lambda value: value.__setitem__("path", generic_str_subclass(value["path"]))),
+                ("PATH_EQUALITY_OBJECT", lambda value: value.__setitem__("path", equality_alias(value["path"]))),
+            ))
+        if reference["xattrs"]:
+            mutations.extend((
+                ("XATTR_FLOAT", lambda value: value["xattrs"][0].__setitem__("size", 11.0)),
+                ("XATTR_COMPLEX", lambda value: value["xattrs"][0].__setitem__("size", complex(11, 0))),
+                ("XATTR_INT_SUBCLASS", lambda value: value["xattrs"][0].__setitem__("size", structured_int_subclass)),
+                ("XATTR_DICT_SUBCLASS", lambda value: value["xattrs"].__setitem__(0, structured_dict_subclass)),
+                ("XATTR_NAME_SUBCLASS", lambda value: value["xattrs"][0].__setitem__("name", structured_str_subclass)),
+            ))
+        for key in ("protected_parent", "durable"):
+            if key in reference:
+                mutations.extend((
+                    (f"{key.upper()}_INTEGER", lambda value, field=key: value.__setitem__(field, int(value[field]))),
+                    (f"{key.upper()}_EQUALITY_OBJECT", lambda value, field=key: value.__setitem__(field, equality_alias(value[field]))),
+                ))
+        for key in ("sha256", "cdhash"):
+            if key in reference and reference[key] is not None:
+                mutations.extend((
+                    (f"{key.upper()}_STRING_SUBCLASS", lambda value, field=key: value.__setitem__(field, generic_str_subclass(value[field]))),
+                    (f"{key.upper()}_EQUALITY_OBJECT", lambda value, field=key: value.__setitem__(field, equality_alias(value[field]))),
+                ))
+        for label, mutate in mutations:
+            mutant = copy.deepcopy(reference)
+            mutate(mutant)
+            if not mutant == reference:
+                raise Rig(f"noncausal created-record mutant changes value: {label}")
+            result.append((label, mutant))
+        record_key = copy.deepcopy(reference)
+        record_key[generic_str_subclass("type")] = record_key.pop("type")
+        if not record_key == reference:
+            raise Rig("noncausal created-record key mutant")
+        result.append(("RECORD_KEY_SUBCLASS", record_key))
+        if reference["xattrs"]:
+            xattr_key = copy.deepcopy(reference)
+            xattr_key["xattrs"][0].pop("name")
+            xattr_key["xattrs"][0][structured_key_subclass] = "com.apple.provenance"
+            if not xattr_key == reference:
+                raise Rig("noncausal created-record xattr-key mutant")
+            result.append(("XATTR_KEY_SUBCLASS", xattr_key))
+        result.append(("RECORD_DICT_SUBCLASS", record_dict_subclass(reference)))
+        result.append(("RECORD_EQUALITY_DICT_SUBCLASS", equality_record(reference)))
+        return result
+
+    def traced_source_rejection(replacement: Any, invoke: Callable[[], bool]) -> bool:
+        original = exact_prestage_source_identity
+        observed: list[bool] = []
+
+        def traced(value: Any, size: int, digest: str) -> bool:
+            verdict = original(value, size, digest)
+            if value is replacement:
+                observed.append(verdict)
+            return verdict
+
+        globals()["exact_prestage_source_identity"] = traced
+        try:
+            outcome = invoke()
+        finally:
+            globals()["exact_prestage_source_identity"] = original
+        return outcome is False and observed == [False]
+
+    def traced_created_rejection(replacement: Any, invoke: Callable[[], bool]) -> bool:
+        original = exact_created_record_metadata
+        observed: list[bool] = []
+
+        def traced(value: Any) -> bool:
+            verdict = original(value)
+            if value is replacement:
+                observed.append(verdict)
+            return verdict
+
+        globals()["exact_created_record_metadata"] = traced
+        try:
+            outcome = invoke()
+        finally:
+            globals()["exact_created_record_metadata"] = original
+        return outcome is False and observed == [False]
+    check(
+        exact_created_xattrs([])
+        and exact_created_xattrs([dict(PROVENANCE_XATTR)]),
+        "A_H039_R9_EXACT_STRUCTURED_CREATED_XATTR_TWO_STATE",
+    )
+    structured_xattr_mutants = (
+        [{"name": "com.apple.provenance", "size": 11.0}],
+        [{"name": "com.apple.provenance", "size": True}],
+        [{"name": "com.apple.provenance", "size": complex(11, 0)}],
+        structured_list_subclass,
+        [structured_dict_subclass],
+        [{"name": structured_str_subclass, "size": 11}],
+        [{structured_key_subclass: "com.apple.provenance", "size": 11}],
+        [{"name": "com.apple.provenance", "size": structured_int_subclass}],
+        [{"name": "com.apple.provenance", "size": 11, "extra": False}],
+        (dict(PROVENANCE_XATTR),),
+    )
+    exact_xattr_raw = (
+        b"drwx------@ 2 root wheel - 64 Sep 3 06:09 /h039-r9\n"
+        b"\tcom.apple.provenance\t11 \n"
+    )
+    check(
+        parse_closed_acl_xattr_ls(
+            b"drwx------ 2 root wheel - 64 Sep 3 06:09 /h039-r9\n",
+            "/h039-r9", [],
+        )
+        and parse_closed_acl_xattr_ls(
+            exact_xattr_raw, "/h039-r9", [dict(PROVENANCE_XATTR)],
+        ),
+        "A_H039_R9_EXACT_RAW_CREATED_XATTR_TWO_STATE",
+    )
+    for index, mutant in enumerate(structured_xattr_mutants):
+        check(
+            not exact_created_xattrs(mutant),
+            f"N_H039_R9_STRUCTURED_XATTR_EXACT_TYPE_{index:02d}",
+        )
+        check(
+            not parse_closed_acl_xattr_ls(
+                exact_xattr_raw, "/h039-r9", mutant,
+            ),
+            f"N_H039_R9_RAW_XATTR_EXACT_TYPE_{index:02d}",
+        )
+    check(
+        not parse_closed_acl_xattr_ls(
+            exact_xattr_raw, generic_str_subclass("/h039-r9"),
+            [dict(PROVENANCE_XATTR)],
+        ),
+        "N_H039_R10_RAW_XATTR_PATH_STRING_SUBCLASS",
+    )
+
+    source_reference = prestage_source_identity(123456, "ab" * 32)
+    check(
+        exact_prestage_source_identity(source_reference, 123456, "ab" * 32),
+        "A_H039_R10_EXACT_UNTRUSTED_SOURCE_RECORD",
+    )
+    for index, (_label, mutant) in enumerate(
+        connected_source_mutants(source_reference),
+    ):
+        check(
+            not exact_prestage_source_identity(mutant, 123456, "ab" * 32),
+            f"N_H039_R10_UNTRUSTED_SOURCE_EXACT_TYPE_{index:02d}",
+        )
+
+    parent_reference = prestage_prefix_fixture(
+        0, installer_size=123456, installer_sha256="ab" * 32,
+        installer_cdhash="cd" * 20,
+    )["protected_parent"]
+    check(
+        exact_prestage_protected_parent(parent_reference),
+        "A_H039_R10_EXACT_PROTECTED_PARENT_RECORD",
+    )
+    parent_mutants: list[Any] = []
+    for key, replacement in (
+        ("acl", empty_list_subclass), ("acl", equal_empty),
+        ("xattrs", empty_list_subclass), ("xattrs", equal_empty),
+        ("path", generic_str_subclass(parent_reference["path"])),
+        ("type", generic_str_subclass(parent_reference["type"])),
+    ):
+        mutant = copy.deepcopy(parent_reference)
+        mutant[key] = replacement
+        parent_mutants.append(mutant)
+    parent_mutants.append(record_dict_subclass(parent_reference))
+    for index, mutant in enumerate(parent_mutants):
+        check(
+            not exact_prestage_protected_parent(mutant),
+            f"N_H039_R10_PROTECTED_PARENT_EXACT_TYPE_{index:02d}",
+        )
+
+    created_reference = prestage_directory_record("/h039-r10", 0, 2)
+    check(
+        exact_created_record_metadata(created_reference),
+        "A_H039_R10_EXACT_ROOT_CREATED_METADATA_RECORD",
+    )
+    for index, (_label, mutant) in enumerate(
+        connected_created_record_mutants(created_reference),
+    ):
+        check(
+            not exact_created_record_metadata(mutant),
+            f"N_H039_R10_ROOT_CREATED_RECORD_EXACT_TYPE_{index:02d}",
+        )
+
+    live_digest = "ab" * 32
+    live_snapshot_prefix = (0, 0, 0, 0, 0, 0, 1, 0, 0, "", b"")
+
+    def live_metadata_admitted(
+        xattrs: Any, *, has_acl: Any = False, flags: Any = 0,
+    ) -> bool:
+        snapshot = live_snapshot_prefix[:8] + (flags,) \
+            + live_snapshot_prefix[9:] + (xattrs, has_acl)
+        try:
+            require_no_extended_authority(snapshot, "R9_CAUSAL_FIXTURE")
+            return True
+        except Rig:
+            return False
+
+    check(
+        live_metadata_admitted(())
+        and live_metadata_admitted((
+            (b"com.apple.provenance", 11, live_digest),
+        )),
+        "A_H039_R9_INSTALLED_LIVE_XATTR_TWO_STATE",
+    )
+    live_tuple_subclass = type(
+        "H039LiveTupleSubclass", (tuple,), {},
+    )(((b"com.apple.provenance", 11, live_digest),))
+    live_item_subclass = type(
+        "H039LiveItemSubclass", (tuple,), {},
+    )((b"com.apple.provenance", 11, live_digest))
+    live_bytes_subclass = type(
+        "H039LiveBytesSubclass", (bytes,), {},
+    )(b"com.apple.provenance")
+    live_digest_subclass = type(
+        "H039LiveDigestSubclass", (str,), {},
+    )(live_digest)
+    live_xattr_mutants = (
+        ((b"com.apple.provenance", 10, live_digest),),
+        ((b"com.apple.provenance", 0, live_digest),),
+        ((b"com.apple.provenance", 11.0, live_digest),),
+        ((b"com.apple.provenance", True, live_digest),),
+        ((b"user.hostile", 11, live_digest),),
+        ((b"com.apple.provenance", 11, live_digest),
+         (b"user.hostile", 1, live_digest)),
+        live_tuple_subclass,
+        (live_item_subclass,),
+        ((live_bytes_subclass, 11, live_digest),),
+        ((b"com.apple.provenance", 11, live_digest_subclass),),
+        ((b"com.apple.provenance", 11, "A" * 64),),
+        [(b"com.apple.provenance", 11, live_digest)],
+    )
+    for index, mutant in enumerate(live_xattr_mutants):
+        check(
+            not live_metadata_admitted(mutant),
+            f"N_H039_R9_INSTALLED_LIVE_XATTR_EXACT_TYPE_{index:02d}",
+        )
+    check(
+        not live_metadata_admitted((), has_acl=0)
+        and not live_metadata_admitted((), flags=False),
+        "N_H039_R9_INSTALLED_LIVE_ACL_FLAGS_EXACT_TYPES",
+    )
+
     dd_bounded_stream_selftests()
     lexical_fixture = (
         'const char *a="//"; const char *b="/*literal*/"; '
@@ -2783,6 +3355,26 @@ def causal_oracle_selftests() -> None:
             ),
             f"A_H039_R6_FIRST_ROOT_CRASH_PREFIX_{prefix:02d}",
         )
+        protected_records = list(fixture["directories"])
+        if fixture["leaf"] is not None:
+            protected_records.append(fixture["leaf"])
+        for record_index in range(len(protected_records)):
+            provenance = copy.deepcopy(fixture)
+            provenance_records = list(provenance["directories"])
+            if provenance["leaf"] is not None:
+                provenance_records.append(provenance["leaf"])
+            provenance_records[record_index]["xattrs"] = [
+                dict(PROVENANCE_XATTR),
+            ]
+            check(
+                prestage_prefix_oracle(
+                    prefix, provenance, installer_size=123456,
+                    installer_sha256=prestage_sha,
+                    installer_cdhash=prestage_cdhash,
+                ),
+                f"A_H039_R8_FIRST_ROOT_PREFIX_{prefix:02d}_"
+                f"PROVENANCE_OBJECT_{record_index:02d}",
+            )
     ready = prestage_prefix_fixture(
         len(FIRST_ROOT_ARGV) - 1, installer_size=123456,
         installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
@@ -2872,9 +3464,13 @@ def causal_oracle_selftests() -> None:
         ("PARENT_MODE", lambda value: value["protected_parent"].__setitem__("mode", 0o777)),
         ("PARENT_ACL", lambda value: value["protected_parent"]["acl"].append("user:501:allow:add_file,delete_child")),
         ("PARENT_XATTR", lambda value: value["protected_parent"]["xattrs"].append("user.hostile")),
+        ("PARENT_ACL_LIST_SUBCLASS", lambda value: value["protected_parent"].__setitem__("acl", empty_list_subclass)),
+        ("PARENT_XATTR_LIST_SUBCLASS", lambda value: value["protected_parent"].__setitem__("xattrs", empty_list_subclass)),
+        ("PARENT_ACL_EQUALITY_OBJECT", lambda value: value["protected_parent"].__setitem__("acl", equal_empty)),
+        ("PARENT_XATTR_EQUALITY_OBJECT", lambda value: value["protected_parent"].__setitem__("xattrs", equal_empty)),
+        ("PARENT_RECORD_DICT_SUBCLASS", lambda value: value.__setitem__("protected_parent", record_dict_subclass(value["protected_parent"]))),
+        ("PARENT_PATH_STRING_SUBCLASS", lambda value: value["protected_parent"].__setitem__("path", generic_str_subclass("/private/var/db"))),
         ("PARENT_BOOL_UID", lambda value: value["protected_parent"].__setitem__("uid", False)),
-        ("SOURCE_BOOL_UID", lambda value: value["source_identity"].__setitem__("uid", False)),
-        ("SOURCE_BOOL_CLOSED", lambda value: value["source_identity"].__setitem__("closed", 1)),
         ("ARGV", lambda value: value["argv_prefix"][-1].append("hostile")),
         ("NEIGHBOR_DESTINATION", lambda value: value["leaf"].__setitem__("path", str(PROTECTED_INSTALLER) + ".neighbor")),
         ("SYMLINK", lambda value: value["leaf"].__setitem__("type", "symlink")),
@@ -2886,6 +3482,24 @@ def causal_oracle_selftests() -> None:
         ("FLAGS", lambda value: value["leaf"].__setitem__("flags", 1)),
         ("ACL", lambda value: value["leaf"]["acl"].append("allow-user-501")),
         ("XATTR", lambda value: value["leaf"]["xattrs"].append("user.hostile")),
+        ("XATTR_WRONG_NAME", lambda value: value["leaf"].__setitem__(
+            "xattrs", [{"name": "user.hostile", "size": 11}],
+        )),
+        ("XATTR_WRONG_SIZE", lambda value: value["leaf"].__setitem__(
+            "xattrs", [{"name": "com.apple.provenance", "size": 10}],
+        )),
+        ("XATTR_FLOAT_SIZE", lambda value: value["leaf"].__setitem__(
+            "xattrs", [{"name": "com.apple.provenance", "size": 11.0}],
+        )),
+        ("XATTR_BOOL_SIZE", lambda value: value["leaf"].__setitem__(
+            "xattrs", [{"name": "com.apple.provenance", "size": True}],
+        )),
+        ("XATTR_DUPLICATE", lambda value: value["leaf"].__setitem__(
+            "xattrs", [dict(PROVENANCE_XATTR), dict(PROVENANCE_XATTR)],
+        )),
+        ("DIRECTORY_XATTR_WRONG_SIZE", lambda value: value["directories"][0].__setitem__(
+            "xattrs", [{"name": "com.apple.provenance", "size": 12}],
+        )),
         ("SIZE", lambda value: value["leaf"].__setitem__("size", 123455)),
         ("DIGEST", lambda value: value["leaf"].__setitem__("sha256", "00" * 32)),
         ("CDHASH", lambda value: value["leaf"].__setitem__("cdhash", "00" * 20)),
@@ -2930,6 +3544,53 @@ def causal_oracle_selftests() -> None:
             ),
             f"N_H039_R6_FIRST_ROOT_{label}",
         )
+    for label, replacement in connected_source_mutants(ready["source_identity"]):
+        mutant = copy.deepcopy(ready)
+        mutant["source_identity"] = replacement
+        check(
+            traced_source_rejection(
+                replacement,
+                lambda candidate=mutant: prestage_prefix_oracle(
+                    len(FIRST_ROOT_ARGV) - 1, candidate, installer_size=123456,
+                    installer_sha256=prestage_sha,
+                    installer_cdhash=prestage_cdhash,
+                ),
+            ),
+            f"N_H039_R12_FIRST_ROOT_SOURCE_{label}",
+        )
+    for consumer in ("DIRECTORY", "LEAF"):
+        for xattr_state in ("EMPTY", "PROVENANCE"):
+            baseline = copy.deepcopy(ready)
+            reference = baseline["directories"][0] \
+                if consumer == "DIRECTORY" else baseline["leaf"]
+            reference["xattrs"] = [] if xattr_state == "EMPTY" \
+                else [dict(PROVENANCE_XATTR)]
+            check(
+                prestage_prefix_oracle(
+                    len(FIRST_ROOT_ARGV) - 1, baseline,
+                    installer_size=123456, installer_sha256=prestage_sha,
+                    installer_cdhash=prestage_cdhash,
+                ),
+                f"A_H039_R12_FIRST_ROOT_{consumer}_{xattr_state}_BASELINE",
+            )
+            for label, replacement in connected_created_record_mutants(reference):
+                mutant = copy.deepcopy(baseline)
+                if consumer == "DIRECTORY":
+                    mutant["directories"][0] = replacement
+                else:
+                    mutant["leaf"] = replacement
+                check(
+                    traced_created_rejection(
+                        replacement,
+                        lambda candidate=mutant: prestage_prefix_oracle(
+                            len(FIRST_ROOT_ARGV) - 1, candidate,
+                            installer_size=123456,
+                            installer_sha256=prestage_sha,
+                            installer_cdhash=prestage_cdhash,
+                        ),
+                    ),
+                    f"N_H039_R12_FIRST_ROOT_{consumer}_{xattr_state}_{label}",
+                )
     descriptor_ready = prestage_prefix_fixture(
         len(FIRST_ROOT_ARGV), installer_size=123456,
         installer_sha256=prestage_sha, installer_cdhash=prestage_cdhash,
@@ -2975,6 +3636,35 @@ def causal_oracle_selftests() -> None:
             ),
             f"A_H039_R6_BOOTSTRAP_CRASH_{phase}_EXACT_RECOVERY",
         )
+        created_records = [fixture["namespace"], *fixture["namespace_objects"].values()]
+        if fixture["installed_helper"] is not None:
+            created_records.append(fixture["installed_helper"])
+        for record_index in range(len(created_records)):
+            provenance = copy.deepcopy(fixture)
+            provenance_records = [
+                provenance["namespace"], *provenance["namespace_objects"].values(),
+            ]
+            if provenance["installed_helper"] is not None:
+                provenance_records.append(provenance["installed_helper"])
+            provenance_records[record_index]["xattrs"] = [dict(PROVENANCE_XATTR)]
+            identities, memberships = recovery_expected_bindings(
+                provenance["namespace"], provenance["namespace_objects"],
+                provenance["installed_helper"],
+            )
+            provenance["recovery_observation"] = recovery_observation_fixture(
+                identities, memberships,
+            )
+            check(
+                bootstrap_recovery_oracle(
+                    provenance, mediator_size=89392,
+                    mediator_sha256=mediator_sha,
+                    mediator_cdhash=mediator_cdhash, installer_size=191712,
+                    installer_sha256=installer_sha,
+                    installer_cdhash=installer_cdhash,
+                ),
+                f"A_H039_R8_BOOTSTRAP_{phase}_"
+                f"PROVENANCE_OBJECT_{record_index:02d}",
+            )
     bootstrap_ready = bootstrap_recovery_fixture(
         "MEDIATOR_READY", mediator_size=89392,
         mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
@@ -3161,7 +3851,36 @@ def causal_oracle_selftests() -> None:
         ("NAMESPACE_MODE", lambda value: value["namespace"].__setitem__("mode", 0o777)),
         ("NAMESPACE_BOOL_UID", lambda value: value["namespace"].__setitem__("uid", False)),
         ("ACL", lambda value: value["namespace_objects"][".install"]["acl"].append("allow-user-501")),
+        ("ACL_LIST_SUBCLASS", lambda value: value["namespace_objects"][".install"].__setitem__("acl", empty_list_subclass)),
+        ("ACL_EQUALITY_OBJECT", lambda value: value["namespace_objects"][".install"].__setitem__("acl", equal_empty)),
+        ("OBJECT_RECORD_DICT_SUBCLASS", lambda value: value["namespace_objects"].__setitem__(".install", record_dict_subclass(value["namespace_objects"][".install"]))),
+        ("NAMESPACE_RECORD_DICT_SUBCLASS", lambda value: value.__setitem__("namespace", record_dict_subclass(value["namespace"]))),
+        ("NAMESPACE_TYPE_STRING_SUBCLASS", lambda value: value["namespace"].__setitem__("type", generic_str_subclass("directory"))),
         ("XATTR", lambda value: value["namespace_objects"][".install"]["xattrs"].append("user.hostile")),
+        ("XATTR_WRONG_NAME", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", [{"name": "user.hostile", "size": 11}],
+        )),
+        ("XATTR_WRONG_SIZE", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", [{"name": "com.apple.provenance", "size": 10}],
+        )),
+        ("XATTR_FLOAT_SIZE", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", [{"name": "com.apple.provenance", "size": 11.0}],
+        )),
+        ("XATTR_BOOL_SIZE", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", [{"name": "com.apple.provenance", "size": True}],
+        )),
+        ("XATTR_LIST_SUBCLASS", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", structured_list_subclass,
+        )),
+        ("XATTR_DICT_SUBCLASS", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", [structured_dict_subclass],
+        )),
+        ("XATTR_DUPLICATE", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", [dict(PROVENANCE_XATTR), dict(PROVENANCE_XATTR)],
+        )),
+        ("XATTR_OBSERVATION_MISMATCH", lambda value: value["namespace_objects"][".install"].__setitem__(
+            "xattrs", [dict(PROVENANCE_XATTR)],
+        )),
         ("NEIGHBOR", lambda value: value["namespace_objects"].__setitem__("neighbor", bootstrap_object("regular", 0o400, 99, size=1, digest="11" * 32))),
         ("CHILD_PROCESS", lambda value: value["process_lifecycle"]["descendants"].append(99)),
         ("LIVE_PROCESS", lambda value: value["process_lifecycle"]["active"].append(98)),
@@ -3193,6 +3912,66 @@ def causal_oracle_selftests() -> None:
             ),
             f"N_H039_R6_BOOTSTRAP_{label}",
         )
+    helper_ready_state = bootstrap_recovery_fixture(
+        "HELPER_PUBLISHED", mediator_size=89392,
+        mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
+        installer_size=191712, installer_sha256=installer_sha,
+        installer_cdhash=installer_cdhash,
+    )
+    for consumer, exact_baseline in (
+        ("NAMESPACE", bootstrap_ready),
+        ("OBJECT", bootstrap_ready),
+        ("HELPER", helper_ready_state),
+    ):
+        for xattr_state in ("EMPTY", "PROVENANCE"):
+            baseline = copy.deepcopy(exact_baseline)
+            if consumer == "NAMESPACE":
+                reference = baseline["namespace"]
+            elif consumer == "OBJECT":
+                reference = baseline["namespace_objects"][".install/mediator"]
+            else:
+                reference = baseline["installed_helper"]
+            reference["xattrs"] = [] if xattr_state == "EMPTY" \
+                else [dict(PROVENANCE_XATTR)]
+            identities, memberships = recovery_expected_bindings(
+                baseline["namespace"], baseline["namespace_objects"],
+                baseline["installed_helper"],
+            )
+            baseline["recovery_observation"] = recovery_observation_fixture(
+                identities, memberships,
+            )
+            check(
+                bootstrap_recovery_oracle(
+                    baseline, mediator_size=89392,
+                    mediator_sha256=mediator_sha,
+                    mediator_cdhash=mediator_cdhash, installer_size=191712,
+                    installer_sha256=installer_sha,
+                    installer_cdhash=installer_cdhash,
+                ),
+                f"A_H039_R12_BOOTSTRAP_{consumer}_{xattr_state}_BASELINE",
+            )
+            for label, replacement in connected_created_record_mutants(reference):
+                mutant = copy.deepcopy(baseline)
+                if consumer == "NAMESPACE":
+                    mutant["namespace"] = replacement
+                elif consumer == "OBJECT":
+                    mutant["namespace_objects"][".install/mediator"] = replacement
+                else:
+                    mutant["installed_helper"] = replacement
+                check(
+                    traced_created_rejection(
+                        replacement,
+                        lambda candidate=mutant: bootstrap_recovery_oracle(
+                            candidate, mediator_size=89392,
+                            mediator_sha256=mediator_sha,
+                            mediator_cdhash=mediator_cdhash,
+                            installer_size=191712,
+                            installer_sha256=installer_sha,
+                            installer_cdhash=installer_cdhash,
+                        ),
+                    ),
+                    f"N_H039_R12_BOOTSTRAP_{consumer}_{xattr_state}_{label}",
+                )
     restage_ready_state = bootstrap_recovery_fixture(
         "RESTAGE_INSTALLER_READY", mediator_size=89392,
         mediator_sha256=mediator_sha, mediator_cdhash=mediator_cdhash,
@@ -3219,6 +3998,27 @@ def causal_oracle_selftests() -> None:
             ),
             f"N_H039_R6_RESTAGE_{label}",
         )
+    for consumer in (
+        "required_fresh_source_identity", "observed_source_identity",
+    ):
+        reference = restage_ready_state["restage_binding"][consumer]
+        for label, replacement in connected_source_mutants(reference):
+            mutant = copy.deepcopy(restage_ready_state)
+            mutant["restage_binding"][consumer] = replacement
+            check(
+                traced_source_rejection(
+                    replacement,
+                    lambda candidate=mutant: bootstrap_recovery_oracle(
+                        candidate, mediator_size=89392,
+                        mediator_sha256=mediator_sha,
+                        mediator_cdhash=mediator_cdhash,
+                        installer_size=191712,
+                        installer_sha256=installer_sha,
+                        installer_cdhash=installer_cdhash,
+                    ),
+                ),
+                f"N_H039_R12_RESTAGE_{consumer.upper()}_{label}",
+            )
     complete = bootstrap_recovery_fixture(
         "COMPLETE", mediator_size=89392, mediator_sha256=mediator_sha,
         mediator_cdhash=mediator_cdhash, installer_size=191712,
@@ -5050,16 +5850,10 @@ def product_identity(
         return False, {"error": str(exc), "merge": merge_detail}
 
 
-def product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+def retained_product_contract_publication_identity(merge: str) \
+        -> tuple[bool, dict[str, Any]]:
     try:
-        parents = commit_parents(merge)
-        if len(parents) != 2:
-            return False, {"parents": parents}
-        contract_merge, candidate = parents
-        product_ok, product_detail = product_identity(
-            contract_merge, candidate, require_checkout=False,
-            require_contract_publication=False,
-        )
+        contract_ok, contract_detail = exact_contract_merge(merge)
         remote_main = observed_production_main()
         head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
         status = git(["status", "--porcelain=v1", "--untracked-files=all"])
@@ -5067,17 +5861,22 @@ def product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
             SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
             and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
         )
+        retained_product = all(
+            sha(blob(merge, path)) == digest
+            and blob(merge, path) == blob(PUBLISHED_H039_R7_PRODUCT_MERGE, path)
+            for path, digest in PUBLISHED_H039_R7_PRODUCT_BLOBS.items()
+        )
         ok = (
-            product_ok and commit_tree(merge) == commit_tree(candidate)
+            contract_ok and retained_product
             and remote_main == merge and head == merge and status == b""
             and executing_bytes_equal
         )
         return ok, {
-            "parents": parents, "tree": commit_tree(merge),
-            "candidate_tree": commit_tree(candidate), "remote_main": remote_main,
+            "contract": contract_detail, "tree": commit_tree(merge),
+            "published_r7_product": PUBLISHED_H039_R7_PRODUCT_MERGE,
+            "retained_product": retained_product, "remote_main": remote_main,
             "head": head, "status": status.decode(),
             "executing_bytes_equal": executing_bytes_equal,
-            "product": product_detail,
         }
     except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
         return False, {"error": str(exc)}
@@ -5948,9 +6747,12 @@ def installer_verify_effects(commit: str) -> None:
     installer.chmod(0o755)
     mediator.chmod(0o555)
     before_install = INSTALLED.exists() or INSTALLED.is_symlink()
-    before_namespace = NAMESPACE.exists() or NAMESPACE.is_symlink()
-    if before_install or before_namespace:
-        raise Rig("uninstalled product review requires exact fixed-path absence")
+    try:
+        namespace_before = stable_identity(os.lstat(NAMESPACE))
+    except OSError as exc:
+        raise Rig("retained-product review requires the exact prefix-1 namespace") from exc
+    if before_install:
+        raise Rig("retained-product review requires the installed helper absent")
 
     def exact_tree() -> dict[str, tuple[tuple[int, ...], str | None]]:
         try:
@@ -6146,9 +6948,9 @@ def installer_verify_effects(commit: str) -> None:
             raise Rig("unprivileged installer bootstrap unexpectedly succeeded")
         if (
             before_install != (INSTALLED.exists() or INSTALLED.is_symlink())
-            or before_namespace != (NAMESPACE.exists() or NAMESPACE.is_symlink())
+            or stable_identity(os.lstat(NAMESPACE)) != namespace_before
         ):
-            raise Rig("installer product review changed fixed installation state")
+            raise Rig("installer product review changed fixed prefix-1 state")
     finally:
         expected = {
             "controller", "controller/runtime-cleanup",
@@ -6828,13 +7630,28 @@ def path_security_snapshot(path: Path, payload_digest: str = "") -> tuple[Any, .
     return stat_snapshot(value, payload_digest) + (xattrs, has_acl)
 
 
+def exact_live_created_xattrs(value: Any) -> bool:
+    """Close live readable metadata to empty or one exact provenance tuple."""
+    if type(value) is not tuple:
+        return False
+    if len(value) == 0:
+        return True
+    if len(value) != 1 or type(value[0]) is not tuple or len(value[0]) != 3:
+        return False
+    name, size, digest = value[0]
+    return (
+        type(name) is bytes and name == b"com.apple.provenance"
+        and type(size) is int and size == 11
+        and type(digest) is str
+        and re.fullmatch(r"[0-9a-f]{64}", digest) is not None
+    )
+
+
 def require_no_extended_authority(snapshot: tuple[Any, ...], label: str) -> None:
     xattrs, has_acl = snapshot[-2:]
-    unexpected_xattrs = {
-        name for name, _size, _digest in xattrs
-        if name not in ALLOWED_NONAUTHORITY_XATTRS
-    }
-    if unexpected_xattrs or has_acl or snapshot[8] != 0:
+    if not exact_live_created_xattrs(xattrs) \
+            or type(has_acl) is not bool or has_acl is not False \
+            or type(snapshot[8]) is not int or snapshot[8] != 0:
         raise Rig(f"object has extended authority metadata: {label}")
 
 
@@ -8510,7 +9327,7 @@ def guarded_product_effects() -> dict[str, Any]:
 
 
 
-def published_r5_product_uninstalled_baseline() -> tuple[bool, dict[str, Any]]:
+def published_r7_product_prefix1_baseline() -> tuple[bool, dict[str, Any]]:
     repo: dict[str, dict[str, Any]] = {}
     for path in PRODUCT_PATHS:
         target = ROOT / path
@@ -8528,14 +9345,61 @@ def published_r5_product_uninstalled_baseline() -> tuple[bool, dict[str, Any]]:
     repo_ok = all(
         value == {
             "regular": True, "mode": PRODUCT_MODES[path], "nlink": 1,
-            "sha256": PUBLISHED_H039_R5_PRODUCT_BLOBS[path],
+            "sha256": PUBLISHED_H039_R7_PRODUCT_BLOBS[path],
         }
         for path, value in repo.items()
     )
     installed = INSTALLED.exists() or INSTALLED.is_symlink()
-    namespace = NAMESPACE.exists() or NAMESPACE.is_symlink()
-    return repo_ok and not installed and not namespace, {
-        "repo": repo, "installed": installed, "namespace": namespace,
+    try:
+        evidence_raw = PREFIX1_EVIDENCE.read_bytes()
+        evidence = strict_json(evidence_raw)
+        namespace_value = os.lstat(NAMESPACE)
+        namespace_stat = (
+            f"{namespace_value.st_dev}:{namespace_value.st_ino}:"
+            f"{namespace_value.st_mode:o}:{namespace_value.st_uid}:"
+            f"{namespace_value.st_gid}:{namespace_value.st_nlink}:"
+            f"{namespace_value.st_size}:{namespace_value.st_flags}"
+        )
+        evidence_ok = (
+            sha(evidence_raw) == PREFIX1_EVIDENCE_SHA256
+            and isinstance(evidence, dict)
+            and evidence.get("published_product_merge")
+            == PUBLISHED_H039_R7_PRODUCT_MERGE
+            and evidence.get("first_root_prefix_index") == 1
+            and evidence.get("exact_child_argv") == FIRST_ROOT_ARGV[0]
+            and evidence.get("owner_terminal_result") == {
+                "exit_code": 0, "stdout": "", "stderr": "",
+                "credential_disclosed_to_agent": False,
+            }
+            and evidence.get("root_read_only_rebind", {}).get("before_stat")
+            == namespace_stat
+            and evidence.get("root_read_only_rebind", {}).get("after_stat")
+            == namespace_stat
+            and evidence.get("root_read_only_rebind", {}).get("stat_exit_codes")
+            == [0, 0]
+            and evidence.get("root_read_only_rebind", {}).get("ls_exit_code") == 0
+            and evidence.get("root_read_only_rebind", {}).get("acl") == []
+            and evidence.get("root_read_only_rebind", {}).get("xattrs") == []
+            and evidence.get("fixed_descendants") == {
+                str(NAMESPACE / ".install"): "ABSENT",
+                str(INSTALLED): "ABSENT",
+            }
+            and evidence.get("continued_root_effect") is False
+            and evidence.get("rollback_effect") is False
+            and evidence.get("supervisor_resume") is False
+            and stat.S_ISDIR(namespace_value.st_mode)
+            and not NAMESPACE.is_symlink()
+            and namespace_value.st_uid == 0 and namespace_value.st_gid == 0
+            and stat.S_IMODE(namespace_value.st_mode) == 0o700
+            and namespace_value.st_nlink == 2 and namespace_value.st_flags == 0
+        )
+    except (OSError, Rig, ValueError) as exc:
+        evidence_ok = False
+        evidence = {"error": str(exc)}
+        namespace_stat = "UNAVAILABLE"
+    return repo_ok and not installed and evidence_ok, {
+        "repo": repo, "installed": installed, "prefix1_evidence": evidence,
+        "namespace_stat": namespace_stat, "evidence_ok": evidence_ok,
     }
 
 
@@ -8543,6 +9407,11 @@ def finish(phase: str) -> int:
     print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
     print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
     print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R8_MATERIAL_REVIEW_EXTENSION={R8_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R9_MATERIAL_REVIEW_EXTENSION={R9_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         print("H039_GATE_RESULT=PASS")
@@ -8566,28 +9435,37 @@ def main(argv: list[str]) -> int:
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
         print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
         print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R8_MATERIAL_REVIEW_EXTENSION={R8_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R9_MATERIAL_REVIEW_EXTENSION={R9_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
         print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
         print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R8_MATERIAL_REVIEW_EXTENSION={R8_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R9_MATERIAL_REVIEW_EXTENSION={R9_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
-    product = len(argv) == 3 and argv[0] == "--product"
     installed = len(argv) == 2 and argv[0] == "--installed"
-    if not (preproduct or product or installed):
+    if not (preproduct or installed):
         print(
-            "RIG_ERROR: usage: h-039-exit [--product CONTRACT_MERGE "
-            "PRODUCT_CANDIDATE | --installed PUBLISHED_PRODUCT_MERGE]",
+            "RIG_ERROR: usage: h-039-exit [--installed "
+            "PUBLISHED_R12_CONTRACT_REBIND_MERGE]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if product else argv[1:] if installed else []
+    supplied_commits = argv[1:] if installed else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
-    phase = "preproduct" if preproduct else "product" if product else "installed"
+    phase = "preproduct" if preproduct else "installed"
     try:
         if any(object_type(value) != "commit" for value in supplied_commits):
             raise Rig("every supplied identity must name a literal commit object")
@@ -8600,37 +9478,27 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            baseline, detail = published_r5_product_uninstalled_baseline()
-            check(baseline, "A_H039_R6_PUBLISHED_R5_PRODUCT_ROOT_UNINSTALLED_BASELINE", detail)
+            baseline, detail = published_r7_product_prefix1_baseline()
+            check(
+                baseline,
+                "A_H039_R12_PUBLISHED_R7_PRODUCT_EXACT_PREFIX1_BASELINE",
+                detail,
+            )
             if not baseline:
-                raise Rig("R6 preproduct baseline is not exact published R5 with root absent")
+                raise Rig("R12 preproduct baseline is not exact published R7 prefix 1")
+            recipe, manifest = manifest_checks(PUBLISHED_H039_R7_PRODUCT_MERGE)
+            immutable_source_checks(PUBLISHED_H039_R7_PRODUCT_MERGE)
+            reproducible_rebuild(recipe, PUBLISHED_H039_R7_PRODUCT_MERGE)
+            macho_checks(manifest, PUBLISHED_H039_R7_PRODUCT_MERGE)
+            installer_verify_effects(PUBLISHED_H039_R7_PRODUCT_MERGE)
+            check(True, "A_H039_R12_RETAINED_R7_PRODUCT_REVIEWED_AT_PREFIX1")
             check(False, LABEL, {
                 "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
             })
             return finish(phase)
 
-        if product:
-            identity_ok, identity_detail = product_identity(argv[1], argv[2])
-            check(
-                identity_ok, "A_H039_EXACT_DIRECT_CHILD_FOUR_FILE_PRODUCT_IDENTITY",
-                identity_detail,
-            )
-            if not identity_ok:
-                return finish(phase)
-            recipe, manifest = manifest_checks(argv[2])
-            immutable_source_checks(argv[2])
-            reproducible_rebuild(recipe, argv[2])
-            macho_checks(manifest, argv[2])
-            installer_verify_effects(argv[2])
-            check(True, "A_H039_UNINSTALLED_BUILD_SOURCE_AND_MACHO_IDENTITY")
-            check(
-                not (INSTALLED.exists() or INSTALLED.is_symlink())
-                and not (NAMESPACE.exists() or NAMESPACE.is_symlink()),
-                "A_H039_PRODUCT_REVIEW_HAS_NO_INSTALL_EFFECT",
-            )
-            return finish(phase)
-
-        publication_ok, publication_detail = product_publication_identity(argv[1])
+        publication_ok, publication_detail = \
+            retained_product_contract_publication_identity(argv[1])
         check(
             publication_ok, "A_H039_GUARDED_PRODUCT_PUBLICATION_IDENTITY",
             publication_detail,
@@ -8667,6 +9535,11 @@ def main(argv: list[str]) -> int:
         print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
         print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
         print(f"R7_MATERIAL_REVIEW_EXTENSION={R7_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R8_MATERIAL_REVIEW_EXTENSION={R8_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R9_MATERIAL_REVIEW_EXTENSION={R9_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R10_MATERIAL_REVIEW_EXTENSION={R10_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R11_MATERIAL_REVIEW_EXTENSION={R11_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R12_MATERIAL_REVIEW_EXTENSION={R12_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)
