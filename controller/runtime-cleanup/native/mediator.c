@@ -580,6 +580,362 @@ done:if(project>=0)close(project);if(controller>=0)close(controller);if(self_par
 static int close_bootstrap_descriptors(void){
   const int byte_cap=1048576;pid_t self=getpid();errno=0;int sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);if(sizing<=0||errno!=0||sizing>byte_cap||sizing%(int)sizeof(struct proc_fdinfo))return 0;struct proc_fdinfo*list=malloc((size_t)byte_cap);if(!list)return 0;errno=0;int got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);if(got!=2*(int)sizeof *list||errno!=0){free(list);return 0;}int one=0,two=0;for(size_t i=0;i<2;i++){if(list[i].proc_fd==1&&!one)one=1;else if(list[i].proc_fd==2&&!two)two=1;else{free(list);return 0;}}if(!one||!two){free(list);return 0;}if(close(1)!=0){free(list);return 0;}if(close(2)!=0){free(list);return 0;}errno=0;sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);if(sizing<0||errno!=0||sizing>byte_cap||sizing%(int)sizeof *list){free(list);return 0;}memset(list,0,(size_t)byte_cap);errno=0;got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);int ok=got==0&&errno==0;free(list);return ok;
 }
+#if defined(H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC)
+enum h039_diagnostic_exit {
+  H039_DIAG_IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT = 0,
+  H039_DIAG_MAIN_ARGC = 1,
+  H039_DIAG_MAIN_ARGV_POINTER = 2,
+  H039_DIAG_MAIN_ARGV0 = 3,
+  H039_DIAG_MAIN_ARGV1 = 4,
+  H039_DIAG_MAIN_OPERATION = 5,
+  H039_DIAG_FD0_CLOSE = 6,
+  H039_DIAG_FD0_POSTCLOSE_FCNTL_RESULT = 7,
+  H039_DIAG_FD0_POSTCLOSE_ERRNO = 8,
+  H039_DIAG_FD_INITIAL_SIZING = 9,
+  H039_DIAG_FD_INITIAL_ERRNO = 10,
+  H039_DIAG_FD_INITIAL_CAP = 11,
+  H039_DIAG_FD_INITIAL_ALIGNMENT = 12,
+  H039_DIAG_FD_INVENTORY_ALLOCATION = 13,
+  H039_DIAG_FD_POPULATED_COUNT = 14,
+  H039_DIAG_FD_POPULATED_ERRNO = 15,
+  H039_DIAG_FD_ENTRY0_MEMBERSHIP_UNIQUENESS = 16,
+  H039_DIAG_FD_ENTRY1_MEMBERSHIP_UNIQUENESS = 17,
+  H039_DIAG_FD1_ABSENT = 18,
+  H039_DIAG_FD2_ABSENT = 19,
+  H039_DIAG_FD1_CLOSE = 20,
+  H039_DIAG_FD2_CLOSE = 21,
+  H039_DIAG_FD_SECOND_SIZING = 22,
+  H039_DIAG_FD_SECOND_ERRNO = 23,
+  H039_DIAG_FD_SECOND_CAP = 24,
+  H039_DIAG_FD_SECOND_ALIGNMENT = 25,
+  H039_DIAG_FD_FINAL_GOT_NONZERO = 26,
+  H039_DIAG_FD_FINAL_ERRNO = 27,
+  H039_DIAG_HANDLER_ARGC = 28,
+  H039_DIAG_HANDLER_ARGV_POINTER = 29,
+  H039_DIAG_HANDLER_ARGV0 = 30,
+  H039_DIAG_HANDLER_ARGV1 = 31,
+  H039_DIAG_HANDLER_BOOTSTRAP = 32,
+  H039_DIAG_ROOT_RUID = 33,
+  H039_DIAG_ROOT_EUID = 34,
+  H039_DIAG_ROOT_RGID = 35,
+  H039_DIAG_ROOT_EGID = 36,
+  H039_DIAG_INITIAL_NSGET = 37,
+  H039_DIAG_INITIAL_CANONICAL = 38,
+  H039_DIAG_INITIAL_FIXED_PATH = 39,
+  H039_DIAG_INITIAL_ARGV0_PATH = 40,
+  H039_DIAG_CHDIR_ROOT = 41,
+  H039_DIAG_LOADED_SECOND_NSGET = 42,
+  H039_DIAG_LOADED_CANONICAL = 43,
+  H039_DIAG_LOADED_PATH_LENGTH = 44,
+  H039_DIAG_LOADED_SLASH = 45,
+  H039_DIAG_LOADED_BASENAME = 46,
+  H039_DIAG_LOADED_PARENT_OPEN = 47,
+  H039_DIAG_LOADED_SELF_OPEN = 48,
+  H039_DIAG_LOADED_SELF_FSTAT = 49,
+  H039_DIAG_LOADED_NAME_FSTATAT = 50,
+  H039_DIAG_LOADED_SAME_STAT = 51,
+  H039_DIAG_LOADED_REGULAR = 52,
+  H039_DIAG_LOADED_NLINK = 53,
+  H039_DIAG_LOADED_REGION_FULL_SIZE = 54,
+  H039_DIAG_LOADED_REGION_DEVICE = 55,
+  H039_DIAG_LOADED_REGION_INODE = 56,
+  H039_DIAG_LOADED_REGION_PATH = 57,
+  H039_DIAG_LOADED_INITIAL_PATH = 58,
+  H039_DIAG_LOADED_SELF_UID = 59,
+  H039_DIAG_LOADED_SELF_GID = 60,
+  H039_DIAG_LOADED_SELF_MODE = 61,
+  H039_DIAG_LOADED_SELF_OUTER_NLINK = 62,
+  H039_DIAG_EMBEDDED_SECTION_POINTER = 63,
+  H039_DIAG_EMBEDDED_SECTION_SIZE_NONZERO = 64,
+  H039_DIAG_EMBEDDED_DIGEST = 65,
+  H039_DIAG_EMBEDDED_ALLOCATION = 66,
+  H039_DIAG_CONTROLLER_PARENT_OPEN = 67,
+  H039_DIAG_CONTROLLER_PARENT_FSTAT = 68,
+  H039_DIAG_CONTROLLER_PARENT_SHAPE = 69,
+  H039_DIAG_PROJECT_PARENT_OPEN = 70,
+  H039_DIAG_PROJECT_PARENT_FSTAT = 71,
+  H039_DIAG_PROJECT_PARENT_SHAPE = 72,
+  H039_DIAG_STAGING_PROJECT_FSTAT = 73,
+  H039_DIAG_STAGING_PROJECT_SHAPE = 74,
+  H039_DIAG_STAGING_PROJECT_FSYNC = 75,
+  H039_DIAG_STAGING_PROJECT_POST_FSYNC_FSTAT = 76,
+  H039_DIAG_STAGING_PROJECT_SAME_STAT = 77,
+  H039_DIAG_STAGING_PROJECT_MEMBERSHIP = 78,
+  H039_DIAG_STAGING_DURABLE_CONTROLLER = 79,
+  H039_DIAG_STAGING_DURABLE_RUNTIME = 80,
+  H039_DIAG_STAGING_CONTROLLER_MEMBERSHIP = 81,
+  H039_DIAG_STAGING_RUNTIME_MEMBERSHIP = 82,
+  H039_DIAG_STAGING_STABLE_SELF = 83,
+  H039_DIAG_STAGING_SELF_IDENTITY_EQUALITY = 84,
+  H039_DIAG_STAGING_SELF_FSYNC = 85,
+  H039_DIAG_STAGING_RUNTIME_FSYNC = 86,
+  H039_DIAG_STAGING_SELF_POST_FSYNC_FSTAT = 87,
+  H039_DIAG_STAGING_SELF_SAME_STAT = 88,
+  H039_DIAG_STAGING_SELF_NAME_FSTATAT = 89,
+  H039_DIAG_STAGING_SELF_FINAL_SAME_STAT = 90,
+  H039_DIAG_STAGING_SELF_CLOSE = 91,
+  H039_DIAG_STAGING_RUNTIME_CLOSE = 92,
+  H039_DIAG_STAGING_CONTROLLER_CLOSE = 93,
+  H039_DIAG_NAMESPACE_OPEN = 94,
+  H039_DIAG_NAMESPACE_FSTAT = 95,
+  H039_DIAG_NAMESPACE_SHAPE = 96,
+  H039_DIAG_DATABASE_PARENT = 97,
+  H039_DIAG_NAMESPACE_FSYNC = 98,
+  H039_DIAG_DATABASE_FSYNC = 99,
+  H039_DIAG_NAMESPACE_POST_FSYNC_FSTAT = 100,
+  H039_DIAG_NAMESPACE_POST_FSYNC_SAME_STAT = 101,
+  H039_DIAG_DATABASE_NAME_FSTATAT = 102,
+  H039_DIAG_DATABASE_NAME_SAME_STAT = 103,
+  H039_DIAG_NAMESPACE_LSTAT = 104,
+  H039_DIAG_NAMESPACE_LSTAT_SAME_STAT = 105,
+  H039_DIAG_PROJECT_RE_FSTAT = 106,
+  H039_DIAG_NAMESPACE_INSTALL_FSTATAT = 107,
+  H039_DIAG_NAMESPACE_INSTALL_SAME_STAT = 108,
+  H039_DIAG_PROJECT_RE_FSYNC = 109,
+  H039_DIAG_NAMESPACE_RE_FSYNC = 110,
+  H039_DIAG_PROJECT_FINAL_FSTAT = 111,
+  H039_DIAG_PROJECT_FINAL_SAME_STAT = 112,
+  H039_DIAG_NAMESPACE_INSTALL_FINAL_FSTATAT = 113,
+  H039_DIAG_NAMESPACE_INSTALL_FINAL_SAME_STAT = 114,
+  H039_DIAG_NAMESPACE_EXACT_MEMBERSHIP = 115,
+  H039_DIAG_NAMESPACE_A_ENOENT = 116,
+  H039_DIAG_NAMESPACE_C_ENOENT = 117,
+  H039_DIAG_NAMESPACE_Q_ENOENT = 118,
+  H039_DIAG_NAMESPACE_R_ENOENT = 119,
+  H039_DIAG_NAMESPACE_S_ENOENT = 120,
+  H039_DIAG_NAMESPACE_PREFIX0_NO_LOCK = 121,
+  H039_DIAG_HELPERS_OPEN = 122,
+  H039_DIAG_HELPERS_FSTAT_SHAPE_FSYNC_REBIND = 123,
+  H039_DIAG_INSTALLED_HELPER_ENOENT = 124,
+  H039_DIAG_STAGED_MEDIATOR_ENOENT = 125
+};
+
+static int diagnostic_close_bootstrap_descriptors(void){
+  const int byte_cap=1048576;
+  pid_t self=getpid();
+  errno=0;
+  int sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);
+  if(sizing<=0)return H039_DIAG_FD_INITIAL_SIZING;
+  if(errno!=0)return H039_DIAG_FD_INITIAL_ERRNO;
+  if(sizing>byte_cap)return H039_DIAG_FD_INITIAL_CAP;
+  if(sizing%(int)sizeof(struct proc_fdinfo))return H039_DIAG_FD_INITIAL_ALIGNMENT;
+  struct proc_fdinfo *list=malloc((size_t)byte_cap);
+  if(!list)return H039_DIAG_FD_INVENTORY_ALLOCATION;
+  errno=0;
+  int got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);
+  if(got!=2*(int)sizeof *list){free(list);return H039_DIAG_FD_POPULATED_COUNT;}
+  if(errno!=0){free(list);return H039_DIAG_FD_POPULATED_ERRNO;}
+  if(list[0].proc_fd!=1&&list[0].proc_fd!=2){free(list);return H039_DIAG_FD_ENTRY0_MEMBERSHIP_UNIQUENESS;}
+  if((list[1].proc_fd!=1&&list[1].proc_fd!=2)||list[1].proc_fd==list[0].proc_fd){free(list);return H039_DIAG_FD_ENTRY1_MEMBERSHIP_UNIQUENESS;}
+  int one=list[0].proc_fd==1||list[1].proc_fd==1;
+  int two=list[0].proc_fd==2||list[1].proc_fd==2;
+  if(!one){free(list);return H039_DIAG_FD1_ABSENT;}
+  if(!two){free(list);return H039_DIAG_FD2_ABSENT;}
+  if(close(1)!=0){free(list);return H039_DIAG_FD1_CLOSE;}
+  if(close(2)!=0){free(list);return H039_DIAG_FD2_CLOSE;}
+  errno=0;
+  sizing=proc_pidinfo(self,PROC_PIDLISTFDS,0,NULL,0);
+  if(sizing<0){free(list);return H039_DIAG_FD_SECOND_SIZING;}
+  if(errno!=0){free(list);return H039_DIAG_FD_SECOND_ERRNO;}
+  if(sizing>byte_cap){free(list);return H039_DIAG_FD_SECOND_CAP;}
+  if(sizing%(int)sizeof *list){free(list);return H039_DIAG_FD_SECOND_ALIGNMENT;}
+  memset(list,0,(size_t)byte_cap);
+  errno=0;
+  got=proc_pidinfo(self,PROC_PIDLISTFDS,0,list,byte_cap);
+  if(got!=0){free(list);return H039_DIAG_FD_FINAL_GOT_NONZERO;}
+  if(errno!=0){free(list);return H039_DIAG_FD_FINAL_ERRNO;}
+  free(list);
+  return -1;
+}
+
+__attribute__((noinline,used)) int installer_bootstrap(int argc,char **argv){
+  if(close(0)!=0)return H039_DIAG_FD0_CLOSE;
+  errno=0;
+  int fd0=fcntl(0,F_GETFD);
+  if(fd0!=-1)return H039_DIAG_FD0_POSTCLOSE_FCNTL_RESULT;
+  if(errno!=EBADF)return H039_DIAG_FD0_POSTCLOSE_ERRNO;
+  int descriptor_result=diagnostic_close_bootstrap_descriptors();
+  if(descriptor_result!=-1)return descriptor_result;
+
+  if(argc!=2)return H039_DIAG_HANDLER_ARGC;
+  if(!argv)return H039_DIAG_HANDLER_ARGV_POINTER;
+  if(!argv[0])return H039_DIAG_HANDLER_ARGV0;
+  if(!argv[1])return H039_DIAG_HANDLER_ARGV1;
+  if(strcmp(argv[1],"bootstrap"))return H039_DIAG_HANDLER_BOOTSTRAP;
+  if(getuid()!=0)return H039_DIAG_ROOT_RUID;
+  if(geteuid()!=0)return H039_DIAG_ROOT_EUID;
+  if(getgid()!=0)return H039_DIAG_ROOT_RGID;
+  if(getegid()!=0)return H039_DIAG_ROOT_EGID;
+
+  char initial[4096];
+  uint32_t cap=4096;
+  if(_NSGetExecutablePath(initial,&cap))return H039_DIAG_INITIAL_NSGET;
+  if(!canonical_absolute(initial))return H039_DIAG_INITIAL_CANONICAL;
+  if(strcmp(initial,NS "/.install/controller/runtime-cleanup/install"))return H039_DIAG_INITIAL_FIXED_PATH;
+  if(strcmp(argv[0],initial))return H039_DIAG_INITIAL_ARGV0_PATH;
+  static char *empty[]={NULL};
+  environ=empty;
+  if(chdir("/"))return H039_DIAG_CHDIR_ROOT;
+
+  char self_path[4096];
+  cap=4096;
+  if(_NSGetExecutablePath(self_path,&cap))return H039_DIAG_LOADED_SECOND_NSGET;
+  if(!canonical_absolute(self_path))return H039_DIAG_LOADED_CANONICAL;
+  size_t self_path_n=strlen(self_path);
+  if(self_path_n>=sizeof self_path)return H039_DIAG_LOADED_PATH_LENGTH;
+  char *slash=strrchr(self_path,'/');
+  if(!slash)return H039_DIAG_LOADED_SLASH;
+  if(strcmp(slash+1,"install"))return H039_DIAG_LOADED_BASENAME;
+  int self_parent=open(NS "/.install/controller/runtime-cleanup",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(self_parent<0)return H039_DIAG_LOADED_PARENT_OPEN;
+  int self_fd=openat(self_parent,"install",O_RDONLY|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE);
+  if(self_fd<0)return H039_DIAG_LOADED_SELF_OPEN;
+  struct stat self;
+  if(fstat(self_fd,&self))return H039_DIAG_LOADED_SELF_FSTAT;
+  struct stat self_name;
+  if(fstatat(self_parent,"install",&self_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_LOADED_NAME_FSTATAT;
+  if(!same_stat(&self,&self_name))return H039_DIAG_LOADED_SAME_STAT;
+  if(!S_ISREG(self.st_mode))return H039_DIAG_LOADED_REGULAR;
+  if(self.st_nlink!=1)return H039_DIAG_LOADED_NLINK;
+  struct proc_regionwithpathinfo image={0};
+  int got=proc_pidinfo(getpid(),PROC_PIDREGIONPATHINFO,(uint64_t)(uintptr_t)&main,&image,sizeof image);
+  if(got!=(int)sizeof image)return H039_DIAG_LOADED_REGION_FULL_SIZE;
+  if(image.prp_vip.vip_vi.vi_stat.vst_dev!=(uint32_t)self.st_dev)return H039_DIAG_LOADED_REGION_DEVICE;
+  if(image.prp_vip.vip_vi.vi_stat.vst_ino!=(uint64_t)self.st_ino)return H039_DIAG_LOADED_REGION_INODE;
+  if(strcmp(image.prp_vip.vip_path,self_path))return H039_DIAG_LOADED_REGION_PATH;
+  if(strcmp(self_path,initial))return H039_DIAG_LOADED_INITIAL_PATH;
+  if(self.st_uid!=0)return H039_DIAG_LOADED_SELF_UID;
+  if(self.st_gid!=0)return H039_DIAG_LOADED_SELF_GID;
+  if((self.st_mode&07777)!=0500)return H039_DIAG_LOADED_SELF_MODE;
+  if(self.st_nlink!=1)return H039_DIAG_LOADED_SELF_OUTER_NLINK;
+
+  unsigned long section_n=0;
+  uint8_t *section=getsectiondata(&_mh_execute_header,"__H039RO","__h039med",&section_n);
+  if(!section)return H039_DIAG_EMBEDDED_SECTION_POINTER;
+  if(section_n==0||section_n!=(unsigned long)H039_MEDIATOR_SIZE)return H039_DIAG_EMBEDDED_SECTION_SIZE_NONZERO;
+  char section_digest[65];
+  digest(section,(size_t)section_n,section_digest);
+  if(strcmp(section_digest,Q(H039_MEDIATOR_SHA256)))return H039_DIAG_EMBEDDED_DIGEST;
+  unsigned char *mediator=malloc((size_t)section_n);
+  if(!mediator)return H039_DIAG_EMBEDDED_ALLOCATION;
+  memcpy(mediator,section,(size_t)section_n);
+  (void)*(volatile unsigned char *)mediator;
+
+  int controller=openat(self_parent,"..",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(controller<0)return H039_DIAG_CONTROLLER_PARENT_OPEN;
+  struct stat controller_stat;
+  if(fstat(controller,&controller_stat))return H039_DIAG_CONTROLLER_PARENT_FSTAT;
+  if(!S_ISDIR(controller_stat.st_mode)||controller_stat.st_uid!=0||controller_stat.st_gid!=0||(controller_stat.st_mode&07777)!=0700)return H039_DIAG_CONTROLLER_PARENT_SHAPE;
+  int project=openat(controller,"..",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(project<0)return H039_DIAG_PROJECT_PARENT_OPEN;
+  struct stat project_stat;
+  if(fstat(project,&project_stat))return H039_DIAG_PROJECT_PARENT_FSTAT;
+  if(!S_ISDIR(project_stat.st_mode)||project_stat.st_uid!=0||project_stat.st_gid!=0||(project_stat.st_mode&07777)!=0700)return H039_DIAG_PROJECT_PARENT_SHAPE;
+
+  struct stat project_before;
+  if(fstat(project,&project_before))return H039_DIAG_STAGING_PROJECT_FSTAT;
+  if(!S_ISDIR(project_before.st_mode)||project_before.st_uid!=0||project_before.st_gid!=0||(project_before.st_mode&07777)!=0700)return H039_DIAG_STAGING_PROJECT_SHAPE;
+  if(fsync(project))return H039_DIAG_STAGING_PROJECT_FSYNC;
+  struct stat project_after;
+  if(fstat(project,&project_after))return H039_DIAG_STAGING_PROJECT_POST_FSYNC_FSTAT;
+  if(!same_stat(&project_before,&project_after))return H039_DIAG_STAGING_PROJECT_SAME_STAT;
+  const char *project_names[]={"controller","mediator"};
+  if(!exact_names(project,project_names,2,1U))return H039_DIAG_STAGING_PROJECT_MEMBERSHIP;
+  int staging_controller=durable_fixed_dir_at(project,"controller",0,0,0700);
+  if(staging_controller<0)return H039_DIAG_STAGING_DURABLE_CONTROLLER;
+  int staging_runtime=durable_fixed_dir_at(staging_controller,"runtime-cleanup",0,0,0700);
+  if(staging_runtime<0)return H039_DIAG_STAGING_DURABLE_RUNTIME;
+  const char *controller_names[]={"runtime-cleanup"};
+  if(!exact_names(staging_controller,controller_names,1,1U))return H039_DIAG_STAGING_CONTROLLER_MEMBERSHIP;
+  const char *runtime_names[]={"install"};
+  if(!exact_names(staging_runtime,runtime_names,1,1U))return H039_DIAG_STAGING_RUNTIME_MEMBERSHIP;
+  struct stat named;
+  int stable_self=stable_named_fd(staging_runtime,"install",O_RDONLY,0,0,0500,4194304,NULL,NULL,&named);
+  if(stable_self<0)return H039_DIAG_STAGING_STABLE_SELF;
+  if(!same_stat(&self,&named))return H039_DIAG_STAGING_SELF_IDENTITY_EQUALITY;
+  if(fsync(stable_self))return H039_DIAG_STAGING_SELF_FSYNC;
+  if(flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;
+  struct stat stable_after;
+  if(fstat(stable_self,&stable_after))return H039_DIAG_STAGING_SELF_POST_FSYNC_FSTAT;
+  if(!same_stat(&named,&stable_after))return H039_DIAG_STAGING_SELF_SAME_STAT;
+  struct stat stable_name;
+  if(fstatat(staging_runtime,"install",&stable_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_STAGING_SELF_NAME_FSTATAT;
+  if(!same_stat(&stable_after,&stable_name))return H039_DIAG_STAGING_SELF_FINAL_SAME_STAT;
+  if(close(stable_self))return H039_DIAG_STAGING_SELF_CLOSE;
+  if(close(staging_runtime))return H039_DIAG_STAGING_RUNTIME_CLOSE;
+  if(close(staging_controller))return H039_DIAG_STAGING_CONTROLLER_CLOSE;
+
+  int ns=open(NS,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(ns<0)return H039_DIAG_NAMESPACE_OPEN;
+  struct stat namespace_stat;
+  if(fstat(ns,&namespace_stat))return H039_DIAG_NAMESPACE_FSTAT;
+  if(!S_ISDIR(namespace_stat.st_mode)||namespace_stat.st_uid!=0||namespace_stat.st_gid!=0||((namespace_stat.st_mode&07777)!=0700&&(namespace_stat.st_mode&07777)!=0555))return H039_DIAG_NAMESPACE_SHAPE;
+  int database=openat(ns,"..",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  struct stat database_stat;
+  if(database<0||fstat(database,&database_stat)||!S_ISDIR(database_stat.st_mode)||database_stat.st_uid!=0||database_stat.st_gid!=0||(database_stat.st_mode&07777)!=0755)return H039_DIAG_DATABASE_PARENT;
+  if(fsync(ns))return H039_DIAG_NAMESPACE_FSYNC;
+  if(flush_dir(database))return H039_DIAG_DATABASE_FSYNC;
+  struct stat namespace_after;
+  if(fstat(ns,&namespace_after))return H039_DIAG_NAMESPACE_POST_FSYNC_FSTAT;
+  if(!same_stat(&namespace_stat,&namespace_after))return H039_DIAG_NAMESPACE_POST_FSYNC_SAME_STAT;
+  struct stat namespace_name;
+  if(fstatat(database,"nortropic-runtime-cleanup-v1",&namespace_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_DATABASE_NAME_FSTATAT;
+  if(!same_stat(&namespace_after,&namespace_name))return H039_DIAG_DATABASE_NAME_SAME_STAT;
+  struct stat namespace_path;
+  if(lstat(NS,&namespace_path))return H039_DIAG_NAMESPACE_LSTAT;
+  if(!same_stat(&namespace_after,&namespace_path))return H039_DIAG_NAMESPACE_LSTAT_SAME_STAT;
+  struct stat project_recheck;
+  if(fstat(project,&project_recheck))return H039_DIAG_PROJECT_RE_FSTAT;
+  struct stat install_name;
+  if(fstatat(ns,".install",&install_name,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_NAMESPACE_INSTALL_FSTATAT;
+  if(!same_stat(&project_recheck,&install_name))return H039_DIAG_NAMESPACE_INSTALL_SAME_STAT;
+  if(fsync(project))return H039_DIAG_PROJECT_RE_FSYNC;
+  if(fsync(ns))return H039_DIAG_NAMESPACE_RE_FSYNC;
+  struct stat project_final;
+  if(fstat(project,&project_final))return H039_DIAG_PROJECT_FINAL_FSTAT;
+  if(!same_stat(&project_recheck,&project_final))return H039_DIAG_PROJECT_FINAL_SAME_STAT;
+  struct stat install_final;
+  if(fstatat(ns,".install",&install_final,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return H039_DIAG_NAMESPACE_INSTALL_FINAL_FSTATAT;
+  if(!same_stat(&project_final,&install_final))return H039_DIAG_NAMESPACE_INSTALL_FINAL_SAME_STAT;
+  const char *namespace_names[]={".install"};
+  if(!exact_names(ns,namespace_names,1,1U))return H039_DIAG_NAMESPACE_EXACT_MEMBERSHIP;
+
+  struct stat absent;
+  errno=0;
+  if(fstatat(ns,"a",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_A_ENOENT;
+  errno=0;
+  if(fstatat(ns,"c",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_C_ENOENT;
+  errno=0;
+  if(fstatat(ns,"q",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_Q_ENOENT;
+  errno=0;
+  if(fstatat(ns,"r",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_R_ENOENT;
+  errno=0;
+  if(fstatat(ns,"s",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_S_ENOENT;
+  errno=0;
+  if(fstatat(ns,"s/lock",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_NAMESPACE_PREFIX0_NO_LOCK;
+
+  int helpers=open("/Library/PrivilegedHelperTools",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);
+  if(helpers<0)return H039_DIAG_HELPERS_OPEN;
+  struct stat helpers_before,helpers_after,helpers_name;
+  if(fstat(helpers,&helpers_before)||!S_ISDIR(helpers_before.st_mode)||helpers_before.st_uid!=0||helpers_before.st_gid!=0||(helpers_before.st_mode&0022)||fsync(helpers)||fstat(helpers,&helpers_after)||!same_stat(&helpers_before,&helpers_after)||lstat("/Library/PrivilegedHelperTools",&helpers_name)||!same_stat(&helpers_after,&helpers_name))return H039_DIAG_HELPERS_FSTAT_SHAPE_FSYNC_REBIND;
+  errno=0;
+  if(fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_INSTALLED_HELPER_ENOENT;
+  errno=0;
+  if(fstatat(project,"mediator",&absent,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)!=-1||errno!=ENOENT)return H039_DIAG_STAGED_MEDIATOR_ENOENT;
+
+  (void)mediator;
+  return H039_DIAG_IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT;
+}
+
+static int installer_main(int argc,char **argv){
+  if(argc!=2)return H039_DIAG_MAIN_ARGC;
+  if(!argv)return H039_DIAG_MAIN_ARGV_POINTER;
+  if(!argv[0])return H039_DIAG_MAIN_ARGV0;
+  if(!argv[1])return H039_DIAG_MAIN_ARGV1;
+  if(strcmp(argv[1],"bootstrap"))return H039_DIAG_MAIN_OPERATION;
+  return installer_bootstrap(argc,argv);
+}
+#else
 static int installer_bootstrap(int argc,char **argv){
   if(close(0)!=0)return 1;errno=0;if(fcntl(0,F_GETFD)!=-1||errno!=EBADF)return 1;if(!close_bootstrap_descriptors())return 1;if(argc!=2||!argv||!argv[0]||strcmp(argv[1],"bootstrap")||getuid()!=0||geteuid()!=0||getgid()!=0||getegid()!=0)return 1;char initial[4096];uint32_t cap=4096;if(_NSGetExecutablePath(initial,&cap)||!canonical_absolute(initial)||strcmp(initial,NS "/.install/controller/runtime-cleanup/install")||strcmp(argv[0],initial))return 1;static char*empty[]={NULL};environ=empty;if(chdir("/"))return 1;umask(077);char self_path[4096];struct stat self;int self_parent=-1,controller=-1,project=-1;unsigned char*mediator=NULL;size_t mediator_n=0;int result=1;if(!loaded_self(self_path,&self,&self_parent)||strcmp(self_path,initial)||self.st_uid!=0||self.st_gid!=0||(self.st_mode&07777)!=0500||self.st_nlink!=1)goto done;if(!load_embedded_mediator(&mediator,&mediator_n))goto done;controller=parent_dir(self_parent,0,0,0700);if(controller<0)goto done;project=parent_dir(controller,0,0,0700);if(project<0||!validate_bootstrap_staging(project,&self))goto done;result=!apply_install(project,mediator,mediator_n);
 done:if(project>=0)close(project);if(controller>=0)close(controller);if(self_parent>=0)close(self_parent);free(mediator);return result;
@@ -587,6 +943,7 @@ done:if(project>=0)close(project);if(controller>=0)close(controller);if(self_par
 static int installer_main(int argc,char **argv){
   if(argc!=2||!argv||!argv[0])return 1;if(!strcmp(argv[1],"verify")){unsigned char*embedded=NULL;size_t embedded_n=0;if(!load_embedded_mediator(&embedded,&embedded_n))return 1;int result=installer_verify(embedded,embedded_n);free(embedded);return result;}if(!strcmp(argv[1],"bootstrap"))return installer_bootstrap(argc,argv);return 1;
 }
+#endif
 #endif
 
 int main(int argc,char **argv){
