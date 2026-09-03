@@ -4977,3 +4977,29 @@ exact source and reject removal, substitution, addition, broader prefix and the
 existing caller-selected-path mutant. The exact source/IR, import and effect
 closures, four-file product scope, manual ceremony and authority are unchanged;
 a fresh product after guarded R15 publication is mandatory.
+
+## 2026-09-03 — H-039 R16/R10 diagnostic fsync polarity
+
+The published R9 diagnostic ran exactly once and returned status 86 while its
+pre/post root observations remained byte-identical at SHA-256 `dc132ef8…`.
+Source and optimized-IR inspection proved a narrow product defect: the status
+86 and status 99 branches returned when `flush_dir` succeeded even though that
+helper is true exactly when `fsync` succeeds. Exact R8 bytes were restored on
+the same protected inode and fully reauthenticated; no retry or install
+occurred.
+
+R16 starts directly from published main `0f717dbf…` and corrects only those two
+polarities with one `!` each. Connected source and IR mutants prove success
+continues, controlled failure returns exactly 86 or 99, sequence gives 86 when
+both fail, and all-success reaches code 0 only at the existing immediate
+pre-create zero-effect boundary. The status registry, every other check and
+ordering edge, imports, effects, descriptors, paths, runtime mediator and
+authority remain closed. The future R10 product changes exactly installer,
+installer-only source and identity manifest; the build recipe is also
+byte-exact to published R9.
+
+The transition remains serial: freeze, two independent gate reviews, guarded
+R16 publication, fresh R10, two independent product reviews, guarded product
+publication, then one no-retry same-inode R8-to-R10-to-R8 manual ceremony.
+Every observed result requires a new owner adjudication before production
+installation, H038/H032/H031 progress or supervisor resume.

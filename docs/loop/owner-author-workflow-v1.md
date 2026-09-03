@@ -2216,3 +2216,32 @@ gate reviews, guarded R15 contract publication, then one fresh four-file R9
 product directly from that published contract merge. The rejected `710e3c0d…`
 product is not rebased, amended or adopted. No root execution, installation,
 H038 progress, dependency credit or supervisor resume occurs in R15.
+
+## H-039 R16/R10 diagnostic fsync-polarity correction
+
+Published R9 main `0f717dbf8b729173413524ae032eff8e0a777a1e`, tree
+`e5d2399157385b78e5fd8d2ed3874d1121c3fe5b`, is the sole R16 authority
+base. The one permitted R9 diagnostic returned status 86 and its complete
+pre/post observations were byte-identical at SHA-256 `dc132ef8e…`; exact R8
+was then restored on the same protected inode and fully reauthenticated. There
+is no diagnostic retry.
+
+R16 changes only two proven inverted predicates. `flush_dir(fd)` remains true
+exactly when `fsync(fd)` returns zero, so status 86
+`STAGING_RUNTIME_FSYNC` and status 99 `DATABASE_FSYNC` return only on
+`!flush_dir(...)`. The raw outcome matrix is `(0,0)->0`, `(-1,0)->86`,
+`(0,-1)->99`, and `(-1,-1)->86`; exact optimized IR must independently bind
+each success edge to continuation and each failure edge to its existing status.
+Code 0 remains only the immediate pre-create zero-effect boundary. Every other
+status, check order, import, effect, descriptor rule, fixed path, authority and
+lifecycle remains unchanged.
+
+After R16 freeze, two independent gate reviews and guarded contract
+publication, a fresh R10 product may modify exactly the existing installer,
+installer-only source and identity manifest. The build recipe and runtime
+mediator remain byte-exact to published R9. Two independent product reviews and
+guarded product publication precede a new strict manual same-inode
+R8-to-R10-to-R8 ceremony. It executes the diagnostic exactly once with no
+retry, proves full zero effect, restores exact R8, and always ends at mandatory
+owner adjudication. Production installation, H038/H032/H031 progress and
+supervisor resume remain stopped until that adjudication.
