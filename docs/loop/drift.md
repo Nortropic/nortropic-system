@@ -4886,3 +4886,77 @@ zero residue. Generic later N2 remains replay.
 All other phase, nonce, record, predecessor, namespace and receipt-temp
 coexistence mutants reject. Authority advances only to R4 `287c7436…`; no
 product, registry, install, path or broader OS authority changes.
+## 2026-09-03 — H-039 R14-R2/R9 exact-reference root-bootstrap diagnosis
+
+The guarded R13 contract and R8 product are published at `b9d006e3…` and
+`4bd4257e…`. The exact first R8 bootstrap returned status 1. Independent full
+read-only observations before and after it are byte-identical, size 10489 and
+SHA-256 `cd9aa26e88d9f400640251e75fd559000fe722ea9415542b7d52f78c275a9d0c`;
+the protected installer remains the same inode, root:wheel 0500, exact R8 bytes,
+with no `.install/mediator`, final helper or runtime layout. The published image
+collapses all pre-effect branches to status 1, so the exact failing predicate is
+not observable and another R8 execution is forbidden.
+
+The owner authorizes a diagnostic trust transition, not an installation or an
+authority expansion. Frozen R14-R1 `1ac9e788…` is immutable NO-CREDIT and a
+nonparent after both independent reviews reproduced noncausal exit-code and
+effect-authority bypasses plus an incomplete post-root state transition. R14-R2
+starts fresh from exact `4bd4257e…` and freezes an exact, distinct bounded exit-code registry for
+the sequential fd, invocation, identity, embedded-image, protected-parent,
+staging, namespace and helper preflight predicates through the boundary immediately
+before first persistent mediator creation. R9 may change only the existing four
+installer-related files; the runtime mediator stays byte-exact. The sole accepted
+source is the deterministic byte-exact published-R8 transform containing one
+frozen diagnostic branch. Its recipe adds only the diagnostic define and
+`-Wno-unused-function`; its undefined imports are an exact closed set. Macro,
+function-pointer, inline-assembly, raw-syscall, caller-path, environment,
+root-only and dead-decoy alternatives therefore cannot pass by syntax variation.
+The actual path closes fd0 and proves `EBADF`, closes exact fd1/fd2 and proves an
+empty inventory before filesystem access, uses only existing fixed read-only and
+stability primitives, emits nothing and cannot reach the installer effect graph.
+Early/reversed/rotated/combined/dead codes and return 126 reject.
+
+`--published` remains the pre-root product/publication validation and does not
+claim diagnostic completion. After guarded contract and diagnostic-product publication, the root ceremony may
+same-inode-stage, authenticate and execute the diagnostic exactly once. Complete
+root observations must prove zero effect. A separate fail-closed `--post-root`
+phase consumes only four fixed canonical evidence files and binds exact built-in
+types, published product identity, execution count one, exact 0..125 code/name,
+empty output and byte-identical pre/post snapshots. The exact published R8 bytes
+must then be same-inode restored and fully reauthenticated; path substitution,
+type/equality proxies, phase skipping, effect or resume reject before status can route
+a later owner decision. No production install, H-038 transition or supervisor
+resume occurs in R14/R9.
+## 2026-09-03 — H-039 R14-R3 compiled reachability and no machine post-root credit
+
+R14-R2 `363f7d7a…` is immutable NO-CREDIT and a nonparent. Independent review
+proved that caller-authored and symlinked fixed-name evidence could earn its
+post-root PASS, that `clang -O2` removed diagnostic statuses 28, 29, and 66,
+and that diagnostic `umask` exceeded the owner's exhaustive read-only primitive
+set. R14-R3 therefore starts directly from published `4bd4257e…`, retains the
+sole byte-exact source transform, removes `umask`, and freezes the exact
+optimized LLVM IR/control-flow image with all statuses 0..125 retained.
+
+All automatic post-root validation and credit is removed. Published validation
+is pre-root product-publication-only. The later one-shot root observation and
+same-inode R8 restoration are a manual owner ceremony, always ending at
+`OWNER_ADJUDICATION_STOP`. uid501 cannot establish historical execution count
+after zero-effect restoration; transcripts remain workflow reports only. No
+product, root effect, installation, H038 advance, supervisor resume, or broader
+authority is introduced by this contract iteration.
+## 2026-09-03 — H-039 R14-R4 owning-CFG reachability clarification
+
+Both independent reviews rejected frozen R14-R3 `35a7e56f…`: statuses 28 and
+29 were retained local handler returns but were dominated by main's validated
+fixed call, so not every status was executable from process entry. Further
+analysis identified the same defense-in-depth class for known examples 18, 19,
+and 62. R14-R4 starts freshly from published `4bd4257e…` and treats R1–R3 as
+immutable NO-CREDIT nonparents.
+
+The exact source, optimized IR, and 0..125 registry remain unchanged. Credit is
+for one predicate-local return per existing check in its owning CFG, not global
+semantic reachability. Main owns 1..5, the handler owns 6..125, and 0 is solely
+the pre-create boundary. The gate binds the single direct main call and its
+dominating fixed validated arguments and rejects manufactured reachability.
+Contradictory observed codes require owner stop. No authority or lifecycle
+boundary changes.
