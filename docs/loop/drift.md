@@ -4960,3 +4960,20 @@ the pre-create boundary. The gate binds the single direct main call and its
 dominating fixed validated arguments and rejects manufactured reachability.
 Contradictory observed codes require owner stop. No authority or lifecycle
 boundary changes.
+
+## 2026-09-03 — H-039 R15 diagnostic literal-set composition correction
+
+The frozen R14 contract itself generated the exact diagnostic source SHA-256
+`c99e69e7…`, size 117449, but its shared absolute-literal checker compared both
+published R8 and diagnostic sources with R8's 15-member set. The diagnostic's
+fixed read-only parent literal `/.install/controller/runtime-cleanup` was
+therefore rejected as the sole extra member. Product candidate `710e3c0d…`,
+tree `1fd09c2f…`, is immutable NO-CREDIT and a sibling nonparent.
+
+R15 starts directly from published R14 merge `d337f33d…`, tree `6b6433ac…`.
+It retains the exact R8 15-member set and defines the diagnostic set as exactly
+that set plus the one mandated parent literal. Connected selftests accept the
+exact source and reject removal, substitution, addition, broader prefix and the
+existing caller-selected-path mutant. The exact source/IR, import and effect
+closures, four-file product scope, manual ceremony and authority are unchanged;
+a fresh product after guarded R15 publication is mandatory.

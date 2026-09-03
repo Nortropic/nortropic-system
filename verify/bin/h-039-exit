@@ -1,5 +1,5 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""Frozen H-039 R14 exit-code-only root-bootstrap diagnostic gate.
+"""Frozen H-039 R15 exit-code-only root-bootstrap diagnostic gate.
 
 No arguments execute pre-product RED while re-reviewing exact published R8 bytes
 and the owner-recorded zero-effect state. ``--product`` reviews one fresh R9
@@ -43,12 +43,14 @@ H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
 
-CONTRACT_AUTHORITY_BASE = "4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd"
-CONTRACT_AUTHORITY_TREE = "faad7bb5c823e89fc49928f3da5e4abcaf18dbe2"
+CONTRACT_AUTHORITY_BASE = "d337f33d2f6a2041fb2403479faaae4de2266cb7"
+CONTRACT_AUTHORITY_TREE = "6b6433ace449a926dde255c8c00b33ff4842718d"
 CONTRACT_AUTHORITY_PARENTS = [
-    "b9d006e3be10679df7c4d5525f5ab6ace83ae192",
-    "936344abd31c27ae50171b94beac8e2afdfeba3d",
+    "4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd",
+    "90ab5983fdb33fac745517d988de7c4604d85ca0",
 ]
+REJECTED_R14_DIAGNOSTIC_CANDIDATE = "710e3c0db8d6e534cc657be11745f58d2c8ca671"
+REJECTED_R14_DIAGNOSTIC_TREE = "1fd09c2fe469da78538264762866d2bfae98290e"
 PUBLISHED_H039_R5_PRODUCT_MERGE = "f190cc575f36e6fe97f84b3e1810ca92d7d13401"
 PUBLISHED_H039_R5_PRODUCT_TREE = "1e8d0e7d31f2745bada3a5aeded69a1eecbf7fba"
 PUBLISHED_H039_R5_PRODUCT_PARENTS = [
@@ -78,6 +80,7 @@ PUBLISHED_H039_R7_PRODUCT_BLOBS = {
 PUBLISHED_H039_R8_CONTRACT_MERGE = "b9d006e3be10679df7c4d5525f5ab6ace83ae192"
 PUBLISHED_H039_R8_PRODUCT_CANDIDATE = "936344abd31c27ae50171b94beac8e2afdfeba3d"
 PUBLISHED_H039_R8_PRODUCT_MERGE = "4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd"
+R13_CONTRACT_AUTHORITY = PUBLISHED_H039_R8_PRODUCT_MERGE
 PUBLISHED_H039_R8_PRODUCT_TREE = "faad7bb5c823e89fc49928f3da5e4abcaf18dbe2"
 PUBLISHED_H039_R8_PRODUCT_PARENTS = [
     PUBLISHED_H039_R8_CONTRACT_MERGE,
@@ -814,11 +817,14 @@ NATIVE_ABSOLUTE_STRINGS = {
     "Versions/3.12/Resources/Python.app/Contents/MacOS/Python",
     "/a/%s/h/l", "/a/%s/h/r", "/a/%s/p/c",
 }
+R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
+    "/.install/controller/runtime-cleanup",
+}
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
 REASON = "H039_R14_R9_DIAGNOSTIC_PRODUCT_ABSENT_MANUAL_CEREMONY_NEVER_MACHINE_CREDITABLE"
 FAILURE_SIGNATURE = [
     "EXACT_PUBLISHED_R8_FOUR_CHANGED_PRODUCT_AND_RUNTIME_MEDIATOR_BYTES_PRESENT",
-    "PUBLISHED_R8_MAIN_4BD4257E_IS_THE_EXACT_R14_AUTHORITY_BASE",
+    "PUBLISHED_R14_CONTRACT_D337F33D_IS_THE_EXACT_R15_AUTHORITY_BASE_AND_RETAINS_R8",
     "OWNER_RECORDED_R8_BOOTSTRAP_RC1_AND_BYTE_IDENTICAL_PRE_POST_TRANSCRIPTS_PROVE_ZERO_EFFECT",
     "FRESH_R9_FOUR_FILE_EXIT_CODE_DIAGNOSTIC_NOT_YET_PUBLISHED",
     "EXACT_0_TO125_LOGICAL_PREDICATE_REGISTRY_AND_MUTATOR_FREE_CALLGRAPH_REQUIRED",
@@ -828,7 +834,7 @@ FAILURE_SIGNATURE = [
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "f726a0401ed0d26c864ead9fd6a81ecd457e147ae273325172834a272fa608bd"
+EXPECTED_H039_ROW_SHA256 = "122ef0c474194aa23c2da40eba763ed7228b5ffdc28dec8d85e7e55baed1e686"
 
 passed = 0
 failed = 0
@@ -1010,6 +1016,14 @@ def static_contract_checks() -> dict[str, Any]:
           "A_H039_AUTHORITY_BASE_TREE")
     check(commit_parents(CONTRACT_AUTHORITY_BASE) == CONTRACT_AUTHORITY_PARENTS,
           "A_H039_AUTHORITY_BASE_ORDERED_PARENTS")
+    check(
+        object_type(REJECTED_R14_DIAGNOSTIC_CANDIDATE) == "commit"
+        and commit_tree(REJECTED_R14_DIAGNOSTIC_CANDIDATE)
+        == REJECTED_R14_DIAGNOSTIC_TREE
+        and commit_parents(REJECTED_R14_DIAGNOSTIC_CANDIDATE)
+        == [CONTRACT_AUTHORITY_BASE],
+        "A_H039_R15_REJECTED_R14_PRODUCT_IMMUTABLE_NO_CREDIT_IDENTITY",
+    )
     check(object_type(PUBLISHED_H036_PRODUCT_MERGE) == "commit",
           "A_H039_PUBLISHED_H036_PRODUCT_MERGE_EXISTS")
     check(
@@ -1092,6 +1106,16 @@ def static_contract_checks() -> dict[str, Any]:
         type(diagnostic) is dict
         and diagnostic.get("authority_base") == CONTRACT_AUTHORITY_BASE
         and diagnostic.get("authority_tree") == CONTRACT_AUTHORITY_TREE
+        and diagnostic.get("rejected_r14_diagnostic_candidate")
+        == REJECTED_R14_DIAGNOSTIC_CANDIDATE
+        and diagnostic.get("rejected_r14_diagnostic_tree")
+        == REJECTED_R14_DIAGNOSTIC_TREE
+        and diagnostic.get("published_r8_absolute_path_literals")
+        == sorted(NATIVE_ABSOLUTE_STRINGS)
+        and diagnostic.get("diagnostic_absolute_path_literals")
+        == sorted(R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS)
+        and diagnostic.get("diagnostic_only_absolute_path_literal")
+        == "/.install/controller/runtime-cleanup"
         and diagnostic.get("published_r8_candidate")
         == PUBLISHED_H039_R8_PRODUCT_CANDIDATE
         and diagnostic.get("published_r8_installer_sha256")
@@ -1238,6 +1262,16 @@ def r14_registry_selftests(row: dict[str, Any]) -> None:
             and value.get("diagnostic_source_sha256")
             == R14_DIAGNOSTIC_SOURCE_SHA256
             and value.get("diagnostic_source_size") == R14_DIAGNOSTIC_SOURCE_SIZE
+            and value.get("rejected_r14_diagnostic_candidate")
+            == REJECTED_R14_DIAGNOSTIC_CANDIDATE
+            and value.get("rejected_r14_diagnostic_tree")
+            == REJECTED_R14_DIAGNOSTIC_TREE
+            and value.get("published_r8_absolute_path_literals")
+            == sorted(NATIVE_ABSOLUTE_STRINGS)
+            and value.get("diagnostic_absolute_path_literals")
+            == sorted(R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS)
+            and value.get("diagnostic_only_absolute_path_literal")
+            == "/.install/controller/runtime-cleanup"
             and value.get("diagnostic_optimized_ir_sha256") == R14_DIAGNOSTIC_IR_SHA256
             and value.get("diagnostic_optimized_ir_size") == R14_DIAGNOSTIC_IR_SIZE
             and value.get("compiled_cfg_interpretation") == R14_CFG_INTERPRETATION
@@ -1275,6 +1309,12 @@ def r14_registry_selftests(row: dict[str, Any]) -> None:
             "reference_source_transform", "SEMANTICALLY_EQUIVALENT_SOURCE")),
         ("REFERENCE_DIGEST_CHANGED", lambda value: value.__setitem__(
             "diagnostic_source_sha256", "00" * 32)),
+        ("REJECTED_PRODUCT_ADOPTED", lambda value: value.__setitem__(
+            "rejected_r14_diagnostic_candidate", CONTRACT_AUTHORITY_BASE)),
+        ("DIAGNOSTIC_LITERAL_REMOVED", lambda value: value[
+            "diagnostic_absolute_path_literals"].pop()),
+        ("DIAGNOSTIC_LITERAL_BROADENED", lambda value: value.__setitem__(
+            "diagnostic_only_absolute_path_literal", "/.install/controller")),
         ("IR_DIGEST_CHANGED", lambda value: value.__setitem__(
             "diagnostic_optimized_ir_sha256", "00" * 32)),
         ("IR_SIZE_CHANGED", lambda value: value.__setitem__(
@@ -2003,7 +2043,7 @@ def r13_preeffects_migration_fixture(
     return {
         "phase": phase,
         "published_r7_product": PUBLISHED_H039_R7_PRODUCT_MERGE,
-        "r13_contract_authority": CONTRACT_AUTHORITY_BASE,
+        "r13_contract_authority": R13_CONTRACT_AUTHORITY,
         "protected_chain": {
             key: copy.deepcopy(value)
             for key, value in R13_PRESERVED_R7_PRE_EFFECTS.items()
@@ -8192,6 +8232,72 @@ def native_absolute_strings(source: str) -> set[str]:
     ))
 
 
+def exact_native_absolute_literal_authority(
+    source: str, *, diagnostic_product: bool,
+) -> bool:
+    expected = (
+        R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS
+        if diagnostic_product else NATIVE_ABSOLUTE_STRINGS
+    )
+    return native_absolute_strings(source) == expected
+
+
+def r15_native_absolute_literal_oracle_selftests() -> None:
+    def fixture(values: set[str]) -> str:
+        return "\n".join(
+            f'static const char *h039_path_{index}="{value}";'
+            for index, value in enumerate(sorted(values))
+        )
+
+    diagnostic_fixture = fixture(R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS)
+    r8_fixture = fixture(NATIVE_ABSOLUTE_STRINGS)
+    check(
+        exact_native_absolute_literal_authority(
+            diagnostic_fixture, diagnostic_product=True,
+        )
+        and exact_native_absolute_literal_authority(
+            r8_fixture, diagnostic_product=False,
+        ),
+        "A_H039_R15_CAUSAL_EXACT_15_AND_16_LITERAL_SETS",
+    )
+    required = "/.install/controller/runtime-cleanup"
+    mutants = {
+        "REMOVED": R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS - {required},
+        "SUBSTITUTED": (
+            R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS - {required}
+        ) | {"/.install/controller/runtime-cleanup-substitute"},
+        "ADDED": R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS | {"/tmp/h039-added"},
+        "BROADER_PREFIX": (
+            R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS - {required}
+        ) | {"/.install/controller"},
+    }
+    for label, values in mutants.items():
+        check(
+            not exact_native_absolute_literal_authority(
+                fixture(values), diagnostic_product=True,
+            ),
+            f"N_H039_R15_CAUSAL_LITERAL_MEMBERSHIP_{label}",
+        )
+
+    source = r14_expected_diagnostic_source()
+    caller_selected = source.replace(
+        b"if(close(0)!=0)",
+        b"if(open(argv[1],O_RDONLY)<0||close(0)!=0)", 1,
+    )
+    literal_set_unchanged = exact_native_absolute_literal_authority(
+        caller_selected.decode("utf-8"), diagnostic_product=True,
+    )
+    rejected = False
+    try:
+        r14_diagnostic_source_checks(caller_selected)
+    except Rig:
+        rejected = True
+    check(
+        literal_set_unchanged and rejected,
+        "N_H039_R15_CALLER_SELECTED_PATH_REJECTED_BY_EXACT_SOURCE",
+    )
+
+
 def r14_diagnostic_fragment() -> bytes:
     assignments = ",\n".join(
         f"  H039_DIAG_{name} = {code}" for code, name in R14_EXIT_CODES
@@ -8505,12 +8611,27 @@ def r14_diagnostic_source_oracle_selftests() -> None:
 
     def rejected(value: bytes) -> bool:
         try:
+            decoded = value.decode("utf-8")
+            if not exact_native_absolute_literal_authority(
+                decoded, diagnostic_product=True,
+            ):
+                raise Rig("diagnostic native absolute literal authority mismatch")
             r14_diagnostic_source_checks(value)
-        except Rig:
+        except (Rig, UnicodeError):
             return True
         return False
 
-    check(not rejected(source), "A_H039_R14_R4_EXACT_REFERENCE_SOURCE_ANCHOR")
+    check(not rejected(source), "A_H039_R15_EXACT_REFERENCE_SOURCE_AND_LITERAL_SET")
+    check(
+        exact_native_absolute_literal_authority(
+            blob(
+                PUBLISHED_H039_R8_PRODUCT_MERGE,
+                "controller/runtime-cleanup/native/mediator.c",
+            ).decode("utf-8"),
+            diagnostic_product=False,
+        ),
+        "A_H039_R15_LEGACY_R8_LITERAL_SET_UNCHANGED",
+    )
     marker = b"return H039_DIAG_IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT;"
     mutations = {
         "CODE0_BEFORE_ACTUAL_BOUNDARY": source.replace(
@@ -8572,11 +8693,28 @@ def r14_diagnostic_source_oracle_selftests() -> None:
             b"if(chdir(\"/\"))return H039_DIAG_CHDIR_ROOT;",
             b"umask(077);if(chdir(\"/\"))return H039_DIAG_CHDIR_ROOT;", 1,
         ),
+        "ABSOLUTE_LITERAL_REMOVED": source.replace(
+            b'NS "/.install/controller/runtime-cleanup"',
+            b'NS ""', 1,
+        ),
+        "ABSOLUTE_LITERAL_SUBSTITUTED": source.replace(
+            b'NS "/.install/controller/runtime-cleanup"',
+            b'NS "/.install/controller/runtime-cleanup-substitute"', 1,
+        ),
+        "ABSOLUTE_LITERAL_ADDED": source.replace(
+            b"static int installer_main",
+            b'static const char *h039_added_path="/tmp/h039-added";\n'
+            b"static int installer_main", 1,
+        ),
+        "ABSOLUTE_LITERAL_BROADER_PREFIX": source.replace(
+            b'NS "/.install/controller/runtime-cleanup"',
+            b'NS "/.install/controller"', 1,
+        ),
     }
     for label, mutant in mutations.items():
         if mutant == source:
             raise Rig(f"noncausal R14-R4 source mutant: {label}")
-        check(rejected(mutant), f"N_H039_R14_R4_SOURCE_{label}")
+        check(rejected(mutant), f"N_H039_R15_SOURCE_{label}")
 
 def immutable_source_checks(
     commit: str | None = None, *, diagnostic_product: bool = False,
@@ -8619,8 +8757,9 @@ def immutable_source_checks(
         raise Rig("forbidden native capability token")
     if any(token not in semantic_source for token in required):
         raise Rig("required native primitive token absent")
-    absolute_strings = native_absolute_strings(source)
-    if absolute_strings != NATIVE_ABSOLUTE_STRINGS:
+    if not exact_native_absolute_literal_authority(
+        source, diagnostic_product=diagnostic_product,
+    ):
         raise Rig("native absolute path literal authority is not exact closed set")
     if (
         re.search(
@@ -11091,6 +11230,7 @@ def main(argv: list[str]) -> int:
         row = static_contract_checks()
         contract_selftests(row)
         r14_registry_selftests(row)
+        r15_native_absolute_literal_oracle_selftests()
         r14_diagnostic_source_oracle_selftests()
         causal_oracle_selftests()
         seatbelt_profile_selftests()
