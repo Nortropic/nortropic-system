@@ -854,7 +854,7 @@ __attribute__((noinline,used)) int installer_bootstrap(int argc,char **argv){
   if(stable_self<0)return H039_DIAG_STAGING_STABLE_SELF;
   if(!same_stat(&self,&named))return H039_DIAG_STAGING_SELF_IDENTITY_EQUALITY;
   if(fsync(stable_self))return H039_DIAG_STAGING_SELF_FSYNC;
-  if(flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;
+  if(!flush_dir(staging_runtime))return H039_DIAG_STAGING_RUNTIME_FSYNC;
   struct stat stable_after;
   if(fstat(stable_self,&stable_after))return H039_DIAG_STAGING_SELF_POST_FSYNC_FSTAT;
   if(!same_stat(&named,&stable_after))return H039_DIAG_STAGING_SELF_SAME_STAT;
@@ -874,7 +874,7 @@ __attribute__((noinline,used)) int installer_bootstrap(int argc,char **argv){
   struct stat database_stat;
   if(database<0||fstat(database,&database_stat)||!S_ISDIR(database_stat.st_mode)||database_stat.st_uid!=0||database_stat.st_gid!=0||(database_stat.st_mode&07777)!=0755)return H039_DIAG_DATABASE_PARENT;
   if(fsync(ns))return H039_DIAG_NAMESPACE_FSYNC;
-  if(flush_dir(database))return H039_DIAG_DATABASE_FSYNC;
+  if(!flush_dir(database))return H039_DIAG_DATABASE_FSYNC;
   struct stat namespace_after;
   if(fstat(ns,&namespace_after))return H039_DIAG_NAMESPACE_POST_FSYNC_FSTAT;
   if(!same_stat(&namespace_stat,&namespace_after))return H039_DIAG_NAMESPACE_POST_FSYNC_SAME_STAT;
