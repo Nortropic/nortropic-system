@@ -5030,3 +5030,44 @@ reject. R10 remains consumed and may never be restaged or rerun. Root bootstrap,
 post-observation and installed execution remain strictly after dual review and
 guarded R17 publication, and any nonzero, ambiguous or partial result stops
 without retry or expanded cleanup authority.
+
+## 2026-09-04 — H-039 R18/R11 production flush polarity
+
+The authorized R8 production bootstrap returned status 1 and changed no
+observed root byte (`91c78194…` before and after). The frozen product source
+shows exactly four production failure conjunctions treating successful
+`flush_dir` as failure among 21 sites. R18 starts from published `6481abc1…`,
+records all sites, and admits exactly one logical negation at each of the four
+inverted predicates. Four connected state-family controls distinguish fsync
+success from failure before the next mutation.
+
+R18-R1 `1d73a79c…` / tree `19018dd3…` is immutable NO-CREDIT and a
+nonparent after both independent reviews proved that its four claimed controls
+were never executed, its mutant oracle was vacuous behind whole-image equality,
+and its new compiler dependency leaked into historical lanes. Fresh R18-R2 is
+again based directly on `6481abc1…`. Each complete registered owning function
+and target expression is extracted and compiled by the pinned compiler. Explicit
+fresh-prefix0, complete-0400, prefix5-with-lock and remove-staging states run the
+real function body under deny-default installer Seatbelt for raw fsync 0 and -1;
+reverted and doubled full-function variants must fail both expected outcomes.
+Fresh-prefix0 success must also cross the namespace name/rebind checks, observe
+exact prefix 0 with no lock, and reach the mocked first effect-capable call with
+zero recorded effects; failure must stop before each of those observations.
+All 21 sites are correlated to actual function order, call argument and
+polarity, and per-target moved-negation mutants reject. These compiler/causal
+checks are phase-closed to preproduct and explicit R18 product, publication and
+installed lanes. Historical R16/R10 and R17/R8 dispatch does not invoke them.
+
+The R11 source remains the current R10 wrapper plus those four bytes. Its recipe
+returns exactly to published R8 SHA-256 `82ca604e…` by removing only the two
+diagnostic argv entries; this must erase the diagnostic branch from
+preprocessed source, optimized IR and the final installer. Only the rebuilt
+installer and minimal manifest may otherwise differ, while the runtime mediator
+remains SHA-256 `6c2f2dbe…`. The final installer check is only a manifest-bound
+production-branch exclusion composed with exact product identity and
+reproducible rebuild, not an independent whole-binary equality claim. Freeze,
+dual gate review, guarded contract
+publication, fresh product, dual product review and guarded product publication
+are serial. No root action occurs before them; afterward there is at most one
+same-inode no-retry R11 bootstrap. R10 remains permanently consumed and
+supervisor resume remains forbidden.
