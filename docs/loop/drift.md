@@ -5107,3 +5107,14 @@ review calls instead require the exact published root:wheel 04555 mediator,
 bind its full identity and digest, and prove that helper and namespace identity
 are unchanged across the unprivileged deny-default review. Historical lanes
 retain the absent-helper rule; no root or product effect is added.
+
+BUILDER falsification then proved published R19 `95edbe75…` unsatisfiable as
+written: globally replacing `exact_names` makes the unchanged recipe rebuild a
+runtime mediator with SHA-256 `08e1cb90…`, not frozen `6c2f2dbe…`. No R12
+candidate was frozen. R19-R3 remains a five-file TEST_AUTHOR child of the
+published contract. Its exact source replacement is conditional only on the
+already frozen `H039_INSTALLER` build role: installer selection is the reviewed
+fixed-dot independent-cursor function, while non-installer selection is the
+byte-exact published R11 function. Global, both-old, both-corrected, swapped and
+missing-guard variants reject, and the unchanged recipe must reproducibly emit
+the frozen runtime mediator before product credit.
