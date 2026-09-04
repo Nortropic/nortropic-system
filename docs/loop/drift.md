@@ -5003,3 +5003,30 @@ R16 publication, fresh R10, two independent product reviews, guarded product
 publication, then one no-retry same-inode R8-to-R10-to-R8 manual ceremony.
 Every observed result requires a new owner adjudication before production
 installation, H038/H032/H031 progress or supervisor resume.
+
+## 2026-09-04 — H-039 R17 current-publication installed-effect completion
+
+Published R16/R10 main `931e58f4…` retained the complete historical R8
+installed-effect implementation, but dispatch exposed only no-argument,
+`--product` and `--published` lanes. The historical R8 `--installed` lane could
+not legitimately be replayed because its publication check required live main,
+HEAD, gate and spec to remain at old merge `4bd4257e…`. A production bootstrap
+would therefore have created durable root effects without a current
+publication-bound completion gate. Work stopped before root execution.
+
+R17 repairs only that representability gap. A distinct R17 oracle binds a fresh
+five-file TEST_AUTHOR candidate and later two-parent merge to base `931e58f4…`,
+live authenticated main, clean HEAD and executing contract bytes. A separate
+historical oracle binds exact R8 merge `4bd4257e…`, parents, tree, four-file
+change and all product digests. Neither the existing R16/R10 identity functions
+nor any product byte changes. Identity failures short-circuit before installed
+inspection or effect.
+
+The four existing installed-engine functions are byte-compared with published
+`931e58f4…`; the one authorized uid501/gid20 effect execution additionally
+requires receipt sequence zero before entry and exactly thirteen after success.
+R9/R10, stale publication, aliases, substitutions and broader product identities
+reject. R10 remains consumed and may never be restaged or rerun. Root bootstrap,
+post-observation and installed execution remain strictly after dual review and
+guarded R17 publication, and any nonzero, ambiguous or partial result stops
+without retry or expanded cleanup authority.
