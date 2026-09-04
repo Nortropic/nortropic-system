@@ -2410,3 +2410,54 @@ reviewed independent-cursor body; runtime preprocessing must select exact R11
 Global, reversed, duplicated, old-only, corrected-only and unguarded forms
 reject. R12 remains exactly three product files and cannot grant installed
 credit; R20 and every no-retry/root prohibition remain unchanged.
+
+## H-039 R20/R12 installed-effect completion
+
+Guarded R12 product merge `09537f74d7727544fb1d28c3540774c099a3488c`,
+tree `093789676a3d55dc3802e0e05358914a5d8120cc`, is the sole R20 base.
+R20 is productless and may modify only the same five TEST_AUTHOR contract
+files. Its candidate must be a clean direct child of that merge; guarded
+publication must retain the candidate tree and exact ordered parents.
+
+Frozen R20-R1 `27ad790442a69c1aa2f15d158850c1361376321c7`, tree
+`f6c9dbec3958f165094291486b54a6b3042abba7`, is immutable NO-CREDIT and a
+nonparent. Its formal gate correctly rejected a redundant invocation of the
+R19 cursor causal suite from the new installed lane because that suite is
+phase-scoped to preproduct and the explicit R19 product/publication lanes.
+Fresh R20-R2 removes only that redundant invocation; fixed R12 product
+identity, reproducible build checks and both earlier product reviews remain
+mandatory before installed effects.
+
+Frozen R20-R2 `00af76ebd03d7ee5a1176a7f5068f22a2a5f403f`, tree
+`3f26242ce32093d400a520266a11d8187dce377a`, is also immutable NO-CREDIT and
+a nonparent. Its first host-formal attempt was environment-blocked at the
+outer-Seatbelt boundary, but had already recorded that the updated R20 material
+review string in the spec diverged from the gate's frozen literal. Fresh
+R20-R3 starts again directly from `09537f74…` and changes only that binding plus
+the exact no-credit records; no root or product effect occurred.
+
+Frozen R20-R3 `10b3dc57155a6a771e17b35689ac3a125a1d8dde`, tree
+`f1540218918f81953f8435693ff11474dc1c32b9`, is immutable NO-CREDIT and a
+nonparent after its complete host run returned 91485 PASS / 3 FAIL: the sole
+intended operational RED and exactly two checks of the same stale preproduct
+failure-signature literal. Fresh R20-R4 starts from `09537f74…`, synchronizes
+that literal and requires the entire static contract/selftest layer to pass
+before freeze.
+
+The only new runtime form is `--r20-installed <published-R20-contract>
+09537f74d7727544fb1d28c3540774c099a3488c`. Before any installed-state
+inspection or effect, the gate binds current live main, clean HEAD, executing
+gate/spec bytes, the R20 publication graph, and separately the exact R12
+contract, candidate, ordered merge parents, tree, three-file product surface
+and all five product blobs. The installation/effect engine function bodies are
+byte-exact to published R12; R20 changes no product byte or authority.
+
+Freeze, two independent adversarial reviews and guarded non-force publication
+precede every root action. Only then may a separately reviewed owner-TTY
+workflow fully reauthenticate the exact partial state and protected installer
+inode, same-inode stage exact R12, and perform one no-retry recovery. The
+unprivileged installed lane starts only after successful recovery, requires
+uid501/gid20 and receipt sequence 0, advances exactly to 13, and proves zero
+runtime, process and descriptor residue. Any identity drift, output, nonzero or
+unexpected state stops for owner adjudication. R11 is never retried, R10 is
+never restaged or executed, and supervisor resume remains prohibited.

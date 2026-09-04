@@ -5118,3 +5118,43 @@ fixed-dot independent-cursor function, while non-installer selection is the
 byte-exact published R11 function. Global, both-old, both-corrected, swapped and
 missing-guard variants reject, and the unchanged recipe must reproducibly emit
 the frozen runtime mediator before product credit.
+
+## 2026-09-04 — H-039 R20/R12 current-publication installed-effect completion
+
+R19-R3 and the fresh R12 product are now guardedly published as merge
+`09537f74…`, tree `09378967…`; the publication-only gate is 91359/0. R19
+intentionally exposes no installed lane, so root recovery or effect credit
+before a new publication would be stale-authority progress.
+
+R20 changes only the five TEST_AUTHOR contract files. It binds its clean
+direct-child candidate and guarded merge to live main and executing bytes, then
+separately binds fixed R12 contract `45a6f191…`, candidate `ab77a0b2…`, merge
+parents/tree, exact three-file product change and all five product blobs. The
+four installation/effect engine bodies remain byte-exact to published R12.
+There is no new product or broader authority.
+
+Frozen R20-R1 `27ad7904…`, tree `f6c9dbec…`, is immutable NO-CREDIT and a
+nonparent. Its formal gate stopped because the installed lane redundantly
+reexecuted the R19 cursor causal suite outside that suite's closed phase set.
+R20-R2 removes only that redundant call; all exact R12 identity, rebuild,
+binary and earlier dual-review requirements remain in force.
+
+Frozen R20-R2 `00af76eb…`, tree `3f26242c…`, is likewise immutable NO-CREDIT
+and a nonparent. Before its host-formal run became environment-undecidable at
+the outer-Seatbelt boundary, the gate had recorded a static mismatch between
+the updated spec material-review extension and its frozen literal. R20-R3
+closes exactly that binding and records R2; no product, root, installed effect
+or authority change is admitted.
+
+Frozen R20-R3 `10b3dc57…`, tree `f1540218…`, is immutable NO-CREDIT and a
+nonparent after the unrestricted host run completed at 91485 PASS / 3 FAIL.
+The two failures beyond the intended RED were the contract and selftest copies
+of one stale preproduct failure signature. R20-R4 synchronizes that exact
+literal and records R3; the candidate remains a fresh direct child of
+`09537f74…` with no product or authority expansion.
+
+Only after dual review and guarded R20 publication may the exact partial state
+and protected inode be root-reauthenticated for one same-inode, no-retry R12
+recovery. The subsequent uid501/gid20 lane requires receipt sequence 0→13 and
+zero runtime/process/descriptor residue. R11 remains consumed, R10 remains
+forbidden, and any nonzero, output, drift or unexpected state is an owner stop.
