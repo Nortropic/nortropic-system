@@ -1,15 +1,18 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""Frozen H-039 R16/R10 root-bootstrap diagnostic polarity gate.
+"""Frozen H-039 R17/R8 installed-effect completion gate.
 
 No arguments execute pre-product RED while re-reviewing exact published R8 bytes
 and the owner-recorded zero-effect state. ``--product`` reviews one fresh R10
-diagnostic candidate without root effect. This Python gate never runs elevated,
-installs anything, or accepts a cleanup path, PID, command, descriptor, or effect.
+diagnostic candidate without root effect and ``--published`` preserves its exact
+pre-root publication review. Only ``--installed`` can exercise the already
+published R8 installation. This Python gate never runs elevated, installs
+anything, or accepts a cleanup path, PID, command, or caller-selected descriptor.
 """
 
 from __future__ import annotations
 
 import array
+import ast
 import copy
 import ctypes
 import errno
@@ -42,6 +45,13 @@ REGISTRY = ROOT / "specs/owner-production-paths.v1.json"
 H035_GATE = ROOT / "verify/bin/h-035-exit"
 H036_GATE = ROOT / "verify/bin/h-036-exit"
 H037_GATE = ROOT / "verify/bin/h-037-exit"
+
+R17_AUTHORITY_BASE = "931e58f48278922378948da526ebb84dcc8ecdf8"
+R17_AUTHORITY_TREE = "9d06af294688be836542e4390bb3130bbfe7fc29"
+R17_AUTHORITY_PARENTS = [
+    "1c4ef1af8d0c7db24093d5a280ead2c2492df3f3",
+    "af71bbdcc85936a1d9811461d2edc455876829d4",
+]
 
 CONTRACT_AUTHORITY_BASE = "0f717dbf8b729173413524ae032eff8e0a777a1e"
 CONTRACT_AUTHORITY_TREE = "e5d2399157385b78e5fd8d2ed3874d1121c3fe5b"
@@ -175,6 +185,12 @@ PRODUCT_PATHS = [
 PRODUCT_GIT_ORDER = [
     "controller/runtime-cleanup/install",
     "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/identity-manifest.json",
+]
+R8_PRODUCT_GIT_ORDER = [
+    "controller/runtime-cleanup/install",
+    "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/build-recipe.json",
     "verify/h039/identity-manifest.json",
 ]
 PRODUCT_MODES = {
@@ -713,6 +729,54 @@ R16_MATERIAL_REVIEW_EXTENSION = (
     "RECIPE_AND_RUNTIME_MEDIATOR_ARE_BYTE_EXACT_TO_PUBLISHED_R9_AND_ONLY_A_"
     "FRESH_DIRECT_CHILD_AFTER_GUARDED_R16_CONTRACT_PUBLICATION_CAN_RECEIVE_CREDIT"
 )
+R17_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_THE_R17_CONTRACT_IS_A_FRESH_EXACT_FIVE_FILE_"
+    "DIRECT_CHILD_OF_PUBLISHED931E58F4_AND_ITS_RUNTIME_SUPPLIED_TWO_PARENT_MERGE_"
+    "IS_CURRENT_LIVE_ORIGIN_MAIN_CLEAN_HEAD_WITH_MERGE_TREE_EQUAL_CANDIDATE_AND_"
+    "EXECUTING_GATE_SPEC_BYTES_EQUAL_THE_MERGE;_THE_INSTALLED_TARGET_IS_NOT_CALLER_"
+    "SELECTABLE_AND_IS_EXACTLY_PUBLISHED_R8_MERGE4BD4257E_WITH_ORDERED_PARENTS_"
+    "B9D006E3_AND936344AB_TREEFAAD7BB5_EXACT_FOUR_FILE_PRODUCT_CHANGE_AND_ALL_FIVE_"
+    "FROZEN_PRODUCT_BLOBS;_R9_R10_ARBITRARY_STALE_SUBSTITUTED_OR_BROADER_IDENTITIES_"
+    "REJECT_BEFORE_INSTALLATION_OR_EFFECT;_THE_EXISTING_INSTALLATION_CHECKS_FIXED_"
+    "INSTALLATION_SNAPSHOT_PRODUCT_EFFECTS_AND_GUARDED_PRODUCT_EFFECTS_FUNCTION_"
+    "BODIES_ARE_BYTE_EQUIVALENT_TO_PUBLISHED931E58F4;_THE_LIVE_UID501_GID20_LANE_"
+    "STARTS_AT_EMPTY_RECEIPT_SEQUENCE0_ADVANCES_EXACTLY13_AND_LEAVES_ZERO_RUNTIME_"
+    "PROCESS_AND_DESCRIPTOR_RESIDUE;_R16_R10_DIAGNOSTIC_LANES_STATUS_SEMANTICS_"
+    "OWNER_ADJUDICATION_AND_NO_RERUN_RULE_REMAIN_UNCHANGED_WITH_NO_NEW_PRODUCT_"
+    "ROOT_FILESYSTEM_PROCESS_NETWORK_CREDENTIAL_OR_SEATBELT_BYPASS_AUTHORITY"
+)
+R17_RECONCILIATION = (
+    "THIS_FIELD_SUPERSEDES_ONLY_R16S_MISSING_CURRENT_PUBLICATION_BOUND_INSTALLED_"
+    "EFFECT_COMPLETION_LANE;_PUBLISHED_R16_R10_MERGE931E58F4_TREE9D06AF29_IS_THE_"
+    "EXACT_R17_AUTHORITY_BASE;_ONE_FRESH_FIVE_FILE_TEST_AUTHOR_CANDIDATE_AND_ITS_"
+    "RUNTIME_SUPPLIED_GUARDED_TWO_PARENT_MERGE_ARE_BOUND_TO_LIVE_ORIGIN_MAIN_CLEAN_"
+    "HEAD_AND_EXECUTING_GATE_SPEC_BYTES;_THE_INSTALLED_PRODUCT_IS_FIXED_NOT_CALLER_"
+    "SELECTABLE_EXACT_PUBLISHED_R8_MERGE4BD4257E_PARENTSB9D006E3_936344AB_TREE_"
+    "FAAD7BB5_EXACT_FOUR_FILE_CHANGE_AND_ALL_FIVE_BLOBS;_R9_R10_ARBITRARY_STALE_"
+    "SUBSTITUTED_OR_BROADER_IDENTITIES_REJECT_BEFORE_ANY_INSTALLATION_OR_EFFECT_"
+    "CALL;_THE_EXISTING_INSTALLED_ENGINE_BODIES_REMAIN_BYTE_EQUIVALENT;_EXACT_"
+    "UID501_GID20_REVIEW_STARTS_AT_RECEIPT_SEQUENCE0_ADVANCES_EXACTLY13_AND_LEAVES_"
+    "ZERO_RUNTIME_PROCESS_DESCRIPTOR_RESIDUE;_R10_IS_NEVER_RESTAGED_OR_EXECUTED_"
+    "AGAIN_AND_NO_PRODUCT_BYTES_OR_BROADER_AUTHORITY_CHANGE"
+)
+R17_CANDIDATE_CHANGE_SHAPE = (
+    "EXACTLY_FIVE_EXISTING_M_CHANGES_WITH_UNCHANGED_MODES_AND_NO_RENAME_ADD_"
+    "DELETE_SUBSTITUTION_OR_BROADER_PREFIX"
+)
+R17_PUBLICATION_BINDING = (
+    "ORDERED_PARENTS_EXACT_AUTHORITY_BASE_AND_DIRECT_CHILD_CANDIDATE;_MERGE_"
+    "TREE_EQUALS_CANDIDATE;_BASE_TO_CANDIDATE_AND_BASE_TO_MERGE_HAVE_EXACT_"
+    "FIVE_FILE_SHAPE;_LIVE_AUTHENTICATED_ORIGIN_MAIN_EQUALS_MERGE;_CLEAN_HEAD_"
+    "EQUALS_MERGE;_ALL_FIVE_CHECKOUT_BYTES_EQUAL_MERGE_BLOBS;_EXECUTING_GATE_"
+    "AND_SPEC_EQUAL_MERGE_BLOBS"
+)
+R17_INSTALLED_ENGINE_BINDING = (
+    "BYTE_EQUIVALENT_TO_PUBLISHED_R16_R10_MERGE_931E58F4"
+)
+R17_INSTALLED_ENGINE_FUNCTIONS = [
+    "fixed_installation_snapshot", "installation_checks",
+    "product_effects", "guarded_product_effects",
+]
 R14_CFG_INTERPRETATION = (
     "EACH_EXISTING_CHECK_HAS_ONE_OPTIMIZER_RETAINED_PREDICATE_LOCAL_STATUS_IN_ITS_"
     "OWNING_COMPILED_CFG;_MAIN_OWNS1_TO5_INSTALLER_BOOTSTRAP_OWNS6_TO125_AND_CODE0_"
@@ -891,20 +955,20 @@ R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
     "/.install/controller/runtime-cleanup",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_R16_R10_POLARITY_CORRECTED_DIAGNOSTIC_PRODUCT_ABSENT"
+REASON = "H039_R17_GUARDED_COMPLETION_PUBLICATION_AND_INSTALLED_EFFECT_ABSENT"
 FAILURE_SIGNATURE = [
-    "EXACT_PUBLISHED_R9_DIAGNOSTIC_AND_RUNTIME_MEDIATOR_BYTES_PRESENT",
-    "PUBLISHED_R9_MAIN_0F717DBF_IS_THE_EXACT_R16_AUTHORITY_BASE",
-    "OWNER_RECORDED_R9_STATUS86_AND_BYTE_IDENTICAL_PRE_POST_TRANSCRIPTS_PROVE_ZERO_EFFECT",
-    "FRESH_R10_THREE_FILE_POLARITY_DIAGNOSTIC_NOT_YET_PUBLISHED",
-    "RAW_FSYNC_SUCCESS_FAILURE_POLARITY_MATRIX_AND_EXACT_O2_CFG_REQUIRED",
-    "NEW_MANUAL_ONE_SHOT_R10_DIAGNOSTIC_R8_RESTORE_AND_OWNER_STOP_REQUIRED",
+    "PUBLISHED_R16_R10_MAIN_931E58F4_IS_THE_EXACT_R17_AUTHORITY_BASE",
+    "OWNER_ADJUDICATED_R10_STATUS0_AT_IMMEDIATE_PRECREATE_ZERO_EFFECT_BOUNDARY",
+    "EXACT_PUBLISHED_R8_RESTORED_ON_PROTECTED_INODE_AND_R10_RERUN_FORBIDDEN",
+    "FRESH_R17_FIVE_FILE_TEST_AUTHOR_CONTRACT_REQUIRES_DUAL_REVIEW_AND_PUBLICATION",
+    "CURRENT_PUBLICATION_AND_HISTORICAL_R8_IDENTITIES_MUST_BOTH_PRECEDE_EFFECTS",
+    "EXACT_ONE_UID501_GID20_INSTALLED_EFFECT_MATRIX_NOT_YET_EXECUTED",
     "PATHLESS_CAPABILITY_AND_MANAGED_OPTION_A_FALSIFICATION_GREEN",
     "F_OFD_SETLK_REFERENCE_FALSIFICATION_GREEN",
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "b513b4e00d4ad97f21018efe0c617ba216cd5e0754227b514c16f2fb753de94e"
+EXPECTED_H039_ROW_SHA256 = "807a6ace1df0c13f8ab0b4fbb7f8a0d651991439fc8690f6935a609c04932d0a"
 
 passed = 0
 failed = 0
@@ -960,6 +1024,40 @@ def recovery_argv_registry() -> dict[str, Any]:
             "STAT;_EACH_EXECUTABLE_STAT_CODESIGN_VERIFY_CODESIGN_DETAIL_STAT;_"
             "EACH_DIRECTORY_STAT_FIND_P_S_X_MINDEPTH1_MAXDEPTH1_PRINT0_STAT"
         ),
+    }
+
+
+def r17_registry_expected() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "authority_base": R17_AUTHORITY_BASE,
+        "authority_tree": R17_AUTHORITY_TREE,
+        "authority_ordered_parents": R17_AUTHORITY_PARENTS,
+        "test_author_paths": TEST_AUTHOR_GIT_ORDER,
+        "candidate_change_shape": R17_CANDIDATE_CHANGE_SHAPE,
+        "installed_cli": [
+            "--installed", "RUNTIME_SUPPLIED_PUBLISHED_R17_CONTRACT_MERGE",
+            PUBLISHED_H039_R8_PRODUCT_MERGE,
+        ],
+        "publication_binding": R17_PUBLICATION_BINDING,
+        "published_r8_product_merge": PUBLISHED_H039_R8_PRODUCT_MERGE,
+        "published_r8_product_tree": PUBLISHED_H039_R8_PRODUCT_TREE,
+        "published_r8_product_ordered_parents": PUBLISHED_H039_R8_PRODUCT_PARENTS,
+        "published_r8_product_change_paths": R8_PRODUCT_GIT_ORDER,
+        "published_r8_product_blobs": PUBLISHED_H039_R8_PRODUCT_BLOBS,
+        "identity_before_effect": True,
+        "installed_engine_bodies": R17_INSTALLED_ENGINE_BINDING,
+        "required_uid": CLIENT_UID,
+        "required_gid": CLIENT_GID,
+        "initial_receipt_sequence": 0,
+        "effect_receipt_delta": 13,
+        "final_receipt_sequence": 13,
+        "zero_runtime_process_descriptor_residue": True,
+        "reject_r9_r10_arbitrary_stale_substituted_and_broader_identity": True,
+        "r10_diagnostic_reexecution_or_restage": False,
+        "workflow_evidence_grants_credit": False,
+        "new_product_bytes": False,
+        "broader_authority": False,
     }
 
 
@@ -1082,6 +1180,11 @@ def exact_contract(row: Any) -> bool:
 def static_contract_checks() -> dict[str, Any]:
     for path, digest in PINNED.items():
         check(path_sha(ROOT / path) == digest, f"A_H039_PINNED_{path.upper().replace('/', '_').replace('.', '_')}")
+    check(
+        commit_tree(R17_AUTHORITY_BASE) == R17_AUTHORITY_TREE
+        and commit_parents(R17_AUTHORITY_BASE) == R17_AUTHORITY_PARENTS,
+        "A_H039_R17_AUTHORITY_BASE_TREE_AND_ORDERED_PARENTS",
+    )
     check(commit_tree(CONTRACT_AUTHORITY_BASE) == CONTRACT_AUTHORITY_TREE,
           "A_H039_AUTHORITY_BASE_TREE")
     check(commit_parents(CONTRACT_AUTHORITY_BASE) == CONTRACT_AUTHORITY_PARENTS,
@@ -1184,6 +1287,9 @@ def static_contract_checks() -> dict[str, Any]:
     polarity = row.get("h039_os_exclusive_runtime_cleanup", {}).get(
         "r16_flush_polarity_correction", {},
     )
+    completion = row.get("h039_os_exclusive_runtime_cleanup", {}).get(
+        "r17_installed_effect_completion", {},
+    )
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -1285,6 +1391,29 @@ def static_contract_checks() -> dict[str, Any]:
         "A_H039_R16_EXACT_FLUSH_POLARITY_REGISTRY",
     )
     check(
+        exact_typed_tree(completion, r17_registry_expected()),
+        "A_H039_R17_EXACT_INSTALLED_EFFECT_COMPLETION_REGISTRY",
+    )
+    expected_red = {
+        "label": LABEL,
+        "reason": REASON,
+        "failure_signature": FAILURE_SIGNATURE,
+    }
+    check(
+        exact_typed_tree(
+            row.get("h039_os_exclusive_runtime_cleanup", {}).get(
+                "preproduct_red", {},
+            ),
+            expected_red,
+        ),
+        "A_H039_R17_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
+    )
+    check(
+        row.get("h039_r17_installed_effect_completion_reconciliation")
+        == R17_RECONCILIATION,
+        "A_H039_R17_EXACT_RECONCILIATION",
+    )
+    check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
         .get("causal_falsification", {})
         .get("material_properties_judge_only") == MATERIAL_PROPERTIES_JUDGE_ONLY
@@ -1338,6 +1467,14 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", "")),
         "A_H039_R16_EXACT_MATERIAL_REVIEW_BOUNDARY",
+    )
+    check(
+        row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r17_material_review_extension") == R17_MATERIAL_REVIEW_EXTENSION
+        and f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", "")),
+        "A_H039_R17_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -1554,6 +1691,149 @@ def r16_registry_selftests(row: dict[str, Any]) -> None:
         mutant = copy.deepcopy(polarity)
         mutate(mutant)
         check(not valid(mutant), f"N_H039_R16_REGISTRY_{label}")
+
+
+def exact_r17_installed_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 3
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--installed"
+        and valid_hex(argv[1], 40)
+        and argv[2] == PUBLISHED_H039_R8_PRODUCT_MERGE
+    )
+
+
+def r17_registry_selftests(row: dict[str, Any]) -> None:
+    completion = row["h039_os_exclusive_runtime_cleanup"][
+        "r17_installed_effect_completion"
+    ]
+    expected = r17_registry_expected()
+    check(
+        exact_typed_tree(completion, expected),
+        "A_H039_R17_COMPLETION_REGISTRY_SELFTEST_ANCHOR",
+    )
+    for label, mutate in (
+        ("KEY_REMOVED", lambda value: value.pop("identity_before_effect")),
+        ("KEY_ADDED", lambda value: value.__setitem__("alternate", False)),
+        ("BASE_CHANGED", lambda value: value.__setitem__("authority_base", "00" * 20)),
+        ("PARENTS_SWAPPED", lambda value: value["authority_ordered_parents"].reverse()),
+        ("PATH_REMOVED", lambda value: value["test_author_paths"].pop()),
+        ("PATH_PREFIX", lambda value: value["test_author_paths"].__setitem__(0, "docs/**")),
+        ("CLI_R8_REMOVED", lambda value: value["installed_cli"].pop()),
+        ("R8_REPLACED_R9", lambda value: value.__setitem__(
+            "published_r8_product_merge", PUBLISHED_H039_R9_PRODUCT_MERGE)),
+        ("R8_PARENT_SWAPPED", lambda value: value[
+            "published_r8_product_ordered_parents"].reverse()),
+        ("R8_PATH_ADDED", lambda value: value[
+            "published_r8_product_change_paths"].append("controller/runtime-cleanup/neighbor")),
+        ("R8_BLOB_CHANGED", lambda value: value[
+            "published_r8_product_blobs"].__setitem__(
+                "controller/runtime-cleanup/install", "00" * 32)),
+        ("IDENTITY_AFTER_EFFECT", lambda value: value.__setitem__(
+            "identity_before_effect", False)),
+        ("UID_WIDENED", lambda value: value.__setitem__("required_uid", True)),
+        ("SEQUENCE_STALE", lambda value: value.__setitem__("initial_receipt_sequence", 1)),
+        ("R10_RETRY", lambda value: value.__setitem__(
+            "r10_diagnostic_reexecution_or_restage", True)),
+        ("PRODUCT_BYTES", lambda value: value.__setitem__("new_product_bytes", True)),
+        ("AUTHORITY_WIDENED", lambda value: value.__setitem__("broader_authority", True)),
+    ):
+        mutant = copy.deepcopy(completion)
+        mutate(mutant)
+        check(
+            not exact_typed_tree(mutant, expected),
+            f"N_H039_R17_COMPLETION_REGISTRY_{label}",
+        )
+
+    sample_merge = "ab" * 20
+    check(
+        exact_r17_installed_argv([
+            "--installed", sample_merge, PUBLISHED_H039_R8_PRODUCT_MERGE,
+        ]),
+        "A_H039_R17_EXACT_INSTALLED_CLI_SHAPE",
+    )
+    cli_mutants = [
+        [], ["--installed"], ["--installed", sample_merge],
+        ["--installed", sample_merge, PUBLISHED_H039_R9_PRODUCT_MERGE],
+        ["--installed", sample_merge, R17_AUTHORITY_BASE],
+        ["--installed", sample_merge.upper(), PUBLISHED_H039_R8_PRODUCT_MERGE],
+        ["--installed", sample_merge[:-1], PUBLISHED_H039_R8_PRODUCT_MERGE],
+        ["--installed", sample_merge, PUBLISHED_H039_R8_PRODUCT_MERGE, "extra"],
+        ["--published", sample_merge, PUBLISHED_H039_R8_PRODUCT_MERGE],
+    ]
+    for index, mutant in enumerate(cli_mutants):
+        check(
+            not exact_r17_installed_argv(mutant),
+            f"N_H039_R17_INSTALLED_CLI_MUTANT_{index:02d}",
+        )
+
+    expected_red = {
+        "label": LABEL,
+        "reason": REASON,
+        "failure_signature": FAILURE_SIGNATURE,
+    }
+    preproduct_red = row["h039_os_exclusive_runtime_cleanup"]["preproduct_red"]
+    check(
+        exact_typed_tree(preproduct_red, expected_red),
+        "A_H039_R17_PREPRODUCT_RED_SELFTEST_ANCHOR",
+    )
+    for label, mutate in (
+        ("REASON", lambda value: value.__setitem__(
+            "reason", "H039_R16_R10_POLARITY_CORRECTED_DIAGNOSTIC_PRODUCT_ABSENT",
+        )),
+        ("SIGNATURE_REMOVED", lambda value: value["failure_signature"].pop()),
+        ("SIGNATURE_REORDERED", lambda value: value["failure_signature"].reverse()),
+        ("SIGNATURE_SUBSTITUTED", lambda value: value["failure_signature"].__setitem__(
+            0, "EXACT_PUBLISHED_R9_DIAGNOSTIC_AND_RUNTIME_MEDIATOR_BYTES_PRESENT",
+        )),
+    ):
+        mutant = copy.deepcopy(preproduct_red)
+        mutate(mutant)
+        check(
+            not exact_typed_tree(mutant, expected_red),
+            f"N_H039_R17_PREPRODUCT_RED_{label}",
+        )
+
+
+def source_function_bytes(raw: bytes, names: list[str]) -> dict[str, bytes]:
+    try:
+        text = raw.decode("utf-8")
+        tree = ast.parse(text)
+    except (UnicodeError, SyntaxError) as exc:
+        raise Rig(f"installed engine source parse failed: {exc}") from exc
+    lines = text.splitlines(keepends=True)
+    found: dict[str, bytes] = {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) \
+                and node.name in names:
+            if node.name in found or node.end_lineno is None:
+                raise Rig(f"ambiguous installed engine function: {node.name}")
+            found[node.name] = "".join(
+                lines[node.lineno - 1:node.end_lineno]
+            ).encode("utf-8")
+    if sorted(found) != sorted(names):
+        raise Rig("installed engine function set incomplete")
+    return found
+
+
+def r17_installed_engine_selftests() -> None:
+    current = source_function_bytes(GATE.read_bytes(), R17_INSTALLED_ENGINE_FUNCTIONS)
+    authority = source_function_bytes(
+        blob(R17_AUTHORITY_BASE, "verify/bin/h-039-exit"),
+        R17_INSTALLED_ENGINE_FUNCTIONS,
+    )
+    check(
+        current == authority,
+        "A_H039_R17_INSTALLED_ENGINE_FUNCTIONS_BYTE_EQUIVALENT_TO_931E58F4",
+        {name: sha(raw) for name, raw in current.items()},
+    )
+    for name in R17_INSTALLED_ENGINE_FUNCTIONS:
+        mutant = dict(current)
+        mutant[name] += b"\n# MUTANT"
+        check(
+            mutant != authority,
+            f"N_H039_R17_INSTALLED_ENGINE_BYTE_MUTANT_{name.upper()}",
+        )
 
 
 def first_root_tool_checks() -> None:
@@ -6860,6 +7140,251 @@ def exact_product_change_shape(changes: list[tuple[str, str, str, str]]) -> bool
     ]
 
 
+def exact_r8_product_change_shape(
+    changes: list[tuple[str, str, str, str]],
+) -> bool:
+    return changes == [
+        (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
+        for path in R8_PRODUCT_GIT_ORDER
+    ]
+
+
+def stable_checkout_blob(path: str, expected: bytes) -> bool:
+    target = ROOT / path
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            target,
+            os.O_RDONLY | os.O_CLOEXEC
+            | getattr(os, "O_NOFOLLOW_ANY") | 0x00002000,
+        )
+        before = os.fstat(descriptor)
+        expected_mode = 0o755 if path == "verify/bin/h-039-exit" else 0o644
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 \
+                or stat.S_IMODE(before.st_mode) != expected_mode \
+                or before.st_size > 4194304:
+            return False
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                return False
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            return False
+        after = os.fstat(descriptor)
+        named = os.lstat(target)
+        identity = lambda value: (
+            value.st_dev, value.st_ino, value.st_mode, value.st_uid,
+            value.st_gid, value.st_nlink, value.st_size,
+            value.st_mtime_ns, value.st_ctime_ns,
+        )
+        return (
+            identity(before) == identity(after) == identity(named)
+            and b"".join(chunks) == expected
+        )
+    except OSError:
+        return False
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def r17_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        changes = raw_changes(R17_AUTHORITY_BASE, candidate)
+        additions, deletions = line_delta(R17_AUTHORITY_BASE, candidate)
+        detail = {
+            "authority_tree": commit_tree(R17_AUTHORITY_BASE),
+            "authority_parents": commit_parents(R17_AUTHORITY_BASE),
+            "candidate": candidate,
+            "candidate_parents": commit_parents(candidate),
+            "changes": changes,
+            "additions": additions,
+            "deletions": deletions,
+        }
+        ok = (
+            object_type(R17_AUTHORITY_BASE) == "commit"
+            and detail["authority_tree"] == R17_AUTHORITY_TREE
+            and detail["authority_parents"] == R17_AUTHORITY_PARENTS
+            and object_type(candidate) == "commit"
+            and candidate not in {
+                R17_AUTHORITY_BASE, CONTRACT_AUTHORITY_BASE,
+                PUBLISHED_H039_R8_CONTRACT_MERGE,
+                PUBLISHED_H039_R8_PRODUCT_CANDIDATE,
+                PUBLISHED_H039_R8_PRODUCT_MERGE,
+                PUBLISHED_H039_R9_PRODUCT_CANDIDATE,
+            }
+            and detail["candidate_parents"] == [R17_AUTHORITY_BASE]
+            and exact_contract_change_shape(changes)
+            and type(additions) is int and additions <= MAX_ADDED_LINES
+            and type(deletions) is int and deletions <= MAX_DELETED_LINES
+        )
+        return ok, detail
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r17_contract_candidate_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r17_contract_candidate_graph(candidate)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(candidate, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        ok = (
+            graph_ok and remote_main == R17_AUTHORITY_BASE
+            and head == candidate and status_raw == b"" and checkout_equal
+        )
+        return ok, {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r17_contract_publication_graph(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        authority, candidate = parents
+        graph_ok, graph = r17_contract_candidate_graph(candidate)
+        merge_changes = raw_changes(R17_AUTHORITY_BASE, merge)
+        merge_tree = commit_tree(merge)
+        candidate_tree = commit_tree(candidate)
+        ok = (
+            object_type(merge) == "commit" and authority == R17_AUTHORITY_BASE
+            and graph_ok and merge_tree == candidate_tree
+            and exact_contract_change_shape(merge_changes)
+        )
+        return ok, {
+            "parents": parents, "graph": graph, "merge_changes": merge_changes,
+            "merge_tree": merge_tree, "candidate_tree": candidate_tree,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
+def r17_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r17_contract_publication_graph(merge)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        ok = (
+            graph_ok and remote_main == merge and head == merge
+            and status_raw == b"" and checkout_equal
+        )
+        return ok, {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def historical_r8_product_identity(commit: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(commit)
+        candidate_parents = commit_parents(PUBLISHED_H039_R8_PRODUCT_CANDIDATE)
+        candidate_changes = raw_changes(
+            PUBLISHED_H039_R8_CONTRACT_MERGE,
+            PUBLISHED_H039_R8_PRODUCT_CANDIDATE,
+        )
+        merge_changes = raw_changes(PUBLISHED_H039_R8_CONTRACT_MERGE, commit)
+        tree = commit_tree(commit)
+        candidate_tree = commit_tree(PUBLISHED_H039_R8_PRODUCT_CANDIDATE)
+        blob_digests = {
+            path: sha(blob(commit, path)) for path in PRODUCT_PATHS
+        }
+        ancestry = PUBLISHED_H039_R8_PRODUCT_MERGE in git(
+            ["rev-list", R17_AUTHORITY_BASE],
+        ).decode("ascii").splitlines()
+        ok = (
+            commit == PUBLISHED_H039_R8_PRODUCT_MERGE
+            and object_type(commit) == "commit"
+            and parents == PUBLISHED_H039_R8_PRODUCT_PARENTS
+            and candidate_parents == [PUBLISHED_H039_R8_CONTRACT_MERGE]
+            and tree == PUBLISHED_H039_R8_PRODUCT_TREE
+            and candidate_tree == PUBLISHED_H039_R8_PRODUCT_TREE
+            and exact_r8_product_change_shape(candidate_changes)
+            and exact_r8_product_change_shape(merge_changes)
+            and blob_digests == PUBLISHED_H039_R8_PRODUCT_BLOBS
+            and ancestry
+        )
+        return ok, {
+            "commit": commit, "parents": parents,
+            "candidate_parents": candidate_parents,
+            "tree": tree, "candidate_tree": candidate_tree,
+            "candidate_changes": candidate_changes,
+            "merge_changes": merge_changes, "blob_digests": blob_digests,
+            "ancestor_of_r17_base": ancestry,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "commit": commit}
+
+
+def r17_git_identity_selftests() -> None:
+    r8_ok, r8_detail = historical_r8_product_identity(
+        PUBLISHED_H039_R8_PRODUCT_MERGE,
+    )
+    check(r8_ok, "A_H039_R17_EXACT_HISTORICAL_R8_PRODUCT_IDENTITY", r8_detail)
+    rejected = [
+        PUBLISHED_H039_R8_CONTRACT_MERGE,
+        PUBLISHED_H039_R8_PRODUCT_CANDIDATE,
+        PUBLISHED_H039_R9_PRODUCT_MERGE,
+        R17_AUTHORITY_BASE,
+    ]
+    for index, commit in enumerate(rejected):
+        historical_ok, _detail = historical_r8_product_identity(commit)
+        graph_ok, _graph = r17_contract_publication_graph(commit)
+        candidate_ok, _candidate = r17_contract_candidate_graph(commit)
+        check(
+            not historical_ok and not graph_ok and not candidate_ok,
+            f"N_H039_R17_R9_R10_R8_OR_ARBITRARY_IDENTITY_{index:02d}",
+        )
+
+    changes = [
+        (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
+        for path in R8_PRODUCT_GIT_ORDER
+    ]
+    check(
+        exact_r8_product_change_shape(changes),
+        "A_H039_R17_EXACT_R8_FOUR_FILE_CHANGE_SHAPE",
+    )
+    for label, mutate in (
+        ("MISSING", lambda value: value.pop()),
+        ("EXTRA", lambda value: value.append(
+            ("verify/h039/runtime-cleanup-mediator", "100755", "100755", "M"))),
+        ("REORDERED", lambda value: value.reverse()),
+        ("SUBSTITUTED", lambda value: value.__setitem__(
+            0, ("controller/runtime-cleanup/neighbor", *value[0][1:]))),
+        ("MODE", lambda value: value.__setitem__(
+            0, (value[0][0], "100644", value[0][2], value[0][3]))),
+        ("ADDED", lambda value: value.__setitem__(
+            0, (value[0][0], "000000", value[0][2], "A"))),
+    ):
+        mutant = copy.deepcopy(changes)
+        mutate(mutant)
+        check(
+            not exact_r8_product_change_shape(mutant),
+            f"N_H039_R17_R8_CHANGE_SHAPE_{label}",
+        )
+
+
 def exact_contract_merge(base: str) -> tuple[bool, dict[str, Any]]:
     try:
         parents = commit_parents(base)
@@ -11616,6 +12141,7 @@ def finish(phase: str) -> int:
     print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
     print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
     print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         if phase == "published":
@@ -11653,6 +12179,7 @@ def main(argv: list[str]) -> int:
         print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
         print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -11670,23 +12197,28 @@ def main(argv: list[str]) -> int:
         print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
         print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
     product = len(argv) == 3 and argv[0] == "--product"
     published = len(argv) == 2 and argv[0] == "--published"
-    if not (preproduct or product or published):
+    installed = exact_r17_installed_argv(argv)
+    if not (preproduct or product or published or installed):
         print(
             "RIG_ERROR: usage: h-039-exit [--product PUBLISHED_R16_CONTRACT_MERGE "
-            "R10_DIAGNOSTIC_CANDIDATE | --published PUBLISHED_R10_PRODUCT_MERGE]",
+            "R10_DIAGNOSTIC_CANDIDATE | --published PUBLISHED_R10_PRODUCT_MERGE | "
+            "--installed PUBLISHED_R17_CONTRACT_MERGE "
+            "4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if product or published else []
+    supplied_commits = argv[1:] if product or published or installed else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
     phase = (
-        "preproduct" if preproduct else "product" if product else "published"
+        "preproduct" if preproduct else "product" if product
+        else "published" if published else "installed"
     )
     try:
         if any(object_type(value) != "commit" for value in supplied_commits):
@@ -11695,6 +12227,9 @@ def main(argv: list[str]) -> int:
         contract_selftests(row)
         r14_registry_selftests(row)
         r16_registry_selftests(row)
+        r17_registry_selftests(row)
+        r17_git_identity_selftests()
+        r17_installed_engine_selftests()
         r15_native_absolute_literal_oracle_selftests()
         r14_diagnostic_source_oracle_selftests()
         r16_flush_polarity_selftests()
@@ -11705,6 +12240,15 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
+            candidate = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+            candidate_ok, candidate_detail = r17_contract_candidate_identity(candidate)
+            check(
+                candidate_ok,
+                "A_H039_R17_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
+                candidate_detail,
+            )
+            if not candidate_ok:
+                return finish(phase)
             baseline, detail = published_r8_zero_effect_baseline(
                 require_repo_r8=False,
             )
@@ -11772,34 +12316,91 @@ def main(argv: list[str]) -> int:
             )
             return finish(phase)
 
-        root_before, root_before_detail = \
-            published_r8_zero_effect_baseline(require_repo_r8=False)
-        check(
-            root_before, "A_H039_R16_PUBLISHED_DIAGNOSTIC_ZERO_EFFECT_BEFORE",
-            root_before_detail,
-        )
-        if not root_before:
+        if published:
+            root_before, root_before_detail = \
+                published_r8_zero_effect_baseline(require_repo_r8=False)
+            check(
+                root_before, "A_H039_R16_PUBLISHED_DIAGNOSTIC_ZERO_EFFECT_BEFORE",
+                root_before_detail,
+            )
+            if not root_before:
+                return finish(phase)
+            publication_ok, publication_detail = product_publication_identity(argv[1])
+            check(
+                publication_ok, "A_H039_R16_GUARDED_DIAGNOSTIC_PUBLICATION_IDENTITY",
+                publication_detail,
+            )
+            if not publication_ok:
+                return finish(phase)
+            recipe, manifest = manifest_checks(argv[1], diagnostic_product=True)
+            immutable_source_checks(
+                argv[1], diagnostic_product=True, corrected_polarity=True,
+            )
+            reproducible_rebuild(recipe, argv[1])
+            macho_checks(manifest, argv[1], diagnostic_product=True)
+            installer_verify_effects(argv[1], diagnostic_product=True)
+            root_after, root_after_detail = \
+                published_r8_zero_effect_baseline(require_repo_r8=False)
+            check(
+                root_after and root_after_detail == root_before_detail,
+                "A_H039_R16_PUBLISHED_DIAGNOSTIC_ZERO_ROOT_EFFECT",
+                {"before": root_before_detail, "after": root_after_detail},
+            )
             return finish(phase)
-        publication_ok, publication_detail = product_publication_identity(argv[1])
+
+        publication_ok, publication_detail = \
+            r17_contract_publication_identity(argv[1])
         check(
-            publication_ok, "A_H039_R16_GUARDED_DIAGNOSTIC_PUBLICATION_IDENTITY",
+            publication_ok,
+            "A_H039_R17_CURRENT_GUARDED_CONTRACT_PUBLICATION_IDENTITY",
             publication_detail,
         )
         if not publication_ok:
             return finish(phase)
-        recipe, manifest = manifest_checks(argv[1], diagnostic_product=True)
-        immutable_source_checks(
-            argv[1], diagnostic_product=True, corrected_polarity=True,
-        )
-        reproducible_rebuild(recipe, argv[1])
-        macho_checks(manifest, argv[1], diagnostic_product=True)
-        installer_verify_effects(argv[1], diagnostic_product=True)
-        root_after, root_after_detail = \
-            published_r8_zero_effect_baseline(require_repo_r8=False)
+        r8_ok, r8_detail = historical_r8_product_identity(argv[2])
         check(
-            root_after and root_after_detail == root_before_detail,
-            "A_H039_R16_PUBLISHED_DIAGNOSTIC_ZERO_ROOT_EFFECT",
-            {"before": root_before_detail, "after": root_after_detail},
+            r8_ok, "A_H039_R17_EXACT_PUBLISHED_R8_PRODUCT_IDENTITY", r8_detail,
+        )
+        if not r8_ok:
+            return finish(phase)
+        recipe, manifest = manifest_checks(argv[2])
+        immutable_source_checks(argv[2])
+        reproducible_rebuild(recipe, argv[2])
+        macho_checks(manifest, argv[2])
+        installation_checks(manifest)
+        initial_sequence, initial_receipt = receipt_state()
+        pristine = initial_sequence == 0 and initial_receipt is None
+        check(
+            pristine, "A_H039_R17_PRISTINE_INSTALLED_RECEIPT_SEQUENCE_ZERO",
+            {"sequence": initial_sequence, "receipt": initial_receipt},
+        )
+        if not pristine:
+            return finish(phase)
+        installed_identity = macho_identity(
+            INSTALLED, "se.nortropic.runtime-cleanup-mediator",
+        )
+        expected_installed_identity = {
+            "cdhash": manifest["mediator_codesign_cdhash"],
+            "uuid": manifest["mediator_lc_uuid"],
+            "dependencies": manifest["mediator_dependencies"],
+            "platform": manifest["platform"],
+            "minos": manifest["minos"],
+            "sdk": manifest["sdk"],
+        }
+        check(
+            all(installed_identity.get(key) == value
+                for key, value in expected_installed_identity.items()),
+            "A_H039_R17_INSTALLED_R8_MACHO_IDENTITY",
+            installed_identity,
+        )
+        effects = guarded_product_effects()
+        final_sequence, final_receipt = receipt_state()
+        check(
+            all(value is True for value in effects.values())
+            and final_sequence == 13 and final_receipt is not None,
+            LABEL,
+            {"effects": effects, "final_sequence": final_sequence,
+             "final_receipt_present": final_receipt is not None},
         )
         return finish(phase)
     except Undecidable as exc:
@@ -11818,6 +12419,7 @@ def main(argv: list[str]) -> int:
         print(f"R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION={R13_PRECOMPARISON_EXACT_TYPED_REVIEW_EXTENSION}")
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
         print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)

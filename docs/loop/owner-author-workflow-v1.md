@@ -2245,3 +2245,44 @@ R8-to-R10-to-R8 ceremony. It executes the diagnostic exactly once with no
 retry, proves full zero effect, restores exact R8, and always ends at mandatory
 owner adjudication. Production installation, H038/H032/H031 progress and
 supervisor resume remain stopped until that adjudication.
+
+## H-039 R17/R8 installed-effect completion
+
+Published R16/R10 merge `931e58f48278922378948da526ebb84dcc8ecdf8`,
+tree `9d06af294688be836542e4390bb3130bbfe7fc29`, is the sole R17
+authority base. The owner accepted the single R10 status-0 observation as
+reaching the frozen immediate pre-create zero-effect boundary, without granting
+retroactive task credit, and authorized exactly one later production bootstrap
+of restored published R8. R10 is never restaged or executed again.
+
+R17 changes only the five TEST_AUTHOR contract files. Its candidate is a clean
+direct child of `931e58f4…` with exactly those five existing files modified and
+unchanged modes. After two independent adversarial reviews, guarded non-force
+publication must produce a merge whose ordered parents are the exact authority
+base and reviewed candidate, whose tree equals the candidate, and which is both
+live authenticated `origin/main` and clean `HEAD`. The executing gate, spec and
+all five checkout contract files must equal that merge's Git blobs.
+
+The post-publication invocation is exactly
+`h-039-exit --installed <published-R17-merge> 4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd`.
+The second identity is not selectable authority: every other value rejects.
+Before reading installed state or creating effects, the lane independently
+authenticates published R8's ordered parents `b9d006e3…` and `936344ab…`, tree
+`faad7bb5…`, exact four-file product change and all five frozen product blobs.
+R9, R10, arbitrary commits, stale main, dirty/wrong HEAD, substituted contract
+bytes and broader identities reject before the installed engine.
+
+The existing `installation_checks`, `fixed_installation_snapshot`,
+`product_effects` and `guarded_product_effects` functions remain byte-equivalent
+to published `931e58f4…`. The sole uid501/gid20 installed run requires an empty
+receipt directory and sequence zero before effects, advances exactly thirteen
+receipts, and passes only with zero runtime, process and descriptor residue and
+unchanged fixed installation identities. A partial or failed run is never
+retried and requires a new owner decision.
+
+After R17 publication the transition is strictly serial: full read-only R8 root
+reauthentication; exactly one direct owner-TTY bootstrap through the fixed
+protected installer path and argv; post-installation observation; exactly one
+unprivileged installed lane; independent effect review; guarded H039 completion;
+then H038, H032 and H031. Supervisor resume remains forbidden until that whole
+chain is green and separately adjudicated.
