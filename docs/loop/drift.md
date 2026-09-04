@@ -5158,3 +5158,36 @@ and protected inode be root-reauthenticated for one same-inode, no-retry R12
 recovery. The subsequent uid501/gid20 lane requires receipt sequence 0→13 and
 zero runtime/process/descriptor residue. R11 remains consumed, R10 remains
 forbidden, and any nonzero, output, drift or unexpected state is an owner stop.
+
+## 2026-09-04 — H-039 R21/R12 APFS receipt-directory comparison boundary
+
+The owner-adjudicated R12 bootstrap completed at status 0 with no output. The
+immutable post-install transcript `4f5309ee…` contains 96 ordered read-only
+commands, size 10218 and RC-vector `9e34b85e…`; source binding `4adb154c…`, dual
+review `ff358a0c…` and frozen validator `bb472c94…` remain workflow-only. The
+validator's rejection is not product drift: it requires nlink 2 for `s` while
+also requiring its sole regular member `lock`. The observed APFS relation is
+empty `a/c/q/r` at 2/64, singleton `s` at 3/96, and namespace at 7/224.
+
+R20's byte-exact fixed snapshot also compares `r` nlink/size across receipt
+sequence 0 to 1. Creating the sole validated `r/last` necessarily changes that
+directory from 2/64 to 3/96 before the first post-cleanup comparison, so the
+R20 installed lane was not executed and becomes stale. R21 changes no product
+or evidence byte. Its sole engine delta is connected inside `product_effects`:
+zero residue and `receipt_state` are checked before and after the unchanged
+snapshot; only fixed `r` tuple indices 6/7 are normalized after exact empty or
+single-valid-last geometry succeeds. All other fields and objects remain raw.
+
+The serialized boundary is R21 five-file freeze, two independent reviews,
+guarded publication, exactly one uid501/gid20 installed run, independent effect
+review and guarded H039 completion. No new root ceremony, install, restage,
+retry, rollback, cleanup, R10 action, product change or wider authority exists.
+H038/H032/H031 and supervisor resume remain prohibited until full PASS.
+
+Frozen R21-R1 `93cfd6bd…`, tree `73e0db7a…`, is immutable NO-CREDIT and a
+nonparent. Both independent reviews executed the same missing causal family:
+global directory nlink/size normalization in `stat_snapshot` passed all 53 R21
+engine assertions and masked raw `s` geometry. Fresh R21-R2 again starts
+directly from `9ed9ed70…`, byte-binds the complete fixed-snapshot observation
+dependency chain and rejects that exact mutant. Product, evidence, root state,
+installed-effect state and authority remain unchanged.

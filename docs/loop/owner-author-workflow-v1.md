@@ -2461,3 +2461,42 @@ uid501/gid20 and receipt sequence 0, advances exactly to 13, and proves zero
 runtime, process and descriptor residue. Any identity drift, output, nonzero or
 unexpected state stops for owner adjudication. R11 is never retried, R10 is
 never restaged or executed, and supervisor resume remains prohibited.
+
+## H-039 R21/R12 APFS receipt-aware installed completion
+
+Owner adjudication accepts the sole R12 production bootstrap as successful:
+status 0, no installer output, and the immutable 96-command post-install
+transcript has SHA-256 `4f5309ee…`, size 10218 and RC-vector `9e34b85e…`.
+Recovery source binding `4adb154c…`, dual review `ff358a0c…` and the frozen
+workflow validator `bb472c94…` remain read-only workflow evidence and grant no
+task credit. That validator's sole failure is historical: it demands nlink 2
+for every fixed directory although APFS reports `s` as nlink 3, size 96 when
+its sole regular member is `lock`. No repeat root observation is permitted.
+
+R21 is a productless five-file TEST_AUTHOR refreeze directly from guarded R20
+merge `9ed9ed70…`. Its only current lane is `--r21-installed
+<published-R21-contract> 09537f74…`; the R20 lane is stale and cannot execute.
+The fixed R12 graph and every product byte remain exact. All fixed engine
+functions except `product_effects` remain byte-exact to R20. Inside
+`product_effects`, one connected local helper validates zero runtime residue
+and exact receipt state both before and after the unchanged fixed snapshot,
+requires APFS `r` geometry 2/64 when empty or 3/96 with one validated `last`,
+and normalizes only tuple indices 6 and 7 to the empty geometry for comparison.
+Every other `r` field and every field of the namespace, `a/c/q/s`, `lock` and
+installed mediator remains raw-bound.
+
+Two independent adversarial gate reviews and guarded non-force publication
+must precede exactly one unprivileged uid501/gid20 R21 installed-effect run.
+That run starts at receipt sequence 0, must finish at 13 with zero runtime,
+process and descriptor residue, and is followed by independent effect review
+and guarded H039 completion. R21 authorizes no root ceremony, restaging,
+installation, retry, rollback, cleanup, R10 action, product change or broader
+authority. H038/H032/H031 and supervisor resume remain stopped until full PASS.
+
+Frozen R21-R1 `93cfd6bd…`, tree `73e0db7a…`, is immutable NO-CREDIT and cannot
+be a candidate or publication parent. Dual review proved its engine suite
+accepted global directory nlink/size normalization in `stat_snapshot`, because
+the fixed-snapshot observation dependency chain was not byte-bound. Fresh
+R21-R2 starts from the same published `9ed9ed70…` base, binds that complete
+chain to R20 and causally rejects the demonstrated global-normalization mutant
+before it may be refrozen and independently reviewed.
