@@ -2410,3 +2410,29 @@ reviewed independent-cursor body; runtime preprocessing must select exact R11
 Global, reversed, duplicated, old-only, corrected-only and unguarded forms
 reject. R12 remains exactly three product files and cannot grant installed
 credit; R20 and every no-retry/root prohibition remain unchanged.
+
+## H-039 R20/R12 installed-effect completion
+
+Guarded R12 product merge `09537f74d7727544fb1d28c3540774c099a3488c`,
+tree `093789676a3d55dc3802e0e05358914a5d8120cc`, is the sole R20 base.
+R20 is productless and may modify only the same five TEST_AUTHOR contract
+files. Its candidate must be a clean direct child of that merge; guarded
+publication must retain the candidate tree and exact ordered parents.
+
+The only new runtime form is `--r20-installed <published-R20-contract>
+09537f74d7727544fb1d28c3540774c099a3488c`. Before any installed-state
+inspection or effect, the gate binds current live main, clean HEAD, executing
+gate/spec bytes, the R20 publication graph, and separately the exact R12
+contract, candidate, ordered merge parents, tree, three-file product surface
+and all five product blobs. The installation/effect engine function bodies are
+byte-exact to published R12; R20 changes no product byte or authority.
+
+Freeze, two independent adversarial reviews and guarded non-force publication
+precede every root action. Only then may a separately reviewed owner-TTY
+workflow fully reauthenticate the exact partial state and protected installer
+inode, same-inode stage exact R12, and perform one no-retry recovery. The
+unprivileged installed lane starts only after successful recovery, requires
+uid501/gid20 and receipt sequence 0, advances exactly to 13, and proves zero
+runtime, process and descriptor residue. Any identity drift, output, nonzero or
+unexpected state stops for owner adjudication. R11 is never retried, R10 is
+never restaged or executed, and supervisor resume remains prohibited.

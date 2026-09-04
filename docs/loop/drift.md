@@ -5118,3 +5118,23 @@ fixed-dot independent-cursor function, while non-installer selection is the
 byte-exact published R11 function. Global, both-old, both-corrected, swapped and
 missing-guard variants reject, and the unchanged recipe must reproducibly emit
 the frozen runtime mediator before product credit.
+
+## 2026-09-04 — H-039 R20/R12 current-publication installed-effect completion
+
+R19-R3 and the fresh R12 product are now guardedly published as merge
+`09537f74…`, tree `09378967…`; the publication-only gate is 91359/0. R19
+intentionally exposes no installed lane, so root recovery or effect credit
+before a new publication would be stale-authority progress.
+
+R20 changes only the five TEST_AUTHOR contract files. It binds its clean
+direct-child candidate and guarded merge to live main and executing bytes, then
+separately binds fixed R12 contract `45a6f191…`, candidate `ab77a0b2…`, merge
+parents/tree, exact three-file product change and all five product blobs. The
+four installation/effect engine bodies remain byte-exact to published R12.
+There is no new product or broader authority.
+
+Only after dual review and guarded R20 publication may the exact partial state
+and protected inode be root-reauthenticated for one same-inode, no-retry R12
+recovery. The subsequent uid501/gid20 lane requires receipt sequence 0→13 and
+zero runtime/process/descriptor residue. R11 remains consumed, R10 remains
+forbidden, and any nonzero, output, drift or unexpected state is an owner stop.
