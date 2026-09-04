@@ -2399,3 +2399,14 @@ unprivileged review must begin and end with the same exact published 04555
 root:wheel mediator identity/digest and namespace identity. The historical
 absent-helper paths remain unchanged, and this host-state accommodation grants
 no product effect, root action or installed credit.
+
+The first post-publication R12 build produced no candidate. Exact global source
+SHA-256 `f79f7eb9…` rebuilds runtime mediator SHA-256 `08e1cb90…`, while the
+contract simultaneously freezes mediator `6c2f2dbe…`. R19-R3 therefore starts
+from published R19 `95edbe75…` and admits only an `H039_INSTALLER`-scoped
+selection around that one function. Installer preprocessing must select the
+reviewed independent-cursor body; runtime preprocessing must select exact R11
+`dup` bytes, and the unchanged recipe must reproduce the frozen mediator.
+Global, reversed, duplicated, old-only, corrected-only and unguarded forms
+reject. R12 remains exactly three product files and cannot grant installed
+credit; R20 and every no-retry/root prohibition remain unchanged.
