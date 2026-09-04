@@ -2500,3 +2500,30 @@ the fixed-snapshot observation dependency chain was not byte-bound. Fresh
 R21-R2 starts from the same published `9ed9ed70…` base, binds that complete
 chain to R20 and causally rejects the demonstrated global-normalization mutant
 before it may be refrozen and independently reviewed.
+
+## H-039 R22/R13 pre-store mediator exit diagnostic
+
+The single owner-authorized INT2 observation is consumed immutable workflow
+evidence: SHA-256 `b264306e…`, exact schema-version integer 2 request hashes
+`c6af21d5…`/`85a60ecf…`, exit 1, no response or ancillary descriptor, empty
+stdout/stderr, and byte-identical namespace and installed R12 mediator before
+and after. It grants no task credit and must never be retried.
+
+R22 is a fresh five-file TEST_AUTHOR child of published R21 `df5c9823…`. It
+admits only a compile-time, exit-code-only R13 diagnostic built into the repo
+`controller/runtime-cleanup/install` artifact from the exact R12 source. The
+diagnostic uses distinct one-shot nonce `a4583df4…`, request hashes
+`f29ec6f1…`/`7bfa1b33…`, and codes 0..70 for the main, boundary, chdir,
+descriptor inventories, receive, parse, and semantics predicates. Code 0 means
+the exact INVALID_KEYS frame is reconstructed and matched in memory; no
+`error_frame`, write/send, store, or later effect call occurs. Dominated
+defense-in-depth statuses need not be host-reachable.
+
+The product changes exactly source, recipe, diagnostic executable and manifest.
+The production runtime artifact `6c2f2dbe…` and its compile/sign argv remain
+byte-exact R12. Guarded product publication ends only at
+`PASS_PRE_ROOT_DIAGNOSTIC_PUBLICATION_ONLY`. Any root staging, one-shot run,
+inert transition, or removal at the separate fixed path
+`/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-pre-effect-diagnostic-v1`
+requires a new owner decision; it may never use `.install` or replace the live
+production mediator. H038/H032/H031 and supervisor resume remain stopped.

@@ -5191,3 +5191,25 @@ engine assertions and masked raw `s` geometry. Fresh R21-R2 again starts
 directly from `9ed9ed70…`, byte-binds the complete fixed-snapshot observation
 dependency chain and rejects that exact mutant. Product, evidence, root state,
 installed-effect state and authority remain unchanged.
+
+## 2026-09-05 — H-039 R22/R13 consumed-probe diagnostic boundary
+
+R21's one-shot INT2 workflow observation (`b264306e…`) returned exit 1 with no
+response, ancillary descriptor, stdout/stderr, or namespace/installed-byte
+effect. It is consumed NO-CREDIT evidence and is not a reusable test input.
+The unresolved drift is therefore localization inside the production R12
+mediator's pre-store path, not permission to repeat the live probe.
+
+R22 is a fresh exact five-file TEST_AUTHOR contract from `df5c9823…`. A later
+R13 may change only source, recipe, repo diagnostic executable and manifest.
+The exact compile-time branch consumes only the distinct fixed request
+`a4583df4…`/`f29ec6f1…`/`7bfa1b33…`, returns statuses 0..70, and reaches zero
+only after canonical INVALID_KEYS frame construction in memory. It performs no
+write/send/error-frame/store or later effect. The production mediator and its
+compile/sign argv remain byte-exact R12.
+
+Contract and product each require two independent reviews and guarded
+publication. Product publication is explicitly pre-root only. The separate
+fixed root diagnostic lifecycle is not authorized here and requires new owner
+adjudication before stage/run/inert/remove. R22 adds no retry, cleanup,
+installed-effect, downstream, supervisor-resume, or broader authority.
