@@ -5071,3 +5071,31 @@ publication, fresh product, dual product review and guarded product publication
 are serial. No root action occurs before them; afterward there is at most one
 same-inode no-retry R11 bootstrap. R10 remains permanently consumed and
 supervisor resume remains forbidden.
+
+## 2026-09-04 — H-039 R19/R12 independent directory cursors
+
+The one-shot R11 production bootstrap returned 1 after durable helper and
+`a/c/q/r/s/lock` publication. Owner-witnessed transcript `1531da5e…` and its
+96-status vector `c47f7e5d…` bind that partial state; the protected R11
+installer remains on inode `16777232:126988174`, the namespace remains 0700,
+and `.install` is retained without `.install/mediator`. R11 receives no retry.
+
+Source reconstruction identifies the exact frontier: `exact_names` passed a
+`dup(directory)` to `fdopendir`, so the first namespace enumeration advanced
+the original open file description to EOF. The later required-63 enumeration
+therefore saw no names and returned before `fchmod(ns,0555)` and staging
+removal. R19 permits only one replacement of that function: fixed `openat` of
+`.` creates an independent description, while pre-open, scan and post-scan
+`same_stat` checks bind the original identity. Executed deny-default APFS
+fixtures distinguish the corrected function from the old shared-cursor form,
+prove repeated growth and stable scans, leave the caller cursor untouched, and
+reject foreign-directory substitution, missing/unexpected membership,
+missing-identity, wrong-dot and decoy variants.
+
+The R19 contract remains a five-file TEST_AUTHOR transition from published
+`f2d8afdc…`. Only after dual review and guarded publication may fresh R12 alter
+the source, rebuilt installer and minimal manifest. The production recipe and
+runtime mediator remain byte-exact. R19 has no installed lane; a separate
+productless R20 refreeze and publication must precede the single no-retry
+partial-state recovery. R10 remains consumed, and H038/H032/H031 and supervisor
+resume remain stopped.
