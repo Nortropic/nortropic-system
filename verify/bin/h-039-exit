@@ -1,12 +1,14 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""Frozen H-039 R17/R8 installed-effect completion gate.
+"""Frozen H-039 R18/R11 production-flush polarity gate.
 
 No arguments execute pre-product RED while re-reviewing exact published R8 bytes
-and the owner-recorded zero-effect state. ``--product`` reviews one fresh R10
-diagnostic candidate without root effect and ``--published`` preserves its exact
-pre-root publication review. Only ``--installed`` can exercise the already
-published R8 installation. This Python gate never runs elevated, installs
-anything, or accepts a cleanup path, PID, command, or caller-selected descriptor.
+and the owner-recorded R8 status-1 zero-effect state. The historical R16/R10
+``--product`` and ``--published`` lanes and R17/R8 ``--installed`` lane remain
+frozen. Distinct ``--r18-product``, ``--r18-published`` and ``--r18-installed``
+lanes bind the exact current-wrapper-plus-four-negations R11 production image,
+the exact R8 production recipe restoration, and current live publication before
+any installed effect. This Python gate never runs elevated, installs anything,
+or accepts a cleanup path, PID, command, or caller-selected descriptor.
 """
 
 from __future__ import annotations
@@ -51,6 +53,12 @@ R17_AUTHORITY_TREE = "9d06af294688be836542e4390bb3130bbfe7fc29"
 R17_AUTHORITY_PARENTS = [
     "1c4ef1af8d0c7db24093d5a280ead2c2492df3f3",
     "af71bbdcc85936a1d9811461d2edc455876829d4",
+]
+R18_AUTHORITY_BASE = "6481abc184c64e7b09d9347a96ff86db3fe10f11"
+R18_AUTHORITY_TREE = "07ea3b0e834d69be5daa6c6bc4c9a14c55d5c905"
+R18_AUTHORITY_PARENTS = [
+    "931e58f48278922378948da526ebb84dcc8ecdf8",
+    "848ec73e3ad5a02ff4db8206620e0b9dea79d43d",
 ]
 
 CONTRACT_AUTHORITY_BASE = "0f717dbf8b729173413524ae032eff8e0a777a1e"
@@ -187,6 +195,12 @@ PRODUCT_GIT_ORDER = [
     "controller/runtime-cleanup/native/mediator.c",
     "verify/h039/identity-manifest.json",
 ]
+R18_PRODUCT_GIT_ORDER = [
+    "controller/runtime-cleanup/install",
+    "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/build-recipe.json",
+    "verify/h039/identity-manifest.json",
+]
 R8_PRODUCT_GIT_ORDER = [
     "controller/runtime-cleanup/install",
     "controller/runtime-cleanup/native/mediator.c",
@@ -200,6 +214,65 @@ PRODUCT_MODES = {
     "verify/h039/build-recipe.json": "100644",
     "verify/h039/identity-manifest.json": "100644",
 }
+R18_CURRENT_WRAPPER_SOURCE_SHA256 = (
+    "6a4388c499a8385c6d061a6a5ab539e39d02f13539a538d1d30b4e5b30b2c163"
+)
+R18_CURRENT_WRAPPER_SOURCE_SIZE = 117451
+R18_CORRECTED_WRAPPER_SOURCE_SHA256 = (
+    "9f7b293cdc81c26b3f3746e3f789cd6c5ab3fd6cd578d1801c3f62ef20eebf8a"
+)
+R18_CORRECTED_WRAPPER_SOURCE_SIZE = 117455
+R18_CURRENT_DIAGNOSTIC_RECIPE_SHA256 = (
+    "f2cbc6aad1ee1d70cc9f8dcde82c5d2e34f4720a61fc36e72bd13703dabaecdf"
+)
+R18_PRODUCTION_RECIPE_SHA256 = (
+    "82ca604e690f8dbfc16867c695a117f7e43a0c56de4b4bfe48b072f04fe1f0ae"
+)
+R18_RECIPE_REMOVED_ARGV = [
+    "-Wno-unused-function",
+    "-DH039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC=1",
+]
+R18_OLD_PREDICATES = [
+    "fchmod(fd,04555)||fsync(fd)||flush_dir(project)||fstat(fd,&ready)",
+    "fsync(lock_fd)||flush_dir(fd)||fstat(lock_fd,&after)",
+    "self<0||fsync(self)||flush_dir(runtime)||fstat(self,&after)",
+    "db<0||fsync(ns)||flush_dir(db)||fstat(ns,&after)",
+]
+R18_CORRECTED_PREDICATES = [
+    "fchmod(fd,04555)||fsync(fd)||!flush_dir(project)||fstat(fd,&ready)",
+    "fsync(lock_fd)||!flush_dir(fd)||fstat(lock_fd,&after)",
+    "self<0||fsync(self)||!flush_dir(runtime)||fstat(self,&after)",
+    "db<0||fsync(ns)||!flush_dir(db)||fstat(ns,&after)",
+]
+R18_FLUSH_SITE_REGISTRY = [
+    [1, "durable_fixed_dir_at", "parent", "SUCCESS_CONJUNCTION", False],
+    [2, "validate_bootstrap_staging", "runtime", "SUCCESS_CONJUNCTION", False],
+    [3, "exact_regular_bytes", "parent", "SUCCESS_CONJUNCTION", False],
+    [4, "ensure_lock", "state-existing", "SUCCESS_CONJUNCTION", False],
+    [5, "ensure_lock", "state-new", "SUCCESS_CONJUNCTION", False],
+    [6, "stage_embedded_mediator", "project-existing-read", "SUCCESS_CONJUNCTION", False],
+    [7, "stage_embedded_mediator", "project-partial-unlink", "FAILURE_OR_NEGATED", False],
+    [8, "stage_embedded_mediator", "project-full-0400", "FAILURE_OR_NEGATED", True],
+    [9, "stage_embedded_mediator", "project-new-ready", "SUCCESS_CONJUNCTION", False],
+    [10, "publish_staged_mediator", "project-installed", "FAILURE_OR_NEGATED", False],
+    [11, "publish_staged_mediator", "project-rename", "SUCCESS_CONJUNCTION", False],
+    [12, "publish_staged_mediator", "helpers-rename", "SUCCESS_CONJUNCTION", False],
+    [13, "directory_prefix", "state-existing-lock", "FAILURE_OR_NEGATED", True],
+    [14, "remove_fixed_staging", "runtime-pre-unlink", "FAILURE_OR_NEGATED", True],
+    [15, "remove_fixed_staging", "runtime-post-unlink", "FAILURE_OR_NEGATED", False],
+    [16, "remove_fixed_staging", "controller-post-unlink", "FAILURE_OR_NEGATED", False],
+    [17, "remove_fixed_staging", "project-post-unlink", "FAILURE_OR_NEGATED", False],
+    [18, "apply_install", "database-pre-effect", "FAILURE_OR_NEGATED", True],
+    [19, "apply_install", "database-namespace-publish", "FAILURE_OR_NEGATED", False],
+    [20, "apply_install", "namespace-final-cleanup", "FAILURE_OR_NEGATED", False],
+    [21, "apply_install", "database-final-cleanup", "FAILURE_OR_NEGATED", False],
+]
+R18_CAUSAL_FIXTURES = [
+    ["FRESH_PREFIX0", "apply_install", "database-pre-effect", "FSYNC0_CONTINUES_FSYNC_MINUS1_STOPS_BEFORE_EFFECT"],
+    ["COMPLETE_MEDIATOR_0400", "stage_embedded_mediator", "project-full-0400", "FSYNC0_CONTINUES_TO_REBIND_FSYNC_MINUS1_STOPS"],
+    ["PREFIX5_WITH_LOCK", "directory_prefix", "state-existing-lock", "FSYNC0_CONTINUES_TO_REBIND_FSYNC_MINUS1_STOPS"],
+    ["REMOVE_STAGING", "remove_fixed_staging", "runtime-pre-unlink", "FSYNC0_CONTINUES_TO_REBIND_FSYNC_MINUS1_STOPS_BEFORE_UNLINK"],
+]
 INSTALLED = Path("/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator")
 NAMESPACE = Path("/private/var/db/nortropic-runtime-cleanup-v1")
 PROTECTED_INSTALLER = (
@@ -777,6 +850,45 @@ R17_INSTALLED_ENGINE_FUNCTIONS = [
     "fixed_installation_snapshot", "installation_checks",
     "product_effects", "guarded_product_effects",
 ]
+R18_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_THE_R11_SOURCE_IS_EXACTLY_PUBLISHED_R10_"
+    "WRAPPER_SOURCE_WITH_ONLY_FOUR_INSERTED_LOGICAL_NEGATIONS_AT_THE_REGISTERED_"
+    "H039_INSTALLER_PRODUCTION_FLUSH_DIR_SITES;_FLUSH_DIR_REMAINS_TRUE_IFF_FSYNC_"
+    "RETURNS_ZERO_AND_EXACTLY17_OF21_INSTALLER_SITES_REMAIN_BYTE_IDENTICAL_WHILE_"
+    "EXACTLY4_FAILURE_OR_SITES_CHANGE;_FRESH_PREFIX0_COMPLETE_MEDIATOR0400_PREFIX5_"
+    "WITH_LOCK_AND_REMOVE_STAGING_FIXTURES_BIND_SUCCESS_TO_CONTINUATION_AND_FAILURE_"
+    "TO_STOP_BEFORE_THE_NEXT_MUTATION;_THE_BUILD_RECIPE_IS_BYTE_EXACT_PUBLISHED_R8_"
+    "PRODUCTION_RECIPE_WITH_ONLY_THE_TWO_DIAGNOSTIC_ARGV_MEMBERS_REMOVED_FROM_"
+    "PUBLISHED_R10;_PREPROCESSED_SOURCE_O2_IR_AND_FINAL_INSTALLER_SELECT_ONLY_THE_"
+    "PRODUCTION_BRANCH_AND_EXCLUDE_DIAGNOSTIC_STATUS_IMPORT_AND_DISPATCH;_THE_"
+    "RUNTIME_MEDIATOR_IS_BYTE_EXACT;_CURRENT_PRODUCT_PUBLICATION_IDENTITY_PRECEDES_"
+    "THE_SINGLE_UID501_GID20_INSTALLED_EFFECT_LANE_AND_NO_R10_RESTAGE_EXECUTION_"
+    "RETRY_OR_BROADER_AUTHORITY_IS_ADMITTED"
+)
+R18_RECONCILIATION = (
+    "THIS_FIELD_SUPERSEDES_ONLY_R17S_FAILED_R8_PRODUCTION_BOOTSTRAP_AND_STALE_R8_"
+    "INSTALLED_TARGET;_PUBLISHED_R17_MERGE6481ABC1_TREE07EA3B0E_IS_THE_EXACT_R18_"
+    "AUTHORITY_BASE;_R8_BOOTSTRAP_RC1_AND_BYTE_IDENTICAL_PRE_POST_SHA91C78194_ARE_"
+    "CAUSED_BY_EXACTLY4_INVERTED_SUCCESS_BOOLEAN_FLUSH_DIR_PREDICATES_AMONG21_"
+    "INSTALLER_SITES;_ONE_FRESH_FIVE_FILE_TEST_AUTHOR_CONTRACT_ADMITS_ONLY_CURRENT_"
+    "R10_WRAPPER_PLUS4_NEGATIONS_EXACT_R8_PRODUCTION_RECIPE_RESTORATION_REBUILT_"
+    "INSTALLER_AND_MINIMAL_MANIFEST_IDENTITY_UPDATE;_RUNTIME_MEDIATOR_REMAINS_BYTE_"
+    "EXACT;_R18_PRODUCT_PUBLICATION_AND_INSTALLED_LANES_BIND_THE_FRESH_R11_MERGE_"
+    "LIVE_MAIN_CLEAN_HEAD_EXECUTING_GATE_SPEC_EXACT_PRODUCT_GRAPH_AND_BLOBS_BEFORE_"
+    "ANY_EFFECT;_R10_IS_NEVER_RESTAGED_OR_EXECUTED_NO_DIAGNOSTIC_OR_RETRY_OCCURS_"
+    "AND_NONZERO_OUTPUT_IDENTITY_DRIFT_OR_UNEXPECTED_STATE_REQUIRES_OWNER_STOP"
+)
+R18_PRODUCT_CHANGE_SHAPE = (
+    "EXACTLY_FOUR_EXISTING_M_CHANGES_INSTALL_SOURCE_RECIPE_MANIFEST_WITH_UNCHANGED_"
+    "MODES_AND_NO_RENAME_ADD_DELETE_SUBSTITUTION_OR_BROADER_PREFIX;_SOURCE_CURRENT_"
+    "WRAPPER_PLUS4_NEGATIONS;_RECIPE_EXACT_R8;_RUNTIME_MEDIATOR_BYTE_EXACT"
+)
+R18_PUBLICATION_BINDING = (
+    "PRODUCT_MERGE_ORDERED_PARENTS_EXACT_R18_CONTRACT_MERGE_AND_DIRECT_CHILD_R11_"
+    "CANDIDATE;_MERGE_TREE_EQUALS_CANDIDATE;_LIVE_AUTHENTICATED_ORIGIN_MAIN_AND_"
+    "CLEAN_HEAD_EQUAL_PRODUCT_MERGE;_EXECUTING_GATE_SPEC_AND_PRODUCT_BLOBS_EQUAL_"
+    "THE_MERGE;_CONTRACT_MERGE_IS_EXACT_TWO_PARENT_PUBLICATION_FROM6481ABC1"
+)
 R14_CFG_INTERPRETATION = (
     "EACH_EXISTING_CHECK_HAS_ONE_OPTIMIZER_RETAINED_PREDICATE_LOCAL_STATUS_IN_ITS_"
     "OWNING_COMPILED_CFG;_MAIN_OWNS1_TO5_INSTALLER_BOOTSTRAP_OWNS6_TO125_AND_CODE0_"
@@ -955,20 +1067,21 @@ R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
     "/.install/controller/runtime-cleanup",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_R17_GUARDED_COMPLETION_PUBLICATION_AND_INSTALLED_EFFECT_ABSENT"
+REASON = "H039_R18_R11_CORRECTED_PRODUCTION_PUBLICATION_AND_INSTALLED_EFFECT_ABSENT"
 FAILURE_SIGNATURE = [
-    "PUBLISHED_R16_R10_MAIN_931E58F4_IS_THE_EXACT_R17_AUTHORITY_BASE",
-    "OWNER_ADJUDICATED_R10_STATUS0_AT_IMMEDIATE_PRECREATE_ZERO_EFFECT_BOUNDARY",
-    "EXACT_PUBLISHED_R8_RESTORED_ON_PROTECTED_INODE_AND_R10_RERUN_FORBIDDEN",
-    "FRESH_R17_FIVE_FILE_TEST_AUTHOR_CONTRACT_REQUIRES_DUAL_REVIEW_AND_PUBLICATION",
-    "CURRENT_PUBLICATION_AND_HISTORICAL_R8_IDENTITIES_MUST_BOTH_PRECEDE_EFFECTS",
-    "EXACT_ONE_UID501_GID20_INSTALLED_EFFECT_MATRIX_NOT_YET_EXECUTED",
+    "PUBLISHED_R17_MAIN_6481ABC1_IS_THE_EXACT_R18_AUTHORITY_BASE",
+    "R8_RC1_ZERO_EFFECT_IS_CAUSED_BY_EXACTLY4_OF21_INVERTED_FLUSH_DIR_SITES",
+    "FRESH_R18_FIVE_FILE_TEST_AUTHOR_CONTRACT_REQUIRES_DUAL_REVIEW_AND_PUBLICATION",
+    "R11_REQUIRES_CURRENT_WRAPPER_PLUS4_NEGATIONS_AND_EXACT_R8_PRODUCTION_RECIPE",
+    "RUNTIME_MEDIATOR_AND_ALL_NONAUTHORIZED_PRODUCT_BYTES_REMAIN_EXACT",
+    "CURRENT_R11_PRODUCT_PUBLICATION_MUST_PRECEDE_ONE_UID501_GID20_EFFECT_RUN",
+    "R10_DIAGNOSTIC_IS_CONSUMED_AND_NEVER_RESTAGED_OR_EXECUTED",
     "PATHLESS_CAPABILITY_AND_MANAGED_OPTION_A_FALSIFICATION_GREEN",
     "F_OFD_SETLK_REFERENCE_FALSIFICATION_GREEN",
     "ACCEPTED_STREAM_NODELETEBUSY_LIMIT_BOUND_TO_H038_WRITER_LIFETIME",
     "PUBLISHED_H036_AND_REGISTRY_V3_IDENTITIES_PINNED",
 ]
-EXPECTED_H039_ROW_SHA256 = "807a6ace1df0c13f8ab0b4fbb7f8a0d651991439fc8690f6935a609c04932d0a"
+EXPECTED_H039_ROW_SHA256 = "21bea5cd5aa7fbf7dde6ea8c42aca4a76c2ddc9bca51d1c3b79435f4ac10aed3"
 
 passed = 0
 failed = 0
@@ -1057,6 +1170,67 @@ def r17_registry_expected() -> dict[str, Any]:
         "r10_diagnostic_reexecution_or_restage": False,
         "workflow_evidence_grants_credit": False,
         "new_product_bytes": False,
+        "broader_authority": False,
+    }
+
+
+def r18_registry_expected() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "authority_base": R18_AUTHORITY_BASE,
+        "authority_tree": R18_AUTHORITY_TREE,
+        "authority_ordered_parents": R18_AUTHORITY_PARENTS,
+        "test_author_paths": TEST_AUTHOR_GIT_ORDER,
+        "contract_candidate_change_shape": R17_CANDIDATE_CHANGE_SHAPE,
+        "failed_r8_product_merge": PUBLISHED_H039_R8_PRODUCT_MERGE,
+        "failed_r8_bootstrap_exit": 1,
+        "failed_r8_pre_post_transcript_sha256":
+            "91c781947e020145aa6323dabc790571292dfebc765e0ae26ea855b801c0a063",
+        "flush_dir_definition": "return fsync(fd)==0;",
+        "installer_flush_dir_site_count": 21,
+        "unchanged_correct_site_count": 17,
+        "corrected_inverted_site_count": 4,
+        "flush_site_registry": R18_FLUSH_SITE_REGISTRY,
+        "causal_fixtures": R18_CAUSAL_FIXTURES,
+        "base_wrapper_source_sha256": R18_CURRENT_WRAPPER_SOURCE_SHA256,
+        "base_wrapper_source_size": R18_CURRENT_WRAPPER_SOURCE_SIZE,
+        "old_predicates": R18_OLD_PREDICATES,
+        "corrected_predicates": R18_CORRECTED_PREDICATES,
+        "corrected_wrapper_source_sha256": R18_CORRECTED_WRAPPER_SOURCE_SHA256,
+        "corrected_wrapper_source_size": R18_CORRECTED_WRAPPER_SOURCE_SIZE,
+        "source_delta": "EXACTLY_FOUR_INSERTED_EXCLAMATION_BYTES",
+        "diagnostic_recipe_sha256": R18_CURRENT_DIAGNOSTIC_RECIPE_SHA256,
+        "production_recipe_sha256": R18_PRODUCTION_RECIPE_SHA256,
+        "recipe_removed_argv": R18_RECIPE_REMOVED_ARGV,
+        "recipe_delta": "EXACTLY_TWO_DIAGNOSTIC_ARGV_DELETIONS",
+        "preprocessed_compiled_branch": "H039_INSTALLER_PRODUCTION_ELSE_ONLY",
+        "diagnostic_branch_status_and_import_reachable": False,
+        "product_change_paths": R18_PRODUCT_GIT_ORDER,
+        "product_change_shape": R18_PRODUCT_CHANGE_SHAPE,
+        "runtime_mediator_sha256": PUBLISHED_H039_R8_PRODUCT_BLOBS[
+            "verify/h039/runtime-cleanup-mediator"
+        ],
+        "product_cli": [
+            "--r18-product", "RUNTIME_SUPPLIED_PUBLISHED_R18_CONTRACT_MERGE",
+            "RUNTIME_SUPPLIED_R11_CANDIDATE",
+        ],
+        "published_cli": [
+            "--r18-published", "RUNTIME_SUPPLIED_PUBLISHED_R11_PRODUCT_MERGE",
+        ],
+        "installed_cli": [
+            "--r18-installed", "RUNTIME_SUPPLIED_PUBLISHED_R11_PRODUCT_MERGE",
+        ],
+        "publication_binding": R18_PUBLICATION_BINDING,
+        "installed_engine_bodies": R17_INSTALLED_ENGINE_BINDING,
+        "required_uid": CLIENT_UID,
+        "required_gid": CLIENT_GID,
+        "initial_receipt_sequence": 0,
+        "effect_receipt_delta": 13,
+        "final_receipt_sequence": 13,
+        "zero_runtime_process_descriptor_residue": True,
+        "root_bootstrap_count": 1,
+        "root_bootstrap_retry": False,
+        "r10_diagnostic_reexecution_or_restage": False,
         "broader_authority": False,
     }
 
@@ -1185,6 +1359,11 @@ def static_contract_checks() -> dict[str, Any]:
         and commit_parents(R17_AUTHORITY_BASE) == R17_AUTHORITY_PARENTS,
         "A_H039_R17_AUTHORITY_BASE_TREE_AND_ORDERED_PARENTS",
     )
+    check(
+        commit_tree(R18_AUTHORITY_BASE) == R18_AUTHORITY_TREE
+        and commit_parents(R18_AUTHORITY_BASE) == R18_AUTHORITY_PARENTS,
+        "A_H039_R18_AUTHORITY_BASE_TREE_AND_ORDERED_PARENTS",
+    )
     check(commit_tree(CONTRACT_AUTHORITY_BASE) == CONTRACT_AUTHORITY_TREE,
           "A_H039_AUTHORITY_BASE_TREE")
     check(commit_parents(CONTRACT_AUTHORITY_BASE) == CONTRACT_AUTHORITY_PARENTS,
@@ -1290,6 +1469,9 @@ def static_contract_checks() -> dict[str, Any]:
     completion = row.get("h039_os_exclusive_runtime_cleanup", {}).get(
         "r17_installed_effect_completion", {},
     )
+    production_correction = row.get(
+        "h039_os_exclusive_runtime_cleanup", {},
+    ).get("r18_production_flush_polarity_correction", {})
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -1394,6 +1576,10 @@ def static_contract_checks() -> dict[str, Any]:
         exact_typed_tree(completion, r17_registry_expected()),
         "A_H039_R17_EXACT_INSTALLED_EFFECT_COMPLETION_REGISTRY",
     )
+    check(
+        exact_typed_tree(production_correction, r18_registry_expected()),
+        "A_H039_R18_EXACT_PRODUCTION_FLUSH_POLARITY_REGISTRY",
+    )
     expected_red = {
         "label": LABEL,
         "reason": REASON,
@@ -1406,12 +1592,17 @@ def static_contract_checks() -> dict[str, Any]:
             ),
             expected_red,
         ),
-        "A_H039_R17_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
+        "A_H039_R18_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
     )
     check(
         row.get("h039_r17_installed_effect_completion_reconciliation")
         == R17_RECONCILIATION,
         "A_H039_R17_EXACT_RECONCILIATION",
+    )
+    check(
+        row.get("h039_r18_r11_production_flush_polarity_reconciliation")
+        == R18_RECONCILIATION,
+        "A_H039_R18_EXACT_RECONCILIATION",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -1475,6 +1666,14 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("exit_criterion", "")),
         "A_H039_R17_EXACT_MATERIAL_REVIEW_BOUNDARY",
+    )
+    check(
+        row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r18_material_review_extension") == R18_MATERIAL_REVIEW_EXTENSION
+        and f"R18_MATERIAL_REVIEW_EXTENSION={R18_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("exit_criterion", "")),
+        "A_H039_R18_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -1792,6 +1991,101 @@ def r17_registry_selftests(row: dict[str, Any]) -> None:
         check(
             not exact_typed_tree(mutant, expected_red),
             f"N_H039_R17_PREPRODUCT_RED_{label}",
+        )
+
+
+def exact_r18_product_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 3
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r18-product"
+        and valid_hex(argv[1], 40) and valid_hex(argv[2], 40)
+    )
+
+
+def exact_r18_publication_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 2
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r18-published" and valid_hex(argv[1], 40)
+    )
+
+
+def exact_r18_installed_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 2
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r18-installed" and valid_hex(argv[1], 40)
+    )
+
+
+def r18_registry_selftests(row: dict[str, Any]) -> None:
+    registry = row["h039_os_exclusive_runtime_cleanup"][
+        "r18_production_flush_polarity_correction"
+    ]
+    expected = r18_registry_expected()
+    check(
+        exact_typed_tree(registry, expected),
+        "A_H039_R18_PRODUCTION_REGISTRY_SELFTEST_ANCHOR",
+    )
+    for label, mutate in (
+        ("KEY_REMOVED", lambda value: value.pop("flush_dir_definition")),
+        ("KEY_ADDED", lambda value: value.__setitem__("alternate", False)),
+        ("BASE_CHANGED", lambda value: value.__setitem__("authority_base", "00" * 20)),
+        ("SITE_REMOVED", lambda value: value["flush_site_registry"].pop()),
+        ("SITE_REORDERED", lambda value: value["flush_site_registry"].reverse()),
+        ("SITE_CLASS_CHANGED", lambda value: value["flush_site_registry"][7].__setitem__(3, "SUCCESS_CONJUNCTION")),
+        ("CORRECTED_COUNT", lambda value: value.__setitem__("corrected_inverted_site_count", 3)),
+        ("FIXTURE_REMOVED", lambda value: value["causal_fixtures"].pop()),
+        ("SOURCE_CHANGED", lambda value: value.__setitem__("corrected_wrapper_source_sha256", "00" * 32)),
+        ("SOURCE_DELTA_WIDENED", lambda value: value.__setitem__("source_delta", "SEMANTIC_EQUIVALENCE")),
+        ("RECIPE_DIAGNOSTIC", lambda value: value.__setitem__("production_recipe_sha256", R18_CURRENT_DIAGNOSTIC_RECIPE_SHA256)),
+        ("RECIPE_ARG_REMOVED", lambda value: value["recipe_removed_argv"].pop()),
+        ("DIAGNOSTIC_REACHABLE", lambda value: value.__setitem__("diagnostic_branch_status_and_import_reachable", True)),
+        ("PRODUCT_PATH_REMOVED", lambda value: value["product_change_paths"].pop()),
+        ("MEDIATOR_CHANGED", lambda value: value.__setitem__("runtime_mediator_sha256", "00" * 32)),
+        ("RETRY", lambda value: value.__setitem__("root_bootstrap_retry", True)),
+        ("R10_RESTAGE", lambda value: value.__setitem__("r10_diagnostic_reexecution_or_restage", True)),
+        ("AUTHORITY_WIDENED", lambda value: value.__setitem__("broader_authority", True)),
+    ):
+        mutant = copy.deepcopy(registry)
+        mutate(mutant)
+        check(
+            not exact_typed_tree(mutant, expected),
+            f"N_H039_R18_REGISTRY_{label}",
+        )
+
+    sample_contract = "ab" * 20
+    sample_candidate = "cd" * 20
+    sample_product = "ef" * 20
+    check(
+        exact_r18_product_argv([
+            "--r18-product", sample_contract, sample_candidate,
+        ]),
+        "A_H039_R18_EXACT_PRODUCT_CLI_SHAPE",
+    )
+    check(
+        exact_r18_publication_argv(["--r18-published", sample_product]),
+        "A_H039_R18_EXACT_PUBLICATION_CLI_SHAPE",
+    )
+    check(
+        exact_r18_installed_argv(["--r18-installed", sample_product]),
+        "A_H039_R18_EXACT_INSTALLED_CLI_SHAPE",
+    )
+    cli_mutants = [
+        [], ["--r18-product", sample_contract],
+        ["--r18-product", sample_contract, sample_candidate, "extra"],
+        ["--r18-product", sample_contract.upper(), sample_candidate],
+        ["--r18-published", sample_product, sample_candidate],
+        ["--r18-installed", sample_product, PUBLISHED_H039_R8_PRODUCT_MERGE],
+        ["--installed", sample_product],
+    ]
+    for index, mutant in enumerate(cli_mutants):
+        check(
+            not exact_r18_product_argv(mutant)
+            and not exact_r18_publication_argv(mutant)
+            and not exact_r18_installed_argv(mutant),
+            f"N_H039_R18_CLI_MUTANT_{index:02d}",
         )
 
 
@@ -7140,6 +7434,15 @@ def exact_product_change_shape(changes: list[tuple[str, str, str, str]]) -> bool
     ]
 
 
+def exact_r18_product_change_shape(
+    changes: list[tuple[str, str, str, str]],
+) -> bool:
+    return changes == [
+        (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
+        for path in R18_PRODUCT_GIT_ORDER
+    ]
+
+
 def exact_r8_product_change_shape(
     changes: list[tuple[str, str, str, str]],
 ) -> bool:
@@ -7186,6 +7489,49 @@ def stable_checkout_blob(path: str, expected: bytes) -> bool:
             and b"".join(chunks) == expected
         )
     except OSError:
+        return False
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def stable_product_checkout_blob(path: str, expected: bytes) -> bool:
+    target = ROOT / path
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            target,
+            os.O_RDONLY | os.O_CLOEXEC
+            | getattr(os, "O_NOFOLLOW_ANY") | 0x00002000,
+        )
+        before = os.fstat(descriptor)
+        expected_mode = int(PRODUCT_MODES[path], 8) & 0o777
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 \
+                or stat.S_IMODE(before.st_mode) != expected_mode \
+                or before.st_size > PRODUCT_BYTE_LIMITS[path]:
+            return False
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                return False
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            return False
+        after = os.fstat(descriptor)
+        named = os.lstat(target)
+        identity = lambda value: (
+            value.st_dev, value.st_ino, value.st_mode, value.st_uid,
+            value.st_gid, value.st_nlink, value.st_size,
+            value.st_mtime_ns, value.st_ctime_ns,
+        )
+        return (
+            identity(before) == identity(after) == identity(named)
+            and b"".join(chunks) == expected
+        )
+    except (KeyError, OSError):
         return False
     finally:
         if descriptor >= 0:
@@ -7275,6 +7621,108 @@ def r17_contract_publication_graph(merge: str) -> tuple[bool, dict[str, Any]]:
 
 def r17_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
     graph_ok, graph = r17_contract_publication_graph(merge)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        ok = (
+            graph_ok and remote_main == merge and head == merge
+            and status_raw == b"" and checkout_equal
+        )
+        return ok, {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r18_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        changes = raw_changes(R18_AUTHORITY_BASE, candidate)
+        additions, deletions = line_delta(R18_AUTHORITY_BASE, candidate)
+        detail = {
+            "authority_tree": commit_tree(R18_AUTHORITY_BASE),
+            "authority_parents": commit_parents(R18_AUTHORITY_BASE),
+            "candidate": candidate,
+            "candidate_parents": commit_parents(candidate),
+            "changes": changes,
+            "additions": additions,
+            "deletions": deletions,
+        }
+        ok = (
+            object_type(R18_AUTHORITY_BASE) == "commit"
+            and detail["authority_tree"] == R18_AUTHORITY_TREE
+            and detail["authority_parents"] == R18_AUTHORITY_PARENTS
+            and object_type(candidate) == "commit"
+            and candidate not in {
+                R18_AUTHORITY_BASE, R17_AUTHORITY_BASE, CONTRACT_AUTHORITY_BASE,
+                PUBLISHED_H039_R8_PRODUCT_MERGE,
+                PUBLISHED_H039_R9_PRODUCT_MERGE,
+            }
+            and detail["candidate_parents"] == [R18_AUTHORITY_BASE]
+            and exact_contract_change_shape(changes)
+            and type(additions) is int and additions <= MAX_ADDED_LINES
+            and type(deletions) is int and deletions <= MAX_DELETED_LINES
+        )
+        return ok, detail
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r18_contract_candidate_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r18_contract_candidate_graph(candidate)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(candidate, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        ok = (
+            graph_ok and remote_main == R18_AUTHORITY_BASE
+            and head == candidate and status_raw == b"" and checkout_equal
+        )
+        return ok, {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r18_contract_publication_graph(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        authority, candidate = parents
+        graph_ok, graph = r18_contract_candidate_graph(candidate)
+        changes = raw_changes(R18_AUTHORITY_BASE, merge)
+        merge_tree = commit_tree(merge)
+        candidate_tree = commit_tree(candidate)
+        ok = (
+            object_type(merge) == "commit" and authority == R18_AUTHORITY_BASE
+            and graph_ok and merge_tree == candidate_tree
+            and exact_contract_change_shape(changes)
+        )
+        return ok, {
+            "parents": parents, "candidate": graph, "changes": changes,
+            "merge_tree": merge_tree, "candidate_tree": candidate_tree,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
+def r18_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r18_contract_publication_graph(merge)
     try:
         remote_main = observed_production_main()
         head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
@@ -7481,6 +7929,114 @@ def product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
         }
     except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
         return False, {"error": str(exc)}
+
+
+def r18_product_identity(
+    contract_merge: str, candidate: str, *, require_checkout: bool = True,
+    require_contract_publication: bool = True,
+) -> tuple[bool, dict[str, Any]]:
+    contract_ok, contract_detail = r18_contract_publication_graph(contract_merge)
+    try:
+        parents = commit_parents(candidate)
+        changes = raw_changes(contract_merge, candidate)
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        frozen_paths = [
+            "specs/tasks.spec.json", "verify/bin/h-039-exit",
+            "specs/owner-production-paths.v1.json",
+            "verify/h039/runtime-cleanup-mediator",
+        ]
+        frozen_equal = all(
+            blob(candidate, path) == blob(contract_merge, path)
+            for path in frozen_paths
+        )
+        source_exact = (
+            blob(candidate, "controller/runtime-cleanup/native/mediator.c")
+            == r18_expected_production_source()
+        )
+        recipe_raw = blob(candidate, "verify/h039/build-recipe.json")
+        recipe_exact = (
+            recipe_raw == r18_expected_production_recipe()
+            and sha(recipe_raw) == R18_PRODUCTION_RECIPE_SHA256
+        )
+        mediator_exact = (
+            sha(blob(candidate, "verify/h039/runtime-cleanup-mediator"))
+            == PUBLISHED_H039_R8_PRODUCT_BLOBS[
+                "verify/h039/runtime-cleanup-mediator"
+            ]
+        )
+        product_sizes = {
+            path: blob_size(candidate, path) for path in PRODUCT_PATHS
+        }
+        additions, deletions = line_delta(contract_merge, candidate)
+        bounded = (
+            all(product_sizes[path] <= PRODUCT_BYTE_LIMITS[path]
+                for path in PRODUCT_PATHS)
+            and sum(product_sizes.values()) <= MAX_AGGREGATE_PRODUCT_BYTES
+        )
+        remote_main = observed_production_main() \
+            if require_contract_publication else None
+        ok = (
+            contract_ok and object_type(candidate) == "commit"
+            and parents == [contract_merge]
+            and exact_r18_product_change_shape(changes)
+            and additions <= MAX_ADDED_LINES and deletions <= MAX_DELETED_LINES
+            and frozen_equal and source_exact and recipe_exact
+            and mediator_exact and bounded
+            and (not require_contract_publication or remote_main == contract_merge)
+            and (not require_checkout or (head == candidate and status_raw == b""))
+        )
+        return ok, {
+            "contract": contract_detail, "parents": parents,
+            "changes": changes, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "frozen_equal": frozen_equal, "source_exact": source_exact,
+            "recipe_exact": recipe_exact, "mediator_exact": mediator_exact,
+            "product_sizes": product_sizes, "bounded": bounded,
+            "additions": additions, "deletions": deletions,
+            "remote_main": remote_main,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "contract": contract_detail}
+
+
+def r18_product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        contract_merge, candidate = parents
+        product_ok, product_detail = r18_product_identity(
+            contract_merge, candidate, require_checkout=False,
+            require_contract_publication=False,
+        )
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        executing_bytes_equal = (
+            SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
+        )
+        product_blob_equal = all(
+            stable_product_checkout_blob(path, blob(merge, path))
+            for path in R18_PRODUCT_GIT_ORDER
+        )
+        ok = (
+            product_ok and commit_tree(merge) == commit_tree(candidate)
+            and remote_main == merge and head == merge and status_raw == b""
+            and executing_bytes_equal and product_blob_equal
+        )
+        return ok, {
+            "parents": parents, "tree": commit_tree(merge),
+            "candidate_tree": commit_tree(candidate),
+            "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "executing_bytes_equal": executing_bytes_equal,
+            "product_blob_equal": product_blob_equal,
+            "product": product_detail,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
 
 
 def product_bytes(path: str, commit: str | None) -> bytes:
@@ -9414,6 +9970,411 @@ def r16_expected_diagnostic_source() -> bytes:
     return corrected
 
 
+def r18_expected_production_recipe() -> bytes:
+    current = blob(R18_AUTHORITY_BASE, "verify/h039/build-recipe.json")
+    target = blob(PUBLISHED_H039_R8_PRODUCT_MERGE, "verify/h039/build-recipe.json")
+    if sha(current) != R18_CURRENT_DIAGNOSTIC_RECIPE_SHA256:
+        raise Rig("R18 current diagnostic recipe identity drift")
+    if sha(target) != R18_PRODUCTION_RECIPE_SHA256:
+        raise Rig("R18 published R8 production recipe identity drift")
+    current_value = strict_json(current)
+    target_value = strict_json(target)
+    if type(current_value) is not dict or type(target_value) is not dict:
+        raise Rig("R18 recipe is not an exact object")
+    current_argv = current_value.get("installer_compile_argv")
+    target_argv = target_value.get("installer_compile_argv")
+    if type(current_argv) is not list or type(target_argv) is not list:
+        raise Rig("R18 recipe installer argv is not exact")
+    reduced = list(current_argv)
+    for item in R18_RECIPE_REMOVED_ARGV:
+        if reduced.count(item) != 1:
+            raise Rig("R18 diagnostic recipe removal anchor drift")
+        reduced.remove(item)
+    expected_value = copy.deepcopy(current_value)
+    expected_value["installer_compile_argv"] = reduced
+    if expected_value != target_value:
+        raise Rig("R18 recipe delta is broader than two diagnostic argv deletions")
+    return target
+
+
+def r18_expected_production_source() -> bytes:
+    base = blob(
+        R18_AUTHORITY_BASE,
+        "controller/runtime-cleanup/native/mediator.c",
+    )
+    if (
+        len(base) != R18_CURRENT_WRAPPER_SOURCE_SIZE
+        or sha(base) != R18_CURRENT_WRAPPER_SOURCE_SHA256
+    ):
+        raise Rig("R18 current R10-wrapper source identity drift")
+    corrected = base
+    for old_text, corrected_text in zip(
+        R18_OLD_PREDICATES, R18_CORRECTED_PREDICATES, strict=True,
+    ):
+        old = old_text.encode("utf-8")
+        new = corrected_text.encode("utf-8")
+        if corrected.count(old) != 1 or corrected.count(new) != 0:
+            raise Rig("R18 production polarity transform anchor drift")
+        corrected = corrected.replace(old, new, 1)
+    if (
+        len(corrected) != R18_CORRECTED_WRAPPER_SOURCE_SIZE
+        or sha(corrected) != R18_CORRECTED_WRAPPER_SOURCE_SHA256
+    ):
+        raise Rig("R18 transform is not exactly four inserted negations")
+    return corrected
+
+
+def r18_effective_production_source(raw: bytes) -> bytes:
+    start_marker = b"#if defined(H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC)\n"
+    production_marker = b"#else\nstatic int installer_bootstrap(int argc,char **argv){"
+    end_marker = b"#endif\n#endif\n\nint main(int argc,char **argv){"
+    if (
+        raw.count(start_marker) != 1
+        or raw.count(production_marker) != 1
+        or raw.count(end_marker) != 1
+    ):
+        raise Rig("R18 diagnostic-wrapper production-selection anchors drift")
+    start = raw.index(start_marker)
+    production = raw.index(production_marker, start)
+    end = raw.index(end_marker, production)
+    effective = (
+        raw[:start]
+        + raw[production + len(b"#else\n"):end]
+        + raw[end + len(b"#endif\n"):]
+    )
+    historical = blob(
+        PUBLISHED_H039_R8_PRODUCT_MERGE,
+        "controller/runtime-cleanup/native/mediator.c",
+    )
+    expected = historical
+    for old_text, corrected_text in zip(
+        R18_OLD_PREDICATES, R18_CORRECTED_PREDICATES, strict=True,
+    ):
+        old = old_text.encode("utf-8")
+        new = corrected_text.encode("utf-8")
+        if expected.count(old) != 1 or expected.count(new) != 0:
+            raise Rig("R18 effective R8 production anchor drift")
+        expected = expected.replace(old, new, 1)
+    if (
+        len(expected) != 98750
+        or sha(expected)
+        != "ace7910829a9f6c5a6793822fa504c8ef841ce78bf9b36168dd2323b67eba2ce"
+        or effective != expected
+    ):
+        raise Rig("R18 selected production source is not exact R8 plus four negations")
+    return effective
+
+
+def r18_production_flush_valid(raw: bytes, *, exact_image: bool) -> bool:
+    try:
+        expected = r18_expected_production_source()
+        if exact_image and raw != expected:
+            return False
+        if raw != expected:
+            return False
+        effective_raw = r18_effective_production_source(raw)
+        source = c_semantic_source(effective_raw.decode("utf-8"))
+        if source.count("static int flush_dir(int fd){return fsync(fd)==0;}") != 1:
+            return False
+        names = [
+            "durable_fixed_dir_at", "validate_bootstrap_staging",
+            "exact_regular_bytes", "ensure_lock", "stage_embedded_mediator",
+            "publish_staged_mediator", "directory_prefix",
+            "remove_fixed_staging", "apply_install",
+        ]
+        bodies = "\n".join(c_function_body(source, name) for name in names)
+        if bodies.count("flush_dir(") != 21:
+            return False
+        if any(bodies.count(old) != 0 for old in R18_OLD_PREDICATES):
+            return False
+        if any(bodies.count(new) != 1 for new in R18_CORRECTED_PREDICATES):
+            return False
+        if "H039_DIAG_" in source or "ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC" in source:
+            return False
+        bootstrap = c_structure_mask(c_function_body(source, "installer_bootstrap"))
+        installer_raw = c_function_body(source, "installer_main")
+        installer = c_structure_mask(installer_raw)
+        if "apply_install(project,mediator,mediator_n)" not in bootstrap:
+            return False
+        if (
+            installer_raw.count('"verify"') != 1
+            or installer_raw.count('"bootstrap"') != 1
+            or "installer_bootstrap(argc,argv)" not in installer
+        ):
+            return False
+        for raw_rc, expected_result in ((0, "CONTINUE"), (-1, "STOP")):
+            flush_success = raw_rc == 0
+            result = "STOP" if not flush_success else "CONTINUE"
+            if result != expected_result:
+                return False
+        recipe = r18_expected_production_recipe()
+        recipe_value = strict_json(recipe)
+        compile_argv = recipe_value.get("installer_compile_argv")
+        if (
+            type(compile_argv) is not list
+            or "-DH039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC=1" in compile_argv
+            or "-Wno-unused-function" in compile_argv
+            or "-DH039_INSTALLER=1" not in compile_argv
+        ):
+            return False
+        return True
+    except (Rig, UnicodeError, ValueError, TypeError):
+        return False
+
+
+def r18_flush_polarity_selftests() -> None:
+    source = r18_expected_production_source()
+    check(
+        r18_production_flush_valid(source, exact_image=True),
+        "A_H039_R18_EXACT_FOUR_OF_TWENTY_ONE_PRODUCTION_FLUSH_POLARITY",
+    )
+    for index, (old_text, corrected_text) in enumerate(zip(
+        R18_OLD_PREDICATES, R18_CORRECTED_PREDICATES, strict=True,
+    )):
+        corrected = corrected_text.encode("utf-8")
+        old = old_text.encode("utf-8")
+        reverted = source.replace(corrected, old, 1)
+        doubled = source.replace(corrected, corrected.replace(b"!flush", b"!!flush"), 1)
+        substituted = source.replace(corrected, corrected.replace(b"flush_dir(", b"flush_dir(decoy,"), 1)
+        for label, mutant in (
+            ("REVERTED", reverted), ("DOUBLE_NEGATION", doubled),
+            ("ARGUMENT_SUBSTITUTED", substituted),
+        ):
+            if mutant == source:
+                raise Rig(f"noncausal R18 target mutant {index} {label}")
+            check(
+                not r18_production_flush_valid(mutant, exact_image=False),
+                f"N_H039_R18_TARGET_{index + 1:02d}_{label}",
+            )
+    helper_mutant = source.replace(
+        b"return fsync(fd)==0;", b"return fsync(fd)!=0;", 1,
+    )
+    decoy_mutant = source.replace(
+        b"static int installer_verify",
+        b"static int h039_flush_decoy(void){return flush_dir(-1);}\n"
+        b"static int installer_verify",
+        1,
+    )
+    reordered_mutant = source.replace(
+        R18_CORRECTED_PREDICATES[0].encode("utf-8"),
+        R18_CORRECTED_PREDICATES[1].encode("utf-8"),
+        1,
+    )
+    for label, mutant in (
+        ("HELPER_INVERTED", helper_mutant),
+        ("DEAD_DECOY", decoy_mutant),
+        ("SITE_REORDERED_OR_SWAPPED", reordered_mutant),
+    ):
+        check(
+            mutant != source
+            and not r18_production_flush_valid(mutant, exact_image=False),
+            f"N_H039_R18_{label}",
+        )
+    start = source.index(b"static int durable_fixed_dir_at")
+    end = source.index(b"static int installer_verify", start)
+    region = source[start:end]
+    positions = [
+        match.start() for match in re.finditer(br"flush_dir\(", region)
+    ]
+    check(len(positions) == 21, "A_H039_R18_EXACT_INSTALLER_FLUSH_SITE_COUNT")
+    for index, position in enumerate(positions):
+        absolute = start + position
+        mutant = source[:absolute] + b"!" + source[absolute:]
+        check(
+            not r18_production_flush_valid(mutant, exact_image=False),
+            f"N_H039_R18_FLUSH_SITE_{index + 1:02d}_CHANGED",
+        )
+    current_recipe = blob(R18_AUTHORITY_BASE, "verify/h039/build-recipe.json")
+    production_recipe = r18_expected_production_recipe()
+    check(
+        sha(current_recipe) == R18_CURRENT_DIAGNOSTIC_RECIPE_SHA256
+        and sha(production_recipe) == R18_PRODUCTION_RECIPE_SHA256,
+        "A_H039_R18_EXACT_TWO_ARGV_RECIPE_RESTORATION",
+    )
+    check(
+        current_recipe != production_recipe,
+        "N_H039_R18_DIAGNOSTIC_RECIPE_CANNOT_BUILD_PRODUCTION_R11",
+    )
+
+
+def r18_compiled_production_views(raw: bytes) -> tuple[bytes, bytes]:
+    if raw != r18_expected_production_source():
+        raise Rig("R18 compiled view source is not exact")
+    recipe = strict_json(r18_expected_production_recipe())
+    compile_argv = recipe.get("installer_compile_argv")
+    if type(compile_argv) is not list or not all(
+        type(value) is str for value in compile_argv
+    ):
+        raise Rig("R18 production recipe argv type mismatch")
+    compiler = Path(compile_argv[0])
+    if (
+        str(compiler) != recipe.get("compiler_path")
+        or path_sha(compiler) != recipe.get("compiler_sha256")
+    ):
+        raise Undecidable("R18 pinned compiler identity drift")
+    source_argument = "controller/runtime-cleanup/native/mediator.c"
+    output_argument = "controller/runtime-cleanup/install"
+    flags: list[str] = []
+    index = 1
+    while index < len(compile_argv):
+        value = compile_argv[index]
+        if value == "-o":
+            if index + 1 >= len(compile_argv) \
+                    or compile_argv[index + 1] != output_argument:
+                raise Rig("R18 production recipe output anchor drift")
+            index += 2
+            continue
+        if value == source_argument:
+            index += 1
+            continue
+        if value.startswith("-Wl,"):
+            index += 1
+            continue
+        flags.append(value)
+        index += 1
+    if (
+        "-DH039_INSTALLER=1" not in flags
+        or "-DH039_ROOT_ENTRY_FD0_NORMALIZATION=1" not in flags
+        or any("ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC" in value for value in flags)
+    ):
+        raise Rig("R18 effective production compile definitions drift")
+    temporary = Path(tempfile.mkdtemp(prefix="h039-r18-ir-", dir="/private/tmp"))
+    project = temporary / "project"
+    try:
+        (project / "controller/runtime-cleanup/native").mkdir(parents=True)
+        (project / "verify/h039").mkdir(parents=True)
+        (project / source_argument).write_bytes(raw)
+        (project / "verify/h039/runtime-cleanup-mediator").write_bytes(
+            blob(PUBLISHED_H039_R8_PRODUCT_MERGE,
+                 "verify/h039/runtime-cleanup-mediator")
+        )
+        environment = {
+            "HOME": "/var/empty", "TMPDIR": str(project),
+            "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin",
+        }
+
+        def compiled(extra: list[str]) -> bytes:
+            command = [
+                str(SANDBOX_EXEC),
+                "-D", f"H039_BUILD_EXECUTABLE={compiler}",
+                "-D", f"H039_BUILD_ROOT={project}",
+                "-p", BUILD_REVIEW_PROFILE,
+                str(compiler), *flags, *extra,
+            ]
+            result = bounded_run(
+                command, cwd=project, env=environment, timeout=60,
+            )
+            if result.returncode == 71 \
+                    and b"sandbox_apply: Operation not permitted" in result.stderr:
+                raise Undecidable("outer Seatbelt denied R18 compiled-view sandbox")
+            if result.returncode != 0 or result.stderr:
+                raise Rig(
+                    f"R18 compiled view failed rc={result.returncode} "
+                    f"stderr={result.stderr!r}"
+                )
+            return result.stdout
+
+        preprocessed = compiled(["-E", "-P", source_argument])
+        ir = compiled(["-S", "-emit-llvm", source_argument, "-o", "-"])
+        return preprocessed, ir
+    finally:
+        shutil.rmtree(temporary)
+
+
+def r18_compiled_production_checks(raw: bytes) -> None:
+    preprocessed, ir = r18_compiled_production_views(raw)
+    forbidden = (
+        b"H039_DIAG_", b"ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC",
+        b"IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT",
+    )
+    if any(token in preprocessed or token in ir for token in forbidden):
+        raise Rig("R18 diagnostic branch survived production preprocessing")
+    required_preprocessed = (
+        b"apply_install", b"stage_embedded_mediator", b"directory_prefix",
+        b"remove_fixed_staging", b"installer_bootstrap", b"installer_main",
+    )
+    if any(token not in preprocessed for token in required_preprocessed):
+        raise Rig("R18 production function missing after preprocessing")
+    required_ir = (
+        b"@main", b'@"\\01_fsync"', b'@"\\01_openat"',
+        b'@"\\01_fchmod"', b"@fchown",
+        b"@mkdirat", b"@renameatx_np", b"@unlinkat",
+    )
+    if any(token not in ir for token in required_ir):
+        raise Rig("R18 optimized production effect/control-flow import missing")
+    if ir.count(b'@"\\01_fsync"') < 5:
+        raise Rig("R18 optimized production durability graph is incomplete")
+    check(
+        True,
+        "A_H039_R18_PRODUCTION_PREPROCESS_AND_O2_IR_SELECT_EFFECT_GRAPH",
+        {
+            "preprocessed_sha256": sha(preprocessed),
+            "preprocessed_size": len(preprocessed),
+            "optimized_ir_sha256": sha(ir),
+            "optimized_ir_size": len(ir),
+        },
+    )
+
+
+def r18_final_installer_branch_valid(raw: bytes) -> bool:
+    diagnostic_tokens = (
+        b"H039_DIAG_", b"ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC",
+        b"IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT",
+        b"/.install/controller/runtime-cleanup\0",
+    )
+    production_tokens = (
+        b"/.install/controller/runtime-cleanup/install\0",
+        b"/Library/PrivilegedHelperTools\0",
+        b"bootstrap\0", b"verify\0",
+    )
+    return (
+        len(raw) <= PRODUCT_BYTE_LIMITS["controller/runtime-cleanup/install"]
+        and all(token not in raw for token in diagnostic_tokens)
+        and all(raw.count(token) == 1 for token in production_tokens)
+        and raw.count(b"se.nortropic.runtime-cleanup-mediator\0") == 2
+    )
+
+
+def r18_final_installer_branch_selftests() -> None:
+    production = blob(
+        PUBLISHED_H039_R8_PRODUCT_MERGE,
+        "controller/runtime-cleanup/install",
+    )
+    diagnostic = blob(
+        R18_AUTHORITY_BASE,
+        "controller/runtime-cleanup/install",
+    )
+    check(
+        r18_final_installer_branch_valid(production),
+        "A_H039_R18_PUBLISHED_R8_FINAL_PRODUCTION_BRANCH_CONTROL",
+    )
+    check(
+        not r18_final_installer_branch_valid(diagnostic),
+        "N_H039_R18_PUBLISHED_R10_FINAL_DIAGNOSTIC_BRANCH_REJECTED",
+    )
+    for index, token in enumerate((
+        b"H039_DIAG_FAKE\0",
+        b"ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC\0",
+        b"IMMEDIATE_PRE_CREATE_BOUNDARY_REACHED_ZERO_EFFECT\0",
+        b"/.install/controller/runtime-cleanup\0",
+    )):
+        check(
+            not r18_final_installer_branch_valid(production + token),
+            f"N_H039_R18_FINAL_INSTALLER_DIAGNOSTIC_TOKEN_{index:02d}",
+        )
+
+
+def r18_final_installer_branch_checks(commit: str) -> None:
+    raw = product_bytes("controller/runtime-cleanup/install", commit)
+    if not r18_final_installer_branch_valid(raw):
+        raise Rig("R18 final installer retained diagnostic branch identity")
+    check(
+        True,
+        "A_H039_R18_FINAL_R11_INSTALLER_PRODUCTION_BRANCH_ONLY",
+        {"sha256": sha(raw), "size": len(raw)},
+    )
+
+
 def r16_flush_polarity_outcome(
     raw: bytes, staging_runtime_fsync_rc: int, database_fsync_rc: int,
 ) -> int | None:
@@ -9701,9 +10662,13 @@ def r14_diagnostic_source_oracle_selftests() -> None:
 
 def immutable_source_checks(
     commit: str | None = None, *, diagnostic_product: bool = False,
-    corrected_polarity: bool = False,
+    corrected_polarity: bool = False, r18_product: bool = False,
 ) -> None:
     raw = product_bytes("controller/runtime-cleanup/native/mediator.c", commit)
+    if r18_product:
+        if not r18_production_flush_valid(raw, exact_image=True):
+            raise Rig("R18 production source or recipe selection is not exact")
+        raw = r18_effective_production_source(raw)
     try:
         source = raw.decode("utf-8")
     except UnicodeError as exc:
@@ -12142,6 +13107,7 @@ def finish(phase: str) -> int:
     print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
     print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
     print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R18_MATERIAL_REVIEW_EXTENSION={R18_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         if phase == "published":
@@ -12180,6 +13146,7 @@ def main(argv: list[str]) -> int:
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
         print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
         print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R18_MATERIAL_REVIEW_EXTENSION={R18_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -12198,27 +13165,42 @@ def main(argv: list[str]) -> int:
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
         print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
         print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R18_MATERIAL_REVIEW_EXTENSION={R18_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
     product = len(argv) == 3 and argv[0] == "--product"
     published = len(argv) == 2 and argv[0] == "--published"
     installed = exact_r17_installed_argv(argv)
-    if not (preproduct or product or published or installed):
+    r18_product = exact_r18_product_argv(argv)
+    r18_published = exact_r18_publication_argv(argv)
+    r18_installed = exact_r18_installed_argv(argv)
+    if not (
+        preproduct or product or published or installed
+        or r18_product or r18_published or r18_installed
+    ):
         print(
             "RIG_ERROR: usage: h-039-exit [--product PUBLISHED_R16_CONTRACT_MERGE "
             "R10_DIAGNOSTIC_CANDIDATE | --published PUBLISHED_R10_PRODUCT_MERGE | "
             "--installed PUBLISHED_R17_CONTRACT_MERGE "
-            "4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd]",
+            "4bd4257e4a6c782d8d570684ccc5e0c17a8fc7fd | "
+            "--r18-product PUBLISHED_R18_CONTRACT_MERGE R11_CANDIDATE | "
+            "--r18-published PUBLISHED_R11_PRODUCT_MERGE | "
+            "--r18-installed PUBLISHED_R11_PRODUCT_MERGE]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if product or published or installed else []
+    supplied_commits = argv[1:] if (
+        product or published or installed
+        or r18_product or r18_published or r18_installed
+    ) else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
     phase = (
         "preproduct" if preproduct else "product" if product
-        else "published" if published else "installed"
+        else "published" if published else "installed" if installed
+        else "r18-product" if r18_product
+        else "r18-published" if r18_published else "r18-installed"
     )
     try:
         if any(object_type(value) != "commit" for value in supplied_commits):
@@ -12228,11 +13210,15 @@ def main(argv: list[str]) -> int:
         r14_registry_selftests(row)
         r16_registry_selftests(row)
         r17_registry_selftests(row)
+        r18_registry_selftests(row)
         r17_git_identity_selftests()
         r17_installed_engine_selftests()
         r15_native_absolute_literal_oracle_selftests()
         r14_diagnostic_source_oracle_selftests()
         r16_flush_polarity_selftests()
+        r18_flush_polarity_selftests()
+        r18_compiled_production_checks(r18_expected_production_source())
+        r18_final_installer_branch_selftests()
         causal_oracle_selftests()
         seatbelt_profile_selftests()
         ofd_lock_reference()
@@ -12241,10 +13227,10 @@ def main(argv: list[str]) -> int:
         fd_relative_integration_reference()
         if preproduct:
             candidate = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
-            candidate_ok, candidate_detail = r17_contract_candidate_identity(candidate)
+            candidate_ok, candidate_detail = r18_contract_candidate_identity(candidate)
             check(
                 candidate_ok,
-                "A_H039_R17_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
+                "A_H039_R18_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
                 candidate_detail,
             )
             if not candidate_ok:
@@ -12254,34 +13240,156 @@ def main(argv: list[str]) -> int:
             )
             check(
                 baseline,
-                "A_H039_R16_PUBLISHED_R8_ROOT_ZERO_EFFECT_BASELINE",
+                "A_H039_R18_FAILED_R8_ROOT_ZERO_EFFECT_BASELINE",
                 detail,
             )
             if not baseline:
-                raise Rig("R16 root baseline is not the exact published R8 zero-effect state")
-            recipe, manifest = manifest_checks(
-                PUBLISHED_H039_R9_PRODUCT_MERGE,
-                diagnostic_product=True,
+                raise Rig("R18 root baseline is not the exact failed R8 zero-effect state")
+            r8_ok, r8_detail = historical_r8_product_identity(
+                PUBLISHED_H039_R8_PRODUCT_MERGE,
             )
-            immutable_source_checks(
-                PUBLISHED_H039_R9_PRODUCT_MERGE,
-                diagnostic_product=True,
-                corrected_polarity=False,
+            check(
+                r8_ok, "A_H039_R18_EXACT_FAILED_PUBLISHED_R8_PRODUCT_IDENTITY",
+                r8_detail,
             )
-            reproducible_rebuild(recipe, PUBLISHED_H039_R9_PRODUCT_MERGE)
-            r14_reference_rebuild()
-            macho_checks(
-                manifest, PUBLISHED_H039_R9_PRODUCT_MERGE,
-                diagnostic_product=True,
+            if not r8_ok:
+                return finish(phase)
+            recipe, manifest = manifest_checks(PUBLISHED_H039_R8_PRODUCT_MERGE)
+            immutable_source_checks(PUBLISHED_H039_R8_PRODUCT_MERGE)
+            reproducible_rebuild(recipe, PUBLISHED_H039_R8_PRODUCT_MERGE)
+            macho_checks(manifest, PUBLISHED_H039_R8_PRODUCT_MERGE)
+            installer_verify_effects(PUBLISHED_H039_R8_PRODUCT_MERGE)
+            check(
+                True,
+                "A_H039_R18_R8_FAILURE_CAUSE_EXACTLY_FOUR_INVERTED_FLUSH_SITES",
             )
-            installer_verify_effects(
-                PUBLISHED_H039_R9_PRODUCT_MERGE,
-                diagnostic_product=True,
-            )
-            check(True, "A_H039_R16_RETAINED_R9_PRODUCT_REVIEWED_ZERO_EFFECT")
             check(False, LABEL, {
                 "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
             })
+            return finish(phase)
+
+        if r18_product:
+            root_before, root_before_detail = \
+                published_r8_zero_effect_baseline(require_repo_r8=False)
+            check(
+                root_before, "A_H039_R18_R11_REVIEW_ZERO_EFFECT_BEFORE",
+                root_before_detail,
+            )
+            if not root_before:
+                return finish(phase)
+            identity_ok, identity_detail = r18_product_identity(argv[1], argv[2])
+            check(
+                identity_ok,
+                "A_H039_R18_EXACT_DIRECT_CHILD_FOUR_FILE_R11_IDENTITY",
+                identity_detail,
+            )
+            if not identity_ok:
+                return finish(phase)
+            recipe, manifest = manifest_checks(argv[2])
+            immutable_source_checks(argv[2], r18_product=True)
+            r18_compiled_production_checks(
+                product_bytes("controller/runtime-cleanup/native/mediator.c", argv[2])
+            )
+            reproducible_rebuild(recipe, argv[2])
+            macho_checks(manifest, argv[2])
+            r18_final_installer_branch_checks(argv[2])
+            installer_verify_effects(argv[2])
+            root_after, root_after_detail = \
+                published_r8_zero_effect_baseline(require_repo_r8=False)
+            check(
+                root_after and root_after_detail == root_before_detail,
+                "A_H039_R18_R11_PRODUCT_REVIEW_ZERO_ROOT_EFFECT",
+                {"before": root_before_detail, "after": root_after_detail},
+            )
+            return finish(phase)
+
+        if r18_published:
+            root_before, root_before_detail = \
+                published_r8_zero_effect_baseline(require_repo_r8=False)
+            check(
+                root_before, "A_H039_R18_PUBLISHED_R11_ZERO_EFFECT_BEFORE",
+                root_before_detail,
+            )
+            if not root_before:
+                return finish(phase)
+            publication_ok, publication_detail = \
+                r18_product_publication_identity(argv[1])
+            check(
+                publication_ok,
+                "A_H039_R18_GUARDED_R11_PRODUCT_PUBLICATION_IDENTITY",
+                publication_detail,
+            )
+            if not publication_ok:
+                return finish(phase)
+            recipe, manifest = manifest_checks(argv[1])
+            immutable_source_checks(argv[1], r18_product=True)
+            r18_compiled_production_checks(
+                product_bytes("controller/runtime-cleanup/native/mediator.c", argv[1])
+            )
+            reproducible_rebuild(recipe, argv[1])
+            macho_checks(manifest, argv[1])
+            r18_final_installer_branch_checks(argv[1])
+            installer_verify_effects(argv[1])
+            root_after, root_after_detail = \
+                published_r8_zero_effect_baseline(require_repo_r8=False)
+            check(
+                root_after and root_after_detail == root_before_detail,
+                "A_H039_R18_PUBLISHED_R11_ZERO_ROOT_EFFECT",
+                {"before": root_before_detail, "after": root_after_detail},
+            )
+            return finish(phase)
+
+        if r18_installed:
+            publication_ok, publication_detail = \
+                r18_product_publication_identity(argv[1])
+            check(
+                publication_ok,
+                "A_H039_R18_CURRENT_R11_PRODUCT_PUBLICATION_IDENTITY",
+                publication_detail,
+            )
+            if not publication_ok:
+                return finish(phase)
+            recipe, manifest = manifest_checks(argv[1])
+            immutable_source_checks(argv[1], r18_product=True)
+            reproducible_rebuild(recipe, argv[1])
+            macho_checks(manifest, argv[1])
+            r18_final_installer_branch_checks(argv[1])
+            installation_checks(manifest)
+            initial_sequence, initial_receipt = receipt_state()
+            pristine = initial_sequence == 0 and initial_receipt is None
+            check(
+                pristine,
+                "A_H039_R18_PRISTINE_INSTALLED_RECEIPT_SEQUENCE_ZERO",
+                {"sequence": initial_sequence, "receipt": initial_receipt},
+            )
+            if not pristine:
+                return finish(phase)
+            installed_identity = macho_identity(
+                INSTALLED, "se.nortropic.runtime-cleanup-mediator",
+            )
+            expected_installed_identity = {
+                "cdhash": manifest["mediator_codesign_cdhash"],
+                "uuid": manifest["mediator_lc_uuid"],
+                "dependencies": manifest["mediator_dependencies"],
+                "platform": manifest["platform"],
+                "minos": manifest["minos"],
+                "sdk": manifest["sdk"],
+            }
+            check(
+                all(installed_identity.get(key) == value
+                    for key, value in expected_installed_identity.items()),
+                "A_H039_R18_INSTALLED_R11_MEDIATOR_MACHO_IDENTITY",
+                installed_identity,
+            )
+            effects = guarded_product_effects()
+            final_sequence, final_receipt = receipt_state()
+            check(
+                all(value is True for value in effects.values())
+                and final_sequence == 13 and final_receipt is not None,
+                LABEL,
+                {"effects": effects, "final_sequence": final_sequence,
+                 "final_receipt_present": final_receipt is not None},
+            )
             return finish(phase)
 
         if product:
@@ -12420,6 +13528,7 @@ def main(argv: list[str]) -> int:
         print(f"R14_MATERIAL_REVIEW_EXTENSION={R14_MATERIAL_REVIEW_EXTENSION}")
         print(f"R16_MATERIAL_REVIEW_EXTENSION={R16_MATERIAL_REVIEW_EXTENSION}")
         print(f"R17_MATERIAL_REVIEW_EXTENSION={R17_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R18_MATERIAL_REVIEW_EXTENSION={R18_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)

@@ -2286,3 +2286,42 @@ protected installer path and argv; post-installation observation; exactly one
 unprivileged installed lane; independent effect review; guarded H039 completion;
 then H038, H032 and H031. Supervisor resume remains forbidden until that whole
 chain is green and separately adjudicated.
+
+## H-039 R18/R11 production flush-polarity correction
+
+The single owner-authorized published-R8 production bootstrap returned status
+1 and the frozen pre/post observer transcripts were byte-identical at SHA-256
+`91c781947e020145aa6323dabc790571292dfebc765e0ae26ea855b801c0a063`.
+It produced no installation effect and must never be retried. Published R17
+main `6481abc184c64e7b09d9347a96ff86db3fe10f11`, tree
+`07ea3b0e834d69be5daa6c6bc4c9a14c55d5c905`, is the sole R18 base.
+
+The production branch contains 21 `flush_dir` sites. Seventeen already use the
+helper's success result correctly; four failure conjunctions are inverted.
+R18 freezes their exact ordered registry and permits only one `!` insertion at
+each of `stage_embedded_mediator` project-full-0400, `directory_prefix`
+existing-lock, `remove_fixed_staging` pre-unlink and `apply_install`
+database-pre-effect. Reverted, doubled, moved, reordered, missing, extra or
+decoy forms reject, and the fresh-prefix0, complete-mediator-0400,
+prefix5-with-lock and remove-staging controls bind fsync success to continuation
+and failure to the existing pre-mutation stop.
+
+After a five-file TEST_AUTHOR freeze and two independent gate reviews, guarded
+contract publication may be followed by one fresh four-file R11 product. Its C
+source is the published R10 wrapper with exactly those four inserted bytes. Its
+build recipe is byte-exact published R8 SHA-256 `82ca604e…`, obtained from the
+R10 diagnostic recipe only by deleting `-Wno-unused-function` and
+`-DH039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC=1`. The rebuilt installer and minimal
+manifest identities are the other two changes; runtime mediator SHA-256
+`6c2f2dbe…` remains exact. Preprocessed source, optimized IR and final binary
+must contain only the production branch, never diagnostic dispatch, status or
+imports.
+
+Two independent product reviews and guarded publication precede any root
+transition. Only then may exact R11 be written onto the already protected
+installer inode, fully reauthenticated and executed once with the fixed
+launcher and argv. There is no retry. A current-publication-bound
+`--r18-installed` uid501/gid20 lane is the only completion route. Nonzero,
+output, identity drift or unexpected state is a new owner stop. R10 remains
+consumed and forbidden; H038, H032, H031 and supervisor resume remain stopped
+until full H039 completion.

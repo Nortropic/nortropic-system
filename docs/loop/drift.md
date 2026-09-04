@@ -5030,3 +5030,24 @@ reject. R10 remains consumed and may never be restaged or rerun. Root bootstrap,
 post-observation and installed execution remain strictly after dual review and
 guarded R17 publication, and any nonzero, ambiguous or partial result stops
 without retry or expanded cleanup authority.
+
+## 2026-09-04 — H-039 R18/R11 production flush polarity
+
+The authorized R8 production bootstrap returned status 1 and changed no
+observed root byte (`91c78194…` before and after). The frozen product source
+shows exactly four production failure conjunctions treating successful
+`flush_dir` as failure among 21 sites. R18 starts from published `6481abc1…`,
+records all sites, and admits exactly one logical negation at each of the four
+inverted predicates. Four connected state-family controls distinguish fsync
+success from failure before the next mutation.
+
+The R11 source remains the current R10 wrapper plus those four bytes. Its recipe
+returns exactly to published R8 SHA-256 `82ca604e…` by removing only the two
+diagnostic argv entries; this must erase the diagnostic branch from
+preprocessed source, optimized IR and the final installer. Only the rebuilt
+installer and minimal manifest may otherwise differ, while the runtime mediator
+remains SHA-256 `6c2f2dbe…`. Freeze, dual gate review, guarded contract
+publication, fresh product, dual product review and guarded product publication
+are serial. No root action occurs before them; afterward there is at most one
+same-inode no-retry R11 bootstrap. R10 remains permanently consumed and
+supervisor resume remains forbidden.
