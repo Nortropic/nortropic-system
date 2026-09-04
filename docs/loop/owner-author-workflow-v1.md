@@ -2352,3 +2352,50 @@ launcher and argv. There is no retry. A current-publication-bound
 output, identity drift or unexpected state is a new owner stop. R10 remains
 consumed and forbidden; H038, H032, H031 and supervisor resume remain stopped
 until full H039 completion.
+
+## H-039 R19/R12 directory-cursor recovery
+
+Published R11 merge `f2d8afdc113ba8decb552bcf4aa8a26cf4d07878`, tree
+`b683c54c86269ce1e4ab2c50dac1091673ae8edc`, is the sole R19 base. Its
+one permitted root bootstrap returned 1. The owner-witnessed post-failure
+transcript SHA-256 `1531da5e…` and RC-vector SHA-256 `c47f7e5d…` bind the
+partial state in which the exact helper and `a/c/q/r/s/lock` are installed,
+the namespace remains 0700, `.install` remains, and its staged mediator is
+absent. The R11 attempt is consumed and must not be retried.
+
+The failure is the shared directory cursor created by `dup(directory)` before
+`fdopendir`: the first namespace scan advances the original open file
+description, and the later required-63 scan sees EOF before namespace
+publication. R19 admits exactly one replacement of `exact_names`. It obtains a
+new open description only through fixed `openat(directory,".",O_RDONLY |
+O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY)`, binds it to the original pre-open
+identity, and revalidates the original identity after enumeration. No caller
+path, descriptor selector or broader filesystem authority is introduced.
+
+The executing gate compiles the exact function with the pinned toolchain and
+runs it under a deny-default profile. The matrix must prove repeated scan after
+membership growth, repeated stable scan, untouched caller cursor, rejection of
+a foreign substituted directory, and missing/unexpected-name rejection. Old
+`dup`, missing scan/post identity, wrong-dot and cursor-consuming variants must
+fail causally; missing-pre and dead-decoy variants must fail the exact-source
+oracle. These checks execute only in preproduct and explicit R19 product and
+publication lanes.
+
+The order is strict: five-file TEST_AUTHOR freeze; two independent adversarial
+gate reviews; guarded non-force contract publication; a fresh three-file R12
+product changing only source, rebuilt installer and minimal manifest; two
+independent product reviews; guarded product publication; then a separate
+productless R20 installed-effect refreeze, two reviews and guarded publication.
+Only after R20 may the exact R12 installer be same-inode staged against the
+fully reauthenticated partial state and run once with no retry. R19/R12 gives
+no installed-effect credit. R10 remains permanently consumed; H038, H032, H031
+and supervisor resume remain prohibited until the complete green chain and
+separate resume adjudication.
+
+Frozen R19-R1 `8e1ae011…` is immutable NO-CREDIT: its formal preproduct run
+found that the inherited installer-review helper still required an absent
+installed mediator. R19-R2 changes only that R19 review precondition. The
+unprivileged review must begin and end with the same exact published 04555
+root:wheel mediator identity/digest and namespace identity. The historical
+absent-helper paths remain unchanged, and this host-state accommodation grants
+no product effect, root action or installed credit.
