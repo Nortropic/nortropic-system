@@ -5381,3 +5381,45 @@ are gate-bound. Substitution, truncation, decoys and prepublication execution
 reject. R24 remains stale; only
 `--r25-installed <published-R25-contract> 8bb7bae9…` may follow guarded R25.
 No product/root effect, broader authority or supervisor resume is admitted.
+
+## 2026-09-05 — H-039 R26/R14 pre-staged recovery boundary
+
+Published R25 merge `aa1a304b5387c6697e8413438c1898cb5015a4ef`
+is the exact R26 base. Its consumed one-shot ceremony stopped before reservation
+and bootstrap because the fixed `.install` metadata oracle expected the old
+directory geometry even though complete R14 staging was already present. The
+authorized read-only follow-up created the fixed root-command transcript but
+then refused on its final evidence-root name rebind. The R25 ceremony,
+observer, validator and transcript remain immutable workflow-only NO-CREDIT;
+none may authorize or perform an R25 retry.
+
+R26 closes only this pre-staged-state representation gap. It is productless and
+changes exactly the five TEST_AUTHOR contract files. Its new workflow-only
+ceremony and validator must bind the complete observed R14 staging identities,
+bytes and direct memberships. Only after exact membership validation may the
+three staging directories `.install`, `.install/controller` and
+`.install/controller/runtime-cleanup` derive the APFS field
+`st_nlink = 2 + direct_members`. The rule cannot normalize any other directory
+or field, run before membership validation, use a lower bound, or mask missing,
+extra, substituted, symlinked, hardlinked or nonregular members.
+
+No restaging, in-place rewrite, chmod, cleanup or other pre-bootstrap mutation
+is available. A new fixed NOCLOBBER reservation permanently consumes the one
+R26 attempt before the unchanged published R14 installer can run once through
+the existing fixed launcher and argv. Contract freeze, two independent reviews
+and guarded publication are serial prerequisites. Success additionally requires
+status zero, empty output, independent exact post-state validation and the
+current-publication-bound installed-effect run before guarded H039 completion.
+Every nonzero, output, identity or state deviation stops for owner adjudication
+without retry or general rollback. No broader authority, downstream
+H038/H032/H031 transition or supervisor resume is admitted before full H039
+PASS.
+
+R26-R1 `8f58b01d…`, tree `d69aefa1…`, is immutable NO-CREDIT and a
+nonparent after both formal reviews returned rc 2 at the identical
+`R19 causal compiler phase set drift`. The two distinct review log objects
+share digest `e70565dd…`; immutable record `8c0013e2…` binds their identities,
+the unchanged base and the absence of publication/root/product/downstream
+effects. Fresh R26-R2 is again a direct child of `aa1a304b…` and restores only
+the inherited first preproduct R19 cursor-causal call. The exact three-phase
+closed-world oracle remains unchanged.
