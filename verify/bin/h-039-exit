@@ -1,20 +1,21 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""Frozen H-039 R25/R14 group-order compatible installed-completion gate.
+"""Frozen H-039 R26/R14 pre-staged recovery completion gate.
 
 No arguments execute the exact pre-root RED while authenticating the guarded
-R14 product publication, the still-installed R12 identity, and the frozen
-workflow-only one-shot ceremony. ``--r25-installed`` is the sole current effect
-lane: it authenticates the current R25 publication and exact R14 product before
-the existing receipt-aware uid501/gid20 effect engine runs. Historical product,
-diagnostic, and installed lanes remain non-current. This Python gate never runs
-elevated, stages or installs anything, or accepts a cleanup path, PID, command,
-or caller-selected descriptor.
+R14 product publication, the consumed R25 failure, exact observed R14 staging,
+and the frozen workflow-only recovery ceremony. ``--r26-installed`` is the sole
+current effect lane: it authenticates the current R26 publication and exact R14
+product before the existing receipt-aware uid501/gid20 effect engine runs.
+Historical product, diagnostic, and installed lanes remain non-current. This
+Python gate never runs elevated, stages or installs anything, or accepts a
+cleanup path, PID, command, or caller-selected descriptor.
 """
 
 from __future__ import annotations
 
 import array
 import ast
+import base64
 import copy
 import ctypes
 import errno
@@ -551,6 +552,78 @@ R25_VALIDATOR_STDIN_WRAPPER = (
     "g={'__name__':'__main__','__file__':p};"
     "exec(compile(b,p,'exec'),g,g)"
 )
+R26_AUTHORITY_BASE = "aa1a304b5387c6697e8413438c1898cb5015a4ef"
+R26_AUTHORITY_TREE = "fcf18de78a138d54ac69b3fc9827004adc24faf6"
+R26_AUTHORITY_PARENTS = [
+    R25_AUTHORITY_BASE,
+    "7c806ea05ffc82548fb962bae93a4e90f4c7ae61",
+]
+R26_R25_CONTRACT_CANDIDATE = R26_AUTHORITY_PARENTS[1]
+R26_BASE_GATE_SHA256 = "a8605562351778b4923fd157d0efcebad1387678bcd698bc5922b8fe65f276ff"
+R26_BASE_SPEC_SHA256 = "69f74967f18c62784d5399167a62fa2571339cd8e51272f2db2d22beb8ad7198"
+R26_R25_GUARDED_PUBLICATION = R23_EVIDENCE_ROOT / "h039-r25-contract-guarded-publication.json"
+R26_R25_GUARDED_PUBLICATION_SHA256 = "ac75451e17c41b04a84eac8cafcb64a983dc97e79a2613e5b0c778d6e9ad4e9d"
+R26_R25_POST_OBSERVER = R23_EVIDENCE_ROOT / "h039-r25-r14-post-failure-root-observe.py"
+R26_R25_POST_VALIDATOR = R23_EVIDENCE_ROOT / "h039-r25-r14-post-failure-validate.py"
+R26_R25_POST_SOURCE_BINDING = R23_EVIDENCE_ROOT / "h039-r25-r14-post-failure-source-binding.json"
+R26_R25_POST_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r25-r14-post-failure-workflow-dual-review.json"
+R26_R25_POST_TRANSCRIPT = R23_EVIDENCE_ROOT / "h039-r25-r14-post-failure-root-observation.jsonl"
+R26_R25_POST_HASHES = {
+    R26_R25_POST_OBSERVER: "6bf3503ee529e1ca8d94163ade01d83ba89d823aa50ba268872e2fdeaf7558fb",
+    R26_R25_POST_VALIDATOR: "47edb228c8645dd8d290b56030fce291d1958873b53bad940b066388de615923",
+    R26_R25_POST_SOURCE_BINDING: "dedb7273d576618bafc7139d134dcaaf044e2547e41e5efb16e5ae0cbb17801d",
+    R26_R25_POST_DUAL_REVIEW: "a0ce694c173d689c2da92bcd23d40769ef820024fd143c24937353c992ea9870",
+    R26_R25_POST_TRANSCRIPT: "d5f3bcce61f1446f72a6c0b1ab1fb680d12cebb5916673e172dd8bc710db41f6",
+}
+R26_R25_POST_TRANSCRIPT_IDENTITY8 = [
+    16777232, 129341217, 0o100600, 501, 20, 1, 67588, 0,
+]
+R26_R25_PLAN_SHA256 = "8bb64c3ea0c36496d439f05063de6729d04cfe78312f6570c5799aa665ff6f7f"
+R26_R25_RC_VECTOR_SHA256 = "d06073d999b47c824ce134788b32cafe197f15df59c83adfbe3bd4388824b122"
+R26_CEREMONY_TOOL = R23_EVIDENCE_ROOT / "h039-r26-r14-recovery-ceremony.py"
+R26_CEREMONY_VALIDATOR = R23_EVIDENCE_ROOT / "h039-r26-r14-recovery-validate.py"
+R26_CEREMONY_SOURCE_BINDING = R23_EVIDENCE_ROOT / "h039-r26-r14-recovery-source-binding.json"
+R26_CEREMONY_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r26-r14-recovery-workflow-dual-review.json"
+R26_CEREMONY_ATTEMPT = R23_EVIDENCE_ROOT / "h039-r26-r14-recovery-attempt-reservation.json"
+R26_CEREMONY_OUTCOME = R23_EVIDENCE_ROOT / "h039-r26-r14-recovery-outcome.json"
+R26_CEREMONY_TOOL_SHA256 = "06faa0e090b3631fdefbcda9a20a18f06947f52de3e9ed0326a12d63937a31cc"
+R26_CEREMONY_VALIDATOR_SHA256 = "94022d415909a91f6237ab6a4236ada3083587cff21243f1678b86a57e9ec8e3"
+R26_CEREMONY_SOURCE_BINDING_SHA256 = "f7f165bb284ea96e13b41616565f9d1fc5741bff328da90b38d641ac563b9331"
+R26_CEREMONY_DUAL_REVIEW_SHA256 = "6e85689820eecacd7ef17ed5505ba55666d9d7659865e5677e020ca84b64f518"
+REJECTED_R26_R1_CANDIDATE = "8f58b01d954273c489d47df2a096fc3bbdbe01cb"
+REJECTED_R26_R1_TREE = "d69aefa1cfa0e1f28683d21b54372810ad46f769"
+REJECTED_R26_R1_GATE_SHA256 = "76478c76a4aee74f47381845e16e48498e83bc0eea06f2cec25e6ce9cf477a9f"
+REJECTED_R26_R1_SPEC_SHA256 = "eaf66af2ff9cf25505b98f16a05b7bffa8134daf640bf098906b67170de5d4a4"
+R26_R1_FAILURE_RECORD = R23_EVIDENCE_ROOT / "h039-r26-r1-formal-gate-review-failure.json"
+R26_R1_FAILURE_RECORD_SHA256 = "8c0013e263120f7288d2897e9fa81a68d8a1075a5d2f5f380b8ae8771ebbf99d"
+R26_R1_REVIEW_LOG_SHA256 = "e70565ddf30ee7767111c142f22aa33bdf852723bf0de6b75caa74e7f6866881"
+R26_R1_REVIEW_LOGS = {
+    R23_EVIDENCE_ROOT / "h039-r26-gate-review-a-8f58b01d.log": [16777232, 129386654, 0o100644, 501, 20, 1, 108448, 0],
+    R23_EVIDENCE_ROOT / "h039-r26-gate-review-b-8f58b01d.log": [16777232, 129386642, 0o100644, 501, 20, 1, 108448, 0],
+}
+R26_VALIDATOR_SIZE = 42984
+R26_VALIDATOR_STDIN_WRAPPER = (
+    "import hashlib,sys;"
+    "p='/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence/"
+    "h039-r26-r14-recovery-validate.py';"
+    "sys.argv==['-c']or sys.exit(96);"
+    "b=sys.stdin.buffer.read(42984);"
+    "(len(b)==42984 and sys.stdin.buffer.read(1)==b'' and "
+    "hashlib.sha256(b).hexdigest()=='94022d415909a91f6237ab6a4236ada3083587cff21243f1678b86a57e9ec8e3')"
+    "or sys.exit(97);"
+    "sys.argv=[p];"
+    "g={'__name__':'__main__','__file__':p};"
+    "exec(compile(b,p,'exec'),g,g)"
+)
+R26_PRESTAGED_IDENTITIES = {
+    "namespace": [16777232, 126958092, 0o040555, 0, 0, 8, 256, 0],
+    "install": [16777232, 129313663, 0o040700, 0, 0, 4, 128, 0],
+    "controller": [16777232, 129313664, 0o040700, 0, 0, 3, 96, 0],
+    "runtime": [16777232, 129313665, 0o040700, 0, 0, 3, 96, 0],
+    "installer": [16777232, 129313666, 0o100500, 0, 0, 1, 169504, 0],
+    "staged_mediator": [16777232, 129313667, 0o100400, 0, 0, 1, 89392, 0],
+    "installed_old_r12": [16777232, 128098563, 0o104555, 0, 0, 1, 89392, 0],
+}
 REJECTED_R20_R1_CANDIDATE = "27ad790442a69c1d35f3cfcccfb6fc02fdd57aea"
 REJECTED_R20_R1_TREE = "f6c9dbec3958f165094291486b54a6b3042abba7"
 REJECTED_R20_R1_GATE_SHA256 = (
@@ -859,6 +932,8 @@ R18_CAUSAL_FIXTURES = [
 ]
 INSTALLED = Path("/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator")
 NAMESPACE = Path("/private/var/db/nortropic-runtime-cleanup-v1")
+PROTECTED_NAMESPACE = NAMESPACE
+PROTECTED_INSTALL = NAMESPACE / ".install"
 PROTECTED_INSTALLER = (
     NAMESPACE / ".install/controller/runtime-cleanup/install"
 )
@@ -1873,6 +1948,57 @@ R25_PUBLICATION_BINDING = (
 )
 R25_INSTALLED_ENGINE_FUNCTIONS = R24_INSTALLED_ENGINE_FUNCTIONS
 R25_INSTALLED_ENGINE_BINDING = R24_INSTALLED_ENGINE_BINDING
+R26_RECONCILIATION = (
+    "THIS_FIELD_SUPERSEDES_ONLY_R25S_CONSUMED_PRE_RESERVATION_ROOT_UPDATE_STOP;_"
+    "PUBLISHED_R25_AA1A304B_TREEFCF18DE7_IS_THE_EXACT_R26_AUTHORITY_BASE;_THE_"
+    "R26_R1_8F58B01D_TREED69AEFA1_GATE76478C76_SPECEAF66AF2_DUAL_REVIEW_LOG_"
+    "E70565DD_AND_RECORD8C0013E2_ARE_IMMUTABLE_NO_CREDIT_NONPARENT_AFTER_RC2_"
+    "R19_CAUSAL_COMPILER_PHASE_SET_DRIFT;_FRESH_R26_R2_RESTORES_EXACTLY_THE_"
+    "INHERITED_PREPRODUCT_R19_CURSOR_CAUSAL_CHECK_WITHOUT_RELAXING_SCOPE;_THE_"
+    "R25_CEREMONY_STATUS1_POSTFAILURE_OBSERVER_REFUSAL_AND91LINE_NOFOOTER_"
+    "TRANSCRIPT_ARE_IMMUTABLE_WORKFLOW_ONLY_NO_CREDIT_AND_R25_MAY_NEVER_RETRY;_"
+    "THE_TRANSCRIPT_PLUS_OWNER_ADJUDICATION_PROVES_EXACT_FULL_R14_STAGING;_R26_"
+    "FRESHLY_REAUTHENTICATES_THAT_LIVE_STATE_WITH_APFS_NLINK_EQUAL2_PLUS_EXACT_"
+    "DIRECT_MEMBERS_ONLY_FOR_INSTALL_CONTROLLER_AND_RUNTIME;_EVERY_OTHER_FIELD_"
+    "DIRECT_MEMBER_DIGEST_CDHASH_ACL_XATTR_AND_NAME_REBIND_REMAINS_EXACT;_NO_"
+    "RESTAGE_REWRITE_CHMOD_CLEANUP_OR_PREBOOTSTRAP_MUTATION_IS_ADMITTED;_ONE_NEW_"
+    "DURABLE_O_EXCL_RESERVATION_PRECEDES_EXACTLY_ONE_FIXED_R14_BOOTSTRAP;_RC0_"
+    "EMPTY_OUTPUT_EXACT_POSTSTATE_AND_INDEPENDENT_VALIDATION_PRECEDE_ONE_UID501_"
+    "GID20_R26_INSTALLED_EFFECT_AND_GUARDED_H039_COMPLETION;_EVERY_DEVIATION_IS_"
+    "AN_OWNER_STOP_WITHOUT_RETRY_OR_GENERAL_ROLLBACK"
+)
+R26_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_R26_IS_AN_EXACT_PRODUCTLESS_FIVE_FILE_DIRECT_"
+    "CHILD_OF_PUBLISHED_R25_AA1A304B_AND_BINDS_ITS_ORDERED_PARENTS_TREE_GATE_"
+    "SPEC_AND_GUARDED_PUBLICATION;_REJECTED_R1_8F58B01D_TREE_D69AEFA1_GATE_"
+    "76478C76_SPEC_EAF66AF2_TWO_DISTINCT_LOG_IDENTITIES_SHARE_DIGEST_E70565DD_"
+    "AND_RECORD8C0013E2_BINDS_THEM_IMMUTABLE_NO_CREDIT_NONPARENT;_R2_RESTORES_"
+    "ONLY_THE_INHERITED_R19_PREPRODUCT_CAUSAL_CALL_WITH_CLOSED_WORLD_UNCHANGED;_"
+    "THE_CONSUMED_R25_TOOL_AND_POSTFAILURE_CHAIN_"
+    "INCLUDING_TRANSCRIPTD5F3BCCE_IDENTITY91_HEADER_PLUS90_RC0_SLOTS_NO_FOOTER_"
+    "PLAN8BB64C3E_AND_VECTOR_D06073D9_ARE_IMMUTABLE_NO_CREDIT_AND_NEVER_RUN;_THE_"
+    "EXACT_FULL_R14_STAGING_IS_REAUTHENTICATED_LIVE_BEFORE_RESERVATION_WITH_"
+    "MEMBERSHIP_DERIVED_APFS_NLINK_EXACTLY2_PLUS_DIRECT_MEMBERS_SCOPED_ONLY_TO_"
+    "INSTALL_CONTROLLER_RUNTIME_AND_EXACT_RAW_SIZE128_96_96;_OLD3_2_GREATER_"
+    "EQUAL_GLOBAL_OTHER_DIRECTORY_PREMEMBERSHIP_OR_DECOY_NORMALIZATION_REJECT;_"
+    "THE_NEW_CEREMONY_HAS_NO_MKDIR_DD_COPY_CHMOD_RENAME_UNLINK_CLEANUP_RESTAGE_"
+    "OR_CALL_TO_R25_AND_CREATES_ONLY_ONE_FIXED_DURABLE_O_EXCL_RESERVATION_BEFORE_"
+    "ONE_FIXED_SUDO_ENV_I_C_ROOT_INSTALLER_BOOTSTRAP;_NONZERO_OUTPUT_EXCEPTION_"
+    "NONREAP_REBIND_OR_POSTSTATE_DRIFT_CONSUMES_THE_ATTEMPT_AND_STOPS;_THE_"
+    "INSTALLED_LANE_AUTHENTICATES_CURRENT_R26_HISTORICAL_R14_IMMUTABLE_R25_"
+    "FAILURE_AND_COMPLETED_R26_RECORDS_BEFORE_THE_BYTE_EXACT54_FUNCTION_ENGINE;_"
+    "R25_AND_OLDER_LANES_ARE_STALE_AND_NO_PRODUCT_BROADER_AUTHORITY_DOWNSTREAM_"
+    "OR_SUPERVISOR_RESUME_IS_ADMITTED"
+)
+R26_PUBLICATION_BINDING = (
+    "ORDERED_PARENTS_EXACT_PUBLISHED_R25_AUTHORITY_AND_DIRECT_CHILD_R26_"
+    "CANDIDATE;_MERGE_TREE_EQUALS_CANDIDATE;_BASE_TO_CANDIDATE_AND_BASE_TO_"
+    "MERGE_HAVE_EXACT_FIVE_FILE_SHAPE;_LIVE_AUTHENTICATED_ORIGIN_MAIN_EQUALS_"
+    "MERGE;_CLEAN_HEAD_EQUALS_MERGE;_ALL_FIVE_CHECKOUT_BYTES_EQUAL_MERGE_BLOBS;_"
+    "EXECUTING_GATE_AND_SPEC_EQUAL_MERGE_BLOBS"
+)
+R26_INSTALLED_ENGINE_FUNCTIONS = R25_INSTALLED_ENGINE_FUNCTIONS
+R26_INSTALLED_ENGINE_BINDING = R25_INSTALLED_ENGINE_BINDING
 R21_UNCHANGED_ENGINE_FUNCTIONS = [
     "path_sha", "path_acl_presence", "path_extended_metadata",
     "path_security_snapshot", "exact_live_created_xattrs",
@@ -2060,29 +2186,33 @@ R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
     "/.install/controller/runtime-cleanup",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_R25_SORTED_GROUP_WORKFLOW_AND_INSTALLED_EFFECT_COMPLETION_ABSENT"
+REASON = "H039_R26_PRESTAGED_R14_RECOVERY_AND_INSTALLED_EFFECT_COMPLETION_ABSENT"
 FAILURE_SIGNATURE = [
-    "PUBLISHED_R24_MAIN_1710D58A_IS_THE_EXACT_R25_AUTHORITY_BASE",
-    "R24_ORDERED_R14_AND_R24_CANDIDATE_PARENTS_TREE_GATE_AND_SPEC_ARE_EXACT",
-    "R24_GUARDED_PUBLICATION_RECEIPT_IS_IMMUTABLE_AND_EXACT",
-    "R24_GROUP_ORDER_REFUSAL_IS_IMMUTABLE_NO_CREDIT_PRE_EFFECT_EVIDENCE",
-    "R24_ACTUAL_AND_FROZEN_GROUPS_ARE_THE_SAME_19_UNIQUE_MEMBERS_IN_DIFFERENT_ORDER",
+    "PUBLISHED_R25_MAIN_AA1A304B_IS_THE_EXACT_R26_AUTHORITY_BASE",
+    "R25_ORDERED_R24_AND_R25_CANDIDATE_PARENTS_TREE_GATE_AND_SPEC_ARE_EXACT",
+    "R25_GUARDED_PUBLICATION_RECEIPT_IS_IMMUTABLE_AND_EXACT",
+    "R25_CONSUMED_CEREMONY_AND_POSTFAILURE_CHAIN_ARE_IMMUTABLE_NO_CREDIT",
+    "R25_ATTEMPT_AND_OUTCOME_REMAIN_ABSENT_AND_R25_RETRY_IS_FORBIDDEN",
+    "R25_TRANSCRIPT_IS_EXACT_HEADER_PLUS90_RC0_SLOTS_WITH_NO_FOOTER",
+    "R25_TRANSCRIPT_PLAN_RC_VECTOR_IDENTITY_AND_DIGEST_ARE_EXACT",
+    "OWNER_ADJUDICATED_TRANSCRIPT_PROVES_EXACT_FULL_R14_PRESTAGING",
+    "R26_R1_DUAL_REVIEW_RIG_IS_IMMUTABLE_NO_CREDIT_AND_NONPARENT",
+    "R26_R2_RESTORES_ONLY_INHERITED_R19_PREPRODUCT_CAUSAL_CALL",
     "R14_PRODUCT_FIVE_BLOBS_REBUILD_MACHO_AND_FIXED_UPDATER_ARE_EXACT",
-    "R14_DUAL_REVIEW_GUARDED_PUBLICATION_AND_UMASK0022_POSTVERIFY_ARE_EXACT",
-    "FRESH_PRODUCTLESS_R25_FIVE_FILE_CONTRACT_REQUIRES_TWO_REVIEWS_AND_PUBLICATION",
-    "R25_CEREMONY_VALIDATOR_SOURCE_BINDING_AND_DUAL_REVIEW_ARE_FIXED_HASH_BOUND",
-    "EXACTLY_TWO_DIRECT_SORTED_OS_GETGROUPS_EQUAL_UNCHANGED_CLIENT_GROUPS_PREDICATES",
-    "MISSING_EXTRA_DUPLICATE_SUBSTITUTED_SET_SUBSET_SUPERSET_AND_DECOY_GROUPS_REJECT",
-    "ALL_OTHER_R24_WORKFLOW_ROOT_COMMAND_PATH_IDENTITY_AND_EFFECT_BYTES_ARE_EXACT",
-    "R25_CEREMONY_ACCEPTS_NO_CALLER_PATH_FD_ENVIRONMENT_ARGUMENT_OR_INPUT",
-    "R14_INSTALLER_AND_RUNTIME_SOURCE_BYTES_EQUAL_COMMIT_BLOBS_DIGESTS_SIZES_CDHASHES_AND_RETAINED_FDS_BOUND",
-    "FIXED_DESTINATION_ABSENT_PRESTATE_CONTROLLER_AND_MEDIATOR_FIRST_CREATE_AND_R14_REAUTH_REQUIRED",
+    "FRESH_PRODUCTLESS_R26_FIVE_FILE_CONTRACT_REQUIRES_TWO_REVIEWS_AND_PUBLICATION",
+    "R26_CEREMONY_VALIDATOR_SOURCE_BINDING_AND_DUAL_REVIEW_ARE_FIXED_HASH_BOUND",
+    "R26_LIVE_REAUTHENTICATES_EXACT_R14_PRESTAGED_IDENTITIES_AND_MEMBERSHIP",
+    "APFS_NLINK_EQUALS_TWO_PLUS_DIRECT_MEMBERS_ONLY_FOR_THREE_STAGING_DIRECTORIES",
+    "OLD3_2_GREATER_EQUAL_GLOBAL_PREMEMBERSHIP_OTHER_DIRECTORY_AND_DECOY_ORACLES_REJECT",
+    "NO_RESTAGE_REWRITE_CHMOD_CLEANUP_OR_OTHER_PREBOOTSTRAP_MUTATION",
+    "R26_CEREMONY_ACCEPTS_NO_CALLER_PATH_FD_ENVIRONMENT_ARGUMENT_OR_INPUT",
     "STAGED_MEDIATOR_SAME_INODE_INSTALL_AND_RETAINED_OLD_R12_NLINK0_REQUIRED",
+    "DURABLE_FIXED_O_EXCL_RESERVATION_PRECEDES_SPAWN_AND_PERMANENTLY_CONSUMES_ATTEMPT",
     "EXACT_FIXED_SUDO_ENV_I_C_ROOT_BOOTSTRAP_RUNS_ONCE_WITHOUT_RETRY",
     "NONZERO_OUTPUT_IDENTITY_DRIFT_OR_AMBIGUITY_REQUIRES_NEW_OWNER_STOP",
-    "STATUS0_AND_EMPTY_OUTPUT_PRECEDE_POST_OBSERVATION_AND_R25_INSTALLED_EFFECT",
-    "R25_INSTALLED_CLI_BINDS_CURRENT_PUBLICATION_AND_EXACT_R14_PRODUCT_MERGE",
-    "R24_AND_EVERY_OLDER_INSTALLED_LANE_IS_HISTORICAL_AND_STALE",
+    "STATUS0_AND_EMPTY_OUTPUT_PRECEDE_POST_VALIDATION_AND_R26_INSTALLED_EFFECT",
+    "R26_INSTALLED_CLI_BINDS_CURRENT_PUBLICATION_AND_EXACT_R14_PRODUCT_MERGE",
+    "R25_AND_EVERY_OLDER_INSTALLED_LANE_IS_HISTORICAL_AND_STALE",
     "EXACT_R14_INSTALLATION_MANIFEST_REBUILD_MACHO_AND_IDENTITY_PRECEDE_EFFECT",
     "ALL_54_TRANSITIVE_INSTALLED_EFFECT_FUNCTIONS_REMAIN_BYTE_EXACT_TO_R14",
     "INITIAL_RECEIPT_SEQUENCE0_EFFECT_DELTA13_AND_FINAL_SEQUENCE13_ARE_REQUIRED",
@@ -2090,7 +2220,7 @@ FAILURE_SIGNATURE = [
     "R13_DIAGNOSTIC_RESTAGE_OR_EXECUTION_AND_PRODUCT_CHANGE_REMAIN_FORBIDDEN",
     "NO_BROADER_AUTHORITY_H038_H032_H031_OR_SUPERVISOR_RESUME_BEFORE_H039_PASS",
 ]
-EXPECTED_H039_ROW_SHA256 = "477ab76cb8af5f46875f7c9be75d7ee34007bde0b5074d27d398e5010578328b"
+EXPECTED_H039_ROW_SHA256 = "5f333d37e10cfc1f981fa6293baf79a6bdbeeed2748d1f72b58ada74d38a6e78"
 
 passed = 0
 failed = 0
@@ -2989,6 +3119,142 @@ def r25_registry_expected() -> dict[str, Any]:
         "zero_runtime_process_descriptor_residue": True,
         "post_observation_before_installed_effect": True,
         "r13_diagnostic_reexecution_or_restage": False,
+        "new_product_bytes": False,
+        "broader_authority": False,
+        "downstream_or_supervisor_resume_before_h039_pass": False,
+    }
+
+
+def r26_registry_expected() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "authority_base": R26_AUTHORITY_BASE,
+        "authority_tree": R26_AUTHORITY_TREE,
+        "authority_ordered_parents": R26_AUTHORITY_PARENTS,
+        "authority_gate_sha256": R26_BASE_GATE_SHA256,
+        "authority_spec_sha256": R26_BASE_SPEC_SHA256,
+        "test_author_paths": TEST_AUTHOR_GIT_ORDER,
+        "candidate_change_shape": R17_CANDIDATE_CHANGE_SHAPE,
+        "productless_contract": True,
+        "rejected_r26_r1": {
+            "candidate": REJECTED_R26_R1_CANDIDATE,
+            "tree": REJECTED_R26_R1_TREE,
+            "gate_sha256": REJECTED_R26_R1_GATE_SHA256,
+            "spec_sha256": REJECTED_R26_R1_SPEC_SHA256,
+            "failure_record_path": str(R26_R1_FAILURE_RECORD),
+            "failure_record_sha256": R26_R1_FAILURE_RECORD_SHA256,
+            "review_log_sha256": R26_R1_REVIEW_LOG_SHA256,
+            "review_log_identity8": list(R26_R1_REVIEW_LOGS.values()),
+            "disposition": "IMMUTABLE_NO_CREDIT_NONPARENT_FORMAL_DUAL_REVIEW_RC2_R19_CAUSAL_COMPILER_PHASE_SET_DRIFT",
+            "retry": False,
+        },
+        "published_r25_contract": {
+            "merge": R26_AUTHORITY_BASE,
+            "tree": R26_AUTHORITY_TREE,
+            "ordered_parents": R26_AUTHORITY_PARENTS,
+            "candidate": R26_R25_CONTRACT_CANDIDATE,
+            "gate_sha256": R26_BASE_GATE_SHA256,
+            "spec_sha256": R26_BASE_SPEC_SHA256,
+            "guarded_publication_path": str(R26_R25_GUARDED_PUBLICATION),
+            "guarded_publication_sha256": R26_R25_GUARDED_PUBLICATION_SHA256,
+        },
+        "published_r14": r24_registry_expected()["published_r14"],
+        "immutable_r25_failure": {
+            "consumed_ceremony_path": str(R25_CEREMONY_TOOL),
+            "consumed_ceremony_sha256": R25_CEREMONY_TOOL_SHA256,
+            "consumed_validator_sha256": R25_CEREMONY_VALIDATOR_SHA256,
+            "consumed_source_binding_sha256": R25_CEREMONY_SOURCE_BINDING_SHA256,
+            "consumed_dual_review_sha256": R25_CEREMONY_DUAL_REVIEW_SHA256,
+            "post_observer_sha256": R26_R25_POST_HASHES[R26_R25_POST_OBSERVER],
+            "post_validator_sha256": R26_R25_POST_HASHES[R26_R25_POST_VALIDATOR],
+            "post_source_binding_sha256": R26_R25_POST_HASHES[
+                R26_R25_POST_SOURCE_BINDING
+            ],
+            "post_dual_review_sha256": R26_R25_POST_HASHES[
+                R26_R25_POST_DUAL_REVIEW
+            ],
+            "transcript_path": str(R26_R25_POST_TRANSCRIPT),
+            "transcript_identity8": R26_R25_POST_TRANSCRIPT_IDENTITY8,
+            "transcript_sha256": R26_R25_POST_HASHES[R26_R25_POST_TRANSCRIPT],
+            "transcript_lines": 91,
+            "transcript_header_plus_slots": [1, 90],
+            "transcript_footer": False,
+            "all_slot_returncodes_zero": True,
+            "command_plan_sha256": R26_R25_PLAN_SHA256,
+            "returncode_vector_sha256": R26_R25_RC_VECTOR_SHA256,
+            "owner_adjudicated_full_r14_staging": True,
+            "workflow_only": True,
+            "task_credit": False,
+            "r25_retry": False,
+            "r25_attempt_and_outcome_absent": True,
+        },
+        "exact_prestaged_r14": {
+            "identities": R26_PRESTAGED_IDENTITIES,
+            "members": {
+                "namespace": [".install", "a", "c", "q", "r", "s"],
+                "install": ["controller", "mediator"],
+                "controller": ["runtime-cleanup"],
+                "runtime": ["install"],
+                "a": [], "c": [], "q": [], "r": [], "s": ["lock"],
+            },
+            "installer_sha256": R24_R14_PRODUCT_BLOBS[
+                "controller/runtime-cleanup/install"
+            ],
+            "installer_cdhash": R24_R14_INSTALLER_CDHASH,
+            "staged_mediator_sha256": R24_R14_PRODUCT_BLOBS[
+                "verify/h039/runtime-cleanup-mediator"
+            ],
+            "staged_mediator_cdhash": R24_R14_RUNTIME_CDHASH,
+            "old_installed_sha256": R23_OLD_R12_MEDIATOR_SHA256,
+            "directory_oracle": "EXACT_NLINK_EQUALS_2_PLUS_DIRECT_MEMBERS_AFTER_EXACT_MEMBERSHIP",
+            "directory_oracle_scope": ["install", "controller", "runtime"],
+            "raw_directory_size": {"install": 128, "controller": 96, "runtime": 96},
+            "global_or_other_directory_normalization": False,
+        },
+        "fixed_recovery_ceremony": {
+            "tool_path": str(R26_CEREMONY_TOOL),
+            "tool_sha256": R26_CEREMONY_TOOL_SHA256,
+            "validator_path": str(R26_CEREMONY_VALIDATOR),
+            "validator_sha256": R26_CEREMONY_VALIDATOR_SHA256,
+            "source_binding_path": str(R26_CEREMONY_SOURCE_BINDING),
+            "source_binding_sha256": R26_CEREMONY_SOURCE_BINDING_SHA256,
+            "dual_review_path": str(R26_CEREMONY_DUAL_REVIEW),
+            "dual_review_sha256": R26_CEREMONY_DUAL_REVIEW_SHA256,
+            "attempt_reservation_path": str(R26_CEREMONY_ATTEMPT),
+            "outcome_path": str(R26_CEREMONY_OUTCOME),
+            "prebootstrap_root_mutations": [],
+            "forbidden_prebootstrap_calls": [
+                "mkdir", "dd", "copy", "chmod", "chown", "link", "rename",
+                "unlink", "rmdir", "cleanup", "restage", "r25_ceremony",
+            ],
+            "fixed_bootstrap_argv": [
+                "/usr/bin/sudo", "/usr/bin/env", "-i", "-C", "/",
+                str(PROTECTED_INSTALLER), "bootstrap",
+            ],
+            "durable_o_excl_reservation_before_spawn": True,
+            "attempt_count": 1,
+            "retry": False,
+            "status_zero_and_empty_output_required": True,
+            "direct_child_reaped": True,
+            "staged_mediator_dev_inode_equals_installed_helper": True,
+            "retained_old_r12_helper_reaches_nlink_zero": True,
+            "caller_argument_path_fd_environment_or_input": False,
+            "workflow_evidence_grants_credit": False,
+        },
+        "installed_cli": ["--r26-installed",
+                          "RUNTIME_SUPPLIED_PUBLISHED_R26_CONTRACT_MERGE",
+                          R24_AUTHORITY_BASE],
+        "historical_r25_lane_stale": True,
+        "publication_binding": R26_PUBLICATION_BINDING,
+        "identity_before_effect": True,
+        "installed_engine_functions": R26_INSTALLED_ENGINE_FUNCTIONS,
+        "installed_engine_bodies": R26_INSTALLED_ENGINE_BINDING,
+        "required_uid": CLIENT_UID,
+        "required_gid": CLIENT_GID,
+        "initial_receipt_sequence": 0,
+        "effect_receipt_delta": 13,
+        "final_receipt_sequence": 13,
+        "zero_runtime_process_descriptor_residue": True,
         "new_product_bytes": False,
         "broader_authority": False,
         "downstream_or_supervisor_resume_before_h039_pass": False,
@@ -4110,6 +4376,26 @@ def static_contract_checks() -> dict[str, Any]:
         "A_H039_R25_AUTHORITY_BASE_GRAPH_GATE_AND_SPEC",
     )
     check(
+        commit_tree(R26_AUTHORITY_BASE) == R26_AUTHORITY_TREE
+        and commit_parents(R26_AUTHORITY_BASE) == R26_AUTHORITY_PARENTS
+        and commit_parents(R26_R25_CONTRACT_CANDIDATE) == [R25_AUTHORITY_BASE]
+        and sha(blob(R26_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+        == R26_BASE_GATE_SHA256
+        and sha(blob(R26_AUTHORITY_BASE, "specs/tasks.spec.json"))
+        == R26_BASE_SPEC_SHA256,
+        "A_H039_R26_AUTHORITY_BASE_GRAPH_GATE_AND_SPEC",
+    )
+    check(
+        object_type(REJECTED_R26_R1_CANDIDATE) == "commit"
+        and commit_tree(REJECTED_R26_R1_CANDIDATE) == REJECTED_R26_R1_TREE
+        and commit_parents(REJECTED_R26_R1_CANDIDATE) == [R26_AUTHORITY_BASE]
+        and sha(blob(REJECTED_R26_R1_CANDIDATE, "verify/bin/h-039-exit"))
+        == REJECTED_R26_R1_GATE_SHA256
+        and sha(blob(REJECTED_R26_R1_CANDIDATE, "specs/tasks.spec.json"))
+        == REJECTED_R26_R1_SPEC_SHA256,
+        "A_H039_R26_REJECTED_R1_PHASE_SCOPE_DRIFT_IMMUTABLE_NO_CREDIT",
+    )
+    check(
         object_type(REJECTED_R22_R1_CANDIDATE) == "commit"
         and commit_tree(REJECTED_R22_R1_CANDIDATE) == REJECTED_R22_R1_TREE
         and commit_parents(REJECTED_R22_R1_CANDIDATE) == [R22_AUTHORITY_BASE]
@@ -4268,6 +4554,9 @@ def static_contract_checks() -> dict[str, Any]:
     group_order_completion = row.get(
         "h039_os_exclusive_runtime_cleanup", {},
     ).get("r25_group_order_compatible_installed_completion", {})
+    prestaged_recovery = row.get(
+        "h039_os_exclusive_runtime_cleanup", {},
+    ).get("r26_prestaged_r14_recovery_completion", {})
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -4404,6 +4693,10 @@ def static_contract_checks() -> dict[str, Any]:
         exact_typed_tree(group_order_completion, r25_registry_expected()),
         "A_H039_R25_EXACT_GROUP_ORDER_COMPATIBLE_INSTALLED_COMPLETION_REGISTRY",
     )
+    check(
+        exact_typed_tree(prestaged_recovery, r26_registry_expected()),
+        "A_H039_R26_EXACT_PRESTAGED_R14_RECOVERY_COMPLETION_REGISTRY",
+    )
     expected_red = {
         "label": LABEL,
         "reason": REASON,
@@ -4416,7 +4709,7 @@ def static_contract_checks() -> dict[str, Any]:
             ),
             expected_red,
         ),
-        "A_H039_R25_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
+        "A_H039_R26_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
     )
     check(
         row.get("h039_r17_installed_effect_completion_reconciliation")
@@ -4462,6 +4755,11 @@ def static_contract_checks() -> dict[str, Any]:
         row.get("h039_r25_group_order_compatible_installed_completion_reconciliation")
         == R25_RECONCILIATION,
         "A_H039_R25_EXACT_RECONCILIATION",
+    )
+    check(
+        row.get("h039_r26_prestaged_r14_recovery_reconciliation")
+        == R26_RECONCILIATION,
+        "A_H039_R26_EXACT_RECONCILIATION",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -4581,6 +4879,14 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("h039_r25_exit_criterion", "")),
         "A_H039_R25_EXACT_MATERIAL_REVIEW_BOUNDARY",
+    )
+    check(
+        row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r26_material_review_extension") == R26_MATERIAL_REVIEW_EXTENSION
+        and f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("h039_r26_exit_criterion", "")),
+        "A_H039_R26_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -5258,6 +5564,16 @@ def exact_r25_installed_argv(argv: Any) -> bool:
     )
 
 
+def exact_r26_installed_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 3
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r26-installed"
+        and valid_hex(argv[1], 40)
+        and argv[2] == R24_AUTHORITY_BASE
+    )
+
+
 def r23_registry_selftests(row: dict[str, Any]) -> None:
     registry = row["h039_os_exclusive_runtime_cleanup"][
         "r23_fd_scan_and_fixed_update"
@@ -5513,6 +5829,98 @@ def r25_registry_selftests(row: dict[str, Any]) -> None:
         )
 
 
+def r26_registry_selftests(row: dict[str, Any]) -> None:
+    registry = row["h039_os_exclusive_runtime_cleanup"][
+        "r26_prestaged_r14_recovery_completion"
+    ]
+    expected = r26_registry_expected()
+    check(
+        exact_typed_tree(registry, expected),
+        "A_H039_R26_REGISTRY_SELFTEST_ANCHOR",
+    )
+    mutations: tuple[tuple[str, Callable[[dict[str, Any]], None]], ...] = (
+        ("KEY_REMOVED", lambda value: value.pop("exact_prestaged_r14")),
+        ("KEY_ADDED", lambda value: value.__setitem__("alternate", False)),
+        ("BASE_CHANGED", lambda value: value.__setitem__("authority_base", "00" * 20)),
+        ("PARENTS_SWAPPED", lambda value: value["authority_ordered_parents"].reverse()),
+        ("PATH_REMOVED", lambda value: value["test_author_paths"].pop()),
+        ("PRODUCTFUL", lambda value: value.__setitem__("productless_contract", False)),
+        ("R1_CANDIDATE_CHANGED", lambda value: value[
+            "rejected_r26_r1"].__setitem__("candidate", "00" * 20)),
+        ("R1_RECORD_CHANGED", lambda value: value[
+            "rejected_r26_r1"].__setitem__("failure_record_sha256", "00" * 32)),
+        ("R1_LOG_CHANGED", lambda value: value[
+            "rejected_r26_r1"]["review_log_identity8"][0].__setitem__(1, 0)),
+        ("R1_DISPOSITION_CHANGED", lambda value: value[
+            "rejected_r26_r1"].__setitem__("disposition", "CREDIT")),
+        ("R1_RETRY", lambda value: value[
+            "rejected_r26_r1"].__setitem__("retry", True)),
+        ("R25_RECEIPT_CHANGED", lambda value: value[
+            "published_r25_contract"].__setitem__(
+                "guarded_publication_sha256", "00" * 32)),
+        ("TRANSCRIPT_CHANGED", lambda value: value[
+            "immutable_r25_failure"].__setitem__("transcript_sha256", "00" * 32)),
+        ("TRANSCRIPT_FOOTER", lambda value: value[
+            "immutable_r25_failure"].__setitem__("transcript_footer", True)),
+        ("R25_RETRY", lambda value: value[
+            "immutable_r25_failure"].__setitem__("r25_retry", True)),
+        ("OLD_INSTALL_NLINK", lambda value: value[
+            "exact_prestaged_r14"]["identities"]["install"].__setitem__(5, 3)),
+        ("RUNTIME_OLD_NLINK", lambda value: value[
+            "exact_prestaged_r14"]["identities"]["runtime"].__setitem__(5, 2)),
+        ("GLOBAL_NORMALIZATION", lambda value: value[
+            "exact_prestaged_r14"].__setitem__(
+                "global_or_other_directory_normalization", True)),
+        ("ORACLE_WIDENED", lambda value: value[
+            "exact_prestaged_r14"].__setitem__(
+                "directory_oracle", "NLINK_GREATER_EQUAL_MEMBERS")),
+        ("MEMBER_REMOVED", lambda value: value[
+            "exact_prestaged_r14"]["members"]["install"].pop()),
+        ("PREBOOTSTRAP_CHMOD", lambda value: value[
+            "fixed_recovery_ceremony"]["prebootstrap_root_mutations"].append("chmod")),
+        ("RESERVATION_AFTER_SPAWN", lambda value: value[
+            "fixed_recovery_ceremony"].__setitem__(
+                "durable_o_excl_reservation_before_spawn", False)),
+        ("RETRY", lambda value: value[
+            "fixed_recovery_ceremony"].__setitem__("retry", True)),
+        ("R25_CURRENT", lambda value: value.__setitem__(
+            "historical_r25_lane_stale", False)),
+        ("CLI_STALE", lambda value: value["installed_cli"].__setitem__(
+            0, "--r25-installed")),
+        ("ENGINE_CHANGED", lambda value: value.__setitem__(
+            "installed_engine_bodies", "SEMANTICALLY_EQUIVALENT")),
+        ("PRODUCT_BYTES", lambda value: value.__setitem__("new_product_bytes", True)),
+        ("AUTHORITY_WIDENED", lambda value: value.__setitem__(
+            "broader_authority", True)),
+        ("DOWNSTREAM_PREMATURE", lambda value: value.__setitem__(
+            "downstream_or_supervisor_resume_before_h039_pass", True)),
+    )
+    for label, mutate in mutations:
+        mutant = copy.deepcopy(registry)
+        mutate(mutant)
+        check(not exact_typed_tree(mutant, expected), f"N_H039_R26_REGISTRY_{label}")
+    sample = "ab" * 20
+    check(
+        exact_r26_installed_argv([
+            "--r26-installed", sample, R24_AUTHORITY_BASE,
+        ]),
+        "A_H039_R26_EXACT_INSTALLED_CLI_SHAPE",
+    )
+    aliases = (
+        [], ["--r26-installed"], ["--r26-installed", sample],
+        ["--r26-installed", sample, R25_AUTHORITY_BASE],
+        ["--r26-installed", sample.upper(), R24_AUTHORITY_BASE],
+        ["--r26-installed", sample, R24_AUTHORITY_BASE, "extra"],
+        ["--r25-installed", sample, R24_AUTHORITY_BASE],
+        type("R26ListAlias", (list,), {})([
+            "--r26-installed", sample, R24_AUTHORITY_BASE,
+        ]),
+    )
+    for index, value in enumerate(aliases):
+        check(not exact_r26_installed_argv(value),
+              f"N_H039_R26_INSTALLED_CLI_MUTANT_{index:02d}")
+
+
 def r24_dispatch_selftests() -> None:
     try:
         source = GATE.read_text(encoding="utf-8")
@@ -5750,6 +6158,134 @@ def r25_dispatch_selftests() -> None:
         and installed_names.count("receipt_state") == 2
         and installed_names.count("namespace_empty_runtime") == 1,
         "A_H039_R25_ONLY_CURRENT_CLI_AND_IDENTITY_BEFORE_ONE_GUARDED_EFFECT",
+        {"historical_false": sorted(false_targets & historical_flags)},
+    )
+
+
+def r26_dispatch_selftests() -> None:
+    try:
+        tree = ast.parse(GATE.read_text(encoding="utf-8"), filename=str(GATE))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R26 executing gate AST unavailable") from exc
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    main = functions.get("main")
+    if main is None:
+        raise Rig("R26 main function absent")
+
+    def call_name(call: ast.Call) -> str:
+        if isinstance(call.func, ast.Name):
+            return call.func.id
+        if isinstance(call.func, ast.Attribute) \
+                and isinstance(call.func.value, ast.Name):
+            return f"{call.func.value.id}.{call.func.attr}"
+        return ""
+
+    false_targets = {
+        target.id for node in main.body if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Constant) and node.value.value is False
+        for target in node.targets if isinstance(target, ast.Name)
+    }
+    historical_flags = {
+        "product", "published", "installed", "r18_product", "r18_published",
+        "r18_installed", "r19_product", "r19_published", "r23_product",
+        "r23_published", "r24_installed", "r25_installed",
+    }
+    installed_branches = [
+        node for node in ast.walk(main) if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name) and node.test.id == "r26_installed"
+    ]
+    preproduct_branches = [
+        node for node in ast.walk(main) if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name) and node.test.id == "preproduct"
+        and any(
+            isinstance(item, ast.Call)
+            and call_name(item) == "r26_contract_candidate_identity"
+            for item in ast.walk(node)
+        )
+    ]
+    stale_branches = [
+        node for node in ast.walk(main) if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name)
+        and node.test.id in {"r24_installed", "r25_installed"}
+    ]
+    if len(installed_branches) != 1 or len(preproduct_branches) != 1 \
+            or stale_branches:
+        raise Rig("R26 current/stale dispatch branch cardinality drift")
+
+    def require_order(branch: ast.If, ordered: tuple[str, ...]) -> list[str]:
+        calls = [node for node in ast.walk(branch) if isinstance(node, ast.Call)]
+        names = [call_name(node) for node in calls]
+        lines = [
+            next(node.lineno for node in calls if call_name(node) == name)
+            if names.count(name) == 1 else -1
+            for name in ordered
+        ]
+        if lines != sorted(lines) or -1 in lines:
+            raise Rig(f"R26 dispatch order/cardinality drift: {ordered!r}")
+        return names
+
+    pre_names = require_order(preproduct_branches[0], (
+        "r19_cursor_causal_checks", "r26_r25_publication_evidence_checks",
+        "r26_immutable_r25_failure_checks",
+        "r26_immutable_r1_review_failure_checks",
+        "r24_r14_publication_evidence_checks",
+        "r26_ceremony_prepublication_checks",
+        "r26_contract_candidate_identity", "historical_r14_product_identity",
+        "r22_int2_evidence_checks", "r23_product_material_with_retained_installed",
+    ))
+    installed_names = require_order(installed_branches[0], (
+        "r26_contract_publication_identity", "historical_r14_product_identity",
+        "r26_r25_publication_evidence_checks",
+        "r26_immutable_r25_failure_checks",
+        "r26_immutable_r1_review_failure_checks",
+        "r24_r14_publication_evidence_checks", "r26_ceremony_completed_checks",
+        "r23_product_material_checks", "manifest_checks", "installation_checks",
+        "macho_identity", "guarded_product_effects", "namespace_empty_runtime",
+    ))
+    material_calls = [
+        node for node in ast.walk(installed_branches[0])
+        if isinstance(node, ast.Call)
+        and call_name(node) == "r23_product_material_checks"
+    ]
+    if len(material_calls) != 1:
+        raise Rig("R26 installed material call cardinality drift")
+    material_call = material_calls[0]
+    material_commit = material_call.args[0] if len(material_call.args) == 1 else None
+    material_digest = (
+        material_call.keywords[0].value
+        if len(material_call.keywords) == 1
+        and material_call.keywords[0].arg == "retained_installed_sha256"
+        else None
+    )
+    exact_material = (
+        isinstance(material_commit, ast.Subscript)
+        and isinstance(material_commit.value, ast.Name)
+        and material_commit.value.id == "argv"
+        and isinstance(material_commit.slice, ast.Constant)
+        and material_commit.slice.value == 2
+        and isinstance(material_digest, ast.Subscript)
+        and isinstance(material_digest.value, ast.Name)
+        and material_digest.value.id == "R24_R14_PRODUCT_BLOBS"
+        and isinstance(material_digest.slice, ast.Constant)
+        and material_digest.slice.value == "verify/h039/runtime-cleanup-mediator"
+    )
+    forbidden_pre = {
+        "installation_checks", "guarded_product_effects", "product_effects",
+        "subprocess.run", "subprocess.Popen", "os.posix_spawn", "os.unlink",
+        "shutil.rmtree", "r26_ceremony_completed_checks",
+        "r26_run_authenticated_validator",
+    }
+    check(
+        historical_flags <= false_targets and exact_material
+        and preproduct_branches[0].lineno < installed_branches[0].lineno
+        and not (forbidden_pre & set(pre_names))
+        and installed_names.count("guarded_product_effects") == 1
+        and "product_effects" not in installed_names
+        and installed_names.count("receipt_state") == 2
+        and installed_names.count("namespace_empty_runtime") == 1,
+        "A_H039_R26_ONLY_CURRENT_CLI_IDENTITY_AND_COMPLETION_BEFORE_ONE_EFFECT",
         {"historical_false": sorted(false_targets & historical_flags)},
     )
 
@@ -6106,6 +6642,58 @@ def r25_installed_engine_selftests() -> None:
         check(
             mutant != authority,
             f"N_H039_R25_EFFECT_ENGINE_BYTE_MUTANT_{name.upper()}",
+        )
+
+
+def r26_installed_engine_selftests() -> None:
+    try:
+        tree = ast.parse(GATE.read_text(encoding="utf-8"), filename=str(GATE))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R26 installed engine AST unavailable") from exc
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    frontier = {
+        "installation_checks", "fixed_installation_snapshot",
+        "namespace_empty_runtime", "parse_receipt", "receipt_state",
+        "require_cleanup_success", "lock_and_inherited_fd_effects",
+        "product_effects", "guarded_product_effects",
+    }
+    closure: set[str] = set()
+    while frontier:
+        name = frontier.pop()
+        if name in closure or name not in functions:
+            continue
+        closure.add(name)
+        frontier.update(
+            node.func.id for node in ast.walk(functions[name])
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in functions and node.func.id not in closure
+        )
+    check(
+        sorted(closure) == sorted(R26_INSTALLED_ENGINE_FUNCTIONS)
+        and len(closure) == 54 and len(R26_INSTALLED_ENGINE_FUNCTIONS) == 54,
+        "A_H039_R26_TRANSITIVE_EFFECT_ENGINE_CLOSURE_EXACT_54",
+        sorted(closure),
+    )
+    current = source_function_bytes(
+        GATE.read_bytes(), R26_INSTALLED_ENGINE_FUNCTIONS,
+    )
+    authority = source_function_bytes(
+        blob(R24_AUTHORITY_BASE, "verify/bin/h-039-exit"),
+        R26_INSTALLED_ENGINE_FUNCTIONS,
+    )
+    check(
+        current == authority,
+        "A_H039_R26_EXACT_54_FUNCTION_EFFECT_ENGINE_BYTE_EQUIVALENT_TO_R14",
+        {name: sha(current[name]) for name in R26_INSTALLED_ENGINE_FUNCTIONS},
+    )
+    for name in R26_INSTALLED_ENGINE_FUNCTIONS:
+        mutant = dict(current)
+        mutant[name] += b"\n# MUTANT"
+        check(
+            mutant != authority,
+            f"N_H039_R26_EFFECT_ENGINE_BYTE_MUTANT_{name.upper()}",
         )
 
 
@@ -12908,6 +13496,108 @@ def r25_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]
         return False, {"error": str(exc), "graph": graph}
 
 
+def r26_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        changes = raw_changes(R26_AUTHORITY_BASE, candidate)
+        additions, deletions = line_delta(R26_AUTHORITY_BASE, candidate)
+        detail = {
+            "authority_tree": commit_tree(R26_AUTHORITY_BASE),
+            "authority_parents": commit_parents(R26_AUTHORITY_BASE),
+            "candidate": candidate, "candidate_parents": commit_parents(candidate),
+            "changes": changes, "additions": additions, "deletions": deletions,
+        }
+        rejected = {
+            R26_AUTHORITY_BASE, R26_R25_CONTRACT_CANDIDATE,
+            R25_AUTHORITY_BASE, R25_R24_CONTRACT_CANDIDATE,
+            R24_AUTHORITY_BASE, R24_R14_PRODUCT_CANDIDATE,
+            REJECTED_R26_R1_CANDIDATE,
+        }
+        ok = (
+            object_type(R26_AUTHORITY_BASE) == "commit"
+            and detail["authority_tree"] == R26_AUTHORITY_TREE
+            and detail["authority_parents"] == R26_AUTHORITY_PARENTS
+            and sha(blob(R26_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+            == R26_BASE_GATE_SHA256
+            and sha(blob(R26_AUTHORITY_BASE, "specs/tasks.spec.json"))
+            == R26_BASE_SPEC_SHA256
+            and object_type(candidate) == "commit" and candidate not in rejected
+            and detail["candidate_parents"] == [R26_AUTHORITY_BASE]
+            and exact_contract_change_shape(changes)
+            and type(additions) is int and additions <= MAX_ADDED_LINES
+            and type(deletions) is int and deletions <= MAX_DELETED_LINES
+        )
+        return ok, detail
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r26_contract_candidate_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r26_contract_candidate_graph(candidate)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(candidate, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        return (
+            graph_ok and remote_main == R26_AUTHORITY_BASE and head == candidate
+            and status_raw == b"" and checkout_equal
+        ), {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r26_contract_publication_graph(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        authority, candidate = parents
+        candidate_ok, candidate_detail = r26_contract_candidate_graph(candidate)
+        changes = raw_changes(R26_AUTHORITY_BASE, merge)
+        ok = (
+            object_type(merge) == "commit" and authority == R26_AUTHORITY_BASE
+            and candidate_ok and commit_tree(merge) == commit_tree(candidate)
+            and exact_contract_change_shape(changes)
+        )
+        return ok, {
+            "parents": parents, "candidate": candidate_detail,
+            "changes": changes, "tree": commit_tree(merge),
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
+def r26_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r26_contract_publication_graph(merge)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        return (
+            graph_ok and remote_main == merge and head == merge
+            and status_raw == b"" and checkout_equal
+            and SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
+        ), {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
 def exact_r22_product_change_shape(
     changes: list[tuple[str, str, str, str]],
 ) -> bool:
@@ -13376,6 +14066,48 @@ def r25_git_identity_selftests() -> None:
             not exact_contract_change_shape(mutant),
             f"N_H039_R25_CONTRACT_CHANGE_SHAPE_{label}",
         )
+
+
+def r26_git_identity_selftests() -> None:
+    product_ok, product_detail = historical_r14_product_identity(R24_AUTHORITY_BASE)
+    check(product_ok, "A_H039_R26_EXACT_HISTORICAL_R14_PRODUCT_IDENTITY_SELFTEST",
+          product_detail)
+    for index, commit in enumerate((
+        R26_AUTHORITY_BASE, R26_R25_CONTRACT_CANDIDATE,
+        R25_AUTHORITY_BASE, R25_R24_CONTRACT_CANDIDATE,
+        R24_AUTHORITY_BASE, R24_R14_PRODUCT_CANDIDATE,
+        R23_AUTHORITY_BASE, REJECTED_R26_R1_CANDIDATE,
+    )):
+        graph_ok, _graph = r26_contract_publication_graph(commit)
+        candidate_ok, _candidate = r26_contract_candidate_graph(commit)
+        check(not graph_ok and not candidate_ok,
+              f"N_H039_R26_STALE_SUBSTITUTED_OR_COMPONENT_IDENTITY_{index:02d}")
+    changes = [
+        (
+            path,
+            "100755" if path == "verify/bin/h-039-exit" else "100644",
+            "100755" if path == "verify/bin/h-039-exit" else "100644",
+            "M",
+        )
+        for path in TEST_AUTHOR_GIT_ORDER
+    ]
+    check(exact_contract_change_shape(changes),
+          "A_H039_R26_EXACT_PRODUCTLESS_FIVE_FILE_CHANGE_SHAPE")
+    for label, mutate in (
+        ("MISSING", lambda value: value.pop()),
+        ("EXTRA", lambda value: value.append(
+            ("controller/runtime-cleanup/install", "100755", "100755", "M"))),
+        ("REORDERED", lambda value: value.reverse()),
+        ("SUBSTITUTED", lambda value: value.__setitem__(
+            0, ("docs/loop/neighbor.md", *value[0][1:]))),
+        ("MODE", lambda value: value.__setitem__(
+            3, (value[3][0], "100755", value[3][2], value[3][3]))),
+        ("ADDED", lambda value: value.__setitem__(
+            0, (value[0][0], "000000", value[0][2], "A"))),
+    ):
+        mutant = copy.deepcopy(changes); mutate(mutant)
+        check(not exact_contract_change_shape(mutant),
+              f"N_H039_R26_CONTRACT_CHANGE_SHAPE_{label}")
 
 
 def r17_git_identity_selftests() -> None:
@@ -19213,6 +19945,1351 @@ def r25_ceremony_completed_checks() -> None:
             os.close(descriptor)
 
 
+def r26_evidence_identity(value: os.stat_result) -> list[int]:
+    return [
+        value.st_dev, value.st_ino, value.st_mode, value.st_uid, value.st_gid,
+        value.st_nlink, value.st_size, getattr(value, "st_flags", 0),
+        value.st_mtime_ns, value.st_ctime_ns,
+    ]
+
+
+def r26_open_evidence(
+    path: Path, digest: str | None, *, mode: int, maximum: int = 12582912,
+) -> tuple[int, bytes, list[int]]:
+    exact_paths = {
+        R26_R25_GUARDED_PUBLICATION,
+        R25_CEREMONY_TOOL, R25_CEREMONY_VALIDATOR,
+        R25_CEREMONY_SOURCE_BINDING, R25_CEREMONY_DUAL_REVIEW,
+        *R26_R25_POST_HASHES.keys(),
+        R26_CEREMONY_TOOL, R26_CEREMONY_VALIDATOR,
+        R26_CEREMONY_SOURCE_BINDING, R26_CEREMONY_DUAL_REVIEW,
+        R26_CEREMONY_ATTEMPT, R26_CEREMONY_OUTCOME,
+        R26_R1_FAILURE_RECORD, *R26_R1_REVIEW_LOGS.keys(),
+    }
+    dynamic = {R26_CEREMONY_ATTEMPT, R26_CEREMONY_OUTCOME}
+    if (path not in exact_paths or (digest is None) != (path in dynamic)
+            or (digest is not None and not valid_hex(digest))):
+        raise Rig("R26 evidence request is not fixed and digest-bound")
+    descriptor = -1
+    try:
+        named = os.lstat(path)
+        descriptor = os.open(
+            path, os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
+            | getattr(os, "O_NOFOLLOW_ANY") | 0x00002000,
+        )
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != CLIENT_UID or opened.st_gid != CLIENT_GID
+            or stat.S_IMODE(opened.st_mode) != mode or opened.st_nlink != 1
+            or opened.st_size > maximum
+            or stable_identity(named) != stable_identity(opened)
+        ):
+            raise Rig(f"R26 evidence identity mismatch: {path}")
+        chunks: list[bytes] = []
+        remaining = opened.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                raise Rig(f"R26 evidence short read: {path}")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise Rig(f"R26 evidence trailing byte: {path}")
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+        rebound = os.lstat(path)
+        if (
+            stable_identity(opened) != stable_identity(after)
+            or stable_identity(after) != stable_identity(rebound)
+            or len(raw) != after.st_size
+            or (digest is not None and sha(raw) != digest)
+        ):
+            raise Rig(f"R26 evidence changed or rebound: {path}")
+        result = descriptor, raw, r26_evidence_identity(after)
+        descriptor = -1
+        return result
+    except OSError as exc:
+        raise Undecidable(f"R26 fixed evidence unavailable: {path}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def r26_r25_publication_evidence_checks() -> None:
+    descriptor, raw, _identity = r26_open_evidence(
+        R26_R25_GUARDED_PUBLICATION,
+        R26_R25_GUARDED_PUBLICATION_SHA256, mode=0o644,
+    )
+    try:
+        value = strict_json(raw)
+        publication = value.get("publication", {}) if type(value) is dict else {}
+        graph = value.get("git_graph_authentication", {}) \
+            if type(value) is dict else {}
+        reviews = value.get("independent_review_binding", {}) \
+            if type(value) is dict else {}
+        effects = value.get("effects", {}) if type(value) is dict else {}
+        exact = (
+            type(value) is dict and value.get("schema_version") == 1
+            and type(value.get("schema_version")) is int
+            and value.get("record_type")
+            == "h039_r25_guarded_contract_publication_receipt"
+            and value.get("disposition") == "PASS"
+            and value.get("workflow_only") is True
+            and value.get("task_credit") == "NONE"
+            and publication.get("base_commit") == R25_AUTHORITY_BASE
+            and publication.get("candidate_commit") == R26_R25_CONTRACT_CANDIDATE
+            and publication.get("merge_commit") == R26_AUTHORITY_BASE
+            and publication.get("tree") == R26_AUTHORITY_TREE
+            and publication.get("state") == "MERGED"
+            and graph.get("merge_ordered_parents") == R26_AUTHORITY_PARENTS
+            and graph.get("candidate_sole_parent") == R25_AUTHORITY_BASE
+            and graph.get("candidate_tree") == R26_AUTHORITY_TREE
+            and graph.get("merge_tree") == R26_AUTHORITY_TREE
+            and graph.get("merge_tree_equals_candidate_tree") is True
+            and graph.get("merge_diff_from_candidate_empty") is True
+            and graph.get("base_to_candidate_and_base_to_merge_exact_changed_paths")
+            == TEST_AUTHOR_GIT_ORDER
+            and graph.get("exact_five_file_productless_contract_transition") is True
+            and reviews.get("both_independent_reviews_pass") is True
+            and reviews.get("retry_count", 0) == 0
+            and effects.get("contract_publication_completed") is True
+            and effects.get("product_change_performed") is False
+            and effects.get("root_or_sudo_performed") is False
+            and effects.get("ceremony_or_validator_executed") is False
+            and effects.get("installation_or_staging_performed") is False
+            and effects.get("cleanup_or_rollback_performed") is False
+            and effects.get("h038_h032_h031_progress_performed") is False
+            and effects.get("supervisor_resume_performed") is False
+        )
+        check(exact, "A_H039_R26_EXACT_R25_GUARDED_PUBLICATION_RECEIPT")
+        if not exact:
+            raise Rig("R26 R25 publication receipt semantics drift")
+    finally:
+        os.close(descriptor)
+
+
+def r26_transcript_accepts(raw: bytes) -> bool:
+    try:
+        lines = raw.splitlines()
+        if len(lines) != 91 or raw != b"\n".join(lines) + b"\n":
+            return False
+        records = [strict_json(line) for line in lines]
+        if any(canonical(record) != line for record, line in zip(records, lines)):
+            return False
+        header, slots = records[0], records[1:]
+        if not (
+            type(header) is dict and header.get("schema_version") == 1
+            and type(header.get("schema_version")) is int
+            and header.get("record_type")
+            == "h039_r25_r14_root_read_only_observation_header"
+            and header.get("authority")
+            == "OWNER_AUTHORIZED_WORKFLOW_ONLY_ROOT_READ_ONLY_POST_FAILURE_OBSERVATION"
+            and header.get("observer_sha256")
+            == R26_R25_POST_HASHES[R26_R25_POST_OBSERVER]
+            and header.get("validator_sha256")
+            == R26_R25_POST_HASHES[R26_R25_POST_VALIDATOR]
+            and header.get("source_binding_sha256")
+            == R26_R25_POST_HASHES[R26_R25_POST_SOURCE_BINDING]
+            and header.get("plan_sha256") == R26_R25_PLAN_SHA256
+            and header.get("slot_count") == 90
+            and header.get("attempt_reservation_absent_before") is True
+            and header.get("outcome_absent_before") is True
+            and header.get("workflow_report_only") is True
+            and header.get("task_credit") is False
+        ):
+            return False
+        required = {
+            "record_type", "slot", "kind", "path_key", "path", "argv",
+            "state", "returncode", "stdout_size", "stdout_sha256",
+            "stdout_base64", "stderr_size", "stderr_sha256",
+            "stderr_base64", "not_run_reason",
+        }
+        for index, item in enumerate(slots):
+            if not (
+                type(item) is dict and set(item) == required
+                and item.get("record_type")
+                == "h039_r25_r14_root_read_only_slot"
+                and item.get("slot") == index and type(item.get("slot")) is int
+                and item.get("state") == "EXECUTED"
+                and item.get("returncode") == 0
+                and type(item.get("returncode")) is int
+                and item.get("not_run_reason") is None
+                and type(item.get("argv")) is list
+                and item["argv"][:5]
+                == ["/usr/bin/sudo", "/usr/bin/env", "-i", "-C", "/"]
+            ):
+                return False
+            for prefix in ("stdout", "stderr"):
+                decoded = base64.b64decode(item[f"{prefix}_base64"], validate=True)
+                if (
+                    type(item[f"{prefix}_size"]) is not int
+                    or item[f"{prefix}_size"] != len(decoded)
+                    or item[f"{prefix}_sha256"] != sha(decoded)
+                ):
+                    return False
+        plan = [
+            {key: item[key] for key in ("kind", "path_key", "path", "argv")}
+            for item in slots
+        ]
+        return (
+            sha(canonical(plan)) == R26_R25_PLAN_SHA256
+            and sha(canonical([item["returncode"] for item in slots]))
+            == R26_R25_RC_VECTOR_SHA256
+        )
+    except (ValueError, TypeError, UnicodeError, Rig):
+        return False
+
+
+def r26_source_binding_accepts(value: Any) -> bool:
+    if type(value) is not dict or set(value) != {
+        "schema_version", "record_type", "authority", "authority_scope",
+        "published_r25_contract", "published_r14_product",
+        "consumed_r25_workflow", "exact_prestaged_r14", "fixed_execution",
+        "dynamic_records", "workflow_tools", "evidence_root_record_creation",
+        "independent_validation_contract", "serial_order", "forbidden",
+        "root_effect_during_authoring_or_review", "task_credit",
+    }:
+        return False
+    published = value.get("published_r25_contract", {})
+    product = value.get("published_r14_product", {})
+    consumed = value.get("consumed_r25_workflow", {})
+    staged = value.get("exact_prestaged_r14", {})
+    execution = value.get("fixed_execution", {})
+    dynamic = value.get("dynamic_records", {})
+    tools = value.get("workflow_tools", {})
+    parent = value.get("evidence_root_record_creation", {})
+    validation = value.get("independent_validation_contract", {})
+    expected_old = {
+        str(R25_CEREMONY_TOOL): R25_CEREMONY_TOOL_SHA256,
+        str(R25_CEREMONY_VALIDATOR): R25_CEREMONY_VALIDATOR_SHA256,
+        str(R25_CEREMONY_SOURCE_BINDING): R25_CEREMONY_SOURCE_BINDING_SHA256,
+        str(R25_CEREMONY_DUAL_REVIEW): R25_CEREMONY_DUAL_REVIEW_SHA256,
+        str(R26_R25_POST_OBSERVER): R26_R25_POST_HASHES[R26_R25_POST_OBSERVER],
+        str(R26_R25_POST_VALIDATOR): R26_R25_POST_HASHES[R26_R25_POST_VALIDATOR],
+        str(R26_R25_POST_SOURCE_BINDING): R26_R25_POST_HASHES[
+            R26_R25_POST_SOURCE_BINDING
+        ],
+        str(R26_R25_POST_DUAL_REVIEW): R26_R25_POST_HASHES[
+            R26_R25_POST_DUAL_REVIEW
+        ],
+        str(R26_R25_GUARDED_PUBLICATION): R26_R25_GUARDED_PUBLICATION_SHA256,
+        str(R26_R25_POST_TRANSCRIPT): R26_R25_POST_HASHES[R26_R25_POST_TRANSCRIPT],
+    }
+    immutable = consumed.get("immutable_files", []) \
+        if type(consumed) is dict else []
+    immutable_map = {
+        item.get("path"): item for item in immutable if type(item) is dict
+    }
+    expected_dirs = {
+        str(PROTECTED_NAMESPACE): (
+            [16777232, 126958092, stat.S_IFDIR | 0o555, 0, 0, 8, 256, 0],
+            [str(PROTECTED_INSTALL), str(PROTECTED_NAMESPACE / "a"),
+             str(PROTECTED_NAMESPACE / "c"), str(PROTECTED_NAMESPACE / "q"),
+             str(PROTECTED_NAMESPACE / "r"), str(PROTECTED_NAMESPACE / "s")],
+        ),
+        str(PROTECTED_INSTALL): (
+            R26_PRESTAGED_IDENTITIES["install"],
+            [str(PROTECTED_INSTALL / "controller"),
+             str(PROTECTED_INSTALL / "mediator")],
+        ),
+        str(PROTECTED_INSTALL / "controller"): (
+            R26_PRESTAGED_IDENTITIES["controller"],
+            [str(PROTECTED_INSTALL / "controller/runtime-cleanup")],
+        ),
+        str(PROTECTED_INSTALL / "controller/runtime-cleanup"): (
+            R26_PRESTAGED_IDENTITIES["runtime"],
+            [str(PROTECTED_INSTALLER)],
+        ),
+        str(PROTECTED_NAMESPACE / "a"): (
+            [16777232, 128098564, stat.S_IFDIR | 0o555, 0, 0, 2, 64, 0], [],
+        ),
+        str(PROTECTED_NAMESPACE / "c"): (
+            [16777232, 128098565, stat.S_IFDIR | 0o555, 0, 0, 2, 64, 0], [],
+        ),
+        str(PROTECTED_NAMESPACE / "q"): (
+            [16777232, 128098566, stat.S_IFDIR | 0o555, 0, 0, 2, 64, 0], [],
+        ),
+        str(PROTECTED_NAMESPACE / "r"): (
+            [16777232, 128098567, stat.S_IFDIR | 0o555, 0, 0, 2, 64, 0], [],
+        ),
+        str(PROTECTED_NAMESPACE / "s"): (
+            [16777232, 128098568, stat.S_IFDIR | 0o555, 0, 0, 3, 96, 0],
+            [str(PROTECTED_NAMESPACE / "s/lock")],
+        ),
+    }
+    directories = staged.get("directories", []) if type(staged) is dict else []
+    directory_map = {
+        item.get("path"): (item.get("identity8"), item.get("members"))
+        for item in directories if type(item) is dict
+    }
+    regulars = staged.get("regulars", []) if type(staged) is dict else []
+    regular_map = {
+        item.get("path"): item for item in regulars if type(item) is dict
+    }
+    expected_regulars = {
+        str(PROTECTED_NAMESPACE / "s/lock"): {
+            "path": str(PROTECTED_NAMESPACE / "s/lock"),
+            "identity8": [16777232, 128098569, stat.S_IFREG | 0o600,
+                          0, 0, 1, 0, 0],
+            "sha256": sha(b""), "codesign": None,
+        },
+        str(PROTECTED_INSTALLER): {
+            "path": str(PROTECTED_INSTALLER),
+            "identity8": R26_PRESTAGED_IDENTITIES["installer"],
+            "sha256": R24_R14_PRODUCT_BLOBS["controller/runtime-cleanup/install"],
+            "codesign": {"identifier": "se.nortropic.runtime-cleanup-installer",
+                         "cdhash": R24_R14_INSTALLER_CDHASH},
+        },
+        str(PROTECTED_INSTALL / "mediator"): {
+            "path": str(PROTECTED_INSTALL / "mediator"),
+            "identity8": R26_PRESTAGED_IDENTITIES["staged_mediator"],
+            "sha256": R24_R14_PRODUCT_BLOBS["verify/h039/runtime-cleanup-mediator"],
+            "codesign": {"identifier": "se.nortropic.runtime-cleanup-mediator",
+                         "cdhash": R24_R14_RUNTIME_CDHASH},
+        },
+        str(INSTALLED): {
+            "path": str(INSTALLED),
+            "identity8": R26_PRESTAGED_IDENTITIES["installed_old_r12"],
+            "sha256": R23_OLD_R12_MEDIATOR_SHA256,
+            "codesign": {"identifier": "se.nortropic.runtime-cleanup-mediator",
+                         "cdhash": "226263c4ba843c8815389aaffc38ee83a3b49a33"},
+        },
+    }
+    return (
+        value.get("schema_version") == 1
+        and type(value.get("schema_version")) is int
+        and value.get("record_type")
+        == "h039_r26_r14_prestaged_recovery_source_binding"
+        and value.get("authority")
+        == "OWNER_AUTHORIZED_PRODUCTLESS_PRESTAGED_R14_RECOVERY"
+        and value.get("authority_scope")
+        == "Authenticate exact observed complete R14 staging, create one durable no-retry reservation, and execute the fixed published R14 bootstrap exactly once; no pre-bootstrap mutation"
+        and value.get("root_effect_during_authoring_or_review") is False
+        and value.get("task_credit") is False
+        and published.get("merge") == R26_AUTHORITY_BASE
+        and published.get("ordered_parents") == R26_AUTHORITY_PARENTS
+        and published.get("candidate") == R26_R25_CONTRACT_CANDIDATE
+        and published.get("tree") == R26_AUTHORITY_TREE
+        and published.get("gate_sha256") == R26_BASE_GATE_SHA256
+        and published.get("spec_sha256") == R26_BASE_SPEC_SHA256
+        and published.get("guarded_publication_receipt_sha256")
+        == R26_R25_GUARDED_PUBLICATION_SHA256
+        and product.get("merge") == R24_AUTHORITY_BASE
+        and product.get("ordered_parents") == R24_AUTHORITY_PARENTS
+        and product.get("candidate") == R24_R14_PRODUCT_CANDIDATE
+        and product.get("tree") == R24_AUTHORITY_TREE
+        and product.get("installer_sha256")
+        == R24_R14_PRODUCT_BLOBS["controller/runtime-cleanup/install"]
+        and product.get("installer_size") == R24_R14_INSTALLER_SIZE
+        and product.get("installer_cdhash") == R24_R14_INSTALLER_CDHASH
+        and product.get("mediator_sha256")
+        == R24_R14_PRODUCT_BLOBS["verify/h039/runtime-cleanup-mediator"]
+        and product.get("mediator_size") == R24_R14_RUNTIME_SIZE
+        and product.get("mediator_cdhash") == R24_R14_RUNTIME_CDHASH
+        and consumed.get("retry_permitted") is False
+        and consumed.get("task_credit") is False
+        and consumed.get("dynamic_records_absent")
+        == [str(R25_CEREMONY_ATTEMPT), str(R25_CEREMONY_OUTCOME)]
+        and len(immutable) == len(expected_old)
+        and set(immutable_map) == set(expected_old)
+        and all(
+            set(immutable_map[path]) == {"path", "identity", "sha256"}
+            and immutable_map[path].get("path") == path
+            and immutable_map[path].get("sha256") == digest
+            and type(immutable_map[path].get("identity")) is list
+            and len(immutable_map[path]["identity"]) == 8
+            and all(type(item) is int for item in immutable_map[path]["identity"])
+            for path, digest in expected_old.items()
+        )
+        and consumed.get("ceremony_result")
+        == "STATUS_1_PRE_RESERVATION_ROOT_STAGING_DIRECTORY_METADATA_DIFFERS_INSTALL"
+        and consumed.get("post_failure_observer_result")
+        == "STATUS_1_AFTER_ALL_90_ROOT_READ_ONLY_SLOTS_EVIDENCE_ROOT_NAME_REBOUND"
+        and consumed.get("observation") == {
+            "format": "CANONICAL_DUPLICATE_FREE_JSONL_HEADER_PLUS_90_EXECUTED_SLOTS_WITH_NO_FOOTER",
+            "slot_count": 90, "all_returncodes": 0,
+            "plan_sha256": R26_R25_PLAN_SHA256,
+            "returncode_vector_sha256": R26_R25_RC_VECTOR_SHA256,
+        }
+        and staged.get("membership_derived_nlink_scope") == [
+            str(PROTECTED_INSTALL), str(PROTECTED_INSTALL / "controller"),
+            str(PROTECTED_INSTALL / "controller/runtime-cleanup"),
+        ]
+        and staged.get("directory_rule")
+        == "Only for the three stale staging directories .install, .install/controller and .install/controller/runtime-cleanup: after exact direct membership, require st_nlink == 2 + len(direct_members); namespace and a/c/q/r/s retain raw exact identity with no normalization"
+        and all(
+            type(item) is dict and set(item) == {"path", "identity8", "members"}
+            for item in directories
+        )
+        and directory_map == expected_dirs and len(directories) == 9
+        and len(regulars) == 4 and regular_map == expected_regulars
+        and execution.get("launcher") == [
+            "/usr/bin/sudo", "/usr/bin/env", "-i", "-C", "/",
+            str(PROTECTED_INSTALLER), "bootstrap",
+        ]
+        and execution.get("expected_exit") == 0
+        and execution.get("expected_stdout_bytes") == 0
+        and execution.get("expected_stderr_bytes") == 0
+        and execution.get("retry_permitted") is False
+        and execution.get("pre_bootstrap_mutation_commands") == []
+        and execution.get("read_only_root_tools") == [
+            "/usr/bin/stat", "/usr/bin/find", "/bin/ls",
+            "/usr/bin/openssl", "/usr/bin/codesign",
+        ]
+        and dynamic.get("attempt") == str(R26_CEREMONY_ATTEMPT)
+        and dynamic.get("outcome") == str(R26_CEREMONY_OUTCOME)
+        and dynamic.get("initial_state") == "BOTH_ABSENT_WITH_NO_SYMLINK"
+        and dynamic.get("reservation_state")
+        == "CONSUMED_BEFORE_SPAWN_NO_RETRY"
+        and dynamic.get("create")
+        == "O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE mode0600, file fsync, exact own parent-membership delta, parent fsync, retained identity/digest/name-rebind"
+        and tools == {
+            "ceremony": str(R26_CEREMONY_TOOL),
+            "validator": str(R26_CEREMONY_VALIDATOR),
+            "dual_review": str(R26_CEREMONY_DUAL_REVIEW),
+        }
+        and parent.get("raw_nlink_size_or_timestamp_equality_for_parent") is False
+        and parent.get("stable_fields")
+        == ["dev", "ino", "type", "mode", "uid", "gid", "flags"]
+        and parent.get("required_membership_delta")
+        == "exactly the one fixed record name being created; no missing, extra, or substituted name"
+        and parent.get("rationale")
+        == "APFS derives directory nlink and size from membership; the record itself is the only authorized parent mutation"
+        and validation == {
+            "schema_version_type": "EXACT_INT_NOT_BOOL",
+            "preflight_trace": "Exactly 58 ordered fixed stat/find/ls/openssl/codesign commands; every argv, path, return code and decoded stream is causally checked against exact_prestaged_r14",
+            "prespawn_trace": "A second independently decoded exact 58-command trace and snapshot equal to the pre-reservation authenticated state",
+            "reservation_bindings": [
+                "source_binding_identity", "dual_review_sha256_and_identity",
+                "exact_consumed_r25_file_vector", "exact_prestaged_r14",
+                "fixed_bootstrap_argv_and_expected_silent_status_zero",
+            ],
+            "post_state_bindings": [
+                "raw_exact_namespace_and_a_c_q_r_s",
+                "regular_root_owned_lock",
+                "new_helper_digest_cdhash_and_staged_inode_origin",
+                "retained_old_helper_before_identity_and_unlinked_nlink_zero_digest",
+                "install_absence_receipt_absence_sequence_zero_and_empty_runtime_residue",
+            ],
+            "workflow_dual_review": "Exact schema and candidate hashes; exactly two distinct independent read-only full rereviews; no root, sudo, modification or execution",
+        }
+        and value.get("serial_order") == [
+            "PUBLISH_R26_CONTRACT_AFTER_TWO_INDEPENDENT_REVIEWS",
+            "OWNER_VERIFY_FROZEN_WORKFLOW_HASHES_AND_DYNAMIC_RECORDS_ABSENT",
+            "AUTHENTICATE_CONSUMED_R25_CHAIN_AND_EXACT_OBSERVED_FULL_R14_STAGING",
+            "CREATE_DURABLE_R26_RESERVATION_CONSUMED_BEFORE_SPAWN",
+            "EXACTLY_ONE_FIXED_OUTPUT_FREE_R14_BOOTSTRAP",
+            "CREATE_DURABLE_R26_OUTCOME", "INDEPENDENT_POST_STATE_VALIDATION",
+            "CURRENT_PUBLICATION_BOUND_INSTALLED_EFFECT", "GUARDED_H039_COMPLETION",
+        ]
+        and value.get("forbidden") == [
+            "R25_RETRY",
+            "PRE_BOOTSTRAP_RESTAGING_REWRITE_CHMOD_CLEANUP_OR_OTHER_MUTATION",
+            "SECOND_R26_BOOTSTRAP_OR_RETRY",
+            "CALLER_ARGUMENT_PATH_FD_OR_INPUT",
+            "GENERAL_ROLLBACK_OR_CLEANUP",
+            "PROCESS_SCAN_SIGNAL_SHELL_GIT_NETWORK_OR_CREDENTIAL_AUTHORITY",
+            "BROADER_FILESYSTEM_ROOT_NATIVE_OR_SEATBELT_BYPASS_AUTHORITY",
+            "TASK_CREDIT_FROM_WORKFLOW_EVIDENCE",
+            "H038_H032_H031_OR_SUPERVISOR_PROGRESS_BEFORE_FULL_H039_PASS",
+        ]
+    )
+
+
+def r26_immutable_r25_failure_checks() -> None:
+    source_fd, source_raw, _source_identity = r26_open_evidence(
+        R26_CEREMONY_SOURCE_BINDING, R26_CEREMONY_SOURCE_BINDING_SHA256,
+        mode=0o644,
+    )
+    opened = [source_fd]
+    try:
+        source = strict_json(source_raw)
+        if not r26_source_binding_accepts(source):
+            raise Rig("R26 source binding semantics drift")
+        immutable = source["consumed_r25_workflow"]["immutable_files"]
+        live: dict[str, list[int]] = {}
+        for item in immutable:
+            path = Path(item["path"])
+            mode = 0o600 if path == R26_R25_POST_TRANSCRIPT else 0o644
+            descriptor, raw, identity = r26_open_evidence(
+                path, item["sha256"], mode=mode,
+            )
+            opened.append(descriptor)
+            live[str(path)] = identity[:8]
+            if identity[:8] != item["identity"]:
+                raise Rig(f"R26 immutable R25 identity drift: {path}")
+            if path == R26_R25_POST_TRANSCRIPT and not r26_transcript_accepts(raw):
+                raise Rig("R26 immutable R25 transcript semantics drift")
+        absent = []
+        for path in (R25_CEREMONY_ATTEMPT, R25_CEREMONY_OUTCOME):
+            try:
+                os.lstat(path)
+            except FileNotFoundError:
+                absent.append(True)
+            except OSError as exc:
+                raise Undecidable(f"R26 R25 dynamic absence undecidable: {path}") from exc
+            else:
+                absent.append(False)
+        check(
+            absent == [True, True]
+            and live[str(R26_R25_POST_TRANSCRIPT)]
+            == R26_R25_POST_TRANSCRIPT_IDENTITY8,
+            "A_H039_R26_IMMUTABLE_R25_FAILURE_TRANSCRIPT_AND_NO_RETRY",
+            {"immutable_count": len(live), "r25_dynamic_absent": absent},
+        )
+    finally:
+        for descriptor in opened:
+            os.close(descriptor)
+
+
+def r26_immutable_r1_review_failure_checks() -> None:
+    record_fd, record_raw, record_identity = r26_open_evidence(
+        R26_R1_FAILURE_RECORD, R26_R1_FAILURE_RECORD_SHA256, mode=0o644,
+    )
+    opened = [(record_fd, R26_R1_FAILURE_RECORD, record_identity)]
+    logs: list[bytes] = []
+    try:
+        value = strict_json(record_raw)
+        if type(value) is not dict:
+            raise Rig("R26 R1 failure record is not an exact object")
+        formal = value.get("formal_reviews", {})
+        entries_ok = type(formal) is dict
+        for label, (path, identity8) in zip(("a", "b"), R26_R1_REVIEW_LOGS.items()):
+            descriptor, raw, identity = r26_open_evidence(
+                path, R26_R1_REVIEW_LOG_SHA256, mode=0o644, maximum=131072,
+            )
+            opened.append((descriptor, path, identity))
+            logs.append(raw)
+            entries_ok = entries_ok and identity[:8] == identity8 and exact_typed_tree(formal.get(label), {
+                "clone": f"/private/tmp/h039-r26-gate-review-{label}-8f58b01d",
+                "log": str(path), "log_identity8": identity8,
+                "log_sha256": R26_R1_REVIEW_LOG_SHA256, "line_count": 3243,
+                "exit_status": 2, "invocation_count": 1, "retry_performed": False,
+            })
+        candidate = value.get("candidate", {})
+        consensus = value.get("consensus", {})
+        exact = (
+            record_identity[:8] == [16777232, 129395554, 0o100644, 501, 20, 1, 3172, 0]
+            and set(value) == {"schema_version", "record_type", "recorded_utc",
+                "workflow_only", "task_credit", "disposition", "candidate",
+                "formal_reviews", "consensus", "remote_observation", "effects", "next_state"}
+            and type(value.get("schema_version")) is int and value.get("schema_version") == 1
+            and value.get("record_type") == "h039_r26_r1_formal_gate_review_failure"
+            and value.get("recorded_utc") == "2026-09-05T18:35:03Z"
+            and value.get("workflow_only") is True and value.get("task_credit") == "NONE"
+            and value.get("disposition") == "IMMUTABLE_NO_CREDIT_NONPARENT"
+            and exact_typed_tree(candidate, {"base": R26_AUTHORITY_BASE,
+                "commit": REJECTED_R26_R1_CANDIDATE, "tree": REJECTED_R26_R1_TREE,
+                "gate_sha256": REJECTED_R26_R1_GATE_SHA256,
+                "spec_sha256": REJECTED_R26_R1_SPEC_SHA256,
+                "exact_five_file_shape": True,
+                "diff_shortstat": "5 files changed, 2400 insertions(+), 184 deletions(-)",
+                "immutable": True, "retry_permitted": False})
+            and set(formal) == {"invocation", "inherited_umask",
+                "capture_wrapper_retained_fd9", "a", "b"}
+            and formal.get("invocation") == "env PROVIDER_CALL_ALLOWED=NO MODEL_CALL_ALLOWED=NO ./verify/bin/h-039-exit"
+            and formal.get("inherited_umask") == "0022"
+            and formal.get("capture_wrapper_retained_fd9") is True and entries_ok
+            and len({tuple(identity8[:2]) for identity8 in R26_R1_REVIEW_LOGS.values()}) == 2
+            and len(logs) == 2 and logs[0] == logs[1]
+            and len(logs[0].splitlines()) == 3243
+            and sum(line.startswith(b"PASS ") for line in logs[0].splitlines()) == 3242
+            and logs[0].count(b"RIG_ERROR: R19 causal compiler phase set drift") == 1
+            and b"FAIL " not in logs[0] and b"H039_GATE_SUMMARY=" not in logs[0]
+            and b"H039_GATE_RESULT=" not in logs[0]
+            and exact_typed_tree(consensus, {"logs_byte_identical": True,
+                "logs_distinct_inodes": True, "pass_prefixed_lines": 3242,
+                "fail_prefixed_lines": 0, "rig_error_count": 1, "undecidable_count": 0,
+                "summary_present": False, "result_present": False,
+                "exact_rig_error": "R19 causal compiler phase set drift",
+                "root_cause": "R26_R1_DELETED_THE_INHERITED_PREPRODUCT_R19_CURSOR_CAUSAL_CALL_WHILE_THE_UNCHANGED_CLOSED_WORLD_SELFTEST_REQUIRED_EXACTLY_PREPRODUCT_R19_PRODUCT_AND_R19_PUBLISHED",
+                "minimal_fail_closed_remediation": "RESTORE_EXACT_R19_CURSOR_CAUSAL_CHECK_OF_EXACT_EXPECTED_PRODUCTION_SOURCE_AS_FIRST_PREPRODUCT_STATEMENT_WITHOUT_RELAXING_CARDINALITY_OR_SCOPE"})
+            and exact_typed_tree(value.get("remote_observation"), {
+                "origin_main_before": R26_AUTHORITY_BASE,
+                "origin_main_after": R26_AUTHORITY_BASE, "read_only": True})
+            and exact_typed_tree(value.get("effects"), {"push_or_publication_performed": False,
+                "root_sudo_install_staging_cleanup_or_rollback_performed": False,
+                "product_change_performed": False, "h038_h032_h031_progress_performed": False,
+                "supervisor_resume_performed": False})
+            and all(r26_evidence_identity(os.fstat(fd)) == identity
+                and r26_evidence_identity(os.lstat(path)) == identity
+                for fd, path, identity in opened)
+            and value.get("next_state") == "FRESH_R26_R2_SIBLING_DIRECT_CHILD_OF_AA1A304B_WITH_FULL_REFREEZE_AND_TWO_NEW_INDEPENDENT_REVIEWS"
+        )
+        check(exact, "A_H039_R26_R1_DUAL_REVIEW_RIG_IMMUTABLE_NO_CREDIT_NONPARENT")
+    finally:
+        for descriptor, _path, _identity in opened:
+            os.close(descriptor)
+
+
+def r26_ceremony_review_accepts(value: Any) -> bool:
+    expected_scope = {
+        "consumed_r25_chain_immutable_and_no_credit": True,
+        "r25_retry_absent": True,
+        "exact_observed_full_r14_staging_authenticated": True,
+        "membership_derived_nlink_scope_exactly": [str(PROTECTED_INSTALL),
+            str(PROTECTED_INSTALL / "controller"),
+            str(PROTECTED_INSTALL / "controller/runtime-cleanup")],
+        "namespace_and_a_c_q_r_s_raw_exact_identity_unchanged": True,
+        "pre_bootstrap_root_mutation_command_count": 0,
+        "pre_reservation_and_prespawn_authentication_are_read_only": True,
+        "one_fixed_o_excl_reservation_before_spawn": True,
+        "one_fixed_bootstrap_argv_and_no_retry": True,
+        "outcome_and_post_state_fail_closed": True,
+        "evidence_parent_own_record_delta_separate_from_h039_oracle": True,
+        "no_root_or_sudo_during_review": True,
+        "no_task_credit": True,
+    }
+    expected_keys = {
+        "schema_version", "record_type", "authority", "published_r25_contract_merge",
+        "published_r14_product_merge", "candidate", "required_review_scope",
+        "reviews", "root_or_sudo_used", "workflow_files_modified_during_review",
+        "root_update_executed", "workflow_report_only", "task_credit", "next_state", "verdict",
+    }
+    review_keys = {
+        "role", "verdict", "independent", "read_only", "full_candidate_rereview",
+        "root_or_sudo_used", "ceremony_or_validator_executed", "files_modified", "finding",
+    }
+    if type(value) is not dict or set(value) != expected_keys:
+        return False
+    reviews = value.get("reviews")
+    combined = " ".join(item.get("finding", "") for item in reviews).lower() \
+        if type(reviews) is list else ""
+    return (
+        type(value.get("schema_version")) is int
+        and value.get("schema_version") == 1
+        and value.get("record_type")
+        == "h039_r26_r14_recovery_workflow_dual_review"
+        and value.get("authority")
+        == "OWNER_AUTHORIZED_PRODUCTLESS_PRESTAGED_R14_RECOVERY"
+        and value.get("published_r25_contract_merge") == R26_AUTHORITY_BASE
+        and value.get("published_r14_product_merge") == R24_AUTHORITY_BASE
+        and value.get("candidate") == {"ceremony_sha256": R26_CEREMONY_TOOL_SHA256,
+            "validator_sha256": R26_CEREMONY_VALIDATOR_SHA256,
+            "source_binding_sha256": R26_CEREMONY_SOURCE_BINDING_SHA256}
+        and value.get("required_review_scope") == expected_scope
+        and type(reviews) is list and len(reviews) == 2
+        and [item.get("role") for item in reviews] == [
+            "INDEPENDENT_WORKFLOW_REVIEWER_A", "INDEPENDENT_ADVERSARIAL_WORKFLOW_REVIEWER_B"]
+        and all(
+            type(item) is dict and set(item) == review_keys
+            and item.get("verdict") == "PASS"
+            and item.get("independent") is True
+            and item.get("read_only") is True
+            and item.get("full_candidate_rereview") is True
+            and item.get("root_or_sudo_used") is False
+            and item.get("ceremony_or_validator_executed") is False
+            and item.get("files_modified") is False
+            and type(item.get("finding")) is str
+            and len(item["finding"]) >= 120
+            for item in reviews
+        )
+        and all(token in combined for token in
+                ("nlink", "reservation", "post-state", "authority"))
+        and value.get("root_or_sudo_used") is False
+        and value.get("workflow_files_modified_during_review") is False
+        and value.get("root_update_executed") is False
+        and value.get("workflow_report_only") is True
+        and value.get("task_credit") is False
+        and value.get("next_state")
+        == "R26_CONTRACT_FREEZE_TWO_REVIEWS_GUARDED_PUBLICATION_BEFORE_OWNER_CEREMONY"
+        and value.get("verdict") == "PASS"
+    )
+
+def r26_workflow_source_shape_accepts(tool: Any, validator: Any,
+                                      *, exact_identity: bool = True) -> bool:
+    if type(tool) is not bytes or type(validator) is not bytes:
+        return False
+    if exact_identity and (len(tool) != 48460 or sha(tool) != R26_CEREMONY_TOOL_SHA256
+            or len(validator) != R26_VALIDATOR_SIZE
+            or sha(validator) != R26_CEREMONY_VALIDATOR_SHA256):
+        return False
+    try:
+        tool_text = tool.decode("utf-8")
+        validator_text = validator.decode("utf-8")
+        tool_tree = ast.parse(tool_text)
+        validator_tree = ast.parse(validator_text)
+    except (UnicodeError, SyntaxError):
+        return False
+
+    def functions(tree: ast.Module) -> dict[str, ast.FunctionDef]:
+        values = {
+            node.name: node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+        }
+        if len(values) != sum(
+            isinstance(node, ast.FunctionDef) for node in tree.body
+        ):
+            return {}
+        return values
+
+    def call_name(node: ast.Call) -> str:
+        if isinstance(node.func, ast.Name):
+            return node.func.id
+        if isinstance(node.func, ast.Attribute):
+            owner = node.func.value.id \
+                if isinstance(node.func.value, ast.Name) else ""
+            return f"{owner}.{node.func.attr}" if owner else node.func.attr
+        return ""
+
+    tool_functions = functions(tool_tree)
+    validator_functions = functions(validator_tree)
+    tool_main = tool_functions.get("main")
+    validator_main = validator_functions.get("main")
+    directory = tool_functions.get("root_dir_snapshot")
+    record = tool_functions.get("create_record")
+    verify_tools = tool_functions.get("verify_tools")
+    authentication = tool_functions.get("authenticate_full_prestaging")
+    if None in (tool_main, validator_main, directory, record, verify_tools, authentication):
+        return False
+    if tool_main.args.args or validator_main.args.args:
+        return False
+    tool_calls = [node for node in ast.walk(tool_tree) if isinstance(node, ast.Call)]
+    validator_calls = [
+        node for node in ast.walk(validator_tree) if isinstance(node, ast.Call)
+    ]
+    banned = {
+        "mkdir", "makedirs", "chmod", "chown", "link", "linkat",
+        "rename", "replace", "unlink", "remove", "rmdir", "rmtree",
+        "copy", "copy2", "copyfile", "kill", "system", "posix_spawn", "exec", "eval", "compile", "globals", "locals", "vars", "setattr", "delattr", "__import__", "__setitem__", "run_path", "run_module", "exec_module", "load_module",
+    }
+    if (any(call_name(node).split(".")[-1] in banned for node in tool_calls)
+            or sum(call_name(node) == "no_acl_or_xattr_marker" for node in tool_calls) != 4
+            or any((isinstance(node, ast.Name) and node.id in {"root_dir_snapshot", "root_regular_snapshot", "authenticate_full_prestaging"} and not isinstance(node.ctx, ast.Load)) or (isinstance(node, ast.Attribute) and node.attr in {"root_dir_snapshot", "root_regular_snapshot", "authenticate_full_prestaging"} and not isinstance(node.ctx, ast.Load)) or (isinstance(node, (ast.ClassDef, ast.AsyncFunctionDef, ast.alias, ast.ExceptHandler)) and (getattr(node, "name", None) in {"*", "root_dir_snapshot", "root_regular_snapshot", "authenticate_full_prestaging"} or getattr(node, "asname", None) in {"root_dir_snapshot", "root_regular_snapshot", "authenticate_full_prestaging"})) for node in ast.walk(tool_tree))):
+        return False
+    if any(call_name(node).split(".")[-1] in banned for node in validator_calls):
+        return False
+    popen = [node for node in tool_calls if call_name(node) == "subprocess.Popen"]
+    create_calls = [
+        node for node in ast.walk(tool_main)
+        if isinstance(node, ast.Call) and call_name(node) == "create_record"
+    ]
+    authentications = [
+        node for node in ast.walk(tool_main)
+        if isinstance(node, ast.Call)
+        and call_name(node) == "authenticate_full_prestaging"
+    ]
+    if (
+        len(popen) != 1 or len(create_calls) != 2 or len(authentications) != 2
+        or [node.lineno for node in (
+            authentications[0], create_calls[0], authentications[1],
+            popen[0], create_calls[1],
+        )] != sorted(node.lineno for node in (
+            authentications[0], create_calls[0], authentications[1],
+            popen[0], create_calls[1],
+        ))
+    ):
+        return False
+    process = popen[0]
+    if not (
+        len(process.args) == 1 and isinstance(process.args[0], ast.Name)
+        and process.args[0].id == "BOOTSTRAP_COMMAND"
+        and [item.arg for item in process.keywords] == [
+            "cwd", "env", "stdin", "stdout", "stderr", "close_fds",
+        ]
+        and isinstance(process.keywords[0].value, ast.Constant)
+        and process.keywords[0].value.value == "/"
+        and isinstance(process.keywords[1].value, ast.Dict)
+        and not process.keywords[1].value.keys
+        and isinstance(process.keywords[-1].value, ast.Constant)
+        and process.keywords[-1].value.value is True
+    ):
+        return False
+    if [
+        node.args[0].id if node.args and isinstance(node.args[0], ast.Name)
+        else None for node in create_calls
+    ] != ["RESERVATION", "OUTCOME"]:
+        return False
+    parent = {
+        child: ancestor for ancestor in ast.walk(tool_tree)
+        for child in ast.iter_child_nodes(ancestor)
+    }
+    cursor: ast.AST | None = process
+    while cursor in parent:
+        cursor = parent[cursor]
+        if isinstance(cursor, (ast.For, ast.AsyncFor, ast.While)):
+            return False
+    open_calls = [node for node in tool_calls if call_name(node) == "os.open"]
+    record_opens = [node for node in ast.walk(record) if isinstance(node, ast.Call)
+                    and call_name(node) == "os.open"]
+    if len(record_opens) != 2 or not any(
+        any(isinstance(arg, ast.Name) and arg.id == "CREATE_FLAGS"
+            for arg in node.args) for node in record_opens
+    ):
+        return False
+    directory_source = ast.get_source_segment(tool_text, directory) or ""
+    authentication_source = ast.get_source_segment(tool_text, authentication) or ""
+    snapshot_values = [call_name(node.value) if isinstance(node.value, ast.Call) else "" for node in ast.walk(authentication) if isinstance(node, ast.DictComp)]
+    remainder = copy.deepcopy(tool_tree)
+    [setattr(node, "body", [ast.Pass()]) for node in remainder.body if isinstance(node, ast.FunctionDef) and node.name in {"root_dir_snapshot", "authenticate_full_prestaging"}]
+    verify_tools_source = ast.get_source_segment(tool_text, verify_tools) or ""
+    if not (
+        directory_source.count("path in MEMBERSHIP_DERIVED_NLINK_DIRS") == 3
+        and directory_source.find("observed_members = root_members")
+        < directory_source.find("require(observed_members == members")
+        < directory_source.find("before[5] == 2 + len(observed_members)")
+        and "before[5] >=" not in directory_source
+        and "before[5] == 3" not in directory_source
+        and [sha(ast.dump(node, include_attributes=False).encode()) for node in (directory, authentication)] == ["a8f8289e453fe10fd408039d78b1f760aa781c3d448447e1e4b27fff88a283dc", "f99f39755a6fd97fc94c9dc7daf683c5def3170949466b2332b6cdb776b90232"]
+        and sha(ast.dump(remainder, include_attributes=False).encode()) == "e96f2b2aa65b953aac3fc1b6d1281dcb270bac46986ac6a6d01f38b9e5da9c0b"
+        and authentication_source.count("root_dir_snapshot(path, expected, members, trace)") == 1
+        and snapshot_values == ["root_dir_snapshot", "root_regular_snapshot"]
+    ):
+        return False
+    if not (
+        "for raw_path in (CODESIGN, ENV, STAT, FIND, LS, OPENSSL):"
+        in verify_tools_source
+        and verify_tools_source.find("descriptor = os.open(path, flags)")
+        < verify_tools_source.find("local_codesign(path, expected")
+        and "require_verify=False" in verify_tools_source
+    ):
+        return False
+    assignments = {
+        target.id: node.value for node in tool_tree.body
+        if isinstance(node, ast.Assign) and len(node.targets) == 1
+        and isinstance((target := node.targets[0]), ast.Name)
+    }
+    scope = assignments.get("MEMBERSHIP_DERIVED_NLINK_DIRS")
+    if not (
+        isinstance(scope, ast.Set)
+        and [item.id if isinstance(item, ast.Name) else None
+             for item in scope.elts] == ["INSTALL", "CONTROLLER", "RUNTIME"]
+    ):
+        return False
+    validator_names = [call_name(node) for node in validator_calls]
+    if (
+        "subprocess.Popen" in validator_names
+        or any(name in validator_names for name in {
+            "exec", "eval", "compile", "runpy.run_path",
+        })
+        or sum(name == "subprocess.run" for name in validator_names) != 3
+        or sum(name == "no_acl_or_xattr_marker" for name in validator_names) != 3
+        or sum(name == "os.write" for name in validator_names) != 0
+        or sum(name == "os.open" for name in validator_names) != 4
+    ):
+        return False
+    return len(open_calls) == 6
+
+def r26_ceremony_static_records() -> tuple[dict[str, Any], dict[str, Any]]:
+    opened: list[int] = []
+    try:
+        tool_fd, tool_raw, _tool_identity = r26_open_evidence(
+            R26_CEREMONY_TOOL, R26_CEREMONY_TOOL_SHA256, mode=0o644,
+        ); opened.append(tool_fd)
+        validator_fd, validator_raw, _validator_identity = r26_open_evidence(
+            R26_CEREMONY_VALIDATOR, R26_CEREMONY_VALIDATOR_SHA256, mode=0o644,
+        ); opened.append(validator_fd)
+        binding_fd, binding_raw, _binding_identity = r26_open_evidence(
+            R26_CEREMONY_SOURCE_BINDING,
+            R26_CEREMONY_SOURCE_BINDING_SHA256, mode=0o644,
+        ); opened.append(binding_fd)
+        review_fd, review_raw, _review_identity = r26_open_evidence(
+            R26_CEREMONY_DUAL_REVIEW,
+            R26_CEREMONY_DUAL_REVIEW_SHA256, mode=0o644,
+        ); opened.append(review_fd)
+        binding = strict_json(binding_raw)
+        review = strict_json(review_raw)
+        exact = (
+            r26_source_binding_accepts(binding)
+            and r26_ceremony_review_accepts(review)
+            and r26_workflow_source_shape_accepts(tool_raw, validator_raw)
+        )
+        check(
+            exact,
+            "A_H039_R26_FIXED_PRESTAGED_RECOVERY_WORKFLOW_BINDING_AND_DUAL_REVIEW",
+            {
+                "ceremony": sha(tool_raw), "validator": sha(validator_raw),
+                "source_binding": sha(binding_raw),
+                "dual_review": sha(review_raw),
+            },
+        )
+        if not exact:
+            raise Rig("R26 frozen recovery workflow chain drift")
+        return binding, review
+    finally:
+        for descriptor in opened:
+            os.close(descriptor)
+
+def r26_ceremony_prepublication_checks() -> None:
+    binding, review = r26_ceremony_static_records()
+    absent: list[bool] = []
+    for path in (R26_CEREMONY_ATTEMPT, R26_CEREMONY_OUTCOME):
+        try:
+            os.lstat(path)
+        except FileNotFoundError:
+            absent.append(True)
+        except OSError as exc:
+            raise Undecidable(
+                f"R26 dynamic evidence absence undecidable: {path}"
+            ) from exc
+        else:
+            absent.append(False)
+    check(
+        absent == [True, True]
+        and binding.get("dynamic_records", {}).get("initial_state")
+        == "BOTH_ABSENT_WITH_NO_SYMLINK"
+        and review.get("root_update_executed") is False,
+        "A_H039_R26_ATTEMPT_AND_OUTCOME_ABSENT_BEFORE_PUBLICATION",
+    )
+
+def r26_ceremony_static_selftests() -> None:
+    opened: list[int] = []
+    try:
+        tool_fd, tool_raw, _ = r26_open_evidence(
+            R26_CEREMONY_TOOL, R26_CEREMONY_TOOL_SHA256, mode=0o644,
+        ); opened.append(tool_fd)
+        validator_fd, validator_raw, _ = r26_open_evidence(
+            R26_CEREMONY_VALIDATOR, R26_CEREMONY_VALIDATOR_SHA256, mode=0o644,
+        ); opened.append(validator_fd)
+        binding_fd, binding_raw, _ = r26_open_evidence(
+            R26_CEREMONY_SOURCE_BINDING,
+            R26_CEREMONY_SOURCE_BINDING_SHA256, mode=0o644,
+        ); opened.append(binding_fd)
+        review_fd, review_raw, _ = r26_open_evidence(
+            R26_CEREMONY_DUAL_REVIEW,
+            R26_CEREMONY_DUAL_REVIEW_SHA256, mode=0o644,
+        ); opened.append(review_fd)
+        binding = strict_json(binding_raw)
+        review = strict_json(review_raw)
+        check(
+            r26_workflow_source_shape_accepts(tool_raw, validator_raw)
+            and r26_source_binding_accepts(binding)
+            and r26_ceremony_review_accepts(review),
+            "A_H039_R26_WORKFLOW_STATIC_SELFTEST_ANCHOR",
+        )
+        digest_scope: list[bool] = []
+        for path, digest in ((R26_CEREMONY_TOOL, None),
+                             (R26_CEREMONY_ATTEMPT, "0" * 64)):
+            try:
+                descriptor, _, _ = r26_open_evidence(path, digest, mode=0o644)
+            except Rig:
+                digest_scope.append(True)
+            else:
+                os.close(descriptor); digest_scope.append(False)
+        check(digest_scope == [True, True], "N_H039_R26_STATIC_DYNAMIC_DIGEST_SCOPE")
+        source_mutations: tuple[Callable[[dict[str, Any]], None], ...] = (
+            lambda value: value["exact_prestaged_r14"][
+                "membership_derived_nlink_scope"].append(str(PROTECTED_NAMESPACE)),
+            lambda value: value["exact_prestaged_r14"]["directories"][1][
+                "identity8"].__setitem__(5, 3),
+            lambda value: value["exact_prestaged_r14"]["directories"][1][
+                "members"].append(str(PROTECTED_INSTALL / "neighbor")),
+            lambda value: value["fixed_execution"][
+                "pre_bootstrap_mutation_commands"].append("chmod"),
+            lambda value: value["fixed_execution"]["launcher"].__setitem__(
+                5, str(PROTECTED_INSTALLER) + ".neighbor"),
+            lambda value: value["dynamic_records"].__setitem__(
+                "reservation_state", "RETRYABLE"),
+            lambda value: value["independent_validation_contract"].__setitem__(
+                "preflight_trace", "COUNT_ONLY"),
+            lambda value: value["forbidden"].remove("R25_RETRY"),
+        )
+        for index, mutate in enumerate(source_mutations):
+            mutant = copy.deepcopy(binding)
+            mutate(mutant)
+            check(
+                not r26_source_binding_accepts(mutant),
+                f"N_H039_R26_SOURCE_BINDING_MUTANT_{index:02d}",
+            )
+        review_mutations: tuple[Callable[[dict[str, Any]], None], ...] = (
+            lambda value: value["candidate"].__setitem__(
+                "ceremony_sha256", "0" * 64),
+            lambda value: value["reviews"][0].__setitem__(
+                "independent", False),
+            lambda value: value["reviews"][1].__setitem__(
+                "role", value["reviews"][0]["role"]),
+            lambda value: value.__setitem__("root_or_sudo_used", True),
+            lambda value: value.__setitem__("verdict", "PENDING"),
+        )
+        for index, mutate in enumerate(review_mutations):
+            mutant = copy.deepcopy(review)
+            mutate(mutant)
+            check(
+                not r26_ceremony_review_accepts(mutant),
+                f"N_H039_R26_DUAL_REVIEW_MUTANT_{index:02d}",
+            )
+        for index, mutant in enumerate((
+            tool_raw[:-1], tool_raw + b"\n",
+            tool_raw.replace(
+                b"before[5] == 2 + len(observed_members)",
+                b"before[5] >= 2 + len(observed_members)", 1,
+            ),
+            tool_raw.replace(b"before[5] == 2 + len(observed_members)",
+                             b"before[5] == expected[5]", 1),
+            tool_raw.replace(b"    before = root_identity(path, trace)\n", b"    if True: return {'identity8': expected, 'members': members, 'nlink_rule': '2+direct_members'}\n    before = root_identity(path, trace)\n", 1),
+            tool_raw.replace(
+                b"{INSTALL, CONTROLLER, RUNTIME}",
+                b"{NAMESPACE, INSTALL, CONTROLLER, RUNTIME}", 1,
+            ),
+            tool_raw.replace(b"def authenticate_full_prestaging() -> tuple[dict[str, Any], list[dict[str, Any]]]:", b"def unsafe_snapshot(path, expected, members, trace): return {'identity8': expected, 'members': members, 'nlink_rule': '2+direct_members'}\nsys.modules[__name__].__dict__['root_dir_snapshot'] = unsafe_snapshot\n\ndef authenticate_full_prestaging() -> tuple[dict[str, Any], list[dict[str, Any]]]:", 1),
+            tool_raw.replace(
+                b"str(path): root_dir_snapshot(path, expected, members, trace)",
+                b"str(path): unsafe_snapshot(path, expected, members, trace)", 1,
+            ).replace(b"def authenticate_full_prestaging() -> tuple[dict[str, Any], list[dict[str, Any]]]:",
+                b"def unsafe_snapshot(path, expected, members, trace):\n    return {'identity8': expected, 'members': members, 'nlink_rule': '2+direct_members'}\n\ndef authenticate_full_prestaging() -> tuple[dict[str, Any], list[dict[str, Any]]]:\n    if False: root_dir_snapshot(path, expected, members, trace)", 1),
+            tool_raw.replace(b"subprocess.Popen(", b"subprocess.Popen(subprocess.Popen(", 1),
+        )):
+            check(
+                mutant != tool_raw and not r26_workflow_source_shape_accepts(
+                    mutant, validator_raw, exact_identity=index < 2),
+                f"N_H039_R26_CEREMONY_SOURCE_MUTANT_{index:02d}",
+            )
+        for index, mutant in enumerate((
+            validator_raw[:-1], validator_raw + b"\n",
+            validator_raw.replace(b"return 0", b"return 1", 1),
+        )):
+            check(
+                not r26_workflow_source_shape_accepts(tool_raw, mutant),
+                f"N_H039_R26_VALIDATOR_SOURCE_MUTANT_{index:02d}",
+            )
+    finally:
+        for descriptor in opened:
+            os.close(descriptor)
+
+def r26_validator_bytes_accepts(raw: Any) -> bool:
+    return (
+        type(raw) is bytes and len(raw) == R26_VALIDATOR_SIZE
+        and sha(raw) == R26_CEREMONY_VALIDATOR_SHA256
+    )
+
+def r26_validator_wrapper_accepts(value: Any) -> bool:
+    return (
+        type(value) is str and value == R26_VALIDATOR_STDIN_WRAPPER
+        and sha(value.encode("utf-8"))
+        == "3a4e80d7a4aeccab994a487866efb28c5ac4555b5b37cc0b86003b084fd75ca4"
+    )
+
+def r26_run_authenticated_validator(
+    validator_raw: bytes,
+) -> subprocess.CompletedProcess[bytes]:
+    if (
+        not r26_validator_bytes_accepts(validator_raw)
+        or not r26_validator_wrapper_accepts(R26_VALIDATOR_STDIN_WRAPPER)
+    ):
+        raise Rig("R26 retained validator bytes or fixed wrapper drift")
+    return subprocess.run(
+        [
+            "/Library/Developer/CommandLineTools/usr/bin/python3",
+            "-I", "-S", "-c", R26_VALIDATOR_STDIN_WRAPPER,
+        ],
+        cwd="/", env={}, input=validator_raw, close_fds=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        timeout=90,
+    )
+
+def r26_validator_delivery_selftests() -> None:
+    descriptor, validator_raw, _identity = r26_open_evidence(
+        R26_CEREMONY_VALIDATOR, R26_CEREMONY_VALIDATOR_SHA256, mode=0o644,
+    )
+    try:
+        check(
+            r26_validator_bytes_accepts(validator_raw)
+            and r26_validator_wrapper_accepts(R26_VALIDATOR_STDIN_WRAPPER),
+            "A_H039_R26_RETAINED_VALIDATOR_STDIN_WRAPPER_ANCHOR",
+        )
+        for index, mutant in enumerate((
+            validator_raw[:-1], validator_raw + b"\n",
+            b"X" + validator_raw[1:], bytearray(validator_raw),
+            memoryview(validator_raw),
+        )):
+            check(
+                not r26_validator_bytes_accepts(mutant),
+                f"N_H039_R26_VALIDATOR_DELIVERY_MUTANT_{index:02d}",
+            )
+        for index, decoy in enumerate((
+            R26_VALIDATOR_STDIN_WRAPPER
+            + ";exec(compile(open(p,'rb').read(),p,'exec'))",
+            R26_VALIDATOR_STDIN_WRAPPER.replace("read(42984)", "read()"),
+            R26_VALIDATOR_STDIN_WRAPPER.replace("len(b)==42984", "len(b)>=42984"),
+            R26_VALIDATOR_STDIN_WRAPPER.replace("sys.argv==['-c']", "True"),
+            R26_VALIDATOR_STDIN_WRAPPER.replace(
+                R26_CEREMONY_VALIDATOR_SHA256, "0" * 64,
+            ),
+            R26_VALIDATOR_STDIN_WRAPPER.replace("sys.argv=[p]", "sys.argv=[p,'x']"),
+        )):
+            check(
+                not r26_validator_wrapper_accepts(decoy),
+                f"N_H039_R26_VALIDATOR_WRAPPER_DECOY_{index:02d}",
+            )
+        try:
+            tree = ast.parse(GATE.read_text(encoding="utf-8"), filename=str(GATE))
+            wrapper = ast.parse(R26_VALIDATOR_STDIN_WRAPPER, mode="exec")
+        except (OSError, UnicodeError, SyntaxError) as exc:
+            raise Rig("R26 validator delivery AST unavailable") from exc
+        functions = {
+            node.name: node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+        }
+        runner = functions.get("r26_run_authenticated_validator")
+        completed = functions.get("r26_ceremony_completed_checks")
+        main = functions.get("main")
+        if runner is None or completed is None or main is None:
+            raise Rig("R26 validator delivery functions absent")
+        runner_calls = [
+            node for node in ast.walk(runner) if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "subprocess" and node.func.attr == "run"
+        ]
+        completed_calls = [
+            node for node in ast.walk(completed) if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "r26_run_authenticated_validator"
+        ]
+        owners = [
+            name for name, function in functions.items()
+            if any(
+                isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "r26_run_authenticated_validator"
+                for node in ast.walk(function)
+            )
+        ]
+        wrapper_names = {
+            node.func.id for node in ast.walk(wrapper)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        wrapper_attrs = {
+            node.func.attr for node in ast.walk(wrapper)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        main_source = ast.get_source_segment(
+            GATE.read_text(encoding="utf-8"), main,
+        ) or ""
+        check(
+            len(runner_calls) == 1 and len(completed_calls) == 1
+            and owners == ["r26_ceremony_completed_checks"]
+            and wrapper_names == {"len", "compile", "exec"}
+            and wrapper_attrs == {"read", "exit", "sha256", "hexdigest"}
+            and "open" not in R26_VALIDATOR_STDIN_WRAPPER
+            and main_source.find("r26_ceremony_prepublication_checks()")
+            < main_source.find("if r26_installed:")
+            < main_source.find("r26_ceremony_completed_checks()"),
+            "A_H039_R26_VALIDATOR_STDIN_ONLY_AND_INSTALLED_LANE_ONLY",
+        )
+    finally:
+        os.close(descriptor)
+
+def r26_ceremony_completed_checks() -> None:
+    r26_ceremony_static_records()
+    opened: list[tuple[int, Path, list[int]]] = []
+    try:
+        tool_fd, tool_raw, tool_identity = r26_open_evidence(
+            R26_CEREMONY_TOOL, R26_CEREMONY_TOOL_SHA256, mode=0o644,
+        ); opened.append((tool_fd, R26_CEREMONY_TOOL, tool_identity))
+        binding_fd, binding_raw, binding_identity = r26_open_evidence(
+            R26_CEREMONY_SOURCE_BINDING,
+            R26_CEREMONY_SOURCE_BINDING_SHA256, mode=0o644,
+        ); opened.append((binding_fd, R26_CEREMONY_SOURCE_BINDING, binding_identity))
+        validator_fd, validator_raw, validator_identity = r26_open_evidence(
+            R26_CEREMONY_VALIDATOR,
+            R26_CEREMONY_VALIDATOR_SHA256, mode=0o644,
+        ); opened.append((validator_fd, R26_CEREMONY_VALIDATOR, validator_identity))
+        review_fd, review_raw, review_identity = r26_open_evidence(
+            R26_CEREMONY_DUAL_REVIEW,
+            R26_CEREMONY_DUAL_REVIEW_SHA256, mode=0o644,
+        ); opened.append((review_fd, R26_CEREMONY_DUAL_REVIEW, review_identity))
+        attempt_fd, attempt_raw, attempt_identity = r26_open_evidence(
+            R26_CEREMONY_ATTEMPT, None, mode=0o600,
+        ); opened.append((attempt_fd, R26_CEREMONY_ATTEMPT, attempt_identity))
+        outcome_fd, outcome_raw, outcome_identity = r26_open_evidence(
+            R26_CEREMONY_OUTCOME, None, mode=0o600,
+        ); opened.append((outcome_fd, R26_CEREMONY_OUTCOME, outcome_identity))
+        binding = strict_json(binding_raw)
+        review = strict_json(review_raw)
+        attempt = strict_json(attempt_raw)
+        outcome = strict_json(outcome_raw)
+        attempt_sha = sha(attempt_raw)
+        outcome_sha = sha(outcome_raw)
+        required_attempt = {
+            "schema_version", "record_type", "state", "retry_permitted",
+            "task_credit", "published_r25_contract_merge",
+            "published_r14_product_merge", "source_binding_sha256",
+            "source_binding_identity", "ceremony_sha256", "ceremony_identity",
+            "validator_sha256", "validator_identity", "dual_review_sha256",
+            "dual_review_identity", "consumed_r25_files",
+            "exact_prestaged_r14", "preflight_root_trace",
+            "preflight_root_trace_sha256", "bootstrap_argv", "expected_exit",
+            "expected_stdout_bytes", "expected_stderr_bytes",
+        }
+        required_outcome = {
+            "schema_version", "record_type", "classification",
+            "retry_permitted", "rollback_permitted", "task_credit",
+            "source_binding_sha256", "attempt_reservation_sha256",
+            "attempt_reservation_identity", "bootstrap_argv",
+            "pre_spawn_reauthentication", "pre_spawn_root_trace",
+            "pre_spawn_root_trace_sha256", "process", "post_state",
+            "post_state_exception",
+            "downstream_permitted_only_after_independent_validation",
+        }
+        process = outcome.get("process", {}) if type(outcome) is dict else {}
+        post = outcome.get("post_state", {}) if type(outcome) is dict else {}
+        expected_consumed = [
+            {
+                "path": item["path"], "identity8": item["identity"],
+                "sha256": item["sha256"],
+            }
+            for item in binding["consumed_r25_workflow"]["immutable_files"]
+        ]
+        expected_prestaged = {
+            "directories": {
+                item["path"]: {
+                    "identity8": item["identity8"],
+                    "members": item["members"],
+                    "nlink_rule": (
+                        "2+direct_members"
+                        if item["path"] in binding["exact_prestaged_r14"][
+                            "membership_derived_nlink_scope"
+                        ] else "raw_exact_identity"
+                    ),
+                }
+                for item in binding["exact_prestaged_r14"]["directories"]
+            },
+            "regulars": {
+                item["path"]: {
+                    "identity8": item["identity8"],
+                    "sha256": item["sha256"],
+                    "identifier": (
+                        item["codesign"]["identifier"]
+                        if item["codesign"] is not None else None
+                    ),
+                    "cdhash": (
+                        item["codesign"]["cdhash"]
+                        if item["codesign"] is not None else None
+                    ),
+                }
+                for item in binding["exact_prestaged_r14"]["regulars"]
+            },
+        }
+        exact = (
+            r24_canonical_record(attempt) == attempt_raw
+            and r24_canonical_record(outcome) == outcome_raw
+            and set(attempt) == required_attempt
+            and type(attempt.get("schema_version")) is int
+            and attempt.get("schema_version") == 1
+            and attempt.get("record_type")
+            == "h039_r26_r14_recovery_attempt_reservation"
+            and attempt.get("state") == "CONSUMED_BEFORE_SPAWN_NO_RETRY"
+            and attempt.get("retry_permitted") is False
+            and attempt.get("task_credit") is False
+            and attempt.get("published_r25_contract_merge") == R26_AUTHORITY_BASE
+            and attempt.get("published_r14_product_merge") == R24_AUTHORITY_BASE
+            and attempt.get("source_binding_sha256")
+            == R26_CEREMONY_SOURCE_BINDING_SHA256
+            and attempt.get("source_binding_identity") == binding_identity
+            and attempt.get("ceremony_sha256") == R26_CEREMONY_TOOL_SHA256
+            and attempt.get("ceremony_identity") == tool_identity
+            and attempt.get("validator_sha256") == R26_CEREMONY_VALIDATOR_SHA256
+            and attempt.get("validator_identity") == validator_identity
+            and attempt.get("dual_review_sha256")
+            == R26_CEREMONY_DUAL_REVIEW_SHA256
+            and attempt.get("dual_review_identity") == review_identity
+            and attempt.get("consumed_r25_files") == expected_consumed
+            and attempt.get("exact_prestaged_r14") == expected_prestaged
+            and type(attempt.get("preflight_root_trace")) is list
+            and len(attempt["preflight_root_trace"]) == 58
+            and sha(r24_canonical_record(attempt["preflight_root_trace"]))
+            == attempt.get("preflight_root_trace_sha256")
+            and attempt.get("bootstrap_argv") == [
+                "/usr/bin/sudo", "/usr/bin/env", "-i", "-C", "/",
+                str(PROTECTED_INSTALLER), "bootstrap",
+            ]
+            and type(attempt.get("expected_exit")) is int
+            and attempt.get("expected_exit") == 0
+            and type(attempt.get("expected_stdout_bytes")) is int
+            and attempt.get("expected_stdout_bytes") == 0
+            and type(attempt.get("expected_stderr_bytes")) is int
+            and attempt.get("expected_stderr_bytes") == 0
+            and set(outcome) == required_outcome
+            and type(outcome.get("schema_version")) is int
+            and outcome.get("schema_version") == 1
+            and outcome.get("record_type") == "h039_r26_r14_recovery_outcome"
+            and outcome.get("classification") == "R14_PRESTAGED_RECOVERY_COMPLETE"
+            and outcome.get("retry_permitted") is False
+            and outcome.get("rollback_permitted") is False
+            and outcome.get("task_credit") is False
+            and outcome.get("source_binding_sha256")
+            == R26_CEREMONY_SOURCE_BINDING_SHA256
+            and outcome.get("attempt_reservation_sha256") == attempt_sha
+            and outcome.get("attempt_reservation_identity") == attempt_identity
+            and outcome.get("bootstrap_argv") == attempt.get("bootstrap_argv")
+            and outcome.get("pre_spawn_reauthentication")
+            == attempt.get("exact_prestaged_r14")
+            and type(outcome.get("pre_spawn_root_trace")) is list
+            and len(outcome["pre_spawn_root_trace"]) == 58
+            and sha(r24_canonical_record(outcome["pre_spawn_root_trace"]))
+            == outcome.get("pre_spawn_root_trace_sha256")
+            and outcome.get("post_state_exception") is None
+            and outcome.get(
+                "downstream_permitted_only_after_independent_validation"
+            ) is True
+            and type(process) is dict and set(process) == {
+                "spawn_returned", "exception", "returncode", "stdout",
+                "stderr", "direct_child_reaped",
+            }
+            and process.get("spawn_returned") is True
+            and process.get("exception") is None
+            and type(process.get("returncode")) is int
+            and process.get("returncode") == 0
+            and process.get("stdout") == {
+                "size": 0, "sha256": sha(b""), "base64": "",
+            }
+            and process.get("stderr") == {
+                "size": 0, "sha256": sha(b""), "base64": "",
+            }
+            and process.get("direct_child_reaped") is True
+            and type(post) is dict
+            and post.get("installed_helper_sha256")
+            == R24_R14_PRODUCT_BLOBS["verify/h039/runtime-cleanup-mediator"]
+            and post.get("installed_helper_cdhash") == R24_R14_RUNTIME_CDHASH
+            and post.get("staged_mediator_origin_identity8")
+            == R26_PRESTAGED_IDENTITIES["staged_mediator"]
+            and post.get("install_absent") is True
+            and post.get("receipt_absent") is True
+            and post.get("sequence") == 0
+            and post.get("runtime_residue") == []
+            and r26_source_binding_accepts(binding)
+            and r26_ceremony_review_accepts(review)
+        )
+        check(
+            exact,
+            "A_H039_R26_DURABLE_NO_RETRY_STATUS0_EMPTY_OUTPUT_RECOVERY_RECORDS",
+            {"attempt_sha256": attempt_sha, "outcome_sha256": outcome_sha},
+        )
+        if not exact:
+            raise Rig("R26 completed recovery records drift")
+        run = r26_run_authenticated_validator(validator_raw)
+        helper = post.get("installed_helper_identity", [])
+        expected_stdout = [
+            "R26_RECOVERY_VALIDATION=PASS",
+            f"ATTEMPT_RESERVATION_SHA256={attempt_sha}",
+            "ATTEMPT_RESERVATION_IDENTITY="
+            + ":".join(map(str, attempt_identity)),
+            f"OUTCOME_SHA256={outcome_sha}",
+            "OUTCOME_IDENTITY=" + ":".join(map(str, outcome_identity)),
+            "INSTALLED_HELPER_IDENTITY=" + ":".join(map(str, helper)),
+            "BOOTSTRAP_RETRY_PERMITTED=NO", "TASK_CREDIT=NONE",
+        ]
+        stdout_lines = run.stdout.decode("utf-8", "strict").splitlines()
+        check(
+            run.returncode == 0 and run.stderr == b""
+            and stdout_lines == expected_stdout,
+            "A_H039_R26_FROZEN_INDEPENDENT_RECOVERY_VALIDATOR_PASS",
+            {"returncode": run.returncode, "stdout_sha256": sha(run.stdout)},
+        )
+        if run.returncode != 0 or run.stderr or stdout_lines != expected_stdout:
+            raise Rig("R26 frozen independent validator did not pass exactly")
+        for file_descriptor, path, identity_value in opened:
+            if (
+                r26_evidence_identity(os.fstat(file_descriptor)) != identity_value
+                or r26_evidence_identity(os.lstat(path)) != identity_value
+            ):
+                raise Rig(f"R26 retained ceremony evidence rebound: {path}")
+    finally:
+        for descriptor, _path, _identity in opened:
+            os.close(descriptor)
+
+
 def r19_cursor_harness_source(
     function: bytes, *, substitution: bool = False, post_race: bool = False,
 ) -> bytes:
@@ -24173,6 +26250,7 @@ def finish(phase: str) -> int:
     print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
     print(f"R24_MATERIAL_REVIEW_EXTENSION={R24_MATERIAL_REVIEW_EXTENSION}")
     print(f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         if phase in {"published", "r19-published", "r23-published"}:
@@ -24219,6 +26297,7 @@ def main(argv: list[str]) -> int:
         print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
         print(f"R24_MATERIAL_REVIEW_EXTENSION={R24_MATERIAL_REVIEW_EXTENSION}")
         print(f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -24245,27 +26324,28 @@ def main(argv: list[str]) -> int:
         print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
         print(f"R24_MATERIAL_REVIEW_EXTENSION={R24_MATERIAL_REVIEW_EXTENSION}")
         print(f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
-    r25_installed = exact_r25_installed_argv(argv)
-    r24_installed = False
+    r26_installed = exact_r26_installed_argv(argv)
+    r24_installed = r25_installed = False
     product = published = installed = False
     r18_product = r18_published = r18_installed = False
     r19_product = r19_published = False
     r23_product = r23_published = False
-    if not (preproduct or r25_installed):
+    if not (preproduct or r26_installed):
         print(
-            "RIG_ERROR: usage: h-039-exit [--r25-installed "
-            "PUBLISHED_R25_CONTRACT_MERGE "
+            "RIG_ERROR: usage: h-039-exit [--r26-installed "
+            "PUBLISHED_R26_CONTRACT_MERGE "
             "8bb7bae975dcd76b70c563a99583807b70089350]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if r25_installed else []
+    supplied_commits = argv[1:] if r26_installed else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
-    phase = "preproduct" if preproduct else "r25-installed"
+    phase = "preproduct" if preproduct else "r26-installed"
     r18_phase = False
     r19_phase = preproduct or r19_product or r19_published
     r23_phase = preproduct
@@ -24303,33 +26383,33 @@ def main(argv: list[str]) -> int:
             r23_source_contract_selftests()
         r24_registry_selftests(row)
         r25_registry_selftests(row)
+        r26_registry_selftests(row)
         r24_git_identity_selftests()
         r25_git_identity_selftests()
-        r25_dispatch_selftests()
-        r25_installed_engine_selftests()
+        r26_git_identity_selftests()
+        r26_dispatch_selftests()
+        r26_installed_engine_selftests()
         r24_ceremony_static_selftests()
         r25_ceremony_static_selftests()
-        r25_validator_delivery_selftests()
+        r26_ceremony_static_selftests()
+        r26_validator_delivery_selftests()
         causal_oracle_selftests()
         ofd_lock_reference()
         connected_stream_unlink_reference()
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            r19_partial_state_evidence_checks()
             r19_cursor_causal_checks(r19_expected_production_source())
-            r21_post_install_evidence_checks()
-            r23_r22_lifecycle_evidence_checks()
-            r25_r24_publication_evidence_checks()
-            r25_refusal_evidence_checks()
+            r26_r25_publication_evidence_checks()
+            r26_immutable_r25_failure_checks()
+            r26_immutable_r1_review_failure_checks()
             r24_r14_publication_evidence_checks()
-            r24_fixed_source_checks()
-            r25_ceremony_prepublication_checks()
+            r26_ceremony_prepublication_checks()
             candidate = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
-            candidate_ok, candidate_detail = r25_contract_candidate_identity(candidate)
+            candidate_ok, candidate_detail = r26_contract_candidate_identity(candidate)
             check(
                 candidate_ok,
-                "A_H039_R25_FRESH_DIRECT_CHILD_PRODUCTLESS_FIVE_FILE_CONTRACT_CANDIDATE",
+                "A_H039_R26_FRESH_DIRECT_CHILD_PRODUCTLESS_FIVE_FILE_CONTRACT_CANDIDATE",
                 candidate_detail,
             )
             if not candidate_ok:
@@ -24339,7 +26419,7 @@ def main(argv: list[str]) -> int:
             )
             check(
                 product_ok,
-                "A_H039_R25_EXACT_PUBLISHED_R14_PRODUCT_IDENTITY",
+                "A_H039_R26_EXACT_PUBLISHED_R14_PRODUCT_IDENTITY",
                 product_detail,
             )
             if not product_ok:
@@ -24353,12 +26433,12 @@ def main(argv: list[str]) -> int:
             })
             return finish(phase)
 
-        if r25_installed:
+        if r26_installed:
             publication_ok, publication_detail = \
-                r25_contract_publication_identity(argv[1])
+                r26_contract_publication_identity(argv[1])
             check(
                 publication_ok,
-                "A_H039_R25_CURRENT_GUARDED_CONTRACT_PUBLICATION_IDENTITY",
+                "A_H039_R26_CURRENT_GUARDED_CONTRACT_PUBLICATION_IDENTITY",
                 publication_detail,
             )
             if not publication_ok:
@@ -24366,15 +26446,16 @@ def main(argv: list[str]) -> int:
             product_ok, product_detail = historical_r14_product_identity(argv[2])
             check(
                 product_ok,
-                "A_H039_R25_EXACT_HISTORICAL_R14_PRODUCT_IDENTITY",
+                "A_H039_R26_EXACT_HISTORICAL_R14_PRODUCT_IDENTITY",
                 product_detail,
             )
             if not product_ok:
                 return finish(phase)
-            r25_r24_publication_evidence_checks()
-            r25_refusal_evidence_checks()
+            r26_r25_publication_evidence_checks()
+            r26_immutable_r25_failure_checks()
+            r26_immutable_r1_review_failure_checks()
             r24_r14_publication_evidence_checks()
-            r25_ceremony_completed_checks()
+            r26_ceremony_completed_checks()
             r23_product_material_checks(
                 argv[2],
                 retained_installed_sha256=R24_R14_PRODUCT_BLOBS[
@@ -24385,14 +26466,14 @@ def main(argv: list[str]) -> int:
             installation_checks(manifest)
             check(
                 os.getuid() == CLIENT_UID and os.getgid() == CLIENT_GID,
-                "A_H039_R25_EXACT_UID501_GID20_EFFECT_BOUNDARY",
+                "A_H039_R26_EXACT_UID501_GID20_EFFECT_BOUNDARY",
                 {"uid": os.getuid(), "gid": os.getgid()},
             )
             initial_sequence, initial_receipt = receipt_state()
             pristine = initial_sequence == 0 and initial_receipt is None
             check(
                 pristine,
-                "A_H039_R25_PRISTINE_INSTALLED_RECEIPT_SEQUENCE_ZERO",
+                "A_H039_R26_PRISTINE_INSTALLED_RECEIPT_SEQUENCE_ZERO",
                 {"sequence": initial_sequence, "receipt": initial_receipt},
             )
             if not pristine:
@@ -24411,7 +26492,7 @@ def main(argv: list[str]) -> int:
             check(
                 all(installed_identity.get(key) == value
                     for key, value in expected_installed_identity.items()),
-                "A_H039_R25_INSTALLED_R14_MEDIATOR_MACHO_IDENTITY",
+                "A_H039_R26_INSTALLED_R14_MEDIATOR_MACHO_IDENTITY",
                 installed_identity,
             )
             effects = guarded_product_effects()

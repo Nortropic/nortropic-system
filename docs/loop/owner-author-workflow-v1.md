@@ -2709,3 +2709,41 @@ legacy/logical metadata; actual argv, retained FD and final rebind are bound by
 the gate. Only then may `--r25-installed <published-R25-contract> 8bb7bae9…`
 run once before independent effect review. Every deviation stops; no broader
 authority, downstream progress or supervisor resume precedes H039 completion.
+
+## H-039 R26 — pre-staged R14 recovery
+
+R25 is published as merge `aa1a304b5387c6697e8413438c1898cb5015a4ef`.
+Its one-shot ceremony refused before reservation and bootstrap because the
+fixed `.install` directory metadata differed after the complete R14 staging
+had already been created. The authorized follow-up observer wrote the fixed
+read-only root-command transcript and then refused on its final evidence-root
+name rebind. The consumed R25 ceremony, observer, validator and transcript are
+immutable workflow-only NO-CREDIT evidence; no R25 retry is permitted.
+
+R26 is productless and changes only the same five TEST_AUTHOR contract files.
+Its new fixed workflow-only ceremony and validator may authenticate only the
+exact observed complete R14 staging. After exact direct-membership validation,
+the APFS directory oracle derives `st_nlink = 2 + direct_members` only for
+`.install`, `.install/controller` and
+`.install/controller/runtime-cleanup`; all other identities and membership
+requirements remain exactly bound. Before bootstrap there is no restaging,
+rewrite, chmod, cleanup or other mutation. A new durable NOCLOBBER reservation
+then consumes the sole R26 attempt before exactly the published R14 installer
+is invoked once through the existing fixed launcher and `bootstrap` argv.
+
+Five-file freeze, two independent adversarial reviews and guarded publication
+must precede that owner-TTY transition. Only status zero, empty output and an
+independently validated exact post-state admit the current-publication-bound
+installed-effect run and guarded H039 completion. Nonzero status, output or
+identity/state drift is an owner stop without retry or general rollback. No
+broader authority, H038/H032/H031 progress or supervisor resume is admitted
+before full H039 PASS.
+
+The first frozen R26 candidate `8f58b01d…` is an immutable NO-CREDIT
+nonparent. Both independent formal reviews stopped at the same inherited
+closed-world proof: it had removed the preproduct R19 cursor-causal call while
+the unchanged verifier still required exactly the preproduct, R19-product and
+R19-published phases. Fresh R26-R2 starts again directly from `aa1a304b…`,
+restores exactly that call as the first preproduct statement, retains the
+three-phase cardinality check, and hash-binds both review logs and the failure
+record. Nothing from R1 authorizes publication, root work or retry.
