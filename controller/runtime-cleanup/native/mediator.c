@@ -502,10 +502,76 @@ static int close_inherited(void){
   int bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0||bytes>(int)(sizeof(struct proc_fdinfo)*1048576U))return 0;size_t cap=(size_t)bytes+sizeof(struct proc_fdinfo)*16U;struct proc_fdinfo *list=malloc(cap?cap:sizeof *list);if(!list)return 0;int got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0||got%(int)sizeof *list){free(list);return 0;}size_t count=(size_t)got/sizeof *list;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0&&close(list[i].proc_fd)){free(list);return 0;}free(list);
   bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0||bytes>(int)(sizeof(struct proc_fdinfo)*16U))return 0;cap=(size_t)bytes+sizeof(struct proc_fdinfo)*4U;list=malloc(cap?cap:sizeof *list);if(!list)return 0;got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0||got%(int)sizeof *list){free(list);return 0;}count=(size_t)got/sizeof *list;int only_zero=1;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0)only_zero=0;free(list);return only_zero;
 }
+#if defined(H039_RUNTIME_PRESTORE_EXIT_DIAGNOSTIC)
+#define H039_R22_PATH "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-pre-effect-diagnostic-v1"
+enum {
+  H039_R22_INVALID_KEYS_FRAME_READY_NO_WRITE_PRESTORE_ZERO_EFFECT=0,
+  H039_R22_MAIN_ARGC=1,H039_R22_MAIN_ARGV_POINTER=2,H039_R22_MAIN_ARGV0_POINTER=3,H039_R22_MAIN_ARGV0_FIXED_DIAGNOSTIC_PATH=4,
+  H039_R22_BOUNDARY_RUID=5,H039_R22_BOUNDARY_RGID=6,H039_R22_BOUNDARY_EUID=7,H039_R22_BOUNDARY_EGID=8,
+  H039_R22_BOUNDARY_FD0_FSTAT=9,H039_R22_BOUNDARY_FD0_IS_SOCKET=10,H039_R22_BOUNDARY_SO_TYPE_GET=11,H039_R22_BOUNDARY_SO_TYPE_VALUE=12,
+  H039_R22_BOUNDARY_GETPEERNAME=13,H039_R22_BOUNDARY_PEER_FAMILY=14,H039_R22_BOUNDARY_GETPEEREID=15,H039_R22_BOUNDARY_PEER_UID=16,H039_R22_BOUNDARY_PEER_GID=17,
+  H039_R22_BOUNDARY_SO_NOSIGPIPE=18,H039_R22_BOUNDARY_SO_SNDTIMEO=19,H039_R22_CHDIR_ROOT=20,
+  H039_R22_FD_SCAN1_SIZE=21,H039_R22_FD_SCAN1_CAP=22,H039_R22_FD_SCAN1_ALLOC=23,H039_R22_FD_SCAN1_FETCH=24,H039_R22_FD_SCAN1_ALIGNMENT=25,H039_R22_FD_SCAN1_CLOSE_NONZERO=26,
+  H039_R22_FD_SCAN2_SIZE=27,H039_R22_FD_SCAN2_CAP=28,H039_R22_FD_SCAN2_ALLOC=29,H039_R22_FD_SCAN2_FETCH=30,H039_R22_FD_SCAN2_ALIGNMENT=31,H039_R22_FD_SCAN2_ONLY_ZERO=32,
+  H039_R22_RECEIVE_DEADLINE_START=33,H039_R22_PREFIX_DEADLINE_ERROR=34,H039_R22_PREFIX_DEADLINE_EXPIRED=35,H039_R22_PREFIX_POLL_ERROR=36,H039_R22_PREFIX_POLL_TIMEOUT=37,
+  H039_R22_PREFIX_POLL_REVENT_ERROR=38,H039_R22_PREFIX_POST_POLL_DEADLINE=39,H039_R22_PREFIX_RECVMSG_ERROR=40,H039_R22_PREFIX_PREMATURE_EOF=41,H039_R22_PREFIX_POST_RECV_DEADLINE=42,H039_R22_PREFIX_TRUNCATION=43,
+  H039_R22_FRAME_LENGTH=44,H039_R22_BODY_ALLOC=45,H039_R22_BODY_DEADLINE_ERROR=46,H039_R22_BODY_DEADLINE_EXPIRED=47,H039_R22_BODY_POLL_ERROR=48,H039_R22_BODY_POLL_TIMEOUT=49,
+  H039_R22_BODY_POLL_REVENT_ERROR=50,H039_R22_BODY_POST_POLL_DEADLINE=51,H039_R22_BODY_RECVMSG_ERROR=52,H039_R22_BODY_PREMATURE_EOF=53,H039_R22_BODY_POST_RECV_DEADLINE=54,H039_R22_BODY_TRUNCATION=55,
+  H039_R22_EOF_DEADLINE_ERROR=56,H039_R22_EOF_DEADLINE_EXPIRED=57,H039_R22_EOF_POLL_ERROR=58,H039_R22_EOF_POLL_TIMEOUT=59,H039_R22_EOF_POLL_REVENT_ERROR=60,H039_R22_EOF_POST_POLL_DEADLINE=61,
+  H039_R22_EOF_RECVMSG_ERROR=62,H039_R22_EOF_POST_RECV_DEADLINE=63,H039_R22_EOF_TRUNCATION=64,H039_R22_EOF_EXTRA_BYTE=65,H039_R22_EOF_ANCILLARY_PRESENT=66,
+  H039_R22_PARSE_REQUEST=67,H039_R22_REQUEST_SEMANTICS_ZERO=68,H039_R22_REQUEST_NOT_NEGATIVE_INVALID_KEYS=69,H039_R22_SEMANTIC_REASON_OR_CANONICAL_FRAME_MISMATCH=70
+};
+static int r22_boundary(void){
+  if(getuid()!=CLIENT_UID)return H039_R22_BOUNDARY_RUID;if(getgid()!=CLIENT_GID)return H039_R22_BOUNDARY_RGID;
+  if(geteuid()!=0)return H039_R22_BOUNDARY_EUID;if(getegid()!=CLIENT_GID)return H039_R22_BOUNDARY_EGID;
+  struct stat s;if(fstat(0,&s))return H039_R22_BOUNDARY_FD0_FSTAT;if(!S_ISSOCK(s.st_mode))return H039_R22_BOUNDARY_FD0_IS_SOCKET;
+  int type=0;socklen_t tn=sizeof type;if(getsockopt(0,SOL_SOCKET,SO_TYPE,&type,&tn))return H039_R22_BOUNDARY_SO_TYPE_GET;if(type!=SOCK_STREAM)return H039_R22_BOUNDARY_SO_TYPE_VALUE;
+  struct sockaddr_un peer;socklen_t pn=sizeof peer;if(getpeername(0,(struct sockaddr*)&peer,&pn))return H039_R22_BOUNDARY_GETPEERNAME;if(peer.sun_family!=AF_UNIX)return H039_R22_BOUNDARY_PEER_FAMILY;
+  uid_t uid=(uid_t)-1;gid_t gid=(gid_t)-1;if(getpeereid(0,&uid,&gid))return H039_R22_BOUNDARY_GETPEEREID;if(uid!=CLIENT_UID)return H039_R22_BOUNDARY_PEER_UID;if(gid!=CLIENT_GID)return H039_R22_BOUNDARY_PEER_GID;
+  int one=1;struct timeval timeout={5,0};if(setsockopt(0,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof one))return H039_R22_BOUNDARY_SO_NOSIGPIPE;if(setsockopt(0,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof timeout))return H039_R22_BOUNDARY_SO_SNDTIMEO;return 0;
+}
+static int r22_close_inherited(void){
+  int bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0)return H039_R22_FD_SCAN1_SIZE;if(bytes>(int)(sizeof(struct proc_fdinfo)*1048576U))return H039_R22_FD_SCAN1_CAP;
+  size_t cap=(size_t)bytes+sizeof(struct proc_fdinfo)*16U;struct proc_fdinfo*list=malloc(cap?cap:sizeof *list);if(!list)return H039_R22_FD_SCAN1_ALLOC;
+  int got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0){free(list);return H039_R22_FD_SCAN1_FETCH;}if(got%(int)sizeof *list){free(list);return H039_R22_FD_SCAN1_ALIGNMENT;}
+  size_t count=(size_t)got/sizeof *list;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0&&close(list[i].proc_fd)){free(list);return H039_R22_FD_SCAN1_CLOSE_NONZERO;}free(list);
+  bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0)return H039_R22_FD_SCAN2_SIZE;if(bytes>(int)(sizeof(struct proc_fdinfo)*16U))return H039_R22_FD_SCAN2_CAP;
+  cap=(size_t)bytes+sizeof(struct proc_fdinfo)*4U;list=malloc(cap?cap:sizeof *list);if(!list)return H039_R22_FD_SCAN2_ALLOC;
+  got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0){free(list);return H039_R22_FD_SCAN2_FETCH;}if(got%(int)sizeof *list){free(list);return H039_R22_FD_SCAN2_ALIGNMENT;}
+  count=(size_t)got/sizeof *list;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0){free(list);return H039_R22_FD_SCAN2_ONLY_ZERO;}free(list);return 0;
+}
+static void r22_ancillary(struct msghdr*msg,int*seen){
+  for(struct cmsghdr*c=CMSG_FIRSTHDR(msg);c;c=CMSG_NXTHDR(msg,c)){*seen=1;if(c->cmsg_level==SOL_SOCKET&&c->cmsg_type==SCM_RIGHTS){size_t bytes=c->cmsg_len>=CMSG_LEN(0)?c->cmsg_len-CMSG_LEN(0):0;int*fds=(int*)CMSG_DATA(c);for(size_t i=0;i<bytes/sizeof(int);i++)close(fds[i]);}}
+}
+static int r22_piece(int fd,unsigned char*dst,size_t n,int*ancillary,const struct timespec*deadline,int base){
+  size_t at=0;while(at<n){int remaining=deadline_remaining(deadline);if(remaining<0)return base;if(remaining==0)return base+1;
+    struct pollfd watched={fd,POLLIN|POLLHUP,0};int ready=poll(&watched,1,remaining);if(ready<0&&errno==EINTR)continue;if(ready<0)return base+2;if(ready==0)return base+3;if(watched.revents&(POLLERR|POLLNVAL))return base+4;
+    remaining=deadline_remaining(deadline);if(remaining<=0)return base+5;struct iovec iov={dst+at,n-at};unsigned char control[CMSG_SPACE(sizeof(int)*16)]={0};struct msghdr msg={0};msg.msg_iov=&iov;msg.msg_iovlen=1;msg.msg_control=control;msg.msg_controllen=sizeof control;
+    ssize_t q=recvmsg(fd,&msg,MSG_DONTWAIT);if(q<0&&(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK))continue;if(q<0)return base+6;if(q==0)return base+7;if(deadline_remaining(deadline)<=0)return base+8;r22_ancillary(&msg,ancillary);if(msg.msg_flags&(MSG_TRUNC|MSG_CTRUNC))return base+9;at+=(size_t)q;}return 0;
+}
+static int r22_receive(unsigned char**out,size_t*length){
+  struct timespec deadline;if(!start_absolute_deadline(&deadline))return H039_R22_RECEIVE_DEADLINE_START;unsigned char prefix[4],extra;int ancillary=0;
+  int status=r22_piece(0,prefix,4,&ancillary,&deadline,H039_R22_PREFIX_DEADLINE_ERROR);if(status)return status;uint32_t n=(uint32_t)prefix[0]<<24|(uint32_t)prefix[1]<<16|(uint32_t)prefix[2]<<8|prefix[3];if(n!=127U)return H039_R22_FRAME_LENGTH;
+  unsigned char*raw=malloc(n);if(!raw)return H039_R22_BODY_ALLOC;status=r22_piece(0,raw,n,&ancillary,&deadline,H039_R22_BODY_DEADLINE_ERROR);if(status){free(raw);return status;}
+  for(;;){int remaining=deadline_remaining(&deadline);if(remaining<0){free(raw);return H039_R22_EOF_DEADLINE_ERROR;}if(remaining==0){free(raw);return H039_R22_EOF_DEADLINE_EXPIRED;}
+    struct pollfd watched={0,POLLIN|POLLHUP,0};int ready=poll(&watched,1,remaining);if(ready<0&&errno==EINTR)continue;if(ready<0){free(raw);return H039_R22_EOF_POLL_ERROR;}if(ready==0){free(raw);return H039_R22_EOF_POLL_TIMEOUT;}if(watched.revents&(POLLERR|POLLNVAL)){free(raw);return H039_R22_EOF_POLL_REVENT_ERROR;}if(deadline_remaining(&deadline)<=0){free(raw);return H039_R22_EOF_POST_POLL_DEADLINE;}
+    struct iovec iov={&extra,1};unsigned char control[CMSG_SPACE(sizeof(int)*16)]={0};struct msghdr msg={0};msg.msg_iov=&iov;msg.msg_iovlen=1;msg.msg_control=control;msg.msg_controllen=sizeof control;ssize_t q=recvmsg(0,&msg,MSG_DONTWAIT);if(q<0&&(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK))continue;if(q<0){free(raw);return H039_R22_EOF_RECVMSG_ERROR;}if(deadline_remaining(&deadline)<=0){free(raw);return H039_R22_EOF_POST_RECV_DEADLINE;}r22_ancillary(&msg,&ancillary);if(msg.msg_flags&(MSG_TRUNC|MSG_CTRUNC)){free(raw);return H039_R22_EOF_TRUNCATION;}if(q!=0){free(raw);return H039_R22_EOF_EXTRA_BYTE;}if(ancillary){free(raw);return H039_R22_EOF_ANCILLARY_PRESENT;}break;}
+  *out=raw;*length=n;return 0;
+}
+static int mediator_main(int argc,char**argv){
+  if(argc!=1)return H039_R22_MAIN_ARGC;if(!argv)return H039_R22_MAIN_ARGV_POINTER;if(!argv[0])return H039_R22_MAIN_ARGV0_POINTER;if(strcmp(argv[0],H039_R22_PATH))return H039_R22_MAIN_ARGV0_FIXED_DIAGNOSTIC_PATH;
+  int status=r22_boundary();if(status)return status;static char*empty[]={NULL};environ=empty;if(chdir("/"))return H039_R22_CHDIR_ROOT;status=r22_close_inherited();if(status)return status;
+  unsigned char*raw=NULL;size_t n=0;status=r22_receive(&raw,&n);if(status)return status;static const unsigned char exact[]={"{\"operation\":\"create-v1\",\"request_nonce\":\"a4583df42239f5c1c383d260d92e17715fb8484cafa9e13660203e8263cdf501\",\"schema_version\":2}"};
+  Request request;if(n!=sizeof exact-1||memcmp(raw,exact,sizeof exact-1)||!parse_request(raw,n,&request)){free(raw);return H039_R22_PARSE_REQUEST;}free(raw);const char*reason="INVALID_KEYS";int operation=request_semantics(&request,&reason);if(operation==0)return H039_R22_REQUEST_SEMANTICS_ZERO;if(operation!=-1)return H039_R22_REQUEST_NOT_NEGATIVE_INVALID_KEYS;
+  static const char expected_body[]={"{\"operation\":\"error-v1\",\"reason\":\"INVALID_KEYS\",\"request_nonce\":\"a4583df42239f5c1c383d260d92e17715fb8484cafa9e13660203e8263cdf501\",\"schema_version\":1}"};char body[512];int body_n=snprintf(body,sizeof body,"{\"operation\":\"error-v1\",\"reason\":\"%s\",\"request_nonce\":\"%s\",\"schema_version\":1}",reason,request.nonce);unsigned char frame[4+sizeof expected_body-1];if(body_n!=(int)sizeof expected_body-1||strcmp(reason,"INVALID_KEYS")||memcmp(body,expected_body,sizeof expected_body)||sizeof expected_body-1!=150U)return H039_R22_SEMANTIC_REASON_OR_CANONICAL_FRAME_MISMATCH;frame[0]=0;frame[1]=0;frame[2]=0;frame[3]=150;memcpy(frame+4,body,150);static const unsigned char expected_prefix[4]={0,0,0,150};if(memcmp(frame,expected_prefix,4)||memcmp(frame+4,expected_body,150))return H039_R22_SEMANTIC_REASON_OR_CANONICAL_FRAME_MISMATCH;
+  return H039_R22_INVALID_KEYS_FRAME_READY_NO_WRITE_PRESTORE_ZERO_EFFECT;
+}
+#else
 static int mediator_main(int argc,char **argv){
   if(argc!=1||!argv||!argv[0]||!mediator_boundary())return 1;static char*empty[]={NULL};environ=empty;if(chdir("/")||!close_inherited())return 1;umask(077);unsigned char*raw=NULL;size_t n=0;if(!receive_frame(0,&raw,&n))return 1;Request request;int parsed=parse_request(raw,n,&request);free(raw);if(!parsed)return 1;const char*semantic_reason="INVALID_KEYS";int operation=request_semantics(&request,&semantic_reason);if(!operation)return 1;if(operation<0){error_frame(0,request.nonce,semantic_reason);return 1;}
   Store store;RecoveryContinuation continuation;memset(&continuation,0,sizeof continuation);if(!open_store(&store)){close_store(&store);return 1;}if(!acquire_lock(store.lock)){int saved=errno;error_frame(0,request.nonce,(saved==EAGAIN||saved==EACCES)?"LOCK_BUSY":"UNSUPPORTED_PRIMITIVE");close_store(&store);return 1;}if(!reconcile_state_temp(&store,&request,operation,&continuation)){close_store(&store);return 1;}int rc=operation==1?process_create(&store,&request):process_cleanup(&store,&request,&continuation);memset(&continuation,0,sizeof continuation);close_store(&store);return rc;
 }
+#endif
 #endif
 
 #ifdef H039_INSTALLER
