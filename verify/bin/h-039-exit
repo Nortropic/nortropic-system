@@ -1,5 +1,5 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""Frozen H-039 R22/R13 pre-store mediator exit-diagnostic gate.
+"""Frozen H-039 R23/R14 populated-FD and fixed-helper upgrade gate.
 
 No arguments execute pre-product RED while authenticating the published R11
 product, the owner-witnessed partial state, and the exact directory-cursor
@@ -8,8 +8,11 @@ selects the exact historical function. Historical lanes remain frozen. Distinct 
 ``--r19-published`` lanes bind one cursor-independent R12 installer and current
 live publication. R22 consumes the single owner-authorized INT2 zero-effect
 observation and admits only a compile-time, no-output pre-store diagnostic.
-This Python gate never runs elevated, installs
-anything, or accepts a cleanup path, PID, command, or caller-selected descriptor.
+R23 consumes the owner-adjudicated, zero-effect R22/R13 status-28 lifecycle,
+keeps that historical diagnostic branch byte-exact, and admits only the exact
+R12-to-R14 fixed-object update plus the populated second FD inventory.  This
+Python gate never runs elevated, installs anything, or accepts a cleanup path,
+PID, command, or caller-selected descriptor.
 """
 
 from __future__ import annotations
@@ -251,6 +254,144 @@ R22_EXIT_NAMES = (
     "SEMANTIC_REASON_OR_CANONICAL_FRAME_MISMATCH",
 )
 R22_EXIT_CODES = [[code, name] for code, name in enumerate(R22_EXIT_NAMES)]
+R23_AUTHORITY_BASE = "b9eff66eef4e9de52aaf29ef20e9134db6fe1cc8"
+R23_AUTHORITY_TREE = "3b4a94bb4c63f1d2635ff83e3bf6d9d0fda1c93a"
+R23_AUTHORITY_PARENTS = [
+    "8cb87d6b0667f58b889553e14a7ad756e22edcaf",
+    "f72e3d1860b77463b3f0f534b5e07bb5dcff110f",
+]
+R23_BASE_GATE_SHA256 = (
+    "d2346121a8512ff960a7f93b7398005d5f77b88809662a7fcb2634e9c0d13e47"
+)
+R23_BASE_SPEC_SHA256 = (
+    "79be4a7595d78f5bbf9b1d649c8f60022348c585f1deb65ed7c7baeea87aed32"
+)
+R23_OLD_R12_MEDIATOR_SHA256 = (
+    "6c2f2dbe6f564224686d53acf9cbc782074ff554508b51031cf6b076fbb0d68a"
+)
+R23_OLD_R12_MEDIATOR_SIZE = 89392
+R23_OLD_SCAN2 = (
+    b"  bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(bytes<0||bytes>"
+    b"(int)(sizeof(struct proc_fdinfo)*16U))return 0;cap=(size_t)bytes+sizeof("
+    b"struct proc_fdinfo)*4U;list=malloc(cap?cap:sizeof *list);if(!list)return "
+    b"0;got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)cap);if(got<0||got"
+    b"%(int)sizeof *list){free(list);return 0;}count=(size_t)got/sizeof *list;"
+    b"int only_zero=1;for(size_t i=0;i<count;i++)if(list[i].proc_fd!=0)only_"
+    b"zero=0;free(list);return only_zero;"
+)
+R23_NEW_SCAN2 = (
+    b"  struct proc_fdinfo final_list[17];got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,"
+    b"0,final_list,(int)sizeof final_list);return got==(int)sizeof *final_list&&"
+    b"final_list[0].proc_fd==0;"
+)
+R23_OLD_INSTALLER_COMPILE_GUARD = (
+    b"#if defined(H039_INSTALLER) && (!defined(H039_MEDIATOR_SHA256) || "
+    b"!defined(H039_MEDIATOR_SIZE) || "
+    b"!defined(H039_ROOT_ENTRY_FD0_NORMALIZATION))"
+)
+R23_NEW_INSTALLER_COMPILE_GUARD = (
+    b"#if defined(H039_INSTALLER) && (!defined(H039_MEDIATOR_SHA256) || "
+    b"!defined(H039_MEDIATOR_SIZE) || "
+    b"!defined(H039_ROOT_ENTRY_FD0_NORMALIZATION) || "
+    b"!defined(H039_OLD_MEDIATOR_SHA256) || "
+    b"!defined(H039_OLD_MEDIATOR_SIZE))"
+)
+R23_UPDATER_INSERT_ANCHOR = b"\nstatic int apply_install("
+R23_UPDATER_HELPERS = b"""
+typedef struct{int a,c,q,r,s,lock;} UpgradeGuard;
+static void upgrade_guard_init(UpgradeGuard*g){g->a=g->c=g->q=g->r=g->s=g->lock=-1;}
+static int upgrade_same_directory_object(const struct stat*a,const struct stat*b){return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&S_ISDIR(a->st_mode)&&S_ISDIR(b->st_mode);}
+static int upgrade_directory_shape(const struct stat*s){return S_ISDIR(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0555;}
+static int upgrade_rebound_dir(int ns,const char*name,int fd){struct stat retained,named;return fd>=0&&!fstat(fd,&retained)&&upgrade_directory_shape(&retained)&&!fstatat(ns,name,&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);}
+static int upgrade_lock_shape(const struct stat*s){return S_ISREG(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0600&&s->st_nlink==1&&s->st_size==0;}
+static int upgrade_guard_shape(int ns,const UpgradeGuard*g,int with_install){const char*staged[]={".install","a","c","q","r","s"},*final[]={"a","c","q","r","s"},*lock_names[]={"lock"};struct stat retained,named;if(with_install){if(!exact_names(ns,staged,6,63U))return 0;}else if(!exact_names(ns,final,5,31U))return 0;return upgrade_rebound_dir(ns,"a",g->a)&&upgrade_rebound_dir(ns,"c",g->c)&&upgrade_rebound_dir(ns,"q",g->q)&&upgrade_rebound_dir(ns,"r",g->r)&&upgrade_rebound_dir(ns,"s",g->s)&&exact_empty(g->a)&&exact_empty(g->c)&&exact_empty(g->q)&&exact_empty(g->r)&&exact_names(g->s,lock_names,1,1U)&&g->lock>=0&&!fstat(g->lock,&retained)&&upgrade_lock_shape(&retained)&&!fstatat(g->s,"lock",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);}
+static int upgrade_guard_acquire(int ns,UpgradeGuard*g){upgrade_guard_init(g);g->a=durable_fixed_dir_at(ns,"a",0,0,0555);g->c=durable_fixed_dir_at(ns,"c",0,0,0555);g->q=durable_fixed_dir_at(ns,"q",0,0,0555);g->r=durable_fixed_dir_at(ns,"r",0,0,0555);g->s=durable_fixed_dir_at(ns,"s",0,0,0555);struct stat lock_id;g->lock=g->s>=0?stable_named_fd(g->s,"lock",O_RDWR,0,0,0600,0,NULL,NULL,&lock_id):-1;if(!upgrade_guard_shape(ns,g,1)||fsync(g->lock)||!flush_dir(g->s))return 0;struct flock lk;memset(&lk,0,sizeof lk);lk.l_type=F_WRLCK;lk.l_whence=SEEK_SET;lk.l_start=0;lk.l_len=0;if(fcntl(g->lock,F_OFD_SETLK,&lk)||!upgrade_guard_shape(ns,g,1))return 0;return 1;}
+static int upgrade_guard_close(UpgradeGuard*g){int ok=1;if(g->a>=0&&close(g->a))ok=0;if(g->c>=0&&close(g->c))ok=0;if(g->q>=0&&close(g->q))ok=0;if(g->r>=0&&close(g->r))ok=0;if(g->s>=0&&close(g->s))ok=0;if(g->lock>=0&&close(g->lock))ok=0;upgrade_guard_init(g);return ok;}
+static int upgrade_fixed_absent(int parent,const char*name){struct stat value;errno=0;return fstatat(parent,name,&value,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)<0&&errno==ENOENT;}
+static int upgrade_project_rebound(int ns,int project){struct stat retained,named;return !fstat(project,&retained)&&!fstatat(ns,".install",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&upgrade_same_directory_object(&retained,&named);}
+static int upgrade_helpers_rebound(int helpers){struct stat retained,named;return !fstat(helpers,&retained)&&!lstat("/Library/PrivilegedHelperTools",&named)&&upgrade_same_directory_object(&retained,&named);}
+static int upgrade_namespace_rebound(int ns,int db){struct stat retained,named,path;return !fstat(ns,&retained)&&!fstatat(db,"nortropic-runtime-cleanup-v1",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named)&&!lstat(NS,&path)&&same_stat(&retained,&path)&&(retained.st_mode&07777)==0555;}
+static int retained_installed_version(int helpers,const unsigned char*new_raw,size_t new_n,struct stat*identity,int*opened){struct stat present;if(fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&present,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)){return errno==ENOENT?0:-1;}unsigned char*raw=NULL;size_t n=0;struct stat before,after,rebound;int fd=stable_named_fd(helpers,"se.nortropic.runtime-cleanup-mediator",O_RDONLY,0,0,04555,4194304,&raw,&n,&before);if(fd<0)return -1;char sum[65];digest(raw,n,sum);int version=n==new_n&&!memcmp(raw,new_raw,new_n)&&!strcmp(sum,Q(H039_MEDIATOR_SHA256))?2:(n==(size_t)H039_OLD_MEDIATOR_SIZE&&!strcmp(sum,Q(H039_OLD_MEDIATOR_SHA256))?1:-1);free(raw);if(version<0||fsync(fd)||!flush_dir(helpers)||fstat(fd,&after)||!same_stat(&before,&after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&after,&rebound)){close(fd);return -1;}*identity=after;*opened=fd;return version;}
+static int upgrade_old_unlinked(const struct stat*before,const struct stat*after){return before->st_dev==after->st_dev&&before->st_ino==after->st_ino&&before->st_mode==after->st_mode&&before->st_uid==after->st_uid&&before->st_gid==after->st_gid&&before->st_size==after->st_size&&before->st_nlink==1&&after->st_nlink==0;}
+static int upgrade_installed_mediator(int project,int ns,int db,int helpers,const unsigned char*raw,size_t n){
+  UpgradeGuard guard;upgrade_guard_init(&guard);int old_fd=-1,new_fd=-1,ok=0;struct stat project_id,helpers_id,old_id,new_id,old_after,new_after,published;
+  if(!upgrade_guard_acquire(ns,&guard))goto done;
+  const char*project_names[]={"controller","mediator"};if(!exact_names(project,project_names,2,1U)||fstat(project,&project_id)||fstat(helpers,&helpers_id)||!upgrade_project_rebound(ns,project)||!upgrade_helpers_rebound(helpers))goto done;
+  int version=retained_installed_version(helpers,raw,n,&old_id,&old_fd);if(version!=1&&version!=2)goto done;
+  if(old_id.st_dev!=project_id.st_dev||old_id.st_dev!=helpers_id.st_dev)goto done;
+  if(version==1){
+    if(!stage_embedded_mediator(project,raw,n)||!exact_regular_bytes(project,"mediator",04555,raw,n,&new_id,&new_fd)||new_id.st_dev!=old_id.st_dev||!upgrade_guard_shape(ns,&guard,1)||!upgrade_project_rebound(ns,project)||!upgrade_helpers_rebound(helpers))goto done;
+    if(fstat(old_fd,&old_after)||!same_stat(&old_id,&old_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&old_after,&published)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(project,"mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+    unsigned flags=RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH;if(renameatx_np(project,"mediator",helpers,"se.nortropic.runtime-cleanup-mediator",flags)||!flush_dir(project)||!flush_dir(helpers))goto done;
+    if(fstat(old_fd,&old_after)||!upgrade_old_unlinked(&old_id,&old_after)||fstat(new_fd,&new_after)||!same_rename_identity(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published)||!upgrade_fixed_absent(project,"mediator"))goto done;new_id=new_after;
+  }else{
+    new_fd=old_fd;old_fd=-1;new_id=old_id;if(!upgrade_fixed_absent(project,"mediator"))goto done;
+  }
+  if(new_id.st_dev!=project_id.st_dev||new_id.st_dev!=helpers_id.st_dev||!upgrade_guard_shape(ns,&guard,1)||!upgrade_project_rebound(ns,project)||!upgrade_helpers_rebound(helpers)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+  if(!remove_fixed_staging(project)||!upgrade_project_rebound(ns,project)||!exact_empty(project)||unlinkat(ns,".install",AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!upgrade_fixed_absent(ns,".install")||!flush_dir(ns)||!flush_dir(db)||!upgrade_guard_shape(ns,&guard,0)||!upgrade_fixed_absent(ns,".install")||!upgrade_namespace_rebound(ns,db)||!upgrade_helpers_rebound(helpers)||fstat(new_fd,&new_after)||!same_stat(&new_id,&new_after)||fstatat(helpers,"se.nortropic.runtime-cleanup-mediator",&published,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&new_after,&published))goto done;
+  ok=1;
+done:
+  if(old_fd>=0&&close(old_fd))ok=0;if(new_fd>=0&&close(new_fd))ok=0;if(!upgrade_guard_close(&guard))ok=0;return ok;
+}
+"""
+R23_DISPATCH_ANCHOR = (
+    b"if(helpers>=0)close(helpers);close(db);close(ns);return 0;}"
+    b"int installed=installed_mediator_status"
+)
+R23_DISPATCH_REPLACEMENT = (
+    b"if(helpers>=0)close(helpers);close(db);close(ns);return 0;}"
+    b"if(finalizing&&prefix==5&&has_lock){int upgraded=upgrade_installed_mediator("
+    b"project,ns,db,helpers,mediator,mediator_n);if(close(helpers))upgraded=0;"
+    b"if(close(db))upgraded=0;if(close(ns))upgraded=0;return upgraded;}"
+    b"int installed=installed_mediator_status"
+)
+R23_R22_OUTCOME_SHA256 = (
+    "ff0554955732a67c23503d6785c0d69af0ed3ef1a6b0d0351e75f2a96fd1fa2b"
+)
+R23_R22_POST_RUN_SHA256 = (
+    "d77c36c5ee1f322edb7f06b87fee097c34f5932bc327542fb488fb586264c3f6"
+)
+R23_R22_CLEANUP_SHA256 = (
+    "bb3f93e28f7a7e187d4094e699e9049b8315811a1b1239f57d7f99450f54a902"
+)
+R23_R22_FINAL_ABSENT_SHA256 = (
+    "9bb2a51b53c773a06682823e0d2f5a31c2e4f4a0954e099f62c893d772064a9b"
+)
+R23_R22_FINAL_VALIDATOR_SHA256 = (
+    "55da495b7b79195485e3a9978faadd5ba0c3a66976d1b5c9ac4544d11ba0cccf"
+)
+R23_R22_SOURCE_BINDING_SHA256 = (
+    "dfc0571f0af32cd46a73528abce15237ec7c9a3274b8940fecdbbaaabf6f700a"
+)
+R23_EVIDENCE_ROOT = Path(
+    "/Users/elinhaggstrom/nortropic/evidence/bootstrap-supervisor/evidence"
+)
+R23_R22_EVIDENCE = {
+    "outcome": (
+        R23_EVIDENCE_ROOT / "h039-r22-r13-diagnostic-run-result.json",
+        R23_R22_OUTCOME_SHA256,
+    ),
+    "post_run": (
+        R23_EVIDENCE_ROOT / "h039-r22-r13-post-run-04555-root-observation.json",
+        R23_R22_POST_RUN_SHA256,
+    ),
+    "cleanup": (
+        R23_EVIDENCE_ROOT / "h039-r22-r13-diagnostic-cleanup-result.json",
+        R23_R22_CLEANUP_SHA256,
+    ),
+    "final_absent": (
+        R23_EVIDENCE_ROOT / "h039-r22-r13-final-absent-root-observation.json",
+        R23_R22_FINAL_ABSENT_SHA256,
+    ),
+    "final_validator": (
+        R23_EVIDENCE_ROOT / "h039-r22-r13-diagnostic-final-validate-r2.py",
+        R23_R22_FINAL_VALIDATOR_SHA256,
+    ),
+    "source_binding": (
+        R23_EVIDENCE_ROOT / "h039-r22-r13-diagnostic-source-binding-r2.json",
+        R23_R22_SOURCE_BINDING_SHA256,
+    ),
+}
 REJECTED_R20_R1_CANDIDATE = "27ad790442a69c1d35f3cfcccfb6fc02fdd57aea"
 REJECTED_R20_R1_TREE = "f6c9dbec3958f165094291486b54a6b3042abba7"
 REJECTED_R20_R1_GATE_SHA256 = (
@@ -445,6 +586,13 @@ R19_PRODUCT_GIT_ORDER = [
     "controller/runtime-cleanup/install",
     "controller/runtime-cleanup/native/mediator.c",
     "verify/h039/identity-manifest.json",
+]
+R23_PRODUCT_GIT_ORDER = [
+    "controller/runtime-cleanup/install",
+    "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/build-recipe.json",
+    "verify/h039/identity-manifest.json",
+    "verify/h039/runtime-cleanup-mediator",
 ]
 R8_PRODUCT_GIT_ORDER = [
     "controller/runtime-cleanup/install",
@@ -1406,6 +1554,55 @@ R22_PUBLICATION_BINDING = (
     "CLEAN_HEAD_EQUALS_MERGE;_ALL_FIVE_CHECKOUT_BYTES_EQUAL_MERGE_BLOBS;_"
     "EXECUTING_GATE_AND_SPEC_EQUAL_MERGE_BLOBS"
 )
+R23_RECONCILIATION = (
+    "THIS_FIELD_SUPERSEDES_ONLY_R22S_POST_DIAGNOSTIC_OWNER_STOP;_PUBLISHED_"
+    "R13_MERGE_B9EFF66E_TREE3B4A94BB_IS_THE_EXACT_R23_AUTHORITY_BASE;_THE_"
+    "OWNER_ADJUDICATED_OUTCOMEFF055495_STATUS28_WAIT7168_POSTRUND77C36C5_"
+    "CLEANUPBB3F93E2_FINALABSENT9BB2A51B_FINALVALIDATOR55DA495B_AND_SOURCE_"
+    "BINDINGDFC0571F_AS_IMMUTABLE_WORKFLOW_ONLY_NO_CREDIT_EVIDENCE;_STATUS28_"
+    "IS_EXACTLY_THE_SECOND_PROC_PIDLISTFDS_NULL_SIZING_CAP_AND_THE_SAME_"
+    "PREFETCH_CAP_PREDICATE_IS_PRODUCTION_REACHABLE_BEFORE_REQUEST_READ;_R23_"
+    "ADMITS_ONLY_ONE_POPULATED_FIXED17_SECOND_SCAN_REQUIRING_EXACTLY_ONE_FULL_"
+    "FD0_RECORD_AND_ONE_FIXED_OBJECT_OLD_R12_TO_NEW_R14_ATOMIC_RENAME_OVER_"
+    "UPDATE_UNDER_THE_RETAINED_NONBLOCKING_S_LOCK;_THE_COMPLETE_R22_DIAGNOSTIC_"
+    "BRANCH_IS_BYTE_EXACT_AND_CONSUMED_AND_MAY_NEVER_BE_COMPILED_STAGED_OR_RUN_"
+    "AGAIN;_A_SEPARATE_PRODUCTLESS_R24_PUBLICATION_MUST_BIND_THE_EXACT_R14_"
+    "PRODUCT_AND_ROOT_CEREMONY_BEFORE_ONE_NO_RETRY_UPDATE_OR_INSTALLED_EFFECT"
+)
+R23_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_R23_IS_AN_EXACT_FIVE_FILE_DIRECT_CHILD_OF_"
+    "PUBLISHED_R13_B9EFF66E_AND_BINDS_THE_OWNER_ADJUDICATED_STATUS28_ZERO_"
+    "EFFECT_LIFECYCLE_OUTCOMEFF055495_POSTRUND77C36C5_CLEANUPBB3F93E2_FINAL_"
+    "ABSENT9BB2A51B_FINALVALIDATOR55DA495B_SOURCEBINDINGDFC0571F;_THE_R14_"
+    "RUNTIME_CLOSE_INHERITED_FIRST_SCAN_AND_EVERY_POSTSCAN_PROTOCOL_STORE_AND_"
+    "EFFECT_BYTE_REMAIN_EXACT_WHILE_THE_SECOND_NULL_SIZING_QUERY_AND_HEAP_"
+    "ALLOCATION_ARE_REPLACED_BY_ONE_POPULATED17_RECORD_FETCH;_NEGATIVE_EMPTY_"
+    "MISALIGNED_MULTI_DUPLICATEZERO_NONZERO_AND_SATURATED_RESULTS_REJECT_"
+    "AND_ONLY_ONE_COMPLETE_FD0_RECORD_ACCEPTS;_THE_HISTORICAL_R22_DIAGNOSTIC_"
+    "BLOCK_IS_BYTE_EXACT_AND_ABSENT_FROM_PRODUCTION_PREPROCESS_IR_AND_BINARIES;_"
+    "THE_R12_RECIPE_STRUCTURE_IS_RESTORED_WITH_ONLY_NEW_MEDIATOR_DIGEST_SIZE_"
+    "AND_EXACT_OLD_R12_DIGEST6C2F2DBE_SIZE89392_BINDINGS;_THE_INSTALLER_ACCEPTS_"
+    "ONLY_IDLE_SEQUENCE0_A_C_Q_R_EMPTY_S_EXACTLOCK_AND_HOLDS_A_NONBLOCKING_OFD_"
+    "LOCK_ACROSS_STAGE_RENAME_FSYNC_REBIND_AND_STAGING_REMOVAL;_OLD_AND_NEW_"
+    "HELPERS_ARE_FULL_DIGEST_RETAINED_FD_NAME_REBIND_AND_SAME_DEVICE_BOUND;_THE_"
+    "ONLY_RENAME_IS_FIXED_MEDIATOR_TO_FIXED_HELPER_WITH_NOFOLLOW_ANY_AND_RESOLVE_"
+    "BENEATH_WITHOUT_EXCL_OR_SWAP_AND_SUCCESS_REQUIRES_NEW_NAME_TO_NEW_FD_OLD_"
+    "FD_NLINK0_BOTH_PARENT_FSYNC_AND_ZERO_STAGING_RESIDUE;_ONLY_OLD_WITH_ABSENT_"
+    "PARTIAL_FULL_OR_READY_STAGE_NEW_WITH_STAGEABSENT_CLEANUPPREFIX_AND_COMPLETE_"
+    "NEW_WITH_DOTINSTALLABSENT_STATES_ARE_REPRESENTABLE;_LOCKRACE_NONIDLE_OLD_"
+    "NEW_SUBSTITUTION_SYMLINK_HARDLINK_NAMERACE_CROSSDEVICE_RENAME_FSYNC_CRASH_"
+    "NEIGHBOR_AND_RUNTIME_UPDATER_MUTANTS_REJECT;_FIVE_FILE_R14_DUAL_REVIEW_AND_"
+    "GUARDED_PUBLICATION_PRECEDE_SEPARATE_PRODUCTLESS_R24_DUAL_REVIEW_PUBLICATION_"
+    "AND_ONE_FIXED_NO_RETRY_ROOT_UPDATE;_NO_R13_DIAGNOSTIC_RETRY_INSTALLED_"
+    "CREDIT_DOWNSTREAM_RESUME_OR_BROADER_AUTHORITY_IS_ADMITTED"
+)
+R23_PUBLICATION_BINDING = (
+    "ORDERED_PARENTS_EXACT_PUBLISHED_R13_AUTHORITY_AND_DIRECT_CHILD_R23_"
+    "CANDIDATE;_MERGE_TREE_EQUALS_CANDIDATE;_BASE_TO_CANDIDATE_AND_BASE_TO_"
+    "MERGE_HAVE_EXACT_FIVE_FILE_SHAPE;_LIVE_AUTHENTICATED_ORIGIN_MAIN_EQUALS_"
+    "MERGE;_CLEAN_HEAD_EQUALS_MERGE;_ALL_FIVE_CHECKOUT_BYTES_EQUAL_MERGE_BLOBS;_"
+    "EXECUTING_GATE_AND_SPEC_EQUAL_MERGE_BLOBS"
+)
 R21_UNCHANGED_ENGINE_FUNCTIONS = [
     "path_sha", "path_acl_presence", "path_extended_metadata",
     "path_security_snapshot", "exact_live_created_xattrs",
@@ -1593,34 +1790,31 @@ R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
     "/.install/controller/runtime-cleanup",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_R22_R13_PRESTORE_MEDIATOR_EXIT_DIAGNOSTIC_ABSENT"
+REASON = "H039_R23_R14_POPULATED_FD_SCAN_AND_FIXED_HELPER_UPGRADE_ABSENT"
 FAILURE_SIGNATURE = [
-    "PUBLISHED_R21_MAIN_DF5C9823_IS_THE_EXACT_R22_AUTHORITY_BASE",
-    "PUBLISHED_R21_GRAPH_GATE_SPEC_AND_FIVE_FILE_CONTRACT_ARE_EXACT",
-    "R12_PRODUCT_GRAPH_TREE_THREE_FILE_SURFACE_AND_FIVE_BLOBS_ARE_EXACT",
-    "INT2_B264306E_EXIT1_NO_RESPONSE_ZERO_EFFECT_IS_CONSUMED_NO_RETRY",
-    "R22_R1_63F4FEA7_TREE96071314_GATE769E9299_SPEC466F5F04_IS_IMMUTABLE_NO_CREDIT_NONPARENT",
-    "R22_R2_A5869E4A_TREE33F8B864_GATE01AF8A99_SPEC555381A3_IS_IMMUTABLE_NO_CREDIT_NONPARENT",
-    "R22_R3_8B25DA35_TREEAEDFD931_GATE9DFE216D_SPEC11468BC1_IS_IMMUTABLE_NO_CREDIT_NONPARENT",
-    "FRESH_R22_R4_FIVE_FILE_CONTRACT_REQUIRES_DUAL_REVIEW_AND_PUBLICATION",
-    "LEGACY_R19_PARTIAL_CURSOR_R21_POSTINSTALL_AND_R12_REBUILD_MACHO_PROOFS_PRECEDE_INTENDED_RED",
-    "FIXED_INT2_RECORD_TYPE_LITERAL_MATCHES_IMMUTABLE_EVIDENCE",
-    "PRODUCT_AND_PUBLICATION_IDENTITIES_BIND_MUTUALLY_COMPATIBLE_HEAD_MAIN_AND_EXECUTING_BYTES",
-    "PRODUCT_AND_PUBLICATION_LANES_STABLE_BIND_FULL_INSTALLED_R12_IDENTITY_TO_INT2_PRE_POST_WORK",
-    "PRODUCT_AND_PUBLICATION_LANES_HOLD_ONE_EXACT_RETAINED_INSTALLED_FD_ACROSS_MATERIAL_REVIEW",
-    "FRESH_R13_FOUR_FILE_DIAGNOSTIC_PRODUCT_REQUIRES_DUAL_REVIEW_AND_PUBLICATION",
-    "EXACT_CODES0_TO70_LOCALIZE_THE_R12_PRESTORE_PATH",
-    "CODE0_REQUIRES_EXACT_DISTINCT_R22_REQUEST_INVALID_KEYS_CANONICAL_FRAME_READY_IN_MEMORY_NO_WRITE",
-    "ERROR_FRAME_WRITE_SEND_OPEN_STORE_AND_LATER_EFFECTS_ARE_UNREACHABLE",
-    "DIAGNOSTIC_SOURCE_OPTIMIZED_IR_AND_FINAL_IMPORTS_EXCLUDE_UMASK",
-    "R22_PRODUCT_CHECKOUT_BINDS_EXECUTABLE_0755_MODE_AND_REJECTS_0644_OR_SUBSTITUTION",
-    "R12_RUNTIME_ARTIFACT_AND_MEDIATOR_COMPILE_SIGN_ARGV_REMAIN_BYTE_EXACT",
-    "SEPARATE_FIXED_ROOT_DIAGNOSTIC_PATH_NEVER_DOT_INSTALL_OR_PRODUCTION_MEDIATOR",
-    "R22_PUBLICATION_ENDS_PASS_PRE_ROOT_DIAGNOSTIC_PUBLICATION_ONLY",
-    "ROOT_STAGE_RUN_INERT_REMOVE_REQUIRES_NEW_OWNER_ADJUDICATION",
-    "NO_RETRY_INSTALLED_EFFECT_DOWNSTREAM_OR_SUPERVISOR_RESUME",
+    "PUBLISHED_R13_MAIN_B9EFF66E_IS_THE_EXACT_R23_AUTHORITY_BASE",
+    "R22_R13_OUTCOMEFF055495_STATUS28_WAIT7168_ZERO_EFFECT_IS_OWNER_ADJUDICATED",
+    "POSTRUND77C36C5_CLEANUPBB3F93E2_FINALABSENT9BB2A51B_VALIDATE55DA495B_ARE_EXACT",
+    "R22_DIAGNOSTIC_IS_CONSUMED_REMOVED_IMMUTABLE_NO_CREDIT_AND_NEVER_RUN_AGAIN",
+    "FRESH_R23_FIVE_FILE_CONTRACT_REQUIRES_TWO_REVIEWS_AND_GUARDED_PUBLICATION",
+    "RUNTIME_FIRST_FD_SCAN_AND_ALL_POSTSCAN_PROTOCOL_STORE_EFFECT_BYTES_REMAIN_EXACT",
+    "SECOND_SCAN_HAS_NO_NULL_SIZING_AND_USES_EXACT_POPULATED_CAPACITY17",
+    "ONLY_ONE_COMPLETE_FD0_RECORD_ACCEPTS",
+    "NEGATIVE_EMPTY_MISALIGNED_MULTI_DUPLICATEZERO_NONZERO_AND_SATURATION_REJECT",
+    "HISTORICAL_R22_DIAGNOSTIC_BLOCK_REMAINS_BYTE_EXACT_AND_NOT_COMPILED",
+    "R12_PRODUCTION_RECIPE_STRUCTURE_AND_EXACT_OLD_R12_IDENTITY_ARE_BOUND",
+    "FIXED_IDLE_SEQUENCE0_NAMESPACE_AND_RETAINED_NONBLOCKING_OFD_LOCK_ARE_REQUIRED",
+    "OLD_AND_NEW_HELPER_BYTES_RETAINED_FDS_NAME_REBINDS_AND_SAME_DEVICE_ARE_REQUIRED",
+    "ATOMIC_FIXED_NAME_RENAME_OVER_USES_NOFOLLOW_ANY_RESOLVE_BENEATH_NO_EXCL_NO_SWAP",
+    "SUCCESS_BINDS_NEW_NAME_TO_NEW_FD_OLD_NLINK0_BOTH_PARENT_FSYNC_AND_ZERO_STAGING",
+    "ONLY_FROZEN_OLD_NEW_STAGE_AND_CLEANUP_CRASH_STATES_ARE_REPRESENTABLE",
+    "LOCKRACE_NONIDLE_SUBSTITUTION_LINK_NAMERACE_CROSSDEVICE_AND_NEIGHBOR_REJECT",
+    "FRESH_R14_FIVE_FILE_PRODUCT_REQUIRES_TWO_REVIEWS_AND_GUARDED_PUBLICATION",
+    "SEPARATE_PRODUCTLESS_R24_REFREEZE_REVIEWS_AND_PUBLICATION_PRECEDE_ROOT_UPDATE",
+    "ONE_FIXED_NO_RETRY_ROOT_UPDATE_PRECEDES_UID501_GID20_EFFECT_REVIEW",
+    "NO_DIAGNOSTIC_RETRY_TASK_CREDIT_DOWNSTREAM_OR_SUPERVISOR_RESUME",
 ]
-EXPECTED_H039_ROW_SHA256 = "ccf8482b27b8a57370577ab5ab65cdb0b9992fc5c82671f2221023a5141f6474"
+EXPECTED_H039_ROW_SHA256 = "e372e7af8810b569d599c6d38c8c98205f8c43277cb5a7ea604658c70d9b949c"
 
 passed = 0
 failed = 0
@@ -2165,6 +2359,138 @@ def r22_registry_expected() -> dict[str, Any]:
     }
 
 
+def r23_registry_expected() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "authority_base": R23_AUTHORITY_BASE,
+        "authority_tree": R23_AUTHORITY_TREE,
+        "authority_ordered_parents": R23_AUTHORITY_PARENTS,
+        "authority_gate_sha256": R23_BASE_GATE_SHA256,
+        "authority_spec_sha256": R23_BASE_SPEC_SHA256,
+        "test_author_paths": TEST_AUTHOR_GIT_ORDER,
+        "candidate_change_shape": R17_CANDIDATE_CHANGE_SHAPE,
+        "owner_adjudicated_r22_lifecycle": {
+            "published_r13_merge": R23_AUTHORITY_BASE,
+            "outcome_sha256": R23_R22_OUTCOME_SHA256,
+            "exit_status": 28,
+            "raw_wait_status": 7168,
+            "classification": "STATUS_28_ZERO_EFFECT_OWNER_STOP",
+            "response_stdout_stderr_and_ancillary_bytes": 0,
+            "zero_effect": True,
+            "post_run_sha256": R23_R22_POST_RUN_SHA256,
+            "cleanup_sha256": R23_R22_CLEANUP_SHA256,
+            "final_absent_sha256": R23_R22_FINAL_ABSENT_SHA256,
+            "final_validator_sha256": R23_R22_FINAL_VALIDATOR_SHA256,
+            "source_binding_sha256": R23_R22_SOURCE_BINDING_SHA256,
+            "lifecycle_validation": "PASS",
+            "diagnostic_consumed_removed_never_restage_or_run": True,
+            "workflow_only_no_credit": True,
+        },
+        "product_cli": [
+            "--r23-product", "RUNTIME_SUPPLIED_PUBLISHED_R23_CONTRACT_MERGE",
+            "R14_PRODUCTION_CANDIDATE",
+        ],
+        "publication_cli": [
+            "--r23-published", "RUNTIME_SUPPLIED_PUBLISHED_R14_PRODUCT_MERGE",
+        ],
+        "publication_result": "PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY",
+        "product_change_paths": R23_PRODUCT_GIT_ORDER,
+        "product_change_shape": (
+            "EXACTLY_FIVE_EXISTING_M_CHANGES_WITH_UNCHANGED_MODES_NO_ADD_DELETE_"
+            "RENAME_SUBSTITUTION_OR_BROADER_PREFIX"
+        ),
+        "production_scan2": {
+            "first_scan": "BYTE_EXACT_PUBLISHED_R13_PRODUCTION_FIRST_SCAN",
+            "null_sizing_query": False,
+            "allocation": "FIXED_STACK_ARRAY_17_PROC_FDINFO",
+            "populated_fetch": "PROC_PIDLISTFDS_SELF_DIRECT_TO_FIXED17_ARRAY",
+            "success": "GOT_EXACTLY_ONE_COMPLETE_RECORD_AND_PROC_FD_EXACTLY0",
+            "reject": [
+                "NEGATIVE", "EMPTY", "MISALIGNED",
+                "MORE_THAN_ONE", "DUPLICATE_ZERO", "NONZERO_FD",
+                "CAPACITY17_SATURATED_OR_GREATER",
+            ],
+            "postscan_protocol_store_effect": "BYTE_EXACT_PUBLISHED_R13",
+        },
+        "historical_r22_diagnostic": {
+            "source_block": "BYTE_EXACT_PUBLISHED_R13",
+            "status_registry": "UNCHANGED_0_TO_70_INCLUDING_STATUS28_OLD_CAP",
+            "compiled_in_r14": False,
+            "product_or_publication_cli_runnable_in_r23": False,
+            "restage_or_execution": False,
+        },
+        "production_recipe": {
+            "source_merge": R20_AUTHORITY_BASE,
+            "structure": "BYTE_EXACT_PUBLISHED_R12_PRODUCTION_RECIPE",
+            "published_r12_recipe_sha256": R18_PRODUCTION_RECIPE_SHA256,
+            "old_mediator_sha256": R23_OLD_R12_MEDIATOR_SHA256,
+            "old_mediator_size": R23_OLD_R12_MEDIATOR_SIZE,
+            "new_mediator_sha256_and_size": "DERIVED_FROM_EXACT_R14_ARTIFACT",
+            "diagnostic_define_identifier_status_or_import": False,
+        },
+        "fixed_object_update": {
+            "whole_source_reference": (
+                "EXACT_PUBLISHED_R13_SOURCE_PLUS_ONLY_SCAN2_COMPILE_GUARD_"
+                "UPDATER_HELPER_AND_DISPATCH_TRANSFORMS"
+            ),
+            "installed_path": str(INSTALLED),
+            "staged_name": ".install/mediator",
+            "caller_path_fd_input": False,
+            "required_state": "EXACT_SEQUENCE0_A_C_Q_R_EMPTY_S_EXACT_REGULAR_LOCK",
+            "lock": "RETAINED_REVERIFIED_ROOT_WHEEL_REGULAR_0600_NLINK1_SIZE0_NONBLOCKING_F_OFD_SETLK_THROUGH_CLEANUP",
+            "old_identity": (
+                "ROOT_WHEEL_04555_NLINK1_FULL_SHA256_6C2F2DBE_SIZE89392_RETAINED_"
+                "FD_AND_NAME_REBIND"
+            ),
+            "new_identity": (
+                "ROOT_WHEEL_04555_NLINK1_FULL_R14_DIGEST_SIZE_RETAINED_FD_AND_"
+                "STAGE_NAME_REBIND"
+            ),
+            "same_device": True,
+            "rename": (
+                "FIXED_STAGE_MEDIATOR_TO_FIXED_HELPER_RENAMEATX_NP_NOFOLLOW_ANY_"
+                "RESOLVE_BENEATH_NO_EXCL_NO_SWAP"
+            ),
+            "postrename": (
+                "FSYNC_STAGE_AND_HELPER_PARENTS_NEW_NAME_EQUALS_RETAINED_NEW_FD_"
+                "RETAINED_OLD_FD_NLINK0"
+            ),
+            "installed_inode_inplace_write_chmod_dd_or_swap": False,
+            "staging_removed_before_lock_release": True,
+            "retry_or_general_rollback": False,
+        },
+        "representable_crash_states": [
+            "O0_OLD_STAGE_ABSENT_INSTALL_CHAIN_COMPLETE",
+            "O1_OLD_STAGE_PARTIAL_0400_INSTALL_CHAIN_COMPLETE",
+            "O2_OLD_STAGE_FULL_0400_INSTALL_CHAIN_COMPLETE",
+            "O3_OLD_STAGE_READY_04555_INSTALL_CHAIN_COMPLETE",
+            "N0_NEW_STAGE_ABSENT_INSTALL_FILE_PRESENT_RUNTIME_CONTROLLER_PROJECT",
+            "N1_NEW_STAGE_ABSENT_INSTALL_FILE_ABSENT_RUNTIME_CONTROLLER_PROJECT",
+            "N2_NEW_STAGE_ABSENT_RUNTIME_ABSENT_CONTROLLER_PROJECT",
+            "N3_NEW_STAGE_ABSENT_CONTROLLER_ABSENT_PROJECT",
+            "N4_NEW_DOT_INSTALL_ABSENT_COMPLETE",
+        ],
+        "causal_rejections": [
+            "NULL_SIZE_INTERPRETATION", "FETCH_FAILURE", "MISALIGNMENT",
+            "SATURATION", "MISSING_DUPLICATE_OR_EXTRA_FD", "LOCK_RACE",
+            "NONIDLE_OR_RECEIPT", "OLD_OR_NEW_SUBSTITUTION", "SYMLINK",
+            "HARDLINK", "NAME_RACE", "CROSS_DEVICE", "RENAME_FLAG_DRIFT",
+            "EACH_RENAME_FSYNC_OR_CLEANUP_CRASH_BOUNDARY", "NEIGHBOR_PATH",
+            "UPDATER_IN_RUNTIME_BINARY",
+        ],
+        "serial_next": [
+            "R23_FREEZE_TWO_GATE_REVIEWS_GUARDED_PUBLICATION",
+            "FRESH_FIVE_FILE_R14_TWO_PRODUCT_REVIEWS_GUARDED_PUBLICATION",
+            "SEPARATE_PRODUCTLESS_R24_FREEZE_TWO_REVIEWS_GUARDED_PUBLICATION",
+            "EXACT_HASH_BOUND_ONE_NO_RETRY_ROOT_UPDATE",
+            "POST_OBSERVATION_ONE_UID501_GID20_R24_INSTALLED_EFFECT_REVIEW",
+            "GUARDED_H039_COMPLETION_H038_H032_H031_THEN_RESUME_ADJUDICATION",
+        ],
+        "r24_installed_lane_available_in_r23": False,
+        "broader_authority": False,
+    }
+
+
 R22_DIAGNOSTIC_BRANCH = r'''#if defined(H039_RUNTIME_PRESTORE_EXIT_DIAGNOSTIC)
 #define H039_R22_PATH "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-pre-effect-diagnostic-v1"
 enum {
@@ -2369,6 +2695,719 @@ def r22_source_recipe_selftests() -> None:
     )
 
 
+def r23_expected_runtime_prefix() -> bytes:
+    source = blob(
+        R23_AUTHORITY_BASE, "controller/runtime-cleanup/native/mediator.c",
+    )
+    marker = b"\n#ifdef H039_INSTALLER\n#define Q1(x) #x"
+    if source.count(marker) != 1 or source.count(R23_OLD_SCAN2) != 1:
+        raise Rig("R23 published R13 runtime/installer anchor drift")
+    prefix, _installer = source.split(marker, 1)
+    corrected = prefix.replace(R23_OLD_SCAN2, R23_NEW_SCAN2, 1)
+    if corrected.count(R23_OLD_SCAN2) or corrected.count(R23_NEW_SCAN2) != 1:
+        raise Rig("R23 populated scan transform is not singular")
+    if corrected.count(R23_OLD_INSTALLER_COMPILE_GUARD) != 1 \
+            or corrected.count(R23_NEW_INSTALLER_COMPILE_GUARD) != 0:
+        raise Rig("R23 installer compile guard transform anchor drift")
+    corrected = corrected.replace(
+        R23_OLD_INSTALLER_COMPILE_GUARD,
+        R23_NEW_INSTALLER_COMPILE_GUARD, 1,
+    )
+    return corrected + marker
+
+
+def r23_expected_production_source() -> bytes:
+    source = blob(
+        R23_AUTHORITY_BASE, "controller/runtime-cleanup/native/mediator.c",
+    )
+    transforms = (
+        (R23_OLD_SCAN2, R23_NEW_SCAN2, "populated scan2"),
+        (
+            R23_OLD_INSTALLER_COMPILE_GUARD,
+            R23_NEW_INSTALLER_COMPILE_GUARD,
+            "old/new compile-time identity guard",
+        ),
+        (
+            R23_UPDATER_INSERT_ANCHOR,
+            b"\n" + R23_UPDATER_HELPERS + R23_UPDATER_INSERT_ANCHOR,
+            "fixed updater helpers",
+        ),
+        (
+            R23_DISPATCH_ANCHOR,
+            R23_DISPATCH_REPLACEMENT,
+            "finalizing prefix5 retained-lock dispatch",
+        ),
+    )
+    for old, new, label in transforms:
+        if old == new or source.count(old) != 1 or source.count(new) != 0:
+            raise Rig(f"R23 {label} source anchor is not exact and singular")
+        source = source.replace(old, new, 1)
+        if source.count(old) != new.count(old) or source.count(new) != 1:
+            raise Rig(f"R23 {label} source transform is not exact and singular")
+    return source
+
+
+def r23_expected_production_recipe(mediator: bytes) -> bytes:
+    raw = blob(R20_AUTHORITY_BASE, "verify/h039/build-recipe.json")
+    if sha(raw) != R18_PRODUCTION_RECIPE_SHA256:
+        raise Rig("R23 published R12 production recipe digest drift")
+    recipe = strict_json(raw)
+    def formatted(value: Any) -> bytes:
+        return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode()
+
+    if type(recipe) is not dict or formatted(recipe) != raw:
+        raise Rig("R23 published R12 production recipe formatting identity drift")
+    argv = recipe.get("installer_compile_argv")
+    current_pair = [
+        f"-DH039_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}",
+        f"-DH039_MEDIATOR_SIZE={R23_OLD_R12_MEDIATOR_SIZE}",
+    ]
+    old_binding_pair = [
+        f"-DH039_OLD_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}",
+        f"-DH039_OLD_MEDIATOR_SIZE={R23_OLD_R12_MEDIATOR_SIZE}",
+    ]
+    if type(argv) is not list or any(type(value) is not str for value in argv):
+        raise Rig("R23 published R12 installer argv type drift")
+    starts = [
+        index for index in range(len(argv) - 1)
+        if argv[index:index + 2] == current_pair
+    ]
+    if starts != [argv.index(current_pair[0])]:
+        raise Rig("R23 published R12 mediator identity argv is not one exact pair")
+    index = starts[0]
+    changed = copy.deepcopy(recipe)
+    changed["installer_compile_argv"][index:index + 2] = [
+        f"-DH039_MEDIATOR_SHA256={sha(mediator)}",
+        f"-DH039_MEDIATOR_SIZE={len(mediator)}",
+        *old_binding_pair,
+    ]
+    expected = formatted(changed)
+    if strict_json(expected) != changed:
+        raise Rig("R23 exact production recipe serialization drift")
+    return expected
+
+
+def r23_scan2_accepts(got: Any, fds: Any, *, record_size: int = 8) -> bool:
+    return (
+        type(got) is int and type(record_size) is int and record_size > 0
+        and type(fds) is list and all(type(value) is int for value in fds)
+        and got == record_size and len(fds) >= 1 and fds[0] == 0
+    )
+
+
+def r23_scan2_causal_selftests() -> None:
+    record = 8
+    cases = {
+        "FETCH_NEGATIVE": (-1, [0]),
+        "EMPTY": (0, []),
+        "SHORT_MISALIGNED": (record - 1, [0]),
+        "LONG_MISALIGNED": (record + 1, [0]),
+        "TWO_ZERO_RECORDS": (record * 2, [0, 0]),
+        "EXTRA_FD1": (record * 2, [0, 1]),
+        "SOLE_NONZERO_FD1": (record, [1]),
+        "SATURATED_17_ZERO_RECORDS": (record * 17, [0] * 17),
+        "SATURATED_17_MIXED_RECORDS": (record * 17, [0] + list(range(1, 17))),
+        "OVER_CAPACITY": (record * 18, [0] * 18),
+    }
+    check(
+        r23_scan2_accepts(record, [0], record_size=record),
+        "A_H039_R23_POPULATED_SCAN2_EXACT_SINGLETON_FD0_MODEL",
+    )
+    for label, (got, fds) in cases.items():
+        check(
+            not r23_scan2_accepts(got, fds, record_size=record),
+            f"N_H039_R23_POPULATED_SCAN2_{label}",
+        )
+    # Explicitly prove the rejected historical predicate: a padded NULL-size
+    # estimate can be one record while the populated result contains more.
+    null_size_estimate = record
+    populated_got = record * 2
+    check(
+        null_size_estimate == record
+        and not r23_scan2_accepts(populated_got, [0, 1], record_size=record),
+        "N_H039_R23_NULL_SIZE_ESTIMATE_NEVER_INTERPRETED_AS_MEMBERSHIP",
+    )
+
+
+def r23_update_state_valid(state: Any, *, new_size: int = 100003) -> bool:
+    if type(state) is not dict or set(state) != {
+        "phase", "installed", "stage", "stage_bytes", "install_file",
+        "runtime_dir", "controller_dir", "dot_install", "idle",
+        "neighbor_names",
+    }:
+        return False
+    if (
+        type(state["phase"]) is not str
+        or type(state["installed"]) is not str
+        or type(state["stage"]) is not str
+        or type(state["stage_bytes"]) is not int
+        or type(new_size) is not int or new_size <= 0
+        or any(type(state[key]) is not bool for key in (
+            "install_file", "runtime_dir", "controller_dir", "dot_install",
+            "idle",
+        ))
+        or type(state["neighbor_names"]) is not list
+        or any(type(name) is not str for name in state["neighbor_names"])
+    ):
+        return False
+    if not state["idle"] or state["neighbor_names"]:
+        return False
+    values = (
+        state["installed"], state["stage"], state["stage_bytes"],
+        state["install_file"], state["runtime_dir"],
+        state["controller_dir"], state["dot_install"],
+    )
+    expected: dict[str, tuple[Any, ...]] = {
+        "O0": ("OLD_R12", "ABSENT", 0, True, True, True, True),
+        "O2": ("OLD_R12", "FULL_0400", new_size, True, True, True, True),
+        "O3": ("OLD_R12", "READY_04555", new_size, True, True, True, True),
+        "N0": ("NEW_R14", "ABSENT", 0, True, True, True, True),
+        "N1": ("NEW_R14", "ABSENT", 0, False, True, True, True),
+        "N2": ("NEW_R14", "ABSENT", 0, False, False, True, True),
+        "N3": ("NEW_R14", "ABSENT", 0, False, False, False, True),
+        "N4": ("NEW_R14", "ABSENT", 0, False, False, False, False),
+    }
+    if state["phase"] == "O1":
+        return (
+            values[:2] == ("OLD_R12", "PARTIAL_0400")
+            and 0 <= state["stage_bytes"] < new_size
+            and values[3:] == (True, True, True, True)
+        )
+    return state["phase"] in expected and values == expected[state["phase"]]
+
+
+def r23_update_state_selftests() -> None:
+    baseline = {
+        "phase": "O0", "installed": "OLD_R12", "stage": "ABSENT",
+        "stage_bytes": 0, "install_file": True, "runtime_dir": True,
+        "controller_dir": True, "dot_install": True, "idle": True,
+        "neighbor_names": [],
+    }
+    accepted = [copy.deepcopy(baseline)]
+    for phase, stage, size in (
+        ("O1", "PARTIAL_0400", 0), ("O1", "PARTIAL_0400", 1),
+        ("O2", "FULL_0400", 100003),
+        ("O3", "READY_04555", 100003),
+    ):
+        value = copy.deepcopy(baseline)
+        value.update({"phase": phase, "stage": stage, "stage_bytes": size})
+        accepted.append(value)
+    for phase, members in (
+        ("N0", (True, True, True, True)),
+        ("N1", (False, True, True, True)),
+        ("N2", (False, False, True, True)),
+        ("N3", (False, False, False, True)),
+        ("N4", (False, False, False, False)),
+    ):
+        value = copy.deepcopy(baseline)
+        value.update({
+            "phase": phase, "installed": "NEW_R14",
+            "install_file": members[0], "runtime_dir": members[1],
+            "controller_dir": members[2], "dot_install": members[3],
+        })
+        accepted.append(value)
+    check(
+        all(r23_update_state_valid(value) for value in accepted),
+        "A_H039_R23_EXACT_TYPED_O0_O3_N0_N4_CRASH_STATES",
+    )
+    mutants: list[tuple[str, dict[str, Any]]] = []
+    for key, replacement in (
+        ("idle", False), ("installed", "SUBSTITUTE"),
+        ("stage", "SYMLINK"), ("phase", "O4"),
+    ):
+        value = copy.deepcopy(baseline)
+        value[key] = replacement
+        mutants.append((key.upper(), value))
+    neighbor = copy.deepcopy(baseline)
+    neighbor["neighbor_names"] = ["caller-selected"]
+    mutants.append(("NEIGHBOR", neighbor))
+    early_stage = copy.deepcopy(baseline)
+    early_stage.update({"phase": "O2", "stage": "FULL_0400", "stage_bytes": 1})
+    mutants.append(("WRONG_FULL_LENGTH", early_stage))
+    oversized_partial = copy.deepcopy(baseline)
+    oversized_partial.update({
+        "phase": "O1", "stage": "PARTIAL_0400", "stage_bytes": 100003,
+    })
+    mutants.append(("PARTIAL_NOT_PROPER_PREFIX", oversized_partial))
+    stale_after = copy.deepcopy(baseline)
+    stale_after.update({"phase": "N0", "installed": "NEW_R14",
+                        "stage": "READY_04555", "stage_bytes": 100003})
+    mutants.append(("NEW_WITH_STAGE", stale_after))
+    skipped_cleanup = copy.deepcopy(baseline)
+    skipped_cleanup.update({
+        "phase": "N2", "installed": "NEW_R14", "install_file": False,
+        "runtime_dir": True, "controller_dir": False, "dot_install": True,
+    })
+    mutants.append(("NONPREFIX_CLEANUP", skipped_cleanup))
+    for label, value in mutants:
+        check(
+            not r23_update_state_valid(value),
+            f"N_H039_R23_UPDATE_CRASH_STATE_{label}",
+        )
+
+
+R23_UPDATE_EVENT_TRACE = (
+    "LOCK_RETAINED_OPEN", "LOCK_NAME_REBIND", "LOCK_NONBLOCKING_OFD_ACQUIRE",
+    "IDLE_SEQUENCE0_REVALIDATE", "OLD_RETAINED_OPEN_DIGEST_NAME_REBIND",
+    "STAGE_RECOVER_OR_CREATE_FIXED_NEW", "NEW_RETAINED_OPEN_DIGEST_NAME_REBIND",
+    "OLD_NEW_STAGE_HELPERS_SAME_DEVICE",
+    "RENAME_FIXED_OVER_NOFOLLOW_ANY_RESOLVE_BENEATH",
+    "FSYNC_STAGE_PARENT", "FSYNC_HELPER_PARENT",
+    "OLD_RETAINED_FD_NLINK_ZERO", "NEW_NAME_TO_RETAINED_FD_REBIND",
+    "REMOVE_INSTALL_FILE_N1", "REMOVE_RUNTIME_DIRECTORY_N2",
+    "REMOVE_CONTROLLER_DIRECTORY_N3", "REMOVE_DOT_INSTALL_DIRECTORY_N4",
+    "ZERO_STAGING_RESIDUE", "LOCK_CLOSE_LAST",
+)
+
+
+def r23_update_event_trace_valid(value: Any) -> bool:
+    return (
+        type(value) is list
+        and all(type(item) is str for item in value)
+        and tuple(value) == R23_UPDATE_EVENT_TRACE
+    )
+
+
+def r23_update_event_trace_selftests() -> None:
+    reference = list(R23_UPDATE_EVENT_TRACE)
+    check(
+        r23_update_event_trace_valid(reference),
+        "A_H039_R23_EXACT_LOCK_RENAME_DURABILITY_CLEANUP_EVENT_TRACE",
+    )
+    mutants: list[tuple[str, list[str]]] = []
+    for index, label in enumerate(reference):
+        removed = list(reference)
+        removed.pop(index)
+        mutants.append((f"REMOVED_{label}", removed))
+    for left, right, label in (
+        (2, 3, "IDLE_BEFORE_LOCK"),
+        (8, 9, "FSYNC_BEFORE_RENAME"),
+        (10, 11, "OLD_NLINK_BEFORE_BOTH_FSYNC"),
+        (17, 18, "LOCK_RELEASE_BEFORE_ZERO_RESIDUE"),
+    ):
+        reordered = list(reference)
+        reordered[left], reordered[right] = reordered[right], reordered[left]
+        mutants.append((label, reordered))
+    widened = list(reference)
+    widened.insert(14, "REMOVE_CALLER_SELECTED_NEIGHBOR")
+    mutants.append(("NEIGHBOR_CLEANUP", widened))
+    retry = list(reference) + ["AUTOMATIC_RETRY"]
+    mutants.append(("AUTOMATIC_RETRY", retry))
+    for label, mutant in mutants:
+        check(
+            not r23_update_event_trace_valid(mutant),
+            f"N_H039_R23_UPDATE_EVENT_TRACE_{label}",
+        )
+
+
+def r23_exact_c_function(raw: bytes, name: str) -> bytes:
+    needle = f"static int {name}(".encode("ascii")
+    if raw.count(needle) != 1:
+        raise Rig(f"R23 exact C function cardinality drift: {name}")
+    start = raw.index(needle)
+    opening = raw.find(b"{", start)
+    if opening < 0:
+        raise Rig(f"R23 exact C function opening brace absent: {name}")
+    depth = 0
+    quote = 0
+    escaped = False
+    for index in range(opening, len(raw)):
+        value = raw[index]
+        if quote:
+            if escaped:
+                escaped = False
+            elif value == 92:
+                escaped = True
+            elif value == quote:
+                quote = 0
+            continue
+        if value in (34, 39):
+            quote = value
+        elif value == 123:
+            depth += 1
+        elif value == 125:
+            depth -= 1
+            if depth == 0:
+                return raw[start:index + 1]
+    raise Rig(f"R23 exact C function closing brace absent: {name}")
+
+
+R23_SCAN2_HARNESS_HEAD = br'''#include <errno.h>
+#include <libproc.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/proc_info.h>
+#include <unistd.h>
+#define SZ ((int)sizeof(struct proc_fdinfo))
+typedef struct{int got,fd,fd2,stale,want;} Case;
+static const Case cases[]={{SZ,0,0,0,1},{SZ,0,0,1,1},{-1,0,0,0,0},{0,0,0,0,0},{SZ-1,0,0,0,0},{2*SZ,0,0,0,0},{2*SZ,0,1,0,0},{SZ,1,0,0,0},{17*SZ,0,0,0,0},{18*SZ,0,0,0,0}};
+static int calls,current,bad,closed;
+static pid_t h_getpid(void){return 42;}
+static int h_close(int fd){if(fd!=9||closed++)bad=1;return 0;}
+static int h_proc_pidinfo(int pid,int flavor,uint64_t arg,void*buffer,int bytes){int call=calls++;if(pid!=42||flavor!=PROC_PIDLISTFDS||arg){bad=1;return -1;}if(call==0){if(buffer||bytes)bad=1;return 2*SZ;}if(call==1){if(!buffer||bytes!=18*SZ)bad=1;else{memset(buffer,0,(size_t)bytes);((struct proc_fdinfo*)buffer)[1].proc_fd=9;}return 2*SZ;}if(call==2){if(!buffer||bytes!=17*SZ)bad=1;else{memset(buffer,0,(size_t)bytes);((struct proc_fdinfo*)buffer)[0].proc_fd=cases[current].fd;((struct proc_fdinfo*)buffer)[1].proc_fd=cases[current].fd2;}errno=cases[current].stale?EBUSY:0;return cases[current].got;}bad=1;return -1;}
+#define getpid h_getpid
+#define close h_close
+#define proc_pidinfo h_proc_pidinfo
+'''
+R23_SCAN2_HARNESS_TAIL = br'''
+#undef proc_pidinfo
+#undef close
+#undef getpid
+int main(void){for(current=0;current<(int)(sizeof cases/sizeof cases[0]);current++){calls=bad=closed=0;errno=0;int got=close_inherited();if(got!=cases[current].want||calls!=3||closed!=1||bad)return 10+current;}puts("R23_COMPILED_SCAN2_HARNESS=PASS");return 0;}
+'''
+
+
+R23_CONNECTED_CLOSURE_HARNESS_HEAD = br'''#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#define fstat h039_fstat
+#define fstatat h039_fstatat
+#define lstat h039_lstat
+#define fsync h039_fsync
+#define fcntl h039_fcntl
+#define openat h039_openat
+#define pread h039_pread
+#define write h039_write
+#define fchown h039_fchown
+#define fchmod h039_fchmod
+#define unlinkat h039_unlinkat
+#define renameatx_np h039_renameatx_np
+#define close h039_close
+#define Q1(x) #x
+#define Q(x) Q1(x)
+#define H039_MEDIATOR_SHA256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+#define H039_MEDIATOR_SIZE 100003
+#define H039_OLD_MEDIATOR_SHA256 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+#define H039_OLD_MEDIATOR_SIZE 89392
+#define NS "/private/var/db/nortropic-runtime-cleanup-v1"
+enum{OLD_R12=1,NEW_R14=2};
+enum{STAGE_ABSENT=0,STAGE_PARTIAL=1,STAGE_FULL=2,STAGE_READY=3};
+enum{C_NONE=0,C_O1_ZERO,C_O1_PARTIAL,C_O2,C_O3,C_RENAME,C_PROJECT_FSYNC,C_HELPER_FSYNC,C_N1,C_N2,C_N3,C_DOT_INSTALL,C_NS_FSYNC,C_DB_FSYNC,C_LOCK,C_LOCK_SIZE,C_LOCK_MODE,C_LOCK_OWNER,C_LOCK_LINK,C_DIR_MODE,C_DIR_OWNER,C_OLD_CROSS_DEVICE,C_NEW_CROSS_DEVICE,C_PROJECT_REBIND,C_HELPER_REBIND,C_NONIDLE,C_NEIGHBOR,C_OLD_SUBSTITUTION,C_NEW_SUBSTITUTION,C_STAGE_SYMLINK,C_OLD_HARDLINK,C_NEW_HARDLINK,C_NAME_RACE};
+static int g_installed,g_stage,g_cleanup,g_crash,g_lock,g_violation,g_stage_calls,g_rename_calls,g_helper_reads,g_write_calls,g_fsync_calls,g_fail_fsync,g_after_fail,g_fd_open[64];
+static long g_stage_bytes;
+static unsigned char g_new_bytes[H039_MEDIATOR_SIZE];
+static void fill_dir(struct stat*s,ino_t ino,mode_t mode){memset(s,0,sizeof *s);s->st_dev=1;s->st_ino=ino;s->st_mode=S_IFDIR|mode;s->st_uid=0;s->st_gid=0;s->st_nlink=2;s->st_size=64;}
+static void fill_file(struct stat*s,ino_t ino,mode_t mode,off_t size,nlink_t links){memset(s,0,sizeof *s);s->st_dev=1;s->st_ino=ino;s->st_mode=S_IFREG|mode;s->st_uid=0;s->st_gid=0;s->st_nlink=links;s->st_size=size;}
+static void fill_old(struct stat*s){fill_file(s,100,04555,H039_OLD_MEDIATOR_SIZE,g_installed==OLD_R12?1:0);if(g_crash==C_OLD_CROSS_DEVICE)s->st_dev=2;if(g_crash==C_OLD_HARDLINK)s->st_nlink=2;}
+static void fill_new(struct stat*s){fill_file(s,200,04555,H039_MEDIATOR_SIZE,1);if(g_crash==C_NEW_CROSS_DEVICE)s->st_dev=2;if(g_crash==C_NEW_HARDLINK)s->st_nlink=2;}
+static void fill_stage(struct stat*s){mode_t mode=g_stage==STAGE_READY?04555:0400;fill_file(s,200,mode,g_stage_bytes,1);if(g_crash==C_NEW_CROSS_DEVICE)s->st_dev=2;if(g_crash==C_NEW_HARDLINK)s->st_nlink=2;}
+static void fill_lock(struct stat*s){fill_file(s,1015,0600,0,1);if(g_lock&&g_crash==C_LOCK_SIZE)s->st_size=1;if(g_lock&&g_crash==C_LOCK_MODE)s->st_mode=S_IFREG|0640;if(g_lock&&g_crash==C_LOCK_OWNER)s->st_uid=s->st_gid=1;if(g_lock&&g_crash==C_LOCK_LINK)s->st_nlink=2;}
+static void fill_guard_dir(struct stat*s,ino_t ino){fill_dir(s,ino,0555);if(g_lock&&g_crash==C_DIR_MODE)s->st_mode=S_IFDIR|0755;if(g_lock&&g_crash==C_DIR_OWNER)s->st_uid=s->st_gid=1;}
+static int h039_fstat(int fd,struct stat*s){if(fd==1)fill_dir(s,20,0700);else if(fd==2)fill_dir(s,21,0555);else if(fd==3)fill_dir(s,22,0755);else if(fd==4)fill_dir(s,30,0755);else if(fd>=10&&fd<=14)fill_guard_dir(s,(ino_t)(1000+fd));else if(fd==15)fill_lock(s);else if(fd==40)fill_old(s);else if(fd==41){if(g_installed==NEW_R14)fill_new(s);else fill_stage(s);}else if(fd==50)fill_dir(s,1050,0700);else if(fd==51)fill_dir(s,1051,0700);else if(fd==52)fill_file(s,1052,0500,169264,1);else return -1;return 0;}
+static int h039_fstatat(int parent,const char*name,struct stat*s,int flags){if(flags!=(AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)){g_violation=1;return -1;}if(parent==4&&!strcmp(name,"se.nortropic.runtime-cleanup-mediator")){g_helper_reads++;if(g_installed==OLD_R12)fill_old(s);else fill_new(s);if(g_crash==C_NAME_RACE&&g_installed==NEW_R14)s->st_ino++;return 0;}if(parent==1&&!strcmp(name,"mediator")){if(g_installed==OLD_R12&&!g_stage_calls)g_stage_calls++;if(g_stage==STAGE_ABSENT){errno=ENOENT;return -1;}fill_stage(s);return 0;}if(parent==2&&!strcmp(name,".install")){if(g_cleanup==4){errno=ENOENT;return -1;}fill_dir(s,20+(g_crash==C_PROJECT_REBIND),0700);return 0;}if(parent==2){const char*names[]={"a","c","q","r","s"};for(int i=0;i<5;i++)if(!strcmp(name,names[i])){fill_guard_dir(s,1010+i);return 0;}}if(parent==14&&!strcmp(name,"lock")){fill_lock(s);return 0;}if(parent==3&&!strcmp(name,"nortropic-runtime-cleanup-v1")){fill_dir(s,21,0555);return 0;}if(parent==50&&!strcmp(name,"runtime-cleanup")&&g_cleanup<2){fill_dir(s,1051,0700);return 0;}if(parent==51&&!strcmp(name,"install")&&g_cleanup<1){fill_file(s,1052,0500,169264,1);return 0;}if(parent==1&&!strcmp(name,"controller")&&g_cleanup<3){fill_dir(s,1050,0700);return 0;}errno=ENOENT;return -1;}
+static int h039_lstat(const char*path,struct stat*s){if(!strcmp(path,"/Library/PrivilegedHelperTools")){fill_dir(s,30+(g_crash==C_HELPER_REBIND),0755);return 0;}if(!strcmp(path,NS)){fill_dir(s,21,0555);return 0;}errno=ENOENT;return -1;}
+static int h039_fsync(int fd){g_fsync_calls++;if(g_fail_fsync==g_fsync_calls){g_after_fail=1;return -1;}if(fd==41&&g_stage==STAGE_READY&&g_crash==C_O3)return -1;if(g_installed==NEW_R14&&g_cleanup==0&&fd==1&&g_crash==C_PROJECT_FSYNC)return -1;if(g_installed==NEW_R14&&g_cleanup==0&&fd==4&&g_crash==C_HELPER_FSYNC)return -1;if(g_cleanup==1&&fd==51&&g_crash==C_N1)return -1;if(g_cleanup==2&&fd==50&&g_crash==C_N2)return -1;if(g_cleanup==3&&fd==1&&g_crash==C_N3)return -1;if(g_cleanup==4&&fd==2&&g_crash==C_NS_FSYNC)return -1;if(g_cleanup==4&&fd==3&&g_crash==C_DB_FSYNC)return -1;return 0;}
+static int h039_fcntl(int fd,int command,...){if(fd!=15||command!=F_OFD_SETLK){g_violation=1;return -1;}va_list ap;va_start(ap,command);struct flock*lock=va_arg(ap,struct flock*);va_end(ap);if(!lock||lock->l_type!=F_WRLCK||lock->l_whence!=SEEK_SET||lock->l_start||lock->l_len){g_violation=1;return -1;}if(g_crash==C_LOCK)return -1;g_lock=1;return 0;}
+static int h039_openat(int parent,const char*name,int flags,...){if(g_crash==C_STAGE_SYMLINK&&parent==1&&!strcmp(name,"mediator")){errno=ELOOP;return -1;}mode_t mode=0;if(flags&O_CREAT){va_list ap;va_start(ap,flags);mode=(mode_t)va_arg(ap,int);va_end(ap);}int fd=-1,dir_flags=O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY,named=O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE;if(parent==2&&flags==dir_flags){const char*names[]={"a","c","q","r","s"};for(int i=0;i<5;i++)if(!strcmp(name,names[i]))fd=10+i;}else if(parent==1&&!strcmp(name,"controller")&&flags==dir_flags&&g_cleanup<3)fd=50;else if(parent==50&&!strcmp(name,"runtime-cleanup")&&flags==dir_flags&&g_cleanup<2)fd=51;else if(parent==14&&!strcmp(name,"lock")&&flags==(O_RDWR|named))fd=15;else if(parent==4&&!strcmp(name,"se.nortropic.runtime-cleanup-mediator")&&flags==(O_RDONLY|named))fd=g_installed==OLD_R12?40:41;else if(parent==1&&!strcmp(name,"mediator")&&g_stage!=STAGE_ABSENT&&flags==(O_RDONLY|named))fd=41;else if(parent==51&&!strcmp(name,"install")&&g_cleanup<1&&flags==(O_RDONLY|named))fd=52;else if(parent==1&&!strcmp(name,"mediator")&&g_stage==STAGE_ABSENT&&flags==(O_RDWR|O_CREAT|O_EXCL|named)&&mode==0400){if(!g_lock)g_violation=1;if(g_after_fail)g_violation=1;g_stage=STAGE_PARTIAL;g_stage_bytes=0;fd=41;}if(fd<0){g_violation=1;errno=EINVAL;return -1;}g_fd_open[fd]++;return fd;}
+static int h039_fchown(int fd,uid_t uid,gid_t gid){if(g_after_fail){g_violation=1;return -1;}return fd==41&&uid==0&&gid==0?0:-1;}
+static int h039_fchmod(int fd,mode_t mode){if(g_after_fail){g_violation=1;return -1;}if(fd!=41)return -1;if(mode==0400){g_stage=STAGE_PARTIAL;return 0;}if(mode==04555){if(g_crash==C_O2)return -1;g_stage=STAGE_READY;return 0;}return -1;}
+static int h039_close(int fd){if(fd<0||fd>=64||g_fd_open[fd]<=0){g_violation=1;return -1;}if(fd==15){for(int i=10;i<64;i++)if(i!=15&&g_fd_open[i])g_violation=1;g_lock=0;}g_fd_open[fd]--;return 0;}
+static int h039_unlinkat(int parent,const char*name,int flags){if(!g_lock||g_after_fail)g_violation=1;int leaf=AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE;if(parent==1&&!strcmp(name,"mediator")&&g_stage==STAGE_PARTIAL&&flags==leaf){g_stage=STAGE_ABSENT;g_stage_bytes=0;return 0;}if(parent==51&&!strcmp(name,"install")&&flags==leaf){g_cleanup=1;return 0;}int dir=AT_REMOVEDIR|AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH;if(flags!=dir){g_violation=1;return -1;}if(parent==50&&!strcmp(name,"runtime-cleanup")){g_cleanup=2;return 0;}if(parent==1&&!strcmp(name,"controller")){g_cleanup=3;return 0;}if(parent==2&&!strcmp(name,".install")){if(g_crash==C_DOT_INSTALL)return -1;g_cleanup=4;return 0;}g_violation=1;return -1;}
+static int h039_renameatx_np(int project,const char*stage,int helpers,const char*installed,unsigned flags){g_rename_calls++;if(g_after_fail||!g_lock||project!=1||helpers!=4||strcmp(stage,"mediator")||strcmp(installed,"se.nortropic.runtime-cleanup-mediator")||flags!=(RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH)||g_installed!=OLD_R12||g_stage!=STAGE_READY)g_violation=1;if(g_crash==C_RENAME)return -1;g_installed=NEW_R14;g_stage=STAGE_ABSENT;g_stage_bytes=0;return 0;}
+static ssize_t h039_write(int fd,const void*raw,size_t n){(void)raw;g_write_calls++;if(g_after_fail){g_violation=1;return -1;}if(fd!=41||!g_lock)return -1;if(g_crash==C_O1_ZERO)return -1;if(g_crash==C_O1_PARTIAL&&g_write_calls>1)return -1;size_t q=g_crash==C_O1_PARTIAL?1:n;g_stage_bytes+=(long)q;if((size_t)g_stage_bytes==H039_MEDIATOR_SIZE)g_stage=STAGE_FULL;return (ssize_t)q;}
+static ssize_t h039_pread(int fd,void*raw,size_t n,off_t offset){size_t size;unsigned char value;if(fd==40){size=H039_OLD_MEDIATOR_SIZE;value=g_crash==C_OLD_SUBSTITUTION?'X':'O';}else if(fd==41){size=g_installed==NEW_R14?H039_MEDIATOR_SIZE:(size_t)g_stage_bytes;value=g_crash==C_NEW_SUBSTITUTION?'X':'N';}else return -1;if(offset<0||(size_t)offset>=size)return 0;size_t q=n<size-(size_t)offset?n:size-(size_t)offset;memset(raw,value,q);return (ssize_t)q;}
+static int exact_names(int directory,const char*const*allowed,size_t allowed_count,unsigned required){(void)allowed;if(g_crash==C_NEIGHBOR)return 0;if(directory==2){if(g_cleanup==4)return allowed_count==5&&required==31U;return allowed_count==6&&required==63U;}if(directory==1)return (allowed_count==2||(g_installed==NEW_R14&&allowed_count==1))&&required==1U;if(directory==14)return allowed_count==1&&required==1U;if(directory==50||directory==51)return allowed_count==1&&required==1U;return 0;}
+static int exact_empty(int directory){if(directory==13&&g_crash==C_NONIDLE)return 0;if(directory>=10&&directory<=13)return 1;if(directory==1)return g_cleanup==3;return 0;}
+static void digest(const void*raw,size_t n,char out[65]){const unsigned char*p=raw;const char*value=(n==H039_MEDIATOR_SIZE&&n&&p[0]=='N')?Q(H039_MEDIATOR_SHA256):((n==H039_OLD_MEDIATOR_SIZE&&n&&p[0]=='O')?Q(H039_OLD_MEDIATOR_SHA256):"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");memcpy(out,value,65);}
+'''
+
+R23_CONNECTED_CLOSURE_HARNESS_TAIL = br'''
+static int h039_phase(void){if(g_installed==OLD_R12)return g_stage;if(g_cleanup==0)return 4;return 4+g_cleanup;}
+static int h039_all_closed(void){for(int i=10;i<64;i++)if(g_fd_open[i])return 0;return 1;}
+static void h039_reset(int installed,int stage,int crash,int fail_fsync){g_installed=installed;g_stage=stage;g_stage_bytes=stage==STAGE_PARTIAL?1:(stage>=STAGE_FULL?H039_MEDIATOR_SIZE:0);g_cleanup=0;g_crash=crash;g_lock=g_violation=g_stage_calls=g_rename_calls=g_helper_reads=g_write_calls=g_fsync_calls=g_after_fail=0;g_fail_fsync=fail_fsync;memset(g_fd_open,0,sizeof g_fd_open);memset(g_new_bytes,'N',sizeof g_new_bytes);}
+static int h039_run(int installed,int stage,int crash,int want_result,int want_phase,int want_stage_calls,int want_rename_calls){
+  h039_reset(installed,stage,crash,0);
+  int result=upgrade_installed_mediator(1,2,3,4,g_new_bytes,sizeof g_new_bytes);
+  int accepted=result==want_result&&h039_phase()==want_phase&&!g_violation&&!g_lock&&h039_all_closed()&&g_stage_calls==want_stage_calls&&g_rename_calls==want_rename_calls&&(want_result!=1||g_helper_reads==(want_rename_calls?7:5));
+  if(!accepted)fprintf(stderr,"case=%d/%d/%d result=%d/%d phase=%d/%d violation=%d lock=%d closed=%d stage=%d/%d rename=%d/%d helper=%d cleanup=%d\n",installed,stage,crash,result,want_result,h039_phase(),want_phase,g_violation,g_lock,h039_all_closed(),g_stage_calls,want_stage_calls,g_rename_calls,want_rename_calls,g_helper_reads,g_cleanup);
+  return accepted;
+}
+static int h039_fsync_failure(int stage,int ordinal){h039_reset(OLD_R12,stage,C_NONE,ordinal);int result=upgrade_installed_mediator(1,2,3,4,g_new_bytes,sizeof g_new_bytes);return !result&&g_after_fail&&g_fsync_calls>=ordinal&&!g_violation&&!g_lock&&h039_all_closed();}
+int main(void){
+  int ok=1;
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_O1_ZERO,0,1,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_O1_PARTIAL,0,1,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_O2,0,2,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_O3,0,3,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_RENAME,0,3,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_PROJECT_FSYNC,0,4,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_HELPER_FSYNC,0,4,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_N1,0,5,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_N2,0,6,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_N3,0,7,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_DOT_INSTALL,0,7,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_NS_FSYNC,0,8,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_DB_FSYNC,0,8,1,1);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_NONE,1,8,1,1);
+  ok&=h039_run(NEW_R14,STAGE_ABSENT,C_NONE,1,8,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_LOCK,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_LOCK_SIZE,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_LOCK_MODE,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_LOCK_OWNER,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_LOCK_LINK,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_DIR_MODE,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_DIR_OWNER,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_OLD_CROSS_DEVICE,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_READY,C_NEW_CROSS_DEVICE,0,3,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_PROJECT_REBIND,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_HELPER_REBIND,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_NONIDLE,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_NEIGHBOR,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_OLD_SUBSTITUTION,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_READY,C_NEW_SUBSTITUTION,0,3,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_STAGE_SYMLINK,0,0,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_OLD_HARDLINK,0,0,0,0);
+  ok&=h039_run(OLD_R12,STAGE_READY,C_NEW_HARDLINK,0,3,1,0);
+  ok&=h039_run(OLD_R12,STAGE_ABSENT,C_NAME_RACE,0,4,1,1);
+  for(int stage=0;stage<=3;stage++){ok&=h039_run(OLD_R12,stage,C_NONE,1,8,1,1);int durability_count=g_fsync_calls;for(int i=1;i<=durability_count;i++){int x=h039_fsync_failure(stage,i);if(!x)fprintf(stderr,"stage=%d fsync=%d/%d phase=%d violation=%d after=%d calls=%d closed=%d\n",stage,i,durability_count,h039_phase(),g_violation,g_after_fail,g_fsync_calls,h039_all_closed());ok&=x;}}
+  if(!ok)return 1;
+  fputs("R23_CONNECTED_UPDATER_CLOSURE_HARNESS=PASS\n",stdout);return 0;
+}
+'''
+
+
+def r23_run_confined_harness(harness: bytes, stem: str, expected: bytes) -> None:
+    if path_sha(SANDBOX_EXEC) != SANDBOX_EXEC_SHA256 \
+            or path_sha(BUILD_COMPILER) != BUILD_COMPILER_SHA256 \
+            or path_sha(BUILD_SDK / "SDKSettings.json") \
+            != BUILD_SDK_SETTINGS_SHA256:
+        raise Undecidable("R23 pinned confined harness tool identity drift")
+    temporary = Path(tempfile.mkdtemp(prefix=f"h039-r23-{stem}-", dir="/private/tmp"))
+    try:
+        source_path, executable = temporary / f"{stem}.c", temporary / stem
+        source_path.write_bytes(harness)
+        environment = {"HOME": "/var/empty", "TMPDIR": str(temporary),
+                       "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"}
+        build = bounded_run([
+            str(SANDBOX_EXEC), "-D", f"H039_BUILD_EXECUTABLE={BUILD_COMPILER}",
+            "-D", f"H039_BUILD_ROOT={temporary}", "-p", BUILD_REVIEW_PROFILE,
+            str(BUILD_COMPILER), "-std=c11", "-O0", "-Wall", "-Wextra",
+            "-Werror", "-Wno-unused-parameter", "-arch", "arm64", "-isysroot",
+            str(BUILD_SDK), "-mmacosx-version-min=15.0", str(source_path), "-o",
+            str(executable)], cwd=temporary, env=environment, timeout=30)
+        if build.returncode == 71 and b"sandbox_apply: Operation not permitted" in build.stderr:
+            raise Undecidable(f"outer Seatbelt denied R23 {stem} build")
+        if build.returncode or build.stdout or build.stderr:
+            raise Rig(f"R23 {stem} build failed rc={build.returncode} stdout={build.stdout!r} stderr={build.stderr!r}")
+        run = bounded_run([
+            str(SANDBOX_EXEC), "-D", f"H039_EXECUTABLE={executable}", "-D",
+            f"H039_MEDIATOR={executable}", "-D", f"H039_TEST_ROOT={temporary}",
+            "-p", INSTALLER_REVIEW_PROFILE, str(executable)], cwd="/",
+            env=environment, timeout=10)
+        if run.returncode == 71 and b"sandbox_apply: Operation not permitted" in run.stderr:
+            raise Undecidable(f"outer Seatbelt denied R23 {stem} execution")
+        if run.returncode or run.stderr or run.stdout != expected:
+            raise Rig(f"R23 {stem} rejected rc={run.returncode} stdout={run.stdout!r} stderr={run.stderr!r}")
+    finally:
+        shutil.rmtree(temporary)
+
+
+def r23_compiled_scan2_harness() -> None:
+    exact = r23_exact_c_function(r23_expected_production_source(), "close_inherited")
+    harness = R23_SCAN2_HARNESS_HEAD + exact + R23_SCAN2_HARNESS_TAIL
+    r23_run_confined_harness(harness, "scan2", b"R23_COMPILED_SCAN2_HARNESS=PASS\n")
+    check(True, "A_H039_R23_EXACT_COMPILED_POPULATED_SCAN2_CAUSAL_HARNESS",
+          {"exact_function_sha256": sha(exact), "harness_sha256": sha(harness)})
+
+
+def r23_connected_updater_harness() -> None:
+    expected = r23_expected_production_source()
+    support = b"\n".join(
+        r23_exact_c_function(expected, name)
+        for name in (
+            "same_stat", "write_all", "pread_all", "stable_read_fd",
+            "stable_named_fd", "fixed_dir_at", "flush_dir",
+            "durable_fixed_dir_at", "exact_regular_bytes",
+            "same_rename_identity", "stage_embedded_mediator",
+            "remove_fixed_staging",
+        )
+    )
+    extracted = R23_UPDATER_HELPERS
+    if expected.count(extracted) != 1 \
+            or r23_exact_c_function(expected, "upgrade_installed_mediator") \
+            not in extracted:
+        raise Rig("R23 exact updater helper closure extraction drift")
+    harness = (
+        R23_CONNECTED_CLOSURE_HARNESS_HEAD + support + b"\n" + extracted
+        + R23_CONNECTED_CLOSURE_HARNESS_TAIL
+    )
+    r23_run_confined_harness(
+        harness, "updater", b"R23_CONNECTED_UPDATER_CLOSURE_HARNESS=PASS\n",
+    )
+    check(
+        True,
+        "A_H039_R23_EXACT_UPDATER_HELPER_CLOSURE_CONNECTED_O0_O3_N0_N4_"
+        "SYSCALL_HARNESS",
+        {"source_sha256": sha(extracted), "harness_sha256": sha(harness)},
+    )
+
+
+def r23_source_contract_checks(raw: bytes) -> None:
+    expected = r23_expected_production_source()
+    if raw != expected:
+        raise Rig(
+            "R23 source is not the exact whole published-R13 plus scan2, "
+            "compile-guard, fixed-updater and fixed-dispatch transform"
+        )
+    marker = b"\n#ifdef H039_INSTALLER\n#define Q1(x) #x"
+    if raw.count(marker) != 1:
+        raise Rig("R23 installer boundary absent or duplicated")
+    prefix, installer_tail = raw.split(marker, 1)
+    expected_prefix = r23_expected_runtime_prefix()
+    if prefix + marker != expected_prefix:
+        raise Rig("R23 changed production runtime outside exact populated scan2")
+    if prefix.count(R22_DIAGNOSTIC_BRANCH) != 1:
+        raise Rig("R23 historical R22 diagnostic branch changed or duplicated")
+    close_body = c_function_body(c_semantic_source(prefix.decode("utf-8")), "close_inherited")
+    if (
+        close_body.count("proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0)") != 1
+        or close_body.count("struct proc_fdinfo final_list[17]") != 1
+        or close_body.count(
+            "proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,final_list,(int)sizeof final_list)"
+        ) != 1
+        or close_body.count(
+            "return got==(int)sizeof *final_list&&final_list[0].proc_fd==0;"
+        ) != 1
+        or "errno" in close_body
+    ):
+        raise Rig("R23 populated FD scan2 exact source contract mismatch")
+    full = c_semantic_source(raw.decode("utf-8"))
+    update_body = c_function_body(full, "upgrade_installed_mediator")
+    directory_shape = c_function_body(full, "upgrade_directory_shape")
+    guard_shape = c_function_body(full, "upgrade_guard_shape")
+    if any(token not in directory_shape for token in (
+        "S_ISDIR(s->st_mode)", "s->st_uid==0", "s->st_gid==0",
+        "(s->st_mode&07777)==0555",
+    )) or full.count("upgrade_directory_shape(&retained)") != 1 \
+            or guard_shape.count("upgrade_rebound_dir(ns,") != 5:
+        raise Rig("R23 retained runtime directory repeated shape binding missing")
+    lock_shape = c_function_body(full, "upgrade_lock_shape")
+    if any(token not in lock_shape for token in (
+        "S_ISREG(s->st_mode)", "s->st_uid==0", "s->st_gid==0",
+        "(s->st_mode&07777)==0600", "s->st_nlink==1", "s->st_size==0",
+    )) or full.count("upgrade_lock_shape(&retained)") != 1:
+        raise Rig("R23 retained lock full repeated shape binding missing")
+    if any(token not in full for token in (
+        "F_OFD_SETLK", "F_WRLCK", "H039_OLD_MEDIATOR_SHA256",
+        "H039_OLD_MEDIATOR_SIZE",
+    )):
+        raise Rig("R23 fixed updater lock or old identity primitive missing")
+    required = (
+        "retained_installed_version(",
+        "renameatx_np", "RENAME_NOFOLLOW_ANY", "RENAME_RESOLVE_BENEATH",
+        "flush_dir(project)", "flush_dir(helpers)",
+        "remove_fixed_staging", "exact_empty(project)",
+        "upgrade_project_rebound(ns,project)",
+        "upgrade_helpers_rebound(helpers)", "upgrade_guard_close(&guard)",
+    )
+    if any(token not in update_body for token in required):
+        raise Rig("R23 fixed old-R12 to new-R14 updater primitive missing")
+    forbidden = (
+        "RENAME_SWAP", "RENAME_EXCL", "system(", "exec", "fork(",
+        "posix_spawn", "popen(", "process", "kill(", "unlink(",
+        "rename(", "argv", "getenv(",
+    )
+    if any(token in update_body for token in forbidden):
+        raise Rig("R23 updater contains forbidden general or in-place authority")
+    if re.search(r"(?<!f)chmod\s*\(", update_body) \
+            or re.search(r"(?<!f)write\s*\(", update_body):
+        raise Rig("R23 updater writes or chmods the installed helper in place")
+    if update_body.count(
+        'renameatx_np(project,"mediator",helpers,'
+        '"se.nortropic.runtime-cleanup-mediator",'
+    ) != 1:
+        raise Rig("R23 updater does not rename exactly fixed stage to fixed helper")
+    apply = c_function_body(full, "apply_install")
+    if apply.count("upgrade_installed_mediator(") != 1 \
+            or apply.count("finalizing&&prefix==5&&has_lock") != 1:
+        raise Rig("R23 updater is absent or multiply dispatched")
+    if R22_DIAGNOSTIC_DEFINE.encode() in installer_tail:
+        raise Rig("R23 historical diagnostic define leaked into installer branch")
+
+
+def r23_source_contract_selftests() -> None:
+    r23_scan2_causal_selftests()
+    r23_update_state_selftests()
+    r23_update_event_trace_selftests()
+    r23_compiled_scan2_harness()
+    r23_connected_updater_harness()
+    prefix = r23_expected_runtime_prefix()
+    check(
+        prefix.count(R23_NEW_SCAN2) == 1 and prefix.count(R23_OLD_SCAN2) == 0,
+        "A_H039_R23_EXACT_R13_TO_POPULATED_SCAN2_PREFIX_TRANSFORM",
+    )
+    expected = r23_expected_production_source()
+    r23_source_contract_checks(expected)
+    check(
+        expected.count(R23_NEW_SCAN2) == 1
+        and expected.count(R23_NEW_INSTALLER_COMPILE_GUARD) == 1
+        and expected.count(R23_UPDATER_HELPERS) == 1
+        and expected.count(R23_DISPATCH_REPLACEMENT) == 1,
+        "A_H039_R23_EXACT_WHOLE_R13_TO_R14_SOURCE_TRANSFORM",
+        {"sha256": sha(expected), "size": len(expected)},
+    )
+    scan_mutants = {
+        "NULL_QUERY_RESTORED": prefix.replace(R23_NEW_SCAN2, R23_OLD_SCAN2, 1),
+        "CAPACITY_16": prefix.replace(b"final_list[17]", b"final_list[16]", 1),
+        "CAPACITY_18": prefix.replace(b"final_list[17]", b"final_list[18]", 1),
+        "SHORT_ACCEPT": prefix.replace(b"got==(int)sizeof *final_list", b"got<=(int)sizeof *final_list", 1),
+        "EXTRA_ACCEPT": prefix.replace(b"got==(int)sizeof *final_list", b"got>=(int)sizeof *final_list", 1),
+        "NONZERO_ACCEPT": prefix.replace(b"final_list[0].proc_fd==0", b"final_list[0].proc_fd>=0", 1),
+        "DECOY_SECOND_FETCH": prefix.replace(R23_NEW_SCAN2, R23_NEW_SCAN2 + R23_NEW_SCAN2, 1),
+    }
+    for label, mutant in scan_mutants.items():
+        check(
+            mutant != prefix and mutant != r23_expected_runtime_prefix(),
+            f"N_H039_R23_SCAN2_SOURCE_{label}",
+        )
+    source_mutants = {
+        "OLD_COMPILE_GUARD": expected.replace(
+            R23_NEW_INSTALLER_COMPILE_GUARD,
+            R23_OLD_INSTALLER_COMPILE_GUARD, 1,
+        ),
+        "UPDATER_DELETED": expected.replace(R23_UPDATER_HELPERS, b"", 1),
+        "UPDATER_DECOY": expected.replace(
+            R23_UPDATER_HELPERS,
+            R23_UPDATER_HELPERS + b"\n/* updater decoy */\n", 1,
+        ),
+        "DISPATCH_DELETED": expected.replace(
+            R23_DISPATCH_REPLACEMENT, R23_DISPATCH_ANCHOR, 1,
+        ),
+        "LOCK_RELEASE_EARLY": expected.replace(
+            b"if(old_fd>=0&&close(old_fd))ok=0;if(new_fd>=0&&close(new_fd))ok=0;"
+            b"if(!upgrade_guard_close(&guard))ok=0;return ok;",
+            b"if(!upgrade_guard_close(&guard))ok=0;if(old_fd>=0&&close(old_fd))ok=0;"
+            b"if(new_fd>=0&&close(new_fd))ok=0;return ok;", 1,
+        ),
+        "RENAME_EXCL": expected.replace(
+            b"unsigned flags=RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH;",
+            b"unsigned flags=RENAME_EXCL|RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH;",
+            1,
+        ),
+        "PROJECT_REBIND_REMOVED": expected.replace(
+            b"||!upgrade_project_rebound(ns,project)||!exact_empty(project)",
+            b"||!exact_empty(project)", 1,
+        ),
+    }
+    for label, mutant in source_mutants.items():
+        rejected = mutant != expected
+        try:
+            r23_source_contract_checks(mutant)
+        except Rig:
+            pass
+        else:
+            rejected = False
+        check(rejected, f"N_H039_R23_WHOLE_SOURCE_{label}")
+
+
 def strict_json(raw: bytes) -> Any:
     def pairs(items):
         out: dict[str, Any] = {}
@@ -2539,6 +3578,15 @@ def static_contract_checks() -> dict[str, Any]:
         "A_H039_R22_AUTHORITY_BASE_GRAPH_GATE_AND_SPEC",
     )
     check(
+        commit_tree(R23_AUTHORITY_BASE) == R23_AUTHORITY_TREE
+        and commit_parents(R23_AUTHORITY_BASE) == R23_AUTHORITY_PARENTS
+        and sha(blob(R23_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+        == R23_BASE_GATE_SHA256
+        and sha(blob(R23_AUTHORITY_BASE, "specs/tasks.spec.json"))
+        == R23_BASE_SPEC_SHA256,
+        "A_H039_R23_AUTHORITY_BASE_GRAPH_GATE_AND_SPEC",
+    )
+    check(
         object_type(REJECTED_R22_R1_CANDIDATE) == "commit"
         and commit_tree(REJECTED_R22_R1_CANDIDATE) == REJECTED_R22_R1_TREE
         and commit_parents(REJECTED_R22_R1_CANDIDATE) == [R22_AUTHORITY_BASE]
@@ -2688,6 +3736,9 @@ def static_contract_checks() -> dict[str, Any]:
     prestore_diagnostic = row.get(
         "h039_os_exclusive_runtime_cleanup", {},
     ).get("r22_prestore_mediator_diagnostic", {})
+    fd_scan_update = row.get(
+        "h039_os_exclusive_runtime_cleanup", {},
+    ).get("r23_fd_scan_and_fixed_update", {})
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -2812,6 +3863,10 @@ def static_contract_checks() -> dict[str, Any]:
         exact_typed_tree(prestore_diagnostic, r22_registry_expected()),
         "A_H039_R22_EXACT_PRESTORE_MEDIATOR_DIAGNOSTIC_REGISTRY",
     )
+    check(
+        exact_typed_tree(fd_scan_update, r23_registry_expected()),
+        "A_H039_R23_EXACT_FD_SCAN_AND_FIXED_UPDATE_REGISTRY",
+    )
     expected_red = {
         "label": LABEL,
         "reason": REASON,
@@ -2824,7 +3879,7 @@ def static_contract_checks() -> dict[str, Any]:
             ),
             expected_red,
         ),
-        "A_H039_R22_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
+        "A_H039_R23_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
     )
     check(
         row.get("h039_r17_installed_effect_completion_reconciliation")
@@ -2855,6 +3910,11 @@ def static_contract_checks() -> dict[str, Any]:
         row.get("h039_r22_prestore_mediator_diagnostic_reconciliation")
         == R22_RECONCILIATION,
         "A_H039_R22_EXACT_RECONCILIATION",
+    )
+    check(
+        row.get("h039_r23_fd_scan_and_fixed_update_reconciliation")
+        == R23_RECONCILIATION,
+        "A_H039_R23_EXACT_RECONCILIATION",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -2950,6 +4010,14 @@ def static_contract_checks() -> dict[str, Any]:
         .get("causal_falsification", {})
         .get("r22_material_review_extension") == R22_MATERIAL_REVIEW_EXTENSION,
         "A_H039_R22_EXACT_MATERIAL_REVIEW_BOUNDARY",
+    )
+    check(
+        row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r23_material_review_extension") == R23_MATERIAL_REVIEW_EXTENSION
+        and f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("h039_r23_exit_criterion", "")),
+        "A_H039_R23_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -3587,6 +4655,198 @@ def exact_r22_publication_argv(argv: Any) -> bool:
         type(argv) is list and len(argv) == 2
         and type(argv[0]) is str and argv[0] == "--r22-published"
         and type(argv[1]) is str and valid_hex(argv[1], 40)
+    )
+
+
+def exact_r23_product_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 3
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r23-product"
+        and valid_hex(argv[1], 40) and valid_hex(argv[2], 40)
+    )
+
+
+def exact_r23_publication_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 2
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r23-published" and valid_hex(argv[1], 40)
+    )
+
+
+def r23_registry_selftests(row: dict[str, Any]) -> None:
+    registry = row["h039_os_exclusive_runtime_cleanup"][
+        "r23_fd_scan_and_fixed_update"
+    ]
+    expected = r23_registry_expected()
+    check(
+        exact_typed_tree(registry, expected),
+        "A_H039_R23_REGISTRY_SELFTEST_ANCHOR",
+    )
+    for label, mutate in (
+        ("KEY_REMOVED", lambda value: value.pop("fixed_object_update")),
+        ("KEY_ADDED", lambda value: value.__setitem__("alternate", False)),
+        ("BASE_CHANGED", lambda value: value.__setitem__("authority_base", "00" * 20)),
+        ("PARENTS_SWAPPED", lambda value: value["authority_ordered_parents"].reverse()),
+        ("PATH_REMOVED", lambda value: value["product_change_paths"].pop()),
+        ("STATUS_CHANGED", lambda value: value[
+            "owner_adjudicated_r22_lifecycle"].__setitem__("exit_status", 0)),
+        ("RETRY", lambda value: value[
+            "owner_adjudicated_r22_lifecycle"].__setitem__(
+                "diagnostic_consumed_removed_never_restage_or_run", False)),
+        ("NULL_SIZE", lambda value: value["production_scan2"].__setitem__(
+            "null_sizing_query", True)),
+        ("CAPACITY_WIDENED", lambda value: value["production_scan2"].__setitem__(
+            "allocation", "DYNAMIC")),
+        ("OLD_DIGEST_CHANGED", lambda value: value["production_recipe"].__setitem__(
+            "old_mediator_sha256", "00" * 32)),
+        ("CALLER_PATH", lambda value: value["fixed_object_update"].__setitem__(
+            "caller_path_fd_input", True)),
+        ("LOCK_RELEASE_EARLY", lambda value: value["fixed_object_update"].__setitem__(
+            "staging_removed_before_lock_release", False)),
+        ("INPLACE", lambda value: value["fixed_object_update"].__setitem__(
+            "installed_inode_inplace_write_chmod_dd_or_swap", True)),
+        ("CRASH_STATE_ADDED", lambda value: value[
+            "representable_crash_states"].append("ARBITRARY")),
+        ("R24_PREMATURE", lambda value: value.__setitem__(
+            "r24_installed_lane_available_in_r23", True)),
+        ("AUTHORITY_WIDENED", lambda value: value.__setitem__(
+            "broader_authority", True)),
+    ):
+        mutant = copy.deepcopy(registry)
+        mutate(mutant)
+        check(not exact_typed_tree(mutant, expected), f"N_H039_R23_REGISTRY_{label}")
+    sample = "ab" * 20
+    check(
+        exact_r23_product_argv(["--r23-product", sample, "cd" * 20])
+        and exact_r23_publication_argv(["--r23-published", sample]),
+        "A_H039_R23_EXACT_PRODUCT_AND_PUBLICATION_CLI_SHAPES",
+    )
+    check(
+        exact_r22_product_argv(["--r22-product", sample, "cd" * 20])
+        and exact_r22_publication_argv(["--r22-published", sample])
+        and not exact_r23_product_argv(["--r22-product", sample, "cd" * 20])
+        and not exact_r23_publication_argv(["--r22-published", sample]),
+        "N_H039_R23_HISTORICAL_R22_CLI_SHAPES_ARE_STALE",
+    )
+    invalid = (
+        [], ["--r23-product", sample],
+        ["--r23-product", sample, "CD" * 20],
+        ["--r23-published", sample, "extra"],
+        ["--r24-installed", sample], ["--r22-product", sample, "cd" * 20],
+    )
+    for index, argv in enumerate(invalid):
+        check(
+            not exact_r23_product_argv(argv) and not exact_r23_publication_argv(argv),
+            f"N_H039_R23_CLI_MUTANT_{index:02d}",
+        )
+
+
+def r23_dispatch_retained_selftests() -> None:
+    try:
+        source = GATE.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(GATE))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R23 executing gate AST is unavailable") from exc
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    if not {
+        "main", "r23_product_material_with_retained_installed",
+        "r23_product_material_checks", "r23_compiled_production_views",
+    } \
+            <= functions.keys():
+        raise Rig("R23 retained review dispatch functions absent")
+
+    def name(call: ast.Call) -> str:
+        if isinstance(call.func, ast.Name):
+            return call.func.id
+        if isinstance(call.func, ast.Attribute) \
+                and isinstance(call.func.value, ast.Name):
+            return f"{call.func.value.id}.{call.func.attr}"
+        return ""
+
+    wrapper = functions["r23_product_material_with_retained_installed"]
+    wrapper_calls = [node for node in ast.walk(wrapper) if isinstance(node, ast.Call)]
+    wrapper_names = [name(node) for node in wrapper_calls]
+    closes = [node for node in wrapper_calls if name(node) == "os.close"]
+    finalizers = [
+        node for node in ast.walk(wrapper) if isinstance(node, ast.Try)
+        and closes and any(closes[0] in ast.walk(item) for item in node.finalbody)
+    ]
+    wrapper_text = ast.get_source_segment(source, wrapper) or ""
+    if (
+        wrapper_names.count("r22_open_installed_retained") != 1
+        or wrapper_names.count("r22_retained_installed_snapshot") != 2
+        or wrapper_names.count("r23_product_material_checks") != 1
+        or wrapper_names.count("fixed_installation_snapshot") != 2
+        or wrapper_names.count("exact_typed_tree") != 1
+        or wrapper_names.count("os.close") != 1
+        or wrapper_names.count("fcntl.fcntl") != 5
+        or len(finalizers) != 1
+        or "os.open" in wrapper_names or "os.dup" in wrapper_names
+        or "os.set_inheritable" in wrapper_names
+        or wrapper_text.count("require_clean_metadata=True") != 2
+        or wrapper_text.count("finally:") != 1
+        or wrapper_text.count("errno.EBADF") != 1
+    ):
+        raise Rig("R23 retained installed/namespace wrapper shape drift")
+    main = functions["main"]
+    main_calls = [node for node in ast.walk(main) if isinstance(node, ast.Call)]
+    main_names = [name(node) for node in main_calls]
+    main_text = ast.get_source_segment(source, main) or ""
+    stale_r22 = {
+        "exact_r22_product_argv", "exact_r22_publication_argv",
+        "r22_product_identity", "r22_product_publication_identity",
+        "r22_product_material_checks",
+        "r22_product_material_with_retained_installed",
+        "r22_compiled_diagnostic_views", "r22_compiled_diagnostic_checks",
+    }
+    production_chain_names = {
+        name(node) for function_name in (
+            "r23_product_material_with_retained_installed",
+            "r23_product_material_checks", "r23_compiled_production_views",
+        ) for node in ast.walk(functions[function_name])
+        if isinstance(node, ast.Call)
+    }
+    if "--r22-product" in main_text or "--r22-published" in main_text \
+            or stale_r22 & set(main_names) \
+            or stale_r22 & production_chain_names:
+        raise Rig("R23 historical R22 product/publication material lane is runnable")
+    ordered = ("seatbelt_profile_selftests", "r23_source_contract_selftests",
+               "r23_dispatch_retained_selftests")
+    order_lines = [next(node.lineno for node in main_calls if name(node) == item)
+                   if main_names.count(item) == 1 else -1 for item in ordered]
+    if order_lines != sorted(order_lines) or -1 in order_lines:
+        raise Rig("R23 pinned Seatbelt authentication does not precede harnesses")
+    for phase in ("r23_product", "r23_published"):
+        branches = [
+            node for node in ast.walk(main) if isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name) and node.test.id == phase
+        ]
+        if len(branches) != 1:
+            raise Rig(f"R23 {phase} branch cardinality drift")
+        calls = [node for node in ast.walk(branches[0]) if isinstance(node, ast.Call)]
+        names = [name(node) for node in calls]
+        required = (
+            "r23_r22_lifecycle_evidence_checks", "r22_int2_evidence_checks",
+            "r23_product_material_with_retained_installed",
+        )
+        lines = [next(node.lineno for node in calls if name(node) == item)
+                 if names.count(item) == 1 else -1 for item in required]
+        if lines != sorted(lines) or -1 in lines \
+                or "r23_product_material_checks" in names \
+                or "r22_open_installed_retained" in names \
+                or "os.open" in names or "os.close" in names:
+            raise Rig(f"R23 {phase} does not bind identity before retained review")
+    check(
+        True,
+        "A_H039_R23_PRODUCT_LANES_ONE_RETAINED_OLD_FD_AND_NAMESPACE_NO_EFFECT",
+    )
+    check(
+        True,
+        "N_H039_R23_R22_PRODUCT_PUBLICATION_CLI_AND_DIAGNOSTIC_COMPILE_STALE",
     )
 
 
@@ -10226,12 +11486,118 @@ def r22_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]
         return False, {"error": str(exc), "graph": graph}
 
 
+def r23_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        changes = raw_changes(R23_AUTHORITY_BASE, candidate)
+        additions, deletions = line_delta(R23_AUTHORITY_BASE, candidate)
+        detail = {
+            "authority_tree": commit_tree(R23_AUTHORITY_BASE),
+            "authority_parents": commit_parents(R23_AUTHORITY_BASE),
+            "candidate": candidate, "candidate_parents": commit_parents(candidate),
+            "changes": changes, "additions": additions, "deletions": deletions,
+        }
+        rejected = {
+            R23_AUTHORITY_BASE, R22_AUTHORITY_BASE, R21_AUTHORITY_BASE,
+            REJECTED_R22_R1_CANDIDATE, REJECTED_R22_R2_CANDIDATE,
+            REJECTED_R22_R3_CANDIDATE,
+        }
+        ok = (
+            object_type(R23_AUTHORITY_BASE) == "commit"
+            and detail["authority_tree"] == R23_AUTHORITY_TREE
+            and detail["authority_parents"] == R23_AUTHORITY_PARENTS
+            and sha(blob(R23_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+            == R23_BASE_GATE_SHA256
+            and sha(blob(R23_AUTHORITY_BASE, "specs/tasks.spec.json"))
+            == R23_BASE_SPEC_SHA256
+            and object_type(candidate) == "commit" and candidate not in rejected
+            and detail["candidate_parents"] == [R23_AUTHORITY_BASE]
+            and exact_contract_change_shape(changes)
+            and type(additions) is int and additions <= MAX_ADDED_LINES
+            and type(deletions) is int and deletions <= MAX_DELETED_LINES
+        )
+        return ok, detail
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r23_contract_candidate_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r23_contract_candidate_graph(candidate)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(candidate, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        ok = (
+            graph_ok and remote_main == R23_AUTHORITY_BASE and head == candidate
+            and status_raw == b"" and checkout_equal
+        )
+        return ok, {"graph": graph, "remote_main": remote_main, "head": head,
+                    "status": status_raw.decode("utf-8", "replace"),
+                    "checkout_equal": checkout_equal}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r23_contract_publication_graph(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        authority, candidate = parents
+        candidate_ok, candidate_detail = r23_contract_candidate_graph(candidate)
+        changes = raw_changes(R23_AUTHORITY_BASE, merge)
+        ok = (
+            object_type(merge) == "commit" and authority == R23_AUTHORITY_BASE
+            and candidate_ok and commit_tree(merge) == commit_tree(candidate)
+            and exact_contract_change_shape(changes)
+        )
+        return ok, {"parents": parents, "candidate": candidate_detail,
+                    "changes": changes, "tree": commit_tree(merge)}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
+def r23_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r23_contract_publication_graph(merge)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        ok = (
+            graph_ok and remote_main == merge and head == merge
+            and status_raw == b"" and checkout_equal
+            and SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
+        )
+        return ok, {"graph": graph, "remote_main": remote_main, "head": head,
+                    "status": status_raw.decode("utf-8", "replace"),
+                    "checkout_equal": checkout_equal}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
 def exact_r22_product_change_shape(
     changes: list[tuple[str, str, str, str]],
 ) -> bool:
     return changes == [
         (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
         for path in R22_PRODUCT_PATHS
+    ]
+
+
+def exact_r23_product_change_shape(
+    changes: list[tuple[str, str, str, str]],
+) -> bool:
+    return changes == [
+        (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
+        for path in R23_PRODUCT_GIT_ORDER
     ]
 
 
@@ -10328,6 +11694,141 @@ def r22_product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
             and checkout_equal and contract_checkout_equal and executing_bytes_equal
             and blob(merge, "verify/h039/runtime-cleanup-mediator")
             == blob(R20_AUTHORITY_BASE, "verify/h039/runtime-cleanup-mediator")
+        )
+        return ok, {"parents": parents, "product": product, "changes": changes,
+                    "remote_main": remote_main, "head": head,
+                    "status": status_raw.decode("utf-8", "replace"),
+                    "checkout_equal": checkout_equal,
+                    "contract_checkout_equal": contract_checkout_equal,
+                    "executing_bytes_equal": executing_bytes_equal}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
+def r23_product_identity(
+    contract_merge: str, candidate: str, *, require_checkout: bool = True,
+    require_contract_publication: bool = True,
+) -> tuple[bool, dict[str, Any]]:
+    try:
+        contract_ok, contract = r23_contract_publication_graph(contract_merge)
+        changes = raw_changes(contract_merge, candidate)
+        additions, deletions = line_delta(contract_merge, candidate)
+        remote_main = observed_production_main() \
+            if require_contract_publication else None
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_product_checkout_blob(path, blob(candidate, path))
+            for path in R23_PRODUCT_GIT_ORDER
+        ) if require_checkout else True
+        contract_checkout_equal = all(
+            stable_checkout_blob(path, blob(contract_merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        ) if require_checkout else True
+        executing_contract_bytes_equal = (
+            SPEC.read_bytes() == blob(contract_merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(contract_merge, "verify/bin/h-039-exit")
+        ) if require_checkout else True
+        source = blob(candidate, "controller/runtime-cleanup/native/mediator.c")
+        r23_source_contract_checks(source)
+        source_exact = source == r23_expected_production_source()
+        recipe_raw = blob(candidate, "verify/h039/build-recipe.json")
+        recipe = strict_json(recipe_raw)
+        r12_recipe = strict_json(
+            blob(R20_AUTHORITY_BASE, "verify/h039/build-recipe.json")
+        )
+        mediator = blob(candidate, "verify/h039/runtime-cleanup-mediator")
+        argv = recipe.get("installer_compile_argv", []) \
+            if type(recipe) is dict else []
+        r12_argv = r12_recipe.get("installer_compile_argv", []) \
+            if type(r12_recipe) is dict else []
+        expected_argv = list(r12_argv)
+        digest_index = expected_argv.index(
+            f"-DH039_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}"
+        )
+        expected_argv[digest_index:digest_index + 2] = [
+            f"-DH039_MEDIATOR_SHA256={sha(mediator)}",
+            f"-DH039_MEDIATOR_SIZE={len(mediator)}",
+            f"-DH039_OLD_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}",
+            f"-DH039_OLD_MEDIATOR_SIZE={R23_OLD_R12_MEDIATOR_SIZE}",
+        ]
+        expected_recipe = copy.deepcopy(r12_recipe)
+        expected_recipe["installer_compile_argv"] = expected_argv
+        expected_recipe_raw = r23_expected_production_recipe(mediator)
+        recipe_exact = (
+            recipe_raw == expected_recipe_raw
+            and recipe == expected_recipe
+            and sha(blob(R20_AUTHORITY_BASE, "verify/h039/build-recipe.json"))
+            == R18_PRODUCTION_RECIPE_SHA256
+            and f"-D{R22_DIAGNOSTIC_DEFINE}" not in argv
+            and "-Wno-unused-function" not in argv
+        )
+        ok = (
+            contract_ok
+            and (not require_contract_publication or remote_main == contract_merge)
+            and object_type(candidate) == "commit"
+            and commit_parents(candidate) == [contract_merge]
+            and exact_r23_product_change_shape(changes)
+            and additions <= MAX_ADDED_LINES and deletions <= MAX_DELETED_LINES
+            and source_exact and recipe_exact
+            and sha(blob(R23_AUTHORITY_BASE, "verify/h039/runtime-cleanup-mediator"))
+            == R23_OLD_R12_MEDIATOR_SHA256
+            and mediator != blob(
+                R23_AUTHORITY_BASE, "verify/h039/runtime-cleanup-mediator",
+            )
+            and (not require_checkout or (
+                head == candidate and status_raw == b"" and checkout_equal
+                and contract_checkout_equal and executing_contract_bytes_equal
+            ))
+        )
+        return ok, {
+            "contract": contract, "candidate": candidate,
+            "parents": commit_parents(candidate), "changes": changes,
+            "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+            "contract_checkout_equal": contract_checkout_equal,
+            "executing_contract_bytes_equal": executing_contract_bytes_equal,
+            "source_sha256": sha(source), "source_exact": source_exact,
+            "recipe_exact": recipe_exact,
+            "new_mediator_sha256": sha(mediator), "new_mediator_size": len(mediator),
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r23_product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        contract_merge, candidate = parents
+        product_ok, product = r23_product_identity(
+            contract_merge, candidate, require_checkout=False,
+            require_contract_publication=False,
+        )
+        changes = raw_changes(contract_merge, merge)
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_product_checkout_blob(path, blob(merge, path))
+            for path in R23_PRODUCT_GIT_ORDER
+        )
+        contract_checkout_equal = all(
+            stable_checkout_blob(path, blob(merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        executing_bytes_equal = (
+            SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
+        )
+        ok = (
+            product_ok and object_type(merge) == "commit"
+            and commit_tree(merge) == commit_tree(candidate)
+            and exact_r23_product_change_shape(changes)
+            and remote_main == merge and head == merge and status_raw == b""
+            and checkout_equal and contract_checkout_equal and executing_bytes_equal
         )
         return ok, {"parents": parents, "product": product, "changes": changes,
                     "remote_main": remote_main, "head": head,
@@ -10911,7 +12412,7 @@ def product_bytes(path: str, commit: str | None) -> bytes:
 
 def manifest_checks(
     commit: str | None = None, *, r13_product: bool = True,
-    diagnostic_product: bool = False,
+    diagnostic_product: bool = False, r23_product: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     recipe_raw = product_bytes("verify/h039/build-recipe.json", commit)
     manifest_raw = product_bytes("verify/h039/identity-manifest.json", commit)
@@ -10945,6 +12446,13 @@ def manifest_checks(
               if diagnostic_product else []),
             f"-DH039_MEDIATOR_SHA256={mediator_digest}",
             f"-DH039_MEDIATOR_SIZE={mediator_size}",
+            *(
+                [
+                    f"-DH039_OLD_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}",
+                    f"-DH039_OLD_MEDIATOR_SIZE={R23_OLD_R12_MEDIATOR_SIZE}",
+                ]
+                if r23_product else []
+            ),
             "-Wl,-segprot,__H039RO,r,r",
             "-Wl,-sectcreate,__H039RO,__h039med,verify/h039/runtime-cleanup-mediator",
             "controller/runtime-cleanup/native/mediator.c",
@@ -10975,6 +12483,8 @@ def manifest_checks(
             or type(recipe.get("schema_version")) is not int \
             or recipe != expected_recipe:
         raise Rig("build recipe mismatch")
+    if r23_product and recipe_raw != r23_expected_production_recipe(mediator_raw):
+        raise Rig("R23 production recipe raw bytes are not exact R12 transform")
     required = {
         "schema_version", "artifact_path", "artifact_sha256", "source_sha256",
         "installer_path", "installer_sha256", "recipe_sha256",
@@ -13557,6 +15067,52 @@ def r22_product_material_with_retained_installed(
                 raise Rig("R22 retained installed descriptor remained open")
 
 
+def r23_product_material_with_retained_installed(
+    commit: str, expected: tuple[tuple[Any, ...], tuple[int, ...]],
+) -> None:
+    descriptor = -1
+    try:
+        expected_snapshot, expected_identity = expected
+        namespace_before = fixed_installation_snapshot(require_clean_metadata=True)
+        descriptor = r22_open_installed_retained()
+        if type(descriptor) is not int or descriptor < 3 \
+                or fcntl.fcntl(descriptor, fcntl.F_GETFL) & os.O_ACCMODE \
+                != os.O_RDONLY \
+                or fcntl.fcntl(descriptor, fcntl.F_GETFD) \
+                & fcntl.FD_CLOEXEC == 0:
+            raise Rig("R23 retained old R12 descriptor flags mismatch")
+        before = r22_retained_installed_snapshot(
+            descriptor, expected_snapshot, expected_identity,
+        )
+        r23_product_material_checks(commit)
+        if os.lseek(descriptor, 0, os.SEEK_CUR) != expected_snapshot[7]:
+            raise Rig("R23 retained old R12 offset changed across material review")
+        if fcntl.fcntl(descriptor, fcntl.F_GETFL) & os.O_ACCMODE \
+                != os.O_RDONLY \
+                or fcntl.fcntl(descriptor, fcntl.F_GETFD) \
+                & fcntl.FD_CLOEXEC == 0:
+            raise Rig("R23 retained old R12 descriptor changed across material review")
+        after = r22_retained_installed_snapshot(
+            descriptor, expected_snapshot, expected_identity,
+        )
+        namespace_after = fixed_installation_snapshot(require_clean_metadata=True)
+        check(
+            r22_exact_installed_transition(before, after, expected_snapshot)
+            and exact_typed_tree(namespace_after, namespace_before),
+            "A_H039_R23_ONE_RETAINED_OLD_R12_FD_AND_NAMESPACE_ENCLOSE_MATERIAL_REVIEW",
+        )
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+            try:
+                fcntl.fcntl(descriptor, fcntl.F_GETFD)
+            except OSError as exc:
+                if exc.errno != errno.EBADF:
+                    raise Rig("R23 retained old R12 post-close errno mismatch") from exc
+            else:
+                raise Rig("R23 retained old R12 descriptor remained open")
+
+
 def r22_int2_evidence_checks() \
         -> tuple[tuple[Any, ...], tuple[int, ...]]:
     raw = b""
@@ -13647,6 +15203,289 @@ def r22_int2_evidence_checks() \
     if not ok:
         raise Rig("R22 consumed INT2 evidence drift")
     return installed_snapshot, installed_identity
+
+
+def r23_open_lifecycle_retained(label: str) -> tuple[int, bytes, tuple[int, ...]]:
+    if label not in R23_R22_EVIDENCE:
+        raise Rig("R23 lifecycle evidence request is not frozen")
+    path, expected_digest = R23_R22_EVIDENCE[label]
+    descriptor = -1
+    try:
+        named = os.lstat(path)
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
+            | getattr(os, "O_NOFOLLOW_ANY") | 0x00002000,
+        )
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != CLIENT_UID or opened.st_gid != CLIENT_GID
+            or stat.S_IMODE(opened.st_mode) not in {0o600, 0o644}
+            or opened.st_nlink != 1 or opened.st_size > 16777216
+            or stable_identity(named) != stable_identity(opened)
+        ):
+            raise Rig(f"R23 {label} evidence identity mismatch")
+        chunks: list[bytes] = []
+        remaining = opened.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                raise Rig(f"R23 {label} evidence short read")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise Rig(f"R23 {label} evidence trailing byte")
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+        rebound = os.lstat(path)
+        if (
+            stable_identity(opened) != stable_identity(after)
+            or stable_identity(after) != stable_identity(rebound)
+            or len(raw) != after.st_size or sha(raw) != expected_digest
+        ):
+            raise Rig(f"R23 {label} evidence changed or rebound")
+        retained = stable_identity(after)
+        result = descriptor, raw, retained
+        descriptor = -1
+        return result
+    except OSError as exc:
+        raise Undecidable(f"R23 fixed lifecycle evidence unavailable: {path}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def r23_stable_lifecycle_bytes(label: str) -> bytes:
+    descriptor, raw, _identity = r23_open_lifecycle_retained(label)
+    try:
+        return raw
+    finally:
+        os.close(descriptor)
+
+
+def r23_r22_dynamic_chain_accepts(
+    source_binding: Any, identities: dict[str, str],
+    stdout_lines: set[str], expected_lines: set[str],
+) -> bool:
+    tools = source_binding.get("workflow_tools", {}) \
+        if type(source_binding) is dict else {}
+    compatibility = source_binding.get("compatibility_refreeze", {}) \
+        if type(source_binding) is dict else {}
+    return (
+        type(source_binding) is dict
+        and source_binding.get("schema_version") == 1
+        and source_binding.get("record_type")
+        == "h039_r22_r13_workflow_diagnostic_compat_source_binding_r2"
+        and source_binding.get("published_product", {}).get("merge")
+        == R23_AUTHORITY_BASE
+        and compatibility.get("outcome")
+        == "h039-r22-r13-diagnostic-run-result.json"
+        and compatibility.get("final_validator")
+        == "h039-r22-r13-diagnostic-final-validate-r2.py"
+        and tools.get("h039-r22-r13-diagnostic-final-validate-r2.py")
+        == R23_R22_FINAL_VALIDATOR_SHA256
+        and tools.get("h039-r22-r13-diagnostic-cleanup.py")
+        == "e6f5137b62f51220f237dc2abb8fa0b1687307d318b2f2a9b517b164bdbd2eff"
+        and identities == {
+            "source_binding": R23_R22_SOURCE_BINDING_SHA256,
+            "validator": R23_R22_FINAL_VALIDATOR_SHA256,
+            "outcome": R23_R22_OUTCOME_SHA256,
+            "cleanup": R23_R22_CLEANUP_SHA256,
+        }
+        and expected_lines <= stdout_lines
+    )
+
+
+def r23_r22_lifecycle_evidence_checks() -> None:
+    raw = {
+        label: r23_stable_lifecycle_bytes(label)
+        for label in R23_R22_EVIDENCE
+        if label != "final_validator"
+    }
+    outcome = strict_json(raw["outcome"])
+    post_run = strict_json(raw["post_run"])
+    cleanup = strict_json(raw["cleanup"])
+    final_absent = strict_json(raw["final_absent"])
+    source_binding = strict_json(raw["source_binding"])
+    empty_digest = sha(b"")
+    protocol = outcome.get("protocol", {}) if type(outcome) is dict else {}
+    check(
+        type(outcome) is dict
+        and outcome.get("schema_version") == 1
+        and type(outcome.get("schema_version")) is int
+        and outcome.get("record_type")
+        == "h039_r22_r13_one_shot_prestore_diagnostic_observation"
+        and outcome.get("published_r13_merge") == R23_AUTHORITY_BASE
+        and outcome.get("classification") == "STATUS_28_ZERO_EFFECT_OWNER_STOP"
+        and outcome.get("diagnostic_spawn_count") == 1
+        and type(outcome.get("diagnostic_spawn_count")) is int
+        and outcome.get("zero_effect") is True
+        and outcome.get("retry_permitted") is False
+        and outcome.get("downstream_progress_permitted") is False
+        and outcome.get("workflow_report_only") is True
+        and outcome.get("task_credit") is False
+        and outcome.get("namespace_before") == outcome.get("namespace_after")
+        and outcome.get("production_before") == outcome.get("production_after")
+        and outcome.get("diagnostic_before") == outcome.get("diagnostic_after")
+        and type(protocol) is dict
+        and protocol.get("wait_status_raw") == 7168
+        and protocol.get("exit_status") == 28
+        and protocol.get("signal") is None
+        and protocol.get("spawn_error") is None
+        and protocol.get("send_error") is None
+        and protocol.get("receive_error") is None
+        and protocol.get("response_wire_size") == 0
+        and protocol.get("response_wire_sha256") == empty_digest
+        and protocol.get("stdout_size") == 0
+        and protocol.get("stdout_sha256") == empty_digest
+        and protocol.get("stderr_size") == 0
+        and protocol.get("stderr_sha256") == empty_digest
+        and protocol.get("ancillary_fd_count") == 0
+        and protocol.get("ancillary_fds") == []
+        and protocol.get("ancillary_messages") == [],
+        "A_H039_R23_OWNER_ADJUDICATED_R22_STATUS28_ZERO_EFFECT_OUTCOME",
+        {"sha256": sha(raw["outcome"]), "status": protocol.get("exit_status")},
+    )
+    check(
+        all(
+            type(value) is dict
+            and value.get("schema_version") == 1
+            and value.get("published_r13_merge") == R23_AUTHORITY_BASE
+            and value.get("workflow_report_only") is True
+            and value.get("task_credit") is False
+            for value in (post_run, final_absent)
+        )
+        and post_run.get("record_type")
+        == "h039_r22_r13_fixed_root_read_only_observation"
+        and post_run.get("phase") == "post-run-04555"
+        and post_run.get("classification") == "EXPECTED_PHASE_SHAPE"
+        and post_run.get("command_count") == 109
+        and post_run.get("read_only") is True
+        and final_absent.get("record_type")
+        == "h039_r22_r13_fixed_root_read_only_observation"
+        and final_absent.get("phase") == "final-absent"
+        and final_absent.get("classification") == "EXPECTED_PHASE_SHAPE"
+        and final_absent.get("command_count") == 109
+        and final_absent.get("read_only") is True,
+        "A_H039_R23_R22_POST_RUN_AND_FINAL_ABSENT_ROOT_OBSERVATIONS",
+    )
+    production = cleanup.get("production_after", {}) \
+        if type(cleanup) is dict else {}
+    check(
+        type(cleanup) is dict and cleanup.get("schema_version") == 1
+        and cleanup.get("record_type")
+        == "h039_r22_r13_fixed_diagnostic_cleanup_result"
+        and cleanup.get("published_r13_merge") == R23_AUTHORITY_BASE
+        and cleanup.get("observed_diagnostic_status") == 28
+        and cleanup.get("observed_wait_status_raw") == 7168
+        and cleanup.get("outcome_classification")
+        == "STATUS_28_ZERO_EFFECT_OWNER_STOP"
+        and cleanup.get("run_outcome_sha256") == R23_R22_OUTCOME_SHA256
+        and cleanup.get("post_run_observation_sha256") == R23_R22_POST_RUN_SHA256
+        and cleanup.get("production_before") == cleanup.get("production_after")
+        and type(production) is dict
+        and production.get("sha256") == R23_OLD_R12_MEDIATOR_SHA256
+        and type(production.get("identity")) is list
+        and len(production["identity"]) >= 7
+        and production["identity"][5:7]
+        == [1, R23_OLD_R12_MEDIATOR_SIZE]
+        and cleanup.get("fixed_name_absent") is True
+        and cleanup.get("retained_nlink_after_remove") == 0
+        and cleanup.get("retry_permitted") is False
+        and cleanup.get("rollback_permitted") is False
+        and cleanup.get("workflow_report_only") is True
+        and cleanup.get("task_credit") is False,
+        "A_H039_R23_R22_EXACT_FIXED_DIAGNOSTIC_CLEANUP_AND_R12_CONTINUITY",
+    )
+    expected_lines = {
+        "LIFECYCLE_EVIDENCE_VALIDATION=PASS",
+        f"PUBLISHED_R13_MERGE={R23_AUTHORITY_BASE}",
+        f"SOURCE_BINDING_SHA256={R23_R22_SOURCE_BINDING_SHA256}",
+        f"RUN_OUTCOME_SHA256={R23_R22_OUTCOME_SHA256}",
+        "OBSERVED_DIAGNOSTIC_STATUS=28",
+        f"ROOT_OBSERVATION_POST_RUN_04555_SHA256={R23_R22_POST_RUN_SHA256}",
+        f"ROOT_OBSERVATION_FINAL_ABSENT_SHA256={R23_R22_FINAL_ABSENT_SHA256}",
+        f"CLEANUP_REPORT_SHA256={R23_R22_CLEANUP_SHA256}",
+        "DIAGNOSTIC_NAME_ABSENT=YES",
+        "PRODUCTION_MEDIATOR_UNCHANGED=YES",
+        "WORKFLOW_REPORT_ONLY=YES",
+        "TASK_CREDIT=NONE",
+        "STOP_FOR_OWNER_ADJUDICATION=YES",
+    }
+    validator_fd, validator_raw, validator_identity = \
+        r23_open_lifecycle_retained("final_validator")
+    run: subprocess.CompletedProcess[bytes] | None = None
+    try:
+        identities = {
+            "source_binding": sha(raw["source_binding"]),
+            "validator": sha(validator_raw),
+            "outcome": sha(raw["outcome"]),
+            "cleanup": sha(raw["cleanup"]),
+        }
+        source_ok = (
+            validator_raw.count(b"LIFECYCLE_EVIDENCE_VALIDATION=PASS") == 1
+            and r23_r22_dynamic_chain_accepts(
+                source_binding, identities, expected_lines, expected_lines,
+            )
+        )
+        check(
+            source_ok,
+            "A_H039_R23_R22_FROZEN_LIFECYCLE_VALIDATOR_AND_SOURCE_BINDING",
+        )
+        mutations: list[tuple[Any, dict[str, str], set[str]]] = []
+        for label in identities:
+            wrong = dict(identities); wrong[label] = "00" * 32
+            missing = dict(identities); del missing[label]
+            other = next(item for item in identities if item != label)
+            crossed = dict(identities); crossed[label] = identities[other]
+            mutations.extend(((source_binding, wrong, expected_lines),
+                              (source_binding, missing, expected_lines),
+                              (source_binding, crossed, expected_lines)))
+        binding_wrong = copy.deepcopy(source_binding)
+        binding_wrong["workflow_tools"][
+            "h039-r22-r13-diagnostic-final-validate-r2.py"
+        ] = "00" * 32
+        mutations.append((binding_wrong, identities, expected_lines))
+        mutations.extend(
+            (source_binding, identities, expected_lines - {line})
+            for line in expected_lines
+        )
+        if any(r23_r22_dynamic_chain_accepts(binding, identity, lines,
+                                              expected_lines)
+               for binding, identity, lines in mutations):
+            raise Rig("R23 dynamic lifecycle mutant accepted")
+        command = [
+            "/Library/Developer/CommandLineTools/usr/bin/python3", "-I", "-S",
+            "-",
+        ]
+        run = subprocess.run(
+            command, cwd="/", input=validator_raw,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            timeout=30, env={},
+        )
+        stdout_lines = set(run.stdout.decode("utf-8", "strict").splitlines())
+        after = os.fstat(validator_fd)
+        rebound = os.lstat(R23_R22_EVIDENCE["final_validator"][0])
+        check(
+            run.returncode == 0 and run.stderr == b""
+            and stable_identity(after) == validator_identity
+            and stable_identity(rebound) == validator_identity
+            and r23_r22_dynamic_chain_accepts(
+                source_binding, identities, stdout_lines, expected_lines,
+            ),
+            "A_H039_R23_R22_FROZEN_FINAL_VALIDATOR_EXECUTION_PASS",
+            {"returncode": run.returncode, "stdout_sha256": sha(run.stdout)},
+        )
+    finally:
+        os.close(validator_fd)
+        try:
+            fcntl.fcntl(validator_fd, fcntl.F_GETFD)
+        except OSError as exc:
+            if exc.errno != errno.EBADF:
+                raise
+        else:
+            raise Rig("R23 retained lifecycle validator descriptor remained open")
 
 
 def r19_cursor_harness_source(
@@ -18466,6 +20305,120 @@ def r22_product_material_checks(commit: str) -> None:
     )
 
 
+def r23_compiled_production_views(source: bytes, runtime: bytes,
+                                  recipe: dict[str, Any]) -> tuple[bytes, ...]:
+    if source != r23_expected_production_source():
+        raise Rig("R23 compiled views source is not exact")
+    temporary = Path(tempfile.mkdtemp(prefix="h039-r23-views-", dir="/private/tmp"))
+    project = temporary / "project"
+    try:
+        (project / "controller/runtime-cleanup/native").mkdir(parents=True)
+        (project / "verify/h039").mkdir(parents=True)
+        source_name = "controller/runtime-cleanup/native/mediator.c"
+        (project / source_name).write_bytes(source)
+        (project / "verify/h039/runtime-cleanup-mediator").write_bytes(runtime)
+        environment = {"HOME": "/var/empty", "TMPDIR": str(project),
+                       "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"}
+
+        def views(key: str, output: str) -> tuple[bytes, bytes]:
+            argv = recipe.get(key)
+            if type(argv) is not list or not argv or argv[0] != str(BUILD_COMPILER):
+                raise Rig(f"R23 {key} exact compiler argv drift")
+            flags: list[str] = []
+            index = 1
+            while index < len(argv):
+                value = argv[index]
+                if value == "-o":
+                    if index + 1 >= len(argv) or argv[index + 1] != output:
+                        raise Rig(f"R23 {key} output drift")
+                    index += 2
+                elif value == source_name or value.startswith("-Wl,"):
+                    index += 1
+                else:
+                    flags.append(value); index += 1
+            observed = []
+            for extra in (["-E", "-P", source_name],
+                          ["-S", "-emit-llvm", source_name, "-o", "-"]):
+                result = bounded_run([
+                    str(SANDBOX_EXEC), "-D",
+                    f"H039_BUILD_EXECUTABLE={BUILD_COMPILER}", "-D",
+                    f"H039_BUILD_ROOT={project}", "-p", BUILD_REVIEW_PROFILE,
+                    str(BUILD_COMPILER), *flags, *extra], cwd=project,
+                    env=environment, timeout=60)
+                if result.returncode == 71 and b"sandbox_apply: Operation not permitted" in result.stderr:
+                    raise Undecidable("outer Seatbelt denied R23 compiled views")
+                if result.returncode or result.stderr:
+                    raise Rig(f"R23 {key} compiled view failed rc={result.returncode} stderr={result.stderr!r}")
+                observed.append(result.stdout)
+            return observed[0], observed[1]
+        return (*views("installer_compile_argv", "controller/runtime-cleanup/install"),
+                *views("mediator_compile_argv", "verify/h039/runtime-cleanup-mediator"))
+    finally:
+        shutil.rmtree(temporary)
+
+
+def r23_product_material_checks(commit: str) -> None:
+    source = product_bytes("controller/runtime-cleanup/native/mediator.c", commit)
+    runtime = product_bytes("verify/h039/runtime-cleanup-mediator", commit)
+    installer = product_bytes("controller/runtime-cleanup/install", commit)
+    recipe, manifest = manifest_checks(commit, r23_product=True)
+    r23_source_contract_checks(source)
+    reproducible_rebuild(recipe, commit)
+    macho_checks(manifest, commit)
+    r18_final_installer_branch_checks(commit, manifest)
+    installer_verify_effects(commit, retained_partial_state=True)
+    installer_pre, installer_ir, runtime_pre, runtime_ir = \
+        r23_compiled_production_views(source, runtime, recipe)
+    old_ascii = R23_OLD_R12_MEDIATOR_SHA256.encode("ascii")
+    diagnostic_tokens = (
+        R22_DIAGNOSTIC_IDENTIFIER.encode("ascii"),
+        b"H039_R22_FD_SCAN2_CAP", b"H039_RUNTIME_PRESTORE_EXIT_DIAGNOSTIC",
+    )
+    updater_tokens = (
+        b"/.install/controller/runtime-cleanup/install\0",
+        b"/Library/PrivilegedHelperTools\0",
+    )
+    diagnostic_views = (
+        R22_DIAGNOSTIC_DEFINE.encode(), b"H039_R22_",
+        R22_DIAGNOSTIC_IDENTIFIER.encode(),
+    )
+    updater_views = (
+        b"upgrade_installed_mediator", R23_OLD_R12_MEDIATOR_SHA256.encode(),
+        b"renameatx_np", b"se.nortropic.runtime-cleanup-mediator",
+    )
+    runtime_forbidden_views = (
+        b"upgrade_installed_mediator", b"retained_installed_version",
+        R23_OLD_R12_MEDIATOR_SHA256.encode(),
+    )
+    if (
+        old_ascii not in installer
+        or old_ascii in runtime
+        or any(token in runtime for token in updater_tokens)
+        or any(token in runtime or token in installer for token in diagnostic_tokens)
+        or any(token in installer_pre or token in installer_ir
+               or token in runtime_pre or token in runtime_ir
+               for token in diagnostic_views)
+        or any(token not in installer_pre for token in updater_views)
+        or old_ascii not in installer_ir or b"renameatx_np" not in installer_ir
+        or any(token in runtime_pre or token in runtime_ir
+               for token in runtime_forbidden_views)
+    ):
+        raise Rig("R23 installer/runtime trust-domain separation mismatch")
+    check(
+        True,
+        "A_H039_R23_REBUILD_MACHO_SCAN2_AND_FIXED_UPDATER_TRUST_DOMAIN",
+        {
+            "source_sha256": sha(source),
+            "runtime_sha256": sha(runtime), "runtime_size": len(runtime),
+            "installer_sha256": sha(installer), "installer_size": len(installer),
+            "installer_pre_sha256": sha(installer_pre),
+            "installer_ir_sha256": sha(installer_ir),
+            "runtime_pre_sha256": sha(runtime_pre),
+            "runtime_ir_sha256": sha(runtime_ir),
+        },
+    )
+
+
 def finish(phase: str) -> int:
     print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
     print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
@@ -18487,11 +20440,10 @@ def finish(phase: str) -> int:
     print(f"R20_MATERIAL_REVIEW_EXTENSION={R20_MATERIAL_REVIEW_EXTENSION}")
     print(f"R21_MATERIAL_REVIEW_EXTENSION={R21_MATERIAL_REVIEW_EXTENSION}")
     print(f"R22_MATERIAL_REVIEW_EXTENSION={R22_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
-        if phase == "r22-published":
-            print("H039_GATE_RESULT=PASS_PRE_ROOT_DIAGNOSTIC_PUBLICATION_ONLY")
-        elif phase in {"published", "r19-published"}:
+        if phase in {"published", "r19-published", "r23-published"}:
             print("H039_GATE_RESULT=PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY")
         else:
             print("H039_GATE_RESULT=PASS")
@@ -18532,6 +20484,7 @@ def main(argv: list[str]) -> int:
         print(f"R20_MATERIAL_REVIEW_EXTENSION={R20_MATERIAL_REVIEW_EXTENSION}")
         print(f"R21_MATERIAL_REVIEW_EXTENSION={R21_MATERIAL_REVIEW_EXTENSION}")
         print(f"R22_MATERIAL_REVIEW_EXTENSION={R22_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -18555,6 +20508,7 @@ def main(argv: list[str]) -> int:
         print(f"R20_MATERIAL_REVIEW_EXTENSION={R20_MATERIAL_REVIEW_EXTENSION}")
         print(f"R21_MATERIAL_REVIEW_EXTENSION={R21_MATERIAL_REVIEW_EXTENSION}")
         print(f"R22_MATERIAL_REVIEW_EXTENSION={R22_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
     product = len(argv) == 3 and argv[0] == "--product"
@@ -18565,12 +20519,12 @@ def main(argv: list[str]) -> int:
     r18_installed = exact_r18_installed_argv(argv)
     r19_product = exact_r19_product_argv(argv)
     r19_published = exact_r19_publication_argv(argv)
-    r22_product = exact_r22_product_argv(argv)
-    r22_published = exact_r22_publication_argv(argv)
+    r23_product = exact_r23_product_argv(argv)
+    r23_published = exact_r23_publication_argv(argv)
     if not (
         preproduct or product or published or installed
         or r18_product or r18_published or r18_installed
-        or r19_product or r19_published or r22_product or r22_published
+        or r19_product or r19_published or r23_product or r23_published
     ):
         print(
             "RIG_ERROR: usage: h-039-exit [--product PUBLISHED_R16_CONTRACT_MERGE "
@@ -18582,15 +20536,15 @@ def main(argv: list[str]) -> int:
             "--r18-installed PUBLISHED_R11_PRODUCT_MERGE | "
             "--r19-product PUBLISHED_R19_CONTRACT_MERGE R12_CANDIDATE | "
             "--r19-published PUBLISHED_R12_PRODUCT_MERGE | "
-            "--r22-product PUBLISHED_R22_CONTRACT_MERGE R13_DIAGNOSTIC_CANDIDATE | "
-            "--r22-published PUBLISHED_R13_DIAGNOSTIC_PRODUCT_MERGE]",
+            "--r23-product PUBLISHED_R23_CONTRACT_MERGE R14_CANDIDATE | "
+            "--r23-published PUBLISHED_R14_PRODUCT_MERGE]",
             file=sys.stderr,
         )
         return 2
     supplied_commits = argv[1:] if (
         product or published or installed
         or r18_product or r18_published or r18_installed
-        or r19_product or r19_published or r22_product or r22_published
+        or r19_product or r19_published or r23_product or r23_published
     ) else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
@@ -18603,16 +20557,17 @@ def main(argv: list[str]) -> int:
         else "r18-installed" if r18_installed
         else "r19-product" if r19_product
         else "r19-published" if r19_published
-        else "r22-product" if r22_product else "r22-published"
+        else "r23-product" if r23_product else "r23-published"
     )
     r18_phase = r18_product or r18_published or r18_installed
     r19_phase = preproduct or r19_product or r19_published
-    r22_phase = preproduct or r22_product or r22_published
+    r23_phase = preproduct or r23_product or r23_published
     try:
         if any(object_type(value) != "commit" for value in supplied_commits):
             raise Rig("every supplied identity must name a literal commit object")
         row = static_contract_checks()
         contract_selftests(row)
+        seatbelt_profile_selftests()
         r14_registry_selftests(row)
         r16_registry_selftests(row)
         r17_registry_selftests(row)
@@ -18632,13 +20587,15 @@ def main(argv: list[str]) -> int:
             r19_source_selftests()
             r19_scoped_build_satisfiability_checks()
             r19_dispatch_scope_selftests()
-        if r22_phase:
+        if preproduct:
             r21_registry_selftests(row)
             r22_registry_selftests(row)
             r22_source_recipe_selftests()
-            r22_dispatch_identity_selftests()
+        if r23_phase:
+            r23_registry_selftests(row)
+            r23_source_contract_selftests()
+            r23_dispatch_retained_selftests()
         causal_oracle_selftests()
-        seatbelt_profile_selftests()
         ofd_lock_reference()
         connected_stream_unlink_reference()
         managed_option_a_reference()
@@ -18648,11 +20605,12 @@ def main(argv: list[str]) -> int:
             r19_cursor_causal_checks(r19_expected_production_source())
             r21_post_install_evidence_checks()
             r22_int2_evidence_checks()
+            r23_r22_lifecycle_evidence_checks()
             candidate = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
-            candidate_ok, candidate_detail = r22_contract_candidate_identity(candidate)
+            candidate_ok, candidate_detail = r23_contract_candidate_identity(candidate)
             check(
                 candidate_ok,
-                "A_H039_R22_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
+                "A_H039_R23_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
                 candidate_detail,
             )
             if not candidate_ok:
@@ -18676,42 +20634,44 @@ def main(argv: list[str]) -> int:
             })
             return finish(phase)
 
-        if r22_product:
+        if r23_product:
             publication_ok, publication_detail = \
-                r22_contract_publication_graph(argv[1])
+                r23_contract_publication_graph(argv[1])
             check(
                 publication_ok,
-                "A_H039_R22_EXACT_GUARDED_CONTRACT_PUBLICATION_GRAPH",
+                "A_H039_R23_EXACT_GUARDED_CONTRACT_PUBLICATION_GRAPH",
                 publication_detail,
             )
             if not publication_ok:
                 return finish(phase)
-            product_ok, product_detail = r22_product_identity(argv[1], argv[2])
+            product_ok, product_detail = r23_product_identity(argv[1], argv[2])
             check(
                 product_ok,
-                "A_H039_R22_EXACT_DIRECT_CHILD_FOUR_FILE_DIAGNOSTIC_IDENTITY",
+                "A_H039_R23_EXACT_DIRECT_CHILD_FIVE_FILE_R14_IDENTITY",
                 product_detail,
             )
             if not product_ok:
                 return finish(phase)
+            r23_r22_lifecycle_evidence_checks()
             installed_expected = r22_int2_evidence_checks()
-            r22_product_material_with_retained_installed(
+            r23_product_material_with_retained_installed(
                 argv[2], installed_expected,
             )
             return finish(phase)
 
-        if r22_published:
+        if r23_published:
             publication_ok, publication_detail = \
-                r22_product_publication_identity(argv[1])
+                r23_product_publication_identity(argv[1])
             check(
                 publication_ok,
-                "A_H039_R22_GUARDED_DIAGNOSTIC_PRODUCT_PUBLICATION_IDENTITY",
+                "A_H039_R23_GUARDED_R14_PRODUCT_PUBLICATION_IDENTITY",
                 publication_detail,
             )
             if not publication_ok:
                 return finish(phase)
+            r23_r22_lifecycle_evidence_checks()
             installed_expected = r22_int2_evidence_checks()
-            r22_product_material_with_retained_installed(
+            r23_product_material_with_retained_installed(
                 argv[1], installed_expected,
             )
             return finish(phase)
@@ -19037,6 +20997,7 @@ def main(argv: list[str]) -> int:
         print(f"R20_MATERIAL_REVIEW_EXTENSION={R20_MATERIAL_REVIEW_EXTENSION}")
         print(f"R21_MATERIAL_REVIEW_EXTENSION={R21_MATERIAL_REVIEW_EXTENSION}")
         print(f"R22_MATERIAL_REVIEW_EXTENSION={R22_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)

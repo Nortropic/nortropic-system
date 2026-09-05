@@ -5263,3 +5263,37 @@ pre-root publication stop and all authority boundaries remain unchanged.
 ### R22-R4 — continuous installed-object capability
 
 Frozen R22-R3 `8b25da35…`, tree `aedfd931…`, gate `9dfe216d…` and spec `11468bc1…`, is immutable NO-CREDIT and a nonparent: its two stable snapshots opened and closed separate FDs, so equal names/identities did not prove continuity through material review. Fresh R22-R4 starts directly from `df5c9823…`; each product lane opens the fixed installed R12 mediator once with exact no-follow/CLOEXEC read-only flags, binds name/FD/full INT2 identity, encloses material review between complete same-FD reads/snapshots, proves the post-material FD offset still equals the exact size, rechecks read-only/CLOEXEC, final-name-rebinds, then closes exactly once in an outer `finally` and proves EBADF. AST/runtime tests reject R3, second/reopened/substituted/wrong FDs, no rewind, wrong offset, lost CLOEXEC, misordering and non-final close. All R3 diagnostic, mode, fresh-request, no-retry, production-byte, root-stop and authority properties remain unchanged.
+
+## 2026-09-05 — H-039 R23/R14 populated-scan and fixed-update boundary
+
+Frozen R23-R1 `b5b33b67…` is immutable NO-CREDIT: it demanded outcome and
+cleanup digest literals from the frozen final-validator source even though the
+validator binds those files dynamically. R23-R2 preserves every R23 contract
+property and instead binds the exact validator, source-binding/tool identities,
+stable lifecycle bytes and successful validator output containing both digests.
+
+The completed R22/R13 workflow localized production exit 1 to status 28: the
+second `PROC_PIDLISTFDS` NULL query is a padded capacity estimate, not an FD
+membership result. The diagnostic is consumed, removed and immutable NO-CREDIT;
+its R22 product/publication CLIs are stale and non-runnable in R23. R23 freezes
+one fixed 17-record populated fetch, accepting only one aligned fd0
+record and rejecting errors, empty/short/misaligned, duplicate/extra/nonzero or
+saturated results. Production's first close scan and all later logic remain
+exact; the complete R22 diagnostic branch remains byte-exact historical source
+and is excluded from preprocessing, optimized IR and production binaries.
+
+The remaining drift is fixed installed-object replacement: exact old R12 must
+become exact new R14 without in-place writes or widened paths. R14 therefore
+adds only an installer-side updater that holds one retained nonblocking OFD
+lock through classification, staging, atomic rename-over, both durability/name
+proofs and exact staging removal. Only idle sequence-0 and exact O0–O3/N0–N4
+states are representable; substitution, links, races, cross-device identity,
+neighbors, and every rename/fsync/crash boundary fail closed. The runtime binary
+contains no updater, and raw recipe/source/product identities remain exact.
+
+The serialized closure is R23 dual review/publication, fresh five-file R14 dual
+review/publication, productless R24 dual review/publication, then one no-retry
+fixed root update and installed effect review before H038→H032→H031. Any
+nonzero/output/drift is a new owner stop. No broader authority is introduced,
+and supervisor resume remains prohibited until the full chain and separate
+resume adjudication are green.

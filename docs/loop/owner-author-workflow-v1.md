@@ -2568,3 +2568,44 @@ canonical INVALID_KEYS frame in memory. No root lifecycle or broader authority
 is authorized.
 
 Frozen R22-R3 `8b25da35…`, tree `aedfd931…`, gate SHA-256 `9dfe216d…` and spec SHA-256 `11468bc1…`, is immutable NO-CREDIT and a nonparent because its two stable snapshots used separate opens. Fresh R22-R4 starts again from `df5c9823…`; each R22 product lane uses one exact no-follow/CLOEXEC read-only retained descriptor, binds initial name/FD/full INT2 identity, holds it across `r22_product_material_checks`, proves its offset remains the exact size, rechecks flags, rewinds and completely re-reads/re-snapshots that same FD, performs final full identity/name rebind, closes exactly once in an outer `finally` on every exit and proves EBADF. AST/runtime tests reject R3, second/reopened/substituted/wrong FDs, no rewind, wrong offset, lost CLOEXEC and non-final close. No R3 diagnostic, mode, fresh-request, no-retry, root-stop or authority rule changes.
+
+## H-039 R23/R14 populated FD scan and fixed mediator update
+
+Frozen R23-R1 `b5b33b67…`, tree `76f37e0e…`, gate `f48a5023…` and
+spec `2bd7d066…` are immutable NO-CREDIT: its gate incorrectly required the
+outcome and cleanup digests as source literals in the frozen lifecycle
+validator, although that validator authenticates them dynamically through its
+fixed source-binding/predecessor chain and reports them on successful execution.
+R23-R2 starts again directly from published R13 `b9eff66e…` and replaces only
+that false literal oracle with exact validator/source-binding/tool identities,
+stable evidence bytes and the executed validator's exact digest-bearing output.
+
+The owner-adjudicated R22/R13 lifecycle is complete workflow-only evidence:
+the consumed diagnostic returned status 28 (`H039_R22_FD_SCAN2_CAP`), cleanup
+removed its fixed object, and final absence passed. R13 may never be run or
+restaged, and historical R22 product/publication CLIs are stale in R23. The
+defect is the production second `PROC_PIDLISTFDS` check treating
+its padded NULL sizing result as membership. R23 instead freezes one populated
+17-record fetch and accepts only one complete record containing fd0; every
+error, empty, short/misaligned, duplicate, extra/nonzero, or saturated result
+fails closed. The first scan and later protocol/store/effect bytes stay exact,
+and the complete historical R22 diagnostic branch stays byte-exact and absent
+from all production compiled views and binaries.
+
+Fresh R14 changes exactly the five registered product paths. Its source is the
+exact R13 source plus only the scan correction and installer-only fixed updater;
+its raw recipe is exact published R12 formatting with only the new and retained
+old mediator identities. Under one retained, revalidated nonblocking OFD lock,
+the lifecycle represents only exact idle sequence-0 O0–O3/N0–N4 states. It
+stages or authenticates the fixed new object, atomically rename-overs exact old
+R12, proves durability/name/inode transitions, removes only fixed staging, and
+closes the lock last. Connected confined tests reject substitutions, links,
+races, cross-device objects, neighbor names and every mutation/durability fault.
+
+Order is R23 freeze → two reviews → guarded publication; fresh R14 build → two
+reviews → guarded publication; productless R24 freeze → two reviews → guarded
+publication; then one fixed no-retry root update, one uid501/gid20 installed
+effect review and guarded H039 completion. Only then may H038 → H032 → H031
+continue. Any drift, output or nonzero status is an owner stop; no broader
+filesystem/process/signal/shell/Git/network/credential/root/native or
+Seatbelt-bypass authority is added, and supervisor resume remains prohibited.
