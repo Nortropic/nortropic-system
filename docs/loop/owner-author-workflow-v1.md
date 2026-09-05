@@ -2500,3 +2500,71 @@ the fixed-snapshot observation dependency chain was not byte-bound. Fresh
 R21-R2 starts from the same published `9ed9ed70…` base, binds that complete
 chain to R20 and causally rejects the demonstrated global-normalization mutant
 before it may be refrozen and independently reviewed.
+
+## H-039 R22/R13 pre-store mediator exit diagnostic
+
+The single owner-authorized INT2 observation is consumed immutable workflow
+evidence: SHA-256 `b264306e…`, exact schema-version integer 2 request hashes
+`c6af21d5…`/`85a60ecf…`, exit 1, no response or ancillary descriptor, empty
+stdout/stderr, and byte-identical namespace and installed R12 mediator before
+and after. It grants no task credit and must never be retried.
+
+R22 is a fresh five-file TEST_AUTHOR child of published R21 `df5c9823…`. It
+admits only a compile-time, exit-code-only R13 diagnostic built into the repo
+`controller/runtime-cleanup/install` artifact from the exact R12 source. The
+diagnostic uses distinct one-shot nonce `a4583df4…`, request hashes
+`f29ec6f1…`/`7bfa1b33…`, and codes 0..70 for the main, boundary, chdir,
+descriptor inventories, receive, parse, and semantics predicates. Code 0 means
+the exact INVALID_KEYS frame is reconstructed and matched in memory; no
+`error_frame`, write/send, store, or later effect call occurs. Dominated
+defense-in-depth statuses need not be host-reachable.
+
+The product changes exactly source, recipe, diagnostic executable and manifest.
+The production runtime artifact `6c2f2dbe…` and its compile/sign argv remain
+byte-exact R12. Guarded product publication ends only at
+`PASS_PRE_ROOT_DIAGNOSTIC_PUBLICATION_ONLY`. Any root staging, one-shot run,
+inert transition, or removal at the separate fixed path
+`/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-pre-effect-diagnostic-v1`
+requires a new owner decision; it may never use `.install` or replace the live
+production mediator. H038/H032/H031 and supervisor resume remain stopped.
+
+Frozen R22-R1 `63f4fea7…`, tree `96071314…`, gate SHA-256
+`769e9299…` and spec SHA-256 `466f5f04…`, is immutable NO-CREDIT and a
+nonparent. Its formal host no-argument run stopped with rc 2 and exact
+`RIG_ERROR: R19 causal compiler phase set drift`: R1 had removed the inherited
+R19 partial-state/cursor and R21 post-install preproduct proof calls plus the
+historical R12 manifest/rebuild/Mach-O/final-branch proof sequence. Independent
+review also found that R1 expected a prefixed INT2 `record_type` which did not
+match immutable evidence `b264306e…`'s exact
+`h039_r21_int2_zero_effect_protocol_observation` value. Fresh R22-R2 starts
+again from `df5c9823…`, restores those exact proof phases in their historical
+order, corrects only that evidence literal, and closes product/publication
+identity composition while preserving every R22 no-output, no-effect,
+no-retry, pre-root and authority boundary.
+
+Both later R22 product-review and product-publication lanes must stable-open
+the fixed installed production mediator with no-follow, hash it and read its
+ACL/xattrs through the retained descriptor, and rebind its name. The complete
+type/mode/uid/gid/dev/inode/nlink/size/flags/digest/symlink-target/xattr/ACL
+snapshot must equal consumed INT2 `installed_after` both before and after lane
+work. A symlink or same-byte inode replacement therefore rejects; digest-only
+continuity cannot earn credit.
+
+Frozen R22-R2 `a5869e4a…`, tree `33f8b864…`, gate SHA-256 `01af8a99…`
+and spec SHA-256 `555381a3…`, is immutable NO-CREDIT and a nonparent. Review
+found exactly three residual defects: the diagnostic branch retained an
+unnecessary `umask(077)` capability, the current product checkout used the
+contract-byte helper without enforcing the executable's registered 0755 mode,
+and the executable failure signature still attributed code 0 to consumed INT2.
+Fresh R22-R3 starts again from published `df5c9823…`. It removes only the
+diagnostic umask call and rejects `umask`/`_umask` in diagnostic source,
+optimized IR and final imports; production R12 source/runtime behavior remains
+untouched. Both R22 product lanes use the existing stable no-follow,
+mode-aware product checkout helper over all four registered paths. Executed
+fixtures accept all exact modes and reject every wrong mode, a same-byte 0755
+symlink, content substitution, and a final-name same-byte/mode distinct-inode
+rebind. Code 0 and the RED signature bind only the distinct R22 request and
+canonical INVALID_KEYS frame in memory. No root lifecycle or broader authority
+is authorized.
+
+Frozen R22-R3 `8b25da35…`, tree `aedfd931…`, gate SHA-256 `9dfe216d…` and spec SHA-256 `11468bc1…`, is immutable NO-CREDIT and a nonparent because its two stable snapshots used separate opens. Fresh R22-R4 starts again from `df5c9823…`; each R22 product lane uses one exact no-follow/CLOEXEC read-only retained descriptor, binds initial name/FD/full INT2 identity, holds it across `r22_product_material_checks`, proves its offset remains the exact size, rechecks flags, rewinds and completely re-reads/re-snapshots that same FD, performs final full identity/name rebind, closes exactly once in an outer `finally` on every exit and proves EBADF. AST/runtime tests reject R3, second/reopened/substituted/wrong FDs, no rewind, wrong offset, lost CLOEXEC and non-final close. No R3 diagnostic, mode, fresh-request, no-retry, root-stop or authority rule changes.
