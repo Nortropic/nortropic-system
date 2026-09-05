@@ -5191,3 +5191,75 @@ engine assertions and masked raw `s` geometry. Fresh R21-R2 again starts
 directly from `9ed9ed70…`, byte-binds the complete fixed-snapshot observation
 dependency chain and rejects that exact mutant. Product, evidence, root state,
 installed-effect state and authority remain unchanged.
+
+## 2026-09-05 — H-039 R22/R13 consumed-probe diagnostic boundary
+
+R21's one-shot INT2 workflow observation (`b264306e…`) returned exit 1 with no
+response, ancillary descriptor, stdout/stderr, or namespace/installed-byte
+effect. It is consumed NO-CREDIT evidence and is not a reusable test input.
+The unresolved drift is therefore localization inside the production R12
+mediator's pre-store path, not permission to repeat the live probe.
+
+R22 is a fresh exact five-file TEST_AUTHOR contract from `df5c9823…`. A later
+R13 may change only source, recipe, repo diagnostic executable and manifest.
+The exact compile-time branch consumes only the distinct fixed request
+`a4583df4…`/`f29ec6f1…`/`7bfa1b33…`, returns statuses 0..70, and reaches zero
+only after canonical INVALID_KEYS frame construction in memory. It performs no
+write/send/error-frame/store or later effect. The production mediator and its
+compile/sign argv remain byte-exact R12.
+
+Contract and product each require two independent reviews and guarded
+publication. Product publication is explicitly pre-root only. The separate
+fixed root diagnostic lifecycle is not authorized here and requires new owner
+adjudication before stage/run/inert/remove. R22 adds no retry, cleanup,
+installed-effect, downstream, supervisor-resume, or broader authority.
+
+### R22-R2 — inherited preproduct and publication identity closure
+
+Frozen R22-R1 `63f4fea7…`, tree `96071314…`, gate `769e9299…` and spec
+`466f5f04…`, is immutable NO-CREDIT and a nonparent. Its unrestricted host
+no-argument gate stopped rc 2 at exact `RIG_ERROR: R19 causal compiler phase
+set drift`: the R22 preproduct replacement had omitted the inherited R19
+partial-state/cursor and R21 post-install proof calls, as well as the R12
+manifest/reproducible-rebuild/Mach-O/final-installer checks after historical
+product identity. Review then proved a second deterministic mismatch: R1's
+prefixed INT2 record-type literal did not equal immutable evidence
+`b264306e…`'s exact `h039_r21_int2_zero_effect_protocol_observation`.
+
+R22-R2 is a fresh five-file child of the same `df5c9823…` base. It restores
+the complete legacy proof ordering, uses the evidence's exact literal, rejects
+R1 by commit/tree/gate/spec identity, and composes product and publication
+identity so contract bytes are bound while the product checkout is current and
+the final merge alone is bound to live main. Diagnostic bytes, statuses,
+distinct nonce, consumed-probe prohibition, production mediator, root state,
+publication-only stop and authority remain unchanged.
+
+R2 additionally closes the product-review observation race: both R22 product
+and publication lanes stable-open/no-follow the live installed R12 mediator,
+read bytes plus ACL/xattrs from a retained descriptor, rebind the fixed name,
+and compare the full snapshot to immutable INT2 `installed_after` before and
+after lane work. Same-byte inode replacement and symlink substitution are
+explicit causal negatives; a path digest alone no longer proves continuity.
+
+### R22-R3 — diagnostic umask and product-mode closure
+
+Frozen R22-R2 `a5869e4a…`, tree `33f8b864…`, gate `01af8a99…` and spec
+`555381a3…`, is immutable NO-CREDIT and a nonparent. Review isolated three
+remaining drifts: diagnostic `umask(077)` exceeded the no-output pre-store
+authority; R22 product checkouts used a stable byte helper that did not enforce
+the registered executable mode; and the RED signature mislabeled the fresh
+R22 code-zero request as consumed INT2.
+
+Fresh R22-R3 starts directly from `df5c9823…`. Only the diagnostic umask call
+is removed; exact source transformation plus optimized-IR and final-import
+oracles reject `umask` and `_umask`, while production R12 bytes and statuses
+0..70 stay fixed. Candidate and publication checkouts use the inherited
+mode-aware stable product helper over the exact four paths. Executed fixtures
+bind every registered mode and reject wrong modes, same-byte symlink, changed
+content, and same-byte/mode final-name inode replacement. The fresh R22 nonce,
+canonical in-memory INVALID_KEYS frame, consumed INT2 no-retry rule, separate
+pre-root publication stop and all authority boundaries remain unchanged.
+
+### R22-R4 — continuous installed-object capability
+
+Frozen R22-R3 `8b25da35…`, tree `aedfd931…`, gate `9dfe216d…` and spec `11468bc1…`, is immutable NO-CREDIT and a nonparent: its two stable snapshots opened and closed separate FDs, so equal names/identities did not prove continuity through material review. Fresh R22-R4 starts directly from `df5c9823…`; each product lane opens the fixed installed R12 mediator once with exact no-follow/CLOEXEC read-only flags, binds name/FD/full INT2 identity, encloses material review between complete same-FD reads/snapshots, proves the post-material FD offset still equals the exact size, rechecks read-only/CLOEXEC, final-name-rebinds, then closes exactly once in an outer `finally` and proves EBADF. AST/runtime tests reject R3, second/reopened/substituted/wrong FDs, no rewind, wrong offset, lost CLOEXEC, misordering and non-final close. All R3 diagnostic, mode, fresh-request, no-retry, production-byte, root-stop and authority properties remain unchanged.
