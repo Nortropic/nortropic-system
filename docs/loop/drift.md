@@ -5297,3 +5297,50 @@ fixed root update and installed effect review before H038→H032→H031. Any
 nonzero/output/drift is a new owner stop. No broader authority is introduced,
 and supervisor resume remains prohibited until the full chain and separate
 resume adjudication are green.
+
+## 2026-09-05 — H-039 R24/R14 fixed-update installed-completion boundary
+
+R14 is now guardedly published as merge `8bb7bae9…`, tree `0518d016…`, with
+ordered parents R23 `96af0d2f…` and product candidate `e7412a35…`. The five
+product SHA-256 values are fixed as installer `16d90c96…`, source
+`18efd8df…`, recipe `0fde3eb7…`, manifest `1e332e24…` and runtime
+`4a388755…`. A-R2/B-R4 aggregate `92cc591e…`, publication `260b64ef…` and
+corrected umask-0022 postpublication record/log `0658be4d…`/`2cb14ff8…` are
+immutable workflow bindings. The prior umask-0077 run is fixture-only
+NO-CREDIT and cannot displace the successful verification.
+
+R24 closes only R23's intentional pre-root stop. It is an exact productless
+five-file TEST_AUTHOR child of R14 and adds one current-publication form:
+`--r24-installed <published-R24-contract> 8bb7bae9…`. Historical diagnostic,
+product, publication and installed forms are stale. All 54 functions in the
+transitive receipt-aware installed-effect closure remain byte-identical to the
+published R14 gate and each single-function mutant must reject.
+
+The root boundary is represented only by the fixed, hash-bound workflow tool,
+validator, source binding and dual review (`3fa94226292c0d6994883d39737fb9464a6473fdb78b32b53493258a401e239e`,
+`b9af2d3111e98fde43f5ec1d73eaf511284d0a69f141493a5626a249cad1ef38`,
+`11edd396273e741dffe1e9e440adfeb2e4c1939577fc55fe72470a2519db0936`,
+`c7eba4275c13214e39770feec5f95fe0e79c027a83820ed46ffd771f50cc431e`). The protected `.install`
+destination is absent, so the admitted transition is fixed-name root-protected
+first creation—not reuse of the removed historical inode. Without claiming a
+clean source worktree, exact R14 installer and runtime-mediator commit blobs,
+digests, sizes and CDHashes are read through retained source FDs to exact EOF
+and final source-name rebind. Root may create exactly the fixed `controller`
+and `mediator` members: the runtime at fixed `.install/mediator` remains
+retained/name-rebound inert 0400, while the installer at fixed
+`.install/controller/runtime-cleanup/install` is retained/name-rebound at
+0400 and then reauthenticated 0500 before the single fixed
+sudo/env/bootstrap argv. One NOCLOBBER reservation permanently consumes the
+attempt. Caller arguments, paths, FDs, environment and input are absent.
+Success additionally binds the staged mediator's exact dev/inode to the
+installed 04555 helper and holds a read-only CLOEXEC capability to the exact
+old R12 helper across the child until that retained inode proves `nlink=0`.
+Same-byte copy or inode substitution is therefore not an admitted update.
+
+Only exit 0 with empty output and exact poststate permits post-observation and
+one uid501/gid20 effect run from receipt sequence 0 to 13. Any other status,
+output, identity drift, ambiguity or state drift is an owner stop without
+retry or general rollback. Completion still requires zero runtime/process/FD
+residue, independent effect review and guarded H039 completion before
+H038→H032→H031. No broader filesystem/process/signal/shell/Git/network/
+credential/root/native/Seatbelt authority or supervisor resume is introduced.

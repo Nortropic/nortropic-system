@@ -2609,3 +2609,62 @@ effect review and guarded H039 completion. Only then may H038 → H032 → H031
 continue. Any drift, output or nonzero status is an owner stop; no broader
 filesystem/process/signal/shell/Git/network/credential/root/native or
 Seatbelt-bypass authority is added, and supervisor resume remains prohibited.
+
+## H-039 R24/R14 fixed-update installed completion
+
+Published R14 merge `8bb7bae975dcd76b70c563a99583807b70089350`, tree
+`0518d016a012c8946e1fd6baabc4df81d5dd23f6`, with ordered parents published
+R23 `96af0d2f5a9156b560f5f871a989a8b577451bad` and reviewed candidate
+`e7412a35ffd65523df707f640bb1c73974d85cd4`, is the sole R24 authority base.
+R14 changed exactly the five registered product paths. Its installer/source/
+recipe/manifest/runtime SHA-256 values are respectively `16d90c96…`,
+`18efd8df…`, `0fde3eb7…`, `1e332e24…` and `4a388755…`; the installer is
+169504 bytes/CDHash `7679b396…` and the runtime is 89392 bytes/CDHash
+`07ab2816…`/UUID `E179B158-A1DB-332E-9151-12538CABF919`.
+
+Independent product reviews A-R2 and B-R4 aggregate at `92cc591e…`; guarded
+publication receipt `260b64ef…` and the corrected umask-0022 postpublication
+record/log `0658be4d…`/`2cb14ff8…` prove 92002 PASS / 0 FAIL and
+`PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY`. The prior umask-0077 attempt remains
+immutable NO-CREDIT fixture evidence. R24 is productless and changes exactly
+the five TEST_AUTHOR contract files; it must bind all of that graph, product
+and workflow evidence before publication.
+
+The fixed ceremony is workflow-only and is bound before R24 publication by
+tool `3fa94226292c0d6994883d39737fb9464a6473fdb78b32b53493258a401e239e`, validator
+`b9af2d3111e98fde43f5ec1d73eaf511284d0a69f141493a5626a249cad1ef38`, source binding
+`11edd396273e741dffe1e9e440adfeb2e4c1939577fc55fe72470a2519db0936` and dual review
+`c7eba4275c13214e39770feec5f95fe0e79c027a83820ed46ffd771f50cc431e`. The fixed `.install` destination
+prestate is exactly absent. Without claiming a clean source worktree, the
+ceremony retained-FD authenticates the exact R14 installer and runtime
+mediator against candidate `e7412a35…` commit blobs, SHA-256 values
+`16d90c96…`/`4a388755…`, sizes 169504/89392 and CDHashes
+`7679b396…`/`07ab2816…`, through exact EOF and final source-name rebind.
+Root-protected first creation may then create exactly the `controller` and
+`mediator` members. The runtime is fixed at
+`/private/var/db/nortropic-runtime-cleanup-v1/.install/mediator`, retained
+and name-rebound as inert 0400. The installer is fixed at
+`/private/var/db/nortropic-runtime-cleanup-v1/.install/controller/runtime-cleanup/install`,
+retained and name-rebound first at inert 0400 and then fully reauthenticated
+0500. The sole execution argv is `/usr/bin/sudo /usr/bin/env -i -C /
+/private/var/db/nortropic-runtime-cleanup-v1/.install/controller/runtime-cleanup/install
+bootstrap`. The tool accepts no argument, caller path, descriptor,
+environment or input and creates one durable NOCLOBBER attempt reservation.
+The exact staged mediator dev/inode must become the installed 04555 helper,
+while a retained read-only CLOEXEC capability to the exact old R12 helper
+crosses the child and must prove that old inode reaches `nlink=0`; copied or
+same-byte substituted replacement objects reject.
+Status 0 with empty stdout/stderr is mandatory; nonzero, output, identity
+drift, ambiguity or unexpected state stops for the owner and consumes the
+attempt without retry.
+
+Only after successful post-observation may exact CLI `--r24-installed
+<published-R24-contract> 8bb7bae975dcd76b70c563a99583807b70089350`
+run once as uid501/gid20. It authenticates current R24 publication, historical
+R14 graph/product, the frozen ceremony and its status-0 outcome before the
+byte-exact 54-function receipt-aware engine advances sequence 0 to 13 and
+requires zero runtime, process and descriptor residue. Independent effect
+review and guarded H039 completion precede H038 → H032 → H031. R13 remains
+consumed; no product change, retry, general write/unlink/rename, process scan,
+signal, shell, Git, network, credential, general root/native or Seatbelt-bypass
+authority is admitted, and supervisor resume remains separately prohibited.
