@@ -5344,3 +5344,40 @@ retry or general rollback. Completion still requires zero runtime/process/FD
 residue, independent effect review and guarded H039 completion before
 H038→H032→H031. No broader filesystem/process/signal/shell/Git/network/
 credential/root/native/Seatbelt authority or supervisor resume is introduced.
+
+## 2026-09-05 — H-039 R25/R14 supplementary-group order compatibility
+
+Published R24 merge `1710d58aab3552349f3cf6a06058a8e00e350caf`, tree
+`5fddcfe39c815360bd266856e153bf337be1b4db`, is the exact R25 base. Its
+one-shot workflow refused before every effect because macOS returned the same
+19 unique supplementary GIDs in a different order. The immutable refusal
+record `cc9b1c7404526d0addbec94551f9188aafd3b54faed778e18ef01fbec52e5423`
+binds empty stdout, exact stderr, source-defined exit 1 (the owner did not
+measure the shell status), absent R24 attempt/outcome, no source/tool/root or
+staging action, and unchanged installed-R12 receipt sequence zero.
+
+R25 changes only the same five TEST_AUTHOR files. New workflow-only ceremony
+`5011ee641c4d84b1d187ea9c97c9e0e17223db48447403e25f1ebed20e7f1873`,
+validator `8439233108e799791ddaf59ce166e26c2f4f78cf9bbd264248b383a2357965a8`,
+source binding `49b8716be25804fd0af68e5acec6390d1b5afd60af31781828d497322bf607e8`
+and dual review `508829c96b4122ecb60f0d638b3c782f3f1cbfe2fefc758fb008b75fdb38a716`
+are exact R24 derivatives. Their only membership changes are the two live
+entry predicates from ordered equality to
+`sorted(os.getgroups()) == CLIENT_GROUPS`; fixed R25 paths, record labels and
+published-R24 authority are necessarily rebound. The unchanged constant is
+the exact ascending unique list
+`[12,20,33,61,79,80,81,98,100,204,250,395,398,399,400,701,702,703,704]`.
+Every permutation accepts; missing, extra, duplicate, substituted, set,
+subset, superset, length-only, wrong-constant and decoy constructions reject.
+
+All root commands, tool identities, R14 source bytes, old-R12 prestate,
+staging, bootstrap, no-retry and post-state checks remain exact. Stable-opened
+exact validator bytes now reach fixed CLT Python `-I -S -c` only via stdin
+with exact length, digest and EOF; the wrapper restores only logical metadata.
+No path supplies code; frozen validator `SELF` opens only as non-executable
+identity/digest evidence and its bytes never reach a code sink. Source-binding
+`invocation` remains logical/legacy, while actual argv and retained-FD/rebind
+are gate-bound. Substitution, truncation, decoys and prepublication execution
+reject. R24 remains stale; only
+`--r25-installed <published-R25-contract> 8bb7bae9…` may follow guarded R25.
+No product/root effect, broader authority or supervisor resume is admitted.

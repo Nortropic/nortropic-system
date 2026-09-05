@@ -2668,3 +2668,44 @@ review and guarded H039 completion precede H038 → H032 → H031. R13 remains
 consumed; no product change, retry, general write/unlink/rename, process scan,
 signal, shell, Git, network, credential, general root/native or Seatbelt-bypass
 authority is admitted, and supervisor resume remains separately prohibited.
+
+## H-039 R25 — group-order-compatible fixed R14 update
+
+R24 is published as merge `1710d58aab3552349f3cf6a06058a8e00e350caf`
+with tree `5fddcfe39c815360bd266856e153bf337be1b4db`. Its consumed ceremony
+refused before every effect because `os.getgroups()` returned the exact frozen
+19-member set in a different order. The immutable refusal record has SHA-256
+`cc9b1c7404526d0addbec94551f9188aafd3b54faed778e18ef01fbec52e5423`;
+R24 attempt and outcome remain absent. R24 is henceforth stale, unauthorized
+and non-crediting, but no physical inability to interpret its retained file is
+asserted.
+
+The R25 workflow set is fixed before contract freeze:
+
+- ceremony `5011ee641c4d84b1d187ea9c97c9e0e17223db48447403e25f1ebed20e7f1873`;
+- validator `8439233108e799791ddaf59ce166e26c2f4f78cf9bbd264248b383a2357965a8`;
+- source binding `49b8716be25804fd0af68e5acec6390d1b5afd60af31781828d497322bf607e8`;
+- independent dual review `508829c96b4122ecb60f0d638b3c782f3f1cbfe2fefc758fb008b75fdb38a716`.
+
+Both executable entry checks use exactly
+`sorted(os.getgroups()) == CLIENT_GROUPS`, and `CLIENT_GROUPS` remains the
+same exact sorted 19-GID list. Gate review must accept permutations and reject
+every missing, extra, duplicate or substituted member, as well as set,
+subset/superset, length-only, wrong-constant and decoy predicates. Apart from
+the two comparisons and fixed R25 name/record/published-R24 rebinding, the new
+tools must reverse exactly to the frozen R24 semantics; root commands, source
+and destination identities, staging modes, retained descriptors, bootstrap
+argv, no-retry and post-state logic do not change.
+
+The serialized transition is: freeze five-file R25, obtain two reviews, publish
+guardat, then let the owner verify hashes/absence and run the ceremony once.
+After status zero and empty output, the gate supplies already stable-opened,
+identity/digest-verified validator bytes only through stdin to fixed CLT Python
+`-I -S -c`; exact length/digest/EOF and a frozen wrapper set only logical
+`sys.argv`, `__file__` and `__name__`; no path selects executable code. The
+frozen validator may stable-open `SELF` only for non-executable identity/digest
+evidence, and those bytes never reach code. Its source-binding `invocation` is
+legacy/logical metadata; actual argv, retained FD and final rebind are bound by
+the gate. Only then may `--r25-installed <published-R25-contract> 8bb7bae9…`
+run once before independent effect review. Every deviation stops; no broader
+authority, downstream progress or supervisor resume precedes H039 completion.
