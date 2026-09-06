@@ -2897,3 +2897,60 @@ store mutation. R28 then makes exactly one diagnostic the first post-R15 store
 mutation and stops for mandatory owner adjudication. The inherited
 mutating effect engine, H039 completion and downstream progress require new
 post-diagnostic owner authority.
+
+### H-039 R28 current-publication installed/update binding
+
+R28 starts only from published R15 merge
+`f0877daae8612f4c5b274ae4cc04bc1bd775c01a`, tree
+`6023ee91e5332e34eb7076cb2c31466a0b5491ae`, ordered parents R27
+`b29376a0aec131a0eb0a3807c47beb14645bd899` then R15 candidate
+`7786536acd284f2c13341446608a646d6cb761ec`. It is productless and may edit
+only the same five TEST_AUTHOR files. The exact R27 publication receipt, R15
+dual product review and both individual reviews, postpublication runner review,
+final postpublication record `0076e0a8…`, guarded product receipt `e8a1383c…`
+and its independent dual audit `16eb8e21…` are immutable workflow-only input.
+
+The current CLI is only `--r28-installed <published-R28-contract-merge>
+f0877daae8612f4c5b274ae4cc04bc1bd775c01a`. R27 product/publication, R26
+installed and every earlier selector are historical and unreachable. The
+independently reviewed root-update package is pinned to ceremony `cdb5f47e…`,
+validator `2528d2e0…`, source binding `6eebfb64…` and dual review `2d4249b7…`.
+The independently dual-reviewed diagnostic package is pinned to runner
+`64265252…` identity8 `[16777232,129873531,33188,501,20,1,184522,0]`,
+validator `612d1630…` identity8
+`[16777232,129873986,33188,501,20,1,165142,0]`, source binding `f6cc01e4…`
+identity8 `[16777232,129874313,33188,501,20,1,19913,0]`, and final dual review
+`7cc3615b…` identity8 `[16777232,129907322,33188,501,20,1,6142,0]`. No
+arguments remains the intended prepublication RED and must not inspect the
+protected store/helper or perform any mutation.
+
+Freeze two separate four-artifact workflow packages. Root update uses
+`h039-r28-r15-root-update-ceremony.py`, its validator, source binding and dual
+review. Live diagnostic uses
+`h039-r28-r15-live-diagnostic-run-once.py`, its validator, source binding and
+dual review under the same `h039-r28-r15-live-diagnostic-*` basename family.
+All eight static artifacts must rebind exactly, and both packages' attempt and
+outcome records must be absent at freeze.
+Neither static workflow evidence nor the R28 gate grants H039 completion
+credit.
+
+The update binding additionally pins the ordered eight-record publication
+closure plus the R26 failure log, the evidence-root identity, and the reviewed
+authenticated-exec wrapper. Static and dynamic records are opened relative to
+one retained no-follow evidence-root descriptor. The owner-serialized final
+review hash and identity are an external publication precondition, never a
+locally forgeable proof or task-credit source.
+
+Only after two gate reviews and guarded R28 publication may the update workflow
+read-bind the frozen R14 namespace identities, durably reserve one attempt and
+perform one fixed no-retry R14→R15 update. Any drift, nonzero status, output,
+ambiguity or poststate mismatch consumes that attempt and stops for owner. On
+exact success, `--r28-installed` only read-validates the consumed records,
+unchanged sequence-1 store and installed R15 bytes. It invokes neither the
+diagnostic nor the inherited effect engine and ends exactly
+`PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`, with no task completion credit.
+
+The separately frozen diagnostic workflow is already authorized to run exactly
+once after that PASS, as the first post-R15 store mutation. It then ends at the
+mandatory owner stop. Fresh authority is required after that stop—not before
+the diagnostic—and H038, H032, H031 and supervisor resume remain forbidden.
