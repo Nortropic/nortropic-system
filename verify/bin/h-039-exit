@@ -1,14 +1,12 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""Frozen H-039 R26/R14 pre-staged recovery completion gate.
+"""Frozen H-039 R27/R15 atomic create-phase diagnostic product gate.
 
-No arguments execute the exact pre-root RED while authenticating the guarded
-R14 product publication, the consumed R25 failure, exact observed R14 staging,
-and the frozen workflow-only recovery ceremony. ``--r26-installed`` is the sole
-current effect lane: it authenticates the current R26 publication and exact R14
-product before the existing receipt-aware uid501/gid20 effect engine runs.
-Historical product, diagnostic, and installed lanes remain non-current. This
-Python gate never runs elevated, stages or installs anything, or accepts a
-cleanup path, PID, command, or caller-selected descriptor.
+No arguments execute the exact read-only pre-root RED while authenticating the
+published R26 authority, immutable failed R26 run, and exact live sequence-1/R14
+prestate. ``--r27-product`` and ``--r27-published`` review only immutable Git
+objects and isolated synthetic fixtures. There is no installed, root-update, or
+live-diagnostic lane in R27. This Python gate never runs elevated, stages or
+installs anything, or accepts a path, PID, command, state, nonce, or descriptor.
 """
 
 from __future__ import annotations
@@ -624,6 +622,73 @@ R26_PRESTAGED_IDENTITIES = {
     "staged_mediator": [16777232, 129313667, 0o100400, 0, 0, 1, 89392, 0],
     "installed_old_r12": [16777232, 128098563, 0o104555, 0, 0, 1, 89392, 0],
 }
+R27_AUTHORITY_BASE = "c43a4c0522e66aa6a44b6e4478d11c0bd8274d23"
+R27_AUTHORITY_TREE = "25f90891487ac45b8cf9b7c603eec8be383cb7be"
+R27_AUTHORITY_PARENTS = ["aa1a304b5387c6697e8413438c1898cb5015a4ef", "bcba53ace8cd73640857a49630a8eb6cfab72324"]
+R27_R26_CONTRACT_CANDIDATE = R27_AUTHORITY_PARENTS[1]
+R27_BASE_GATE_SHA256 = "8da91a9cc48a8d7144e9b565d17df7d1883f4e8a37aac6d666d7c7ff734ec421"
+R27_BASE_SPEC_SHA256 = "07b95f008a0c1a60c2f6ee0a0062b286399b8f4db158cee035a39d4892408b0f"
+R27_R26_GUARDED_PUBLICATION = R23_EVIDENCE_ROOT / "h039-r26-r2-contract-guarded-publication.json"
+R27_R26_GUARDED_PUBLICATION_SHA256 = "77dc52ac61a93ce6bfc7a64c9be7fb12559499db73af8d6a4f814ef2370a2ea7"
+R27_R26_FAILURE_LOG = R23_EVIDENCE_ROOT / "h039-r26-installed-effect-r2-c43a4c05.log"
+R27_R26_FAILURE_LOG_SHA256 = "27196ce2d8556b4d852c4d9379a0f218ca3fbc547371f37d976eb5a2b8acdaad"
+R27_R26_FAILURE_LOG_SIZE = 4918483
+R27_R26_EVIDENCE_IDENTITY8 = {
+    "publication": [16777232, 129422656, 0o100644, 501, 20, 1, 8524, 0],
+    "failure_log": [16777232, 129427946, 0o100644, 501, 20, 1, 4918483, 0],
+}
+R27_R26_FAILURE_LOG_LINES = 92928
+R27_R26_FAILURE_PASS_LINES = 92927
+R27_R26_FAILURE = b"RIG_ERROR: lock-holder create did not reach PREPARED"
+R27_R26_FAILURE_PREDECESSOR = b"PASS N_H039_MODEL_CRASH_BARRIER_6_TERMINAL_LOCATION"
+REJECTED_R27_R1_CANDIDATE = "ae10c55972a3122b330ae81f5180b40daed94b0d"
+REJECTED_R27_R1_TREE = "add9ee8395c9e526b65c6af86c91937e7eefd80f"
+REJECTED_R27_R1_GATE_SHA256 = "cb42e688be29622decd79f754745614c4022cb4f6d1fddf7512c4c1982c8e1ed"
+REJECTED_R27_R1_SPEC_SHA256 = "d30d4c63eb5390ac2cc9f7acf9da6cf92de26d73e629ad495402c1704a113d9f"
+R27_R1_REVIEW_LOGS = {
+    R23_EVIDENCE_ROOT / "h039-r27-gate-review-a-ae10c559.log": ("5e546ece2a38a65f4ed0e8244a0e21e7603891f3ae8bdf572132a9bcc0f92449", [16777232, 129612176, 0o100644, 501, 20, 1, 143842, 0]),
+    R23_EVIDENCE_ROOT / "h039-r27-gate-review-b-ae10c559.log": ("e19264feca88f1177242030ebb6d8e8a46b1319d4d9e92ec6a18c4d33e37eb83", [16777232, 129613083, 0o100644, 501, 20, 1, 133828, 0]),
+}
+R27_R1_DISPATCH_ERROR = b"RIG_ERROR: R26 current/stale dispatch branch cardinality drift"
+R27_R1_SEATBELT_UNDECIDABLE = b"OD\xc3\x96MBART H039_HOST_ENVIRONMENT \xe2\x80\x94 outer Seatbelt denied nested build-review sandbox"
+R27_REQUEST_NONCE = "a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b"
+R27_CLEANUP_NONCE = "0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417"
+R27_REQUEST_BODY = (
+    b'{"operation":"create-phase-diagnostic-v1","request_nonce":"'
+    + R27_REQUEST_NONCE.encode("ascii") + b'","schema_version":1}'
+)
+R27_REQUEST_BODY_SHA256 = "15d1605b336ac90037c6734b970cd0cdbc798e33648e6b2233df4302a430bf43"
+R27_REQUEST_WIRE = len(R27_REQUEST_BODY).to_bytes(4, "big") + R27_REQUEST_BODY
+R27_REQUEST_WIRE_SHA256 = "b711e43ddce6bc07b2d6bd0e1a59b0b24ca9a4116f505d3c61615ace24da7e09"
+R27_SEQUENCE_ONE_RECEIPT = (
+    b'{"capability_sha256":"c0561f2ff4b382a39fb79da72c3e34ad6c884a7b4f7eb2ae1fc77057d557d6ae",'
+    b'"cleanup_request_nonce":"66002a07aed574c8775a2c9759ffb19ca5672a2b5433f0dbb47b405cce7947be",'
+    b'"create_request_nonce":"7ea091edc6b1f543ac49ed517611e0b0b36d8a0eb0a78f770974ae15583a5263",'
+    b'"effect_sha256":"b86112a8b274aefe308ccaad0b697f2d13fe1d4f83810f3ec876a7ebe771bf0d",'
+    b'"runtime_id":"733a61fcdcd54d230e0e2ec6a4df8384","schema_version":1,"sequence":1}'
+)
+R27_SEQUENCE_ONE_RECEIPT_SHA256 = "fdb437bda59993f3994b758f5ffd52707da00ccb35839ec0b0730d4e089ec46a"
+R27_OLD_R14_MEDIATOR_SHA256 = "4a388755bd7c11c2d7a6c61347f19ab46eee0c4eabbb2f32f5468511faf9bbcd"
+R27_OLD_R14_MEDIATOR_SIZE = 89392
+R27_LIVE_IDENTITY8 = {
+    "namespace": [16777232, 126958092, 0o040555, 0, 0, 7, 224, 0],
+    "a": [16777232, 128098564, 0o040555, 0, 0, 2, 64, 0],
+    "c": [16777232, 128098565, 0o040555, 0, 0, 2, 64, 0],
+    "q": [16777232, 128098566, 0o040555, 0, 0, 2, 64, 0],
+    "r": [16777232, 128098567, 0o040555, 0, 0, 3, 96, 0],
+    "s": [16777232, 128098568, 0o040555, 0, 0, 3, 96, 0],
+    "lock": [16777232, 128098569, 0o100600, 0, 0, 1, 0, 0],
+    "last": [16777232, 129435766, 0o100444, 0, 0, 1, 432, 0],
+    "installed_r14": [16777232, 129313667, 0o104555, 0, 0, 1, 89392, 0],
+}
+R27_REGISTRY_SHA256 = "15137d42cd4dca18dafef1ff5a63694d755aa7d1d90df589d05817b51943ef9b"
+R27_RECONCILIATION_SHA256 = "d3a8efd2de8f77220d4eef26fc365a0c528cf17f1cd177858e2b5baa603fd94e"
+R27_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_ALL_EXACT_GRAPH_EVIDENCE_LIVE_PRESTATE_COMPOSITION_PRODUCT_RAW_WIRE_LEGACY_ISOLATION_PRECONDITION_LOCK_PHASE_PREPARED_PATH_SOCKET_AND_SEPARATE_SIGNED_LISTENER_FD_IDENTITY_CAPTURE_REFSTAT_TRANSFER_AND_RECEIVER_MATCH_FD_CLOEXEC_LOCALITY_LOCAL_CLOSE_ALL_ACK_ABSOLUTE_RECOVERY_GRACE_CONTINUOUS_WRITER_OUTCOME_RECOVERY_RECEIPT_RESULT_INSTALLER_TERMINAL_REPORTER_AND_R28_CONSUMING_OWNER_STOP_BINDINGS_IN_THE_NESTED_R27_REGISTRY;_EACH_SINGLE_STATE_IDENTITY_PHASE_RECEIPT_RESULT_FD_ALIAS_CLOSE_ORDER_DEADLINE_REPORTER_LIVE_DEPENDENCY_OR_DOWNSTREAM_MUTANT_REJECTS;_NO_SCM_RIGHTS_CLOEXEC_PRESERVATION_NO_PRODUCT_HARDCODED_HOST_DEV_INO_AND_NO_UNIVERSAL_HOSTILE_HOLDER_OR_PROCESS_DEATH_RESTORATION_CLAIM_IS_MADE."
+)
+R27_EXIT_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_ALL_EXACT_GRAPH_EVIDENCE_LIVE_PRESTATE_COMPOSITION_PRODUCT_RAW_WIRE_LEGACY_ISOLATION_PRECONDITION_LOCK_PHASE_PREPARED_PATH_SOCKET_AND_SEPARATE_SIGNED_LISTENER_FD_IDENTITY_CAPTURE_REFSTAT_TRANSFER_AND_RECEIVER_MATCH_FD_CLOEXEC_LOCALITY_LOCAL_CLOSE_ALL_ACK_ABSOLUTE_RECOVERY_GRACE_CONTINUOUS_WRITER_OUTCOME_RECOVERY_RECEIPT_RESULT_INSTALLER_TERMINAL_REPORTER_AND_R28_CONSUMING_OWNER_STOP_BINDINGS_IN_THE_NESTED_R27_REGISTRY;_EACH_SINGLE_STATE_IDENTITY_PHASE_RECEIPT_RESULT_FD_ALIAS_CLOSE_ORDER_DEADLINE_REPORTER_LIVE_DEPENDENCY_OR_DOWNSTREAM_MUTANT_REJECTS;_NO_SCM_RIGHTS_CLOEXEC_PRESERVATION_NO_PRODUCT_HARDCODED_HOST_DEV_INO_AND_NO_UNIVERSAL_HOSTILE_HOLDER_OR_PROCESS_DEATH_RESTORATION_CLAIM_IS_MADE"
+)
 REJECTED_R20_R1_CANDIDATE = "27ad790442a69c1d35f3cfcccfb6fc02fdd57aea"
 REJECTED_R20_R1_TREE = "f6c9dbec3958f165094291486b54a6b3042abba7"
 REJECTED_R20_R1_GATE_SHA256 = (
@@ -2186,41 +2251,31 @@ R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
     "/.install/controller/runtime-cleanup",
 }
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
-REASON = "H039_R26_PRESTAGED_R14_RECOVERY_AND_INSTALLED_EFFECT_COMPLETION_ABSENT"
+REASON = "H039_R27_R15_ATOMIC_CREATE_PHASE_DIAGNOSTIC_PRODUCT_ABSENT"
 FAILURE_SIGNATURE = [
-    "PUBLISHED_R25_MAIN_AA1A304B_IS_THE_EXACT_R26_AUTHORITY_BASE",
-    "R25_ORDERED_R24_AND_R25_CANDIDATE_PARENTS_TREE_GATE_AND_SPEC_ARE_EXACT",
-    "R25_GUARDED_PUBLICATION_RECEIPT_IS_IMMUTABLE_AND_EXACT",
-    "R25_CONSUMED_CEREMONY_AND_POSTFAILURE_CHAIN_ARE_IMMUTABLE_NO_CREDIT",
-    "R25_ATTEMPT_AND_OUTCOME_REMAIN_ABSENT_AND_R25_RETRY_IS_FORBIDDEN",
-    "R25_TRANSCRIPT_IS_EXACT_HEADER_PLUS90_RC0_SLOTS_WITH_NO_FOOTER",
-    "R25_TRANSCRIPT_PLAN_RC_VECTOR_IDENTITY_AND_DIGEST_ARE_EXACT",
-    "OWNER_ADJUDICATED_TRANSCRIPT_PROVES_EXACT_FULL_R14_PRESTAGING",
-    "R26_R1_DUAL_REVIEW_RIG_IS_IMMUTABLE_NO_CREDIT_AND_NONPARENT",
-    "R26_R2_RESTORES_ONLY_INHERITED_R19_PREPRODUCT_CAUSAL_CALL",
-    "R14_PRODUCT_FIVE_BLOBS_REBUILD_MACHO_AND_FIXED_UPDATER_ARE_EXACT",
-    "FRESH_PRODUCTLESS_R26_FIVE_FILE_CONTRACT_REQUIRES_TWO_REVIEWS_AND_PUBLICATION",
-    "R26_CEREMONY_VALIDATOR_SOURCE_BINDING_AND_DUAL_REVIEW_ARE_FIXED_HASH_BOUND",
-    "R26_LIVE_REAUTHENTICATES_EXACT_R14_PRESTAGED_IDENTITIES_AND_MEMBERSHIP",
-    "APFS_NLINK_EQUALS_TWO_PLUS_DIRECT_MEMBERS_ONLY_FOR_THREE_STAGING_DIRECTORIES",
-    "OLD3_2_GREATER_EQUAL_GLOBAL_PREMEMBERSHIP_OTHER_DIRECTORY_AND_DECOY_ORACLES_REJECT",
-    "NO_RESTAGE_REWRITE_CHMOD_CLEANUP_OR_OTHER_PREBOOTSTRAP_MUTATION",
-    "R26_CEREMONY_ACCEPTS_NO_CALLER_PATH_FD_ENVIRONMENT_ARGUMENT_OR_INPUT",
-    "STAGED_MEDIATOR_SAME_INODE_INSTALL_AND_RETAINED_OLD_R12_NLINK0_REQUIRED",
-    "DURABLE_FIXED_O_EXCL_RESERVATION_PRECEDES_SPAWN_AND_PERMANENTLY_CONSUMES_ATTEMPT",
-    "EXACT_FIXED_SUDO_ENV_I_C_ROOT_BOOTSTRAP_RUNS_ONCE_WITHOUT_RETRY",
-    "NONZERO_OUTPUT_IDENTITY_DRIFT_OR_AMBIGUITY_REQUIRES_NEW_OWNER_STOP",
-    "STATUS0_AND_EMPTY_OUTPUT_PRECEDE_POST_VALIDATION_AND_R26_INSTALLED_EFFECT",
-    "R26_INSTALLED_CLI_BINDS_CURRENT_PUBLICATION_AND_EXACT_R14_PRODUCT_MERGE",
-    "R25_AND_EVERY_OLDER_INSTALLED_LANE_IS_HISTORICAL_AND_STALE",
-    "EXACT_R14_INSTALLATION_MANIFEST_REBUILD_MACHO_AND_IDENTITY_PRECEDE_EFFECT",
-    "ALL_54_TRANSITIVE_INSTALLED_EFFECT_FUNCTIONS_REMAIN_BYTE_EXACT_TO_R14",
-    "INITIAL_RECEIPT_SEQUENCE0_EFFECT_DELTA13_AND_FINAL_SEQUENCE13_ARE_REQUIRED",
-    "ZERO_RUNTIME_PROCESS_DESCRIPTOR_RESIDUE_AND_FIXED_INSTALLATION_STABILITY_REQUIRED",
-    "R13_DIAGNOSTIC_RESTAGE_OR_EXECUTION_AND_PRODUCT_CHANGE_REMAIN_FORBIDDEN",
-    "NO_BROADER_AUTHORITY_H038_H032_H031_OR_SUPERVISOR_RESUME_BEFORE_H039_PASS",
+    "PUBLISHED_R26_MAIN_C43A4C05_IS_THE_EXACT_R27_AUTHORITY_BASE", "R26_ORDERED_R25_AND_R26_CANDIDATE_PARENTS_TREE_GATE_AND_SPEC_ARE_EXACT", "R26_GUARDED_PUBLICATION_RECEIPT_77DC52AC_IS_IMMUTABLE_AND_EXACT",
+    "R26_INSTALLED_EFFECT_LOG_27196CE2_IS_IMMUTABLE_WORKFLOW_ONLY_NO_CREDIT", "R26_LOG_SIZE4918483_LINES92928_PASS_PREFIX92927_FAIL_PREFIX0_ARE_EXACT", "R26_SOLE_ERROR_IS_CONCATENATED_AFTER_EXACT_PASS_ON_PHYSICAL_LINE92867_THEN_LINE92868_IS_BLANK_AND_EXACTLY60_PASS_PREFIXED_LINES_RUN_THROUGH92928_WITH_NO_SUMMARY_OR_CREDIT",
+    "R26_GUARD_RECEIPT_AND_FAILURE_LOG_IDENTITY8_VALUES_ARE_EXACT", "R26_INSTALLED_LANE_IS_STALE_AND_MAY_NOT_RETRY", "NOARG_READONLY_BINDS_EXACT_LIVE_SEQUENCE1_RECEIPT_BODY432_SHAFDB437BD_ROOT_WHEEL0444_NLINK1_AND_FINAL_REBIND",
+    "REJECTED_R27_R1_AE10C559_TREEADD9EE83_GATECB42E688_SPECD30D4C63_IS_IMMUTABLE_NO_CREDIT_NONPARENT", "R27_R1_REVIEW_A_5E546ECE_IDENTITY8_SIZE143842_LINES4142_PASS4141_FAIL0_SOLE_R26_DISPATCH_RIG_ERROR", "R27_R1_REVIEW_B_E19264FE_SIZE133828_PASS3323_SOLE_SEATBELT_UNDECIDABLE_IS_NO_CREDIT", "R26_STALE_INSTALLED_BRANCH_REMAINS_EXACT_UNREACHABLE_INDEPENDENTLY_BOOTSTRAP_AND_MUTUALLY_BOUND_DISPATCH_SELFTEST_CALLS_ARE_EXACTLY_ONCE_AND_ALL_SELECTOR_USES_AND_CURRENT_R27_THREE_LANES_ARE_IMMUTABLE_MAIN_AST_CAUSALLY_CLOSED",
+    "LIVE_NAMESPACE_MEMBERS_A_C_Q_R_S_DOTINSTALL_ABSENT_AND_ALL_NAMESPACE_STORE_LOCK_RECEIPT_IDENTITY8_VALUES_ARE_EXACT", "LIVE_PRESTATE_IS_ZERO_RUNTIME_WITH_INSTALLED_R14_SHA4A388755_SIZE89392_CDHASH07AB2816_AND_EXACT_IDENTITY8", "PRODUCT_AND_PUBLICATION_LANES_HAVE_NO_LIVE_ROOT_DEPENDENCY_OR_MUTATION",
+    "FRESH_R27_FIVE_FILE_CONTRACT_REQUIRES_TWO_REVIEWS_AND_GUARDED_PUBLICATION", "R27_HAS_ONLY_NOARG_RED_R27_PRODUCT_AND_R27_PUBLISHED_LANES", "R15_PRODUCT_HAS_EXACT_FIVE_EXISTING_M_PATHS_IN_R23_ORDER_WITH_UNCHANGED_MODES",
+    "R15_RECIPE_BINDS_OLD_R14_AND_NEW_R15_IDENTITIES_AND_MANIFEST_IS_MECHANICAL", "EXACT_BODY144_SHA15D1605B_AND_WIRE148_SHAB711E43D_SELECT_ONLY_OPERATION3", "FIXED_CREATE_NONCE_A9116C18_AND_INTERNAL_CLEANUP_NONCE_0EB67D19_ARE_DISTINCT",
+    "GENERIC_REQUEST_SEMANTICS_AND_LEGACY_CREATE_CLEANUP_REMAIN_BYTE_AND_BEHAVIOR_EXACT", "DIAGNOSTIC_NEVER_CALLS_OR_ALTERS_LEGACY_FIFO_ACK_BYTE41", "EXACT_SEQUENCE1_LAST_AND_EMPTY_A_C_Q_CURRENT_TEMPS_PRECEDE_TRANSACTION2",
+    "SAME_EXISTING_OFD_LOCK_IS_RETAINED_THROUGH_PHASE_RECOVERY_FINAL_VALIDATION_AND_RESULT", "DURABLE_PHASE_ORDER_IS_RESERVING_CREATING_PUBLISHING_PREPARING_PREPARED", "EXACTLY_ONE_REQUEST_BOUND_CREATE_OCCURS_WITH_NO_CALLER_SELECTED_STATE_PHASE_IDENTITY_PATH_OR_NONCE",
+    "PRECONDITION_STATE_OR_IDENTITY_DEVIATION_IS_NONZERO_NO_RESULT_ZERO_EFFECT_BEFORE_MUTATION", "FAILURE_BEFORE_FIRST_DURABLE_RESERVING_IS_NONZERO_NO_RESULT_NO_PREPARED_FRAME_NO_FDS_NO_FABRICATED_PHASE_AND_PRESERVES_EXACT_SEQUENCE1_WITH_NO_CURRENT_TEMPS_OR_RUNTIME", "ACTIVE_IS_NEVER_ACCEPTED_OR_WRITTEN_AND_STORE_LOCK_FD_IS_NEVER_DELEGATED_OR_DUPLICATED",
+    "RESTORATION_IS_SAME_TRANSACTION_ONLY_AND_COMPLETES_BEFORE_UNLOCK", "PREPARED_FRAME_OPERATION_AND_EXACT14_KEY_CANONICAL_SCHEMA_BINDS_RUNTIME_FIFO_NAMED_SOCKET_AND_SEPARATE_SIGNED_LISTENER_FD_IDENTITIES_WITH_NO_CAPABILITY_OR_PATH", "PREPARED_FRAME_HAS_EXACT_THREE_ORDERED_RUNTIME_FIFO_LISTENER_FDS",
+    "PREPARED_SENDER_FDS_ARE_DISTINCT_AT_LEAST3_EXACT_TYPE_ACCESS_IDENTITY_AND_CLOEXEC_LISTENER_FD_IS_SEPARATELY_CAPTURED_REFSTATTED_AND_RECEIVER_MATCHED_AND_RECEIVER_IMMEDIATELY_SETS_AND_VERIFIES_CLOEXEC", "ONLY_PREPARED_USES_SCM_RIGHTS_AND_X_THEN_EOF_ACK", "FIXED_COOPERATIVE_RUNNER_CLOSES_RUNTIME_LISTENER_WRITES_X_AND_CLOSES_FIFO",
+    "NEW_DIAGNOSTIC_ACK_ACCEPTS_ONLY_BYTE58_THEN_TRUE_EOF_UNDER_ONE_ABSOLUTE_DEADLINE_AND_RECOVERY_EOF_GRACE_CHECKS_THE_SAME_ABSOLUTE_DEADLINE_AT_LOOP_ENTRY_AND_AFTER_EVERY_POSITIVE_READ", "MEDIATOR_CLOSES_LOCAL_WRITER_BEFORE_ACK_LOCAL_RUNTIME_LISTENER_OBJECT_HIDDEN_PORTAL_BEFORE_NODELETEBUSY_AND_FIFO_READER_BEFORE_UNLINK", "RETAINED_LOCAL_ALIAS_CLOSE_ORDER_OR_CONTINUOUS_WRITER_DEADLINE_EXTENSION_MUTANTS_REJECT",
+    "EARLY_PHASE_RECOVERY_PRESERVES_ORIGINAL_SEQUENCE1_LAST_BYTES_AND_INODE", "LATE_PHASE_RECOVERY_PUBLISHES_SEQUENCE2_CLEANUP_RECEIPT_BOUND_TO_BOTH_NONCES", "SEQUENCE2_RECEIPT_AND_EFFECT_HAVE_EXACT_CANONICAL_KEYS_VALUES_AND_SAME_TRANSACTION_DERIVATIONS",
+    "SEQUENCE2_EFFECT_PREIMAGE_SIZE377_AND_RECEIPT_SIZE432_ARE_EXACT", "FINAL_NAMESPACE_IS_EXACT_A_C_Q_R_S_WITH_DOTINSTALL_ABSENT_AND_CURRENT_TEMPS_ABSENT_A_C_Q_EMPTY_S_SAMELOCK_R_VALIDLAST", "FINAL_RETAINED_NAMESPACE_A_C_Q_R_S_LOCK_IDENTITIES_EQUAL_OPERATION_CAPTURED_PREOP_IDENTITIES_BEFORE_AFTER_REBIND_AND_ONLY_R_LAST_INODE_IS_PHASE_DEPENDENT",
+    "FINAL_ZERO_RUNTIME_OBJECT_RESIDUE_AND_NO_MEDIATOR_OWNED_DESCRIPTOR_LEAK", "CONNECTED_COMPILED_RUNNER_VERIFIES_POST_EXIT_PROCESS_AND_FD_CLEANUP", "ONLY_AN_EXACT_REPORTABLE_DURABLE_PHASE_RETURNS_ONE_CANONICAL_REQUEST_BOUND_RESULT_WITH_REACHED_PHASE_AND_PHASE_DEPENDENT_RECEIPT",
+    "RESERVING_CREATING_RESULTS_BIND_EXACT_PRESERVED_SEQUENCE1_RECEIPT_AND_FDB437BD", "PUBLISHING_PREPARING_PREPARED_RESULTS_BIND_EXACT_CANONICAL_SEQUENCE2_RECEIPT_AND_DERIVED_SHA256", "ONE_CANONICAL_RESULT_HAS_EXACT_KEYS_ZERO_FDS_AND_NO_RAW_CAPABILITY_OR_PATH",
+    "DOUBLE_STATE_FSYNC_FAILURE_OR_PERSISTENT_RETAINED_FSTAT_UNCERTAINTY_RECOVERS_ONLY_THE_KNOWN_TRANSACTION_AND_IS_NONZERO_NO_RESULT", "EXIT0_FOLLOWS_ONLY_EXACT_REPORTABLE_PHASE_DURABILITY_RETAINED_IDENTITY_RECOVERY_FINAL_VALIDATION_AND_RESULT_WHILE_UNCLASSIFIABLE_OR_UNPROVEN_OUTCOMES_ARE_NONZERO_NO_RESULT_OWNER_STOP", "SUCCESSFUL_ATOMICITY_IS_SCOPED_TO_THE_FIXED_OPERATION_AND_FOR_PREPARED_THE_FIXED_COOPERATIVE_RUNNER_ONLY",
+    "NO_HOSTILE_RETAINED_FD_OR_MEDIATOR_DEATH_RESTORATION_CLAIM_IS_MADE", "R15_INSTALLER_GLOBAL_LEGACY_IDENTITIES_REMAIN_R14_R12_AND_DEDICATED_SEQUENCE1_UPDATER_BINDS_R15_R14", "R15_INSTALLER_ACCEPTS_ONLY_EXACT_SEQUENCE1_R14_TO_R15_UPDATE_UNDER_SAME_LOCK_PRESERVES_LAST_BYTES_INODE_AND_REJECTS_EMPTY_PREFIX_ALREADYR15_AND_NONEXACT_PREMUTATION",
+    "PRODUCT_REVIEW_RUNS_CONNECTED_COMPILED_MEDIATOR_AND_INSTALLER_ONLY_IN_ISOLATED_SYNTHETIC_FIXTURES_WITH_NO_LIVE_ROOT_DEPENDENCY", "R27_PERFORMS_NO_ROOT_UPDATE_INSTALLED_EFFECT_DIAGNOSTIC_OR_EVIDENCE_WRITE", "R27_ENDS_ONLY_PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY",
+    "R28_MUST_FREEZE_REVIEW_PUBLISH_UPDATE_R15_RUN_READONLY_UPDATE_REVIEW_THEN_ONE_DIAGNOSTIC_AND_OWNER_STOP", "INHERITED_MUTATING_EFFECT_H039_COMPLETION_AND_DOWNSTREAM_REQUIRE_FRESH_POST_DIAGNOSTIC_OWNER_AUTHORITY", "NO_BROADER_AUTHORITY_H038_H032_H031_OR_SUPERVISOR_RESUME_BEFORE_H039_PASS",
 ]
-EXPECTED_H039_ROW_SHA256 = "5f333d37e10cfc1f981fa6293baf79a6bdbeeed2748d1f72b58ada74d38a6e78"
+EXPECTED_H039_ROW_SHA256 = "d77919d16b87b7781561df2347f92eea09689398bc5e1663d54beb168367462d"
 
 passed = 0
 failed = 0
@@ -3802,6 +3857,840 @@ def r23_exact_c_function(raw: bytes, name: str) -> bytes:
     raise Rig(f"R23 exact C function closing brace absent: {name}")
 
 
+R27_DIAGNOSTIC_HELPERS_HEAD = br'''
+static const unsigned char diagnostic_request[]={"{\"operation\":\"create-phase-diagnostic-v1\",\"request_nonce\":\"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b\",\"schema_version\":1}"};
+static const unsigned char diagnostic_predecessor[]={"{\"capability_sha256\":\"c0561f2ff4b382a39fb79da72c3e34ad6c884a7b4f7eb2ae1fc77057d557d6ae\",\"cleanup_request_nonce\":\"66002a07aed574c8775a2c9759ffb19ca5672a2b5433f0dbb47b405cce7947be\",\"create_request_nonce\":\"7ea091edc6b1f543ac49ed517611e0b0b36d8a0eb0a78f770974ae15583a5263\",\"effect_sha256\":\"b86112a8b274aefe308ccaad0b697f2d13fe1d4f83810f3ec876a7ebe771bf0d\",\"runtime_id\":\"733a61fcdcd54d230e0e2ec6a4df8384\",\"schema_version\":1,\"sequence\":1}"};
+static int diagnostic_exact_names(int directory,const char*const*allowed,size_t allowed_count,unsigned required){
+  struct stat original_before,scan_identity,original_after;if(fstat(directory,&original_before)||!S_ISDIR(original_before.st_mode))return 0;int scan=openat(directory,".",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);if(scan<0)return 0;if(fstat(scan,&scan_identity)||!same_stat(&original_before,&scan_identity)){close(scan);return 0;}DIR*stream=fdopendir(scan);if(!stream){close(scan);return 0;}unsigned seen=0;int ok=1;struct dirent*entry;errno=0;while((entry=readdir(stream))!=NULL){if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,".."))continue;size_t index;for(index=0;index<allowed_count;index++)if(!strcmp(entry->d_name,allowed[index]))break;if(index==allowed_count||index>=sizeof(unsigned)*8U||(seen&(1U<<index))){ok=0;break;}seen|=1U<<index;}if(errno)ok=0;if(closedir(stream))ok=0;if(fstat(directory,&original_after)||!same_stat(&original_before,&original_after))ok=0;return ok&&(seen&required)==required;
+}
+static int diagnostic_ack(int reader){
+  struct timespec deadline;if(!start_absolute_deadline(&deadline))return 0;unsigned char byte;ssize_t n;for(;;){n=read(reader,&byte,1);if(n<0&&errno==EINTR)continue;if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){if(!wait_input_until(reader,&deadline))return 0;continue;}break;}if(deadline_remaining(&deadline)<=0||n!=1||byte!='X')return 0;for(;;){n=read(reader,&byte,1);if(n<0&&errno==EINTR)continue;if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){if(deadline_remaining(&deadline)<=0)return 0;struct timespec pause={0,1000000};while(nanosleep(&pause,&pause)&&errno==EINTR){}continue;}break;}return deadline_remaining(&deadline)>0&&n==0;
+}
+static int diagnostic_wait_eof(int reader){struct timespec deadline;if(!start_absolute_deadline(&deadline))return 0;unsigned char bytes[32];for(;;){if(deadline_remaining(&deadline)<=0)return 0;ssize_t n=read(reader,bytes,sizeof bytes);if(n==0)return 1;if(n>0){if(deadline_remaining(&deadline)<=0)return 0;continue;}if(errno==EINTR)continue;if(errno!=EAGAIN&&errno!=EWOULDBLOCK)return 0;if(deadline_remaining(&deadline)<=0)return 0;struct timespec pause={0,1000000};if(nanosleep(&pause,NULL)&&errno!=EINTR)return 0;}
+}
+static int
+diagnostic_close_fd(int fd);
+static int diagnostic_bind_listener(const State*s,int portal,struct stat*path_identity,struct stat*fd_identity,int*owned){*owned=-1;char name[35],path[104];if(!object_name(s,name))return 0;int pn=snprintf(path,sizeof path,NS "/a/%s/p/c",name);if(pn<=0||(size_t)pn>=sizeof path||(size_t)pn>=sizeof(((struct sockaddr_un*)0)->sun_path))return 0;int fd=socket(AF_UNIX,SOCK_STREAM,0);if(fd<0)return 0;*owned=fd;int one=1;if(fcntl(fd,F_SETFD,FD_CLOEXEC)||setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof one))return 0;struct sockaddr_un address;memset(&address,0,sizeof address);address.sun_family=AF_UNIX;strcpy(address.sun_path,path);struct stat rebound,descriptor;if(bind(fd,(struct sockaddr*)&address,(socklen_t)(offsetof(struct sockaddr_un,sun_path)+strlen(path)+1))||chown(path,0,CLIENT_GID)||chmod(path,0620)||listen(fd,16)||!flush_dir(portal)||fstat(fd,&descriptor)||!S_ISSOCK(descriptor.st_mode)||lstat(path,path_identity)||!S_ISSOCK(path_identity->st_mode)||path_identity->st_uid||path_identity->st_gid!=CLIENT_GID||(path_identity->st_mode&07777)!=0620||path_identity->st_nlink!=1||fstatat(portal,"c",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(path_identity,&rebound))return 0;*fd_identity=descriptor;return 1;
+}
+static int diagnostic_prepared_descriptors(int runtime,int writer,int listener,int portal,const State*s,const struct stat*listener_identity){if(runtime<3||writer<3||listener<3||portal<3||runtime==writer||runtime==listener||writer==listener)return 0;int rf=fcntl(runtime,F_GETFD),wf=fcntl(writer,F_GETFD),lf=fcntl(listener,F_GETFD),ra=fcntl(runtime,F_GETFL),wa=fcntl(writer,F_GETFL),la=fcntl(listener,F_GETFL);if(rf<0||wf<0||lf<0||ra<0||wa<0||la<0||!(rf&FD_CLOEXEC)||!(wf&FD_CLOEXEC)||!(lf&FD_CLOEXEC)||(ra&O_ACCMODE)!=O_RDONLY||(wa&O_ACCMODE)!=O_WRONLY||(la&O_ACCMODE)!=O_RDWR)return 0;struct stat r,w,l,named,rebound,before;if(fstat(runtime,&r)||fstat(writer,&w)||!S_ISDIR(r.st_mode)||!S_ISFIFO(w.st_mode)||(unsigned long long)r.st_dev!=s->runtime_dev||(unsigned long long)r.st_ino!=s->runtime_ino||(unsigned long long)w.st_dev!=s->fifo_dev||(unsigned long long)w.st_ino!=s->fifo_ino)return 0;char name[35],path[104];if(!object_name(s,name))return 0;int pn=snprintf(path,sizeof path,NS "/a/%s/p/c",name);if(pn<=0||(size_t)pn>=sizeof path||fstatat(portal,"c",&before,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH))return 0;struct sockaddr_un address;socklen_t length=sizeof address;memset(&address,0,sizeof address);struct socket_fdinfo info;memset(&info,0,sizeof info);int got=proc_pidfdinfo(getpid(),listener,PROC_PIDFDSOCKETINFO,&info,sizeof info);return !getsockname(listener,(struct sockaddr*)&address,&length)&&address.sun_family==AF_UNIX&&!strcmp(address.sun_path,path)&&got==(int)sizeof info&&info.psi.soi_family==AF_UNIX&&info.psi.soi_type==SOCK_STREAM&&info.psi.soi_kind==SOCKINFO_UN&&(info.psi.soi_options&SO_ACCEPTCONN)&&!strcmp(info.psi.soi_proto.pri_un.unsi_addr.ua_sun.sun_path,path)&&!lstat(path,&named)&&!fstatat(portal,"c",&rebound,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&before,&named)&&same_stat(&named,&rebound)&&S_ISSOCK(named.st_mode)&&(unsigned long long)named.st_dev==s->socket_dev&&(unsigned long long)named.st_ino==s->socket_ino&&named.st_uid==0&&named.st_gid==CLIENT_GID&&(named.st_mode&07777)==0620&&named.st_nlink==1&&!fstat(listener,&l)&&S_ISSOCK(l.st_mode)&&l.st_dev==listener_identity->st_dev&&l.st_ino==listener_identity->st_ino;
+}
+static int diagnostic_close_fd(int fd){
+  if(close(fd)==0)return 1;int saved=errno,probe=fcntl(fd,F_GETFD);if(probe<0&&errno==EBADF){errno=saved;return 1;}if(probe<0){errno=saved;return 0;}if(close(fd)==0){errno=saved;return 1;}saved=errno;int closed=fcntl(fd,F_GETFD)<0&&errno==EBADF;errno=saved;return closed;
+}
+static int diagnostic_release(int*fd){if(*fd<0)return 1;int value=*fd;if(!diagnostic_close_fd(value))return 0;*fd=-1;return 1;}
+static int diagnostic_remove_owned_temp(Store*t,const struct stat*owned){
+  struct stat named;if(fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!S_ISREG(named.st_mode)||named.st_dev!=owned->st_dev||named.st_ino!=owned->st_ino||named.st_nlink!=1)return 0;if(unlinkat(t->s,".current.tmp",AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH|AT_UNIQUE)||!flush_dir(t->s))return 0;if(fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)==0||errno!=ENOENT)return 0;return 1;
+}
+static int diagnostic_same_file(const struct stat*a,const struct stat*b){
+  return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&a->st_nlink==b->st_nlink&&a->st_size==b->st_size;
+}
+static int diagnostic_current_equals(Store*t,const State*s,const struct stat*owned){
+  char expected[4096];int expected_n=state_bytes(s,expected,sizeof expected);unsigned char*raw=NULL;size_t n=0;struct stat identity;int found=read_named(t->s,"current",&raw,&n,&identity);int ok=expected_n>0&&found==1&&n==(size_t)expected_n&&!memcmp(raw,expected,n)&&(!owned||diagnostic_same_file(owned,&identity))&&diagnostic_exact_names(t->s,(const char*const[]){"lock","current"},2,3U);free(raw);return ok;
+}
+static int diagnostic_prior_state(Store*t,int absent,const State*last){
+  if(absent){State ignored;return state_present(t,&ignored)==0&&diagnostic_exact_names(t->s,(const char*const[]){"lock"},1,1U);}return diagnostic_current_equals(t,last,NULL);
+}
+static int diagnostic_put_state(Store*t,const State*s,int absent,State*last,State*reportable){
+  char raw[4096];int n=state_bytes(s,raw,sizeof raw);if(n<=0||(size_t)n>=sizeof raw)return -1;int fd=openat(t->s,".current.tmp",O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW_ANY|O_UNIQUE,0444);if(fd<0)return -1;struct stat owned,ready,retained,named;if(fstat(fd,&owned)){int identified=!fstatat(t->s,".current.tmp",&owned,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&S_ISREG(owned.st_mode)&&owned.st_uid==0&&owned.st_gid==0&&(owned.st_mode&07777)==0400&&owned.st_nlink==1&&owned.st_size==0;int closed=diagnostic_release(&fd),removed=identified&&diagnostic_remove_owned_temp(t,&owned),prior=removed&&diagnostic_prior_state(t,absent,last);return closed&&prior?0:-1;}int complete=S_ISREG(owned.st_mode)&&owned.st_nlink==1&&write_all(fd,raw,(size_t)n)&&!fsync(fd)&&!fchown(fd,0,0)&&!fchmod(fd,0444)&&!fsync(fd)&&!fstat(fd,&ready)&&S_ISREG(ready.st_mode)&&ready.st_uid==0&&ready.st_gid==0&&(ready.st_mode&07777)==0444&&ready.st_nlink==1&&ready.st_size==(off_t)n&&ready.st_dev==owned.st_dev&&ready.st_ino==owned.st_ino&&!fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&ready,&named);if(complete)owned=ready;if(!complete){int closed=diagnostic_release(&fd),removed=diagnostic_remove_owned_temp(t,&owned),prior=removed&&diagnostic_prior_state(t,absent,last);return closed&&prior?0:-1;}unsigned flags=RENAME_NOFOLLOW_ANY|RENAME_RESOLVE_BENEATH|(absent?RENAME_EXCL:0);int renamed=renameatx_np(t->s,".current.tmp",t->s,"current",flags)==0;int retained_ok=!fstat(fd,&retained)&&diagnostic_same_file(&owned,&retained);if(!retained_ok)retained_ok=!fstat(fd,&retained)&&diagnostic_same_file(&owned,&retained);int committed=diagnostic_current_equals(t,s,&owned);if(!committed)committed=diagnostic_current_equals(t,s,&owned);if(committed){int first_flush=flush_dir(t->s),durable=first_flush||flush_dir(t->s);*last=*s;int closed=diagnostic_release(&fd),classified=retained_ok&&durable&&closed;if(classified)*reportable=*s;else return -1;return renamed&&first_flush?1:2;}int temp=fstatat(t->s,".current.tmp",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH);if(!renamed&&temp==0&&same_stat(&owned,&named)){int closed=diagnostic_release(&fd),removed=diagnostic_remove_owned_temp(t,&owned),prior=removed&&diagnostic_prior_state(t,absent,last);return closed&&prior?0:-1;}diagnostic_release(&fd);return -1;
+}
+'''
+
+R27_DIAGNOSTIC_HELPERS_TAIL = br'''
+typedef struct{struct stat ns,a,c,q,r,s,lock;} DiagnosticStoreIdentity;
+static int diagnostic_identity8_equal(const struct stat*a,const struct stat*b){
+  return a->st_dev==b->st_dev&&a->st_ino==b->st_ino&&a->st_mode==b->st_mode&&a->st_uid==b->st_uid&&a->st_gid==b->st_gid&&a->st_nlink==b->st_nlink&&a->st_size==b->st_size&&a->st_flags==b->st_flags;
+}
+static int diagnostic_directory_shape(const struct stat*s,unsigned long links){
+  return S_ISDIR(s->st_mode)&&s->st_uid==0&&s->st_gid==0&&(s->st_mode&07777)==0555&&s->st_nlink==links;
+}
+static int diagnostic_store_identity(Store*t,DiagnosticStoreIdentity*identity,const DiagnosticStoreIdentity*expected){
+  struct stat named;if(fstat(t->ns,&identity->ns)||fstat(t->a,&identity->a)||fstat(t->c,&identity->c)||fstat(t->q,&identity->q)||fstat(t->r,&identity->r)||fstat(t->s,&identity->s)||fstat(t->lock,&identity->lock))return 0;if(!diagnostic_directory_shape(&identity->ns,7)||!diagnostic_directory_shape(&identity->a,2)||!diagnostic_directory_shape(&identity->c,2)||!diagnostic_directory_shape(&identity->q,2)||!diagnostic_directory_shape(&identity->r,3)||!diagnostic_directory_shape(&identity->s,3)||!S_ISREG(identity->lock.st_mode)||identity->lock.st_uid||identity->lock.st_gid||(identity->lock.st_mode&07777)!=0600||identity->lock.st_nlink!=1||identity->lock.st_size)return 0;if(lstat(NS,&named)||!same_stat(&identity->ns,&named))return 0;const char*names[]={"a","c","q","r","s"};const struct stat*values[]={&identity->a,&identity->c,&identity->q,&identity->r,&identity->s};for(size_t i=0;i<5;i++)if(fstatat(t->ns,names[i],&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(values[i],&named))return 0;if(fstatat(t->s,"lock",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)||!same_stat(&identity->lock,&named))return 0;if(!expected)return 1;const struct stat*observed[]={&identity->ns,&identity->a,&identity->c,&identity->q,&identity->r,&identity->s,&identity->lock};const struct stat*prior[]={&expected->ns,&expected->a,&expected->c,&expected->q,&expected->r,&expected->s,&expected->lock};for(size_t i=0;i<7;i++)if(!diagnostic_identity8_equal(observed[i],prior[i]))return 0;return 1;
+}
+static int diagnostic_predecessor_open(Store*t,struct stat*identity,DiagnosticStoreIdentity*store_identity){
+  const char*fixed[]={"a","c","q","r","s"},*lock_names[]={"lock"},*last_names[]={"last"};unsigned char*raw=NULL;size_t n=0;Receipt receipt;int fd=-1,ok=diagnostic_store_identity(t,store_identity,NULL)&&diagnostic_exact_names(t->ns,fixed,5,31U)&&diagnostic_exact_names(t->a,NULL,0,0)&&diagnostic_exact_names(t->c,NULL,0,0)&&diagnostic_exact_names(t->q,NULL,0,0)&&diagnostic_exact_names(t->r,last_names,1,1U)&&diagnostic_exact_names(t->s,lock_names,1,1U);if(ok)fd=stable_named_fd(t->r,"last",O_RDONLY,0,0,0444,sizeof diagnostic_predecessor-1,&raw,&n,identity);ok=fd>=0&&n==sizeof diagnostic_predecessor-1&&!memcmp(raw,diagnostic_predecessor,n)&&parse_receipt_raw(raw,n,&receipt)&&receipt.sequence==1;free(raw);if(!ok&&fd>=0){close(fd);fd=-1;}return fd;
+}
+static int diagnostic_predecessor_same(Store*t,int fd,const struct stat*identity){
+  unsigned char*raw=NULL;size_t n=0;struct stat retained,named;int ok=stable_read_fd(fd,sizeof diagnostic_predecessor-1,&raw,&n,&retained)&&same_stat(identity,&retained)&&n==sizeof diagnostic_predecessor-1&&!memcmp(raw,diagnostic_predecessor,n)&&!fstatat(t->r,"last",&named,AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);free(raw);return ok;
+}
+static int diagnostic_predecessor_unlinked(int fd,const struct stat*identity){
+  struct stat after;return !fstat(fd,&after)&&identity->st_dev==after.st_dev&&identity->st_ino==after.st_ino&&identity->st_mode==after.st_mode&&identity->st_uid==after.st_uid&&identity->st_gid==after.st_gid&&identity->st_size==after.st_size&&identity->st_nlink==1&&after.st_nlink==0;
+}
+static int diagnostic_store_fds_only(const Store*t){
+  const int wanted[]={0,t->ns,t->a,t->c,t->q,t->r,t->s,t->lock};struct proc_fdinfo list[17];memset(list,0,sizeof list);errno=0;int got=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,list,(int)sizeof list);if(got!=8*(int)sizeof(struct proc_fdinfo)||errno)return 0;unsigned seen=0;for(int i=0;i<8;i++){int match=-1;for(int j=0;j<8;j++)if(list[i].proc_fd==wanted[j]){match=j;break;}if(match<0||(seen&(1U<<(unsigned)match)))return 0;seen|=1U<<(unsigned)match;}return seen==255U;
+}
+static int diagnostic_final(Store*t,const State*created,int early,const DiagnosticStoreIdentity*initial,char receipt_sha[65]){
+  const char*fixed[]={"a","c","q","r","s"},*lock_names[]={"lock"},*last_names[]={"last"};DiagnosticStoreIdentity final_identity;if(!diagnostic_store_identity(t,&final_identity,initial)||!diagnostic_exact_names(t->ns,fixed,5,31U)||!diagnostic_exact_names(t->a,NULL,0,0)||!diagnostic_exact_names(t->c,NULL,0,0)||!diagnostic_exact_names(t->q,NULL,0,0)||!diagnostic_exact_names(t->r,last_names,1,1U)||!diagnostic_exact_names(t->s,lock_names,1,1U))return 0;State absent;if(state_present(t,&absent)!=0)return 0;Receipt receipt;unsigned char*raw=NULL;size_t n=0;int found=last_present(t,&receipt,&raw,&n);if(found!=1)return 0;int ok=0;if(early){ok=n==sizeof diagnostic_predecessor-1&&!memcmp(raw,diagnostic_predecessor,n)&&receipt.sequence==1;}else{Receipt expected;memset(&expected,0,sizeof expected);strcpy(expected.runtime,created->runtime);strcpy(expected.cap,created->cap);strcpy(expected.create_nonce,"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b");strcpy(expected.cleanup_nonce,"0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417");expected.sequence=2;char exact[2048];int exact_n=receipt_bytes(&expected,exact,sizeof exact);ok=exact_n==432&&n==432&&!memcmp(raw,exact,n)&&receipt.sequence==2&&!strcmp(receipt.create_nonce,expected.create_nonce)&&!strcmp(receipt.cleanup_nonce,expected.cleanup_nonce)&&!strcmp(receipt.runtime,expected.runtime)&&!strcmp(receipt.cap,expected.cap)&&!strcmp(receipt.effect,expected.effect);}if(ok)digest(raw,n,receipt_sha);free(raw);return ok;
+}
+static int process_diagnostic(Store*t,const Request*r){
+  struct stat predecessor_identity;DiagnosticStoreIdentity store_identity;int predecessor=diagnostic_predecessor_open(t,&predecessor_identity,&store_identity);if(predecessor<0||strcmp(r->operation,"create-phase-diagnostic-v1")||strcmp(r->nonce,"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b")||*r->capability){if(predecessor>=0)close(predecessor);return 1;}State created,reportable;memset(&created,0,sizeof created);memset(&reportable,0,sizeof reportable);int unwound=0,prepared_ack=diagnostic_create_runtime_object(t,r,&created,&reportable,&unwound);State current;int present=state_present(t,&current),phase=phase_index(created.phase);int self=present==1&&phase>=0&&phase<=4&&created.sequence==2&&!strcmp(created.create_nonce,r->nonce)&&!*created.cleanup_nonce&&state_tx_equal(&created,&current)&&state_ids_equal(&created,&current)&&!strcmp(created.phase,current.phase)&&!*current.cleanup_nonce&&validate_store_shape(t,&current,NULL);if(!self){close(predecessor);return 1;}int classified=state_tx_equal(&created,&reportable)&&state_ids_equal(&created,&reportable)&&!strcmp(created.phase,reportable.phase),result_eligible=classified&&unwound&&((phase<4&&!prepared_ack)||(phase==4&&prepared_ack));char reached[16];strcpy(reached,created.phase);int early=phase<=1;Request recovery;memset(&recovery,0,sizeof recovery);strcpy(recovery.nonce,"0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417");const char*reason="INCOMPLETE_IDENTITY";if(!recover_with_create(t,&current,&recovery,&reason)){close(predecessor);return 1;}char receipt_sha[65];int final=(early?diagnostic_predecessor_same(t,predecessor,&predecessor_identity):diagnostic_predecessor_unlinked(predecessor,&predecessor_identity))&&diagnostic_final(t,&created,early,&store_identity,receipt_sha);if(close(predecessor))final=0;if(!final||!diagnostic_store_fds_only(t)||!result_eligible)return 1;unsigned long long receipt_sequence=early?1ULL:2ULL;char body[1024];int n=snprintf(body,sizeof body,"{\"cleanup_request_nonce\":\"0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417\",\"operation\":\"create-phase-diagnostic-result-v1\",\"reached_phase\":\"%s\",\"receipt_sequence\":%llu,\"receipt_sha256\":\"%s\",\"request_nonce\":\"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b\",\"runtime_id\":\"%s\",\"schema_version\":1,\"transaction_sequence\":2,\"zero_runtime_residue\":true}",reached,receipt_sequence,receipt_sha,created.runtime);return n>0&&(size_t)n<sizeof body&&json_frame(0,body)?0:1;
+}
+'''
+
+R27_MAIN_PARSE_OLD = (
+    b"Request request;int parsed=parse_request(raw,n,&request);free(raw);if(!parsed)"
+    b"return 1;const char*semantic_reason=\"INVALID_KEYS\";int operation="
+    b"request_semantics(&request,&semantic_reason);"
+)
+R27_MAIN_PARSE_NEW = (
+    b"int exact_diagnostic=n==sizeof diagnostic_request-1&&!memcmp(raw,"
+    b"diagnostic_request,sizeof diagnostic_request-1);Request request;int parsed="
+    b"parse_request(raw,n,&request);free(raw);if(!parsed)return 1;const char*"
+    b"semantic_reason=\"INVALID_KEYS\";int operation=exact_diagnostic?3:"
+    b"request_semantics(&request,&semantic_reason);"
+)
+R27_MAIN_PROCESS_OLD = (
+    b"if(!reconcile_state_temp(&store,&request,operation,&continuation)){close_store("
+    b"&store);return 1;}int rc=operation==1?process_create(&store,&request):"
+    b"process_cleanup(&store,&request,&continuation);"
+)
+R27_MAIN_PROCESS_NEW = (
+    b"if(operation==3){int rc=process_diagnostic(&store,&request);close_store(&store);"
+    b"return rc;}if(!reconcile_state_temp(&store,&request,operation,&continuation)){"
+    b"close_store(&store);return 1;}int rc=operation==1?process_create(&store,&request):"
+    b"process_cleanup(&store,&request,&continuation);"
+)
+R27_SEQUENCE_ONE_RECEIPT_C = (
+    b'"{\\"capability_sha256\\":\\"c0561f2ff4b382a39fb79da72c3e34ad6c884a7b4f7eb2ae1fc77057d557d6ae\\",'
+    b'\\"cleanup_request_nonce\\":\\"66002a07aed574c8775a2c9759ffb19ca5672a2b5433f0dbb47b405cce7947be\\",'
+    b'\\"create_request_nonce\\":\\"7ea091edc6b1f543ac49ed517611e0b0b36d8a0eb0a78f770974ae15583a5263\\",'
+    b'\\"effect_sha256\\":\\"b86112a8b274aefe308ccaad0b697f2d13fe1d4f83810f3ec876a7ebe771bf0d\\",'
+    b'\\"runtime_id\\":\\"733a61fcdcd54d230e0e2ec6a4df8384\\",\\"schema_version\\":1,\\"sequence\\":1}"'
+)
+R27_SEQUENCE_ONE_CLASSIFIER = (
+    b"\nstatic int sequence_one_candidate(int ns){const char*names[]={\"last\"};"
+    b"int r=durable_fixed_dir_at(ns,\"r\",0,0,0555);unsigned char*raw=NULL;"
+    b"size_t n=0;struct stat identity;int fd=r>=0?stable_named_fd(r,\"last\","
+    b"O_RDONLY,0,0,0444,432,&raw,&n,&identity):-1;int ok=r>=0&&fd>=0&&"
+    b"exact_names(r,names,1,1U)&&n==432&&!memcmp(raw," + R27_SEQUENCE_ONE_RECEIPT_C
+    + b",432);free(raw);if(fd>=0&&close(fd))ok=0;if(r>=0&&close(r))ok=0;return ok;}\n"
+)
+R27_SEQUENCE_ONE_DISPATCH_ANCHOR = (
+    b"int finalizing=(nss.st_mode&07777)==0555;const char*namespace_names[]="
+)
+R27_SEQUENCE_ONE_DISPATCH_REPLACEMENT = (
+    b"int finalizing=(nss.st_mode&07777)==0555;if(finalizing&&sequence_one_candidate(ns)){"
+    b"int helpers=open(\"/Library/PrivilegedHelperTools\",O_RDONLY|O_DIRECTORY|O_CLOEXEC|"
+    b"O_NOFOLLOW_ANY);struct stat hs,hs_after;if(helpers<0||fstat(helpers,&hs)||!S_ISDIR("
+    b"hs.st_mode)||hs.st_uid||hs.st_gid||(hs.st_mode&0022)||fsync(helpers)||fstat(helpers,"
+    b"&hs_after)||!same_stat(&hs,&hs_after)){if(helpers>=0)close(helpers);close(db);close(ns);"
+    b"return 0;}int upgraded=sequence_one_upgrade_installed_mediator(project,ns,db,helpers,"
+    b"mediator,mediator_n);if(close(helpers))upgraded=0;if(close(db))upgraded=0;if(close(ns))"
+    b"upgraded=0;return upgraded;}close(db);close(ns);return 0;"
+    b"const char*namespace_names[]="
+)
+
+
+def r27_sequence_one_updater(source: bytes) -> bytes:
+    start = source.index(b"typedef struct{int a,c,q,r,s,lock;} UpgradeGuard;")
+    finish = source.index(b"\nstatic int apply_install(", start)
+    block = source[start:finish]
+    renames = (
+        (b"upgrade_installed_mediator", b"sequence_one_upgrade_installed_mediator"),
+        (b"retained_installed_version", b"sequence_one_retained_installed_version"),
+        (b"upgrade_same_directory_object", b"sequence_one_same_directory_object"),
+        (b"upgrade_directory_shape", b"sequence_one_directory_shape"),
+        (b"upgrade_namespace_rebound", b"sequence_one_namespace_rebound"),
+        (b"upgrade_project_rebound", b"sequence_one_project_rebound"),
+        (b"upgrade_helpers_rebound", b"sequence_one_helpers_rebound"),
+        (b"upgrade_guard_acquire", b"sequence_one_guard_acquire"),
+        (b"upgrade_guard_close", b"sequence_one_guard_close"),
+        (b"upgrade_guard_shape", b"sequence_one_guard_shape"),
+        (b"upgrade_rebound_dir", b"sequence_one_rebound_dir"),
+        (b"upgrade_lock_shape", b"sequence_one_lock_shape"),
+        (b"upgrade_fixed_absent", b"sequence_one_fixed_absent"),
+        (b"upgrade_old_unlinked", b"sequence_one_old_unlinked"),
+        (b"upgrade_guard_init", b"sequence_one_guard_init"),
+        (b"UpgradeGuard", b"SequenceOneUpgradeGuard"),
+    )
+    for old, new in renames:
+        block = block.replace(old, new)
+    old_type = b"typedef struct{int a,c,q,r,s,lock;} SequenceOneUpgradeGuard;"
+    new_type = (
+        b"typedef struct{int a,c,q,r,s,lock,last;struct stat last_identity;} "
+        b"SequenceOneUpgradeGuard;"
+    )
+    old_init = (
+        b"static void sequence_one_guard_init(SequenceOneUpgradeGuard*g){"
+        b"g->a=g->c=g->q=g->r=g->s=g->lock=-1;}"
+    )
+    new_init = (
+        b"static void sequence_one_guard_init(SequenceOneUpgradeGuard*g){"
+        b"g->a=g->c=g->q=g->r=g->s=g->lock=g->last=-1;memset(&g->last_identity,0,"
+        b"sizeof g->last_identity);}"
+    )
+    if block.count(old_type) != 1 or block.count(old_init) != 1:
+        raise Rig("R27 sequence-one updater type/init anchor drift")
+    block = block.replace(old_type, new_type, 1).replace(old_init, new_init, 1)
+    shape_anchor = b"static int sequence_one_guard_shape("
+    receipt_helper = (
+        b"static int sequence_one_receipt(const SequenceOneUpgradeGuard*g){const char*"
+        b"names[]={\"last\"};unsigned char*raw=NULL;size_t n=0;struct stat retained,named;"
+        b"int ok=g->last>=0&&stable_read_fd(g->last,432,&raw,&n,&retained)&&same_stat("
+        b"&g->last_identity,&retained)&&n==432&&!memcmp(raw," + R27_SEQUENCE_ONE_RECEIPT_C
+        + b",432)&&exact_names(g->r,names,1,1U)&&!fstatat(g->r,\"last\",&named,"
+        b"AT_SYMLINK_NOFOLLOW_ANY|AT_RESOLVE_BENEATH)&&same_stat(&retained,&named);free(raw);"
+        b"return ok;}\n"
+    )
+    if block.count(shape_anchor) != 1 or block.count(b"exact_empty(g->r)") != 1:
+        raise Rig("R27 sequence-one updater receipt/shape anchor drift")
+    block = block.replace(shape_anchor, receipt_helper + shape_anchor, 1)
+    block = block.replace(b"exact_empty(g->r)", b"sequence_one_receipt(g)", 1)
+    acquire_old = (
+        b'g->r=durable_fixed_dir_at(ns,"r",0,0,0555);g->s='
+    )
+    acquire_new = (
+        b'g->r=durable_fixed_dir_at(ns,"r",0,0,0555);struct stat last_id;g->last='
+        b'g->r>=0?stable_named_fd(g->r,"last",O_RDONLY,0,0,0444,432,NULL,NULL,&last_id):-1;'
+        b'if(g->last>=0)g->last_identity=last_id;g->s='
+    )
+    durability_old = b"if(!sequence_one_guard_shape(ns,g,1)||fsync(g->lock)||!flush_dir(g->s))"
+    durability_new = (
+        b"if(!sequence_one_guard_shape(ns,g,1)||fsync(g->last)||!flush_dir(g->r)||"
+        b"fsync(g->lock)||!flush_dir(g->s))"
+    )
+    close_old = b"if(g->r>=0&&close(g->r))ok=0;if(g->s>=0&&close(g->s))ok=0;"
+    close_new = (
+        b"if(g->last>=0&&close(g->last))ok=0;if(g->r>=0&&close(g->r))ok=0;"
+        b"if(g->s>=0&&close(g->s))ok=0;"
+    )
+    for old, new, label in (
+        (acquire_old, acquire_new, "retained last open"),
+        (durability_old, durability_new, "last durability"),
+        (close_old, close_new, "last close before lock"),
+    ):
+        if block.count(old) != 1:
+            raise Rig(f"R27 sequence-one updater {label} anchor drift")
+        block = block.replace(old, new, 1)
+    for old, new in (
+        (b"H039_MEDIATOR_SHA256", b"H039_R15_MEDIATOR_SHA256"),
+        (b"H039_MEDIATOR_SIZE", b"H039_R15_MEDIATOR_SIZE"),
+        (b"H039_OLD_MEDIATOR_SHA256", b"H039_R15_OLD_MEDIATOR_SHA256"),
+        (b"H039_OLD_MEDIATOR_SIZE", b"H039_R15_OLD_MEDIATOR_SIZE"),
+    ):
+        block = block.replace(old, new)
+    retry = b"if(version!=1&&version!=2)goto done;"
+    if block.count(retry) != 1:
+        raise Rig("R27 sequence-one updater no-retry anchor drift")
+    block = block.replace(retry, b"if(version!=1)goto done;", 1)
+    return R27_SEQUENCE_ONE_CLASSIFIER + block
+
+
+def r27_private_create(source: bytes) -> bytes:
+    private = r23_exact_c_function(source, "create_runtime_object")
+    transforms = (
+        (
+            b"static int create_runtime_object(Store*t,const Request*request){\n  State s;",
+            b"static int diagnostic_create_runtime_object(Store*t,const Request*request,State*last,State*reportable,int*unwound){\n  int object=-1,hidden=-1,runtime=-1,reader=-1,writer=-1,portal=-1,listener=-1;unsigned char*python=NULL;size_t python_n=0;int ok=0,pre_release_ok=1;struct stat runtime_stat,fifo_stat,portal_stat,socket_stat,listener_fd_stat,python_stat;State s;",
+        ),
+        (
+            b"if(!hex_bytes(capability,capraw,32))return 0;",
+            b"if(!hex_bytes(capability,capraw,32))goto done;",
+        ),
+        (
+            b"s.sequence=next_sequence(t);if(!s.sequence||!put_state(t,&s,1))return 0;",
+            b"s.sequence=next_sequence(t);int diagnostic_state_result=s.sequence==2?diagnostic_put_state(t,&s,1,last,reportable):-1;if(diagnostic_state_result!=1)goto done;",
+        ),
+        (
+            b"char name[35];if(!object_name(&s,name))return 0;int object=create_dir_owned(t->c,name,0,0,0700);if(object<0)return 0;struct stat object_stat;if(fstat(object,&object_stat)){close(object);return 0;}",
+            b"char name[35];if(!object_name(&s,name))goto done;object=create_dir_owned(t->c,name,0,0,0700);if(object<0)goto done;struct stat object_stat;if(fstat(object,&object_stat))goto done;",
+        ),
+        (
+            b'strcpy(s.phase,"CREATING");if(!put_state(t,&s,0)){close(object);return 0;}',
+            b'strcpy(s.phase,"CREATING");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;',
+        ),
+        (
+            b"  int hidden=-1,runtime=-1,reader=-1,writer=-1,portal=-1,listener=-1;unsigned char*python=NULL;size_t python_n=0;int ok=0;struct stat runtime_stat,fifo_stat,portal_stat,socket_stat,python_stat;\n",
+            b"",
+        ),
+        (
+            b'strcpy(s.phase,"PUBLISHING");if(!put_state(t,&s,0)||renameatx_np',
+            b'strcpy(s.phase,"PUBLISHING");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;if(renameatx_np',
+        ),
+        (
+            b'strcpy(s.phase,"PREPARING");if(!put_state(t,&s,0))goto done;',
+            b'strcpy(s.phase,"PREPARING");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;',
+        ),
+        (
+            b"listener=bind_listener(&s,portal,&socket_stat);",
+            b"if(!diagnostic_bind_listener(&s,portal,&socket_stat,&listener_fd_stat,&listener))goto done;",
+        ),
+        (
+            b'strcpy(s.phase,"PREPARED");if(!put_state(t,&s,0))goto done;',
+            b'strcpy(s.phase,"PREPARED");diagnostic_state_result=diagnostic_put_state(t,&s,0,last,reportable);if(diagnostic_state_result!=1)goto done;',
+        ),
+        (
+            b'int bn=snprintf(body,sizeof body,"{\\"capability\\":\\"%s\\",\\"operation\\":\\"create-prepared-v1\\",\\"portal_identity\\":\\"%s/a/%s/p\\",\\"request_nonce\\":\\"%s\\",\\"runtime_id\\":\\"%s\\",\\"schema_version\\":1}",capability,NS,name,request->nonce,s.runtime);if(bn<=0||(size_t)bn>=sizeof body||!send_prepared(0,body,runtime,writer,listener))goto done;',
+            b'int bn=snprintf(body,sizeof body,"{\\"fifo_dev\\":%llu,\\"fifo_ino\\":%llu,\\"listener_fd_dev\\":%lld,\\"listener_fd_ino\\":%llu,\\"operation\\":\\"create-phase-diagnostic-prepared-v1\\",\\"reached_phase\\":\\"PREPARED\\",\\"request_nonce\\":\\"a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b\\",\\"runtime_dev\\":%llu,\\"runtime_id\\":\\"%s\\",\\"runtime_ino\\":%llu,\\"schema_version\\":1,\\"socket_dev\\":%llu,\\"socket_ino\\":%llu,\\"transaction_sequence\\":2}",s.fifo_dev,s.fifo_ino,(long long)listener_fd_stat.st_dev,(unsigned long long)listener_fd_stat.st_ino,s.runtime_dev,s.runtime,s.runtime_ino,s.socket_dev,s.socket_ino);if(bn<=0||(size_t)bn>=sizeof body||!send_prepared(0,body,runtime,writer,listener))goto done;',
+        ),
+        (
+            b'  if(!fifo_ack(reader)){error_frame(0,request->nonce,"INVALID_ACK");goto done;}strcpy(s.phase,"ACTIVE");if(!put_state(t,&s,0))goto done;char committed[512];snprintf(committed,sizeof committed,"{\\"operation\\":\\"create-committed-v1\\",\\"request_nonce\\":\\"%s\\",\\"runtime_id\\":\\"%s\\",\\"schema_version\\":1}",request->nonce,s.runtime);if(!json_frame(0,committed))goto done;ok=1;',
+            b'  if(!diagnostic_release(&runtime))pre_release_ok=0;if(!diagnostic_release(&listener))pre_release_ok=0;if(!diagnostic_release(&writer))pre_release_ok=0;if(!diagnostic_release(&portal))pre_release_ok=0;if(!diagnostic_release(&hidden))pre_release_ok=0;if(!diagnostic_release(&object))pre_release_ok=0;if(!pre_release_ok)goto done;int diagnostic_ack_ok=diagnostic_ack(reader);if(!diagnostic_ack_ok){(void)diagnostic_wait_eof(reader);goto done;}ok=1;',
+        ),
+        (
+            b"if(bn<=0||(size_t)bn>=sizeof body||!send_prepared(0,body,runtime,writer,listener))goto done;",
+            b"if(bn<=0||(size_t)bn>=sizeof body||!diagnostic_prepared_descriptors(runtime,writer,listener,portal,&s,&listener_fd_stat)||!send_prepared(0,body,runtime,writer,listener))goto done;",
+        ),
+        (
+            b"done:free(python);if(listener>=0)close(listener);if(portal>=0)close(portal);if(writer>=0)close(writer);if(reader>=0)close(reader);if(runtime>=0)close(runtime);if(hidden>=0)close(hidden);close(object);return ok;",
+            b"done:free(python);int unwind_ok=pre_release_ok;if(!diagnostic_release(&listener))unwind_ok=0;if(!diagnostic_release(&portal))unwind_ok=0;if(!diagnostic_release(&writer))unwind_ok=0;if(!diagnostic_release(&runtime))unwind_ok=0;if(!diagnostic_release(&hidden))unwind_ok=0;if(object>=0&&!strcmp(last->phase,\"CREATING\")&&(fchmod(object,0700)||fsync(object)||!flush_dir(t->c)))unwind_ok=0;if(!diagnostic_release(&object))unwind_ok=0;if(!diagnostic_release(&reader))unwind_ok=0;*unwound=unwind_ok;return ok&&unwind_ok;",
+        ),
+    )
+    for old, new in transforms:
+        if private.count(old) != 1 or (new and private.count(new)):
+            raise Rig(
+                "R27 private diagnostic create transform anchor drift: "
+                f"{old[:96]!r} old={private.count(old)} new={private.count(new)}"
+            )
+        private = private.replace(old, new, 1)
+    return private
+
+
+def r27_installer_macro_domains(source: bytes) -> bytes:
+    guard = (
+        b"#if defined(H039_INSTALLER) && (!defined(H039_MEDIATOR_SHA256) || "
+        b"!defined(H039_MEDIATOR_SIZE) || !defined(H039_ROOT_ENTRY_FD0_NORMALIZATION) "
+        b"|| !defined(H039_OLD_MEDIATOR_SHA256) || !defined(H039_OLD_MEDIATOR_SIZE))"
+    )
+    guarded = guard[:-1] + (
+        b" || !defined(H039_R15_MEDIATOR_SHA256) || "
+        b"!defined(H039_R15_MEDIATOR_SIZE) || "
+        b"!defined(H039_R15_OLD_MEDIATOR_SHA256) || "
+        b"!defined(H039_R15_OLD_MEDIATOR_SIZE))"
+    )
+    if source.count(guard) != 1:
+        raise Rig("R27 installer macro-domain guard anchor drift")
+    source = source.replace(guard, guarded, 1)
+    for name in ("load_source", "load_embedded_mediator"):
+        function = r23_exact_c_function(source, name)
+        changed = function.replace(
+            b"H039_MEDIATOR_SHA256", b"H039_R15_MEDIATOR_SHA256",
+        ).replace(b"H039_MEDIATOR_SIZE", b"H039_R15_MEDIATOR_SIZE")
+        if changed == function:
+            raise Rig(f"R27 installer {name} macro-domain anchor drift")
+        source = source.replace(function, changed, 1)
+    diagnostic_start = source.index(
+        b"#if defined(H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC)"
+    )
+    diagnostic_end = source.index(
+        b"#else\nstatic int installer_bootstrap", diagnostic_start,
+    )
+    diagnostic = source[diagnostic_start:diagnostic_end]
+    changed_diagnostic = diagnostic.replace(
+        b"H039_MEDIATOR_SHA256", b"H039_R15_MEDIATOR_SHA256",
+    ).replace(b"H039_MEDIATOR_SIZE", b"H039_R15_MEDIATOR_SIZE")
+    if changed_diagnostic == diagnostic:
+        raise Rig("R27 installer diagnostic macro-domain anchor drift")
+    return source[:diagnostic_start] + changed_diagnostic + source[diagnostic_end:]
+
+
+def r27_expected_production_source() -> bytes:
+    source = r27_installer_macro_domains(blob(
+        R27_AUTHORITY_BASE, "controller/runtime-cleanup/native/mediator.c",
+    ))
+    private = r27_private_create(source)
+    process_anchor = b"\nstatic int process_create(Store*t,const Request*r){"
+    insert = (
+        b"\n" + R27_DIAGNOSTIC_HELPERS_HEAD + private + b"\n"
+        + R27_DIAGNOSTIC_HELPERS_TAIL + process_anchor
+    )
+    if source.count(process_anchor) != 1:
+        raise Rig("R27 runtime helper insertion anchor drift")
+    source = source.replace(process_anchor, insert, 1)
+    for old, new, label in (
+        (R27_MAIN_PARSE_OLD, R27_MAIN_PARSE_NEW, "raw operation-3 selection"),
+        (R27_MAIN_PROCESS_OLD, R27_MAIN_PROCESS_NEW, "private operation-3 dispatch"),
+    ):
+        if source.count(old) != 1 or source.count(new):
+            raise Rig(f"R27 {label} source anchor drift")
+        source = source.replace(old, new, 1)
+    updater = r27_sequence_one_updater(source)
+    updater_anchor = b"\nstatic int apply_install("
+    if source.count(updater_anchor) != 1 or source.count(updater):
+        raise Rig("R27 sequence-one updater insertion anchor drift")
+    source = source.replace(updater_anchor, b"\n" + updater + updater_anchor, 1)
+    if source.count(R27_SEQUENCE_ONE_DISPATCH_ANCHOR) != 1:
+        raise Rig("R27 sequence-one finalizing dispatch anchor drift")
+    source = source.replace(
+        R27_SEQUENCE_ONE_DISPATCH_ANCHOR,
+        R27_SEQUENCE_ONE_DISPATCH_REPLACEMENT, 1,
+    )
+    return source
+
+
+def r27_expected_production_recipe(mediator: bytes) -> bytes:
+    raw = blob(R27_AUTHORITY_BASE, "verify/h039/build-recipe.json")
+    recipe = strict_json(raw)
+    if type(recipe) is not dict \
+            or (json.dumps(recipe, ensure_ascii=False, indent=2) + "\n").encode() != raw:
+        raise Rig("R27 published R14 recipe formatting drift")
+    argv = recipe.get("installer_compile_argv")
+    old = [
+        f"-DH039_MEDIATOR_SHA256={R27_OLD_R14_MEDIATOR_SHA256}",
+        f"-DH039_MEDIATOR_SIZE={R27_OLD_R14_MEDIATOR_SIZE}",
+        f"-DH039_OLD_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}",
+        f"-DH039_OLD_MEDIATOR_SIZE={R23_OLD_R12_MEDIATOR_SIZE}",
+    ]
+    if type(argv) is not list or sum(
+        argv[index:index + 4] == old for index in range(max(0, len(argv) - 3))
+    ) != 1:
+        raise Rig("R27 published R14 recipe identity quartet drift")
+    index = next(index for index in range(len(argv) - 3)
+                 if argv[index:index + 4] == old)
+    changed = copy.deepcopy(recipe)
+    changed["installer_compile_argv"][index + 4:index + 4] = [
+        f"-DH039_R15_MEDIATOR_SHA256={sha(mediator)}",
+        f"-DH039_R15_MEDIATOR_SIZE={len(mediator)}",
+        f"-DH039_R15_OLD_MEDIATOR_SHA256={R27_OLD_R14_MEDIATOR_SHA256}",
+        f"-DH039_R15_OLD_MEDIATOR_SIZE={R27_OLD_R14_MEDIATOR_SIZE}",
+    ]
+    return (json.dumps(changed, ensure_ascii=False, indent=2) + "\n").encode()
+
+
+def r27_source_contract_checks(raw: bytes) -> None:
+    expected = r27_expected_production_source()
+    if raw != expected:
+        raise Rig("R27 source is not the exact published-R14 to R15 transform")
+    base = blob(R27_AUTHORITY_BASE, "controller/runtime-cleanup/native/mediator.c")
+    parse_prefix = b"static __attribute__((unused)) int parse_request"
+    plain_prefix = b"static int parse_request"
+    if raw.count(parse_prefix) != 1 or base.count(parse_prefix) != 1:
+        raise Rig("R27 inherited parse_request cardinality drift")
+    if r23_exact_c_function(
+        raw.replace(parse_prefix, plain_prefix, 1), "parse_request",
+    ) != r23_exact_c_function(
+        base.replace(parse_prefix, plain_prefix, 1), "parse_request",
+    ):
+        raise Rig("R27 changed inherited function bytes: parse_request")
+    for name in (
+        "request_semantics", "process_create",
+        "process_cleanup", "fifo_ack", "create_runtime_object",
+        "directory_prefix", "upgrade_installed_mediator",
+    ):
+        if r23_exact_c_function(raw, name) != r23_exact_c_function(base, name):
+            raise Rig(f"R27 changed inherited function bytes: {name}")
+    request_c = R27_REQUEST_BODY.replace(b'"', b'\\"')
+    predecessor_c = R27_SEQUENCE_ONE_RECEIPT.replace(b'"', b'\\"')
+    required = (
+        request_c, predecessor_c,
+        b"create-phase-diagnostic-prepared-v1", b'\\"listener_fd_dev\\":%lld', b'\\"listener_fd_ino\\":%llu',
+        b"create-phase-diagnostic-result-v1", b"diagnostic_ack",
+        b"sequence_one_upgrade_installed_mediator", b"F_OFD_SETLK",
+    )
+    if any(token not in raw for token in required):
+        raise Rig("R27 diagnostic or sequence-one updater literal closure missing")
+    if raw.count(request_c) != 1 or raw.count(predecessor_c) != 3:
+        raise Rig("R27 fixed request/predecessor literal cardinality drift")
+    private = r23_exact_c_function(raw, "diagnostic_create_runtime_object")
+    process = r23_exact_c_function(raw, "process_diagnostic")
+    transition = r23_exact_c_function(raw, "diagnostic_put_state")
+    final = r23_exact_c_function(raw, "diagnostic_final")
+    checked_close = r23_exact_c_function(raw, "diagnostic_close_fd")
+    release = r23_exact_c_function(raw, "diagnostic_release")
+    apply_install = r23_exact_c_function(raw, "apply_install")
+    sequence_updater = r23_exact_c_function(
+        raw, "sequence_one_upgrade_installed_mediator",
+    )
+    if (
+        private.count(b"diagnostic_put_state(t,&s") != 5
+        or private.count(b"!put_state(t,&s") != 0
+        or b'"ACTIVE"' in private
+        or private.count(b"send_prepared(0,body,runtime,writer,listener)") != 1
+        or private.count(b"&socket_stat,&listener_fd_stat,&listener") != 1 or private.count(b"&s,&listener_fd_stat)||!send_prepared") != 1 or private.count(b"(long long)listener_fd_stat.st_dev") != 1 or private.count(b"(unsigned long long)listener_fd_stat.st_ino") != 1 or raw.count(b"!fstat(listener,&l)&&S_ISSOCK(l.st_mode)&&l.st_dev==listener_identity->st_dev&&l.st_ino==listener_identity->st_ino") != 1 or private.count(b'portal=create_dir_owned(object,"p",0,CLIENT_GID,0700)') != 1 or private.count(b"fchmod(portal,0550)||fsync(portal)") != 1
+        or private.count(
+            b'object>=0&&!strcmp(last->phase,"CREATING")&&('
+            b'fchmod(object,0700)||fsync(object)||!flush_dir(t->c))'
+        ) != 1
+        or b"t->lock" in private
+        or process.count(
+            b"diagnostic_create_runtime_object(t,r,&created,&reportable,&unwound)"
+        ) != 1
+        or process.count(b"recover_with_create(t,&current,&recovery,&reason)") != 1
+        or b'\\"cleanup_request_nonce\\"' not in process
+        or b'\\"cleanup_nonce\\"' in process
+        or b"diagnostic_store_fds_only(t)" not in process
+        or b"phase>=0&&phase<=4" not in process
+        or b"if(!self)" not in process
+        or b"classified=state_tx_equal(&created,&reportable)&&state_ids_equal(&created,&reportable)&&!strcmp(created.phase,reportable.phase)" not in process
+        or b"result_eligible=classified&&unwound&&" not in process
+        or b"diagnostic_store_identity(t,&final_identity,initial)" not in final
+        or b"same_stat(&ready,&named)" not in transition
+        or b"diagnostic_remove_owned_temp(t,&owned)" not in transition
+        or transition.count(b"*last=*s;") != 1
+        or transition.count(b"if(classified)*reportable=*s;else return -1") != 1
+        or b"return renamed&&first_flush?1:2" not in transition
+        or checked_close.count(b"close(fd)") != 2
+        or checked_close.count(b"fcntl(fd,F_GETFD)") != 2
+        or b"return close(fd)" in checked_close
+        or b"if(!diagnostic_close_fd(value))return 0;*fd=-1" not in release
+        or b"if(!pre_release_ok)goto done" not in private
+        or apply_install.count(b"}close(db);close(ns);return 0;const char*") != 1
+        or b"if(version!=1)goto done;" not in sequence_updater
+        or b"H039_R15_MEDIATOR_SHA256" not in raw
+        or b"H039_R15_OLD_MEDIATOR_SHA256" not in raw
+    ):
+        raise Rig("R27 one-create phase/result/descriptor causal closure drift")
+
+
+def r27_source_contract_selftests() -> None:
+    def rejected(candidate: bytes) -> bool:
+        try:
+            r27_source_contract_checks(candidate)
+        except Rig:
+            return True
+        return False
+
+    check(
+        len(R27_REQUEST_BODY) == 144
+        and sha(R27_REQUEST_BODY) == R27_REQUEST_BODY_SHA256
+        and len(R27_REQUEST_WIRE) == 148
+        and R27_REQUEST_WIRE[:4] == bytes.fromhex("00000090")
+        and sha(R27_REQUEST_WIRE) == R27_REQUEST_WIRE_SHA256
+        and len(R27_SEQUENCE_ONE_RECEIPT) == 432
+        and sha(R27_SEQUENCE_ONE_RECEIPT) == R27_SEQUENCE_ONE_RECEIPT_SHA256,
+        "A_H039_R27_FIXED_REQUEST_WIRE_AND_SEQUENCE1_RECEIPT_IDENTITIES",
+    )
+    expected = r27_expected_production_source()
+    r27_source_contract_checks(expected)
+    request_c = R27_REQUEST_BODY.replace(b'"', b'\\"')
+    for label, mutant in (
+        ("REQUEST_SPACE", expected.replace(request_c, request_c[:-1] + b" }", 1)),
+        ("ACK_A", expected.replace(b"byte!='X'", b"byte!='A'", 1)), ("EOF_GRACE_ENTRY_DEADLINE_REMOVED", expected.replace(b"for(;;){if(deadline_remaining(&deadline)<=0)return 0;ssize_t", b"for(;;){ssize_t", 1)), ("EOF_GRACE_POSITIVE_DEADLINE_REMOVED", expected.replace(b"if(n>0){if(deadline_remaining(&deadline)<=0)return 0;continue;}", b"if(n>0)continue;", 1)), ("LISTENER_FD_PATH_ALIAS", expected.replace(b"(long long)listener_fd_stat.st_dev,(unsigned long long)listener_fd_stat.st_ino", b"(long long)socket_stat.st_dev,(unsigned long long)socket_stat.st_ino", 1)), ("LISTENER_FD_REFSTAT_REMOVED", expected.replace(b"&&!fstat(listener,&l)&&S_ISSOCK(l.st_mode)&&l.st_dev==listener_identity->st_dev&&l.st_ino==listener_identity->st_ino", b"", 1)), ("LISTENER_FD_SIGN_LOST", expected.replace(b'\\"listener_fd_dev\\":%lld', b'\\"listener_fd_dev\\":%llu', 1)), ("PORTAL_WRITABLE", expected.replace(b"fchmod(portal,0550)", b"fchmod(portal,0750)", 1)),
+        ("ACTIVE", expected.replace(b"ok=1;\ndone:", b'strcpy(s.phase,"ACTIVE");ok=1;\ndone:', 1)),
+        ("SEQ1_ANY", expected.replace(b"n==432&&!memcmp(raw,", b"n==432||!memcmp(raw,", 1)),
+        ("OLD_IDENTITY_MACRO", expected.replace(
+            b"H039_OLD_MEDIATOR_SHA256", b"H039_MEDIATOR_SHA256", 1,
+        )),
+        ("NONSEQUENCE_FALLTHROUGH", expected.replace(
+            b"}close(db);close(ns);return 0;const char*",
+            b"}const char*", 1,
+        )),
+        ("DIAGNOSTIC_RECONCILE_BEFORE_PRECONDITION", expected.replace(
+            b"if(operation==3){int rc=process_diagnostic",
+            b"if(operation==3&&!reconcile_state_temp(&store,&request,operation,"
+            b"&continuation)){close_store(&store);return 1;}if(operation==3){"
+            b"int rc=process_diagnostic",
+            1,
+        )),
+    ):
+        check(
+            mutant != expected and rejected(mutant),
+            f"N_H039_R27_SOURCE_MUTANT_{label}",
+        )
+    probe=b"distinct-r15";argv=strict_json(r27_expected_production_recipe(probe))["installer_compile_argv"];macros=[value for value in argv if value.startswith("-DH039_") and ("MEDIATOR_SHA256=" in value or "MEDIATOR_SIZE=" in value)]
+    check(macros==[f"-DH039_MEDIATOR_SHA256={R27_OLD_R14_MEDIATOR_SHA256}",f"-DH039_MEDIATOR_SIZE={R27_OLD_R14_MEDIATOR_SIZE}",f"-DH039_OLD_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}",f"-DH039_OLD_MEDIATOR_SIZE={R23_OLD_R12_MEDIATOR_SIZE}",f"-DH039_R15_MEDIATOR_SHA256={sha(probe)}",f"-DH039_R15_MEDIATOR_SIZE={len(probe)}",f"-DH039_R15_OLD_MEDIATOR_SHA256={R27_OLD_R14_MEDIATOR_SHA256}",f"-DH039_R15_OLD_MEDIATOR_SIZE={R27_OLD_R14_MEDIATOR_SIZE}"],"A_H039_R27_EXACT_LEGACY_AND_R15_INSTALLER_MACRO_DOMAINS")
+    r27_connected_compiled_mediator_checks(expected)
+    r27_connected_installer_checks(expected)
+
+
+def r27_protocol_model_selftests() -> None:
+    def selected(raw: bytes) -> int:
+        return 3 if raw == R27_REQUEST_BODY else -1
+
+    check(selected(R27_REQUEST_BODY) == 3,
+          "A_H039_R27_ONLY_EXACT_RAW_BODY_SELECTS_OPERATION3")
+    variants = (
+        b" " + R27_REQUEST_BODY, R27_REQUEST_BODY + b"\n",
+        R27_REQUEST_BODY.replace(b'"operation":', b'"operation" :', 1),
+        R27_REQUEST_BODY.replace(b'"operation"', b'"schema_version"', 1),
+        R27_REQUEST_BODY.replace(b"diagnostic-v1", b"diagnostic-v2", 1),
+    )
+    for index, value in enumerate(variants):
+        check(selected(value) != 3, f"N_H039_R27_RAW_SELECTION_VARIANT_{index}")
+    phases = ["RESERVING", "CREATING", "PUBLISHING", "PREPARING", "PREPARED"]
+    for phase in phases:
+        early = phase in {"RESERVING", "CREATING"}
+        receipt_sequence = 1 if early else 2
+        receipt_sha = (
+            R27_SEQUENCE_ONE_RECEIPT_SHA256 if early else "ab" * 32
+        )
+        body = canonical({
+            "cleanup_request_nonce": R27_CLEANUP_NONCE,
+            "operation": "create-phase-diagnostic-result-v1",
+            "reached_phase": phase,
+            "receipt_sequence": receipt_sequence,
+            "receipt_sha256": receipt_sha,
+            "request_nonce": R27_REQUEST_NONCE,
+            "runtime_id": "cd" * 16,
+            "schema_version": 1,
+            "transaction_sequence": 2,
+            "zero_runtime_residue": True,
+        })
+        parsed = strict_json(body)
+        check(
+            type(parsed) is dict
+            and list(parsed) == [
+                "cleanup_request_nonce", "operation", "reached_phase",
+                "receipt_sequence", "receipt_sha256", "request_nonce",
+                "runtime_id", "schema_version", "transaction_sequence",
+                "zero_runtime_residue",
+            ]
+            and parsed["reached_phase"] == phase
+            and parsed["receipt_sequence"] == receipt_sequence
+            and parsed["receipt_sha256"] == receipt_sha,
+            f"A_H039_R27_PHASE_DEPENDENT_CANONICAL_RESULT_{phase}",
+        )
+        check(
+            (phase == "PREPARED") == (phase not in phases[:-1]),
+            f"A_H039_R27_ONLY_PREPARED_REQUIRES_3FD_X_EOF_{phase}",
+        )
+    for ack in (b"", b"A", b"XX", b"Xx"):
+        check(ack != b"X", f"N_H039_R27_DIAGNOSTIC_ACK_{ack.hex() or 'EMPTY'}")
+
+
+def r27_immutable_r26_evidence_checks() -> None:
+    def identity8(value: os.stat_result) -> list[int]:
+        return [
+            value.st_dev, value.st_ino, value.st_mode, value.st_uid,
+            value.st_gid, value.st_nlink, value.st_size,
+            getattr(value, "st_flags", 0),
+        ]
+
+    def stable_evidence(path: Path, label: str) -> bytes:
+        nofollow_any = getattr(os, "O_NOFOLLOW_ANY", None)
+        if nofollow_any is None:
+            raise Undecidable("R27 immutable evidence requires O_NOFOLLOW_ANY")
+        fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | nofollow_any | 0x00002000)
+        try:
+            before = os.fstat(fd)
+
+            def read_full() -> bytes:
+                raw = bytearray()
+                while len(raw) < before.st_size:
+                    part = os.pread(fd, before.st_size - len(raw), len(raw))
+                    if not part:
+                        raise Rig(f"R27 immutable {label} short read")
+                    raw.extend(part)
+                if os.pread(fd, 1, before.st_size):
+                    raise Rig(f"R27 immutable {label} grew during read")
+                return bytes(raw)
+
+            first, second = read_full(), read_full()
+            after, named = os.fstat(fd), os.lstat(path)
+            expected = R27_R26_EVIDENCE_IDENTITY8[label]
+            if (
+                first != second or identity8(before) != expected
+                or identity8(after) != expected or identity8(named) != expected
+            ):
+                raise Rig(f"R27 immutable {label} identity/read/rebind drift")
+            return first
+        finally:
+            os.close(fd)
+
+    try:
+        publication_raw = stable_evidence(
+            R27_R26_GUARDED_PUBLICATION, "publication",
+        )
+        failure_raw = stable_evidence(R27_R26_FAILURE_LOG, "failure_log")
+    except OSError as exc:
+        raise Undecidable(f"R27 immutable R26 evidence unavailable: {exc}") from exc
+    publication = strict_json(publication_raw)
+    publication_ok = (
+        sha(publication_raw) == R27_R26_GUARDED_PUBLICATION_SHA256
+        and type(publication) is dict
+        and publication.get("record_type")
+        == "h039_r26_r2_guarded_contract_publication_receipt"
+        and publication.get("disposition") == "PASS"
+        and publication.get("workflow_only") is True
+        and publication.get("task_credit") == "NONE"
+        and publication.get("publication", {}).get("merge_commit")
+        == R27_AUTHORITY_BASE
+        and publication.get("publication", {}).get("tree") == R27_AUTHORITY_TREE
+        and publication.get("git_graph_authentication", {}).get(
+            "merge_ordered_parents"
+        ) == R27_AUTHORITY_PARENTS
+    )
+    lines = failure_raw.splitlines()
+    failure_ok = (
+        len(failure_raw) == R27_R26_FAILURE_LOG_SIZE
+        and sha(failure_raw) == R27_R26_FAILURE_LOG_SHA256
+        and len(lines) == R27_R26_FAILURE_LOG_LINES
+        and sum(line.startswith(b"PASS ") for line in lines)
+        == R27_R26_FAILURE_PASS_LINES
+        and not any(line.startswith(b"FAIL ") for line in lines)
+        and failure_raw.count(R27_R26_FAILURE) == 1
+        and failure_raw.count(
+            R27_R26_FAILURE_PREDECESSOR + R27_R26_FAILURE
+        ) == 1
+        and lines[92866] == R27_R26_FAILURE_PREDECESSOR + R27_R26_FAILURE
+        and len(lines[92867:]) == 61
+        and lines[92867] == b""
+        and sum(line.startswith(b"PASS ") for line in lines[92868:]) == 60
+        and all(line.startswith(b"PASS ") for line in lines[92868:])
+        and not any(
+            marker in failure_raw
+            for marker in (b"H039_GATE_SUMMARY", b"H039_GATE_RESULT")
+        )
+        and failure_raw.endswith(b"\n")
+    )
+    check(publication_ok, "A_H039_R27_EXACT_R26_GUARDED_PUBLICATION_RECEIPT")
+    check(failure_ok, "A_H039_R27_IMMUTABLE_R26_INSTALLED_FAILURE_NO_CREDIT")
+
+
+def r27_immutable_r1_review_failure_checks() -> None:
+    def identity8(value: os.stat_result) -> list[int]:
+        return [value.st_dev, value.st_ino, value.st_mode, value.st_uid, value.st_gid, value.st_nlink, value.st_size, getattr(value, "st_flags", 0)]
+
+    def stable(path: Path, digest: str, expected: list[int]) -> bytes:
+        nofollow_any = getattr(os, "O_NOFOLLOW_ANY", None)
+        if nofollow_any is None:
+            raise Undecidable("R27 R1 immutable review evidence requires O_NOFOLLOW_ANY")
+        fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | nofollow_any | 0x00002000)
+        try:
+            before = os.fstat(fd)
+            def read_full() -> bytes:
+                raw = bytearray()
+                while len(raw) < before.st_size:
+                    part = os.pread(fd, before.st_size - len(raw), len(raw))
+                    if not part: raise Rig(f"R27 R1 immutable review short read: {path.name}")
+                    raw.extend(part)
+                if os.pread(fd, 1, before.st_size): raise Rig(f"R27 R1 immutable review grew: {path.name}")
+                return bytes(raw)
+            first, second = read_full(), read_full(); after, named = os.fstat(fd), os.lstat(path)
+            if first != second or sha(first) != digest or identity8(before) != expected or identity8(after) != expected or identity8(named) != expected:
+                raise Rig(f"R27 R1 immutable review identity/read/rebind drift: {path.name}")
+            return first
+        finally:
+            os.close(fd)
+
+    try:
+        raw = [stable(path, digest, identity) for path, (digest, identity) in R27_R1_REVIEW_LOGS.items()]
+        changes = raw_changes(R27_AUTHORITY_BASE, REJECTED_R27_R1_CANDIDATE); additions, deletions = line_delta(R27_AUTHORITY_BASE, REJECTED_R27_R1_CANDIDATE)
+        candidate_ok = object_type(REJECTED_R27_R1_CANDIDATE) == "commit" and commit_tree(REJECTED_R27_R1_CANDIDATE) == REJECTED_R27_R1_TREE and commit_parents(REJECTED_R27_R1_CANDIDATE) == [R27_AUTHORITY_BASE] and exact_contract_change_shape(changes) and (additions, deletions) == (2400, 167) and sha(blob(REJECTED_R27_R1_CANDIDATE, "verify/bin/h-039-exit")) == REJECTED_R27_R1_GATE_SHA256 and sha(blob(REJECTED_R27_R1_CANDIDATE, "specs/tasks.spec.json")) == REJECTED_R27_R1_SPEC_SHA256
+    except OSError as exc:
+        raise Undecidable(f"R27 R1 immutable review evidence unavailable: {exc}") from exc
+    a, b = raw; a_lines, b_lines = a.splitlines(), b.splitlines()
+    a_ok = len(a) == 143842 and len(a_lines) == 4142 and sum(line.startswith(b"PASS ") for line in a_lines) == 4141 and not any(line.startswith(b"FAIL ") for line in a_lines) and a.count(b"RIG_ERROR:") == 1 and a.count(b"PASS A_H039_R26_REGISTRY_SELFTEST_ANCHOR" + R27_R1_DISPATCH_ERROR) == 1
+    b_ok = len(b) == 133828 and len(b_lines) == 3349 and sum(line.startswith(b"PASS ") for line in b_lines) == 3323 and not any(line.startswith(b"FAIL ") for line in b_lines) and b.count(R27_R1_SEATBELT_UNDECIDABLE) == 1 and b.count(b"RIG_ERROR:") == 0
+    no_credit = all(marker not in value for value in (a, b) for marker in (b"H039_GATE_SUMMARY", b"H039_GATE_RESULT"))
+    check(candidate_ok, "A_H039_R27_REJECTED_R1_EXACT_FIVE_FILE_IMMUTABLE_NO_CREDIT")
+    check(a_ok and b_ok and no_credit, "A_H039_R27_REJECTED_R1_DUAL_REVIEW_LOGS_IMMUTABLE_NO_CREDIT")
+
+
+def r27_live_sequence_one_prestate_checks() -> None:
+    nofollow_any = getattr(os, "O_NOFOLLOW_ANY", None)
+    unique = 0x00002000
+    if sys.platform != "darwin" or nofollow_any is None:
+        raise Undecidable("R27 exact live prestate requires Darwin O_NOFOLLOW_ANY")
+
+    def identity8(value: os.stat_result) -> list[int]:
+        return [
+            value.st_dev, value.st_ino, value.st_mode, value.st_uid,
+            value.st_gid, value.st_nlink, value.st_size,
+            getattr(value, "st_flags", 0),
+        ]
+
+    descriptors: list[int] = []
+    detail: dict[str, Any] = {}
+    try:
+        paths = {
+            "namespace": NAMESPACE,
+            "a": NAMESPACE / "a", "c": NAMESPACE / "c",
+            "q": NAMESPACE / "q", "r": NAMESPACE / "r",
+            "s": NAMESPACE / "s",
+        }
+        for label, path in paths.items():
+            named = os.lstat(path)
+            descriptor = os.open(
+                path,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | nofollow_any,
+            )
+            descriptors.append(descriptor)
+            opened = os.fstat(descriptor)
+            rebound = os.lstat(path)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or identity8(opened) != R27_LIVE_IDENTITY8[label]
+                or stable_identity(named) != stable_identity(opened)
+                or stable_identity(opened) != stable_identity(rebound)
+            ):
+                raise Rig(f"R27 live {label} identity drift")
+            detail[label] = identity8(opened)
+        expected_members = {
+            "namespace": ["a", "c", "q", "r", "s"],
+            "a": [], "c": [], "q": [], "r": ["last"], "s": ["lock"],
+        }
+        for (label, _path), descriptor in zip(paths.items(), descriptors):
+            if sorted(os.listdir(descriptor)) != expected_members[label]:
+                raise Rig(f"R27 live {label} membership drift")
+        lock_before = os.stat("lock", dir_fd=descriptors[-1], follow_symlinks=False)
+        lock_after = os.stat("lock", dir_fd=descriptors[-1], follow_symlinks=False)
+        if (
+            identity8(lock_before) != R27_LIVE_IDENTITY8["lock"]
+            or stable_identity(lock_before) != stable_identity(lock_after)
+        ):
+            raise Rig("R27 live retained lock identity drift")
+        detail["lock"] = identity8(lock_after)
+
+        def exact_file(path: Path, expected: list[int], maximum: int) -> bytes:
+            named = os.lstat(path)
+            descriptor = os.open(
+                path,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
+                | nofollow_any | unique,
+            )
+            try:
+                before = os.fstat(descriptor)
+                if not stat.S_ISREG(before.st_mode) or identity8(before) != expected:
+                    raise Rig(f"R27 exact live file identity drift: {path}")
+                chunks: list[bytes] = []
+                remaining = before.st_size
+                while remaining:
+                    chunk = os.read(descriptor, min(65536, remaining))
+                    if not chunk:
+                        raise Rig(f"R27 exact live file short read: {path}")
+                    chunks.append(chunk)
+                    remaining -= len(chunk)
+                if os.read(descriptor, 1):
+                    raise Rig(f"R27 exact live file trailing byte: {path}")
+                raw = b"".join(chunks)
+                after = os.fstat(descriptor)
+                rebound = os.lstat(path)
+                if (
+                    len(raw) > maximum
+                    or stable_identity(named) != stable_identity(before)
+                    or stable_identity(before) != stable_identity(after)
+                    or stable_identity(after) != stable_identity(rebound)
+                ):
+                    raise Rig(f"R27 exact live file changed or rebound: {path}")
+                return raw
+            finally:
+                os.close(descriptor)
+
+        receipt = exact_file(
+            NAMESPACE / "r/last", R27_LIVE_IDENTITY8["last"], 432,
+        )
+        installed = exact_file(
+            INSTALLED, R27_LIVE_IDENTITY8["installed_r14"],
+            R27_OLD_R14_MEDIATOR_SIZE,
+        )
+        if (
+            receipt != R27_SEQUENCE_ONE_RECEIPT
+            or sha(receipt) != R27_SEQUENCE_ONE_RECEIPT_SHA256
+            or len(receipt) != 432
+            or sha(installed) != R27_OLD_R14_MEDIATOR_SHA256
+            or len(installed) != R27_OLD_R14_MEDIATOR_SIZE
+        ):
+            raise Rig("R27 live receipt or installed R14 bytes drift")
+        identity = macho_identity(
+            INSTALLED, "se.nortropic.runtime-cleanup-mediator",
+        )
+        if (
+            identity.get("cdhash") != R24_R14_RUNTIME_CDHASH
+            or identity8(os.lstat(INSTALLED))
+            != R27_LIVE_IDENTITY8["installed_r14"]
+        ):
+            raise Rig("R27 live installed R14 Mach-O identity drift")
+        detail.update({
+            "receipt_sha256": sha(receipt),
+            "installed_sha256": sha(installed),
+            "installed_cdhash": identity["cdhash"],
+        })
+        check(True, "A_H039_R27_READ_ONLY_EXACT_LIVE_SEQUENCE1_R14_PRESTATE", detail)
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
 R23_SCAN2_HARNESS_HEAD = br'''#include <errno.h>
 #include <libproc.h>
 #include <stdint.h>
@@ -4294,7 +5183,32 @@ def exact_contract(row: Any) -> bool:
     return isinstance(row, dict) and sha(canonical(row)) == EXPECTED_H039_ROW_SHA256
 
 
+def r27_dispatch_surface_exact(module: ast.Module, reference: ast.Module) -> bool:
+    current = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "main"]; expected = [node for node in reference.body if isinstance(node, ast.FunctionDef) and node.name == "main"]
+    if len(current) != 1 or len(expected) != 1: return False
+    normalized = copy.deepcopy(current[0]); current_tries = [node for node in normalized.body if isinstance(node, ast.Try)]; expected_tries = [node for node in expected[0].body if isinstance(node, ast.Try)]
+    if len(current_tries) != 1 or len(expected_tries) != 1: return False
+    current_try, expected_try = current_tries[0], expected_tries[0]; direct = lambda node, name: isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) and node.value.func.id == name and not node.value.args and not node.value.keywords
+    if any([index for index, node in enumerate(current_try.body) if direct(node, name)] != [index for index, node in enumerate(expected_try.body) if direct(node, name)] or sum(direct(node, name) for node in current_try.body) != 1 for name in ("r26_dispatch_selftests", "r27_dispatch_selftests")): return False
+    evidence = [index for index, node in enumerate(current_try.body) if direct(node, "r27_immutable_r1_review_failure_checks")]; insertion = [index for index, node in enumerate(expected_try.body) if direct(node, "r27_source_contract_selftests")]
+    if len(evidence) != 1 or evidence != insertion: return False
+    del current_try.body[evidence[0]]
+    helper_pairs = [([node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == name], [node for node in reference.body if isinstance(node, ast.FunctionDef) and node.name == name]) for name in ("exact_r27_product_argv", "exact_r27_publication_argv")]
+    return ast.dump(normalized, include_attributes=False) == ast.dump(expected[0], include_attributes=False) and all(len(current_helper) == 1 and len(expected_helper) == 1 and ast.dump(current_helper[0], include_attributes=False) == ast.dump(expected_helper[0], include_attributes=False) for current_helper, expected_helper in helper_pairs)
+
+
 def static_contract_checks() -> dict[str, Any]:
+    try: dispatch_tree = ast.parse(GATE.read_text(encoding="utf-8"), filename=str(GATE)); dispatch_reference = ast.parse(blob(REJECTED_R27_R1_CANDIDATE, "verify/bin/h-039-exit").decode("utf-8"))
+    except (OSError, UnicodeError, SyntaxError) as exc: raise Rig("R27 independent dispatch bootstrap AST unavailable") from exc
+    check(r27_dispatch_surface_exact(dispatch_tree, dispatch_reference), "A_H039_R27_INDEPENDENT_EXACT_CLOSED_WORLD_DISPATCH_SURFACE")
+    def without(names): value = copy.deepcopy(dispatch_tree); main = next(node for node in value.body if isinstance(node, ast.FunctionDef) and node.name == "main"); owner = next(node for node in main.body if isinstance(node, ast.Try)); owner.body = [node for node in owner.body if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) and node.value.func.id in names)]; return value
+    mutants = [without(names) for names in ({"r26_dispatch_selftests"}, {"r27_dispatch_selftests"}, {"r26_dispatch_selftests", "r27_dispatch_selftests"})]; combined = copy.deepcopy(dispatch_tree); combined_main = next(node for node in combined.body if isinstance(node, ast.FunctionDef) and node.name == "main"); combined_try = next(node for node in combined_main.body if isinstance(node, ast.Try))
+    hidden = {name: next(index for index, node in enumerate(combined_try.body) if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) and node.value.func.id == name) for name in ("r26_dispatch_selftests", "r27_dispatch_selftests")}
+    combined_try.body[hidden["r27_dispatch_selftests"]] = ast.If(ast.Constant(False), [combined_try.body[hidden["r27_dispatch_selftests"]]], [])
+    r26_call = combined_try.body[hidden["r26_dispatch_selftests"]]; combined_try.body[hidden["r26_dispatch_selftests"]] = ast.Expr(ast.BoolOp(ast.And(), [ast.Constant(False), r26_call.value]))
+    admission = next(index for index, node in enumerate(combined_main.body) if isinstance(node, ast.If) and isinstance(node.test, ast.UnaryOp) and isinstance(node.test.op, ast.Not) and isinstance(node.test.operand, ast.BoolOp)); combined_main.body[admission:admission] = [ast.If(ast.Compare(ast.Subscript(ast.Name("argv", ast.Load()), ast.Constant(0), ast.Load()), [ast.Eq()], [ast.Constant("--r26-installed")]), [ast.Expr(ast.Call(ast.Name("guarded_product_effects", ast.Load()), [], []))], []), ast.If(ast.Call(ast.Name("bool", ast.Load()), [ast.Name("r26_installed", ast.Load())], []), [ast.Expr(ast.Call(ast.Name("r26_ceremony_completed_checks", ast.Load()), [], []))], [])]; mutants.append(combined)
+    relocated = copy.deepcopy(dispatch_tree); relocated_main = next(node for node in relocated.body if isinstance(node, ast.FunctionDef) and node.name == "main"); relocated_try = next(node for node in relocated_main.body if isinstance(node, ast.Try)); relocated_call = next(node for node in relocated_try.body if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) and node.value.func.id == "r27_immutable_r1_review_failure_checks"); relocated_try.body.remove(relocated_call); relocated_try.body.extend([ast.Return(ast.Constant(0)), relocated_call]); mutants.append(relocated)
+    check(all(not r27_dispatch_surface_exact(mutant, dispatch_reference) for mutant in mutants), "N_H039_R27_INDEPENDENT_SINGLE_DOUBLE_HIDDEN_OBFUSCATED_AND_EVIDENCE_RELOCATION_MUTANTS")
     for path, digest in PINNED.items():
         check(path_sha(ROOT / path) == digest, f"A_H039_PINNED_{path.upper().replace('/', '_').replace('.', '_')}")
     check(
@@ -4394,6 +5308,14 @@ def static_contract_checks() -> dict[str, Any]:
         and sha(blob(REJECTED_R26_R1_CANDIDATE, "specs/tasks.spec.json"))
         == REJECTED_R26_R1_SPEC_SHA256,
         "A_H039_R26_REJECTED_R1_PHASE_SCOPE_DRIFT_IMMUTABLE_NO_CREDIT",
+    )
+    check(
+        object_type(REJECTED_R27_R1_CANDIDATE) == "commit"
+        and commit_tree(REJECTED_R27_R1_CANDIDATE) == REJECTED_R27_R1_TREE
+        and commit_parents(REJECTED_R27_R1_CANDIDATE) == [R27_AUTHORITY_BASE]
+        and sha(blob(REJECTED_R27_R1_CANDIDATE, "verify/bin/h-039-exit")) == REJECTED_R27_R1_GATE_SHA256
+        and sha(blob(REJECTED_R27_R1_CANDIDATE, "specs/tasks.spec.json")) == REJECTED_R27_R1_SPEC_SHA256,
+        "A_H039_R27_REJECTED_R1_DISPATCH_DRIFT_IMMUTABLE_NO_CREDIT",
     )
     check(
         object_type(REJECTED_R22_R1_CANDIDATE) == "commit"
@@ -4557,6 +5479,9 @@ def static_contract_checks() -> dict[str, Any]:
     prestaged_recovery = row.get(
         "h039_os_exclusive_runtime_cleanup", {},
     ).get("r26_prestaged_r14_recovery_completion", {})
+    atomic_diagnostic = row.get(
+        "h039_os_exclusive_runtime_cleanup", {},
+    ).get("r27_atomic_create_phase_diagnostic", {})
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -4697,6 +5622,11 @@ def static_contract_checks() -> dict[str, Any]:
         exact_typed_tree(prestaged_recovery, r26_registry_expected()),
         "A_H039_R26_EXACT_PRESTAGED_R14_RECOVERY_COMPLETION_REGISTRY",
     )
+    check(
+        type(atomic_diagnostic) is dict
+        and sha(canonical(atomic_diagnostic)) == R27_REGISTRY_SHA256,
+        "A_H039_R27_EXACT_ATOMIC_CREATE_PHASE_DIAGNOSTIC_REGISTRY",
+    )
     expected_red = {
         "label": LABEL,
         "reason": REASON,
@@ -4709,7 +5639,7 @@ def static_contract_checks() -> dict[str, Any]:
             ),
             expected_red,
         ),
-        "A_H039_R26_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
+        "A_H039_R27_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
     )
     check(
         row.get("h039_r17_installed_effect_completion_reconciliation")
@@ -4760,6 +5690,14 @@ def static_contract_checks() -> dict[str, Any]:
         row.get("h039_r26_prestaged_r14_recovery_reconciliation")
         == R26_RECONCILIATION,
         "A_H039_R26_EXACT_RECONCILIATION",
+    )
+    check(
+        type(row.get("h039_r27_atomic_create_phase_diagnostic_reconciliation"))
+        is str
+        and sha(row[
+            "h039_r27_atomic_create_phase_diagnostic_reconciliation"
+        ].encode("utf-8")) == R27_RECONCILIATION_SHA256,
+        "A_H039_R27_EXACT_RECONCILIATION",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -4887,6 +5825,14 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}."
         in str(row.get("h039_r26_exit_criterion", "")),
         "A_H039_R26_EXACT_MATERIAL_REVIEW_BOUNDARY",
+    )
+    check(
+        row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r27_material_review_extension") == R27_MATERIAL_REVIEW_EXTENSION
+        and f"R27_MATERIAL_REVIEW_EXTENSION={R27_EXIT_MATERIAL_REVIEW_EXTENSION}."
+        in str(row.get("h039_r27_exit_criterion", "")),
+        "A_H039_R27_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -5574,6 +6520,156 @@ def exact_r26_installed_argv(argv: Any) -> bool:
     )
 
 
+def exact_r27_product_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 3
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r27-product"
+        and valid_hex(argv[1], 40) and valid_hex(argv[2], 40)
+    )
+
+
+def exact_r27_publication_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 2
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r27-published" and valid_hex(argv[1], 40)
+    )
+
+
+def r27_dispatch_selftests() -> None:
+    sample = "ab" * 20; source = GATE.read_text(encoding="utf-8")
+
+    def call_name(call: ast.Call) -> str:
+        return call.func.id if isinstance(call.func, ast.Name) else ""
+
+    def main_node(module: ast.Module) -> ast.FunctionDef:
+        values = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "main"]
+        if len(values) != 1: raise Rig("R27 main cardinality drift")
+        return values[0]
+
+    def assignments(main: ast.FunctionDef, name: str) -> list[ast.Assign]:
+        return [node for node in main.body if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == name]
+
+    def branches(main: ast.FunctionDef, name: str, marker: str) -> list[ast.If]:
+        return [node for node in ast.walk(main) if isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == name and any(isinstance(item, ast.Call) and call_name(item) == marker for item in ast.walk(node))]
+
+    def terminal(branch: ast.If) -> bool:
+        last = branch.body[-1] if branch.body else None
+        return isinstance(last, ast.Return) and isinstance(last.value, ast.Call) and call_name(last.value) == "finish" and len(last.value.args) == 1 and isinstance(last.value.args[0], ast.Name) and last.value.args[0].id == "phase" and not last.value.keywords and not branch.orelse
+
+    def ordered_calls(branch: ast.If, wanted: tuple[str, ...]) -> bool:
+        positions = [[index for index, statement in enumerate(branch.body) for node in ast.walk(statement) if isinstance(node, ast.Call) and call_name(node) == name] for name in wanted]
+        return all(len(value) == 1 for value in positions) and [value[0] for value in positions] == sorted(value[0] for value in positions)
+
+    def exact_extension_print(node: ast.stmt, name: str) -> bool:
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call) or call_name(node.value) != "print" or len(node.value.args) != 1: return False
+        value = node.value.args[0]
+        return isinstance(value, ast.JoinedStr) and len(value.values) == 2 and isinstance(value.values[0], ast.Constant) and value.values[0].value == f"{name}_MATERIAL_REVIEW_EXTENSION=" and isinstance(value.values[1], ast.FormattedValue) and isinstance(value.values[1].value, ast.Name) and value.values[1].value.id == f"{name}_MATERIAL_REVIEW_EXTENSION"
+
+    def audit(module: ast.Module) -> None:
+        main = main_node(module); pre = branches(main, "preproduct", "r27_contract_candidate_identity"); product = branches(main, "r27_product", "r27_contract_publication_graph"); published = branches(main, "r27_published", "r27_product_publication_identity"); stale = branches(main, "r26_installed", "r26_contract_publication_identity")
+        if any(len(value) != 1 for value in (pre, product, published, stale)) or not (pre[0].lineno < product[0].lineno < published[0].lineno < stale[0].lineno): raise Rig("R27 current/stale branch cardinality/order drift")
+        if not r27_dispatch_surface_exact(module, reference): raise Rig("R27 exact main dispatch closed-world AST drift")
+        pre_assignment, product_assignment, published_assignment, stale_assignment = (assignments(main, name) for name in ("preproduct", "r27_product", "r27_published", "r26_installed"))
+        if any(len(value) != 1 for value in (pre_assignment, product_assignment, published_assignment, stale_assignment)): raise Rig("R27 dispatch assignment cardinality drift")
+        pa, ra, ua, sa = pre_assignment[0].value, product_assignment[0].value, published_assignment[0].value, stale_assignment[0].value
+        if not (isinstance(pa, ast.UnaryOp) and isinstance(pa.op, ast.Not) and isinstance(pa.operand, ast.Name) and pa.operand.id == "argv" and isinstance(ra, ast.Call) and call_name(ra) == "exact_r27_product_argv" and len(ra.args) == 1 and isinstance(ra.args[0], ast.Name) and ra.args[0].id == "argv" and isinstance(ua, ast.Call) and call_name(ua) == "exact_r27_publication_argv" and len(ua.args) == 1 and isinstance(ua.args[0], ast.Name) and ua.args[0].id == "argv" and isinstance(sa, ast.Constant) and sa.value is False): raise Rig("R27 exact dispatch selector drift")
+        stores = [node for node in ast.walk(main) if isinstance(node, ast.Name) and node.id == "r26_installed" and isinstance(node.ctx, ast.Store)]; main_names = [call_name(node) for node in ast.walk(main) if isinstance(node, ast.Call)]
+        pre_names = {call_name(node) for node in ast.walk(pre[0]) if isinstance(node, ast.Call)}; r26_current = {"r26_contract_candidate_identity", "r26_contract_publication_identity", "r26_r25_publication_evidence_checks", "r26_immutable_r25_failure_checks", "r26_immutable_r1_review_failure_checks", "r26_ceremony_prepublication_checks", "r26_ceremony_completed_checks", "r26_run_authenticated_validator"}
+        if len(stores) != 1 or "exact_r26_installed_argv" in main_names or any(main_names.count(name) != 1 for name in ("r26_dispatch_selftests", "r27_dispatch_selftests", "r27_immutable_r1_review_failure_checks")) or pre_names & r26_current or not terminal(stale[0]): raise Rig("R27 stale R26 lane became reachable/current")
+        expected = ((pre[0], ("r27_immutable_r26_evidence_checks", "r27_live_sequence_one_prestate_checks", "r27_contract_candidate_identity", "historical_r14_product_identity")), (product[0], ("r27_contract_publication_graph", "r27_product_identity", "r27_immutable_r26_evidence_checks", "historical_r14_product_identity", "r27_product_material_checks")), (published[0], ("r27_product_publication_identity", "r27_immutable_r26_evidence_checks", "historical_r14_product_identity", "r27_product_material_checks")))
+        if any(not terminal(branch) or not ordered_calls(branch, calls) for branch, calls in expected): raise Rig("R27 current lane order/terminal drift")
+        admissions = [node for node in main.body if isinstance(node, ast.If) and isinstance(node.test, ast.UnaryOp) and isinstance(node.test.op, ast.Not) and isinstance(node.test.operand, ast.BoolOp)]
+        admitted = [node for node in admissions if isinstance(node.test.operand.op, ast.Or) and [value.id for value in node.test.operand.values if isinstance(value, ast.Name)] == ["preproduct", "r27_product", "r27_published"] and len(node.test.operand.values) == 3]
+        if len(admitted) != 1 or not isinstance(admitted[0].body[-1], ast.Return) or not isinstance(admitted[0].body[-1].value, ast.Constant) or admitted[0].body[-1].value.value != 2: raise Rig("R27 exact admission rejection drift")
+        tries = [node for node in main.body if isinstance(node, ast.Try)]; handlers = [] if len(tries) != 1 else [item for item in tries[0].handlers if isinstance(item.type, ast.Name) and item.type.id == "Undecidable"]
+        if len(handlers) != 1 or not isinstance(handlers[0].body[-1], ast.Return) or not isinstance(handlers[0].body[-1].value, ast.Constant) or handlers[0].body[-1].value.value != 2 or any(sum(exact_extension_print(item, name) for item in handlers[0].body) != 1 for name in ("R25", "R26", "R27")): raise Rig("R27 undecidable terminal reporter drift")
+
+    try: tree = ast.parse(source, filename=str(GATE)); reference = ast.parse(blob(REJECTED_R27_R1_CANDIDATE, "verify/bin/h-039-exit").decode("utf-8")); audit(tree)
+    except (OSError, UnicodeError, SyntaxError) as exc: raise Rig("R27 executing gate AST unavailable") from exc
+    check(
+        exact_r27_product_argv(["--r27-product", sample, "cd" * 20])
+        and exact_r27_publication_argv(["--r27-published", sample]),
+        "A_H039_R27_EXACT_PRODUCT_AND_PUBLICATION_CLI_SHAPES",
+    )
+    mutants: tuple[Any, ...] = (
+        [], ["--r27-product"], ["--r27-product", sample],
+        ["--r27-product", sample.upper(), "cd" * 20],
+        ["--r27-product", sample, "cd" * 20, "extra"],
+        ["--r27-published"], ["--r27-published", sample.upper()],
+        ["--r27-published", sample, "extra"],
+        ["--r26-installed", sample, R24_AUTHORITY_BASE],
+    )
+    for index, mutant in enumerate(mutants):
+        check(
+            not exact_r27_product_argv(mutant)
+            and not exact_r27_publication_argv(mutant),
+            f"N_H039_R27_CLI_MUTANT_{index:02d}",
+        )
+    check(
+        publication_only_phase("r27-published")
+        and not publication_only_phase("r27-product")
+        and not publication_only_phase("r26-installed"),
+        "A_H039_R27_PUBLICATION_ONLY_RESULT_CLASSIFICATION",
+    )
+    check(True, "A_H039_R27_EXACT_CURRENT_AND_STALE_DISPATCH_AST")
+    mutants: list[tuple[str, ast.Module]] = []
+    mutant = copy.deepcopy(tree); assignments(main_node(mutant), "r26_installed")[0].value = ast.Constant(True); mutants.append(("R26_REACHABLE", mutant))
+    mutant = copy.deepcopy(tree); assignments(main_node(mutant), "r27_product")[0].value.func.id = "exact_r26_installed_argv"; mutants.append(("PRODUCT_SELECTOR", mutant))
+    mutant = copy.deepcopy(tree); branches(main_node(mutant), "preproduct", "r27_contract_candidate_identity")[0].body.insert(0, ast.Expr(ast.Call(ast.Name("r26_contract_candidate_identity", ast.Load()), [], []))); mutants.append(("R26_PREPRODUCT_CALL", mutant))
+    mutant = copy.deepcopy(tree); target = branches(main_node(mutant), "r27_product", "r27_contract_publication_graph")[0]; target.body[0], target.body[3] = target.body[3], target.body[0]; mutants.append(("PRODUCT_ORDER", mutant))
+    mutant = copy.deepcopy(tree); branches(main_node(mutant), "r27_published", "r27_product_publication_identity")[0].body[-1] = ast.Pass(); mutants.append(("PUBLISHED_FALLTHROUGH", mutant))
+    mutant = copy.deepcopy(tree); main = main_node(mutant); main.body.append(copy.deepcopy(branches(main, "preproduct", "r27_contract_candidate_identity")[0])); mutants.append(("PREPRODUCT_DUPLICATE", mutant))
+    mutant = copy.deepcopy(tree); main_node(mutant).body.append(ast.If(ast.Name("r27_product", ast.Load()), [ast.Expr(ast.Call(ast.Name("len", ast.Load()), [ast.Tuple([], ast.Load())], []))], [])); mutants.append(("PRODUCT_MARKERLESS_DECOY", mutant))
+    mutant = copy.deepcopy(tree); body = next(node for node in main_node(mutant).body if isinstance(node, ast.Try)).body; body[:] = [node for node in body if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and call_name(node.value) == "r26_dispatch_selftests")]; mutants.append(("R26_SELFTEST_CALL_REMOVED", mutant)); mutant = copy.deepcopy(tree); body = next(node for node in main_node(mutant).body if isinstance(node, ast.Try)).body; body[:] = [node for node in body if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and call_name(node.value) == "r27_dispatch_selftests")]; mutants.append(("R27_SELFTEST_CALL_REMOVED", mutant))
+    mutant = copy.deepcopy(tree); main_node(mutant).body.append(ast.If(ast.Call(ast.Name("bool", ast.Load()), [ast.Name("r26_installed", ast.Load())], []), [ast.Expr(ast.Call(ast.Name("r26_contract_candidate_identity", ast.Load()), [], []))], [])); mutants.append(("R26_CALL_WRAPPED_SELECTOR", mutant)); mutant = copy.deepcopy(tree); main_node(mutant).body.append(ast.If(ast.Call(ast.Name("bool", ast.Load()), [ast.Name("r27_product", ast.Load())], []), [ast.Expr(ast.Call(ast.Name("r26_contract_publication_identity", ast.Load()), [], []))], [])); mutants.append(("R27_CALL_WRAPPED_SELECTOR", mutant))
+    mutant = copy.deepcopy(tree); main_node(mutant).body.append(ast.Expr(ast.Name("r27_product", ast.Load()))); mutants.append(("R27_SELECTOR_DECOY_EXPRESSION", mutant)); mutant = copy.deepcopy(tree); next(node for node in mutant.body if isinstance(node, ast.FunctionDef) and node.name == "exact_r27_product_argv").body = [ast.Return(ast.Constant(True))]; mutants.append(("PRODUCT_HELPER_TRUE", mutant)); mutant = copy.deepcopy(tree); next(node for node in mutant.body if isinstance(node, ast.FunctionDef) and node.name == "exact_r27_publication_argv").body = [ast.Return(ast.Constant(True))]; mutants.append(("PUBLICATION_HELPER_TRUE", mutant))
+    mutant = copy.deepcopy(tree); main = main_node(mutant); handler = next(item for node in main.body if isinstance(node, ast.Try) for item in node.handlers if isinstance(item.type, ast.Name) and item.type.id == "Undecidable"); handler.body = [item for item in handler.body if not exact_extension_print(item, "R27")]; mutants.append(("TERMINAL_R27_REMOVED", mutant))
+    mutant = copy.deepcopy(tree); call = next(node for node in ast.walk(main_node(mutant)) if isinstance(node, ast.Call) and call_name(node) == "r27_immutable_r1_review_failure_checks"); call.func.id = "r27_source_contract_selftests"; mutants.append(("R1_EVIDENCE_CALL_REMOVED", mutant))
+    for label, mutant in mutants:
+        try: audit(mutant); rejected = False
+        except Rig: rejected = True
+        check(rejected, f"N_H039_R27_DISPATCH_MUTANT_{label}")
+    check(True, "A_H039_R27_UNDECIDABLE_TERMINAL_REPORTS_R25_R26_R27")
+
+
+def r27_registry_selftests(row: dict[str, Any]) -> None:
+    registry = row["h039_os_exclusive_runtime_cleanup"][
+        "r27_atomic_create_phase_diagnostic"
+    ]
+    check(
+        type(registry) is dict
+        and sha(canonical(registry)) == R27_REGISTRY_SHA256,
+        "A_H039_R27_REGISTRY_SELFTEST_ANCHOR",
+    )
+    mutations = (
+        ("OPERATION", lambda value: value["diagnostic_operation"].__setitem__(
+            "operation_code", 2,
+        )),
+        ("ACTIVE", lambda value: value["diagnostic_operation"].__setitem__(
+            "active_phase_accepted_or_written", True,
+        )),
+        ("PHASE", lambda value: value["diagnostic_operation"][
+            "durable_phase_registry"
+        ].pop()),
+        ("RESULT_KEY", lambda value: value["diagnostic_operation"][
+            "result_exact_keys_in_canonical_order"
+        ].__setitem__(0, "cleanup_nonce")),
+        ("INSTALLED_LANE", lambda value: value.__setitem__(
+            "r27_installed_lane", True,
+        )),
+        ("R28_ORDER", lambda value: value["r28_required_sequence"].reverse()), ("LISTENER_FD_KEY", lambda value: value["diagnostic_operation"]["prepared_exchange"]["exact_keys_in_canonical_order"].pop(2)), ("GRACE_DEADLINE", lambda value: value["diagnostic_operation"]["diagnostic_ack"].pop("recovery_eof_grace_deadline")), ("R1_CREDIT", lambda value: value["rejected_r27_r1"].__setitem__("task_credit", True)), ("R1_DISPATCH", lambda value: value["rejected_r27_r1"]["correction"].__setitem__("historical_r26_installed_branch_reachable", True)),
+    )
+    for label, mutate in mutations:
+        mutant = copy.deepcopy(registry)
+        mutate(mutant)
+        check(
+            sha(canonical(mutant)) != R27_REGISTRY_SHA256,
+            f"N_H039_R27_REGISTRY_MUTANT_{label}",
+        )
+
+
 def r23_registry_selftests(row: dict[str, Any]) -> None:
     registry = row["h039_os_exclusive_runtime_cleanup"][
         "r23_fd_scan_and_fixed_update"
@@ -6190,8 +7286,11 @@ def r26_dispatch_selftests() -> None:
     historical_flags = {
         "product", "published", "installed", "r18_product", "r18_published",
         "r18_installed", "r19_product", "r19_published", "r23_product",
-        "r23_published", "r24_installed", "r25_installed",
+        "r23_published", "r24_installed", "r25_installed", "r26_installed",
     }
+    r26_assignments = [node for node in main.body if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "r26_installed"]
+    r26_stores = [node for node in ast.walk(main) if isinstance(node, ast.Name) and node.id == "r26_installed" and isinstance(node.ctx, ast.Store)]
+    main_call_names = [call_name(node) for node in ast.walk(main) if isinstance(node, ast.Call)]
     installed_branches = [
         node for node in ast.walk(main) if isinstance(node, ast.If)
         and isinstance(node.test, ast.Name) and node.test.id == "r26_installed"
@@ -6201,7 +7300,7 @@ def r26_dispatch_selftests() -> None:
         and isinstance(node.test, ast.Name) and node.test.id == "preproduct"
         and any(
             isinstance(item, ast.Call)
-            and call_name(item) == "r26_contract_candidate_identity"
+            and call_name(item) == "r27_contract_candidate_identity"
             for item in ast.walk(node)
         )
     ]
@@ -6226,15 +7325,8 @@ def r26_dispatch_selftests() -> None:
             raise Rig(f"R26 dispatch order/cardinality drift: {ordered!r}")
         return names
 
-    pre_names = require_order(preproduct_branches[0], (
-        "r19_cursor_causal_checks", "r26_r25_publication_evidence_checks",
-        "r26_immutable_r25_failure_checks",
-        "r26_immutable_r1_review_failure_checks",
-        "r24_r14_publication_evidence_checks",
-        "r26_ceremony_prepublication_checks",
-        "r26_contract_candidate_identity", "historical_r14_product_identity",
-        "r22_int2_evidence_checks", "r23_product_material_with_retained_installed",
-    ))
+    pre_names = [call_name(node) for node in ast.walk(preproduct_branches[0]) if isinstance(node, ast.Call)]
+    stale_preproduct_calls = {"r19_cursor_causal_checks", "r26_r25_publication_evidence_checks", "r26_immutable_r25_failure_checks", "r26_immutable_r1_review_failure_checks", "r24_r14_publication_evidence_checks", "r26_ceremony_prepublication_checks", "r26_contract_candidate_identity", "r22_int2_evidence_checks", "r23_product_material_with_retained_installed"}
     installed_names = require_order(installed_branches[0], (
         "r26_contract_publication_identity", "historical_r14_product_identity",
         "r26_r25_publication_evidence_checks",
@@ -6279,7 +7371,11 @@ def r26_dispatch_selftests() -> None:
     }
     check(
         historical_flags <= false_targets and exact_material
+        and len(r26_assignments) == 1 and isinstance(r26_assignments[0].value, ast.Constant) and r26_assignments[0].value.value is False
+        and len(r26_stores) == 1 and "exact_r26_installed_argv" not in main_call_names and main_call_names.count("r27_dispatch_selftests") == 1
+        and not (stale_preproduct_calls & set(pre_names))
         and preproduct_branches[0].lineno < installed_branches[0].lineno
+        and isinstance(installed_branches[0].body[-1], ast.Return)
         and not (forbidden_pre & set(pre_names))
         and installed_names.count("guarded_product_effects") == 1
         and "product_effects" not in installed_names
@@ -13598,6 +14694,109 @@ def r26_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]
         return False, {"error": str(exc), "graph": graph}
 
 
+def r27_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        changes = raw_changes(R27_AUTHORITY_BASE, candidate)
+        additions, deletions = line_delta(R27_AUTHORITY_BASE, candidate)
+        detail = {
+            "authority_tree": commit_tree(R27_AUTHORITY_BASE),
+            "authority_parents": commit_parents(R27_AUTHORITY_BASE),
+            "candidate": candidate,
+            "candidate_parents": commit_parents(candidate),
+            "changes": changes, "additions": additions, "deletions": deletions,
+        }
+        rejected = {
+            R27_AUTHORITY_BASE, R27_R26_CONTRACT_CANDIDATE,
+            R26_AUTHORITY_BASE, R26_R25_CONTRACT_CANDIDATE,
+            R25_AUTHORITY_BASE, R24_AUTHORITY_BASE, R24_R14_PRODUCT_CANDIDATE,
+            REJECTED_R26_R1_CANDIDATE, REJECTED_R27_R1_CANDIDATE,
+        }
+        ok = (
+            object_type(R27_AUTHORITY_BASE) == "commit"
+            and detail["authority_tree"] == R27_AUTHORITY_TREE
+            and detail["authority_parents"] == R27_AUTHORITY_PARENTS
+            and sha(blob(R27_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+            == R27_BASE_GATE_SHA256
+            and sha(blob(R27_AUTHORITY_BASE, "specs/tasks.spec.json"))
+            == R27_BASE_SPEC_SHA256
+            and object_type(candidate) == "commit" and candidate not in rejected
+            and detail["candidate_parents"] == [R27_AUTHORITY_BASE]
+            and exact_contract_change_shape(changes)
+            and type(additions) is int and additions <= MAX_ADDED_LINES
+            and type(deletions) is int and deletions <= MAX_DELETED_LINES
+        )
+        return ok, detail
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r27_contract_candidate_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r27_contract_candidate_graph(candidate)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(candidate, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        return (
+            graph_ok and remote_main == R27_AUTHORITY_BASE and head == candidate
+            and status_raw == b"" and checkout_equal
+        ), {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r27_contract_publication_graph(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        authority, candidate = parents
+        candidate_ok, candidate_detail = r27_contract_candidate_graph(candidate)
+        changes = raw_changes(R27_AUTHORITY_BASE, merge)
+        ok = (
+            object_type(merge) == "commit" and authority == R27_AUTHORITY_BASE
+            and candidate_ok and commit_tree(merge) == commit_tree(candidate)
+            and exact_contract_change_shape(changes)
+        )
+        return ok, {
+            "parents": parents, "candidate": candidate_detail,
+            "changes": changes, "tree": commit_tree(merge),
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
+def r27_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r27_contract_publication_graph(merge)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_checkout_blob(path, blob(merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        return (
+            graph_ok and remote_main == merge and head == merge
+            and status_raw == b"" and checkout_equal
+            and SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
+        ), {
+            "graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
 def exact_r22_product_change_shape(
     changes: list[tuple[str, str, str, str]],
 ) -> bool:
@@ -13851,6 +15050,134 @@ def r23_product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
                     "checkout_equal": checkout_equal,
                     "contract_checkout_equal": contract_checkout_equal,
                     "executing_bytes_equal": executing_bytes_equal}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
+def exact_r27_product_change_shape(
+    changes: list[tuple[str, str, str, str]],
+) -> bool:
+    return changes == [
+        (path, PRODUCT_MODES[path], PRODUCT_MODES[path], "M")
+        for path in R23_PRODUCT_GIT_ORDER
+    ]
+
+
+def r27_product_identity(
+    contract_merge: str, candidate: str, *, require_checkout: bool = True,
+    require_contract_publication: bool = True,
+) -> tuple[bool, dict[str, Any]]:
+    try:
+        contract_ok, contract = r27_contract_publication_graph(contract_merge)
+        changes = raw_changes(contract_merge, candidate)
+        additions, deletions = line_delta(contract_merge, candidate)
+        remote_main = observed_production_main() \
+            if require_contract_publication else None
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_product_checkout_blob(path, blob(candidate, path))
+            for path in R23_PRODUCT_GIT_ORDER
+        ) if require_checkout else True
+        contract_checkout_equal = all(
+            stable_checkout_blob(path, blob(contract_merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        ) if require_checkout else True
+        executing_contract_bytes_equal = (
+            SPEC.read_bytes() == blob(contract_merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(contract_merge, "verify/bin/h-039-exit")
+        ) if require_checkout else True
+        source = blob(candidate, "controller/runtime-cleanup/native/mediator.c")
+        mediator = blob(candidate, "verify/h039/runtime-cleanup-mediator")
+        source_exact = source == r27_expected_production_source()
+        recipe_exact = (
+            blob(candidate, "verify/h039/build-recipe.json")
+            == r27_expected_production_recipe(mediator)
+        )
+        retained_r14 = all(
+            blob(contract_merge, path) == blob(R27_AUTHORITY_BASE, path)
+            for path in R23_PRODUCT_GIT_ORDER
+        )
+        ok = (
+            contract_ok
+            and (not require_contract_publication or remote_main == contract_merge)
+            and object_type(candidate) == "commit"
+            and commit_parents(candidate) == [contract_merge]
+            and exact_r27_product_change_shape(changes)
+            and type(additions) is int and additions <= MAX_ADDED_LINES
+            and type(deletions) is int and deletions <= MAX_DELETED_LINES
+            and source_exact and recipe_exact and retained_r14
+            and sha(blob(contract_merge, "verify/h039/runtime-cleanup-mediator"))
+            == R27_OLD_R14_MEDIATOR_SHA256
+            and len(blob(contract_merge, "verify/h039/runtime-cleanup-mediator"))
+            == R27_OLD_R14_MEDIATOR_SIZE
+            and mediator != blob(
+                contract_merge, "verify/h039/runtime-cleanup-mediator",
+            )
+            and (not require_checkout or (
+                head == candidate and status_raw == b"" and checkout_equal
+                and contract_checkout_equal and executing_contract_bytes_equal
+            ))
+        )
+        return ok, {
+            "contract": contract, "candidate": candidate,
+            "parents": commit_parents(candidate), "changes": changes,
+            "additions": additions, "deletions": deletions,
+            "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+            "contract_checkout_equal": contract_checkout_equal,
+            "executing_contract_bytes_equal": executing_contract_bytes_equal,
+            "source_sha256": sha(source), "source_exact": source_exact,
+            "recipe_exact": recipe_exact, "retained_r14": retained_r14,
+            "new_mediator_sha256": sha(mediator),
+            "new_mediator_size": len(mediator),
+        }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r27_product_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        contract_merge, candidate = parents
+        product_ok, product = r27_product_identity(
+            contract_merge, candidate, require_checkout=False,
+            require_contract_publication=False,
+        )
+        changes = raw_changes(contract_merge, merge)
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(
+            stable_product_checkout_blob(path, blob(merge, path))
+            for path in R23_PRODUCT_GIT_ORDER
+        )
+        contract_checkout_equal = all(
+            stable_checkout_blob(path, blob(merge, path))
+            for path in TEST_AUTHOR_GIT_ORDER
+        )
+        executing_bytes_equal = (
+            SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
+        )
+        ok = (
+            product_ok and object_type(merge) == "commit"
+            and commit_tree(merge) == commit_tree(candidate)
+            and exact_r27_product_change_shape(changes)
+            and remote_main == merge and head == merge and status_raw == b""
+            and checkout_equal and contract_checkout_equal and executing_bytes_equal
+        )
+        return ok, {
+            "parents": parents, "product": product, "changes": changes,
+            "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal,
+            "contract_checkout_equal": contract_checkout_equal,
+            "executing_bytes_equal": executing_bytes_equal,
+        }
     except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
         return False, {"error": str(exc), "merge": merge}
 
@@ -14611,6 +15938,7 @@ def product_bytes(path: str, commit: str | None) -> bytes:
 def manifest_checks(
     commit: str | None = None, *, r13_product: bool = True,
     diagnostic_product: bool = False, r23_product: bool = False,
+    r27_product: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     recipe_raw = product_bytes("verify/h039/build-recipe.json", commit)
     manifest_raw = product_bytes("verify/h039/identity-manifest.json", commit)
@@ -14646,10 +15974,16 @@ def manifest_checks(
             f"-DH039_MEDIATOR_SIZE={mediator_size}",
             *(
                 [
-                    f"-DH039_OLD_MEDIATOR_SHA256={R23_OLD_R12_MEDIATOR_SHA256}",
-                    f"-DH039_OLD_MEDIATOR_SIZE={R23_OLD_R12_MEDIATOR_SIZE}",
+                    "-DH039_OLD_MEDIATOR_SHA256=" + (
+                        R27_OLD_R14_MEDIATOR_SHA256 if r27_product
+                        else R23_OLD_R12_MEDIATOR_SHA256
+                    ),
+                    "-DH039_OLD_MEDIATOR_SIZE=" + str(
+                        R27_OLD_R14_MEDIATOR_SIZE if r27_product
+                        else R23_OLD_R12_MEDIATOR_SIZE
+                    ),
                 ]
-                if r23_product else []
+                if r23_product or r27_product else []
             ),
             "-Wl,-segprot,__H039RO,r,r",
             "-Wl,-sectcreate,__H039RO,__h039med,verify/h039/runtime-cleanup-mediator",
@@ -14677,12 +16011,15 @@ def manifest_checks(
         "sdk_version": "26.5",
         "source_mode": "100644",
     }
+    if r27_product: expected_recipe = strict_json(r27_expected_production_recipe(mediator_raw))
     if not isinstance(recipe, dict) \
             or type(recipe.get("schema_version")) is not int \
             or recipe != expected_recipe:
         raise Rig("build recipe mismatch")
     if r23_product and recipe_raw != r23_expected_production_recipe(mediator_raw):
         raise Rig("R23 production recipe raw bytes are not exact R12 transform")
+    if r27_product and recipe_raw != r27_expected_production_recipe(mediator_raw):
+        raise Rig("R27 production recipe raw bytes are not exact R14 transform")
     required = {
         "schema_version", "artifact_path", "artifact_sha256", "source_sha256",
         "installer_path", "installer_sha256", "recipe_sha256",
@@ -26108,8 +27445,11 @@ def r22_product_material_checks(commit: str) -> None:
 
 
 def r23_compiled_production_views(source: bytes, runtime: bytes,
-                                  recipe: dict[str, Any]) -> tuple[bytes, ...]:
-    if source != r23_expected_production_source():
+                                  recipe: dict[str, Any], *,
+                                  expected_source: bytes | None = None,
+                                  ) -> tuple[bytes, ...]:
+    if source != (r23_expected_production_source()
+                  if expected_source is None else expected_source):
         raise Rig("R23 compiled views source is not exact")
     temporary = Path(tempfile.mkdtemp(prefix="h039-r23-views-", dir="/private/tmp"))
     project = temporary / "project"
@@ -26226,6 +27566,606 @@ def r23_product_material_checks(
     )
 
 
+def r27_sequence_two_receipt(runtime_id: str, capability_sha256: str) -> bytes:
+    effect = canonical({
+        "capability_sha256": capability_sha256,
+        "cleanup_request_nonce": R27_CLEANUP_NONCE,
+        "create_request_nonce": R27_REQUEST_NONCE,
+        "runtime_id": runtime_id,
+        "schema_version": 1,
+        "sequence": 2,
+        "zero_runtime_residue": True,
+    })
+    if len(effect) != 377:
+        raise Rig("R27 sequence-two effect preimage size drift")
+    receipt = canonical({
+        "capability_sha256": capability_sha256,
+        "cleanup_request_nonce": R27_CLEANUP_NONCE,
+        "create_request_nonce": R27_REQUEST_NONCE,
+        "effect_sha256": sha(effect),
+        "runtime_id": runtime_id,
+        "schema_version": 1,
+        "sequence": 2,
+    })
+    if len(receipt) != 432:
+        raise Rig("R27 sequence-two receipt size drift")
+    return receipt
+
+
+R27_CONNECTED_TEST_SHIM = br'''
+#include <stdarg.h>
+static const char*h039_test_stop_phase="NORMAL";
+static const char*h039_test_fault="NONE",*h039_test_active_phase="";
+static int h039_test_temp_fd=-1,h039_test_rename_seen=0,h039_test_fault_hits=0,h039_test_close_calls=0,h039_test_real_closes=0;
+static const char h039_test_root[]="@TEST_ROOT@";
+static int h039_test_suffix(const char*path,const char*suffix){size_t n=strlen(path),m=strlen(suffix);return n>=m&&!strcmp(path+n-m,suffix);}
+static int h039_test_inside(const char*path){size_t n=sizeof h039_test_root-1;return !strncmp(path,h039_test_root,n)&&(path[n]==0||path[n]=='/');}
+static int h039_test_fault_once(const char*name){if(h039_test_fault_hits||strcmp(h039_test_fault,name)||strcmp(h039_test_active_phase,h039_test_stop_phase))return 0;h039_test_fault_hits=1;errno=EIO;return 1;}
+static int h039_test_fault_twice(const char*name){if(h039_test_fault_hits>=2||strcmp(h039_test_fault,name)||strcmp(h039_test_active_phase,h039_test_stop_phase))return 0;h039_test_fault_hits++;errno=EIO;return 1;}
+static void h039_test_adjust(struct stat*s,const char*path){
+  if(!h039_test_inside(path))return;mode_t permissions=s->st_mode&07777;if(S_ISDIR(s->st_mode)&&permissions==0755)s->st_mode=(s->st_mode&S_IFMT)|0555;else if(S_ISDIR(s->st_mode)&&permissions==0750)s->st_mode=(s->st_mode&S_IFMT)|0550;else if(S_ISREG(s->st_mode)&&permissions==0644)s->st_mode=(s->st_mode&S_IFMT)|0444;int client=strstr(path,"/h/r")&&(h039_test_suffix(path,"/h/r")||strstr(path,"/h/r/"));int staff=client||h039_test_suffix(path,"/p")||h039_test_suffix(path,"/p/c")||S_ISSOCK(s->st_mode);s->st_uid=client?501:0;s->st_gid=staff?20:0;
+}
+static int h039_test_fd_path(int fd,char path[PATH_MAX]){memset(path,0,PATH_MAX);return fcntl(fd,F_GETPATH,path)==0;}
+static int h039_test_fstat(int fd,struct stat*s){int result=fstat(fd,s);if(!result&&fd==h039_test_temp_fd&&h039_test_rename_seen&&(h039_test_fault_once("FSTAT_AFTER_RENAME")||h039_test_fault_twice("FSTAT_AFTER_RENAME_TWICE")))return -1;if(!result){char path[PATH_MAX];if(h039_test_fd_path(fd,path))h039_test_adjust(s,path);else if(S_ISSOCK(s->st_mode)){s->st_uid=0;s->st_gid=20;}}return result;}
+static int h039_test_fstatat(int fd,const char*name,struct stat*s,int flags){int result=fstatat(fd,name,s,flags);if(!result&&h039_test_rename_seen&&!strcmp(name,"current")&&h039_test_fault_once("FSTATAT_CURRENT"))return -1;if(!result){char parent[PATH_MAX],path[PATH_MAX];if(h039_test_fd_path(fd,parent)&&snprintf(path,sizeof path,"%s/%s",parent,name)>0)h039_test_adjust(s,path);}return result;}
+static int h039_test_lstat(const char*path,struct stat*s){int result=lstat(path,s);if(!result)h039_test_adjust(s,path);return result;}
+static int h039_test_fchown(int fd,uid_t uid,gid_t gid){(void)fd;(void)uid;(void)gid;return 0;}
+static int h039_test_chown(const char*path,uid_t uid,gid_t gid){(void)path;(void)uid;(void)gid;return 0;}
+static int h039_test_fchmod(int fd,mode_t mode){struct stat value;mode_t actual=mode;if(!fstat(fd,&value)&&S_ISDIR(value.st_mode)){if(mode==0555)actual=0755;else if(mode==0550)actual=0750;}return fchmod(fd,actual);}
+static int h039_test_openat(int fd,const char*name,int flags,...){mode_t mode=0;if(flags&O_CREAT){va_list ap;va_start(ap,flags);mode=(mode_t)va_arg(ap,int);va_end(ap);}if(!strcmp(h039_test_stop_phase,"BEFORE_RESERVING")&&!strcmp(name,".current.tmp")){errno=EIO;return -1;}int result=flags&O_CREAT?openat(fd,name,flags,mode):openat(fd,name,flags);if(result>=0&&!strcmp(name,".current.tmp")&&!strcmp(h039_test_active_phase,h039_test_stop_phase)&&!h039_test_fault_hits){h039_test_temp_fd=result;h039_test_rename_seen=0;}return result;}
+static int h039_test_renameatx_np(int from,const char*from_name,int to,const char*to_name,unsigned flags){if(!strcmp(from_name,".current.tmp")&&!strcmp(to_name,"current")&&h039_test_fault_once("RENAME_BEFORE_EIO"))return -1;int result=renameatx_np(from,from_name,to,to_name,flags);if(!result){h039_test_rename_seen=1;if(h039_test_fault_once("RENAME_AFTER_EIO"))return -1;}return result;}
+static int h039_test_fsync(int fd){if(h039_test_rename_seen&&(h039_test_fault_once("FSYNC_STATE")||h039_test_fault_twice("FSYNC_STATE_TWICE")))return -1;return fsync(fd);}
+static int h039_test_close(int fd){int tracked=fd==h039_test_temp_fd&&h039_test_rename_seen;if(tracked)h039_test_close_calls++;if(tracked&&h039_test_fault_once("CLOSE_OPEN_EINTR")){errno=EINTR;return -1;}int result=close(fd);if(tracked&&result==0){h039_test_real_closes++;h039_test_temp_fd=-1;}if(tracked&&!strcmp(h039_test_fault,"CLOSE_CLOSED_EINTR")&&!h039_test_fault_hits&&result==0){h039_test_fault_hits=1;errno=EINTR;return -1;}return result;}
+#define fstat h039_test_fstat
+#define fstatat h039_test_fstatat
+#define lstat h039_test_lstat
+#define fchown h039_test_fchown
+#define chown h039_test_chown
+#define fchmod h039_test_fchmod
+#define openat h039_test_openat
+#define renameatx_np h039_test_renameatx_np
+#define fsync h039_test_fsync
+#define close h039_test_close
+'''
+
+
+def r27_connected_test_source(source: bytes, namespace: Path) -> bytes:
+    if source != r27_expected_production_source():
+        raise Rig("R27 connected harness source is not the exact oracle")
+    encoded = str(namespace).encode("ascii")
+    if b'"' in encoded or b"\\" in encoded or len(encoded) > 80:
+        raise Rig("R27 connected harness namespace is not a short safe literal")
+    ns_define = b'#define NS "/private/var/db/nortropic-runtime-cleanup-v1"'
+    if source.count(ns_define) != 1:
+        raise Rig("R27 connected harness namespace anchor drift")
+    derived = source.replace(ns_define, b'#define NS "' + encoded + b'"', 1)
+    boundary = r23_exact_c_function(derived, "mediator_boundary")
+    if derived.count(boundary) != 1:
+        raise Rig("R27 connected harness boundary anchor drift")
+    derived = derived.replace(
+        boundary, b"static int mediator_boundary(void){return 1;}", 1,
+    )
+    restore = b"if(seteuid(0))_exit(125);"
+    if derived.count(restore) != 1:
+        raise Rig("R27 connected harness effective-uid restoration anchor drift")
+    derived = derived.replace(
+        restore, b"if(seteuid(CLIENT_UID))_exit(125);", 1,
+    )
+    original_transition = r23_exact_c_function(derived, "diagnostic_put_state")
+    transition = original_transition
+    transition_head = b"static int diagnostic_put_state(Store*t,const State*s,int absent,State*last,State*reportable){\n  "
+    if transition.count(transition_head) != 1:
+        raise Rig("R27 connected harness transition fault-ledger anchor drift")
+    transition = transition.replace(
+        transition_head,
+        transition_head + b"h039_test_active_phase=s->phase;h039_test_temp_fd=-1;h039_test_rename_seen=0;",
+        1,
+    )
+    stop_anchor = b"return renamed&&first_flush?1:2;"
+    if transition.count(stop_anchor) != 1:
+        raise Rig("R27 connected harness phase-stop anchor drift")
+    stopped = transition.replace(
+        stop_anchor,
+        b'if(renamed&&first_flush&&!strcmp(h039_test_stop_phase,s->phase))return 2;'
+        b"return renamed&&first_flush?1:2;",
+        1,
+    )
+    derived = derived.replace(original_transition, stopped, 1)
+    shim_anchor = b"extern char **environ;"
+    shim = R27_CONNECTED_TEST_SHIM.replace(b"@TEST_ROOT@", encoded)
+    if derived.count(shim_anchor) != 1:
+        raise Rig("R27 connected harness shim anchor drift")
+    derived = derived.replace(shim_anchor, shim + b"\n" + shim_anchor, 1)
+    wrapper = br'''
+#undef main
+int main(int argc,char**argv){if((argc!=2&&argc!=3)||!argv||!argv[1])return 120;h039_test_stop_phase=argv[1];if(argc==3)h039_test_fault=argv[2];char*product_argv[]={argv[0],NULL};int result=h039_product_main(1,product_argv);int hits=strstr(h039_test_fault,"TWICE")?2:1;if(strcmp(h039_test_fault,"NONE")&&h039_test_fault_hits!=hits)return 121;if(!strcmp(h039_test_fault,"CLOSE_CLOSED_EINTR")&&(h039_test_close_calls!=1||h039_test_real_closes!=1))return 122;if(!strcmp(h039_test_fault,"CLOSE_OPEN_EINTR")&&(h039_test_close_calls!=2||h039_test_real_closes!=1))return 123;return result;}
+'''
+    return b"#define main h039_product_main\n" + derived + wrapper
+
+
+def r27_connected_compiled_mediator_checks(source: bytes) -> None:
+    root = Path(tempfile.mkdtemp(prefix="r27c-", dir="/private/tmp"))
+    track_temp_root(root)
+    namespace = root / "n"
+    source_path = root / "mediator.c"
+    executable = root / "mediator"
+    child: subprocess.Popen[bytes] | None = None
+    received_fds: set[int] = set()
+
+    def stable_directory_identity(path: Path) -> tuple[int, int, int, int]:
+        value = os.stat(path, follow_symlinks=False)
+        return value.st_dev, value.st_ino, value.st_nlink, value.st_size
+
+    def create_store() -> tuple[os.stat_result, dict[str, tuple[int, int, int, int]]]:
+        if namespace.exists():
+            shutil.rmtree(namespace)
+        namespace.mkdir(mode=0o755)
+        for name in ("a", "c", "q", "r", "s"):
+            (namespace / name).mkdir(mode=0o755)
+        lock = namespace / "s/lock"
+        lock.write_bytes(b"")
+        os.chmod(lock, 0o600)
+        last = namespace / "r/last"
+        last.write_bytes(R27_SEQUENCE_ONE_RECEIPT)
+        os.chmod(last, 0o644)
+        identities = {
+            name: stable_directory_identity(
+                namespace if name == "namespace" else namespace / name
+            )
+            for name in ("namespace", "a", "c", "q", "r", "s")
+        }
+        return os.stat(last, follow_symlinks=False), identities
+
+    def receive_frame(
+        channel: socket.socket,
+    ) -> tuple[bytes, list[int]] | None:
+        frame_max = 1 << 20
+        raw = bytearray()
+        descriptors: list[int] = []
+        wanted: int | None = None
+        while wanted is None or len(raw) < wanted:
+            chunk, ancillary, flags, _address = channel.recvmsg(
+                frame_max + 4,
+                socket.CMSG_SPACE(16 * array.array("i").itemsize),
+            )
+            if flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC):
+                raise Rig("R27 connected harness truncated frame or ancillary")
+            for level, kind, payload in ancillary:
+                if level != socket.SOL_SOCKET or kind != socket.SCM_RIGHTS:
+                    raise Rig("R27 connected harness unexpected ancillary")
+                values = array.array("i")
+                usable = len(payload) - len(payload) % values.itemsize
+                values.frombytes(payload[:usable])
+                for descriptor in values:
+                    received_fds.add(descriptor)
+                    flags_value = fcntl.fcntl(descriptor, fcntl.F_GETFD)
+                    fcntl.fcntl(
+                        descriptor, fcntl.F_SETFD,
+                        flags_value | fcntl.FD_CLOEXEC,
+                    )
+                    if not fcntl.fcntl(descriptor, fcntl.F_GETFD) \
+                            & fcntl.FD_CLOEXEC:
+                        raise Rig(
+                            "R27 connected runner failed immediate ancillary "
+                            "CLOEXEC normalization"
+                        )
+                    descriptors.append(descriptor)
+            if not chunk:
+                if raw:
+                    raise Rig("R27 connected harness partial frame at EOF")
+                return None
+            raw.extend(chunk)
+            if wanted is None and len(raw) >= 4:
+                wanted = 4 + int.from_bytes(raw[:4], "big")
+                if wanted > frame_max + 4:
+                    raise Rig("R27 connected harness oversized frame")
+            if wanted is not None and len(raw) > wanted:
+                raise Rig("R27 connected harness coalesced extra frame bytes")
+        return bytes(raw[4:]), descriptors
+
+    def validate_final(
+        predecessor: os.stat_result,
+        identities: dict[str, tuple[int, int, int, int]],
+        phase: str,
+    ) -> tuple[bytes, int]:
+        expected_members = {
+            "a": [], "c": [], "q": [], "r": ["last"], "s": ["lock"],
+        }
+        if sorted(path.name for path in namespace.iterdir()) != ["a", "c", "q", "r", "s"]:
+            raise Rig("R27 connected harness final namespace drift")
+        for name, expected in expected_members.items():
+            if sorted(path.name for path in (namespace / name).iterdir()) != expected:
+                raise Rig(f"R27 connected harness final {name} membership drift")
+        for name, before in identities.items():
+            path = namespace if name == "namespace" else namespace / name
+            if stable_directory_identity(path) != before:
+                raise Rig(f"R27 connected harness final {name} identity drift")
+        last_path = namespace / "r/last"
+        receipt = last_path.read_bytes()
+        last_after = os.stat(last_path, follow_symlinks=False)
+        early = phase in {"BEFORE_RESERVING", "RESERVING", "CREATING"}
+        if early:
+            if receipt != R27_SEQUENCE_ONE_RECEIPT or (
+                last_after.st_dev, last_after.st_ino
+            ) != (predecessor.st_dev, predecessor.st_ino):
+                raise Rig("R27 connected harness did not preserve sequence one")
+            return receipt, 1
+        parsed = strict_json(receipt)
+        if (
+            len(receipt) != 432 or parsed.get("schema_version") != 1
+            or parsed.get("sequence") != 2
+            or parsed.get("create_request_nonce") != R27_REQUEST_NONCE
+            or parsed.get("cleanup_request_nonce") != R27_CLEANUP_NONCE
+            or (last_after.st_dev, last_after.st_ino)
+            == (predecessor.st_dev, predecessor.st_ino)
+            or receipt != r27_sequence_two_receipt(
+                parsed["runtime_id"], parsed["capability_sha256"],
+            )
+        ):
+            raise Rig(
+                "R27 connected harness sequence-two receipt drift "
+                f"phase={phase} size={len(receipt)} parsed={parsed}"
+            )
+        return receipt, 2
+
+    def snapshot() -> tuple[tuple[object, ...], ...]:
+        result = []
+        for path in [namespace, *sorted(namespace.rglob("*"))]:
+            value = os.lstat(path); payload = path.read_bytes() if stat.S_ISREG(value.st_mode) else b""
+            result.append((str(path.relative_to(namespace)), value.st_dev, value.st_ino, value.st_mode, value.st_nlink, value.st_size, payload))
+        return tuple(result)
+
+    def run_invalid(kind: str) -> None:
+        nonlocal child
+        create_store()
+        target = namespace / {"CURRENT": "s/current", "CURRENT_TMP": "s/.current.tmp", "LAST_TMP": "r/.last.tmp", "EXTRA_NAMESPACE": "extra", "RECEIPT": "r/last"}[kind]
+        if kind == "EXTRA_NAMESPACE": target.mkdir()
+        elif kind == "RECEIPT":
+            raw = bytearray(target.read_bytes()); raw[1] ^= 1; target.write_bytes(raw)
+        else: target.write_bytes(b"x")
+        before = snapshot(); parent, peer = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM); parent.settimeout(4)
+        try:
+            child = subprocess.Popen([str(executable), "NORMAL", "NONE"], stdin=peer.fileno(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True, cwd=root, env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"})
+            peer.close(); parent.sendall(R27_REQUEST_WIRE); parent.shutdown(socket.SHUT_WR)
+            frame = receive_frame(parent); returncode = child.wait(timeout=4); child = None
+            if returncode != 1 or frame is not None or snapshot() != before: raise Rig(f"R27 invalid prestate was not zero-effect: {kind}")
+        finally:
+            parent.close(); peer.close()
+            if child is not None:
+                try: os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError: pass
+                child.wait(); child = None
+
+    def run_case(
+        phase: str, ack: bytes | str | None, *, fault: str = "NONE",
+        reached: str | None = None, expect_result: bool | None = None,
+    ) -> None:
+        nonlocal child
+        predecessor, identities = create_store()
+        parent, peer = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        parent.settimeout(12)
+        first: tuple[bytes, list[int]] | None = None
+        second: tuple[bytes, list[int]] | None = None
+        try:
+            child = subprocess.Popen(
+                [str(executable), phase, fault], stdin=peer.fileno(),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                close_fds=True, start_new_session=True,
+                cwd=root, env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            )
+            peer.close()
+            parent.sendall(R27_REQUEST_WIRE)
+            parent.shutdown(socket.SHUT_WR)
+            first = receive_frame(parent)
+            prepared = False
+            if first is not None:
+                first_body, first_fds = first
+                parsed_first = strict_json(first_body)
+                prepared = parsed_first.get("operation") == \
+                    "create-phase-diagnostic-prepared-v1"
+                if prepared:
+                    if phase != "NORMAL" or len(first_fds) != 3 \
+                            or len(set(first_fds)) != 3 \
+                            or any(fd < 3 for fd in first_fds):
+                        raise Rig("R27 connected harness prepared FD cardinality drift")
+                    for descriptor in first_fds:
+                        if not fcntl.fcntl(descriptor, fcntl.F_GETFD) \
+                                & fcntl.FD_CLOEXEC:
+                            raise Rig("R27 connected runner failed immediate CLOEXEC normalization")
+                    runtime_fd, writer_fd, listener_fd = first_fds
+                    runtime_stat, writer_stat, listener_fd_stat = os.fstat(runtime_fd), os.fstat(writer_fd), os.fstat(listener_fd)
+                    listener_socket = socket.socket(fileno=listener_fd)
+                    try:
+                        listener_path = listener_socket.getsockname()
+                        listener_type = listener_socket.getsockopt(
+                            socket.SOL_SOCKET, socket.SO_TYPE,
+                        )
+                    finally:
+                        listener_socket.detach()
+                    listener_named = os.stat(listener_path, follow_symlinks=False)
+                    if (
+                        list(parsed_first) != [
+                            "fifo_dev", "fifo_ino", "listener_fd_dev", "listener_fd_ino", "operation", "reached_phase",
+                            "request_nonce", "runtime_dev", "runtime_id", "runtime_ino",
+                            "schema_version", "socket_dev", "socket_ino",
+                            "transaction_sequence",
+                        ]
+                        or parsed_first["reached_phase"] != "PREPARED"
+                        or parsed_first["request_nonce"] != R27_REQUEST_NONCE
+                        or parsed_first["schema_version"] != 1
+                        or parsed_first["transaction_sequence"] != 2
+                        or first_body != canonical(parsed_first)
+                        or type(parsed_first.get("listener_fd_dev")) is not int or type(parsed_first.get("listener_fd_ino")) is not int
+                        or not stat.S_ISDIR(runtime_stat.st_mode)
+                        or fcntl.fcntl(runtime_fd, fcntl.F_GETFL) \
+                        & os.O_ACCMODE != os.O_RDONLY
+                        or not stat.S_ISFIFO(writer_stat.st_mode)
+                        or fcntl.fcntl(writer_fd, fcntl.F_GETFL) & os.O_ACCMODE
+                        != os.O_WRONLY
+                        or not stat.S_ISSOCK(listener_fd_stat.st_mode)
+                        or listener_type != socket.SOCK_STREAM
+                        or fcntl.fcntl(listener_fd, fcntl.F_GETFL) \
+                        & os.O_ACCMODE != os.O_RDWR
+                        or listener_path != str(
+                            namespace / "a" / f"o-{parsed_first['runtime_id']}"
+                            / "p/c"
+                        )
+                        or (runtime_stat.st_dev, runtime_stat.st_ino)
+                        != (parsed_first["runtime_dev"], parsed_first["runtime_ino"])
+                        or (writer_stat.st_dev, writer_stat.st_ino)
+                        != (parsed_first["fifo_dev"], parsed_first["fifo_ino"])
+                        or (listener_named.st_dev, listener_named.st_ino)
+                        != (parsed_first["socket_dev"], parsed_first["socket_ino"])
+                        or (listener_fd_stat.st_dev, listener_fd_stat.st_ino) != (parsed_first["listener_fd_dev"], parsed_first["listener_fd_ino"])
+                    ):
+                        raise Rig("R27 connected prepared schema/type/identity drift")
+                    os.close(runtime_fd); received_fds.remove(runtime_fd)
+                    os.close(listener_fd); received_fds.remove(listener_fd)
+                    if ack == "CONTINUOUS":
+                        os.set_blocking(writer_fd,False);writes=0;stop=time.monotonic()+6.25
+                        while child.poll() is None and time.monotonic()<stop:
+                            try: writes+=int(os.write(writer_fd,b"Y"*32)>0)
+                            except (BlockingIOError,BrokenPipeError): pass
+                            time.sleep(0.0005)
+                        if child.poll() is None or writes<2: raise Rig("R27 continuous writer extended recovery EOF grace")
+                    elif ack in {"TIMEOUT", "X_TIMEOUT"}:
+                        if ack == "X_TIMEOUT" and os.write(writer_fd, b"X") != 1:
+                            raise Rig("R27 connected harness short delayed-EOF ACK")
+                        time.sleep(5.25)
+                    elif isinstance(ack, bytes) and ack:
+                        if os.write(writer_fd, ack) != len(ack):
+                            raise Rig("R27 connected harness short ACK write")
+                    os.close(writer_fd); received_fds.remove(writer_fd)
+                    second = receive_frame(parent)
+            returncode = child.wait(timeout=12)
+            child = None
+            if ack == "CONTINUOUS":
+                if returncode != 1 or second is not None: raise Rig("R27 continuous-writer owner stop fabricated success or result")
+                return
+            expected_phase = reached or ("PREPARED" if phase == "NORMAL" else phase)
+            receipt, receipt_sequence = validate_final(
+                predecessor, identities, expected_phase,
+            )
+            eligible = expected_phase in {
+                "RESERVING", "CREATING", "PUBLISHING", "PREPARING",
+            } \
+                or (phase == "NORMAL" and ack == b"X")
+            if expect_result is not None: eligible = expect_result
+            result_frame = second if prepared else first
+            if eligible:
+                if returncode != 0 or result_frame is None or result_frame[1]:
+                    raise Rig(
+                        "R27 connected eligible phase lacked zero-FD result "
+                        f"phase={phase} ack={ack!r} rc={returncode} "
+                        f"prepared={prepared} frame={result_frame is not None} "
+                        f"fds={None if result_frame is None else result_frame[1]}"
+                    )
+                result = strict_json(result_frame[0])
+                result_phase = "PREPARED" if phase == "NORMAL" else expected_phase
+                if (
+                    list(result) != [
+                        "cleanup_request_nonce", "operation", "reached_phase",
+                        "receipt_sequence", "receipt_sha256", "request_nonce",
+                        "runtime_id", "schema_version", "transaction_sequence",
+                        "zero_runtime_residue",
+                    ]
+                    or result != {
+                        "cleanup_request_nonce": R27_CLEANUP_NONCE,
+                        "operation": "create-phase-diagnostic-result-v1",
+                        "reached_phase": result_phase,
+                        "receipt_sequence": receipt_sequence,
+                        "receipt_sha256": sha(receipt),
+                        "request_nonce": R27_REQUEST_NONCE,
+                        "runtime_id": result["runtime_id"],
+                        "schema_version": 1,
+                        "transaction_sequence": 2,
+                        "zero_runtime_residue": True,
+                    }
+                    or not re.fullmatch(r"[0-9a-f]{32}", result["runtime_id"])
+                ):
+                    raise Rig("R27 connected canonical result drift")
+            elif returncode == 0 or result_frame is not None:
+                raise Rig(
+                    "R27 connected rejected phase fabricated a result "
+                    f"phase={phase} ack={ack!r} rc={returncode} "
+                    f"frame={None if result_frame is None else result_frame[0]!r}"
+                )
+        finally:
+            parent.close()
+            peer.close()
+            if child is not None:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                child.wait()
+                child = None
+            for descriptor in list(received_fds):
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+                received_fds.discard(descriptor)
+
+    try:
+        probe=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);probe_path=root/"socket-probe"
+        try: probe.bind(str(probe_path))
+        except PermissionError as error: raise Undecidable("outer Seatbelt denied R27 pathname AF_UNIX bind") from error
+        finally: probe.close();probe_path.unlink(missing_ok=True)
+        source_path.write_bytes(r27_connected_test_source(source, namespace))
+        compile_result = bounded_run(
+            [
+                str(BUILD_COMPILER), "-std=c11", "-O1", "-Wall", "-Wextra",
+                "-Werror", "-fstack-protector-strong", "-isysroot",
+                str(BUILD_SDK), "-mmacosx-version-min=15.0",
+                str(source_path), "-o", str(executable),
+            ],
+            cwd=root,
+            env={"HOME": "/var/empty", "TMPDIR": str(root), "PATH": "/usr/bin:/bin",
+                 "LANG": "C", "LC_ALL": "C"},
+            timeout=60,
+        )
+        if compile_result.returncode or compile_result.stderr:
+            raise Rig(
+                "R27 connected mediator harness compile failed "
+                f"rc={compile_result.returncode} stderr={compile_result.stderr!r}"
+            )
+        for phase in (
+            "BEFORE_RESERVING", "RESERVING", "CREATING", "PUBLISHING",
+            "PREPARING", "PREPARED",
+        ):
+            run_case(phase, None)
+        for ack in (b"X", b"", b"A", b"XX", "TIMEOUT", "X_TIMEOUT", "CONTINUOUS"):
+            run_case("NORMAL", ack)
+        faults = (("RESERVING","RENAME_BEFORE_EIO","BEFORE_RESERVING"),("PUBLISHING","RENAME_BEFORE_EIO","CREATING"),("RESERVING","RENAME_AFTER_EIO","RESERVING"),("PUBLISHING","RENAME_AFTER_EIO","PUBLISHING"),("CREATING","FSTAT_AFTER_RENAME","CREATING"),("PREPARING","FSTATAT_CURRENT","PREPARING"),("PUBLISHING","FSYNC_STATE","PUBLISHING"),("CREATING","CLOSE_CLOSED_EINTR","CREATING"),("PREPARING","CLOSE_OPEN_EINTR","PREPARING"))
+        for phase, fault, reached in faults:
+            run_case(phase, None, fault=fault, reached=reached)
+        run_case("PUBLISHING",None,fault="FSYNC_STATE_TWICE",reached="PUBLISHING",expect_result=False);run_case("CREATING",None,fault="FSTAT_AFTER_RENAME_TWICE",reached="CREATING",expect_result=False)
+        for kind in ("CURRENT","CURRENT_TMP","LAST_TMP","EXTRA_NAMESPACE","RECEIPT"): run_invalid(kind)
+        check(True,"A_H039_R27_CONNECTED_COMPILED_MEDIATOR_PHASE_RECOVERY_AND_ACK_MATRIX",{"source_sha256":sha(source),"cases":29})
+    finally:
+        if child is not None:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            child.wait()
+        for descriptor in list(received_fds):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        shutil.rmtree(root)
+        TEST_TEMP_ROOTS[:] = [item for item in TEST_TEMP_ROOTS if item[0] != root]
+
+
+R27_INSTALLER_TEST_SHIM = br'''
+static const char h039_root[]="@TEST_ROOT@";
+static int h039_inside(const char*p){size_t n=sizeof h039_root-1;return !strncmp(p,h039_root,n)&&(p[n]==0||p[n]=='/');}
+static int h039_suffix(const char*p,const char*s){size_t n=strlen(p),m=strlen(s);return n>=m&&!strcmp(p+n-m,s);}
+static void h039_adjust(struct stat*v,const char*p){if(!h039_inside(p))return;mode_t m=v->st_mode&07777;if(S_ISDIR(v->st_mode)){if(h039_suffix(p,"/db")||h039_suffix(p,"/helpers"))m=0755;else if(h039_suffix(p,"/nortropic-runtime-cleanup-v1"))m=m==0700?0700:0555;else if(h039_suffix(p,"/a")||h039_suffix(p,"/c")||h039_suffix(p,"/q")||h039_suffix(p,"/r")||h039_suffix(p,"/s"))m=0555;else m=0700;}else if(h039_suffix(p,"/r/last"))m=0444;else if(h039_suffix(p,"/s/lock"))m=0600;else if(h039_suffix(p,"/runtime-cleanup/install"))m=0500;else if(h039_suffix(p,"/se.nortropic.runtime-cleanup-mediator"))m=04555;v->st_mode=(v->st_mode&S_IFMT)|m;v->st_uid=v->st_gid=0;}
+static int h039_fdpath(int fd,char p[PATH_MAX]){memset(p,0,PATH_MAX);return fcntl(fd,F_GETPATH,p)==0;}
+static int h039_fstat(int fd,struct stat*v){int r=fstat(fd,v);if(!r){char p[PATH_MAX];if(h039_fdpath(fd,p))h039_adjust(v,p);else if(S_ISREG(v->st_mode)&&(v->st_mode&07777)==04555)v->st_uid=v->st_gid=0;}return r;}
+static int h039_fstatat(int fd,const char*n,struct stat*v,int f){int r=fstatat(fd,n,v,f);if(!r){char d[PATH_MAX],p[PATH_MAX];if(h039_fdpath(fd,d)&&snprintf(p,sizeof p,"%s/%s",d,n)>0)h039_adjust(v,p);}return r;}
+static int h039_lstat(const char*p,struct stat*v){int r=lstat(p,v);if(!r)h039_adjust(v,p);return r;}
+static int h039_fchown(int fd,uid_t u,gid_t g){(void)fd;(void)u;(void)g;return 0;}
+#define fstat h039_fstat
+#define fstatat h039_fstatat
+#define lstat h039_lstat
+#define fchown h039_fchown
+'''
+
+
+def r27_connected_installer_checks(source: bytes) -> None:
+    if source != r27_expected_production_source(): raise Rig("R27 installer harness source drift")
+    root=Path(tempfile.mkdtemp(prefix="r27i-",dir="/private/tmp"));track_temp_root(root);db,namespace,helpers=root/"db",root/"db/nortropic-runtime-cleanup-v1",root/"helpers";c_path,executable,embedded=root/"installer.c",root/"installer",root/"r15";r12,old,new=b"R12",b"R14",b"R15"
+    def snapshot() -> tuple[tuple[object, ...], ...]:
+        return tuple((str(path.relative_to(root)),v.st_dev,v.st_ino,v.st_mode,v.st_nlink,v.st_size,path.read_bytes() if stat.S_ISREG(v.st_mode) else b"") for base in (namespace,helpers) for path in [base,*sorted(base.rglob("*"))] for v in [os.lstat(path)])
+    def fixture(kind: str) -> tuple[tuple[object, ...], ...]:
+        for path in (namespace,helpers): shutil.rmtree(path) if path.exists() else None
+        db.mkdir(mode=0o755,exist_ok=True); namespace.mkdir(mode=0o700 if kind=="NONFINAL" else 0o755); helpers.mkdir(mode=0o755)
+        for name in ("a","c","q","r","s"): (namespace/name).mkdir(mode=0o755)
+        stage=namespace/".install/controller/runtime-cleanup";stage.mkdir(parents=True,mode=0o700);(stage/"install").write_bytes(b"I");os.chmod(stage/"install",0o600)
+        (namespace/"s/lock").write_bytes(b"");os.chmod(namespace/"s/lock",0o600)
+        if kind!="EMPTY": (namespace/"r/last").write_bytes(R27_SEQUENCE_ONE_RECEIPT);os.chmod(namespace/"r/last",0o644)
+        if kind=="WRONG": raw=bytearray((namespace/"r/last").read_bytes());raw[1]^=1;(namespace/"r/last").write_bytes(raw)
+        if kind=="EXTRA": (namespace/"r/extra").write_bytes(b"x")
+        installed=helpers/"se.nortropic.runtime-cleanup-mediator";installed.write_bytes(new if kind=="ALREADY" else old);os.chmod(installed,0o4555)
+        return snapshot()
+    try:
+        mode_probe=root/"mode-probe";mode_probe.write_bytes(b"");mode_fd=os.open(mode_probe,os.O_RDONLY|os.O_CLOEXEC|os.O_NOFOLLOW)
+        try: os.chmod(mode_probe,0o4555);retained=os.fstat(mode_fd);rebound=os.lstat(mode_probe)
+        except PermissionError as error: raise Undecidable("outer Seatbelt denied R27 set-id fixture chmod") from error
+        finally: os.close(mode_fd)
+        if (retained.st_dev,retained.st_ino,retained.st_mode,retained.st_nlink)!=(rebound.st_dev,rebound.st_ino,rebound.st_mode,rebound.st_nlink) or stat.S_IMODE(retained.st_mode)!=0o4555: raise Undecidable("outer Seatbelt stripped R27 set-id fixture mode")
+        embedded.write_bytes(new)
+        encoded=str(root).encode(); ns=b'#define NS "/private/var/db/nortropic-runtime-cleanup-v1"'; derived=source.replace(ns,b'#define NS "'+str(namespace).encode()+b'"',1).replace(b'/Library/PrivilegedHelperTools',str(helpers).encode())
+        shim=R27_INSTALLER_TEST_SHIM.replace(b"@TEST_ROOT@",encoded);derived=derived.replace(b"extern char **environ;",shim+b"\nextern char **environ;",1)
+        wrapper=br'''
+#undef main
+int main(void){unsigned char*raw=NULL;size_t n=0;if(!load_embedded_mediator(&raw,&n))return 2;int p=open(NS "/.install",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);int ok=p>=0&&apply_install(p,raw,n);if(p>=0)close(p);free(raw);return ok?0:1;}
+'''
+        c_path.write_bytes(b"#define main h039_product_main\n"+derived+wrapper.replace(b"@HELPERS@",str(helpers).encode()))
+        defines=["-DH039_INSTALLER=1","-DH039_ROOT_ENTRY_FD0_NORMALIZATION=1",f"-DH039_MEDIATOR_SHA256={sha(old)}","-DH039_MEDIATOR_SIZE=3",f"-DH039_OLD_MEDIATOR_SHA256={sha(r12)}","-DH039_OLD_MEDIATOR_SIZE=3",f"-DH039_R15_MEDIATOR_SHA256={sha(new)}","-DH039_R15_MEDIATOR_SIZE=3",f"-DH039_R15_OLD_MEDIATOR_SHA256={sha(old)}","-DH039_R15_OLD_MEDIATOR_SIZE=3"]
+        built=bounded_run([str(BUILD_COMPILER),"-std=c11","-O1","-Wall","-Wextra","-Werror","-isysroot",str(BUILD_SDK),"-mmacosx-version-min=15.0",*defines,str(c_path),"-Wl,-segprot,__H039RO,r,r","-Wl,-sectcreate,__H039RO,__h039med,"+str(embedded),"-o",str(executable)],cwd=root,env={"HOME":"/var/empty","TMPDIR":str(root),"PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C"},timeout=60)
+        if built.returncode or built.stderr: raise Rig(f"R27 installer harness compile failed: {built.stderr!r}")
+        fixture("EXACT");last=os.stat(namespace/"r/last");run=bounded_run([str(executable)],cwd=root,env={"PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C"},timeout=15);after=os.stat(namespace/"r/last")
+        if run.returncode or (helpers/"se.nortropic.runtime-cleanup-mediator").read_bytes()!=new or (namespace/".install").exists() or (last.st_dev,last.st_ino)!=(after.st_dev,after.st_ino) or (namespace/"r/last").read_bytes()!=R27_SEQUENCE_ONE_RECEIPT: raise Rig(f"R27 exact sequence-one installer update failed rc={run.returncode} install={(namespace/'.install').exists()} helper={(helpers/'se.nortropic.runtime-cleanup-mediator').read_bytes()!r}")
+        for kind in ("EMPTY","WRONG","EXTRA","ALREADY","NONFINAL"):
+            before=fixture(kind);run=bounded_run([str(executable)],cwd=root,env={"PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C"},timeout=15)
+            if run.returncode!=1 or snapshot()!=before: raise Rig(f"R27 nonexact installer state mutated: {kind}")
+        check(True,"A_H039_R27_CONNECTED_SEQUENCE1_ONLY_INSTALLER_MATRIX",{"cases":6})
+    finally:
+        shutil.rmtree(root);TEST_TEMP_ROOTS[:]=[item for item in TEST_TEMP_ROOTS if item[0]!=root]
+
+
+def r27_product_material_checks(commit: str) -> None:
+    source = product_bytes("controller/runtime-cleanup/native/mediator.c", commit)
+    runtime = product_bytes("verify/h039/runtime-cleanup-mediator", commit)
+    installer = product_bytes("controller/runtime-cleanup/install", commit)
+    recipe, manifest = manifest_checks(commit, r27_product=True)
+    r27_source_contract_checks(source)
+    r27_connected_compiled_mediator_checks(source)
+    r27_connected_installer_checks(source)
+    reproducible_rebuild(recipe, commit)
+    macho_checks(manifest, commit)
+    installer_pre, installer_ir, runtime_pre, runtime_ir = \
+        r23_compiled_production_views(
+            source, runtime, recipe, expected_source=source,
+        )
+    if (
+        R27_OLD_R14_MEDIATOR_SHA256.encode() not in installer
+        or R27_OLD_R14_MEDIATOR_SHA256.encode() in runtime
+        or b"sequence_one_upgrade_installed_mediator" not in installer_pre
+        or b"sequence_one_upgrade_installed_mediator" not in installer_ir
+        or installer_pre.count(b"sequence_one_upgrade_installed_mediator(") != 2 or installer_ir.count(b"@sequence_one_upgrade_installed_mediator") != 2
+        or b"@upgrade_installed_mediator" in installer_ir or any(R23_OLD_R12_MEDIATOR_SHA256.encode() in view for view in (installer_ir,installer))
+        or b"}close(db);close(ns);return 0;const char*" not in installer_pre
+        or b"process_diagnostic" not in runtime_pre
+        or b"create-phase-diagnostic-result-v1" not in runtime_ir
+        or b"sequence_one_upgrade_installed_mediator" in runtime_pre
+        or b"sequence_one_upgrade_installed_mediator" in runtime_ir
+    ):
+        raise Rig("R27 installer/runtime compiled trust-domain separation drift")
+    check(
+        True,
+        "A_H039_R27_REBUILD_MACHO_ISOLATED_DIAGNOSTIC_AND_SEQUENCE1_UPDATER",
+        {
+            "source_sha256": sha(source),
+            "runtime_sha256": sha(runtime), "runtime_size": len(runtime),
+            "installer_sha256": sha(installer), "installer_size": len(installer),
+            "installer_pre_sha256": sha(installer_pre),
+            "installer_ir_sha256": sha(installer_ir),
+            "runtime_pre_sha256": sha(runtime_pre),
+            "runtime_ir_sha256": sha(runtime_ir),
+        },
+    )
+
+
+def publication_only_phase(phase: str) -> bool:
+    return phase in {"published", "r19-published", "r23-published", "r27-published"}
+
+
 def finish(phase: str) -> int:
     print(f"MATERIAL_PROPERTIES_JUDGE_ONLY={MATERIAL_PROPERTIES_JUDGE_ONLY}")
     print(f"R6_MATERIAL_REVIEW_EXTENSION={R6_MATERIAL_REVIEW_EXTENSION}")
@@ -26251,9 +28191,10 @@ def finish(phase: str) -> int:
     print(f"R24_MATERIAL_REVIEW_EXTENSION={R24_MATERIAL_REVIEW_EXTENSION}")
     print(f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}")
     print(f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
-        if phase in {"published", "r19-published", "r23-published"}:
+        if publication_only_phase(phase):
             print("H039_GATE_RESULT=PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY")
         else:
             print("H039_GATE_RESULT=PASS")
@@ -26298,6 +28239,7 @@ def main(argv: list[str]) -> int:
         print(f"R24_MATERIAL_REVIEW_EXTENSION={R24_MATERIAL_REVIEW_EXTENSION}")
         print(f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}")
         print(f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -26325,30 +28267,36 @@ def main(argv: list[str]) -> int:
         print(f"R24_MATERIAL_REVIEW_EXTENSION={R24_MATERIAL_REVIEW_EXTENSION}")
         print(f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}")
         print(f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
-    r26_installed = exact_r26_installed_argv(argv)
+    r27_product = exact_r27_product_argv(argv)
+    r27_published = exact_r27_publication_argv(argv)
+    r26_installed = False
     r24_installed = r25_installed = False
     product = published = installed = False
     r18_product = r18_published = r18_installed = False
     r19_product = r19_published = False
     r23_product = r23_published = False
-    if not (preproduct or r26_installed):
+    if not (preproduct or r27_product or r27_published):
         print(
-            "RIG_ERROR: usage: h-039-exit [--r26-installed "
-            "PUBLISHED_R26_CONTRACT_MERGE "
-            "8bb7bae975dcd76b70c563a99583807b70089350]",
+            "RIG_ERROR: usage: h-039-exit [--r27-product "
+            "PUBLISHED_R27_CONTRACT_MERGE R15_CANDIDATE | "
+            "--r27-published PUBLISHED_R15_PRODUCT_MERGE]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if r26_installed else []
+    supplied_commits = argv[1:] if (r27_product or r27_published) else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
-    phase = "preproduct" if preproduct else "r26-installed"
+    phase = (
+        "preproduct" if preproduct
+        else "r27-product" if r27_product else "r27-published"
+    )
     r18_phase = False
-    r19_phase = preproduct or r19_product or r19_published
-    r23_phase = preproduct
+    r19_phase = False
+    r23_phase = False
     try:
         if any(object_type(value) != "commit" for value in supplied_commits):
             raise Rig("every supplied identity must name a literal commit object")
@@ -26389,6 +28337,11 @@ def main(argv: list[str]) -> int:
         r26_git_identity_selftests()
         r26_dispatch_selftests()
         r26_installed_engine_selftests()
+        r27_dispatch_selftests()
+        r27_registry_selftests(row)
+        r27_immutable_r1_review_failure_checks()
+        r27_source_contract_selftests()
+        r27_protocol_model_selftests()
         r24_ceremony_static_selftests()
         r25_ceremony_static_selftests()
         r26_ceremony_static_selftests()
@@ -26399,17 +28352,13 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            r19_cursor_causal_checks(r19_expected_production_source())
-            r26_r25_publication_evidence_checks()
-            r26_immutable_r25_failure_checks()
-            r26_immutable_r1_review_failure_checks()
-            r24_r14_publication_evidence_checks()
-            r26_ceremony_prepublication_checks()
+            r27_immutable_r26_evidence_checks()
+            r27_live_sequence_one_prestate_checks()
             candidate = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
-            candidate_ok, candidate_detail = r26_contract_candidate_identity(candidate)
+            candidate_ok, candidate_detail = r27_contract_candidate_identity(candidate)
             check(
                 candidate_ok,
-                "A_H039_R26_FRESH_DIRECT_CHILD_PRODUCTLESS_FIVE_FILE_CONTRACT_CANDIDATE",
+                "A_H039_R27_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
                 candidate_detail,
             )
             if not candidate_ok:
@@ -26419,18 +28368,70 @@ def main(argv: list[str]) -> int:
             )
             check(
                 product_ok,
-                "A_H039_R26_EXACT_PUBLISHED_R14_PRODUCT_IDENTITY",
+                "A_H039_R27_EXACT_PUBLISHED_R14_PRODUCT_IDENTITY",
                 product_detail,
             )
             if not product_ok:
                 return finish(phase)
-            installed_expected = r22_int2_evidence_checks()
-            r23_product_material_with_retained_installed(
-                R24_AUTHORITY_BASE, installed_expected,
-            )
             check(False, LABEL, {
                 "failure_signature": FAILURE_SIGNATURE, "reason": REASON,
             })
+            return finish(phase)
+
+        if r27_product:
+            publication_ok, publication_detail = \
+                r27_contract_publication_graph(argv[1])
+            check(
+                publication_ok,
+                "A_H039_R27_EXACT_GUARDED_CONTRACT_PUBLICATION_GRAPH",
+                publication_detail,
+            )
+            if not publication_ok:
+                return finish(phase)
+            product_ok, product_detail = r27_product_identity(argv[1], argv[2])
+            check(
+                product_ok,
+                "A_H039_R27_EXACT_DIRECT_CHILD_FIVE_FILE_R15_IDENTITY",
+                product_detail,
+            )
+            if not product_ok:
+                return finish(phase)
+            r27_immutable_r26_evidence_checks()
+            historical_ok, historical_detail = historical_r14_product_identity(
+                R24_AUTHORITY_BASE,
+            )
+            check(
+                historical_ok,
+                "A_H039_R27_EXACT_HISTORICAL_R14_PRODUCT_IDENTITY",
+                historical_detail,
+            )
+            if not historical_ok:
+                return finish(phase)
+            r27_product_material_checks(argv[2])
+            return finish(phase)
+
+        if r27_published:
+            publication_ok, publication_detail = \
+                r27_product_publication_identity(argv[1])
+            check(
+                publication_ok,
+                "A_H039_R27_GUARDED_R15_PRODUCT_PUBLICATION_IDENTITY",
+                publication_detail,
+            )
+            if not publication_ok:
+                return finish(phase)
+            r27_immutable_r26_evidence_checks()
+            historical_ok, historical_detail = historical_r14_product_identity(
+                R24_AUTHORITY_BASE,
+            )
+            check(
+                historical_ok,
+                "A_H039_R27_EXACT_HISTORICAL_R14_PRODUCT_IDENTITY",
+                historical_detail,
+            )
+            if not historical_ok:
+                return finish(phase)
+            r27_product_material_checks(argv[1])
             return finish(phase)
 
         if r26_installed:
@@ -26874,6 +28875,9 @@ def main(argv: list[str]) -> int:
         print(f"R22_MATERIAL_REVIEW_EXTENSION={R22_MATERIAL_REVIEW_EXTENSION}")
         print(f"R23_MATERIAL_REVIEW_EXTENSION={R23_MATERIAL_REVIEW_EXTENSION}")
         print(f"R24_MATERIAL_REVIEW_EXTENSION={R24_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R25_MATERIAL_REVIEW_EXTENSION={R25_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R26_MATERIAL_REVIEW_EXTENSION={R26_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)

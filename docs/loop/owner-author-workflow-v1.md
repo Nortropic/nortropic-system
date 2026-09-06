@@ -2747,3 +2747,153 @@ R19-published phases. Fresh R26-R2 starts again directly from `aa1a304b…`,
 restores exactly that call as the first preproduct statement, retains the
 three-phase cardinality check, and hash-binds both review logs and the failure
 record. Nothing from R1 authorizes publication, root work or retry.
+
+## H-039 R27/R15 — atomic create-phase diagnostic product
+
+R27-R2 starts from published R26 `c43a4c0522e66aa6a44b6e4478d11c0bd8274d23`, never R27-R1 `ae10c55972a3122b330ae81f5180b40daed94b0d` (tree `add9ee8395c9e526b65c6af86c91937e7eefd80f`,
+gate `cb42e688be29622decd79f754745614c4022cb4f6d1fddf7512c4c1982c8e1ed`, spec `d30d4c63eb5390ac2cc9f7acf9da6cf92de26d73e629ad495402c1704a113d9f`). Review A SHA `5e546ece2a38a65f4ed0e8244a0e21e7603891f3ae8bdf572132a9bcc0f92449`,
+identity8 `[16777232,129612176,33188,501,20,1,143842,0]`, is 4,142 lines/4,141 PASS/0 FAIL with sole concatenated R26-dispatch RIG_ERROR. Review B SHA `e19264feca88f1177242030ebb6d8e8a46b1319d4d9e92ec6a18c4d33e37eb83`,
+identity8 `[16777232,129613083,33188,501,20,1,133828,0]`, is 133,828 bytes/3,349 lines/3,323 PASS/0 FAIL with sole outer-Seatbelt ODÖMBART. Both are immutable NO-CREDIT/nonparent/nonretryable.
+R2 retains exact historical R26 bytes/order, literal-false sole selector, zero parser/current calls and terminal unreachability. An independent closed-world bootstrap plus R26/R27 mutual audits require exact direct calls;
+the new evidence call must be exact/direct at R1's source-selftest insertion index and reachable before it is removed for normalized `main`/R27 CLI-helper equality, so relocation after return, hidden calls, wrapped/markerless/decoy selectors, old-lane effects, alternate admission or route drift reject. R25/R26/R27 reporting stays exact.
+R26 log `27196ce2…` remains 92,928 lines/92,927 PASS/0 FAIL with its sole error, blank, 60 PASS tail and no credit. The only forms are RED, `--r27-product <published-R27-contract> <R15-candidate>` and
+`--r27-published <published-R15-product>`; R27 has no installed/evidence form and R26 cannot retry.
+
+The no-argument lane may perform one read-only authentication of immutable live prestate: exact 432-byte canonical sequence-1 receipt `fdb437bd…`, regular root:wheel 0444 nlink1 with stable no-follow full-read/rebind;
+empty `a/c/q`, `r={last}`, `s={lock}`, exact namespace membership, `.install`/current/temps/extras/runtime objects absent; and installed R14 helper SHA `4a388755…`, size89392, CDHash `07ab2816…`.
+Exact namespace/store/lock/receipt/R26-evidence/helper identity8 tuples are registry-bound only for no-argument review and future R28 read-only preflight. R15 source, binaries and fixtures never embed/compare host dev/inode;
+after exact under-lock bytes/membership preconditions, product code captures actual pre-operation identities and requires retained or stable-reopened final-name rebind. Product/publication fixtures are synthetic and live-root-independent.
+
+After five-file R27 freeze, two independent adversarial reviews and guarded
+contract publication, create a fresh R15 candidate changing exactly these
+existing paths with their modes unchanged:
+
+- `controller/runtime-cleanup/install` (`100755`);
+- `controller/runtime-cleanup/native/mediator.c` (`100644`);
+- `verify/h039/build-recipe.json` (`100644`);
+- `verify/h039/identity-manifest.json` (`100644`);
+- `verify/h039/runtime-cleanup-mediator` (`100755`).
+
+The product adds only the exact raw-wire operation
+`create-phase-diagnostic-v1` as operation 3 plus its private implementation.
+Its canonical 144-byte body has digest `15d1605b…`; the `00000090`-prefixed
+148-byte wire has digest `b711e43d…`. It uses fixed create/request nonce
+`a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b`,
+fixed internal cleanup nonce
+`0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417`
+and invalid ACK `X`. Exact raw bytes, not generic JSON equivalence, select the
+branch. Generic request semantics, legacy create/cleanup and legacy ACK `A`
+must remain byte- and behavior-exact; the diagnostic uses a separate ACK path.
+
+Product review uses only isolated synthetic fixtures. Begin with the exact
+432-byte sequence-1 `r/last` bytes and required object shapes, empty `a/c/q`, only
+`s/lock`, and no current or temporary record. Reject every precondition, state
+or identity deviation nonzero with no result and zero effect before mutation.
+Permit no caller-selected state, phase, identity, path or nonce. Retain the
+same OFD lock without delegating or duplicating its descriptor while exactly
+one request-bound create advances transaction 2 through the five durable
+phases; ACTIVE is never accepted or written. Only at PREPARED require exact
+operation
+`create-phase-diagnostic-prepared-v1` and only canonical keys `fifo_dev`,
+`fifo_ino`, `listener_fd_dev`, `listener_fd_ino`, `operation`, `reached_phase`,
+`request_nonce`, `runtime_dev`, `runtime_id`, `runtime_ino`, `schema_version`,
+`socket_dev`, `socket_ino` and `transaction_sequence`. Socket fields bind only
+the stable named socket; signed listener-FD fields preserve Darwin `st_dev=-1`,
+bind its separately captured descriptor, are re-`fstat`ed immediately before
+SCM_RIGHTS and receiver-matched. No capability/path exists. Require three
+distinct fd>=3 values in runtime-directory, mediator-local FIFO-writer and
+bound-listener order; never transfer the lock. The retained root:gid20 0550
+portal excludes uid501 rename/create/unlink, so no self-connect is needed.
+Before `sendmsg` verify sender `FD_CLOEXEC`; SCM_RIGHTS does not preserve it.
+The fixed runner immediately sets/verifies it on all three received FDs before
+non-`fcntl` use, exposure, fork or exec. The FIFO is only the request-created
+mediator-local object, never caller-selected/external/store. Earlier phases
+send no FD and enter no
+ACK path. On every PREPARED ACK path the fixed runner closes all three already
+received descriptors; on its exact success path it closes runtime/listener,
+writes exactly `X`, then closes its received mediator-local runtime-object FIFO
+writer. The mediator
+closes its local writer before waiting for X/EOF;
+closes local runtime/listener/object/hidden/portal FDs before
+`AT_NODELETEBUSY`; among mediator-local runtime-object descriptors retains only
+the validated FIFO reader through X and EOF (the required store-directory and
+lock identity capabilities are outside that runtime-object descriptor set);
+and closes it before unlink. Retained aliases and reordered closes reject.
+Verify same-transaction RESERVING/CREATING recovery preserves the original
+last bytes, inode and `fdb437bd…` digest before unlock. Verify PUBLISHING,
+PREPARING and PREPARED recovery publishes before unlock the exact canonical
+sequence-2 receipt with keys `capability_sha256`, `cleanup_request_nonce`,
+`create_request_nonce`, `effect_sha256`, `runtime_id`, `schema_version` and
+`sequence`, whose effect and receipt digests derive from the exact 377-byte
+canonical effect preimage and exact 432-byte canonical receipt. Before each
+classified success, revalidate under the same lock exact namespace membership
+`a/c/q/r/s` with `.install` absent; `a/c/q` empty, `r={last}`, `s={lock}`;
+current and both temporary names absent; and retained pre/post/rebound identity
+equality to the identities captured under the lock before this operation for
+the namespace, `a/c/q/r/s` and lock. Those are fixture-local identities, never
+hardcoded live host dev/inode values. Only the `r/last` inode is
+phase-dependent. Also require zero runtime-object
+residue and no mediator-owned runtime-FD leak. Accept only one strict canonical
+result with no additional/result ancillary FDs and no raw
+capability/path. Its `reached_phase` is the exact last fsynced phase:
+RESERVING/CREATING return receipt sequence 1 plus the preserved receipt digest;
+PUBLISHING/PREPARING return receipt sequence 2 plus the new canonical receipt
+digest. At PREPARED the fixed runner closes all three delivered FDs. Bounded
+recovery covers no byte held through ACK deadline then closure within grace,
+and `X` with EOF withheld through the deadline then closure within grace. The
+grace is one absolute deadline checked at every loop entry and after every
+positive read; EINTR, EAGAIN and continuous writes cannot extend it. A bounded
+continuous-writer negative must terminate nonzero/no-result after grace, with
+restoration and zero residue unclaimed. It and fixed wrong/missing/extra/non-EOF
+cases released within the bounded protocol otherwise recover and validate.
+Only exact `X` followed by true EOF before deadline emits PREPARED result and
+exits zero; every other covered case is nonzero/no-result with no result FD.
+Arbitrary/hostile retention past grace is the same unclaimed owner stop. Other
+classified durable phases may emit their canonical result and exit zero, after
+which the synthetic runner verifies post-exit
+process and FD cleanup. A failure before
+the first durable RESERVING fsync is nonzero with no result, prepared frame,
+FDs or fabricated phase; it preserves the original sequence-1 store and inode
+with no current, temporary or runtime object. A classified non-PREPARED
+durable-phase failure may exit zero only after exact same-transaction recovery,
+final under-lock validation and its canonical phase-bound result; the stricter
+PREPARED ACK rule above controls every PREPARED outcome. The undecidable
+terminal reporter emits exact R25/R26/R27 material extensions once under a
+static regression. Unclassifiable recovery/identity drift never fabricates success.
+
+Review must state the honest scope: success is atomic for the fixed operation
+and, at PREPARED, that fixed cooperative runner within its bounded close grace.
+It is not a promise to revoke descriptors retained by a hostile receiver past
+that grace, not a zero-residue claim for that case, and not a restoration guarantee
+across mediator process death.
+
+The installer change is equally narrow. The R15 installer build accepts only
+the exact sequence-1 R14→R15 updater precondition under the retained `s/lock`
+OFD lock. Empty `r`, every nonfinalizing prefix, already-R15/version-2 and all
+other nonexact states fail closed before mutation. Runtime legacy `create-v1`
+and `cleanup-v1` remain byte- and behavior-exact; no generic prefix/fresh
+installer behavior is claimed reachable in the R15 installer. Preserve
+the existing `r/last` bytes and inode through post-validation. R15 captures the
+actual pre-update identities under that lock and final-name-rebinds them; only
+R28's separate read-only preflight compares the live numeric identity8 registry.
+No host dev/inode constant is embedded in the product. Do not widen a
+shared prefix predicate to accept `(empty OR sequence 1)`. The recipe binds old R14 and new
+R15 identities, and the manifest follows only the rebuilt artifacts.
+
+After two independent R15 product reviews and guarded non-force publication,
+stop at `PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY`. Outside the single no-argument
+read-only prestate authentication, do not inspect the live protected store;
+never install R15, mutate the store, run the diagnostic, write diagnostic
+evidence or invoke an installed effect during R27. Fresh productless R28 must
+freeze, receive two independent reviews and publish guarded before a read-only
+exact live identity8 preflight and a durable one-shot reservation consumed
+before the one fixed R14→R15 root launch. The update uses only the prebound
+launcher, argv and old/new identities and may never retry. Identity or prestate
+drift, nonzero status, any output, ambiguous execution or unexpected state is a
+consuming owner stop without retry, rollback, general cleanup or wider
+authority. Only exact status zero, empty output, unambiguous execution and the
+fixed poststate continue to a read-only installed/update effect review with no
+store mutation. R28 then makes exactly one diagnostic the first post-R15 store
+mutation and stops for mandatory owner adjudication. The inherited
+mutating effect engine, H039 completion and downstream progress require new
+post-diagnostic owner authority.
