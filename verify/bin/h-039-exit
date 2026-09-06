@@ -1,11 +1,11 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""H-039 R29 current-publication installed/update binding gate.
+"""H-039 R30 target-namespace-symbol installed/update binding gate.
 
 No arguments execute the exact read-only prepublication RED without protected
-store or helper access. ``--r29-installed`` authenticates the current published
-R29 contract, consumed no-retry R14-to-R15 update records, installed R15, and
+store or helper access. ``--r30-installed`` authenticates the current published
+R30 contract, consumed no-retry R14-to-R15 update records, installed R15, and
 the preserved sequence-1 store. It invokes neither update nor diagnostic and
-ends at ``PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY``. R28 and earlier selectors are
+ends at ``PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY``. R29 and earlier selectors are
 historical. This Python gate never runs elevated, mutates state, invokes a
 root-update ceremony, live diagnostic, or inherited mutating effect, or accepts
 a caller path, PID, command, state, nonce, or descriptor.
@@ -16,6 +16,7 @@ from __future__ import annotations
 import array
 import ast
 import base64
+import builtins
 import copy
 import ctypes
 import errno
@@ -33,6 +34,7 @@ import socket
 import stat
 import struct
 import subprocess
+import symtable
 import sys
 import tempfile
 import time
@@ -1084,6 +1086,132 @@ R29_MATERIAL_REVIEW_EXTENSION = (
     "NO_PRODUCT_ROOT_FILESYSTEM_PROCESS_NETWORK_GIT_CREDENTIAL_SEATBELT_"
     "BYPASS_TASK_CREDIT_DOWNSTREAM_"
     "OR_RESUME_AUTHORITY_IS_ADDED"
+)
+R30_AUTHORITY_BASE = "8e44faaea9b91b596f33b9ae75e663e900e50834"
+R30_AUTHORITY_TREE = "be9552f6d0d63289e6032ef4de1b166baca430b6"
+R30_AUTHORITY_PARENTS = [
+    "a13cd9f60d4c8e74855fb9ccdf58f2dc4a61c569",
+    "0b432fbc3e7bab5af9255f6ffa379532eefc7b40",
+]
+R30_R29_CANDIDATE = R30_AUTHORITY_PARENTS[1]
+R30_R15_PRODUCT_MERGE = R29_R15_PRODUCT_MERGE
+R30_BASE_GATE_SHA256 = "31983b9b966370387389491467f5e4a73b0f6c86d6a461ffa094d073c6722b3c"
+R30_BASE_SPEC_SHA256 = "408f4c6641645756a03ccecb6f10b560075348a6557c938ddb523b4e6f4707ee"
+R30_R29_ROW_SHA256 = "7aab16268f3c8fafd3cc360aebfa3f5534177171b2c3dba9ad89c191fb17bd9b"
+R30_R29_REGISTRY_SHA256 = R29_REGISTRY_SHA256
+R30_R29_RECONCILIATION_SHA256 = R29_RECONCILIATION_SHA256
+R30_R29_NORMALIZED_GATE_SHA256 = R29_R2_GATE_SOURCE_SHA256
+R30_R29_MATERIAL_EXTENSION_SHA256 = (
+    "dab3af951e3f84a61fcf154a9a52ed6818823bdaa0bfe1355994e87f4cbd6e71"
+)
+R30_R29_DUAL_REVIEW_SHA256 = "ab05f2b17bdc049f514db7f8f05f1acbd854120a6246f991a2b142c936ffcb47"
+R30_R29_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r29-r2-dual-gate-review-0b432fbc.json"
+R30_R29_PUBLICATION = R23_EVIDENCE_ROOT / "h039-r29-r2-contract-guarded-publication.json"
+R30_R29_PUBLICATION_AUDIT = R23_EVIDENCE_ROOT / "h039-r29-r2-contract-guarded-publication-dual-audit.json"
+R30_R29_FAILURE = R23_EVIDENCE_ROOT / "h039-r29-r15-pre-reservation-target-namespace-rig-error.json"
+REJECTED_R30_R1_CANDIDATE = "276fc91e7e71f7f89b01c293d5d5e0f67c11e965"; REJECTED_R30_R1_TREE = "9f7020685e07c7af2fb1111e9fe5da83c039645c"
+REJECTED_R30_R1_GATE_SHA256 = "62b5aab626dd4ced9c6a54f1f4d6e7ed29e3d22f1079ddbc297a80def8312959"; REJECTED_R30_R1_SPEC_SHA256 = "df8922f81c92fda7540d09edfe7e20c800b85ad779abcfe1a650880e8f770292"
+REJECTED_R30_R1_NORMALIZED_GATE_SHA256 = "9eff2ddc0027788f8846ab7d89d731610d086bad086328b7fc561a0b3c8c0861"; REJECTED_R30_R1_ROW_SHA256 = "912e346da976e3934fb13d1539c3b0a4b0a26be27a0fc08ecc4cc88e69b13eeb"
+REJECTED_R30_R1_REGISTRY_SHA256 = "f7d9745a0e06e2d60cfab557fe8489bc118e076902075816811564a2f28768ee"; REJECTED_R30_R1_RECONCILIATION_SHA256 = "eae2a6a96e56d6f30200d5ee8a339cc703f2a454d9af3bf6efb050138eef166e"
+REJECTED_R30_R1_FILE_SHA256 = {"docs/05-beslutslogg.md": "f0122e9aa239cd4c21a3cdc4ee8d3b311d74d53d9a118e3e544880dacbe5cbfc", "docs/loop/drift.md": "c0ba2a01d8a8dde04f349283d49178028a648dd632c3cf57072e788acd2b658f", "docs/loop/owner-author-workflow-v1.md": "0d894acbf011f17c74cdbd67b5d19f876fcef47035f967df64a63c8faa08cc79", "specs/tasks.spec.json": REJECTED_R30_R1_SPEC_SHA256, "verify/bin/h-039-exit": REJECTED_R30_R1_GATE_SHA256}
+REJECTED_R30_R1_LINE_DELTA_BY_PATH = {"docs/05-beslutslogg.md": [1, 0], "docs/loop/drift.md": [34, 0], "docs/loop/owner-author-workflow-v1.md": [49, 0], "specs/tasks.spec.json": [26, 4], "verify/bin/h-039-exit": [2156, 46]}
+REJECTED_R30_R1_LINE_DELTA = (2266, 50)
+R30_R1_FAILURE_DRAFT = R23_EVIDENCE_ROOT / "h039-r30-r1-dual-gate-review-failure-276fc91e.json"; R30_R1_FAILURE = R23_EVIDENCE_ROOT / "h039-r30-r1-dual-gate-review-failure-276fc91e-r2.json"
+R30_R1_LOG_A = R23_EVIDENCE_ROOT / "h039-r30-gate-review-a-276fc91e.log"; R30_R1_LOG_B = R23_EVIDENCE_ROOT / "h039-r30-gate-review-b-276fc91e.log"
+R30_PREDECESSOR_EVIDENCE = {
+    R30_R29_DUAL_REVIEW: (
+        R30_R29_DUAL_REVIEW_SHA256,
+        [16777232, 130156729, 0o100644, 501, 20, 1, 4359, 0],
+    ),
+    R30_R29_PUBLICATION: (
+        "e20c851f10235051ccf7eb8961633caec99f6fa08cdbe48e3c853b2531fb2323",
+        [16777232, 130160925, 0o100644, 501, 20, 1, 9372, 0],
+    ),
+    R30_R29_PUBLICATION_AUDIT: (
+        "990c6cb5d3261ecef29e63655be85236335b6282c63e01a033f4303f5b8edfe5",
+        [16777232, 130162946, 0o100644, 501, 20, 1, 3030, 0],
+    ),
+    R30_R29_FAILURE: (
+        "76643791ee49f1ea056af8e93fa43a27c1e080ef11c66ed22da9e7f4784765df",
+        [16777232, 130165872, 0o100644, 501, 20, 1, 4601, 0],
+    ),
+    R30_R1_FAILURE_DRAFT: ("22883d8fff06cbabae771fde44b95812c423987d7c3e9509d2dbd6b444665d13", [16777232, 130236725, 0o100644, 501, 20, 1, 4927, 0]),
+    R30_R1_FAILURE: ("ccc95c6f8a631d26f73140c499e3e2c38d1a19dd097736bca4e0ca74191f42dc", [16777232, 130237079, 0o100644, 501, 20, 1, 5386, 0]),
+    R30_R1_LOG_A: ("9b76ce0eb6772d2da4f46af43b6193a36bc08dd1529c288a4c846a3de1dd5ded", [16777232, 130219235, 0o100644, 501, 20, 1, 5035667, 0]),
+    R30_R1_LOG_B: ("9b76ce0eb6772d2da4f46af43b6193a36bc08dd1529c288a4c846a3de1dd5ded", [16777232, 130217800, 0o100644, 501, 20, 1, 5035667, 0]),
+}
+R30_ORDERED_PUBLICATION_EVIDENCE = R29_ORDERED_PUBLICATION_EVIDENCE + [
+    {
+        "path": str(path), "sha256": digest, "identity8": identity,
+        "kind": kind,
+    }
+    for path, kind in (
+        (R30_R29_DUAL_REVIEW, "r29_dual_gate_review"),
+        (R30_R29_PUBLICATION, "r29_guarded_contract_publication_receipt"),
+        (R30_R29_PUBLICATION_AUDIT,
+         "r29_guarded_contract_publication_dual_audit"),
+    )
+    for digest, identity in [R30_PREDECESSOR_EVIDENCE[path]]
+]
+R30_UPDATE_RUNNER = R23_EVIDENCE_ROOT / "h039-r30-r15-root-update-ceremony.py"
+R30_UPDATE_VALIDATOR = R23_EVIDENCE_ROOT / "h039-r30-r15-root-update-validate.py"
+R30_UPDATE_SOURCE_BINDING = R23_EVIDENCE_ROOT / "h039-r30-r15-root-update-source-binding.json"
+R30_UPDATE_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r30-r15-root-update-workflow-dual-review.json"
+R30_UPDATE_ATTEMPT = R23_EVIDENCE_ROOT / "h039-r30-r15-root-update-attempt-reservation.json"
+R30_UPDATE_OUTCOME = R23_EVIDENCE_ROOT / "h039-r30-r15-root-update-outcome.json"
+R30_DIAGNOSTIC_RUNNER = R23_EVIDENCE_ROOT / "h039-r30-r15-live-diagnostic-run-once.py"
+R30_DIAGNOSTIC_VALIDATOR = R23_EVIDENCE_ROOT / "h039-r30-r15-live-diagnostic-validate.py"
+R30_DIAGNOSTIC_SOURCE_BINDING = R23_EVIDENCE_ROOT / "h039-r30-r15-live-diagnostic-source-binding.json"
+R30_DIAGNOSTIC_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r30-r15-live-diagnostic-workflow-dual-review.json"
+R30_DIAGNOSTIC_ATTEMPT = R23_EVIDENCE_ROOT / "h039-r30-r15-live-diagnostic-attempt-reservation.json"
+R30_DIAGNOSTIC_OUTCOME = R23_EVIDENCE_ROOT / "h039-r30-r15-live-diagnostic-outcome.json"
+R30_WORKFLOW_HASHES = {
+    R30_UPDATE_RUNNER: "a0957f984dc29ce0f1ab9ca7927d08c4a85c52cd162d36ce80cd937f8828454f",
+    R30_UPDATE_VALIDATOR: "19c7a607eb7dbdfcfa987248a851d48429e2db4817a220d1053d0b6883b96e79",
+    R30_UPDATE_SOURCE_BINDING: "813c7ef9080ee46aa9b0a17f59851764c8d16192d796f2edc2e8d7d41b905bb7",
+    R30_UPDATE_DUAL_REVIEW: "25125c8e017ab5b1a3a45a30d29b74ad02a14e84ef441b64f2c1f05f1594b8e7",
+    R30_DIAGNOSTIC_RUNNER: "028eeac74ae664abf2132526403f2fa66530e396d270cb402d4dcb6039c65b7f",
+    R30_DIAGNOSTIC_VALIDATOR: "f18f54fbbe62a7a8622fd4f812b775657da7858d49bc297736114f4b5dda99ae",
+    R30_DIAGNOSTIC_SOURCE_BINDING: "04fd4d20136eca0967732ee0f08fe94b8254ebc158a27b2996cc814e04c2bfa3",
+    R30_DIAGNOSTIC_DUAL_REVIEW: "885c1df2710930e2c5839f24c47886fcd3fcf287035508f4b82bf96be324a727",
+}
+R30_WORKFLOW_IDENTITY8 = {
+    R30_UPDATE_RUNNER: [16777232, 130168233, 33188, 501, 20, 1, 119485, 0],
+    R30_UPDATE_VALIDATOR: [16777232, 130168264, 33188, 501, 20, 1, 106360, 0],
+    R30_UPDATE_SOURCE_BINDING: [16777232, 130165911, 33188, 501, 20, 1, 33166, 0],
+    R30_UPDATE_DUAL_REVIEW: [16777232, 130177342, 33188, 501, 20, 1, 3992, 0],
+    R30_DIAGNOSTIC_RUNNER: [16777232, 130172699, 33188, 501, 20, 1, 194126, 0],
+    R30_DIAGNOSTIC_VALIDATOR: [16777232, 130172720, 33188, 501, 20, 1, 174948, 0],
+    R30_DIAGNOSTIC_SOURCE_BINDING: [16777232, 130172630, 33188, 501, 20, 1, 21576, 0],
+    R30_DIAGNOSTIC_DUAL_REVIEW: [16777232, 130179869, 33188, 501, 20, 1, 3359, 0],
+}
+R30_REGISTRY_SHA256 = "03e21240e5427893abda63eaf9b117b4fd31085fb48a29e39b08b673c8109fcc"
+R30_RECONCILIATION_SHA256 = "e476ca5d099fea4b6ab2aff95231438bafb18209bf39016cb192a75e5f190580"
+R30_GATE_SOURCE_SHA256 = "5fc0bd028b742439b1f4913f144c24497a592528bf3ffd97cd7276b7711d1a50"
+R30_MATERIAL_REVIEW_EXTENSION = (
+    "INDEPENDENT_REVIEW_MUST_PROVE_R30_IS_AN_EXACT_PRODUCTLESS_FIVE_FILE_"
+    "DIRECT_CHILD_OF_PUBLISHED_R29_8E44FAAE_TREEBE9552F6_WITH_ORDERED_"
+    "PARENTS_A13CD9F6_AND0B432FBC_AND_BINDS_GUARDED_RECEIPTE20C851F_"
+    "PUBLICATION_AUDIT990C6CB5_AND_FAILURE_RECORD76643791;_THE_R29_OWNER_"
+    "INVOCATION_IS_IMMUTABLE_CONSUMED_NO_CREDIT_NO_RETRY_AND_FAILED_AT_"
+    "THE_SOLE_OUTER_TARGET_PY_LOAD_BEFORE_WORKFLOW_REVIEW_AUTH_ROOT_TOOL_"
+    "SUDO_RESERVATION_STAGING_BOOTSTRAP_OR_PERSISTENT_EFFECT;_EXACTLY_TWO_"
+    "EXECUTABLE_OUTER_TARGET_NAMES_CHANGE_FROM_PY_TO_PYTHON_AT_THE_LIVE_"
+    "ROOT_UPDATE_CEREMONY_AND_VALIDATOR_OWNER_LAUNCHER_PREFIX_ELEMENTS_AND_"
+    "BOTH_RESOLVE_TO_ONE_EXACT_MODULE_CONSTANT;_THE_WRAPPER_LOCAL_PY_AND_"
+    "ITS_USES_ARE_BYTE_EXACT_AND_SELECTED_SCOPE_INJECTS_NEITHER_PY_NOR_"
+    "PYTHON;_ONE_SIDED_ALIAS_LITERAL_FALLBACK_DECOY_SCOPE_LEAKAGE_OR_MOVED_"
+    "ORDERING_MUTANTS_REJECT;_GLOBAL2400_2400_AND_THE_EXACT20_R29_CONSUMER_"
+    "NAME_AST_MAP_REMAIN_UNCHANGED_WITH_NO_NEW_CONSUMER_WHILE_R30_CANDIDATE_"
+    "GRAPH_CALLS_THE_EXISTING_R29_ACCEPTOR_EXACTLY_ONCE;_FRESH_R30_WORKFLOW_"
+    "NAMES_REBIND_EXACTLY_ALL_"
+    "R29_AND_R30_DYNAMIC_RECORDS_ARE_ABSENT_AT_FREEZE_R29_INSTALLED_IS_"
+    "HISTORICAL_AND_ONLY_CURRENT_R30_INSTALLED_MAY_READ_ONLY_VALIDATE_ONE_"
+    "CONSUMED_FIXED_UPDATE_BEFORE_ONE_DIAGNOSTIC_AND_MANDATORY_OWNER_STOP;_"
+    "REJECTED_R30_R1_276FC91E_TREE9F702068_GATE62B5AAB6_SPECDF8922F8_"
+    "DUAL_LOG9B76CE0E_CORRECTED_FAILURECCC95C6F_IS_IMMUTABLE_CONSUMED_"
+    "NO_CREDIT_NONPARENT_AND_R2_REBINDS_ONLY_STALE_R29_REASON_TO_R30;_"
+    "NO_PRODUCT_BROADER_AUTHORITY_DOWNSTREAM_OR_RESUME_IS_ADDED"
 )
 REJECTED_R20_R1_CANDIDATE = "27ad790442a69c1d35f3cfcccfb6fc02fdd57aea"
 REJECTED_R20_R1_TREE = "f6c9dbec3958f165094291486b54a6b3042abba7"
@@ -2649,6 +2777,7 @@ R14_DIAGNOSTIC_NATIVE_ABSOLUTE_STRINGS = NATIVE_ABSOLUTE_STRINGS | {
 LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
 REASON = "H039_R28_GUARDED_PUBLICATION_ROOT_UPDATE_AND_LIVE_DIAGNOSTIC_PENDING"
 R29_REASON = "H039_R29_GUARDED_PUBLICATION_ROOT_UPDATE_AND_LIVE_DIAGNOSTIC_PENDING"
+R30_REASON = "H039_R30_GUARDED_PUBLICATION_ROOT_UPDATE_AND_LIVE_DIAGNOSTIC_PENDING"
 FAILURE_SIGNATURE = [
     "PUBLISHED_R26_MAIN_C43A4C05_IS_THE_EXACT_R27_AUTHORITY_BASE", "R26_ORDERED_R25_AND_R26_CANDIDATE_PARENTS_TREE_GATE_AND_SPEC_ARE_EXACT", "R26_GUARDED_PUBLICATION_RECEIPT_77DC52AC_IS_IMMUTABLE_AND_EXACT",
     "R26_INSTALLED_EFFECT_LOG_27196CE2_IS_IMMUTABLE_WORKFLOW_ONLY_NO_CREDIT", "R26_LOG_SIZE4918483_LINES92928_PASS_PREFIX92927_FAIL_PREFIX0_ARE_EXACT", "R26_SOLE_ERROR_IS_CONCATENATED_AFTER_EXACT_PASS_ON_PHYSICAL_LINE92867_THEN_LINE92868_IS_BLANK_AND_EXACTLY60_PASS_PREFIXED_LINES_RUN_THROUGH92928_WITH_NO_SUMMARY_OR_CREDIT",
@@ -2694,9 +2823,18 @@ FAILURE_SIGNATURE = [
     "R29_GATE_NEVER_RUNS_ROOT_UPDATE_LIVE_DIAGNOSTIC_OR_MUTATING_EFFECT_ENGINE",
     "REJECTED_R29_R1_1AFE9CCE_TREE393F385A_GATED5796945_SPECC4874647_DELTA1811_117_DUAL_FORMAL_LOG736E27A2_REVIEWS4D45DAA7_CFC5842A_AGGREGATEEE57392A_IS_IMMUTABLE_CONSUMED_NO_CREDIT_NONPARENT",
     "R29_R2_PRESERVES_GLOBAL2400_2400_AND_ALL18_LEGACY_CONSUMER_NAME_AST_PAIRS_WHILE_ADMITTING_EXACTLY_R29_LINE_DELTA_ACCEPTS_AND_R29_LINE_DELTA_SELFTESTS_AST_EXACT_TO_R1_WITH_NO_THIRD_CONSUMER_PREFIX_EXEMPTION_OR_BYPASS_AND_EXACTLY_ONE_LIVE_CANDIDATE_GRAPH_CALL",
-    "NO_PRODUCT_BROADER_AUTHORITY_DOWNSTREAM_PROGRESS_OR_SUPERVISOR_RESUME_IS_ADDED",
+    "PUBLISHED_R29_8E44FAAE_TREEBE9552F6_ORDERED_PARENTS_A13CD9F6_AND0B432FBC_IS_THE_EXACT_R30_AUTHORITY_BASE",
+    "R29_GUARDED_RECEIPTE20C851F_PUBLICATION_AUDIT990C6CB5_AND_FAILURE_RECORD76643791_ARE_EXACT_IMMUTABLE_WORKFLOW_EVIDENCE",
+    "R29_OWNER_INVOCATION_IS_CONSUMED_NO_CREDIT_NO_RETRY_AND_FAILED_AT_THE_SOLE_OUTER_TARGET_PY_LOAD_BEFORE_REVIEW_AUTH_ROOT_TOOL_SUDO_RESERVATION_STAGING_BOOTSTRAP_OR_EFFECT",
+    "R30_CHANGES_EXACTLY_TWO_EXECUTABLE_OUTER_TARGET_NAMES_FROM_PY_TO_PYTHON_IN_ROOT_UPDATE_CEREMONY_AND_VALIDATOR_OWNER_LAUNCHER_PREFIX",
+    "R30_BOTH_PYTHON_LOADS_RESOLVE_TO_ONE_FIXED_MODULE_CONSTANT_WITH_NO_ALIAS_LITERAL_FALLBACK_DECOY_OR_UNBOUND_GLOBAL",
+    "R30_WRAPPER_LOCAL_PY_AND_ALL_USES_REMAIN_BYTE_EXACT_AND_SELECTED_SCOPE_INJECTS_NEITHER_PY_NOR_PYTHON",
+    "ALL_R29_AND_R30_STATIC_WORKFLOW_ARTIFACTS_REBIND_AND_ALL_R29_AND_R30_DYNAMIC_RECORDS_ARE_ABSENT_AT_FREEZE",
+    "R29_INSTALLED_IS_HISTORICAL_AND_ONLY_NOARG_RED_OR_CURRENT_PUBLICATION_BOUND_R30_INSTALLED_IS_REACHABLE",
+    "R30_GATE_NEVER_RUNS_ROOT_UPDATE_LIVE_DIAGNOSTIC_OR_MUTATING_EFFECT_ENGINE",
+    "REJECTED_R30_R1_276FC91E_TREE9F702068_GATE62B5AAB6_SPECDF8922F8_DELTA2266_50_DUAL_FORMAL_LOG9B76CE0E_CORRECTED_FAILURECCC95C6F_IS_IMMUTABLE_CONSUMED_NO_CREDIT_NONPARENT_AND_R2_REBINDS_ONLY_R17_REGISTRY_SELFTESTS_STALE_R29_REASON_TO_R30", "NO_PRODUCT_BROADER_AUTHORITY_DOWNSTREAM_PROGRESS_OR_SUPERVISOR_RESUME_IS_ADDED",
 ]
-EXPECTED_H039_ROW_SHA256 = "7aab16268f3c8fafd3cc360aebfa3f5534177171b2c3dba9ad89c191fb17bd9b"
+EXPECTED_H039_ROW_SHA256 = "ed131418bd7f1e6d2ad1c3204983cea6e23bd1437721bc864e949ec3f134d444"
 
 passed = 0
 failed = 0
@@ -5624,15 +5762,15 @@ def static_contract_checks() -> dict[str, Any]:
             GATE.read_text(encoding="utf-8"), filename=str(GATE),
         )
     except (OSError, UnicodeError, SyntaxError) as exc:
-        raise Rig("R29 independent dispatch bootstrap AST unavailable") from exc
+        raise Rig("R30 independent dispatch bootstrap AST unavailable") from exc
     check(
-        r29_dispatch_surface_exact(dispatch_tree),
-        "A_H039_R29_INDEPENDENT_EXACT_CLOSED_WORLD_DISPATCH_SURFACE",
+        r30_dispatch_surface_exact(dispatch_tree),
+        "A_H039_R30_INDEPENDENT_EXACT_CLOSED_WORLD_DISPATCH_SURFACE",
     )
     dispatch_mutants: list[ast.Module] = []
     for selector in (
-        "r29_installed", "r28_installed", "r27_product", "r27_published",
-        "r26_installed",
+        "r30_installed", "r29_installed", "r28_installed", "r27_product",
+        "r27_published", "r26_installed",
     ):
         mutant = copy.deepcopy(dispatch_tree)
         main = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
@@ -5642,35 +5780,39 @@ def static_contract_checks() -> dict[str, Any]:
             and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
             and node.targets[0].id == selector
         )
-        assignment.value = ast.Constant(selector != "r29_installed")
+        assignment.value = ast.Constant(selector != "r30_installed")
         dispatch_mutants.append(mutant)
     mutant = copy.deepcopy(dispatch_tree)
     main = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
                 and node.name == "main")
     branch = next(node for node in ast.walk(main) if isinstance(node, ast.If)
                   and isinstance(node.test, ast.Name)
-                  and node.test.id == "r29_installed")
+                  and node.test.id == "r30_installed")
     branch.body.insert(0, ast.Expr(ast.Call(
         ast.Name("guarded_product_effects", ast.Load()), [], [],
     )))
     dispatch_mutants.append(mutant)
     check(
-        all(not r29_dispatch_surface_exact(mutant) for mutant in dispatch_mutants),
-        "N_H039_R29_INDEPENDENT_SELECTOR_AND_MUTATING_EFFECT_MUTANTS",
+        all(not r30_dispatch_surface_exact(mutant) for mutant in dispatch_mutants),
+        "N_H039_R30_INDEPENDENT_SELECTOR_AND_MUTATING_EFFECT_MUTANTS",
     )
     try:
         historical_dispatch = ast.parse(
-            blob(R29_AUTHORITY_BASE, "verify/bin/h-039-exit").decode("utf-8"),
-            filename=f"{R29_AUTHORITY_BASE}:verify/bin/h-039-exit",
+            blob(R30_AUTHORITY_BASE, "verify/bin/h-039-exit").decode("utf-8"),
+            filename=f"{R30_AUTHORITY_BASE}:verify/bin/h-039-exit",
         )
     except (UnicodeError, SyntaxError) as exc:
-        raise Rig("R29 historical R28 dispatch AST unavailable") from exc
+        raise Rig("R30 historical R29 dispatch AST unavailable") from exc
     check(
-        r28_dispatch_surface_exact(historical_dispatch)
-        and r29_historical_r28_surface_exact(
+        r29_dispatch_surface_exact(historical_dispatch)
+        and r30_historical_r29_surface_exact(
             dispatch_tree, historical_dispatch,
         ),
-        "A_H039_R29_R28_GATE_SURFACE_IMMUTABLE_AND_HISTORICAL",
+        "A_H039_R30_R29_GATE_SURFACE_IMMUTABLE_AND_HISTORICAL",
+    )
+    check(
+        r30_gate_closed_world_exact(dispatch_tree, historical_dispatch),
+        "A_H039_R30_EXACT_WHOLE_GATE_CLOSED_WORLD_DELTA",
     )
     for path, digest in PINNED.items():
         check(path_sha(ROOT / path) == digest, f"A_H039_PINNED_{path.upper().replace('/', '_').replace('.', '_')}")
@@ -5818,6 +5960,20 @@ def static_contract_checks() -> dict[str, Any]:
         and sha(blob(REJECTED_R28_R2_CANDIDATE, "specs/tasks.spec.json"))
         == REJECTED_R28_R2_SPEC_SHA256,
         "A_H039_R28_R2_EXACT_DELTA_FORMAL_DUAL_FAILURE_IMMUTABLE_NO_CREDIT_NONPARENT",
+    )
+    check(
+        object_type(R30_AUTHORITY_BASE) == "commit"
+        and commit_tree(R30_AUTHORITY_BASE) == R30_AUTHORITY_TREE
+        and commit_parents(R30_AUTHORITY_BASE) == R30_AUTHORITY_PARENTS
+        and object_type(R30_R29_CANDIDATE) == "commit"
+        and commit_parents(R30_R29_CANDIDATE) == [R29_AUTHORITY_BASE]
+        and commit_tree(R30_R29_CANDIDATE) == R30_AUTHORITY_TREE
+        and raw_changes(R30_R29_CANDIDATE, R30_AUTHORITY_BASE) == []
+        and sha(blob(R30_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+        == R30_BASE_GATE_SHA256
+        and sha(blob(R30_AUTHORITY_BASE, "specs/tasks.spec.json"))
+        == R30_BASE_SPEC_SHA256,
+        "A_H039_R30_EXACT_PUBLISHED_R29_AUTHORITY_GRAPH_GATE_AND_SPEC",
     )
     check(
         object_type(REJECTED_R22_R1_CANDIDATE) == "commit"
@@ -5990,6 +6146,9 @@ def static_contract_checks() -> dict[str, Any]:
     darwin_dev_t_binding = row.get(
         "h039_os_exclusive_runtime_cleanup", {},
     ).get("r29_darwin_dev_t_compatible_installed_binding", {})
+    target_namespace_binding = row.get(
+        "h039_os_exclusive_runtime_cleanup", {},
+    ).get("r30_target_namespace_symbol_installed_binding", {})
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -6143,11 +6302,16 @@ def static_contract_checks() -> dict[str, Any]:
     check(
         exact_typed_tree(darwin_dev_t_binding, r29_registry_expected())
         and sha(canonical(darwin_dev_t_binding)) == R29_REGISTRY_SHA256,
-        "A_H039_R29_EXACT_CURRENT_DARWIN_DEV_T_INSTALLED_BINDING_REGISTRY",
+        "A_H039_R30_EXACT_HISTORICAL_R29_DARWIN_DEV_T_REGISTRY",
+    )
+    check(
+        exact_typed_tree(target_namespace_binding, r30_registry_expected())
+        and sha(canonical(target_namespace_binding)) == R30_REGISTRY_SHA256,
+        "A_H039_R30_EXACT_CURRENT_TARGET_NAMESPACE_SYMBOL_REGISTRY",
     )
     expected_red = {
         "label": LABEL,
-        "reason": R29_REASON,
+        "reason": R30_REASON,
         "failure_signature": FAILURE_SIGNATURE,
     }
     check(
@@ -6157,7 +6321,7 @@ def static_contract_checks() -> dict[str, Any]:
             ),
             expected_red,
         ),
-        "A_H039_R29_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
+        "A_H039_R30_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
     )
     check(
         row.get("h039_r17_installed_effect_completion_reconciliation")
@@ -6233,6 +6397,15 @@ def static_contract_checks() -> dict[str, Any]:
             "h039_r29_darwin_dev_t_compatible_installed_binding_reconciliation"
         ].encode("utf-8")) == R29_RECONCILIATION_SHA256,
         "A_H039_R29_EXACT_RECONCILIATION",
+    )
+    check(
+        type(row.get(
+            "h039_r30_target_namespace_symbol_reconciliation"
+        )) is str
+        and sha(row[
+            "h039_r30_target_namespace_symbol_reconciliation"
+        ].encode("utf-8")) == R30_RECONCILIATION_SHA256,
+        "A_H039_R30_EXACT_RECONCILIATION",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -6384,6 +6557,14 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}"
         in str(row.get("h039_r29_exit_criterion", "")),
         "A_H039_R29_EXACT_MATERIAL_REVIEW_BOUNDARY",
+    )
+    check(
+        row.get("h039_os_exclusive_runtime_cleanup", {})
+        .get("causal_falsification", {})
+        .get("r30_material_review_extension") == R30_MATERIAL_REVIEW_EXTENSION
+        and f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}"
+        in str(row.get("h039_r30_exit_criterion", "")),
+        "A_H039_R30_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -6678,7 +6859,7 @@ def r17_registry_selftests(row: dict[str, Any]) -> None:
 
     expected_red = {
         "label": LABEL,
-        "reason": R29_REASON,
+        "reason": R30_REASON,
         "failure_signature": FAILURE_SIGNATURE,
     }
     preproduct_red = row["h039_os_exclusive_runtime_cleanup"]["preproduct_red"]
@@ -6687,6 +6868,7 @@ def r17_registry_selftests(row: dict[str, Any]) -> None:
         "A_H039_R17_PREPRODUCT_RED_SELFTEST_ANCHOR",
     )
     for label, mutate in (
+        ("STALE_R29_REASON", lambda value: value.__setitem__("reason", R29_REASON)),
         ("STALE_R28_UNFROZEN_REASON", lambda value: value.__setitem__(
             "reason", R28_STALE_UNFROZEN_REASON,
         )),
@@ -7621,6 +7803,247 @@ def r29_registry_selftests(row: dict[str, Any]) -> None:
         )
 
 
+def r30_registry_expected() -> dict[str, Any]:
+    def artifact(path: Path) -> dict[str, Any]:
+        digest, identity = (
+            (R30_WORKFLOW_HASHES[path], R30_WORKFLOW_IDENTITY8[path])
+            if path in R30_WORKFLOW_HASHES
+            else R30_PREDECESSOR_EVIDENCE[path]
+        )
+        return {"path": str(path), "sha256": digest, "identity8": identity}
+
+    return {
+        "schema_version": 1,
+        "authority_base": R30_AUTHORITY_BASE,
+        "authority_tree": R30_AUTHORITY_TREE,
+        "authority_ordered_parents": R30_AUTHORITY_PARENTS,
+        "authority_candidate": R30_R29_CANDIDATE,
+        "authority_gate_sha256": R30_BASE_GATE_SHA256,
+        "authority_spec_sha256": R30_BASE_SPEC_SHA256,
+        "test_author_paths": TEST_AUTHOR_GIT_ORDER,
+        "candidate_change_shape": (
+            "EXACTLY_FIVE_EXISTING_M_CHANGES_WITH_UNCHANGED_MODES_AND_NO_"
+            "RENAME_ADD_DELETE_SUBSTITUTION_OR_BROADER_PREFIX"
+        ),
+        "productless_contract": True,
+        "published_r29": {
+            "merge": R30_AUTHORITY_BASE,
+            "tree": R30_AUTHORITY_TREE,
+            "ordered_parents": R30_AUTHORITY_PARENTS,
+            "candidate": R30_R29_CANDIDATE,
+            "gate_sha256": R30_BASE_GATE_SHA256,
+            "spec_sha256": R30_BASE_SPEC_SHA256,
+            "canonical_h039_row_sha256": R30_R29_ROW_SHA256,
+            "registry_sha256": R30_R29_REGISTRY_SHA256,
+            "reconciliation_sha256": R30_R29_RECONCILIATION_SHA256,
+            "normalized_gate_source_sha256": R30_R29_NORMALIZED_GATE_SHA256,
+            "material_extension_sha256": R30_R29_MATERIAL_EXTENSION_SHA256,
+            "dual_gate_review_sha256": R30_R29_DUAL_REVIEW_SHA256,
+            "guarded_publication": artifact(R30_R29_PUBLICATION),
+            "publication_dual_audit": artifact(R30_R29_PUBLICATION_AUDIT),
+        },
+        "published_r15": {
+            "merge": R30_R15_PRODUCT_MERGE,
+            "tree": R28_AUTHORITY_TREE,
+            "ordered_parents": R28_AUTHORITY_PARENTS,
+            "candidate": R28_R15_CANDIDATE,
+            "product_sha256": R28_PRODUCT_BLOBS,
+            "runtime_size": R28_R15_RUNTIME_SIZE,
+            "runtime_cdhash": R28_R15_RUNTIME_CDHASH,
+            "runtime_uuid": R28_R15_RUNTIME_UUID,
+        },
+        "immutable_r29_failure": {
+            **artifact(R30_R29_FAILURE),
+            "classification": (
+                "IMMUTABLE_CONSUMED_NO_CREDIT_PRE_RESERVATION_TARGET_"
+                "NAMESPACE_RIG_ERROR"
+            ),
+            "error": "NameError:name 'PY' is not defined",
+            "wrapper_authentication_completed": True,
+            "selected_target_entered": True,
+            "review_root_reservation_staging_or_bootstrap_reached": False,
+            "persistent_effect": False,
+            "all_four_r29_dynamic_records_absent": True,
+            "r29_retry_permitted": False,
+        },
+        "immutable_rejected_r30_r1": {
+            "candidate": REJECTED_R30_R1_CANDIDATE, "tree": REJECTED_R30_R1_TREE,
+            "ordered_parents": [R30_AUTHORITY_BASE], "gate_sha256": REJECTED_R30_R1_GATE_SHA256,
+            "spec_sha256": REJECTED_R30_R1_SPEC_SHA256, "normalized_gate_source_sha256": REJECTED_R30_R1_NORMALIZED_GATE_SHA256,
+            "canonical_h039_row_sha256": REJECTED_R30_R1_ROW_SHA256, "registry_sha256": REJECTED_R30_R1_REGISTRY_SHA256, "reconciliation_sha256": REJECTED_R30_R1_RECONCILIATION_SHA256,
+            "file_sha256": REJECTED_R30_R1_FILE_SHA256, "line_delta_by_path": REJECTED_R30_R1_LINE_DELTA_BY_PATH, "total_line_delta": list(REJECTED_R30_R1_LINE_DELTA),
+            "corrected_failure_record": artifact(R30_R1_FAILURE),
+            "unbound_draft": {**artifact(R30_R1_FAILURE_DRAFT), "accepted_as_authority": False},
+            "formal_logs": [artifact(R30_R1_LOG_A), artifact(R30_R1_LOG_B)],
+            "classification": "IMMUTABLE_CONSUMED_NO_CREDIT_NONPARENT",
+            "stale_expression": "r17_registry_selftests expected_red reason R29_REASON",
+            "required_expression": "r17_registry_selftests expected_red reason R30_REASON",
+            "r1_retry_or_parentage_permitted": False,
+        },
+        "target_namespace_symbol_correction": {
+            "affected_outer_targets": [
+                str(R30_UPDATE_RUNNER), str(R30_UPDATE_VALIDATOR),
+            ],
+            "exact_executable_identifier_replacements": [
+                "ROOT_CEREMONY_OWNER_LAUNCHER_PREFIX_PY_TO_PYTHON",
+                "ROOT_VALIDATOR_OWNER_LAUNCHER_PREFIX_PY_TO_PYTHON",
+            ],
+            "module_python_constant": (
+                "/Library/Developer/CommandLineTools/usr/bin/python3"
+            ),
+            "outer_py_loads_after_correction": 0,
+            "outer_python_store_count_each": 1,
+            "outer_python_load_count_each": 3,
+            "all_outer_workflow_globals_resolve": True,
+            "wrapper_local_py_and_uses_byte_exact": True,
+            "selected_byte_scope_injects_py_or_python": False,
+            "alias_literal_fallback_decoy_or_wrapper_scope_leak": False,
+            "diagnostic_protocol_or_product_change": False,
+        },
+        "closed_world_line_limit": {
+            "published_r29_consumer_count": 20,
+            "r30_consumer_count": 20,
+            "consumer_names_and_asts_identical": True,
+            "published_r29_surface_byte_exact": True,
+            "candidate_graph_uses_existing_r29_acceptor_exactly_once": True,
+            "new_consumer_global_widen_or_bypass": False,
+        },
+        "workflow_only_artifacts": {
+            "root_update": {
+                "ceremony": artifact(R30_UPDATE_RUNNER),
+                "validator": artifact(R30_UPDATE_VALIDATOR),
+                "source_binding": artifact(R30_UPDATE_SOURCE_BINDING),
+                "dual_review": artifact(R30_UPDATE_DUAL_REVIEW),
+                "attempt": str(R30_UPDATE_ATTEMPT),
+                "outcome": str(R30_UPDATE_OUTCOME),
+            },
+            "live_diagnostic": {
+                "runner": artifact(R30_DIAGNOSTIC_RUNNER),
+                "validator": artifact(R30_DIAGNOSTIC_VALIDATOR),
+                "source_binding": artifact(R30_DIAGNOSTIC_SOURCE_BINDING),
+                "dual_review": artifact(R30_DIAGNOSTIC_DUAL_REVIEW),
+                "attempt": str(R30_DIAGNOSTIC_ATTEMPT),
+                "outcome": str(R30_DIAGNOSTIC_OUTCOME),
+            },
+            "all_eight_r30_static_artifacts_rebind_exactly": True,
+            "all_four_r30_dynamic_records_absent_at_freeze": True,
+            "all_four_r29_dynamic_records_absent_at_freeze": True,
+            "root_update_or_diagnostic_performed_by_gate": False,
+            "workflow_evidence_grants_task_credit": False,
+        },
+        "current_cli": [
+            "--r30-installed",
+            "RUNTIME_SUPPLIED_PUBLISHED_R30_CONTRACT_MERGE",
+            R30_R15_PRODUCT_MERGE,
+        ],
+        "historical_cli_selectors_unreachable": [
+            "--r29-installed", "--r28-installed", "--r27-product",
+            "--r27-published", "--r26-installed",
+        ],
+        "noarg": {
+            "result": "RED_EXPECTED",
+            "reason": R30_REASON,
+            "protected_store_or_helper_inspection": False,
+            "root_update_diagnostic_or_evidence_write": False,
+        },
+        "installed_lane": {
+            "read_only": True,
+            "binds_current_r30_publication": True,
+            "binds_consumed_one_shot_r30_root_update": True,
+            "installed_r15_sha256": R28_PRODUCT_BLOBS[
+                "verify/h039/runtime-cleanup-mediator"
+            ],
+            "diagnostic_invocation": False,
+            "inherited_mutating_effect_engine": False,
+            "task_completion_credit": False,
+            "result": "PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY",
+        },
+        "required_serial_transition": [
+            "FREEZE_R30", "TWO_INDEPENDENT_GATE_REVIEWS",
+            "GUARDED_R30_PUBLICATION", "ONE_NEW_R30_OWNER_TTY_UPDATE",
+            "INDEPENDENT_POST_STATE_VALIDATION", "R30_INSTALLED_REVIEW",
+            "ONE_FROZEN_R15_LIVE_DIAGNOSTIC", "OWNER_STOP",
+        ],
+        "broader_authority": False,
+        "h038_h032_h031_or_supervisor_resume": False,
+    }
+
+
+def exact_r30_installed_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 3
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r30-installed"
+        and valid_hex(argv[1], 40)
+        and argv[2] == R30_R15_PRODUCT_MERGE
+    )
+
+
+def r30_workflow_frozen() -> bool:
+    return (
+        type(R30_WORKFLOW_HASHES) is dict
+        and set(R30_WORKFLOW_HASHES) == set(R30_WORKFLOW_IDENTITY8)
+        and len(R30_WORKFLOW_HASHES) == 8
+        and all(type(value) is str and valid_hex(value, 64)
+                and value != "0" * 64 for value in R30_WORKFLOW_HASHES.values())
+        and all(
+            type(value) is list and len(value) == 8
+            and all(type(member) is int for member in value)
+            and stat.S_ISREG(value[2]) and value[5] == 1
+            for value in R30_WORKFLOW_IDENTITY8.values()
+        )
+    )
+
+
+def r30_registry_selftests(row: dict[str, Any]) -> None:
+    registry = row["h039_os_exclusive_runtime_cleanup"][
+        "r30_target_namespace_symbol_installed_binding"
+    ]
+    expected = r30_registry_expected()
+    check(
+        exact_typed_tree(registry, expected)
+        and sha(canonical(registry)) == R30_REGISTRY_SHA256,
+        "A_H039_R30_EXACT_TARGET_NAMESPACE_SYMBOL_REGISTRY",
+    )
+    check(r30_workflow_frozen(),
+          "A_H039_R30_ALL_EIGHT_WORKFLOW_ARTIFACT_IDENTITIES_FROZEN")
+    for label, mutate in (
+        ("BASE", lambda value: value.__setitem__("authority_base", "00" * 20)),
+        ("PARENTS", lambda value: value["authority_ordered_parents"].reverse()),
+        ("FAILURE", lambda value: value["immutable_r29_failure"].__setitem__(
+            "persistent_effect", True,
+        )),
+        ("R1", lambda value: value["immutable_rejected_r30_r1"].__setitem__(
+            "r1_retry_or_parentage_permitted", True,
+        )),
+        ("ALIAS", lambda value: value["target_namespace_symbol_correction"].__setitem__(
+            "alias_literal_fallback_decoy_or_wrapper_scope_leak", True,
+        )),
+        ("SCOPE", lambda value: value["target_namespace_symbol_correction"].__setitem__(
+            "selected_byte_scope_injects_py_or_python", True,
+        )),
+        ("CONSUMER", lambda value: value["closed_world_line_limit"].__setitem__(
+            "r30_consumer_count", 21,
+        )),
+        ("STATIC", lambda value: value["workflow_only_artifacts"][
+            "root_update"
+        ]["ceremony"].__setitem__("sha256", "00" * 32)),
+        ("CLI", lambda value: value["current_cli"].__setitem__(
+            0, "--r29-installed",
+        )),
+        ("CREDIT", lambda value: value["installed_lane"].__setitem__(
+            "task_completion_credit", True,
+        )),
+        ("DOWNSTREAM", lambda value: value.__setitem__(
+            "h038_h032_h031_or_supervisor_resume", True,
+        )),
+    ):
+        mutant = copy.deepcopy(expected)
+        mutate(mutant)
+        check(not exact_typed_tree(mutant, expected),
+              f"N_H039_R30_REGISTRY_MUTANT_{label}")
+
+
 def exact_r27_product_argv(argv: Any) -> bool:
     return (
         type(argv) is list and len(argv) == 3
@@ -8303,6 +8726,179 @@ def r29_dispatch_selftests() -> None:
         and not pre_diagnostic_owner_stop_phase("r28-installed")
         and not pre_diagnostic_owner_stop_phase("preproduct"),
         "A_H039_R29_DISTINCT_PRE_DIAGNOSTIC_OWNER_STOP_CLASSIFICATION",
+    )
+
+
+def r30_dispatch_surface_exact(module: ast.Module) -> bool:
+    mains = [node for node in module.body if isinstance(node, ast.FunctionDef)
+             and node.name == "main"]
+    if len(mains) != 1:
+        return False
+    main = mains[0]
+
+    def assignment(name: str) -> ast.Assign | None:
+        rows = [node for node in main.body if isinstance(node, ast.Assign)
+                and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == name]
+        return rows[0] if len(rows) == 1 else None
+
+    def call_name(call: ast.Call) -> str:
+        return call.func.id if isinstance(call.func, ast.Name) else ""
+
+    pre = assignment("preproduct")
+    current = assignment("r30_installed")
+    stale = assignment("r29_installed")
+    if None in (pre, current, stale):
+        return False
+    if not (
+        isinstance(pre.value, ast.UnaryOp) and isinstance(pre.value.op, ast.Not)
+        and isinstance(pre.value.operand, ast.Name)
+        and pre.value.operand.id == "argv"
+        and isinstance(current.value, ast.Call)
+        and call_name(current.value) == "exact_r30_installed_argv"
+        and len(current.value.args) == 1
+        and isinstance(current.value.args[0], ast.Name)
+        and current.value.args[0].id == "argv"
+        and isinstance(stale.value, ast.Constant) and stale.value.value is False
+    ):
+        return False
+    older = ("r28_installed", "r27_product", "r27_published", "r26_installed")
+    if any((row := assignment(name)) is None
+           or not isinstance(row.value, ast.Constant) or row.value.value is not False
+           for name in older):
+        return False
+    branches: dict[str, list[ast.If]] = {}
+    for name, marker in {
+        "preproduct": "r30_contract_candidate_identity",
+        "r30_installed": "r30_contract_publication_identity",
+        "r29_installed": "r29_contract_publication_identity",
+    }.items():
+        branches[name] = [node for node in ast.walk(main)
+                          if isinstance(node, ast.If)
+                          and isinstance(node.test, ast.Name)
+                          and node.test.id == name
+                          and any(isinstance(item, ast.Call)
+                                  and call_name(item) == marker
+                                  for item in ast.walk(node))]
+    if any(len(value) != 1 for value in branches.values()):
+        return False
+    pre_calls = {call_name(item) for item in ast.walk(branches["preproduct"][0])
+                 if isinstance(item, ast.Call)}
+    installed_calls = {
+        call_name(item) for item in ast.walk(branches["r30_installed"][0])
+        if isinstance(item, ast.Call)
+    }
+    required_pre = {
+        "r30_prepublication_workflow_checks",
+        "r30_immutable_r29_publication_checks",
+        "r30_contract_candidate_identity", "r28_published_r15_identity",
+    }
+    required_installed = {
+        "r30_contract_publication_identity", "r28_published_r15_identity",
+        "r30_immutable_r29_publication_checks", "r30_workflow_completed_checks",
+        "r28_read_only_installed_update_checks", "finish",
+    }
+    forbidden = {
+        "product_effects", "guarded_product_effects", "run_product",
+        "request_operation", "r30_run_diagnostic",
+    }
+    if (not required_pre <= pre_calls or not required_installed <= installed_calls
+            or pre_calls & forbidden or installed_calls & forbidden):
+        return False
+    all_calls = [call_name(item) for item in ast.walk(main)
+                 if isinstance(item, ast.Call)]
+    critical = [
+        "r30_registry_selftests", "r30_line_limit_surface_selftests",
+        "r29_line_delta_selftests", "r30_dispatch_selftests",
+        "r30_static_workflow_selftests",
+    ]
+    tries = [node for node in main.body if isinstance(node, ast.Try)
+             and any(isinstance(item, ast.Call)
+                     and call_name(item) == "static_contract_checks"
+                     for row in node.body for item in ast.walk(row))]
+    if len(tries) != 1:
+        return False
+    direct = [call_name(row.value) for row in tries[0].body
+              if isinstance(row, ast.Expr) and isinstance(row.value, ast.Call)]
+    admissions = [node for node in main.body if isinstance(node, ast.If)
+                  and isinstance(node.test, ast.UnaryOp)
+                  and isinstance(node.test.op, ast.Not)
+                  and isinstance(node.test.operand, ast.BoolOp)
+                  and isinstance(node.test.operand.op, ast.Or)]
+    admitted = [node for node in admissions if [
+        value.id for value in node.test.operand.values
+        if isinstance(value, ast.Name)
+    ] == ["preproduct", "r30_installed"]
+               and len(node.test.operand.values) == 2]
+    return (
+        len(admitted) == 1
+        and [name for name in direct if name in critical] == critical
+        and all(direct.count(name) == 1 for name in critical)
+        and all_calls.count("exact_r30_installed_argv") == 1
+        and all_calls.count("exact_r29_installed_argv") == 0
+        and all(all_calls.count(name) == 0 for name in (
+            "r29_registry_selftests", "r29_line_limit_surface_selftests",
+            "r29_dispatch_selftests", "r29_static_workflow_selftests",
+            "exact_r28_installed_argv", "exact_r27_product_argv",
+            "exact_r27_publication_argv", "exact_r26_installed_argv",
+        ))
+    )
+
+
+def r30_dispatch_selftests() -> None:
+    def call_name(call: ast.Call) -> str:
+        return call.func.id if isinstance(call.func, ast.Name) else ""
+
+    try:
+        tree = ast.parse(GATE.read_bytes(), filename=str(GATE))
+        historical = ast.parse(blob(R30_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R30 dispatch source unavailable") from exc
+    check(r29_dispatch_surface_exact(historical),
+          "A_H039_R30_HISTORICAL_R29_DISPATCH_AUTHENTICATED")
+    check(r30_dispatch_surface_exact(tree),
+          "A_H039_R30_EXACT_CURRENT_AND_HISTORICAL_DISPATCH_SURFACE")
+    sample = "ab" * 20
+    check(exact_r30_installed_argv([
+        "--r30-installed", sample, R30_R15_PRODUCT_MERGE,
+    ]), "A_H039_R30_EXACT_INSTALLED_CLI_SHAPE")
+    for index, mutant in enumerate((
+        [], ["--r30-installed"], ["--r30-installed", sample],
+        ["--r30-installed", sample.upper(), R30_R15_PRODUCT_MERGE],
+        ["--r30-installed", sample, R30_AUTHORITY_BASE],
+        ["--r30-installed", sample, R30_R15_PRODUCT_MERGE, "extra"],
+        ["--r29-installed", sample, R30_R15_PRODUCT_MERGE],
+    )):
+        check(not exact_r30_installed_argv(mutant),
+              f"N_H039_R30_CLI_MUTANT_{index:02d}")
+    mutants: list[tuple[str, ast.Module]] = []
+    for name in ("r30_registry_selftests", "r30_line_limit_surface_selftests",
+                 "r30_static_workflow_selftests"):
+        mutant = copy.deepcopy(tree)
+        main = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
+                    and node.name == "main")
+        row = next(row for holder in main.body if isinstance(holder, ast.Try)
+                   for row in holder.body if isinstance(row, ast.Expr)
+                   and isinstance(row.value, ast.Call)
+                   and call_name(row.value) == name)
+        row.value.func.id = "r29_registry_selftests"
+        mutants.append((f"DEAD_OR_STALE_{name.upper()}", mutant))
+    mutant = copy.deepcopy(tree)
+    main = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
+                and node.name == "main")
+    row = next(node for node in main.body if isinstance(node, ast.Assign)
+               and isinstance(node.targets[0], ast.Name)
+               and node.targets[0].id == "r29_installed")
+    row.value = ast.Constant(True)
+    mutants.append(("R29_REVIVED", mutant))
+    for label, mutant in mutants:
+        check(not r30_dispatch_surface_exact(mutant),
+              f"N_H039_R30_DISPATCH_MUTANT_{label}")
+    check(
+        pre_diagnostic_owner_stop_phase("r30-installed")
+        and not pre_diagnostic_owner_stop_phase("r29-installed")
+        and not pre_diagnostic_owner_stop_phase("preproduct"),
+        "A_H039_R30_DISTINCT_PRE_DIAGNOSTIC_OWNER_STOP_CLASSIFICATION",
     )
 
 
@@ -31164,6 +31760,448 @@ def r29_line_limit_surface_selftests() -> None:
     check(not r29_line_limit_surface_exact(tree, r2_tree, r1_tree, gate_raw.replace(gate_raw.splitlines(True)[0], b"#!/usr/bin/env -S /bin/echo PREEXEC\n", 1), r1_raw), "N_H039_R29_R2_EXECUTABLE_PREAMBLE_MUTANT")
 
 
+def r30_historical_r29_surface_exact(
+    current: ast.Module, reference: ast.Module,
+) -> bool:
+    def selected(module: ast.Module) -> list[tuple[str, str]]:
+        rows: list[tuple[str, str]] = []
+        for node in module.body:
+            if isinstance(node, ast.FunctionDef) and (
+                node.name.startswith("r29_")
+                or node.name == "exact_r29_installed_argv"
+            ):
+                rows.append(("function", ast.dump(node, include_attributes=False)))
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                if any(isinstance(target, ast.Name)
+                       and target.id.startswith("R29_") for target in targets):
+                    rows.append(("assignment", ast.dump(node, include_attributes=False)))
+            elif (
+                isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Attribute)
+                and isinstance(node.value.func.value, ast.Name)
+                and node.value.func.value.id.startswith("R29_")
+            ):
+                rows.append(("mutation", ast.dump(node, include_attributes=False)))
+        return rows
+
+    return selected(current) == selected(reference)
+
+
+def r30_historical_r29_bytes_exact(
+    current_raw: bytes, reference_raw: bytes,
+) -> bool:
+    def selected(raw: bytes) -> list[tuple[str, str, bytes]]:
+        text = raw.decode("utf-8", "strict")
+        module = ast.parse(text)
+        lines = raw.splitlines(keepends=True)
+        rows: list[tuple[str, str, bytes]] = []
+        for node in module.body:
+            label = ""
+            kind = ""
+            if isinstance(node, ast.FunctionDef) and (
+                node.name.startswith("r29_")
+                or node.name == "exact_r29_installed_argv"
+            ):
+                kind, label = "function", node.name
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                names = [target.id for target in targets
+                         if isinstance(target, ast.Name)
+                         and target.id.startswith("R29_")]
+                if names:
+                    kind, label = "assignment", ",".join(names)
+            elif (
+                isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Attribute)
+                and isinstance(node.value.func.value, ast.Name)
+                and node.value.func.value.id.startswith("R29_")
+            ):
+                kind, label = "mutation", node.value.func.value.id
+            if kind:
+                if node.end_lineno is None:
+                    return []
+                rows.append((kind, label, b"".join(
+                    lines[node.lineno - 1:node.end_lineno]
+                )))
+        return rows
+
+    try:
+        return selected(current_raw) == selected(reference_raw)
+    except (SyntaxError, UnicodeError, ValueError, TypeError):
+        return False
+
+
+def r30_max_consumer_rows(module: ast.Module) -> list[tuple[str, str]]:
+    protected = {"MAX_ADDED_LINES", "MAX_DELETED_LINES"}
+    rows: list[tuple[str, str]] = []
+    for node in module.body:
+        direct = any(
+            isinstance(item, ast.Name) and item.id in protected
+            and isinstance(item.ctx, ast.Load) for item in ast.walk(node)
+        )
+        indirect = any(
+            (isinstance(item, ast.Subscript)
+             and isinstance(item.slice, ast.Constant)
+             and item.slice.value in protected)
+            or (
+                isinstance(item, ast.Call)
+                and (
+                    isinstance(item.func, ast.Name)
+                    and item.func.id in {
+                        "exec", "eval", "getattr", "setattr", "delattr",
+                    }
+                    or isinstance(item.func, ast.Attribute)
+                    and item.func.attr in {
+                        "get", "__getitem__", "__setitem__", "update",
+                        "setdefault",
+                    }
+                )
+                and any(
+                    isinstance(part, ast.Constant) and type(part.value) is str
+                    and any(name in part.value for name in protected)
+                    for part in ast.walk(item)
+                )
+            ) for item in ast.walk(node)
+        )
+        if direct or indirect:
+            label = node.name if isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef)
+            ) else type(node).__name__
+            rows.append((label, ast.dump(node, include_attributes=False)))
+    return rows
+
+
+def r30_line_limit_surface_accepts(
+    current: ast.Module, r29_base: ast.Module,
+) -> bool:
+    if not r30_historical_r29_surface_exact(current, r29_base):
+        return False
+    protected = ("MAX_ADDED_LINES", "MAX_DELETED_LINES")
+    for name in protected:
+        old = [node for node in r29_base.body if isinstance(node, ast.Assign)
+               and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+               and node.targets[0].id == name]
+        now = [node for node in current.body if isinstance(node, ast.Assign)
+               and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+               and node.targets[0].id == name]
+        writes = [node for node in ast.walk(current)
+                  if isinstance(node, ast.Name) and node.id == name
+                  and isinstance(node.ctx, (ast.Store, ast.Del))]
+        if (len(old) != 1 or len(now) != 1 or len(writes) != 1
+                or ast.dump(now[0], include_attributes=False)
+                != ast.dump(old[0], include_attributes=False)):
+            return False
+    old_rows = r30_max_consumer_rows(r29_base)
+    now_rows = r30_max_consumer_rows(current)
+    if len(old_rows) != 20 or now_rows != old_rows:
+        return False
+
+    def owners(module: ast.Module) -> list[tuple[str, int]]:
+        return [
+            (node.name, sum(
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Name)
+                and item.func.id == "r29_line_delta_accepts"
+                for item in ast.walk(node)
+            )) for node in module.body if isinstance(node, ast.FunctionDef)
+            if any(isinstance(item, ast.Call)
+                   and isinstance(item.func, ast.Name)
+                   and item.func.id == "r29_line_delta_accepts"
+                   for item in ast.walk(node))
+        ]
+
+    expected_owners = sorted(
+        owners(r29_base) + [("r30_contract_candidate_graph", 1)],
+    )
+    return sorted(owners(current)) == expected_owners
+
+
+def r30_line_limit_surface_selftests() -> None:
+    try:
+        current_raw = GATE.read_bytes()
+        current = ast.parse(current_raw, filename=str(GATE))
+        r29_raw = blob(R30_AUTHORITY_BASE, "verify/bin/h-039-exit")
+        r29_base = ast.parse(r29_raw, filename=R30_AUTHORITY_BASE)
+        r2 = ast.parse(blob(REJECTED_R28_R2_CANDIDATE,
+                           "verify/bin/h-039-exit"))
+        r1_raw = blob(REJECTED_R29_R1_CANDIDATE, "verify/bin/h-039-exit")
+        r1 = ast.parse(r1_raw)
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R30 line-limit references unavailable") from exc
+    check(
+        sha(r29_raw) == R30_BASE_GATE_SHA256
+        and r29_line_limit_surface_exact(r29_base, r2, r1, r29_raw, r1_raw),
+        "A_H039_R30_PUBLISHED_R29_LINE_LIMIT_ORACLE_AUTHENTICATED",
+    )
+    check(r30_line_limit_surface_accepts(current, r29_base),
+          "A_H039_R30_NO_NEW_LINE_LIMIT_CONSUMER_OR_GLOBAL_WIDENING")
+    check(
+        r30_historical_r29_bytes_exact(current_raw, r29_raw),
+        "A_H039_R30_HISTORICAL_R29_SELECTED_SOURCE_BYTES_EXACT",
+    )
+    whitespace_mutant = current_raw.replace(
+        b"def r29_line_delta_accepts(additions: Any, deletions: Any) -> bool:\n",
+        b"def  r29_line_delta_accepts(additions: Any, deletions: Any) -> bool:\n",
+        1,
+    )
+    comment_mutant = current_raw.replace(
+        b"def r29_line_delta_accepts(additions: Any, deletions: Any) -> bool:\n",
+        b"def r29_line_delta_accepts(additions: Any, deletions: Any) -> bool:\n"
+        b"    # unauthorized historical comment\n", 1,
+    )
+    check(
+        whitespace_mutant != current_raw
+        and not r30_historical_r29_bytes_exact(whitespace_mutant, r29_raw)
+        and comment_mutant != current_raw
+        and not r30_historical_r29_bytes_exact(comment_mutant, r29_raw),
+        "N_H039_R30_HISTORICAL_R29_WHITESPACE_AND_COMMENT_MUTANTS",
+    )
+
+    def function(module: ast.Module, name: str) -> ast.FunctionDef:
+        return next(node for node in module.body
+                    if isinstance(node, ast.FunctionDef) and node.name == name)
+
+    mutants: list[tuple[str, ast.Module]] = []
+    mutant = copy.deepcopy(current)
+    mutant.body.append(ast.parse(
+        "def hidden_limit_consumer():\n return MAX_ADDED_LINES\n"
+    ).body[0])
+    mutants.append(("NEW_DIRECT_CONSUMER", mutant))
+    mutant = copy.deepcopy(current)
+    row = next(node for node in mutant.body if isinstance(node, ast.Assign)
+               and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+               and node.targets[0].id == "MAX_ADDED_LINES")
+    row.value = ast.Constant(2401)
+    mutants.append(("GLOBAL_WIDEN", mutant))
+    mutant = copy.deepcopy(current)
+    function(mutant, "r29_line_delta_accepts").body.append(ast.Pass())
+    mutants.append(("HISTORICAL_ACCEPTOR_DRIFT", mutant))
+    mutant = copy.deepcopy(current)
+    function(mutant, "r29_line_delta_selftests").name += "_decoy"
+    mutants.append(("HISTORICAL_SELFTEST_RENAME", mutant))
+    mutant = copy.deepcopy(current)
+    call = next(item for item in ast.walk(
+        function(mutant, "r30_contract_candidate_graph")
+    ) if isinstance(item, ast.Call) and isinstance(item.func, ast.Name)
+                and item.func.id == "r29_line_delta_accepts")
+    call.func.id = "r29_line_delta_accepts_decoy"
+    mutants.append(("DECOY_ACCEPTOR", mutant))
+    mutant = copy.deepcopy(current)
+    graph = function(mutant, "r30_contract_candidate_graph")
+    call = next(item for item in ast.walk(graph) if isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Name)
+                and item.func.id == "r29_line_delta_accepts")
+    graph.body.append(ast.Expr(copy.deepcopy(call)))
+    mutants.append(("DUPLICATE_ACCEPTOR", mutant))
+    for label, mutant in mutants:
+        check(not r30_line_limit_surface_accepts(mutant, r29_base),
+              f"N_H039_R30_LINE_LIMIT_MUTANT_{label}")
+
+
+def r30_gate_closed_world_exact(
+    current: ast.Module, base: ast.Module,
+) -> bool:
+    expected_module = "4b1a0cdb17f143c60557f1c13c44a469a569d9ca6f54d3d7e893341bd898fd48"
+    expected_self = "6865cb7bdc66e38422fd02ae754e11ae200ffb77a97ed99850f5a074ba89e3c9"
+    new_functions = {
+        "exact_r30_installed_argv", "r30_contract_candidate_graph",
+        "r30_contract_candidate_identity", "r30_contract_publication_identity",
+        "r30_dict_value", "r30_dispatch_selftests", "r30_dispatch_surface_exact",
+        "r30_dynamic_presence", "r30_dynamic_presence_accepts",
+        "r30_gate_closed_world_exact", "r30_gate_closed_world_selftests",
+        "r30_generation_normalized_dump", "r30_historical_r29_bytes_exact",
+        "r30_historical_r29_surface_exact", "r30_immutable_r29_publication_checks",
+        "r30_line_limit_surface_accepts", "r30_line_limit_surface_selftests",
+        "r30_literal_assignment", "r30_max_consumer_rows",
+        "r30_open_static_workflows", "r30_outer_unresolved_globals",
+        "r30_prepublication_workflow_checks", "r30_registry_expected",
+        "r30_registry_selftests", "r30_review_entries_accept",
+        "r30_run_update_validator", "r30_selection_dict",
+        "r30_static_workflow_selftests", "r30_static_workflows_accept",
+        "r30_target_namespace_surface_accepts", "r30_update_record_selftests",
+        "r30_update_records_accept", "r30_workflow_completed_checks",
+        "r30_workflow_frozen", "r30_workflow_semantic_accepts",
+    }
+    changed_functions = {
+        "finish", "main", "pre_diagnostic_owner_stop_phase",
+        "r17_registry_selftests", "static_contract_checks",
+    }
+    new_assignments = {
+        "R30_AUTHORITY_BASE", "R30_AUTHORITY_PARENTS", "R30_AUTHORITY_TREE",
+        "R30_BASE_GATE_SHA256", "R30_BASE_SPEC_SHA256", "R30_DIAGNOSTIC_ATTEMPT",
+        "R30_DIAGNOSTIC_DUAL_REVIEW", "R30_DIAGNOSTIC_OUTCOME",
+        "R30_DIAGNOSTIC_RUNNER", "R30_DIAGNOSTIC_SOURCE_BINDING",
+        "R30_DIAGNOSTIC_VALIDATOR", "R30_GATE_SOURCE_SHA256",
+        "R30_MATERIAL_REVIEW_EXTENSION", "R30_ORDERED_PUBLICATION_EVIDENCE",
+        "R30_PREDECESSOR_EVIDENCE", "R30_R15_PRODUCT_MERGE", "R30_R29_CANDIDATE",
+        "R30_R29_DUAL_REVIEW", "R30_R29_DUAL_REVIEW_SHA256", "R30_R29_FAILURE",
+        "R30_R29_MATERIAL_EXTENSION_SHA256", "R30_R29_NORMALIZED_GATE_SHA256",
+        "R30_R29_PUBLICATION", "R30_R29_PUBLICATION_AUDIT",
+        "R30_R29_RECONCILIATION_SHA256", "R30_R29_REGISTRY_SHA256",
+        "R30_R29_ROW_SHA256", "R30_REASON", "R30_RECONCILIATION_SHA256",
+        "R30_REGISTRY_SHA256", "R30_UPDATE_ATTEMPT", "R30_UPDATE_DUAL_REVIEW",
+        "R30_UPDATE_OUTCOME", "R30_UPDATE_RUNNER", "R30_UPDATE_SOURCE_BINDING",
+        "R30_UPDATE_VALIDATOR", "R30_WORKFLOW_HASHES", "R30_WORKFLOW_IDENTITY8", "REJECTED_R30_R1_CANDIDATE", "REJECTED_R30_R1_TREE", "REJECTED_R30_R1_GATE_SHA256", "REJECTED_R30_R1_SPEC_SHA256", "REJECTED_R30_R1_NORMALIZED_GATE_SHA256", "REJECTED_R30_R1_ROW_SHA256", "REJECTED_R30_R1_REGISTRY_SHA256", "REJECTED_R30_R1_RECONCILIATION_SHA256", "REJECTED_R30_R1_FILE_SHA256", "REJECTED_R30_R1_LINE_DELTA_BY_PATH", "REJECTED_R30_R1_LINE_DELTA", "R30_R1_FAILURE_DRAFT", "R30_R1_FAILURE", "R30_R1_LOG_A", "R30_R1_LOG_B",
+    }
+    changed_assignments = {"EXPECTED_H039_ROW_SHA256", "FAILURE_SIGNATURE"}
+    dump = lambda node: ast.dump(node, include_attributes=False)
+    functions = lambda tree: [node for node in tree.body
+                              if isinstance(node, ast.FunctionDef)]
+    assignments = lambda tree: [node for node in tree.body
+                                if isinstance(node, ast.Assign)
+                                and len(node.targets) == 1
+                                and isinstance(node.targets[0], ast.Name)]
+    cf_rows, bf_rows = functions(current), functions(base)
+    ca_rows, ba_rows = assignments(current), assignments(base)
+    cf = {node.name: node for node in cf_rows}; bf = {node.name: node for node in bf_rows}
+    ca = {node.targets[0].id: node for node in ca_rows}
+    ba = {node.targets[0].id: node for node in ba_rows}
+    if not (
+        len(cf) == len(cf_rows) and len(bf) == len(bf_rows)
+        and len(ca) == len(ca_rows) and len(ba) == len(ba_rows)
+        and set(cf) - set(bf) == new_functions and not set(bf) - set(cf)
+        and set(ca) - set(ba) == new_assignments and not set(ba) - set(ca)
+        and {name for name in set(cf) & set(bf) if dump(cf[name]) != dump(bf[name])}
+        == changed_functions
+        and {name for name in set(ca) & set(ba) if dump(ca[name]) != dump(ba[name])}
+        == changed_assignments
+    ):
+        return False
+    own = copy.deepcopy(cf["r30_gate_closed_world_exact"])
+    self_rows = [node for node in own.body if isinstance(node, ast.Assign)
+                 and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                 and node.targets[0].id == "expected_self"]
+    if len(self_rows) != 1:
+        return False
+    self_rows[0].value = ast.Constant("0" * 64)
+    if sha(dump(own).encode()) != expected_self:
+        return False
+    projected = copy.deepcopy(current)
+    projected.body = [node for node in projected.body if not (
+        isinstance(node, ast.FunctionDef)
+        and node.name == "r30_gate_closed_world_exact"
+    )]
+    source_rows = [node for node in assignments(projected)
+                   if node.targets[0].id == "R30_GATE_SOURCE_SHA256"]
+    if len(source_rows) != 1:
+        return False
+    source_rows[0].value = ast.Constant("0" * 64)
+    return sha(dump(projected).encode()) == expected_module
+
+
+def r30_gate_closed_world_selftests() -> None:
+    try:
+        current = ast.parse(GATE.read_bytes(), filename=str(GATE))
+        base = ast.parse(blob(R30_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R30 whole-gate closed-world references unavailable") from exc
+    check(r30_gate_closed_world_exact(current, base),
+          "A_H039_R30_WHOLE_GATE_CLOSED_WORLD_ORACLE_LIVE")
+    function = lambda tree, name: next(node for node in tree.body
+                                      if isinstance(node, ast.FunctionDef)
+                                      and node.name == name)
+    assignment = lambda tree, name: next(node for node in tree.body
+                                        if isinstance(node, ast.Assign)
+                                        and len(node.targets) == 1
+                                        and isinstance(node.targets[0], ast.Name)
+                                        and node.targets[0].id == name)
+    mutants: list[tuple[str, ast.Module]] = []
+    mutant = copy.deepcopy(current); mutant.body.append(ast.parse("os.unlink('/tmp/x')").body[0]); mutants.append(("TOP_LEVEL_EFFECT", mutant))
+    mutant = copy.deepcopy(current); function(mutant, "main").body.insert(0, ast.parse("subprocess.run(['/bin/sh'])").body[0]); mutants.append(("MAIN_PROCESS_EFFECT", mutant))
+    mutant = copy.deepcopy(current); mutant.body.append(ast.Import(names=[ast.alias("socket")])); mutants.append(("EXTRA_IMPORT", mutant))
+    mutant = copy.deepcopy(current); mutant.body.append(ast.parse("def r30_decoy():\n return True").body[0]); mutants.append(("EXTRA_FUNCTION", mutant))
+    mutant = copy.deepcopy(current); function(mutant, "sha").body.append(ast.Pass()); mutants.append(("HISTORICAL_FUNCTION", mutant))
+    mutant = copy.deepcopy(current); assignment(mutant, "R30_REASON").value = ast.Constant("weakened"); mutants.append(("R30_ASSIGNMENT", mutant))
+    mutant = copy.deepcopy(current); function(mutant, "r30_gate_closed_world_exact").body.append(ast.Pass()); mutants.append(("ORACLE_SELF", mutant))
+    for label, mutant in mutants:
+        check(not r30_gate_closed_world_exact(mutant, base),
+              f"N_H039_R30_WHOLE_GATE_MUTANT_{label}")
+
+
+def r30_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        changes = raw_changes(R30_AUTHORITY_BASE, candidate)
+        additions, deletions = line_delta(R30_AUTHORITY_BASE, candidate)
+        detail = {
+            "authority_tree": commit_tree(R30_AUTHORITY_BASE),
+            "authority_parents": commit_parents(R30_AUTHORITY_BASE),
+            "candidate": candidate, "candidate_parents": commit_parents(candidate),
+            "changes": changes, "additions": additions, "deletions": deletions,
+        }
+        rejected = {
+            R30_AUTHORITY_BASE, R30_R29_CANDIDATE, R30_R15_PRODUCT_MERGE,
+            R29_AUTHORITY_BASE, R29_R28_CANDIDATE,
+            REJECTED_R29_R1_CANDIDATE, REJECTED_R28_R2_CANDIDATE,
+            REJECTED_R30_R1_CANDIDATE,
+        }
+        ok = (
+            object_type(R30_AUTHORITY_BASE) == "commit"
+            and detail["authority_tree"] == R30_AUTHORITY_TREE
+            and detail["authority_parents"] == R30_AUTHORITY_PARENTS
+            and sha(blob(R30_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+            == R30_BASE_GATE_SHA256
+            and sha(blob(R30_AUTHORITY_BASE, "specs/tasks.spec.json"))
+            == R30_BASE_SPEC_SHA256
+            and object_type(candidate) == "commit" and candidate not in rejected
+            and detail["candidate_parents"] == [R30_AUTHORITY_BASE]
+            and exact_contract_change_shape(changes)
+            and r29_line_delta_accepts(additions, deletions)
+        )
+        return ok, detail
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r30_contract_candidate_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r30_contract_candidate_graph(candidate)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(stable_checkout_blob(path, blob(candidate, path))
+                             for path in TEST_AUTHOR_GIT_ORDER)
+        return (
+            graph_ok and remote_main == R30_AUTHORITY_BASE
+            and head == candidate and status_raw == b"" and checkout_equal
+        ), {"graph": graph, "remote_main": remote_main, "head": head,
+            "status": status_raw.decode("utf-8", "replace"),
+            "checkout_equal": checkout_equal}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r30_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        authority, candidate = parents
+        candidate_ok, candidate_detail = r30_contract_candidate_graph(candidate)
+        changes = raw_changes(R30_AUTHORITY_BASE, merge)
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(stable_checkout_blob(path, blob(merge, path))
+                             for path in TEST_AUTHOR_GIT_ORDER)
+        ok = (
+            object_type(merge) == "commit" and authority == R30_AUTHORITY_BASE
+            and candidate_ok and commit_tree(merge) == commit_tree(candidate)
+            and exact_contract_change_shape(changes)
+            and remote_main == merge and head == merge and status_raw == b""
+            and checkout_equal
+            and SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+            and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit")
+        )
+        return ok, {"parents": parents, "candidate": candidate_detail,
+                    "changes": changes, "tree": commit_tree(merge),
+                    "remote_main": remote_main, "head": head,
+                    "status": status_raw.decode("utf-8", "replace"),
+                    "checkout_equal": checkout_equal}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
 def r28_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
     try:
         changes = raw_changes(R28_AUTHORITY_BASE, candidate)
@@ -33056,6 +34094,1119 @@ def r28_read_only_installed_update_checks(
             os.close(descriptor)
 
 
+def r30_outer_unresolved_globals(raw: bytes) -> list[tuple[str, int, str]]:
+    text = raw.decode("utf-8", "strict")
+    top = symtable.symtable(text, "<r30-workflow>", "exec")
+    module_bound = {
+        symbol.get_name() for symbol in top.get_symbols()
+        if symbol.is_assigned() or symbol.is_imported() or symbol.is_namespace()
+    }
+    builtin_names = set(dir(builtins))
+    unresolved: list[tuple[str, int, str]] = []
+
+    def visit(scope: Any) -> None:
+        for symbol in scope.get_symbols():
+            if (
+                symbol.is_referenced() and symbol.is_global()
+                and symbol.get_name() not in module_bound
+                and symbol.get_name() not in builtin_names
+            ):
+                unresolved.append((
+                    scope.get_name(), scope.get_lineno(), symbol.get_name(),
+                ))
+        for child in scope.get_children():
+            visit(child)
+
+    visit(top)
+    return sorted(set(unresolved))
+
+
+def r30_generation_normalized_dump(node: ast.AST) -> str:
+    projected = copy.deepcopy(node)
+    for item in ast.walk(projected):
+        if isinstance(item, ast.Constant) and type(item.value) is str:
+            item.value = item.value.replace("R30", "R29").replace("r30", "r29")
+    return ast.dump(projected, include_attributes=False)
+
+
+def r30_literal_assignment(module: ast.Module, name: str) -> str | None:
+    rows = [
+        node for node in module.body if isinstance(node, ast.Assign)
+        and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == name and isinstance(node.value, ast.Constant)
+        and type(node.value.value) is str
+    ]
+    return rows[0].value.value if len(rows) == 1 else None
+
+
+def r30_selection_dict(module: ast.Module) -> ast.Dict | None:
+    functions = [node for node in module.body if isinstance(node, ast.FunctionDef)
+                 and node.name == "read_and_validate_binding"]
+    if len(functions) != 1:
+        return None
+    rows = [
+        node for node in ast.walk(functions[0]) if isinstance(node, ast.Dict)
+        and sum(isinstance(key, ast.Constant)
+                and key.value == "owner_launcher_prefix" for key in node.keys) == 1
+    ]
+    return rows[0] if len(rows) == 1 else None
+
+
+def r30_dict_value(row: ast.Dict, key: str) -> ast.expr | None:
+    matches = [value for name, value in zip(row.keys, row.values)
+               if isinstance(name, ast.Constant) and name.value == key]
+    return matches[0] if len(matches) == 1 else None
+
+
+def r30_target_namespace_surface_accepts(
+    path: Path, raw: bytes, r29_raw: bytes,
+) -> bool:
+    try:
+        if (
+            path not in {R30_UPDATE_RUNNER, R30_UPDATE_VALIDATOR}
+        ):
+            return False
+        current = ast.parse(raw.decode("utf-8", "strict"))
+        predecessor = ast.parse(r29_raw.decode("utf-8", "strict"))
+        expected_python = "/Library/Developer/CommandLineTools/usr/bin/python3"
+        assignments = [
+            node for node in current.body if isinstance(node, ast.Assign)
+            and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "PYTHON"
+        ]
+        python_names = [node for node in ast.walk(current)
+                        if isinstance(node, ast.Name) and node.id == "PYTHON"]
+        contexts = [(type(node.ctx), node.id) for node in python_names]
+        if (
+            len(assignments) != 1
+            or not isinstance(assignments[0].value, ast.Constant)
+            or assignments[0].value.value != expected_python
+            or contexts.count((ast.Store, "PYTHON")) != 1
+            or contexts.count((ast.Load, "PYTHON")) != 3
+            or any(isinstance(node, ast.Name) and node.id == "PY"
+                   for node in ast.walk(current))
+            or r30_outer_unresolved_globals(raw)
+        ):
+            return False
+        selection = r30_selection_dict(current)
+        old_selection = r30_selection_dict(predecessor)
+        if selection is None or old_selection is None:
+            return False
+        prefix = r30_dict_value(selection, "owner_launcher_prefix")
+        image = r30_dict_value(selection, "python_image")
+        expected_prefix = ast.parse(
+            '["/usr/bin/env","-i","-C","/",PYTHON,"-I","-S","-c",'
+            '"EXACT_REVIEWED_WRAPPER_LITERAL"]', mode="eval",
+        ).body
+        if (
+            ast.dump(prefix, include_attributes=False)
+            != ast.dump(expected_prefix, include_attributes=False)
+            or not isinstance(image, ast.Name) or image.id != "PYTHON"
+            or not isinstance(image.ctx, ast.Load)
+        ):
+            return False
+        projected = copy.deepcopy(selection)
+        projected_prefix = r30_dict_value(projected, "owner_launcher_prefix")
+        if not isinstance(projected_prefix, ast.List) or len(projected_prefix.elts) != 9:
+            return False
+        projected_prefix.elts[4] = ast.Name(id="PY", ctx=ast.Load())
+        if (r30_generation_normalized_dump(projected)
+                != ast.dump(old_selection, include_attributes=False)):
+            return False
+        wrapper = r30_literal_assignment(current, "AUTHENTICATED_EXEC_WRAPPER")
+        old_wrapper = r30_literal_assignment(predecessor, "AUTHENTICATED_EXEC_WRAPPER")
+        if wrapper is None or old_wrapper is None:
+            return False
+        return (
+            wrapper.replace("R30", "R29").replace("r30", "r29")
+            == old_wrapper
+            and r30_generation_normalized_dump(ast.parse(wrapper))
+            == ast.dump(ast.parse(old_wrapper), include_attributes=False)
+        )
+    except (SyntaxError, UnicodeError, ValueError, TypeError):
+        return False
+
+
+def r30_workflow_semantic_accepts(
+    path: Path, raw: bytes, r29_raw: bytes | None = None,
+) -> bool:
+    json_shapes = {
+        R30_UPDATE_SOURCE_BINDING: "2f54686a2f2dfb54ad6dd439fd8582e0ae0b87192cdeb8ff43b93686913f279b",
+        R30_UPDATE_DUAL_REVIEW: "3951affe85ed92ad3d27f560f313ce1cf457b1966466af835832316936cbbba5",
+        R30_DIAGNOSTIC_SOURCE_BINDING: "68aa6940c2564bea610066d3ec1cad9e1a27c36c37ac14fabd6f199060e2623a",
+        R30_DIAGNOSTIC_DUAL_REVIEW: "8236ffa0877a4e96f7d0e4a80e2cbb313135bbb5e2e265709e05d5c1117720a2",
+    }
+    if path not in {
+        R30_UPDATE_RUNNER, R30_UPDATE_VALIDATOR,
+        R30_DIAGNOSTIC_RUNNER, R30_DIAGNOSTIC_VALIDATOR,
+    }:
+        def shape(value: Any) -> Any:
+            if type(value) is dict:
+                return ["dict", [[key, shape(value[key])] for key in sorted(value)]]
+            if type(value) is list:
+                return ["list", [shape(item) for item in value]]
+            return type(value).__name__
+        try:
+            return (
+                path in json_shapes and r29_raw is None
+                and sha(canonical(shape(strict_json(raw)))) == json_shapes[path]
+            )
+        except (Rig, UnicodeError, ValueError, TypeError):
+            return False
+    profiles = {
+        R30_UPDATE_RUNNER: (
+            R29_UPDATE_RUNNER, {"authenticate_consumed_r29_workflow"},
+            {"_ceremony_with_root", "authenticate_publication_chain",
+             "authenticate_workflow_reviews", "read_and_validate_binding"},
+            set(), set(), {"EXPECTED_REVIEW_SCOPE", "SOURCE_BINDING_SHA256"},
+            "688ad404768c621cf5cdecb3dcb8f920ba61017f7cfcb88ab562bd62de506579", True,
+        ),
+        R30_UPDATE_VALIDATOR: (
+            R29_UPDATE_VALIDATOR, {"authenticate_consumed_r29_workflow"},
+            {"_validate_with_root", "authenticate_publication_chain",
+             "authenticate_workflow_reviews", "read_and_validate_binding"},
+            set(), set(), {"EXPECTED_REVIEW_SCOPE", "SOURCE_BINDING_SHA256"},
+            "72fd283007a940b2fc65e8a29e589a265c6a87272d54baf34ee3f2773d587be7", True,
+        ),
+        R30_DIAGNOSTIC_RUNNER: (
+            R29_DIAGNOSTIC_RUNNER, set(),
+            {"main", "validate_publication_records", "validate_root_update_chain",
+             "validate_static_workflow"},
+            {"R29_CONTRACT_CANDIDATE", "R29_CONTRACT_MERGE", "R29_CONTRACT_TREE",
+             "R29_PUBLICATION_AUDIT_NAME", "R29_PUBLICATION_AUDIT_SHA256",
+             "R29_PUBLICATION_NAME", "R29_PUBLICATION_SHA256"},
+            {"R28_PUBLICATION_NAME", "R28_PUBLICATION_SHA256"},
+            {"EXPECTED_PUBLISHED_EVIDENCE", "PUBLICATION_IDENTITY8",
+             "REQUIRED_FIXED_EVIDENCE_NAMES", "ROOT_UPDATE_STATIC"},
+            "37687773c2612213dd6d89beca75227117a8b9f987dea6bb5a6f672ed0b0d277", False,
+        ),
+        R30_DIAGNOSTIC_VALIDATOR: (
+            R29_DIAGNOSTIC_VALIDATOR, set(),
+            {"main", "validate_known_records", "validate_protocol",
+             "validate_root_update", "validate_static"},
+            {"R29_CONTRACT_CANDIDATE", "R29_CONTRACT_MERGE", "R29_CONTRACT_TREE",
+             "R29_PUBLICATION_AUDIT_NAME", "R29_PUBLICATION_AUDIT_SHA256",
+             "R29_PUBLICATION_NAME", "R29_PUBLICATION_SHA256"},
+            {"R28_PUBLICATION_NAME", "R28_PUBLICATION_SHA256"},
+            {"EXPECTED_PUBLISHED_EVIDENCE", "PUBLICATION_IDENTITY8",
+             "REQUIRED_FIXED_EVIDENCE_NAMES", "ROOT_UPDATE_STATIC"},
+            "a25945250bc8b0a3bcfb5b89386da465083738c54d3ccf4c2f82d61ae7eb71c5", False,
+        ),
+    }
+    predecessor_path, new_functions, changed_functions, new_assignments, \
+        removed_assignments, changed_assignments, expected_ast, root = profiles[path]
+    try:
+        if r29_raw is None or sha(r29_raw) != R29_WORKFLOW_HASHES[predecessor_path]:
+            return False
+        current, predecessor = ast.parse(raw), ast.parse(r29_raw)
+        projected = copy.deepcopy(current)
+        if root:
+            selection = r30_selection_dict(projected)
+            prefix = r30_dict_value(selection, "owner_launcher_prefix") \
+                if selection is not None else None
+            if not isinstance(prefix, ast.List) or len(prefix.elts) != 9:
+                return False
+            prefix.elts[4] = ast.Name(id="PY", ctx=ast.Load())
+        for node in ast.walk(projected):
+            if isinstance(node, ast.Constant) and type(node.value) is str:
+                node.value = node.value.replace("R30", "R29").replace("r30", "r29")
+        functions = lambda tree: [node for node in tree.body
+                                  if isinstance(node, ast.FunctionDef)]
+        assignments = lambda tree: [node for node in tree.body
+                                    if isinstance(node, ast.Assign)
+                                    and len(node.targets) == 1
+                                    and isinstance(node.targets[0], ast.Name)]
+        current_functions = functions(projected); old_functions = functions(predecessor)
+        current_assignments = assignments(projected); old_assignments = assignments(predecessor)
+        cf = {node.name: node for node in current_functions}
+        of = {node.name: node for node in old_functions}
+        ca = {node.targets[0].id: node for node in current_assignments}
+        oa = {node.targets[0].id: node for node in old_assignments}
+        dump = lambda node: ast.dump(node, include_attributes=False)
+        return (
+            len(cf) == len(current_functions) and len(of) == len(old_functions)
+            and len(ca) == len(current_assignments) and len(oa) == len(old_assignments)
+            and set(cf) - set(of) == new_functions and not set(of) - set(cf)
+            and {name for name in set(cf) & set(of) if dump(cf[name]) != dump(of[name])}
+            == changed_functions
+            and set(ca) - set(oa) == new_assignments
+            and set(oa) - set(ca) == removed_assignments
+            and {name for name in set(ca) & set(oa) if dump(ca[name]) != dump(oa[name])}
+            == changed_assignments
+            and sha(dump(projected).encode()) == expected_ast
+        )
+    except (KeyError, SyntaxError, UnicodeError, ValueError, TypeError):
+        return False
+
+
+def r30_review_entries_accept(value: Any, *, diagnostic: bool) -> bool:
+    return r29_review_entries_accept(value, diagnostic=diagnostic) and all(
+        "R30" in item.get("role", "").upper()
+        if not diagnostic else type(item.get("reviewer")) is str
+        for item in value
+    )
+
+
+def r30_static_workflows_accept(
+    raws: Any, r29_raws: Any,
+) -> bool:
+    if (
+        type(raws) is not dict or set(raws) != set(R30_WORKFLOW_HASHES)
+        or type(r29_raws) is not dict or set(r29_raws) != set(R29_WORKFLOW_HASHES)
+    ):
+        return False
+    try:
+        if not all(
+            type(raws[path]) is bytes
+            and sha(raws[path]) == R30_WORKFLOW_HASHES[path]
+            and r30_workflow_semantic_accepts(
+                path, raws[path],
+                r29_raws.get({
+                    R30_UPDATE_RUNNER: R29_UPDATE_RUNNER,
+                    R30_UPDATE_VALIDATOR: R29_UPDATE_VALIDATOR,
+                    R30_DIAGNOSTIC_RUNNER: R29_DIAGNOSTIC_RUNNER,
+                    R30_DIAGNOSTIC_VALIDATOR: R29_DIAGNOSTIC_VALIDATOR,
+                }.get(path)),
+            )
+            for path in R30_WORKFLOW_HASHES
+        ):
+            return False
+        root_pairs = (
+            (R30_UPDATE_RUNNER, R29_UPDATE_RUNNER),
+            (R30_UPDATE_VALIDATOR, R29_UPDATE_VALIDATOR),
+        )
+        if not all(
+            r30_target_namespace_surface_accepts(
+                current, raws[current], r29_raws[predecessor],
+            )
+            for current, predecessor in root_pairs
+        ):
+            return False
+        root_binding = strict_json(raws[R30_UPDATE_SOURCE_BINDING])
+        root_review = strict_json(raws[R30_UPDATE_DUAL_REVIEW])
+        diagnostic_binding = strict_json(raws[R30_DIAGNOSTIC_SOURCE_BINDING])
+        diagnostic_review = strict_json(raws[R30_DIAGNOSTIC_DUAL_REVIEW])
+        root_selection = root_binding.get("authenticated_code_selection", {})
+        diagnostic_selection = diagnostic_binding.get(
+            "authenticated_code_selection", {},
+        )
+        root_wrapper = r29_authenticated_exec_wrapper(
+            raws[R30_UPDATE_RUNNER], root_selection.get("wrapper_sha256", ""),
+        )
+        root_validator_wrapper = r29_authenticated_exec_wrapper(
+            raws[R30_UPDATE_VALIDATOR], root_selection.get("wrapper_sha256", ""),
+        )
+        diagnostic_wrapper = r29_authenticated_exec_wrapper(
+            raws[R30_DIAGNOSTIC_RUNNER],
+            diagnostic_selection.get("wrapper_sha256", ""),
+        )
+        diagnostic_validator_wrapper = r29_authenticated_exec_wrapper(
+            raws[R30_DIAGNOSTIC_VALIDATOR],
+            diagnostic_selection.get("wrapper_sha256", ""),
+        )
+        old_root_wrapper = r29_authenticated_exec_wrapper(
+            r29_raws[R29_UPDATE_RUNNER],
+            R29_UPDATE_AUTHENTICATED_EXEC_WRAPPER_SHA256,
+        )
+        old_diagnostic_wrapper = r29_authenticated_exec_wrapper(
+            r29_raws[R29_DIAGNOSTIC_RUNNER],
+            R29_DIAGNOSTIC_AUTHENTICATED_EXEC_WRAPPER_SHA256,
+        )
+        expected_root_candidate = {
+            "ceremony_sha256": R30_WORKFLOW_HASHES[R30_UPDATE_RUNNER],
+            "ceremony_identity8": R30_WORKFLOW_IDENTITY8[R30_UPDATE_RUNNER],
+            "validator_sha256": R30_WORKFLOW_HASHES[R30_UPDATE_VALIDATOR],
+            "validator_identity8": R30_WORKFLOW_IDENTITY8[R30_UPDATE_VALIDATOR],
+            "source_binding_sha256": R30_WORKFLOW_HASHES[
+                R30_UPDATE_SOURCE_BINDING
+            ],
+            "source_binding_identity8": R30_WORKFLOW_IDENTITY8[
+                R30_UPDATE_SOURCE_BINDING
+            ],
+        }
+        expected_diagnostic_candidates = {
+            role: {
+                "path": str(path), "sha256": R30_WORKFLOW_HASHES[path],
+                "identity8": R30_WORKFLOW_IDENTITY8[path],
+            }
+            for role, path in {
+                "runner": R30_DIAGNOSTIC_RUNNER,
+                "validator": R30_DIAGNOSTIC_VALIDATOR,
+                "source_binding": R30_DIAGNOSTIC_SOURCE_BINDING,
+            }.items()
+        }
+        published = root_binding.get("published_r29_contract", {})
+        failure = root_binding.get(
+            "immutable_r29_pre_reservation_failure_evidence", {},
+        )
+        consumed = root_binding.get("immutable_r29_consumed_workflow_evidence", {})
+        root_dynamic = root_binding.get("dynamic_records", {})
+        diagnostic_predecessor = diagnostic_binding.get("published_predecessor", {})
+        diagnostic_dynamic = diagnostic_binding.get(
+            "dynamic_diagnostic_records", {},
+        )
+        return (
+            root_wrapper == root_validator_wrapper
+            and root_wrapper.replace("R30", "R29").replace("r30", "r29")
+            == old_root_wrapper
+            and diagnostic_wrapper == diagnostic_validator_wrapper
+            and diagnostic_wrapper.replace("R30", "R29").replace("r30", "r29")
+            == old_diagnostic_wrapper
+            and type(root_binding) is dict
+            and root_binding.get("schema_version") == 1
+            and type(root_binding.get("schema_version")) is int
+            and root_binding.get("record_type")
+            == "h039_r30_r15_root_update_source_binding"
+            and published.get("merge") == R30_AUTHORITY_BASE
+            and published.get("tree") == R30_AUTHORITY_TREE
+            and published.get("ordered_parents") == R30_AUTHORITY_PARENTS
+            and published.get("candidate") == R30_R29_CANDIDATE
+            and published.get("gate_sha256") == R30_BASE_GATE_SHA256
+            and published.get("spec_sha256") == R30_BASE_SPEC_SHA256
+            and published.get("dual_gate_review_sha256")
+            == R30_R29_DUAL_REVIEW_SHA256
+            and published.get("guarded_publication_receipt_sha256")
+            == R30_PREDECESSOR_EVIDENCE[R30_R29_PUBLICATION][0]
+            and published.get("guarded_publication_dual_audit_sha256")
+            == R30_PREDECESSOR_EVIDENCE[R30_R29_PUBLICATION_AUDIT][0]
+            and root_binding.get("immutable_publication_evidence")
+            == R30_ORDERED_PUBLICATION_EVIDENCE
+            and failure.get("path") == str(R30_R29_FAILURE)
+            and failure.get("sha256") == R30_PREDECESSOR_EVIDENCE[
+                R30_R29_FAILURE
+            ][0]
+            and failure.get("identity8") == R30_PREDECESSOR_EVIDENCE[
+                R30_R29_FAILURE
+            ][1]
+            and failure.get("r29_invocation_permanently_consumed") is True
+            and failure.get("root_or_sudo_started") is False
+            and failure.get("dynamic_records_absent") is True
+            and failure.get("persistent_effect") is False
+            and failure.get("task_credit") is False
+            and consumed.get("static_artifacts") == [
+                {"path": str(path), "identity8": R29_WORKFLOW_IDENTITY8[path],
+                 "sha256": R29_WORKFLOW_HASHES[path]}
+                for path in R29_WORKFLOW_HASHES
+            ]
+            and consumed.get("r29_invocation_permanently_consumed") is True
+            and consumed.get("task_credit") is False
+            and root_dynamic.get("attempt") == str(R30_UPDATE_ATTEMPT)
+            and root_dynamic.get("outcome") == str(R30_UPDATE_OUTCOME)
+            and root_binding.get("future_r30_merge_intentionally_not_embedded")
+            is True
+            and root_binding.get("root_effect_during_authoring_or_review") is False
+            and root_binding.get("task_credit") is False
+            and root_selection.get("python_image")
+            == "/Library/Developer/CommandLineTools/usr/bin/python3"
+            and root_selection.get("owner_launcher_prefix", [None] * 5)[4]
+            == "/Library/Developer/CommandLineTools/usr/bin/python3"
+            and type(root_review) is dict
+            and root_review.get("record_type")
+            == "h039_r30_r15_root_update_workflow_dual_review"
+            and root_review.get("published_r29_contract_merge")
+            == R30_AUTHORITY_BASE
+            and root_review.get("published_r15_product_merge")
+            == R30_R15_PRODUCT_MERGE
+            and root_review.get("candidate") == expected_root_candidate
+            and r30_review_entries_accept(
+                root_review.get("reviews"), diagnostic=False,
+            )
+            and root_review.get("root_or_sudo_used") is False
+            and root_review.get("workflow_files_modified_during_review") is False
+            and root_review.get("root_update_executed") is False
+            and root_review.get("workflow_report_only") is True
+            and root_review.get("task_credit") is False
+            and root_review.get("verdict") == "PASS"
+            and type(diagnostic_binding) is dict
+            and diagnostic_binding.get("schema_version") == 1
+            and type(diagnostic_binding.get("schema_version")) is int
+            and diagnostic_binding.get("record_type")
+            == "h039_r30_r15_live_diagnostic_source_binding"
+            and diagnostic_predecessor.get("r29_contract_merge")
+            == R30_AUTHORITY_BASE
+            and diagnostic_predecessor.get("r29_contract_candidate")
+            == R30_R29_CANDIDATE
+            and diagnostic_predecessor.get("r29_contract_tree")
+            == R30_AUTHORITY_TREE
+            and diagnostic_dynamic.get("attempt")
+            == str(R30_DIAGNOSTIC_ATTEMPT)
+            and diagnostic_dynamic.get("outcome")
+            == str(R30_DIAGNOSTIC_OUTCOME)
+            and diagnostic_binding.get("diagnostic_effect_boundary", {}).get(
+                "task_credit"
+            ) is False
+            and diagnostic_binding.get("diagnostic_effect_boundary", {}).get(
+                "h038_h032_h031_or_supervisor_progress_permitted"
+            ) is False
+            and diagnostic_binding.get("root_update_workflow", {}).get(
+                "static_artifacts"
+            ) == [
+                {"role": role, "path": str(path),
+                 "sha256": R30_WORKFLOW_HASHES[path],
+                 "identity8": R30_WORKFLOW_IDENTITY8[path]}
+                for role, path in (
+                    ("ceremony", R30_UPDATE_RUNNER),
+                    ("validator", R30_UPDATE_VALIDATOR),
+                    ("source_binding", R30_UPDATE_SOURCE_BINDING),
+                    ("dual_review", R30_UPDATE_DUAL_REVIEW),
+                )
+            ]
+            and type(diagnostic_review) is dict
+            and diagnostic_review.get("record_type")
+            == "h039_r30_r15_live_diagnostic_workflow_dual_review"
+            and diagnostic_review.get("published_r29_contract_merge")
+            == R30_AUTHORITY_BASE
+            and diagnostic_review.get("published_r15_product_merge")
+            == R30_R15_PRODUCT_MERGE
+            and diagnostic_review.get("candidate_artifacts")
+            == expected_diagnostic_candidates
+            and diagnostic_review.get("review_count") == 2
+            and type(diagnostic_review.get("review_count")) is int
+            and r30_review_entries_accept(
+                diagnostic_review.get("reviews"), diagnostic=True,
+            )
+            and diagnostic_review.get("disposition") == "PASS"
+            and diagnostic_review.get("root_or_live_state_accessed") is False
+            and diagnostic_review.get("workflow_or_gate_executed") is False
+            and diagnostic_review.get("diagnostic_executed") is False
+            and diagnostic_review.get("task_credit") is False
+            and diagnostic_review.get("workflow_only") is True
+        )
+    except (IndexError, KeyError, Rig, TypeError, UnicodeError, ValueError):
+        return False
+
+
+def r30_open_static_workflows(root_fd: int) -> tuple[
+    dict[Path, bytes], list[tuple[int, Path, list[int], str]],
+]:
+    if not r30_workflow_frozen():
+        raise Rig("R30 workflow identities remain unresolved")
+    raws: dict[Path, bytes] = {}
+    retained: list[tuple[int, Path, list[int], str]] = []
+    r29_retained: list[tuple[int, Path, list[int], str]] = []
+    try:
+        for path, digest in R30_WORKFLOW_HASHES.items():
+            descriptor, raw, identity = r28_open_evidence_regular(
+                root_fd, path, digest=digest,
+                identity8=R30_WORKFLOW_IDENTITY8[path], mode=0o644,
+                uid=CLIENT_UID, gid=CLIENT_GID,
+            )
+            retained.append((descriptor, path, identity, digest))
+            raws[path] = raw
+        r29_raws, r29_retained = r29_open_static_workflows(root_fd)
+        if not r30_static_workflows_accept(raws, r29_raws):
+            raise Rig("R30 frozen update/diagnostic static package mismatch")
+        return raws, retained
+    finally:
+        for descriptor, _path, _identity, _digest in r29_retained:
+            os.close(descriptor)
+        if sys.exc_info()[0] is not None:
+            for descriptor, _path, _identity, _digest in retained:
+                os.close(descriptor)
+
+
+def r30_static_workflow_selftests() -> None:
+    root_fd = r28_open_evidence_root()
+    retained: list[tuple[int, Path, list[int], str]] = []
+    r29_retained: list[tuple[int, Path, list[int], str]] = []
+    try:
+        raws, retained = r30_open_static_workflows(root_fd)
+        r29_raws, r29_retained = r29_open_static_workflows(root_fd)
+        for path in R30_WORKFLOW_HASHES:
+            mutant = dict(raws)
+            mutant[path] = raws[path] + b"\n# unauthorized R30 byte\n"
+            check(
+                not r30_static_workflows_accept(mutant, r29_raws),
+                f"N_H039_R30_STATIC_EXTRA_BYTE_MUTANT_{path.name}",
+            )
+            if path in {
+                R30_UPDATE_RUNNER, R30_UPDATE_VALIDATOR,
+                R30_DIAGNOSTIC_RUNNER, R30_DIAGNOSTIC_VALIDATOR,
+            }:
+                predecessor = {
+                    R30_UPDATE_RUNNER: R29_UPDATE_RUNNER,
+                    R30_UPDATE_VALIDATOR: R29_UPDATE_VALIDATOR,
+                    R30_DIAGNOSTIC_RUNNER: R29_DIAGNOSTIC_RUNNER,
+                    R30_DIAGNOSTIC_VALIDATOR: R29_DIAGNOSTIC_VALIDATOR,
+                }[path]
+                executable_mutant = raws[path] + b"\nos.unlink('/tmp/r30-forbidden')\n"
+                check(
+                    not r30_workflow_semantic_accepts(
+                        path, executable_mutant, r29_raws[predecessor],
+                    ),
+                    f"N_H039_R30_REPINNED_EXECUTABLE_WORKFLOW_MUTANT_{path.name}",
+                )
+        schema_mutant = raws[R30_UPDATE_SOURCE_BINDING].replace(
+            b"{", b'{"unauthorized_general_root_authority":true,', 1,
+        )
+        check(
+            not r30_workflow_semantic_accepts(
+                R30_UPDATE_SOURCE_BINDING, schema_mutant,
+            ),
+            "N_H039_R30_REPINNED_EXTRA_AUTHORITY_SCHEMA_MUTANT",
+        )
+        for path, predecessor in (
+            (R30_UPDATE_RUNNER, R29_UPDATE_RUNNER),
+            (R30_UPDATE_VALIDATOR, R29_UPDATE_VALIDATOR),
+        ):
+            for label, old, new in (
+                ("UNBOUND_PY", b"PYTHON, \"-I\"", b"PY, \"-I\""),
+                ("LITERAL", b"PYTHON, \"-I\"",
+                 b'"/Library/Developer/CommandLineTools/usr/bin/python3", "-I"'),
+                ("ALIAS", b"PYTHON = ", b"PY = PYTHON = "),
+                ("FALLBACK", b"PYTHON, \"-I\"",
+                 b'(PYTHON or "/Library/Developer/CommandLineTools/usr/bin/python3"), "-I"'),
+                ("DECOY", b'"owner_launcher_prefix": [',
+                 b'"owner_launcher_prefix_decoy": [], "owner_launcher_prefix": ['),
+                ("MOVED", b'"/usr/bin/env", "-i", "-C"',
+                 b'"-i", "/usr/bin/env", "-C"'),
+                ("WRAPPER_WHITESPACE", b'PY="/Library/Developer',
+                 b'PY = "/Library/Developer'),
+            ):
+                mutant_raw = raws[path].replace(old, new, 1)
+                check(
+                    mutant_raw != raws[path]
+                    and not r30_target_namespace_surface_accepts(
+                        path, mutant_raw, r29_raws[predecessor],
+                    ),
+                    f"N_H039_R30_TARGET_NAMESPACE_MUTANT_{path.name}_{label}",
+                )
+        scope_mutant = raws[R30_UPDATE_RUNNER].replace(
+            b'"_H039_AUTHENTICATED_EXEC":',
+            b'"PY":PY,"_H039_AUTHENTICATED_EXEC":', 1,
+        )
+        check(
+            scope_mutant != raws[R30_UPDATE_RUNNER]
+            and not r30_target_namespace_surface_accepts(
+                R30_UPDATE_RUNNER, scope_mutant, r29_raws[R29_UPDATE_RUNNER],
+            ),
+            "N_H039_R30_WRAPPER_SCOPE_SYMBOL_INJECTION_MUTANT",
+        )
+        if not all(
+            r28_retained_evidence_regular(
+                root_fd, descriptor, path, identity, digest,
+            )
+            for descriptor, path, identity, digest in retained + r29_retained
+        ):
+            raise Rig("R30 retained static workflow artifact rebound")
+        r28_rebind_evidence_root(root_fd)
+    finally:
+        for descriptor, _path, _identity, _digest in retained + r29_retained:
+            os.close(descriptor)
+        os.close(root_fd)
+
+
+def r30_dynamic_presence(root_fd: int) -> list[bool]:
+    result: list[bool] = []
+    for path in (
+        R30_UPDATE_ATTEMPT, R30_UPDATE_OUTCOME,
+        R30_DIAGNOSTIC_ATTEMPT, R30_DIAGNOSTIC_OUTCOME,
+        R29_UPDATE_ATTEMPT, R29_UPDATE_OUTCOME,
+        R29_DIAGNOSTIC_ATTEMPT, R29_DIAGNOSTIC_OUTCOME,
+    ):
+        try:
+            if path.parent != R23_EVIDENCE_ROOT:
+                raise Rig("R30 dynamic record parent differs")
+            r28_rebind_evidence_root(root_fd)
+            os.stat(path.name, dir_fd=root_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            result.append(False)
+        except OSError as exc:
+            raise Undecidable(
+                f"R30 dynamic record state unavailable: {path}"
+            ) from exc
+        else:
+            result.append(True)
+    return result
+
+
+def r30_dynamic_presence_accepts(present: Any, phase: str) -> bool:
+    return (
+        type(present) is list and len(present) == 8
+        and all(type(value) is bool for value in present)
+        and (
+            phase == "preproduct" and present == [False] * 8
+            or phase == "r30-installed"
+            and present == [True, True, False, False] + [False] * 4
+        )
+    )
+
+
+def r30_prepublication_workflow_checks() -> None:
+    root_fd = r28_open_evidence_root()
+    retained: list[tuple[int, Path, list[int], str]] = []
+    try:
+        _raws, retained = r30_open_static_workflows(root_fd)
+        presence = r30_dynamic_presence(root_fd)
+        check(
+            r30_dynamic_presence_accepts(presence, "preproduct"),
+            "A_H039_R30_ALL_EIGHT_R29_AND_R30_DYNAMIC_NAMES_ABSENT_AT_FREEZE",
+        )
+        if not r30_dynamic_presence_accepts(presence, "preproduct"):
+            raise Rig("R30 or historical R29 dynamic record exists before freeze")
+        if not all(
+            r28_retained_evidence_regular(
+                root_fd, descriptor, path, identity, digest,
+            )
+            for descriptor, path, identity, digest in retained
+        ):
+            raise Rig("R30 retained prepublication workflow artifact rebound")
+        r28_rebind_evidence_root(root_fd)
+    finally:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        os.close(root_fd)
+
+
+def r30_immutable_r29_publication_checks() -> None:
+    root_fd = r28_open_evidence_root()
+    retained: list[tuple[int, Path, list[int], str]] = []
+    records: dict[Path, Any] = {}
+    try:
+        for item in R30_ORDERED_PUBLICATION_EVIDENCE:
+            path = Path(item["path"])
+            descriptor, raw, identity = r28_open_evidence_regular(
+                root_fd, path, digest=item["sha256"],
+                identity8=item["identity8"], mode=0o644,
+                uid=CLIENT_UID, gid=CLIENT_GID,
+            )
+            retained.append((descriptor, path, identity, item["sha256"]))
+            records[path] = strict_json(raw)
+        failure_descriptor, failure_raw, failure_identity = \
+            r28_open_evidence_regular(
+                root_fd, R30_R29_FAILURE,
+                digest=R30_PREDECESSOR_EVIDENCE[R30_R29_FAILURE][0],
+                identity8=R30_PREDECESSOR_EVIDENCE[R30_R29_FAILURE][1],
+                mode=0o644, uid=CLIENT_UID, gid=CLIENT_GID,
+            )
+        retained.append((
+            failure_descriptor, R30_R29_FAILURE, failure_identity,
+            R30_PREDECESSOR_EVIDENCE[R30_R29_FAILURE][0],
+        ))
+        records[R30_R29_FAILURE] = strict_json(failure_raw)
+        r1_raws: dict[Path, bytes] = {}
+        for path in (R30_R1_FAILURE_DRAFT, R30_R1_FAILURE,
+                     R30_R1_LOG_A, R30_R1_LOG_B):
+            digest, identity8 = R30_PREDECESSOR_EVIDENCE[path]
+            descriptor, raw, identity = r28_open_evidence_regular(
+                root_fd, path, digest=digest, identity8=identity8,
+                mode=0o644, uid=CLIENT_UID, gid=CLIENT_GID,
+            )
+            retained.append((descriptor, path, identity, digest)); r1_raws[path] = raw
+        publication = records[R30_R29_PUBLICATION]
+        audit = records[R30_R29_PUBLICATION_AUDIT]
+        failure = records[R30_R29_FAILURE]
+        boundary = failure.get("causal_execution_boundary", {})
+        adjudication = failure.get("owner_adjudication", {})
+        consensus = audit.get("mechanical_consensus", {})
+        r1 = strict_json(r1_raws[R30_R1_FAILURE]); r1_candidate = r1.get("candidate", {})
+        r1_formal = r1.get("formal_result", {}); r1_cause = r1.get("root_cause", {})
+        r1_superseded = r1.get("supersedes_unbound_record", {})
+        r1_gate = blob(REJECTED_R30_R1_CANDIDATE, "verify/bin/h-039-exit")
+        r1_anchor = f'R30_GATE_SOURCE_SHA256 = "{REJECTED_R30_R1_NORMALIZED_GATE_SHA256}"\n'.encode()
+        r1_spec = strict_json(blob(REJECTED_R30_R1_CANDIDATE, "specs/tasks.spec.json"))
+        r1_row = next(item for item in r1_spec["tasks"] if item.get("id") == "h-039")
+        r1_logs = [r1_raws[R30_R1_LOG_A], r1_raws[R30_R1_LOG_B]]
+        r1_lines = r1_logs[0].splitlines()
+        r1_exact = (
+            r1.get("record_type") == "h039_r30_r1_dual_gate_review_failure_r2"
+            and r1.get("disposition") == "REJECTED_IMMUTABLE_CONSUMED_NO_CREDIT_NONPARENT"
+            and r1.get("task_credit") is False and r1.get("r30_r1_permanently_consumed") is True
+            and r1_superseded == {"path": str(R30_R1_FAILURE_DRAFT), "sha256": R30_PREDECESSOR_EVIDENCE[R30_R1_FAILURE_DRAFT][0], "identity8": R30_PREDECESSOR_EVIDENCE[R30_R1_FAILURE_DRAFT][1], "classification": "UNBOUND_NO_CREDIT_DRAFT_WITH_INCORRECT_FUNCTION_NAME", "accepted_as_authority": False}
+            and r1_candidate.get("commit") == REJECTED_R30_R1_CANDIDATE
+            and r1_candidate.get("tree") == REJECTED_R30_R1_TREE
+            and r1_candidate.get("ordered_parents") == [R30_AUTHORITY_BASE]
+            and r1_candidate.get("gate_sha256") == REJECTED_R30_R1_GATE_SHA256
+            and r1_candidate.get("spec_sha256") == REJECTED_R30_R1_SPEC_SHA256
+            and r1_candidate.get("normalized_gate_source_sha256") == REJECTED_R30_R1_NORMALIZED_GATE_SHA256
+            and r1_candidate.get("file_sha256") == REJECTED_R30_R1_FILE_SHA256
+            and r1_candidate.get("line_delta_by_path") == REJECTED_R30_R1_LINE_DELTA_BY_PATH
+            and r1_candidate.get("total_line_delta") == list(REJECTED_R30_R1_LINE_DELTA)
+            and len(r1_logs[0]) == 5035667 and r1_logs[0] == r1_logs[1]
+            and R30_PREDECESSOR_EVIDENCE[R30_R1_LOG_A][1][:2] != R30_PREDECESSOR_EVIDENCE[R30_R1_LOG_B][1][:2]
+            and len(r1_lines) == 95048
+            and sum(line.startswith(b"PASS ") for line in r1_lines) == 95016
+            and sum(line.startswith(b"FAIL ") for line in r1_lines) == 2
+            and not any(line.startswith((b"RIG_ERROR:", "ODÖMBART".encode())) for line in r1_lines)
+            and sha(r1_lines[4847]) == "dd74dd6a54700fca3809acb09f0a9ba2addb045645d4d17895f35b50de73b5fb"
+            and sha(r1_lines[95017]) == "bced3dd539ae876d7fd93055155392164df4e767253216834d5032ac3a4c4a2c"
+            and r1_formal.get("unexpected_failure") == "FAIL A_H039_R17_PREPRODUCT_RED_SELFTEST_ANCHOR"
+            and r1_cause.get("exact_stale_expression") == "r17_registry_selftests expected_red reason R29_REASON"
+            and r1_cause.get("required_exact_expression") == "r17_registry_selftests expected_red reason R30_REASON"
+            and not r30_contract_candidate_graph(REJECTED_R30_R1_CANDIDATE)[0]
+            and object_type(REJECTED_R30_R1_CANDIDATE) == "commit"
+            and commit_tree(REJECTED_R30_R1_CANDIDATE) == REJECTED_R30_R1_TREE
+            and commit_parents(REJECTED_R30_R1_CANDIDATE) == [R30_AUTHORITY_BASE]
+            and exact_contract_change_shape(raw_changes(R30_AUTHORITY_BASE, REJECTED_R30_R1_CANDIDATE))
+            and line_delta(R30_AUTHORITY_BASE, REJECTED_R30_R1_CANDIDATE) == REJECTED_R30_R1_LINE_DELTA
+            and all(sha(blob(REJECTED_R30_R1_CANDIDATE, path)) == digest for path, digest in REJECTED_R30_R1_FILE_SHA256.items())
+            and sha(canonical(r1_row)) == REJECTED_R30_R1_ROW_SHA256
+            and sha(canonical(r1_row["h039_os_exclusive_runtime_cleanup"]["r30_target_namespace_symbol_installed_binding"])) == REJECTED_R30_R1_REGISTRY_SHA256
+            and sha(r1_row["h039_r30_target_namespace_symbol_reconciliation"].encode()) == REJECTED_R30_R1_RECONCILIATION_SHA256
+            and r1_gate.count(r1_anchor) == 1
+            and sha(r1_gate.replace(r1_anchor, r1_anchor.replace(REJECTED_R30_R1_NORMALIZED_GATE_SHA256.encode(), b"0" * 64))) == REJECTED_R30_R1_NORMALIZED_GATE_SHA256
+        )
+        exact = (
+            len(R30_ORDERED_PUBLICATION_EVIDENCE) == 13
+            and publication.get("record_type")
+            == "h039_r29_r2_guarded_contract_publication_receipt"
+            and publication.get("publication", {}).get("merge_commit")
+            == R30_AUTHORITY_BASE
+            and publication.get("publication", {}).get("candidate_commit")
+            == R30_R29_CANDIDATE
+            and publication.get("publication", {}).get("tree")
+            == R30_AUTHORITY_TREE
+            and publication.get("git_graph_authentication", {}).get(
+                "merge_ordered_parents"
+            ) == R30_AUTHORITY_PARENTS
+            and publication.get("disposition") == "PASS"
+            and publication.get("workflow_only") is True
+            and publication.get("task_credit") == "NONE"
+            and audit.get("record_type")
+            == "h039_r29_r2_guarded_contract_publication_dual_audit"
+            and audit.get("verdict") == "PASS"
+            and audit.get("receipt", {}).get("sha256")
+            == R30_PREDECESSOR_EVIDENCE[R30_R29_PUBLICATION][0]
+            and consensus.get("candidate") == R30_R29_CANDIDATE
+            and consensus.get("published_merge") == R30_AUTHORITY_BASE
+            and consensus.get("merge_tree") == R30_AUTHORITY_TREE
+            and consensus.get("both_independent_reviews_pass") is True
+            and failure.get("record_type")
+            == "h039_r29_r15_pre_reservation_target_namespace_rig_error"
+            and failure.get("disposition")
+            == "IMMUTABLE_CONSUMED_NO_CREDIT_PRE_RESERVATION_TARGET_NAMESPACE_RIG_ERROR"
+            and failure.get("task_credit") == "NONE"
+            and set(boundary) == {
+                "wrapper_authentication_completed",
+                "selected_target_bytes_compiled_and_entered",
+                "dynamic_names_checked_absent", "process_local_umask_0022_set",
+                "source_binding_stable_read_before_failure",
+                "workflow_review_authentication_reached",
+                "root_tool_verification_reached", "sudo_or_root_process_started",
+                "reservation_creation_reached", "staging_reached",
+                "bootstrap_reached", "persistent_filesystem_or_product_effect",
+            }
+            and boundary.get("wrapper_authentication_completed") is True
+            and boundary.get("selected_target_bytes_compiled_and_entered") is True
+            and boundary.get("dynamic_names_checked_absent") is True
+            and boundary.get("process_local_umask_0022_set") is True
+            and boundary.get("source_binding_stable_read_before_failure") is True
+            and boundary.get("workflow_review_authentication_reached") is False
+            and boundary.get("root_tool_verification_reached") is False
+            and boundary.get("sudo_or_root_process_started") is False
+            and boundary.get("reservation_creation_reached") is False
+            and boundary.get("staging_reached") is False
+            and boundary.get("bootstrap_reached") is False
+            and boundary.get("persistent_filesystem_or_product_effect") is False
+            and adjudication.get("r29_invocation_permanently_consumed") is True
+            and adjudication.get("r29_retry_forbidden") is True
+            and r1_exact
+        )
+        if not exact:
+            raise Rig("R30 immutable R29 publication/failure evidence mismatch")
+        r29_immutable_r28_publication_checks()
+        if not all(
+            r28_retained_evidence_regular(
+                root_fd, descriptor, path, identity, digest,
+            )
+            for descriptor, path, identity, digest in retained
+        ):
+            raise Rig("R30 immutable publication and R1 rejection closure rebound")
+        r28_rebind_evidence_root(root_fd)
+        check(
+            True,
+            "A_H039_R30_EXACT_IMMUTABLE_R29_PUBLICATION_AND_R1_REJECTION_CLOSURE",
+        )
+    finally:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        os.close(root_fd)
+
+
+def r30_update_records_accept(
+    attempt_raw: bytes, attempt: Any, attempt_identity: list[int],
+    outcome_raw: bytes, outcome: Any, outcome_identity: list[int],
+) -> bool:
+    try:
+        required_attempt = {
+            "schema_version", "record_type", "state", "retry_permitted",
+            "task_credit", "authenticated_entry", "r30_publication_precondition",
+            "published_r27_contract_merge", "published_r15_product_merge",
+            "published_r28_contract_merge", "published_r29_contract_merge",
+            "source_binding_sha256", "source_binding_identity",
+            "ceremony_sha256", "ceremony_identity", "validator_sha256",
+            "validator_identity", "dual_review_sha256", "dual_review_identity",
+            "publication_chain", "predecessor_state_evidence",
+            "consumed_r29_workflow", "exact_r14_sequence1_prestate",
+            "preflight_root_trace", "preflight_root_trace_sha256",
+            "source_installer_identity", "source_installer_blob",
+            "source_installer_sha256", "source_mediator_identity",
+            "source_mediator_blob", "source_mediator_sha256", "staging_argv",
+            "bootstrap_argv", "expected_exit", "expected_stdout_bytes",
+            "expected_stderr_bytes",
+        }
+        required_outcome = {
+            "schema_version", "record_type", "classification",
+            "retry_permitted", "rollback_permitted", "task_credit",
+            "source_binding_sha256", "attempt_reservation_sha256",
+            "attempt_reservation_identity", "bootstrap_argv",
+            "pre_stage_reauthentication", "pre_stage_root_trace",
+            "pre_stage_root_trace_sha256", "staging", "staging_root_trace",
+            "staging_root_trace_sha256", "pre_spawn_reauthentication",
+            "pre_spawn_root_trace", "pre_spawn_root_trace_sha256", "process",
+            "post_state", "post_state_exception", "attempt_exception",
+            "diagnostic_permitted_only_after_current_publication_bound_validation",
+            "mandatory_owner_stop_after_diagnostic",
+            "h038_h032_h031_and_supervisor_permitted",
+        }
+        process = outcome.get("process", {})
+        post = outcome.get("post_state", {})
+        empty_stream = {"size": 0, "sha256": sha(b""), "base64": ""}
+        return (
+            type(attempt) is dict and type(outcome) is dict
+            and set(attempt) == required_attempt and set(outcome) == required_outcome
+            and attempt_raw == r28_record_bytes(attempt)
+            and outcome_raw == r28_record_bytes(outcome)
+            and type(attempt_identity) is list and len(attempt_identity) == 10
+            and all(type(member) is int for member in attempt_identity)
+            and type(outcome_identity) is list and len(outcome_identity) == 10
+            and all(type(member) is int for member in outcome_identity)
+            and attempt_identity[6] == len(attempt_raw)
+            and outcome_identity[6] == len(outcome_raw)
+            and attempt.get("schema_version") == 1
+            and type(attempt.get("schema_version")) is int
+            and attempt.get("record_type")
+            == "h039_r30_r15_root_update_attempt_reservation"
+            and attempt.get("state")
+            == "CONSUMED_BEFORE_FIRST_ROOT_AFFECTING_COMMAND_NO_RETRY"
+            and attempt.get("retry_permitted") is False
+            and attempt.get("task_credit") is False
+            and attempt.get("published_r29_contract_merge")
+            == R30_AUTHORITY_BASE
+            and attempt.get("published_r15_product_merge")
+            == R30_R15_PRODUCT_MERGE
+            and attempt.get("source_binding_sha256")
+            == R30_WORKFLOW_HASHES[R30_UPDATE_SOURCE_BINDING]
+            and attempt.get("ceremony_sha256")
+            == R30_WORKFLOW_HASHES[R30_UPDATE_RUNNER]
+            and attempt.get("validator_sha256")
+            == R30_WORKFLOW_HASHES[R30_UPDATE_VALIDATOR]
+            and attempt.get("dual_review_sha256")
+            == R30_WORKFLOW_HASHES[R30_UPDATE_DUAL_REVIEW]
+            and attempt.get("expected_exit") == 0
+            and type(attempt.get("expected_exit")) is int
+            and attempt.get("expected_stdout_bytes") == 0
+            and attempt.get("expected_stderr_bytes") == 0
+            and outcome.get("schema_version") == 1
+            and type(outcome.get("schema_version")) is int
+            and outcome.get("record_type")
+            == "h039_r30_r15_root_update_outcome"
+            and outcome.get("classification")
+            == "R15_SEQUENCE1_ROOT_UPDATE_COMPLETE_ZERO_STAGING"
+            and outcome.get("retry_permitted") is False
+            and outcome.get("rollback_permitted") is False
+            and outcome.get("task_credit") is False
+            and outcome.get("source_binding_sha256")
+            == R30_WORKFLOW_HASHES[R30_UPDATE_SOURCE_BINDING]
+            and outcome.get("attempt_reservation_sha256") == sha(attempt_raw)
+            and outcome.get("attempt_reservation_identity") == attempt_identity
+            and type(process) is dict and process.get("spawn_returned") is True
+            and process.get("exception") is None
+            and process.get("returncode") == 0
+            and type(process.get("returncode")) is int
+            and process.get("stdout") == empty_stream
+            and process.get("stderr") == empty_stream
+            and process.get("direct_child_reaped") is True
+            and type(post) is dict and post.get("sequence") == 1
+            and post.get("install_absent") is True
+            and post.get("receipt_absent") is False
+            and post.get("runtime_residue") == []
+            and outcome.get("post_state_exception") is None
+            and outcome.get("attempt_exception") is None
+            and outcome.get(
+                "diagnostic_permitted_only_after_current_publication_bound_validation"
+            ) is True
+            and outcome.get("mandatory_owner_stop_after_diagnostic") is True
+            and outcome.get("h038_h032_h031_and_supervisor_permitted") is False
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def r30_update_record_selftests(
+    attempt: dict[str, Any], attempt_identity: list[int],
+    outcome: dict[str, Any], outcome_identity: list[int],
+) -> None:
+    def accepts(a: dict[str, Any], o: dict[str, Any]) -> bool:
+        a_raw = r28_record_bytes(a)
+        a_identity = list(attempt_identity)
+        a_identity[6] = len(a_raw)
+        o["attempt_reservation_sha256"] = sha(a_raw)
+        o["attempt_reservation_identity"] = a_identity
+        o_raw = r28_record_bytes(o)
+        o_identity = list(outcome_identity)
+        o_identity[6] = len(o_raw)
+        return r30_update_records_accept(
+            a_raw, a, a_identity, o_raw, o, o_identity,
+        )
+
+    for label, target, mutate in (
+        ("RETRY", "attempt", lambda value: value.__setitem__(
+            "retry_permitted", True,
+        )),
+        ("PUBLICATION", "attempt", lambda value: value.__setitem__(
+            "published_r29_contract_merge", "00" * 20,
+        )),
+        ("SOURCE", "attempt", lambda value: value.__setitem__(
+            "source_binding_sha256", "00" * 32,
+        )),
+        ("EXTRA", "attempt", lambda value: value.__setitem__("extra", False)),
+        ("CLASSIFICATION", "outcome", lambda value: value.__setitem__(
+            "classification", "AMBIGUOUS_ATTEMPT_CONSUMED_OWNER_STOP",
+        )),
+        ("PROCESS", "outcome", lambda value: value["process"].__setitem__(
+            "returncode", 1,
+        )),
+        ("SEQUENCE", "outcome", lambda value: value["post_state"].__setitem__(
+            "sequence", 2,
+        )),
+        ("CREDIT", "outcome", lambda value: value.__setitem__(
+            "task_credit", True,
+        )),
+        ("DOWNSTREAM", "outcome", lambda value: value.__setitem__(
+            "h038_h032_h031_and_supervisor_permitted", True,
+        )),
+    ):
+        a = copy.deepcopy(attempt)
+        o = copy.deepcopy(outcome)
+        mutate(a if target == "attempt" else o)
+        check(not accepts(a, o), f"N_H039_R30_UPDATE_RECORD_MUTANT_{label}")
+
+
+def r30_run_update_validator(
+    ceremony_raw: bytes, validator_raw: bytes, binding_raw: bytes,
+    attempt_sha256: str, outcome_sha256: str,
+) -> None:
+    binding = strict_json(binding_raw)
+    wrapper_sha = binding.get("authenticated_code_selection", {}).get(
+        "wrapper_sha256", "",
+    )
+    wrapper = r29_authenticated_exec_wrapper(ceremony_raw, wrapper_sha)
+    if r29_authenticated_exec_wrapper(validator_raw, wrapper_sha) != wrapper:
+        raise Rig("R30 ceremony/validator authenticated wrappers differ")
+    review_sha = R30_WORKFLOW_HASHES[R30_UPDATE_DUAL_REVIEW]
+    review_identity = R30_WORKFLOW_IDENTITY8[R30_UPDATE_DUAL_REVIEW]
+    argv = [
+        "/usr/bin/env", "-i", "-C", "/",
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-I", "-S", "-c", wrapper, "validator", review_sha,
+        json.dumps(review_identity, separators=(",", ":")),
+    ]
+    child: subprocess.Popen[bytes] | None = None
+    first_exception: BaseException | None = None
+    stdout = stderr = b""
+    try:
+        child = subprocess.Popen(
+            argv, cwd="/", env={}, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True,
+        )
+        while child.returncode is None:
+            try:
+                stdout, stderr = child.communicate()
+            except BaseException as exc:
+                first_exception = first_exception or exc
+    except BaseException as exc:
+        first_exception = first_exception or exc
+    finally:
+        if child is not None:
+            while child.returncode is None:
+                try:
+                    stdout, stderr = child.communicate()
+                except BaseException as exc:
+                    first_exception = first_exception or exc
+    if child is None or child.returncode is None:
+        raise Rig("R30 validator exact child was not reaped")
+    expected = ("\n".join([
+        "R30_R15_ROOT_UPDATE_VALIDATION=PASS",
+        f"ATTEMPT_RESERVATION_SHA256={attempt_sha256}",
+        f"OUTCOME_SHA256={outcome_sha256}",
+        "LIVE_STATE=R15_SEQUENCE1_ZERO_STAGING",
+        "WORKFLOW_REPORT_ONLY=YES", "TASK_CREDIT=NONE",
+        "DIAGNOSTIC_REQUIRES_CURRENT_PUBLICATION_BOUND_VALIDATION=YES",
+        "MANDATORY_OWNER_STOP_AFTER_DIAGNOSTIC=YES",
+        "H038_H032_H031_AND_SUPERVISOR_PERMITTED=NO",
+    ]) + "\n").encode("ascii")
+    passed_exactly = (
+        first_exception is None and child.returncode == 0
+        and stderr == b"" and stdout == expected
+    )
+    check(
+        passed_exactly,
+        "A_H039_R30_FROZEN_READ_ONLY_ROOT_UPDATE_VALIDATOR_PASS",
+        {"returncode": child.returncode, "stdout_sha256": sha(stdout)},
+    )
+    if not passed_exactly:
+        raise Rig("R30 frozen read-only root-update validator did not pass exactly")
+
+
+def r30_workflow_completed_checks() -> tuple[
+    dict[str, Any], list[tuple[int, Path, list[int], str]], int,
+]:
+    root_fd = r28_open_evidence_root()
+    try:
+        raws, retained = r30_open_static_workflows(root_fd)
+    except BaseException:
+        os.close(root_fd)
+        raise
+    try:
+        attempt_fd, attempt_raw, attempt_identity = r28_open_evidence_regular(
+            root_fd, R30_UPDATE_ATTEMPT,
+            mode=0o600, uid=CLIENT_UID, gid=CLIENT_GID,
+        )
+        retained.append((
+            attempt_fd, R30_UPDATE_ATTEMPT, attempt_identity, sha(attempt_raw),
+        ))
+        outcome_fd, outcome_raw, outcome_identity = r28_open_evidence_regular(
+            root_fd, R30_UPDATE_OUTCOME,
+            mode=0o600, uid=CLIENT_UID, gid=CLIENT_GID,
+        )
+        retained.append((
+            outcome_fd, R30_UPDATE_OUTCOME, outcome_identity, sha(outcome_raw),
+        ))
+        attempt = strict_json(attempt_raw)
+        outcome = strict_json(outcome_raw)
+        if not r30_dynamic_presence_accepts(
+            r30_dynamic_presence(root_fd), "r30-installed",
+        ) or not r30_update_records_accept(
+            attempt_raw, attempt, attempt_identity,
+            outcome_raw, outcome, outcome_identity,
+        ):
+            raise Rig("R30 consumed one-shot update records mismatch")
+        r30_update_record_selftests(
+            attempt, attempt_identity, outcome, outcome_identity,
+        )
+        r30_run_update_validator(
+            raws[R30_UPDATE_RUNNER], raws[R30_UPDATE_VALIDATOR],
+            raws[R30_UPDATE_SOURCE_BINDING],
+            sha(attempt_raw), sha(outcome_raw),
+        )
+        if not all(
+            r28_retained_evidence_regular(
+                root_fd, descriptor, path, identity, digest,
+            )
+            for descriptor, path, identity, digest in retained
+        ):
+            raise Rig("R30 retained workflow record changed after validation")
+        r28_rebind_evidence_root(root_fd)
+        check(True, "A_H039_R30_EXACT_CONSUMED_ONE_SHOT_UPDATE_WORKFLOW")
+        return outcome, retained, root_fd
+    except BaseException:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        os.close(root_fd)
+        raise
+
+
 def r29_authenticated_exec_wrapper(raw: bytes, expected_sha256: str) -> str:
     try:
         tree = ast.parse(raw.decode("utf-8", "strict"))
@@ -33802,7 +35953,7 @@ def publication_only_phase(phase: str) -> bool:
 
 
 def pre_diagnostic_owner_stop_phase(phase: str) -> bool:
-    return phase == "r29-installed"
+    return phase == "r30-installed"
 
 
 def finish(phase: str) -> int:
@@ -33833,6 +35984,7 @@ def finish(phase: str) -> int:
     print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
     print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
     print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         if pre_diagnostic_owner_stop_phase(phase):
@@ -33843,10 +35995,10 @@ def finish(phase: str) -> int:
             print("H039_GATE_RESULT=PASS")
         return 0
     expected = canonical({
-        "failure_signature": FAILURE_SIGNATURE, "reason": R29_REASON,
+        "failure_signature": FAILURE_SIGNATURE, "reason": R30_REASON,
     }).decode()
     if phase == "preproduct" and failed_labels == [(LABEL, expected)]:
-        print(f"H039_GATE_RESULT=RED_EXPECTED label={LABEL} reason={R29_REASON}")
+        print(f"H039_GATE_RESULT=RED_EXPECTED label={LABEL} reason={R30_REASON}")
         return 1
     print("H039_GATE_RESULT=FAIL")
     return 1
@@ -33885,6 +36037,7 @@ def main(argv: list[str]) -> int:
         print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
         print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
         print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -33915,9 +36068,11 @@ def main(argv: list[str]) -> int:
         print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
         print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
         print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
-    r29_installed = exact_r29_installed_argv(argv)
+    r30_installed = exact_r30_installed_argv(argv)
+    r29_installed = False
     r28_installed = False
     r27_product = False
     r27_published = False
@@ -33927,18 +36082,18 @@ def main(argv: list[str]) -> int:
     r18_product = r18_published = r18_installed = False
     r19_product = r19_published = False
     r23_product = r23_published = False
-    if not (preproduct or r29_installed):
+    if not (preproduct or r30_installed):
         print(
-            "RIG_ERROR: usage: h-039-exit [--r29-installed "
-            "PUBLISHED_R29_CONTRACT_MERGE " + R29_R15_PRODUCT_MERGE + "]",
+            "RIG_ERROR: usage: h-039-exit [--r30-installed "
+            "PUBLISHED_R30_CONTRACT_MERGE " + R30_R15_PRODUCT_MERGE + "]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if r29_installed else []
+    supplied_commits = argv[1:] if r30_installed else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
-    phase = "preproduct" if preproduct else "r29-installed"
+    phase = "preproduct" if preproduct else "r30-installed"
     r18_phase = False
     r19_phase = False
     r23_phase = False
@@ -33983,8 +36138,9 @@ def main(argv: list[str]) -> int:
         r26_installed_engine_selftests()
         r27_registry_selftests(row)
         r28_registry_selftests(row)
-        r29_registry_selftests(row)
-        r29_line_limit_surface_selftests()
+        r30_registry_selftests(row)
+        r30_line_limit_surface_selftests()
+        r30_gate_closed_world_selftests()
         r29_line_delta_selftests()
         if not r28_workflow_frozen():
             raise Rig(
@@ -33996,8 +36152,13 @@ def main(argv: list[str]) -> int:
                 "R29 workflow SHA256/identity8 placeholders unresolved; "
                 "candidate is intentionally not freeze-ready"
             )
-        r29_dispatch_selftests()
-        r29_static_workflow_selftests()
+        if not r30_workflow_frozen():
+            raise Rig(
+                "R30 workflow SHA256/identity8 placeholders unresolved; "
+                "candidate is intentionally not freeze-ready"
+            )
+        r30_dispatch_selftests()
+        r30_static_workflow_selftests()
         r27_immutable_r1_review_failure_checks()
         r28_immutable_r2_review_failure_checks()
         r29_immutable_r1_dual_review_failure_checks()
@@ -34013,31 +36174,65 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            r28_prepublication_workflow_checks()
-            r29_prepublication_workflow_checks()
-            r29_immutable_r28_publication_checks()
+            r30_prepublication_workflow_checks()
+            r30_immutable_r29_publication_checks()
             candidate = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
-            candidate_ok, candidate_detail = r29_contract_candidate_identity(candidate)
+            candidate_ok, candidate_detail = r30_contract_candidate_identity(candidate)
             check(
                 candidate_ok,
-                "A_H039_R29_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
+                "A_H039_R30_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
                 candidate_detail,
             )
             if not candidate_ok:
                 return finish(phase)
             product_ok, product_detail = r28_published_r15_identity(
-                R29_R15_PRODUCT_MERGE,
+                R30_R15_PRODUCT_MERGE,
             )
             check(
                 product_ok,
-                "A_H039_R29_EXACT_PUBLISHED_R15_PRODUCT_IDENTITY",
+                "A_H039_R30_EXACT_PUBLISHED_R15_PRODUCT_IDENTITY",
                 product_detail,
             )
             if not product_ok:
                 return finish(phase)
             check(False, LABEL, {
-                "failure_signature": FAILURE_SIGNATURE, "reason": R29_REASON,
+                "failure_signature": FAILURE_SIGNATURE, "reason": R30_REASON,
             })
+            return finish(phase)
+
+        if r30_installed:
+            publication_ok, publication_detail = \
+                r30_contract_publication_identity(argv[1])
+            check(
+                publication_ok,
+                "A_H039_R30_EXACT_CURRENT_GUARDED_CONTRACT_PUBLICATION",
+                publication_detail,
+            )
+            if not publication_ok:
+                return finish(phase)
+            product_ok, product_detail = r28_published_r15_identity(argv[2])
+            check(
+                product_ok,
+                "A_H039_R30_EXACT_HISTORICAL_PUBLISHED_R15_IDENTITY",
+                product_detail,
+            )
+            if not product_ok:
+                return finish(phase)
+            r30_immutable_r29_publication_checks()
+            update_outcome, retained, evidence_root_fd = \
+                r30_workflow_completed_checks()
+            try:
+                r28_read_only_installed_update_checks(
+                    argv[2], update_outcome, retained, evidence_root_fd,
+                )
+                check(
+                    True,
+                    "A_H039_R30_READ_ONLY_INSTALLED_R15_PRE_DIAGNOSTIC_OWNER_STOP",
+                )
+            finally:
+                for descriptor, _path, _identity, _digest in retained:
+                    os.close(descriptor)
+                os.close(evidence_root_fd)
             return finish(phase)
 
         if r29_installed:
@@ -34608,6 +36803,7 @@ def main(argv: list[str]) -> int:
         print(f"R27_MATERIAL_REVIEW_EXTENSION={R27_MATERIAL_REVIEW_EXTENSION}")
         print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
         print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)
@@ -34616,6 +36812,12 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    _r29_raw = GATE.read_bytes(); _r29_anchor = f'R29_R2_GATE_SOURCE_SHA256 = "{R29_R2_GATE_SOURCE_SHA256}"\n'.encode()
-    if _r29_raw.count(_r29_anchor) != 1 or sha(_r29_raw.replace(_r29_anchor, _r29_anchor.replace(R29_R2_GATE_SOURCE_SHA256.encode(), b"0" * 64))) != R29_R2_GATE_SOURCE_SHA256: raise SystemExit("RIG_ERROR: R29 executing gate source identity differs")
+    _r30_raw = GATE.read_bytes()
+    _r30_anchor = f'R30_GATE_SOURCE_SHA256 = "{R30_GATE_SOURCE_SHA256}"\n'.encode()
+    if (_r30_raw.count(_r30_anchor) != 1
+            or sha(_r30_raw.replace(
+                _r30_anchor,
+                _r30_anchor.replace(R30_GATE_SOURCE_SHA256.encode(), b"0" * 64),
+            )) != R30_GATE_SOURCE_SHA256):
+        raise SystemExit("RIG_ERROR: R30 executing gate source identity differs")
     raise SystemExit(main(sys.argv[1:]))

@@ -5569,3 +5569,40 @@ new consumers were `r29_line_delta_accepts` and `r29_line_delta_selftests`.
 R29-R2 preserves global 2400/2400 and all 18 legacy consumer name/AST pairs,
 admits only those two consumers AST-exact to R1, and rejects a third consumer,
 prefix exemption, decoy, dead path, bypass, R1 parentage or credit.
+
+## 2026-09-06 — H-039 R30/R15 target-namespace symbol correction
+
+Published R29 `8e44faaea9b91b596f33b9ae75e663e900e50834`, tree `be9552f6…`,
+is the sole R30 parent. Guarded receipt `e20c851f…` and independent audit
+`990c6cb5…` bind its exact candidate, ordered graph, five-file delta and current
+main.
+
+The R29 owner command is immutable consumed NO-CREDIT. The authenticated
+wrapper passed and compiled the exact selected ceremony, whose outer
+`read_and_validate_binding` then referenced unbound `PY` in the live
+`authenticated_code_selection.owner_launcher_prefix`. Only `PYTHON` is defined
+in that namespace. Failure record `76643791…` proves the `NameError` happened
+before review authentication, tool verification, sudo/root, reservation,
+staging or bootstrap, with every R29 record absent and exact R14 sequence-1
+receipt `fdb437bd…` plus installed mediator `4a388755…` unchanged. No R29 retry
+is possible.
+
+R30 is productless. Exactly five TEST_AUTHOR files change, while fresh
+workflow-only R30 artifacts rebind the fixed names. The only workflow semantic
+delta is two outer-target AST identifier replacements `PY`→`PYTHON`, one in
+the ceremony and one in its validator. The embedded wrapper's legitimate local
+`PY` and selected scope remain exact; no `PY`/`PYTHON` is injected. Static and
+causal controls reject one-sided fixes, unresolved globals, aliases, literals,
+fallbacks, decoys, wrapper leakage, scope merge, moved ordering or any other
+workflow delta.
+
+R29-installed becomes unreachable historical state. R30 admits only no-argument
+expected RED and current-publication-bound `--r30-installed … f0877daa…`.
+Freeze requires fresh static identities and absent R29/R30 records. Guarded
+publication precedes one new no-retry R30 owner-TTY update authority; success
+must then pass read-only post-state and installed validation before one frozen
+diagnostic and mandatory owner stop. Rejected R30-R1 `276fc91e…`, its two
+`9b76ce0e…` logs and corrected `ccc95c6f…` record remain immutable NO-CREDIT;
+fresh R30-R2 again descends directly from `8e44faae…` and only rebinds the stale
+R17 registry selftest reason from R29 to R30. Product bytes, root commands,
+authority, H038/H032/H031 and supervisor state do not change.
