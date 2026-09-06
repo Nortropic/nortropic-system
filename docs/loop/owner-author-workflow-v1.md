@@ -2897,3 +2897,95 @@ store mutation. R28 then makes exactly one diagnostic the first post-R15 store
 mutation and stops for mandatory owner adjudication. The inherited
 mutating effect engine, H039 completion and downstream progress require new
 post-diagnostic owner authority.
+
+### H-039 R28 current-publication installed/update binding
+
+Frozen R28-R1 `b3da926af58a93ee03b7dbfd257940904b0e241a`, tree
+`52c8dc366fe20f9a9189477fe30e008983ab5e6b`, gate `e374dfab…` and spec
+`dd0884e7…`, is immutable rejected before any formal gate run, has no review
+log or task credit, and is not a parent of R2. Its RED reason falsely claimed
+that the exact eight already frozen workflow artifacts were unfrozen. Fresh
+R2 therefore starts directly from `f0877daa…`, preserves all frozen workflow
+and product bytes, states the truthful guarded-publication/root-update/live-
+diagnostic-pending reason, and explicitly scopes the inherited live-prestate
+signature to R27's no-argument read-only lane.
+
+R28 starts only from published R15 merge
+`f0877daae8612f4c5b274ae4cc04bc1bd775c01a`, tree
+`6023ee91e5332e34eb7076cb2c31466a0b5491ae`, ordered parents R27
+`b29376a0aec131a0eb0a3807c47beb14645bd899` then R15 candidate
+`7786536acd284f2c13341446608a646d6cb761ec`. It is productless and may edit
+only the same five TEST_AUTHOR files. The exact R27 publication receipt, R15
+dual product review and both individual reviews, postpublication runner review,
+final postpublication record `0076e0a8…`, guarded product receipt `e8a1383c…`
+and its independent dual audit `16eb8e21…` are immutable workflow-only input.
+
+The current CLI is only `--r28-installed <published-R28-contract-merge>
+f0877daae8612f4c5b274ae4cc04bc1bd775c01a`. R27 product/publication, R26
+installed and every earlier selector are historical and unreachable. The
+independently reviewed root-update package is pinned to ceremony `cdb5f47e…`,
+validator `2528d2e0…`, source binding `6eebfb64…` and dual review `2d4249b7…`.
+The independently dual-reviewed diagnostic package is pinned to runner
+`64265252…` identity8 `[16777232,129873531,33188,501,20,1,184522,0]`,
+validator `612d1630…` identity8
+`[16777232,129873986,33188,501,20,1,165142,0]`, source binding `f6cc01e4…`
+identity8 `[16777232,129874313,33188,501,20,1,19913,0]`, and final dual review
+`7cc3615b…` identity8 `[16777232,129907322,33188,501,20,1,6142,0]`. No
+arguments remains the intended prepublication RED and must not inspect the
+protected store/helper or perform any mutation.
+
+Freeze two separate four-artifact workflow packages. Root update uses
+`h039-r28-r15-root-update-ceremony.py`, its validator, source binding and dual
+review. Live diagnostic uses
+`h039-r28-r15-live-diagnostic-run-once.py`, its validator, source binding and
+dual review under the same `h039-r28-r15-live-diagnostic-*` basename family.
+All eight static artifacts must rebind exactly, and both packages' attempt and
+outcome records must be absent at freeze.
+Neither static workflow evidence nor the R28 gate grants H039 completion
+credit.
+
+The update binding additionally pins the ordered eight-record publication
+closure plus the R26 failure log, the evidence-root identity, and the reviewed
+authenticated-exec wrapper. Static and dynamic records are opened relative to
+one retained no-follow evidence-root descriptor. The owner-serialized final
+review hash and identity are an external publication precondition, never a
+locally forgeable proof or task-credit source.
+
+Only after two gate reviews and guarded R28 publication may the update workflow
+read-bind the frozen R14 namespace identities, durably reserve one attempt and
+perform one fixed no-retry R14→R15 update. Any drift, nonzero status, output,
+ambiguity or poststate mismatch consumes that attempt and stops for owner. On
+exact success, `--r28-installed` only read-validates the consumed records,
+unchanged sequence-1 store and installed R15 bytes. It invokes neither the
+diagnostic nor the inherited effect engine and ends exactly
+`PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`, with no task completion credit.
+
+The separately frozen diagnostic workflow is already authorized to run exactly
+once after that PASS, as the first post-R15 store mutation. It then ends at the
+mandatory owner stop. Fresh authority is required after that stop—not before
+the diagnostic—and H038, H032, H031 and supervisor resume remain forbidden.
+
+#### R28-R3 exact candidate-delta migration
+
+R28-R2 `332256b99c78639e03d54c729a86bfcf781334e4`, tree
+`2cb56948e396bf835e56890ff1b23b86627e7324`, remains immutable NO-CREDIT,
+nonretryable, unpublished and nonparent. Its exact parent was `f0877daa…`, its
+gate/spec bytes were `b2cb8d56…`/`2e1e2b49…`, and its five-path numstat was
+`+3077/-116`. Two independent formal invocations produced byte-identical
+`60a113bd…` logs on distinct inodes with 94,313 PASS and the sole candidate-
+graph FAIL. Records `28499307…`, `eb79074d…` and aggregation `faa4faea…` prove
+that all graph, checkout and review conditions passed except the inherited
+global `additions <= 2400` predicate.
+
+R3 is a fresh direct child of `f0877daa…`, never of R2. TEST_AUTHOR may retain
+the same exact five files and replace only the R28 candidate graph's global
+line-budget use with an exact `(additions, deletions)` tuple equality, measured
+after all R3 bytes are final and stable twice. `MAX_ADDED_LINES=2400`,
+`MAX_DELETED_LINES=2400` and every other consumer stay byte-exact. The tuple
+members must be built-in integers and the graph must call the sole helper in
+the exact transformed R2 position. Inequality, fallback, wider bounds,
+hardcoded/decoy/dead/duplicated/moved helper, tuple or registry substitution,
+and R2 credit/parentage are causal negatives. This bounded representability
+migration creates no new product or operational authority. R3 still requires
+freeze, two fresh independent reviews and guarded publication before any
+already-serialized R28 workflow transition.
