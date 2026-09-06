@@ -2989,3 +2989,53 @@ and R2 credit/parentage are causal negatives. This bounded representability
 migration creates no new product or operational authority. R3 still requires
 freeze, two fresh independent reviews and guarded publication before any
 already-serialized R28 workflow transition.
+
+### H-039 R29/R15 signed `/dev/fd` `dev_t` workflow compatibility
+
+Published R28 merge `a13cd9f60d4c8e74855fb9ccdf58f2dc4a61c569`, tree
+`086b5a417c5263cb510d07b4a69ae8783e452b90`, ordered parents
+`f0877daae8612f4c5b274ae4cc04bc1bd775c01a` then
+`be917597ddee2024934843d4f3bbc816227ed10b`, is the exact R29 base. The
+owner-witnessed R28 authenticated wrapper stopped at
+`RuntimeError: fd inventory directory`: R28 froze `/dev/fd` device
+`2485446765`, while the fixed CLT Python image reports the same raw Darwin
+`dev_t` as signed `-1809520531`. The stop occurred before selected-target
+compile/exec, reservation, sudo/root process or state mutation. Every R28
+artifact remains byte-exact, immutable NO-CREDIT and nonretryable.
+
+R29 is productless and changes only the same five TEST_AUTHOR files plus fresh
+fixed workflow-only identities. Its sole compatibility replacement is the
+exact signed `-1809520531` device member in the four programs' authenticated
+wrapper/target descriptor controls and corresponding source bindings. All
+other identity fields, two-pass inventories, transient-descriptor EBADF,
+CLOEXEC, retained descriptors and final name rebind remain exact. Unsigned or
+signed alternatives, modulo, masking, casting, global normalization, changes
+to another tuple member or filesystem identity, and descriptor bypass reject.
+
+The root-update package is frozen at ceremony `70d2100b9c017572…`, validator
+`92e07072df09eb90…`, source binding `714fc60a670f5544…` and dual review
+`f936d2c29885b805…`. The live-diagnostic package is frozen at runner
+`b7c7d20d4ca4bce5…`, validator `2ca38cf561ce4910…`, source binding
+`e2dc7b24fbf2072a…` and dual review `db7b20293e778950…`. All eight R28 and
+eight R29 static objects must rebind exactly, and all four R28 plus four R29
+attempt/outcome names must remain absent at freeze.
+
+R28 installed is historical and unreachable after R29. Only no-argument RED
+and current-publication-bound `--r29-installed <published-R29-contract>
+f0877daae8612f4c5b274ae4cc04bc1bd775c01a` are current. After R29 freeze, two
+independent reviews and guarded publication, the frozen root workflow may
+consume exactly one no-retry attempt and perform the unchanged R14→R15 update.
+The installed lane remains read-only and ends at
+`PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`; exactly one frozen diagnostic may then
+run as the first post-R15 store mutation and must end at mandatory owner stop.
+No product change, broader authority, H038/H032/H031 progress or supervisor
+resume is admitted.
+
+R29-R1 `1afe9cce…` is now immutable consumed NO-CREDIT and cannot be a trust
+parent. Its two independent runs yielded the byte-identical `736e27a2…` log:
+94,717 PASS, the intended operational RED, and one TEST_AUTHOR failure because
+R1 introduced two R29-specific consumers outside R28's frozen closed-world
+line-limit map. R29-R2 keeps global 2400/2400 and all 18 legacy consumers
+AST-exact, admits exactly `r29_line_delta_accepts` and
+`r29_line_delta_selftests` AST-exact to R1, and rejects any third consumer,
+blanket prefix exemption, alternate call path, R1 parentage or task credit.

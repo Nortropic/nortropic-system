@@ -5525,3 +5525,47 @@ bound, hardcoded exact-count substitution, dead/decoy/duplicated/moved helper,
 swapped or ±1 tuple, registry drift, and any R2 credit or parentage. No product,
 runtime, root, filesystem, process, network, credential, downstream or resume
 authority changes.
+
+## 2026-09-06 — H-039 R29/R15 signed `/dev/fd` `dev_t` workflow migration
+
+Published R28 `a13cd9f60d4c8e74855fb9ccdf58f2dc4a61c569`, tree
+`086b5a417c5263cb510d07b4a69ae8783e452b90`, ordered parents `f0877daa…` and
+`be917597…`, remains byte-exact. Its owner invocation failed inside the
+authenticated wrapper's `/dev/fd` identity equality: the frozen unsigned
+device value was `2485446765`, while fixed CLT Python exposes the identical
+raw Darwin value as signed `-1809520531`. The refusal preceded selected-target
+compile/exec, reservation, sudo/root process and every state mutation. R28
+artifacts are immutable workflow-only NO-CREDIT and cannot retry.
+
+R29 is productless and changes exactly the same five TEST_AUTHOR files. Fresh
+R29 workflow and record names replace no R28 bytes. Exact signed
+`-1809520531` is accepted only as `/dev/fd`'s device member in the four
+programs' wrapper/target controls and corresponding bindings; inode,
+type/mode, UID/GID, nlink, size, flags, double inventory, transient EBADF,
+CLOEXEC and name rebind remain exact. Unsigned, modulo, mask/cast,
+disjunction, global normalization, alternate tuple-field, other-filesystem and
+descriptor-bypass mutants reject.
+
+The frozen root package is `70d2100b…`/`92e07072…`/`714fc60a…`/`f936d2c2…`.
+The frozen diagnostic package is `b7c7d20d…`/`2ca38cf5…`/`e2dc7b24…`/
+`db7b2029…`. Root publication closure is ten records plus one predecessor;
+the diagnostic fixed-name closure is 21. All eight R28 and eight R29 static
+objects rebind, and all four R28 plus four R29 dynamic names remain absent at
+freeze. These closure-induced metadata and descriptor-count changes add no
+operational authority.
+
+R28 installed is stale. R29 admits only no-argument RED or
+`--r29-installed <published-R29-contract> f0877daa…`. Guarded publication
+precedes exactly one no-retry root update; installed validation stays read-only
+and stops at `PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`; one diagnostic then ends
+at mandatory owner adjudication. No product, wider authority, H038/H032/H031
+progress or supervisor resume is introduced.
+
+R29-R1 `1afe9cce…`, tree `393f385a…`, is immutable consumed NO-CREDIT and a
+nonparent. Both independent formal runs produced the same byte-identical
+`736e27a2…` log with 94,717 PASS and exactly two FAIL: the intended
+operational RED and the inherited closed-world line-limit oracle, whose only
+new consumers were `r29_line_delta_accepts` and `r29_line_delta_selftests`.
+R29-R2 preserves global 2400/2400 and all 18 legacy consumer name/AST pairs,
+admits only those two consumers AST-exact to R1, and rejects a third consumer,
+prefix exemption, decoy, dead path, bypass, R1 parentage or credit.
