@@ -5449,3 +5449,79 @@ Atomic success is scoped to the fixed operation and cooperative PREPARED runner 
 The R15 installer accepts only exact final sequence1 R14→R15 under retained `s/lock`; empty `r`, every prefix, already-R15/version2 and all nonexact states fail before mutation. Runtime legacy operations remain exact; generic prefix/fresh installer behavior is unreachable. Existing `r/last` bytes/inode survive replacement, actual identities are captured/rebound, and no host dev/inode is compiled in.
 
 R27-R2 performs no root update, installed effect, live diagnostic or evidence write and ends only at `PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY`. Fresh productless R28 must freeze/review/publish, read-only preflight identities, durably consume one reservation, perform one prebound no-retry R14→R15 launch, require status0/empty output/unambiguous exact poststate, read-only review the update, run exactly one diagnostic as first post-R15 mutation, then stop for owner adjudication. Drift/nonzero/output/ambiguity/unexpected state consumes the attempt without retry/rollback/general cleanup/wider authority; H039 completion, inherited effects, H038→H032→H031 and resume need fresh post-diagnostic authority.
+
+## 2026-09-06 — H-039 R28 current-publication installed/update boundary
+
+Frozen R28-R1 `b3da926af58a93ee03b7dbfd257940904b0e241a`, tree
+`52c8dc366fe20f9a9189477fe30e008983ab5e6b`, gate `e374dfab…` and spec
+`dd0884e7…`, is immutable rejected pre-formal-run NO-CREDIT and is not an R2
+parent. Its RED reason falsely named the eight already frozen workflow
+artifacts as unfrozen; no formal gate invocation or review log exists. Fresh
+R2 restarts directly from `f0877daa…`, keeps the frozen workflow/product
+bytes, uses the truthful guarded-publication/root-update/live-diagnostic-
+pending reason, and qualifies the historical live-prestate signature as the
+R27 no-argument read-only binding.
+
+Published R15 `f0877daae8612f4c5b274ae4cc04bc1bd775c01a`, tree
+`6023ee91e5332e34eb7076cb2c31466a0b5491ae`, ordered parents R27
+`b29376a0…` and candidate `7786536a…`, is the sole R28 authority base. Base
+gate/spec are `0ca1fb9a…`/`185ff3d0…`; all five R15 product digests and eight
+immutable publication/review records are pinned, including final postpublication
+`0076e0a8…` identity8 size 8660, guarded product receipt `e8a1383c…` size
+10357 and dual audit `16eb8e21…` size 2287.
+
+R28 changes exactly the five TEST_AUTHOR contract files and no product or
+evidence file. Its only current routes are no arguments and
+`--r28-installed <published-R28-contract> f0877daa…`; R27/R26 selectors are
+historical literal-false branches. No arguments has no protected-store/helper
+inspection and no update, diagnostic or evidence effect. Explicit hash and
+identity8 bindings for the diagnostic four-artifact package are now frozen:
+runner `64265252…`/`[16777232,129873531,33188,501,20,1,184522,0]`, validator
+`612d1630…`/`[16777232,129873986,33188,501,20,1,165142,0]`, source binding
+`f6cc01e4…`/`[16777232,129874313,33188,501,20,1,19913,0]`, and independently
+reviewed final record
+`7cc3615b…`/`[16777232,129907322,33188,501,20,1,6142,0]`. The reviewed update
+package remains pinned to `cdb5f47e…`/`2528d2e0…`/`6eebfb64…` with dual review
+`2d4249b7…`; no arguments is the canonical RED.
+Both update and diagnostic attempt/outcome pairs must be absent at freeze.
+
+The update side binds the ordered eight publication/review records plus the R26
+failure log, retains and rebinds the evidence-root directory descriptor, and
+uses descriptor-relative fixed-name access for dynamic records. Validator code
+is selected only from authenticated bytes through the reviewed wrapper. Its
+review hash/identity pin is owner-serialized external state and cannot be
+treated as a locally unforgeable publication proof or task credit.
+
+After guarded R28 publication, only the frozen update ceremony may authenticate
+the exact R14 prestate, durably consume one reservation and launch the fixed
+R14→R15 update once without retry. The installed lane is read-only: it validates
+the consumed update record, exact installed R15 and preserved sequence-1 store,
+runs no diagnostic or inherited effect engine, grants no H039 completion credit,
+and returns only `PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`. The separately frozen
+and already-authorized diagnostic workflow may then run exactly once as the
+first post-R15 store mutation, followed by mandatory owner stop. Fresh authority
+is required only after that diagnostic stop; downstream and resume remain
+forbidden.
+
+### R28-R3 exact line-delta representability remediation
+
+R28-R2 `332256b99c78639e03d54c729a86bfcf781334e4`, tree
+`2cb56948e396bf835e56890ff1b23b86627e7324`, is immutable NO-CREDIT and not
+an R3 parent. Both independent formal reviews consumed one invocation and
+produced distinct-inode, byte-identical logs `60a113bd…` with 94,313 PASS and
+one FAIL. The sole failed predicate was the R28 candidate graph's inherited
+global added-line ceiling: exact delta `+3077/-116` exceeded only
+`MAX_ADDED_LINES=2400`. Review A `28499307…`, review B `eb79074d…`, and final
+dual failure aggregation `faa4faea…` bind that result and prohibit retry,
+credit, publication support and R2 parentage.
+
+Fresh R28-R3 restarts directly from `f0877daa…`. It preserves the global
+2400/2400 limits and every non-R28 consumer byte-exact. Only the R28 contract
+candidate graph replaces its two global-limit predicates with one exact,
+built-in-integer tuple equality against the final twice-stable base-to-R3
+numstat. This admits one frozen delta, not a wider ceiling. Static causal
+controls reject the restored global-only form, `<=`, OR/fallback, any broader
+bound, hardcoded exact-count substitution, dead/decoy/duplicated/moved helper,
+swapped or ±1 tuple, registry drift, and any R2 credit or parentage. No product,
+runtime, root, filesystem, process, network, credential, downstream or resume
+authority changes.
