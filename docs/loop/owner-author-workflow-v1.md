@@ -3093,3 +3093,68 @@ failure record are immutable consumed NO-CREDIT nonparent evidence; the
 `22883d8f…` draft is explicitly unbound. Fresh R30-R2 again descends directly
 from `8e44faae…` and only changes the stale `r17_registry_selftests` expected
 reason `R29_REASON` to `R30_REASON`, while a revert mutant must reject.
+
+## H-039 R31/R15 exact lock-provenance compatibility refreeze
+
+Published R30 merge `e1421f355f96f70458d3e664a69f773a27d89487`, tree
+`16c43c3301eca91dc2c4966d22b453044a2b7bfc`, is the sole R31 parent while it
+remains current main. The corrected R30 outer entry authenticated the exact
+frozen ceremony and reached only its root-read-only pre-reservation checks.
+All six directory snapshots and the lock metadata and empty digest passed; the
+27th fixed read-only root child, `/bin/ls -ldeO@` on exact `s/lock`, then
+returned rc0 and was rejected solely by R30's plain ACL/xattr marker predicate.
+No reservation, mutation, staging or bootstrap occurred. All four R30 dynamic
+records remain absent, and the installed R14 mediator plus sequence-1 store
+remain exact. The R30 ceremony and its earlier empty observation latch are
+immutable consumed NO-CREDIT and cannot retry.
+
+The independently validated R2 observation `579539d7bb707eb4770e23a3555851f2ad64833f74a188c12d1278c65dc22ad7`
+with identity8 `[16777232,130387041,33152,501,20,1,10484,0]` binds `s` to
+exactly member `lock` and binds that file to root:wheel 0600, nlink 1, size 0,
+flags 0, empty SHA-256 and stable inode `128098569`. Its listing has stdout
+SHA-256 `0af243fa057db4b2c9d582b97bd451f92571bab39e32a076301f3a960bb79cbd`,
+empty stderr, exactly two LF-terminated rows, first token `-rw-------@`, and
+second row exactly `\tcom.apple.provenance\t11 `. There are no ACL rows.
+Owner adjudication `f1d8f737ade8313fd3798269999599b4d4e80a3e25ea2d3355efe42d9bb2d535`
+admits only that exact singleton xattr name and size as already permitted
+non-authority metadata. It does not adjudicate the xattr value, provenance
+origin or general Apple semantics; R15 product bytes do not read or use xattrs.
+
+R31 is productless and changes exactly the existing five TEST_AUTHOR files.
+Fresh R31 root-update and live-diagnostic workflow-only names, reviews and
+dynamic record names replace no R30 evidence. The sole security-semantic
+change is scoped to exact `s/lock` in four consumers. Root-update ceremony and
+validator require rc0, empty stderr and the exact two-row listing above. Live
+diagnostic runner and validator require the exact stable-rebound profile
+`[["com.apple.provenance",11]]`. Plain/absent is not an alternative. Wrong or
+duplicate names, wrong sizes, extra xattr or listing rows, `+` or ACL markers,
+ACL rows, CRLF/NUL, truncation, other paths, substring/set/`>=`, wildcard,
+global parsing relaxation, another normalized object, fewer than four changed
+consumers, and any xattr-value read or behavioral use reject. Every other
+namespace, runtime, receipt, staging, installation, identity, membership,
+retained-FD, bootstrap, no-retry, post-state and owner-stop invariant remains
+exact.
+
+The independently reviewed root package is frozen at ceremony
+`a1cd7939029a0136cc375568892439027e021fa9711c23a53b76ede802b7df4f`,
+validator `c85ecf4c5010d17b8f1d716050c1eb533d1c09831b984e4aeec14302c6e06bbe`,
+source binding `5420fd54cae71b7df8e6acec5aefcff9111c901409e4f99e9b7dbf66061d45dc`
+and dual review `f80ba3920bee93a16bccefc86d0b69343f671b09ec08e12b596d655466475955`.
+The independently reviewed live package is frozen at runner
+`7bcb2559728497e559aeb473f5c36d858faa2239305095b68a8783fab3f2451f`,
+validator `7f1face4a90954cf5a6806767096541131d7c5c6bd77e6ea1df1907e9dce6997`,
+source binding `8a79f59b0238707f501e5d83503d9da44a7881a95bfbe44a9752b50d4e594202`
+and dual review `34e8b75ca0f7f94bbb3535bfdb54de4eb3d6e2a29e42ae74b043a260e347c906`.
+
+R30 installed is historical after R31. Only no-argument expected RED and
+`--r31-installed <published-R31-contract> f0877daae8612f4c5b274ae4cc04bc1bd775c01a`
+are current. Freeze requires exact R30/R31 immutable closure and absent fresh
+R31 attempt/outcome names. After two independent gate reviews and guarded
+publication, owner hash verification precedes exactly one new R31 owner-TTY
+root-update attempt. This is new authority, never an R30 retry. Any nonzero,
+unexpected output, identity, marker or state drift stops without retry,
+rollback or general cleanup. Status zero must pass the independent post-state
+validator and current-publication-bound installed-effect review before exactly
+one frozen R15 live diagnostic; that diagnostic ends at mandatory owner stop.
+No product change, wider authority, H038/H032/H031 progress or supervisor
+resume is admitted before full H039 PASS.

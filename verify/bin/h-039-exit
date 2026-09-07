@@ -1,11 +1,11 @@
 #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
-"""H-039 R30 target-namespace-symbol installed/update binding gate.
+"""H-039 R31 lock-provenance-compatible installed/update binding gate.
 
 No arguments execute the exact read-only prepublication RED without protected
-store or helper access. ``--r30-installed`` authenticates the current published
-R30 contract, consumed no-retry R14-to-R15 update records, installed R15, and
+store or helper access. ``--r31-installed`` authenticates the current published
+R31 contract, consumed no-retry R14-to-R15 update records, installed R15, and
 the preserved sequence-1 store. It invokes neither update nor diagnostic and
-ends at ``PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY``. R29 and earlier selectors are
+ends at ``PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY``. R30 and earlier selectors are
 historical. This Python gate never runs elevated, mutates state, invokes a
 root-update ceremony, live diagnostic, or inherited mutating effect, or accepts
 a caller path, PID, command, state, nonce, or descriptor.
@@ -1213,6 +1213,138 @@ R30_MATERIAL_REVIEW_EXTENSION = (
     "NO_CREDIT_NONPARENT_AND_R2_REBINDS_ONLY_STALE_R29_REASON_TO_R30;_"
     "NO_PRODUCT_BROADER_AUTHORITY_DOWNSTREAM_OR_RESUME_IS_ADDED"
 )
+R31_AUTHORITY_BASE = "e1421f355f96f70458d3e664a69f773a27d89487"
+R31_AUTHORITY_TREE = "16c43c3301eca91dc2c4966d22b453044a2b7bfc"
+R31_AUTHORITY_PARENTS = [
+    "8e44faaea9b91b596f33b9ae75e663e900e50834",
+    "cf5a2726bb9f06b1deaf32657e3c3c29f387a0f6",
+]
+R31_R30_CANDIDATE = R31_AUTHORITY_PARENTS[1]
+R31_R15_PRODUCT_MERGE = R30_R15_PRODUCT_MERGE
+R31_BASE_GATE_SHA256 = "9a46968b7f5ba8c66fe022f61696f0a891e6e3743eecba18b061c9a671515211"
+R31_BASE_SPEC_SHA256 = "cb0851acef5c0b10c5f1cb0b48af167c7d2abf0a9299b975a8da94b7f6383104"
+R31_R30_ROW_SHA256 = "ed131418bd7f1e6d2ad1c3204983cea6e23bd1437721bc864e949ec3f134d444"
+R31_R30_REGISTRY_SHA256 = R30_REGISTRY_SHA256
+R31_R30_RECONCILIATION_SHA256 = R30_RECONCILIATION_SHA256
+R31_R30_NORMALIZED_GATE_SHA256 = R30_GATE_SOURCE_SHA256
+R31_R30_MATERIAL_EXTENSION_SHA256 = (
+    "fab80152302577fa11806c2897fa0515d37f4ffabbddffc4574704ab6de4d2db"
+)
+R31_R30_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r30-r2-dual-gate-review-cf5a2726.json"
+R31_R30_PUBLICATION = R23_EVIDENCE_ROOT / "h039-r30-r2-contract-guarded-publication.json"
+R31_R30_PUBLICATION_AUDIT = R23_EVIDENCE_ROOT / "h039-r30-r2-contract-guarded-publication-dual-audit.json"
+R31_EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+R31_R30_PUBLICATION_EVIDENCE = {
+    R31_R30_DUAL_REVIEW: ("451bacbaabbd95b80423adb2674c13e58c963d8e9236735b64df87c58a879976", [16777232, 130301005, 0o100644, 501, 20, 1, 4434, 0]),
+    R31_R30_PUBLICATION: ("cd8cfda43ed8ed0689c455808ceb3c6f3f380795bce3ba3177e79549cacea48a", [16777232, 130337533, 0o100644, 501, 20, 1, 9711, 0]),
+    R31_R30_PUBLICATION_AUDIT: ("4cd81c25e7d725ee20548f995256b2b424d124b4947751bf247d9e3b66668c29", [16777232, 130337732, 0o100644, 501, 20, 1, 3126, 0]),
+}
+R31_ORDERED_PUBLICATION_EVIDENCE = R30_ORDERED_PUBLICATION_EVIDENCE + [
+    {"path": str(path), "sha256": R31_R30_PUBLICATION_EVIDENCE[path][0],
+     "identity8": R31_R30_PUBLICATION_EVIDENCE[path][1], "kind": kind}
+    for path, kind in (
+        (R31_R30_DUAL_REVIEW, "r30_dual_gate_review"),
+        (R31_R30_PUBLICATION, "r30_guarded_contract_publication_receipt"),
+        (R31_R30_PUBLICATION_AUDIT, "r30_guarded_contract_publication_dual_audit"),
+    )
+]
+R31_R30_EVIDENCE = {
+    R23_EVIDENCE_ROOT / "h039-r30-pre-target-review-digest-argument-rig-error.json": ("31a859a95e315aa0920fa572e4f7d48b3056c18b4745244628bcae91c2bab3ba", [16777232, 130339347, 0o100644, 501, 20, 1, 3162, 0]),
+    R23_EVIDENCE_ROOT / "h039-r30-lock-marker-post-failure-capture-spin.json": ("fd329cabc23a3bf043870c5e2a8b820dfe7a22aa9d7fe01997a422613ec45e0b", [16777232, 130378592, 0o100644, 501, 20, 1, 4360, 0]),
+    R23_EVIDENCE_ROOT / "h039-r30-lock-marker-post-failure-observation.json": (R31_EMPTY_SHA256, [16777232, 130369140, 0o100600, 501, 20, 1, 0, 0]),
+    R23_EVIDENCE_ROOT / "h039-r30-lock-marker-post-failure-observation-r2.json": ("579539d7bb707eb4770e23a3555851f2ad64833f74a188c12d1278c65dc22ad7", [16777232, 130387041, 0o100600, 501, 20, 1, 10484, 0]),
+    R23_EVIDENCE_ROOT / "h039-r30-lock-provenance-owner-adjudication.json": ("f1d8f737ade8313fd3798269999599b4d4e80a3e25ea2d3355efe42d9bb2d535", [16777232, 130397452, 0o100644, 501, 20, 1, 4356, 0]),
+}
+R31_UPDATE_RUNNER = R23_EVIDENCE_ROOT / "h039-r31-r15-root-update-ceremony.py"
+R31_UPDATE_VALIDATOR = R23_EVIDENCE_ROOT / "h039-r31-r15-root-update-validate.py"
+R31_UPDATE_SOURCE_BINDING = R23_EVIDENCE_ROOT / "h039-r31-r15-root-update-source-binding.json"
+R31_UPDATE_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r31-r15-root-update-workflow-dual-review.json"
+R31_UPDATE_ATTEMPT = R23_EVIDENCE_ROOT / "h039-r31-r15-root-update-attempt-reservation.json"
+R31_UPDATE_OUTCOME = R23_EVIDENCE_ROOT / "h039-r31-r15-root-update-outcome.json"
+R31_DIAGNOSTIC_RUNNER = R23_EVIDENCE_ROOT / "h039-r31-r15-live-diagnostic-run-once.py"
+R31_DIAGNOSTIC_VALIDATOR = R23_EVIDENCE_ROOT / "h039-r31-r15-live-diagnostic-validate.py"
+R31_DIAGNOSTIC_SOURCE_BINDING = R23_EVIDENCE_ROOT / "h039-r31-r15-live-diagnostic-source-binding.json"
+R31_DIAGNOSTIC_DUAL_REVIEW = R23_EVIDENCE_ROOT / "h039-r31-r15-live-diagnostic-workflow-dual-review.json"
+R31_DIAGNOSTIC_ATTEMPT = R23_EVIDENCE_ROOT / "h039-r31-r15-live-diagnostic-attempt-reservation.json"
+R31_DIAGNOSTIC_OUTCOME = R23_EVIDENCE_ROOT / "h039-r31-r15-live-diagnostic-outcome.json"
+R31_WORKFLOW_HASHES = {
+    R31_UPDATE_RUNNER: "a1cd7939029a0136cc375568892439027e021fa9711c23a53b76ede802b7df4f",
+    R31_UPDATE_VALIDATOR: "c85ecf4c5010d17b8f1d716050c1eb533d1c09831b984e4aeec14302c6e06bbe",
+    R31_UPDATE_SOURCE_BINDING: "5420fd54cae71b7df8e6acec5aefcff9111c901409e4f99e9b7dbf66061d45dc",
+    R31_UPDATE_DUAL_REVIEW: "f80ba3920bee93a16bccefc86d0b69343f671b09ec08e12b596d655466475955",
+    R31_DIAGNOSTIC_RUNNER: "7bcb2559728497e559aeb473f5c36d858faa2239305095b68a8783fab3f2451f",
+    R31_DIAGNOSTIC_VALIDATOR: "7f1face4a90954cf5a6806767096541131d7c5c6bd77e6ea1df1907e9dce6997",
+    R31_DIAGNOSTIC_SOURCE_BINDING: "8a79f59b0238707f501e5d83503d9da44a7881a95bfbe44a9752b50d4e594202",
+    R31_DIAGNOSTIC_DUAL_REVIEW: "34e8b75ca0f7f94bbb3535bfdb54de4eb3d6e2a29e42ae74b043a260e347c906",
+}
+R31_WORKFLOW_IDENTITY8 = {
+    R31_UPDATE_RUNNER: [16777232, 130397518, 0o100644, 501, 20, 1, 135936, 0],
+    R31_UPDATE_VALIDATOR: [16777232, 130397519, 0o100644, 501, 20, 1, 123199, 0],
+    R31_UPDATE_SOURCE_BINDING: [16777232, 130397883, 0o100644, 501, 20, 1, 42557, 0],
+    R31_UPDATE_DUAL_REVIEW: [16777232, 130399741, 0o100644, 501, 20, 1, 4829, 0],
+    R31_DIAGNOSTIC_RUNNER: [16777232, 130397520, 0o100644, 501, 20, 1, 217324, 0],
+    R31_DIAGNOSTIC_VALIDATOR: [16777232, 130397521, 0o100644, 501, 20, 1, 198349, 0],
+    R31_DIAGNOSTIC_SOURCE_BINDING: [16777232, 130397523, 0o100644, 501, 20, 1, 26024, 0],
+    R31_DIAGNOSTIC_DUAL_REVIEW: [16777232, 130409087, 0o100644, 501, 20, 1, 8060, 0],
+}
+R31_WORKFLOW_AST_SHA256 = {
+    R31_UPDATE_RUNNER: "d6361ae903403ad9b7d9c9176e0112b86407e3c61b8e4e0335dccb676c0e9ee2",
+    R31_UPDATE_VALIDATOR: "e0fe965cb8b3e83fbe2669401544d4285a7a4c844b48eb0d8ebdd7d3095acd69",
+    R31_DIAGNOSTIC_RUNNER: "5186cb39c8e8e27efd017475d6bf58989933e600d4c607f2554414143411593c",
+    R31_DIAGNOSTIC_VALIDATOR: "1ab6473fa4d6546f48b591630f4b7680f25e25ee6d22e561d94b3eef1e3dd9fd",
+}
+R31_CONSUMER_AST_SHA256 = {
+    (R31_UPDATE_RUNNER, "no_acl_or_xattr_marker"): "c18dd55b0dc3dce8d2cee0b85cf7903f98e7ef95b0a898f6bca05122efe713a0",
+    (R31_UPDATE_RUNNER, "root_listing"): "6134b12c3991dcabd65ff2d3b1bd2db15172a0e0512fe4e4d16a7afa1aca1345",
+    (R31_UPDATE_VALIDATOR, "no_acl_or_xattr_marker"): "b81c8632661cf1234489515c4960a3c04130585f88ef6c22434ade63dfdf48eb",
+    (R31_UPDATE_VALIDATOR, "validate_trace"): "62695888d724ed98508c14998f195c6118b21c08d0fde042ffe1f9e72b79a603",
+    (R31_DIAGNOSTIC_RUNNER, "validate_root_trace"): "7b96806e6951ffb5a6f8b474eeee8bf605b493949bc1ff810b5e6bd72cf05165",
+    (R31_DIAGNOSTIC_RUNNER, "store_snapshot"): "adc54835f7919dd0a0555379d723e9b1620e748cbdd594394700ed47c9fa1a33",
+    (R31_DIAGNOSTIC_VALIDATOR, "validate_root_trace"): "7b96806e6951ffb5a6f8b474eeee8bf605b493949bc1ff810b5e6bd72cf05165",
+    (R31_DIAGNOSTIC_VALIDATOR, "live_store_snapshot"): "bcbd6450c07e15d1b87a49cebbf9468012323dad4f5012d15a3536a90b54b32b",
+}
+R31_XATTR_HELPER_AST_SHA256 = {
+    (R31_UPDATE_RUNNER, "retained_xattrs"): "7d8cddfb78ac995888a3584b08845355917c2e68c3329085b80962182ac56711",
+    (R31_UPDATE_VALIDATOR, "retained_xattrs"): "cff2fdad29138d8c6969911263f96a01191326e707bfdaf7e287b34ee74f99b6",
+    (R31_DIAGNOSTIC_RUNNER, "retained_xattrs"): "acf07ce6f1a2c658cb6b84eca2faf7e45c4a683c4cb80a38a4ff9896b3faf51b",
+    (R31_DIAGNOSTIC_RUNNER, "path_xattrs_no_follow"): "5e4db7cdd419dc716eb80203ec9446d3edaf21d0dee68e52f3f3395f5469d680",
+    (R31_DIAGNOSTIC_VALIDATOR, "retained_xattrs"): "acf07ce6f1a2c658cb6b84eca2faf7e45c4a683c4cb80a38a4ff9896b3faf51b",
+    (R31_DIAGNOSTIC_VALIDATOR, "path_xattrs_no_follow"): "5e4db7cdd419dc716eb80203ec9446d3edaf21d0dee68e52f3f3395f5469d680",
+}
+R31_CONSUMER_CALL_GRAPH = {
+    R31_UPDATE_RUNNER: {
+        "stable_open_source": ({"retained_xattrs": 1, "no_acl_or_xattr_marker": 1}, "4a88d15f41159baa613d7e21564dae073ce6d46549382c2cd28f4c1e6c06f26e"),
+        "root_dir_snapshot": ({"root_listing": 1}, "99b27e69b2abbd8b0d06e1d4b07bc6b9c31691da63732c807fcc6ed27059ff28"),
+        "root_regular_snapshot": ({"root_listing": 1}, "8943901672c9615db74e2373a50a93463b9efcdea784d5cc9998fa9f69895470"),
+        "new_stage_dir_snapshot": ({"root_listing": 1}, "9b168c1a0e190f8325181f8fb838a3d8e4b3f147d26c04fce922210256b52b87"),
+        "verify_post_state": ({"no_acl_or_xattr_marker": 5}, "2705cc883c1137022f40dd5d61ff6e10b2c7973e65c941637fd73e5b2ae7a326"),
+    },
+    R31_UPDATE_VALIDATOR: {
+        "stable_source": ({"retained_xattrs": 1, "no_acl_or_xattr_marker": 1}, "351ca2b24b4b7b4667c69365a0aee06ab0860328617cd33b4078137a680ce998"),
+        "validate_post_state": ({"no_acl_or_xattr_marker": 5}, "49e5bba503cc71ac9f5b709cd9b618a8ac3cdfb5005f30d3e08a584b0c950af4"),
+        "_validate_with_root": ({"validate_trace": 4}, "7553f7a62ded3ac313aa500d100228ad312363a1ec513281e93eb48c95d140ac"),
+    },
+    R31_DIAGNOSTIC_RUNNER: {
+        "validate_root_source": ({"retained_xattrs": 1}, "c61b014cfed2966ac7ea23d2a61578976042e449ca62d5c65ba72b297b007310"),
+        "validate_root_update_chain": ({"validate_root_trace": 4}, "a85d46f8f44c7cb1ebddde2443e419e9b3161c0b29aad4fa9d2745df18d5d670"),
+        "stable_target": ({"retained_xattrs": 1}, "8aa162334f509918004e5c8ff261dda8edd90f7553d87f0331cb3c53568d5af4"),
+        "open_directory": ({"retained_xattrs": 1}, "e8ceac69e9880dcd31b5c41b1e6b5f628b7c84fed7393b735e5391aa719ea28d"),
+        "read_regular_at": ({"retained_xattrs": 1}, "27a8cfc6ea95baafd3bb5f92a24b5222b252f367d202d732b4316736a5531fa2"),
+        "store_snapshot": ({"path_xattrs_no_follow": 1, "retained_xattrs": 1}, "adc54835f7919dd0a0555379d723e9b1620e748cbdd594394700ed47c9fa1a33"),
+        "main": ({"store_snapshot": 2}, "80aad64665a0cf578353112bfaaefec1382f8c057fc574de09b439fc08a0b160"),
+    },
+    R31_DIAGNOSTIC_VALIDATOR: {
+        "validate_root_source": ({"retained_xattrs": 1}, "c61b014cfed2966ac7ea23d2a61578976042e449ca62d5c65ba72b297b007310"),
+        "validate_root_update": ({"validate_root_trace": 4}, "76988f6466dcc9df3cc92908ad04e3fab0888744791e4f0164e12aaac9649e84"),
+        "live_store_snapshot": ({"retained_xattrs": 3, "path_xattrs_no_follow": 1}, "bcbd6450c07e15d1b87a49cebbf9468012323dad4f5012d15a3536a90b54b32b"),
+        "live_target": ({"retained_xattrs": 1}, "04c20e3a49f7da572e895cad5b9ceac490bbfdead8058ac3dd83876076be118f"),
+        "main": ({"live_store_snapshot": 1}, "5c3a7ffd63846355b950add4205eb8baf94a1fe9d3316f7c5f0a69742da017e5"),
+    },
+}
+R31_REGISTRY_SHA256 = "a284997217541a0da63202702e59d8f614c6d13a746359588b9345c39f6c5e7e"
+R31_RECONCILIATION_SHA256 = "2f3d21fac989104f9ea32516fc7538fefb38841668855834f1d1eab7276a9a55"
+R31_GATE_SOURCE_SHA256 = "6037098b007c01087b2e644900d32da711124ba2402dc601a02c41b1d5f9a9c5"
+R31_MATERIAL_REVIEW_EXTENSION = "INDEPENDENT_REVIEW_MUST_PROVE_EXACT_PUBLISHED_R30_GRAPH_PRODUCT_AND_PUBLICATION_CLOSURE_IMMUTABLE_R30_FAILURE_OBSERVATION_AND_ADJUDICATION_CLOSURE_EXACT_FOUR_CONSUMER_S_LOCK_SCOPE_EXACT_ROOT_TWO_LINE_AND_LIVE_SINGLETON_PROFILE_NO_XATTR_VALUE_READ_ALL_OTHER_OBJECT_RULES_BYTE_EQUIVALENT_EXACT_FROZEN_R31_ROOT_AND_LIVE_STATIC_PACKAGES_R30_SELECTOR_STALE_CURRENT_RUNTIME_BOUND_R31_SELECTOR_ONE_NO_RETRY_UPDATE_THEN_INSTALLED_THEN_ONE_DIAGNOSTIC_OWNER_STOP_AND_NO_BROADER_AUTHORITY_OR_DOWNSTREAM_PROGRESS"
 REJECTED_R20_R1_CANDIDATE = "27ad790442a69c1d35f3cfcccfb6fc02fdd57aea"
 REJECTED_R20_R1_TREE = "f6c9dbec3958f165094291486b54a6b3042abba7"
 REJECTED_R20_R1_GATE_SHA256 = (
@@ -2778,6 +2910,7 @@ LABEL = "A_H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_OPERATIONAL"
 REASON = "H039_R28_GUARDED_PUBLICATION_ROOT_UPDATE_AND_LIVE_DIAGNOSTIC_PENDING"
 R29_REASON = "H039_R29_GUARDED_PUBLICATION_ROOT_UPDATE_AND_LIVE_DIAGNOSTIC_PENDING"
 R30_REASON = "H039_R30_GUARDED_PUBLICATION_ROOT_UPDATE_AND_LIVE_DIAGNOSTIC_PENDING"
+R31_REASON = "H039_R31_GUARDED_PUBLICATION_ROOT_UPDATE_AND_LIVE_DIAGNOSTIC_PENDING"
 FAILURE_SIGNATURE = [
     "PUBLISHED_R26_MAIN_C43A4C05_IS_THE_EXACT_R27_AUTHORITY_BASE", "R26_ORDERED_R25_AND_R26_CANDIDATE_PARENTS_TREE_GATE_AND_SPEC_ARE_EXACT", "R26_GUARDED_PUBLICATION_RECEIPT_77DC52AC_IS_IMMUTABLE_AND_EXACT",
     "R26_INSTALLED_EFFECT_LOG_27196CE2_IS_IMMUTABLE_WORKFLOW_ONLY_NO_CREDIT", "R26_LOG_SIZE4918483_LINES92928_PASS_PREFIX92927_FAIL_PREFIX0_ARE_EXACT", "R26_SOLE_ERROR_IS_CONCATENATED_AFTER_EXACT_PASS_ON_PHYSICAL_LINE92867_THEN_LINE92868_IS_BLANK_AND_EXACTLY60_PASS_PREFIXED_LINES_RUN_THROUGH92928_WITH_NO_SUMMARY_OR_CREDIT",
@@ -2834,7 +2967,7 @@ FAILURE_SIGNATURE = [
     "R30_GATE_NEVER_RUNS_ROOT_UPDATE_LIVE_DIAGNOSTIC_OR_MUTATING_EFFECT_ENGINE",
     "REJECTED_R30_R1_276FC91E_TREE9F702068_GATE62B5AAB6_SPECDF8922F8_DELTA2266_50_DUAL_FORMAL_LOG9B76CE0E_CORRECTED_FAILURECCC95C6F_IS_IMMUTABLE_CONSUMED_NO_CREDIT_NONPARENT_AND_R2_REBINDS_ONLY_R17_REGISTRY_SELFTESTS_STALE_R29_REASON_TO_R30", "NO_PRODUCT_BROADER_AUTHORITY_DOWNSTREAM_PROGRESS_OR_SUPERVISOR_RESUME_IS_ADDED",
 ]
-EXPECTED_H039_ROW_SHA256 = "ed131418bd7f1e6d2ad1c3204983cea6e23bd1437721bc864e949ec3f134d444"
+EXPECTED_H039_ROW_SHA256 = "ab8ab680fd172f674fefcbd96b10489af7e45009760683153668111b3f0e698e"
 
 passed = 0
 failed = 0
@@ -5762,15 +5895,15 @@ def static_contract_checks() -> dict[str, Any]:
             GATE.read_text(encoding="utf-8"), filename=str(GATE),
         )
     except (OSError, UnicodeError, SyntaxError) as exc:
-        raise Rig("R30 independent dispatch bootstrap AST unavailable") from exc
+        raise Rig("R31 independent dispatch bootstrap AST unavailable") from exc
     check(
-        r30_dispatch_surface_exact(dispatch_tree),
-        "A_H039_R30_INDEPENDENT_EXACT_CLOSED_WORLD_DISPATCH_SURFACE",
+        r31_dispatch_surface_exact(dispatch_tree),
+        "A_H039_R31_INDEPENDENT_EXACT_CLOSED_WORLD_DISPATCH_SURFACE",
     )
     dispatch_mutants: list[ast.Module] = []
     for selector in (
-        "r30_installed", "r29_installed", "r28_installed", "r27_product",
-        "r27_published", "r26_installed",
+        "r31_installed", "r30_installed", "r29_installed", "r28_installed",
+        "r27_product", "r27_published", "r26_installed",
     ):
         mutant = copy.deepcopy(dispatch_tree)
         main = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
@@ -5780,39 +5913,39 @@ def static_contract_checks() -> dict[str, Any]:
             and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
             and node.targets[0].id == selector
         )
-        assignment.value = ast.Constant(selector != "r30_installed")
+        assignment.value = ast.Constant(selector != "r31_installed")
         dispatch_mutants.append(mutant)
     mutant = copy.deepcopy(dispatch_tree)
     main = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
                 and node.name == "main")
     branch = next(node for node in ast.walk(main) if isinstance(node, ast.If)
                   and isinstance(node.test, ast.Name)
-                  and node.test.id == "r30_installed")
+                  and node.test.id == "r31_installed")
     branch.body.insert(0, ast.Expr(ast.Call(
         ast.Name("guarded_product_effects", ast.Load()), [], [],
     )))
     dispatch_mutants.append(mutant)
     check(
-        all(not r30_dispatch_surface_exact(mutant) for mutant in dispatch_mutants),
-        "N_H039_R30_INDEPENDENT_SELECTOR_AND_MUTATING_EFFECT_MUTANTS",
+        all(not r31_dispatch_surface_exact(mutant) for mutant in dispatch_mutants),
+        "N_H039_R31_INDEPENDENT_SELECTOR_AND_MUTATING_EFFECT_MUTANTS",
     )
     try:
         historical_dispatch = ast.parse(
-            blob(R30_AUTHORITY_BASE, "verify/bin/h-039-exit").decode("utf-8"),
-            filename=f"{R30_AUTHORITY_BASE}:verify/bin/h-039-exit",
+            blob(R31_AUTHORITY_BASE, "verify/bin/h-039-exit").decode("utf-8"),
+            filename=f"{R31_AUTHORITY_BASE}:verify/bin/h-039-exit",
         )
     except (UnicodeError, SyntaxError) as exc:
-        raise Rig("R30 historical R29 dispatch AST unavailable") from exc
+        raise Rig("R31 historical R30 dispatch AST unavailable") from exc
     check(
-        r29_dispatch_surface_exact(historical_dispatch)
-        and r30_historical_r29_surface_exact(
-            dispatch_tree, historical_dispatch,
+        r30_dispatch_surface_exact(historical_dispatch)
+        and r31_historical_r30_bytes_exact(
+            GATE.read_bytes(), blob(R31_AUTHORITY_BASE, "verify/bin/h-039-exit"),
         ),
-        "A_H039_R30_R29_GATE_SURFACE_IMMUTABLE_AND_HISTORICAL",
+        "A_H039_R31_R30_GATE_SURFACE_IMMUTABLE_AND_HISTORICAL",
     )
     check(
-        r30_gate_closed_world_exact(dispatch_tree, historical_dispatch),
-        "A_H039_R30_EXACT_WHOLE_GATE_CLOSED_WORLD_DELTA",
+        r31_gate_closed_world_exact(dispatch_tree, historical_dispatch),
+        "A_H039_R31_EXACT_WHOLE_GATE_CLOSED_WORLD_DELTA",
     )
     for path, digest in PINNED.items():
         check(path_sha(ROOT / path) == digest, f"A_H039_PINNED_{path.upper().replace('/', '_').replace('.', '_')}")
@@ -5974,6 +6107,20 @@ def static_contract_checks() -> dict[str, Any]:
         and sha(blob(R30_AUTHORITY_BASE, "specs/tasks.spec.json"))
         == R30_BASE_SPEC_SHA256,
         "A_H039_R30_EXACT_PUBLISHED_R29_AUTHORITY_GRAPH_GATE_AND_SPEC",
+    )
+    check(
+        object_type(R31_AUTHORITY_BASE) == "commit"
+        and commit_tree(R31_AUTHORITY_BASE) == R31_AUTHORITY_TREE
+        and commit_parents(R31_AUTHORITY_BASE) == R31_AUTHORITY_PARENTS
+        and object_type(R31_R30_CANDIDATE) == "commit"
+        and commit_parents(R31_R30_CANDIDATE) == [R30_AUTHORITY_BASE]
+        and commit_tree(R31_R30_CANDIDATE) == R31_AUTHORITY_TREE
+        and raw_changes(R31_R30_CANDIDATE, R31_AUTHORITY_BASE) == []
+        and sha(blob(R31_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+        == R31_BASE_GATE_SHA256
+        and sha(blob(R31_AUTHORITY_BASE, "specs/tasks.spec.json"))
+        == R31_BASE_SPEC_SHA256,
+        "A_H039_R31_EXACT_PUBLISHED_R30_AUTHORITY_GRAPH_GATE_AND_SPEC",
     )
     check(
         object_type(REJECTED_R22_R1_CANDIDATE) == "commit"
@@ -6149,6 +6296,9 @@ def static_contract_checks() -> dict[str, Any]:
     target_namespace_binding = row.get(
         "h039_os_exclusive_runtime_cleanup", {},
     ).get("r30_target_namespace_symbol_installed_binding", {})
+    lock_provenance_binding = row.get(
+        "h039_os_exclusive_runtime_cleanup", {},
+    ).get("r31_lock_provenance_compatible_installed_binding", {})
     check(
         first_root.get("ordered_effect_argv") == FIRST_ROOT_ARGV
         and first_root.get("recovery_membership_argv") == recovery_argv_registry()
@@ -6307,11 +6457,15 @@ def static_contract_checks() -> dict[str, Any]:
     check(
         exact_typed_tree(target_namespace_binding, r30_registry_expected())
         and sha(canonical(target_namespace_binding)) == R30_REGISTRY_SHA256,
-        "A_H039_R30_EXACT_CURRENT_TARGET_NAMESPACE_SYMBOL_REGISTRY",
+        "A_H039_R31_EXACT_HISTORICAL_R30_TARGET_NAMESPACE_SYMBOL_REGISTRY",
+    )
+    check(
+        r31_registry_accepts(lock_provenance_binding),
+        "A_H039_R31_EXACT_CURRENT_LOCK_PROVENANCE_COMPATIBILITY_REGISTRY",
     )
     expected_red = {
         "label": LABEL,
-        "reason": R30_REASON,
+        "reason": R31_REASON,
         "failure_signature": FAILURE_SIGNATURE,
     }
     check(
@@ -6321,7 +6475,7 @@ def static_contract_checks() -> dict[str, Any]:
             ),
             expected_red,
         ),
-        "A_H039_R30_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
+        "A_H039_R31_PREPRODUCT_RED_EQUALS_EXECUTABLE_RESULT",
     )
     check(
         row.get("h039_r17_installed_effect_completion_reconciliation")
@@ -6406,6 +6560,14 @@ def static_contract_checks() -> dict[str, Any]:
             "h039_r30_target_namespace_symbol_reconciliation"
         ].encode("utf-8")) == R30_RECONCILIATION_SHA256,
         "A_H039_R30_EXACT_RECONCILIATION",
+    )
+    check(
+        type(row.get("h039_r31_lock_provenance_compatibility_reconciliation"))
+        is str
+        and sha(row[
+            "h039_r31_lock_provenance_compatibility_reconciliation"
+        ].encode("utf-8")) == R31_RECONCILIATION_SHA256,
+        "A_H039_R31_EXACT_RECONCILIATION",
     )
     check(
         row.get("h039_os_exclusive_runtime_cleanup", {})
@@ -6565,6 +6727,11 @@ def static_contract_checks() -> dict[str, Any]:
         and f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}"
         in str(row.get("h039_r30_exit_criterion", "")),
         "A_H039_R30_EXACT_MATERIAL_REVIEW_BOUNDARY",
+    )
+    check(
+        f"R31_MATERIAL_REVIEW_EXTENSION={R31_MATERIAL_REVIEW_EXTENSION}"
+        in str(row.get("h039_r31_exit_criterion", "")),
+        "A_H039_R31_EXACT_MATERIAL_REVIEW_BOUNDARY",
     )
     first_root_tool_checks()
     return row
@@ -6859,7 +7026,7 @@ def r17_registry_selftests(row: dict[str, Any]) -> None:
 
     expected_red = {
         "label": LABEL,
-        "reason": R30_REASON,
+        "reason": R31_REASON,
         "failure_signature": FAILURE_SIGNATURE,
     }
     preproduct_red = row["h039_os_exclusive_runtime_cleanup"]["preproduct_red"]
@@ -6868,7 +7035,7 @@ def r17_registry_selftests(row: dict[str, Any]) -> None:
         "A_H039_R17_PREPRODUCT_RED_SELFTEST_ANCHOR",
     )
     for label, mutate in (
-        ("STALE_R29_REASON", lambda value: value.__setitem__("reason", R29_REASON)),
+        ("STALE_R30_REASON", lambda value: value.__setitem__("reason", R30_REASON)),
         ("STALE_R28_UNFROZEN_REASON", lambda value: value.__setitem__(
             "reason", R28_STALE_UNFROZEN_REASON,
         )),
@@ -8044,6 +8211,163 @@ def r30_registry_selftests(row: dict[str, Any]) -> None:
               f"N_H039_R30_REGISTRY_MUTANT_{label}")
 
 
+def r31_registry_accepts(value: Any) -> bool:
+    try:
+        workflow = value["workflow_only_artifacts"]
+        root = workflow["root_update"]
+        live = workflow["live_diagnostic"]
+        lock = value["lock_provenance_compatibility"]
+        published = value["published_r30"]
+        evidence = value["immutable_r30_lock_provenance_evidence"]
+        expected_root = {
+            "ceremony": R31_UPDATE_RUNNER,
+            "validator": R31_UPDATE_VALIDATOR,
+            "source_binding": R31_UPDATE_SOURCE_BINDING,
+            "dual_review": R31_UPDATE_DUAL_REVIEW,
+        }
+        expected_live = {
+            "runner": R31_DIAGNOSTIC_RUNNER,
+            "validator": R31_DIAGNOSTIC_VALIDATOR,
+            "source_binding": R31_DIAGNOSTIC_SOURCE_BINDING,
+            "dual_review": R31_DIAGNOSTIC_DUAL_REVIEW,
+        }
+        artifacts_exact = all(
+            section[role] == {
+                "path": str(path), "sha256": R31_WORKFLOW_HASHES[path],
+                "identity8": R31_WORKFLOW_IDENTITY8[path],
+            }
+            for section, expected in ((root, expected_root), (live, expected_live))
+            for role, path in expected.items()
+        )
+        return (
+            type(value) is dict and sha(canonical(value)) == R31_REGISTRY_SHA256
+            and value.get("schema_version") == 1
+            and value.get("authority_base") == R31_AUTHORITY_BASE
+            and value.get("authority_tree") == R31_AUTHORITY_TREE
+            and value.get("authority_ordered_parents") == R31_AUTHORITY_PARENTS
+            and value.get("authority_candidate") == R31_R30_CANDIDATE
+            and value.get("authority_gate_sha256") == R31_BASE_GATE_SHA256
+            and value.get("authority_spec_sha256") == R31_BASE_SPEC_SHA256
+            and value.get("authority_canonical_h039_row_sha256")
+            == R31_R30_ROW_SHA256
+            and value.get("test_author_paths") == TEST_AUTHOR_GIT_ORDER
+            and value.get("productless_contract") is True
+            and value.get("broader_authority") is False
+            and published.get("merge") == R31_AUTHORITY_BASE
+            and published.get("tree") == R31_AUTHORITY_TREE
+            and published.get("ordered_parents") == R31_AUTHORITY_PARENTS
+            and published.get("candidate") == R31_R30_CANDIDATE
+            and published.get("registry_sha256") == R31_R30_REGISTRY_SHA256
+            and published.get("reconciliation_sha256")
+            == R31_R30_RECONCILIATION_SHA256
+            and published.get("normalized_gate_source_sha256")
+            == R31_R30_NORMALIZED_GATE_SHA256
+            and lock == {
+                "scope": "EXACT_S_LOCK_ONLY_IN_FOUR_WORKFLOW_CONSUMERS",
+                "affected_consumers": ["ROOT_UPDATE_CEREMONY", "ROOT_UPDATE_VALIDATOR", "LIVE_DIAGNOSTIC_RUNNER", "LIVE_DIAGNOSTIC_VALIDATOR"],
+                "identity8": [16777232, 128098569, 0o100600, 0, 0, 1, 0, 0],
+                "payload_sha256": R31_EMPTY_SHA256,
+                "root_listing": {
+                    "returncode": 0, "stderr_sha256": R31_EMPTY_SHA256,
+                    "stdout_size": 122,
+                    "stdout_sha256": "0af243fa057db4b2c9d582b97bd451f92571bab39e32a076301f3a960bb79cbd",
+                    "line_count": 2, "mode_token": "-rw-------@",
+                    "second_line": "\tcom.apple.provenance\t11 ",
+                    "acl_rows": [], "extra_xattr_rows": [],
+                },
+                "live_xattr_profile": [["com.apple.provenance", 11]],
+                "stable_name_rebind": True,
+                "plain_or_absent_variant_permitted": False,
+                "wrong_duplicate_extra_plus_acl_crlf_nul_truncated_other_path_substring_set_ge_wildcard_or_global_parser_permitted": False,
+                "value_bytes_read": False,
+                "value_origin_or_general_apple_semantics_adjudicated": False,
+                "r15_product_reads_or_uses_xattrs": False,
+                "other_object_acl_or_xattr_rule_changed": False,
+            }
+            and evidence["validated_observation"]["sha256"]
+            == R31_R30_EVIDENCE[R23_EVIDENCE_ROOT / "h039-r30-lock-marker-post-failure-observation-r2.json"][0]
+            and evidence["owner_adjudication"]["sha256"]
+            == R31_R30_EVIDENCE[R23_EVIDENCE_ROOT / "h039-r30-lock-provenance-owner-adjudication.json"][0]
+            and artifacts_exact
+            and root.get("attempt") == str(R31_UPDATE_ATTEMPT)
+            and root.get("outcome") == str(R31_UPDATE_OUTCOME)
+            and live.get("attempt") == str(R31_DIAGNOSTIC_ATTEMPT)
+            and live.get("outcome") == str(R31_DIAGNOSTIC_OUTCOME)
+            and value.get("current_cli") == [
+                "--r31-installed", "RUNTIME_SUPPLIED_PUBLISHED_R31_CONTRACT_MERGE",
+                R31_R15_PRODUCT_MERGE,
+            ]
+            and value.get("historical_cli_selectors_unreachable", [None])[0]
+            == "--r30-installed"
+            and value.get("noarg", {}).get("reason") == R31_REASON
+            and value.get("installed_lane", {}).get("task_completion_credit")
+            is False
+            and value.get("h038_h032_h031_or_supervisor_resume") is False
+            and value.get("new_tool_root_command_path_or_mutation") is False
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def exact_r31_installed_argv(argv: Any) -> bool:
+    return (
+        type(argv) is list and len(argv) == 3
+        and all(type(value) is str for value in argv)
+        and argv[0] == "--r31-installed" and valid_hex(argv[1], 40)
+        and argv[2] == R31_R15_PRODUCT_MERGE
+    )
+
+
+def r31_workflow_frozen() -> bool:
+    return (
+        set(R31_WORKFLOW_HASHES) == set(R31_WORKFLOW_IDENTITY8)
+        and len(R31_WORKFLOW_HASHES) == 8
+        and all(valid_hex(digest, 64) and digest != "0" * 64
+                for digest in R31_WORKFLOW_HASHES.values())
+        and all(type(identity) is list and len(identity) == 8
+                and all(type(member) is int for member in identity)
+                and stat.S_ISREG(identity[2]) and identity[5] == 1
+                for identity in R31_WORKFLOW_IDENTITY8.values())
+    )
+
+
+def r31_registry_selftests(row: dict[str, Any]) -> None:
+    registry = row["h039_os_exclusive_runtime_cleanup"][
+        "r31_lock_provenance_compatible_installed_binding"
+    ]
+    check(r31_registry_accepts(registry),
+          "A_H039_R31_EXACT_LOCK_PROVENANCE_COMPATIBILITY_REGISTRY")
+    check(r31_workflow_frozen(),
+          "A_H039_R31_ALL_EIGHT_WORKFLOW_ARTIFACT_IDENTITIES_FROZEN")
+    for label, mutate in (
+        ("BASE", lambda value: value.__setitem__("authority_base", "00" * 20)),
+        ("SCOPE", lambda value: value["lock_provenance_compatibility"].__setitem__("scope", "GLOBAL")),
+        ("PLAIN", lambda value: value["lock_provenance_compatibility"].__setitem__("plain_or_absent_variant_permitted", True)),
+        ("VALUE", lambda value: value["lock_provenance_compatibility"].__setitem__("value_bytes_read", True)),
+        ("CONSUMER", lambda value: value["lock_provenance_compatibility"]["affected_consumers"].pop()),
+        ("STATIC", lambda value: value["workflow_only_artifacts"]["root_update"]["ceremony"].__setitem__("sha256", "00" * 32)),
+        ("CLI", lambda value: value["current_cli"].__setitem__(0, "--r30-installed")),
+        ("CREDIT", lambda value: value["installed_lane"].__setitem__("task_completion_credit", True)),
+        ("DOWNSTREAM", lambda value: value.__setitem__("h038_h032_h031_or_supervisor_resume", True)),
+    ):
+        mutant = copy.deepcopy(registry); mutate(mutant)
+        check(not r31_registry_accepts(mutant),
+              f"N_H039_R31_REGISTRY_MUTANT_{label}")
+    sample = "ab" * 20
+    check(exact_r31_installed_argv([
+        "--r31-installed", sample, R31_R15_PRODUCT_MERGE,
+    ]), "A_H039_R31_EXACT_INSTALLED_CLI_SHAPE")
+    for index, mutant in enumerate((
+        [], ["--r31-installed", sample],
+        ["--r30-installed", sample, R31_R15_PRODUCT_MERGE],
+        ["--r31-installed", sample.upper(), R31_R15_PRODUCT_MERGE],
+        ["--r31-installed", sample, R31_AUTHORITY_BASE],
+        ["--r31-installed", sample, R31_R15_PRODUCT_MERGE, "extra"],
+    )):
+        check(not exact_r31_installed_argv(mutant),
+              f"N_H039_R31_INSTALLED_CLI_MUTANT_{index:02d}")
+
+
 def exact_r27_product_argv(argv: Any) -> bool:
     return (
         type(argv) is list and len(argv) == 3
@@ -8900,6 +9224,146 @@ def r30_dispatch_selftests() -> None:
         and not pre_diagnostic_owner_stop_phase("preproduct"),
         "A_H039_R30_DISTINCT_PRE_DIAGNOSTIC_OWNER_STOP_CLASSIFICATION",
     )
+
+
+def r31_dispatch_surface_exact(module: ast.Module) -> bool:
+    mains = [node for node in module.body if isinstance(node, ast.FunctionDef)
+             and node.name == "main"]
+    if len(mains) != 1:
+        return False
+    main = mains[0]
+    def assignment(name: str) -> ast.Assign | None:
+        rows = [node for node in main.body if isinstance(node, ast.Assign)
+                and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == name]
+        return rows[0] if len(rows) == 1 else None
+    call_name = lambda call: call.func.id if isinstance(call.func, ast.Name) else ""
+    pre = assignment("preproduct"); current = assignment("r31_installed")
+    stale = assignment("r30_installed")
+    if None in (pre, current, stale):
+        return False
+    if not (
+        isinstance(pre.value, ast.UnaryOp) and isinstance(pre.value.op, ast.Not)
+        and isinstance(pre.value.operand, ast.Name) and pre.value.operand.id == "argv"
+        and isinstance(current.value, ast.Call)
+        and call_name(current.value) == "exact_r31_installed_argv"
+        and len(current.value.args) == 1 and isinstance(current.value.args[0], ast.Name)
+        and current.value.args[0].id == "argv"
+        and isinstance(stale.value, ast.Constant) and stale.value.value is False
+    ):
+        return False
+    for name in ("r29_installed", "r28_installed", "r27_product",
+                 "r27_published", "r26_installed"):
+        row = assignment(name)
+        if row is None or not isinstance(row.value, ast.Constant) \
+                or row.value.value is not False:
+            return False
+    branches: dict[str, ast.If] = {}
+    for name, marker in (
+        ("preproduct", "r31_contract_candidate_identity"),
+        ("r31_installed", "r31_contract_publication_identity"),
+        ("r30_installed", "r30_contract_publication_identity"),
+    ):
+        rows = [node for node in ast.walk(main) if isinstance(node, ast.If)
+                and isinstance(node.test, ast.Name) and node.test.id == name
+                and any(isinstance(call, ast.Call) and call_name(call) == marker
+                        for call in ast.walk(node))]
+        if len(rows) != 1:
+            return False
+        branches[name] = rows[0]
+    calls = lambda node: {call_name(item) for item in ast.walk(node)
+                          if isinstance(item, ast.Call)}
+    pre_calls = calls(branches["preproduct"])
+    installed_calls = calls(branches["r31_installed"])
+    if not {
+        "r31_prepublication_workflow_checks", "r31_immutable_r30_closure_checks",
+        "r31_contract_candidate_identity", "r28_published_r15_identity",
+    } <= pre_calls or not {
+        "r31_contract_publication_identity", "r28_published_r15_identity",
+        "r31_immutable_r30_closure_checks", "r31_workflow_completed_checks",
+        "finish",
+    } <= installed_calls:
+        return False
+    forbidden = {
+        "product_effects", "guarded_product_effects", "run_product",
+        "request_operation", "r28_read_only_installed_update_checks",
+        "fixed_installation_snapshot", "path_extended_metadata",
+        "fd_extended_metadata", "r31_run_diagnostic",
+    }
+    if pre_calls & forbidden or installed_calls & forbidden:
+        return False
+    all_calls = [call_name(item) for item in ast.walk(main)
+                 if isinstance(item, ast.Call)]
+    critical = [
+        "r31_registry_selftests", "r31_line_limit_surface_selftests",
+        "r31_gate_closed_world_selftests", "r29_line_delta_selftests",
+        "r31_dispatch_selftests", "r31_static_workflow_selftests",
+    ]
+    tries = [node for node in main.body if isinstance(node, ast.Try)
+             and any(isinstance(item, ast.Call)
+                     and call_name(item) == "static_contract_checks"
+                     for row in node.body for item in ast.walk(row))]
+    if len(tries) != 1:
+        return False
+    direct = [call_name(row.value) for row in tries[0].body
+              if isinstance(row, ast.Expr) and isinstance(row.value, ast.Call)]
+    admissions = [node for node in main.body if isinstance(node, ast.If)
+                  and isinstance(node.test, ast.UnaryOp)
+                  and isinstance(node.test.op, ast.Not)
+                  and isinstance(node.test.operand, ast.BoolOp)
+                  and isinstance(node.test.operand.op, ast.Or)
+                  and [value.id for value in node.test.operand.values
+                       if isinstance(value, ast.Name)]
+                  == ["preproduct", "r31_installed"]
+                  and len(node.test.operand.values) == 2]
+    return (
+        len(admissions) == 1
+        and [name for name in direct if name in critical] == critical
+        and all(direct.count(name) == 1 for name in critical)
+        and all_calls.count("exact_r31_installed_argv") == 1
+        and all(all_calls.count(name) == 0 for name in (
+            "exact_r30_installed_argv", "exact_r29_installed_argv",
+            "exact_r28_installed_argv", "exact_r27_product_argv",
+            "exact_r27_publication_argv", "exact_r26_installed_argv",
+            "r30_registry_selftests", "r30_line_limit_surface_selftests",
+            "r30_dispatch_selftests", "r30_static_workflow_selftests",
+        ))
+    )
+
+
+def r31_dispatch_selftests() -> None:
+    try:
+        current = ast.parse(GATE.read_bytes(), filename=str(GATE))
+        historical = ast.parse(blob(R31_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R31 dispatch source unavailable") from exc
+    check(r30_dispatch_surface_exact(historical),
+          "A_H039_R31_HISTORICAL_R30_DISPATCH_AUTHENTICATED")
+    check(r31_dispatch_surface_exact(current),
+          "A_H039_R31_EXACT_CURRENT_AND_HISTORICAL_DISPATCH_SURFACE")
+    mutants: list[tuple[str, ast.Module]] = []
+    for name in ("r31_registry_selftests", "r31_line_limit_surface_selftests",
+                 "r31_gate_closed_world_selftests", "r31_static_workflow_selftests"):
+        mutant = copy.deepcopy(current)
+        target = next(node for node in ast.walk(mutant)
+                      if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                      and node.func.id == name)
+        target.func.id = "r30_registry_selftests"
+        mutants.append((f"STALE_{name.upper()}", mutant))
+    mutant = copy.deepcopy(current)
+    stale_row = next(node for node in next(
+        item for item in mutant.body if isinstance(item, ast.FunctionDef)
+        and item.name == "main").body if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "r30_installed")
+    stale_row.value = ast.Constant(True); mutants.append(("R30_REVIVED", mutant))
+    for label, mutant in mutants:
+        check(not r31_dispatch_surface_exact(mutant),
+              f"N_H039_R31_DISPATCH_MUTANT_{label}")
+    check(pre_diagnostic_owner_stop_phase("r31-installed")
+          and not pre_diagnostic_owner_stop_phase("r30-installed")
+          and not pre_diagnostic_owner_stop_phase("preproduct"),
+          "A_H039_R31_DISTINCT_PRE_DIAGNOSTIC_OWNER_STOP_CLASSIFICATION")
 
 
 def r23_registry_selftests(row: dict[str, Any]) -> None:
@@ -32202,6 +32666,291 @@ def r30_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]
         return False, {"error": str(exc), "merge": merge}
 
 
+def r31_historical_r30_bytes_exact(current_raw: bytes, base_raw: bytes) -> bool:
+    def selected(raw: bytes) -> list[tuple[str, bytes]]:
+        module = ast.parse(raw.decode("utf-8", "strict"))
+        lines = raw.splitlines(keepends=True); result: list[tuple[str, bytes]] = []
+        for node in module.body:
+            label = ""
+            if isinstance(node, ast.FunctionDef) and (
+                node.name.startswith("r30_") or node.name == "exact_r30_installed_argv"
+            ):
+                label = f"function:{node.name}"
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                names = [target.id for target in targets if isinstance(target, ast.Name)
+                         and target.id.startswith("R30_")]
+                if names:
+                    label = "assignment:" + ",".join(names)
+            elif (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                  and isinstance(node.value.func, ast.Attribute)
+                  and isinstance(node.value.func.value, ast.Name)
+                  and node.value.func.value.id.startswith("R30_")):
+                label = "mutation:" + node.value.func.value.id
+            if label:
+                if node.end_lineno is None:
+                    return []
+                result.append((label, b"".join(lines[node.lineno - 1:node.end_lineno])))
+        return result
+    try:
+        return selected(current_raw) == selected(base_raw)
+    except (SyntaxError, UnicodeError, ValueError, TypeError):
+        return False
+
+
+def r31_line_limit_surface_accepts(current: ast.Module, base: ast.Module) -> bool:
+    for name in ("MAX_ADDED_LINES", "MAX_DELETED_LINES"):
+        old = [node for node in base.body if isinstance(node, ast.Assign)
+               and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+               and node.targets[0].id == name]
+        now = [node for node in current.body if isinstance(node, ast.Assign)
+               and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+               and node.targets[0].id == name]
+        writes = [node for node in ast.walk(current) if isinstance(node, ast.Name)
+                  and node.id == name and isinstance(node.ctx, (ast.Store, ast.Del))]
+        if len(old) != 1 or len(now) != 1 or len(writes) != 1 \
+                or ast.dump(old[0], include_attributes=False) \
+                != ast.dump(now[0], include_attributes=False):
+            return False
+    if r30_max_consumer_rows(current) != r30_max_consumer_rows(base) \
+            or len(r30_max_consumer_rows(base)) != 20:
+        return False
+    owners = lambda module: sorted((node.name, sum(
+        isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+        and call.func.id == "r29_line_delta_accepts" for call in ast.walk(node)
+    )) for node in module.body if isinstance(node, ast.FunctionDef)
+        if any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+               and call.func.id == "r29_line_delta_accepts"
+               for call in ast.walk(node)))
+    return owners(current) == sorted(owners(base) + [("r31_contract_candidate_graph", 1)])
+
+
+def r31_line_limit_surface_selftests() -> None:
+    try:
+        current_raw = GATE.read_bytes(); current = ast.parse(current_raw)
+        base_raw = blob(R31_AUTHORITY_BASE, "verify/bin/h-039-exit")
+        base = ast.parse(base_raw)
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R31 line-limit references unavailable") from exc
+    check(sha(base_raw) == R31_BASE_GATE_SHA256
+          and r31_historical_r30_bytes_exact(current_raw, base_raw),
+          "A_H039_R31_HISTORICAL_R30_SOURCE_BYTES_EXACT")
+    check(r31_line_limit_surface_accepts(current, base),
+          "A_H039_R31_GLOBAL2400_AND_EXACT20_CONSUMERS_UNCHANGED")
+    mutants: list[tuple[str, ast.Module]] = []
+    mutant = copy.deepcopy(current); mutant.body.append(ast.parse(
+        "def hidden_r31_limit():\n return MAX_ADDED_LINES\n").body[0]); mutants.append(("NEW_CONSUMER", mutant))
+    mutant = copy.deepcopy(current)
+    next(node for node in mutant.body if isinstance(node, ast.Assign)
+         and isinstance(node.targets[0], ast.Name)
+         and node.targets[0].id == "MAX_ADDED_LINES").value = ast.Constant(2401)
+    mutants.append(("GLOBAL_WIDEN", mutant))
+    for label, replacement in (("DECOY", "r29_line_delta_accepts_decoy"),
+                               ("BYPASS", "r30_contract_candidate_graph")):
+        mutant = copy.deepcopy(current)
+        graph = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
+                     and node.name == "r31_contract_candidate_graph")
+        next(call for call in ast.walk(graph) if isinstance(call, ast.Call)
+             and isinstance(call.func, ast.Name)
+             and call.func.id == "r29_line_delta_accepts").func.id = replacement
+        mutants.append((label, mutant))
+    mutant = copy.deepcopy(current)
+    graph = next(node for node in mutant.body if isinstance(node, ast.FunctionDef)
+                 and node.name == "r31_contract_candidate_graph")
+    call = next(call for call in ast.walk(graph) if isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Name)
+                and call.func.id == "r29_line_delta_accepts")
+    graph.body.append(ast.Expr(copy.deepcopy(call))); mutants.append(("DUPLICATE", mutant))
+    for label, mutant in mutants:
+        check(not r31_line_limit_surface_accepts(mutant, base),
+              f"N_H039_R31_LINE_LIMIT_MUTANT_{label}")
+    historical_mutant = current_raw.replace(
+        b"def r30_registry_expected() -> dict[str, Any]:\n",
+        b"def  r30_registry_expected() -> dict[str, Any]:\n", 1)
+    check(historical_mutant != current_raw
+          and not r31_historical_r30_bytes_exact(historical_mutant, base_raw),
+          "N_H039_R31_HISTORICAL_R30_WHITESPACE_MUTANT")
+
+
+def r31_gate_closed_world_exact(current: ast.Module, base: ast.Module) -> bool:
+    expected_module = "d080a997fe5750571eeed3d30fb2eaf66c9f6e18697b998fb5752c175b1fdefa"
+    expected_self = "afd0e105ec2f1b89270805408dae9f8234af81f8d41c8c2eb1d7ffac8029fa8b"
+    new_functions = {
+        "exact_r31_installed_argv", "r31_contract_candidate_graph",
+        "r31_contract_candidate_identity", "r31_contract_publication_identity",
+        "r31_dispatch_selftests", "r31_dispatch_surface_exact",
+        "r31_gate_closed_world_exact", "r31_gate_closed_world_selftests",
+        "r31_historical_r30_bytes_exact", "r31_line_limit_surface_accepts",
+        "r31_line_limit_surface_selftests", "r31_registry_accepts",
+        "r31_registry_selftests", "r31_workflow_frozen",
+        "r31_consumer_graph_accepts", "r31_consumer_surface_accepts",
+        "r31_all_consumer_surfaces_accept",
+        "r31_workflow_semantic_accepts", "r31_static_workflows_accept",
+        "r31_open_static_workflows", "r31_static_workflow_selftests",
+        "r31_dynamic_presence", "r31_dynamic_presence_accepts",
+        "r31_prepublication_workflow_checks", "r31_lock_profile_accepts",
+        "r31_immutable_r30_closure_checks", "r31_run_update_validator",
+        "r31_workflow_completed_checks",
+    }
+    changed_functions = {"finish", "main", "pre_diagnostic_owner_stop_phase",
+                         "r17_registry_selftests", "static_contract_checks"}
+    new_assignments = {
+        "R31_AUTHORITY_BASE", "R31_AUTHORITY_TREE", "R31_AUTHORITY_PARENTS",
+        "R31_R30_CANDIDATE", "R31_R15_PRODUCT_MERGE", "R31_BASE_GATE_SHA256",
+        "R31_BASE_SPEC_SHA256", "R31_R30_ROW_SHA256", "R31_R30_REGISTRY_SHA256",
+        "R31_R30_RECONCILIATION_SHA256", "R31_R30_NORMALIZED_GATE_SHA256",
+        "R31_R30_MATERIAL_EXTENSION_SHA256", "R31_R30_DUAL_REVIEW",
+        "R31_R30_PUBLICATION", "R31_R30_PUBLICATION_AUDIT",
+        "R31_EMPTY_SHA256", "R31_R30_PUBLICATION_EVIDENCE",
+        "R31_ORDERED_PUBLICATION_EVIDENCE", "R31_R30_EVIDENCE",
+        "R31_UPDATE_RUNNER", "R31_UPDATE_VALIDATOR", "R31_UPDATE_SOURCE_BINDING",
+        "R31_UPDATE_DUAL_REVIEW", "R31_UPDATE_ATTEMPT", "R31_UPDATE_OUTCOME",
+        "R31_DIAGNOSTIC_RUNNER", "R31_DIAGNOSTIC_VALIDATOR",
+        "R31_DIAGNOSTIC_SOURCE_BINDING", "R31_DIAGNOSTIC_DUAL_REVIEW",
+        "R31_DIAGNOSTIC_ATTEMPT", "R31_DIAGNOSTIC_OUTCOME",
+        "R31_WORKFLOW_HASHES", "R31_WORKFLOW_IDENTITY8",
+        "R31_WORKFLOW_AST_SHA256", "R31_CONSUMER_AST_SHA256",
+        "R31_XATTR_HELPER_AST_SHA256", "R31_CONSUMER_CALL_GRAPH",
+        "R31_REGISTRY_SHA256", "R31_RECONCILIATION_SHA256",
+        "R31_GATE_SOURCE_SHA256", "R31_MATERIAL_REVIEW_EXTENSION", "R31_REASON",
+    }
+    changed_assignments = {"EXPECTED_H039_ROW_SHA256"}
+    dump = lambda node: ast.dump(node, include_attributes=False)
+    funcs = lambda tree: [node for node in tree.body if isinstance(node, ast.FunctionDef)]
+    assigns = lambda tree: [node for node in tree.body if isinstance(node, ast.Assign)
+                            and len(node.targets) == 1
+                            and isinstance(node.targets[0], ast.Name)]
+    cf_rows, bf_rows = funcs(current), funcs(base); ca_rows, ba_rows = assigns(current), assigns(base)
+    cf = {node.name: node for node in cf_rows}; bf = {node.name: node for node in bf_rows}
+    ca = {node.targets[0].id: node for node in ca_rows}; ba = {node.targets[0].id: node for node in ba_rows}
+    if not (len(cf) == len(cf_rows) and len(bf) == len(bf_rows)
+            and len(ca) == len(ca_rows) and len(ba) == len(ba_rows)
+            and set(cf) - set(bf) == new_functions and not set(bf) - set(cf)
+            and set(ca) - set(ba) == new_assignments and not set(ba) - set(ca)
+            and {name for name in set(cf) & set(bf) if dump(cf[name]) != dump(bf[name])}
+            == changed_functions
+            and {name for name in set(ca) & set(ba) if dump(ca[name]) != dump(ba[name])}
+            == changed_assignments):
+        return False
+    own = copy.deepcopy(cf["r31_gate_closed_world_exact"])
+    self_row = next((node for node in own.body if isinstance(node, ast.Assign)
+                     and isinstance(node.targets[0], ast.Name)
+                     and node.targets[0].id == "expected_self"), None)
+    if self_row is None:
+        return False
+    self_row.value = ast.Constant("0" * 64)
+    if sha(dump(own).encode()) != expected_self:
+        return False
+    projected = copy.deepcopy(current)
+    projected.body = [node for node in projected.body if not (
+        isinstance(node, ast.FunctionDef) and node.name == "r31_gate_closed_world_exact")]
+    source = [node for node in assigns(projected)
+              if node.targets[0].id == "R31_GATE_SOURCE_SHA256"]
+    if len(source) != 1:
+        return False
+    source[0].value = ast.Constant("0" * 64)
+    return sha(dump(projected).encode()) == expected_module
+
+
+def r31_gate_closed_world_selftests() -> None:
+    try:
+        current = ast.parse(GATE.read_bytes(), filename=str(GATE))
+        base = ast.parse(blob(R31_AUTHORITY_BASE, "verify/bin/h-039-exit"))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        raise Rig("R31 whole-gate closed-world references unavailable") from exc
+    check(r31_gate_closed_world_exact(current, base),
+          "A_H039_R31_WHOLE_GATE_CLOSED_WORLD_ORACLE_LIVE")
+    function = lambda tree, name: next(node for node in tree.body
+                                      if isinstance(node, ast.FunctionDef)
+                                      and node.name == name)
+    assignment = lambda tree, name: next(node for node in tree.body
+                                         if isinstance(node, ast.Assign)
+                                         and isinstance(node.targets[0], ast.Name)
+                                         and node.targets[0].id == name)
+    mutants: list[tuple[str, ast.Module]] = []
+    mutant = copy.deepcopy(current); mutant.body.append(ast.parse("os.unlink('/tmp/x')").body[0]); mutants.append(("TOP_LEVEL_EFFECT", mutant))
+    mutant = copy.deepcopy(current); function(mutant, "main").body.insert(0, ast.parse("subprocess.run(['/bin/sh'])").body[0]); mutants.append(("MAIN_EFFECT", mutant))
+    mutant = copy.deepcopy(current); mutant.body.append(ast.Import(names=[ast.alias("socket")])); mutants.append(("IMPORT", mutant))
+    mutant = copy.deepcopy(current); mutant.body.append(ast.parse("def r31_decoy():\n return True").body[0]); mutants.append(("FUNCTION", mutant))
+    mutant = copy.deepcopy(current); function(mutant, "sha").body.append(ast.Pass()); mutants.append(("HISTORICAL", mutant))
+    mutant = copy.deepcopy(current); assignment(mutant, "R31_REASON").value = ast.Constant("weakened"); mutants.append(("ASSIGNMENT", mutant))
+    mutant = copy.deepcopy(current); function(mutant, "r31_gate_closed_world_exact").body.append(ast.Pass()); mutants.append(("SELF", mutant))
+    for label, mutant in mutants:
+        check(not r31_gate_closed_world_exact(mutant, base),
+              f"N_H039_R31_WHOLE_GATE_MUTANT_{label}")
+
+
+def r31_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        changes = raw_changes(R31_AUTHORITY_BASE, candidate)
+        additions, deletions = line_delta(R31_AUTHORITY_BASE, candidate)
+        detail = {"authority_tree": commit_tree(R31_AUTHORITY_BASE),
+                  "authority_parents": commit_parents(R31_AUTHORITY_BASE),
+                  "candidate": candidate, "candidate_parents": commit_parents(candidate),
+                  "changes": changes, "additions": additions, "deletions": deletions}
+        rejected = {R31_AUTHORITY_BASE, R31_R30_CANDIDATE, R31_R15_PRODUCT_MERGE,
+                    R30_AUTHORITY_BASE, R30_R29_CANDIDATE,
+                    REJECTED_R30_R1_CANDIDATE, REJECTED_R29_R1_CANDIDATE}
+        ok = (object_type(R31_AUTHORITY_BASE) == "commit"
+              and detail["authority_tree"] == R31_AUTHORITY_TREE
+              and detail["authority_parents"] == R31_AUTHORITY_PARENTS
+              and sha(blob(R31_AUTHORITY_BASE, "verify/bin/h-039-exit")) == R31_BASE_GATE_SHA256
+              and sha(blob(R31_AUTHORITY_BASE, "specs/tasks.spec.json")) == R31_BASE_SPEC_SHA256
+              and object_type(candidate) == "commit" and candidate not in rejected
+              and detail["candidate_parents"] == [R31_AUTHORITY_BASE]
+              and exact_contract_change_shape(changes)
+              and r29_line_delta_accepts(additions, deletions))
+        return ok, detail
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "candidate": candidate}
+
+
+def r31_contract_candidate_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    graph_ok, graph = r31_contract_candidate_graph(candidate)
+    try:
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(stable_checkout_blob(path, blob(candidate, path))
+                             for path in TEST_AUTHOR_GIT_ORDER)
+        return (graph_ok and remote_main == R31_AUTHORITY_BASE and head == candidate
+                and status_raw == b"" and checkout_equal), {
+                    "graph": graph, "remote_main": remote_main, "head": head,
+                    "status": status_raw.decode("utf-8", "replace"),
+                    "checkout_equal": checkout_equal,
+                }
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "graph": graph}
+
+
+def r31_contract_publication_identity(merge: str) -> tuple[bool, dict[str, Any]]:
+    try:
+        parents = commit_parents(merge)
+        if len(parents) != 2:
+            return False, {"parents": parents}
+        authority, candidate = parents
+        candidate_ok, candidate_detail = r31_contract_candidate_graph(candidate)
+        changes = raw_changes(R31_AUTHORITY_BASE, merge)
+        remote_main = observed_production_main()
+        head = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
+        status_raw = git(["status", "--porcelain=v1", "--untracked-files=all"])
+        checkout_equal = all(stable_checkout_blob(path, blob(merge, path))
+                             for path in TEST_AUTHOR_GIT_ORDER)
+        ok = (object_type(merge) == "commit" and authority == R31_AUTHORITY_BASE
+              and candidate_ok and commit_tree(merge) == commit_tree(candidate)
+              and exact_contract_change_shape(changes) and remote_main == merge
+              and head == merge and status_raw == b"" and checkout_equal
+              and SPEC.read_bytes() == blob(merge, "specs/tasks.spec.json")
+              and GATE.read_bytes() == blob(merge, "verify/bin/h-039-exit"))
+        return ok, {"parents": parents, "candidate": candidate_detail,
+                    "changes": changes, "tree": commit_tree(merge),
+                    "remote_main": remote_main, "head": head,
+                    "status": status_raw.decode("utf-8", "replace"),
+                    "checkout_equal": checkout_equal}
+    except (Rig, subprocess.SubprocessError, OSError, ValueError) as exc:
+        return False, {"error": str(exc), "merge": merge}
+
+
 def r28_contract_candidate_graph(candidate: str) -> tuple[bool, dict[str, Any]]:
     try:
         changes = raw_changes(R28_AUTHORITY_BASE, candidate)
@@ -35207,6 +35956,684 @@ def r30_workflow_completed_checks() -> tuple[
         raise
 
 
+def r31_lock_profile_accepts(root_stdout: Any, live_profile: Any) -> bool:
+    if type(root_stdout) is not bytes or b"\r" in root_stdout or b"\0" in root_stdout:
+        return False
+    rows = root_stdout.split(b"\n")
+    lock_path = os.fsencode(str(Path("/private/var/db/nortropic-runtime-cleanup-v1/s/lock")))
+    return (
+        len(rows) == 3 and rows[2] == b""
+        and rows[0].split(None, 1)[0] == b"-rw-------@"
+        and rows[0].endswith(b" " + lock_path)
+        and rows[1] == b"\tcom.apple.provenance\t11 "
+        and exact_typed_tree(live_profile, [["com.apple.provenance", 11]])
+    )
+
+
+def r31_consumer_graph_accepts(path: Path, module: Any) -> bool:
+    if not isinstance(module, ast.Module) or path not in R31_WORKFLOW_AST_SHA256:
+        return False
+    consumers = {
+        name: digest for (owner, name), digest in R31_CONSUMER_AST_SHA256.items()
+        if owner == path
+    }
+    helpers = {
+        name: digest for (owner, name), digest in R31_XATTR_HELPER_AST_SHA256.items()
+        if owner == path
+    }
+    expected = consumers | helpers
+    caller_names = set(R31_CONSUMER_CALL_GRAPH[path])
+    rows = [node for node in module.body if isinstance(node, ast.FunctionDef)]
+    if not consumers or any(
+        sum(node.name == name for node in rows) != 1
+        for name in set(expected) | caller_names
+    ):
+        return False
+    functions = {node.name: node for node in rows}
+    if not all(sha(ast.dump(
+        functions[name], include_attributes=False,
+    ).encode()) == digest for name, digest in expected.items()):
+        return False
+    selected_names = set(expected)
+    observed_graph: dict[str, tuple[dict[str, int], str]] = {}
+    for caller in rows:
+        calls = {
+            name: sum(isinstance(call, ast.Call)
+                      and isinstance(call.func, ast.Name)
+                      and call.func.id == name for call in ast.walk(caller))
+            for name in selected_names
+        }
+        calls = {name: count for name, count in calls.items() if count}
+        if calls:
+            observed_graph[caller.name] = (
+                calls, sha(ast.dump(caller, include_attributes=False).encode()),
+            )
+    if observed_graph != R31_CONSUMER_CALL_GRAPH[path]:
+        return False
+    parents = {id(child): parent for parent in ast.walk(module)
+               for child in ast.iter_child_nodes(parent)}
+    caller_graph = R31_CONSUMER_CALL_GRAPH[path]
+    protected_names = selected_names | set(caller_graph)
+
+    def enclosing_function(node: ast.AST) -> str | None:
+        parent: ast.AST | None = node
+        owner: str | None = None
+        while parent is not None and id(parent) in parents:
+            parent = parents[id(parent)]
+            if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                owner = parent.name
+        return owner
+
+    for node in ast.walk(module):
+        if isinstance(node, ast.Name):
+            if node.id in protected_names and not isinstance(node.ctx, ast.Load):
+                return False
+            if not isinstance(node.ctx, ast.Load):
+                continue
+            owner = enclosing_function(node)
+            if node.id in {"libc", "ctypes"} and owner not in helpers:
+                return False
+            if node.id in selected_names:
+                parent = parents.get(id(node))
+                if (not isinstance(parent, ast.Call) or parent.func is not node
+                        or owner not in caller_graph):
+                    return False
+        elif isinstance(node, ast.FunctionDef) and node.name in protected_names:
+            if functions.get(node.name) is not node:
+                return False
+        elif isinstance(node, (ast.AsyncFunctionDef, ast.ClassDef)) \
+                and node.name in protected_names:
+            return False
+        elif isinstance(node, ast.arg) and node.arg in protected_names:
+            return False
+        elif isinstance(node, ast.alias):
+            bound = node.asname or node.name.split(".", 1)[0]
+            if bound in protected_names:
+                return False
+        elif isinstance(node, (ast.Global, ast.Nonlocal)) \
+                and protected_names.intersection(node.names):
+            return False
+    xattr_names = {
+        "getxattr", "fgetxattr", "setxattr", "fsetxattr",
+        "removexattr", "fremovexattr",
+    }
+    for node in ast.walk(module):
+        if isinstance(node, ast.Constant) and node.value in xattr_names:
+            return False
+        if isinstance(node, ast.Name) and node.id in xattr_names:
+            return False
+        if isinstance(node, ast.Attribute) and node.attr in xattr_names:
+            parent: ast.AST | None = node
+            owner: str | None = None
+            while parent is not None and id(parent) in parents:
+                parent = parents[id(parent)]
+                if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    owner = parent.name
+                    break
+            if owner not in helpers:
+                return False
+    xattr_calls = [call for call in ast.walk(module) if isinstance(call, ast.Call)
+                   and isinstance(call.func, ast.Attribute)
+                   and call.func.attr in {"fgetxattr", "getxattr"}]
+    expected_calls = 2 if path in {
+        R31_DIAGNOSTIC_RUNNER, R31_DIAGNOSTIC_VALIDATOR,
+    } else 1
+    if len(xattr_calls) != expected_calls or not all(
+        isinstance(call.func.value, ast.Name) and call.func.value.id == "libc"
+        and len(call.args) == 6 and isinstance(call.args[2], ast.Constant)
+        and call.args[2].value is None and isinstance(call.args[3], ast.Constant)
+        and call.args[3].value == 0 for call in xattr_calls
+    ):
+        return False
+    forbidden = {"setxattr", "fsetxattr", "removexattr", "fremovexattr"}
+    return not any(isinstance(node, ast.Attribute) and node.attr in forbidden
+                   for node in ast.walk(module))
+
+
+def r31_consumer_surface_accepts(path: Path, module: Any) -> bool:
+    if not isinstance(module, ast.Module) or path not in R31_WORKFLOW_AST_SHA256:
+        return False
+    normalized = copy.deepcopy(module)
+    normalized.body = [node for node in normalized.body
+                       if not isinstance(node, ast.Pass)]
+    return (
+        sha(ast.dump(normalized, include_attributes=False).encode())
+        == R31_WORKFLOW_AST_SHA256[path]
+        and r31_consumer_graph_accepts(path, module)
+    )
+
+
+def r31_all_consumer_surfaces_accept(modules: Any) -> bool:
+    expected = set(R31_WORKFLOW_AST_SHA256)
+    return (type(modules) is dict and set(modules) == expected
+            and all(r31_consumer_surface_accepts(path, modules[path])
+                    for path in expected))
+
+
+def r31_workflow_semantic_accepts(path: Path, raw: Any) -> bool:
+    if type(raw) is not bytes or path not in R31_WORKFLOW_HASHES \
+            or sha(raw) != R31_WORKFLOW_HASHES[path]:
+        return False
+    if path in {R31_UPDATE_SOURCE_BINDING, R31_UPDATE_DUAL_REVIEW,
+                R31_DIAGNOSTIC_SOURCE_BINDING, R31_DIAGNOSTIC_DUAL_REVIEW}:
+        try:
+            value = strict_json(raw)
+        except (Rig, UnicodeError, ValueError, TypeError):
+            return False
+        expected_type = {
+            R31_UPDATE_SOURCE_BINDING: "h039_r31_r15_root_update_source_binding",
+            R31_UPDATE_DUAL_REVIEW: "h039_r31_r15_root_update_workflow_dual_review",
+            R31_DIAGNOSTIC_SOURCE_BINDING: "h039_r31_r15_live_diagnostic_source_binding",
+            R31_DIAGNOSTIC_DUAL_REVIEW: "h039_r31_r15_live_diagnostic_workflow_dual_review",
+        }[path]
+        credit = (value.get("diagnostic_effect_boundary", {}).get("task_credit")
+                  if path == R31_DIAGNOSTIC_SOURCE_BINDING
+                  else value.get("task_credit"))
+        return (type(value) is dict and value.get("record_type") == expected_type
+                and credit is False
+                and (path not in {R31_UPDATE_DUAL_REVIEW, R31_DIAGNOSTIC_DUAL_REVIEW}
+                     or value.get("verdict", value.get("disposition")) == "PASS"))
+    try:
+        module = ast.parse(raw.decode("utf-8", "strict"), filename=str(path))
+    except (SyntaxError, UnicodeError):
+        return False
+    if sha(ast.dump(module, include_attributes=False).encode()) \
+            != R31_WORKFLOW_AST_SHA256[path]:
+        return False
+    return r31_consumer_surface_accepts(path, module)
+
+
+def r31_static_workflows_accept(raws: Any) -> bool:
+    if type(raws) is not dict or set(raws) != set(R31_WORKFLOW_HASHES):
+        return False
+    try:
+        root_binding = strict_json(raws[R31_UPDATE_SOURCE_BINDING])
+        root_review = strict_json(raws[R31_UPDATE_DUAL_REVIEW])
+        live_binding = strict_json(raws[R31_DIAGNOSTIC_SOURCE_BINDING])
+        live_review = strict_json(raws[R31_DIAGNOSTIC_DUAL_REVIEW])
+        expected_root = {
+            "ceremony_sha256": R31_WORKFLOW_HASHES[R31_UPDATE_RUNNER],
+            "ceremony_identity8": R31_WORKFLOW_IDENTITY8[R31_UPDATE_RUNNER],
+            "validator_sha256": R31_WORKFLOW_HASHES[R31_UPDATE_VALIDATOR],
+            "validator_identity8": R31_WORKFLOW_IDENTITY8[R31_UPDATE_VALIDATOR],
+            "source_binding_sha256": R31_WORKFLOW_HASHES[R31_UPDATE_SOURCE_BINDING],
+            "source_binding_identity8": R31_WORKFLOW_IDENTITY8[R31_UPDATE_SOURCE_BINDING],
+        }
+        expected_live = {role: {"path": str(path),
+                                "sha256": R31_WORKFLOW_HASHES[path],
+                                "identity8": R31_WORKFLOW_IDENTITY8[path]}
+                         for role, path in (
+                             ("runner", R31_DIAGNOSTIC_RUNNER),
+                             ("validator", R31_DIAGNOSTIC_VALIDATOR),
+                             ("source_binding", R31_DIAGNOSTIC_SOURCE_BINDING),
+                         )}
+        lock = root_binding.get("immutable_r30_lock_provenance_evidence", {})
+        live_lock = live_binding.get(
+            "immutable_r30_lock_provenance_evidence", {},
+        ).get("exact_profile", {})
+        return (
+            all(r31_workflow_semantic_accepts(path, raws[path])
+                for path in R31_WORKFLOW_HASHES)
+            and root_binding.get("published_r30_contract", {}).get("merge")
+            == R31_AUTHORITY_BASE
+            and root_binding.get("immutable_publication_evidence")
+            == R31_ORDERED_PUBLICATION_EVIDENCE
+            and root_binding.get("dynamic_records", {}).get("attempt")
+            == str(R31_UPDATE_ATTEMPT)
+            and root_binding.get("dynamic_records", {}).get("outcome")
+            == str(R31_UPDATE_OUTCOME)
+            and lock.get("exact_profile", {}).get("root_second_line")
+            == "\tcom.apple.provenance\t11 "
+            and lock.get("exact_profile", {}).get("live_xattrs")
+            == [["com.apple.provenance", 11]]
+            and lock.get("exact_profile", {}).get("value_bytes_read") is False
+            and root_review.get("candidate") == expected_root
+            and root_review.get("lock_provenance_adjudication_sha256")
+            == R31_R30_EVIDENCE[R23_EVIDENCE_ROOT / "h039-r30-lock-provenance-owner-adjudication.json"][0]
+            and root_review.get("verdict") == "PASS"
+            and live_binding.get("published_predecessor", {}).get("r30_contract_merge")
+            == R31_AUTHORITY_BASE
+            and live_binding.get("dynamic_diagnostic_records", {}).get("attempt")
+            == str(R31_DIAGNOSTIC_ATTEMPT)
+            and live_binding.get("dynamic_diagnostic_records", {}).get("outcome")
+            == str(R31_DIAGNOSTIC_OUTCOME)
+            and live_lock.get("live_xattrs")
+            == [["com.apple.provenance", 11]]
+            and live_lock.get("value_bytes_read") is False
+            and live_review.get("candidate_artifacts") == expected_live
+            and live_review.get("review_count") == 2
+            and live_review.get("disposition") == "PASS"
+        )
+    except (KeyError, Rig, TypeError, UnicodeError, ValueError):
+        return False
+
+
+def r31_open_static_workflows(root_fd: int) -> tuple[
+    dict[Path, bytes], list[tuple[int, Path, list[int], str]],
+]:
+    if not r31_workflow_frozen():
+        raise Rig("R31 workflow identities remain unresolved")
+    raws: dict[Path, bytes] = {}; retained: list[tuple[int, Path, list[int], str]] = []
+    try:
+        for path, digest in R31_WORKFLOW_HASHES.items():
+            descriptor, raw, identity = r28_open_evidence_regular(
+                root_fd, path, digest=digest, identity8=R31_WORKFLOW_IDENTITY8[path],
+                mode=0o644, uid=CLIENT_UID, gid=CLIENT_GID,
+            )
+            retained.append((descriptor, path, identity, digest)); raws[path] = raw
+        if not r31_static_workflows_accept(raws):
+            raise Rig("R31 frozen update/diagnostic static package mismatch")
+        return raws, retained
+    except BaseException:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        raise
+
+
+def r31_static_workflow_selftests() -> None:
+    root_fd = r28_open_evidence_root(); retained: list[tuple[int, Path, list[int], str]] = []
+    try:
+        raws, retained = r31_open_static_workflows(root_fd)
+        for path in R31_WORKFLOW_HASHES:
+            mutant = dict(raws); mutant[path] += b"\n# unauthorized R31 byte\n"
+            check(not r31_static_workflows_accept(mutant),
+                  f"N_H039_R31_STATIC_EXTRA_BYTE_MUTANT_{path.name}")
+        canonical_root = (b"-rw-------@ 1 root wheel - 0 fixed "
+                          b"/private/var/db/nortropic-runtime-cleanup-v1/s/lock\n"
+                          b"\tcom.apple.provenance\t11 \n")
+        profile = [["com.apple.provenance", 11]]
+        check(r31_lock_profile_accepts(canonical_root, profile),
+              "A_H039_R31_EXACT_ROOT_AND_LIVE_LOCK_PROFILE_MODEL")
+        modules = {
+            path: ast.parse(raws[path].decode("utf-8", "strict"), filename=str(path))
+            for path in R31_WORKFLOW_AST_SHA256
+        }
+        check(r31_all_consumer_surfaces_accept(modules),
+              "A_H039_R31_ALL_FOUR_CONSUMER_SURFACES_CAUSALLY_BOUND")
+        root_mutants = [
+            canonical_root.replace(b"@", b"-", 1),
+            canonical_root.replace(b"provenance", b"quarantine", 1),
+            canonical_root.replace(b"11 ", b"12 ", 1),
+            canonical_root.replace(b"\n\t", b"\n\tcom.apple.extra\t1 \n\t", 1),
+            canonical_root.replace(b"@", b"+", 1),
+            canonical_root.replace(b"\n", b"\r\n", 1),
+            canonical_root + b"\0",
+            canonical_root[:-1],
+            canonical_root.replace(b"/s/lock", b"/r/last", 1),
+        ]
+        for index, mutant in enumerate(root_mutants):
+            check(not r31_lock_profile_accepts(mutant, profile),
+                  f"N_H039_R31_ROOT_LOCK_PROFILE_MUTANT_{index:02d}")
+        for index, mutant in enumerate(([], [["com.apple.provenance", 12]],
+                                        [["com.apple.provenance", 11], ["extra", 1]],
+                                        {"com.apple.provenance": 11},
+                                        [["prefix.com.apple.provenance", 11]])):
+            check(not r31_lock_profile_accepts(canonical_root, mutant),
+                  f"N_H039_R31_LIVE_LOCK_PROFILE_MUTANT_{index:02d}")
+        for (path, name), _digest in R31_CONSUMER_AST_SHA256.items():
+            mutant = copy.deepcopy(modules[path])
+            function = next(node for node in mutant.body
+                            if isinstance(node, ast.FunctionDef)
+                            and node.name == name)
+            markers = [node for node in ast.walk(function)
+                       if isinstance(node, ast.Constant)
+                       and node.value in {
+                           b"\tcom.apple.provenance\t11 ",
+                           "com.apple.provenance",
+                       }]
+            if len(markers) != 1:
+                raise Rig(f"R31 exact marker cardinality differs: {path}:{name}")
+            markers[0].value = (
+                b"\tcom.apple.quarantine\t11 "
+                if isinstance(markers[0].value, bytes)
+                else "com.apple.quarantine"
+            )
+            check(not r31_consumer_graph_accepts(path, mutant),
+                  f"N_H039_R31_CAUSAL_CONSUMER_MARKER_MUTANT_{path.name}_{name}")
+        for path, module in modules.items():
+            value_read = copy.deepcopy(module)
+            calls = [call for call in ast.walk(value_read)
+                     if isinstance(call, ast.Call)
+                     and isinstance(call.func, ast.Attribute)
+                     and call.func.attr in {"fgetxattr", "getxattr"}]
+            if not calls:
+                raise Rig(f"R31 xattr query surface missing: {path}")
+            calls[0].args[2] = ast.Name(id="buffer", ctx=ast.Load())
+            calls[0].args[3] = ast.Constant(value=1)
+            check(not r31_consumer_graph_accepts(path, value_read),
+                  f"N_H039_R31_CAUSAL_XATTR_VALUE_READ_MUTANT_{path.name}")
+        for path, names in {
+            owner: [name for (candidate, name) in R31_CONSUMER_AST_SHA256
+                    if candidate == owner]
+            for owner in R31_WORKFLOW_AST_SHA256
+        }.items():
+            redirected = copy.deepcopy(modules[path])
+            target = next(node for node in redirected.body
+                          if isinstance(node, ast.FunctionDef)
+                          and node.name == names[0])
+            decoy = copy.deepcopy(target); decoy.name += "_decoy"
+            calls = [call for call in ast.walk(redirected)
+                     if isinstance(call, ast.Call)
+                     and isinstance(call.func, ast.Name)
+                     and call.func.id == names[0]]
+            if not calls:
+                raise Rig(f"R31 direct consumer calls missing: {path}:{names[0]}")
+            calls[0].func.id = decoy.name; redirected.body.append(decoy)
+            check(not r31_consumer_graph_accepts(path, redirected),
+                  f"N_H039_R31_CAUSAL_CONSUMER_DECOY_REDIRECT_{path.name}")
+        for path, name in R31_XATTR_HELPER_AST_SHA256:
+            redirected = copy.deepcopy(modules[path])
+            calls = [call for call in ast.walk(redirected)
+                     if isinstance(call, ast.Call)
+                     and isinstance(call.func, ast.Name)
+                     and call.func.id == name]
+            if not calls:
+                raise Rig(f"R31 direct xattr helper calls missing: {path}:{name}")
+            decoy_name = name + "_decoy"
+            calls[0].func.id = decoy_name
+            redirected.body.extend(ast.parse(
+                f"def {decoy_name}(*args, **kwargs):\n return []\n",
+            ).body)
+            check(not r31_consumer_graph_accepts(path, redirected),
+                  f"N_H039_R31_CAUSAL_XATTR_HELPER_DECOY_REDIRECT_{path.name}_{name}")
+        compensated = copy.deepcopy(modules[R31_UPDATE_RUNNER])
+        calls = [call for call in ast.walk(compensated)
+                 if isinstance(call, ast.Call)
+                 and isinstance(call.func, ast.Name)
+                 and call.func.id == "no_acl_or_xattr_marker"]
+        if not calls:
+            raise Rig("R31 compensated consumer call surface missing")
+        calls[0].func.id = "no_acl_or_xattr_marker_decoy"
+        compensated.body.extend(ast.parse(
+            "def no_acl_or_xattr_marker_decoy(*args, **kwargs):\n return None\n"
+            "def r31_dead_compensation():\n"
+            " no_acl_or_xattr_marker(None, None)\n",
+        ).body)
+        check(not r31_consumer_graph_accepts(R31_UPDATE_RUNNER, compensated),
+              "N_H039_R31_COMPENSATED_CONSUMER_DECOY_REDIRECT")
+        for label, source in (
+            ("CONSUMER_REBIND",
+             "no_acl_or_xattr_marker = lambda *args, **kwargs: None\n"),
+            ("HELPER_REBIND",
+             "retained_xattrs = lambda *args, **kwargs: []\n"),
+            ("CONSUMER_DELETE", "del no_acl_or_xattr_marker\n"),
+            ("CONSUMER_NAMED_EXPR",
+             "(no_acl_or_xattr_marker := (lambda *args: None))\n"),
+            ("HELPER_CLASS_SHADOW", "class retained_xattrs:\n pass\n"),
+            ("HELPER_IMPORT_SHADOW", "import os as retained_xattrs\n"),
+        ):
+            rebound = copy.deepcopy(modules[R31_UPDATE_RUNNER])
+            rebound.body.extend(ast.parse(source).body)
+            check(not r31_consumer_graph_accepts(
+                      R31_UPDATE_RUNNER, rebound),
+                  f"N_H039_R31_PROTECTED_SYMBOL_{label}_MUTANT")
+        caller_collision = copy.deepcopy(modules[R31_UPDATE_RUNNER])
+        altered_caller = next(node for node in caller_collision.body
+                              if isinstance(node, ast.FunctionDef)
+                              and node.name == "stable_open_source")
+        original_caller = copy.deepcopy(next(
+            node for node in modules[R31_UPDATE_RUNNER].body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "stable_open_source"
+        ))
+        helper_calls = [call for call in ast.walk(altered_caller)
+                        if isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Name)
+                        and call.func.id == "retained_xattrs"]
+        if len(helper_calls) != 1:
+            raise Rig("R31 duplicate caller collision surface differs")
+        helper_calls[0].func.id = "retained_xattrs_decoy"
+        caller_collision.body.append(original_caller)
+        caller_collision.body.extend(ast.parse(
+            "def retained_xattrs_decoy(*args, **kwargs):\n return []\n",
+        ).body)
+        check(not r31_consumer_graph_accepts(
+                  R31_UPDATE_RUNNER, caller_collision),
+              "N_H039_R31_DUPLICATE_CALLER_COLLISION_MUTANT")
+        for label, source in (
+            ("ALIASED", "xattr_alias = libc.fgetxattr\n"
+             "xattr_alias(3, b'x', bytearray(1), 1, 0, 0)\n"),
+            ("DYNAMIC_GETATTR", "getattr(libc, 'fget' + 'xattr')"
+             "(3, b'x', bytearray(1), 1, 0, 0)\n"),
+            ("DYNAMIC_SUBSCRIPT", "libc['fget' + 'xattr']"
+             "(3, b'x', bytearray(1), 1, 0, 0)\n"),
+            ("CONSUMER_ALIAS", "consumer_alias = no_acl_or_xattr_marker\n"
+             "consumer_alias(None, '')\n"),
+            ("NESTED_CONSUMER_ALIAS",
+             "def r31_indirect_consumer():\n"
+             " consumer_alias = no_acl_or_xattr_marker\n"
+             " consumer_alias(None, '')\n"),
+        ):
+            value_read = copy.deepcopy(modules[R31_UPDATE_RUNNER])
+            value_read.body.extend(ast.parse(source).body)
+            check(not r31_consumer_graph_accepts(
+                      R31_UPDATE_RUNNER, value_read),
+                  f"N_H039_R31_{label}_XATTR_VALUE_READ_MUTANT")
+        for label, source in (
+            ("HIDDEN_OS_LISTXATTR",
+             "def r31_hidden_xattr_read():\n return os.listxattr('/tmp')\n"),
+            ("DYNAMIC_OS_GETXATTR",
+             "getattr(os, 'get' + 'xattr')('/tmp', 'x')\n"),
+            ("DYNAMIC_CTYPES_IMPORT",
+             "r31_ct = __import__('ct' + 'ypes')\n"
+             "r31_lib = r31_ct.CDLL(None)\n"
+             "getattr(r31_lib, 'fget' + 'xattr')"
+             "(3, b'x', bytearray(1), 1, 0, 0)\n"),
+            ("FUNCTION_GLOBALS_CTYPES",
+             "getattr(main.__globals__['ct' + 'ypes'].CDLL(None), "
+             "'fget' + 'xattr')(3, b'x', bytearray(1), 1, 0, 0)\n"),
+        ):
+            value_read = copy.deepcopy(modules[R31_UPDATE_RUNNER])
+            value_read.body.extend(ast.parse(source).body)
+            check(not r31_consumer_surface_accepts(
+                      R31_UPDATE_RUNNER, value_read),
+                  f"N_H039_R31_CLOSED_WORLD_{label}_MUTANT")
+        for (path, name), _digest in (
+            R31_CONSUMER_AST_SHA256 | R31_XATTR_HELPER_AST_SHA256
+        ).items():
+            duplicate = copy.deepcopy(modules[path])
+            function = next(node for node in duplicate.body
+                            if isinstance(node, ast.FunctionDef)
+                            and node.name == name)
+            duplicate.body.append(copy.deepcopy(function))
+            check(not r31_consumer_graph_accepts(path, duplicate),
+                  f"N_H039_R31_DUPLICATE_SELECTED_FUNCTION_{path.name}_{name}")
+        missing = dict(modules); missing.pop(next(iter(modules)))
+        check(not r31_all_consumer_surfaces_accept(missing),
+              "N_H039_R31_FEWER_THAN_ALL_FOUR_CONSUMERS_MUTANT")
+        control_path = R31_UPDATE_RUNNER
+        control_raw = raws[control_path] + b"\npass\n"
+        control_module = ast.parse(control_raw, filename=str(control_path))
+        check(r31_consumer_graph_accepts(control_path, control_module)
+              and r31_consumer_surface_accepts(control_path, control_module)
+              and not r31_workflow_semantic_accepts(control_path, control_raw),
+              "A_H039_R31_CONSUMER_CAUSAL_ORACLE_INDEPENDENT_OF_FILE_DIGEST")
+        if not all(r28_retained_evidence_regular(root_fd, *row)
+                   for row in retained):
+            raise Rig("R31 retained static workflow artifact rebound")
+        r28_rebind_evidence_root(root_fd)
+    finally:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        os.close(root_fd)
+
+
+def r31_dynamic_presence(root_fd: int) -> list[bool]:
+    result: list[bool] = []
+    for path in (R31_UPDATE_ATTEMPT, R31_UPDATE_OUTCOME,
+                 R31_DIAGNOSTIC_ATTEMPT, R31_DIAGNOSTIC_OUTCOME,
+                 R30_UPDATE_ATTEMPT, R30_UPDATE_OUTCOME,
+                 R30_DIAGNOSTIC_ATTEMPT, R30_DIAGNOSTIC_OUTCOME):
+        try:
+            if path.parent != R23_EVIDENCE_ROOT:
+                raise Rig("R31 dynamic record parent differs")
+            r28_rebind_evidence_root(root_fd)
+            os.stat(path.name, dir_fd=root_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            result.append(False)
+        except OSError as exc:
+            raise Undecidable(f"R31 dynamic record state unavailable: {path}") from exc
+        else:
+            result.append(True)
+    return result
+
+
+def r31_dynamic_presence_accepts(present: Any, phase: str) -> bool:
+    return (type(present) is list and len(present) == 8
+            and all(type(value) is bool for value in present)
+            and (phase == "preproduct" and present == [False] * 8
+                 or phase == "r31-installed"
+                 and present == [True, True, False, False] + [False] * 4))
+
+
+def r31_prepublication_workflow_checks() -> None:
+    root_fd = r28_open_evidence_root(); retained: list[tuple[int, Path, list[int], str]] = []
+    try:
+        _raws, retained = r31_open_static_workflows(root_fd)
+        presence = r31_dynamic_presence(root_fd)
+        check(r31_dynamic_presence_accepts(presence, "preproduct"),
+              "A_H039_R31_ALL_EIGHT_R30_AND_R31_DYNAMIC_NAMES_ABSENT_AT_FREEZE")
+        if not r31_dynamic_presence_accepts(presence, "preproduct"):
+            raise Rig("R31 or historical R30 dynamic record exists before freeze")
+        if not all(r28_retained_evidence_regular(root_fd, *row) for row in retained):
+            raise Rig("R31 retained prepublication workflow artifact rebound")
+        r28_rebind_evidence_root(root_fd)
+    finally:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        os.close(root_fd)
+
+
+def r31_immutable_r30_closure_checks() -> None:
+    r30_immutable_r29_publication_checks()
+    root_fd = r28_open_evidence_root(); retained: list[tuple[int, Path, list[int], str]] = []
+    try:
+        _r30_raws, r30_retained = r30_open_static_workflows(root_fd)
+        retained.extend(r30_retained)
+        records: dict[Path, Any] = {}
+        for path, (digest, identity) in {
+            **R31_R30_PUBLICATION_EVIDENCE, **R31_R30_EVIDENCE,
+        }.items():
+            descriptor, raw, observed = r28_open_evidence_regular(
+                root_fd, path, digest=digest, identity8=identity,
+                mode=stat.S_IMODE(identity[2]), uid=CLIENT_UID, gid=CLIENT_GID,
+            )
+            retained.append((descriptor, path, observed, digest))
+            if raw:
+                try:
+                    records[path] = strict_json(raw)
+                except Rig:
+                    records[path] = None
+        adjudication_path = R23_EVIDENCE_ROOT / "h039-r30-lock-provenance-owner-adjudication.json"
+        adjudication = records[adjudication_path]
+        observation_path = R23_EVIDENCE_ROOT / "h039-r30-lock-marker-post-failure-observation-r2.json"
+        check(type(adjudication) is dict
+              and adjudication.get("classification")
+              == "EXACT_ALREADY_ADMITTED_NON_AUTHORITY_PROVENANCE_XATTR_NO_ACL"
+              and adjudication.get("validated_observation", {}).get("sha256")
+              == R31_R30_EVIDENCE[observation_path][0]
+              and adjudication.get("exact_lock_state", {}).get("xattr_profile")
+              == [["com.apple.provenance", 11]]
+              and adjudication.get("exact_lock_state", {}).get(
+                  "xattr_value_read_or_adjudicated") is False
+              and adjudication.get("security_scope", {}).get("broader_authority")
+              is False,
+              "A_H039_R31_EXACT_R30_LOCK_PROVENANCE_OWNER_ADJUDICATION")
+        if not all(r28_retained_evidence_regular(root_fd, *row) for row in retained):
+            raise Rig("R31 retained R30 closure artifact rebound")
+        r28_rebind_evidence_root(root_fd)
+    finally:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        os.close(root_fd)
+
+
+def r31_run_update_validator(ceremony_raw: bytes, validator_raw: bytes,
+                             binding_raw: bytes, attempt_sha256: str,
+                             outcome_sha256: str) -> None:
+    binding = strict_json(binding_raw)
+    wrapper_sha = binding.get("authenticated_code_selection", {}).get("wrapper_sha256", "")
+    wrapper = r29_authenticated_exec_wrapper(ceremony_raw, wrapper_sha)
+    if r29_authenticated_exec_wrapper(validator_raw, wrapper_sha) != wrapper:
+        raise Rig("R31 ceremony/validator authenticated wrappers differ")
+    review_sha = R31_WORKFLOW_HASHES[R31_UPDATE_DUAL_REVIEW]
+    review_identity = R31_WORKFLOW_IDENTITY8[R31_UPDATE_DUAL_REVIEW]
+    argv = ["/usr/bin/env", "-i", "-C", "/",
+            "/Library/Developer/CommandLineTools/usr/bin/python3",
+            "-I", "-S", "-c", wrapper, "validator", review_sha,
+            json.dumps(review_identity, separators=(",", ":"))]
+    child: subprocess.Popen[bytes] | None = None; first: BaseException | None = None
+    stdout = stderr = b""
+    try:
+        child = subprocess.Popen(argv, cwd="/", env={}, stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 close_fds=True)
+        while child.returncode is None:
+            try:
+                stdout, stderr = child.communicate()
+            except BaseException as exc:
+                first = first or exc
+    except BaseException as exc:
+        first = first or exc
+    finally:
+        if child is not None:
+            while child.returncode is None:
+                try:
+                    stdout, stderr = child.communicate()
+                except BaseException as exc:
+                    first = first or exc
+    if child is None or child.returncode is None:
+        raise Rig("R31 validator exact child was not reaped")
+    expected = ("\n".join([
+        "R31_R15_ROOT_UPDATE_VALIDATION=PASS",
+        f"ATTEMPT_RESERVATION_SHA256={attempt_sha256}",
+        f"OUTCOME_SHA256={outcome_sha256}",
+        "LIVE_STATE=R15_SEQUENCE1_ZERO_STAGING", "WORKFLOW_REPORT_ONLY=YES",
+        "TASK_CREDIT=NONE", "DIAGNOSTIC_REQUIRES_CURRENT_PUBLICATION_BOUND_VALIDATION=YES",
+        "MANDATORY_OWNER_STOP_AFTER_DIAGNOSTIC=YES",
+        "H038_H032_H031_AND_SUPERVISOR_PERMITTED=NO",
+    ]) + "\n").encode("ascii")
+    passed_exactly = first is None and child.returncode == 0 \
+        and stderr == b"" and stdout == expected
+    check(passed_exactly, "A_H039_R31_FROZEN_READ_ONLY_ROOT_UPDATE_VALIDATOR_PASS",
+          {"returncode": child.returncode, "stdout_sha256": sha(stdout)})
+    if not passed_exactly:
+        raise Rig("R31 frozen read-only root-update validator did not pass exactly")
+
+
+def r31_workflow_completed_checks() -> tuple[
+    list[tuple[int, Path, list[int], str]], int,
+]:
+    root_fd = r28_open_evidence_root()
+    try:
+        raws, retained = r31_open_static_workflows(root_fd)
+    except BaseException:
+        os.close(root_fd); raise
+    try:
+        attempt_fd, attempt_raw, attempt_identity = r28_open_evidence_regular(
+            root_fd, R31_UPDATE_ATTEMPT, mode=0o600,
+            uid=CLIENT_UID, gid=CLIENT_GID)
+        retained.append((attempt_fd, R31_UPDATE_ATTEMPT, attempt_identity, sha(attempt_raw)))
+        outcome_fd, outcome_raw, outcome_identity = r28_open_evidence_regular(
+            root_fd, R31_UPDATE_OUTCOME, mode=0o600,
+            uid=CLIENT_UID, gid=CLIENT_GID)
+        retained.append((outcome_fd, R31_UPDATE_OUTCOME, outcome_identity, sha(outcome_raw)))
+        if not r31_dynamic_presence_accepts(r31_dynamic_presence(root_fd), "r31-installed"):
+            raise Rig("R31 consumed one-shot update record presence mismatch")
+        r31_run_update_validator(raws[R31_UPDATE_RUNNER], raws[R31_UPDATE_VALIDATOR],
+                                 raws[R31_UPDATE_SOURCE_BINDING], sha(attempt_raw),
+                                 sha(outcome_raw))
+        if not all(r28_retained_evidence_regular(root_fd, *row) for row in retained):
+            raise Rig("R31 retained workflow record changed after validation")
+        r28_rebind_evidence_root(root_fd)
+        check(True, "A_H039_R31_EXACT_CONSUMED_ONE_SHOT_UPDATE_WORKFLOW")
+        return retained, root_fd
+    except BaseException:
+        for descriptor, _path, _identity, _digest in retained:
+            os.close(descriptor)
+        os.close(root_fd); raise
+
+
 def r29_authenticated_exec_wrapper(raw: bytes, expected_sha256: str) -> str:
     try:
         tree = ast.parse(raw.decode("utf-8", "strict"))
@@ -35953,7 +37380,7 @@ def publication_only_phase(phase: str) -> bool:
 
 
 def pre_diagnostic_owner_stop_phase(phase: str) -> bool:
-    return phase == "r30-installed"
+    return phase == "r31-installed"
 
 
 def finish(phase: str) -> int:
@@ -35985,6 +37412,7 @@ def finish(phase: str) -> int:
     print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
     print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
     print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
+    print(f"R31_MATERIAL_REVIEW_EXTENSION={R31_MATERIAL_REVIEW_EXTENSION}")
     print(f"H039_GATE_SUMMARY={passed} PASS {failed} FAIL")
     if failed == 0:
         if pre_diagnostic_owner_stop_phase(phase):
@@ -35995,10 +37423,10 @@ def finish(phase: str) -> int:
             print("H039_GATE_RESULT=PASS")
         return 0
     expected = canonical({
-        "failure_signature": FAILURE_SIGNATURE, "reason": R30_REASON,
+        "failure_signature": FAILURE_SIGNATURE, "reason": R31_REASON,
     }).decode()
     if phase == "preproduct" and failed_labels == [(LABEL, expected)]:
-        print(f"H039_GATE_RESULT=RED_EXPECTED label={LABEL} reason={R30_REASON}")
+        print(f"H039_GATE_RESULT=RED_EXPECTED label={LABEL} reason={R31_REASON}")
         return 1
     print("H039_GATE_RESULT=FAIL")
     return 1
@@ -36038,6 +37466,7 @@ def main(argv: list[str]) -> int:
         print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
         print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
         print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R31_MATERIAL_REVIEW_EXTENSION={R31_MATERIAL_REVIEW_EXTENSION}")
         return 2
     if os.geteuid() == 0:
         print("ODÖMBART H039_HOST_ENVIRONMENT — Python gate must never run as root")
@@ -36069,9 +37498,11 @@ def main(argv: list[str]) -> int:
         print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
         print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
         print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R31_MATERIAL_REVIEW_EXTENSION={R31_MATERIAL_REVIEW_EXTENSION}")
         return 2
     preproduct = not argv
-    r30_installed = exact_r30_installed_argv(argv)
+    r31_installed = exact_r31_installed_argv(argv)
+    r30_installed = False
     r29_installed = False
     r28_installed = False
     r27_product = False
@@ -36082,18 +37513,18 @@ def main(argv: list[str]) -> int:
     r18_product = r18_published = r18_installed = False
     r19_product = r19_published = False
     r23_product = r23_published = False
-    if not (preproduct or r30_installed):
+    if not (preproduct or r31_installed):
         print(
-            "RIG_ERROR: usage: h-039-exit [--r30-installed "
-            "PUBLISHED_R30_CONTRACT_MERGE " + R30_R15_PRODUCT_MERGE + "]",
+            "RIG_ERROR: usage: h-039-exit [--r31-installed "
+            "PUBLISHED_R31_CONTRACT_MERGE " + R31_R15_PRODUCT_MERGE + "]",
             file=sys.stderr,
         )
         return 2
-    supplied_commits = argv[1:] if r30_installed else []
+    supplied_commits = argv[1:] if r31_installed else []
     if any(not valid_hex(value, 40) for value in supplied_commits):
         print("RIG_ERROR: every commit argument must be exact lowercase 40-hex", file=sys.stderr)
         return 2
-    phase = "preproduct" if preproduct else "r30-installed"
+    phase = "preproduct" if preproduct else "r31-installed"
     r18_phase = False
     r19_phase = False
     r23_phase = False
@@ -36138,9 +37569,9 @@ def main(argv: list[str]) -> int:
         r26_installed_engine_selftests()
         r27_registry_selftests(row)
         r28_registry_selftests(row)
-        r30_registry_selftests(row)
-        r30_line_limit_surface_selftests()
-        r30_gate_closed_world_selftests()
+        r31_registry_selftests(row)
+        r31_line_limit_surface_selftests()
+        r31_gate_closed_world_selftests()
         r29_line_delta_selftests()
         if not r28_workflow_frozen():
             raise Rig(
@@ -36152,13 +37583,13 @@ def main(argv: list[str]) -> int:
                 "R29 workflow SHA256/identity8 placeholders unresolved; "
                 "candidate is intentionally not freeze-ready"
             )
-        if not r30_workflow_frozen():
+        if not r31_workflow_frozen():
             raise Rig(
-                "R30 workflow SHA256/identity8 placeholders unresolved; "
+                "R31 workflow SHA256/identity8 placeholders unresolved; "
                 "candidate is intentionally not freeze-ready"
             )
-        r30_dispatch_selftests()
-        r30_static_workflow_selftests()
+        r31_dispatch_selftests()
+        r31_static_workflow_selftests()
         r27_immutable_r1_review_failure_checks()
         r28_immutable_r2_review_failure_checks()
         r29_immutable_r1_dual_review_failure_checks()
@@ -36174,13 +37605,13 @@ def main(argv: list[str]) -> int:
         managed_option_a_reference()
         fd_relative_integration_reference()
         if preproduct:
-            r30_prepublication_workflow_checks()
-            r30_immutable_r29_publication_checks()
+            r31_prepublication_workflow_checks()
+            r31_immutable_r30_closure_checks()
             candidate = git(["rev-parse", "HEAD^{commit}"]).decode().strip()
-            candidate_ok, candidate_detail = r30_contract_candidate_identity(candidate)
+            candidate_ok, candidate_detail = r31_contract_candidate_identity(candidate)
             check(
                 candidate_ok,
-                "A_H039_R30_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
+                "A_H039_R31_FRESH_DIRECT_CHILD_FIVE_FILE_CONTRACT_CANDIDATE",
                 candidate_detail,
             )
             if not candidate_ok:
@@ -36190,14 +37621,45 @@ def main(argv: list[str]) -> int:
             )
             check(
                 product_ok,
-                "A_H039_R30_EXACT_PUBLISHED_R15_PRODUCT_IDENTITY",
+                "A_H039_R31_EXACT_PUBLISHED_R15_PRODUCT_IDENTITY",
                 product_detail,
             )
             if not product_ok:
                 return finish(phase)
             check(False, LABEL, {
-                "failure_signature": FAILURE_SIGNATURE, "reason": R30_REASON,
+                "failure_signature": FAILURE_SIGNATURE, "reason": R31_REASON,
             })
+            return finish(phase)
+
+        if r31_installed:
+            publication_ok, publication_detail = \
+                r31_contract_publication_identity(argv[1])
+            check(
+                publication_ok,
+                "A_H039_R31_EXACT_CURRENT_GUARDED_CONTRACT_PUBLICATION",
+                publication_detail,
+            )
+            if not publication_ok:
+                return finish(phase)
+            product_ok, product_detail = r28_published_r15_identity(argv[2])
+            check(
+                product_ok,
+                "A_H039_R31_EXACT_HISTORICAL_PUBLISHED_R15_IDENTITY",
+                product_detail,
+            )
+            if not product_ok:
+                return finish(phase)
+            r31_immutable_r30_closure_checks()
+            retained, evidence_root_fd = r31_workflow_completed_checks()
+            try:
+                check(
+                    True,
+                    "A_H039_R31_READ_ONLY_INSTALLED_R15_PRE_DIAGNOSTIC_OWNER_STOP",
+                )
+            finally:
+                for descriptor, _path, _identity, _digest in retained:
+                    os.close(descriptor)
+                os.close(evidence_root_fd)
             return finish(phase)
 
         if r30_installed:
@@ -36804,6 +38266,7 @@ def main(argv: list[str]) -> int:
         print(f"R28_MATERIAL_REVIEW_EXTENSION={R28_MATERIAL_REVIEW_EXTENSION}")
         print(f"R29_MATERIAL_REVIEW_EXTENSION={R29_MATERIAL_REVIEW_EXTENSION}")
         print(f"R30_MATERIAL_REVIEW_EXTENSION={R30_MATERIAL_REVIEW_EXTENSION}")
+        print(f"R31_MATERIAL_REVIEW_EXTENSION={R31_MATERIAL_REVIEW_EXTENSION}")
         return 2
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         print(f"RIG_ERROR: {exc}", file=sys.stderr)
@@ -36812,12 +38275,12 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    _r30_raw = GATE.read_bytes()
-    _r30_anchor = f'R30_GATE_SOURCE_SHA256 = "{R30_GATE_SOURCE_SHA256}"\n'.encode()
-    if (_r30_raw.count(_r30_anchor) != 1
-            or sha(_r30_raw.replace(
-                _r30_anchor,
-                _r30_anchor.replace(R30_GATE_SOURCE_SHA256.encode(), b"0" * 64),
-            )) != R30_GATE_SOURCE_SHA256):
-        raise SystemExit("RIG_ERROR: R30 executing gate source identity differs")
+    _r31_raw = GATE.read_bytes()
+    _r31_anchor = f'R31_GATE_SOURCE_SHA256 = "{R31_GATE_SOURCE_SHA256}"\n'.encode()
+    if (_r31_raw.count(_r31_anchor) != 1
+            or sha(_r31_raw.replace(
+                _r31_anchor,
+                _r31_anchor.replace(R31_GATE_SOURCE_SHA256.encode(), b"0" * 64),
+            )) != R31_GATE_SOURCE_SHA256):
+        raise SystemExit("RIG_ERROR: R31 executing gate source identity differs")
     raise SystemExit(main(sys.argv[1:]))
