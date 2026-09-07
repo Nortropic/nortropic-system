@@ -3039,3 +3039,57 @@ line-limit map. R29-R2 keeps global 2400/2400 and all 18 legacy consumers
 AST-exact, admits exactly `r29_line_delta_accepts` and
 `r29_line_delta_selftests` AST-exact to R1, and rejects any third consumer,
 blanket prefix exemption, alternate call path, R1 parentage or task credit.
+
+## H-039 R30/R15 target-namespace symbol refreeze
+
+Published R29 merge `8e44faaea9b91b596f33b9ae75e663e900e50834`, tree
+`be9552f6d0d63289e6032ef4de1b166baca430b6`, ordered parents `a13cd9f6…`
+and `0b432fbc…`, is the exact productless R30 base. Its guarded publication
+receipt `e20c851f…` and independent publication audit `990c6cb5…` are immutable
+workflow-only evidence.
+
+The owner-witnessed R29 command is permanently consumed NO-CREDIT. Its
+authenticated wrapper completed, selected the exact frozen ceremony bytes and
+entered the target module, but `read_and_validate_binding` evaluated the
+`authenticated_code_selection.owner_launcher_prefix` list through an unbound
+outer-module name `PY`. That module defines only the intended fixed `PYTHON`
+constant. The resulting `NameError` preceded workflow-review authentication,
+root-tool verification, sudo/root, reservation, staging and bootstrap. Failure
+record `76643791…` binds that causal order, four absent R29 dynamic records, the
+unchanged sequence-1 receipt `fdb437bd…` and unchanged installed R14 mediator
+`4a388755…`. R29 may never retry.
+
+R30 changes exactly the five existing TEST_AUTHOR files and no product file.
+Fresh root-update and live-diagnostic workflow-only objects use fixed R30 names
+and fresh attempt/outcome names. Relative to the authenticated R29 targets,
+exactly two executable AST names change: one in the root-update ceremony and
+one in its validator, each from `PY` to `PYTHON` at the live
+`owner_launcher_prefix` element. The outer module must contain exactly one
+fixed `PYTHON` definition, no executable outer `PY` load or binding, and each
+corrected load must resolve to that definition. One-sided fixes, aliases,
+literals, fallback expressions, exception fallback, decoys and moved checks
+reject.
+
+The embedded authenticated wrapper retains its own local `PY` definition and
+all uses byte-exact. Its selected target scope remains exact and injects neither
+`PY` nor `PYTHON`; target bytes still enter only through exact
+`compile(target_raw,target,"exec")` and `exec(...,scope,scope)`. All root
+commands, paths, R14→R15 product bytes, staging, bootstrap argv, descriptor and
+identity controls, no-retry semantics, post-state requirements and the frozen
+live diagnostic otherwise remain unchanged.
+
+Only no-argument expected RED and
+`--r30-installed <published-R30-contract> f0877daae8612f4c5b274ae4cc04bc1bd775c01a`
+are current. R29-installed and every earlier selector are historical and
+unreachable. Freeze requires all R29 and R30 static objects to rebind and every
+R29/R30 attempt/outcome name to be absent. After two independent adversarial
+gate reviews and guarded publication, a new R30 owner-TTY attempt—not an R29
+retry—may run exactly once. Status zero is followed by independent read-only
+post-state validation, current R30 installed review and one frozen R15 live
+diagnostic, then mandatory owner stop. No product, broader authority,
+H038/H032/H031 progress or supervisor resume is admitted. R30-R1 `276fc91e…`,
+its byte-identical distinct-inode `9b76ce0e…` logs and corrected `ccc95c6f…`
+failure record are immutable consumed NO-CREDIT nonparent evidence; the
+`22883d8f…` draft is explicitly unbound. Fresh R30-R2 again descends directly
+from `8e44faae…` and only changes the stale `r17_registry_selftests` expected
+reason `R29_REASON` to `R30_REASON`, while a revert mutant must reject.
