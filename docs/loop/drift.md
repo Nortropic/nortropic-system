@@ -5606,3 +5606,42 @@ diagnostic and mandatory owner stop. Rejected R30-R1 `276fc91e…`, its two
 fresh R30-R2 again descends directly from `8e44faae…` and only rebinds the stale
 R17 registry selftest reason from R29 to R30. Product bytes, root commands,
 authority, H038/H032/H031 and supervisor state do not change.
+
+## 2026-09-07 — H-039 R31/R15 exact lock-provenance compatibility
+
+Published R30 `e1421f355f96f70458d3e664a69f773a27d89487`, tree `16c43c33…`,
+is the sole R31 parent while current main is unchanged. R30's corrected owner
+entry authenticated the frozen ceremony and reached its fixed read-only root
+snapshot. All directory, lock metadata and empty-payload checks passed; fixed
+root child 27 then rejected exact `s/lock` only because `ls -ldeO@` showed a
+singleton `com.apple.provenance` marker instead of R30's frozen plain form.
+This preceded reservation, mutation, staging and bootstrap. R30's ceremony and
+empty earlier observation latch are immutable consumed NO-CREDIT and cannot
+retry; all four R30 dynamic records remain absent.
+
+Independent R2 observation `579539d7…`, listing digest `0af243fa…`, and owner
+adjudication `f1d8f737…` bind root:wheel 0600, nlink1, size0, flags0, empty
+payload, stable inode and exact singleton membership. Listing output is rc0,
+empty stderr and exactly `-rw-------@` followed by
+`\tcom.apple.provenance\t11 `, with no ACL row. Only the exact xattr name and
+size are adjudicated as already admitted non-authority metadata. Value bytes,
+origin and general Apple semantics remain untrusted and unread; R15 consumes
+no xattr.
+
+R31 changes exactly five TEST_AUTHOR files and no product. Root ceremony and
+validator require that exact two-row representation; live runner and validator
+require exact stable-rebound `[["com.apple.provenance",11]]`. Plain/absent,
+OR acceptance, wrong/duplicate/extra marker or size, ACL, `+`, CRLF/NUL,
+truncation, another path or object, subset/set/substring/`>=`/wildcard/global
+normalization, fewer than all four consumers, and xattr-value use reject. All
+other object policies and the full authority, identity, descriptor, staging,
+bootstrap, no-retry and owner-stop envelope stay unchanged.
+
+The frozen double-reviewed root package is `a1cd7939…`/`c85ecf4c…`/
+`5420fd54…`/`f80ba392…`; the frozen double-reviewed live package is
+`7bcb2559…`/`7f1face4…`/`8a79f59b…`/`34e8b75c…`. R30-installed becomes
+historical. After freeze, two gate reviews and guarded publication, only
+current R31 may authorize one new no-retry root update, then post-state and
+installed-effect validation, then exactly one R15 live diagnostic and mandatory
+owner stop. H038/H032/H031 progress and supervisor resume remain forbidden
+until full H039 PASS.
