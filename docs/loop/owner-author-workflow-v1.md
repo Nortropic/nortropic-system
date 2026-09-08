@@ -3158,3 +3158,32 @@ validator and current-publication-bound installed-effect review before exactly
 one frozen R15 live diagnostic; that diagnostic ends at mandatory owner stop.
 No product change, wider authority, H038/H032/H031 progress or supervisor
 resume is admitted before full H039 PASS.
+
+## H-039 R32/R15 exact workflow selected-target size budget
+
+R32 is a productless five-file TEST_AUTHOR refreeze from published R31
+`a77001184a409cb359d6588854408eab203ab9c5`. The consumed R31 outer entry
+failed before target open because the selected 135936-byte root ceremony
+exceeded the embedded 131072-byte stable-open cap; failure record `6ef7af65…`
+is immutable NO-CREDIT and proves no root or persistent effect.
+
+The sole root-size or authority correction is present in exactly the root-update
+ceremony and validator wrappers: the selected-target cap is the exact no-margin
+maximum of the frozen final root files, `max(152914,140492) = 152914`. Both
+live wrappers remain exactly 262144 and every other size ceiling remains
+unchanged. Old, ±1, rounded/general/larger, OR, doubled, computed, global,
+fallback, decoy, dead and one-sided forms reject. The first unsuffixed live
+quartet is preserved and separately stable-opened as immutable NO-CREDIT, but
+is excluded from the live 61-name closure. Current R2 is validation-completeness
+only: it adds exact key 40 `consumed_r31_workflow`, authenticates that typed
+closure in both initial and final root-chain validation, and changes exactly
+two undefined validator retained-open callees to the existing `read_at`
+primitive. Its 262144 cap, dynamic names, FD inventories, request protocol,
+no-retry and owner-stop rules are unchanged. Current root4 plus R2-live4,
+the complete published R31 closure and four absent R31 plus four absent R32
+dynamic names are frozen. R31-installed is historical; only no-argument RED
+and current-publication-bound `--r32-installed … f0877daa…` are admitted.
+After guarded R32 publication, exactly one new owner-TTY root update may run;
+success still requires independent post-state and installed review before one
+R15 diagnostic and mandatory owner stop. No product, wider authority,
+downstream progress or supervisor resume is admitted.
