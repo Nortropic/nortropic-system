@@ -1,5 +1,25 @@
 # Att köra loopen
 
+## 2026-09-07 — H-039 R32/R15 workflow selected-target size budget
+
+Published R31 `a7700118…` and its product, lock-provenance semantics and full
+publication closure remain immutable. The consumed R31 outer entry stopped
+before target open: selected ceremony size 135936 exceeded the fixed 131072
+wrapper cap, with no root or persistent effect (`6ef7af65…`). R32 is
+productless and changes only five TEST_AUTHOR files. The sole root-size or
+authority correction is exactly two root embedded-wrapper caps set to the
+no-margin maximum of final ceremony 152914 and validator 140492. Both live
+caps remain 262144. The superseded unsuffixed live quartet remains separately
+authenticated immutable NO-CREDIT and outside the runtime closure. Current
+R2 repairs validation completeness only: exact reservation key 40 binds the
+consumed-R31 closure at initial and final validation and two undefined
+validator callees become the existing retained `read_at` primitive. Dynamic
+names, FD inventories, request protocol, commands, paths, effects, no-retry
+and owner-stop rules remain exact. Current root4 plus R2-live4 are frozen.
+R31 installed is historical; R32 installed is current-publication-bound to
+the unchanged R15 product. No H038/H032/H031 or supervisor progress occurs
+before full H039 PASS.
+
 ## 2026-09-03 — H-039 R13-R4 pre-comparison typed closure
 
 Frozen R13-R3 `a57b9a07…` is immutable NO-CREDIT. Before its independent
