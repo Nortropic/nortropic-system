@@ -1,5 +1,31 @@
 # Att köra loopen
 
+## 2026-09-08 — H-039 R33/R15 exact receipt-provenance profile
+
+Published R32 `9b9a638b…`, its product and full publication closure remain
+immutable. The consumed R32 owner-TTY entry refused inside read-only root
+observation, before reservation, with no root or persistent effect
+(`222391df…`): the frozen marker table predicted a single-line
+`-r--r--r--` listing for the sequence-1 receipt `r/last`, while the host has
+carried the same 11-byte `com.apple.provenance` marker since sequence-1
+creation (`2608b256…`). The owner adjudicated the exact two-line profile
+as a non-authority host marker. R33 is productless and changes only five
+TEST_AUTHOR files. Root ceremony and validator require that exact profile at
+all four `r/last` listing sites and the measured uid501 single-line `s/lock`
+form at both uid501 sites (uid 501 cannot list xattr names of the root-only
+0600 lock; the sudo root listing keeps the two-line profile). Root wrapper
+caps move to the no-margin maximum `max(189114,177471)=189114`; both
+live caps remain 262144. The live quartet is the exact R2 lineage rebound to
+the R33 root package with typed keys 41 `consumed_r32_workflow` and 42
+`r32_receipt_provenance`, a 74-name closure and 91/92 descriptor inventories.
+R32 installed is historical; R33 installed is current-publication-bound to the
+unchanged R15 product. No H038/H032/H031 or supervisor progress occurs before
+full H039 PASS.
+
+### R33-r2 — post-reboot device identity rebind (2026-09-08)
+
+R33-r2 (2026-09-08, owner amendment; precisering `39ce18dc…`): after the owner's reboot the Data volume's st_dev changed 16777232→16777230 (volume UUID `3C8EFFC9-C3A2-4056-86C1-8F574B161EAB` unchanged, supporting evidence only). The root package is refrozen as `-r2` with every live file-object identity on the current device, a closed historical→current transition table of 83 rows, and separate historical constants at the five record↔live cross-check sites; the gate carries 17 R33 copies of live-referenced constants (st_dev only), exactly 23 live-reference substitutions in 12 historical functions bound to AST positions, and device-rebind selftests that falsify old-device live checks, other-field changes, partial or unchanged consumers, global normalisation, extra table pairs, alias/fallback/decoy forms and historical-content rebinding. Historical records, packages and constants remain byte-exact; the superseded r1 root trio and the rejected first r2 candidate are bound/preserved immutable NO-CREDIT. The devfs mount id also changed at the reboot (/dev/fd st_dev -1809520531→2114656325, owner devfs amendment, finding `ce9e5e0e…`): a second, separate closed transition binds exactly /dev/fd at 7 code sites (wrapper FDROOT_ID, descriptor_inventory, code selection, binding row) with no signed/unsigned normalisation and no other /dev object changed; the gate's device-surface rule is AST-exact and type-exact. Live-r2 (2026-09-08, owner authorization A-C; precisering `383a8421…`): formal live review B found the frozen R33 live trio still carrying the R32-era outcome evidence counts 9/19 while the R33 runner authenticates 11 known publication records and the R33-r2 root binding carries 22 immutable publication rows; that trio is immutable NO-CREDIT and superseded by the `-r2` live package whose only delta is the four static names, `known_publication_evidence_count` 11 and `root_publication_evidence_count` 22. The gate binds both counts to the authenticated sets (the runner's fixed record list and the root binding's unique rows) and falsifies stale, constant-instead-of-measured, one-sided, consistently-stale, float/bool and dropped/duplicated-row forms.
+
 ## 2026-09-07 — H-039 R32/R15 workflow selected-target size budget
 
 Published R31 `a7700118…` and its product, lock-provenance semantics and full
@@ -5665,3 +5691,7 @@ current R31 may authorize one new no-retry root update, then post-state and
 installed-effect validation, then exactly one R15 live diagnostic and mandatory
 owner stop. H038/H032/H031 progress and supervisor resume remain forbidden
 until full H039 PASS.
+
+Live-r3 retains root-r2 and all historical bytes; the exact five consumer ASTs bind both receipt trace profiles, the preserved sequence-1 receipt singleton xattrs and exact authenticated uid501-unlistable s/lock without reading xattr values. Failed live-r2 consumer evidence is separately immutable/no-credit, not R1 stale-count evidence. The Path-keyed stale-count fixture uses mapping unpacking without changing its keys, values or negative predicate.
+
+R33 formal-A device amendment binds exactly four R24/R25 historical/current identity10 rows (16777232 to 16777230; fields 1-9 exact), with three centralized comparison replacements in the two shared binding predicates and causal positive baselines. Historical workflow bytes remain immutable and no stale lane reopens.
