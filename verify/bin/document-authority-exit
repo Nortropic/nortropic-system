@@ -323,6 +323,13 @@ def main():
                        snapshot_digest(snapshot), str(snapshot))
         check("platform_consume_approved", bool(json_ok(consumed)) and
               tree_state(snapshot) == snap_before and tree_state(root) == before)
+        actual_digest = snapshot_digest(snapshot)
+        wrong_digest = ("0" if actual_digest[0] != "0" else "1") + actual_digest[1:]
+        for name, digest in (("wrong_valid_digest", wrong_digest), ("malformed_digest", "not-a-sha256")):
+            pre = tree_state(snapshot)
+            result = cli(root, "platform-check", spec_sha, "h-035", registry_sha, digest, str(snapshot))
+            check("consume_" + name, rejected(result, "SNAPSHOT_AUTHORITY") and
+                  tree_state(snapshot) == pre and tree_state(root) == before)
         for rel in DOCUMENTS:
             path = snapshot / rel
             saved = path.read_bytes()
@@ -391,6 +398,8 @@ def main():
             check("consume_" + name, rejected(result, reason) and tree_state(snapshot) == pre and tree_state(root) == before)
     else:
         check("platform_consume_approved", False, "prepare prerequisite absent; no consumption credit")
+        for name in ("wrong_valid_digest", "malformed_digest"):
+            check("consume_" + name, False, "not reached")
         for rel in DOCUMENTS:
             check("consume_rehashed_drift:" + rel, False, "not reached")
         check("consume_rehashed_missing_contract", False, "not reached")
@@ -418,6 +427,18 @@ def main():
         result = cli(root, "platform-prepare", spec_sha, "h-035", registry_sha, str(dest))
         check("prepare_missing_pre_effect:" + rel, rejected(result, "DOCUMENT_GENERATION") and not dest.exists() and tree_state(root) == unchanged)
         path.write_bytes(saved)
+    for name in ("relative", "existing_file", "existing_nonempty_directory"):
+        dest = root / "relative-snapshot" if name == "relative" else scratch / ("destination-" + name)
+        if name == "existing_file":
+            dest.write_bytes(b"PRESERVE EXISTING DESTINATION\n")
+        elif name == "existing_nonempty_directory":
+            dest.mkdir()
+            (dest / "preserved.txt").write_bytes(b"PRESERVE EXISTING DIRECTORY\n")
+        pre_root, pre_scratch = tree_state(root), tree_state(scratch)
+        argument = "relative-snapshot" if name == "relative" else str(dest)
+        result = cli(root, "platform-prepare", spec_sha, "h-035", registry_sha, argument)
+        check("prepare_destination_" + name, rejected(result, "SNAPSHOT_AUTHORITY") and
+              tree_state(root) == pre_root and tree_state(scratch) == pre_scratch)
     for name, taskid, ssha, rsha, reason in (
         ("unknown_task", "h-999", spec_sha, registry_sha, "TASK_ID"),
         ("other_real_task", "h-032", spec_sha, registry_sha, "TASK_ID"),

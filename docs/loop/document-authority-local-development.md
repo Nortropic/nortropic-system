@@ -108,3 +108,17 @@ kontraktskontrollen; de bevisar därför inte den nya generationens mekanism.
 Resultat: `/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/document-authority-local-3l_80b3k/result.json`,
 SHA256 `52784573adeb67401e5a0b355bc45f1e19e314ca24f792eba1e1456ddaeed3f5`.
 Ingen produkt, publicering eller operativ kvalificering har krediterats.
+
+### Minimal successor efter fryst kontraktsgranskning
+
+Första lokala kontraktskandidaten bevaras oförändrad som granskningsunderlag.
+Granskningen reproducerade baslinjen men fann att snapshotdigestargumentet
+bara fått korrekta värden. En implementation kunde därför ignorera argumentet.
+Successorn tillför en felaktig men giltigt formad 64-hex-digest och en felaktigt
+formad digest. Båda ska ge `SNAPSHOT_AUTHORITY` utan ändrad källa eller snapshot.
+
+Det redan skrivna kravet på ny absolut destination får tre konkreta motprov:
+relativ sökväg, befintlig reguljärfil och befintlig icke-tom katalog. Samma
+`SNAPSHOT_AUTHORITY`-kod gäller; hela fixtureinnehållet ska bevaras vid avslag.
+Detta utvidgar varken API-koder, produktpaths eller filesystem-racemodell.
+Specen är oförändrad. Ingen successor-körning påstås i denna hållning.
