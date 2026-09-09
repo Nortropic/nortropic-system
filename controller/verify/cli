@@ -67,6 +67,32 @@ PRETASK_PATHS = (
 
 _barn: subprocess.Popen | None = None
 
+# Fixed LOCAL_ONLY h-035 experiment. These are owner-approved input bytes, not
+# a caller-selected domain, registry replacement or task-execution capability.
+PLATFORM_SPEC = "5592e77437fe55c7b12ea10b5b35274dbe13bbb39a2a869226c8f1ac55e18061"
+PLATFORM_REGISTER = "a87869be0bcfcd1e04cbd494f99e132fde1ce282dd75801cd9b1b33968b14460"
+PLATFORM_DOCUMENTS = {
+    "AGENTS.md": "3eeb07999fbd8e2d6869576aec7b08f7e342cdfbfd02c0c5da3768f1fcd2219a",
+    "CLAUDE.md": "79525570edb52f6329d4f6192f85807e7f2d682788af4e604199cb0ec13a0ae7",
+    "README.md": "cdfc75ffabee3b252567476ac7c30a75a8b15a2ddad530dd671cde9b25db58a4",
+    "docs/00-borja-har.md": "0c75396154f338db1ca01adc548e39da2c63cff69892db76e9f45e04c3defefa",
+    "docs/03-regelverk.md": "10fc5dc2a00003dbad526b9e47962a753c42805ef88817f6495e49c93df3885e",
+    "docs/05-beslutslogg.md": "56519fcbdc5bf0d6ffc0e8b9e1d546b0d6bd590359bbbaa8ffe56bdbf7ee62b3",
+    "docs/07-konstitution.md": "1ad6d2f5ab4be16cc660545f8237136f7529f3b24f88843f78800e252e1f691d",
+    "docs/agentoverlamning.md": "87903a42ff7b491f2c7400c6de4ca06877966169ab10c9b5be86b52e754b1b18",
+    "docs/loop/byggplan-v3.md": "3e6834887d3bf7b9ec871bad428ff5b2df1aa4e79c69617c44668b7fee5fea36",
+    "docs/loop/drift.md": "cedddbf1e11a1eba766cdb75c63bf447c9b6a9a90a14847d571ffd0b8a639879",
+    "docs/loop/harness-substitution-contract-v1.md": "7142acff69b7aad2f3af40761ed61fc2bd454e979af8157935dda3ca2cb273b0",
+    "docs/loop/regler.md": "75691a420e0f31aef57a6445eab23e75380eaa3d869e71d51d79cc9a71034147",
+    "docs/loop/harness-substitution-audit-2026-08-11.md": "6c1a87e490d249a40371d2569d2246166b754cbb60d2baa0d73498b14494f425",
+}
+PLATFORM_CONTROL = (
+    "specs/tasks.spec.json", "controller/verify/register.json",
+    "specs/owner-production-paths.v1.json", "controller/authority/core.py",
+    "controller/policy/cli", "controller/verify/cli",
+    "config/managed-settings.json", "verify/bin/document-authority-exit",
+)
+
 
 class Riggfel(ValueError):
     """Verifierarens urvals-/startvägran, skild från taskens 0/1/2."""
@@ -839,7 +865,137 @@ def kmd_task_run(
     return kod
 
 
+class PlatformRefusal(ValueError):
+    pass
+
+
+def platform_file(root: Path, rel: str, missing: str, shape: str) -> tuple[bytes, int]:
+    path = root
+    parts = PurePosixPath(rel).parts
+    expected_mode = 0o755 if rel in ("controller/policy/cli", "controller/verify/cli") else 0o644
+    try:
+        for index, part in enumerate(parts):
+            path = path / part
+            mode = path.lstat().st_mode
+            if stat.S_ISLNK(mode) or (index < len(parts) - 1 and not stat.S_ISDIR(mode)):
+                raise PlatformRefusal(shape)
+        if not stat.S_ISREG(mode) or stat.S_IMODE(mode) != expected_mode:
+            raise PlatformRefusal(shape)
+        raw = las_regelbundna_bytes(path)
+    except FileNotFoundError as exc:
+        raise PlatformRefusal(missing) from exc
+    except (OSError, Integritetsfel) as exc:
+        raise PlatformRefusal(shape) from exc
+    return raw, expected_mode
+
+
+def platform_source(spec_sha: str, task: str, register_sha: str) -> dict[str, tuple[bytes, int]]:
+    if task != "h-035":
+        raise PlatformRefusal("TASK_ID")
+    if spec_sha != PLATFORM_SPEC:
+        raise PlatformRefusal("SPEC_IDENTITY")
+    if register_sha != PLATFORM_REGISTER:
+        raise PlatformRefusal("REGISTER_IDENTITY")
+    source = {}
+    for rel, expected, reason in (
+        ("specs/tasks.spec.json", PLATFORM_SPEC, "SPEC_IDENTITY"),
+        ("controller/verify/register.json", PLATFORM_REGISTER, "REGISTER_IDENTITY"),
+    ):
+        entry = platform_file(KODROT, rel, reason, "SOURCE_TYPE_OR_MODE")
+        if sha256_bytes(entry[0]) != expected:
+            raise PlatformRefusal(reason)
+        source[rel] = entry
+    # Exact complete spec bytes above bind the local amendment as well as every
+    # preexisting field. The unchanged registry parser checks structure only;
+    # platform qualification does not execute or require registered web files.
+    try:
+        spec = parse_json(source["specs/tasks.spec.json"][0], "platform spec")
+        rows = [row for row in spec["tasks"] if row["id"] == "h-035"]
+        if len(rows) != 1 or rows[0]["local_document_authority_v1"]["status"] != "LOCAL_ONLY_QUALIFICATION_EXPERIMENT":
+            raise PlatformRefusal("SPEC_IDENTITY")
+        las_register_fran(KODROT / "controller/verify/register.json")
+    except (Riggfel, KeyError, TypeError) as exc:
+        raise PlatformRefusal("SPEC_IDENTITY") from exc
+    for rel, digest in PLATFORM_DOCUMENTS.items():
+        entry = platform_file(KODROT, rel, "DOCUMENT_GENERATION", "SOURCE_TYPE_OR_MODE")
+        if sha256_bytes(entry[0]) != digest:
+            raise PlatformRefusal("DOCUMENT_GENERATION")
+        source[rel] = entry
+    for rel in PLATFORM_CONTROL:
+        if rel not in source:
+            source[rel] = platform_file(KODROT, rel, "SNAPSHOT_AUTHORITY", "SOURCE_TYPE_OR_MODE")
+    return source
+
+
+def platform_snapshot(snapshot: Path, source: dict[str, tuple[bytes, int]], digest: str) -> None:
+    if SHA256_FORM.fullmatch(digest) is None:
+        raise PlatformRefusal("SNAPSHOT_AUTHORITY")
+    # Check generation independently of the caller's self-consistent digest.
+    for rel, expected in PLATFORM_DOCUMENTS.items():
+        raw, _mode = platform_file(snapshot, rel, "DOCUMENT_GENERATION", "SNAPSHOT_AUTHORITY")
+        if sha256_bytes(raw) != expected:
+            raise PlatformRefusal("DOCUMENT_GENERATION")
+    expected_dirs = {"."}
+    for rel in source:
+        expected_dirs.update(p.as_posix() for p in PurePosixPath(rel).parents)
+    files, dirs = set(), {"."}
+    for path in snapshot.rglob("*"):
+        rel = path.relative_to(snapshot).as_posix()
+        mode = path.lstat().st_mode
+        if stat.S_ISDIR(mode):
+            dirs.add(rel)
+        elif stat.S_ISREG(mode):
+            files.add(rel)
+        else:
+            raise PlatformRefusal("SNAPSHOT_AUTHORITY")
+    if files != set(source) or dirs != expected_dirs:
+        raise PlatformRefusal("SNAPSHOT_AUTHORITY")
+    for rel, entry in source.items():
+        if platform_file(snapshot, rel, "SNAPSHOT_AUTHORITY", "SNAPSHOT_AUTHORITY") != entry:
+            raise PlatformRefusal("SNAPSHOT_AUTHORITY")
+    if trad_manifest(snapshot) != digest:
+        raise PlatformRefusal("SNAPSHOT_AUTHORITY")
+
+
+def platform_command(argv: list[str]) -> int:
+    try:
+        prepare = argv[1] == "platform-prepare"
+        if len(argv) != (6 if prepare else 7):
+            raise PlatformRefusal("SNAPSHOT_AUTHORITY")
+        source = platform_source(argv[2], argv[3], argv[4])
+        try:
+            snapshot = snapshot_katalog(argv[-1], maste_finnas=not prepare)
+        except Integritetsfel as exc:
+            raise PlatformRefusal("SNAPSHOT_AUTHORITY") from exc
+        if prepare:
+            # Authenticate all inputs before the sole exclusive creation. Never
+            # remove an existing destination or clean up partially made evidence.
+            snapshot.mkdir(mode=0o700)
+            for rel, (raw, mode) in source.items():
+                target = snapshot / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("xb") as stream:
+                    stream.write(raw)
+                target.chmod(mode)
+            digest = trad_manifest(snapshot)
+        else:
+            digest = argv[5]
+        platform_snapshot(snapshot, source, digest)
+        if platform_source(argv[2], argv[3], argv[4]) != source:
+            raise PlatformRefusal("SNAPSHOT_AUTHORITY")
+        print(json.dumps({"status": "ok", "snapshot_sha256": digest}, sort_keys=True))
+        return PASS
+    except PlatformRefusal as exc:
+        print(json.dumps({"status": "refused", "reason": str(exc)}, sort_keys=True))
+        return INTEGRITET
+    except (OSError, Integritetsfel):
+        print(json.dumps({"status": "refused", "reason": "SNAPSHOT_AUTHORITY"}, sort_keys=True))
+        return INTEGRITET
+
+
 def main(argv: list[str]) -> int:
+    if len(argv) >= 2 and argv[1] in ("platform-prepare", "platform-check"):
+        return platform_command(argv)
     if len(argv) < 2:
         return vagra("användning: cli list | preflight | check | task | prepare | run | run-commit | task-run")
     signal.signal(signal.SIGINT, _avbryt)

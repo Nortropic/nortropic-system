@@ -122,3 +122,56 @@ relativ sökväg, befintlig reguljärfil och befintlig icke-tom katalog. Samma
 `SNAPSHOT_AUTHORITY`-kod gäller; hela fixtureinnehållet ska bevaras vid avslag.
 Detta utvidgar varken API-koder, produktpaths eller filesystem-racemodell.
 Specen är oförändrad. Ingen successor-körning påstås i denna hållning.
+
+### BUILDER — uppmätt lokal produktkandidat 2026-09-09
+
+Efter separat kontraktsgranskning utgick BUILDER från lokal kontraktskandidat
+`459bd3956807e26bca90bbb37629fc7750c46be8`, gren
+`nortropic/loop-document-authority-product-r2`. Ingen publicerad bas eller
+H035-doneness tillskrivs denna lokala identitet. `origin/main` saknas i denna
+byggklon och är därför OVERIFIERAT där.
+
+Egen före-baslinje gav rc 1, 23 PASS / 77 FAIL, inga RIG_ERROR. Resultat:
+`/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/document-authority-local-l66ftplh/result.json`,
+SHA256 `fdb457aa5b93118b7e28fc1ca032c46d0378db346e4970e028ee5cf6b41bbeff`.
+
+Endast de två produktfilerna ändrades. Autopiloten jämför de 13 fast beslutade
+Gitblob-identiteterna och reguljärt 100644-mode på `origin/main`, oberoende av
+arbetskopiedokumenten, före ett enda journal-event. Dess tidigare dubblerade
+historiska självtestbindning har synkats; ingen schedulerövergång kördes.
+Verifierarens nya två exakta kommandon binds till den frysta hela specen,
+oförändrat register, dokumentgeneration och 21-leaf-snapshot. Gammal webbbana
+är oförändrad. Snapshotvägran återställer eller raderar inga bevarade objekt.
+
+Den oberoende hållna TEST_AUTHOR-grinden kördes mot produkten med följande
+kommando och umask 0022:
+
+```text
+/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -B /Users/elinhaggstrom/nortropic/worktrees/test-author-document-authority-20260909/verify/bin/document-authority-exit --subject /Users/elinhaggstrom/nortropic/worktrees/builder-document-authority-20260909
+```
+
+Utfall rc 0: 100 PASS / 0 FAIL, inga RIG_ERROR,
+`DOCUMENT_AUTHORITY_RESULT=PASS_LOCAL_QUALIFICATION_ONLY`. Resultat:
+`/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/document-authority-local-cijlzpz2/result.json`,
+SHA256 `9ed02c2a8ec0a55d408b40c1f27c2fe4af15960a5320f8bf4d7700bbcf0729c9`.
+Produkt-SHA256 vid denna körning:
+
+```text
+scripts/nortropic-codex-autopilot.py 582c26856e993d005be7d4d9159e0d6a60c908f800746dcdf7f2f489b1290576
+controller/verify/cli 3728206f3cd62f32837ec274fb30ad318cc91af3bd69d9902361025376394743
+```
+
+Separat importerad `selftest(None)` gav rc 0. Den gör endast käll-/statisk
+kontroll här, ingen origin-, nätverks-, journal- eller operativ kontroll.
+AST-jämförelse mot byggbasen bekräftade 145 oförändrade äldre definitioner;
+endast `ensure_substitution_authority`, `selftest` och verifierarens `main`
+ändrades bland befintliga definitioner. Faktisk platform-check accepterade
+godkänd snapshot även med en ogiltig caller-satt authority-root, och avvisade
+ett extra argument med rätt strukturerad kod; snapshotdigest var oförändrad.
+`git diff --check` gav rc 0. Dessa är begränsade kompletterande kontroller,
+inte ersättare för oberoende produktgranskning.
+
+FROZEN_ARTIFACTS_MODIFIED=NO; ALLOWED_WRITE_VIOLATION=NO; PUSH=NO; MERGE=NO.
+H039, godkända dokument och historiska gates har inte ändrats av BUILDER.
+Oberoende produktgranskning återstår vid denna anteckning. Fulla historiska
+gates, installation, kundflöde, operativ bootstrap och supervisor är NOT_RUN.
