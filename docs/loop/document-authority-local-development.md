@@ -175,3 +175,39 @@ FROZEN_ARTIFACTS_MODIFIED=NO; ALLOWED_WRITE_VIOLATION=NO; PUSH=NO; MERGE=NO.
 H039, godkända dokument och historiska gates har inte ändrats av BUILDER.
 Oberoende produktgranskning återstår vid denna anteckning. Fulla historiska
 gates, installation, kundflöde, operativ bootstrap och supervisor är NOT_RUN.
+
+### BUILDER — avgränsad rättning efter oberoende produktfynd
+
+Den första immutabla produktkandidaten
+`64389fccdb694b3eb4307f8efebd9e4f62e635d8` bevaras. Oberoende reviewer visade
+att ett lokalt Gitträd kan namnge godkända blob-OID utan att objekten finns:
+`ls-tree` räcker därför inte som ersättning för den gamla `cat-file -e`-kontrollen.
+Den första kandidatens 100 gröna kontroller var otillräckliga för detta fall.
+
+Successorn återställer objektets existenskontroll före exakt typ/mode/OID och
+journalföring, med endast två tillagda produktrader. Inget gate-, spec-,
+register-, policy- eller verifierarbyte ändrades. Autopilotens nya SHA256 är
+`eabcc7624ca92166e094c032022167e2d99932faea325c24c84eb42dd2bf0b13`.
+
+Reviewerproben kopierades till en ny egen fixture med endast SUBJECT-sökvägen
+ändrad; den gamla review-fixturen och kandidaten rördes inte. Kommando:
+
+```text
+/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -B /private/tmp/document-authority-builder-missing-objects.aPg6Iw/probe.py
+```
+
+Probe-SHA256 `fa27b164180923a14ddee15fc2a88d478cc954efd7306520ea6a91b3c0669b99`.
+Utfall rc 0, fyra av fyra kontroller passerade: snapshotlänk som leaf respektive
+ancestor, fel Gitmode och saknade Gitobjekt. De två snapshotlänkfallen skickade
+också en felaktig snapshotdigest: dessa är kombinerade negativa utfall, inte
+oberoende kausala bevis för länkvägran. I sista fallet gav Git-existensprovet
+rc 1 och autopilot-callable rc 7 före journal; hela fixtureträdet var oförändrat.
+`journal_created=false`. Inga objekt raderades för att skapa negativfixturen;
+den byggdes med `mktree --missing` i en ny lokal Git-databas.
+
+Samma frysta TEST_AUTHOR-kommando ovan kördes på successorn med umask 0022:
+rc 0, 100 PASS / 0 FAIL, inga RIG_ERROR. Bevarat resultat finns i
+`/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/document-authority-local-9c5__fw0/result.json`.
+Resultat-SHA256 `944b44a49e41238c318bb2a06981becd2aa35f4e32a95d890d33f38cabcdd64c`.
+Importerad `selftest(None)` gav åter rc 0. Detta är fortfarande lokal
+kvalificeringskredit; oberoende successor-review återstår vid anteckningen.

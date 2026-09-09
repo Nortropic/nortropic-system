@@ -1342,6 +1342,8 @@ def ensure_roadmap_plan(repo: Path) -> None:
 def ensure_substitution_authority(repo: Path) -> None:
     """Qualify the approved document generation from Git, never mutable worktree prose."""
     for rel, expected_blob in SUBSTITUTION_BLOBS.items():
+        if git(repo, "cat-file", "-e", f"refs/remotes/origin/main:{rel}", check=False).rc != 0:
+            raise Stop(f"substitution authority object unavailable from origin/main: {rel}")
         entry = git(repo, "ls-tree", "refs/remotes/origin/main", "--", rel, check=False)
         expected = f"100644 blob {expected_blob}\t{rel}"
         if entry.rc != 0 or entry.out.strip() != expected:
