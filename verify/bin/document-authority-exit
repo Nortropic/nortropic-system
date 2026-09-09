@@ -1,0 +1,583 @@
+#!/usr/bin/env python3.12
+"""LOCAL_ONLY document qualification; never a scheduler/H035/resume verdict.
+
+Runs actual candidate Python callables/CLIs only in retained local fixtures.
+No historical gate, task-run, customer flow, provider, build or publication.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path, PurePosixPath
+import stat
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+DOCBASE = "40f0bb6b9859eaf7be8ef330fc5e53319dd0605b"
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+PYTHON = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+PYTHON_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+GATE = "verify/bin/document-authority-exit"
+SPEC = "specs/tasks.spec.json"
+REGISTER = "controller/verify/register.json"
+AMENDMENT_KEY = "local_document_authority_v1"
+AMENDMENT = {
+    "status": "LOCAL_ONLY_QUALIFICATION_EXPERIMENT",
+    "authority": "OWNER_REQUEST_20260909_DOCUMENT_AUTHORITY",
+    "document_checkpoint": DOCBASE,
+    "task_id": "h-035",
+    "gate": GATE,
+    "product_paths": ["scripts/nortropic-codex-autopilot.py", "controller/verify/cli"],
+    "development_document": "docs/loop/document-authority-local-development.md",
+    "commands": ["platform-prepare", "platform-check"],
+    "scope": "FIXED_APPROVED_DOCUMENT_GENERATION_AND_SNAPSHOT_QUALIFICATION_ONLY",
+    "scheduler_authority": False,
+    "publication_authority": False,
+    "supervisor_resume_authority": False,
+}
+# Twelve owner-approved changed documents, plus unchanged audit dependency.
+DOCUMENTS = {
+    "AGENTS.md": "3eeb07999fbd8e2d6869576aec7b08f7e342cdfbfd02c0c5da3768f1fcd2219a",
+    "CLAUDE.md": "79525570edb52f6329d4f6192f85807e7f2d682788af4e604199cb0ec13a0ae7",
+    "README.md": "cdfc75ffabee3b252567476ac7c30a75a8b15a2ddad530dd671cde9b25db58a4",
+    "docs/00-borja-har.md": "0c75396154f338db1ca01adc548e39da2c63cff69892db76e9f45e04c3defefa",
+    "docs/03-regelverk.md": "10fc5dc2a00003dbad526b9e47962a753c42805ef88817f6495e49c93df3885e",
+    "docs/05-beslutslogg.md": "56519fcbdc5bf0d6ffc0e8b9e1d546b0d6bd590359bbbaa8ffe56bdbf7ee62b3",
+    "docs/07-konstitution.md": "1ad6d2f5ab4be16cc660545f8237136f7529f3b24f88843f78800e252e1f691d",
+    "docs/agentoverlamning.md": "87903a42ff7b491f2c7400c6de4ca06877966169ab10c9b5be86b52e754b1b18",
+    "docs/loop/byggplan-v3.md": "3e6834887d3bf7b9ec871bad428ff5b2df1aa4e79c69617c44668b7fee5fea36",
+    "docs/loop/drift.md": "cedddbf1e11a1eba766cdb75c63bf447c9b6a9a90a14847d571ffd0b8a639879",
+    "docs/loop/harness-substitution-contract-v1.md": "7142acff69b7aad2f3af40761ed61fc2bd454e979af8157935dda3ca2cb273b0",
+    "docs/loop/regler.md": "75691a420e0f31aef57a6445eab23e75380eaa3d869e71d51d79cc9a71034147",
+    "docs/loop/harness-substitution-audit-2026-08-11.md": "6c1a87e490d249a40371d2569d2246166b754cbb60d2baa0d73498b14494f425",
+}
+FIXTURE_FILES = tuple(DOCUMENTS) + (
+    SPEC, REGISTER, "specs/owner-production-paths.v1.json",
+    "controller/authority/core.py", "controller/policy/cli", "controller/verify/cli",
+    "scripts/nortropic-codex-autopilot.py", "scripts/check-invariants.mjs",
+    "config/managed-settings.json", GATE,
+)
+REQUIRED_SNAPSHOT = tuple(DOCUMENTS) + (
+    SPEC, REGISTER, "specs/owner-production-paths.v1.json",
+    "controller/authority/core.py", "controller/policy/cli", "controller/verify/cli",
+    "config/managed-settings.json", GATE,
+)
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def strict(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON member")
+            result[key] = value
+        return result
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def environment():
+    return {
+        "PATH": str(Path(GIT).parent) + ":" + str(Path(PYTHON).parent) + ":/usr/bin:/bin",
+        "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_AUTHOR_NAME": "Local fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+        "GIT_COMMITTER_NAME": "Local fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+        "PROVIDER_CALL_ALLOWED": "NO", "MODEL_CALL_ALLOWED": "NO",
+    }
+
+
+def run(argv, cwd):
+    return subprocess.run(argv, cwd=cwd, env=environment(), capture_output=True,
+                          text=True, timeout=30, check=False)
+
+
+def git(root, *args):
+    result = run([GIT, "-c", "core.hooksPath=/dev/null", *args], root)
+    if result.returncode:
+        raise RuntimeError("fixture Git failed: " + result.stderr)
+    return result.stdout.strip()
+
+
+def historical_document(rel):
+    result = subprocess.run([GIT, "show", DOCBASE + "^:" + rel], cwd=ROOT,
+                            env=environment(), capture_output=True, timeout=30, check=False)
+    if result.returncode:
+        raise RuntimeError("historical document fixture unavailable")
+    return result.stdout
+
+
+def copy_file(source, target):
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as stream:
+        stream.write(source.read_bytes())
+    target.chmod(stat.S_IMODE(source.stat().st_mode))
+
+
+def fixture(subject, root):
+    root.mkdir()
+    for rel in FIXTURE_FILES:
+        # Contract inputs come from the held TEST_AUTHOR, not product-selected tests.
+        source = ROOT if rel in (SPEC, GATE) else subject
+        copy_file(source / rel, root / rel)
+    return root
+
+
+def tree_state(root):
+    result = []
+    for p in [root] + sorted(root.rglob("*")):
+        st = p.lstat()
+        rel = p.relative_to(root).as_posix()
+        if stat.S_ISLNK(st.st_mode):
+            value = os.readlink(p)
+        elif stat.S_ISREG(st.st_mode):
+            value = sha(p.read_bytes())
+        elif stat.S_ISDIR(st.st_mode):
+            value = "directory"
+        else:
+            value = "special"
+        result.append((rel, stat.S_IMODE(st.st_mode), st.st_uid, st.st_gid, value))
+    return result
+
+
+def snapshot_digest(root):
+    # Independent implementation of the existing public snapshot wire digest.
+    rows = []
+    def walk(path, rel):
+        mode = path.lstat().st_mode
+        if stat.S_ISDIR(mode):
+            rows.append(["d", rel.as_posix(), f"{stat.S_IMODE(mode):04o}"])
+            for child in sorted(path.iterdir(), key=lambda p: p.name):
+                walk(child, rel / child.name)
+        elif stat.S_ISREG(mode):
+            rows.append(["f", rel.as_posix(), f"{stat.S_IMODE(mode):04o}", sha(path.read_bytes())])
+        else:
+            raise ValueError("nonregular snapshot fixture")
+    walk(root, PurePosixPath("."))
+    return sha(json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode())
+
+
+def cli(root, *args):
+    return run([PYTHON, "-B", str(root / "controller/verify/cli"), *args], root)
+
+
+def rejected(result, reason):
+    if result.returncode not in (3, 4) or result.stderr:
+        return False
+    try:
+        return strict(result.stdout) == {"status": "refused", "reason": reason}
+    except ValueError:
+        return False
+
+
+def legacy_rejected(result, prefix):
+    return result.returncode == 4 and not result.stdout and result.stderr.startswith(prefix) and not any(
+        bad in result.stderr for bad in ("internt verifierarfel", "Traceback", "NameError"))
+
+
+def exact_projection(snapshot, source):
+    expected_dirs = {"."}
+    for rel in REQUIRED_SNAPSHOT:
+        expected_dirs.update(p.as_posix() for p in PurePosixPath(rel).parents)
+    leaves, dirs = set(), {"."}
+    for path in snapshot.rglob("*"):
+        rel = path.relative_to(snapshot).as_posix()
+        mode = path.lstat().st_mode
+        if stat.S_ISDIR(mode):
+            dirs.add(rel)
+        elif stat.S_ISREG(mode):
+            leaves.add(rel)
+        else:
+            return False
+    return leaves == set(REQUIRED_SNAPSHOT) and dirs == expected_dirs and all(
+        (snapshot / rel).read_bytes() == (source / rel).read_bytes() and
+        stat.S_IMODE((snapshot / rel).stat().st_mode) == stat.S_IMODE((source / rel).stat().st_mode)
+        for rel in REQUIRED_SNAPSHOT)
+
+
+def json_ok(result):
+    if result.returncode or result.stderr:
+        return None
+    try:
+        obj = strict(result.stdout)
+        return obj if type(obj) is dict and obj.get("status") == "ok" else None
+    except ValueError:
+        return None
+
+
+def autopilot_call(root):
+    # Run the real module and real callable, never its operational __main__.
+    code = (
+        "import importlib.util,sys,json; from pathlib import Path; "
+        "p=Path(sys.argv[1]); s=importlib.util.spec_from_file_location('subject_autopilot',"
+        "p/'scripts/nortropic-codex-autopilot.py'); m=importlib.util.module_from_spec(s); "
+        "sys.modules[s.name]=m; s.loader.exec_module(m)\n"
+        "try:\n m.ensure_substitution_authority(p)\n"
+        "except m.Stop as e:\n print('DOCUMENT_AUTHORITY_REJECT:'+str(e)); sys.exit(7)\n"
+        "print('DOCUMENT_AUTHORITY_ACCEPT')\n"
+    )
+    return run([PYTHON, "-B", "-c", code, str(root)], root)
+
+
+def ensure_positive(result, root, previous, previous_journal):
+    journal_rel = ".git/nortropic-codex-autopilot/events.jsonl"
+    journal_dir = ".git/nortropic-codex-autopilot"
+    if result.returncode or result.stderr or result.stdout.splitlines()[-1:] != ["DOCUMENT_AUTHORITY_ACCEPT"]:
+        return False
+    now = tree_state(root)
+    excluded = {journal_rel, journal_dir}
+    if [r for r in now if r[0] not in excluded] != [r for r in previous if r[0] not in excluded]:
+        return False
+    path = root / journal_rel
+    if not path.is_file() or path.is_symlink():
+        return False
+    raw = path.read_bytes()
+    if not raw.startswith(previous_journal):
+        return False
+    tail = raw[len(previous_journal):]
+    if len(tail.splitlines()) != 1:
+        return False
+    try:
+        row = strict(tail)
+    except ValueError:
+        return False
+    expected_blobs = {}
+    for rel in DOCUMENTS:
+        content = (ROOT / rel).read_bytes()
+        expected_blobs[rel] = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
+    contract = "docs/loop/harness-substitution-contract-v1.md"
+    audit = "docs/loop/harness-substitution-audit-2026-08-11.md"
+    return type(row) is dict and set(row) == {"ts", "event", "contract", "contract_blob", "audit", "audit_blob", "document_blobs"} and (
+        type(row["ts"]) is str and bool(row["ts"]) and row["event"] == "SUBSTITUTION_AUTHORITY" and
+        row["contract"] == contract and row["contract_blob"] == expected_blobs[contract] and
+        row["audit"] == audit and row["audit_blob"] == expected_blobs[audit] and row["document_blobs"] == expected_blobs)
+
+
+def init_commit(root):
+    git(root, "init", "--template=", "--initial-branch=fixture")
+    git(root, "add", "--all")
+    git(root, "commit", "--no-gpg-sign", "-m", "local diagnostic fixture")
+    commit = git(root, "rev-parse", "HEAD")
+    git(root, "update-ref", "refs/remotes/origin/main", commit)
+    return commit
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--subject", type=Path, default=ROOT)
+    args = parser.parse_args()
+    subject = args.subject.resolve()
+    if sys.version_info[:2] != (3, 12) or sha(Path(PYTHON).read_bytes()) != PYTHON_SHA:
+        raise RuntimeError("pinned Python 3.12 required")
+    for rel, digest in DOCUMENTS.items():
+        if sha((subject / rel).read_bytes()) != digest:
+            raise RuntimeError("subject approved document mismatch: " + rel)
+    spec_raw = (ROOT / SPEC).read_bytes()
+    document = strict(spec_raw)
+    task = [t for t in document["tasks"] if t["id"] == "h-035"]
+    if len(task) != 1 or task[0].pop(AMENDMENT_KEY) != AMENDMENT:
+        raise RuntimeError("exact local amendment differs")
+    old_spec = strict(git(ROOT, "show", DOCBASE + ":" + SPEC))
+    if document != old_spec:
+        raise RuntimeError("preexisting spec fields changed")
+    originals = {rel: sha((subject / rel).read_bytes()) for rel in FIXTURE_FILES if (subject / rel).is_file()}
+    held = {rel: sha((ROOT / rel).read_bytes()) for rel in (SPEC, GATE)}
+    scratch = Path(tempfile.mkdtemp(prefix="document-authority-local-")).resolve()
+    print("FIXTURE_ROOT=" + str(scratch), flush=True)
+    rows = []
+    def check(label, passed, detail=""):
+        rows.append({"label": label, "pass": bool(passed), "detail": detail})
+        print(("PASS " if passed else "FAIL ") + label, flush=True)
+
+    # Fixed platform lane on the same missing-web input that legacy rejects.
+    root = fixture(subject, scratch / "platform")
+    spec_sha = sha((root / SPEC).read_bytes())
+    registry_sha = sha((root / REGISTER).read_bytes())
+    before = tree_state(root)
+    legacy = cli(root, "preflight")
+    check("legacy_missing_web_reject", legacy_rejected(legacy, "osäker eller saknad registerfil för nortropic-verify-suite:") and tree_state(root) == before)
+    canary = run([PYTHON, "-B", "-c", "import json; print(json.dumps({'status':'refused','reason':'DOCUMENT_GENERATION'})); raise SystemExit(4)"], root)
+    check("refusal_predicate_positive_canary", rejected(canary, "DOCUMENT_GENERATION"))
+    canary = run([PYTHON, "-B", "-c", "import sys; print('internt verifierarfel: NameError: canary',file=sys.stderr); raise SystemExit(4)"], root)
+    check("refusal_predicate_internal_fault_canary", not rejected(canary, "DOCUMENT_GENERATION"))
+    canary = run([PYTHON, "-B", "-c", "raise NameError('fixture-canary')"], root)
+    check("refusal_predicate_uncaught_fault_canary", not rejected(canary, "DOCUMENT_GENERATION"))
+    snapshot = scratch / "approved-snapshot"
+    positive = cli(root, "platform-prepare", spec_sha, "h-035", registry_sha, str(snapshot))
+    report = json_ok(positive)
+    snapshot_valid = bool(report and snapshot.is_dir() and
+                          report.get("snapshot_sha256") == snapshot_digest(snapshot))
+    check("platform_prepare_without_web", snapshot_valid and tree_state(root) == before,
+          positive.stdout + positive.stderr)
+    check("platform_exact_dependency_projection", snapshot_valid and exact_projection(snapshot, root))
+    if snapshot_valid:
+        snap_before = tree_state(snapshot)
+        consumed = cli(root, "platform-check", spec_sha, "h-035", registry_sha,
+                       snapshot_digest(snapshot), str(snapshot))
+        check("platform_consume_approved", bool(json_ok(consumed)) and
+              tree_state(snapshot) == snap_before and tree_state(root) == before)
+        for rel in DOCUMENTS:
+            path = snapshot / rel
+            saved = path.read_bytes()
+            path.write_bytes(saved + b"\nUNAPPROVED GENERATION\n")
+            mutant_before = tree_state(snapshot)
+            result = cli(root, "platform-check", spec_sha, "h-035", registry_sha,
+                         snapshot_digest(snapshot), str(snapshot))
+            check("consume_rehashed_drift:" + rel, rejected(result, "DOCUMENT_GENERATION") and
+                  tree_state(snapshot) == mutant_before and tree_state(root) == before)
+            path.write_bytes(saved)
+        path = snapshot / "docs/loop/harness-substitution-contract-v1.md"
+        saved = path.read_bytes()
+        path.unlink()
+        mutant_before = tree_state(snapshot)
+        result = cli(root, "platform-check", spec_sha, "h-035", registry_sha,
+                     snapshot_digest(snapshot), str(snapshot))
+        check("consume_rehashed_missing_contract", rejected(result, "DOCUMENT_GENERATION") and tree_state(snapshot) == mutant_before and tree_state(root) == before)
+        path.write_bytes(saved)
+        for rel in REQUIRED_SNAPSHOT:
+            if rel in DOCUMENTS:
+                continue
+            path = snapshot / rel
+            saved = path.read_bytes()
+            path.write_bytes(saved + b"\nUNAPPROVED CONTROL PLANE\n")
+            mutant_before = tree_state(snapshot)
+            result = cli(root, "platform-check", spec_sha, "h-035", registry_sha,
+                         snapshot_digest(snapshot), str(snapshot))
+            check("consume_rehashed_control_plane:" + rel, rejected(result, "SNAPSHOT_AUTHORITY") and
+                  tree_state(snapshot) == mutant_before and tree_state(root) == before)
+            path.write_bytes(saved)
+        saved_documents = {rel: (snapshot / rel).read_bytes() for rel in DOCUMENTS}
+        for rel in DOCUMENTS:
+            (snapshot / rel).write_bytes(historical_document(rel))
+        mutant_before = tree_state(snapshot)
+        result = cli(root, "platform-check", spec_sha, "h-035", registry_sha,
+                     snapshot_digest(snapshot), str(snapshot))
+        check("consume_rehashed_historical_generation", rejected(result, "DOCUMENT_GENERATION") and tree_state(snapshot) == mutant_before and tree_state(root) == before)
+        for rel, raw in saved_documents.items():
+            (snapshot / rel).write_bytes(raw)
+        for name in ("mode", "extra_leaf", "extra_directory"):
+            path = snapshot / ("controller/authority/core.py" if name == "mode" else "unapproved-extra")
+            if name == "mode":
+                saved_mode = stat.S_IMODE(path.stat().st_mode)
+                path.chmod(saved_mode ^ 0o100)
+            elif name == "extra_leaf":
+                path.write_bytes(b"unapproved")
+            else:
+                path.mkdir()
+            mutant_before = tree_state(snapshot)
+            result = cli(root, "platform-check", spec_sha, "h-035", registry_sha, snapshot_digest(snapshot), str(snapshot))
+            check("consume_rehashed_shape:" + name, rejected(result, "SNAPSHOT_AUTHORITY") and tree_state(snapshot) == mutant_before and tree_state(root) == before)
+            if name == "mode":
+                path.chmod(saved_mode)
+            elif name == "extra_leaf":
+                path.unlink()
+            else:
+                path.rmdir()
+        for name, taskid, ssha, rsha, reason in (
+            ("unknown_task", "h-999", spec_sha, registry_sha, "TASK_ID"),
+            ("other_real_task", "h-032", spec_sha, registry_sha, "TASK_ID"),
+            ("wrong_spec", "h-035", "0" * 64, registry_sha, "SPEC_IDENTITY"),
+            ("wrong_registry", "h-035", spec_sha, "0" * 64, "REGISTER_IDENTITY"),
+        ):
+            pre = tree_state(snapshot)
+            result = cli(root, "platform-check", ssha, taskid, rsha, snapshot_digest(snapshot), str(snapshot))
+            check("consume_" + name, rejected(result, reason) and tree_state(snapshot) == pre and tree_state(root) == before)
+    else:
+        check("platform_consume_approved", False, "prepare prerequisite absent; no consumption credit")
+        for rel in DOCUMENTS:
+            check("consume_rehashed_drift:" + rel, False, "not reached")
+        check("consume_rehashed_missing_contract", False, "not reached")
+        for rel in REQUIRED_SNAPSHOT:
+            if rel not in DOCUMENTS:
+                check("consume_rehashed_control_plane:" + rel, False, "not reached")
+        check("consume_rehashed_historical_generation", False, "not reached")
+        for name in ("mode", "extra_leaf", "extra_directory"):
+            check("consume_rehashed_shape:" + name, False, "not reached")
+        for name in ("unknown_task", "other_real_task", "wrong_spec", "wrong_registry"):
+            check("consume_" + name, False, "not reached")
+
+    for number, rel in enumerate(DOCUMENTS):
+        path = root / rel
+        saved = path.read_bytes()
+        path.write_bytes(saved + b"\nUNAPPROVED GENERATION\n")
+        unchanged = tree_state(root)
+        dest = scratch / ("reject-doc-" + str(number))
+        result = cli(root, "platform-prepare", spec_sha, "h-035", registry_sha, str(dest))
+        check("prepare_drift_pre_effect:" + rel, rejected(result, "DOCUMENT_GENERATION") and not dest.exists() and tree_state(root) == unchanged)
+        path.write_bytes(saved)
+        path.unlink()
+        unchanged = tree_state(root)
+        dest = scratch / ("reject-missing-" + str(number))
+        result = cli(root, "platform-prepare", spec_sha, "h-035", registry_sha, str(dest))
+        check("prepare_missing_pre_effect:" + rel, rejected(result, "DOCUMENT_GENERATION") and not dest.exists() and tree_state(root) == unchanged)
+        path.write_bytes(saved)
+    for name, taskid, ssha, rsha, reason in (
+        ("unknown_task", "h-999", spec_sha, registry_sha, "TASK_ID"),
+        ("other_real_task", "h-032", spec_sha, registry_sha, "TASK_ID"),
+        ("wrong_spec", "h-035", "0" * 64, registry_sha, "SPEC_IDENTITY"),
+        ("wrong_registry", "h-035", spec_sha, "0" * 64, "REGISTER_IDENTITY"),
+    ):
+        dest = scratch / ("reject-" + name)
+        unchanged = tree_state(root)
+        result = cli(root, "platform-prepare", ssha, taskid, rsha, str(dest))
+        check(name, rejected(result, reason) and not dest.exists() and tree_state(root) == unchanged)
+    forged = strict(spec_raw)
+    row = next(t for t in forged["tasks"] if t["id"] == "h-035")
+    row[AMENDMENT_KEY]["scheduler_authority"] = True
+    (root / SPEC).write_text(json.dumps(forged))
+    unchanged = tree_state(root)
+    dest = scratch / "reject-forged-amendment"
+    result = cli(root, "platform-prepare", sha((root / SPEC).read_bytes()), "h-035", registry_sha, str(dest))
+    check("caller_rehashed_amendment_reject", rejected(result, "SPEC_IDENTITY") and not dest.exists() and tree_state(root) == unchanged)
+    (root / SPEC).write_bytes(spec_raw)
+    forged = strict(spec_raw)
+    next(t for t in forged["tasks"] if t["id"] == "h-035")["title"] += " UNAPPROVED"
+    (root / SPEC).write_text(json.dumps(forged))
+    unchanged = tree_state(root)
+    dest = scratch / "reject-rehashed-other-spec-field"
+    result = cli(root, "platform-prepare", sha((root / SPEC).read_bytes()), "h-035", registry_sha, str(dest))
+    check("caller_rehashed_other_spec_field", rejected(result, "SPEC_IDENTITY") and not dest.exists() and tree_state(root) == unchanged)
+    (root / SPEC).write_bytes(spec_raw)
+    registry_raw = (root / REGISTER).read_bytes()
+    forged = strict(registry_raw)
+    forged["notes"] = "UNAPPROVED REGISTRY GENERATION"
+    (root / REGISTER).write_text(json.dumps(forged))
+    unchanged = tree_state(root)
+    dest = scratch / "reject-rehashed-registry"
+    result = cli(root, "platform-prepare", spec_sha, "h-035", sha((root / REGISTER).read_bytes()), str(dest))
+    check("caller_rehashed_registry", rejected(result, "REGISTER_IDENTITY") and not dest.exists() and tree_state(root) == unchanged)
+    (root / REGISTER).write_bytes(registry_raw)
+    for name in ("mode", "symlink"):
+        path = root / "docs/07-konstitution.md"
+        saved, saved_mode = path.read_bytes(), stat.S_IMODE(path.stat().st_mode)
+        if name == "mode":
+            path.chmod(saved_mode ^ 0o100)
+        else:
+            path.unlink()
+            path.symlink_to(subject / "docs/07-konstitution.md")
+        unchanged = tree_state(root)
+        dest = scratch / ("reject-source-" + name)
+        result = cli(root, "platform-prepare", spec_sha, "h-035", registry_sha, str(dest))
+        check("prepare_source_" + name, rejected(result, "SOURCE_TYPE_OR_MODE") and not dest.exists() and tree_state(root) == unchanged)
+        if name == "symlink":
+            path.unlink()
+            path.write_bytes(saved)
+        path.chmod(saved_mode)
+
+    # Legacy schema + actual registered bytes remain required on the web lane.
+    web = fixture(subject, scratch / "legacy-web")
+    copy_file(subject / "workflows/nortropic-verify-suite.js", web / "workflows/nortropic-verify-suite.js")
+    web_before = tree_state(web)
+    result = cli(web, "preflight")
+    check("legacy_web_preflight_positive", result.returncode == 0 and tree_state(web) == web_before)
+    for rel in ("scripts/check-invariants.mjs", "workflows/nortropic-verify-suite.js"):
+        path = web / rel
+        saved = path.read_bytes()
+        path.write_bytes(saved + b"\n// drift\n")
+        pre = tree_state(web)
+        result = cli(web, "preflight")
+        check("legacy_web_drift_reject:" + rel, legacy_rejected(result, "hash_mismatch: " + rel) and tree_state(web) == pre)
+        path.write_bytes(saved)
+
+    # Real local origin/main objects. No source or real remote refs are changed.
+    authority = fixture(subject, scratch / "autopilot")
+    init_commit(authority)
+    pre = tree_state(authority)
+    accepted = autopilot_call(authority)
+    journal = authority / ".git/nortropic-codex-autopilot/events.jsonl"
+    check("actual_ensure_approved_git_generation", ensure_positive(accepted, authority, pre, b""),
+          accepted.stdout + accepted.stderr)
+    mutable_saved = {rel: (authority / rel).read_bytes() for rel in DOCUMENTS}
+    for number, rel in enumerate(DOCUMENTS):
+        if number % 2:
+            (authority / rel).unlink()
+        else:
+            (authority / rel).write_bytes(b"MUTABLE NONAUTHORITY\n")
+    pre = tree_state(authority)
+    journal_before = journal.read_bytes() if journal.exists() else b""
+    result = autopilot_call(authority)
+    check("actual_ensure_git_positive_mutable_hostile", ensure_positive(result, authority, pre, journal_before))
+    for rel, raw in mutable_saved.items():
+        (authority / rel).write_bytes(raw)
+    for number, rel in enumerate(DOCUMENTS):
+        path = authority / rel
+        saved = path.read_bytes()
+        path.write_bytes(saved + b"\nUNKNOWN AUTHORITY\n")
+        git(authority, "add", "--", rel)
+        git(authority, "commit", "--no-gpg-sign", "-m", "unknown document fixture")
+        git(authority, "update-ref", "refs/remotes/origin/main", git(authority, "rev-parse", "HEAD"))
+        # Crossed negative: mutable bytes look approved, immutable origin does not.
+        path.write_bytes(saved)
+        pre = tree_state(authority)
+        result = autopilot_call(authority)
+        check("actual_ensure_unknown_pre_effect:" + rel, result.returncode == 7 and
+              "DOCUMENT_AUTHORITY_REJECT:" in result.stdout and not result.stderr and tree_state(authority) == pre)
+        path.write_bytes(saved)
+        git(authority, "add", "--", rel)
+        git(authority, "commit", "--no-gpg-sign", "-m", "restore approved fixture document")
+        git(authority, "update-ref", "refs/remotes/origin/main", git(authority, "rev-parse", "HEAD"))
+    contract = authority / "docs/loop/harness-substitution-contract-v1.md"
+    saved = contract.read_bytes()
+    for name in ("missing", "mixed_historical"):
+        if name == "missing":
+            contract.unlink()
+        else:
+            contract.write_bytes(historical_document("docs/loop/harness-substitution-contract-v1.md"))
+        git(authority, "add", "--all")
+        git(authority, "commit", "--no-gpg-sign", "-m", name + " origin authority negative")
+        git(authority, "update-ref", "refs/remotes/origin/main", git(authority, "rev-parse", "HEAD"))
+        contract.write_bytes(saved)
+        pre = tree_state(authority)
+        result = autopilot_call(authority)
+        check("actual_ensure_" + name + "_origin_reject", result.returncode == 7 and "DOCUMENT_AUTHORITY_REJECT:" in result.stdout
+              and not result.stderr and tree_state(authority) == pre)
+        git(authority, "add", "--all")
+        git(authority, "commit", "--no-gpg-sign", "-m", "restore origin authority")
+        git(authority, "update-ref", "refs/remotes/origin/main", git(authority, "rev-parse", "HEAD"))
+    for rel in DOCUMENTS:
+        (authority / rel).write_bytes(historical_document(rel))
+    git(authority, "add", "--all")
+    git(authority, "commit", "--no-gpg-sign", "-m", "historical generation negative")
+    git(authority, "update-ref", "refs/remotes/origin/main", git(authority, "rev-parse", "HEAD"))
+    pre = tree_state(authority)
+    result = autopilot_call(authority)
+    check("actual_ensure_historical_generation_reject", result.returncode == 7 and
+          "DOCUMENT_AUTHORITY_REJECT:" in result.stdout and not result.stderr and tree_state(authority) == pre)
+
+    # Unchanged policy's actual entrypoint must still reject a protected write.
+    policy = fixture(subject, scratch / "policy")
+    base = init_commit(policy)
+    protected = policy / "docs/07-konstitution.md"
+    protected.write_bytes(protected.read_bytes() + b"\nUNAUTHORIZED\n")
+    git(policy, "add", "--", "docs/07-konstitution.md")
+    git(policy, "commit", "--no-gpg-sign", "-m", "protected negative fixture")
+    candidate = git(policy, "rev-parse", "HEAD")
+    result = run([PYTHON, "-B", str(policy / "controller/policy/cli"), "check", "h-035", base, candidate], policy)
+    evidence = list((policy / "controller/policy/evidence").glob("*.json"))
+    check("protected_write_actual_policy_reject", result.returncode == 3 and len(evidence) == 1 and
+          strict(evidence[0].read_bytes()).get("verdikt") == "sektion_a")
+
+    check("subject_and_held_bytes_unchanged", all(sha((subject / rel).read_bytes()) == digest for rel, digest in originals.items())
+          and all(sha((ROOT / rel).read_bytes()) == digest for rel, digest in held.items()))
+    result = {"scope": "LOCAL_QUALIFICATION_ONLY", "subject": str(subject),
+              "fixture_root": str(scratch), "rows": rows,
+              "pass": all(row["pass"] for row in rows), "fixture_origin_is_published_origin": False}
+    with (scratch / "result.json").open("x") as stream:
+        json.dump(result, stream, indent=2)
+    print("DOCUMENT_AUTHORITY_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
+    return 0 if result["pass"] else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print("DOCUMENT_AUTHORITY_RIG_ERROR=" + repr(exc), file=sys.stderr)
+        sys.exit(2)
