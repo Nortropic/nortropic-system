@@ -4,6 +4,15 @@
 
 ---
 
+Tillämpningstillägg för domänsynkningen 2026-09-09:
+
+Den historiska lägesbilden och dess daterade beslut nedan bevaras.
+Nortropics senare målbild skiljer organisation, autonomiplattform och
+Digitala enligt substitutionskontraktets §1. Äldre hänvisningar till
+fabriken beskriver webbspårets ursprung, inte organisationens uttömmande
+ändamål. Tillägget ändrar inte historisk beviscredit eller aktiverar
+äldre kommandon; övriga ändringsvägar följer sina giltiga delegationer.
+
 ## 1. Bevisat läge 2026-08-07
 
 Allt nedan är belagt med kommandoutfall denna dag. Inget kommer ur minne eller rapportering.
@@ -35,7 +44,10 @@ Controllern **duplicerar inte** stewardtrappan. Trappan låter en modell applice
 
 Controllern **tillför** tre saker fabriken saknar: SHA-bundna attestationer, exklusiv lease, isolerat workspace per försök. Och som sjunde skiva: det första verkligt mekaniska §A-skyddet.
 
-Scope: bygga och förbättra fabriken. **Aldrig kundflödet.** Regel 16 (`disable-model-invocation`) står orörd.
+Scope för plattformsbygget: kvalificera autonomiplattformen som
+verksamheter kan använda. Webbverksamhetens kundflöde exekveras inte
+genom detta byggmandat. Regel 16 och 21 står orörda. Ingen ny backlog
+eller operativ kundbehörighet skapas genom målbildssynkningen.
 
 ## 3. Bindande ändringar mot v4.1
 
@@ -68,6 +80,12 @@ specs/**  verify/**  controller/**  CLAUDE.md
 
 **Två mekanismer, olika ytor.** `controller/**`, `specs/**` och `verify/**` står i §A-mängden ovan men vaktas INTE av skiva 7:s §A-kontroll — de skyddas av `allowed_write` (som är smalare per task) och av ägarhand. Skälet är mekaniskt: varje h-task bygger i `controller/<del>/**`, så en §A-vakt som täckte hela `controller/**` hade avvisat sin egen kandidat, h-007:s inkluderad. §A-kontrollen prövar därför resten av mängden — `AUTOPILOT`, `workflows/**`, `tests/fixtures/**`, `docs/07-konstitution.md`, `docs/03-regelverk.md`, `agents/nortropic-steward.md`, `scripts/check-invariants.mjs`, `skills/nortropic-eval/references/eval-rubric.md`, `skills/nortropic-plan/references/juridikflaggor.md`, `CLAUDE.md` — alltså det som ligger utanför varje tasks `allowed_write` och som ingen annan mekanism fångar. Förhållandet skrivs här i stället för att lämnas underförstått (beslut 2026-08-08, LOOP-ÄGARHAND-15). **Vitlistan binder allowed_write:** `.gitignore` är en whitelist (`/*` med `!`-undantag) — en tasks `allowed_write` måste ligga inom vitlistade träd, annars kan ingen worker committa någon kandidat alls (LOOP-ÄGARHAND-26).
 
+Domänklassningen ändrar inte mängden skyddade paths ovan eller vilken
+mekanism som vaktar dem. Plattformens taskvisa allowed_write, webbens
+skydd och ägarändringsvägar är skilda ansvar. En framtida ändring av
+testurval eller skyddsverkställare kräver eget avgränsat kontrakt och
+regression; den får inte genomföras genom att kalla en fil WEB.
+
 ## 4. Stängda beslut
 
 1. Macen är fabriken. Molnsessioner bygger aldrig.
@@ -79,7 +97,7 @@ specs/**  verify/**  controller/**  CLAUDE.md
 7. Codex granskar varje PR som rör §A-ytan i §3.1.
 8. 5Z-kedjan och Post-Workspace ARKIVERADE. Systeminstallationen arkiverad, **ej avvecklad**.
 9. `docs/100-dagar/programregister.md` är den enda backloggen.
-10. Controllern rör aldrig kundflödet.
+10. Plattformsbygget ger ingen kundflödesbehörighet; se §2:s scope och loopregel 10.
 
 ## 5. Pass 0 — sanering, säkring, dokument (~1 h)
 

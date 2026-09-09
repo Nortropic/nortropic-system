@@ -612,3 +612,46 @@ not falsely claimed distinguishable; protected/runtime-enclosing and topology-vi
 | 2026-09-06 | H-039 R27-R2/R15 atomic create-phase diagnostic | Frozen R27-R1 `ae10c55972a3122b330ae81f5180b40daed94b0d`/tree `add9ee8395c9e526b65c6af86c91937e7eefd80f`/gate `cb42e688be29622decd79f754745614c4022cb4f6d1fddf7512c4c1982c8e1ed`/spec `d30d4c63eb5390ac2cc9f7acf9da6cf92de26d73e629ad495402c1704a113d9f` is immutable NO-CREDIT, nonparent and nonretryable. Review A `5e546ece2a38a65f4ed0e8244a0e21e7603891f3ae8bdf572132a9bcc0f92449`, identity8 `[16777232,129612176,33188,501,20,1,143842,0]`, has 4,142 lines/4,141 PASS/0 FAIL and sole concatenated `RIG_ERROR: R26 current/stale dispatch branch cardinality drift`; review B `e19264feca88f1177242030ebb6d8e8a46b1319d4d9e92ec6a18c4d33e37eb83`, identity8 `[16777232,129613083,33188,501,20,1,133828,0]`, is 133,828 bytes/3,349 lines/3,323 PASS/0 FAIL with sole outer-Seatbelt ODÖMBART. Fresh direct-base R2 retains exact historical R26 installed material/order but proves its sole selector is literal false, parser/current-preproduct cardinality is zero and branch is unreachable. An independent static bootstrap plus mutual R26/R27 audits require one call each and reject double removal; after removing only the new R1-evidence call, normalized main and exact R27 CLI-helper ASTs equal immutable R1, rejecting wrapped/markerless selector branches, decoy uses, alternate admission and all route drift while retaining exact Undecidable R25/R26/R27 reporting. Published R26 `c43a4c05…`, guarded receipt `77dc52ac…` and immutable log `27196ce2…` are exact. The sole RIG_ERROR is concatenated after the named PASS on physical line 92,867; line 92,868 is blank, followed by exactly 60 PASS lines on 92,869–92,928 (61 later physical lines), with no summary or credit. No-argument review and future R28 preflight alone bind the exact live numeric identity8 values, 432-byte sequence-1 receipt `fdb437bd…`, zero-runtime state and installed R14 `4a388755…`/89392/`07ab2816…`; R15 embeds no host dev/inode and captures/rebinds its actual pre-operation identities under the lock in synthetic product lanes. R27 has only RED, `--r27-product` and `--r27-published`; fresh R15 changes the exact existing five-file product. Only body `15d1605b…`/wire `b711e43d…` selects private operation 3; generic semantics, legacy create/cleanup and ACK `A` stay exact. One request-bound create under a nondelegated OFD lock records the last fsynced RESERVING–PREPARED phase; only PREPARED sends the exact 14-key frame and three distinct typed FDs. `socket_dev/socket_ino` bind the stable named socket; signed `listener_fd_dev/listener_fd_ino` preserve Darwin `st_dev=-1`, bind the separately captured listener FD, are re-fstatted immediately before SCM_RIGHTS and receiver-matched. The root:gid20 0550 portal excludes uid501 rename/create/unlink, so no self-connect is needed. The FIFO role remains solely the request-created mediator-local runtime-object writer. The mediator verifies each sender-local FD is CLOEXEC immediately before `sendmsg`; SCM_RIGHTS does not preserve that flag. The fixed single-threaded runner immediately after `recvmsg` sets and verifies CLOEXEC on all three received FDs before any non-`fcntl` use, exposure, fork or exec. Exact X+EOF before the ACK deadline is the sole PREPARED success. Recovery EOF grace is one absolute deadline checked at every loop entry and after every positive read; EINTR, EAGAIN and continuous writes cannot extend it. A bounded continuous-writer negative must stop nonzero/no-result after grace with restoration and zero residue unclaimed. Bounded recovery is claimed only when no byte is held through that deadline and the writer closes within the fixed recovery grace, or when X is written but EOF is withheld through the deadline and the writer closes within that grace; both return nonzero with no result frame or result ancillary FD after recovery. Arbitrary or hostile retention past the grace is outside the admitted fixed cooperative execution and returns nonzero/no-result without claiming restoration or zero residue. Same-transaction recovery preserves exact sequence 1 for RESERVING/CREATING or publishes the exact 377-byte-effect/432-byte-receipt-derived sequence 2 for later phases. Exact final membership and equality to captured pre-operation identities are rebound under lock; only `r/last` is phase-dependent. Pre-RESERVING, invalid, unclassifiable or recovery-drift cases are nonzero with no fabricated phase or result. The R15 installer accepts only the exact final sequence-1 R14 state; empty `r`, every prefix, already-R15/version-2 and every other nonexact state fail before mutation. Runtime legacy create-v1/cleanup-v1 remain exact; no generic prefix/fresh installer path is reachable in R15. The undecidable terminal reporter emits exact R25/R26/R27 material extensions once under static regression. R27 ends at `PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY`. Fresh productless R28 must freeze, receive two independent reviews and publish guarded; read-bind exact live identities; durably consume a one-shot reservation; then perform the sole fixed no-retry R14→R15 launch using prebound argv/identities. Drift, nonzero, output, ambiguity or unexpected state is a consuming owner stop without retry, rollback or general cleanup. Only exact success admits a read-only installed/update review and exactly one diagnostic as the first post-R15 store mutation, followed by mandatory owner adjudication. The mutating effect engine, H039 completion, downstream progress and resume require fresh post-diagnostic owner authority. | (this commit) |
 
 R33 formal-A device amendment binds exactly four R24/R25 historical/current identity10 rows (16777232 to 16777230; fields 1-9 exact), with three centralized comparison replacements in the two shared binding predicates and causal positive baselines. Historical workflow bytes remain immutable and no stale lane reopens.
+
+## Förslag till domänsynkning 2026-09-09
+
+Föreslagen lydelse — EJ ANTAGET ELLER AKTIVERAT. Beslutskälla och faktisk
+aktiveringsidentitet är ännu inte bokförda; nedanstående text ger ingen auktoritet.
+
+Ägarbeslut om domänsynkning: Nortropic är organisationen;
+autonomiplattformen är en del och Digitala första professionella
+verksamheten. Den tidigare webbfabriksdefinitionen i
+substitutionskontraktets produktkonstant och §1 samt AGENTS v4
+ersätts framåt av den antagna lydelsen. Berörda dokument och
+tillämpningsklausuler följer det godkända tolvdokumentpaketet.
+Skyddade ytor, human-only-villkor, frusna verifieringskrav och
+förbrukade försök bevaras. Ingen fysisk flytt, verifierarseparation,
+H039-completion eller supervisor-resume beviljas genom denna post.
+Beslutskälla, verklig kandidat/bas och publicerad aktiveringsidentitet
+anges separat; före det är posten ett förslag.
+
+## 2026-09-09 — faktiskt godkännande av separat dokumentkandidat
+
+Användaren har i denna Codex-konversation förmedlat godkännandet från
+Improvements-uppgift 01a0865b-3206-7061-9344-29d0c67c0253, host local.
+Frågan var: ”Godkänner du dokumentpaketet och ändringsvägen i §10.6, så att nästa
+steg blir en separat dokumentkandidat med säkerhetskraven och H039-arbetet
+bevarade, utan publicering eller driftstart?” Svaret återges ordagrant:
+”jag godkänner”. Godkännandet avser §10.6 och diffen i §10.4 i
+FORSLAG-FORSTA-ANDRINGSPAKET-20260909.md, diff-SHA256
+4d81b60ea11ab2a7bcad4a78eeda64255416a26968f955d757e6d16bed4186be.
+
+Källa är användarens aktuella förmedlade instruktion. Den separata uppgiftens
+originaltranskript har inte oberoende hämtats i detta pass (OVERIFIERAT).
+Detta är inte granskarens eget mandat. Tidigare förslagsrader bevaras som
+förslag vid sin dokumentationstid; det faktiska godkännandet verkar framåt.
+
+Kandidatbasen är verifierad canonical main
+ed584ec3088c08005f99de1da825d083e350a8d2. Åtta agenttillåtna dokument
+förbereds i separat arbetsyta; de fyra dokumentens mänskliga appliceringsväg
+kvarstår utan undantag. H039-WIP och hållna arbetskopior ska bevaras.
+
+Denna loggpost ger ingen publicerings-, aktiverings-, produkt-, gate-, register-,
+pin-, installations-, kundflödes- eller supervisor-resume-auktoritet.
+Substitutionspinne och authority-snapshots måste hanteras före senare aktivering.
+Textkontroll ger ingen runtime- eller bootstrapcredit.

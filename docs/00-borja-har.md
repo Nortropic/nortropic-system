@@ -3,11 +3,25 @@
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
 Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad. Avsnittet om betygssystemets utkast (2026-08-26) är skrivet mot `docs/utkast/eval-rubrik-v4-UTKAST.md` och `scripts/check-v4-utkast.mjs`; det beskriver ett UTKAST utan konsument — ingen mätning i drift har ändrats.
 
+Dokumentnot för domänsynkningen: verifieringsstämpeln ovan är historisk och
+omfattar inte de nya tillämpningsstyckena. Ingen ny systemverifiering påstås.
+
 Det här är ingången för dig som aldrig sett systemet förut. Läs den i ett svep, så förstår du vad Nortropic är och hur det hänger ihop — utan en enda insider-term. Det här dokumentet ersätter inte den tekniska dokumentationen (docs/01–07 och README); det är kartan du läser innan du dyker ner i den. Vill du veta exakt hur något fungerar finns länkar sist.
 
-## Fabriken
+## Organisationen, plattformen och Digitala
 
-Tänk dig en liten fabrik som bygger färdiga hemsidor åt svenska småföretag — rörmokare, frisörer, hunddagis, elektriker. Du matar in ett papper med fakta om kunden i ena änden, och ut kommer en färdig, granskad hemsida i andra änden. Fabriken sköter det mesta av arbetet själv; du (ägaren) fattar de viktiga besluten vid några få kontrollpunkter. Det är byggt för en person som kör en kund i taget.
+Nortropic ska hjälpa ägaren från en rå tanke till ett genomförbart
+initiativ, ett användbart resultat och lärdomar som finns kvar.
+Plattformen gör tillåtet autonomt arbete möjligt, men är inte hela
+organisationen. Digitala är den första professionella verksamheten.
+De följande robotarna och webbflödena beskriver befintligt material
+för Digitala — inte allt Nortropic eller Digitala ska kunna.
+
+Projekt- & Innovationskontoret beskriver det organisatoriska stödet
+kring initiativ och kontinuitet. Customer Zero är ägaren/Nortropic:
+samma initiativ ska kunna få både projektstöd och Digitalas leverans.
+Det är en kvalificeringsriktning, inte bevis på att kedjan redan fungerar
+eller en beställning av ett visst antal nya program.
 
 ## De 7 robotarna
 
@@ -50,16 +64,21 @@ Fabriken kan förbättra sig själv lite i taget — den "städar på natten": r
 
 För enkla eller gratis-jobb kan fabriken köra hela vägen på egen hand — från kundpapper till en färdig förhandsversion — utan att stanna och fråga dig vid varje steg. Den samlar i stället ihop alla frågor och saknade fakta till EN slutlista som du betar av. Men den **publicerar aldrig själv**: juridiksigneringen och den sista publicera-knappen trycker alltid en människa. Och stöter den på något som påverkar riktningen eller kräver ett juridiskt beslut, stannar den och lämnar över till dig.
 
-## Förmannen som inte är en robot (loopen)
+## Autonomiplattformen och dess bootstrap
 
-Fabriken bygger hemsidor, men kan inte förbättra sig själv utan att du står bredvid och
-puttar vid varje steg. Loopen är ett litet program — inte en robot — som tar bort
-puttandet: det läser nästa uppgift ur 100-dagarsprogrammet, startar en färsk robot som
-gör exakt den uppgiften i ett eget rum, kontrollerar mekaniskt att den höll sig innanför
-ramarna, och lägger fram resultatet för dig att godkänna. Det bygger och förbättrar bara
-fabriken — kundflödet rör det aldrig, och grundlagen ([07-konstitution.md](07-konstitution.md))
-rör bara du. Planen står i [docs/loop/byggplan-v3.md](loop/byggplan-v3.md), och hur du
-kör den står i [docs/loop/drift.md](loop/drift.md).
+Plattformen ska omsätta ett giltigt uppdrag i avgränsad exekvering,
+verifierat resultat och spårbart avslut. En rå tanke behöver först
+formas till ett uppdrag inom mandat; den är inte själv körbehörighet.
+Trust Kernel är tillitsdelen, och H034 är en avgränsad kontroll i den.
+Bootstrap kvalificerar den tekniska grunden. Supervisor kan senare
+driva arbete först när rätt beredskap är verifierad. Dokumentändring,
+installation och startad supervisor är olika saker och bevisar inte
+var för sig fungerande organisationsautonomi.
+
+Kundflödets nuvarande mänskliga steg och konstitutionens skydd består.
+Plattformens arbete bedöms enligt sina verkliga task-/gatekontrakt,
+inte genom att varje uppdrag måste se ut som ett webbkundprojekt.
+Källor: substitutionskontraktets §1, loopreglerna och aktuell drift.
 
 ## Tre Codex-arbetsroller
 

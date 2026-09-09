@@ -2,9 +2,25 @@
 
 Senast verifierad mot systemet: 2026-08-24 · v18 (denna commit)
 
+Dokumentnot för domänsynkningen: verifieringsstämpeln ovan är historisk och
+omfattar inte de nya tillämpningsstyckena. Ingen ny systemverifiering påstås.
+
 v15 ger stewarden en avgränsad rätt att applicera vissa ändringar själv — självförbättringstrappan: Nivå 1 **Vaktmästaren** och Nivå 2 **Nattskiftet** (MODE-definitionerna i `agents/nortropic-steward.md`). Den rätten är bara säker så länge gränsen är skriven, mekaniskt kontrollerbar och omöjlig att flytta inifrån. Den här filen ÄR gränsen: **§A** listar det som aldrig får självmodifieras — oavsett nivå, oavsett hur grön en regressionskörning ser ut; **§B** är trappans lagar. Designprincipen (ur evaluator-optimizer-mönstret och valideringsgrindad självmodifiering): det mänskliga godkännandet per ändring ersätts av mekaniska grindar, en regressionssvit, granskning i efterhand via digesten — och mänskligt ägande av måtten. Tillsynen flyttas till META-nivån; den tas inte bort.
 
 **Ändringar i den här filen görs alltid av en människa och committas märkta HÖGRISK** (ordet HÖGRISK i commit-meddelandet). En autonom mod som hittar ett fel här skriver ett förslag — aldrig en fix. Det gäller §A och §B lika.
+
+**Tillämpningsområde.** Nortropic är organisationen. Autonomiplattformen
+är en del av den; Digitala är den första professionella verksamheten.
+Denna fils konkreta steward-, kund-, paket- och webbkrav gäller de
+verksamhetsflöden och skyddade ytor som de namnger. De är inte universella
+funktionskrav på plattformens egna uppdrag. Human-only, människans ägande
+av måtten och förbudet mot självauktorisering behåller sin bindande
+betydelse. Alla redan skyddade ytor förblir skyddade även när plattformen
+utför arbete; ingen domänetikett får göra en förbjuden skrivning tillåten.
+§B:s AUTOPILOT är stewardtrappans brytare, inte supervisor-resume.
+Domänavgränsningen ger ingen ny rätt till kundinitiering eller publicering.
+Den avsedda plattformsgränsen beskrivs i substitutionskontraktets §1 utan
+att det kontraktet ges företräde framför denna konstitution.
 
 ## §A — Aldrig självmodifierbart
 

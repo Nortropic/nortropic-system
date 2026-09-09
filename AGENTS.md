@@ -15,6 +15,13 @@ Läs och följ i denna ordning när de är relevanta:
 
 Vid konflikt gäller den högre auktoriteten. Återge inte reglerna här; peka på källan.
 
+Fastställ uppdragets tillämpningsdomän med konstitutionen, regelverket
+och substitutionskontraktets §1 innan en domänregel tillämpas som
+funktionskrav. Nortropic är organisationen, autonomiplattformen en del
+och Digitala första professionella verksamheten. Detta ändrar inte
+företrädesordning, skyddade ytor eller aktuellt mandat. En oklar
+tillämpning ger inte rätt att själv undanta ett obligatoriskt skydd.
+
 ## Repoidentitet före arbete
 
 Innan en ändring som kan påverka Git- eller trust-state:
@@ -135,7 +142,6 @@ Owner has 2026-08-11 amended the remaining autonomous-loop **implementation shap
 
 ```text
 NORTROPIC_ARCHITECTURE=PROVIDER_NEUTRAL_TRUST_KERNEL
-PRODUCT=NORTROPIC_AUTONOMOUS_WEBSITE_FACTORY
 AGENT_REASONING_OWNER=PROVIDER_HARNESS
 TRUST_TRANSITION_OWNER=NORTROPIC
 MODEL_OUTPUT_IS_TRUST_AUTHORITY=NO
@@ -143,6 +149,9 @@ FROZEN_OWNER_GATES_REMAIN_TRUST_AUTHORITY=YES
 SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT=REQUIRED
 NO_FORCE_SEMANTICS=YES
 ```
+
+Produkt- och domängränsen definieras i
+docs/loop/harness-substitution-contract-v1.md §1; denna router återger inte en separat produktkonstant.
 
 Claude/Codex/future providers own reasoning, sessions, context, tool loops, internal retries and reviewer/remediation intelligence. Nortropic owns TaskContract provenance, allowed_write, G20 containment, exact candidate SHA, deterministic policy/frozen gates, attestation, fencing/recovery, promotion and guarded authoritative transitions.
 
