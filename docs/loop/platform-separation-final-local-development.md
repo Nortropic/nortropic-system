@@ -468,3 +468,21 @@ governance 68/70 röd exakt på g6/g7 — deltan orsakas redan av grindens egen 
 
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
+
+#### Builder 2026-09-10 — produkt v2 mot kontrakt v2.2 (arbetsyta `~/nortropic-repos/work/builder-v2-final-separation-20260910`)
+Kandidat HEAD `3221966fe20f82b5c4f5d05e568caf7f877dea30` (= 4e139294 + v1-produkt 842d0bbf + v2-commit 3221966f). Statisk baslinje på 842d0bbf
+(`--skip-held-gates`): 73 PASS / 10 FAIL, varav fem produktrader röda av rätt skäl — owner-h003-noten bar ordet för
+webbens beslutsdokument (aktiv-doc-rad, trädvid rad, supersessionsrad), routerns p.5 nämnde owner-author-workflow och
+remaining-bootstrap-delegation utan fryst-not, loop-review saknade supersessionshuvud. Produkt v2 (7 filer, +24/−12):
+AGENTS.md p.5 och Fasgränser (fryst grindinput, inte dagens instruktion), README utan webbrepots namn, owner-h003-noten
+omskriven, supersessionshuvud i loop-review, append-only not i EFTERARBETE, ompinnade `PLATFORM_DOCUMENTS`/`SUBSTITUTION_BLOBS`
+för AGENTS.md/README.md. Statisk körning på 3221966f: 78 PASS / 5 FAIL (exakt de sandboxberoende raderna).
+Fullkörning med hållna grindar (`--held-control-set/--held-launch-cwd/--held-governance` ur test-author-arbetsytorna,
+eget `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**83/83** (0 FAIL), `FIXTURE_ROOT=/private/tmp/claude-501/b2full-3221966/platform-separation-final-2o7iuzqp`, result.json sha256 `1156a31feeb20b61fb20a5d0e868e355ccb4d8e83c26ba693781df0beb232c3a`.
+Mätt där: control-set rc 0 68/68 (result 0d351060…); launch-cwd rc 1
+19/20 röd exakt ['frozen_verify_bin_identical_to_base_383ed387'] (result cced0feb…); governance rc 1 68/70
+röd exakt ['g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only', 'g7_launch_cwd_exit_19_of_20_only_frozen_listing_sees_this_gate'] (result 464959ff…). Trädklassning {'text': 33, 'frozen': 54, 'partial': 7, 'code': 24, 'binary': 3, 'local-development': 6, 'test': 16}. Slutning 36 nådda /
+29 skannade, 0 hängande. Direkt i engångsreplika av 3221966f: `selftest(None)` PASS,
+publication-callers exit 0, preflight exit 0, `check-invariants` 6 PASS / 0 FAIL, policysviten 103 rätt / 0 fel, loopsviten
+53 ok / 0 FEL med B2 via PINV-005. `specs/tasks.spec.json` oförändrad (blob 3d810cf7). PUSH=NO, MERGE=NO.
