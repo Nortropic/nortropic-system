@@ -6,14 +6,16 @@
 byggde på, gäller inte plattformen. Den fullständiga ursprungstexten — det bevisade läget
 2026-08-07 i det odelade repot, Pass 0/Pass 1, den ursprungliga §A-mängden med webbfiler,
 doctor #5-luckan, kalendern och den ursprungliga startprompten — är bevarad ordagrant som
-historia i `docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md`. Nedan står plattformsdelen.
+historia i Git-historiken (`dae90c8f:docs/loop/byggplan-v3.md`) och i webbrepot med proveniens.
+Nedan står plattformsdelen.
 Historiska beslut behåller sina datum; gamla resultat behåller sina ursprungliga subjekt.
 
 ---
 
 Tillämpningstillägg för domänsynkningen 2026-09-09:
 
-Den historiska lägesbilden och dess daterade beslut bevaras (arkivkopian).
+Den historiska lägesbilden och dess daterade beslut bevaras i Git-historiken
+(`dae90c8f:docs/loop/byggplan-v3.md`).
 Nortropics senare målbild skiljer organisation, autonomiplattform och
 Digitala enligt substitutionskontraktets §1. Äldre hänvisningar till
 fabriken beskriver webbspårets ursprung, inte organisationens uttömmande
@@ -23,7 +25,7 @@ fabriken beskriver webbspårets ursprung, inte organisationens uttömmande
 ## 1. Läge
 
 Det bevisade läget 2026-08-07 (repots innehåll före uppdelningen, systeminstallationen,
-arkiven) står i arkivkopian. Kvarstående plattformsfakta:
+arkiven) står i den historiska texten (`dae90c8f:docs/loop/byggplan-v3.md`). Kvarstående plattformsfakta:
 
 | Påstående | Bevis |
 |---|---|
@@ -92,15 +94,16 @@ inte genomföras genom att kalla en fil WEB.
 3. Spec och exit-test före kod.
 4. Fixa-och-kör-om. Aldrig en ny namngiven komponent på ett fel.
 5. Planens namn. Inga nya kodnamn.
-6. Ingen sudo i kontrollplanet. *(Undantag 2026-08-07: tre läsande arkiveringskörningar. Loggat i arkivkopian.)*
+6. Ingen sudo i kontrollplanet. *(Undantag 2026-08-07: tre läsande arkiveringskörningar. Loggat i den historiska texten, `dae90c8f:docs/loop/byggplan-v3.md`.)*
 7. Varje kandidat som rör den skyddade mängden i §3.1 avvisas av policyn; ändringar där går genom kontraktsflödet med oberoende granskning.
-8. 5Z-kedjan och Post-Workspace ARKIVERADE. Systeminstallationen arkiverad, **ej avvecklad** (arkivkopian).
+8. 5Z-kedjan och Post-Workspace ARKIVERADE. Systeminstallationen arkiverad, **ej avvecklad** (historik: `dae90c8f:docs/loop/byggplan-v3.md`).
 9. Backloggen är specens rader och skivordningen i §7. Ingen andra uppgiftslista.
 10. Plattformsbygget ger ingen kundflödesbehörighet; se §2:s scope och loopregel 10.
 
 ## 5–6. Pass 0 och Pass 1 (historik)
 
-Genomförda 2026-08-07/08 i det odelade repot; stegen och exitkriterierna står i arkivkopian.
+Genomförda 2026-08-07/08 i det odelade repot; stegen och exitkriterierna står i den
+historiska texten (`dae90c8f:docs/loop/byggplan-v3.md`).
 Det som består på plattformen: `docs/loop/` med plan, regler, arkitektur och arkiv;
 `specs/tasks.spec.json`; `verify/bin/` med frysta exit-test skrivna före bygget; sandbox i
 managed scope, aldrig i repot; trösklar räknade ur mätt historik (specens `note_on_limits`).
@@ -110,7 +113,7 @@ managed scope, aldrig i repot; trösklar räknade ur mätt historik (specens `no
 | Task | Skiva | Exit-test |
 |---|---|---|
 | h-001 | 1 SQLite-state + eventlogg | Rekonstruera statustabell enbart ur `events.jsonl`, diffa mot SQLite → noll avvikelse |
-| h-002 | 2 Verifier-runner | Manipulerad verifierarfil → `hash_mismatch` före körning · fri text i verifier-fält kan inte exekvera. **Registrera befintliga grindar** (`check-invariants.mjs`, `nortropic-verify-suite.js`) — bygg ingen ny verifierare |
+| h-002 | 2 Verifier-runner | Manipulerad verifierarfil → `hash_mismatch` före körning · fri text i verifier-fält kan inte exekvera. **Registrera befintliga grindar** (`check-invariants.mjs`; webbens grind registreras sedan 2026-09-10 i webbrepot) — bygg ingen ny verifierare |
 | h-003 | 3 Attestation + stale | Verifiera task A · commit som matchar `invalidates_on` → A blir `stale`, omtest köas |
 | h-004 | 4 Lease | 100 samtidiga starter → exakt 1 ägare · `kill -9` → reclaim efter TTL, aldrig före |
 | h-005 | 5 Workspace per attempt | Ren checkout på beordrad base-SHA · skrivning i den skyddade mängden stoppas av OS · Ctrl-C → rest städas · ingen kvarlämnad gren/lås |
@@ -163,7 +166,8 @@ byggs (ägarbeslut).
 ### 7.1 Doctor #5-luckan (historik)
 
 Luckan gällde webbens invarianter (INV-007–009) och följer webbrepot; posten m-001 som bar den
-i specen är borttagen 2026-09-10 (`docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md`).
+i specen är borttagen 2026-09-10 (fältens dåvarande lydelse: `dae90c8f:specs/tasks.spec.json`;
+överförd till webbrepot med proveniens).
 Plattformens invarianter är PINV-001–006 i `scripts/check-invariants.mjs`.
 
 ## 8. Byggflödet per task
@@ -177,13 +181,15 @@ Plattformens invarianter är PINV-001–006 i `scripts/check-invariants.mjs`.
    exitkoden, inte rapporten.
 4. En oberoende **produktgranskning** (read-only) prövar mot `docs/loop/granskningsrubrik.md`
    och försöker falsifiera kandidaten. Blockerande fynd → tillbaka till steg 2, samma gren.
-5. Fasgräns: push, merge och publicering ingår inte i nuvarande fas; den kvarvarande kedjan
-   följer `docs/loop/remaining-bootstrap-delegation-v1.md`.
+5. Fasgräns: push, merge och publicering ingår inte i nuvarande fas (fasgränserna står i
+   `AGENTS.md`). Den kvarvarande bootstrapkedjans historiska delegation står i
+   `docs/loop/remaining-bootstrap-delegation-v1.md` — fryst grindinput, inte dagens instruktion.
 
 ## 9. Kalender (historik)
 
 Kalendern och dess läge 2026-08-08 (h-001–h-011 levererade och grindade; smoke-momentet mot
-Claude Code 2.1.224 genomfört) står i arkivkopian. Kvar: h-014–h-015 och piloten, som bör
+Claude Code 2.1.224 genomfört) står i den historiska texten (`dae90c8f:docs/loop/byggplan-v3.md`).
+Kvar: h-014–h-015 och piloten, som bör
 omdefinieras nu när skivorna 14–15 och H-arbetena ligger emellan.
 
 ## 10. Stoppregler

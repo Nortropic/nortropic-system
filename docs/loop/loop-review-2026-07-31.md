@@ -1,3 +1,7 @@
+> **Supersessionsnot 2026-09-10 (plattformsrepot).** Historisk granskning (2026-07-31) av en tidigare
+> loopplan, bevarad byte-exakt under denna not. Nuvarande auktoritet är `AGENTS.md`; inget i granskningen är
+> dagens instruktion, och dess omnämnanden av det odelade repots filer är historiska observationer.
+
 # Granskning och omvärldsanalys: Nortropic autonom loop v3.0
 
 **Datum:** 2026-07-31  

@@ -68,7 +68,6 @@ REJECTED_S3 = "1e21a7fe150f25626301f3656893d1798ae46c3d"
 FULL_ROADMAP_OWNER_PATH = "docs/loop/codex-autopilot-v3-full-roadmap.md"
 SUBSTITUTION_OWNER_PATH = "docs/loop/harness-substitution-contract-v1.md"
 SUBSTITUTION_AUDIT_PATH = "docs/loop/harness-substitution-audit-2026-08-11.md"
-ROADMAP_PLAN_BRANCH = "plan/autonomous-loop-v1"
 ROADMAP_PLAN_SHA = "0b3212c991d4227c8df2656465ae2c0252dda39e"
 ROADMAP_PLAN_PATH = "docs/loop/autonomous-loop-plan-v1.md"
 ROADMAP_HANDOFF_PATH = "docs/loop/autonomous-loop-codex-handoff.md"
@@ -98,16 +97,16 @@ ROADMAP_PLAN_BLOBS = {
 # Platform document generation after the 2026-09-10 repository split: router
 # documents and docs/loop/** only, pinned by blob on origin/main.
 SUBSTITUTION_BLOBS = {
-    "AGENTS.md": "e0fc54d74590fac924bb6060bb219836d336561e",
+    "AGENTS.md": "8d54ece2e1861f2b5869dfd83694ff3a6860e240",
     "CLAUDE.md": "772a39e8247e51c79e412bb9698d7715f693625b",
-    "README.md": "2a3c33a48fdae5e2c3d57d34b1e91e537886be52",
-    "docs/loop/byggplan-v3.md": "d76407e429f4824ef235edc8bf28ddc1602ef091",
-    "docs/loop/codex-evidence-contract.md": "18b833174d1673c24e00b6c2f28601d9ab5f48fd",
-    "docs/loop/drift.md": "8f0fbacb9ed401d53a1113b7effc0a6ff92078a7",
+    "README.md": "7fa037e541561a7be256603d68cbf3915ae5ed0d",
+    "docs/loop/byggplan-v3.md": "e54a43fe69002a20aa539dd6c70f29d4b7302f62",
+    "docs/loop/codex-evidence-contract.md": "e89e5bff8f1373d98130d0d8c28d0da30f300623",
+    "docs/loop/drift.md": "6e57111d86442cd4f64e36cc7c85cb3ef17f9337",
     "docs/loop/owner-author-workflow-v1.md": "4aabf054c217cfd5cdca46456d11f25de0211bbf",
-    "docs/loop/regler.md": "52352266ae732ef707c2d241ca7317d7d77a80bc",
+    "docs/loop/regler.md": "b28cb66232e495153bcfb033b3487217bc76be44",
     "docs/loop/remaining-bootstrap-delegation-v1.md": "20319089c4085b79ec2b8f600396c71b21dbd392",
-    SUBSTITUTION_OWNER_PATH: "4a41e3952f55453ba2e83b2d553f7af2b76d5705",
+    SUBSTITUTION_OWNER_PATH: "1fde089c8f685ed0f439f87bf86a2a3d4bdb3774",
     SUBSTITUTION_AUDIT_PATH: "bb5f99c111cd5aaf784e73e67bde354023b1b5f2",
 }
 
@@ -1327,15 +1326,15 @@ def publication_authority(repo: Path, candidate_sha: str, task_id: str,
 
 
 def ensure_roadmap_plan(repo: Path) -> None:
-    # The plan is authority by exact immutable commit, never by the mutable branch tip.
-    git(repo, "fetch", "origin", ROADMAP_PLAN_BRANCH)
-    if git(repo, "cat-file", "-e", f"{ROADMAP_PLAN_SHA}^{{commit}}", check=False).rc != 0:
-        raise Stop(f"frozen roadmap commit unavailable after fetch: {ROADMAP_PLAN_SHA}")
+    # The plan is authority by exact immutable objects: the platform-frozen copies at HEAD must carry the
+    # blob identity of the historical plan commit ROADMAP_PLAN_SHA. Local objects only — no fetch, no branch,
+    # no remote; a missing or mutated copy is a Stop, never a fallback.
     for rel, expected_blob in ROADMAP_PLAN_BLOBS.items():
-        actual = git(repo, "rev-parse", f"{ROADMAP_PLAN_SHA}:{rel}").out.strip()
+        probe = git(repo, "rev-parse", "--verify", "--quiet", f"HEAD:{rel}", check=False)
+        actual = probe.out.strip() if probe.rc == 0 else None
         if actual != expected_blob:
             raise Stop(f"roadmap artifact identity mismatch path={rel} expected={expected_blob} actual={actual}")
-    journal(repo, "ROADMAP_AUTHORITY", plan_sha=ROADMAP_PLAN_SHA, branch=ROADMAP_PLAN_BRANCH)
+    journal(repo, "ROADMAP_AUTHORITY", plan_sha=ROADMAP_PLAN_SHA, plan_blobs=json.dumps(ROADMAP_PLAN_BLOBS, sort_keys=True))
 
 
 def ensure_substitution_authority(repo: Path) -> None:
@@ -2579,7 +2578,7 @@ def selftest(repo: Path | None = None) -> None:
     if ROADMAP_PLAN_SHA != "0b3212c991d4227c8df2656465ae2c0252dda39e":
         raise Stop("roadmap authority SHA drift")
     if (len(SUBSTITUTION_BLOBS) != 11 or
-            SUBSTITUTION_BLOBS.get(SUBSTITUTION_OWNER_PATH) != "4a41e3952f55453ba2e83b2d553f7af2b76d5705" or
+            SUBSTITUTION_BLOBS.get(SUBSTITUTION_OWNER_PATH) != "1fde089c8f685ed0f439f87bf86a2a3d4bdb3774" or
             SUBSTITUTION_BLOBS.get(SUBSTITUTION_AUDIT_PATH) != "bb5f99c111cd5aaf784e73e67bde354023b1b5f2"):
         raise Stop("substitution authority blob drift")
     if repo is not None and repo.exists():
@@ -2820,8 +2819,10 @@ def acquire_lock(repo: Path):
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Nortropic Codex Build Autopilot v4 — provider-neutral trust-kernel roadmap")
-    p.add_argument("--repo", default=str(Path.home() / "nortropic/nortropic-system"))
-    p.add_argument("--worktrees", default=str(Path.home() / "nortropic/worktrees"))
+    # Defaults: the platform repository is the working directory the executor is started in; worktrees live
+    # beside it (<repo>/../worktrees, the controller/workspace convention). No fixed user root.
+    p.add_argument("--repo", default=os.getcwd())
+    p.add_argument("--worktrees", default=str(Path(os.getcwd()).resolve().parent / "worktrees"))
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("doctor")
     sub.add_parser("status")

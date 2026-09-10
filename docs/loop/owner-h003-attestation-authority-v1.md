@@ -203,3 +203,9 @@ Skäl: h-011:s frysta drain-semantik kräver att en beroende task kan bli behör
 - implementationen får välja lås/CAS/databas/rename-teknik, men gate ska mäta all-or-none-effekten och samtidighetsordningen, inte mekanismen.
 
 Detta är ett roadmap-internt owner-beslut under Codex Operating Model v3:s stående delegation och kräver ingen ny mänsklig handoff.
+
+## Plattformsnot 2026-09-10
+
+Historiskt ägarbeslut, bevarat byte-exakt ovan. §9:s test-author-skrivyta namnger det odelade repots dåvarande
+dokumentationsfil för beslut; på plattformen är dokumentationens hemvist `docs/loop/drift.md` och
+auktoritetsordningen står i `AGENTS.md`. Noten ändrar inga frysta identiteter i h-003/h-004.
