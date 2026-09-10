@@ -3,9 +3,9 @@
 Repoidentitet: `git@github.com:Nortropic/nortropic-system.git` med bevarad Git-historik.
 Sedan 2026-09-10 innehåller repot enbart den verksamhetsneutrala autonomiplattformen:
 Trust Kernel (hela tillitsplattformen, inte bara H034:s fyra artefaktfiler), controller,
-bootstrap, supervisor/autopilot och tillhörande H-arbeten. Webbförvaltningen
-(agenter, skills, workflows, paket, kvalitetsregler och verksamhetsmaterial) är utbruten
-till repot `nortropic-webbforvaltning`; historiskt webbmaterial finns kvar som Git-historik.
+bootstrap, supervisor/autopilot och tillhörande H-arbeten. Webbförvaltningen är utbruten
+till repot `nortropic-webbforvaltning`; dess styrning gäller inte plattformen, och
+historiskt webbmaterial finns kvar som Git-historik och under `docs/loop/arkiv/`.
 
 Nortropic är den organisatoriska helheten; plattformen är en del av den; Digitala är den
 första professionella verksamheten. Webbens brief-, design-, kvalitets- och
@@ -17,21 +17,31 @@ förvaltningsregler är domänkrav och gäller inte plattformsuppdrag.
   policy, envelope, brytare, utforare, launch (H036), lease, workspace, worker, verify,
   attest, state, loop, runtime-cleanup (H039), h034-native (Trust Kernel-artefakt).
 - **`verify/`** — frysta exit-test per skiva (`h-001`…`h-039`, `p-*`, python-authority) samt
-  lokala kvalificeringsgrindar (`document-authority-exit`, `invariant-required-exit`),
-  och H034/H039-artefaktpaket under `verify/h034/`, `verify/h039/`. Ändras endast av människa.
-- **`specs/`** — `tasks.spec.json` (kontrollplanets skivor, `allowed_write`, frysta grindar)
-  och `owner-production-paths.v1.json`.
+  lokala kvalificeringsgrindar (`document-authority-exit`, `invariant-required-exit`,
+  `platform-control-set-exit`, `launch-cwd-exit`, `platform-governance-exit`), och
+  H034/H039-artefaktpaket under `verify/h034/`, `verify/h039/`. Frysta: en grind ändras aldrig
+  av den builder den dömer; nya eller ändrade grindar går genom kontraktsflödet i `AGENTS.md`.
+- **`specs/`** — `tasks.spec.json` (kontrollplanets skivor, `allowed_write`, frysta grindar,
+  den skyddade mängden i `defaults.denied_write`) och `owner-production-paths.v1.json`.
 - **`scripts/nortropic-codex-autopilot.py`** — mekanisk exekverare (v2–v4);
-  **`scripts/check-invariants.mjs`** — registrerad global verifierare (människohand;
-  läser i dag fortfarande webbfiler, se efterarbete); `scripts/check-verifierarregistret.mjs`.
+  **`scripts/check-invariants.mjs`** — registrerad plattformsverifierare (PINV-001–006, i den
+  skyddade mängden); `scripts/check-verifierarregistret.mjs`.
 - **`config/`** — loop-config-exempel, worker-prompt, provider-/python-authority-pinnar,
   premiärbacklog, källkopia av managed-settings.
 - **`tests/controller/`**, **`tests/scripts/`** — kontraktssviter och hermetiska prov.
-- **`.agents/skills/`** — rollskills (test-author, builder, reviewer, architect,
-  empirical-runner, gate-reviewer).
+- **`.agents/skills/`** — rollskills (test-author, builder, reviewer, gate-reviewer, architect,
+  empirical-runner). Rollerna och flödet står i `AGENTS.md`.
 - **`docs/loop/`** — byggplan v3, regler, v4.1-arkitektur, substitutionskontrakt, owner-
   author-workflow, delegation, drift, evidenskontrakt, lokala utvecklingsdokument, arkiv.
-- **`SEPARATION-20260910/`** — allokeringen fil för fil, efterarbete och proveniens för uppdelningen.
+- **`SEPARATION-20260910/`** — förslagen från uppdelningen (`proposed/`).
+
+## Skydden
+
+Den skyddade mängden (`verify/**`, `specs/**`, `controller/verify/register.json`,
+`scripts/check-invariants.mjs`, `.gitignore`, `CLAUDE.md`) är specens `defaults.denied_write`
+och avvisas av `controller/policy/cli` med exit 3 oavsett task; skrivning utanför taskens
+`allowed_write` avvisas med exit 4. `controller/verify/cli` kör bara registrerade verifierare
+med matchande hash. PASS finns bara som en fryst grinds exitkod — aldrig som rapport.
 
 ## Läsordning
 

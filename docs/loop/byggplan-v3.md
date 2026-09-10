@@ -2,47 +2,41 @@
 
 **Datum:** 2026-08-07 · **Ersätter:** byggplan v2 (vars lägesbild "repot är orört och rent" är vederlagd med bevis) · **Auktoritet:** v4.1 med de bindande ändringarna i §3 · **Fabrik:** Macen. Vanliga datorn är fönster. Molnsessioner är aldrig verkstad.
 
+**Plattformsversion 2026-09-10.** Webbförvaltningens styrning, som den ursprungliga texten
+byggde på, gäller inte plattformen. Den fullständiga ursprungstexten — det bevisade läget
+2026-08-07 i det odelade repot, Pass 0/Pass 1, den ursprungliga §A-mängden med webbfiler,
+doctor #5-luckan, kalendern och den ursprungliga startprompten — är bevarad ordagrant som
+historia i `docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md`. Nedan står plattformsdelen.
+Historiska beslut behåller sina datum; gamla resultat behåller sina ursprungliga subjekt.
+
 ---
 
 Tillämpningstillägg för domänsynkningen 2026-09-09:
 
-Den historiska lägesbilden och dess daterade beslut nedan bevaras.
+Den historiska lägesbilden och dess daterade beslut bevaras (arkivkopian).
 Nortropics senare målbild skiljer organisation, autonomiplattform och
 Digitala enligt substitutionskontraktets §1. Äldre hänvisningar till
 fabriken beskriver webbspårets ursprung, inte organisationens uttömmande
 ändamål. Tillägget ändrar inte historisk beviscredit eller aktiverar
 äldre kommandon; övriga ändringsvägar följer sina giltiga delegationer.
 
-## 1. Bevisat läge 2026-08-07
+## 1. Läge
 
-Allt nedan är belagt med kommandoutfall denna dag. Inget kommer ur minne eller rapportering.
+Det bevisade läget 2026-08-07 (repots innehåll före uppdelningen, systeminstallationen,
+arkiven) står i arkivkopian. Kvarstående plattformsfakta:
 
 | Påstående | Bevis |
 |---|---|
-| Repot är **inte** tomt: v17, 232 commits, 14 `100d`-grenar | `git log --oneline \| wc -l`, `git branch -a` |
-| Sju agenter, tio skills, sex workflows, 22 numrerade regler, konstitution §A/§B, stewardtrappa, `AUTOPILOT`=`off` | `ls agents/ workflows/`, `docs/03-regelverk.md`, `docs/07-konstitution.md`, `cat AUTOPILOT` |
-| `controller/`, `specs/`, `verify/` finns inte → **skivorna 1–7 obyggda** står fast | `ls specs/ verify/` → No such file |
-| Konstitutionens §A ≠ v4.1 §20:s §A. Noll överlapp | `docs/07-konstitution.md` §A1–A8 mot v4.1 §20 |
-| **Doctor #5 är prosa, inte kod** — och tillskrivs tre skilda uppdrag i tre dokument | Full grep över `*.js`/`*.mjs`/`*.md`: enda träffen utanför `docs/` är prosa i `skills/nortropic-stack/SKILL.md:81`. Ingen kodfil nämner den |
-| `check-invariants.mjs` är äkta mekanisk grind: exit 0/1, `execFileSync` utan shell, `invalid`→FAIL | filens huvud, rad 1–31 |
-| I drift **är** repo-roten `~/.claude` (annan maskin) | README rad 8, programregister rad 4 |
-| Fabriken körs **inte** på denna Mac | `ls ~/.claude/` = endast CC-struktur · `~/Workflow/` saknas |
-| Kontot hade aldrig autentiserat mot GitHub före idag | `~/.ssh` skapad 12:49 av dagens `ssh`-anrop |
-| Systeminstallation `/usr/local/libexec/nortropic` (122 binärer, config 700, rollback) + 7 systemkonton + `/etc/sudoers.d/nortropic-controller` (NOPASSWD × 14) | `ls -la`, `sudo cat`, `dscl . -list /Groups` |
-| Eskaleringsvägen för användarkontot är stängd | ej medlem i nortropic-grupper · binärer ej grupp-/världsskrivbara · ingen LaunchDaemon/Agent |
-| Tre arkiv säkrade | `5z-kedjan` 617 · `5z-rootsealed` 503 · `nortropic-systeminstallation` 386 poster |
-| Branch protection saknas på båda remotes | programregister, Residualrisker |
-| 100-dagarsprogrammet **är** backloggen | `docs/100-dagar/programregister.md`, baslinje `69559a5`, tagg `100d-baseline-20260730` |
-
-**Slutsats:** inventeringens huvudfynd (0 av 7 skivor) håller. Dess sökrum var ofullständigt — `/usr/local/libexec/` genomsöktes aldrig. Byggplan v2:s lägesbild är vederlagd.
+| `check-invariants.mjs` är äkta mekanisk grind: exit 0/1, `execFileSync` utan shell, `invalid`→FAIL | filens huvud |
+| Kontrollplanet ligger i `controller/` + `specs/` + `verify/`, dokumenten i `docs/loop/` | `ls controller/ specs/ verify/ docs/loop/` |
+| Skivorna i §7 (h-001–h-017) är specade; h-014/h-015 är obyggda (grind saknas på disk) | `specs/tasks.spec.json`, `ls verify/bin/` |
 
 ## 2. Vad kontrollplanet är till för
 
-100-dagarsprogrammet körs redan för hand: sju batchar, gren per batch, `[100D]`-commits, exitgrind per dag. Det som saknas är mekaniseringen av överlämningarna — projektets ursprungsproblem.
-
-Controllern **duplicerar inte** stewardtrappan. Trappan låter en modell applicera och granskas i efterhand via digesten. Controllern låter en worker föreslå en kandidat som verifieras mekaniskt mot en människogodkänd spec och mergas av Johnny via PR. Auto-merge är av även på nivå 3 (v4.1 §19.5). `AUTOPILOT` styr därför inte controllern.
-
-Controllern **tillför** tre saker fabriken saknar: SHA-bundna attestationer, exklusiv lease, isolerat workspace per försök. Och som sjunde skiva: det första verkligt mekaniska §A-skyddet.
+Controllern låter en worker föreslå en kandidat som verifieras mekaniskt mot en fryst spec
+och en fryst grind. Den tillför: SHA-bundna attestationer, exklusiv lease, isolerat
+workspace per försök — och som sjunde skiva det mekaniska skyddet av den skyddade mängden
+(§3.1).
 
 Scope för plattformsbygget: kvalificera autonomiplattformen som
 verksamheter kan använda. Webbverksamhetens kundflöde exekveras inte
@@ -53,38 +47,43 @@ eller operativ kundbehörighet skapas genom målbildssynkningen.
 
 | § | Vad som gäller nu |
 |---|---|
-| **§4** | Filstrukturen ritar `src/ tests/` — det är en kundsajt. Systemrepot har `agents/ skills/ workflows/ vendored-skills/ scripts/ tests/fixtures/ docs/`. Kontrollplanet läggs i `controller/` + `specs/` + `verify/`, dokumenten i `docs/loop/` |
-| **§5** | Exempeltask u-014 (`src/contact/**`) utgår. Tasks refererar dag-id och exitgrind i `docs/100-dagar/programregister.md`. **Ingen ny backlog** |
-| **§10** | `security-settings.json` läggs i managed scope eller `~/.config/nortropic-loop/` — **aldrig i repot**, som i drift är `~/.claude` (B9 återuppstår annars). `denyWrite` = §A-mängden i §3.1 nedan. `denyRead` utökas med `~/.claude/{sessions,session-env,backups,debug,projects}` |
+| **§4** | Kontrollplanet läggs i `controller/` + `specs/` + `verify/`, dokumenten i `docs/loop/` |
+| **§5** | Exempeltask u-014 (`src/contact/**`) utgår. Tasks och skivordning står i `specs/tasks.spec.json` och §7 nedan. **Ingen ny backlog** |
+| **§10** | `security-settings.json` läggs i managed scope eller `~/.config/nortropic-loop/` — **aldrig i repot**. `denyWrite` täcker den delmängd av §3.1 sandboxen kan täcka; `denyRead` utökas med `~/.claude/{sessions,session-env,backups,debug,projects}` |
 | **§14** | Diffpolicyn får `docs`-kravet: task som rör fil med docs-hemvist utan docs-uppdatering i samma commit = policyfailure (regel 17 + 22) |
-| **§20** | §A-ytan är konstitutionens §A **plus** kontrollplanet. v4.1:s ursprungliga lista skyddar sökvägar som inte finns |
+| **§20** | §A-ytan är plattformens skyddade mängd i §3.1. v4.1:s ursprungliga lista skyddar sökvägar som inte finns |
 
-### 3.1 §A-mängden — bindande för `denied_write`; sandbox täcker delmängden
-
-**Rubriken var bredare än verkligheten (rättat 2026-08-08).** `controller/**` står i mängden nedan men finns INTE i installerad `sandbox.filesystem.denyWrite` — och kan inte finnas, eftersom h-taskarnas `allowed_write` ÄR `controller/**`. Sandboxen bär tretton poster; mängden nedan är bindande för `denied_write` i specen, och stycket *Två mekanismer, olika ytor* nedan säger vilken mekanism som vaktar vad.
+### 3.1 Den skyddade mängden (§A) — bindande för `defaults.denied_write`; sandbox täcker delmängden
 
 ```
-docs/07-konstitution.md
-docs/03-regelverk.md                       (invarianterna, §A1)
-skills/nortropic-eval/references/eval-rubric.md
-skills/nortropic-plan/references/juridikflaggor.md
-workflows/**                               (ALDRIG-listan, regel 3)
-tests/fixtures/**
-agents/nortropic-steward.md                (styrningen, §A6)
-AUTOPILOT
-scripts/check-invariants.mjs
-specs/**  verify/**  controller/**  CLAUDE.md
+verify/**                          (frysta grindar och artefaktpaket)
+specs/**                           (specen och authority-registret)
+controller/verify/register.json    (verifierarregistret)
+scripts/check-invariants.mjs       (registrerad plattformsverifierare)
+.gitignore                         (vitlistan; binder allowed_write, LOOP-ÄGARHAND-26)
+CLAUDE.md                          (pekaren)
 ```
 
-`allowed_write` för h-001→h-007: `controller/**`, `tests/controller/**`.
+Mängden ÄR specens `defaults.denied_write`. `controller/policy/cli` läser den därifrån —
+ingen egen lista, ingen subtraktion — och avvisar varje kandidat som rör den med exit 3,
+före alla lindrigare avslag och oavsett vilken task som föreslår kandidaten. Skrivning
+utanför taskens `allowed_write` avvisas därefter med exit 4.
 
-**Två mekanismer, olika ytor.** `controller/**`, `specs/**` och `verify/**` står i §A-mängden ovan men vaktas INTE av skiva 7:s §A-kontroll — de skyddas av `allowed_write` (som är smalare per task) och av ägarhand. Skälet är mekaniskt: varje h-task bygger i `controller/<del>/**`, så en §A-vakt som täckte hela `controller/**` hade avvisat sin egen kandidat, h-007:s inkluderad. §A-kontrollen prövar därför resten av mängden — `AUTOPILOT`, `workflows/**`, `tests/fixtures/**`, `docs/07-konstitution.md`, `docs/03-regelverk.md`, `agents/nortropic-steward.md`, `scripts/check-invariants.mjs`, `skills/nortropic-eval/references/eval-rubric.md`, `skills/nortropic-plan/references/juridikflaggor.md`, `CLAUDE.md` — alltså det som ligger utanför varje tasks `allowed_write` och som ingen annan mekanism fångar. Förhållandet skrivs här i stället för att lämnas underförstått (beslut 2026-08-08, LOOP-ÄGARHAND-15). **Vitlistan binder allowed_write:** `.gitignore` är en whitelist (`/*` med `!`-undantag) — en tasks `allowed_write` måste ligga inom vitlistade träd, annars kan ingen worker committa någon kandidat alls (LOOP-ÄGARHAND-26).
+**Två mekanismer, olika ytor.** `controller/**` står inte i mängden: varje h-task bygger i
+`controller/<del>/**`, så en vakt som täckte hela `controller/**` hade avvisat sin egen
+kandidat. `controller/**` skyddas av taskens `allowed_write` (smalare per task). Sandboxen
+täcker den delmängd den kan; policyn täcker hela mängden. Ändringar i mängden — nya
+frysta grindar, specrader, registerposter, pinnar — går genom kontraktsflödet (regel 11),
+aldrig genom en loop-tasks kandidat. Historiska tasks vars `allowed_write` rör mängden
+(h-002, h-037) kan inte längre passera policyn för sådana skrivningar; deras resultat
+behåller sina historiska subjekt. **Vitlistan binder allowed_write:** `.gitignore` är en
+whitelist (`/*` med `!`-undantag) — en tasks `allowed_write` måste ligga inom vitlistade
+träd, annars kan ingen worker committa någon kandidat alls (LOOP-ÄGARHAND-26).
 
 Domänklassningen ändrar inte mängden skyddade paths ovan eller vilken
-mekanism som vaktar dem. Plattformens taskvisa allowed_write, webbens
-skydd och ägarändringsvägar är skilda ansvar. En framtida ändring av
-testurval eller skyddsverkställare kräver eget avgränsat kontrakt och
-regression; den får inte genomföras genom att kalla en fil WEB.
+mekanism som vaktar dem. En framtida ändring av testurval eller
+skyddsverkställare kräver eget avgränsat kontrakt och regression; den får
+inte genomföras genom att kalla en fil WEB.
 
 ## 4. Stängda beslut
 
@@ -93,47 +92,18 @@ regression; den får inte genomföras genom att kalla en fil WEB.
 3. Spec och exit-test före kod.
 4. Fixa-och-kör-om. Aldrig en ny namngiven komponent på ett fel.
 5. Planens namn. Inga nya kodnamn.
-6. Ingen sudo i kontrollplanet. *(Undantag 2026-08-07: tre läsande arkiveringskörningar. Loggat.)*
-7. Codex granskar varje PR som rör §A-ytan i §3.1.
-8. 5Z-kedjan och Post-Workspace ARKIVERADE. Systeminstallationen arkiverad, **ej avvecklad**.
-9. `docs/100-dagar/programregister.md` är den enda backloggen.
+6. Ingen sudo i kontrollplanet. *(Undantag 2026-08-07: tre läsande arkiveringskörningar. Loggat i arkivkopian.)*
+7. Varje kandidat som rör den skyddade mängden i §3.1 avvisas av policyn; ändringar där går genom kontraktsflödet med oberoende granskning.
+8. 5Z-kedjan och Post-Workspace ARKIVERADE. Systeminstallationen arkiverad, **ej avvecklad** (arkivkopian).
+9. Backloggen är specens rader och skivordningen i §7. Ingen andra uppgiftslista.
 10. Plattformsbygget ger ingen kundflödesbehörighet; se §2:s scope och loopregel 10.
 
-## 5. Pass 0 — sanering, säkring, dokument (~1 h)
+## 5–6. Pass 0 och Pass 1 (historik)
 
-Steg 1–2 är **klara** (tarbollar säkrade, repot klonat till `~/nortropic/nortropic-system`, gren `nortropic/task-pass0` skapad, inget committat).
-
-Grenen bygger på fel premiss och kasseras: `git checkout main && git branch -D nortropic/task-pass0`.
-
-Ny gren `nortropic/loop-pass0`. Fem commits:
-
-**C1 — arkivet.** `docs/loop/arkiv/5z-inventering-2026-08-07.md` + `docs/loop/arkiv/post-workspace/` (README + POST_WORKSPACE_ARCHITECTURE.md, toppnot *"Kravinput till skiva 6–7. Installeras ej."*).
-
-**C2 — loop-dokumenten.** `docs/loop/` får `implementation-v4.1.md`, `byggplan-v3.md`, `granskningsrubrik.md`, `loop-review-2026-07-31.md`. Egen underkatalog, parallell med `docs/100-dagar/` och `docs/arkiv/` — den numrerade serien 00–07 är systemdokumentationen och rörs inte.
-
-**C3 — reglerna.** `docs/loop/regler.md` med byggreglerna. `CLAUDE.md` får **en rad** som pekar dit. Regelblocket läggs aldrig i `CLAUDE.md` självt — den filen är en 264-byte pekare, och ett andra regelverk bredvid `docs/03-regelverk.md` vore två sanningar.
-
-**C4 — beslutsloggen.** Rader i `docs/05-beslutslogg.md`. **Ingen ny beslutslogg.** Raderna får aldrig inledas med `RETRO-1-GENOMFÖRD` eller `CHECKPOINT` — §B3 och §B5 parsar dem mekaniskt. Innehåll: fabriksbeslutet · 5Z + Post-Workspace arkiverade · tarbollarnas sökvägar och antal · sudo-undantaget · systeminstallationsfyndet · doctor #5-fyndet · att byggplan v2 vederlagts.
-
-**C5 — dokumentationslagren.** `docs/00-borja-har.md` och `README.md` repokartan får varsitt stycke om loop-spåret. Regel 22 kräver att det enkla lagret följer med i **samma commit**; doctor #12(e) fäller drift. Utan C5 underkänns Pass 0 av repots egna grindar.
-
-**Före C1:** verifiera doctor #5-fyndet fullständigt.
-```bash
-grep -rn "doctor #5\|doctor#5" . --include=*.js --include=*.mjs --include=*.md | grep -v "^./docs/"
-```
-
-**Exit Pass 0:** fem commits i `git log --oneline` · `docs/loop/` innehåller de fyra dokumenten · `CLAUDE.md` pekar på `docs/loop/regler.md` · `node scripts/check-invariants.mjs` ger exit 0 · doctor-körning utan nytt FAIL.
-
-## 6. Pass 1 — spec, grind och gräns (~2 h)
-
-1. **GitHub Pro + branch protection** enligt v4.1 §19.3. Stänger residualrisken "force-push ej blockerad" i programregistret. Oberoende av allt annat — gör den först.
-2. **`specs/tasks.spec.json`** med h-001→h-007. Varje task bär `denied_write` enligt §3.1, `docs_impact`-fält, och referens till dag-id i programregistret.
-3. **`verify/bin/`** — sju exit-testskript, skrivna **före** bygget. De får faila; komponenterna finns inte än.
-4. **Sandbox** i managed scope / `~/.config/nortropic-loop/`, aldrig i repot.
-5. **Offensiv gränstest** mot §A-mängden i §3.1 — inte mot v4.1:s ursprungliga lista. Testagent försöker skriva `docs/07-konstitution.md` med Python, ändra `workflows/` med `sed`, röra `tests/fixtures/`, läsa `~/.ssh` och `~/.claude/sessions`, pusha direkt till main. Samtliga ska misslyckas mekaniskt.
-6. **Trösklarna räknas fram** ur batch 001–007:s historik (diffstorlekar, attempts, failure-mönster) — inte gissas. v4.1 §16–17 fylls med mätta värden.
-
-**Exit Pass 1:** spec validerar · sju skript körbara · gränstesten grön · branch protection aktiv · trösklar dokumenterade med nämnare.
+Genomförda 2026-08-07/08 i det odelade repot; stegen och exitkriterierna står i arkivkopian.
+Det som består på plattformen: `docs/loop/` med plan, regler, arkitektur och arkiv;
+`specs/tasks.spec.json`; `verify/bin/` med frysta exit-test skrivna före bygget; sandbox i
+managed scope, aldrig i repot; trösklar räknade ur mätt historik (specens `note_on_limits`).
 
 ## 7. Skivorna
 
@@ -143,9 +113,9 @@ grep -rn "doctor #5\|doctor#5" . --include=*.js --include=*.mjs --include=*.md |
 | h-002 | 2 Verifier-runner | Manipulerad verifierarfil → `hash_mismatch` före körning · fri text i verifier-fält kan inte exekvera. **Registrera befintliga grindar** (`check-invariants.mjs`, `nortropic-verify-suite.js`) — bygg ingen ny verifierare |
 | h-003 | 3 Attestation + stale | Verifiera task A · commit som matchar `invalidates_on` → A blir `stale`, omtest köas |
 | h-004 | 4 Lease | 100 samtidiga starter → exakt 1 ägare · `kill -9` → reclaim efter TTL, aldrig före |
-| h-005 | 5 Workspace per attempt | Ren checkout på beordrad base-SHA · §A-skrivning stoppas av OS · Ctrl-C → rest städas · ingen kvarlämnad gren/lås |
+| h-005 | 5 Workspace per attempt | Ren checkout på beordrad base-SHA · skrivning i den skyddade mängden stoppas av OS · Ctrl-C → rest städas · ingen kvarlämnad gren/lås |
 | h-006 | 6 Worker-launch | Prosa-svar → `unparseable_output` · påstådd `CANDIDATE_SHA` som saknas → failure, inte krasch |
-| h-007 | 7 Diffpolicy | Kandidat som rör §A-mängden avvisas med sparat evidence · 3× LOC-budget avvisas · docs-krav ouppfyllt avvisas |
+| h-007 | 7 Diffpolicy | Kandidat som rör den skyddade mängden avvisas med sparat evidence · 3× LOC-budget avvisas · docs-krav ouppfyllt avvisas |
 | h-008 | 6b Taskkuvert | §12-kuvert ur config-specen: nio fält · exit_test och register följer aldrig med · okänd task avvisas |
 | h-009 | 6c Processtart | Konfigurerat argv-kommando med timeout · hela processgruppen dödas · rest mäts på EFFEKT |
 | h-010 | 8 Taskval + claim | Doneness ur attest (`--require-valid`), aldrig ur state · kodpunktsordning · claim = exakt ett event · trasig spec/state/attestbutik är fel, aldrig tomt svar |
@@ -158,14 +128,14 @@ grep -rn "doctor #5\|doctor#5" . --include=*.js --include=*.mjs --include=*.md |
 | h-017 | 15 Per-task-domen | Taskens egen grind körs mot kandidatträdet UTÖVER configens verifierare — båda måste vara gröna · grinden slås upp på SÖKVÄG ur spec-radens `exit_test`, aldrig på id, så den som skriver registret aldrig kan peka om sin egen task · registret prövas i sin helhet FÖRE leasen och taskens post överst i varvet, så riggfel stannar innan modellkvot bränns · röd grind kostar försök som varje annat nedströmsavslag · domen bokförs i attestationen med `grind_id`, och en ogrindad task attesteras som förut men UTAN det fältet |
 
 Skivorna 6b, 6c, 8 och 9 tillkom efter planens skrivning (LOOP-ÄGARHAND-16–27), skivorna 10–13
-2026-08-08 efter smoke-momentet, skiva 14 2026-08-09 (LOOP-ÄGARHAND-36). Specen och
-beslutsloggen är operativ ordning.
+2026-08-08 efter smoke-momentet, skiva 14 2026-08-09 (LOOP-ÄGARHAND-36). Specen är operativ
+ordning.
 
 **Skivorna 10–14 bär slutmålets kvarvarande klausuler.** Skiva 10 gör försöket fullbordbart —
 mätt 2026-08-08: en session kan skriva i workspacet men inte committa, och kandidat-SHA:t hör
 hemma i controllerledet, inte i modellens verktygsdisciplin. Skiva 11 bär attempt-budget och
-circuit. Skiva 12 är den enda vägen till "störs bara när en människa krävs". Skiva 13 är
-driftformen kör tills kvoten tar slut, börja om när den är tillbaka. **Skiva 14 är
+circuit. Skiva 12 är den enda vägen till "störs bara när ett yttre hinder kräver det". Skiva 13
+är driftformen kör tills kvoten tar slut, börja om när den är tillbaka. **Skiva 14 är
 inkopplingen:** utan den anropar `controller/loop/cli` fortfarande `controller/launch/cli`
 direkt, och skivorna 10 och 11 är byggda men verkningslösa — de har ingen anropare i repot.
 
@@ -179,7 +149,7 @@ när kedjan går genom brytaren. Inkopplingen måste därför ske FÖRE dem.
 betyder en attestation *diffen var laglig och de globala invarianterna höll* — inte att
 tasken är löst; taskens `exit_test` körs aldrig av kedjan, eftersom fältet medvetet
 utelämnas ur kuvertet så workern inte kan tuna mot sin egen grind. Så länge det står
-skalar autonomin med hur mycket diff en människa orkar läsa, och mer uthållighet
+skalar autonomin med hur mycket diff en granskare orkar läsa, och mer uthållighet
 (notis, återtag) ger bara fler okontrollerade kandidater. Skiva 15 låter CONTROLLERN köra
 grinden — workern ser den fortfarande aldrig — och gör därmed attestationen värd namnet.
 Ordningen blir: **14 → 15 → 12 → 13.**
@@ -190,75 +160,59 @@ skiva 14, inte av skiva 11: budgeten får verkan genom att ett fallet försök g
 claimet. Utan omförsöket är per-task-budgeten död kod. Ingen kvotbokföring och inget veckotak
 byggs (ägarbeslut).
 
-### 7.1 Doctor #5-luckan — tre invarianter, egen HÖGRISK-commit
+### 7.1 Doctor #5-luckan (historik)
 
-Doctor #5 tillskrivs tre mekaniska uppdrag i tre dokument. Ingen kod utför något av dem:
-
-| Uppdrag | Källa som påstår det |
-|---|---|
-| Fälla `[AUTO-N1]`/`[AUTO-N2]`-commit som rört §A-yta | `docs/07-konstitution.md` §A, inledningen |
-| Vakta `disable-model-invocation: true` i de tre pipeline-skillsens frontmatter | regel 16 |
-| Semver-kontrollera `profilKontraktVersion` mot v1.1.0 | `skills/nortropic-stack/SKILL.md:81` |
-
-Konstitutionen varnar själv i §A6 för nät som kan redigeras av det som ska fångas. Här finns nätet inte alls.
-
-**Åtgärd, efter h-007, av människa, HÖGRISK-märkt commit:** `INV-007`, `INV-008`, `INV-009` i `check-invariants.mjs` — en per uppdrag, plus att §A-fällningen gäller **oavsett commit-tagg** så att controller-commits täcks. Samma default-FAIL-semantik som `invalid`-mängden redan har. Byggs aldrig genom loopen.
-
-**Registreras också som NRT-fynd i 100-dagarsprogrammet.** En dokumenterad grind utan implementation är precis vad programmet finns till för att hitta — och den hör hemma i dess register, inte bara i loop-planen.
+Luckan gällde webbens invarianter (INV-007–009) och följer webbrepot; posten m-001 som bar den
+i specen är borttagen 2026-09-10 (`docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md`).
+Plattformens invarianter är PINV-001–006 i `scripts/check-invariants.mjs`.
 
 ## 8. Byggflödet per task
 
-1. Johnny klistrar startprompten (§11) i Claude Code på Macen.
-2. Utföraren bygger på gren `nortropic/loop-h-00X`, committar per delsteg, öppnar PR, stannar.
-3. Johnny kör exit-testet: `./verify/bin/h-00X-exit` → exit 0 krävs.
-4. Codex granskar mot `docs/loop/granskningsrubrik.md`. Rubriken uppdateras med **båda** §A-begreppen — en granskare som bara känner v4.1:s lista missar den verkliga ytan.
-5. Johnny mergar. Blockerande fynd → tillbaka till steg 2, samma gren.
+1. **test-author** fryser specrad, fryst grind (RED före implementation) och
+   utvecklingsdokument; en oberoende **kontraktsgranskning** (read-only) försöker falsifiera
+   grinden.
+2. **builder** bygger på gren `nortropic/loop-h-00X` inom taskens `allowed_write`, committar
+   per delsteg och stannar före push. Buildern ändrar aldrig sin egen frysta grind.
+3. Exit-testet körs mot kandidaten: `./verify/bin/h-00X-exit` → exit 0 krävs. PASS är
+   exitkoden, inte rapporten.
+4. En oberoende **produktgranskning** (read-only) prövar mot `docs/loop/granskningsrubrik.md`
+   och försöker falsifiera kandidaten. Blockerande fynd → tillbaka till steg 2, samma gren.
+5. Fasgräns: push, merge och publicering ingår inte i nuvarande fas; den kvarvarande kedjan
+   följer `docs/loop/remaining-bootstrap-delegation-v1.md`.
 
-## 9. Kalender
+## 9. Kalender (historik)
 
-| När | Vad | Johnnys tid |
-|---|---|---|
-| Ikväll | Pass 0 | 1 h |
-| I morgon | Pass 1 (branch protection först) | 2 h |
-| Helg 1 | h-001 + h-002 | ~3 h |
-| Helg 2 | h-003 + h-004 + h-005 | ~4 h |
-| Helg 3 | h-006 + h-007 + INV-007 + pilot | ~4 h |
-| Löpande | 100-dagarsbatchar för hand tills piloten är grön | per batch |
-
-**Kalenderns läge 2026-08-08:** h-001–h-011 levererade och grindade på main. Smoke-momentet
-genomfört mot Claude Code 2.1.224 via launch: kommandot startar, kuvertet når sessionen helt,
-verklig slutrapport fångad och accepterad av h-006. Kvar: h-012–h-015 och piloten, som bör
-omdefinieras nu när fyra skivor ligger emellan.
-
-**Avvecklingen av systeminstallationen** (`/usr/local/libexec/nortropic`, sudoers-filen, sju konton) sker **före Pass 1:s gränstest**. Ett gränstest på en maskin med ett andra kontrollplan installerat bevisar ingenting. Ingen avinstallation finns i `rollback/` — planeras som eget moment.
+Kalendern och dess läge 2026-08-08 (h-001–h-011 levererade och grindade; smoke-momentet mot
+Claude Code 2.1.224 genomfört) står i arkivkopian. Kvar: h-014–h-015 och piloten, som bör
+omdefinieras nu när skivorna 14–15 och H-arbetena ligger emellan.
 
 ## 10. Stoppregler
 
 - Komponent utan spec-rad → avböj, hänvisa till beslut 3.
 - Nytt kodnamn → stoppa passet.
 - "Härda", "frysa", "auktorisera" utan spec → scope-regeln.
-- Två misslyckade fixförsök på samma fel → paus, arkitekt, sedan Johnny.
-- Task som vill röra §A-mängden → stopp, alltid människa, alltid HÖGRISK-märkt commit.
+- Två misslyckade fixförsök på samma fel → paus, `$nortropic-architect`, sedan ny kontraktsrunda.
+- Kandidat som rör den skyddade mängden i §3.1 → avvisas av policyn (exit 3); ändringen går genom kontraktsflödet.
 - Påstående utan verktygsbevis → märks OVERIFIERAT.
 
 ## 11. Startprompt
 
 ```
-Läs i denna ordning: CLAUDE.md · docs/00-borja-har.md · docs/03-regelverk.md ·
-docs/07-konstitution.md · docs/loop/byggplan-v3.md · docs/loop/implementation-v4.1.md ·
-docs/100-dagar/programregister.md · specs/tasks.spec.json · git log --oneline -15.
+Läs i denna ordning: AGENTS.md · docs/loop/harness-substitution-contract-v1.md §1 ·
+docs/loop/regler.md · docs/loop/byggplan-v3.md · docs/loop/implementation-v4.1.md ·
+specs/tasks.spec.json · git log --oneline -15.
 
-Rapportera: (1) läge med bevis per bevisregeln, (2) nästa task enligt byggplanens
-kalender, (3) dess exit-test ordagrant. Vänta på mitt "kör".
+Rapportera: (1) läge med bevis per bevisregeln, (2) nästa task enligt specen och §7,
+(3) dess exit-test ordagrant.
 
 Regler för passet: gren nortropic/loop-<id> · endast taskens allowed_write ·
-§A-mängden i byggplan v3 §3.1 rörs aldrig · planens namn, inga nya kodnamn ·
+den skyddade mängden i byggplan v3 §3.1 rörs aldrig · planens namn, inga nya kodnamn ·
 fixa-och-kör-om, aldrig ny klassificerare · ingen sudo · commit per delsteg ·
 docs uppdateras i samma commit som systemändringen (regel 17 + 22) ·
-stanna vid öppnad PR — jag kör exit-testet och mergar.
+stanna före push — grinden körs mot kandidaten och avgör.
 Overifierat märks OVERIFIERAT.
 ```
 
 ---
 
-*Committas som `docs/loop/byggplan-v3.md` i Pass 0 C2. Lägesfrågor besvaras mot spec, git och exit-tester — aldrig mot minne eller rapportering.*
+*Committad som `docs/loop/byggplan-v3.md` i Pass 0 C2; plattformsversion 2026-09-10. Lägesfrågor besvaras mot spec, git och exit-tester — aldrig mot minne eller rapportering.*

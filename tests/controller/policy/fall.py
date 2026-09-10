@@ -3,14 +3,19 @@
 
     python3.12 tests/controller/policy/fall.py     exit 0 = alla fall håller
 
-Det här är INTE exitgrinden. `verify/bin/h-007-exit` är grinden och ägs av
-människan; den här filen täcker vad grinden inte når och får aldrig åberopas
-som bevis för att skiva 7 är klar.
+Det här är INTE exitgrinden. `verify/bin/h-007-exit` är den frysta grinden;
+den här filen täcker vad grinden inte når och får aldrig åberopas som bevis
+för att skiva 7 är klar.
 
-Grinden prövar fem av §A-mängdens sökvägar. De fem den INTE prövar står
-först nedan — bland dem konstitutionen själv. En lögnstub som dömde på
-sökvägsprefix tog `docs/07-konstitution.md` med exit 0 och fick ändå
-14 PASS 0 FAIL (mätt 2026-08-08).
+Plattformens skyddade mängd (§A) är exakt specens `defaults.denied_write`:
+`verify/**`, `specs/**`, `controller/verify/register.json`,
+`scripts/check-invariants.mjs`, `.gitignore`, `CLAUDE.md` (2026-09-10). Varje
+sökväg i mängden prövas nedan, liksom radering av en skyddad fil, att den
+skyddade mängden aldrig maskeras av ett lindrigare avslag, att avslaget är
+neutralt formulerat (ingen människohandsregel) och att skyddet kommer ur
+specen och inte ur en egen lista: samma skrivning mot en härledd spec med
+tom `denied_write` ska falla som *utanför allowed_write* (exit 4), inte som
+skyddad mängd.
 
 Grinden använder tre task-id men bara två accepterade former, och båda
 reduceras till "något under controller/ plus något under docs/". Avsnittet
@@ -30,27 +35,38 @@ ROT = Path(__file__).resolve().parents[3]
 CLI = ROT / "controller/policy/cli"
 ACCEPT, ANROP, SEKTION_A, UTANFOR, DOCS, FILBUDGET, RADBUDGET = 0, 1, 3, 4, 5, 6, 7
 
+# Historiska specrader (h-001…h-017) bär dessa docs-sökvägar i allowed_write/
+# docs_impact; de är fixturdata för task-id-skopningen, inte plattformsdokument.
 BESL = "docs/05-beslutslogg.md"
 BORJA = "docs/00-borja-har.md"
+# Avslag ur den skyddade mängden får aldrig bära ett generiskt människokrav.
+NEUTRALT_FORBJUDET = ("människ", "högrisk")
 
 # (namn, task-id, {sökväg: tillägg}, väntad kod, sökväg orsaken MÅSTE namnge)
 # Sista fältet är den ÖVERTRÄDANDE sökvägen — inte varje ändrad fil. En
 # kandidat kan innehålla lagliga filer bredvid den olagliga, och orsaken ska
 # peka ut den som brast.
 FALL: list[tuple] = [
-    # --- §A-ytor som grindens K1 aldrig prövar ---
-    ("konstitutionen", "h-001", {"docs/07-konstitution.md": "\n# p\n"}, SEKTION_A,
-     "docs/07-konstitution.md"),  # GRUNDLAGEN — lögnstubben tog denna med exit 0
-    ("regelverket", "h-001", {"docs/03-regelverk.md": "\n# p\n"}, SEKTION_A, "docs/03-regelverk.md"),
+    # --- den skyddade mängden: exakt specens defaults.denied_write, exit 3 ---
+    ("verify", "h-001", {"verify/bin/prov": "p\n"}, SEKTION_A, "verify/bin/prov"),  # frysta grindar
+    ("specs", "h-001", {"specs/prov.json": "{}\n"}, SEKTION_A, "specs/prov.json"),  # specen
+    ("registret", "h-001", {"controller/verify/register.json": "\n"}, SEKTION_A,
+     "controller/verify/register.json"),  # verifierarregistret
+    ("verifieraren", "h-001", {"scripts/check-invariants.mjs": "\n// p\n"}, SEKTION_A,
+     "scripts/check-invariants.mjs"),
+    ("vitlistan", "h-001", {".gitignore": "\n# p\n"}, SEKTION_A, ".gitignore"),
     ("claude-md", "h-001", {"CLAUDE.md": "\n# p\n"}, SEKTION_A, "CLAUDE.md"),
-    ("eval-rubriken", "h-001",
-     {"skills/nortropic-eval/references/eval-rubric.md": "\n# p\n"}, SEKTION_A,
-     "skills/nortropic-eval/references/eval-rubric.md"),  # §A2, måttstocken
-    ("juridikflaggorna", "h-001",
-     {"skills/nortropic-plan/references/juridikflaggor.md": "\n# p\n"}, SEKTION_A,
-     "skills/nortropic-plan/references/juridikflaggor.md"),  # §A4
-    ("radering-av-sektion-a", "h-001", {"AUTOPILOT": None}, SEKTION_A,
-     "AUTOPILOT"),  # en §A-fil som RADERAS är lika rörd som en som ändras
+    ("radering-av-skyddad-fil", "h-001", {"CLAUDE.md": None}, SEKTION_A,
+     "CLAUDE.md"),  # en skyddad fil som RADERAS är lika rörd som en som ändras
+    ("skyddad-maskeras-aldrig", "h-001",
+     {"verify/bin/prov": "p\n", "controller/state/p.txt": "p\n", "docs/webbfil.md": "p\n"},
+     SEKTION_A, "verify/bin/prov"),  # skyddad + tillåten + utanför → alltid exit 3
+    # h-035 bär scripts/check-invariants.mjs i allowed_write; den skyddade mängden vinner ändå.
+    ("skyddad-trots-allowed-write", "h-035", {"scripts/check-invariants.mjs": "\n// p\n"}, SEKTION_A,
+     "scripts/check-invariants.mjs"),
+
+    # --- utanför allowed_write: exit 4, orsaken nämner allowed_write ---
+    ("webbfil-utanfor", "h-001", {"docs/webbfil.md": "p\n"}, UTANFOR, "docs/webbfil.md"),
 
     # --- TASK-ID-SKOPNING: det grinden inte kan skilja ---
     ("ratt-task-ratt-yta", "h-006",
@@ -68,10 +84,6 @@ FALL: list[tuple] = [
      "docs/00-borja-har.md"),  # docs_impact har TVÅ sökvägar; en räcker inte
     ("h007-fel-docs", "h-007", {"controller/policy/p.txt": "p\n", BORJA: "p\n"}, DOCS,
      "docs/05-beslutslogg.md"),  # rätt antal docs-filer, fel mängd
-
-    # --- ägarhandsytorna: avvisas, men som utanför allowed_write ---
-    ("specs", "h-001", {"specs/prov.json": "{}\n"}, UTANFOR, "specs/prov.json"),  # ägarhand, inte §A-vaktens jobb
-    ("verify", "h-001", {"verify/bin/prov": "p\n"}, UTANFOR, "verify/bin/prov"),  # ägarhand
 
     # --- anropsfel ---
     ("okant-task-id", "h-999", {"controller/state/p.txt": "p\n", BESL: "| p |\n"}, ANROP, None),
@@ -139,6 +151,25 @@ def main() -> int:
             if namnger:
                 doma(f"{namn}/namnger", namnger in ut, f"[{ut[:60]}]",
                      f"orsaken ska namnge {namnger}")
+            if vantad == SEKTION_A:
+                doma(f"{namn}/neutral", not any(t in ut.lower() for t in NEUTRALT_FORBJUDET),
+                     f"[{ut[:60]}]", "avslaget bär ingen människohandsregel")
+            if vantad == UTANFOR:
+                doma(f"{namn}/allowed_write", "allowed_write" in ut, f"[{ut[:60]}]",
+                     "orsaken ska nämna allowed_write")
+
+        # Skyddet kommer ur specen, inte ur en egen lista: samma skrivning mot en
+        # härledd spec med tom denied_write faller som utanför allowed_write.
+        harledd = json.loads((ROT / "specs/tasks.spec.json").read_text(encoding="utf-8"))
+        harledd["defaults"]["denied_write"] = []
+        harledd_fil = Path(yttre) / "harledd-spec.json"
+        harledd_fil.write_text(json.dumps(harledd, ensure_ascii=False), encoding="utf-8")
+        kand = kandidat({"verify/bin/prov": "p\n"})
+        r = subprocess.run([str(CLI), "check", "h-001", base, kand, str(harledd_fil)],
+                           capture_output=True, text=True, cwd=ROT, timeout=60)
+        doma("skydd-ur-specen", r.returncode == UTANFOR,
+             f"exit={r.returncode} ut=[{r.stdout.strip()[:60]}]", f"exit={UTANFOR} med tom denied_write")
+        doma("skydd-ur-specen/stderr", r.stderr.strip() == "", f"[{r.stderr.strip()[:60]}]", "tom stderr")
 
         # Budgetarnas gränser. Taket är inklusivt: 8 filer och 600 rader går igenom.
         for namn, antal, vantad in (("filer-8", 7, ACCEPT), ("filer-9", 8, FILBUDGET)):
@@ -164,7 +195,7 @@ def main() -> int:
         # Evidence: ett avslag utan sparat bevis är ett påstående.
         ev = ROT / "controller/policy/evidence"
         fore = len(list(ev.glob("*.json"))) if ev.is_dir() else 0
-        kod, _, _ = kor("h-001", kandidat({"AUTOPILOT": "\non\n"}))
+        kod, _, _ = kor("h-001", kandidat({"CLAUDE.md": "\n# p\n"}))
         nya = sorted(ev.glob("*.json"), key=lambda p: p.stat().st_mtime)
         doma("evidence/nytt", len(nya) > fore, f"{fore} → {len(nya)}", "en ny evidence-fil")
         if nya:
@@ -178,8 +209,8 @@ def main() -> int:
                      "evidence ska vara läsbar JSON")
             doma("evidence/verdikt", d.get("verdikt") == "sektion_a",
                  str(d.get("verdikt")), "verdikt sektion_a")
-            doma("evidence/filer", "AUTOPILOT" in d.get("andrade_filer", []),
-                 str(d.get("andrade_filer")), "AUTOPILOT i andrade_filer")
+            doma("evidence/filer", "CLAUDE.md" in d.get("andrade_filer", []),
+                 str(d.get("andrade_filer")), "CLAUDE.md i andrade_filer")
     finally:
         git("worktree", "remove", "--force", str(ws))
         subprocess.run(["rm", "-rf", yttre])

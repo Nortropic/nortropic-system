@@ -1,31 +1,37 @@
 #!/usr/bin/env python3.12
-"""controller/policy/cli — skiva 7: diffpolicy, mekanisk §A-vakt.
+"""controller/policy/cli — skiva 7: diffpolicy, mekanisk vakt av plattformens skyddade mängd (§A).
 
-    check <task-id> <base-sha> <candidate-sha>
+    check <task-id> <base-sha> <candidate-sha> [spec-fil]
         0   kandidaten får föreslås
         ≠0  avslag, orsaken på stdout — den NAMNGER vad som brast
 
-Kandidatens diff prövas innan den ens föreslås. Detta är systemets första
-verkligt mekaniska §A-skydd: fram tills nu har §A vaktats av prosa i
-docs/07-konstitution.md och av en doctor #5 som inte finns i kod.
+Kandidatens diff prövas innan den ens föreslås. Detta är det mekaniska
+skyddet mot obehörig skrivning: en kandidat som rör den skyddade mängden
+avvisas oavsett vilken task som föreslår den, och en kandidat som skriver
+utanför taskens `allowed_write` avvisas därefter.
 
-**Ytan hämtas ur specen, aldrig ur en egen lista.** `denied_write` i
-specs/tasks.spec.json ÄR byggplan v3 §3.1:s mängd. En andra lista här hade
-blivit två sanningar som driftar isär — precis det repot varnar för på flera
-ställen. Vi subtraherar `specs/**` och `verify/**`: enligt §3.1 stycket
-"Två mekanismer, olika ytor" vaktas de av ägarhand, och `controller/**`
-saknas redan i `denied_write` eftersom varje h-task bygger där. En §A-vakt
-som täckte controller/** hade avvisat sin egen kandidat.
+**Ytan hämtas ur specen, aldrig ur en egen lista.** `defaults.denied_write` i
+specs/tasks.spec.json ÄR plattformens skyddade mängd (byggplan v3 §3.1,
+regel 6): frysta grindar `verify/**`, specen `specs/**`, verifierarregistret
+`controller/verify/register.json`, verifieraren `scripts/check-invariants.mjs`,
+vitlistan `.gitignore` och pekaren `CLAUDE.md`. En andra lista här hade blivit
+två sanningar som driftar isär — precis det repot varnar för på flera ställen.
+Inget subtraheras: hela mängden vaktas här. `controller/**` står inte i
+mängden eftersom varje h-task bygger där; en vakt som täckte controller/**
+hade avvisat sin egen kandidat. Ändringar i den skyddade mängden går genom
+det autonoma kontraktsflödet (test-author → oberoende granskning → builder →
+oberoende granskning), aldrig genom en loop-tasks kandidat.
 
 Skrivytan för en task är `allowed_write` UNION `docs_impact`. Unionen är
-nödvändig, inte bekväm: h-007 har `docs/00-borja-har.md` i `docs_impact` men
-inte i `allowed_write`, och docs-kravet beordrar alltså en ändring som
-allowed_write förbjuder. Provets K4 kräver att den formen accepteras.
-Rapporterat som spec-fynd — den rena rättningen är ägarhand.
+nödvändig, inte bekväm: historiska specrader (h-007) har `docs_impact`-poster
+som inte står i `allowed_write`, och docs-kravet beordrar alltså en ändring
+som allowed_write förbjuder. Provets K4 kräver att den formen accepteras.
+Rapporterat som spec-fynd; den rena rättningen är en specändring genom
+kontraktsflödet.
 
-Ordningen på prövningarna är verdikternas allvar, inte bekvämlighet: §A
-först, för det är den enda överträdelse som aldrig får maskeras av ett
-lindrigare avslag.
+Ordningen på prövningarna är verdikternas allvar, inte bekvämlighet: den
+skyddade mängden först, för det är den enda överträdelse som aldrig får
+maskeras av ett lindrigare avslag.
 
 Exitkoden bär verdiktet: 0 accepterad · 1 anropsfel · 3 §A · 4 utanför
 allowed_write · 5 docs-kravet · 6 filbudget · 7 radbudget · 8 internt fel.
@@ -53,10 +59,6 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROT / "controller/authority"))
 from core import (AuthorityError, overlaps, permits, strict_json_bytes, strict_json_file,
                   task_authority, validate_registry)  # noqa: E402
-
-# Vaktas av ägarhand, inte av den här komponenten (byggplan v3 §3.1,
-# "Två mekanismer, olika ytor"). controller/** står inte i denied_write.
-AGARHAND = ("specs/**", "verify/**")
 
 ANROP, SEKTION_A, UTANFOR, DOCS, FILBUDGET, RADBUDGET, INTERNT = 1, 3, 4, 5, 6, 7, 8
 
@@ -211,14 +213,16 @@ def gor_check(task_id: str, base_arg: str, kand_arg: str, spec_fil: Path = SPEC)
                 return avslag(UTANFOR, "protected_authority_grant",
                               f"ordinary task {task_id} överlappar skyddad authority-yta", *arg)
 
-    # 1. §A — den enda överträdelse som aldrig får maskeras av ett lindrigare
-    #    avslag. Ytan är specens denied_write minus ägarhandsytorna.
-    vaktad = [m for m in std.get("denied_write", []) if m not in AGARHAND]
+    # 1. Den skyddade mängden (§A) — den enda överträdelse som aldrig får
+    #    maskeras av ett lindrigare avslag. Ytan är exakt specens
+    #    defaults.denied_write; ingen egen lista, ingen subtraktion.
+    vaktad = list(std.get("denied_write", []))
     traffar = [f for f in filer if any(matchar(f, m) for m in vaktad)]
     if traffar:
         return avslag(SEKTION_A, "sektion_a",
-                      "§A-yta rörd, aldrig via loopen — alltid människa och HÖGRISK-märkt "
-                      f"commit: {', '.join(traffar)}", *arg)
+                      "skyddad plattformsyta rörd (specens defaults.denied_write; ändras "
+                      "endast genom kontraktsflödet, aldrig via en loop-tasks kandidat): "
+                      f"{', '.join(traffar)}", *arg)
 
     # 2. Skrivytan. Unionen med docs_impact är nödvändig — se modulens docstring.
     skrivyta = list(task.get("allowed_write", [])) + list(task.get("docs_impact", []))
@@ -228,7 +232,7 @@ def gor_check(task_id: str, base_arg: str, kand_arg: str, spec_fil: Path = SPEC)
                       f"utanför allowed_write för {task_id}: {', '.join(utanfor)}", *arg)
 
     # 3. Docs-kravet (regel 17 + 22). docs_impact är en sökvägslista sedan
-    #    ÄGARHAND-11, så villkoret är en mängdkontroll och inte en tolkning:
+    #    LOOP-ÄGARHAND-11, så villkoret är en mängdkontroll och inte en tolkning:
     #    VARJE listad sökväg ska vara rörd i samma commit.
     saknade = [d for d in task.get("docs_impact", []) if d not in filer]
     if saknade:

@@ -81,7 +81,6 @@ TEST_AUTHOR_ALLOWED = {
     "specs/tasks.spec.json",
     "verify/bin/h-003-exit",
     "verify/bin/h-004-exit",
-    "docs/05-beslutslogg.md",
     "docs/loop/drift.md",
 }
 
@@ -99,14 +98,14 @@ ROADMAP_PLAN_BLOBS = {
 # Platform document generation after the 2026-09-10 repository split: router
 # documents and docs/loop/** only, pinned by blob on origin/main.
 SUBSTITUTION_BLOBS = {
-    "AGENTS.md": "c90ebebd6a71b7623516271d07a4ef72759c4457",
-    "CLAUDE.md": "630ce3275cbf09e167bcc46861e893043a90861c",
-    "README.md": "20df72000ecf9899aac48c80590e5803d008a160",
-    "docs/loop/byggplan-v3.md": "c0b3b04b09fe901a16df9c83a81c37d157aa03bb",
+    "AGENTS.md": "e0fc54d74590fac924bb6060bb219836d336561e",
+    "CLAUDE.md": "772a39e8247e51c79e412bb9698d7715f693625b",
+    "README.md": "2a3c33a48fdae5e2c3d57d34b1e91e537886be52",
+    "docs/loop/byggplan-v3.md": "d76407e429f4824ef235edc8bf28ddc1602ef091",
     "docs/loop/codex-evidence-contract.md": "18b833174d1673c24e00b6c2f28601d9ab5f48fd",
     "docs/loop/drift.md": "8f0fbacb9ed401d53a1113b7effc0a6ff92078a7",
     "docs/loop/owner-author-workflow-v1.md": "4aabf054c217cfd5cdca46456d11f25de0211bbf",
-    "docs/loop/regler.md": "b0bc10ae78ed8eb4ee9a1767921111eb94faa146",
+    "docs/loop/regler.md": "52352266ae732ef707c2d241ca7317d7d77a80bc",
     "docs/loop/remaining-bootstrap-delegation-v1.md": "20319089c4085b79ec2b8f600396c71b21dbd392",
     SUBSTITUTION_OWNER_PATH: "4a41e3952f55453ba2e83b2d553f7af2b76d5705",
     SUBSTITUTION_AUDIT_PATH: "bb5f99c111cd5aaf784e73e67bde354023b1b5f2",
@@ -156,14 +155,14 @@ SUBSTITUTION_ROADMAP: tuple[RoadmapSlice, ...] = (
     RoadmapSlice(
         "SUB-1", "h-027", "AgentProvider interface plus Codex adapter", "verify/bin/h-027-exit",
         ("h-004", "h-006", "h-008", "h-009", "h-011", "h-013", "h-016", "h-017"),
-        ("controller/provider/**", "tests/controller/provider/**", "docs/05-beslutslogg.md"),
+        ("controller/provider/**", "tests/controller/provider/**"),
     ),
     RoadmapSlice(
         "SUB-2", "h-028", "split provider launch from G20 containment", "verify/bin/h-028-exit",
         ("h-017", "h-027"),
         (
             "controller/launch/**", "controller/provider/**", "tests/controller/launch/**",
-            "tests/controller/provider/**", "docs/05-beslutslogg.md",
+            "tests/controller/provider/**",
         ),
     ),
     RoadmapSlice(
@@ -172,7 +171,7 @@ SUBSTITUTION_ROADMAP: tuple[RoadmapSlice, ...] = (
         (
             "controller/provider/**", "controller/taskcontract/**", "controller/worker/**", "controller/envelope/**",
             "tests/controller/provider/**", "tests/controller/taskcontract/**", "tests/controller/worker/**",
-            "tests/controller/envelope/**", "docs/05-beslutslogg.md",
+            "tests/controller/envelope/**",
         ),
     ),
     RoadmapSlice(
@@ -180,7 +179,7 @@ SUBSTITUTION_ROADMAP: tuple[RoadmapSlice, ...] = (
         ("h-003", "h-004", "h-010", "h-012", "h-013", "h-017", "h-029"),
         (
             "controller/loop/**", "controller/brytare/**", "controller/provider/**", "tests/controller/loop/**",
-            "tests/controller/brytare/**", "tests/controller/provider/**", "docs/05-beslutslogg.md", "docs/loop/drift.md",
+            "tests/controller/brytare/**", "tests/controller/provider/**", "docs/loop/drift.md",
         ),
     ),
 )
@@ -192,44 +191,44 @@ SUBSTITUTION_ROADMAP: tuple[RoadmapSlice, ...] = (
 ROADMAP: tuple[RoadmapSlice, ...] = (
     RoadmapSlice("S2", "h-015", "recovery / crash consistency", "verify/bin/h-015-exit",
                  ("h-010", "h-013", "h-016", "h-004", "h-030"),
-                 ("controller/atertag/**", "tests/controller/atertag/**", "docs/05-beslutslogg.md")),
+                 ("controller/atertag/**", "tests/controller/atertag/**")),
     RoadmapSlice("S4", "h-018", "minimal structured FailureArtifact", "verify/bin/h-018-exit",
                  ("h-012", "h-013", "h-016", "h-017", "h-030"),
-                 ("controller/aterkoppling/**", "controller/envelope/cli", "tests/controller/aterkoppling/**", "docs/05-beslutslogg.md")),
+                 ("controller/aterkoppling/**", "controller/envelope/cli", "tests/controller/aterkoppling/**")),
     RoadmapSlice("S5", "h-019", "normalized typed events / projection", "verify/bin/h-019-exit",
                  ("h-001", "h-016", "h-030"),
-                 ("controller/handelse/**", "controller/loop/**", "tests/controller/handelse/**", "docs/05-beslutslogg.md")),
+                 ("controller/handelse/**", "controller/loop/**", "tests/controller/handelse/**")),
     RoadmapSlice("S6", "h-014", "notification from typed lifecycle events", "verify/bin/h-014-exit",
                  ("h-019",),
-                 ("controller/notis/**", "controller/loop/**", "tests/controller/notis/**", "docs/05-beslutslogg.md")),
+                 ("controller/notis/**", "controller/loop/**", "tests/controller/notis/**")),
     RoadmapSlice("S7", "h-020", "verified auto-promotion", "verify/bin/h-020-exit",
                  ("h-017", "h-015", "h-004", "h-019"),
-                 ("controller/befordran/**", "tests/controller/befordran/**", "docs/05-beslutslogg.md")),
+                 ("controller/befordran/**", "tests/controller/befordran/**")),
     RoadmapSlice("S8", "h-021", "merge conflict reasoning plus full re-verification", "verify/bin/h-021-exit",
                  ("h-020",),
-                 ("controller/konflikt/**", "tests/controller/konflikt/**", "docs/05-beslutslogg.md")),
+                 ("controller/konflikt/**", "tests/controller/konflikt/**")),
     RoadmapSlice("S9", "h-022", "trusted control-plane transition", "verify/bin/h-022-exit",
                  ("h-020",),
-                 ("controller/overvakare/**", "tests/controller/overvakare/**", "docs/05-beslutslogg.md")),
+                 ("controller/overvakare/**", "tests/controller/overvakare/**")),
     RoadmapSlice("S10", "h-023", "Markdown intake and canonical Task IR", "verify/bin/h-023-exit",
                  ("h-019", "h-007"),
-                 ("controller/intag/**", "tests/controller/intag/**", "docs/05-beslutslogg.md")),
+                 ("controller/intag/**", "tests/controller/intag/**")),
     RoadmapSlice("S11", "h-024", "provider verifier author/challenger plus kernel freeze", "verify/bin/h-024-exit",
                  ("h-023", "h-017"),
-                 ("controller/grindsmed/**", "tests/controller/grindsmed/**", "docs/05-beslutslogg.md")),
+                 ("controller/grindsmed/**", "tests/controller/grindsmed/**")),
     RoadmapSlice("S12", "h-025", "evaluator adapter with bounded adversarial review", "verify/bin/h-025-exit",
                  ("h-018", "h-019"),
-                 ("controller/bedomare/**", "tests/controller/bedomare/**", "docs/05-beslutslogg.md")),
+                 ("controller/bedomare/**", "tests/controller/bedomare/**")),
     RoadmapSlice("S13", "h-026", "read / typed-command projection", "verify/bin/h-026-exit",
                  ("h-019",),
-                 ("controller/lucka/**", "tests/controller/lucka/**", "docs/05-beslutslogg.md")),
+                 ("controller/lucka/**", "tests/controller/lucka/**")),
 )
 
 EMPIRICAL_STAGE = "L"
 EMPIRICAL_MAX_ROUNDS = 5
 EMPIRICAL_GATE_PATH = "verify/bin/autonomous-loop-exit"
 EMPIRICAL_GATE_SUBJECT = "[LOOP] ÄGARHAND: freeze empirical autonomous-loop closeout L"
-EMPIRICAL_GATE_ALLOWED = {EMPIRICAL_GATE_PATH, "docs/05-beslutslogg.md", "docs/loop/drift.md"}
+EMPIRICAL_GATE_ALLOWED = {EMPIRICAL_GATE_PATH, "docs/loop/drift.md"}
 
 
 def now_id() -> str:
@@ -1380,7 +1379,6 @@ def roadmap_test_author_allowed(sl: RoadmapSlice) -> set[str]:
     allowed = {
         "specs/tasks.spec.json",
         sl.gate_path,
-        "docs/05-beslutslogg.md",
         "docs/loop/drift.md",
     }
     # Frozen plan explicitly says S5's owner spec pass corrects byggplan §7 so S6 follows typed events.
@@ -1426,18 +1424,13 @@ def assert_roadmap_test_author_scope(repo: Path, base_sha: str, sl: RoadmapSlice
             f"roadmap task allowed_write differs from frozen plan slice={sl.code}: "
             f"expected={sorted(sl.plan_allowed_write)} actual={sorted(aw)}"
         )
-    protected_exact = {
-        "docs/07-konstitution.md",
-        "docs/03-regelverk.md",
-        "skills/nortropic-eval/references/eval-rubric.md",
-        "skills/nortropic-plan/references/juridikflaggor.md",
-        "agents/nortropic-steward.md",
-        "AUTOPILOT",
-        "scripts/check-invariants.mjs",
-        "CLAUDE.md",
-        "controller/verify/register.json",
-    }
-    protected_roots = ("specs/", "verify/", "workflows/", "tests/fixtures/")
+    # The platform protected set is the spec's own defaults.denied_write (the same set the
+    # policy refuses); no second list here.
+    denied = load_spec(repo).get("defaults", {}).get("denied_write")
+    if not isinstance(denied, list) or not denied or not all(isinstance(x, str) and x for x in denied):
+        raise Stop("tasks spec has no explicit nonempty defaults.denied_write")
+    protected_exact = {d for d in denied if not d.endswith("/**")}
+    protected_roots = tuple(d[:-3] + "/" for d in denied if d.endswith("/**"))
     for pattern in aw:
         norm = pattern.replace(os.sep, "/").lstrip("./")
         if norm in protected_exact or any(norm == root.rstrip("/") or norm.startswith(root) for root in protected_roots):
@@ -1493,10 +1486,11 @@ Owner delegation:
 - make ordinary architecture choices needed to produce a truthful mechanism-neutral task contract
   and RED frozen gate without asking the human again;
 - create/update ONLY task `{sl.task_id}` in specs/tasks.spec.json and gate `{sl.gate_path}` plus
-  docs/05-beslutslogg.md / docs/loop/drift.md when needed; for original S5 only, the frozen plan
+  docs/loop/drift.md when needed; for original S5 only, the frozen plan
   additionally permits its documented owner-pass correction to docs/loop/byggplan-v3.md §7;
 - do NOT implement production code or tests/controller/**;
-- do NOT alter constitution/rulebook/frozen plan, unrelated tasks, existing frozen gates, or weaken
+- do NOT alter the platform authority documents (AGENTS.md, docs/loop/regler.md,
+  docs/loop/byggplan-v3.md), the frozen plan, unrelated tasks, existing frozen gates, or weaken
   any green regression control;
 - exact builder allowed_write must equal PLAN_ALLOWED_WRITE above;
 - bind every REQUIRED_DEPENDENCY above; additional legacy dependencies may remain only when truthful;
@@ -1776,9 +1770,10 @@ Read:
   {SUBSTITUTION_OWNER_PATH}
   {SUBSTITUTION_AUDIT_PATH}
 
-Create or narrowly harden exactly `{EMPIRICAL_GATE_PATH}` plus docs/05-beslutslogg.md and
-docs/loop/drift.md only when documentation is needed. Do not modify specs/**, controller/**,
-tests/controller/**, any existing verify gate, constitution, rulebook, or production code.
+Create or narrowly harden exactly `{EMPIRICAL_GATE_PATH}` plus docs/loop/drift.md only when
+documentation is needed. Do not modify specs/**, controller/**, tests/controller/**, any existing
+verify gate, the platform authority documents (AGENTS.md, docs/loop/regler.md,
+docs/loop/byggplan-v3.md), or production code.
 
 The gate must bind the FINAL TARGET STATE by public effects, not source strings or one provider.
 It must exercise the provider-neutral path and Trust Kernel separation materially: Task IR/contract,

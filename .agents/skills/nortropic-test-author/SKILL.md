@@ -1,28 +1,27 @@
 ---
 name: nortropic-test-author
-description: Prepare an owner-authorized Nortropic task contract and frozen acceptance gate before builder implementation. Never implement production code.
+description: Prepare a Nortropic task contract and frozen acceptance gate before builder implementation. Never implement production code.
 ---
 
 # Nortropic Test Author
 
-Use only when the owner explicitly asks to prepare or harden a task's specification / frozen acceptance gate.
+Use when the autonomous flow allocates preparation or hardening of a task's specification / frozen acceptance gate.
 
-You are a separate **workflow role** from the builder. This Skill is not by itself a mechanical security boundary; frozen owner gates and Nortropic's enforced write boundaries remain the trust authority.
+You are a separate **workflow role** from the builder. This Skill is not by itself a mechanical security boundary; frozen gates and the enforced technical protections named in `AGENTS.md` remain the trust authority.
 
 ## Read first
 
-1. `AGENTS.md`
-2. `docs/07-konstitution.md`
-3. `docs/03-regelverk.md`
-4. `docs/loop/regler.md`
-5. relevant plan/handoff/drift documents
-6. current code needed to determine what is measurable
+1. `AGENTS.md` (authority order, autonomous flow, technical protections)
+2. `docs/loop/regler.md`
+3. `docs/loop/byggplan-v3.md`
+4. relevant plan/handoff/drift documents
+5. current code needed to determine what is measurable
 
 Do not invent a second backlog or parallel truth store.
 
 ## Hard boundary
 
-You MAY prepare owner-authorized artifacts needed to make the task mechanically judgeable.
+You MAY prepare the artifacts needed to make the task mechanically judgeable: spec row, frozen gate, development document, register/pin bindings when the contract allocates them.
 
 You MUST NOT implement the production solution that the gate will judge.
 
@@ -34,9 +33,9 @@ Default: `PUSH=NO`, `MERGE=NO`.
 
 ### 1. Lock prestate
 
-Report repository, branch, HEAD, `origin/main` or `OVERIFIERAT`, working-tree status, and exact owner-authorized task/slice.
+Report repository, branch, HEAD, `origin/main` or `OVERIFIERAT`, working-tree status, and exact allocated task/slice.
 
-If unrelated changes exist, stop unless the owner explicitly provided an isolation plan.
+If unrelated changes exist, stop unless an isolation plan was provided.
 
 ### 2. Plan-vs-code measurability review
 
@@ -45,7 +44,7 @@ Before writing the gate:
 - identify the exact criterion;
 - identify existing components that own each side of the contract;
 - prove the criterion can be measured without depending on future implementation internals;
-- identify required files outside the owner-authorized surface.
+- identify required files outside the allocated surface.
 
 If the criterion cannot be measured honestly, STOP.
 
@@ -92,4 +91,4 @@ PUSH=NO
 MERGE=NO
 ```
 
-Stop for owner review/merge before a builder starts.
+Stop for independent contract review (`$nortropic-gate-reviewer`, read-only) before a builder starts.

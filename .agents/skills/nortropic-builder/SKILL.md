@@ -7,25 +7,24 @@ description: Implement one frozen Nortropic control-plane task inside its allowe
 
 Use for implementation **after** the task spec and frozen exit-test exist.
 
-You are the producer, not the owner of the verdict. This Skill defines workflow responsibility, not a mechanical filesystem/security boundary; the frozen owner contract and enforced Nortropic boundaries remain authoritative.
+You are the producer, not the owner of the verdict. This Skill defines workflow responsibility, not a mechanical filesystem/security boundary; the frozen contract and the enforced technical protections named in `AGENTS.md` remain authoritative.
 
 ## Read first
 
-1. `AGENTS.md`
-2. `docs/07-konstitution.md`
-3. `docs/03-regelverk.md`
-4. `docs/loop/regler.md`
-5. current task in `specs/tasks.spec.json`
-6. that task's frozen `exit_test`
-7. relevant plan/handoff/drift documents
+1. `AGENTS.md` (authority order, autonomous flow, technical protections)
+2. `docs/loop/regler.md`
+3. `docs/loop/byggplan-v3.md` (the protected set, §3.1)
+4. current task in `specs/tasks.spec.json`
+5. that task's frozen `exit_test`
+6. relevant plan/handoff/drift documents
 
 The task spec defines `allowed_write`. Do not widen it yourself.
 
 ## Frozen artifacts
 
-Unless the owner explicitly placed a file in this task's authorized builder surface, do not modify trust inputs that define/judge the current task, including the frozen spec/gate and verifier/register material not explicitly owned.
+Never modify the trust inputs that define or judge the current task: the frozen spec row, the frozen gate, the verifier register and the protected set (`defaults.denied_write`). A builder never edits its own frozen gate or its own contract; a contract change goes through a new test-author freeze and independent review.
 
-If satisfying the criterion requires a file outside `allowed_write`, STOP.
+If satisfying the criterion requires a file outside `allowed_write`, STOP and report exactly why.
 
 ## Workflow
 
@@ -39,12 +38,12 @@ Confirm exact `allowed_write`.
 
 Before edits:
 - map criteria to current code;
-- identify smallest existing owner components for the gap;
+- identify smallest existing components for the gap;
 - list expected changed files;
 - identify likely regressions;
 - report plan/code mismatch with evidence.
 
-Do not redesign owner-locked semantics.
+Do not redesign frozen semantics.
 
 ### 3. Baseline
 
@@ -74,13 +73,13 @@ Before strengthening ask:
 
 > Which legitimate implementation would this incorrectly reject?
 
-Do not expand the threat model beyond the frozen owner criterion without a real stop condition.
+Do not expand the threat model beyond the frozen criterion without a real stop condition.
 
 ### 7. Commit discipline
 
-One slice = one builder branch/PR. Preserve existing commits unless owner instructs otherwise. Commit per meaningful delsteg with required docs in the same commit.
+One slice = one builder branch/PR. Preserve existing commits. Commit per meaningful delsteg with required docs in the same commit. No amend after a gate run; re-pin and add a new commit.
 
-Do not push by default.
+Do not push: the current phase is local commits and local qualification.
 
 ### 8. Final report
 
@@ -94,4 +93,4 @@ PUSH=NO
 MERGE=NO
 ```
 
-STOP BEFORE PUSH unless owner explicitly authorizes publication.
+STOP BEFORE PUSH. The candidate goes to independent review and local qualification with the frozen gate.
