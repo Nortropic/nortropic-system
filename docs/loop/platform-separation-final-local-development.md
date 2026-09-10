@@ -580,5 +580,38 @@ subjektets byte-identiska kopior; eget `TMPDIR`):
 `ad9aa6288d1f165d8d529ed211776b1b22982105672439544d54c8dd9deaa5c2`. Röda och gröna rader identiska med v2.3
 (F6 grön: attest/cli är byte-lik basen; F7: control-set 68/68, launch-cwd 19/20, governance 68/70 exakt g6/g7).
 
+### Oberoende kontraktsgranskning nr 4 (på d7cd584f) → v2.5
+En grindintern lucka: F8 fångade webbrepots namn och gamla roten men inte en absolut/tilde-sökväg till ett annat
+syskonrepo under `nortropic-repos/`. v2.5 (grind sha256 `2132ef512c7f32aacec94b63c0258b49c3a3905eb40694abd3ac3049ab33a007`,
+commit `4dffec98`): `SIBLING_RE = (~|$HOME|/Users/elinhaggstrom)/nortropic-repos/(?!nortropic-system(/|$))` i F8:s
+kopplingsskanning och i den trädvida kod-/textskanningen, med kanari. Granskarens noteringar bokförda i Vad grinden
+inte bevisar (q01 accepterad överapproximation, q08 `../` som JSON-nyckel, q02/q02b kodade `..`, q09 lägesändring
+på FROZEN_FILES).
+Produktträdet `9c0a98be` (builder v4, read-only) statiskt under v2.5: 78 PASS / 6 FAIL — de fem sandboxberoende
+raderna (`--skip-held-gates`) plus `f6_frozen_evidence_…` enbart därför att trädet bär grind v2.4 (`gate_ok=False`,
+`problems=[]`); med v2.5 i trädet är det 79/5. Inga nya röda rader av SIBLING_RE på produktträdet.
+
+Referenskonstruktion v2.5 (scratch, förkastad; HEAD `495e5c68…`, 143 filer, innehåll som v2.3): fullkörning exit
+**0**, **84/84**, result.json sha256 `eb72ac152863b0fb38cb6bbcd21fd2b5d67d60bf2ca32068f82bced715efce84`; control-set
+68/68 (d8c3dcb8…), launch-cwd 19/20 (7fc33cef…), governance 68/70 exakt {g6, g7} (997449c1…), loopsvit 53 ok, 0 träffar.
+
+Negativer mot v2.5: **90 körda, 77 fångade, 0 riggfel.** Alla 68 tidigare fångade fångas på samma rader.
+Granskarens q-serie: q01 `../x` i JSON-prosa → slutning (överapproximation, accepterad); q03 absolut
+webbrepo-sökväg → loop-config-rad + trädvid + F8; q03b absolut gammal rot → F8; **q03c** absolut sökväg till annat
+syskonrepo → trädvid + F8; **q03d** `worker_cmd` mot syskonrepo → trädvid + F8; q03e (test-author) `~/nortropic-repos/x/…`
+→ trädvid + F8; q04 en kommentarrad i attest/cli → F6; q05/q05b `expected_refreeze`/`h038_proof` i ny fil (.py resp.
+utan ändelse med annan shebang) → trädvid.
+Inte fångade (13): n03/n04/n05/n20/n21/n23 (utanför omfång), p02/p09 (accepterade formuleringar), p05 `humanOnly`
+(semantikgräns), q02/q02b (backslash-/procentkodat `..`), q08 (`../` som JSON-nyckel), q09 (lägesändring på
+byte-fryst fil) — alla deklarerade i Vad grinden inte bevisar.
+
+### Test-author 2026-09-10 — baslinje RED för v2.5 (före produkt)
+Kommando (arbetsyta HEAD `4dffec98` = 332f07ce + grind v2.5 + detta dokument utan detta avsnitt; hållna grindar ur
+subjektets byte-identiska kopior; eget `TMPDIR`):
+`python3.12 verify/bin/platform-separation-final-exit --subject <arbetsyta>` → exit **1**,
+`RED_LOCAL_QUALIFICATION`, **52 PASS / 36 FAIL** (88 rader), result.json sha256
+`faea27bb37fb6e69afe9b3a3ce08348e2e2c3a4ff39514b222f3914ee0a3cc70`. Röda och gröna rader identiska med v2.3/v2.4
+(F7: control-set 68/68, launch-cwd 19/20, governance 68/70 exakt g6/g7).
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
