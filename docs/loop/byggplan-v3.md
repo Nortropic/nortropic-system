@@ -6,7 +6,8 @@
 byggde på, gäller inte plattformen. Den fullständiga ursprungstexten — det bevisade läget
 2026-08-07 i det odelade repot, Pass 0/Pass 1, den ursprungliga §A-mängden med webbfiler,
 doctor #5-luckan, kalendern och den ursprungliga startprompten — är bevarad ordagrant som
-historia i `docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md`. Nedan står plattformsdelen.
+historia i Git-historiken (`dae90c8f:docs/loop/byggplan-v3.md`) och i webbrepot med proveniens.
+Nedan står plattformsdelen.
 Historiska beslut behåller sina datum; gamla resultat behåller sina ursprungliga subjekt.
 
 ---
@@ -110,7 +111,7 @@ managed scope, aldrig i repot; trösklar räknade ur mätt historik (specens `no
 | Task | Skiva | Exit-test |
 |---|---|---|
 | h-001 | 1 SQLite-state + eventlogg | Rekonstruera statustabell enbart ur `events.jsonl`, diffa mot SQLite → noll avvikelse |
-| h-002 | 2 Verifier-runner | Manipulerad verifierarfil → `hash_mismatch` före körning · fri text i verifier-fält kan inte exekvera. **Registrera befintliga grindar** (`check-invariants.mjs`, `nortropic-verify-suite.js`) — bygg ingen ny verifierare |
+| h-002 | 2 Verifier-runner | Manipulerad verifierarfil → `hash_mismatch` före körning · fri text i verifier-fält kan inte exekvera. **Registrera befintliga grindar** (`check-invariants.mjs`; webbens grind registreras sedan 2026-09-10 i webbrepot) — bygg ingen ny verifierare |
 | h-003 | 3 Attestation + stale | Verifiera task A · commit som matchar `invalidates_on` → A blir `stale`, omtest köas |
 | h-004 | 4 Lease | 100 samtidiga starter → exakt 1 ägare · `kill -9` → reclaim efter TTL, aldrig före |
 | h-005 | 5 Workspace per attempt | Ren checkout på beordrad base-SHA · skrivning i den skyddade mängden stoppas av OS · Ctrl-C → rest städas · ingen kvarlämnad gren/lås |
@@ -163,7 +164,8 @@ byggs (ägarbeslut).
 ### 7.1 Doctor #5-luckan (historik)
 
 Luckan gällde webbens invarianter (INV-007–009) och följer webbrepot; posten m-001 som bar den
-i specen är borttagen 2026-09-10 (`docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md`).
+i specen är borttagen 2026-09-10 (fältens dåvarande lydelse: `dae90c8f:specs/tasks.spec.json`;
+överförd till webbrepot med proveniens).
 Plattformens invarianter är PINV-001–006 i `scripts/check-invariants.mjs`.
 
 ## 8. Byggflödet per task
