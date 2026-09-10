@@ -880,9 +880,9 @@ def main():
     agents_text = text(AGENTS)
     authority_section = next((agents_text[s:e] for h, s, e in sections(agents_text) if h.startswith("## Auktoritetsordning")), "")
     exempt_in_router = []
-    # One list item (a numbered/bulleted entry with its continuation lines) is the unit: the marker must sit in the
-    # same item as the reference. The spec itself is active authority (exempt only from token scanning).
-    for item in re.split(r"\n(?=\s*(?:\d+\.|[-*])\s)", authority_section):
+    # One list item (a numbered/bulleted entry with its continuation lines, never a following paragraph) is the
+    # unit: the marker must sit in the same item as the reference. The spec itself is active authority (exempt only from token scanning).
+    for item in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|[-*])\s)", authority_section):
         for ref in refs_from_text(AGENTS, item):
             if ref != SPEC and (ref in CLOSURE_EXEMPT or ref.startswith(CLOSURE_EXEMPT_PREFIXES) or ref in TREE_FROZEN_FILES):
                 if not (re.search(r"(?i)fryst|historisk", item) and re.search(r"(?i)inte dagens instruktion", item)):
