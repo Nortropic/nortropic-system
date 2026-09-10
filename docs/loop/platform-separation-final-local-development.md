@@ -541,5 +541,38 @@ stycket), substitutionskontraktet, historiska ×4, drift, F3 ×5, F4 ×5, F5 ×2
 selftest, publication-callers, loop-cli, F6 ×3, F7 ×3 (control-set 68/68; launch-cwd 19/20; governance 68/70
 exakt g6/g7), F10 ×2.
 
+### Oberoende kontraktsgranskning nr 3 (på a6953ac5) → v2.4
+Två grindinterna luckor utan kriterieändring i sak, plus kalibrering. v2.4 (grind sha256
+`915e7c51f161a3b3b8e83516112d4669cf8571e9ddc41ed0d05ef3c02050f9ea`, commit `bd8c0a2f`): `controller/attest/cli`
+byte-fryst mot 332f07ce i F6 (filen ligger utanför produktytan; gör det namnbundna undantaget
+{expected_refreeze, h038_proof} säkert — p04b/p04d); `refs_from_json` räknar `../`-strängvärden som hängande
+(p08/p08c); markörregexen tolererar radbrytning i "inte dagens instruktion" och böjningen `frus…` (p02/p09 är
+legitima formuleringar, inte återinföranden). `humanOnly` förblir deklarerad semantikgräns (p05).
+
+Referenskonstruktion v2.4 (scratch, förkastad; HEAD `a630e152…`, 143 filer, samma innehåll som v2.3):
+fullkörning exit **0**, **84/84**, result.json sha256
+`d8e90b8117f2cb03b490a7fd585c31ab76da9f47c78b76929b103739f87aceb6`; control-set 68/68 (5f36c1ed…), launch-cwd
+19/20 (73294f30…), governance 68/70 exakt {g6, g7} (2eba2c6e…), loopsvit 53 ok, trädklassning oförändrad, 0 träffar.
+
+Negativer mot v2.4: **77 körda, 68 fångade, 0 riggfel.** Alla 52 tidigare fångade (a–h, m0–m15, n-serien) fångas
+på samma rader (p04b-typen nu via F6). Granskarens p-serie: p01 markör i föregående stycke → routerraden; p03
+fryst dokument via relativ länk → routerraden; p04 `expected_refreeze` i annan fil → trädvid; **p04b**
+omdefinierad `expected_refreeze` i attest/cli → `f6_frozen_evidence_…`; p04c/**p04d** nästlad def i `h038_proof` →
+F6 (+ trädvid för p04c); p06 symlänkad katalog utan referens → `f1_no_symlink_entries_at_head`; p07 `./../../../`-länk
+inuti trädet → slutning + x_md + trädvid; **p08** `"rules": "../webb/AGENTS.md"` → `f2_closure_all_active_references_…`;
+p08b `../nortropic-webbforvaltning/…` → slutning + loop-config-rad + trädvid; **p08c** `worker_cmd` mot syskonrepo →
+`f2_closure_all_active_references_…`; p10 CLAUDE.md lyfter plankopian → routerraden.
+Inte fångade (9): n03/n04/n05/n20/n21/n23 (utanför omfång, som ovan), p05 `humanOnly` (deklarerad semantikgräns),
+p02 och p09 (avsiktligt accepterade formuleringar: radbruten fras respektive "frusen" — markören finns, dokumentet
+lyfts inte).
+
+### Test-author 2026-09-10 — baslinje RED för v2.4 (före produkt)
+Kommando (arbetsyta HEAD `bd8c0a2f` = 332f07ce + grind v2.4 + detta dokument utan detta avsnitt; hållna grindar ur
+subjektets byte-identiska kopior; eget `TMPDIR`):
+`python3.12 verify/bin/platform-separation-final-exit --subject <arbetsyta>` → exit **1**,
+`RED_LOCAL_QUALIFICATION`, **52 PASS / 36 FAIL** (88 rader), result.json sha256
+`ad9aa6288d1f165d8d529ed211776b1b22982105672439544d54c8dd9deaa5c2`. Röda och gröna rader identiska med v2.3
+(F6 grön: attest/cli är byte-lik basen; F7: control-set 68/68, launch-cwd 19/20, governance 68/70 exakt g6/g7).
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
