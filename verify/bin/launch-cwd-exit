@@ -1,0 +1,665 @@
+#!/usr/bin/env python3.12
+"""LOCAL_ONLY launch worker-cwd qualification; never a scheduler/H036/H035/resume verdict.
+
+`controller/launch/cli run <workspace> <kuvert> <timeout> -- <cmd>` must execute <cmd>
+with its current working directory equal to the resolved workspace, regardless of the
+caller's cwd. MEASURED 2026-09-10 on 383ed387: the target inherits the CALLER's cwd
+(launch/cli spawns the supervisor without cwd, the supervisor spawns the confined helper
+without cwd, confined-exec-v1 execs without chdir). In the ordinary chain
+(loop -> brytare -> utforare -> launch) a worker that writes relative paths therefore
+writes into the loop's cwd (the live checkout, where Seatbelt denies) instead of the
+workspace, and never produces a candidate.
+
+The gate exercises the real launcher, the real chain (`controller/loop/cli run`) and the
+real Seatbelt confinement in disposable Git replicas of --subject HEAD, from caller cwds
+that are scratch directories, deleted, unwritable, or the replica's own live checkout.
+No historical gate, provider, build, publication or resume is executed.
+"""
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+PYTHON = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+PYTHON_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+NODE = "/opt/homebrew/opt/node@22/bin/node"
+SANDBOX_EXEC = "/usr/bin/sandbox-exec"
+GATE = "verify/bin/launch-cwd-exit"
+LAUNCH_CLI = "controller/launch/cli"
+RUNTIME_HELPER = "controller/launch/runtime_snapshot.py"
+UTFORARE_CLI = "controller/utforare/cli"
+BRYTARE_CLI = "controller/brytare/cli"
+LOOP_CLI = "controller/loop/cli"
+VERIFY_CLI = "controller/verify/cli"
+REGISTER = "controller/verify/register.json"
+VERIFIER = "scripts/check-invariants.mjs"
+SUBJECT_FILES = (LAUNCH_CLI, RUNTIME_HELPER, UTFORARE_CLI, BRYTARE_CLI, LOOP_CLI)
+# Human-hand proposals (held bytes) make the replica's control set start; see
+# docs/loop/platform-control-set-local-development.md. They are copied into fixtures only.
+PROPOSAL_MJS = "SEPARATION-20260910/proposed/scripts-check-invariants.mjs"
+PROPOSAL_REGISTER = "SEPARATION-20260910/proposed/controller-verify-register.json"
+H036_GATE = "verify/bin/h-036-exit"
+# verify/bin/** at the contract's base commit: every file there must stay byte-identical.
+FROZEN_BASE = "383ed3873105d77fd1129d74abf408092e0ff2f3"
+FIXTURE_TASK = "p-fixture"
+FIXTURE_GATE = "verify/bin/p-fixture-exit"
+FIXTURE_DIR = "tests/launch-cwd-fixture"
+FIXTURE_FILE = FIXTURE_DIR + "/out.txt"
+FIXTURE_WRITE = FIXTURE_DIR + "/**"
+FIXTURE_GATE_TEXT = ("#!/usr/bin/env bash\n# LOCAL_ONLY fixture task gate: judges the candidate view it is started in.\n"
+                     "set -u\n[ -d controller ] && [ -f specs/tasks.spec.json ] || exit 1\nexit 0\n")
+# The worker under test: RELATIVE paths only, no cd, no absolute path, never touches git.
+WORKER_RELATIVE = ("#!/bin/sh\n# LOCAL_ONLY stub worker: relative write inside allowed_write, nothing else.\n"
+                   "mkdir -p " + FIXTURE_DIR + " || exit 3\n"
+                   "printf 'kandidat\\n' > " + FIXTURE_FILE + " || exit 3\n"
+                   "printf 'redigerade " + FIXTURE_FILE + "\\n'\n")
+# Policy control: an ABSOLUTE write outside allowed_write, independent of the cwd defect. The
+# path lies in a whitelisted tree (tests/): the repository .gitignore is a whitelist (`/*` with
+# `!` exceptions), so a root-level file would be ignored and never reach utforare or policy.
+OUTSIDE_FILE = "tests/launch-cwd-utanfor.txt"
+WORKER_OUTSIDE = ("#!/bin/sh\n# LOCAL_ONLY stub worker: absolute write OUTSIDE allowed_write.\n"
+                  "printf 'utanfor\\n' > {workspace}/" + OUTSIDE_FILE + " || exit 3\n"
+                  "printf 'redigerade " + OUTSIDE_FILE + "\\n'\n")
+# Direct-launch target: reports its physical cwd, then writes a relative file.
+TARGET_MARK = "#!/bin/sh\npwd -P || exit 3\nmkdir -p mark || exit 3\nprintf 'mark\\n' > mark/out.txt || exit 3\n"
+TARGET_ENV = ("import os,json\n"
+              "print(json.dumps({'cwd': os.getcwd(), 'path': os.environ.get('PATH'),"
+              " 'kuvert': os.environ.get('NORTROPIC_KUVERT'),"
+              " 'stripped': [k for k in os.environ if k.startswith(('GH_','GITHUB_','SLACK_','GIT_','DYLD_','PYTHON'))],"
+              " 'home': 'HOME' in os.environ}, sort_keys=True))\n")
+TARGET_DENIAL = ("import os,sys,json\n"
+                 "out={}\n"
+                 "for name,p in json.loads(sys.argv[1]).items():\n"
+                 "    try:\n"
+                 "        fd=os.open(p, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600); os.close(fd); out[name]=0\n"
+                 "    except OSError as e:\n"
+                 "        out[name]=e.errno\n"
+                 "out['cwd']=os.getcwd()\n"
+                 "print(json.dumps(out, sort_keys=True))\n")
+LEASE_RESOURCE = "launch-cwd-fixture"
+H036_PARENT = Path("/private/tmp")
+H036_PREFIX = ".nortropic-h036-runtime-"
+COMMIT_FORM = re.compile(r"^[0-9a-f]{40}$")
+SHA256_FORM = re.compile(r"^[0-9a-f]{64}$")
+EPERM = 1
+
+
+class Rig(RuntimeError):
+    pass
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def strict(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON member " + repr(key))
+            result[key] = value
+        return result
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+class Bench:
+    """Scratch root, closed child environment and pinned tool resolver (python3.12/node by PATH)."""
+
+    def __init__(self, scratch):
+        self.scratch = scratch
+        self.resolver = scratch / "resolver"
+        self.home = scratch / "home"
+        self.xdg = scratch / "xdg"
+        self.template = scratch / "empty-template"
+        for d in (self.resolver, self.home, self.xdg, self.template):
+            d.mkdir(mode=0o700)
+        (self.resolver / "python3.12").symlink_to(PYTHON)
+        (self.resolver / "node").symlink_to(NODE)
+
+    def env(self, tmpdir, extra=None):
+        e = {
+            "HOME": str(self.home), "XDG_CONFIG_HOME": str(self.xdg),
+            "PATH": str(self.resolver) + ":/usr/bin:/bin",
+            "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+            "TMPDIR": str(tmpdir), "DARWIN_USER_TEMP_DIR": str(tmpdir),
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+            "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "cat",
+            "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1", "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_AUTHOR_NAME": "Local fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "Local fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            # Canaries for the launcher's environment stripping (bound as an effect below).
+            "GH_TOKEN": "fixture-gh", "GITHUB_TOKEN": "fixture-github", "SLACK_TOKEN": "fixture-slack",
+            "PROVIDER_CALL_ALLOWED": "NO", "MODEL_CALL_ALLOWED": "NO",
+        }
+        if extra:
+            e.update(extra)
+        return e
+
+    def tmp(self, name):
+        p = self.scratch / ("tmp-" + name)
+        p.mkdir(mode=0o700)
+        return p
+
+
+def run(argv, cwd, env, timeout=120, stdin=None):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                          text=True, timeout=timeout, check=False, input=stdin)
+
+
+def run_bytes(argv, cwd, env, timeout=120):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                          timeout=timeout, check=False, stdin=subprocess.DEVNULL)
+
+
+def git_raw(root, env, *args, stdin=None):
+    return run([GIT, "-c", "core.hooksPath=/dev/null", *args], root, env, stdin=stdin)
+
+
+def git(root, env, *args, stdin=None):
+    r = git_raw(root, env, *args, stdin=stdin)
+    if r.returncode:
+        raise Rig("fixture Git failed: " + " ".join(args) + ": " + r.stderr.strip())
+    return r.stdout.strip()
+
+
+def write(path, data, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    with path.open("xb") as stream:
+        stream.write(data)
+    path.chmod(mode)
+
+
+def replica(bench, name, source, candidate_sha):
+    """git init with an empty template + local-only exact-SHA fetch + detached checkout."""
+    repo = bench.scratch / ("replica-" + name)
+    repo.mkdir(mode=0o755)
+    env = bench.env(bench.tmp("git-" + name))
+    for command in (
+        ("init", "--quiet", f"--template={bench.template}"),
+        ("config", "--local", "--replace-all", "core.repositoryformatversion", "0"),
+        ("config", "--local", "--replace-all", "core.filemode", "true"),
+        ("config", "--local", "--replace-all", "core.bare", "false"),
+        ("config", "--local", "--replace-all", "core.logallrefupdates", "false"),
+        ("config", "--local", "--replace-all", "core.ignorecase", "true"),
+        ("config", "--local", "--replace-all", "core.precomposeunicode", "true"),
+        ("config", "--local", "--replace-all", "core.hooksPath", "/dev/null"),
+        ("config", "--local", "--replace-all", "gc.auto", "0"),
+        ("config", "--local", "--replace-all", "maintenance.auto", "false"),
+        ("config", "--local", "--replace-all", "fetch.writeCommitGraph", "false"),
+        ("config", "--local", "--replace-all", "pack.writeReverseIndex", "false"),
+        ("config", "--local", "--replace-all", "protocol.file.allow", "never"),
+        ("-c", "protocol.file.allow=always", "-c", "fetch.unpackLimit=1",
+         "fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
+         str(source), candidate_sha),
+        ("checkout", "--detach", "--quiet", candidate_sha),
+    ):
+        r = run([GIT, *command], repo, env)
+        if r.returncode or r.stdout or r.stderr:
+            raise Rig("replica construction " + repr(command) + ": " + (r.stderr or r.stdout))
+    if git(repo, env, "rev-parse", "HEAD") != candidate_sha or git(repo, env, "status", "--porcelain"):
+        raise Rig("replica does not reproduce the candidate: " + name)
+    return repo, env
+
+
+def overlay(repo, env, files, message="local fixture overlay"):
+    for rel, (data, mode) in files.items():
+        p = repo / rel
+        if p.exists() or p.is_symlink():
+            p.unlink()
+        write(p, data, mode)
+    git(repo, env, "add", "-A", "--", *files)
+    if git_raw(repo, env, "diff", "--cached", "--quiet").returncode != 0:
+        git(repo, env, "commit", "--quiet", "--no-gpg-sign", "-m", message)
+    if git(repo, env, "status", "--porcelain"):
+        raise Rig("overlay left the replica dirty")
+    return git(repo, env, "rev-parse", "HEAD")
+
+
+def tree_state(root):
+    result = []
+    for p in [root] + sorted(root.rglob("*")):
+        rel = p.relative_to(root).as_posix()
+        st = p.lstat()
+        if stat.S_ISLNK(st.st_mode):
+            value = os.readlink(p)
+        elif stat.S_ISREG(st.st_mode):
+            value = sha(p.read_bytes())
+        elif stat.S_ISDIR(st.st_mode):
+            value = "directory"
+        else:
+            value = "special"
+        result.append((rel, stat.S_IMODE(st.st_mode), value))
+    return result
+
+
+def h036_roots():
+    try:
+        return sorted(n for n in os.listdir(H036_PARENT) if n.startswith(H036_PREFIX))
+    except OSError:
+        return None
+
+
+def launch_success(result):
+    """Launcher success = rc 0 and empty stderr; returns the target's stdout bytes, else None."""
+    if result.returncode != 0 or result.stderr:
+        return None
+    return result.stdout
+
+
+def first_line(raw):
+    lines = raw.decode("utf-8", "replace").splitlines()
+    return lines[0] if lines else ""
+
+
+def json_line(raw):
+    try:
+        obj = strict(first_line(raw))
+    except ValueError:
+        return None
+    return obj if type(obj) is dict else None
+
+
+def register_with_fixture_gate(register_raw, gate_sha):
+    data = strict(register_raw)
+    data["verifiers"][FIXTURE_TASK] = {
+        "path": FIXTURE_GATE, "sha256": gate_sha, "runner": "bash", "startbar": True,
+        "beskrivning": "LOCAL_ONLY fixture task gate registered by " + GATE,
+    }
+    return (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def fixture_spec(path):
+    write(path, json.dumps({
+        "spec_version": "2.0.0", "defaults": {"denied_write": []},
+        "tasks": [{
+            "id": FIXTURE_TASK, "authority_class": "ordinary", "title": "launch cwd fixture task",
+            "summary": "LOCAL_ONLY fixture: edit one file under " + FIXTURE_DIR + "/ by RELATIVE path.",
+            "exit_criterion": FIXTURE_FILE + " exists in the candidate.",
+            "allowed_write": [FIXTURE_WRITE], "owner_author_allowed_write": [], "docs_impact": [],
+            "depends_on": [], "exit_test": FIXTURE_GATE, "max_changed_files": 5, "max_added_lines": 20,
+        }],
+    }, ensure_ascii=False, indent=1) + "\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--subject", type=Path, default=ROOT)
+    args = parser.parse_args()
+    subject = args.subject.resolve()
+    if sys.version_info[:2] != (3, 12) or sha(Path(PYTHON).read_bytes()) != PYTHON_SHA:
+        raise Rig("pinned Python 3.12 required")
+    for tool in (GIT, NODE, SANDBOX_EXEC):
+        if not Path(tool).is_file() or not os.access(tool, os.X_OK):
+            raise Rig("pinned tool unavailable: " + tool)
+    for rel in SUBJECT_FILES + (VERIFY_CLI, REGISTER):
+        p = subject / rel
+        if not p.is_file() or p.is_symlink():
+            raise Rig("subject file missing or not regular: " + rel)
+    for rel in (PROPOSAL_MJS, PROPOSAL_REGISTER, H036_GATE, GATE):
+        if not (ROOT / rel).is_file():
+            raise Rig("held file missing: " + rel)
+    subject_sha = {rel: sha((subject / rel).read_bytes()) for rel in SUBJECT_FILES}
+    held = {rel: sha((ROOT / rel).read_bytes()) for rel in (GATE, H036_GATE, PROPOSAL_MJS, PROPOSAL_REGISTER)}
+    proposal_mjs = (ROOT / PROPOSAL_MJS).read_bytes()
+    proposal_register = (ROOT / PROPOSAL_REGISTER).read_bytes()
+    scratch = Path(tempfile.mkdtemp(prefix="launch-cwd-local-")).resolve()
+    print("FIXTURE_ROOT=" + str(scratch), flush=True)
+    bench = Bench(scratch)
+    probe_env = bench.env(bench.tmp("probe"))
+    head_probe = run([GIT, "-C", str(subject), "rev-parse", "--verify", "HEAD^{commit}"], scratch, probe_env)
+    if head_probe.returncode or not COMMIT_FORM.fullmatch(head_probe.stdout.strip()):
+        raise Rig("subject HEAD unavailable: " + head_probe.stderr.strip())
+    head = head_probe.stdout.strip()
+    if run([GIT, "-C", str(subject), "cat-file", "-e", FROZEN_BASE + "^{commit}"], scratch, probe_env).returncode:
+        raise Rig("frozen base " + FROZEN_BASE + " is not in the subject's history")
+    if run([GIT, "-C", str(subject), "status", "--porcelain", "--", *SUBJECT_FILES], scratch, probe_env).stdout.strip():
+        raise Rig("subject product files are not committed at HEAD; the replica would not carry them")
+    h036_start = h036_roots()
+    if h036_start is None:
+        raise Rig("cannot enumerate " + str(H036_PARENT))
+    rows = []
+
+    def check(label, passed, detail=""):
+        rows.append({"label": label, "pass": bool(passed), "detail": str(detail)[-700:]})
+        print(("PASS " if passed else "FAIL ") + label, flush=True)
+
+    # ------------------------------------------------------------------ launch replica (direct rows)
+    rep, rep_env = replica(bench, "subject-launch", subject, head)
+    if any(sha((rep / rel).read_bytes()) != subject_sha[rel] for rel in SUBJECT_FILES):
+        raise Rig("replica product bytes differ from subject")
+    cli = rep / LAUNCH_CLI
+    fx = bench.tmp("launch-fixtures")
+    kuvert = fx / "kuvert.json"
+    write(kuvert, json.dumps({"task_id": "launch-cwd-fixture", "spec_sha256": "local-fixture"}) + "\n")
+    target_mark = fx / "mark.sh"
+    write(target_mark, TARGET_MARK, 0o755)
+    launch_env = bench.env(bench.tmp("launch-env"))
+
+    def new_ws(name):
+        ws = (fx / ("ws-" + name)).resolve()
+        ws.mkdir(mode=0o755)
+        return ws
+
+    def launch(ws, cwd, command, timeout="20", extra_env=None, outer=90):
+        env = dict(launch_env)
+        if extra_env:
+            env.update(extra_env)
+        return subprocess.run([PYTHON, "-I", "-S", "-B", str(cli), "run", str(ws), str(kuvert), timeout, "--", *command],
+                              cwd=str(cwd), env=env, capture_output=True, timeout=outer, check=False,
+                              stdin=subprocess.DEVNULL)
+
+    def mark_ok(ws, result):
+        out = launch_success(result)
+        return (out is not None and first_line(out) == str(ws)
+                and (ws / "mark/out.txt").is_file() and (ws / "mark/out.txt").read_bytes() == b"mark\n")
+
+    def detail_of(ws, result, caller):
+        return (f"rc={result.returncode} stdout={result.stdout[:160]!r} stderr={result.stderr[-160:]!r} "
+                f"ws_has_mark={(ws / 'mark/out.txt').exists()} caller_has_mark={(Path(caller) / 'mark/out.txt').exists()}")
+
+    # canaries: a fault and a classified anropsfel are never launch success
+    fault = run_bytes([PYTHON, "-B", "-c", "raise NameError('fixture-canary')"], scratch, probe_env)
+    check("canary_traceback_is_not_launch_success", fault.returncode != 0 and launch_success(fault) is None)
+    ws = new_ws("canary")
+    bad = subprocess.run([PYTHON, "-I", "-S", "-B", str(cli), "run", str(ws), str(fx / "absent.json"), "20", "--", str(target_mark)],
+                         cwd=str(scratch), env=launch_env, capture_output=True, timeout=90, check=False, stdin=subprocess.DEVNULL)
+    check("canary_launch_anropsfel_is_not_launch_success",
+          bad.returncode == 1 and bad.stdout.startswith(b"anropsfel") and launch_success(bad) is None and not (ws / "mark").exists(),
+          f"rc={bad.returncode} {bad.stdout[:120]!r}")
+
+    # A1/A2: caller cwd is a scratch directory
+    ws = new_ws("scratch-caller")
+    caller = fx / "caller-scratch"
+    caller.mkdir(mode=0o755)
+    before = tree_state(caller)
+    r = launch(ws, caller, [str(target_mark)])
+    check("launch_target_cwd_is_workspace_from_scratch_caller_cwd", mark_ok(ws, r), detail_of(ws, r, caller))
+    check("launch_scratch_caller_cwd_receives_nothing", tree_state(caller) == before, detail_of(ws, r, caller))
+
+    # A3: caller cwd deleted before the launcher starts (a wrapper chdirs, rmdirs, then execs the launcher)
+    ws = new_ws("deleted-caller")
+    gone = fx / "caller-deleted"
+    gone.mkdir(mode=0o755)
+    wrapper = "import os,sys\nos.chdir(sys.argv[1]); os.rmdir(sys.argv[1]); os.execv(sys.argv[2], sys.argv[2:])\n"
+    r = subprocess.run([PYTHON, "-B", "-c", wrapper, str(gone), PYTHON, "-I", "-S", "-B", str(cli), "run", str(ws), str(kuvert), "20", "--", str(target_mark)],
+                       cwd=str(scratch), env=launch_env, capture_output=True, timeout=90, check=False, stdin=subprocess.DEVNULL)
+    check("launch_target_cwd_is_workspace_when_caller_cwd_deleted", mark_ok(ws, r) and not gone.exists(),
+          detail_of(ws, r, scratch) + f" gone_exists={gone.exists()}")
+
+    # A4: caller cwd unwritable (0500)
+    ws = new_ws("ro-caller")
+    ro = fx / "caller-unwritable"
+    ro.mkdir(mode=0o755)
+    ro.chmod(0o500)
+    try:
+        (ro / "probe").write_text("x")
+        ro_unwritable = False
+        (ro / "probe").unlink()
+    except OSError:
+        ro_unwritable = True
+    before = tree_state(ro)
+    r = launch(ws, ro, [str(target_mark)])
+    after = tree_state(ro)
+    ro.chmod(0o755)
+    check("launch_target_cwd_is_workspace_when_caller_cwd_unwritable",
+          ro_unwritable and mark_ok(ws, r) and after == before,
+          detail_of(ws, r, ro) + f" ro_unwritable={ro_unwritable}")
+
+    # D3: the frozen h-036 gate's own invocation form (cwd == workspace) keeps working
+    ws = new_ws("h036-form")
+    r = launch(ws, ws, [str(target_mark)])
+    check("launch_with_caller_cwd_equal_to_workspace_unchanged", mark_ok(ws, r), detail_of(ws, r, ws))
+
+    # C2: Seatbelt still denies explicit writes to the live root / trust root when the caller cwd IS the live root
+    ws = new_ws("denial")
+    trust = fx / "trust-root"
+    trust.mkdir(mode=0o755)
+    targets = {"live_root": str(rep / "launch-cwd-denied.txt"), "live_tests": str(rep / "tests/launch-cwd-denied.txt"),
+               "trust_root": str(trust / "denied.txt"), "workspace": str(ws / "allowed.txt")}
+    before_rep = git(rep, rep_env, "status", "--porcelain")
+    r = launch(ws, rep, [PYTHON, "-I", "-S", "-B", "-c", TARGET_DENIAL, json.dumps(targets)],
+               extra_env={"NORTROPIC_TRUST_ROOT": str(trust)})
+    out = launch_success(r)
+    obj = json_line(out) if out is not None else None
+    denied = (obj is not None and obj.get("live_root") == EPERM and obj.get("live_tests") == EPERM
+              and obj.get("trust_root") == EPERM and obj.get("workspace") == 0
+              and not Path(targets["live_root"]).exists() and not Path(targets["live_tests"]).exists()
+              and not Path(targets["trust_root"]).exists() and (ws / "allowed.txt").is_file()
+              and git(rep, rep_env, "status", "--porcelain") == "" and before_rep == "")
+    for rel in ("live_root", "live_tests"):
+        p = Path(targets[rel])
+        if p.exists():
+            p.unlink()
+    check("seatbelt_denies_explicit_live_and_trust_writes_from_live_root_caller_cwd", denied,
+          f"rc={r.returncode} {r.stdout[:200]!r} {r.stderr[-120:]!r}")
+
+    # C3: environment stripping and the closed target PATH are preserved
+    ws = new_ws("env")
+    r = launch(ws, scratch, [PYTHON, "-I", "-S", "-B", "-c", TARGET_ENV])
+    out = launch_success(r)
+    obj = json_line(out) if out is not None else None
+    check("launch_env_stripping_and_closed_path_preserved",
+          obj is not None and obj.get("stripped") == [] and obj.get("path") == "/usr/bin:/bin"
+          and isinstance(obj.get("kuvert"), str) and obj.get("kuvert") and obj.get("home") is True,
+          f"rc={r.returncode} {r.stdout[:200]!r} {r.stderr[-120:]!r}")
+
+    # C4: a workspace overlapping the live root is still refused before any target starts
+    r = launch(rep / "tests", scratch, [str(target_mark)])
+    check("launch_workspace_overlapping_live_root_still_refused",
+          r.returncode == 3 and b"launch_failed" in r.stdout and not (rep / "tests/mark").exists()
+          and git(rep, rep_env, "status", "--porcelain") == "",
+          f"rc={r.returncode} {r.stdout[:160]!r}")
+
+    # ------------------------------------------------------------------ chain replicas (loop -> brytare -> utforare -> launch)
+    def chain_replica(name):
+        repo, env = replica(bench, name, subject, head)
+        register = register_with_fixture_gate(proposal_register, sha(FIXTURE_GATE_TEXT.encode()))
+        base = overlay(repo, env, {VERIFIER: (proposal_mjs, 0o644), REGISTER: (register, 0o644),
+                                   FIXTURE_GATE: (FIXTURE_GATE_TEXT, 0o755)},
+                       message="apply held proposals and register LOCAL_ONLY fixture task gate")
+        tmp = bench.tmp(name)
+        env = bench.env(tmp)
+        spec_path = tmp / "spec.json"
+        fixture_spec(spec_path)
+        return repo, tmp, env, base, spec_path, sha(register)
+
+    def loop_config(repo, tmp, env, base, spec_path, worker_text):
+        state = tmp / "state"
+        r = run([repo / "controller/state/cli", "init", state], scratch, env)
+        if r.returncode:
+            raise Rig("state init failed: " + r.stderr)
+        (tmp / "workspaces").mkdir()
+        run_id = "lcw-" + tmp.name
+        attempt_ws = tmp / "workspaces" / f"{run_id}-{FIXTURE_TASK}-1"
+        worker = tmp / "worker.sh"
+        write(worker, worker_text.format(workspace=str(attempt_ws)), 0o700)
+        cfg = tmp / "config.json"
+        write(cfg, json.dumps({
+            "spec": str(spec_path), "attest_dir": str(tmp / "attest"), "state_dir": str(state),
+            "lease_dir": str(tmp / "lease"), "lease_resurs": LEASE_RESOURCE, "workspace_rot": str(tmp / "workspaces"),
+            "brytare_rot": str(tmp / "breaker"), "base_sha": base, "verifier_id": "check-invariants",
+            "run_id": run_id, "worker_cmd": [str(worker)], "timeout_s": 60,
+            "budget": 1, "troskel": 2}, indent=1) + "\n")
+        return cfg
+
+    def run_loop(repo, env, cfg, cwd, timeout=600):
+        proc = subprocess.Popen([str(repo / LOOP_CLI), "run", str(cfg)], cwd=str(cwd), env=env, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
+                                stdin=subprocess.DEVNULL)
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                out, err = proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGKILL)
+                out, err = proc.communicate()
+            err += "\nGATE: loop killed after timeout"
+        return proc.returncode, out, err
+
+    def lease_free(repo, tmp, env):
+        r = run([repo / "controller/lease/cli", tmp / "lease", "owner", LEASE_RESOURCE], scratch, env)
+        return r.returncode != 0 and r.stdout.strip() == "" and not (tmp / "lease" / (LEASE_RESOURCE + ".lease")).exists()
+
+    def attestation(tmp):
+        path = tmp / "attest" / "attestations.json"
+        try:
+            if path.is_file():
+                return strict(path.read_bytes())["attestations"].get(FIXTURE_TASK)
+        except (ValueError, KeyError, TypeError):
+            return None
+        return None
+
+    def candidate_has_fixture(repo, env, base, att):
+        if type(att) is not dict or not COMMIT_FORM.fullmatch(str(att.get("candidate_sha", ""))):
+            return False
+        cand = att["candidate_sha"]
+        show = git_raw(repo, env, "show", "-s", "--format=%an", cand)
+        blob = git_raw(repo, env, "show", f"{cand}:{FIXTURE_FILE}")
+        parent = git_raw(repo, env, "rev-parse", f"{cand}^")
+        return (show.returncode == 0 and show.stdout.strip() == "nortropic-utforare"
+                and blob.returncode == 0 and blob.stdout == "kandidat\n"
+                and parent.stdout.strip() == base
+                and att.get("grind_id") == FIXTURE_TASK and att.get("grind_sha256") == sha(FIXTURE_GATE_TEXT.encode())
+                and att.get("stale") is False)
+
+    def clean_after(repo, tmp, env, base):
+        return (lease_free(repo, tmp, env) and not any((tmp / "workspaces").iterdir())
+                and not [p for p in tmp.iterdir() if p.name.startswith("nortropic-loop-")]
+                and git(repo, env, "status", "--porcelain") == "" and git(repo, env, "rev-parse", "HEAD") == base
+                and git(repo, env, "worktree", "list", "--porcelain").count("worktree ") == 1)
+
+    # precondition: the chain replica's control set starts (preflight + task lookup)
+    repo, tmp, env, base, spec_path, register_sha = chain_replica("chain-scratch-cwd")
+    r = run([repo / VERIFY_CLI, "preflight"], scratch, env)
+    pre_ok = r.returncode == 0 and r.stderr == "" and r.stdout.count("\n") == 1
+    try:
+        pre_ok = pre_ok and strict(r.stdout) == {"status": "ok", "register_sha256": register_sha}
+    except ValueError:
+        pre_ok = False
+    r2 = run([repo / VERIFY_CLI, "task", register_sha, spec_path, FIXTURE_TASK], scratch, env)
+    try:
+        task_ok = r2.returncode == 0 and strict(r2.stdout) == {
+            "status": "grindad", "grind_id": FIXTURE_TASK, "grind_sha256": sha(FIXTURE_GATE_TEXT.encode()),
+            "register_sha256": register_sha}
+    except ValueError:
+        task_ok = False
+    chain_ready = pre_ok and task_ok
+    check("chain_replica_preflight_and_fixture_task_lookup_ok", chain_ready,
+          (r.stderr or r.stdout)[-200:] + (r2.stderr or r2.stdout)[-200:])
+
+    # B1/B2: loop started from a scratch caller cwd; worker writes a RELATIVE path
+    caller = tmp / "caller-scratch"
+    caller.mkdir(mode=0o755)
+    cfg = loop_config(repo, tmp, env, base, spec_path, WORKER_RELATIVE)
+    before = tree_state(caller)
+    rc, out, err = run_loop(repo, env, cfg, caller) if chain_ready else (None, "", "chain not ready")
+    att = attestation(tmp)
+    check("loop_from_scratch_caller_cwd_attests_relative_write_in_candidate",
+          chain_ready and rc == 0 and "drain klar: 1 varv, 1 attesterade" in out and candidate_has_fixture(repo, env, base, att)
+          and clean_after(repo, tmp, env, base),
+          f"rc={rc} " + (out + err)[-500:])
+    check("loop_scratch_caller_cwd_receives_nothing", chain_ready and tree_state(caller) == before,
+          "caller tree after: " + json.dumps([t[0] for t in tree_state(caller)])[:300])
+
+    # B3/B4: loop started from the replica's live checkout (the ordinary drift form)
+    repo, tmp, env, base, spec_path, _ = chain_replica("chain-live-cwd")
+    cfg = loop_config(repo, tmp, env, base, spec_path, WORKER_RELATIVE)
+    rc, out, err = run_loop(repo, env, cfg, repo) if chain_ready else (None, "", "chain not ready")
+    att = attestation(tmp)
+    live_clean = clean_after(repo, tmp, env, base) and not (repo / FIXTURE_DIR).exists()
+    check("loop_from_live_checkout_cwd_attests_relative_write_in_candidate",
+          chain_ready and rc == 0 and "drain klar: 1 varv, 1 attesterade" in out and candidate_has_fixture(repo, env, base, att)
+          and live_clean,
+          f"rc={rc} " + (out + err)[-500:])
+    check("loop_live_checkout_receives_nothing", chain_ready and rc == 0 and live_clean,
+          f"rc={rc} status={git_raw(repo, env, 'status', '--porcelain').stdout[:200]!r} fixture_dir={(repo / FIXTURE_DIR).exists()}")
+
+    # C1: policy still refuses a candidate outside allowed_write (absolute write, cwd-independent)
+    repo, tmp, env, base, spec_path, _ = chain_replica("chain-policy")
+    cfg = loop_config(repo, tmp, env, base, spec_path, WORKER_OUTSIDE)
+    rc, out, err = run_loop(repo, env, cfg, repo) if chain_ready else (None, "", "chain not ready")
+    att = attestation(tmp)
+    check("policy_still_refuses_absolute_write_outside_allowed_write",
+          chain_ready and rc == 0 and "avbrutet i policy" in out and "allowed_write" in out
+          and "0 attesterade" in out and att is None and clean_after(repo, tmp, env, base),
+          f"rc={rc} " + (out + err)[-500:])
+
+    # ------------------------------------------------------------------ frozen artifacts
+    problems = []
+    listing = git_raw(subject, probe_env, "ls-tree", FROZEN_BASE, "verify/bin/")
+    frozen = {}
+    for line in listing.stdout.splitlines():
+        meta, _, rel = line.partition("\t")
+        mode, _kind, oid = meta.split()
+        frozen[rel] = (mode, oid)
+    for rel, (mode, oid) in sorted(frozen.items()):
+        p = subject / rel
+        try:
+            st = p.lstat()
+            actual = git_raw(subject, probe_env, "hash-object", "--", str(p)).stdout.strip()
+            if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode) or actual != oid \
+                    or (mode == "100755") != bool(st.st_mode & stat.S_IXUSR):
+                problems.append(rel)
+        except OSError:
+            problems.append(rel)
+    extra = []
+    for p in sorted((subject / "verify/bin").iterdir()):
+        rel = "verify/bin/" + p.name
+        if rel in frozen:
+            continue
+        if rel == GATE:
+            if p.is_symlink() or not p.is_file() or sha(p.read_bytes()) != held[GATE]:
+                problems.append(rel + " (differs from held gate)")
+            continue
+        extra.append(rel)
+    check("frozen_verify_bin_identical_to_base_" + FROZEN_BASE[:8],
+          listing.returncode == 0 and len(frozen) >= 30 and not problems and not extra,
+          f"files={len(frozen)} problems={problems} extra={extra}")
+    check("h036_exit_byte_identical_to_held",
+          (subject / H036_GATE).is_file() and not (subject / H036_GATE).is_symlink()
+          and sha((subject / H036_GATE).read_bytes()) == held[H036_GATE], held[H036_GATE])
+
+    # ------------------------------------------------------------------ rig: residue and bytes
+    h036_end = h036_roots()
+    check("h036_runtime_roots_no_residue", h036_end == h036_start, f"before={h036_start} after={h036_end}")
+    check("subject_and_held_bytes_unchanged",
+          all(sha((subject / rel).read_bytes()) == digest for rel, digest in subject_sha.items())
+          and all(sha((ROOT / rel).read_bytes()) == digest for rel, digest in held.items()))
+    result = {"scope": "LOCAL_QUALIFICATION_ONLY", "subject": str(subject), "subject_head": head,
+              "frozen_base": FROZEN_BASE, "subject_sha256": subject_sha, "held_sha256": held,
+              "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
+              "sandbox_exec": SANDBOX_EXEC, "sandbox_exec_sha256": sha(Path(SANDBOX_EXEC).read_bytes()),
+              "fixture_root": str(scratch), "rows": rows, "pass": all(row["pass"] for row in rows)}
+    with (scratch / "result.json").open("x") as stream:
+        json.dump(result, stream, indent=2, ensure_ascii=False)
+    print("LAUNCH_CWD_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
+    return 0 if result["pass"] else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print("LAUNCH_CWD_RIG_ERROR=" + repr(exc), file=sys.stderr)
+        sys.exit(2)
