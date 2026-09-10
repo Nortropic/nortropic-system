@@ -488,5 +488,52 @@ platform-prepare/-check, selftest, publication-callers, loop-cli oförändrad, F
 grindar, EFTERARBETE append-only), F7 ×3 (control-set 68/68; launch-cwd 19/20 med exakt två extra grindar;
 governance 68/70 röd exakt på g6/g7 — deltan orsakas redan av grindens egen närvaro), F10 ×2.
 
+### Oberoende kontraktsgranskning nr 2 (på 4e139294) → v2.3
+Granskaren bekräftade satisfierbarhet (83/83) och 20/20 gamla mutanter, men fann sex nya luckor. v2.3 (grind
+sha256 `f9708786415c0d5f9db9c994a09964f92145b1d4636fb4261164e69e7f31a6dd`, commit `77a09be4`) lägger till:
+`f1_no_symlink_entries_at_head` (n13); exakt mängd {attest/cli: expected_refreeze, h038_proof} i stället för
+namnmönstret `refreeze|h03[5-9]` (n28); router-regeln över hela AGENTS.md + CLAUDE.md per stycke/listpunkt
+(n18b); hård ägarstoppsmängd även i supersessionsnoterna (n16); `../`-referenser utanför trädet är hängande
+(n12b); token `human_only` i text/JSON (n15). Kalibrering: `../` inuti en markdownlänk bedöms genom
+upplösningen (en `../loop/z.md`-länk som stannar i trädet är legitim); ordet "human-only" förblir undantaget.
+
+Referenskonstruktion v2.3 (scratch, förkastad; HEAD `444986f8…`, 143 filer; utöver v2.2: markörerna
+`fryst … inte dagens instruktion` i AGENTS.md:s Fasgränser- och Historik-stycken): fullkörning exit **0**,
+**84/84**, result.json sha256 `e4bf8967be7eefad7286b02e72998d3515b2f2efc32188741b1248bed676d09f`; control-set
+68/68 (47c354b2…), launch-cwd 19/20 (db438881…), governance 68/70 exakt {g6, g7} (e335e33b…), loopsvit 53 ok,
+trädklassning frozen 54 / partial 7 / local-development 6 / code 24 / test 16 / text 33 / binary 3, 0 träffar.
+
+Negativer mot v2.3 (58 st, statiskt `--skip-held-gates`, inga riggfel): test-authorns a–h fångade (rader som
+i v2.2, e dessutom `f1_no_blob…`); granskarens m0–m15 fångade (rader som i v2.2); granskarens n-serie:
+n01 kommentar i autopilot → `f4_autopilot_source_…`; n02 f-sträng → trädvid; n06 test-sh docs/07 → trädvid;
+n07/n07b ny skill-katalog / olänkad sidofil → slutning+skill-rad+trädvid / trädvid; n08 ny katalog under
+docs/loop → trädvid; n09/n09b ny fil under SEPARATION resp. proposed → trädvid / F6; n10/n11 webbvärde i
+owner-production-paths / provider-identity → slutning+dokumentrad+trädvid; n12 CLAUDE.md webbauktoritet →
+slutning+CLAUDE-rad+trädvid; **n12b** `../webb/…` → `f2_closure_all_active_references_…`; **n13** symlänk med
+frånvarande mål → `f1_no_symlink_entries_at_head`; n13b symlänk mot webbrepot → symlänkrad+slutning+dokumentrad;
+n14/n14b blobkopia under verify/ resp. controller/ → `f1_no_blob…`+F6 / `f1_no_blob…`+trädvid×2; **n15**
+`human_only`-fält i premiar → premiar-rad ×2 + trädvid människohand; **n16** hårt ägarstopp i v4.1-huvudet →
+`f2_historical_document_…_implementation_v4_1_md`; n18 plankopia lyft i Auktoritetsordning → routerraden;
+**n18b** plankopia lyft i annan sektion → routerraden; n19 zero-width i token → slutning (hängande); n22
+HTML-kommentar i docs/loop → trädvid; n24 controller/prompts/system.md → trädvid; n25 tests-json docs/05 →
+trädvid; n26/n26b funktion döpt h036_/refreeze_ → trädvid + `f4_autopilot_source_…`; n27 docstring injicerad
+i prompt → `f4_autopilot_source_…`; **n28** `h035_rules()` i policy-cli → trädvid.
+Missade, medvetet utanför omfång (står i Vad grinden inte bevisar): n03 `%`-splittring inuti ordet, n04 base64,
+n05 ny testfil som läser docs/05 (tester är fixturmedvetna), n20 worker-prompt läser `$HOME`-fil, n21 autopilot
+läser miljövariabelstyrd fil, n23 `.github/workflows/ci.yml` (ignoreras av vitlistan och blir aldrig spårad;
+tvingad spårning fångas av `f1_every_tracked_file_…`, mätt av granskaren som n23f).
+
+### Test-author 2026-09-10 — baslinje RED för v2.3 (före produkt)
+Kommando (arbetsyta HEAD `77a09be4` = 332f07ce + grind v2.3 + detta dokument utan detta avsnitt; hållna grindar
+ur subjektets byte-identiska kopior; eget `TMPDIR`):
+`python3.12 verify/bin/platform-separation-final-exit --subject <arbetsyta>` → exit **1**,
+`RED_LOCAL_QUALIFICATION`, **52 PASS / 36 FAIL** (88 rader), result.json sha256
+`2a9f3d4c005cb2c13c0335d6c654bcdbcf6866500ecac87ff7e7c4df0e27ff05`.
+Röda rader: samma 36 som v2.2 (F1 ×4, slutning, `f2_active_doc_…` ×9, trädvid ×2, router (nu även Fasgränser-
+stycket), substitutionskontraktet, historiska ×4, drift, F3 ×5, F4 ×5, F5 ×2, F8). Gröna: kanarier ×5,
+`f1_no_symlink_entries_at_head`, local-development-mängd, spec byte-lik, preflight, PINV 6/0, prepare/check,
+selftest, publication-callers, loop-cli, F6 ×3, F7 ×3 (control-set 68/68; launch-cwd 19/20; governance 68/70
+exakt g6/g7), F10 ×2.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
