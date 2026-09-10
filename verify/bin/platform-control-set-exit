@@ -1,0 +1,974 @@
+#!/usr/bin/env python3.12
+"""LOCAL_ONLY platform control-set qualification; never a scheduler/H035/resume verdict.
+
+After the 2026-09-10 repository split this repository holds only the business-
+neutral autonomy platform. The mandatory control set (verifier register, global
+verifier, pre-task authority snapshot, document authority) must work without any
+web file while every missing mandatory PLATFORM dependency still stops. This gate
+exercises the real `controller/verify/cli`, `controller/loop/cli` and the real
+imported autopilot callables of --subject in disposable Git replicas, and
+exercises the PROPOSED human-hand files (SEPARATION-20260910/proposed/) inside
+fixtures. No historical gate, provider, build, publication or resume is executed.
+"""
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+PYTHON = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+PYTHON_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+NODE = "/opt/homebrew/opt/node@22/bin/node"
+SANDBOX_EXEC = "/usr/bin/sandbox-exec"
+GATE = "verify/bin/platform-control-set-exit"
+PROPOSAL_MJS = "SEPARATION-20260910/proposed/scripts-check-invariants.mjs"
+PROPOSAL_REGISTER = "SEPARATION-20260910/proposed/controller-verify-register.json"
+VERIFY_CLI = "controller/verify/cli"
+LOOP_CLI = "controller/loop/cli"
+AUTOPILOT = "scripts/nortropic-codex-autopilot.py"
+VERIFIER = "scripts/check-invariants.mjs"
+REGISTER = "controller/verify/register.json"
+SPEC = "specs/tasks.spec.json"
+SUBJECT_FILES = (VERIFY_CLI, AUTOPILOT, VERIFIER, REGISTER)
+FROZEN_BASE = "dae90c8fffa7b33e46e61e81de96e89137ff7829"
+FROZEN_TREES = ("verify/h034", "verify/h039", "controller/h034-native",
+                "controller/runtime-cleanup", "controller/provenance")
+FROZEN_FILE_RE = re.compile(r"^verify/bin/h-0\d\d-exit$")
+INVARIANT_REQUIRED_GATE = "verify/bin/invariant-required-exit"
+SUBSTITUTION_CONTRACT = "docs/loop/harness-substitution-contract-v1.md"
+SUBSTITUTION_AUDIT = "docs/loop/harness-substitution-audit-2026-08-11.md"
+PLATFORM_DOCUMENTS = (
+    "AGENTS.md", "CLAUDE.md", "README.md", "docs/loop/regler.md", "docs/loop/byggplan-v3.md",
+    "docs/loop/drift.md", SUBSTITUTION_CONTRACT, SUBSTITUTION_AUDIT,
+    "docs/loop/owner-author-workflow-v1.md", "docs/loop/remaining-bootstrap-delegation-v1.md",
+    "docs/loop/codex-evidence-contract.md",
+)
+# The same platform set the proposed verifier binds (PINV-003); web trees never qualify.
+PLATFORM_PREFIXES = ("controller/", "verify/", "specs/", "config/", "docs/loop/", "tests/controller/", "tests/scripts/")
+PLATFORM_EXACT = {"controller", "verify", "specs", "config", "AGENTS.md", "CLAUDE.md", "README.md",
+                  VERIFIER, AUTOPILOT, "scripts/check-verifierarregistret.mjs"}
+WEB_ABSENT = ("docs/07-konstitution.md", "docs/03-regelverk.md", "docs/00-borja-har.md",
+              "docs/05-beslutslogg.md", "docs/agentoverlamning.md", "workflows", "agents", "skills",
+              "packs", "tests/fixtures", "AUTOPILOT")
+SNAPSHOT_REQUIRED = (REGISTER, VERIFY_CLI, VERIFIER, "config/managed-settings.json", SPEC, "docs/loop/regler.md")
+SNAPSHOT_TOP_ALLOWED = {"controller", "verify", "specs", "scripts", "config", "docs"}
+FIXTURE_TASK = "p-fixture"
+FIXTURE_GATE = "verify/bin/p-fixture-exit"
+FIXTURE_WRITE = "tests/platform-fixture/**"
+FIXTURE_FILE = "tests/platform-fixture/out.txt"
+FIXTURE_GATE_TEXT = ("#!/usr/bin/env bash\n# LOCAL_ONLY fixture task gate: judges the candidate view it is started in.\n"
+                     "set -u\n[ -d controller ] && [ -f specs/tasks.spec.json ] || exit 1\nexit 0\n")
+# MEASURED 2026-09-10: the H-036 launcher starts the target in the CALLER's cwd (the loop's
+# cwd, i.e. the live checkout), not in the workspace; confined-exec-v1 never chdirs. The stub
+# therefore addresses its per-attempt workspace by the loop's deterministic absolute path
+# <workspace_rot>/<run_id>-<task>-1 and never writes anywhere else. That launcher property is
+# outside this contract's product surface and is recorded in the development document.
+WORKER_TEMPLATE = ("#!/bin/sh\n# LOCAL_ONLY stub worker: edits one file inside allowed_write, never touches git.\n"
+                   "cd {workspace} || exit 3\n"
+                   "mkdir -p tests/platform-fixture && printf 'kandidat\\n' > tests/platform-fixture/out.txt && "
+                   "printf 'redigerade tests/platform-fixture/out.txt\\n'\n")
+LEASE_RESOURCE = "platform-fixture"
+H036_PARENT = Path("/private/tmp")
+H036_PREFIX = ".nortropic-h036-runtime-"
+SHA256_FORM = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_FORM = re.compile(r"^[0-9a-f]{40}$")
+DRIVER_MARK = "PLATFORM_CONTROL_SET_DRIVER="
+# Real module, real callables, never the operational __main__. Stop -> exit 7.
+DRIVER = (
+    "import importlib.util,sys,json\n"
+    "from pathlib import Path\n"
+    "subject=Path(sys.argv[1]); root=Path(sys.argv[2]); scenario=sys.argv[3]\n"
+    "s=importlib.util.spec_from_file_location('subject_autopilot', subject/'" + AUTOPILOT + "')\n"
+    "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
+    "out={'scenario':scenario}\n"
+    "try:\n"
+    "    if scenario=='ensure_substitution_authority':\n"
+    "        m.ensure_substitution_authority(root)\n"
+    "        out.update(outcome='returned')\n"
+    "    elif scenario=='selftest_none':\n"
+    "        m.selftest(None)\n"
+    "        out.update(outcome='returned')\n"
+    "    elif scenario=='canary_fault':\n"
+    "        raise NameError('fixture-canary')\n"
+    "    else:\n"
+    "        raise SystemExit(9)\n"
+    "except m.Stop as e:\n"
+    "    out.update(outcome='stop', message=str(e))\n"
+    "print('" + DRIVER_MARK + "'+json.dumps(out, ensure_ascii=False))\n"
+    "raise SystemExit(7 if out.get('outcome')=='stop' else 0)\n"
+)
+JOURNAL = ".git/nortropic-codex-autopilot/events.jsonl"
+
+
+class Rig(RuntimeError):
+    pass
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def strict(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON member " + repr(key))
+            result[key] = value
+        return result
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def is_platform_path(rel):
+    return rel in PLATFORM_EXACT or any(rel.startswith(p) for p in PLATFORM_PREFIXES)
+
+
+class Bench:
+    """Scratch root, closed child environment and pinned tool resolver."""
+
+    def __init__(self, scratch):
+        self.scratch = scratch
+        self.resolver = scratch / "resolver"
+        self.home = scratch / "home"
+        self.xdg = scratch / "xdg"
+        self.template = scratch / "empty-template"
+        for d in (self.resolver, self.home, self.xdg, self.template):
+            d.mkdir(mode=0o700)
+        (self.resolver / "python3.12").symlink_to(PYTHON)
+        (self.resolver / "node").symlink_to(NODE)
+
+    def env(self, tmpdir, extra=None):
+        e = {
+            "HOME": str(self.home), "XDG_CONFIG_HOME": str(self.xdg),
+            "PATH": str(self.resolver) + ":/usr/bin:/bin",
+            "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+            "TMPDIR": str(tmpdir), "DARWIN_USER_TEMP_DIR": str(tmpdir),
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+            "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "cat",
+            "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1", "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_AUTHOR_NAME": "Local fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "Local fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PROVIDER_CALL_ALLOWED": "NO", "MODEL_CALL_ALLOWED": "NO",
+        }
+        if extra:
+            e.update(extra)
+        return e
+
+    def tmp(self, name):
+        p = self.scratch / ("tmp-" + name)
+        p.mkdir(mode=0o700)
+        return p
+
+
+def run(argv, cwd, env, timeout=120, stdin=None):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                          text=True, timeout=timeout, check=False, input=stdin)
+
+
+def run_bytes(argv, cwd, env, timeout=120):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                          timeout=timeout, check=False)
+
+
+def git_raw(root, env, *args, stdin=None):
+    return run([GIT, "-c", "core.hooksPath=/dev/null", *args], root, env, stdin=stdin)
+
+
+def git(root, env, *args, stdin=None):
+    r = git_raw(root, env, *args, stdin=stdin)
+    if r.returncode:
+        raise Rig("fixture Git failed: " + " ".join(args) + ": " + r.stderr.strip())
+    return r.stdout.strip()
+
+
+def write(path, data, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    with path.open("xb") as stream:
+        stream.write(data)
+    path.chmod(mode)
+
+
+def json_ok(result):
+    """Exact one-line JSON dict on stdout with rc 0 and empty stderr, else None."""
+    if result.returncode != 0 or result.stderr:
+        return None
+    if not result.stdout.endswith("\n") or result.stdout.count("\n") != 1:
+        return None
+    try:
+        obj = strict(result.stdout)
+    except ValueError:
+        return None
+    return obj if type(obj) is dict else None
+
+
+def json_refusal(result):
+    """platform-prepare/check refusal: rc 4, empty stderr, exact refused JSON; returns reason or None."""
+    if result.returncode != 4 or result.stderr or result.stdout.count("\n") != 1:
+        return None
+    try:
+        obj = strict(result.stdout)
+    except ValueError:
+        return None
+    if type(obj) is not dict or set(obj) != {"status", "reason"} or obj["status"] != "refused":
+        return None
+    return obj["reason"]
+
+
+def driver_outcome(result):
+    """Exact driver outcome or None; a traceback/uncaught fault never counts."""
+    if result.stderr:
+        return None
+    lines = result.stdout.splitlines()
+    if not lines or not lines[-1].startswith(DRIVER_MARK):
+        return None
+    try:
+        obj = strict(lines[-1][len(DRIVER_MARK):])
+    except ValueError:
+        return None
+    if type(obj) is not dict or obj.get("outcome") not in ("returned", "stop"):
+        return None
+    if obj["outcome"] == "returned" and result.returncode != 0:
+        return None
+    if obj["outcome"] == "stop" and (result.returncode != 7 or type(obj.get("message")) is not str):
+        return None
+    return obj
+
+
+def replica(bench, name, source, candidate_sha):
+    """h-035 recipe: git init with an empty template + local-only exact-SHA fetch + detached checkout."""
+    repo = bench.scratch / ("replica-" + name)
+    repo.mkdir(mode=0o755)
+    env = bench.env(bench.tmp("git-" + name))
+    for command in (
+        ("init", "--quiet", f"--template={bench.template}"),
+        ("config", "--local", "--replace-all", "core.repositoryformatversion", "0"),
+        ("config", "--local", "--replace-all", "core.filemode", "true"),
+        ("config", "--local", "--replace-all", "core.bare", "false"),
+        ("config", "--local", "--replace-all", "core.logallrefupdates", "false"),
+        ("config", "--local", "--replace-all", "core.ignorecase", "true"),
+        ("config", "--local", "--replace-all", "core.precomposeunicode", "true"),
+        ("config", "--local", "--replace-all", "core.hooksPath", "/dev/null"),
+        ("config", "--local", "--replace-all", "gc.auto", "0"),
+        ("config", "--local", "--replace-all", "maintenance.auto", "false"),
+        ("config", "--local", "--replace-all", "fetch.writeCommitGraph", "false"),
+        ("config", "--local", "--replace-all", "pack.writeReverseIndex", "false"),
+        ("config", "--local", "--replace-all", "protocol.file.allow", "never"),
+        ("-c", "protocol.file.allow=always", "-c", "fetch.unpackLimit=1",
+         "fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
+         str(source), candidate_sha),
+        ("checkout", "--detach", "--quiet", candidate_sha),
+    ):
+        r = run([GIT, *command], repo, env)
+        if r.returncode or r.stdout or r.stderr:
+            raise Rig("replica construction " + repr(command) + ": " + (r.stderr or r.stdout))
+    if git(repo, env, "rev-parse", "HEAD") != candidate_sha or git(repo, env, "status", "--porcelain"):
+        raise Rig("replica does not reproduce the candidate: " + name)
+    return repo
+
+
+def overlay(repo, env, files, removals=(), message="local fixture overlay"):
+    """Write/replace files (rel -> (bytes, mode)), remove paths, commit on the detached HEAD."""
+    for rel, (data, mode) in files.items():
+        p = repo / rel
+        if p.exists() or p.is_symlink():
+            p.unlink()
+        write(p, data, mode)
+    for rel in removals:
+        p = repo / rel
+        if p.exists():
+            p.unlink()
+    paths = list(files) + list(removals)
+    git(repo, env, "add", "-A", "--", *paths)
+    # A subject that already carries the overlay bytes (proposals applied) needs no commit.
+    if git_raw(repo, env, "diff", "--cached", "--quiet").returncode != 0:
+        git(repo, env, "commit", "--quiet", "--no-gpg-sign", "-m", message)
+    if git(repo, env, "status", "--porcelain"):
+        raise Rig("overlay left the replica dirty")
+    return git(repo, env, "rev-parse", "HEAD")
+
+
+def mutated_commit(repo, env, tmpdir, rel, data):
+    """A commit whose tree is HEAD's tree with `rel` replaced by `data` (plumbing only)."""
+    blob = git(repo, env, "hash-object", "-w", "--stdin", stdin=data.decode("utf-8"))
+    index = tmpdir / ("index-" + sha(rel.encode())[:12])
+    ienv = dict(env, GIT_INDEX_FILE=str(index))
+    git(repo, ienv, "read-tree", "HEAD")
+    git(repo, ienv, "update-index", "--add", "--cacheinfo", f"100644,{blob},{rel}")
+    tree = git(repo, ienv, "write-tree")
+    return git(repo, env, "commit-tree", tree, "-p", "HEAD", "-m", "mutated " + rel)
+
+
+def tree_state(root, skip=()):
+    result = []
+    for p in [root] + sorted(root.rglob("*")):
+        rel = p.relative_to(root).as_posix()
+        if rel == ".git" or rel.startswith(".git/") or rel in skip:
+            continue
+        st = p.lstat()
+        if stat.S_ISLNK(st.st_mode):
+            value = os.readlink(p)
+        elif stat.S_ISREG(st.st_mode):
+            value = sha(p.read_bytes())
+        elif stat.S_ISDIR(st.st_mode):
+            value = "directory"
+        else:
+            value = "special"
+        result.append((rel, stat.S_IMODE(st.st_mode), value))
+    return result
+
+
+def journal_rows(repo):
+    path = repo / JOURNAL
+    if not path.exists():
+        return []
+    if path.is_symlink() or not path.is_file():
+        raise Rig("journal is not a regular file")
+    return [strict(line) for line in path.read_bytes().splitlines()]
+
+
+def h036_roots():
+    try:
+        names = sorted(n for n in os.listdir(H036_PARENT) if n.startswith(H036_PREFIX))
+    except OSError:
+        return None
+    return names
+
+
+def register_with_fixture_gate(register_raw, gate_sha):
+    data = strict(register_raw)
+    data["verifiers"][FIXTURE_TASK] = {
+        "path": FIXTURE_GATE, "sha256": gate_sha, "runner": "bash", "startbar": True,
+        "beskrivning": "LOCAL_ONLY fixture task gate registered by verify/bin/platform-control-set-exit",
+    }
+    return (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def fixture_spec(path):
+    write(path, json.dumps({
+        "spec_version": "2.0.0", "defaults": {"denied_write": []},
+        "tasks": [{
+            "id": FIXTURE_TASK, "authority_class": "ordinary", "title": "platform fixture task",
+            "summary": "LOCAL_ONLY fixture: edit one file under tests/platform-fixture/ without committing.",
+            "exit_criterion": "tests/platform-fixture/out.txt exists in the candidate.",
+            "allowed_write": [FIXTURE_WRITE], "owner_author_allowed_write": [], "docs_impact": [],
+            "depends_on": [], "exit_test": FIXTURE_GATE, "max_changed_files": 5, "max_added_lines": 20,
+        }],
+    }, ensure_ascii=False, indent=1) + "\n")
+
+
+def failing_ids(stdout):
+    ids = set()
+    summary = None
+    for line in stdout.splitlines():
+        m = re.match(r"^(PINV-\d{3}) ", line)
+        if m:
+            ids.add(m.group(1))
+        m = re.match(r"^(\d+) PASS, (\d+) FAIL, (\d+) overtradelser$", line)
+        if m:
+            summary = tuple(int(x) for x in m.groups())
+    return ids, summary
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--subject", type=Path, default=ROOT)
+    parser.add_argument("--skip-loop", action="store_true",
+                        help="skip the sandbox-exec dependent end-to-end loop row (row is then FAIL, never PASS)")
+    args = parser.parse_args()
+    subject = args.subject.resolve()
+    if sys.version_info[:2] != (3, 12) or sha(Path(PYTHON).read_bytes()) != PYTHON_SHA:
+        raise Rig("pinned Python 3.12 required")
+    for tool in (GIT, NODE):
+        if not Path(tool).is_file() or not os.access(tool, os.X_OK):
+            raise Rig("pinned tool unavailable: " + tool)
+    for rel in SUBJECT_FILES + (LOOP_CLI, SPEC, INVARIANT_REQUIRED_GATE):
+        p = subject / rel
+        if not p.is_file() or p.is_symlink():
+            raise Rig("subject file missing or not regular: " + rel)
+    for rel in (PROPOSAL_MJS, PROPOSAL_REGISTER):
+        if not (ROOT / rel).is_file():
+            raise Rig("held proposal missing: " + rel)
+    subject_sha = {rel: sha((subject / rel).read_bytes()) for rel in SUBJECT_FILES}
+    held = {rel: sha((ROOT / rel).read_bytes()) for rel in (GATE, PROPOSAL_MJS, PROPOSAL_REGISTER)}
+    proposal_mjs = (ROOT / PROPOSAL_MJS).read_bytes()
+    proposal_register = (ROOT / PROPOSAL_REGISTER).read_bytes()
+    scratch = Path(tempfile.mkdtemp(prefix="platform-control-set-local-")).resolve()
+    print("FIXTURE_ROOT=" + str(scratch), flush=True)
+    bench = Bench(scratch)
+    probe_env = bench.env(bench.tmp("probe"))
+    head_probe = run([GIT, "-C", str(subject), "rev-parse", "--verify", "HEAD^{commit}"], scratch, probe_env)
+    if head_probe.returncode or not COMMIT_FORM.fullmatch(head_probe.stdout.strip()):
+        raise Rig("subject HEAD unavailable: " + head_probe.stderr.strip())
+    head = head_probe.stdout.strip()
+    if run([GIT, "-C", str(subject), "cat-file", "-e", FROZEN_BASE + "^{commit}"], scratch, probe_env).returncode:
+        raise Rig("frozen base " + FROZEN_BASE + " is not in the subject's history")
+    if run([GIT, "-C", str(subject), "status", "--porcelain", "--", *SUBJECT_FILES], scratch, probe_env).stdout.strip():
+        raise Rig("subject product files are not committed at HEAD; the replica would not carry them")
+    rows = []
+
+    def check(label, passed, detail=""):
+        rows.append({"label": label, "pass": bool(passed), "detail": str(detail)[-700:]})
+        print(("PASS " if passed else "FAIL ") + label, flush=True)
+
+    # ------------------------------------------------------------------ canaries
+    fault = run([PYTHON, "-B", "-c", "raise NameError('fixture-canary')"], scratch, probe_env)
+    check("canary_traceback_is_not_outcome",
+          fault.returncode != 0 and json_ok(fault) is None and driver_outcome(fault) is None and json_refusal(fault) is None)
+    unknown = run([subject / VERIFY_CLI, "preflight", "extra-argument"], scratch, probe_env)
+    check("canary_verify_unknown_command_is_not_ok",
+          unknown.returncode == 3 and json_ok(unknown) is None and json_refusal(unknown) is None, unknown.stderr[-200:])
+    canary_repo = bench.scratch / "canary-repo"
+    canary_repo.mkdir()
+    git(canary_repo, probe_env, "init", "--quiet", f"--template={bench.template}")
+    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "unknown_scenario"], scratch, probe_env)
+    check("canary_driver_unknown_scenario_is_not_outcome", canary.returncode == 9 and driver_outcome(canary) is None)
+    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "canary_fault"], scratch, probe_env)
+    check("canary_driver_fault_is_not_outcome", canary.returncode not in (0, 7) and driver_outcome(canary) is None)
+
+    # ------------------------------------------------------------------ proposals (D1/D2)
+    try:
+        preg = strict(proposal_register)
+        verifiers = preg["verifiers"]
+        entry = verifiers.get("check-invariants")
+        proposal_ok = (
+            type(verifiers) is dict and len(verifiers) >= 1
+            and all(type(p) is dict and p.get("startbar") is True and p.get("runner") in ("node", "bash")
+                    and type(p.get("path")) is str and SHA256_FORM.fullmatch(str(p.get("sha256"))) for p in verifiers.values())
+            and entry is not None and entry["path"] == VERIFIER and entry["sha256"] == sha(proposal_mjs)
+            and entry["runner"] == "node"
+            and all(is_platform_path(p["path"]) for p in verifiers.values())
+            and "nortropic-verify-suite" not in verifiers
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        proposal_ok, entry = False, repr(exc)
+    check("proposal_register_strict_startbar_only_bound_to_proposal_verifier", proposal_ok, str(entry)[:300])
+
+    applied = replica(bench, "proposal-applied", subject, head)
+    applied_env = bench.env(bench.tmp("proposal-applied"))
+    overlay(applied, applied_env, {VERIFIER: (proposal_mjs, 0o644), REGISTER: (proposal_register, 0o644)},
+            message="apply human-hand proposals in fixture")
+    r = run([applied / VERIFY_CLI, "preflight"], scratch, applied_env)
+    obj = json_ok(r)
+    check("proposal_register_accepted_by_subject_preflight",
+          obj == {"status": "ok", "register_sha256": sha(proposal_register)}, r.stderr[-300:] or r.stdout[-300:])
+
+    # ------------------------------------------------------------------ PINV fixtures (proposed verifier, from proposal path)
+    def pinv_fixture(name, mutate=None, untracked=None):
+        root = bench.scratch / ("pinv-" + name)
+        root.mkdir()
+        env = bench.env(bench.tmp("pinv-" + name))
+        gate = "#!/usr/bin/env bash\nexit 0\n"
+        spec = {"spec_version": "local-fixture",
+                "defaults": {"allowed_write": ["controller/**"], "denied_write": ["specs/**", "verify/**"]},
+                "tasks": [{"id": "t-1", "exit_test": "verify/bin/t-1-exit", "allowed_write": ["controller/x/**"]},
+                          {"id": "t-2", "exit_test": "verify/bin/t-2-exit", "allowed_write": ["tests/controller/**"]}]}
+        cli = ("#!/usr/bin/env python3.12\n"
+               "PRETASK_PATHS = (\n    \"controller\",\n    \"verify\",\n    \"specs\",\n"
+               "    \"scripts/check-invariants.mjs\",\n    \"config/managed-settings.json\",\n"
+               "    \"docs/loop/regler.md\",\n)\n"
+               "PLATFORM_DOCUMENTS = {\n    \"AGENTS.md\": \"00\",\n    \"docs/loop/regler.md\": \"00\",\n}\n")
+        autopilot = ("SUBSTITUTION_OWNER_PATH = \"docs/loop/harness-substitution-contract-v1.md\"\n"
+                     "FORBIDDEN_GIT_TOKENS = (\n    \"--force\",\n    \"--force-with-lease\",\n    \"--amend\",\n)\n"
+                     "SUBSTITUTION_BLOBS = {\n    \"AGENTS.md\": \"aa\",\n    SUBSTITUTION_OWNER_PATH: \"bb\",\n}\n"
+                     "def publish(repo):\n    return git(repo, \"push\", \"origin\", \"HEAD:refs/heads/x\")\n")
+        files = {
+            "verify/bin/t-1-exit": (gate, 0o755),
+            VERIFIER: (proposal_mjs, 0o644),
+            VERIFY_CLI: (cli, 0o755),
+            AUTOPILOT: (autopilot, 0o644),
+            "config/managed-settings.json": ("{}\n", 0o644),
+            "docs/loop/regler.md": ("regler\n", 0o644),
+            "docs/loop/harness-substitution-contract-v1.md": ("kontrakt\n", 0o644),
+            "AGENTS.md": ("agents\n", 0o644),
+            "controller/x/cli": ("#!/bin/sh\nexit 0\n", 0o755),
+        }
+        register = {"verifiers": {
+            "check-invariants": {"path": VERIFIER, "sha256": sha(proposal_mjs), "runner": "node", "startbar": True},
+            "t-1": {"path": "verify/bin/t-1-exit", "sha256": sha(gate.encode()), "runner": "bash", "startbar": True},
+        }}
+        state = {"spec": spec, "register": register, "files": files, "spec_text": None}
+        if mutate:
+            mutate(state)
+        files = state["files"]
+        files[SPEC] = (state["spec_text"] if state["spec_text"] is not None
+                       else json.dumps(state["spec"], indent=1) + "\n", 0o644)
+        files[REGISTER] = (json.dumps(state["register"], indent=1) + "\n", 0o644)
+        for rel, (data, mode) in files.items():
+            write(root / rel, data, mode)
+        git(root, env, "init", "--quiet", f"--template={bench.template}", "--initial-branch=fixture")
+        git(root, env, "config", "--local", "core.filemode", "true")
+        git(root, env, "add", "--all")
+        git(root, env, "commit", "--quiet", "--no-gpg-sign", "-m", "pinv fixture " + name)
+        for rel, (data, mode) in (untracked or {}).items():
+            write(root / rel, data, mode)
+        return root, env
+
+    def pinv_run(root, env, script=None):
+        return run([NODE, script or (root / VERIFIER)], root, env)
+
+    root, env = pinv_fixture("base")
+    r = pinv_run(root, env)
+    ids, summary = failing_ids(r.stdout)
+    check("pinv_base_fixture_all_pass", r.returncode == 0 and ids == set() and summary == (6, 0, 0), r.stdout[-300:] + r.stderr[-300:])
+
+    def m001_mode(s):
+        s["files"]["verify/bin/t-1-exit"] = (s["files"]["verify/bin/t-1-exit"][0], 0o644)
+
+    def m001_outside(s):
+        # The gate file stays tracked under verify/bin/ (so verify/ is not emptied); the
+        # spec row and register point at a copy outside verify/bin/.
+        s["spec"]["tasks"][0]["exit_test"] = "scripts/t-1-exit"
+        s["files"]["scripts/t-1-exit"] = s["files"]["verify/bin/t-1-exit"]
+        s["register"]["verifiers"]["t-1"]["path"] = "scripts/t-1-exit"
+
+    def m002_sha(s):
+        s["register"]["verifiers"]["check-invariants"]["sha256"] = "0" * 64
+
+    def m002_not_startbar(s):
+        s["register"]["verifiers"]["web"] = {"path": "docs/loop/regler.md", "sha256": sha(b"regler\n"), "runner": None, "startbar": False}
+
+    def m002_untracked(s):
+        s["register"]["verifiers"]["extra"] = {"path": "scripts/extra.mjs", "sha256": sha(b"process.exit(0);\n"), "runner": "node", "startbar": True}
+
+    def m003_web(s):
+        s["files"][VERIFY_CLI] = (s["files"][VERIFY_CLI][0].replace("    \"verify\",\n", "    \"verify\",\n    \"docs/07-konstitution.md\",\n"), 0o755)
+        s["files"]["docs/07-konstitution.md"] = ("konstitution\n", 0o644)
+
+    def m003_missing(s):
+        s["files"][VERIFY_CLI] = (s["files"][VERIFY_CLI][0].replace("    \"AGENTS.md\": \"00\",\n", "    \"AGENTS.md\": \"00\",\n    \"docs/loop/absent.md\": \"00\",\n"), 0o755)
+
+    def m003_no_block(s):
+        text = s["files"][VERIFY_CLI][0]
+        start, end = text.index("PRETASK_PATHS = ("), text.index(")\n") + 2
+        s["files"][VERIFY_CLI] = (text[:start] + text[end:], 0o755)
+
+    def m004_dup(s):
+        s["spec_text"] = (json.dumps(s["spec"], indent=1) + "\n").replace("\"id\": \"t-1\",", "\"id\": \"t-1\",\n   \"id\": \"t-1\",", 1)
+
+    def m004_glob(s):
+        s["spec"]["tasks"][0]["allowed_write"] = ["../controller/**"]
+
+    def m005_push(s):
+        s["files"][AUTOPILOT] = (s["files"][AUTOPILOT][0].replace("\"push\", \"origin\"", "\"push\", \"--force-with-lease\", \"origin\""), 0o644)
+
+    def m005_push_cli(s):
+        s["files"]["controller/x/cli"] = ("#!/bin/sh\ngit push --force origin main\n", 0o755)
+
+    def m005_no_guard(s):
+        text = s["files"][AUTOPILOT][0]
+        start, end = text.index("FORBIDDEN_GIT_TOKENS = ("), text.index(")\n") + 2
+        s["files"][AUTOPILOT] = (text[:start] + text[end:], 0o644)
+
+    def m006_drift(s):
+        drifted = proposal_mjs + b"\n// drift\n"
+        s["files"][VERIFIER] = (drifted, 0o644)
+        s["register"]["verifiers"]["check-invariants"]["sha256"] = sha(drifted)
+
+    def m006_id(s):
+        s["register"]["verifiers"]["invariants"] = s["register"]["verifiers"].pop("check-invariants")
+
+    mutants = [
+        ("pinv001_negative_gate_mode_644", m001_mode, None, {"PINV-001"}, None),
+        ("pinv001_negative_gate_outside_verify_bin", m001_outside, None, {"PINV-001"}, None),
+        ("pinv001_negative_gate_on_disk_untracked", None, {"verify/bin/t-2-exit": ("#!/bin/sh\nexit 0\n", 0o755)}, {"PINV-001"}, None),
+        ("pinv002_negative_register_sha_drift", m002_sha, None, {"PINV-002"}, None),
+        ("pinv002_negative_entry_not_startbar", m002_not_startbar, None, {"PINV-002"}, None),
+        ("pinv002_negative_entry_path_untracked", m002_untracked, {"scripts/extra.mjs": ("process.exit(0);\n", 0o644)}, {"PINV-002"}, None),
+        ("pinv003_negative_web_path_declared", m003_web, None, {"PINV-003"}, None),
+        ("pinv003_negative_declared_path_not_tracked", m003_missing, None, {"PINV-003"}, None),
+        ("pinv003_negative_declaration_block_missing_is_fail", m003_no_block, None, {"PINV-003"}, None),
+        ("pinv004_negative_duplicate_json_key_is_fail", m004_dup, None, {"PINV-001", "PINV-004"}, None),
+        ("pinv004_negative_traversal_glob", m004_glob, None, {"PINV-004"}, None),
+        ("pinv005_negative_force_push_in_autopilot", m005_push, None, {"PINV-005"}, None),
+        ("pinv005_negative_force_push_in_controller_cli", m005_push_cli, None, {"PINV-005"}, None),
+        ("pinv005_negative_guard_missing_is_fail", m005_no_guard, None, {"PINV-005"}, None),
+        ("pinv006_negative_executed_bytes_differ_from_tree", m006_drift, None, {"PINV-006"}, ROOT / PROPOSAL_MJS),
+        ("pinv006_negative_register_id_is_not_check_invariants", m006_id, None, {"PINV-006"}, None),
+    ]
+    for label, mutate, untracked, expected, script in mutants:
+        root, env = pinv_fixture(label, mutate, untracked)
+        r = pinv_run(root, env, script)
+        ids, summary = failing_ids(r.stdout)
+        check(label, r.returncode == 1 and ids == expected and summary is not None
+              and summary[1] == len(expected) and summary[0] + summary[1] == 6,
+              r.stdout[-400:] + r.stderr[-200:])
+
+    # ------------------------------------------------------------------ D3/D6: the subject as it is, no overlay
+    pure = replica(bench, "subject-pure", subject, head)
+    pure_tmp = bench.tmp("subject-pure")
+    pure_env = bench.env(pure_tmp)
+    pure_register_sha = sha((pure / REGISTER).read_bytes())
+    r = run([pure / VERIFY_CLI, "preflight"], scratch, pure_env)
+    preflight_ok = json_ok(r) == {"status": "ok", "register_sha256": pure_register_sha}
+    check("subject_preflight_exit0_exact_json", preflight_ok, r.stderr[-300:] or r.stdout[-300:])
+
+    snapshot = pure_tmp / "pre-task-authority"
+    r = run([pure / VERIFY_CLI, "prepare", pure_register_sha, snapshot], scratch, pure_env)
+    obj = json_ok(r)
+    snapshot_sha = obj["snapshot_sha256"] if obj and set(obj) == {"status", "snapshot_sha256"} and obj["status"] == "ok" \
+        and SHA256_FORM.fullmatch(str(obj["snapshot_sha256"])) else None
+    top = sorted(p.name for p in snapshot.iterdir()) if snapshot.is_dir() else None
+    prepare_ok = (snapshot_sha is not None and top is not None and set(top) <= SNAPSHOT_TOP_ALLOWED
+                  and all((snapshot / rel).is_file() for rel in SNAPSHOT_REQUIRED)
+                  and not any((snapshot / rel).exists() for rel in WEB_ABSENT))
+    check("subject_prepare_exit0_platform_roots_only", prepare_ok,
+          f"top={top} " + (r.stderr[-300:] or r.stdout[-300:]))
+
+    if prepare_ok:
+        r = run([pure / VERIFY_CLI, "run-commit", pure_register_sha, "check-invariants", head, snapshot_sha, snapshot],
+                scratch, pure_env, timeout=600)
+        residue = [p.name for p in pure_tmp.iterdir() if p.name.startswith("nortropic-taskdom-")]
+        worktrees = git(pure, pure_env, "worktree", "list", "--porcelain").count("worktree ")
+        check("subject_run_commit_check_invariants_exit0",
+              r.returncode == 0 and not residue and worktrees == 1 and "0 FAIL" in r.stdout,
+              r.stdout[-400:] + r.stderr[-300:])
+    else:
+        check("subject_run_commit_check_invariants_exit0", False, "positive prepare not established")
+    r = run([NODE, pure / VERIFIER], pure, pure_env, timeout=300)
+    check("subject_real_verifier_rc0_no_web", r.returncode == 0 and "0 FAIL" in r.stdout, r.stdout[-400:] + r.stderr[-300:])
+
+    # platform-prepare / platform-check on the subject's own documents (D3, document authority)
+    spec_sha = sha((pure / SPEC).read_bytes())
+    psnap = pure_tmp / "platform-snapshot"
+    r = run([pure / VERIFY_CLI, "platform-prepare", spec_sha, "h-035", pure_register_sha, psnap], scratch, pure_env)
+    obj = json_ok(r)
+    pdigest = obj["snapshot_sha256"] if obj and obj.get("status") == "ok" and SHA256_FORM.fullmatch(str(obj.get("snapshot_sha256"))) else None
+    accept_ok = False
+    if pdigest:
+        c = run([pure / VERIFY_CLI, "platform-check", spec_sha, "h-035", pure_register_sha, pdigest, psnap], scratch, pure_env)
+        accept_ok = (json_ok(c) == {"status": "ok", "snapshot_sha256": pdigest}
+                     and not any((psnap / rel).exists() for rel in WEB_ABSENT)
+                     and all((psnap / rel).is_file() for rel in (SPEC, REGISTER, VERIFY_CLI)))
+        detail = c.stdout[-300:] + c.stderr[-200:]
+    else:
+        detail = r.stdout[-300:] + r.stderr[-300:]
+    check("platform_prepare_and_check_accept_subject_documents", accept_ok, detail)
+
+    def platform_prepare_refused(label, mutate_rel, restore):
+        target = pure_tmp / ("platform-snapshot-" + sha(label.encode())[:8])
+        r = run([pure / VERIFY_CLI, "platform-prepare", spec_sha, "h-035", pure_register_sha, target], scratch, pure_env)
+        reason = json_refusal(r)
+        restore()
+        check(label, accept_ok and reason == "DOCUMENT_GENERATION" and not target.exists()
+              and sha((pure / mutate_rel).read_bytes()) == original[mutate_rel],
+              ("positive not established; " if not accept_ok else "") + r.stdout[-200:] + r.stderr[-200:])
+
+    original = {rel: sha((pure / rel).read_bytes()) for rel in PLATFORM_DOCUMENTS if (pure / rel).is_file()}
+    for rel in PLATFORM_DOCUMENTS:
+        label = "platform_prepare_rejects_modified_" + rel.replace("/", "_").replace(".", "_")
+        if rel not in original:
+            check(label, False, "document missing in subject: " + rel)
+            continue
+        raw = (pure / rel).read_bytes()
+        (pure / rel).write_bytes(raw + b"\n<!-- LOCAL fixture mutation -->\n")
+        platform_prepare_refused(label, rel, lambda rel=rel, raw=raw: (pure / rel).write_bytes(raw))
+    rel = "docs/loop/drift.md"
+    if rel in original:
+        raw = (pure / rel).read_bytes()
+        (pure / rel).unlink()
+        platform_prepare_refused("platform_prepare_rejects_missing_platform_doc", rel,
+                                 lambda: write(pure / rel, raw, 0o644))
+    else:
+        check("platform_prepare_rejects_missing_platform_doc", False, "document missing in subject: " + rel)
+    if accept_ok and "AGENTS.md" in original:
+        target = pure_tmp / "platform-snapshot-check"
+        r = run([pure / VERIFY_CLI, "platform-prepare", spec_sha, "h-035", pure_register_sha, target], scratch, pure_env)
+        obj = json_ok(r)
+        raw = (pure / "AGENTS.md").read_bytes()
+        (pure / "AGENTS.md").write_bytes(raw + b"\n<!-- LOCAL fixture mutation -->\n")
+        c = run([pure / VERIFY_CLI, "platform-check", spec_sha, "h-035", pure_register_sha,
+                 obj["snapshot_sha256"] if obj else "0" * 64, target], scratch, pure_env)
+        (pure / "AGENTS.md").write_bytes(raw)
+        check("platform_check_rejects_doc_modified_after_prepare",
+              obj is not None and json_refusal(c) == "DOCUMENT_GENERATION"
+              and sha((pure / "AGENTS.md").read_bytes()) == original["AGENTS.md"], c.stdout[-200:] + c.stderr[-200:])
+    else:
+        check("platform_check_rejects_doc_modified_after_prepare", False, "positive not established")
+
+    # ------------------------------------------------------------------ D3: fixture-registered task gate and refusals
+    subject_register = (subject / REGISTER).read_bytes()
+    try:
+        fixture_register = register_with_fixture_gate(subject_register, sha(FIXTURE_GATE_TEXT.encode()))
+    except (ValueError, KeyError, TypeError) as exc:
+        fixture_register = None
+        register_error = repr(exc)
+
+    def fixture_replica(name):
+        repo = replica(bench, name, subject, head)
+        tmp = bench.tmp(name)
+        env = bench.env(tmp)
+        if fixture_register is None:
+            raise Rig("subject register unusable for fixture overlay: " + register_error)
+        base = overlay(repo, env, {REGISTER: (fixture_register, 0o644), FIXTURE_GATE: (FIXTURE_GATE_TEXT, 0o755)},
+                       message="register LOCAL_ONLY fixture task gate")
+        spec_path = tmp / "spec.json"
+        fixture_spec(spec_path)
+        return repo, tmp, env, base, spec_path
+
+    fx, fx_tmp, fx_env, fx_base, fx_spec = fixture_replica("subject-fixture")
+    fx_register_sha = sha(fixture_register)
+    r = run([fx / VERIFY_CLI, "task", fx_register_sha, fx_spec, FIXTURE_TASK], scratch, fx_env)
+    check("fixture_task_lookup_grindad",
+          json_ok(r) == {"status": "grindad", "grind_id": FIXTURE_TASK, "grind_sha256": sha(FIXTURE_GATE_TEXT.encode()),
+                         "register_sha256": fx_register_sha}, r.stdout[-300:] + r.stderr[-300:])
+    r = run([fx / VERIFY_CLI, "preflight"], scratch, fx_env)
+    fx_pre = json_ok(r) == {"status": "ok", "register_sha256": fx_register_sha}
+    fx_snapshot = fx_tmp / "pre-task-authority"
+    r2 = run([fx / VERIFY_CLI, "prepare", fx_register_sha, fx_snapshot], scratch, fx_env)
+    obj = json_ok(r2)
+    fx_snap_sha = obj["snapshot_sha256"] if obj and obj.get("status") == "ok" and SHA256_FORM.fullmatch(str(obj.get("snapshot_sha256"))) else None
+    fixture_positive = fx_pre and fx_snap_sha is not None
+    check("fixture_preflight_prepare_ok", fixture_positive, (r.stderr or r.stdout)[-200:] + (r2.stderr or r2.stdout)[-300:])
+    if fixture_positive:
+        r = run([fx / VERIFY_CLI, "task-run", fx_register_sha, FIXTURE_TASK, sha(FIXTURE_GATE_TEXT.encode()), fx_base,
+                 fx_snap_sha, fx_snapshot], scratch, fx_env, timeout=300)
+        residue = [p.name for p in fx_tmp.iterdir() if p.name.startswith("nortropic-taskdom-")]
+        check("fixture_task_run_exit0", r.returncode == 0 and not residue, r.stdout[-300:] + r.stderr[-300:])
+    else:
+        check("fixture_task_run_exit0", False, "positive preflight/prepare not established")
+
+    def refusal(label, removal, must_mention, drift=False, via_prepare_allowed=False):
+        repo, tmp, env, base, spec_path = fixture_replica("refusal-" + label)
+        target = repo / removal
+        if drift:
+            target.write_bytes(target.read_bytes() + b"\n")
+        else:
+            target.unlink()
+        p = run([repo / VERIFY_CLI, "preflight"], scratch, env)
+        stage, out = "preflight", p
+        if p.returncode == 0 and via_prepare_allowed:
+            snap = tmp / "pre-task-authority"
+            out = run([repo / VERIFY_CLI, "prepare", sha(fixture_register), snap], scratch, env)
+            stage = "prepare"
+            residue_free = not snap.exists()
+        else:
+            residue_free = True
+        text = out.stderr
+        check(label, fixture_positive and out.returncode == 4 and json_ok(out) is None and residue_free
+              and all(m in text for m in must_mention),
+              ("positive not established; " if not fixture_positive else "") + f"{stage} rc={out.returncode} " + text[-300:])
+
+    refusal("refuse_missing_register", REGISTER, ("regist",))
+    refusal("refuse_missing_check_invariants", VERIFIER, ("check-invariants",))
+    refusal("refuse_drifted_check_invariants", VERIFIER, ("hash_mismatch: scripts/check-invariants.mjs",), drift=True)
+    refusal("refuse_missing_registered_task_gate", FIXTURE_GATE, (FIXTURE_TASK,))
+    refusal("refuse_missing_managed_settings", "config/managed-settings.json", ("managed-settings",), via_prepare_allowed=True)
+    refusal("refuse_missing_regler", "docs/loop/regler.md", ("regler.md",), via_prepare_allowed=True)
+
+    def loop_config(repo, tmp, env, base, spec_path):
+        state = tmp / "state"
+        r = run([repo / "controller/state/cli", "init", state], scratch, env)
+        if r.returncode:
+            raise Rig("state init failed: " + r.stderr)
+        (tmp / "workspaces").mkdir()
+        run_id = "pcs-" + tmp.name
+        worker = tmp / "worker.sh"
+        write(worker, WORKER_TEMPLATE.format(workspace=json.dumps(str(tmp / "workspaces" / f"{run_id}-{FIXTURE_TASK}-1"))), 0o700)
+        cfg = tmp / "config.json"
+        write(cfg, json.dumps({
+            "spec": str(spec_path), "attest_dir": str(tmp / "attest"), "state_dir": str(state),
+            "lease_dir": str(tmp / "lease"), "lease_resurs": LEASE_RESOURCE, "workspace_rot": str(tmp / "workspaces"),
+            "brytare_rot": str(tmp / "breaker"), "base_sha": base, "verifier_id": "check-invariants",
+            "run_id": run_id, "worker_cmd": [str(worker)], "timeout_s": 60,
+            "budget": 1, "troskel": 2}, indent=1) + "\n")
+        return cfg
+
+    def run_loop(repo, tmp, env, cfg, timeout):
+        proc = subprocess.Popen([str(repo / LOOP_CLI), "run", str(cfg)], cwd=str(repo), env=env, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                out, err = proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGKILL)
+                out, err = proc.communicate()
+            err += "\nGATE: loop killed after timeout"
+        return proc.returncode, out, err
+
+    def lease_free(repo, tmp, env):
+        # `owner` prints the holder on stdout (rc 0) or refuses with "ägs inte" (rc 1) when free.
+        r = run([repo / "controller/lease/cli", tmp / "lease", "owner", LEASE_RESOURCE], scratch, env)
+        return r.returncode != 0 and r.stdout.strip() == "" and not (tmp / "lease" / (LEASE_RESOURCE + ".lease")).exists()
+
+    # missing controller/authority/core.py: the loop stops in taskval before any worker/lease residue
+    repo, tmp, env, base, spec_path = fixture_replica("stop-missing-core")
+    cfg = loop_config(repo, tmp, env, base, spec_path)
+    (repo / "controller/authority/core.py").unlink()
+    rc, out, err = run_loop(repo, tmp, env, cfg, 120)
+    check("stop_missing_authority_core_before_worker",
+          rc not in (0, None) and "taskval" in (out + err) and lease_free(repo, tmp, env)
+          and not any((tmp / "workspaces").iterdir()) and not (tmp / "attest" / "attestations.json").exists()
+          and not [p for p in tmp.iterdir() if p.name.startswith("nortropic-loop-")],
+          f"rc={rc} " + (out + err)[-400:])
+
+    # ------------------------------------------------------------------ D4: autopilot substitution authority on a platform origin/main
+    ap = replica(bench, "subject-origin", subject, head)
+    ap_tmp = bench.tmp("subject-origin")
+    ap_env = bench.env(ap_tmp)
+    git(ap, ap_env, "update-ref", "refs/remotes/origin/main", head)
+    web_absent = all(git_raw(ap, ap_env, "cat-file", "-e", f"refs/remotes/origin/main:{rel}").returncode != 0
+                     for rel in WEB_ABSENT)
+    before = tree_state(ap)
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, ap, "ensure_substitution_authority"], ap_tmp, ap_env, timeout=300)
+    obj = driver_outcome(r)
+    rows_j = [x for x in journal_rows(ap) if x.get("event") == "SUBSTITUTION_AUTHORITY"]
+    blobs_ok = False
+    if len(rows_j) == 1 and type(rows_j[0].get("document_blobs")) is dict:
+        blobs = rows_j[0]["document_blobs"]
+        blobs_ok = (
+            SUBSTITUTION_CONTRACT in blobs and SUBSTITUTION_AUDIT in blobs
+            and rows_j[0].get("contract") == SUBSTITUTION_CONTRACT and rows_j[0].get("audit") == SUBSTITUTION_AUDIT
+            and rows_j[0].get("contract_blob") == blobs[SUBSTITUTION_CONTRACT]
+            and rows_j[0].get("audit_blob") == blobs[SUBSTITUTION_AUDIT]
+            and all(type(k) is str and is_platform_path(k) for k in blobs)
+            and all(git_raw(ap, ap_env, "rev-parse", f"refs/remotes/origin/main:{k}").stdout.strip() == v
+                    for k, v in blobs.items())
+        )
+    accept_ap = bool(obj) and obj["outcome"] == "returned" and web_absent and blobs_ok and tree_state(ap) == before
+    check("autopilot_substitution_accepts_platform_generation_without_web_docs", accept_ap,
+          r.stdout[-300:] + r.stderr[-300:] + " rows=" + str(len(rows_j)))
+    for rel in PLATFORM_DOCUMENTS:
+        label = "autopilot_substitution_rejects_mutated_" + rel.replace("/", "_").replace(".", "_")
+        raw = git_raw(ap, ap_env, "show", f"refs/remotes/origin/main:{rel}")
+        if raw.returncode:
+            check(label, False, "document missing in origin/main: " + rel)
+            continue
+        mutated = mutated_commit(ap, ap_env, ap_tmp, rel, raw.stdout.encode("utf-8") + b"\n<!-- LOCAL fixture mutation -->\n")
+        git(ap, ap_env, "update-ref", "refs/remotes/origin/main", mutated)
+        count = len([x for x in journal_rows(ap) if x.get("event") == "SUBSTITUTION_AUTHORITY"])
+        r = run([PYTHON, "-B", "-c", DRIVER, subject, ap, "ensure_substitution_authority"], ap_tmp, ap_env, timeout=300)
+        obj = driver_outcome(r)
+        git(ap, ap_env, "update-ref", "refs/remotes/origin/main", head)
+        after = len([x for x in journal_rows(ap) if x.get("event") == "SUBSTITUTION_AUTHORITY"])
+        check(label, accept_ap and bool(obj) and obj["outcome"] == "stop" and "substitution authority" in obj["message"]
+              and after == count,
+              ("positive not established; " if not accept_ap else "") + r.stdout[-300:] + r.stderr[-300:])
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, ap, "selftest_none"], ap_tmp, ap_env, timeout=300)
+    obj = driver_outcome(r)
+    check("autopilot_selftest_none_returns", bool(obj) and obj["outcome"] == "returned" and "AUTOPILOT_V4_SELFTEST=PASS" in r.stdout,
+          r.stdout[-300:] + r.stderr[-300:])
+
+    # ------------------------------------------------------------------ D5: ordinary loop path end to end (needs sandbox-exec)
+    label = "loop_end_to_end_attests_platform_fixture_task"
+    if args.skip_loop:
+        check(label, False, "skipped by --skip-loop")
+    else:
+        lp = replica(bench, "subject-loop", subject, head)
+        lp_tmp = bench.tmp("subject-loop")
+        lp_env = bench.env(lp_tmp)
+        try:
+            lp_register = register_with_fixture_gate(proposal_register, sha(FIXTURE_GATE_TEXT.encode()))
+        except (ValueError, KeyError, TypeError) as exc:
+            raise Rig("proposal register unusable: " + repr(exc))
+        lp_base = overlay(lp, lp_env, {VERIFIER: (proposal_mjs, 0o644), REGISTER: (lp_register, 0o644),
+                                       FIXTURE_GATE: (FIXTURE_GATE_TEXT, 0o755)},
+                          message="apply proposals and register LOCAL_ONLY fixture task gate")
+        lp_spec = lp_tmp / "spec.json"
+        fixture_spec(lp_spec)
+        cfg = loop_config(lp, lp_tmp, lp_env, lp_base, lp_spec)
+        h036_before = h036_roots()
+        rc, out, err = run_loop(lp, lp_tmp, lp_env, cfg, 600)
+        h036_after = h036_roots()
+        attest_path = lp_tmp / "attest" / "attestations.json"
+        attest = None
+        candidate_ok = False
+        try:
+            if attest_path.is_file():
+                attest = strict(attest_path.read_bytes())["attestations"].get(FIXTURE_TASK)
+        except (ValueError, KeyError, TypeError):
+            attest = None
+        if type(attest) is dict and COMMIT_FORM.fullmatch(str(attest.get("candidate_sha", ""))):
+            cand = attest["candidate_sha"]
+            show = git_raw(lp, lp_env, "show", "-s", "--format=%an", cand)
+            tree = git_raw(lp, lp_env, "cat-file", "-e", f"{cand}:{FIXTURE_FILE}")
+            parent = git_raw(lp, lp_env, "rev-parse", f"{cand}^")
+            candidate_ok = (show.returncode == 0 and show.stdout.strip() == "nortropic-utforare"
+                            and tree.returncode == 0 and parent.stdout.strip() == lp_base
+                            and attest.get("grind_id") == FIXTURE_TASK
+                            and attest.get("grind_sha256") == sha(FIXTURE_GATE_TEXT.encode())
+                            and attest.get("stale") is False)
+        check(label,
+              rc == 0 and "attesterad" in out and "drain klar: 1 varv, 1 attesterade" in out and candidate_ok
+              and h036_before is not None and h036_after == h036_before and lease_free(lp, lp_tmp, lp_env)
+              and not any((lp_tmp / "workspaces").iterdir())
+              and not [p for p in lp_tmp.iterdir() if p.name.startswith("nortropic-loop-")]
+              and git(lp, lp_env, "status", "--porcelain") == "" and git(lp, lp_env, "rev-parse", "HEAD") == lp_base
+              and git(lp, lp_env, "worktree", "list", "--porcelain").count("worktree ") == 1,
+              f"rc={rc} " + (out + err)[-600:])
+
+    # ------------------------------------------------------------------ D6: frozen artifacts and the invariant-required gate
+    problems = []
+    for rel in FROZEN_TREES:
+        frozen = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}")
+        current = git_raw(subject, probe_env, "rev-parse", f"HEAD:{rel}")
+        dirty = git_raw(subject, probe_env, "status", "--porcelain", "--", rel).stdout.strip()
+        if frozen.returncode or current.returncode or frozen.stdout.strip() != current.stdout.strip() or dirty:
+            problems.append(rel)
+    listing = git_raw(subject, probe_env, "ls-tree", FROZEN_BASE, "verify/bin/")
+    frozen_files = 0
+    for line in listing.stdout.splitlines():
+        meta, _, rel = line.partition("\t")
+        mode, _kind, oid = meta.split()
+        if not FROZEN_FILE_RE.match(rel):
+            continue
+        frozen_files += 1
+        p = subject / rel
+        try:
+            st = p.lstat()
+            actual = git_raw(subject, probe_env, "hash-object", "--", str(p)).stdout.strip()
+            if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode) or actual != oid \
+                    or (mode == "100755") != bool(st.st_mode & stat.S_IXUSR):
+                problems.append(rel)
+        except OSError:
+            problems.append(rel)
+    check("frozen_artifacts_identical_to_dae90c8f",
+          listing.returncode == 0 and frozen_files >= 20 and not problems, f"files={frozen_files} problems={problems}")
+    r = run([PYTHON, "-B", subject / INVARIANT_REQUIRED_GATE, "--subject", subject], scratch, bench.env(bench.tmp("invariant-required")), timeout=900)
+    passes = len(re.findall(r"^PASS ", r.stdout, re.M))
+    fails = len(re.findall(r"^FAIL ", r.stdout, re.M))
+    check("invariant_required_exit_15_of_15",
+          r.returncode == 0 and passes == 15 and fails == 0 and "INVARIANT_REQUIRED_RESULT=PASS_LOCAL_QUALIFICATION_ONLY" in r.stdout,
+          f"rc={r.returncode} pass={passes} fail={fails} " + r.stderr[-200:] + " ".join(l for l in r.stdout.splitlines() if l.startswith("FAIL")))
+
+    # ------------------------------------------------------------------ D7: bytes unchanged
+    check("subject_and_held_bytes_unchanged",
+          all(sha((subject / rel).read_bytes()) == digest for rel, digest in subject_sha.items())
+          and all(sha((ROOT / rel).read_bytes()) == digest for rel, digest in held.items()))
+    result = {"scope": "LOCAL_QUALIFICATION_ONLY", "subject": str(subject), "subject_head": head,
+              "subject_sha256": subject_sha, "held_sha256": held,
+              "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
+              "sandbox_exec_present": Path(SANDBOX_EXEC).is_file(),
+              "fixture_root": str(scratch), "rows": rows, "pass": all(row["pass"] for row in rows)}
+    with (scratch / "result.json").open("x") as stream:
+        json.dump(result, stream, indent=2, ensure_ascii=False)
+    print("PLATFORM_CONTROL_SET_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
+    return 0 if result["pass"] else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print("PLATFORM_CONTROL_SET_RIG_ERROR=" + repr(exc), file=sys.stderr)
+        sys.exit(2)
