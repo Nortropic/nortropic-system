@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3.1 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskning nr 5; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.2 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5 och 6; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -95,6 +95,10 @@ nådda slutningen och de hållna grindarnas körningar. Subjektets bytes är of�
   `c8ea8511…` (plan) och `1e53887c…` (handoff) — en omdöpt eller omparkerad kopia är samma objekt (tolv blobbar).
 - `f1_no_symlink_entries_at_head`: inga poster med läge 120000 i HEAD-trädet (basen har 0) — en symlänk kan
   peka ut ur trädet (t.ex. mot webbrepot) och undgår filskanning.
+- `f1_tracked_paths_unique_case_insensitively` (v3.2 N4): inga två spårade sökvägar som bara skiljer sig i skiftläge — på
+  ett skiftlägesokänsligt filsystem kan bara en av dem checkas ut, och den andra (t.ex. `Autonomous-Loop-Plan-Platform-v2.md`
+  med avvikande tabell) blir en dold tvilling. Riggen tolererar just den smutsen (subjekt och replikor) så att felet blir
+  en produktrad (exit 1), inte ett riggfel (exit 2).
 
 ### F2 — referensslutningsorakel (kärnan)
 Rötter: `AGENTS.md`, `CLAUDE.md`, `README.md`, `.agents/skills/*/SKILL.md`, specens `authority.*`,
@@ -208,10 +212,11 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   (v3): `## Auktoritetsordning` i `AGENTS.md` nämner `docs/loop/autonomous-loop-plan-platform-v2.md`, och den
   listpunkt/det stycke som nämner den bär INTE `inte dagens instruktion`/`historisk`/`fryst grindinput` (planen är
   aktiv; den får därför inte stå i samma listpunkt som de frysta dokumentens markörnot — egen punkt) och bär (v3.1 N6)
-  handoffens sökväg, ordet `plangeneration` och ordet `aktiv`; `## Historik` finns och bär `plangeneration`,
-  `Git-historik`, `historia`/`historisk` och den nya planens sökväg (den gamla generationen namnges som historia utan
-  sha, blob eller sökväg — pekarna är förbjudna; en etikett utan pekare som "gällande referens" är deklarerad
-  semantikgräns, N1).
+  handoffens sökväg, ordet `plangeneration` och ordet `aktiv`; `## Historik` finns och binder BÅDA riktningarna (v3.2
+  N8): ett stycke som namnger den `tidigare|föregående|gamla|äldre plangeneration(en)` tillsammans med `historia/historisk`
+  och `Git-historik` (den gamla som historia — utan sha, blob eller sökväg; pekarna är förbjudna), och ett stycke som
+  namnger den nya planens sökväg tillsammans med ordet `aktiv` (den nya som aktiv). En etikett utan pekare som "gällande
+  referens" är deklarerad semantikgräns (N1).
 - `f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit` (v3):
   `## Authority` bär `PLAN_GENERATION=<autopilotens PLAN_GENERATION>`, `ROADMAP_PLAN_PATH=<ny plan>`,
   `ROADMAP_HANDOFF_PATH=<ny handoff>` och namnger `AGENTS.md`; `HUMAN_AUTHORITY_HARD_STOP` finns kvar i dokumentet;
@@ -281,19 +286,24 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f4_ensure_roadmap_plan_returns_in_replica_without_any_remote`: den riktiga modulens
   `ensure_roadmap_plan(repo)` (namnet behålls — h-032-exit och publication-callers är namnbundna) returnerar i en
   replika utan remote (ingen fetch möjlig).
-- `f4_ensure_roadmap_plan_stops_on_mutated_plan_generation` / `…_missing_handoff`: planen med en ändrad byte
-  respektive en borttagen handoff → `Stop`.
+- `f4_ensure_roadmap_plan_stops_on_mutated_plan_generation` / `…_missing_handoff` / (v3.2 N2) `…_mutated_handoff`: planen
+  med en ändrad byte, en borttagen handoff respektive en handoff med en ändrad byte → `Stop` (handoffens BYTES binds i
+  körtidsvakten, inte bara dess existens).
+- `f3_platform_prepare_refuses_mutated_plan_generation_in_replica` / `f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare`
+  (v3.2 N3 — pinnen mätt i EFFEKT): `controller/verify/cli platform-prepare` i en replika med muterad (ej ompinnad) plan
+  → exakt `{"status":"refused","reason":"DOCUMENT_GENERATION"}`; `platform-check` mot en snapshot vars plan muterats
+  efter prepare → samma avslag. En cli som itererar en filtrerad tvilling av `PLATFORM_DOCUMENTS` faller här.
 - `f4_autopilot_source_free_of_old_plan_commit_git_show_by_commit_and_plan_sha` (v3): autopilotens FULLTEXT (inkl.
   kommentarer/docstrings) och AST-strängar saknar den gamla planens pekare, `git show {…}:`/`git show <…>`/
   `git show <7–40 hex>:` (läsning ur commit; `git show HEAD:`/`origin/main:` är tillåtet) och identifieraren/fältet
   `plan_sha`/`PLAN_SHA`/`ROADMAP_PLAN_SHA` (skiftlägesoberoende; `plan_sha256` undantaget).
 - `f4_produced_prompts_of_roadmap_empirical_and_architect_builders_name_plan_generation_and_handoff_for_every_slice_and_role`
   och `f4_produced_prompts_free_of_old_plan_pointers_commit_reads_web_and_owner_stop_tokens_and_inject_only_declared_tracked_documents`
-  (v3.1, B3 — de FAKTISKA prompterna): drivern importerar den riktiga modulen och ANROPAR varje promptbyggare med
-  fixturargument — byggare = funktion vars kodobjekts strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
-  `prompt|_extra$|authority_text$`, minus flöden (funktion med parameter `repo`/`wt`/`wt_root` eller som refererar
-  `run_codex*`/`git`/`journal`/`publish`/`stage_and_commit`/worktree-hantering; flöden anropas aldrig, deras inlinade
-  promptliteraler täcks av AST-raden); varianter: varje verklig `RoadmapSlice` ur `SUBSTITUTION_ROADMAP + ROADMAP`, båda
+  (v3.1, B3 — de FAKTISKA prompterna): drivern importerar den riktiga modulen (under slumpat modulnamn, N1-härdning)
+  och ANROPAR varje promptbyggare med fixturargument — byggare = funktion vars kodobjekts strängkonstanter bär
+  `Use `$nortropic-` eller vars namn matchar `prompt|_extra$|authority_text$`, minus flöden (v3.2 B1: ENBART via signatur —
+  en parameter `repo`/`wt`/`wt_root`; ingen strängförekomst kan välja bort mätningen); flöden anropas aldrig, deras
+  inlinade promptliteraler täcks av AST-raden; varianter: varje verklig `RoadmapSlice` ur `SUBSTITUTION_ROADMAP + ROADMAP`, båda
   remedieringsrollerna, båda `refrozen`-värdena; fixturer: 40-hex shas, tomt signal-dict, ett fynd, `h-015`, `BUILD`.
   Rad 1: byggarna `architect_prompt`, `roadmap_test_author_prompt`, `roadmap_gate_reviewer_prompt`,
   `roadmap_remediation_prompt`, `slice_builder_extra`, `slice_authority_text`, `empirical_gate_test_author_prompt`,
@@ -302,6 +312,25 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   commit-läsning, kodwebb- eller ägarstoppstoken; mängden `docs/…`-sökvägar (med ändelse) och rotdokument i producerad text
   ⊇ krävd och ⊆ tillåten (samma mängder som nedan), alla spårade och skannade/blob-pinnade; ingen byggare kastar.
   Mätt på referensen: 15 byggare, 101 producerade texter, 1 flöde (`empirical_gate_contract_flow`, inlinad remedieringsprompt).
+- `f4_prompt_builders_flows_and_callers_are_the_closed_expected_sets_every_runner_prompt_sourced_and_every_builder_live`
+  (v3.2, B1 — SLUTEN VÄRLD, mätt på plattformens autopilot): drivern rapporterar exakt `EXPECTED_PROMPT_BUILDERS` (15
+  namn) och `EXPECTED_PROMPT_FLOWS` ({`empirical_gate_contract_flow`}); statiskt (`prompt_world`, toppnivåfunktioner):
+  varje funktion som bär rollmarkören i någon strängkonstant eller returnerar ett uttryck vars konstanter bär markören
+  eller en `docs/…`-fil är PRODUCENT och måste tillhöra byggare ∪ flöden; varje funktion som namnger en byggare måste
+  tillhöra byggare ∪ `EXPECTED_PROMPT_CALLERS` (8 namn: architect_resolution, builder_flow, empirical_unattended_flow,
+  ensure_empirical_program_gate, ensure_roadmap_slice, roadmap_contract_flow, run_codex, test_author_flow, + flödet);
+  varje promptargument till `run_codex`/`run_codex_resolving_architecture` klassificeras rekursivt (Name → egen
+  tilldelning/parameter/modulkonstant/import; Call till byggare = OK utan att inspektera argument; Call till annan
+  modulfunktion = fel om den är producent eller byggarreferent, annars datahjälpare; f-sträng/BinOp/IfExp → delarna;
+  inlinad prompttext bara i ett förväntat flöde; Attribute/Subscript = data) — en okänd källa är RÖD; och varje krävd
+  byggare är nåbar från `main()` via namnreferensgraf (död krävd byggare = röd). Kanari: fixturmodul med tvilling,
+  inlinat flöde och död prompt flaggas exakt. Gräns: en levande tvilling som varken bär markör/`docs/`-fil, namnger en
+  byggare eller når en runner via Name/Call/f-sträng (t.ex. via dict-uppslag av funktioner) fångas inte statiskt — den
+  producerade texten mäts då bara om tvillingen heter `…prompt…`.
+- `f4_prompt_builders_run_in_contained_fixture_without_side_effects` (v3.2, N5): byggarna körs i en egen fixtur (HOME/XDG/
+  TMPDIR under fixturen, tom cwd, `GIT_DIR` mot ett tomt bare-repo, proxyvariabler mot en stängd lokal port); varje ny
+  eller ändrad fil under fixturen eller under subjektträdet efteråt är FAIL. Gräns: nätverk blockeras bara via
+  proxyvariabler i den statiska banan; `os.system`/råa sockets är produktfel som produktgranskningen läser.
 - `f4_prompt_functions_ast_literals_inject_only_the_declared_platform_document_set_all_tracked_and_scanned` (v3,
   komplement — statisk): promptbyggande funktioner = varje funktion vars strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
   `prompt|_extra$|authority_text$`, PLUS varje funktion som anropar en sådan (deras `extra`-strängar injiceras);
@@ -317,7 +346,9 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f4_plan_generation_slice_table_equals_autopilot_roadmap_tuples_and_selftest_exact_sets` (v3): planen bär en
   markdowntabell med rubrikcellerna exakt `slice | task | exit_test | allowed_write | depends_on | status`
   (skiftlägesoberoende; backticks/fetstil tolereras; listceller kommaseparerade; `-`/`—` = tom; status `BYGGD`/`OBYGGD`,
-  skiftlägesoberoende). Skivmängden == autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`-koder ∪ {S1, S3, L}; för varje
+  skiftlägesoberoende). v3.2 (B2): HTML-kommentarer och kodstaket stripas före parsning (bara den SYNLIGA texten räknas)
+  och exakt EN sådan tabell får finnas — två tabeller, en dold korrekt + en synlig avvikande, eller en tabell enbart i
+  kommentar/staket är alla röda. Kanari med två tabeller, kommentardold + synlig, stakettabell och enbart dold tabell. Skivmängden == autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`-koder ∪ {S1, S3, L}; för varje
   autopilotskiva: task == `task_id`, exit_test == `gate_path`, allowed_write-mängd == `plan_allowed_write`,
   depends_on-mängd == `required_deps`; S1/S3: task h-017/h-004, exit_test och depends_on == specradens, ingen
   skrivyta (`-`), `BYGGD`; L: task `-`, exit_test == `EMPIRICAL_GATE_PATH`, ingen skrivyta, depends_on == alla
@@ -327,6 +358,12 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f4_plan_generation_bootstrap_section_names_h031_to_h039_as_platform_establishment` (v3): ett `## `-avsnitt vars
   rubrik bär `bootstrap` namnger alla nio h-031…h-039 (bootstrap etablerar plattformen; delegationsdokumenten är
   read-only och omdefinieras inte — semantiken läses av granskaren).
+- `f4_plan_generation_has_required_sections_syfte_malbild_skydd_skivtabell_bootstrap_arbetsflode_avslutskriterier` (v3.2
+  N7): planens synliga text har `## `-rubriker som matchar `syfte`, `målbild`, `skyddade invarianter|tekniska skydd`,
+  `skivtabell`, `bootstrap`, `arbetsflöde`, `avslutskriteri`, var och en med ≥3 icke-tomma kroppsrader. Planens substans
+  mäts alltså via skivtabellen + de krävda avsnitten + tokenmängderna; kriterier och negativa kontroller per skiva läses av
+  den oberoende produktgranskningen. RECON-kartan (`~/nortropic/RECON-PLANGENERATION-20260910.md`, sha256
+  `e01fcfa5a7bf948c0de0a42079f995eb64772a19f496891b88c525f5d56b4625`) är vägledning för författandet, inte en pinne.
 - `f4_architect_and_empirical_runner_skills_name_plan_generation_and_no_plan_commit` (v3):
   `.agents/skills/nortropic-architect/SKILL.md` och `nortropic-empirical-runner/SKILL.md` namnger den nya planens
   sökväg och saknar `<PLAN_SHA>`, `frozen autonomous-loop plan commit`, `git show {…|<…|<hex>:` och den gamla planens pekare.
@@ -450,8 +487,11 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    GitHub/Promoter-värden är publiceringsmål och externa mätningar (OVERIFIERAT tills mekaniskt ommätta).
    Obligatoriskt innehåll: den maskinläsbara skivtabellen (kolumner `slice | task | exit_test | allowed_write |
    depends_on | status`; S1/S3 `BYGGD` utan skrivyta; SUB-1…SUB-4, S2, S4–S13 exakt som autopilotens tuplar;
-   L = `verify/bin/autonomous-loop-exit`, beroende av alla skivors task-id, `OBYGGD`), ett `## …bootstrap…`-avsnitt som
-   namnger h-031…h-039 utan att omdefiniera delegationsdokumenten, och `PLAN_GENERATION`-identiteten (blob vid HEAD).
+   L = `verify/bin/autonomous-loop-exit`, beroende av alla skivors task-id, `OBYGGD`; exakt EN sådan tabell, synlig —
+   inte i HTML-kommentar eller kodstaket), ett `## …bootstrap…`-avsnitt som namnger h-031…h-039 utan att omdefiniera
+   delegationsdokumenten, `PLAN_GENERATION`-identiteten (blob vid HEAD) och (v3.2) `## `-avsnitten Syfte, Målbild,
+   Skyddade invarianter/tekniska skydd, Skivtabell, Bootstrap etablerar plattformen, Arbetsflöde
+   (test-author → granskning → builder → granskning → lokal kvalificering), Avslutskriterier (≥3 rader var).
    De gamla kopiorna `docs/loop/autonomous-loop-plan-v1.md`/`autonomous-loop-codex-handoff.md` tas bort ur HEAD; de
    gamla objekten stannar i historiken. Inga pekare till den gamla planen (sha, 8-prefix, blobbar, sökvägar, gren,
    etiketterna effekt-authority/fryst input/historisk källa) i någon aktiv fil.
@@ -491,7 +531,11 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `docs/loop/autonomous-loop-platform-handoff-v2.md` med sha256 (elva-mängden i `SUBSTITUTION_BLOBS` oförändrad).
    (v3.1 B3) Varje roadmap-/empirisk-/arkitektprompt — även SUB-grenarna i `slice_builder_extra`/`slice_authority_text` —
    namnger både plan och handoff i sin PRODUCERADE text; byggarna måste kunna anropas med fixturargument (sträng-shas, tom
-   signal, ett fynd, verkliga skivor) utan sidoeffekter.
+   signal, ett fynd, verkliga skivor) utan sidoeffekter. (v3.2 B1) Mängden promptbyggare (15 namn), flöden
+   (`empirical_gate_contract_flow`) och byggaranropare (8 namn) är SLUTEN: inga nya/omdöpta prompt-, tvilling- eller
+   flödesfunktioner; varje runner-anrop får sin prompt från en förväntad byggare (eller inlinad text i det förväntade
+   flödet); varje krävd byggare nås från `main()`. `ensure_roadmap_plan` verifierar båda filernas blob (N2); `controller/verify/cli`
+   itererar `PLATFORM_DOCUMENTS` självt i prepare/check (N3). Inga skiftlägestvillingar av spårade sökvägar (N4).
 6. **Dokument:** `AGENTS.md` (Historik → Git-referenser/webbrepot utan sökväg), `README.md` (r.8, 21, 28),
    `docs/loop/regler.md` (r.9–10), `docs/loop/byggplan-v3.md` (r.9, 113, 166),
    `docs/loop/codex-autopilot-v3-full-roadmap.md` (r.17, 115), `docs/loop/harness-substitution-contract-v1.md`
@@ -521,6 +565,11 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
 - (v3.1) Prompter som inlinas direkt i ett flöde (t.ex. remedieringsprompten i `empirical_gate_contract_flow`) mäts bara
   statiskt (AST-literaler), inte som producerad text — flöden anropas inte. En byggare som kräver argument utanför
   fixturmängden faller rött (fail-closed), inte tyst grönt.
+- (v3.2) Grind-fingeravtryck (N1): en byggare kan producera planen bara under mätning (t.ex. på `PROVIDER_CALL_ALLOWED=NO`
+  eller fixturens HOME); modulnamnet slumpas men bench-miljön är synlig — produktgranskningen läser byggarna. Sluten värld
+  (N6-arv): base64/gzip-bilagor, zero-width-/blankstegsdelade prefix och semantisk override utan token fångas inte;
+  dubbletter/omordning i `allowed_write` är mängdsemantik. En tvilling som når en runner enbart via funktionsuppslag i en
+  dict/lista mäts inte statiskt (se B1-raden).
 - (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
   tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
   `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av
