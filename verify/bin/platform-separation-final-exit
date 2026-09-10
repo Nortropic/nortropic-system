@@ -9,16 +9,22 @@ skills, guards, config, workflows, permission rules and indirect dependencies.
 Pure web material must not stay in the tree renamed as history; platform Git
 history and kernel/H evidence stay. This gate binds EFFECTS on --subject:
 
-  F1  tree allowlist + required absences + transfer provenance by blob OID
+  F1  tree allowlist + required absences + transfer provenance by blob OID +
+      no blob at HEAD equal to a transferred or pre-split governance object
   F2  reference-closure oracle from the ACTIVE roots (router, skills, spec
       authority, verify-cli constants, autopilot constants, loop config) with
-      token scans, dangling references, section-level supersession bindings
+      token scans, dangling references, section-level supersession bindings;
+      PLUS a tree-wide scan of every tracked text file outside the explicit
+      frozen-evidence set (code by AST string constants, tests by fixture-aware
+      tokens), a closed set of *-local-development documents and a router that
+      never elevates frozen gate inputs
   F3  config/permission rules (premiar-backlog, managed-settings, .gitignore
-      effect, register, verify-cli pins, preflight, PINV 6/0)
+      effect, register, verify-cli pins, preflight, PINV 6/0, spec unchanged)
   F4  autopilot/loop function without the old root or an origin branch
       (ensure_roadmap_plan on local objects, selftest, publication-callers)
   F5  tests/controller/loop/fall.py B2 without web fixture (+ hermetic run)
-  F6  frozen evidence byte-identical to 332f07ce (+ this gate only)
+  F6  frozen evidence byte-identical to 332f07ce (+ this gate only);
+      EFTERARBETE.md append-only with a scanned addition
   F7  the three earlier frozen local gates run on the candidate, exact outcomes
   F8  no tracked file couples to the web repo path or the old root
   F10 rig discipline: canaries, strict JSON, result.json, bytes unchanged
@@ -66,6 +72,8 @@ SUBSTITUTION = "docs/loop/harness-substitution-contract-v1.md"
 IMPLEMENTATION = "docs/loop/implementation-v4.1.md"
 AUTOPILOT_V2 = "docs/loop/codex-autopilot-v2.md"
 OWNER_H003 = "docs/loop/owner-h003-attestation-authority-v1.md"
+LOOP_REVIEW = "docs/loop/loop-review-2026-07-31.md"
+EFTERARBETE = "SEPARATION-20260910/EFTERARBETE.md"
 EVIDENCE_CONTRACT = "docs/loop/codex-evidence-contract.md"
 PLAN_COPY = "docs/loop/autonomous-loop-plan-v1.md"
 HANDOFF_COPY = "docs/loop/autonomous-loop-codex-handoff.md"
@@ -91,6 +99,20 @@ ABSENT_PREFIXES = ("agents/", "workflows/", "skills/", "vendored-skills/", "pack
                    "tools/", "docs/100-dagar/", "docs/arkiv/")
 ABSENT_RE = re.compile(r"^docs/0\d-[^/]*\.md$")
 TRANSFERRED = ABSENT_EXACT[:4]
+# F1: no blob at HEAD, under any path, may equal a transferred object (at 332f07ce) or a pre-split governance
+# original (dae90c8f): a renamed or re-parked copy is the same object.
+FORBIDDEN_BLOBS = {
+    "6b41bcd4e1e04b3d4a64fc2e72effc2763c4a4f9": "332f07ce:docs/loop/arkiv/regler-fore-2026-09-10.md",
+    "bd298bcfd2ef6111b6de734e73c8e98c759c0ecc": "332f07ce:docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md",
+    "a847ade1a491a3728b4759f0de42be71fb393935": "332f07ce:docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md",
+    "2d018d65f0a0edbf0cb65aa0a0168e9e7c3bb1e5": "332f07ce:scripts/check-verifierarregistret.mjs",
+    "b0bc10ae78ed8eb4ee9a1767921111eb94faa146": "dae90c8f:docs/loop/regler.md",
+    "c0b3b04b09fe901a16df9c83a81c37d157aa03bb": "dae90c8f:docs/loop/byggplan-v3.md",
+    "2324b2fe9b98bfb4f6a1b38e81154325e09f2bc0": "dae90c8f:specs/tasks.spec.json",
+    "26e835d01bd952239f7956e8a821168445a5ef51": "dae90c8f:AGENTS.md",
+    "52c93a66879f6043b89ea20f7fa7d31143219f35": "dae90c8f:CLAUDE.md",
+    "1b95647e842464ed9e710a16e9fa451b4f385b68": "dae90c8f:README.md",
+}
 # F6 frozen evidence at 332f07ce. verify/** may gain exactly this gate; SEPARATION may gain the
 # provenance file and a changed EFTERARBETE.md; nothing else.
 FROZEN_TREES = ("verify", "controller/h034-native", "controller/runtime-cleanup", "controller/provenance",
@@ -112,26 +134,51 @@ CLOSURE_EXEMPT_PREFIXES = ("SEPARATION-20260910/", "verify/")
 # Historical documents that stay byte-identical and gain one dated supersession block (header or appended note).
 HISTORICAL_NOTE_DOCS = {IMPLEMENTATION: (r"§\s*3\b", r"§\s*4\b", r"§\s*29\b"),
                         AUTOPILOT_V2: (r"OWNER_AUTHORITY_REQUIRED",),
-                        OWNER_H003: (r"§\s*9\b|\b9\.", r"docs/loop/drift\.md")}
+                        OWNER_H003: (r"§\s*9\b|\b9\.", r"docs/loop/drift\.md"),
+                        LOOP_REVIEW: (r"2026-07-31",)}
+# Tree-wide scan (F2): every tracked file is classified. Frozen evidence is bound by OID elsewhere and not scanned;
+# partial documents are scanned only in their active/added part; code is scanned on AST string constants (Python)
+# or full text (shell/JS/C); test suites carry frozen spec rows' docs_impact as fixture data; everything else is
+# text. Binary blobs are tolerated only inside the frozen kernel/provenance trees.
+TREE_FROZEN_PREFIXES = ("verify/", "SEPARATION-20260910/proposed/")
+TREE_FROZEN_FILES = {"SEPARATION-20260910/README.md", "SEPARATION-20260910/ALLOCATION.tsv",
+                     "SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv", PROVENANCE_2, PLAN_COPY, HANDOFF_COPY,
+                     "docs/loop/owner-author-workflow-v1.md", "docs/loop/remaining-bootstrap-delegation-v1.md",
+                     VERIFIER, SPEC}
+BINARY_ALLOWED_PREFIXES = ("verify/", "controller/provenance/dist/", "controller/runtime-cleanup/install")
 DRIFT_ACTIVE_HEADING = re.compile(r"^## Aktiv plattformsnot\b.*$", re.M)
 # --- token rules -----------------------------------------------------------------------------
 WEB_TOKENS = (
-    r"docs/07-konstitution", r"docs/03-regelverk", r"docs/05-beslutslogg", r"docs/00-[\w-]*", r"docs/agentoverlamning",
-    r"docs/100-dagar", r"docs/arkiv/", r"KONSTITUTION\.md", r"(?<![\w-])AUTOPILOT(?![\w-])", r"(?i)steward",
-    r"Vaktmästaren", r"Nattskiftet", r"eval-rubric", r"juridikflaggor", r"nortropic-verify-suite",
-    r"(?<![\w./-])workflows/", r"(?<![\w./-])agents/[\w-]+\.md", r"(?<![\w./-])skills/", r"vendored-skills",
-    r"tests/fixtures", r"(?i)konstitution\w*", r"(?i)constitution\w*", r"(?i)regelverk\w*", r"(?i)\brulebook\b",
+    r"(?i)docs/07-konstitution", r"(?i)docs/03-regelverk", r"(?i)docs/05-beslutslogg", r"(?i)docs/00-[\w-]*",
+    r"(?i)docs/agentoverlamning", r"(?i)docs/100-dagar", r"(?i)docs/arkiv/", r"KONSTITUTION\.md",
+    r"(?<![\w-])AUTOPILOT(?![\w-])", r"(?i)steward", r"Vaktmästaren", r"Nattskiftet", r"eval-rubric", r"juridikflaggor",
+    r"nortropic-verify-suite", r"(?<![\w./-])workflows/", r"(?<![\w./-])agents/[\w-]+\.md", r"(?<![\w./-])skills/",
+    r"vendored-skills", r"tests/fixtures", r"(?i)konstitution\w*", r"(?i)constitution\w*", r"(?i)regelverk\w*",
+    r"(?i)\brulebook\b", r"(?i)beslutslogg\w*", r"nortropic-webbforvaltning/",
 )
+# Code: the platform autopilot names itself "AUTOPILOT <event>" in its journal; the web repo may not be named at all.
+CODE_WEB_TOKENS = tuple(t for t in WEB_TOKENS if "AUTOPILOT" not in t) + (r"nortropic-webbforvaltning",)
+# Test suites keep frozen spec rows' docs_impact paths (docs/05, docs/00) as fixture data.
+TEST_WEB_TOKENS = tuple(t for t in CODE_WEB_TOKENS if not any(k in t for k in ("docs/05", "docs/00", "beslutslogg")))
 HUMAN_TOKENS = (
     r"(?i)människohand", r"(?i)endast\s+av\s+(en\s+)?människ", r"(?i)av\s+(en\s+)?människa\b", r"(?i)högrisk",
     r"(?i)owner[-_ ]only", r"(?i)human owner", r"(?i)policyägare", r"OWNER_GATE_(STILL_)?REQUIRED",
     r"OWNER_AUTHORITY_REQUIRED", r"(?i)remove the owner gate", r"(?i)owner reproduces",
     r"(?i)människan för kandidaterna", r"(?i)auto-merge är avstängt", r"(?i)godkänner\s+(spec|§A|merge)",
-    r"(?i)human[- ]hand", r"(?i)owner[- ]hand",
+    r"(?i)human[- ]hand", r"(?i)owner[- ]hand", r"(?i)\bJohnny\b", r"(?i)klartecken",
+    r"(?i)vänta på (ägaren|människan|en människa)", r"(?i)ägarens (uttryckliga )?(godkännande|klartecken|beslut)",
+)
+# Code strings: the autopilot's prompts legitimately negate the human owner ("not a request for the human owner");
+# only unambiguous owner-stop tokens are bound there.
+CODE_HUMAN_TOKENS = (
+    r"(?i)människohand", r"(?i)endast\s+av\s+(en\s+)?människ", r"(?i)högrisk", r"(?i)owner[-_ ]only",
+    r"OWNER_AUTHORITY_REQUIRED", r"(?i)\bJohnny\b", r"(?i)klartecken", r"(?i)vänta på (ägaren|människan|en människa)",
+    r"(?i)ägarens (uttryckliga )?(godkännande|klartecken|beslut)", r"(?i)auto-merge är avstängt",
+    r"(?i)människan för kandidaterna",
 )
 EXEC_WEB_TOKENS = (
-    r"docs/07-konstitution", r"docs/03-regelverk", r"docs/05-beslutslogg", r"docs/00-borja-har",
-    r"docs/agentoverlamning", r"docs/100-dagar", r"(?<![\w./-])workflows/", r"tests/fixtures",
+    r"(?i)docs/07-konstitution", r"(?i)docs/03-regelverk", r"(?i)docs/05-beslutslogg", r"(?i)docs/00-borja-har",
+    r"(?i)docs/agentoverlamning", r"(?i)docs/100-dagar", r"(?<![\w./-])workflows/", r"tests/fixtures",
     r"eval-rubric", r"juridikflaggor", r"nortropic-steward", r"nortropic-verify-suite", r"[\"']AUTOPILOT[\"']",
 )
 LOOP_FALL_WEB_TOKENS = (r"(?<![\w./-])agents/", r"(?<!P)INV-00\d", r"(?<![\w./-])workflows/", r"tests/fixtures")
@@ -144,9 +191,12 @@ NOT_IGNORED = ("SEPARATION-20260910/README.md", PROVENANCE_2, "docs/loop/x.md", 
 # turns that suite red (measured 2026-09-10 on the reference construction). Absence of web docs is bound by F1.
 IGNORED = ("workflows/x.js", "agents/x.md", "skills/x/SKILL.md", "vendored-skills/x/SKILL.md", "packs/x.json",
            "backtests/x.md", "tools/x/y.mjs", "AUTOPILOT")
-PATH_RE = re.compile(r"(?<![\w/.-])((?:docs|config|specs)/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.(?:md|json))")
+# Any file-like reference under the instruction/config trees, case-insensitive (Docs/05-Beslutslogg.md is a
+# reference too); a trailing "/" or a directory candidate is a tree reference and is neither followed nor dangling.
+PATH_RE = re.compile(r"(?i)(?<![\w/.-])((?:docs|config|specs)/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*)")
 ROOT_DOC_RE = re.compile(r"(?<![\w/.-])(AGENTS\.md|CLAUDE\.md|README\.md|\.agents/skills/[A-Za-z0-9_-]+/SKILL\.md)")
-LINK_RE = re.compile(r"\]\(([^)\s#]+)(?:#[^)]*)?\)")
+# Markdown links with optional angle brackets and an optional "title"; any target extension.
+LINK_RE = re.compile(r"\]\(\s*<?([^)\s>#]+)>?(?:#[^)\s]*)?(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
 DOC_SECTIONS = ("## Enkelt förklarat", "## Avgränsning och roller", "## Kriterium (effekter)",
                 "## Produktyta för BUILDER", "## Vad grinden inte bevisar", "## Utfall")
 SHA256_FORM = re.compile(r"^[0-9a-f]{64}$")
@@ -245,18 +295,27 @@ def sections(text):
     return out
 
 
+def clean_candidate(candidate):
+    return candidate.rstrip(".,;:")
+
+
 def refs_from_text(rel, text):
+    """Repo-relative file references: path tokens (case-insensitive), root documents, markdown links."""
     out = set()
     for m in PATH_RE.finditer(text):
-        out.add(m.group(1))
+        c = clean_candidate(m.group(1))
+        if "." in c.rsplit("/", 1)[-1]:
+            out.add(c)
+        else:
+            out.add(c + "/")      # directory reference (resolved against tracked directories, never followed)
     for m in ROOT_DOC_RE.finditer(text):
         out.add(m.group(1))
     for m in LINK_RE.finditer(text):
         target = m.group(1)
-        if "://" in target or not target.endswith((".md", ".json")):
+        if "://" in target or target.startswith(("mailto:", "#")):
             continue
-        if target.startswith(("docs/", "config/", "specs/", ".agents/")) or target in (AGENTS, CLAUDE, README):
-            out.add(target)
+        if target.startswith("/"):
+            out.add("/" + target)  # absolute link: never a tracked path -> dangling
             continue
         parts = []
         for seg in (Path(rel).parent / target).as_posix().split("/"):
@@ -265,7 +324,7 @@ def refs_from_text(rel, text):
                     parts.pop()
             elif seg and seg != ".":
                 parts.append(seg)
-        out.add("/".join(parts))
+        out.add("/".join(parts) + ("/" if target.endswith("/") else ""))
     return out
 
 
@@ -280,6 +339,16 @@ def refs_from_json(obj):
     elif isinstance(obj, str) and (PATH_RE.fullmatch(obj) or ROOT_DOC_RE.fullmatch(obj)):
         out.add(obj)
     return out
+
+
+def decode_text(raw):
+    """UTF-8 text without NUL bytes, else None (binary)."""
+    if b"\x00" in raw:
+        return None
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def module_constants(source, names):
@@ -588,10 +657,12 @@ def main():
           and bool(scan("Registrerad hash uppdateras endast av människohand.", HUMAN_TOKENS))
           and bool(scan("OWNER_AUTHORITY_REQUIRED=YES", HUMAN_TOKENS))
           and not scan(".agents/skills/x/SKILL.md AUTOPILOT_V4_SELFTEST HUMAN_AUTHORITY_HARD_STOP LOOP-ÄGARHAND-26", WEB_TOKENS + HUMAN_TOKENS)
-          and not scan("inte ett permanent krav på mänskligt godkännande", HUMAN_TOKENS))
+          and not scan("inte ett permanent krav på mänskligt godkännande", HUMAN_TOKENS)
+          and bool(scan("Merge kräver ägarens uttryckliga klartecken; vänta på Johnny.", HUMAN_TOKENS))
+          and bool(scan("Read docs/07-" + "konstitution.md first", CODE_WEB_TOKENS)) and not scan("AUTOPILOT ROADMAP_AUTHORITY", CODE_WEB_TOKENS))
     check("canary_closure_extraction_follows_backticked_paths_and_relative_links",
-          refs_from_text("docs/loop/a.md", "se `docs/loop/y.md`, [z](../loop/z.md) och [w](w.md); AGENTS.md")
-          == {"docs/loop/y.md", "docs/loop/z.md", "docs/loop/w.md", AGENTS}
+          refs_from_text("docs/loop/a.md", "se `docs/loop/y.md`, [z](../loop/z.md) och [w](w.md \"titel\"); AGENTS.md; Docs/05-Beslutslogg.md; docs/loop/; <docs/loop/q.txt>")
+          == {"docs/loop/y.md", "docs/loop/z.md", "docs/loop/w.md", AGENTS, "Docs/05-Beslutslogg.md", "docs/loop/", "docs/loop/q.txt"}
           and refs_from_json({"spec": "config/premiar-backlog.json", "x": ["docs/05-beslutslogg.md"]})
           == {"config/premiar-backlog.json", "docs/05-beslutslogg.md"})
 
@@ -621,6 +692,9 @@ def main():
         prov_ok = not problems and set(listed) == set(TRANSFERRED)
         prov_detail = f"listed={sorted(listed)} problems={problems}"
     check("f1_web_transfer_provenance_2_lists_the_four_files_with_blob_oids_at_" + FROZEN_BASE[:8], prov_ok, prov_detail)
+    same_object = sorted(f"{rel} == {FORBIDDEN_BLOBS[oid]}" for rel, (mode, oid) in tracked_entries.items() if oid in FORBIDDEN_BLOBS)
+    check("f1_no_blob_at_head_equals_a_transferred_or_pre_split_governance_object", not same_object and len(FORBIDDEN_BLOBS) == 10,
+          str(same_object)[:600])
 
     # ------------------------------------------------------------------ F2: reference closure oracle
     roots, root_problems = {AGENTS, CLAUDE, README, LOOP_CONFIG}, []
@@ -691,10 +765,18 @@ def main():
                 if m is None or int(m.group(1)) in (6, 12) or int(m.group(1)) > 13:
                     keep.append(raw[s:e])
             return "".join(keep)
+        if rel == EFTERARBETE:
+            base = base_bytes(rel)
+            current = (subject / rel).read_bytes()
+            if base is not None and current.startswith(base):
+                return current[len(base):].decode("utf-8", "replace")
+            return raw
         if rel.endswith("-local-development.md"):
             return None
         return raw
 
+    tracked_dirs = {rel.rsplit("/", 1)[0] + "/" for rel in tracked if "/" in rel}
+    tracked_dirs |= {d[:i + 1] for d in list(tracked_dirs) for i, ch in enumerate(d) if ch == "/"}
     reached, edges, dangling, queue = set(), {}, {}, sorted(roots)
     while queue:
         rel = queue.pop(0)
@@ -716,6 +798,10 @@ def main():
         refs.discard(rel)
         edges[rel] = sorted(refs)
         for ref in refs:
+            if ref.endswith("/"):
+                if ref not in tracked_dirs:
+                    dangling.setdefault(ref, []).append(rel)
+                continue
             if ref not in tracked:
                 dangling.setdefault(ref, []).append(rel)
             if ref not in reached:
@@ -733,6 +819,74 @@ def main():
         human = () if rel in HISTORICAL_NOTE_DOCS else HUMAN_TOKENS
         hits = scan(body, WEB_TOKENS + human)
         check("f2_active_doc_free_of_web_governance_and_human_hand_rules_" + label_of(rel), not hits, fmt_hits(hits))
+    classification, web_hits, human_hits, binary_outside = {}, [], [], []
+    for rel in sorted(tracked):
+        p = subject / rel
+        if not p.is_file() or p.is_symlink():
+            continue
+        if rel.startswith(TREE_FROZEN_PREFIXES) or rel in TREE_FROZEN_FILES:
+            classification[rel] = "frozen"
+            continue
+        raw = p.read_bytes()
+        body = decode_text(raw)
+        if body is None:
+            classification[rel] = "binary"
+            if not rel.startswith(BINARY_ALLOWED_PREFIXES):
+                binary_outside.append(rel)
+            continue
+        if rel in HISTORICAL_NOTE_DOCS or rel in (DRIFT, SUBSTITUTION, EFTERARBETE):
+            classification[rel] = "partial"
+            part = scannable_text(rel) or ""
+            web_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, WEB_TOKENS)]
+            if rel not in HISTORICAL_NOTE_DOCS:
+                human_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, HUMAN_TOKENS)]
+            continue
+        if rel.endswith("-local-development.md"):
+            classification[rel] = "local-development"
+            continue
+        is_python = rel.endswith(".py") or body.startswith("#!/usr/bin/env python")
+        is_test = rel.startswith("tests/")
+        if is_python:
+            classification[rel] = "test" if is_test else "code"
+            try:
+                strings = code_strings(body, skip_function_re=r"(?i)refreeze|h03[5-9]")
+            except SyntaxError as exc:
+                web_hits.append(f"{rel}: does not parse: {exc!r}")
+                continue
+            tokens = TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS
+            for line, value in strings:
+                web_hits += [f"{rel}@{line} {pat}: {value[:50]!r}" for pat in tokens if re.search(pat, value)]
+                if not is_test:
+                    human_hits += [f"{rel}@{line} {pat}: {value[:50]!r}" for pat in CODE_HUMAN_TOKENS if re.search(pat, value)]
+            continue
+        if rel.startswith("controller/") and not rel.endswith((".md", ".json")) or rel.endswith((".mjs", ".js", ".c", ".h")):
+            classification[rel] = "test" if is_test else "code"
+            web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS)]
+            continue
+        classification[rel] = "text"
+        web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, WEB_TOKENS)]
+        human_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, HUMAN_TOKENS)]
+    counts = {k: sum(1 for v in classification.values() if v == k) for k in ("frozen", "partial", "local-development", "code", "test", "text", "binary")}
+    check("f2_tree_wide_no_web_governance_reference_outside_frozen_evidence",
+          not web_hits and not binary_outside and counts["text"] >= 20 and counts["code"] >= 15,
+          f"counts={counts} binary_outside={binary_outside} hits={web_hits[:12]}")
+    check("f2_tree_wide_no_human_hand_rule_outside_frozen_evidence", not human_hits and counts["text"] >= 20,
+          f"counts={counts} hits={human_hits[:12]}")
+    base_local_dev = {rel for rel in ls_tree(subject, probe_env, FROZEN_BASE, ".") if rel.endswith("-local-development.md")}
+    head_local_dev = {rel for rel in tracked if rel.endswith("-local-development.md")}
+    check("f2_local_development_documents_are_exactly_the_" + FROZEN_BASE[:8] + "_set_plus_this_contract",
+          head_local_dev == base_local_dev | {DOCUMENT} and len(base_local_dev) >= 4,
+          f"extra={sorted(head_local_dev - base_local_dev - {DOCUMENT})} missing={sorted((base_local_dev | {DOCUMENT}) - head_local_dev)}")
+    agents_text = text(AGENTS)
+    authority_section = next((agents_text[s:e] for h, s, e in sections(agents_text) if h.startswith("## Auktoritetsordning")), "")
+    exempt_in_router = []
+    for para in re.split(r"\n\s*\n", authority_section):
+        for ref in refs_from_text(AGENTS, para):
+            if ref in CLOSURE_EXEMPT or ref.startswith(CLOSURE_EXEMPT_PREFIXES) or ref in TREE_FROZEN_FILES:
+                if not (re.search(r"(?i)fryst|historisk", para) and re.search(r"(?i)inte dagens instruktion", para)):
+                    exempt_in_router.append(ref)
+    check("f2_router_authority_section_marks_frozen_gate_inputs_as_not_current_instruction",
+          bool(authority_section) and not exempt_in_router, f"unmarked={exempt_in_router}")
     fr = text(FULL_ROADMAP)
     fr_authority = next((fr[s:e] for h, s, e in sections(fr) if h.startswith("## Authority")), "")
     check("f2_full_roadmap_authority_section_keeps_plan_sha_and_names_agents_md_as_conflict_authority",
@@ -878,6 +1032,9 @@ def main():
             if rel not in tracked or sha((subject / rel).read_bytes()) != digest:
                 problems.append("PLATFORM_DOCUMENTS " + rel)
     check("f3_verify_cli_pins_equal_candidate_spec_register_and_every_generation_document", not problems, str(problems))
+    spec_base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{SPEC}").stdout.strip()
+    check("f3_spec_byte_identical_to_" + FROZEN_BASE[:8] + "_this_contract_requires_no_spec_change",
+          bool(spec_base_oid) and head_oid(SPEC) == spec_base_oid, f"head={head_oid(SPEC)} base={spec_base_oid}")
     rep, rep_env = replica(bench, "candidate", subject, head)
     rep_tmp = bench.tmp("candidate")
     r = run([rep / VERIFY_CLI, "preflight"], scratch, rep_env)
@@ -1002,6 +1159,11 @@ def main():
         and stat.S_IMODE(gate_path.lstat().st_mode) == 0o755
     check("f6_frozen_evidence_identical_to_" + FROZEN_BASE[:8] + "_plus_this_gate_only",
           not problems and additions == [GATE] and gate_ok, f"problems={problems[:10]} additions={additions} gate_ok={gate_ok}")
+    ea_base, ea_head = base_bytes(EFTERARBETE), (subject / EFTERARBETE).read_bytes() if (subject / EFTERARBETE).is_file() else b""
+    ea_added = ea_head[len(ea_base):].decode("utf-8", "replace") if ea_base is not None and ea_head.startswith(ea_base) else None
+    ea_hits = scan(ea_added or "", WEB_TOKENS + HUMAN_TOKENS)
+    check("f6_efterarbete_append_only_vs_" + FROZEN_BASE[:8] + "_with_scanned_addition",
+          EFTERARBETE in tracked and ea_added is not None and not ea_hits, f"append_only={ea_added is not None} hits={fmt_hits(ea_hits, 4)}")
     held_identical = {}
     for rel in (CONTROL_SET_GATE, LAUNCH_CWD_GATE, GOVERNANCE_GATE):
         base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
@@ -1011,9 +1173,13 @@ def main():
 
     # ------------------------------------------------------------------ F7: earlier frozen local gates on the candidate
     def held_gate(rel, override):
+        """The held copy: the subject's own copy when byte-identical to the base, else an override that is."""
+        base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
         if override is not None:
             p = override.resolve()
-            return p if p.is_file() else None
+            if not p.is_file() or git_raw(subject, probe_env, "hash-object", "--", str(p)).stdout.strip() != base_oid:
+                return None
+            return p
         return (subject / rel) if held_identical.get(rel) else None
 
     gate_runs = {}
@@ -1024,7 +1190,7 @@ def main():
             return
         program = held_gate(rel, override)
         if program is None:
-            check(label, False, "no held copy: subject copy not byte-identical to " + FROZEN_BASE[:8] + " and no override given")
+            check(label, False, "no held copy: neither the subject copy nor the given override is byte-identical to " + FROZEN_BASE[:8] + ":" + rel)
             return
         tmp = bench.tmp("held-" + Path(rel).name)
         r = run([PYTHON, "-B", program, "--subject", subject], scratch, bench.env(tmp), timeout=timeout)
@@ -1115,6 +1281,7 @@ def main():
               "subject_sha256": subject_sha, "held_sha256": held, "held_gate_runs": gate_runs,
               "closure_roots": sorted(roots), "closure_reached": sorted(reached), "closure_scanned": scanned,
               "closure_dangling": {k: sorted(v) for k, v in sorted(dangling.items())},
+              "tree_classification": classification, "forbidden_blobs": FORBIDDEN_BLOBS,
               "governance_expected_fails": list(GOVERNANCE_EXPECTED_FAILS),
               "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
               "sandbox_exec_present": Path(SANDBOX_EXEC).is_file(),
