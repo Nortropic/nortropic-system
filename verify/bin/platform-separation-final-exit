@@ -10,7 +10,8 @@ Pure web material must not stay in the tree renamed as history; platform Git
 history and kernel/H evidence stay. This gate binds EFFECTS on --subject:
 
   F1  tree allowlist + required absences + transfer provenance by blob OID +
-      no blob at HEAD equal to a transferred or pre-split governance object
+      no blob at HEAD equal to a transferred or pre-split governance object +
+      no symlink entry at HEAD
   F2  reference-closure oracle from the ACTIVE roots (router, skills, spec
       authority, verify-cli constants, autopilot constants, loop config) with
       token scans, dangling references, section-level supersession bindings;
@@ -146,6 +147,16 @@ TREE_FROZEN_FILES = {"SEPARATION-20260910/README.md", "SEPARATION-20260910/ALLOC
                      "docs/loop/owner-author-workflow-v1.md", "docs/loop/remaining-bootstrap-delegation-v1.md",
                      VERIFIER, SPEC}
 BINARY_ALLOWED_PREFIXES = ("verify/", "controller/provenance/dist/", "controller/runtime-cleanup/install")
+# Exact set of functions whose string constants are historical refreeze evidence (measured at 332f07ce: the only
+# code constants naming docs/05-beslutslogg.md). No name pattern: a new function called h035_x or refreeze_y is scanned.
+HISTORICAL_CODE_FUNCTIONS = {(ATTEST_CLI, "expected_refreeze"), (ATTEST_CLI, "h038_proof")}
+# Owner-stop tokens that are never acceptable even inside a supersession note that quotes what it supersedes.
+HARD_HUMAN_TOKENS = (
+    r"(?i)människohand", r"(?i)endast\s+av\s+(en\s+)?människ", r"(?i)högrisk", r"(?i)klartecken",
+    r"(?i)vänta på (ägaren|människan|en människa|Johnny)", r"(?i)ägarens (uttryckliga )?(godkännande|klartecken|beslut)",
+)
+# References that leave the repository tree (../x) are never tracked: always dangling.
+OUTSIDE_RE = re.compile(r"(?<![\w.])((?:\.\./)+[A-Za-z0-9_./-]+)")
 DRIFT_ACTIVE_HEADING = re.compile(r"^## Aktiv plattformsnot\b.*$", re.M)
 # --- token rules -----------------------------------------------------------------------------
 WEB_TOKENS = (
@@ -167,6 +178,7 @@ HUMAN_TOKENS = (
     r"(?i)människan för kandidaterna", r"(?i)auto-merge är avstängt", r"(?i)godkänner\s+(spec|§A|merge)",
     r"(?i)human[- ]hand", r"(?i)owner[- ]hand", r"(?i)\bJohnny\b", r"(?i)klartecken",
     r"(?i)vänta på (ägaren|människan|en människa)", r"(?i)ägarens (uttryckliga )?(godkännande|klartecken|beslut)",
+    r"human_only",
 )
 # Code strings: the autopilot's prompts legitimately negate the human owner ("not a request for the human owner");
 # only unambiguous owner-stop tokens are bound there.
@@ -310,6 +322,10 @@ def refs_from_text(rel, text):
             out.add(c + "/")      # directory reference (resolved against tracked directories, never followed)
     for m in ROOT_DOC_RE.finditer(text):
         out.add(m.group(1))
+    # ../x outside a markdown link leaves the repository (never tracked -> dangling); inside a link the
+    # resolution below decides whether the target escapes the tree.
+    for m in OUTSIDE_RE.finditer(LINK_RE.sub("](#)", text)):
+        out.add("<outside-tree>" + m.group(1))
     for m in LINK_RE.finditer(text):
         target = m.group(1)
         if "://" in target or target.startswith(("mailto:", "#")):
@@ -317,14 +333,16 @@ def refs_from_text(rel, text):
         if target.startswith("/"):
             out.add("/" + target)  # absolute link: never a tracked path -> dangling
             continue
-        parts = []
+        parts, escaped = [], False
         for seg in (Path(rel).parent / target).as_posix().split("/"):
             if seg == "..":
                 if parts:
                     parts.pop()
+                else:
+                    escaped = True
             elif seg and seg != ".":
                 parts.append(seg)
-        out.add("/".join(parts) + ("/" if target.endswith("/") else ""))
+        out.add(("<outside-tree>" if escaped else "") + "/".join(parts) + ("/" if target.endswith("/") else ""))
     return out
 
 
@@ -375,8 +393,8 @@ def ast_path_strings(source):
     return out
 
 
-def code_strings(source, skip_function_re=None):
-    """(line, value) for string constants that are neither docstrings nor inside functions matching skip_function_re."""
+def code_strings(source, skip_functions=()):
+    """(line, value) for string constants that are neither docstrings nor inside a function named in skip_functions."""
     tree = ast.parse(source)
     docstrings, out, stack = set(), [], []
     for node in ast.walk(tree):
@@ -394,7 +412,7 @@ def code_strings(source, skip_function_re=None):
 
         def visit_Constant(self, node):
             if isinstance(node.value, str) and id(node) not in docstrings:
-                if not (skip_function_re and any(re.search(skip_function_re, n) for n in stack)):
+                if not any(n in skip_functions for n in stack):
                     out.append((node.lineno, node.value))
     V().visit(tree)
     return out
@@ -663,6 +681,8 @@ def main():
     check("canary_closure_extraction_follows_backticked_paths_and_relative_links",
           refs_from_text("docs/loop/a.md", "se `docs/loop/y.md`, [z](../loop/z.md) och [w](w.md \"titel\"); AGENTS.md; Docs/05-Beslutslogg.md; docs/loop/; <docs/loop/q.txt>")
           == {"docs/loop/y.md", "docs/loop/z.md", "docs/loop/w.md", AGENTS, "Docs/05-Beslutslogg.md", "docs/loop/", "docs/loop/q.txt"}
+          and all(r.startswith("<outside-tree>") for r in refs_from_text(CLAUDE, "Läs `../webb/AGENTS.md` och [r](../../x/regler.md)."))
+          and len(refs_from_text(CLAUDE, "Läs `../webb/AGENTS.md` och [r](../../x/regler.md).")) >= 2
           and refs_from_json({"spec": "config/premiar-backlog.json", "x": ["docs/05-beslutslogg.md"]})
           == {"config/premiar-backlog.json", "docs/05-beslutslogg.md"})
 
@@ -692,6 +712,9 @@ def main():
         prov_ok = not problems and set(listed) == set(TRANSFERRED)
         prov_detail = f"listed={sorted(listed)} problems={problems}"
     check("f1_web_transfer_provenance_2_lists_the_four_files_with_blob_oids_at_" + FROZEN_BASE[:8], prov_ok, prov_detail)
+    symlinks = sorted(rel for rel, (mode, oid) in tracked_entries.items() if mode == "120000")
+    base_symlinks = sorted(rel for rel, (mode, oid) in ls_tree(subject, probe_env, FROZEN_BASE, ".").items() if mode == "120000")
+    check("f1_no_symlink_entries_at_head", not symlinks and not base_symlinks, f"symlinks={symlinks} base={base_symlinks}")
     same_object = sorted(f"{rel} == {FORBIDDEN_BLOBS[oid]}" for rel, (mode, oid) in tracked_entries.items() if oid in FORBIDDEN_BLOBS)
     check("f1_no_blob_at_head_equals_a_transferred_or_pre_split_governance_object", not same_object and len(FORBIDDEN_BLOBS) == 10,
           str(same_object)[:600])
@@ -849,7 +872,7 @@ def main():
         if is_python:
             classification[rel] = "test" if is_test else "code"
             try:
-                strings = code_strings(body, skip_function_re=r"(?i)refreeze|h03[5-9]")
+                strings = code_strings(body, skip_functions={fn for f, fn in HISTORICAL_CODE_FUNCTIONS if f == rel})
             except SyntaxError as exc:
                 web_hits.append(f"{rel}: does not parse: {exc!r}")
                 continue
@@ -880,13 +903,15 @@ def main():
     agents_text = text(AGENTS)
     authority_section = next((agents_text[s:e] for h, s, e in sections(agents_text) if h.startswith("## Auktoritetsordning")), "")
     exempt_in_router = []
-    # One list item (a numbered/bulleted entry with its continuation lines, never a following paragraph) is the
-    # unit: the marker must sit in the same item as the reference. The spec itself is active authority (exempt only from token scanning).
-    for item in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|[-*])\s)", authority_section):
-        for ref in refs_from_text(AGENTS, item):
-            if ref != SPEC and (ref in CLOSURE_EXEMPT or ref.startswith(CLOSURE_EXEMPT_PREFIXES) or ref in TREE_FROZEN_FILES):
-                if not (re.search(r"(?i)fryst|historisk", item) and re.search(r"(?i)inte dagens instruktion", item)):
-                    exempt_in_router.append(ref)
+    # The whole router (AGENTS.md and CLAUDE.md), unit = one paragraph or one list item (a numbered/bulleted entry
+    # with its continuation lines, never a following paragraph): every mention of a frozen/exempt document must
+    # carry the markers in that same unit. The spec itself is active authority (exempt only from token scanning).
+    for rel in (AGENTS, CLAUDE):
+        for item in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|[-*])\s)", text(rel)):
+            for ref in refs_from_text(rel, item):
+                if ref != SPEC and (ref in CLOSURE_EXEMPT or ref.startswith(CLOSURE_EXEMPT_PREFIXES) or ref in TREE_FROZEN_FILES):
+                    if not (re.search(r"(?i)fryst|historisk", item) and re.search(r"(?i)inte dagens instruktion", item)):
+                        exempt_in_router.append(f"{rel}: {ref}")
     check("f2_router_authority_section_marks_frozen_gate_inputs_as_not_current_instruction",
           bool(authority_section) and not exempt_in_router, f"unmarked={exempt_in_router}")
     fr = text(FULL_ROADMAP)
@@ -935,6 +960,7 @@ def main():
         else:
             problems += [f"note lacks {m}" for m in ("2026-09-10", AGENTS) + tuple(markers) if not re.search(m, block)]
             problems += [f"note carries web token {p}@{l}" for p, l, _ in scan(block, WEB_TOKENS)[:3]]
+            problems += [f"note carries owner-stop token {p}@{l}" for p, l, _ in scan(block, HARD_HUMAN_TOKENS)[:3]]
         check("f2_historical_document_unchanged_plus_dated_supersession_note_" + label_of(rel), not problems, str(problems)[:600])
     drift_base, drift_head = base_bytes(DRIFT), (subject / DRIFT).read_bytes()
     active = scannable_text(DRIFT) or ""
@@ -1256,7 +1282,7 @@ def main():
         is_python = rel.endswith(".py") or raw.startswith("#!/usr/bin/env python")
         if is_python:
             try:
-                for line, value in code_strings(raw, skip_function_re=r"(?i)refreeze|h03[5-9]"):
+                for line, value in code_strings(raw, skip_functions={fn for f, fn in HISTORICAL_CODE_FUNCTIONS if f == rel}):
                     if OLD_ROOT_RE.search(value) or OLD_ROOT_REL_RE.match(value) or WEB_REPO_RE.search(value):
                         coupling.append(f"{rel}:{line} {value[:60]}")
                 continue

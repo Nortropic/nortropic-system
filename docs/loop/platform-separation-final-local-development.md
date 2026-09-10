@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v2 efter oberoende kontraktsgranskning 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v2.3 efter två oberoende kontraktsgranskningar 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -77,6 +77,8 @@ nådda slutningen och de hållna grindarnas körningar. Subjektets bytes är of�
   dae90c8f-originalen av `docs/loop/regler.md` (`b0bc10ae…`), `docs/loop/byggplan-v3.md` (`c0b3b04b…`),
   `specs/tasks.spec.json` (`2324b2fe…`), `AGENTS.md`/`CLAUDE.md`/`README.md` — en omdöpt eller omparkerad kopia
   är samma objekt.
+- `f1_no_symlink_entries_at_head`: inga poster med läge 120000 i HEAD-trädet (basen har 0) — en symlänk kan
+  peka ut ur trädet (t.ex. mot webbrepot) och undgår filskanning.
 
 ### F2 — referensslutningsorakel (kärnan)
 Rötter: `AGENTS.md`, `CLAUDE.md`, `README.md`, `.agents/skills/*/SKILL.md`, specens `authority.*`,
@@ -88,6 +90,8 @@ alla dokumentsökvägslitteraler i `scripts/nortropic-codex-autopilot.py` (AST, 
 markdownlänkar `](mål)`, `](<mål>)`, `](mål "titel")` med valfri ändelse upplösta relativt dokumentet
 (även `../`); i JSON varje strängvärde som helt är en sådan sökväg. Katalogreferenser (`docs/loop/`) följs
 inte men måste vara spårade kataloger. Alla nådda spårade textfiler följs och skannas (även `.txt`, `.sh`).
+Referenser som lämnar trädet (`../x` utanför länk, eller en länk vars upplösning går förbi roten) är alltid
+hängande — ett syskonrepo kan aldrig vara aktiv instruktion.
 Referenser till kod (`controller/…`, `verify/…`) följs inte; `specs/tasks.spec.json` följs bara via
 `authority.*` och är dessutom byte-bunden (F3).
 **Undantag (fryst evidens — varken skannas eller följs):** `docs/loop/owner-author-workflow-v1.md`,
@@ -105,8 +109,11 @@ supersessionsblocket; `SEPARATION-20260910/EFTERARBETE.md` — bara det tillagda
 *fryst* (`verify/**`, `SEPARATION-20260910/{README.md,ALLOCATION.tsv,WEB-TRANSFER-PROVENIENS*.tsv,proposed/**}`,
 plankopiorna, owner-author-workflow, remaining-bootstrap-delegation, `scripts/check-invariants.mjs`,
 `specs/tasks.spec.json` — alla OID-bundna på annat håll, skannas inte), *delvis* (ovan), *local-development*
-(sluten mängd, se nedan), *kod* (Python: AST-strängkonstanter utom docstrings och `refreeze|h03[5-9]`-funktioner;
-skal/JS/C: hela texten) med webbtoken utom `AUTOPILOT` (autopilotens journalprefix) plus webbrepots namn
+(sluten mängd, se nedan), *kod* (Python: AST-strängkonstanter utom docstrings och utom exakt mängden
+{`controller/attest/cli`: `expected_refreeze`, `h038_proof`} — de enda funktionerna vid 332f07ce vars konstanter
+namnger webbens beslutslogg, historisk refreeze-evidens; inget namnmönster, en ny `h035_x`/`refreeze_y` skannas;
+skal/JS/C: hela texten — autopiloten skannas alltså i sin helhet på strängkonstanter, inte bara på namngivna
+konstanter) med webbtoken utom `AUTOPILOT` (autopilotens journalprefix) plus webbrepots namn
 `nortropic-webbforvaltning`, och en smal ägarstoppsmängd (`människohand`, `endast av människ…`, `högrisk`,
 `owner-only`, `OWNER_AUTHORITY_REQUIRED`, `Johnny`, `klartecken`, `vänta på ägaren/människan`, `ägarens
 godkännande/klartecken/beslut`, `auto-merge är avstängt`, `människan för kandidaterna`); *test*
@@ -115,8 +122,9 @@ fixturdata); *text* (allt annat: md, json, tsv, sh, .gitignore) med hela webb- o
 Binära blobbar tolereras bara under `verify/**`, `controller/provenance/dist/`, `controller/runtime-cleanup/install`.
 Rader: `f2_tree_wide_no_web_governance_reference_outside_frozen_evidence` och
 `f2_tree_wide_no_human_hand_rule_outside_frozen_evidence` (detaljen listar fil@rad token).
-Sammansatta sökvägar i kod (`"docs/07-" + "konstitution.md"`) fångas via fragmenttoken
-`konstitution`/`regelverk`/`beslutslogg`.
+Sammansatta sökvägar i kod (`"docs/07-" + "konstitution.md"`) fångas bara när något fragment självt bär ett
+helt token (`konstitution`/`regelverk`/`beslutslogg`); en splittring inuti ordet (`"konst%s" % "itution"`),
+base64 eller läsning av en fil utanför repot vid körning ligger utanför grindens omfång (se Vad grinden inte bevisar).
 - `f2_closure_roots_extracted_…`: rötterna kunde extraheras (≥6 skills, ≥8 autopilotsökvägar, ≥25 rötter).
 - `f2_closure_all_active_references_resolve_to_tracked_files`: ingen hängande referens från något
   följt dokument (t.ex. arkitektskillens `docs/loop/autonomous-loop-plan-v1.md` måste finnas).
@@ -132,7 +140,7 @@ Sammansatta sökvägar i kod (`"docs/07-" + "konstitution.md"`) fångas via frag
   `OWNER_GATE_(STILL_)REQUIRED`, `OWNER_AUTHORITY_REQUIRED`, `remove the owner gate`, `owner reproduces`,
   `människan för kandidaterna`, `auto-merge är avstängt`, `godkänner spec|§A|merge`, `human-hand`,
   `owner-hand`, `Johnny`, `klartecken`, `vänta på ägaren/människan/en människa`, `ägarens (uttryckliga)
-  godkännande/klartecken/beslut`. Undantag: `HUMAN_AUTHORITY_HARD_STOP` (verklig auktoritetskonflikt / extern
+  godkännande/klartecken/beslut`, `human_only` (fältnamn i JSON/text). Undantag: `HUMAN_AUTHORITY_HARD_STOP` (verklig auktoritetskonflikt / extern
   credentialceremoni), `LOOP-ÄGARHAND-<n>`, fasformuleringar som "inte ett permanent krav på
   mänskligt godkännande", `OWNER_DECISION_REQUIRED` (intern arkitektsignal) och `human-only` som
   ord (substitutionskontraktets §1 rad 53 bär "human-only-gränser" i ett avsnitt som ska bestå).
@@ -144,10 +152,13 @@ Sammansatta sökvägar i kod (`"docs/07-" + "konstitution.md"`) fångas via frag
 - `f2_local_development_documents_are_exactly_the_332f07ce_set_plus_this_contract`: mängden spårade
   `docs/loop/*-local-development.md` == mängden vid 332f07ce ∪ {detta dokument} (ett nytt oskannat
   följedokument kan inte tillkomma utan eget kontrakt).
-- `f2_router_authority_section_marks_frozen_gate_inputs_as_not_current_instruction`: varje referens i
-  `AGENTS.md` `## Auktoritetsordning` till ett fryst/undantaget dokument står i samma listpunkt som orden
-  `fryst`/`historisk` och `inte dagens instruktion` (routern lyfter aldrig fryst grindinput till instruktion;
-  `specs/tasks.spec.json` är aktiv auktoritet och undantas bara från tokenskanning).
+- `f2_router_authority_section_marks_frozen_gate_inputs_as_not_current_instruction`: varje omnämnande i hela
+  `AGENTS.md` och `CLAUDE.md` av ett fryst/undantaget dokument (owner-author-workflow,
+  remaining-bootstrap-delegation, plankopiorna) står i samma stycke eller listpunkt (aldrig ett efterföljande
+  stycke) som orden `fryst`/`historisk` och `inte dagens instruktion` — routern lyfter aldrig fryst grindinput
+  till instruktion, i ingen sektion; `specs/tasks.spec.json` är aktiv auktoritet och undantas bara från
+  tokenskanning. `## Auktoritetsordning` måste finnas. Kalibrerat mot referensen: p.5, Fasgränser-stycket
+  (remaining-bootstrap-delegation) och Historik-stycket (plankopiorna) bär markörerna; buildern får formulera.
 - `f2_full_roadmap_authority_section_…`: `## Authority` behåller `ROADMAP_PLAN_SHA=0b3212c9…`,
   `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH` och namnger `AGENTS.md` som konfliktauktoritet;
   `HUMAN_AUTHORITY_HARD_STOP` finns kvar i dokumentet.
@@ -158,8 +169,10 @@ Sammansatta sökvägar i kod (`"docs/07-" + "konstitution.md"`) fångas via frag
 - `f2_historical_document_unchanged_plus_dated_supersession_note_<dokument>`: dokumentet är exakt
   332f07ce-bytes plus ETT tillagt block (huvud före eller not efter) som bär `2026-09-10`, `AGENTS.md`
   och de specifika markörerna — v4.1: `§3`, `§4`, `§29`; v2: `OWNER_AUTHORITY_REQUIRED`; owner-h003:
-  `§9` och `docs/loop/drift.md` — och som självt saknar webbtoken (människohandstoken får citeras
-  där eftersom noten anger vilka meningar som ersätts).
+  `§9` och `docs/loop/drift.md`; loop-review: `2026-07-31` — och som självt saknar webbtoken och den hårda
+  ägarstoppsmängden (`människohand`, `endast av människ…`, `högrisk`, `klartecken`, `vänta på …`, `ägarens
+  godkännande/klartecken/beslut`); övriga människohandstoken får citeras där eftersom noten anger vilka
+  meningar som ersätts.
 - `f2_drift_md_append_only_with_active_platform_note_free_of_web_governance`: `docs/loop/drift.md`
   vid HEAD börjar med 332f07ce-bytes (append-only); det tillagda innehåller `## Aktiv plattformsnot…`
   med `2026-09-10`, `AGENTS.md`, `§5` och utan webb-/människohandstoken. Historiska poster rörs inte.
@@ -238,6 +251,8 @@ Grinden kör den hållna kopian: subjektets egen fil när dess blob == `332f07ce
 `--held-*`-override som måste ha exakt den bloben (annars FAIL-rad, aldrig subjektets avvikande kopia).
 Kvalificeringen kör alltså alltid 332f07ce-bytes av de tre grindarna. Kör aldrig två fullkörningar i samma
 `TMPDIR`: launch-cwd-grindens h036-residuekontroll ser den andra körningens rötter (mätt flaky 2026-09-10).
+Riggnot: grinden städar inte sitt `FIXTURE_ROOT` (replikor, hållna grindars rötter, `result.json` ligger kvar
+som evidens) — den som kör ansvarar för att ta bort scratch efter att `result.json` bokförts.
 - `f7_platform_control_set_exit_68_of_68_on_candidate`: exit 0, 68 PASS, `PASS_LOCAL_QUALIFICATION_ONLY`,
   `subject_head` == kandidaten, raderna `subject_preflight_exit0_exact_json`,
   `platform_prepare_and_check_accept_subject_documents`, `fixture_task_run_exit0`,
@@ -314,7 +329,9 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `docs/loop/drift.md`; supersessionshuvud i `docs/loop/loop-review-2026-07-31.md` (historisk granskning;
    trädvid skanning träffar annars `konstitution` r.74/210); `AGENTS.md` `## Auktoritetsordning` p.5 markerar
    owner-author-workflow och remaining-bootstrap-delegation som fryst grindinput, inte dagens instruktion;
-   `README.md` namnger inte webbrepot (`nortropic-webbforvaltning`).
+   `README.md` namnger inte webbrepot (`nortropic-webbforvaltning`); Fasgränser-stycket och Historik-stycket i
+   `AGENTS.md` bär markörerna `fryst`/`historisk` + `inte dagens instruktion` vid omnämnandet av
+   remaining-bootstrap-delegation respektive plankopiorna.
 7. **Tester:** `tests/controller/loop/fall.py` B2 (webbfixtur/INV-004 → PINV-sabotage, t.ex.
    `push --force` i `controller/<x>/cli` → PINV-005).
 8. **Inte rörs:** `verify/**` (utom att denna grind redan ligger där), frysta träd/filer i F6,
@@ -339,7 +356,12 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   mängden är sluten (332f07ce-mängden + detta dokument) och `document-authority-local-development.md` är
   byte-bunden; de övriga fyra kan ändras utan att F2 märker det — deras form binds av respektive frusen grind.
 - Kod utanför AST-strängkonstanter (kommentarer, docstrings, identifierare) skannas inte; en webbkoppling som
-  bara lever i en kommentar är inte ett körbart beroende.
+  bara lever i en kommentar är inte ett körbart beroende. (Autopiloten är undantaget: `f4_autopilot_source_…`
+  skannar dess fulltext med EXEC-token, så även kommentarer/docstrings där fångas.)
+- Obfuskering i kod: en sökväg splittrad inuti ett ord (`"konst%s" % "itution"`), base64, eller körtidsläsning
+  av en fil utanför repot (`$HOME/...`, miljövariabel) fångas inte statiskt; `tests/**`-filer får bära
+  `docs/05`/`docs/00` som fixturdata och en ny testfil som läser webbens beslutslogg fångas därför inte.
+- Symlänkar: bara frånvaron av symlänkposter binds (F1); en symlänks mål prövas inte.
 - Semantik bortom token: en omskrivning som uttrycker webbstyrning med andra ord fångas inte.
   Token-listan är den mätbara approximationen; oberoende granskning läser texten.
 - Att `--repo`:s nya default är rätt katalog — bara att den inte är den gamla roten.
