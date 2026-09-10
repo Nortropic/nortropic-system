@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v2.4 efter tre oberoende kontraktsgranskningar 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v2.5 efter fyra oberoende kontraktsgranskningar 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -274,8 +274,11 @@ som evidens) — den som kör ansvarar för att ta bort scratch efter att `resul
 
 ### F8 — livebana utan webbrepot
 - `f8_no_tracked_file_couples_to_web_repo_path_or_old_root`: ingen spårad fil bär
-  `nortropic-repos/nortropic-webbforvaltning` eller den gamla roten `~/nortropic/` /
-  `/Users/elinhaggstrom/nortropic/` (evidensarkivet `…/nortropic/evidence/` undantaget). Undantag:
+  `nortropic-repos/nortropic-webbforvaltning`, den gamla roten `~/nortropic/` / `/Users/elinhaggstrom/nortropic/`
+  (evidensarkivet `…/nortropic/evidence/` undantaget) eller en sökväg till något ANNAT syskonrepo under
+  reporoten — `(~|$HOME|/Users/elinhaggstrom)/nortropic-repos/<x>` där `<x>` ≠ `nortropic-system` (samma
+  mönster ingår i den trädvida kod-/textskanningen; kanari: `/Users/elinhaggstrom/nortropic-repos/webb/AGENTS.md`,
+  `~/nortropic-repos/x/y.sh`, `$HOME/nortropic-repos/webb` träffar, plattformsroten träffar inte). Undantag:
   `SEPARATION-20260910/**`, `verify/**`, `docs/loop/arkiv/**`, `*-local-development.md`,
   `specs/tasks.spec.json` (frysta rader), `drift.md`, owner-author-workflow, remaining-bootstrap,
   plankopiorna. Pythonfiler mäts på AST-strängkonstanter (docstrings/kommentarer är inte körbara
@@ -368,6 +371,9 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   `docs/05`/`docs/00` som fixturdata och en ny testfil som läser webbens beslutslogg fångas därför inte.
   Fältnamn utöver `human_only` (t.ex. `humanOnly`) är en deklarerad semantikgräns.
 - Symlänkar: bara frånvaron av symlänkposter binds (F1); en symlänks mål prövas inte.
+- Lägesändring (100755 → 100644) på en byte-fryst fil i F6 `FROZEN_FILES` jämförs inte (blob-OID:n är samma);
+  frysta träd jämförs med läge. `../` i JSON-nyckelnamn och backslash-/procentkodade `..` fångas inte;
+  `../x` i JSON-prosa räknas som hängande (accepterad överapproximation).
 - Semantik bortom token: en omskrivning som uttrycker webbstyrning med andra ord fångas inte.
   Token-listan är den mätbara approximationen; oberoende granskning läser texten.
 - Att `--repo`:s nya default är rätt katalog — bara att den inte är den gamla roten.
