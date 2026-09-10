@@ -763,6 +763,17 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
         return svar(f"anropsfel: timeout måste vara större än noll, fick {timeout_arg}", ANROP)
     timeout_ms = max(1, min(86400000, round(sekunder * 1000)))
 
+    # Målet ska köras i det upplösta workspacet, oberoende av anroparens cwd.
+    # cwd ärvs launcher → supervisor → inneslutet mål, så bytet sker här, före
+    # supervisorstarten och före varje relativ åtkomst; en raderad eller
+    # oskrivbar anropar-cwd påverkar därmed inte utfallet.  Kuvert och timeout
+    # är redan lästa, så ett relativt kuvertargument löses fortsatt mot anroparen.
+    try:
+        os.chdir(ws)
+    except OSError as exc:
+        return svar(f"launch_failed: kunde inte byta arbetskatalog till workspacet {ws}: "
+                    f"{exc.strerror or exc}", LAUNCH)
+
     if not command_exists(kommando[0], ws):
         return svar(f"launch_failed: kommandot finns inte eller är inte körbart: {kommando[0]}", LAUNCH)
 

@@ -219,3 +219,63 @@ eller miljörensning rörs; M2 visar att grinden mäter effekten och inte förek
 av ett `chdir`; M3 visar att raderad-cwd-raden särskiljer en rättning som råkar
 fungera bara när anroparen står i en levande katalog. Ingen referens lämnas kvar:
 BUILDER skriver rättningen själv genom den ordinarie ändringsvägen.
+
+Produkt 2026-09-10 (BUILDER, arbetsyta
+`/Users/elinhaggstrom/nortropic-repos/work/builder-launch-cwd-20260910`, gren
+`nortropic/launch-cwd-product`, förälder 2444a856): rättningen är elva rader i
+`controller/launch/cli::gor_run` — `os.chdir(ws)` på det upplösta workspacet efter att
+kuvert och timeout lästs (ett relativt kuvertargument löses därför fortsatt mot
+anroparen), före `command_exists` och före dispatch till `nested_launch`/`top_level_launch`,
+alltså före supervisorstarten och före varje relativ åtkomst; `OSError` klassas
+`launch_failed` (exit 3) i stället för stackspår. Ingen ändring i Seatbelt-profil,
+miljörensning, argv, exitkoder eller JSON; `controller/launch/runtime_snapshot.py`,
+`controller/utforare/cli`, `controller/brytare/cli` och `controller/loop/cli` orörda.
+Launcher SHA-256 efter rättningen
+`5273a48480ec73550ddc915e9b2c54d396717573dd7af79fe89cbe549cf1d4f1`.
+
+- Baslinje före rättningen (samma kommando från test-author-arbetsytan, subjekt =
+  arbetsytan på 2444a856, launcher `65571892…`): exit 1, 13 PASS / 7 FAIL, exakt
+  TEST_AUTHORs sju rader, `RED_LOCAL_QUALIFICATION`,
+  `FIXTURE_ROOT=/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/launch-cwd-local-tifo0ae8`.
+- Kandidat (produktcommit med launcher `5273a484…`): exit 0, 20 PASS / 0 FAIL, ingen
+  `RIG_ERROR`, `LAUNCH_CWD_RESULT=PASS_LOCAL_QUALIFICATION_ONLY`,
+  `FIXTURE_ROOT=/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/launch-cwd-local-miga9ttl`,
+  `result.json` SHA-256
+  `fef94aa98426fd2b40dee00356e3ee3ce5d183fc22759f4402578c4c1f40009f`. Inga
+  `/private/tmp/.nortropic-h036-runtime-*` före eller efter.
+- `tests/controller/launch/fall.py` (pinnad Python, bypass): kandidat 50 rätt / 3 fel,
+  exit 1; baslinjeklon av 2444a856 i scratchpad 49 rätt / 4 fel. Skillnaden är fallet
+  `cwd` (målets `pwd -P` = workspacet), som faller på baslinjen och passerar på
+  kandidaten. De tre gemensamma felen är förexisterande och cwd-oberoende:
+  `kuvert/env` och `kuvert/stdin` (`nonzero_exit: processen avslutade med kod 127` —
+  provets `kuvert.sh` anropar `python3.12`, som inte finns i målets `PATH=/usr/bin:/bin`)
+  samt `kuvert/ej-i-workspace` (H-036-supervisorns `.nortropic-h036-proof-*-ancestor-*`
+  effektplansfiler i workspacet). Körningen lämnar gitignorerade
+  `.nortropic-h036-proof-*-trust-*`-filer i ROT när `NORTROPIC_TRUST_ROOT` saknas
+  (36 st, borttagna efteråt).
+- Prober (bypass, `NORTROPIC_TRUST_ROOT` i scratchpad): workspace utan sökrättighet
+  (0000) → exit 3 `launch_failed: kunde inte byta arbetskatalog till workspacet …:
+  Permission denied`, tom stderr; relativt kuvertargument från anroparens cwd → exit 0
+  och målets cwd = workspacet (baslinjen: exit 0 men målets cwd = anroparkatalogen);
+  relativ kommandosökväg `./mark.sh` i workspacet → exit 0 på kandidaten,
+  `nonzero_exit … kod 1` på baslinjen (inte bundet här; konsekvent med `command_exists`).
+- `verify/bin/invariant-required-exit --subject <arbetsytan>` från den hållna
+  kontrollmängdsarbetsytan (dadafe96): 14 PASS / 1 FAIL (`real_verifier_rc0_on_subject`),
+  exit 1 — som på 383ed387; `result.json` SHA-256
+  `256f72df3da2c6313882997c6aedd6659078af953a2927ce66e4c5e6f88a04b5`.
+- `verify/bin/platform-control-set-exit --subject <arbetsytan>` från den hållna
+  kontrollmängdsarbetsytan (dadafe96, bypass, umask 0022): exit 1, 68 rader, 40 PASS / 28 FAIL,
+  `RED_LOCAL_QUALIFICATION`, inget `RIG_ERROR` — exakt samma 28 röda rader som på 383ed387
+  (otillämpat register/verifierare i arbetsträdet), inga nya röda;
+  `loop_end_to_end_attests_platform_fixture_task` PASS. `FIXTURE_ROOT=/private/var/folders/_v/
+  t4cy04w95gz3m782_3p5qs9h0000gn/T/platform-control-set-local-kn8qfjo4`, `result.json` SHA-256
+  `9f5cbd2219c6739c14abe06f9c288e7dee5d4a0e4bc275b7bf1292229caae75e`.
+- Bunden följd för h-036: `verify/bin/h-036-exit` pinnar `controller/launch/cli` byte för
+  byte (`PINNED_UNCHANGED`, `65571892…`) och kommer inte att acceptera kandidatens
+  launcherbytes (`5273a484…`). Refreeze av h-036 är ett ägarbeslut utanför detta
+  kontrakt; h-036-grinden är orörd (byte-identisk med den hållna `b6fd9737…`).
+- Utanför detta kontrakt kvarstår kapslade lanseringar (nivå+1 ärver supervisorns cwd;
+  kräver `cwd`/`chdir` i `runtime_snapshot.py`, h-036-yta).
+
+PRODUCTION_IMPLEMENTATION_WRITTEN=YES · FROZEN_ARTIFACTS_MODIFIED=NO ·
+ALLOWED_WRITE_VIOLATION=NO · PUSH=NO · MERGE=NO.
