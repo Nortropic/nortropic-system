@@ -29,3 +29,10 @@ kontrollmängd utan webbfiler — registrerad plattformsverifierare, `PRETASK_PA
 dokumentauktoritet bunden till `docs/loop/**`, plattformslane i `controller/loop/cli`
 enligt substitutionskontraktet — följt av H039-efterföljare i separat yta
 (se `~/nortropic/H039-AVSLUTSKRAV-MINSTA-VAG-20260910.md`).
+
+## Not 2026-09-10 (slutseparation)
+
+Tabellen ovan är uppdelningens mätta evidens och ändras inte. Rättningsvägen som anges i ingressen är
+historisk: ordinarie ändringsväg är kontraktsflödet i `AGENTS.md` (test-author-frys, oberoende granskning,
+builder, oberoende granskning, lokal kvalificering med fryst grind), och slutseparationens bindningar döms av
+`verify/bin/platform-separation-final-exit`.

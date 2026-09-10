@@ -17,8 +17,9 @@ Läs och följ i denna ordning när de är relevanta:
    `docs/loop/byggplan-v3.md` (skivorna; den skyddade mängden i §3.1)
 3. aktuell task i `specs/tasks.spec.json`
 4. taskens frysta `exit_test` under `verify/bin/`
-5. `docs/loop/owner-author-workflow-v1.md`, `docs/loop/remaining-bootstrap-delegation-v1.md`,
-   `docs/loop/drift.md` och övriga plan-/driftdokument under `docs/loop/`
+5. `docs/loop/drift.md` och övriga plan-/driftdokument under `docs/loop/`.
+   `docs/loop/owner-author-workflow-v1.md` och `docs/loop/remaining-bootstrap-delegation-v1.md`
+   är fryst grindinput (historisk evidens, byte-bunden av grindarna), inte dagens instruktion.
 
 Vid konflikt gäller den högre auktoriteten. Ingen router, handoff, senare målbild eller
 historisk text är egen operationsbehörighet. Historiska dokument och frysta artefakter
@@ -112,9 +113,9 @@ MERGE=NO
 
 I nuvarande fas ingår lokala immutabla commits och lokal kvalificering med frysta grindar.
 Push, publicering, installation, livekörning och supervisor-resume ingår inte i denna fas.
-Det är fasens omfång, inte en permanent regel om mänskligt godkännande. För den kvarvarande
-bootstrapkedjan gäller `docs/loop/remaining-bootstrap-delegation-v1.md` (guarded normal
-merge commit; aldrig utan mekaniska grindar).
+Det är fasens omfång, inte en permanent regel om mänskligt godkännande. Den kvarvarande
+bootstrapkedjans historiska delegation står i `docs/loop/remaining-bootstrap-delegation-v1.md`
+(fryst grindinput: guarded normal merge commit, aldrig utan mekaniska grindar).
 
 ## Operating model v2–v4 (plattformsdelen)
 

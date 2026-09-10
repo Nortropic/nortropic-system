@@ -207,5 +207,5 @@ Detta är ett roadmap-internt owner-beslut under Codex Operating Model v3:s stå
 ## Plattformsnot 2026-09-10
 
 Historiskt ägarbeslut, bevarat byte-exakt ovan. §9:s test-author-skrivyta namnger det odelade repots dåvarande
-beslutslogg; på plattformen är dokumentationens hemvist `docs/loop/drift.md` och auktoritetsordningen står i
-`AGENTS.md`. Noten ändrar inga frysta identiteter i h-003/h-004.
+dokumentationsfil för beslut; på plattformen är dokumentationens hemvist `docs/loop/drift.md` och
+auktoritetsordningen står i `AGENTS.md`. Noten ändrar inga frysta identiteter i h-003/h-004.
