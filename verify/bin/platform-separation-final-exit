@@ -89,6 +89,8 @@ PLATFORM_ROOT = "/Users/elinhaggstrom/nortropic-repos/nortropic-system/"
 OLD_ROOT_RE = re.compile(r"(?:~|/Users/elinhaggstrom)/nortropic/(?!evidence/)")
 OLD_ROOT_REL_RE = re.compile(r"^nortropic/(nortropic-system|worktrees)(/|$)")
 WEB_REPO_RE = re.compile(r"nortropic-repos/nortropic-webbforvaltning")
+# Any sibling repository under the repos root other than the platform itself (absolute, ~ or $HOME form).
+SIBLING_RE = re.compile(r"(?:~|\$HOME|/Users/elinhaggstrom)/nortropic-repos/(?!nortropic-system(?:/|$))")
 # F1 allowlist: tracked paths of the platform.
 ALLOW_PREFIXES = (".agents/skills/", "SEPARATION-20260910/", "config/", "controller/", "docs/loop/", "specs/",
                   "tests/controller/", "tests/scripts/", "verify/")
@@ -683,7 +685,9 @@ def main():
           and not scan(".agents/skills/x/SKILL.md AUTOPILOT_V4_SELFTEST HUMAN_AUTHORITY_HARD_STOP LOOP-ÄGARHAND-26", WEB_TOKENS + HUMAN_TOKENS)
           and not scan("inte ett permanent krav på mänskligt godkännande", HUMAN_TOKENS)
           and bool(scan("Merge kräver ägarens uttryckliga klartecken; vänta på Johnny.", HUMAN_TOKENS))
-          and bool(scan("Read docs/07-" + "konstitution.md first", CODE_WEB_TOKENS)) and not scan("AUTOPILOT ROADMAP_AUTHORITY", CODE_WEB_TOKENS))
+          and bool(scan("Read docs/07-" + "konstitution.md first", CODE_WEB_TOKENS)) and not scan("AUTOPILOT ROADMAP_AUTHORITY", CODE_WEB_TOKENS)
+          and all(SIBLING_RE.search(x) for x in ("/Users/elinhaggstrom/nortropic-repos/webb/AGENTS.md", "~/nortropic-repos/x/y.sh", "$HOME/nortropic-repos/webb"))
+          and not SIBLING_RE.search("/Users/elinhaggstrom/nortropic-repos/nortropic-system/verify/bin/x") and not SIBLING_RE.search("~/nortropic-repos/nortropic-system"))
     check("canary_closure_extraction_follows_backticked_paths_and_relative_links",
           refs_from_text("docs/loop/a.md", "se `docs/loop/y.md`, [z](../loop/z.md) och [w](w.md \"titel\"); AGENTS.md; Docs/05-Beslutslogg.md; docs/loop/; <docs/loop/q.txt>")
           == {"docs/loop/y.md", "docs/loop/z.md", "docs/loop/w.md", AGENTS, "Docs/05-Beslutslogg.md", "docs/loop/", "docs/loop/q.txt"}
@@ -885,6 +889,8 @@ def main():
             tokens = TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS
             for line, value in strings:
                 web_hits += [f"{rel}@{line} {pat}: {value[:50]!r}" for pat in tokens if re.search(pat, value)]
+                if SIBLING_RE.search(value):
+                    web_hits.append(f"{rel}@{line} sibling-repo path: {value[:60]!r}")
                 if not is_test:
                     human_hits += [f"{rel}@{line} {pat}: {value[:50]!r}" for pat in CODE_HUMAN_TOKENS if re.search(pat, value)]
             continue
@@ -893,7 +899,7 @@ def main():
             web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS)]
             continue
         classification[rel] = "text"
-        web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, WEB_TOKENS)]
+        web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, WEB_TOKENS + (SIBLING_RE.pattern,))]
         human_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, HUMAN_TOKENS)]
     counts = {k: sum(1 for v in classification.values() if v == k) for k in ("frozen", "partial", "local-development", "code", "test", "text", "binary")}
     check("f2_tree_wide_no_web_governance_reference_outside_frozen_evidence",
@@ -1289,14 +1295,14 @@ def main():
         if is_python:
             try:
                 for line, value in code_strings(raw, skip_functions={fn for f, fn in HISTORICAL_CODE_FUNCTIONS if f == rel}):
-                    if OLD_ROOT_RE.search(value) or OLD_ROOT_REL_RE.match(value) or WEB_REPO_RE.search(value):
+                    if OLD_ROOT_RE.search(value) or OLD_ROOT_REL_RE.match(value) or WEB_REPO_RE.search(value) or SIBLING_RE.search(value):
                         coupling.append(f"{rel}:{line} {value[:60]}")
                 continue
             except SyntaxError:
                 pass
-        for m in list(OLD_ROOT_RE.finditer(raw)) + list(WEB_REPO_RE.finditer(raw)):
+        for m in list(OLD_ROOT_RE.finditer(raw)) + list(WEB_REPO_RE.finditer(raw)) + list(SIBLING_RE.finditer(raw)):
             coupling.append(f"{rel}:{raw.count(chr(10), 0, m.start()) + 1} {raw[max(0, m.start() - 15):m.end() + 25]!r}")
-    check("f8_no_tracked_file_couples_to_web_repo_path_or_old_root", not coupling, "; ".join(coupling[:10]))
+    check("f8_no_tracked_file_couples_to_web_repo_path_or_old_root", not coupling, "; ".join(coupling[:10]))  # incl. sibling repos
     cs = gate_runs.get(CONTROL_SET_GATE)
     check("f8_ordinary_loop_e2e_and_platform_prepare_check_green_on_candidate_via_held_control_set",
           cs is not None and cs["rc"] == 0 and not cs["fails"], str(cs)[:300] if cs else "control-set gate not run")
