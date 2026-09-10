@@ -87,3 +87,17 @@ föll: `run_invariants_missing_verifier_stops`,
 `run_invariants_dangling_symlink_verifier_stops` och
 `final_gates_green_missing_verifier_stops`. Övriga tolv, inklusive
 konsumenträkningen fem-av-fem och den riktiga verifierarens rc 0, passerade.
+
+BUILDER-kandidat på 0936fb6c (subjekt `worktrees/builder-invariant-required-20260910`,
+autopilot SHA256 `9c2dc08b478c40038b60bd0af2a8628b00c07037abea49bd570d61230bedf0a1`):
+ändringen är två rader i `run_invariants` — returannotationen `Cmd` och
+`raise Stop(f"mandatory invariant verifier missing: {p}")` i stället för
+`return None`. De fem anroparnas vakter är orörda. Fryst grind
+`invariant-required-exit`: exit 0, 15/15 PASS,
+`INVARIANT_REQUIRED_RESULT=PASS_LOCAL_QUALIFICATION_ONLY`, result.json SHA256
+`fc7718465f5d0a97f7eec46f4b6c96faafce253f7cfa110ba0587e1ecd4d47f5`.
+Regression `document-authority-exit`: exit 0, 100/100 PASS, result.json SHA256
+`1c38b98833745cf2122d0ae2614ebf9ee59294985b7c9a598221555076200342`.
+`check-invariants.mjs` 8 PASS/0 FAIL exit 0; `check-docs-coherence.mjs` 109/109
+exit 0; `selftest(None)` AUTOPILOT_V4_SELFTEST=PASS; hermetiskt test
+`publication-callers.py` exit 0. Lokal commit, ingen push, ingen merge.

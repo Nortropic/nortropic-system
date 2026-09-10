@@ -436,10 +436,10 @@ def run_gate(repo: Path, task_id: str, timeout: int = 1200) -> Cmd:
     return res
 
 
-def run_invariants(repo: Path) -> Cmd | None:
+def run_invariants(repo: Path) -> Cmd:
     p = repo / "scripts/check-invariants.mjs"
     if not p.exists():
-        return None
+        raise Stop(f"mandatory invariant verifier missing: {p}")
     res = run(["node", str(p)], cwd=repo, check=False, timeout=1200)
     journal(repo, "INVARIANTS", exit=res.rc)
     return res
