@@ -310,10 +310,11 @@ ROLE=BUILDER · FROZEN_ARTIFACTS_MODIFIED=NO · ALLOWED_WRITE_VIOLATION=NO · PU
 ### Demonstration av det autonoma flödet (fylls i av root efter cykeln)
 
 ```text
-CONTRACT_COMMIT=<sha>          # TEST_AUTHOR: grind + dokument
-CONTRACT_REVIEW=<identitet>    # oberoende kontraktsgranskning, read-only
-BUILDER_CANDIDATE=<sha>        # produkt inom produktytan
-PRODUCT_REVIEW=<identitet>     # oberoende produktgranskning, read-only
-LOCAL_QUALIFICATION=<result.json sha256, PASS_LOCAL_QUALIFICATION_ONLY>
-OWNER_INTERMEDIATION=NONE
+CONTRACT_COMMIT=e8eb50fa13b8fb875800258a867eb234860be839   # TEST_AUTHOR: grind 6c10766d + dokument; RED 31/39 på 512490d4
+CONTRACT_REVIEW=TEST_AUTHOR_ADVERSARIAL_ONLY               # test-authorns egen adversariella grindgranskning (skrotreplikor: hårdkodad lista 5/14, "alltid exit 3" 0/14); ingen separat oberoende kontraktsgranskning registrerad (reviewerns F-6)
+BUILDER_CANDIDATE=fbdf3ece18ea05d0f60133e8cba5df4b0f2ea185  # produkt inom produktytan; utfallscommit 9112a304
+PRODUCT_REVIEW=work/review-platform-governance-20260910 READY_FOR_LOCAL_QUALIFICATION_ONLY 2026-09-10  # read-only; 7/7 mutanter fångade; fynd F-1..F-6 ej blockerande
+LOCAL_QUALIFICATION=62cacdf39feffc9248347f8b309340f1427b35271c43970d18c28756ed801894 (builder, subjekt fbdf3ece) / 916b925e7c00ba745c78d27b9188f27049b3cfb566627415cfcb81475978fcd9 (reviewer, subjekt 9112a304), PASS_LOCAL_QUALIFICATION_ONLY 70/70
+OWNER_INTERMEDIATION=NONE   # ägarbeslutet 2026-09-10 gavs före cykeln; ingen ägarhand i kontrakt→bygge→granskning→kvalificering
+INTEGRATION=e1ce2b9dc56f0911355ef0de1ab3ac06b2b51e86 (nortropic/platform-integration-20260910)
 ```
