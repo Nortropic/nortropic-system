@@ -968,5 +968,42 @@ krävd ∪ {regler, byggplan, drift, owner-h003}.
 De 19 från v3 fångas på samma rader som förut (planändrande mutanter dessutom på de två producerade-prompt-raderna där
 prompterna påverkas). Granskarens: (a02) moduldict → `f4_produced_prompts_free_of_…` (odeklarerat dokument i producerad prompt; AST-raden grön — därför komplement); (a04) 12-hex i AGENTS Historik, ompinnad → AGENTS-dokumentraden + trädvid (B1-token); (a10) `str.format` → `f4_produced_prompts_free_of_…`; (a11) literal `PLAN_GENERATION=platform-v1-legacy` → selftest-raden (N2); (a13) builder-skill `git show <PLAN_SHA>:` → builder-skillens dokumentrad + trädvid (B2); (a23) planen bara i död funktion → `f4_produced_prompts_of_roadmap_…` (AST-raden grön — därför komplement); (a28) EFTERARBETE-svans med gamla planfilen → `f6_efterarbete_…` + trädvid (N3). Alla 26: exit 1, inget riggfel, 0 missade.
 
+### Oberoende kontraktsgranskning nr 6 (på af584e71) → v3.2
+`GATE_REVIEW_RESULT=NOT_READY`: B1 (öppen värld i promptmätningen: självdeklarerat flöde via dött `journal`-namn; död krävd
+byggare + levande tvilling), B2 (skivtabellen = första rubrikträffen, även i HTML-kommentar) + N1–N9. Remediering v3.2 (grind
+sha256 `c391eebb26c72a0f0df0b72db73432bb5041266388432f1b8a67e1a06969b6ca`, 2009 rader, 105 rader i körning; commit `9d2ef894`):
+
+| Fynd | Åtgärd i grinden (rad i v3.2) |
+|---|---|
+| B1 öppen värld | `EXPECTED_PROMPT_BUILDERS`/`_FLOWS`/`_CALLERS` (r.220–232); flöden via signatur enbart (DRIVER r.350); `prompt_world` (r.609–735): producenter, byggarreferenter, runner-promptkällor (rekursiv klassificering), nåbarhet från `main`; raden `f4_prompt_builders_flows_and_callers_…` (r.1704); kanari `canary_closed_world_…` (r.1105) |
+| B2 dold tabell | `visible_markdown` (r.737) stripar HTML-kommentarer/kodstaket; `parse_slice_table` kräver exakt en tabell (r.743–751); kanarier med två/dold/staket-tabell |
+| N2 handoffens bytes | replika `handoff-mutated` → `f4_ensure_roadmap_plan_stops_on_mutated_handoff` (r.1613) |
+| N3 död pinne | `json_refusal` (r.854); `f3_platform_prepare_refuses_mutated_plan_generation_in_replica` (r.1619), `f3_platform_check_refuses_snapshot_…` (r.1627) |
+| N4 skiftlägestvilling | `f1_tracked_paths_unique_case_insensitively` (r.1155); `CASE_COLLISION` (r.397) tolererar kollisionssmuts i subjekt/replika/overlay (r.1014) → produktrad, inte RIG |
+| N5 inneslutning | fixtur `prompts_root` med HOME/XDG/TMPDIR/cwd/GIT_DIR/proxy (r.1671), `snapshot_tree` (r.867) före/efter subjekt + fixtur → `f4_prompt_builders_run_in_contained_fixture_without_side_effects` (r.1689); slumpat modulnamn (DRIVER r.323) |
+| N8 Historik båda riktningar | `hist_new_active`/`hist_old_history` (r.1370–1371) |
+| N7 substans | `PLAN_REQUIRED_SECTIONS` (r.233) → `f4_plan_generation_has_required_sections_…` (r.1798); dokumentet: substans = skivtabell + krävda avsnitt + token; RECON-kartan vägledning (sha256 bokförd) |
+| N1, N6, N9 | dokumenterade som gränser (fingeravtryck; base64/zwsp/semantik/dubbletter; FIXTURE_ROOT städas av den som kör) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.2 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.2 + dokument (fixtur-HEAD `548731c0`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **71 PASS / 34 FAIL**
+(105 rader), result.json sha256 `f81a788375d2bf886aec4fee19990703a2e1343ed4e507725868a1049e46a83a`. Röda: v3.1:s 30 plus (v3.2) `f4_ensure_roadmap_plan_stops_on_mutated_handoff`
+(positivt ankare saknas), de två cli-effektraderna (planen ej pinnad) och `f4_plan_generation_has_required_sections_…` (planen
+saknas) — alla av rätt skäl; nya gröna på 320c9df7: skiftlägesraden, sidoeffektraden och den slutna-världen-raden (v2.5-produktens
+autopilot har exakt de 15 byggarna, 1 flödet och 8 anroparna; de gamla pekarna fångas av de producerade-prompt-raderna). F7 oförändrat: control-set 68/68 (`c3ffaf23…`), launch-cwd 19/20 med exakt två extra grindar (`aa4c15ca…`),
+governance 68/70 exakt {g6, g7} (`23dfefd2…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.2 (scratch, förkastad)
+Som v3.1 plus avsnitten Syfte/Arbetsflöde/Avslutskriterier i planen. Fixtur-HEAD `a6250fab`, 143 filer. Fullkörning (bypass,
+egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **105/105**, result.json sha256 `bbee9f8ec3d7e7403284c44894557620d4c0506501fa02eb3acefd6ab3743a2b`; control-set 68/68
+(`72c68acc…`), launch-cwd 19/20 (`ad5730ab…`), governance 68/70 exakt {g6, g7} (`026d74be…`), loopsvit 53 ok / 0 FEL; 15
+byggare / 1 flöde / 101 producerade texter / 0 sidoeffekter.
+
+### F9 v3.2 — negativer (var och en i egen replika av v3.2-referensen, statiskt `--skip-held-gates`; 36 körda,
+36 fångade, 0 riggfel)
+De 26 från v3/v3.1 fångas på samma rader (planändrande mutanter dessutom på cli-effektraderna eftersom pinnarna inte
+ompinnades). Granskarens nr 6 och egna varianter: (a_flowoptout) a02 + dött `journal`-namn → `f4_produced_prompts_free_of_…` (byggaren anropas nu; flöden bara via signatur); (a_shadow) död krävd byggare + levande tvilling `architect_prompt_live` → slutna-världen-raden (byggarmängd ≠ 15, runner-prompt från icke-byggare); (a_shadow2, egen) tvilling utan promptnamn, resultat via variabel → slutna-världen-raden (Name → tilldelning → Call till icke-byggare som refererar en byggare); (a_two_tables) kommentardold korrekt + synlig avvikande tabell → skivtabellraden (S2 utan h-030 i den synliga); (a_handoff_exist) handoffens existens i stället för bytes → `f4_ensure_roadmap_plan_stops_on_mutated_handoff`; (a_cli_dead_pin) filtrerad `PLATFORM_DOCUMENTS_LIVE` → båda cli-effektraderna; (a_casevariant) skiftlägestvilling som indexpost → `f1_tracked_paths_unique_case_insensitively`, exit 1 (v3.1: RIG exit 2); (a_sideeffect) byggare skriver $HOME/SIDE-EFFECT-MARKER → sidoeffektraden (filen landar i fixturens HOME); (a_nosections, egen) `## AVSLUTSKRITERIER` borttagen → krävda-avsnitt-raden. Alla 36: exit 1, 0 riggfel, 0 missade. Grindmutanten (h) faller alltjämt på kanarien.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
