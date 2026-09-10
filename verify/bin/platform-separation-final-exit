@@ -1,0 +1,1133 @@
+#!/usr/bin/env python3.12
+"""LOCAL_ONLY final-separation qualification of the platform repo; never a scheduler/H035/resume verdict.
+
+Owner order (precisified 2026-09-10): nortropic-system contains ONLY Nortropic's
+business-neutral platform (Trust Kernel, bootstrap, controller, supervisor and
+their development/verification/documentation). All web/Digitala-specific
+governance leaves the platform's current use: code, docs, agent instructions,
+skills, guards, config, workflows, permission rules and indirect dependencies.
+Pure web material must not stay in the tree renamed as history; platform Git
+history and kernel/H evidence stay. This gate binds EFFECTS on --subject:
+
+  F1  tree allowlist + required absences + transfer provenance by blob OID
+  F2  reference-closure oracle from the ACTIVE roots (router, skills, spec
+      authority, verify-cli constants, autopilot constants, loop config) with
+      token scans, dangling references, section-level supersession bindings
+  F3  config/permission rules (premiar-backlog, managed-settings, .gitignore
+      effect, register, verify-cli pins, preflight, PINV 6/0)
+  F4  autopilot/loop function without the old root or an origin branch
+      (ensure_roadmap_plan on local objects, selftest, publication-callers)
+  F5  tests/controller/loop/fall.py B2 without web fixture (+ hermetic run)
+  F6  frozen evidence byte-identical to 332f07ce (+ this gate only)
+  F7  the three earlier frozen local gates run on the candidate, exact outcomes
+  F8  no tracked file couples to the web repo path or the old root
+  F10 rig discipline: canaries, strict JSON, result.json, bytes unchanged
+F9 (reintroduction negatives) is exercised by the test author on a scratch
+reference construction and recorded in the development document.
+No historical H gate, provider, build, publication or resume is executed.
+"""
+import argparse
+import ast
+import hashlib
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+PYTHON = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+PYTHON_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+NODE = "/opt/homebrew/opt/node@22/bin/node"
+SANDBOX_EXEC = "/usr/bin/sandbox-exec"
+GATE = "verify/bin/platform-separation-final-exit"
+DOCUMENT = "docs/loop/platform-separation-final-local-development.md"
+FROZEN_BASE = "332f07ceb914a07c6632c1393969d9d5a337566b"
+GOVERNANCE_BASE = "512490d44007373b79aca504aa92709e9810aa24"
+LAUNCH_CWD_BASE = "383ed3873105d77fd1129d74abf408092e0ff2f3"
+CONTROL_SET_GATE = "verify/bin/platform-control-set-exit"
+LAUNCH_CWD_GATE = "verify/bin/launch-cwd-exit"
+GOVERNANCE_GATE = "verify/bin/platform-governance-exit"
+VERIFY_CLI, LOOP_CLI, ATTEST_CLI = "controller/verify/cli", "controller/loop/cli", "controller/attest/cli"
+AUTOPILOT = "scripts/nortropic-codex-autopilot.py"
+VERIFIER, REGISTER, SPEC = "scripts/check-invariants.mjs", "controller/verify/register.json", "specs/tasks.spec.json"
+PREMIAR, MANAGED, LOOP_CONFIG = "config/premiar-backlog.json", "config/managed-settings.json", "config/loop-config.exempel.json"
+LOOP_FALL = "tests/controller/loop/fall.py"
+PUBLICATION_CALLERS = "tests/scripts/nortropic-codex-autopilot/publication-callers.py"
+AGENTS, CLAUDE, README = "AGENTS.md", "CLAUDE.md", "README.md"
+SKILLS_DIR = ".agents/skills"
+DRIFT = "docs/loop/drift.md"
+FULL_ROADMAP = "docs/loop/codex-autopilot-v3-full-roadmap.md"
+SUBSTITUTION = "docs/loop/harness-substitution-contract-v1.md"
+IMPLEMENTATION = "docs/loop/implementation-v4.1.md"
+AUTOPILOT_V2 = "docs/loop/codex-autopilot-v2.md"
+OWNER_H003 = "docs/loop/owner-h003-attestation-authority-v1.md"
+EVIDENCE_CONTRACT = "docs/loop/codex-evidence-contract.md"
+PLAN_COPY = "docs/loop/autonomous-loop-plan-v1.md"
+HANDOFF_COPY = "docs/loop/autonomous-loop-codex-handoff.md"
+PROVENANCE_2 = "SEPARATION-20260910/WEB-TRANSFER-PROVENIENS-2.tsv"
+CHECK_INVARIANTS_SHA = "ae72cdf8b8a21456662f1e4c391670f47a8a4b3728600ad221999e624dc95184"
+# Historical plan objects (commit 0b3212c9 is not required in the subject's object store; the
+# platform-frozen copies are bound by these blob OIDs, byte identity with the pinned objects).
+ROADMAP_PLAN_SHA = "0b3212c991d4227c8df2656465ae2c0252dda39e"
+ROADMAP_PLAN_BLOBS = {PLAN_COPY: "c8ea851167f38f6846485035ee2e6b1dc3b54db0",
+                      HANDOFF_COPY: "1e53887c59b8da0989579eaa241c5b53ea02abb9"}
+PLATFORM_ROOT = "/Users/elinhaggstrom/nortropic-repos/nortropic-system/"
+OLD_ROOT_RE = re.compile(r"(?:~|/Users/elinhaggstrom)/nortropic/(?!evidence/)")
+OLD_ROOT_REL_RE = re.compile(r"^nortropic/(nortropic-system|worktrees)(/|$)")
+WEB_REPO_RE = re.compile(r"nortropic-repos/nortropic-webbforvaltning")
+# F1 allowlist: tracked paths of the platform.
+ALLOW_PREFIXES = (".agents/skills/", "SEPARATION-20260910/", "config/", "controller/", "docs/loop/", "specs/",
+                  "tests/controller/", "tests/scripts/", "verify/")
+ALLOW_EXACT = {".gitignore", AGENTS, CLAUDE, README, VERIFIER, AUTOPILOT}
+ABSENT_EXACT = ("docs/loop/arkiv/regler-fore-2026-09-10.md", "docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md",
+                "docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md", "scripts/check-verifierarregistret.mjs",
+                "AUTOPILOT", "KONSTITUTION.md")
+ABSENT_PREFIXES = ("agents/", "workflows/", "skills/", "vendored-skills/", "packs/", "backtests/", "tests/fixtures/",
+                   "tools/", "docs/100-dagar/", "docs/arkiv/")
+ABSENT_RE = re.compile(r"^docs/0\d-[^/]*\.md$")
+TRANSFERRED = ABSENT_EXACT[:4]
+# F6 frozen evidence at 332f07ce. verify/** may gain exactly this gate; SEPARATION may gain the
+# provenance file and a changed EFTERARBETE.md; nothing else.
+FROZEN_TREES = ("verify", "controller/h034-native", "controller/runtime-cleanup", "controller/provenance",
+                "SEPARATION-20260910/proposed")
+FROZEN_FILES = (VERIFIER, LOOP_CLI, "docs/loop/owner-author-workflow-v1.md",
+                "docs/loop/remaining-bootstrap-delegation-v1.md", "docs/loop/document-authority-local-development.md",
+                "SEPARATION-20260910/README.md", "SEPARATION-20260910/ALLOCATION.tsv",
+                "SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv")
+# The eleven documents whose generation the verify-cli and the autopilot pin (unchanged key set at 332f07ce).
+GENERATION_DOCS = (AGENTS, CLAUDE, README, "docs/loop/byggplan-v3.md", EVIDENCE_CONTRACT, DRIFT,
+                   "docs/loop/harness-substitution-audit-2026-08-11.md", SUBSTITUTION,
+                   "docs/loop/owner-author-workflow-v1.md", "docs/loop/regler.md",
+                   "docs/loop/remaining-bootstrap-delegation-v1.md")
+# F2: frozen-evidence documents reached by the closure but neither scanned nor followed; *-local-development.md
+# (gate companions that necessarily name the forbidden tokens) are likewise not scanned.
+CLOSURE_EXEMPT = {"docs/loop/owner-author-workflow-v1.md", "docs/loop/remaining-bootstrap-delegation-v1.md",
+                  PLAN_COPY, HANDOFF_COPY, SPEC}
+CLOSURE_EXEMPT_PREFIXES = ("SEPARATION-20260910/", "verify/")
+# Historical documents that stay byte-identical and gain one dated supersession block (header or appended note).
+HISTORICAL_NOTE_DOCS = {IMPLEMENTATION: (r"§\s*3\b", r"§\s*4\b", r"§\s*29\b"),
+                        AUTOPILOT_V2: (r"OWNER_AUTHORITY_REQUIRED",),
+                        OWNER_H003: (r"§\s*9\b|\b9\.", r"docs/loop/drift\.md")}
+DRIFT_ACTIVE_HEADING = re.compile(r"^## Aktiv plattformsnot\b.*$", re.M)
+# --- token rules -----------------------------------------------------------------------------
+WEB_TOKENS = (
+    r"docs/07-konstitution", r"docs/03-regelverk", r"docs/05-beslutslogg", r"docs/00-[\w-]*", r"docs/agentoverlamning",
+    r"docs/100-dagar", r"docs/arkiv/", r"KONSTITUTION\.md", r"(?<![\w-])AUTOPILOT(?![\w-])", r"(?i)steward",
+    r"Vaktmästaren", r"Nattskiftet", r"eval-rubric", r"juridikflaggor", r"nortropic-verify-suite",
+    r"(?<![\w./-])workflows/", r"(?<![\w./-])agents/[\w-]+\.md", r"(?<![\w./-])skills/", r"vendored-skills",
+    r"tests/fixtures", r"(?i)konstitution\w*", r"(?i)constitution\w*", r"(?i)regelverk\w*", r"(?i)\brulebook\b",
+)
+HUMAN_TOKENS = (
+    r"(?i)människohand", r"(?i)endast\s+av\s+(en\s+)?människ", r"(?i)av\s+(en\s+)?människa\b", r"(?i)högrisk",
+    r"(?i)owner[-_ ]only", r"(?i)human owner", r"(?i)policyägare", r"OWNER_GATE_(STILL_)?REQUIRED",
+    r"OWNER_AUTHORITY_REQUIRED", r"(?i)remove the owner gate", r"(?i)owner reproduces",
+    r"(?i)människan för kandidaterna", r"(?i)auto-merge är avstängt", r"(?i)godkänner\s+(spec|§A|merge)",
+    r"(?i)human[- ]hand", r"(?i)owner[- ]hand",
+)
+EXEC_WEB_TOKENS = (
+    r"docs/07-konstitution", r"docs/03-regelverk", r"docs/05-beslutslogg", r"docs/00-borja-har",
+    r"docs/agentoverlamning", r"docs/100-dagar", r"(?<![\w./-])workflows/", r"tests/fixtures",
+    r"eval-rubric", r"juridikflaggor", r"nortropic-steward", r"nortropic-verify-suite", r"[\"']AUTOPILOT[\"']",
+)
+LOOP_FALL_WEB_TOKENS = (r"(?<![\w./-])agents/", r"(?<!P)INV-00\d", r"(?<![\w./-])workflows/", r"tests/fixtures")
+GITIGNORE_WEB_WHITELIST = re.compile(r"^!/(workflows|agents|skills|vendored-skills|packs|backtests|tools|AUTOPILOT)(/|$)", re.M)
+NOT_IGNORED = ("SEPARATION-20260910/README.md", PROVENANCE_2, "docs/loop/x.md", "verify/bin/x-exit", "controller/x/cli",
+               "specs/x.json", "config/x.json", "tests/controller/x/fall.py", "tests/scripts/x/y.py",
+               ".agents/skills/x/SKILL.md", VERIFIER, AUTOPILOT, AGENTS, CLAUDE, README)
+# docs/ stays whitelisted as a whole: the frozen policy suite (tests/controller/policy/fall.py) stages the frozen
+# spec rows' docs_impact (docs/05-beslutslogg.md) in fixture worktrees via `git add -A`; a narrowed docs/ whitelist
+# turns that suite red (measured 2026-09-10 on the reference construction). Absence of web docs is bound by F1.
+IGNORED = ("workflows/x.js", "agents/x.md", "skills/x/SKILL.md", "vendored-skills/x/SKILL.md", "packs/x.json",
+           "backtests/x.md", "tools/x/y.mjs", "AUTOPILOT")
+PATH_RE = re.compile(r"(?<![\w/.-])((?:docs|config|specs)/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.(?:md|json))")
+ROOT_DOC_RE = re.compile(r"(?<![\w/.-])(AGENTS\.md|CLAUDE\.md|README\.md|\.agents/skills/[A-Za-z0-9_-]+/SKILL\.md)")
+LINK_RE = re.compile(r"\]\(([^)\s#]+)(?:#[^)]*)?\)")
+DOC_SECTIONS = ("## Enkelt förklarat", "## Avgränsning och roller", "## Kriterium (effekter)",
+                "## Produktyta för BUILDER", "## Vad grinden inte bevisar", "## Utfall")
+SHA256_FORM = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_FORM = re.compile(r"^[0-9a-f]{40}$")
+OID_FORM = re.compile(r"^[0-9a-f]{40}$")
+SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+CONTROL_SET_ROW_COUNT, LAUNCH_CWD_ROW_COUNT, GOVERNANCE_ROW_COUNT = 68, 20, 70
+CONTROL_SET_ROWS = ("subject_preflight_exit0_exact_json", "platform_prepare_and_check_accept_subject_documents",
+                    "fixture_task_run_exit0", "autopilot_selftest_none_returns",
+                    "autopilot_substitution_accepts_platform_generation_without_web_docs",
+                    "loop_end_to_end_attests_platform_fixture_task", "invariant_required_exit_15_of_15")
+LAUNCH_CWD_FROZEN_ROW = "frozen_verify_bin_identical_to_base_383ed387"
+LAUNCH_CWD_EXPECTED_DETAIL = "problems=[] extra=['" + GOVERNANCE_GATE + "', '" + GATE + "']"
+# The governance gate (frozen for subject 9112a304) sees exactly these deltas on a final-separation candidate:
+# its verify/register freeze (512490d4 + itself) and its launch-cwd expectation of one extra gate. Measured on the
+# reference construction 2026-09-10; every other row must stay green.
+GOVERNANCE_EXPECTED_FAILS = ("g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only",
+                             "g7_launch_cwd_exit_19_of_20_only_frozen_listing_sees_this_gate")
+DRIVER_MARK = "PLATFORM_SEPARATION_DRIVER="
+# Real module, real callables, never the operational __main__. Stop -> exit 7.
+DRIVER = (
+    "import importlib.util,sys,json\n"
+    "from pathlib import Path\n"
+    "subject=Path(sys.argv[1]); root=Path(sys.argv[2]); scenario=sys.argv[3]\n"
+    "s=importlib.util.spec_from_file_location('subject_autopilot', subject/'" + AUTOPILOT + "')\n"
+    "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
+    "out={'scenario':scenario}\n"
+    "try:\n"
+    "    if scenario=='selftest_none':\n"
+    "        m.selftest(None)\n"
+    "        out.update(outcome='returned')\n"
+    "    elif scenario=='roadmap_plan':\n"
+    "        m.ensure_roadmap_plan(root)\n"
+    "        out.update(outcome='returned')\n"
+    "    elif scenario=='constants':\n"
+    "        out.update(outcome='returned', plan_sha=m.ROADMAP_PLAN_SHA, plan_blobs=dict(m.ROADMAP_PLAN_BLOBS),\n"
+    "                   substitution_blobs=dict(m.SUBSTITUTION_BLOBS), plan_path=m.ROADMAP_PLAN_PATH, handoff_path=m.ROADMAP_HANDOFF_PATH)\n"
+    "    elif scenario=='canary_fault':\n"
+    "        raise NameError('fixture-canary')\n"
+    "    else:\n"
+    "        raise SystemExit(9)\n"
+    "except m.Stop as e:\n"
+    "    out.update(outcome='stop', message=str(e))\n"
+    "print('" + DRIVER_MARK + "'+json.dumps(out, ensure_ascii=False))\n"
+    "raise SystemExit(7 if out.get('outcome')=='stop' else 0)\n"
+)
+
+
+class Rig(RuntimeError):
+    pass
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def strict(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON member " + repr(key))
+            result[key] = value
+        return result
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def scan(text, patterns):
+    """(pattern, line, excerpt) for every match; an empty list is the only PASS."""
+    hits = []
+    for pattern in patterns:
+        for m in re.finditer(pattern, text):
+            line = text.count("\n", 0, m.start()) + 1
+            hits.append((pattern, line, text[max(0, m.start() - 20):m.end() + 20].replace("\n", " ")))
+    return hits
+
+
+def fmt_hits(hits, limit=6):
+    return "; ".join(f"{p}@{l}: {x}" for p, l, x in hits[:limit])
+
+
+def label_of(rel):
+    return re.sub(r"[^A-Za-z0-9]+", "_", rel)
+
+
+def sections(text):
+    """[(heading, start, end)] over `## ` headings; text before the first heading is the preamble ('')."""
+    out, starts = [], [m.start() for m in re.finditer(r"^## .*$", text, re.M)]
+    prev, prev_head = 0, ""
+    for s in starts:
+        out.append((prev_head, prev, s))
+        prev, prev_head = s, text[s:text.find("\n", s) if text.find("\n", s) != -1 else len(text)]
+    out.append((prev_head, prev, len(text)))
+    return out
+
+
+def refs_from_text(rel, text):
+    out = set()
+    for m in PATH_RE.finditer(text):
+        out.add(m.group(1))
+    for m in ROOT_DOC_RE.finditer(text):
+        out.add(m.group(1))
+    for m in LINK_RE.finditer(text):
+        target = m.group(1)
+        if "://" in target or not target.endswith((".md", ".json")):
+            continue
+        if target.startswith(("docs/", "config/", "specs/", ".agents/")) or target in (AGENTS, CLAUDE, README):
+            out.add(target)
+            continue
+        parts = []
+        for seg in (Path(rel).parent / target).as_posix().split("/"):
+            if seg == "..":
+                if parts:
+                    parts.pop()
+            elif seg and seg != ".":
+                parts.append(seg)
+        out.add("/".join(parts))
+    return out
+
+
+def refs_from_json(obj):
+    out = set()
+    if isinstance(obj, dict):
+        for v in obj.values():
+            out |= refs_from_json(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            out |= refs_from_json(v)
+    elif isinstance(obj, str) and (PATH_RE.fullmatch(obj) or ROOT_DOC_RE.fullmatch(obj)):
+        out.add(obj)
+    return out
+
+
+def module_constants(source, names):
+    """name -> literal value for top-level assignments of `names` (dict keys / tuple items are path literals)."""
+    tree = ast.parse(source)
+    found = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in names:
+                    found[target.id] = ast.literal_eval(node.value)
+    return found
+
+
+def ast_path_strings(source):
+    """Every repo-relative document path literal anywhere in a Python module (incl. prompt-building functions)."""
+    out = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            for m in PATH_RE.finditer(node.value):
+                out.add(m.group(1))
+            if PATH_RE.fullmatch(node.value):
+                out.add(node.value)
+    return out
+
+
+def code_strings(source, skip_function_re=None):
+    """(line, value) for string constants that are neither docstrings nor inside functions matching skip_function_re."""
+    tree = ast.parse(source)
+    docstrings, out, stack = set(), [], []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
+            first = node.body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+                docstrings.add(id(first.value))
+
+    class V(ast.NodeVisitor):
+        def visit_FunctionDef(self, node):
+            stack.append(node.name)
+            self.generic_visit(node)
+            stack.pop()
+        visit_AsyncFunctionDef = visit_FunctionDef
+
+        def visit_Constant(self, node):
+            if isinstance(node.value, str) and id(node) not in docstrings:
+                if not (skip_function_re and any(re.search(skip_function_re, n) for n in stack)):
+                    out.append((node.lineno, node.value))
+    V().visit(tree)
+    return out
+
+
+def argparse_defaults(source):
+    """option -> [string constants inside its default expression] for every add_argument call."""
+    out = {}
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_argument" \
+                and node.args and isinstance(node.args[0], ast.Constant):
+            for kw in node.keywords:
+                if kw.arg == "default":
+                    out[node.args[0].value] = [n.value for n in ast.walk(kw.value)
+                                               if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+    return out
+
+
+class Bench:
+    """Scratch root, closed child environment and pinned tool resolver."""
+
+    def __init__(self, scratch):
+        self.scratch = scratch
+        self.resolver = scratch / "resolver"
+        self.home = scratch / "home"
+        self.xdg = scratch / "xdg"
+        self.template = scratch / "empty-template"
+        for d in (self.resolver, self.home, self.xdg, self.template):
+            d.mkdir(mode=0o700)
+        (self.resolver / "python3.12").symlink_to(PYTHON)
+        (self.resolver / "node").symlink_to(NODE)
+        (self.resolver / "git").symlink_to(GIT)
+
+    def env(self, tmpdir, extra=None):
+        e = {
+            "HOME": str(self.home), "XDG_CONFIG_HOME": str(self.xdg),
+            "PATH": str(self.resolver) + ":/usr/bin:/bin",
+            "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+            "TMPDIR": str(tmpdir), "DARWIN_USER_TEMP_DIR": str(tmpdir),
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+            "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "cat",
+            "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1", "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_AUTHOR_NAME": "Local fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "Local fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PROVIDER_CALL_ALLOWED": "NO", "MODEL_CALL_ALLOWED": "NO",
+        }
+        if extra:
+            e.update(extra)
+        return e
+
+    def tmp(self, name):
+        p = self.scratch / ("tmp-" + name)
+        p.mkdir(mode=0o700)
+        return p
+
+
+def run(argv, cwd, env, timeout=120, stdin=None):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                          text=True, timeout=timeout, check=False, input=stdin)
+
+
+def run_bytes(argv, cwd, env, timeout=120):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True, timeout=timeout, check=False)
+
+
+def git_raw(root, env, *args):
+    return run([GIT, "-c", "core.hooksPath=/dev/null", *args], root, env)
+
+
+def git(root, env, *args):
+    r = git_raw(root, env, *args)
+    if r.returncode:
+        raise Rig("fixture Git failed: " + " ".join(args) + ": " + r.stderr.strip())
+    return r.stdout.strip()
+
+
+def write(path, data, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    with path.open("xb") as stream:
+        stream.write(data)
+    path.chmod(mode)
+
+
+def json_ok(result):
+    """Exact one-line JSON dict on stdout with rc 0 and empty stderr, else None."""
+    if result.returncode != 0 or result.stderr:
+        return None
+    if not result.stdout.endswith("\n") or result.stdout.count("\n") != 1:
+        return None
+    try:
+        obj = strict(result.stdout)
+    except ValueError:
+        return None
+    return obj if type(obj) is dict else None
+
+
+def driver_outcome(result):
+    """Exact driver outcome or None; a traceback/uncaught fault never counts."""
+    if result.stderr:
+        return None
+    lines = result.stdout.splitlines()
+    if not lines or not lines[-1].startswith(DRIVER_MARK):
+        return None
+    try:
+        obj = strict(lines[-1][len(DRIVER_MARK):])
+    except ValueError:
+        return None
+    if type(obj) is not dict or obj.get("outcome") not in ("returned", "stop"):
+        return None
+    if obj["outcome"] == "returned" and result.returncode != 0:
+        return None
+    if obj["outcome"] == "stop" and (result.returncode != 7 or type(obj.get("message")) is not str):
+        return None
+    return obj
+
+
+def replica(bench, name, source, candidate_sha):
+    """h-035 recipe: git init with an empty template + local-only exact-SHA fetch + detached checkout; no remote."""
+    repo = bench.scratch / ("replica-" + name)
+    repo.mkdir(mode=0o755)
+    env = bench.env(bench.tmp("git-" + name))
+    for command in (
+        ("init", "--quiet", f"--template={bench.template}"),
+        ("config", "--local", "--replace-all", "core.repositoryformatversion", "0"),
+        ("config", "--local", "--replace-all", "core.filemode", "true"),
+        ("config", "--local", "--replace-all", "core.bare", "false"),
+        ("config", "--local", "--replace-all", "core.logallrefupdates", "false"),
+        ("config", "--local", "--replace-all", "core.ignorecase", "true"),
+        ("config", "--local", "--replace-all", "core.precomposeunicode", "true"),
+        ("config", "--local", "--replace-all", "core.hooksPath", "/dev/null"),
+        ("config", "--local", "--replace-all", "gc.auto", "0"),
+        ("config", "--local", "--replace-all", "maintenance.auto", "false"),
+        ("config", "--local", "--replace-all", "fetch.writeCommitGraph", "false"),
+        ("config", "--local", "--replace-all", "pack.writeReverseIndex", "false"),
+        ("config", "--local", "--replace-all", "protocol.file.allow", "never"),
+        ("-c", "protocol.file.allow=always", "-c", "fetch.unpackLimit=1",
+         "fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
+         str(source), candidate_sha),
+        ("checkout", "--detach", "--quiet", candidate_sha),
+    ):
+        r = run([GIT, *command], repo, env)
+        if r.returncode or r.stdout or r.stderr:
+            raise Rig("replica construction " + repr(command) + ": " + (r.stderr or r.stdout))
+    if git(repo, env, "rev-parse", "HEAD") != candidate_sha or git(repo, env, "status", "--porcelain"):
+        raise Rig("replica does not reproduce the candidate: " + name)
+    if git_raw(repo, env, "remote").stdout.strip():
+        raise Rig("replica unexpectedly has a remote")
+    return repo, env
+
+
+def overlay(repo, env, files, removals=(), message="local fixture overlay"):
+    """Write/replace files (rel -> (bytes, mode)), remove `removals`, commit on the detached HEAD."""
+    for rel, (data, mode) in files.items():
+        p = repo / rel
+        if p.exists() or p.is_symlink():
+            p.unlink()
+        write(p, data, mode)
+    for rel in removals:
+        (repo / rel).unlink()
+    git(repo, env, "add", "-A", "--", *files, *removals)
+    if git_raw(repo, env, "diff", "--cached", "--quiet").returncode != 0:
+        git(repo, env, "commit", "--quiet", "--no-gpg-sign", "-m", message)
+    if git(repo, env, "status", "--porcelain"):
+        raise Rig("overlay left the replica dirty")
+    return git(repo, env, "rev-parse", "HEAD")
+
+
+def ls_tree(subject, env, rev, path):
+    """rel -> (mode, oid) for every blob under path at rev (empty when the path is absent)."""
+    r = git_raw(subject, env, "ls-tree", "-r", rev, "--", path)
+    if r.returncode:
+        raise Rig("ls-tree failed: " + rev + " " + path + ": " + r.stderr.strip())
+    out = {}
+    for line in r.stdout.splitlines():
+        meta, _, rel = line.partition("\t")
+        mode, kind, oid = meta.split()
+        if kind == "blob":
+            out[rel] = (mode, oid)
+    return out
+
+
+def gate_rows(stdout):
+    passes = re.findall(r"^PASS (\S+)", stdout, re.M)
+    fails = re.findall(r"^FAIL (\S+)", stdout, re.M)
+    m = re.search(r"^FIXTURE_ROOT=(.+)$", stdout, re.M)
+    return passes, fails, (Path(m.group(1)) if m else None)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--subject", type=Path, default=ROOT)
+    parser.add_argument("--held-control-set", type=Path, default=None,
+                        help="held copy of verify/bin/platform-control-set-exit (default: the subject's copy, credited "
+                             "only when byte-identical to " + FROZEN_BASE[:8] + ")")
+    parser.add_argument("--held-launch-cwd", type=Path, default=None, help="held copy of verify/bin/launch-cwd-exit (same rule)")
+    parser.add_argument("--held-governance", type=Path, default=None, help="held copy of verify/bin/platform-governance-exit (same rule)")
+    parser.add_argument("--skip-held-gates", action="store_true",
+                        help="skip the sandbox-exec dependent rows (held gates, loop fall.py); their rows are then FAIL, never PASS")
+    args = parser.parse_args()
+    subject = args.subject.resolve()
+    if sys.version_info[:2] != (3, 12) or sha(Path(PYTHON).read_bytes()) != PYTHON_SHA:
+        raise Rig("pinned Python 3.12 required")
+    for tool in (GIT, NODE):
+        if not Path(tool).is_file() or not os.access(tool, os.X_OK):
+            raise Rig("pinned tool unavailable: " + tool)
+    for rel in (SPEC, VERIFY_CLI, LOOP_CLI, AUTOPILOT, VERIFIER, REGISTER, PREMIAR, MANAGED, LOOP_CONFIG, LOOP_FALL,
+                PUBLICATION_CALLERS, AGENTS, CLAUDE, README, ".gitignore", DRIFT, FULL_ROADMAP, SUBSTITUTION,
+                IMPLEMENTATION, AUTOPILOT_V2, OWNER_H003, EVIDENCE_CONTRACT):
+        p = subject / rel
+        if not p.is_file() or p.is_symlink():
+            raise Rig("subject file missing or not regular: " + rel)
+    scratch = Path(tempfile.mkdtemp(prefix="platform-separation-final-")).resolve()
+    print("FIXTURE_ROOT=" + str(scratch), flush=True)
+    bench = Bench(scratch)
+    probe_env = bench.env(bench.tmp("probe"))
+    head_probe = run([GIT, "-C", str(subject), "rev-parse", "--verify", "HEAD^{commit}"], scratch, probe_env)
+    if head_probe.returncode or not COMMIT_FORM.fullmatch(head_probe.stdout.strip()):
+        raise Rig("subject HEAD unavailable: " + head_probe.stderr.strip())
+    head = head_probe.stdout.strip()
+    for base in (FROZEN_BASE, GOVERNANCE_BASE, LAUNCH_CWD_BASE):
+        if run([GIT, "-C", str(subject), "cat-file", "-e", base + "^{commit}"], scratch, probe_env).returncode:
+            raise Rig("frozen base " + base + " is not in the subject's history")
+    if run([GIT, "-C", str(subject), "status", "--porcelain", "--untracked-files=no"], scratch, probe_env).stdout.strip():
+        raise Rig("subject tracked files are not committed at HEAD; the replicas would not carry them")
+    tracked_entries = ls_tree(subject, probe_env, "HEAD", ".")
+    tracked = set(tracked_entries)
+    subject_sha = {rel: sha((subject / rel).read_bytes()) for rel in sorted(tracked) if (subject / rel).is_file()}
+    held = {GATE: sha((ROOT / GATE).read_bytes())}
+    rows = []
+
+    def check(label, passed, detail=""):
+        rows.append({"label": label, "pass": bool(passed), "detail": str(detail)[-1200:]})
+        print(("PASS " if passed else "FAIL ") + label, flush=True)
+
+    def text(rel):
+        return (subject / rel).read_text(encoding="utf-8", errors="replace")
+
+    def base_bytes(rel):
+        r = run_bytes([GIT, "-C", str(subject), "show", f"{FROZEN_BASE}:{rel}"], scratch, probe_env)
+        return r.stdout if r.returncode == 0 else None
+
+    def head_oid(rel):
+        return tracked_entries.get(rel, (None, None))[1]
+
+    # ------------------------------------------------------------------ F10 canaries
+    fault = run([PYTHON, "-B", "-c", "raise NameError('fixture-canary')"], scratch, probe_env)
+    check("canary_traceback_is_not_outcome", fault.returncode != 0 and json_ok(fault) is None and driver_outcome(fault) is None)
+    canary_repo = bench.scratch / "canary-repo"
+    canary_repo.mkdir()
+    git(canary_repo, probe_env, "init", "--quiet", f"--template={bench.template}")
+    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "unknown_scenario"], scratch, probe_env)
+    check("canary_driver_unknown_scenario_is_not_outcome", canary.returncode == 9 and driver_outcome(canary) is None)
+    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "canary_fault"], scratch, probe_env)
+    check("canary_driver_fault_is_not_outcome", canary.returncode not in (0, 7) and driver_outcome(canary) is None)
+    check("canary_token_scan_detects_web_governance_and_human_hand_rules",
+          bool(scan("Läs docs/07-konstitution.md först.", WEB_TOKENS)) and bool(scan("Konstitutionen står över.", WEB_TOKENS))
+          and bool(scan("Registrerad hash uppdateras endast av människohand.", HUMAN_TOKENS))
+          and bool(scan("OWNER_AUTHORITY_REQUIRED=YES", HUMAN_TOKENS))
+          and not scan(".agents/skills/x/SKILL.md AUTOPILOT_V4_SELFTEST HUMAN_AUTHORITY_HARD_STOP LOOP-ÄGARHAND-26", WEB_TOKENS + HUMAN_TOKENS)
+          and not scan("inte ett permanent krav på mänskligt godkännande", HUMAN_TOKENS))
+    check("canary_closure_extraction_follows_backticked_paths_and_relative_links",
+          refs_from_text("docs/loop/a.md", "se `docs/loop/y.md`, [z](../loop/z.md) och [w](w.md); AGENTS.md")
+          == {"docs/loop/y.md", "docs/loop/z.md", "docs/loop/w.md", AGENTS}
+          and refs_from_json({"spec": "config/premiar-backlog.json", "x": ["docs/05-beslutslogg.md"]})
+          == {"config/premiar-backlog.json", "docs/05-beslutslogg.md"})
+
+    # ------------------------------------------------------------------ F1: tree allowlist, absences, provenance
+    offenders = sorted(rel for rel in tracked if rel not in ALLOW_EXACT and not rel.startswith(ALLOW_PREFIXES))
+    check("f1_every_tracked_file_matches_platform_allowlist", not offenders and len(tracked) >= 120,
+          f"tracked={len(tracked)} offenders={offenders[:12]}")
+    present = sorted(rel for rel in tracked if rel in ABSENT_EXACT or rel.startswith(ABSENT_PREFIXES) or ABSENT_RE.match(rel))
+    check("f1_required_absences_web_material_and_transferred_files", not present, f"present={present[:12]}")
+    prov_ok, prov_detail = False, "missing"
+    if PROVENANCE_2 in tracked and (subject / PROVENANCE_2).is_file():
+        lines = [l for l in text(PROVENANCE_2).splitlines() if l.strip()]
+        data_rows = [l.split("\t") for l in lines if not l.lower().startswith("path")]
+        listed = {r[0]: r for r in data_rows if len(r) >= 3}
+        problems = []
+        for rel in TRANSFERRED:
+            row = listed.get(rel)
+            base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
+            if row is None:
+                problems.append(rel + ": not listed")
+            elif not OID_FORM.fullmatch(row[1]) or row[1] != base_oid:
+                problems.append(f"{rel}: oid {row[1]} != {base_oid}")
+            elif not row[2].strip():
+                problems.append(rel + ": no destination")
+            if rel in tracked:
+                problems.append(rel + ": still tracked")
+        prov_ok = not problems and set(listed) == set(TRANSFERRED)
+        prov_detail = f"listed={sorted(listed)} problems={problems}"
+    check("f1_web_transfer_provenance_2_lists_the_four_files_with_blob_oids_at_" + FROZEN_BASE[:8], prov_ok, prov_detail)
+
+    # ------------------------------------------------------------------ F2: reference closure oracle
+    roots, root_problems = {AGENTS, CLAUDE, README, LOOP_CONFIG}, []
+    skills = sorted(rel for rel in tracked if re.fullmatch(r"\.agents/skills/[^/]+/SKILL\.md", rel))
+    roots |= set(skills)
+    try:
+        spec_obj = strict((subject / SPEC).read_bytes())
+        authority = spec_obj.get("authority", {})
+        auth_paths = [authority.get(k) for k in ("plan", "architecture", "rules", "backlog")]
+        if not all(type(p) is str and PATH_RE.fullmatch(p) for p in auth_paths):
+            root_problems.append(f"spec authority not four document paths: {authority}")
+        roots |= {p for p in auth_paths if type(p) is str}
+        spec_strict = type(spec_obj.get("tasks")) is list and type(spec_obj.get("defaults")) is dict
+    except ValueError as exc:
+        spec_obj, spec_strict = {}, False
+        root_problems.append("spec not strict JSON: " + repr(exc))
+    try:
+        cli_consts = module_constants(text(VERIFY_CLI), {"PRETASK_PATHS", "PLATFORM_DOCUMENTS", "PLATFORM_CONTROL"})
+        for name in ("PRETASK_PATHS", "PLATFORM_DOCUMENTS", "PLATFORM_CONTROL"):
+            if name not in cli_consts:
+                root_problems.append("verify cli lacks " + name)
+        cli_paths = set()
+        for value in cli_consts.values():
+            cli_paths |= set(value.keys()) if isinstance(value, dict) else set(value)
+        roots |= {p for p in cli_paths if isinstance(p, str) and (PATH_RE.fullmatch(p) or ROOT_DOC_RE.fullmatch(p))}
+    except (SyntaxError, ValueError) as exc:
+        cli_consts = {}
+        root_problems.append("verify cli constants unreadable: " + repr(exc))
+    try:
+        autopilot_source = text(AUTOPILOT)
+        autopilot_roots = ast_path_strings(autopilot_source)
+        roots |= autopilot_roots
+    except SyntaxError as exc:
+        autopilot_source, autopilot_roots = "", set()
+        root_problems.append("autopilot does not parse: " + repr(exc))
+    check("f2_closure_roots_extracted_from_router_skills_spec_authority_verify_cli_autopilot_and_loop_config",
+          not root_problems and len(skills) >= 6 and len(autopilot_roots) >= 8 and len(roots) >= 25,
+          f"roots={len(roots)} skills={len(skills)} autopilot_roots={len(autopilot_roots)} problems={root_problems}")
+
+    def exempt(rel):
+        return rel in CLOSURE_EXEMPT or rel.startswith(CLOSURE_EXEMPT_PREFIXES)
+
+    def scannable_text(rel):
+        """The part of a reached document that is ACTIVE instruction (None when the document is frozen evidence)."""
+        if exempt(rel):
+            return None
+        raw = text(rel)
+        if rel == DRIFT:
+            m = DRIFT_ACTIVE_HEADING.search(raw)
+            if m is None:
+                return ""
+            end = raw.find("\n## ", m.end())
+            return raw[m.start():end if end != -1 else len(raw)]
+        if rel in HISTORICAL_NOTE_DOCS:
+            base = base_bytes(rel)
+            current = (subject / rel).read_bytes()
+            if base is None:
+                return raw
+            if current.endswith(base):
+                return current[:len(current) - len(base)].decode("utf-8", "replace")
+            if current.startswith(base):
+                return current[len(base):].decode("utf-8", "replace")
+            return raw
+        if rel == SUBSTITUTION:
+            keep = []
+            for head_line, s, e in sections(raw):
+                m = re.match(r"^## (\d+)\.", head_line)
+                if m is None or int(m.group(1)) in (6, 12) or int(m.group(1)) > 13:
+                    keep.append(raw[s:e])
+            return "".join(keep)
+        if rel.endswith("-local-development.md"):
+            return None
+        return raw
+
+    reached, edges, dangling, queue = set(), {}, {}, sorted(roots)
+    while queue:
+        rel = queue.pop(0)
+        if rel in reached:
+            continue
+        reached.add(rel)
+        if rel not in tracked or not (subject / rel).is_file():
+            continue
+        body = scannable_text(rel)
+        if body is None:
+            continue
+        if rel.endswith(".json"):
+            try:
+                refs = refs_from_json(strict((subject / rel).read_bytes()))
+            except ValueError:
+                refs = set()
+        else:
+            refs = refs_from_text(rel, body)
+        refs.discard(rel)
+        edges[rel] = sorted(refs)
+        for ref in refs:
+            if ref not in tracked:
+                dangling.setdefault(ref, []).append(rel)
+            if ref not in reached:
+                queue.append(ref)
+    check("f2_closure_all_active_references_resolve_to_tracked_files", not dangling,
+          f"reached={len(reached)} dangling={ {k: v[:3] for k, v in sorted(dangling.items())} }")
+    scanned = []
+    for rel in sorted(reached):
+        if rel not in tracked or not (subject / rel).is_file():
+            continue
+        body = scannable_text(rel)
+        if body is None:
+            continue
+        scanned.append(rel)
+        human = () if rel in HISTORICAL_NOTE_DOCS else HUMAN_TOKENS
+        hits = scan(body, WEB_TOKENS + human)
+        check("f2_active_doc_free_of_web_governance_and_human_hand_rules_" + label_of(rel), not hits, fmt_hits(hits))
+    fr = text(FULL_ROADMAP)
+    fr_authority = next((fr[s:e] for h, s, e in sections(fr) if h.startswith("## Authority")), "")
+    check("f2_full_roadmap_authority_section_keeps_plan_sha_and_names_agents_md_as_conflict_authority",
+          "ROADMAP_PLAN_SHA=" + ROADMAP_PLAN_SHA in fr_authority and "ROADMAP_PLAN_PATH=" + PLAN_COPY in fr_authority
+          and "ROADMAP_HANDOFF_PATH=" + HANDOFF_COPY in fr_authority and AGENTS in fr_authority
+          and "HUMAN_AUTHORITY_HARD_STOP" in fr, f"authority_section_len={len(fr_authority)}")
+    sub_base, sub_head = base_bytes(SUBSTITUTION), text(SUBSTITUTION)
+    problems = []
+    if sub_base is None:
+        problems.append("no base")
+    else:
+        def numbered(txt):
+            out = {}
+            for h, s, e in sections(txt):
+                m = re.match(r"^## (\d+)\.", h)
+                if m:
+                    out[int(m.group(1))] = txt[s:e]
+            return out
+        base_secs, head_secs = numbered(sub_base.decode("utf-8", "replace")), numbered(sub_head)
+        for n in (1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13):
+            # A section ends at the next heading or EOF; only trailing whitespace may differ (a new §14 follows §13).
+            if base_secs.get(n) is None or (head_secs.get(n) or "").rstrip() != base_secs[n].rstrip():
+                problems.append(f"§{n} changed or missing")
+        for n in (6, 12):
+            if head_secs.get(n) is None:
+                problems.append(f"§{n} missing")
+        amendment = [h for h, s, e in sections(sub_head)
+                     if re.search(r"2026-09-10|v1\.1|(?i:amendment|tillägg|ändring)", h) and AGENTS in sub_head[s:e]]
+        if not amendment:
+            problems.append("no dated amendment section naming AGENTS.md")
+    check("f2_substitution_contract_sections_1_5_7_11_13_unchanged_and_dated_amendment_present", not problems, str(problems)[:600])
+    for rel, markers in HISTORICAL_NOTE_DOCS.items():
+        base = base_bytes(rel)
+        current = (subject / rel).read_bytes()
+        block = None
+        if base is not None and current != base:
+            if current.endswith(base):
+                block = current[:len(current) - len(base)].decode("utf-8", "replace")
+            elif current.startswith(base):
+                block = current[len(base):].decode("utf-8", "replace")
+        problems = []
+        if block is None:
+            problems.append("document is not <base bytes> plus exactly one added header or appended note")
+        else:
+            problems += [f"note lacks {m}" for m in ("2026-09-10", AGENTS) + tuple(markers) if not re.search(m, block)]
+            problems += [f"note carries web token {p}@{l}" for p, l, _ in scan(block, WEB_TOKENS)[:3]]
+        check("f2_historical_document_unchanged_plus_dated_supersession_note_" + label_of(rel), not problems, str(problems)[:600])
+    drift_base, drift_head = base_bytes(DRIFT), (subject / DRIFT).read_bytes()
+    active = scannable_text(DRIFT) or ""
+    problems = []
+    if drift_base is None or not drift_head.startswith(drift_base) or drift_head == drift_base:
+        problems.append("drift.md is not append-only vs " + FROZEN_BASE[:8] + " with an appended block")
+    if not active:
+        problems.append("no '## Aktiv plattformsnot' section")
+    else:
+        problems += [f"note lacks {m}" for m in ("2026-09-10", AGENTS, r"§\s*5\b") if not re.search(m, active)]
+        problems += [f"{p}@{l}" for p, l, _ in scan(active, WEB_TOKENS + HUMAN_TOKENS)[:4]]
+    check("f2_drift_md_append_only_with_active_platform_note_free_of_web_governance", not problems, str(problems)[:600])
+
+    # ------------------------------------------------------------------ F3: config and permission rules
+    denied = spec_obj.get("defaults", {}).get("denied_write", []) if spec_strict else []
+    try:
+        premiar = strict((subject / PREMIAR).read_bytes())
+        premiar_denied = premiar.get("defaults", {}).get("denied_write")
+        premiar_hits = scan(text(PREMIAR), WEB_TOKENS + HUMAN_TOKENS)
+        premiar_ok = spec_strict and premiar_denied == denied and not premiar_hits and "docs/05" not in text(PREMIAR) \
+            and type(premiar.get("tasks")) is list and len(premiar["tasks"]) >= 2
+        detail = f"denied={premiar_denied} spec={denied} hits={fmt_hits(premiar_hits, 4)}"
+    except ValueError as exc:
+        premiar_ok, detail = False, repr(exc)
+    check("f3_premiar_backlog_denied_write_equals_spec_denied_write_and_no_web_docs", premiar_ok, detail)
+    try:
+        managed = strict((subject / MANAGED).read_bytes())
+        deny = managed["permissions"]["deny"]
+        deny_write = managed["sandbox"]["filesystem"]["denyWrite"]
+        problems = []
+        for entry in deny + deny_write:
+            if "/Users/elinhaggstrom/nortropic" in entry and PLATFORM_ROOT not in entry:
+                problems.append("not platform root: " + entry)
+        problems += [f"web token {p}: {x}" for p, l, x in scan(text(MANAGED), EXEC_WEB_TOKENS + (r"(?<![\w./-])agents/", r"(?<![\w./-])skills/"))[:4]]
+        problems += [f"old root: {x}" for p, l, x in scan(text(MANAGED), (OLD_ROOT_RE.pattern,))[:4]]
+        for pattern in denied:
+            core = pattern[:-3] if pattern.endswith("/**") else pattern
+            if f"Edit(/{PLATFORM_ROOT}{pattern})" not in deny:
+                problems.append("Edit deny missing for " + pattern)
+            if f"{PLATFORM_ROOT}{core}" not in deny_write:
+                problems.append("denyWrite missing for " + core)
+        if f"Edit(/{PLATFORM_ROOT}{REGISTER})" not in deny or f"{PLATFORM_ROOT}{REGISTER}" not in deny_write:
+            problems.append("register not denied")
+        if managed["sandbox"].get("enabled") is not True or managed["sandbox"]["network"].get("strictAllowlist") is not True:
+            problems.append("sandbox/network hardening changed")
+        managed_ok = spec_strict and bool(denied) and not problems
+        detail = str(problems)[:600]
+    except (ValueError, KeyError, TypeError) as exc:
+        managed_ok, detail = False, repr(exc)
+    check("f3_managed_settings_source_uses_platform_root_denies_platform_set_and_register_no_web_paths", managed_ok, detail)
+    ignore_problems = []
+    for rel in NOT_IGNORED:
+        if git_raw(subject, probe_env, "check-ignore", "--no-index", "-q", "--", rel).returncode == 0:
+            ignore_problems.append("ignored: " + rel)
+    for rel in IGNORED:
+        if git_raw(subject, probe_env, "check-ignore", "--no-index", "-q", "--", rel).returncode != 0:
+            ignore_problems.append("not ignored: " + rel)
+    check("f3_gitignore_effect_platform_paths_trackable_web_paths_ignored", not ignore_problems, str(ignore_problems)[:600])
+    gi = text(".gitignore")
+    stale = []
+    for m in re.finditer(r"^!/([^*\n]+?)/?\s*$", gi, re.M):
+        rel = m.group(1)
+        if rel in tracked or any(t.startswith(rel + "/") for t in tracked):
+            continue
+        stale.append(rel)
+    check("f3_gitignore_whitelists_no_absent_tree", not stale and not GITIGNORE_WEB_WHITELIST.search(gi),
+          f"stale={stale} web_whitelist={bool(GITIGNORE_WEB_WHITELIST.search(gi))}")
+    try:
+        register = strict((subject / REGISTER).read_bytes())
+        verifiers = register["verifiers"]
+        entry = verifiers.get("check-invariants", {})
+        version = SEMVER.match(str(register.get("register_version", "")))
+        note_text = json.dumps({k: v for k, v in register.items() if k != "verifiers"}, ensure_ascii=False) \
+            + json.dumps([v.get("beskrivning") for v in verifiers.values()], ensure_ascii=False)
+        hits = scan(note_text, WEB_TOKENS + HUMAN_TOKENS + (r"(?<![\w./-])workflows/",))
+        register_ok = (version is not None and tuple(int(g) for g in version.groups()) > (1, 0, 0) and not hits
+                       and entry.get("path") == VERIFIER and entry.get("sha256") == CHECK_INVARIANTS_SHA
+                       and sha((subject / VERIFIER).read_bytes()) == CHECK_INVARIANTS_SHA
+                       and all(v.get("startbar") is True for v in verifiers.values()))
+        detail = f"version={register.get('register_version')} hits={fmt_hits(hits, 4)} entry_sha={str(entry.get('sha256'))[:12]}"
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        register_ok, detail = False, repr(exc)
+    check("f3_register_note_free_of_human_hand_and_web_gate_version_bumped_check_invariants_sha_unchanged", register_ok, detail)
+    verify_text = text(VERIFY_CLI)
+    pin_spec = re.search(r'^PLATFORM_SPEC\s*=\s*"([0-9a-f]{64})"', verify_text, re.M)
+    pin_register = re.search(r'^PLATFORM_REGISTER\s*=\s*"([0-9a-f]{64})"', verify_text, re.M)
+    documents = cli_consts.get("PLATFORM_DOCUMENTS", {})
+    problems = []
+    if pin_spec is None or pin_spec.group(1) != sha((subject / SPEC).read_bytes()):
+        problems.append("PLATFORM_SPEC")
+    if pin_register is None or pin_register.group(1) != sha((subject / REGISTER).read_bytes()):
+        problems.append("PLATFORM_REGISTER")
+    if type(documents) is not dict or not set(GENERATION_DOCS) <= set(documents):
+        problems.append("PLATFORM_DOCUMENTS key set")
+    else:
+        for rel, digest in documents.items():
+            if rel not in tracked or sha((subject / rel).read_bytes()) != digest:
+                problems.append("PLATFORM_DOCUMENTS " + rel)
+    check("f3_verify_cli_pins_equal_candidate_spec_register_and_every_generation_document", not problems, str(problems))
+    rep, rep_env = replica(bench, "candidate", subject, head)
+    rep_tmp = bench.tmp("candidate")
+    r = run([rep / VERIFY_CLI, "preflight"], scratch, rep_env)
+    register_sha = sha((rep / REGISTER).read_bytes())
+    check("f3_preflight_exit0_exact_json_with_candidate_register_digest",
+          json_ok(r) == {"status": "ok", "register_sha256": register_sha}, (r.stdout + r.stderr)[-300:])
+    r = run([NODE, rep / VERIFIER], rep, rep_env, timeout=300)
+    check("f3_check_invariants_6_pass_0_fail_in_candidate_replica",
+          r.returncode == 0 and re.search(r"^6 PASS, 0 FAIL, 0 overtradelser$", r.stdout, re.M) is not None,
+          (r.stdout + r.stderr)[-300:])
+    psnap = rep_tmp / "platform-snapshot"
+    spec_sha = sha((rep / SPEC).read_bytes())
+    r = run([rep / VERIFY_CLI, "platform-prepare", spec_sha, "h-035", register_sha, psnap], scratch, rep_env)
+    obj = json_ok(r)
+    accept_ok, detail = False, (r.stdout + r.stderr)[-300:]
+    if obj and obj.get("status") == "ok" and SHA256_FORM.fullmatch(str(obj.get("snapshot_sha256"))):
+        c = run([rep / VERIFY_CLI, "platform-check", spec_sha, "h-035", register_sha, obj["snapshot_sha256"], psnap], scratch, rep_env)
+        accept_ok = json_ok(c) == {"status": "ok", "snapshot_sha256": obj["snapshot_sha256"]}
+        detail = (c.stdout + c.stderr)[-300:]
+    check("f3_platform_prepare_and_check_accept_candidate_documents_in_replica", accept_ok, detail)
+
+    # ------------------------------------------------------------------ F4: autopilot/loop function without old root or origin branch
+    try:
+        defaults = argparse_defaults(autopilot_source)
+        bad = {opt: vals for opt, vals in defaults.items()
+               if any(OLD_ROOT_RE.search(v) or OLD_ROOT_REL_RE.match(v) or "nortropic/nortropic-system" in v for v in vals)}
+        check("f4_autopilot_argparse_defaults_do_not_point_at_old_root", "--repo" in defaults and not bad,
+              f"repo_default_strings={defaults.get('--repo')} bad={bad}")
+    except SyntaxError as exc:
+        check("f4_autopilot_argparse_defaults_do_not_point_at_old_root", False, repr(exc))
+    hits = scan(autopilot_source, EXEC_WEB_TOKENS)
+    check("f4_autopilot_source_no_web_document_reference", not hits and bool(autopilot_source), fmt_hits(hits))
+    plan_problems = []
+    for rel, expected in ROADMAP_PLAN_BLOBS.items():
+        mode, oid = tracked_entries.get(rel, (None, None))
+        if oid != expected or mode != "100644":
+            plan_problems.append(f"{rel}: {mode} {oid}")
+    ap_tmp = bench.tmp("autopilot")
+    ap_env = bench.env(ap_tmp)
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "constants"], ap_tmp, ap_env, timeout=300)
+    consts = driver_outcome(r)
+    if not consts or consts["outcome"] != "returned":
+        plan_problems.append("driver constants unavailable: " + (r.stdout + r.stderr)[-200:])
+        consts = {}
+    elif consts.get("plan_blobs") != ROADMAP_PLAN_BLOBS or consts.get("plan_sha") != ROADMAP_PLAN_SHA \
+            or consts.get("plan_path") != PLAN_COPY or consts.get("handoff_path") != HANDOFF_COPY:
+        plan_problems.append(f"autopilot ROADMAP_PLAN_* drift: {consts.get('plan_blobs')} {consts.get('plan_sha')}")
+    check("f4_roadmap_plan_copies_tracked_byte_identical_to_" + ROADMAP_PLAN_SHA[:8] + "_objects_and_autopilot_constants",
+          not plan_problems, str(plan_problems)[:600])
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+    obj = driver_outcome(r)
+    check("f4_ensure_roadmap_plan_returns_in_replica_without_any_remote",
+          bool(obj) and obj["outcome"] == "returned" and git_raw(rep, rep_env, "remote").stdout.strip() == "",
+          (r.stdout + r.stderr)[-400:])
+    if not plan_problems:
+        mut, mut_env = replica(bench, "plan-mutated", subject, head)
+        plan_bytes = (mut / PLAN_COPY).read_bytes()
+        overlay(mut, mut_env, {PLAN_COPY: (plan_bytes.replace(b"\n", b"\n<!-- LOCAL mutation -->\n", 1), 0o644)},
+                message="LOCAL fixture: mutated plan copy")
+        r = run([PYTHON, "-B", "-c", DRIVER, subject, mut, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+        obj = driver_outcome(r)
+        check("f4_ensure_roadmap_plan_stops_on_mutated_plan_copy", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
+        gone, gone_env = replica(bench, "plan-missing", subject, head)
+        overlay(gone, gone_env, {}, removals=(HANDOFF_COPY,), message="LOCAL fixture: handoff copy removed")
+        r = run([PYTHON, "-B", "-c", DRIVER, subject, gone, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+        obj = driver_outcome(r)
+        check("f4_ensure_roadmap_plan_stops_on_missing_handoff_copy", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
+    else:
+        check("f4_ensure_roadmap_plan_stops_on_mutated_plan_copy", False, "positive not established (plan copies missing)")
+        check("f4_ensure_roadmap_plan_stops_on_missing_handoff_copy", False, "positive not established (plan copies missing)")
+    blobs = consts.get("substitution_blobs") if consts else None
+    problems = []
+    if type(blobs) is not dict or not set(GENERATION_DOCS) <= set(blobs):
+        problems.append("SUBSTITUTION_BLOBS key set")
+    else:
+        problems += [f"{rel}: {oid} != {head_oid(rel)}" for rel, oid in blobs.items() if head_oid(rel) != oid]
+    check("f4_autopilot_substitution_blobs_equal_head_blobs_of_generation_documents", not problems, str(problems)[:600])
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "selftest_none"], ap_tmp, ap_env, timeout=300)
+    obj = driver_outcome(r)
+    check("f4_autopilot_selftest_none_returns_pass",
+          bool(obj) and obj["outcome"] == "returned" and "AUTOPILOT_V4_SELFTEST=PASS" in r.stdout, (r.stdout + r.stderr)[-300:])
+    r = run([PYTHON, "-B", rep / PUBLICATION_CALLERS], rep, ap_env, timeout=600)
+    check("f4_autopilot_publication_callers_exit0", r.returncode == 0 and "traceback" not in (r.stdout + r.stderr).lower(),
+          f"rc={r.returncode} " + (r.stdout + r.stderr)[-300:])
+    check("f4_controller_loop_cli_unchanged_vs_" + FROZEN_BASE[:8],
+          head_oid(LOOP_CLI) is not None and git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{LOOP_CLI}").stdout.strip() == head_oid(LOOP_CLI))
+
+    # ------------------------------------------------------------------ F5: loop test suite without the web fixture
+    hits = scan(text(LOOP_FALL), LOOP_FALL_WEB_TOKENS)
+    check("f5_loop_fall_py_b2_no_web_fixture_or_web_invariant", not hits and "B2" in text(LOOP_FALL), fmt_hits(hits))
+    if args.skip_held_gates:
+        check("f5_loop_fall_py_green_in_replica", False, "skipped by --skip-held-gates")
+    else:
+        lf, lf_env = replica(bench, "loop-fall", subject, head)
+        lf_env = bench.env(bench.tmp("loop-fall"))
+        r = run([PYTHON, "-B", lf / LOOP_FALL], lf, lf_env, timeout=1200)
+        oks = re.findall(r"^ok\s+(.*)$", r.stdout, re.M)
+        fel = re.findall(r"^FEL\s+(.*)$", r.stdout, re.M)
+        b2 = [l for l in oks if l.startswith("B2") and "PINV" in l]
+        check("f5_loop_fall_py_green_in_replica",
+              r.returncode == 0 and not fel and len(oks) >= 53 and b2 and r.stdout.rstrip().endswith("alla fall håller")
+              and "traceback" not in (r.stdout + r.stderr).lower(),
+              f"rc={r.returncode} ok={len(oks)} fel={fel[:3]} b2_pinv={len(b2)} " + r.stderr[-200:])
+
+    # ------------------------------------------------------------------ F6: frozen evidence by blob OID
+    problems, additions = [], []
+    for tree_rel in FROZEN_TREES:
+        base_entries = ls_tree(subject, probe_env, FROZEN_BASE, tree_rel)
+        head_entries = ls_tree(subject, probe_env, "HEAD", tree_rel)
+        for rel, entry in base_entries.items():
+            if head_entries.get(rel) != entry:
+                problems.append(rel)
+        additions += [rel for rel in head_entries if rel not in base_entries]
+        if git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", tree_rel).stdout.strip():
+            problems.append(tree_rel + " (working tree differs from HEAD)")
+    for rel in FROZEN_FILES:
+        base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
+        if not base_oid or base_oid != head_oid(rel) or git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", rel).stdout.strip():
+            problems.append(rel)
+    gate_path = subject / GATE
+    gate_ok = gate_path.is_file() and not gate_path.is_symlink() and sha(gate_path.read_bytes()) == held[GATE] \
+        and stat.S_IMODE(gate_path.lstat().st_mode) == 0o755
+    check("f6_frozen_evidence_identical_to_" + FROZEN_BASE[:8] + "_plus_this_gate_only",
+          not problems and additions == [GATE] and gate_ok, f"problems={problems[:10]} additions={additions} gate_ok={gate_ok}")
+    held_identical = {}
+    for rel in (CONTROL_SET_GATE, LAUNCH_CWD_GATE, GOVERNANCE_GATE):
+        base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
+        actual = git_raw(subject, probe_env, "hash-object", "--", str(subject / rel)).stdout.strip()
+        held_identical[rel] = bool(base_oid) and base_oid == actual and os.access(subject / rel, os.X_OK)
+    check("f6_earlier_local_gates_identical_to_" + FROZEN_BASE[:8], all(held_identical.values()), str(held_identical))
+
+    # ------------------------------------------------------------------ F7: earlier frozen local gates on the candidate
+    def held_gate(rel, override):
+        if override is not None:
+            p = override.resolve()
+            return p if p.is_file() else None
+        return (subject / rel) if held_identical.get(rel) else None
+
+    gate_runs = {}
+
+    def run_held(label, rel, override, timeout, judge):
+        if args.skip_held_gates:
+            check(label, False, "skipped by --skip-held-gates")
+            return
+        program = held_gate(rel, override)
+        if program is None:
+            check(label, False, "no held copy: subject copy not byte-identical to " + FROZEN_BASE[:8] + " and no override given")
+            return
+        tmp = bench.tmp("held-" + Path(rel).name)
+        r = run([PYTHON, "-B", program, "--subject", subject], scratch, bench.env(tmp), timeout=timeout)
+        passes, fails, root = gate_rows(r.stdout)
+        result = None
+        if root is not None and (root / "result.json").is_file():
+            try:
+                result = strict((root / "result.json").read_bytes())
+            except ValueError:
+                result = None
+        gate_runs[rel] = {"program": str(program), "program_sha256": sha(program.read_bytes()), "rc": r.returncode,
+                          "pass": len(passes), "fail": len(fails), "fails": fails, "fixture_root": str(root),
+                          "result_sha256": sha((root / "result.json").read_bytes()) if result is not None else None,
+                          "stderr": r.stderr[-400:]}
+        ok, detail = judge(r, passes, fails, result)
+        check(label, ok, f"rc={r.returncode} pass={len(passes)} fail={len(fails)} " + detail + " " + r.stderr[-200:])
+
+    def rows_by_label(result):
+        return {row["label"]: row for row in result["rows"]} if result and type(result.get("rows")) is list else {}
+
+    def judge_control_set(r, passes, fails, result):
+        rows_by = rows_by_label(result)
+        missing = [name for name in CONTROL_SET_ROWS if not rows_by.get(name, {}).get("pass")]
+        ok = (r.returncode == 0 and len(passes) == CONTROL_SET_ROW_COUNT and not fails
+              and "PLATFORM_CONTROL_SET_RESULT=PASS_LOCAL_QUALIFICATION_ONLY" in r.stdout
+              and result is not None and result.get("pass") is True and result.get("subject_head") == head and not missing)
+        return ok, f"fails={fails[:6]} missing_rows={missing}"
+
+    def judge_launch_cwd(r, passes, fails, result):
+        frozen = rows_by_label(result).get(LAUNCH_CWD_FROZEN_ROW, {})
+        # launch-cwd froze the whole verify/bin listing at 383ed387 (+ itself); this candidate carries exactly two
+        # later gates there (governance + this one), so that single row is red for exactly that reason.
+        ok = (len(passes) + len(fails) == LAUNCH_CWD_ROW_COUNT and fails == [LAUNCH_CWD_FROZEN_ROW] and r.returncode == 1
+              and result is not None and result.get("subject_head") == head and frozen.get("pass") is False
+              and str(frozen.get("detail", "")).endswith(LAUNCH_CWD_EXPECTED_DETAIL))
+        return ok, f"fails={fails[:6]} frozen_detail={str(frozen.get('detail'))[-160:]!r}"
+
+    def judge_governance(r, passes, fails, result):
+        ok = (len(passes) + len(fails) == GOVERNANCE_ROW_COUNT and sorted(fails) == sorted(GOVERNANCE_EXPECTED_FAILS)
+              and r.returncode == 1 and result is not None and result.get("subject_head") == head
+              and "PLATFORM_GOVERNANCE_RESULT=RED_LOCAL_QUALIFICATION" in r.stdout)
+        return ok, f"fails={fails[:8]} expected={list(GOVERNANCE_EXPECTED_FAILS)}"
+
+    run_held("f7_platform_control_set_exit_68_of_68_on_candidate", CONTROL_SET_GATE, args.held_control_set, 3600, judge_control_set)
+    run_held("f7_launch_cwd_exit_19_of_20_frozen_listing_sees_exactly_governance_and_this_gate", LAUNCH_CWD_GATE,
+             args.held_launch_cwd, 1800, judge_launch_cwd)
+    run_held("f7_platform_governance_exit_red_exactly_on_its_frozen_verify_register_and_launch_cwd_rows", GOVERNANCE_GATE,
+             args.held_governance, 7200, judge_governance)
+
+    # ------------------------------------------------------------------ F8: no coupling to the web repo path or the old root
+    coupling = []
+    for rel in sorted(tracked):
+        if rel.startswith(("SEPARATION-20260910/", "verify/", "docs/loop/arkiv/")) or rel.endswith("-local-development.md") \
+                or rel in (SPEC, DRIFT, PLAN_COPY, HANDOFF_COPY, "docs/loop/owner-author-workflow-v1.md",
+                           "docs/loop/remaining-bootstrap-delegation-v1.md"):
+            continue
+        p = subject / rel
+        if not p.is_file():
+            continue
+        raw = p.read_text(encoding="utf-8", errors="replace")
+        is_python = rel.endswith(".py") or raw.startswith("#!/usr/bin/env python")
+        if is_python:
+            try:
+                for line, value in code_strings(raw, skip_function_re=r"(?i)refreeze|h03[5-9]"):
+                    if OLD_ROOT_RE.search(value) or OLD_ROOT_REL_RE.match(value) or WEB_REPO_RE.search(value):
+                        coupling.append(f"{rel}:{line} {value[:60]}")
+                continue
+            except SyntaxError:
+                pass
+        for m in list(OLD_ROOT_RE.finditer(raw)) + list(WEB_REPO_RE.finditer(raw)):
+            coupling.append(f"{rel}:{raw.count(chr(10), 0, m.start()) + 1} {raw[max(0, m.start() - 15):m.end() + 25]!r}")
+    check("f8_no_tracked_file_couples_to_web_repo_path_or_old_root", not coupling, "; ".join(coupling[:10]))
+    cs = gate_runs.get(CONTROL_SET_GATE)
+    check("f8_ordinary_loop_e2e_and_platform_prepare_check_green_on_candidate_via_held_control_set",
+          cs is not None and cs["rc"] == 0 and not cs["fails"], str(cs)[:300] if cs else "control-set gate not run")
+
+    # ------------------------------------------------------------------ F10: development document, bytes unchanged
+    doc = subject / DOCUMENT
+    doc_text = doc.read_text(encoding="utf-8", errors="replace") if doc.is_file() and not doc.is_symlink() else ""
+    missing = [s for s in DOC_SECTIONS if s not in doc_text]
+    check("f10_development_document_tracked_with_required_sections",
+          bool(doc_text) and DOCUMENT in tracked and not missing and "F9" in doc_text, f"missing={missing}")
+    check("f10_subject_and_held_bytes_unchanged",
+          all((subject / rel).is_file() and sha((subject / rel).read_bytes()) == digest for rel, digest in subject_sha.items())
+          and all(sha((ROOT / rel).read_bytes()) == digest for rel, digest in held.items()))
+    result = {"scope": "LOCAL_QUALIFICATION_ONLY", "subject": str(subject), "subject_head": head, "frozen_base": FROZEN_BASE,
+              "roadmap_plan_sha": ROADMAP_PLAN_SHA, "roadmap_plan_blobs": ROADMAP_PLAN_BLOBS,
+              "subject_sha256": subject_sha, "held_sha256": held, "held_gate_runs": gate_runs,
+              "closure_roots": sorted(roots), "closure_reached": sorted(reached), "closure_scanned": scanned,
+              "closure_dangling": {k: sorted(v) for k, v in sorted(dangling.items())},
+              "governance_expected_fails": list(GOVERNANCE_EXPECTED_FAILS),
+              "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
+              "sandbox_exec_present": Path(SANDBOX_EXEC).is_file(),
+              "fixture_root": str(scratch), "rows": rows, "pass": all(row["pass"] for row in rows)}
+    with (scratch / "result.json").open("x") as stream:
+        json.dump(result, stream, indent=2, ensure_ascii=False)
+    print("PLATFORM_SEPARATION_FINAL_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
+    return 0 if result["pass"] else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print("PLATFORM_SEPARATION_FINAL_RIG_ERROR=" + repr(exc), file=sys.stderr)
+        sys.exit(2)
