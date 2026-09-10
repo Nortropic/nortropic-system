@@ -750,5 +750,94 @@ subjektets byte-identiska kopior; eget `TMPDIR`):
 `faea27bb37fb6e69afe9b3a3ce08348e2e2c3a4ff39514b222f3914ee0a3cc70`. Röda och gröna rader identiska med v2.3/v2.4
 (F7: control-set 68/68, launch-cwd 19/20, governance 68/70 exakt g6/g7).
 
+### Kontrakt v3 2026-09-10 — plangenerationen (ägarorder: den gamla planen är inte längre aktiv authority)
+Grind v3 sha256 `523c53bd8dd813c648d1671385a334518cfa61d44da0d05820eea7dd9e4e6bb7` (commit `12e7dfaa`), 95 rader (v2.5: 88). Nya/ändrade rader: F1 (två gamla plankopior
+frånvarande; tolv förbjudna blobbar), F2 (plangenerationen skannas som aktivt dokument med `OLD_PLAN_TOKENS` +
+`PLAN_TOKENS`; `OLD_PLAN_TOKENS` trädvitt i alla klasser; `f2_plan_generation_and_handoff_reached_…`; routerraden för
+plangenerationen; full-roadmap-, substitutions- (§15) och drift-raderna omskrivna, drift skannar hela svansen), F4
+(planfiler + autopilotens blobbar/sökvägar; ingen `ROADMAP_PLAN_SHA`; `ensure_roadmap_plan`-raderna på nya filer;
+autopilotens fulltext utan gammal commit/`git show <commit>:`/`plan_sha`; promptinjicerad dokumentmängd; skivtabell ==
+ROADMAP + selftest; bootstrapavsnitt; skills; selftest skriver `PLAN_GENERATION=`), F8 (plangenerationen ej undantagen),
+F10 (kanari för planskanning/tabellparser/`git show`/undantagsmängd). Beslut utöver orkestratorns P1–P8: (i) bara
+PEKARE till den gamla planen är förbjudna (commit 40/8 hex som hex-ord, blobbar, sökvägar med `.md`/`docs/loop/`,
+grenen) plus de tre etiketterna på båda språken — auditens r.241 (namn utan pekare) förblir tillåten; (ii) `Verkstadsgolvet`
+är förbjudet i planen helt; (iii) promptmängden binds som krävd ⊆ injicerad ⊆ tillåten (krävd: plan, handoff,
+full-roadmap, kontrakt, audit, evidenskontrakt, AGENTS, rapportschema; tillåtna extra: regler, byggplan, drift,
+owner-h003) i stället för exakt likhet; (iv) drift.md:s hela svans skannas; (v) S1/S3-rader binds mot specraden
+(task, exit_test, depends_on) utan skrivyta, L mot `EMPIRICAL_GATE_PATH` med alla skivors task-id som beroenden;
+(vi) status `BYGGD` ⇔ grindfilen spårad; (vii) den nya planen måste stå i egen listpunkt i Auktoritetsordningen.
+
+### Test-author 2026-09-10 — baslinje RED för v3 (före produkt)
+Subjekt: replika av plattformsintegrationen `320c9df7` (v2.5-produkten, 84/84 under v2.5) + grind v3 + detta dokument
+(fixtur-HEAD `92424535`, scratch). Kommando (bypass, egen `TMPDIR`, hållna grindar ur subjektets byte-identiska kopior):
+`python3.12 verify/bin/platform-separation-final-exit --subject <replika>` → exit **1**, `RED_LOCAL_QUALIFICATION`,
+**69 PASS / 26 FAIL** (95 rader), result.json sha256 `2a99fec75daf150ae124f4509a03c4abaf3ea7f5d372c76bf9e8a0a5d9eed85c`.
+Röda rader (alla av rätt skäl — plangenerationen saknas, den gamla planen är aktiv): `f1_required_absences_…` (gamla
+kopiorna spårade), `f1_no_blob_…` (blobbarna `c8ea8511`/`1e53887c`), `f2_closure_…` (gamla planen följs nu: `docs/03`,
+`docs/05`, `docs/07` hänger), `f2_active_doc_…` ×7 (arkitektskillen r.21 gammal sökväg; AGENTS r.127/153–155 commit +
+sökvägar; README r.38; gamla planen och handoffen själva — webbtoken; full-roadmap r.11; substitutionskontraktet r.7),
+`f2_plan_generation_and_handoff_reached_…`, `f2_tree_wide_no_web_governance_…` (samma träffar trädvitt),
+`f2_router_authority_order_…` (planen saknas i Auktoritetsordningen), `f2_full_roadmap_…`, `f2_substitution_…` (inget §15;
+ingressen namnger commiten), `f2_drift_…` (svansen namnger inte planen), F4 ×10 (planfiler/blobbar; `ROADMAP_PLAN_SHA`
+finns; mutated/missing utan positivt ankare; autopilotens fulltext r.71/72/94/95/2578 + `git show` r.1479/1658/1768;
+promptmängden saknar plan/handoff/evidenskontrakt och injicerar den gamla planen; skivtabell saknas; bootstrapavsnitt
+saknas; skills; selftest skriver `PLAN_SHA=`). Gröna: kanarier ×6, övriga F1/F3/F5/F6, F7 (control-set 68/68 result
+`2a33a5c4…`; launch-cwd 19/20 med exakt `extra=[governance, denna grind]` `f9ce1deb…`; governance 68/70 exakt {g6, g7}
+`c4fe0665…`), loopsviten 53 ok / 0 FEL (B2 via PINV), `f4_ensure_roadmap_plan_returns_…` (gamla kopiorna finns),
+F8 ×2, F10 ×2; trädklassning frozen 52 / partial 7 / local-development 6 / code 24 / test 16 / text 35 / binary 3;
+slutning 39 nådda / 31 skannade.
+
+### Referenskonstruktion v3 (scratch, förkastad — bevisar satisfierbarhet)
+Replika av `320c9df7` + grind/dokument v3 + produktytan (skript i test-authorns scratch, aldrig i repot): grov plan
+`docs/loop/autonomous-loop-plan-platform-v2.md` (PLAN_GENERATION-block, målbild, tekniska skydd, skivtabell med 18 rader
+S1/S3/SUB-1…4/S2/S4…S13/L, skivkriterier, `## BOOTSTRAP …` med h-031…h-039, migrationsordning, OVERIFIERAT) och handoff
+`docs/loop/autonomous-loop-platform-handoff-v2.md`; gamla kopior borttagna; autopilot enligt produktyta p.3
+(`PLAN_GENERATION = "platform-v2"`, nya sökvägar, `ROADMAP_PLAN_BLOBS` = HEAD-blobbar `6513b845…`/`9d1c7b2e…`, alla
+`git show`/`PLAN_SHA` bort, evidenskontraktet i `agent_prompt_common`, selftest-identitetsvakt, ompinnade
+`SUBSTITUTION_BLOBS`); skills, AGENTS (egen p.5 för planen, p.6 drift m.fl., Historik utan pekare), full-roadmap Authority,
+substitutionskontraktets ingress + §15 (v1.2), drift-not, README r.38; `controller/verify/cli` `PLATFORM_DOCUMENTS`
+ompinnad för AGENTS/README/drift/kontraktet. Fixtur-HEAD `45e0c957`, 143 spårade filer. Fullkörning (bypass, egen
+`TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **95/95**, result.json sha256 `5050cefa61800c990f1cd11a685e1a69a57b8829dd8e32a484a21749469cf2a6`; control-set
+68/68 (`b881b0a9…`), launch-cwd 19/20 med exakt två extra grindar (`19ac4f9d…`), governance 68/70 exakt {g6, g7}
+(`1ecc6a6a…`), loopsvit 53 ok / 0 FEL, trädklassning frozen 52 / partial 7 / local-development 6 / code 24 / test 16 / text 35 / binary 3, slutning 36 nådda / 31 skannade,
+0 hängande. Promptmängd mätt på referensen: injicerad = krävd ∪ {regler, byggplan, drift, owner-h003}.
+
+### F9 v3 — negativer (var och en i egen replika av referensen, statiskt `--skip-held-gates`; 19 körda, 19 fångade,
+0 riggfel; siffror utan de fem sandboxberoende raderna)
+(a) gamla planens bytes under nya sökvägen, autopiloten ompinnad → `f1_no_blob_…`, planraden (webbtoken), slutning
+(`docs/03/05/07` hänger), trädvid, autopilotens fulltext (ompinnade bloben är en gammal-plan-pekare), skivtabell,
+bootstrapavsnitt; (b) `git show 0b3212c9…:` i roadmap-test-author-prompten → autopilotens fulltext + trädvid;
+(b2) `git show {ROADMAP_PLAN_BLOBS[…]}:` utan sha → autopilotens fulltext (`git show {`); (c) `"PLAN_" + "SHA="` i
+selftests utdata → `f4_autopilot_selftest_none_…` (källskanningen ser den inte — utdataraden gör det); (d) `<PLAN_SHA>`
+i arkitektskillen → skillraden; (e) planen med `docs/07-konstitution.md` överordnad → planraden + slutning + trädvid
+(+ blobraderna, planen ändrad utan ompinning); (f) h-030 bort ur S2:s beroenden → skivtabellraden (+ blobraderna);
+(g) `ROADMAP_PLAN_SHA=0b3212c9…` i full-roadmaps Authority → full-roadmap-raden + dokumentraden + trädvid;
+(h) grindmutant med plangenerationen åter i `CLOSURE_EXEMPT`/`TREE_FROZEN_FILES` (körd ur egen rot mot referensen) →
+`canary_plan_generation_scan_rejects_…`, `f2_plan_generation_and_handoff_reached_…`, routerraden (planen blev
+undantagen utan markör), promptraden (planen ej skannad), F6 (grindbytes ≠ hållna); (i) ingressen namnger commiten →
+substitutionsraden (ingress) + dokumentraden + trädvid (+ pinnar/prepare); (j) gamla handoffens blob under
+`SEPARATION-20260910/` → `f1_no_blob_…` (+ trädvid: filen klassas text under SEPARATION — inte fryst-listad);
+(k) planen i samma listpunkt som "inte dagens instruktion" → routerraden för plangenerationen (+ pinnar/prepare);
+(l) senare `## `-not i drift-svansen med `docs/07` → drift-raden + drift-dokumentraden + slutning + trädvid (+ pinnar);
+(m) `ROADMAP_PLAN_SHA` behållen → `f4_autopilot_has_plan_generation_…` + fulltext + trädvid; (n) `implementation-v4.1.md`
+injicerad i builder-prompten → promptraden; (o) S2 `BYGGD` utan grind → skivtabellraden (+ blobraderna); (q)
+`ägarterminalen` i planen → planraden + trädvid (+ blobraderna); (r) `## CODEX_START_HERE` i handoffen → handoffraden +
+trädvid (+ blobraderna); (s) "Historisk källa: `docs/loop/autonomous-loop-plan-v1.md`" i planen → planraden + slutning
+(hängande) + trädvid (+ blobraderna). Ej körda/utanför omfång: etikett utan pekare (auditens r.241), semantisk
+omskrivning av skivkriterier, refreeze av stale H-grindar (Vad grinden inte bevisar).
+
+### Antaganden och UNRESOLVED (v3)
+- `PLAN_GENERATION`-värdet är builderns; grinden binder bara att det är en icke-tom sträng och att full-roadmap
+  bär exakt samma värde. `AUTOPILOT_V4_SELFTEST=PASS` behålls (control-set-grinden binder strängen).
+- Skivtuplarna, `EMPIRICAL_GATE_PATH` och `ROADMAP[0] == S2/h-015` ändras inte (governance g-rader, h-032-exit).
+- S6/h-014: specraden säger `depends_on: [h-013]`, autopiloten h-019; tabellen binds mot autopiloten. Specrefreeze
+  (även `docs/05`-ytorna i h-014/h-015/h-017) är ett eget kontrakt — specen är byte-fryst här.
+- `origin/main`-strategin (autopilotens `ensure_substitution_authority`/`doctor` läser `refs/remotes/origin/main`) är
+  UNRESOLVED utanför kontraktet; F4 kör bara `ensure_roadmap_plan`/selftest/publication-callers.
+- Refreeze-ordningen h-036/h-037 → h-035/h-038 → h-032 → h-031 + document-authority efter autopilot-/AGENTS-/drift-
+  ändringen (pinnarna är redan stale) ligger utanför detta kontrakt.
+- Riggnot: grinden städar inte sitt `FIXTURE_ROOT`; fixturrötterna för RED, referens och negativer ligger i
+  test-authorns scratch och tas bort av den som kör efter bokföring.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
