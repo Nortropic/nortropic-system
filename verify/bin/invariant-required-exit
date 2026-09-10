@@ -1,0 +1,406 @@
+#!/usr/bin/env python3.12
+"""LOCAL_ONLY invariant-required qualification; never a scheduler/H035/resume verdict.
+
+Runs the actual imported candidate callables `run_invariants` and
+`assert_final_gates` only in disposable local Git fixtures with controlled
+verifier and task-gate results. A missing mandatory invariant verifier must
+stop the control plane; it must never be reported as absent-and-therefore-green.
+No historical gate, task-run, provider, build, publication or resume is executed.
+"""
+import argparse
+import ast
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+PYTHON = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+PYTHON_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+NODE = "/opt/homebrew/opt/node@22/bin/node"
+GATE = "verify/bin/invariant-required-exit"
+PRODUCT = "scripts/nortropic-codex-autopilot.py"
+VERIFIER = "scripts/check-invariants.mjs"
+SPEC = "specs/tasks.spec.json"
+JOURNAL = ".git/nortropic-codex-autopilot/events.jsonl"
+# Exact production consumers of run_invariants in the bound candidate generation.
+CONSUMER_CALL_SITES = 5
+DRIVER_MARK = "INVARIANT_REQUIRED_DRIVER="
+# Real module, real callables, never the operational __main__.
+DRIVER = (
+    "import importlib.util,sys,json\n"
+    "from pathlib import Path\n"
+    "subject=Path(sys.argv[1]); root=Path(sys.argv[2]); scenario=sys.argv[3]\n"
+    "s=importlib.util.spec_from_file_location('subject_autopilot', subject/'" + PRODUCT + "')\n"
+    "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
+    "out={'scenario':scenario}\n"
+    "try:\n"
+    "    if scenario=='run_invariants':\n"
+    "        r=m.run_invariants(root)\n"
+    "        out.update(outcome='returned', is_none=r is None, is_cmd=isinstance(r,m.Cmd),\n"
+    "                   rc=None if r is None else getattr(r,'rc',None))\n"
+    "    elif scenario=='assert_final_gates':\n"
+    "        m.assert_final_gates(root,'t-frozen',['t-frozen','t-green'])\n"
+    "        out.update(outcome='returned')\n"
+    "    elif scenario=='canary_fault':\n"
+    "        raise NameError('fixture-canary')\n"
+    "    else:\n"
+    "        raise SystemExit(9)\n"
+    "except m.Stop as e:\n"
+    "    out.update(outcome='stop', message=str(e))\n"
+    "print('" + DRIVER_MARK + "'+json.dumps(out, ensure_ascii=False))\n"
+)
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def strict(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON member")
+            result[key] = value
+        return result
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def environment():
+    return {
+        "PATH": ":".join([str(Path(GIT).parent), str(Path(PYTHON).parent), str(Path(NODE).parent), "/usr/bin", "/bin"]),
+        "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_AUTHOR_NAME": "Local fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+        "GIT_COMMITTER_NAME": "Local fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+        "PROVIDER_CALL_ALLOWED": "NO", "MODEL_CALL_ALLOWED": "NO",
+    }
+
+
+def run(argv, cwd, timeout=60):
+    return subprocess.run(argv, cwd=cwd, env=environment(), capture_output=True,
+                          text=True, timeout=timeout, check=False)
+
+
+def git(root, *args):
+    result = run([GIT, "-c", "core.hooksPath=/dev/null", *args], root)
+    if result.returncode:
+        raise RuntimeError("fixture Git failed: " + result.stderr)
+    return result.stdout.strip()
+
+
+def write_exec(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as stream:
+        stream.write(text)
+    path.chmod(0o755)
+
+
+def fixture(scratch, name, verifier, gates):
+    """verifier: None (absent), int (controlled exit), 'directory' or 'dangling_symlink'."""
+    root = scratch / name
+    root.mkdir()
+    (root / "specs").mkdir()
+    tasks = [{"id": tid, "exit_test": "verify/bin/" + tid} for tid in ("t-frozen", "t-green")]
+    (root / SPEC).write_text(json.dumps({"spec_version": "local-fixture", "tasks": tasks}, indent=1) + "\n",
+                             encoding="utf-8")
+    for tid, rc in gates.items():
+        write_exec(root / "verify/bin" / tid, "#!/bin/sh\nprintf 'controlled task gate %s rc=%s\\n' " + tid + " " + str(rc) + "\nexit " + str(rc) + "\n")
+    (root / "scripts").mkdir()
+    target = root / VERIFIER
+    if isinstance(verifier, int):
+        target.write_text("process.stdout.write('controlled invariant verifier rc=" + str(verifier) + "\\n');\n"
+                          "process.exit(" + str(verifier) + ");\n", encoding="utf-8")
+    elif verifier == "directory":
+        target.mkdir()
+        (target / "placeholder.txt").write_text("not a verifier\n", encoding="utf-8")
+    elif verifier == "dangling_symlink":
+        target.symlink_to(root / "scripts/absent-verifier.mjs")
+    elif verifier is not None:
+        raise RuntimeError("unknown verifier fixture")
+    git(root, "init", "--template=", "--initial-branch=fixture")
+    git(root, "add", "--all")
+    git(root, "commit", "--no-gpg-sign", "-m", "local invariant fixture")
+    return root
+
+
+def tree_state(root):
+    result = []
+    for p in [root] + sorted(root.rglob("*")):
+        st = p.lstat()
+        rel = p.relative_to(root).as_posix()
+        if rel == JOURNAL or rel == str(Path(JOURNAL).parent):
+            continue
+        if stat.S_ISLNK(st.st_mode):
+            value = os.readlink(p)
+        elif stat.S_ISREG(st.st_mode):
+            value = sha(p.read_bytes())
+        elif stat.S_ISDIR(st.st_mode):
+            value = "directory"
+        else:
+            value = "special"
+        result.append((rel, stat.S_IMODE(st.st_mode), value))
+    return result
+
+
+def journal_rows(root):
+    path = root / JOURNAL
+    if not path.exists():
+        return []
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError("journal is not a regular file")
+    rows = []
+    for line in path.read_bytes().splitlines():
+        rows.append(strict(line))
+    return rows
+
+
+def invariant_rows(rows):
+    return [r for r in rows if r.get("event") == "INVARIANTS"]
+
+
+def drive(subject, root, scenario):
+    return run([PYTHON, "-B", "-c", DRIVER, str(subject), str(root), scenario], root, timeout=120)
+
+
+def outcome(result):
+    """Exact driver outcome or None. A traceback/uncaught fault never counts as an outcome."""
+    if result.returncode or result.stderr:
+        return None
+    lines = result.stdout.splitlines()
+    if not lines or not lines[-1].startswith(DRIVER_MARK):
+        return None
+    try:
+        obj = strict(lines[-1][len(DRIVER_MARK):])
+    except ValueError:
+        return None
+    return obj if type(obj) is dict and obj.get("outcome") in ("returned", "stop") else None
+
+
+def stopped(result, must_contain=(), must_not_contain=()):
+    obj = outcome(result)
+    if not obj or obj["outcome"] != "stop" or type(obj.get("message")) is not str:
+        return False
+    msg = obj["message"].casefold()
+    return all(t.casefold() in msg for t in must_contain) and not any(t.casefold() in msg for t in must_not_contain)
+
+
+def returned(result):
+    obj = outcome(result)
+    return obj if obj and obj["outcome"] == "returned" else None
+
+
+def consumer_sites(source):
+    """Every production call of run_invariants: (function, index in body, guarded)."""
+    tree = ast.parse(source)
+    sites = []
+
+    def is_call(node):
+        return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "run_invariants")
+
+    def guarded(body, index):
+        stmt = body[index]
+        if not (isinstance(stmt, ast.Assign) and is_call(stmt.value) and len(stmt.targets) == 1
+                and isinstance(stmt.targets[0], ast.Name)):
+            return False
+        name = stmt.targets[0].id
+        if index + 1 >= len(body) or not isinstance(body[index + 1], ast.If):
+            return False
+        following = body[index + 1]
+        test = ast.unparse(following.test)
+        raises = any(isinstance(n, ast.Raise) and isinstance(n.exc, ast.Call)
+                     and isinstance(n.exc.func, ast.Name) and n.exc.func.id == "Stop"
+                     for n in ast.walk(following))
+        return (name + ".rc != 0") in test and raises and not following.orelse
+
+    def direct_call(stmt):
+        """The call appears in this statement's own expressions, not in a nested statement."""
+        stack = [stmt]
+        while stack:
+            node = stack.pop()
+            if is_call(node):
+                return True
+            for _, value in ast.iter_fields(node):
+                items = value if isinstance(value, list) else [value]
+                for item in items:
+                    if isinstance(item, ast.AST) and not isinstance(item, ast.stmt):
+                        stack.append(item)
+        return False
+
+    def walk_body(fn, body):
+        for index, stmt in enumerate(body):
+            if direct_call(stmt):
+                sites.append((fn, index, guarded(body, index)))
+            for _, value in ast.iter_fields(stmt):
+                if isinstance(value, list) and value and all(isinstance(x, ast.stmt) for x in value):
+                    walk_body(fn, value)
+            for handler in getattr(stmt, "handlers", []):
+                walk_body(fn, handler.body)
+
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name != "run_invariants":
+            walk_body(node.name, node.body)
+    return sites
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--subject", type=Path, default=ROOT)
+    args = parser.parse_args()
+    subject = args.subject.resolve()
+    if sys.version_info[:2] != (3, 12) or sha(Path(PYTHON).read_bytes()) != PYTHON_SHA:
+        raise RuntimeError("pinned Python 3.12 required")
+    if not Path(NODE).is_file() or not os.access(NODE, os.X_OK):
+        raise RuntimeError("node runtime for the real verifier unavailable")
+    product = subject / PRODUCT
+    if not product.is_file() or product.is_symlink():
+        raise RuntimeError("subject product missing: " + PRODUCT)
+    if not (subject / VERIFIER).is_file():
+        raise RuntimeError("subject lacks the mandatory verifier: " + VERIFIER)
+    product_sha = sha(product.read_bytes())
+    held = {rel: sha((ROOT / rel).read_bytes()) for rel in (GATE,)}
+    scratch = Path(tempfile.mkdtemp(prefix="invariant-required-local-")).resolve()
+    print("FIXTURE_ROOT=" + str(scratch), flush=True)
+    rows = []
+
+    def check(label, passed, detail=""):
+        rows.append({"label": label, "pass": bool(passed), "detail": detail})
+        print(("PASS " if passed else "FAIL ") + label, flush=True)
+
+    # Driver predicate canaries: faults are never stops or returns.
+    root = fixture(scratch, "canary", 0, {"t-frozen": 0, "t-green": 0})
+    canary = drive(subject, root, "canary_fault")
+    check("driver_fault_is_not_outcome", canary.returncode != 0 and outcome(canary) is None and not stopped(canary) and returned(canary) is None)
+    canary = drive(subject, root, "unknown_scenario")
+    check("driver_unknown_scenario_is_not_outcome", canary.returncode == 9 and outcome(canary) is None)
+
+    # run_invariants: the mandatory verifier must never be absent-and-green.
+    root = fixture(scratch, "ri-missing", None, {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "run_invariants")
+    check("run_invariants_missing_verifier_stops",
+          stopped(result, must_contain=("invariant",)) and tree_state(root) == before
+          and not any(r.get("exit") == 0 for r in invariant_rows(journal_rows(root))),
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "ri-dangling", "dangling_symlink", {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "run_invariants")
+    check("run_invariants_dangling_symlink_verifier_stops",
+          stopped(result, must_contain=("invariant",)) and tree_state(root) == before
+          and not any(r.get("exit") == 0 for r in invariant_rows(journal_rows(root))),
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "ri-rc0", 0, {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "run_invariants")
+    obj = returned(result)
+    inv = invariant_rows(journal_rows(root))
+    check("run_invariants_present_rc0_returns_cmd",
+          bool(obj) and obj.get("is_cmd") is True and obj.get("is_none") is False and obj.get("rc") == 0
+          and len(inv) == 1 and inv[0].get("exit") == 0 and tree_state(root) == before,
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "ri-rc1", 1, {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "run_invariants")
+    obj = returned(result)
+    inv = invariant_rows(journal_rows(root))
+    check("run_invariants_present_rc1_returns_nonzero_cmd",
+          bool(obj) and obj.get("is_cmd") is True and obj.get("rc") == 1
+          and len(inv) == 1 and inv[0].get("exit") == 1 and tree_state(root) == before,
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "ri-directory", "directory", {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "run_invariants")
+    obj = returned(result)
+    check("run_invariants_directory_verifier_never_green",
+          (stopped(result) or (bool(obj) and obj.get("is_none") is False and obj.get("rc") not in (None, 0)))
+          and tree_state(root) == before
+          and not any(r.get("exit") == 0 for r in invariant_rows(journal_rows(root))),
+          result.stdout[-400:] + result.stderr[-400:])
+
+    # assert_final_gates with controlled task gates: order and refusal causes.
+    root = fixture(scratch, "afg-missing", None, {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "assert_final_gates")
+    journal = journal_rows(root)
+    gates = [r for r in journal if r.get("event") == "GATE"]
+    check("final_gates_green_missing_verifier_stops",
+          stopped(result, must_contain=("invariant",), must_not_contain=("final gate", "regressed"))
+          and [(g.get("task"), g.get("exit")) for g in gates] == [("t-frozen", 0), ("t-green", 0)]
+          and not any(r.get("exit") == 0 for r in invariant_rows(journal)) and tree_state(root) == before,
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "afg-rc0", 0, {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "assert_final_gates")
+    journal = journal_rows(root)
+    check("final_gates_green_rc0_returns",
+          returned(result) is not None
+          and [(r.get("event"), r.get("task"), r.get("exit")) for r in journal]
+          == [("GATE", "t-frozen", 0), ("GATE", "t-green", 0), ("INVARIANTS", None, 0)]
+          and tree_state(root) == before,
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "afg-rc1", 1, {"t-frozen": 0, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "assert_final_gates")
+    journal = journal_rows(root)
+    check("final_gates_green_rc1_stops",
+          stopped(result, must_contain=("invariant",), must_not_contain=("final gate", "regressed"))
+          and [r.get("exit") for r in invariant_rows(journal)] == [1] and tree_state(root) == before,
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "afg-frozen-red", 0, {"t-frozen": 1, "t-green": 0})
+    before = tree_state(root)
+    result = drive(subject, root, "assert_final_gates")
+    journal = journal_rows(root)
+    check("final_gates_frozen_red_stops_before_verifier",
+          stopped(result, must_contain=("final gate",)) and not invariant_rows(journal)
+          and [(r.get("task"), r.get("exit")) for r in journal if r.get("event") == "GATE"] == [("t-frozen", 1)]
+          and tree_state(root) == before,
+          result.stdout[-400:] + result.stderr[-400:])
+    root = fixture(scratch, "afg-baseline-red", 0, {"t-frozen": 0, "t-green": 1})
+    before = tree_state(root)
+    result = drive(subject, root, "assert_final_gates")
+    journal = journal_rows(root)
+    check("final_gates_baseline_regressed_stops_before_verifier",
+          stopped(result, must_contain=("regressed",)) and not invariant_rows(journal)
+          and tree_state(root) == before,
+          result.stdout[-400:] + result.stderr[-400:])
+
+    # All production consumers: exact count, each guarded by rc != 0 -> Stop.
+    sites = consumer_sites(product.read_text(encoding="utf-8"))
+    check("consumers_exact_count_all_guarded",
+          len(sites) == CONSUMER_CALL_SITES and all(g for _, _, g in sites),
+          json.dumps(sites))
+
+    # The real mandatory verifier still judges the subject itself (read-only, no journal).
+    real = run([NODE, str(subject / VERIFIER)], subject, timeout=300)
+    check("real_verifier_rc0_on_subject", real.returncode == 0 and "0 FAIL" in real.stdout,
+          real.stdout[-400:] + real.stderr[-400:])
+
+    check("subject_and_held_bytes_unchanged",
+          sha(product.read_bytes()) == product_sha
+          and all(sha((ROOT / rel).read_bytes()) == digest for rel, digest in held.items()))
+    result = {"scope": "LOCAL_QUALIFICATION_ONLY", "subject": str(subject),
+              "subject_product_sha256": product_sha, "node": NODE,
+              "node_sha256": sha(Path(NODE).read_bytes()),
+              "fixture_root": str(scratch), "rows": rows,
+              "pass": all(row["pass"] for row in rows)}
+    with (scratch / "result.json").open("x") as stream:
+        json.dump(result, stream, indent=2)
+    print("INVARIANT_REQUIRED_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
+    return 0 if result["pass"] else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print("INVARIANT_REQUIRED_RIG_ERROR=" + repr(exc), file=sys.stderr)
+        sys.exit(2)
