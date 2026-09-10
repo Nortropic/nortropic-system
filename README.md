@@ -4,7 +4,7 @@ Repoidentitet: `git@github.com:Nortropic/nortropic-system.git` med bevarad Git-h
 Sedan 2026-09-10 innehåller repot enbart den verksamhetsneutrala autonomiplattformen:
 Trust Kernel (hela tillitsplattformen, inte bara H034:s fyra artefaktfiler), controller,
 bootstrap, supervisor/autopilot och tillhörande H-arbeten. Webbförvaltningen är utbruten
-till repot `nortropic-webbforvaltning`; dess styrning gäller inte plattformen, och
+till ett separat webbrepo; dess styrning gäller inte plattformen, och
 historiskt webbmaterial finns kvar som Git-historik och, där det överförts, i webbrepot med
 proveniens (`SEPARATION-20260910/WEB-TRANSFER-PROVENIENS*.tsv`).
 
