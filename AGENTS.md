@@ -115,7 +115,8 @@ I nuvarande fas ingår lokala immutabla commits och lokal kvalificering med frys
 Push, publicering, installation, livekörning och supervisor-resume ingår inte i denna fas.
 Det är fasens omfång, inte en permanent regel om mänskligt godkännande. Den kvarvarande
 bootstrapkedjans historiska delegation står i `docs/loop/remaining-bootstrap-delegation-v1.md`
-(fryst grindinput: guarded normal merge commit, aldrig utan mekaniska grindar).
+— fryst grindinput (guarded normal merge commit, aldrig utan mekaniska grindar), historisk
+evidens och inte dagens instruktion.
 
 ## Operating model v2–v4 (plattformsdelen)
 
@@ -151,5 +152,6 @@ destination) står i `SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv` och
 routertexten finns i Git-historiken före uppdelningen; uppdelningens förslag ligger under
 `SEPARATION-20260910/proposed/`. Den frysta autonoma planen (`0b3212c9`) är kopierad
 byte-exakt till `docs/loop/autonomous-loop-plan-v1.md` och
-`docs/loop/autonomous-loop-codex-handoff.md`; plan-authority läses ur dessa kopior, inte ur
-någon origin-gren.
+`docs/loop/autonomous-loop-codex-handoff.md`; kopiorna är fryst grindinput (byte-bundna av
+autopiloten och grindarna), historisk planevidens och inte dagens instruktion. Autopiloten
+binder planidentiteten mot dessa lokala kopior, inte mot någon origin-gren.
