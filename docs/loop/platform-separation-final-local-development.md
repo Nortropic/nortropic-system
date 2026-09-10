@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v2.3 efter två oberoende kontraktsgranskningar 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v2.4 efter tre oberoende kontraktsgranskningar 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -90,8 +90,9 @@ alla dokumentsökvägslitteraler i `scripts/nortropic-codex-autopilot.py` (AST, 
 markdownlänkar `](mål)`, `](<mål>)`, `](mål "titel")` med valfri ändelse upplösta relativt dokumentet
 (även `../`); i JSON varje strängvärde som helt är en sådan sökväg. Katalogreferenser (`docs/loop/`) följs
 inte men måste vara spårade kataloger. Alla nådda spårade textfiler följs och skannas (även `.txt`, `.sh`).
-Referenser som lämnar trädet (`../x` utanför länk, eller en länk vars upplösning går förbi roten) är alltid
-hängande — ett syskonrepo kan aldrig vara aktiv instruktion.
+Referenser som lämnar trädet (`../x` utanför länk, en länk vars upplösning går förbi roten, eller ett
+JSON-strängvärde som bär `../x`, t.ex. `worker_cmd`) är alltid hängande — ett syskonrepo kan aldrig vara
+aktiv instruktion.
 Referenser till kod (`controller/…`, `verify/…`) följs inte; `specs/tasks.spec.json` följs bara via
 `authority.*` och är dessutom byte-bunden (F3).
 **Undantag (fryst evidens — varken skannas eller följs):** `docs/loop/owner-author-workflow-v1.md`,
@@ -112,6 +113,8 @@ plankopiorna, owner-author-workflow, remaining-bootstrap-delegation, `scripts/ch
 (sluten mängd, se nedan), *kod* (Python: AST-strängkonstanter utom docstrings och utom exakt mängden
 {`controller/attest/cli`: `expected_refreeze`, `h038_proof`} — de enda funktionerna vid 332f07ce vars konstanter
 namnger webbens beslutslogg, historisk refreeze-evidens; inget namnmönster, en ny `h035_x`/`refreeze_y` skannas;
+undantaget är namnbundet och därför säkert bara för att `controller/attest/cli` samtidigt är byte-fryst mot
+332f07ce i F6 — en omdefinierad `expected_refreeze` eller en nästlad def i `h038_proof` faller på F6;
 skal/JS/C: hela texten — autopiloten skannas alltså i sin helhet på strängkonstanter, inte bara på namngivna
 konstanter) med webbtoken utom `AUTOPILOT` (autopilotens journalprefix) plus webbrepots namn
 `nortropic-webbforvaltning`, och en smal ägarstoppsmängd (`människohand`, `endast av människ…`, `högrisk`,
@@ -155,7 +158,8 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f2_router_authority_section_marks_frozen_gate_inputs_as_not_current_instruction`: varje omnämnande i hela
   `AGENTS.md` och `CLAUDE.md` av ett fryst/undantaget dokument (owner-author-workflow,
   remaining-bootstrap-delegation, plankopiorna) står i samma stycke eller listpunkt (aldrig ett efterföljande
-  stycke) som orden `fryst`/`historisk` och `inte dagens instruktion` — routern lyfter aldrig fryst grindinput
+  stycke) som orden `frys…`/`frus…`/`historisk` och frasen `inte dagens instruktion` (radbrytning inom frasen
+  tolereras) — routern lyfter aldrig fryst grindinput
   till instruktion, i ingen sektion; `specs/tasks.spec.json` är aktiv auktoritet och undantas bara från
   tokenskanning. `## Auktoritetsordning` måste finnas. Kalibrerat mot referensen: p.5, Fasgränser-stycket
   (remaining-bootstrap-delegation) och Historik-stycket (plankopiorna) bär markörerna; buildern får formulera.
@@ -238,6 +242,7 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f6_frozen_evidence_identical_to_332f07ce_plus_this_gate_only`: träden `verify/**` (får bara få
   denna grind), `controller/h034-native`, `controller/runtime-cleanup`, `controller/provenance`,
   `SEPARATION-20260910/proposed/**` och filerna `scripts/check-invariants.mjs`, `controller/loop/cli`,
+  `controller/attest/cli` (utanför produktytan; bär de historiska refreeze-konstanterna),
   `docs/loop/owner-author-workflow-v1.md`, `docs/loop/remaining-bootstrap-delegation-v1.md`,
   `docs/loop/document-authority-local-development.md`, `SEPARATION-20260910/{README.md,ALLOCATION.tsv,WEB-TRANSFER-PROVENIENS.tsv}`
   byte-identiska (blob-OID) med 332f07ce och arbetsträdet == HEAD; grinden 755 och lika den hållna kopian.
@@ -361,6 +366,7 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
 - Obfuskering i kod: en sökväg splittrad inuti ett ord (`"konst%s" % "itution"`), base64, eller körtidsläsning
   av en fil utanför repot (`$HOME/...`, miljövariabel) fångas inte statiskt; `tests/**`-filer får bära
   `docs/05`/`docs/00` som fixturdata och en ny testfil som läser webbens beslutslogg fångas därför inte.
+  Fältnamn utöver `human_only` (t.ex. `humanOnly`) är en deklarerad semantikgräns.
 - Symlänkar: bara frånvaron av symlänkposter binds (F1); en symlänks mål prövas inte.
 - Semantik bortom token: en omskrivning som uttrycker webbstyrning med andra ord fångas inte.
   Token-listan är den mätbara approximationen; oberoende granskning läser texten.

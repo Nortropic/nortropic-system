@@ -118,7 +118,9 @@ FORBIDDEN_BLOBS = {
 # provenance file and a changed EFTERARBETE.md; nothing else.
 FROZEN_TREES = ("verify", "controller/h034-native", "controller/runtime-cleanup", "controller/provenance",
                 "SEPARATION-20260910/proposed")
-FROZEN_FILES = (VERIFIER, LOOP_CLI, "docs/loop/owner-author-workflow-v1.md",
+# controller/attest/cli lies outside this contract's product surface and carries the only historical refreeze
+# constants (HISTORICAL_CODE_FUNCTIONS): byte-freezing it makes that name-bound exemption safe.
+FROZEN_FILES = (VERIFIER, LOOP_CLI, ATTEST_CLI, "docs/loop/owner-author-workflow-v1.md",
                 "docs/loop/remaining-bootstrap-delegation-v1.md", "docs/loop/document-authority-local-development.md",
                 "SEPARATION-20260910/README.md", "SEPARATION-20260910/ALLOCATION.tsv",
                 "SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv")
@@ -354,8 +356,12 @@ def refs_from_json(obj):
     elif isinstance(obj, list):
         for v in obj:
             out |= refs_from_json(v)
-    elif isinstance(obj, str) and (PATH_RE.fullmatch(obj) or ROOT_DOC_RE.fullmatch(obj)):
-        out.add(obj)
+    elif isinstance(obj, str):
+        if PATH_RE.fullmatch(obj) or ROOT_DOC_RE.fullmatch(obj):
+            out.add(obj)
+        m = OUTSIDE_RE.search(obj)
+        if m:
+            out.add("<outside-tree>" + m.group(1))  # ../x in a JSON value (worker_cmd, rules): never tracked
     return out
 
 
@@ -683,8 +689,8 @@ def main():
           == {"docs/loop/y.md", "docs/loop/z.md", "docs/loop/w.md", AGENTS, "Docs/05-Beslutslogg.md", "docs/loop/", "docs/loop/q.txt"}
           and all(r.startswith("<outside-tree>") for r in refs_from_text(CLAUDE, "Läs `../webb/AGENTS.md` och [r](../../x/regler.md)."))
           and len(refs_from_text(CLAUDE, "Läs `../webb/AGENTS.md` och [r](../../x/regler.md).")) >= 2
-          and refs_from_json({"spec": "config/premiar-backlog.json", "x": ["docs/05-beslutslogg.md"]})
-          == {"config/premiar-backlog.json", "docs/05-beslutslogg.md"})
+          and refs_from_json({"spec": "config/premiar-backlog.json", "x": ["docs/05-beslutslogg.md"], "w": ["bash", "../webb/x.sh"]})
+          == {"config/premiar-backlog.json", "docs/05-beslutslogg.md", "<outside-tree>../webb/x.sh"})
 
     # ------------------------------------------------------------------ F1: tree allowlist, absences, provenance
     offenders = sorted(rel for rel in tracked if rel not in ALLOW_EXACT and not rel.startswith(ALLOW_PREFIXES))
@@ -910,7 +916,7 @@ def main():
         for item in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|[-*])\s)", text(rel)):
             for ref in refs_from_text(rel, item):
                 if ref != SPEC and (ref in CLOSURE_EXEMPT or ref.startswith(CLOSURE_EXEMPT_PREFIXES) or ref in TREE_FROZEN_FILES):
-                    if not (re.search(r"(?i)fryst|historisk", item) and re.search(r"(?i)inte dagens instruktion", item)):
+                    if not (re.search(r"(?i)frys|frus|historisk", item) and re.search(r"(?i)inte\s+dagens\s+instruktion", item)):
                         exempt_in_router.append(f"{rel}: {ref}")
     check("f2_router_authority_section_marks_frozen_gate_inputs_as_not_current_instruction",
           bool(authority_section) and not exempt_in_router, f"unmarked={exempt_in_router}")
