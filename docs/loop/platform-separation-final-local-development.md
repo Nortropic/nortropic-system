@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v2.5 efter fyra oberoende kontraktsgranskningar 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3 2026-09-10: plangenerationen bunden; v2.5 efter fyra oberoende kontraktsgranskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -31,6 +31,20 @@ autopiloten fungerar i en replika utan remote, och att de tre tidigare frysta gr
 exakt förutsagt utfall. Frysta H-grindar, artefakter och historiska beslutsdokument binds
 byte-exakt mot 332f07ce; deras historiska webbreferenser är evidens, inte instruktion.
 
+**v3 (ägarorder 2026-09-10, plangenerationen).** Den gamla roadmap-planen (commit `0b3212c9`, kopierad
+byte-exakt som `docs/loop/autonomous-loop-plan-v1.md`/`autonomous-loop-codex-handoff.md`) var i v2.5 fortfarande
+effekt-authority: autopilotens rollprompter lät agenterna läsa den med `git show 0b3212c9:…`, och den gör
+`docs/07-konstitution`/`docs/03-regelverk` överordnade. v3 binder att planen är en PLATTFORMSGENERATION —
+`docs/loop/autonomous-loop-plan-platform-v2.md` + `docs/loop/autonomous-loop-platform-handoff-v2.md`, frysta genom
+det autonoma flödet — som är ett AKTIVT dokument (skannat som alla andra, plus en planspecifik tokenmängd), att
+alla aktiva konsumenter (autopilotens konstanter och prompter, skills, full-roadmap, AGENTS, substitutionskontraktets
+ingress/§15, drift, README, pinnar) är bundna till den nya generationen, att planens maskinläsbara skivtabell är
+en sanning med autopilotens `SUBSTITUTION_ROADMAP + ROADMAP` och selftests exakta mängder, och att den gamla planen
+(commit, blobbar, sökvägar, etiketter som "effekt-authority"/"fryst input"/"historisk källa") inte kan återinföras som
+aktiv källa — den får bara förekomma i fryst evidens (`verify/**`, `SEPARATION-20260910/**`,
+`*-local-development.md`, byte-frysta dokument, drift.md:s bas). Målbild: autonomin utvecklar hela Nortropic inkl.
+plattformen; bootstrap (h-031…h-039) etablerar en kvalificerad bas; webben är en verksamhet som använder plattformen.
+
 ## Avgränsning och roller
 
 - **test-author (denna tråd):** fryser grinden och detta dokument; bygger en förkastad
@@ -47,8 +61,9 @@ byte-exakt mot 332f07ce; deras historiska webbreferenser är evidens, inte instr
 - Fasgräns: `PUSH=NO`, `MERGE=NO`. Ingen installation av managed-settings (extern ceremoni),
   ingen livekörning, ingen supervisor-resume.
 - Codex-/providermaskineriet i autopiloten tas INTE bort i detta kontrakt; substitutionen
-  (SUB-1/h-027) är nästa kontrakt. Här binds bara att ingen webbkoppling och ingen gammal
-  rot-default finns kvar, och att planens authority ligger i plattformsfrysta kopior.
+  (SUB-1/h-027) är nästa kontrakt. Här binds att ingen webbkoppling och ingen gammal
+  rot-default finns kvar, och (v3) att planens authority är plattformens plangeneration — ett aktivt,
+  blob-bundet dokument vid HEAD — och att den gamla planen inte längre är aktiv källa.
 
 ## Kriterium (effekter)
 
@@ -67,16 +82,17 @@ nådda slutningen och de hållna grindarnas körningar. Subjektets bytes är of�
   `AGENTS.md`, `CLAUDE.md`, `README.md`, `scripts/check-invariants.mjs`,
   `scripts/nortropic-codex-autopilot.py`. (Härlett ur revisionens PLATFORM_KEEP/REWRITE.)
 - `f1_required_absences_…`: frånvarande: `docs/loop/arkiv/{regler,byggplan-v3,spec-styrningsfalt}-fore-2026-09-10.md`,
-  `scripts/check-verifierarregistret.mjs`, `AUTOPILOT`, `KONSTITUTION.md`, `docs/0N-*.md`, och allt under
+  `scripts/check-verifierarregistret.mjs`, `AUTOPILOT`, `KONSTITUTION.md`, `docs/0N-*.md`, (v3) de gamla plankopiorna
+  `docs/loop/autonomous-loop-plan-v1.md` och `docs/loop/autonomous-loop-codex-handoff.md`, och allt under
   `agents/ workflows/ skills/ vendored-skills/ packs/ backtests/ tests/fixtures/ tools/ docs/100-dagar/ docs/arkiv/`.
 - `f1_web_transfer_provenance_2_…`: `SEPARATION-20260910/WEB-TRANSFER-PROVENIENS-2.tsv` (ny) listar
   exakt de fyra överförda filerna; kolumn 2 = blob-OID som grinden mäter med
   `git rev-parse 332f07ce:<path>`; kolumn 3 (destination) icke-tom; filerna är inte spårade vid HEAD.
-- `f1_no_blob_at_head_equals_a_transferred_or_pre_split_governance_object`: ingen blob vid HEAD, under
-  någon sökväg, är lika de fyra överförda objekten (`6b41bcd4…`, `bd298bcf…`, `a847ade1…`, `2d018d65…`) eller
+- `f1_no_blob_at_head_equals_a_transferred_pre_split_governance_or_pre_platform_plan_object`: ingen blob vid HEAD,
+  under någon sökväg, är lika de fyra överförda objekten (`6b41bcd4…`, `bd298bcf…`, `a847ade1…`, `2d018d65…`),
   dae90c8f-originalen av `docs/loop/regler.md` (`b0bc10ae…`), `docs/loop/byggplan-v3.md` (`c0b3b04b…`),
-  `specs/tasks.spec.json` (`2324b2fe…`), `AGENTS.md`/`CLAUDE.md`/`README.md` — en omdöpt eller omparkerad kopia
-  är samma objekt.
+  `specs/tasks.spec.json` (`2324b2fe…`), `AGENTS.md`/`CLAUDE.md`/`README.md`, eller (v3) den gamla planens objekt
+  `c8ea8511…` (plan) och `1e53887c…` (handoff) — en omdöpt eller omparkerad kopia är samma objekt (tolv blobbar).
 - `f1_no_symlink_entries_at_head`: inga poster med läge 120000 i HEAD-trädet (basen har 0) — en symlänk kan
   peka ut ur trädet (t.ex. mot webbrepot) och undgår filskanning.
 
@@ -96,19 +112,35 @@ aktiv instruktion.
 Referenser till kod (`controller/…`, `verify/…`) följs inte; `specs/tasks.spec.json` följs bara via
 `authority.*` och är dessutom byte-bunden (F3).
 **Undantag (fryst evidens — varken skannas eller följs):** `docs/loop/owner-author-workflow-v1.md`,
-`docs/loop/remaining-bootstrap-delegation-v1.md`, de plattformsfrysta plankopiorna
-`docs/loop/autonomous-loop-plan-v1.md`/`autonomous-loop-codex-handoff.md` (bundna byte-exakt i F4;
-de historiska planobjekten bär själva webbreferenser),
-`SEPARATION-20260910/**`, `verify/**`, samt `docs/loop/*-local-development.md` (grindarnas
-följedokument, som av nödvändighet namnger de förbjudna token; deras form binds av respektive grind).
-**Delvis:** `docs/loop/drift.md` — bara avsnittet `## Aktiv plattformsnot…` skannas/följs;
-substitutionskontraktet — bara ingressen, §6, §12 och tillagda avsnitt (övriga avsnitt binds
-byte-exakt); de historiska dokumenten `implementation-v4.1.md`, `codex-autopilot-v2.md`,
-`owner-h003-attestation-authority-v1.md`, `loop-review-2026-07-31.md` — bara det tillagda
-supersessionsblocket; `SEPARATION-20260910/EFTERARBETE.md` — bara det tillagda (append-only, F6).
+`docs/loop/remaining-bootstrap-delegation-v1.md`, `SEPARATION-20260910/**`, `verify/**`, samt
+`docs/loop/*-local-development.md` (grindarnas följedokument, som av nödvändighet namnger de förbjudna token;
+deras form binds av respektive grind). **v3: plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` och
+`docs/loop/autonomous-loop-platform-handoff-v2.md` är INTE undantagna** — de nås via autopilotens konstanter och
+skills, följs och skannas med hela webb- och människohandsmängden, med den gamla planens pekare (nedan) och med
+den planspecifika mängden `CODEX_START_HERE`, `Codex-handoff`, `ägarhand` (fångar även `ÄGARHAND-<n>`),
+`ägarterminal`, `gh pr merge`, `kundfabrik`, `kundflöde`, `Jonkebronk`, `slack-webhook`, `målbild §`,
+`Verkstadsgolvet` (verksamhetens kontrollrum namnges inte alls i plattformsplanen — plattformen exponerar en typad
+läs-/kommandoyta, verksamheten använder den), `human-only`, `owner-only`. En grindmutant som återinför undantaget
+faller på kanarien `canary_plan_generation_scan_rejects_…`.
+**Den gamla planens pekare (`OLD_PLAN_TOKENS`, skannas i varje aktiv/skannad fil och trädvitt i alla klasser):**
+commiten `0b3212c991d4227c8df2656465ae2c0252dda39e` och 8-teckensprefixet `0b3212c9` som hex-ord, blobbarna
+`c8ea8511…`/`1e53887c…`, sökvägarna `autonomous-loop-plan-v1.md`/`docs/loop/autonomous-loop-plan-v1`/
+`autonomous-loop-codex-handoff`, grenen `plan/autonomous-loop-v1`, och etiketterna `effekt-authority`/`effect
+authority`, `fryst input`/`frozen input`, `historisk källa`/`historical source`. Tillåtna bara i fryst evidens
+(`verify/**`, `SEPARATION-20260910/**`, `*-local-development.md`, owner-author-workflow, remaining-bootstrap-delegation,
+drift.md:s 332f07ce-bas, substitutionskontraktets byte-frysta §). Substitutionskontraktets ingress (r.7) namnger i dag
+commiten och skannas → måste skrivas om, med ett §15-tillägg (v1.2). Auditens r.241 nämner planens NAMN utan sökväg
+eller `.md` och träffas inte (beslut: bara pekare som kan lösa till ett objekt eller en fil är förbjudna; en etikett
+utan pekare kan inte återinföra planen mekaniskt).
+**Delvis:** `docs/loop/drift.md` — (v3) HELA den appenderade svansen efter 332f07ce-bytes skannas/följs (v2.5 tog bara
+det första `## Aktiv plattformsnot`-avsnittet; en senare `## `-rubrik gick oskannad); substitutionskontraktet — bara
+ingressen, §6, §12 och tillagda avsnitt §14+ (övriga avsnitt binds byte-exakt); de historiska dokumenten
+`implementation-v4.1.md`, `codex-autopilot-v2.md`, `owner-h003-attestation-authority-v1.md`,
+`loop-review-2026-07-31.md` — bara det tillagda supersessionsblocket; `SEPARATION-20260910/EFTERARBETE.md` — bara det
+tillagda (append-only, F6).
 **Trädvid skanning (`f2_tree_wide_…`):** utöver slutningen klassificeras VARJE spårad fil vid HEAD:
 *fryst* (`verify/**`, `SEPARATION-20260910/{README.md,ALLOCATION.tsv,WEB-TRANSFER-PROVENIENS*.tsv,proposed/**}`,
-plankopiorna, owner-author-workflow, remaining-bootstrap-delegation, `scripts/check-invariants.mjs`,
+owner-author-workflow, remaining-bootstrap-delegation, `scripts/check-invariants.mjs`,
 `specs/tasks.spec.json` — alla OID-bundna på annat håll, skannas inte), *delvis* (ovan), *local-development*
 (sluten mängd, se nedan), *kod* (Python: AST-strängkonstanter utom docstrings och utom exakt mängden
 {`controller/attest/cli`: `expected_refreeze`, `h038_proof`} — de enda funktionerna vid 332f07ce vars konstanter
@@ -122,6 +154,8 @@ konstanter) med webbtoken utom `AUTOPILOT` (autopilotens journalprefix) plus web
 godkännande/klartecken/beslut`, `auto-merge är avstängt`, `människan för kandidaterna`); *test*
 (`tests/**`: kodtoken utom `docs/05`, `docs/00`, `beslutslogg` — frysta specraders `docs_impact` är
 fixturdata); *text* (allt annat: md, json, tsv, sh, .gitignore) med hela webb- och människohandsmängden.
+(v3) `OLD_PLAN_TOKENS` ingår i alla klasser (kod: per AST-sträng; test; delvis; text), och plangenerationens två filer
+skannas dessutom med den planspecifika mängden.
 Binära blobbar tolereras bara under `verify/**`, `controller/provenance/dist/`, `controller/runtime-cleanup/install`.
 Rader: `f2_tree_wide_no_web_governance_reference_outside_frozen_evidence` och
 `f2_tree_wide_no_human_hand_rule_outside_frozen_evidence` (detaljen listar fil@rad token).
@@ -152,6 +186,8 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   registrets not, premiar-backlog, managed-settings. `config/README.md` nås inte av slutningen (ingen aktiv
   referens) och binds av den trädvida skanningen (r.69 `nortropic-verify-suite`, r.104 `av människan`, r.106
   `Auto-merge är avstängt`/`människan för kandidaterna`) samt F8 (r.35–36/43 gamla roten).
+- `f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents` (v3): båda filerna är spårade,
+  nås av slutningen (autopilotens `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH`, skills) och finns i den skannade mängden.
 - `f2_local_development_documents_are_exactly_the_332f07ce_set_plus_this_contract`: mängden spårade
   `docs/loop/*-local-development.md` == mängden vid 332f07ce ∪ {detta dokument} (ett nytt oskannat
   följedokument kan inte tillkomma utan eget kontrakt).
@@ -163,13 +199,21 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   till instruktion, i ingen sektion; `specs/tasks.spec.json` är aktiv auktoritet och undantas bara från
   tokenskanning. `## Auktoritetsordning` måste finnas. Kalibrerat mot referensen: p.5, Fasgränser-stycket
   (remaining-bootstrap-delegation) och Historik-stycket (plankopiorna) bär markörerna; buildern får formulera.
-- `f2_full_roadmap_authority_section_…`: `## Authority` behåller `ROADMAP_PLAN_SHA=0b3212c9…`,
-  `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH` och namnger `AGENTS.md` som konfliktauktoritet;
-  `HUMAN_AUTHORITY_HARD_STOP` finns kvar i dokumentet.
-- `f2_substitution_contract_sections_1_5_7_11_13_unchanged_and_dated_amendment_present`: §1–§5,
-  §7–§11, §13 byte-identiska med 332f07ce (avsnitt = från `## N.` till nästa `## `); §6 och §12
-  finns; ett tillagt avsnitt vars rubrik bär `2026-09-10`/`v1.1`/amendment/tillägg och vars text
-  namnger `AGENTS.md`.
+- `f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history`
+  (v3): `## Auktoritetsordning` i `AGENTS.md` nämner `docs/loop/autonomous-loop-plan-platform-v2.md`, och den
+  listpunkt/det stycke som nämner den bär INTE `inte dagens instruktion`/`historisk`/`fryst grindinput` (planen är
+  aktiv; den får därför inte stå i samma listpunkt som de frysta dokumentens markörnot — egen punkt); `## Historik`
+  finns och bär orden `plangeneration` och `Git-historik` (den gamla generationen namnges som historia utan sha,
+  blob eller sökväg — pekarna är förbjudna).
+- `f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit` (v3):
+  `## Authority` bär `PLAN_GENERATION=<autopilotens PLAN_GENERATION>`, `ROADMAP_PLAN_PATH=<ny plan>`,
+  `ROADMAP_HANDOFF_PATH=<ny handoff>` och namnger `AGENTS.md`; `HUMAN_AUTHORITY_HARD_STOP` finns kvar i dokumentet;
+  hela dokumentet fritt från den gamla planens pekare.
+- `f2_substitution_contract_sections_1_5_7_11_13_unchanged_dated_amendment_and_plan_generation_amendment_present`:
+  §1–§5, §7–§11, §13 byte-identiska med 332f07ce (avsnitt = från `## N.` till nästa `## `); §6 och §12 finns; ett
+  tillagt avsnitt vars rubrik bär `2026-09-10`/`v1.1`/amendment/tillägg och vars text namnger `AGENTS.md` (§14);
+  (v3) ett avsnitt `## 15.`+ vars rubrikrad bär `2026-09-10` eller `v1.2` och vars text namnger den nya planens
+  sökväg och `AGENTS.md`; ingressen (texten före `## 1.`) fri från den gamla planens pekare.
 - `f2_historical_document_unchanged_plus_dated_supersession_note_<dokument>`: dokumentet är exakt
   332f07ce-bytes plus ETT tillagt block (huvud före eller not efter) som bär `2026-09-10`, `AGENTS.md`
   och de specifika markörerna — v4.1: `§3`, `§4`, `§29`; v2: `OWNER_AUTHORITY_REQUIRED`; owner-h003:
@@ -177,9 +221,11 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   ägarstoppsmängden (`människohand`, `endast av människ…`, `högrisk`, `klartecken`, `vänta på …`, `ägarens
   godkännande/klartecken/beslut`); övriga människohandstoken får citeras där eftersom noten anger vilka
   meningar som ersätts.
-- `f2_drift_md_append_only_with_active_platform_note_free_of_web_governance`: `docs/loop/drift.md`
-  vid HEAD börjar med 332f07ce-bytes (append-only); det tillagda innehåller `## Aktiv plattformsnot…`
-  med `2026-09-10`, `AGENTS.md`, `§5` och utan webb-/människohandstoken. Historiska poster rörs inte.
+- `f2_drift_md_append_only_whole_tail_scanned_with_active_platform_note_naming_plan_generation`: `docs/loop/drift.md`
+  vid HEAD börjar med 332f07ce-bytes (append-only); hela svansen skannas och innehåller en rubrik
+  `## Aktiv plattformsnot…`, `2026-09-10`, `AGENTS.md`, `§5` och (v3) den nya planens sökväg, utan webb-/människohands-
+  token och utan den gamla planens pekare. Historiska poster rörs inte (r.521/564 i basen nämner den gamla commiten —
+  bas, inte svans).
 
 ### F3 — konfiguration och behörighetsregler
 - `f3_premiar_backlog_…`: `config/premiar-backlog.json` `defaults.denied_write` == specens
@@ -216,20 +262,54 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f4_autopilot_argparse_defaults_do_not_point_at_old_root`: ingen `add_argument`-default (särskilt
   `--repo`, även `--worktrees`) bär `nortropic/nortropic-system`, `~/nortropic/…` eller `nortropic/worktrees`.
 - `f4_autopilot_source_no_web_document_reference`: inga webbdokumentlitteraler i autopiloten.
-- `f4_roadmap_plan_copies_tracked_byte_identical_to_0b3212c9_objects_and_autopilot_constants`:
-  `HEAD:docs/loop/autonomous-loop-plan-v1.md` == blob `c8ea851167f38f6846485035ee2e6b1dc3b54db0`,
-  `HEAD:docs/loop/autonomous-loop-codex-handoff.md` == `1e53887c59b8da0989579eaa241c5b53ea02abb9`
-  (= `git rev-parse 0b3212c9…:<path>` i en klon som bär planobjektet; kommiten krävs inte i
-  subjektets objektlager), läge 100644; autopilotens `ROADMAP_PLAN_BLOBS`/`ROADMAP_PLAN_SHA`/
-  `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH` lika.
+- `f4_plan_generation_files_tracked_100644_and_autopilot_paths_and_blobs_equal_head` (v3): `docs/loop/autonomous-loop-plan-platform-v2.md`
+  och `docs/loop/autonomous-loop-platform-handoff-v2.md` är spårade reguljära filer med läge 100644; autopilotens
+  `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH` är exakt dessa sökvägar och `ROADMAP_PLAN_BLOBS` == filernas HEAD-blobbar
+  (identiteten är HEAD-bloben, ingen commit). Konstanterna läses ur den riktiga modulen (DRIVER `constants`).
+- `f4_autopilot_has_plan_generation_constant_and_no_roadmap_plan_sha_attribute` (v3): modulen har ingen attribut
+  `ROADMAP_PLAN_SHA`; `PLAN_GENERATION` är en icke-tom sträng (värdet är builderns, t.ex. `platform-v2`).
 - `f4_ensure_roadmap_plan_returns_in_replica_without_any_remote`: den riktiga modulens
-  `ensure_roadmap_plan(repo)` returnerar i en replika utan remote (ingen fetch möjlig).
-- `f4_ensure_roadmap_plan_stops_on_mutated_plan_copy` / `…_missing_handoff_copy`: en kopia med en
-  ändrad byte respektive en borttagen kopia → `Stop`.
+  `ensure_roadmap_plan(repo)` (namnet behålls — h-032-exit och publication-callers är namnbundna) returnerar i en
+  replika utan remote (ingen fetch möjlig).
+- `f4_ensure_roadmap_plan_stops_on_mutated_plan_generation` / `…_missing_handoff`: planen med en ändrad byte
+  respektive en borttagen handoff → `Stop`.
+- `f4_autopilot_source_free_of_old_plan_commit_git_show_by_commit_and_plan_sha` (v3): autopilotens FULLTEXT (inkl.
+  kommentarer/docstrings) och AST-strängar saknar den gamla planens pekare, `git show {…}:`/`git show <…>`/
+  `git show <7–40 hex>:` (läsning ur commit; `git show HEAD:`/`origin/main:` är tillåtet) och identifieraren/fältet
+  `plan_sha`/`PLAN_SHA`/`ROADMAP_PLAN_SHA` (skiftlägesoberoende; `plan_sha256` undantaget).
+- `f4_prompt_functions_inject_exactly_the_declared_platform_document_set_all_tracked_and_scanned` (v3):
+  promptbyggande funktioner = varje funktion vars strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
+  `prompt|_extra$|authority_text$`, PLUS varje funktion som anropar en sådan (deras `extra`-strängar injiceras);
+  ≥9 markörfunktioner och ≥12 totalt. Den injicerade dokumentmängden = alla `docs/…`-literaler med ändelse och
+  rotdokument (`AGENTS.md`, `CLAUDE.md`, `README.md`, skills) i deras strängkonstanter (även f-strängdelar) och i de
+  modulkonstanter (strängar) de namnger. Krav: KRÄVD mängd {ny plan, ny handoff, full-roadmap, substitutionskontraktet,
+  auditen, evidenskontraktet, `AGENTS.md`, rapportschemat} ⊆ injicerad ⊆ TILLÅTEN = krävd ∪ {`docs/loop/regler.md`,
+  `docs/loop/byggplan-v3.md`, `docs/loop/drift.md`, `docs/loop/owner-h003-attestation-authority-v1.md`}; varje injicerad
+  fil spårad och i den skannade slutningsmängden (eller ett generationsdokument, blob-pinnat). Beslut: delmängd-i-
+  tillåten i stället för exakt likhet, så att en legitim prompt som slutar nämna owner-h003 (S3 byggd) eller drift inte
+  faller; evidenskontraktet är krävt eftersom varje rollrapport följer det. Mätt vid 320c9df7: injicerad = {AGENTS,
+  gammal plan, byggplan, schema, full-roadmap, drift, audit, kontrakt, owner-h003, regler}.
+- `f4_plan_generation_slice_table_equals_autopilot_roadmap_tuples_and_selftest_exact_sets` (v3): planen bär en
+  markdowntabell med rubrikcellerna exakt `slice | task | exit_test | allowed_write | depends_on | status`
+  (skiftlägesoberoende; backticks/fetstil tolereras; listceller kommaseparerade; `-`/`—` = tom; status `BYGGD`/`OBYGGD`,
+  skiftlägesoberoende). Skivmängden == autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`-koder ∪ {S1, S3, L}; för varje
+  autopilotskiva: task == `task_id`, exit_test == `gate_path`, allowed_write-mängd == `plan_allowed_write`,
+  depends_on-mängd == `required_deps`; S1/S3: task h-017/h-004, exit_test och depends_on == specradens, ingen
+  skrivyta (`-`), `BYGGD`; L: task `-`, exit_test == `EMPIRICAL_GATE_PATH`, ingen skrivyta, depends_on == alla
+  autopilotskivors task-id; status `BYGGD` ⇔ exit_test-filen är spårad vid HEAD; varje rad vars task har en specrad
+  har specradens `exit_test`; selftests literala `sub_exact`/`road_exact` täcker exakt autopilotkoderna och stämmer
+  med tabellen. Specen är byte-fryst (332f07ce) — planen kopierar inte specradernas `docs/05`-ytor.
+- `f4_plan_generation_bootstrap_section_names_h031_to_h039_as_platform_establishment` (v3): ett `## `-avsnitt vars
+  rubrik bär `bootstrap` namnger alla nio h-031…h-039 (bootstrap etablerar plattformen; delegationsdokumenten är
+  read-only och omdefinieras inte — semantiken läses av granskaren).
+- `f4_architect_and_empirical_runner_skills_name_plan_generation_and_no_plan_commit` (v3):
+  `.agents/skills/nortropic-architect/SKILL.md` och `nortropic-empirical-runner/SKILL.md` namnger den nya planens
+  sökväg och saknar `<PLAN_SHA>`, `frozen autonomous-loop plan commit`, `git show {…|<…|<hex>:` och den gamla planens pekare.
 - `f4_autopilot_substitution_blobs_equal_head_blobs_of_generation_documents`: `SUBSTITUTION_BLOBS`
   ⊇ de elva dokumenten och varje OID == kandidatens HEAD-blob (pinnar uppdateras när generationen ändras).
-- `f4_autopilot_selftest_none_returns_pass`, `f4_autopilot_publication_callers_exit0`,
-  `f4_controller_loop_cli_unchanged_vs_332f07ce`.
+- `f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha` (v3): `selftest(None)` returnerar,
+  stdout bär `AUTOPILOT_V4_SELFTEST=PASS` (control-set-grinden binder strängen) och `PLAN_GENERATION=` men ingen
+  `plan_sha`/`PLAN_SHA`-rad; `f4_autopilot_publication_callers_exit0`, `f4_controller_loop_cli_unchanged_vs_332f07ce`.
 
 ### F5 — loopens testsvit utan webbfixtur
 - `f5_loop_fall_py_b2_no_web_fixture_or_web_invariant`: `tests/controller/loop/fall.py` saknar
@@ -280,8 +360,8 @@ som evidens) — den som kör ansvarar för att ta bort scratch efter att `resul
   mönster ingår i den trädvida kod-/textskanningen; kanari: `/Users/elinhaggstrom/nortropic-repos/webb/AGENTS.md`,
   `~/nortropic-repos/x/y.sh`, `$HOME/nortropic-repos/webb` träffar, plattformsroten träffar inte). Undantag:
   `SEPARATION-20260910/**`, `verify/**`, `docs/loop/arkiv/**`, `*-local-development.md`,
-  `specs/tasks.spec.json` (frysta rader), `drift.md`, owner-author-workflow, remaining-bootstrap,
-  plankopiorna. Pythonfiler mäts på AST-strängkonstanter (docstrings/kommentarer är inte körbara
+  `specs/tasks.spec.json` (frysta rader), `drift.md`, owner-author-workflow, remaining-bootstrap
+  (v3: plangenerationen är inte undantagen). Pythonfiler mäts på AST-strängkonstanter (docstrings/kommentarer är inte körbara
   beroenden; konstanter i `refreeze|h03[5-9]`-funktioner är historisk evidens).
 - `f8_ordinary_loop_e2e_and_platform_prepare_check_green_on_candidate_via_held_control_set`: den
   hållna control-set-grindens ordinarie loop-e2e (fixturtask attesteras i replika) och
@@ -294,12 +374,25 @@ full-roadmap; (c) `docs/05-beslutslogg.md` i premiar-backlogs `allowed_write`; (
 åter i `.gitignore`; (e) `scripts/check-verifierarregistret.mjs` återställd; (f) nytt dokument
 `docs/loop/x.md` som refererar `docs/03-regelverk.md`, länkat från `AGENTS.md`; (g)
 `ensure_roadmap_plan` fetchar från origin igen; (h) registernot med "endast av människohand".
+v3 (plangenerationen): (a) gamla planens bytes under den nya sökvägen med autopiloten ompinnad till den bloben;
+(b) `git show 0b3212c9…:` i en prompt, (b2) `git show {…}:` via klammerplatshållare utan sha; (c) `PLAN_SHA=` i
+selftests utdata (hopsatt så att källskanningen inte ser den); (d) `<PLAN_SHA>` i arkitektskillen; (e) planen
+med `docs/07-konstitution.md` som överordnad; (f) skivtabellen driver från autopilotens ROADMAP (ett beroende bort);
+(g) full-roadmaps Authority namnger den gamla sha:n; (h) grindmutant som återinför plankopiornas undantag (kanari);
+(i) substitutionskontraktets ingress namnger den gamla sha:n; (j) den gamla handoffens blob under
+`SEPARATION-20260910/`; (k) planen i samma listpunkt som "inte dagens instruktion" i routern; (l) en senare
+`## `-not i drift.md:s svans med `docs/07`; (m) `ROADMAP_PLAN_SHA` behållen vid sidan av `PLAN_GENERATION`; (n) en
+prompt injicerar ett odeklarerat dokument (`implementation-v4.1.md`); (o) S2 markerad `BYGGD` utan grind; (q)
+`ägarterminalen` i planen; (r) `CODEX_START_HERE` i handoffen; (s) "Historisk källa: `…autonomous-loop-plan-v1.md`" i planen.
 Resultat: se Utfall.
 
 ### F10 — riggdisciplin
 Kanarier (traceback är inget utfall; okänt driverscenario; driverfel; tokenskannern fångar
 webb-/människohandstoken och släpper undantagen; slutningsextraktionen följer backticks och
-relativa länkar), strikt JSON (dubblerad nyckel = fel), `result.json`, subjektets och den hållna
+relativa länkar; (v3) planskanningen fångar den gamla planens pekare, `docs/05-beslutslogg`/`ägarterminalen`/
+`Verkstadsgolvet`/`gh pr merge`/`målbild §`/`CODEX_START_HERE` och släpper en legitim skivrad, `git show <…|{…|<hex>:`
+fångas men `git show HEAD:` släpps, tabellparsern läser en fixturtabell exakt, och plangenerationen står inte i något
+undantag — en grindmutant som återinför undantaget faller här), strikt JSON (dubblerad nyckel = fel), `result.json`, subjektets och den hållna
 grindens bytes oförändrade, utvecklingsdokumentet spårat med avsnitten Enkelt förklarat /
 Avgränsning och roller / Kriterium (effekter) / Produktyta för BUILDER / Vad grinden inte bevisar / Utfall.
 
@@ -313,13 +406,34 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    (kolumner path · blob-OID vid 332f07ce · destination i webbrepot · not; OID:erna är
    `6b41bcd4…`, `bd298bcf…`, `a847ade1…`, `2d018d65…`). Överföringen till webbrepot är gjord av roten
    (`nortropic-webbforvaltning` commit `e4c8c52`, `SEPARATION-ORIGIN/transfer-20260910-2/`).
-2. **Nya plattformsfrysta plankopior:** `docs/loop/autonomous-loop-plan-v1.md` och
-   `docs/loop/autonomous-loop-codex-handoff.md`, byte-identiska med `0b3212c9…:docs/loop/<fil>`
-   (hämtas ur en klon som bär planobjektet, t.ex. `git -C ~/nortropic-repos/nortropic-system cat-file -p c8ea8511…`).
-3. **Autopilot** `scripts/nortropic-codex-autopilot.py`: `--repo`/`--worktrees` utan gammal rot;
-   `ensure_roadmap_plan` verifierar `HEAD:<kopia>` mot `ROADMAP_PLAN_BLOBS` (ingen fetch, ingen gren);
-   `SUBSTITUTION_BLOBS` = nya HEAD-blobbar för de elva dokumenten; `selftest`:s hårdkodade kontrakts-blob
-   uppdaterad. Codex-maskineriet lämnas (SUB-1 nästa).
+2. **Plangenerationen (v3, ersätter v2.5:s plankopior):** nya filer `docs/loop/autonomous-loop-plan-platform-v2.md`
+   och `docs/loop/autonomous-loop-platform-handoff-v2.md` (läge 100644), författade av buildern ur rekognoseringens
+   KEEP/REWRITE/REMOVE-karta (`~/nortropic/RECON-PLANGENERATION-20260910.md` §A): funktionella mål, tekniska skydd
+   (G20, sökvägsuppslag, register utanför skrivytan, ingen force, promotion under lease, eventström utan authority,
+   providerutdata aldrig trust) och kvarvarande plattformsarbete bevaras; webbstyrning (`docs/07`/`docs/03`/`docs/05`,
+   konstitution/regelverk), människohandskrav (ägarhand/ägarterminal/ägarbeslut, "fråga ägaren") och
+   verksamhetsberoenden (kundfabrik/kundflöde, Slack-webhook, Verkstadsgolvet, Jonkebronk, målbild §x) tas bort;
+   GitHub/Promoter-värden är publiceringsmål och externa mätningar (OVERIFIERAT tills mekaniskt ommätta).
+   Obligatoriskt innehåll: den maskinläsbara skivtabellen (kolumner `slice | task | exit_test | allowed_write |
+   depends_on | status`; S1/S3 `BYGGD` utan skrivyta; SUB-1…SUB-4, S2, S4–S13 exakt som autopilotens tuplar;
+   L = `verify/bin/autonomous-loop-exit`, beroende av alla skivors task-id, `OBYGGD`), ett `## …bootstrap…`-avsnitt som
+   namnger h-031…h-039 utan att omdefiniera delegationsdokumenten, och `PLAN_GENERATION`-identiteten (blob vid HEAD).
+   De gamla kopiorna `docs/loop/autonomous-loop-plan-v1.md`/`autonomous-loop-codex-handoff.md` tas bort ur HEAD; de
+   gamla objekten stannar i historiken. Inga pekare till den gamla planen (sha, 8-prefix, blobbar, sökvägar, gren,
+   etiketterna effekt-authority/fryst input/historisk källa) i någon aktiv fil.
+3. **Autopilot** `scripts/nortropic-codex-autopilot.py` (E.2): `--repo`/`--worktrees` utan gammal rot;
+   `ROADMAP_PLAN_SHA` bort, `PLAN_GENERATION = "<builderns värde>"` in, `ROADMAP_PLAN_PATH/ROADMAP_HANDOFF_PATH` = nya
+   sökvägar, `ROADMAP_PLAN_BLOBS` = nya HEAD-blobbar (enda identitet); `ensure_roadmap_plan` (namnet behålls) verifierar
+   `HEAD:<fil>` (ingen fetch, ingen gren), journalfält `plan_generation`; alla `git show {SHA}:{PATH}` i prompterna
+   (roadmap_test_author 1479, slice_builder_extra 1658, empirical_gate_test_author 1768) → "läs `{PLAN_PATH}` och
+   `{HANDOFF_PATH}` vid HEAD i den auktoritativa arbetskopian; orkestratorn har verifierat bloben"; alla `PLAN_SHA=`-rader
+   (architect 907, roadmap-prompter 1465/1525/1548, empirical 1761/1807/2044, selftest 2631, status 2682,
+   roadmap_status 2704, doctor 2801) → `PLAN_GENERATION=`; `slice_authority_text` 1372 → plangenerationen;
+   kommentaren 186–189 och docstring 2–7 utan `ROADMAP_PLAN_SHA`; `selftest` 2578 → identitetsvakt på
+   `PLAN_GENERATION` + `ROADMAP_PLAN_BLOBS`; något prompt injicerar `docs/loop/codex-evidence-contract.md` (t.ex.
+   `agent_prompt_common`) och prompterna namnger både plan och handoff; `SUBSTITUTION_BLOBS` = nya HEAD-blobbar för de
+   elva dokumenten; `selftest`:s hårdkodade kontrakts-blob uppdaterad. `ROADMAP[0]` förblir S2/h-015 och skivtuplarna
+   ändras inte (h-032-exit och governance-grinden binder dem). Codex-/providermaskineriet lämnas (SUB-1 nästa).
 4. **Verify-cli** `controller/verify/cli`: `PLATFORM_REGISTER`, `PLATFORM_DOCUMENTS` (sha256 av de
    slutliga dokumenten). `controller/verify/register.json`: ny not utan människohand/webbgrind,
    `register_version` stegad, check-invariants-posten oförändrad.
@@ -327,6 +441,18 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `config/managed-settings.json` (plattformsrot, webbposter bort, registret nekat),
    `config/README.md` (r.5, 35–36, 43, 69, 92–107), `.gitignore` (webbträd bort, `SEPARATION-20260910/`
    vitlistad; `docs/`, `tests/`, `scripts/` förblir hela vitlistor — se F3).
+5b. **Skills (E.3):** `.agents/skills/nortropic-architect/SKILL.md` r.3/16/21/23 och
+   `nortropic-empirical-runner/SKILL.md` r.14/16: plangenerationens sökväg vid HEAD, blob-verifierad av orkestratorn;
+   inget `git show <PLAN_SHA>`, inget "frozen autonomous-loop plan commit", ingen gammal sökväg.
+5c. **Plandokumenten (E.4):** `docs/loop/codex-autopilot-v3-full-roadmap.md` `## Authority` → `PLAN_GENERATION=`,
+   nya `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH`, `AGENTS.md`, blob-läsning vid HEAD (r.16 skrivs om); `AGENTS.md`
+   r.127 (v3-raden) utan sha, `## Auktoritetsordning` får den nya planen som EGEN punkt (aktivt dokument, inte i samma
+   punkt som markörnoten för frysta dokument), `## Historik` namnger den tidigare plangenerationen som historia i
+   Git-historiken (utan sha/blob/sökväg) och den nya som aktiv; `docs/loop/harness-substitution-contract-v1.md` ingress
+   r.7 utan commit + nytt `## 15. … 2026-09-10 … (v1.2)` som namnger den nya planens sökväg och `AGENTS.md` (§1–§5,
+   §7–§11, §13 orörda); `docs/loop/drift.md` appenderad not som namnger den nya planens sökväg (hela svansen skannas);
+   `README.md` r.38 utan de gamla filnamnen. Pinnar: `controller/verify/cli` `PLATFORM_DOCUMENTS` och autopilotens
+   `SUBSTITUTION_BLOBS` för AGENTS/README/drift/kontraktet (och varje annat ändrat generationsdokument).
 6. **Dokument:** `AGENTS.md` (Historik → Git-referenser/webbrepot utan sökväg), `README.md` (r.8, 21, 28),
    `docs/loop/regler.md` (r.9–10), `docs/loop/byggplan-v3.md` (r.9, 113, 166),
    `docs/loop/codex-autopilot-v3-full-roadmap.md` (r.17, 115), `docs/loop/harness-substitution-contract-v1.md`
@@ -344,15 +470,26 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `push --force` i `controller/<x>/cli` → PINV-005).
 8. **Inte rörs:** `verify/**` (utom att denna grind redan ligger där), frysta träd/filer i F6,
    `controller/loop/cli`, `specs/tasks.spec.json` (kräver ingen ändring; frysta rader behålls),
-   `scripts/check-invariants.mjs`.
+   `scripts/check-invariants.mjs`, `controller/verify/register.json`, `docs/loop/remaining-bootstrap-delegation-v1.md`,
+   `docs/loop/owner-author-workflow-v1.md`, providermaskineriet (`run_codex`, rollpolicyn, `CODEX_FULL_ACCESS_MODE`),
+   autopilotens skivtuplar och `EMPIRICAL_GATE_PATH`. Refreeze av h-036/h-037/h-035/h-038/document-authority (stale
+   pinnar på autopilot/AGENTS/drift) är ett separat H-steg som plangenerationens ändring bör batchas med (recon D).
 
 ## Vad grinden inte bevisar
 
 - Att webbrepot faktiskt bär de överförda filerna: grinden läser aldrig webbrepot (plattformen ska
   fungera utan det); proveniensen binds mot 332f07ce-objekt i plattformens egen historik.
-- Att de plattformsfrysta plankopiorna är fria från webbstyrning: de är byte-identiska med de
-  historiska planobjekten och bär webbreferenser som effekt-authority (UNRESOLVED för SUB-1/senare
-  kontrakt: omfrysning av planen för plattformen).
+- (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
+  tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
+  `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av
+  den oberoende granskningen. En etikett för den gamla planen utan pekare (t.ex. auditens r.241 `autonomous-loop-plan-v1`
+  utan sökväg/`.md`) fångas inte — den kan inte mekaniskt återinföra planen.
+- (v3) Att h-036/h-037/h-035/h-038/document-authority-grindarna går gröna efter autopilot-/AGENTS-/drift-ändringen
+  (pinnarna är redan stale sedan separationen; refreeze är ett eget H-steg), eller att h-017-exit går grönt på
+  plattformen (läser frånvarande webbfiler).
+- (v3) Beroendekonflikten S6/h-014 (spec `depends_on: [h-013]`, autopilot h-019) och specradernas `docs/05`-ytor:
+  specen är byte-fryst i detta kontrakt; planen binds mot autopilotens tuplar och specradens `exit_test`, inte mot
+  specradens `depends_on` för obyggda skivor.
 - Att frysta H-grindar går gröna på kandidaten (h-016/017/036/037/038 läser webbfiler vid körning;
   refreeze hör till nästa H-steg) eller att `document-authority-exit`/`h-035-exit` gör det.
 - Att managed-settings är installerad (extern rootceremoni) eller att Claude Code/Codex faktiskt

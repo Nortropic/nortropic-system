@@ -18,11 +18,18 @@ history and kernel/H evidence stay. This gate binds EFFECTS on --subject:
       PLUS a tree-wide scan of every tracked text file outside the explicit
       frozen-evidence set (code by AST string constants, tests by fixture-aware
       tokens), a closed set of *-local-development documents and a router that
-      never elevates frozen gate inputs
+      never elevates frozen gate inputs. v3: the ROADMAP PLAN is a PLATFORM
+      GENERATION (docs/loop/autonomous-loop-plan-platform-v2.md + handoff) and an
+      ACTIVE document scanned like every other; the pre-platform plan (commit
+      0b3212c9, its blobs, its paths) may be pointed at only from frozen evidence
   F3  config/permission rules (premiar-backlog, managed-settings, .gitignore
       effect, register, verify-cli pins, preflight, PINV 6/0, spec unchanged)
   F4  autopilot/loop function without the old root or an origin branch
-      (ensure_roadmap_plan on local objects, selftest, publication-callers)
+      (ensure_roadmap_plan on local objects, selftest, publication-callers);
+      v3: plan generation bound by HEAD blob, no ROADMAP_PLAN_SHA, no `git show
+      <commit>:` plan reading, prompt-injected documents enumerated by AST and
+      equal to a declared platform set, the plan's slice table equal to the
+      autopilot's roadmap tuples and selftest's exact sets (one truth)
   F5  tests/controller/loop/fall.py B2 without web fixture (+ hermetic run)
   F6  frozen evidence byte-identical to 332f07ce (+ this gate only);
       EFTERARBETE.md append-only with a scanned addition
@@ -76,15 +83,21 @@ OWNER_H003 = "docs/loop/owner-h003-attestation-authority-v1.md"
 LOOP_REVIEW = "docs/loop/loop-review-2026-07-31.md"
 EFTERARBETE = "SEPARATION-20260910/EFTERARBETE.md"
 EVIDENCE_CONTRACT = "docs/loop/codex-evidence-contract.md"
-PLAN_COPY = "docs/loop/autonomous-loop-plan-v1.md"
-HANDOFF_COPY = "docs/loop/autonomous-loop-codex-handoff.md"
+OLD_PLAN_COPY = "docs/loop/autonomous-loop-plan-v1.md"
+OLD_HANDOFF_COPY = "docs/loop/autonomous-loop-codex-handoff.md"
+PLAN_GEN = "docs/loop/autonomous-loop-plan-platform-v2.md"
+HANDOFF_GEN = "docs/loop/autonomous-loop-platform-handoff-v2.md"
+AUDIT = "docs/loop/harness-substitution-audit-2026-08-11.md"
+REPORT_SCHEMA = "docs/loop/codex-autopilot-report.schema.json"
 PROVENANCE_2 = "SEPARATION-20260910/WEB-TRANSFER-PROVENIENS-2.tsv"
 CHECK_INVARIANTS_SHA = "ae72cdf8b8a21456662f1e4c391670f47a8a4b3728600ad221999e624dc95184"
-# Historical plan objects (commit 0b3212c9 is not required in the subject's object store; the
-# platform-frozen copies are bound by these blob OIDs, byte identity with the pinned objects).
-ROADMAP_PLAN_SHA = "0b3212c991d4227c8df2656465ae2c0252dda39e"
-ROADMAP_PLAN_BLOBS = {PLAN_COPY: "c8ea851167f38f6846485035ee2e6b1dc3b54db0",
-                      HANDOFF_COPY: "1e53887c59b8da0989579eaa241c5b53ea02abb9"}
+# The pre-platform plan generation (commit 0b3212c9, copied byte-identically into the tree as the two OLD_* files
+# until v2.5) is history: its commit, its two blobs and its two paths may appear only in frozen evidence (verify/**,
+# SEPARATION-20260910/**, *-local-development.md, the byte-frozen documents and the pre-332f07ce body of drift.md),
+# never in an active or scanned file; no blob at HEAD may equal one of its objects under any path.
+OLD_PLAN_COMMIT = "0b3212c991d4227c8df2656465ae2c0252dda39e"
+OLD_PLAN_BLOBS = {"c8ea851167f38f6846485035ee2e6b1dc3b54db0": OLD_PLAN_COMMIT[:8] + ":" + OLD_PLAN_COPY,
+                  "1e53887c59b8da0989579eaa241c5b53ea02abb9": OLD_PLAN_COMMIT[:8] + ":" + OLD_HANDOFF_COPY}
 PLATFORM_ROOT = "/Users/elinhaggstrom/nortropic-repos/nortropic-system/"
 OLD_ROOT_RE = re.compile(r"(?:~|/Users/elinhaggstrom)/nortropic/(?!evidence/)")
 OLD_ROOT_REL_RE = re.compile(r"^nortropic/(nortropic-system|worktrees)(/|$)")
@@ -97,7 +110,7 @@ ALLOW_PREFIXES = (".agents/skills/", "SEPARATION-20260910/", "config/", "control
 ALLOW_EXACT = {".gitignore", AGENTS, CLAUDE, README, VERIFIER, AUTOPILOT}
 ABSENT_EXACT = ("docs/loop/arkiv/regler-fore-2026-09-10.md", "docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md",
                 "docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md", "scripts/check-verifierarregistret.mjs",
-                "AUTOPILOT", "KONSTITUTION.md")
+                "AUTOPILOT", "KONSTITUTION.md", OLD_PLAN_COPY, OLD_HANDOFF_COPY)
 ABSENT_PREFIXES = ("agents/", "workflows/", "skills/", "vendored-skills/", "packs/", "backtests/", "tests/fixtures/",
                    "tools/", "docs/100-dagar/", "docs/arkiv/")
 ABSENT_RE = re.compile(r"^docs/0\d-[^/]*\.md$")
@@ -116,6 +129,7 @@ FORBIDDEN_BLOBS = {
     "52c93a66879f6043b89ea20f7fa7d31143219f35": "dae90c8f:CLAUDE.md",
     "1b95647e842464ed9e710a16e9fa451b4f385b68": "dae90c8f:README.md",
 }
+FORBIDDEN_BLOBS.update(OLD_PLAN_BLOBS)
 # F6 frozen evidence at 332f07ce. verify/** may gain exactly this gate; SEPARATION may gain the
 # provenance file and a changed EFTERARBETE.md; nothing else.
 FROZEN_TREES = ("verify", "controller/h034-native", "controller/runtime-cleanup", "controller/provenance",
@@ -133,8 +147,8 @@ GENERATION_DOCS = (AGENTS, CLAUDE, README, "docs/loop/byggplan-v3.md", EVIDENCE_
                    "docs/loop/remaining-bootstrap-delegation-v1.md")
 # F2: frozen-evidence documents reached by the closure but neither scanned nor followed; *-local-development.md
 # (gate companions that necessarily name the forbidden tokens) are likewise not scanned.
-CLOSURE_EXEMPT = {"docs/loop/owner-author-workflow-v1.md", "docs/loop/remaining-bootstrap-delegation-v1.md",
-                  PLAN_COPY, HANDOFF_COPY, SPEC}
+# v3: the plan generation (PLAN_GEN, HANDOFF_GEN) is NOT exempt — it is active instruction and is scanned/followed.
+CLOSURE_EXEMPT = {"docs/loop/owner-author-workflow-v1.md", "docs/loop/remaining-bootstrap-delegation-v1.md", SPEC}
 CLOSURE_EXEMPT_PREFIXES = ("SEPARATION-20260910/", "verify/")
 # Historical documents that stay byte-identical and gain one dated supersession block (header or appended note).
 HISTORICAL_NOTE_DOCS = {IMPLEMENTATION: (r"§\s*3\b", r"§\s*4\b", r"§\s*29\b"),
@@ -147,7 +161,7 @@ HISTORICAL_NOTE_DOCS = {IMPLEMENTATION: (r"§\s*3\b", r"§\s*4\b", r"§\s*29\b")
 # text. Binary blobs are tolerated only inside the frozen kernel/provenance trees.
 TREE_FROZEN_PREFIXES = ("verify/", "SEPARATION-20260910/proposed/")
 TREE_FROZEN_FILES = {"SEPARATION-20260910/README.md", "SEPARATION-20260910/ALLOCATION.tsv",
-                     "SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv", PROVENANCE_2, PLAN_COPY, HANDOFF_COPY,
+                     "SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv", PROVENANCE_2,
                      "docs/loop/owner-author-workflow-v1.md", "docs/loop/remaining-bootstrap-delegation-v1.md",
                      VERIFIER, SPEC}
 BINARY_ALLOWED_PREFIXES = ("verify/", "controller/provenance/dist/", "controller/runtime-cleanup/install")
@@ -161,7 +175,43 @@ HARD_HUMAN_TOKENS = (
 )
 # References that leave the repository tree (../x) are never tracked: always dangling.
 OUTSIDE_RE = re.compile(r"(?<![\w.])((?:\.\./)+[A-Za-z0-9_./-]+)")
+# drift.md: the whole tail appended after the 332f07ce bytes is active and scanned (v2.5 scanned only the first
+# "## Aktiv plattformsnot" section); at least one such heading must exist in the tail.
 DRIFT_ACTIVE_HEADING = re.compile(r"^## Aktiv plattformsnot\b.*$", re.M)
+# The pre-platform plan may be pointed at only from frozen evidence: its commit (40-hex and the 8-char prefix as a
+# hex word), its two blob OIDs, its two tree paths, its plan branch, and the labels that re-elevated it into
+# instruction ("effekt-authority", "fryst input", "historisk källa" and their English forms).
+OLD_PLAN_TOKENS = (
+    OLD_PLAN_COMMIT, r"(?<![0-9a-fA-F])0b3212c9(?![0-9a-fA-F])", r"c8ea851167f38f6846485035ee2e6b1dc3b54db0",
+    r"1e53887c59b8da0989579eaa241c5b53ea02abb9", r"autonomous-loop-plan-v1\.md", r"docs/loop/autonomous-loop-plan-v1\b",
+    r"autonomous-loop-codex-handoff\b", r"plan/autonomous-loop-v1", r"(?i)effekt-?authority", r"(?i)effect[- ]authority",
+    r"(?i)fryst input", r"(?i)frozen input", r"(?i)historisk källa", r"(?i)historical source",
+)
+# The plan generation is an ACTIVE platform document: on top of WEB/HUMAN/OLD_PLAN tokens it may carry no business,
+# provider-entry or owner-hand authority. Verkstadsgolvet (the business control room, substitution contract §11) is
+# not named in the platform plan at all: the platform exposes a typed read/command surface, the business uses it.
+PLAN_TOKENS = (
+    r"CODEX_START_HERE", r"Codex-handoff", r"(?i)ägarhand", r"(?i)ägarterminal", r"gh pr merge", r"(?i)kundfabrik",
+    r"(?i)kundflöde", r"Jonkebronk", r"(?i)slack-webhook", r"(?i)målbild\s*§", r"Verkstadsgolvet", r"(?i)human-only",
+    r"(?i)owner-only",
+)
+# Plan reading by commit is the old mechanism: `git show {SHA}:`, `git show <PLAN_SHA>:`, `git show 0b3212c9:`.
+GIT_SHOW_COMMIT_RE = r"git\s+show\s+(?:\{|<|[0-9a-fA-F]{7,40}\s*:)"
+# No plan_sha / PLAN_SHA / ROADMAP_PLAN_SHA identifier, journal field or output line anywhere in the autopilot.
+PLAN_SHA_RE = r"(?i)plan_sha(?!256)"
+SKILL_OLD_PLAN_TOKENS = (r"<PLAN_SHA>", r"(?i)frozen autonomous-loop plan commit", GIT_SHOW_COMMIT_RE)
+PLAN_SKILLS = (".agents/skills/nortropic-architect/SKILL.md", ".agents/skills/nortropic-empirical-runner/SKILL.md")
+# Machine-readable slice table in the plan generation: a markdown table with exactly these header cells.
+PLAN_TABLE_COLUMNS = ("slice", "task", "exit_test", "allowed_write", "depends_on", "status")
+PLAN_STATUS_BUILT, PLAN_STATUS_UNBUILT = "BYGGD", "OBYGGD"
+PLAN_HISTORICAL_SLICES = {"S1": "h-017", "S3": "h-004"}   # built before the platform generation; rows kept, no write surface
+PLAN_PROGRAM_SLICE = "L"
+# Prompt-building functions: every function whose string constants carry the role-invocation marker or whose name
+# says so, plus every function that calls one (its `extra` strings are injected too).
+PROMPT_MARK = "Use `$nortropic-"
+PROMPT_FUNCTION_NAME_RE = re.compile(r"prompt|_extra$|authority_text$")
+PROMPT_DOCS_REQUIRED = frozenset({PLAN_GEN, HANDOFF_GEN, FULL_ROADMAP, SUBSTITUTION, AUDIT, EVIDENCE_CONTRACT, AGENTS, REPORT_SCHEMA})
+PROMPT_DOCS_ALLOWED = PROMPT_DOCS_REQUIRED | {"docs/loop/regler.md", "docs/loop/byggplan-v3.md", DRIFT, OWNER_H003}
 # --- token rules -----------------------------------------------------------------------------
 WEB_TOKENS = (
     r"(?i)docs/07-konstitution", r"(?i)docs/03-regelverk", r"(?i)docs/05-beslutslogg", r"(?i)docs/00-[\w-]*",
@@ -248,8 +298,11 @@ DRIVER = (
     "        m.ensure_roadmap_plan(root)\n"
     "        out.update(outcome='returned')\n"
     "    elif scenario=='constants':\n"
-    "        out.update(outcome='returned', plan_sha=m.ROADMAP_PLAN_SHA, plan_blobs=dict(m.ROADMAP_PLAN_BLOBS),\n"
-    "                   substitution_blobs=dict(m.SUBSTITUTION_BLOBS), plan_path=m.ROADMAP_PLAN_PATH, handoff_path=m.ROADMAP_HANDOFF_PATH)\n"
+    "        out.update(outcome='returned', has_plan_sha=hasattr(m,'ROADMAP_PLAN_SHA'), plan_generation=getattr(m,'PLAN_GENERATION',None),\n"
+    "                   plan_blobs=dict(m.ROADMAP_PLAN_BLOBS), substitution_blobs=dict(m.SUBSTITUTION_BLOBS),\n"
+    "                   plan_path=m.ROADMAP_PLAN_PATH, handoff_path=m.ROADMAP_HANDOFF_PATH, empirical_gate_path=m.EMPIRICAL_GATE_PATH,\n"
+    "                   roadmap=[[sl.code, sl.task_id, sl.gate_path, list(sl.plan_allowed_write or ()), list(sl.required_deps)]\n"
+    "                            for sl in tuple(m.SUBSTITUTION_ROADMAP)+tuple(m.ROADMAP)])\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
     "    else:\n"
@@ -437,6 +490,89 @@ def argparse_defaults(source):
                     out[node.args[0].value] = [n.value for n in ast.walk(kw.value)
                                                if isinstance(n, ast.Constant) and isinstance(n.value, str)]
     return out
+
+
+def prompt_document_sets(source):
+    """name -> {docs/ and root-document paths injected by that prompt-building function}: its own string constants
+    (incl. f-string parts), the module-level string constants it names, and the same for every function that calls a
+    prompt builder (their `extra` strings are injected too). Returns (sets, builders, callers)."""
+    tree = ast.parse(source)
+    module_str = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) \
+                and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            module_str[node.targets[0].id] = node.value.value
+    functions = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+    def consts(node):
+        return [c.value for c in ast.walk(node) if isinstance(c, ast.Constant) and isinstance(c.value, str)]
+
+    builders = {name for name, node in functions.items()
+                if any(PROMPT_MARK in v for v in consts(node)) or PROMPT_FUNCTION_NAME_RE.search(name)}
+    callers = {name for name, node in functions.items() if name not in builders
+               and any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in builders for c in ast.walk(node))}
+    out = {}
+    for name in builders | callers:
+        node = functions[name]
+        values = consts(node) + [module_str[n.id] for n in ast.walk(node) if isinstance(n, ast.Name) and n.id in module_str]
+        docs = set()
+        for value in values:
+            for m in PATH_RE.finditer(value):
+                c = clean_candidate(m.group(1))
+                if c.startswith("docs/") and "." in c.rsplit("/", 1)[-1]:
+                    docs.add(c)
+            for m in ROOT_DOC_RE.finditer(value):
+                docs.add(m.group(1))
+        out[name] = docs
+    return out, builders, callers
+
+
+def selftest_exact_sets(source):
+    """{'sub_exact': {...}, 'road_exact': {...}} literal dicts assigned inside selftest()."""
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.FunctionDef) and node.name == "selftest":
+            found = {}
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Assign) and len(sub.targets) == 1 and isinstance(sub.targets[0], ast.Name) \
+                        and sub.targets[0].id in ("sub_exact", "road_exact"):
+                    try:
+                        found[sub.targets[0].id] = ast.literal_eval(sub.value)
+                    except ValueError:
+                        pass
+            return found
+    return {}
+
+
+def split_cell_list(cell):
+    cell = cell.strip().strip("`").strip()
+    if cell in ("", "-", "—", "–"):
+        return []
+    return [x.strip().strip("`").strip() for x in cell.split(",") if x.strip().strip("`").strip()]
+
+
+def parse_slice_table(text):
+    """(rows, problem): rows = [(slice, task, exit_test, [allowed_write], [depends_on], STATUS)] from the FIRST markdown
+    table whose header cells are exactly PLAN_TABLE_COLUMNS (case-insensitive, backticks/bold tolerated)."""
+    lines = text.splitlines()
+    i, rows = 0, []
+    while i < len(lines):
+        line = lines[i].strip()
+        if line.startswith("|"):
+            cells = [c.strip().strip("`*").strip().lower() for c in line.strip("|").split("|")]
+            if cells == list(PLAN_TABLE_COLUMNS):
+                i += 1
+                if i < len(lines) and re.match(r"^\|?\s*:?-{3,}", lines[i].strip()):
+                    i += 1
+                while i < len(lines) and lines[i].strip().startswith("|"):
+                    c = [x.strip() for x in lines[i].strip().strip("|").split("|")]
+                    if len(c) != len(PLAN_TABLE_COLUMNS):
+                        return None, f"row with {len(c)} cells: {lines[i].strip()[:80]}"
+                    rows.append((c[0].strip("`").strip(), c[1].strip("`").strip(), c[2].strip("`").strip(),
+                                 split_cell_list(c[3]), split_cell_list(c[4]), c[5].strip("`*").strip().upper()))
+                    i += 1
+                return rows, ""
+        i += 1
+    return None, "no table with header " + " | ".join(PLAN_TABLE_COLUMNS)
 
 
 class Bench:
@@ -688,6 +824,44 @@ def main():
           and bool(scan("Read docs/07-" + "konstitution.md first", CODE_WEB_TOKENS)) and not scan("AUTOPILOT ROADMAP_AUTHORITY", CODE_WEB_TOKENS)
           and all(SIBLING_RE.search(x) for x in ("/Users/elinhaggstrom/nortropic-repos/webb/AGENTS.md", "~/nortropic-repos/x/y.sh", "$HOME/nortropic-repos/webb"))
           and not SIBLING_RE.search("/Users/elinhaggstrom/nortropic-repos/nortropic-system/verify/bin/x") and not SIBLING_RE.search("~/nortropic-repos/nortropic-system"))
+    fixture_table = ("| slice | task | exit_test | allowed_write | depends_on | status |\n|---|---|---|---|---|---|\n"
+                     "| S2 | h-015 | `verify/bin/h-015-exit` | `controller/atertag/**`, `tests/controller/atertag/**` | h-010, h-030 | OBYGGD |\n"
+                     "| L | - | verify/bin/autonomous-loop-exit | - | h-015 | obyggd |\n\nprose after")
+    check("canary_plan_generation_scan_rejects_old_plan_pointers_business_and_owner_hand_authority",
+          bool(scan("Read the plan with git show 0b3212c9:docs/loop/x.md", OLD_PLAN_TOKENS))
+          and bool(scan("blob c8ea851167f38f6846485035ee2e6b1dc3b54db0 under any path", OLD_PLAN_TOKENS))
+          and bool(scan("se docs/loop/autonomous-loop-plan-v1.md (effekt-authority, fryst input)", OLD_PLAN_TOKENS))
+          and len(scan("se docs/loop/autonomous-loop-plan-v1.md (effekt-authority, fryst input)", OLD_PLAN_TOKENS)) >= 4
+          and not scan("hash 0b3212c9a is another object; plan_sha256 of the H039 command plan; PLAN_GENERATION=platform-v2",
+                       OLD_PLAN_TOKENS + (PLAN_SHA_RE,))
+          and bool(scan("Beslutsloggsrad i docs/05-beslutslogg.md i samma commit", WEB_TOKENS + PLAN_TOKENS))
+          and bool(scan("körning i ägarterminalen före merge", PLAN_TOKENS)) and bool(scan("ÄGARHAND-42", PLAN_TOKENS))
+          and bool(scan("Verkstadsgolvet läser ur strömmen", PLAN_TOKENS)) and bool(scan("gh pr merge --rebase", PLAN_TOKENS))
+          and bool(scan("målbild §2.7", PLAN_TOKENS)) and bool(scan("## CODEX_START_HERE", PLAN_TOKENS))
+          and not scan("S2 (h-015): exit_test verify/bin/h-015-exit, allowed_write controller/atertag/**; HUMAN_AUTHORITY_HARD_STOP; "
+                       "PLAN_GENERATION=platform-v2; bootstrap h-031…h-039 etablerar plattformen; ingen människa är merge-gate",
+                       WEB_TOKENS + HUMAN_TOKENS + PLAN_TOKENS + OLD_PLAN_TOKENS)
+          and all(re.search(GIT_SHOW_COMMIT_RE, x) for x in ("git show <PLAN_SHA>:docs/x", "git show {ROADMAP_PLAN_SHA}:{P}",
+                                                              "git show 0b3212c991d4227c8df2656465ae2c0252dda39e:docs/loop/x.md"))
+          and not re.search(GIT_SHOW_COMMIT_RE, "git show HEAD:docs/loop/x.md") and not re.search(GIT_SHOW_COMMIT_RE, "git show origin/main:x")
+          and bool(re.search(PLAN_SHA_RE, "ROADMAP_PLAN_SHA={x}")) and bool(re.search(PLAN_SHA_RE, "plan_sha=json")) and not re.search(PLAN_SHA_RE, "plan_sha256")
+          and parse_slice_table(fixture_table)[0] == [("S2", "h-015", "verify/bin/h-015-exit", ["controller/atertag/**", "tests/controller/atertag/**"],
+                                                        ["h-010", "h-030"], "OBYGGD"),
+                                                       ("L", "-", "verify/bin/autonomous-loop-exit", [], ["h-015"], "OBYGGD")]
+          and parse_slice_table("| slice | task |\n|---|---|\n| a | b |")[0] is None
+          and PLAN_GEN not in CLOSURE_EXEMPT and HANDOFF_GEN not in CLOSURE_EXEMPT and PLAN_GEN not in TREE_FROZEN_FILES
+          and HANDOFF_GEN not in TREE_FROZEN_FILES and not PLAN_GEN.startswith(CLOSURE_EXEMPT_PREFIXES + TREE_FROZEN_PREFIXES)
+          and not PLAN_GEN.endswith("-local-development.md") and OLD_PLAN_COPY in ABSENT_EXACT and OLD_HANDOFF_COPY in ABSENT_EXACT
+          and set(OLD_PLAN_BLOBS) <= set(FORBIDDEN_BLOBS))
+    # Autopilot constants are read once here (module import only; no repository needed) and reused by F2 and F4.
+    ap_tmp = bench.tmp("autopilot")
+    ap_env = bench.env(ap_tmp)
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "constants"], ap_tmp, ap_env, timeout=300)
+    consts = driver_outcome(r)
+    consts_detail = (r.stdout + r.stderr)[-200:]
+    if not consts or consts["outcome"] != "returned":
+        consts = {}
+    plan_generation = consts.get("plan_generation")
     check("canary_closure_extraction_follows_backticked_paths_and_relative_links",
           refs_from_text("docs/loop/a.md", "se `docs/loop/y.md`, [z](../loop/z.md) och [w](w.md \"titel\"); AGENTS.md; Docs/05-Beslutslogg.md; docs/loop/; <docs/loop/q.txt>")
           == {"docs/loop/y.md", "docs/loop/z.md", "docs/loop/w.md", AGENTS, "Docs/05-Beslutslogg.md", "docs/loop/", "docs/loop/q.txt"}
@@ -726,8 +900,8 @@ def main():
     base_symlinks = sorted(rel for rel, (mode, oid) in ls_tree(subject, probe_env, FROZEN_BASE, ".").items() if mode == "120000")
     check("f1_no_symlink_entries_at_head", not symlinks and not base_symlinks, f"symlinks={symlinks} base={base_symlinks}")
     same_object = sorted(f"{rel} == {FORBIDDEN_BLOBS[oid]}" for rel, (mode, oid) in tracked_entries.items() if oid in FORBIDDEN_BLOBS)
-    check("f1_no_blob_at_head_equals_a_transferred_or_pre_split_governance_object", not same_object and len(FORBIDDEN_BLOBS) == 10,
-          str(same_object)[:600])
+    check("f1_no_blob_at_head_equals_a_transferred_pre_split_governance_or_pre_platform_plan_object",
+          not same_object and len(FORBIDDEN_BLOBS) == 12, str(same_object)[:600])
 
     # ------------------------------------------------------------------ F2: reference closure oracle
     roots, root_problems = {AGENTS, CLAUDE, README, LOOP_CONFIG}, []
@@ -776,11 +950,11 @@ def main():
             return None
         raw = text(rel)
         if rel == DRIFT:
-            m = DRIFT_ACTIVE_HEADING.search(raw)
-            if m is None:
-                return ""
-            end = raw.find("\n## ", m.end())
-            return raw[m.start():end if end != -1 else len(raw)]
+            base = base_bytes(rel)
+            current = (subject / rel).read_bytes()
+            if base is not None and current.startswith(base):
+                return current[len(base):].decode("utf-8", "replace")
+            return raw
         if rel in HISTORICAL_NOTE_DOCS:
             base = base_bytes(rel)
             current = (subject / rel).read_bytes()
@@ -850,8 +1024,12 @@ def main():
             continue
         scanned.append(rel)
         human = () if rel in HISTORICAL_NOTE_DOCS else HUMAN_TOKENS
-        hits = scan(body, WEB_TOKENS + human)
+        plan_extra = PLAN_TOKENS if rel in (PLAN_GEN, HANDOFF_GEN) else ()
+        hits = scan(body, WEB_TOKENS + human + OLD_PLAN_TOKENS + plan_extra)
         check("f2_active_doc_free_of_web_governance_and_human_hand_rules_" + label_of(rel), not hits, fmt_hits(hits))
+    check("f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents",
+          PLAN_GEN in scanned and HANDOFF_GEN in scanned and PLAN_GEN in tracked and HANDOFF_GEN in tracked,
+          f"plan_scanned={PLAN_GEN in scanned} handoff_scanned={HANDOFF_GEN in scanned}")
     classification, web_hits, human_hits, binary_outside = {}, [], [], []
     for rel in sorted(tracked):
         p = subject / rel
@@ -870,7 +1048,7 @@ def main():
         if rel in HISTORICAL_NOTE_DOCS or rel in (DRIFT, SUBSTITUTION, EFTERARBETE):
             classification[rel] = "partial"
             part = scannable_text(rel) or ""
-            web_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, WEB_TOKENS)]
+            web_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, WEB_TOKENS + OLD_PLAN_TOKENS)]
             if rel not in HISTORICAL_NOTE_DOCS:
                 human_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, HUMAN_TOKENS)]
             continue
@@ -886,7 +1064,7 @@ def main():
             except SyntaxError as exc:
                 web_hits.append(f"{rel}: does not parse: {exc!r}")
                 continue
-            tokens = TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS
+            tokens = (TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS) + OLD_PLAN_TOKENS
             for line, value in strings:
                 web_hits += [f"{rel}@{line} {pat}: {value[:50]!r}" for pat in tokens if re.search(pat, value)]
                 if SIBLING_RE.search(value):
@@ -896,10 +1074,11 @@ def main():
             continue
         if rel.startswith("controller/") and not rel.endswith((".md", ".json")) or rel.endswith((".mjs", ".js", ".c", ".h")):
             classification[rel] = "test" if is_test else "code"
-            web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS)]
+            web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, (TEST_WEB_TOKENS if is_test else CODE_WEB_TOKENS) + OLD_PLAN_TOKENS)]
             continue
         classification[rel] = "text"
-        web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, WEB_TOKENS + (SIBLING_RE.pattern,))]
+        plan_extra = PLAN_TOKENS if rel in (PLAN_GEN, HANDOFF_GEN) else ()
+        web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, WEB_TOKENS + (SIBLING_RE.pattern,) + OLD_PLAN_TOKENS + plan_extra)]
         human_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, HUMAN_TOKENS)]
     counts = {k: sum(1 for v in classification.values() if v == k) for k in ("frozen", "partial", "local-development", "code", "test", "text", "binary")}
     check("f2_tree_wide_no_web_governance_reference_outside_frozen_evidence",
@@ -926,12 +1105,20 @@ def main():
                         exempt_in_router.append(f"{rel}: {ref}")
     check("f2_router_authority_section_marks_frozen_gate_inputs_as_not_current_instruction",
           bool(authority_section) and not exempt_in_router, f"unmarked={exempt_in_router}")
+    auth_units = [u for u in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|[-*])\s)", authority_section) if PLAN_GEN in u]
+    demoted = [u[:80] for u in auth_units if re.search(r"(?i)inte\s+dagens\s+instruktion|historisk|frys\w*\s+grindinput|frus\w*\s+grindinput", u)]
+    historik = next((agents_text[s:e] for h, s, e in sections(agents_text) if h.startswith("## Historik")), "")
+    check("f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history",
+          bool(auth_units) and not demoted and bool(historik) and re.search(r"(?i)plangeneration", historik) is not None
+          and re.search(r"(?i)git-?historik", historik) is not None,
+          f"authority_mentions={len(auth_units)} demoted={demoted} historik_len={len(historik)}")
     fr = text(FULL_ROADMAP)
     fr_authority = next((fr[s:e] for h, s, e in sections(fr) if h.startswith("## Authority")), "")
-    check("f2_full_roadmap_authority_section_keeps_plan_sha_and_names_agents_md_as_conflict_authority",
-          "ROADMAP_PLAN_SHA=" + ROADMAP_PLAN_SHA in fr_authority and "ROADMAP_PLAN_PATH=" + PLAN_COPY in fr_authority
-          and "ROADMAP_HANDOFF_PATH=" + HANDOFF_COPY in fr_authority and AGENTS in fr_authority
-          and "HUMAN_AUTHORITY_HARD_STOP" in fr, f"authority_section_len={len(fr_authority)}")
+    check("f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit",
+          bool(plan_generation) and "PLAN_GENERATION=" + str(plan_generation) in fr_authority
+          and "ROADMAP_PLAN_PATH=" + PLAN_GEN in fr_authority and "ROADMAP_HANDOFF_PATH=" + HANDOFF_GEN in fr_authority
+          and AGENTS in fr_authority and "HUMAN_AUTHORITY_HARD_STOP" in fr and not scan(fr, OLD_PLAN_TOKENS),
+          f"plan_generation={plan_generation!r} authority_section_len={len(fr_authority)} old={fmt_hits(scan(fr, OLD_PLAN_TOKENS), 3)}")
     sub_base, sub_head = base_bytes(SUBSTITUTION), text(SUBSTITUTION)
     problems = []
     if sub_base is None:
@@ -956,7 +1143,16 @@ def main():
                      if re.search(r"2026-09-10|v1\.1|(?i:amendment|tillägg|ändring)", h) and AGENTS in sub_head[s:e]]
         if not amendment:
             problems.append("no dated amendment section naming AGENTS.md")
-    check("f2_substitution_contract_sections_1_5_7_11_13_unchanged_and_dated_amendment_present", not problems, str(problems)[:600])
+        # v3: a later amendment (§15+, v1.2) binds the preamble's plan authority to the platform plan generation.
+        generation_amendment = [n for n, body in head_secs.items() if n >= 15 and PLAN_GEN in body and AGENTS in body
+                                and re.search(r"2026-09-10|v1\.2", body.split("\n", 1)[0])]
+        if not generation_amendment:
+            problems.append("no §15+ amendment (heading dated 2026-09-10 or v1.2) naming the plan generation and AGENTS.md")
+        preamble = next((sub_head[s:e] for h, s, e in sections(sub_head) if h == ""), "")
+        if scan(preamble, OLD_PLAN_TOKENS):
+            problems.append("preamble still names the pre-platform plan: " + fmt_hits(scan(preamble, OLD_PLAN_TOKENS), 2))
+    check("f2_substitution_contract_sections_1_5_7_11_13_unchanged_dated_amendment_and_plan_generation_amendment_present",
+          not problems, str(problems)[:600])
     for rel, markers in HISTORICAL_NOTE_DOCS.items():
         base = base_bytes(rel)
         current = (subject / rel).read_bytes()
@@ -979,12 +1175,12 @@ def main():
     problems = []
     if drift_base is None or not drift_head.startswith(drift_base) or drift_head == drift_base:
         problems.append("drift.md is not append-only vs " + FROZEN_BASE[:8] + " with an appended block")
-    if not active:
-        problems.append("no '## Aktiv plattformsnot' section")
+    if not active or DRIFT_ACTIVE_HEADING.search(active) is None:
+        problems.append("appended tail carries no '## Aktiv plattformsnot' heading")
     else:
-        problems += [f"note lacks {m}" for m in ("2026-09-10", AGENTS, r"§\s*5\b") if not re.search(m, active)]
-        problems += [f"{p}@{l}" for p, l, _ in scan(active, WEB_TOKENS + HUMAN_TOKENS)[:4]]
-    check("f2_drift_md_append_only_with_active_platform_note_free_of_web_governance", not problems, str(problems)[:600])
+        problems += [f"tail lacks {m}" for m in ("2026-09-10", AGENTS, r"§\s*5\b", re.escape(PLAN_GEN)) if not re.search(m, active)]
+        problems += [f"{p}@{l}" for p, l, _ in scan(active, WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS)[:4]]
+    check("f2_drift_md_append_only_whole_tail_scanned_with_active_platform_note_naming_plan_generation", not problems, str(problems)[:600])
 
     # ------------------------------------------------------------------ F3: config and permission rules
     denied = spec_obj.get("defaults", {}).get("denied_write", []) if spec_strict else []
@@ -1107,23 +1303,25 @@ def main():
         check("f4_autopilot_argparse_defaults_do_not_point_at_old_root", False, repr(exc))
     hits = scan(autopilot_source, EXEC_WEB_TOKENS)
     check("f4_autopilot_source_no_web_document_reference", not hits and bool(autopilot_source), fmt_hits(hits))
+    # --- plan generation: the two files at HEAD are the plan; the autopilot binds exactly their HEAD blobs.
     plan_problems = []
-    for rel, expected in ROADMAP_PLAN_BLOBS.items():
+    expected_plan_blobs = {}
+    for rel in (PLAN_GEN, HANDOFF_GEN):
         mode, oid = tracked_entries.get(rel, (None, None))
-        if oid != expected or mode != "100644":
-            plan_problems.append(f"{rel}: {mode} {oid}")
-    ap_tmp = bench.tmp("autopilot")
-    ap_env = bench.env(ap_tmp)
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "constants"], ap_tmp, ap_env, timeout=300)
-    consts = driver_outcome(r)
-    if not consts or consts["outcome"] != "returned":
-        plan_problems.append("driver constants unavailable: " + (r.stdout + r.stderr)[-200:])
-        consts = {}
-    elif consts.get("plan_blobs") != ROADMAP_PLAN_BLOBS or consts.get("plan_sha") != ROADMAP_PLAN_SHA \
-            or consts.get("plan_path") != PLAN_COPY or consts.get("handoff_path") != HANDOFF_COPY:
-        plan_problems.append(f"autopilot ROADMAP_PLAN_* drift: {consts.get('plan_blobs')} {consts.get('plan_sha')}")
-    check("f4_roadmap_plan_copies_tracked_byte_identical_to_" + ROADMAP_PLAN_SHA[:8] + "_objects_and_autopilot_constants",
-          not plan_problems, str(plan_problems)[:600])
+        if oid is None or mode != "100644" or not (subject / rel).is_file() or (subject / rel).is_symlink():
+            plan_problems.append(f"{rel}: not a tracked regular 100644 file ({mode} {oid})")
+        expected_plan_blobs[rel] = oid
+    if not consts:
+        plan_problems.append("driver constants unavailable: " + consts_detail)
+    else:
+        if consts.get("plan_path") != PLAN_GEN or consts.get("handoff_path") != HANDOFF_GEN:
+            plan_problems.append(f"autopilot paths: {consts.get('plan_path')} {consts.get('handoff_path')}")
+        if consts.get("plan_blobs") != expected_plan_blobs:
+            plan_problems.append(f"autopilot ROADMAP_PLAN_BLOBS {consts.get('plan_blobs')} != HEAD {expected_plan_blobs}")
+    check("f4_plan_generation_files_tracked_100644_and_autopilot_paths_and_blobs_equal_head", not plan_problems, str(plan_problems)[:600])
+    check("f4_autopilot_has_plan_generation_constant_and_no_roadmap_plan_sha_attribute",
+          bool(consts) and consts.get("has_plan_sha") is False and type(plan_generation) is str and plan_generation.strip() != "",
+          f"has_plan_sha={consts.get('has_plan_sha')} plan_generation={plan_generation!r} {consts_detail if not consts else ''}")
     r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
     obj = driver_outcome(r)
     check("f4_ensure_roadmap_plan_returns_in_replica_without_any_remote",
@@ -1131,20 +1329,115 @@ def main():
           (r.stdout + r.stderr)[-400:])
     if not plan_problems:
         mut, mut_env = replica(bench, "plan-mutated", subject, head)
-        plan_bytes = (mut / PLAN_COPY).read_bytes()
-        overlay(mut, mut_env, {PLAN_COPY: (plan_bytes.replace(b"\n", b"\n<!-- LOCAL mutation -->\n", 1), 0o644)},
-                message="LOCAL fixture: mutated plan copy")
+        plan_bytes = (mut / PLAN_GEN).read_bytes()
+        overlay(mut, mut_env, {PLAN_GEN: (plan_bytes.replace(b"\n", b"\n<!-- LOCAL mutation -->\n", 1), 0o644)},
+                message="LOCAL fixture: mutated plan generation")
         r = run([PYTHON, "-B", "-c", DRIVER, subject, mut, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
         obj = driver_outcome(r)
-        check("f4_ensure_roadmap_plan_stops_on_mutated_plan_copy", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
+        check("f4_ensure_roadmap_plan_stops_on_mutated_plan_generation", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
         gone, gone_env = replica(bench, "plan-missing", subject, head)
-        overlay(gone, gone_env, {}, removals=(HANDOFF_COPY,), message="LOCAL fixture: handoff copy removed")
+        overlay(gone, gone_env, {}, removals=(HANDOFF_GEN,), message="LOCAL fixture: handoff removed")
         r = run([PYTHON, "-B", "-c", DRIVER, subject, gone, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
         obj = driver_outcome(r)
-        check("f4_ensure_roadmap_plan_stops_on_missing_handoff_copy", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
+        check("f4_ensure_roadmap_plan_stops_on_missing_handoff", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
     else:
-        check("f4_ensure_roadmap_plan_stops_on_mutated_plan_copy", False, "positive not established (plan copies missing)")
-        check("f4_ensure_roadmap_plan_stops_on_missing_handoff_copy", False, "positive not established (plan copies missing)")
+        check("f4_ensure_roadmap_plan_stops_on_mutated_plan_generation", False, "positive not established (plan generation missing or unbound)")
+        check("f4_ensure_roadmap_plan_stops_on_missing_handoff", False, "positive not established (plan generation missing or unbound)")
+    # --- no commit-SHA plan authority anywhere in the autopilot (full text incl. comments/docstrings, and AST strings)
+    old_hits = scan(autopilot_source, OLD_PLAN_TOKENS + (GIT_SHOW_COMMIT_RE, PLAN_SHA_RE))
+    try:
+        old_hits += [(pat, line, value[:60]) for line, value in code_strings(autopilot_source)
+                     for pat in OLD_PLAN_TOKENS + (GIT_SHOW_COMMIT_RE, PLAN_SHA_RE) if re.search(pat, value)]
+    except SyntaxError as exc:
+        old_hits.append(("parse", 0, repr(exc)))
+    check("f4_autopilot_source_free_of_old_plan_commit_git_show_by_commit_and_plan_sha", not old_hits and bool(autopilot_source),
+          fmt_hits(old_hits))
+    # --- every prompt-building function's injected document set is exactly the declared platform set
+    try:
+        prompt_sets, builders, callers = prompt_document_sets(autopilot_source)
+    except SyntaxError as exc:
+        prompt_sets, builders, callers = {}, set(), set()
+    injected = set().union(*prompt_sets.values()) if prompt_sets else set()
+    marker_builders = {name for name in builders if any(PROMPT_MARK in v for v in
+                       [c.value for c in ast.walk(next(n for n in ast.walk(ast.parse(autopilot_source))
+                                                          if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name))
+                        if isinstance(c, ast.Constant) and isinstance(c.value, str)])} if builders else set()
+    problems = []
+    if len(marker_builders) < 9 or len(builders) < 12:
+        problems.append(f"too few prompt builders found: marker={len(marker_builders)} all={len(builders)}")
+    problems += [f"required document not injected by any prompt: {rel}" for rel in sorted(PROMPT_DOCS_REQUIRED - injected)]
+    problems += [f"undeclared document injected: {rel} by {sorted(n for n, s in prompt_sets.items() if rel in s)[:3]}"
+                 for rel in sorted(injected - PROMPT_DOCS_ALLOWED)]
+    problems += [f"injected document not tracked: {rel}" for rel in sorted(injected) if rel not in tracked]
+    problems += [f"injected document neither scanned nor blob-pinned: {rel}" for rel in sorted(injected)
+                 if rel in tracked and rel not in scanned and rel not in GENERATION_DOCS]
+    check("f4_prompt_functions_inject_exactly_the_declared_platform_document_set_all_tracked_and_scanned", not problems,
+          f"builders={sorted(builders)} callers={sorted(callers)} injected={sorted(injected)} problems={problems}"[-1100:])
+    # --- the plan's machine-readable slice table equals the autopilot's roadmap tuples and selftest's exact sets
+    problems = []
+    spec_rows = {t.get("id"): t for t in spec_obj.get("tasks", []) if type(t) is dict} if spec_strict else {}
+    table = None
+    if PLAN_GEN in tracked and (subject / PLAN_GEN).is_file():
+        table, why = parse_slice_table(text(PLAN_GEN))
+        if table is None:
+            problems.append(why)
+    else:
+        problems.append("plan generation missing")
+    if not consts or type(consts.get("roadmap")) is not list:
+        problems.append("autopilot roadmap unavailable")
+    if table is not None and consts and type(consts.get("roadmap")) is list:
+        autop = {row[0]: row for row in consts["roadmap"]}
+        table_rows = {r[0]: r for r in table}
+        if len(table_rows) != len(table):
+            problems.append("duplicate slice codes in table")
+        expected_codes = set(autop) | set(PLAN_HISTORICAL_SLICES) | {PLAN_PROGRAM_SLICE}
+        if set(table_rows) != expected_codes:
+            problems.append(f"slice set {sorted(set(table_rows) ^ expected_codes)} differs (table vs autopilot+S1/S3/L)")
+        all_tasks = {row[1] for row in autop.values()}
+        for code, (slice_code, task, gate, allowed, deps, status) in sorted(table_rows.items()):
+            if status not in (PLAN_STATUS_BUILT, PLAN_STATUS_UNBUILT):
+                problems.append(f"{code}: status {status!r}")
+                continue
+            if (gate in tracked) != (status == PLAN_STATUS_BUILT):
+                problems.append(f"{code}: status {status} but gate tracked={gate in tracked} ({gate})")
+            if code in autop:
+                _, a_task, a_gate, a_allowed, a_deps = autop[code]
+                if task != a_task or gate != a_gate or set(allowed) != set(a_allowed) or set(deps) != set(a_deps):
+                    problems.append(f"{code}: table ({task},{gate},{sorted(allowed)},{sorted(deps)}) != autopilot ({a_task},{a_gate},{sorted(a_allowed)},{sorted(a_deps)})")
+            elif code in PLAN_HISTORICAL_SLICES:
+                s_row = spec_rows.get(PLAN_HISTORICAL_SLICES[code], {})
+                if task != PLAN_HISTORICAL_SLICES[code] or gate != s_row.get("exit_test") or allowed \
+                        or set(deps) != set(s_row.get("depends_on") or []) or status != PLAN_STATUS_BUILT:
+                    problems.append(f"{code}: built slice must equal spec row {PLAN_HISTORICAL_SLICES[code]} (task, exit_test, depends_on), no write surface, {PLAN_STATUS_BUILT}")
+            else:  # L
+                if task not in ("", "-", "—", "–") or gate != consts.get("empirical_gate_path") or allowed or set(deps) != all_tasks:
+                    problems.append(f"{code}: program gate row must be (-, {consts.get('empirical_gate_path')}, -, all roadmap tasks)")
+            if task in spec_rows and spec_rows[task].get("exit_test") != gate:
+                problems.append(f"{code}: exit_test {gate} != spec row {task} exit_test {spec_rows[task].get('exit_test')}")
+        exact = selftest_exact_sets(autopilot_source)
+        st = dict(exact.get("sub_exact", {}))
+        st.update(exact.get("road_exact", {}))
+        if not st or set(st) != set(autop):
+            problems.append(f"selftest exact sets cover {sorted(st)} vs autopilot {sorted(autop)}")
+        for code, (s_task, s_gate) in sorted(st.items()):
+            if code in table_rows and (table_rows[code][1], table_rows[code][2]) != (s_task, s_gate):
+                problems.append(f"{code}: selftest exact ({s_task},{s_gate}) != table")
+    check("f4_plan_generation_slice_table_equals_autopilot_roadmap_tuples_and_selftest_exact_sets", not problems, str(problems)[:1100])
+    boot = "".join(text(PLAN_GEN)[s:e] for h, s, e in sections(text(PLAN_GEN)) if re.search(r"(?i)bootstrap", h)) \
+        if PLAN_GEN in tracked and (subject / PLAN_GEN).is_file() else ""
+    missing_ids = [f"h-0{n}" for n in range(31, 40) if not re.search(rf"\bh-0{n}\b", boot)]
+    check("f4_plan_generation_bootstrap_section_names_h031_to_h039_as_platform_establishment", bool(boot) and not missing_ids,
+          f"section_len={len(boot)} missing={missing_ids}")
+    skill_problems = []
+    for rel in PLAN_SKILLS:
+        if rel not in tracked:
+            skill_problems.append(rel + ": missing")
+            continue
+        t = text(rel)
+        skill_problems += [f"{rel}@{l} {p}" for p, l, _ in scan(t, SKILL_OLD_PLAN_TOKENS + OLD_PLAN_TOKENS)[:4]]
+        if PLAN_GEN not in t:
+            skill_problems.append(rel + ": does not name " + PLAN_GEN)
+    check("f4_architect_and_empirical_runner_skills_name_plan_generation_and_no_plan_commit", not skill_problems, str(skill_problems)[:600])
     blobs = consts.get("substitution_blobs") if consts else None
     problems = []
     if type(blobs) is not dict or not set(GENERATION_DOCS) <= set(blobs):
@@ -1154,8 +1447,9 @@ def main():
     check("f4_autopilot_substitution_blobs_equal_head_blobs_of_generation_documents", not problems, str(problems)[:600])
     r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "selftest_none"], ap_tmp, ap_env, timeout=300)
     obj = driver_outcome(r)
-    check("f4_autopilot_selftest_none_returns_pass",
-          bool(obj) and obj["outcome"] == "returned" and "AUTOPILOT_V4_SELFTEST=PASS" in r.stdout, (r.stdout + r.stderr)[-300:])
+    check("f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha",
+          bool(obj) and obj["outcome"] == "returned" and "AUTOPILOT_V4_SELFTEST=PASS" in r.stdout
+          and "PLAN_GENERATION=" in r.stdout and re.search(PLAN_SHA_RE, r.stdout) is None, (r.stdout + r.stderr)[-300:])
     r = run([PYTHON, "-B", rep / PUBLICATION_CALLERS], rep, ap_env, timeout=600)
     check("f4_autopilot_publication_callers_exit0", r.returncode == 0 and "traceback" not in (r.stdout + r.stderr).lower(),
           f"rc={r.returncode} " + (r.stdout + r.stderr)[-300:])
@@ -1284,7 +1578,7 @@ def main():
     coupling = []
     for rel in sorted(tracked):
         if rel.startswith(("SEPARATION-20260910/", "verify/", "docs/loop/arkiv/")) or rel.endswith("-local-development.md") \
-                or rel in (SPEC, DRIFT, PLAN_COPY, HANDOFF_COPY, "docs/loop/owner-author-workflow-v1.md",
+                or rel in (SPEC, DRIFT, "docs/loop/owner-author-workflow-v1.md",
                            "docs/loop/remaining-bootstrap-delegation-v1.md"):
             continue
         p = subject / rel
@@ -1317,7 +1611,9 @@ def main():
           all((subject / rel).is_file() and sha((subject / rel).read_bytes()) == digest for rel, digest in subject_sha.items())
           and all(sha((ROOT / rel).read_bytes()) == digest for rel, digest in held.items()))
     result = {"scope": "LOCAL_QUALIFICATION_ONLY", "subject": str(subject), "subject_head": head, "frozen_base": FROZEN_BASE,
-              "roadmap_plan_sha": ROADMAP_PLAN_SHA, "roadmap_plan_blobs": ROADMAP_PLAN_BLOBS,
+              "plan_generation": plan_generation, "plan_generation_paths": [PLAN_GEN, HANDOFF_GEN],
+              "plan_generation_blobs": {rel: head_oid(rel) for rel in (PLAN_GEN, HANDOFF_GEN)},
+              "old_plan_commit": OLD_PLAN_COMMIT, "old_plan_blobs": OLD_PLAN_BLOBS,
               "subject_sha256": subject_sha, "held_sha256": held, "held_gate_runs": gate_runs,
               "closure_roots": sorted(roots), "closure_reached": sorted(reached), "closure_scanned": scanned,
               "closure_dangling": {k: sorted(v) for k, v in sorted(dangling.items())},
