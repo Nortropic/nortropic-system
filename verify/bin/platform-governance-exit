@@ -1,0 +1,842 @@
+#!/usr/bin/env python3.12
+"""LOCAL_ONLY platform governance qualification; never a scheduler/H035/resume verdict.
+
+Owner decision 2026-09-10: the Trust Kernel and bootstrap are developed with full
+autonomy inside the ordered task. The web governance (docs/07-konstitution.md,
+docs/03-regelverk.md, web agent roles, steward ladder/AUTOPILOT, human-hand rules)
+does not govern this platform and must leave its ACTIVE authority order,
+instructions, agent prompts and executable dependencies. The platform protections
+(wrong identity, unauthorized write, missing verifier, false PASS) stay as explicit
+technical requirements. This gate binds EFFECTS on --subject: token scans of the
+active authority files (G1/G2), the real `controller/policy/cli` refusing platform-
+set writes in disposable Git replicas (G3), the spec and the verify-cli pins (G4),
+the executable dependencies incl. the real policy test suite, the imported
+autopilot callables and publication-callers (G5), frozen artifacts by blob OID
+against 512490d4 (G6), the two existing frozen local gates run against the
+candidate (G7), the development document (G8) and rig discipline (G9).
+No historical gate, provider, build, publication or resume is executed.
+"""
+import argparse
+import ast
+import hashlib
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+PYTHON = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+PYTHON_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+NODE = "/opt/homebrew/opt/node@22/bin/node"
+SANDBOX_EXEC = "/usr/bin/sandbox-exec"
+GATE = "verify/bin/platform-governance-exit"
+DOCUMENT = "docs/loop/platform-governance-local-development.md"
+FROZEN_BASE = "512490d44007373b79aca504aa92709e9810aa24"
+CONTROL_SET_GATE = "verify/bin/platform-control-set-exit"
+LAUNCH_CWD_GATE = "verify/bin/launch-cwd-exit"
+LAUNCH_CWD_FROZEN_ROW = "frozen_verify_bin_identical_to_base_383ed387"
+POLICY_CLI = "controller/policy/cli"
+VERIFY_CLI = "controller/verify/cli"
+LOOP_CLI = "controller/loop/cli"
+ATTEST_CLI = "controller/attest/cli"
+AUTOPILOT = "scripts/nortropic-codex-autopilot.py"
+VERIFIER = "scripts/check-invariants.mjs"
+REGISTER = "controller/verify/register.json"
+SPEC = "specs/tasks.spec.json"
+POLICY_TEST = "tests/controller/policy/fall.py"
+PUBLICATION_CALLERS = "tests/scripts/nortropic-codex-autopilot/publication-callers.py"
+AGENTS, CLAUDE, README = "AGENTS.md", "CLAUDE.md", "README.md"
+REGLER, BYGGPLAN = "docs/loop/regler.md", "docs/loop/byggplan-v3.md"
+SKILLS_DIR = ".agents/skills"
+# G1 active authority order (skills are added from the tree); G2 phrase scan covers the same set.
+ACTIVE_DOCS = (AGENTS, CLAUDE, README, REGLER, BYGGPLAN)
+# Product surface recorded in result.json and bound unchanged after the run.
+SURFACE = (AGENTS, CLAUDE, README, REGLER, BYGGPLAN, SPEC, POLICY_CLI, VERIFY_CLI, LOOP_CLI, ATTEST_CLI,
+           AUTOPILOT, VERIFIER, REGISTER, POLICY_TEST, PUBLICATION_CALLERS, ".gitignore",
+           "config/premiar-backlog.json", CONTROL_SET_GATE, LAUNCH_CWD_GATE)
+# G6: everything frozen at 512490d4. verify/** may gain exactly this gate; nothing else.
+FROZEN_TREES = ("verify", "controller/h034-native", "controller/runtime-cleanup", "controller/provenance")
+FROZEN_FILES = (VERIFIER, REGISTER)
+# G3: the platform protected set the real policy must refuse as its first (unmaskable) verdict.
+PLATFORM_PROTECTED = ("verify/bin/p-gov-probe-exit", SPEC, REGISTER, VERIFIER, ".gitignore", CLAUDE)
+FIXTURE_TASK, FIXTURE_TASK_CONTROLLER = "p-gov-fixture", "p-gov-controller"
+FIXTURE_WRITE, FIXTURE_FILE = "tests/platform-fixture/**", "tests/platform-fixture/out.txt"
+CONTROLLER_WRITE, CONTROLLER_FILE = "controller/loop/**", "controller/loop/p-gov-local-fixture.txt"
+# Rows of the held control-set gate this contract relies on by name (its bytes are frozen by G6).
+CONTROL_SET_ROWS = ("subject_preflight_exit0_exact_json", "subject_prepare_exit0_platform_roots_only",
+                    "subject_run_commit_check_invariants_exit0", "platform_prepare_and_check_accept_subject_documents",
+                    "fixture_task_run_exit0", "autopilot_selftest_none_returns",
+                    "loop_end_to_end_attests_platform_fixture_task", "invariant_required_exit_15_of_15")
+CONTROL_SET_ROW_COUNT, LAUNCH_CWD_ROW_COUNT = 68, 20
+LAUNCH_CWD_EXPECTED_DETAIL = "problems=[] extra=['" + GATE + "']"
+
+# --- token rules -----------------------------------------------------------------------------
+# Web governance documents and trees (G1, executables in G5). `.agents/skills/` is the platform's
+# own skills tree and is excluded by the lookbehind; `AUTOPILOT_*` identifiers are excluded.
+WEB_TOKENS = (
+    r"docs/07-konstitution", r"docs/03-regelverk", r"docs/05-beslutslogg", r"docs/00-borja-har",
+    r"docs/agentoverlamning", r"docs/100-dagar", r"(?<![\w./-])workflows/", r"(?<![\w./-])agents/",
+    r"(?<![\w./-])skills/", r"tests/fixtures", r"eval-rubric", r"juridikflaggor",
+    r"(?<![\w-])AUTOPILOT(?![\w-])", r"(?i)steward", r"(?i)konstitution", r"(?i)regelverk",
+)
+# Executables: the same documents/trees as literal paths; the web file AUTOPILOT only as a quoted
+# literal (the platform's own autopilot log prefix "AUTOPILOT <event>" is not the web file).
+EXEC_WEB_TOKENS = (
+    r"docs/07-konstitution", r"docs/03-regelverk", r"docs/05-beslutslogg", r"docs/00-borja-har",
+    r"docs/agentoverlamning", r"docs/100-dagar", r"(?<![\w./-])workflows/", r"tests/fixtures",
+    r"eval-rubric", r"juridikflaggor", r"nortropic-steward", r"[\"']AUTOPILOT[\"']",
+)
+# Test suites keep the historical spec rows' docs_impact paths (docs/05, docs/00) as fixture data.
+TEST_WEB_TOKENS = tuple(t for t in EXEC_WEB_TOKENS if "docs/05" not in t and "docs/00" not in t)
+# G2: generic human-hand / owner-stop rules. `LOOP-ÄGARHAND-<n>` decision identifiers are allowed.
+HUMAN_HAND_TOKENS = (
+    r"(?i)högrisk", r"(?i)human[-_ ]only", r"(?i)owner[-_ ]only", r"(?i)människohand",
+    r"(?i)endast\s+av\s+(en\s+)?människ", r"(?i)alltid\s+(en\s+)?människ", r"(?i)aldrig\s+genom\s+loopen",
+    r"OWNER_DECISION_REQUIRED", r"(?<!-)(?i:ägarhand)(?!-\d)", r"(?i)human[- ]hand", r"(?i)owner[- ]hand",
+)
+POLICY_HUMAN_TOKENS = (r"(?i)människ", r"(?i)högrisk")
+# G2 required elements: the autonomous flow and the four technical protections, named in the router.
+REQUIRED_AGENTS = {
+    "role_test_author": r"(?i)test[-_ ]?author", "role_builder": r"(?i)builder",
+    "role_reviewer": r"(?i)reviewer|granskare",
+    "builder_never_edits_own_frozen_gate": r"(?i)(egen|egna|own)\s+(frysta|frozen)|aldrig\s+sin\s+egen",
+    "reviewer_read_only": r"(?i)read[- ]only|endast\s+läs",
+    "protection_identity": r"(?i)identitet|identity", "protection_allowed_write": r"allowed_write",
+    "protection_verifier": r"(?i)verifierar|verifier", "protection_hash": r"(?i)hash",
+    "protection_false_pass": r"(?i)(falsk\w*|false|osann\w*)\s+PASS",
+}
+REQUIRED_REGLER = {
+    "role_test_author": r"(?i)test[-_ ]?author", "role_builder": r"(?i)builder",
+    "role_reviewer": r"(?i)reviewer|granskare", "protection_allowed_write": r"allowed_write",
+    "protection_verifier": r"(?i)verifierar|verifier", "protection_false_pass": r"(?i)(falsk\w*|false|osann\w*)\s+PASS",
+}
+REQUIRED_SKILLS = {"nortropic-builder": (r"(?i)frozen|frysta?", r"allowed_write"),
+                   "nortropic-reviewer": (r"(?i)read[- ]only",),
+                   "nortropic-test-author": (r"(?i)builder",)}
+DOC_SECTIONS = ("## Enkelt förklarat", "## Avgränsning och roller", "## Kriterium (effekter)",
+                "## Produktyta för BUILDER", "## Vad grinden inte bevisar", "## Utfall")
+PLATFORM_PREFIXES = ("controller/", "verify/", "specs/", "config/", "docs/loop/", "tests/controller/",
+                     "tests/scripts/", "tests/platform-fixture/")
+PLATFORM_EXACT = {AGENTS, CLAUDE, README, ".gitignore", VERIFIER, AUTOPILOT, "scripts/check-verifierarregistret.mjs"}
+ARKIV_RE = re.compile(r"docs/loop/arkiv/[A-Za-z0-9_./-]*[A-Za-z0-9_/-]")
+SHA256_FORM = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_FORM = re.compile(r"^[0-9a-f]{40}$")
+DRIVER_MARK = "PLATFORM_GOVERNANCE_DRIVER="
+# Real module, real callables, never the operational __main__. Stop -> exit 7.
+DRIVER = (
+    "import importlib.util,sys,json\n"
+    "from pathlib import Path\n"
+    "subject=Path(sys.argv[1]); root=Path(sys.argv[2]); scenario=sys.argv[3]\n"
+    "s=importlib.util.spec_from_file_location('subject_autopilot', subject/'" + AUTOPILOT + "')\n"
+    "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
+    "out={'scenario':scenario}\n"
+    "try:\n"
+    "    if scenario=='selftest_none':\n"
+    "        m.selftest(None)\n"
+    "        out.update(outcome='returned')\n"
+    "    elif scenario=='governance_sets':\n"
+    "        sets={'TEST_AUTHOR_ALLOWED':sorted(m.TEST_AUTHOR_ALLOWED),'EMPIRICAL_GATE_ALLOWED':sorted(m.EMPIRICAL_GATE_ALLOWED)}\n"
+    "        for sl in tuple(m.SUBSTITUTION_ROADMAP)+tuple(m.ROADMAP):\n"
+    "            sets['plan:'+sl.code]=sorted(sl.plan_allowed_write or ())\n"
+    "            sets['test_author:'+sl.code]=sorted(m.roadmap_test_author_allowed(sl))\n"
+    "        out.update(outcome='returned', sets=sets)\n"
+    "    elif scenario=='canary_fault':\n"
+    "        raise NameError('fixture-canary')\n"
+    "    else:\n"
+    "        raise SystemExit(9)\n"
+    "except m.Stop as e:\n"
+    "    out.update(outcome='stop', message=str(e))\n"
+    "print('" + DRIVER_MARK + "'+json.dumps(out, ensure_ascii=False))\n"
+    "raise SystemExit(7 if out.get('outcome')=='stop' else 0)\n"
+)
+
+
+class Rig(RuntimeError):
+    pass
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def strict(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate JSON member " + repr(key))
+            result[key] = value
+        return result
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def scan(text, patterns):
+    """(pattern, line, excerpt) for every match; an empty list is the only PASS."""
+    hits = []
+    for pattern in patterns:
+        for m in re.finditer(pattern, text):
+            line = text.count("\n", 0, m.start()) + 1
+            hits.append((pattern, line, text[max(0, m.start() - 20):m.end() + 20].replace("\n", " ")))
+    return hits
+
+
+def pattern_core(pattern):
+    return pattern[:-3] if pattern.endswith("/**") else pattern
+
+
+def is_platform_path(pattern):
+    core = pattern_core(pattern)
+    return core in PLATFORM_EXACT or any(core == p.rstrip("/") or core.startswith(p) for p in PLATFORM_PREFIXES)
+
+
+class Bench:
+    """Scratch root, closed child environment and pinned tool resolver."""
+
+    def __init__(self, scratch):
+        self.scratch = scratch
+        self.resolver = scratch / "resolver"
+        self.home = scratch / "home"
+        self.xdg = scratch / "xdg"
+        self.template = scratch / "empty-template"
+        for d in (self.resolver, self.home, self.xdg, self.template):
+            d.mkdir(mode=0o700)
+        (self.resolver / "python3.12").symlink_to(PYTHON)
+        (self.resolver / "node").symlink_to(NODE)
+
+    def env(self, tmpdir, extra=None):
+        e = {
+            "HOME": str(self.home), "XDG_CONFIG_HOME": str(self.xdg),
+            "PATH": str(self.resolver) + ":/usr/bin:/bin",
+            "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+            "TMPDIR": str(tmpdir), "DARWIN_USER_TEMP_DIR": str(tmpdir),
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+            "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_PAGER": "cat",
+            "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1", "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_AUTHOR_NAME": "Local fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "Local fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PROVIDER_CALL_ALLOWED": "NO", "MODEL_CALL_ALLOWED": "NO",
+        }
+        if extra:
+            e.update(extra)
+        return e
+
+    def tmp(self, name):
+        p = self.scratch / ("tmp-" + name)
+        p.mkdir(mode=0o700)
+        return p
+
+
+def run(argv, cwd, env, timeout=120, stdin=None):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                          text=True, timeout=timeout, check=False, input=stdin)
+
+
+def run_bytes(argv, cwd, env, timeout=120, stdin=None):
+    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                          timeout=timeout, check=False, input=stdin)
+
+
+def git_raw(root, env, *args, stdin=None):
+    return run([GIT, "-c", "core.hooksPath=/dev/null", *args], root, env, stdin=stdin)
+
+
+def git(root, env, *args, stdin=None):
+    r = git_raw(root, env, *args, stdin=stdin)
+    if r.returncode:
+        raise Rig("fixture Git failed: " + " ".join(args) + ": " + r.stderr.strip())
+    return r.stdout.strip()
+
+
+def write(path, data, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    with path.open("xb") as stream:
+        stream.write(data)
+    path.chmod(mode)
+
+
+def json_ok(result):
+    """Exact one-line JSON dict on stdout with rc 0 and empty stderr, else None."""
+    if result.returncode != 0 or result.stderr:
+        return None
+    if not result.stdout.endswith("\n") or result.stdout.count("\n") != 1:
+        return None
+    try:
+        obj = strict(result.stdout)
+    except ValueError:
+        return None
+    return obj if type(obj) is dict else None
+
+
+def driver_outcome(result):
+    """Exact driver outcome or None; a traceback/uncaught fault never counts."""
+    if result.stderr:
+        return None
+    lines = result.stdout.splitlines()
+    if not lines or not lines[-1].startswith(DRIVER_MARK):
+        return None
+    try:
+        obj = strict(lines[-1][len(DRIVER_MARK):])
+    except ValueError:
+        return None
+    if type(obj) is not dict or obj.get("outcome") not in ("returned", "stop"):
+        return None
+    if obj["outcome"] == "returned" and result.returncode != 0:
+        return None
+    if obj["outcome"] == "stop" and (result.returncode != 7 or type(obj.get("message")) is not str):
+        return None
+    return obj
+
+
+def policy_verdict(result):
+    """Classified policy verdict (exit 0 accepted, 3 platform set, 4 outside allowed_write) or None.
+
+    Exit 1 (call error), 2, 5-8, a traceback or anything on stderr is never a verdict.
+    """
+    if result.stderr or result.returncode not in (0, 3, 4) or "traceback" in result.stdout.lower():
+        return None
+    if result.returncode == 0 and not result.stdout.startswith("accepterad"):
+        return None
+    if result.returncode != 0 and not result.stdout.strip():
+        return None
+    return result.returncode
+
+
+def replica(bench, name, source, candidate_sha):
+    """h-035 recipe: git init with an empty template + local-only exact-SHA fetch + detached checkout."""
+    repo = bench.scratch / ("replica-" + name)
+    repo.mkdir(mode=0o755)
+    env = bench.env(bench.tmp("git-" + name))
+    for command in (
+        ("init", "--quiet", f"--template={bench.template}"),
+        ("config", "--local", "--replace-all", "core.repositoryformatversion", "0"),
+        ("config", "--local", "--replace-all", "core.filemode", "true"),
+        ("config", "--local", "--replace-all", "core.bare", "false"),
+        ("config", "--local", "--replace-all", "core.logallrefupdates", "false"),
+        ("config", "--local", "--replace-all", "core.ignorecase", "true"),
+        ("config", "--local", "--replace-all", "core.precomposeunicode", "true"),
+        ("config", "--local", "--replace-all", "core.hooksPath", "/dev/null"),
+        ("config", "--local", "--replace-all", "gc.auto", "0"),
+        ("config", "--local", "--replace-all", "maintenance.auto", "false"),
+        ("config", "--local", "--replace-all", "fetch.writeCommitGraph", "false"),
+        ("config", "--local", "--replace-all", "pack.writeReverseIndex", "false"),
+        ("config", "--local", "--replace-all", "protocol.file.allow", "never"),
+        ("-c", "protocol.file.allow=always", "-c", "fetch.unpackLimit=1",
+         "fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
+         str(source), candidate_sha),
+        ("checkout", "--detach", "--quiet", candidate_sha),
+    ):
+        r = run([GIT, *command], repo, env)
+        if r.returncode or r.stdout or r.stderr:
+            raise Rig("replica construction " + repr(command) + ": " + (r.stderr or r.stdout))
+    if git(repo, env, "rev-parse", "HEAD") != candidate_sha or git(repo, env, "status", "--porcelain"):
+        raise Rig("replica does not reproduce the candidate: " + name)
+    return repo, env
+
+
+def overlay(repo, env, files, message="local fixture overlay"):
+    """Write/replace files (rel -> (bytes, mode)) and commit on the detached HEAD."""
+    for rel, (data, mode) in files.items():
+        p = repo / rel
+        if p.exists() or p.is_symlink():
+            p.unlink()
+        write(p, data, mode)
+    git(repo, env, "add", "-A", "--", *files)
+    if git_raw(repo, env, "diff", "--cached", "--quiet").returncode != 0:
+        git(repo, env, "commit", "--quiet", "--no-gpg-sign", "-m", message)
+    if git(repo, env, "status", "--porcelain"):
+        raise Rig("overlay left the replica dirty")
+    return git(repo, env, "rev-parse", "HEAD")
+
+
+def plumbing_child(repo, env, tmpdir, changes, parent="HEAD"):
+    """A commit whose tree is parent's tree with `changes` (rel -> bytes, or None = removed) applied.
+
+    Plumbing only: no checkout, no .gitignore whitelist, no working-tree change.
+    """
+    index = tmpdir / ("index-" + sha(json.dumps(sorted(changes)).encode())[:12])
+    if index.exists():
+        index.unlink()
+    ienv = dict(env, GIT_INDEX_FILE=str(index))
+    git(repo, ienv, "read-tree", parent)
+    for rel, data in changes.items():
+        if data is None:
+            git(repo, ienv, "update-index", "--force-remove", "--", rel)
+            continue
+        r = run_bytes([GIT, "-C", str(repo), "hash-object", "-w", "--stdin"], repo, env, stdin=data)
+        if r.returncode:
+            raise Rig("hash-object failed for " + rel)
+        blob = r.stdout.decode().strip()
+        git(repo, ienv, "update-index", "--add", "--cacheinfo", f"100644,{blob},{rel}")
+    tree = git(repo, ienv, "write-tree")
+    return git(repo, env, "commit-tree", tree, "-p", parent, "-m", "local governance fixture candidate")
+
+
+def tracked(subject, env, rel, rev="HEAD"):
+    return git_raw(subject, env, "cat-file", "-e", f"{rev}:{rel}").returncode == 0
+
+
+def ls_tree(subject, env, rev, path):
+    """rel -> (mode, oid) for every blob under path at rev."""
+    r = git_raw(subject, env, "ls-tree", "-r", rev, "--", path)
+    if r.returncode:
+        raise Rig("ls-tree failed: " + rev + " " + path + ": " + r.stderr.strip())
+    out = {}
+    for line in r.stdout.splitlines():
+        meta, _, rel = line.partition("\t")
+        mode, kind, oid = meta.split()
+        if kind == "blob":
+            out[rel] = (mode, oid)
+    return out
+
+
+def gate_rows(stdout):
+    passes = re.findall(r"^PASS (\S+)", stdout, re.M)
+    fails = re.findall(r"^FAIL (\S+)", stdout, re.M)
+    m = re.search(r"^FIXTURE_ROOT=(.+)$", stdout, re.M)
+    return passes, fails, (Path(m.group(1)) if m else None)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--subject", type=Path, default=ROOT)
+    parser.add_argument("--held-control-set", type=Path, default=None,
+                        help="held copy of verify/bin/platform-control-set-exit (default: the subject's copy, "
+                             "credited only after it is proven byte-identical to " + FROZEN_BASE[:8] + ")")
+    parser.add_argument("--held-launch-cwd", type=Path, default=None,
+                        help="held copy of verify/bin/launch-cwd-exit (same rule)")
+    parser.add_argument("--skip-held-gates", action="store_true",
+                        help="skip the two sandbox-exec dependent held gates (their rows are then FAIL, never PASS)")
+    args = parser.parse_args()
+    subject = args.subject.resolve()
+    if sys.version_info[:2] != (3, 12) or sha(Path(PYTHON).read_bytes()) != PYTHON_SHA:
+        raise Rig("pinned Python 3.12 required")
+    for tool in (GIT, NODE):
+        if not Path(tool).is_file() or not os.access(tool, os.X_OK):
+            raise Rig("pinned tool unavailable: " + tool)
+    for rel in (SPEC, POLICY_CLI, VERIFY_CLI, LOOP_CLI, ATTEST_CLI, AUTOPILOT, VERIFIER, REGISTER, POLICY_TEST,
+                PUBLICATION_CALLERS, CONTROL_SET_GATE, LAUNCH_CWD_GATE, AGENTS, CLAUDE, README, REGLER, BYGGPLAN):
+        p = subject / rel
+        if not p.is_file() or p.is_symlink():
+            raise Rig("subject file missing or not regular: " + rel)
+    subject_sha = {rel: sha((subject / rel).read_bytes()) for rel in SURFACE if (subject / rel).is_file()}
+    held = {GATE: sha((ROOT / GATE).read_bytes())}
+    scratch = Path(tempfile.mkdtemp(prefix="platform-governance-local-")).resolve()
+    print("FIXTURE_ROOT=" + str(scratch), flush=True)
+    bench = Bench(scratch)
+    probe_env = bench.env(bench.tmp("probe"))
+    head_probe = run([GIT, "-C", str(subject), "rev-parse", "--verify", "HEAD^{commit}"], scratch, probe_env)
+    if head_probe.returncode or not COMMIT_FORM.fullmatch(head_probe.stdout.strip()):
+        raise Rig("subject HEAD unavailable: " + head_probe.stderr.strip())
+    head = head_probe.stdout.strip()
+    if run([GIT, "-C", str(subject), "cat-file", "-e", FROZEN_BASE + "^{commit}"], scratch, probe_env).returncode:
+        raise Rig("frozen base " + FROZEN_BASE + " is not in the subject's history")
+    if run([GIT, "-C", str(subject), "status", "--porcelain", "--", *SURFACE], scratch, probe_env).stdout.strip():
+        raise Rig("subject product-surface files are not committed at HEAD; the replicas would not carry them")
+    skills = sorted(p.relative_to(subject).as_posix() for p in (subject / SKILLS_DIR).glob("*/SKILL.md"))
+    rows = []
+
+    def check(label, passed, detail=""):
+        rows.append({"label": label, "pass": bool(passed), "detail": str(detail)[-900:]})
+        print(("PASS " if passed else "FAIL ") + label, flush=True)
+
+    def text(rel):
+        return (subject / rel).read_text(encoding="utf-8", errors="replace")
+
+    # ------------------------------------------------------------------ G9 canaries
+    fault = run([PYTHON, "-B", "-c", "raise NameError('fixture-canary')"], scratch, probe_env)
+    check("canary_traceback_is_not_outcome",
+          fault.returncode != 0 and json_ok(fault) is None and driver_outcome(fault) is None and policy_verdict(fault) is None)
+    call_error = run([subject / POLICY_CLI], scratch, probe_env)
+    check("canary_policy_call_error_is_not_verdict", call_error.returncode == 1 and policy_verdict(call_error) is None,
+          call_error.stdout[-120:])
+    canary_repo = bench.scratch / "canary-repo"
+    canary_repo.mkdir()
+    git(canary_repo, probe_env, "init", "--quiet", f"--template={bench.template}")
+    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "unknown_scenario"], scratch, probe_env)
+    check("canary_driver_unknown_scenario_is_not_outcome", canary.returncode == 9 and driver_outcome(canary) is None)
+    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "canary_fault"], scratch, probe_env)
+    check("canary_driver_fault_is_not_outcome", canary.returncode not in (0, 7) and driver_outcome(canary) is None)
+    check("canary_token_scan_detects_web_reference",
+          bool(scan("Läs docs/07-konstitution.md först.", WEB_TOKENS)) and not scan(".agents/skills/x/SKILL.md AUTOPILOT_V4", WEB_TOKENS)
+          and bool(scan("LOOP-ÄGARHAND-26 vaktas av ägarhand", HUMAN_HAND_TOKENS)) and not scan("LOOP-ÄGARHAND-26", HUMAN_HAND_TOKENS))
+
+    # ------------------------------------------------------------------ G1: active authority order is platform-only
+    active = list(ACTIVE_DOCS) + skills
+    check("g1_active_authority_files_present",
+          len(skills) >= 3 and all(f"{SKILLS_DIR}/{n}/SKILL.md" in skills for n in REQUIRED_SKILLS)
+          and all(tracked(subject, probe_env, rel) for rel in active), f"skills={skills}")
+    for rel in active:
+        hits = scan(text(rel), WEB_TOKENS)
+        check("g1_no_web_governance_reference_" + rel.replace("/", "_").replace(".", "_"), not hits,
+              "; ".join(f"{p}@{l}: {x}" for p, l, x in hits[:6]))
+    arkiv_refs = sorted({m.group(0) for rel in active for m in ARKIV_RE.finditer(text(rel))})
+    missing = [ref for ref in arkiv_refs if not tracked(subject, probe_env, ref)]
+    check("g1_arkiv_references_resolve_to_tracked_files", not missing, f"refs={arkiv_refs} missing={missing}")
+
+    # ------------------------------------------------------------------ G2: no generic human-hand rule; autonomous flow named
+    for rel in active:
+        hits = scan(text(rel), HUMAN_HAND_TOKENS)
+        check("g2_no_human_hand_rule_" + rel.replace("/", "_").replace(".", "_"), not hits,
+              "; ".join(f"{p}@{l}: {x}" for p, l, x in hits[:6]))
+    agents_text = text(AGENTS)
+    missing = [k for k, p in REQUIRED_AGENTS.items() if not re.search(p, agents_text)]
+    check("g2_agents_md_names_autonomous_flow_and_four_protections", not missing, f"missing={missing}")
+    regler_text = text(REGLER)
+    missing = [k for k, p in REQUIRED_REGLER.items() if not re.search(p, regler_text)]
+    check("g2_regler_names_roles_and_protections", not missing, f"missing={missing}")
+    check("g2_claude_md_routes_to_agents_md", "AGENTS.md" in text(CLAUDE))
+    problems = []
+    for rel in skills:
+        body = text(rel)
+        if "AGENTS.md" not in body:
+            problems.append(rel + ": no AGENTS.md")
+        for name, patterns in REQUIRED_SKILLS.items():
+            if rel == f"{SKILLS_DIR}/{name}/SKILL.md":
+                problems += [f"{rel}: missing {p}" for p in patterns if not re.search(p, body)]
+    check("g2_skills_route_to_agents_md_and_name_their_boundary", not problems, str(problems))
+
+    # ------------------------------------------------------------------ G3: policy protects the platform set (real cli, replica)
+    pol, pol_env = replica(bench, "policy", subject, head)
+    pol_tmp = bench.tmp("policy")
+    try:
+        spec_obj = strict((pol / SPEC).read_bytes())
+        spec_strict = type(spec_obj) is dict and type(spec_obj.get("tasks")) is list and type(spec_obj.get("defaults")) is dict
+    except ValueError as exc:
+        spec_obj, spec_strict = None, False
+        spec_error = repr(exc)
+
+    def fixture_task(task_id, allowed):
+        return {"id": task_id, "authority_class": "ordinary", "title": "LOCAL_ONLY governance fixture task",
+                "summary": "LOCAL_ONLY fixture task for verify/bin/platform-governance-exit.",
+                "allowed_write": [allowed], "owner_author_allowed_write": [], "docs_impact": [], "depends_on": [],
+                "exit_test": "verify/bin/p-gov-fixture-exit", "exit_criterion": "fixture", "max_changed_files": 8,
+                "max_added_lines": 600}
+
+    derived = pol_tmp / "derived-spec.json"
+    derived_open = pol_tmp / "derived-spec-no-denied-write.json"
+    if spec_strict:
+        d = json.loads(json.dumps(spec_obj))
+        d["tasks"] = [t for t in d["tasks"]] + [fixture_task(FIXTURE_TASK, FIXTURE_WRITE),
+                                                 fixture_task(FIXTURE_TASK_CONTROLLER, CONTROLLER_WRITE)]
+        write(derived, json.dumps(d, ensure_ascii=False, indent=1) + "\n")
+        d2 = json.loads(json.dumps(d))
+        d2["defaults"]["denied_write"] = []
+        write(derived_open, json.dumps(d2, ensure_ascii=False, indent=1) + "\n")
+    evidence_dir = pol / "controller/policy/evidence"
+
+    def policy_check(task, changes, spec_path=derived):
+        before = set(evidence_dir.glob("*.json")) if evidence_dir.is_dir() else set()
+        cand = plumbing_child(pol, pol_env, pol_tmp, changes)
+        r = run([pol / POLICY_CLI, "check", task, head, cand, spec_path], scratch, pol_env)
+        after = set(evidence_dir.glob("*.json")) if evidence_dir.is_dir() else set()
+        new = sorted(after - before)
+        evidence = None
+        if len(new) == 1:
+            try:
+                evidence = strict(new[0].read_bytes())
+            except ValueError:
+                evidence = None
+        return r, policy_verdict(r), evidence
+
+    spec_bytes = (pol / SPEC).read_bytes()
+    r, verdict, _ = policy_check(FIXTURE_TASK, {FIXTURE_FILE: b"kandidat\n"}) if spec_strict else (None, None, None)
+    allow_ok = spec_strict and verdict == 0
+    check("g3_policy_accepts_write_inside_allowed_write", allow_ok,
+          (r.stdout + r.stderr)[-300:] if r else "spec not strict: " + spec_error)
+    r, verdict, _ = policy_check(FIXTURE_TASK_CONTROLLER, {CONTROLLER_FILE: b"kandidat\n"}) if spec_strict else (None, None, None)
+    check("g3_policy_accepts_controller_write_inside_allowed_write", spec_strict and verdict == 0,
+          (r.stdout + r.stderr)[-300:] if r else "spec not strict")
+    refusals_ok = allow_ok
+    for rel in PLATFORM_PROTECTED:
+        data = (spec_bytes + b"\n") if rel == SPEC else (pol / rel).read_bytes() + b"\n" if (pol / rel).is_file() else b"#!/usr/bin/env bash\nexit 0\n"
+        r, verdict, evidence = policy_check(FIXTURE_TASK, {rel: data}) if spec_strict else (None, None, None)
+        ok = (allow_ok and verdict == 3 and rel in r.stdout and not scan(r.stdout, POLICY_HUMAN_TOKENS)
+              and type(evidence) is dict and evidence.get("verdikt") not in (None, "utanfor_allowed_write")
+              and rel in (evidence.get("andrade_filer") or []))
+        refusals_ok = refusals_ok and ok
+        check("g3_policy_refuses_platform_write_exit3_" + rel.replace("/", "_").replace(".", "_"), ok,
+              ("positive not established; " if not allow_ok else "") + ((r.stdout + r.stderr)[-300:] if r else "") + f" evidence={evidence and evidence.get('verdikt')}")
+    r, verdict, evidence = policy_check(FIXTURE_TASK, {CLAUDE: None}) if spec_strict else (None, None, None)
+    check("g3_policy_refuses_platform_deletion_exit3_CLAUDE_md",
+          allow_ok and verdict == 3 and CLAUDE in r.stdout and not scan(r.stdout, POLICY_HUMAN_TOKENS),
+          (r.stdout + r.stderr)[-300:] if r else "")
+    r, verdict, _ = policy_check(FIXTURE_TASK, {"verify/bin/p-gov-probe-exit": b"exit 0\n", FIXTURE_FILE: b"kandidat\n",
+                                                "workflows/x.js": b"x\n"}) if spec_strict else (None, None, None)
+    check("g3_policy_platform_verdict_is_never_masked_by_milder_refusal", allow_ok and verdict == 3,
+          (r.stdout + r.stderr)[-300:] if r else "")
+    for label, rel in (("workflows_x_js", "workflows/x.js"), ("docs_07_konstitution_md", "docs/07-konstitution.md")):
+        r, verdict, evidence = policy_check(FIXTURE_TASK, {rel: b"web\n"}) if spec_strict else (None, None, None)
+        check("g3_policy_web_path_is_only_outside_allowed_write_exit4_" + label,
+              allow_ok and verdict == 4 and "allowed_write" in r.stdout and rel in r.stdout
+              and type(evidence) is dict and evidence.get("verdikt") == "utanfor_allowed_write",
+              (r.stdout + r.stderr)[-300:] if r else "")
+    r, verdict, _ = policy_check(FIXTURE_TASK, {"verify/bin/p-gov-probe-exit": b"exit 0\n"}, derived_open) if spec_strict else (None, None, None)
+    check("g3_policy_protection_is_sourced_from_spec_denied_write", refusals_ok and verdict == 4,
+          ("positive refusals not established; " if not refusals_ok else "") + ((r.stdout + r.stderr)[-300:] if r else ""))
+    hits = scan(text(POLICY_CLI), EXEC_WEB_TOKENS + POLICY_HUMAN_TOKENS)
+    check("g3_policy_cli_no_web_reference_and_no_human_demand", not hits, "; ".join(f"{p}@{l}: {x}" for p, l, x in hits[:6]))
+
+    # ------------------------------------------------------------------ G4: spec generation and verify-cli pins
+    authority_ok = False
+    if spec_strict:
+        authority = spec_obj.get("authority", {})
+        auth_paths = [authority.get(k) for k in ("plan", "architecture", "rules", "backlog")]
+        authority_ok = all(type(p) is str and is_platform_path(p) and tracked(subject, probe_env, p) for p in auth_paths)
+    check("g4_spec_strict_and_authority_documents_are_tracked_platform_documents", spec_strict and authority_ok,
+          f"authority={spec_obj.get('authority') if spec_strict else spec_error}")
+    human_only = spec_obj.get("human_only") if spec_strict else None
+    ho_text = json.dumps(human_only, ensure_ascii=False) if human_only is not None else ""
+    hits = scan(ho_text, WEB_TOKENS + HUMAN_HAND_TOKENS + (r"scripts/check-invariants\.mjs",))
+    check("g4_spec_human_only_block_absent_or_free_of_web_and_human_hand_rules", spec_strict and not hits,
+          "; ".join(f"{p}: {x}" for p, l, x in hits[:6]))
+    h035 = next((t for t in spec_obj["tasks"] if t.get("id") == "h-035"), None) if spec_strict else None
+    problems = []
+    if h035 is None:
+        problems.append("h-035 missing")
+    else:
+        for key in ("allowed_write", "owner_author_allowed_write", "docs_impact"):
+            for pattern in h035.get(key, []):
+                if scan(pattern, WEB_TOKENS) or not is_platform_path(pattern):
+                    problems.append(f"{key}: {pattern}")
+                elif not pattern.endswith("/**") and not tracked(subject, probe_env, pattern):
+                    problems.append(f"{key}: {pattern} not tracked")
+    check("g4_spec_h035_surfaces_platform_only_and_tracked", spec_strict and not problems, str(problems))
+    denied = spec_obj.get("defaults", {}).get("denied_write", []) if spec_strict else []
+
+    def covered(path):
+        return any(pattern == path or (pattern.endswith("/**") and (path == pattern_core(pattern) or path.startswith(pattern_core(pattern) + "/")))
+                   for pattern in denied if type(pattern) is str)
+    uncovered = [p for p in PLATFORM_PROTECTED if not covered(p)]
+    web_in_denied = [p for p in denied if type(p) is not str or scan(p, WEB_TOKENS) or not is_platform_path(p)]
+    check("g4_spec_defaults_denied_write_is_the_platform_set", spec_strict and not uncovered and not web_in_denied and "controller/**" not in denied,
+          f"denied={denied} uncovered={uncovered} web={web_in_denied}")
+    base_spec = strict(git(subject, probe_env, "show", f"{FROZEN_BASE}:{SPEC}").encode("utf-8"))
+
+    def absent_gates(spec):
+        out, bad = set(), []
+        for t in spec.get("tasks", []):
+            et = t.get("exit_test")
+            if type(et) is not str or not et.startswith("verify/bin/"):
+                bad.append(f"{t.get('id')}: {et}")
+                continue
+            p = subject / et
+            if not p.exists():
+                out.add(t.get("id"))
+            elif p.is_symlink() or not p.is_file() or stat.S_IMODE(p.lstat().st_mode) != 0o755:
+                bad.append(f"{t.get('id')}: {et} not regular 755")
+        return out, bad
+    cand_absent, bad = absent_gates(spec_obj) if spec_strict else (set(), ["spec not strict"])
+    base_absent, _ = absent_gates(base_spec)
+    check("g4_spec_no_task_lost_its_gate", spec_strict and not bad and cand_absent == base_absent,
+          f"absent={sorted(cand_absent)} base_absent={sorted(base_absent)} bad={bad}")
+    verify_text = text(VERIFY_CLI)
+    pin_spec = re.search(r'^PLATFORM_SPEC\s*=\s*"([0-9a-f]{64})"', verify_text, re.M)
+    pin_register = re.search(r'^PLATFORM_REGISTER\s*=\s*"([0-9a-f]{64})"', verify_text, re.M)
+    check("g4_verify_cli_pins_equal_candidate_spec_and_register",
+          pin_spec is not None and pin_spec.group(1) == sha((subject / SPEC).read_bytes())
+          and pin_register is not None and pin_register.group(1) == sha((subject / REGISTER).read_bytes()),
+          f"PLATFORM_SPEC={pin_spec and pin_spec.group(1)} spec={sha((subject / SPEC).read_bytes())}")
+    psnap = pol_tmp / "platform-snapshot"
+    spec_sha, register_sha = sha((pol / SPEC).read_bytes()), sha((pol / REGISTER).read_bytes())
+    r = run([pol / VERIFY_CLI, "platform-prepare", spec_sha, "h-035", register_sha, psnap], scratch, pol_env)
+    obj = json_ok(r)
+    accept_ok = False
+    if obj and obj.get("status") == "ok" and SHA256_FORM.fullmatch(str(obj.get("snapshot_sha256"))):
+        c = run([pol / VERIFY_CLI, "platform-check", spec_sha, "h-035", register_sha, obj["snapshot_sha256"], psnap], scratch, pol_env)
+        accept_ok = json_ok(c) == {"status": "ok", "snapshot_sha256": obj["snapshot_sha256"]}
+        detail = c.stdout[-200:] + c.stderr[-200:]
+    else:
+        detail = r.stdout[-200:] + r.stderr[-200:]
+    check("g4_platform_prepare_and_check_accept_candidate_spec_and_documents", accept_ok, detail)
+
+    # ------------------------------------------------------------------ G5: executable dependencies
+    for rel, tokens in ((VERIFY_CLI, EXEC_WEB_TOKENS), (LOOP_CLI, EXEC_WEB_TOKENS), (AUTOPILOT, EXEC_WEB_TOKENS)):
+        hits = scan(text(rel), tokens)
+        check("g5_no_web_document_reference_" + rel.replace("/", "_").replace(".", "_"), not hits,
+              "; ".join(f"{p}@{l}: {x}" for p, l, x in hits[:6]))
+    problems = []
+    for p in sorted((subject / "tests/controller").glob("*/fall.py")):
+        hits = scan(p.read_text(encoding="utf-8", errors="replace"), TEST_WEB_TOKENS)
+        problems += [f"{p.relative_to(subject)}:{l} {x}" for _, l, x in hits[:3]]
+    check("g5_controller_test_suites_no_web_governance_reference", not problems, "; ".join(problems[:8]))
+    try:
+        tree = ast.parse(text(ATTEST_CLI))
+        stack, outside = [], []
+
+        class V(ast.NodeVisitor):
+            def visit_FunctionDef(self, node):
+                stack.append(node.name)
+                self.generic_visit(node)
+                stack.pop()
+            visit_AsyncFunctionDef = visit_FunctionDef
+
+            def visit_Constant(self, node):
+                if isinstance(node.value, str) and "docs/05-beslutslogg.md" in node.value:
+                    if not stack or not re.search(r"(?i)refreeze|h03[58]", stack[-1]):
+                        outside.append(f"line {node.lineno} in {stack[-1] if stack else '<module>'}")
+        V().visit(tree)
+        attest_ok, attest_detail = not outside, str(outside)
+    except SyntaxError as exc:
+        attest_ok, attest_detail = False, "attest cli does not parse: " + repr(exc)
+    hits = scan(text(ATTEST_CLI), TEST_WEB_TOKENS)
+    check("g5_attest_cli_docs05_only_inside_historical_refreeze_functions", attest_ok and not hits,
+          attest_detail + "; ".join(f"{p}@{l}" for p, l, _ in hits[:4]))
+
+    ap_tmp = bench.tmp("autopilot")
+    ap_env = bench.env(ap_tmp)
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, pol, "selftest_none"], ap_tmp, ap_env, timeout=300)
+    obj = driver_outcome(r)
+    check("g5_autopilot_selftest_none_returns_pass", bool(obj) and obj["outcome"] == "returned" and "AUTOPILOT_V4_SELFTEST=PASS" in r.stdout,
+          r.stdout[-300:] + r.stderr[-300:])
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, pol, "governance_sets"], ap_tmp, ap_env, timeout=300)
+    obj = driver_outcome(r)
+    problems = []
+    if obj and obj["outcome"] == "returned" and type(obj.get("sets")) is dict and obj["sets"]:
+        for name, entries in obj["sets"].items():
+            problems += [f"{name}: {e}" for e in entries if type(e) is not str or scan(e, WEB_TOKENS) or not is_platform_path(e)]
+    else:
+        problems.append("driver returned no sets: " + (r.stdout + r.stderr)[-300:])
+    check("g5_autopilot_test_author_and_roadmap_surfaces_platform_only", not problems, "; ".join(problems[:8]))
+    r = run([PYTHON, "-B", pol / PUBLICATION_CALLERS], pol, ap_env, timeout=600)
+    check("g5_autopilot_publication_callers_exit0", r.returncode == 0 and "traceback" not in (r.stdout + r.stderr).lower(),
+          f"rc={r.returncode} " + (r.stdout + r.stderr)[-300:])
+    ft, ft_env = replica(bench, "policy-test", subject, head)
+    ft_env = bench.env(bench.tmp("policy-test"))
+    r = run([PYTHON, "-B", ft / POLICY_TEST], ft, ft_env, timeout=900)
+    fall_lines = [l for l in r.stdout.splitlines() if l.startswith(("FAIL", "SKIP"))]
+    fall_green = r.returncode == 0 and not fall_lines and "traceback" not in (r.stdout + r.stderr).lower() \
+        and git(ft, ft_env, "status", "--porcelain", "--", "controller", "tests", "specs", "verify") == ""
+    check("g5_policy_test_suite_green_against_candidate_policy", fall_green,
+          f"rc={r.returncode} " + "; ".join(fall_lines[:5]) + r.stderr[-200:] + r.stdout[-120:])
+    old, old_env = replica(bench, "policy-test-old-policy", subject, head)
+    old_env = bench.env(bench.tmp("policy-test-old-policy"))
+    old_policy = run_bytes([GIT, "-C", str(subject), "show", f"{FROZEN_BASE}:{POLICY_CLI}"], scratch, probe_env)
+    if old_policy.returncode:
+        raise Rig("cannot read policy cli at frozen base")
+    overlay(old, old_env, {POLICY_CLI: (old_policy.stdout, 0o755)}, message="LOCAL fixture: policy cli of " + FROZEN_BASE[:8])
+    r = run([PYTHON, "-B", old / POLICY_TEST], old, old_env, timeout=900)
+    check("g5_policy_test_suite_discriminates_policy_of_" + FROZEN_BASE[:8],
+          fall_green and r.returncode == 1 and sha(old_policy.stdout) != sha((subject / POLICY_CLI).read_bytes()),
+          ("positive not established; " if not fall_green else "") + f"rc={r.returncode} " + r.stdout[-200:])
+
+    # ------------------------------------------------------------------ G6: frozen artifacts by blob OID
+    problems, additions = [], []
+    for tree_rel in FROZEN_TREES:
+        base_entries = ls_tree(subject, probe_env, FROZEN_BASE, tree_rel)
+        head_entries = ls_tree(subject, probe_env, "HEAD", tree_rel)
+        for rel, entry in base_entries.items():
+            if head_entries.get(rel) != entry:
+                problems.append(rel)
+        additions += [rel for rel in head_entries if rel not in base_entries]
+        if git_raw(subject, probe_env, "status", "--porcelain", "--", tree_rel).stdout.strip():
+            problems.append(tree_rel + " (working tree differs from HEAD)")
+    for rel in FROZEN_FILES:
+        base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
+        head_oid = git_raw(subject, probe_env, "rev-parse", f"HEAD:{rel}").stdout.strip()
+        if not base_oid or base_oid != head_oid or git_raw(subject, probe_env, "status", "--porcelain", "--", rel).stdout.strip():
+            problems.append(rel)
+    gate_path = subject / GATE
+    gate_ok = gate_path.is_file() and not gate_path.is_symlink() and sha(gate_path.read_bytes()) == held[GATE] \
+        and stat.S_IMODE(gate_path.lstat().st_mode) == 0o755
+    check("g6_frozen_trees_and_files_identical_to_" + FROZEN_BASE[:8] + "_plus_this_gate_only",
+          not problems and additions == [GATE] and gate_ok, f"problems={problems} additions={additions} gate_ok={gate_ok}")
+    held_identical = {}
+    for rel in (CONTROL_SET_GATE, LAUNCH_CWD_GATE):
+        base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
+        actual = git_raw(subject, probe_env, "hash-object", "--", str(subject / rel)).stdout.strip()
+        held_identical[rel] = bool(base_oid) and base_oid == actual and os.access(subject / rel, os.X_OK)
+    check("g6_existing_local_gates_identical_to_" + FROZEN_BASE[:8], all(held_identical.values()), str(held_identical))
+
+    # ------------------------------------------------------------------ G7: the two existing frozen local gates on the candidate
+    def held_gate(rel, override):
+        if override is not None:
+            p = override.resolve()
+            return p if p.is_file() else None
+        return (subject / rel) if held_identical.get(rel) else None
+
+    gate_runs = {}
+
+    def run_held(label, rel, override, timeout, judge):
+        if args.skip_held_gates:
+            check(label, False, "skipped by --skip-held-gates")
+            return
+        program = held_gate(rel, override)
+        if program is None:
+            check(label, False, "no held copy: subject copy not byte-identical to " + FROZEN_BASE[:8] + " and no override given")
+            return
+        tmp = bench.tmp("held-" + Path(rel).name)
+        r = run([PYTHON, "-B", program, "--subject", subject], scratch, bench.env(tmp), timeout=timeout)
+        passes, fails, root = gate_rows(r.stdout)
+        result = None
+        if root is not None and (root / "result.json").is_file():
+            try:
+                result = strict((root / "result.json").read_bytes())
+            except ValueError:
+                result = None
+        gate_runs[rel] = {"program": str(program), "program_sha256": sha(program.read_bytes()), "rc": r.returncode,
+                          "pass": len(passes), "fail": len(fails), "fixture_root": str(root),
+                          "result_sha256": sha((root / "result.json").read_bytes()) if result is not None else None,
+                          "stderr": r.stderr[-400:]}
+        ok, detail = judge(r, passes, fails, result)
+        check(label, ok, f"rc={r.returncode} pass={len(passes)} fail={len(fails)} " + detail + " " + r.stderr[-200:])
+
+    def judge_control_set(r, passes, fails, result):
+        rows_by = {row["label"]: row for row in result["rows"]} if result and type(result.get("rows")) is list else {}
+        missing = [name for name in CONTROL_SET_ROWS if not rows_by.get(name, {}).get("pass")]
+        ok = (r.returncode == 0 and len(passes) == CONTROL_SET_ROW_COUNT and not fails
+              and "PLATFORM_CONTROL_SET_RESULT=PASS_LOCAL_QUALIFICATION_ONLY" in r.stdout
+              and result is not None and result.get("pass") is True and result.get("subject_head") == head and not missing)
+        return ok, f"fails={fails[:6]} missing_rows={missing}"
+
+    def judge_launch_cwd(r, passes, fails, result):
+        rows_by = {row["label"]: row for row in result["rows"]} if result and type(result.get("rows")) is list else {}
+        frozen = rows_by.get(LAUNCH_CWD_FROZEN_ROW, {})
+        # The launch-cwd gate froze the whole verify/bin listing at 383ed387 (+ itself). This contract adds exactly
+        # one file there, so that single row must be red for exactly that reason; every other row must pass.
+        ok = (len(passes) + len(fails) == LAUNCH_CWD_ROW_COUNT and fails == [LAUNCH_CWD_FROZEN_ROW]
+              and r.returncode == 1 and result is not None and result.get("subject_head") == head
+              and frozen.get("pass") is False and str(frozen.get("detail", "")).endswith(LAUNCH_CWD_EXPECTED_DETAIL))
+        return ok, f"fails={fails[:6]} frozen_detail={frozen.get('detail')!r}"
+
+    run_held("g7_platform_control_set_exit_68_of_68_on_candidate", CONTROL_SET_GATE, args.held_control_set, 3600, judge_control_set)
+    run_held("g7_launch_cwd_exit_19_of_20_only_frozen_listing_sees_this_gate", LAUNCH_CWD_GATE, args.held_launch_cwd, 1800, judge_launch_cwd)
+
+    # ------------------------------------------------------------------ G8: development document
+    doc = subject / DOCUMENT
+    doc_text = doc.read_text(encoding="utf-8", errors="replace") if doc.is_file() and not doc.is_symlink() else ""
+    missing = [s for s in DOC_SECTIONS if s not in doc_text]
+    check("g8_development_document_tracked_with_required_sections",
+          bool(doc_text) and tracked(subject, probe_env, DOCUMENT) and not missing and "Produktyta för BUILDER" in doc_text,
+          f"missing={missing}")
+
+    # ------------------------------------------------------------------ G9: bytes unchanged
+    check("g9_subject_and_held_bytes_unchanged",
+          all(sha((subject / rel).read_bytes()) == digest for rel, digest in subject_sha.items())
+          and all(sha((ROOT / rel).read_bytes()) == digest for rel, digest in held.items()))
+    result = {"scope": "LOCAL_QUALIFICATION_ONLY", "subject": str(subject), "subject_head": head, "frozen_base": FROZEN_BASE,
+              "subject_sha256": subject_sha, "held_sha256": held, "skills": skills, "held_gate_runs": gate_runs,
+              "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
+              "sandbox_exec_present": Path(SANDBOX_EXEC).is_file(),
+              "fixture_root": str(scratch), "rows": rows, "pass": all(row["pass"] for row in rows)}
+    with (scratch / "result.json").open("x") as stream:
+        json.dump(result, stream, indent=2, ensure_ascii=False)
+    print("PLATFORM_GOVERNANCE_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
+    return 0 if result["pass"] else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print("PLATFORM_GOVERNANCE_RIG_ERROR=" + repr(exc), file=sys.stderr)
+        sys.exit(2)
