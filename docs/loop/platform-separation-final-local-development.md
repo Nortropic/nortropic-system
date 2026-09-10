@@ -354,4 +354,30 @@ origin igen → RED `f4_ensure_roadmap_plan_returns_in_replica_without_any_remot
 människohand" → RED `f3_register_note_…` (+ pinnar/prepare). Alla åtta: exit 1.
 
 ### Builder / kvalificering
-(fylls i efter produktkörningen)
+**Builder 2026-09-10** (arbetsyta `~/nortropic-repos/work/builder-final-separation-20260910`, gren
+`nortropic/final-separation-product`, produktcommit `191fadf6d949ea9e82bb0342d408b07c55c41586` på 9bb3503d;
+26 filer, +1870/−765). Produktytan 1–7 ovan utförd exakt; inget i punkt 8 rört (`verify/**`, F6-trädet,
+`controller/loop/cli`, specen, `scripts/check-invariants.mjs` byte-identiska med 332f07ce). Beslut utöver
+referensen: `--repo` default = arbetskatalogen (`os.getcwd()`), `--worktrees` = `<cwd>/../worktrees`
+(controller/workspace-konventionen); `ROADMAP_PLAN_BRANCH` borttagen (ingen gren finns kvar att namnge);
+`ensure_roadmap_plan` läser `HEAD:<kopia>` med `rev-parse --verify --quiet` och journalför blob-mappen;
+§6 SUB-4:s dubblerade `docs/loop/drift.md` avdubblerad; `.gitignore` behåller `docs/`, `tests/`, `scripts/`
+som hela vitlistor (F3-lärdomen), `SEPARATION-20260910/` vitlistad, webbträden bort; config/README:s
+räkningar (deny 27, denyWrite 6) uppdaterade så tabellen är sann.
+Statisk körning före produkt (`--skip-held-gates`, HEAD 9bb3503d): exit 1, 43 PASS / 35 FAIL (samma röda
+rader som test-authorns baslinje plus de fem sandboxberoende). Statisk körning på 191fadf6: exit 1,
+69 PASS / 5 FAIL = exakt de fem `--skip-held-gates`-raderna.
+Fullkörning med hållna grindar på 191fadf6 (hållen grind byte-identisk med subjektets kopia): exit 0,
+`PLATFORM_SEPARATION_FINAL_RESULT=PASS_LOCAL_QUALIFICATION_ONLY`, **74/74**, `result.json` sha256
+`7ca43067aa578128bd453acbd470e00eb290f583ef3a4cd45039481231572feb`
+(`FIXTURE_ROOT=/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/platform-separation-final-nr_od6rb`).
+Mätt där: control-set 68/68 (result 22dafb48…); launch-cwd 19/20 med exakt
+`extra=['verify/bin/platform-governance-exit', 'verify/bin/platform-separation-final-exit']` (4782d941…);
+governance 68/70 röd exakt på {g6, g7} (17e4a41e…); loop-sviten 53 ok / 0 FEL, B2 via PINV-005; slutning
+29 rötter → 33 nådda → 28 skannade, 0 hängande. Direkt: `selftest(None)` PASS (kontraktsblob 1fde089c…),
+`publication-callers.py` 4 PASS, `preflight` `{"status":"ok","register_sha256":"9752d01d…"}`,
+`check-invariants` 6 PASS / 0 FAIL, `tests/controller/policy/fall.py` 103 rätt / 0 fel.
+Riggobservation (inte produkt): två fullkörningar som överlappade en annan tråds grindkörning på samma
+värd blev röda enbart på launch-cwd-radens `h036_runtime_roots_no_residue` (främmande
+`/private/tmp/.nortropic-h036-runtime-*` under mätfönstret); grinden ska köras ensam på värden.
+Slutlig fullkörning på slutlig HEAD (denna utfallscommit) rapporteras i builderns rapport.
