@@ -14,7 +14,7 @@ ROADMAP_HANDOFF_PATH=docs/loop/autonomous-loop-codex-handoff.md
 ```
 
 Planen läses ur exakt commit-SHA med `git show`; den muterbara branchen är aldrig authority.
-Vid konflikt gäller fortfarande högre authority i `AGENTS.md`: konstitution → regelverk → loop-regler.
+Vid konflikt gäller fortfarande högre authority enligt auktoritetsordningen i `AGENTS.md`.
 
 ## Stående owner-delegation
 
@@ -112,7 +112,7 @@ Architect-lagret ska lösa bland annat:
 
 `HUMAN_AUTHORITY_HARD_STOP` får användas endast när arbetet inte lagligen/ärligt kan fortsätta under delegerad authority, till exempel:
 
-1. ändring av `docs/07-konstitution.md`, människägd eval-rubric, juridik-human-only-regel, root-`AUTOPILOT` eller annan uttryckligt human-only §A-yta;
+1. (utgått 2026-09-10 — punkten avsåg webbens styrningsytor, som inte styr plattformen; plattformens skyddade mängd ändras genom kontraktsflödet i `AGENTS.md`, aldrig genom ett hårdstopp);
 2. faktisk motsägelse mellan två högre authorities som roadmapen inte kan lösa;
 3. extern secret/credential/org-resurs som kräver en mänsklig eller extern identitetsceremoni och som inte kan provisioneras automatiskt utan att försvaga den frysta modellen;
 4. verifieringsmiljön gör en trust-transition genuint odömbar efter att architect/test-author försökt en mekanism-agnostisk lösning;

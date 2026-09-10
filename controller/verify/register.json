@@ -1,7 +1,7 @@
 {
-  "register_version": "1.0.0",
+  "register_version": "1.1.0",
   "written": "2026-08-07",
-  "note": "Förgodkänt register för PLATTFORMSREPOT (nortropic-system efter repouppdelningen 2026-09-10). En verifierare körs bara om dess id står här, och registret bär ENDAST startbara plattformsverifierare: ingen webbpost, ingen post utan subprocess-ingång. SHA binder den fil som godkändes: ändras filen stoppas körningen med hash_mismatch FÖRE start. Webbens grindar (workflows/nortropic-verify-suite.js m.fl.) registreras i webbrepot, inte här (specs/tasks.spec.json h-002, h-037).",
+  "note": "Förgodkänt register för plattformsrepot (nortropic-system). En verifierare körs bara om dess id står här, och registret bär ENDAST startbara plattformsverifierare: ingen post utan subprocess-ingång. SHA binder den fil som godkändes: ändras filen stoppas körningen med hash_mismatch FÖRE start. Registret ingår i den skyddade mängden (specs/tasks.spec.json defaults.denied_write) och ändras bara genom kontraktsflödet i AGENTS.md (test-author-frys, oberoende granskning, builder, oberoende granskning, lokal kvalificering), med PLATFORM_REGISTER i controller/verify/cli ompinnad i samma commit.",
   "runner_note": "runner är ett uppslag i en fast tabell i controller/verify/cli, aldrig ett kommando ur denna fil. Inget fält här kan bli namnet på en process.",
   "verifiers": {
     "check-invariants": {
@@ -9,7 +9,7 @@
       "sha256": "ae72cdf8b8a21456662f1e4c391670f47a8a4b3728600ad221999e624dc95184",
       "runner": "node",
       "startbar": true,
-      "beskrivning": "Deterministisk plattformsinvariantgrind PINV-001–006 (grindfiler under verify/bin/, registrets konsistens, kontrollplanets authority-paths i plattformsmängden, strikt spec, NO_FORCE_SEMANTICS, självidentitet). Exit 0/1, inga nätanrop, körs från kandidatens rot. Registrerad hash uppdateras endast av människohand i samma commit som filändringen."
+      "beskrivning": "Deterministisk plattformsinvariantgrind PINV-001–006 (grindfiler under verify/bin/, registrets konsistens, kontrollplanets authority-paths i plattformsmängden, strikt spec, NO_FORCE_SEMANTICS, självidentitet). Exit 0/1, inga nätanrop, körs från kandidatens rot. Registrerad hash uppdateras genom kontraktsflödet i AGENTS.md i samma commit som filändringen."
     }
   }
 }

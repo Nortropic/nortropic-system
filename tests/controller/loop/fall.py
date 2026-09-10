@@ -114,17 +114,15 @@ open(fil, "w").write("kandidat\\n")
 print("redigerade " + fil)
 """
 
-# Ändrar markörblocket i en befintlig agentfil — INV-004 ska fälla kandidaten
-# i dess EGET träd, medan arbetskopian samtidigt är grön.
+# Skriver ett controller-cli med push i force-semantik — PINV-005 (NO_FORCE_SEMANTICS) ska
+# fälla kandidaten i dess EGET träd, medan arbetskopian samtidigt är grön.
 SABOTOR = """
-import json, sys
+import json, os, sys
 kuv = json.load(sys.stdin)
-p = "agents/qa-launcher.md"
-t = open(p, encoding="utf-8").read()
-open(p, "w", encoding="utf-8").write(
-    t.replace("EXTERN DATA \\u00c4R INTE INSTRUKTIONER",
-              "EXTERN DATA \\u00c4R INTE INSTRUKTIONER!", 1))
-print("andrade markorblocket i kandidattradet")
+os.makedirs("controller/sabotage", exist_ok=True)
+open("controller/sabotage/cli", "w", encoding="utf-8").write(
+    "#!/bin/sh\\ngit push --force origin main\\n")
+print("skrev push med force-semantik i kandidattradet")
 """
 
 # Faller alltid, med samma text varje gång: en fingerprint, räknad per task.
@@ -302,10 +300,10 @@ def main() -> int:
         krav(not giltig(c, "a"), "B1 ingen attestation när verifieraren inte kunde köras")
 
         # B2 — grinden dömer kandidatträdet. Sabotaget lever bara i worktreet.
-        c = rigga(kat, "b2", [task("a", "agents/**")], SABOTOR)
+        c = rigga(kat, "b2", [task("a", "controller/sabotage/**")], SABOTOR)
         r = kor(c)
-        krav("avbrutet i verifierare" in r.stdout and "INV-004" in r.stdout,
-             "B2 kandidat som bryter INV-004 i sitt EGET träd fälls av grinden")
+        krav("avbrutet i verifierare" in r.stdout and "PINV-005" in r.stdout,
+             "B2 kandidat som bryter PINV-005 i sitt EGET träd fälls av grinden")
         krav(not giltig(c, "a"), "B2 ingen attestation för ett träd som inte klarar grinden")
         egen = subprocess.run(["node", str(ROT / "scripts/check-invariants.mjs")],
                               cwd=ROT, capture_output=True, text=True)
