@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3 2026-09-10: plangenerationen bunden; v2.5 efter fyra oberoende kontraktsgranskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.1 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskning nr 5; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -123,12 +123,16 @@ den planspecifika mängden `CODEX_START_HERE`, `Codex-handoff`, `ägarhand` (få
 läs-/kommandoyta, verksamheten använder den), `human-only`, `owner-only`. En grindmutant som återinför undantaget
 faller på kanarien `canary_plan_generation_scan_rejects_…`.
 **Den gamla planens pekare (`OLD_PLAN_TOKENS`, skannas i varje aktiv/skannad fil och trädvitt i alla klasser):**
-commiten `0b3212c991d4227c8df2656465ae2c0252dda39e` och 8-teckensprefixet `0b3212c9` som hex-ord, blobbarna
-`c8ea8511…`/`1e53887c…`, sökvägarna `autonomous-loop-plan-v1.md`/`docs/loop/autonomous-loop-plan-v1`/
+varje Git-förkortning (8–40 hex, skiftlägesoberoende, hex-avgränsad) av commiten `0b3212c9…` — även
+12-formen `0b3212c991d4` — och av blobbarna `c8ea8511…`/`1e53887c…` (v3.1, B1), sökvägarna `autonomous-loop-plan-v1.md`/`docs/loop/autonomous-loop-plan-v1`/
 `autonomous-loop-codex-handoff`, grenen `plan/autonomous-loop-v1`, och etiketterna `effekt-authority`/`effect
 authority`, `fryst input`/`frozen input`, `historisk källa`/`historical source`. Tillåtna bara i fryst evidens
 (`verify/**`, `SEPARATION-20260910/**`, `*-local-development.md`, owner-author-workflow, remaining-bootstrap-delegation,
-drift.md:s 332f07ce-bas, substitutionskontraktets byte-frysta §). Substitutionskontraktets ingress (r.7) namnger i dag
+drift.md:s 332f07ce-bas, substitutionskontraktets byte-frysta §). **Commit-läsning (`COMMIT_READ_TOKENS`, v3.1 B2):**
+`<PLAN_SHA>`, "frozen autonomous-loop plan commit", `git show {…|<…|<7–40 hex>:` och `plan_sha`/`PLAN_SHA` (ej `plan_sha256`)
+är förbjudna i VARJE skannat aktivt dokument — alla sex skills, AGENTS/CLAUDE/README, planen, handoffen, full-roadmap,
+supersessionsnoterna, drift-svansen och EFTERARBETE-svansen — inte bara i de två plan-namngivande skillsen.
+Substitutionskontraktets ingress (r.7) namnger i dag
 commiten och skannas → måste skrivas om, med ett §15-tillägg (v1.2). Auditens r.241 nämner planens NAMN utan sökväg
 eller `.md` och träffas inte (beslut: bara pekare som kan lösa till ett objekt eller en fil är förbjudna; en etikett
 utan pekare kan inte återinföra planen mekaniskt).
@@ -137,7 +141,8 @@ det första `## Aktiv plattformsnot`-avsnittet; en senare `## `-rubrik gick oska
 ingressen, §6, §12 och tillagda avsnitt §14+ (övriga avsnitt binds byte-exakt); de historiska dokumenten
 `implementation-v4.1.md`, `codex-autopilot-v2.md`, `owner-h003-attestation-authority-v1.md`,
 `loop-review-2026-07-31.md` — bara det tillagda supersessionsblocket; `SEPARATION-20260910/EFTERARBETE.md` — bara det
-tillagda (append-only, F6).
+tillagda (append-only, F6; v3.1 N3: svansgrenen i `scannable_text` ligger före undantagsprövningen och är nåbar, så svansen
+mäts både trädvitt och i F6 med webb-, människohands-, gamla-plan- och commit-läsningstoken).
 **Trädvid skanning (`f2_tree_wide_…`):** utöver slutningen klassificeras VARJE spårad fil vid HEAD:
 *fryst* (`verify/**`, `SEPARATION-20260910/{README.md,ALLOCATION.tsv,WEB-TRANSFER-PROVENIENS*.tsv,proposed/**}`,
 owner-author-workflow, remaining-bootstrap-delegation, `scripts/check-invariants.mjs`,
@@ -202,9 +207,11 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history`
   (v3): `## Auktoritetsordning` i `AGENTS.md` nämner `docs/loop/autonomous-loop-plan-platform-v2.md`, och den
   listpunkt/det stycke som nämner den bär INTE `inte dagens instruktion`/`historisk`/`fryst grindinput` (planen är
-  aktiv; den får därför inte stå i samma listpunkt som de frysta dokumentens markörnot — egen punkt); `## Historik`
-  finns och bär orden `plangeneration` och `Git-historik` (den gamla generationen namnges som historia utan sha,
-  blob eller sökväg — pekarna är förbjudna).
+  aktiv; den får därför inte stå i samma listpunkt som de frysta dokumentens markörnot — egen punkt) och bär (v3.1 N6)
+  handoffens sökväg, ordet `plangeneration` och ordet `aktiv`; `## Historik` finns och bär `plangeneration`,
+  `Git-historik`, `historia`/`historisk` och den nya planens sökväg (den gamla generationen namnges som historia utan
+  sha, blob eller sökväg — pekarna är förbjudna; en etikett utan pekare som "gällande referens" är deklarerad
+  semantikgräns, N1).
 - `f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit` (v3):
   `## Authority` bär `PLAN_GENERATION=<autopilotens PLAN_GENERATION>`, `ROADMAP_PLAN_PATH=<ny plan>`,
   `ROADMAP_HANDOFF_PATH=<ny handoff>` och namnger `AGENTS.md`; `HUMAN_AUTHORITY_HARD_STOP` finns kvar i dokumentet;
@@ -250,8 +257,11 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f3_register_note_…`: noten/beskrivningen fri från människohands- och webbtoken (inkl.
   `workflows/`); `register_version` > 1.0.0; `check-invariants` pekar på
   `scripts/check-invariants.mjs` med sha `ae72cdf8…` (oförändrad, verifierad på disk); alla poster `startbar`.
-- `f3_verify_cli_pins_…`: `PLATFORM_SPEC` == sha256(spec), `PLATFORM_REGISTER` == sha256(register),
-  `PLATFORM_DOCUMENTS` ⊇ de elva generationsdokumenten och varje pinne == sha256 av kandidatens fil.
+- `f3_verify_cli_pins_equal_candidate_spec_register_every_generation_document_and_the_plan_generation`: `PLATFORM_SPEC` ==
+  sha256(spec), `PLATFORM_REGISTER` == sha256(register), `PLATFORM_DOCUMENTS` ⊇ de elva generationsdokumenten ∪ (v3.1 N5)
+  {ny plan, ny handoff} och varje pinne == sha256 av kandidatens fil — planen är därmed korsbunden: blob i autopilotens
+  `ROADMAP_PLAN_BLOBS` och sha256 i verify-cli, båda mot samma HEAD-fil, och `platform-prepare/-check` ser den.
+  `SUBSTITUTION_BLOBS` förblir elva (selftest binder antalet).
 - `f3_preflight_exit0_…`: `controller/verify/cli preflight` i replika → exakt `{"status":"ok","register_sha256":<sha>}`.
 - `f3_check_invariants_6_pass_0_fail_in_candidate_replica`: `node scripts/check-invariants.mjs` → exit 0, `6 PASS, 0 FAIL`.
 - `f3_platform_prepare_and_check_accept_candidate_documents_in_replica`: `platform-prepare`+`platform-check` (h-035) ok.
@@ -277,8 +287,23 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   kommentarer/docstrings) och AST-strängar saknar den gamla planens pekare, `git show {…}:`/`git show <…>`/
   `git show <7–40 hex>:` (läsning ur commit; `git show HEAD:`/`origin/main:` är tillåtet) och identifieraren/fältet
   `plan_sha`/`PLAN_SHA`/`ROADMAP_PLAN_SHA` (skiftlägesoberoende; `plan_sha256` undantaget).
-- `f4_prompt_functions_inject_exactly_the_declared_platform_document_set_all_tracked_and_scanned` (v3):
-  promptbyggande funktioner = varje funktion vars strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
+- `f4_produced_prompts_of_roadmap_empirical_and_architect_builders_name_plan_generation_and_handoff_for_every_slice_and_role`
+  och `f4_produced_prompts_free_of_old_plan_pointers_commit_reads_web_and_owner_stop_tokens_and_inject_only_declared_tracked_documents`
+  (v3.1, B3 — de FAKTISKA prompterna): drivern importerar den riktiga modulen och ANROPAR varje promptbyggare med
+  fixturargument — byggare = funktion vars kodobjekts strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
+  `prompt|_extra$|authority_text$`, minus flöden (funktion med parameter `repo`/`wt`/`wt_root` eller som refererar
+  `run_codex*`/`git`/`journal`/`publish`/`stage_and_commit`/worktree-hantering; flöden anropas aldrig, deras inlinade
+  promptliteraler täcks av AST-raden); varianter: varje verklig `RoadmapSlice` ur `SUBSTITUTION_ROADMAP + ROADMAP`, båda
+  remedieringsrollerna, båda `refrozen`-värdena; fixturer: 40-hex shas, tomt signal-dict, ett fynd, `h-015`, `BUILD`.
+  Rad 1: byggarna `architect_prompt`, `roadmap_test_author_prompt`, `roadmap_gate_reviewer_prompt`,
+  `roadmap_remediation_prompt`, `slice_builder_extra`, `slice_authority_text`, `empirical_gate_test_author_prompt`,
+  `empirical_gate_reviewer_prompt`, `empirical_prompt` finns, kan anropas och VARJE producerad variant (även SUB-skivor)
+  namnger både planen och handoffen; ≥20 producerade texter. Rad 2: ingen producerad text bär gamla-plan-pekare,
+  commit-läsning, kodwebb- eller ägarstoppstoken; mängden `docs/…`-sökvägar (med ändelse) och rotdokument i producerad text
+  ⊇ krävd och ⊆ tillåten (samma mängder som nedan), alla spårade och skannade/blob-pinnade; ingen byggare kastar.
+  Mätt på referensen: 15 byggare, 101 producerade texter, 1 flöde (`empirical_gate_contract_flow`, inlinad remedieringsprompt).
+- `f4_prompt_functions_ast_literals_inject_only_the_declared_platform_document_set_all_tracked_and_scanned` (v3,
+  komplement — statisk): promptbyggande funktioner = varje funktion vars strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
   `prompt|_extra$|authority_text$`, PLUS varje funktion som anropar en sådan (deras `extra`-strängar injiceras);
   ≥9 markörfunktioner och ≥12 totalt. Den injicerade dokumentmängden = alla `docs/…`-literaler med ändelse och
   rotdokument (`AGENTS.md`, `CLAUDE.md`, `README.md`, skills) i deras strängkonstanter (även f-strängdelar) och i de
@@ -307,9 +332,9 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   sökväg och saknar `<PLAN_SHA>`, `frozen autonomous-loop plan commit`, `git show {…|<…|<hex>:` och den gamla planens pekare.
 - `f4_autopilot_substitution_blobs_equal_head_blobs_of_generation_documents`: `SUBSTITUTION_BLOBS`
   ⊇ de elva dokumenten och varje OID == kandidatens HEAD-blob (pinnar uppdateras när generationen ändras).
-- `f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha` (v3): `selftest(None)` returnerar,
-  stdout bär `AUTOPILOT_V4_SELFTEST=PASS` (control-set-grinden binder strängen) och `PLAN_GENERATION=` men ingen
-  `plan_sha`/`PLAN_SHA`-rad; `f4_autopilot_publication_callers_exit0`, `f4_controller_loop_cli_unchanged_vs_332f07ce`.
+- `f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha` (v3.1 N2): `selftest(None)` returnerar,
+  stdout bär `AUTOPILOT_V4_SELFTEST=PASS` (control-set-grinden binder strängen) och exakt raden
+  `PLAN_GENERATION=<modulens PLAN_GENERATION>` men ingen `plan_sha`/`PLAN_SHA`-rad; `f4_autopilot_publication_callers_exit0`, `f4_controller_loop_cli_unchanged_vs_332f07ce`.
 
 ### F5 — loopens testsvit utan webbfixtur
 - `f5_loop_fall_py_b2_no_web_fixture_or_web_invariant`: `tests/controller/loop/fall.py` saknar
@@ -384,6 +409,10 @@ med `docs/07-konstitution.md` som överordnad; (f) skivtabellen driver från aut
 `## `-not i drift.md:s svans med `docs/07`; (m) `ROADMAP_PLAN_SHA` behållen vid sidan av `PLAN_GENERATION`; (n) en
 prompt injicerar ett odeklarerat dokument (`implementation-v4.1.md`); (o) S2 markerad `BYGGD` utan grind; (q)
 `ägarterminalen` i planen; (r) `CODEX_START_HERE` i handoffen; (s) "Historisk källa: `…autonomous-loop-plan-v1.md`" i planen.
+v3.1 (granskarens, kontrakt nr 5): (a02) odeklarerat dokument via moduldict i `builder_prompt`; (a04) `git show 0b3212c991d4:`
+i AGENTS Historik med ompinnade pinnar; (a10) odeklarerat dokument via `str.format`; (a11) selftest skriver literal
+`PLAN_GENERATION=platform-v1-legacy`; (a13) builder-skill läser planen med `git show <PLAN_SHA>:`; (a23) planen bara i en
+oanropad funktion, alla levande prompter utan plan/handoff; (a28) EFTERARBETE-svans med gamla planfilen "(fryst input)".
 Resultat: se Utfall.
 
 ### F10 — riggdisciplin
@@ -391,14 +420,19 @@ Kanarier (traceback är inget utfall; okänt driverscenario; driverfel; tokenska
 webb-/människohandstoken och släpper undantagen; slutningsextraktionen följer backticks och
 relativa länkar; (v3) planskanningen fångar den gamla planens pekare, `docs/05-beslutslogg`/`ägarterminalen`/
 `Verkstadsgolvet`/`gh pr merge`/`målbild §`/`CODEX_START_HERE` och släpper en legitim skivrad, `git show <…|{…|<hex>:`
-fångas men `git show HEAD:` släpps, tabellparsern läser en fixturtabell exakt, och plangenerationen står inte i något
+fångas men `git show HEAD:` släpps, 12-hex-/40-hex-/versal-/9-hex-formerna av den gamla commiten och blobprefix fångas men
+hex-föregången och 41-hex-form släpps, `<PLAN_SHA>`/`PLAN_SHA=`/"frozen autonomous-loop plan commit" fångas men
+`plan_sha256`/`PLAN_GENERATION=` släpps, tabellparsern läser en fixturtabell exakt, och plangenerationen står inte i något
 undantag — en grindmutant som återinför undantaget faller här), strikt JSON (dubblerad nyckel = fel), `result.json`, subjektets och den hållna
 grindens bytes oförändrade, utvecklingsdokumentet spårat med avsnitten Enkelt förklarat /
 Avgränsning och roller / Kriterium (effekter) / Produktyta för BUILDER / Vad grinden inte bevisar / Utfall.
 
 ## Produktyta för BUILDER
 
-Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs/tasks.spec.json` ändras INTE):
+Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs/tasks.spec.json` ändras INTE).
+**v3.1-förtydligande (N7):** punkterna 1, 4, 5, 6 och 7 är v2.5:s yta och redan UTFÖRDA i integrationen `320c9df7`
+(84/84 under v2.5); registret (p.4) rörs därför inte igen — p.8 gäller. v3/v3.1:s yta är p.2 (plangenerationen), p.3
+(autopiloten), p.5b (skills), p.5c (plandokumenten + pinnar, inkl. `PLATFORM_DOCUMENTS` för plan och handoff).
 
 1. **Bort ur trädet:** `docs/loop/arkiv/regler-fore-2026-09-10.md`,
    `docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md`, `docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md`,
@@ -452,7 +486,12 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    r.7 utan commit + nytt `## 15. … 2026-09-10 … (v1.2)` som namnger den nya planens sökväg och `AGENTS.md` (§1–§5,
    §7–§11, §13 orörda); `docs/loop/drift.md` appenderad not som namnger den nya planens sökväg (hela svansen skannas);
    `README.md` r.38 utan de gamla filnamnen. Pinnar: `controller/verify/cli` `PLATFORM_DOCUMENTS` och autopilotens
-   `SUBSTITUTION_BLOBS` för AGENTS/README/drift/kontraktet (och varje annat ändrat generationsdokument).
+   `SUBSTITUTION_BLOBS` för AGENTS/README/drift/kontraktet (och varje annat ändrat generationsdokument); (v3.1 N5)
+   `PLATFORM_DOCUMENTS` får dessutom `docs/loop/autonomous-loop-plan-platform-v2.md` och
+   `docs/loop/autonomous-loop-platform-handoff-v2.md` med sha256 (elva-mängden i `SUBSTITUTION_BLOBS` oförändrad).
+   (v3.1 B3) Varje roadmap-/empirisk-/arkitektprompt — även SUB-grenarna i `slice_builder_extra`/`slice_authority_text` —
+   namnger både plan och handoff i sin PRODUCERADE text; byggarna måste kunna anropas med fixturargument (sträng-shas, tom
+   signal, ett fynd, verkliga skivor) utan sidoeffekter.
 6. **Dokument:** `AGENTS.md` (Historik → Git-referenser/webbrepot utan sökväg), `README.md` (r.8, 21, 28),
    `docs/loop/regler.md` (r.9–10), `docs/loop/byggplan-v3.md` (r.9, 113, 166),
    `docs/loop/codex-autopilot-v3-full-roadmap.md` (r.17, 115), `docs/loop/harness-substitution-contract-v1.md`
@@ -479,6 +518,9 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
 
 - Att webbrepot faktiskt bär de överförda filerna: grinden läser aldrig webbrepot (plattformen ska
   fungera utan det); proveniensen binds mot 332f07ce-objekt i plattformens egen historik.
+- (v3.1) Prompter som inlinas direkt i ett flöde (t.ex. remedieringsprompten i `empirical_gate_contract_flow`) mäts bara
+  statiskt (AST-literaler), inte som producerad text — flöden anropas inte. En byggare som kräver argument utanför
+  fixturmängden faller rött (fail-closed), inte tyst grönt.
 - (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
   tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
   `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av

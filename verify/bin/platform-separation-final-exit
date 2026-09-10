@@ -181,9 +181,13 @@ DRIFT_ACTIVE_HEADING = re.compile(r"^## Aktiv plattformsnot\b.*$", re.M)
 # The pre-platform plan may be pointed at only from frozen evidence: its commit (40-hex and the 8-char prefix as a
 # hex word), its two blob OIDs, its two tree paths, its plan branch, and the labels that re-elevated it into
 # instruction ("effekt-authority", "fryst input", "historisk källa" and their English forms).
+# v3.1 (review v5 B1): every Git abbreviation of the old commit and of the two blobs (8-40 hex, case-insensitive,
+# hex-delimited) is a pointer — `0b3212c991d4:` as much as the 8- or 40-character form.
 OLD_PLAN_TOKENS = (
-    OLD_PLAN_COMMIT, r"(?<![0-9a-fA-F])0b3212c9(?![0-9a-fA-F])", r"c8ea851167f38f6846485035ee2e6b1dc3b54db0",
-    r"1e53887c59b8da0989579eaa241c5b53ea02abb9", r"autonomous-loop-plan-v1\.md", r"docs/loop/autonomous-loop-plan-v1\b",
+    r"(?<![0-9a-fA-F])(?i:0b3212c9)[0-9a-fA-F]{0,32}(?![0-9a-fA-F])",
+    r"(?<![0-9a-fA-F])(?i:c8ea8511)[0-9a-fA-F]{0,32}(?![0-9a-fA-F])",
+    r"(?<![0-9a-fA-F])(?i:1e53887c)[0-9a-fA-F]{0,32}(?![0-9a-fA-F])",
+    r"autonomous-loop-plan-v1\.md", r"docs/loop/autonomous-loop-plan-v1\b",
     r"autonomous-loop-codex-handoff\b", r"plan/autonomous-loop-v1", r"(?i)effekt-?authority", r"(?i)effect[- ]authority",
     r"(?i)fryst input", r"(?i)frozen input", r"(?i)historisk källa", r"(?i)historical source",
 )
@@ -199,8 +203,16 @@ PLAN_TOKENS = (
 GIT_SHOW_COMMIT_RE = r"git\s+show\s+(?:\{|<|[0-9a-fA-F]{7,40}\s*:)"
 # No plan_sha / PLAN_SHA / ROADMAP_PLAN_SHA identifier, journal field or output line anywhere in the autopilot.
 PLAN_SHA_RE = r"(?i)plan_sha(?!256)"
-SKILL_OLD_PLAN_TOKENS = (r"<PLAN_SHA>", r"(?i)frozen autonomous-loop plan commit", GIT_SHOW_COMMIT_RE)
+# v3.1 (review v5 B2): reading the plan by commit is forbidden in EVERY scanned active document (all skills, router,
+# README, plan, handoff, full-roadmap, notes, drift/EFTERARBETE tails), not only in the two plan-naming skills.
+COMMIT_READ_TOKENS = (r"<PLAN_SHA>", r"(?i)frozen autonomous-loop plan commit", GIT_SHOW_COMMIT_RE, PLAN_SHA_RE)
+SKILL_OLD_PLAN_TOKENS = COMMIT_READ_TOKENS
 PLAN_SKILLS = (".agents/skills/nortropic-architect/SKILL.md", ".agents/skills/nortropic-empirical-runner/SKILL.md")
+# v3.1 (review v5 B3): the prompt builders whose PRODUCED text must name the plan generation and the handoff for every
+# slice/role variant; the DRIVER calls them with fixture arguments (real RoadmapSlice objects, 40-hex shas, empty findings).
+REQUIRED_PLAN_PROMPT_BUILDERS = ("architect_prompt", "roadmap_test_author_prompt", "roadmap_gate_reviewer_prompt",
+                                 "roadmap_remediation_prompt", "slice_builder_extra", "slice_authority_text",
+                                 "empirical_gate_test_author_prompt", "empirical_gate_reviewer_prompt", "empirical_prompt")
 # Machine-readable slice table in the plan generation: a markdown table with exactly these header cells.
 PLAN_TABLE_COLUMNS = ("slice", "task", "exit_test", "allowed_write", "depends_on", "status")
 PLAN_STATUS_BUILT, PLAN_STATUS_UNBUILT = "BYGGD", "OBYGGD"
@@ -303,6 +315,49 @@ DRIVER = (
     "                   plan_path=m.ROADMAP_PLAN_PATH, handoff_path=m.ROADMAP_HANDOFF_PATH, empirical_gate_path=m.EMPIRICAL_GATE_PATH,\n"
     "                   roadmap=[[sl.code, sl.task_id, sl.gate_path, list(sl.plan_allowed_write or ()), list(sl.required_deps)]\n"
     "                            for sl in tuple(m.SUBSTITUTION_ROADMAP)+tuple(m.ROADMAP)])\n"
+    "    elif scenario=='prompts':\n"
+    "        import inspect,re as _re\n"
+    "        builders={}\n"
+    "        def _consts(co):\n"
+    "            for c in co.co_consts:\n"
+    "                if isinstance(c,str): yield c\n"
+    "                elif hasattr(c,'co_consts'): yield from _consts(c)\n"
+    "        for _n,_f in list(vars(m).items()):\n"
+    "            if not inspect.isfunction(_f) or _f.__module__!=m.__name__: continue\n"
+    "            if any(" + repr(PROMPT_MARK) + " in c for c in _consts(_f.__code__)) or _re.search(" + repr(PROMPT_FUNCTION_NAME_RE.pattern) + ", _n): builders[_n]=_f\n"
+    "        # a FLOW composes prompts and acts on repositories (repo/wt parameters, Git, providers, journal): never called here;\n"
+    "        # its inline prompt literals are covered by the AST row\n"
+    "        SIDE={'run_codex','run_codex_resolving_architecture','git','journal','publish','stage_and_commit','ensure_worktree','detached_worktree','remove_worktree','subprocess'}\n"
+    "        flows={n for n,f in builders.items() if set(inspect.signature(f).parameters) & {'repo','wt','wt_root'} or set(f.__code__.co_names) & SIDE}\n"
+    "        for n in flows: builders.pop(n)\n"
+    "        slices=list(m.SUBSTITUTION_ROADMAP)+list(m.ROADMAP); SHA='a'*40; texts={}; errors={}\n"
+    "        def fixture(p):\n"
+    "            n=p.name; a=p.annotation\n"
+    "            if n in ('signal','report'): return {}\n"
+    "            if n=='findings': return [{'summary':'fixture','severity':'blocking'}]\n"
+    "            if n in ('base_sha','candidate_sha'): return SHA\n"
+    "            if p.default is not inspect.Parameter.empty: return p.default\n"
+    "            if n=='task_id': return 'h-015'\n"
+    "            if n=='stage': return 'BUILD'\n"
+    "            if a is int: return 0\n"
+    "            if a is bool: return False\n"
+    "            if a is list: return []\n"
+    "            if a is dict: return {}\n"
+    "            return 'fixture'\n"
+    "        for _n,_f in sorted(builders.items()):\n"
+    "            params=[p for p in inspect.signature(_f).parameters.values() if p.kind in (p.POSITIONAL_OR_KEYWORD,p.KEYWORD_ONLY)]\n"
+    "            variants=[{}]\n"
+    "            if any(p.name=='sl' for p in params): variants=[{'sl':sl} for sl in slices]\n"
+    "            if any(p.name=='role' for p in params): variants=[dict(v,role=r) for v in variants for r in ('TEST_AUTHOR','BUILDER')]\n"
+    "            if any(p.name=='refrozen' for p in params): variants=[dict(v,refrozen=b) for v in variants for b in (False,True)]\n"
+    "            for v in variants:\n"
+    "                kwargs={p.name: (v[p.name] if p.name in v else fixture(p)) for p in params}\n"
+    "                key=_n+''.join('['+(v[k].code if k=='sl' else str(v[k]))+']' for k in ('sl','role','refrozen') if k in v)\n"
+    "                try:\n"
+    "                    t=_f(**kwargs); texts[key]=t if isinstance(t,str) else '<non-str '+type(t).__name__+'>'\n"
+    "                except Exception as e:\n"
+    "                    errors[key]=repr(e)[:200]\n"
+    "        out.update(outcome='returned', builders=sorted(builders), flows=sorted(flows), texts=texts, errors=errors)\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
     "    else:\n"
@@ -830,9 +885,15 @@ def main():
     check("canary_plan_generation_scan_rejects_old_plan_pointers_business_and_owner_hand_authority",
           bool(scan("Read the plan with git show 0b3212c9:docs/loop/x.md", OLD_PLAN_TOKENS))
           and bool(scan("blob c8ea851167f38f6846485035ee2e6b1dc3b54db0 under any path", OLD_PLAN_TOKENS))
+          and all(scan(x, OLD_PLAN_TOKENS) for x in ("läs den med `git show 0b3212c991d4:` vid behov", "0b3212c991d4227c8df2656465ae2c0252dda39e",
+                                                     "0B3212C991D4227C", "blob c8ea8511 eller 1e53887c59b8", "(0b3212c99)"))
+          and not scan("10b3212c991d4 är ett annat objekt; 0b3212c991d4227c8df2656465ae2c0252dda39e0 är 41 hex", OLD_PLAN_TOKENS)
+          and all(scan(x, COMMIT_READ_TOKENS) for x in ("the roadmap: `git show <PLAN_SHA>:docs/loop/x.md`", "PLAN_SHA=abc",
+                                                        "the exact frozen autonomous-loop plan commit named by the orchestrator"))
+          and not scan("git show HEAD:docs/loop/x.md; plan_sha256 of the command plan; PLAN_GENERATION=platform-v2", COMMIT_READ_TOKENS)
           and bool(scan("se docs/loop/autonomous-loop-plan-v1.md (effekt-authority, fryst input)", OLD_PLAN_TOKENS))
           and len(scan("se docs/loop/autonomous-loop-plan-v1.md (effekt-authority, fryst input)", OLD_PLAN_TOKENS)) >= 4
-          and not scan("hash 0b3212c9a is another object; plan_sha256 of the H039 command plan; PLAN_GENERATION=platform-v2",
+          and not scan("hash 10b3212c9a is hex-preceded; plan_sha256 of the H039 command plan; PLAN_GENERATION=platform-v2",
                        OLD_PLAN_TOKENS + (PLAN_SHA_RE,))
           and bool(scan("Beslutsloggsrad i docs/05-beslutslogg.md i samma commit", WEB_TOKENS + PLAN_TOKENS))
           and bool(scan("körning i ägarterminalen före merge", PLAN_TOKENS)) and bool(scan("ÄGARHAND-42", PLAN_TOKENS))
@@ -946,6 +1007,12 @@ def main():
 
     def scannable_text(rel):
         """The part of a reached document that is ACTIVE instruction (None when the document is frozen evidence)."""
+        if rel == EFTERARBETE:   # v3.1 (N3): the appended tail is active and scanned; the 332f07ce body is frozen evidence
+            base = base_bytes(rel)
+            current = (subject / rel).read_bytes()
+            if base is not None and current.startswith(base):
+                return current[len(base):].decode("utf-8", "replace")
+            return text(rel)
         if exempt(rel):
             return None
         raw = text(rel)
@@ -972,12 +1039,6 @@ def main():
                 if m is None or int(m.group(1)) in (6, 12) or int(m.group(1)) > 13:
                     keep.append(raw[s:e])
             return "".join(keep)
-        if rel == EFTERARBETE:
-            base = base_bytes(rel)
-            current = (subject / rel).read_bytes()
-            if base is not None and current.startswith(base):
-                return current[len(base):].decode("utf-8", "replace")
-            return raw
         if rel.endswith("-local-development.md"):
             return None
         return raw
@@ -1025,7 +1086,7 @@ def main():
         scanned.append(rel)
         human = () if rel in HISTORICAL_NOTE_DOCS else HUMAN_TOKENS
         plan_extra = PLAN_TOKENS if rel in (PLAN_GEN, HANDOFF_GEN) else ()
-        hits = scan(body, WEB_TOKENS + human + OLD_PLAN_TOKENS + plan_extra)
+        hits = scan(body, WEB_TOKENS + human + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS + plan_extra)
         check("f2_active_doc_free_of_web_governance_and_human_hand_rules_" + label_of(rel), not hits, fmt_hits(hits))
     check("f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents",
           PLAN_GEN in scanned and HANDOFF_GEN in scanned and PLAN_GEN in tracked and HANDOFF_GEN in tracked,
@@ -1048,7 +1109,7 @@ def main():
         if rel in HISTORICAL_NOTE_DOCS or rel in (DRIFT, SUBSTITUTION, EFTERARBETE):
             classification[rel] = "partial"
             part = scannable_text(rel) or ""
-            web_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, WEB_TOKENS + OLD_PLAN_TOKENS)]
+            web_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, WEB_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)]
             if rel not in HISTORICAL_NOTE_DOCS:
                 human_hits += [f"{rel}(added/active)@{l} {pat}: {x}" for pat, l, x in scan(part, HUMAN_TOKENS)]
             continue
@@ -1078,7 +1139,7 @@ def main():
             continue
         classification[rel] = "text"
         plan_extra = PLAN_TOKENS if rel in (PLAN_GEN, HANDOFF_GEN) else ()
-        web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, WEB_TOKENS + (SIBLING_RE.pattern,) + OLD_PLAN_TOKENS + plan_extra)]
+        web_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, WEB_TOKENS + (SIBLING_RE.pattern,) + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS + plan_extra)]
         human_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan(body, HUMAN_TOKENS)]
     counts = {k: sum(1 for v in classification.values() if v == k) for k in ("frozen", "partial", "local-development", "code", "test", "text", "binary")}
     check("f2_tree_wide_no_web_governance_reference_outside_frozen_evidence",
@@ -1108,10 +1169,12 @@ def main():
     auth_units = [u for u in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|[-*])\s)", authority_section) if PLAN_GEN in u]
     demoted = [u[:80] for u in auth_units if re.search(r"(?i)inte\s+dagens\s+instruktion|historisk|frys\w*\s+grindinput|frus\w*\s+grindinput", u)]
     historik = next((agents_text[s:e] for h, s, e in sections(agents_text) if h.startswith("## Historik")), "")
+    anchored = [u for u in auth_units if HANDOFF_GEN in u and re.search(r"(?i)plangeneration", u) and re.search(r"(?i)\baktiv", u)]
     check("f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history",
-          bool(auth_units) and not demoted and bool(historik) and re.search(r"(?i)plangeneration", historik) is not None
-          and re.search(r"(?i)git-?historik", historik) is not None,
-          f"authority_mentions={len(auth_units)} demoted={demoted} historik_len={len(historik)}")
+          bool(auth_units) and not demoted and len(anchored) == len(auth_units) and bool(historik)
+          and re.search(r"(?i)plangeneration", historik) is not None and re.search(r"(?i)git-?historik", historik) is not None
+          and PLAN_GEN in historik and re.search(r"(?i)\bhistori(a|sk)", historik) is not None,
+          f"authority_mentions={len(auth_units)} anchored={len(anchored)} demoted={demoted} historik_len={len(historik)} plan_in_historik={PLAN_GEN in historik}")
     fr = text(FULL_ROADMAP)
     fr_authority = next((fr[s:e] for h, s, e in sections(fr) if h.startswith("## Authority")), "")
     check("f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit",
@@ -1167,7 +1230,7 @@ def main():
             problems.append("document is not <base bytes> plus exactly one added header or appended note")
         else:
             problems += [f"note lacks {m}" for m in ("2026-09-10", AGENTS) + tuple(markers) if not re.search(m, block)]
-            problems += [f"note carries web token {p}@{l}" for p, l, _ in scan(block, WEB_TOKENS)[:3]]
+            problems += [f"note carries web token {p}@{l}" for p, l, _ in scan(block, WEB_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)[:3]]
             problems += [f"note carries owner-stop token {p}@{l}" for p, l, _ in scan(block, HARD_HUMAN_TOKENS)[:3]]
         check("f2_historical_document_unchanged_plus_dated_supersession_note_" + label_of(rel), not problems, str(problems)[:600])
     drift_base, drift_head = base_bytes(DRIFT), (subject / DRIFT).read_bytes()
@@ -1179,7 +1242,7 @@ def main():
         problems.append("appended tail carries no '## Aktiv plattformsnot' heading")
     else:
         problems += [f"tail lacks {m}" for m in ("2026-09-10", AGENTS, r"§\s*5\b", re.escape(PLAN_GEN)) if not re.search(m, active)]
-        problems += [f"{p}@{l}" for p, l, _ in scan(active, WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS)[:4]]
+        problems += [f"{p}@{l}" for p, l, _ in scan(active, WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)[:4]]
     check("f2_drift_md_append_only_whole_tail_scanned_with_active_platform_note_naming_plan_generation", not problems, str(problems)[:600])
 
     # ------------------------------------------------------------------ F3: config and permission rules
@@ -1261,13 +1324,13 @@ def main():
         problems.append("PLATFORM_SPEC")
     if pin_register is None or pin_register.group(1) != sha((subject / REGISTER).read_bytes()):
         problems.append("PLATFORM_REGISTER")
-    if type(documents) is not dict or not set(GENERATION_DOCS) <= set(documents):
-        problems.append("PLATFORM_DOCUMENTS key set")
+    if type(documents) is not dict or not (set(GENERATION_DOCS) | {PLAN_GEN, HANDOFF_GEN}) <= set(documents):
+        problems.append("PLATFORM_DOCUMENTS key set (eleven generation documents + plan generation + handoff)")
     else:
         for rel, digest in documents.items():
             if rel not in tracked or sha((subject / rel).read_bytes()) != digest:
                 problems.append("PLATFORM_DOCUMENTS " + rel)
-    check("f3_verify_cli_pins_equal_candidate_spec_register_and_every_generation_document", not problems, str(problems))
+    check("f3_verify_cli_pins_equal_candidate_spec_register_every_generation_document_and_the_plan_generation", not problems, str(problems))
     spec_base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{SPEC}").stdout.strip()
     check("f3_spec_byte_identical_to_" + FROZEN_BASE[:8] + "_this_contract_requires_no_spec_change",
           bool(spec_base_oid) and head_oid(SPEC) == spec_base_oid, f"head={head_oid(SPEC)} base={spec_base_oid}")
@@ -1371,8 +1434,47 @@ def main():
     problems += [f"injected document not tracked: {rel}" for rel in sorted(injected) if rel not in tracked]
     problems += [f"injected document neither scanned nor blob-pinned: {rel}" for rel in sorted(injected)
                  if rel in tracked and rel not in scanned and rel not in GENERATION_DOCS]
-    check("f4_prompt_functions_inject_exactly_the_declared_platform_document_set_all_tracked_and_scanned", not problems,
+    check("f4_prompt_functions_ast_literals_inject_only_the_declared_platform_document_set_all_tracked_and_scanned", not problems,
           f"builders={sorted(builders)} callers={sorted(callers)} injected={sorted(injected)} problems={problems}"[-1100:])
+    # --- v3.1 (review v5 B3): the PRODUCED prompts. The driver imports the real module and CALLS every prompt builder with
+    # fixture arguments (every real RoadmapSlice, both remediation roles, both refrozen values); the produced text is measured.
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "prompts"], ap_tmp, ap_env, timeout=300)
+    produced = driver_outcome(r)
+    produced = produced if produced and produced["outcome"] == "returned" and type(produced.get("texts")) is dict else {}
+    texts, perrors, pbuilders = produced.get("texts", {}), produced.get("errors", {}), produced.get("builders", [])
+    problems = []
+    if not produced:
+        problems.append("prompt driver unavailable: " + (r.stdout + r.stderr)[-200:])
+    for name in REQUIRED_PLAN_PROMPT_BUILDERS:
+        if name not in pbuilders:
+            problems.append(name + ": not found as a prompt builder")
+            continue
+        keys = [k for k in texts if k == name or k.startswith(name + "[")]
+        raised = [k for k in perrors if k == name or k.startswith(name + "[")]
+        if raised:
+            problems.append(f"{name}: raised {perrors[raised[0]]}")
+        if not keys:
+            problems.append(name + ": produced no text")
+        problems += [f"{k}: lacks plan/handoff" for k in keys if PLAN_GEN not in texts[k] or HANDOFF_GEN not in texts[k]]
+    check("f4_produced_prompts_of_roadmap_empirical_and_architect_builders_name_plan_generation_and_handoff_for_every_slice_and_role",
+          not problems and len(texts) >= 20, f"builders={len(pbuilders)} texts={len(texts)} problems={problems}"[-1100:])
+    problems, produced_docs = [], set()
+    for k, t in sorted(texts.items()):
+        problems += [f"{k}@{l} {p}: {x}" for p, l, x in scan(t, OLD_PLAN_TOKENS + COMMIT_READ_TOKENS + CODE_WEB_TOKENS + CODE_HUMAN_TOKENS)[:2]]
+        for m_ in PATH_RE.finditer(t):
+            c = clean_candidate(m_.group(1))
+            if c.startswith("docs/") and "." in c.rsplit("/", 1)[-1]:
+                produced_docs.add(c)
+        for m_ in ROOT_DOC_RE.finditer(t):
+            produced_docs.add(m_.group(1))
+    problems += [f"builder raised: {k}: {e}" for k, e in sorted(perrors.items())]
+    problems += [f"required document in no produced prompt: {rel}" for rel in sorted(PROMPT_DOCS_REQUIRED - produced_docs)]
+    problems += [f"undeclared document in a produced prompt: {rel}" for rel in sorted(produced_docs - PROMPT_DOCS_ALLOWED)]
+    problems += [f"produced-prompt document not tracked: {rel}" for rel in sorted(produced_docs) if rel not in tracked]
+    problems += [f"produced-prompt document neither scanned nor blob-pinned: {rel}" for rel in sorted(produced_docs)
+                 if rel in tracked and rel not in scanned and rel not in GENERATION_DOCS]
+    check("f4_produced_prompts_free_of_old_plan_pointers_commit_reads_web_and_owner_stop_tokens_and_inject_only_declared_tracked_documents",
+          bool(produced) and not problems and len(texts) >= 20, f"texts={len(texts)} docs={sorted(produced_docs)} problems={problems}"[-1100:])
     # --- the plan's machine-readable slice table equals the autopilot's roadmap tuples and selftest's exact sets
     problems = []
     spec_rows = {t.get("id"): t for t in spec_obj.get("tasks", []) if type(t) is dict} if spec_strict else {}
@@ -1449,7 +1551,8 @@ def main():
     obj = driver_outcome(r)
     check("f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha",
           bool(obj) and obj["outcome"] == "returned" and "AUTOPILOT_V4_SELFTEST=PASS" in r.stdout
-          and "PLAN_GENERATION=" in r.stdout and re.search(PLAN_SHA_RE, r.stdout) is None, (r.stdout + r.stderr)[-300:])
+          and type(plan_generation) is str and re.search(r"^PLAN_GENERATION=" + re.escape(plan_generation) + r"$", r.stdout, re.M) is not None
+          and re.search(PLAN_SHA_RE, r.stdout) is None, (r.stdout + r.stderr)[-300:])
     r = run([PYTHON, "-B", rep / PUBLICATION_CALLERS], rep, ap_env, timeout=600)
     check("f4_autopilot_publication_callers_exit0", r.returncode == 0 and "traceback" not in (r.stdout + r.stderr).lower(),
           f"rc={r.returncode} " + (r.stdout + r.stderr)[-300:])
@@ -1495,7 +1598,7 @@ def main():
           not problems and additions == [GATE] and gate_ok, f"problems={problems[:10]} additions={additions} gate_ok={gate_ok}")
     ea_base, ea_head = base_bytes(EFTERARBETE), (subject / EFTERARBETE).read_bytes() if (subject / EFTERARBETE).is_file() else b""
     ea_added = ea_head[len(ea_base):].decode("utf-8", "replace") if ea_base is not None and ea_head.startswith(ea_base) else None
-    ea_hits = scan(ea_added or "", WEB_TOKENS + HUMAN_TOKENS)
+    ea_hits = scan(ea_added or "", WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)
     check("f6_efterarbete_append_only_vs_" + FROZEN_BASE[:8] + "_with_scanned_addition",
           EFTERARBETE in tracked and ea_added is not None and not ea_hits, f"append_only={ea_added is not None} hits={fmt_hits(ea_hits, 4)}")
     held_identical = {}
@@ -1614,6 +1717,7 @@ def main():
               "plan_generation": plan_generation, "plan_generation_paths": [PLAN_GEN, HANDOFF_GEN],
               "plan_generation_blobs": {rel: head_oid(rel) for rel in (PLAN_GEN, HANDOFF_GEN)},
               "old_plan_commit": OLD_PLAN_COMMIT, "old_plan_blobs": OLD_PLAN_BLOBS,
+              "produced_prompts": sorted(texts), "produced_prompt_documents": sorted(produced_docs),
               "subject_sha256": subject_sha, "held_sha256": held, "held_gate_runs": gate_runs,
               "closure_roots": sorted(roots), "closure_reached": sorted(reached), "closure_scanned": scanned,
               "closure_dangling": {k: sorted(v) for k, v in sorted(dangling.items())},
