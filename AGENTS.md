@@ -1,26 +1,31 @@
-# Codex i nortropic-system
+# Agenter i nortropic-system (plattformsrepot)
 
-Detta är en **router**, inte ett nytt regelverk.
+Detta är en **router**, inte ett nytt regelverk. Repot är Nortropics
+verksamhetsneutrala autonomiplattform: Trust Kernel (hela tillitsplattformen),
+controller, bootstrap, supervisor/autopilot och tillhörande H-arbeten.
+Webbförvaltningen (agenter, skills, workflows, paket, kvalitetsregler,
+verksamhetsmaterial) är sedan 2026-09-10 utbruten till ett separat repo;
+se `SEPARATION-20260910/README.md`. Webbens brief-, design-, kvalitets- och
+förvaltningsregler är inte plattformskrav.
 
 ## Auktoritet
 
 Läs och följ i denna ordning när de är relevanta:
 
-1. `docs/07-konstitution.md`
-2. `docs/03-regelverk.md`
-3. `docs/loop/regler.md` för kontrollplansbygget
-4. aktuell task i `specs/tasks.spec.json`
-5. taskens frysta `exit_test`
-6. relevanta plan- och driftdokument
+1. `docs/loop/harness-substitution-contract-v1.md` §1 (plattformsgräns och ägarskap)
+2. `docs/loop/regler.md` och `docs/loop/byggplan-v3.md` (kontrollplanets regler, §A-mängd)
+3. aktuell task i `specs/tasks.spec.json`
+4. taskens frysta `exit_test` under `verify/bin/`
+5. `docs/loop/owner-author-workflow-v1.md`, `docs/loop/remaining-bootstrap-delegation-v1.md`
+   och övriga plan-/driftdokument under `docs/loop/`
 
 Vid konflikt gäller den högre auktoriteten. Återge inte reglerna här; peka på källan.
-
-Fastställ uppdragets tillämpningsdomän med konstitutionen, regelverket
-och substitutionskontraktets §1 innan en domänregel tillämpas som
-funktionskrav. Nortropic är organisationen, autonomiplattformen en del
-och Digitala första professionella verksamheten. Detta ändrar inte
-företrädesordning, skyddade ytor eller aktuellt mandat. En oklar
-tillämpning ger inte rätt att själv undanta ett obligatoriskt skydd.
+Gemensamma säkerhetsprinciper som följde med webbens konstitution och gäller
+plattformen finns redan mekaniskt här: `verify/**`, `specs/**`,
+`controller/verify/register.json` och `scripts/check-invariants.mjs` ändras
+endast av människohand; frysta grindar, förbrukade försök och human-only-
+ceremonier kvarstår. En router, handoff eller senare målbild är inte egen
+operationsbehörighet.
 
 ## Repoidentitet före arbete
 
@@ -34,129 +39,68 @@ git rev-parse origin/main
 ```
 
 Om remote inte kan kontrolleras: skriv `ORIGIN_MAIN=OVERIFIERAT`; gissa aldrig.
-
 Ingen force-semantik: varken `--force`, `--force-with-lease`, ledande `+` i refspec eller history overwrite.
 
 ## Rollseparation
 
-En Codex-tråd/worktree har **en** roll åt gången:
+En tråd/worktree har **en** roll åt gången (`.agents/skills/`):
 
 - `$nortropic-test-author` — owner-begärd spec/acceptance-gate-förberedelse. Ingen produktionsimplementation.
 - `$nortropic-builder` — implementerar en redan fryst task inom `allowed_write`. Ändrar aldrig sin egen frysta spec/gate.
 - `$nortropic-reviewer` — oberoende, normalt read-only, försöker falsifiera builderkandidaten.
+- `$nortropic-architect` (read-only) och `$nortropic-empirical-runner` (closeout) enligt v3/v4 nedan.
 
-Blanda inte roller i samma tråd bara för att spara tid. Om ett uppdrag kräver byte av trustroll: stoppa och rapportera.
-
-## Vad rollseparationen ÄR
-
-Rollerna ovan är **workflow-separation**, inte en mekanisk säkerhetsgräns.
+Rollerna är **workflow-separation**, inte en mekanisk säkerhetsgräns:
 
 ```text
-CODEX_ROLE_SEPARATION=WORKFLOW
-CODEX_ROLE_SEPARATION_IS_SECURITY_BOUNDARY=NO
+ROLE_SEPARATION=WORKFLOW
+ROLE_SEPARATION_IS_SECURITY_BOUNDARY=NO
 FROZEN_OWNER_GATES_REMAIN_TRUST_AUTHORITY=YES
 OWNER_GATE_REQUIRED=YES
 ```
 
-Skills och separata Codex-trådar/worktrees minskar rollblandning och koordinationskostnad,
-men de ersätter inte Nortropics mekaniska `allowed_write`, sandbox, frozen exit-test,
-attestation eller owner-gates.
-
-En Codex-roll får därför aldrig använda sin Skill som bevis för att en fil faktiskt var
-mekaniskt otillgänglig.
+Skills och separata trådar/worktrees ersätter inte `allowed_write`, sandbox,
+frozen exit-test, attestation eller owner-gates. En roll får aldrig använda sin
+Skill som bevis för att en fil faktiskt var mekaniskt otillgänglig.
 
 ## Evidence
 
-Slutrapporten ska följa `docs/loop/codex-evidence-contract.md`.
-
-Codex egen utsaga är inte owner-bevis. Ett grönt exit-test rapporteras med faktiskt kommando + exitkod. Overifierat märks `OVERIFIERAT`.
+Slutrapporten följer `docs/loop/codex-evidence-contract.md`. Agentens egen utsaga
+är inte owner-bevis. Ett grönt exit-test rapporteras med faktiskt kommando + exitkod.
+Overifierat märks `OVERIFIERAT`.
 
 ## Push / merge
-
-Standard är:
 
 ```text
 PUSH=NO
 MERGE=NO
 ```
 
-Pusha eller merga endast när användaren uttryckligen har gett den befogenheten för den aktuella fasen och projektets gates tillåter det.
+Pusha eller merga endast när ägaren uttryckligen gett befogenheten för aktuell fas
+och grindarna tillåter det. För den kvarvarande bootstrapkedjan H-035 → H-034 →
+H-033 → H-032 → H-031 → supervisor-resume gäller `docs/loop/remaining-bootstrap-delegation-v1.md`
+(guarded normal merge commit; aldrig utan mekaniska grindar).
 
-För den strikt avgränsade kvarvarande bootstrapkedjan H-035 → H-034 → H-033 →
-H-032 → H-031 → supervisor-resume → första verkliga autonoma start gäller den
-versionerade owner-delegationen i
-`docs/loop/remaining-bootstrap-delegation-v1.md`. Den tar bort interaktiv human
-närvaro men aldrig de mekaniska grindarna, och kräver guarded normal merge commit.
+## Operating model v2–v4 (oförändrat innehåll, plattformsdelen)
 
-<!-- CODEX-OPERATING-MODEL-V2 -->
-## Codex operating model v2 — stående owner-befogenhet för mekanisk exekvering
+- **v2 (2026-08-10):** `scripts/nortropic-codex-autopilot.py` är den mekaniska
+  exekveraren för redan owner-auktoriserat kontrollplansarbete
+  (`OWNER_GATE_EXECUTOR=MECHANICAL`, `FROZEN_OWNER_GATES_REMAIN_TRUST_AUTHORITY=YES`).
+  Rollagenterna committar/pushar/mergar inte själva.
+- **v3 (2026-08-10):** full-roadmap-autonomi för S2, S4–S13 och empirisk slutkörning
+  under den ägarlåsta planen `0b3212c991d4227c8df2656465ae2c0252dda39e`;
+  programgrind `verify/bin/autonomous-loop-exit` fryses av test-author + gate-reviewer
+  före downstream. Mänsklig hard-stop endast för uttryckliga undantag (human-only,
+  juridik, verklig authority-konflikt, extern credential-/provisioningceremoni).
+- **v4 (2026-08-11):** provider-neutral Trust Kernel enligt
+  `docs/loop/harness-substitution-contract-v1.md`:
+  `AGENT_REASONING_OWNER=PROVIDER_HARNESS`, `TRUST_TRANSITION_OWNER=NORTROPIC`,
+  `MODEL_OUTPUT_IS_TRUST_AUTHORITY=NO`, `SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT=REQUIRED`,
+  `NO_FORCE_SEMANTICS=YES`. Reviderad sekvens SUB-1/h-027 → SUB-2/h-028 → SUB-3/h-029 →
+  SUB-4/h-030 → S2/S4–S13 → L. Worktreen `owner/h-003-attestation-validity-44d525a5dd60`
+  är bevarad forensisk evidens, inte authority.
 
-Owner har 2026-08-10 uttryckligen auktoriserat `scripts/nortropic-codex-autopilot.py` att vara den mekaniska exekveraren för redan owner-auktoriserat kontrollplansarbete.
-
-```text
-OWNER_AUTHORITY_REQUIRED=YES
-HUMAN_OWNER_PRESENT_PER_TASK=NO
-OWNER_GATE_EXECUTOR=MECHANICAL
-FROZEN_OWNER_GATES_REMAIN_TRUST_AUTHORITY=YES
-```
-
-Detta ändrar inte auktoritetsordningen ovan och gör inte Codex-prosa till trust authority. Rollagenterna committar/pushar/mergar fortfarande inte. Autopiloten får däremot, efter sina mekaniska identity/scope/gate/reviewer-kontroller, skapa immutable candidate commits, publicera, skapa PR och rebase-merga med expected-head-guard utan ny interaktiv owner-prompt per transition.
-
-En verklig ny policy-/arkitekturfråga, odömbart gateutfall, oväntad remote-identity eller no-progress stoppar fortfarande fail-closed.
-
-<!-- CODEX-OPERATING-MODEL-V3 -->
-## Codex operating model v3 — full-roadmap autonomy
-
-Owner har 2026-08-10 delegerat den återstående kontrollplansroadmapen S2, S4–S13 och den empiriska obevakade slutkörningen till den mekaniska autopiloten under den ägarlåsta planen på commit `0b3212c991d4227c8df2656465ae2c0252dda39e`.
-
-```text
-FULL_ROADMAP_AUTONOMY=YES
-HUMAN_OWNER_PRESENT_PER_SLICE=NO
-OWNER_DECISION_REQUIRED=INTERNAL_ARCHITECT_SIGNAL
-HUMAN_AUTHORITY_HARD_STOP=EXCEPTION_ONLY
-FROZEN_OWNER_GATES_REMAIN_TRUST_AUTHORITY=YES
-```
-
-`$nortropic-architect` är read-only och löser normala arkitekturfrågor under högre authority och den exakta frozen roadmapen. `OWNER_DECISION_REQUIRED` från test-author/builder/reviewer är därför en intern routingsignal till architect, aldrig i sig en mänsklig handoff.
-
-Mänsklig hard-stop får endast användas för gränser som v3-owner-delegationen uttryckligen undantar, exempelvis konstitution/§A-human-only, juridiskt human-only, verklig konflikt mellan högre authorities eller en extern credential-/provisioningceremoni som inte kan utföras utan att försvaga kontraktet. Full definition: `docs/loop/codex-autopilot-v3-full-roadmap.md`.
-
-V3 lägger även till `$nortropic-empirical-runner`: en read-only closeout-roll som kör stage L i disposable state efter att S2/S4–S13 är gröna. Den bygger inget och dess utsaga är inte PASS-authority; `FULL_ROADMAP_COMPLETE` kräver orchestratorns egna identity/gate/invariant-kontroller runt dess faktiska run-evidence.
-
-
-### Programnivå-domen
-
-Full-roadmap completion har en separat frozen program gate:
-
-```text
-verify/bin/autonomous-loop-exit
-```
-
-Den fryses av test-author + gate-reviewer innan downstream roadmap implementation. Independent
-empirical-runner får falsifiera den, men får aldrig ersätta ett rött gate-resultat med prosa-PASS.
-
-<!-- CODEX-OPERATING-MODEL-V4-PROVIDER-NEUTRAL -->
-## Codex operating model v4 — provider-neutral Trust Kernel
-
-Owner has 2026-08-11 amended the remaining autonomous-loop **implementation shape** through `docs/loop/harness-substitution-contract-v1.md`. Higher authority and the exact frozen roadmap remain unchanged for required effects, migration intent and negative controls.
-
-```text
-NORTROPIC_ARCHITECTURE=PROVIDER_NEUTRAL_TRUST_KERNEL
-AGENT_REASONING_OWNER=PROVIDER_HARNESS
-TRUST_TRANSITION_OWNER=NORTROPIC
-MODEL_OUTPUT_IS_TRUST_AUTHORITY=NO
-FROZEN_OWNER_GATES_REMAIN_TRUST_AUTHORITY=YES
-SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT=REQUIRED
-NO_FORCE_SEMANTICS=YES
-```
-
-Produkt- och domängränsen definieras i
-docs/loop/harness-substitution-contract-v1.md §1; denna router återger inte en separat produktkonstant.
-
-Claude/Codex/future providers own reasoning, sessions, context, tool loops, internal retries and reviewer/remediation intelligence. Nortropic owns TaskContract provenance, allowed_write, G20 containment, exact candidate SHA, deterministic policy/frozen gates, attestation, fencing/recovery, promotion and guarded authoritative transitions.
-
-`$nortropic-architect` must run the five-question substitution test before extending custom harness machinery. Provider/session/reviewer output is workflow evidence only and never PASS/attestation/promotion authority.
-
-Revised sequence after S3 h-003/h-004: SUB-1/h-027 → SUB-2/h-028 → SUB-3/h-029 → SUB-4/h-030 → S2/S4–S13 → L. SUB-0 is this owner amendment, not a builder task.
-
-The quota-aborted dirty worktree `owner/h-003-attestation-validity-44d525a5dd60` is preserved forensic evidence and must not be adopted as authority. Fresh S3 work after this amendment starts from the new authoritative main.
+`controller/loop/cli` är befintligt kontrollplansarbete vars framtida roll följer
+substitutionskontraktet; dess historiska form är inte automatiskt slutarkitekturen.
+Den fullständiga historiska routertexten (inkl. webbdelarna) finns i Git-historiken
+före `SEPARATION-20260910` och i webbrepot.
