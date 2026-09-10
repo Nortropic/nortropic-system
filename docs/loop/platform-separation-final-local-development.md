@@ -401,5 +401,70 @@ utan de fem sandboxberoende raderna)
 origin igen → RED `f4_ensure_roadmap_plan_returns_in_replica_without_any_remote`; (h) registernot "endast av
 människohand" → RED `f3_register_note_…` (+ pinnar/prepare). Alla åtta: exit 1.
 
+### Oberoende kontraktsgranskning 2026-09-10 → v2/v2.2
+Granskaren fann att en kandidat med 14 samtidiga återinföranden passerade v1 (74/74, result 32c7a1d2…).
+v2 lägger till: trädvid skanning av varje spårad fil utanför den frysta mängden, blob-OID-frånvaro,
+byte-bunden spec, EFTERARBETE append-only, bredare/skiftlägesoberoende extraktion (titlade länkar, `<…>`,
+valfri ändelse, `../`), kod/skal skannade med fragmenttoken (`konstitution`/`regelverk`/`beslutslogg`) och
+webbrepots namn, semantiska ägarstoppstoken (`Johnny`, `klartecken`, `vänta på ägaren`, `ägarens
+godkännande`), router↔undantag-not per listpunkt, sluten local-development-mängd, hållna kopior bundna mot
+bas-blob, config/README bunden trädvitt (v1:s påstående att F2 täckte config/README r.5/69/92–107 var fel:
+filen nås inte av slutningen). Kalibrering mot referensen: `mänsklig* godkännande` utgick (fasformuleringen
+i AGENTS.md/regler.md), `human owner`/`human-hand` utgick för kodsträngar (autopilotens negationer
+"not a request for the human owner"). Slutlig grind v2.2 (sha256
+`6506e97af4fb2ed84088ee8112640fea6ddf1b6eeb68ae57192a5fb386e1a925`, commit `c37030c9`): router-raden döms
+per listpunkt, aldrig ett efterföljande stycke (ett utkast passerade baslinjen av en slump på AGENTS.md:s
+allmänna mening om frysta artefakter).
+
+Referenskonstruktion v2.2 (scratch, förkastad; HEAD `c0ee652b…`, 143 filer; utöver v1: supersessionshuvud i
+loop-review, AGENTS p.5-not "fryst grindinput … inte dagens instruktion", README utan webbreponamn,
+owner-h003-not utan ordet beslutslogg; `.gitignore` med hela `docs/`/`tests/`/`scripts/`-vitlistor):
+fullkörning exit **0**, **83/83**, result.json sha256
+`74d1bceef847e9120045363a136491c6f027e6b88b84702c98d8281dc862cda3`; control-set 68/68 (8dcc6511…),
+launch-cwd 19/20 med exakt två extra grindar (f0a0cb9d…), governance 68/70 exakt {g6, g7} (718dad1f…),
+loopsvit 53 ok / 0 FEL med B2 via PINV-005, trädklassning frozen 54 / partial 7 / local-development 6 /
+code 24 / test 16 / text 33 / binary 3 med 0 träffar, slutning 36 nådda / 29 skannade, 0 hängande.
+
+Negativer mot v2.2 (24 st, var och en i egen replika av referensen, statiskt `--skip-held-gates`; alla
+exit 1, inget riggfel, 0 missade). Test-authorns: (a) skill read-first docs/07 → skill-rad + slutning +
+trädvid; (b) "Konstitutionen står över" i full-roadmap → full-roadmap-rad + trädvid; (c) docs/05 i premiar →
+premiar ×2 + slutning + trädvid; (d) `!/workflows/` → gitignore ×2; (e) vakten återställd → F1 ×4; (f)
+`docs/loop/x.md` → docs/03 via AGENTS → slutning + x_md + trädvid (+ pinnar/prepare); (g) fetch origin →
+`f4_ensure_roadmap_plan_returns…`; (h) "endast av människohand" i registret → registernot + trädvid människohand
+(+ pinnar/prepare). Granskarens: m0 config/README människohand → `f2_tree_wide_no_human_hand_rule…`; m1
+`.txt`-dokument från skill → slutning + `…_docs_loop_prompts_txt` + trädvid; m2 omdöpt arkivkopia →
+`f1_no_blob_at_head_…` + trädvid ×2; m3 worker-prompt.sh → slutning + `…_config_worker_prompt_sh` + trädvid;
+m4/m4b autopilotprompt (ord / sammansatt sökväg) → trädvid; m5/m5b controller relativ webbrepo-sökväg / öppnar
+webbdokument → trädvid; m6/m6b specrad ny/ändrad + ompinnad → `f3_spec_byte_identical…`; m7 EFTERARBETE aktiv
+instruktion → `f6_efterarbete_append_only…`; m8/m8b titlad/vanlig länk till notes.md → slutning + `…_notes_md` +
+trädvid; m9 `Docs/05-Beslutslogg.md` → slutning + skill-rad + trädvid; m10 nytt local-development-dokument →
+`f2_local_development_documents_…`; m11 `../../../`-länk → slutning + x_md + trädvid; m12 `<docs/07-…>` →
+slutning + skill-rad + trädvid; m13 "ägarens klartecken; vänta på Johnny" → skill-rad + trädvid människohand;
+m14 ny worker-webb.sh via loop-config → slutning + `…_config_worker_webb_sh` + trädvid; m15 modifierad, olänkad
+arkivkopia → trädvid ×2.
+
+### Test-author 2026-09-10 — baslinje RED för v2.2 (före produkt)
+Kommando (arbetsyta HEAD `c37030c9` = 332f07ce + grind v2.2 + detta dokument utan detta avsnitt; hållna grindar
+ur subjektets byte-identiska kopior; eget `TMPDIR`):
+`python3.12 verify/bin/platform-separation-final-exit --subject <arbetsyta>` → exit **1**,
+`RED_LOCAL_QUALIFICATION`, **51 PASS / 36 FAIL** (87 rader), result.json sha256
+`f43f6ef159ee20e0342e2bbb087de16438eb8a5ff4d5da61c80ec2e2c61bf769`.
+Röda rader (alla av rätt skäl): F1 ×4 (`check-verifierarregistret.mjs` i trädet; arkivkopior + vakten kvar;
+proveniens-2 saknas; fyra blobbar lika de överförda objekten); `f2_closure_all_active_references_…`;
+`f2_active_doc_…` ×9 (managed-settings, premiar-backlog, tre arkivkopior, byggplan r.113, full-roadmap r.17/115,
+evidenskontraktet r.120/130/137/139/144, substitutionskontraktet r.5+§6); `f2_tree_wide_no_web_governance_…`
+(.gitignore webbvitlistor, config/README r.35/69, managed-settings, registret, arkivkopiorna, …);
+`f2_tree_wide_no_human_hand_rule_…` (registrets not, arkivkopiornas HÖGRISK/"av människa", config/README);
+`f2_router_authority_section_…` (p.5 nämner owner-author-workflow/remaining-bootstrap utan fryst-not);
+`f2_substitution_contract_…`; `f2_historical_document_…` ×4 (v4.1, v2, owner-h003, loop-review); `f2_drift_md_…`;
+F3: premiar, managed-settings, gitignore-effekt, gitignore-vitlista (18 frånvarande träd), registernot;
+F4: argparse-defaults (`~/nortropic/…`), plankopior, `ensure_roadmap_plan` ×3 (Stop: `git fetch origin
+plan/autonomous-loop-v1` — transport 'file' not allowed); F5 ×2 (agents/qa-launcher.md, INV-004; 52 ok / 1 FEL);
+`f8_no_tracked_file_couples_…` (config/README r.35–36/43, managed-settings ×26).
+Gröna: kanarier ×5, `f2_local_development_documents_…`, `f3_spec_byte_identical_…`, preflight, PINV 6/0,
+platform-prepare/-check, selftest, publication-callers, loop-cli oförändrad, F6 ×3 (fryst evidens, tidigare
+grindar, EFTERARBETE append-only), F7 ×3 (control-set 68/68; launch-cwd 19/20 med exakt två extra grindar;
+governance 68/70 röd exakt på g6/g7 — deltan orsakas redan av grindens egen närvaro), F10 ×2.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
