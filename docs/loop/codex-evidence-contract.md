@@ -117,7 +117,7 @@ Builder:
 ```text
 FROZEN_ARTIFACTS_MODIFIED=NO
 ALLOWED_WRITE_VIOLATION=NO
-OWNER_GATE_REQUIRED=YES
+LOCAL_QUALIFICATION_REQUIRED=YES
 PUSH=NO
 MERGE=NO
 ```
@@ -127,21 +127,21 @@ Reviewer:
 ```text
 PRODUCTION_FILES_MODIFIED=NO
 BLOCKING_FINDINGS=<ids or NONE>
-OWNER_GATE_STILL_REQUIRED=YES
+LOCAL_QUALIFICATION_STILL_REQUIRED=YES
 PUSH=NO
 MERGE=NO
 ```
 
-## Owner interpretation
+## Interpretation
 
-The report reduces coordination cost. It does **not** remove the owner gate.
+The report reduces coordination cost. It does **not** replace the frozen gates.
 
-Before a trust-relevant push/merge, owner reproduces decisive frozen gates in the intended owner environment and verifies candidate identity/diff scope.
+Before a trust-relevant transition the decisive frozen gates are reproduced mechanically in local qualification (`AGENTS.md`) and candidate identity/diff scope is verified from Git, never from the report.
 
 <!-- CODEX-AUTOPILOT-V2-EVIDENCE -->
 ## v2 — mekanisk owner-gate executor
 
-Under `docs/loop/codex-autopilot-v2.md` är human owner fortfarande policyägare men behöver inte vara interaktiv terminaloperatör per candidate. `scripts/nortropic-codex-autopilot.py` reproducerar transition-relevant proof: exact Git identity, cumulative scope/budget, faktiskt frozen exit-test, independent reviewer identity, remote head/base och merged tree.
+Under `docs/loop/codex-autopilot-v2.md` (historisk operating model; auktoriteten är sedan 2026-09-10 `AGENTS.md`) finns ingen interaktiv terminaloperatör per candidate. `scripts/nortropic-codex-autopilot.py` reproducerar transition-relevant proof: exact Git identity, cumulative scope/budget, faktiskt frozen exit-test, independent reviewer identity, remote head/base och merged tree.
 
 Agentens strukturerade rapport är fortfarande evidence/claims och aldrig en verdict store. Autopilotens journal under Git common-dir är checkpoint/evidence only och får inte övertrumfa faktisk Git-/gate-state.
 

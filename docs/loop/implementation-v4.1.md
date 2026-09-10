@@ -1,3 +1,10 @@
+> **Supersessionsnot 2026-09-10 (plattformsrepot).** Historiskt arkitekturdokument (v4.1, 2026-07-31), bevarat
+> byte-exakt under denna not. Nuvarande auktoritet är `AGENTS.md`. Ersatta av det autonoma kontraktsflödet och de
+> tekniska skydden i `AGENTS.md` är: §3:s mänskliga led i arkitekturskissen ("godkänner spec, §A och merge"),
+> §4:s filstruktur med det odelade repots webbstyrningsfiler, och §29:s lista över vad som aldrig automatiseras
+> (godkännande av ny/ändrad task-spec, beslut vid §A, auto-merge). Gamla resultat behåller sina ursprungliga
+> subjekt.
+
 # Nortropic autonom loop — v4.1
 
 **Version:** 4.1

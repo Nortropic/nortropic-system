@@ -2,7 +2,7 @@
 
 ## managed-settings.json
 
-Claude Codes managed settings för fabrikens byggmaskin. **Källkopia — installeras, läses aldrig härifrån i drift.**
+Claude Codes managed settings för plattformens byggmaskin. **Källkopia — installeras, läses aldrig härifrån i drift.**
 
 Installationssökväg på macOS:
 
@@ -22,8 +22,8 @@ Träder i kraft vid nästa sessionsstart.
 
 | Nyckel | Verkan |
 |---|---|
-| `permissions.deny` (34) | Nekar verktygsvägen mot §A-mängden och läsning av nycklar |
-| `sandbox.filesystem.denyWrite` (13) | Nekar skalvägen mot §A på OS-nivå (Seatbelt) |
+| `permissions.deny` (27) | Nekar verktygsvägen mot den skyddade mängden (specens `defaults.denied_write`, inkl. `controller/verify/register.json`) under plattformsroten `/Users/elinhaggstrom/nortropic-repos/nortropic-system/` och läsning av nycklar |
+| `sandbox.filesystem.denyWrite` (6) | Nekar skalvägen mot samma mängd på OS-nivå (Seatbelt) |
 | `sandbox.network` | Tom allowlist utom `api.anthropic.com`, `strictAllowlist`, `allowManagedDomainsOnly` |
 | `requiredMinimum/MaximumVersion` | Claude Code vägrar starta utanför 2.1.224 |
 | `env.DISABLE_AUTOUPDATER` | Bakgrundsuppdatering av — pinnen håller |
@@ -32,16 +32,17 @@ Träder i kraft vid nästa sessionsstart.
 
 En `denyWrite`-post nekar **hela sökvägsgrenen ovanför sitt mål**, inte bara målet.
 Mätt 2026-08-07 med positiv kontroll: med provraden
-`/Users/elinhaggstrom/nortropic/wt/a1/AUTOPILOT` installerad gick `mkdir ~/nortropic/wt2`
-och `mkdir ~/nortropic/prov-igen` medan `mkdir ~/nortropic/wt` gav EPERM. Samma förälder,
+`<rot>/wt/a1/<fil>` installerad (`<rot>` = dåvarande föräldermapp till repot) gick `mkdir <rot>/wt2`
+och `mkdir <rot>/prov-igen` medan `mkdir <rot>/wt` gav EPERM. Samma förälder,
 samma användare, samma session. Gäller lika för glob och konkret sökväg.
 
 Följd: `denyWrite` kan inte selektivt skydda filer i en katalog som också måste vara
 skrivbar. Mekanismen fungerar där trädet redan finns (klonhalvan, verifierad 2026-08-07),
 men inte där kontrollplanet självt måste skapa katalogen.
 
-De tretton `~/nortropic/worktrees/**`-posterna är därför **borttagna** — de gjorde
-worktree-roten oskapbar och skyddade ingenting. 26 → 13 denyWrite-poster.
+De tretton `<rot>/worktrees/**`-posterna är därför **borttagna** — de gjorde
+worktree-roten oskapbar och skyddade ingenting. 26 → 13 denyWrite-poster (2026-09-10: 6,
+plattformens skyddade mängd under plattformsroten).
 §A-skyddet i workspacet vaktas i stället av skiva 7:s diffpolicy. Det är svagare:
 diffpolicyn granskar resultatet, inte försöket.
 
@@ -66,7 +67,7 @@ en logg eller ett workspace.
 | `workspace_rot` | katalog | Roten under vilken varje försök får sitt worktree. Utanför repot. |
 | `brytare_rot` | katalog | Roten under vilken varje task får sin brytarkatalog, `<brytare_rot>/<task-id>`. Där bor `tillstand.json` och den valfria `kvot.monster`. Utanför repot. |
 | `base_sha` | 40 hex | Commiten varje varv utgår från. Nästa varv bygger på förra ATTESTERADE kandidaten — basen flyttas aldrig av ett fallet varv. |
-| `verifier_id` | id | Verifieraren ur `controller/verify/register.json`. I dag `check-invariants`; `nortropic-verify-suite` är registrerad men **ej startbar**. |
+| `verifier_id` | id | Verifieraren ur `controller/verify/register.json`. I dag `check-invariants` (PINV-001–006), registrets enda post. |
 | `run_id` | sträng | Unikt per körning. Ingår i attempt-id och i kuvertet. |
 | `worker_cmd` | argv-lista | Kommandot som startar workern, som **lista** — aldrig en sträng, för då hade den blivit ett skalkommando hos den som exekverar den. |
 | `timeout_s` | tal > 0 | Per försök. Hela processgruppen dödas vid överskridande. |
@@ -101,7 +102,7 @@ Kedjan dömer tre saker: att rapporten är välformad (h-006), att diffen hålle
 inom `allowed_write` och budgetarna (h-007), och att verifieraren ur configen är
 grön mot kandidatträdet (h-002). **Taskens eget `exit_test` körs inte av kedjan**
 — det är medvetet utelämnat ur kuvertet så workern inte kan tuna mot sin egen
-grind, och det körs i dag av människan i byggflödets steg 3. En attestation
-betyder därför "diffen var laglig och de globala invarianterna höll", inte
-"tasken är löst". Auto-merge är avstängt beslut; människan för kandidaterna till
-main.
+grind, och det körs i byggflödets steg 3 som lokal kvalificering med den frysta
+grinden (`AGENTS.md`). En attestation betyder därför "diffen var laglig och de
+globala invarianterna höll", inte "tasken är löst". Kedjan för ingen kandidat till
+main; push och merge ingår inte i nuvarande fas (`AGENTS.md`).

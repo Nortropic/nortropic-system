@@ -5726,3 +5726,11 @@ Separat kandidatbas: ed584ec3088c08005f99de1da825d083e350a8d2.
 H039-WIP överförs inte. Ingen publicering, aktivering, installation eller
 supervisor resume ingår. Oförändrade substitutionspins och authority-snapshots
 är kvarstående kopplingar inför senare aktivering, inte dokumentcredit.
+
+## Aktiv plattformsnot (2026-09-10)
+
+Posterna ovan är historik och behåller sina subjekt och datum. §5 ovan ("Granska och föra till main")
+beskriver det historiska flödet där en person granskade kandidaterna och förde dem till main. På
+plattformen gäller i stället `AGENTS.md`: kontraktsflöde med oberoende granskning, frysta grindar och lokal
+kvalificering; push och merge ingår inte i nuvarande fas. Denna fil är dokumentationens hemvist för
+plattformens tasks.

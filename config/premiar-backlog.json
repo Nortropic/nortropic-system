@@ -1,19 +1,16 @@
 {
   "version": "premiar-1",
-  "note": "Premiärbacklog för loopens första verkliga körning. Två tasks, den andra beroende av den första så att kedjande base prövas med verkligt arbete. Båda binder fynd som redan är MÄTTA och registrerade i beslutsloggen (LOOP-ÄGARHAND-35 respektive granskningen av h-012) men aldrig bundna i en fallsamling. Arbetet är att DOKUMENTERA beteendet i fall, inte att ändra komponenterna.",
+  "note": "Premiärbacklog för loopens första verkliga körning. Två tasks, den andra beroende av den första så att kedjande base prövas med verkligt arbete. Båda binder fynd som redan är MÄTTA och registrerade (LOOP-ÄGARHAND-35 respektive granskningen av h-012, i Git-historiken före uppdelningen 2026-09-10) men aldrig bundna i en fallsamling. Dokumentationens hemvist på plattformen är docs/loop/drift.md. Arbetet är att DOKUMENTERA beteendet i fall, inte att ändra komponenterna.",
   "defaults": {
     "max_changed_files": 4,
     "max_added_lines": 200,
     "denied_write": [
-      "docs/07-konstitution.md",
-      "docs/03-regelverk.md",
-      "AUTOPILOT",
-      "CLAUDE.md",
-      "workflows/**",
-      "scripts/check-invariants.mjs",
-      "specs/**",
       "verify/**",
-      "controller/**"
+      "specs/**",
+      "controller/verify/register.json",
+      "scripts/check-invariants.mjs",
+      ".gitignore",
+      "CLAUDE.md"
     ]
   },
   "tasks": [
@@ -24,12 +21,12 @@
       "summary": "LOOP-ÄGARHAND-35 registrerade tre fynd i controller/brytare/cli som mättes men medvetet inte åtgärdades: h-009:s 200-teckensklipp av stderr kan SPLITTRA samma fel i flera fingerprints när ett prefix varierar i längd · VAG:s gränsklass innehåller kolon och matchar girigt, så en URL:s värdnamn raderas tillsammans med sökvägen och två fel mot olika ändpunkter smälter ihop · fingerprint-nycklarna gallras aldrig, så tillståndsfilen växer monotont. Inget av dem är bundet i tests/controller/brytare/fall.py, vilket betyder att en framtida ändring kan göra dem värre utan att något mäter det. Uppgiften är att DOKUMENTERA det uppmätta beteendet som fall — inte att ändra komponenten.",
       "allowed_write": [
         "tests/controller/brytare/**",
-        "docs/05-beslutslogg.md"
+        "docs/loop/drift.md"
       ],
       "exit_test": "verify/bin/p-001-exit",
       "exit_criterion": "tests/controller/brytare/fall.py kör grönt och bär minst tre fler fall än före. Fallen namnger de tre fenomenen var för sig: klippet vid 200 tecken, värdnamnet som försvinner ur en URL, och att fingerprint-nycklarna aldrig gallras. Inget befintligt fall är borttaget, och controller/brytare/cli är oförändrad — uppgiften dokumenterar beteende, den ändrar det inte.",
       "docs_impact": [
-        "docs/05-beslutslogg.md"
+        "docs/loop/drift.md"
       ],
       "depends_on": []
     },
@@ -40,12 +37,12 @@
       "summary": "Granskningen av controller/utforare/cli mätte två mekanismer som är verkliga men bedömdes ofarliga och därför lämnades: git show --name-only citerar sökvägar enligt core.quotePath, så ett filnamn med icke-ASCII hamnar i files som citerad oktalform i stället för den verkliga sökvägen · skapar sessionen ett nästlat git-repo stagas det som en gitlink (mode 160000) vars målcommit inte finns i den delade objektdatabasen. Ingen av dem är bunden i tests/controller/utforare/fall.py. Uppgiften är att dokumentera det uppmätta beteendet som fall — inte att ändra komponenten.",
       "allowed_write": [
         "tests/controller/utforare/**",
-        "docs/05-beslutslogg.md"
+        "docs/loop/drift.md"
       ],
       "exit_test": "verify/bin/p-002-exit",
       "exit_criterion": "tests/controller/utforare/fall.py kör grönt och bär minst två fler fall än före. Fallen namnger de två fenomenen var för sig: den citerade formen för ett icke-ASCII-filnamn i files, och gitlinken för ett nästlat repo. Inget befintligt fall är borttaget, och controller/utforare/cli är oförändrad.",
       "docs_impact": [
-        "docs/05-beslutslogg.md"
+        "docs/loop/drift.md"
       ],
       "depends_on": [
         "p-001"

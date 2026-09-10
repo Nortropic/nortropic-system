@@ -5,8 +5,8 @@ verksamhetsneutrala autonomiplattform: Trust Kernel (hela tillitsplattformen),
 controller, bootstrap, supervisor/autopilot och tillhörande H-arbeten.
 Webbförvaltningen är sedan 2026-09-10 utbruten till ett separat repo. Dess styrning
 gäller inte plattformen och ingår inte i plattformens auktoritetsordning, instruktioner,
-agentprompter eller körbara beroenden. Historiken är bevarad ordagrant under
-`docs/loop/arkiv/` (se Historik nedan) och i Git-historiken före uppdelningen.
+agentprompter eller körbara beroenden. Historiken är bevarad i Git-historiken före
+uppdelningen och, för överfört material, i webbrepot med proveniens (se Historik nedan).
 
 ## Auktoritetsordning
 
@@ -140,9 +140,15 @@ substitutionskontraktet; dess historiska form är inte automatiskt slutarkitektu
 
 ## Historik
 
-Den styrning som före 2026-09-10 stod i plattformens dokument är bevarad ordagrant, som
-historia och inte som instruktion, i `docs/loop/arkiv/regler-fore-2026-09-10.md`,
-`docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md` och
-`docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md`. Den fullständiga historiska
+Den styrning som före 2026-09-10 stod i plattformens dokument finns ordagrant i Git-historiken
+före uppdelningen — `dae90c8f:docs/loop/regler.md`, `dae90c8f:docs/loop/byggplan-v3.md` och
+specens dåvarande styrningsfält i `dae90c8f:specs/tasks.spec.json` — som historia och inte som
+instruktion. Det renodlade webbmaterialet (dessa texters arkivkopior och webbens registervakt)
+är överfört till webbrepot; överföringens proveniens (sökväg, blob-OID vid 332f07ce,
+destination) står i `SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv` och
+`SEPARATION-20260910/WEB-TRANSFER-PROVENIENS-2.tsv`. Den fullständiga historiska
 routertexten finns i Git-historiken före uppdelningen; uppdelningens förslag ligger under
-`SEPARATION-20260910/proposed/`.
+`SEPARATION-20260910/proposed/`. Den frysta autonoma planen (`0b3212c9`) är kopierad
+byte-exakt till `docs/loop/autonomous-loop-plan-v1.md` och
+`docs/loop/autonomous-loop-codex-handoff.md`; plan-authority läses ur dessa kopior, inte ur
+någon origin-gren.

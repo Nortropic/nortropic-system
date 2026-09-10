@@ -5,7 +5,8 @@ Sedan 2026-09-10 innehåller repot enbart den verksamhetsneutrala autonomiplattf
 Trust Kernel (hela tillitsplattformen, inte bara H034:s fyra artefaktfiler), controller,
 bootstrap, supervisor/autopilot och tillhörande H-arbeten. Webbförvaltningen är utbruten
 till repot `nortropic-webbforvaltning`; dess styrning gäller inte plattformen, och
-historiskt webbmaterial finns kvar som Git-historik och under `docs/loop/arkiv/`.
+historiskt webbmaterial finns kvar som Git-historik och, där det överförts, i webbrepot med
+proveniens (`SEPARATION-20260910/WEB-TRANSFER-PROVENIENS*.tsv`).
 
 Nortropic är den organisatoriska helheten; plattformen är en del av den; Digitala är den
 första professionella verksamheten. Webbens brief-, design-, kvalitets- och
@@ -18,22 +19,25 @@ förvaltningsregler är domänkrav och gäller inte plattformsuppdrag.
   attest, state, loop, runtime-cleanup (H039), h034-native (Trust Kernel-artefakt).
 - **`verify/`** — frysta exit-test per skiva (`h-001`…`h-039`, `p-*`, python-authority) samt
   lokala kvalificeringsgrindar (`document-authority-exit`, `invariant-required-exit`,
-  `platform-control-set-exit`, `launch-cwd-exit`, `platform-governance-exit`), och
+  `platform-control-set-exit`, `launch-cwd-exit`, `platform-governance-exit`,
+  `platform-separation-final-exit`), och
   H034/H039-artefaktpaket under `verify/h034/`, `verify/h039/`. Frysta: en grind ändras aldrig
   av den builder den dömer; nya eller ändrade grindar går genom kontraktsflödet i `AGENTS.md`.
 - **`specs/`** — `tasks.spec.json` (kontrollplanets skivor, `allowed_write`, frysta grindar,
   den skyddade mängden i `defaults.denied_write`) och `owner-production-paths.v1.json`.
 - **`scripts/nortropic-codex-autopilot.py`** — mekanisk exekverare (v2–v4);
   **`scripts/check-invariants.mjs`** — registrerad plattformsverifierare (PINV-001–006, i den
-  skyddade mängden); `scripts/check-verifierarregistret.mjs`.
+  skyddade mängden).
 - **`config/`** — loop-config-exempel, worker-prompt, provider-/python-authority-pinnar,
   premiärbacklog, källkopia av managed-settings.
 - **`tests/controller/`**, **`tests/scripts/`** — kontraktssviter och hermetiska prov.
 - **`.agents/skills/`** — rollskills (test-author, builder, reviewer, gate-reviewer, architect,
   empirical-runner). Rollerna och flödet står i `AGENTS.md`.
 - **`docs/loop/`** — byggplan v3, regler, v4.1-arkitektur, substitutionskontrakt, owner-
-  author-workflow, delegation, drift, evidenskontrakt, lokala utvecklingsdokument, arkiv.
-- **`SEPARATION-20260910/`** — förslagen från uppdelningen (`proposed/`).
+  author-workflow, delegation, drift, evidenskontrakt, lokala utvecklingsdokument, de
+  plattformsfrysta plankopiorna (`autonomous-loop-plan-v1.md`, `autonomous-loop-codex-handoff.md`), arkiv.
+- **`SEPARATION-20260910/`** — förslagen från uppdelningen (`proposed/`), allokeringen och
+  proveniensen för det som överförts till webbrepot (`WEB-TRANSFER-PROVENIENS*.tsv`).
 
 ## Skydden
 

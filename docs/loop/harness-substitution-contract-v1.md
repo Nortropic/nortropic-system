@@ -2,7 +2,7 @@
 
 **Owner architecture amendment — 2026-08-11**
 
-This document is owner authority for the implementation shape of the remaining Nortropic autonomous-loop roadmap. It does **not** weaken the constitution, rulebook, loop rules, frozen task gates, candidate identity requirements, containment, or promotion boundaries.
+This document is owner authority for the implementation shape of the remaining Nortropic autonomous-loop roadmap. It does **not** weaken the platform authority order in `AGENTS.md`, the loop rules, frozen task gates, candidate identity requirements, containment, or promotion boundaries.
 
 The original frozen roadmap at commit `0b3212c991d4227c8df2656465ae2c0252dda39e` remains authority for required effects, migration intent, negative controls and final capabilities. Where that plan prescribes or implies custom agent-harness machinery that modern provider harnesses already own, this amendment supersedes only that **implementation shape**.
 
@@ -167,7 +167,7 @@ Exact builder `allowed_write`:
 ```text
 controller/provider/**
 tests/controller/provider/**
-docs/05-beslutslogg.md
+docs/loop/drift.md
 ```
 
 Required effects:
@@ -194,7 +194,7 @@ controller/launch/**
 controller/provider/**
 tests/controller/launch/**
 tests/controller/provider/**
-docs/05-beslutslogg.md
+docs/loop/drift.md
 ```
 
 Required effects:
@@ -225,7 +225,7 @@ tests/controller/provider/**
 tests/controller/taskcontract/**
 tests/controller/worker/**
 tests/controller/envelope/**
-docs/05-beslutslogg.md
+docs/loop/drift.md
 ```
 
 Required effects:
@@ -255,7 +255,6 @@ controller/provider/**
 tests/controller/loop/**
 tests/controller/brytare/**
 tests/controller/provider/**
-docs/05-beslutslogg.md
 docs/loop/drift.md
 ```
 
@@ -331,7 +330,7 @@ Provider session status and usage are observability. Kernel state is authority. 
 
 Ordinary implementation choices under this contract are delegated to the autonomous architect/test-author/builder/reviewer workflow.
 
-Human authority remains necessary only for genuine higher-authority conflict, constitution/human-only policy, legal human-only action, or an external credential/provisioning ceremony that cannot be automated without weakening the frozen model.
+Human authority remains necessary only for genuine higher-authority conflict or an external credential/provisioning ceremony that cannot be automated without weakening the frozen model (`HUMAN_AUTHORITY_HARD_STOP`; the platform authority order is `AGENTS.md`).
 
 The dedicated external Nortropic Promoter identity remains such a possible deployment ceremony. Broad personal GitHub credentials are never a silent substitute.
 
@@ -342,3 +341,7 @@ The dedicated external Nortropic Promoter identity remains such a possible deplo
 `FULL_ROADMAP_COMPLETE` additionally requires the external promoter identity required by the frozen promotion model to be proven.
 
 Neither a provider `READY` report nor an orchestrator configuration marker such as `FULL_ROADMAP=YES` is product completion.
+
+## 14. Amendment 2026-09-10 — platform separation (v1.1)
+
+The web governance that this contract's preamble, §6 and §12 referred to left the platform repository on 2026-09-10 (`AGENTS.md`, Historik). The platform's authority order is `AGENTS.md`. This amendment changes exactly three places: the preamble names the platform authority order instead of the web documents; the SUB builder write surfaces in §6 name `docs/loop/drift.md` — the platform's documentation home — instead of the web decision log; §12 keeps only the two genuine hard stops (higher-authority conflict, external credential/provisioning ceremony). §1–§5, §7–§11 and §13 are unchanged; the historical references they carry are evidence, not instruction. Codex/provider machinery is untouched here; its substitution is SUB-1.
