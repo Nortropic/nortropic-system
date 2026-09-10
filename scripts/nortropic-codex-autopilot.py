@@ -97,10 +97,10 @@ ROADMAP_PLAN_BLOBS = {
 # Platform document generation after the 2026-09-10 repository split: router
 # documents and docs/loop/** only, pinned by blob on origin/main.
 SUBSTITUTION_BLOBS = {
-    "AGENTS.md": "ebd5e49479fe10d707d7c0f0c81ce555fa14d164",
+    "AGENTS.md": "8d54ece2e1861f2b5869dfd83694ff3a6860e240",
     "CLAUDE.md": "772a39e8247e51c79e412bb9698d7715f693625b",
     "README.md": "7fa037e541561a7be256603d68cbf3915ae5ed0d",
-    "docs/loop/byggplan-v3.md": "e9f56512566beab335d146b106c144f88f932115",
+    "docs/loop/byggplan-v3.md": "e54a43fe69002a20aa539dd6c70f29d4b7302f62",
     "docs/loop/codex-evidence-contract.md": "e89e5bff8f1373d98130d0d8c28d0da30f300623",
     "docs/loop/drift.md": "6e57111d86442cd4f64e36cc7c85cb3ef17f9337",
     "docs/loop/owner-author-workflow-v1.md": "4aabf054c217cfd5cdca46456d11f25de0211bbf",
