@@ -266,6 +266,47 @@ röd. (B) minimal riktig ändring — `defaults.denied_write` = de sex plattform
 FROZEN_GATE_READY=YES · BASELINE_RED_FOR_RIGHT_REASON=YES ·
 PRODUCTION_IMPLEMENTATION_WRITTEN=NO · PUSH=NO · MERGE=NO.
 
+### Produktkörning 2026-09-10 (BUILDER, subjekt = kandidaten fbdf3ece)
+
+Subjekt: produktcommiten `fbdf3ece18ea05d0f60133e8cba5df4b0f2ea185` (förälder e8eb50fa, träd
+`95127e740d3d52e4741dbfd0a1c9c784198e43e6`), arbetsyta
+`/Users/elinhaggstrom/nortropic-repos/work/builder-platform-governance-20260910`, status tom.
+Samma kommando som ovan med `--subject` = arbetsytan (bypass av sessionens sandbox för de hållna
+grindarnas loopar, umask 0022, hållna kopior byte-lika kandidatens).
+
+Exit 0, 70 rader: 70 PASS / 0 FAIL, inget RIG_ERROR,
+`PLATFORM_GOVERNANCE_RESULT=PASS_LOCAL_QUALIFICATION_ONLY`. `FIXTURE_ROOT=
+/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/platform-governance-local-zmoo5yz1`,
+`result.json` SHA-256 `62cacdf39feffc9248347f8b309340f1427b35271c43970d18c28756ed801894`
+(`subject_head` = fbdf3ece). Hållna grindar: `platform-control-set-exit` exit 0, 68/68,
+result.json `55f86fcdc7ba7a8f…`; `launch-cwd-exit` exit 1, 19/20 med exakt
+`frozen_verify_bin_identical_to_base_383ed387` = `files=32 problems=[] extra=['verify/bin/platform-governance-exit']`,
+result.json `c831bf0d4553bafc…`.
+
+Baslinje före produkt (samma grind, `--skip-held-gates`, sandboxat): exit 1, 29 PASS / 41 FAIL
+(39 produktrader + 2 hoppade G7-rader), `RED_LOCAL_QUALIFICATION`.
+
+Direkta kontroller mot arbetsytan (pinnad Python 3.12): `tests/controller/policy/fall.py` →
+103 rätt, 0 fel, exit 0, ingen kvarlämnad worktree/gren; autopilotens `selftest(None)` →
+`AUTOPILOT_V4_SELFTEST=PASS`; `publication-callers.py` → exit 0 ("4 publication callers PASS");
+`controller/verify/cli preflight` → exit 0 `{"register_sha256": "f1c553d9…", "status": "ok"}`;
+`node scripts/check-invariants.mjs` → 6 PASS, 0 FAIL, exit 0.
+
+Produktändringen (19 filer, +848/−429 mot e8eb50fa): `defaults.denied_write` = `verify/**`,
+`specs/**`, `controller/verify/register.json`, `scripts/check-invariants.mjs`, `.gitignore`,
+`CLAUDE.md`; `human_only` borttaget (m-001 hör till webbrepot, m-002 var utanför repot och redan
+avvecklad — båda arkiverade i `docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md`);
+`authority.backlog` → `docs/loop/byggplan-v3.md` (skivordningen i §7 + specens rader; det andra
+kandidatdokumentet förklarar sig självt inte vara en backlog); h-035 utan `docs/05-beslutslogg.md`
+i `allowed_write`/`docs_impact`, `AGENTS.md` kvar (plattformsdokument); policyn vaktar hela
+`denied_write` utan `AGARHAND`-subtraktion, verdiktetiketten `sektion_a` och exit 3 behålls, texten
+neutral; `PLATFORM_SPEC` = `3e5d564c…`; `PLATFORM_DOCUMENTS`/`SUBSTITUTION_BLOBS` re-pinnade för
+AGENTS.md, CLAUDE.md, README.md, regler.md, byggplan-v3.md (blob = `git rev-parse HEAD:<fil>`);
+autopilotens roadmap-skydd läser specens `denied_write` i stället för en egen lista; regler.md och
+byggplan-v3.md ordagrant arkiverade i `docs/loop/arkiv/*-fore-2026-09-10.md`.
+
+ROLE=BUILDER · FROZEN_ARTIFACTS_MODIFIED=NO · ALLOWED_WRITE_VIOLATION=NO · PUSH=NO · MERGE=NO.
+
 ### Demonstration av det autonoma flödet (fylls i av root efter cykeln)
 
 ```text
