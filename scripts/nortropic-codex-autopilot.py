@@ -96,18 +96,18 @@ ROADMAP_PLAN_BLOBS = {
     ROADMAP_PLAN_PATH: "c8ea851167f38f6846485035ee2e6b1dc3b54db0",
     ROADMAP_HANDOFF_PATH: "1e53887c59b8da0989579eaa241c5b53ea02abb9",
 }
+# Platform document generation after the 2026-09-10 repository split: router
+# documents and docs/loop/** only, pinned by blob on origin/main.
 SUBSTITUTION_BLOBS = {
-    "AGENTS.md": "26e835d01bd952239f7956e8a821168445a5ef51",
-    "CLAUDE.md": "52c93a66879f6043b89ea20f7fa7d31143219f35",
-    "README.md": "1b95647e842464ed9e710a16e9fa451b4f385b68",
-    "docs/00-borja-har.md": "d023530b2561cd2a7a7b3925cb17fc4510798590",
-    "docs/03-regelverk.md": "51b40ed15da4d373f8ba7d032602f915c1c33ae3",
-    "docs/05-beslutslogg.md": "311bf8e156a66825f4b2afd25c55a0f930cd8a24",
-    "docs/07-konstitution.md": "134ec4b65c2a6ba96c2a239ee4c69d82573cb3f3",
-    "docs/agentoverlamning.md": "586487a47894e746b097c5b4b301d6f070fc794b",
+    "AGENTS.md": "c90ebebd6a71b7623516271d07a4ef72759c4457",
+    "CLAUDE.md": "630ce3275cbf09e167bcc46861e893043a90861c",
+    "README.md": "20df72000ecf9899aac48c80590e5803d008a160",
     "docs/loop/byggplan-v3.md": "c0b3b04b09fe901a16df9c83a81c37d157aa03bb",
+    "docs/loop/codex-evidence-contract.md": "18b833174d1673c24e00b6c2f28601d9ab5f48fd",
     "docs/loop/drift.md": "8f0fbacb9ed401d53a1113b7effc0a6ff92078a7",
+    "docs/loop/owner-author-workflow-v1.md": "4aabf054c217cfd5cdca46456d11f25de0211bbf",
     "docs/loop/regler.md": "b0bc10ae78ed8eb4ee9a1767921111eb94faa146",
+    "docs/loop/remaining-bootstrap-delegation-v1.md": "20319089c4085b79ec2b8f600396c71b21dbd392",
     SUBSTITUTION_OWNER_PATH: "4a41e3952f55453ba2e83b2d553f7af2b76d5705",
     SUBSTITUTION_AUDIT_PATH: "bb5f99c111cd5aaf784e73e67bde354023b1b5f2",
 }
@@ -2583,7 +2583,7 @@ def selftest(repo: Path | None = None) -> None:
             raise Stop(f"provider-neutral dependency floor missing from {code}")
     if ROADMAP_PLAN_SHA != "0b3212c991d4227c8df2656465ae2c0252dda39e":
         raise Stop("roadmap authority SHA drift")
-    if (len(SUBSTITUTION_BLOBS) != 13 or
+    if (len(SUBSTITUTION_BLOBS) != 11 or
             SUBSTITUTION_BLOBS.get(SUBSTITUTION_OWNER_PATH) != "4a41e3952f55453ba2e83b2d553f7af2b76d5705" or
             SUBSTITUTION_BLOBS.get(SUBSTITUTION_AUDIT_PATH) != "bb5f99c111cd5aaf784e73e67bde354023b1b5f2"):
         raise Stop("substitution authority blob drift")
