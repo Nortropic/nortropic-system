@@ -200,10 +200,71 @@ grinden binder dem oförändrade.
 
 ## Utfall
 
-### Preprodukt-RED 2026-09-10 (TEST_AUTHOR)
+### Preprodukt-RED 2026-09-10 (TEST_AUTHOR, subjekt = arbetsytan vid 6c10766d)
 
-Fylls i efter grindens första körning mot arbetsytan med grinden och dokumentet committade
-(subjekt, kommando, exit, rader, `FIXTURE_ROOT`, `result.json`-sha256). Se nästa avsnitt.
+Subjekt: kontraktscommiten `6c10766d540887928396fc8a9a1208138624e23a` (förälder 512490d4;
+grind + detta dokument, inget annat). Kommando (bypass av sessionens sandbox för de hållna
+grindarnas loopar, umask 0022, hållna kopior vid dadafe96 resp. 2444a856 byte-lika
+kandidatens):
+
+```text
+/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -B /Users/elinhaggstrom/nortropic-repos/work/test-author-platform-governance-20260910/verify/bin/platform-governance-exit --subject /Users/elinhaggstrom/nortropic-repos/work/test-author-platform-governance-20260910 --held-control-set /Users/elinhaggstrom/nortropic-repos/work/test-author-platform-control-set-20260910/verify/bin/platform-control-set-exit --held-launch-cwd /Users/elinhaggstrom/nortropic-repos/work/test-author-launch-cwd-20260910/verify/bin/launch-cwd-exit
+```
+
+Exit 1, 70 rader: 31 PASS / 39 FAIL, inget RIG_ERROR,
+`PLATFORM_GOVERNANCE_RESULT=RED_LOCAL_QUALIFICATION`. `FIXTURE_ROOT=
+/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/platform-governance-local-3wk39584`,
+`result.json` SHA-256 `067580e8a92ed2f283b795e52941d0e1377f6c5d25061ff0f9a4e60227e7a5f4`.
+
+Gröna: de fem kanarierna, `g1_active_authority_files_present`,
+`g1_no_web_governance_reference_CLAUDE_md`/`README_md`/`nortropic-empirical-runner`,
+`g1_arkiv_references_resolve_to_tracked_files`, `g2_no_human_hand_rule_` för builder-,
+reviewer- och test-author-skillen, `g2_claude_md_routes_to_agents_md`,
+`g3_policy_accepts_write_inside_allowed_write`, `g3_policy_accepts_controller_write_inside_allowed_write`,
+`g3_policy_platform_verdict_is_never_masked_by_milder_refusal` (redan i dag exit 3 via
+`workflows/x.js`), `g4_spec_no_task_lost_its_gate`, `g4_verify_cli_pins_equal_candidate_spec_and_register`,
+`g4_platform_prepare_and_check_accept_candidate_spec_and_documents`,
+`g5_no_web_document_reference_controller_verify_cli`/`controller_loop_cli`,
+`g5_attest_cli_docs05_only_inside_historical_refreeze_functions`, `g5_autopilot_selftest_none_returns_pass`,
+`g5_autopilot_publication_callers_exit0`, båda G6-raderna, båda G7-raderna
+(`platform-control-set-exit` 68/68, result.json `b3ff2c54…`; `launch-cwd-exit` 19/20 med
+exakt `frozen_verify_bin_identical_to_base_383ed387` = `files=32 problems=[] extra=['verify/bin/platform-governance-exit']`,
+result.json `3aaaf94c…`), G8 och G9.
+
+Röda av rätt skäl: G1 — `AGENTS.md` ("webbens konstitution", "inte ett nytt regelverk"),
+`regler.md` ("Konstitutionen och regelverket står fortsatt över"), `byggplan-v3.md` (§3.1 med
+hela webbmängden), fem skills med `docs/07`/`docs/03` i Read first. G2 — "endast av
+människohand" (`AGENTS.md`, `CLAUDE.md`, `README.md`), regel 6 "alltid människa, alltid
+HÖGRISK" (`regler.md`, `byggplan-v3.md` §3.1/§7.1/§10), `OWNER_DECISION_REQUIRED`/`human-only`
+(architect-, empirical-runner-, gate-reviewer-skillen); `AGENTS.md` saknar `hash` och
+`falsk PASS`; `regler.md` saknar rollnamn, `allowed_write`, falsk PASS; architect-skillen
+pekar inte på `AGENTS.md`. G3 — `verify/bin`, `specs/tasks.spec.json`,
+`controller/verify/register.json`, `.gitignore` avvisas i dag som `utanför allowed_write`
+(exit 4, AGARHAND-subtraktionen / saknas i `denied_write`); `scripts/check-invariants.mjs`
+och `CLAUDE.md` ger exit 3 men med texten "alltid människa och HÖGRISK-märkt commit";
+`workflows/x.js` och `docs/07-konstitution.md` ger exit 3 (§A) i stället för exit 4;
+policyns docstring nämner `docs/07`, `docs/00-borja-har`. G4 — `authority.backlog` →
+`docs/100-dagar/programregister.md` (borta), `human_only` bär m-001 med "Människohand,
+HÖGRISK-märkt", h-035 bär `docs/05-beslutslogg.md`, `denied_write` täcker inte
+`controller/verify/register.json`/`.gitignore` och bär webbsökvägar. G5 — autopiloten bär
+`docs/07`/`docs/03`/`docs/05`/`"AUTOPILOT"` (rad 84, 159–232, 1383, 1430–1440, 1496, 1779);
+`tests/controller/policy/fall.py` prövar `docs/07`; `TEST_AUTHOR_ALLOWED`,
+`EMPIRICAL_GATE_ALLOWED` och alla roadmap-tupler bär `docs/05`; basens eget policyprov är
+redan rött på plattformsträdet (`radering-av-sektion-a`: webbfilen `AUTOPILOT` finns inte att
+radera → exit 5 i stället för 3; 77 rätt, 2 fel) och diskrimineringsraden krediteras därför inte.
+
+Adversariell grindgranskning (skrotreplikor under `$TMPDIR`, raderade; `--skip-held-gates`):
+(A) policy med hårdkodad plattformslista, spec orörd, människotext kvar → G3 5/14,
+`g3_policy_protection_is_sourced_from_spec_denied_write` och textraderna röda, g4-`denied_write`
+röd. (B) minimal riktig ändring — `defaults.denied_write` = de sex plattformsmönstren,
+`AGARHAND = ()`, neutral avslagstext — → G3 13/14 (enda röda: docstringens `docs/07`/
+`HÖGRISK`-prosa), `g4_spec_defaults_denied_write_is_the_platform_set` grön, pinnraden röd
+(specen ändrad utan `PLATFORM_SPEC`), policyprovet rött (det förväntar `verify` → exit 4).
+(C) policy som alltid ger exit 3 → G3 0/14. Raderna skiljer rätt från fel; G3/G4-effekterna
+är uppfyllbara. Ingen referensimplementation för G1/G2/G5 skrevs (textarbete i produktytan).
+
+FROZEN_GATE_READY=YES · BASELINE_RED_FOR_RIGHT_REASON=YES ·
+PRODUCTION_IMPLEMENTATION_WRITTEN=NO · PUSH=NO · MERGE=NO.
 
 ### Demonstration av det autonoma flödet (fylls i av root efter cykeln)
 
