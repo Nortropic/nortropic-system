@@ -537,3 +537,24 @@ exakt g6/g7), F10 ×2.
 
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
+
+#### Builder v3 2026-09-10 — produkt mot v2.3, fullkörning GRÖN
+Kandidat: gren `nortropic/final-separation-product-v3`, produktcommit `012c433b55ac54cc8a891100a4123a02127c9b61`
+(parent `48aeb782` = v2-kandidaten ombaserad på kontrakt v2.3 `a6953ac`; grind `f9708786…` orörd).
+Produktändring mot 48aeb782 (4 filer, +21/−15): `AGENTS.md` Fasgränser- och Historik-styckena bär nu
+`fryst`/`historisk` + `inte dagens instruktion` vid remaining-bootstrap-delegation respektive plankopiorna;
+`docs/loop/byggplan-v3.md` sex hänvisningar till den borttagna arkivkopian → `dae90c8f:docs/loop/byggplan-v3.md`
+och §8.5 → "fryst grindinput, inte dagens instruktion"; ompinnat i `controller/verify/cli` `PLATFORM_DOCUMENTS`
+(AGENTS.md `fb030dad…`, byggplan `a3467085…`) och autopilotens `SUBSTITUTION_BLOBS` (`8d54ece2…`, `e54a43fe…`).
+Statisk körning (`--skip-held-gates`, eget TMPDIR): på 48aeb782 exit 1, 78 PASS / 6 FAIL (routerraden + 5 sandboxrader);
+på 012c433b exit 1, 79 PASS / 5 FAIL (exakt de 5 sandboxraderna).
+Fullkörning på 012c433b (hållna grindar via `--held-control-set/--held-launch-cwd/--held-governance`, eget TMPDIR,
+ingen annan grind på hosten enligt `/bin/ps`): `python3.12 verify/bin/platform-separation-final-exit --subject <arbetsyta> …`
+→ exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **84 PASS / 0 FAIL**, stderr tom, result.json sha256
+`cb8bd31a52d839c0f2493488e29b63d534d6d8dd7c7aec4f86bb9d544915cce3`. Hållna grindar: control-set rc 0, 68/68;
+launch-cwd rc 1, 19/20, enda röda `frozen_verify_bin_identical_to_base_383ed387` med `extra=[governance, final]`;
+governance rc 1, 68/70, röda exakt {g6, g7}. Direkt utanför grinden: `selftest(None)` returnerade med
+`AUTOPILOT_V4_SELFTEST=PASS`; publication-callers exit 0; `controller/verify/cli preflight` exit 0 (register
+`9752d01d…`); `node scripts/check-invariants.mjs` 6 PASS / 0 FAIL; `tests/controller/policy/fall.py` 103 rätt / 0 fel.
+Frysta artefakter orörda (grind, tre tidigare grindar, check-invariants, loop/policy-cli, owner-author-workflow,
+remaining-bootstrap-delegation, plankopior, spec byte-lik 332f07ce). PUSH=NO MERGE=NO.
