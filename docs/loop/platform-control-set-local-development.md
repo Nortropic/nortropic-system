@@ -237,3 +237,44 @@ finns inte kvar.
 
 FROZEN_GATE_READY=YES · BASELINE_RED_FOR_RIGHT_REASON=YES ·
 PRODUCTION_IMPLEMENTATION_WRITTEN=NO · PUSH=NO · MERGE=NO.
+
+### Produkt 2026-09-10 (BUILDER, subjekt = arbetsytan vid 4ff1b078, förslagen INTE tillämpade)
+
+Produktcommit `4ff1b078d5b8b6348aa71d5ea4956d5dfa152692` (förälder dadafe96) på
+`nortropic/platform-control-set-product`: `controller/verify/cli`
+`83060ddcc2d3b87ace2186577eef8229de38bf858dfc5980d1881bcb71701431` (PRETASK_PATHS och
+`snapshot_roots` utan `docs/07`/`docs/03`; `PLATFORM_DOCUMENTS` = de 11 plattformsdokumenten
+med sha256 vid dadafe96; `PLATFORM_REGISTER` = förslagets `f1c553d9…`; `PLATFORM_SPEC`
+oförändrad), `scripts/nortropic-codex-autopilot.py`
+`bea85be9296566dd4256333a9b234cee31c1eeac4bed3c99817a7a196a4015f7` (`SUBSTITUTION_BLOBS` =
+samma 11 dokument med blob-OID vid dadafe96; selftest 13→11). `controller/loop/cli` orörd.
+
+Samma grindkommando (held dadafe96, bypass för D5, umask 0022) mot arbetsytan: exit 1,
+68 rader: 40 PASS / 28 FAIL, inget RIG_ERROR, `RED_LOCAL_QUALIFICATION`, result.json
+`/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/platform-control-set-local-0880l__5/result.json`
+SHA-256 `3d7d757ab5f21c0f0fdfb5d2a047f0e620e4d5f2caf421b54b786d143fd9cb7a`. Nya gröna
+mot preprodukt-RED: `autopilot_substitution_accepts_platform_generation_without_web_docs`,
+alla 11 `autopilot_substitution_rejects_mutated_*`, `loop_end_to_end_attests_platform_fixture_task`
+(replikan bär förslagen själv). Kvarvarande 28 röda är alla blockerade av det otillämpade
+registret/verifieraren i arbetsträdet: `subject_preflight`/`subject_prepare`/
+`subject_run_commit`/`subject_real_verifier` (webbposten `nortropic-verify-suite`, 0/8),
+`platform_prepare_and_check_accept_subject_documents` + 12 `platform_prepare_*`/
+`platform_check_*` (nu `REGISTER_IDENTITY`: pinnen `f1c553d9…` möter det gamla registret
+`a87869be…`), `fixture_preflight_prepare_ok`, `fixture_task_run_exit0`, sex `refuse_*`,
+`stop_missing_authority_core_before_worker` (stoppar redan i verifierarregistret) och
+`invariant_required_exit_15_of_15` (14/15, endast `real_verifier_rc0_on_subject`).
+
+Engångsreplika (scratchpad, h-035-receptet) = produkten + förslagen kopierade till
+`scripts/check-invariants.mjs` (`ae72cdf8…`) och `controller/verify/register.json`
+(`f1c553d9…`), commit 0724a258 ovanpå dadafe96: samma kommando gav exit 0, 68/68 PASS,
+`PASS_LOCAL_QUALIFICATION_ONLY`, result.json
+`/private/var/folders/_v/t4cy04w95gz3m782_3p5qs9h0000gn/T/platform-control-set-local-ltq6iwsy/result.json`
+SHA-256 `3c94d8d8095d489b4aef8f2f354fd700b3720d0fa5b57e15549d6f8ee9c580ab`;
+`invariant-required-exit` 15/15 i replikan, 14/15 mot arbetsytan;
+`tests/scripts/nortropic-codex-autopilot/publication-callers.py` exit 0; `selftest(None)`
+`AUTOPILOT_V4_SELFTEST=PASS`. Replikorna raderade efter körning. Produkten är komplett i
+väntan på ägarens hand (`cp`-kommandona i `SEPARATION-20260910/proposed/README.md`).
+
+PRODUCTION_IMPLEMENTATION_WRITTEN=YES · GATE_GREEN_WITH_PROPOSALS_IN_REPLICA=YES ·
+PROPOSALS_APPLIED=NO · FROZEN_ARTIFACTS_MODIFIED=NO · ALLOWED_WRITE_VIOLATION=NO ·
+PUSH=NO · MERGE=NO.
