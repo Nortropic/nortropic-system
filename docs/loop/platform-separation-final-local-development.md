@@ -300,5 +300,58 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista:
 
 ## Utfall
 
-Fylls i av test-author efter körningarna (baslinje RED på 332f07ce, referenskonstruktion, negativer)
-och av buildern/kvalificeringen efter produktkörningen.
+### Test-author 2026-09-10 — baslinje RED (före produkt)
+Kommando (arbetsyta `~/nortropic-repos/work/test-author-final-separation-20260910`, HEAD `e2c3bafd` =
+332f07ce + grind + detta dokument, hållna grindar körda ur subjektets byte-identiska kopior):
+`python3.12 verify/bin/platform-separation-final-exit --subject <arbetsyta>` → exit **1**,
+`PLATFORM_SEPARATION_FINAL_RESULT=RED_LOCAL_QUALIFICATION`, **47 PASS / 31 FAIL** (78 rader),
+`result.json` sha256 `877dcba2796740781f8fbed7070a4e8d886c19af58ebb5921645ad5ab1424131`.
+Röda rader (alla av rätt skäl, produktytan ovan): `f1_every_tracked_file_matches_platform_allowlist`
+(`scripts/check-verifierarregistret.mjs`), `f1_required_absences_…` (arkivkopiorna + vakten),
+`f1_web_transfer_provenance_2_…` (saknas), `f2_closure_all_active_references_resolve_to_tracked_files`
+(plankopiorna saknas; `docs/07/03/05/00`, `docs/100-dagar` hänger från arkivkopior, premiar-backlog,
+full-roadmap, substitutionskontraktet), `f2_active_doc_…` för managed-settings, premiar-backlog, de tre
+arkivkopiorna, byggplan (r.113 `nortropic-verify-suite.js`), full-roadmap (r.17/115),
+evidenskontraktet (r.120/130/137/139/144), substitutionskontraktet (r.5, §6 ×4),
+`f2_substitution_contract_…` (inget tilläggsavsnitt), `f2_historical_document_…` ×3 (inga
+supersessionsblock), `f2_drift_md_…` (ingen aktiv plattformsnot), `f3_premiar_backlog_…`,
+`f3_managed_settings_…` (gammal rot, webbposter), `f3_gitignore_effect_…`, `f3_gitignore_whitelists_no_absent_tree`
+(18 frånvarande träd), `f3_register_note_…` (människohand, `workflows/nortropic-verify-suite.js`, 1.0.0),
+`f4_autopilot_argparse_defaults_…` (`--repo`/`--worktrees` → `~/nortropic/…`), `f4_roadmap_plan_copies_…`,
+`f4_ensure_roadmap_plan_returns_…` (Stop: `git fetch origin plan/autonomous-loop-v1` — transport 'file' not allowed),
+`f4_…stops_on_mutated/missing…` (positivt ankare saknas), `f5_loop_fall_py_b2_…` (`agents/qa-launcher.md`, INV-004),
+`f5_loop_fall_py_green_in_replica` (52 ok, 1 FEL = B2), `f8_no_tracked_file_couples_…` (config/README r.35/36/43,
+managed-settings ×26). Gröna: kanarier, F6 (fryst evidens + tre tidigare grindar byte-identiska), F7
+(control-set 68/68; launch-cwd 19/20 med exakt `extra=[governance, denna grind]`; governance 68/70 röd exakt
+på g6/g7 — deltan orsakas av grindens egen närvaro och registret är ännu orört), preflight, PINV 6/0,
+platform-prepare/-check, selftest, publication-callers, loop-cli oförändrad, F10.
+
+### Referenskonstruktion (scratch, förkastad — bevisar satisfierbarhet)
+Replika av 332f07ce + de ändringar produktytan beskriver (script i test-authorns scratch, aldrig i repot),
+HEAD `95646f5e…`, 143 spårade filer. Fullkörning med hållna grindar: exit **0**,
+`PASS_LOCAL_QUALIFICATION_ONLY`, **74/74**, `result.json` sha256
+`11130b7c4cef5320096cb1f64e53576a5aa658cda24f22449b0ef8b014180226`. Mätt där: control-set 68/68
+(result 266da090…), launch-cwd 19/20 med `extra=['verify/bin/platform-governance-exit',
+'verify/bin/platform-separation-final-exit']` (cdc2719e…), governance 68/70 med exakt
+{g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only,
+g7_launch_cwd_exit_19_of_20_only_frozen_listing_sees_this_gate} röda (058d2208…), loop-sviten 53 ok / 0 FEL
+med B2 via PINV-005, slutning 29 rötter → 33 nådda → 28 skannade dokument.
+Lärdom under konstruktionen (ledde till kravändring före frysning): en smalare `docs/`-vitlista
+(`/docs/*` + `!/docs/loop/`) gjorde governance-grindens G5 (policysviten) röd — sviten stagar frysta
+specraders `docs/05-beslutslogg.md` i fixturworktrees; kravet på ignorerade `docs/0N-*` ströks.
+
+### F9 — negativer (var och en i egen replika av referensen, statisk körning `--skip-held-gates`; siffror
+utan de fem sandboxberoende raderna)
+(a) `docs/07-konstitution.md` read-first i builder-skill → RED `f2_active_doc_…_nortropic_builder_SKILL_md`,
+`f2_closure_all_active_references_…`; (b) "Konstitutionen står över" i full-roadmap → RED
+`f2_active_doc_…_full_roadmap_md`; (c) `docs/05-beslutslogg.md` i premiar `allowed_write` → RED
+`f3_premiar_backlog_…`, `f2_active_doc_…_premiar_backlog_json`, `f2_closure_…`; (d) `!/workflows/` i
+`.gitignore` → RED `f3_gitignore_whitelists_no_absent_tree`, `f3_gitignore_effect_…`; (e)
+`scripts/check-verifierarregistret.mjs` återställd → RED alla tre F1-rader; (f) `docs/loop/x.md` →
+`docs/03-regelverk.md`, länkad från AGENTS.md → RED `f2_active_doc_…_docs_loop_x_md`, `f2_closure_…`
+(+ pinnar/prepare eftersom AGENTS.md ändrades utan pinnuppdatering); (g) `ensure_roadmap_plan` fetchar
+origin igen → RED `f4_ensure_roadmap_plan_returns_in_replica_without_any_remote`; (h) registernot "endast av
+människohand" → RED `f3_register_note_…` (+ pinnar/prepare). Alla åtta: exit 1.
+
+### Builder / kvalificering
+(fylls i efter produktkörningen)
