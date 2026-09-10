@@ -6,8 +6,8 @@ genom det autonoma kontraktsflödet (regel 11), aldrig genom en loop-tasks kandi
 Dessa regler styr bygget av Nortropics autonomiplattform. Plattformens auktoritetsordning
 är plattformsdokumenten enligt `AGENTS.md`: substitutionskontraktets §1, dessa regler,
 byggplan v3, specen, den frysta `exit_test` och plan-/driftdokumenten under `docs/loop/`.
-Webbens styrning gäller inte plattformen; den text som före 2026-09-10 stod här är
-bevarad ordagrant som historia i `docs/loop/arkiv/regler-fore-2026-09-10.md`. Webbkundens
+Webbens styrning gäller inte plattformen; den text som före 2026-09-10 stod här finns
+ordagrant i Git-historiken (`dae90c8f:docs/loop/regler.md`) och i webbrepot med proveniens. Webbkundens
 brief- och kvalitetskrav är inte plattformens universella funktionskrav. Plattformens
 avsedda gräns anges i harness-substitution-contract-v1.md §1.
 

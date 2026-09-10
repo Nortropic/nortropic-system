@@ -1,3 +1,8 @@
+> **Supersessionsnot 2026-09-10 (plattformsrepot).** Historisk operating model (v2, 2026-08-10), bevarad byte-exakt
+> under denna not. Nuvarande auktoritet är `AGENTS.md`: `OWNER_AUTHORITY_REQUIRED=YES` och meningarna om att
+> ägaren fryser policy och förblir dess ägare är ersatta av det autonoma kontraktsflödet, de frysta grindarna och
+> lokal kvalificering. Gamla resultat behåller sina ursprungliga subjekt.
+
 # Codex Operating Model v2 — Nortropic Build Autopilot
 
 **Owner-beslut:** 2026-08-10
