@@ -1,23 +1,15 @@
 {
   "register_version": "1.0.0",
   "written": "2026-08-07",
-  "note": "Förgodkänt register. En verifierare körs bara om dess id står här. SHA binder den fil som godkändes: ändras filen stoppas körningen med hash_mismatch FÖRE start. Registret pekar på systemets BEFINTLIGA grindar — inga kopior, ingen ny verifierare (specs/tasks.spec.json h-002).",
+  "note": "Förgodkänt register för PLATTFORMSREPOT (nortropic-system efter repouppdelningen 2026-09-10). En verifierare körs bara om dess id står här, och registret bär ENDAST startbara plattformsverifierare: ingen webbpost, ingen post utan subprocess-ingång. SHA binder den fil som godkändes: ändras filen stoppas körningen med hash_mismatch FÖRE start. Webbens grindar (workflows/nortropic-verify-suite.js m.fl.) registreras i webbrepot, inte här (specs/tasks.spec.json h-002, h-037).",
   "runner_note": "runner är ett uppslag i en fast tabell i controller/verify/cli, aldrig ett kommando ur denna fil. Inget fält här kan bli namnet på en process.",
   "verifiers": {
     "check-invariants": {
       "path": "scripts/check-invariants.mjs",
-      "sha256": "d37e45b46cdc92a016022b80e7f1ea32661cd33a4f1b97af61962bc7cb0bf3ba",
+      "sha256": "ae72cdf8b8a21456662f1e4c391670f47a8a4b3728600ad221999e624dc95184",
       "runner": "node",
       "startbar": true,
-      "beskrivning": "Deterministisk invariantgrind INV-001–008. Exit 0/1, inga natanrop, körs från reporoten. Registrerad hash uppdateras endast av människohand i samma commit som filändringen."
-    },
-    "nortropic-verify-suite": {
-      "path": "workflows/nortropic-verify-suite.js",
-      "sha256": "7c02f12ef7d4f6991fafa0c9a19753ccfb2b8d785c746212025864a4158a3373",
-      "runner": null,
-      "startbar": false,
-      "skal_ej_startbar": "Workflow-skript för Claude Codes runtime: börjar med 'export const meta' och anropar phase()/agent()/log() på toppnivå. Varken shebang eller argv-ingång, alltså ingen subprocess-ingång. SHA-registrerad så att drift upptäcks — aldrig tyst utesluten, aldrig tyst grön.",
-      "beskrivning": "Regressionsnätet för självförbättringstrappan (konstitutionen §A6, §B6). Startas av Claude Code, inte av controllern."
+      "beskrivning": "Deterministisk plattformsinvariantgrind PINV-001–006 (grindfiler under verify/bin/, registrets konsistens, kontrollplanets authority-paths i plattformsmängden, strikt spec, NO_FORCE_SEMANTICS, självidentitet). Exit 0/1, inga nätanrop, körs från kandidatens rot. Registrerad hash uppdateras endast av människohand i samma commit som filändringen."
     }
   }
 }

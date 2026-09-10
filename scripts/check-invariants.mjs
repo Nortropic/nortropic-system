@@ -1,240 +1,311 @@
 #!/usr/bin/env node
-// check-invariants.mjs — deterministisk invariantgrind (BATCH-002, hardnad BATCH-003)
-// Ren Node, inga npm-beroenden, inga natanrop. Kors fran reporoten.
-// Exit 0 om alla PASS, annars exit 1. En rad per overtradelse:
-//   <INV-ID> <fil>:<rad> <kort orsak>
-// Avslutas med: X PASS, Y FAIL, Z overtradelser.
-// (INV-001/INV-003 anropar `git ls-files` via execFileSync — ingen shell, statiska
-//  argument, inga natanrop; enda syftet ar git-tree-scoping per spec.)
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+// check-invariants.mjs — deterministisk PLATTFORMSinvariantgrind (PINV-001–006).
+// Ersätter webbinvarianterna INV-001–008 efter repouppdelningen 2026-09-10; webbens
+// invariantgrind lever i webbrepot. Samma path, samma register-id (check-invariants),
+// samma konventioner som förut:
+//   Ren Node, inga npm-beroenden, inga natanrop. Kors fran kandidatens rot (cwd).
+//   Exit 0 om alla PASS, annars exit 1. En rad per overtradelse:
+//     <PINV-ID> <fil>:<rad> <kort orsak>
+//   Avslutas med: X PASS, Y FAIL, Z overtradelser.
+//   En kontroll som inte kan bedomas (invalid) raknas som FAIL, aldrig PASS.
+//   `git ls-files` anropas via execFileSync — ingen shell, statiska argument; enda
+//   syftet ar git-tree-scoping (sparade filer och deras lagen).
+// PRINCIP (arvd fran INV-003): grinden scannar aldrig sin egen kallkod. PINV-003 och
+// PINV-005 laser bara de namngivna kontrollplansfilerna, aldrig scripts/check-invariants.mjs.
+import { readFileSync, lstatSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
-const CHECKS = ['INV-001', 'INV-002', 'INV-003', 'INV-004', 'INV-005', 'INV-006', 'INV-007', 'INV-008'];
+const CHECKS = ['PINV-001', 'PINV-002', 'PINV-003', 'PINV-004', 'PINV-005', 'PINV-006'];
 const violations = [];               // { id, line }
 const invalid = new Set();           // checks som inte kunde bedomas -> FAIL, aldrig PASS
 function flag(id, file, line, reason) { violations.push({ id, line: `${id} ${file}:${line} ${reason}` }); }
 
-// filsystem-walk (INV-004) — scannar disken, per spec
-function walk(dir, ok, out = []) {
-  let ents; try { ents = readdirSync(dir); } catch { return out; }
-  for (const e of ents) {
-    const p = `${dir}/${e}`;
-    let s; try { s = statSync(p); } catch { continue; }
-    if (s.isDirectory()) walk(p, ok, out);
-    else if (ok(e)) out.push(p);
+const SPEC = 'specs/tasks.spec.json';
+const REGISTER = 'controller/verify/register.json';
+const VERIFY_CLI = 'controller/verify/cli';
+const AUTOPILOT = 'scripts/nortropic-codex-autopilot.py';
+const SELF_PATH = 'scripts/check-invariants.mjs';
+const SELF_ID = 'check-invariants';
+const RUNNERS = new Set(['node', 'bash']);
+
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+const readLines = (f) => readFileSync(f, 'utf8').split('\n');
+// git ls-files -s: "<mode> <oid> <stage>\t<path>" per sparad fil under path.
+function tracked(...paths) {
+  const out = execFileSync('git', ['ls-files', '-s', '--', ...paths], { encoding: 'utf8' });
+  const rows = [];
+  for (const raw of out.split('\n')) {
+    if (!raw.trim()) continue;
+    const tab = raw.indexOf('\t');
+    const [mode] = raw.slice(0, tab).split(' ');
+    rows.push({ mode, path: raw.slice(tab + 1) });
   }
+  return rows;
+}
+const trackedFile = (path) => tracked(path).find(r => r.path === path) || null;
+
+// ---- strikt JSON: dubblerad nyckel ar ett fel, aldrig "sista vinner" ----
+function strictJson(text) {
+  let i = 0;
+  const ws = () => { while (i < text.length && ' \t\r\n'.includes(text[i])) i++; };
+  const fail = (m) => { throw new SyntaxError(`${m} at ${i}`); };
+  function value() {
+    ws();
+    const c = text[i];
+    if (c === '{') {
+      i++; const obj = {}; ws();
+      if (text[i] === '}') { i++; return obj; }
+      for (;;) {
+        ws(); if (text[i] !== '"') fail('object key');
+        const k = str(); ws(); if (text[i] !== ':') fail('colon'); i++;
+        if (Object.prototype.hasOwnProperty.call(obj, k)) fail(`duplicate key ${JSON.stringify(k)}`);
+        obj[k] = value(); ws();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === '}') { i++; return obj; }
+        fail('object');
+      }
+    }
+    if (c === '[') {
+      i++; const arr = []; ws();
+      if (text[i] === ']') { i++; return arr; }
+      for (;;) { arr.push(value()); ws(); if (text[i] === ',') { i++; continue; } if (text[i] === ']') { i++; return arr; } fail('array'); }
+    }
+    if (c === '"') return str();
+    if (text.startsWith('true', i)) { i += 4; return true; }
+    if (text.startsWith('false', i)) { i += 5; return false; }
+    if (text.startsWith('null', i)) { i += 4; return null; }
+    const m = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?/.exec(text.slice(i));
+    if (!m) fail('value');
+    i += m[0].length; return Number(m[0]);
+  }
+  function str() {
+    i++; let s = '';
+    for (;;) {
+      if (i >= text.length) fail('string');
+      const c = text[i++];
+      if (c === '"') return s;
+      if (c === '\\') {
+        const e = text[i++];
+        if (e === 'u') { s += String.fromCharCode(parseInt(text.slice(i, i + 4), 16)); i += 4; }
+        else s += ({ '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t' })[e] ?? fail('escape');
+      } else s += c;
+    }
+  }
+  const v = value(); ws();
+  if (i !== text.length) fail('trailing');
+  return v;
+}
+function loadStrict(file) { return strictJson(readFileSync(file, 'utf8')); }
+
+// Plattformsmangden: de trad/filer kontrollplanet far peka pa som authority. Allt annat
+// (workflows/, agents/, skills/, packs/, tests/fixtures/, docs/0x-*, AUTOPILOT, ...) ar
+// webbforvaltning och finns inte i detta repo.
+const PLATFORM_PREFIXES = ['controller/', 'verify/', 'specs/', 'config/', 'docs/loop/', 'tests/controller/', 'tests/scripts/'];
+const PLATFORM_EXACT = new Set(['controller', 'verify', 'specs', 'config', 'AGENTS.md', 'CLAUDE.md', 'README.md',
+  'scripts/check-invariants.mjs', 'scripts/nortropic-codex-autopilot.py', 'scripts/check-verifierarregistret.mjs']);
+const isPlatformPath = (p) => PLATFORM_EXACT.has(p) || PLATFORM_PREFIXES.some(pre => p.startsWith(pre));
+// Repo-relativ path utan traversal, absolutform eller shelltecken (samma form som verify/cli).
+const SAFE_REL = /^[A-Za-z0-9._/-]+$/;
+const safeRel = (p) => typeof p === 'string' && p.length > 0 && SAFE_REL.test(p) && !p.startsWith('/')
+  && !p.split('/').some(seg => seg === '' || seg === '.' || seg === '..');
+
+// ---- PINV-004: specen parsar strikt; id/exit_test unika; skrivytornas glob-monster valformade ----
+// Kors forst: PINV-001 bygger pa samma parsade spec och blir INVALID om specen inte kan lasas.
+const GLOB_FORM = /^[A-Za-z0-9._*/-]+$/;
+const globOk = (g) => typeof g === 'string' && g.length > 0 && GLOB_FORM.test(g) && !g.startsWith('/')
+  && !g.split('/').some(seg => seg === '' || seg === '.' || seg === '..');
+let spec = null;
+try {
+  spec = loadStrict(SPEC);
+  if (!spec || typeof spec !== 'object' || !Array.isArray(spec.tasks)) { invalid.add('PINV-004'); spec = null; }
+  else {
+    const ids = new Map(); const gates = new Map();
+    spec.tasks.forEach((t, n) => {
+      const where = `${SPEC}:task#${n + 1}`;
+      if (!t || typeof t !== 'object' || typeof t.id !== 'string' || !t.id) { flag('PINV-004', SPEC, `task#${n + 1}`, 'task saknar id som icke-tom strang'); return; }
+      if (ids.has(t.id)) flag('PINV-004', SPEC, t.id, `dubblerat task-id (aven task#${ids.get(t.id)})`); else ids.set(t.id, n + 1);
+      if (t.exit_test !== undefined) {
+        if (!safeRel(t.exit_test)) flag('PINV-004', SPEC, t.id, `exit_test ar ingen saker repo-relativ path: ${JSON.stringify(t.exit_test)}`);
+        else if (gates.has(t.exit_test)) flag('PINV-004', SPEC, t.id, `exit_test delas med ${gates.get(t.exit_test)}: ${t.exit_test}`);
+        else gates.set(t.exit_test, t.id);
+      }
+      for (const key of ['allowed_write', 'owner_author_allowed_write', 'docs_impact']) {
+        if (t[key] === undefined) continue;
+        if (!Array.isArray(t[key])) { flag('PINV-004', SPEC, t.id, `${key} ar ingen lista`); continue; }
+        for (const g of t[key]) if (!globOk(g)) flag('PINV-004', SPEC, t.id, `${key} har ogiltigt monster ${JSON.stringify(g)}`);
+      }
+      void where;
+    });
+    const defaults = spec.defaults && typeof spec.defaults === 'object' ? spec.defaults : {};
+    for (const key of ['allowed_write', 'denied_write']) {
+      if (defaults[key] === undefined) continue;
+      if (!Array.isArray(defaults[key])) { flag('PINV-004', SPEC, 'defaults', `${key} ar ingen lista`); continue; }
+      for (const g of defaults[key]) if (!globOk(g)) flag('PINV-004', SPEC, 'defaults', `${key} har ogiltigt monster ${JSON.stringify(g)}`);
+    }
+  }
+} catch (e) { invalid.add('PINV-004'); spec = null; }
+
+// ---- PINV-001: varje tasks exit_test ligger under verify/bin/ och ar, nar den ar sparad, ----
+// en reguljar fil med lage 100755. En fil pa disk som INTE ar sparad ar en ohanterad grind
+// (den kan inte frysas) och flaggas. En osparad, franvarande grind ar en obyggd skiva och
+// ar inte en overtradelse (t.ex. h-014/h-015 vid 2026-09-10).
+try {
+  if (spec === null) invalid.add('PINV-001');
+  else {
+    const withGate = spec.tasks.filter(t => t && typeof t === 'object' && typeof t.id === 'string' && typeof t.exit_test === 'string');
+    if (withGate.length === 0) invalid.add('PINV-001');   // tomt = kunde-ej-bedoma, aldrig PASS
+    for (const t of withGate) {
+      const g = t.exit_test;
+      if (!safeRel(g) || !g.startsWith('verify/bin/') || g.split('/').length !== 3) { flag('PINV-001', SPEC, t.id, `exit_test utanfor verify/bin/: ${g}`); continue; }
+      const row = trackedFile(g);
+      if (row === null) {
+        let onDisk = false; try { onDisk = !lstatSync(g).isDirectory() || true; } catch { onDisk = false; }
+        if (onDisk) flag('PINV-001', g, 1, `grind finns pa disk men ar inte sparad i git (task ${t.id})`);
+        continue;
+      }
+      if (row.mode !== '100755') flag('PINV-001', g, 1, `grind sparad med lage ${row.mode}, kravs 100755 (task ${t.id})`);
+      else { let st; try { st = lstatSync(g); } catch { st = null; }
+        if (!st || !st.isFile()) flag('PINV-001', g, 1, `grind ar inte en reguljar fil pa disk (task ${t.id})`); }
+    }
+  }
+} catch { invalid.add('PINV-001'); }
+
+// ---- PINV-002: registrets egen konsistens: VARJE post ar startbar med kand runner, unik path, ----
+// pathen sparad som reguljar fil och sha256 pa disk == registrerad. Ett register med en
+// ej startbar eller osparad post ar inte ett plattformsregister.
+let register = null;
+try {
+  const data = loadStrict(REGISTER);
+  if (!data || typeof data !== 'object' || !data.verifiers || typeof data.verifiers !== 'object' || Array.isArray(data.verifiers)) invalid.add('PINV-002');
+  else {
+    register = data.verifiers;
+    const ids = Object.keys(register);
+    if (ids.length === 0) invalid.add('PINV-002');
+    const seen = new Map();
+    for (const vid of ids) {
+      const post = register[vid];
+      if (!post || typeof post !== 'object') { flag('PINV-002', REGISTER, vid, 'posten ar ingen dict'); continue; }
+      if (post.startbar !== true) flag('PINV-002', REGISTER, vid, `startbar ar inte true (${JSON.stringify(post.startbar)})`);
+      if (!RUNNERS.has(post.runner)) flag('PINV-002', REGISTER, vid, `okand runner ${JSON.stringify(post.runner)}`);
+      if (!safeRel(post.path)) { flag('PINV-002', REGISTER, vid, `path ar ingen saker repo-relativ path: ${JSON.stringify(post.path)}`); continue; }
+      if (seen.has(post.path)) flag('PINV-002', REGISTER, vid, `path delas med ${seen.get(post.path)}: ${post.path}`); else seen.set(post.path, vid);
+      if (typeof post.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(post.sha256)) { flag('PINV-002', REGISTER, vid, 'ogiltig sha256'); continue; }
+      const row = trackedFile(post.path);
+      if (row === null) { flag('PINV-002', REGISTER, vid, `registrerad path ar inte sparad i git: ${post.path}`); continue; }
+      if (row.mode !== '100644' && row.mode !== '100755') { flag('PINV-002', REGISTER, vid, `registrerad path ar ingen reguljar fil (lage ${row.mode}): ${post.path}`); continue; }
+      let st; try { st = lstatSync(post.path); } catch { st = null; }
+      if (!st || !st.isFile()) { flag('PINV-002', REGISTER, vid, `registrerad path saknas eller ar inte reguljar pa disk: ${post.path}`); continue; }
+      const actual = sha256(readFileSync(post.path));
+      if (actual !== post.sha256) flag('PINV-002', REGISTER, vid, `hash_mismatch ${post.path}: registrerad ${post.sha256.slice(0, 12)}…, pa disk ${actual.slice(0, 12)}…`);
+    }
+  }
+} catch { invalid.add('PINV-002'); }
+
+// ---- PINV-003: kontrollplanets deklarerade authority-paths ar plattformspaths som finns sparade ----
+// Bundet smalt och arligt: exakt tre namngivna deklarationsblock lases som text —
+//   controller/verify/cli:                  PRETASK_PATHS = ( ... )   och  PLATFORM_DOCUMENTS = { ... }
+//   scripts/nortropic-codex-autopilot.py:   SUBSTITUTION_BLOBS = { ... }
+// Varje path-literal (eller NAME som loses ur `NAME = "..."` i samma fil) maste ligga i
+// plattformsmangden OCH vara sparad i git. Saknat block -> INVALID. Mer an sa bevisar ingen grep.
+function declarationBlock(lines, head, close) {
+  const start = lines.findIndex(l => l.startsWith(head));
+  if (start < 0) return null;
+  const single = lines[start].slice(head.length).trim();
+  if (single.endsWith(close)) return { start, body: [lines[start].slice(head.length)] };
+  const body = [];
+  for (let i = start + 1; i < lines.length; i++) { if (lines[i].trim() === close) return { start, body }; body.push(lines[i]); }
+  return null;
+}
+function resolveName(lines, name) {
+  const re = new RegExp(`^${name}\\s*=\\s*"([^"]*)"\\s*$`);
+  for (const l of lines) { const m = re.exec(l); if (m) return m[1]; }
+  return null;
+}
+function declaredPaths(file, head, close, keyed) {
+  const lines = readLines(file);
+  const block = declarationBlock(lines, head, close);
+  if (!block) return null;
+  const out = [];
+  block.body.forEach((raw, k) => {
+    const lineNo = block.start + 1 + (block.body.length === 1 && raw === lines[block.start].slice(head.length) ? 0 : k + 1);
+    const l = raw.split('#')[0];
+    if (!l.trim()) return;
+    if (keyed) {
+      const m = /^\s*("([^"]*)"|([A-Za-z_][A-Za-z0-9_]*))\s*:/.exec(l);
+      if (!m) { out.push({ path: null, line: lineNo, text: l.trim() }); return; }
+      const p = m[2] !== undefined ? m[2] : resolveName(lines, m[3]);
+      out.push({ path: p, line: lineNo, text: l.trim() });
+    } else {
+      const strs = [...l.matchAll(/"([^"]*)"/g)].map(m => m[1]);
+      if (strs.length === 0 && l.trim() !== ',') { out.push({ path: null, line: lineNo, text: l.trim() }); return; }
+      for (const s of strs) out.push({ path: s, line: lineNo, text: l.trim() });
+    }
+  });
   return out;
 }
-const readLines = (f) => readFileSync(f, 'utf8').split('\n');
-const trackedUnder = (...paths) => execFileSync('git', ['ls-files', '--', ...paths], { encoding: 'utf8' })
-  .split('\n').map(s => s.trim()).filter(Boolean);
-
-// ---- INV-001 (NRT-003): "git add -A" i GIT-SPARADE filer under workflows/ + skills/ ----
-// Scope = git-tree, inte filsystemet (ospar tredjeparts hamnar utanfor automatiskt).
-// BATCH-004C-OMFORMNING + HARDNING (agergodkand): git add -A ar en overtradelse UTOM nar raden BORJAR med den
-// KEDJADE SECRET-VAKT-prefixen — dvs vakten (git status --porcelain mot .env/.vercel/node_modules, .example
-// undantaget) OCH git add -A star i SAMMA && -kedja pa SAMMA rad. Da gor en falld vakt stageningen OMOJLIG,
-// inte bara olamplig (aven en agent som kor raden kan inte na git add -A forbi ett secret). Kravet ar SUBSTANS,
-// inte ett ord: en kommentar eller ett echo som namner "SECRET-VAKT" bryter prefixet (raden borjar da inte med
-// vakten) -> flaggas anda. `startsWith` pa den exakta prefixen ar substanskrav + kedjningskrav i ett.
-// HISTORIK: pipeline-.js-stegens git add -A (autobygg:203, launch:149) hölls RÖDA tills BATCH-005-
-// fixkontraktet ersatte dem (DEL 1 launch 2026-08-06, DEL 2 autobygg samma dag) — .js-filer LÖSES med
-// kand fil-mangd (deklaration → delta-verifiering → pathspec:ad commit), ALDRIG med vakten (saknar
-// ```-block; undantagsvagen ar strukturellt otillganglig). En gron INV-001 ar alltsa det FORVANTADE
-// tillstandet efter BATCH-005. `git add -u` far ALDRIG anvandas (missar nya filer -> rorjour-buggen).
-const VAKT001_CORE = "! git status --porcelain | grep -E '\\.env|\\.vercel|node_modules' | grep -vqE '\\.example' && git add -A";
 try {
-  const tracked = trackedUnder('workflows', 'skills');
-  if (tracked.length === 0) invalid.add('INV-001');   // tomt = kunde-ej-bedoma, aldrig PASS
-  for (const f of tracked) {
-    readLines(f).forEach((l, i) => {
-      const t = l.trim();
-      if (t.startsWith('#') || t.startsWith('//')) return;   // kommentar/prosa exekverar aldrig -> ingen riktig staging
-      if (l.includes('git add -A') && !t.startsWith(VAKT001_CORE))
-        flag('INV-001', f, i + 1, 'git add -A utan kedjad SECRET-VAKT-prefix (NRT-003)');
-    });
-  }
-} catch { invalid.add('INV-001'); }
-
-// ---- INV-002 (NRT-004): agents/design-reviewer.md tools-rad far ej innehalla Bash ---- ORORD BATCH-003.
-try {
-  const f = 'agents/design-reviewer.md';
-  const lines = readLines(f);
-  const idx = lines.findIndex(l => l.startsWith('tools:'));
-  if (idx < 0) invalid.add('INV-002');
-  else if (/\bBash\b/.test(lines[idx])) flag('INV-002', f, idx + 1, 'design-reviewer tools innehaller Bash (NRT-004)');
-} catch { invalid.add('INV-002'); }
-
-// ---- INV-003 (NRT-013): query-formen "x-vercel-protection-bypass=" ----
-// BATCH-003-hardning: scope breddat till GIT-SPARADE filer under workflows/ + skills/ + agents/
-// (bypass-strangen kunde tidigare flyttas till en skill/agent och bli osynlig).
-// UNDANTAR scripts/ och docs/ — och det ar en PRINCIP, inte en tillfallighet: en monstermatchande
-// grind far ALDRIG scanna sin egen kallkod (scripts/) eller sin egen dokumentation (docs/).
-// Grindens kalla innehaller nodvandigtvis den strang den soker efter, och programregistret
-// beskriver regeln; scannas de flaggar grinden sig sjalv, blir permanent rod, och nagon "loser"
-// det genom att ta bort kontrollen. Undantaget foljer av att scripts/ och docs/ inte ligger
-// under de tre scannade paths. Header-formen (namn utan efterfoljande =) ar tillaten.
-// BATCH-004C-OMFORMNING + HARDNING (agergodkand): query-formen ar NODVANDIG — header-formen gar inte att satta
-// i kedjans verktyg och bypass-cookien gar inte att forsatta direkt (verifierat mot MCP-schemana, se
-// programregistret). Darfor forbjuds inte strangen; i stallet KRAVS LACKSKYDD-klausulens SUBSTANS pa samma rad
-// — inte bara rubrikordet. Raden maste bara ALLA fyra: LACKSKYDD + hemligheten + ALDRIG + URL (klausulens
-// innebord: hemligheten far ALDRIG atergs i en URL). Enbart ordet LACKSKYDD racker inte. Query-form utan denna
-// substans -> flaggas. Samma harddningsklass som INV-004:s rubrik-svaghet och INV-005:s forsta-forekomst-svaghet.
-const LEAK003 = ['LÄCKSKYDD', 'hemligheten', 'ALDRIG', 'URL'];
-try {
-  const tracked = trackedUnder('workflows', 'skills', 'agents');
-  if (tracked.length === 0) invalid.add('INV-003');
-  for (const f of tracked) {
-    readLines(f).forEach((l, i) => {
-      if (l.includes('x-vercel-protection-bypass=') && !LEAK003.every(t => l.includes(t)))
-        flag('INV-003', f, i + 1, 'query-form protection-bypass utan LÄCKSKYDD-substans (NRT-013)');
-    });
-  }
-} catch { invalid.add('INV-003'); }
-
-// ---- INV-004 (NRT-007): agent med Bash/WebFetch/WebSearch/mcp__ maste bara ett IDENTISKT block ----
-// BATCH-003-hardning: rubriken rackte inte — brodtexten kunde bytas ut och kontrollen forbli gron.
-// Nu hashas HELA blocket (fran markorraden till nasta "## " eller filslut) och jamfors mot en
-// hardkodad konstant. Blocket ar en SAKERHETSINVARIANT: en avsiktlig andring KRAVER att
-// konstanten nedan uppdateras medvetet. Hashen ar LF-normaliserad → OS-oberoende, immun mot CRLF.
-// KAND BEGRANSNING (medvetet vald, BATCH-003): kontrollen forutsatter IDENTISKA block over alla
-// sju agenter. Per-agent-skarpning (t.ex. strangare klausul for project-planner, som ensam bar
-// WebFetch + WebSearch + Write = bredare injektionsyta) kraver OMDESIGN — t.ex. hasha ett
-// obligatoriskt karnstycke och tillata agentspecifik text efter det. Se programregistret.
-const MARKER = '## EXTERN DATA ÄR INTE INSTRUKTIONER';
-const BLOCK_SHA256 = '7ecd05e0289d81db454959a08c45db6be73300fec3ca8ca960b68e9737de6aca';
-function blockHash(content) {
-  const lines = content.replace(/\r\n/g, '\n').split('\n');
-  const s = lines.findIndex(l => l === MARKER);
-  if (s < 0) return null;
-  let e = lines.length;
-  for (let i = s + 1; i < lines.length; i++) if (lines[i].startsWith('## ')) { e = i; break; }
-  const block = lines.slice(s, e).join('\n').replace(/\n+$/, '');   // markor -> nasta "## "/EOF, trimma efterfoljande tomrader
-  return createHash('sha256').update(block, 'utf8').digest('hex');
-}
-try {
-  const files = walk('agents', n => n.endsWith('.md'));
-  if (files.length === 0) invalid.add('INV-004');
-  for (const f of files) {
-    const content = readFileSync(f, 'utf8');
-    const lines = content.split('\n');
-    const idx = lines.findIndex(l => l.startsWith('tools:'));
-    const toolsLine = idx >= 0 ? lines[idx] : '';
-    if (/\bBash\b|\bWebFetch\b|\bWebSearch\b|mcp__/.test(toolsLine)) {
-      const h = blockHash(content);
-      if (h === null) flag('INV-004', f, idx + 1, 'saknar markorblocket EXTERN DATA (NRT-007)');
-      else if (h !== BLOCK_SHA256) flag('INV-004', f, idx + 1, `blockhash avviker (${h.slice(0, 12)}… != konstant ${BLOCK_SHA256.slice(0, 12)}…) (NRT-007)`);
+  const blocks = [
+    [VERIFY_CLI, 'PRETASK_PATHS = (', ')', false],
+    [VERIFY_CLI, 'PLATFORM_DOCUMENTS = {', '}', true],
+    [AUTOPILOT, 'SUBSTITUTION_BLOBS = {', '}', true],
+  ];
+  for (const [file, head, close, keyed] of blocks) {
+    if (trackedFile(file) === null) { invalid.add('PINV-003'); continue; }
+    const decl = declaredPaths(file, head, close, keyed);
+    if (decl === null || decl.length === 0) { invalid.add('PINV-003'); continue; }
+    for (const d of decl) {
+      if (d.path === null) { flag('PINV-003', file, d.line, `oupplosbar path i ${head.trim()}: ${d.text}`); continue; }
+      if (!safeRel(d.path)) { flag('PINV-003', file, d.line, `osaker path i ${head.trim()}: ${JSON.stringify(d.path)}`); continue; }
+      if (!isPlatformPath(d.path)) { flag('PINV-003', file, d.line, `authority-path utanfor plattformsmangden: ${d.path}`); continue; }
+      if (tracked(d.path).length === 0) flag('PINV-003', file, d.line, `deklarerad authority-path ar inte sparad i repot: ${d.path}`);
     }
   }
-} catch { invalid.add('INV-004'); }
+} catch { invalid.add('PINV-003'); }
 
-// ---- INV-005 (NRT-009): doctor-checkantal verify-suite == steward. Las talen, hardkoda ej. ----
-// BATCH-003-hardning: matcha SAMTLIGA forekomster av monstret, inte bara den forsta.
-// Tidigare tog `break` forsta traffen (rad 6 = loggmetadata i meta.phases), inte den faktiska
-// instruktionen till stewarden (rad 86). En fix av bara metadata-strangen hade da ljugit grinden
-// gron. Nu flaggas EN overtradelse PER forekomst vars tal avviker fran stewardens — ingen enskild
-// strang kan langre lura grinden. (INV-005 = deklarationskonsistens, EJ tackning — se register;
-// far ej ensam bevisa att NRT-009 ar lost.)
+// ---- PINV-005 (NO_FORCE_SEMANTICS): guarden finns och ingen push-rad bar force ----
+// Guarden: FORBIDDEN_GIT_TOKENS = ( ... ) i autopiloten med "--force" och "--force-with-lease".
+// Overtradelse: en icke-kommentarrad i autopiloten eller nagon sparad controller/**/cli som
+// bar bade ordet push och --force/--force-with-lease. (`worktree remove --force` ar ingen
+// history overwrite och flaggas inte; kort `-f` bevisas inte av en grep och lamnas.)
 try {
-  // steward: hogsta "N. **" INOM "## MODE: doctor"-sektionen
-  const st = readLines('agents/nortropic-steward.md');
-  const start = st.findIndex(l => /^##\s+MODE:\s*doctor/i.test(l));
-  let stN = null;
-  if (start >= 0) {
-    let end = st.length;
-    for (let i = start + 1; i < st.length; i++) { if (/^##\s/.test(st[i])) { end = i; break; } }
-    for (let i = start; i < end; i++) {
-      const m = st[i].match(/^(\d+)\.\s+\*\*/);
-      if (m) { const n = parseInt(m[1], 10); if (stN === null || n > stN) stN = n; }
+  if (trackedFile(AUTOPILOT) === null) invalid.add('PINV-005');
+  else {
+    const apLines = readLines(AUTOPILOT);
+    const guard = declarationBlock(apLines, 'FORBIDDEN_GIT_TOKENS = (', ')');
+    const tokens = guard ? guard.body.flatMap(l => [...l.split('#')[0].matchAll(/"([^"]*)"/g)].map(m => m[1])) : [];
+    if (!guard || !tokens.includes('--force') || !tokens.includes('--force-with-lease')) invalid.add('PINV-005');
+    const files = [AUTOPILOT, ...tracked('controller').map(r => r.path).filter(p => /^controller\/[^/]+\/cli$/.test(p))];
+    for (const f of files) {
+      readLines(f).forEach((l, i) => {
+        const t = l.trim();
+        if (t.startsWith('#')) return;
+        if (/\bpush\b/.test(l) && /--force(-with-lease)?\b/.test(l)) flag('PINV-005', f, i + 1, 'push med force-semantik (NO_FORCE_SEMANTICS)');
+      });
     }
   }
-  // verify-suite: SAMTLIGA forekomster (en-dash U+2013 el. hyphen — `-` sist i klassen = literal)
-  const vs = readLines('workflows/nortropic-verify-suite.js');
-  const hits = [];
-  vs.forEach((l, i) => {
-    const m = l.match(/(?:checks|kontroller)\s*1[–-](\d+)/i);
-    if (m) hits.push({ line: i + 1, n: parseInt(m[1], 10) });
-  });
-  if (stN === null || hits.length === 0) invalid.add('INV-005');   // oparsbart/ingen forekomst -> INVALID, aldrig PASS
-  else for (const h of hits) {
-    if (h.n !== stN) flag('INV-005', 'workflows/nortropic-verify-suite.js', h.line,
-      `doctor-checkantal: verify-suite=${h.n} != steward=${stN} (NRT-009)`);
+} catch { invalid.add('PINV-005'); }
+
+// ---- PINV-006 (sjalvidentitet): registret pekar pa denna fil exakt en gang, under id ----
+// check-invariants, och de bytes som KORS (process.argv[1], t.ex. authority-snapshotens
+// kopia) ar exakt de bytes som ligger sparade pa scripts/check-invariants.mjs i kandidattradet.
+try {
+  if (register === null) invalid.add('PINV-006');
+  else {
+    const hits = Object.entries(register).filter(([, p]) => p && p.path === SELF_PATH);
+    if (hits.length !== 1) flag('PINV-006', REGISTER, SELF_PATH, `${hits.length} poster pekar pa ${SELF_PATH}, kravs exakt 1`);
+    else if (hits[0][0] !== SELF_ID) flag('PINV-006', REGISTER, hits[0][0], `posten for ${SELF_PATH} heter inte ${SELF_ID}`);
+    const own = process.argv[1];
+    const treeRow = trackedFile(SELF_PATH);
+    if (!own || treeRow === null) invalid.add('PINV-006');
+    else {
+      const executed = sha256(readFileSync(own));
+      const inTree = sha256(readFileSync(SELF_PATH));
+      // Registrets sha256 mot tradfilen ags av PINV-002; har binds bara korda bytes == tradets bytes.
+      if (executed !== inTree) flag('PINV-006', SELF_PATH, 1, `korda bytes ${executed.slice(0, 12)}… != sparade bytes ${inTree.slice(0, 12)}…`);
+    }
   }
-} catch { invalid.add('INV-005'); }
-
-// ---- INV-006 (BATCH-005): FIXKONTRAKT-KARNAN byte-identisk i autobygg + launch ----
-// Karnan (FILELIST + normPath/badRepoPaths/fixDelta + CONTRACT_EXEMPT + porcelainPrompt) ar
-// MEDVETET duplicerad — workflow-DSL-filer kan inte importera varandra — och duplicering utan
-// driftvakt ar exakt den drift som vantar pa att handa (agarbeslut 2026-08-06: GATE-schemat drev
-// redan isar mellan filerna utan att nagon grind sag det). Samma form som INV-004: LF-normaliserad
-// SHA-256 over blocket mellan de exakta markorraderna (inkl. markorerna); har hashas de TVA blocken
-// MOT VARANDRA (inte mot konstant) — invarianten ar ICKE-DIVERGENS, och en legitim samordnad
-// andring av bada blocken ar underhallsmodellen, inte drift. Saknad/dubblerad/omvand markor i
-// NAGON av filerna -> INVALID (kunde-ej-bedoma, aldrig tyst PASS — INV-001:s tomhetsdisciplin).
-const K6_FILES = ['workflows/nortropic-autobygg.js', 'workflows/nortropic-launch.js'];
-const K6_START = '// ─────────── FIXKONTRAKT-KÄRNA (BATCH-005) — BYTE-IDENTISK i nortropic-autobygg.js och nortropic-launch.js; INV-006 hashar båda blocken och flaggar avvikelse ───────────';
-const K6_END = '// ─────────── SLUT FIXKONTRAKT-KÄRNA (BATCH-005) ───────────';
-function karnHash(file) {
-  const lines = readFileSync(file, 'utf8').replace(/\r\n/g, '\n').split('\n');
-  const starts = []; const ends = [];
-  lines.forEach((l, i) => { if (l === K6_START) starts.push(i); if (l === K6_END) ends.push(i); });
-  if (starts.length !== 1 || ends.length !== 1 || ends[0] <= starts[0]) return null;   // saknad/dubblerad/omvand -> odombar
-  return { line: starts[0] + 1, hash: createHash('sha256').update(lines.slice(starts[0], ends[0] + 1).join('\n'), 'utf8').digest('hex') };
-}
-try {
-  const a = karnHash(K6_FILES[0]);
-  const b = karnHash(K6_FILES[1]);
-  if (!a || !b) invalid.add('INV-006');
-  else if (a.hash !== b.hash)
-    flag('INV-006', K6_FILES[0], a.line,
-      `FIXKONTRAKT-KÄRNAN avviker från ${K6_FILES[1]} (${a.hash.slice(0, 12)}… != ${b.hash.slice(0, 12)}…) (BATCH-005)`);
-} catch { invalid.add('INV-006'); }
-
-// ---- INV-007 (regel 16): pipeline-skills bar disable-model-invocation: true ----
-// Regel 16 utpekar TRE skills vars steg skapar verkliga resurser respektive systemforslag;
-// modellen far aldrig trigga dem sjalv. Regeltexten sager "vaktas av doctor #5" — doctor #5
-// var prosa, inte kod (Pass 0 2026-08-07), sa uppdraget hade ingen implementation. Den har.
-// Filerna ar HARDKODADE med avsikt: regel 16 namnger exakt dessa tre. En ny pipeline-skill
-// som behover samma skydd ska DARFOR falla pa att regel 16 uppdateras medvetet, inte glida
-// in under ett glob-monster. Saknad fil eller saknad frontmatter -> INVALID, aldrig PASS.
-const INV007_SKILLS = [
-  'skills/nortropic-plan/SKILL.md',
-  'skills/nortropic-init/SKILL.md',
-  'skills/nortropic-retro/SKILL.md',
-];
-try {
-  for (const f of INV007_SKILLS) {
-    const lines = readLines(f);
-    // frontmatter = mellan forsta '---' och nasta '---'
-    if (lines[0].trim() !== '---') { invalid.add('INV-007'); continue; }
-    let fmEnd = -1;
-    for (let i = 1; i < lines.length; i++) if (lines[i].trim() === '---') { fmEnd = i; break; }
-    if (fmEnd < 0) { invalid.add('INV-007'); continue; }
-    const idx = lines.slice(0, fmEnd).findIndex(l => l.startsWith('disable-model-invocation:'));
-    if (idx < 0) flag('INV-007', f, fmEnd + 1, 'disable-model-invocation saknas i frontmatter (regel 16)');
-    else if (lines[idx].split(':')[1].trim() !== 'true')
-      flag('INV-007', f, idx + 1, `disable-model-invocation ar inte true (regel 16)`);
-  }
-} catch { invalid.add('INV-007'); }
-
-// ---- INV-008 (regel 20 / T1): profile.ts-kontraktsversionen ar deklarerad och parsbar ----
-// Steward-texten (agents/nortropic-steward.md, doctor #5 T1) kraver att kontraktsversionen
-// lases ur SKILL.md och att en oparsbar deklaration ar FAIL — "navet tappade sin sparbarhet".
-// DENNA grind provar ENDAST deklarationens integritet. Den semver-medvetna jamforelsen mot
-// kundrepons profilKontraktVersion gar INTE att gora har: kundrepon ligger utanfor detta repo
-// (~/Workflow, ~/*/src/content/profile.ts) och filen ar repolokal utan filsystemsvandring
-// utanfor reporoten. Den halvan kvarstar hos doctor #5 och ar registrerad i programregistret
-// med detta skal — en grind som bara prover halften far aldrig se komplett ut.
-const INV008_FIL = 'skills/nortropic-stack/SKILL.md';
-const INV008_RE = /profile\.ts-kontraktsversion:\s*v(\d+)\.(\d+)\.(\d+)/;
-try {
-  const lines = readLines(INV008_FIL);
-  const idx = lines.findIndex(l => l.includes('profile.ts-kontraktsversion'));
-  if (idx < 0) invalid.add('INV-008');                       // deklarationen saknas helt -> odombar
-  else if (!INV008_RE.test(lines[idx]))
-    flag('INV-008', INV008_FIL, idx + 1, 'profile.ts-kontraktsversion ej parsbar som vMajor.minor.patch (T1)');
-} catch { invalid.add('INV-008'); }
+} catch { invalid.add('PINV-006'); }
 
 // ---- Rapport ----
 for (const v of violations) console.log(v.line);
