@@ -24,8 +24,8 @@ Gemensamma säkerhetsprinciper som följde med webbens konstitution och gäller
 plattformen finns redan mekaniskt här: `verify/**`, `specs/**`,
 `controller/verify/register.json` och `scripts/check-invariants.mjs` ändras
 endast av människohand (preciserat i avsnittet om delegationer nedan); frysta
-grindar, förbrukade försök och human-only-ceremonier kvarstår. En router, handoff eller senare målbild är inte egen
-operationsbehörighet.
+grindar, förbrukade försök och human-only-ceremonier kvarstår. En router,
+handoff eller senare målbild är inte egen operationsbehörighet.
 
 ## Repoidentitet före arbete
 
