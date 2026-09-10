@@ -881,5 +881,43 @@ omskrivning av skivkriterier, refreeze av stale H-grindar (Vad grinden inte bevi
 - Riggnot: grinden städar inte sitt `FIXTURE_ROOT`; fixturrötterna för RED, referens och negativer ligger i
   test-authorns scratch och tas bort av den som kör efter bokföring.
 
+### Oberoende kontraktsgranskning nr 5 (på a1101192) → v3.1
+`GATE_REVIEW_RESULT=NOT_READY`: tre blockerare + N1–N8; 20 egna attacker (12 fångade / 8 missade). Remediering v3.1 (grind
+sha256 `b298b07db3629235390b98bfb9ce464f1e662111086516a6a06da5c703b0106a`, 1740 rader, 97 rader i körning; commit `288b68ef`):
+
+| Fynd | Åtgärd i grinden (rad i v3.1) |
+|---|---|
+| B1 9–39-hex-pekare passerar | `OLD_PLAN_TOKENS` (r.186–193): `(?<![0-9a-fA-F])(?i:0b3212c9)[0-9a-fA-F]{0,32}(?![0-9a-fA-F])` och samma form för blobbarna `c8ea8511`/`1e53887c`; kanari med `0b3212c991d4:`, 40-hex, versaler, `(0b3212c99)`, blobprefix; negation hex-föregången/41-hex |
+| B2 `<PLAN_SHA>`/`git show` bara i två skills | `COMMIT_READ_TOKENS` (r.208) i slutningsskanningen av varje aktivt dokument (r.1089), trädvitt partial/text (r.1112, 1142), supersessionsnoter (r.1233), drift-svans (r.1245), EFTERARBETE-svans (r.1601); kanari `<PLAN_SHA>`/`PLAN_SHA=`/"frozen … plan commit" vs `git show HEAD:`/`plan_sha256` |
+| B3 promptraden mäter AST-union, inte prompter | DRIVER-scenario `prompts` (r.318–345): importerar modulen, upptäcker byggare via kodobjektets strängkonstanter/namn, exkluderar flöden (r.331), anropar varje byggare med fixturer per skiva/roll/refrozen; raderna `f4_produced_prompts_of_roadmap_…` (r.1459) och `f4_produced_prompts_free_of_…` (r.1476); AST-raden kvar som komplement (r.1437) |
+| N2 `PLAN_GENERATION=` obunden | selftest-raden kräver exakt `^PLAN_GENERATION=<modulens värde>$` (r.1552–1554) |
+| N3 död EFTERARBETE-gren | svansgrenen först i `scannable_text` (r.1010); f6-svansskanning med `OLD_PLAN_TOKENS + COMMIT_READ_TOKENS` (r.1601) |
+| N5 planen ej i `PLATFORM_DOCUMENTS` | `f3_verify_cli_pins_…_and_the_plan_generation` kräver plan + handoff pinnade med sha256 (r.1327–1333) |
+| N6 svaga routerankare | Auktoritetsordningens planpunkt måste bära handoffen, `plangeneration`, `aktiv`; Historik måste bära `historia/historisk` och den nya planens sökväg (r.1172–1173) |
+| N7 p.4 vs p.8 | Produktyta för BUILDER: v3.1-förtydligande (p.1/4/5/6/7 utförda i 320c9df7; v3-ytan är p.2/3/5b/5c) |
+| N1, N4 | behållna, dokumenterade som gräns (etikett utan pekare; `effect authority`-paret) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.1 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.1 + dokument (fixtur-HEAD `7e9f2d2e`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **67 PASS / 30 FAIL**
+(97 rader), result.json sha256 `3d623223ed814e02c01a9cfcd7dccd1ea3b6b34a0d7036d6ee7467ca3ba3fd32`. Röda rader: v3:s 26 plus (v3.1) empirical-runner-skillen
+(`frozen autonomous-loop plan commit`), `f3_verify_cli_pins_…` (planen ej pinnad) och de två producerade-prompt-raderna
+(planen saknas i levande prompter; gamla planen injiceras) — alla av rätt skäl. F7 oförändrat: control-set 68/68
+(`04c02fc4…`), launch-cwd 19/20 med exakt två extra grindar (`40827abe…`), governance 68/70 exakt {g6, g7} (`4444aab8…`);
+loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.1 (scratch, förkastad)
+Som v3-referensen plus: SUB-grenarna i `slice_authority_text`/`slice_builder_extra` namnger plan och handoff;
+`controller/verify/cli` `PLATFORM_DOCUMENTS` pinnar plan (`6513b845…`) och handoff (`9d1c7b2e…`) med sha256. Fixtur-HEAD
+`65efe37b`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **97/97**,
+result.json sha256 `1e5d148b78ecfb6012068ad3cf5a3c68429b42a5a6fb15adba0e60e322577261`; control-set 68/68 (`95106b51…`), launch-cwd 19/20 (`e664078e…`), governance 68/70 exakt
+{g6, g7} (`64f8cf59…`), loopsvit 53 ok / 0 FEL; 15 byggare / 101 producerade texter / 1 flöde; producerad dokumentmängd =
+krävd ∪ {regler, byggplan, drift, owner-h003}.
+
+### F9 v3.1 — negativer (var och en i egen replika av v3.1-referensen, statiskt `--skip-held-gates`; 26 körda,
+26 fångade, 0 riggfel)
+De 19 från v3 fångas på samma rader som förut (planändrande mutanter dessutom på de två producerade-prompt-raderna där
+prompterna påverkas). Granskarens: (a02) moduldict → `f4_produced_prompts_free_of_…` (odeklarerat dokument i producerad prompt; AST-raden grön — därför komplement); (a04) 12-hex i AGENTS Historik, ompinnad → AGENTS-dokumentraden + trädvid (B1-token); (a10) `str.format` → `f4_produced_prompts_free_of_…`; (a11) literal `PLAN_GENERATION=platform-v1-legacy` → selftest-raden (N2); (a13) builder-skill `git show <PLAN_SHA>:` → builder-skillens dokumentrad + trädvid (B2); (a23) planen bara i död funktion → `f4_produced_prompts_of_roadmap_…` (AST-raden grön — därför komplement); (a28) EFTERARBETE-svans med gamla planfilen → `f6_efterarbete_…` + trädvid (N3). Alla 26: exit 1, inget riggfel, 0 missade.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
