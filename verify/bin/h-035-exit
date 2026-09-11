@@ -158,6 +158,26 @@ H036_V3_DOCUMENT_APPENDS = {
         "5185d47c2885c64c480d98f218b4e436afd79cf6df1a17f8c8385735bb1563e8",
         b"\n<!-- H036_REGISTRY_V3_REFREEZE_V1 -->"),
 }
+H036_V3_PLATFORM_DOCUMENT_STATE = {
+    "docs/loop/drift.md": (21015,
+        "9d88513c10c5667f7dab6d236261c192801d4f8c9fa71d616f7bb82d21b702e7",
+        b"\n## 2026-09-08 \xe2\x80\x94 H-039 R33/R15 exact receipt-provenance profile\n",
+        72656,
+        "1143b566447ab5babe0cc57cbbf35d2304edeb663fb1a3159bd55cf0a33e40ca",
+        b"\n## 2026-09-02 \xe2\x80\x94 H-039 native cleanup and managed-Kuvert drift\n",
+        "e3da007ae3b15c5d657e6c89f9d2f240f582e4642f4256e5bc42465542e83891"),
+    "docs/loop/owner-author-workflow-v1.md": (20719,
+        "2a7030101501f5d178b9ce8335ea2a2795cb17fd53a087f69f81847032e69d50",
+        b"\n## H-039 R13-R4 pre-comparison typed closure\n",
+        93914,
+        "1b90720b916ad4964601e2d4734208b4b14bdb953c3bb1b96ebbb5c6d07fda4b",
+        b"\n<!-- H039_OS_EXCLUSIVE_RUNTIME_CLEANUP_MEDIATOR_V1 -->\n",
+        "5f87f5e8bdf2049d6bd0c256d43897eb25c27b80f7935ed7a851c6097c4a0081"),
+}
+H036_V3_RETIRED_DOCUMENTS = {
+    "docs/05-beslutslogg.md":
+        "d6fb01591fdc3436d32d211bfdc44fc4e6f3afa0a1d5c40945e3d6d468c2d4ac",
+}
 
 BPAM_AMENDMENT = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_AMENDMENT_V1 -->\n"
 BPAM_CONTRACT_BEGIN = b"<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_BEGIN -->\n```json\n"; BPAM_CONTRACT_END = b"```\n<!-- BOUNDED_PREREQUISITE_AUTHORITY_MIGRATION_CONTRACT_END -->\n"
@@ -249,16 +269,35 @@ H035_R13_FROZEN_AUTHORITY = {
         "tests/controller/policy/**","tests/controller/taskval/**","tests/controller/envelope/**",
         "tests/controller/state/**","tests/controller/attest/**","tests/controller/loop/**",
         "scripts/nortropic-codex-autopilot.py","tests/scripts/nortropic-codex-autopilot/**",
-        "scripts/check-invariants.mjs","docs/05-beslutslogg.md","docs/loop/drift.md",
+        "scripts/check-invariants.mjs","docs/loop/drift.md",
         "docs/loop/owner-author-workflow-v1.md","AGENTS.md","docs/loop/codex-autopilot-v3-full-roadmap.md",
         "docs/loop/remaining-bootstrap-delegation-v1.md",
     ],
     "owner_author_allowed_write":[],
-    "docs_impact":["docs/05-beslutslogg.md","docs/loop/drift.md","docs/loop/owner-author-workflow-v1.md","AGENTS.md","docs/loop/codex-autopilot-v3-full-roadmap.md",
+    "docs_impact":["docs/loop/drift.md","docs/loop/owner-author-workflow-v1.md","AGENTS.md","docs/loop/codex-autopilot-v3-full-roadmap.md",
                    "docs/loop/remaining-bootstrap-delegation-v1.md"],
     "depends_on":["h-017"], "exit_test":"verify/bin/h-035-exit",
     "max_changed_files":35, "max_added_lines":4600,
     "bootstrap_exception":{"kind":"frozen_v1_allowed_write_once","prospective_task_id_bypass":False},
+}
+H035_PLATFORM_SPEC_DELTA = {
+    "retired_top_level_key":"human_only",
+    "retired_top_level_canonical_sha256":
+        "5e9afcd5f59110e125820a896012035283b7536756f1661b99173b389eb4914b",
+    "replaced_top_level_canonical_sha256":{
+        "authority":
+            "fa125221121212c74d551bf70aff97178b7b96475fa25669eda457463835f0a3",
+        "defaults":
+            "b42f6c520a0ff4d0ddcb56cd8091b2582f90f2284bbd5b76e8ad3b72bb1dbab9"},
+    "inserted_task_index":24,
+    "inserted_task_id":"h-039",
+    "inserted_task_canonical_sha256":
+        "2e613161ffa759973bf2a4bde7c6612cfd17e1b475d691e88998b1b228972654",
+    "h035_added_field":"local_document_authority_v1",
+    "h035_added_field_canonical_sha256":
+        "fc1f2236280a6c5d4fda419225fbe8c691249fd89f8dcde11777f0f093e4c765",
+    "h035_retired_document_path":"docs/05-beslutslogg.md",
+    "h035_retired_document_fields":("allowed_write","docs_impact"),
 }
 H035_R14_TWO_STATE_REGISTRY = {
     "contract_id":"H035_TWO_STATE_OWNER_PRODUCTION_REGISTRY_V2",
@@ -1775,6 +1814,24 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
         candidate_rows=candidate_copy.get("tasks")
         base_candidate_rows=base_copy.get("tasks")
         if not isinstance(candidate_rows,list) or not isinstance(base_candidate_rows,list): return False
+        delta=H035_PLATFORM_SPEC_DELTA
+        if delta["retired_top_level_key"] in candidate_copy: return False
+        retired_top=base_copy.pop(delta["retired_top_level_key"],None)
+        if (retired_top is None or canonical_json_sha256(retired_top)
+                !=delta["retired_top_level_canonical_sha256"]): return False
+        for key,pinned in delta["replaced_top_level_canonical_sha256"].items():
+            replaced=candidate_copy.get(key)
+            if (not isinstance(replaced,dict) or not isinstance(base_copy.get(key),dict)
+                    or canonical_json_sha256(replaced)!=pinned): return False
+            candidate_copy[key]=base_copy[key]
+        inserted_index=delta["inserted_task_index"]
+        if inserted_index>=len(candidate_rows): return False
+        inserted=candidate_rows[inserted_index]
+        if (not isinstance(inserted,dict)
+                or inserted.get("id")!=delta["inserted_task_id"]
+                or canonical_json_sha256(inserted)
+                    !=delta["inserted_task_canonical_sha256"]): return False
+        candidate_rows.pop(inserted_index)
         if len(candidate_rows)!=len(base_candidate_rows): return False
         if ([row.get("id") if isinstance(row,dict) else None for row in candidate_rows]
                 != [row.get("id") if isinstance(row,dict) else None for row in base_candidate_rows]):
@@ -1809,6 +1866,18 @@ def r15_contract_selftests(contract: object, tasks: list[object], current_spec: 
                     return False
                 if row.pop("r33_request_bound_registry_consumers",None) is None:
                     return False
+                if (canonical_json_sha256(row.pop(delta["h035_added_field"],None))
+                        !=delta["h035_added_field_canonical_sha256"]):
+                    return False
+                retired_path=delta["h035_retired_document_path"]
+                for field in delta["h035_retired_document_fields"]:
+                    values=row.get(field); base_values=base_h035.get(field)
+                    if (not isinstance(values,list) or not isinstance(base_values,list)
+                            or retired_path in values
+                            or [item for item in base_values
+                                if item!=retired_path]!=values):
+                        return False
+                    row[field]=base_values
         return r15_json_equal(candidate_copy,base_copy)
 
     check(exact_spec_transform(current_spec),
@@ -17622,40 +17691,77 @@ def r15_document_append_selftests() -> None:
     check(len(h034_mutants)==10 and all(not exact_h034_append(path,candidate)
           for path,candidate in h034_mutants),
           "J_H034_V3_DOCUMENT_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
-    h036_positives=[];h036_mutants=[];h036_unchanged=[]
+    def exact_h036_platform_document(path: str,candidate: bytes) -> bool:
+        published=r15_git_object_bytes(ROOT,H036_V3_AUTHORITY_BASE,path)
+        if published is None or path not in H036_V3_PLATFORM_DOCUMENT_STATE:return False
+        (head_size,head_digest,head_marker,tail_size,tail_digest,tail_marker,
+         whole_digest)=H036_V3_PLATFORM_DOCUMENT_STATE[path]
+        size,digest,marker=H036_V3_DOCUMENT_APPENDS[path]
+        title=published.find(b"\n")+1
+        if (title<1 or len(candidate)
+                !=len(published)+head_size+size+tail_size):return False
+        if candidate[:title]!=published[:title]:return False
+        head=candidate[title:title+head_size]
+        if (hashlib.sha256(head).hexdigest()!=head_digest
+                or not head.startswith(head_marker)
+                or not head.endswith(b"\n")):return False
+        cursor=title+head_size
+        if candidate[cursor:cursor+len(published)-title]!=published[title:]:return False
+        cursor+=len(published)-title
+        append=candidate[cursor:cursor+size]
+        if (hashlib.sha256(append).hexdigest()!=digest
+                or not append.startswith(marker)
+                or not append.endswith(b"\n")):return False
+        tail=candidate[cursor+size:]
+        return (len(tail)==tail_size and hashlib.sha256(tail).hexdigest()==tail_digest
+                and tail.startswith(tail_marker) and tail.endswith(b"\n")
+                and hashlib.sha256(candidate).hexdigest()==whole_digest)
+    h036_positives=[];h036_mutants=[];h036_unchanged=[];h036_retired=[]
     for path in r33_appends:
         published=r15_git_object_bytes(ROOT,H036_V3_AUTHORITY_BASE,path)
-        try:current=(ROOT/path).read_bytes()
+        target=ROOT/path
+        try:current=target.read_bytes()
         except OSError:current=b""
-        if path not in H036_V3_DOCUMENT_APPENDS:
+        if path in H036_V3_RETIRED_DOCUMENTS:
+            h036_retired.append(published is not None
+                and hashlib.sha256(published).hexdigest()
+                    ==H036_V3_RETIRED_DOCUMENTS[path]
+                and not target.exists() and not target.is_symlink())
+            continue
+        if path not in H036_V3_PLATFORM_DOCUMENT_STATE:
             h036_unchanged.append(published is not None and current==published)
             continue
-        size,digest,marker=H036_V3_DOCUMENT_APPENDS[path]
-        suffix=current[len(published):] if published is not None \
-            and current.startswith(published) else b""
-        h036_positives.append(published is not None and len(suffix)==size
-            and hashlib.sha256(suffix).hexdigest()==digest
-            and suffix.startswith(marker) and suffix.endswith(b"\n"))
-        if published is not None:
-            h036_mutants.extend(((path,published),
-                                 (path,published+suffix+b"extra\n"),
-                                 (path,published+suffix[:-1]),
-                                 (path,published[:-1]+suffix),
-                                 (path,b"rewrite\n"+published+suffix),
-                                 (path,published+suffix.replace(
-                                     marker,b"substitute",1))))
-    def exact_h036_append(path: str,candidate: bytes) -> bool:
-        published=r15_git_object_bytes(ROOT,H036_V3_AUTHORITY_BASE,path)
-        if published is None or not candidate.startswith(published):return False
-        size,digest,marker=H036_V3_DOCUMENT_APPENDS[path]
-        suffix=candidate[len(published):]
-        return (len(suffix)==size and hashlib.sha256(suffix).hexdigest()==digest
-                and suffix.startswith(marker) and suffix.endswith(b"\n"))
-    check(len(h036_positives)==3 and all(h036_positives)
+        h036_positives.append(exact_h036_platform_document(path,current))
+        if published is None or not h036_positives[-1]:continue
+        (head_size,_hd,head_marker,_ts,_td,tail_marker,
+         _whole)=H036_V3_PLATFORM_DOCUMENT_STATE[path]
+        size,_digest,marker=H036_V3_DOCUMENT_APPENDS[path]
+        title=published.find(b"\n")+1
+        head=current[title:title+head_size]
+        body=current[title+head_size:head_size+len(published)]
+        rest=current[head_size+len(published):]
+        h036_mutants.extend((
+            (path,published),
+            (path,current+b"extra\n"),
+            (path,current[:-1]),
+            (path,b"rewrite\n"+current),
+            (path,current[:title]+current[title+head_size:]),
+            (path,current[:title]+head.replace(head_marker,b"substitute",1)
+                 +current[title+head_size:]),
+            (path,current[:title]+head+body[:-1]+rest),
+            (path,current[:head_size+len(published)]
+                 +rest.replace(marker,b"substitute",1)),
+            (path,current[:head_size+len(published)]
+                 +rest.replace(tail_marker,b"substitute",1)),
+        ))
+    check(len(h036_positives)==2 and all(h036_positives)
+          and len(h036_retired)==1 and all(h036_retired)
           and len(h036_unchanged)==1 and all(h036_unchanged),
-          "F_H036_V3_THREE_DOCUMENTS_EXACT_35D7FD7C_PLUS_HASH_BOUND_APPEND")
-    check(len(h036_mutants)==18 and all(not exact_h036_append(path,candidate)
-          for path,candidate in h036_mutants),
+          "F_H036_V3_PLATFORM_DOCUMENTS_EXACT_35D7FD7C_BASE_PLUS_HASH_BOUND_HEAD_APPEND_TAIL")
+    check(len(h036_mutants)==18
+          and all(candidate!=(ROOT/path).read_bytes()
+                  and not exact_h036_platform_document(path,candidate)
+                  for path,candidate in h036_mutants),
           "J_H036_V3_DOCUMENT_MISSING_REWRITE_TRUNCATE_PREFIX_EXTRA_SUBSTITUTE_REJECT")
 
 
