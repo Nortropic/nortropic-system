@@ -416,6 +416,57 @@ PLAN_REQUIRED_SECTIONS = ((r"(?i)syfte", "Syfte"), (r"(?i)målbild", "Målbild")
                           (r"(?i)(skyddade\s+invarianter|tekniska\s+skydd)", "Skyddade invarianter / tekniska skydd"),
                           (r"(?i)skivtabell", "Skivtabell"), (r"(?i)bootstrap", "Bootstrap etablerar plattformen"),
                           (r"(?i)arbetsflöde", "Arbetsflöde"), (r"(?i)avslutskriteri", "Avslutskriterier"))
+# v3.10 (owner decision 2026-09-11): the plan generation is the source of the goal picture and the exit criteria and
+# `docs/loop/regler.md` is the source of the WORKING METHOD. The owner forbids a separate gate series for the
+# documentation, so the bindings are these six rows with exact anchors. Threat model (see the development document's
+# `## Hotmodell`): the adversary is a BUILDER under a frozen gate it may not edit, plus accidental reintroduction —
+# the rows therefore measure WHAT THE ACTIVE TEXT SAYS. A builder that paraphrases past every anchor while writing a
+# different meaning is a declared boundary: the product review reads the text.
+RULES = "docs/loop/regler.md"
+ROLE_SKILLS = tuple(".agents/skills/nortropic-%s/SKILL.md" % n for n in
+                    ("architect", "builder", "empirical-runner", "gate-reviewer", "reviewer", "test-author"))
+REFERENCE_DOCS = (AGENTS, CLAUDE) + ROLE_SKILLS
+# B1: the plan's `## Avslutskriterier` carries FOUR measurable levels; every pattern must match inside that section.
+PLAN_EXIT_LEVELS = (
+    ("planseparation", (r"(?i)planseparation", r"(?i)(\bhandoff\b|överlämning)",
+                        r"(?i)(alla|varje)\s+aktiva?\s+konsument", r"(?i)arbetsdelar", r"(?i)genomfört\s+flöde")),
+    ("trust_kernel", (r"Trust Kernel", r"(?i)giltig\s+uppgift", r"(?i)fel\s+identitet", r"(?i)otillåtna\s+skrivningar",
+                      r"(?i)saknad\s+obligatorisk\s+verifierare", r"(?i)fel\s+hash", r"(?i)avvisas\s+mekaniskt",
+                      r"(?i)frysta\s+verifierare", r"(?i)exitkod\s+0\s+ensam\s+räcker\s+inte")),
+    ("lokal_bootstrap_milstolpe", (r"(?i)bootstrap-?milstolpe", r"(?i)verklig\s+uppgift", r"(?i)hela\s+rollflödet",
+                                   r"(?i)kvalificerad\s+produkt", r"(?i)utan\s+webbstyrning",
+                                   r"(?i)utan\s+generellt\s+mänskligt\s+ingripande")),
+    ("operativ_helhet_senare", (r"(?i)operativ\s+helhet", r"(?i)installation", r"(?i)driftkvalificering",
+                                r"(?i)supervisor-?resume", r"(?i)själv\s+identifiera", r"(?i)\bsenare\b",
+                                r"(?i)utanför\s+dagens")),
+)
+# B2: the `## Bootstrap` section names a FINITE handover point and says the development continues after it.
+PLAN_BOOTSTRAP_HANDOVER = (r"(?i)ändlig", r"(?i)överlämningspunkt", r"(?i)kvalificerad\s+autonom\s+drift",
+                           r"(?i)fortsatta\s+utveckling", r"(?i)därefter")
+# B3: the `## Målbild` carries the autonomy's own identification of needs and web/Digitala as a BUSINESS using the platform.
+PLAN_MALBILD_AUTONOMY = (r"(?i)(identifierar?\s+(själv\s+)?behov|behov\s+och\s+möjligheter)", r"(?i)prioriter",
+                         r"(?i)genomför", r"(?i)utvärder", r"(?i)mål\s+och\s+mandat",
+                         r"(?i)webb\s*/\s*digitala", r"(?i)verksamhet\s+som\s+använder")
+# B4: H039's functional requirement, preserved in the plan's protected-invariants section.
+PLAN_H039_REQUIREMENT = (r"(?i)h-?039", r"(?i)avslutad\s+städning", r"(?i)noll\s+registrerade\s+runtime-?rester",
+                         r"(?i)(radera|radering|ersätta|ersättning)", r"(?i)främmande\s+data", r"(?i)kapplöpning")
+# B5: what `docs/loop/regler.md` must carry to BE the source of the working method.
+RULES_REQUIRED = (
+    ("rollflodet", (r"(?i)test-?author", r"(?i)granskning", r"(?i)builder", r"(?i)lokal\s+kvalificering")),
+    ("builder_ror_aldrig_sin_egen_frysta_grind", (r"(?i)ändrar\s+aldrig\s+sin\s+egen\s+frysta\s+grind",)),
+    ("grindandring_kravd_och_hindrad", (r"(?i)befintligt\s+krav", r"(?i)konkret\s+hinder")),
+    ("granskarens_godkannandenorm", (r"(?i)arbetsbudget", r"(?i)aldrig\s+ett\s+kvarvarande\s+fel",
+                                     r"(?i)skenande\s+kostnad", r"(?i)enklare\s+upplägg")),
+    ("riggbegransningar_mot_hotmodellen", (r"(?i)riggbegränsningar", r"(?i)hotmodell")),
+    ("kallan_for_arbetsmetoden", (r"(?i)källa\s+för\s+arbetsmetoden",)),
+)
+# B5 (no duplicated rulebook): the SAME normative sentence in two active documents is a duplicated rulebook, not a
+# reference. A sentence that NAMES the rulebook or the plan is a pointer and is exempt — pointing is what is wanted.
+# Measured on 320c9df7: 52 normative sentences across the nine documents, zero collisions.
+NORMATIVE_MARKER = re.compile(r"(?i)(?<![\w])(aldrig|alltid|måste|ska|får inte|avvisas|obligatorisk"
+                              r"|never|always|must|may not|shall|required)(?![\w])")
+NORMATIVE_MIN_LEN = 40
+RULES_MIN_NORMATIVE_SENTENCES = 8
 # Machine-readable slice table in the plan generation: a markdown table with exactly these header cells.
 PLAN_TABLE_COLUMNS = ("slice", "task", "exit_test", "allowed_write", "depends_on", "status")
 PLAN_STATUS_BUILT, PLAN_STATUS_UNBUILT = "BYGGD", "OBYGGD"
@@ -478,7 +529,7 @@ PATH_RE = re.compile(r"(?i)(?<![\w/.-])((?:docs|config|specs)/[A-Za-z0-9_.-]+(?:
 ROOT_DOC_RE = re.compile(r"(?<![\w/.-])(AGENTS\.md|CLAUDE\.md|README\.md|\.agents/skills/[A-Za-z0-9_-]+/SKILL\.md)")
 # Markdown links with optional angle brackets and an optional "title"; any target extension.
 LINK_RE = re.compile(r"\]\(\s*<?([^)\s>#]+)>?(?:#[^)\s]*)?(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
-DOC_SECTIONS = ("## Enkelt förklarat", "## Avgränsning och roller", "## Kriterium (effekter)",
+DOC_SECTIONS = ("## Enkelt förklarat", "## Avgränsning och roller", "## Hotmodell", "## Kriterium (effekter)",
                 "## Produktyta för BUILDER", "## Vad grinden inte bevisar", "## Utfall")
 SHA256_FORM = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_FORM = re.compile(r"^[0-9a-f]{40}$")
@@ -892,6 +943,7 @@ DRIVER = (
     "                       stdin_forms=sorted({c.get('stdin_form','none') for c in popen_calls}),\n"
     "                       private_env_paths=sorted({c.get('env_path') for c in popen_calls if c.get('env_given') and c.get('env_path') and c.get('env_path')!=_os.environ.get('PATH','')})[:3],\n"
     "                       git_launcher_starts=[x for c in popen_calls for x in c.get('git_launcher',[])][:4],\n"
+    "                       bare_name_starts=sum(1 for c in popen_calls if '/' not in (c['argv'][0] if c['argv'] else '/')),\n"
     "                       recorder_integrity=_integrity_of_recorders(),\n"
     "                       closure_counts=list(_COUNTS),\n"
     "                       popen_identity_after=identity_after)\n"
@@ -972,7 +1024,7 @@ EMITTED_ROWS = []
 ABORT_STATE = {"scratch": None, "rows": None}
 # v3.10 (review v14 N1): the gate emits a fixed number of rows. A run that stops early must not look NUMERICALLY better
 # than an honest RED — the abort path therefore counts every row that never ran as FAIL, which needs this denominator.
-EXPECTED_ROW_COUNT = 121  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
+EXPECTED_ROW_COUNT = 127  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
 
 
 # v3.2 (N4): a tracked-path pair that collides case-insensitively cannot be checked out cleanly on a case-insensitive file
@@ -2526,6 +2578,53 @@ def main():
           and bool(hist_new_active) and bool(hist_old_history),
           f"authority_mentions={len(auth_units)} anchored={len(anchored)} demoted={demoted} historik_len={len(historik)} "
           f"new_as_active={len(hist_new_active)} old_as_history={len(hist_old_history)}")
+    # v3.10 (owner decision 2026-09-11) B5: regler.md IS the working method, and the router/skills point at it.
+    rules_text = visible_markdown(text(RULES)) if RULES in tracked and (subject / RULES).is_file() else ""
+    rules_problems = []
+    for label, patterns in RULES_REQUIRED:
+        missing = [p for p in patterns if not re.search(p, rules_text)]
+        if missing:
+            rules_problems.append(f"{label}: {missing}")
+    check("f2_regler_md_carries_the_working_method_role_flow_frozen_gate_rule_gate_change_rule_review_standard_and_rig_threat_model",
+          bool(rules_text) and not rules_problems, f"len={len(rules_text)} problems={rules_problems}"[:900])
+
+    def normative_sentences(rel):
+        """Normalised normative sentences of an active document; a sentence that NAMES the rulebook or the plan is a
+        pointer, not a duplicated rule, and is left out."""
+        body = re.sub(r"[`*_#>|\[\]]", " ", visible_markdown(text(rel)))
+        body = re.sub(r"\s+", " ", body)
+        out = set()
+        for sentence in re.split(r"(?<=[.!?])\s+", body):
+            sentence = re.sub(r"\s+", " ", sentence.strip().strip(".;:,").lower())
+            if (len(sentence) >= NORMATIVE_MIN_LEN and NORMATIVE_MARKER.search(sentence)
+                    and RULES not in sentence and PLAN_GEN not in sentence):
+                out.add(sentence)
+        return out
+
+    ref_problems, sentence_sets = [], {}
+    for rel in (RULES, PLAN_GEN) + REFERENCE_DOCS:
+        if rel not in tracked or not (subject / rel).is_file():
+            ref_problems.append(rel + ": missing")
+            continue
+        if rel in REFERENCE_DOCS:
+            body = text(rel)
+            for target in (RULES, PLAN_GEN):
+                if target not in body:
+                    ref_problems.append(f"{rel}: does not reference {target}")
+        sentence_sets[rel] = normative_sentences(rel)
+    duplicated = []
+    named = sorted(sentence_sets)
+    for i, a in enumerate(named):
+        for b in named[i + 1:]:
+            for sentence in sorted(sentence_sets[a] & sentence_sets[b])[:2]:
+                duplicated.append(f"{a} == {b}: {sentence[:90]}")
+    if len(sentence_sets.get(RULES, ())) < RULES_MIN_NORMATIVE_SENTENCES:
+        ref_problems.append(f"{RULES} carries {len(sentence_sets.get(RULES, ()))} normative sentences "
+                            f"(< {RULES_MIN_NORMATIVE_SENTENCES})")
+    check("f2_agents_claude_and_role_skills_reference_regler_md_and_the_plan_without_duplicating_a_normative_sentence",
+          not ref_problems and not duplicated,
+          f"normative={sum(len(v) for v in sentence_sets.values())} problems={ref_problems[:6]} "
+          f"duplicated={duplicated[:4]}"[:900])
     fr = text(FULL_ROADMAP)
     fr_authority = next((fr[s:e] for h, s, e in sections(fr) if h.startswith("## Authority")), "")
     check("f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit",
@@ -3147,16 +3246,24 @@ def main():
     if not live_out or live_out["outcome"] != "returned":
         problems.append("live driver unavailable")
     else:
-        counters = {"stub_calls": len(stub_calls), "popen_total": live_out.get("popen_total"),
+        # The PATH stubs can only see starts that resolve a BARE name; a start with a directory in argv[0] bypasses PATH
+        # by construction and is bound by the in-process half and by the realpath/sha256 identity instead. The denominator
+        # is therefore the bare-name starts, and the three in-process counters must agree with each other.
+        counters = {"stub_calls": len(stub_calls), "bare_name_starts": live_out.get("bare_name_starts"),
+                    "popen_total": live_out.get("popen_total"),
                     "init_total": live_out.get("init_total"), "child_total": live_out.get("child_total")}
         closure = live_out.get("closure_counts") or []
-        if len(set(counters.values())) != 1:
-            problems.append(f"the two halves disagree: {counters}")
+        if counters["stub_calls"] != counters["bare_name_starts"]:
+            problems.append(f"the two halves disagree: stub log has {counters['stub_calls']} entries, "
+                            f"the recorders saw {counters['bare_name_starts']} starts that resolve a bare name")
+        if len({counters["popen_total"], counters["init_total"], counters["child_total"]}) != 1:
+            problems.append(f"the in-process recorders disagree: {counters}")
         if len(closure) == 4 and [closure[0], closure[1], closure[2]] != [counters["popen_total"], counters["child_total"], counters["init_total"]]:
             problems.append(f"closure counters {closure[:3]} differ from the recorded lists {[counters['popen_total'], counters['child_total'], counters['init_total']]}")
         if live_out.get("recorder_integrity"):
             problems.append(f"the recording containers were replaced: {live_out.get('recorder_integrity')}")
-        if any(v is None or v < LIVE_MIN_PROCESS_STARTS for v in counters.values()):
+        if any(counters[k] is None or counters[k] < LIVE_MIN_PROCESS_STARTS
+               for k in ("stub_calls", "bare_name_starts", "popen_total", "init_total", "child_total")):
             problems.append(f"process starts below the measured minimum {LIVE_MIN_PROCESS_STARTS}: {counters}")
         broken = [c["seq"] for c in stub_calls if not c["chain_ok"]][:3]
         if broken:
@@ -3166,7 +3273,8 @@ def main():
             problems.append(f"stub log numbering is not contiguous: {len(seqs)} entries, "
                             f"max={max(seqs) if seqs else 0}, missing={sorted(set(range(1, (max(seqs) if seqs else 0) + 1)) - set(seqs))[:5]}")
     check("f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain",
-          not problems, f"stub_calls={len(stub_calls)} popen={(live_out or {}).get('popen_total')} "
+          not problems, f"stub_calls={len(stub_calls)} bare={(live_out or {}).get('bare_name_starts')} "
+                        f"popen={(live_out or {}).get('popen_total')} "
                         f"init={(live_out or {}).get('init_total')} child={(live_out or {}).get('child_total')} "
                         f"closure={(live_out or {}).get('closure_counts')} problems={problems}"[-900:])
     livemut, livemut_env = replica(bench, "live-flows-mutated", subject, head)
@@ -3302,6 +3410,30 @@ def main():
                         if not any(re.search(pattern, h) and len([l for l in body.splitlines()[1:] if l.strip()]) >= 3 for h, body in plan_sections)]
     check("f4_plan_generation_has_required_sections_syfte_malbild_skydd_skivtabell_bootstrap_arbetsflode_avslutskriterier",
           bool(plan_visible) and not missing_sections, f"headings={len(plan_sections)} missing={missing_sections}")
+    # v3.10 (owner decision 2026-09-11) B1-B4: the four measurable exit levels, the finite bootstrap handover point,
+    # the goal picture's own identification of needs, and H039's preserved functional requirement.
+    def plan_section(pattern):
+        return "".join(body for h, body in plan_sections if re.search(pattern, h))
+
+    exit_section = plan_section(r"(?i)avslutskriteri")
+    level_problems = []
+    for label, patterns in PLAN_EXIT_LEVELS:
+        missing = [p for p in patterns if not re.search(p, exit_section)]
+        if missing:
+            level_problems.append(f"{label}: {missing}")
+    check("f4_plan_generation_avslutskriterier_carry_the_four_measurable_levels_planseparation_trust_kernel_bootstrap_milestone_and_later_operational_whole",
+          bool(exit_section) and not level_problems, f"len={len(exit_section)} problems={level_problems}"[:900])
+    missing_handover = [p for p in PLAN_BOOTSTRAP_HANDOVER if not re.search(p, boot)]
+    check("f4_plan_generation_bootstrap_names_a_finite_handover_point_to_qualified_autonomous_operation",
+          bool(boot) and not missing_handover, f"len={len(boot)} missing={missing_handover}")
+    malbild = plan_section(r"(?i)målbild")
+    missing_malbild = [p for p in PLAN_MALBILD_AUTONOMY if not re.search(p, malbild)]
+    check("f4_plan_generation_malbild_carries_self_identified_needs_within_goal_and_mandate_and_web_as_a_business_using_the_platform",
+          bool(malbild) and not missing_malbild, f"len={len(malbild)} missing={missing_malbild}")
+    invariants = plan_section(r"(?i)(skyddade\s+invarianter|tekniska\s+skydd)")
+    missing_h039 = [p for p in PLAN_H039_REQUIREMENT if not re.search(p, invariants)]
+    check("f4_plan_generation_preserves_h039_functional_requirement_zero_runtime_residues_and_no_loss_of_foreign_data",
+          bool(invariants) and not missing_h039, f"len={len(invariants)} missing={missing_h039}")
     # the handoff's pins live in fenced text blocks that readers see; only HTML comments are removed here
     handoff_visible = re.sub(r"<!--.*?-->", "", text(HANDOFF_GEN), flags=re.S) if HANDOFF_GEN in tracked and (subject / HANDOFF_GEN).is_file() else ""
     handoff_sections = [(h, handoff_visible[s:e]) for h, s, e in sections(handoff_visible) if h]

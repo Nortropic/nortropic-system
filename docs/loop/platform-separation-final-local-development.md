@@ -65,6 +65,38 @@ plattformen; bootstrap (h-031…h-039) etablerar en kvalificerad bas; webben är
   rot-default finns kvar, och (v3) att planens authority är plattformens plangeneration — ett aktivt,
   blob-bundet dokument vid HEAD — och att den gamla planen inte längre är aktiv källa.
 
+## Hotmodell
+
+Grinden mäter mot EN motpart, och den motparten avgör vad som är blockerande fynd och vad som är en deklarerad gräns.
+
+**Motparten är en BUILDER-agent som arbetar under en fryst grind den inte får ändra, plus oavsiktligt
+återinförande.** Den är INTE en medveten sabotör med godtycklig kodexekvering i grindens process. Buildern skriver
+produkt i sin egen skrivyta, kan läsa grinden, kan läsa och skriva i sin egen kandidat, och kör som samma användare på
+samma maskin som grinden. Den som avsiktligt vill sabotera mätningen har enklare vägar än någon av dem nedan, och de
+vägarna stoppas av rollflödet och av produktgranskningen, inte av en grindrad.
+
+**Blockerande (grinden måste fälla):**
+1. Gammal plan eller webbstyrning når FAKTISKT en agent eller en startad process. Det är slutkriteriet självt;
+   granskning nr 13:s B2 och nr 14:s B1/B2 var alla av denna klass och alla mättes med riktiga barnprocesser.
+2. Grindens EGEN bevisning kan förfalskas med vanliga produktmedel — obalanserade räknare, `PATH` genom `env=`,
+   en utifrån-logg utan nämnare. Utan detta betyder flödesbeviset ingenting, även om punkt 1 aldrig utnyttjas.
+
+**Deklarerad gräns med skriven motivering (grinden fäller inte, dokumentet redovisar):**
+undanflykter som kräver avsiktlig manipulation av grindens interna objekt — `sys._getframe`/`f_back`/`f_globals`,
+`gc.get_objects`/`get_referrers`, utbytta inspelarobjekt, `sys.settrace`/`setprofile` — och manipulation av
+stubbloggens FIL av samma användare. Alla dessa är statiskt förbjudna i den skannade produktytan
+(`GATE_NAMESPACE_TOKENS`) och deras kvarvarande NÅBARHET i körtid är gränsen: en produkt som skriver
+`sys._getframe` blir röd på texten, en produkt som når samma objekt genom en väg ingen token namnger gör det
+avsiktligt och ligger utanför modellen. Stubbloggen är på samma sätt manipulerbar av samma uid — men
+**DETEKTERBAR, inte förhindrad**: löpnumret kommer från en låst räknare och varje post bär en HMAC över
+(nummer ‖ innehåll) med en nonce per grindkörning, så borttagna, ändrade och tillagda poster syns som bruten kedja
+eller lucka. Nonce:n är läsbar för den som läser stubben på sin egen `PATH`; vad kedjan köper är att utifrån-talet
+inte kan sänkas TYST, inte att det inte kan sänkas.
+
+**Samma användare och samma maskin är inget generellt undantag från kraven** (ägarbeslutet, arbetssätt p.5). Det
+avgör bara vad som är rimligt att verkställa mekaniskt och vad som ska deklareras: en skyddsåtgärd som visar sig dyr
+eller spröd ska bytas mot ett ENKLARE upplägg med skriven gräns, inte mot fler rader.
+
 ## Kriterium (effekter)
 
 Grinden körs som `python3.12 verify/bin/platform-separation-final-exit --subject <kandidatrot>`
@@ -201,6 +233,23 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   `Auto-merge är avstängt`/`människan för kandidaterna`) samt F8 (r.35–36/43 gamla roten).
 - `f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents` (v3): båda filerna är spårade,
   nås av slutningen (autopilotens `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH`, skills) och finns i den skannade mängden.
+- `f2_regler_md_carries_the_working_method_role_flow_frozen_gate_rule_gate_change_rule_review_standard_and_rig_threat_model`
+  (v3.10, ägarbeslut 2026-09-11): `docs/loop/regler.md` bär, i sin synliga text, alla fem grupperna i
+  `RULES_REQUIRED` — rollflödet (`test-author`/`granskning`/`builder`/`lokal kvalificering`), att buildern
+  `ändrar aldrig sin egen frysta grind`, kopplingen `befintligt krav` + `konkret hinder` för varje ytterligare
+  grindändring, granskarens godkännandenorm (`arbetsbudget` … `aldrig ett kvarvarande fel`; `skenande kostnad` →
+  `enklare upplägg`) och att `riggbegränsningar` bedöms mot uppgiftens `hotmodell` — samt frasen
+  `källa för arbetsmetoden`. Mätt på 320c9df7: de två första grupperna håller redan (regel 11), de fyra övriga
+  saknas — raden är röd på baslinjen av exakt det skälet.
+- `f2_agents_claude_and_role_skills_reference_regler_md_and_the_plan_without_duplicating_a_normative_sentence`
+  (v3.10, ägarbeslut 2026-09-11): `AGENTS.md`, `CLAUDE.md` och samtliga sex rollskills namnger BÅDE
+  `docs/loop/regler.md` och plangenerationen; och ingen normativ mening förekommer i två av de nio aktiva
+  dokumenten (regelkällan, planen och de åtta hänvisarna). En mening är normativ när den är ≥ `NORMATIVE_MIN_LEN`
+  = 40 tecken efter normalisering (markdown-tecken bort, gemener, blanksteg normaliserade) och bär en markör ur
+  `NORMATIVE_MARKER`. En mening som NAMNGER regelkällan eller planen är en **pekare** och undantas — pekaren får
+  och ska upprepas i alla åtta dokumenten. Regelkällan måste själv bära ≥ `RULES_MIN_NORMATIVE_SENTENCES` = 8
+  normativa meningar, annars är den inte mätbar (en tömd regelfil kan inte passera genom att inte ha något att
+  duplicera). Mätt på 320c9df7: 52 normativa meningar över de nio dokumenten, noll kollisioner; i referensen 63.
 - `f2_local_development_documents_are_exactly_the_332f07ce_set_plus_this_contract`: mängden spårade
   `docs/loop/*-local-development.md` == mängden vid 332f07ce ∪ {detta dokument} (ett nytt oskannat
   följedokument kan inte tillkomma utan eget kontrakt).
@@ -525,6 +574,21 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   mäts alltså via skivtabellen + de krävda avsnitten + tokenmängderna; kriterier och negativa kontroller per skiva läses av
   den oberoende produktgranskningen. RECON-kartan (`~/nortropic/RECON-PLANGENERATION-20260910.md`, sha256
   `e01fcfa5a7bf948c0de0a42079f995eb64772a19f496891b88c525f5d56b4625`) är vägledning för författandet, inte en pinne.
+- `f4_plan_generation_avslutskriterier_carry_the_four_measurable_levels_planseparation_trust_kernel_bootstrap_milestone_and_later_operational_whole`
+  (v3.10, ägarbeslut 2026-09-11): avsnittet `## Avslutskriterier` bär alla mönster i `PLAN_EXIT_LEVELS` fördelade på
+  fyra nivåer — planseparation, Trust Kernel, lokal bootstrap-milstolpe och operativ helhet markerad `senare` och
+  `utanför dagens` fas. Mätpunkten är AVSNITTET, inte hela planen: en nivå som står någon annanstans räknas inte.
+- `f4_plan_generation_bootstrap_names_a_finite_handover_point_to_qualified_autonomous_operation` (v3.10): avsnittet
+  `## Bootstrap…` bär `ändlig`, `överlämningspunkt`, `kvalificerad autonom drift`, `fortsatta utveckling` och
+  `därefter` — bootstrap slutar vid en bestämd punkt, och organisationens utveckling fortsätter efter den.
+- `f4_plan_generation_malbild_carries_self_identified_needs_within_goal_and_mandate_and_web_as_a_business_using_the_platform`
+  (v3.10): avsnittet `## Målbild` bär att autonomin själv identifierar behov/möjligheter, prioriterar, genomför och
+  utvärderar inom organisationens `mål och mandat`, och att `Webb/Digitala` är en `verksamhet som använder`
+  plattformen.
+- `f4_plan_generation_preserves_h039_functional_requirement_zero_runtime_residues_and_no_loss_of_foreign_data`
+  (v3.10): avsnittet Skyddade invarianter/tekniska skydd bär `h-039`, `avslutad städning`,
+  `noll registrerade runtime-rester`, radering/ersättning och `främmande data` genom den identifierade
+  `kapplöpningen`. Ägarbeslutets H039-punkt överlever alltså generationsbytet i planen, inte bara i H-evidensen.
 - `f4_architect_and_empirical_runner_skills_name_plan_generation_and_no_plan_commit` (v3):
   `.agents/skills/nortropic-architect/SKILL.md` och `nortropic-empirical-runner/SKILL.md` namnger den nya planens
   sökväg och saknar `<PLAN_SHA>`, `frozen autonomous-loop plan commit`, `git show {…|<…|<hex>:` och den gamla planens pekare.
@@ -713,7 +777,8 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    avsnitten Syfte, Låsta värden/pinnar, Startordning, Stoppregler, Avslutskriterier + planens sökväg + `PLAN_GENERATION`;
    skivtabellens radordning följer autopilotens ROADMAP-ordning.
 6. **Dokument:** `AGENTS.md` (Historik → Git-referenser/webbrepot utan sökväg), `README.md` (r.8, 21, 28),
-   `docs/loop/regler.md` (r.9–10), `docs/loop/byggplan-v3.md` (r.9, 113, 166),
+   `docs/loop/regler.md` (r.9–10; se även 6b — filen ligger i produktytan och rörs, den är INTE i p.8),
+   `docs/loop/byggplan-v3.md` (r.9, 113, 166),
    `docs/loop/codex-autopilot-v3-full-roadmap.md` (r.17, 115), `docs/loop/harness-substitution-contract-v1.md`
    (ingress r.5, §6, §12 + daterat tilläggsavsnitt; §1–§5/§7–§11/§13 orörda),
    `docs/loop/codex-evidence-contract.md` (r.120, 130, 135–144), supersessionshuvud i
@@ -725,6 +790,43 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `README.md` namnger inte webbrepot (`nortropic-webbforvaltning`); Fasgränser-stycket och Historik-stycket i
    `AGENTS.md` bär markörerna `fryst`/`historisk` + `inte dagens instruktion` vid omnämnandet av
    remaining-bootstrap-delegation respektive plankopiorna.
+6b. **Ägarbeslutets bindningar (v3.10, ägarbeslut 2026-09-11).** Ägaren förbjuder en separat grindserie för
+   dokumentationen; bindningarna är därför sex rader med exakta ankare, och inget därutöver.
+   **(B1) Plangenerationens `## Avslutskriterier`** ska bära FYRA mätbara nivåer, var och en med sina ord i just
+   det avsnittet: *(i) planseparation* — egen plan + handoff hos alla aktiva konsumenter, planens `arbetsdelar`
+   stämmer med exekveringen, ett `genomfört flöde` visar att rätt plan når agenterna; *(ii) `Trust Kernel`* — en
+   `giltig uppgift` kan slutföras och `fel identitet`, `otillåtna skrivningar`, `saknad obligatorisk verifierare`
+   och `fel hash` `avvisas mekaniskt`, kvalificering kräver `frysta verifierare` körda färdigt mot exakt rätt
+   kandidat, och `exitkod 0 ensam räcker inte`; *(iii) `bootstrap-milstolpe`* — en `verklig uppgift` genom
+   `hela rollflödet` till `kvalificerad produkt` `utan webbstyrning` och `utan generellt mänskligt ingripande`
+   (ordet *människohand* är förbjudet av `HARD_HUMAN_TOKENS` och får inte användas); *(iv) `operativ helhet`* —
+   `installation`, `driftkvalificering`, `supervisor-resume`, `själv identifiera`, uttryckligen `senare` och
+   `utanför dagens` fas.
+   **(B2) `## Bootstrap`** ska namnge en `ÄNDLIG` `överlämningspunkt` till `kvalificerad autonom drift` och att
+   `organisationens fortsatta utveckling` sker `därefter`.
+   **(B3) `## Målbild`** ska bära att autonomin själv identifierar behov och möjligheter inom organisationens
+   `mål och mandat`, prioriterar, genomför och utvärderar, och att `Webb/Digitala` är en `verksamhet som använder`
+   den gemensamma plattformen.
+   **(B4) H039:s funktionskrav** bevaras i avsnittet Skyddade invarianter/tekniska skydd: `h-039`,
+   `avslutad städning`, `noll registrerade runtime-rester`, och att städningen inte får radera eller ersätta
+   `främmande data` genom den identifierade `kapplöpningen`.
+   **(B5) `docs/loop/regler.md` är källa för arbetsmetoden** och ligger i produktytan (den rörs; den är inte i p.8).
+   Filen ska bära: rollflödet (`test-author` → `granskning` → `builder` → `lokal kvalificering`); att buildern
+   `ändrar aldrig sin egen frysta grind` (regel 11 bär den redan); att varje ytterligare grindändring kopplas till
+   ett `befintligt krav` OCH ett `konkret hinder`; granskarens godkännandenorm (`arbetsbudget` gör `aldrig ett
+   kvarvarande fel` godkänt, `skenande kostnad` leder till ett `enklare upplägg`); och att `riggbegränsningar`
+   bedöms mot uppgiftens `hotmodell`. Filen måste dessutom bära minst
+   `RULES_MIN_NORMATIVE_SENTENCES` = 8 normativa meningar (annars är regelkällan inte mätbar).
+   `AGENTS.md`, `CLAUDE.md` och ALLA SEX rollskills ska **hänvisa** till både `docs/loop/regler.md` och
+   plangenerationen — och inte duplicera dem: samma normativa mening (≥ 40 tecken, med markör
+   *aldrig/alltid/måste/ska/får inte/avvisas/obligatorisk/never/always/must/may not/shall/required*) i två aktiva
+   dokument är RÖD. En mening som NAMNGER regelkällan eller planen är en pekare och undantas — pekare får upprepas.
+   Mätt på 320c9df7: 52 normativa meningar över de nio dokumenten, noll kollisioner; `docs/loop/regler.md` bar 7,
+   så tillägget behövs. **Ompinning:** `CLAUDE.md` och `docs/loop/regler.md` är generationsdokument — deras blob i
+   autopilotens `SUBSTITUTION_BLOBS` och deras sha256 i `controller/verify/cli` `PLATFORM_DOCUMENTS` måste pinnas om
+   när de ändras. `LOOP-ÄGARHAND-16–27` (r.16) och webbavgränsningarna i r.10–11/r.29 är MÄTT gröna som de står —
+   `HUMAN_TOKENS` bär inte `ägarhand` (det gör bara `PLAN_TOKENS`, som bara gäller plangenerationen) och `kundflöde`
+   likaså — så ingen omskrivning och inget extra ankare behövs för dem.
 7. **Tester:** `tests/controller/loop/fall.py` B2 (webbfixtur/INV-004 → PINV-sabotage, t.ex.
    `push --force` i `controller/<x>/cli` → PINV-005).
 8. **Inte rörs:** `verify/**` (utom att denna grind redan ligger där), frysta träd/filer i F6,
@@ -1788,7 +1890,7 @@ krävde ingen produktändring.
 |---|---|
 | B1 namnrymden via frame/heap | `GATE_NAMESPACE_TOKENS` utökad med `_getframe(`, `f_globals`, `f_back`, `f_locals`, `f_code`, `gc.get_objects/referrers/referents`, `sys.settrace`, `sys.setprofile`, `threading.settrace` |
 | B1 inspelningsintegritet | räknarna hålls **också** som heltal i en closure-cell som ingen listutbytning når; inspelningsbehållarnas typ, identitet och bundna `append` pinnas vid installation och prövas efter flödena (`recorder_integrity`) |
-| **B1/B3 halvorna mot varandra** | ny rad `f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain`: `stub_calls = popen_total = init_total = child_total`, closure-räknarna mot listorna, obruten HMAC-kedja, sammanhängande numrering, och varje räknare över `LIVE_MIN_PROCESS_STARTS` |
+| **B1/B3 halvorna mot varandra** | ny rad `f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain`: `stub_calls = bare_name_starts` och `popen_total = init_total = child_total`, closure-räknarna mot listorna, obruten HMAC-kedja, sammanhängande numrering, och varje räknare över `LIVE_MIN_PROCESS_STARTS`. **Nämnaren är de BARA namnen, inte alla starter:** en start vars `argv[0]` bär en katalogdel går per konstruktion förbi `PATH` och kan inte synas i stubbloggen; den binds i stället av in-process-halvan, av realpath+sha256-identiteten och av den slutna formmängden (mätt: `b6_abs_sh_stdin_file` faller på dem). Att kräva likhet mot ALLA starter vore en falsk rödhet utan att stänga något |
 | B2 identitet i barnets värld | `_identify` löser binären med **den PATH anropet använder** (`env=`-argumentets, annars `os.environ`); en start som bär en egen `PATH` i `env=` är röd |
 | B2 stdin i alla kanaler | `input`, pipe, vanlig **fil** och **ärvd fd** (via `/dev/fd/<n>`), plus `pass_fds`; innehållet läses och skannas med `OLD_PLAN_TOKENS` och providermarkörerna. Varje start med stdin ansluten är röd |
 | B2 miljön | mäts även när barnet **ärver** den, inte bara när den skickas som `env=` |
