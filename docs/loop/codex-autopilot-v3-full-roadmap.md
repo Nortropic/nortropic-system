@@ -5,15 +5,17 @@
 
 ## Authority
 
-Den fullständiga autonoma loop-planen är fryst som execution authority vid:
+Den fullständiga autonoma loop-planen är plattformens aktiva plangeneration:
 
 ```text
-ROADMAP_PLAN_SHA=0b3212c991d4227c8df2656465ae2c0252dda39e
-ROADMAP_PLAN_PATH=docs/loop/autonomous-loop-plan-v1.md
-ROADMAP_HANDOFF_PATH=docs/loop/autonomous-loop-codex-handoff.md
+PLAN_GENERATION=platform-v2
+ROADMAP_PLAN_PATH=docs/loop/autonomous-loop-plan-platform-v2.md
+ROADMAP_HANDOFF_PATH=docs/loop/autonomous-loop-platform-handoff-v2.md
 ```
 
-Planen läses ur exakt commit-SHA med `git show`; den muterbara branchen är aldrig authority.
+Planen och överlämningen läses vid HEAD i den auktoritativa arbetskopian, och deras blobbar är pinnade
+i autopilotens `ROADMAP_PLAN_BLOBS` och i `controller/verify/cli` `PLATFORM_DOCUMENTS`; ingen commit,
+gren eller opinnad kopia är authority.
 Vid konflikt gäller fortfarande högre authority enligt auktoritetsordningen i `AGENTS.md`.
 
 ## Stående owner-delegation
@@ -27,7 +29,7 @@ OWNER_DECISION_REQUIRED_IS_NORMAL_HUMAN_STOP=NO
 FROZEN_GATE_AFTER_TEST_AUTHOR_REMAINS_TRUST_AUTHORITY=YES
 ```
 
-När test-author, builder eller reviewer rapporterar `OWNER_DECISION_REQUIRED` för en fråga som täcks av roadmapen ska orchestratorn **inte stoppa för människan**. Den startar en separat `$nortropic-architect`, som läser högre authority + exakt roadmap-SHA + faktisk kod/evidence och väljer den minsta kompatibla designen. Resolutionen är guidance; den blir inte trust authority förrän test-author har översatt den till en mekaniskt dömbar frozen task/gate och gate-reviewern har falsifierat den.
+När test-author, builder eller reviewer rapporterar `OWNER_DECISION_REQUIRED` för en fråga som täcks av roadmapen ska orchestratorn **inte stoppa för människan**. Den startar en separat `$nortropic-architect`, som läser högre authority + den pinnade plangenerationen + faktisk kod/evidence och väljer den minsta kompatibla designen. Resolutionen är guidance; den blir inte trust authority förrän test-author har översatt den till en mekaniskt dömbar frozen task/gate och gate-reviewern har falsifierat den.
 
 ## Roadmap
 

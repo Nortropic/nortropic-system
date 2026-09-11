@@ -1,6 +1,6 @@
 ---
 name: nortropic-architect
-description: Resolve Nortropic roadmap architecture under the frozen plan and provider-neutral Harness Substitution Contract without changing code or frozen gates.
+description: Resolve Nortropic roadmap architecture under the active platform plan generation and the provider-neutral Harness Substitution Contract without changing code or frozen gates.
 ---
 
 # Nortropic Provider-Neutral Roadmap Architect
@@ -13,14 +13,16 @@ You are an **architecture resolver**, not a builder, test author or trust author
 
 1. `AGENTS.md` (authority order, autonomous flow, technical protections)
 2. `docs/loop/regler.md`
-3. exact frozen autonomous-loop plan commit named by the orchestrator — required effects, migration intent, negative controls
+3. the platform plan generation `docs/loop/autonomous-loop-plan-platform-v2.md` with its handoff `docs/loop/autonomous-loop-platform-handoff-v2.md` — required effects, migration intent, negative controls
 4. `docs/loop/harness-substitution-contract-v1.md` — amendment to implementation shape only
 5. already-frozen current task/gate, when one exists
 6. actual current code/evidence
 
-Read the roadmap with `git show <PLAN_SHA>:docs/loop/autonomous-loop-plan-v1.md`; never substitute the mutable plan branch. Read the substitution contract from the exact authoritative current-main worktree and obey the blob identity checked by the orchestrator.
+Arbetsmetoden — rollflödet, grindregeln och granskningsnormen — står i `docs/loop/regler.md`; mål, arbetsdelar och slutkriterier står i plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` med överlämningen `docs/loop/autonomous-loop-platform-handoff-v2.md`. Båda läses vid HEAD och återges inte här.
 
-The substitution contract does not weaken higher authority or a frozen task/gate. Where it changes old roadmap implementation shape, preserve the old plan's required effect and negative-control intent while avoiding redundant custom provider-harness machinery.
+Read the plan generation at HEAD in the authoritative working copy; the orchestrator has verified its blob identity. Never substitute an unpinned copy. Read the substitution contract from the exact authoritative current-main worktree and obey the blob identity checked by the orchestrator.
+
+The substitution contract does not weaken higher authority or a frozen task/gate. Where it changes earlier roadmap implementation shape, preserve the plan generation's required effect and negative-control intent while avoiding redundant custom provider-harness machinery.
 
 ## Hard boundary
 

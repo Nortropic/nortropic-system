@@ -34,8 +34,9 @@ förvaltningsregler är domänkrav och gäller inte plattformsuppdrag.
 - **`.agents/skills/`** — rollskills (test-author, builder, reviewer, gate-reviewer, architect,
   empirical-runner). Rollerna och flödet står i `AGENTS.md`.
 - **`docs/loop/`** — byggplan v3, regler, v4.1-arkitektur, substitutionskontrakt, owner-
-  author-workflow, delegation, drift, evidenskontrakt, lokala utvecklingsdokument, de
-  plattformsfrysta plankopiorna (`autonomous-loop-plan-v1.md`, `autonomous-loop-codex-handoff.md`), arkiv.
+  author-workflow, delegation, drift, evidenskontrakt, lokala utvecklingsdokument, arkiv och
+  plattformens aktiva plangeneration `autonomous-loop-plan-platform-v2.md` med överlämningen
+  `autonomous-loop-platform-handoff-v2.md`.
 - **`SEPARATION-20260910/`** — förslagen från uppdelningen (`proposed/`), allokeringen och
   proveniensen för det som överförts till webbrepot (`WEB-TRANSFER-PROVENIENS*.tsv`).
 

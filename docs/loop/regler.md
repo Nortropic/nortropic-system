@@ -49,3 +49,29 @@ Detta ändrar inte regel 16 eller 21 och aktiverar ingen sådan körning.
 13. Fasgräns (nuvarande fas): lokala immutabla commits och lokal kvalificering ingår; push,
     publicering, installation, livekörning och supervisor-resume ingår inte. Det är fasens
     omfång, inte ett permanent krav på mänskligt godkännande.
+
+## Arbetsmetoden (ägarbeslut 2026-09-11)
+
+Denna fil är källa för arbetsmetoden. Plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md`
+är källa för mål, arbetsdelar och slutkriterier; `AGENTS.md`, `CLAUDE.md` och rollskillsen under
+`.agents/skills/` hänvisar hit och till planen utan att återge innehållet. Punkterna nedan är
+bokstavsmärkta; de numeriska hänvisningarna i reglerna 3, 7 och 10 ovan pekar på den text som före
+2026-09-10 stod i plattformens dokument och finns i Git-historiken.
+
+A. Leveransen definieras före arbetet: den fungerande effekten, de konkreta fel som ska avvisas och
+   provet som visar båda. Ett prov som inte kan bli rött av rätt produktskäl är inget prov.
+
+B. Varje ytterligare grindändring ska kopplas till både ett befintligt krav och ett konkret hinder för
+   leveransen. En sidoförbättring utan sådant hinder blir aldrig automatiskt en blockerare, och en
+   fryst grind står kvar tills kopplingen är skriven.
+
+C. Granskarens godkännandenorm: godkänn när de avgränsade kraven håller, underkänn när de bryts.
+   Arbetsbudget eller antal rundor gör aldrig ett kvarvarande fel godkänt. Skenande kostnad ska leda
+   till ett enklare upplägg eller en ändrad implementation, aldrig till att ett känt fel accepteras.
+
+D. Riggbegränsningar bedöms konkret mot uppgiftens hotmodell och aldrig som generell ursäkt. Samma
+   användare och samma maskin är inget generellt undantag från kraven; en skyddsåtgärd som visar sig
+   dyr eller spröd ska bytas mot ett enklare upplägg med skriven gräns i stället för mot fler rader.
+
+E. Rutinmässiga beslut fattas autonomt inom uppdraget. När de avgränsade kriterierna är uppfyllda ska
+   arbetet gå vidare i stället för att invänta ytterligare bekräftelse.

@@ -13,6 +13,7 @@ You are the producer, not the owner of the verdict. This Skill defines workflow 
 
 1. `AGENTS.md` (authority order, autonomous flow, technical protections)
 2. `docs/loop/regler.md`
+2b. plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` med `docs/loop/autonomous-loop-platform-handoff-v2.md`
 3. `docs/loop/byggplan-v3.md` (the protected set, §3.1)
 4. current task in `specs/tasks.spec.json`
 5. that task's frozen `exit_test`

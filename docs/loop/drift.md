@@ -5734,3 +5734,8 @@ beskriver det historiska flödet där en person granskade kandidaterna och förd
 plattformen gäller i stället `AGENTS.md`: kontraktsflöde med oberoende granskning, frysta grindar och lokal
 kvalificering; push och merge ingår inte i nuvarande fas. Denna fil är dokumentationens hemvist för
 plattformens tasks.
+
+Plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` med överlämningen
+`docs/loop/autonomous-loop-platform-handoff-v2.md` (`PLAN_GENERATION=platform-v2`) är plattformens aktiva
+plan enligt `AGENTS.md`. Den ersätter den tidigare plangenerationen, som ligger kvar i Git-historiken.
+Identiteten är blobbarna vid HEAD, pinnade i autopiloten och i `controller/verify/cli`.

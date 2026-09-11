@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v2.5 efter fyra oberoende kontraktsgranskningar 2026-09-10) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.6 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5–10; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -31,6 +31,20 @@ autopiloten fungerar i en replika utan remote, och att de tre tidigare frysta gr
 exakt förutsagt utfall. Frysta H-grindar, artefakter och historiska beslutsdokument binds
 byte-exakt mot 332f07ce; deras historiska webbreferenser är evidens, inte instruktion.
 
+**v3 (ägarorder 2026-09-10, plangenerationen).** Den gamla roadmap-planen (commit `0b3212c9`, kopierad
+byte-exakt som `docs/loop/autonomous-loop-plan-v1.md`/`autonomous-loop-codex-handoff.md`) var i v2.5 fortfarande
+effekt-authority: autopilotens rollprompter lät agenterna läsa den med `git show 0b3212c9:…`, och den gör
+`docs/07-konstitution`/`docs/03-regelverk` överordnade. v3 binder att planen är en PLATTFORMSGENERATION —
+`docs/loop/autonomous-loop-plan-platform-v2.md` + `docs/loop/autonomous-loop-platform-handoff-v2.md`, frysta genom
+det autonoma flödet — som är ett AKTIVT dokument (skannat som alla andra, plus en planspecifik tokenmängd), att
+alla aktiva konsumenter (autopilotens konstanter och prompter, skills, full-roadmap, AGENTS, substitutionskontraktets
+ingress/§15, drift, README, pinnar) är bundna till den nya generationen, att planens maskinläsbara skivtabell är
+en sanning med autopilotens `SUBSTITUTION_ROADMAP + ROADMAP` och selftests exakta mängder, och att den gamla planen
+(commit, blobbar, sökvägar, etiketter som "effekt-authority"/"fryst input"/"historisk källa") inte kan återinföras som
+aktiv källa — den får bara förekomma i fryst evidens (`verify/**`, `SEPARATION-20260910/**`,
+`*-local-development.md`, byte-frysta dokument, drift.md:s bas). Målbild: autonomin utvecklar hela Nortropic inkl.
+plattformen; bootstrap (h-031…h-039) etablerar en kvalificerad bas; webben är en verksamhet som använder plattformen.
+
 ## Avgränsning och roller
 
 - **test-author (denna tråd):** fryser grinden och detta dokument; bygger en förkastad
@@ -47,8 +61,41 @@ byte-exakt mot 332f07ce; deras historiska webbreferenser är evidens, inte instr
 - Fasgräns: `PUSH=NO`, `MERGE=NO`. Ingen installation av managed-settings (extern ceremoni),
   ingen livekörning, ingen supervisor-resume.
 - Codex-/providermaskineriet i autopiloten tas INTE bort i detta kontrakt; substitutionen
-  (SUB-1/h-027) är nästa kontrakt. Här binds bara att ingen webbkoppling och ingen gammal
-  rot-default finns kvar, och att planens authority ligger i plattformsfrysta kopior.
+  (SUB-1/h-027) är nästa kontrakt. Här binds att ingen webbkoppling och ingen gammal
+  rot-default finns kvar, och (v3) att planens authority är plattformens plangeneration — ett aktivt,
+  blob-bundet dokument vid HEAD — och att den gamla planen inte längre är aktiv källa.
+
+## Hotmodell
+
+Grinden mäter mot EN motpart, och den motparten avgör vad som är blockerande fynd och vad som är en deklarerad gräns.
+
+**Motparten är en BUILDER-agent som arbetar under en fryst grind den inte får ändra, plus oavsiktligt
+återinförande.** Den är INTE en medveten sabotör med godtycklig kodexekvering i grindens process. Buildern skriver
+produkt i sin egen skrivyta, kan läsa grinden, kan läsa och skriva i sin egen kandidat, och kör som samma användare på
+samma maskin som grinden. Den som avsiktligt vill sabotera mätningen har enklare vägar än någon av dem nedan, och de
+vägarna stoppas av rollflödet och av produktgranskningen, inte av en grindrad.
+
+**Blockerande (grinden måste fälla):**
+1. Gammal plan eller webbstyrning når FAKTISKT en agent eller en startad process. Det är slutkriteriet självt;
+   granskning nr 13:s B2 och nr 14:s B1/B2 var alla av denna klass och alla mättes med riktiga barnprocesser.
+2. Grindens EGEN bevisning kan förfalskas med vanliga produktmedel — obalanserade räknare, `PATH` genom `env=`,
+   en utifrån-logg utan nämnare. Utan detta betyder flödesbeviset ingenting, även om punkt 1 aldrig utnyttjas.
+
+**Deklarerad gräns med skriven motivering (grinden fäller inte, dokumentet redovisar):**
+undanflykter som kräver avsiktlig manipulation av grindens interna objekt — `sys._getframe`/`f_back`/`f_globals`,
+`gc.get_objects`/`get_referrers`, utbytta inspelarobjekt, `sys.settrace`/`setprofile` — och manipulation av
+stubbloggens FIL av samma användare. Alla dessa är statiskt förbjudna i den skannade produktytan
+(`GATE_NAMESPACE_TOKENS`) och deras kvarvarande NÅBARHET i körtid är gränsen: en produkt som skriver
+`sys._getframe` blir röd på texten, en produkt som når samma objekt genom en väg ingen token namnger gör det
+avsiktligt och ligger utanför modellen. Stubbloggen är på samma sätt manipulerbar av samma uid — men
+**DETEKTERBAR, inte förhindrad**: löpnumret kommer från en låst räknare och varje post bär en HMAC över
+(nummer ‖ innehåll) med en nonce per grindkörning, så borttagna, ändrade och tillagda poster syns som bruten kedja
+eller lucka. Nonce:n är läsbar för den som läser stubben på sin egen `PATH`; vad kedjan köper är att utifrån-talet
+inte kan sänkas TYST, inte att det inte kan sänkas.
+
+**Samma användare och samma maskin är inget generellt undantag från kraven** (ägarbeslutet, arbetssätt p.5). Det
+avgör bara vad som är rimligt att verkställa mekaniskt och vad som ska deklareras: en skyddsåtgärd som visar sig dyr
+eller spröd ska bytas mot ett ENKLARE upplägg med skriven gräns, inte mot fler rader.
 
 ## Kriterium (effekter)
 
@@ -67,18 +114,25 @@ nådda slutningen och de hållna grindarnas körningar. Subjektets bytes är of�
   `AGENTS.md`, `CLAUDE.md`, `README.md`, `scripts/check-invariants.mjs`,
   `scripts/nortropic-codex-autopilot.py`. (Härlett ur revisionens PLATFORM_KEEP/REWRITE.)
 - `f1_required_absences_…`: frånvarande: `docs/loop/arkiv/{regler,byggplan-v3,spec-styrningsfalt}-fore-2026-09-10.md`,
-  `scripts/check-verifierarregistret.mjs`, `AUTOPILOT`, `KONSTITUTION.md`, `docs/0N-*.md`, och allt under
+  `scripts/check-verifierarregistret.mjs`, `AUTOPILOT`, `KONSTITUTION.md`, `docs/0N-*.md`, (v3) de gamla plankopiorna
+  `docs/loop/autonomous-loop-plan-v1.md` och `docs/loop/autonomous-loop-codex-handoff.md`, och allt under
   `agents/ workflows/ skills/ vendored-skills/ packs/ backtests/ tests/fixtures/ tools/ docs/100-dagar/ docs/arkiv/`.
 - `f1_web_transfer_provenance_2_…`: `SEPARATION-20260910/WEB-TRANSFER-PROVENIENS-2.tsv` (ny) listar
   exakt de fyra överförda filerna; kolumn 2 = blob-OID som grinden mäter med
   `git rev-parse 332f07ce:<path>`; kolumn 3 (destination) icke-tom; filerna är inte spårade vid HEAD.
-- `f1_no_blob_at_head_equals_a_transferred_or_pre_split_governance_object`: ingen blob vid HEAD, under
-  någon sökväg, är lika de fyra överförda objekten (`6b41bcd4…`, `bd298bcf…`, `a847ade1…`, `2d018d65…`) eller
+- `f1_no_blob_at_head_equals_a_transferred_pre_split_governance_or_pre_platform_plan_object`: ingen blob vid HEAD,
+  under någon sökväg, är lika de fyra överförda objekten (`6b41bcd4…`, `bd298bcf…`, `a847ade1…`, `2d018d65…`),
   dae90c8f-originalen av `docs/loop/regler.md` (`b0bc10ae…`), `docs/loop/byggplan-v3.md` (`c0b3b04b…`),
-  `specs/tasks.spec.json` (`2324b2fe…`), `AGENTS.md`/`CLAUDE.md`/`README.md` — en omdöpt eller omparkerad kopia
-  är samma objekt.
+  `specs/tasks.spec.json` (`2324b2fe…`), `AGENTS.md`/`CLAUDE.md`/`README.md`, eller (v3) den gamla planens objekt
+  `c8ea8511…` (plan) och `1e53887c…` (handoff) — en omdöpt eller omparkerad kopia är samma objekt (tolv blobbar).
 - `f1_no_symlink_entries_at_head`: inga poster med läge 120000 i HEAD-trädet (basen har 0) — en symlänk kan
   peka ut ur trädet (t.ex. mot webbrepot) och undgår filskanning.
+- `f1_tracked_paths_unique_case_insensitively` (v3.2 N4, v3.3: nyckeln är NFC-normaliserad + gemener; Git körs med
+  `core.quotePath=false` så icke-ASCII-sökvägar läses okvoterade): inga två spårade sökvägar som bara skiljer sig i
+  skiftläge eller Unicode-normalisering — på ett skiftläges-/normaliseringsokänsligt filsystem kan bara en av dem checkas
+  ut och den andra blir en dold tvilling. Riggen tolererar just den smutsen (subjekt och replikor) så att felet blir en
+  produktrad (exit 1), inte ett riggfel (exit 2). Gräns: en enda trädpost som saknas i arbetsträdet (t.ex. en NFD-post som
+  `core.precomposeunicode` kollapsat) är ingen tvilling utan en osäker utcheckning — riggfel av rätt skäl.
 
 ### F2 — referensslutningsorakel (kärnan)
 Rötter: `AGENTS.md`, `CLAUDE.md`, `README.md`, `.agents/skills/*/SKILL.md`, specens `authority.*`,
@@ -96,19 +150,42 @@ aktiv instruktion.
 Referenser till kod (`controller/…`, `verify/…`) följs inte; `specs/tasks.spec.json` följs bara via
 `authority.*` och är dessutom byte-bunden (F3).
 **Undantag (fryst evidens — varken skannas eller följs):** `docs/loop/owner-author-workflow-v1.md`,
-`docs/loop/remaining-bootstrap-delegation-v1.md`, de plattformsfrysta plankopiorna
-`docs/loop/autonomous-loop-plan-v1.md`/`autonomous-loop-codex-handoff.md` (bundna byte-exakt i F4;
-de historiska planobjekten bär själva webbreferenser),
-`SEPARATION-20260910/**`, `verify/**`, samt `docs/loop/*-local-development.md` (grindarnas
-följedokument, som av nödvändighet namnger de förbjudna token; deras form binds av respektive grind).
-**Delvis:** `docs/loop/drift.md` — bara avsnittet `## Aktiv plattformsnot…` skannas/följs;
-substitutionskontraktet — bara ingressen, §6, §12 och tillagda avsnitt (övriga avsnitt binds
-byte-exakt); de historiska dokumenten `implementation-v4.1.md`, `codex-autopilot-v2.md`,
-`owner-h003-attestation-authority-v1.md`, `loop-review-2026-07-31.md` — bara det tillagda
-supersessionsblocket; `SEPARATION-20260910/EFTERARBETE.md` — bara det tillagda (append-only, F6).
+`docs/loop/remaining-bootstrap-delegation-v1.md`, `SEPARATION-20260910/**`, `verify/**`, samt
+`docs/loop/*-local-development.md` (grindarnas följedokument, som av nödvändighet namnger de förbjudna token;
+deras form binds av respektive grind). **v3: plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` och
+`docs/loop/autonomous-loop-platform-handoff-v2.md` är INTE undantagna** — de nås via autopilotens konstanter och
+skills, följs och skannas med hela webb- och människohandsmängden, med den gamla planens pekare (nedan) och med
+den planspecifika mängden `CODEX_START_HERE`, `Codex-handoff`, `ägarhand` (fångar även `ÄGARHAND-<n>`),
+`ägarterminal`, `gh pr merge`, `kundfabrik`, `kundflöde`, `Jonkebronk`, `slack-webhook`, `målbild §`,
+`Verkstadsgolvet` (verksamhetens kontrollrum namnges inte alls i plattformsplanen — plattformen exponerar en typad
+läs-/kommandoyta, verksamheten använder den), `human-only`, `owner-only`. En grindmutant som återinför undantaget
+faller på kanarien `canary_plan_generation_scan_rejects_…`.
+**Den gamla planens pekare (`OLD_PLAN_TOKENS`, skannas i varje aktiv/skannad fil och trädvitt i alla klasser):**
+varje Git-förkortning (8–40 hex, skiftlägesoberoende, hex-avgränsad) av commiten `0b3212c9…` — även
+12-formen `0b3212c991d4` — och av blobbarna `c8ea8511…`/`1e53887c…` (v3.1, B1), sökvägarna `autonomous-loop-plan-v1.md`/`docs/loop/autonomous-loop-plan-v1`/
+`autonomous-loop-codex-handoff`, grenen `plan/autonomous-loop-v1`, och etiketterna `effekt-authority`/`effect
+authority`, `fryst input`/`frozen input`, `historisk källa`/`historical source`. Tillåtna bara i fryst evidens
+(`verify/**`, `SEPARATION-20260910/**`, `*-local-development.md`, owner-author-workflow, remaining-bootstrap-delegation,
+drift.md:s 332f07ce-bas, substitutionskontraktets byte-frysta §). **Commit-läsning (`COMMIT_READ_TOKENS`, v3.1 B2):**
+`<PLAN_SHA>`, "frozen autonomous-loop plan commit", `git show {…|<…|<7–40 hex>:`, `plan_sha`/`PLAN_SHA` (ej `plan_sha256`) och
+(v3.3 N1) `git show <ref>:` för varje ref utom `HEAD` (t.ex. `origin/main:`, `refs/preserved/…:`) samt `refs/preserved/`
+är förbjudna i VARJE skannat aktivt dokument (autopilotens egen läsning av substitutionsauktoriteten ur
+`refs/remotes/origin/main` sker som argv i kod, inte som dokumenttext, och berörs inte) — alla sex skills, AGENTS/CLAUDE/README, planen, handoffen, full-roadmap,
+supersessionsnoterna, drift-svansen och EFTERARBETE-svansen — inte bara i de två plan-namngivande skillsen.
+Substitutionskontraktets ingress (r.7) namnger i dag
+commiten och skannas → måste skrivas om, med ett §15-tillägg (v1.2). Auditens r.241 nämner planens NAMN utan sökväg
+eller `.md` och träffas inte (beslut: bara pekare som kan lösa till ett objekt eller en fil är förbjudna; en etikett
+utan pekare kan inte återinföra planen mekaniskt).
+**Delvis:** `docs/loop/drift.md` — (v3) HELA den appenderade svansen efter 332f07ce-bytes skannas/följs (v2.5 tog bara
+det första `## Aktiv plattformsnot`-avsnittet; en senare `## `-rubrik gick oskannad); substitutionskontraktet — bara
+ingressen, §6, §12 och tillagda avsnitt §14+ (övriga avsnitt binds byte-exakt); de historiska dokumenten
+`implementation-v4.1.md`, `codex-autopilot-v2.md`, `owner-h003-attestation-authority-v1.md`,
+`loop-review-2026-07-31.md` — bara det tillagda supersessionsblocket; `SEPARATION-20260910/EFTERARBETE.md` — bara det
+tillagda (append-only, F6; v3.1 N3: svansgrenen i `scannable_text` ligger före undantagsprövningen och är nåbar, så svansen
+mäts både trädvitt och i F6 med webb-, människohands-, gamla-plan- och commit-läsningstoken).
 **Trädvid skanning (`f2_tree_wide_…`):** utöver slutningen klassificeras VARJE spårad fil vid HEAD:
 *fryst* (`verify/**`, `SEPARATION-20260910/{README.md,ALLOCATION.tsv,WEB-TRANSFER-PROVENIENS*.tsv,proposed/**}`,
-plankopiorna, owner-author-workflow, remaining-bootstrap-delegation, `scripts/check-invariants.mjs`,
+owner-author-workflow, remaining-bootstrap-delegation, `scripts/check-invariants.mjs`,
 `specs/tasks.spec.json` — alla OID-bundna på annat håll, skannas inte), *delvis* (ovan), *local-development*
 (sluten mängd, se nedan), *kod* (Python: AST-strängkonstanter utom docstrings och utom exakt mängden
 {`controller/attest/cli`: `expected_refreeze`, `h038_proof`} — de enda funktionerna vid 332f07ce vars konstanter
@@ -122,6 +199,8 @@ konstanter) med webbtoken utom `AUTOPILOT` (autopilotens journalprefix) plus web
 godkännande/klartecken/beslut`, `auto-merge är avstängt`, `människan för kandidaterna`); *test*
 (`tests/**`: kodtoken utom `docs/05`, `docs/00`, `beslutslogg` — frysta specraders `docs_impact` är
 fixturdata); *text* (allt annat: md, json, tsv, sh, .gitignore) med hela webb- och människohandsmängden.
+(v3) `OLD_PLAN_TOKENS` ingår i alla klasser (kod: per AST-sträng; test; delvis; text), och plangenerationens två filer
+skannas dessutom med den planspecifika mängden.
 Binära blobbar tolereras bara under `verify/**`, `controller/provenance/dist/`, `controller/runtime-cleanup/install`.
 Rader: `f2_tree_wide_no_web_governance_reference_outside_frozen_evidence` och
 `f2_tree_wide_no_human_hand_rule_outside_frozen_evidence` (detaljen listar fil@rad token).
@@ -152,6 +231,25 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   registrets not, premiar-backlog, managed-settings. `config/README.md` nås inte av slutningen (ingen aktiv
   referens) och binds av den trädvida skanningen (r.69 `nortropic-verify-suite`, r.104 `av människan`, r.106
   `Auto-merge är avstängt`/`människan för kandidaterna`) samt F8 (r.35–36/43 gamla roten).
+- `f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents` (v3): båda filerna är spårade,
+  nås av slutningen (autopilotens `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH`, skills) och finns i den skannade mängden.
+- `f2_regler_md_carries_the_working_method_role_flow_frozen_gate_rule_gate_change_rule_review_standard_and_rig_threat_model`
+  (v3.10, ägarbeslut 2026-09-11): `docs/loop/regler.md` bär, i sin synliga text, alla fem grupperna i
+  `RULES_REQUIRED` — rollflödet (`test-author`/`granskning`/`builder`/`lokal kvalificering`), att buildern
+  `ändrar aldrig sin egen frysta grind`, kopplingen `befintligt krav` + `konkret hinder` för varje ytterligare
+  grindändring, granskarens godkännandenorm (`arbetsbudget` … `aldrig ett kvarvarande fel`; `skenande kostnad` →
+  `enklare upplägg`) och att `riggbegränsningar` bedöms mot uppgiftens `hotmodell` — samt frasen
+  `källa för arbetsmetoden`. Mätt på 320c9df7: de två första grupperna håller redan (regel 11), de fyra övriga
+  saknas — raden är röd på baslinjen av exakt det skälet.
+- `f2_agents_claude_and_role_skills_reference_regler_md_and_the_plan_without_duplicating_a_normative_sentence`
+  (v3.10, ägarbeslut 2026-09-11): `AGENTS.md`, `CLAUDE.md` och samtliga sex rollskills namnger BÅDE
+  `docs/loop/regler.md` och plangenerationen; och ingen normativ mening förekommer i två av de nio aktiva
+  dokumenten (regelkällan, planen och de åtta hänvisarna). En mening är normativ när den är ≥ `NORMATIVE_MIN_LEN`
+  = 40 tecken efter normalisering (markdown-tecken bort, gemener, blanksteg normaliserade) och bär en markör ur
+  `NORMATIVE_MARKER`. En mening som NAMNGER regelkällan eller planen är en **pekare** och undantas — pekaren får
+  och ska upprepas i alla åtta dokumenten. Regelkällan måste själv bära ≥ `RULES_MIN_NORMATIVE_SENTENCES` = 8
+  normativa meningar, annars är den inte mätbar (en tömd regelfil kan inte passera genom att inte ha något att
+  duplicera). Mätt på 320c9df7: 52 normativa meningar över de nio dokumenten, noll kollisioner; i referensen 63.
 - `f2_local_development_documents_are_exactly_the_332f07ce_set_plus_this_contract`: mängden spårade
   `docs/loop/*-local-development.md` == mängden vid 332f07ce ∪ {detta dokument} (ett nytt oskannat
   följedokument kan inte tillkomma utan eget kontrakt).
@@ -163,13 +261,24 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   till instruktion, i ingen sektion; `specs/tasks.spec.json` är aktiv auktoritet och undantas bara från
   tokenskanning. `## Auktoritetsordning` måste finnas. Kalibrerat mot referensen: p.5, Fasgränser-stycket
   (remaining-bootstrap-delegation) och Historik-stycket (plankopiorna) bär markörerna; buildern får formulera.
-- `f2_full_roadmap_authority_section_…`: `## Authority` behåller `ROADMAP_PLAN_SHA=0b3212c9…`,
-  `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH` och namnger `AGENTS.md` som konfliktauktoritet;
-  `HUMAN_AUTHORITY_HARD_STOP` finns kvar i dokumentet.
-- `f2_substitution_contract_sections_1_5_7_11_13_unchanged_and_dated_amendment_present`: §1–§5,
-  §7–§11, §13 byte-identiska med 332f07ce (avsnitt = från `## N.` till nästa `## `); §6 och §12
-  finns; ett tillagt avsnitt vars rubrik bär `2026-09-10`/`v1.1`/amendment/tillägg och vars text
-  namnger `AGENTS.md`.
+- `f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history`
+  (v3): `## Auktoritetsordning` i `AGENTS.md` nämner `docs/loop/autonomous-loop-plan-platform-v2.md`, och den
+  listpunkt/det stycke som nämner den bär INTE `inte dagens instruktion`/`historisk`/`fryst grindinput` (planen är
+  aktiv; den får därför inte stå i samma listpunkt som de frysta dokumentens markörnot — egen punkt) och bär (v3.1 N6)
+  handoffens sökväg, ordet `plangeneration` och ordet `aktiv`; `## Historik` finns och binder BÅDA riktningarna (v3.2
+  N8): ett stycke som namnger den `tidigare|föregående|gamla|äldre plangeneration(en)` tillsammans med `historia/historisk`
+  och `Git-historik` (den gamla som historia — utan sha, blob eller sökväg; pekarna är förbjudna), och ett stycke som
+  namnger den nya planens sökväg tillsammans med ordet `aktiv` (den nya som aktiv). En etikett utan pekare som "gällande
+  referens" är deklarerad semantikgräns (N1).
+- `f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit` (v3):
+  `## Authority` bär `PLAN_GENERATION=<autopilotens PLAN_GENERATION>`, `ROADMAP_PLAN_PATH=<ny plan>`,
+  `ROADMAP_HANDOFF_PATH=<ny handoff>` och namnger `AGENTS.md`; `HUMAN_AUTHORITY_HARD_STOP` finns kvar i dokumentet;
+  hela dokumentet fritt från den gamla planens pekare.
+- `f2_substitution_contract_sections_1_5_7_11_13_unchanged_dated_amendment_and_plan_generation_amendment_present`:
+  §1–§5, §7–§11, §13 byte-identiska med 332f07ce (avsnitt = från `## N.` till nästa `## `); §6 och §12 finns; ett
+  tillagt avsnitt vars rubrik bär `2026-09-10`/`v1.1`/amendment/tillägg och vars text namnger `AGENTS.md` (§14);
+  (v3) ett avsnitt `## 15.`+ vars rubrikrad bär `2026-09-10` eller `v1.2` och vars text namnger den nya planens
+  sökväg och `AGENTS.md`; ingressen (texten före `## 1.`) fri från den gamla planens pekare.
 - `f2_historical_document_unchanged_plus_dated_supersession_note_<dokument>`: dokumentet är exakt
   332f07ce-bytes plus ETT tillagt block (huvud före eller not efter) som bär `2026-09-10`, `AGENTS.md`
   och de specifika markörerna — v4.1: `§3`, `§4`, `§29`; v2: `OWNER_AUTHORITY_REQUIRED`; owner-h003:
@@ -177,9 +286,11 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   ägarstoppsmängden (`människohand`, `endast av människ…`, `högrisk`, `klartecken`, `vänta på …`, `ägarens
   godkännande/klartecken/beslut`); övriga människohandstoken får citeras där eftersom noten anger vilka
   meningar som ersätts.
-- `f2_drift_md_append_only_with_active_platform_note_free_of_web_governance`: `docs/loop/drift.md`
-  vid HEAD börjar med 332f07ce-bytes (append-only); det tillagda innehåller `## Aktiv plattformsnot…`
-  med `2026-09-10`, `AGENTS.md`, `§5` och utan webb-/människohandstoken. Historiska poster rörs inte.
+- `f2_drift_md_append_only_whole_tail_scanned_with_active_platform_note_naming_plan_generation`: `docs/loop/drift.md`
+  vid HEAD börjar med 332f07ce-bytes (append-only); hela svansen skannas och innehåller en rubrik
+  `## Aktiv plattformsnot…`, `2026-09-10`, `AGENTS.md`, `§5` och (v3) den nya planens sökväg, utan webb-/människohands-
+  token och utan den gamla planens pekare. Historiska poster rörs inte (r.521/564 i basen nämner den gamla commiten —
+  bas, inte svans).
 
 ### F3 — konfiguration och behörighetsregler
 - `f3_premiar_backlog_…`: `config/premiar-backlog.json` `defaults.denied_write` == specens
@@ -204,8 +315,11 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f3_register_note_…`: noten/beskrivningen fri från människohands- och webbtoken (inkl.
   `workflows/`); `register_version` > 1.0.0; `check-invariants` pekar på
   `scripts/check-invariants.mjs` med sha `ae72cdf8…` (oförändrad, verifierad på disk); alla poster `startbar`.
-- `f3_verify_cli_pins_…`: `PLATFORM_SPEC` == sha256(spec), `PLATFORM_REGISTER` == sha256(register),
-  `PLATFORM_DOCUMENTS` ⊇ de elva generationsdokumenten och varje pinne == sha256 av kandidatens fil.
+- `f3_verify_cli_pins_equal_candidate_spec_register_every_generation_document_and_the_plan_generation`: `PLATFORM_SPEC` ==
+  sha256(spec), `PLATFORM_REGISTER` == sha256(register), `PLATFORM_DOCUMENTS` ⊇ de elva generationsdokumenten ∪ (v3.1 N5)
+  {ny plan, ny handoff} och varje pinne == sha256 av kandidatens fil — planen är därmed korsbunden: blob i autopilotens
+  `ROADMAP_PLAN_BLOBS` och sha256 i verify-cli, båda mot samma HEAD-fil, och `platform-prepare/-check` ser den.
+  `SUBSTITUTION_BLOBS` förblir elva (selftest binder antalet).
 - `f3_preflight_exit0_…`: `controller/verify/cli preflight` i replika → exakt `{"status":"ok","register_sha256":<sha>}`.
 - `f3_check_invariants_6_pass_0_fail_in_candidate_replica`: `node scripts/check-invariants.mjs` → exit 0, `6 PASS, 0 FAIL`.
 - `f3_platform_prepare_and_check_accept_candidate_documents_in_replica`: `platform-prepare`+`platform-check` (h-035) ok.
@@ -216,20 +330,273 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f4_autopilot_argparse_defaults_do_not_point_at_old_root`: ingen `add_argument`-default (särskilt
   `--repo`, även `--worktrees`) bär `nortropic/nortropic-system`, `~/nortropic/…` eller `nortropic/worktrees`.
 - `f4_autopilot_source_no_web_document_reference`: inga webbdokumentlitteraler i autopiloten.
-- `f4_roadmap_plan_copies_tracked_byte_identical_to_0b3212c9_objects_and_autopilot_constants`:
-  `HEAD:docs/loop/autonomous-loop-plan-v1.md` == blob `c8ea851167f38f6846485035ee2e6b1dc3b54db0`,
-  `HEAD:docs/loop/autonomous-loop-codex-handoff.md` == `1e53887c59b8da0989579eaa241c5b53ea02abb9`
-  (= `git rev-parse 0b3212c9…:<path>` i en klon som bär planobjektet; kommiten krävs inte i
-  subjektets objektlager), läge 100644; autopilotens `ROADMAP_PLAN_BLOBS`/`ROADMAP_PLAN_SHA`/
-  `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH` lika.
+- `f4_plan_generation_files_tracked_100644_and_autopilot_paths_and_blobs_equal_head` (v3): `docs/loop/autonomous-loop-plan-platform-v2.md`
+  och `docs/loop/autonomous-loop-platform-handoff-v2.md` är spårade reguljära filer med läge 100644; autopilotens
+  `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH` är exakt dessa sökvägar och `ROADMAP_PLAN_BLOBS` == filernas HEAD-blobbar
+  (identiteten är HEAD-bloben, ingen commit). Konstanterna läses ur den riktiga modulen (DRIVER `constants`).
+- `f4_autopilot_has_plan_generation_constant_and_no_roadmap_plan_sha_attribute` (v3): modulen har ingen attribut
+  `ROADMAP_PLAN_SHA`; `PLAN_GENERATION` är en icke-tom sträng (värdet är builderns, t.ex. `platform-v2`).
+- `f4_plan_constants_are_single_literal_assignments_equal_at_runtime_and_the_two_roadmap_tuples_keep_their_identities`
+  (v3.5, review v9 N2/N3): `PLAN_GENERATION`, `ROADMAP_PLAN_PATH`, `ROADMAP_HANDOFF_PATH`, `ROADMAP_PLAN_BLOBS`,
+  `AUTOPILOT_ROLE_POLICY`, `SUBSTITUTION_BLOBS` och `EMPIRICAL_GATE_PATH` tilldelas EXAKT EN gång på modulnivå, av rent
+  literalt material (inget `Call`/`Attribute`/`Subscript`/`IfExp` och inga namn utom de fyra sökvägskonstanter som används som
+  dict-nycklar) — en andra, miljöstyrd tilldelning (`os.environ.get(…, ROADMAP_PLAN_PATH)`) är RÖD — och modulens
+  körtidsvärden är lika med literalerna för ALLA SJU konstanterna (v3.6 B1(b)/N8: även `ROADMAP_PLAN_BLOBS`,
+  `SUBSTITUTION_BLOBS` och `AUTOPILOT_ROLE_POLICY`, vars exporterade körtidsvärden tidigare var en död mätning); dessutom `SUBSTITUTION_ROADMAP`-koderna == `SUB-1…SUB-4`, `ROADMAP[0].code == "S2"`
+  och de två tuplarna är disjunkta (att tömma `SUBSTITUTION_ROADMAP` och lägga skivorna först i `ROADMAP` är RÖTT).
 - `f4_ensure_roadmap_plan_returns_in_replica_without_any_remote`: den riktiga modulens
-  `ensure_roadmap_plan(repo)` returnerar i en replika utan remote (ingen fetch möjlig).
-- `f4_ensure_roadmap_plan_stops_on_mutated_plan_copy` / `…_missing_handoff_copy`: en kopia med en
-  ändrad byte respektive en borttagen kopia → `Stop`.
+  `ensure_roadmap_plan(repo)` (namnet behålls — h-032-exit och publication-callers är namnbundna) returnerar i en
+  replika utan remote (ingen fetch möjlig).
+- `f4_ensure_roadmap_plan_stops_on_mutated_plan_generation` / `…_missing_handoff` / (v3.2 N2) `…_mutated_handoff`: planen
+  med en ändrad byte, en borttagen handoff respektive en handoff med en ändrad byte → `Stop` (handoffens BYTES binds i
+  körtidsvakten, inte bara dess existens).
+- `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together` (v3.6, review v10 N5): planen
+  OCH varje annan spårad fil med samma blob muteras med samma bytes; vakten måste ändå `Stop`. En vakt som jämför mot en
+  spårad kopia (t.ex. under `config/`) i stället för `ROADMAP_PLAN_BLOBS` ser då ingen skillnad och faller.
+- `f3_platform_prepare_refuses_mutated_plan_generation_in_replica` / `f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare`
+  (v3.2 N3 — pinnen mätt i EFFEKT): `controller/verify/cli platform-prepare` i en replika med muterad (ej ompinnad) plan
+  → exakt `{"status":"refused","reason":"DOCUMENT_GENERATION"}`; (v3.3 N5) `f3_platform_prepare_refuses_mutated_handoff_in_replica`
+  detsamma för en muterad handoff; `platform-check` mot en snapshot vars plan muterats efter prepare → samma avslag. En
+  cli som itererar en filtrerad tvilling av `PLATFORM_DOCUMENTS` eller hoppar över handoffen faller här.
+- `f4_autopilot_source_free_of_old_plan_commit_git_show_by_commit_and_plan_sha` (v3): autopilotens FULLTEXT (inkl.
+  kommentarer/docstrings) och AST-strängar saknar den gamla planens pekare, `git show {…}:`/`git show <…>`/
+  `git show <7–40 hex>:` (läsning ur commit; `git show HEAD:`/`origin/main:` är tillåtet) och identifieraren/fältet
+  `plan_sha`/`PLAN_SHA`/`ROADMAP_PLAN_SHA` (skiftlägesoberoende; `plan_sha256` undantaget).
+- `f4_produced_prompts_of_roadmap_empirical_and_architect_builders_name_plan_generation_and_handoff_for_every_slice_and_role`
+  och `f4_produced_prompts_free_of_old_plan_pointers_commit_reads_web_and_owner_stop_tokens_and_inject_only_declared_tracked_documents`
+  (v3.1, B3 — de FAKTISKA prompterna): drivern importerar den riktiga modulen (under slumpat modulnamn, N1-härdning)
+  och ANROPAR varje promptbyggare med fixturargument — byggare = funktion vars kodobjekts strängkonstanter bär
+  `Use `$nortropic-` eller vars namn matchar `prompt|_extra$|authority_text$`, minus flöden (v3.2 B1: ENBART via signatur —
+  en parameter `repo`/`wt`/`wt_root`; ingen strängförekomst kan välja bort mätningen); flöden anropas aldrig, deras
+  inlinade promptliteraler täcks av AST-raden; varianter: varje verklig `RoadmapSlice` ur `SUBSTITUTION_ROADMAP + ROADMAP`, båda
+  remedieringsrollerna, båda `refrozen`-värdena; fixturer: 40-hex shas, tomt signal-dict, ett fynd, `h-015`, `BUILD`.
+  Rad 1: byggarna `architect_prompt`, `roadmap_test_author_prompt`, `roadmap_gate_reviewer_prompt`,
+  `roadmap_remediation_prompt`, `slice_builder_extra`, `slice_authority_text`, `empirical_gate_test_author_prompt`,
+  `empirical_gate_reviewer_prompt`, `empirical_prompt` finns, kan anropas och VARJE producerad variant (även SUB-skivor)
+  namnger både planen och handoffen; ≥20 producerade texter. Rad 2: ingen producerad text bär gamla-plan-pekare,
+  commit-läsning, kodwebb- eller ägarstoppstoken; mängden `docs/…`-sökvägar (med ändelse) och rotdokument i producerad text
+  ⊇ krävd och ⊆ tillåten (samma mängder som nedan), alla spårade och skannade/blob-pinnade; ingen byggare kastar.
+  Mätt på referensen: 15 byggare, 101 producerade texter, 1 flöde (`empirical_gate_contract_flow`, inlinad remedieringsprompt).
+- `f4_prompt_builders_flows_and_callers_are_the_closed_expected_sets_every_runner_prompt_sourced_and_every_builder_live`
+  (v3.2, B1 — SLUTEN VÄRLD, mätt på plattformens autopilot): drivern rapporterar exakt `EXPECTED_PROMPT_BUILDERS` (15
+  namn) och `EXPECTED_PROMPT_FLOWS` ({`empirical_gate_contract_flow`}); statiskt (`prompt_world`, toppnivåfunktioner):
+  varje funktion som bär rollmarkören i någon strängkonstant eller returnerar ett uttryck vars konstanter bär markören
+  eller en `docs/…`-fil är PRODUCENT och måste tillhöra byggare ∪ flöden; varje funktion som namnger en byggare måste
+  tillhöra byggare ∪ `EXPECTED_PROMPT_CALLERS` (8 namn: architect_resolution, builder_flow, empirical_unattended_flow,
+  ensure_empirical_program_gate, ensure_roadmap_slice, roadmap_contract_flow, run_codex, test_author_flow, + flödet);
+  varje promptargument till `run_codex`/`run_codex_resolving_architecture` klassificeras FAIL-CLOSED (v3.3, B1): roten
+  måste vara ett direkt `Call` till en förväntad byggare (enda andra rötter: f-sträng inuti ett förväntat flöde,
+  parametern `prompt` inuti en runner); tillåtna additiva delar är konstanter utan markör/`docs/`-fil, parametrar som
+  additiva operander och argumentlösa blankstegstrimningar (`rstrip/strip/lstrip`) av källan; (v3.4 B1) INGEN omskrivning
+  efter roten: `replace/format/join/%` och varje metod med argument är RÖTT, enbart operatorn `+` är tillåten (`* 0 + x` är
+  RÖTT), två byggarrötter får inte konkateneras; `Name` löses genom funktionens EGNA tilldelningar (alla tilldelningar till
+  namnet måste ha byggarrot); RÖTT är anrop till varje annan modulfunktion (ingen "datahjälpare"), modulnivånamn/konstanter/
+  importer som textkälla, subscript/klassmetoder, comprehension, `IfExp` där bara en gren har byggarrot, `+=` med
+  prompttext, varje referens till ett runner-namn som inte är ett direkt anrop (alias, även på modulnivå), (v3.4) varje
+  dynamiskt uppslag (`globals/getattr/vars/locals/eval/exec/__import__`, `sys.modules`, `importlib`, `__dict__`) utanför
+  den mätta slutna mängden {_provider_snapshot, _python_snapshot, _strict_provider_authority, publication_authority,
+  publish, selftest} och varje strängkonstant som namnger en runner utanför `selftest` (även på modul-/klassnivå) — ett
+  runner-anrop via `globals()["run_codex_"+…]` är därmed RÖTT på två sätt. Modul- och klassnivå
+  sveps: rollmarkör i någon strängkonstant, eller `docs/`-fil inbäddad i längre text (hela sökvägskonstanter är
+  tillåtna), är RÖTT — även dynamiskt (`vars(m)`: strängar och klassers metoder). Nåbarhet från `main()` räknas enbart
+  via ANROP (`Call.func`), inte via döda referenser. Kanari: fixturmodul med tvilling via anrop, inlinat flöde, död
+  prompt, modulmall, klassmetod, runner-alias, parameter-genomsläpp och hjälpfunktion — alla flaggas; det legitima
+  flödet (byggare + additiv guidance, vaktanrop) och en ren trimning (`.rstrip()`) släpps; `.replace`, `* 0 + x` och
+  `globals()[…]`-runner flaggas (kanari). Referensens 16 verkliga runner-argument (13 byggaranrop, `effective`←`prompt` i
+  runnern, `byggare + (guidance-f-sträng if … else "")`, f-sträng i flödet; enbart operatorn `+`, inga strängmetoder) går igenom.
+- `f4_live_flows_run_to_completion_through_the_stubbed_runner_every_prompt_naming_plan_and_handoff_where_required_and_free_of_old_pointers`
+  (v3.3/v3.4, B1 dynamisk — den verkliga effekten): DRIVER-scenariot `live_flows` importerar modulen i en replika av
+  kandidaten (`refs/remotes/origin/main` = HEAD), monkeypatchar `run_codex` till en fångare som bokför VARJE argument och
+  svarar med ett syntetiskt READY-rapportobjekt (`AgentRun`), så att flödena fortsätter förbi första anropet genom
+  reviewer-/remedierings-/publiceringsvägarna — (v3.5 N1) stubben är tillståndsstyrd: FÖRSTA svaret per (flöde, roll) är
+  `NEEDS_REMEDIATION` med ett fynd för REVIEWER och GATE_REVIEWER (och för EMPIRICAL i det fristående empiriska flödet), därefter
+  READY, så att varje remedieringsgren OCH arkitektvägen (`architect_resolution` via den empiriska routningen) faktiskt nås;
+  den slutna stubbmängden `LIVE_STUB_NAMES` (ensure_worktree,
+  detached_worktree, remove_worktree, clean, origin_main, capture_green_gates, run_gate, run_empirical_gate,
+  assert_builder_scope, assert_test_author_scope, assert_roadmap_test_author_scope, assert_empirical_gate_author_scope,
+  assert_final_gates, assert_task_gate_completion, assert_s7_external_prerequisite, run_invariants, stage_and_commit,
+  publication_authority, publish, task_contract_judgeable, task_obj) och `LIVE_REQUIRED_ATTRS` (run_codex, AgentRun, Cmd,
+  sha, Stop, EMPIRICAL_GATE_SUBJECT, skivtuplarna, slice_builder_extra och de tio flödesfunktionerna) är deklarerade — ett
+  omdöpt hjälpnamn ger produktraden "closed-world name missing", inte ett oklart fel. Stubbarna är tillståndsstyrda som
+  produktionen kräver: taskgrinden RED tills en BUILDER-prompt för just den tasken fångats, programgrinden RED tills
+  L publicerats (eller i den fristående empiriska slutkörningen). Flöden: `architect_resolution`, `roadmap_contract_flow`
+  [SUB-1, S2], `empirical_gate_contract_flow`, `builder_flow[S2]` (med `slice_builder_extra`), `ensure_roadmap_slice`
+  [SUB-1, S2], `test_author_flow`, `empirical_unattended_flow`, `full_roadmap`. Krav: varje flöde löper till slut
+  (`returned`), antalet runner-anrop ≥ mätt minimum per flöde (v3.5: 1/4/4/4/4/4/4/4/7/37 — minima mätta MED remedierings-
+  grenarna, så en produkt som hoppar över dem faller), (v3.6 N4) minst en fångad prompt per remedieringsbärande flöde bär
+  granskningsfyndets id (`FIXTURE-1`) — ett närvarokrav på id-strängen, inte ett bevis för att fyndtexten renderades
+  (granskning nr 11 N5: `builder_prompt(...) + "Reviewer finding ids: FIXTURE-1."` uppfyller det) — plan + handoff i varje fångad prompt
+  för rollerna ARCHITECT, TEST_AUTHOR/GATE_REVIEWER (roadmap-/empiriska flödena), BUILDER (skivvägen och den empiriska
+  remedieringen) och EMPIRICAL — REVIEWER och S3-flödets (h-003) prompter undantagna — och inga gamla pekare/commit-läsning/
+  kodwebb/ägarstopp i NÅGON fångad prompt (alla roller, alla anrop). **(v3.7, granskning nr 11 B2)** Det svepet låg i v3.6
+  felindenterat inne i FIXTURE-1-grenen och kördes därför aldrig på en grön produkt; det ligger nu i loopen över
+  `caps` och exekveras för varje fångad prompt i vart och ett av de tio flödena. Tio separata kanarier (en per flöde,
+  en körtidshopsatt gammal plansökväg i den prompt flödet faktiskt skickar) är röda och flaggar exakt sitt eget flöde.
+  (v3.5) Eftersom remedieringsgrenarna nu nås måste även
+  `remediation_prompt` (BUILDER och TEST_AUTHOR) och den inlinade L-remedieringen namnge plan + handoff — annars faller raden.
+- `f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects` (v3.5, review v9 B1 dynamisk):
+  drivern spelar in VARJE processtart under live-flödena — `subprocess.Popen` plus `os.posix_spawn(p)`, `os.execv(e|p|pe)`,
+  `os.spawnv(e)` och `os.system` (v3.6 N1), patchade både i sina moduler och i modulens namnrymd — och delegerar till
+  originalet. Eftersom runnern är stubbad får ingen providerstart alls ske: en start är misstänkt om argv bär elementet
+  `--output-schema` eller `danger-full-access`, om binärens namn bär `codex`, om binären inte är en av de mätta tillåtna
+  eller om primitiven inte är den enda mätta (`subprocess.Popen`) — och den måste då bära en av de fångade prompterna.
+  **(v3.8, granskning nr 12 B2)** Den tillåtna mängden är delad, för v3.7:s vidgning till `{git, env, sh, python3.12}`
+  lade in tre TOLKAR i verktygsmängden utan innehållsregel för vad de ombeds köra (mätt: en providerrad inuti ETT
+  `sh -c`-element var grön). `ALLOWED_LIVE_TOOLS = {git}` känns igen på **exakta argv-element** (ett delsträngstest
+  flaggade det vanliga `git show …:docs/loop/codex-evidence-contract.md`); `ALLOWED_LIVE_WRAPPERS = {env, sh,
+  python3.12}` får hela sin argv genomsökt efter providermarkörer som **delsträng**.
+  **(v3.9, granskning nr 13 B2)** Det räckte inte: sex mätta mutanter var gröna under v3.8 därför att en tolks nyttolast
+  inte behöver ligga i argv alls (`sh` med skriptet på STDIN, argv = `['/bin/sh']`), inte behöver stava markörerna
+  (`sh -c 'exec "$0" "$@"'`, `env A=1 …`, `python3.12 -c '<kort enradare>'`), och därför att `git` var bundet på
+  **basnamn** — ett skalskript som hette `git` fick fri argv och rapporterades som `live_start_binaries=['git']`.
+  Den avgörande mutanten gav en barnprocess `PROVIDER=codex PROMPT=read docs/loop/autonomous-loop-plan-v1.md` på stdin
+  medan grinden var grön. v3.9 binder därför: (i) **identitet, inte basnamn** — varje exekverad fil löses till sin
+  realpath och sha256-prövas mot den mätta mängden (de pinnade verktygen, de två omslagsbinärerna och grindens egna
+  stubbar), och realpath + sha256 redovisas i evidensen i stället för basnamn; (ii) **sluten formmängd för omslag** — en
+  omslagsstart är tillåten bara när hela dess argv är en av formerna i `ALLOWED_LIVE_WRAPPER_FORMS` (`env true`,
+  `python3.12 -c 'print(1)'` — precis granskning nr 11:s två falskt-röda prov), och **stdin till ett omslag är rött
+  villkorslöst**; (iii) **nyttolast utanför argv mäts** — stdin-innehållet fångas både in-process
+  (`Popen.communicate`) och utifrån (PATH-stubbarna), och argv ∪ stdin ∪ barnets miljö skannas tillsammans med
+  `OLD_PLAN_TOKENS` och providermarkörerna. Mätt: referensen startar bara `git`, och de två falskt-röda proven förblir
+  gröna. (v3.6 B1) Identiteten mäts dessutom EFTER flödena: grindens egna inspelare måste fortfarande vara
+  installerade på alla primitiver och `m.subprocess` vara samma modulobjekt — en produkt som byter ut `subprocess.Popen`
+  från en funktionskropp avinstallerar inspelaren och faller här i stället för att se ren ut.
+  **(v3.8, granskning nr 12 B1) Inspelarna installeras FÖRE `exec_module`** i live-scenariot. v3.7 fångade stdlib-
+  originalen före modulladdningen men installerade inspelarna efter den, så varje importtidsfångst som inte är en sats —
+  ett funktionsdefault (`def _s(t, _S=os.posix_spawn)`), ett dekoratorargument, ett metoddefault, en metaklass — tog den
+  riktiga primitiven (mätt: 24 riktiga barnprocesser med en neutral prompt medan grinden var grön). Med inspelarna
+  installerade först fångar varje sådan konstruktion det INSTRUMENTERADE objektet, vilket stänger hela klassen
+  strukturellt i stället för form för form — och det är den enda bindningen som finns för de åtta `os.*`-primitiverna,
+  som inte har något attribut under modulattributet att spela in. Starter som produkten gör medan den importeras
+  redovisas separat (`import_time_starts`) och är röda.
+  **(v3.7, granskning nr 11 B1) Gränsen binds också UNDER `Popen`:** `subprocess.Popen._execute_child` och
+  `Popen.__init__` fångas ur stdlib INNAN subjektsmodulen laddas, jämförs mot originalen både vid import och efter
+  flödena, och `_execute_child` bär grindens egen inspelare under körningen. Därmed mäts (a) det som FAKTISKT når
+  barnprocessen — varje argv som skiljer sig från den argv Popen-inspelaren såg redovisas som `argv rewritten between
+  Popen and the child` — och (b) starter gjorda genom en Popen-KLASS som fångats vid import, som då syns bara på
+  barnnivån. **(v3.8, granskning nr 12 B1(b)) Aggregatjämförelsen `child_total == popen_total` är balanserbar** (mätt:
+  19 dolda starter plus 19 inspelade Popen-anrop med samma argv som kastar i `__init__` före `_execute_child` gick jämnt
+  ut), så den står kvar som en indikator men bär inte beviset. Beviset är **per anrop**: varje barnstart som sker medan
+  inget inspelat Popen-anrop ligger på stacken redovisas som `child start outside any recorded Popen call`, och argv
+  jämförs som **multimängd** (`Counter`), inte som mängd. Referensen mäter `popen_total = child_total = 333`.
+  Samma före/efter-sidoeffektsvep som `prompts`-scenariot omger live-körningen (N4); **(v3.7 N8)** svepet täcker nu
+  dessutom subjektets `.git/` (refs, hooks, config, HEAD, toppnivåposter) och grindens egen `FIXTURE_ROOT` rekursivt,
+  minus de två sökvägar flödena legitimt äger (live-repliken och drivrutinens `TMPDIR`).
+- `f4_live_flows_stop_before_the_stubbed_runner_on_mutated_plan_generation` (v3.3, B2 dynamisk): samma körning i en
+  replika med muterad plan — de fyra vaktbärande flödena (`roadmap_contract_flow` ×2, `empirical_gate_contract_flow`,
+  `full_roadmap`) måste STOPPA (`Stop`) utan att runnern anropats; de övriga flödena bär ingen egen vakt.
+- `f4_runner_machinery_ast_identical_to_320c9df7_provider_machinery_untouched` (v3.4, B2): mätpunkten är bunden —
+  normaliserad AST-identitet (sha256 av `ast.dump` utan positioner, mätt med den pinnade python3.12) för `run_codex`,
+  `run_codex_resolving_architecture`, `_provider_snapshot`, `_python_snapshot`, `_strict_provider_authority` och
+  `AUTOPILOT_ROLE_POLICY` == plattformsautopiloten vid 320c9df7. Runnern kan därmed inte läsa prompten ur fil/miljö i sin
+  egen kropp. Kanari: whitespace-/formateringsändring ger samma identitet, en kroppsändring en annan. **Vad som är mekaniskt
+  backat av "rörs inte" (korrigerad formulering, v3.5 efter granskning nr 9):** dessa sex definitioner binds per normaliserad
+  AST; `controller/authority/{cli,core.py}` och `controller/launch/{cli,runtime_snapshot.py}` binds per BLOB mot 320c9df7
+  (raden nedan); autopilotens modulnivå binds per FORM; `verify/**`, `controller/loop/cli`, specen och registret binds av F6/F3.
+  Allt annat under `controller/**` är deklarerad gräns (det skyddas i drift av specens `denied_write` och policygrinden, inte av
+  detta kontrakt).
+- `f4_autopilot_module_and_class_bodies_are_the_declared_form_no_exec_surface_rebinding_anywhere_and_the_pinned_authority_library`
+  (v3.5/v3.6, review v9/v10 B1): varje toppnivåsats i autopiloten är en `Import`/`ImportFrom`/`FunctionDef`/`ClassDef`/
+  `AnnAssign`/`Assign` med enbart `Name`-mål, modulens docstring, `__main__`-vakten sist, eller en av exakt två mätta satser
+  (`sys.dont_write_bytecode = True`, `sys.path.insert(0, str(AUTHORITY_LIB))`, matchade byte-exakt); varje bar anropssats och
+  varje block på modulnivå är RÖTT. (v3.6 B1) Samma satsformer krävs i KLASSKROPPAR (en `ClassDef`-kropp körs vid import;
+  baslinjens fem klasser bär bara `Pass`/`FunctionDef`/`AnnAssign`), och exec-ytsregeln gäller HELA FILEN, inte bara
+  modulnivån: ingen tilldelning någonstans — funktionskropp, klasskropp, `AugAssign`, `setattr` — får ha ett attributmål vars
+  namn ligger i exec-ytan (`Popen`, `run`, `call`, `check_output`, `system`, `exec*`, `posix_spawn`, `fork`, `popen`, `which`,
+  `copy`, `move` …) eller vars bas är en exec-modul (`subprocess`/`os`/`shutil`/`sys`/`multiprocessing`/`pty`/`posix`,
+  undantaget `sys.dont_write_bytecode`), skriva in i `sys.modules`/`globals()`/`vars()`/`locals()` eller subscript-tilldela ett
+  MODULNIVÅNAMN (så fälls `AUTOPILOT_ROLE_POLICY["BUILDER"] = …` var den än står). Tillåtet överallt: vanliga namn,
+  tuple-uppackning, `self.<attr>` utanför exec-ytan och subscript på lokala namn (mätt på 320c9df7: tio icke-Name-mål totalt,
+  alla ofarliga). (v3.6 N6) Modulnivåns VÄRDEregel träffar bara attribut på exec-moduler — ett legitimt `X = Y.copy()` är grönt.
+  (v3.6 N7) En modulnivåkonstant får inte sätta ihop en `docs/…`-sökväg av fragment. (v3.6 N3) `AUTHORITY_LIB` har
+  320c9df7:s AST-identitet och drivern rapporterar vilken fil den importerade `core`-modulen faktiskt kom från — den måste
+  ligga under `controller/authority/`. DYNAMISKT: efter modulimporten måste `subprocess.Popen`, `os.posix_spawn`,
+  `os.execv*`, `os.spawnv*` och `os.system` vara stdlibs original och `m.subprocess` samma modulobjekt.
+- `f4_runner_dependencies_authority_and_launch_byte_identical_to_320c9df7` (v3.5, review v9 B1): `controller/authority/cli`,
+  `controller/authority/core.py`, `controller/launch/cli` och `controller/launch/runtime_snapshot.py` har exakt sina
+  320c9df7-blobbar (`6b6bb827…`, `b17600c7…`, `ed865cf4…`, `cb9a4ab1…`) — authority-biblioteket importeras av autopiloten vid
+  start och launchern bär provider-argv; F7:s launch-cwd-grind mäter launcherns cwd-beteende, inte dess bytes (mätt av
+  granskningen: en launcher som skriver om provider-argv ger identisk 19/20 och identisk detalj), därför denna blobbindning.
+- `f4_provider_argv_built_and_started_in_exactly_one_place_inside_run_codex` (v3.5, review v9 B1): `subprocess.Popen(` anropas
+  exakt en gång i autopiloten och bara i `run_codex`; ingen annan funktion bär en `Popen`-start eller strängkonstanten
+  `--output-schema`.
+- `f4_ensure_roadmap_plan_called_from_exactly_the_expected_guard_callers_all_reachable_from_main` (v3.3, B2 statisk):
+  funktionerna som ANROPAR `ensure_roadmap_plan` (`Call`-position) == {doctor, empirical_gate_contract_flow,
+  full_roadmap, roadmap_contract_flow, roadmap_status}, alla nåbara från `main()` via anrop.
+- `f4_prompt_builders_run_in_contained_fixture_without_side_effects` (v3.2 N5, v3.3 N6): byggarna körs i en egen fixtur
+  (HOME/XDG/TMPDIR under fixturen, cwd i fixturen, `GIT_DIR` mot ett tomt bare-repo, proxyvariabler mot en stängd lokal
+  port); varje ny eller ändrad fil under fixturen eller under subjektets ARBETSTRÄD (`.git/` undantaget — indexbrus från
+  andra processer är inte en produktsidoeffekt) och varje ny/borttagen/överskriven toppnivåpost (reguljära filer mäts med storlek + mtime) i `/private/tmp`,
+  `/private/tmp/claude`, `/private/tmp/claude-501`, processens tempkatalog och dess förälder är FAIL — undantaget är exakt
+  grindens eget `FIXTURE_ROOT`-namn (v3.4: inte längre prefixet). Gräns: samtidiga skrivningar från ANDRA processer i dessa
+  delade kataloger under byggarnas körning (sekunder) ger falskt rött — kör en fullkörning åt gången. Gräns: skrivningar
+  till andra absoluta sökvägar, frånkopplade processer och nätverk utan proxy fångas inte; produktgranskningen läser
+  byggarna.
+- `f4_prompt_functions_ast_literals_inject_only_the_declared_platform_document_set_all_tracked_and_scanned` (v3,
+  komplement — statisk): promptbyggande funktioner = varje funktion vars strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
+  `prompt|_extra$|authority_text$`, PLUS varje funktion som anropar en sådan (deras `extra`-strängar injiceras);
+  ≥9 markörfunktioner och ≥12 totalt. Den injicerade dokumentmängden = alla `docs/…`-literaler med ändelse och
+  rotdokument (`AGENTS.md`, `CLAUDE.md`, `README.md`, skills) i deras strängkonstanter (även f-strängdelar) och i de
+  modulkonstanter (strängar) de namnger. Krav: KRÄVD mängd {ny plan, ny handoff, full-roadmap, substitutionskontraktet,
+  auditen, evidenskontraktet, `AGENTS.md`, rapportschemat} ⊆ injicerad ⊆ TILLÅTEN = krävd ∪ {`docs/loop/regler.md`,
+  `docs/loop/byggplan-v3.md`, `docs/loop/drift.md`, `docs/loop/owner-h003-attestation-authority-v1.md`}; varje injicerad
+  fil spårad och i den skannade slutningsmängden (eller ett generationsdokument, blob-pinnat). Beslut: delmängd-i-
+  tillåten i stället för exakt likhet, så att en legitim prompt som slutar nämna owner-h003 (S3 byggd) eller drift inte
+  faller; evidenskontraktet är krävt eftersom varje rollrapport följer det. Mätt vid 320c9df7: injicerad = {AGENTS,
+  gammal plan, byggplan, schema, full-roadmap, drift, audit, kontrakt, owner-h003, regler}.
+- `f4_plan_generation_slice_table_equals_autopilot_roadmap_tuples_and_selftest_exact_sets` (v3): planen bär en
+  markdowntabell med rubrikcellerna exakt `slice | task | exit_test | allowed_write | depends_on | status`
+  (skiftlägesoberoende; backticks/fetstil tolereras; listceller kommaseparerade; `-`/`—` = tom; status `BYGGD`/`OBYGGD`,
+  skiftlägesoberoende). v3.2 (B2): HTML-kommentarer och kodstaket stripas före parsning (bara den SYNLIGA texten räknas)
+  och exakt EN sådan tabell får finnas — två tabeller, en dold korrekt + en synlig avvikande, eller en tabell enbart i
+  kommentar/staket är alla röda; (v3.3 N3) varje annan synlig tabell vars rubrik bär både `slice` och `task` (t.ex. en
+  7-kolumns "läsvy") är också röd — en sanning. Kanari med två tabeller, kommentardold + synlig, stakettabell, enbart
+  dold tabell och 7-kolumnstabell. (v3.3 N2) Bootstrapraden läser samma synliga text (id:n i en HTML-kommentar räknas inte). Skivmängden == autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`-koder ∪ {S1, S3, L}; för varje
+  autopilotskiva: task == `task_id`, exit_test == `gate_path`, allowed_write-mängd == `plan_allowed_write`,
+  depends_on-mängd == `required_deps`; S1/S3: task h-017/h-004, exit_test och depends_on == specradens, ingen
+  skrivyta (`-`), `BYGGD`; L: task `-`, exit_test == `EMPIRICAL_GATE_PATH`, ingen skrivyta, depends_on == alla
+  autopilotskivors task-id; status `BYGGD` ⇔ exit_test-filen är spårad vid HEAD; varje rad vars task har en specrad
+  har specradens `exit_test`; selftests literala `sub_exact`/`road_exact` täcker exakt autopilotkoderna och stämmer
+  med tabellen. Specen är byte-fryst (332f07ce) — planen kopierar inte specradernas `docs/05`-ytor.
+- `f4_plan_generation_bootstrap_section_names_h031_to_h039_as_platform_establishment` (v3): ett `## `-avsnitt vars
+  rubrik bär `bootstrap` namnger alla nio h-031…h-039 (bootstrap etablerar plattformen; delegationsdokumenten är
+  read-only och omdefinieras inte — semantiken läses av granskaren).
+- `f4_handoff_has_required_sections_syfte_pinnar_startordning_stoppregler_avslutskriterier_and_names_plan_and_generation`
+  (v3.4 N): handoffens text (HTML-kommentarer borttagna; kodstaket räknas som synlig text eftersom pinnarna står där) har
+  `## `-rubriker som matchar `syfte`, `låsta värden|pinnar`, `start`, `stopp`, `avslutskriteri` (≥2 kroppsrader var), namnger
+  planens sökväg, bär `PLAN_GENERATION` med autopilotens värde, och är inte byte-identisk med planen.
+- (v3.4 N) Skivtabellens radordning för autopilotens skivor == `SUBSTITUTION_ROADMAP + ROADMAP`-ordningen, `ROADMAP[0]`
+  är S2 (h-032:s och governance-grindens fixturskiva), och varje beroende som är en annan tabellrad står på en tidigare rad
+  (topologiskt konsistent) — mäts i skivtabellraden.
+- `f4_plan_generation_has_required_sections_syfte_malbild_skydd_skivtabell_bootstrap_arbetsflode_avslutskriterier` (v3.2
+  N7): planens synliga text har `## `-rubriker som matchar `syfte`, `målbild`, `skyddade invarianter|tekniska skydd`,
+  `skivtabell`, `bootstrap`, `arbetsflöde`, `avslutskriteri`, var och en med ≥3 icke-tomma kroppsrader. Planens substans
+  mäts alltså via skivtabellen + de krävda avsnitten + tokenmängderna; kriterier och negativa kontroller per skiva läses av
+  den oberoende produktgranskningen. RECON-kartan (`~/nortropic/RECON-PLANGENERATION-20260910.md`, sha256
+  `e01fcfa5a7bf948c0de0a42079f995eb64772a19f496891b88c525f5d56b4625`) är vägledning för författandet, inte en pinne.
+- `f4_plan_generation_avslutskriterier_carry_the_four_measurable_levels_planseparation_trust_kernel_bootstrap_milestone_and_later_operational_whole`
+  (v3.10, ägarbeslut 2026-09-11): avsnittet `## Avslutskriterier` bär alla mönster i `PLAN_EXIT_LEVELS` fördelade på
+  fyra nivåer — planseparation, Trust Kernel, lokal bootstrap-milstolpe och operativ helhet markerad `senare` och
+  `utanför dagens` fas. Mätpunkten är AVSNITTET, inte hela planen: en nivå som står någon annanstans räknas inte.
+- `f4_plan_generation_bootstrap_names_a_finite_handover_point_to_qualified_autonomous_operation` (v3.10): avsnittet
+  `## Bootstrap…` bär `ändlig`, `överlämningspunkt`, `kvalificerad autonom drift`, `fortsatta utveckling` och
+  `därefter` — bootstrap slutar vid en bestämd punkt, och organisationens utveckling fortsätter efter den.
+- `f4_plan_generation_malbild_carries_self_identified_needs_within_goal_and_mandate_and_web_as_a_business_using_the_platform`
+  (v3.10): avsnittet `## Målbild` bär att autonomin själv identifierar behov/möjligheter, prioriterar, genomför och
+  utvärderar inom organisationens `mål och mandat`, och att `Webb/Digitala` är en `verksamhet som använder`
+  plattformen.
+- `f4_plan_generation_preserves_h039_functional_requirement_zero_runtime_residues_and_no_loss_of_foreign_data`
+  (v3.10): avsnittet Skyddade invarianter/tekniska skydd bär `h-039`, `avslutad städning`,
+  `noll registrerade runtime-rester`, radering/ersättning och `främmande data` genom den identifierade
+  `kapplöpningen`. Ägarbeslutets H039-punkt överlever alltså generationsbytet i planen, inte bara i H-evidensen.
+- `f4_architect_and_empirical_runner_skills_name_plan_generation_and_no_plan_commit` (v3):
+  `.agents/skills/nortropic-architect/SKILL.md` och `nortropic-empirical-runner/SKILL.md` namnger den nya planens
+  sökväg och saknar `<PLAN_SHA>`, `frozen autonomous-loop plan commit`, `git show {…|<…|<hex>:` och den gamla planens pekare.
 - `f4_autopilot_substitution_blobs_equal_head_blobs_of_generation_documents`: `SUBSTITUTION_BLOBS`
   ⊇ de elva dokumenten och varje OID == kandidatens HEAD-blob (pinnar uppdateras när generationen ändras).
-- `f4_autopilot_selftest_none_returns_pass`, `f4_autopilot_publication_callers_exit0`,
-  `f4_controller_loop_cli_unchanged_vs_332f07ce`.
+- `f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha` (v3.1 N2): `selftest(None)` returnerar,
+  stdout bär `AUTOPILOT_V4_SELFTEST=PASS` (control-set-grinden binder strängen) och exakt raden
+  `PLAN_GENERATION=<modulens PLAN_GENERATION>` men ingen `plan_sha`/`PLAN_SHA`-rad; `f4_autopilot_publication_callers_exit0`, `f4_controller_loop_cli_unchanged_vs_332f07ce`.
 
 ### F5 — loopens testsvit utan webbfixtur
 - `f5_loop_fall_py_b2_no_web_fixture_or_web_invariant`: `tests/controller/loop/fall.py` saknar
@@ -280,8 +647,8 @@ som evidens) — den som kör ansvarar för att ta bort scratch efter att `resul
   mönster ingår i den trädvida kod-/textskanningen; kanari: `/Users/elinhaggstrom/nortropic-repos/webb/AGENTS.md`,
   `~/nortropic-repos/x/y.sh`, `$HOME/nortropic-repos/webb` träffar, plattformsroten träffar inte). Undantag:
   `SEPARATION-20260910/**`, `verify/**`, `docs/loop/arkiv/**`, `*-local-development.md`,
-  `specs/tasks.spec.json` (frysta rader), `drift.md`, owner-author-workflow, remaining-bootstrap,
-  plankopiorna. Pythonfiler mäts på AST-strängkonstanter (docstrings/kommentarer är inte körbara
+  `specs/tasks.spec.json` (frysta rader), `drift.md`, owner-author-workflow, remaining-bootstrap
+  (v3: plangenerationen är inte undantagen). Pythonfiler mäts på AST-strängkonstanter (docstrings/kommentarer är inte körbara
   beroenden; konstanter i `refreeze|h03[5-9]`-funktioner är historisk evidens).
 - `f8_ordinary_loop_e2e_and_platform_prepare_check_green_on_candidate_via_held_control_set`: den
   hållna control-set-grindens ordinarie loop-e2e (fixturtask attesteras i replika) och
@@ -294,18 +661,40 @@ full-roadmap; (c) `docs/05-beslutslogg.md` i premiar-backlogs `allowed_write`; (
 åter i `.gitignore`; (e) `scripts/check-verifierarregistret.mjs` återställd; (f) nytt dokument
 `docs/loop/x.md` som refererar `docs/03-regelverk.md`, länkat från `AGENTS.md`; (g)
 `ensure_roadmap_plan` fetchar från origin igen; (h) registernot med "endast av människohand".
+v3 (plangenerationen): (a) gamla planens bytes under den nya sökvägen med autopiloten ompinnad till den bloben;
+(b) `git show 0b3212c9…:` i en prompt, (b2) `git show {…}:` via klammerplatshållare utan sha; (c) `PLAN_SHA=` i
+selftests utdata (hopsatt så att källskanningen inte ser den); (d) `<PLAN_SHA>` i arkitektskillen; (e) planen
+med `docs/07-konstitution.md` som överordnad; (f) skivtabellen driver från autopilotens ROADMAP (ett beroende bort);
+(g) full-roadmaps Authority namnger den gamla sha:n; (h) grindmutant som återinför plankopiornas undantag (kanari);
+(i) substitutionskontraktets ingress namnger den gamla sha:n; (j) den gamla handoffens blob under
+`SEPARATION-20260910/`; (k) planen i samma listpunkt som "inte dagens instruktion" i routern; (l) en senare
+`## `-not i drift.md:s svans med `docs/07`; (m) `ROADMAP_PLAN_SHA` behållen vid sidan av `PLAN_GENERATION`; (n) en
+prompt injicerar ett odeklarerat dokument (`implementation-v4.1.md`); (o) S2 markerad `BYGGD` utan grind; (q)
+`ägarterminalen` i planen; (r) `CODEX_START_HERE` i handoffen; (s) "Historisk källa: `…autonomous-loop-plan-v1.md`" i planen.
+v3.1 (granskarens, kontrakt nr 5): (a02) odeklarerat dokument via moduldict i `builder_prompt`; (a04) `git show 0b3212c991d4:`
+i AGENTS Historik med ompinnade pinnar; (a10) odeklarerat dokument via `str.format`; (a11) selftest skriver literal
+`PLAN_GENERATION=platform-v1-legacy`; (a13) builder-skill läser planen med `git show <PLAN_SHA>:`; (a23) planen bara i en
+oanropad funktion, alla levande prompter utan plan/handoff; (a28) EFTERARBETE-svans med gamla planfilen "(fryst input)".
 Resultat: se Utfall.
 
 ### F10 — riggdisciplin
 Kanarier (traceback är inget utfall; okänt driverscenario; driverfel; tokenskannern fångar
 webb-/människohandstoken och släpper undantagen; slutningsextraktionen följer backticks och
-relativa länkar), strikt JSON (dubblerad nyckel = fel), `result.json`, subjektets och den hållna
+relativa länkar; (v3) planskanningen fångar den gamla planens pekare, `docs/05-beslutslogg`/`ägarterminalen`/
+`Verkstadsgolvet`/`gh pr merge`/`målbild §`/`CODEX_START_HERE` och släpper en legitim skivrad, `git show <…|{…|<hex>:`
+fångas men `git show HEAD:` släpps, 12-hex-/40-hex-/versal-/9-hex-formerna av den gamla commiten och blobprefix fångas men
+hex-föregången och 41-hex-form släpps, `<PLAN_SHA>`/`PLAN_SHA=`/"frozen autonomous-loop plan commit" fångas men
+`plan_sha256`/`PLAN_GENERATION=` släpps, tabellparsern läser en fixturtabell exakt, och plangenerationen står inte i något
+undantag — en grindmutant som återinför undantaget faller här), strikt JSON (dubblerad nyckel = fel), `result.json`, subjektets och den hållna
 grindens bytes oförändrade, utvecklingsdokumentet spårat med avsnitten Enkelt förklarat /
 Avgränsning och roller / Kriterium (effekter) / Produktyta för BUILDER / Vad grinden inte bevisar / Utfall.
 
 ## Produktyta för BUILDER
 
-Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs/tasks.spec.json` ändras INTE):
+Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs/tasks.spec.json` ändras INTE).
+**v3.1-förtydligande (N7):** punkterna 1, 4, 5, 6 och 7 är v2.5:s yta och redan UTFÖRDA i integrationen `320c9df7`
+(84/84 under v2.5); registret (p.4) rörs därför inte igen — p.8 gäller. v3/v3.1:s yta är p.2 (plangenerationen), p.3
+(autopiloten), p.5b (skills), p.5c (plandokumenten + pinnar, inkl. `PLATFORM_DOCUMENTS` för plan och handoff).
 
 1. **Bort ur trädet:** `docs/loop/arkiv/regler-fore-2026-09-10.md`,
    `docs/loop/arkiv/byggplan-v3-fore-2026-09-10.md`, `docs/loop/arkiv/spec-styrningsfalt-fore-2026-09-10.md`,
@@ -313,13 +702,37 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    (kolumner path · blob-OID vid 332f07ce · destination i webbrepot · not; OID:erna är
    `6b41bcd4…`, `bd298bcf…`, `a847ade1…`, `2d018d65…`). Överföringen till webbrepot är gjord av roten
    (`nortropic-webbforvaltning` commit `e4c8c52`, `SEPARATION-ORIGIN/transfer-20260910-2/`).
-2. **Nya plattformsfrysta plankopior:** `docs/loop/autonomous-loop-plan-v1.md` och
-   `docs/loop/autonomous-loop-codex-handoff.md`, byte-identiska med `0b3212c9…:docs/loop/<fil>`
-   (hämtas ur en klon som bär planobjektet, t.ex. `git -C ~/nortropic-repos/nortropic-system cat-file -p c8ea8511…`).
-3. **Autopilot** `scripts/nortropic-codex-autopilot.py`: `--repo`/`--worktrees` utan gammal rot;
-   `ensure_roadmap_plan` verifierar `HEAD:<kopia>` mot `ROADMAP_PLAN_BLOBS` (ingen fetch, ingen gren);
-   `SUBSTITUTION_BLOBS` = nya HEAD-blobbar för de elva dokumenten; `selftest`:s hårdkodade kontrakts-blob
-   uppdaterad. Codex-maskineriet lämnas (SUB-1 nästa).
+2. **Plangenerationen (v3, ersätter v2.5:s plankopior):** nya filer `docs/loop/autonomous-loop-plan-platform-v2.md`
+   och `docs/loop/autonomous-loop-platform-handoff-v2.md` (läge 100644), författade av buildern ur rekognoseringens
+   KEEP/REWRITE/REMOVE-karta (`~/nortropic/RECON-PLANGENERATION-20260910.md` §A): funktionella mål, tekniska skydd
+   (G20, sökvägsuppslag, register utanför skrivytan, ingen force, promotion under lease, eventström utan authority,
+   providerutdata aldrig trust) och kvarvarande plattformsarbete bevaras; webbstyrning (`docs/07`/`docs/03`/`docs/05`,
+   konstitution/regelverk), människohandskrav (ägarhand/ägarterminal/ägarbeslut, "fråga ägaren") och
+   verksamhetsberoenden (kundfabrik/kundflöde, Slack-webhook, Verkstadsgolvet, Jonkebronk, målbild §x) tas bort;
+   GitHub/Promoter-värden är publiceringsmål och externa mätningar (OVERIFIERAT tills mekaniskt ommätta).
+   Obligatoriskt innehåll: den maskinläsbara skivtabellen (kolumner `slice | task | exit_test | allowed_write |
+   depends_on | status`; S1/S3 `BYGGD` utan skrivyta; SUB-1…SUB-4, S2, S4–S13 exakt som autopilotens tuplar;
+   L = `verify/bin/autonomous-loop-exit`, beroende av alla skivors task-id, `OBYGGD`; exakt EN sådan tabell, synlig —
+   inte i HTML-kommentar eller kodstaket), ett `## …bootstrap…`-avsnitt som namnger h-031…h-039 utan att omdefiniera
+   delegationsdokumenten, `PLAN_GENERATION`-identiteten (blob vid HEAD) och (v3.2) `## `-avsnitten Syfte, Målbild,
+   Skyddade invarianter/tekniska skydd, Skivtabell, Bootstrap etablerar plattformen, Arbetsflöde
+   (test-author → granskning → builder → granskning → lokal kvalificering), Avslutskriterier (≥3 rader var).
+   De gamla kopiorna `docs/loop/autonomous-loop-plan-v1.md`/`autonomous-loop-codex-handoff.md` tas bort ur HEAD; de
+   gamla objekten stannar i historiken. Inga pekare till den gamla planen (sha, 8-prefix, blobbar, sökvägar, gren,
+   etiketterna effekt-authority/fryst input/historisk källa) i någon aktiv fil.
+3. **Autopilot** `scripts/nortropic-codex-autopilot.py` (E.2): `--repo`/`--worktrees` utan gammal rot;
+   `ROADMAP_PLAN_SHA` bort, `PLAN_GENERATION = "<builderns värde>"` in, `ROADMAP_PLAN_PATH/ROADMAP_HANDOFF_PATH` = nya
+   sökvägar, `ROADMAP_PLAN_BLOBS` = nya HEAD-blobbar (enda identitet); `ensure_roadmap_plan` (namnet behålls) verifierar
+   `HEAD:<fil>` (ingen fetch, ingen gren), journalfält `plan_generation`; alla `git show {SHA}:{PATH}` i prompterna
+   (roadmap_test_author 1479, slice_builder_extra 1658, empirical_gate_test_author 1768) → "läs `{PLAN_PATH}` och
+   `{HANDOFF_PATH}` vid HEAD i den auktoritativa arbetskopian; orkestratorn har verifierat bloben"; alla `PLAN_SHA=`-rader
+   (architect 907, roadmap-prompter 1465/1525/1548, empirical 1761/1807/2044, selftest 2631, status 2682,
+   roadmap_status 2704, doctor 2801) → `PLAN_GENERATION=`; `slice_authority_text` 1372 → plangenerationen;
+   kommentaren 186–189 och docstring 2–7 utan `ROADMAP_PLAN_SHA`; `selftest` 2578 → identitetsvakt på
+   `PLAN_GENERATION` + `ROADMAP_PLAN_BLOBS`; något prompt injicerar `docs/loop/codex-evidence-contract.md` (t.ex.
+   `agent_prompt_common`) och prompterna namnger både plan och handoff; `SUBSTITUTION_BLOBS` = nya HEAD-blobbar för de
+   elva dokumenten; `selftest`:s hårdkodade kontrakts-blob uppdaterad. `ROADMAP[0]` förblir S2/h-015 och skivtuplarna
+   ändras inte (h-032-exit och governance-grinden binder dem). Codex-/providermaskineriet lämnas (SUB-1 nästa).
 4. **Verify-cli** `controller/verify/cli`: `PLATFORM_REGISTER`, `PLATFORM_DOCUMENTS` (sha256 av de
    slutliga dokumenten). `controller/verify/register.json`: ny not utan människohand/webbgrind,
    `register_version` stegad, check-invariants-posten oförändrad.
@@ -327,8 +740,45 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `config/managed-settings.json` (plattformsrot, webbposter bort, registret nekat),
    `config/README.md` (r.5, 35–36, 43, 69, 92–107), `.gitignore` (webbträd bort, `SEPARATION-20260910/`
    vitlistad; `docs/`, `tests/`, `scripts/` förblir hela vitlistor — se F3).
+5b. **Skills (E.3):** `.agents/skills/nortropic-architect/SKILL.md` r.3/16/21/23 och
+   `nortropic-empirical-runner/SKILL.md` r.14/16: plangenerationens sökväg vid HEAD, blob-verifierad av orkestratorn;
+   inget `git show <PLAN_SHA>`, inget "frozen autonomous-loop plan commit", ingen gammal sökväg.
+5c. **Plandokumenten (E.4):** `docs/loop/codex-autopilot-v3-full-roadmap.md` `## Authority` → `PLAN_GENERATION=`,
+   nya `ROADMAP_PLAN_PATH`/`ROADMAP_HANDOFF_PATH`, `AGENTS.md`, blob-läsning vid HEAD (r.16 skrivs om); `AGENTS.md`
+   r.127 (v3-raden) utan sha, `## Auktoritetsordning` får den nya planen som EGEN punkt (aktivt dokument, inte i samma
+   punkt som markörnoten för frysta dokument), `## Historik` namnger den tidigare plangenerationen som historia i
+   Git-historiken (utan sha/blob/sökväg) och den nya som aktiv; `docs/loop/harness-substitution-contract-v1.md` ingress
+   r.7 utan commit + nytt `## 15. … 2026-09-10 … (v1.2)` som namnger den nya planens sökväg och `AGENTS.md` (§1–§5,
+   §7–§11, §13 orörda); `docs/loop/drift.md` appenderad not som namnger den nya planens sökväg (hela svansen skannas);
+   `README.md` r.38 utan de gamla filnamnen. Pinnar: `controller/verify/cli` `PLATFORM_DOCUMENTS` och autopilotens
+   `SUBSTITUTION_BLOBS` för AGENTS/README/drift/kontraktet (och varje annat ändrat generationsdokument); (v3.1 N5)
+   `PLATFORM_DOCUMENTS` får dessutom `docs/loop/autonomous-loop-plan-platform-v2.md` och
+   `docs/loop/autonomous-loop-platform-handoff-v2.md` med sha256 (elva-mängden i `SUBSTITUTION_BLOBS` oförändrad).
+   (v3.1 B3) Varje roadmap-/empirisk-/arkitektprompt — även SUB-grenarna i `slice_builder_extra`/`slice_authority_text` —
+   namnger både plan och handoff i sin PRODUCERADE text; byggarna måste kunna anropas med fixturargument (sträng-shas, tom
+   signal, ett fynd, verkliga skivor) utan sidoeffekter. (v3.2 B1) Mängden promptbyggare (15 namn), flöden
+   (`empirical_gate_contract_flow`) och byggaranropare (8 namn) är SLUTEN: inga nya/omdöpta prompt-, tvilling- eller
+   flödesfunktioner; varje runner-anrop får sin prompt från en förväntad byggare (eller inlinad text i det förväntade
+   flödet); varje krävd byggare nås från `main()`. `ensure_roadmap_plan` verifierar båda filernas blob (N2); `controller/verify/cli`
+   itererar `PLATFORM_DOCUMENTS` självt i prepare/check för plan OCH handoff (N3/v3.3 N5). Inga skiftlägestvillingar
+   eller NFC/NFD-tvillingar av spårade sökvägar (N4). (v3.3 B1/B2) Varje runner-prompt har ett direkt byggaranrop som
+   rot; ingen runner-alias, ingen modul-/klassnivåmall med rollmarkör, inga parameter-genomsläpp av prompttext; exakt
+   {doctor, empirical_gate_contract_flow, full_roadmap, roadmap_contract_flow, roadmap_status} anropar `ensure_roadmap_plan`
+   och flödena stoppar där vid muterad plan; byggarna får inte skriva utanför fixturen (inte heller till `/private/tmp`,
+   `/private/tmp/claude*`). (v3.4) Runner-prompten får inte skrivas om efter byggarroten (ingen `.replace/.format/.join`,
+   bara `+` och blankstegstrimning), inga dynamiska uppslag (`globals()` m.fl.) utanför den mätta mängden, inga
+   strängkonstanter med runnernamn utanför `selftest`; alla tio flöden måste löpa till slut mot den stubbade runnern med
+   syntetiska READY-svar (stubbmängden `LIVE_STUB_NAMES`/`LIVE_REQUIRED_ATTRS` är sluten — omdöpning = produktrad);
+   `run_codex`, `run_codex_resolving_architecture`, `_provider_snapshot`, `_python_snapshot`, `_strict_provider_authority`
+   och `AUTOPILOT_ROLE_POLICY` är AST-identiska med 320c9df7, `controller/authority/**` och `controller/launch/**` blob-identiska
+   (providermaskineriet och dess beroenden rörs inte); autopilotens modulnivå håller formregeln (inga attribut-/subscript-mål,
+   inga block, ingen exec-ytsbindning); plan-/handoffkonstanterna tilldelas en gång som literaler; `remediation_prompt` (båda
+   rollerna) och den inlinade L-remedieringen namnger plan + handoff (remedieringsgrenarna körs live); handoffen bär
+   avsnitten Syfte, Låsta värden/pinnar, Startordning, Stoppregler, Avslutskriterier + planens sökväg + `PLAN_GENERATION`;
+   skivtabellens radordning följer autopilotens ROADMAP-ordning.
 6. **Dokument:** `AGENTS.md` (Historik → Git-referenser/webbrepot utan sökväg), `README.md` (r.8, 21, 28),
-   `docs/loop/regler.md` (r.9–10), `docs/loop/byggplan-v3.md` (r.9, 113, 166),
+   `docs/loop/regler.md` (r.9–10; se även 6b — filen ligger i produktytan och rörs, den är INTE i p.8),
+   `docs/loop/byggplan-v3.md` (r.9, 113, 166),
    `docs/loop/codex-autopilot-v3-full-roadmap.md` (r.17, 115), `docs/loop/harness-substitution-contract-v1.md`
    (ingress r.5, §6, §12 + daterat tilläggsavsnitt; §1–§5/§7–§11/§13 orörda),
    `docs/loop/codex-evidence-contract.md` (r.120, 130, 135–144), supersessionshuvud i
@@ -340,19 +790,191 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `README.md` namnger inte webbrepot (`nortropic-webbforvaltning`); Fasgränser-stycket och Historik-stycket i
    `AGENTS.md` bär markörerna `fryst`/`historisk` + `inte dagens instruktion` vid omnämnandet av
    remaining-bootstrap-delegation respektive plankopiorna.
+6b. **Ägarbeslutets bindningar (v3.10, ägarbeslut 2026-09-11).** Ägaren förbjuder en separat grindserie för
+   dokumentationen; bindningarna är därför sex rader med exakta ankare, och inget därutöver.
+   **(B1) Plangenerationens `## Avslutskriterier`** ska bära FYRA mätbara nivåer, var och en med sina ord i just
+   det avsnittet: *(i) planseparation* — egen plan + handoff hos alla aktiva konsumenter, planens `arbetsdelar`
+   stämmer med exekveringen, ett `genomfört flöde` visar att rätt plan når agenterna; *(ii) `Trust Kernel`* — en
+   `giltig uppgift` kan slutföras och `fel identitet`, `otillåtna skrivningar`, `saknad obligatorisk verifierare`
+   och `fel hash` `avvisas mekaniskt`, kvalificering kräver `frysta verifierare` körda färdigt mot exakt rätt
+   kandidat, och `exitkod 0 ensam räcker inte`; *(iii) `bootstrap-milstolpe`* — en `verklig uppgift` genom
+   `hela rollflödet` till `kvalificerad produkt` `utan webbstyrning` och `utan generellt mänskligt ingripande`
+   (ordet *människohand* är förbjudet av `HARD_HUMAN_TOKENS` och får inte användas); *(iv) `operativ helhet`* —
+   `installation`, `driftkvalificering`, `supervisor-resume`, `själv identifiera`, uttryckligen `senare` och
+   `utanför dagens` fas.
+   **(B2) `## Bootstrap`** ska namnge en `ÄNDLIG` `överlämningspunkt` till `kvalificerad autonom drift` och att
+   `organisationens fortsatta utveckling` sker `därefter`.
+   **(B3) `## Målbild`** ska bära att autonomin själv identifierar behov och möjligheter inom organisationens
+   `mål och mandat`, prioriterar, genomför och utvärderar, och att `Webb/Digitala` är en `verksamhet som använder`
+   den gemensamma plattformen.
+   **(B4) H039:s funktionskrav** bevaras i avsnittet Skyddade invarianter/tekniska skydd: `h-039`,
+   `avslutad städning`, `noll registrerade runtime-rester`, och att städningen inte får radera eller ersätta
+   `främmande data` genom den identifierade `kapplöpningen`.
+   **(B5) `docs/loop/regler.md` är källa för arbetsmetoden** och ligger i produktytan (den rörs; den är inte i p.8).
+   Filen ska bära: rollflödet (`test-author` → `granskning` → `builder` → `lokal kvalificering`); att buildern
+   `ändrar aldrig sin egen frysta grind` (regel 11 bär den redan); att varje ytterligare grindändring kopplas till
+   ett `befintligt krav` OCH ett `konkret hinder`; granskarens godkännandenorm (`arbetsbudget` gör `aldrig ett
+   kvarvarande fel` godkänt, `skenande kostnad` leder till ett `enklare upplägg`); och att `riggbegränsningar`
+   bedöms mot uppgiftens `hotmodell`. Filen måste dessutom bära minst
+   `RULES_MIN_NORMATIVE_SENTENCES` = 8 normativa meningar (annars är regelkällan inte mätbar).
+   `AGENTS.md`, `CLAUDE.md` och ALLA SEX rollskills ska **hänvisa** till både `docs/loop/regler.md` och
+   plangenerationen — och inte duplicera dem: samma normativa mening (≥ 40 tecken, med markör
+   *aldrig/alltid/måste/ska/får inte/avvisas/obligatorisk/never/always/must/may not/shall/required*) i två aktiva
+   dokument är RÖD. En mening som NAMNGER regelkällan eller planen är en pekare och undantas — pekare får upprepas.
+   Mätt på 320c9df7: 52 normativa meningar över de nio dokumenten, noll kollisioner; `docs/loop/regler.md` bar 7,
+   så tillägget behövs. **Ompinning:** `CLAUDE.md` och `docs/loop/regler.md` är generationsdokument — deras blob i
+   autopilotens `SUBSTITUTION_BLOBS` och deras sha256 i `controller/verify/cli` `PLATFORM_DOCUMENTS` måste pinnas om
+   när de ändras. `LOOP-ÄGARHAND-16–27` (r.16) och webbavgränsningarna i r.10–11/r.29 är MÄTT gröna som de står —
+   `HUMAN_TOKENS` bär inte `ägarhand` (det gör bara `PLAN_TOKENS`, som bara gäller plangenerationen) och `kundflöde`
+   likaså — så ingen omskrivning och inget extra ankare behövs för dem.
 7. **Tester:** `tests/controller/loop/fall.py` B2 (webbfixtur/INV-004 → PINV-sabotage, t.ex.
    `push --force` i `controller/<x>/cli` → PINV-005).
 8. **Inte rörs:** `verify/**` (utom att denna grind redan ligger där), frysta träd/filer i F6,
    `controller/loop/cli`, `specs/tasks.spec.json` (kräver ingen ändring; frysta rader behålls),
-   `scripts/check-invariants.mjs`.
+   `scripts/check-invariants.mjs`, `controller/verify/register.json`, `docs/loop/remaining-bootstrap-delegation-v1.md`,
+   `docs/loop/owner-author-workflow-v1.md`, providermaskineriet (`run_codex`, `run_codex_resolving_architecture`,
+   `_provider_snapshot`, `_python_snapshot`, `_strict_provider_authority`, rollpolicyn, `CODEX_FULL_ACCESS_MODE`),
+   (v3.5) `controller/authority/cli`, `controller/authority/core.py`, `controller/launch/cli`,
+   `controller/launch/runtime_snapshot.py` — blob-bundna mot 320c9df7; **KOSTNAD (v3.6, granskning nr 10):** varje legitim
+   framtida ändring i dessa fyra filer gör denna grind röd — särskilt refreeze av h-035/h-036/h-037/h-038, som dokumentet
+   självt pekar ut som ett separat H-steg och som rör `controller/launch/**`. Ompinning kräver en ny kontraktsversion
+   (test-author-frys + oberoende granskning); det är en medveten rigiditet, inte en oavsiktlig bieffekt.
+   **KOSTNAD (v3.7, granskning nr 11 N9):** den slutna binärmängden under live-flödena är `{git, /usr/bin/env,
+   pinnad python3.12, /bin/sh}` och den slutna primitivmängden är `{subprocess.Popen}`. En legitim produkt som under ett
+   flöde startar NÅGON ANNAN binär (en verktygsversion, en systemsond, en extern grind) eller använder en annan
+   startprimitiv blir röd på `f4_live_flows_start_no_provider_process…` — mätt två gånger av granskare nr 11 på
+   `/usr/bin/env` respektive den pinnade `python3.12` under v3.6:s `{git}`-mängd. Mängden utvidgas bara genom en ny
+   kontraktsversion.
+   **RÄTTELSE (v3.8, granskning nr 12 B2):** vidgningen i v3.7 tog samtidigt bort en verklig kontroll — en providerrad
+   inuti ETT `sh -c`-element blev grön (mätt; med v3.6:s `{git}`-mängd är samma mutant röd). Mängden är därför delad i
+   TOOLS (`git`, exakta argv-element) och WRAPPERS (`env`, `sh`, `python3.12`, delsträngstest över hela argv plus en
+   längdgräns på `WRAPPER_ARGV_MAX` = 200 tecken per argv-element). Kostnaden för den slutna mängden kvarstår som ovan,
+   och en legitim `sh -c '<lång skriptrad>'` under ett flöde är röd per design.
+   **KOSTNAD (v3.8, granskning nr 12 N2):** exec-aliasspårningen var i v3.7 en GLOBAL textmatchning, vilket gjorde varje
+   lokal variabel som råkade heta som ett mätt alias (`p`, `r`, `rc`, `sub`) förbjuden att subscript- eller
+   attributtilldela — två mätta falskt röda (`p[x] = p.get(x, 0) + 1`; `r.returncode = int(r.returncode or 0)`).
+   Spårningen är nu skopmedveten (per funktion/klass, med arv från omslutande skop) och ett ANROPSRESULTAT blir inte
+   längre alias, så aliasmängden på baslinjen är TOM och båda fallen är gröna. Kvar som kostnad: den som avsiktligt
+   binder `subprocess.Popen` eller en `os.*`-primitiv till ett namn och sedan skriver på det namnet blir röd — vilket är
+   regelns syfte, inte en bieffekt.
+   **RÄTTELSE (v3.9, granskning nr 13 N4):** v3.8:s skopmedvetna aliasspårning var **vakuös i praktiken** — fem av fem
+   sondprov band ett exec-objekt utan att bli alias (`[P] = [subprocess.Popen]`, `[x for x in (subprocess.Popen,)][0]`,
+   `P = [subprocess.Popen][0]` följt av `setattr(P, '_exec'+'ute_child', f)`), och det som bar lasten var de
+   namnbaserade reglerna plus den dynamiska identitetskontrollen. v3.9 gör spårningen icke-vakuös: värdet genomsöks
+   rekursivt och varje exec-atom som inte är funktionen i ett anrop inuti värdet gör målet till alias, destrukturering
+   binder varje delmål, och `setattr` med ett BERÄKNAT attributnamn samt varje explicit `__setattr__`-anrop är rött.
+   Mätt: baslinjens aliasmängd är fortfarande tom, de tre sondproven faller, och v12:s två falskt-röda fall
+   (`p[x] = …`, `r.returncode = …`) är fortfarande gröna.
+   **KOSTNAD (v3.9, granskning nr 13 B2/N3):** den slutna formmängden för omslagsbinärer gör varje legitim
+   `sh -c …`/`env …`/`python -c …` under ett flöde röd utom de två mätta formerna, `stdin` till ett omslag är rött
+   villkorslöst, och ett exec-objekt som defaultargument (`def f(cmd, _r=subprocess.run)`) är rött. Alla tre är
+   medvetna rigiditeter; var och en stänger ett mätt hål.
+   **KOSTNAD (v3.9, granskning nr 13 N7):** grinden städar inte sitt `FIXTURE_ROOT`. Granskare nr 13 mätte **31 rötter
+   och 3,6 GiB** under en enda granskning; den som kör ansvarar för att ta bort dem.
+   Samma sak gäller de slutna namnmängderna (`LIVE_STUB_NAMES`, `EXPECTED_PROMPT_BUILDERS`,
+   `EXPECTED_PROMPT_CALLERS`, `EXPECTED_PLAN_GUARD_CALLERS`): legitim omdöpning är röd per design —
+   autopilotens skivtuplar och `EMPIRICAL_GATE_PATH`. Refreeze av h-036/h-037/h-035/h-038/document-authority (stale
+   pinnar på autopilot/AGENTS/drift) är ett separat H-steg som plangenerationens ändring bör batchas med (recon D).
 
 ## Vad grinden inte bevisar
 
 - Att webbrepot faktiskt bär de överförda filerna: grinden läser aldrig webbrepot (plattformen ska
   fungera utan det); proveniensen binds mot 332f07ce-objekt i plattformens egen historik.
-- Att de plattformsfrysta plankopiorna är fria från webbstyrning: de är byte-identiska med de
-  historiska planobjekten och bär webbreferenser som effekt-authority (UNRESOLVED för SUB-1/senare
-  kontrakt: omfrysning av planen för plattformen).
+- (v3.1) Prompter som inlinas direkt i ett flöde (t.ex. remedieringsprompten i `empirical_gate_contract_flow`) mäts bara
+  statiskt (AST-literaler), inte som producerad text — flöden anropas inte. En byggare som kräver argument utanför
+  fixturmängden faller rött (fail-closed), inte tyst grönt.
+- (v3.2/v3.3) Grind-fingeravtryck (N1): en byggare kan producera planen bara under mätning (bench-miljön, den stubbade
+  runnern och fixturargumenten är synliga; modulnamnet slumpas) — produktgranskningen läser byggarna och flödena. Sluten
+  värld (N6-arv): base64/gzip-bilagor, zero-width-/blankstegsdelade prefix och semantisk override utan token fångas inte;
+  dubbletter/omordning i `allowed_write` är mängdsemantik; körtidsläsning av planfilen i en byggare mäts inte (sökvägs-
+  och blobbindningen + `ensure_roadmap_plan`-vakten är identitetsskyddet). Den statiska klassificeringen är fail-closed:
+  en legitim refaktorering av promptvägen (nya byggare, indirektion, klassbaserade prompter) är röd per design och kräver
+  ny kontraktsversion; den dynamiska live-mätningen kör flödena till slut med stubbad runner (syntetiska READY-svar) och stubbad
+  worktree-/grind-/publiceringshantering — Git-/provider-/publiceringsbeteendet i stubbarna mäts inte här (control-set-
+  grinden, loopsviten och publication-callers mäter det); byggaranropens argument inspekteras inte statiskt (skivan i
+  `roadmap_test_author_prompt(sl, …)` kan dopas i drift — produktgranskningen läser); ett andra providersamtal utanför
+  `run_codex` (`subprocess`, egen hjälpare) efter ett legitimt första anrop fångas inte av live-mätningen men gör
+  `run_codex`-vägen död/oanvänd bara om anroparen ändras (slutna anropar-/producentmängder + AST-identitet + Popen-inspelningen
+  under live-flödena fångar de kända formerna; ett andra providersamtal som startar en process fångas nu av Popen-inspelningen,
+  medan ett samtal via ett redan öppet handtag eller ett nät-API inte gör det); benchens miljö och den stubbade runnerns svar
+  (inklusive att första svaret är NEEDS_REMEDIATION) är synliga fingeravtryck (N1).
+- (v3.9) Providergränsen är bunden till NIO mätpunkter, varav en ligger UTANFÖR produktens interpreter: de sex AST-identiteterna, de fyra blob-pinnade beroendefilerna,
+  autopilotens modul- OCH klasskroppsform (satser **och värden** — en klasskropp får inte binda ett exec-objekt),
+  exec-ytsregeln över HELA filen med **transitiv aliasspårning** (varje namn, klassattribut eller instansattribut som
+  någonstans i filen binds från `subprocess.<exec>`/`os.<exec>`, från ett redan spårat alias, från ett attribut på ett
+  sådant eller från ett anrop av ett sådant, är ett alias — och varje tilldelning PÅ ett alias är röd) plus ett absolut
+  förbud mot tilldelning till interna/dunder-attribut (`_execute_child`, `__init__`, `__call__`, `__new__`, …) på vad
+  som helst, den pinnade authority-bibliotekssökvägen (AST + importerad fil), processtart-inspelningen med
+  identitetskontroll före OCH efter flödena över `subprocess.Popen` + `os.posix_spawn/execv*/spawnv*/system`, och
+  **inspelningen ETT LAGER NER**: `Popen._execute_child`/`Popen.__init__` fångade ur stdlib före modulladdning, mätta
+  före och efter flödena, med jämförelse av den argv som faktiskt når barnet mot den argv Popen-inspelaren såg — och
+  **(v3.8) INSTALLATIONEN FÖRE `exec_module`**, som är det som binder importtidsfångster som inte är satser
+  (funktionsdefault, dekoratorargument, metoddefault) och som är den enda bindningen för de åtta `os.*`-primitiverna.
+  Den statiska formregeln täcker samma två former (`FunctionDef.args.defaults`/`kw_defaults` och `decorator_list`).
+  **(v3.10, granskning nr 14 B1)** Drivrutinens privata namnrymd var fortfarande nåbar — inte via `import __main__`,
+  som v3.9 förbjöd, utan som `f_globals` på frame-stacken (`sys._getframe()`/`f_back`) och som ett vanligt objekt i
+  heapen (`gc.get_objects()`). Båda vägarna är nu förbjudna i `GATE_NAMESPACE_TOKENS` tillsammans med `sys.settrace`,
+  `sys.setprofile` och `gc.get_referrers/referents`; mätt på 320c9df7 nämner autopiloten ingen av dem.
+  **(v3.10, granskning nr 14 B2)** Identiteten löstes i FEL process: `Popen` löser ett bart `argv[0]` genom
+  `env=`-argumentets `PATH`, medan grinden löste samma namn genom drivrutinens `os.environ`. En `env={'PATH': <egen
+  katalog>}` gjorde att grinden sha256-prövade sin egen stubb medan produktens binär kördes — mätt 114/5 grön med den
+  gamla planen på barnets stdin. Identiteten löses nu med **den PATH anropet faktiskt använder**, en start som bär en
+  egen `PATH` i `env=` är röd, stdin mäts i **alla** kanaler (`input`, pipe, vanlig fil, ärvd fd via `/dev/fd`,
+  `pass_fds`), miljön mäts även när barnet ärver, och `git` som **startare** (`-c alias.*`, `core.pager`,
+  `diff.external`, `credential.helper`, `--exec-path`, `--upload-pack`, samt `GIT_EXTERNAL_DIFF`/`GIT_PAGER`/`GIT_SSH*`
+  /`GIT_CONFIG*` i miljön) är röd.
+  **(v3.9) Den NIONDE och bärande mätpunkten ligger utanför produktens interpreter:** live-körningens `PATH` är grindens
+  egna stubbar, som loggar den riktiga binären, hela argv och hela stdin till filer som grinden läser utifrån. Granskning
+  nr 13 visade varför de åtta in-process-mätpunkterna inte räcker: drivrutinen körde som `__main__` i samma interpreter
+  som produkten och lämnade stdlib-originalen i sin egen namnrymd, så ett `import __main__` gav en produkt fri
+  processtart med **varje räknare identisk med referensens**. In-process-halvan är nu hårdare (privat namnrymd,
+  inspelare på `Popen.__init__`, identitet prövad vid varje anrop, realpath + sha256 på varje exekverad fil, sluten
+  formmängd för omslag, stdin-innehåll fångat), men beviset bärs av **de två halvorna tillsammans**.
+  **RÄTTELSE (v3.10, granskning nr 14 B3):** påståendet att utifrån-mätningen "per konstruktion inte kan påverkas av
+  något produkten gör i sin egen process" var **falskt**. Stubbloggens sökväg står i klartext i stubbskripten som ligger
+  på produktens egen `PATH`, katalogen ägs av samma uid, och loggen var dessutom undantagen från sidoeffektsvepet —
+  granskaren raderade 7 poster (333 → 328) utan att en enda rad reagerade. Och eftersom ingen rad jämförde halvorna
+  kunde en produkt i stället tysta in-process-inspelarna helt (mätt: `popen = child = init = 5` mot `stub_calls = 333`,
+  grinden grön). Det som gäller från v3.10 är i stället: (a) varje stubbpost bär ett **löpnummer från en låst räknare**
+  och en **HMAC** över (nummer ‖ innehåll) med en nonce som genereras per grindkörning, så raderade, ändrade och
+  tillagda poster syns som bruten kedja eller lucka i numreringen; (b) stubbloggen **ingår i sidoeffektsvepet** — bara de
+  poster stubbarna själva skriver är redovisade, allt annat i katalogen är en sidoeffekt; (c) en **egen rad**,
+  `f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain`, kräver att
+  `stub_calls = popen_total = init_total = child_total`, att closure-räknarna (heltal som ingen listutbytning når)
+  stämmer med listorna, att inspelningsbehållarnas typ och identitet är oförändrade, och att varje räknare klarar det
+  mätta golvet `LIVE_MIN_PROCESS_STARTS`. En produkt måste alltså förfalska **båda** halvorna konsistent, inte
+  vardera för sig. Nonce:n är läsbar för en produkt som läser stubben på sin egen PATH; vad kedjan köper är att
+  utifrån-talet inte kan sänkas TYST.
+  Utanför dem gäller deklarerad gräns: annan kod under `controller/**` som autopiloten inte importerar vid start,
+  miljövariabler som launchern själv läser, provideranrop som inte startar en process (öppet handtag, nät-API) och
+  start via en primitiv utanför den instrumenterade mängden och utanför `subprocess` (mätt av granskare nr 11:
+  `ctypes`→libc `posix_spawn` och `multiprocessing` med `fork`-start, båda utan ny process-image för providern).
+  Stubbnamnen och de slutna namn-/binärmängderna gör legitim omstrukturering röd per design (p.8).
+- (v3.8) **Tre kvarvarande icke-blockerande fynd behålls som deklarerade gränser, med mätt motivering.**
+  (a) *Remedieringsbeviset* (granskning nr 11 N5, nr 12 N3): `LIVE_FINDING_ID`-kravet är ett närvarokrav på id-strängen;
+  `builder_prompt(...) + "Reviewer finding ids: FIXTURE-1."` uppfyller det. Gränsen är immateriell för ordern — den kan
+  inte låta den gamla planen nå en levande prompt, bara göra remedieringsbeviset svagare än det låter.
+  (b) *Rollpolicy muterad under flödena* (nr 11 N6, nr 12 N4): `AUTOPILOT_ROLE_POLICY.update({...})` från en
+  funktionskropp syns inte i `constants`-scenariot, som mäter vid import. Mätt motivering: konstanten är avbildningen
+  `roll → (modell, reasoning_effort)` och dess enda konsument är `run_codex`:s modellroutning; den styr varken
+  `allowed_write` eller promptinnehåll och kan därför inte låta den gamla planen eller ett webbstyrande dokument nå en
+  prompt. Immateriell.
+  (c) *Handoffens generationsvärde* (nr 11 N7, nr 12 N5): handoffraden delsträngstestar `PLAN_GENERATION` och värdet, så
+  en handoff som skriver `PLAN_GENERATION=platform-v1-legacy` överlever om planens sökväg innehåller `platform-v2`.
+  Mätt motivering: den gamla planens blobar och sökvägar är mekaniskt förbjudna vid HEAD (F1/F2) och handoffen skannas
+  som aktivt dokument, så det som kan införas är en MOTSTRIDIG ETIKETT, inte en styrande gammal plan. Immateriell för
+  ordern, men den av de tre som ligger närmast en dokumentbindning i order (2).
+- (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
+  tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
+  `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av
+  den oberoende granskningen. En etikett för den gamla planen utan pekare (t.ex. auditens r.241 `autonomous-loop-plan-v1`
+  utan sökväg/`.md`) fångas inte — den kan inte mekaniskt återinföra planen.
+- (v3) Att h-036/h-037/h-035/h-038/document-authority-grindarna går gröna efter autopilot-/AGENTS-/drift-ändringen
+  (pinnarna är redan stale sedan separationen; refreeze är ett eget H-steg), eller att h-017-exit går grönt på
+  plattformen (läser frånvarande webbfiler).
+- (v3) Beroendekonflikten S6/h-014 (spec `depends_on: [h-013]`, autopilot h-019) och specradernas `docs/05`-ytor:
+  specen är byte-fryst i detta kontrakt; planen binds mot autopilotens tuplar och specradens `exit_test`, inte mot
+  specradens `depends_on` för obyggda skivor.
 - Att frysta H-grindar går gröna på kandidaten (h-016/017/036/037/038 läser webbfiler vid körning;
   refreeze hör till nästa H-steg) eller att `document-authority-exit`/`h-035-exit` gör det.
 - Att managed-settings är installerad (extern rootceremoni) eller att Claude Code/Codex faktiskt
@@ -612,6 +1234,759 @@ subjektets byte-identiska kopior; eget `TMPDIR`):
 `RED_LOCAL_QUALIFICATION`, **52 PASS / 36 FAIL** (88 rader), result.json sha256
 `faea27bb37fb6e69afe9b3a3ce08348e2e2c3a4ff39514b222f3914ee0a3cc70`. Röda och gröna rader identiska med v2.3/v2.4
 (F7: control-set 68/68, launch-cwd 19/20, governance 68/70 exakt g6/g7).
+
+### Kontrakt v3 2026-09-10 — plangenerationen (ägarorder: den gamla planen är inte längre aktiv authority)
+Grind v3 sha256 `523c53bd8dd813c648d1671385a334518cfa61d44da0d05820eea7dd9e4e6bb7` (commit `12e7dfaa`), 95 rader (v2.5: 88). Nya/ändrade rader: F1 (två gamla plankopior
+frånvarande; tolv förbjudna blobbar), F2 (plangenerationen skannas som aktivt dokument med `OLD_PLAN_TOKENS` +
+`PLAN_TOKENS`; `OLD_PLAN_TOKENS` trädvitt i alla klasser; `f2_plan_generation_and_handoff_reached_…`; routerraden för
+plangenerationen; full-roadmap-, substitutions- (§15) och drift-raderna omskrivna, drift skannar hela svansen), F4
+(planfiler + autopilotens blobbar/sökvägar; ingen `ROADMAP_PLAN_SHA`; `ensure_roadmap_plan`-raderna på nya filer;
+autopilotens fulltext utan gammal commit/`git show <commit>:`/`plan_sha`; promptinjicerad dokumentmängd; skivtabell ==
+ROADMAP + selftest; bootstrapavsnitt; skills; selftest skriver `PLAN_GENERATION=`), F8 (plangenerationen ej undantagen),
+F10 (kanari för planskanning/tabellparser/`git show`/undantagsmängd). Beslut utöver orkestratorns P1–P8: (i) bara
+PEKARE till den gamla planen är förbjudna (commit 40/8 hex som hex-ord, blobbar, sökvägar med `.md`/`docs/loop/`,
+grenen) plus de tre etiketterna på båda språken — auditens r.241 (namn utan pekare) förblir tillåten; (ii) `Verkstadsgolvet`
+är förbjudet i planen helt; (iii) promptmängden binds som krävd ⊆ injicerad ⊆ tillåten (krävd: plan, handoff,
+full-roadmap, kontrakt, audit, evidenskontrakt, AGENTS, rapportschema; tillåtna extra: regler, byggplan, drift,
+owner-h003) i stället för exakt likhet; (iv) drift.md:s hela svans skannas; (v) S1/S3-rader binds mot specraden
+(task, exit_test, depends_on) utan skrivyta, L mot `EMPIRICAL_GATE_PATH` med alla skivors task-id som beroenden;
+(vi) status `BYGGD` ⇔ grindfilen spårad; (vii) den nya planen måste stå i egen listpunkt i Auktoritetsordningen.
+
+### Test-author 2026-09-10 — baslinje RED för v3 (före produkt)
+Subjekt: replika av plattformsintegrationen `320c9df7` (v2.5-produkten, 84/84 under v2.5) + grind v3 + detta dokument
+(fixtur-HEAD `92424535`, scratch). Kommando (bypass, egen `TMPDIR`, hållna grindar ur subjektets byte-identiska kopior):
+`python3.12 verify/bin/platform-separation-final-exit --subject <replika>` → exit **1**, `RED_LOCAL_QUALIFICATION`,
+**69 PASS / 26 FAIL** (95 rader), result.json sha256 `2a99fec75daf150ae124f4509a03c4abaf3ea7f5d372c76bf9e8a0a5d9eed85c`.
+Röda rader (alla av rätt skäl — plangenerationen saknas, den gamla planen är aktiv): `f1_required_absences_…` (gamla
+kopiorna spårade), `f1_no_blob_…` (blobbarna `c8ea8511`/`1e53887c`), `f2_closure_…` (gamla planen följs nu: `docs/03`,
+`docs/05`, `docs/07` hänger), `f2_active_doc_…` ×7 (arkitektskillen r.21 gammal sökväg; AGENTS r.127/153–155 commit +
+sökvägar; README r.38; gamla planen och handoffen själva — webbtoken; full-roadmap r.11; substitutionskontraktet r.7),
+`f2_plan_generation_and_handoff_reached_…`, `f2_tree_wide_no_web_governance_…` (samma träffar trädvitt),
+`f2_router_authority_order_…` (planen saknas i Auktoritetsordningen), `f2_full_roadmap_…`, `f2_substitution_…` (inget §15;
+ingressen namnger commiten), `f2_drift_…` (svansen namnger inte planen), F4 ×10 (planfiler/blobbar; `ROADMAP_PLAN_SHA`
+finns; mutated/missing utan positivt ankare; autopilotens fulltext r.71/72/94/95/2578 + `git show` r.1479/1658/1768;
+promptmängden saknar plan/handoff/evidenskontrakt och injicerar den gamla planen; skivtabell saknas; bootstrapavsnitt
+saknas; skills; selftest skriver `PLAN_SHA=`). Gröna: kanarier ×6, övriga F1/F3/F5/F6, F7 (control-set 68/68 result
+`2a33a5c4…`; launch-cwd 19/20 med exakt `extra=[governance, denna grind]` `f9ce1deb…`; governance 68/70 exakt {g6, g7}
+`c4fe0665…`), loopsviten 53 ok / 0 FEL (B2 via PINV), `f4_ensure_roadmap_plan_returns_…` (gamla kopiorna finns),
+F8 ×2, F10 ×2; trädklassning frozen 52 / partial 7 / local-development 6 / code 24 / test 16 / text 35 / binary 3;
+slutning 39 nådda / 31 skannade.
+
+### Referenskonstruktion v3 (scratch, förkastad — bevisar satisfierbarhet)
+Replika av `320c9df7` + grind/dokument v3 + produktytan (skript i test-authorns scratch, aldrig i repot): grov plan
+`docs/loop/autonomous-loop-plan-platform-v2.md` (PLAN_GENERATION-block, målbild, tekniska skydd, skivtabell med 18 rader
+S1/S3/SUB-1…4/S2/S4…S13/L, skivkriterier, `## BOOTSTRAP …` med h-031…h-039, migrationsordning, OVERIFIERAT) och handoff
+`docs/loop/autonomous-loop-platform-handoff-v2.md`; gamla kopior borttagna; autopilot enligt produktyta p.3
+(`PLAN_GENERATION = "platform-v2"`, nya sökvägar, `ROADMAP_PLAN_BLOBS` = HEAD-blobbar `6513b845…`/`9d1c7b2e…`, alla
+`git show`/`PLAN_SHA` bort, evidenskontraktet i `agent_prompt_common`, selftest-identitetsvakt, ompinnade
+`SUBSTITUTION_BLOBS`); skills, AGENTS (egen p.5 för planen, p.6 drift m.fl., Historik utan pekare), full-roadmap Authority,
+substitutionskontraktets ingress + §15 (v1.2), drift-not, README r.38; `controller/verify/cli` `PLATFORM_DOCUMENTS`
+ompinnad för AGENTS/README/drift/kontraktet. Fixtur-HEAD `45e0c957`, 143 spårade filer. Fullkörning (bypass, egen
+`TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **95/95**, result.json sha256 `5050cefa61800c990f1cd11a685e1a69a57b8829dd8e32a484a21749469cf2a6`; control-set
+68/68 (`b881b0a9…`), launch-cwd 19/20 med exakt två extra grindar (`19ac4f9d…`), governance 68/70 exakt {g6, g7}
+(`1ecc6a6a…`), loopsvit 53 ok / 0 FEL, trädklassning frozen 52 / partial 7 / local-development 6 / code 24 / test 16 / text 35 / binary 3, slutning 36 nådda / 31 skannade,
+0 hängande. Promptmängd mätt på referensen: injicerad = krävd ∪ {regler, byggplan, drift, owner-h003}.
+
+### F9 v3 — negativer (var och en i egen replika av referensen, statiskt `--skip-held-gates`; 19 körda, 19 fångade,
+0 riggfel; siffror utan de fem sandboxberoende raderna)
+(a) gamla planens bytes under nya sökvägen, autopiloten ompinnad → `f1_no_blob_…`, planraden (webbtoken), slutning
+(`docs/03/05/07` hänger), trädvid, autopilotens fulltext (ompinnade bloben är en gammal-plan-pekare), skivtabell,
+bootstrapavsnitt; (b) `git show 0b3212c9…:` i roadmap-test-author-prompten → autopilotens fulltext + trädvid;
+(b2) `git show {ROADMAP_PLAN_BLOBS[…]}:` utan sha → autopilotens fulltext (`git show {`); (c) `"PLAN_" + "SHA="` i
+selftests utdata → `f4_autopilot_selftest_none_…` (källskanningen ser den inte — utdataraden gör det); (d) `<PLAN_SHA>`
+i arkitektskillen → skillraden; (e) planen med `docs/07-konstitution.md` överordnad → planraden + slutning + trädvid
+(+ blobraderna, planen ändrad utan ompinning); (f) h-030 bort ur S2:s beroenden → skivtabellraden (+ blobraderna);
+(g) `ROADMAP_PLAN_SHA=0b3212c9…` i full-roadmaps Authority → full-roadmap-raden + dokumentraden + trädvid;
+(h) grindmutant med plangenerationen åter i `CLOSURE_EXEMPT`/`TREE_FROZEN_FILES` (körd ur egen rot mot referensen) →
+`canary_plan_generation_scan_rejects_…`, `f2_plan_generation_and_handoff_reached_…`, routerraden (planen blev
+undantagen utan markör), promptraden (planen ej skannad), F6 (grindbytes ≠ hållna); (i) ingressen namnger commiten →
+substitutionsraden (ingress) + dokumentraden + trädvid (+ pinnar/prepare); (j) gamla handoffens blob under
+`SEPARATION-20260910/` → `f1_no_blob_…` (+ trädvid: filen klassas text under SEPARATION — inte fryst-listad);
+(k) planen i samma listpunkt som "inte dagens instruktion" → routerraden för plangenerationen (+ pinnar/prepare);
+(l) senare `## `-not i drift-svansen med `docs/07` → drift-raden + drift-dokumentraden + slutning + trädvid (+ pinnar);
+(m) `ROADMAP_PLAN_SHA` behållen → `f4_autopilot_has_plan_generation_…` + fulltext + trädvid; (n) `implementation-v4.1.md`
+injicerad i builder-prompten → promptraden; (o) S2 `BYGGD` utan grind → skivtabellraden (+ blobraderna); (q)
+`ägarterminalen` i planen → planraden + trädvid (+ blobraderna); (r) `## CODEX_START_HERE` i handoffen → handoffraden +
+trädvid (+ blobraderna); (s) "Historisk källa: `docs/loop/autonomous-loop-plan-v1.md`" i planen → planraden + slutning
+(hängande) + trädvid (+ blobraderna). Ej körda/utanför omfång: etikett utan pekare (auditens r.241), semantisk
+omskrivning av skivkriterier, refreeze av stale H-grindar (Vad grinden inte bevisar).
+
+### Antaganden och UNRESOLVED (v3)
+- `PLAN_GENERATION`-värdet är builderns; grinden binder bara att det är en icke-tom sträng och att full-roadmap
+  bär exakt samma värde. `AUTOPILOT_V4_SELFTEST=PASS` behålls (control-set-grinden binder strängen).
+- Skivtuplarna, `EMPIRICAL_GATE_PATH` och `ROADMAP[0] == S2/h-015` ändras inte (governance g-rader, h-032-exit).
+- S6/h-014: specraden säger `depends_on: [h-013]`, autopiloten h-019; tabellen binds mot autopiloten. Specrefreeze
+  (även `docs/05`-ytorna i h-014/h-015/h-017) är ett eget kontrakt — specen är byte-fryst här.
+- `origin/main`-strategin (autopilotens `ensure_substitution_authority`/`doctor` läser `refs/remotes/origin/main`) är
+  UNRESOLVED utanför kontraktet; F4 kör bara `ensure_roadmap_plan`/selftest/publication-callers.
+- Refreeze-ordningen h-036/h-037 → h-035/h-038 → h-032 → h-031 + document-authority efter autopilot-/AGENTS-/drift-
+  ändringen (pinnarna är redan stale) ligger utanför detta kontrakt.
+- Riggnot: grinden städar inte sitt `FIXTURE_ROOT`; fixturrötterna för RED, referens och negativer ligger i
+  test-authorns scratch och tas bort av den som kör efter bokföring.
+
+### Oberoende kontraktsgranskning nr 5 (på a1101192) → v3.1
+`GATE_REVIEW_RESULT=NOT_READY`: tre blockerare + N1–N8; 20 egna attacker (12 fångade / 8 missade). Remediering v3.1 (grind
+sha256 `b298b07db3629235390b98bfb9ce464f1e662111086516a6a06da5c703b0106a`, 1740 rader, 97 rader i körning; commit `288b68ef`):
+
+| Fynd | Åtgärd i grinden (rad i v3.1) |
+|---|---|
+| B1 9–39-hex-pekare passerar | `OLD_PLAN_TOKENS` (r.186–193): `(?<![0-9a-fA-F])(?i:0b3212c9)[0-9a-fA-F]{0,32}(?![0-9a-fA-F])` och samma form för blobbarna `c8ea8511`/`1e53887c`; kanari med `0b3212c991d4:`, 40-hex, versaler, `(0b3212c99)`, blobprefix; negation hex-föregången/41-hex |
+| B2 `<PLAN_SHA>`/`git show` bara i två skills | `COMMIT_READ_TOKENS` (r.208) i slutningsskanningen av varje aktivt dokument (r.1089), trädvitt partial/text (r.1112, 1142), supersessionsnoter (r.1233), drift-svans (r.1245), EFTERARBETE-svans (r.1601); kanari `<PLAN_SHA>`/`PLAN_SHA=`/"frozen … plan commit" vs `git show HEAD:`/`plan_sha256` |
+| B3 promptraden mäter AST-union, inte prompter | DRIVER-scenario `prompts` (r.318–345): importerar modulen, upptäcker byggare via kodobjektets strängkonstanter/namn, exkluderar flöden (r.331), anropar varje byggare med fixturer per skiva/roll/refrozen; raderna `f4_produced_prompts_of_roadmap_…` (r.1459) och `f4_produced_prompts_free_of_…` (r.1476); AST-raden kvar som komplement (r.1437) |
+| N2 `PLAN_GENERATION=` obunden | selftest-raden kräver exakt `^PLAN_GENERATION=<modulens värde>$` (r.1552–1554) |
+| N3 död EFTERARBETE-gren | svansgrenen först i `scannable_text` (r.1010); f6-svansskanning med `OLD_PLAN_TOKENS + COMMIT_READ_TOKENS` (r.1601) |
+| N5 planen ej i `PLATFORM_DOCUMENTS` | `f3_verify_cli_pins_…_and_the_plan_generation` kräver plan + handoff pinnade med sha256 (r.1327–1333) |
+| N6 svaga routerankare | Auktoritetsordningens planpunkt måste bära handoffen, `plangeneration`, `aktiv`; Historik måste bära `historia/historisk` och den nya planens sökväg (r.1172–1173) |
+| N7 p.4 vs p.8 | Produktyta för BUILDER: v3.1-förtydligande (p.1/4/5/6/7 utförda i 320c9df7; v3-ytan är p.2/3/5b/5c) |
+| N1, N4 | behållna, dokumenterade som gräns (etikett utan pekare; `effect authority`-paret) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.1 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.1 + dokument (fixtur-HEAD `7e9f2d2e`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **67 PASS / 30 FAIL**
+(97 rader), result.json sha256 `3d623223ed814e02c01a9cfcd7dccd1ea3b6b34a0d7036d6ee7467ca3ba3fd32`. Röda rader: v3:s 26 plus (v3.1) empirical-runner-skillen
+(`frozen autonomous-loop plan commit`), `f3_verify_cli_pins_…` (planen ej pinnad) och de två producerade-prompt-raderna
+(planen saknas i levande prompter; gamla planen injiceras) — alla av rätt skäl. F7 oförändrat: control-set 68/68
+(`04c02fc4…`), launch-cwd 19/20 med exakt två extra grindar (`40827abe…`), governance 68/70 exakt {g6, g7} (`4444aab8…`);
+loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.1 (scratch, förkastad)
+Som v3-referensen plus: SUB-grenarna i `slice_authority_text`/`slice_builder_extra` namnger plan och handoff;
+`controller/verify/cli` `PLATFORM_DOCUMENTS` pinnar plan (`6513b845…`) och handoff (`9d1c7b2e…`) med sha256. Fixtur-HEAD
+`65efe37b`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **97/97**,
+result.json sha256 `1e5d148b78ecfb6012068ad3cf5a3c68429b42a5a6fb15adba0e60e322577261`; control-set 68/68 (`95106b51…`), launch-cwd 19/20 (`e664078e…`), governance 68/70 exakt
+{g6, g7} (`64f8cf59…`), loopsvit 53 ok / 0 FEL; 15 byggare / 101 producerade texter / 1 flöde; producerad dokumentmängd =
+krävd ∪ {regler, byggplan, drift, owner-h003}.
+
+### F9 v3.1 — negativer (var och en i egen replika av v3.1-referensen, statiskt `--skip-held-gates`; 26 körda,
+26 fångade, 0 riggfel)
+De 19 från v3 fångas på samma rader som förut (planändrande mutanter dessutom på de två producerade-prompt-raderna där
+prompterna påverkas). Granskarens: (a02) moduldict → `f4_produced_prompts_free_of_…` (odeklarerat dokument i producerad prompt; AST-raden grön — därför komplement); (a04) 12-hex i AGENTS Historik, ompinnad → AGENTS-dokumentraden + trädvid (B1-token); (a10) `str.format` → `f4_produced_prompts_free_of_…`; (a11) literal `PLAN_GENERATION=platform-v1-legacy` → selftest-raden (N2); (a13) builder-skill `git show <PLAN_SHA>:` → builder-skillens dokumentrad + trädvid (B2); (a23) planen bara i död funktion → `f4_produced_prompts_of_roadmap_…` (AST-raden grön — därför komplement); (a28) EFTERARBETE-svans med gamla planfilen → `f6_efterarbete_…` + trädvid (N3). Alla 26: exit 1, inget riggfel, 0 missade.
+
+### Oberoende kontraktsgranskning nr 6 (på af584e71) → v3.2
+`GATE_REVIEW_RESULT=NOT_READY`: B1 (öppen värld i promptmätningen: självdeklarerat flöde via dött `journal`-namn; död krävd
+byggare + levande tvilling), B2 (skivtabellen = första rubrikträffen, även i HTML-kommentar) + N1–N9. Remediering v3.2 (grind
+sha256 `c391eebb26c72a0f0df0b72db73432bb5041266388432f1b8a67e1a06969b6ca`, 2009 rader, 105 rader i körning; commit `9d2ef894`):
+
+| Fynd | Åtgärd i grinden (rad i v3.2) |
+|---|---|
+| B1 öppen värld | `EXPECTED_PROMPT_BUILDERS`/`_FLOWS`/`_CALLERS` (r.220–232); flöden via signatur enbart (DRIVER r.350); `prompt_world` (r.609–735): producenter, byggarreferenter, runner-promptkällor (rekursiv klassificering), nåbarhet från `main`; raden `f4_prompt_builders_flows_and_callers_…` (r.1704); kanari `canary_closed_world_…` (r.1105) |
+| B2 dold tabell | `visible_markdown` (r.737) stripar HTML-kommentarer/kodstaket; `parse_slice_table` kräver exakt en tabell (r.743–751); kanarier med två/dold/staket-tabell |
+| N2 handoffens bytes | replika `handoff-mutated` → `f4_ensure_roadmap_plan_stops_on_mutated_handoff` (r.1613) |
+| N3 död pinne | `json_refusal` (r.854); `f3_platform_prepare_refuses_mutated_plan_generation_in_replica` (r.1619), `f3_platform_check_refuses_snapshot_…` (r.1627) |
+| N4 skiftlägestvilling | `f1_tracked_paths_unique_case_insensitively` (r.1155); `CASE_COLLISION` (r.397) tolererar kollisionssmuts i subjekt/replika/overlay (r.1014) → produktrad, inte RIG |
+| N5 inneslutning | fixtur `prompts_root` med HOME/XDG/TMPDIR/cwd/GIT_DIR/proxy (r.1671), `snapshot_tree` (r.867) före/efter subjekt + fixtur → `f4_prompt_builders_run_in_contained_fixture_without_side_effects` (r.1689); slumpat modulnamn (DRIVER r.323) |
+| N8 Historik båda riktningar | `hist_new_active`/`hist_old_history` (r.1370–1371) |
+| N7 substans | `PLAN_REQUIRED_SECTIONS` (r.233) → `f4_plan_generation_has_required_sections_…` (r.1798); dokumentet: substans = skivtabell + krävda avsnitt + token; RECON-kartan vägledning (sha256 bokförd) |
+| N1, N6, N9 | dokumenterade som gränser (fingeravtryck; base64/zwsp/semantik/dubbletter; FIXTURE_ROOT städas av den som kör) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.2 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.2 + dokument (fixtur-HEAD `548731c0`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **71 PASS / 34 FAIL**
+(105 rader), result.json sha256 `f81a788375d2bf886aec4fee19990703a2e1343ed4e507725868a1049e46a83a`. Röda: v3.1:s 30 plus (v3.2) `f4_ensure_roadmap_plan_stops_on_mutated_handoff`
+(positivt ankare saknas), de två cli-effektraderna (planen ej pinnad) och `f4_plan_generation_has_required_sections_…` (planen
+saknas) — alla av rätt skäl; nya gröna på 320c9df7: skiftlägesraden, sidoeffektraden och den slutna-världen-raden (v2.5-produktens
+autopilot har exakt de 15 byggarna, 1 flödet och 8 anroparna; de gamla pekarna fångas av de producerade-prompt-raderna). F7 oförändrat: control-set 68/68 (`c3ffaf23…`), launch-cwd 19/20 med exakt två extra grindar (`aa4c15ca…`),
+governance 68/70 exakt {g6, g7} (`23dfefd2…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.2 (scratch, förkastad)
+Som v3.1 plus avsnitten Syfte/Arbetsflöde/Avslutskriterier i planen. Fixtur-HEAD `a6250fab`, 143 filer. Fullkörning (bypass,
+egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **105/105**, result.json sha256 `bbee9f8ec3d7e7403284c44894557620d4c0506501fa02eb3acefd6ab3743a2b`; control-set 68/68
+(`72c68acc…`), launch-cwd 19/20 (`ad5730ab…`), governance 68/70 exakt {g6, g7} (`026d74be…`), loopsvit 53 ok / 0 FEL; 15
+byggare / 1 flöde / 101 producerade texter / 0 sidoeffekter.
+
+### F9 v3.2 — negativer (var och en i egen replika av v3.2-referensen, statiskt `--skip-held-gates`; 36 körda,
+36 fångade, 0 riggfel)
+De 26 från v3/v3.1 fångas på samma rader (planändrande mutanter dessutom på cli-effektraderna eftersom pinnarna inte
+ompinnades). Granskarens nr 6 och egna varianter: (a_flowoptout) a02 + dött `journal`-namn → `f4_produced_prompts_free_of_…` (byggaren anropas nu; flöden bara via signatur); (a_shadow) död krävd byggare + levande tvilling `architect_prompt_live` → slutna-världen-raden (byggarmängd ≠ 15, runner-prompt från icke-byggare); (a_shadow2, egen) tvilling utan promptnamn, resultat via variabel → slutna-världen-raden (Name → tilldelning → Call till icke-byggare som refererar en byggare); (a_two_tables) kommentardold korrekt + synlig avvikande tabell → skivtabellraden (S2 utan h-030 i den synliga); (a_handoff_exist) handoffens existens i stället för bytes → `f4_ensure_roadmap_plan_stops_on_mutated_handoff`; (a_cli_dead_pin) filtrerad `PLATFORM_DOCUMENTS_LIVE` → båda cli-effektraderna; (a_casevariant) skiftlägestvilling som indexpost → `f1_tracked_paths_unique_case_insensitively`, exit 1 (v3.1: RIG exit 2); (a_sideeffect) byggare skriver $HOME/SIDE-EFFECT-MARKER → sidoeffektraden (filen landar i fixturens HOME); (a_nosections, egen) `## AVSLUTSKRITERIER` borttagen → krävda-avsnitt-raden. Alla 36: exit 1, 0 riggfel, 0 missade. Grindmutanten (h) faller alltjämt på kanarien.
+
+### Oberoende kontraktsgranskning nr 7 (på 6d6f86c3) → v3.3
+`GATE_REVIEW_RESULT=NOT_READY`: B1 (sluten värld över namn men öppen över textkällor: globals-uppslag, parameter-genomsläpp,
+modulmall, klassmetod, runner-alias → levande prompt utan plan), B2 (`ensure_roadmap_plan` bunden som funktion, inte som anropad
+vakt) + N1–N10. Remediering v3.3 (grind sha256 `f83b05c42f93956d99c84cdb7ee63153d21d5c3e3d1aad3ccb97b2ba2a2f1d60`, 2194 rader, 109 rader i körning; commit `9a2644e3`):
+
+| Fynd | Åtgärd i grinden (rad i v3.3) |
+|---|---|
+| B1 textkällor | `prompt_world` fail-closed `classify` (r.656–807): rot = direkt byggaranrop / f-sträng i förväntat flöde / `prompt`-param i runner; alla tilldelningar till ett namn måste ha rot; `IfExp` med rotlös gren, metodanrop utanför `PROMPT_TEXT_METHODS` (r.237), subscript, comprehension, modulnamn, andra funktioner = RÖTT; runner-alias i funktion och på modul-/klassnivå (r.694,712); modul-/klasssvep (markör, inbäddad `docs/`-fil); dynamiskt svep `stray` i DRIVER; nåbarhet via `Call.func`; kanari (r.1228) |
+| B1 dynamisk | DRIVER `live_flows` (r.400–428): stubbad `run_codex`, stubbade worktree/`clean`/`origin_main`; `f4_live_flows_reach_…` (r.1869) |
+| B2 vakten | `EXPECTED_PLAN_GUARD_CALLERS` (r.239) → `f4_ensure_roadmap_plan_called_from_…` (r.1845); `f4_live_flows_stop_before_…` (r.1888) på muterad replika |
+| N1 ref-namn | `COMMIT_READ_TOKENS` + `git show <ref≠HEAD>:` och `refs/preserved/` (r.211); kanari |
+| N2 synlig bootstrap | bootstrapraden läser `visible_markdown` (r.1972) |
+| N3 läsvy-tabell | `parse_slice_table`: slice-liknande tabeller med andra kolumner = fel (r.838); kanari |
+| N4 NFC/NFD | `collision_key` NFC+gemener (r.1109); `core.quotePath=false` i alla Git-anrop (r.912,1118) |
+| N5 handoff-cli | `f3_platform_prepare_refuses_mutated_handoff_in_replica` (r.1748) |
+| N6 sidoeffekter | `snapshot_tree(skip_git=True)` + `snapshot_names` för `/private/tmp`, `/private/tmp/claude`, tempkatalog (r.970, 1808–1818) |
+| N7–N10 | dokumenterade som gränser (formgräns för avsnitt, körtidsläsning, rigiditet, FIXTURE_ROOT-städning) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.3 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.3 + dokument (fixtur-HEAD `9b28692a`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **72 PASS / 37 FAIL**
+(109 rader), result.json sha256 `d4fb0bd071475a65c4fc7233c910ab3324817415e88a6e6d58a0fa55a0982418`. Röda: v3.2:s 34 plus (v3.3) `f3_platform_prepare_refuses_mutated_handoff_…`
+(ingen ny handoff), `f4_live_flows_reach_…` (den levande prompten bär den gamla plancommiten och saknar plan/handoff) och
+`f4_live_flows_stop_before_…` (ingen ny plan att mutera → flödena når runnern) — alla av rätt skäl; nya gröna på 320c9df7:
+slutna-världen-raden och vaktanroparraden (v2.5-produktens autopilot har exakt de förväntade mängderna). F7 oförändrat:
+control-set 68/68 (`897cf465…`), launch-cwd 19/20 med exakt två extra grindar (`4cfa6d16…`), governance 68/70 exakt {g6, g7}
+(`86f6c1ba…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.3 (scratch, förkastad)
+Som v3.2 (ingen produktändring krävdes för v3.3). Fixtur-HEAD `3b4562f6`, 143 filer. Fullkörning (bypass, egen `TMPDIR`):
+exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **109/109**, result.json sha256 `460e703344bb0b0eded1c1afa3fba587330cf4bfaeae5f40b29315026a2711be`; control-set 68/68 (`023c5030…`),
+launch-cwd 19/20 (`243ca000…`), governance 68/70 exakt {g6, g7} (`77d4953a…`), loopsvit 53 ok / 0 FEL; 15 byggare / 1 flöde /
+101 texter / 0 sidoeffekter; live-flöden: 5 fångade prompter med plan+handoff (2569–3660 tecken), muterad replika: 4 stopp
+före runnern.
+
+### F9 v3.3 — negativer (var och en i egen replika av v3.3-referensen, statiskt `--skip-held-gates`; 48 körda,
+48 fångade, 0 riggfel)
+De 36 från v3–v3.2 fångas på samma rader (planändrande mutanter dessutom på `f4_live_flows_reach_…` eftersom pinnarna inte
+ompinnades). Granskarens nr 7: (a_globals_twin) byggaren via `globals()`, död `assert` → slutna-världen-raden (anrop till icke-byggare som rot); (a_param_passthrough) genomsläppt parameter + neutral text → slutna-världen-raden (`IfExp` med rotlös gren, parameter som rot); (a_module_template) modulnivåmall med markör → slutna-världen-raden (stray + modulnamn som textkälla) + `f4_live_flows_reach_…` (levande prompt utan plan); (a_class_twin) klassmetod via modulinstans → slutna-världen-raden (stray, metodanrop) + live-raden; (a_runner_alias) `_rc = run_codex` → slutna-världen-raden (alias på modulnivå) + live-raden; (a_unwired_ensure) tre vaktanrop borttagna → vaktanroparraden + `f4_live_flows_stop_before_…` (flödena når runnern med muterad plan); (a_refname_read) `git show refs/preserved/…:` i arkitektskillen → skillens dokumentrad + trädvid + skillraden (N1); (a_second_table_7col) 7-kolumns läsvy → skivtabellraden (N3); (a_boot_comment) id:n i HTML-kommentar → bootstrapraden (N2); (a_nfd_twin, äkta tvilling med `core.precomposeunicode=false`) → `f1_tracked_paths_unique_…`, exit 1 (N4; den kollapsade enkelposten utan arbetsträdsfil ger riggfel av rätt skäl); (a_cli_skip_handoff) → `f3_platform_prepare_refuses_mutated_handoff_…` (N5); (a_side_abs) skrivning till /private/tmp/claude → sidoeffektraden (N6). Alla 48 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade. Not: 47 negativer kördes mot grinden före den sista quotePath-justeringen (enbart okvoterade icke-ASCII-sökvägar i Git-anrop; ingen ASCII-rad påverkas), a_nfd_twin mot den slutliga.
+
+### Oberoende kontraktsgranskning nr 8 (på 6c984b82) → v3.4
+`GATE_REVIEW_RESULT=NOT_READY`: B1 (effektbindningen slutade vid stubbgränsen och första runner-anropet; `classify` släppte
+omskrivning efter roten och runner via `globals()`), B2 (`run_codex` obunden — prompt ur fil) + N1–N12. Remediering v3.4
+(grind sha256 `0096bd03d1798dd6cd02ef57748a5283b06a1088a748a1b035ad8a3df39d14e3`, 2347 rader, 111 rader i körning; commit `81f39036`):
+
+| Fynd | Åtgärd i grinden (rad i v3.4) |
+|---|---|
+| B1 statiskt | `PROMPT_TEXT_METHODS` = trimningar utan argument (r.237); `BinOp` bara `Add`, två rötter förbjudna (r.832); metodanrop med argument RÖTT (r.851); dynamiska uppslag utanför `DYNAMIC_LOOKUP_FUNCTIONS` och runnernamn i strängkonstanter utanför `selftest` (r.793–799, modulsvep r.765); kanari med rewrite/mult/lookup/trim (r.1331) |
+| B1 dynamiskt | DRIVER `live_flows` med syntetisk READY-`AgentRun`, tillståndsstyrda `run_gate`/`run_empirical_gate`, `LIVE_STUB_NAMES`/`LIVE_REQUIRED_ATTRS` (r.265–270, DRIVER r.442–500); tio flöden, `LIVE_MIN_CAPTURES`, `LIVE_PLAN_ROLES` (r.273–286); raden `f4_live_flows_run_to_completion_…` (r.1986) |
+| B2 mätpunkten | `RUNNER_MACHINERY_AST_SHA256` (r.247–254), `ast_identities` (r.878) → `f4_runner_machinery_ast_identical_to_320c9df7_…` (r.2012) |
+| N sidoeffekt-prefix | `snapshot_names` med (storlek, mtime) för filer, `SIDE_EFFECT_DIRS` inkl. `/private/tmp/claude-501` och tempkatalogens förälder, undantag exakt `scratch.name` (r.1061, 1917) |
+| N handoff-substans | `HANDOFF_REQUIRED_SECTIONS` (r.256) → `f4_handoff_has_required_sections_…` (r.2131) |
+| N ROADMAP-ordning | radordning == autopilotens, `ROADMAP[0]==S2`, topologisk konsistens (r.2087–2098) |
+| N1/N5/N6/N8–N12 | dokumenterade som gränser (andra providersamtal efter första anropet, byggarargument, fingeravtryck, döda grenar i läskommandon, rigiditet, FIXTURE_ROOT) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.4 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.4 + dokument (fixtur-HEAD `9431a733`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **73 PASS / 38 FAIL**
+(111 rader), result.json sha256 `c1cbeff0889538b4fdef646f6db51ad87b1ff95f03e6e8ed502a824c2714c7b5`. Röda: v3.3:s 37 plus (v3.4) handoff-avsnittsraden (ingen ny handoff); de
+två live-raderna kvarstår röda av rätt skäl (BUILDER-/TEST_AUTHOR-prompterna i alla tio flöden bär den gamla plancommiten och
+saknar plan/handoff; utan ny plan stoppar de vaktbärande flödena inte); gröna nya: `f4_runner_machinery_ast_…` (320c9df7 är
+baslinjen) och slutna-världen-raden. F7 oförändrat: control-set 68/68 (`b61a5318…`), launch-cwd 19/20 med exakt två extra
+grindar (`0007a474…`), governance 68/70 exakt {g6, g7} (`d97442dd…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.4 (scratch, förkastad)
+Som v3.3 plus handoffavsnitten Syfte/Låsta värden (pinnar)/Stoppregler/Startordning/Avslutskriterier (ingen autopilotändring).
+Fixtur-HEAD `c74f9d14`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**111/111**, result.json sha256 `0fb237d9d07b2161eb011eb62d2e4f5a2ef717f1cf8f574d03fd708c13f7e19f`; control-set 68/68 (`29b3d358…`), launch-cwd 19/20 (`e709d43a…`),
+governance 68/70 exakt {g6, g7} (`072a16b8…`), loopsvit 53 ok / 0 FEL; live-flöden: 10 flöden till slut, 49 fångade
+prompter (full_roadmap 33), muterad replika 4 stopp; runner-maskineriets AST identisk med 320c9df7.
+
+### F9 v3.4 — negativer (var och en i egen replika av v3.4-referensen, statiskt `--skip-held-gates`; 55 körda,
+55 fångade, 0 riggfel)
+De 48 från v3–v3.3 fångas på samma rader (v3.3:s B1-varianter dessutom på den nya live-raden). Granskarens nr 8: (a_replace_rewrite_builder) `.replace` efter byggarroten i `builder_flow` → slutna-världen-raden (metodanrop med argument) + live-raden (levande BUILDER-prompt pekar på gamla planen); (a_replace_self_builder) `x.replace(x, extra)` → slutna-världen + live; (a_mult_zero_builder) `* 0 + extra` → slutna-världen (operator Mult) + live; (a_globals_runner_builder) runner via `globals()["run_codex_"+…]` → slutna-världen (dynamiskt uppslag + runnernamn i sträng) + live; (a_prompt_file_runner) runnern läser prompten ur `wt/.architect-prompt` → `f4_runner_machinery_ast_identical_to_320c9df7_…`; (a_side_prefix_exempt) skrivning till `/private/tmp/claude-501/platform-separation-final-…` → sidoeffektraden (exakt FIXTURE_ROOT-namn undantaget; `/private/tmp/claude-501` ingår); (a_side_abs) omkörd efter att den kvarlämnade v3.3-markören tagits bort → sidoeffektraden (överskriven fil mäts via mtime); (a_roadmap_reorder) S4 före S2 i ROADMAP + selftestordning → skivtabellraden (ordning ≠ autopilot, ROADMAP[0] ≠ S2); (a_handoff_empty) handoff = en rubrik → handoff-avsnittsraden. Alla 55 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade. Not: de 53 första negativerna kördes mot grinden före den sista sidoeffektsvepsjusteringen (påverkar bara sidoeffektraden), a_side_abs/a_side_prefix_exempt mot den slutliga.
+
+### Oberoende kontraktsgranskning nr 9 (på d8d405f5) → v3.5
+`GATE_REVIEW_RESULT=NOT_READY` med EN blockerare: B1 — providergränsen efter `run_codex` var öppen på tre seams
+(`subprocess.Popen` skuggad på autopilotens modulnivå; samma skuggning i `controller/authority/core.py` som importeras vid start;
+`controller/launch/cli` som skriver om provider-argv — den sista fångades inte heller av den hållna launch-cwd-grinden, mätt).
+Remediering v3.5 (grind sha256 `56a37d665b37920473e4246f16921f03c85bca7343e31ea835580e990456a631`, 2542 rader, 116 rader i körning; commit `749bc3b6`):
+
+| Fynd | Åtgärd i grinden (rad i v3.5) |
+|---|---|
+| B1 modulnivå | `module_level_form` (r.889–923) + `EXEC_SURFACE_ATTRS`/`MODULE_LEVEL_EXCEPTIONS` (r.256–266); dynamisk Popen-identitet i DRIVER (r.305–307) → `f4_autopilot_module_level_is_the_declared_form_…` (r.1960) |
+| B1 beroenden | `RUNNER_DEPENDENCY_BLOBS` (r.268–275) → `f4_runner_dependencies_authority_and_launch_byte_identical_to_320c9df7` (r.1967) |
+| B1 argv-plats | `f4_provider_argv_built_and_started_in_exactly_one_place_inside_run_codex` (r.1985) |
+| B1 dynamisk | Popen-inspelning i `live_flows` (r.478–486) → `f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects` (r.2166) |
+| N1 remedieringsgrenar | tillståndsstyrd stub: första svaret per (flöde, roll) NEEDS_REMEDIATION för REVIEWER/GATE_REVIEWER (+ EMPIRICAL i det fristående flödet) (r.494–503); minima 1/4/4/4/4/4/4/4/7/37 (r.300); ARCHITECT/BUILDER krävda i det empiriska flödet (r.303) |
+| N2 miljöstyrd sökväg | `literal_constant_assignments` (r.926–946) → `f4_plan_constants_are_single_literal_assignments_…` (r.2040) |
+| N3 ROADMAP-konkatenering | `substitution_codes`/`roadmap_codes` i DRIVER (r.421–423), krav i samma rad |
+| N4 osvept live | sidoeffektsvep runt `live_flows` (r.2100–2108) |
+| N5–N10 | dokumenterade som gränser (TASK=-kopplingen, delat svepfönster, fingeravtryck, andra providersamtal utan processtart) |
+
+Produktytan växte med v3.5: `remediation_prompt` (BUILDER och TEST_AUTHOR) och den inlinade L-remedieringen måste namnge plan +
+handoff, eftersom remedieringsgrenarna nu körs live.
+
+### Test-author 2026-09-11 — baslinje RED för v3.5 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.5 + dokument (fixtur-HEAD `ea0a7887`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **77 PASS / 39 FAIL**
+(116 rader), result.json sha256 `6de924fcd44b2f36c50afec4f6a4f4b381e2fc3f2b2cc125696309c57f1e28fa`. Röda: v3.4:s 38 plus `f4_plan_constants_…` (ingen `PLAN_GENERATION` vid
+320c9df7) — alla av rätt skäl; nya gröna på 320c9df7: modulnivåformen, beroendeblobbarna, argv-platsen och
+live-providerstarterna (320c9df7 är baslinjen för alla fyra). F7 oförändrat: control-set 68/68 (`f49a93e3…`), launch-cwd 19/20
+med exakt två extra grindar (`7b145fba…`), governance 68/70 exakt {g6, g7} (`ed43e250…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.5 (scratch, förkastad)
+Som v3.4 plus plan + handoff i `remediation_prompt` (båda rollerna), i `builder_prompt` och i den inlinade L-remedieringen
+(remedieringsgrenarna körs nu live). Fixtur-HEAD `6d081062`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**,
+`PASS_LOCAL_QUALIFICATION_ONLY`, **116/116**, result.json sha256 `9add2f4b26d55b1ccb560ec266ebb5af67a076e7a20f0a107a478d5677c464fe`; control-set 68/68 (`62c71572…`), launch-cwd 19/20
+(`9b78ec46…`), governance 68/70 exakt {g6, g7} (`4135d6ff…`), loopsvit 53 ok / 0 FEL; live-flöden 10 till slut med
+1/4/4/4/4/4/4/4/7/37 fångade prompter (73 totalt), 0 providerstarter av 59 inspelade Popen-anrop, 0 sidoeffekter;
+runner-maskineriets AST och de fyra beroendeblobbarna identiska med 320c9df7.
+
+### F9 v3.5 — negativer (var och en i egen replika av v3.5-referensen, statiskt `--skip-held-gates`; 63 körda,
+63 fångade, 0 riggfel)
+De 55 från v3–v3.4 fångas på samma rader (B1-varianterna från v8 dessutom på live-raden). Granskarens nr 9: (a9_popen_shadow) `subprocess.Popen` skuggad på autopilotens modulnivå → modulnivåformen (attributmål + exec-ytsbindning), argv-platsraden och live-providerraden (Popen-identiteten); (a9_core_import_shadow) samma skuggning i `controller/authority/core.py` → modulnivåraden (dynamisk Popen-identitet efter import), beroendeblobraden och live-providerraden; (a9_launcher_rewrite) `controller/launch/cli` skriver om provider-argv → beroendeblobraden (F7:s launch-cwd ger fortfarande identisk 19/20, därför blobbindningen); (a9_env_plan_path2) andra, miljöstyrd tilldelning av plan-/handoffsökväg → plankonstantraden; (a9_sub_into_roadmap) `SUBSTITUTION_ROADMAP=()` med skivorna först i `ROADMAP` → plankonstantraden + selftestraden; (a9_policy_item_assign) `AUTOPILOT_ROLE_POLICY["BUILDER"]=…` efter literalen → modulnivåformen (subscriptmål); (a9_remediation_no_plan) remedierings-BUILDER-prompten slutar namnge planen → live-raden (remedieringsgrenen körs nu); (a9_flow_side_effect) hjälpare i `roadmap_contract_flow` skriver `/private/tmp/claude/v35-flow-marker` → live-sidoeffektraden. Alla 63 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade.
+
+### Oberoende kontraktsgranskning nr 10 (på 61426e1c) → v3.6
+`GATE_REVIEW_RESULT=NOT_READY` med en blockerare: B1 — providergränsen var bunden vid MODULNIVÅ och vid IMPORTÖGONBLICKET,
+inte i funktions- och klasskroppar (`a10_func_popen_shadow`: tre rader i `journal()` som byter ut `subprocess.Popen` var
+111/116 grön medan providern i drift fick neutral text och grindens egen inspelare avinstallerades; `a10_class_body_exec`:
+klasskropp som ändrar `AUTOPILOT_ROLE_POLICY` vid import). Remediering v3.6 (grind sha256 `8a26e60f417784254122d656cf20ce46c73934a1051938178368ba387665a223`, 2758 rader,
+117 rader i körning; commit `7e0eb95a`):
+
+| Fynd | Åtgärd i grinden (rad i v3.6) |
+|---|---|
+| B1 hela filen | `exec_surface_assignments` (r.989–1050): attributmål i exec-ytan/exec-modul, `sys.modules`/`globals()`-skrivning, subscript på modulnivånamn, `setattr` — var som helst i filen; vitlista `sys.dont_write_bytecode` (r.265) |
+| B1 klasskroppar | `check_class` i `module_level_form` (r.1053–1063) |
+| B1 identitet efter flödena | `popen_identity_after` i DRIVERn (r.602–606) + kravet i live-providerraden (r.2384) |
+| B1 flera primitiver/markörer | `EXEC_PRIMITIVES` (r.280–281), `PROVIDER_SHAPE_ELEMENTS`/`_BINARY_TOKENS` (r.275–276), `ALLOWED_LIVE_BINARIES`/`ALLOWED_LIVE_PRIMITIVES` fail-closed mot mätningen (r.277–278) |
+| B1(b)/N8 sju konstanter | `RUNTIME_CONSTANT_KEYS` + `literal_dict_with_path_keys` (r.303–306, 1129) |
+| N1 andra startprimitiver | `os.posix_spawn/execv*/spawnv*/system` instrumenterade och identitetsmätta (r.280–281) |
+| N3 AUTHORITY_LIB | AST-identitet + `core_module_file` under `controller/authority/` (r.269–270) |
+| N4 remedieringens identitet | `LIVE_REMEDIATION_FLOWS`/`LIVE_FINDING_ID` (r.336–339) |
+| N5 vakt mot kopia | `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together` (r.2150–2166) |
+| N6 falskt rött | modulnivåns värderegel begränsad till exec-modulattribut (verifierat: `X = Y.copy()` grön) |
+| N7 härledd sökväg | modulnivåkonstant får inte sätta ihop en `docs/…`-sökväg av fragment (r.1083–1087) |
+| p.8-kostnad | de fyra blobpinnarnas falskt-rött-kostnad (h-035–h-038-refreeze) inskriven i "Inte rörs" |
+
+### Test-author 2026-09-11 — baslinje RED för v3.6 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.6 + dokument (fixtur-HEAD `3d554938`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **76 PASS / 41 FAIL**
+(117 rader), result.json sha256 `a3fcb2cebe1fdfb366aff9a85a964bbe0d253ea36824455705f09bfe225079bb`.
+**RÄTTELSE (v3.7, granskning nr 11 N1):** siffran 76/41 är inte reproducerbar. Granskare nr 11 mätte v3.6-grinden
+statiskt på en ren `320c9df7`-replika till **72/45** och v3.5-grinden på samma replika till 72/44 med exakt en tillagd
+röd rad; eftersom `--skip-held-gates` påverkar precis fem rader borde fullkörningen ha gett **77 PASS / 40 FAIL**, vilket
+också är vad prosan nedan räknar upp ("v3.5:s 39 plus …"). Felet låg i RED-fixturen, inte i grinden: den byggdes genom att
+stapla `LOCAL fixture: gate v3.x`-commits på varandra i stället för att klonas om från `320c9df7`. Från v3.7 byggs
+RED-repliken om från grunden vid varje mätning (klon → `checkout --detach 320c9df7` → grind + dokument → en commit) och
+radlistan redovisas, inte bara summan. Röda: v3.5:s 39 plus `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy…`
+(inget positivt ankare utan plangeneration) — alla av rätt skäl; de övriga nya raderna är gröna på 320c9df7 (baslinjen är
+deras definition). F7 oförändrat: control-set 68/68 (`54f190c7…`), launch-cwd 19/20 med exakt två extra grindar (`947f8ebe…`),
+governance 68/70 exakt {g6, g7} (`b57072ac…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.6 (scratch, förkastad)
+Oförändrad produkt jämfört med v3.5 (ingen produktändring krävdes — granskningen mätte satisfierbarheten i förväg).
+Fixtur-HEAD `291e1941`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**117/117**, result.json sha256 `575ee34c119ac1abf19ef4ecd90a6dbc4402b00ba2045aaafa1bdb4ad5aa64ee`; control-set 68/68 (`5faf485e…`), launch-cwd 19/20 (`e277b1fb…`),
+governance 68/70 exakt {g6, g7} (`4dca90b7…`), loopsvit 53 ok / 0 FEL; live-flöden 10 till slut med fångstprofilen
+1/4/4/4/4/4/4/4/7/37, startprimitiver subprocess.Popen, binärer git, identitet efter flödena True, 0 providerstarter,
+0 sidoeffekter; `core`-modulen importerad ur `controller/authority/core.py`.
+
+### F9 v3.6 — negativer (var och en i egen replika av v3.6-referensen, statiskt `--skip-held-gates`; 69 körda,
+69 fångade, 0 riggfel) + ett falskt-rött-prov som förblir grönt
+De 63 från v3–v3.5 fångas på samma rader (v9:s `a9_popen_shadow`/`a9_policy_item_assign` faller nu dessutom på den
+utvidgade exec-ytsregeln). Granskarens nr 10: (a10_func_popen_shadow) `subprocess.Popen` bytt ut från `journal()`-kroppen → exec-ytsregeln över hela filen + live-providerraden (inspelaren avinstallerad, identitet efter flödena falsk); (a10_class_body_exec) klasskropp som sätter `AUTOPILOT_ROLE_POLICY['BUILDER']` vid import → klasskroppsformen/exec-ytsregeln + plankonstantraden (körtidsvärde ≠ literal); (a10_os_posix_spawn) providerstart via `os.posix_spawn` → live-providerraden (okänd primitiv och okänd binär); (a10_authority_lib_benign) `AUTHORITY_LIB` ompekad till en opinnad `core.py` → modulnivåraden (AST-identitet + importerad core-fil); (a10_guard_copy_in_docs) vakten jämför mot spårad kopia → den nya kopieringsmutationsraden; (a10_indirect_plan_constant) `PLAN_DOC = "docs/loop/" + "…"` → modulnivåraden (hopsatt dokumentsökväg). Falskt-rött-provet (a10_legit_module_copy, `ROLE_POLICY_VIEW = AUTOPILOT_ROLE_POLICY.copy()`) förblir GRÖNT (112/5 = enbart sandboxraderna). Alla 69 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade.
+
+### Oberoende kontraktsgranskning nr 11 (på 50956fa7) → v3.7
+`GATE_REVIEW_RESULT=NOT_READY` med TVÅ blockerare. **B1:** providergränsen var bunden VID `subprocess.Popen` och de nio
+primitiverna, inte UNDER dem — `class _Boot: POPEN = subprocess.Popen` (tillåten `Assign` till `Name` i en klasskropp)
+fångade den riktiga Popen-KLASSEN vid import och tre rader i `journal()` bytte ut `_Boot.POPEN._execute_child`;
+attributnamnet låg utanför `EXEC_SURFACE_ATTRS` och basen var ett `Attribute`, så mutanten var **112/5 — identisk med
+referensen**, med `popen_identity`/`popen_identity_after` båda `True` och `popen_total` oförändrat, medan barnprocessen
+faktiskt tog emot "Do the task the orchestrator names. Report per the schema.". **B2 (regression jag införde i v3.6):**
+token-svepet över levande prompter hamnade genom en indenteringsmiss inne i FIXTURE-1-grenen och utanför loopen över
+`caps` — det kördes aldrig på en grön produkt, och när det kördes bara på den `p` som råkade vara kvar från förra
+iterationen; `architect_resolution` och `empirical_unattended_flow` sveptes aldrig. Remediering v3.7:
+
+| Fynd | Åtgärd i grinden (v3.7) |
+|---|---|
+| B1(a) exec-alias på djupet | `exec_surface_assignments`: transitiv aliasmängd (namn/klassattribut/instansattribut bundna från `subprocess.<exec>`/`os.<exec>`, från ett spårat alias, från ett attribut på ett sådant, eller från ett anrop av ett sådant) + rött för varje tilldelning vars mål är ett attribut PÅ ett alias eller vars kedja passerar ett exec-modul-/exec-ytsnamn |
+| B1(b) interna attribut | `FORBIDDEN_ATTR_TARGETS` = `_execute_child`, `__init__`, `__call__`, `__new__`, `__get__`, `__getattribute__`, `__subclasshook__`, `_posixsubprocess`, `_communicate`, `_get_handles` — rött på VAD SOM HELST, alias eller inte; samma namnkontroll på `setattr(obj, "<namn>", …)` |
+| B1(a′) default-/dekoratorfångst | `exec_surface_assignments` fäller ett exec-objekt bundet som **defaultargument** eller skickat till en **dekorator** — båda evalueras vid import, före varje inspelare. **KOSTNAD (granskning nr 13 N3):** `def f(cmd, _r=subprocess.run)` är ett vanligt legitimt idiom och blir RÖTT; det undantas inte, eftersom `subprocess.run` ligger i exec-ytan och ett undantag skulle återöppna v12:s B1 |
+| B1(b′) klasskroppens värden | `check_class` kräver literalt material i klasskroppens `Assign` (mätt: baslinjens fem klasskroppar bär inga `Assign` alls) — fäller `POPEN = subprocess.Popen` och granskningens N2 |
+| B1(c) mät det som når barnet | DRIVERn fångar `subprocess.Popen`, `Popen._execute_child` och `Popen.__init__` **före** modulladdning (även de nio primitiverna, som i v3.6 fångades efter och därmed jämfördes mot sig själva), mäter identitet vid import och efter flödena, installerar en inspelare på `_execute_child` och rapporterar `child_total`, `child_binaries`, `child_argv_rewritten` och `child_starts_unexpected` |
+| B1(c′) starter under inspelaren | live-providerraden kräver `child_total == popen_total` (en start genom en klasskroppsfångad Popen syns bara på barnnivån) och att ingen argv skrivits om mellan Popen och barnet |
+| B2 indentering + kanari | svepet tillbaka i `for i, c in enumerate(caps)`; FIXTURE-1-kravet står kvar som egen sats. Tio separata kanarier, en per flöde |
+| N2 klasskroppsfångad Popen | stängd av B1(b′) statiskt och av `child_total != popen_total` dynamiskt |
+| N3 subscript-basen | `x.__dict__[…]`, `vars(x)[…]`, `globals(  )[…]` och alias-baser fälls nu (regelns text höll inte vad den lovade) |
+| N4 kopieringsraden vakuös | mutationen körs i en egen replika och uppdaterar VARJE spårat ankare till den muterade planen (byte-kopior skrivs om; planens sha256 och blob-OID ersätts där de står som text, med filens egen mode), och ankarantalet redovisas i radens detalj; dessutom en ny rad `f4_ensure_roadmap_plan_reads_the_pinned_plan_blobs_measured_by_repinning_them_in_the_imported_module` som ompinnar `ROADMAP_PLAN_BLOBS` i den importerade modulen och kräver `Stop` på en OMUTERAD replika |
+| N8 sidoeffektsvepets blinda fläckar | `snapshot_git_meta` (subjektets `.git/`: refs, hooks, config, HEAD, toppnivåposter) + `snapshot_fixture` (grindens `FIXTURE_ROOT` rekursivt, minus live-repliken och drivrutinens `TMPDIR`) |
+| N9 falskt rött (mätt 2×) | `ALLOWED_LIVE_BINARIES` = `{git, env, sh, python3.12}`; kostnaden inskriven i p.8 tillsammans med blobpinnarna |
+| N1 RED-protokollet | RED-repliken byggs om från grunden vid varje mätning; rättelsen inskriven ovan |
+| N10(b)(c) osanna meningar | kriterietexten för live-raden och FIXTURE-1-kravet omskriven till vad som faktiskt mäts |
+
+### Test-author 2026-09-11 — baslinje RED för v3.7 (före produkt)
+Subjekt: **omklonad** replika av `320c9df7` (`git clone --no-checkout` → `checkout --detach 320c9df7` → grind v3.7 +
+utvecklingsdokument → **en** commit; fixtur-HEAD `8813fc65`) — inga staplade fixturcommits, till skillnad från v3.6
+(N1). Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **72 PASS / 46 FAIL** av **118 rader**. Fullkörning
+(bypass, egen `TMPDIR`, hållna grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`,
+**77 PASS / 41 FAIL**, result.json sha256 `0313a2ea398528dd94c8f1c4d6043aa50ba8fe64ceb0432edab5cc1bc1168a5e`.
+Delta statisk → full är exakt de fem sandboxraderna (`f5_loop_fall_py_green_in_replica`, de tre `f7_`-raderna,
+`f8_ordinary_loop_e2e…`), precis som granskning nr 11 räknade. De 41 röda raderna:
+
+`f1_required_absences_web_material_and_transferred_files`, `f1_no_blob_at_head_equals_a_transferred_pre_split_governance_or_pre_platform_plan_object`,
+`f2_closure_all_active_references_resolve_to_tracked_files`, `f2_active_doc_free_of_web_governance_and_human_hand_rules_*` (8 dokument:
+architect-SKILL, empirical-runner-SKILL, AGENTS.md, README.md, codex-handoff, autonomous-loop-plan-v1, full-roadmap, substitution-contract),
+`f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents`, `f2_tree_wide_no_web_governance_reference_outside_frozen_evidence`,
+`f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history`,
+`f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit`,
+`f2_substitution_contract_sections_1_5_7_11_13_unchanged_dated_amendment_and_plan_generation_amendment_present`,
+`f2_drift_md_append_only_whole_tail_scanned_with_active_platform_note_naming_plan_generation`,
+`f3_verify_cli_pins_equal_candidate_spec_register_every_generation_document_and_the_plan_generation`,
+`f3_platform_prepare_refuses_mutated_plan_generation_in_replica`, `f3_platform_prepare_refuses_mutated_handoff_in_replica`,
+`f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare`,
+`f4_plan_generation_files_tracked_100644_and_autopilot_paths_and_blobs_equal_head`,
+`f4_autopilot_has_plan_generation_constant_and_no_roadmap_plan_sha_attribute`,
+`f4_plan_constants_are_single_literal_assignments_equal_at_runtime_and_the_two_roadmap_tuples_keep_their_identities`,
+`f4_ensure_roadmap_plan_stops_on_mutated_plan_generation`, `f4_ensure_roadmap_plan_stops_on_missing_handoff`,
+`f4_ensure_roadmap_plan_stops_on_mutated_handoff`, `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together`,
+`f4_ensure_roadmap_plan_reads_the_pinned_plan_blobs_measured_by_repinning_them_in_the_imported_module` (ny i v3.7),
+`f4_autopilot_source_free_of_old_plan_commit_git_show_by_commit_and_plan_sha`,
+`f4_prompt_functions_ast_literals_inject_only_the_declared_platform_document_set_all_tracked_and_scanned`,
+`f4_live_flows_run_to_completion_…_and_free_of_old_pointers`, `f4_live_flows_stop_before_the_stubbed_runner_on_mutated_plan_generation`,
+`f4_produced_prompts_of_roadmap_empirical_and_architect_builders_…`, `f4_produced_prompts_free_of_old_plan_pointers_…`,
+`f4_plan_generation_slice_table_equals_autopilot_roadmap_tuples_and_selftest_exact_sets`,
+`f4_plan_generation_bootstrap_section_names_h031_to_h039_as_platform_establishment`,
+`f4_plan_generation_has_required_sections_…`, `f4_handoff_has_required_sections_…`,
+`f4_architect_and_empirical_runner_skills_name_plan_generation_and_no_plan_commit`,
+`f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha`.
+
+Alla röda av rätt skäl (plangenerationen finns inte på `320c9df7`). Ingen av v3.7:s nya statiska regler är röd på
+baslinjen: den transitiva aliasmängden är `{p, r, rc, sub}` (alla resultat av `subprocess.run`/`Popen`, ingen skrivs
+till), filen har tre attributmål (`sys.dont_write_bytecode` vitlistad, `self.task_id`, `self.reason`), noll
+dunder-/internattributmål, noll `setattr` och noll `Assign` i klasskroppar. F7 oförändrat: control-set 68/68,
+launch-cwd 19/20 med exakt två extra grindar, governance 68/70 exakt `{g6, g7}`; loopsviten 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.7 (scratch, förkastad — bevisar satisfierbarhet)
+Oförändrad produkt jämfört med v3.5/v3.6: **ingen produktändring krävdes** utöver v3.5:s. Fixtur-HEAD `81b570de`,
+143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **118/118**, result.json
+sha256 `3c6f8f5ad5f76552f83f68b84fd239f0c7a7c24c029e2fb759c40f9b566c5b65`; control-set 68/68, launch-cwd 19/20,
+governance 68/70 exakt `{g6, g7}`, loopsviten 53 ok / 0 FEL. Live-flöden: tio till slut med fångstprofilen
+1/4/4/4/4/4/4/4/7/37, `popen_total = child_total = 333`, `provider_starts = 0`, startprimitiver `['subprocess.Popen']`,
+binärer `['git']` på både Popen- och barnnivå, `child_argv_rewritten = []`, `child_starts_unexpected = []`,
+`popen_identity = popen_identity_after = True`, `live_side_effects = []` (nu inklusive subjektets `.git/` och
+`FIXTURE_ROOT` rekursivt); `core`-modulen importerad ur `controller/authority/core.py`.
+
+**RÄTTELSE (v3.8, granskning nr 12 N1) till både v3.6- och v3.7-protokollet.** Skillnaden mellan v3.6-protokollets
+`popen_total = 59` och v3.7-protokollets `333` var **varken fixturen eller en ändrad räknare** — det var ett
+rapporteringsfel i grinden: den muterade live-körningen tilldelades tillbaka till `live_out`, och det var den
+överskrivna variabeln som serialiserades under `live_*` i `result.json`, medan radernas detaljer kom från den gröna
+körningen. v3.6:s 59 är alltså den MUTERADE körningen (där de fyra vaktbärande flödena stoppar) och v3.7:s 333 den
+gröna — i samma körning. Min förklaring "fixturen, inte grinden" var fel i sak. Från v3.8 serialiseras den gröna
+körningen under `live_*` (med `live_child_total`, `live_child_binaries`, `live_child_argv_rewritten`,
+`live_child_unrecorded`, `live_import_time_starts`, `live_allowed_tools`, `live_allowed_wrappers`) och den muterade
+under `live_mutated_*`; mätt på v3.8-referensen: `live_popen_total = 333`, `live_mutated_popen_total = 59`. Den nya vaktraden stoppar med
+`roadmap artifact identity mismatch … expected=000000000000000000000000000000000000000f`, dvs. vakten läser bevisligen
+`ROADMAP_PLAN_BLOBS`; ankarraden redovisar `anchors=2` (`controller/verify/cli`, autopiloten).
+
+### F9 v3.7 — negativer (var och en i egen replika av v3.7-referensen, statiskt `--skip-held-gates`; **84 körda,
+84 fångade, 0 riggfel**) + **tre** falskt-röda prov som förblir gröna
+De 69 från v3–v3.6 (inklusive grindmutanten `h`) fångas på samma rader som förut; `a10_guard_copy_in_docs` faller nu
+dessutom på den nya ompinningsraden. Nya i v3.7 (15):
+
+| Negativ | Fälls av |
+|---|---|
+| `a11_execute_child_shadow` (granskning nr 11 B1, ordagrant återbyggd) | modul-/klasskroppsraden med **två** oberoende anmärkningar — `line 73: class body _Boot binds non-literal subprocess.Popen` och `line 342: assignment to internal attribute _Boot.POPEN._execute_child` — samt live-providerraden (`the recorder is no longer installed`) |
+| `a11_class_orig_capture2` (N2) | klasskroppsraden statiskt; dynamiskt `child starts 352 != recorded Popen starts 333` + `argv rewritten between Popen and the child: /usr/bin/true exec --json neutral task text` + `the child process received an unexpected argv: true:…` |
+| `a11_guard_digest_copy` (N4) | både `…stops_when_the_plan_and_every_tracked_copy_are_mutated_together` (ankare = 3: `config/plan-digests.json`, `controller/verify/cli`, autopiloten) och `…reads_the_pinned_plan_blobs_measured_by_repinning…` |
+| `a11_side_subject_git` (N8) | `side effect during live flows: subject/.git:entry:v37-subject-git-marker` |
+| `a11_side_fixture_root` (N8) | `side effect during live flows: fixture:v37-fixture-root-marker` |
+| `b2_canary_01` … `b2_canary_10` (B2) | live-raden. Tio **separata** mutanter, en per flöde: en körtidshopsatt gammal plansökväg (`"docs/loop/autonomous-loop-plan-" + "v1.md"`, osynlig för varje källtokenregel) läggs till den prompt just det flödet faktiskt skickar, valt på anropsstacken. Var och en är röd och flaggar **exakt sitt eget flöde**: `architect_resolution#1`, `roadmap_contract_flow[SUB-1]#1`, `roadmap_contract_flow[S2]#1`, `empirical_gate_contract_flow#1`, `builder_flow[S2]#1`, `ensure_roadmap_slice[SUB-1]#1`, `ensure_roadmap_slice[S2]#1`, `test_author_flow#1`, `empirical_unattended_flow#1`, `full_roadmap#…`. Under v3.6 var alla tio gröna. |
+
+Falskt-röda prov som **förblir gröna** (113/5 = enbart de fem sandboxraderna): `a10_legit_module_copy`
+(`X = Y.copy()` på modulnivå), och de två granskning nr 11 mätte som falskt röda under v3.6 —
+`a11_legit_env_snapshot` (`subprocess.run(['/usr/bin/env','true'])` i ett flöde) och `a11_legit_python_snapshot`
+(`subprocess.run([sys.executable,'-c','print(1)'])`); båda ger nu `popen_total = child_total = 352`, `problems=[]`.
+
+### Oberoende kontraktsgranskning nr 12 (på e1efb141) → v3.8
+`GATE_REVIEW_RESULT=NOT_READY` med TVÅ blockerare, båda i providerledet; allt som remedierades efter nr 11 bekräftades
+verkligt (reproducerat, inte läst), RED-protokollet reproducerbart (72/46 statiskt, delta = fem sandboxrader → 77/41,
+radlistan identisk med dokumentets) och referensen 113/5 på första försöket.
+
+**B1 — providergränsen band SATSFORMER.** En importtidsfångst genom ett funktionsdefault
+(`def _quiet_spawn2(text, _S=os.posix_spawn)`) eller ett dekoratorargument är varken `Assign`, `AnnAssign` eller
+`setattr`, och `module_level_form` hoppar över `FunctionDef` helt; för de åtta `os.*`-primitiverna finns dessutom ingen
+inspelare under modulattributet. Mätt i grindens EGEN live-körning: **24 riktiga processer** startade med en neutral
+prompt medan grinden var 113/5 grön, `popen_total = child_total = 333`, `start_binaries=['git']`, identiteter `True`.
+Delfynd B1(b): de två räknarraderna var balanserbara (19 dolda starter + 19 inspelade Popen-anrop med samma argv som
+kastar före `_execute_child`).
+
+**B2 — REGRESSION införd av v3.7:s N9-fix.** Den vidgade `ALLOWED_LIVE_BINARIES = {git, env, sh, python3.12}` lade in
+tre tolkar i verktygsmängden utan innehållsregel: en providerrad inuti ETT `sh -c`-element, hopsatt i körtid och
+startad med vanlig `subprocess.run`, var 113/5 grön. Kontroll: med `{git}` och allt annat identiskt är samma mutant röd
+medan referensen förblir grön.
+
+| Fynd | Åtgärd i grinden (v3.8) |
+|---|---|
+| B1 strukturellt | DRIVERn installerar inspelarna på alla nio primitiver **och** på `Popen._execute_child` **före** `s.loader.exec_module(m)` i live-scenariot; varje importtidsfångst — modulnivå, klasskropp, funktionsdefault, dekoratorargument, metoddefault, metaklass — fångar därmed det instrumenterade objektet. `popen_identity` jämförs mot `_EXPECT` (inspelarna i live, stdlib-originalen annars) |
+| B1 statiskt komplement | `exec_surface_assignments` täcker `FunctionDef.args.defaults`/`kw_defaults` och `decorator_list` med samma `is_exec_object`. Mätt på 320c9df7: noll exec-objekt i defaults, noll i dekoratorer |
+| B1(b) icke-balanserbara räknare | per-anrops-identitet (`_ACTIVE`-stack: varje barnstart utan ett inspelat Popen-anrop på stacken redovisas som `child start outside any recorded Popen call`) + argv jämförd som **multimängd** (`Counter`) + `import_time_starts` |
+| B1 os.*-primitiverna | de har inget attribut under modulattributet; förladdningsinstallationen är deras enda bindning, och den är nu på plats |
+| B2 tolkar vs verktyg | `ALLOWED_LIVE_TOOLS = {git}` (exakta argv-element) och `ALLOWED_LIVE_WRAPPERS = {env, sh, python3.12}` (providermarkörer som **delsträng** över hela argv + `WRAPPER_ARGV_MAX = 200` per argv-element som inte är en fångad prompt) |
+| N1 rapporteringsfel | den gröna live-körningen serialiseras under `live_*`, den muterade under `live_mutated_*`, och barnnivåns fält tillkommer; rättelsen inskriven vid v3.6/v3.7-posterna |
+| N2 två nya falskt röda | aliasspårningen är skopmedveten (per funktion/klass med arv) och ett anropsresultat blir inte längre alias; aliasmängden på baslinjen är TOM och båda fallen gröna. Kostnaden inskriven i p.8 |
+| N7 dokumentnit | RED-listans parentes rättad från "7 dokument" till "8 dokument" |
+| N8 p.8 | providergränsens mätpunkter omskrivna till åtta; B2-hålet, aliaskostnaden och den för starka `child_total`-meningen rättade |
+| N3/N4/N5 (nr 11:s N5/N6/N7) | behållna som **deklarerade gränser** med granskarens mätta motivering inskriven i p.8 (remedieringsbeviset, rollpolicyns enda konsument, handoffens etikett) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.8 (före produkt)
+Subjekt: omklonad replika av `320c9df7` + grind v3.8 + utvecklingsdokument, **en** commit (fixtur-HEAD `2da73e81`).
+Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **72 PASS / 46 FAIL** av **118 rader**. Fullkörning (bypass, egen
+`TMPDIR`, hållna grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`,
+**77 PASS / 41 FAIL**, result.json sha256 `548edc894d01003ae6e99562d92840a09ad6de1e36c5d8502142231ae2e21ae2`.
+Delta statisk→full är exakt de fem sandboxraderna. **Radlistan är byte för byte identisk med v3.7:s 41 rader**
+(`comm` på de två FAIL-mängderna: noll tillagda, noll borttagna), dvs. v3.8:s nya regler — inspelarinstallation före
+`exec_module`, formregeln för defaults/dekoratorer, den delade binärmängden, den skopmedvetna aliasspårningen och de
+icke-balanserbara räknarna — är alla **gröna på baslinjen** och lägger inte till någon rad. F7 oförändrat: control-set
+68/68, launch-cwd 19/20 med exakt två extra grindar, governance 68/70 exakt `{g6, g7}`; loopsviten 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.8 (scratch, förkastad — bevisar satisfierbarhet)
+Oförändrad produkt jämfört med v3.5–v3.7: **ingen produktändring krävdes**. Fixtur-HEAD `9df7e5b8`, 143 filer.
+Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **118/118**, result.json sha256
+`a05147984af6adf3624d6ad5bfdb691a085f209c1b8a31bdf12d6e11e8dd23d2`; control-set 68/68, launch-cwd 19/20, governance
+68/70 exakt `{g6, g7}`, loopsviten 53 ok / 0 FEL. Live-flöden: tio till slut med fångstprofilen 1/4/4/4/4/4/4/4/7/37 och
+— nu korrekt serialiserat ur den GRÖNA körningen — `live_popen_total = live_child_total = 333`,
+`live_provider_starts = 0`, `live_start_primitives = ['subprocess.Popen']`, `live_start_binaries = ['git']`,
+`live_child_binaries = ['git']`, `live_child_argv_rewritten = []`, `live_child_unrecorded = []`,
+`live_import_time_starts = 0`, `live_popen_identity = live_popen_identity_after = True`, `live_side_effects = []`,
+`live_allowed_tools = ['git']`, `live_allowed_wrappers = ['env', 'python3.12', 'sh']`, och den muterade körningen under
+`live_mutated_popen_total = 59` — de två tal som i v3.6/v3.7 blandades ihop står nu bredvid varandra i samma
+evidensfil.
+
+### F9 v3.8 — negativer (var och en i egen replika av v3.8-referensen, statiskt `--skip-held-gates`; **91 körda,
+91 fångade, 0 riggfel**) + **fem** falskt-röda prov som förblir gröna
+De 91 är de 69 från v3–v3.6 (inklusive grindmutanten `h`), de 15 från v3.7 (granskning nr 11:s B1-alias, N2, N4, de två
+N8-sidoeffekterna och de tio per-flödeskanarierna) och 7 nya från granskning nr 12:
+
+| Negativ | Fälls av |
+|---|---|
+| `a12_default_arg_posix_spawn2` (nr 12 B1, ordagrant återbyggd) | statiskt `line 235: exec object captured as a default argument: os.posix_spawn`; dynamiskt `provider processes started outside the stubbed runner: 19`, `processes started with unexpected binaries: ['true']`, `child starts 333 != recorded Popen starts 352` — dvs. `os.posix_spawn` går nu genom inspelaren |
+| `a12_decorator_capture` (nr 12 B1) | statiskt `line 248: exec object captured by a decorator: _hold(os.posix_spawn)` + samma dynamiska rad |
+| `a12_method_default_capture` (nr 12) | statiskt `exec object captured as a default argument` (metoddefault i klasskropp) + live-providerraden |
+| `a12_default_arg_popen` (nr 12) | samma två lager, för `subprocess.Popen` |
+| `a12_balance_counts` (nr 12 B1(b)) | 19 dolda starter + 19 inspelade Popen-anrop med samma argv som kastar före `_execute_child`: statiskt defaultregeln, argv-platsraden, och dynamiskt `provider processes started outside the stubbed runner: 38` med `popen_total=371 child_total=352` — balanseringen går inte längre jämnt ut |
+| `a12_sh_provider_clean` (nr 12 B2) | live-providerraden: `binaries=['git','sh']`, `provider processes started outside the stubbed runner: 19`, `unmatched provider prompt: sh:Do the task the orchestrator names…` — omslagsregelns delsträngstest ser markören inuti `sh -c`-elementet |
+| `a12_env_provider_clean` (nr 12 B2) | samma, `binaries=['env','git']` |
+
+Falskt-röda prov som **förblir gröna** (113/5 = enbart de fem sandboxraderna): `a10_legit_module_copy`,
+`a11_legit_env_snapshot` (`/usr/bin/env true` i ett flöde), `a11_legit_python_snapshot`
+(`python3.12 -c 'print(1)'`), och de två granskning nr 12 mätte som falskt röda under v3.7 —
+`a12_legit_local_p_dict` (en lokal dict som heter `p`) och `a12_legit_result_attr`
+(`r.returncode = int(r.returncode or 0)` på en `CompletedProcess`).
+
+### Oberoende kontraktsgranskning nr 13 (på c4721ae8) → v3.9
+`GATE_REVIEW_RESULT=NOT_READY` med två blockerare som har **samma rot: mätningen skedde i samma interpreter som
+produkten**. Allt som remedierades efter nr 12 bekräftades verkligt, RED 72/46 reproducerades med identisk 41-radslista,
+F7 är byte-identisk med v2.5, radnamnsdiffen är tom, och `live_*`/`live_mutated_*` serialiseras korrekt. Granskaren
+byggde dessutom referensen 113/5 i tre iterationer **utan att öppna något test-author-artefakt** — kontraktet är alltså
+nåbart ur dokumentet allena.
+
+**B1 — grindens egen drivrutin lämnade stdlib-originalen åt produkten.** Drivrutinen körde som `__main__` i samma
+interpreter som subjektsmodulen och behöll `_ORIG_PRIMS`/`_ORIG_EXEC_CHILD`. En mutant som gjorde `import __main__`,
+återställde `_execute_child` runt en start och satte tillbaka inspelaren fick **113/5 med räknare identiska med den rena
+referensens** (333/333, `start_binaries=['git']`, identiteter `True`, `child_unrecorded=[]`) medan en riktig barnprocess
+kördes. Statiskt missades den eftersom `Subscript` inte gav alias, `type.__setattr__` med hopsatt namn varken är `Assign`
+eller `setattr` med konstant, och `__main__` saknades i den dynamiska uppslagsmängden.
+
+**B2 — omslagsregeln fångade bara tre markörsträngar i argv.** Sex mutanter gröna med bevisade barnprocesser, den
+avgörande med `PROVIDER=codex PROMPT=read docs/loop/autonomous-loop-plan-v1.md` **på stdin**: den gamla planen nådde en
+levande prompt i praktiken medan grinden var grön.
+
+| Fynd | Åtgärd i grinden (v3.9) |
+|---|---|
+| B1 privat namnrymd | `DRIVER_BOOT`: `python -c` kör en kort bootstrap som exekverar drivrutinskällan i en privat namnrymdsdict (inte en modul, inte i `sys.modules`) och tömmer den efteråt — `__main__` bär varken original, inspelare eller anropslistor |
+| B1 klassens egen `__init__` | inspelare på `Popen.__init__`: varje instansiering av den riktiga klassen syns oavsett vilken referens anroparen använde; `init_total == popen_total` krävs och `init_unrecorded` redovisas |
+| B1 identitet per anrop | instrumenteringens identitet prövas vid **varje inspelat anrop** (`identity_violations`), inte bara före/efter flödena |
+| B1 statiskt | `GATE_NAMESPACE_TOKENS` (`import __main__`, `__main__.`, `sys.modules['__main__']`, `type/object.__setattr__`, `__builtins__`, `gate_driver`) i autopilotkällan; explicit `__setattr__`-anrop och `setattr` med **beräknat** attributnamn är röda |
+| **B1/B2 utifrån-mätningen** | live-körningens `PATH` är grindens egna stubbar (`git`, `node`, `python3.12`, `env`, `sh`); varje stubb loggar realbinär, argv och stdin till en fil och delegerar. Grinden läser loggarna utanför produktens process och skannar argv ∪ stdin med `OLD_PLAN_TOKENS`, `COMMIT_READ_TOKENS` och providermarkörerna. Referensen: `stub_calls = 333` |
+| B2 identitet | varje exekverad fil löses till realpath och sha256-prövas mot den mätta mängden; basnamn rapporteras aldrig ensamt |
+| B2 sluten formmängd | `ALLOWED_LIVE_WRAPPER_FORMS` = `('env','true')`, `('python3.12','-c','print(1)')`; allt annat omslags-argv är rött, och stdin till ett omslag är rött villkorslöst |
+| B2 nyttolast utanför argv | stdin-innehåll fångas in-process (`Popen.communicate`) och utifrån; argv ∪ stdin ∪ barnets miljö skannas med `OLD_PLAN_TOKENS` |
+| N1/N2 | de två dokumentpåståenden granskaren underkände var **inte gjorda** — v3.8:s dokumentpatch avbröts på ett ankarfel innan filen skrevs. Båda är nu utförda: "SJU mätpunkter" → NIO, "(7 dokument" → "(8 dokument", och `child_total`-meningen är omskriven |
+| N3 | default-/dekoratorregeln står nu i kriterieavsnittet med sin mätta falskt-röda kostnad |
+| N4 | aliasspårningen är icke-vakuös (containrar, comprehensions, destrukturering, beräknade `setattr`-namn); baslinjen fortfarande tom, v12:s två falskt-röda fortfarande gröna |
+| N5 | drivrutinens cwd är en egen tom katalog, inte dess `TMPDIR`, så `python -c`:s `sys.path[0]` inte längre är produktens skrivbara yta; cwd ingår i sidoeffektsvepet |
+| N7 | `FIXTURE_ROOT`-kostnaden (31 rötter / 3,6 GiB per granskning) inskriven i p.8 |
+| **Riggdisciplin (eget fynd)** | En mutant kunde göra grinden ODÖMBAR (exit 2) genom att bryta `subprocess.Popen` globalt så att ett av produktens egna hjälpskript hängde. `run()`/`run_bytes()` behandlar nu timeout som ett PRODUKTutfall (rc 124 + `PLATFORM_SEPARATION_TIMEOUT`-markör i stdout), och ett oväntat undantag **efter** att grinden börjat döma ger den nya sista raden `f10_gate_reached_its_last_row_without_an_unexpected_failure` som RÖD med exit 1 i stället för exit 2. Ett fel **före** första raden (saknat verktyg, oanvändbart subjekt) är fortfarande ett riggfel. Radantalet är därför 119, inte 118 |
+| N1 (v14) | avbrottsvägen skriver nu `result.json`, räknar varje ej körd rad som FAIL mot det pinnade `EXPECTED_ROW_COUNT`, och radens `detail` bär `aborted after N of M rows` — en avbruten körning kan inte längre läsas som numeriskt närmare grön än en ärlig baslinje |
+| N2 (v14) | `except Rig` är borttagen som egen gren: ett `Rig` som uppstår EFTER att dömandet börjat är nu en produktdom (f10-raden, exit 1), inte exit 2. Ett fel före första raden är fortfarande riggfel |
+| N3 (v14) | `result["pass"]` kräver nu både att alla rader är gröna och att radantalet är `EXPECTED_ROW_COUNT` |
+| N4 (v14) | `node` får ingen stubb längre. Beslutet är att `node` inte får startas under flödena (referensen startar det aldrig); ett försök blir en oupplöst binär och ett oväntat verktyg |
+| N5 (v14) | stubbloggens undantag i sidoeffektsvepet borttaget |
+| **Dokumentfynd (eget)** | Granskningens N1/N2 ("uteblivna rättelser") berodde inte på att ändringarna var ogjorda utan på att **v3.8:s dokumentpatch avbröts på ett ankarfel innan filen skrevs** — sju redan utförda ändringar gick därmed förlorade tillsammans med den felande. Alla sju är nu utförda, och patchskripten skriver numera filen även när ett enskilt ankare missas |
+
+### Test-author 2026-09-11 — baslinje RED för v3.9 (före produkt)
+Subjekt: omklonad replika av `320c9df7` + grind v3.9 + utvecklingsdokument, **en** commit (fixtur-HEAD `18ea2f69`).
+Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **72 PASS / 47 FAIL** av **119 rader**. Fullkörning (bypass, egen
+`TMPDIR`, `/bin/ps`-kontroll före): exit **1**, `RED_LOCAL_QUALIFICATION`, **77 PASS / 42 FAIL**, result.json sha256
+`e120a99e2cc1753e4718aab65d91698cae7af91303b8267ee984ec1ee1690db0`. Delta statisk→full är exakt de fem sandboxraderna.
+
+**Radantalet är 119, inte 118**, därför att `f10_gate_reached_its_last_row_without_an_unexpected_failure` tillkommit
+(riggdisciplinen nedan). **Den enda TILLKOMNA röda produktraden jämfört med v3.8 är**
+`f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects`, och den är röd **av
+rätt skäl**: på `320c9df7` finns den gamla planen, och autopilotens egna `git`-starter under flödena bär
+`docs/loop/autonomous-loop-plan-v1.md` i sin argv. Den nya skanningen av argv ∪ stdin ∪ barnets miljö ser det, och
+rapporterar `a started process carries an old-plan pointer: git:autonomous-loop-plan-v1\.md,docs/loop/autonomous-loop-plan-v1\b`.
+Det är precis den effekt ordern kräver att grinden mäter, och baslinjen ska därför vara röd där. Ingen rad försvann
+(`comm` mot v3.8:s FAIL-mängd: noll borttagna, exakt en tillagd).
+
+### Referenskonstruktion v3.9 (scratch, förkastad — bevisar satisfierbarhet)
+Oförändrad produkt jämfört med v3.5–v3.8: **ingen produktändring krävdes**. Fixtur-HEAD `4c64024d`, 143 filer.
+Fullkörning (bypass, egen `TMPDIR`, `/bin/ps`-kontroll före): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**119/119**, result.json sha256 `9ba9fd4a5de1621034446f12a426a4e93a5965973b57a257a701a7a87a0fe8fc`.
+Live-flödenas evidens, nu med utifrån-mätningen bredvid in-process-mätningen:
+
+```text
+live_stub_call_total    = 333      (PATH-stubbarnas egna loggar, utanför produktens interpreter)
+live_popen_total        = 333      live_child_total = 333      live_init_total = 333
+live_provider_starts    = 0        live_identity_violations = []   live_init_unrecorded = []
+live_child_unrecorded   = []       live_child_argv_rewritten = []  live_import_time_starts = 0
+live_old_pointer_starts = []       live_stdin_starts = []
+live_start_binaries     = ['git']  live_child_binaries = ['git']   live_start_primitives = ['subprocess.Popen']
+live_allowed_tools      = ['git']  live_allowed_wrappers = ['env','python3.12','sh']
+live_allowed_wrapper_forms   = [['env','true'], ['python3.12','-c','print(1)']]
+live_allowed_start_sha256    = [env, git, node, python3.12, sh, stub:env, stub:git, stub:node, stub:python3.12, stub:sh]
+live_popen_identity = live_popen_identity_after = True      live_side_effects = []
+live_mutated_popen_total = 59      (den muterade körningen, separat serialiserad)
+```
+
+De fyra räknarna `stub_calls`, `popen_total`, `child_total` och `init_total` är alla 333 och mäts på fyra oberoende
+nivåer: utanför processen (stubbarna), på modulattributet, på klassens `__init__` och på `Popen._execute_child`.
+
+### Vad utifrån-mätningen STÄNGER — och vad som kvarstår
+**Stänger** (mätt: var och en var en grön mutant under v3.8):
+- En produkt som återtar stdlib-originalen ur grindens egen namnrymd (`import __main__`) och startar en process med
+  inspelaren tillfälligt avmonterad. Stubbloggen ser starten oavsett vad som händer inuti processen.
+- En nyttolast som inte ligger i argv: ett skal som får hela kommandot på **stdin**. Stubben loggar stdin-innehållet.
+- En providerstart genom en tillåten tolk med kort, markörfri argv (`sh -c 'exec "$0" "$@"'`, `env A=1 …`,
+  `python3.12 -c '<enradare>'`).
+- En binär vars **basnamn** är `git` men vars innehåll inte är gits: realpath + sha256 avgör, inte namnet.
+- Den gamla planens sökväg som når en barnprocess — i argv, på stdin eller i barnets miljö.
+
+**Kvarstår deklarerat** (ingen av dem låter den gamla planen styra i praktiken):
+- Processtarter som inte löser sin binär genom `PATH` **och** inte går genom någon instrumenterad primitiv
+  (`ctypes`→libc, `multiprocessing`/fork). Stubbarna ser bara PATH-uppslagningar; de instrumenterade primitiverna ser
+  resten. En start som undviker båda bär ingen prompt och kan därför inte återinföra planen.
+- Provideranrop som inte startar en process alls (öppet handtag, nät-API).
+- Stdin-innehåll som skrivs direkt på en pipe utan `communicate` till en start som **inte** går via PATH — regeln
+  "stdin satt på ett omslag är rött" fäller formen, men innehållet loggas då inte.
+- Annan kod under `controller/**` som autopiloten inte importerar vid start, och miljövariabler som launchern läser.
+- Planens semantik bortom token och skivtabell (granskning nr 13 N8, bekräftad).
+- Benchens fingeravtryck (stubbnamnen, `NEEDS_REMEDIATION`-mönstret) och de slutna namn-, binär- och formmängderna,
+  som gör legitim omstrukturering röd per design.
+
+### F9 v3.9 — negativer (var och en i egen replika av v3.9-referensen, statiskt `--skip-held-gates`; **101 körda,
+101 fångade, 0 riggfel**) + **fem** falskt-röda prov som förblir gröna
+De 91 från v3–v3.8 fångas på samma rader (flera faller nu dessutom på den skärpta live-raden), och granskning nr 13:s
+sju mutanter plus tre statiska sondprov är nya:
+
+| Negativ (granskning nr 13) | Fälls av |
+|---|---|
+| `a13_driver_ns_recovery` (B1, ordagrant återbyggd) | modul-/klassformraden med tre anmärkningar: `line 241: explicit __setattr__ call _t.__setattr__`, samma på r.245, och `autopilot@237 reaches the gate's namespace: import\s+__main__` — plus att angreppet inte längre kan lyckas: `__main__` bär inga original |
+| `b_stdin_old_plan_prompt` (B2, den avgörande) | live-raden: `a started process carries an old-plan pointer: sh:autonomous-loop-plan-v1\.md,docs/loop/autonomous-loop-plan-v1\b` — den gamla planen på ett barns stdin är nu RÖD — plus `provider processes started outside the stubbed runner: 38` och slutna-världen-raden (`extra=['_stdin_prompt']`) |
+| `a13_wrapper_stdin` | live-raden: `unmatched provider prompt: sh:/bin/sh` (stdin till ett omslag är rött villkorslöst) |
+| `a13_wrapper_short_argv` | live-raden: `unmatched provider prompt: sh:x` (argv är inte en av de mätta formerna) |
+| `a13_wrapper_env_short` | live-raden: `unmatched provider prompt: env:x` |
+| `a13_wrapper_python_short` | live-raden: `unmatched provider prompt: python3.12:x` |
+| `b_tool_named_git_real` | live-raden: `processes started from unmeasured binaries: [...]` — realpath + sha256 skiljer skriptet från gits binär trots basnamnet |
+| `s1_list_unpack_alias` | `module-level assignment to [_S1]` + `assignment onto exec alias _S1.foo` |
+| `s2_comprehension_alias` | `module-level binding of subprocess.Popen` + `assignment onto exec alias _S2.foo` |
+| `s5_indirect_setattr` | `setattr with a computed attribute name on _S5` + `f4_autopilot_publication_callers_exit0` (timeout som produktutfall, rc 124) |
+
+Falskt-röda prov som **förblir gröna** (114/5 = enbart de fem sandboxraderna): `a10_legit_module_copy`,
+`a11_legit_env_snapshot` (`/usr/bin/env true`), `a11_legit_python_snapshot` (`python3.12 -c 'print(1)'`),
+`a12_legit_local_p_dict` och `a12_legit_result_attr`.
+
+**Fixturnot:** `a11_side_subject_git` skriver i sitt eget subjekts `.git/`. Mutanten måste därför köras på en ren
+replika — en andra körning i samma katalog ser markören redan i före-ögonblicksbilden och blir grön av rigg-skäl, inte
+av produktskäl. Mätt och verifierat: på ren replika faller den på sidoeffektsvepet.
+
+### Oberoende kontraktsgranskning nr 14 (på f6add80b) → v3.10
+`GATE_REVIEW_RESULT=NOT_READY` med **tre** blockerare, alla på live-raden, alla reproducerade med riktiga barnprocesser
+och bevismarkörer. Allt som remedierades efter nr 13 bekräftades verkligt (sex av sex mutanter faller på angivna rader,
+fem falskt-röda prov gröna, RED 72/47 med exakt en tillagd rad och noll borttagna, F7 byte-identisk, f10-raden
+fungerar), och referensen nåddes i **första** iterationen med nr 13:s dokumentbyggda konstruktion oförändrad — v3.9
+krävde ingen produktändring.
+
+| Fynd | Åtgärd i grinden (v3.10) |
+|---|---|
+| B1 namnrymden via frame/heap | `GATE_NAMESPACE_TOKENS` utökad med `_getframe(`, `f_globals`, `f_back`, `f_locals`, `f_code`, `gc.get_objects/referrers/referents`, `sys.settrace`, `sys.setprofile`, `threading.settrace` |
+| B1 inspelningsintegritet | räknarna hålls **också** som heltal i en closure-cell som ingen listutbytning når; inspelningsbehållarnas typ, identitet och bundna `append` pinnas vid installation och prövas efter flödena (`recorder_integrity`) |
+| **B1/B3 halvorna mot varandra** | ny rad `f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain`: `stub_calls = bare_name_starts` och `popen_total = init_total = child_total`, closure-räknarna mot listorna, obruten HMAC-kedja, sammanhängande numrering, och varje räknare över `LIVE_MIN_PROCESS_STARTS`. **Nämnaren är de BARA namnen, inte alla starter:** en start vars `argv[0]` bär en katalogdel går per konstruktion förbi `PATH` och kan inte synas i stubbloggen; den binds i stället av in-process-halvan, av realpath+sha256-identiteten och av den slutna formmängden (mätt: `b6_abs_sh_stdin_file` faller på dem). Att kräva likhet mot ALLA starter vore en falsk rödhet utan att stänga något |
+| B2 identitet i barnets värld | `_identify` löser binären med **den PATH anropet använder** (`env=`-argumentets, annars `os.environ`); en start som bär en egen `PATH` i `env=` är röd |
+| B2 stdin i alla kanaler | `input`, pipe, vanlig **fil** och **ärvd fd** (via `/dev/fd/<n>`), plus `pass_fds`; innehållet läses och skannas med `OLD_PLAN_TOKENS` och providermarkörerna. Varje start med stdin ansluten är röd |
+| B2 miljön | mäts även när barnet **ärver** den, inte bara när den skickas som `env=` |
+| B2 git som startare | `-c` med `alias.*`/`core.pager`/`core.editor`/`core.sshCommand`/`core.hooksPath`/`diff.external`/`credential.helper`/`filter.*`/`uploadpack.*`/`protocol.*`, `--exec-path`, `--upload-pack`, `--receive-pack`, samt `GIT_EXTERNAL_DIFF`/`GIT_PAGER`/`GIT_EDITOR`/`GIT_SSH*`/`GIT_CONFIG*`/`GIT_PROXY_COMMAND`/`GIT_ASKPASS` i miljön |
+| B3 manipulationsupptäckande logg | varje stubbpost bär löpnummer från en låst räknare och en HMAC med en nonce per körning; grinden kräver obruten kedja och sammanhängande numrering |
+| B3 loggen i svepet | undantaget borttaget; endast `stublog/seq`, `stublog/lock` och `stublog/call-<n>[.stdin]` är redovisade, allt annat i katalogen är en sidoeffekt |
+| B3 nämnare | `live_stub_call_total` binds av den nya raden mot de tre in-process-räknarna och mot det mätta golvet |
+
+### Test-author 2026-09-11 — baslinje RED för v3.10 (före produkt)
+Subjekt: omklonad replika av `320c9df7` + grind v3.10 + utvecklingsdokument, **en** commit (fixtur-HEAD `9593e3ec`).
+Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **74 PASS / 53 FAIL** av **127 rader**.
+Fullkörning (bypass, egen `TMPDIR`, `/bin/ps`-kontroll före): exit **1**, `RED_LOCAL_QUALIFICATION`,
+**79 PASS / 48 FAIL**, result.json sha256 `bb4dde21fe7bece43879046f377076014c01cc646a5db57bf95a8b7d03956d46`. Delta statisk→full är exakt de fem
+sandboxraderna.
+
+**Radantalet är 127, inte 121**, därför att ägarbeslutets sex bindningar tillkommit (B1–B5). **De TILLKOMNA röda
+raderna jämfört med v3.9/v3.10:s förra mätning är exakt dessa sex, och noll rader försvann** (`comm` mot den förra
+FAIL-mängden):
+
+```text
+f2_regler_md_carries_the_working_method_role_flow_frozen_gate_rule_gate_change_rule_review_standard_and_rig_threat_model
+f2_agents_claude_and_role_skills_reference_regler_md_and_the_plan_without_duplicating_a_normative_sentence
+f4_plan_generation_avslutskriterier_carry_the_four_measurable_levels_planseparation_trust_kernel_bootstrap_milestone_and_later_operational_whole
+f4_plan_generation_bootstrap_names_a_finite_handover_point_to_qualified_autonomous_operation
+f4_plan_generation_malbild_carries_self_identified_needs_within_goal_and_mandate_and_web_as_a_business_using_the_platform
+f4_plan_generation_preserves_h039_functional_requirement_zero_runtime_residues_and_no_loss_of_foreign_data
+```
+
+Alla sex är röda **av rätt skäl**. De fyra plangenerationsraderna är röda därför att plangenerationen inte finns på
+`320c9df7` alls. De två regelkälleraderna är röda av MÄTT delvis skäl: `docs/loop/regler.md` bär redan rollflödet och
+regel 11:s *"ändrar aldrig sin egen frysta grind"*, men saknar kopplingen `befintligt krav` + `konkret hinder`,
+granskarens godkännandenorm, `riggbegränsningar`/`hotmodell` och frasen `källa för arbetsmetoden` — grindens `detail`
+räknar upp exakt de fyra grupperna. Referensdelen är röd därför att plangenerationen saknas och ingen av de åtta
+hänvisarna kan namnge den. På baslinjen mäts **52 normativa meningar** över de aktiva dokumenten, **noll kollisioner**:
+duplikationsregeln är alltså grön på baslinjen och röd först när någon faktiskt duplicerar.
+
+**Ägarbeslutets textrester i `docs/loop/regler.md` (kontrollerade, inget ankare behövs).** `LOOP-ÄGARHAND-16–27`
+(r.16) och de negativa webbavgränsningarna (r.10–11 "Webbkundens brief- och kvalitetskrav", r.29 "utför inte
+kundflödet") träffas av **noll** mönster i `WEB_TOKENS`, `HUMAN_TOKENS`, `HARD_HUMAN_TOKENS`, `OLD_PLAN_TOKENS` och
+`COMMIT_READ_TOKENS` — de två orden matchar bara `PLAN_TOKENS`, som per konstruktion bara appliceras på
+plangenerationen. Mätt genom att köra grindens egna mönstermängder mot filen. Ingen omskrivning krävs av buildern och
+inget ankare tillkommer; det enklare valet.
+
+### Referenskonstruktion v3.10 (scratch, förkastad — bevisar satisfierbarhet)
+Produktändringen jämfört med v3.5–v3.9 är exakt ägarbeslutets bindningar: plangenerationens fyra nya textstycken
+(målbild, skyddade invarianter, bootstrap, avslutskriterier), fyra nya regler i `docs/loop/regler.md`, och en
+pekarmening i `CLAUDE.md` och i de fem rollskills som inte redan namngav båda dokumenten — plus ompinning av
+`CLAUDE.md` och `docs/loop/regler.md` i `SUBSTITUTION_BLOBS` och `PLATFORM_DOCUMENTS`. Fixtur-HEAD `10704dcd`.
+Statisk körning: **122 PASS / 5 FAIL**. Fullkörning (bypass, egen `TMPDIR`,
+`/bin/ps`-kontroll före): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **127/127**, result.json sha256
+`d041affa02fb033fca19265340a4e34d8b6f58ecb4ee72b94404b5ee81dd65e1`. Samtliga sex nya rader gröna i **första** iterationen, med icke-tomma mätytor:
+`avslutskriterier len=1611`, `bootstrap len=1099`, `målbild len=861`,
+`invarianter len=826`, `regler.md len=5116`, `normativa meningar=63`.
+
+### F9 v3.10 — negativer (var och en i egen replika av v3.10-referensen, statiskt `--skip-held-gates`; **124 körda,
+117 fångade, 7 falskt-röda prov gröna, 0 riggfel**)
+Samtliga tidigare negativer byggdes OM mot den nya referensen och kördes om mot den nya grinden; ingen föll bort och
+ingen bytte rad. Nytt i v3.10:
+
+| Negativ | Faller på |
+|---|---|
+| `b1_env_path_launder` (nr 14 B2) | live-raden + `…out_of_process_stub_log_and_in_process_recorders_agree…` |
+| `b2_tool_stdin_file` (nr 14 B2) | live-raden |
+| `b3_stub_log_wipe` (nr 14 B3, loggmanipulationen) | `…out_of_process_stub_log_and_in_process_recorders_agree…` |
+| `b4_frame_ns_scrub` (nr 14 B1) | `…module_and_class_bodies_are_the_declared_form…` + `…agree_with_an_unbroken_chain` |
+| `b5_gc_ns_scrub` (nr 14 B1) | samma två + live-raden |
+| `b7_git_alias_launcher` (nr 14 B2) | live-raden |
+| `b9_fd_payload` (nr 14 B2) | live-raden |
+| `b11_silence_recorders` (nr 14 B1, den allvarligaste) | `…module_and_class_bodies…` + `…agree_with_an_unbroken_chain` |
+| `b13_exit_level_dropped` (B1) | `f4_plan_generation_avslutskriterier_carry_the_four_measurable_levels_…` |
+| `b13b_exit_level_not_marked_later` (B1) | samma rad — nivå (iv) utan `senare`/`utanför dagens` |
+| `b14_bootstrap_no_finite_handover` (B2) | `f4_plan_generation_bootstrap_names_a_finite_handover_point_…` |
+| `b15_malbild_no_business` (B3) | `f4_plan_generation_malbild_carries_self_identified_needs_…` |
+| `b16_h039_requirement_dropped` (B4) | `f4_plan_generation_preserves_h039_functional_requirement_…` |
+| `b17_rules_without_method` (B5) | BÅDA regelkälleraderna (metoden borta **och** under åtta normativa meningar) |
+| `b18_duplicated_normative_sentence` (B5) | `f2_agents_claude_and_role_skills_reference_…_without_duplicating_a_normative_sentence` |
+| `b19_skill_without_reference` (B5) | samma rad — en rollskill som inte namnger regelkällan/planen |
+| `probe_rules_extra_rule` (falskt-rött prov) | **GRÖN** — en legitim ny regel med egen normativ mening |
+| `probe_pointer_repeated_verbatim` (falskt-rött prov) | **GRÖN** — samma PEKARMENING ordagrant i `AGENTS.md` som i rollskills |
+
+Var och en av `b13`–`b19` faller på **exakt** den avsedda raden och ingen annan (samtliga ompinnade, så pinnraderna
+inte skymmer domen).
+
+**Riggdisciplinen mätt, inte läst (granskning nr 14 N1/N2).** `gate-abort` är en grindmutant som reser `Rig` EFTER att
+domen börjat (direkt före F6-blocket) och körs mot referensen. Utfall: exit **1** (produktdom, inte exit 2),
+`FAIL f10_gate_reached_its_last_row_without_an_unexpected_failure`, `PLATFORM_SEPARATION_FINAL_ABORT=Rig(...)`, och
+`result.json` **skrivs** med `aborted: true`, `pass: false`, `expected_rows: 127` och 127 rader varav **11**
+`not_run_*` räknade som FAIL. Den tryckta summan blir `114/13` över hela nämnaren — en avbruten körning kan alltså
+inte längre läsas som numeriskt närmare grönt än en ärlig baslinje. Båda de icke-blockerande fynden är därmed
+stängda genom körning.
+
+**Not om subjekten.** Negativerna kördes mot referensen `ca83c175`; de slutliga fullkörningarna mot `10704dcd`
+(referens) och `9593e3ec` (RED). Skillnaden mellan `ca83c175` och `10704dcd` är enbart utvecklingsdokumentets PROSA
+(kriterieavsnittens radbeskrivningar och detta utfallsavsnitt); produkten, grinden och alla mätytor är identiska, och
+dokumentet är varken tokenskannat eller innehållsbundet av någon rad utöver `DOC_SECTIONS`-närvaron. Statisk körning
+på `10704dcd` ger samma 122/5 som på `ca83c175`.
 
 ### Builder / kvalificering
 (fylls i efter produktkörningen)

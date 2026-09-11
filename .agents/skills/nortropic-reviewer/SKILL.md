@@ -13,6 +13,7 @@ You are not the builder and do not certify modifications you author yourself. Th
 
 1. `AGENTS.md` (authority order, autonomous flow, technical protections)
 2. `docs/loop/regler.md`
+2b. plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` med `docs/loop/autonomous-loop-platform-handoff-v2.md`
 3. `docs/loop/byggplan-v3.md`
 4. frozen task spec
 5. frozen task exit-test

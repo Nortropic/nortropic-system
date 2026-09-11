@@ -4,7 +4,7 @@
 
 This document is owner authority for the implementation shape of the remaining Nortropic autonomous-loop roadmap. It does **not** weaken the platform authority order in `AGENTS.md`, the loop rules, frozen task gates, candidate identity requirements, containment, or promotion boundaries.
 
-The original frozen roadmap at commit `0b3212c991d4227c8df2656465ae2c0252dda39e` remains authority for required effects, migration intent, negative controls and final capabilities. Where that plan prescribes or implies custom agent-harness machinery that modern provider harnesses already own, this amendment supersedes only that **implementation shape**.
+The platform's active plan generation `PLAN_GENERATION=platform-v2` — `docs/loop/autonomous-loop-plan-platform-v2.md` with its handoff `docs/loop/autonomous-loop-platform-handoff-v2.md`, read at HEAD and pinned by blob — remains authority for required effects, migration intent, negative controls and final capabilities. Where that plan prescribes or implies custom agent-harness machinery that modern provider harnesses already own, this amendment supersedes only that **implementation shape**.
 
 ```text
 NORTROPIC_ARCHITECTURE=PROVIDER_NEUTRAL_TRUST_KERNEL
@@ -345,3 +345,7 @@ Neither a provider `READY` report nor an orchestrator configuration marker such 
 ## 14. Amendment 2026-09-10 — platform separation (v1.1)
 
 The web governance that this contract's preamble, §6 and §12 referred to left the platform repository on 2026-09-10 (`AGENTS.md`, Historik). The platform's authority order is `AGENTS.md`. This amendment changes exactly three places: the preamble names the platform authority order instead of the web documents; the SUB builder write surfaces in §6 name `docs/loop/drift.md` — the platform's documentation home — instead of the web decision log; §12 keeps only the two genuine hard stops (higher-authority conflict, external credential/provisioning ceremony). §1–§5, §7–§11 and §13 are unchanged; the historical references they carry are evidence, not instruction. Codex/provider machinery is untouched here; its substitution is SUB-1.
+
+## 15. Amendment 2026-09-10 — plan generation platform-v2 (v1.2)
+
+The preamble now binds required effects to the platform's own plan generation. `docs/loop/autonomous-loop-plan-platform-v2.md`, with its handoff `docs/loop/autonomous-loop-platform-handoff-v2.md`, is read at HEAD in the authoritative working copy and pinned by blob in the autopilot and in `controller/verify/cli`; no commit, branch or unpinned copy is authority. The platform authority order in `AGENTS.md` is unchanged, and so are §1–§5, §7–§11 and §13. The slice identities in §5–§7 are unchanged; the plan generation's slice table carries the same identities in the same order, which is what makes the plan and the execution one truth.

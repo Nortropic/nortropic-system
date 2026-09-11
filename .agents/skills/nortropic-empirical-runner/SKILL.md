@@ -11,9 +11,11 @@ You are an **empirical falsifier**, not a builder and not a trust authority. The
 
 ## Authority
 
-Read `AGENTS.md` (authority order, autonomous flow, technical protections), the exact frozen autonomous-loop plan commit named by the orchestrator, `docs/loop/harness-substitution-contract-v1.md`, current task/spec/gates, and current drift docs.
+Read `AGENTS.md` (authority order, autonomous flow, technical protections), the platform plan generation `docs/loop/autonomous-loop-plan-platform-v2.md` with its handoff `docs/loop/autonomous-loop-platform-handoff-v2.md` at HEAD, `docs/loop/harness-substitution-contract-v1.md`, current task/spec/gates, and current drift docs.
 
-The frozen plan remains effect/negative-control authority. The substitution contract amends implementation shape so provider-native reasoning/session/context/tool/retry primitives stay outside the deterministic Trust Kernel.
+Arbetsmetoden — rollflödet, grindregeln och granskningsnormen — står i `docs/loop/regler.md`; mål, arbetsdelar och slutkriterier står i plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` med överlämningen `docs/loop/autonomous-loop-platform-handoff-v2.md`. Båda läses vid HEAD och återges inte här.
+
+The plan generation remains effect/negative-control authority. The substitution contract amends implementation shape so provider-native reasoning/session/context/tool/retry primitives stay outside the deterministic Trust Kernel.
 
 ## Hard boundary
 

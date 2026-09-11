@@ -17,7 +17,10 @@ Läs och följ i denna ordning när de är relevanta:
    `docs/loop/byggplan-v3.md` (skivorna; den skyddade mängden i §3.1)
 3. aktuell task i `specs/tasks.spec.json`
 4. taskens frysta `exit_test` under `verify/bin/`
-5. `docs/loop/drift.md` och övriga plan-/driftdokument under `docs/loop/`.
+5. plangenerationen: `docs/loop/autonomous-loop-plan-platform-v2.md` med överlämningen
+   `docs/loop/autonomous-loop-platform-handoff-v2.md` (`PLAN_GENERATION=platform-v2`) är den aktiva
+   plangenerationen — aktiv instruktion för mål, arbetsdelar och slutkriterier, blob-pinnad vid HEAD.
+6. `docs/loop/drift.md` och övriga plan-/driftdokument under `docs/loop/`.
    `docs/loop/owner-author-workflow-v1.md` och `docs/loop/remaining-bootstrap-delegation-v1.md`
    är fryst grindinput (historisk evidens, byte-bunden av grindarna), inte dagens instruktion.
 
@@ -124,7 +127,7 @@ evidens och inte dagens instruktion.
   exekveraren av kontrollplansarbete (`FROZEN_GATES_REMAIN_TRUST_AUTHORITY=YES`).
   Rollagenterna committar/pushar/mergar inte själva.
 - **v3 (2026-08-10):** full-roadmap-autonomi för S2, S4–S13 och empirisk slutkörning
-  under den frysta planen `0b3212c991d4227c8df2656465ae2c0252dda39e`; programgrinden
+  under plangenerationen `platform-v2`; programgrinden
   `verify/bin/autonomous-loop-exit` fryses av test-author + gate-reviewer före downstream.
   `HUMAN_AUTHORITY_HARD_STOP` är reserverat för en verklig konflikt mellan högre
   auktoriteter eller en extern credential-/provisioningceremoni som inte kan
@@ -150,8 +153,11 @@ instruktion. Det renodlade webbmaterialet (dessa texters arkivkopior och webbens
 destination) står i `SEPARATION-20260910/WEB-TRANSFER-PROVENIENS.tsv` och
 `SEPARATION-20260910/WEB-TRANSFER-PROVENIENS-2.tsv`. Den fullständiga historiska
 routertexten finns i Git-historiken före uppdelningen; uppdelningens förslag ligger under
-`SEPARATION-20260910/proposed/`. Den frysta autonoma planen (`0b3212c9`) är kopierad
-byte-exakt till `docs/loop/autonomous-loop-plan-v1.md` och
-`docs/loop/autonomous-loop-codex-handoff.md`; kopiorna är fryst grindinput (byte-bundna av
-autopiloten och grindarna), historisk planevidens och inte dagens instruktion. Autopiloten
-binder planidentiteten mot dessa lokala kopior, inte mot någon origin-gren.
+`SEPARATION-20260910/proposed/`.
+
+Den tidigare plangenerationen av roadmap-planen och dess överlämning ligger kvar i Git-historiken som
+historia. Den är inte längre spårad i trädet, inte längre pinnad av någon konsument och inte dagens
+instruktion; dess objekt namnges inte här, eftersom en pekare skulle kunna återinföra den.
+
+`docs/loop/autonomous-loop-plan-platform-v2.md` är den aktiva planen, och autopiloten binder
+planidentiteten mot dess blob vid HEAD, inte mot någon commit eller origin-gren.

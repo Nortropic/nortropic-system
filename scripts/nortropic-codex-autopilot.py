@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Nortropic Codex Build Autopilot v4 — provider-neutral trust-kernel roadmap.
 
-Unattended workflow executor for the owner-authorized Nortropic autonomous-loop roadmap after
-Harness Substitution Amendment v1. The original frozen plan remains authority for required effects;
-the substitution contract supersedes only implementation shape that would duplicate provider-native
-session/context/tool/retry machinery.
+Unattended workflow executor for the Nortropic autonomous-loop roadmap after Harness Substitution
+Amendment v1. The active platform plan generation (PLAN_GENERATION) is authority for required
+effects; the substitution contract supersedes only implementation shape that would duplicate
+provider-native session/context/tool/retry machinery.
 
 Agent prose is never trust authority. Git identity, containment, frozen gates, deterministic policy,
 attestation/fencing and guarded publication drive trust transitions. No force/amend/reset/rebase
@@ -68,9 +68,9 @@ REJECTED_S3 = "1e21a7fe150f25626301f3656893d1798ae46c3d"
 FULL_ROADMAP_OWNER_PATH = "docs/loop/codex-autopilot-v3-full-roadmap.md"
 SUBSTITUTION_OWNER_PATH = "docs/loop/harness-substitution-contract-v1.md"
 SUBSTITUTION_AUDIT_PATH = "docs/loop/harness-substitution-audit-2026-08-11.md"
-ROADMAP_PLAN_SHA = "0b3212c991d4227c8df2656465ae2c0252dda39e"
-ROADMAP_PLAN_PATH = "docs/loop/autonomous-loop-plan-v1.md"
-ROADMAP_HANDOFF_PATH = "docs/loop/autonomous-loop-codex-handoff.md"
+PLAN_GENERATION = "platform-v2"
+ROADMAP_PLAN_PATH = "docs/loop/autonomous-loop-plan-platform-v2.md"
+ROADMAP_HANDOFF_PATH = "docs/loop/autonomous-loop-platform-handoff-v2.md"
 
 H003_GATE_SUBJECT = "[LOOP] ÄGARHAND: freeze h-003 attestation authority v1"
 H003_BUILD_SUBJECT = "[LOOP] h-003: attestation authority protocol v1"
@@ -91,22 +91,22 @@ FORBIDDEN_GIT_TOKENS = (
 MAX_ARCHITECT_ROUNDS = 5
 SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT = True
 ROADMAP_PLAN_BLOBS = {
-    ROADMAP_PLAN_PATH: "c8ea851167f38f6846485035ee2e6b1dc3b54db0",
-    ROADMAP_HANDOFF_PATH: "1e53887c59b8da0989579eaa241c5b53ea02abb9",
+    ROADMAP_PLAN_PATH: "fbdbcf05acbac3e0e86271607af9f5375da938ca",
+    ROADMAP_HANDOFF_PATH: "a0c0c9edd37cdf1a0ee955d3b5ce5615d72f3bb5",
 }
 # Platform document generation after the 2026-09-10 repository split: router
 # documents and docs/loop/** only, pinned by blob on origin/main.
 SUBSTITUTION_BLOBS = {
-    "AGENTS.md": "8d54ece2e1861f2b5869dfd83694ff3a6860e240",
-    "CLAUDE.md": "772a39e8247e51c79e412bb9698d7715f693625b",
-    "README.md": "7fa037e541561a7be256603d68cbf3915ae5ed0d",
+    "AGENTS.md": "0f27560fc862f4da326abe4691120f70fac84385",
+    "CLAUDE.md": "9e1d69767db149535a831ee463cdf91bfd9db056",
+    "README.md": "7b60bd210e0aa63115b34aec1b0294c0977746a5",
     "docs/loop/byggplan-v3.md": "e54a43fe69002a20aa539dd6c70f29d4b7302f62",
     "docs/loop/codex-evidence-contract.md": "e89e5bff8f1373d98130d0d8c28d0da30f300623",
-    "docs/loop/drift.md": "6e57111d86442cd4f64e36cc7c85cb3ef17f9337",
+    "docs/loop/drift.md": "28c1d96a658a531750396f0cbacec98100d5455d",
     "docs/loop/owner-author-workflow-v1.md": "4aabf054c217cfd5cdca46456d11f25de0211bbf",
-    "docs/loop/regler.md": "b28cb66232e495153bcfb033b3487217bc76be44",
+    "docs/loop/regler.md": "5a4f6b90e969ada640ebe915c1204606fd4c681f",
     "docs/loop/remaining-bootstrap-delegation-v1.md": "20319089c4085b79ec2b8f600396c71b21dbd392",
-    SUBSTITUTION_OWNER_PATH: "1fde089c8f685ed0f439f87bf86a2a3d4bdb3774",
+    SUBSTITUTION_OWNER_PATH: "387fbc94916ae23b8440d94958cd0e29d93527ac",
     SUBSTITUTION_AUDIT_PATH: "bb5f99c111cd5aaf784e73e67bde354023b1b5f2",
 }
 
@@ -184,7 +184,7 @@ SUBSTITUTION_ROADMAP: tuple[RoadmapSlice, ...] = (
 )
 
 # Original S2–S13 capability identities remain stable. Required effects, migration intent and
-# negative controls remain bound to ROADMAP_PLAN_SHA, while implementation shape is interpreted
+# negative controls remain bound to the active plan generation, while implementation shape is interpreted
 # through SUBSTITUTION_OWNER_PATH. S2/S4/S5 gain h-030 as the provider-neutral migration floor;
 # later slices inherit that floor transitively.
 ROADMAP: tuple[RoadmapSlice, ...] = (
@@ -586,7 +586,8 @@ Use actual commands/evidence. PASS/FAIL only for tests actually run. Mark unknow
 OWNER_DECISION_REQUIRED is an INTERNAL signal to the autonomous architect, not a request for the human owner.
 Use it only when you can name a concrete missing architecture boundary. Ordinary design choices inside the frozen roadmap + harness-substitution contract must be resolved autonomously. Apply the substitution test before adding custom harness machinery; provider/session output is never trust authority.
 A true human-only boundary is outcome=BLOCKED with stop_reason prefixed HUMAN_AUTHORITY_HARD_STOP:.
-Your final response MUST conform exactly to docs/loop/codex-autopilot-report.schema.json.
+Your final response MUST conform exactly to docs/loop/codex-autopilot-report.schema.json and to the
+role-report evidence rules in docs/loop/codex-evidence-contract.md.
 """.strip()
 
 
@@ -904,8 +905,9 @@ Use `$nortropic-architect`.
 Resolve this roadmap-internal architecture signal WITHOUT modifying files:
 STAGE={stage}
 TASK_ID={task_id}
-ROADMAP_PLAN_SHA={ROADMAP_PLAN_SHA}
+PLAN_GENERATION={PLAN_GENERATION}
 ROADMAP_PLAN_PATH={ROADMAP_PLAN_PATH}
+ROADMAP_HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 OWNER_DELEGATION={FULL_ROADMAP_OWNER_PATH}
 SUBSTITUTION_AUTHORITY={SUBSTITUTION_OWNER_PATH}
 SUBSTITUTION_AUDIT={SUBSTITUTION_AUDIT_PATH}
@@ -915,12 +917,14 @@ SIGNAL_STOP_REASON={signal.get('stop_reason', '')}
 SIGNAL_FINDINGS={json.dumps(report_blockers(signal), ensure_ascii=False)}
 {context}
 
-Read higher authority, the exact frozen plan with git show, and the current-main substitution
+Read higher authority, the pinned plan generation `{ROADMAP_PLAN_PATH}` and its handoff
+`{ROADMAP_HANDOFF_PATH}` at HEAD of the authoritative worktree (the orchestrator has verified their
+blob identity), and the current-main substitution
 contract. The plan remains authority for required effects/negative controls; the substitution
 contract supersedes only implementation shape that would duplicate provider-native
 session/context/tool/retry machinery.
 
-The human owner has delegated normal S3/SUB-1..SUB-4/S2–S13/L architecture decisions to you.
+Delegation per `{FULL_ROADMAP_OWNER_PATH}` covers normal S3/SUB-1..SUB-4/S2–S13/L architecture decisions.
 Choose the smallest compatible public contract/effect. Do not ask the human to choose between
 legitimate compatible designs.
 
@@ -1088,6 +1092,7 @@ Use `$nortropic-test-author` again on the existing candidate branch. The indepen
 {rendered}
 
 BASE_SHA={base_sha}
+PLAN_GENERATION={PLAN_GENERATION} (`{ROADMAP_PLAN_PATH}` with handoff `{ROADMAP_HANDOFF_PATH}` at HEAD).
 Owner authority remains `{OWNER_DECISION_PATH}`. Make the smallest gate/spec correction inside the same owner-authorized edit surface. Do not implement production code and do not rewrite history. Re-run decisive RED/adversarial evidence and return the structured report.
 """
     assert task_id is not None
@@ -1096,6 +1101,7 @@ Use `$nortropic-builder` again for TASK={task_id}. The independent reviewer conf
 {rendered}
 
 TASK_BASE_SHA={base_sha}
+PLAN_GENERATION={PLAN_GENERATION} (`{ROADMAP_PLAN_PATH}` with handoff `{ROADMAP_HANDOFF_PATH}` at HEAD).
 Make the smallest remediation inside the existing frozen task allowed_write. Do not modify frozen artifacts and do not rewrite history. Re-run decisive tests and adversarial review, then return the structured report.
 """
 
@@ -1326,15 +1332,16 @@ def publication_authority(repo: Path, candidate_sha: str, task_id: str,
 
 
 def ensure_roadmap_plan(repo: Path) -> None:
-    # The plan is authority by exact immutable objects: the platform-frozen copies at HEAD must carry the
-    # blob identity of the historical plan commit ROADMAP_PLAN_SHA. Local objects only — no fetch, no branch,
-    # no remote; a missing or mutated copy is a Stop, never a fallback.
+    # The plan is authority by exact immutable objects: the plan generation's two files at HEAD must carry
+    # the blob identities pinned in ROADMAP_PLAN_BLOBS. Local objects only — no fetch, no branch,
+    # no remote; a missing or mutated file is a Stop, never a fallback.
     for rel, expected_blob in ROADMAP_PLAN_BLOBS.items():
         probe = git(repo, "rev-parse", "--verify", "--quiet", f"HEAD:{rel}", check=False)
         actual = probe.out.strip() if probe.rc == 0 else None
         if actual != expected_blob:
             raise Stop(f"roadmap artifact identity mismatch path={rel} expected={expected_blob} actual={actual}")
-    journal(repo, "ROADMAP_AUTHORITY", plan_sha=ROADMAP_PLAN_SHA, plan_blobs=json.dumps(ROADMAP_PLAN_BLOBS, sort_keys=True))
+    journal(repo, "ROADMAP_AUTHORITY", plan_generation=PLAN_GENERATION,
+            plan_blobs=json.dumps(ROADMAP_PLAN_BLOBS, sort_keys=True))
 
 
 def ensure_substitution_authority(repo: Path) -> None:
@@ -1365,11 +1372,13 @@ def slice_authority_text(sl: RoadmapSlice) -> str:
     if is_substitution_slice(sl):
         return (
             f"Owner substitution authority: {SUBSTITUTION_OWNER_PATH} on current authoritative main. "
-            f"Supporting audit: {SUBSTITUTION_AUDIT_PATH}. The original frozen plan still binds trust/effect "
-            f"requirements that the substitution contract explicitly preserves."
+            f"Supporting audit: {SUBSTITUTION_AUDIT_PATH}. Plan generation {PLAN_GENERATION} "
+            f"(`{ROADMAP_PLAN_PATH}` with handoff `{ROADMAP_HANDOFF_PATH}` at HEAD) still binds the "
+            f"trust/effect requirements that the substitution contract explicitly preserves."
         )
     return (
-        f"Original effect authority: exact plan {ROADMAP_PLAN_SHA}:{ROADMAP_PLAN_PATH}. "
+        f"Required effects and negative controls come from plan generation {PLAN_GENERATION} — `{ROADMAP_PLAN_PATH}` with handoff "
+        f"`{ROADMAP_HANDOFF_PATH}` at HEAD of the authoritative worktree, blob-verified by the orchestrator. "
         f"Implementation-shape authority: {SUBSTITUTION_OWNER_PATH} on current authoritative main."
     )
 
@@ -1454,7 +1463,7 @@ def roadmap_test_author_prompt(sl: RoadmapSlice, base_sha: str) -> str:
         "owner contract for task identity, dependencies, builder allowed_write and required effects."
         if is_substitution_slice(sl)
         else
-        "This is an original S-slice. Preserve the exact frozen plan's required effects/negative controls, "
+        "This is an original S-slice. Preserve the plan generation's required effects/negative controls, "
         "but apply the substitution contract wherever the old implementation shape would duplicate provider harness capability."
     )
     return f"""
@@ -1462,8 +1471,9 @@ Use `$nortropic-test-author`.
 
 This is Codex Operating Model v4 provider-neutral trust-kernel execution.
 BASE_SHA={base_sha}
-PLAN_SHA={ROADMAP_PLAN_SHA}
+PLAN_GENERATION={PLAN_GENERATION}
 PLAN_PATH={ROADMAP_PLAN_PATH}
+HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 OWNER_DELEGATION={FULL_ROADMAP_OWNER_PATH}
 SUBSTITUTION_AUTHORITY={SUBSTITUTION_OWNER_PATH}
 SUBSTITUTION_AUDIT={SUBSTITUTION_AUDIT_PATH}
@@ -1475,8 +1485,9 @@ REQUIRED_EXIT_TEST={sl.gate_path}
 REQUIRED_DEPENDENCIES={','.join(sl.required_deps) if sl.required_deps else 'NONE'}
 PLAN_ALLOWED_WRITE={json.dumps(list(sl.plan_allowed_write) if sl.plan_allowed_write is not None else [], ensure_ascii=False)}
 
-Read:
-  git show {ROADMAP_PLAN_SHA}:{ROADMAP_PLAN_PATH}
+Read, at HEAD in the authoritative working copy (the orchestrator has verified their blobs):
+  {ROADMAP_PLAN_PATH}
+  {ROADMAP_HANDOFF_PATH}
   {SUBSTITUTION_OWNER_PATH}
   {SUBSTITUTION_AUDIT_PATH}
 and higher authority. {sub_note}
@@ -1485,11 +1496,11 @@ Owner delegation:
 - make ordinary architecture choices needed to produce a truthful mechanism-neutral task contract
   and RED frozen gate without asking the human again;
 - create/update ONLY task `{sl.task_id}` in specs/tasks.spec.json and gate `{sl.gate_path}` plus
-  docs/loop/drift.md when needed; for original S5 only, the frozen plan
+  docs/loop/drift.md when needed; for original S5 only, the plan generation
   additionally permits its documented owner-pass correction to docs/loop/byggplan-v3.md §7;
 - do NOT implement production code or tests/controller/**;
 - do NOT alter the platform authority documents (AGENTS.md, docs/loop/regler.md,
-  docs/loop/byggplan-v3.md), the frozen plan, unrelated tasks, existing frozen gates, or weaken
+  docs/loop/byggplan-v3.md), the plan generation, unrelated tasks, existing frozen gates, or weaken
   any green regression control;
 - exact builder allowed_write must equal PLAN_ALLOWED_WRITE above;
 - bind every REQUIRED_DEPENDENCY above; additional legacy dependencies may remain only when truthful;
@@ -1522,13 +1533,14 @@ Independently falsify the frozen-contract candidate for {sl.code}: {sl.title}.
 BASE_SHA={base_sha}
 CANDIDATE_SHA={candidate_sha}
 TASK_ID={sl.task_id}
-PLAN_SHA={ROADMAP_PLAN_SHA}
+PLAN_GENERATION={PLAN_GENERATION}
 PLAN_PATH={ROADMAP_PLAN_PATH}
+HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 OWNER_DELEGATION={FULL_ROADMAP_OWNER_PATH}
 SUBSTITUTION_AUTHORITY={SUBSTITUTION_OWNER_PATH}
 SLICE_AUTHORITY={slice_authority_text(sl)}
 
-Read the exact frozen plan and substitution owner contract. Verify only the current slice task
+Read the plan generation, its handoff and the substitution owner contract. Verify only the current slice task
 object/gate/docs changed; exact owner-bound dependencies and allowed_write hold; the gate binds
 public effects rather than one implementation/provider; previous green semantics remain preserved;
 positive anchors exist; unsafe mutants go red; a legitimate alternative provider/implementation can
@@ -1545,7 +1557,9 @@ Independent gate review confirmed these blockers:
 {rendered}
 
 BASE_SHA={base_sha}
-PLAN_SHA={ROADMAP_PLAN_SHA}
+PLAN_GENERATION={PLAN_GENERATION}
+PLAN_PATH={ROADMAP_PLAN_PATH}
+HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 SUBSTITUTION_AUTHORITY={SUBSTITUTION_OWNER_PATH}
 SLICE_AUTHORITY={slice_authority_text(sl)}
 Make the smallest correction inside the same owner surface. Do not implement production code,
@@ -1647,15 +1661,16 @@ def slice_builder_extra(sl: RoadmapSlice, *, refrozen: bool = False) -> str:
         return (
             prefix
             + f"Implement owner-authorized substitution slice {sl.code} / {sl.task_id}. "
-            + f"Read `{SUBSTITUTION_OWNER_PATH}` and `{SUBSTITUTION_AUDIT_PATH}`; the current frozen task/gate on main is authority. "
+            + f"Read `{ROADMAP_PLAN_PATH}` and `{ROADMAP_HANDOFF_PATH}` at HEAD (plan generation {PLAN_GENERATION}), "
+            + f"`{SUBSTITUTION_OWNER_PATH}` and `{SUBSTITUTION_AUDIT_PATH}`; the current frozen task/gate on main is authority. "
             + "Use provider-native session/context/tool/retry primitives where the contract assigns them to the provider. "
             + "Do not move G20 containment, candidate identity, policy/gates, attestation/fencing or promotion into provider trust. "
             + "Do not redesign/widen the frozen contract."
         )
     return (
         prefix
-        + f"Implement roadmap slice {sl.code} from exact effect plan {ROADMAP_PLAN_SHA} under substitution authority `{SUBSTITUTION_OWNER_PATH}`. "
-        + f"Read it with git show {ROADMAP_PLAN_SHA}:{ROADMAP_PLAN_PATH}. The current frozen task/gate on main is authority. "
+        + f"Implement roadmap slice {sl.code} from plan generation {PLAN_GENERATION} under substitution authority `{SUBSTITUTION_OWNER_PATH}`. "
+        + f"Read `{ROADMAP_PLAN_PATH}` and `{ROADMAP_HANDOFF_PATH}` at HEAD in the authoritative working copy; the orchestrator has verified their blobs. The current frozen task/gate on main is authority. "
         + "Preserve plan effects/negative controls while preferring provider-native harness primitives for non-trust responsibilities. "
         + "Do not redesign or widen the frozen contract."
     )
@@ -1758,14 +1773,16 @@ complete provider-neutral Nortropic roadmap. It is not a synthetic builder task 
 added to specs/tasks.spec.json.
 
 BASE_SHA={base_sha}
-PLAN_SHA={ROADMAP_PLAN_SHA}
+PLAN_GENERATION={PLAN_GENERATION}
 PLAN_PATH={ROADMAP_PLAN_PATH}
+HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 OWNER_DELEGATION={FULL_ROADMAP_OWNER_PATH}
 SUBSTITUTION_AUTHORITY={SUBSTITUTION_OWNER_PATH}
 PROGRAM_GATE={EMPIRICAL_GATE_PATH}
 
-Read:
-  git show {ROADMAP_PLAN_SHA}:{ROADMAP_PLAN_PATH}
+Read, at HEAD in the authoritative working copy (blobs verified by the orchestrator):
+  {ROADMAP_PLAN_PATH}
+  {ROADMAP_HANDOFF_PATH}
   {SUBSTITUTION_OWNER_PATH}
   {SUBSTITUTION_AUDIT_PATH}
 
@@ -1804,8 +1821,9 @@ Use `$nortropic-gate-reviewer`.
 Independently falsify the PROGRAM-LEVEL empirical stage-L gate candidate.
 BASE_SHA={base_sha}
 CANDIDATE_SHA={candidate_sha}
-PLAN_SHA={ROADMAP_PLAN_SHA}
+PLAN_GENERATION={PLAN_GENERATION}
 PLAN_PATH={ROADMAP_PLAN_PATH}
+HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 SUBSTITUTION_AUTHORITY={SUBSTITUTION_OWNER_PATH}
 PROGRAM_GATE={EMPIRICAL_GATE_PATH}
 OWNER_DELEGATION={FULL_ROADMAP_OWNER_PATH}
@@ -1900,6 +1918,9 @@ def empirical_gate_contract_flow(repo: Path, wt_root: Path, guidance: str = "") 
             repo, wt, "TEST_AUTHOR",
             f"""Use `$nortropic-test-author` again. The independent reviewer confirmed these blockers
 against the empirical program gate:\n{json.dumps(blockers, ensure_ascii=False, indent=2)}\n
+PLAN_GENERATION={PLAN_GENERATION}
+PLAN_PATH={ROADMAP_PLAN_PATH}
+HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 Keep the same program-level owner surface. Do not modify production/spec/task gates. Preserve
 product RED for the incomplete roadmap and strengthen only the truthful stage-L effects.""",
             "EMPIRICAL_GATE_REMEDIATION", "L"
@@ -2041,15 +2062,16 @@ Use `$nortropic-empirical-runner`. Do not modify repository files.
 This is independent closeout/falsification for stage L AFTER the frozen program gate
 `{EMPIRICAL_GATE_PATH}` has been executed by the orchestrator.
 AUTHORITATIVE_MAIN={base_sha}
-PLAN_SHA={ROADMAP_PLAN_SHA}
+PLAN_GENERATION={PLAN_GENERATION}
 PLAN_PATH={ROADMAP_PLAN_PATH}
+HANDOFF_PATH={ROADMAP_HANDOFF_PATH}
 OWNER_DELEGATION={FULL_ROADMAP_OWNER_PATH}
 SUBSTITUTION_AUTHORITY={SUBSTITUTION_OWNER_PATH}
 
 FROZEN_PROGRAM_GATE_OUTPUT:
 {gate_output[-12000:]}
 
-Read the exact plan, substitution contract, frozen program gate and public controller/provider
+Read the plan generation, its handoff, the substitution contract, the frozen program gate and public controller/provider
 interfaces. Independently inspect or reproduce decisive end-to-end effects in disposable state.
 The frozen gate is root of the stage-L verdict; your READY can never turn a red gate green.
 
@@ -2171,7 +2193,9 @@ def empirical_unattended_flow(repo: Path, wt_root: Path) -> None:
             f"nortropic/loop-{target}-empirical-{fresh[:8]}",
             f"loop-{target}-empirical-builder-{fresh[:8]}",
             f"[LOOP] {target}: remediate empirical unattended run",
-            extra=f"Empirical stage L exposed this architect-routed defect: {guidance}. Current frozen task/gate on main is authority."
+            extra=(f"Empirical stage L exposed this architect-routed defect: {guidance}. "
+                   f"Plan generation {PLAN_GENERATION}: read `{ROADMAP_PLAN_PATH}` and `{ROADMAP_HANDOFF_PATH}` at HEAD. "
+                   f"Current frozen task/gate on main is authority.")
         )
     raise Stop(f"HUMAN_AUTHORITY_HARD_STOP: empirical remediation budget exhausted after {EMPIRICAL_MAX_ROUNDS} rounds")
 
@@ -2216,7 +2240,7 @@ def full_roadmap(repo: Path, wt_root: Path) -> None:
     journal(
         repo,
         "FULL_ROADMAP_SOFTWARE_COMPLETE",
-        plan_sha=ROADMAP_PLAN_SHA,
+        plan_generation=PLAN_GENERATION,
         substitution_blob=SUBSTITUTION_BLOBS[SUBSTITUTION_OWNER_PATH],
         main=base,
         slices=all_codes,
@@ -2229,7 +2253,7 @@ def full_roadmap(repo: Path, wt_root: Path) -> None:
     journal(
         repo,
         "FULL_ROADMAP_COMPLETE",
-        plan_sha=ROADMAP_PLAN_SHA,
+        plan_generation=PLAN_GENERATION,
         substitution_blob=SUBSTITUTION_BLOBS[SUBSTITUTION_OWNER_PATH],
         main=origin_main(repo),
         slices=all_codes,
@@ -2569,16 +2593,19 @@ def selftest(repo: Path | None = None) -> None:
     if {x.code: (x.task_id, x.gate_path) for x in SUBSTITUTION_ROADMAP} != sub_exact:
         raise Stop("substitution task/gate mapping drifted from owner contract")
     if {x.code: (x.task_id, x.gate_path) for x in ROADMAP} != road_exact:
-        raise Stop("S-roadmap task/gate mapping drifted from frozen plan")
+        raise Stop("S-roadmap task/gate mapping drifted from the plan generation")
     # Migration floor: S2/S4/S5 must not be schedulable before SUB-4.
     for code in ("S2", "S4", "S5"):
         sl = next(x for x in ROADMAP if x.code == code)
         if "h-030" not in sl.required_deps:
             raise Stop(f"provider-neutral dependency floor missing from {code}")
-    if ROADMAP_PLAN_SHA != "0b3212c991d4227c8df2656465ae2c0252dda39e":
-        raise Stop("roadmap authority SHA drift")
+    if PLAN_GENERATION != "platform-v2" or set(ROADMAP_PLAN_BLOBS) != {ROADMAP_PLAN_PATH, ROADMAP_HANDOFF_PATH}:
+        raise Stop("plan generation identity drift")
+    if (ROADMAP_PLAN_BLOBS.get(ROADMAP_PLAN_PATH) != "fbdbcf05acbac3e0e86271607af9f5375da938ca" or
+            ROADMAP_PLAN_BLOBS.get(ROADMAP_HANDOFF_PATH) != "a0c0c9edd37cdf1a0ee955d3b5ce5615d72f3bb5"):
+        raise Stop("plan generation blob drift")
     if (len(SUBSTITUTION_BLOBS) != 11 or
-            SUBSTITUTION_BLOBS.get(SUBSTITUTION_OWNER_PATH) != "1fde089c8f685ed0f439f87bf86a2a3d4bdb3774" or
+            SUBSTITUTION_BLOBS.get(SUBSTITUTION_OWNER_PATH) != "387fbc94916ae23b8440d94958cd0e29d93527ac" or
             SUBSTITUTION_BLOBS.get(SUBSTITUTION_AUDIT_PATH) != "bb5f99c111cd5aaf784e73e67bde354023b1b5f2"):
         raise Stop("substitution authority blob drift")
     if repo is not None and repo.exists():
@@ -2628,7 +2655,7 @@ def selftest(repo: Path | None = None) -> None:
     print("AUTOPILOT_V4_SELFTEST=PASS")
     print("SUBSTITUTION=" + "->".join(sub_codes))
     print("ROADMAP=" + "->".join(road_codes))
-    print(f"PLAN_SHA={ROADMAP_PLAN_SHA}")
+    print(f"PLAN_GENERATION={PLAN_GENERATION}")
     print(f"SUBSTITUTION_CONTRACT_BLOB={SUBSTITUTION_BLOBS[SUBSTITUTION_OWNER_PATH]}")
     print(f"EMPIRICAL_GATE={EMPIRICAL_GATE_PATH}")
 
@@ -2679,7 +2706,7 @@ def status(repo: Path, wt_root: Path) -> None:
     print("AUTOPILOT_VERSION=4")
     print(f"REPOSITORY={ident}")
     print(f"ORIGIN_MAIN={om}")
-    print(f"FULL_ROADMAP_PLAN_SHA={ROADMAP_PLAN_SHA}")
+    print(f"FULL_ROADMAP_PLAN_GENERATION={PLAN_GENERATION}")
     print(f"SUBSTITUTION_CONTRACT_BLOB={SUBSTITUTION_BLOBS[SUBSTITUTION_OWNER_PATH]}")
     enabled, done, blocked, _plist, _label = supervisor_paths()
     print(f"SUPERVISOR_ENABLED={'YES' if enabled.exists() else 'NO'}")
@@ -2701,7 +2728,7 @@ def roadmap_status(repo: Path, wt_root: Path) -> None:
     base = origin_main(repo)
     scan = detached_worktree(repo, wt_root, f"status-roadmap-{base[:12]}-{now_id()}", base)
     try:
-        print(f"ROADMAP_PLAN_SHA={ROADMAP_PLAN_SHA}")
+        print(f"ROADMAP_PLAN_GENERATION={PLAN_GENERATION}")
         print(f"SUBSTITUTION_CONTRACT_BLOB={SUBSTITUTION_BLOBS[SUBSTITUTION_OWNER_PATH]}")
         print(f"SUB-0\t{SUBSTITUTION_OWNER_PATH}\tFROZEN")
         for sl in SUBSTITUTION_ROADMAP + ROADMAP:
@@ -2798,7 +2825,7 @@ def doctor(repo: Path) -> None:
     if git(repo, "cat-file", "-e", f"refs/remotes/origin/main:{FULL_ROADMAP_OWNER_PATH}", check=False).rc != 0:
         raise Stop(f"full-roadmap owner delegation missing from origin/main: {FULL_ROADMAP_OWNER_PATH}")
     print(
-        f"DOCTOR=PASS\nREPOSITORY={ident}\nORIGIN_MAIN={om}\nROADMAP_PLAN_SHA={ROADMAP_PLAN_SHA}\n"
+        f"DOCTOR=PASS\nREPOSITORY={ident}\nORIGIN_MAIN={om}\nROADMAP_PLAN_GENERATION={PLAN_GENERATION}\n"
         f"SUBSTITUTION_CONTRACT_BLOB={SUBSTITUTION_BLOBS[SUBSTITUTION_OWNER_PATH]}\n"
         "ARCHITECTURE=PROVIDER_NEUTRAL_TRUST_KERNEL\n"
         "FULL_ROADMAP=YES\nCODEX_FULL_ACCESS_MODE=danger-full-access\nAPPROVAL_POLICY=never"

@@ -13,6 +13,7 @@ This is workflow separation, never a security boundary. The enforced technical p
 
 1. `AGENTS.md` (authority order, autonomous flow, technical protections)
 2. `docs/loop/regler.md`
+2b. plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` med `docs/loop/autonomous-loop-platform-handoff-v2.md`
 3. `docs/loop/byggplan-v3.md`
 4. the exact decision/contract artifact named by the orchestrator
 5. the test-author candidate commit/diff

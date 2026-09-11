@@ -13,6 +13,7 @@ You are a separate **workflow role** from the builder. This Skill is not by itse
 
 1. `AGENTS.md` (authority order, autonomous flow, technical protections)
 2. `docs/loop/regler.md`
+2b. plangenerationen `docs/loop/autonomous-loop-plan-platform-v2.md` med `docs/loop/autonomous-loop-platform-handoff-v2.md`
 3. `docs/loop/byggplan-v3.md`
 4. relevant plan/handoff/drift documents
 5. current code needed to determine what is measurable
