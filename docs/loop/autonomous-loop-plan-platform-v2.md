@@ -21,8 +21,11 @@ ingripande eller verksamhetsspecifika beroenden. Där den tidigare generationen 
 styrtext binder denna generation samma krav till plattformens egen spec, grind eller kontraktsflöde.
 
 Planen läses av autopiloten (`scripts/nortropic-codex-autopilot.py`), av rollskillsen under `.agents/skills/`
-och av de agenter rollflödet startar. Varje arbetsdel i skivtabellen nedan motsvarar exakt en post i
-autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`; tabellen och exekveringen är en och samma sanning.
+och av de agenter rollflödet startar. Femton av skivtabellens arton rader — SUB-1 till SUB-4 och S2 till S13 —
+motsvarar exakt, och i samma ordning, posterna i autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`; för dem är
+tabellen och exekveringen en och samma sanning. De tre övriga raderna har ingen post i tuplarna: S1 och S3 är
+byggda före plattformsgenerationen och läses ur sina specrader, och L är programgrinden, vars sökväg kommer ur
+autopilotens `EMPIRICAL_GATE_PATH`.
 
 ## Målbild
 
@@ -100,6 +103,12 @@ ordning: varje beroende som är en annan rad står tidigare.
 | L | - | verify/bin/autonomous-loop-exit | - | h-027, h-028, h-029, h-030, h-015, h-018, h-019, h-014, h-020, h-021, h-022, h-023, h-024, h-025, h-026 | OBYGGD |
 
 ### Vad varje skiva ska åstadkomma
+
+Raderna nedan är sammanfattningar. De detaljerade, mätbara exitkriterierna och de skivspecifika negativa
+kontrollerna för de obyggda skivorna S4, S5 och S7 till S13 står i `## Appendix A` sist i detta dokument och
+är bindande på samma sätt som texten här. För S1, S2, S3 och S6 står motsvarande kriterier i
+`docs/loop/byggplan-v3.md` §7 och i respektive specrad; för SUB-1 till SUB-4 i
+`docs/loop/harness-substitution-contract-v1.md` §6.
 
 - **S1 (h-017) — betrodd uppgiftsspecifik acceptansgrind + G20.** Byggd. Varje uppgift döms av sin egen
   frysta exitgrind, och inneslutningen prövas mekaniskt. Regeln består: en byggare kan aldrig vidga sin
@@ -220,3 +229,173 @@ Dessa punkter är OVERIFIERAT tills de har mätts mekaniskt; ingen av dem blocke
   autopilotens tuplar och specradens `exit_test`. En specändring kräver kontraktsflödet.
 - Programgrindens namn `verify/bin/autonomous-loop-exit` är bundet av autopilotens `EMPIRICAL_GATE_PATH`
   och byts inte utan en ny frysning.
+
+## Appendix A — bevarade krav och negativa kontroller för de obyggda skivorna
+
+Detta appendix bär de detaljerade exitkriterierna och de skivspecifika negativa kontrollerna för S4, S5 och
+S7 till S13. De är oförändrade funktions- och säkerhetskrav från den föregående plangenerationen, återgivna i
+plattformens egen struktur och renade från verksamhetsstyrning och krav på generellt mänskligt ingripande.
+Skrivytor, beroenden och exitprov står i skivtabellen och upprepas inte här.
+
+Kriterierna är bindande för test-author när skivan fryses: den frysta grinden ska mäta de namngivna effekterna
+och avvisa de namngivna negativa kontrollerna. Där ett krav inte längre går att uppfylla i plattformens form
+ska avvikelsen skrivas ut i frysningen, inte tigas ihjäl.
+
+### A.4 — S4 / h-018, strukturerad felåterkoppling
+
+Exitkriterium. Efter ett fallet försök finns en immutabel artefakt adresserad per (`run_id`, `task_id`,
+`attempt_id`), och försök N+1 får den i kuvertet — i ett färskt workspace på samma fastställda task-base.
+Den fallna kandidaten blir aldrig nästa försöks base. Artefakten bär `run_id`, `task_id`, `attempt_id`,
+base-identitet, kandidatidentitet där sådan finns, felstadium, felklass, grindens/verifierarens identitet,
+exitkod, timeout eller signal, relevant stdout, relevant stderr och evidensreferenser. Den innehåller aldrig
+grindens kod, dess kontrollnamn eller verifierarregistret — mätt genom att en grind vars text bär en unik
+markörsträng aldrig läcker markören till kuvertet. Ett andra försök skriver en ny artefakt, och den första är
+byte-identisk efteråt.
+
+Negativa kontroller. Försök N+1 utan artefakt · artefakt som bär grindens innehåll eller registret · artefakt
+som skrivs över · återkoppling som når en uppgift den inte gäller · fallen kandidat använd som ny base ·
+återanvänt workspace.
+
+Avgränsning mot S5 (annars två sanningar). Återkopplingsartefakten är auktoritet för vad byggaren får veta.
+Händelsen `feedback.created` bär bara en referens till artefakten, aldrig dess innehåll. Ingen komponent får
+läsa återkoppling ur händelseströmmen.
+
+### A.5 — S5 / h-019, typade livscykelhändelser
+
+Exitkriterium. Varje händelse bär `schema_version`, `event_id`, `seq`, `ts`, `run_id`, `task_id`,
+`attempt_id`, `event_type`, `payload` och `evidence_refs`. Ordningen läses ur `seq`; väggklockans `ts` får
+aldrig ensam definiera ordning, och ett prov med bakåtgående klocka ska inte ändra läsordningen. Strömmen är
+append-only: en avbruten körning lämnar en läsbar logg där varje rad är exakt en händelse. Uppgiftstillståndet
+i den befintliga loopen är byte-identiskt före och efter en körning som skriver hundra händelser, mätt med
+sha256. Ett okänt `event_type` avvisas, aldrig tolkas. Strömmen är aldrig schemaläggnings- eller
+färdigställandeauktoritet: uppgiftsval och attestering läser den inte, mätt genom att en körning med raderad
+händelseström ger identiska domar.
+
+Händelsefamiljer: `run.*`, `task.*`, `attempt.*`, `workspace.*`, `agent.*`, `candidate.*`, `policy.*`,
+`verification.*`, `feedback.*`, `evaluation.*`, `attestation.*`, `promotion.*`, `merge.*`, `main.*`,
+`breaker.*`, `budget.*`.
+
+Negativa kontroller. Händelse skriven i den befintliga loopens logg · halvskriven rad · `event_type` utanför
+schemat accepteras · saknad `attempt_id` på en försökshändelse · ordning läst ur `ts` · någon komponent som
+fattar beslut ur strömmen.
+
+### A.7 — S7 / h-020, verifierad autopromotion
+
+Exitkriterium, mätt mot ett lokalt bare-repo som står för origin och aldrig mot den verkliga fjärran:
+
+1. En promotionsberättigad attestering flyttar huvudlinjen till kandidatens SHA med en non-force
+   fast-forward-push, och referensen läses om efteråt och svarar kandidatens SHA.
+2. En attestering utan uppgiftsgrindens verdikt flyttar aldrig huvudlinjen.
+3. Har fjärran rört sig från A till C sedan verifieringen avbryts promotionen, huvudlinjen står orörd, och
+   kandidaten går vidare till S8 — den skrivs aldrig över.
+4. Är A inte förfader till B avbryts promotionen.
+5. Promotion utan giltigt, bevisat lease-ägarskap sker aldrig.
+6. Samma promotion körd två gånger ger ett huvudlinjeläge.
+7. En byggarsession som skriver ut hela sin miljö och hela sitt filträd läcker aldrig promotionsnyckeln.
+8. Ingen force-semantik förekommer i någon kodväg — mätt statiskt: noll förekomster av `--force`,
+   `--force-with-lease` och ledande `+` i refspec i hela komponenten.
+
+Promotionen bär alltså förväntad gammal huvudlinje-SHA och kräver fast-forward, och den är idempotent och
+kraschsäker.
+
+Negativa kontroller. Attestering utan grindidentitet befordras · huvudlinjen har rört sig och skrivs över ·
+force-push i någon väg · promotion utan efterkontroll · dubbelkörning ger två promotioner · promotion efter
+förlorat lease · nyckeln läsbar för byggaren · nyckeln i controllerns miljövariabler · promotion mot ett annat
+repo än plattformsrepot.
+
+### A.8 — S8 / h-021, konfliktlösning med fullständig omverifiering
+
+Exitkriterium. En verifierad kandidat B som inte kan befordras mot aktuell huvudlinje C ger en ny kandidat D
+där `parent(D) = C` — en single-parent-commit ovanpå aktuell huvudlinje, inte en Git-merge-commit. D:s
+attestering skapas först efter att policy, global verifierare, uppgiftsgrind och krävd bedömare körts om från
+noll mot D. B:s attestering, PASS och bedömning återanvänds aldrig — mätt genom att D:s dom uteblir när D är
+saboterad, trots att B var grön. Lösaren får B:s avsedda delta och konflikten, aldrig B:s attestering eller
+dom. Promotion av D är en vanlig fast-forward C → D. Rör sig huvudlinjen igen till E är det ett nytt
+avgränsat försök, inte ett fel. Konfliktlösningen har egen avgränsad budget i antal försök och väggtid; nås
+taket stannar körningen med orsak och uppgiften förblir tagen.
+
+Negativa kontroller. D ärver B:s attestering eller bedömning · D är en merge-commit med två föräldrar ·
+`parent(D)` är inte aktuell huvudlinje · omverifiering hoppas över · konfliktlösning utan budget · konflikt
+löst utan evidens · en huvudlinje som rör sig igen behandlas inte som ett nytt försök · force i
+konfliktlösningsvägen.
+
+### A.9 — S9 / h-022, betrodd kontrollplanstransition
+
+Exitkriterium. Efter promotion av en trust-kritisk ändring avslutas den gamla controllern rent, supervisorn
+bootstrap-verifierar den nya auktoritativa huvudlinjen, och först därefter startas en ny controlleridentitet
+som återupptar backloggen. Ingen process överlever promotionen och fortsätter döma — mätt med en
+kandidatversion som bär en unik markörsträng: markören får inte förekomma i något som kördes före
+promotionen, och den gamla processens pid får inte leva efter transitionen. Den nya controllern dömer
+ingenting innan bootstrap är grön. Det finns exakt en betrodd auktoritet åt gången, aldrig två.
+
+Avgränsning mot G20. G20 (S1) svarar på frågan vem som dömer kandidaten. S9 svarar på hur den befordrade
+versionen blir nästa betrodda körtid. S9 får inte duplicera G20, och G20 får inte skjutas hit.
+
+Negativa kontroller. Omladdning utan omstart · ny controller dömer före bootstrap · två trust-auktoriteter
+samtidigt · bootstrap som inte verifierar den nya huvudlinjen · gammal process som lever vidare.
+
+### A.10 — S10 / h-023, intag och kanonisk Task IR
+
+Exitkriterium. En Markdown-fil med två arbetsmål ger två uppgifter i kanonisk IR, var och en spårbar till
+källans sha256 och sektion via proveniens. Källan sparas som en immutabel ögonblicksbild. En uppgift som inte
+kan göras tillräckligt verifierbar hamnar i `NEEDS_SPEC` med noll byggarstarter — mätt genom att ingen
+session startar och inget workspace skapas. Den genererade IR-filen kan matas till loopen som `spec` utan att
+någon befintlig komponent ändras.
+
+Negativa kontroller. Uppgift utan verifieringskontrakt når byggaren · proveniens saknas eller pekar fel ·
+`NEEDS_SPEC` startar ändå en session · genererad JSON som inte går att spåra till källans sha256 ·
+källögonblicksbild som muteras · planerare som hittar på svaga acceptanskriterier och ändå går READY.
+
+### A.11 — S11 / h-024, verifierarförfattare och utmanare
+
+Exitkriterium. För en uppgift utan ett i förväg skrivet prov produceras en grind som fryses i registret med
+sökväg och sha256 innan byggaren startar. Utmanaren fäller en medvetet svag grind — mätt med en grind som
+alltid säger ja, som utmanaren måste avvisa. Författare och byggare körs i skilda sessioner och skilda
+trust-domäner, mätt genom att byggarens sessionsidentitet aldrig sammanfaller med författarens. Kan kontraktet
+inte göras tillräckligt starkt blir utfallet `NEEDS_SPEC` med noll byggarstarter. Registret ligger utanför
+skivans skrivyta; en ny grind registreras genom kontraktsflödet.
+
+Negativa kontroller. Författare och byggare i samma session · utmanare som inte fäller en medvetet svag grind
+· grind som fryses utan att ha prövats åt båda hållen · grind som ändras efter frysning · byggare som når
+grindens innehåll.
+
+### A.12 — S12 / h-025, oberoende bedömare
+
+Exitkriterium. Bedömaren körs först när de hårda grindarna är gröna; en röd grind går aldrig vidare. Ett fynd
+blir en återkopplingsartefakt enligt A.4 och tvingar fram en ny kandidat som verifieras från noll. En bedömare
+som säger ja om en kandidat med röd grind ändrar ingenting — attesteringen uteblir ändå, mätt. Riskklassen
+styr: låg risk ger hårda grindar, normal risk ger dessutom en färsk bedömare, hög eller omtvistad risk ger
+dessutom avgränsad adversariell korsgranskning mellan två oberoende providers. Rundor och kostnad har tak i
+konfigurationen; en körning som når taket stannar med orsak. Bedömaren får kandidatens diff, uppgiftskontraktet
+och evidensreferenser — aldrig grindens kod eller registret.
+
+Negativa kontroller. Bedömarens ja attesterar ensamt · fynd som inte ger omverifiering · obundet antal rundor
+· kostnad utan tak · bedömare körd före de hårda grindarna · bedömare som ser grindens implementation ·
+samstämmighet behandlad som PASS.
+
+### A.13 — S13 / h-026, typad läs- och kommandoyta
+
+Exitkriterium. Fem verb fungerar med typad nyttolast, och ett sjätte verb avvisas:
+
+```text
+intake.submit               { source_ref, source_sha256 }
+run.start                   { config_ref }
+run.pause_at_safe_boundary  { run_id }
+run.resume                  { run_id }
+inspect                     { task_id | run_id }
+```
+
+En nyttolast som bär en skalsträng exekveras aldrig — mätt med en nyttolast vars innehåll skulle ha skapat en
+kanariefil om den tolkats. Läsytan svarar ur händelseströmmen och kan inte skriva. Controllerns lokala
+tillstånd förblir auktoritet: en projektion som gått isär ändrar ingen dom. Är ytan nere kör controllern
+vidare oförändrat, mätt med identiska attesteringar och identisk exitkod. `run.pause_at_safe_boundary`
+definierar säker gräns som mellan uppgifter, aldrig mitt i ett försök — annars lämnas workspace och lease i
+obestämt läge.
+
+Bindande: ingen generisk skalyta, ingen generisk Git-yta, ingen tvingad merge, ingen godtycklig filredigering.
+Ett kommando är ett namn ur listan plus en typad nyttolast, aldrig en sträng som blir ett kommando. Den
+konsumerande verksamheten får aldrig bli den komponent som själv certifierar eller befordrar Git.
+
+Negativa kontroller. Kommando utanför de fem verben accepteras · skalsträng exekveras · godtycklig
+filredigering · generisk Git-yta · projektion behandlad som auktoritet · fel i läsytan som stoppar eller
+ändrar controllern · ytan som själv befordrar.
