@@ -1041,5 +1041,45 @@ byggare / 1 flöde / 101 producerade texter / 0 sidoeffekter.
 De 26 från v3/v3.1 fångas på samma rader (planändrande mutanter dessutom på cli-effektraderna eftersom pinnarna inte
 ompinnades). Granskarens nr 6 och egna varianter: (a_flowoptout) a02 + dött `journal`-namn → `f4_produced_prompts_free_of_…` (byggaren anropas nu; flöden bara via signatur); (a_shadow) död krävd byggare + levande tvilling `architect_prompt_live` → slutna-världen-raden (byggarmängd ≠ 15, runner-prompt från icke-byggare); (a_shadow2, egen) tvilling utan promptnamn, resultat via variabel → slutna-världen-raden (Name → tilldelning → Call till icke-byggare som refererar en byggare); (a_two_tables) kommentardold korrekt + synlig avvikande tabell → skivtabellraden (S2 utan h-030 i den synliga); (a_handoff_exist) handoffens existens i stället för bytes → `f4_ensure_roadmap_plan_stops_on_mutated_handoff`; (a_cli_dead_pin) filtrerad `PLATFORM_DOCUMENTS_LIVE` → båda cli-effektraderna; (a_casevariant) skiftlägestvilling som indexpost → `f1_tracked_paths_unique_case_insensitively`, exit 1 (v3.1: RIG exit 2); (a_sideeffect) byggare skriver $HOME/SIDE-EFFECT-MARKER → sidoeffektraden (filen landar i fixturens HOME); (a_nosections, egen) `## AVSLUTSKRITERIER` borttagen → krävda-avsnitt-raden. Alla 36: exit 1, 0 riggfel, 0 missade. Grindmutanten (h) faller alltjämt på kanarien.
 
+### Oberoende kontraktsgranskning nr 7 (på 6d6f86c3) → v3.3
+`GATE_REVIEW_RESULT=NOT_READY`: B1 (sluten värld över namn men öppen över textkällor: globals-uppslag, parameter-genomsläpp,
+modulmall, klassmetod, runner-alias → levande prompt utan plan), B2 (`ensure_roadmap_plan` bunden som funktion, inte som anropad
+vakt) + N1–N10. Remediering v3.3 (grind sha256 `f83b05c42f93956d99c84cdb7ee63153d21d5c3e3d1aad3ccb97b2ba2a2f1d60`, 2194 rader, 109 rader i körning; commit `9a2644e3`):
+
+| Fynd | Åtgärd i grinden (rad i v3.3) |
+|---|---|
+| B1 textkällor | `prompt_world` fail-closed `classify` (r.656–807): rot = direkt byggaranrop / f-sträng i förväntat flöde / `prompt`-param i runner; alla tilldelningar till ett namn måste ha rot; `IfExp` med rotlös gren, metodanrop utanför `PROMPT_TEXT_METHODS` (r.237), subscript, comprehension, modulnamn, andra funktioner = RÖTT; runner-alias i funktion och på modul-/klassnivå (r.694,712); modul-/klasssvep (markör, inbäddad `docs/`-fil); dynamiskt svep `stray` i DRIVER; nåbarhet via `Call.func`; kanari (r.1228) |
+| B1 dynamisk | DRIVER `live_flows` (r.400–428): stubbad `run_codex`, stubbade worktree/`clean`/`origin_main`; `f4_live_flows_reach_…` (r.1869) |
+| B2 vakten | `EXPECTED_PLAN_GUARD_CALLERS` (r.239) → `f4_ensure_roadmap_plan_called_from_…` (r.1845); `f4_live_flows_stop_before_…` (r.1888) på muterad replika |
+| N1 ref-namn | `COMMIT_READ_TOKENS` + `git show <ref≠HEAD>:` och `refs/preserved/` (r.211); kanari |
+| N2 synlig bootstrap | bootstrapraden läser `visible_markdown` (r.1972) |
+| N3 läsvy-tabell | `parse_slice_table`: slice-liknande tabeller med andra kolumner = fel (r.838); kanari |
+| N4 NFC/NFD | `collision_key` NFC+gemener (r.1109); `core.quotePath=false` i alla Git-anrop (r.912,1118) |
+| N5 handoff-cli | `f3_platform_prepare_refuses_mutated_handoff_in_replica` (r.1748) |
+| N6 sidoeffekter | `snapshot_tree(skip_git=True)` + `snapshot_names` för `/private/tmp`, `/private/tmp/claude`, tempkatalog (r.970, 1808–1818) |
+| N7–N10 | dokumenterade som gränser (formgräns för avsnitt, körtidsläsning, rigiditet, FIXTURE_ROOT-städning) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.3 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.3 + dokument (fixtur-HEAD `9b28692a`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **72 PASS / 37 FAIL**
+(109 rader), result.json sha256 `d4fb0bd071475a65c4fc7233c910ab3324817415e88a6e6d58a0fa55a0982418`. Röda: v3.2:s 34 plus (v3.3) `f3_platform_prepare_refuses_mutated_handoff_…`
+(ingen ny handoff), `f4_live_flows_reach_…` (den levande prompten bär den gamla plancommiten och saknar plan/handoff) och
+`f4_live_flows_stop_before_…` (ingen ny plan att mutera → flödena når runnern) — alla av rätt skäl; nya gröna på 320c9df7:
+slutna-världen-raden och vaktanroparraden (v2.5-produktens autopilot har exakt de förväntade mängderna). F7 oförändrat:
+control-set 68/68 (`897cf465…`), launch-cwd 19/20 med exakt två extra grindar (`4cfa6d16…`), governance 68/70 exakt {g6, g7}
+(`86f6c1ba…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.3 (scratch, förkastad)
+Som v3.2 (ingen produktändring krävdes för v3.3). Fixtur-HEAD `3b4562f6`, 143 filer. Fullkörning (bypass, egen `TMPDIR`):
+exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **109/109**, result.json sha256 `460e703344bb0b0eded1c1afa3fba587330cf4bfaeae5f40b29315026a2711be`; control-set 68/68 (`023c5030…`),
+launch-cwd 19/20 (`243ca000…`), governance 68/70 exakt {g6, g7} (`77d4953a…`), loopsvit 53 ok / 0 FEL; 15 byggare / 1 flöde /
+101 texter / 0 sidoeffekter; live-flöden: 5 fångade prompter med plan+handoff (2569–3660 tecken), muterad replika: 4 stopp
+före runnern.
+
+### F9 v3.3 — negativer (var och en i egen replika av v3.3-referensen, statiskt `--skip-held-gates`; 48 körda,
+48 fångade, 0 riggfel)
+De 36 från v3–v3.2 fångas på samma rader (planändrande mutanter dessutom på `f4_live_flows_reach_…` eftersom pinnarna inte
+ompinnades). Granskarens nr 7: (a_globals_twin) byggaren via `globals()`, död `assert` → slutna-världen-raden (anrop till icke-byggare som rot); (a_param_passthrough) genomsläppt parameter + neutral text → slutna-världen-raden (`IfExp` med rotlös gren, parameter som rot); (a_module_template) modulnivåmall med markör → slutna-världen-raden (stray + modulnamn som textkälla) + `f4_live_flows_reach_…` (levande prompt utan plan); (a_class_twin) klassmetod via modulinstans → slutna-världen-raden (stray, metodanrop) + live-raden; (a_runner_alias) `_rc = run_codex` → slutna-världen-raden (alias på modulnivå) + live-raden; (a_unwired_ensure) tre vaktanrop borttagna → vaktanroparraden + `f4_live_flows_stop_before_…` (flödena når runnern med muterad plan); (a_refname_read) `git show refs/preserved/…:` i arkitektskillen → skillens dokumentrad + trädvid + skillraden (N1); (a_second_table_7col) 7-kolumns läsvy → skivtabellraden (N3); (a_boot_comment) id:n i HTML-kommentar → bootstrapraden (N2); (a_nfd_twin, äkta tvilling med `core.precomposeunicode=false`) → `f1_tracked_paths_unique_…`, exit 1 (N4; den kollapsade enkelposten utan arbetsträdsfil ger riggfel av rätt skäl); (a_cli_skip_handoff) → `f3_platform_prepare_refuses_mutated_handoff_…` (N5); (a_side_abs) skrivning till /private/tmp/claude → sidoeffektraden (N6). Alla 48 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade. Not: 47 negativer kördes mot grinden före den sista quotePath-justeringen (enbart okvoterade icke-ASCII-sökvägar i Git-anrop; ingen ASCII-rad påverkas), a_nfd_twin mot den slutliga.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
