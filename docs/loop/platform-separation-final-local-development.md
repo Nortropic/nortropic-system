@@ -1899,5 +1899,94 @@ krävde ingen produktändring.
 | B3 loggen i svepet | undantaget borttaget; endast `stublog/seq`, `stublog/lock` och `stublog/call-<n>[.stdin]` är redovisade, allt annat i katalogen är en sidoeffekt |
 | B3 nämnare | `live_stub_call_total` binds av den nya raden mot de tre in-process-räknarna och mot det mätta golvet |
 
+### Test-author 2026-09-11 — baslinje RED för v3.10 (före produkt)
+Subjekt: omklonad replika av `320c9df7` + grind v3.10 + utvecklingsdokument, **en** commit (fixtur-HEAD `9593e3ec`).
+Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **74 PASS / 53 FAIL** av **127 rader**.
+Fullkörning (bypass, egen `TMPDIR`, `/bin/ps`-kontroll före): exit **1**, `RED_LOCAL_QUALIFICATION`,
+**79 PASS / 48 FAIL**, result.json sha256 `bb4dde21fe7bece43879046f377076014c01cc646a5db57bf95a8b7d03956d46`. Delta statisk→full är exakt de fem
+sandboxraderna.
+
+**Radantalet är 127, inte 121**, därför att ägarbeslutets sex bindningar tillkommit (B1–B5). **De TILLKOMNA röda
+raderna jämfört med v3.9/v3.10:s förra mätning är exakt dessa sex, och noll rader försvann** (`comm` mot den förra
+FAIL-mängden):
+
+```text
+f2_regler_md_carries_the_working_method_role_flow_frozen_gate_rule_gate_change_rule_review_standard_and_rig_threat_model
+f2_agents_claude_and_role_skills_reference_regler_md_and_the_plan_without_duplicating_a_normative_sentence
+f4_plan_generation_avslutskriterier_carry_the_four_measurable_levels_planseparation_trust_kernel_bootstrap_milestone_and_later_operational_whole
+f4_plan_generation_bootstrap_names_a_finite_handover_point_to_qualified_autonomous_operation
+f4_plan_generation_malbild_carries_self_identified_needs_within_goal_and_mandate_and_web_as_a_business_using_the_platform
+f4_plan_generation_preserves_h039_functional_requirement_zero_runtime_residues_and_no_loss_of_foreign_data
+```
+
+Alla sex är röda **av rätt skäl**. De fyra plangenerationsraderna är röda därför att plangenerationen inte finns på
+`320c9df7` alls. De två regelkälleraderna är röda av MÄTT delvis skäl: `docs/loop/regler.md` bär redan rollflödet och
+regel 11:s *"ändrar aldrig sin egen frysta grind"*, men saknar kopplingen `befintligt krav` + `konkret hinder`,
+granskarens godkännandenorm, `riggbegränsningar`/`hotmodell` och frasen `källa för arbetsmetoden` — grindens `detail`
+räknar upp exakt de fyra grupperna. Referensdelen är röd därför att plangenerationen saknas och ingen av de åtta
+hänvisarna kan namnge den. På baslinjen mäts **52 normativa meningar** över de aktiva dokumenten, **noll kollisioner**:
+duplikationsregeln är alltså grön på baslinjen och röd först när någon faktiskt duplicerar.
+
+**Ägarbeslutets textrester i `docs/loop/regler.md` (kontrollerade, inget ankare behövs).** `LOOP-ÄGARHAND-16–27`
+(r.16) och de negativa webbavgränsningarna (r.10–11 "Webbkundens brief- och kvalitetskrav", r.29 "utför inte
+kundflödet") träffas av **noll** mönster i `WEB_TOKENS`, `HUMAN_TOKENS`, `HARD_HUMAN_TOKENS`, `OLD_PLAN_TOKENS` och
+`COMMIT_READ_TOKENS` — de två orden matchar bara `PLAN_TOKENS`, som per konstruktion bara appliceras på
+plangenerationen. Mätt genom att köra grindens egna mönstermängder mot filen. Ingen omskrivning krävs av buildern och
+inget ankare tillkommer; det enklare valet.
+
+### Referenskonstruktion v3.10 (scratch, förkastad — bevisar satisfierbarhet)
+Produktändringen jämfört med v3.5–v3.9 är exakt ägarbeslutets bindningar: plangenerationens fyra nya textstycken
+(målbild, skyddade invarianter, bootstrap, avslutskriterier), fyra nya regler i `docs/loop/regler.md`, och en
+pekarmening i `CLAUDE.md` och i de fem rollskills som inte redan namngav båda dokumenten — plus ompinning av
+`CLAUDE.md` och `docs/loop/regler.md` i `SUBSTITUTION_BLOBS` och `PLATFORM_DOCUMENTS`. Fixtur-HEAD `10704dcd`.
+Statisk körning: **122 PASS / 5 FAIL**. Fullkörning (bypass, egen `TMPDIR`,
+`/bin/ps`-kontroll före): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **127/127**, result.json sha256
+`d041affa02fb033fca19265340a4e34d8b6f58ecb4ee72b94404b5ee81dd65e1`. Samtliga sex nya rader gröna i **första** iterationen, med icke-tomma mätytor:
+`avslutskriterier len=1611`, `bootstrap len=1099`, `målbild len=861`,
+`invarianter len=826`, `regler.md len=5116`, `normativa meningar=63`.
+
+### F9 v3.10 — negativer (var och en i egen replika av v3.10-referensen, statiskt `--skip-held-gates`; **124 körda,
+117 fångade, 7 falskt-röda prov gröna, 0 riggfel**)
+Samtliga tidigare negativer byggdes OM mot den nya referensen och kördes om mot den nya grinden; ingen föll bort och
+ingen bytte rad. Nytt i v3.10:
+
+| Negativ | Faller på |
+|---|---|
+| `b1_env_path_launder` (nr 14 B2) | live-raden + `…out_of_process_stub_log_and_in_process_recorders_agree…` |
+| `b2_tool_stdin_file` (nr 14 B2) | live-raden |
+| `b3_stub_log_wipe` (nr 14 B3, loggmanipulationen) | `…out_of_process_stub_log_and_in_process_recorders_agree…` |
+| `b4_frame_ns_scrub` (nr 14 B1) | `…module_and_class_bodies_are_the_declared_form…` + `…agree_with_an_unbroken_chain` |
+| `b5_gc_ns_scrub` (nr 14 B1) | samma två + live-raden |
+| `b7_git_alias_launcher` (nr 14 B2) | live-raden |
+| `b9_fd_payload` (nr 14 B2) | live-raden |
+| `b11_silence_recorders` (nr 14 B1, den allvarligaste) | `…module_and_class_bodies…` + `…agree_with_an_unbroken_chain` |
+| `b13_exit_level_dropped` (B1) | `f4_plan_generation_avslutskriterier_carry_the_four_measurable_levels_…` |
+| `b13b_exit_level_not_marked_later` (B1) | samma rad — nivå (iv) utan `senare`/`utanför dagens` |
+| `b14_bootstrap_no_finite_handover` (B2) | `f4_plan_generation_bootstrap_names_a_finite_handover_point_…` |
+| `b15_malbild_no_business` (B3) | `f4_plan_generation_malbild_carries_self_identified_needs_…` |
+| `b16_h039_requirement_dropped` (B4) | `f4_plan_generation_preserves_h039_functional_requirement_…` |
+| `b17_rules_without_method` (B5) | BÅDA regelkälleraderna (metoden borta **och** under åtta normativa meningar) |
+| `b18_duplicated_normative_sentence` (B5) | `f2_agents_claude_and_role_skills_reference_…_without_duplicating_a_normative_sentence` |
+| `b19_skill_without_reference` (B5) | samma rad — en rollskill som inte namnger regelkällan/planen |
+| `probe_rules_extra_rule` (falskt-rött prov) | **GRÖN** — en legitim ny regel med egen normativ mening |
+| `probe_pointer_repeated_verbatim` (falskt-rött prov) | **GRÖN** — samma PEKARMENING ordagrant i `AGENTS.md` som i rollskills |
+
+Var och en av `b13`–`b19` faller på **exakt** den avsedda raden och ingen annan (samtliga ompinnade, så pinnraderna
+inte skymmer domen).
+
+**Riggdisciplinen mätt, inte läst (granskning nr 14 N1/N2).** `gate-abort` är en grindmutant som reser `Rig` EFTER att
+domen börjat (direkt före F6-blocket) och körs mot referensen. Utfall: exit **1** (produktdom, inte exit 2),
+`FAIL f10_gate_reached_its_last_row_without_an_unexpected_failure`, `PLATFORM_SEPARATION_FINAL_ABORT=Rig(...)`, och
+`result.json` **skrivs** med `aborted: true`, `pass: false`, `expected_rows: 127` och 127 rader varav **11**
+`not_run_*` räknade som FAIL. Den tryckta summan blir `114/13` över hela nämnaren — en avbruten körning kan alltså
+inte längre läsas som numeriskt närmare grönt än en ärlig baslinje. Båda de icke-blockerande fynden är därmed
+stängda genom körning.
+
+**Not om subjekten.** Negativerna kördes mot referensen `ca83c175`; de slutliga fullkörningarna mot `10704dcd`
+(referens) och `9593e3ec` (RED). Skillnaden mellan `ca83c175` och `10704dcd` är enbart utvecklingsdokumentets PROSA
+(kriterieavsnittens radbeskrivningar och detta utfallsavsnitt); produkten, grinden och alla mätytor är identiska, och
+dokumentet är varken tokenskannat eller innehållsbundet av någon rad utöver `DOC_SECTIONS`-närvaron. Statisk körning
+på `10704dcd` ger samma 122/5 som på `ca83c175`.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
