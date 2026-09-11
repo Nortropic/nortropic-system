@@ -541,12 +541,49 @@ CONTROL_SET_ROWS = ("subject_preflight_exit0_exact_json", "platform_prepare_and_
                     "autopilot_substitution_accepts_platform_generation_without_web_docs",
                     "loop_end_to_end_attests_platform_fixture_task", "invariant_required_exit_15_of_15")
 LAUNCH_CWD_FROZEN_ROW = "frozen_verify_bin_identical_to_base_383ed387"
-LAUNCH_CWD_EXPECTED_DETAIL = "problems=[] extra=['" + GOVERNANCE_GATE + "', '" + GATE + "']"
+LAUNCH_CWD_EXPECTED_EXTRA = " extra=['" + GOVERNANCE_GATE + "', '" + GATE + "']"
 # The governance gate (frozen for subject 9112a304) sees exactly these deltas on a final-separation candidate:
 # its verify/register freeze (512490d4 + itself) and its launch-cwd expectation of one extra gate. Measured on the
 # reference construction 2026-09-10; every other row must stay green.
 GOVERNANCE_EXPECTED_FAILS = ("g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only",
                              "g7_launch_cwd_exit_19_of_20_only_frozen_listing_sees_this_gate")
+# --- v3.11: an ORDERED, QUALIFIED refreeze of a frozen H gate --------------------------------------------------
+# v3.10 blob-froze the whole verify/ tree against 332f07ce and allowed exactly one addition (this gate). Measured
+# on the h-035 refreeze candidate a288e169: 122/5, all five caused by ONE frozen gate's bytes changing — so no H
+# gate could ever be refrozen and h-035, h-036, h-037 and h-038 were all blocked. v3.11 keeps the freeze and cuts
+# exactly one hole with a lock on it: the path SET stays equal to the base set plus this gate, every byte stays
+# frozen EXCEPT what the candidate DECLARES, a declaration must name one frozen H gate with its base and new
+# sha256, and the declaration is credited only against a qualification RECEIPT from a separate run of that gate
+# on this exact candidate. The three HELD gates are never refreezable: the qualification runs their frozen bytes.
+REFREEZE_DECL = "SEPARATION-20260910/REFREEZE.json"
+REFREEZE_DECL_CONTRACT = "platform-separation-final-refreeze-declaration-v1"
+REFREEZE_RECEIPT_CONTRACT = "platform-separation-final-refreeze-receipt-v1"
+REFREEZE_ENTRY_KEYS = frozenset({"path", "base_sha256", "new_sha256", "expected_pass", "reason"})
+REFREEZE_RECEIPT_KEYS = frozenset({"contract", "gate", "gate_sha256", "subject_head", "invocation", "exit_code",
+                                   "pass_count", "fail_count", "stdout_sha256", "stdout"})
+# Only a frozen H gate. The three held gates are excluded by this pattern and again by an explicit check.
+REFREEZE_GATE_RE = re.compile(r"^verify/bin/h-0\d\d-exit$")
+# Measured floor: every H gate in the tree emits far more rows than this (h-035: 462). A "refreeze" that reduces a
+# gate to a handful of rows is not credited by this contract.
+REFREEZE_MIN_PASS = 20
+# The canonical invocation elements a qualification run must carry (h-035 is undecidable without -I -S -B).
+REFREEZE_INVOCATION_FLAGS = ("-I", "-S", "-B")
+# A refreeze necessarily ADDS bytes under verify/, which the tree-wide scan classifies as frozen evidence and does
+# not read. The added LINES are therefore scanned here — except for three RETIREMENT IDENTIFIERS that a refreeze
+# against the platform generation must be able to carry: the retired document path docs/05-beslutslogg.md, the
+# word "beslutslogg", and the retired spec key `human_only`. Measured on the real candidate a288e169: those three
+# are its ONLY hits, all inside RETIRED/retired constants, and with them excluded its 128 added lines have zero
+# hits. docs/07-konstitution.md and docs/03-regelverk.md are still caught (konstitution\w*, regelverk\w*), and F1
+# still binds that no such file exists in the tree.
+REFREEZE_RETIREMENT_IDENTIFIERS = (r"(?i)docs/05-beslutslogg", r"(?i)beslutslogg\w*", r"human_only")
+# The control-set gate froze verify/bin/h-0NN-exit against dae90c8f; a refreeze makes exactly that row red.
+CONTROL_SET_BASE = "dae90c8fffa7b33e46e61e81de96e89137ff7829"
+CONTROL_SET_FROZEN_ROW = "frozen_artifacts_identical_to_dae90c8f"
+# The governance gate runs the control-set gate itself, so a refreeze adds exactly this one row to its expected
+# red set — never "some failures allowed".
+GOVERNANCE_CONTROL_SET_ROW = "g7_platform_control_set_exit_68_of_68_on_candidate"
+REFREEZE_ADDED_TOKENS = tuple(t for t in WEB_TOKENS + HUMAN_TOKENS
+                              if t not in REFREEZE_RETIREMENT_IDENTIFIERS) + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS
 DRIVER_MARK = "PLATFORM_SEPARATION_DRIVER="
 # Real module, real callables, never the operational __main__. Stop -> exit 7.
 DRIVER = (
@@ -1024,7 +1061,7 @@ EMITTED_ROWS = []
 ABORT_STATE = {"scratch": None, "rows": None}
 # v3.10 (review v14 N1): the gate emits a fixed number of rows. A run that stops early must not look NUMERICALLY better
 # than an honest RED — the abort path therefore counts every row that never ran as FAIL, which needs this denominator.
-EXPECTED_ROW_COUNT = 127  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
+EXPECTED_ROW_COUNT = 131  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
 
 
 # v3.2 (N4): a tracked-path pair that collides case-insensitively cannot be checked out cleanly on a case-insensitive file
@@ -1994,25 +2031,6 @@ def snapshot_fixture(root, skip):
     return out
 
 
-def snapshot_names(*dirs):
-    """Top-level entries of the given directories as (name, size, mtime_ns) for regular files and (name,) for everything
-    else — absolute-path side effects such as /private/tmp/claude/<marker>, including an overwritten existing marker (v3.4 N)."""
-    out = {}
-    for d in dirs:
-        try:
-            entries = []
-            for name in sorted(os.listdir(d)):
-                try:
-                    st = os.lstat(os.path.join(d, name))
-                    entries.append((name, st.st_size, st.st_mtime_ns) if stat.S_ISREG(st.st_mode) else (name,))
-                except OSError:
-                    entries.append((name,))
-            out[d] = entries
-        except OSError:
-            out[d] = None
-    return out
-
-
 def driver_outcome(result):
     """Exact driver outcome or None; a traceback/uncaught fault never counts."""
     if result.stderr:
@@ -2113,6 +2131,10 @@ def main():
                              "only when byte-identical to " + FROZEN_BASE[:8] + ")")
     parser.add_argument("--held-launch-cwd", type=Path, default=None, help="held copy of verify/bin/launch-cwd-exit (same rule)")
     parser.add_argument("--held-governance", type=Path, default=None, help="held copy of verify/bin/platform-governance-exit (same rule)")
+    parser.add_argument("--refreeze-receipt", type=Path, action="append", default=None,
+                        help="qualification receipt (JSON) for a declared refreeze: the recorded outcome of a "
+                             "separate run of the refrozen gate ON THIS CANDIDATE. Required for every declared "
+                             "refreeze; without it that row is FAIL, never PASS")
     parser.add_argument("--skip-held-gates", action="store_true",
                         help="skip the sandbox-exec dependent rows (held gates, loop fall.py); their rows are then FAIL, never PASS")
     args = parser.parse_args()
@@ -3015,17 +3037,18 @@ def main():
         "HOME": str(prompts_root / "home"), "XDG_CONFIG_HOME": str(prompts_root / "xdg"), "GIT_DIR": str(prompts_root / "gitdir"),
         "http_proxy": "http://127.0.0.1:9", "https_proxy": "http://127.0.0.1:9", "HTTP_PROXY": "http://127.0.0.1:9",
         "HTTPS_PROXY": "http://127.0.0.1:9", "ALL_PROXY": "http://127.0.0.1:9", "no_proxy": "", "NO_PROXY": ""})
+    # v3.11 (rig fix): the sweep covers what THIS GATE created — the contained fixture root and the subject tree.
+    # v3.4-v3.10 also diffed the top-level entries of /private/tmp, /private/tmp/claude, /private/tmp/claude-501,
+    # $TMPDIR and its parent. Those are shared with every other process on the host: a second interactive session
+    # creating its own temp directory produced a FALSE RED twice while all four process counters were identical.
+    # A false red blocks every future qualification, so it is itself a defect. What this no longer catches is
+    # declared in the development document (Vad grinden inte bevisar).
     before_fixture, before_subject = snapshot_tree(prompts_root), snapshot_tree(subject, skip_git=True)
-    SIDE_EFFECT_DIRS = ("/private/tmp", "/private/tmp/claude", "/private/tmp/claude-501", str(Path(tempfile.gettempdir())),
-                        str(Path(tempfile.gettempdir()).parent))
-    before_names = snapshot_names(*SIDE_EFFECT_DIRS)
     module_alias = "m" + hashlib.sha256(os.urandom(16)).hexdigest()[:12]
     r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, canary_repo, "prompts", module_alias], prompts_root / "cwd", prompts_env, timeout=300)
     after_fixture, after_subject = snapshot_tree(prompts_root), snapshot_tree(subject, skip_git=True)
-    after_names = snapshot_names(*SIDE_EFFECT_DIRS)
     side_effects = sorted(set(after_fixture.items()) ^ set(before_fixture.items())) + \
-        sorted("subject:" + k for k in set(after_subject.items()) ^ set(before_subject.items()) for k in [k[0]]) + \
-        sorted(f"{d}:{n[0]}" for d in before_names for n in set(after_names[d] or []) ^ set(before_names[d] or []) if str(n[0]) != scratch.name)
+        sorted("subject:" + k for k in set(after_subject.items()) ^ set(before_subject.items()) for k in [k[0]])
     produced = driver_outcome(r)
     produced = produced if produced and produced["outcome"] == "returned" and type(produced.get("texts")) is dict else {}
     texts, perrors, pbuilders = produced.get("texts", {}), produced.get("errors", {}), produced.get("builders", [])
@@ -3117,18 +3140,16 @@ def main():
     # children, and the product can write and delete there — measured. Its expected growth is bounded by the chain check
     # below, so ordinary stub writes are accounted for by `stub_log_expected` instead of by an exemption.
     fixture_skip = (str(live.relative_to(scratch)), str(ap_tmp.relative_to(scratch)))
-    before_live_subject, before_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
+    before_live_subject = snapshot_tree(subject, skip_git=True)
     before_live_git, before_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
     r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, live, "live_flows"], ap_cwd, stub_env, timeout=1800)
     stub_calls = read_stub_calls(stub_log, stub_nonce)
-    after_live_subject, after_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
+    after_live_subject = snapshot_tree(subject, skip_git=True)
     after_live_git, after_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
     live_side_effects = sorted("subject:" + k[0] for k in set(after_live_subject.items()) ^ set(before_live_subject.items())) + \
         sorted("subject/.git:" + k[0] for k in set(after_live_git.items()) ^ set(before_live_git.items())) + \
         sorted("fixture:" + k[0] for k in set(after_live_fixture.items()) ^ set(before_live_fixture.items())
-               if not STUB_LOG_ENTRY.match(k[0])) + \
-        sorted(f"{d}:{n[0]}" for d in before_live_names for n in set(after_live_names[d] or []) ^ set(before_live_names[d] or [])
-               if str(n[0]) != scratch.name)
+               if not STUB_LOG_ENTRY.match(k[0]))
     live_out = driver_outcome(r)
     live_flows = live_out.get("flows", {}) if live_out and live_out["outcome"] == "returned" else {}
     problems = []
@@ -3494,26 +3515,167 @@ def main():
               and "traceback" not in (r.stdout + r.stderr).lower(),
               f"rc={r.returncode} ok={len(oks)} fel={fel[:3]} b2_pinv={len(b2)} " + r.stderr[-200:])
 
+    # ------------------------------------------------------------------ F6: frozen evidence, refreeze declaration
+    # v3.11: the declaration is parsed FIRST; the freeze rows below are computed against it. An absent declaration
+    # means "no refreeze" and every row below then has exactly its v3.10 meaning.
+    decl_path = subject / REFREEZE_DECL
+    decl_problems, declared, refreeze_paths = [], [], set()
+    decl_raw = decl_path.read_bytes() if decl_path.is_file() and not decl_path.is_symlink() else None
+    if (decl_raw is None) != (REFREEZE_DECL not in tracked):
+        decl_problems.append(f"declaration present={decl_raw is not None} tracked={REFREEZE_DECL in tracked}")
+    elif decl_raw is not None:
+        try:
+            decl = strict(decl_raw)
+        except ValueError as exc:
+            decl, _ = None, decl_problems.append(f"declaration is not strict JSON: {exc}")
+        if decl is not None:
+            if type(decl) is not dict or set(decl) != {"contract", "refreezes"} \
+                    or decl.get("contract") != REFREEZE_DECL_CONTRACT or type(decl.get("refreezes")) is not list:
+                decl_problems.append("declaration shape: exactly {contract, refreezes} with the pinned contract string")
+            else:
+                entries = decl["refreezes"]
+                # ORDERED: one frozen H gate per candidate. Two refreezes in one candidate is not an ordered refreeze,
+                # and it is exactly the shape of "a declared refreeze that also quietly changes a second gate".
+                if len(entries) != 1:
+                    decl_problems.append(f"exactly one ordered refreeze per candidate, declared {len(entries)}")
+                for entry in entries:
+                    if type(entry) is not dict or set(entry) != REFREEZE_ENTRY_KEYS:
+                        decl_problems.append(f"entry keys {sorted(entry) if type(entry) is dict else type(entry)}")
+                        continue
+                    rel = entry["path"]
+                    if type(rel) is not str or not REFREEZE_GATE_RE.match(rel):
+                        decl_problems.append(f"not a frozen H gate path: {rel!r}")
+                        continue
+                    if rel in (CONTROL_SET_GATE, LAUNCH_CWD_GATE, GOVERNANCE_GATE, GATE):
+                        decl_problems.append(f"a held gate may not be refrozen: {rel}")
+                        continue
+                    if rel in refreeze_paths:
+                        decl_problems.append(f"duplicate declaration: {rel}")
+                        continue
+                    base_raw = base_bytes(rel)
+                    now_path = subject / rel
+                    now_raw = now_path.read_bytes() if now_path.is_file() and not now_path.is_symlink() else None
+                    if base_raw is None or now_raw is None or rel not in tracked:
+                        decl_problems.append(f"{rel}: absent at {FROZEN_BASE[:8]} or not a tracked regular file here")
+                        continue
+                    refreeze_paths.add(rel)
+                    declared.append(entry)
+                    if entry["base_sha256"] != sha(base_raw):
+                        decl_problems.append(f"{rel}: declared base sha256 is not the {FROZEN_BASE[:8]} object")
+                    if entry["new_sha256"] != sha(now_raw):
+                        decl_problems.append(f"{rel}: declared new sha256 is not the candidate's bytes")
+                    if sha(base_raw) == sha(now_raw):
+                        decl_problems.append(f"{rel}: declared refreeze changes nothing")
+                    if stat.S_IMODE(now_path.lstat().st_mode) != 0o755:
+                        decl_problems.append(f"{rel}: refrozen gate is not mode 755")
+                    if type(entry["expected_pass"]) is not int or type(entry["expected_pass"]) is bool \
+                            or entry["expected_pass"] < REFREEZE_MIN_PASS:
+                        decl_problems.append(f"{rel}: expected_pass below the measured floor {REFREEZE_MIN_PASS}")
+                    if type(entry["reason"]) is not str or len(entry["reason"].strip()) < 20:
+                        decl_problems.append(f"{rel}: no written reason")
+                    try:
+                        ast.parse((decode_text(now_raw) or ""))
+                    except SyntaxError as exc:
+                        decl_problems.append(f"{rel}: the refrozen gate does not parse: {exc!r}")
+    check("f6_refreeze_declaration_is_one_ordered_frozen_h_gate_with_matching_base_and_new_sha256",
+          not decl_problems, f"declared={[e.get('path') for e in declared]} problems={decl_problems[:8]}")
+    # The added LINES of every declared refreeze are scanned; verify/** is otherwise frozen evidence and unscanned.
+    added_hits, added_lines = [], 0
+    for entry in declared:
+        rel = entry["path"]
+        base_text = decode_text(base_bytes(rel) or b"") or ""
+        now_text = decode_text((subject / rel).read_bytes()) or ""
+        base_set = set(base_text.splitlines())
+        added = [line for line in now_text.splitlines() if line not in base_set]
+        added_lines += len(added)
+        added_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan("\n".join(added), REFREEZE_ADDED_TOKENS)]
+    check("f6_refreeze_added_lines_free_of_web_governance_human_hand_and_old_plan_tokens",
+          not added_hits, f"added_lines={added_lines} hits={added_hits[:6]}")
+    # The qualification receipt: a declared refreeze is credited only against a recorded run of the refrozen gate ON
+    # THIS CANDIDATE. The receipt is supplied at qualification time (--refreeze-receipt), never from the tree, so a
+    # builder working under this frozen gate cannot produce one. What it does and does not prove: development document.
+    receipts, receipt_problems = [], []
+    for path in (args.refreeze_receipt or []):
+        try:
+            receipts.append((str(path), strict(Path(path).read_bytes())))
+        except (OSError, ValueError) as exc:
+            receipt_problems.append(f"{path}: unreadable or not strict JSON: {exc!r}")
+    by_gate = {}
+    for source, obj in receipts:
+        by_gate.setdefault(obj.get("gate") if type(obj) is dict else None, []).append((source, obj))
+    for unexpected in sorted(k for k in by_gate if k not in refreeze_paths):
+        receipt_problems.append(f"receipt for a gate this candidate does not declare: {unexpected!r}")
+    for entry in declared:
+        rel = entry["path"]
+        found = by_gate.get(rel, [])
+        if len(found) != 1:
+            receipt_problems.append(f"{rel}: {len(found)} qualification receipts supplied, exactly one required")
+            continue
+        _source, obj = found[0]
+        if type(obj) is not dict or set(obj) != REFREEZE_RECEIPT_KEYS or obj["contract"] != REFREEZE_RECEIPT_CONTRACT:
+            receipt_problems.append(f"{rel}: receipt shape / contract string")
+            continue
+        out = obj["stdout"]
+        if type(out) is not str or obj["stdout_sha256"] != sha(out.encode("utf-8")):
+            receipt_problems.append(f"{rel}: the receipt's stdout does not match its own sha256")
+            continue
+        passes = len(re.findall(r"^PASS ", out, re.M))
+        fails = len(re.findall(r"^FAIL ", out, re.M))
+        if obj["subject_head"] != head:
+            receipt_problems.append(f"{rel}: receipt names subject {obj['subject_head']!r}, not this candidate {head}")
+        if obj["gate_sha256"] != entry["new_sha256"] or obj["gate_sha256"] != sha((subject / rel).read_bytes()):
+            receipt_problems.append(f"{rel}: the receipt's gate sha256 is not this candidate's refrozen bytes")
+        if obj["exit_code"] != 0 or fails or obj["fail_count"] != 0:
+            receipt_problems.append(f"{rel}: the refrozen gate was not green on this candidate "
+                                    f"(exit={obj['exit_code']} declared_fail={obj['fail_count']} FAIL lines={fails})")
+        if passes != obj["pass_count"] or passes != entry["expected_pass"]:
+            receipt_problems.append(f"{rel}: {passes} PASS lines in the receipt, receipt says {obj['pass_count']}, "
+                                    f"the declaration predicted {entry['expected_pass']}")
+        invocation = obj["invocation"]
+        if type(invocation) is not list or not all(type(x) is str for x in invocation) or PYTHON not in invocation \
+                or not set(REFREEZE_INVOCATION_FLAGS) <= set(invocation) \
+                or not invocation or Path(invocation[-1]).name != Path(rel).name:
+            receipt_problems.append(f"{rel}: the receipt's invocation is not the canonical pinned form: {invocation!r}")
+    check("f6_declared_refreeze_is_qualified_by_a_receipt_bound_to_this_candidate_and_the_refrozen_bytes",
+          not receipt_problems, f"declared={len(declared)} receipts={len(receipts)} problems={receipt_problems[:6]}")
+
     # ------------------------------------------------------------------ F6: frozen evidence by blob OID
-    problems, additions = [], []
+    # (a) the exact SET of tracked paths under the frozen trees == base set + the declared additions (this gate);
+    # (b) every file byte-frozen against the base EXCEPT the declared refreezes; an undeclared byte change stays red,
+    # and a declaration of a file that did not change is red too.
+    path_problems, byte_problems, additions, removals = [], [], [], []
     for tree_rel in FROZEN_TREES:
         base_entries = ls_tree(subject, probe_env, FROZEN_BASE, tree_rel)
         head_entries = ls_tree(subject, probe_env, "HEAD", tree_rel)
         for rel, entry in base_entries.items():
-            if head_entries.get(rel) != entry:
-                problems.append(rel)
+            if rel not in head_entries:
+                removals.append(rel)
+            elif head_entries[rel] != entry:
+                byte_problems.append(rel)
         additions += [rel for rel in head_entries if rel not in base_entries]
         if git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", tree_rel).stdout.strip():
-            problems.append(tree_rel + " (working tree differs from HEAD)")
+            path_problems.append(tree_rel + " (working tree differs from HEAD)")
     for rel in FROZEN_FILES:
         base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
-        if not base_oid or base_oid != head_oid(rel) or git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", rel).stdout.strip():
-            problems.append(rel)
+        if not base_oid:
+            path_problems.append(rel + " (absent at " + FROZEN_BASE[:8] + ")")
+        elif rel not in tracked:
+            removals.append(rel)
+        elif base_oid != head_oid(rel):
+            byte_problems.append(rel)
+        if git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", rel).stdout.strip():
+            path_problems.append(rel + " (working tree differs from HEAD)")
     gate_path = subject / GATE
     gate_ok = gate_path.is_file() and not gate_path.is_symlink() and sha(gate_path.read_bytes()) == held[GATE] \
         and stat.S_IMODE(gate_path.lstat().st_mode) == 0o755
-    check("f6_frozen_evidence_identical_to_" + FROZEN_BASE[:8] + "_plus_this_gate_only",
-          not problems and additions == [GATE] and gate_ok, f"problems={problems[:10]} additions={additions} gate_ok={gate_ok}")
+    check("f6_frozen_tree_paths_are_the_" + FROZEN_BASE[:8] + "_set_plus_this_gate_only",
+          not path_problems and sorted(additions) == [GATE] and not removals and gate_ok,
+          f"problems={path_problems[:10]} additions={sorted(additions)} removals={removals[:10]} gate_ok={gate_ok}")
+    undeclared = sorted(set(byte_problems) - refreeze_paths)
+    unchanged_declared = sorted(refreeze_paths - set(byte_problems))
+    check("f6_frozen_tree_bytes_identical_to_" + FROZEN_BASE[:8] + "_except_the_declared_refreeze",
+          not undeclared and not unchanged_declared,
+          f"undeclared_byte_changes={undeclared[:10]} declared_but_unchanged={unchanged_declared}")
     ea_base, ea_head = base_bytes(EFTERARBETE), (subject / EFTERARBETE).read_bytes() if (subject / EFTERARBETE).is_file() else b""
     ea_added = ea_head[len(ea_base):].decode("utf-8", "replace") if ea_base is not None and ea_head.startswith(ea_base) else None
     ea_hits = scan(ea_added or "", WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)
@@ -3566,9 +3728,33 @@ def main():
     def rows_by_label(result):
         return {row["label"]: row for row in result["rows"]} if result and type(result.get("rows")) is list else {}
 
+    # v3.11: the EXACT effect a declared refreeze has on each held gate, derived from that gate's own frozen base —
+    # never a loosened "some failures allowed". With no declaration these are empty and every expectation is v3.10's.
+    def base_oid_at(rev, rel):
+        return git_raw(subject, probe_env, "rev-parse", f"{rev}:{rel}").stdout.strip()
+
+    cs_expected = sorted(rel for rel in refreeze_paths
+                         if base_oid_at(CONTROL_SET_BASE, rel) and base_oid_at(CONTROL_SET_BASE, rel) != head_oid(rel))
+    lc_expected = sorted(rel for rel in refreeze_paths
+                         if base_oid_at(LAUNCH_CWD_BASE, rel) and base_oid_at(LAUNCH_CWD_BASE, rel) != head_oid(rel))
+    gov_expected_fails = sorted(GOVERNANCE_EXPECTED_FAILS) + ([GOVERNANCE_CONTROL_SET_ROW] if cs_expected else [])
+    control_state = {"missing": None}
+
     def judge_control_set(r, passes, fails, result):
         rows_by = rows_by_label(result)
         missing = [name for name in CONTROL_SET_ROWS if not rows_by.get(name, {}).get("pass")]
+        control_state["missing"] = missing
+        if cs_expected:
+            frozen = rows_by.get(CONTROL_SET_FROZEN_ROW, {})
+            # The refreeze makes exactly the frozen-artifacts row red, naming exactly the declared paths; the seven
+            # product rows (loop e2e, prepare/check, fixture task, selftest, substitution, invariant-required) stay green.
+            ok = (r.returncode == 1 and len(passes) == CONTROL_SET_ROW_COUNT - 1 and fails == [CONTROL_SET_FROZEN_ROW]
+                  and "PLATFORM_CONTROL_SET_RESULT=RED_LOCAL_QUALIFICATION" in r.stdout
+                  and result is not None and result.get("pass") is False and result.get("subject_head") == head
+                  and not missing and frozen.get("pass") is False
+                  and str(frozen.get("detail", "")).endswith("problems=" + repr(cs_expected)))
+            return ok, f"fails={fails[:6]} missing_rows={missing} expected_problems={cs_expected} " \
+                       f"frozen_detail={str(frozen.get('detail'))[-120:]!r}"
         ok = (r.returncode == 0 and len(passes) == CONTROL_SET_ROW_COUNT and not fails
               and "PLATFORM_CONTROL_SET_RESULT=PASS_LOCAL_QUALIFICATION_ONLY" in r.stdout
               and result is not None and result.get("pass") is True and result.get("subject_head") == head and not missing)
@@ -3577,23 +3763,33 @@ def main():
     def judge_launch_cwd(r, passes, fails, result):
         frozen = rows_by_label(result).get(LAUNCH_CWD_FROZEN_ROW, {})
         # launch-cwd froze the whole verify/bin listing at 383ed387 (+ itself); this candidate carries exactly two
-        # later gates there (governance + this one), so that single row is red for exactly that reason.
+        # later gates there (governance + this one), so that single row is red for exactly that reason. v3.11: a
+        # declared refreeze adds exactly its own paths to that row's `problems`, and nothing else.
+        expected_detail = "problems=" + repr(lc_expected) + LAUNCH_CWD_EXPECTED_EXTRA
         ok = (len(passes) + len(fails) == LAUNCH_CWD_ROW_COUNT and fails == [LAUNCH_CWD_FROZEN_ROW] and r.returncode == 1
               and result is not None and result.get("subject_head") == head and frozen.get("pass") is False
-              and str(frozen.get("detail", "")).endswith(LAUNCH_CWD_EXPECTED_DETAIL))
-        return ok, f"fails={fails[:6]} frozen_detail={str(frozen.get('detail'))[-160:]!r}"
+              and str(frozen.get("detail", "")).endswith(expected_detail))
+        return ok, f"fails={fails[:6]} expected_detail={expected_detail!r} frozen_detail={str(frozen.get('detail'))[-160:]!r}"
 
     def judge_governance(r, passes, fails, result):
-        ok = (len(passes) + len(fails) == GOVERNANCE_ROW_COUNT and sorted(fails) == sorted(GOVERNANCE_EXPECTED_FAILS)
+        # v3.11: the governance gate RUNS the control-set gate, so a declared refreeze adds exactly that one row to its
+        # red set — and that row must be red for exactly the refreeze's effect (67 of 68, naming the frozen row).
+        nested = rows_by_label(result).get(GOVERNANCE_CONTROL_SET_ROW, {})
+        nested_ok = True
+        if cs_expected:
+            nested_ok = (nested.get("pass") is False
+                         and f"pass={CONTROL_SET_ROW_COUNT - 1} fail=1 fails=[{CONTROL_SET_FROZEN_ROW!r}]" in str(nested.get("detail", "")))
+        ok = (len(passes) + len(fails) == GOVERNANCE_ROW_COUNT and sorted(fails) == gov_expected_fails
               and r.returncode == 1 and result is not None and result.get("subject_head") == head
-              and "PLATFORM_GOVERNANCE_RESULT=RED_LOCAL_QUALIFICATION" in r.stdout)
-        return ok, f"fails={fails[:8]} expected={list(GOVERNANCE_EXPECTED_FAILS)}"
+              and "PLATFORM_GOVERNANCE_RESULT=RED_LOCAL_QUALIFICATION" in r.stdout and nested_ok)
+        return ok, f"fails={fails[:8]} expected={gov_expected_fails} nested_detail={str(nested.get('detail'))[-140:]!r}"
 
-    run_held("f7_platform_control_set_exit_68_of_68_on_candidate", CONTROL_SET_GATE, args.held_control_set, 3600, judge_control_set)
-    run_held("f7_launch_cwd_exit_19_of_20_frozen_listing_sees_exactly_governance_and_this_gate", LAUNCH_CWD_GATE,
-             args.held_launch_cwd, 1800, judge_launch_cwd)
-    run_held("f7_platform_governance_exit_red_exactly_on_its_frozen_verify_register_and_launch_cwd_rows", GOVERNANCE_GATE,
-             args.held_governance, 7200, judge_governance)
+    run_held("f7_platform_control_set_exit_on_candidate_68_of_68_or_exactly_the_declared_refreeze_effect",
+             CONTROL_SET_GATE, args.held_control_set, 3600, judge_control_set)
+    run_held("f7_launch_cwd_exit_19_of_20_frozen_listing_sees_exactly_governance_this_gate_and_the_declared_refreeze",
+             LAUNCH_CWD_GATE, args.held_launch_cwd, 1800, judge_launch_cwd)
+    run_held("f7_platform_governance_exit_red_exactly_on_its_frozen_rows_and_the_declared_refreeze_effect",
+             GOVERNANCE_GATE, args.held_governance, 7200, judge_governance)
 
     # ------------------------------------------------------------------ F8: no coupling to the web repo path or the old root
     coupling = []
@@ -3619,8 +3815,15 @@ def main():
             coupling.append(f"{rel}:{raw.count(chr(10), 0, m.start()) + 1} {raw[max(0, m.start() - 15):m.end() + 25]!r}")
     check("f8_no_tracked_file_couples_to_web_repo_path_or_old_root", not coupling, "; ".join(coupling[:10]))  # incl. sibling repos
     cs = gate_runs.get(CONTROL_SET_GATE)
+    # v3.11: the meaning is unchanged — the ORDINARY loop e2e and platform prepare/check are green on the candidate.
+    # With a declared refreeze the held control-set gate's own frozen-artifacts row is red by construction, so the
+    # expectation is exactly that one row and the seven product rows still green, never "some failures allowed".
+    expected_cs_fails = [CONTROL_SET_FROZEN_ROW] if cs_expected else []
     check("f8_ordinary_loop_e2e_and_platform_prepare_check_green_on_candidate_via_held_control_set",
-          cs is not None and cs["rc"] == 0 and not cs["fails"], str(cs)[:300] if cs else "control-set gate not run")
+          cs is not None and cs["fails"] == expected_cs_fails and control_state["missing"] == []
+          and cs["rc"] == (1 if cs_expected else 0),
+          (f"expected_fails={expected_cs_fails} missing_rows={control_state['missing']} " + str(cs)[:300])
+          if cs else "control-set gate not run")
 
     # ------------------------------------------------------------------ F10: development document, bytes unchanged
     doc = subject / DOCUMENT
@@ -3670,7 +3873,16 @@ def main():
               "closure_roots": sorted(roots), "closure_reached": sorted(reached), "closure_scanned": scanned,
               "closure_dangling": {k: sorted(v) for k, v in sorted(dangling.items())},
               "tree_classification": classification, "forbidden_blobs": FORBIDDEN_BLOBS,
-              "governance_expected_fails": list(GOVERNANCE_EXPECTED_FAILS),
+              "governance_expected_fails": gov_expected_fails,
+              "refreeze_declaration": declared, "refreeze_declaration_path": REFREEZE_DECL,
+              "refreeze_added_lines": added_lines,
+              "refreeze_receipts": [{"source": s, "gate": o.get("gate"), "exit_code": o.get("exit_code"),
+                                     "pass_count": o.get("pass_count"), "fail_count": o.get("fail_count"),
+                                     "stdout_sha256": o.get("stdout_sha256"), "subject_head": o.get("subject_head"),
+                                     "gate_sha256": o.get("gate_sha256"), "invocation": o.get("invocation")}
+                                    for s, o in receipts if type(o) is dict],
+              "refreeze_expected_control_set_problems": cs_expected,
+              "refreeze_expected_launch_cwd_problems": lc_expected,
               "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
               "sandbox_exec_present": Path(SANDBOX_EXEC).is_file(),
               "fixture_root": str(scratch), "expected_rows": EXPECTED_ROW_COUNT, "rows": rows,

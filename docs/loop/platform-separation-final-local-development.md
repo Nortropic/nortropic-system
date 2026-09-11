@@ -1,7 +1,9 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3.6 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5–10; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.11 2026-09-11: ordnad, kvalificerad refreeze av en
+fryst H-grind tillåts; sidoeffektsvepet skopat till grindens egna rötter. v3.6–v3.10: plangenerationen bunden,
+remedierad efter kontraktsgranskningarna nr 5–14) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -598,6 +600,18 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   stdout bär `AUTOPILOT_V4_SELFTEST=PASS` (control-set-grinden binder strängen) och exakt raden
   `PLAN_GENERATION=<modulens PLAN_GENERATION>` men ingen `plan_sha`/`PLAN_SHA`-rad; `f4_autopilot_publication_callers_exit0`, `f4_controller_loop_cli_unchanged_vs_332f07ce`.
 
+**v3.11 — riggfixen i sidoeffektsvepet.** `f4_prompt_builders_run_in_contained_fixture_without_side_effects`
+och `f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects` jämförde
+t.o.m. v3.10 också toppnivåposterna i `/private/tmp`, `/private/tmp/claude`, `/private/tmp/claude-501`,
+`$TMPDIR` och dess förälder. De katalogerna delas med varje annan process på värden: en annan interaktiv
+session som skapade sin egen temporärkatalog gav **falskt RÖTT två gånger** medan alla fyra processräknarna
+var identiska. Ett falskt rött blockerar varje framtida kvalificering och är därför självt ett fel. Svepet
+täcker från v3.11 exakt det grinden själv skapat: subjektets arbetsträd, subjektets `.git`
+(namn/refs/hooks/config) och grindens egen `FIXTURE_ROOT` rekursivt minus de två sökvägar flödena
+legitimt äger (live-replikan och driverns `TMPDIR`) — för promptkörningen hela dess inneslutna fixturrot
+(`home`/`xdg`/`cwd`/`tmp`/`gitdir`). Produktens egna sidoeffekter fångas alltså fortfarande: driverns cwd
+ligger under `FIXTURE_ROOT` och sveps. Vad det INTE längre fångar står under "Vad grinden inte bevisar".
+
 ### F5 — loopens testsvit utan webbfixtur
 - `f5_loop_fall_py_b2_no_web_fixture_or_web_invariant`: `tests/controller/loop/fall.py` saknar
   `agents/`, `INV-00N`, `workflows/`, `tests/fixtures`; B2 finns.
@@ -605,14 +619,61 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   körs hermetiskt i replika → exit 0, ≥53 `ok`, inga `FEL`, en B2-rad som namnger `PINV`, slutar
   med `alla fall håller`. (Mätt 2026-09-10 på 332f07ce: 52 ok, 1 FEL = B2, 41 s.)
 
-### F6 — fryst evidens
-- `f6_frozen_evidence_identical_to_332f07ce_plus_this_gate_only`: träden `verify/**` (får bara få
-  denna grind), `controller/h034-native`, `controller/runtime-cleanup`, `controller/provenance`,
-  `SEPARATION-20260910/proposed/**` och filerna `scripts/check-invariants.mjs`, `controller/loop/cli`,
+### F6 — fryst evidens och den ordnade refreezen (v3.11)
+
+**Hindret v3.11 tar bort.** v3.10 blob-frös HELA `verify/`-trädet mot 332f07ce och tillät exakt ETT tillägg
+(denna grind). Mätt på h-035:s refreeze-kandidat `a288e169`: **122/5**, och alla fem röda rader hade ETT
+gemensamt skäl — en fryst grinds bytes hade ändrats. Följden var att INGEN H-grind någonsin kunde frysas om,
+vilket blockerade h-035, h-036, h-037 och h-038, alltså hela den kvarvarande bindningskedjan. Det avvisade
+alternativet — att lägga refreezes med separationsgrinden medvetet röd — faller på ägarbeslutets Trust
+Kernel-kriterium: kvalificering kräver att rätt frysta verifierare körts färdigt med samtliga obligatoriska
+kontroller, och en medvetet röd grind är ingen kvalificering.
+
+**Deklarationen** ligger i `SEPARATION-20260910/REFREEZE.json` (spårad, valfri; frånvaro = ingen refreeze):
+
+```json
+{"contract": "platform-separation-final-refreeze-declaration-v1",
+ "refreezes": [{"path": "verify/bin/h-035-exit", "base_sha256": "<332f07ce-objektets sha256>",
+                "new_sha256": "<kandidatens bytes>", "expected_pass": 462, "reason": "<skriven motivering>"}]}
+```
+
+- `f6_refreeze_declaration_is_one_ordered_frozen_h_gate_with_matching_base_and_new_sha256`: strikt JSON,
+  exakt nyckelmängd, **exakt EN** post (ordnad refreeze — två grindar i samma kandidat är ingen ordnad
+  refreeze och är dessutom formen för "ändrar i smyg en andra grind"), sökvägen matchar
+  `^verify/bin/h-0\d\d-exit$` (de tre HÅLLNA grindarna kan aldrig frysas om — kvalificeringen kör deras
+  frysta bytes), `base_sha256` == 332f07ce-objektets bytes, `new_sha256` == kandidatens bytes, bytes skilda
+  från basen, läge 755, `expected_pass` heltal ≥ 20 (mätt golv), skriven `reason`, och filen parsar som Python.
+- `f6_refreeze_added_lines_free_of_web_governance_human_hand_and_old_plan_tokens`: `verify/**` klassas som
+  fryst evidens och skannas annars inte — en refreeze ADDERAR bytes dit, så de TILLAGDA raderna (rader som
+  inte finns i basversionen) skannas med `WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS`
+  minus tre **retirement-identifierare**: `docs/05-beslutslogg`, `beslutslogg\w*` och `human_only`. Mätt på
+  den verkliga kandidaten `a288e169`: exakt dessa tre är dess enda träffar, alla inuti `RETIRED`/`retired`-
+  konstanter; utan dem har dess 128 tillagda rader **noll** träffar. `docs/07-konstitution.md` och
+  `docs/03-regelverk.md` fångas fortfarande (`konstitution\w*`, `regelverk\w*`), och F1 binder alltjämt att
+  ingen sådan fil finns i trädet.
+- `f6_declared_refreeze_is_qualified_by_a_receipt_bound_to_this_candidate_and_the_refrozen_bytes`: en
+  deklarerad refreeze krediteras BARA mot ett **kvalificeringskvitto** som lämnas vid körningen
+  (`--refreeze-receipt <fil>`), aldrig ur trädet. Kvittot är strikt JSON med exakt nyckelmängden
+  `{contract, gate, gate_sha256, subject_head, invocation, exit_code, pass_count, fail_count, stdout_sha256,
+  stdout}`. Grinden räknar om `sha256(stdout)`, räknar `^PASS `/`^FAIL `-raderna själv och kräver:
+  `gate` == den deklarerade sökvägen · `gate_sha256` == `new_sha256` == kandidatens bytes ·
+  `subject_head` == **exakt denna kandidats commit** · `exit_code == 0`, noll FAIL-rader, `fail_count == 0` ·
+  antalet PASS-rader == `pass_count` == deklarationens `expected_pass` (byggaren måste alltså FÖRUTSÄGA
+  utfallet innan kvalificeringskörningen) · `invocation` är den kanoniska pinnade formen (den pinnade
+  Python-binären, `-I -S -B`, sista argumentets basnamn == grindens). Ett kvitto för en grind kandidaten
+  inte deklarerar är rött. Utan kvitto är raden FAIL, aldrig PASS.
+- `f6_frozen_tree_paths_are_the_332f07ce_set_plus_this_gate_only`: (a) den exakta MÄNGDEN spårade sökvägar
+  under träden `verify/**`, `controller/h034-native`, `controller/runtime-cleanup`, `controller/provenance`,
+  `SEPARATION-20260910/proposed/**` samt filerna `scripts/check-invariants.mjs`, `controller/loop/cli`,
   `controller/attest/cli` (utanför produktytan; bär de historiska refreeze-konstanterna),
   `docs/loop/owner-author-workflow-v1.md`, `docs/loop/remaining-bootstrap-delegation-v1.md`,
-  `docs/loop/document-authority-local-development.md`, `SEPARATION-20260910/{README.md,ALLOCATION.tsv,WEB-TRANSFER-PROVENIENS.tsv}`
-  byte-identiska (blob-OID) med 332f07ce och arbetsträdet == HEAD; grinden 755 och lika den hållna kopian.
+  `docs/loop/document-authority-local-development.md`,
+  `SEPARATION-20260910/{README.md,ALLOCATION.tsv,WEB-TRANSFER-PROVENIENS.tsv}` == basmängden **plus exakt
+  denna grind**; inga tysta tillägg, inga borttagningar; arbetsträdet == HEAD; grinden 755 och lika den
+  hållna kopian.
+- `f6_frozen_tree_bytes_identical_to_332f07ce_except_the_declared_refreeze`: (b) varje fil i de träden är
+  byte-fryst (blob-OID) mot 332f07ce UTOM de deklarerade refreezerna. En ODEKLARERAD byteändring är röd, och
+  en deklaration av en fil som inte ändrats är också röd.
 - `f6_earlier_local_gates_identical_to_332f07ce`: control-set-, launch-cwd- och governance-grinden oförändrade.
 - `f6_efterarbete_append_only_vs_332f07ce_with_scanned_addition`: `SEPARATION-20260910/EFTERARBETE.md` börjar
   med 332f07ce-bytes; det tillagda saknar webb- och människohandstoken (basdelen är uppdelningens evidens).
@@ -625,19 +686,34 @@ Kvalificeringen kör alltså alltid 332f07ce-bytes av de tre grindarna. Kör ald
 `TMPDIR`: launch-cwd-grindens h036-residuekontroll ser den andra körningens rötter (mätt flaky 2026-09-10).
 Riggnot: grinden städar inte sitt `FIXTURE_ROOT` (replikor, hållna grindars rötter, `result.json` ligger kvar
 som evidens) — den som kör ansvarar för att ta bort scratch efter att `result.json` bokförts.
-- `f7_platform_control_set_exit_68_of_68_on_candidate`: exit 0, 68 PASS, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**v3.11 — de tre hållna grindarnas förväntade utfall vid en deklarerad refreeze.** Förväntningarna härleds ur
+varje hållen grinds EGEN frysta bas och är exakta, aldrig "några fel tillåts". Utan deklaration gäller v3.10:s
+förväntningar oförändrat.
+- control-set frös `verify/bin/h-0NN-exit` mot `dae90c8f` ⇒ en refreeze gör exakt raden
+  `frozen_artifacts_identical_to_dae90c8f` röd, med `detail` som slutar `problems=<de deklarerade sökvägarna>`;
+  exit 1, 67 av 68, `RED_LOCAL_QUALIFICATION`, och de sju produktraderna fortfarande gröna.
+- launch-cwd frös hela `verify/bin`-listningen mot `383ed387` ⇒ raden
+  `frozen_verify_bin_identical_to_base_383ed387` får de deklarerade sökvägarna i `problems`, `extra` oförändrat.
+- governance KÖR control-set-grinden ⇒ exakt EN rad tillkommer i dess röda mängd,
+  `g7_platform_control_set_exit_68_of_68_on_candidate`, och den radens `detail` måste bära
+  `pass=67 fail=1 fails=['frozen_artifacts_identical_to_dae90c8f']`.
+
+- `f7_platform_control_set_exit_on_candidate_68_of_68_or_exactly_the_declared_refreeze_effect`
+  (utan refreeze): exit 0, 68 PASS, `PASS_LOCAL_QUALIFICATION_ONLY`,
   `subject_head` == kandidaten, raderna `subject_preflight_exit0_exact_json`,
   `platform_prepare_and_check_accept_subject_documents`, `fixture_task_run_exit0`,
   `autopilot_selftest_none_returns`, `autopilot_substitution_accepts_platform_generation_without_web_docs`,
   `loop_end_to_end_attests_platform_fixture_task`, `invariant_required_exit_15_of_15` gröna.
-- `f7_launch_cwd_exit_19_of_20_frozen_listing_sees_exactly_governance_and_this_gate`: exit 1, exakt
-  raden `frozen_verify_bin_identical_to_base_383ed387` röd med detalj som slutar
-  `problems=[] extra=['verify/bin/platform-governance-exit', 'verify/bin/platform-separation-final-exit']`.
-- `f7_platform_governance_exit_red_exactly_on_its_frozen_verify_register_and_launch_cwd_rows`: exit 1,
+- `f7_launch_cwd_exit_19_of_20_frozen_listing_sees_exactly_governance_this_gate_and_the_declared_refreeze`:
+  exit 1, exakt raden `frozen_verify_bin_identical_to_base_383ed387` röd med detalj som slutar
+  `problems=<deklarerade sökvägar> extra=['verify/bin/platform-governance-exit', 'verify/bin/platform-separation-final-exit']`.
+- `f7_platform_governance_exit_red_exactly_on_its_frozen_rows_and_the_declared_refreeze_effect`: exit 1,
   70 rader, exakt {`g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only`,
   `g7_launch_cwd_exit_19_of_20_only_frozen_listing_sees_this_gate`} röda (registret ändras och en
-  grind tillkommer; dess launch-cwd-förväntan ser en extra grind). Governance-grinden förblir fryst
-  för sitt subjekt 9112a304; detta binder bara dess mätta utfall på en slutseparationskandidat.
+  grind tillkommer; dess launch-cwd-förväntan ser en extra grind) — plus, och bara vid en deklarerad
+  refreeze, `g7_platform_control_set_exit_68_of_68_on_candidate` med exakt refreezens effekt.
+  Governance-grinden förblir fryst för sitt subjekt 9112a304; detta binder bara dess mätta utfall på en
+  slutseparationskandidat.
 
 ### F8 — livebana utan webbrepot
 - `f8_no_tracked_file_couples_to_web_repo_path_or_old_root`: ingen spårad fil bär
@@ -652,7 +728,9 @@ som evidens) — den som kör ansvarar för att ta bort scratch efter att `resul
   beroenden; konstanter i `refreeze|h03[5-9]`-funktioner är historisk evidens).
 - `f8_ordinary_loop_e2e_and_platform_prepare_check_green_on_candidate_via_held_control_set`: den
   hållna control-set-grindens ordinarie loop-e2e (fixturtask attesteras i replika) och
-  platform-prepare/-check är gröna på kandidaten (raderna i F7).
+  platform-prepare/-check är gröna på kandidaten (raderna i F7). **v3.11:** meningen är oförändrad; vid en
+  deklarerad refreeze är den förväntade FAIL-mängden exakt `['frozen_artifacts_identical_to_dae90c8f']` och
+  alla sju produktrader gröna — aldrig "några fel tillåts".
 
 ### F9 — återinförandenegativer (utförs av test-author, inte grindrader)
 Var och en i en förkastad replika av referenskonstruktionen; var och en ska ge RED på minst en namngiven rad:
@@ -998,6 +1076,29 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   `../x` i JSON-prosa räknas som hängande (accepterad överapproximation).
 - Semantik bortom token: en omskrivning som uttrycker webbstyrning med andra ord fångas inte.
   Token-listan är den mätbara approximationen; oberoende granskning läser texten.
+- **(v3.11) Kvalificeringskvittot bevisar inte att körningen ägde rum.** Grinden kör INTE den omfrysta
+  H-grinden själv. Det är ett medvetet val: varje H-grind har sin egen rigg (h-035 kräver ~450 s, den
+  kanoniska invokationen `-I -S -B` + `PYTHONEXECUTABLE`, sju bevarade kandidater i ODB:n, en kanonisk lokal
+  bare-origin och en vitlistad lokal git-config, och den läser processtabellen — en nästlad körning inne i
+  separationsgrinden skulle dessutom störas av grindens egna samtidiga hållna körningar). Att baka in varje
+  H-grinds rigg i det generella separationskontraktet är både dyrt och sprött. Kvittot binder i stället
+  proveniens och intern konsistens: grindens bytes, kandidatens commit, den kanoniska invokationen,
+  räknade PASS/FAIL-rader mot deklarationens FÖRUTSAGDA antal, och stdout mot sin egen sha256. Vad det
+  bevisar: att den som kvalificerar har kört exakt dessa grindbytes mot exakt denna kandidat och redovisat
+  utfallet, och att BYGGAREN inte kan få en refreeze accepterad — kvittot kommer inte ur trädet utan ges vid
+  kvalificeringen. Vad det INTE bevisar: att kvalificeraren inte fabricerat kvittot. Under hotmodellen
+  (motparten är en builder under en fryst grind, inte kvalificeraren själv) är det en deklarerad gräns.
+- **(v3.11) Refreezens innehåll bedöms inte.** Separationskontraktet avgör inte om den omfrysta H-grinden är
+  ett korrekt kontrakt — bara att den är deklarerad, byte-bunden, parsbar, ≥ 20 rader grön på kandidaten och
+  att dess tillagda rader inte bär webbstyrnings-/människohandstoken. H-grindens eget innehåll är dess eget
+  kontraktsflödes och den oberoende granskningens sak.
+- **(v3.11) Sidoeffekter utanför grindens egna rötter.** Svepet jämför inte längre delade systemkataloger
+  (`/private/tmp`, `/private/tmp/claude`, `/private/tmp/claude-501`, `$TMPDIR` och dess förälder). En produkt
+  som under flödena skriver direkt till en HÅRDKODAD absolut sökväg utanför subjektet och `FIXTURE_ROOT`
+  (t.ex. `open('/private/tmp/x','w')`) fångas därför inte av sidoeffektsraderna. Angränsande rader som
+  fortfarande binder hårdkodade sökvägar: `f8_no_tracked_file_couples_to_web_repo_path_or_old_root`,
+  AST-strängskanningen av autopiloten, och live-radernas binär-/identitetsmängd (en sidoeffekt via en
+  startad process fångas av dem). Skälet till gränsen: delade kataloger gav mätt falskt rött två gånger.
 - Att `--repo`:s nya default är rätt katalog — bara att den inte är den gamla roten.
 - Att provider-/Codex-maskineriet är ersatt (SUB-1).
 - origin/main-strategin (nuvarande origin = gamla GitHub-repot) — UNRESOLVED utanför kontraktet.
