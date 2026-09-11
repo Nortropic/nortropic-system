@@ -274,11 +274,19 @@ AUTHORITY_LIB_DIR = "controller/authority"
 # plus a binary whose basename carries the provider name; every other start must be an ordinary tool below.
 PROVIDER_SHAPE_ELEMENTS = ("--output-schema", "danger-full-access")
 PROVIDER_SHAPE_BINARY_TOKENS = ("codex",)
-# v3.7 (review v11 N9): {"git"} alone was a measured FALSE RED — a legitimate product that runs `/usr/bin/env`, the pinned
-# python3.12 or `/bin/sh` under a flow (a runtime snapshot, a tool version, a gate run) went red on the closed set and was
-# counted as 19 provider starts. The set is the ordinary-tool set; a provider-SHAPED start through any of them is still red
-# (PROVIDER_SHAPE_ELEMENTS/_BINARY_TOKENS), and the remaining false-red cost is written into the development document p.8.
-ALLOWED_LIVE_BINARIES = frozenset({"git", "env", "sh", "python3.12"})
+# v3.7 (review v11 N9) widened the closed binary set from {"git"} to {"git","env","sh","python3.12"} because the narrow set
+# was a measured FALSE RED. v3.8 (review v12 B2) keeps the width but not the hole: the widening put three INTERPRETERS into
+# the ordinary-tool set while provider recognition still compared EXACT argv ELEMENTS — and an interpreter's payload is a
+# single element, so `/bin/sh -c '<runtime-assembled codex line>' … <neutral prompt>` was green. The set is therefore split.
+# TOOLS carry free argv and are recognised by exact elements (a substring test would flag the ordinary
+# `git show …:docs/loop/codex-evidence-contract.md`). WRAPPERS are interpreters: their whole argv is tested for provider
+# markers as a SUBSTRING, and any argv element longer than WRAPPER_ARGV_MAX that is not one of the captured prompts is
+# treated as a payload. Measured: the reference starts only `git`, and review v11's two false-red probes
+# (`/usr/bin/env true`, `python3.12 -c 'print(1)'`) carry no marker and no long element — both stay green.
+ALLOWED_LIVE_TOOLS = frozenset({"git"})
+ALLOWED_LIVE_WRAPPERS = frozenset({"env", "sh", "python3.12"})
+ALLOWED_LIVE_BINARIES = ALLOWED_LIVE_TOOLS | ALLOWED_LIVE_WRAPPERS
+WRAPPER_ARGV_MAX = 200
 ALLOWED_LIVE_PRIMITIVES = frozenset({"subprocess.Popen"})   # the baseline never uses posix_spawn/exec*/system
 # The start primitives the driver instruments and whose identity must survive the flows.
 EXEC_PRIMITIVES = (("subprocess", "Popen"), ("os", "posix_spawn"), ("os", "posix_spawnp"), ("os", "execv"), ("os", "execve"),
@@ -461,14 +469,51 @@ DRIVER = (
     "_ORIG_PRIMS={(mod.__name__,name):getattr(mod,name) for mod,name in _PRIMS}\n"
     "from pathlib import Path\n"
     "subject=Path(sys.argv[1]); root=Path(sys.argv[2]); scenario=sys.argv[3]\n"
+    # v3.8 (review v12 B1): in the LIVE scenario the recorders are installed BEFORE the subject module is executed. v3.7
+    # captured the stdlib originals before the load but installed the recorders after it, so any import-time capture that
+    # is not a statement — a FUNCTION DEFAULT (`def _s(t, _S=os.posix_spawn)`), a decorator argument, a method default,
+    # a metaclass — took the real primitive and started processes the gate never saw (measured: 24 real children with a
+    # neutral prompt while the gate was green). With the recorders installed first, every such capture captures the
+    # INSTRUMENTED object, which closes the whole class structurally rather than form by form. The eight `os.*`
+    # primitives have no attribute below the module attribute to record, so this is the only place they can be bound.
+    "popen_calls=[]; child_calls=[]; rec_count=[0]; _ACTIVE=[]; _RECS={}\n"
+    "def _make_rec(mn,pn,orig):\n"
+    "    def _rec(*a,**k):\n"
+    "        rec_count[0]+=1\n"
+    "        try:\n"
+    "            argv=a[0] if a else k.get('args') or k.get('argv')\n"
+    "            items=[str(x) for x in argv] if not isinstance(argv,(str,bytes)) else [str(argv)]\n"
+    "        except Exception: items=['<unreadable>']\n"
+    "        popen_calls.append({'prim':mn+'.'+pn,'argv':items})\n"
+    "        _ACTIVE.append(items)\n"
+    "        try:\n"
+    "            return orig(*a,**k)\n"
+    "        finally:\n"
+    "            _ACTIVE.pop()\n"
+    "    return _rec\n"
+    # Per-CALL identity, not an aggregate: a child start that happens while no recorded Popen call is on the stack is
+    # unrecorded, whatever the totals say. Review v12 B1(b) balanced the v3.7 aggregates (19 hidden starts + 19 recorded
+    # Popen calls with the same argv that raised inside __init__ before _execute_child); that is caught here.
+    "def _child_rec(self,args,executable=None,*a,**k):\n"
+    "    try:\n"
+    "        items=[str(x) for x in args] if not isinstance(args,(str,bytes)) else [str(args)]\n"
+    "    except Exception: items=['<unreadable>']\n"
+    "    child_calls.append({'argv':items,'recorded':bool(_ACTIVE)})\n"
+    "    return _ORIG_EXEC_CHILD(self,args,executable,*a,**k)\n"
+    "_EXPECT=dict(_ORIG_PRIMS); _EXPECT_CHILD=_ORIG_EXEC_CHILD\n"
+    "if scenario=='live_flows':\n"
+    "    for mod,name in _PRIMS:\n"
+    "        r_=_make_rec(mod.__name__,name,_ORIG_PRIMS[(mod.__name__,name)]); _RECS[(mod.__name__,name)]=r_; setattr(mod,name,r_)\n"
+    "    _EXPECT=dict(_RECS)\n"
+    "    if _ORIG_EXEC_CHILD is not None:\n"
+    "        _ORIG_POPEN._execute_child=_child_rec; _EXPECT_CHILD=_child_rec\n"
     "s=importlib.util.spec_from_file_location(sys.argv[4] if len(sys.argv)>4 else 'subject_autopilot', subject/'" + AUTOPILOT + "')\n"
     "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
     "out={'scenario':scenario}\n"
-    "out['popen_identity']=bool(_sp.Popen is _ORIG_POPEN and sys.modules['subprocess'].Popen is _ORIG_POPEN\n"
+    "out['popen_identity']=bool(all(getattr(sys.modules[mn],pn) is _EXPECT[(mn,pn)] for (mn,pn) in _EXPECT)\n"
     "                           and getattr(m,'subprocess',_sp) is _sp\n"
-    "                           and getattr(_ORIG_POPEN,'_execute_child',None) is _ORIG_EXEC_CHILD\n"
-    "                           and _ORIG_POPEN.__init__ is _ORIG_POPEN_INIT\n"
-    "                           and all(getattr(sys.modules[mn],pn) is fn for (mn,pn),fn in _ORIG_PRIMS.items()))\n"
+    "                           and getattr(_ORIG_POPEN,'_execute_child',None) is _EXPECT_CHILD\n"
+    "                           and _ORIG_POPEN.__init__ is _ORIG_POPEN_INIT)\n"
     "out['core_module_file']=getattr(sys.modules.get('core'),'__file__',None)\n"
     "try:\n"
     "    if scenario=='selftest_none':\n"
@@ -547,33 +592,12 @@ DRIVER = (
     "            out.update(outcome='returned', flows={}, missing_names=missing)\n"
     "        else:\n"
     "            captured=[]; outcomes={}; state={'flow':None,'l_green':False,'answered':set()}\n"
-    "            popen_calls=[]; rec_count=[0]\n"
-    "            def _make_rec(mn,pn,orig):\n"
-    "                def _rec(*a,**k):\n"
-    "                    rec_count[0]+=1\n"
-    "                    try:\n"
-    "                        argv=a[0] if a else k.get('args') or k.get('argv')\n"
-    "                        items=[str(x) for x in argv] if not isinstance(argv,(str,bytes)) else [str(argv)]\n"
-    "                    except Exception: items=['<unreadable>']\n"
-    "                    popen_calls.append({'prim':mn+'.'+pn,'argv':items})\n"
-    "                    return orig(*a,**k)\n"
-    "                return _rec\n"
-    "            _RECS={}\n"
-    "            for mod,name in _PRIMS:\n"
-    "                r_=_make_rec(mod.__name__,name,_ORIG_PRIMS[(mod.__name__,name)]); _RECS[(mod.__name__,name)]=r_; setattr(mod,name,r_)\n"
+    # The recorders are already installed (before the module was executed); only the module's own namespace is refreshed,
+    # and the import-time starts the product may have made are discarded so the flow counters start at zero.
     "            if getattr(m,'subprocess',None) is not None: m.subprocess.Popen=_RECS[('subprocess','Popen')]\n"
-    # v3.7 (review v11 B1(c)): record what actually REACHES THE CHILD. `Popen._execute_child` is the real start; a product
-    # that captured the Popen class at import and replaced this method rewrote the argv AFTER the Popen-level recorder saw
-    # the plan-bearing prompt. The recorder also sees starts made through a captured class that never touches the module
-    # attribute, so `child_total` must equal the recorded `popen_total`.
-    "            child_calls=[]\n"
-    "            def _child_rec(self,args,executable=None,*a,**k):\n"
-    "                try:\n"
-    "                    items=[str(x) for x in args] if not isinstance(args,(str,bytes)) else [str(args)]\n"
-    "                except Exception: items=['<unreadable>']\n"
-    "                child_calls.append({'argv':items})\n"
-    "                return _ORIG_EXEC_CHILD(self,args,executable,*a,**k)\n"
-    "            if _ORIG_EXEC_CHILD is not None: _ORIG_POPEN._execute_child=_child_rec\n"
+    "            import_time_starts=len(popen_calls); import_time_children=len(child_calls)\n"
+    "            del popen_calls[:]; del child_calls[:]; rec_count[0]=0\n"
+
     "            head=m.sha(root); results=Path(_tf.mkdtemp(prefix='live-results-'))\n"
     "            def report_for(role):\n"
     "                base={'role':role,'outcome':'READY','owner_decision_required':False,'blocking_findings':[],'frozen_gate_ready':True,\n"
@@ -627,26 +651,43 @@ DRIVER = (
     "                    outcomes[_n]={'outcome':'error','message':repr(e)[:300]}\n"
     "                outcomes[_n]['captures']=[{'role':c['role'],'prompt':c['prompt']} for c in captured[before:]]\n"
     "            prompts_seen={c['prompt'] for c in captured}\n"
+    # v3.8 (review v12 B2): TOOLS are recognised by exact argv elements (a substring test flags the ordinary
+    # `git show …:docs/loop/codex-evidence-contract.md`); WRAPPERS are interpreters whose payload is one element, so their
+    # whole argv is searched for provider markers as a SUBSTRING and any element longer than WRAPPER_ARGV_MAX that is not
+    # a captured prompt counts as a payload. A binary in neither set is red as before.
+    "            _TOOLS=" + repr(sorted(ALLOWED_LIVE_TOOLS)) + "; _WRAPPERS=" + repr(sorted(ALLOWED_LIVE_WRAPPERS)) + "\n"
+    "            _SUBSTR_MARKS=" + repr(tuple(PROVIDER_SHAPE_ELEMENTS) + tuple(PROVIDER_SHAPE_BINARY_TOKENS)) + "\n"
+    "            def _base_of(items):\n"
+    "                return (items[0].rsplit('/',1)[-1] if items else '')\n"
+    "            def _marked(items,base):\n"
+    "                if base in _WRAPPERS:\n"
+    "                    joined=' '.join(items)\n"
+    "                    if any(t in joined for t in _SUBSTR_MARKS): return True\n"
+    "                    return any(len(x)>" + str(WRAPPER_ARGV_MAX) + " and x not in prompts_seen for x in items)\n"
+    "                return any(mk in items for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
+    "            def _is_matched(items):\n"
+    "                return any(items and (items[-1]==p or p in items[-1]) for p in prompts_seen)\n"
     "            def _shape(c):\n"
-    "                base=(c['argv'][0].rsplit('/',1)[-1] if c['argv'] else '')\n"
-    "                marked=any(mk in c['argv'] for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
-    "                allowed=base in " + repr(sorted(ALLOWED_LIVE_BINARIES)) + "\n"
-    "                allowed=allowed and c['prim'] in " + repr(sorted(ALLOWED_LIVE_PRIMITIVES)) + "\n"
-    "                return {'prim':c['prim'],'base':base,'marked':marked,'allowed':allowed,'last':(c['argv'][-1] if c['argv'] else ''),\n"
-    "                        'matched':any(c['argv'] and (c['argv'][-1]==p or p in c['argv'][-1]) for p in prompts_seen)}\n"
+    "                base=_base_of(c['argv'])\n"
+    "                allowed=(base in _TOOLS or base in _WRAPPERS) and c['prim'] in " + repr(sorted(ALLOWED_LIVE_PRIMITIVES)) + "\n"
+    "                return {'prim':c['prim'],'base':base,'marked':_marked(c['argv'],base),'allowed':allowed,\n"
+    "                        'last':(c['argv'][-1] if c['argv'] else ''),'matched':_is_matched(c['argv'])}\n"
     "            shapes=[_shape(c) for c in popen_calls]\n"
     "            suspect=[s for s in shapes if (s['marked'] or not s['allowed']) and not s['matched']]\n"
     "            def _cshape(c):\n"
-    "                base=(c['argv'][0].rsplit('/',1)[-1] if c['argv'] else '')\n"
-    # The provider markers are matched exactly as at Popen level: exact argv ELEMENTS plus the binary's basename. A
-    # substring test over the whole argv flagged the ordinary `git show …:docs/loop/codex-evidence-contract.md` (measured).
-    "                marked=any(mk in c['argv'] for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
-    "                return {'base':base,'marked':marked,'last':(c['argv'][-1] if c['argv'] else ''),\n"
-    "                        'matched':any(c['argv'] and (c['argv'][-1]==p or p in c['argv'][-1]) for p in prompts_seen)}\n"
+    "                base=_base_of(c['argv'])\n"
+    "                return {'base':base,'marked':_marked(c['argv'],base),'last':(c['argv'][-1] if c['argv'] else ''),\n"
+    "                        'matched':_is_matched(c['argv']),'recorded':c.get('recorded',True)}\n"
     "            child_shapes=[_cshape(c) for c in child_calls]\n"
-    "            child_suspect=[s for s in child_shapes if (s['marked'] or s['base'] not in " + repr(sorted(ALLOWED_LIVE_BINARIES)) + ") and not s['matched']]\n"
-    "            _pargv={tuple(c['argv']) for c in popen_calls}\n"
-    "            child_rewritten=[' '.join(c['argv'])[:140] for c in child_calls if tuple(c['argv']) not in _pargv]\n"
+    "            child_suspect=[s for s in child_shapes if (s['marked'] or (s['base'] not in _TOOLS and s['base'] not in _WRAPPERS)) and not s['matched']]\n"
+    # v3.8 (review v12 B1(b)): argv is compared as a MULTISET, not a set, so an equal number of hidden starts and recorded
+    # calls carrying the same argv no longer cancels out; and every child start made while no recorded Popen call is on the
+    # stack is reported by identity, which no aggregate balance can hide.
+    "            import collections as _co\n"
+    "            _pargv=_co.Counter(tuple(c['argv']) for c in popen_calls)\n"
+    "            _cargv=_co.Counter(tuple(c['argv']) for c in child_calls)\n"
+    "            child_rewritten=[' '.join(a)[:140] for a in (_cargv-_pargv)]\n"
+    "            child_unrecorded=[' '.join(c['argv'])[:140] for c in child_calls if not c.get('recorded',True)]\n"
     "            identity_after=bool(all(getattr(sys.modules[mn],pn) is _RECS[(mn,pn)] for (mn,pn) in _RECS)\n"
     "                                and getattr(m,'subprocess',_sp) is _sp and m.subprocess.Popen is _RECS[('subprocess','Popen')]\n"
     "                                and (_ORIG_EXEC_CHILD is None or _ORIG_POPEN._execute_child is _child_rec)\n"
@@ -656,7 +697,8 @@ DRIVER = (
     "                       start_primitives=sorted({s['prim'] for s in shapes}), start_binaries=sorted({s['base'] for s in shapes}),\n"
     "                       child_total=len(child_calls), child_binaries=sorted({s['base'] for s in child_shapes}),\n"
     "                       child_starts_unexpected=[s['base']+':'+s['last'][:120] for s in child_suspect[:4]],\n"
-    "                       child_argv_rewritten=child_rewritten[:4],\n"
+    "                       child_argv_rewritten=child_rewritten[:4], child_unrecorded=child_unrecorded[:4],\n"
+    "                       import_time_starts=import_time_starts, import_time_children=import_time_children,\n"
     "                       popen_identity_after=identity_after)\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
@@ -1041,21 +1083,28 @@ def prompt_world(source):
 
 
 def exec_surface_assignments(source):
-    """[] when no assignment ANYWHERE in the file rebinds an exec-surface attribute, an exec ALIAS or an internal attribute.
+    """[] when nothing ANYWHERE in the file rebinds an exec-surface attribute, an exec ALIAS or an internal attribute, and
+    no exec object is captured by a function default or a decorator argument.
 
-    v3.6 held the rule over the whole file but measured only the NAME `Popen` and the MODULE `subprocess`. v3.7 (review v11
-    B1) closes the layer below: exec objects are tracked transitively — a name, class attribute or instance attribute bound
-    from `subprocess.<exec attr>`, `os.<exec attr>`, an already tracked alias, an attribute of one, or a call of one, is an
-    alias, and any assignment onto an alias is red — and assignment to an internal/dunder attribute (`_execute_child`,
-    `__init__`, `__call__`, `__new__`, …) is red on ANY object, alias or not.
-    Allowed everywhere: plain names, tuple/list destructuring, `self.<attr>` (attr outside the exec surface, the forbidden
-    set and the alias set) and subscript assignment to a LOCAL name. Red: an attribute target whose name is an exec
-    primitive, whose chain passes through an exec module, or whose base is an alias; `sys.modules[...]`, `vars(x)[...]`,
-    `x.__dict__[...]`; and subscript assignment to a module-level name."""
+    v3.7 tracked exec aliases transitively but (i) only through STATEMENTS and (ii) by matching unparsed text GLOBALLY,
+    which made every local variable named like a measured alias forbidden to write to (review v12 N2, two measured false
+    reds). v3.8 makes the tracking SCOPE-AWARE — each function/class body has its own alias set, inheriting the enclosing
+    one — drops call RESULTS from the alias set (a `Popen` instance is not the exec surface; writing its dunder attributes
+    is already forbidden below), and extends the rule to the two non-statement capture forms: a FUNCTION DEFAULT and a
+    DECORATOR ARGUMENT are evaluated at import, before any recorder exists (review v12 B1).
+    Allowed everywhere: plain names, tuple/list destructuring, `self.<attr>` outside the exec surface and the forbidden
+    set, and subscript assignment to a LOCAL name. Red: an attribute target whose name is an exec primitive or an
+    internal/dunder attribute, whose chain passes an exec module, or whose base is an alias in scope; `sys.modules[...]`,
+    `vars(x)[...]`, `x.__dict__[...]`; subscript assignment to a module-level name; `setattr` on an exec module, an alias
+    or a forbidden/exec-surface name; and an exec object bound as a default or passed to a decorator.
+    Measured on 320c9df7: every alias set is EMPTY, there are three attribute targets (`sys.dont_write_bytecode`
+    whitelisted, `self.task_id`, `self.reason`), no forbidden attribute target, no `setattr`, and no exec object in any
+    default or decorator — so every clause is green on the baseline."""
     tree = ast.parse(source)
     module_names = {t.id for n in tree.body if isinstance(n, (ast.Assign, ast.AnnAssign))
                     for t in (n.targets if isinstance(n, ast.Assign) else [n.target]) if isinstance(t, ast.Name)}
     problems = []
+    SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
 
     def chain(node):
         parts = []
@@ -1068,60 +1117,75 @@ def exec_surface_assignments(source):
             return parts
         return None
 
-    aliases = set()
+    def defaults_and_decorators(node):
+        """The expressions a `def`/`class` statement evaluates in the ENCLOSING scope, at import time."""
+        args = getattr(node, "args", None)
+        out = list(getattr(node, "decorator_list", []))
+        if args is not None:
+            out += list(args.defaults) + [d for d in args.kw_defaults if d is not None]
+        return out
 
-    def is_exec_object(node):
-        """True for `subprocess.Popen`, `os.execv`, `subprocess.Popen._execute_child`, a tracked alias, an attribute of an
-        alias, and a call of any of those (`p = subprocess.Popen(...)` makes `p` an alias too)."""
-        if isinstance(node, ast.Call):
-            return is_exec_object(node.func)
+    def own_nodes(scope):
+        """Every node belonging to this scope. A nested function/class STATEMENT belongs here (its defaults and decorators
+        are evaluated in this scope) but its body is a different scope and is not walked."""
+        out = []
+
+        def walk(node):
+            for child in ast.iter_child_nodes(node):
+                out.append(child)
+                if isinstance(child, SCOPES):
+                    for outer in defaults_and_decorators(child):
+                        out.append(outer)
+                        walk(outer)
+                    continue
+                walk(child)
+
+        walk(scope)
+        return out
+
+    def is_exec_object(node, aliases):
+        """`subprocess.Popen`, `os.execv`, `subprocess.Popen._execute_child`, an alias in scope, or an attribute of one.
+        A CALL is deliberately not an exec object (v3.8): `p = subprocess.run(...)` binds a result, not the surface."""
         if isinstance(node, ast.Name):
             return node.id in aliases
         if not isinstance(node, ast.Attribute):
             return False
         text = ast.unparse(node)
-        if text in aliases or any(text.startswith(a + ".") for a in aliases):
+        if text in aliases or any(text.startswith(alias + ".") for alias in aliases):
             return True
-        c = chain(node)
-        return bool(c) and len(c) >= 2 and c[0] in EXEC_MODULE_NAMES and c[1] in EXEC_SURFACE_ATTRS
+        parts = chain(node)
+        return bool(parts) and len(parts) >= 2 and parts[0] in EXEC_MODULE_NAMES and parts[1] in EXEC_SURFACE_ATTRS
 
-    for _ in range(12):                                   # transitive closure (the file is small; this always terminates)
-        grew = False
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign):
-                targets, value = list(node.targets), node.value
-            elif isinstance(node, ast.AnnAssign) and node.value is not None:
-                targets, value = [node.target], node.value
-            else:
-                continue
-            if not is_exec_object(value):
-                continue
-            for target in targets:
-                if isinstance(target, (ast.Name, ast.Attribute)):
-                    text = ast.unparse(target)
-                    if text not in aliases:
-                        aliases.add(text)
-                        grew = True
-        for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
-            for stmt in cls.body:                          # a class attribute is also reachable as `<Class>.<name>`
-                if isinstance(stmt, ast.Assign) and is_exec_object(stmt.value):
-                    for target in stmt.targets:
-                        if isinstance(target, ast.Name) and cls.name + "." + target.id not in aliases:
-                            aliases.add(cls.name + "." + target.id)
+    def scope_aliases(scope, inherited):
+        aliases, nodes = set(inherited), own_nodes(scope)
+        for _ in range(12):                                   # transitive closure inside this scope
+            grew = False
+            for node in nodes:
+                if isinstance(node, ast.Assign):
+                    targets, value = list(node.targets), node.value
+                elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                    targets, value = [node.target], node.value
+                else:
+                    continue
+                if not is_exec_object(value, aliases):
+                    continue
+                for target in targets:
+                    if isinstance(target, (ast.Name, ast.Attribute)):
+                        text = ast.unparse(target)
+                        if text not in aliases:
+                            aliases.add(text)
                             grew = True
-        if not grew:
-            break
+            if not grew:
+                break
+        return aliases, nodes
 
-    def on_alias(text):
-        return text in aliases or any(text == a or text.startswith(a + ".") for a in aliases)
-
-    def check_target(target, node):
+    def check_target(target, node, aliases):
         if isinstance(target, (ast.Tuple, ast.List)):
             for element in target.elts:
-                check_target(element, node)
+                check_target(element, node, aliases)
             return
         if isinstance(target, ast.Starred):
-            check_target(target.value, node)
+            check_target(target.value, node, aliases)
             return
         if isinstance(target, ast.Name):
             if target.id in PROMPT_RUNNERS:
@@ -1141,16 +1205,15 @@ def exec_surface_assignments(source):
             if any(p in EXEC_MODULE_NAMES for p in parts[:-1]) or any(p in EXEC_SURFACE_ATTRS for p in parts[:-1]):
                 problems.append(f"line {node.lineno}: assignment into exec module {text}")
                 return
-            if on_alias(ast.unparse(target.value)):
+            base_text = ast.unparse(target.value)
+            if base_text in aliases or any(base_text.startswith(alias + ".") for alias in aliases):
                 problems.append(f"line {node.lineno}: assignment onto exec alias {text}")
             return
         if isinstance(target, ast.Subscript):
             base = target.value
             base_text = ast.unparse(base)
-            # v3.7 (review v11 N3): the rule promised `sys.modules`/`globals()`/`vars()`/`locals()`; `subprocess.__dict__[…]`,
-            # `vars(subprocess)[…]` and `globals(  )[…]` fell outside the four literal strings.
             if base_text in ("sys.modules", "globals()", "vars()", "locals()") or base_text.endswith(".__dict__") \
-                    or re.match(r"^(vars|globals|locals)\s*\(", base_text) or on_alias(base_text):
+                    or re.match(r"^(vars|globals|locals)\s*\(", base_text) or base_text in aliases:
                 problems.append(f"line {node.lineno}: assignment into {base_text[:40]}")
                 return
             if isinstance(base, ast.Name) and base.id in module_names:
@@ -1158,19 +1221,38 @@ def exec_surface_assignments(source):
             return
         problems.append(f"line {node.lineno}: assignment to {type(target).__name__} target {text[:50]}")
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                check_target(target, node)
-        elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
-            check_target(node.target, node)
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "setattr":
-            arg = ast.unparse(node.args[0]) if node.args else "?"
-            name = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else None
-            if arg in EXEC_MODULE_NAMES or arg in PROMPT_RUNNERS or on_alias(arg) \
-                    or (isinstance(name, str) and (name in FORBIDDEN_ATTR_TARGETS or name in EXEC_SURFACE_ATTRS
-                                                   or name in PROMPT_RUNNERS)):
-                problems.append(f"line {node.lineno}: setattr on {arg}.{name}")
+    def check_scope(scope, inherited):
+        aliases, nodes = scope_aliases(scope, inherited)
+        for node in nodes:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    check_target(target, node, aliases)
+            elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
+                check_target(node.target, node, aliases)
+            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "setattr":
+                arg = ast.unparse(node.args[0]) if node.args else "?"
+                name = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else None
+                on_alias = arg in aliases or any(arg.startswith(alias + ".") for alias in aliases)
+                if arg in EXEC_MODULE_NAMES or arg in PROMPT_RUNNERS or on_alias \
+                        or (isinstance(name, str) and (name in FORBIDDEN_ATTR_TARGETS or name in EXEC_SURFACE_ATTRS
+                                                       or name in PROMPT_RUNNERS)):
+                    problems.append(f"line {node.lineno}: setattr on {arg}.{name}")
+            elif isinstance(node, SCOPES):
+                # v3.8 (review v12 B1): a default argument and a decorator argument are evaluated when the `def` runs —
+                # at import, before any recorder is installed — and neither is an Assign, an AnnAssign or a setattr.
+                args = getattr(node, "args", None)
+                defaults = (list(args.defaults) + [d for d in args.kw_defaults if d is not None]) if args else []
+                for value in defaults:
+                    if any(is_exec_object(sub, aliases) for sub in [value] + list(ast.walk(value))):
+                        problems.append(f"line {node.lineno}: exec object captured as a default argument: {ast.unparse(value)[:50]}")
+                for decorator in getattr(node, "decorator_list", []):
+                    if any(is_exec_object(sub, aliases) for sub in [decorator] + list(ast.walk(decorator))):
+                        problems.append(f"line {node.lineno}: exec object captured by a decorator: {ast.unparse(decorator)[:50]}")
+        for node in nodes:
+            if isinstance(node, SCOPES):
+                check_scope(node, aliases)
+
+    check_scope(tree, set())
     return problems
 
 
@@ -2604,7 +2686,14 @@ def main():
         # argv rewritten below the Popen-level recorder no longer matches the argv the recorder saw.
         if live_out.get("child_total") != live_out.get("popen_total"):
             problems.append(f"child starts {live_out.get('child_total')} != recorded Popen starts {live_out.get('popen_total')}")
+        # v3.8 (review v12 B1(b)): the aggregate equality above is balanceable; these two are not. `child_unrecorded`
+        # names every child start made while no recorded Popen call was on the stack, and `child_argv_rewritten` now
+        # compares argv as a MULTISET. `import_time_starts` reports what the product started while it was being imported,
+        # which is only visible because the recorders are installed before `exec_module`.
+        problems += [f"child start outside any recorded Popen call: {x}" for x in (live_out.get("child_unrecorded") or [])[:2]]
         problems += [f"argv rewritten between Popen and the child: {x}" for x in (live_out.get("child_argv_rewritten") or [])[:2]]
+        if live_out.get("import_time_starts") or live_out.get("import_time_children"):
+            problems.append(f"the autopilot started {live_out.get('import_time_starts')} process(es) while being imported")
         problems += [f"the child process received an unexpected argv: {x}" for x in (live_out.get("child_starts_unexpected") or [])[:2]]
         unexpected_child = sorted(set(live_out.get("child_binaries") or []) - ALLOWED_LIVE_BINARIES - {""})
         if unexpected_child:
@@ -2618,15 +2707,19 @@ def main():
     problems += [f"side effect during live flows: {x}" for x in live_side_effects[:6]]
     check("f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects",
           not problems, f"popen_total={(live_out or {}).get('popen_total')} child_total={(live_out or {}).get('child_total')} "
+                        f"binaries={(live_out or {}).get('start_binaries')} child_binaries={(live_out or {}).get('child_binaries')} "
                         f"problems={problems}"[-900:])
+    live_green = live_out
     livemut, livemut_env = replica(bench, "live-flows-mutated", subject, head)
     if PLAN_GEN in tracked and (livemut / PLAN_GEN).is_file():
         overlay(livemut, livemut_env, {PLAN_GEN: ((livemut / PLAN_GEN).read_bytes() + b"\n<!-- LOCAL mutation -->\n", 0o644)},
                 message="LOCAL fixture: mutated plan for live flows")
     git(livemut, livemut_env, "update-ref", "refs/remotes/origin/main", git(livemut, livemut_env, "rev-parse", "HEAD"))
     r = run([PYTHON, "-B", "-c", DRIVER, subject, livemut, "live_flows"], ap_tmp, ap_env, timeout=900)
-    live_out = driver_outcome(r)
-    mut_flows = live_out.get("flows", {}) if live_out and live_out["outcome"] == "returned" else {}
+    # v3.8 (review v12 N1): this is the MUTATED run; v3.7 assigned it back to `live_out`, so `result.json` serialised the
+    # mutated counters under `live_*` while the row details carried the green run's — the whole "59 vs 333" discrepancy.
+    live_mut_out = driver_outcome(r)
+    mut_flows = live_mut_out.get("flows", {}) if live_mut_out and live_mut_out["outcome"] == "returned" else {}
     problems = [] if mut_flows else ["live driver unavailable: " + (r.stdout + r.stderr)[-200:]]
     if PLAN_GEN not in tracked:
         problems.append("plan generation missing (positive not established)")
@@ -2958,9 +3051,18 @@ def main():
                                  "captures": [(c.get("role"), len(c.get("prompt", ""))) for c in v.get("captures", [])]} for k, v in live_flows.items()},
               "live_flows_mutated": {k: {"outcome": v.get("outcome"), "captures": len(v.get("captures", []))} for k, v in mut_flows.items()},
               "runner_machinery_ast": ids, "runner_dependency_blobs": {rel: head_oid(rel) for rel in RUNNER_DEPENDENCY_BLOBS},
-              "live_popen_total": (live_out or {}).get("popen_total"), "live_provider_starts": (live_out or {}).get("provider_starts"),
-              "live_start_primitives": (live_out or {}).get("start_primitives"), "live_start_binaries": (live_out or {}).get("start_binaries"),
-              "live_popen_identity_after": (live_out or {}).get("popen_identity_after"), "core_module_file": produced.get("core_module_file"),
+              "live_popen_total": (live_green or {}).get("popen_total"), "live_provider_starts": (live_green or {}).get("provider_starts"),
+              "live_start_primitives": (live_green or {}).get("start_primitives"), "live_start_binaries": (live_green or {}).get("start_binaries"),
+              "live_child_total": (live_green or {}).get("child_total"), "live_child_binaries": (live_green or {}).get("child_binaries"),
+              "live_child_argv_rewritten": (live_green or {}).get("child_argv_rewritten"),
+              "live_child_unrecorded": (live_green or {}).get("child_unrecorded"),
+              "live_import_time_starts": (live_green or {}).get("import_time_starts"),
+              "live_popen_identity": (live_green or {}).get("popen_identity"),
+              "live_popen_identity_after": (live_green or {}).get("popen_identity_after"),
+              "live_mutated_popen_total": (live_mut_out or {}).get("popen_total"),
+              "live_mutated_provider_starts": (live_mut_out or {}).get("provider_starts"),
+              "live_allowed_tools": sorted(ALLOWED_LIVE_TOOLS), "live_allowed_wrappers": sorted(ALLOWED_LIVE_WRAPPERS),
+              "core_module_file": produced.get("core_module_file"),
               "live_side_effects": live_side_effects,
               "case_collisions": case_dupes,
               "subject_sha256": subject_sha, "held_sha256": held, "held_gate_runs": gate_runs,

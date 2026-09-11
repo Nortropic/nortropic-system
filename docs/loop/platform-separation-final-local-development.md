@@ -712,7 +712,20 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    flöde startar NÅGON ANNAN binär (en verktygsversion, en systemsond, en extern grind) eller använder en annan
    startprimitiv blir röd på `f4_live_flows_start_no_provider_process…` — mätt två gånger av granskare nr 11 på
    `/usr/bin/env` respektive den pinnade `python3.12` under v3.6:s `{git}`-mängd. Mängden utvidgas bara genom en ny
-   kontraktsversion. Samma sak gäller de slutna namnmängderna (`LIVE_STUB_NAMES`, `EXPECTED_PROMPT_BUILDERS`,
+   kontraktsversion.
+   **RÄTTELSE (v3.8, granskning nr 12 B2):** vidgningen i v3.7 tog samtidigt bort en verklig kontroll — en providerrad
+   inuti ETT `sh -c`-element blev grön (mätt; med v3.6:s `{git}`-mängd är samma mutant röd). Mängden är därför delad i
+   TOOLS (`git`, exakta argv-element) och WRAPPERS (`env`, `sh`, `python3.12`, delsträngstest över hela argv plus en
+   längdgräns på `WRAPPER_ARGV_MAX` = 200 tecken per argv-element). Kostnaden för den slutna mängden kvarstår som ovan,
+   och en legitim `sh -c '<lång skriptrad>'` under ett flöde är röd per design.
+   **KOSTNAD (v3.8, granskning nr 12 N2):** exec-aliasspårningen var i v3.7 en GLOBAL textmatchning, vilket gjorde varje
+   lokal variabel som råkade heta som ett mätt alias (`p`, `r`, `rc`, `sub`) förbjuden att subscript- eller
+   attributtilldela — två mätta falskt röda (`p[x] = p.get(x, 0) + 1`; `r.returncode = int(r.returncode or 0)`).
+   Spårningen är nu skopmedveten (per funktion/klass, med arv från omslutande skop) och ett ANROPSRESULTAT blir inte
+   längre alias, så aliasmängden på baslinjen är TOM och båda fallen är gröna. Kvar som kostnad: den som avsiktligt
+   binder `subprocess.Popen` eller en `os.*`-primitiv till ett namn och sedan skriver på det namnet blir röd — vilket är
+   regelns syfte, inte en bieffekt.
+   Samma sak gäller de slutna namnmängderna (`LIVE_STUB_NAMES`, `EXPECTED_PROMPT_BUILDERS`,
    `EXPECTED_PROMPT_CALLERS`, `EXPECTED_PLAN_GUARD_CALLERS`): legitim omdöpning är röd per design —
    autopilotens skivtuplar och `EMPIRICAL_GATE_PATH`. Refreeze av h-036/h-037/h-035/h-038/document-authority (stale
    pinnar på autopilot/AGENTS/drift) är ett separat H-steg som plangenerationens ändring bör batchas med (recon D).
@@ -1432,7 +1445,17 @@ governance 68/70 exakt `{g6, g7}`, loopsviten 53 ok / 0 FEL. Live-flöden: tio t
 1/4/4/4/4/4/4/4/7/37, `popen_total = child_total = 333`, `provider_starts = 0`, startprimitiver `['subprocess.Popen']`,
 binärer `['git']` på både Popen- och barnnivå, `child_argv_rewritten = []`, `child_starts_unexpected = []`,
 `popen_identity = popen_identity_after = True`, `live_side_effects = []` (nu inklusive subjektets `.git/` och
-`FIXTURE_ROOT` rekursivt); `core`-modulen importerad ur `controller/authority/core.py`. Den nya vaktraden stoppar med
+`FIXTURE_ROOT` rekursivt); `core`-modulen importerad ur `controller/authority/core.py`.
+
+**RÄTTELSE (v3.8, granskning nr 12 N1) till både v3.6- och v3.7-protokollet.** Skillnaden mellan v3.6-protokollets
+`popen_total = 59` och v3.7-protokollets `333` var **varken fixturen eller en ändrad räknare** — det var ett
+rapporteringsfel i grinden: den muterade live-körningen tilldelades tillbaka till `live_out`, och det var den
+överskrivna variabeln som serialiserades under `live_*` i `result.json`, medan radernas detaljer kom från den gröna
+körningen. v3.6:s 59 är alltså den MUTERADE körningen (där de fyra vaktbärande flödena stoppar) och v3.7:s 333 den
+gröna — i samma körning. Min förklaring "fixturen, inte grinden" var fel i sak. Från v3.8 serialiseras den gröna
+körningen under `live_*` (med `live_child_total`, `live_child_binaries`, `live_child_argv_rewritten`,
+`live_child_unrecorded`, `live_import_time_starts`, `live_allowed_tools`, `live_allowed_wrappers`) och den muterade
+under `live_mutated_*`; mätt på v3.8-referensen: `live_popen_total = 333`, `live_mutated_popen_total = 59`. Den nya vaktraden stoppar med
 `roadmap artifact identity mismatch … expected=000000000000000000000000000000000000000f`, dvs. vakten läser bevisligen
 `ROADMAP_PLAN_BLOBS`; ankarraden redovisar `anchors=2` (`controller/verify/cli`, autopiloten).
 
@@ -1454,6 +1477,37 @@ Falskt-röda prov som **förblir gröna** (113/5 = enbart de fem sandboxraderna)
 (`X = Y.copy()` på modulnivå), och de två granskning nr 11 mätte som falskt röda under v3.6 —
 `a11_legit_env_snapshot` (`subprocess.run(['/usr/bin/env','true'])` i ett flöde) och `a11_legit_python_snapshot`
 (`subprocess.run([sys.executable,'-c','print(1)'])`); båda ger nu `popen_total = child_total = 352`, `problems=[]`.
+
+### Oberoende kontraktsgranskning nr 12 (på e1efb141) → v3.8
+`GATE_REVIEW_RESULT=NOT_READY` med TVÅ blockerare, båda i providerledet; allt som remedierades efter nr 11 bekräftades
+verkligt (reproducerat, inte läst), RED-protokollet reproducerbart (72/46 statiskt, delta = fem sandboxrader → 77/41,
+radlistan identisk med dokumentets) och referensen 113/5 på första försöket.
+
+**B1 — providergränsen band SATSFORMER.** En importtidsfångst genom ett funktionsdefault
+(`def _quiet_spawn2(text, _S=os.posix_spawn)`) eller ett dekoratorargument är varken `Assign`, `AnnAssign` eller
+`setattr`, och `module_level_form` hoppar över `FunctionDef` helt; för de åtta `os.*`-primitiverna finns dessutom ingen
+inspelare under modulattributet. Mätt i grindens EGEN live-körning: **24 riktiga processer** startade med en neutral
+prompt medan grinden var 113/5 grön, `popen_total = child_total = 333`, `start_binaries=['git']`, identiteter `True`.
+Delfynd B1(b): de två räknarraderna var balanserbara (19 dolda starter + 19 inspelade Popen-anrop med samma argv som
+kastar före `_execute_child`).
+
+**B2 — REGRESSION införd av v3.7:s N9-fix.** Den vidgade `ALLOWED_LIVE_BINARIES = {git, env, sh, python3.12}` lade in
+tre tolkar i verktygsmängden utan innehållsregel: en providerrad inuti ETT `sh -c`-element, hopsatt i körtid och
+startad med vanlig `subprocess.run`, var 113/5 grön. Kontroll: med `{git}` och allt annat identiskt är samma mutant röd
+medan referensen förblir grön.
+
+| Fynd | Åtgärd i grinden (v3.8) |
+|---|---|
+| B1 strukturellt | DRIVERn installerar inspelarna på alla nio primitiver **och** på `Popen._execute_child` **före** `s.loader.exec_module(m)` i live-scenariot; varje importtidsfångst — modulnivå, klasskropp, funktionsdefault, dekoratorargument, metoddefault, metaklass — fångar därmed det instrumenterade objektet. `popen_identity` jämförs mot `_EXPECT` (inspelarna i live, stdlib-originalen annars) |
+| B1 statiskt komplement | `exec_surface_assignments` täcker `FunctionDef.args.defaults`/`kw_defaults` och `decorator_list` med samma `is_exec_object`. Mätt på 320c9df7: noll exec-objekt i defaults, noll i dekoratorer |
+| B1(b) icke-balanserbara räknare | per-anrops-identitet (`_ACTIVE`-stack: varje barnstart utan ett inspelat Popen-anrop på stacken redovisas som `child start outside any recorded Popen call`) + argv jämförd som **multimängd** (`Counter`) + `import_time_starts` |
+| B1 os.*-primitiverna | de har inget attribut under modulattributet; förladdningsinstallationen är deras enda bindning, och den är nu på plats |
+| B2 tolkar vs verktyg | `ALLOWED_LIVE_TOOLS = {git}` (exakta argv-element) och `ALLOWED_LIVE_WRAPPERS = {env, sh, python3.12}` (providermarkörer som **delsträng** över hela argv + `WRAPPER_ARGV_MAX = 200` per argv-element som inte är en fångad prompt) |
+| N1 rapporteringsfel | den gröna live-körningen serialiseras under `live_*`, den muterade under `live_mutated_*`, och barnnivåns fält tillkommer; rättelsen inskriven vid v3.6/v3.7-posterna |
+| N2 två nya falskt röda | aliasspårningen är skopmedveten (per funktion/klass med arv) och ett anropsresultat blir inte längre alias; aliasmängden på baslinjen är TOM och båda fallen gröna. Kostnaden inskriven i p.8 |
+| N7 dokumentnit | RED-listans parentes rättad från "7 dokument" till "8 dokument" |
+| N8 p.8 | providergränsens mätpunkter omskrivna till åtta; B2-hålet, aliaskostnaden och den för starka `child_total`-meningen rättade |
+| N3/N4/N5 (nr 11:s N5/N6/N7) | behållna som **deklarerade gränser** med granskarens mätta motivering inskriven i p.8 (remedieringsbeviset, rollpolicyns enda konsument, handoffens etikett) |
 
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
