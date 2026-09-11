@@ -1509,5 +1509,50 @@ medan referensen förblir grön.
 | N8 p.8 | providergränsens mätpunkter omskrivna till åtta; B2-hålet, aliaskostnaden och den för starka `child_total`-meningen rättade |
 | N3/N4/N5 (nr 11:s N5/N6/N7) | behållna som **deklarerade gränser** med granskarens mätta motivering inskriven i p.8 (remedieringsbeviset, rollpolicyns enda konsument, handoffens etikett) |
 
+### Test-author 2026-09-11 — baslinje RED för v3.8 (före produkt)
+Subjekt: omklonad replika av `320c9df7` + grind v3.8 + utvecklingsdokument, **en** commit (fixtur-HEAD `2da73e81`).
+Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **72 PASS / 46 FAIL** av **118 rader**. Fullkörning (bypass, egen
+`TMPDIR`, hållna grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`,
+**77 PASS / 41 FAIL**, result.json sha256 `548edc894d01003ae6e99562d92840a09ad6de1e36c5d8502142231ae2e21ae2`.
+Delta statisk→full är exakt de fem sandboxraderna. **Radlistan är byte för byte identisk med v3.7:s 41 rader**
+(`comm` på de två FAIL-mängderna: noll tillagda, noll borttagna), dvs. v3.8:s nya regler — inspelarinstallation före
+`exec_module`, formregeln för defaults/dekoratorer, den delade binärmängden, den skopmedvetna aliasspårningen och de
+icke-balanserbara räknarna — är alla **gröna på baslinjen** och lägger inte till någon rad. F7 oförändrat: control-set
+68/68, launch-cwd 19/20 med exakt två extra grindar, governance 68/70 exakt `{g6, g7}`; loopsviten 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.8 (scratch, förkastad — bevisar satisfierbarhet)
+Oförändrad produkt jämfört med v3.5–v3.7: **ingen produktändring krävdes**. Fixtur-HEAD `9df7e5b8`, 143 filer.
+Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **118/118**, result.json sha256
+`a05147984af6adf3624d6ad5bfdb691a085f209c1b8a31bdf12d6e11e8dd23d2`; control-set 68/68, launch-cwd 19/20, governance
+68/70 exakt `{g6, g7}`, loopsviten 53 ok / 0 FEL. Live-flöden: tio till slut med fångstprofilen 1/4/4/4/4/4/4/4/7/37 och
+— nu korrekt serialiserat ur den GRÖNA körningen — `live_popen_total = live_child_total = 333`,
+`live_provider_starts = 0`, `live_start_primitives = ['subprocess.Popen']`, `live_start_binaries = ['git']`,
+`live_child_binaries = ['git']`, `live_child_argv_rewritten = []`, `live_child_unrecorded = []`,
+`live_import_time_starts = 0`, `live_popen_identity = live_popen_identity_after = True`, `live_side_effects = []`,
+`live_allowed_tools = ['git']`, `live_allowed_wrappers = ['env', 'python3.12', 'sh']`, och den muterade körningen under
+`live_mutated_popen_total = 59` — de två tal som i v3.6/v3.7 blandades ihop står nu bredvid varandra i samma
+evidensfil.
+
+### F9 v3.8 — negativer (var och en i egen replika av v3.8-referensen, statiskt `--skip-held-gates`; **91 körda,
+91 fångade, 0 riggfel**) + **fem** falskt-röda prov som förblir gröna
+De 91 är de 69 från v3–v3.6 (inklusive grindmutanten `h`), de 15 från v3.7 (granskning nr 11:s B1-alias, N2, N4, de två
+N8-sidoeffekterna och de tio per-flödeskanarierna) och 7 nya från granskning nr 12:
+
+| Negativ | Fälls av |
+|---|---|
+| `a12_default_arg_posix_spawn2` (nr 12 B1, ordagrant återbyggd) | statiskt `line 235: exec object captured as a default argument: os.posix_spawn`; dynamiskt `provider processes started outside the stubbed runner: 19`, `processes started with unexpected binaries: ['true']`, `child starts 333 != recorded Popen starts 352` — dvs. `os.posix_spawn` går nu genom inspelaren |
+| `a12_decorator_capture` (nr 12 B1) | statiskt `line 248: exec object captured by a decorator: _hold(os.posix_spawn)` + samma dynamiska rad |
+| `a12_method_default_capture` (nr 12) | statiskt `exec object captured as a default argument` (metoddefault i klasskropp) + live-providerraden |
+| `a12_default_arg_popen` (nr 12) | samma två lager, för `subprocess.Popen` |
+| `a12_balance_counts` (nr 12 B1(b)) | 19 dolda starter + 19 inspelade Popen-anrop med samma argv som kastar före `_execute_child`: statiskt defaultregeln, argv-platsraden, och dynamiskt `provider processes started outside the stubbed runner: 38` med `popen_total=371 child_total=352` — balanseringen går inte längre jämnt ut |
+| `a12_sh_provider_clean` (nr 12 B2) | live-providerraden: `binaries=['git','sh']`, `provider processes started outside the stubbed runner: 19`, `unmatched provider prompt: sh:Do the task the orchestrator names…` — omslagsregelns delsträngstest ser markören inuti `sh -c`-elementet |
+| `a12_env_provider_clean` (nr 12 B2) | samma, `binaries=['env','git']` |
+
+Falskt-röda prov som **förblir gröna** (113/5 = enbart de fem sandboxraderna): `a10_legit_module_copy`,
+`a11_legit_env_snapshot` (`/usr/bin/env true` i ett flöde), `a11_legit_python_snapshot`
+(`python3.12 -c 'print(1)'`), och de två granskning nr 12 mätte som falskt röda under v3.7 —
+`a12_legit_local_p_dict` (en lokal dict som heter `p`) och `a12_legit_result_attr`
+(`r.returncode = int(r.returncode or 0)` på en `CompletedProcess`).
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
