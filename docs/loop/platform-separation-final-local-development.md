@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3.4 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5–8; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.5 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5–9; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -287,6 +287,13 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   (identiteten är HEAD-bloben, ingen commit). Konstanterna läses ur den riktiga modulen (DRIVER `constants`).
 - `f4_autopilot_has_plan_generation_constant_and_no_roadmap_plan_sha_attribute` (v3): modulen har ingen attribut
   `ROADMAP_PLAN_SHA`; `PLAN_GENERATION` är en icke-tom sträng (värdet är builderns, t.ex. `platform-v2`).
+- `f4_plan_constants_are_single_literal_assignments_equal_at_runtime_and_the_two_roadmap_tuples_keep_their_identities`
+  (v3.5, review v9 N2/N3): `PLAN_GENERATION`, `ROADMAP_PLAN_PATH`, `ROADMAP_HANDOFF_PATH`, `ROADMAP_PLAN_BLOBS`,
+  `AUTOPILOT_ROLE_POLICY`, `SUBSTITUTION_BLOBS` och `EMPIRICAL_GATE_PATH` tilldelas EXAKT EN gång på modulnivå, av rent
+  literalt material (inget `Call`/`Attribute`/`Subscript`/`IfExp` och inga namn utom de fyra sökvägskonstanter som används som
+  dict-nycklar) — en andra, miljöstyrd tilldelning (`os.environ.get(…, ROADMAP_PLAN_PATH)`) är RÖD — och modulens
+  körtidsvärden är lika med literalerna; dessutom `SUBSTITUTION_ROADMAP`-koderna == `SUB-1…SUB-4`, `ROADMAP[0].code == "S2"`
+  och de två tuplarna är disjunkta (att tömma `SUBSTITUTION_ROADMAP` och lägga skivorna först i `ROADMAP` är RÖTT).
 - `f4_ensure_roadmap_plan_returns_in_replica_without_any_remote`: den riktiga modulens
   `ensure_roadmap_plan(repo)` (namnet behålls — h-032-exit och publication-callers är namnbundna) returnerar i en
   replika utan remote (ingen fetch möjlig).
@@ -348,7 +355,10 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   (v3.3/v3.4, B1 dynamisk — den verkliga effekten): DRIVER-scenariot `live_flows` importerar modulen i en replika av
   kandidaten (`refs/remotes/origin/main` = HEAD), monkeypatchar `run_codex` till en fångare som bokför VARJE argument och
   svarar med ett syntetiskt READY-rapportobjekt (`AgentRun`), så att flödena fortsätter förbi första anropet genom
-  reviewer-/remedierings-/publiceringsvägarna; den slutna stubbmängden `LIVE_STUB_NAMES` (ensure_worktree,
+  reviewer-/remedierings-/publiceringsvägarna — (v3.5 N1) stubben är tillståndsstyrd: FÖRSTA svaret per (flöde, roll) är
+  `NEEDS_REMEDIATION` med ett fynd för REVIEWER och GATE_REVIEWER (och för EMPIRICAL i det fristående empiriska flödet), därefter
+  READY, så att varje remedieringsgren OCH arkitektvägen (`architect_resolution` via den empiriska routningen) faktiskt nås;
+  den slutna stubbmängden `LIVE_STUB_NAMES` (ensure_worktree,
   detached_worktree, remove_worktree, clean, origin_main, capture_green_gates, run_gate, run_empirical_gate,
   assert_builder_scope, assert_test_author_scope, assert_roadmap_test_author_scope, assert_empirical_gate_author_scope,
   assert_final_gates, assert_task_gate_completion, assert_s7_external_prerequisite, run_invariants, stage_and_commit,
@@ -359,19 +369,48 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   L publicerats (eller i den fristående empiriska slutkörningen). Flöden: `architect_resolution`, `roadmap_contract_flow`
   [SUB-1, S2], `empirical_gate_contract_flow`, `builder_flow[S2]` (med `slice_builder_extra`), `ensure_roadmap_slice`
   [SUB-1, S2], `test_author_flow`, `empirical_unattended_flow`, `full_roadmap`. Krav: varje flöde löper till slut
-  (`returned`), antalet runner-anrop ≥ mätt minimum per flöde (1/2/2/2/2/2/2/2/1/33), plan + handoff i varje fångad prompt
-  för rollerna ARCHITECT, TEST_AUTHOR/GATE_REVIEWER (roadmap-/empiriska flödena), BUILDER (skivvägen) och EMPIRICAL —
-  REVIEWER och S3-flödets (h-003) prompter undantagna — och inga gamla pekare/commit-läsning/kodwebb/ägarstopp i NÅGON
-  fångad prompt (alla roller, alla anrop).
+  (`returned`), antalet runner-anrop ≥ mätt minimum per flöde (v3.5: 1/4/4/4/4/4/4/4/7/37 — minima mätta MED remedierings-
+  grenarna, så en produkt som hoppar över dem faller), plan + handoff i varje fångad prompt
+  för rollerna ARCHITECT, TEST_AUTHOR/GATE_REVIEWER (roadmap-/empiriska flödena), BUILDER (skivvägen och den empiriska
+  remedieringen) och EMPIRICAL — REVIEWER och S3-flödets (h-003) prompter undantagna — och inga gamla pekare/commit-läsning/
+  kodwebb/ägarstopp i NÅGON fångad prompt (alla roller, alla anrop). (v3.5) Eftersom remedieringsgrenarna nu nås måste även
+  `remediation_prompt` (BUILDER och TEST_AUTHOR) och den inlinade L-remedieringen namnge plan + handoff — annars faller raden.
+- `f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects` (v3.5, review v9 B1 dynamisk):
+  drivern spelar in VARJE `subprocess.Popen` under live-flödena (patchad både i `subprocess` och i modulens namnrymd) och
+  delegerar till originalet; eftersom runnern är stubbad får ingen providerstart alls ske — varje inspelad argv som bär
+  `--output-schema` eller `danger-full-access` är en förbigång, och dess sista argument måste dessutom vara en av de fångade
+  prompterna. Samma före/efter-sidoeffektsvep som `prompts`-scenariot omger live-körningen (N4), och `subprocess.Popen`-
+  identiteten kontrolleras efter modulimporten.
 - `f4_live_flows_stop_before_the_stubbed_runner_on_mutated_plan_generation` (v3.3, B2 dynamisk): samma körning i en
   replika med muterad plan — de fyra vaktbärande flödena (`roadmap_contract_flow` ×2, `empirical_gate_contract_flow`,
   `full_roadmap`) måste STOPPA (`Stop`) utan att runnern anropats; de övriga flödena bär ingen egen vakt.
 - `f4_runner_machinery_ast_identical_to_320c9df7_provider_machinery_untouched` (v3.4, B2): mätpunkten är bunden —
   normaliserad AST-identitet (sha256 av `ast.dump` utan positioner, mätt med den pinnade python3.12) för `run_codex`,
   `run_codex_resolving_architecture`, `_provider_snapshot`, `_python_snapshot`, `_strict_provider_authority` och
-  `AUTOPILOT_ROLE_POLICY` == plattformsautopiloten vid 320c9df7. Runnern kan därmed inte läsa prompten ur fil/miljö efter
-  stubbgränsen; "rörs inte" (p.8) är mekaniskt backat. Kanari: whitespace-/formateringsändring ger samma identitet, en
-  kroppsändring en annan.
+  `AUTOPILOT_ROLE_POLICY` == plattformsautopiloten vid 320c9df7. Runnern kan därmed inte läsa prompten ur fil/miljö i sin
+  egen kropp. Kanari: whitespace-/formateringsändring ger samma identitet, en kroppsändring en annan. **Vad som är mekaniskt
+  backat av "rörs inte" (korrigerad formulering, v3.5 efter granskning nr 9):** dessa sex definitioner binds per normaliserad
+  AST; `controller/authority/{cli,core.py}` och `controller/launch/{cli,runtime_snapshot.py}` binds per BLOB mot 320c9df7
+  (raden nedan); autopilotens modulnivå binds per FORM; `verify/**`, `controller/loop/cli`, specen och registret binds av F6/F3.
+  Allt annat under `controller/**` är deklarerad gräns (det skyddas i drift av specens `denied_write` och policygrinden, inte av
+  detta kontrakt).
+- `f4_autopilot_module_level_is_the_declared_form_and_importing_it_leaves_the_exec_surface_unchanged` (v3.5, review v9 B1):
+  varje toppnivåsats i autopiloten är en `Import`/`ImportFrom`/`FunctionDef`/`ClassDef`/`AnnAssign`/`Assign` med enbart
+  `Name`-mål, modulens docstring, `__main__`-vakten sist, eller en av exakt två mätta satser (`sys.dont_write_bytecode = True`,
+  `sys.path.insert(0, str(AUTHORITY_LIB))`); varje annat mål (attribut som `subprocess.Popen = …`, subscript som
+  `AUTOPILOT_ROLE_POLICY["BUILDER"] = …`), varje bar anropssats och varje block (`if`/`for`/`with`/`try`) på modulnivå är RÖTT,
+  liksom att binda ett exec-ytsnamn (`Popen`, `run`, `call`, `check_output`, `system`, `exec*`, `posix_spawn`, `fork`, `popen`,
+  `which`, `copy`, `move` …) eller ett runnernamn till en modulnivåvariabel. DYNAMISKT: efter att drivern importerat modulen
+  måste `subprocess.Popen` vara stdlibs original och `m.subprocess` samma modulobjekt — en skuggning i autopiloten ELLER i
+  något den importerar vid start (t.ex. `controller/authority/core.py`) faller här.
+- `f4_runner_dependencies_authority_and_launch_byte_identical_to_320c9df7` (v3.5, review v9 B1): `controller/authority/cli`,
+  `controller/authority/core.py`, `controller/launch/cli` och `controller/launch/runtime_snapshot.py` har exakt sina
+  320c9df7-blobbar (`6b6bb827…`, `b17600c7…`, `ed865cf4…`, `cb9a4ab1…`) — authority-biblioteket importeras av autopiloten vid
+  start och launchern bär provider-argv; F7:s launch-cwd-grind mäter launcherns cwd-beteende, inte dess bytes (mätt av
+  granskningen: en launcher som skriver om provider-argv ger identisk 19/20 och identisk detalj), därför denna blobbindning.
+- `f4_provider_argv_built_and_started_in_exactly_one_place_inside_run_codex` (v3.5, review v9 B1): `subprocess.Popen(` anropas
+  exakt en gång i autopiloten och bara i `run_codex`; ingen annan funktion bär en `Popen`-start eller strängkonstanten
+  `--output-schema`.
 - `f4_ensure_roadmap_plan_called_from_exactly_the_expected_guard_callers_all_reachable_from_main` (v3.3, B2 statisk):
   funktionerna som ANROPAR `ensure_roadmap_plan` (`Call`-position) == {doctor, empirical_gate_contract_flow,
   full_roadmap, roadmap_contract_flow, roadmap_status}, alla nåbara från `main()` via anrop.
@@ -607,7 +646,10 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    strängkonstanter med runnernamn utanför `selftest`; alla tio flöden måste löpa till slut mot den stubbade runnern med
    syntetiska READY-svar (stubbmängden `LIVE_STUB_NAMES`/`LIVE_REQUIRED_ATTRS` är sluten — omdöpning = produktrad);
    `run_codex`, `run_codex_resolving_architecture`, `_provider_snapshot`, `_python_snapshot`, `_strict_provider_authority`
-   och `AUTOPILOT_ROLE_POLICY` är AST-identiska med 320c9df7 (providermaskineriet rörs inte, mekaniskt); handoffen bär
+   och `AUTOPILOT_ROLE_POLICY` är AST-identiska med 320c9df7, `controller/authority/**` och `controller/launch/**` blob-identiska
+   (providermaskineriet och dess beroenden rörs inte); autopilotens modulnivå håller formregeln (inga attribut-/subscript-mål,
+   inga block, ingen exec-ytsbindning); plan-/handoffkonstanterna tilldelas en gång som literaler; `remediation_prompt` (båda
+   rollerna) och den inlinade L-remedieringen namnger plan + handoff (remedieringsgrenarna körs live); handoffen bär
    avsnitten Syfte, Låsta värden/pinnar, Startordning, Stoppregler, Avslutskriterier + planens sökväg + `PLAN_GENERATION`;
    skivtabellens radordning följer autopilotens ROADMAP-ordning.
 6. **Dokument:** `AGENTS.md` (Historik → Git-referenser/webbrepot utan sökväg), `README.md` (r.8, 21, 28),
@@ -628,7 +670,10 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
 8. **Inte rörs:** `verify/**` (utom att denna grind redan ligger där), frysta träd/filer i F6,
    `controller/loop/cli`, `specs/tasks.spec.json` (kräver ingen ändring; frysta rader behålls),
    `scripts/check-invariants.mjs`, `controller/verify/register.json`, `docs/loop/remaining-bootstrap-delegation-v1.md`,
-   `docs/loop/owner-author-workflow-v1.md`, providermaskineriet (`run_codex`, rollpolicyn, `CODEX_FULL_ACCESS_MODE`),
+   `docs/loop/owner-author-workflow-v1.md`, providermaskineriet (`run_codex`, `run_codex_resolving_architecture`,
+   `_provider_snapshot`, `_python_snapshot`, `_strict_provider_authority`, rollpolicyn, `CODEX_FULL_ACCESS_MODE`),
+   (v3.5) `controller/authority/cli`, `controller/authority/core.py`, `controller/launch/cli`,
+   `controller/launch/runtime_snapshot.py` — blob-bundna mot 320c9df7 —
    autopilotens skivtuplar och `EMPIRICAL_GATE_PATH`. Refreeze av h-036/h-037/h-035/h-038/document-authority (stale
    pinnar på autopilot/AGENTS/drift) är ett separat H-steg som plangenerationens ändring bör batchas med (recon D).
 
@@ -650,8 +695,14 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   grinden, loopsviten och publication-callers mäter det); byggaranropens argument inspekteras inte statiskt (skivan i
   `roadmap_test_author_prompt(sl, …)` kan dopas i drift — produktgranskningen läser); ett andra providersamtal utanför
   `run_codex` (`subprocess`, egen hjälpare) efter ett legitimt första anrop fångas inte av live-mätningen men gör
-  `run_codex`-vägen död/oanvänd bara om anroparen ändras (slutna anropar-/producentmängder + AST-identitet fångar de kända
-  formerna); benchens miljö och den stubbade runnerns svar är synliga fingeravtryck (N1).
+  `run_codex`-vägen död/oanvänd bara om anroparen ändras (slutna anropar-/producentmängder + AST-identitet + Popen-inspelningen
+  under live-flödena fångar de kända formerna; ett andra providersamtal som startar en process fångas nu av Popen-inspelningen,
+  medan ett samtal via ett redan öppet handtag eller ett nät-API inte gör det); benchens miljö och den stubbade runnerns svar
+  (inklusive att första svaret är NEEDS_REMEDIATION) är synliga fingeravtryck (N1).
+- (v3.5) Providergränsen är bunden till fyra mätpunkter: de sex AST-identiteterna, de fyra blob-pinnade beroendefilerna,
+  autopilotens modulnivåform och Popen-identiteten/-inspelningen. Utanför dem gäller deklarerad gräns: annan kod under
+  `controller/**` som autopiloten inte importerar vid start, miljövariabler som launchern själv läser, och provideranrop som
+  inte startar en process. Stubbnamnen och de slutna mängderna gör legitim omstrukturering röd per design.
 - (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
   tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
   `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av

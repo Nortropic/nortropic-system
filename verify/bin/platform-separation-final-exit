@@ -252,6 +252,36 @@ RUNNER_MACHINERY_AST_SHA256 = {
     "run_codex": "0f88ac001575a676584f27ab095d1dc1d5cac58c8c7bae63c52ec15dda96a827",
     "run_codex_resolving_architecture": "344fe698efd803bf940dff12eb219d10f577d46bb4f5e6343a8111ac801faaa9",
 }
+# v3.5 (review v9 B1): the autopilot's MODULE LEVEL is a declared form. Only imports, definitions, annotated assignments and
+# assignments to plain names are allowed, plus exactly the two measured statements below and the __main__ guard; an assignment
+# whose target is an attribute/subscript, a bare call, or any block is RED — that is where `subprocess.Popen`, the role policy
+# or a plan constant can be rebound after the AST-bound names. Binding an exec-surface object to a module name is RED too.
+MODULE_LEVEL_EXCEPTIONS = ("sys.dont_write_bytecode = True", "sys.path.insert(0, str(AUTHORITY_LIB))")
+EXEC_SURFACE_ATTRS = frozenset({
+    "Popen", "run", "call", "check_call", "check_output", "getoutput", "getstatusoutput", "system", "popen", "spawnl", "spawnv",
+    "spawnve", "posix_spawn", "posix_spawnp", "fork", "forkpty", "execv", "execve", "execvp", "execvpe", "execl", "execle",
+    "execlp", "execlpe", "pty", "which", "copy", "copyfile", "copy2", "move"})
+# v3.5 (review v9 B1): the runner's dependencies outside this contract's product surface — the authority library the autopilot
+# imports at start-up and the launcher that carries the provider argv — byte-frozen at 320c9df7 (measured blob OIDs).
+RUNNER_DEPENDENCY_BLOBS = {
+    "controller/authority/cli": "6b6bb827f95ab946be361a3237dff468b3a6f085",
+    "controller/authority/core.py": "b17600c793901391327640ef97d36844a39c393a",
+    "controller/launch/cli": "ed865cf46ad201d2d273a42340ca78968764cd06",
+    "controller/launch/runtime_snapshot.py": "cb9a4ab1a24bea501f2e8660ef042514f93ccc99",
+}
+# A provider start is recognised by these argv markers; the provider argv is built in exactly one function (run_codex).
+PROVIDER_ARGV_MARKERS = ("--output-schema", "danger-full-access")
+PROVIDER_ARGV_STATIC_MARKERS = ("--output-schema",)
+PROVIDER_ARGV_FUNCTION = "run_codex"
+# v3.5 (review v9 N2): these constants are assigned exactly once at module level, from literal material only (no call,
+# attribute, subscript or environment), and the imported module's runtime values equal those literals.
+SINGLE_LITERAL_CONSTANTS = ("PLAN_GENERATION", "ROADMAP_PLAN_PATH", "ROADMAP_HANDOFF_PATH", "ROADMAP_PLAN_BLOBS",
+                            "AUTOPILOT_ROLE_POLICY", "SUBSTITUTION_BLOBS", "EMPIRICAL_GATE_PATH")
+LITERAL_NAME_EXEMPT = frozenset({"ROADMAP_PLAN_PATH", "ROADMAP_HANDOFF_PATH", "SUBSTITUTION_OWNER_PATH", "SUBSTITUTION_AUDIT_PATH"})
+# v3.5 (review v9 N3): the two roadmap tuples are measured separately — emptying SUBSTITUTION_ROADMAP and prepending its
+# slices to ROADMAP keeps the concatenation but breaks the contract's slice identities.
+EXPECTED_SUBSTITUTION_CODES = ("SUB-1", "SUB-2", "SUB-3", "SUB-4")
+EXPECTED_FIRST_ROADMAP_CODE = "S2"
 # v3.4 (review v8 N): the handoff carries these `## ` sections and names the plan + PLAN_GENERATION.
 HANDOFF_REQUIRED_SECTIONS = ((r"(?i)syfte", "Syfte"), (r"(?i)(låsta\s+värden|pinnar)", "Låsta värden / pinnar"),
                              (r"(?i)start", "Startordning"), (r"(?i)stopp", "Stoppregler"), (r"(?i)avslutskriteri", "Avslutskriterier"))
@@ -275,13 +305,15 @@ LIVE_FLOWS = ("architect_resolution", "roadmap_contract_flow[SUB-1]", "roadmap_c
               "empirical_unattended_flow", "full_roadmap")
 LIVE_GUARDED_FLOWS = ("roadmap_contract_flow[SUB-1]", "roadmap_contract_flow[S2]", "empirical_gate_contract_flow", "full_roadmap")
 # minimum runner calls per flow (measured on the platform autopilot) and the roles whose prompt must name plan + handoff
-LIVE_MIN_CAPTURES = {"architect_resolution": 1, "roadmap_contract_flow[SUB-1]": 2, "roadmap_contract_flow[S2]": 2,
-                     "empirical_gate_contract_flow": 2, "builder_flow[S2]": 2, "ensure_roadmap_slice[SUB-1]": 2,
-                     "ensure_roadmap_slice[S2]": 2, "test_author_flow": 2, "empirical_unattended_flow": 1, "full_roadmap": 33}
+# v3.5 (review v9 N1): the stub answers NEEDS_REMEDIATION once per (flow, reviewer role) — and once for EMPIRICAL in the
+# standalone empirical flow — so every remediation branch (and the architect route) is reached; the minima are measured there.
+LIVE_MIN_CAPTURES = {"architect_resolution": 1, "roadmap_contract_flow[SUB-1]": 4, "roadmap_contract_flow[S2]": 4,
+                     "empirical_gate_contract_flow": 4, "builder_flow[S2]": 4, "ensure_roadmap_slice[SUB-1]": 4,
+                     "ensure_roadmap_slice[S2]": 4, "test_author_flow": 4, "empirical_unattended_flow": 7, "full_roadmap": 37}
 LIVE_PLAN_ROLES = {"architect_resolution": {"ARCHITECT"}, "roadmap_contract_flow[SUB-1]": {"TEST_AUTHOR", "GATE_REVIEWER"},
                    "roadmap_contract_flow[S2]": {"TEST_AUTHOR", "GATE_REVIEWER"}, "empirical_gate_contract_flow": {"TEST_AUTHOR", "GATE_REVIEWER"},
                    "builder_flow[S2]": {"BUILDER"}, "ensure_roadmap_slice[SUB-1]": {"BUILDER"}, "ensure_roadmap_slice[S2]": {"BUILDER"},
-                   "test_author_flow": set(), "empirical_unattended_flow": {"EMPIRICAL"},
+                   "test_author_flow": set(), "empirical_unattended_flow": {"EMPIRICAL", "ARCHITECT", "BUILDER"},
                    "full_roadmap": {"TEST_AUTHOR", "GATE_REVIEWER", "BUILDER", "EMPIRICAL"}}
 DOC_LITERAL_RE = re.compile(r"docs/[A-Za-z0-9_./-]+\.[A-Za-z0-9]+")
 # v3.2 (N7): the plan generation must carry these sections (a `## ` heading matching the pattern, body >= 3 non-empty lines).
@@ -372,12 +404,15 @@ GOVERNANCE_EXPECTED_FAILS = ("g6_frozen_trees_and_files_identical_to_512490d4_pl
 DRIVER_MARK = "PLATFORM_SEPARATION_DRIVER="
 # Real module, real callables, never the operational __main__. Stop -> exit 7.
 DRIVER = (
-    "import importlib.util,sys,json\n"
+    "import importlib.util,sys,json,subprocess as _sp\n"
+    "_ORIG_POPEN=_sp.Popen\n"
     "from pathlib import Path\n"
     "subject=Path(sys.argv[1]); root=Path(sys.argv[2]); scenario=sys.argv[3]\n"
     "s=importlib.util.spec_from_file_location(sys.argv[4] if len(sys.argv)>4 else 'subject_autopilot', subject/'" + AUTOPILOT + "')\n"
     "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
     "out={'scenario':scenario}\n"
+    "out['popen_identity']=bool(_sp.Popen is _ORIG_POPEN and sys.modules['subprocess'].Popen is _ORIG_POPEN\n"
+    "                           and getattr(m,'subprocess',_sp) is _sp)\n"
     "try:\n"
     "    if scenario=='selftest_none':\n"
     "        m.selftest(None)\n"
@@ -390,7 +425,9 @@ DRIVER = (
     "                   plan_blobs=dict(m.ROADMAP_PLAN_BLOBS), substitution_blobs=dict(m.SUBSTITUTION_BLOBS),\n"
     "                   plan_path=m.ROADMAP_PLAN_PATH, handoff_path=m.ROADMAP_HANDOFF_PATH, empirical_gate_path=m.EMPIRICAL_GATE_PATH,\n"
     "                   roadmap=[[sl.code, sl.task_id, sl.gate_path, list(sl.plan_allowed_write or ()), list(sl.required_deps)]\n"
-    "                            for sl in tuple(m.SUBSTITUTION_ROADMAP)+tuple(m.ROADMAP)])\n"
+    "                            for sl in tuple(m.SUBSTITUTION_ROADMAP)+tuple(m.ROADMAP)],\n"
+    "                   substitution_codes=[sl.code for sl in m.SUBSTITUTION_ROADMAP], roadmap_codes=[sl.code for sl in m.ROADMAP],\n"
+    "                   role_policy={k: list(v) for k, v in m.AUTOPILOT_ROLE_POLICY.items()})\n"
     "    elif scenario=='prompts':\n"
     "        import inspect,re as _re\n"
     "        builders={}\n"
@@ -445,16 +482,29 @@ DRIVER = (
     "        if missing:\n"
     "            out.update(outcome='returned', flows={}, missing_names=missing)\n"
     "        else:\n"
-    "            captured=[]; outcomes={}; state={'flow':None,'l_green':False}\n"
+    "            captured=[]; outcomes={}; state={'flow':None,'l_green':False,'answered':set()}\n"
+    "            popen_calls=[]\n"
+    "            def _rec_popen(argv,*a,**k):\n"
+    "                try: popen_calls.append([str(x) for x in argv] if not isinstance(argv,str) else [argv])\n"
+    "                except Exception: popen_calls.append(['<unreadable>'])\n"
+    "                return _ORIG_POPEN(argv,*a,**k)\n"
+    "            _sp.Popen=_rec_popen\n"
+    "            if getattr(m,'subprocess',None) is not None: m.subprocess.Popen=_rec_popen\n"
     "            head=m.sha(root); results=Path(_tf.mkdtemp(prefix='live-results-'))\n"
     "            def report_for(role):\n"
-    "                return {'role':role,'outcome':'READY','owner_decision_required':False,'blocking_findings':[],'frozen_gate_ready':True,\n"
-    "                        'baseline_red_for_right_reason':True,'changed_files':[],'production_files_modified':False,'allowed_write_violation':False,\n"
-    "                        'next_action':'DONE','summary':'fixture','tests':[]}\n"
+    "                base={'role':role,'outcome':'READY','owner_decision_required':False,'blocking_findings':[],'frozen_gate_ready':True,\n"
+    "                      'baseline_red_for_right_reason':True,'changed_files':[],'production_files_modified':False,'allowed_write_violation':False,\n"
+    "                      'next_action':'BUILD','next_task_id':'h-015','summary':'fixture','tests':[]}\n"
+    "                key=(state['flow'],role); first=key not in state['answered']; state['answered'].add(key)\n"
+    "                if first and (role in ('REVIEWER','GATE_REVIEWER') or (role=='EMPIRICAL' and state['flow']=='empirical_unattended_flow')):\n"
+    "                    base['outcome']='NEEDS_REMEDIATION'\n"
+    "                    base['blocking_findings']=[{'id':'FIXTURE-1','summary':'fixture blocker','evidence':'fixture'}]\n"
+    "                return base\n"
     "            def fake_run_codex(repo_, wt_, role, prompt):\n"
     "                captured.append({'flow':state['flow'],'role':role,'prompt':prompt})\n"
-    "                res=results/('result-%d.json'%len(captured)); res.write_text(json.dumps(report_for(role)), encoding='utf-8')\n"
-    "                return m.AgentRun(report_for(role), 'fixture-thread', res, res)\n"
+    "                rep_=report_for(role)\n"
+    "                res=results/('result-%d.json'%len(captured)); res.write_text(json.dumps(rep_), encoding='utf-8')\n"
+    "                return m.AgentRun(rep_, 'fixture-thread', res, res)\n"
     "            def built(task_id):\n"
     "                return any(c['flow']==state['flow'] and c['role']=='BUILDER' and ('TASK='+task_id) in c['prompt'] for c in captured)\n"
     "            def fake_publish(repo_, wt_, branch_name, base_sha, candidate_sha, title, changed, **kw):\n"
@@ -492,7 +542,11 @@ DRIVER = (
     "                except Exception as e:\n"
     "                    outcomes[_n]={'outcome':'error','message':repr(e)[:300]}\n"
     "                outcomes[_n]['captures']=[{'role':c['role'],'prompt':c['prompt']} for c in captured[before:]]\n"
-    "            out.update(outcome='returned', flows=outcomes)\n"
+    "            provider_starts=[a for a in popen_calls if any(mk in ' '.join(a) for mk in " + repr(PROVIDER_ARGV_MARKERS) + ")]\n"
+    "            prompts_seen={c['prompt'] for c in captured}\n"
+    "            unmatched=[a[-1][:160] for a in provider_starts if not any(a[-1]==p or p in a[-1] for p in prompts_seen)]\n"
+    "            out.update(outcome='returned', flows=outcomes, popen_total=len(popen_calls),\n"
+    "                       provider_starts=len(provider_starts), provider_starts_unmatched=unmatched)\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
     "    else:\n"
@@ -873,6 +927,65 @@ def prompt_world(source):
         reachable.add(n)
         queue.extend(calls[n])
     return producers, referrers, runner_problems, reachable, stray, guard_callers
+
+
+def module_level_form(source):
+    """[] when every top-level statement of the autopilot matches the declared form (v3.5, review v9 B1)."""
+    tree = ast.parse(source)
+    problems = []
+    for index, node in enumerate(tree.body):
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        if index == 0 and isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            continue
+        segment = ast.unparse(node).strip()
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            non_name = [t for t in targets if not isinstance(t, ast.Name)]
+            if non_name:
+                if segment in MODULE_LEVEL_EXCEPTIONS:
+                    continue
+                problems.append(f"line {node.lineno}: module-level assignment to {ast.unparse(non_name[0])}")
+                continue
+            if any(isinstance(t, ast.Name) and t.id in EXEC_SURFACE_ATTRS for t in targets):
+                problems.append(f"line {node.lineno}: module-level name shadows an exec-surface name")
+            if node.value is not None:
+                for sub in ast.walk(node.value):
+                    if isinstance(sub, ast.Attribute) and sub.attr in EXEC_SURFACE_ATTRS:
+                        problems.append(f"line {node.lineno}: module-level binding of {ast.unparse(sub)[:60]}")
+                    if isinstance(sub, ast.Name) and (sub.id in PROMPT_RUNNERS or sub.id in EXEC_SURFACE_ATTRS):
+                        problems.append(f"line {node.lineno}: module-level binding of {sub.id}")
+            continue
+        if isinstance(node, ast.If) and segment.startswith("if __name__ ==") and len(tree.body) - index == 1:
+            continue
+        if segment in MODULE_LEVEL_EXCEPTIONS:
+            continue
+        problems.append(f"line {node.lineno}: {type(node).__name__} at module level: {segment[:60]}")
+    return problems
+
+
+def literal_constant_assignments(source, names):
+    """name -> (count, literal-or-None, problems) for module-level assignments of `names` (v3.5, review v9 N2)."""
+    tree = ast.parse(source)
+    found = {name: [0, None, []] for name in names}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if not isinstance(target, ast.Name) or target.id not in found:
+                continue
+            entry = found[target.id]
+            entry[0] += 1
+            for sub in ast.walk(node.value):
+                if isinstance(sub, (ast.Call, ast.Attribute, ast.Subscript, ast.IfExp, ast.Starred)):
+                    entry[2].append(f"{target.id}: non-literal {type(sub).__name__} in the value")
+                if isinstance(sub, ast.Name) and sub.id not in LITERAL_NAME_EXEMPT:
+                    entry[2].append(f"{target.id}: name {sub.id} in the value")
+            try:
+                entry[1] = ast.literal_eval(node.value)
+            except (ValueError, TypeError, SyntaxError):
+                entry[1] = None
+    return found
 
 
 def ast_identities(source, names):
@@ -1820,6 +1933,34 @@ def main():
     check("f4_autopilot_has_plan_generation_constant_and_no_roadmap_plan_sha_attribute",
           bool(consts) and consts.get("has_plan_sha") is False and type(plan_generation) is str and plan_generation.strip() != "",
           f"has_plan_sha={consts.get('has_plan_sha')} plan_generation={plan_generation!r} {consts_detail if not consts else ''}")
+    # v3.5 (review v9 N2/N3): the plan constants are single literal assignments whose runtime values equal the literals, and
+    # the two roadmap tuples keep their own identities (emptying SUBSTITUTION_ROADMAP into ROADMAP is refused).
+    problems = []
+    try:
+        literals = literal_constant_assignments(autopilot_source, SINGLE_LITERAL_CONSTANTS)
+    except SyntaxError as exc:
+        literals, _ = {}, problems.append(repr(exc))
+    for name in SINGLE_LITERAL_CONSTANTS:
+        count, value, issues = literals.get(name, (0, None, ["not assigned at module level"]))
+        if count != 1:
+            problems.append(f"{name}: {count} module-level assignments (exactly one expected)")
+        problems += issues[:2]
+    runtime = {"PLAN_GENERATION": consts.get("plan_generation"), "ROADMAP_PLAN_PATH": consts.get("plan_path"),
+               "ROADMAP_HANDOFF_PATH": consts.get("handoff_path"), "EMPIRICAL_GATE_PATH": consts.get("empirical_gate_path")}
+    for name, value in runtime.items():
+        literal = literals.get(name, (0, None, []))[1]
+        if literal is not None and value is not None and literal != value:
+            problems.append(f"{name}: runtime {value!r} != literal {literal!r}")
+    if consts:
+        if list(consts.get("substitution_codes") or []) != list(EXPECTED_SUBSTITUTION_CODES):
+            problems.append(f"SUBSTITUTION_ROADMAP codes {consts.get('substitution_codes')} != {list(EXPECTED_SUBSTITUTION_CODES)}")
+        road = list(consts.get("roadmap_codes") or [])
+        if not road or road[0] != EXPECTED_FIRST_ROADMAP_CODE:
+            problems.append(f"ROADMAP[0] {road[:1]} != [{EXPECTED_FIRST_ROADMAP_CODE!r}]")
+        if set(consts.get("substitution_codes") or []) & set(road):
+            problems.append("SUBSTITUTION_ROADMAP and ROADMAP overlap")
+    check("f4_plan_constants_are_single_literal_assignments_equal_at_runtime_and_the_two_roadmap_tuples_keep_their_identities",
+          not problems, str(problems)[:900])
     r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
     obj = driver_outcome(r)
     check("f4_ensure_roadmap_plan_returns_in_replica_without_any_remote",
@@ -1930,6 +2071,38 @@ def main():
     pflows = produced.get("flows", [])
     check("f4_prompt_builders_run_in_contained_fixture_without_side_effects",
           bool(produced) and not side_effects, f"side_effects={side_effects[:8]} produced={bool(produced)}")
+    # v3.5 (review v9 B1): importing the real module must not rebind the process's exec surface — neither the autopilot's
+    # module level nor anything it imports at start-up (controller/authority/core.py) may shadow subprocess.Popen.
+    form_problems = []
+    try:
+        form_problems += module_level_form(autopilot_source)
+    except SyntaxError as exc:
+        form_problems.append(f"autopilot does not parse: {exc!r}")
+    if produced.get("popen_identity") is not True:
+        form_problems.append("subprocess.Popen identity changed by importing the autopilot (module level or an imported library)")
+    check("f4_autopilot_module_level_is_the_declared_form_and_importing_it_leaves_the_exec_surface_unchanged",
+          not form_problems, str(form_problems)[:900])
+    dep_problems = []
+    for rel, expected in sorted(RUNNER_DEPENDENCY_BLOBS.items()):
+        actual = head_oid(rel)
+        if actual != expected:
+            dep_problems.append(f"{rel}: {actual} != {expected}")
+    check("f4_runner_dependencies_authority_and_launch_byte_identical_to_320c9df7", not dep_problems, str(dep_problems)[:600])
+    argv_problems = []
+    try:
+        for node in ast.walk(ast.parse(autopilot_source)):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                popen_calls = [c for c in ast.walk(node) if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)
+                               and c.func.attr == "Popen"]
+                markers = [v.value for v in ast.walk(node) if isinstance(v, ast.Constant) and isinstance(v.value, str)
+                           and any(mk in v.value for mk in PROVIDER_ARGV_STATIC_MARKERS)]
+                if node.name != PROVIDER_ARGV_FUNCTION and (popen_calls or markers):
+                    argv_problems.append(f"{node.name}: provider start or argv marker outside {PROVIDER_ARGV_FUNCTION}")
+                if node.name == PROVIDER_ARGV_FUNCTION and len(popen_calls) != 1:
+                    argv_problems.append(f"{PROVIDER_ARGV_FUNCTION}: {len(popen_calls)} Popen calls (exactly one expected)")
+    except SyntaxError as exc:
+        argv_problems.append(repr(exc))
+    check("f4_provider_argv_built_and_started_in_exactly_one_place_inside_run_codex", not argv_problems, str(argv_problems)[:600])
     try:
         producers, referrers, runner_problems, reachable, stray, guard_callers = prompt_world(autopilot_source)
     except SyntaxError as exc:
@@ -1960,7 +2133,13 @@ def main():
     # tokens anywhere), and each flow must reach at least its measured minimum number of runner calls.
     live, live_env = replica(bench, "live-flows", subject, head)
     git(live, live_env, "update-ref", "refs/remotes/origin/main", head)
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, live, "live_flows"], ap_tmp, ap_env, timeout=900)
+    # v3.5 (review v9 N4): the same side-effect sweep surrounds the live flows (they run far more product code than `prompts`).
+    before_live_subject, before_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, live, "live_flows"], ap_tmp, ap_env, timeout=1800)
+    after_live_subject, after_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
+    live_side_effects = sorted("subject:" + k[0] for k in set(after_live_subject.items()) ^ set(before_live_subject.items())) + \
+        sorted(f"{d}:{n[0]}" for d in before_live_names for n in set(after_live_names[d] or []) ^ set(before_live_names[d] or [])
+               if str(n[0]) != scratch.name)
     live_out = driver_outcome(r)
     live_flows = live_out.get("flows", {}) if live_out and live_out["outcome"] == "returned" else {}
     problems = []
@@ -1985,6 +2164,20 @@ def main():
                          for pat, l, x in scan(p, OLD_PLAN_TOKENS + COMMIT_READ_TOKENS + CODE_WEB_TOKENS + CODE_HUMAN_TOKENS)[:2]]
     check("f4_live_flows_run_to_completion_through_the_stubbed_runner_every_prompt_naming_plan_and_handoff_where_required_and_free_of_old_pointers",
           not problems, f"captures={ {k: len(v.get('captures', [])) for k, v in live_flows.items()} } problems={problems}"[-1200:])
+    # v3.5 (review v9 B1 dynamic): with the runner stubbed, no provider process may be started at all — every Popen during the
+    # flows is recorded and any provider-shaped start whose last argument is not one of the captured prompts is a bypass.
+    problems = []
+    if not live_out or live_out["outcome"] != "returned":
+        problems.append("live driver unavailable")
+    else:
+        if live_out.get("provider_starts"):
+            problems.append(f"provider processes started outside the stubbed runner: {live_out.get('provider_starts')}")
+        problems += [f"unmatched provider prompt: {x}" for x in live_out.get("provider_starts_unmatched", [])[:2]]
+        if live_out.get("popen_identity") is not True:
+            problems.append("subprocess.Popen identity changed by importing the autopilot")
+    problems += [f"side effect during live flows: {x}" for x in live_side_effects[:6]]
+    check("f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects",
+          not problems, f"popen_total={(live_out or {}).get('popen_total')} problems={problems}"[-900:])
     livemut, livemut_env = replica(bench, "live-flows-mutated", subject, head)
     if PLAN_GEN in tracked and (livemut / PLAN_GEN).is_file():
         overlay(livemut, livemut_env, {PLAN_GEN: ((livemut / PLAN_GEN).read_bytes() + b"\n<!-- LOCAL mutation -->\n", 0o644)},
@@ -2323,7 +2516,9 @@ def main():
               "live_flows": {k: {"outcome": v.get("outcome"), "message": v.get("message", ""),
                                  "captures": [(c.get("role"), len(c.get("prompt", ""))) for c in v.get("captures", [])]} for k, v in live_flows.items()},
               "live_flows_mutated": {k: {"outcome": v.get("outcome"), "captures": len(v.get("captures", []))} for k, v in mut_flows.items()},
-              "runner_machinery_ast": ids,
+              "runner_machinery_ast": ids, "runner_dependency_blobs": {rel: head_oid(rel) for rel in RUNNER_DEPENDENCY_BLOBS},
+              "live_popen_total": (live_out or {}).get("popen_total"), "live_provider_starts": (live_out or {}).get("provider_starts"),
+              "live_side_effects": live_side_effects,
               "case_collisions": case_dupes,
               "subject_sha256": subject_sha, "held_sha256": held, "held_gate_runs": gate_runs,
               "closure_roots": sorted(roots), "closure_reached": sorted(reached), "closure_scanned": scanned,
