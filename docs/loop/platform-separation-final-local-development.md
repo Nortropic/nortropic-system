@@ -2089,5 +2089,120 @@ stängda genom körning.
 dokumentet är varken tokenskannat eller innehållsbundet av någon rad utöver `DOC_SECTIONS`-närvaron. Statisk körning
 på `10704dcd` ger samma 122/5 som på `ca83c175`.
 
+### Kontraktsrunda v3.11 2026-09-12 — ordnad, kvalificerad refreeze (hindret, inte en sidoförbättring)
+**Kopplingen enligt regel B / ägarbeslutets undantag.** Befintligt krav: Trust Kernel-kriteriet ("kvalificering
+kräver att rätt frysta verifierare har körts färdigt mot exakt rätt kandidat med samtliga obligatoriska
+kontroller"). Konkret hinder: v3.10:s `FROZEN_TREES` blob-fryser hela `verify/` och tillåter ett enda tillägg, så
+h-035:s refreeze-kandidat `a288e169` ger **122/5** där alla fem röda rader har ETT skäl — en fryst grinds bytes
+ändrades. Ingen H-grind kan alltså frysas om, och h-035, h-036, h-037 och h-038 är alla blockerade.
+Andra hindret: `f4_live_flows_…_leave_no_side_effects` svepte delade systemkataloger och gick **falskt rött två
+gånger** på främmande temporärkataloger; ett falskt rött blockerar varje framtida kvalificering.
+
+**Raddiff v3.10 → v3.11** (mätt genom att evaluera varje `check(...)`-etikett i båda källorna; 88 oförändrade):
+
+| Ändring | Rad | Motivering |
+|---|---|---|
+| BORT | `f6_frozen_evidence_identical_to_332f07ce_plus_this_gate_only` | delas i mängd- och byteregel; den gamla raden kunde inte skilja en deklarerad refreeze från ett tyst tillägg |
+| NY | `f6_frozen_tree_paths_are_the_332f07ce_set_plus_this_gate_only` | (a) exakt sökvägsmängd: inga tysta tillägg, inga borttagningar |
+| NY | `f6_frozen_tree_bytes_identical_to_332f07ce_except_the_declared_refreeze` | (b) byte-frysning utom det deklarerade; odeklarerad ändring röd, deklarerat-men-oförändrat röd |
+| NY | `f6_refreeze_declaration_is_one_ordered_frozen_h_gate_with_matching_base_and_new_sha256` | deklarationens form, ordningen (exakt en), bas-/ny-sha256, 755, parsbar |
+| NY | `f6_refreeze_added_lines_free_of_web_governance_human_hand_and_old_plan_tokens` | refreezen öppnar en väg för text in i `verify/`, som annars är oskannad fryst evidens — kravet "ingen webbstyrning tillbaka" bevaras |
+| NY | `f6_declared_refreeze_is_qualified_by_a_receipt_bound_to_this_candidate_and_the_refrozen_bytes` | kvalificerad, inte bara deklarerad |
+| NAMN | `f7_platform_control_set_exit_68_of_68_on_candidate` → `…_on_candidate_68_of_68_or_exactly_the_declared_refreeze_effect` | namnet kodade ett radantal som ändras av en refreeze (67/1) |
+| NAMN | `f7_launch_cwd_exit_19_of_20_frozen_listing_sees_exactly_governance_and_this_gate` → `…_sees_exactly_governance_this_gate_and_the_declared_refreeze` | listningen ser nu även refreezen |
+| NAMN | `f7_platform_governance_exit_red_exactly_on_its_frozen_verify_register_and_launch_cwd_rows` → `…_red_exactly_on_its_frozen_rows_and_the_declared_refreeze_effect` | governance kör control-set och får exakt en rad till |
+| ÄNDRAD | `f8_ordinary_loop_e2e_and_platform_prepare_check_green_on_candidate_via_held_control_set` | samma mening; förväntad FAIL-mängd härledd ur refreezen, plus krav att alla sju produktrader är gröna |
+| ÄNDRAD | `f4_prompt_builders_run_in_contained_fixture_without_side_effects` | riggfix: svepet skopat till grindens egna rötter |
+| ÄNDRAD | `f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects` | samma riggfix |
+
+Radantal **127 → 131**. Alla övriga 88 rader oförändrade till namn och innebörd.
+
+**Grind v3.11:** `verify/bin/platform-separation-final-exit` sha256 `3bdc0ce23625d6bfcb331e9abd4ee6d15b15cb3b282e8766bae101da4b0a442b`, 3932 rader,
+commit `a1e37b6717fd4ec84577e67862eaf225c447eb96` (träd `82fa97c31d635541ccadc7e07f37510dc9a779bb`, förälder `5df9213c75c4d2ab0ba8acecefd058cbe389db36`).
+
+### Test-author 2026-09-12 — grön baslinje för v3.11 på den oförändrade integrationen
+Subjekt: `a1e37b6717fd4ec84577e67862eaf225c447eb96` = `5df9213c` + grind v3.11 + detta dokument (ingen refreeze deklarerad).
+Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **126 PASS / 5 FAIL** av 131 rader — de fem röda är exakt de
+sandlådeberoende raderna. Fullkörning (bypass, egen `TMPDIR`, `/bin/ps`-kontroll före): exit **0**,
+`PASS_LOCAL_QUALIFICATION_ONLY`, **131 PASS / 0 FAIL**, result.json sha256 `5159ea80f75319d653d4726a72b585b2f18404943681fa1463323d04b434abaf`.
+Varje ny rad är grön av rätt skäl: utan deklaration är `refreeze_declaration` tom, `refreeze_added_lines` = 0 och
+de tre F7-förväntningarna är identiska med v3.10:s.
+
+### Acceptans 2026-09-12 — h-035:s refreeze-kandidat GRÖN under v3.11
+Kandidat `89ec9ddb024d27658066aec9e381a39cb091491a` = v3.11-integrationen + `a288e169`:s `verify/bin/h-035-exit` (blob `4d13742d`,
+sha256 `91aa7fe7…fabc`, 22511 rader) + `SEPARATION-20260910/REFREEZE.json`. Rebasen är mekanisk: kandidaten
+pinnar varken planen eller handoffen.
+
+**Kvalificeringskörningen av den omfrysta grinden** (separat, utanför separationsgrinden, kanonisk invokation
+`env PROVIDER_CALL_ALLOWED=NO MODEL_CALL_ALLOWED=NO PYTHONEXECUTABLE=$PY $PY -I -S -B verify/bin/h-035-exit` i en
+checkout med kanonisk lokal bare-origin, vitlistad lokal config och de sju bevarade kandidaterna i ODB:n):
+exit **0**, **462 PASS / 0 FAIL**, `H035_GATE_RESULT=PASS`. Kvittot (`receipt-accept.json`, sha256
+`13fb94d07979b95319382ddd6a20577024cdb90d930940325d1ee05a476a119d`) binder `gate_sha256 = 91aa7fe7…`, `subject_head = 89ec9ddb024d27658066aec9e381a39cb091491a`, `pass_count = 462`,
+`stdout_sha256 = b22662b6911a6ece1e6173d768985474b7192830a38bb677599d87e646096158`.
+
+Separationsgrinden v3.11 med `--refreeze-receipt`: exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **131 PASS / 0 FAIL**,
+result.json sha256 `0c29017abb8cb4a2066d706bdbead840c24f22be5bffa3576e8faf4c417ec6e0`. De fem nya F6-raderna gröna i **första** iterationen. De tre hållna
+grindarnas mätta utfall på kandidaten:
+
+| Hållen grind | Mätt utfall på kandidaten | v3.11:s förväntan (härledd, exakt) |
+|---|---|---|
+| `platform-control-set-exit` | exit 1, **67/1**, `frozen_artifacts_identical_to_dae90c8f` med detalj `files=24 problems=['verify/bin/h-035-exit']` | exakt den raden, exakt den sökvägslistan, `RED_LOCAL_QUALIFICATION`, och alla sju produktrader gröna |
+| `launch-cwd-exit` | exit 1, **19/20**, `frozen_verify_bin_identical_to_base_383ed387` med detalj `files=32 problems=['verify/bin/h-035-exit'] extra=['verify/bin/platform-governance-exit', 'verify/bin/platform-separation-final-exit']` | exakt den detaljen |
+| `platform-governance-exit` | exit 1, **67/3**: `g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only`, `g7_launch_cwd_exit_19_of_20_only_frozen_listing_sees_this_gate`, `g7_platform_control_set_exit_68_of_68_on_candidate` | exakt de tre, och den nästlade control-set-radens detalj måste bära `pass=67 fail=1 fails=['frozen_artifacts_identical_to_dae90c8f']` |
+
+På den refreeze-fria baslinjen är samma tre förväntningar identiska med v3.10:s och mättes till 68/68 (grön),
+19/20 och 68/2 — v3.10:s exakta stränghet är alltså bevarad när ingen refreeze deklareras.
+
+### F9 v3.11 — negativer (var och en i egen replika av acceptansreferensen, statiskt `--skip-held-gates`)
+**16 negativer körda, 16 fångade; 1 falskt-rött prov grönt; 0 riggfel.** Var och en i egen replika av
+acceptansreferensen, statiskt `--skip-held-gates` (nämnare 131, de fem sandlådeberoende raderna alltid röda).
+
+| Negativ | Faller på | Mätt skäl |
+|---|---|---|
+| `n0_reference (acceptansreferensen)` | **126/5** — bara de fem sandlådeberoende raderna; ingen ny rödhet | — |
+| `n1_undeclared_byte_change` | `f6_frozen_tree_bytes_…_except_the_declared_refreeze` | `undeclared_byte_changes=['verify/bin/h-035-exit']` |
+| `n2_new_sha_mismatch` | `f6_refreeze_declaration_…` | declared new sha256 is not the candidate's bytes |
+| `n3_base_sha_mismatch` | `f6_refreeze_declaration_…` | declared base sha256 is not the 332f07ce object |
+| `n4_no_receipt` | `f6_declared_refreeze_is_qualified_by_a_receipt_…` | 0 qualification receipts supplied, exactly one required |
+| `n5_receipt_not_green` | `f6_declared_refreeze_is_qualified_…` | the refrozen gate was not green on this candidate (exit=1, 1 FAIL-rad) |
+| `n6_added_file_under_verify` | `f6_frozen_tree_paths_…` | `additions=['…platform-separation-final-exit', 'verify/bin/x-exit']` |
+| `n7_deleted_file_under_verify` | `f6_frozen_tree_paths_…` | `removals=['verify/bin/h-001-exit']` |
+| `n8_web_text_in_refrozen_gate` | `f6_refreeze_added_lines_…` (ENDAST den) | `(?i)docs/07-konstitution` och `(?i)konstitution\w*` i en tillagd rad |
+| `n9_second_gate_quietly_changed` | `f6_frozen_tree_bytes_…` | `undeclared_byte_changes=['verify/bin/h-036-exit']` |
+| `n10_two_declared_refreezes` | `f6_refreeze_declaration_…` | exactly one ordered refreeze per candidate, declared 2 |
+| `n11_held_gate_declared` | `f6_refreeze_declaration_…` + `f6_frozen_tree_bytes_…` | not a frozen H gate path: `verify/bin/platform-control-set-exit` |
+| `n12_expected_pass_mismatch` | `f6_declared_refreeze_is_qualified_…` | 462 PASS-rader, deklarationen förutsade 461 |
+| `n13_receipt_other_candidate` | `f6_declared_refreeze_is_qualified_…` | kvittot namnger ett annat subjekt än kandidaten |
+| `n14_receipt_stdout_tampered` | `f6_declared_refreeze_is_qualified_…` | the receipt's stdout does not match its own sha256 |
+| `n15_declared_but_unchanged` | `f6_refreeze_declaration_…` + `f6_frozen_tree_bytes_…` | declared refreeze changes nothing; `declared_but_unchanged=['verify/bin/h-036-exit']` |
+| `n16_product_side_effect (riggfixens negativ)` | `f4_live_flows_…_leave_no_side_effects` | `side effect during live flows: fixture:driver-cwd/SIDE-EFFECT-MARKER` |
+| `probe_foreign_temp_churn (falskt-rött prov)` | **GRÖN** — båda sidoeffektsraderna | en främmande process skapade och tog bort kataloger och filer i alla fem tidigare svepta kataloger under hela körningen |
+
+
+**F7-förväntningarnas exakthet, mätt på grindens egen domarkod.** De tre domarna (`judge_control_set`,
+`judge_launch_cwd`, `judge_governance`) extraherades ur grindkällan och kördes mot inspelade och syntetiserade
+hållna-grind-utfall. **13 av 13** fall betedde sig som förutsagt: refreezens exakta effekt accepteras (A, F, I),
+medan en extra röd rad (C, J), en annan namngiven sökväg (B), en icke-grön produktrad (D), v3.10:s detalj på en
+refreeze-kandidat (G), en extra fil i listningen (H), en saknad control-set-rad (K), ett nästlat control-set-fel
+av annat skäl (L), samt refreeze-utfallen UTAN deklaration (E, M) alla **avvisas**. Deklarerad gräns: detta är en
+statisk exercering av domarkoden, inte en fullkörning.
+
+**Not om subjekten.** Grinden är byte-identisk i alla körningar ovan (sha256 `3bdc0ce2…`); det som skiljer
+commiten `a1e37b6` från den slutliga commiten är enbart detta utfallsavsnitts PROSA i utvecklingsdokumentet, som
+varken tokenskannas (klassificeras som `local-development`) eller innehållsbinds av någon rad utöver
+`DOC_SECTIONS`-närvaron. Acceptanskandidaten `89ec9ddb` är `a1e37b6` + refreezen + deklarationen, en commit.
+
+**Riggnot (mätt 2026-09-12).** En första baslinjefullkörning gick 130/1 på
+`f7_launch_cwd_…` med `extra=[…'verify/bin/__pycache__'…]`: test-authorns egen förgranskning hade importerat
+grinden med en Python UTAN `-B` och lämnat `verify/bin/__pycache__` i arbetsytan. Det är en riggartefakt, inte en
+produktdom — men raden fångade den korrekt (inget får tillkomma under `verify/`). Städat och kört om på en ren
+klon: 131/131. Regeln `-B` alltid gäller även förgranskningsskript som importerar grinden.
+
+**Deklarerade gränser i denna runda** (fullständigt under "Vad grinden inte bevisar"): (1) kvittot bevisar inte
+att körningen ägde rum — grinden kör inte den omfrysta H-grinden själv, eftersom varje H-grinds rigg är egen och
+spröd; (2) refreezens innehåll bedöms inte; (3) sidoeffektsvepet täcker inte längre hårdkodade absoluta sökvägar
+utanför grindens egna rötter; (4) tre retirement-identifierare undantas från skanningen av refreezens tillagda
+rader.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
