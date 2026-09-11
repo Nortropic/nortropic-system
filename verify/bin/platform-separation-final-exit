@@ -274,7 +274,11 @@ AUTHORITY_LIB_DIR = "controller/authority"
 # plus a binary whose basename carries the provider name; every other start must be an ordinary tool below.
 PROVIDER_SHAPE_ELEMENTS = ("--output-schema", "danger-full-access")
 PROVIDER_SHAPE_BINARY_TOKENS = ("codex",)
-ALLOWED_LIVE_BINARIES = frozenset({"git"})          # measured on the reference: the flows start nothing else
+# v3.7 (review v11 N9): {"git"} alone was a measured FALSE RED — a legitimate product that runs `/usr/bin/env`, the pinned
+# python3.12 or `/bin/sh` under a flow (a runtime snapshot, a tool version, a gate run) went red on the closed set and was
+# counted as 19 provider starts. The set is the ordinary-tool set; a provider-SHAPED start through any of them is still red
+# (PROVIDER_SHAPE_ELEMENTS/_BINARY_TOKENS), and the remaining false-red cost is written into the development document p.8.
+ALLOWED_LIVE_BINARIES = frozenset({"git", "env", "sh", "python3.12"})
 ALLOWED_LIVE_PRIMITIVES = frozenset({"subprocess.Popen"})   # the baseline never uses posix_spawn/exec*/system
 # The start primitives the driver instruments and whose identity must survive the flows.
 EXEC_PRIMITIVES = (("subprocess", "Popen"), ("os", "posix_spawn"), ("os", "posix_spawnp"), ("os", "execv"), ("os", "execve"),
@@ -283,6 +287,15 @@ EXEC_SURFACE_ATTRS = frozenset({
     "Popen", "run", "call", "check_call", "check_output", "getoutput", "getstatusoutput", "system", "popen", "spawnl", "spawnv",
     "spawnve", "posix_spawn", "posix_spawnp", "fork", "forkpty", "execv", "execve", "execvp", "execvpe", "execl", "execle",
     "execlp", "execlpe", "pty", "which", "copy", "copyfile", "copy2", "move"})
+# v3.7 (review v11 B1): the provider boundary binds AT `Popen` and UNDER it. A class body could capture the real Popen
+# CLASS at import (`class _B: POPEN = subprocess.Popen`) and a function body could then replace `_B.POPEN._execute_child`
+# — the attribute name is outside EXEC_SURFACE_ATTRS and its base is an Attribute, so the v3.6 rule let it through while
+# the child process received a neutral prompt. Assignment to these internal/dunder attributes is red on ANY object, and
+# exec aliases are tracked transitively through the whole file. Measured on 320c9df7: the autopilot has exactly three
+# attribute targets (`sys.dont_write_bytecode`, `self.task_id`, `self.reason`), no class-body assignment and four exec
+# aliases (`p`, `r`, `rc`, `sub`, all `subprocess.run`/`Popen` RESULTS), none of which is ever written to — green.
+FORBIDDEN_ATTR_TARGETS = frozenset({"_execute_child", "__init__", "__call__", "__new__", "__get__", "__getattribute__",
+                                    "__subclasshook__", "_posixsubprocess", "_communicate", "_get_handles"})
 # v3.5 (review v9 B1): the runner's dependencies outside this contract's product surface — the authority library the autopilot
 # imports at start-up and the launcher that carries the provider argv — byte-frozen at 320c9df7 (measured blob OIDs).
 RUNNER_DEPENDENCY_BLOBS = {
@@ -438,17 +451,23 @@ DRIVER_MARK = "PLATFORM_SEPARATION_DRIVER="
 # Real module, real callables, never the operational __main__. Stop -> exit 7.
 DRIVER = (
     "import importlib.util,sys,json,subprocess as _sp\n"
+    "import os as _os\n"
+    # v3.7 (review v11 B1): every primitive AND the Popen class's own start method are captured before the subject module is
+    # loaded, so an import-time rebinding is measured against the stdlib original rather than against itself.
     "_ORIG_POPEN=_sp.Popen\n"
+    "_ORIG_EXEC_CHILD=getattr(_ORIG_POPEN,'_execute_child',None)\n"
+    "_ORIG_POPEN_INIT=_ORIG_POPEN.__init__\n"
+    "_PRIMS=[(_sp,'Popen')]+[(_os,n) for n in ('posix_spawn','posix_spawnp','execv','execve','execvp','spawnv','spawnve','system') if hasattr(_os,n)]\n"
+    "_ORIG_PRIMS={(mod.__name__,name):getattr(mod,name) for mod,name in _PRIMS}\n"
     "from pathlib import Path\n"
     "subject=Path(sys.argv[1]); root=Path(sys.argv[2]); scenario=sys.argv[3]\n"
     "s=importlib.util.spec_from_file_location(sys.argv[4] if len(sys.argv)>4 else 'subject_autopilot', subject/'" + AUTOPILOT + "')\n"
     "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
     "out={'scenario':scenario}\n"
-    "import os as _os\n"
-    "_PRIMS=[(_sp,'Popen')]+[(_os,n) for n in ('posix_spawn','posix_spawnp','execv','execve','execvp','spawnv','spawnve','system') if hasattr(_os,n)]\n"
-    "_ORIG_PRIMS={(mod.__name__,name):getattr(mod,name) for mod,name in _PRIMS}\n"
     "out['popen_identity']=bool(_sp.Popen is _ORIG_POPEN and sys.modules['subprocess'].Popen is _ORIG_POPEN\n"
     "                           and getattr(m,'subprocess',_sp) is _sp\n"
+    "                           and getattr(_ORIG_POPEN,'_execute_child',None) is _ORIG_EXEC_CHILD\n"
+    "                           and _ORIG_POPEN.__init__ is _ORIG_POPEN_INIT\n"
     "                           and all(getattr(sys.modules[mn],pn) is fn for (mn,pn),fn in _ORIG_PRIMS.items()))\n"
     "out['core_module_file']=getattr(sys.modules.get('core'),'__file__',None)\n"
     "try:\n"
@@ -456,6 +475,13 @@ DRIVER = (
     "        m.selftest(None)\n"
     "        out.update(outcome='returned')\n"
     "    elif scenario=='roadmap_plan':\n"
+    "        m.ensure_roadmap_plan(root)\n"
+    "        out.update(outcome='returned')\n"
+    # v3.7 (review v11 N4): measure that the guard READS ROADMAP_PLAN_BLOBS. The copy-mutation row is satisfiable by a guard
+    # anchored to a tracked digest manifest; repinning the constant in the imported module and requiring Stop on an
+    # UNMUTATED replica is the direct measurement of which authority the guard actually consults.
+    "    elif scenario=='roadmap_plan_repinned':\n"
+    "        m.ROADMAP_PLAN_BLOBS={k:('0'*39+'f') for k in m.ROADMAP_PLAN_BLOBS}\n"
     "        m.ensure_roadmap_plan(root)\n"
     "        out.update(outcome='returned')\n"
     "    elif scenario=='constants':\n"
@@ -536,6 +562,18 @@ DRIVER = (
     "            for mod,name in _PRIMS:\n"
     "                r_=_make_rec(mod.__name__,name,_ORIG_PRIMS[(mod.__name__,name)]); _RECS[(mod.__name__,name)]=r_; setattr(mod,name,r_)\n"
     "            if getattr(m,'subprocess',None) is not None: m.subprocess.Popen=_RECS[('subprocess','Popen')]\n"
+    # v3.7 (review v11 B1(c)): record what actually REACHES THE CHILD. `Popen._execute_child` is the real start; a product
+    # that captured the Popen class at import and replaced this method rewrote the argv AFTER the Popen-level recorder saw
+    # the plan-bearing prompt. The recorder also sees starts made through a captured class that never touches the module
+    # attribute, so `child_total` must equal the recorded `popen_total`.
+    "            child_calls=[]\n"
+    "            def _child_rec(self,args,executable=None,*a,**k):\n"
+    "                try:\n"
+    "                    items=[str(x) for x in args] if not isinstance(args,(str,bytes)) else [str(args)]\n"
+    "                except Exception: items=['<unreadable>']\n"
+    "                child_calls.append({'argv':items})\n"
+    "                return _ORIG_EXEC_CHILD(self,args,executable,*a,**k)\n"
+    "            if _ORIG_EXEC_CHILD is not None: _ORIG_POPEN._execute_child=_child_rec\n"
     "            head=m.sha(root); results=Path(_tf.mkdtemp(prefix='live-results-'))\n"
     "            def report_for(role):\n"
     "                base={'role':role,'outcome':'READY','owner_decision_required':False,'blocking_findings':[],'frozen_gate_ready':True,\n"
@@ -598,11 +636,27 @@ DRIVER = (
     "                        'matched':any(c['argv'] and (c['argv'][-1]==p or p in c['argv'][-1]) for p in prompts_seen)}\n"
     "            shapes=[_shape(c) for c in popen_calls]\n"
     "            suspect=[s for s in shapes if (s['marked'] or not s['allowed']) and not s['matched']]\n"
+    "            def _cshape(c):\n"
+    "                base=(c['argv'][0].rsplit('/',1)[-1] if c['argv'] else '')\n"
+    # The provider markers are matched exactly as at Popen level: exact argv ELEMENTS plus the binary's basename. A
+    # substring test over the whole argv flagged the ordinary `git show …:docs/loop/codex-evidence-contract.md` (measured).
+    "                marked=any(mk in c['argv'] for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
+    "                return {'base':base,'marked':marked,'last':(c['argv'][-1] if c['argv'] else ''),\n"
+    "                        'matched':any(c['argv'] and (c['argv'][-1]==p or p in c['argv'][-1]) for p in prompts_seen)}\n"
+    "            child_shapes=[_cshape(c) for c in child_calls]\n"
+    "            child_suspect=[s for s in child_shapes if (s['marked'] or s['base'] not in " + repr(sorted(ALLOWED_LIVE_BINARIES)) + ") and not s['matched']]\n"
+    "            _pargv={tuple(c['argv']) for c in popen_calls}\n"
+    "            child_rewritten=[' '.join(c['argv'])[:140] for c in child_calls if tuple(c['argv']) not in _pargv]\n"
     "            identity_after=bool(all(getattr(sys.modules[mn],pn) is _RECS[(mn,pn)] for (mn,pn) in _RECS)\n"
-    "                                and getattr(m,'subprocess',_sp) is _sp and m.subprocess.Popen is _RECS[('subprocess','Popen')])\n"
+    "                                and getattr(m,'subprocess',_sp) is _sp and m.subprocess.Popen is _RECS[('subprocess','Popen')]\n"
+    "                                and (_ORIG_EXEC_CHILD is None or _ORIG_POPEN._execute_child is _child_rec)\n"
+    "                                and _ORIG_POPEN.__init__ is _ORIG_POPEN_INIT)\n"
     "            out.update(outcome='returned', flows=outcomes, popen_total=len(popen_calls), recorded=rec_count[0],\n"
     "                       provider_starts=len(suspect), provider_starts_unmatched=[s['base']+':'+s['last'][:120] for s in suspect[:4]],\n"
     "                       start_primitives=sorted({s['prim'] for s in shapes}), start_binaries=sorted({s['base'] for s in shapes}),\n"
+    "                       child_total=len(child_calls), child_binaries=sorted({s['base'] for s in child_shapes}),\n"
+    "                       child_starts_unexpected=[s['base']+':'+s['last'][:120] for s in child_suspect[:4]],\n"
+    "                       child_argv_rewritten=child_rewritten[:4],\n"
     "                       popen_identity_after=identity_after)\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
@@ -987,16 +1041,79 @@ def prompt_world(source):
 
 
 def exec_surface_assignments(source):
-    """[] when no assignment ANYWHERE in the file rebinds an exec-surface attribute or a module-level container (v3.6, B1).
+    """[] when no assignment ANYWHERE in the file rebinds an exec-surface attribute, an exec ALIAS or an internal attribute.
 
-    Allowed everywhere: plain names, tuple/list destructuring of names, `self.<attr>` (attr outside the exec surface) and
-    subscript assignment to a LOCAL name. Red: an attribute target whose name is an exec primitive or whose base is an exec
-    module (except the whitelisted `sys.dont_write_bytecode`), `sys.modules[...]`, and subscript assignment to a
-    module-level name (that is how a class body or function rewrites the role policy or a plan constant at import time)."""
+    v3.6 held the rule over the whole file but measured only the NAME `Popen` and the MODULE `subprocess`. v3.7 (review v11
+    B1) closes the layer below: exec objects are tracked transitively — a name, class attribute or instance attribute bound
+    from `subprocess.<exec attr>`, `os.<exec attr>`, an already tracked alias, an attribute of one, or a call of one, is an
+    alias, and any assignment onto an alias is red — and assignment to an internal/dunder attribute (`_execute_child`,
+    `__init__`, `__call__`, `__new__`, …) is red on ANY object, alias or not.
+    Allowed everywhere: plain names, tuple/list destructuring, `self.<attr>` (attr outside the exec surface, the forbidden
+    set and the alias set) and subscript assignment to a LOCAL name. Red: an attribute target whose name is an exec
+    primitive, whose chain passes through an exec module, or whose base is an alias; `sys.modules[...]`, `vars(x)[...]`,
+    `x.__dict__[...]`; and subscript assignment to a module-level name."""
     tree = ast.parse(source)
     module_names = {t.id for n in tree.body if isinstance(n, (ast.Assign, ast.AnnAssign))
                     for t in (n.targets if isinstance(n, ast.Assign) else [n.target]) if isinstance(t, ast.Name)}
     problems = []
+
+    def chain(node):
+        parts = []
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name):
+            parts.append(node.id)
+            parts.reverse()
+            return parts
+        return None
+
+    aliases = set()
+
+    def is_exec_object(node):
+        """True for `subprocess.Popen`, `os.execv`, `subprocess.Popen._execute_child`, a tracked alias, an attribute of an
+        alias, and a call of any of those (`p = subprocess.Popen(...)` makes `p` an alias too)."""
+        if isinstance(node, ast.Call):
+            return is_exec_object(node.func)
+        if isinstance(node, ast.Name):
+            return node.id in aliases
+        if not isinstance(node, ast.Attribute):
+            return False
+        text = ast.unparse(node)
+        if text in aliases or any(text.startswith(a + ".") for a in aliases):
+            return True
+        c = chain(node)
+        return bool(c) and len(c) >= 2 and c[0] in EXEC_MODULE_NAMES and c[1] in EXEC_SURFACE_ATTRS
+
+    for _ in range(12):                                   # transitive closure (the file is small; this always terminates)
+        grew = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                targets, value = list(node.targets), node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                targets, value = [node.target], node.value
+            else:
+                continue
+            if not is_exec_object(value):
+                continue
+            for target in targets:
+                if isinstance(target, (ast.Name, ast.Attribute)):
+                    text = ast.unparse(target)
+                    if text not in aliases:
+                        aliases.add(text)
+                        grew = True
+        for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
+            for stmt in cls.body:                          # a class attribute is also reachable as `<Class>.<name>`
+                if isinstance(stmt, ast.Assign) and is_exec_object(stmt.value):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Name) and cls.name + "." + target.id not in aliases:
+                            aliases.add(cls.name + "." + target.id)
+                            grew = True
+        if not grew:
+            break
+
+    def on_alias(text):
+        return text in aliases or any(text == a or text.startswith(a + ".") for a in aliases)
 
     def check_target(target, node):
         if isinstance(target, (ast.Tuple, ast.List)):
@@ -1012,19 +1129,29 @@ def exec_surface_assignments(source):
             return
         text = ast.unparse(target)
         if isinstance(target, ast.Attribute):
+            if target.attr in FORBIDDEN_ATTR_TARGETS:
+                problems.append(f"line {node.lineno}: assignment to internal attribute {text}")
+                return
             if text in ATTRIBUTE_TARGET_WHITELIST:
                 return
             if target.attr in EXEC_SURFACE_ATTRS or target.attr in PROMPT_RUNNERS:
                 problems.append(f"line {node.lineno}: assignment to exec-surface attribute {text}")
                 return
-            if isinstance(target.value, ast.Name) and target.value.id in EXEC_MODULE_NAMES:
+            parts = chain(target) or []
+            if any(p in EXEC_MODULE_NAMES for p in parts[:-1]) or any(p in EXEC_SURFACE_ATTRS for p in parts[:-1]):
                 problems.append(f"line {node.lineno}: assignment into exec module {text}")
+                return
+            if on_alias(ast.unparse(target.value)):
+                problems.append(f"line {node.lineno}: assignment onto exec alias {text}")
             return
         if isinstance(target, ast.Subscript):
             base = target.value
             base_text = ast.unparse(base)
-            if base_text in ("sys.modules", "globals()", "vars()", "locals()"):
-                problems.append(f"line {node.lineno}: assignment into {base_text}")
+            # v3.7 (review v11 N3): the rule promised `sys.modules`/`globals()`/`vars()`/`locals()`; `subprocess.__dict__[…]`,
+            # `vars(subprocess)[…]` and `globals(  )[…]` fell outside the four literal strings.
+            if base_text in ("sys.modules", "globals()", "vars()", "locals()") or base_text.endswith(".__dict__") \
+                    or re.match(r"^(vars|globals|locals)\s*\(", base_text) or on_alias(base_text):
+                problems.append(f"line {node.lineno}: assignment into {base_text[:40]}")
                 return
             if isinstance(base, ast.Name) and base.id in module_names:
                 problems.append(f"line {node.lineno}: assignment into module-level {base.id}[...]")
@@ -1039,8 +1166,11 @@ def exec_surface_assignments(source):
             check_target(node.target, node)
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "setattr":
             arg = ast.unparse(node.args[0]) if node.args else "?"
-            if arg in EXEC_MODULE_NAMES or arg in PROMPT_RUNNERS:
-                problems.append(f"line {node.lineno}: setattr on {arg}")
+            name = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else None
+            if arg in EXEC_MODULE_NAMES or arg in PROMPT_RUNNERS or on_alias(arg) \
+                    or (isinstance(name, str) and (name in FORBIDDEN_ATTR_TARGETS or name in EXEC_SURFACE_ATTRS
+                                                   or name in PROMPT_RUNNERS)):
+                problems.append(f"line {node.lineno}: setattr on {arg}.{name}")
     return problems
 
 
@@ -1057,6 +1187,14 @@ def module_level_form(source):
             if index == 0 and isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
                 continue
             if isinstance(stmt, ast.Assign) and all(isinstance(t, ast.Name) for t in stmt.targets):
+                # v3.7 (review v11 B1/N2): a class body executes at IMPORT, before the driver installs its recorders, so its
+                # VALUES obey the module-level value rule too — `class _B: POPEN = subprocess.Popen` captured the real Popen
+                # class and made both the recorder and `popen_identity_after` blind. Measured on 320c9df7: no class body
+                # carries an Assign at all, so requiring literal material here is green on the baseline.
+                if all(isinstance(c, (ast.Constant, ast.Tuple, ast.List, ast.Set, ast.Dict, ast.UnaryOp, ast.USub, ast.UAdd,
+                                      ast.Not, ast.Invert, ast.Load, ast.Store)) for c in ast.walk(stmt.value)):
+                    continue
+                problems.append(f"line {stmt.lineno}: class body {node.name} binds non-literal {ast.unparse(stmt.value)[:60]}")
                 continue
             problems.append(f"line {stmt.lineno}: {type(stmt).__name__} in class body {node.name}: {ast.unparse(stmt)[:60]}")
 
@@ -1326,6 +1464,45 @@ def snapshot_tree(root, skip_git=False):
         if p.is_file() or p.is_symlink():
             st = p.lstat()
             out[str(p.relative_to(root))] = (st.st_size, st.st_mtime_ns)
+    return out
+
+
+def snapshot_git_meta(root):
+    """{path: (size, mtime_ns)} for a repository's refs, hooks, config, HEAD and every top-level .git entry (v3.7, N8).
+
+    `snapshot_tree(..., skip_git=True)` hides the whole `.git/` directory, so a flow helper writing
+    `<subject>/.git/<marker>` — in the REAL subject, which is where the driver loads the module from — was invisible.
+    Index/object churn from ordinary Git reads is not swept; names, refs, hooks and config are."""
+    out, gd = {}, Path(root) / ".git"
+    if not gd.is_dir():
+        return out
+    for rel in ("config", "HEAD", "packed-refs", "info/exclude"):
+        p = gd / rel
+        if p.is_file():
+            st = p.lstat()
+            out[rel] = (st.st_size, st.st_mtime_ns)
+    for sub_dir in ("refs", "hooks"):
+        d = gd / sub_dir
+        if d.is_dir():
+            for p in sorted(d.rglob("*")):
+                if p.is_file() or p.is_symlink():
+                    st = p.lstat()
+                    out[str(p.relative_to(gd))] = (st.st_size, st.st_mtime_ns)
+    for p in sorted(gd.glob("*")):
+        out["entry:" + p.name] = (p.is_dir(),)
+    return out
+
+
+def snapshot_fixture(root, skip):
+    """Every file under the gate's own FIXTURE_ROOT except the paths the live flows legitimately own (v3.7, N8).
+
+    `snapshot_names` only listed top-level entries, so anything written INSIDE the gate's scratch root was invisible.
+    `skip` carries the live replica (the product's own work tree) and the driver's TMPDIR, measured on the reference."""
+    out = {}
+    for key, value in snapshot_tree(root, skip_git=True).items():
+        if any(key == s or key.startswith(s + "/") for s in skip):
+            continue
+        out[key] = value
     return out
 
 
@@ -2151,20 +2328,46 @@ def main():
         check("f4_ensure_roadmap_plan_stops_on_missing_handoff", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
         # v3.6 (review v10 N5): mutate the plan AND every other tracked file carrying the same bytes, so a guard that
         # compares against a tracked copy instead of ROADMAP_PLAN_BLOBS no longer sees a difference and must still Stop.
-        copies, copy_mut = {}, (mut / PLAN_GEN).read_bytes()
-        plan_blob = head_oid(PLAN_GEN)
+        # v3.7 (review v11 N4): the v3.6 denominator was BYTE-IDENTICAL tracked copies — measured EMPTY on the baseline, so
+        # the row took the else branch, reused the previous run's `obj` and proved nothing; and a guard anchored to a tracked
+        # DIGEST manifest evaded it. The mutation now runs in its own replica and updates EVERY tracked anchor of the plan
+        # to the mutated plan: byte copies are rewritten, and the plan's sha256 and blob OID are replaced with the new
+        # values wherever they appear as text, in place and with the file's own mode. A guard that compares the plan with a
+        # tracked copy, a tracked digest or a tracked OID therefore sees no difference at all and must still Stop, because
+        # the only authority that changed is ROADMAP_PLAN_BLOBS. The anchor count is reported so vacuity stays visible.
+        amut, amut_env = replica(bench, "plan-anchors", subject, head)
+        plan_blob, plan_digest = head_oid(PLAN_GEN), sha(plan_bytes)
+        anchor_plan = (amut / PLAN_GEN).read_bytes().replace(b"\n", b"\n<!-- LOCAL mutation -->\n", 1)
+        overlay(amut, amut_env, {PLAN_GEN: (anchor_plan, 0o644)}, message="LOCAL fixture: mutated plan for the anchor sweep")
+        new_digest = sha(anchor_plan)
+        new_oid = git(amut, amut_env, "rev-parse", "HEAD:" + PLAN_GEN)
+        copies = {}
         for rel, (mode, oid) in sorted(tracked_entries.items()):
-            if oid == plan_blob and rel != PLAN_GEN:
-                copies[rel] = (copy_mut, 0o644)
+            f = amut / rel
+            if rel == PLAN_GEN or not f.is_file() or f.is_symlink():
+                continue
+            try:
+                body = f.read_bytes()
+            except OSError:
+                continue
+            if oid == plan_blob:
+                copies[rel] = (anchor_plan, 0o755 if mode.endswith("755") else 0o644)
+            elif plan_digest.encode() in body or plan_blob.encode() in body:
+                copies[rel] = (body.replace(plan_digest.encode(), new_digest.encode()).replace(plan_blob.encode(), new_oid.encode()),
+                               0o755 if mode.endswith("755") else 0o644)
         if copies:
-            overlay(mut, mut_env, copies, message="LOCAL fixture: mutated tracked copies of the plan")
-            r = run([PYTHON, "-B", "-c", DRIVER, subject, mut, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
-            obj = driver_outcome(r)
-            check("f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together",
-                  bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
-        else:
-            check("f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together",
-                  bool(obj) and obj["outcome"] == "stop", "no tracked copy of the plan exists; the single-file mutation stands")
+            overlay(amut, amut_env, copies, message="LOCAL fixture: every tracked plan anchor updated to the mutated plan")
+        r = run([PYTHON, "-B", "-c", DRIVER, subject, amut, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+        obj = driver_outcome(r)
+        check("f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together",
+              bool(obj) and obj["outcome"] == "stop",
+              f"anchors={len(copies)} {sorted(copies)[:4]} " + (r.stdout + r.stderr)[-260:])
+        # v3.7 (review v11 N4): and the guard must actually READ ROADMAP_PLAN_BLOBS — repin the constant in the imported
+        # module and require Stop on an UNMUTATED replica. A guard anchored to a tracked digest manifest returns here.
+        r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "roadmap_plan_repinned"], ap_tmp, ap_env, timeout=300)
+        obj = driver_outcome(r)
+        check("f4_ensure_roadmap_plan_reads_the_pinned_plan_blobs_measured_by_repinning_them_in_the_imported_module",
+              bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
         hmut, hmut_env = replica(bench, "handoff-mutated", subject, head)
         handoff_bytes = (hmut / HANDOFF_GEN).read_bytes()
         overlay(hmut, hmut_env, {HANDOFF_GEN: (handoff_bytes + b"\n<!-- LOCAL mutation -->\n", 0o644)}, message="LOCAL fixture: mutated handoff")
@@ -2196,6 +2399,7 @@ def main():
         for label in ("f4_ensure_roadmap_plan_stops_on_mutated_plan_generation", "f4_ensure_roadmap_plan_stops_on_missing_handoff",
                       "f4_ensure_roadmap_plan_stops_on_mutated_handoff",
                       "f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together",
+                      "f4_ensure_roadmap_plan_reads_the_pinned_plan_blobs_measured_by_repinning_them_in_the_imported_module",
                       "f3_platform_prepare_refuses_mutated_plan_generation_in_replica",
                       "f3_platform_prepare_refuses_mutated_handoff_in_replica",
                       "f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare"):
@@ -2334,10 +2538,18 @@ def main():
     live, live_env = replica(bench, "live-flows", subject, head)
     git(live, live_env, "update-ref", "refs/remotes/origin/main", head)
     # v3.5 (review v9 N4): the same side-effect sweep surrounds the live flows (they run far more product code than `prompts`).
+    # v3.7 (review v11 N8): the sweep also covers the subject's `.git/` (refs, hooks, config, top-level entries) and the
+    # gate's own FIXTURE_ROOT recursively, minus the two paths the flows legitimately own (the live replica they are given
+    # as a repository, and the driver's TMPDIR). Both were measured blind spots: a flow helper wrote real files in each.
+    fixture_skip = (str(live.relative_to(scratch)), str(ap_tmp.relative_to(scratch)))
     before_live_subject, before_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
+    before_live_git, before_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
     r = run([PYTHON, "-B", "-c", DRIVER, subject, live, "live_flows"], ap_tmp, ap_env, timeout=1800)
     after_live_subject, after_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
+    after_live_git, after_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
     live_side_effects = sorted("subject:" + k[0] for k in set(after_live_subject.items()) ^ set(before_live_subject.items())) + \
+        sorted("subject/.git:" + k[0] for k in set(after_live_git.items()) ^ set(before_live_git.items())) + \
+        sorted("fixture:" + k[0] for k in set(after_live_fixture.items()) ^ set(before_live_fixture.items())) + \
         sorted(f"{d}:{n[0]}" for d in before_live_names for n in set(after_live_names[d] or []) ^ set(before_live_names[d] or [])
                if str(n[0]) != scratch.name)
     live_out = driver_outcome(r)
@@ -2360,12 +2572,16 @@ def main():
             p = c.get("prompt", "")
             if c.get("role") in LIVE_PLAN_ROLES[flow] and (PLAN_GEN not in p or HANDOFF_GEN not in p):
                 problems.append(f"{flow}#{i + 1} {c.get('role')}: live prompt lacks plan/handoff")
+            # v3.7 (review v11 B2): this sweep belongs in the loop. v3.6 indented it into the FIXTURE-1 branch below, so it
+            # ran only after that requirement had already failed — never on a green product — and then only on the `p` left
+            # over from the last iteration, while `architect_resolution` and `empirical_unattended_flow` were never swept
+            # at all. EVERY captured prompt in EVERY flow is scanned here (canaries: ten per-flow negatives).
+            problems += [f"{flow}#{i + 1} {c.get('role')}: live prompt carries {pat}"
+                         for pat, l, x in scan(p, OLD_PLAN_TOKENS + COMMIT_READ_TOKENS + CODE_WEB_TOKENS + CODE_HUMAN_TOKENS)[:2]]
         # v3.6 (review v10 N4): the remediation position must carry the reviewer's findings, not just another ordinary
         # prompt — the stub's finding id is rendered into the remediation prompt by `remediation_prompt`.
         if flow in LIVE_REMEDIATION_FLOWS and not any(LIVE_FINDING_ID in c.get("prompt", "") for c in caps):
             problems.append(f"{flow}: no captured prompt carries the reviewer finding {LIVE_FINDING_ID}")
-            problems += [f"{flow}#{i + 1} {c.get('role')}: live prompt carries {pat}"
-                         for pat, l, x in scan(p, OLD_PLAN_TOKENS + COMMIT_READ_TOKENS + CODE_WEB_TOKENS + CODE_HUMAN_TOKENS)[:2]]
     check("f4_live_flows_run_to_completion_through_the_stubbed_runner_every_prompt_naming_plan_and_handoff_where_required_and_free_of_old_pointers",
           not problems, f"captures={ {k: len(v.get('captures', [])) for k, v in live_flows.items()} } problems={problems}"[-1200:])
     # v3.5 (review v9 B1 dynamic): with the runner stubbed, no provider process may be started at all — every Popen during the
@@ -2383,6 +2599,16 @@ def main():
         # rebinds subprocess.Popen from a function body uninstalls the recorder and would otherwise look clean.
         if live_out.get("popen_identity_after") is not True:
             problems.append("an exec-surface primitive was rebound during the flows (the recorder is no longer installed)")
+        # v3.7 (review v11 B1(c)): measure what actually reaches the child. `Popen._execute_child` is the real start, so a
+        # start made through a class captured at import shows up here even though the module attribute never changed, and an
+        # argv rewritten below the Popen-level recorder no longer matches the argv the recorder saw.
+        if live_out.get("child_total") != live_out.get("popen_total"):
+            problems.append(f"child starts {live_out.get('child_total')} != recorded Popen starts {live_out.get('popen_total')}")
+        problems += [f"argv rewritten between Popen and the child: {x}" for x in (live_out.get("child_argv_rewritten") or [])[:2]]
+        problems += [f"the child process received an unexpected argv: {x}" for x in (live_out.get("child_starts_unexpected") or [])[:2]]
+        unexpected_child = sorted(set(live_out.get("child_binaries") or []) - ALLOWED_LIVE_BINARIES - {""})
+        if unexpected_child:
+            problems.append(f"child processes ran unexpected binaries: {unexpected_child[:4]}")
         unexpected_binaries = sorted(set(live_out.get("start_binaries") or []) - ALLOWED_LIVE_BINARIES - {""})
         if unexpected_binaries:
             problems.append(f"processes started with unexpected binaries: {unexpected_binaries[:4]}")
@@ -2391,7 +2617,8 @@ def main():
             problems.append(f"processes started through unexpected primitives: {unexpected_primitives[:4]}")
     problems += [f"side effect during live flows: {x}" for x in live_side_effects[:6]]
     check("f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects",
-          not problems, f"popen_total={(live_out or {}).get('popen_total')} problems={problems}"[-900:])
+          not problems, f"popen_total={(live_out or {}).get('popen_total')} child_total={(live_out or {}).get('child_total')} "
+                        f"problems={problems}"[-900:])
     livemut, livemut_env = replica(bench, "live-flows-mutated", subject, head)
     if PLAN_GEN in tracked and (livemut / PLAN_GEN).is_file():
         overlay(livemut, livemut_env, {PLAN_GEN: ((livemut / PLAN_GEN).read_bytes() + b"\n<!-- LOCAL mutation -->\n", 0o644)},
