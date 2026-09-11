@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3.2 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5 och 6; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.3 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5, 6 och 7; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -95,10 +95,12 @@ nådda slutningen och de hållna grindarnas körningar. Subjektets bytes är of�
   `c8ea8511…` (plan) och `1e53887c…` (handoff) — en omdöpt eller omparkerad kopia är samma objekt (tolv blobbar).
 - `f1_no_symlink_entries_at_head`: inga poster med läge 120000 i HEAD-trädet (basen har 0) — en symlänk kan
   peka ut ur trädet (t.ex. mot webbrepot) och undgår filskanning.
-- `f1_tracked_paths_unique_case_insensitively` (v3.2 N4): inga två spårade sökvägar som bara skiljer sig i skiftläge — på
-  ett skiftlägesokänsligt filsystem kan bara en av dem checkas ut, och den andra (t.ex. `Autonomous-Loop-Plan-Platform-v2.md`
-  med avvikande tabell) blir en dold tvilling. Riggen tolererar just den smutsen (subjekt och replikor) så att felet blir
-  en produktrad (exit 1), inte ett riggfel (exit 2).
+- `f1_tracked_paths_unique_case_insensitively` (v3.2 N4, v3.3: nyckeln är NFC-normaliserad + gemener; Git körs med
+  `core.quotePath=false` så icke-ASCII-sökvägar läses okvoterade): inga två spårade sökvägar som bara skiljer sig i
+  skiftläge eller Unicode-normalisering — på ett skiftläges-/normaliseringsokänsligt filsystem kan bara en av dem checkas
+  ut och den andra blir en dold tvilling. Riggen tolererar just den smutsen (subjekt och replikor) så att felet blir en
+  produktrad (exit 1), inte ett riggfel (exit 2). Gräns: en enda trädpost som saknas i arbetsträdet (t.ex. en NFD-post som
+  `core.precomposeunicode` kollapsat) är ingen tvilling utan en osäker utcheckning — riggfel av rätt skäl.
 
 ### F2 — referensslutningsorakel (kärnan)
 Rötter: `AGENTS.md`, `CLAUDE.md`, `README.md`, `.agents/skills/*/SKILL.md`, specens `authority.*`,
@@ -133,8 +135,10 @@ varje Git-förkortning (8–40 hex, skiftlägesoberoende, hex-avgränsad) av com
 authority`, `fryst input`/`frozen input`, `historisk källa`/`historical source`. Tillåtna bara i fryst evidens
 (`verify/**`, `SEPARATION-20260910/**`, `*-local-development.md`, owner-author-workflow, remaining-bootstrap-delegation,
 drift.md:s 332f07ce-bas, substitutionskontraktets byte-frysta §). **Commit-läsning (`COMMIT_READ_TOKENS`, v3.1 B2):**
-`<PLAN_SHA>`, "frozen autonomous-loop plan commit", `git show {…|<…|<7–40 hex>:` och `plan_sha`/`PLAN_SHA` (ej `plan_sha256`)
-är förbjudna i VARJE skannat aktivt dokument — alla sex skills, AGENTS/CLAUDE/README, planen, handoffen, full-roadmap,
+`<PLAN_SHA>`, "frozen autonomous-loop plan commit", `git show {…|<…|<7–40 hex>:`, `plan_sha`/`PLAN_SHA` (ej `plan_sha256`) och
+(v3.3 N1) `git show <ref>:` för varje ref utom `HEAD` (t.ex. `origin/main:`, `refs/preserved/…:`) samt `refs/preserved/`
+är förbjudna i VARJE skannat aktivt dokument (autopilotens egen läsning av substitutionsauktoriteten ur
+`refs/remotes/origin/main` sker som argv i kod, inte som dokumenttext, och berörs inte) — alla sex skills, AGENTS/CLAUDE/README, planen, handoffen, full-roadmap,
 supersessionsnoterna, drift-svansen och EFTERARBETE-svansen — inte bara i de två plan-namngivande skillsen.
 Substitutionskontraktets ingress (r.7) namnger i dag
 commiten och skannas → måste skrivas om, med ett §15-tillägg (v1.2). Auditens r.241 nämner planens NAMN utan sökväg
@@ -291,8 +295,9 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   körtidsvakten, inte bara dess existens).
 - `f3_platform_prepare_refuses_mutated_plan_generation_in_replica` / `f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare`
   (v3.2 N3 — pinnen mätt i EFFEKT): `controller/verify/cli platform-prepare` i en replika med muterad (ej ompinnad) plan
-  → exakt `{"status":"refused","reason":"DOCUMENT_GENERATION"}`; `platform-check` mot en snapshot vars plan muterats
-  efter prepare → samma avslag. En cli som itererar en filtrerad tvilling av `PLATFORM_DOCUMENTS` faller här.
+  → exakt `{"status":"refused","reason":"DOCUMENT_GENERATION"}`; (v3.3 N5) `f3_platform_prepare_refuses_mutated_handoff_in_replica`
+  detsamma för en muterad handoff; `platform-check` mot en snapshot vars plan muterats efter prepare → samma avslag. En
+  cli som itererar en filtrerad tvilling av `PLATFORM_DOCUMENTS` eller hoppar över handoffen faller här.
 - `f4_autopilot_source_free_of_old_plan_commit_git_show_by_commit_and_plan_sha` (v3): autopilotens FULLTEXT (inkl.
   kommentarer/docstrings) och AST-strängar saknar den gamla planens pekare, `git show {…}:`/`git show <…>`/
   `git show <7–40 hex>:` (läsning ur commit; `git show HEAD:`/`origin/main:` är tillåtet) och identifieraren/fältet
@@ -319,18 +324,40 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   eller en `docs/…`-fil är PRODUCENT och måste tillhöra byggare ∪ flöden; varje funktion som namnger en byggare måste
   tillhöra byggare ∪ `EXPECTED_PROMPT_CALLERS` (8 namn: architect_resolution, builder_flow, empirical_unattended_flow,
   ensure_empirical_program_gate, ensure_roadmap_slice, roadmap_contract_flow, run_codex, test_author_flow, + flödet);
-  varje promptargument till `run_codex`/`run_codex_resolving_architecture` klassificeras rekursivt (Name → egen
-  tilldelning/parameter/modulkonstant/import; Call till byggare = OK utan att inspektera argument; Call till annan
-  modulfunktion = fel om den är producent eller byggarreferent, annars datahjälpare; f-sträng/BinOp/IfExp → delarna;
-  inlinad prompttext bara i ett förväntat flöde; Attribute/Subscript = data) — en okänd källa är RÖD; och varje krävd
-  byggare är nåbar från `main()` via namnreferensgraf (död krävd byggare = röd). Kanari: fixturmodul med tvilling,
-  inlinat flöde och död prompt flaggas exakt. Gräns: en levande tvilling som varken bär markör/`docs/`-fil, namnger en
-  byggare eller når en runner via Name/Call/f-sträng (t.ex. via dict-uppslag av funktioner) fångas inte statiskt — den
-  producerade texten mäts då bara om tvillingen heter `…prompt…`.
-- `f4_prompt_builders_run_in_contained_fixture_without_side_effects` (v3.2, N5): byggarna körs i en egen fixtur (HOME/XDG/
-  TMPDIR under fixturen, tom cwd, `GIT_DIR` mot ett tomt bare-repo, proxyvariabler mot en stängd lokal port); varje ny
-  eller ändrad fil under fixturen eller under subjektträdet efteråt är FAIL. Gräns: nätverk blockeras bara via
-  proxyvariabler i den statiska banan; `os.system`/råa sockets är produktfel som produktgranskningen läser.
+  varje promptargument till `run_codex`/`run_codex_resolving_architecture` klassificeras FAIL-CLOSED (v3.3, B1): roten
+  måste vara ett direkt `Call` till en förväntad byggare (enda andra rötter: f-sträng inuti ett förväntat flöde,
+  parametern `prompt` inuti en runner); tillåtna additiva delar är konstanter utan markör/`docs/`-fil, parametrar som
+  operander och strängmetoder (`rstrip/strip/lstrip/replace/format/join`) på sådana; `Name` löses genom funktionens
+  EGNA tilldelningar (alla tilldelningar till namnet måste ha byggarrot); RÖTT är anrop till varje annan modulfunktion
+  (ingen "datahjälpare"), modulnivånamn/konstanter/importer som textkälla, attribut-/metodanrop utanför strängmetoderna,
+  subscript/`globals()`/klassmetoder, comprehension, `IfExp` där bara en gren har byggarrot, `+=` med prompttext, och
+  varje referens till ett runner-namn som inte är ett direkt anrop (alias, även på modulnivå). Modul- och klassnivå
+  sveps: rollmarkör i någon strängkonstant, eller `docs/`-fil inbäddad i längre text (hela sökvägskonstanter är
+  tillåtna), är RÖTT — även dynamiskt (`vars(m)`: strängar och klassers metoder). Nåbarhet från `main()` räknas enbart
+  via ANROP (`Call.func`), inte via döda referenser. Kanari: fixturmodul med tvilling via anrop, inlinat flöde, död
+  prompt, modulmall, klassmetod, runner-alias, parameter-genomsläpp och hjälpfunktion — alla flaggas; det legitima
+  flödet (byggare + additiv guidance, vaktanrop) släpps. Referensens 16 verkliga runner-argument (13 byggaranrop,
+  `effective`←`prompt` i runnern, `byggare + (guidance-f-sträng if … else "")`, f-sträng i flödet) går igenom.
+- `f4_live_flows_reach_the_stubbed_runner_with_a_prompt_naming_plan_and_handoff_free_of_old_pointers` (v3.3, B1
+  dynamisk — den verkliga effekten): DRIVER-scenariot `live_flows` importerar modulen i en replika av kandidaten
+  (`refs/remotes/origin/main` = HEAD), monkeypatchar `run_codex` till en fångare som bokför argumentet och avbryter,
+  stubbar worktree-hantering/`clean`/`origin_main` (fixturgränser, inte det som mäts) och kör `architect_resolution`,
+  `roadmap_contract_flow` för SUB-1 och S2, `empirical_gate_contract_flow` och `full_roadmap`; varje flöde måste nå
+  runnern och den fångade prompten måste namnge plan + handoff och sakna gamla pekare, commit-läsning, kodwebb- och
+  ägarstoppstoken.
+- `f4_live_flows_stop_before_the_stubbed_runner_on_mutated_plan_generation` (v3.3, B2 dynamisk): samma körning i en
+  replika med muterad plan — de fyra vaktbärande flödena (`roadmap_contract_flow` ×2, `empirical_gate_contract_flow`,
+  `full_roadmap`) måste STOPPA (`Stop`) utan att runnern anropats; `architect_resolution` är ett delflöde utan egen vakt.
+- `f4_ensure_roadmap_plan_called_from_exactly_the_expected_guard_callers_all_reachable_from_main` (v3.3, B2 statisk):
+  funktionerna som ANROPAR `ensure_roadmap_plan` (`Call`-position) == {doctor, empirical_gate_contract_flow,
+  full_roadmap, roadmap_contract_flow, roadmap_status}, alla nåbara från `main()` via anrop.
+- `f4_prompt_builders_run_in_contained_fixture_without_side_effects` (v3.2 N5, v3.3 N6): byggarna körs i en egen fixtur
+  (HOME/XDG/TMPDIR under fixturen, cwd i fixturen, `GIT_DIR` mot ett tomt bare-repo, proxyvariabler mot en stängd lokal
+  port); varje ny eller ändrad fil under fixturen eller under subjektets ARBETSTRÄD (`.git/` undantaget — indexbrus från
+  andra processer är inte en produktsidoeffekt) och varje ny/borttagen toppnivåpost i `/private/tmp`, `/private/tmp/claude`
+  och processens tempkatalog (grindens egna `platform-separation-final-*`-rötter undantagna) är FAIL. Gräns: skrivningar
+  till andra absoluta sökvägar, frånkopplade processer och nätverk utan proxy fångas inte; produktgranskningen läser
+  byggarna.
 - `f4_prompt_functions_ast_literals_inject_only_the_declared_platform_document_set_all_tracked_and_scanned` (v3,
   komplement — statisk): promptbyggande funktioner = varje funktion vars strängkonstanter bär `Use `$nortropic-` eller vars namn matchar
   `prompt|_extra$|authority_text$`, PLUS varje funktion som anropar en sådan (deras `extra`-strängar injiceras);
@@ -348,7 +375,9 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   (skiftlägesoberoende; backticks/fetstil tolereras; listceller kommaseparerade; `-`/`—` = tom; status `BYGGD`/`OBYGGD`,
   skiftlägesoberoende). v3.2 (B2): HTML-kommentarer och kodstaket stripas före parsning (bara den SYNLIGA texten räknas)
   och exakt EN sådan tabell får finnas — två tabeller, en dold korrekt + en synlig avvikande, eller en tabell enbart i
-  kommentar/staket är alla röda. Kanari med två tabeller, kommentardold + synlig, stakettabell och enbart dold tabell. Skivmängden == autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`-koder ∪ {S1, S3, L}; för varje
+  kommentar/staket är alla röda; (v3.3 N3) varje annan synlig tabell vars rubrik bär både `slice` och `task` (t.ex. en
+  7-kolumns "läsvy") är också röd — en sanning. Kanari med två tabeller, kommentardold + synlig, stakettabell, enbart
+  dold tabell och 7-kolumnstabell. (v3.3 N2) Bootstrapraden läser samma synliga text (id:n i en HTML-kommentar räknas inte). Skivmängden == autopilotens `SUBSTITUTION_ROADMAP + ROADMAP`-koder ∪ {S1, S3, L}; för varje
   autopilotskiva: task == `task_id`, exit_test == `gate_path`, allowed_write-mängd == `plan_allowed_write`,
   depends_on-mängd == `required_deps`; S1/S3: task h-017/h-004, exit_test och depends_on == specradens, ingen
   skrivyta (`-`), `BYGGD`; L: task `-`, exit_test == `EMPIRICAL_GATE_PATH`, ingen skrivyta, depends_on == alla
@@ -535,7 +564,11 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    (`empirical_gate_contract_flow`) och byggaranropare (8 namn) är SLUTEN: inga nya/omdöpta prompt-, tvilling- eller
    flödesfunktioner; varje runner-anrop får sin prompt från en förväntad byggare (eller inlinad text i det förväntade
    flödet); varje krävd byggare nås från `main()`. `ensure_roadmap_plan` verifierar båda filernas blob (N2); `controller/verify/cli`
-   itererar `PLATFORM_DOCUMENTS` självt i prepare/check (N3). Inga skiftlägestvillingar av spårade sökvägar (N4).
+   itererar `PLATFORM_DOCUMENTS` självt i prepare/check för plan OCH handoff (N3/v3.3 N5). Inga skiftlägestvillingar
+   eller NFC/NFD-tvillingar av spårade sökvägar (N4). (v3.3 B1/B2) Varje runner-prompt har ett direkt byggaranrop som
+   rot; ingen runner-alias, ingen modul-/klassnivåmall med rollmarkör, inga parameter-genomsläpp av prompttext; exakt
+   {doctor, empirical_gate_contract_flow, full_roadmap, roadmap_contract_flow, roadmap_status} anropar `ensure_roadmap_plan`
+   och flödena stoppar där vid muterad plan; byggarna får inte skriva utanför fixturen (inte heller till `/private/tmp`).
 6. **Dokument:** `AGENTS.md` (Historik → Git-referenser/webbrepot utan sökväg), `README.md` (r.8, 21, 28),
    `docs/loop/regler.md` (r.9–10), `docs/loop/byggplan-v3.md` (r.9, 113, 166),
    `docs/loop/codex-autopilot-v3-full-roadmap.md` (r.17, 115), `docs/loop/harness-substitution-contract-v1.md`
@@ -565,11 +598,14 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
 - (v3.1) Prompter som inlinas direkt i ett flöde (t.ex. remedieringsprompten i `empirical_gate_contract_flow`) mäts bara
   statiskt (AST-literaler), inte som producerad text — flöden anropas inte. En byggare som kräver argument utanför
   fixturmängden faller rött (fail-closed), inte tyst grönt.
-- (v3.2) Grind-fingeravtryck (N1): en byggare kan producera planen bara under mätning (t.ex. på `PROVIDER_CALL_ALLOWED=NO`
-  eller fixturens HOME); modulnamnet slumpas men bench-miljön är synlig — produktgranskningen läser byggarna. Sluten värld
-  (N6-arv): base64/gzip-bilagor, zero-width-/blankstegsdelade prefix och semantisk override utan token fångas inte;
-  dubbletter/omordning i `allowed_write` är mängdsemantik. En tvilling som når en runner enbart via funktionsuppslag i en
-  dict/lista mäts inte statiskt (se B1-raden).
+- (v3.2/v3.3) Grind-fingeravtryck (N1): en byggare kan producera planen bara under mätning (bench-miljön, den stubbade
+  runnern och fixturargumenten är synliga; modulnamnet slumpas) — produktgranskningen läser byggarna och flödena. Sluten
+  värld (N6-arv): base64/gzip-bilagor, zero-width-/blankstegsdelade prefix och semantisk override utan token fångas inte;
+  dubbletter/omordning i `allowed_write` är mängdsemantik; körtidsläsning av planfilen i en byggare mäts inte (sökvägs-
+  och blobbindningen + `ensure_roadmap_plan`-vakten är identitetsskyddet). Den statiska klassificeringen är fail-closed:
+  en legitim refaktorering av promptvägen (nya byggare, indirektion, klassbaserade prompter) är röd per design och kräver
+  ny kontraktsversion; den dynamiska live-mätningen kör flödena med stubbad runner och stubbad worktree-/origin-hantering
+  — Git-/providerbeteendet bortom första runner-anropet mäts inte här (control-set-grinden och loopsviten mäter det).
 - (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
   tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
   `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av

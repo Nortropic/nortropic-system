@@ -50,6 +50,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -205,7 +206,10 @@ GIT_SHOW_COMMIT_RE = r"git\s+show\s+(?:\{|<|[0-9a-fA-F]{7,40}\s*:)"
 PLAN_SHA_RE = r"(?i)plan_sha(?!256)"
 # v3.1 (review v5 B2): reading the plan by commit is forbidden in EVERY scanned active document (all skills, router,
 # README, plan, handoff, full-roadmap, notes, drift/EFTERARBETE tails), not only in the two plan-naming skills.
-COMMIT_READ_TOKENS = (r"<PLAN_SHA>", r"(?i)frozen autonomous-loop plan commit", GIT_SHOW_COMMIT_RE, PLAN_SHA_RE)
+# v3.3 (review v7 N1): reading any document out of a ref other than HEAD (`git show origin/main:`, `git show refs/preserved/…:`)
+# is a pointer to another version; documents may not instruct it (the autopilot's own substitution read is argv, not text).
+COMMIT_READ_TOKENS = (r"<PLAN_SHA>", r"(?i)frozen autonomous-loop plan commit", GIT_SHOW_COMMIT_RE, PLAN_SHA_RE,
+                      r"git\s+show\s+(?!HEAD\b)[^\s:{}<>]+:", r"refs/preserved/")
 SKILL_OLD_PLAN_TOKENS = COMMIT_READ_TOKENS
 PLAN_SKILLS = (".agents/skills/nortropic-architect/SKILL.md", ".agents/skills/nortropic-empirical-runner/SKILL.md")
 # v3.1 (review v5 B3): the prompt builders whose PRODUCED text must name the plan generation and the handoff for every
@@ -228,6 +232,15 @@ EXPECTED_PROMPT_CALLERS = frozenset({"architect_resolution", "builder_flow", "em
                                      "run_codex", "test_author_flow"}) | EXPECTED_PROMPT_FLOWS
 PROMPT_RUNNERS = ("run_codex", "run_codex_resolving_architecture")
 PROMPT_ARG_INDEX = 3   # run_codex(repo, wt, role, prompt) / run_codex_resolving_architecture(repo, wt, role, prompt, ...)
+# v3.3 (review v7 B1): string methods through which a builder's text may pass on its way to a runner; every other call,
+# attribute, subscript, module-level name, class method or parameter root is RED (fail-closed text sources).
+PROMPT_TEXT_METHODS = frozenset({"rstrip", "strip", "lstrip", "replace", "format", "join"})
+# v3.3 (review v7 B2): exactly these functions call the plan guard ensure_roadmap_plan (Call position), all reachable from main().
+EXPECTED_PLAN_GUARD_CALLERS = frozenset({"doctor", "empirical_gate_contract_flow", "full_roadmap", "roadmap_contract_flow", "roadmap_status"})
+PLAN_GUARD = "ensure_roadmap_plan"
+# v3.3: the flows the live driver runs against a replica with a stubbed runner (the runner captures the prompt and aborts).
+LIVE_FLOWS = ("architect_resolution", "roadmap_contract_flow[SUB-1]", "roadmap_contract_flow[S2]", "empirical_gate_contract_flow", "full_roadmap")
+LIVE_GUARDED_FLOWS = LIVE_FLOWS[1:]   # architect_resolution is a sub-flow of the guarded flows and carries no guard of its own
 DOC_LITERAL_RE = re.compile(r"docs/[A-Za-z0-9_./-]+\.[A-Za-z0-9]+")
 # v3.2 (N7): the plan generation must carry these sections (a `## ` heading matching the pattern, body >= 3 non-empty lines).
 PLAN_REQUIRED_SECTIONS = ((r"(?i)syfte", "Syfte"), (r"(?i)målbild", "Målbild"),
@@ -376,7 +389,41 @@ DRIVER = (
     "                    t=_f(**kwargs); texts[key]=t if isinstance(t,str) else '<non-str '+type(t).__name__+'>'\n"
     "                except Exception as e:\n"
     "                    errors[key]=repr(e)[:200]\n"
-    "        out.update(outcome='returned', builders=sorted(builders), flows=sorted(flows), texts=texts, errors=errors)\n"
+    "        stray=[]\n"
+    "        for _n,_o in list(vars(m).items()):\n"
+    "            if isinstance(_o,str) and " + repr(PROMPT_MARK) + " in _o: stray.append('str:'+_n)\n"
+    "            if isinstance(_o,type) and getattr(_o,'__module__',None)==m.__name__:\n"
+    "                for _a,_v in vars(_o).items():\n"
+    "                    _fn=getattr(_v,'__func__',_v)\n"
+    "                    if hasattr(_fn,'__code__') and any(" + repr(PROMPT_MARK) + " in c for c in _consts(_fn.__code__)): stray.append('class:'+_n+'.'+_a)\n"
+    "        out.update(outcome='returned', builders=sorted(builders), flows=sorted(flows), texts=texts, errors=errors, stray=stray)\n"
+    "    elif scenario=='live_flows':\n"
+    "        captured=[]; outcomes={}\n"
+    "        class Captured(Exception): pass\n"
+    "        def fake_run_codex(repo_, wt_, role, prompt):\n"
+    "            captured.append({'role':role,'prompt':prompt}); raise Captured()\n"
+    "        m.run_codex=fake_run_codex\n"
+    "        m.ensure_worktree=lambda *a, **k: root\n"
+    "        m.detached_worktree=lambda *a, **k: root\n"
+    "        m.remove_worktree=lambda *a, **k: None\n"
+    "        m.clean=lambda _r: True\n"
+    "        _head=m.sha(root); m.origin_main=lambda _r: _head\n"
+    "        flows={'architect_resolution': lambda: m.architect_resolution(root, root, 'BUILD', 'h-015', {'summary':'fixture'}, ''),\n"
+    "               'roadmap_contract_flow[SUB-1]': lambda: m.roadmap_contract_flow(root, root/'wt', m.SUBSTITUTION_ROADMAP[0]),\n"
+    "               'roadmap_contract_flow[S2]': lambda: m.roadmap_contract_flow(root, root/'wt', m.ROADMAP[0]),\n"
+    "               'empirical_gate_contract_flow': lambda: m.empirical_gate_contract_flow(root, root/'wt'),\n"
+    "               'full_roadmap': lambda: m.full_roadmap(root, root/'wt')}\n"
+    "        for _n,_f in flows.items():\n"
+    "            before=len(captured)\n"
+    "            try:\n"
+    "                _f(); outcomes[_n]={'outcome':'returned','captured':len(captured)-before}\n"
+    "            except Captured:\n"
+    "                outcomes[_n]={'outcome':'captured','role':captured[-1]['role'],'prompt':captured[-1]['prompt']}\n"
+    "            except m.Stop as e:\n"
+    "                outcomes[_n]={'outcome':'stop','message':str(e)[:300],'captured':len(captured)-before}\n"
+    "            except Exception as e:\n"
+    "                outcomes[_n]={'outcome':'error','message':repr(e)[:300],'captured':len(captured)-before}\n"
+    "        out.update(outcome='returned', flows=outcomes)\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
     "    else:\n"
@@ -607,14 +654,17 @@ def prompt_document_sets(source):
 
 
 def prompt_world(source):
-    """Static closed-world view of the autopilot's prompt path (top-level functions only):
+    """Static closed-world view of the autopilot's prompt path (top-level functions only) — v3.3 fail-closed:
     producers  = functions carrying the role marker in any string constant, or returning an expression whose string
                  constants carry the marker or a docs/ document path;
     referrers  = functions whose body names an expected prompt builder;
-    runner_problems = every prompt argument of a PROMPT_RUNNERS call that is not sourced from an expected builder
-                 (inline text is allowed only inside an expected flow; a Name is resolved through the function's own
-                 assignments or accepted as a pass-through parameter);
-    reachable  = functions reachable from main() through name references."""
+    runner_problems = every prompt argument of a PROMPT_RUNNERS call whose ROOT is not a direct Call to an expected builder
+                 (an f-string inside an expected flow, or the `prompt` parameter inside a runner, are the only other roots);
+                 parameters, module-level names, other functions, methods, subscripts, comprehensions and conditionals
+                 with a rootless branch are RED; plus every reference to a runner name that is not a direct call (alias);
+    stray      = module- or class-level string constants carrying the marker or a docs/ document that is not a bare path constant;
+    reachable  = functions reachable from main() through CALLS (a name in Call.func position), not mere references;
+    guard_callers = functions calling PLAN_GUARD in Call position."""
     tree = ast.parse(source)
     functions = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
 
@@ -624,12 +674,25 @@ def prompt_world(source):
     def promptish(values):
         return any(PROMPT_MARK in v or DOC_LITERAL_RE.search(v) for v in values)
 
-    module_names = {t.id for n in tree.body if isinstance(n, (ast.Assign, ast.AnnAssign)) for t in (n.targets if isinstance(n, ast.Assign) else [n.target]) if isinstance(t, ast.Name)}
+    module_names = {t.id for n in tree.body if isinstance(n, (ast.Assign, ast.AnnAssign))
+                    for t in (n.targets if isinstance(n, ast.Assign) else [n.target]) if isinstance(t, ast.Name)}
     imported = set()
     for n in tree.body:
         if isinstance(n, (ast.Import, ast.ImportFrom)):
             imported |= {(a.asname or a.name).split(".")[0] for a in n.names}
-    producers, referrers, runner_problems = set(), set(), []
+    stray = []
+    for n in tree.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for v in strs(n):
+            if PROMPT_MARK in v:
+                stray.append(f"line {n.lineno}: role marker outside a builder")
+            elif DOC_LITERAL_RE.search(v) and not (PATH_RE.fullmatch(v) or ROOT_DOC_RE.fullmatch(v)):
+                stray.append(f"line {n.lineno}: document path embedded in a module/class-level text")
+        for nm in ast.walk(n):
+            if isinstance(nm, ast.Name) and nm.id in PROMPT_RUNNERS:
+                stray.append(f"line {n.lineno}: runner {nm.id} aliased or referenced at module/class level")
+    producers, referrers, runner_problems, guard_callers = set(), set(), [], set()
     for name, fn in functions.items():
         if any(PROMPT_MARK in v for v in strs(fn)):
             producers.add(name)
@@ -638,59 +701,76 @@ def prompt_world(source):
                 producers.add(name)
         if {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)} & EXPECTED_PROMPT_BUILDERS:
             referrers.add(name)
+        if any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id == PLAN_GUARD for c in ast.walk(fn)):
+            guard_callers.add(name)
     for name, fn in functions.items():
         params = {a.arg for a in fn.args.args + fn.args.kwonlyargs}
         assigns = {}
         for node in ast.walk(fn):
             if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-                assigns[node.targets[0].id] = node.value
+                assigns.setdefault(node.targets[0].id, []).append(node.value)
+            if isinstance(node, ast.AugAssign) and promptish(strs(node.value)):
+                runner_problems.append(f"{name}: augmented assignment adds prompt text")
+        call_funcs = {id(c.func) for c in ast.walk(fn) if isinstance(c, ast.Call)}
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Name) and node.id in PROMPT_RUNNERS and id(node) not in call_funcs and node.id != name:
+                runner_problems.append(f"{name}: runner {node.id} referenced without a direct call (alias)")
 
         def classify(expr, depth=0):
-            """[] when every TEXT SOURCE of expr is an expected builder, a parameter, a module constant or plain data; else
-            problem strings. Arguments of an expected builder call are not inspected (the produced-text rows measure them)."""
+            """(root, problems): root is True only when the expression's text comes from a direct builder call."""
             if depth > 8:
-                return ["indirection too deep"]
+                return False, ["indirection too deep"]
             if isinstance(expr, ast.Name):
                 if expr.id in assigns:
-                    return classify(assigns[expr.id], depth + 1)
-                return [] if expr.id in params or expr.id in module_names or expr.id in imported else [f"unresolved name {expr.id}"]
+                    results = [classify(v, depth + 1) for v in assigns[expr.id]]
+                    root = all(r for r, _ in results)
+                    probs = [p for _, ps in results for p in ps]
+                    if not root and any(r for r, _ in results):
+                        probs.append(f"assignments to {expr.id} disagree on the builder root")
+                    return root, probs
+                if expr.id in params:
+                    if name in PROMPT_RUNNERS and expr.id == "prompt":
+                        return True, []
+                    return False, []          # additive parameter text; never a root
+                return False, [f"module-level or unknown text source {expr.id}"]
             if isinstance(expr, ast.Constant):
-                return ["inline prompt text outside an expected flow"] \
-                    if isinstance(expr.value, str) and promptish([expr.value]) and name not in EXPECTED_PROMPT_FLOWS else []
+                if isinstance(expr.value, str) and promptish([expr.value]):
+                    return False, ["inline prompt text"]
+                return False, []
             if isinstance(expr, ast.JoinedStr):
-                out = []
-                if promptish([v.value for v in expr.values if isinstance(v, ast.Constant) and isinstance(v.value, str)]) \
-                        and name not in EXPECTED_PROMPT_FLOWS:
-                    out.append("inline prompt text outside an expected flow")
+                if name in EXPECTED_PROMPT_FLOWS:
+                    return True, []
+                probs = ["inline prompt text outside an expected flow"] if promptish(
+                    [v.value for v in expr.values if isinstance(v, ast.Constant) and isinstance(v.value, str)]) else []
                 for v in expr.values:
                     if isinstance(v, ast.FormattedValue):
-                        out += classify(v.value, depth + 1)
-                return out
+                        probs += classify(v.value, depth + 1)[1]
+                return False, probs
             if isinstance(expr, ast.BinOp):
-                return classify(expr.left, depth + 1) + classify(expr.right, depth + 1)
+                rl, pl = classify(expr.left, depth + 1)
+                rr, pr = classify(expr.right, depth + 1)
+                return rl or rr, pl + pr
             if isinstance(expr, ast.IfExp):
-                return classify(expr.body, depth + 1) + classify(expr.orelse, depth + 1)
+                rb, pb = classify(expr.body, depth + 1)
+                ro, po = classify(expr.orelse, depth + 1)
+                if rb != ro:
+                    return rb or ro, pb + po + ["conditional prompt: one branch lacks a builder root"]
+                return rb, pb + po
             if isinstance(expr, ast.Call):
                 if isinstance(expr.func, ast.Name):
                     if expr.func.id in EXPECTED_PROMPT_BUILDERS:
-                        return []
-                    if expr.func.id in functions:
-                        # a module function that neither produces prompt text nor names a builder is a data helper
-                        if expr.func.id in producers or expr.func.id in referrers:
-                            return [f"prompt from non-builder {expr.func.id}()"]
-                        return [p for a in expr.args for p in classify(a, depth + 1)]
-                    return [f"prompt from call {expr.func.id}()"]
-                if isinstance(expr.func, ast.Attribute):   # "\n".join(...), text.rstrip(), ...
-                    out = classify(expr.func.value, depth + 1)
+                        return True, []
+                    return False, [f"prompt from non-builder call {expr.func.id}()"]
+                if isinstance(expr.func, ast.Attribute) and expr.func.attr in PROMPT_TEXT_METHODS:
+                    rr, pr = classify(expr.func.value, depth + 1)
+                    roots, probs = [rr], list(pr)
                     for a in expr.args:
-                        out += classify(a, depth + 1)
-                    return out
-                return ["unresolved call"]
-            if isinstance(expr, (ast.GeneratorExp, ast.ListComp)):
-                return classify(expr.elt, depth + 1) + [p for g in expr.generators for p in classify(g.iter, depth + 1)]
-            if isinstance(expr, (ast.Attribute, ast.Subscript)):
-                return []   # data access, never a text source of its own; produced text is measured by the dynamic rows
-            return [f"unresolved prompt source {type(expr).__name__}"]
+                        r, ps = classify(a, depth + 1)
+                        roots.append(r)
+                        probs += ps
+                    return any(roots), probs
+                return False, ["prompt from a method or attribute call"]
+            return False, [f"unresolved prompt source {type(expr).__name__}"]
 
         for node in ast.walk(fn):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in PROMPT_RUNNERS:
@@ -699,16 +779,20 @@ def prompt_world(source):
                 if arg is None:
                     runner_problems.append(f"{name}: runner call without prompt argument")
                     continue
-                runner_problems += [f"{name}: {p}" for p in classify(arg)]
-    refs = {name: {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and n.id in functions} for name, fn in functions.items()}
+                root, probs = classify(arg)
+                if not root:
+                    probs.append("no direct builder call as root")
+                runner_problems += [f"{name}: {p}" for p in probs]
+    calls = {name: {c.func.id for c in ast.walk(fn) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in functions}
+             for name, fn in functions.items()}
     reachable, queue = set(), ["main"]
     while queue:
         n = queue.pop()
         if n in reachable or n not in functions:
             continue
         reachable.add(n)
-        queue.extend(refs[n])
-    return producers, referrers, runner_problems, reachable
+        queue.extend(calls[n])
+    return producers, referrers, runner_problems, reachable, stray, guard_callers
 
 
 def selftest_exact_sets(source):
@@ -745,10 +829,15 @@ def parse_slice_table(text):
     markdown table whose header cells are exactly PLAN_TABLE_COLUMNS (case-insensitive, backticks/bold tolerated); HTML
     comments and code fences are stripped first; two such tables are a problem (one truth)."""
     lines = visible_markdown(text).splitlines()
-    headers = [i for i, line in enumerate(lines) if line.strip().startswith("|")
-               and [c.strip().strip("`*").strip().lower() for c in line.strip().strip("|").split("|")] == list(PLAN_TABLE_COLUMNS)]
+    header_cells = [(i, [c.strip().strip("`*").strip().lower() for c in line.strip().strip("|").split("|")])
+                    for i, line in enumerate(lines) if line.strip().startswith("|")]
+    headers = [i for i, cells in header_cells if cells == list(PLAN_TABLE_COLUMNS)]
     if len(headers) > 1:
         return None, f"multiple slice tables ({len(headers)}) — one truth required"
+    # v3.3 (review v7 N3): any other visible table whose header carries slice AND task columns is a competing reading view.
+    lookalikes = [i for i, cells in header_cells if cells != list(PLAN_TABLE_COLUMNS) and {"slice", "task"} <= set(cells)]
+    if lookalikes:
+        return None, f"slice-like table(s) with other columns at line(s) {[i + 1 for i in lookalikes]} — one truth required"
     i, rows = 0, []
     while i < len(lines):
         line = lines[i].strip()
@@ -819,7 +908,8 @@ def run_bytes(argv, cwd, env, timeout=120):
 
 
 def git_raw(root, env, *args):
-    return run([GIT, "-c", "core.hooksPath=/dev/null", *args], root, env)
+    # core.quotePath=false: non-ASCII paths (NFC/NFD twins, N4) come back verbatim, not octal-escaped
+    return run([GIT, "-c", "core.hooksPath=/dev/null", "-c", "core.quotePath=false", *args], root, env)
 
 
 def git(root, env, *args):
@@ -864,13 +954,27 @@ def json_refusal(result):
     return obj["reason"]
 
 
-def snapshot_tree(root):
-    """{relative path: (size, mtime_ns)} for every file under root (side-effect detection, N5)."""
+def snapshot_tree(root, skip_git=False):
+    """{relative path: (size, mtime_ns)} for every file under root (side-effect detection, N5/N6); .git/ optionally skipped
+    (index noise from other processes is not a product side effect)."""
     out = {}
     for p in sorted(Path(root).rglob("*")):
+        if skip_git and ".git" in p.relative_to(root).parts:
+            continue
         if p.is_file() or p.is_symlink():
             st = p.lstat()
             out[str(p.relative_to(root))] = (st.st_size, st.st_mtime_ns)
+    return out
+
+
+def snapshot_names(*dirs):
+    """Top-level entry names of the given directories (absolute-path side effects such as /private/tmp/claude/<marker>)."""
+    out = {}
+    for d in dirs:
+        try:
+            out[d] = sorted(os.listdir(d))
+        except OSError:
+            out[d] = None
     return out
 
 
@@ -1002,16 +1106,19 @@ def main():
             raise Rig("frozen base " + base + " is not in the subject's history")
     tracked_entries = ls_tree(subject, probe_env, "HEAD", ".")
     tracked = set(tracked_entries)
+    def collision_key(rel):
+        return unicodedata.normalize("NFC", rel).lower()
+
     lowered = {}
     for rel in tracked:
-        lowered.setdefault(rel.lower(), []).append(rel)
+        lowered.setdefault(collision_key(rel), []).append(rel)
     case_dupes = sorted(v for v in lowered.values() if len(v) > 1)
     CASE_COLLISION["present"] = bool(case_dupes)
-    colliding = {rel for group in case_dupes for rel in group}
-    dirty = [l[3:] for l in run([GIT, "-C", str(subject), "status", "--porcelain", "--untracked-files=no"], scratch, probe_env).stdout.splitlines() if l.strip()]
-    # v3.2 (N4): a case-insensitive checkout cannot hold both members of a colliding pair; that dirtiness is the product
-    # defect measured by f1_tracked_paths_unique_case_insensitively, not a rig error. Any other dirtiness is still a rig error.
-    if dirty and not (colliding and all(path.strip() in colliding for path in dirty)):
+    colliding = {collision_key(rel) for group in case_dupes for rel in group}
+    dirty = [l[3:] for l in run([GIT, "-c", "core.quotePath=false", "-C", str(subject), "status", "--porcelain", "--untracked-files=no"], scratch, probe_env).stdout.splitlines() if l.strip()]
+    # v3.2/v3.3 (N4): a case- or normalisation-insensitive checkout cannot hold both members of a colliding pair; that
+    # dirtiness is the product defect measured by f1_tracked_paths_unique_case_insensitively, not a rig error.
+    if dirty and not (colliding and all(collision_key(path.strip().strip('"')) in colliding for path in dirty)):
         raise Rig("subject tracked files are not committed at HEAD; the replicas would not carry them")
     subject_sha = {rel: sha((subject / rel).read_bytes()) for rel in sorted(tracked) if (subject / rel).is_file()}
     held = {GATE: sha((ROOT / GATE).read_bytes())}
@@ -1063,6 +1170,7 @@ def main():
           and all(scan(x, COMMIT_READ_TOKENS) for x in ("the roadmap: `git show <PLAN_SHA>:docs/loop/x.md`", "PLAN_SHA=abc",
                                                         "the exact frozen autonomous-loop plan commit named by the orchestrator"))
           and not scan("git show HEAD:docs/loop/x.md; plan_sha256 of the command plan; PLAN_GENERATION=platform-v2", COMMIT_READ_TOKENS)
+          and all(scan(x, COMMIT_READ_TOKENS) for x in ("git show origin/main:docs/loop/x.md", "prefer `git show refs/preserved/old-checkout/heads/plan-2026-08:docs/loop/x.md`", "refs/preserved/x"))
           and bool(scan("se docs/loop/autonomous-loop-plan-v1.md (effekt-authority, fryst input)", OLD_PLAN_TOKENS))
           and len(scan("se docs/loop/autonomous-loop-plan-v1.md (effekt-authority, fryst input)", OLD_PLAN_TOKENS)) >= 4
           and not scan("hash 10b3212c9a is hex-preceded; plan_sha256 of the H039 command plan; PLAN_GENERATION=platform-v2",
@@ -1076,7 +1184,7 @@ def main():
                        WEB_TOKENS + HUMAN_TOKENS + PLAN_TOKENS + OLD_PLAN_TOKENS)
           and all(re.search(GIT_SHOW_COMMIT_RE, x) for x in ("git show <PLAN_SHA>:docs/x", "git show {ROADMAP_PLAN_SHA}:{P}",
                                                               "git show 0b3212c991d4227c8df2656465ae2c0252dda39e:docs/loop/x.md"))
-          and not re.search(GIT_SHOW_COMMIT_RE, "git show HEAD:docs/loop/x.md") and not re.search(GIT_SHOW_COMMIT_RE, "git show origin/main:x")
+          and not re.search(GIT_SHOW_COMMIT_RE, "git show HEAD:docs/loop/x.md")
           and bool(re.search(PLAN_SHA_RE, "ROADMAP_PLAN_SHA={x}")) and bool(re.search(PLAN_SHA_RE, "plan_sha=json")) and not re.search(PLAN_SHA_RE, "plan_sha256")
           and parse_slice_table(fixture_table)[0] == [("S2", "h-015", "verify/bin/h-015-exit", ["controller/atertag/**", "tests/controller/atertag/**"],
                                                         ["h-010", "h-030"], "OBYGGD"),
@@ -1086,6 +1194,8 @@ def main():
           and parse_slice_table("<!--\n" + fixture_table.replace("h-010, h-030", "h-010") + "\n-->\n" + fixture_table)[0] == parse_slice_table(fixture_table)[0]
           and parse_slice_table("```\n" + fixture_table + "\n```\n")[0] is None
           and parse_slice_table("<!--\n" + fixture_table + "\n-->\n")[0] is None
+          and parse_slice_table(fixture_table + "\n\n| slice | task | exit_test | allowed_write | depends_on | status | kommentar |\n|---|---|---|---|---|---|---|\n| S2 | h-015 | x | - | h-010 | OBYGGD | läsvy |\n")[0] is None
+          and "slice-like" in parse_slice_table(fixture_table + "\n\n| slice | task | note |\n|---|---|---|\n| S2 | h-015 | x |\n")[1]
           and PLAN_GEN not in CLOSURE_EXEMPT and HANDOFF_GEN not in CLOSURE_EXEMPT and PLAN_GEN not in TREE_FROZEN_FILES
           and HANDOFF_GEN not in TREE_FROZEN_FILES and not PLAN_GEN.startswith(CLOSURE_EXEMPT_PREFIXES + TREE_FROZEN_PREFIXES)
           and not PLAN_GEN.endswith("-local-development.md") and OLD_PLAN_COPY in ABSENT_EXACT and OLD_HANDOFF_COPY in ABSENT_EXACT
@@ -1100,15 +1210,30 @@ def main():
         "def some_flow(repo, wt):\n    p = architect_prompt('X')\n    return run_codex(repo, wt, 'A', p)\n"
         "def inline_flow(repo, wt):\n    return run_codex(repo, wt, 'A', f'Use `$nortropic-test-author` again')\n"
         "def dead_prompt():\n    return 'Use `$nortropic-builder`'\n"
-        "def main():\n    architect_resolution(1, 2); some_flow(1, 2); inline_flow(1, 2)\n")
-    fx_producers, fx_referrers, fx_runner_problems, fx_reachable = prompt_world(fixture_module)
-    check("canary_closed_world_prompt_instrument_flags_twin_inline_flow_and_dead_prompt",
+        "TEMPLATE = 'Use `$nortropic-architect` {x}'\n"
+        "_rc = run_codex\n"
+        "class P:\n    @staticmethod\n    def resolve(s):\n        return 'Use `$nortropic-architect` ' + s\n"
+        "PR = P()\n"
+        "def helper_text(s):\n    return 'resolve ' + s\n"
+        "def tmpl_flow(repo, wt):\n    return run_codex(repo, wt, 'A', TEMPLATE.format(x=1))\n"
+        "def class_flow(repo, wt):\n    return run_codex(repo, wt, 'A', PR.resolve('x'))\n"
+        "def alias_flow(repo, wt):\n    return _rc(repo, wt, 'A', 'plain text')\n"
+        "def param_flow(repo, wt, prompt_text=None):\n    return run_codex(repo, wt, 'A', prompt_text if prompt_text is not None else architect_prompt('S'))\n"
+        "def helper_flow(repo, wt):\n    return run_codex(repo, wt, 'A', helper_text('S'))\n"
+        "def ok_flow(repo, wt, guidance=''):\n    ensure_roadmap_plan(repo)\n    return run_codex(repo, wt, 'A', architect_prompt('S') + ('\\n' + guidance if guidance else ''))\n"
+        "def ensure_roadmap_plan(repo):\n    return None\n"
+        "def main():\n    architect_resolution(1, 2); some_flow(1, 2); inline_flow(1, 2); tmpl_flow(1, 2); class_flow(1, 2); alias_flow(1, 2); param_flow(1, 2); helper_flow(1, 2); ok_flow(1, 2)\n")
+    fx_producers, fx_referrers, fx_runner_problems, fx_reachable, fx_stray, fx_guard = prompt_world(fixture_module)
+    fx_flagged = {p.split(":")[0] for p in fx_runner_problems}
+    check("canary_closed_world_prompt_instrument_flags_twin_inline_flow_dead_prompt_template_class_alias_param_and_helper",
           fx_producers == {"agent_prompt_common", "architect_prompt", "inline_flow", "dead_prompt"}
-          and fx_referrers == {"twin_text", "some_flow", "run_codex"}
-          and any("twin_text" in p for p in fx_runner_problems) and any("inline prompt text" in p for p in fx_runner_problems)
-          and not any("some_flow" in p for p in fx_runner_problems)
-          and "dead_prompt" not in fx_reachable and {"main", "architect_resolution", "twin_text", "architect_prompt", "run_codex", "agent_prompt_common"} <= fx_reachable,
-          f"producers={sorted(fx_producers)} referrers={sorted(fx_referrers)} runner={fx_runner_problems} reachable={sorted(fx_reachable)}")
+          and fx_referrers == {"twin_text", "some_flow", "run_codex", "param_flow", "ok_flow"}
+          and {"architect_resolution", "inline_flow", "tmpl_flow", "class_flow", "param_flow", "helper_flow"} <= fx_flagged
+          and not ({"some_flow", "ok_flow"} & fx_flagged)
+          and any("alias" in p for p in fx_stray) and any("one branch lacks" in p for p in fx_runner_problems)
+          and len(fx_stray) == 3 and fx_guard == {"ok_flow"}
+          and "dead_prompt" not in fx_reachable and {"main", "architect_resolution", "twin_text", "architect_prompt", "run_codex", "agent_prompt_common", "ok_flow", "ensure_roadmap_plan"} <= fx_reachable,
+          f"producers={sorted(fx_producers)} referrers={sorted(fx_referrers)} flagged={sorted(fx_flagged)} stray={fx_stray} guard={sorted(fx_guard)} runner={fx_runner_problems[:6]}")
     # Autopilot constants are read once here (module import only; no repository needed) and reused by F2 and F4.
     ap_tmp = bench.tmp("autopilot")
     ap_env = bench.env(ap_tmp)
@@ -1152,7 +1277,7 @@ def main():
         prov_ok = not problems and set(listed) == set(TRANSFERRED)
         prov_detail = f"listed={sorted(listed)} problems={problems}"
     check("f1_web_transfer_provenance_2_lists_the_four_files_with_blob_oids_at_" + FROZEN_BASE[:8], prov_ok, prov_detail)
-    check("f1_tracked_paths_unique_case_insensitively", not case_dupes, f"collisions={case_dupes[:6]}")
+    check("f1_tracked_paths_unique_case_insensitively", not case_dupes, f"collisions(case/NFC)={case_dupes[:6]}")
     symlinks = sorted(rel for rel, (mode, oid) in tracked_entries.items() if mode == "120000")
     base_symlinks = sorted(rel for rel, (mode, oid) in ls_tree(subject, probe_env, FROZEN_BASE, ".").items() if mode == "120000")
     check("f1_no_symlink_entries_at_head", not symlinks and not base_symlinks, f"symlinks={symlinks} base={base_symlinks}")
@@ -1618,6 +1743,9 @@ def main():
         r = run([mut / VERIFY_CLI, "platform-prepare", sha((mut / SPEC).read_bytes()), "h-035", mut_register_sha, mut_tmp / "snap"], scratch, mut_env)
         check("f3_platform_prepare_refuses_mutated_plan_generation_in_replica", json_refusal(r) == "DOCUMENT_GENERATION",
               (r.stdout + r.stderr)[-300:])
+        hmut_tmp = bench.tmp("handoff-mutated-cli")
+        r = run([hmut / VERIFY_CLI, "platform-prepare", sha((hmut / SPEC).read_bytes()), "h-035", sha((hmut / REGISTER).read_bytes()), hmut_tmp / "snap"], scratch, hmut_env)
+        check("f3_platform_prepare_refuses_mutated_handoff_in_replica", json_refusal(r) == "DOCUMENT_GENERATION", (r.stdout + r.stderr)[-300:])
         snap_plan = psnap / PLAN_GEN
         if accept_ok and snap_plan.is_file():
             original = snap_plan.read_bytes()
@@ -1632,6 +1760,7 @@ def main():
     else:
         for label in ("f4_ensure_roadmap_plan_stops_on_mutated_plan_generation", "f4_ensure_roadmap_plan_stops_on_missing_handoff",
                       "f4_ensure_roadmap_plan_stops_on_mutated_handoff", "f3_platform_prepare_refuses_mutated_plan_generation_in_replica",
+                      "f3_platform_prepare_refuses_mutated_handoff_in_replica",
                       "f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare"):
             check(label, False, "positive not established (plan generation missing or unbound)")
     # --- no commit-SHA plan authority anywhere in the autopilot (full text incl. comments/docstrings, and AST strings)
@@ -1676,12 +1805,15 @@ def main():
         "HOME": str(prompts_root / "home"), "XDG_CONFIG_HOME": str(prompts_root / "xdg"), "GIT_DIR": str(prompts_root / "gitdir"),
         "http_proxy": "http://127.0.0.1:9", "https_proxy": "http://127.0.0.1:9", "HTTP_PROXY": "http://127.0.0.1:9",
         "HTTPS_PROXY": "http://127.0.0.1:9", "ALL_PROXY": "http://127.0.0.1:9", "no_proxy": "", "NO_PROXY": ""})
-    before_fixture, before_subject = snapshot_tree(prompts_root), snapshot_tree(subject)
+    before_fixture, before_subject = snapshot_tree(prompts_root), snapshot_tree(subject, skip_git=True)
+    before_names = snapshot_names("/private/tmp", "/private/tmp/claude", str(Path(tempfile.gettempdir())))
     module_alias = "m" + hashlib.sha256(os.urandom(16)).hexdigest()[:12]
     r = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "prompts", module_alias], prompts_root / "cwd", prompts_env, timeout=300)
-    after_fixture, after_subject = snapshot_tree(prompts_root), snapshot_tree(subject)
+    after_fixture, after_subject = snapshot_tree(prompts_root), snapshot_tree(subject, skip_git=True)
+    after_names = snapshot_names("/private/tmp", "/private/tmp/claude", str(Path(tempfile.gettempdir())))
     side_effects = sorted(set(after_fixture.items()) ^ set(before_fixture.items())) + \
-        sorted("subject:" + k for k in set(after_subject.items()) ^ set(before_subject.items()) for k in [k[0]])
+        sorted("subject:" + k for k in set(after_subject.items()) ^ set(before_subject.items()) for k in [k[0]]) + \
+        sorted(f"{d}:{n}" for d in before_names for n in set(after_names[d] or []) ^ set(before_names[d] or []) if not str(n).startswith("platform-separation-final-"))
     produced = driver_outcome(r)
     produced = produced if produced and produced["outcome"] == "returned" and type(produced.get("texts")) is dict else {}
     texts, perrors, pbuilders = produced.get("texts", {}), produced.get("errors", {}), produced.get("builders", [])
@@ -1689,10 +1821,12 @@ def main():
     check("f4_prompt_builders_run_in_contained_fixture_without_side_effects",
           bool(produced) and not side_effects, f"side_effects={side_effects[:8]} produced={bool(produced)}")
     try:
-        producers, referrers, runner_problems, reachable = prompt_world(autopilot_source)
+        producers, referrers, runner_problems, reachable, stray, guard_callers = prompt_world(autopilot_source)
     except SyntaxError as exc:
-        producers, referrers, runner_problems, reachable = set(), set(), [f"autopilot does not parse: {exc!r}"], set()
+        producers, referrers, runner_problems, reachable, stray, guard_callers = set(), set(), [f"autopilot does not parse: {exc!r}"], set(), [], set()
     problems = []
+    problems += [f"stray prompt material: {s}" for s in stray]
+    problems += [f"dynamic stray prompt material: {s}" for s in produced.get("stray", [])]
     if set(pbuilders) != set(EXPECTED_PROMPT_BUILDERS):
         problems.append(f"builder set differs: extra={sorted(set(pbuilders) - EXPECTED_PROMPT_BUILDERS)} missing={sorted(EXPECTED_PROMPT_BUILDERS - set(pbuilders))}")
     if set(pflows) != set(EXPECTED_PROMPT_FLOWS):
@@ -1703,6 +1837,55 @@ def main():
     problems += [f"prompt builder unreachable from main(): {n}" for n in sorted(EXPECTED_PROMPT_BUILDERS - reachable)]
     check("f4_prompt_builders_flows_and_callers_are_the_closed_expected_sets_every_runner_prompt_sourced_and_every_builder_live",
           not problems and bool(produced), f"problems={problems}"[-1100:])
+    # v3.3 (review v7 B2): the plan guard is CALLED by exactly the expected flows/commands, all reachable from main().
+    problems = []
+    if guard_callers != set(EXPECTED_PLAN_GUARD_CALLERS):
+        problems.append(f"guard callers differ: extra={sorted(guard_callers - EXPECTED_PLAN_GUARD_CALLERS)} missing={sorted(EXPECTED_PLAN_GUARD_CALLERS - guard_callers)}")
+    problems += [f"guard caller unreachable from main(): {n}" for n in sorted(EXPECTED_PLAN_GUARD_CALLERS - reachable)]
+    check("f4_ensure_roadmap_plan_called_from_exactly_the_expected_guard_callers_all_reachable_from_main", not problems and bool(autopilot_source),
+          str(problems)[:600])
+    # v3.3 (review v7 B1/B2 dynamic): the real flows run against replicas with the runner STUBBED (captures the prompt, aborts):
+    # on the intact replica every flow reaches the runner with a prompt naming plan+handoff and free of old pointers;
+    # on a replica with a mutated plan every flow stops before any runner call.
+    live, live_env = replica(bench, "live-flows", subject, head)
+    git(live, live_env, "update-ref", "refs/remotes/origin/main", head)
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, live, "live_flows"], ap_tmp, ap_env, timeout=600)
+    live_out = driver_outcome(r)
+    live_flows = live_out.get("flows", {}) if live_out and live_out["outcome"] == "returned" else {}
+    problems = []
+    if not live_flows:
+        problems.append("live driver unavailable: " + (r.stdout + r.stderr)[-200:])
+    for flow in LIVE_FLOWS:
+        res = live_flows.get(flow)
+        if not res:
+            problems.append(f"{flow}: not run")
+        elif res.get("outcome") != "captured":
+            problems.append(f"{flow}: runner not reached ({res.get('outcome')}: {str(res.get('message', ''))[:120]})")
+        else:
+            p = res.get("prompt", "")
+            if PLAN_GEN not in p or HANDOFF_GEN not in p:
+                problems.append(f"{flow}: live prompt lacks plan/handoff")
+            problems += [f"{flow}: live prompt carries {pat}" for pat, l, x in scan(p, OLD_PLAN_TOKENS + COMMIT_READ_TOKENS + CODE_WEB_TOKENS + CODE_HUMAN_TOKENS)[:2]]
+    check("f4_live_flows_reach_the_stubbed_runner_with_a_prompt_naming_plan_and_handoff_free_of_old_pointers", not problems,
+          f"problems={problems}"[-1100:])
+    livemut, livemut_env = replica(bench, "live-flows-mutated", subject, head)
+    if PLAN_GEN in tracked and (livemut / PLAN_GEN).is_file():
+        overlay(livemut, livemut_env, {PLAN_GEN: ((livemut / PLAN_GEN).read_bytes() + b"\n<!-- LOCAL mutation -->\n", 0o644)},
+                message="LOCAL fixture: mutated plan for live flows")
+    git(livemut, livemut_env, "update-ref", "refs/remotes/origin/main", git(livemut, livemut_env, "rev-parse", "HEAD"))
+    r = run([PYTHON, "-B", "-c", DRIVER, subject, livemut, "live_flows"], ap_tmp, ap_env, timeout=600)
+    live_out = driver_outcome(r)
+    mut_flows = live_out.get("flows", {}) if live_out and live_out["outcome"] == "returned" else {}
+    problems = [] if mut_flows else ["live driver unavailable: " + (r.stdout + r.stderr)[-200:]]
+    if PLAN_GEN not in tracked:
+        problems.append("plan generation missing (positive not established)")
+    for flow in LIVE_GUARDED_FLOWS:
+        res = mut_flows.get(flow)
+        if not res:
+            problems.append(f"{flow}: not run")
+        elif res.get("outcome") != "stop" or res.get("captured"):
+            problems.append(f"{flow}: did not stop before the runner ({res.get('outcome')}, captured={res.get('captured')})")
+    check("f4_live_flows_stop_before_the_stubbed_runner_on_mutated_plan_generation", not problems, f"problems={problems}"[-1100:])
     problems = []
     if not produced:
         problems.append("prompt driver unavailable: " + (r.stdout + r.stderr)[-200:])
@@ -1786,8 +1969,8 @@ def main():
             if code in table_rows and (table_rows[code][1], table_rows[code][2]) != (s_task, s_gate):
                 problems.append(f"{code}: selftest exact ({s_task},{s_gate}) != table")
     check("f4_plan_generation_slice_table_equals_autopilot_roadmap_tuples_and_selftest_exact_sets", not problems, str(problems)[:1100])
-    boot = "".join(text(PLAN_GEN)[s:e] for h, s, e in sections(text(PLAN_GEN)) if re.search(r"(?i)bootstrap", h)) \
-        if PLAN_GEN in tracked and (subject / PLAN_GEN).is_file() else ""
+    plan_visible_for_boot = visible_markdown(text(PLAN_GEN)) if PLAN_GEN in tracked and (subject / PLAN_GEN).is_file() else ""
+    boot = "".join(plan_visible_for_boot[s:e] for h, s, e in sections(plan_visible_for_boot) if re.search(r"(?i)bootstrap", h))
     missing_ids = [f"h-0{n}" for n in range(31, 40) if not re.search(rf"\bh-0{n}\b", boot)]
     check("f4_plan_generation_bootstrap_section_names_h031_to_h039_as_platform_establishment", bool(boot) and not missing_ids,
           f"section_len={len(boot)} missing={missing_ids}")
@@ -1986,6 +2169,8 @@ def main():
               "old_plan_commit": OLD_PLAN_COMMIT, "old_plan_blobs": OLD_PLAN_BLOBS,
               "produced_prompts": sorted(texts), "produced_prompt_documents": sorted(produced_docs),
               "prompt_builders": sorted(pbuilders), "prompt_flows": sorted(pflows), "prompt_side_effects": side_effects,
+              "plan_guard_callers": sorted(guard_callers), "live_flows": {k: {kk: (vv if kk != "prompt" else len(vv)) for kk, vv in v.items()} for k, v in live_flows.items()},
+              "live_flows_mutated": mut_flows,
               "case_collisions": case_dupes,
               "subject_sha256": subject_sha, "held_sha256": held, "held_gate_runs": gate_runs,
               "closure_roots": sorted(roots), "closure_reached": sorted(reached), "closure_scanned": scanned,
