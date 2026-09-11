@@ -1660,5 +1660,91 @@ levande prompt i praktiken medan grinden var grön.
 | **Riggdisciplin (eget fynd)** | En mutant kunde göra grinden ODÖMBAR (exit 2) genom att bryta `subprocess.Popen` globalt så att ett av produktens egna hjälpskript hängde. `run()`/`run_bytes()` behandlar nu timeout som ett PRODUKTutfall (rc 124 + `PLATFORM_SEPARATION_TIMEOUT`-markör i stdout), och ett oväntat undantag **efter** att grinden börjat döma ger den nya sista raden `f10_gate_reached_its_last_row_without_an_unexpected_failure` som RÖD med exit 1 i stället för exit 2. Ett fel **före** första raden (saknat verktyg, oanvändbart subjekt) är fortfarande ett riggfel. Radantalet är därför 119, inte 118 |
 | **Dokumentfynd (eget)** | Granskningens N1/N2 ("uteblivna rättelser") berodde inte på att ändringarna var ogjorda utan på att **v3.8:s dokumentpatch avbröts på ett ankarfel innan filen skrevs** — sju redan utförda ändringar gick därmed förlorade tillsammans med den felande. Alla sju är nu utförda, och patchskripten skriver numera filen även när ett enskilt ankare missas |
 
+### Test-author 2026-09-11 — baslinje RED för v3.9 (före produkt)
+Subjekt: omklonad replika av `320c9df7` + grind v3.9 + utvecklingsdokument, **en** commit (fixtur-HEAD `18ea2f69`).
+Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **72 PASS / 47 FAIL** av **119 rader**. Fullkörning (bypass, egen
+`TMPDIR`, `/bin/ps`-kontroll före): exit **1**, `RED_LOCAL_QUALIFICATION`, **77 PASS / 42 FAIL**, result.json sha256
+`e120a99e2cc1753e4718aab65d91698cae7af91303b8267ee984ec1ee1690db0`. Delta statisk→full är exakt de fem sandboxraderna.
+
+**Radantalet är 119, inte 118**, därför att `f10_gate_reached_its_last_row_without_an_unexpected_failure` tillkommit
+(riggdisciplinen nedan). **Den enda TILLKOMNA röda produktraden jämfört med v3.8 är**
+`f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects`, och den är röd **av
+rätt skäl**: på `320c9df7` finns den gamla planen, och autopilotens egna `git`-starter under flödena bär
+`docs/loop/autonomous-loop-plan-v1.md` i sin argv. Den nya skanningen av argv ∪ stdin ∪ barnets miljö ser det, och
+rapporterar `a started process carries an old-plan pointer: git:autonomous-loop-plan-v1\.md,docs/loop/autonomous-loop-plan-v1\b`.
+Det är precis den effekt ordern kräver att grinden mäter, och baslinjen ska därför vara röd där. Ingen rad försvann
+(`comm` mot v3.8:s FAIL-mängd: noll borttagna, exakt en tillagd).
+
+### Referenskonstruktion v3.9 (scratch, förkastad — bevisar satisfierbarhet)
+Oförändrad produkt jämfört med v3.5–v3.8: **ingen produktändring krävdes**. Fixtur-HEAD `4c64024d`, 143 filer.
+Fullkörning (bypass, egen `TMPDIR`, `/bin/ps`-kontroll före): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**119/119**, result.json sha256 `9ba9fd4a5de1621034446f12a426a4e93a5965973b57a257a701a7a87a0fe8fc`.
+Live-flödenas evidens, nu med utifrån-mätningen bredvid in-process-mätningen:
+
+```text
+live_stub_call_total    = 333      (PATH-stubbarnas egna loggar, utanför produktens interpreter)
+live_popen_total        = 333      live_child_total = 333      live_init_total = 333
+live_provider_starts    = 0        live_identity_violations = []   live_init_unrecorded = []
+live_child_unrecorded   = []       live_child_argv_rewritten = []  live_import_time_starts = 0
+live_old_pointer_starts = []       live_stdin_starts = []
+live_start_binaries     = ['git']  live_child_binaries = ['git']   live_start_primitives = ['subprocess.Popen']
+live_allowed_tools      = ['git']  live_allowed_wrappers = ['env','python3.12','sh']
+live_allowed_wrapper_forms   = [['env','true'], ['python3.12','-c','print(1)']]
+live_allowed_start_sha256    = [env, git, node, python3.12, sh, stub:env, stub:git, stub:node, stub:python3.12, stub:sh]
+live_popen_identity = live_popen_identity_after = True      live_side_effects = []
+live_mutated_popen_total = 59      (den muterade körningen, separat serialiserad)
+```
+
+De fyra räknarna `stub_calls`, `popen_total`, `child_total` och `init_total` är alla 333 och mäts på fyra oberoende
+nivåer: utanför processen (stubbarna), på modulattributet, på klassens `__init__` och på `Popen._execute_child`.
+
+### Vad utifrån-mätningen STÄNGER — och vad som kvarstår
+**Stänger** (mätt: var och en var en grön mutant under v3.8):
+- En produkt som återtar stdlib-originalen ur grindens egen namnrymd (`import __main__`) och startar en process med
+  inspelaren tillfälligt avmonterad. Stubbloggen ser starten oavsett vad som händer inuti processen.
+- En nyttolast som inte ligger i argv: ett skal som får hela kommandot på **stdin**. Stubben loggar stdin-innehållet.
+- En providerstart genom en tillåten tolk med kort, markörfri argv (`sh -c 'exec "$0" "$@"'`, `env A=1 …`,
+  `python3.12 -c '<enradare>'`).
+- En binär vars **basnamn** är `git` men vars innehåll inte är gits: realpath + sha256 avgör, inte namnet.
+- Den gamla planens sökväg som når en barnprocess — i argv, på stdin eller i barnets miljö.
+
+**Kvarstår deklarerat** (ingen av dem låter den gamla planen styra i praktiken):
+- Processtarter som inte löser sin binär genom `PATH` **och** inte går genom någon instrumenterad primitiv
+  (`ctypes`→libc, `multiprocessing`/fork). Stubbarna ser bara PATH-uppslagningar; de instrumenterade primitiverna ser
+  resten. En start som undviker båda bär ingen prompt och kan därför inte återinföra planen.
+- Provideranrop som inte startar en process alls (öppet handtag, nät-API).
+- Stdin-innehåll som skrivs direkt på en pipe utan `communicate` till en start som **inte** går via PATH — regeln
+  "stdin satt på ett omslag är rött" fäller formen, men innehållet loggas då inte.
+- Annan kod under `controller/**` som autopiloten inte importerar vid start, och miljövariabler som launchern läser.
+- Planens semantik bortom token och skivtabell (granskning nr 13 N8, bekräftad).
+- Benchens fingeravtryck (stubbnamnen, `NEEDS_REMEDIATION`-mönstret) och de slutna namn-, binär- och formmängderna,
+  som gör legitim omstrukturering röd per design.
+
+### F9 v3.9 — negativer (var och en i egen replika av v3.9-referensen, statiskt `--skip-held-gates`; **101 körda,
+101 fångade, 0 riggfel**) + **fem** falskt-röda prov som förblir gröna
+De 91 från v3–v3.8 fångas på samma rader (flera faller nu dessutom på den skärpta live-raden), och granskning nr 13:s
+sju mutanter plus tre statiska sondprov är nya:
+
+| Negativ (granskning nr 13) | Fälls av |
+|---|---|
+| `a13_driver_ns_recovery` (B1, ordagrant återbyggd) | modul-/klassformraden med tre anmärkningar: `line 241: explicit __setattr__ call _t.__setattr__`, samma på r.245, och `autopilot@237 reaches the gate's namespace: import\s+__main__` — plus att angreppet inte längre kan lyckas: `__main__` bär inga original |
+| `b_stdin_old_plan_prompt` (B2, den avgörande) | live-raden: `a started process carries an old-plan pointer: sh:autonomous-loop-plan-v1\.md,docs/loop/autonomous-loop-plan-v1\b` — den gamla planen på ett barns stdin är nu RÖD — plus `provider processes started outside the stubbed runner: 38` och slutna-världen-raden (`extra=['_stdin_prompt']`) |
+| `a13_wrapper_stdin` | live-raden: `unmatched provider prompt: sh:/bin/sh` (stdin till ett omslag är rött villkorslöst) |
+| `a13_wrapper_short_argv` | live-raden: `unmatched provider prompt: sh:x` (argv är inte en av de mätta formerna) |
+| `a13_wrapper_env_short` | live-raden: `unmatched provider prompt: env:x` |
+| `a13_wrapper_python_short` | live-raden: `unmatched provider prompt: python3.12:x` |
+| `b_tool_named_git_real` | live-raden: `processes started from unmeasured binaries: [...]` — realpath + sha256 skiljer skriptet från gits binär trots basnamnet |
+| `s1_list_unpack_alias` | `module-level assignment to [_S1]` + `assignment onto exec alias _S1.foo` |
+| `s2_comprehension_alias` | `module-level binding of subprocess.Popen` + `assignment onto exec alias _S2.foo` |
+| `s5_indirect_setattr` | `setattr with a computed attribute name on _S5` + `f4_autopilot_publication_callers_exit0` (timeout som produktutfall, rc 124) |
+
+Falskt-röda prov som **förblir gröna** (114/5 = enbart de fem sandboxraderna): `a10_legit_module_copy`,
+`a11_legit_env_snapshot` (`/usr/bin/env true`), `a11_legit_python_snapshot` (`python3.12 -c 'print(1)'`),
+`a12_legit_local_p_dict` och `a12_legit_result_attr`.
+
+**Fixturnot:** `a11_side_subject_git` skriver i sitt eget subjekts `.git/`. Mutanten måste därför köras på en ren
+replika — en andra körning i samma katalog ser markören redan i före-ögonblicksbilden och blir grön av rigg-skäl, inte
+av produktskäl. Mätt och verifierat: på ren replika faller den på sidoeffektsvepet.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
