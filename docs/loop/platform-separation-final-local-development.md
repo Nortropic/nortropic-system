@@ -1278,5 +1278,48 @@ runner-maskineriets AST och de fyra beroendeblobbarna identiska med 320c9df7.
 63 fångade, 0 riggfel)
 De 55 från v3–v3.4 fångas på samma rader (B1-varianterna från v8 dessutom på live-raden). Granskarens nr 9: (a9_popen_shadow) `subprocess.Popen` skuggad på autopilotens modulnivå → modulnivåformen (attributmål + exec-ytsbindning), argv-platsraden och live-providerraden (Popen-identiteten); (a9_core_import_shadow) samma skuggning i `controller/authority/core.py` → modulnivåraden (dynamisk Popen-identitet efter import), beroendeblobraden och live-providerraden; (a9_launcher_rewrite) `controller/launch/cli` skriver om provider-argv → beroendeblobraden (F7:s launch-cwd ger fortfarande identisk 19/20, därför blobbindningen); (a9_env_plan_path2) andra, miljöstyrd tilldelning av plan-/handoffsökväg → plankonstantraden; (a9_sub_into_roadmap) `SUBSTITUTION_ROADMAP=()` med skivorna först i `ROADMAP` → plankonstantraden + selftestraden; (a9_policy_item_assign) `AUTOPILOT_ROLE_POLICY["BUILDER"]=…` efter literalen → modulnivåformen (subscriptmål); (a9_remediation_no_plan) remedierings-BUILDER-prompten slutar namnge planen → live-raden (remedieringsgrenen körs nu); (a9_flow_side_effect) hjälpare i `roadmap_contract_flow` skriver `/private/tmp/claude/v35-flow-marker` → live-sidoeffektraden. Alla 63 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade.
 
+### Oberoende kontraktsgranskning nr 10 (på 61426e1c) → v3.6
+`GATE_REVIEW_RESULT=NOT_READY` med en blockerare: B1 — providergränsen var bunden vid MODULNIVÅ och vid IMPORTÖGONBLICKET,
+inte i funktions- och klasskroppar (`a10_func_popen_shadow`: tre rader i `journal()` som byter ut `subprocess.Popen` var
+111/116 grön medan providern i drift fick neutral text och grindens egen inspelare avinstallerades; `a10_class_body_exec`:
+klasskropp som ändrar `AUTOPILOT_ROLE_POLICY` vid import). Remediering v3.6 (grind sha256 `8a26e60f417784254122d656cf20ce46c73934a1051938178368ba387665a223`, 2758 rader,
+117 rader i körning; commit `7e0eb95a`):
+
+| Fynd | Åtgärd i grinden (rad i v3.6) |
+|---|---|
+| B1 hela filen | `exec_surface_assignments` (r.989–1050): attributmål i exec-ytan/exec-modul, `sys.modules`/`globals()`-skrivning, subscript på modulnivånamn, `setattr` — var som helst i filen; vitlista `sys.dont_write_bytecode` (r.265) |
+| B1 klasskroppar | `check_class` i `module_level_form` (r.1053–1063) |
+| B1 identitet efter flödena | `popen_identity_after` i DRIVERn (r.602–606) + kravet i live-providerraden (r.2384) |
+| B1 flera primitiver/markörer | `EXEC_PRIMITIVES` (r.280–281), `PROVIDER_SHAPE_ELEMENTS`/`_BINARY_TOKENS` (r.275–276), `ALLOWED_LIVE_BINARIES`/`ALLOWED_LIVE_PRIMITIVES` fail-closed mot mätningen (r.277–278) |
+| B1(b)/N8 sju konstanter | `RUNTIME_CONSTANT_KEYS` + `literal_dict_with_path_keys` (r.303–306, 1129) |
+| N1 andra startprimitiver | `os.posix_spawn/execv*/spawnv*/system` instrumenterade och identitetsmätta (r.280–281) |
+| N3 AUTHORITY_LIB | AST-identitet + `core_module_file` under `controller/authority/` (r.269–270) |
+| N4 remedieringens identitet | `LIVE_REMEDIATION_FLOWS`/`LIVE_FINDING_ID` (r.336–339) |
+| N5 vakt mot kopia | `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together` (r.2150–2166) |
+| N6 falskt rött | modulnivåns värderegel begränsad till exec-modulattribut (verifierat: `X = Y.copy()` grön) |
+| N7 härledd sökväg | modulnivåkonstant får inte sätta ihop en `docs/…`-sökväg av fragment (r.1083–1087) |
+| p.8-kostnad | de fyra blobpinnarnas falskt-rött-kostnad (h-035–h-038-refreeze) inskriven i "Inte rörs" |
+
+### Test-author 2026-09-11 — baslinje RED för v3.6 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.6 + dokument (fixtur-HEAD `3d554938`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **76 PASS / 41 FAIL**
+(117 rader), result.json sha256 `a3fcb2cebe1fdfb366aff9a85a964bbe0d253ea36824455705f09bfe225079bb`. Röda: v3.5:s 39 plus `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy…`
+(inget positivt ankare utan plangeneration) — alla av rätt skäl; de övriga nya raderna är gröna på 320c9df7 (baslinjen är
+deras definition). F7 oförändrat: control-set 68/68 (`54f190c7…`), launch-cwd 19/20 med exakt två extra grindar (`947f8ebe…`),
+governance 68/70 exakt {g6, g7} (`b57072ac…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.6 (scratch, förkastad)
+Oförändrad produkt jämfört med v3.5 (ingen produktändring krävdes — granskningen mätte satisfierbarheten i förväg).
+Fixtur-HEAD `291e1941`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**117/117**, result.json sha256 `575ee34c119ac1abf19ef4ecd90a6dbc4402b00ba2045aaafa1bdb4ad5aa64ee`; control-set 68/68 (`5faf485e…`), launch-cwd 19/20 (`e277b1fb…`),
+governance 68/70 exakt {g6, g7} (`4dca90b7…`), loopsvit 53 ok / 0 FEL; live-flöden 10 till slut med fångstprofilen
+1/4/4/4/4/4/4/4/7/37, startprimitiver subprocess.Popen, binärer git, identitet efter flödena True, 0 providerstarter,
+0 sidoeffekter; `core`-modulen importerad ur `controller/authority/core.py`.
+
+### F9 v3.6 — negativer (var och en i egen replika av v3.6-referensen, statiskt `--skip-held-gates`; 69 körda,
+69 fångade, 0 riggfel) + ett falskt-rött-prov som förblir grönt
+De 63 från v3–v3.5 fångas på samma rader (v9:s `a9_popen_shadow`/`a9_policy_item_assign` faller nu dessutom på den
+utvidgade exec-ytsregeln). Granskarens nr 10: (a10_func_popen_shadow) `subprocess.Popen` bytt ut från `journal()`-kroppen → exec-ytsregeln över hela filen + live-providerraden (inspelaren avinstallerad, identitet efter flödena falsk); (a10_class_body_exec) klasskropp som sätter `AUTOPILOT_ROLE_POLICY['BUILDER']` vid import → klasskroppsformen/exec-ytsregeln + plankonstantraden (körtidsvärde ≠ literal); (a10_os_posix_spawn) providerstart via `os.posix_spawn` → live-providerraden (okänd primitiv och okänd binär); (a10_authority_lib_benign) `AUTHORITY_LIB` ompekad till en opinnad `core.py` → modulnivåraden (AST-identitet + importerad core-fil); (a10_guard_copy_in_docs) vakten jämför mot spårad kopia → den nya kopieringsmutationsraden; (a10_indirect_plan_constant) `PLAN_DOC = "docs/loop/" + "…"` → modulnivåraden (hopsatt dokumentsökväg). Falskt-rött-provet (a10_legit_module_copy, `ROLE_POLICY_VIEW = AUTOPILOT_ROLE_POLICY.copy()`) förblir GRÖNT (112/5 = enbart sandboxraderna). Alla 69 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
