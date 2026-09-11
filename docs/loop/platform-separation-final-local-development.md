@@ -1081,5 +1081,40 @@ före runnern.
 De 36 från v3–v3.2 fångas på samma rader (planändrande mutanter dessutom på `f4_live_flows_reach_…` eftersom pinnarna inte
 ompinnades). Granskarens nr 7: (a_globals_twin) byggaren via `globals()`, död `assert` → slutna-världen-raden (anrop till icke-byggare som rot); (a_param_passthrough) genomsläppt parameter + neutral text → slutna-världen-raden (`IfExp` med rotlös gren, parameter som rot); (a_module_template) modulnivåmall med markör → slutna-världen-raden (stray + modulnamn som textkälla) + `f4_live_flows_reach_…` (levande prompt utan plan); (a_class_twin) klassmetod via modulinstans → slutna-världen-raden (stray, metodanrop) + live-raden; (a_runner_alias) `_rc = run_codex` → slutna-världen-raden (alias på modulnivå) + live-raden; (a_unwired_ensure) tre vaktanrop borttagna → vaktanroparraden + `f4_live_flows_stop_before_…` (flödena når runnern med muterad plan); (a_refname_read) `git show refs/preserved/…:` i arkitektskillen → skillens dokumentrad + trädvid + skillraden (N1); (a_second_table_7col) 7-kolumns läsvy → skivtabellraden (N3); (a_boot_comment) id:n i HTML-kommentar → bootstrapraden (N2); (a_nfd_twin, äkta tvilling med `core.precomposeunicode=false`) → `f1_tracked_paths_unique_…`, exit 1 (N4; den kollapsade enkelposten utan arbetsträdsfil ger riggfel av rätt skäl); (a_cli_skip_handoff) → `f3_platform_prepare_refuses_mutated_handoff_…` (N5); (a_side_abs) skrivning till /private/tmp/claude → sidoeffektraden (N6). Alla 48 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade. Not: 47 negativer kördes mot grinden före den sista quotePath-justeringen (enbart okvoterade icke-ASCII-sökvägar i Git-anrop; ingen ASCII-rad påverkas), a_nfd_twin mot den slutliga.
 
+### Oberoende kontraktsgranskning nr 8 (på 6c984b82) → v3.4
+`GATE_REVIEW_RESULT=NOT_READY`: B1 (effektbindningen slutade vid stubbgränsen och första runner-anropet; `classify` släppte
+omskrivning efter roten och runner via `globals()`), B2 (`run_codex` obunden — prompt ur fil) + N1–N12. Remediering v3.4
+(grind sha256 `0096bd03d1798dd6cd02ef57748a5283b06a1088a748a1b035ad8a3df39d14e3`, 2347 rader, 111 rader i körning; commit `81f39036`):
+
+| Fynd | Åtgärd i grinden (rad i v3.4) |
+|---|---|
+| B1 statiskt | `PROMPT_TEXT_METHODS` = trimningar utan argument (r.237); `BinOp` bara `Add`, två rötter förbjudna (r.832); metodanrop med argument RÖTT (r.851); dynamiska uppslag utanför `DYNAMIC_LOOKUP_FUNCTIONS` och runnernamn i strängkonstanter utanför `selftest` (r.793–799, modulsvep r.765); kanari med rewrite/mult/lookup/trim (r.1331) |
+| B1 dynamiskt | DRIVER `live_flows` med syntetisk READY-`AgentRun`, tillståndsstyrda `run_gate`/`run_empirical_gate`, `LIVE_STUB_NAMES`/`LIVE_REQUIRED_ATTRS` (r.265–270, DRIVER r.442–500); tio flöden, `LIVE_MIN_CAPTURES`, `LIVE_PLAN_ROLES` (r.273–286); raden `f4_live_flows_run_to_completion_…` (r.1986) |
+| B2 mätpunkten | `RUNNER_MACHINERY_AST_SHA256` (r.247–254), `ast_identities` (r.878) → `f4_runner_machinery_ast_identical_to_320c9df7_…` (r.2012) |
+| N sidoeffekt-prefix | `snapshot_names` med (storlek, mtime) för filer, `SIDE_EFFECT_DIRS` inkl. `/private/tmp/claude-501` och tempkatalogens förälder, undantag exakt `scratch.name` (r.1061, 1917) |
+| N handoff-substans | `HANDOFF_REQUIRED_SECTIONS` (r.256) → `f4_handoff_has_required_sections_…` (r.2131) |
+| N ROADMAP-ordning | radordning == autopilotens, `ROADMAP[0]==S2`, topologisk konsistens (r.2087–2098) |
+| N1/N5/N6/N8–N12 | dokumenterade som gränser (andra providersamtal efter första anropet, byggarargument, fingeravtryck, döda grenar i läskommandon, rigiditet, FIXTURE_ROOT) |
+
+### Test-author 2026-09-11 — baslinje RED för v3.4 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.4 + dokument (fixtur-HEAD `9431a733`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **73 PASS / 38 FAIL**
+(111 rader), result.json sha256 `c1cbeff0889538b4fdef646f6db51ad87b1ff95f03e6e8ed502a824c2714c7b5`. Röda: v3.3:s 37 plus (v3.4) handoff-avsnittsraden (ingen ny handoff); de
+två live-raderna kvarstår röda av rätt skäl (BUILDER-/TEST_AUTHOR-prompterna i alla tio flöden bär den gamla plancommiten och
+saknar plan/handoff; utan ny plan stoppar de vaktbärande flödena inte); gröna nya: `f4_runner_machinery_ast_…` (320c9df7 är
+baslinjen) och slutna-världen-raden. F7 oförändrat: control-set 68/68 (`b61a5318…`), launch-cwd 19/20 med exakt två extra
+grindar (`0007a474…`), governance 68/70 exakt {g6, g7} (`d97442dd…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.4 (scratch, förkastad)
+Som v3.3 plus handoffavsnitten Syfte/Låsta värden (pinnar)/Stoppregler/Startordning/Avslutskriterier (ingen autopilotändring).
+Fixtur-HEAD `c74f9d14`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`,
+**111/111**, result.json sha256 `0fb237d9d07b2161eb011eb62d2e4f5a2ef717f1cf8f574d03fd708c13f7e19f`; control-set 68/68 (`29b3d358…`), launch-cwd 19/20 (`e709d43a…`),
+governance 68/70 exakt {g6, g7} (`072a16b8…`), loopsvit 53 ok / 0 FEL; live-flöden: 10 flöden till slut, 49 fångade
+prompter (full_roadmap 33), muterad replika 4 stopp; runner-maskineriets AST identisk med 320c9df7.
+
+### F9 v3.4 — negativer (var och en i egen replika av v3.4-referensen, statiskt `--skip-held-gates`; 55 körda,
+55 fångade, 0 riggfel)
+De 48 från v3–v3.3 fångas på samma rader (v3.3:s B1-varianter dessutom på den nya live-raden). Granskarens nr 8: (a_replace_rewrite_builder) `.replace` efter byggarroten i `builder_flow` → slutna-världen-raden (metodanrop med argument) + live-raden (levande BUILDER-prompt pekar på gamla planen); (a_replace_self_builder) `x.replace(x, extra)` → slutna-världen + live; (a_mult_zero_builder) `* 0 + extra` → slutna-världen (operator Mult) + live; (a_globals_runner_builder) runner via `globals()["run_codex_"+…]` → slutna-världen (dynamiskt uppslag + runnernamn i sträng) + live; (a_prompt_file_runner) runnern läser prompten ur `wt/.architect-prompt` → `f4_runner_machinery_ast_identical_to_320c9df7_…`; (a_side_prefix_exempt) skrivning till `/private/tmp/claude-501/platform-separation-final-…` → sidoeffektraden (exakt FIXTURE_ROOT-namn undantaget; `/private/tmp/claude-501` ingår); (a_side_abs) omkörd efter att den kvarlämnade v3.3-markören tagits bort → sidoeffektraden (överskriven fil mäts via mtime); (a_roadmap_reorder) S4 före S2 i ROADMAP + selftestordning → skivtabellraden (ordning ≠ autopilot, ROADMAP[0] ≠ S2); (a_handoff_empty) handoff = en rubrik → handoff-avsnittsraden. Alla 55 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade. Not: de 53 första negativerna kördes mot grinden före den sista sidoeffektsvepsjusteringen (påverkar bara sidoeffektraden), a_side_abs/a_side_prefix_exempt mot den slutliga.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
