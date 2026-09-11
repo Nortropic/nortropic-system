@@ -1,7 +1,7 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3.5 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5–9; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.6 2026-09-11: plangenerationen bunden, remedierad efter kontraktsgranskningarna nr 5–10; v2.5 efter fyra tidigare granskningar) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -292,7 +292,8 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   `AUTOPILOT_ROLE_POLICY`, `SUBSTITUTION_BLOBS` och `EMPIRICAL_GATE_PATH` tilldelas EXAKT EN gång på modulnivå, av rent
   literalt material (inget `Call`/`Attribute`/`Subscript`/`IfExp` och inga namn utom de fyra sökvägskonstanter som används som
   dict-nycklar) — en andra, miljöstyrd tilldelning (`os.environ.get(…, ROADMAP_PLAN_PATH)`) är RÖD — och modulens
-  körtidsvärden är lika med literalerna; dessutom `SUBSTITUTION_ROADMAP`-koderna == `SUB-1…SUB-4`, `ROADMAP[0].code == "S2"`
+  körtidsvärden är lika med literalerna för ALLA SJU konstanterna (v3.6 B1(b)/N8: även `ROADMAP_PLAN_BLOBS`,
+  `SUBSTITUTION_BLOBS` och `AUTOPILOT_ROLE_POLICY`, vars exporterade körtidsvärden tidigare var en död mätning); dessutom `SUBSTITUTION_ROADMAP`-koderna == `SUB-1…SUB-4`, `ROADMAP[0].code == "S2"`
   och de två tuplarna är disjunkta (att tömma `SUBSTITUTION_ROADMAP` och lägga skivorna först i `ROADMAP` är RÖTT).
 - `f4_ensure_roadmap_plan_returns_in_replica_without_any_remote`: den riktiga modulens
   `ensure_roadmap_plan(repo)` (namnet behålls — h-032-exit och publication-callers är namnbundna) returnerar i en
@@ -300,6 +301,9 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
 - `f4_ensure_roadmap_plan_stops_on_mutated_plan_generation` / `…_missing_handoff` / (v3.2 N2) `…_mutated_handoff`: planen
   med en ändrad byte, en borttagen handoff respektive en handoff med en ändrad byte → `Stop` (handoffens BYTES binds i
   körtidsvakten, inte bara dess existens).
+- `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together` (v3.6, review v10 N5): planen
+  OCH varje annan spårad fil med samma blob muteras med samma bytes; vakten måste ändå `Stop`. En vakt som jämför mot en
+  spårad kopia (t.ex. under `config/`) i stället för `ROADMAP_PLAN_BLOBS` ser då ingen skillnad och faller.
 - `f3_platform_prepare_refuses_mutated_plan_generation_in_replica` / `f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare`
   (v3.2 N3 — pinnen mätt i EFFEKT): `controller/verify/cli platform-prepare` i en replika med muterad (ej ompinnad) plan
   → exakt `{"status":"refused","reason":"DOCUMENT_GENERATION"}`; (v3.3 N5) `f3_platform_prepare_refuses_mutated_handoff_in_replica`
@@ -370,17 +374,23 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   [SUB-1, S2], `empirical_gate_contract_flow`, `builder_flow[S2]` (med `slice_builder_extra`), `ensure_roadmap_slice`
   [SUB-1, S2], `test_author_flow`, `empirical_unattended_flow`, `full_roadmap`. Krav: varje flöde löper till slut
   (`returned`), antalet runner-anrop ≥ mätt minimum per flöde (v3.5: 1/4/4/4/4/4/4/4/7/37 — minima mätta MED remedierings-
-  grenarna, så en produkt som hoppar över dem faller), plan + handoff i varje fångad prompt
+  grenarna, så en produkt som hoppar över dem faller), (v3.6 N4) minst en fångad prompt per remedieringsbärande flöde bär
+  granskningsfyndets id (`FIXTURE-1`) så att remedieringspositionen bevisligen fick fynden och inte bara ännu en vanlig
+  prompt, plan + handoff i varje fångad prompt
   för rollerna ARCHITECT, TEST_AUTHOR/GATE_REVIEWER (roadmap-/empiriska flödena), BUILDER (skivvägen och den empiriska
   remedieringen) och EMPIRICAL — REVIEWER och S3-flödets (h-003) prompter undantagna — och inga gamla pekare/commit-läsning/
   kodwebb/ägarstopp i NÅGON fångad prompt (alla roller, alla anrop). (v3.5) Eftersom remedieringsgrenarna nu nås måste även
   `remediation_prompt` (BUILDER och TEST_AUTHOR) och den inlinade L-remedieringen namnge plan + handoff — annars faller raden.
 - `f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects` (v3.5, review v9 B1 dynamisk):
-  drivern spelar in VARJE `subprocess.Popen` under live-flödena (patchad både i `subprocess` och i modulens namnrymd) och
-  delegerar till originalet; eftersom runnern är stubbad får ingen providerstart alls ske — varje inspelad argv som bär
-  `--output-schema` eller `danger-full-access` är en förbigång, och dess sista argument måste dessutom vara en av de fångade
-  prompterna. Samma före/efter-sidoeffektsvep som `prompts`-scenariot omger live-körningen (N4), och `subprocess.Popen`-
-  identiteten kontrolleras efter modulimporten.
+  drivern spelar in VARJE processtart under live-flödena — `subprocess.Popen` plus `os.posix_spawn(p)`, `os.execv(e|p|pe)`,
+  `os.spawnv(e)` och `os.system` (v3.6 N1), patchade både i sina moduler och i modulens namnrymd — och delegerar till
+  originalet. Eftersom runnern är stubbad får ingen providerstart alls ske: en start är misstänkt om argv bär elementet
+  `--output-schema` eller `danger-full-access`, om binärens namn bär `codex`, om binären inte är den enda mätta
+  (`git`) eller om primitiven inte är den enda mätta (`subprocess.Popen`) — och den måste då bära en av de fångade
+  prompterna. (v3.6 B1) Identiteten mäts dessutom EFTER flödena: grindens egna inspelare måste fortfarande vara
+  installerade på alla primitiver och `m.subprocess` vara samma modulobjekt — en produkt som byter ut `subprocess.Popen`
+  från en funktionskropp avinstallerar inspelaren och faller här i stället för att se ren ut. Samma före/efter-
+  sidoeffektsvep som `prompts`-scenariot omger live-körningen (N4).
 - `f4_live_flows_stop_before_the_stubbed_runner_on_mutated_plan_generation` (v3.3, B2 dynamisk): samma körning i en
   replika med muterad plan — de fyra vaktbärande flödena (`roadmap_contract_flow` ×2, `empirical_gate_contract_flow`,
   `full_roadmap`) måste STOPPA (`Stop`) utan att runnern anropats; de övriga flödena bär ingen egen vakt.
@@ -394,15 +404,23 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   (raden nedan); autopilotens modulnivå binds per FORM; `verify/**`, `controller/loop/cli`, specen och registret binds av F6/F3.
   Allt annat under `controller/**` är deklarerad gräns (det skyddas i drift av specens `denied_write` och policygrinden, inte av
   detta kontrakt).
-- `f4_autopilot_module_level_is_the_declared_form_and_importing_it_leaves_the_exec_surface_unchanged` (v3.5, review v9 B1):
-  varje toppnivåsats i autopiloten är en `Import`/`ImportFrom`/`FunctionDef`/`ClassDef`/`AnnAssign`/`Assign` med enbart
-  `Name`-mål, modulens docstring, `__main__`-vakten sist, eller en av exakt två mätta satser (`sys.dont_write_bytecode = True`,
-  `sys.path.insert(0, str(AUTHORITY_LIB))`); varje annat mål (attribut som `subprocess.Popen = …`, subscript som
-  `AUTOPILOT_ROLE_POLICY["BUILDER"] = …`), varje bar anropssats och varje block (`if`/`for`/`with`/`try`) på modulnivå är RÖTT,
-  liksom att binda ett exec-ytsnamn (`Popen`, `run`, `call`, `check_output`, `system`, `exec*`, `posix_spawn`, `fork`, `popen`,
-  `which`, `copy`, `move` …) eller ett runnernamn till en modulnivåvariabel. DYNAMISKT: efter att drivern importerat modulen
-  måste `subprocess.Popen` vara stdlibs original och `m.subprocess` samma modulobjekt — en skuggning i autopiloten ELLER i
-  något den importerar vid start (t.ex. `controller/authority/core.py`) faller här.
+- `f4_autopilot_module_and_class_bodies_are_the_declared_form_no_exec_surface_rebinding_anywhere_and_the_pinned_authority_library`
+  (v3.5/v3.6, review v9/v10 B1): varje toppnivåsats i autopiloten är en `Import`/`ImportFrom`/`FunctionDef`/`ClassDef`/
+  `AnnAssign`/`Assign` med enbart `Name`-mål, modulens docstring, `__main__`-vakten sist, eller en av exakt två mätta satser
+  (`sys.dont_write_bytecode = True`, `sys.path.insert(0, str(AUTHORITY_LIB))`, matchade byte-exakt); varje bar anropssats och
+  varje block på modulnivå är RÖTT. (v3.6 B1) Samma satsformer krävs i KLASSKROPPAR (en `ClassDef`-kropp körs vid import;
+  baslinjens fem klasser bär bara `Pass`/`FunctionDef`/`AnnAssign`), och exec-ytsregeln gäller HELA FILEN, inte bara
+  modulnivån: ingen tilldelning någonstans — funktionskropp, klasskropp, `AugAssign`, `setattr` — får ha ett attributmål vars
+  namn ligger i exec-ytan (`Popen`, `run`, `call`, `check_output`, `system`, `exec*`, `posix_spawn`, `fork`, `popen`, `which`,
+  `copy`, `move` …) eller vars bas är en exec-modul (`subprocess`/`os`/`shutil`/`sys`/`multiprocessing`/`pty`/`posix`,
+  undantaget `sys.dont_write_bytecode`), skriva in i `sys.modules`/`globals()`/`vars()`/`locals()` eller subscript-tilldela ett
+  MODULNIVÅNAMN (så fälls `AUTOPILOT_ROLE_POLICY["BUILDER"] = …` var den än står). Tillåtet överallt: vanliga namn,
+  tuple-uppackning, `self.<attr>` utanför exec-ytan och subscript på lokala namn (mätt på 320c9df7: tio icke-Name-mål totalt,
+  alla ofarliga). (v3.6 N6) Modulnivåns VÄRDEregel träffar bara attribut på exec-moduler — ett legitimt `X = Y.copy()` är grönt.
+  (v3.6 N7) En modulnivåkonstant får inte sätta ihop en `docs/…`-sökväg av fragment. (v3.6 N3) `AUTHORITY_LIB` har
+  320c9df7:s AST-identitet och drivern rapporterar vilken fil den importerade `core`-modulen faktiskt kom från — den måste
+  ligga under `controller/authority/`. DYNAMISKT: efter modulimporten måste `subprocess.Popen`, `os.posix_spawn`,
+  `os.execv*`, `os.spawnv*` och `os.system` vara stdlibs original och `m.subprocess` samma modulobjekt.
 - `f4_runner_dependencies_authority_and_launch_byte_identical_to_320c9df7` (v3.5, review v9 B1): `controller/authority/cli`,
   `controller/authority/core.py`, `controller/launch/cli` och `controller/launch/runtime_snapshot.py` har exakt sina
   320c9df7-blobbar (`6b6bb827…`, `b17600c7…`, `ed865cf4…`, `cb9a4ab1…`) — authority-biblioteket importeras av autopiloten vid
@@ -673,7 +691,10 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    `docs/loop/owner-author-workflow-v1.md`, providermaskineriet (`run_codex`, `run_codex_resolving_architecture`,
    `_provider_snapshot`, `_python_snapshot`, `_strict_provider_authority`, rollpolicyn, `CODEX_FULL_ACCESS_MODE`),
    (v3.5) `controller/authority/cli`, `controller/authority/core.py`, `controller/launch/cli`,
-   `controller/launch/runtime_snapshot.py` — blob-bundna mot 320c9df7 —
+   `controller/launch/runtime_snapshot.py` — blob-bundna mot 320c9df7; **KOSTNAD (v3.6, granskning nr 10):** varje legitim
+   framtida ändring i dessa fyra filer gör denna grind röd — särskilt refreeze av h-035/h-036/h-037/h-038, som dokumentet
+   självt pekar ut som ett separat H-steg och som rör `controller/launch/**`. Ompinning kräver en ny kontraktsversion
+   (test-author-frys + oberoende granskning); det är en medveten rigiditet, inte en oavsiktlig bieffekt —
    autopilotens skivtuplar och `EMPIRICAL_GATE_PATH`. Refreeze av h-036/h-037/h-035/h-038/document-authority (stale
    pinnar på autopilot/AGENTS/drift) är ett separat H-steg som plangenerationens ändring bör batchas med (recon D).
 
@@ -699,10 +720,13 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   under live-flödena fångar de kända formerna; ett andra providersamtal som startar en process fångas nu av Popen-inspelningen,
   medan ett samtal via ett redan öppet handtag eller ett nät-API inte gör det); benchens miljö och den stubbade runnerns svar
   (inklusive att första svaret är NEEDS_REMEDIATION) är synliga fingeravtryck (N1).
-- (v3.5) Providergränsen är bunden till fyra mätpunkter: de sex AST-identiteterna, de fyra blob-pinnade beroendefilerna,
-  autopilotens modulnivåform och Popen-identiteten/-inspelningen. Utanför dem gäller deklarerad gräns: annan kod under
-  `controller/**` som autopiloten inte importerar vid start, miljövariabler som launchern själv läser, och provideranrop som
-  inte startar en process. Stubbnamnen och de slutna mängderna gör legitim omstrukturering röd per design.
+- (v3.6) Providergränsen är bunden till sex mätpunkter: de sex AST-identiteterna, de fyra blob-pinnade beroendefilerna,
+  autopilotens modul- OCH klasskroppsform, exec-ytsregeln över HELA filen (varje funktionskropp inräknad), den pinnade
+  authority-bibliotekssökvägen (AST + importerad fil) och processtart-inspelningen med identitetskontroll före OCH efter
+  flödena över `subprocess.Popen` + `os.posix_spawn/execv*/spawnv*/system`. Utanför dem gäller deklarerad gräns: annan kod
+  under `controller/**` som autopiloten inte importerar vid start, miljövariabler som launchern själv läser, provideranrop
+  som inte startar en process (öppet handtag, nät-API) och start via en primitiv utanför den instrumenterade mängden
+  (t.ex. `ctypes`/`multiprocessing`-intern spawn). Stubbnamnen och de slutna mängderna gör legitim omstrukturering röd per design.
 - (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
   tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
   `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av
