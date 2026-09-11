@@ -1213,5 +1213,46 @@ prompter (full_roadmap 33), muterad replika 4 stopp; runner-maskineriets AST ide
 55 fångade, 0 riggfel)
 De 48 från v3–v3.3 fångas på samma rader (v3.3:s B1-varianter dessutom på den nya live-raden). Granskarens nr 8: (a_replace_rewrite_builder) `.replace` efter byggarroten i `builder_flow` → slutna-världen-raden (metodanrop med argument) + live-raden (levande BUILDER-prompt pekar på gamla planen); (a_replace_self_builder) `x.replace(x, extra)` → slutna-världen + live; (a_mult_zero_builder) `* 0 + extra` → slutna-världen (operator Mult) + live; (a_globals_runner_builder) runner via `globals()["run_codex_"+…]` → slutna-världen (dynamiskt uppslag + runnernamn i sträng) + live; (a_prompt_file_runner) runnern läser prompten ur `wt/.architect-prompt` → `f4_runner_machinery_ast_identical_to_320c9df7_…`; (a_side_prefix_exempt) skrivning till `/private/tmp/claude-501/platform-separation-final-…` → sidoeffektraden (exakt FIXTURE_ROOT-namn undantaget; `/private/tmp/claude-501` ingår); (a_side_abs) omkörd efter att den kvarlämnade v3.3-markören tagits bort → sidoeffektraden (överskriven fil mäts via mtime); (a_roadmap_reorder) S4 före S2 i ROADMAP + selftestordning → skivtabellraden (ordning ≠ autopilot, ROADMAP[0] ≠ S2); (a_handoff_empty) handoff = en rubrik → handoff-avsnittsraden. Alla 55 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade. Not: de 53 första negativerna kördes mot grinden före den sista sidoeffektsvepsjusteringen (påverkar bara sidoeffektraden), a_side_abs/a_side_prefix_exempt mot den slutliga.
 
+### Oberoende kontraktsgranskning nr 9 (på d8d405f5) → v3.5
+`GATE_REVIEW_RESULT=NOT_READY` med EN blockerare: B1 — providergränsen efter `run_codex` var öppen på tre seams
+(`subprocess.Popen` skuggad på autopilotens modulnivå; samma skuggning i `controller/authority/core.py` som importeras vid start;
+`controller/launch/cli` som skriver om provider-argv — den sista fångades inte heller av den hållna launch-cwd-grinden, mätt).
+Remediering v3.5 (grind sha256 `56a37d665b37920473e4246f16921f03c85bca7343e31ea835580e990456a631`, 2542 rader, 116 rader i körning; commit `749bc3b6`):
+
+| Fynd | Åtgärd i grinden (rad i v3.5) |
+|---|---|
+| B1 modulnivå | `module_level_form` (r.889–923) + `EXEC_SURFACE_ATTRS`/`MODULE_LEVEL_EXCEPTIONS` (r.256–266); dynamisk Popen-identitet i DRIVER (r.305–307) → `f4_autopilot_module_level_is_the_declared_form_…` (r.1960) |
+| B1 beroenden | `RUNNER_DEPENDENCY_BLOBS` (r.268–275) → `f4_runner_dependencies_authority_and_launch_byte_identical_to_320c9df7` (r.1967) |
+| B1 argv-plats | `f4_provider_argv_built_and_started_in_exactly_one_place_inside_run_codex` (r.1985) |
+| B1 dynamisk | Popen-inspelning i `live_flows` (r.478–486) → `f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects` (r.2166) |
+| N1 remedieringsgrenar | tillståndsstyrd stub: första svaret per (flöde, roll) NEEDS_REMEDIATION för REVIEWER/GATE_REVIEWER (+ EMPIRICAL i det fristående flödet) (r.494–503); minima 1/4/4/4/4/4/4/4/7/37 (r.300); ARCHITECT/BUILDER krävda i det empiriska flödet (r.303) |
+| N2 miljöstyrd sökväg | `literal_constant_assignments` (r.926–946) → `f4_plan_constants_are_single_literal_assignments_…` (r.2040) |
+| N3 ROADMAP-konkatenering | `substitution_codes`/`roadmap_codes` i DRIVER (r.421–423), krav i samma rad |
+| N4 osvept live | sidoeffektsvep runt `live_flows` (r.2100–2108) |
+| N5–N10 | dokumenterade som gränser (TASK=-kopplingen, delat svepfönster, fingeravtryck, andra providersamtal utan processtart) |
+
+Produktytan växte med v3.5: `remediation_prompt` (BUILDER och TEST_AUTHOR) och den inlinade L-remedieringen måste namnge plan +
+handoff, eftersom remedieringsgrenarna nu körs live.
+
+### Test-author 2026-09-11 — baslinje RED för v3.5 (före produkt)
+Subjekt: replika av `320c9df7` + grind v3.5 + dokument (fixtur-HEAD `ea0a7887`). Fullkörning (bypass, egen `TMPDIR`, hållna
+grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`, **77 PASS / 39 FAIL**
+(116 rader), result.json sha256 `6de924fcd44b2f36c50afec4f6a4f4b381e2fc3f2b2cc125696309c57f1e28fa`. Röda: v3.4:s 38 plus `f4_plan_constants_…` (ingen `PLAN_GENERATION` vid
+320c9df7) — alla av rätt skäl; nya gröna på 320c9df7: modulnivåformen, beroendeblobbarna, argv-platsen och
+live-providerstarterna (320c9df7 är baslinjen för alla fyra). F7 oförändrat: control-set 68/68 (`f49a93e3…`), launch-cwd 19/20
+med exakt två extra grindar (`7b145fba…`), governance 68/70 exakt {g6, g7} (`ed43e250…`); loopsvit 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.5 (scratch, förkastad)
+Som v3.4 plus plan + handoff i `remediation_prompt` (båda rollerna), i `builder_prompt` och i den inlinade L-remedieringen
+(remedieringsgrenarna körs nu live). Fixtur-HEAD `6d081062`, 143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**,
+`PASS_LOCAL_QUALIFICATION_ONLY`, **116/116**, result.json sha256 `9add2f4b26d55b1ccb560ec266ebb5af67a076e7a20f0a107a478d5677c464fe`; control-set 68/68 (`62c71572…`), launch-cwd 19/20
+(`9b78ec46…`), governance 68/70 exakt {g6, g7} (`4135d6ff…`), loopsvit 53 ok / 0 FEL; live-flöden 10 till slut med
+1/4/4/4/4/4/4/4/7/37 fångade prompter (73 totalt), 0 providerstarter av 59 inspelade Popen-anrop, 0 sidoeffekter;
+runner-maskineriets AST och de fyra beroendeblobbarna identiska med 320c9df7.
+
+### F9 v3.5 — negativer (var och en i egen replika av v3.5-referensen, statiskt `--skip-held-gates`; 63 körda,
+63 fångade, 0 riggfel)
+De 55 från v3–v3.4 fångas på samma rader (B1-varianterna från v8 dessutom på live-raden). Granskarens nr 9: (a9_popen_shadow) `subprocess.Popen` skuggad på autopilotens modulnivå → modulnivåformen (attributmål + exec-ytsbindning), argv-platsraden och live-providerraden (Popen-identiteten); (a9_core_import_shadow) samma skuggning i `controller/authority/core.py` → modulnivåraden (dynamisk Popen-identitet efter import), beroendeblobraden och live-providerraden; (a9_launcher_rewrite) `controller/launch/cli` skriver om provider-argv → beroendeblobraden (F7:s launch-cwd ger fortfarande identisk 19/20, därför blobbindningen); (a9_env_plan_path2) andra, miljöstyrd tilldelning av plan-/handoffsökväg → plankonstantraden; (a9_sub_into_roadmap) `SUBSTITUTION_ROADMAP=()` med skivorna först i `ROADMAP` → plankonstantraden + selftestraden; (a9_policy_item_assign) `AUTOPILOT_ROLE_POLICY["BUILDER"]=…` efter literalen → modulnivåformen (subscriptmål); (a9_remediation_no_plan) remedierings-BUILDER-prompten slutar namnge planen → live-raden (remedieringsgrenen körs nu); (a9_flow_side_effect) hjälpare i `roadmap_contract_flow` skriver `/private/tmp/claude/v35-flow-marker` → live-sidoeffektraden. Alla 63 (inkl. grindmutanten h på kanarien): exit 1, 0 riggfel, 0 missade.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
