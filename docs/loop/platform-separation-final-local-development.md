@@ -1382,5 +1382,78 @@ iterationen; `architect_resolution` och `empirical_unattended_flow` sveptes aldr
 | N1 RED-protokollet | RED-repliken byggs om från grunden vid varje mätning; rättelsen inskriven ovan |
 | N10(b)(c) osanna meningar | kriterietexten för live-raden och FIXTURE-1-kravet omskriven till vad som faktiskt mäts |
 
+### Test-author 2026-09-11 — baslinje RED för v3.7 (före produkt)
+Subjekt: **omklonad** replika av `320c9df7` (`git clone --no-checkout` → `checkout --detach 320c9df7` → grind v3.7 +
+utvecklingsdokument → **en** commit; fixtur-HEAD `8813fc65`) — inga staplade fixturcommits, till skillnad från v3.6
+(N1). Statisk körning (`--skip-held-gates`, egen `TMPDIR`): **72 PASS / 46 FAIL** av **118 rader**. Fullkörning
+(bypass, egen `TMPDIR`, hållna grindar ur subjektets byte-identiska kopior): exit **1**, `RED_LOCAL_QUALIFICATION`,
+**77 PASS / 41 FAIL**, result.json sha256 `0313a2ea398528dd94c8f1c4d6043aa50ba8fe64ceb0432edab5cc1bc1168a5e`.
+Delta statisk → full är exakt de fem sandboxraderna (`f5_loop_fall_py_green_in_replica`, de tre `f7_`-raderna,
+`f8_ordinary_loop_e2e…`), precis som granskning nr 11 räknade. De 41 röda raderna:
+
+`f1_required_absences_web_material_and_transferred_files`, `f1_no_blob_at_head_equals_a_transferred_pre_split_governance_or_pre_platform_plan_object`,
+`f2_closure_all_active_references_resolve_to_tracked_files`, `f2_active_doc_free_of_web_governance_and_human_hand_rules_*` (7 dokument:
+architect-SKILL, empirical-runner-SKILL, AGENTS.md, README.md, codex-handoff, autonomous-loop-plan-v1, full-roadmap, substitution-contract),
+`f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents`, `f2_tree_wide_no_web_governance_reference_outside_frozen_evidence`,
+`f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history`,
+`f2_full_roadmap_authority_section_binds_plan_generation_and_paths_and_names_agents_md_without_old_commit`,
+`f2_substitution_contract_sections_1_5_7_11_13_unchanged_dated_amendment_and_plan_generation_amendment_present`,
+`f2_drift_md_append_only_whole_tail_scanned_with_active_platform_note_naming_plan_generation`,
+`f3_verify_cli_pins_equal_candidate_spec_register_every_generation_document_and_the_plan_generation`,
+`f3_platform_prepare_refuses_mutated_plan_generation_in_replica`, `f3_platform_prepare_refuses_mutated_handoff_in_replica`,
+`f3_platform_check_refuses_snapshot_whose_plan_generation_was_mutated_after_prepare`,
+`f4_plan_generation_files_tracked_100644_and_autopilot_paths_and_blobs_equal_head`,
+`f4_autopilot_has_plan_generation_constant_and_no_roadmap_plan_sha_attribute`,
+`f4_plan_constants_are_single_literal_assignments_equal_at_runtime_and_the_two_roadmap_tuples_keep_their_identities`,
+`f4_ensure_roadmap_plan_stops_on_mutated_plan_generation`, `f4_ensure_roadmap_plan_stops_on_missing_handoff`,
+`f4_ensure_roadmap_plan_stops_on_mutated_handoff`, `f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together`,
+`f4_ensure_roadmap_plan_reads_the_pinned_plan_blobs_measured_by_repinning_them_in_the_imported_module` (ny i v3.7),
+`f4_autopilot_source_free_of_old_plan_commit_git_show_by_commit_and_plan_sha`,
+`f4_prompt_functions_ast_literals_inject_only_the_declared_platform_document_set_all_tracked_and_scanned`,
+`f4_live_flows_run_to_completion_…_and_free_of_old_pointers`, `f4_live_flows_stop_before_the_stubbed_runner_on_mutated_plan_generation`,
+`f4_produced_prompts_of_roadmap_empirical_and_architect_builders_…`, `f4_produced_prompts_free_of_old_plan_pointers_…`,
+`f4_plan_generation_slice_table_equals_autopilot_roadmap_tuples_and_selftest_exact_sets`,
+`f4_plan_generation_bootstrap_section_names_h031_to_h039_as_platform_establishment`,
+`f4_plan_generation_has_required_sections_…`, `f4_handoff_has_required_sections_…`,
+`f4_architect_and_empirical_runner_skills_name_plan_generation_and_no_plan_commit`,
+`f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha`.
+
+Alla röda av rätt skäl (plangenerationen finns inte på `320c9df7`). Ingen av v3.7:s nya statiska regler är röd på
+baslinjen: den transitiva aliasmängden är `{p, r, rc, sub}` (alla resultat av `subprocess.run`/`Popen`, ingen skrivs
+till), filen har tre attributmål (`sys.dont_write_bytecode` vitlistad, `self.task_id`, `self.reason`), noll
+dunder-/internattributmål, noll `setattr` och noll `Assign` i klasskroppar. F7 oförändrat: control-set 68/68,
+launch-cwd 19/20 med exakt två extra grindar, governance 68/70 exakt `{g6, g7}`; loopsviten 53 ok / 0 FEL.
+
+### Referenskonstruktion v3.7 (scratch, förkastad — bevisar satisfierbarhet)
+Oförändrad produkt jämfört med v3.5/v3.6: **ingen produktändring krävdes** utöver v3.5:s. Fixtur-HEAD `81b570de`,
+143 filer. Fullkörning (bypass, egen `TMPDIR`): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **118/118**, result.json
+sha256 `3c6f8f5ad5f76552f83f68b84fd239f0c7a7c24c029e2fb759c40f9b566c5b65`; control-set 68/68, launch-cwd 19/20,
+governance 68/70 exakt `{g6, g7}`, loopsviten 53 ok / 0 FEL. Live-flöden: tio till slut med fångstprofilen
+1/4/4/4/4/4/4/4/7/37, `popen_total = child_total = 333`, `provider_starts = 0`, startprimitiver `['subprocess.Popen']`,
+binärer `['git']` på både Popen- och barnnivå, `child_argv_rewritten = []`, `child_starts_unexpected = []`,
+`popen_identity = popen_identity_after = True`, `live_side_effects = []` (nu inklusive subjektets `.git/` och
+`FIXTURE_ROOT` rekursivt); `core`-modulen importerad ur `controller/authority/core.py`. Den nya vaktraden stoppar med
+`roadmap artifact identity mismatch … expected=000000000000000000000000000000000000000f`, dvs. vakten läser bevisligen
+`ROADMAP_PLAN_BLOBS`; ankarraden redovisar `anchors=2` (`controller/verify/cli`, autopiloten).
+
+### F9 v3.7 — negativer (var och en i egen replika av v3.7-referensen, statiskt `--skip-held-gates`; **84 körda,
+84 fångade, 0 riggfel**) + **tre** falskt-röda prov som förblir gröna
+De 69 från v3–v3.6 (inklusive grindmutanten `h`) fångas på samma rader som förut; `a10_guard_copy_in_docs` faller nu
+dessutom på den nya ompinningsraden. Nya i v3.7 (15):
+
+| Negativ | Fälls av |
+|---|---|
+| `a11_execute_child_shadow` (granskning nr 11 B1, ordagrant återbyggd) | modul-/klasskroppsraden med **två** oberoende anmärkningar — `line 73: class body _Boot binds non-literal subprocess.Popen` och `line 342: assignment to internal attribute _Boot.POPEN._execute_child` — samt live-providerraden (`the recorder is no longer installed`) |
+| `a11_class_orig_capture2` (N2) | klasskroppsraden statiskt; dynamiskt `child starts 352 != recorded Popen starts 333` + `argv rewritten between Popen and the child: /usr/bin/true exec --json neutral task text` + `the child process received an unexpected argv: true:…` |
+| `a11_guard_digest_copy` (N4) | både `…stops_when_the_plan_and_every_tracked_copy_are_mutated_together` (ankare = 3: `config/plan-digests.json`, `controller/verify/cli`, autopiloten) och `…reads_the_pinned_plan_blobs_measured_by_repinning…` |
+| `a11_side_subject_git` (N8) | `side effect during live flows: subject/.git:entry:v37-subject-git-marker` |
+| `a11_side_fixture_root` (N8) | `side effect during live flows: fixture:v37-fixture-root-marker` |
+| `b2_canary_01` … `b2_canary_10` (B2) | live-raden. Tio **separata** mutanter, en per flöde: en körtidshopsatt gammal plansökväg (`"docs/loop/autonomous-loop-plan-" + "v1.md"`, osynlig för varje källtokenregel) läggs till den prompt just det flödet faktiskt skickar, valt på anropsstacken. Var och en är röd och flaggar **exakt sitt eget flöde**: `architect_resolution#1`, `roadmap_contract_flow[SUB-1]#1`, `roadmap_contract_flow[S2]#1`, `empirical_gate_contract_flow#1`, `builder_flow[S2]#1`, `ensure_roadmap_slice[SUB-1]#1`, `ensure_roadmap_slice[S2]#1`, `test_author_flow#1`, `empirical_unattended_flow#1`, `full_roadmap#…`. Under v3.6 var alla tio gröna. |
+
+Falskt-röda prov som **förblir gröna** (113/5 = enbart de fem sandboxraderna): `a10_legit_module_copy`
+(`X = Y.copy()` på modulnivå), och de två granskning nr 11 mätte som falskt röda under v3.6 —
+`a11_legit_env_snapshot` (`subprocess.run(['/usr/bin/env','true'])` i ett flöde) och `a11_legit_python_snapshot`
+(`subprocess.run([sys.executable,'-c','print(1)'])`); båda ger nu `popen_total = child_total = 352`, `problems=[]`.
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
