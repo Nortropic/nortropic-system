@@ -809,14 +809,40 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   **(v3.8) INSTALLATIONEN FÖRE `exec_module`**, som är det som binder importtidsfångster som inte är satser
   (funktionsdefault, dekoratorargument, metoddefault) och som är den enda bindningen för de åtta `os.*`-primitiverna.
   Den statiska formregeln täcker samma två former (`FunctionDef.args.defaults`/`kw_defaults` och `decorator_list`).
+  **(v3.10, granskning nr 14 B1)** Drivrutinens privata namnrymd var fortfarande nåbar — inte via `import __main__`,
+  som v3.9 förbjöd, utan som `f_globals` på frame-stacken (`sys._getframe()`/`f_back`) och som ett vanligt objekt i
+  heapen (`gc.get_objects()`). Båda vägarna är nu förbjudna i `GATE_NAMESPACE_TOKENS` tillsammans med `sys.settrace`,
+  `sys.setprofile` och `gc.get_referrers/referents`; mätt på 320c9df7 nämner autopiloten ingen av dem.
+  **(v3.10, granskning nr 14 B2)** Identiteten löstes i FEL process: `Popen` löser ett bart `argv[0]` genom
+  `env=`-argumentets `PATH`, medan grinden löste samma namn genom drivrutinens `os.environ`. En `env={'PATH': <egen
+  katalog>}` gjorde att grinden sha256-prövade sin egen stubb medan produktens binär kördes — mätt 114/5 grön med den
+  gamla planen på barnets stdin. Identiteten löses nu med **den PATH anropet faktiskt använder**, en start som bär en
+  egen `PATH` i `env=` är röd, stdin mäts i **alla** kanaler (`input`, pipe, vanlig fil, ärvd fd via `/dev/fd`,
+  `pass_fds`), miljön mäts även när barnet ärver, och `git` som **startare** (`-c alias.*`, `core.pager`,
+  `diff.external`, `credential.helper`, `--exec-path`, `--upload-pack`, samt `GIT_EXTERNAL_DIFF`/`GIT_PAGER`/`GIT_SSH*`
+  /`GIT_CONFIG*` i miljön) är röd.
   **(v3.9) Den NIONDE och bärande mätpunkten ligger utanför produktens interpreter:** live-körningens `PATH` är grindens
   egna stubbar, som loggar den riktiga binären, hela argv och hela stdin till filer som grinden läser utifrån. Granskning
   nr 13 visade varför de åtta in-process-mätpunkterna inte räcker: drivrutinen körde som `__main__` i samma interpreter
   som produkten och lämnade stdlib-originalen i sin egen namnrymd, så ett `import __main__` gav en produkt fri
   processtart med **varje räknare identisk med referensens**. In-process-halvan är nu hårdare (privat namnrymd,
   inspelare på `Popen.__init__`, identitet prövad vid varje anrop, realpath + sha256 på varje exekverad fil, sluten
-  formmängd för omslag, stdin-innehåll fångat), men **beviset bärs av utifrån-mätningen**, som per konstruktion inte kan
-  påverkas av något produkten gör i sin egen process.
+  formmängd för omslag, stdin-innehåll fångat), men beviset bärs av **de två halvorna tillsammans**.
+  **RÄTTELSE (v3.10, granskning nr 14 B3):** påståendet att utifrån-mätningen "per konstruktion inte kan påverkas av
+  något produkten gör i sin egen process" var **falskt**. Stubbloggens sökväg står i klartext i stubbskripten som ligger
+  på produktens egen `PATH`, katalogen ägs av samma uid, och loggen var dessutom undantagen från sidoeffektsvepet —
+  granskaren raderade 7 poster (333 → 328) utan att en enda rad reagerade. Och eftersom ingen rad jämförde halvorna
+  kunde en produkt i stället tysta in-process-inspelarna helt (mätt: `popen = child = init = 5` mot `stub_calls = 333`,
+  grinden grön). Det som gäller från v3.10 är i stället: (a) varje stubbpost bär ett **löpnummer från en låst räknare**
+  och en **HMAC** över (nummer ‖ innehåll) med en nonce som genereras per grindkörning, så raderade, ändrade och
+  tillagda poster syns som bruten kedja eller lucka i numreringen; (b) stubbloggen **ingår i sidoeffektsvepet** — bara de
+  poster stubbarna själva skriver är redovisade, allt annat i katalogen är en sidoeffekt; (c) en **egen rad**,
+  `f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain`, kräver att
+  `stub_calls = popen_total = init_total = child_total`, att closure-räknarna (heltal som ingen listutbytning når)
+  stämmer med listorna, att inspelningsbehållarnas typ och identitet är oförändrade, och att varje räknare klarar det
+  mätta golvet `LIVE_MIN_PROCESS_STARTS`. En produkt måste alltså förfalska **båda** halvorna konsistent, inte
+  vardera för sig. Nonce:n är läsbar för en produkt som läser stubben på sin egen PATH; vad kedjan köper är att
+  utifrån-talet inte kan sänkas TYST.
   Utanför dem gäller deklarerad gräns: annan kod under `controller/**` som autopiloten inte importerar vid start,
   miljövariabler som launchern själv läser, provideranrop som inte startar en process (öppet handtag, nät-API) och
   start via en primitiv utanför den instrumenterade mängden och utanför `subprocess` (mätt av granskare nr 11:
@@ -1658,6 +1684,11 @@ levande prompt i praktiken medan grinden var grön.
 | N5 | drivrutinens cwd är en egen tom katalog, inte dess `TMPDIR`, så `python -c`:s `sys.path[0]` inte längre är produktens skrivbara yta; cwd ingår i sidoeffektsvepet |
 | N7 | `FIXTURE_ROOT`-kostnaden (31 rötter / 3,6 GiB per granskning) inskriven i p.8 |
 | **Riggdisciplin (eget fynd)** | En mutant kunde göra grinden ODÖMBAR (exit 2) genom att bryta `subprocess.Popen` globalt så att ett av produktens egna hjälpskript hängde. `run()`/`run_bytes()` behandlar nu timeout som ett PRODUKTutfall (rc 124 + `PLATFORM_SEPARATION_TIMEOUT`-markör i stdout), och ett oväntat undantag **efter** att grinden börjat döma ger den nya sista raden `f10_gate_reached_its_last_row_without_an_unexpected_failure` som RÖD med exit 1 i stället för exit 2. Ett fel **före** första raden (saknat verktyg, oanvändbart subjekt) är fortfarande ett riggfel. Radantalet är därför 119, inte 118 |
+| N1 (v14) | avbrottsvägen skriver nu `result.json`, räknar varje ej körd rad som FAIL mot det pinnade `EXPECTED_ROW_COUNT`, och radens `detail` bär `aborted after N of M rows` — en avbruten körning kan inte längre läsas som numeriskt närmare grön än en ärlig baslinje |
+| N2 (v14) | `except Rig` är borttagen som egen gren: ett `Rig` som uppstår EFTER att dömandet börjat är nu en produktdom (f10-raden, exit 1), inte exit 2. Ett fel före första raden är fortfarande riggfel |
+| N3 (v14) | `result["pass"]` kräver nu både att alla rader är gröna och att radantalet är `EXPECTED_ROW_COUNT` |
+| N4 (v14) | `node` får ingen stubb längre. Beslutet är att `node` inte får startas under flödena (referensen startar det aldrig); ett försök blir en oupplöst binär och ett oväntat verktyg |
+| N5 (v14) | stubbloggens undantag i sidoeffektsvepet borttaget |
 | **Dokumentfynd (eget)** | Granskningens N1/N2 ("uteblivna rättelser") berodde inte på att ändringarna var ogjorda utan på att **v3.8:s dokumentpatch avbröts på ett ankarfel innan filen skrevs** — sju redan utförda ändringar gick därmed förlorade tillsammans med den felande. Alla sju är nu utförda, och patchskripten skriver numera filen även när ett enskilt ankare missas |
 
 ### Test-author 2026-09-11 — baslinje RED för v3.9 (före produkt)
@@ -1745,6 +1776,26 @@ Falskt-röda prov som **förblir gröna** (114/5 = enbart de fem sandboxraderna)
 **Fixturnot:** `a11_side_subject_git` skriver i sitt eget subjekts `.git/`. Mutanten måste därför köras på en ren
 replika — en andra körning i samma katalog ser markören redan i före-ögonblicksbilden och blir grön av rigg-skäl, inte
 av produktskäl. Mätt och verifierat: på ren replika faller den på sidoeffektsvepet.
+
+### Oberoende kontraktsgranskning nr 14 (på f6add80b) → v3.10
+`GATE_REVIEW_RESULT=NOT_READY` med **tre** blockerare, alla på live-raden, alla reproducerade med riktiga barnprocesser
+och bevismarkörer. Allt som remedierades efter nr 13 bekräftades verkligt (sex av sex mutanter faller på angivna rader,
+fem falskt-röda prov gröna, RED 72/47 med exakt en tillagd rad och noll borttagna, F7 byte-identisk, f10-raden
+fungerar), och referensen nåddes i **första** iterationen med nr 13:s dokumentbyggda konstruktion oförändrad — v3.9
+krävde ingen produktändring.
+
+| Fynd | Åtgärd i grinden (v3.10) |
+|---|---|
+| B1 namnrymden via frame/heap | `GATE_NAMESPACE_TOKENS` utökad med `_getframe(`, `f_globals`, `f_back`, `f_locals`, `f_code`, `gc.get_objects/referrers/referents`, `sys.settrace`, `sys.setprofile`, `threading.settrace` |
+| B1 inspelningsintegritet | räknarna hålls **också** som heltal i en closure-cell som ingen listutbytning når; inspelningsbehållarnas typ, identitet och bundna `append` pinnas vid installation och prövas efter flödena (`recorder_integrity`) |
+| **B1/B3 halvorna mot varandra** | ny rad `f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain`: `stub_calls = popen_total = init_total = child_total`, closure-räknarna mot listorna, obruten HMAC-kedja, sammanhängande numrering, och varje räknare över `LIVE_MIN_PROCESS_STARTS` |
+| B2 identitet i barnets värld | `_identify` löser binären med **den PATH anropet använder** (`env=`-argumentets, annars `os.environ`); en start som bär en egen `PATH` i `env=` är röd |
+| B2 stdin i alla kanaler | `input`, pipe, vanlig **fil** och **ärvd fd** (via `/dev/fd/<n>`), plus `pass_fds`; innehållet läses och skannas med `OLD_PLAN_TOKENS` och providermarkörerna. Varje start med stdin ansluten är röd |
+| B2 miljön | mäts även när barnet **ärver** den, inte bara när den skickas som `env=` |
+| B2 git som startare | `-c` med `alias.*`/`core.pager`/`core.editor`/`core.sshCommand`/`core.hooksPath`/`diff.external`/`credential.helper`/`filter.*`/`uploadpack.*`/`protocol.*`, `--exec-path`, `--upload-pack`, `--receive-pack`, samt `GIT_EXTERNAL_DIFF`/`GIT_PAGER`/`GIT_EDITOR`/`GIT_SSH*`/`GIT_CONFIG*`/`GIT_PROXY_COMMAND`/`GIT_ASKPASS` i miljön |
+| B3 manipulationsupptäckande logg | varje stubbpost bär löpnummer från en låst räknare och en HMAC med en nonce per körning; grinden kräver obruten kedja och sammanhängande numrering |
+| B3 loggen i svepet | undantaget borttaget; endast `stublog/seq`, `stublog/lock` och `stublog/call-<n>[.stdin]` är redovisade, allt annat i katalogen är en sidoeffekt |
+| B3 nämnare | `live_stub_call_total` binds av den nya raden mot de tre in-process-räknarna och mot det mätta golvet |
 
 ### Builder / kvalificering
 (fylls i efter produktkörningen)

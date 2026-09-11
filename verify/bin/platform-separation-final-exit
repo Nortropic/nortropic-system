@@ -43,6 +43,7 @@ No historical H gate, provider, build, publication or resume is executed.
 import argparse
 import ast
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -242,9 +243,28 @@ DYNAMIC_LOOKUP_NAMES = ("globals", "getattr", "vars", "locals", "eval", "exec", 
 # v3.9 (review v13 B1): reaching the gate's own driver — `import __main__`, `sys.modules['__main__']` — is forbidden by
 # name, and so is `type.__setattr__`/`object.__setattr__`, which writes an attribute without being an Assign or a
 # `setattr(...)` call with a constant name. Measured on 320c9df7: the autopilot names none of them.
+# v3.10 (review v14 B1): forbidding `import __main__` was not enough — the driver's private namespace is still the
+# `f_globals` of every driver frame on the stack and an ordinary object on the heap. Measured: `sys._getframe()`/`f_back`
+# and `gc.get_objects()` both reached it, and one mutant replaced the four recording lists with list subclasses whose
+# `append` does nothing (114/5 green, in-process counters 5 against 333 stub calls). Reaching for the interpreter's own
+# introspection surfaces has no legitimate use in this product; the autopilot names none of them (measured on 320c9df7).
 GATE_NAMESPACE_TOKENS = (r"import\s+__main__", r"from\s+__main__\s+import", r"__main__\s*\.",
                          r"sys\.modules\[\s*['\"]__main__", r"type\.__setattr__", r"object\.__setattr__",
-                         r"(?<![\w.])__builtins__(?![\w])", r"gate_driver")
+                         r"(?<![\w.])__builtins__(?![\w])", r"gate_driver",
+                         r"(?<![\w])_getframe\s*\(", r"(?<![\w])f_globals(?![\w])", r"(?<![\w])f_back(?![\w])",
+                         r"(?<![\w])f_locals(?![\w])", r"(?<![\w])f_code(?![\w])", r"gc\.get_objects",
+                         r"gc\.get_referrers", r"gc\.get_referents", r"sys\.settrace", r"sys\.setprofile",
+                         r"threading\.settrace", r"(?<![\w.])tracebacklimit(?![\w])")
+# v3.10 (review v14 B2): `git` is the only TOOL with free argv, and it is also a general LAUNCHER. These argv fragments
+# and environment variables make it start something else; measured green under v3.9 (`git -c alias.zz='!…' zz` ran a
+# grandchild). The reference never uses any of them.
+GIT_LAUNCHER_ARGV = (r"^-c$", r"^--exec-path", r"^--upload-pack", r"^--receive-pack")
+GIT_LAUNCHER_CONFIG = ("alias.", "core.pager", "core.editor", "core.sshcommand", "core.hookspath", "diff.external",
+                       "credential.helper", "filter.", "uploadpack.", "receivepack.", "protocol.", "http.proxy",
+                       "sequence.editor", "gpg.program", "ssh.variant")
+GIT_LAUNCHER_ENV = ("GIT_EXTERNAL_DIFF", "GIT_PAGER", "GIT_EDITOR", "GIT_SSH", "GIT_SSH_COMMAND", "GIT_CONFIG",
+                    "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+                    "GIT_PROXY_COMMAND", "GIT_ASKPASS", "GIT_SEQUENCE_EDITOR")
 DYNAMIC_LOOKUP_FUNCTIONS = frozenset({"_provider_snapshot", "_python_snapshot", "_strict_provider_authority", "publication_authority", "publish", "selftest"})
 RUNNER_NAME_STRING_FUNCTIONS = frozenset({"selftest"})
 # v3.4 (review v8 B2): the provider machinery is "not touched" by this contract — bound as normalised AST identity (sha256 of
@@ -304,6 +324,9 @@ ALLOWED_LIVE_WRAPPERS = frozenset({"env", "sh", "python3.12"})
 ALLOWED_LIVE_BINARIES = ALLOWED_LIVE_TOOLS | ALLOWED_LIVE_WRAPPERS
 # Measured wrapper forms: the two legitimate runtime probes review v11 measured as false reds. Anything else is red.
 ALLOWED_LIVE_WRAPPER_FORMS = (("env", "true"), ("python3.12", "-c", "print(1)"))
+# v3.10 (review v14 B1(c)): the measured floor for process starts during the ten live flows. The reference measures 333
+# through four independent counters; a product that runs the flows without starting processes has not run them.
+LIVE_MIN_PROCESS_STARTS = 250
 WRAPPER_ARGV_MAX = 200
 ALLOWED_LIVE_PRIMITIVES = frozenset({"subprocess.Popen"})   # the baseline never uses posix_spawn/exec*/system
 # The start primitives the driver instruments and whose identity must survive the flows.
@@ -499,9 +522,14 @@ DRIVER = (
     # v3.9 (review v13 B2): every started process is identified by the RESOLVED PATH and the sha256 of the file that is
     # actually executed, never by its basename — a script whose basename is `git` reported `start_binaries=['git']` and
     # was indistinguishable from the reference in the evidence file.
-    "def _identify(path_):\n"
+    # v3.10 (review v14 B2): `Popen` resolves a bare argv[0] through the PATH of the `env=` argument, not through the
+    # driver's own environment. v3.9 resolved it through `os.environ`, so `env={'PATH': <own dir>}` made the gate hash the
+    # gate's own stub while the product's own binary ran (measured: 114/5 green with the old plan on the child's stdin).
+    "def _identify(path_, env_=None):\n"
     "    try:\n"
-    "        p_=_sh.which(str(path_), path=_os.environ.get('PATH','')) or str(path_)\n"
+    "        path_str=(dict(env_).get('PATH') if env_ else None)\n"
+    "        if path_str is None: path_str=_os.environ.get('PATH','')\n"
+    "        p_=_sh.which(str(path_), path=path_str) or str(path_)\n"
     "        rp=_os.path.realpath(p_)\n"
     "    except Exception:\n"
     "        rp=str(path_)\n"
@@ -520,8 +548,45 @@ DRIVER = (
     "    except Exception:\n        return False\n"
     "def _envtext(env_):\n"
     "    try:\n"
-    "        return ' '.join(str(k_)+'='+str(v_) for k_,v_ in dict(env_ or {}).items())\n"
+    # When the child inherits, the environment it actually receives is the driver's own.
+    "        return ' '.join(str(k_)+'='+str(v_) for k_,v_ in dict(env_ if env_ is not None else _os.environ).items())\n"
     "    except Exception: return ''\n"
+    # v3.10 (review v14 B2): stdin is measured in every channel, not only as `communicate(input=...)` or a pipe seen by a
+    # stub. A plain temporary FILE and an inherited fd were both invisible; both are read here through /dev/fd.
+    "def _fd_text(obj_):\n"
+    "    try:\n"
+    "        fd_=obj_ if isinstance(obj_,int) else (obj_.fileno() if hasattr(obj_,'fileno') else None)\n"
+    "        if fd_ is None or fd_<0: return ''\n"
+    "        target=_os.path.realpath('/dev/fd/%d'%fd_)\n"
+    "        if _os.path.isfile(target):\n"
+    "            with open(target,'rb') as fh_: return fh_.read(65536).decode('utf-8','replace')\n"
+    "        try:\n"
+    "            pos=_os.lseek(fd_,0,1); _os.lseek(fd_,0,0)\n"
+    "            data=_os.read(fd_,65536); _os.lseek(fd_,pos,0)\n"
+    "            return data.decode('utf-8','replace')\n"
+    "        except Exception: return ''\n"
+    "    except Exception: return ''\n"
+    "def _stdin_form(k_):\n"
+    "    v_=k_.get('stdin')\n"
+    "    if k_.get('input') is not None: return 'input'\n"
+    "    if v_ is None: return 'none'\n"
+    "    if v_ is _sp.DEVNULL: return 'devnull'\n"
+    "    if v_ is _sp.PIPE: return 'pipe'\n"
+    "    return 'fd'\n"
+    # v3.10 (review v14 B2): `git` is a general launcher. These argv fragments and environment variables make it start
+    # something else; the reference uses none of them.
+    "def _git_launcher(items,envtext):\n"
+    "    hits=[]\n"
+    "    if items and items[0].rsplit('/',1)[-1]=='git':\n"
+    "        for i_,a_ in enumerate(items):\n"
+    "            if a_ in ('-c','--exec-path','--upload-pack','--receive-pack') or a_.startswith('--exec-path='):\n"
+    "                nxt=(items[i_+1] if i_+1<len(items) else '').lower()\n"
+    "                if a_!='-c' or any(nxt.startswith(t_) for t_ in " + repr(tuple(t.lower() for t in GIT_LAUNCHER_CONFIG)) + "):\n"
+    "                    hits.append(a_+' '+nxt[:40])\n"
+    "    for v_ in " + repr(tuple(GIT_LAUNCHER_ENV)) + ":\n"
+    "        if (v_+'=') in envtext and (v_+'=/dev/null') not in envtext and (v_+'=cat') not in envtext and (v_+'=1') not in envtext:\n"
+    "            hits.append('env:'+v_)\n"
+    "    return hits[:3]\n"
     "def _make_rec(mn,pn,orig):\n"
     "    def _rec(*a,**k):\n"
     "        rec_count[0]+=1\n"
@@ -529,11 +594,20 @@ DRIVER = (
     "            argv=a[0] if a else k.get('args') or k.get('argv')\n"
     "            items=[str(x) for x in argv] if not isinstance(argv,(str,bytes)) else [str(argv)]\n"
     "        except Exception: items=['<unreadable>']\n"
-    "        rp_,h_=_identify(k.get('executable') or (items[0] if items else ''))\n"
+    "        rp_,h_=_identify(k.get('executable') or (items[0] if items else ''), k.get('env'))\n"
+    "        envtext_=_envtext(k.get('env'))\n"
+    "        form_=_stdin_form(k)\n"
+    "        stdin_text_=_fd_text(k.get('stdin')) if form_=='fd' else ''\n"
+    "        fd_text_=''\n"
+    "        for fd_ in (k.get('pass_fds') or ()):\n"
+    "            fd_text_+=' '+_fd_text(fd_)\n"
     "        rec_={'prim':mn+'.'+pn,'argv':items,'path':rp_,'sha256':h_,'identity':_identity_now(),\n"
-    "              'stdin_set':(k.get('stdin') is not None or k.get('input') is not None),\n"
-    "              'env_text':_envtext(k.get('env'))}\n"
-    "        popen_calls.append(rec_)\n"
+    "              'stdin_set':(form_ not in ('none','devnull')),'stdin_form':form_,\n"
+    "              'stdin_text':(stdin_text_+fd_text_)[:4000],'pass_fds':len(k.get('pass_fds') or ()),\n"
+    "              'env_given':(k.get('env') is not None),\n"
+    "              'env_path':(dict(k.get('env') or {}).get('PATH') or ''),\n"
+    "              'git_launcher':_git_launcher(items,envtext_),'env_text':envtext_}\n"
+    "        popen_calls.append(rec_); _COUNTS[0]+=1\n"
     "        _ACTIVE.append(items)\n"
     "        try:\n"
     "            return orig(*a,**k)\n"
@@ -548,7 +622,7 @@ DRIVER = (
     "    try:\n"
     "        items=[str(x) for x in args] if not isinstance(args,(str,bytes)) else [str(args)]\n"
     "    except Exception: items=['<unreadable>']\n"
-    "    init_calls.append({'argv':items,'recorded':bool(_ACTIVE),'identity':_identity_now()})\n"
+    "    init_calls.append({'argv':items,'recorded':bool(_ACTIVE),'identity':_identity_now()}); _COUNTS[2]+=1\n"
     "    return _ORIG_POPEN_INIT(self,args,*a,**k)\n"
     # v3.9 (review v13 B2/3): stdin CONTENT is captured, not only the fact that stdin was set — the decisive mutant put
     # `PROMPT=read docs/loop/autonomous-loop-plan-v1.md` on a child's stdin with argv=['/bin/sh'].
@@ -556,7 +630,7 @@ DRIVER = (
     "    if input is not None:\n"
     "        try:\n"
     "            t_=input if isinstance(input,str) else bytes(input).decode('utf-8','replace')\n"
-    "            stdin_seen.append({'argv':[str(x) for x in (getattr(self,'args',None) or [])],'text':t_[:4000]})\n"
+    "            stdin_seen.append({'argv':[str(x) for x in (getattr(self,'args',None) or [])],'text':t_[:4000]}); _COUNTS[3]+=1\n"
     "        except Exception: pass\n"
     "    return _ORIG_COMM(self,input,timeout)\n"
     # Per-CALL identity, not an aggregate: a child start that happens while no recorded Popen call is on the stack is
@@ -566,7 +640,7 @@ DRIVER = (
     "    try:\n"
     "        items=[str(x) for x in args] if not isinstance(args,(str,bytes)) else [str(args)]\n"
     "    except Exception: items=['<unreadable>']\n"
-    "    child_calls.append({'argv':items,'recorded':bool(_ACTIVE)})\n"
+    "    child_calls.append({'argv':items,'recorded':bool(_ACTIVE)}); _COUNTS[1]+=1\n"
     "    return _ORIG_EXEC_CHILD(self,args,executable,*a,**k)\n"
     "_EXPECT=dict(_ORIG_PRIMS); _EXPECT_CHILD=_ORIG_EXEC_CHILD; _EXPECT_INIT=_ORIG_POPEN_INIT\n"
     "if scenario=='live_flows':\n"
@@ -577,6 +651,20 @@ DRIVER = (
     "        _ORIG_POPEN._execute_child=_child_rec; _EXPECT_CHILD=_child_rec\n"
     "    _ORIG_POPEN.__init__=_init_rec; _EXPECT_INIT=_init_rec\n"
     "    _ORIG_POPEN.communicate=_comm_rec\n"
+    # v3.10 (review v14 B1(b)): the recording containers themselves were swappable. A mutant replaced the four lists with
+    # list subclasses whose `append` does nothing and was 114/5 green with in-process counters of 5 against 333 stub
+    # calls. Their exact types and bound `append` methods are pinned here and re-checked after the flows; a count is also
+    # kept in a closure cell that no list swap can reach.
+    "_COUNTS=[0,0,0,0]\n"
+    "_PINNED={'popen':(type(popen_calls),id(popen_calls)),'child':(type(child_calls),id(child_calls)),\n"
+    "         'init':(type(init_calls),id(init_calls)),'stdin':(type(stdin_seen),id(stdin_seen))}\n"
+    "def _integrity_of_recorders():\n"
+    "    now={'popen':(type(popen_calls),id(popen_calls)),'child':(type(child_calls),id(child_calls)),\n"
+    "         'init':(type(init_calls),id(init_calls)),'stdin':(type(stdin_seen),id(stdin_seen))}\n"
+    "    bad=[k for k in _PINNED if now[k]!=_PINNED[k]]\n"
+    "    bad+=[k for k,v in (('popen',popen_calls),('child',child_calls),('init',init_calls),('stdin',stdin_seen))\n"
+    "          if type(v) is not list or v.append.__self__ is not v]\n"
+    "    return sorted(set(bad))\n"
     "s=importlib.util.spec_from_file_location(sys.argv[4] if len(sys.argv)>4 else 'subject_autopilot', subject/'" + AUTOPILOT + "')\n"
     "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
     "out={'scenario':scenario}\n"
@@ -743,7 +831,7 @@ DRIVER = (
     "                return [p_ for p_ in _OLD_TOKENS if _re2.search(p_,text_)][:2]\n"
     "            def _shape(c):\n"
     "                items=c['argv']; base=_base_of(items); form=tuple([base]+[str(x) for x in items[1:]])\n"
-    "                payload=_payload(c,items)\n"
+    "                payload=_payload(c,items)+' '+c.get('stdin_text','')\n"
     "                marked=any(mk in items for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
     "                if base in _WRAPPERS:\n"
     # A wrapper's payload need not be in argv at all, so the form is closed and stdin to a wrapper is red outright.
@@ -752,6 +840,12 @@ DRIVER = (
     "                    if any(t in payload for t in _SUBSTR_MARKS): marked=True\n"
     "                else:\n"
     "                    if any(t in (c.get('env_text','') + ' ' + ' '.join(_stdin_by_argv.get(tuple(items),[]))) for t in _SUBSTR_MARKS): marked=True\n"
+    # v3.10 (review v14 B2): stdin in ANY channel, a private PATH in `env=`, an inherited fd and git-as-launcher are all
+    # marked. The reference starts every process with stdin unset, no `env=`, no pass_fds and plain git subcommands.
+    "                if c.get('stdin_set'): marked=True\n"
+    "                if c.get('pass_fds'): marked=True\n"
+    "                if c.get('env_given') and c.get('env_path') and c.get('env_path')!=_os.environ.get('PATH',''): marked=True\n"
+    "                if c.get('git_launcher'): marked=True\n"
     "                old=_old_hits(payload)\n"
     "                allowed=(base in _TOOLS or base in _WRAPPERS) and c['prim'] in " + repr(sorted(ALLOWED_LIVE_PRIMITIVES)) + "\n"
     "                return {'prim':c['prim'],'base':base,'path':c.get('path',''),'sha256':c.get('sha256',''),\n"
@@ -795,6 +889,11 @@ DRIVER = (
     "                       start_identities=[list(x) for x in start_identities],\n"
     "                       identity_violations=identity_violations[:4], old_pointer_starts=old_pointer_starts[:4],\n"
     "                       stdin_starts=[{'argv':s_['argv'][:3],'len':len(s_['text'])} for s_ in stdin_seen[:4]],\n"
+    "                       stdin_forms=sorted({c.get('stdin_form','none') for c in popen_calls}),\n"
+    "                       private_env_paths=sorted({c.get('env_path') for c in popen_calls if c.get('env_given') and c.get('env_path') and c.get('env_path')!=_os.environ.get('PATH','')})[:3],\n"
+    "                       git_launcher_starts=[x for c in popen_calls for x in c.get('git_launcher',[])][:4],\n"
+    "                       recorder_integrity=_integrity_of_recorders(),\n"
+    "                       closure_counts=list(_COUNTS),\n"
     "                       popen_identity_after=identity_after)\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
@@ -830,9 +929,28 @@ DRIVER_BOOT = (
 # The loggers the gate puts on PATH for the live run: each records the resolved binary, the argv and (when stdin is a
 # pipe) the stdin CONTENT into its own file, then execs the real tool. This is the OUT-OF-PROCESS half of the
 # measurement: it does not depend on any in-process recorder and therefore survives every in-process manipulation.
+# v3.10 (review v14 B3): the out-of-process log now carries a sequence number from a locked counter and an HMAC over
+# (sequence || content) with a nonce generated per gate run. Deleted, altered or inserted entries are therefore visible
+# as a broken chain or a gap in the numbering — measured under v3.9: a mutant removed 7 entries (333 -> 328) and no row
+# reacted. The nonce is readable by a product that reads the stub on its own PATH; what the chain buys is that the
+# out-of-process count cannot be reduced SILENTLY, and the row below compares it against the in-process counters, so a
+# product must now forge both halves consistently rather than either one.
 STUB_TEMPLATE = """#!/bin/sh
-L=$(/usr/bin/mktemp {log}/call-XXXXXXXXXX)
-{{ /bin/echo "NAME={name}"; /bin/echo "REAL={real}"; for a in "$@"; do /bin/echo "ARG=$a"; done; }} > "$L" 2>/dev/null
+S={log}/seq
+K={log}/lock
+i=0
+while ! /bin/mkdir "$K" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 2000 ] && break; done
+n=$(/bin/cat "$S" 2>/dev/null || /bin/echo 0)
+n=$((n+1))
+/bin/echo "$n" > "$S"
+/bin/rmdir "$K" 2>/dev/null
+L={log}/call-$n
+B="NAME={name}
+REAL={real}"
+for a in "$@"; do B="$B
+ARG=$a"; done
+M=$(/bin/echo "$n$B" | /usr/bin/openssl dgst -sha256 -hmac "{nonce}" -r 2>/dev/null | /usr/bin/cut -d' ' -f1)
+{{ /bin/echo "SEQ=$n"; /bin/echo "$B"; /bin/echo "MAC=$M"; }} > "$L" 2>/dev/null
 if [ -p /dev/stdin ]; then
   /usr/bin/head -c 262144 > "$L.stdin" 2>/dev/null
   /bin/echo "STDIN=1" >> "$L" 2>/dev/null
@@ -851,6 +969,10 @@ class Rig(RuntimeError):
 # a file that was never produced — and must be a product verdict, not an undecidable exit 2. A failure BEFORE the first
 # row (a missing tool, an unusable subject) is still a rig error.
 EMITTED_ROWS = []
+ABORT_STATE = {"scratch": None, "rows": None}
+# v3.10 (review v14 N1): the gate emits a fixed number of rows. A run that stops early must not look NUMERICALLY better
+# than an honest RED — the abort path therefore counts every row that never ran as FAIL, which needs this denominator.
+EXPECTED_ROW_COUNT = 121  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
 
 
 # v3.2 (N4): a tracked-path pair that collides case-insensitively cannot be checked out cleanly on a case-insensitive file
@@ -1733,7 +1855,12 @@ def snapshot_tree(root, skip_git=False):
     return out
 
 
-def read_stub_calls(log_dir):
+# v3.10 (review v14 N5): the stub log is inside the sweep, but the entries the stubs themselves write are accounted for
+# by the chain row instead of by an exemption — anything ELSE written into that directory is a side effect.
+STUB_LOG_ENTRY = re.compile(r"^stublog/(seq|lock|call-\d+(\.stdin)?)$")
+
+
+def read_stub_calls(log_dir, nonce):
     """[{name, real, argv, stdin}] from the PATH stubs' own log files (v3.9, review v13).
 
     This is measured OUTSIDE the interpreter that runs the product: whatever the product does to the in-process
@@ -1742,10 +1869,17 @@ def read_stub_calls(log_dir):
     for path in sorted(Path(log_dir).glob("call-*")):
         if path.name.endswith(".stdin"):
             continue
-        name, real, argv, has_stdin = "", "", [], False
+        name, real, argv, has_stdin, seq, mac, body = "", "", [], False, None, "", []
         try:
             for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
                 key, _, value = line.partition("=")
+                if key == "SEQ":
+                    seq = int(value) if value.isdigit() else None
+                    continue
+                if key == "MAC":
+                    mac = value
+                    continue
+                body.append(line)
                 if key == "NAME":
                     name = value
                 elif key == "REAL":
@@ -1756,13 +1890,16 @@ def read_stub_calls(log_dir):
                     has_stdin = True
         except OSError:
             continue
+        expect = hmac.new(nonce.encode("utf-8"), (str(seq) + "\n".join(body) + "\n").encode("utf-8"), hashlib.sha256).hexdigest()
+        chain_ok = bool(mac) and hmac.compare_digest(mac, expect)
         stdin_text = ""
         if has_stdin:
             try:
                 stdin_text = Path(str(path) + ".stdin").read_text(encoding="utf-8", errors="replace")[:8000]
             except OSError:
                 stdin_text = ""
-        out.append({"name": name, "real": real, "argv": argv, "stdin": stdin_text})
+        out.append({"name": name, "real": real, "argv": argv, "stdin": stdin_text, "seq": seq, "chain_ok": chain_ok})
+    out.sort(key=lambda c: (c["seq"] is None, c["seq"] or 0))
     return out
 
 
@@ -1957,9 +2094,13 @@ def main():
     stub_dir, stub_log = scratch / "stubbin", scratch / "stublog"
     stub_dir.mkdir(mode=0o755)
     stub_log.mkdir(mode=0o755)
-    STUB_REAL = {"git": GIT, "node": NODE, "python3.12": PYTHON, "env": "/usr/bin/env", "sh": "/bin/sh"}
+    # v3.10 (review v14 N4): `node` had a stub but was in neither the tool nor the wrapper set, so every `node` start was
+    # red four times over. The reference never starts `node`; the decision is that it may not be started during the flows,
+    # so it gets no stub and any attempt to resolve it through PATH is an unresolved binary AND an unexpected tool.
+    STUB_REAL = {"git": GIT, "python3.12": PYTHON, "env": "/usr/bin/env", "sh": "/bin/sh"}
+    stub_nonce = hashlib.sha256(os.urandom(32)).hexdigest()
     for name, real in STUB_REAL.items():
-        write(stub_dir / name, STUB_TEMPLATE.format(log=stub_log, name=name, real=real).encode("utf-8"), 0o755)
+        write(stub_dir / name, STUB_TEMPLATE.format(log=stub_log, name=name, real=real, nonce=stub_nonce).encode("utf-8"), 0o755)
     # Measured identities of every file the flows are allowed to execute: the pinned tools, the two wrapper binaries and
     # the gate's own stubs. A script whose BASENAME is `git` has a different sha256 and is red (review v13 B2).
     ALLOWED_START_SHA = {}
@@ -1996,6 +2137,7 @@ def main():
     subject_sha = {rel: sha((subject / rel).read_bytes()) for rel in sorted(tracked) if (subject / rel).is_file()}
     held = {GATE: sha((ROOT / GATE).read_bytes())}
     rows = []
+    ABORT_STATE["scratch"], ABORT_STATE["rows"] = scratch, rows
 
     def check(label, passed, detail=""):
         rows.append({"label": label, "pass": bool(passed), "detail": str(detail)[-1200:]})
@@ -2872,17 +3014,20 @@ def main():
     # v3.7 (review v11 N8): the sweep also covers the subject's `.git/` (refs, hooks, config, top-level entries) and the
     # gate's own FIXTURE_ROOT recursively, minus the two paths the flows legitimately own (the live replica they are given
     # as a repository, and the driver's TMPDIR). Both were measured blind spots: a flow helper wrote real files in each.
-    # The gate's own stub log is written by the gate, not by the product, so it is not a side effect.
-    fixture_skip = (str(live.relative_to(scratch)), str(ap_tmp.relative_to(scratch)), str(stub_log.relative_to(scratch)))
+    # v3.10 (review v14 N5/B3): the stub log is NOT exempt. It is written by the stubs, which run as the product's own
+    # children, and the product can write and delete there — measured. Its expected growth is bounded by the chain check
+    # below, so ordinary stub writes are accounted for by `stub_log_expected` instead of by an exemption.
+    fixture_skip = (str(live.relative_to(scratch)), str(ap_tmp.relative_to(scratch)))
     before_live_subject, before_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
     before_live_git, before_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
     r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, live, "live_flows"], ap_cwd, stub_env, timeout=1800)
-    stub_calls = read_stub_calls(stub_log)
+    stub_calls = read_stub_calls(stub_log, stub_nonce)
     after_live_subject, after_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
     after_live_git, after_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
     live_side_effects = sorted("subject:" + k[0] for k in set(after_live_subject.items()) ^ set(before_live_subject.items())) + \
         sorted("subject/.git:" + k[0] for k in set(after_live_git.items()) ^ set(before_live_git.items())) + \
-        sorted("fixture:" + k[0] for k in set(after_live_fixture.items()) ^ set(before_live_fixture.items())) + \
+        sorted("fixture:" + k[0] for k in set(after_live_fixture.items()) ^ set(before_live_fixture.items())
+               if not STUB_LOG_ENTRY.match(k[0])) + \
         sorted(f"{d}:{n[0]}" for d in before_live_names for n in set(after_live_names[d] or []) ^ set(before_live_names[d] or [])
                if str(n[0]) != scratch.name)
     live_out = driver_outcome(r)
@@ -2961,6 +3106,14 @@ def main():
             problems.append(f"processes started from unmeasured binaries: {bad_identity[:3]}")
         # v3.9 (review v13 B2/3): old-plan pointers in argv, in the child's env, and in the STDIN the child receives.
         problems += [f"a started process carries an old-plan pointer: {x}" for x in (live_out.get("old_pointer_starts") or [])[:2]]
+        # v3.10 (review v14 B2): stdin in any channel, a private PATH in `env=`, inherited fds and git-as-launcher.
+        unexpected_stdin = sorted(set(live_out.get("stdin_forms") or []) - {"none", "devnull"})
+        if unexpected_stdin:
+            problems.append(f"processes were started with stdin attached: {unexpected_stdin}")
+        if live_out.get("private_env_paths"):
+            problems.append(f"a start carried its own PATH in env=: {live_out.get('private_env_paths')}")
+        if live_out.get("git_launcher_starts"):
+            problems.append(f"git was used as a launcher: {live_out.get('git_launcher_starts')}")
         # The out-of-process half: the PATH stubs logged every start the product resolved by name, with stdin content.
         stub_problems = []
         for call in stub_calls:
@@ -2985,6 +3138,37 @@ def main():
                         f"identities={len(live_out.get('start_identities') or []) if live_out else 0} "
                         f"problems={problems}"[-900:])
     live_green = live_out
+    # v3.10 (review v14 B1(c)/B3(c)): THE row that ties the two halves together. Under v3.9 nothing compared them, so a
+    # product could silence the in-process recorders (measured: 5 against 333) or delete stub log entries (333 -> 328)
+    # without any row reacting. All four counters must agree with each other and with the out-of-process log, the log's
+    # HMAC chain must be unbroken and its numbering contiguous, the recording containers must be the ones installed, and
+    # every counter must clear the measured minimum.
+    problems = []
+    if not live_out or live_out["outcome"] != "returned":
+        problems.append("live driver unavailable")
+    else:
+        counters = {"stub_calls": len(stub_calls), "popen_total": live_out.get("popen_total"),
+                    "init_total": live_out.get("init_total"), "child_total": live_out.get("child_total")}
+        closure = live_out.get("closure_counts") or []
+        if len(set(counters.values())) != 1:
+            problems.append(f"the two halves disagree: {counters}")
+        if len(closure) == 4 and [closure[0], closure[1], closure[2]] != [counters["popen_total"], counters["child_total"], counters["init_total"]]:
+            problems.append(f"closure counters {closure[:3]} differ from the recorded lists {[counters['popen_total'], counters['child_total'], counters['init_total']]}")
+        if live_out.get("recorder_integrity"):
+            problems.append(f"the recording containers were replaced: {live_out.get('recorder_integrity')}")
+        if any(v is None or v < LIVE_MIN_PROCESS_STARTS for v in counters.values()):
+            problems.append(f"process starts below the measured minimum {LIVE_MIN_PROCESS_STARTS}: {counters}")
+        broken = [c["seq"] for c in stub_calls if not c["chain_ok"]][:3]
+        if broken:
+            problems.append(f"stub log entries with a broken HMAC: {broken}")
+        seqs = [c["seq"] for c in stub_calls if c["seq"] is not None]
+        if len(seqs) != len(stub_calls) or seqs != list(range(1, len(seqs) + 1)):
+            problems.append(f"stub log numbering is not contiguous: {len(seqs)} entries, "
+                            f"max={max(seqs) if seqs else 0}, missing={sorted(set(range(1, (max(seqs) if seqs else 0) + 1)) - set(seqs))[:5]}")
+    check("f4_live_flows_out_of_process_stub_log_and_in_process_recorders_agree_with_an_unbroken_chain",
+          not problems, f"stub_calls={len(stub_calls)} popen={(live_out or {}).get('popen_total')} "
+                        f"init={(live_out or {}).get('init_total')} child={(live_out or {}).get('child_total')} "
+                        f"closure={(live_out or {}).get('closure_counts')} problems={problems}"[-900:])
     livemut, livemut_env = replica(bench, "live-flows-mutated", subject, head)
     if PLAN_GEN in tracked and (livemut / PLAN_GEN).is_file():
         overlay(livemut, livemut_env, {PLAN_GEN: ((livemut / PLAN_GEN).read_bytes() + b"\n<!-- LOCAL mutation -->\n", 0o644)},
@@ -3357,8 +3541,14 @@ def main():
               "governance_expected_fails": list(GOVERNANCE_EXPECTED_FAILS),
               "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
               "sandbox_exec_present": Path(SANDBOX_EXEC).is_file(),
-              "fixture_root": str(scratch), "rows": rows, "pass": all(row["pass"] for row in rows)}
+              "fixture_root": str(scratch), "expected_rows": EXPECTED_ROW_COUNT, "rows": rows,
+              "pass": False}
+    check("f10_gate_emitted_the_expected_number_of_rows",
+          len(rows) + 2 == EXPECTED_ROW_COUNT, f"emitted={len(rows) + 2} expected={EXPECTED_ROW_COUNT}")
     check("f10_gate_reached_its_last_row_without_an_unexpected_failure", True, f"rows={len(rows) + 1}")
+    # v3.10 (review v14 N3): the verdict is computed AFTER the last row exists, over the complete row list, and it
+    # requires the pinned row count as well as every row being green.
+    result["pass"] = all(row["pass"] for row in rows) and len(rows) == EXPECTED_ROW_COUNT
     with (scratch / "result.json").open("x") as stream:
         json.dump(result, stream, indent=2, ensure_ascii=False)
     print("PLATFORM_SEPARATION_FINAL_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
@@ -3368,13 +3558,30 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Rig as exc:
-        print("PLATFORM_SEPARATION_FINAL_RIG_ERROR=" + repr(exc), file=sys.stderr)
-        sys.exit(2)
     except Exception as exc:
+        # v3.10 (review v14 N2): `Rig` is no longer exempt once judging has begun. `git()` raises `Rig` on every failed
+        # fixture command and those run on product-controlled content, so a product that broke a late fixture git made the
+        # gate undecidable — exactly the class v3.9 claimed to have closed. A failure BEFORE the first row (missing tool,
+        # unusable subject) is still a rig error; after it, the run is a product verdict.
         if EMITTED_ROWS:
+            rows, scratch = ABORT_STATE["rows"], ABORT_STATE["scratch"]
+            rows.append({"label": "f10_gate_reached_its_last_row_without_an_unexpected_failure", "pass": False,
+                         "detail": f"aborted after {len(rows)} of {EXPECTED_ROW_COUNT} rows: {exc!r}"[:1200]})
             print("FAIL f10_gate_reached_its_last_row_without_an_unexpected_failure", flush=True)
+            # v3.10 (review v14 N1): every row that never ran counts as FAIL, so an aborted run can never read as
+            # numerically closer to green than an honest baseline, and the evidence file is written on this path too.
+            not_run = max(0, EXPECTED_ROW_COUNT - len(rows))
+            for index in range(not_run):
+                rows.append({"label": f"not_run_{index + 1}", "pass": False, "detail": "row never reached (run aborted)"})
+            if scratch is not None:
+                try:
+                    with (Path(scratch) / "result.json").open("w") as stream:
+                        json.dump({"aborted": True, "abort": repr(exc), "rows": rows, "pass": False,
+                                   "expected_rows": EXPECTED_ROW_COUNT}, stream, indent=2, ensure_ascii=False)
+                except OSError:
+                    pass
             print("PLATFORM_SEPARATION_FINAL_ABORT=" + repr(exc), file=sys.stderr)
+            print(f"PLATFORM_SEPARATION_FINAL_ROWS={sum(1 for r in rows if r['pass'])}/{sum(1 for r in rows if not r['pass'])}")
             print("PLATFORM_SEPARATION_FINAL_RESULT=RED_LOCAL_QUALIFICATION")
             sys.exit(1)
         print("PLATFORM_SEPARATION_FINAL_RIG_ERROR=" + repr(exc), file=sys.stderr)
