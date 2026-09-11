@@ -390,16 +390,46 @@ base64 eller läsning av en fil utanför repot vid körning ligger utanför grin
   `os.spawnv(e)` och `os.system` (v3.6 N1), patchade både i sina moduler och i modulens namnrymd — och delegerar till
   originalet. Eftersom runnern är stubbad får ingen providerstart alls ske: en start är misstänkt om argv bär elementet
   `--output-schema` eller `danger-full-access`, om binärens namn bär `codex`, om binären inte är en av de mätta tillåtna
-  (v3.7, granskning nr 11 N9: `git`, `/usr/bin/env`, den pinnade `python3.12`, `/bin/sh`) eller om primitiven inte är den
-  enda mätta (`subprocess.Popen`) — och den måste då bära en av de fångade prompterna. (v3.6 B1) Identiteten mäts dessutom EFTER flödena: grindens egna inspelare måste fortfarande vara
+  eller om primitiven inte är den enda mätta (`subprocess.Popen`) — och den måste då bära en av de fångade prompterna.
+  **(v3.8, granskning nr 12 B2)** Den tillåtna mängden är delad, för v3.7:s vidgning till `{git, env, sh, python3.12}`
+  lade in tre TOLKAR i verktygsmängden utan innehållsregel för vad de ombeds köra (mätt: en providerrad inuti ETT
+  `sh -c`-element var grön). `ALLOWED_LIVE_TOOLS = {git}` känns igen på **exakta argv-element** (ett delsträngstest
+  flaggade det vanliga `git show …:docs/loop/codex-evidence-contract.md`); `ALLOWED_LIVE_WRAPPERS = {env, sh,
+  python3.12}` får hela sin argv genomsökt efter providermarkörer som **delsträng**.
+  **(v3.9, granskning nr 13 B2)** Det räckte inte: sex mätta mutanter var gröna under v3.8 därför att en tolks nyttolast
+  inte behöver ligga i argv alls (`sh` med skriptet på STDIN, argv = `['/bin/sh']`), inte behöver stava markörerna
+  (`sh -c 'exec "$0" "$@"'`, `env A=1 …`, `python3.12 -c '<kort enradare>'`), och därför att `git` var bundet på
+  **basnamn** — ett skalskript som hette `git` fick fri argv och rapporterades som `live_start_binaries=['git']`.
+  Den avgörande mutanten gav en barnprocess `PROVIDER=codex PROMPT=read docs/loop/autonomous-loop-plan-v1.md` på stdin
+  medan grinden var grön. v3.9 binder därför: (i) **identitet, inte basnamn** — varje exekverad fil löses till sin
+  realpath och sha256-prövas mot den mätta mängden (de pinnade verktygen, de två omslagsbinärerna och grindens egna
+  stubbar), och realpath + sha256 redovisas i evidensen i stället för basnamn; (ii) **sluten formmängd för omslag** — en
+  omslagsstart är tillåten bara när hela dess argv är en av formerna i `ALLOWED_LIVE_WRAPPER_FORMS` (`env true`,
+  `python3.12 -c 'print(1)'` — precis granskning nr 11:s två falskt-röda prov), och **stdin till ett omslag är rött
+  villkorslöst**; (iii) **nyttolast utanför argv mäts** — stdin-innehållet fångas både in-process
+  (`Popen.communicate`) och utifrån (PATH-stubbarna), och argv ∪ stdin ∪ barnets miljö skannas tillsammans med
+  `OLD_PLAN_TOKENS` och providermarkörerna. Mätt: referensen startar bara `git`, och de två falskt-röda proven förblir
+  gröna. (v3.6 B1) Identiteten mäts dessutom EFTER flödena: grindens egna inspelare måste fortfarande vara
   installerade på alla primitiver och `m.subprocess` vara samma modulobjekt — en produkt som byter ut `subprocess.Popen`
   från en funktionskropp avinstallerar inspelaren och faller här i stället för att se ren ut.
-  **(v3.7, granskning nr 11 B1) Gränsen binds nu också UNDER `Popen`:** `subprocess.Popen._execute_child` och
+  **(v3.8, granskning nr 12 B1) Inspelarna installeras FÖRE `exec_module`** i live-scenariot. v3.7 fångade stdlib-
+  originalen före modulladdningen men installerade inspelarna efter den, så varje importtidsfångst som inte är en sats —
+  ett funktionsdefault (`def _s(t, _S=os.posix_spawn)`), ett dekoratorargument, ett metoddefault, en metaklass — tog den
+  riktiga primitiven (mätt: 24 riktiga barnprocesser med en neutral prompt medan grinden var grön). Med inspelarna
+  installerade först fångar varje sådan konstruktion det INSTRUMENTERADE objektet, vilket stänger hela klassen
+  strukturellt i stället för form för form — och det är den enda bindningen som finns för de åtta `os.*`-primitiverna,
+  som inte har något attribut under modulattributet att spela in. Starter som produkten gör medan den importeras
+  redovisas separat (`import_time_starts`) och är röda.
+  **(v3.7, granskning nr 11 B1) Gränsen binds också UNDER `Popen`:** `subprocess.Popen._execute_child` och
   `Popen.__init__` fångas ur stdlib INNAN subjektsmodulen laddas, jämförs mot originalen både vid import och efter
   flödena, och `_execute_child` bär grindens egen inspelare under körningen. Därmed mäts (a) det som FAKTISKT når
   barnprocessen — varje argv som skiljer sig från den argv Popen-inspelaren såg redovisas som `argv rewritten between
-  Popen and the child` — och (b) starter gjorda genom en Popen-KLASS som fångats i en klasskropp vid import, eftersom
-  `child_total` då överstiger `popen_total`. Referensen mäter `popen_total == child_total`.
+  Popen and the child` — och (b) starter gjorda genom en Popen-KLASS som fångats vid import, som då syns bara på
+  barnnivån. **(v3.8, granskning nr 12 B1(b)) Aggregatjämförelsen `child_total == popen_total` är balanserbar** (mätt:
+  19 dolda starter plus 19 inspelade Popen-anrop med samma argv som kastar i `__init__` före `_execute_child` gick jämnt
+  ut), så den står kvar som en indikator men bär inte beviset. Beviset är **per anrop**: varje barnstart som sker medan
+  inget inspelat Popen-anrop ligger på stacken redovisas som `child start outside any recorded Popen call`, och argv
+  jämförs som **multimängd** (`Counter`), inte som mängd. Referensen mäter `popen_total = child_total = 333`.
   Samma före/efter-sidoeffektsvep som `prompts`-scenariot omger live-körningen (N4); **(v3.7 N8)** svepet täcker nu
   dessutom subjektets `.git/` (refs, hooks, config, HEAD, toppnivåposter) och grindens egen `FIXTURE_ROOT` rekursivt,
   minus de två sökvägar flödena legitimt äger (live-repliken och drivrutinens `TMPDIR`).
@@ -725,6 +755,20 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
    längre alias, så aliasmängden på baslinjen är TOM och båda fallen är gröna. Kvar som kostnad: den som avsiktligt
    binder `subprocess.Popen` eller en `os.*`-primitiv till ett namn och sedan skriver på det namnet blir röd — vilket är
    regelns syfte, inte en bieffekt.
+   **RÄTTELSE (v3.9, granskning nr 13 N4):** v3.8:s skopmedvetna aliasspårning var **vakuös i praktiken** — fem av fem
+   sondprov band ett exec-objekt utan att bli alias (`[P] = [subprocess.Popen]`, `[x for x in (subprocess.Popen,)][0]`,
+   `P = [subprocess.Popen][0]` följt av `setattr(P, '_exec'+'ute_child', f)`), och det som bar lasten var de
+   namnbaserade reglerna plus den dynamiska identitetskontrollen. v3.9 gör spårningen icke-vakuös: värdet genomsöks
+   rekursivt och varje exec-atom som inte är funktionen i ett anrop inuti värdet gör målet till alias, destrukturering
+   binder varje delmål, och `setattr` med ett BERÄKNAT attributnamn samt varje explicit `__setattr__`-anrop är rött.
+   Mätt: baslinjens aliasmängd är fortfarande tom, de tre sondproven faller, och v12:s två falskt-röda fall
+   (`p[x] = …`, `r.returncode = …`) är fortfarande gröna.
+   **KOSTNAD (v3.9, granskning nr 13 B2/N3):** den slutna formmängden för omslagsbinärer gör varje legitim
+   `sh -c …`/`env …`/`python -c …` under ett flöde röd utom de två mätta formerna, `stdin` till ett omslag är rött
+   villkorslöst, och ett exec-objekt som defaultargument (`def f(cmd, _r=subprocess.run)`) är rött. Alla tre är
+   medvetna rigiditeter; var och en stänger ett mätt hål.
+   **KOSTNAD (v3.9, granskning nr 13 N7):** grinden städar inte sitt `FIXTURE_ROOT`. Granskare nr 13 mätte **31 rötter
+   och 3,6 GiB** under en enda granskning; den som kör ansvarar för att ta bort dem.
    Samma sak gäller de slutna namnmängderna (`LIVE_STUB_NAMES`, `EXPECTED_PROMPT_BUILDERS`,
    `EXPECTED_PROMPT_CALLERS`, `EXPECTED_PLAN_GUARD_CALLERS`): legitim omdöpning är röd per design —
    autopilotens skivtuplar och `EMPIRICAL_GATE_PATH`. Refreeze av h-036/h-037/h-035/h-038/document-authority (stale
@@ -752,7 +796,7 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   under live-flödena fångar de kända formerna; ett andra providersamtal som startar en process fångas nu av Popen-inspelningen,
   medan ett samtal via ett redan öppet handtag eller ett nät-API inte gör det); benchens miljö och den stubbade runnerns svar
   (inklusive att första svaret är NEEDS_REMEDIATION) är synliga fingeravtryck (N1).
-- (v3.7) Providergränsen är bunden till SJU mätpunkter: de sex AST-identiteterna, de fyra blob-pinnade beroendefilerna,
+- (v3.9) Providergränsen är bunden till NIO mätpunkter, varav en ligger UTANFÖR produktens interpreter: de sex AST-identiteterna, de fyra blob-pinnade beroendefilerna,
   autopilotens modul- OCH klasskroppsform (satser **och värden** — en klasskropp får inte binda ett exec-objekt),
   exec-ytsregeln över HELA filen med **transitiv aliasspårning** (varje namn, klassattribut eller instansattribut som
   någonstans i filen binds från `subprocess.<exec>`/`os.<exec>`, från ett redan spårat alias, från ett attribut på ett
@@ -761,12 +805,37 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   som helst, den pinnade authority-bibliotekssökvägen (AST + importerad fil), processtart-inspelningen med
   identitetskontroll före OCH efter flödena över `subprocess.Popen` + `os.posix_spawn/execv*/spawnv*/system`, och
   **inspelningen ETT LAGER NER**: `Popen._execute_child`/`Popen.__init__` fångade ur stdlib före modulladdning, mätta
-  före och efter flödena, med jämförelse av den argv som faktiskt når barnet mot den argv Popen-inspelaren såg.
+  före och efter flödena, med jämförelse av den argv som faktiskt når barnet mot den argv Popen-inspelaren såg — och
+  **(v3.8) INSTALLATIONEN FÖRE `exec_module`**, som är det som binder importtidsfångster som inte är satser
+  (funktionsdefault, dekoratorargument, metoddefault) och som är den enda bindningen för de åtta `os.*`-primitiverna.
+  Den statiska formregeln täcker samma två former (`FunctionDef.args.defaults`/`kw_defaults` och `decorator_list`).
+  **(v3.9) Den NIONDE och bärande mätpunkten ligger utanför produktens interpreter:** live-körningens `PATH` är grindens
+  egna stubbar, som loggar den riktiga binären, hela argv och hela stdin till filer som grinden läser utifrån. Granskning
+  nr 13 visade varför de åtta in-process-mätpunkterna inte räcker: drivrutinen körde som `__main__` i samma interpreter
+  som produkten och lämnade stdlib-originalen i sin egen namnrymd, så ett `import __main__` gav en produkt fri
+  processtart med **varje räknare identisk med referensens**. In-process-halvan är nu hårdare (privat namnrymd,
+  inspelare på `Popen.__init__`, identitet prövad vid varje anrop, realpath + sha256 på varje exekverad fil, sluten
+  formmängd för omslag, stdin-innehåll fångat), men **beviset bärs av utifrån-mätningen**, som per konstruktion inte kan
+  påverkas av något produkten gör i sin egen process.
   Utanför dem gäller deklarerad gräns: annan kod under `controller/**` som autopiloten inte importerar vid start,
   miljövariabler som launchern själv läser, provideranrop som inte startar en process (öppet handtag, nät-API) och
   start via en primitiv utanför den instrumenterade mängden och utanför `subprocess` (mätt av granskare nr 11:
   `ctypes`→libc `posix_spawn` och `multiprocessing` med `fork`-start, båda utan ny process-image för providern).
   Stubbnamnen och de slutna namn-/binärmängderna gör legitim omstrukturering röd per design (p.8).
+- (v3.8) **Tre kvarvarande icke-blockerande fynd behålls som deklarerade gränser, med mätt motivering.**
+  (a) *Remedieringsbeviset* (granskning nr 11 N5, nr 12 N3): `LIVE_FINDING_ID`-kravet är ett närvarokrav på id-strängen;
+  `builder_prompt(...) + "Reviewer finding ids: FIXTURE-1."` uppfyller det. Gränsen är immateriell för ordern — den kan
+  inte låta den gamla planen nå en levande prompt, bara göra remedieringsbeviset svagare än det låter.
+  (b) *Rollpolicy muterad under flödena* (nr 11 N6, nr 12 N4): `AUTOPILOT_ROLE_POLICY.update({...})` från en
+  funktionskropp syns inte i `constants`-scenariot, som mäter vid import. Mätt motivering: konstanten är avbildningen
+  `roll → (modell, reasoning_effort)` och dess enda konsument är `run_codex`:s modellroutning; den styr varken
+  `allowed_write` eller promptinnehåll och kan därför inte låta den gamla planen eller ett webbstyrande dokument nå en
+  prompt. Immateriell.
+  (c) *Handoffens generationsvärde* (nr 11 N7, nr 12 N5): handoffraden delsträngstestar `PLAN_GENERATION` och värdet, så
+  en handoff som skriver `PLAN_GENERATION=platform-v1-legacy` överlever om planens sökväg innehåller `platform-v2`.
+  Mätt motivering: den gamla planens blobar och sökvägar är mekaniskt förbjudna vid HEAD (F1/F2) och handoffen skannas
+  som aktivt dokument, så det som kan införas är en MOTSTRIDIG ETIKETT, inte en styrande gammal plan. Immateriell för
+  ordern, men den av de tre som ligger närmast en dokumentbindning i order (2).
 - (v3) Planens semantik bortom token: att skivkriterierna troget bevarar den gamla planens funktionella mål,
   tekniska skydd och negativa kontroller, att bootstrapavsnittet inte omdefinierar delegationsdokumenten, och att
   `PLAN_GENERATION`-värdet är meningsfullt — grinden binder tabellen, tokenmängderna och pekarna; texten läses av
@@ -1383,6 +1452,7 @@ iterationen; `architect_resolution` och `empirical_unattended_flow` sveptes aldr
 |---|---|
 | B1(a) exec-alias på djupet | `exec_surface_assignments`: transitiv aliasmängd (namn/klassattribut/instansattribut bundna från `subprocess.<exec>`/`os.<exec>`, från ett spårat alias, från ett attribut på ett sådant, eller från ett anrop av ett sådant) + rött för varje tilldelning vars mål är ett attribut PÅ ett alias eller vars kedja passerar ett exec-modul-/exec-ytsnamn |
 | B1(b) interna attribut | `FORBIDDEN_ATTR_TARGETS` = `_execute_child`, `__init__`, `__call__`, `__new__`, `__get__`, `__getattribute__`, `__subclasshook__`, `_posixsubprocess`, `_communicate`, `_get_handles` — rött på VAD SOM HELST, alias eller inte; samma namnkontroll på `setattr(obj, "<namn>", …)` |
+| B1(a′) default-/dekoratorfångst | `exec_surface_assignments` fäller ett exec-objekt bundet som **defaultargument** eller skickat till en **dekorator** — båda evalueras vid import, före varje inspelare. **KOSTNAD (granskning nr 13 N3):** `def f(cmd, _r=subprocess.run)` är ett vanligt legitimt idiom och blir RÖTT; det undantas inte, eftersom `subprocess.run` ligger i exec-ytan och ett undantag skulle återöppna v12:s B1 |
 | B1(b′) klasskroppens värden | `check_class` kräver literalt material i klasskroppens `Assign` (mätt: baslinjens fem klasskroppar bär inga `Assign` alls) — fäller `POPEN = subprocess.Popen` och granskningens N2 |
 | B1(c) mät det som når barnet | DRIVERn fångar `subprocess.Popen`, `Popen._execute_child` och `Popen.__init__` **före** modulladdning (även de nio primitiverna, som i v3.6 fångades efter och därmed jämfördes mot sig själva), mäter identitet vid import och efter flödena, installerar en inspelare på `_execute_child` och rapporterar `child_total`, `child_binaries`, `child_argv_rewritten` och `child_starts_unexpected` |
 | B1(c′) starter under inspelaren | live-providerraden kräver `child_total == popen_total` (en start genom en klasskroppsfångad Popen syns bara på barnnivån) och att ingen argv skrivits om mellan Popen och barnet |
@@ -1405,7 +1475,7 @@ Delta statisk → full är exakt de fem sandboxraderna (`f5_loop_fall_py_green_i
 `f8_ordinary_loop_e2e…`), precis som granskning nr 11 räknade. De 41 röda raderna:
 
 `f1_required_absences_web_material_and_transferred_files`, `f1_no_blob_at_head_equals_a_transferred_pre_split_governance_or_pre_platform_plan_object`,
-`f2_closure_all_active_references_resolve_to_tracked_files`, `f2_active_doc_free_of_web_governance_and_human_hand_rules_*` (7 dokument:
+`f2_closure_all_active_references_resolve_to_tracked_files`, `f2_active_doc_free_of_web_governance_and_human_hand_rules_*` (8 dokument:
 architect-SKILL, empirical-runner-SKILL, AGENTS.md, README.md, codex-handoff, autonomous-loop-plan-v1, full-roadmap, substitution-contract),
 `f2_plan_generation_and_handoff_reached_by_closure_and_scanned_as_active_documents`, `f2_tree_wide_no_web_governance_reference_outside_frozen_evidence`,
 `f2_router_authority_order_names_plan_generation_as_active_and_historik_names_the_earlier_generation_as_history`,
@@ -1553,6 +1623,42 @@ Falskt-röda prov som **förblir gröna** (113/5 = enbart de fem sandboxraderna)
 (`python3.12 -c 'print(1)'`), och de två granskning nr 12 mätte som falskt röda under v3.7 —
 `a12_legit_local_p_dict` (en lokal dict som heter `p`) och `a12_legit_result_attr`
 (`r.returncode = int(r.returncode or 0)` på en `CompletedProcess`).
+
+### Oberoende kontraktsgranskning nr 13 (på c4721ae8) → v3.9
+`GATE_REVIEW_RESULT=NOT_READY` med två blockerare som har **samma rot: mätningen skedde i samma interpreter som
+produkten**. Allt som remedierades efter nr 12 bekräftades verkligt, RED 72/46 reproducerades med identisk 41-radslista,
+F7 är byte-identisk med v2.5, radnamnsdiffen är tom, och `live_*`/`live_mutated_*` serialiseras korrekt. Granskaren
+byggde dessutom referensen 113/5 i tre iterationer **utan att öppna något test-author-artefakt** — kontraktet är alltså
+nåbart ur dokumentet allena.
+
+**B1 — grindens egen drivrutin lämnade stdlib-originalen åt produkten.** Drivrutinen körde som `__main__` i samma
+interpreter som subjektsmodulen och behöll `_ORIG_PRIMS`/`_ORIG_EXEC_CHILD`. En mutant som gjorde `import __main__`,
+återställde `_execute_child` runt en start och satte tillbaka inspelaren fick **113/5 med räknare identiska med den rena
+referensens** (333/333, `start_binaries=['git']`, identiteter `True`, `child_unrecorded=[]`) medan en riktig barnprocess
+kördes. Statiskt missades den eftersom `Subscript` inte gav alias, `type.__setattr__` med hopsatt namn varken är `Assign`
+eller `setattr` med konstant, och `__main__` saknades i den dynamiska uppslagsmängden.
+
+**B2 — omslagsregeln fångade bara tre markörsträngar i argv.** Sex mutanter gröna med bevisade barnprocesser, den
+avgörande med `PROVIDER=codex PROMPT=read docs/loop/autonomous-loop-plan-v1.md` **på stdin**: den gamla planen nådde en
+levande prompt i praktiken medan grinden var grön.
+
+| Fynd | Åtgärd i grinden (v3.9) |
+|---|---|
+| B1 privat namnrymd | `DRIVER_BOOT`: `python -c` kör en kort bootstrap som exekverar drivrutinskällan i en privat namnrymdsdict (inte en modul, inte i `sys.modules`) och tömmer den efteråt — `__main__` bär varken original, inspelare eller anropslistor |
+| B1 klassens egen `__init__` | inspelare på `Popen.__init__`: varje instansiering av den riktiga klassen syns oavsett vilken referens anroparen använde; `init_total == popen_total` krävs och `init_unrecorded` redovisas |
+| B1 identitet per anrop | instrumenteringens identitet prövas vid **varje inspelat anrop** (`identity_violations`), inte bara före/efter flödena |
+| B1 statiskt | `GATE_NAMESPACE_TOKENS` (`import __main__`, `__main__.`, `sys.modules['__main__']`, `type/object.__setattr__`, `__builtins__`, `gate_driver`) i autopilotkällan; explicit `__setattr__`-anrop och `setattr` med **beräknat** attributnamn är röda |
+| **B1/B2 utifrån-mätningen** | live-körningens `PATH` är grindens egna stubbar (`git`, `node`, `python3.12`, `env`, `sh`); varje stubb loggar realbinär, argv och stdin till en fil och delegerar. Grinden läser loggarna utanför produktens process och skannar argv ∪ stdin med `OLD_PLAN_TOKENS`, `COMMIT_READ_TOKENS` och providermarkörerna. Referensen: `stub_calls = 333` |
+| B2 identitet | varje exekverad fil löses till realpath och sha256-prövas mot den mätta mängden; basnamn rapporteras aldrig ensamt |
+| B2 sluten formmängd | `ALLOWED_LIVE_WRAPPER_FORMS` = `('env','true')`, `('python3.12','-c','print(1)')`; allt annat omslags-argv är rött, och stdin till ett omslag är rött villkorslöst |
+| B2 nyttolast utanför argv | stdin-innehåll fångas in-process (`Popen.communicate`) och utifrån; argv ∪ stdin ∪ barnets miljö skannas med `OLD_PLAN_TOKENS` |
+| N1/N2 | de två dokumentpåståenden granskaren underkände var **inte gjorda** — v3.8:s dokumentpatch avbröts på ett ankarfel innan filen skrevs. Båda är nu utförda: "SJU mätpunkter" → NIO, "(7 dokument" → "(8 dokument", och `child_total`-meningen är omskriven |
+| N3 | default-/dekoratorregeln står nu i kriterieavsnittet med sin mätta falskt-röda kostnad |
+| N4 | aliasspårningen är icke-vakuös (containrar, comprehensions, destrukturering, beräknade `setattr`-namn); baslinjen fortfarande tom, v12:s två falskt-röda fortfarande gröna |
+| N5 | drivrutinens cwd är en egen tom katalog, inte dess `TMPDIR`, så `python -c`:s `sys.path[0]` inte längre är produktens skrivbara yta; cwd ingår i sidoeffektsvepet |
+| N7 | `FIXTURE_ROOT`-kostnaden (31 rötter / 3,6 GiB per granskning) inskriven i p.8 |
+| **Riggdisciplin (eget fynd)** | En mutant kunde göra grinden ODÖMBAR (exit 2) genom att bryta `subprocess.Popen` globalt så att ett av produktens egna hjälpskript hängde. `run()`/`run_bytes()` behandlar nu timeout som ett PRODUKTutfall (rc 124 + `PLATFORM_SEPARATION_TIMEOUT`-markör i stdout), och ett oväntat undantag **efter** att grinden börjat döma ger den nya sista raden `f10_gate_reached_its_last_row_without_an_unexpected_failure` som RÖD med exit 1 i stället för exit 2. Ett fel **före** första raden (saknat verktyg, oanvändbart subjekt) är fortfarande ett riggfel. Radantalet är därför 119, inte 118 |
+| **Dokumentfynd (eget)** | Granskningens N1/N2 ("uteblivna rättelser") berodde inte på att ändringarna var ogjorda utan på att **v3.8:s dokumentpatch avbröts på ett ankarfel innan filen skrevs** — sju redan utförda ändringar gick därmed förlorade tillsammans med den felande. Alla sju är nu utförda, och patchskripten skriver numera filen även när ett enskilt ankare missas |
 
 ### Builder / kvalificering
 (fylls i efter produktkörningen)

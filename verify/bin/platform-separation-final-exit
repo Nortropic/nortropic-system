@@ -239,6 +239,12 @@ PROMPT_TEXT_METHODS = frozenset({"rstrip", "strip", "lstrip"})   # v3.4: no-argu
 # occur only in the measured closed set below (provider snapshot/identity code, publication, selftest); a runner or a prompt
 # reached through a dynamic lookup anywhere else is RED. String constants naming a runner appear only in selftest's marker list.
 DYNAMIC_LOOKUP_NAMES = ("globals", "getattr", "vars", "locals", "eval", "exec", "__import__")
+# v3.9 (review v13 B1): reaching the gate's own driver — `import __main__`, `sys.modules['__main__']` — is forbidden by
+# name, and so is `type.__setattr__`/`object.__setattr__`, which writes an attribute without being an Assign or a
+# `setattr(...)` call with a constant name. Measured on 320c9df7: the autopilot names none of them.
+GATE_NAMESPACE_TOKENS = (r"import\s+__main__", r"from\s+__main__\s+import", r"__main__\s*\.",
+                         r"sys\.modules\[\s*['\"]__main__", r"type\.__setattr__", r"object\.__setattr__",
+                         r"(?<![\w.])__builtins__(?![\w])", r"gate_driver")
 DYNAMIC_LOOKUP_FUNCTIONS = frozenset({"_provider_snapshot", "_python_snapshot", "_strict_provider_authority", "publication_authority", "publish", "selftest"})
 RUNNER_NAME_STRING_FUNCTIONS = frozenset({"selftest"})
 # v3.4 (review v8 B2): the provider machinery is "not touched" by this contract — bound as normalised AST identity (sha256 of
@@ -283,9 +289,21 @@ PROVIDER_SHAPE_BINARY_TOKENS = ("codex",)
 # markers as a SUBSTRING, and any argv element longer than WRAPPER_ARGV_MAX that is not one of the captured prompts is
 # treated as a payload. Measured: the reference starts only `git`, and review v11's two false-red probes
 # (`/usr/bin/env true`, `python3.12 -c 'print(1)'`) carry no marker and no long element — both stay green.
+# v3.9 (review v13 B2): a basename is not an identity and an argv is not a payload. Six measured mutants were green
+# under v3.8: `sh` with the script on STDIN (argv=['/bin/sh']), `sh -c 'exec "$0" "$@"'` with short elements, `env` with
+# a short argv, `python3.12 -c` with a short one-liner, and — the worst — a shell script whose BASENAME is `git`, which
+# the evidence file reported as `live_start_binaries=['git']`. One of them put
+# `PROVIDER=codex PROMPT=read docs/loop/autonomous-loop-plan-v1.md` on a child's stdin while the gate was green.
+# v3.9 therefore binds three things instead of the basename set:
+#   (1) TOOLS keep free argv but are identified by RESOLVED PATH + sha256 against the measured tool set;
+#   (2) WRAPPERS are a CLOSED FORM SET — an interpreter start is allowed only when its whole argv equals one of the
+#       measured forms, and stdin to a wrapper is red unconditionally;
+#   (3) argv, stdin CONTENT and the env passed to the child are scanned together for old-plan pointers.
 ALLOWED_LIVE_TOOLS = frozenset({"git"})
 ALLOWED_LIVE_WRAPPERS = frozenset({"env", "sh", "python3.12"})
 ALLOWED_LIVE_BINARIES = ALLOWED_LIVE_TOOLS | ALLOWED_LIVE_WRAPPERS
+# Measured wrapper forms: the two legitimate runtime probes review v11 measured as false reds. Anything else is red.
+ALLOWED_LIVE_WRAPPER_FORMS = (("env", "true"), ("python3.12", "-c", "print(1)"))
 WRAPPER_ARGV_MAX = 200
 ALLOWED_LIVE_PRIMITIVES = frozenset({"subprocess.Popen"})   # the baseline never uses posix_spawn/exec*/system
 # The start primitives the driver instruments and whose identity must survive the flows.
@@ -459,12 +477,13 @@ DRIVER_MARK = "PLATFORM_SEPARATION_DRIVER="
 # Real module, real callables, never the operational __main__. Stop -> exit 7.
 DRIVER = (
     "import importlib.util,sys,json,subprocess as _sp\n"
-    "import os as _os\n"
+    "import os as _os, hashlib as _hl, shutil as _sh\n"
     # v3.7 (review v11 B1): every primitive AND the Popen class's own start method are captured before the subject module is
     # loaded, so an import-time rebinding is measured against the stdlib original rather than against itself.
     "_ORIG_POPEN=_sp.Popen\n"
     "_ORIG_EXEC_CHILD=getattr(_ORIG_POPEN,'_execute_child',None)\n"
     "_ORIG_POPEN_INIT=_ORIG_POPEN.__init__\n"
+    "_ORIG_COMM=_ORIG_POPEN.communicate\n"
     "_PRIMS=[(_sp,'Popen')]+[(_os,n) for n in ('posix_spawn','posix_spawnp','execv','execve','execvp','spawnv','spawnve','system') if hasattr(_os,n)]\n"
     "_ORIG_PRIMS={(mod.__name__,name):getattr(mod,name) for mod,name in _PRIMS}\n"
     "from pathlib import Path\n"
@@ -476,7 +495,33 @@ DRIVER = (
     # neutral prompt while the gate was green). With the recorders installed first, every such capture captures the
     # INSTRUMENTED object, which closes the whole class structurally rather than form by form. The eight `os.*`
     # primitives have no attribute below the module attribute to record, so this is the only place they can be bound.
-    "popen_calls=[]; child_calls=[]; rec_count=[0]; _ACTIVE=[]; _RECS={}\n"
+    "popen_calls=[]; child_calls=[]; init_calls=[]; stdin_seen=[]; rec_count=[0]; _ACTIVE=[]; _RECS={}; _IDC={}\n"
+    # v3.9 (review v13 B2): every started process is identified by the RESOLVED PATH and the sha256 of the file that is
+    # actually executed, never by its basename — a script whose basename is `git` reported `start_binaries=['git']` and
+    # was indistinguishable from the reference in the evidence file.
+    "def _identify(path_):\n"
+    "    try:\n"
+    "        p_=_sh.which(str(path_), path=_os.environ.get('PATH','')) or str(path_)\n"
+    "        rp=_os.path.realpath(p_)\n"
+    "    except Exception:\n"
+    "        rp=str(path_)\n"
+    "    if rp in _IDC: return _IDC[rp]\n"
+    "    try:\n"
+    "        with open(rp,'rb') as fh_: h_=_hl.sha256(fh_.read()).hexdigest()\n"
+    "    except Exception: h_=''\n"
+    "    _IDC[rp]=(rp,h_); return _IDC[rp]\n"
+    # v3.9 (review v13 B1): the identity of the instrumentation is checked at EVERY recorded call, not only before and
+    # after the flows — a product that restores a primitive around one start and puts the recorder back was invisible.
+    "def _identity_now():\n"
+    "    try:\n"
+    "        return bool(all(getattr(sys.modules[mn],pn) is _EXPECT[(mn,pn)] for (mn,pn) in _EXPECT)\n"
+    "                    and getattr(_ORIG_POPEN,'_execute_child',None) is _EXPECT_CHILD\n"
+    "                    and _ORIG_POPEN.__init__ is _EXPECT_INIT)\n"
+    "    except Exception:\n        return False\n"
+    "def _envtext(env_):\n"
+    "    try:\n"
+    "        return ' '.join(str(k_)+'='+str(v_) for k_,v_ in dict(env_ or {}).items())\n"
+    "    except Exception: return ''\n"
     "def _make_rec(mn,pn,orig):\n"
     "    def _rec(*a,**k):\n"
     "        rec_count[0]+=1\n"
@@ -484,13 +529,36 @@ DRIVER = (
     "            argv=a[0] if a else k.get('args') or k.get('argv')\n"
     "            items=[str(x) for x in argv] if not isinstance(argv,(str,bytes)) else [str(argv)]\n"
     "        except Exception: items=['<unreadable>']\n"
-    "        popen_calls.append({'prim':mn+'.'+pn,'argv':items})\n"
+    "        rp_,h_=_identify(k.get('executable') or (items[0] if items else ''))\n"
+    "        rec_={'prim':mn+'.'+pn,'argv':items,'path':rp_,'sha256':h_,'identity':_identity_now(),\n"
+    "              'stdin_set':(k.get('stdin') is not None or k.get('input') is not None),\n"
+    "              'env_text':_envtext(k.get('env'))}\n"
+    "        popen_calls.append(rec_)\n"
     "        _ACTIVE.append(items)\n"
     "        try:\n"
     "            return orig(*a,**k)\n"
     "        finally:\n"
     "            _ACTIVE.pop()\n"
     "    return _rec\n"
+    # v3.9 (review v13 B1): a recorder on the CLASS's own __init__ sees every instantiation of the real Popen class, no
+    # matter which reference to the class the caller used — including a class object recovered from the driver's own
+    # namespace. `init_total` must equal `popen_total`, and an instantiation made while no recorded call is on the stack
+    # is reported by identity.
+    "def _init_rec(self,args,*a,**k):\n"
+    "    try:\n"
+    "        items=[str(x) for x in args] if not isinstance(args,(str,bytes)) else [str(args)]\n"
+    "    except Exception: items=['<unreadable>']\n"
+    "    init_calls.append({'argv':items,'recorded':bool(_ACTIVE),'identity':_identity_now()})\n"
+    "    return _ORIG_POPEN_INIT(self,args,*a,**k)\n"
+    # v3.9 (review v13 B2/3): stdin CONTENT is captured, not only the fact that stdin was set — the decisive mutant put
+    # `PROMPT=read docs/loop/autonomous-loop-plan-v1.md` on a child's stdin with argv=['/bin/sh'].
+    "def _comm_rec(self,input=None,timeout=None):\n"
+    "    if input is not None:\n"
+    "        try:\n"
+    "            t_=input if isinstance(input,str) else bytes(input).decode('utf-8','replace')\n"
+    "            stdin_seen.append({'argv':[str(x) for x in (getattr(self,'args',None) or [])],'text':t_[:4000]})\n"
+    "        except Exception: pass\n"
+    "    return _ORIG_COMM(self,input,timeout)\n"
     # Per-CALL identity, not an aggregate: a child start that happens while no recorded Popen call is on the stack is
     # unrecorded, whatever the totals say. Review v12 B1(b) balanced the v3.7 aggregates (19 hidden starts + 19 recorded
     # Popen calls with the same argv that raised inside __init__ before _execute_child); that is caught here.
@@ -500,20 +568,22 @@ DRIVER = (
     "    except Exception: items=['<unreadable>']\n"
     "    child_calls.append({'argv':items,'recorded':bool(_ACTIVE)})\n"
     "    return _ORIG_EXEC_CHILD(self,args,executable,*a,**k)\n"
-    "_EXPECT=dict(_ORIG_PRIMS); _EXPECT_CHILD=_ORIG_EXEC_CHILD\n"
+    "_EXPECT=dict(_ORIG_PRIMS); _EXPECT_CHILD=_ORIG_EXEC_CHILD; _EXPECT_INIT=_ORIG_POPEN_INIT\n"
     "if scenario=='live_flows':\n"
     "    for mod,name in _PRIMS:\n"
     "        r_=_make_rec(mod.__name__,name,_ORIG_PRIMS[(mod.__name__,name)]); _RECS[(mod.__name__,name)]=r_; setattr(mod,name,r_)\n"
     "    _EXPECT=dict(_RECS)\n"
     "    if _ORIG_EXEC_CHILD is not None:\n"
     "        _ORIG_POPEN._execute_child=_child_rec; _EXPECT_CHILD=_child_rec\n"
+    "    _ORIG_POPEN.__init__=_init_rec; _EXPECT_INIT=_init_rec\n"
+    "    _ORIG_POPEN.communicate=_comm_rec\n"
     "s=importlib.util.spec_from_file_location(sys.argv[4] if len(sys.argv)>4 else 'subject_autopilot', subject/'" + AUTOPILOT + "')\n"
     "m=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)\n"
     "out={'scenario':scenario}\n"
     "out['popen_identity']=bool(all(getattr(sys.modules[mn],pn) is _EXPECT[(mn,pn)] for (mn,pn) in _EXPECT)\n"
     "                           and getattr(m,'subprocess',_sp) is _sp\n"
     "                           and getattr(_ORIG_POPEN,'_execute_child',None) is _EXPECT_CHILD\n"
-    "                           and _ORIG_POPEN.__init__ is _ORIG_POPEN_INIT)\n"
+    "                           and _ORIG_POPEN.__init__ is _EXPECT_INIT)\n"
     "out['core_module_file']=getattr(sys.modules.get('core'),'__file__',None)\n"
     "try:\n"
     "    if scenario=='selftest_none':\n"
@@ -656,28 +726,49 @@ DRIVER = (
     # whole argv is searched for provider markers as a SUBSTRING and any element longer than WRAPPER_ARGV_MAX that is not
     # a captured prompt counts as a payload. A binary in neither set is red as before.
     "            _TOOLS=" + repr(sorted(ALLOWED_LIVE_TOOLS)) + "; _WRAPPERS=" + repr(sorted(ALLOWED_LIVE_WRAPPERS)) + "\n"
+    "            _FORMS=" + repr(tuple(tuple(f) for f in ALLOWED_LIVE_WRAPPER_FORMS)) + "\n"
     "            _SUBSTR_MARKS=" + repr(tuple(PROVIDER_SHAPE_ELEMENTS) + tuple(PROVIDER_SHAPE_BINARY_TOKENS)) + "\n"
+    "            _OLD_TOKENS=" + repr(tuple(OLD_PLAN_TOKENS)) + "\n"
+    "            import re as _re2\n"
+    "            _stdin_by_argv={}\n"
+    "            for s_ in stdin_seen: _stdin_by_argv.setdefault(tuple(s_['argv']),[]).append(s_['text'])\n"
     "            def _base_of(items):\n"
     "                return (items[0].rsplit('/',1)[-1] if items else '')\n"
-    "            def _marked(items,base):\n"
-    "                if base in _WRAPPERS:\n"
-    "                    joined=' '.join(items)\n"
-    "                    if any(t in joined for t in _SUBSTR_MARKS): return True\n"
-    "                    return any(len(x)>" + str(WRAPPER_ARGV_MAX) + " and x not in prompts_seen for x in items)\n"
-    "                return any(mk in items for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
     "            def _is_matched(items):\n"
     "                return any(items and (items[-1]==p or p in items[-1]) for p in prompts_seen)\n"
+    "            def _payload(c,items):\n"
+    "                parts=list(items)+[c.get('env_text','')]+_stdin_by_argv.get(tuple(items),[])\n"
+    "                return ' '.join(x for x in parts if x)\n"
+    "            def _old_hits(text_):\n"
+    "                return [p_ for p_ in _OLD_TOKENS if _re2.search(p_,text_)][:2]\n"
     "            def _shape(c):\n"
-    "                base=_base_of(c['argv'])\n"
+    "                items=c['argv']; base=_base_of(items); form=tuple([base]+[str(x) for x in items[1:]])\n"
+    "                payload=_payload(c,items)\n"
+    "                marked=any(mk in items for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
+    "                if base in _WRAPPERS:\n"
+    # A wrapper's payload need not be in argv at all, so the form is closed and stdin to a wrapper is red outright.
+    "                    if form not in _FORMS: marked=True\n"
+    "                    if c.get('stdin_set'): marked=True\n"
+    "                    if any(t in payload for t in _SUBSTR_MARKS): marked=True\n"
+    "                else:\n"
+    "                    if any(t in (c.get('env_text','') + ' ' + ' '.join(_stdin_by_argv.get(tuple(items),[]))) for t in _SUBSTR_MARKS): marked=True\n"
+    "                old=_old_hits(payload)\n"
     "                allowed=(base in _TOOLS or base in _WRAPPERS) and c['prim'] in " + repr(sorted(ALLOWED_LIVE_PRIMITIVES)) + "\n"
-    "                return {'prim':c['prim'],'base':base,'marked':_marked(c['argv'],base),'allowed':allowed,\n"
-    "                        'last':(c['argv'][-1] if c['argv'] else ''),'matched':_is_matched(c['argv'])}\n"
+    "                return {'prim':c['prim'],'base':base,'path':c.get('path',''),'sha256':c.get('sha256',''),\n"
+    "                        'identity':c.get('identity',True),'marked':marked,'allowed':allowed,'old':old,\n"
+    "                        'last':(items[-1] if items else ''),'matched':_is_matched(items)}\n"
     "            shapes=[_shape(c) for c in popen_calls]\n"
     "            suspect=[s for s in shapes if (s['marked'] or not s['allowed']) and not s['matched']]\n"
+    "            old_pointer_starts=[s['base']+':'+','.join(s['old']) for s in shapes if s['old']]\n"
+    "            identity_violations=[s['base'] for s in shapes if not s['identity']]\n"
+    "            start_identities=sorted({(s['path'],s['sha256']) for s in shapes})\n"
     "            def _cshape(c):\n"
-    "                base=_base_of(c['argv'])\n"
-    "                return {'base':base,'marked':_marked(c['argv'],base),'last':(c['argv'][-1] if c['argv'] else ''),\n"
-    "                        'matched':_is_matched(c['argv']),'recorded':c.get('recorded',True)}\n"
+    "                items=c['argv']; base=_base_of(items)\n"
+    "                form=tuple([base]+[str(x) for x in items[1:]])\n"
+    "                marked=any(mk in items for mk in " + repr(PROVIDER_SHAPE_ELEMENTS) + ") or any(t in base for t in " + repr(PROVIDER_SHAPE_BINARY_TOKENS) + ")\n"
+    "                if base in _WRAPPERS and form not in _FORMS: marked=True\n"
+    "                return {'base':base,'marked':marked,'last':(items[-1] if items else ''),\n"
+    "                        'matched':_is_matched(items),'recorded':c.get('recorded',True)}\n"
     "            child_shapes=[_cshape(c) for c in child_calls]\n"
     "            child_suspect=[s for s in child_shapes if (s['marked'] or (s['base'] not in _TOOLS and s['base'] not in _WRAPPERS)) and not s['matched']]\n"
     # v3.8 (review v12 B1(b)): argv is compared as a MULTISET, not a set, so an equal number of hidden starts and recorded
@@ -691,7 +782,7 @@ DRIVER = (
     "            identity_after=bool(all(getattr(sys.modules[mn],pn) is _RECS[(mn,pn)] for (mn,pn) in _RECS)\n"
     "                                and getattr(m,'subprocess',_sp) is _sp and m.subprocess.Popen is _RECS[('subprocess','Popen')]\n"
     "                                and (_ORIG_EXEC_CHILD is None or _ORIG_POPEN._execute_child is _child_rec)\n"
-    "                                and _ORIG_POPEN.__init__ is _ORIG_POPEN_INIT)\n"
+    "                                and _ORIG_POPEN.__init__ is _init_rec)\n"
     "            out.update(outcome='returned', flows=outcomes, popen_total=len(popen_calls), recorded=rec_count[0],\n"
     "                       provider_starts=len(suspect), provider_starts_unmatched=[s['base']+':'+s['last'][:120] for s in suspect[:4]],\n"
     "                       start_primitives=sorted({s['prim'] for s in shapes}), start_binaries=sorted({s['base'] for s in shapes}),\n"
@@ -699,6 +790,11 @@ DRIVER = (
     "                       child_starts_unexpected=[s['base']+':'+s['last'][:120] for s in child_suspect[:4]],\n"
     "                       child_argv_rewritten=child_rewritten[:4], child_unrecorded=child_unrecorded[:4],\n"
     "                       import_time_starts=import_time_starts, import_time_children=import_time_children,\n"
+    "                       init_total=len(init_calls),\n"
+    "                       init_unrecorded=[' '.join(c['argv'])[:140] for c in init_calls if not c.get('recorded',True)][:4],\n"
+    "                       start_identities=[list(x) for x in start_identities],\n"
+    "                       identity_violations=identity_violations[:4], old_pointer_starts=old_pointer_starts[:4],\n"
+    "                       stdin_starts=[{'argv':s_['argv'][:3],'len':len(s_['text'])} for s_ in stdin_seen[:4]],\n"
     "                       popen_identity_after=identity_after)\n"
     "    elif scenario=='canary_fault':\n"
     "        raise NameError('fixture-canary')\n"
@@ -711,8 +807,50 @@ DRIVER = (
 )
 
 
+# v3.9 (review v13 B1): the driver no longer runs as `__main__`. `python -c` executes a short bootstrap whose only job
+# is to exec the driver source in a PRIVATE namespace dict — not a module, not reachable through `sys.modules`, and
+# cleared afterwards — so `__main__` holds no stdlib originals, no recorders and no call lists. Measured under v3.8: a
+# product that did `import __main__`, recovered `_ORIG_PRIMS`/`_ORIG_EXEC_CHILD`, restored `_execute_child` around one
+# start and put the recorder back started a real child process with EVERY counter identical to the reference.
+DRIVER_BOOT = (
+    "import sys\n"
+    "_src=sys.argv.pop(1)\n"
+    "_code=compile(open(_src,encoding='utf-8').read(),'<gate-driver>','exec')\n"
+    "del _src\n"
+    "_ns={'__name__':'gate_driver','__builtins__':__builtins__}\n"
+    "_rc=0\n"
+    "try:\n"
+    "    exec(_code,_ns)\n"
+    "except SystemExit as _e:\n"
+    "    _rc=_e.code if isinstance(_e.code,int) else 0\n"
+    "finally:\n"
+    "    _ns.clear()\n"
+    "del _ns,_code\n"
+    "raise SystemExit(_rc)\n")
+# The loggers the gate puts on PATH for the live run: each records the resolved binary, the argv and (when stdin is a
+# pipe) the stdin CONTENT into its own file, then execs the real tool. This is the OUT-OF-PROCESS half of the
+# measurement: it does not depend on any in-process recorder and therefore survives every in-process manipulation.
+STUB_TEMPLATE = """#!/bin/sh
+L=$(/usr/bin/mktemp {log}/call-XXXXXXXXXX)
+{{ /bin/echo "NAME={name}"; /bin/echo "REAL={real}"; for a in "$@"; do /bin/echo "ARG=$a"; done; }} > "$L" 2>/dev/null
+if [ -p /dev/stdin ]; then
+  /usr/bin/head -c 262144 > "$L.stdin" 2>/dev/null
+  /bin/echo "STDIN=1" >> "$L" 2>/dev/null
+  exec {real} "$@" < "$L.stdin"
+fi
+exec {real} "$@"
+"""
+
+
 class Rig(RuntimeError):
     pass
+
+
+# v3.9 (review v13, rig discipline): rows already emitted are visible to the top-level handler. A failure AFTER the gate
+# has begun judging is the SUBJECT's doing — a product that breaks `subprocess.Popen` globally made a later helper read
+# a file that was never produced — and must be a product verdict, not an undecidable exit 2. A failure BEFORE the first
+# row (a missing tool, an unusable subject) is still a rig error.
+EMITTED_ROWS = []
 
 
 # v3.2 (N4): a tracked-path pair that collides case-insensitively cannot be checked out cleanly on a case-insensitive file
@@ -1143,9 +1281,9 @@ def exec_surface_assignments(source):
         walk(scope)
         return out
 
-    def is_exec_object(node, aliases):
-        """`subprocess.Popen`, `os.execv`, `subprocess.Popen._execute_child`, an alias in scope, or an attribute of one.
-        A CALL is deliberately not an exec object (v3.8): `p = subprocess.run(...)` binds a result, not the surface."""
+    def is_exec_atom(node, aliases):
+        """A direct reference to the exec surface: `subprocess.Popen`, `os.execv`, an alias in scope, or an attribute
+        of one. Never a CALL — `p = subprocess.run(...)` binds a RESULT, not the surface (review v12 N2)."""
         if isinstance(node, ast.Name):
             return node.id in aliases
         if not isinstance(node, ast.Attribute):
@@ -1155,6 +1293,23 @@ def exec_surface_assignments(source):
             return True
         parts = chain(node)
         return bool(parts) and len(parts) >= 2 and parts[0] in EXEC_MODULE_NAMES and parts[1] in EXEC_SURFACE_ATTRS
+
+    def is_exec_object(node, aliases):
+        """True when the VALUE carries the exec surface itself through any container or indexing step.
+
+        v3.8 matched only a direct atom, which review v13 measured as vacuous: `[subprocess.Popen][0]`,
+        `[x for x in (subprocess.Popen,)][0]` and `[P] = [subprocess.Popen]` all bound the real class without becoming
+        aliases. v3.9 walks the value and accepts any exec atom that is not the FUNCTION of a call inside it, so a
+        container or a comprehension no longer launders the reference while `p = subprocess.run(...)` stays a result."""
+        if isinstance(node, ast.Call):
+            return False
+        called = {id(sub.func) for sub in ast.walk(node) if isinstance(sub, ast.Call)}
+        for element in ast.walk(node):
+            if id(element) in called:
+                continue
+            if isinstance(element, (ast.Name, ast.Attribute)) and is_exec_atom(element, aliases):
+                return True
+        return False
 
     def scope_aliases(scope, inherited):
         aliases, nodes = set(inherited), own_nodes(scope)
@@ -1169,12 +1324,23 @@ def exec_surface_assignments(source):
                     continue
                 if not is_exec_object(value, aliases):
                     continue
-                for target in targets:
+                def bind(target):
+                    nonlocal grew
+                    if isinstance(target, (ast.Tuple, ast.List)):
+                        for element in target.elts:
+                            bind(element)
+                        return
+                    if isinstance(target, ast.Starred):
+                        bind(target.value)
+                        return
                     if isinstance(target, (ast.Name, ast.Attribute)):
                         text = ast.unparse(target)
                         if text not in aliases:
                             aliases.add(text)
                             grew = True
+
+                for target in targets:
+                    bind(target)
             if not grew:
                 break
         return aliases, nodes
@@ -1229,9 +1395,16 @@ def exec_surface_assignments(source):
                     check_target(target, node, aliases)
             elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
                 check_target(node.target, node, aliases)
+            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "__setattr__":
+                # v3.9 (review v13 B1): `type.__setattr__(P, '_exec'+'ute_child', f)` is neither an Assign nor a
+                # `setattr(...)` with a constant name. Any explicit __setattr__ call in this file is red.
+                problems.append(f"line {node.lineno}: explicit __setattr__ call {ast.unparse(node.func)[:40]}")
             elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "setattr":
                 arg = ast.unparse(node.args[0]) if node.args else "?"
                 name = node.args[1].value if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) else None
+                # A non-constant attribute name in `setattr` hides the target from every name rule.
+                if len(node.args) > 1 and not isinstance(node.args[1], ast.Constant):
+                    problems.append(f"line {node.lineno}: setattr with a computed attribute name on {arg[:30]}")
                 on_alias = arg in aliases or any(arg.startswith(alias + ".") for alias in aliases)
                 if arg in EXEC_MODULE_NAMES or arg in PROMPT_RUNNERS or on_alias \
                         or (isinstance(name, str) and (name in FORBIDDEN_ATTR_TARGETS or name in EXEC_SURFACE_ATTRS
@@ -1481,12 +1654,23 @@ class Bench:
 
 
 def run(argv, cwd, env, timeout=120, stdin=None):
-    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
-                          text=True, timeout=timeout, check=False, input=stdin)
+    """v3.9 (review v13): a timeout is a PRODUCT verdict, not a rig error. A product that makes one of its own helper
+    scripts hang made the gate exit 2 (undecidable) instead of exit 1 — measured with a mutant that broke `Popen`
+    globally. The timeout is reported as rc 124 with a marker in stdout, so every row that reads rc falls normally."""
+    try:
+        return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True,
+                              text=True, timeout=timeout, check=False, input=stdin)
+    except subprocess.TimeoutExpired as exc:
+        out = (exc.stdout or "") if isinstance(exc.stdout, str) else (exc.stdout or b"").decode("utf-8", "replace")
+        err = (exc.stderr or "") if isinstance(exc.stderr, str) else (exc.stderr or b"").decode("utf-8", "replace")
+        return subprocess.CompletedProcess(argv, 124, out + f"\nPLATFORM_SEPARATION_TIMEOUT={timeout}s {argv[0]}\n", err)
 
 
 def run_bytes(argv, cwd, env, timeout=120):
-    return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True, timeout=timeout, check=False)
+    try:
+        return subprocess.run([str(a) for a in argv], cwd=str(cwd), env=env, capture_output=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired as exc:
+        return subprocess.CompletedProcess(argv, 124, (exc.stdout or b"") + b"\nPLATFORM_SEPARATION_TIMEOUT\n", exc.stderr or b"")
 
 
 def git_raw(root, env, *args):
@@ -1546,6 +1730,39 @@ def snapshot_tree(root, skip_git=False):
         if p.is_file() or p.is_symlink():
             st = p.lstat()
             out[str(p.relative_to(root))] = (st.st_size, st.st_mtime_ns)
+    return out
+
+
+def read_stub_calls(log_dir):
+    """[{name, real, argv, stdin}] from the PATH stubs' own log files (v3.9, review v13).
+
+    This is measured OUTSIDE the interpreter that runs the product: whatever the product does to the in-process
+    recorders, a process it resolves by name through PATH is recorded here, with its argv AND its stdin content."""
+    out = []
+    for path in sorted(Path(log_dir).glob("call-*")):
+        if path.name.endswith(".stdin"):
+            continue
+        name, real, argv, has_stdin = "", "", [], False
+        try:
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                key, _, value = line.partition("=")
+                if key == "NAME":
+                    name = value
+                elif key == "REAL":
+                    real = value
+                elif key == "ARG":
+                    argv.append(value)
+                elif key == "STDIN":
+                    has_stdin = True
+        except OSError:
+            continue
+        stdin_text = ""
+        if has_stdin:
+            try:
+                stdin_text = Path(str(path) + ".stdin").read_text(encoding="utf-8", errors="replace")[:8000]
+            except OSError:
+                stdin_text = ""
+        out.append({"name": name, "real": real, "argv": argv, "stdin": stdin_text})
     return out
 
 
@@ -1725,6 +1942,33 @@ def main():
     scratch = Path(tempfile.mkdtemp(prefix="platform-separation-final-")).resolve()
     print("FIXTURE_ROOT=" + str(scratch), flush=True)
     bench = Bench(scratch)
+    # v3.9 (review v13 N5): the driver's TMPDIR is no longer its cwd. `python -c` puts the cwd on sys.path ahead of the
+    # stdlib, and the TMPDIR is both writable by the product and exempt from the side-effect sweep, so a file staged
+    # there in one scenario could shadow a not-yet-imported stdlib module in a later one. cwd is now an empty directory
+    # the product is not given, and it IS covered by the sweep.
+    ap_cwd = scratch / "driver-cwd"
+    ap_cwd.mkdir(mode=0o755)
+    driver_dir = scratch / "driver"
+    driver_dir.mkdir(mode=0o755)
+    driver_src = driver_dir / "gate_driver_source.py"
+    write(driver_src, DRIVER.encode("utf-8"), 0o444)
+    # The PATH stubs: one per tool the flows may resolve by name. PATH for the live run is the stub directory ALONE, so
+    # every name lookup is logged from outside the interpreter that runs the product.
+    stub_dir, stub_log = scratch / "stubbin", scratch / "stublog"
+    stub_dir.mkdir(mode=0o755)
+    stub_log.mkdir(mode=0o755)
+    STUB_REAL = {"git": GIT, "node": NODE, "python3.12": PYTHON, "env": "/usr/bin/env", "sh": "/bin/sh"}
+    for name, real in STUB_REAL.items():
+        write(stub_dir / name, STUB_TEMPLATE.format(log=stub_log, name=name, real=real).encode("utf-8"), 0o755)
+    # Measured identities of every file the flows are allowed to execute: the pinned tools, the two wrapper binaries and
+    # the gate's own stubs. A script whose BASENAME is `git` has a different sha256 and is red (review v13 B2).
+    ALLOWED_START_SHA = {}
+    for label, real in list(STUB_REAL.items()):
+        p = Path(real)
+        if p.is_file():
+            ALLOWED_START_SHA[sha(p.read_bytes())] = label
+    for name in STUB_REAL:
+        ALLOWED_START_SHA[sha((stub_dir / name).read_bytes())] = "stub:" + name
     probe_env = bench.env(bench.tmp("probe"))
     head_probe = run([GIT, "-C", str(subject), "rev-parse", "--verify", "HEAD^{commit}"], scratch, probe_env)
     if head_probe.returncode or not COMMIT_FORM.fullmatch(head_probe.stdout.strip()):
@@ -1755,6 +1999,7 @@ def main():
 
     def check(label, passed, detail=""):
         rows.append({"label": label, "pass": bool(passed), "detail": str(detail)[-1200:]})
+        EMITTED_ROWS.append(label)
         print(("PASS " if passed else "FAIL ") + label, flush=True)
 
     def text(rel):
@@ -1773,9 +2018,9 @@ def main():
     canary_repo = bench.scratch / "canary-repo"
     canary_repo.mkdir()
     git(canary_repo, probe_env, "init", "--quiet", f"--template={bench.template}")
-    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "unknown_scenario"], scratch, probe_env)
+    canary = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, canary_repo, "unknown_scenario"], scratch, probe_env)
     check("canary_driver_unknown_scenario_is_not_outcome", canary.returncode == 9 and driver_outcome(canary) is None)
-    canary = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "canary_fault"], scratch, probe_env)
+    canary = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, canary_repo, "canary_fault"], scratch, probe_env)
     check("canary_driver_fault_is_not_outcome", canary.returncode not in (0, 7) and driver_outcome(canary) is None)
     check("canary_token_scan_detects_web_governance_and_human_hand_rules",
           bool(scan("Läs docs/07-konstitution.md först.", WEB_TOKENS)) and bool(scan("Konstitutionen står över.", WEB_TOKENS))
@@ -1875,7 +2120,8 @@ def main():
     # Autopilot constants are read once here (module import only; no repository needed) and reused by F2 and F4.
     ap_tmp = bench.tmp("autopilot")
     ap_env = bench.env(ap_tmp)
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "constants"], ap_tmp, ap_env, timeout=300)
+    stub_env = bench.env(ap_tmp, extra={"PATH": str(stub_dir)})
+    r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, canary_repo, "constants"], ap_cwd, ap_env, timeout=300)
     consts = driver_outcome(r)
     consts_detail = (r.stdout + r.stderr)[-200:]
     if not consts or consts["outcome"] != "returned":
@@ -2390,7 +2636,7 @@ def main():
             problems.append("SUBSTITUTION_ROADMAP and ROADMAP overlap")
     check("f4_plan_constants_are_single_literal_assignments_equal_at_runtime_and_the_two_roadmap_tuples_keep_their_identities",
           not problems, str(problems)[:900])
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+    r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, rep, "roadmap_plan"], ap_cwd, ap_env, timeout=300)
     obj = driver_outcome(r)
     check("f4_ensure_roadmap_plan_returns_in_replica_without_any_remote",
           bool(obj) and obj["outcome"] == "returned" and git_raw(rep, rep_env, "remote").stdout.strip() == "",
@@ -2400,12 +2646,12 @@ def main():
         plan_bytes = (mut / PLAN_GEN).read_bytes()
         overlay(mut, mut_env, {PLAN_GEN: (plan_bytes.replace(b"\n", b"\n<!-- LOCAL mutation -->\n", 1), 0o644)},
                 message="LOCAL fixture: mutated plan generation")
-        r = run([PYTHON, "-B", "-c", DRIVER, subject, mut, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+        r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, mut, "roadmap_plan"], ap_cwd, ap_env, timeout=300)
         obj = driver_outcome(r)
         check("f4_ensure_roadmap_plan_stops_on_mutated_plan_generation", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
         gone, gone_env = replica(bench, "plan-missing", subject, head)
         overlay(gone, gone_env, {}, removals=(HANDOFF_GEN,), message="LOCAL fixture: handoff removed")
-        r = run([PYTHON, "-B", "-c", DRIVER, subject, gone, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+        r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, gone, "roadmap_plan"], ap_cwd, ap_env, timeout=300)
         obj = driver_outcome(r)
         check("f4_ensure_roadmap_plan_stops_on_missing_handoff", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
         # v3.6 (review v10 N5): mutate the plan AND every other tracked file carrying the same bytes, so a guard that
@@ -2439,21 +2685,21 @@ def main():
                                0o755 if mode.endswith("755") else 0o644)
         if copies:
             overlay(amut, amut_env, copies, message="LOCAL fixture: every tracked plan anchor updated to the mutated plan")
-        r = run([PYTHON, "-B", "-c", DRIVER, subject, amut, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+        r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, amut, "roadmap_plan"], ap_cwd, ap_env, timeout=300)
         obj = driver_outcome(r)
         check("f4_ensure_roadmap_plan_stops_when_the_plan_and_every_tracked_copy_are_mutated_together",
               bool(obj) and obj["outcome"] == "stop",
               f"anchors={len(copies)} {sorted(copies)[:4]} " + (r.stdout + r.stderr)[-260:])
         # v3.7 (review v11 N4): and the guard must actually READ ROADMAP_PLAN_BLOBS — repin the constant in the imported
         # module and require Stop on an UNMUTATED replica. A guard anchored to a tracked digest manifest returns here.
-        r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "roadmap_plan_repinned"], ap_tmp, ap_env, timeout=300)
+        r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, rep, "roadmap_plan_repinned"], ap_cwd, ap_env, timeout=300)
         obj = driver_outcome(r)
         check("f4_ensure_roadmap_plan_reads_the_pinned_plan_blobs_measured_by_repinning_them_in_the_imported_module",
               bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
         hmut, hmut_env = replica(bench, "handoff-mutated", subject, head)
         handoff_bytes = (hmut / HANDOFF_GEN).read_bytes()
         overlay(hmut, hmut_env, {HANDOFF_GEN: (handoff_bytes + b"\n<!-- LOCAL mutation -->\n", 0o644)}, message="LOCAL fixture: mutated handoff")
-        r = run([PYTHON, "-B", "-c", DRIVER, subject, hmut, "roadmap_plan"], ap_tmp, ap_env, timeout=300)
+        r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, hmut, "roadmap_plan"], ap_cwd, ap_env, timeout=300)
         obj = driver_outcome(r)
         check("f4_ensure_roadmap_plan_stops_on_mutated_handoff", bool(obj) and obj["outcome"] == "stop", (r.stdout + r.stderr)[-300:])
         # v3.2 (N3): the verify-cli pin of the plan generation measured IN EFFECT — prepare refuses a mutated plan in the
@@ -2533,7 +2779,7 @@ def main():
                         str(Path(tempfile.gettempdir()).parent))
     before_names = snapshot_names(*SIDE_EFFECT_DIRS)
     module_alias = "m" + hashlib.sha256(os.urandom(16)).hexdigest()[:12]
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, canary_repo, "prompts", module_alias], prompts_root / "cwd", prompts_env, timeout=300)
+    r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, canary_repo, "prompts", module_alias], prompts_root / "cwd", prompts_env, timeout=300)
     after_fixture, after_subject = snapshot_tree(prompts_root), snapshot_tree(subject, skip_git=True)
     after_names = snapshot_names(*SIDE_EFFECT_DIRS)
     side_effects = sorted(set(after_fixture.items()) ^ set(before_fixture.items())) + \
@@ -2566,6 +2812,9 @@ def main():
     core_file = produced.get("core_module_file")
     if not core_file or Path(core_file).resolve() != (subject / AUTHORITY_LIB_DIR / "core.py").resolve():
         form_problems.append(f"imported authority library is not {AUTHORITY_LIB_DIR}/core.py: {core_file}")
+    # v3.9 (review v13 B1): the autopilot may not name the gate's own namespace. Measured on 320c9df7: no hit.
+    form_problems += [f"autopilot@{line} reaches the gate's namespace: {pat}"
+                      for pat, line, _v in scan(autopilot_source, GATE_NAMESPACE_TOKENS)[:3]]
     check("f4_autopilot_module_and_class_bodies_are_the_declared_form_no_exec_surface_rebinding_anywhere_and_the_pinned_authority_library",
           not form_problems, str(form_problems)[:900])
     dep_problems = []
@@ -2623,10 +2872,12 @@ def main():
     # v3.7 (review v11 N8): the sweep also covers the subject's `.git/` (refs, hooks, config, top-level entries) and the
     # gate's own FIXTURE_ROOT recursively, minus the two paths the flows legitimately own (the live replica they are given
     # as a repository, and the driver's TMPDIR). Both were measured blind spots: a flow helper wrote real files in each.
-    fixture_skip = (str(live.relative_to(scratch)), str(ap_tmp.relative_to(scratch)))
+    # The gate's own stub log is written by the gate, not by the product, so it is not a side effect.
+    fixture_skip = (str(live.relative_to(scratch)), str(ap_tmp.relative_to(scratch)), str(stub_log.relative_to(scratch)))
     before_live_subject, before_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
     before_live_git, before_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, live, "live_flows"], ap_tmp, ap_env, timeout=1800)
+    r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, live, "live_flows"], ap_cwd, stub_env, timeout=1800)
+    stub_calls = read_stub_calls(stub_log)
     after_live_subject, after_live_names = snapshot_tree(subject, skip_git=True), snapshot_names(*SIDE_EFFECT_DIRS)
     after_live_git, after_live_fixture = snapshot_git_meta(subject), snapshot_fixture(scratch, fixture_skip)
     live_side_effects = sorted("subject:" + k[0] for k in set(after_live_subject.items()) ^ set(before_live_subject.items())) + \
@@ -2698,6 +2949,29 @@ def main():
         unexpected_child = sorted(set(live_out.get("child_binaries") or []) - ALLOWED_LIVE_BINARIES - {""})
         if unexpected_child:
             problems.append(f"child processes ran unexpected binaries: {unexpected_child[:4]}")
+        # v3.9 (review v13 B1): a recorder on the Popen CLASS's own __init__ sees every instantiation of the real class,
+        # whichever reference to it the caller used — including one recovered from the driver's namespace.
+        if live_out.get("init_total") != live_out.get("popen_total"):
+            problems.append(f"Popen instantiations {live_out.get('init_total')} != recorded starts {live_out.get('popen_total')}")
+        problems += [f"Popen instantiated outside any recorded call: {x}" for x in (live_out.get("init_unrecorded") or [])[:2]]
+        problems += [f"the instrumentation was not installed at a recorded start: {x}" for x in (live_out.get("identity_violations") or [])[:2]]
+        # v3.9 (review v13 B2): identity, not basename. Every executed file is resolved to its realpath and hashed.
+        bad_identity = [f"{p}:{h[:12]}" for p, h in (live_out.get("start_identities") or []) if h not in ALLOWED_START_SHA]
+        if bad_identity:
+            problems.append(f"processes started from unmeasured binaries: {bad_identity[:3]}")
+        # v3.9 (review v13 B2/3): old-plan pointers in argv, in the child's env, and in the STDIN the child receives.
+        problems += [f"a started process carries an old-plan pointer: {x}" for x in (live_out.get("old_pointer_starts") or [])[:2]]
+        # The out-of-process half: the PATH stubs logged every start the product resolved by name, with stdin content.
+        stub_problems = []
+        for call in stub_calls:
+            stub_text = " ".join(call["argv"]) + " " + call["stdin"]
+            hits = scan(stub_text, OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)
+            stub_problems += [f"{call['name']} start carries {pat}" for pat, _l, _x in hits[:2]]
+            if any(mark in call["stdin"] for mark in PROVIDER_SHAPE_ELEMENTS + PROVIDER_SHAPE_BINARY_TOKENS):
+                stub_problems.append(f"{call['name']} start carries a provider marker on stdin")
+            if call["name"] not in ALLOWED_LIVE_TOOLS and call["name"] not in ALLOWED_LIVE_WRAPPERS:
+                stub_problems.append(f"unexpected tool resolved through PATH: {call['name']}")
+        problems += stub_problems[:3]
         unexpected_binaries = sorted(set(live_out.get("start_binaries") or []) - ALLOWED_LIVE_BINARIES - {""})
         if unexpected_binaries:
             problems.append(f"processes started with unexpected binaries: {unexpected_binaries[:4]}")
@@ -2707,7 +2981,8 @@ def main():
     problems += [f"side effect during live flows: {x}" for x in live_side_effects[:6]]
     check("f4_live_flows_start_no_provider_process_outside_the_stubbed_runner_and_leave_no_side_effects",
           not problems, f"popen_total={(live_out or {}).get('popen_total')} child_total={(live_out or {}).get('child_total')} "
-                        f"binaries={(live_out or {}).get('start_binaries')} child_binaries={(live_out or {}).get('child_binaries')} "
+                        f"init_total={(live_out or {}).get('init_total')} stub_calls={len(stub_calls)} "
+                        f"identities={len(live_out.get('start_identities') or []) if live_out else 0} "
                         f"problems={problems}"[-900:])
     live_green = live_out
     livemut, livemut_env = replica(bench, "live-flows-mutated", subject, head)
@@ -2715,7 +2990,7 @@ def main():
         overlay(livemut, livemut_env, {PLAN_GEN: ((livemut / PLAN_GEN).read_bytes() + b"\n<!-- LOCAL mutation -->\n", 0o644)},
                 message="LOCAL fixture: mutated plan for live flows")
     git(livemut, livemut_env, "update-ref", "refs/remotes/origin/main", git(livemut, livemut_env, "rev-parse", "HEAD"))
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, livemut, "live_flows"], ap_tmp, ap_env, timeout=900)
+    r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, livemut, "live_flows"], ap_cwd, ap_env, timeout=900)
     # v3.8 (review v12 N1): this is the MUTATED run; v3.7 assigned it back to `live_out`, so `result.json` serialised the
     # mutated counters under `live_*` while the row details carried the green run's — the whole "59 vs 333" discrepancy.
     live_mut_out = driver_outcome(r)
@@ -2874,7 +3149,7 @@ def main():
     else:
         problems += [f"{rel}: {oid} != {head_oid(rel)}" for rel, oid in blobs.items() if head_oid(rel) != oid]
     check("f4_autopilot_substitution_blobs_equal_head_blobs_of_generation_documents", not problems, str(problems)[:600])
-    r = run([PYTHON, "-B", "-c", DRIVER, subject, rep, "selftest_none"], ap_tmp, ap_env, timeout=300)
+    r = run([PYTHON, "-B", "-c", DRIVER_BOOT, driver_src, subject, rep, "selftest_none"], ap_cwd, ap_env, timeout=300)
     obj = driver_outcome(r)
     check("f4_autopilot_selftest_none_returns_pass_prints_plan_generation_and_no_plan_sha",
           bool(obj) and obj["outcome"] == "returned" and "AUTOPILOT_V4_SELFTEST=PASS" in r.stdout
@@ -3057,6 +3332,16 @@ def main():
               "live_child_argv_rewritten": (live_green or {}).get("child_argv_rewritten"),
               "live_child_unrecorded": (live_green or {}).get("child_unrecorded"),
               "live_import_time_starts": (live_green or {}).get("import_time_starts"),
+              "live_init_total": (live_green or {}).get("init_total"),
+              "live_init_unrecorded": (live_green or {}).get("init_unrecorded"),
+              "live_identity_violations": (live_green or {}).get("identity_violations"),
+              "live_old_pointer_starts": (live_green or {}).get("old_pointer_starts"),
+              "live_stdin_starts": (live_green or {}).get("stdin_starts"),
+              "live_start_identities": (live_green or {}).get("start_identities"),
+              "live_stub_calls": [{"name": c["name"], "argv": c["argv"][:6], "stdin_len": len(c["stdin"])} for c in stub_calls[:6]],
+              "live_stub_call_total": len(stub_calls),
+              "live_allowed_wrapper_forms": [list(f) for f in ALLOWED_LIVE_WRAPPER_FORMS],
+              "live_allowed_start_sha256": sorted(ALLOWED_START_SHA.values()),
               "live_popen_identity": (live_green or {}).get("popen_identity"),
               "live_popen_identity_after": (live_green or {}).get("popen_identity_after"),
               "live_mutated_popen_total": (live_mut_out or {}).get("popen_total"),
@@ -3073,6 +3358,7 @@ def main():
               "python": PYTHON, "python_sha256": PYTHON_SHA, "node": NODE, "node_sha256": sha(Path(NODE).read_bytes()),
               "sandbox_exec_present": Path(SANDBOX_EXEC).is_file(),
               "fixture_root": str(scratch), "rows": rows, "pass": all(row["pass"] for row in rows)}
+    check("f10_gate_reached_its_last_row_without_an_unexpected_failure", True, f"rows={len(rows) + 1}")
     with (scratch / "result.json").open("x") as stream:
         json.dump(result, stream, indent=2, ensure_ascii=False)
     print("PLATFORM_SEPARATION_FINAL_RESULT=" + ("PASS_LOCAL_QUALIFICATION_ONLY" if result["pass"] else "RED_LOCAL_QUALIFICATION"))
@@ -3082,6 +3368,14 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
+    except Rig as exc:
+        print("PLATFORM_SEPARATION_FINAL_RIG_ERROR=" + repr(exc), file=sys.stderr)
+        sys.exit(2)
     except Exception as exc:
+        if EMITTED_ROWS:
+            print("FAIL f10_gate_reached_its_last_row_without_an_unexpected_failure", flush=True)
+            print("PLATFORM_SEPARATION_FINAL_ABORT=" + repr(exc), file=sys.stderr)
+            print("PLATFORM_SEPARATION_FINAL_RESULT=RED_LOCAL_QUALIFICATION")
+            sys.exit(1)
         print("PLATFORM_SEPARATION_FINAL_RIG_ERROR=" + repr(exc), file=sys.stderr)
         sys.exit(2)
