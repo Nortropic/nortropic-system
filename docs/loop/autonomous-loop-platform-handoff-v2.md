@@ -38,9 +38,11 @@ Låst utan omförhandling: skivtuplarnas identiteter och ordning, den skyddade m
    pinnen; läs sedan detta dokument.
 2. Läs `AGENTS.md` för auktoritetsordningen och `docs/loop/regler.md` för arbetsmetoden.
 3. Läs `docs/loop/harness-substitution-contract-v1.md` för plattformsgränsen och implementationsformen.
-4. Ta första raden i planens skivtabell vars `status` är `OBYGGD` och vars samtliga beroenden är gröna.
-   Vid oförändrat läge är det SUB-1 / h-027.
-5. Kör rollflödets steg i ordning; hoppa aldrig över den oberoende granskningen.
+4. Bootstrap-kedjans kvarvarande arbete går före skivtabellen: se `## Bootstrap etablerar plattformen` i
+   planen. Vid oförändrat läge är nästa steg h-035 eller h-037; skivtabellens första rad, SUB-1 / h-027,
+   tas först när kedjan är kvalificerad mot plangenerationen.
+5. Ta därefter första raden i skivtabellen vars `status` är `OBYGGD` och vars samtliga beroenden är gröna.
+6. Kör rollflödets steg i ordning; hoppa aldrig över den oberoende granskningen.
 
 ## Stoppregler
 

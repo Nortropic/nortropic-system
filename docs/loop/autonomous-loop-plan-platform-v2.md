@@ -162,9 +162,13 @@ bara läser källtext i stället för att mäta effekt är inte färdig.
 
 Bootstrap-kedjan h-031, h-032, h-033, h-034, h-035, h-036, h-037, h-038 och h-039 etablerar plattformen:
 identitet och proveniens, native-kärnan, starten och dess körtidsbild, dokumentauktoriteten och
-runtime-städningen. Kedjan är byggd och dess exitprov ligger i trädet. De frysta delegationsdokumenten under
-`docs/loop/` som beskriver den kvarvarande bootstrap-delegationen är read-only historik och omdefinieras inte
-av denna plan; planen namnger bara vad kedjan har etablerat.
+runtime-städningen. Varje skiva hålls isär i fyra lägen: implementationen i trädet, den historiskt
+kvalificerade versionen, kvalificeringen mot dagens plangeneration, och det produktarbete som återstår.
+Samtliga nio exitprov ligger i trädet — det bevisar bara det första läget. h-032 saknar sin produkt
+(`controller/result/**` finns inte i trädet) och h-038 saknar sin (inneslutningen av försöksroten finns
+inte i `controller/launch/cli`); ingen av kedjans bindningar är kvalificerad mot plangenerationen förrän
+den har mätts mot den. De frysta delegationsdokumenten under `docs/loop/` som beskriver den kvarvarande
+bootstrap-delegationen är read-only historik och omdefinieras inte av denna plan.
 
 Bootstrap har en ÄNDLIG överlämningspunkt till kvalificerad autonom drift. Punkten är nådd när den lokala
 bootstrap-milstolpen i `## Avslutskriterier` är uppfylld och plattformens bindningar är kvalificerade för
@@ -172,9 +176,28 @@ plangenerationen. Organisationens fortsatta utveckling sker därefter, inom mål
 rollflöde — den ligger inte inom bootstrap. Hela framtida Nortropic behöver alltså inte byggas färdigt under
 bootstrap; bootstrap ska bara lämna över ett system som kan driva den utvecklingen själv.
 
-En ny H-post tillkommer bara när ett konkret hinder för överlämningen kräver den. Refreeze av h-035, h-036,
-h-037 och h-038 efter en ändring i autopiloten eller i routerdokumenten är ett eget H-steg och batchas; den
-hör till bootstrap, inte till skivorna.
+En ny H-post tillkommer bara när ett konkret hinder för överlämningen kräver den. Ompinningen av h-035,
+h-036, h-037 och h-038 mot plangenerationen tas i beroendeordningen h-035 parallellt med h-037, därefter
+h-036, därefter h-038. h-035 och h-038 var röda redan före plangenerationen, så ompinningen är inte
+villkorad av någon ändring i autopilotskriptet eller i routerdokumenten. Kedjans arbete hör till bootstrap
+och tas före skivtabellens rader. Ompinningen omfattar också h-039:s egen bindning: h-039 pinnar i dag
+h-035:s och h-036:s grindbytes, så ett refreeze av h-035 gör den pinnen föråldrad. Den ompinningen är skild
+från h-039:s kvarvarande produktarbete.
+
+h-039 ligger kvar i den kvarvarande vägen, och dess koppling till h-038 går åt andra hållet än den ser ut
+att göra. h-039:s spec-rad har `depends_on: ['h-036']` och namnger inte h-038; registren R30–R33 bär i
+stället fältet `h038_h032_h031_or_supervisor_resume: False`, bundet av `R33_REGISTRY_SHA256`, med
+RED-etiketten `H038_H032_H031_OR_SUPERVISOR_PROGRESS_BEFORE_FULL_H039_PASS`. h-039 kräver alltså ingenting
+av h-038 — h-039 förbjuder h-038 att gå framåt innan h-039 har ett fullt PASS. h-039:s kvarvarande
+produktarbete är `--r33-installed`-lanen: installationsceremonin, den oberoende valideringen av efterläget,
+installed-granskningen, en fryst R15-live-diagnostik och körningen av lanen. Lanen blockeras av
+`PRODUCTION_ORIGIN` och hör därför till den senare operativa överlämningen. Arbetskopian
+`R33_LIVE_R2_FAILED_EVIDENCE` är medvetet NOT_READY, fryst som överspelad NO-CREDIT, och återupplivas inte.
+
+Den lokala bootstrap-milstolpen är ett avgränsat leveransmål. Överlämningen till kvalificerad autonom drift
+kräver därutöver den senare installationen, driftkvalificeringen, supervisor-resume och en visad förmåga att
+själv identifiera, prioritera och driva arbete; de delarna ligger kvar på vägen men startas inte av det steg
+som stänger milstolpen.
 
 ## Arbetsflöde
 
