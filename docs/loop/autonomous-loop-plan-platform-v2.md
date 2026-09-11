@@ -164,11 +164,12 @@ Bootstrap-kedjan h-031, h-032, h-033, h-034, h-035, h-036, h-037, h-038 och h-03
 identitet och proveniens, native-kärnan, starten och dess körtidsbild, dokumentauktoriteten och
 runtime-städningen. Varje skiva hålls isär i fyra lägen: implementationen i trädet, den historiskt
 kvalificerade versionen, kvalificeringen mot dagens plangeneration, och det produktarbete som återstår.
-Samtliga nio exitprov ligger i trädet — det bevisar bara det första läget. h-032 saknar sin produkt
-(`controller/result/**` finns inte i trädet) och h-038 saknar sin (inneslutningen av försöksroten finns
-inte i `controller/launch/cli`); ingen av kedjans bindningar är kvalificerad mot plangenerationen förrän
-den har mätts mot den. De frysta delegationsdokumenten under `docs/loop/` som beskriver den kvarvarande
-bootstrap-delegationen är read-only historik och omdefinieras inte av denna plan.
+Samtliga nio exitprov ligger i trädet; att en grindfil finns säger ingenting om de tre övriga lägena och
+inte heller att skivans produkt finns. h-032 saknar sin produkt (`controller/result/**` finns inte i
+trädet) och h-038 saknar sin (inneslutningen av försöksroten finns inte i `controller/launch/cli`); ingen
+av kedjans bindningar är kvalificerad mot plangenerationen förrän den har mätts mot den. De frysta
+delegationsdokumenten under `docs/loop/` som beskriver den kvarvarande bootstrap-delegationen är read-only
+historik och omdefinieras inte av denna plan.
 
 Bootstrap har en ÄNDLIG överlämningspunkt till kvalificerad autonom drift. Punkten är nådd när den lokala
 bootstrap-milstolpen i `## Avslutskriterier` är uppfylld och plattformens bindningar är kvalificerade för
@@ -185,14 +186,15 @@ h-035:s och h-036:s grindbytes, så ett refreeze av h-035 gör den pinnen förå
 från h-039:s kvarvarande produktarbete.
 
 h-039 ligger kvar i den kvarvarande vägen, och dess koppling till h-038 går åt andra hållet än den ser ut
-att göra. h-039:s spec-rad har `depends_on: ['h-036']` och namnger inte h-038; registren R30–R33 bär i
-stället fältet `h038_h032_h031_or_supervisor_resume: False`, bundet av `R33_REGISTRY_SHA256`, med
-RED-etiketten `H038_H032_H031_OR_SUPERVISOR_PROGRESS_BEFORE_FULL_H039_PASS`. h-039 kräver alltså ingenting
-av h-038 — h-039 förbjuder h-038 att gå framåt innan h-039 har ett fullt PASS. h-039:s kvarvarande
-produktarbete är `--r33-installed`-lanen: installationsceremonin, den oberoende valideringen av efterläget,
-installed-granskningen, en fryst R15-live-diagnostik och körningen av lanen. Lanen blockeras av
-`PRODUCTION_ORIGIN` och hör därför till den senare operativa överlämningen. Arbetskopian
-`R33_LIVE_R2_FAILED_EVIDENCE` är medvetet NOT_READY, fryst som överspelad NO-CREDIT, och återupplivas inte.
+att göra. h-039:s spec-rad har `depends_on: ['h-036']`, som inte nämner h-038; registren R30–R33 bär i
+stället fältet `h038_h032_h031_or_supervisor_resume: False`, i R33 bundet av `R33_REGISTRY_SHA256`, och
+R26:s källbindning listar `H038_H032_H031_OR_SUPERVISOR_PROGRESS_BEFORE_FULL_H039_PASS` bland sina
+`forbidden`-poster. h-039 kräver alltså ingenting av h-038 — h-039 förbjuder h-038 att gå framåt innan
+h-039 har ett fullt PASS. h-039:s kvarvarande produktarbete är `--r33-installed`-lanen:
+installationsceremonin, den oberoende valideringen av efterläget, installed-granskningen, en fryst
+R15-live-diagnostik och körningen av lanen. Lanen blockeras av `PRODUCTION_ORIGIN` och hör därför till den
+senare operativa överlämningen. Arbetskopian `R33_LIVE_R2_FAILED_EVIDENCE` är medvetet NOT_READY, fryst som
+överspelad NO-CREDIT, och återupplivas inte.
 
 Den lokala bootstrap-milstolpen är ett avgränsat leveransmål. Överlämningen till kvalificerad autonom drift
 kräver därutöver den senare installationen, driftkvalificeringen, supervisor-resume och en visad förmåga att
@@ -213,7 +215,8 @@ bara vilken ordning arbetsdelarna tas i.
 6. Lokal kvalificering kör de frysta verifierarna mot exakt den kandidaten; först då finns ett PASS.
 
 Migrationsordningen är skivtabellens ordning: de byggda S1 och S3 ligger fast, därefter SUB-1 till SUB-4,
-därefter S2 och S4 till S13, och sist L. En skiva startas inte innan dess beroenden är gröna.
+därefter S2 och S4 till S13, och sist L. En skiva startas inte innan dess beroenden är gröna. Före tabellens
+rader ligger bootstrap-kedjans kvarvarande arbete; dess ordning står i `## Bootstrap etablerar plattformen`.
 
 ## Avslutskriterier
 
