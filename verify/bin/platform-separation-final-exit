@@ -62,7 +62,7 @@ NODE = "/opt/homebrew/opt/node@22/bin/node"
 SANDBOX_EXEC = "/usr/bin/sandbox-exec"
 GATE = "verify/bin/platform-separation-final-exit"
 DOCUMENT = "docs/loop/platform-separation-final-local-development.md"
-FROZEN_BASE = "03a364bf248b99d4959cbfc3771c12dd33021b65"
+FROZEN_BASE = "536352ffea553bd097db14698c59199b4a89f6f5"
 # Historical transfer objects and active-document scan boundaries do not move with the H-gate generation.
 HISTORICAL_BASE = "332f07ceb914a07c6632c1393969d9d5a337566b"
 GOVERNANCE_BASE = "512490d44007373b79aca504aa92709e9810aa24"
@@ -452,6 +452,41 @@ PLAN_MALBILD_AUTONOMY = (r"(?i)(identifierar?\s+(själv\s+)?behov|behov\s+och\s+
 # B4: H039's functional requirement, preserved in the plan's protected-invariants section.
 PLAN_H039_REQUIREMENT = (r"(?i)h-?039", r"(?i)avslutad\s+städning", r"(?i)noll\s+registrerade\s+runtime-?rester",
                          r"(?i)(radera|radering|ersätta|ersättning)", r"(?i)främmande\s+data", r"(?i)kapplöpning")
+# v3.16: one corrected continuity paragraph, sourced in the devdoc evidence.
+# Keep this source anchor separate from later refreeze-generation increments.
+PLAN_H039_CONTINUITY_BASE = "536352ffea553bd097db14698c59199b4a89f6f5"
+PLAN_H039_CONTINUITY_BASE_SHA256 = "b2a0c1503f8863f379283ecf02cebee8002c07b87e60b8305794258b31a335e5"
+PLAN_H039_CONTINUITY_OLD = """h-039:s kvarvarande produktarbete är `--r33-installed`-lanen:
+installationsceremonin, den oberoende valideringen av efterläget, installed-granskningen, en fryst
+R15-live-diagnostik och körningen av lanen. Lanen blockeras av `PRODUCTION_ORIGIN` och hör därför till den
+senare operativa överlämningen. Arbetskopian `R33_LIVE_R2_FAILED_EVIDENCE` är medvetet NOT_READY, fryst som
+överspelad NO-CREDIT, och återupplivas inte."""
+PLAN_H039_CONTINUITY_NEW = """Installationen är historiskt utförd och `--r33-installed`-körningen är förbrukad:
+96249 PASS/0 FAIL, `PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`, `retry_permitted:false`
+och `task_credit:NONE`. Den får inte köras om och innebär varken full H039-completion
+eller aktuell driftkvalificering. Efterföljande R15-diagnostik är också förbrukad med
+`STORE_CHANGED_OR_UNPROVEN_OWNER_STOP`, utan bevisat slutstate. Senast bundna observation
+avser sekvens 2, inte färskt live-state eller bevis för full policy och noll residue.
+Nästa H039-arbete är en separat efterföljare för den verkliga sekvens-2-/kvittolivscykeln,
+consumer-/adapter-/loaderkvalificeringen och den operativa kvalificeringen.
+Protected-asset-B är ett separat bevarat, ofruset kontrakts-/produktarbete, NOT_READY;
+`R33_LIVE_R2_FAILED_EVIDENCE` är ett annat historiskt NO-CREDIT-paket.
+Ingen ompinning, build-only eller historisk installed-PASS ger H039-taskcredit,
+rätt att upprepa förbrukade körningar eller rätt att gå vidare i bootstrapkedjan."""
+
+
+def h039_continuity_correction(base_raw, candidate_raw):
+    if type(base_raw) is not bytes or sha(base_raw) != PLAN_H039_CONTINUITY_BASE_SHA256:
+        return False, "continuity source object absent or wrong bytes"
+    before, after = PLAN_H039_CONTINUITY_OLD.encode("utf-8"), PLAN_H039_CONTINUITY_NEW.encode("utf-8")
+    if base_raw.count(before) != 1:
+        return False, "continuity source paragraph cardinality"
+    expected = base_raw.replace(before, after, 1)
+    reason = "old H039 continuity still schedules consumed history" if candidate_raw == base_raw \
+        else "candidate must equal the one source-bound continuity correction; all other plan bytes preserved"
+    return candidate_raw == expected, f"{reason}; expected_plan_sha256={sha(expected)}"
+
+
 # B5: what `docs/loop/regler.md` must carry to BE the source of the working method.
 RULES_REQUIRED = (
     ("rollflodet", (r"(?i)test-?author", r"(?i)granskning", r"(?i)builder", r"(?i)lokal\s+kvalificering")),
@@ -1087,7 +1122,7 @@ EMITTED_ROWS = []
 ABORT_STATE = {"scratch": None, "rows": None}
 # v3.10 (review v14 N1): the gate emits a fixed number of rows. A run that stops early must not look NUMERICALLY better
 # than an honest RED — the abort path therefore counts every row that never ran as FAIL, which needs this denominator.
-EXPECTED_ROW_COUNT = 132  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
+EXPECTED_ROW_COUNT = 133  # 132 preserved rows + one continuity row; checked by f10
 
 
 # v3.2 (N4): a tracked-path pair that collides case-insensitively cannot be checked out cleanly on a case-insensitive file
@@ -3528,6 +3563,12 @@ def main():
     missing_h039 = [p for p in PLAN_H039_REQUIREMENT if not re.search(p, invariants)]
     check("f4_plan_generation_preserves_h039_functional_requirement_zero_runtime_residues_and_no_loss_of_foreign_data",
           bool(invariants) and not missing_h039, f"len={len(invariants)} missing={missing_h039}")
+    continuity_ok, continuity_detail = h039_continuity_correction(
+        base_bytes(PLAN_GEN, PLAN_H039_CONTINUITY_BASE),
+        (subject / PLAN_GEN).read_bytes() if (subject / PLAN_GEN).is_file() else b"",
+    )
+    check("f4_plan_h039_continuity_records_consumed_evidence_without_retry_task_credit_or_scope_change",
+          continuity_ok, continuity_detail)
     # the handoff's pins live in fenced text blocks that readers see; only HTML comments are removed here
     handoff_visible = re.sub(r"<!--.*?-->", "", text(HANDOFF_GEN), flags=re.S) if HANDOFF_GEN in tracked and (subject / HANDOFF_GEN).is_file() else ""
     handoff_sections = [(h, handoff_visible[s:e]) for h, s, e in sections(handoff_visible) if h]

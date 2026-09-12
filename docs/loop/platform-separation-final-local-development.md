@@ -2536,3 +2536,77 @@ oväntade bytes avvisades utan överskrivning och finns kvar i fixturen. Samtlig
 fokusfall passerade igen, inklusive fel etikett/arkiv/graf och återinförd historisk path.
 Resultat `v315-focused.12ef5f55386a.result.json` under samma temporära evidensrot.
 Full historisk acceptans är fortfarande NOT_RUN; förutsagt antal 40 oförändrat.
+
+### v3.16 — rättad H039-kontinuitet före implementation, 2026-09-12
+
+TEST_AUTHOR-bas `536352ffea553bd097db14698c59199b4a89f6f5`; endast denna grind och
+detta devdoc ändras före granskning. Den nya F4-raden kräver exakt en ersättning av
+planens gamla H039-kontinuitetsblock (tidigare r193–198). Alla andra planbytes måste
+vara identiska med den hashbundna basen, inklusive skyddade invarianter, verklig
+H039-completion före efterföljande steg, målbild och rollflöde. Det är ett avgränsat
+sakfel som rättas, inte ny taskmening, omkörningsrätt eller en svagare säkerhetsgräns.
+Denna källbas hålls separat från framtida FROZEN_BASE-generationsökningar.
+
+Originalkällor återlästa lokalt, med SHA256:
+
+- `worktrees/h039-r33-installed-capture/installed-outcome.json`:
+  `4419f24b85abef154113950574dabedb42675be934138fd0d150ba0291c85553`.
+  Faktiskt `--r33-installed ed584ec3088c08005f99de1da825d083e350a8d2
+  f0877daae8612f4c5b274ae4cc04bc1bd775c01a`, exit 0, 96249/0,
+  `PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`, retry false, task_credit NONE.
+- Oberoende installed-audit `worktrees/h039-r33-installed-independent-audit/RESULT.json`:
+  `7b440d9dc545256842effc585618f7c043cdd3ab006a009a1d6be0441cf915d0`.
+  Faktisk stdout: `f4e68424110226fedbbc5455acb929012e2ee7a195becfb000de8c5de9658911`.
+- Förbrukad efterföljande diagnostik
+  `evidence/bootstrap-supervisor/evidence/h039-r33-r15-live-diagnostic-outcome.json`:
+  `efcc5fa541ecefbfa9a6d9566110a38a51e9b2f057c0a02357d6d96875028db6`.
+  STORE_CHANGED_OR_UNPROVEN_OWNER_STOP, ofullständig capture, obevisat slutstate.
+- `worktrees/h039-r33-postfailure-observation/observation.json`:
+  `efdb56a797d3afa2c5976ace43500d98f3b0e006f61e7b97690c6144e4734fb6`.
+  Sekvens 2 är tidigare observerad evidens, inte färskt live-state eller full policy.
+- Protected-asset-B:s separata ofrusna grind:
+  `aa9f5147d8d1192cc3353aec9a631cc234b58e31301f698334add1a866634183`;
+  spec `28c25cf5a58f3a0c8c84ded340b618e9d562d7ef9a4be1fd9d3c1a4734fd7db1`.
+  R33_LIVE_R2_FAILED_EVIDENCE är ett annat paket, bland annat felposten
+  `69d6f9ce45efae6dc6e88dd2a9e4997fa4eb2da3afdabd1538b68edc45dd57a0`.
+
+Sökvägarna ovan identifierar bevarad extern evidens under den orörda äldre arbetskopian;
+de är inte nya spårade plattformsberoenden eller körinstruktioner. Källrättelsen
+utför inte installer, diagnostik, task-attestation eller liveobservation och ger ingen
+H039-completion. Det substantiella efterföljararbetet hålls separat.
+
+Efter oberoende grindgranskning får BUILDER endast ändra:
+
+1. `docs/loop/autonomous-loop-plan-platform-v2.md`: byt exakt OLD-blocket till NEW-blocket
+   i grindens två PLAN_H039_CONTINUITY-konstanter, inga andra bytes. Resultatblob
+   `c4f3a615e5e740ffee3c4cf8353969e3134d44f3`, SHA256
+   `cb0f18a774637895d8240c323f46c2dfe9dfca2735119aa9fd2e863c0553080d`.
+2. `scripts/nortropic-codex-autopilot.py`: ersätt exakt två planblobliteraler,
+   ROADMAP_PLAN_BLOBS och selftest, från `8b234a8f951b41388f809561d443202011121986`
+   till ovanstående nya blob. Ingen funktions-/kontrolländring.
+3. `controller/verify/cli`: ersätt endast planpostens PLATFORM_DOCUMENTS-SHA256
+   från `b2a0c1503f8863f379283ecf02cebee8002c07b87e60b8305794258b31a335e5`
+   till ovanstående nya SHA256.
+
+Handoff och övriga pinnar, spec, register, H-grindar, H039-underlag samt REFREEZE.json
+förblir byteidentiska. FROZEN_BASE flyttas till 536352f; H037-deklarationen är då ärvd
+historik, ingen ny H-omfrysning eller nytt H-kvitto ingår. Hållna grindar/baser ändras inte.
+
+Alla befintliga F3/F4-effektprov står kvar: konsumenternas verkliga HEAD-blobbindning,
+mutationsvägran även när en kopia/pin byts, autopilot-selftest och verklig
+platform-prepare/check. Den nya raden hindrar felaktig plantext från att bli grön genom
+enbart självkonsistent ompinnning. Prediktion: 133 totalrader; gamla plantexten ska fälla
+endast den nya raden, rätt text med rätt konsumentpinnar ska kvalificeras av hela grinden.
+Fryst full RED-baslinje och positiv fullkvalificering är ännu NOT_RUN. Ingen plan- eller
+pinimplementation är gjord av TEST_AUTHOR.
+
+Fokus 2026-09-12: pinnad `PYTHON -I -S -B
+/private/tmp/nortropic-v313-contract.Fq5ueV/v316-focused.py`, faktisk exit 0 på grind
+`fabc7a1f7c0e6de32e80f61c794f806027cede3bae59c1d72d3a13dae346d4f6`.
+14 in-memory-fall gav förväntade utfall. Det extraherade faktiska F4-blocket gav
+FAIL på den orörda planens gamla kontinuitet; korrekt ersättning passerade predikatet.
+Förnyelse, taskcredit, paketsammanblandning, falskt färskt state, förtida B-READY,
+gammal text i kommentar och ändringar i övriga planbytes avvisades. Scan 0 träffar.
+Alla äldre funktioner samt main minus just den nya kontrollen är AST-identiska;
+exakt ett ovillkorligt check-anrop tillkommer. EXPECTED_ROW_COUNT är mekaniskt 133.
+Detta är inte fullgrindens RED eller PASS; den seriella frysta baslinjen återstår.
