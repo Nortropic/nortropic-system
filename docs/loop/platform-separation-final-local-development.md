@@ -1,7 +1,8 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
-**Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3.12 2026-09-12: per-grind-golv för den omfrysta
+**Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-12 · **Bas:** `e6e4091c991ccbcaf9b7bab923a4e1e803453290`
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.13 2026-09-12: generationsbyte efter kvalificerad h-035-placering;
+historiska ankare och de tre hållna grindarna bevaras. v3.12: per-grind-golv för den omfrysta
 grindens innehåll och verkställd kvittoplacering, efter kontraktsgranskning nr 15. v3.11: ordnad, kvalificerad
 refreeze av en fryst H-grind; sidoeffektsvepet skopat till grindens egna rötter. v3.6–v3.10: plangenerationen
 bunden, remedierad efter granskningarna nr 5–14) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
@@ -16,6 +17,55 @@ webbmaterial får inte stå kvar i trädet omdöpt till "historia" eller parkera
 det bevaras i webbrepot eller evidensarkivet med spårbart ursprung. Plattformens Git-historik
 och kärn-/H-evidens stannar; fungerande kärn-/H-arbete tas inte bort för att det bär historiska
 webbreferenser (evidensfunktion skiljs från dagens körbara beroenden).
+
+## Generationsdelta v3.13 — enda ändringen mot kriterierna nedan
+
+Detta avsnitt ersätter endast de äldre kriteriernas antagande att omfrysningsbasen också är
+överföringsbas, dokumentens historiska skangräns och ett träd där denna grind ännu saknas.
+Äldre mätningar under Utfall behåller sina ursprungliga subjekt och utgör inte v3.13-kvalificering.
+
+- `FROZEN_BASE` är `e6e4091c991ccbcaf9b7bab923a4e1e803453290`, där h-035 redan är kvalificerad och placerad.
+  F2:s följedokumentmängd, F3:s specbindning, F4:s loopbindning och F6:s nya byte-/sökvägsfrys jämförs mot
+  denna bas; de baskodade radnamnen följer dess åtta första tecken. Inga produktfiler ändras.
+- `HISTORICAL_BASE` är oförändrade `332f07ceb914a07c6632c1393969d9d5a337566b`. F1:s fyra överförda
+  objekt och proveniensrad, substitutionskontraktets historiska avsnitt, de fyra supersessionsdokumentens
+  kroppar samt DRIFT/EFTERARBETE:s skangränser binds fortfarande där. De redan aktiva noterna fortsätter
+  skannas; inget av dem göms genom att flytta gränsen framåt. Proveniensfilen ändras inte.
+- En spårad `REFREEZE.json` som är byteidentisk med filen i den fixerade basen är ärvd historik, inte
+  en ny omfrysning. Den lämnas orörd och ger ingen ny kvittocredit. Ett inskickat kvitto utan en ny
+  deklarerad omfrysning avvisas som oväntat. En annan deklarationsbyteföljd måste fortfarande uppfylla
+  exakt en ny post, matchande bas-/nyhash, ändrade grindbytes, radhärlett golv, högst tre motiverade
+  pensioneringar, tillagda-rader-skanningen och ett separat kvitto för exakt samma kandidat.
+- F6:s sökvägsmängd är basmängden förenad med denna grinds sökväg, även när grinden redan finns i basen.
+  Endast denna grinds byteändring undantas, och endast om dess befintliga jämförelse mot den hållna
+  kopians sha256, reguljär fil utan symlänk och läge 755 håller. Övriga byteändringar måste motsvara
+  den enda nya deklarationen; borttagningar och extra sökvägar avvisas oförändrat.
+- `CONTROL_SET_BASE`, `LAUNCH_CWD_BASE`, `GOVERNANCE_BASE` och de tre hållna grindarnas bytes ändras inte.
+  F7 härleder den ärvda H-grinddriften enbart ur det fixerade FROZEN_BASE-trädet mot varje hållen grinds
+  egen bas, och förenar den med den enda nya deklarerade sökvägen. Kandidatens godtyckliga diff ger
+  aldrig en tillåten sökväg. I denna bas är den ärvda driften exakt `verify/bin/h-035-exit`.
+  Utan ny omfrysning förutsägs därför control-set 67 PASS / 1 FAIL, launch-cwd 19 PASS / 1 FAIL och
+  governance 67 PASS / 3 FAIL, med samma exakta namngivna rader och detaljkrav som tidigare.
+
+Det är en explicit generationsanpassning av acceptansmängden: redan kvalificerade basbytes behöver
+inte deklareras och kvalificeras som en ny ändring. Det är inte bara ett namnbyte. Varje NY omfrysning
+behåller alla v3.12-krav. Skalgrindstöd, nya undantag för produktkod och h-036:s eget kontrakt ingår inte.
+
+### v3.13 — provplan och ännu inte körda prov
+
+Fokuserade prov ska använda extraherade oförändrade predikat och syntetiska in-memory-data; de är
+inte produktkvalificering och syntetiska kvitton är aldrig bevis för en H-körning. Positiva ankare:
+ärvd exakt deklaration utan kvitto; oförändrade historiska skangränser med synliga befintliga noter;
+basens befintliga grindsökväg med korrekt hållen identitet; exakt ärvd F7-drift samt en ny deklarerad
+H-grinddrift. Negativer: gammalt kvitto ihop med ärvd deklaration; muterad ärvd deklaration; odeklarerad
+H-grindändring utöver en deklarerad; fel hållna grindbytes/läge; extra eller borttagen fryst sökväg;
+otillåten text i redan aktiv DRIFT/EFTERARBETE-not; extra drift, extra FAIL eller fel problem-lista i F7.
+
+Full baslinje på exakt committad tvåfilskandidat: NOT_RUN tills körningen har samordnats och verifierats.
+Full h-036-acceptans: NOT_RUN. h-036:s nuvarande grind har föråldrade bindningar till h-035, en frånvarande
+webbfil, autopiloten och launchern; en enkel hashändring eller ett syntetiskt kvitto bevisar inte acceptans.
+Dess riktiga omfrysning och kvalificering behöver eget kontraktsflöde. Denna runda skriver ingen sådan
+grind eller produkt och påstår inte att h-036 är kvalificerad.
 
 ## Enkelt förklarat
 

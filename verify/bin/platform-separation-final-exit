@@ -62,7 +62,9 @@ NODE = "/opt/homebrew/opt/node@22/bin/node"
 SANDBOX_EXEC = "/usr/bin/sandbox-exec"
 GATE = "verify/bin/platform-separation-final-exit"
 DOCUMENT = "docs/loop/platform-separation-final-local-development.md"
-FROZEN_BASE = "332f07ceb914a07c6632c1393969d9d5a337566b"
+FROZEN_BASE = "e6e4091c991ccbcaf9b7bab923a4e1e803453290"
+# Historical transfer objects and active-document scan boundaries do not move with the H-gate generation.
+HISTORICAL_BASE = "332f07ceb914a07c6632c1393969d9d5a337566b"
 GOVERNANCE_BASE = "512490d44007373b79aca504aa92709e9810aa24"
 LAUNCH_CWD_BASE = "383ed3873105d77fd1129d74abf408092e0ff2f3"
 CONTROL_SET_GATE = "verify/bin/platform-control-set-exit"
@@ -2260,7 +2262,7 @@ def main():
     if head_probe.returncode or not COMMIT_FORM.fullmatch(head_probe.stdout.strip()):
         raise Rig("subject HEAD unavailable: " + head_probe.stderr.strip())
     head = head_probe.stdout.strip()
-    for base in (FROZEN_BASE, GOVERNANCE_BASE, LAUNCH_CWD_BASE):
+    for base in (FROZEN_BASE, HISTORICAL_BASE, GOVERNANCE_BASE, LAUNCH_CWD_BASE):
         if run([GIT, "-C", str(subject), "cat-file", "-e", base + "^{commit}"], scratch, probe_env).returncode:
             raise Rig("frozen base " + base + " is not in the subject's history")
     tracked_entries = ls_tree(subject, probe_env, "HEAD", ".")
@@ -2292,8 +2294,8 @@ def main():
     def text(rel):
         return (subject / rel).read_text(encoding="utf-8", errors="replace")
 
-    def base_bytes(rel):
-        r = run_bytes([GIT, "-C", str(subject), "show", f"{FROZEN_BASE}:{rel}"], scratch, probe_env)
+    def base_bytes(rel, rev=FROZEN_BASE):
+        r = run_bytes([GIT, "-C", str(subject), "show", f"{rev}:{rel}"], scratch, probe_env)
         return r.stdout if r.returncode == 0 else None
 
     def head_oid(rel):
@@ -2436,7 +2438,7 @@ def main():
         problems = []
         for rel in TRANSFERRED:
             row = listed.get(rel)
-            base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
+            base_oid = git_raw(subject, probe_env, "rev-parse", f"{HISTORICAL_BASE}:{rel}").stdout.strip()
             if row is None:
                 problems.append(rel + ": not listed")
             elif not OID_FORM.fullmatch(row[1]) or row[1] != base_oid:
@@ -2447,7 +2449,7 @@ def main():
                 problems.append(rel + ": still tracked")
         prov_ok = not problems and set(listed) == set(TRANSFERRED)
         prov_detail = f"listed={sorted(listed)} problems={problems}"
-    check("f1_web_transfer_provenance_2_lists_the_four_files_with_blob_oids_at_" + FROZEN_BASE[:8], prov_ok, prov_detail)
+    check("f1_web_transfer_provenance_2_lists_the_four_files_with_blob_oids_at_" + HISTORICAL_BASE[:8], prov_ok, prov_detail)
     check("f1_tracked_paths_unique_case_insensitively", not case_dupes, f"collisions(case/NFC)={case_dupes[:6]}")
     symlinks = sorted(rel for rel, (mode, oid) in tracked_entries.items() if mode == "120000")
     base_symlinks = sorted(rel for rel, (mode, oid) in ls_tree(subject, probe_env, FROZEN_BASE, ".").items() if mode == "120000")
@@ -2500,7 +2502,7 @@ def main():
     def scannable_text(rel):
         """The part of a reached document that is ACTIVE instruction (None when the document is frozen evidence)."""
         if rel == EFTERARBETE:   # v3.1 (N3): the appended tail is active and scanned; the 332f07ce body is frozen evidence
-            base = base_bytes(rel)
+            base = base_bytes(rel, HISTORICAL_BASE)
             current = (subject / rel).read_bytes()
             if base is not None and current.startswith(base):
                 return current[len(base):].decode("utf-8", "replace")
@@ -2509,13 +2511,13 @@ def main():
             return None
         raw = text(rel)
         if rel == DRIFT:
-            base = base_bytes(rel)
+            base = base_bytes(rel, HISTORICAL_BASE)
             current = (subject / rel).read_bytes()
             if base is not None and current.startswith(base):
                 return current[len(base):].decode("utf-8", "replace")
             return raw
         if rel in HISTORICAL_NOTE_DOCS:
-            base = base_bytes(rel)
+            base = base_bytes(rel, HISTORICAL_BASE)
             current = (subject / rel).read_bytes()
             if base is None:
                 return raw
@@ -2725,7 +2727,7 @@ def main():
           and "ROADMAP_PLAN_PATH=" + PLAN_GEN in fr_authority and "ROADMAP_HANDOFF_PATH=" + HANDOFF_GEN in fr_authority
           and AGENTS in fr_authority and "HUMAN_AUTHORITY_HARD_STOP" in fr and not scan(fr, OLD_PLAN_TOKENS),
           f"plan_generation={plan_generation!r} authority_section_len={len(fr_authority)} old={fmt_hits(scan(fr, OLD_PLAN_TOKENS), 3)}")
-    sub_base, sub_head = base_bytes(SUBSTITUTION), text(SUBSTITUTION)
+    sub_base, sub_head = base_bytes(SUBSTITUTION, HISTORICAL_BASE), text(SUBSTITUTION)
     problems = []
     if sub_base is None:
         problems.append("no base")
@@ -2760,7 +2762,7 @@ def main():
     check("f2_substitution_contract_sections_1_5_7_11_13_unchanged_dated_amendment_and_plan_generation_amendment_present",
           not problems, str(problems)[:600])
     for rel, markers in HISTORICAL_NOTE_DOCS.items():
-        base = base_bytes(rel)
+        base = base_bytes(rel, HISTORICAL_BASE)
         current = (subject / rel).read_bytes()
         block = None
         if base is not None and current != base:
@@ -2776,11 +2778,11 @@ def main():
             problems += [f"note carries web token {p}@{l}" for p, l, _ in scan(block, WEB_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)[:3]]
             problems += [f"note carries owner-stop token {p}@{l}" for p, l, _ in scan(block, HARD_HUMAN_TOKENS)[:3]]
         check("f2_historical_document_unchanged_plus_dated_supersession_note_" + label_of(rel), not problems, str(problems)[:600])
-    drift_base, drift_head = base_bytes(DRIFT), (subject / DRIFT).read_bytes()
+    drift_base, drift_head = base_bytes(DRIFT, HISTORICAL_BASE), (subject / DRIFT).read_bytes()
     active = scannable_text(DRIFT) or ""
     problems = []
     if drift_base is None or not drift_head.startswith(drift_base) or drift_head == drift_base:
-        problems.append("drift.md is not append-only vs " + FROZEN_BASE[:8] + " with an appended block")
+        problems.append("drift.md is not append-only vs " + HISTORICAL_BASE[:8] + " with an appended block")
     if not active or DRIFT_ACTIVE_HEADING.search(active) is None:
         problems.append("appended tail carries no '## Aktiv plattformsnot' heading")
     else:
@@ -3587,14 +3589,14 @@ def main():
               f"rc={r.returncode} ok={len(oks)} fel={fel[:3]} b2_pinv={len(b2)} " + r.stderr[-200:])
 
     # ------------------------------------------------------------------ F6: frozen evidence, refreeze declaration
-    # v3.11: the declaration is parsed FIRST; the freeze rows below are computed against it. An absent declaration
-    # means "no refreeze" and every row below then has exactly its v3.10 meaning.
+    # A declaration byte-identical to the qualified base is inherited history, not a second refreeze.
+    # Only a new declaration is parsed as this generation's one change; F6 still binds every H-gate to its base.
     decl_path = subject / REFREEZE_DECL
     decl_problems, declared, refreeze_paths = [], [], set()
     decl_raw = decl_path.read_bytes() if decl_path.is_file() and not decl_path.is_symlink() else None
     if (decl_raw is None) != (REFREEZE_DECL not in tracked):
         decl_problems.append(f"declaration present={decl_raw is not None} tracked={REFREEZE_DECL in tracked}")
-    elif decl_raw is not None:
+    elif decl_raw is not None and decl_raw != base_bytes(REFREEZE_DECL):
         try:
             decl = strict(decl_raw)
         except ValueError as exc:
@@ -3786,14 +3788,20 @@ def main():
     # (a) the exact SET of tracked paths under the frozen trees == base set + the declared additions (this gate);
     # (b) every file byte-frozen against the base EXCEPT the declared refreezes; an undeclared byte change stays red,
     # and a declaration of a file that did not change is red too.
+    gate_path = subject / GATE
+    gate_ok = gate_path.is_file() and not gate_path.is_symlink() and sha(gate_path.read_bytes()) == held[GATE] \
+        and stat.S_IMODE(gate_path.lstat().st_mode) == 0o755
     path_problems, byte_problems, additions, removals = [], [], [], []
+    expected_additions = []
     for tree_rel in FROZEN_TREES:
         base_entries = ls_tree(subject, probe_env, FROZEN_BASE, tree_rel)
         head_entries = ls_tree(subject, probe_env, "HEAD", tree_rel)
+        if tree_rel == "verify" and GATE not in base_entries:
+            expected_additions.append(GATE)
         for rel, entry in base_entries.items():
             if rel not in head_entries:
                 removals.append(rel)
-            elif head_entries[rel] != entry:
+            elif head_entries[rel] != entry and not (rel == GATE and gate_ok):
                 byte_problems.append(rel)
         additions += [rel for rel in head_entries if rel not in base_entries]
         if git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", tree_rel).stdout.strip():
@@ -3808,21 +3816,18 @@ def main():
             byte_problems.append(rel)
         if git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", rel).stdout.strip():
             path_problems.append(rel + " (working tree differs from HEAD)")
-    gate_path = subject / GATE
-    gate_ok = gate_path.is_file() and not gate_path.is_symlink() and sha(gate_path.read_bytes()) == held[GATE] \
-        and stat.S_IMODE(gate_path.lstat().st_mode) == 0o755
     check("f6_frozen_tree_paths_are_the_" + FROZEN_BASE[:8] + "_set_plus_this_gate_only",
-          not path_problems and sorted(additions) == [GATE] and not removals and gate_ok,
+          not path_problems and sorted(additions) == expected_additions and not removals and gate_ok,
           f"problems={path_problems[:10]} additions={sorted(additions)} removals={removals[:10]} gate_ok={gate_ok}")
     undeclared = sorted(set(byte_problems) - refreeze_paths)
     unchanged_declared = sorted(refreeze_paths - set(byte_problems))
     check("f6_frozen_tree_bytes_identical_to_" + FROZEN_BASE[:8] + "_except_the_declared_refreeze",
           not undeclared and not unchanged_declared,
           f"undeclared_byte_changes={undeclared[:10]} declared_but_unchanged={unchanged_declared}")
-    ea_base, ea_head = base_bytes(EFTERARBETE), (subject / EFTERARBETE).read_bytes() if (subject / EFTERARBETE).is_file() else b""
+    ea_base, ea_head = base_bytes(EFTERARBETE, HISTORICAL_BASE), (subject / EFTERARBETE).read_bytes() if (subject / EFTERARBETE).is_file() else b""
     ea_added = ea_head[len(ea_base):].decode("utf-8", "replace") if ea_base is not None and ea_head.startswith(ea_base) else None
     ea_hits = scan(ea_added or "", WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS)
-    check("f6_efterarbete_append_only_vs_" + FROZEN_BASE[:8] + "_with_scanned_addition",
+    check("f6_efterarbete_append_only_vs_" + HISTORICAL_BASE[:8] + "_with_scanned_addition",
           EFTERARBETE in tracked and ea_added is not None and not ea_hits, f"append_only={ea_added is not None} hits={fmt_hits(ea_hits, 4)}")
     held_identical = {}
     for rel in (CONTROL_SET_GATE, LAUNCH_CWD_GATE, GOVERNANCE_GATE):
@@ -3871,14 +3876,18 @@ def main():
     def rows_by_label(result):
         return {row["label"]: row for row in result["rows"]} if result and type(result.get("rows")) is list else {}
 
-    # v3.11: the EXACT effect a declared refreeze has on each held gate, derived from that gate's own frozen base —
-    # never a loosened "some failures allowed". With no declaration these are empty and every expectation is v3.10's.
+    # Exact inherited H-gate drift comes only from the qualified FROZEN_BASE, never from the candidate's diff.
+    # Add this generation's declared path; each held gate keeps its own immutable base and exact verdict rules.
     def base_oid_at(rev, rel):
         return git_raw(subject, probe_env, "rev-parse", f"{rev}:{rel}").stdout.strip()
 
-    cs_expected = sorted(rel for rel in refreeze_paths
+    frozen_h_gates = {rel: oid for rel, (mode, oid) in ls_tree(subject, probe_env, FROZEN_BASE, "verify/bin").items()
+                      if REFREEZE_GATE_RE.fullmatch(rel)}
+    cs_inherited = {rel for rel, oid in frozen_h_gates.items() if base_oid_at(CONTROL_SET_BASE, rel) != oid}
+    lc_inherited = {rel for rel, oid in frozen_h_gates.items() if base_oid_at(LAUNCH_CWD_BASE, rel) != oid}
+    cs_expected = sorted(rel for rel in cs_inherited | refreeze_paths
                          if base_oid_at(CONTROL_SET_BASE, rel) and base_oid_at(CONTROL_SET_BASE, rel) != head_oid(rel))
-    lc_expected = sorted(rel for rel in refreeze_paths
+    lc_expected = sorted(rel for rel in lc_inherited | refreeze_paths
                          if base_oid_at(LAUNCH_CWD_BASE, rel) and base_oid_at(LAUNCH_CWD_BASE, rel) != head_oid(rel))
     gov_expected_fails = sorted(GOVERNANCE_EXPECTED_FAILS) + ([GOVERNANCE_CONTROL_SET_ROW] if cs_expected else [])
     control_state = {"missing": None}
