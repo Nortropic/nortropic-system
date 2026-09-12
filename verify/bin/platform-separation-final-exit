@@ -559,13 +559,37 @@ REFREEZE_DECL = "SEPARATION-20260910/REFREEZE.json"
 REFREEZE_DECL_CONTRACT = "platform-separation-final-refreeze-declaration-v1"
 REFREEZE_RECEIPT_CONTRACT = "platform-separation-final-refreeze-receipt-v1"
 REFREEZE_ENTRY_KEYS = frozenset({"path", "base_sha256", "new_sha256", "expected_pass", "reason"})
+# v3.12 (review v15 B1): a refreeze may RETIRE a base row label, but only by naming it with a written reason.
+# Optional so that a refreeze retiring nothing keeps the v3.11 entry shape exactly.
+REFREEZE_ENTRY_OPTIONAL_KEYS = frozenset({"retired_labels"})
 REFREEZE_RECEIPT_KEYS = frozenset({"contract", "gate", "gate_sha256", "subject_head", "invocation", "exit_code",
                                    "pass_count", "fail_count", "stdout_sha256", "stdout"})
 # Only a frozen H gate. The three held gates are excluded by this pattern and again by an explicit check.
 REFREEZE_GATE_RE = re.compile(r"^verify/bin/h-0\d\d-exit$")
-# Measured floor: every H gate in the tree emits far more rows than this (h-035: 462). A "refreeze" that reduces a
-# gate to a handful of rows is not credited by this contract.
-REFREEZE_MIN_PASS = 20
+# v3.12 (review v15 B1). v3.11's only content requirement on a refrozen gate was "parses, >= 20 rows, green" —
+# exit code 0 plus a row count. The reviewer replaced verify/bin/h-035-exit (22511 lines, 462 rows) with a FIVE-LINE
+# toy gate printing 25 PASS, ran it HONESTLY, built the receipt from the real stdout, and got rc=0 131/131. The owner
+# decision says qualification requires the RIGHT frozen verifier run to completion WITH ALL MANDATORY CHECKS and that
+# exit code 0 alone is not enough, so that is a defect.
+# The floor is now PER GATE and derived mechanically from the BASE gate's own frozen bytes: the identifier-shaped
+# string constants passed positionally to a call named `check` — that gate's own row labels. Measured at 332f07ce:
+# h-035 251, h-036 27, h-037 21, h-038 9. Every base label must still be a row label in the refrozen gate, except the
+# ones the candidate DECLARES retired. Measured on the real h-035 refreeze candidate a288e169: 250 of 251 kept, and
+# the single dropped label is exactly the H036_V3/docs-05 check the refreeze retires.
+# This is a STATIC rule over bytes, not a coverage rule over the run: 70 of the base labels are in the refrozen source
+# but were not emitted in the honest run (branch-dependent), so requiring them in the receipt would be a false red.
+REFREEZE_LABEL_CALL = "check"
+REFREEZE_LABEL_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+# Fail-closed: a gate whose base bytes do not yield a row-label set cannot be refrozen under this contract at all.
+REFREEZE_MIN_BASE_LABELS = 5
+# A refreeze that drops more than three of the base gate's checks is a rewrite, not a refreeze, and needs its own
+# contract round. Measured: the real h-035 refreeze retires exactly one.
+REFREEZE_MAX_RETIRED_LABELS = 3
+# v3.12 (review v15 N1): the retirement identifiers are exempted only where they are BOUND as retirement evidence —
+# a string constant assigned to a `(?i)retired` name, or a dict entry whose key names a retirement. v3.11 dropped the
+# three patterns globally, and the reviewer smuggled governance prose in a comment and an ACTIVE `human_only` stop
+# through them. Measured on a288e169: 5 hits on 3 lines, all inside retirement-bound string constants, 0 red.
+RETIRED_NAME_RE = re.compile(r"(?i)retired")
 # The canonical invocation elements a qualification run must carry (h-035 is undecidable without -I -S -B).
 REFREEZE_INVOCATION_FLAGS = ("-I", "-S", "-B")
 # A refreeze necessarily ADDS bytes under verify/, which the tree-wide scan classifies as frozen evidence and does
@@ -582,8 +606,8 @@ CONTROL_SET_FROZEN_ROW = "frozen_artifacts_identical_to_dae90c8f"
 # The governance gate runs the control-set gate itself, so a refreeze adds exactly this one row to its expected
 # red set — never "some failures allowed".
 GOVERNANCE_CONTROL_SET_ROW = "g7_platform_control_set_exit_68_of_68_on_candidate"
-REFREEZE_ADDED_TOKENS = tuple(t for t in WEB_TOKENS + HUMAN_TOKENS
-                              if t not in REFREEZE_RETIREMENT_IDENTIFIERS) + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS
+# v3.12: the FULL set is scanned; the three retirement identifiers are exempted per LINE, not globally (N1).
+REFREEZE_ADDED_TOKENS_ALL = WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS
 DRIVER_MARK = "PLATFORM_SEPARATION_DRIVER="
 # Real module, real callables, never the operational __main__. Stop -> exit 7.
 DRIVER = (
@@ -1061,7 +1085,7 @@ EMITTED_ROWS = []
 ABORT_STATE = {"scratch": None, "rows": None}
 # v3.10 (review v14 N1): the gate emits a fixed number of rows. A run that stops early must not look NUMERICALLY better
 # than an honest RED — the abort path therefore counts every row that never ran as FAIL, which needs this denominator.
-EXPECTED_ROW_COUNT = 131  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
+EXPECTED_ROW_COUNT = 132  # measured; pinned by f10_gate_emitted_the_expected_number_of_rows
 
 
 # v3.2 (N4): a tracked-path pair that collides case-insensitively cannot be checked out cleanly on a case-insensitive file
@@ -2015,6 +2039,53 @@ def snapshot_git_meta(root):
                     out[str(p.relative_to(gd))] = (st.st_size, st.st_mtime_ns)
     for p in sorted(gd.glob("*")):
         out["entry:" + p.name] = (p.is_dir(),)
+    return out
+
+
+def gate_row_labels(source):
+    """A gate's own row labels: identifier-shaped string constants passed positionally to a call named `check`.
+
+    Mechanically derived from bytes, so the rule holds for every coming refreeze (h-036, h-037, h-038) without a new
+    contract round. Measured at 332f07ce: h-035 251, h-036 27, h-037 21, h-038 9."""
+    out = set()
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        name = node.func.id if isinstance(node.func, ast.Name) else (node.func.attr if isinstance(node.func, ast.Attribute) else "")
+        if name != REFREEZE_LABEL_CALL:
+            continue
+        for arg in node.args:
+            if isinstance(arg, ast.Constant) and type(arg.value) is str and REFREEZE_LABEL_RE.fullmatch(arg.value):
+                out.add(arg.value)
+    return out
+
+
+def retirement_bound_lines(source):
+    """Line numbers of string constants a refreeze binds as RETIRED evidence (v3.12, review v15 N1).
+
+    A constant qualifies when it is assigned to a name matching `(?i)retired`, or when it is the key or the value of
+    a dict entry whose key names a retirement. A comment is not a string constant and an active `human_only` test is
+    not bound to a retirement constant, so neither is exempt any more."""
+    out = set()
+    tree = ast.parse(source)
+
+    def mark(node):
+        for child in ast.walk(node):
+            if isinstance(child, ast.Constant) and type(child.value) is str:
+                out.add(child.lineno)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            if any(isinstance(t, ast.Name) and RETIRED_NAME_RE.search(t.id) for t in node.targets):
+                mark(node.value)
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and RETIRED_NAME_RE.search(node.target.id) and node.value is not None:
+                mark(node.value)
+        elif isinstance(node, ast.Dict):
+            for key, value in zip(node.keys, node.values):
+                if isinstance(key, ast.Constant) and type(key.value) is str and RETIRED_NAME_RE.search(key.value):
+                    out.add(key.lineno)
+                    mark(value)
     return out
 
 
@@ -3539,7 +3610,8 @@ def main():
                 if len(entries) != 1:
                     decl_problems.append(f"exactly one ordered refreeze per candidate, declared {len(entries)}")
                 for entry in entries:
-                    if type(entry) is not dict or set(entry) != REFREEZE_ENTRY_KEYS:
+                    if type(entry) is not dict or set(entry) not in (REFREEZE_ENTRY_KEYS,
+                                                                     REFREEZE_ENTRY_KEYS | REFREEZE_ENTRY_OPTIONAL_KEYS):
                         decl_problems.append(f"entry keys {sorted(entry) if type(entry) is dict else type(entry)}")
                         continue
                     rel = entry["path"]
@@ -3569,35 +3641,106 @@ def main():
                     if stat.S_IMODE(now_path.lstat().st_mode) != 0o755:
                         decl_problems.append(f"{rel}: refrozen gate is not mode 755")
                     if type(entry["expected_pass"]) is not int or type(entry["expected_pass"]) is bool \
-                            or entry["expected_pass"] < REFREEZE_MIN_PASS:
-                        decl_problems.append(f"{rel}: expected_pass below the measured floor {REFREEZE_MIN_PASS}")
+                            or entry["expected_pass"] < 1:
+                        decl_problems.append(f"{rel}: expected_pass is not a positive integer")
                     if type(entry["reason"]) is not str or len(entry["reason"].strip()) < 20:
                         decl_problems.append(f"{rel}: no written reason")
+                    # v3.12 (B1): retiring a base row label is allowed, but only named and motivated, and few.
+                    retired = entry.get("retired_labels", {})
+                    if type(retired) is not dict or not all(type(k) is str and type(v) is str for k, v in retired.items()):
+                        decl_problems.append(f"{rel}: retired_labels must be a mapping label -> written reason")
+                    else:
+                        if len(retired) > REFREEZE_MAX_RETIRED_LABELS:
+                            decl_problems.append(f"{rel}: {len(retired)} retired row labels exceeds the cap "
+                                                 f"{REFREEZE_MAX_RETIRED_LABELS}; a refreeze that drops more of the "
+                                                 f"base gate's checks is a rewrite and needs its own contract round")
+                        decl_problems += [f"{rel}: retired label {label!r} has no written reason"
+                                          for label, why in sorted(retired.items()) if len(why.strip()) < 20]
                     try:
                         ast.parse((decode_text(now_raw) or ""))
                     except SyntaxError as exc:
                         decl_problems.append(f"{rel}: the refrozen gate does not parse: {exc!r}")
     check("f6_refreeze_declaration_is_one_ordered_frozen_h_gate_with_matching_base_and_new_sha256",
           not decl_problems, f"declared={[e.get('path') for e in declared]} problems={decl_problems[:8]}")
+    # v3.12 (review v15 B1): the per-gate content floor, derived from the BASE gate's own frozen bytes. No run and no
+    # hand-written list: a refreeze must keep every row label the base gate declared, except the ones it DECLARES
+    # retired, and must predict at least that many green rows.
+    label_problems, label_counts = [], {}
+    for entry in declared:
+        rel = entry["path"]
+        retired = entry.get("retired_labels") or {}
+        retired = retired if type(retired) is dict else {}
+        try:
+            base_labels = gate_row_labels(decode_text(base_bytes(rel) or b"") or "")
+            new_labels = gate_row_labels(decode_text((subject / rel).read_bytes()) or "")
+        except (SyntaxError, ValueError) as exc:
+            label_problems.append(f"{rel}: row labels not derivable: {exc!r}")
+            continue
+        floor = len(base_labels) - len(retired)
+        missing = sorted(base_labels - new_labels - set(retired))
+        not_in_base = sorted(set(retired) - base_labels)
+        still_present = sorted(set(retired) & new_labels)
+        label_counts[rel] = {"base": len(base_labels), "refrozen": len(new_labels),
+                             "retired": sorted(retired), "floor": floor, "missing": len(missing)}
+        if len(base_labels) < REFREEZE_MIN_BASE_LABELS:
+            label_problems.append(f"{rel}: only {len(base_labels)} row labels derivable from the "
+                                  f"{FROZEN_BASE[:8]} bytes; this contract cannot credit a refreeze of it")
+        if missing:
+            label_problems.append(f"{rel}: {len(missing)} base row label(s) dropped without a declared "
+                                  f"retirement: {missing[:5]}")
+        if not_in_base:
+            label_problems.append(f"{rel}: retired labels that the base gate never had: {not_in_base[:5]}")
+        if still_present:
+            label_problems.append(f"{rel}: labels declared retired but still present in the refrozen gate: {still_present[:5]}")
+        if type(entry["expected_pass"]) is int and type(entry["expected_pass"]) is not bool \
+                and entry["expected_pass"] < floor:
+            label_problems.append(f"{rel}: expected_pass {entry['expected_pass']} is below the per-gate floor {floor} "
+                                  f"({len(base_labels)} base row labels minus {len(retired)} declared retirements)")
+    check("f6_refreeze_keeps_every_base_row_label_except_the_declared_retirements",
+          not label_problems, f"labels={label_counts} problems={label_problems[:6]}")
     # The added LINES of every declared refreeze are scanned; verify/** is otherwise frozen evidence and unscanned.
-    added_hits, added_lines = [], 0
+    added_hits, added_lines, exempted = [], 0, 0
     for entry in declared:
         rel = entry["path"]
         base_text = decode_text(base_bytes(rel) or b"") or ""
         now_text = decode_text((subject / rel).read_bytes()) or ""
         base_set = set(base_text.splitlines())
-        added = [line for line in now_text.splitlines() if line not in base_set]
-        added_lines += len(added)
-        added_hits += [f"{rel}@{l} {pat}: {x}" for pat, l, x in scan("\n".join(added), REFREEZE_ADDED_TOKENS)]
+        try:
+            bound = retirement_bound_lines(now_text)
+        except (SyntaxError, ValueError):
+            bound = set()          # unparseable is already red on the declaration row; exempt nothing here
+        # v3.12 (review v15 N1): scanned per FILE line, with the full token set. A retirement identifier is exempt
+        # only on a line that carries a retirement-BOUND string constant; everything else is red.
+        for number, line in enumerate(now_text.splitlines(), 1):
+            if line in base_set:
+                continue
+            added_lines += 1
+            for pattern, _l, excerpt in scan(line, REFREEZE_ADDED_TOKENS_ALL):
+                if pattern in REFREEZE_RETIREMENT_IDENTIFIERS and number in bound:
+                    exempted += 1
+                    continue
+                added_hits.append(f"{rel}@{number} {pattern}: {excerpt}")
     check("f6_refreeze_added_lines_free_of_web_governance_human_hand_and_old_plan_tokens",
-          not added_hits, f"added_lines={added_lines} hits={added_hits[:6]}")
+          not added_hits, f"added_lines={added_lines} retirement_bound_exempt={exempted} hits={added_hits[:6]}")
     # The qualification receipt: a declared refreeze is credited only against a recorded run of the refrozen gate ON
-    # THIS CANDIDATE. The receipt is supplied at qualification time (--refreeze-receipt), never from the tree, so a
-    # builder working under this frozen gate cannot produce one. What it does and does not prove: development document.
+    # THIS CANDIDATE, supplied at qualification time (--refreeze-receipt).
+    # v3.12 (review v15 B2): v3.11 ASSERTED that a receipt can never come from the tree and enforced nothing — an
+    # UNTRACKED receipt inside the subject was credited (measured: 126/5, no new red). What is enforced now: a tracked
+    # receipt is self-excluding (it cannot carry the sha of the commit it is part of), and a receipt path that
+    # resolves inside the subject tree is REFUSED, tracked or not. What the receipt does and does not prove — and what
+    # is left to the qualifier rather than to the gate — is written in the development document.
     receipts, receipt_problems = [], []
     for path in (args.refreeze_receipt or []):
         try:
-            receipts.append((str(path), strict(Path(path).read_bytes())))
+            resolved = Path(path).resolve()
+        except (OSError, RuntimeError) as exc:
+            receipt_problems.append(f"{path}: unusable receipt path: {exc!r}")
+            continue
+        if resolved == subject or subject in resolved.parents:
+            receipt_problems.append(f"{path}: a qualification receipt may not lie inside the subject tree")
+            continue
+        try:
+            receipts.append((str(resolved), strict(resolved.read_bytes())))
         except (OSError, ValueError) as exc:
             receipt_problems.append(f"{path}: unreadable or not strict JSON: {exc!r}")
     by_gate = {}
@@ -3875,7 +4018,8 @@ def main():
               "tree_classification": classification, "forbidden_blobs": FORBIDDEN_BLOBS,
               "governance_expected_fails": gov_expected_fails,
               "refreeze_declaration": declared, "refreeze_declaration_path": REFREEZE_DECL,
-              "refreeze_added_lines": added_lines,
+              "refreeze_added_lines": added_lines, "refreeze_label_counts": label_counts,
+              "refreeze_max_retired_labels": REFREEZE_MAX_RETIRED_LABELS,
               "refreeze_receipts": [{"source": s, "gate": o.get("gate"), "exit_code": o.get("exit_code"),
                                      "pass_count": o.get("pass_count"), "fail_count": o.get("fail_count"),
                                      "stdout_sha256": o.get("stdout_sha256"), "subject_head": o.get("subject_head"),

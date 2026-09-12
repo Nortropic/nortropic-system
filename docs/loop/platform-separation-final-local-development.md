@@ -1,9 +1,10 @@
 # Slutseparation av plattformsrepot — lokalt kontrakt (grind + utvecklingsdokument)
 
 **Roll:** TEST_AUTHOR (kontraktsfrys, ingen produkt) · **Datum:** 2026-09-10 · **Bas:** `332f07ceb914a07c6632c1393969d9d5a337566b`
-· **Grind:** `verify/bin/platform-separation-final-exit` (v3.11 2026-09-11: ordnad, kvalificerad refreeze av en
-fryst H-grind tillåts; sidoeffektsvepet skopat till grindens egna rötter. v3.6–v3.10: plangenerationen bunden,
-remedierad efter kontraktsgranskningarna nr 5–14) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
+· **Grind:** `verify/bin/platform-separation-final-exit` (v3.12 2026-09-12: per-grind-golv för den omfrysta
+grindens innehåll och verkställd kvittoplacering, efter kontraktsgranskning nr 15. v3.11: ordnad, kvalificerad
+refreeze av en fryst H-grind; sidoeffektsvepet skopat till grindens egna rötter. v3.6–v3.10: plangenerationen
+bunden, remedierad efter granskningarna nr 5–14) · **Omfång:** `LOCAL_QUALIFICATION_ONLY`.
 
 Ägarordern (preciserad 2026-09-10): `nortropic-system` ska innehålla ENBART Nortropics
 verksamhetsneutrala plattform — Trust Kernel (plattformens tillitsdel som verkställer
@@ -634,8 +635,12 @@ kontroller, och en medvetet röd grind är ingen kvalificering.
 ```json
 {"contract": "platform-separation-final-refreeze-declaration-v1",
  "refreezes": [{"path": "verify/bin/h-035-exit", "base_sha256": "<332f07ce-objektets sha256>",
-                "new_sha256": "<kandidatens bytes>", "expected_pass": 462, "reason": "<skriven motivering>"}]}
+                "new_sha256": "<kandidatens bytes>", "expected_pass": 462, "reason": "<skriven motivering>",
+                "retired_labels": {"<basradetikett>": "<skriven motivering>"}}]}
 ```
+
+`retired_labels` är valfri (frånvaro = inga pensionerade radetiketter); alla andra nycklar är obligatoriska och
+nyckelmängden måste vara exakt en av de två formerna.
 
 - `f6_refreeze_declaration_is_one_ordered_frozen_h_gate_with_matching_base_and_new_sha256`: strikt JSON,
   exakt nyckelmängd, **exakt EN** post (ordnad refreeze — två grindar i samma kandidat är ingen ordnad
@@ -643,17 +648,45 @@ kontroller, och en medvetet röd grind är ingen kvalificering.
   `^verify/bin/h-0\d\d-exit$` (de tre HÅLLNA grindarna kan aldrig frysas om — kvalificeringen kör deras
   frysta bytes), `base_sha256` == 332f07ce-objektets bytes, `new_sha256` == kandidatens bytes, bytes skilda
   från basen, läge 755, `expected_pass` heltal ≥ 20 (mätt golv), skriven `reason`, och filen parsar som Python.
+- `f6_refreeze_keeps_every_base_row_label_except_the_declared_retirements` **(v3.12, granskning nr 15 B1)**:
+  innehållsgolvet, härlett **mekaniskt ur BASGRINDENS egna frysta bytes** — ingen handskriven lista, så regeln gäller
+  varje kommande omfrysning (h-036, h-037, h-038) utan ny kontraktsrunda.
+  - **Härledningen:** `gate_row_labels(source)` returnerar de identifierarformade strängkonstanter som skickas som
+    POSITIONSARGUMENT till ett anrop vid namn `check` — alltså grindens egna radetiketter. Mätt på `332f07ce`:
+    **h-035 251, h-036 27, h-037 21, h-038 9**.
+  - **Regeln:** varje basradetikett måste fortfarande vara en radetikett i den omfrysta grinden, utom de som
+    kandidaten DEKLARERAR pensionerade. Dessutom `expected_pass >= antal basetiketter − antal pensionerade`
+    (per-grind-golv), pensionerade etiketter måste finnas i basen, får inte finnas kvar i den omfrysta grinden och
+    måste var och en bära en skriven motivering på minst 20 tecken. Taket är **tre** pensioneringar: en omfrysning
+    som tappar fler av basens kontroller är en omskrivning, inte en omfrysning, och kräver en egen kontraktsrunda
+    (mätt: den verkliga h-035-omfrysningen pensionerar exakt **en**).
+  - **Fail-closed:** en grind vars bas ger färre än 5 härledbara radetiketter kan inte frysas om under detta kontrakt
+    alls — regeln kan inte bli vakuös.
+  - **Varför statiskt och inte täckning över körningen:** 70 av h-035:s 251 basetiketter finns i den omfrysta källan
+    men emitterades inte i den ärliga körningen (grenberoende). Att kräva dem i kvittot vore ett falskt rött. Mätt på
+    den verkliga kandidaten `a288e169`: 250 av 251 behållna, och den enda som tappas är exakt
+    `F_H036_V3_THREE_DOCUMENTS_EXACT_35D7FD7C_PLUS_HASH_BOUND_APPEND` — den H036_V3/docs-05-kontroll som
+    omfrysningen pensionerar.
+  - Detta ersätter v3.11:s globala `REFREEZE_MIN_PASS = 20`, som granskningen visade var exitkod 0 plus en
+    radräkning: en FEMRADIG leksaksgrind med 25 `PASS`, ärligt körd och med ärligt kvitto, gav `rc=0, 131/131`.
 - `f6_refreeze_added_lines_free_of_web_governance_human_hand_and_old_plan_tokens`: `verify/**` klassas som
   fryst evidens och skannas annars inte — en refreeze ADDERAR bytes dit, så de TILLAGDA raderna (rader som
   inte finns i basversionen) skannas med `WEB_TOKENS + HUMAN_TOKENS + OLD_PLAN_TOKENS + COMMIT_READ_TOKENS`
-  minus tre **retirement-identifierare**: `docs/05-beslutslogg`, `beslutslogg\w*` och `human_only`. Mätt på
-  den verkliga kandidaten `a288e169`: exakt dessa tre är dess enda träffar, alla inuti `RETIRED`/`retired`-
-  konstanter; utan dem har dess 128 tillagda rader **noll** träffar. `docs/07-konstitution.md` och
-  `docs/03-regelverk.md` fångas fortfarande (`konstitution\w*`, `regelverk\w*`), och F1 binder alltjämt att
-  ingen sådan fil finns i trädet.
+  **(v3.12, granskning nr 15 N1)** Hela tokenmängden skannas per FILRAD. De tre **retirement-identifierarna**
+  (`docs/05-beslutslogg`, `beslutslogg\w*`, `human_only`) undantas BARA på en rad som bär en
+  retirement-BUNDEN strängkonstant — en konstant tilldelad ett namn som matchar `(?i)retired`, eller en
+  dict-post vars nyckel namnger en pensionering. v3.11 tog bort de tre mönstren globalt, och granskaren smugglade
+  då in styrningsprosa i en KOMMENTAR och en AKTIV `human_only`-stoppfunktion genom dem; ingetdera är en
+  retirement-bunden strängkonstant och båda är röda i v3.12. Mätt på den verkliga kandidaten `a288e169`: 5 träffar
+  på 3 rader, alla retirement-bundna → 0 röda. `docs/07-konstitution.md` och `docs/03-regelverk.md` fångas
+  fortfarande (`konstitution\w*`, `regelverk\w*`), och F1 binder alltjämt att ingen sådan fil finns i trädet.
 - `f6_declared_refreeze_is_qualified_by_a_receipt_bound_to_this_candidate_and_the_refrozen_bytes`: en
   deklarerad refreeze krediteras BARA mot ett **kvalificeringskvitto** som lämnas vid körningen
-  (`--refreeze-receipt <fil>`), aldrig ur trädet. Kvittot är strikt JSON med exakt nyckelmängden
+  (`--refreeze-receipt <fil>`). **(v3.12, granskning nr 15 B2)** Kvittots sökväg VERKSTÄLLS nu: en sökväg vars
+  `resolve()` ligger i eller under subjektträdet avvisas, spårad som ospårad. v3.11 påstod bara att kvittot aldrig
+  kan komma ur trädet och verkställde ingenting — ett OSPÅRAT kvitto i subjektet krediterades (mätt 126/5, ingen ny
+  röd rad), eftersom renhetskontrollen använder `--untracked-files=no`. Ett SPÅRAT kvitto är självuteslutande
+  (det kan inte bära sha:n för den commit det självt ingår i). Kvittot är strikt JSON med exakt nyckelmängden
   `{contract, gate, gate_sha256, subject_head, invocation, exit_code, pass_count, fail_count, stdout_sha256,
   stdout}`. Grinden räknar om `sha256(stdout)`, räknar `^PASS `/`^FAIL `-raderna själv och kräver:
   `gate` == den deklarerade sökvägen · `gate_sha256` == `new_sha256` == kandidatens bytes ·
@@ -678,6 +711,17 @@ kontroller, och en medvetet röd grind är ingen kvalificering.
 - `f6_efterarbete_append_only_vs_332f07ce_with_scanned_addition`: `SEPARATION-20260910/EFTERARBETE.md` börjar
   med 332f07ce-bytes; det tillagda saknar webb- och människohandstoken (basdelen är uppdelningens evidens).
 - drift.md append-only (F2).
+
+**En generation rymmer exakt EN omfrysning (v3.12, granskning nr 15 N3).** Allt jämförs mot
+`FROZEN_BASE = 332f07ce` och deklarationen tillåter exakt en post. En andra ordnad omfrysning (h-036) ovanpå en
+redan integrerad h-035-omfrysning faller därför på `f6_frozen_tree_bytes_…` med
+`undeclared_byte_changes=['verify/bin/h-035-exit']` — beteendet är korrekt och konservativt, men det betyder att
+**h-036, h-037 och h-038 var och en kräver en ny separationskontraktsrunda med ompinnad `FROZEN_BASE`.**
+Ompinningen görs så här: när h-035-omfrysningen är kvalificerad och integrerad, sätt `FROZEN_BASE` till den
+integrationscommiten, mät om `f2_local_development_documents_are_exactly_the_<bas>_set_plus_this_contract`,
+`f6_*`-radnamnen (de bär basens åtta första tecken) och `f1_web_transfer_provenance_2_lists_the_four_files_with_blob_oids_at_<bas>`,
+och kör om grön baslinje + acceptans för nästa grind i ordningen. `CONTROL_SET_BASE`, `LAUNCH_CWD_BASE` och
+`GOVERNANCE_BASE` är de hållna grindarnas EGNA baser och ompinnas INTE — de tre grindarna är frysta.
 
 ### F7 — de tre tidigare frysta lokala grindarna mot kandidaten
 Grinden kör den hållna kopian: subjektets egen fil när dess blob == `332f07ce:<grind>`, annars en
@@ -1088,10 +1132,28 @@ Ordinarie arbete genom rollflödet (ägarbeslut 2026-09-10). Exakt lista (`specs
   utfallet, och att BYGGAREN inte kan få en refreeze accepterad — kvittot kommer inte ur trädet utan ges vid
   kvalificeringen. Vad det INTE bevisar: att kvalificeraren inte fabricerat kvittot. Under hotmodellen
   (motparten är en builder under en fryst grind, inte kvalificeraren själv) är det en deklarerad gräns.
-- **(v3.11) Refreezens innehåll bedöms inte.** Separationskontraktet avgör inte om den omfrysta H-grinden är
-  ett korrekt kontrakt — bara att den är deklarerad, byte-bunden, parsbar, ≥ 20 rader grön på kandidaten och
-  att dess tillagda rader inte bär webbstyrnings-/människohandstoken. H-grindens eget innehåll är dess eget
-  kontraktsflödes och den oberoende granskningens sak.
+- **(v3.12) Refreezens innehåll bedöms till FORM, inte till mening.** v3.11:s gräns ("innehållet bedöms inte") höll
+  inte: granskningen visade att en femradig leksaksgrind med 25 gröna rader passerade med ett ärligt kvitto. v3.12
+  binder därför innehållet mekaniskt: varje radetikett som basgrindens frysta bytes deklarerar måste finnas kvar i
+  den omfrysta grinden, utom högst tre namngivna och motiverade pensioneringar, och `expected_pass` måste nå
+  per-grind-golvet. Vad detta ALLTJÄMT inte bevisar: att en behållen kontroll fortfarande PRÖVAR samma sak — en
+  omfrysning som behåller etiketten men tömmer kroppen fångas inte av detta kontrakt. Den bedömningen hör till
+  H-grindens eget kontraktsflöde och dess oberoende granskning.
+- **(v3.12) Kvittots miljö är obunden.** Kvittot bär `invocation` som argv-lista; grinden kräver den pinnade
+  Python-binären, `-I -S -B` och rätt basnamn, men inte miljövariabler. En kvalificeringskörning med tillåtna
+  providersamtal ger ett identiskt kvitto (granskning nr 15 N6).
+- **(v3.12) Ett kvitto hopsatt ur en ANNAN kandidats körning med enbart `subject_head` lappad krediteras.**
+  `stdout_sha256` förblir giltig eftersom stdout är orörd. Det kräver att kvalificeraren ljuger och ligger utanför
+  hotmodellen (granskning nr 15 A3), men det är en gräns, inte en egenskap.
+- **(v3.12) Blandade kvittonyckeltyper ger `TypeError`.** Tre kvitton varav ett utan `gate` ger en `TypeError` i
+  sorteringen. Grinden faller stängt (abortvägen: 116/2 av 131, rc 1, varje icke-körd rad räknad som FAIL), men
+  felmeddelandet namnger inte orsaken (granskning nr 15 N5).
+- **(v3.12) `REFREEZE_GATE_RE` är bredare än den ordnade uppgiftsmängden.** `^verify/bin/h-0\d\d-exit$` släpper in
+  varje H-grind som finns vid basen, inte bara h-031…h-039 (granskning nr 15 N4). Innehållsgolvet gäller dem alla,
+  så en urholkning fångas ändå.
+- **(v3.12) `PLAN_TOKENS` ingår inte i skanningen av refreezens tillagda rader** (`CODEX_START_HERE`,
+  `Verkstadsgolvet`, `ägarhand`, `gh pr merge`, `human-only`). De mönstren är skrivna för plangenerationsdokumentet.
+  v3.10 skannade ingenting alls i `verify/**`, så detta är ingen försvagning (granskning nr 15 N10).
 - **(v3.11) Sidoeffekter utanför grindens egna rötter.** Svepet jämför inte längre delade systemkataloger
   (`/private/tmp`, `/private/tmp/claude`, `/private/tmp/claude-501`, `$TMPDIR` och dess förälder). En produkt
   som under flödena skriver direkt till en HÅRDKODAD absolut sökväg utanför subjektet och `FIXTURE_ROOT`
