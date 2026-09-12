@@ -2266,5 +2266,93 @@ spröd; (2) refreezens innehåll bedöms inte; (3) sidoeffektsvepet täcker inte
 utanför grindens egna rötter; (4) tre retirement-identifierare undantas från skanningen av refreezens tillagda
 rader.
 
+### Kontraktsgranskning nr 15 (på `00f84d0e`) → v3.12
+`GATE_REVIEW_RESULT=NOT_READY` med **två** blockerare, båda i refreeze-vägen. Granskaren reproducerade båda de
+avgörande körningarna med **byte-identisk** stdout (baslinje 131/131, acceptans 131/131), bekräftade raddiffen
+mekaniskt, rekonstruerade 8 av 16 negativer (8/8 rätt rad), visade i fullkörning (A10, 128/3) att F7-domarna är
+exakta och inte lösgjorda, och bekräftade med fyra konstruerade negativer (V1–V4) att inget av v3.10:s band
+försvagats. Riggfixen bekräftades strukturellt immun mot främmande sessioner.
+
+| Fynd | Åtgärd i grinden (v3.12) |
+|---|---|
+| **B1** — innehållskravet var exitkod 0 plus en radräkning. Granskaren ersatte `verify/bin/h-035-exit` (22511 rader, 462 rader-i-utfall) med en **femradig** grind som skriver 25 `PASS`, körde den **ärligt**, byggde kvittot ur den **verkliga** stdout:en och fick `rc=0, 131/131`. Ägarbeslutet kräver *samtliga obligatoriska kontroller* och säger att exitkod 0 ensam inte räcker | ny rad `f6_refreeze_keeps_every_base_row_label_except_the_declared_retirements` med **per-grind-golv härlett ur basgrindens frysta bytes**; `REFREEZE_MIN_PASS = 20` borttagen |
+| **B2** — grinden hävdade att kvittot aldrig kan komma ur trädet men verkställde ingenting; ett **ospårat** kvitto i subjektet krediterades (126/5) | en kvittosökväg vars `resolve()` ligger i eller under subjektet avvisas, spårad som ospårad; utsagan omskriven till vad som verkställs |
+| **N1** — retirement-undantagen var globala; granskaren smugglade styrningsprosa i en kommentar och en **aktiv** `human_only`-stopp genom dem | hela tokenmängden skannas per filrad; de tre identifierarna undantas bara på rader som bär en **retirement-bunden** strängkonstant |
+| **N3** — odokumenterat att en generation rymmer exakt EN omfrysning | dokumenterat i F6/F7 tillsammans med hur `FROZEN_BASE` ompinnas för h-036, h-037 och h-038 |
+
+Icke åtgärdade och redovisade som deklarerade gränser: N2 (hårdkodade absoluta sökvägar utanför grindens rötter),
+N4 (`REFREEZE_GATE_RE` bredare än den ordnade mängden), N5 (`TypeError` vid blandade kvittonyckeltyper — faller
+stängt), N6 (kvittots miljö obunden), N7 (`gate_ok` självrefererande, oförändrat från v3.10), N10 (`PLAN_TOKENS`),
+samt A3 (kvitto ur en annan kandidats körning med lappad `subject_head`).
+
+**Så här härleds golvet — exakt.** `gate_row_labels(source)` (grindens egen funktion) `ast.parse`:ar källan och
+returnerar de strängkonstanter som (a) skickas som POSITIONSARGUMENT till ett anrop vars namn är `check`, och
+(b) matchar `[A-Za-z][A-Za-z0-9_]*` i sin helhet. Det är en grinds egna radetiketter. Den körs på BASversionen
+(`332f07ce:<sökväg>`) och på kandidatens version. Mätt på basen: **h-035 251, h-036 27, h-037 21, h-038 9** — regeln
+gäller alltså hela den tvingande ordningen utan ny kontraktsrunda. Kraven: varje basetikett måste finnas kvar som
+radetikett i den omfrysta grinden utom de deklarerade pensioneringarna; en pensionering måste finnas i basen, får
+inte finnas kvar i omfrysningen, måste bära minst 20 teckens motivering, och högst **tre** får deklareras;
+`expected_pass >= basetiketter − pensioneringar`; och färre än **5** härledbara basetiketter gör grinden
+icke-omfrysbar under detta kontrakt (fail-closed). Mätt på den verkliga kandidaten: bas 251, omfryst 251,
+pensionerade 1, golv 250, **saknade 0**.
+
+**Varför statiskt och inte täckning över körningen.** 70 av h-035:s 251 basetiketter finns i den omfrysta källan men
+emitterades inte i den ärliga körningen (grenberoende). En regel som krävde dem i kvittot hade gett ett falskt rött
+på en korrekt omfrysning.
+
+### Test-author 2026-09-12 — grön baslinje för v3.12 på den oförändrade integrationen
+Subjekt `09f0ea6dde40e9b61a0be9c56aa352e19c47dfc3` (`5df9213c` + grind v3.12 + detta dokument, ingen refreeze deklarerad).
+Fullkörning (bypass, egen `TMPDIR`, `/bin/ps` före): exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **132/132**,
+result.json sha256 `06d2436b9f1726c331c4e17a9c475a17057beb780df4a7a030269568a66165d8`. `refreeze_declaration []`, `refreeze_label_counts {}`, `receipts []`.
+
+### Acceptans 2026-09-12 — h-035:s refreeze GRÖN under v3.12
+Kandidat `61adaf6c5495367d6ffe64885c9bead6803d6f5d` = v3.12-integrationen + `a288e169`:s `verify/bin/h-035-exit` + `REFREEZE.json` med
+**en deklarerad pensionering**: `F_H036_V3_THREE_DOCUMENTS_EXACT_35D7FD7C_PLUS_HASH_BOUND_APPEND`, den enda av
+basens 251 radetiketter som omfrysningen tappar.
+
+Kvalificeringskörning av den omfrysta grinden (separat, kanonisk invokation): exit **0**, **462 PASS / 0 FAIL**,
+`H035_GATE_RESULT=PASS`. Kvitto sha256 `bff8cf1e0eb33d68b4643d423b8c892628d86cda05d62a3139fca9149424e3e1`.
+Separationsgrinden med `--refreeze-receipt`: exit **0**, `PASS_LOCAL_QUALIFICATION_ONLY`, **132/132**, result.json
+sha256 `5b4b02746810610f9659ffedc25d8d952144dfe4c48c4762fe84684178cfe501`. `refreeze_label_counts: base 251, refrozen 251, retired 1, floor 250, missing 0`.
+
+| Hållen grind | Mätt utfall på kandidaten | v3.12:s förväntan (härledd, exakt) |
+|---|---|---|
+| `platform-control-set-exit` | exit 1, **67/1**, `frozen_artifacts_identical_to_dae90c8f` (`problems=['verify/bin/h-035-exit']`) | exakt den raden och den sökvägslistan; sju produktrader gröna |
+| `launch-cwd-exit` | exit 1, **19/20**, `frozen_verify_bin_identical_to_base_383ed387` med refreezen i `problems` | exakt den detaljen |
+| `platform-governance-exit` | exit 1, **67/3** (g6, g7_launch_cwd, g7_platform_control_set) | exakt de tre, nästlad detalj `pass=67 fail=1 fails=['frozen_artifacts_identical_to_dae90c8f']` |
+
+På den refreeze-fria baslinjen mättes samma tre till **68/68 (grön), 19/20 och 68/2** — v3.10:s stränghet oförändrad.
+
+**Not om fixturen.** v3.11:s acceptansfixtur `89ec9ddb` gäller inte längre: v3.12 kräver den deklarerade
+pensioneringen, och en första omskrivning av deklarationen (`4a9882f6`) föll dessutom på
+`f2_tree_wide_no_web_governance_reference_outside_frozen_evidence` — deklarationsfilen är **aktiv spårad text** och
+fick inte namnge det retirerade dokumentet i sin motivering. Kontraktet fångade alltså sin egen fixtur. Den slutliga
+fixturen `61adaf6c5495367d6ffe64885c9bead6803d6f5d` har en motivering som beskriver pensioneringen utan att namnge dokumentet.
+
+### F9 v3.12 — negativer
+**26 fall körda, 24 negativer fångade, 2 falskt-röda prov gröna, 0 riggfel** (`ok 26 of 26`). Var och en i egen
+replika av v3.12-acceptansreferensen, statiskt `--skip-held-gates`, nämnare 132, referens 127/5.
+
+| Fall | Faller på | Mätt skäl |
+|---|---|---|
+| `n0_reference (acceptansreferensen)` | **127/5** — bara de fem sandlådeberoende raderna | — |
+| `n17_toy_gate_honestly_run (**granskningens B1**)` | `f6_refreeze_keeps_every_base_row_label_…` (ENDAST den) | femradig grind, ÄRLIGT körd (`$PY -I -S -B`, exit 0, 25 PASS), kvitto ur den verkliga stdout:en: `251 base row label(s) dropped without a declared retirement` |
+| `n18_receipt_inside_subject (**B2**)` | `f6_declared_refreeze_is_qualified_…` | `a qualification receipt may not lie inside the subject tree` — ospårad fil på `<subject>/SEPARATION-20260910/qualification-receipt.json` |
+| `n19_label_dropped_silently` | `f6_refreeze_keeps_every_base_row_label_…` | en basetikett omdöpt utan deklarerad pensionering → `1 base row label(s) dropped` |
+| `n20_second_retirement_declared (falskt-rött prov)` | **GRÖN** — ingen ny röd rad | samma etikett borttagen men DEKLARERAD pensionerad med skriven motivering |
+| `n21_too_many_retirements` | `f6_refreeze_declaration_…` + `f6_refreeze_keeps_…` | fyra pensioneringar överskrider taket tre |
+| `n22_retire_label_not_in_base` | `f6_refreeze_keeps_every_base_row_label_…` | `retired labels that the base gate never had` |
+| `n23_retire_label_still_present` | `f6_refreeze_keeps_every_base_row_label_…` | `labels declared retired but still present in the refrozen gate` |
+| `n24_retirement_exemption_smuggling (**granskningens A7/N1**)` | `f6_refreeze_added_lines_…` | styrningsprosa i en KOMMENTAR och en aktiv `human_only`-stoppfunktion — ingendera retirement-bunden |
+| `n25_expected_pass_below_floor` | `f6_refreeze_keeps_…` + `f6_declared_refreeze_…` | `expected_pass 249 is below the per-gate floor 250` |
+| `n1 … n16 (v3.11:s negativer, ombyggda på v3.12-referensen)` | samtliga på sina namngivna rader | odeklarerad byteändring, fel ny/bas-sha, inget kvitto, icke-grön grind, tillagd/borttagen fil under `verify/`, webbtext, tyst andra grind, två deklarationer, hållen grind deklarerad, fel förutsagt antal, kvitto från annan kandidat, manipulerad stdout, deklarerat-men-oförändrat, produktsidoeffekt |
+
+
+**F7-domarnas exakthet, omkörd på v3.12:s källa:** **13 av 13** fall som förutsagt (samma harness som i v3.11).
+
+### Grind v3.12
+`verify/bin/platform-separation-final-exit` sha256 `c501e8fc3768778e01a6dc0da3eb490d5d0a756effcf766f807e89a7dc8edd27`, 4076 rader, **132 rader-i-utfall**,
+commit `09f0ea6dde40e9b61a0be9c56aa352e19c47dfc3` (träd `6eaacb63b97a98410ed4512207a5e51462f3b410`).
+
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
