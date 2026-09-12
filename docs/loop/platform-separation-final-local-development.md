@@ -2610,3 +2610,497 @@ gammal text i kommentar och ändringar i övriga planbytes avvisades. Scan 0 tr�
 Alla äldre funktioner samt main minus just den nya kontrollen är AST-identiska;
 exakt ett ovillkorligt check-anrop tillkommer. EXPECTED_ROW_COUNT är mekaniskt 133.
 Detta är inte fullgrindens RED eller PASS; den seriella frysta baslinjen återstår.
+
+### H039 lokal asset-förberedelse på 8095d947 — NOT_READY, 2026-09-12
+
+Denna förberedelse preciserar kriteriet före produktarbete; den fryser ännu ingen
+körbar acceptans. Basen är `8095d947c83202e2b87801531d9f7cb1457c8719`.
+Den aktiva plattformsplanens H039-funktionskrav och begränsningar består.
+Bevarad protected-asset-B återbrukas som ofruset underlag, inte som aktuell grind
+eller som R33_LIVE_R2_FAILED_EVIDENCE. Historiska körningar förblir förbrukade.
+
+Potentiell TEST_AUTHOR-yta för det sammanhängande lokala kontraktet är exakt:
+
+1. `verify/bin/h-039-exit` — framtida avgränsad asset-lane, ingen gammal live-dispatch.
+2. `specs/tasks.spec.json` — ett lokalt asset-member i befintlig H039-rad.
+3. `verify/bin/platform-separation-final-exit` — endast nödvändiga exakta
+   spec-/produkt-/kvittobindningar för denna lane, inga generella undantag.
+4. Detta befintliga utvecklingsdokument — kriterium, effekter och creditgräns.
+5. `SEPARATION-20260910/REFREEZE.json` — en H039-deklaration först när grindens
+   bytes, faktisk argv och mätbara antal är stabila.
+6. `controller/verify/cli` — endast `PLATFORM_SPEC` för de exakta specbytesen.
+
+Den första preparatoriska delen ändrar endast dokumentet, det passiva spec-membern
+och dess konsumentpin. Befintliga specfält bevaras byte-exakt; borttagning av exakt
+det tillagda memberblocket ska återskapa hela basens spec. H039:s ordinarie
+`allowed_write`, fem owner-product-paths, `exit_test`, beroenden och historik ändras
+inte. Register, core, gamla dokument, aktiva plan-/handoffbytes och produkt är orörda.
+Den frysta separationsgrindens F3-specfrys får därför ännu inte förväntas vara grön;
+ompinnningen är ingen kvalificering och kringgår inte denna återstående kontraktsyta.
+
+Prospektiv BUILDER-yta för asset-only är fyra befintliga M-paths med samma modes:
+`controller/runtime-cleanup/install`, `controller/runtime-cleanup/native/mediator.c`,
+`verify/h039/build-recipe.json`, `verify/h039/identity-manifest.json`.
+`verify/h039/runtime-cleanup-mediator` förblir byte-/mode-identisk. Produkten är en
+inert carrier, inte en installer: exklusiv containergren med endast return 2,
+separat adaptergren, historisk källa i utesluten gren; de två bundna payloads ligger
+i readonly, icke-exekverbara sektioner. Inga nya spårade produktpaths tillkommer.
+
+Positiv acceptans ska förena faktisk autentiserad commit-/träd-/diskidentitet och
+exakt fyrfilsdiff med oberoende verkligt byggmaterial, reproducerad adapter/container,
+entry-/IR-/Mach-O-/payloadsemantik och kanonisk recipe-/manifestbindning. Återanvänd
+B:s kausala materialprov: samstämmigt ompinad felrecipe, återförseglad felbehörighet,
+korsad payload, aktiv installer-entry, blandade selectors, fel parent/mode/extra path
+och ändrad femte runtimepath ska fällas av respektive verkliga predikat. Generisk
+hashavvikelse, riggfel eller enbart modellrapporter får inte ersätta sådan effekt.
+
+NOT_READY kvarstår tills faktisk observerad graph/numstat, produktbudget från rätt
+material, kausala attributfixturer, sammanhängande dispatch och genuin preproduct-RED
+har mätts och granskats. Inga antal eller budgetar gissas. B:s byggpreflight kräver
+21474836480 fria bytes före skapande och varje lane; gränsen sänks inte till aktuell
+disk. Sparad kompilering är underlag, inte denna kandidats kvalificering. B:s adapter
+avser CPython 3.9.6; den bevisar inte gate-Python 3.12 eller faktisk consumer-ABI.
+
+Högsta framtida asset-dom är `PASS_ASSET_BUILD_ONLY_NOT_H039_PASS_OR_ATTESTATION`.
+Ingen noarg-PASS, task-attestation, downstream-readiness eller supervisor-resume
+följer. Inga native loads, listener queries, installationer, root-/runtimeeffekter,
+kvittoläsningar/-skrivningar, sekvensövergångar eller återförsök av förbrukade lanes
+ingår. En operativ efterföljare behöver även den femte befintliga runtimeprodukten
+och verklig consumer-/loader-/ABI-/kvittolivscykel; asset-PASS löser inte den delen.
+
+Källankare för återbruk: B-grind SHA256
+`aa9f5147d8d1192cc3353aec9a631cc234b58e31301f698334add1a866634183`,
+B-spec `28c25cf5a58f3a0c8c84ded340b618e9d562d7ef9a4be1fd9d3c1a4734fd7db1`,
+adapterns `consumer-integration-spec.md`
+`bea33a27c0a2d27b3d032cafa657de4d0b917919772e30dfc72fa91a8b5b91be`.
+Dessa är bevarade externa underlag, inte nya aktiva filberoenden. Seq2-observationen
+och förbrukad installed-/diagnostikevidens identifieras i v3.16-avsnittet ovan.
+
+Nästa ofrysta tranche inför samma framtida lokala asset-dispatch, inte en sidogrind:
+`--asset-contract CANDIDATE_SHA` och `--asset-product CONTRACT_SHA CANDIDATE_SHA`.
+Noarg och samtliga gamla selectors vägras före Git. Hela ursprungliga R33-källan
+bevaras byte-exakt utanför ett enda prefixblock; ingen historisk import nås.
+Kontraktsrelationen kräver exakt sex ändrade befintliga paths mot 8095, produkten
+exakt fyra mot kontraktet med alla andra blobbar/modes kvar. Samma kontrakt/kandidat
+i produktanropet är endast en uttrycklig produktlös RED-baslinje, aldrig en produktgraf.
+
+Actual reference-numstat är nu mätt av pinned Git: source168/0, recipe282/84,
+manifest75/52 och installer -/-, totalt525/136/661. Resultat-SHA256
+`28bc544a5880adf44e4108595452f3922b5f9c727106e76112dfaf77ad6ed877` binder två små
+fempaths-träd med Myers och indentHeuristic=true, utan attribut. Detta råkade motsvara
+den äldre SequenceMatcher-modellen men bevisar inte full repograf, attribut eller ny build.
+
+Den första enkla read-only-observern i hållpunkt4601259e var otillräcklig och kördes
+inte. Den är nu borttagen, ersatt av B:s retained/raw-object/attribute/config/postauth-
+kedja. Fem helpers (`git_config_exact`, `git_records`, `retained_read`, `close_owned`,
+`acl_empty`) återbrukas ordagrant. Inga repoanrop från den nya porten har ännu körts
+eller kvalificerats. Källan är fortfarande ofryst, inte en positiv acceptansdom.
+
+Observerportens begränsade ändringar mot B:
+
+- Sex aktuella plattformspaths ersätter den historiska kontraktsytan.
+- Samma invokation med HEAD=P autentiserar råa commit-/trädobjekt för B8095, C och P,
+  exakt B→C med sex M-paths och C→P med fyra M-paths. Föräldrarna måste vara direkta
+  och separata. P=C kontrollerar endast kontraktskanten och kan inte få produktcredit.
+  Attributkälla binds till just den autentiserade högersidan av respektive kant.
+  HEAD läses utan taggpeeling; kandidaternas råa objekt måste själva vara commits.
+- Två slutna read-only-operationer tillkommer: `ls-files --stage -z` och
+  `status --porcelain=v1 -z --untracked-files=all`. Ingen fri argv eller ny Gitwrite.
+- Kandidatens alla spårade diskbytes/modes och index binds till objektkartan genom
+  samma retained `open_member`, inklusive NONBLOCK/nofollow, och hålls genom samma
+  finally. Konfigurations-, HEAD-, index- och diskbytes kontrolleras igen före close;
+  primärfel och samtliga postauth-/close-fel bevaras även i main:s riggutdata.
+- Myers/indentHeuristic=true görs uttryckliga. B tillät ingen config som bytte dessa
+  standarder, men den verkligt körda lilla referensmetoden band uttryckligen denna
+  policy. Ny port måste mäta sina egna numstat under samma policy; det historiska
+  referensresultatet ersätter inte ett nytt kandidatprov.
+
+B:s återbrukskedja har ett faktiskt separat syntetiskt metodprov, result-SHA256
+`d1163546ccd93d71d1648f98b78f418bdf091b0360f1313df909727562df4fc7`:
+positiv4M73Git-anrop, committed-attributvägran46 före diff, untracked-attributvägran0,
+fel config1stdin-konfigurationsanrop och inga repoanrop. Detta kvalificerar varken
+den tvåkantade porten, dess nya disk/indexled eller en aktuell H039-produkt.
+
+Identiska basproduktbytes ger `ASSET_REPRESENTATION_ABSENT`; rätt referenshashar ger
+fortfarande NOT_READY. Återstående positivkedja är faktisk immutable observer/graf,
+fulla återbrukade material-/reseal-prov, kausala attributkontroller och exakt kvitto-
+koppling. F3/F6 och REFREEZE är oförändrade tills detta hänger ihop; inget antal eller
+generiskt RED-undantag införs. H036:s historiska74/0 på03a är inte bevis om denna kandidat.
+
+#### Ofrysen materialkoppling efter faktisk tvåkantsmetod
+
+Portens separata syntetiska callable-metod har nu faktisk result-SHA256
+`072ee9434d7ff9fce6101cd97ce3e6a33c061bf309cec9616b53bf1d3ffc48e3`:
+8/8 förväntade utfall, 5022 Gitstarter inklusive setup, 42.94 sekunder, 34240 KiB.
+Detta är metodcredit för tvåkanter/disk/index/postauth, inte ett fryst kontrakt,
+en riktig produkt, färsk byggning eller gate-PASS.
+
+`h039_local_material_binding` använder samma slutförda observers basblobbar,
+trädkartor och bundna diskbytes. Kontraktskanten behåller de fyra basprodukterna;
+kandidatens materialmodes/blob-OID/diskbytes korsbinds och retained runtime binds
+till samma oförändrade objekt på B/C/P. Detta gäller bara asset-underfasen.
+De 13 rena B-definitionerna unique_object, reference_source, reference_recipe,
+actual_layout, actual_signature, actual_macho, actual_material,
+actual_reseal_control, product_recipe, product_manifest, product_budget,
+product_material och product_controls kopieras ordagrant från B SHA256
+`aa9f5147d8d1192cc3353aec9a631cc234b58e31301f698334add1a866634183`.
+Ingen B-import, driver, native loading, extra argv eller extern referenspath införs.
+De 29 produktkontrollerna omfattar koherent ombundna och omslutna negativa prov;
+reseal är endast in-memory kontrollkonstruktion, aldrig produkttransformation.
+B:s SequenceMatcher-budget är fortsatt en separat ren editmodell. Observerns
+faktiska Myers/indentHeuristic=true-numstat är ett annat krav, inte härlett ur den.
+
+CLI överför inga byggutdata eller adapterkällor och har fortfarande ingen positiv
+acceptansväg. Kodgrenen för oförändrade basprodukter ger ASSET_REPRESENTATION_ABSENT;
+detta är inte ett körresultat från aktuell main/preproduct-RED, som är NOT_RUN.
+Saknade oberoende byggindata ger NOT_READY. Historiska utdata kan pröva den rena
+kopplingen men ger uttryckligen ingen färsk bygg-/proveniens-/gatecredit.
+En framtida freshbuild ger inte ensam gatecredit. B build_reference:s
+`active_external_same_uid_consumption_provenance=UNPROVEN` och
+`MEASUREMENT_ONLY_NO_GATE_OR_PRODUCT_CREDIT` förblir ärliga begränsningar.
+Den första är däremot inte ett universellt krav på denna build-only-lane:
+B-specens build_consumed_input_binding/build_threat_boundary avgränsar uttryckligen
+serialiserat arbete utan auktoriserad samtidig same-UID-writer. Det starkare
+hotfallet för senare loader-/consumerarbete får inte importeras som ett nytt
+generellt byggblockerande krav. Färsk sammansatt materialleverans under denna
+skrivna bygggräns samt F3/F6/kvittokoppling återstår före freeze.
+Ingen textreceipt ersätter dessa effekter. Spec/PLATFORM_SPEC, F3/F6 och REFREEZE
+ändras inte i denna materialtranche; tung byggning behåller 20 GiB-golvet.
+
+#### Första build-only-sammansättningen — hållpunkt b921f5a5, ingen byggkörning
+
+Kriteriet är befintligt material_criterion: två oberoende byggrotars exakta bytes
+ska reproduceras och föras till samma observer-/materialpredikat. Det är inte
+ett nytt hotkrav och ändrar inget historiskt build_hardening-fält. Den gamla
+operativa installer-/runtime-receptkedjan ersätts inte av asset-receptets O0/
+macOS14-container; den femte runtimefilen förblir exakt retained input.
+
+Ny ren h039_local_rebuild_binding kontrollerar två exakta tiopaths-outputkartor,
+kräver bytes per output och full byteidentitet mellan rötterna och anropar därefter
+oförändrade B-material-/reseal-predikat genom nuvarande materialkoppling.
+Den avvisar saknat/extra output, fel typ, en ändrad rebuildbyte samt samstämmigt
+felmaterial. Den kan inte intyga att en kompilator startade. Main är fortfarande
+icke-positiv och anropar inte denna nya callable. Spec/PLATFORM_SPEC behöver ingen
+ändring för detta redan allokerade reproducerbarhetskrav; F3/F6/REFREEZE lämnas kvar.
+
+En tidigare föreslagen fristående metod skulle anropa B:s build_reference från
+pinnad aa9f5147-källa, med endast utvalda AST-definitioner laddade (aldrig B:s module entry,
+main, runpy eller import från B). Den anropningen förblir MEASUREMENT_ONLY. Dess
+preflight upprepas internt, inte från en rapport: source/runtime läses med B:s
+retained_read från de fortfarande oförändrade basprodukterna i den enda TA-ytan,
+adapter från den separat hashbundna listener_adapter.c. Detta är en metodfixtur,
+inte senare C/P-kvalificering: B:s repo-relative preflight får inte återanvändas
+mot en produktdisk där mediator.c redan har bytts mot den genererade containern.
+Den slutliga interna porten måste i stället materialisera basbytes och retained
+runtime från samma autentiserade observers minnesfakta, med separat pinnad adapter.
+Den fristående metoden är uttryckligen DEFERRED/NOT_RUN, inte en förutsättning
+eller rekommenderad byggutgift: ny reproducerbarhet med syntetiska faktakartor
+sluter inte den faktiska acceptansvägen. Scriptet h039-local-fresh-build-composition-method.py
+SHA256 493c7a5594f7bb95455f1fdf0a772b8639425e4597eb55eb60e55603b1be3edd
+bevaras som oförbrukat förslag; dess två argv är inte nya kommandon i grinden.
+
+Metodens fasta käll-/indataberoenden:
+
+- B-grind aa9f5147 (full SHA ovan); ingen historisk outputkatalog läses som bygginput.
+- mediator.c 34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b;
+  retained runtime b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7.
+- /Users/elinhaggstrom/nortropic/worktrees/h039-listener-adapter-v1-candidate/listener_adapter.c,
+  SHA256 a35dc310e05f7cf83d7175e5ee5ba3213e6a7433daaa7cc5dd25f9e92ff437fa.
+- B:s exakta reference_recipe och compiler_envelope, inklusive samtliga verktyg,
+  fyra header-/linkinventarier och deras återautentisering. SDK26.5/CLT21 och
+  CPython3.9.6 ändras inte; ingen gate-Python3.12-/loaded-image-/consumer-ABI-credit.
+- B-definitionerna compiler_envelope, retained_read, close_owned, acl_empty,
+  inventory, wait_state, group_action, group_snapshot, bounded_command, preflight,
+  build_reference och reference_source/reference_recipe återbrukas byte-exakt.
+  Nya bridge/material-definitioner läses ur denna hållpunkt, aldrig ur kandidatdata.
+
+Efter en färsk, slutförd driver hämtar metoden båda rotarnas tio outputbytes med
+retained_read och respektive färska inventorydigest, jämför mot driverstorlekar
+och varandra, och använder dem direkt i samma rena rebuild/material-predikat.
+Inga receipt- eller gamla measurementfält kan ersätta de bytesen. Main/observer
+körs inte i denna byggmetod: dess kartor är uttryckligt syntetiska, så rätt effekt
+är endast färsk tvårotsbyggning plus ren materialkoppling, inte graf- eller gate-PASS.
+Den senare accepterande porten måste förena faktiskt observerad C/P-identitet,
+intern färsk byggning, outputpostauth och slutlig kontrakts-/kvittobindning i samma
+invokation; en importerad metodrapport accepteras aldrig som bevis.
+
+Resurs-/effektplan för separat granskning före körning: exakt två seriekörda lanes,
+åtta fasta clang/ld-kommandon vardera under oförändrad deny-default Seatbelt,
+ingen raw fallback och inga native outputstarter. Minst 21474836480 fria bytes
+kontrolleras före skapande och varje lane. Varje kommando har 300 s deadline,
+4194304 bytes sammanlagd capture och 67108864 bytes per child-regular-file;
+ägd grupp följer B:s 10 s bounded cleanup, WNOWAIT-reservation och terminala
+read-only PGID-frånvarokontroll. Okänt ägarskap betyder ingen signal/reap.
+Två rootinventarier har B:s 2 GiB efterkontroll, inte en påstådd OS-diskkvot;
+20 GiB-golvet får inte tolkas som en hård total-write-cap. För metoden planeras
+högst 128 MiB bevarad normal output/capture plus 128 MiB reserv utöver startgolvet;
+råstatus och bevarad rot kvarstår vid varje avvikelse. Ingen automatisk retry,
+filcleanup eller signal mot främmande/okänt ägarskap. Separat effektgranskning ska
+binda exakt script och verkliga preflightvillkor innan denna metod startas.
+
+Same-UID-begränsningen är fortfarande UNPROVEN: 0700, retained FD, före-/efterhash
+och två rötter bevisar inte universell uteslutning av en extern aktiv same-UID-aktör.
+Serialisering är arbetsvillkoret, inte OS-bevis. Upptäckt störning/identitetsfel
+underkänner metoden; ingen tillitsförsvagning eller loaderkvalificering följer.
+Historisk B-mätning behåller sin ursprungliga MEASUREMENT_ONLY/NO-CREDIT-subjekt.
+
+#### Gateägd supplier-port — ofryst källberedskap, faktisk byggning NOT_RUN
+
+Nuvarande source kopplar samma --asset-product-väg till h039_local_build_supplier.
+Noarg/gamla selectors vägras som förut. Kontraktsläge och produktlös P=C-baslinje
+startar aldrig supplier; ASSET_REPRESENTATION_ABSENT ger samma exit1-kodgren före
+byggning. På en observerad separat C→P-kant fortsätter en giltig materialsnapshot
+från NOT_READY_FRESH_SERIALIZED_BUILD_COMPOSITION till den interna suppliern.
+Även lyckad supplier lämnar main på exit2 med
+NOT_READY_F3_F6_RECEIPT_AND_FROZEN_ACCEPTANCE. Ingen positiv acceptans är införd.
+
+Källans anropskedja, inte ett faktiskt körresultat:
+
+    befintlig --asset-product C P
+      → observe + två autentiserade kanter + material-snapshot
+      → build_supplier → build_preflight(samma facts)
+      → två färska privata roots × åtta exakta bounded_command
+      → retained outputbytes + rebuild_binding → material_binding → B-predikat
+      → båda rotarnas slutliga inventory/postauth + ägda descriptor-close
+      → NOT_READY_F3_F6_RECEIPT_AND_FROZEN_ACCEPTANCE (exit2)
+
+Preflightportens enda materialförändring mot B är att bas-mediator hämtas från
+facts.material[8095] och retained runtime från samma redan bundna facts.disk.
+Produktens nya mediator.c läses aldrig som historisk byggkälla. Den oberoende
+adapterns 6955 bytes ligger inert i grindens eget prefix (_LOCAL_ADAPTER_SOURCE),
+byte-exakt a35dc310… enligt full pin ovan; reference_source verifierar denna pin.
+Ingen extern adapterpath eller kandidatmanifest blir aktiv input-auktoritet.
+Ingen adapterprodukt är nyimplementerad och ingenting laddas eller exekveras.
+
+Sex saknade B-definitioner kopieras byte-exakt från aa9f5147: compiler_envelope,
+inventory, wait_state, group_action, group_snapshot och bounded_command.
+Tidigare retained_read/close_owned/acl_empty förblir oförändrade. Porten använder
+samma pins/inventarier, deny-default-profil, två lanes, åtta fasta kommandon per
+lane, source/runtime-materialisering, captures och ägd gruppstädning som B.
+Preflight är intern och upprepas vid varje supplieranrop; ingen caller-attestation,
+receipt, outputpath eller sparad measurement accepteras som substitut.
+
+Driverdeltat läser varje av de tio nyinventerade outputs med retained_read,
+sin färska digest och högst1048576 bytes, och jämför med den färska storleken.
+Båda bytekartorna passerar den rena rebuild/material-kedjan. Hela varje rot,
+inklusive inputs och captures, inventeras igen efter båda byggena och de rena
+predikaten, medan rotens descriptor fortfarande ägs. Slutinventariet måste vara
+exakt lika det först inventerade; close-fel underkänner även en väntande retur.
+Även den autentiserade snapshoten förblir input till slutpredikatet; en osammanhängande
+produkt får inte grönt för att de oberoende byggena lyckades.
+
+Nästa meningsfulla färska byggprov ska avse denna exakta interna supplier på den
+befintliga asset-product-vägen, inte det fristående B-scriptet. Före det behövs
+oberoende source-/effektgranskning och koherent C/P-fixtur/kontraktsbindning; inga
+inerta F3/F6/receipt-fixturer får beskrivas som fryst produktkvalificering. I denna
+tranche provas endast rena predikat och orchestration med helt simulerade OS-,
+inventarie-, verktygs- och child-effekter. Det ger ingen färsk bygg-, sandbox-,
+cleanup-, native-, observer- eller gatecredit. Aktuell preproduct-RED är NOT_RUN.
+
+Effektplanen för den senare faktiska invokationen förblir seriell: en supplier,
+två roots, exakt16 bounded_command-starter, högst300 s per kommando plus befintlig
+10 s ägd cleanup; minst20 GiB kontrolleras omedelbart före skapande och varje lane.
+Source/runtime kommer från observerfakta, alla verktyg och headers återautentiseras
+före/efter, outputleaf högst1 MiB vid leverans och child-filer högst64 MiB.
+Inventariets2 GiB efterkontroll är ingen disk-kvot. Byggstart får inte planeras på
+den tunna20 GiB-marginalen eller samtidigt med andra auktoriserade hostwriters;
+en verklig metodreserv och två exakta precompile-reviews återstår. Inga filer
+städas automatiskt och ingen förbrukad lane återöppnas. F3/F6/REFREEZE/spec/CLI
+lämnas oförändrade, och ingen arbetsrapport kan förvandla denna källport till PASS.
+
+Konkreta återstående separationsbindningar, lästa i oförändrad
+verify/bin/platform-separation-final-exit: F3 jämför hela specblobben med
+FROZEN_BASE 536352ffea553bd097db14698c59199b4a89f6f5 (omkring rad2914), så det
+lokala asset-membern kan inte passera detta utan en exakt kontraktsreconciliation.
+F6 härleder en statisk label-floor ur basgrinden, jämför expected_pass med denna
+och kräver därefter kvittots exit0 och samma verkliga PASS-radantal (omkring
+rad3716 och3814). Historiska labels som förblir bytebevarade men onåbara har
+inte körts och får aldrig räknas som positiva asset-rader. F6:s argvkontroll har
+bara en exakt H036-specialform; övriga kräver att sista argumentets basename
+är gatefilen (omkring rad3821). Den accepterar därför inte --asset-product C P.
+Nästa kontraktstranche behöver en minimal exakt H039 asset-lanespecifik
+spec-/invokations-/resultatbindning med asset-only-ceiling, inte generella
+undantag, gissade antal, nya receiptscheman utan prov eller H039-taskcredit.
+Ingen av dessa F3/F6/receipt-ändringar har gjorts i suppliertranchens source.
+
+### H039 nästa källtranche: exakt underfas och ägd kvalificeringscapture (2026-09-12)
+
+Detta avsnitt beskriver efterföljaren till det bevarade supplier-hållet
+aee154f8/dcd1fb68, inte en ändring av dess historiska resultat. Föregångarens
+sex kontraktbytes och separata tester bevaras i den befintliga evidensytan
+/private/tmp/nortropic-v313-contract.Fq5ueV. Produktens fyra filer och den femte
+retained runtime-filen är orörda. ROLE=TEST_AUTHOR; SOURCE_NOT_READY;
+ACTUAL_COMPOSITION=NOT_RUN; FROZEN_GATE_READY=NO; PUSH=NO; MERGE=NO.
+
+Källan definierar nu hela den villkorade build-only-domen, utan en extra senare
+enablement-edit. Det betyder inte att den har körts, granskats färdigt eller
+frysts. H039:s historiska R33-suffix är fortfarande byteidentiskt och onåbart.
+Noarg/förbrukade selectors vägras. --asset-product kräver olika C/P; P=C är
+inte längre en alternativ produktselector. Produktlös C provas med den redan
+befintliga --asset-contract C och ska ge exakt komplett frånvaroterminal/exit1
+utan supplierstart. Ingen task-completion, attestation, installation, native
+laddning, query eller runtime-diagnostik blir tillåten av en asset-only-dom.
+
+REFREEZE har en smal typad h039_asset_build_only-post, samma bytes i C och P.
+B är8095d947; C har en enda förälder B och ändrar exakt sex kontraktvägar;
+P har en enda förälder C och ändrar exakt fyra produktvägar. Fulla kartors
+medlemskap och moder ska vara oförändrade. Ingen C-hash krävs inne i C och
+inget H039-pin pekar tillbaka på aktuell final-exit. Final-exit håller i stället
+en oberoende H039-källpin; en leksaksgrind med egen omhashad deklaration avvisas.
+F3 tar bort en enda exakt kanonisk lokal asset-member och kräver därefter hela
+B-specens ursprungliga bytes. PLATFORM_SPEC måste fortfarande binda den faktiska
+hela specifikationen. Extra sibling inuti borttagningsspannet accepteras inte.
+
+F6 använder exakt EN final-exit-ägd H039-invokation som resultatkälla. Den tar
+inte ett andra bygge för att replay-certifiera ett caller-kvitto. Den befintliga
+--refreeze-receipt-kompatibiliteten för andra grindar är oförändrad; ett H039-
+caller-kvitto vägras i denna underfas och kan aldrig ersätta actual capture.
+F3/F6:s H039-gren kräver full B/C/P-relation och den oberoende källpinnen före
+invokationen. Redan röda förkrav startar ingen dyr supplier. Okänd kvarlevande
+owner eller icke-kanonisk/partiell child-terminal avbryter före följande effekter,
+bevarar captures och ger ingen automatisk retry.
+
+Resultatets wire är exakt en kanonisk ASCII-JSON-rad med H039_ASSET_RESULT,
+tom stderr, rätt faktisk exitkod, fas, B/C/P, aktuell observerad grindhash,
+complete=true, unika ordnade obligatoriska radidentiteter och polariteter.
+Kontraktsformen innehåller fem faktiskt passerade gemensamma predikat samt
+asset_representation=false. Produktformen innehåller samma fem, sex genomförda
+produkt-/byggpredikat och alla29 namngivna rena kausalkontroller på levererade
+bytes. Dessa schemaantal är inte uppmätta PASS-radantal och ersätter aldrig
+effekterna. Final-exit räknar inga bevarade men onåbara historiska check-labels
+som körda. Produktens fyra byteundantag medges bara efter full positiv asset-
+capture; ingen femte runtime-, medlemskaps- eller modeavvikelse undantas.
+
+Oförändrad held control-set-grind rapporterar på ett sådant P dessutom två
+ändrade katalogträd, i ordningen verify/h039, controller/runtime-cleanup,
+före H-grindarnas filnamn. F7 förutser exakt denna ordnade effekt endast för
+kvalificerat fyrvägs-P. Launch-cwd har inget katalogundantag. Samtliga tidigare
+held-radidentiteter, produkttester, röda polariteter och governancevillkor kvarstår.
+
+Anropskedjan i källan, inte ett genomfört körbevis:
+
+    final-exit: exakt deklaration + B/C/P + spec + oberoende H039-pin
+      → en ägd capture av pinned Python -I -S -B h-039-exit --asset-product C P
+      → H039 observer: raw-object/full-map/disk/index/tool/postauth
+      → samma snapshot till supplier och autentiserade B/runtime/adapterbytes
+      → två privata lanes × åtta exakta sandboxade bounded_command
+      → retained outputs + byteidentisk rebuild + material/29 kausalkontroller
+      → kompletta slutinventarier + samtliga ägda descriptor-close
+      → komplett asset-only-terminal → F6/F7:s smala konsekvenskontroller.
+
+SIGTERM/SIGINT latchar endast första signalen. Ingen asynkron raise får ske i
+Popen→process/ownership-tilldelningen. Safe checks finns före spawn, i ägd
+compilerloop, mellan kommandon, i observer, preflight, retained reads och
+inventarieiterationer. De existerande WNOWAIT/group-snapshot/killpg-before-reap/
+terminalabsence-stegen ligger kvar i finally och innehåller ingen cancel-check;
+upprepade signaler avbryter inte den städningen. Final-exits dedikerade owner-
+capture har7200 s till cooperative cancel och60 s grace, fortsätter drain/wait,
+och dödar aldrig owner blint medan separata compilergrupper kan finnas.
+Grace expiry eller ägarskaps-/IO-fel lämnar uttryckligen
+NOT_QUALIFIED_PRESERVED och eventuell owner-PID/inner-lanes UNRESOLVED.
+Enbart direktchildens exit är aldrig bevis för att innergrupperna är borta.
+Spärrade systemanrop antas inte vara bevisat ändliga. Captures samt disposition
+sparas under den ordinarie final-exit-fixturroten även vid avbrott. Tidspolicyn
+är ingen total disk-kvot;20 GiB-golvet före skapande/varje lane sänks inte.
+
+Fokuserad evidens är separata pure-/mockskript i samma evidensyta:
+h039-phase-result-contract-test-first.py (schemaförväntningar före implementation),
+h039-phase-bindings-test-first.py (fullmap/spec-negativer före implementation),
+h039-cancellation-test-first.py (latch/source-säkerhetsgränser),
+h039-owned-capture-test-first.py (helt mockade process-/signal-/capture-effekter),
+h039-phase-supplier-mocked.py (in-memory supplier plus producent/konsumentschema)
+och h039-phase-final-binding-focused.py (pinnar/deklaration/metadata/F6-effektmock).
+De provar bl.a. toy/omhashad deklaration, falskt/crossed/partiellt kvitto/resultat,
+extra spec/runtime, read-induced atime utan falsk drift, ändrad säkerhetsmetadata,
+EOF-before-exit, cancellation, captureoverflow, okänd owner och bevarade captures.
+De kör INTE actual observer, compiler, native ACL/groupquery, signaler eller
+fullgrind. Metadataidentitet utesluter atime men behåller dev/ino/mode/UID/GID/
+nlink/size/mtime_ns/ctime_ns/flags. Actual lifecycle-förmåga är ännu NOT_RUN.
+
+Exakt återstående ordning: håll sex källfiler/pinnar och resultat oförändrade;
+oberoende source/effectreview; separat effektgranskad liten real-OS-lifecycle-
+metod med högst åtta seriella självterminerande inerta Python-stimuli och
+tydligt test-only argv-byte/tidsförkortning; därefter autentiskt C-preproductprov
+och slutligen en verklig final-exit-ägd kvalificering av builderns exakta C→P.
+Den lilla metoden är inte acceptans, Seatbelt/clang-prov eller produkt-PASS.
+Det dyra fristående historiska B-reference-bygget är uttryckligen uppskjutet
+och ingen prerequisite. Inför riktig supplier krävs färsk resursmätning och
+verklig metodreserv, serialisering utan annan auktoriserad hostwriter och de
+oberoende effektgranskningarna. Inget sådant prov har körts i denna tranche.
+
+### H039 snäv normativ fasordning efter R4-lifecycleprovet (2026-09-12)
+
+Det tidigare hållet775b921d/748b2c63 med specbc5c1050 och dess testrecords är
+bevarat oförändrat. Detta är en separat TA-precisering inom samma sex vägar,
+inte en produktändring, commit, accepterad kontraktsfrysning eller ny kvalificering.
+Den tidigare odelade remaining_before_freeze-listan blandade C:s förkrav med
+framtida P:s kvalificeringskrav. Den ersätts av phase_requirements med
+before_contract_freeze och before_product_qualification. Alla fyra ursprungliga
+mätkrav finns kvar, men i sina respektive faser; inget produktkrav antas uppfyllt
+för att det inte är ett förkrav till ett ännu produktlöst C.
+
+status, current_dispatch och phase_result_contract.source_state uttrycker nu
+stabila normativa villkor. De påstår inte att aktuella bytes är READY, körda,
+granskade eller frysta. Ett senare faktiskt resultat och oberoende granskning
+måste bindas till rätt subjekt; inga statusändringar behöver därefter skrivas
+in i C eller P för att påstå eller möjliggöra en dom. Den samlade membern är
+fortfarande exakt hashbunden, och utanför den återställs hela B-specen byte-exakt.
+
+Ordningen är följande, utan ett C/P-förkravsvarv:
+
+1. Håll och granska C-källan samt lifecycle-metoden och dess avgränsade evidens.
+   C ska vara en immutable direkt child till B8095 med exakt sex kontraktvägar,
+   oförändrade moder och samtliga produkt-/runtimebytes kvar vid B. En lokal
+   immutable C som reviewsubject är ännu inte en accepterad kontraktsfrysning.
+   Exakta member/spec/CLI/H039/final-exit/REFREEZE-bindningar gäller före prov.
+2. Kör efter rätt effektgranskning den verkliga befintliga --asset-contract C
+   mot detta exakta subjekt. Full observer måste autentisera raw objects,
+   fullmap, disk, index, verktyg och postauth. Rätt RED är en komplett kanonisk
+   frånvaroterminal med exit1 och tom stderr, inte ett tidigare argv-/riggfel.
+   Supplier får inte starta. Oberoende källgranskning och denna genuina RED
+   föregår accepterad C-kontraktsfrysning; det är inte H039- eller produktcredit.
+3. Först efter granskad/fryst C följer separat builder-P och oberoende
+   produktgranskning. P ska vara ensam direkt child till C med exakt fyra
+   produktvägar; alla sex kontraktbytes förblir C och retained runtime förblir B.
+   Faktisk graph/numstat, produktbudget, kausala attributfixturer, färsk intern
+   tvålanesupplier, rebuild/materialkontroller och samtliga kausalkontroller
+   krävs fortfarande. F3/F6/F7 och exakt EN final-exit-ägd komplett capture
+   måste följa samma kvalificerade relation. Det äldre kravet som nämner
+   receipt-bindning betyder fortsatt ingen caller-receipt-auktoritet eller
+   replaybyggning; qualification_source och den faktiska F6-grenen är explicita.
+
+TA-subjektets faktiska .git kontrollerades efter kontobytet: katalog0755,
+gitdir/commondir .git relativt worktree. Det är inte en gitfile. Den tidigare
+konversationsuppgiften om obligatorisk clone på den grunden var fel; ingen
+clone behövs eller skapades för denna precisering. Före C-prov ska de faktiska
+befintliga observerförkraven fortfarande kontrolleras, däribland sluten config,
+frånvaro av alternates/shallow/replace/otillåtna attributes, rätt HEAD, disk/index
+och pinnad Python/CLT-Git. En directory-.git är nödvändig här men inte ensam
+tillräcklig för en godkänd observer. C-frånvaroprovet startar ingen compiler;
+20 GiB-golvet före skapande och varje lane gäller fortsatt varje senare supplier,
+tillsammans med faktisk metodreserv och serialisering utan annan auktoriserad writer.
+
+Root körde den separat granskade inerta R4-metoden en gång: metodhash
+baaa479eaf3ea59ed67a8438619a63418bf0e915893ef6b3121b9f671a2152f9,
+fixture /private/tmp/h039-asset-measure-lifecycle-bw_y6e7e, method-result SHA256
+3f6a8560056f4790f037ace0de58ef2f1f3b88915e83d97ad40c4c7f20f309cb.
+Resultatet anger exit0 enligt rootens körpost, sju fall, åtta inerta starter och
+3.9046975829987787 s. Dess egna qualification-fält är false. Sista bevarade
+owner fick separat owned-wait120, utan uppgradering av ursprunglig nonqualification.
+Detta gäller exakt775b/748b och R4:s beskrivna testseams, inte compiler/Seatbelt,
+observer, nytt C/P eller fullgrind. TA läste och hashkontrollerade evidensen men
+körde inte om metoden. Den aktuella preciseringen ändrar endast specnormer,
+beskrivning och nödvändiga hashkonstanter. Funktionsbytes/AST för de faktiskt
+provade lifecyclefunktionerna jämförs uttryckligen mot775b/748b; sådan identitet
+kan bära det avgränsade mekanismbeviset till granskning, aldrig all gammal credit
+till en ny whole-file-hash. Nya pinnar och C/P-subjekt behöver sina egna bindningar.
+
+Test-first h039-phase-order-test-first.py gav faktisk exit1 på bc5c1050 därför
+att phase_requirements saknades. Samma rena oracle kräver den exakta nya
+fasordningen, behåller alla övriga memberfält och gamla mätkrav, och avvisar
+saknade/flyttade/duplicerade krav, självattesterande READY/PASS och ändrade
+resultatpolariteter. Separat coherence-kontroll binder nya pinnar och visar
+att inga effektfunktioner eller historiska suffix ändrats. Dessa är pure-/
+källkontroller, inte faktisk C-RED, produktgrind eller freeze. Nuvarande
+hand-off är SOURCE_UNREVIEWED, C_RED=NOT_RUN, FROZEN_GATE_READY=NO,
+PRODUCTION_IMPLEMENTATION_WRITTEN=NO, PUSH=NO, MERGE=NO.

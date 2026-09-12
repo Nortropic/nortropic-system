@@ -13,6 +13,2561 @@ a caller path, PID, command, state, nonce, or descriptor.
 
 from __future__ import annotations
 
+# H039_LOCAL_ASSET_DRAFT_BEGIN
+# Unfrozen local asset preparation. Everything outside this exact block is
+# byte-identical historical R33 data, not an available execution lane.
+import hashlib as _local_hashlib
+import json as _local_json
+import os as _local_os
+import stat as _local_stat
+import subprocess as _local_subprocess
+import sys as _local_sys
+
+_LOCAL_BASE = "8095d947c83202e2b87801531d9f7cb1457c8719"
+_LOCAL_OLD_GATE_SHA = "d3d147da8d88427aad52550fffcd6156deb38ec88c7bc61908afc197062a5250"
+_LOCAL_SPEC_SHA = "3e5d564cb633c5f720a715c7591a849673b0a95736e6ceb0bcac8db9e63b1b95"
+_LOCAL_MEMBER_SHA = "2ed88a7c76db2212b093659cacc7e082bc8b3ca1ab1472784f4626cadefeb043"
+_LOCAL_CONTRACT_PATHS = (
+    "verify/bin/h-039-exit", "specs/tasks.spec.json",
+    "verify/bin/platform-separation-final-exit",
+    "docs/loop/platform-separation-final-local-development.md",
+    "SEPARATION-20260910/REFREEZE.json", "controller/verify/cli")
+_LOCAL_PRODUCTS = (
+    "controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json")
+_LOCAL_RUNTIME = "verify/h039/runtime-cleanup-mediator"
+_LOCAL_BASE_PRODUCT_SHA = (
+    "05a23e0c63a295367c83a2c0de45495f9f3e3caee36101d1b088e93302a1a486",
+    "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b",
+    "bee82dd83dbff08fff1164294046ea3a980ecc8301a1a1563e68822693474380",
+    "84eca73421ed1cac2c92fd01e519e259cb9088213e66311acd61846e3f27563a")
+_LOCAL_REFERENCE_PRODUCT_SHA = (
+    "563fcecdf4b4d7625baee7cffa09db53f087a63d437a2846e28912dbd4a598a3",
+    "a1dd9e698a644be61b65f1d73229747c7dfc5257c9073b063b85be75757fa1d8",
+    "49506e46ab1486de99e1b2c2883a0cf42a1f564e97c6cdf84fc04d89347534bb",
+    "e5cb7deb73b84a71914981df02fb5d3b5f39d60ae1cf2bf60b17cff3e5f4257e")
+# Actual five-path reference-only Git result 28bc544a..., not a full-repo budget.
+# Fixed Myers + indentHeuristic=true; no .gitattributes in the reference trees.
+_LOCAL_REFERENCE_NUMSTAT = dict(zip(_LOCAL_PRODUCTS, ((None, None), (168, 0), (282, 84), (75, 52))))
+_LOCAL_CANCELLED = None
+
+
+def h039_local_cancel_latch(signum, frame):
+    """No raising or effects: never interrupt the spawn-to-ownership window."""
+    global _LOCAL_CANCELLED
+    if _LOCAL_CANCELLED is None:
+        _LOCAL_CANCELLED = signum
+
+
+def h039_local_cancel_check(phase):
+    """Only safe owned boundaries may turn a latched signal into a failure."""
+    if _LOCAL_CANCELLED is not None:
+        raise ValueError("H039_CANCELLED_PRESERVE", phase, _LOCAL_CANCELLED)
+
+
+def h039_local_sha(raw: bytes) -> str:
+    return _local_hashlib.sha256(raw).hexdigest()
+
+
+def h039_local_oid(value: object) -> bool:
+    return type(value) is str and len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+
+
+def h039_local_blob(raw: bytes) -> str:
+    return _local_hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+
+
+def h039_local_unique(pairs: list) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def h039_local_historical_gate(raw: bytes) -> bool:
+    start = b"# H039_LOCAL_ASSET_DRAFT_" + b"BEGIN\n"
+    end = b"# H039_LOCAL_ASSET_DRAFT_" + b"END\n"
+    if raw.count(start) != 1 or raw.count(end) != 1:
+        return False
+    a, b = raw.index(start), raw.index(end) + len(end)
+    return a < b and h039_local_sha(raw[:a] + raw[b:]) == _LOCAL_OLD_GATE_SHA
+
+
+def h039_local_spec(raw: bytes) -> bool:
+    start = b'      "h039_local_asset_build_only_v1": {\n'
+    end = b'      "h039_os_exclusive_runtime_cleanup": {\n'
+    try:
+        parsed = _local_json.loads(raw, object_pairs_hook=h039_local_unique)
+        rows = [row for row in parsed["tasks"] if row["id"] == "h-039"]
+        if len(rows) != 1 or raw.count(start) != 1 or raw.count(end) != 1:
+            return False
+        a, b = raw.index(start), raw.index(end)
+        member = rows[0]["h039_local_asset_build_only_v1"]
+        block = ('      "h039_local_asset_build_only_v1": ' + _local_json.dumps(member,
+            indent=2, ensure_ascii=True, allow_nan=False).replace("\n", "\n      ") + ",\n").encode("ascii")
+        encoded = _local_json.dumps(member, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+        return (a < b and raw[a:b] == block and h039_local_sha(raw[:a] + raw[b:]) == _LOCAL_SPEC_SHA
+                and h039_local_sha(encoded) == _LOCAL_MEMBER_SHA)
+    except (ValueError, KeyError, TypeError):
+        return False
+
+
+def h039_local_relation(before: dict, after: dict, phase: str) -> str:
+    """Pure full-map relation. Maps must originate from the local observer below."""
+    if (type(before) is not dict or type(after) is not dict or before.keys() != after.keys()
+            or not set(_LOCAL_CONTRACT_PATHS + _LOCAL_PRODUCTS + (_LOCAL_RUNTIME,)) <= before.keys()):
+        return "TREE_MEMBERSHIP"
+    if any(type(row) is not tuple or len(row) != 2 or row[0] not in ("100644", "100755")
+           or not h039_local_oid(row[1]) for mapping in (before, after) for row in mapping.values()):
+        return "TREE_SCHEMA"
+    if any(before[path][0] != after[path][0] for path in before):
+        return "TREE_MODE"
+    changed = {path for path in before if before[path] != after[path]}
+    if phase == "contract":
+        return "RELATION_ONLY_NOT_ACCEPTANCE" if changed == set(_LOCAL_CONTRACT_PATHS) else "CONTRACT_SIX_SCOPE"
+    if phase == "product":
+        return "RELATION_ONLY_NOT_ACCEPTANCE" if changed == set(_LOCAL_PRODUCTS) else "PRODUCT_FOUR_SCOPE"
+    return "PHASE"
+
+
+def h039_local_material_binding(facts: dict, outputs=None, adapter_source=None) -> str:
+    """Pure composition over one completed observer snapshot, never a receipt.
+
+    outputs/adapter_source are internal future measurement inputs, not argv,
+    paths or claims. Calling this helper with historical data proves only the
+    static relation. It cannot prove a fresh build invocation. Build-only
+    composition assumes serialized work with no authorized concurrent writer;
+    universal external hostile same-UID consumption provenance is not claimed.
+    """
+    try:
+        if facts["status"] != "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT":
+            return "MATERIAL_OBSERVER_STATUS"
+        base, contract, candidate = facts["base"], facts["contract"], facts["candidate"]
+        if base != _LOCAL_BASE or contract == base:
+            return "MATERIAL_BASE_IDENTITY"
+        trees, material, disk = facts["trees"], facts["material"], facts["disk"]
+        before = material[base]
+        if set(before) != set(_LOCAL_PRODUCTS) or material[contract] != before:
+            return "MATERIAL_CONTRACT_PRODUCT_DRIFT"
+        files = {}
+        for path, digest in zip(_LOCAL_PRODUCTS, _LOCAL_BASE_PRODUCT_SHA):
+            expected_mode = "100755" if path == _LOCAL_PRODUCTS[0] else "100644"
+            mode, raw = before[path]
+            if (mode != expected_mode or type(raw) is not bytes
+                    or h039_local_sha(raw) != digest
+                    or trees[base][path] != (mode, h039_local_blob(raw))
+                    or trees[contract][path] != trees[base][path]):
+                return "MATERIAL_BASE_BINDING"
+            mode, oid = trees[candidate][path]
+            raw = disk[path]
+            if (mode != expected_mode or type(raw) is not bytes
+                    or oid != h039_local_blob(raw)
+                    or material[candidate][path] != (mode, raw)):
+                return "MATERIAL_CANDIDATE_DISK_BINDING"
+            files[path] = (mode, raw)
+        runtime = disk[_LOCAL_RUNTIME]
+        if (type(runtime) is not bytes or len(runtime) != 106736
+                or h039_local_sha(runtime) != "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7"
+                or trees[base][_LOCAL_RUNTIME] != ("100755", h039_local_blob(runtime))
+                or trees[contract][_LOCAL_RUNTIME] != trees[base][_LOCAL_RUNTIME]
+                or trees[candidate][_LOCAL_RUNTIME] != trees[base][_LOCAL_RUNTIME]):
+            return "MATERIAL_RETAINED_RUNTIME_BINDING"
+        if files == before:
+            return "ASSET_REPRESENTATION_ABSENT"
+        if candidate == contract:
+            return "MATERIAL_PRODUCT_EDGE_REQUIRED"
+    except (KeyError, TypeError, ValueError):
+        return "MATERIAL_OBSERVER_SCHEMA"
+    if outputs is None or adapter_source is None:
+        return "NOT_READY_FRESH_SERIALIZED_BUILD_COMPOSITION"
+    verdict = h039_asset_draft_product_material(before, files, outputs, runtime, adapter_source)
+    if verdict != "FOUR_FILE_STATIC_RELATION_ONLY_NOT_GRAPH_OR_GATE_CREDIT":
+        return verdict
+    # These exact B controls exercise resealed semantic failures, not just pins.
+    controls = h039_asset_draft_product_controls(before, outputs, runtime, adapter_source)
+    if len(controls) != 29 or any(ok is not True for label, ok in controls):
+        return "MATERIAL_CAUSAL_CONTROLS_FAILED"
+    return "STATIC_MATERIAL_BOUND_NOT_FRESH_BUILD_INVOCATION_OR_GATE_CREDIT"
+
+
+def h039_local_rebuild_binding(facts: dict, first: dict, second: dict,
+                             adapter_source: bytes) -> str:
+    """Pure byte-level bridge from two build lanes to the material predicate.
+
+    A future internal driver must deliver both freshly retained output maps;
+    accepting these arguments is not evidence that a compiler ran. Historical
+    inputs exercise only this pure bridge, never freshness or gate acceptance.
+    No filesystem, process, native image or external same-UID exclusion claim.
+    """
+    names = set(h039_asset_draft_reference_recipe()["outputs"])
+    for lane in (first, second):
+        if (type(lane) is not dict or set(lane) != names
+                or any(type(raw) is not bytes for raw in lane.values())):
+            return "REBUILD_OUTPUT_SCHEMA"
+    if first != second:
+        return "REBUILD_OUTPUT_BYTES"
+    verdict = h039_local_material_binding(facts, first, adapter_source)
+    if verdict != "STATIC_MATERIAL_BOUND_NOT_FRESH_BUILD_INVOCATION_OR_GATE_CREDIT":
+        return verdict
+    return "REBUILD_MATERIAL_BOUND_NOT_FRESH_INVOCATION_OR_GATE_CREDIT"
+
+
+def h039_local_observe(contract: str, candidate: str) -> dict:
+    """Use the B-derived closure; no caller report or second observer path."""
+    phase = "CONTRACT_SIX" if contract == candidate else "PRODUCT_FOUR"
+    facts = h039_asset_draft_git_observe_local(_LOCAL_BASE, candidate, phase, contract)
+    return {"commits": {oid: {"commit": facts["commits"][oid], "tree": mapping}
+                        for oid, mapping in facts["trees"].items()},
+            "materials": {path: facts["disk"][path] for path in _LOCAL_PRODUCTS},
+            "controls": {path: facts["disk"][path] for path in _LOCAL_CONTRACT_PATHS},
+            "relations": facts["relations"], "asset_facts": facts}
+
+
+def h039_local_main(argv: list) -> int:
+    if not argv:
+        print("H039_COMPLETION_UNPROVEN", file=_local_sys.stderr)
+        return 2
+    if len(argv) == 2 and argv[0] == "--asset-contract" and h039_local_oid(argv[1]):
+        phase, contract, candidate = "contract", argv[1], argv[1]
+    elif (len(argv) == 3 and argv[0] == "--asset-product" and all(h039_local_oid(arg) for arg in argv[1:])
+          and argv[1] != argv[2]):
+        phase, contract, candidate = "product", argv[1], argv[2]
+    else:
+        print("LOCAL_ASSET_ARGV_REFUSED_NO_CONSUMED_LANE", file=_local_sys.stderr)
+        return 2
+    try:
+        h039_local_cancel_check("observer")
+        facts = h039_local_observe(contract, candidate)
+        rows = [("identity_graph_disk_index_postauth", True)]
+        base, contract_row = facts["commits"][_LOCAL_BASE], facts["commits"][contract]
+        if contract == _LOCAL_BASE or contract_row["commit"]["parents"] != [_LOCAL_BASE]:
+            raise ValueError("contract direct parent")
+        relation = h039_local_relation(base["tree"], contract_row["tree"], "contract")
+        if relation != "RELATION_ONLY_NOT_ACCEPTANCE":
+            raise ValueError(relation)
+        rows.append(("contract_six_scope", True))
+        if not h039_local_historical_gate(facts["controls"]["verify/bin/h-039-exit"]):
+            raise ValueError("historical gate byte closure")
+        rows.append(("historical_gate_bytes", True))
+        if not h039_local_spec(facts["controls"]["specs/tasks.spec.json"]):
+            raise ValueError("local spec byte closure")
+        rows.append(("exact_spec_member", True))
+        if phase == "product" and candidate != contract:
+            row = facts["commits"][candidate]
+            if row["commit"]["parents"] != [contract]:
+                raise ValueError("product direct parent")
+            relation = h039_local_relation(contract_row["tree"], row["tree"], "product")
+            if relation != "RELATION_ONLY_NOT_ACCEPTANCE":
+                raise ValueError(relation)
+        stage = h039_local_material_binding(facts["asset_facts"])
+        if stage not in ("ASSET_REPRESENTATION_ABSENT", "NOT_READY_FRESH_SERIALIZED_BUILD_COMPOSITION"):
+            raise ValueError("base material/runtime", stage)
+        rows.append(("base_material_runtime", True))
+        if phase == "contract" and stage == "ASSET_REPRESENTATION_ABSENT":
+            rows.append(("asset_representation", False))
+        elif phase == "product" and stage == "NOT_READY_FRESH_SERIALIZED_BUILD_COMPOSITION":
+            rows.append(("product_four_scope", True))
+            if facts["relations"]["product"]["observed_git_numstat"] != _LOCAL_REFERENCE_NUMSTAT:
+                raise ValueError("actual product numstat")
+            rows += [("actual_git_numstat", True), ("asset_representation", True)]
+            built = h039_local_build_supplier(facts["asset_facts"])
+            if built["status"] != "SERIALIZED_BUILD_MATERIAL_BOUND_NOT_FROZEN_ACCEPTANCE":
+                raise ValueError("fresh supplier status", built)
+            rows += [("fresh_two_lane_build", True), ("material_semantics", True),
+                     ("build_inventory_postauth", True)]
+            rows += [("control:" + name, ok) for name, ok in built["controls"]]
+        else:
+            raise ValueError("phase material polarity", phase, stage)
+        h039_local_cancel_check("final_result")
+        result = {"contract": "h039-local-asset-build-only-v1", "phase": phase, "base": _LOCAL_BASE,
+            "contract_commit": contract, "candidate_commit": candidate,
+            "gate_sha256": h039_local_sha(facts["controls"]["verify/bin/h-039-exit"]),
+            "complete": True,
+            "verdict": "PASS_ASSET_BUILD_ONLY_NOT_H039_PASS_OR_ATTESTATION" if phase == "product"
+                else "ASSET_REPRESENTATION_ABSENT",
+            "credit": "ASSET_BUILD_ONLY" if phase == "product" else "NONE",
+            "rows": [{"id": name, "ok": ok} for name, ok in rows]}
+        print("H039_ASSET_RESULT " + _local_json.dumps(result, sort_keys=True, separators=(",", ":"),
+              ensure_ascii=True, allow_nan=False))
+        return 0 if phase == "product" else 1
+    except (ValueError, OSError, _local_subprocess.SubprocessError) as exc:
+        failure = {"error": type(exc).__name__, "detail": str(exc)}
+        for name in ("h039_git_postauth", "h039_git_close_failures", "h039_close_failures",
+                     "h039_git_child_cleanup_failures", "h039_git_capture_close_failures"):
+            if hasattr(exc, name):
+                failure[name] = getattr(exc, name)
+        print("LOCAL_ASSET_UNJUDGEABLE " + _local_json.dumps(failure, sort_keys=True), file=_local_sys.stderr)
+        return 2
+
+
+# B closure from source aa9f5147..., no B module or build-driver import.
+# Five helpers remain exact source; operation/observer deltas are documented.
+_asset_hashlib = _local_hashlib
+_asset_json = _local_json
+import difflib as _asset_difflib
+
+_asset_os = _local_os
+_asset_stat = _local_stat
+_asset_sys = _local_sys
+_asset_subprocess = _local_subprocess
+import selectors as _asset_selectors
+import struct as _asset_struct
+import time as _asset_time
+import signal as _asset_signal
+import tempfile as _asset_tempfile
+
+# Thirteen pure B definitions copied byte-for-byte from aa9f5147... .
+# Recipe argv feeds the internal supplier below; no B import or native loading.
+def h039_asset_draft_unique_object(pairs: list) -> dict:
+    """Strict parser hook, including every nested object; no last-key-wins."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
+def h039_asset_draft_reference_source(legacy: bytes, adapter: bytes) -> bytes:
+    """Data-only transformation; both input sources bound by gate-owned identities."""
+    for raw, digest in [(legacy, "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b"),
+                        (adapter, "a35dc310e05f7cf83d7175e5ee5ba3213e6a7433daaa7cc5dd25f9e92ff437fa")]:
+        if type(raw) is not bytes or _asset_hashlib.sha256(raw).hexdigest() != digest:
+            raise ValueError("exact historical or adapter source")
+    historical = ["H039_INSTALLER", "H039_RUNTIME_PRESTORE_EXIT_DIAGNOSTIC",
+                  "H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC", "H039_MEDIATOR_SHA256",
+                  "H039_MEDIATOR_SIZE", "H039_ROOT_ENTRY_FD0_NORMALIZATION",
+                  "H039_OLD_MEDIATOR_SHA256", "H039_OLD_MEDIATOR_SIZE",
+                  "H039_R15_MEDIATOR_SHA256", "H039_R15_MEDIATOR_SIZE",
+                  "H039_R15_OLD_MEDIATOR_SHA256", "H039_R15_OLD_MEDIATOR_SIZE"]
+    prolog = ("/* Gate-generated asset branches; no installation authority. */\n"
+              "#if defined(H039_ASSET_CONTAINER) && defined(H039_LISTENER_ADAPTER)\n"
+              "#error mixed_asset_selection\n#endif\n"
+              "#if defined(H039_ASSET_CONTAINER) || defined(H039_LISTENER_ADAPTER)\n#if "
+              + " || ".join("defined(" + name + ")" for name in historical)
+              + "\n#error historical_asset_selection\n#endif\n#endif\n"
+              "#if defined(H039_ASSET_CONTAINER)\n"
+              "#if H039_ASSET_CONTAINER != 1\n#error asset_selector_value\n#endif\n"
+              "int main(void){return 2;}\n"
+              "#elif defined(H039_LISTENER_ADAPTER)\n"
+              "#if H039_LISTENER_ADAPTER != 1\n#error asset_selector_value\n#endif\n")
+    # Unknown -D names are rejected by exact recipe argv, not by this CPP prolog.
+    return prolog.encode("ascii") + adapter + b"\n#else\n" + legacy + b"\n#endif\n"
+
+
+def h039_asset_draft_reference_recipe() -> dict:
+    """Finite relative-path recipe PROPOSAL; no subprocess or build-root creation.
+
+    Authenticated tool/header/link closure, confinement and output bounds remain
+    required before any compiler execution. Relative paths resolve only below
+    separately authenticated, initially absent build-a/build-b roots.
+    """
+    clt = "/Library/Developer/CommandLineTools"
+    sdk = clt + "/SDKs/MacOSX26.5.sdk"
+    py = clt + "/Library/Frameworks/Python3.framework/Versions/3.9"
+    clang = clt + "/usr/bin/clang"
+    common = [clang, "--no-default-config", "-target", "arm64-apple-macos14.0",
+              "-isysroot", sdk, "-resource-dir", clt + "/usr/lib/clang/21",
+              "-nostdinc", "-isystem",
+              clt + "/usr/lib/clang/21/include", "-isystem", sdk + "/usr/include",
+              "-std=c11", "-O0", "-fPIC", "-fno-modules", "-fno-implicit-modules",
+              "-fno-implicit-module-maps", "-Wall", "-Wextra", "-Werror"]
+    source = "mediator.c"
+    commands = []
+    for name, selector in [("adapter", "H039_LISTENER_ADAPTER"),
+                           ("container", "H039_ASSET_CONTAINER")]:
+        selected = common + (["-isystem", py + "/Headers"] if name == "adapter" else [])
+        selected += ["-D" + selector + "=1"]
+        commands += [selected + ["-E", "-P", source, "-o", name + ".i"],
+                     selected + ["-S", "-emit-llvm", source, "-o", name + ".ll"],
+                     selected + ["-MD", "-MF", name + ".d", "-c", source,
+                                 "-o", name + ".o"]]
+    commands += [[clt + "/usr/bin/ld", "-bundle", "-arch", "arm64",
+                  "-platform_version", "macos", "14.0", "26.5", "-syslibroot", sdk,
+                  "-undefined", "error", "-o", "adapter.so", "adapter.o",
+                  py + "/Python3", sdk + "/usr/lib/libSystem.B.tbd"],
+                 [clang, "--no-default-config", "-target", "arm64-apple-macos14.0",
+                  "-isysroot", sdk, "-Wl,-pie", "-Wl,-segprot,__H039RO,r,r",
+                  "-Wl,-sectcreate,__H039RO,__h039med,retained-runtime",
+                  "-Wl,-sectcreate,__H039RO,__h039lst,adapter.so",
+                  "container.o", "-o", "container"]]
+    return {"schema_version": 1, "status": "DRAFT_NOT_COMPILE_AUTHORITY",
+            "roots": ["build-a", "build-b"], "umask": "0077",
+            "environment": {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C",
+                            "ZERO_AR_DATE": "1", "TMPDIR": "."},
+            "source": source, "retained_runtime": "retained-runtime",
+            "required_tool_sha256": {
+                clang: "f30550eab15fdf5ab8c0dc54c52679711241e5d4b636b027e18c09fef531775d",
+                clt + "/usr/bin/ld": "28d85b9af18c923db12e0b4ce70b80ee217f2b7cade0e872baa9e8ddc396c08d",
+                clt + "/usr/bin/llvm-objdump": "1dcc1432db4d828cf8cd71a84cb8d9bf63a7ca80b5eeec711a9e5f13a3f5f98e"},
+            "required_link_input_sha256": {
+                py + "/Python3": "26422f0b21cb1e07236384afa4043c7401d39d09358c91df8bf3f5496f14712f",
+                sdk + "/usr/lib/libSystem.B.tbd": "20cfce043f11a083e2eb6111efe3579919a8082fa4cc912a7bd839af2010ec57"},
+            "pin_status": "REVIEWED_INVENTORY_VALUES_REAUTHENTICATION_REQUIRED_NO_LOADED_IMAGE_CREDIT",
+            "commands": commands,
+            "outputs": ["adapter.i", "adapter.ll", "adapter.d", "adapter.o",
+                        "container.i", "container.ll", "container.d", "container.o",
+                        "adapter.so", "container"],
+            "comparison": "PER_ARTIFACT_BYTES_ACROSS_INDEPENDENT_ROOTS_NOT_EXECUTION",
+            "runtime_role": "RETAINED_PUBLISHED_RUNTIME_BYTES_NOT_REPRODUCED",
+            "container_role": "INERT_ASSET_CONTAINER",
+            "unresolved": ["AUTHENTICATED_TOOL_HEADER_LINK_AND_LOADER_CLOSURE",
+                           "CONFINED_DRIVER_AND_EXACT_TEMP_OUTPUT_POLICY",
+                           "BOUNDED_STATIC_MACHO_IR_DISASSEMBLY_PARSERS",
+                           "MEASURED_BYTE_LINE_OUTPUT_BUDGETS",
+                           "TWO_INDEPENDENT_PRECOMPILE_REVIEWS"]}
+
+
+def h039_asset_draft_actual_layout(kind: str) -> dict:
+    """Closed measured CLT21/SDK26.5 shape, not a general Mach-O policy.
+
+    Constants came from two independent fixed-recipe lanes, not candidate
+    manifests. They become acceptance authority only after contract review.
+    SDK loader.h supplies structure layouts; all image offsets are measured.
+    """
+    if kind not in ("container", "adapter.so"):
+        raise ValueError("actual material kind")
+    container = kind == "container"
+    vm = 0x100000000 if container else 0
+    # segment: name, vmaddr, vmsize, fileoff, filesize, max, init, flags, sections
+    # section: name, address, size, offset, align, flags, reserved1, reserved2
+    segments = [
+        ("__PAGEZERO", 0, vm, 0, 0, 0, 0, 0, []),
+        ("__TEXT", vm, 16384, 0, 16384, 5, 5, 0, [
+            ("__text", vm + 1040, 20, 1040, 2, 0x80000400, 0, 0),
+            ("__unwind_info", vm + 1060, 88, 1060, 2, 0, 0, 0)]),
+        ("__H039RO", vm + 16384, 163840, 16384, 163840, 1, 1, 4, [
+            ("__h039med", vm + 16384, 106736, 16384, 0, 0, 0, 0),
+            ("__h039lst", vm + 123120, 51176, 123120, 0, 0, 0, 0)]),
+        ("__LINKEDIT", vm + 180224, 16384, 180224, 1736, 1, 1, 0, [])
+    ] if container else [
+        ("__TEXT", 0, 16384, 0, 16384, 5, 5, 0, [
+            ("__text", 1304, 1676, 1304, 2, 0x80000400, 0, 0),
+            ("__stubs", 2980, 180, 2980, 2, 0x80000408, 0, 12),
+            ("__cstring", 3160, 470, 3160, 0, 2, 0, 0),
+            ("__unwind_info", 3632, 112, 3632, 2, 0, 0, 0)]),
+        ("__DATA_CONST", 16384, 16384, 16384, 16384, 3, 3, 16, [
+            ("__got", 16384, 152, 16384, 3, 6, 15, 0)]),
+        ("__DATA", 32768, 16384, 32768, 16384, 3, 3, 0, [
+            ("__h039abi", 32768, 256, 32768, 3, 0, 0, 0),
+            ("__data", 33024, 168, 33024, 3, 0, 0, 0)]),
+        ("__LINKEDIT", 49152, 16384, 49152, 2024, 1, 1, 0, [])
+    ]
+    pack = _asset_struct.pack
+    commands = []
+    for name, va, vs, off, size, maximum, initial, flags, sections in segments:
+        command = pack("<II16sQQQQiiII", 0x19, 72 + 80 * len(sections),
+                       name.encode(), va, vs, off, size, maximum, initial, len(sections), flags)
+        for sn, addr, amount, so, align, sf, r1, r2 in sections:
+            command += pack("<16s16sQQ8I", sn.encode(), name.encode(), addr,
+                            amount, so, align, 0, 0, sf, r1, r2, 0)
+        commands.append(("SEGMENT", command))
+    fixoff, fixsize, expoff, expsize = (180224, 56, 180280, 48) if container else (49152, 448, 49600, 72)
+    symoff, nsyms, stroff, strsize = (180336, 2, 180368, 32) if container else (49680, 27, 50248, 392)
+    signature = (180400, 1560, 20) if container else (50640, 536, 1676)
+    commands += [("FIXUP_COMMAND", pack("<4I", 0x80000034, 16, fixoff, fixsize)),
+                 ("EXPORT_COMMAND", pack("<4I", 0x80000033, 16, expoff, expsize)),
+                 ("SYMTAB_COMMAND", pack("<6I", 2, 24, symoff, nsyms, stroff, strsize))]
+    dysym = (0, 0, 0, 2, 2, 0) + (0,) * 12 if container else (
+        0, 6, 6, 2, 8, 19, 0, 0, 0, 0, 0, 0, 50112, 34, 0, 0, 0, 0)
+    commands.append(("DYSYMTAB_COMMAND", pack("<20I", 0xb, 80, *dysym)))
+    if container:
+        commands.append(("DYLINKER", pack("<III", 0xe, 32, 12) + b"/usr/lib/dyld\0" + bytes(6)))
+    commands += [("UUID", pack("<II", 0x1b, 24) + bytes.fromhex(
+                    "080e82fc14ab34beb95ef1be04acdda9" if container else "dfe8587d374b30d1861cb0d344d148ad")),
+                 ("BUILD_VERSION", pack("<8I", 0x32, 32, 1, 0xe0000, 0x1a0500, 1, 3, 0x4f30000)),
+                 ("SOURCE_VERSION", pack("<IIQ", 0x2a, 16, 0))]
+    if container:
+        commands.append(("ENTRY", pack("<IIQQ", 0x80000028, 24, 1040, 0)))
+    else:
+        name = b"@rpath/Python3.framework/Versions/3.9/Python3\0"
+        commands.append(("PYTHON_DEPENDENCY", pack("<6I", 0xc, 72, 24, 2, 0x30900, 0x30900)
+                         + name + bytes(48 - len(name))))
+    name = b"/usr/lib/libSystem.B.dylib\0"
+    commands += [("SYSTEM_DEPENDENCY", pack("<6I", 0xc, 56, 24, 2, 0x54c0000, 0x10000)
+                  + name + bytes(32 - len(name))),
+                 ("FUNCTION_STARTS_COMMAND", pack("<4I", 0x26, 16, expoff + expsize, 8)),
+                 ("DATA_IN_CODE_COMMAND", pack("<4I", 0x29, 16, symoff, 0)),
+                 ("SIGNATURE_COMMAND", pack("<4I", 0x1d, 16, signature[0], signature[1]))]
+    # Every non-payload file region is either exact structured material, a
+    # reviewed immutable region, or zero padding. No opaque executable slack.
+    regions = [
+        ("UNWIND", 1060, 88, "8e49999106074d5ad5cf640fef39d968a8ae1bf3a06d61e9f37f86a996e4810c"),
+        ("FIXUPS", 180224, 56, "79ea0a68351986957654faa165ab71f04229d089ec2fe02e7cc7e23a6628b99f"),
+        ("EXPORTS", 180280, 48, "2c76df618c6557a5144d6137cc5c9c267d520ccd17d13e6111ce91685b3be2df"),
+        ("FUNCTION_STARTS", 180328, 8, "37dbc6f08b419bc821c0c2f30f89222907902b9481b7aa9958cb9591222858fe")
+    ] if container else [
+        ("CODE", 1304, 1676, "b7b5e2440e74bec63349a014df00f415e5684fc200e39fce572a0518ab42a5c3"),
+        ("STUBS", 2980, 180, "010f49d952499a189f3543f20f612f4ae7611be247310dc6abfc7d4ba5936286"),
+        ("STRINGS", 3160, 470, "8c70fa71265944d9b496154d8f2b32b15cdfa83397d21d9adbff256bd2c0a7d4"),
+        ("UNWIND", 3632, 112, "f1e5e9e87c32daa7584e0a8140f4bdba83246906eb9bcffff22f70dec7134a52"),
+        ("GOT", 16384, 152, "157ac58ea92021e3851b5d57e5be0774f70f49c2054e6a0b5b402bd3f240b85a"),
+        ("DATA", 33024, 168, "02f4770ed2089204013f7697127f7c99112b1eb9365a56584b8eb9341150d00b"),
+        ("FIXUPS", 49152, 448, "d944e8721950c25fb9092c55c0c15fb86965b4856946d1f3dcb15fb2b700dce2"),
+        ("EXPORTS", 49600, 72, "f36d2ffa597db1def6c6f3eae171c42dbfeca2077f7acd288c26376690b0a3c3"),
+        ("FUNCTION_STARTS", 49672, 8, "3e978cf60e336da4555973eb1db217f28bb81e036c0dd07a524d46ecfaabe8a5")
+    ]
+    symbols = [("__mh_execute_header", 15, 1, 16, vm), ("_main", 15, 1, 0, vm + 1040)] if container else [
+        ("_query_received_listener", 14, 1, 0, 1336), ("__Py_IS_TYPE", 14, 1, 0, 2576),
+        ("_refuse", 14, 1, 0, 2616), ("_same_identity", 14, 1, 0, 2668),
+        ("_module", 14, 7, 0, 33024), ("_methods", 14, 7, 0, 33128),
+        ("_H039_ABI_VALUES", 15, 6, 0, 32768), ("_PyInit__h039_listener_v1", 15, 1, 0, 1304)]
+    if not container:
+        symbols += [(name, 1, 0, 256, 0) for name in (
+            "_PyErr_Format", "_PyErr_Occurred", "_PyErr_SetFromErrno", "_PyErr_SetString",
+            "_PyExc_OSError", "_PyExc_ValueError", "_PyLong_AsLong", "_PyLong_Type",
+            "_PyModule_Create2", "__Py_BuildValue_SizeT")]
+        symbols += [(name, 1, 0, 512, 0) for name in (
+            "___error", "___stack_chk_fail", "___stack_chk_guard", "_bzero", "_fcntl",
+            "_fstat", "_getpid", "_memchr", "_proc_pidfdinfo")]
+    return {"header": (0xfeedfacf, 0x100000c, 0, 2 if container else 8,
+                        17 if container else 16, 976 if container else 1232,
+                        0x200085 if container else 0x85, 0),
+            "size": 181960 if container else 51176, "segments": segments,
+            "commands": commands, "regions": regions, "symbols": symbols,
+            "symtab": (symoff, nsyms, stroff, strsize), "signature": signature,
+            "abi": (792, 8, 24, 8, 768, 8, 136, 8, 528, 8, 106, 1, 24, 160, 152,
+                    232, 164, 240, 528, 16, 255, 0, 1, 2, 104, 2, 4, 4, 4, 4, 1, 1)}
+
+
+def h039_asset_draft_actual_signature(raw: bytes, kind: str) -> str:
+    """Pure linker-adhoc structure/pages only; never Apple trust or loading.
+
+    Apple XNU osfmk/kern/cs_blobs.h __CodeDirectory through 0x20400:
+    88-byte header, CS_ADHOC|CS_LINKER_SIGNED, SHA256, log2(page)=12.
+    No historical installer's CS_RUNTIME policy is changed or inherited here.
+    """
+    if type(raw) is not bytes or kind not in ("container", "adapter.so"):
+        return "SIGNATURE_INPUT"
+    layout = h039_asset_draft_actual_layout(kind)
+    off, amount, code_length = layout["signature"]
+    if len(raw) != off + amount:
+        return "SIGNATURE_RANGE"
+    signature = raw[off:]
+    ident = kind.encode("ascii") + b"\0"
+    slots = (off + 4095) // 4096
+    hash_offset = 88 + len(ident)
+    cd_length = hash_offset + slots * 32
+    super_length = 20 + cd_length
+    expected_super = _asset_struct.pack(">5I", 0xfade0cc0, super_length, 1, 0, 20)
+    if signature[:20] != expected_super:
+        return "SIGNATURE_SUPERBLOB"
+    expected_cd = _asset_struct.pack(">9I4B4I4Q", 0xfade0c02, cd_length, 0x20400,
+        0x20002, hash_offset, 88, 0, slots, off, 32, 2, 0, 12,
+        0, 0, 0, 0, 0, 0, code_length, 1 if kind == "container" else 0)
+    if signature[20:108] != expected_cd:
+        return "SIGNATURE_CODEDIRECTORY"
+    if signature[108:20 + hash_offset] != ident:
+        return "SIGNATURE_IDENTIFIER"
+    if amount != (super_length + 7) // 8 * 8 or any(signature[super_length:]):
+        return "SIGNATURE_PADDING"
+    for index in range(slots):
+        page = raw[index * 4096:min(off, (index + 1) * 4096)]
+        start = 20 + hash_offset + index * 32
+        if signature[start:start + 32] != _asset_hashlib.sha256(page).digest():
+            return "SIGNATURE_PAGE_HASH"
+    return "OK"
+
+
+def h039_asset_draft_actual_macho(raw: bytes, kind: str,
+                                 runtime: bytes, adapter: bytes) -> str:
+    """Semantic/region closure FIRST. Full image SHA is a separate last lens.
+
+    Exact commands bind all fields, including SG_NORELOC/SG_READ_ONLY flags,
+    nundef, section owner/mapping/relocs, initializer absence and entry order.
+    Fixed reviewed linkedit bytes close fixups/exports without a general dyld
+    interpreter; symbol rows additionally explain names, types and ordinals.
+    """
+    if kind not in ("container", "adapter.so") or not all(
+            type(value) is bytes for value in (raw, runtime, adapter)):
+        return "INPUT"
+    layout = h039_asset_draft_actual_layout(kind)
+    if len(raw) != layout["size"]:
+        return "SIZE"
+    if _asset_struct.unpack_from("<8I", raw) != layout["header"]:
+        return "HEADER"
+    cursor, occupied = 32, [(0, 32 + layout["header"][5])]
+    for label, expected in layout["commands"]:
+        cmd, amount = _asset_struct.unpack_from("<II", raw, cursor)
+        if cmd != _asset_struct.unpack_from("<I", expected)[0] or amount != len(expected):
+            return "LOAD_COMMAND_ORDER_SIZE"
+        actual = raw[cursor:cursor + amount]
+        if label == "SEGMENT":
+            if actual[56:64] != expected[56:64]:
+                return "SEGMENT_PERMISSIONS"
+            if actual[72:] != expected[72:]:
+                return "SECTION_DESCRIPTOR"
+        if actual != expected:
+            return label
+        cursor += amount
+    if cursor != 32 + layout["header"][5]:
+        return "LOAD_COMMAND_END"
+    if kind == "container":
+        if raw[1040:1060] != bytes.fromhex("ff4300d1ff0f00b940008052ff430091c0035fd6"):
+            return "ENTRY_CODE"
+        if len(runtime) != 106736 or raw[16384:123120] != runtime:
+            return "RUNTIME_PAYLOAD"
+        if len(adapter) != 51176 or raw[123120:174296] != adapter:
+            return "ADAPTER_PAYLOAD"
+        occupied += [(1040, 1060), (16384, 123120), (123120, 174296)]
+    else:
+        if _asset_struct.unpack_from("<32Q", raw, 32768) != layout["abi"]:
+            return "ADAPTER_ABI"
+        occupied.append((32768, 33024))
+    symoff, count, stroff, strsize = layout["symtab"]
+    strings, rows = raw[stroff:stroff + strsize], []
+    for index in range(count):
+        strx, ntype, nsect, desc, value = _asset_struct.unpack_from("<IBBHQ", raw, symoff + index * 16)
+        if not 0 < strx < strsize:
+            return "SYMBOL_STRING_RANGE"
+        end = strings.find(b"\0", strx)
+        if end < 0:
+            return "SYMBOL_STRING_RANGE"
+        try:
+            name = strings[strx:end].decode("ascii")
+        except UnicodeError:
+            return "SYMBOL_STRING_ENCODING"
+        rows.append((name, ntype, nsect, desc, value))
+    if rows != layout["symbols"]:
+        return "SYMBOL_ROWS"
+    # nlist/string canonical representation and indirect-symbol indices are
+    # exact bytes: semantic equality cannot hide unused names or altered slots.
+    sym_digest = ("eace2740b9ee2b9180f851323343c057ba3365e89bd2bb2e48d148c17595bc0a" if kind == "container"
+                  else "7708254384c0f57d7d1e0de744b01ac8d8f7bac6075e559baa1493ebefa6f7de")
+    if _asset_hashlib.sha256(raw[symoff:stroff + strsize]).hexdigest() != sym_digest:
+        return "SYMBOL_REGION"
+    occupied.append((symoff, stroff + strsize))
+    for label, off, amount, digest in layout["regions"]:
+        if _asset_hashlib.sha256(raw[off:off + amount]).hexdigest() != digest:
+            return label
+        occupied.append((off, off + amount))
+    result = h039_asset_draft_actual_signature(raw, kind)
+    if result != "OK":
+        return result
+    occupied.append((layout["signature"][0], len(raw)))
+    previous = 0
+    for left, right in sorted(occupied):
+        if left < previous or not left < right <= len(raw):
+            return "FILE_INTERVAL_OVERLAP"
+        if any(raw[previous:left]):
+            return "FILE_PADDING"
+        previous = right
+    if previous != len(raw):
+        return "FILE_TAIL"
+    return "OK"
+
+
+def h039_asset_draft_actual_material(outputs: dict, runtime: bytes) -> str:
+    """Composed actual bytes, no path/effects/manifest trust or native calls.
+
+    Fixed toolchain/source/relative filenames admit one measured byte result;
+    other legitimate compilers/layouts require a separately reviewed contract.
+    Cross-root determinism is checked by build_reference, not inferred here.
+    """
+    names = ("adapter.i", "adapter.ll", "adapter.d", "adapter.o", "container.i",
+             "container.ll", "container.d", "container.o", "adapter.so", "container")
+    if type(outputs) is not dict or set(outputs) != set(names) or not all(
+            type(outputs[name]) is bytes and 0 < len(outputs[name]) <= 1048576 for name in names):
+        return "OUTPUT_SCHEMA"
+    if type(runtime) is not bytes or len(runtime) != 106736 or _asset_hashlib.sha256(runtime).hexdigest() != (
+            "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7"):
+        return "TRUSTED_RUNTIME_INPUT"
+    if outputs["container.i"] != b"int main(void){return 2;}\n":
+        return "CONTAINER_PREPROCESS"
+    ir = outputs["container.ll"]
+    if (ir.count(b"define ") != 1 or b"define i32 @main() #0 {\n" not in ir
+            or b"  ret i32 2\n" not in ir or any(token in ir for token in (
+                b"call ", b"invoke ", b"declare ", b"@llvm.global_ctors", b"@llvm.global_dtors"))):
+        return "CONTAINER_IR"
+    abi = h039_asset_draft_actual_layout("adapter.so")["abi"]
+    line = ("@H039_ABI_VALUES = constant [32 x i64] [" + ", ".join("i64 " + str(n) for n in abi)
+            + '], section "__DATA,__h039abi", align 8\n').encode()
+    if outputs["adapter.ll"].count(line) != 1:
+        return "ADAPTER_IR_ABI"
+    adapter_ir = outputs["adapter.ll"]
+    definitions = [row for row in adapter_ir.splitlines() if row.startswith(b"define ")]
+    if definitions != [
+            b"define ptr @PyInit__h039_listener_v1() #0 {",
+            b"define internal ptr @query_received_listener(ptr noundef %0, ptr noundef %1) #0 {",
+            b"define internal i32 @_Py_IS_TYPE(ptr noundef %0, ptr noundef %1) #0 {",
+            b"define internal ptr @refuse(ptr noundef %0) #0 {",
+            b"define internal i32 @same_identity(ptr noundef %0, ptr noundef %1) #0 {"]:
+        return "ADAPTER_IR_DEFINITIONS"
+    init = (b"define ptr @PyInit__h039_listener_v1() #0 {\n"
+            b"  %1 = call ptr @PyModule_Create2(ptr noundef @module, i32 noundef 1013)\n"
+            b"  ret ptr %1\n}\n")
+    query = (b"  %92 = load i32, ptr %13, align 4\n"
+             b"  %93 = load i32, ptr %7, align 4\n"
+             b"  %94 = call i32 @proc_pidfdinfo(i32 noundef %92, i32 noundef %93, "
+             b"i32 noundef 3, ptr noundef %12, i32 noundef 792)\n")
+    if (adapter_ir.count(init) != 1 or adapter_ir.count(query) != 1
+            or adapter_ir.count(b"call i32 @proc_pidfdinfo(") != 1
+            or any(token in adapter_ir for token in (b"@llvm.global_ctors", b"@llvm.global_dtors", b"invoke "))):
+        return "ADAPTER_IR_ENTRY_QUERY"
+    obj = outputs["adapter.o"]
+    descriptor = _asset_struct.pack("<16s16sQQ8I", b"__h039abi", b"__DATA",
+                                    1680, 256, 2312, 3, 0, 0, 0, 0, 0, 0)
+    if (len(obj) != 5424 or obj[184:264] != descriptor
+            or _asset_struct.unpack_from("<32Q", obj, 2312) != abi):
+        return "ADAPTER_OBJECT_ABI"
+    for kind in ("adapter.so", "container"):
+        result = h039_asset_draft_actual_macho(outputs[kind], kind, runtime, outputs["adapter.so"])
+        if result != "OK":
+            return kind + ":" + result
+    # No mutation reaches generic identity until semantic/region/signature
+    # checks above completed; opaque intermediate bytes remain exactly pinned.
+    expected = (
+        (374340, "cc62b86b6ccdc50c96feba283de93e181d9c9d7ceb3482a4866cb8f7bbf7560b"),
+        (24994, "e63be921eced7c2de6357005b8881754d05f18f6a701b8ec21d7daad4f9d00fe"),
+        (32763, "f082346b75281cdca411790c9246ceefd098f9ed3f5bf68ede30dfd6489c119c"),
+        (5424, "dc74e336c98e4d8d0c418ca007cc37d71a99b9c5b3d1860c2fe1eb3b8f345e17"),
+        (26, "8e44727a9f77c05ac833f456fe5473048cdfc9139cab00b8993ba8260b5ddd74"),
+        (1154, "4aa6ececc0ef4bb346a8e034546e43e49b19813820ef3af320d8a87f150c4aa4"),
+        (24, "74132f32a4911c1fa5fc542403041eff3071650c63a103666e7f6313d596cc3b"),
+        (528, "492d07ced11ce98b5e4771966d5397bb3ca8a6ae0b83aebe302369d3f54602b0"),
+        (51176, "9f18b8dbc135d9d6e6d2395017e70827aaaf3752a9a0835a94a91b8235fda6ec"),
+        (181960, "563fcecdf4b4d7625baee7cffa09db53f087a63d437a2846e28912dbd4a598a3"))
+    for name, (size, digest) in zip(names, expected):
+        if len(outputs[name]) != size or _asset_hashlib.sha256(outputs[name]).hexdigest() != digest:
+            return "FINAL_IDENTITY:" + name
+    return "ACTUAL_STATIC_MATERIAL_ONLY_NOT_GATE_OR_LOADING_CREDIT"
+
+
+def h039_asset_draft_actual_reseal_control(raw: bytes, kind: str) -> bytes:
+    """Control construction only: rewrite in-memory code-page hashes, no signing.
+
+    Never an acceptance-path transformation or parameter. Structural/header
+    defects remain defects; only the unchanged signature's page slots change.
+    """
+    if type(raw) is not bytes:
+        raise ValueError("control bytes")
+    layout = h039_asset_draft_actual_layout(kind)
+    off, amount, unused = layout["signature"]
+    if len(raw) != off + amount:
+        raise ValueError("control length")
+    changed = bytearray(raw)
+    start = off + 20 + 88 + len(kind) + 1
+    for index in range((off + 4095) // 4096):
+        changed[start + index * 32:start + (index + 1) * 32] = _asset_hashlib.sha256(
+            raw[index * 4096:min(off, (index + 1) * 4096)]).digest()
+    return bytes(changed)
+
+
+def h039_asset_draft_product_recipe() -> bytes:
+    """Prospective product data, not permission or evidence that a build ran."""
+    proposal = h039_asset_draft_reference_recipe()
+    value = {key: proposal[key] for key in (
+        "schema_version", "roots", "umask", "environment", "source", "retained_runtime",
+        "required_tool_sha256", "required_link_input_sha256", "commands", "outputs",
+        "comparison", "runtime_role", "container_role")}
+    value.update({"role": "H039_PROTECTED_LISTENER_ASSET_BUILD_ONLY",
+                  "source_identity": {"path": "controller/runtime-cleanup/native/mediator.c",
+                      "mode": "100644", "size": 181592,
+                      "sha256": "a1dd9e698a644be61b65f1d73229747c7dfc5257c9073b063b85be75757fa1d8"},
+                  "retained_runtime_identity": {"path": "verify/h039/runtime-cleanup-mediator",
+                      "mode": "100755", "size": 106736,
+                      "sha256": "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7"},
+                  "product_output": {"build_name": "container",
+                      "path": "controller/runtime-cleanup/install", "mode": "100755"},
+                  "signing": "LINKER_ADHOC_ONLY_NO_SEPARATE_SIGN_COMMAND",
+                  "verification_ceiling": "STATIC_BUILD_MATERIAL_NOT_LOADING_INSTALLATION_OR_COMPLETION"})
+    return (_asset_json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True,
+                              allow_nan=False) + "\n").encode("ascii")
+
+
+def h039_asset_draft_product_manifest() -> bytes:
+    """Gate-owned prospective bindings; no caller descriptor, own digest or effects."""
+    recipe = h039_asset_draft_product_recipe()
+    value = {"schema_version": 1, "role": "H039_PROTECTED_LISTENER_ASSET_BUILD_ONLY",
+        "source": {"path": "controller/runtime-cleanup/native/mediator.c", "mode": "100644",
+            "size": 181592, "sha256": "a1dd9e698a644be61b65f1d73229747c7dfc5257c9073b063b85be75757fa1d8"},
+        "recipe": {"path": "verify/h039/build-recipe.json", "mode": "100644",
+            "size": len(recipe), "sha256": _asset_hashlib.sha256(recipe).hexdigest()},
+        "container": {"path": "controller/runtime-cleanup/install", "mode": "100755",
+            "size": 181960, "sha256": "563fcecdf4b4d7625baee7cffa09db53f087a63d437a2846e28912dbd4a598a3",
+            "role": "INERT_ASSET_CONTAINER", "format": "ARM64_MH_EXECUTE",
+            "entry": "EXACT_MAIN_RETURN2_NO_PAYLOAD_LOADING",
+            "payload_sections": ["__H039RO,__h039med", "__H039RO,__h039lst"]},
+        "runtime": {"path": "verify/h039/runtime-cleanup-mediator", "mode": "100755",
+            "size": 106736, "sha256": "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7",
+            "role": "RETAINED_PUBLISHED_RUNTIME_BYTES_NOT_REPRODUCED"},
+        "adapter": {"build_name": "adapter.so", "format": "ARM64_MH_BUNDLE",
+            "size": 51176, "sha256": "9f18b8dbc135d9d6e6d2395017e70827aaaf3752a9a0835a94a91b8235fda6ec",
+            "abi_values": list(h039_asset_draft_actual_layout("adapter.so")["abi"])},
+        "signature": "LINKER_ADHOC_CODEDIRECTORY_PAGE_INTEGRITY_NOT_APPLE_TRUST",
+        "verification_ceiling": "STATIC_BUILD_MATERIAL_NOT_LOADING_INSTALLATION_OR_COMPLETION"}
+    return (_asset_json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True,
+                              allow_nan=False) + "\n").encode("ascii")
+
+
+def h039_asset_draft_product_budget(before: dict, after: dict) -> dict:
+    """Pure line-edit model, NOT observed Git numstat or authenticated blob extraction.
+
+    Byte/newline sizes are exact. SequenceMatcher(autojunk=False) defines this
+    model only; later Git observation must report its own actual numstat.
+    Binary line counts are never fabricated from embedded newline bytes.
+    """
+    paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+             "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    for files in (before, after):
+        if (type(files) is not dict or set(files) != set(paths) or any(
+                type(files[path]) is not tuple or len(files[path]) != 2
+                or type(files[path][0]) is not str or type(files[path][1]) is not bytes
+                for path in paths)):
+            raise ValueError("budget file schema")
+    rows = []
+    for path in paths:
+        old, new = before[path][1], after[path][1]
+        row = {"path": path, "old_bytes": len(old), "new_bytes": len(new)}
+        if path == paths[0]:
+            row["kind"] = "BINARY_NO_TEXT_LINE_BUDGET"
+        else:
+            old.decode("utf-8", "strict"); new.decode("utf-8", "strict")
+            if not old.endswith(b"\n") or not new.endswith(b"\n"):
+                raise ValueError("budget final newline")
+            opcodes = _asset_difflib.SequenceMatcher(None, old.splitlines(keepends=True),
+                new.splitlines(keepends=True), autojunk=False).get_opcodes()
+            added = sum(j2 - j1 for tag, i1, i2, j1, j2 in opcodes if tag in ("insert", "replace"))
+            deleted = sum(i2 - i1 for tag, i1, i2, j1, j2 in opcodes if tag in ("delete", "replace"))
+            row.update({"kind": "UTF8_TEXT_MODEL", "old_lines": old.count(b"\n"),
+                        "new_lines": new.count(b"\n"), "added": added,
+                        "deleted": deleted, "total": added + deleted})
+        rows.append(row)
+    return {"projection": "STDLIB_SEQUENCE_MATCHER_AUTOJUNK_FALSE_NOT_GIT_NUMSTAT", "rows": rows,
+            "old_bytes": sum(row["old_bytes"] for row in rows),
+            "new_bytes": sum(row["new_bytes"] for row in rows),
+            "text_added": sum(row.get("added", 0) for row in rows),
+            "text_deleted": sum(row.get("deleted", 0) for row in rows),
+            "text_total": sum(row.get("total", 0) for row in rows)}
+
+
+def h039_asset_draft_product_material(before: dict, files: dict, outputs: dict,
+                                     runtime: bytes, adapter_source: bytes) -> str:
+    """Four-file relation over data; no Git provenance, build or gate verdict."""
+    paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+             "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    modes = ["100755", "100644", "100644", "100644"]
+    for label, mapping in (("BASE", before), ("PRODUCT", files)):
+        if (type(mapping) is not dict or set(mapping) != set(paths) or any(
+                type(mapping[path]) is not tuple or len(mapping[path]) != 2
+                or type(mapping[path][0]) is not str or mapping[path][0] != mode
+                or type(mapping[path][1]) is not bytes or not 0 < len(mapping[path][1]) <= 1048576
+                for path, mode in zip(paths, modes))):
+            return label + "_FILE_SCHEMA"
+    base_ids = [(185808, "05a23e0c63a295367c83a2c0de45495f9f3e3caee36101d1b088e93302a1a486"),
+        (173650, "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b"),
+        (2879, "bee82dd83dbff08fff1164294046ea3a980ecc8301a1a1563e68822693474380"),
+        (2332, "84eca73421ed1cac2c92fd01e519e259cb9088213e66311acd61846e3f27563a")]
+    if any(len(before[path][1]) != size or _asset_hashlib.sha256(before[path][1]).hexdigest() != digest
+           for path, (size, digest) in zip(paths, base_ids)):
+        return "BASE_MATERIAL_BINDING"
+    try:
+        expected_source = h039_asset_draft_reference_source(before[paths[1]][1], adapter_source)
+    except ValueError:
+        return "TRUSTED_SOURCE_BINDING"
+    if files[paths[1]][1] != expected_source:
+        return "PRODUCT_SOURCE_BINDING"
+    expected_recipe = h039_asset_draft_product_recipe()
+    expected_manifest = h039_asset_draft_product_manifest()
+    parsed = []
+    for label, path, expected in (("RECIPE", paths[2], expected_recipe),
+                                   ("MANIFEST", paths[3], expected_manifest)):
+        raw = files[path][1]
+        try:
+            obj = _asset_json.loads(raw, object_pairs_hook=h039_asset_draft_unique_object)
+            serialized = (_asset_json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=True,
+                                            allow_nan=False) + "\n").encode("ascii")
+            shape = _asset_json.loads(expected)
+            if type(obj) is not dict or set(obj) != set(shape):
+                return label + "_SCHEMA"
+        except (ValueError, TypeError, UnicodeError):
+            return label + "_PARSE"
+        if raw != serialized:
+            return label + "_REPRESENTATION"
+        parsed.append((obj, serialized))
+    if parsed[0][1] != expected_recipe:
+        return "RECIPE_BINDING"
+    source_observed = {"path": paths[1], "mode": files[paths[1]][0],
+                       "size": len(files[paths[1]][1]),
+                       "sha256": _asset_hashlib.sha256(files[paths[1]][1]).hexdigest()}
+    if parsed[0][0]["source_identity"] != source_observed:
+        return "SOURCE_RECIPE_RELATION"
+    # Independent actual inputs reach semantic checks before self-consistent
+    # candidate manifest digests can claim authority over crossed/altered bytes.
+    actual = h039_asset_draft_actual_material(outputs, runtime)
+    if actual != "ACTUAL_STATIC_MATERIAL_ONLY_NOT_GATE_OR_LOADING_CREDIT":
+        return "MATERIAL:" + actual
+    if files[paths[0]][1] != outputs["container"]:
+        return "PRODUCT_CONTAINER_BINDING"
+    if parsed[1][1] != expected_manifest:
+        return "MANIFEST_BINDING"
+    # Redundant explicit bounds audit the exact fixed forms. These are measured
+    # byte/newline counts and a named pure edit model, not Git numstat credit.
+    budget = h039_asset_draft_product_budget(before, files)
+    rows = [(row["path"], row["kind"], row["old_bytes"], row["new_bytes"],
+             row.get("old_lines"), row.get("new_lines"), row.get("added"),
+             row.get("deleted"), row.get("total")) for row in budget["rows"]]
+    if (rows != [
+            (paths[0], "BINARY_NO_TEXT_LINE_BUDGET", 185808, 181960, None, None, None, None, None),
+            (paths[1], "UTF8_TEXT_MODEL", 173650, 181592, 1180, 1348, 168, 0, 168),
+            (paths[2], "UTF8_TEXT_MODEL", 2879, 8558, 89, 287, 282, 84, 366),
+            (paths[3], "UTF8_TEXT_MODEL", 2332, 1827, 55, 78, 75, 52, 127)]
+            or (budget["text_added"], budget["text_deleted"], budget["text_total"]) != (525, 136, 661)
+            or (budget["old_bytes"], budget["new_bytes"]) != (364669, 373937)):
+        return "PRODUCT_BUDGET"
+    return "FOUR_FILE_STATIC_RELATION_ONLY_NOT_GRAPH_OR_GATE_CREDIT"
+
+
+def h039_asset_draft_product_controls(before: dict, outputs: dict, runtime: bytes,
+                                     adapter_source: bytes) -> list:
+    """Canonical forms and coherent relation mutants, all in-memory data only."""
+    paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+             "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    files = {paths[0]: ("100755", outputs["container"]),
+             paths[1]: ("100644", h039_asset_draft_reference_source(before[paths[1]][1], adapter_source)),
+             paths[2]: ("100644", h039_asset_draft_product_recipe()),
+             paths[3]: ("100644", h039_asset_draft_product_manifest())}
+    verdict = "FOUR_FILE_STATIC_RELATION_ONLY_NOT_GRAPH_OR_GATE_CREDIT"
+    cases = [("four_file_positive", h039_asset_draft_product_material(
+                 before, files, outputs, runtime, adapter_source) == verdict),
+             ("four_file_mapping_order", h039_asset_draft_product_material(
+                 dict(reversed(list(before.items()))), dict(reversed(list(files.items()))),
+                 outputs, runtime, adapter_source) == verdict)]
+    for label, index, raw, reason in [
+            ("source_modified", 1, files[paths[1]][1] + b"\n", "PRODUCT_SOURCE_BINDING"),
+            ("container_modified", 0, files[paths[0]][1] + b"x", "PRODUCT_CONTAINER_BINDING")]:
+        changed = dict(files); changed[paths[index]] = (files[paths[index]][0], raw)
+        cases.append((label, h039_asset_draft_product_material(before, changed, outputs,
+                      runtime, adapter_source) == reason))
+    for index, label in ((2, "RECIPE"), (3, "MANIFEST")):
+        raw = files[paths[index]][1]
+        for name, mutated, reason in (
+                ("duplicate", raw.replace(b'{\n', b'{\n  "schema_version": 1,\n', 1), "_PARSE"),
+                ("noncanonical", raw + b" ", "_REPRESENTATION"),
+                ("nondict", b"[]\n", "_SCHEMA")):
+            assert mutated != raw
+            changed = dict(files); changed[paths[index]] = ("100644", mutated)
+            cases.append((label + "_" + name, h039_asset_draft_product_material(
+                before, changed, outputs, runtime, adapter_source) == label + reason))
+        for name, key, value, reason in (("unknown", "unknown", 1, "_SCHEMA"),
+                ("bool_version", "schema_version", True, "_BINDING"),
+                ("float_version", "schema_version", 1.0, "_BINDING"),
+                ("wrong_role", "role", "INSTALLED_OPERATIONAL", "_BINDING")):
+            obj = _asset_json.loads(raw); obj[key] = value
+            mutated = (_asset_json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=True,
+                                         allow_nan=False) + "\n").encode("ascii")
+            assert mutated != raw
+            changed = dict(files); changed[paths[index]] = ("100644", mutated)
+            cases.append((label + "_" + name, h039_asset_draft_product_material(
+                before, changed, outputs, runtime, adapter_source) == label + reason))
+        obj = _asset_json.loads(raw)
+        nested_key = "source_identity" if index == 2 else "source"
+        obj[nested_key]["unknown"] = 1
+        changed = dict(files); changed[paths[index]] = ("100644", (_asset_json.dumps(
+            obj, sort_keys=True, indent=2) + "\n").encode("ascii"))
+        cases.append((label + "_nested_unknown", h039_asset_draft_product_material(
+            before, changed, outputs, runtime, adapter_source) == label + "_BINDING"))
+    recipe_obj = _asset_json.loads(files[paths[2]][1]); recipe_obj["umask"] = "0022"
+    recipe_raw = (_asset_json.dumps(recipe_obj, sort_keys=True, indent=2) + "\n").encode("ascii")
+    manifest_obj = _asset_json.loads(files[paths[3]][1])
+    manifest_obj["recipe"].update({"size": len(recipe_raw), "sha256": _asset_hashlib.sha256(recipe_raw).hexdigest()})
+    changed = dict(files); changed[paths[2]] = ("100644", recipe_raw)
+    changed[paths[3]] = ("100644", (_asset_json.dumps(manifest_obj, sort_keys=True, indent=2) + "\n").encode("ascii"))
+    cases.append(("coherent_wrong_recipe_manifest", h039_asset_draft_product_material(
+        before, changed, outputs, runtime, adapter_source) == "RECIPE_BINDING"))
+    for label, field in (("manifest_crossed_payloads", "runtime"),
+                          ("manifest_wrong_recipe", "recipe"), ("manifest_wrong_source", "source")):
+        obj = _asset_json.loads(files[paths[3]][1])
+        obj[field]["sha256"] = obj["adapter"]["sha256"]
+        obj[field]["size"] = obj["adapter"]["size"]
+        changed = dict(files); changed[paths[3]] = ("100644", (_asset_json.dumps(
+            obj, sort_keys=True, indent=2) + "\n").encode("ascii"))
+        cases.append((label, h039_asset_draft_product_material(before, changed, outputs,
+                     runtime, adapter_source) == "MANIFEST_BINDING"))
+    mutant_outputs = dict(outputs)
+    image = bytearray(outputs["container"]); _asset_struct.pack_into("<I", image, 392, 3)
+    mutant_outputs["container"] = h039_asset_draft_actual_reseal_control(bytes(image), "container")
+    obj = _asset_json.loads(files[paths[3]][1])
+    obj["container"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"]).hexdigest()
+    changed = dict(files); changed[paths[0]] = ("100755", mutant_outputs["container"])
+    changed[paths[3]] = ("100644", (_asset_json.dumps(obj, sort_keys=True, indent=2) + "\n").encode())
+    cases.append(("coherent_container_manifest_repin_semantic_reject",
+        h039_asset_draft_actual_signature(mutant_outputs["container"], "container") == "OK"
+        and h039_asset_draft_product_material(before, changed, mutant_outputs, runtime, adapter_source)
+        == "MATERIAL:container:SEGMENT_PERMISSIONS"))
+    image = bytearray(outputs["container"])
+    image[16384:16400], image[123120:123136] = image[123120:123136], image[16384:16400]
+    assert bytes(image) != outputs["container"]
+    mutant_outputs = dict(outputs)
+    mutant_outputs["container"] = h039_asset_draft_actual_reseal_control(bytes(image), "container")
+    obj = _asset_json.loads(files[paths[3]][1])
+    obj["container"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"]).hexdigest()
+    obj["runtime"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"][16384:123120]).hexdigest()
+    obj["adapter"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"][123120:174296]).hexdigest()
+    changed = dict(files); changed[paths[0]] = ("100755", mutant_outputs["container"])
+    changed[paths[3]] = ("100644", (_asset_json.dumps(obj, sort_keys=True, indent=2) + "\n").encode())
+    cases.append(("crossed_payload_prefixes_coherent_manifest",
+        h039_asset_draft_actual_signature(mutant_outputs["container"], "container") == "OK"
+        and h039_asset_draft_product_material(before, changed, mutant_outputs, runtime, adapter_source)
+        == "MATERIAL:container:RUNTIME_PAYLOAD"))
+    cases.append(("wrong_independent_runtime", h039_asset_draft_product_material(
+        before, files, outputs, outputs["adapter.so"], adapter_source) == "MATERIAL:TRUSTED_RUNTIME_INPUT"))
+    changed = dict(files); changed[paths[0]] = ("100644", files[paths[0]][1])
+    cases.append(("product_mode", h039_asset_draft_product_material(before, changed, outputs,
+                  runtime, adapter_source) == "PRODUCT_FILE_SCHEMA"))
+    changed = dict(before); changed[paths[0]] = ("100755", before[paths[0]][1] + b"x")
+    cases.append(("baseline_modified", h039_asset_draft_product_material(changed, files, outputs,
+                  runtime, adapter_source) == "BASE_MATERIAL_BINDING"))
+    return cases
+
+
+
+def h039_asset_draft_git_operation(kind: str, oids: list) -> dict:
+    """Fixed local builtin requests, not execution or a caller-selected argv API."""
+    counts = {"config": 0, "head": 0, "type": 1, "size": 1, "commit": 1, "tree": 1,
+              "blob": 1, "listing": 1, "rawdiff": 2, "numstat": 2, "index": 0, "status": 0}
+    if (type(kind) is not str or kind not in counts or type(oids) is not list
+            or len(oids) != counts[kind] or any(type(oid) is not str or len(oid) != 40
+                or any(c not in "0123456789abcdef" for c in oid) for oid in oids)):
+        raise ValueError("fixed Git request")
+    environment = {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_COUNT": "0",
+        "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_NO_REPLACE_OBJECTS": "1", "GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"}
+    prefix = ["/Library/Developer/CommandLineTools/usr/bin/git", "--no-pager", "--literal-pathspecs", "--no-replace-objects",
+              "-c", "core.attributesFile=/dev/null", "-c", "core.excludesFile=/dev/null",
+              "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+              "-c", "diff.external=", "-c", "pager.diff=false",
+              "-c", "diff.algorithm=myers", "-c", "diff.indentHeuristic=true"]
+    if kind == "config":
+        suffix = ["config", "--no-includes", "--file", "-", "--null", "--list"]
+    elif kind == "head":
+        suffix = ["rev-parse", "--verify", "HEAD"]
+    elif kind == "index":
+        suffix = ["ls-files", "--stage", "-z"]
+    elif kind == "status":
+        suffix = ["status", "--porcelain=v1", "-z", "--untracked-files=all"]
+    elif kind in ("type", "size"):
+        suffix = ["cat-file", "-t" if kind == "type" else "-s", oids[0]]
+    elif kind in ("commit", "tree", "blob"):
+        suffix = ["cat-file", kind, oids[0]]
+    elif kind == "listing":
+        suffix = ["ls-tree", "-r", "-z", "--full-tree", oids[0]]
+    else:
+        suffix = ["diff-tree", "-r", "--no-commit-id", "--no-abbrev", "--no-renames",
+                  "--no-ext-diff", "--no-textconv", "--raw" if kind == "rawdiff" else "--numstat",
+                  "-z", oids[0], oids[1], "--"]
+    return {"prefix": prefix, "suffix": suffix, "environment": environment,
+            "tool_size": 7604272,
+            "tool_sha256": "be4afb2b003904725826250de9fb76567bbacf82323457b5a1ec26706b66bcae",
+            "scope": "LOCAL_BUILTIN_ONLY_NO_REMOTE_OR_HELPERS"}
+
+
+def h039_asset_draft_git_observe_local(base: str, candidate: str, phase: str, contract: str) -> dict:
+    """Local B-derived observer, still unfrozen and never a phase verdict.
+
+    B retained/raw-object/subprocess/attribute/postauth closure is reused.
+    Local deltas: six platform paths, two authenticated edges at HEAD=P,
+    fixed index/status operations and candidate disk bytes in the same closure.
+    No temporary files, Git writes, compiler, asset loading or runtime effect.
+    """
+    h039_asset_draft_git_operation("rawdiff", [base, candidate])
+    h039_asset_draft_git_operation("type", [contract])
+    if (base != _LOCAL_BASE or contract == base or type(phase) is not str
+            or phase not in ("CONTRACT_SIX", "PRODUCT_FOUR")
+            or (phase == "CONTRACT_SIX" and contract != candidate)):
+        raise ValueError("Git fact phase or fixed generation")
+    contract_paths = list(_LOCAL_CONTRACT_PATHS)
+    product_paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+                     "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    # The contract edge is always checked; P=C is only the productless baseline.
+    edges = [("contract", base, contract, contract_paths)]
+    if phase == "PRODUCT_FOUR" and candidate != contract:
+        edges.append(("product", contract, candidate, product_paths))
+    selected_paths = contract_paths + (product_paths if len(edges) == 2 else [])
+    source_path = _asset_os.path.abspath(__file__)
+    if not source_path.endswith("/verify/bin/h-039-exit") or _asset_os.path.realpath(source_path) != source_path:
+        raise ValueError("Git gate-relative root")
+    root = source_path[:-len("/verify/bin/h-039-exit")]
+    tool = h039_asset_draft_git_operation("config", [])
+    tool_raw, config_snapshot, head_snapshot, index_snapshot = None, None, None, None
+    disk_snapshots = []
+    authenticated_attribute_source = None
+    prestate_complete = False
+    descriptors, retained, absent = [], [], []
+    def identity(info: object) -> tuple:
+        return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+                info.st_nlink, info.st_size, info.st_flags, info.st_mtime_ns, info.st_ctime_ns)
+    def open_member(parent: int, name: str, directory: bool, limit: int = 0, tracked_mode: str = None) -> tuple:
+        h039_local_cancel_check("observer_member")
+        before = _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+        flags = _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK
+        if directory:
+            flags |= _asset_os.O_DIRECTORY
+        fd = _asset_os.open(name, flags, dir_fd=parent); descriptors.append(fd)
+        after = _asset_os.fstat(fd)
+        if identity(before) != identity(after) or (_asset_stat.S_ISDIR(after.st_mode) if directory else
+                _asset_stat.S_ISREG(after.st_mode)) is not True:
+            raise ValueError("Git retained member identity")
+        if not directory and (after.st_uid != _asset_os.getuid() or after.st_nlink != 1
+                or _asset_stat.S_IMODE(after.st_mode) not in ((0o600, 0o644) if tracked_mode is None
+                    else (int(tracked_mode[-3:], 8),)) or after.st_size > limit):
+            raise ValueError("Git metadata leaf shape")
+        retained.append((parent, name, fd, identity(after)))
+        data = b""
+        if not directory:
+            while len(data) < after.st_size:
+                chunk = _asset_os.pread(fd, min(65536, after.st_size - len(data)), len(data))
+                if not chunk:
+                    raise ValueError("Git metadata short read")
+                data += chunk
+            if _asset_os.pread(fd, 1, len(data)):
+                raise ValueError("Git metadata grew")
+        return fd, data
+    def absent_member(parent: int, name: str) -> None:
+        try:
+            _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            absent.append((parent, name))
+        else:
+            raise ValueError("Git forbidden local input", name)
+    def run(kind: str, oids: list, data: bytes = b"", limit: int = 4194304) -> bytes:
+        h039_local_cancel_check("observer_before_spawn")
+        request = h039_asset_draft_git_operation(kind, oids)
+        attr_option = []
+        if kind in ("rawdiff", "numstat"):
+            if (authenticated_attribute_source != oids[-1]
+                    or oids not in [[left, right] for _, left, right, _ in edges]):
+                raise ValueError("Git attributes lack authenticated candidate tree")
+            # Installed CLT git.1 --attr-source and gitattributes.5: an absent
+            # working-tree file alone otherwise permits fallback to the index.
+            attr_option = ["--attr-source=" + authenticated_attribute_source]
+        argv = request["prefix"] + attr_option + ([] if kind == "config" else ["--git-dir=" + root + "/.git", "--work-tree=" + root]) + request["suffix"]
+        if kind != "config" and data:
+            raise ValueError("Git unexpected stdin")
+        proc = _asset_subprocess.Popen(argv, cwd="/private/var/empty" if kind == "config" else root,
+            env=request["environment"], stdin=_asset_subprocess.PIPE if data else _asset_subprocess.DEVNULL,
+            stdout=_asset_subprocess.PIPE, stderr=_asset_subprocess.PIPE, shell=False, close_fds=True)
+        poller = None
+        streams, sent = {"stdout": bytearray(), "stderr": bytearray()}, 0
+        deadline = _asset_time.monotonic() + 15.0
+        try:
+            poller = _asset_selectors.DefaultSelector()
+            for stream, label in ((proc.stdout, "stdout"), (proc.stderr, "stderr")):
+                _asset_os.set_blocking(stream.fileno(), False)
+                poller.register(stream, _asset_selectors.EVENT_READ, label)
+            if data:
+                _asset_os.set_blocking(proc.stdin.fileno(), False)
+                poller.register(proc.stdin, _asset_selectors.EVENT_WRITE, "stdin")
+            while poller.get_map():
+                h039_local_cancel_check("observer_owned_loop")
+                remaining = deadline - _asset_time.monotonic()
+                if remaining <= 0:
+                    raise ValueError("Git direct-child deadline")
+                for key, events in poller.select(min(remaining, 0.1)):
+                    stream, label = key.fileobj, key.data
+                    if label == "stdin":
+                        try:
+                            count = _asset_os.write(stream.fileno(), data[sent:sent + 4096])
+                        except BlockingIOError:
+                            continue
+                        if count <= 0:
+                            raise ValueError("Git config stdin progress")
+                        sent += count
+                        if sent == len(data):
+                            poller.unregister(stream); stream.close()
+                        continue
+                    try:
+                        chunk = _asset_os.read(stream.fileno(), 65536)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        poller.unregister(stream); stream.close()
+                        continue
+                    streams[label].extend(chunk)
+                    if len(streams[label]) > (limit if label == "stdout" else 65536):
+                        raise ValueError("Git bounded capture", label)
+            remaining = deadline - _asset_time.monotonic()
+            if remaining <= 0:
+                raise ValueError("Git EOF is not direct-child exit")
+            status = proc.wait(timeout=remaining)
+            if status != 0 or streams["stderr"] or (data and sent != len(data)):
+                raise ValueError("Git builtin failed", status, bytes(streams["stderr"]))
+            return bytes(streams["stdout"])
+        except BaseException as primary:
+            # Eligibility is closed trusted local builtins only. This makes no
+            # descendant-cleanup claim and grants no killpg/native-scan authority.
+            cleanup_failures, polled, child_status = [], False, None
+            try:
+                child_status = proc.poll(); polled = True
+            except BaseException as exc:
+                cleanup_failures.append(("poll", type(exc).__name__, str(exc)))
+            if polled and child_status is None:
+                try:
+                    proc.kill()
+                except BaseException as exc:
+                    cleanup_failures.append(("kill", type(exc).__name__, str(exc)))
+            # Wait is attempted independently even if poll or kill failed.
+            try:
+                proc.wait(timeout=5.0)
+            except BaseException as exc:
+                cleanup_failures.append(("wait", type(exc).__name__, str(exc)))
+            primary.h039_git_child_cleanup_failures = cleanup_failures
+            raise
+        finally:
+            primary = _asset_sys.exc_info()[1]
+            close_failures = []
+            for label, owned in (("selector", poller), ("stdin", proc.stdin),
+                                 ("stdout", proc.stdout), ("stderr", proc.stderr)):
+                if owned is not None:
+                    try:
+                        owned.close()
+                    except BaseException as exc:
+                        close_failures.append((label, type(exc).__name__, str(exc)))
+            if close_failures and primary is None:
+                raise ValueError("Git owned capture close", close_failures)
+            if close_failures and primary is not None:
+                primary.h039_git_capture_close_failures = close_failures
+    def object_raw(kind: str, oid: str, limit: int) -> bytes:
+        if h039_asset_draft_git_records("type", run("type", [oid], limit=16), "") != kind:
+            raise ValueError("Git object kind disagreement")
+        size = h039_asset_draft_git_records("size", run("size", [oid], limit=32), "")
+        if size > limit:
+            raise ValueError("Git object capture bound")
+        raw = run(kind, [oid], limit=limit)
+        if len(raw) != size:
+            raise ValueError("Git object size disagreement")
+        h039_asset_draft_git_records(kind, raw, oid)
+        return raw
+    try:
+        tool_raw = h039_asset_draft_retained_read(tool["prefix"][0], tool["tool_sha256"], tool["tool_size"], True)
+        if (len(tool_raw) != tool["tool_size"] or tool_raw[:8] != bytes.fromhex("cafebabe00000002")
+                or [_asset_struct.unpack_from(">5I", tool_raw, off) for off in (8, 28)] != [
+                    (16777223, 3, 16384, 3867856, 14), (16777228, 0, 3899392, 3704880, 14)]):
+            raise ValueError("fixed direct CLT Git architecture")
+        fd = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_CLOEXEC)
+        descriptors.append(fd)
+        for component in root.split("/")[1:]:
+            fd, unused = open_member(fd, component, True)
+        root_fd = fd
+        if not _asset_stat.S_ISDIR(_asset_os.stat(".git", dir_fd=root_fd, follow_symlinks=False).st_mode):
+            raise ValueError("RIG_UNSUPPORTED_NON_STANDALONE_CHECKOUT")
+        git_fd, unused = open_member(root_fd, ".git", True)
+        config_fd, config = open_member(git_fd, "config", False, 1048576)
+        config_snapshot = (config_fd, config)
+        head_fd, head_before = open_member(git_fd, "HEAD", False, 4096)
+        head_snapshot = (head_fd, head_before)
+        index_fd, index_before = open_member(git_fd, "index", False, 4194304)
+        index_snapshot = (index_fd, index_before)
+        for name in ("commondir", "config.worktree", "shallow"):
+            absent_member(git_fd, name)
+        info_fd, unused = open_member(git_fd, "info", True)
+        for name in ("grafts", "attributes"):
+            absent_member(info_fd, name)
+        object_fd, unused = open_member(git_fd, "objects", True)
+        object_info_fd, unused = open_member(object_fd, "info", True)
+        for name in ("alternates", "http-alternates"):
+            absent_member(object_info_fd, name)
+        refs_fd, unused = open_member(git_fd, "refs", True)
+        absent_member(refs_fd, "replace")
+        attribute_parents = {""}
+        for path in selected_paths:
+            pieces = path.split("/")[:-1]
+            attribute_parents.update("/".join(pieces[:i]) for i in range(1, len(pieces) + 1))
+        for parent in sorted(attribute_parents):
+            current = root_fd
+            for component in parent.split("/") if parent else []:
+                current, unused = open_member(current, component, True)
+            absent_member(current, ".gitattributes")
+        prestate_complete = True
+        if not h039_asset_draft_git_config_exact(run("config", [], config, 1048576)):
+            raise ValueError("Git safe config rejected before repository commands")
+        if h039_asset_draft_git_records("head", run("head", [], limit=64), "") != candidate:
+            raise ValueError("Git candidate is not observed HEAD")
+        commits, maps = {}, {}
+        for commit in dict.fromkeys((base, contract, candidate)):
+            commits[commit] = h039_asset_draft_git_records("commit", object_raw("commit", commit, 65536), commit)
+            pending = [("", commits[commit]["tree"], 0)]; complete = {}; tree_count = 0
+            while pending:
+                prefix, tree_oid, depth = pending.pop(); tree_count += 1
+                if tree_count > 8192 or depth > 128:
+                    raise ValueError("Git tree traversal capture bound")
+                rows = h039_asset_draft_git_records("tree", object_raw("tree", tree_oid, 4194304), tree_oid)
+                for mode, name, member in rows:
+                    relative = prefix + name
+                    if mode == "40000":
+                        pending.append((relative + "/", member, depth + 1))
+                    else:
+                        if relative in complete or len(complete) >= 8192:
+                            raise ValueError("Git full tree membership bound")
+                        complete[relative] = (mode, member)
+            listing = h039_asset_draft_git_records("listing", run("listing", [commit]), "")
+            if listing != complete:
+                raise ValueError("Git listing versus raw recursive tree")
+            maps[commit] = complete
+        # Attribute selection becomes eligible only after both recursive tree
+        # object closures and complete listings have been authenticated.
+        for parent in sorted(attribute_parents):
+            name = (parent + "/" if parent else "") + ".gitattributes"
+            if any(name in mapping for mapping in maps.values()):
+                raise ValueError("Git unreviewed committed attributes")
+        if commits[contract]["parents"] != [base]:
+            raise ValueError("Git contract direct parent")
+        if candidate != contract and commits[candidate]["parents"] != [contract]:
+            raise ValueError("Git product direct parent")
+        relations = {}
+        for edge, left, right, expected_paths in edges:
+            authenticated_attribute_source = right
+            diff = h039_asset_draft_git_records("rawdiff", run("rawdiff", [left, right]), "")
+            actual_changed = sorted(path for path in set(maps[left]) | set(maps[right])
+                                    if maps[left].get(path) != maps[right].get(path))
+            if sorted(diff) != actual_changed or actual_changed != sorted(expected_paths):
+                raise ValueError("Git complete diff surface", edge)
+            for path, row in diff.items():
+                if (row[4] != "M" or row[:2] != (maps[left][path][0], maps[right][path][0])
+                        or row[2:4] != (maps[left][path][1], maps[right][path][1])
+                        or row[0] != row[1]):
+                    raise ValueError("Git raw diff/tree disagreement", edge)
+            numstat = h039_asset_draft_git_records("numstat", run("numstat", [left, right]), "")
+            if set(numstat) != set(diff) or any(
+                    (counts == (None, None)) != (path == "controller/runtime-cleanup/install")
+                    for path, counts in numstat.items()):
+                raise ValueError("Git actual numstat membership/type", edge)
+            if edge == "product" and numstat != _LOCAL_REFERENCE_NUMSTAT:
+                raise ValueError("Git measured reference numstat", numstat)
+            relations[edge] = {"base": left, "candidate": right, "rawdiff": diff,
+                               "observed_git_numstat": numstat}
+        # Opaque unchanged gate/spec blobs may exceed 1 MiB; their modes/OIDs
+        # are already complete. Read only four small material blobs per tree.
+        material = {}
+        for commit, mapping in maps.items():
+            material[commit] = {}
+            for path in product_paths:
+                mode, oid = mapping[path]
+                material[commit][path] = (mode, object_raw("blob", oid, 1048576))
+        # Bind the actual candidate, not only Git's index or skip-worktree view.
+        disk, directories = {}, {"": root_fd}
+        for path, (mode, oid) in sorted(maps[candidate].items()):
+            parts = path.split("/")
+            parent_name = ""
+            for name in parts[:-1]:
+                relative = parent_name + ("/" if parent_name else "") + name
+                if relative not in directories:
+                    directories[relative], unused = open_member(directories[parent_name], name, True)
+                parent_name = relative
+            child, raw = open_member(directories[parent_name], parts[-1], False, 4194304, mode)
+            if h039_local_blob(raw) != oid:
+                raise ValueError("Git candidate disk/object mismatch", path)
+            disk[path] = raw
+            disk_snapshots.append((path, (child, raw)))
+        expected_index = b"".join(f"{mode} {oid} 0\t{path}\0".encode()
+                                  for path, (mode, oid) in sorted(maps[candidate].items()))
+        if run("index", []) != expected_index:
+            raise ValueError("Git candidate index/object mismatch")
+        if run("status", []):
+            raise ValueError("Git candidate is not clean")
+        if h039_asset_draft_git_records("head", run("head", [], limit=64), "") != candidate:
+            raise ValueError("Git HEAD changed")
+        return {"status": "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT",
+                "base": base, "candidate": candidate, "contract": contract, "commits": commits,
+                "trees": maps, "relations": relations, "material": material, "disk": disk}
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        postauth_failures, unobserved, close_failures = [], [], []
+        try:
+            if not prestate_complete:
+                unobserved.append("remaining_prestate_bindings")
+            for label, snapshot in ([("config_bytes", config_snapshot), ("head_bytes", head_snapshot),
+                                     ("index_bytes", index_snapshot)] + disk_snapshots):
+                if snapshot is None:
+                    unobserved.append(label)
+                    continue
+                child, expected_bytes = snapshot
+                try:
+                    if _asset_os.pread(child, len(expected_bytes) + 1, 0) != expected_bytes:
+                        raise ValueError("Git metadata bytes changed")
+                except BaseException as exc:
+                    postauth_failures.append((label, type(exc).__name__, str(exc)))
+            for parent, name, child, expected in retained:
+                try:
+                    if identity(_asset_os.fstat(child)) != expected:
+                        raise ValueError("Git retained FD changed")
+                except BaseException as exc:
+                    postauth_failures.append(("fd:" + name, type(exc).__name__, str(exc)))
+                try:
+                    if identity(_asset_os.stat(name, dir_fd=parent, follow_symlinks=False)) != expected:
+                        raise ValueError("Git retained name changed")
+                except BaseException as exc:
+                    postauth_failures.append(("name:" + name, type(exc).__name__, str(exc)))
+            for parent, name in absent:
+                try:
+                    _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                except BaseException as exc:
+                    postauth_failures.append(("absence:" + name, type(exc).__name__, str(exc)))
+                else:
+                    postauth_failures.append(("absence:" + name, "ValueError", "Git forbidden input appeared"))
+            if tool_raw is None:
+                unobserved.append("tool_bytes")
+            else:
+                try:
+                    if h039_asset_draft_retained_read(tool["prefix"][0], tool["tool_sha256"], tool["tool_size"], True) != tool_raw:
+                        raise ValueError("Git direct tool changed")
+                except BaseException as exc:
+                    postauth_failures.append(("tool_bytes", type(exc).__name__, str(exc)))
+        except BaseException as exc:
+            postauth_failures.append(("postauth_internal", type(exc).__name__, str(exc)))
+        finally:
+            try:
+                close_failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+            except BaseException as exc:
+                close_failures.append(("close_internal", type(exc).__name__, str(exc)))
+        postauth = {"failures": postauth_failures, "unobserved": unobserved,
+                    "acquired_bindings_unchanged": not postauth_failures,
+                    "state": "UNKNOWN_OR_CHANGED" if primary is not None or postauth_failures
+                    or unobserved or close_failures else "ACQUIRED_BINDINGS_UNCHANGED"}
+        if primary is not None:
+            primary.h039_git_postauth = postauth
+            primary.h039_git_close_failures = close_failures
+        elif postauth_failures or unobserved or close_failures:
+            raise ValueError("Git final postauthentication or close failed", postauth, close_failures)
+
+
+def h039_asset_draft_retained_read(path: str, expected_sha256: str,
+                                 maximum_bytes: int, root_owned: bool) -> bytes:
+    """Dormant retained-ancestor, nofollow bounded reader; never executable loading.
+
+    Path/digest/bound originate in the reviewed gate, not an untrusted manifest.
+    No caller can reach this through current argv dispatch. All opened FDs close.
+    This read primitive alone does not authenticate a compiler's later pathname IO.
+    """
+    if (type(path) is not str or not path.startswith("/") or "\0" in path
+            or any(part in {"", ".", ".."} for part in path.split("/")[1:])
+            or type(expected_sha256) is not str or len(expected_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in expected_sha256)
+            or type(maximum_bytes) is not int or not 0 < maximum_bytes <= 536870912
+            or type(root_owned) is not bool):
+        raise ValueError("retained read authority shape")
+    descriptors, bindings = [], []
+    try:
+        current = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_CLOEXEC)
+        descriptors.append(current)
+        root_stat = _asset_os.fstat(current)
+        if root_stat.st_uid != 0 or root_stat.st_mode & 0o022:
+            raise ValueError("root ancestor authority")
+        if root_owned:
+            h039_asset_draft_acl_empty(current)
+        components = path.split("/")[1:]
+        for index, name in enumerate(components):
+            final = index == len(components) - 1
+            flags = _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK
+            if not final:
+                flags |= _asset_os.O_DIRECTORY
+            child = _asset_os.open(name, flags, dir_fd=current)
+            descriptors.append(child)
+            observed = _asset_os.fstat(child)
+            identity = (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_uid,
+                        observed.st_gid, observed.st_nlink, observed.st_size, observed.st_flags,
+                        observed.st_mtime_ns, observed.st_ctime_ns)
+            if root_owned and (observed.st_uid != 0 or observed.st_mode & 0o022):
+                raise ValueError("non-root-writable tool ancestry")
+            if root_owned:
+                h039_asset_draft_acl_empty(child)
+            if final and (not _asset_stat.S_ISREG(observed.st_mode) or observed.st_nlink != 1
+                          or not 0 <= observed.st_size <= maximum_bytes):
+                raise ValueError("retained regular leaf bound")
+            if not final and not _asset_stat.S_ISDIR(observed.st_mode):
+                raise ValueError("retained ancestor type")
+            bindings.append((current, name, child, identity))
+            current = child
+        chunks, offset = [], 0
+        while offset < bindings[-1][3][6]:
+            h039_local_cancel_check("retained_read")
+            chunk = _asset_os.pread(current, min(1048576, bindings[-1][3][6] - offset), offset)
+            if not chunk:
+                raise ValueError("retained short read")
+            chunks.append(chunk)
+            offset += len(chunk)
+        if _asset_os.pread(current, 1, offset):
+            raise ValueError("retained leaf grew")
+        raw = b"".join(chunks)
+        if _asset_hashlib.sha256(raw).hexdigest() != expected_sha256:
+            raise ValueError("retained source digest")
+        for parent, name, child, identity in bindings:
+            if root_owned:
+                h039_asset_draft_acl_empty(child)
+            for observed in [_asset_os.fstat(child), _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)]:
+                if (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_uid,
+                    observed.st_gid, observed.st_nlink, observed.st_size, observed.st_flags,
+                    observed.st_mtime_ns, observed.st_ctime_ns) != identity:
+                    raise ValueError("retained final identity/name rebind")
+        return raw
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+        if failures and primary is None:
+            raise ValueError("retained close failure", failures)
+        if failures and primary is not None:
+            primary.h039_close_failures = failures
+
+
+def h039_asset_draft_close_owned(descriptors: list, closer: object) -> list:
+    """Attempt each owned close once; ambiguous close is never retried."""
+    if (type(descriptors) is not list or len(set(descriptors)) != len(descriptors)
+            or any(type(fd) is not int or fd < 0 for fd in descriptors)):
+        raise ValueError("owned descriptor list")
+    failures = []
+    for descriptor in descriptors:
+        try:
+            closer(descriptor)
+        except BaseException as exc:
+            failures.append((descriptor, type(exc).__name__, str(exc)))
+    return failures
+
+
+def h039_asset_draft_acl_empty(descriptor: int) -> None:
+    """Dormant Darwin ACL metadata query, not candidate loading.
+
+    Small retained-FD ACL arm derived from the published gate and SDK sys/acl.h.
+    UID/mode alone never claims write exclusion; any extended ACL fails closed.
+    """
+    import ctypes
+    import errno
+    if type(descriptor) is not int or descriptor < 0:
+        raise ValueError("ACL descriptor")
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.acl_get_fd_np.argtypes = [ctypes.c_int, ctypes.c_int]
+    libc.acl_get_fd_np.restype = ctypes.c_void_p
+    libc.acl_free.argtypes = [ctypes.c_void_p]
+    libc.acl_free.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    acl = libc.acl_get_fd_np(descriptor, 0x100)
+    if not acl:
+        if ctypes.get_errno() == errno.ENOENT:
+            return
+        raise ValueError("ACL acquisition error", ctypes.get_errno())
+    # Policy is absence of an ACL object, not acceptance of present-empty ACLs.
+    # No undocumented acl_get_entry return convention is used.
+    released = libc.acl_free(acl)
+    raise ValueError("ACL object present or unexpected", "released" if released == 0 else "release failed")
+
+def h039_asset_draft_git_config_exact(raw: bytes) -> bool:
+    """Strict output of pinned Git config --no-includes --file -; no config IO."""
+    if type(raw) is not bytes or not raw or len(raw) > 1048576 or not raw.endswith(b"\0"):
+        return False
+    try:
+        values = {}
+        for row in raw[:-1].split(b"\0"):
+            key, sep, value = row.partition(b"\n")
+            key, value = key.decode("ascii").lower(), value.decode("utf-8")
+            if not sep or not key or key in values or "\n" in value or "\r" in value:
+                return False
+            values[key] = value
+        required = {"core.repositoryformatversion": "0", "core.filemode": "true",
+                    "core.bare": "false", "core.logallrefupdates": "true",
+                    "core.ignorecase": "true", "core.precomposeunicode": "true",
+                    "remote.origin.url": "git@github.com:Nortropic/nortropic-system.git",
+                    "remote.origin.fetch": "+refs/heads/*:refs/remotes/origin/*"}
+        if any(values.get(key) != value for key, value in required.items()):
+            return False
+        for key, value in values.items():
+            if key in required:
+                continue
+            if key in ("user.name", "user.email") and 0 < len(value) <= 256:
+                continue
+            if not key.startswith("branch.") or "." not in key[7:]:
+                return False
+            branch, field = key[7:].rsplit(".", 1)
+            if (not branch or any(c.isspace() or c in "\0\\" for c in branch)
+                    or field not in ("remote", "merge", "vscode-merge-base")):
+                return False
+            if ((field == "remote" and value != "origin")
+                    or (field == "vscode-merge-base" and value != "origin/main")
+                    or (field == "merge" and (not value.startswith("refs/heads/")
+                        or len(value) == 11 or any(c.isspace() for c in value)))):
+                return False
+        return True
+    except (UnicodeError, ValueError):
+        return False
+
+
+def h039_asset_draft_git_records(kind: str, raw: bytes, oid: str) -> object:
+    """Closed wire formats; parsed models alone never authenticate real Git state."""
+    if type(raw) is not bytes or type(kind) is not str:
+        raise ValueError("Git record input")
+    def hexoid(value: str) -> bool:
+        return len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+    def path(value: bytes) -> str:
+        decoded = value.decode("utf-8", "strict")
+        if (not decoded or decoded.startswith("/") or "\0" in decoded
+                or any(part in ("", ".", "..") for part in decoded.split("/"))):
+            raise ValueError("Git path")
+        return decoded
+    if kind in ("commit", "tree", "blob"):
+        if type(oid) is not str or not hexoid(oid):
+            raise ValueError("Git object OID")
+        digest = _asset_hashlib.sha1(kind.encode("ascii") + b" " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+        if digest != oid:
+            raise ValueError("Git object hash")
+    if kind == "blob":
+        return raw
+    if kind == "head":
+        if not raw.endswith(b"\n") or not hexoid(raw[:-1].decode("ascii")):
+            raise ValueError("Git HEAD OID")
+        return raw[:-1].decode("ascii")
+    if kind == "type":
+        if raw not in (b"commit\n", b"tree\n", b"blob\n"):
+            raise ValueError("Git object type")
+        return raw[:-1].decode("ascii")
+    if kind == "size":
+        if not raw.endswith(b"\n") or not raw[:-1].isdigit() or str(int(raw[:-1])).encode() != raw[:-1]:
+            raise ValueError("Git object size")
+        return int(raw[:-1])
+    if kind == "commit":
+        header, separator, message = raw.partition(b"\n\n")
+        if not separator or b"\0" in header or b"\r" in header:
+            raise ValueError("Git commit header")
+        lines = header.split(b"\n")
+        trees = [line[5:].decode("ascii") for line in lines if line.startswith(b"tree ")]
+        parents = [line[7:].decode("ascii") for line in lines if line.startswith(b"parent ")]
+        if (len(trees) != 1 or lines[0] != b"tree " + trees[0].encode()
+                or not hexoid(trees[0]) or any(not hexoid(parent) for parent in parents)
+                or len(set(parents)) != len(parents)
+                or lines[1:1 + len(parents)] != [b"parent " + parent.encode() for parent in parents]
+                or len(lines) < len(parents) + 3
+                or not lines[len(parents) + 1].startswith(b"author ")
+                or not lines[len(parents) + 2].startswith(b"committer ")
+                or sum(line.startswith(b"author ") for line in lines) != 1
+                or sum(line.startswith(b"committer ") for line in lines) != 1):
+            raise ValueError("Git commit fields")
+        optional, continuation = set(), False
+        for line in lines[len(parents) + 3:]:
+            if line.startswith(b" ") and continuation:
+                continue
+            key, sep, value = line.partition(b" ")
+            if (not sep or not value or key not in (b"encoding", b"gpgsig", b"gpgsig-sha256", b"mergetag")
+                    or key in optional):
+                raise ValueError("Git commit optional header")
+            optional.add(key)
+            continuation = key != b"encoding"
+        return {"tree": trees[0], "parents": parents}
+    if kind == "tree":
+        cursor, rows, seen, order = 0, [], set(), []
+        while cursor < len(raw):
+            end = raw.find(b"\0", cursor)
+            if end < 0 or end + 21 > len(raw):
+                raise ValueError("Git tree framing")
+            mode, sep, name = raw[cursor:end].partition(b" ")
+            if not sep or mode not in (b"40000", b"100644", b"100755") or b"/" in name:
+                raise ValueError("Git tree entry")
+            label = path(name)
+            if label in seen:
+                raise ValueError("Git tree duplicate")
+            seen.add(label)
+            member = raw[end + 1:end + 21].hex()
+            if member == "0" * 40:
+                raise ValueError("Git tree null object")
+            rows.append((mode.decode(), label, member))
+            order.append(name + (b"/" if mode == b"40000" else b""))
+            cursor = end + 21
+        if order != sorted(order):
+            raise ValueError("Git tree ordering")
+        return rows
+    if kind not in ("listing", "rawdiff", "numstat"):
+        raise ValueError("Git record kind")
+    if raw and not raw.endswith(b"\0"):
+        raise ValueError("Git NUL framing")
+    parts = raw[:-1].split(b"\0") if raw else []
+    rows = {}
+    if kind == "rawdiff":
+        if len(parts) % 2:
+            raise ValueError("Git rawdiff framing")
+        for meta, name in zip(parts[::2], parts[1::2]):
+            fields = meta.split(b" ")
+            if len(fields) != 5 or not fields[0].startswith(b":"):
+                raise ValueError("Git rawdiff metadata")
+            oldmode, newmode = fields[0][1:].decode("ascii"), fields[1].decode("ascii")
+            oldoid, newoid, status = (value.decode("ascii") for value in fields[2:])
+            if (oldmode not in ("000000", "100644", "100755")
+                    or newmode not in ("000000", "100644", "100755")
+                    or not hexoid(oldoid) or not hexoid(newoid) or status not in ("A", "D", "M")
+                    or (oldmode == "000000") != (oldoid == "0" * 40)
+                    or (newmode == "000000") != (newoid == "0" * 40)
+                    or (status == "A" and (oldmode != "000000" or newmode == "000000"))
+                    or (status == "D" and (newmode != "000000" or oldmode == "000000"))
+                    or (status == "M" and "000000" in (oldmode, newmode))):
+                raise ValueError("Git rawdiff fields")
+            label = path(name)
+            if label in rows:
+                raise ValueError("Git duplicate path")
+            rows[label] = (oldmode, newmode, oldoid, newoid, status)
+    else:
+        for row in parts:
+            fields = row.split(b"\t", 2 if kind == "numstat" else 1)
+            if len(fields) != (3 if kind == "numstat" else 2):
+                raise ValueError("Git row fields")
+            label = path(fields[-1])
+            if label in rows:
+                raise ValueError("Git duplicate path")
+            if kind == "listing":
+                meta = fields[0].split(b" ")
+                if (len(meta) != 3 or meta[0] not in (b"100644", b"100755")
+                        or meta[1] != b"blob" or not hexoid(meta[2].decode("ascii"))):
+                    raise ValueError("Git listing fields")
+                rows[label] = (meta[0].decode(), meta[2].decode())
+            else:
+                counts = fields[:2]
+                if counts == [b"-", b"-"]:
+                    rows[label] = (None, None)
+                elif any(not value.isdigit() or str(int(value)).encode() != value for value in counts):
+                    raise ValueError("Git numstat counts")
+                else:
+                    rows[label] = tuple(int(value) for value in counts)
+    return rows
+
+# Every invocation terminates here; the historical R33 imports below are data.
+# Gate-owned byte-exact adapter input, not Python code or a native load.
+_LOCAL_ADAPTER_SOURCE = (
+    b'/* Compile-only candidate. NOT approved for loading or runtime use.\n'
+    b' * Returns query facts, never an end-to-end listener/lifecycle verdict.\n'
+    b' * Loader/image provenance and Unix sun_len policy remain release blockers.\n'
+    b' */\n'
+    b'#define PY_SSIZE_T_CLEAN\n'
+    b'#include <Python.h>\n'
+    b'#include <errno.h>\n'
+    b'#include <fcntl.h>\n'
+    b'#include <limits.h>\n'
+    b'#include <stddef.h>\n'
+    b'#include <stdint.h>\n'
+    b'#include <string.h>\n'
+    b'#include <sys/socket.h>\n'
+    b'#include <sys/stat.h>\n'
+    b'#include <sys/un.h>\n'
+    b'#include <sys/proc_info.h>\n'
+    b'#include <libproc.h>\n'
+    b'#include <unistd.h>\n'
+    b'\n'
+    b'_Static_assert(PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 9 &&\n'
+    b'               PY_MICRO_VERSION == 6, "exact CPython header version");\n'
+    b'_Static_assert(sizeof(int) == 4 && sizeof(short) == 2 && sizeof(void *) == 8,\n'
+    b'               "candidate data model");\n'
+    b'_Static_assert(sizeof(struct socket_fdinfo) <= INT_MAX, "signed buffer size");\n'
+    b'_Static_assert(_Generic(((struct socket_info *)0)->soi_options,\n'
+    b'                        short: 1, default: 0), "signed short options");\n'
+    b'_Static_assert(PROC_PIDFDSOCKETINFO == 3 && SOCKINFO_UN == 3 &&\n'
+    b'               AF_UNIX == 1 && SOCK_STREAM == 1 && SO_ACCEPTCONN == 2,\n'
+    b'               "fixed SDK constants");\n'
+    b'\n'
+    b'/* Numeric compiler layout evidence; read from LLVM/Mach-O, never executed.\n'
+    b' * Ordered field names are defined in abi-manifest.json. Full union retained.\n'
+    b' */\n'
+    b'__attribute__((used, visibility("default"), section("__DATA,__h039abi")))\n'
+    b'const uint64_t H039_ABI_VALUES[] = {\n'
+    b'    sizeof(struct socket_fdinfo), _Alignof(struct socket_fdinfo),\n'
+    b'    sizeof(struct proc_fileinfo), _Alignof(struct proc_fileinfo),\n'
+    b'    sizeof(struct socket_info), _Alignof(struct socket_info),\n'
+    b'    sizeof(struct vinfo_stat), _Alignof(struct vinfo_stat),\n'
+    b'    sizeof(struct un_sockinfo), _Alignof(struct un_sockinfo),\n'
+    b'    sizeof(struct sockaddr_un), _Alignof(struct sockaddr_un),\n'
+    b'    offsetof(struct socket_fdinfo, psi),\n'
+    b'    offsetof(struct socket_info, soi_family),\n'
+    b'    offsetof(struct socket_info, soi_type),\n'
+    b'    offsetof(struct socket_info, soi_kind),\n'
+    b'    offsetof(struct socket_info, soi_options),\n'
+    b'    offsetof(struct socket_info, soi_proto),\n'
+    b'    sizeof(((struct socket_info *)0)->soi_proto),\n'
+    b'    offsetof(struct un_sockinfo, unsi_addr),\n'
+    b'    sizeof(((struct un_sockinfo *)0)->unsi_addr),\n'
+    b'    offsetof(struct sockaddr_un, sun_len),\n'
+    b'    offsetof(struct sockaddr_un, sun_family),\n'
+    b'    offsetof(struct sockaddr_un, sun_path),\n'
+    b'    sizeof(((struct sockaddr_un *)0)->sun_path),\n'
+    b'    sizeof(((struct socket_info *)0)->soi_options),\n'
+    b'    sizeof(((struct vinfo_stat *)0)->vst_dev),\n'
+    b'    sizeof(((struct socket_info *)0)->soi_family),\n'
+    b'    sizeof(((struct socket_info *)0)->soi_type),\n'
+    b'    sizeof(((struct socket_info *)0)->soi_kind),\n'
+    b'    sizeof(((struct sockaddr_un *)0)->sun_len),\n'
+    b'    sizeof(((struct sockaddr_un *)0)->sun_family)\n'
+    b'};\n'
+    b'\n'
+    b'static int same_identity(const struct stat *a, const struct stat *b) {\n'
+    b'    return a->st_dev == b->st_dev && a->st_ino == b->st_ino &&\n'
+    b'           a->st_mode == b->st_mode && a->st_uid == b->st_uid &&\n'
+    b'           a->st_gid == b->st_gid && a->st_nlink == b->st_nlink &&\n'
+    b'           a->st_size == b->st_size && a->st_flags == b->st_flags;\n'
+    b'}\n'
+    b'\n'
+    b'static PyObject *refuse(const char *reason) {\n'
+    b'    PyErr_SetString(PyExc_ValueError, reason);\n'
+    b'    return NULL;\n'
+    b'}\n'
+    b'\n'
+    b'static PyObject *query_received_listener(PyObject *self, PyObject *arg) {\n'
+    b'    (void)self;\n'
+    b'    /* Provenance comes from the frozen consumer, not the integer type. */\n'
+    b'    if (!PyLong_CheckExact(arg)) return refuse("exact internal FD integer required");\n'
+    b'    long value = PyLong_AsLong(arg);\n'
+    b'    if (PyErr_Occurred()) return NULL;\n'
+    b'    if (value < 3 || value > INT_MAX) return refuse("internal FD range");\n'
+    b'    const int fd = (int)value;\n'
+    b'    struct stat before, after;\n'
+    b'    if (fstat(fd, &before) != 0) return PyErr_SetFromErrno(PyExc_OSError);\n'
+    b'    int df = fcntl(fd, F_GETFD), fl = fcntl(fd, F_GETFL);\n'
+    b'    if (df < 0 || fl < 0) return PyErr_SetFromErrno(PyExc_OSError);\n'
+    b'    if (!S_ISSOCK(before.st_mode) || !(df & FD_CLOEXEC) ||\n'
+    b'        (fl & O_ACCMODE) != O_RDWR) return refuse("listener FD precondition");\n'
+    b'\n'
+    b'    struct socket_fdinfo info;\n'
+    b'    memset(&info, 0, sizeof info);\n'
+    b'    const pid_t pid = getpid();\n'
+    b'    if (pid <= 0 || (int64_t)pid > INT_MAX) return refuse("self PID range");\n'
+    b'    /* Type checked assignment; no dynamic symbol lookup or PID/flavor input. */\n'
+    b'    int (*const query)(int, int, int, void *, int) = proc_pidfdinfo;\n'
+    b'    errno = 0;\n'
+    b'    const int got = query((int)pid, fd, PROC_PIDFDSOCKETINFO, &info, (int)sizeof info);\n'
+    b'    const int saved_errno = errno;\n'
+    b'    if (got != (int)sizeof info) {\n'
+    b'        PyErr_Format(PyExc_ValueError, "proc_pidfdinfo size refusal: return=%d errno=%d",\n'
+    b'                     got, saved_errno);\n'
+    b'        return NULL;\n'
+    b'    }\n'
+    b'    if (info.psi.soi_family != AF_UNIX || info.psi.soi_type != SOCK_STREAM ||\n'
+    b'        info.psi.soi_kind != SOCKINFO_UN ||\n'
+    b'        !(info.psi.soi_options & SO_ACCEPTCONN)) return refuse("listener query semantics");\n'
+    b'    const struct sockaddr_un *address = &info.psi.soi_proto.pri_un.unsi_addr.ua_sun;\n'
+    b'    if (address->sun_family != AF_UNIX) return refuse("Unix address family");\n'
+    b'    const char *nul = memchr(address->sun_path, 0, sizeof address->sun_path);\n'
+    b'    if (!nul) return refuse("unterminated bounded Unix address");\n'
+    b'    const Py_ssize_t path_size = (Py_ssize_t)(nul - address->sun_path);\n'
+    b'    /* sun_len is observed only. Its exact kernel convention is NOT approved.\n'
+    b'     * The consumer must reject release until it has its independent exact\n'
+    b'     * length/path/getsockname policy; prefix extraction is not path acceptance.\n'
+    b'     */\n'
+    b'    if (fstat(fd, &after) != 0) return PyErr_SetFromErrno(PyExc_OSError);\n'
+    b'    const int df_after = fcntl(fd, F_GETFD), fl_after = fcntl(fd, F_GETFL);\n'
+    b'    if (df_after < 0 || fl_after < 0) return PyErr_SetFromErrno(PyExc_OSError);\n'
+    b'    if (!same_identity(&before, &after) || df != df_after || fl != fl_after)\n'
+    b'        return refuse("listener identity or flags changed");\n'
+    b'\n'
+    b'    /* No GIL release, callbacks, close, dup, setter, path open or retry above.\n'
+    b'     * No opaque kernel addresses, native stat device or unused padding emitted.\n'
+    b'     */\n'
+    b'    return Py_BuildValue("(siiiiiiiiiy#s)", "proc_pidfdinfo-v1", (int)pid, fd,\n'
+    b'                         got, saved_errno, info.psi.soi_family, info.psi.soi_type,\n'
+    b'                         info.psi.soi_kind, (int)info.psi.soi_options,\n'
+    b'                         (int)address->sun_len, address->sun_path, path_size,\n'
+    b'                         "UNVALIDATED_ADDRESS_AND_IMAGE");\n'
+    b'}\n'
+    b'\n'
+    b'static PyMethodDef methods[] = {\n'
+    b'    {"query_received_listener", query_received_listener, METH_O,\n'
+    b'     "Internal capability query; not an integrated verdict or public API."},\n'
+    b'    {NULL, NULL, 0, NULL}\n'
+    b'};\n'
+    b'static struct PyModuleDef module = {\n'
+    b'    PyModuleDef_HEAD_INIT, "_h039_listener_v1",\n'
+    b'    "Compile-only unapproved native candidate", -1, methods,\n'
+    b'    NULL, NULL, NULL, NULL\n'
+    b'};\n'
+    b'PyMODINIT_FUNC PyInit__h039_listener_v1(void) {\n'
+    b'    /* No query or external effect at initialization; loading still forbidden. */\n'
+    b'    return PyModule_Create(&module);\n'
+    b'}\n'
+)
+
+
+# Six build envelope/lifecycle helpers copied byte-exact from B aa9f5147.
+def h039_asset_draft_compiler_envelope() -> dict:
+    """Inspectable restricted-driver contract data; does not launch anything.
+
+    Profile derives the existing published build-review envelope while replacing
+    broad tool-directory exec/touch admission with exactly three fixed tools.
+    Root is controller-created and authenticated, never caller selected.
+    """
+    profile = '''(version 1)
+(deny default)
+(allow process-fork)
+(allow process-exec
+    (literal "/Library/Developer/CommandLineTools/usr/bin/clang")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/ld"))
+(allow sysctl-read (sysctl-name-prefix "hw."))
+(allow file-read* (literal "/Library") (literal "/Library/Developer"))
+(allow file-read-metadata
+    (literal "/") (literal "/dev/null") (literal "/private") (literal "/private/tmp")
+    (subpath (param "H039_BUILD_ROOT"))
+    (subpath "/Library/Developer/CommandLineTools")
+    (subpath "/System/Library") (subpath "/usr/lib") (subpath "/private/var/db/dyld"))
+(allow file-read-data (literal "/") (literal "/dev/null")
+    (subpath (param "H039_BUILD_ROOT"))
+    (subpath "/Library/Developer/CommandLineTools")
+    (subpath "/System/Library") (subpath "/usr/lib") (subpath "/private/var/db/dyld"))
+(allow file-write* (subpath (param "H039_BUILD_ROOT")))
+'''
+    return {"status": "DORMANT_MEASUREMENT_DRIVER_REQUIRES_TWO_EXACT_REVIEWS_AND_PREFLIGHT",
+            "profile": profile,
+            "root_binding": "EXCLUSIVELY_CREATED_GATE_PRIVATE_PARENT_TWO_NONALIASED_BUILD_A_B_DIRFDS_NO_CALLER_PATH",
+            "input_binding": "NOFOLLOW_SINGLE_LINK_STABLE_FD_HASH_AND_NAME_REBIND_BEFORE_AND_AFTER_BUILD",
+            "graph_binding": "AUTHENTICATED_PUBLISHED_CONTRACT_AND_PRODUCT_DIRECT_CHILD_FULL_RAW_TREE_MAP_MODES_AND_FOUR_PATH_DIFF",
+            "header_sets": [
+                ["/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include", 3664,
+                 "9af988fd6db7f7b7c96feeac0c36d3b437bc6cb9f8e8481df08a74cb267c48b1"],
+                ["/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/lib", 1116,
+                 "08117fe71bc5a7cc24fe93fc4289bb2a03dd58b79fe70db76f6e2fad54715843"],
+                ["/Library/Developer/CommandLineTools/usr/lib/clang/21/include", 309,
+                 "401608621da8b304ddc9c926b7641c454077d1d7fc39f593cf76194dbee9a54f"],
+                ["/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Headers", 158,
+                 "d0c627578e17a3955eaeb9794dbc831fa812a82a1d4f452342798d183e66d747"]],
+            "header_inventory_authority": "HISTORICAL_INVENTORY_PINS_REQUIRE_EXACT_RECONSTRUCTION_ALGORITHM_AND_FRESH_FD_AUTHENTICATION",
+            "private_link_dependencies": ["libtapi.dylib", "libcodedirectory.dylib", "libLTO.dylib", "libswiftDemangle.dylib"],
+            "system_loader_trust": "PUBLISHED_FIXED_BUILD_TOOL_OS_LIBRARY_ENVELOPE_ONLY_NOT_ADAPTER_LOADED_IMAGE_PROOF",
+            "command_binding": "EXACT_RECIPE_ARRAY_NO_SHELL_OR_AMBIENT_FLAGS_FINITE_REPLACEMENT_ENV_NO_EXTRA_COMMAND",
+            "output_binding": "EXACT_NAMED_REGULAR_SINGLE_LINK_OUTPUTS_EXCLUSIVE_CAPTURE_NO_PREEXISTING_OUTPUT_OR_FOREIGN_TEMP",
+            "failure": "NON_SUCCESS_PRESERVE_NO_AUTOMATIC_RETRY_OR_CLEANUP",
+            "measurement_limits": {"command_seconds": 300, "capture_bytes": 4194304,
+                                   "child_regular_file_bytes": 67108864,
+                                   "minimum_free_bytes": 21474836480},
+            "required_uncompleted_proofs": [
+                "TWO_INDEPENDENT_EXACT_MEASUREMENT_DRIVER_PRECOMPILE_REVIEWS",
+                "ACL_ABSENCE_AND_INVENTORY_ALGORITHM_POSITIVE_PREFLIGHT",
+                "FINITE_TOOLCHAIN_DENYDEFAULT_COMMAND_AND_OUTPUT_SATISFIABILITY",
+                "REFERENCE_REPRODUCTION_MEASUREMENT_ONLY",
+                "ACTUAL_LINKED_MACHO_CLOSED_SHAPE_AND_TOOL_OUTPUT_PARSERS",
+                "LATER_PUBLISHED_CONTRACT_PRODUCT_GRAPH_AND_FULL_PREPRODUCT_GATE"]}
+
+
+def h039_asset_draft_inventory(root: str) -> list:
+    """Dormant bounded nofollow inventory; no writes or candidate execution."""
+    if (type(root) is not str or not root.startswith("/")
+            or any(part in {"", ".", ".."} for part in root.split("/")[1:])):
+        raise ValueError("inventory root")
+    rows, opened, total = [], [], [0]
+    def stable(st: object) -> tuple:
+        return (st.st_dev, st.st_ino, st.st_mode, st.st_uid, st.st_gid, st.st_nlink,
+                st.st_size, st.st_flags, st.st_mtime_ns, st.st_ctime_ns)
+    def visit(fd: int, relative: str, initial: object, parent_fd: int, own_name: str) -> None:
+        if stable(_asset_os.fstat(fd)) != stable(initial):
+            raise ValueError("inventory directory open race")
+        names = sorted(_asset_os.listdir(fd))
+        child_states = {}
+        for name in names:
+            h039_local_cancel_check("inventory_member")
+            if name in {".", ".."} or "/" in name or "\0" in name:
+                raise ValueError("inventory component")
+            rel = relative + name
+            st = _asset_os.stat(name, dir_fd=fd, follow_symlinks=False)
+            child_states[name] = stable(st)
+            ident = [st.st_dev, st.st_ino, st.st_mode, st.st_uid, st.st_gid,
+                     st.st_nlink, st.st_size, st.st_flags]
+            row = [rel, ident]
+            if _asset_stat.S_ISLNK(st.st_mode):
+                row.append(_asset_os.readlink(name, dir_fd=fd))
+                if (stable(_asset_os.stat(name, dir_fd=fd, follow_symlinks=False)) != stable(st)
+                        or _asset_os.readlink(name, dir_fd=fd) != row[-1]):
+                    raise ValueError("inventory symlink rebind")
+            elif _asset_stat.S_ISREG(st.st_mode):
+                if st.st_nlink != 1 or st.st_size > 536870912:
+                    raise ValueError("inventory regular bound")
+                leaf = _asset_os.open(name, _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK, dir_fd=fd)
+                opened.append(leaf)
+                if stable(_asset_os.fstat(leaf)) != stable(st):
+                    raise ValueError("inventory open race")
+                digest, offset = _asset_hashlib.sha256(), 0
+                while offset < st.st_size:
+                    h039_local_cancel_check("inventory_read")
+                    chunk = _asset_os.pread(leaf, min(1048576, st.st_size - offset), offset)
+                    if not chunk:
+                        raise ValueError("inventory short read")
+                    digest.update(chunk)
+                    offset += len(chunk)
+                if (_asset_os.pread(leaf, 1, offset) or stable(_asset_os.fstat(leaf)) != stable(st)
+                        or stable(_asset_os.stat(name, dir_fd=fd, follow_symlinks=False)) != stable(st)):
+                    raise ValueError("inventory final rebind")
+                row.append(digest.hexdigest())
+                total[0] += st.st_size
+                opened.pop()
+                failures = h039_asset_draft_close_owned([leaf], _asset_os.close)
+                if failures:
+                    raise ValueError("inventory leaf close failure", failures)
+            elif not _asset_stat.S_ISDIR(st.st_mode):
+                raise ValueError("inventory special file")
+            rows.append(row)
+            if len(rows) > 20000 or total[0] > 2147483648:
+                raise ValueError("inventory aggregate bound")
+            if _asset_stat.S_ISDIR(st.st_mode):
+                child = _asset_os.open(name, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, dir_fd=fd)
+                opened.append(child)
+                visit(child, rel + "/", st, fd, name)
+        if (sorted(_asset_os.listdir(fd)) != names
+                or any(stable(_asset_os.stat(name, dir_fd=fd, follow_symlinks=False)) != child_states[name] for name in names)
+                or stable(_asset_os.fstat(fd)) != stable(initial)
+                or stable(_asset_os.stat(own_name, dir_fd=parent_fd, follow_symlinks=False)) != stable(initial)):
+            raise ValueError("inventory directory final rebind")
+        opened.pop()
+        failures = h039_asset_draft_close_owned([fd], _asset_os.close)
+        if failures:
+            raise ValueError("inventory directory close failure", failures)
+    try:
+        current = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC)
+        opened.append(current)
+        ancestors = []
+        for component in root.split("/")[1:]:
+            initial = _asset_os.stat(component, dir_fd=current, follow_symlinks=False)
+            child = _asset_os.open(component, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, dir_fd=current)
+            opened.append(child)
+            if stable(_asset_os.fstat(child)) != stable(initial):
+                raise ValueError("inventory ancestor open race")
+            ancestors.append((current, component, child, initial))
+            current = child
+        parent_fd, component, root_fd, initial = ancestors[-1]
+        visit(root_fd, "", initial, parent_fd, component)
+        for parent_fd, component, child, initial in ancestors[:-1]:
+            if (stable(_asset_os.fstat(child)) != stable(initial)
+                    or stable(_asset_os.stat(component, dir_fd=parent_fd, follow_symlinks=False)) != stable(initial)):
+                raise ValueError("inventory ancestor final rebind")
+        return sorted(rows, key=lambda row: row[0])
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        failures = h039_asset_draft_close_owned(list(reversed(opened)), _asset_os.close)
+        if failures and primary is None:
+            raise ValueError("inventory close failure", failures)
+        if failures and primary is not None:
+            primary.h039_close_failures = failures
+
+
+def h039_asset_draft_wait_state(observation: tuple, pid: int, streams_open: bool,
+                               now: float, deadline: float) -> tuple:
+    """Pure exact Darwin wait result and EOF/deadline policy; no OS call."""
+    event, status = "UNOWNED", None
+    if (type(observation) is tuple and len(observation) == 8
+            and all(type(value) is int for value in observation[:7])
+            and type(observation[7]) is bool and type(pid) is int and pid > 0
+            and type(streams_open) is bool):
+        rc, error, signo, sierror, found_pid, code, value, zero = observation
+        if rc == -1 and error == 4:  # Darwin EINTR; no deadline restart
+            event = "INTERRUPTED"
+        elif rc == 0 and zero and observation[1:7] == (0, 0, 0, 0, 0, 0):
+            event = "ALIVE"
+        elif (rc == 0 and error == 0 and signo == 20 and sierror == 0
+                and found_pid == pid and code in {1, 2, 3} and not zero
+                and 0 <= value <= (255 if code == 1 else 31)
+                and (code == 1 or value != 0)):
+            event, status = "EXITED", value if code == 1 else -value
+    if event == "UNOWNED":
+        action = "FAIL_UNOWNED_NO_SIGNAL_NO_REAP"
+    elif now >= deadline:
+        action = "FAIL_DEADLINE"
+    elif event == "EXITED" and not streams_open:
+        action = "COMPLETE"
+    else:
+        action = "READ" if streams_open else "WAIT_SAME_DEADLINE"
+    return event, status, action
+
+
+def h039_asset_draft_group_action(snapshots: object, pid: int, uid: int,
+                                 leader_event: str, owned: bool) -> str:
+    """Pure pre-signal routing for one still-reserved Popen PGID, not global scan."""
+    reject = "FAIL_PRESERVE_NO_SIGNAL_NO_REAP"
+    if (type(owned) is not bool or type(pid) is not int or not 0 < pid < 2147483648
+            or type(uid) is not int or uid < 0 or type(leader_event) is not str
+            or leader_event not in {"ALIVE", "EXITED", "REAPED"}
+            or (not owned and leader_event != "REAPED") or (owned and leader_event == "REAPED")
+            or type(snapshots) is not list or len(snapshots) != 2):
+        return reject
+    bound = []
+    for snapshot in snapshots:
+        if type(snapshot) is not tuple or len(snapshot) != 4:
+            return reject
+        count, error, pids, rows = snapshot
+        if (type(count) is not int or type(error) is not int or error != 0
+                or not 0 <= count < 1024 or count % 4
+                or type(pids) is not list or type(rows) is not list
+                or count != len(pids) * 4 or len(rows) != len(pids)
+                or any(type(value) is not int or not 0 < value < 2147483648 for value in pids)
+                or len(set(pids)) != len(pids)):
+            return reject
+        current = {}
+        for row in rows:
+            if (type(row) is not tuple or len(row) != 6
+                    or any(type(value) is not int for value in row)
+                    or row[0] not in pids or row[0] in current
+                    or row[1] != pid or row[2] != uid or row[3] not in {1, 2, 3, 4, 5}
+                    or row[4] <= 0 or not 0 <= row[5] < 1000000):
+                return reject
+            current[row[0]] = row
+        if set(current) != set(pids):
+            return reject
+        bound.append(current)
+    if set(bound[0]) != set(bound[1]):
+        return reject
+    for member in bound[0]:
+        before, after = bound[0][member], bound[1][member]
+        if before[:3] + before[4:] != after[:3] + after[4:]:
+            return reject
+    final = bound[1]
+    if leader_event == "REAPED":
+        return "TERMINAL_ABSENT" if not final else reject
+    if leader_event == "ALIVE" and (pid not in final or final[pid][3] == 5):
+        return reject
+    if leader_event == "EXITED" and pid in final and final[pid][3] != 5:
+        return reject
+    return "KILL_BOUND_LIVE_GROUP" if any(row[3] != 5 for row in final.values()) else "REAP_WITHOUT_SIGNAL"
+
+
+def h039_asset_draft_group_snapshot(pgid: int) -> list:
+    """Dormant bounded PROC_PGRP_ONLY byte-count snapshots; no all-process query."""
+    import ctypes
+    if type(pgid) is not int or not 0 < pgid < 2147483648:
+        raise ValueError("owned group identifier")
+    class BSDInfo(ctypes.Structure):
+        _fields_ = [(name, ctypes.c_uint32) for name in
+                    ["flags", "status", "xstatus", "pid", "ppid", "uid", "gid",
+                     "ruid", "rgid", "svuid", "svgid", "reserved"]] + [
+                    ("comm", ctypes.c_char * 16), ("name", ctypes.c_char * 32),
+                    ("nfiles", ctypes.c_uint32), ("pgid", ctypes.c_uint32),
+                    ("jobc", ctypes.c_uint32), ("tdev", ctypes.c_uint32),
+                    ("tpgid", ctypes.c_uint32), ("nice", ctypes.c_int32),
+                    ("start_sec", ctypes.c_uint64), ("start_usec", ctypes.c_uint64)]
+    if (ctypes.sizeof(BSDInfo) != 136 or ctypes.alignment(BSDInfo) != 8
+            or [getattr(BSDInfo, field).offset for field in
+                ["status", "pid", "uid", "comm", "name", "pgid", "start_sec", "start_usec"]]
+                != [4, 12, 20, 48, 64, 100, 120, 128]):
+        raise ValueError("SDK26.5 proc_bsdinfo ABI")
+    libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+    listpids = libproc.proc_listpids
+    listpids.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_int]
+    listpids.restype = ctypes.c_int
+    pidinfo = libproc.proc_pidinfo
+    pidinfo.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
+    pidinfo.restype = ctypes.c_int
+    snapshots = []
+    for unused in range(2):
+        storage = (ctypes.c_int32 * 256)()
+        ctypes.set_errno(0)
+        count = listpids(2, pgid, storage, 1024)  # PROC_PGRP_ONLY; BYTES, not PID count.
+        error = ctypes.get_errno()
+        if error or count < 0 or count >= 1024 or count % 4:
+            raise ValueError("group enumeration error/full/unaligned", count, error)
+        pids = list(storage[:count // 4])
+        if any(value <= 0 for value in pids) or len(set(pids)) != len(pids):
+            raise ValueError("group enumeration PID set")
+        rows = []
+        for member in pids:
+            info = BSDInfo()
+            ctypes.set_errno(0)
+            # TBSDINFO arg=1 explicitly permits lookup of positively identified zombies.
+            size = pidinfo(member, 3, 1, ctypes.byref(info), 136)
+            error = ctypes.get_errno()
+            if size != 136 or error or info.pid != member:
+                raise ValueError("group member identity unavailable", member, size, error)
+            rows.append((info.pid, info.pgid, info.uid, info.status, info.start_sec, info.start_usec))
+        snapshots.append((count, 0, pids, rows))
+    return snapshots
+
+
+def h039_asset_draft_bounded_command(command: list, root: str, environment: dict) -> dict:
+    """Dormant confined compiler command; owned group only, no candidate exec.
+
+    Scalar safety bounds are measurement-run rejection limits, not product budgets.
+    EOF is not exit. Darwin waitid/WNOWAIT reserves the child until owned cleanup.
+    Failure captures are returned for durable preservation before caller rejection.
+    """
+    recipe = h039_asset_draft_reference_recipe()
+    if (type(command) is not list or not all(type(arg) is str for arg in command)
+            or command not in recipe["commands"]
+            or type(root) is not str or not root.startswith("/private/tmp/h039-asset-measure-")
+            or not root.endswith(("/build-a", "/build-b")) or len(root.split("/")) != 5
+            or any(part in {"", ".", ".."} for part in root.split("/")[1:])):
+        raise ValueError("finite compiler invocation")
+    expected_env = dict(recipe["environment"])
+    expected_env["TMPDIR"] = root
+    if (type(environment) is not dict
+            or any(type(k) is not str or type(v) is not str for k, v in environment.items())
+            or environment != expected_env):
+        raise ValueError("finite compiler environment")
+    profile = h039_asset_draft_compiler_envelope()["profile"]
+    argv = ["/usr/bin/sandbox-exec", "-D", "H039_BUILD_ROOT=" + root, "-p", profile] + command
+    import resource
+    import ctypes
+    class Sigval(ctypes.Union):
+        _fields_ = [("integer", ctypes.c_int), ("pointer", ctypes.c_void_p)]
+    class Siginfo(ctypes.Structure):
+        _fields_ = [("signo", ctypes.c_int), ("error", ctypes.c_int),
+                    ("code", ctypes.c_int), ("pid", ctypes.c_int32),
+                    ("uid", ctypes.c_uint32), ("status", ctypes.c_int),
+                    ("address", ctypes.c_void_p), ("value", Sigval),
+                    ("band", ctypes.c_long), ("pad", ctypes.c_ulong * 7)]
+    # SDK26.5 sys/signal.h __siginfo and sys/wait.h; no guessed oversized buffer.
+    if (ctypes.sizeof(Siginfo) != 104 or ctypes.alignment(Siginfo) != 8
+            or [getattr(Siginfo, name).offset for name in
+                ["signo", "error", "code", "pid", "uid", "status", "address", "value", "band", "pad"]]
+                != [0, 4, 8, 12, 16, 20, 24, 32, 40, 48]):
+        raise ValueError("Darwin arm64 siginfo ABI")
+    libc = ctypes.CDLL(None, use_errno=True)
+    waitid = libc.waitid
+    waitid.argtypes = [ctypes.c_int, ctypes.c_uint32, ctypes.POINTER(Siginfo), ctypes.c_int]
+    waitid.restype = ctypes.c_int
+    def observe(pid: int) -> tuple:
+        info = Siginfo()
+        ctypes.set_errno(0)
+        rc = waitid(1, pid, ctypes.byref(info), 0x25)  # P_PID, WEXITED|WNOHANG|WNOWAIT
+        error = ctypes.get_errno()
+        return rc, error, info.signo, info.error, info.pid, info.code, info.status, bytes(info) == bytes(104)
+    class ReservedChild(_asset_subprocess.Popen):
+        def __del__(self) -> None:
+            # Pinned Python Popen.__del__ polls/reaps. Disable that implicit path:
+            # only this function's positively owned explicit wait may reap.
+            pass
+    def child_limits() -> None:
+        _asset_os.umask(0o077)
+        resource.setrlimit(resource.RLIMIT_FSIZE, (67108864, 67108864))
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    process, selector = None, _asset_selectors.DefaultSelector()
+    output = {"stdout": bytearray(), "stderr": bytearray()}
+    primary, observed_status = None, None
+    ownership, truncated, cleanup_errors = "UNKNOWN", False, []
+    cleanup_observations, terminal_group = [], None
+    try:
+        h039_local_cancel_check("compiler_before_spawn")
+        process = ReservedChild(argv, cwd=root, env=environment,
+            stdin=_asset_subprocess.DEVNULL, stdout=_asset_subprocess.PIPE,
+            stderr=_asset_subprocess.PIPE, close_fds=True, start_new_session=True,
+            preexec_fn=child_limits)
+        ownership = "OWNED_UNREAPED"
+        for stream, label in [(process.stdout, "stdout"), (process.stderr, "stderr")]:
+            _asset_os.set_blocking(stream.fileno(), False)
+            selector.register(stream, _asset_selectors.EVENT_READ, label)
+        deadline = _asset_time.monotonic() + 300
+        while selector.get_map() or observed_status is None:
+            h039_local_cancel_check("compiler_owned_loop")
+            previous_ownership, ownership = ownership, "UNKNOWN"
+            event, status, action = h039_asset_draft_wait_state(observe(process.pid), process.pid,
+                bool(selector.get_map()), _asset_time.monotonic(), deadline)
+            if event == "UNOWNED":
+                raise ValueError("waitid ownership unknown; no signal or reap")
+            ownership = previous_ownership
+            if event == "EXITED":
+                observed_status = status
+            remaining = deadline - _asset_time.monotonic()
+            if action == "FAIL_DEADLINE":
+                raise ValueError("compiler deadline")
+            if action == "COMPLETE":
+                break
+            for key, unused in selector.select(min(remaining, 0.25)):
+                try:
+                    data = _asset_os.read(key.fileobj.fileno(), 65536)
+                except BlockingIOError:
+                    continue
+                if not data:
+                    selector.unregister(key.fileobj)
+                else:
+                    available = 4194304 - sum(len(value) for value in output.values())
+                    output[key.data].extend(data[:available])
+                    if len(data) > available:
+                        truncated = True
+                        raise ValueError("compiler capture bound")
+    except BaseException as exc:
+        primary = exc
+    finally:
+        try:
+            selector.close()
+        except BaseException as exc:
+            cleanup_errors.append(("selector_close", str(exc)))
+        if process is not None:
+            # Never signal/reap after a wait observation invalidates child ownership.
+            if ownership == "OWNED_UNREAPED":
+                try:
+                    cleanup_deadline, signal_sent = _asset_time.monotonic() + 10, False
+                    for cleanup_index in range(32):
+                        previous_ownership, ownership = ownership, "UNKNOWN"
+                        event, status, unused = h039_asset_draft_wait_state(observe(process.pid), process.pid,
+                            False, _asset_time.monotonic(), cleanup_deadline)
+                        if event == "UNOWNED":
+                            raise ValueError("cleanup child ownership unknown")
+                        ownership = previous_ownership
+                        if _asset_time.monotonic() >= cleanup_deadline:
+                            raise ValueError("owned group cleanup deadline")
+                        if event == "INTERRUPTED":
+                            continue
+                        snapshots = h039_asset_draft_group_snapshot(process.pid)
+                        previous_ownership, ownership = ownership, "UNKNOWN"
+                        event, status, unused = h039_asset_draft_wait_state(observe(process.pid), process.pid,
+                            False, _asset_time.monotonic(), cleanup_deadline)
+                        if event == "UNOWNED":
+                            raise ValueError("cleanup child ownership changed")
+                        ownership = previous_ownership
+                        if _asset_time.monotonic() >= cleanup_deadline:
+                            raise ValueError("owned group cleanup deadline")
+                        if event == "INTERRUPTED":
+                            continue
+                        route = h039_asset_draft_group_action(snapshots, process.pid,
+                            _asset_os.geteuid(), event, ownership == "OWNED_UNREAPED")
+                        cleanup_observations.append({"leader": event, "status": status,
+                                                     "snapshots": snapshots, "route": route})
+                        if route == "FAIL_PRESERVE_NO_SIGNAL_NO_REAP":
+                            raise ValueError("owned group identity/shape unknown")
+                        if route == "REAP_WITHOUT_SIGNAL":
+                            break
+                        if not signal_sent:
+                            # Only a bound live group is signalled, while leader remains reserved.
+                            # EPERM/ESRCH are real failure, never reclassified as empty/zombie success.
+                            _asset_os.killpg(process.pid, _asset_signal.SIGKILL)
+                            signal_sent = True
+                        _asset_time.sleep(min(0.1, max(0.0, cleanup_deadline - _asset_time.monotonic())))
+                    else:
+                        raise ValueError("owned group cleanup observation bound")
+                    remaining = cleanup_deadline - _asset_time.monotonic()
+                    if remaining <= 0:
+                        raise ValueError("owned group cleanup deadline before reap")
+                    process.wait(timeout=remaining)
+                    ownership = "REAPED"
+                    if primary is None and process.returncode != observed_status:
+                        cleanup_errors.append(("observed_exit_changed", str(process.returncode)))
+                except BaseException as exc:
+                    cleanup_errors.append(("owned_group_cleanup", type(exc).__name__, str(exc)))
+            else:
+                cleanup_errors.append(("unknown_ownership_preserved", str(process.pid)))
+            for stream in [process.stdout, process.stderr]:
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except BaseException as exc:
+                        cleanup_errors.append(("capture_close", str(exc)))
+            if ownership == "REAPED":
+                # Read-only terminal absence: remaining zombies/reused PGID are failures.
+                # Never signal a numeric group after releasing the leader reservation.
+                try:
+                    terminal_group = h039_asset_draft_group_snapshot(process.pid)
+                    if h039_asset_draft_group_action(terminal_group, process.pid, _asset_os.geteuid(),
+                            "REAPED", False) != "TERMINAL_ABSENT":
+                        raise ValueError("terminal group not absent")
+                except BaseException as exc:
+                    cleanup_errors.append(("terminal_group_absence", type(exc).__name__, str(exc)))
+    return {"status": "CAPTURED" if primary is None and not cleanup_errors else "FAILED_PRESERVED",
+            "reason": None if primary is None else (type(primary).__name__, str(primary)),
+            "returncode": None if process is None else process.returncode,
+            "ownership": ownership, "observed_exit": observed_status,
+            "cleanup_observations": cleanup_observations, "terminal_group": terminal_group,
+            "truncated": truncated, "cleanup_errors": cleanup_errors,
+            "stdout": bytes(output["stdout"]), "stderr": bytes(output["stderr"])}
+
+
+def h039_local_build_preflight(facts: dict) -> dict:
+    """Snapshot-derived gate inputs plus the unchanged B tool/header preflight.
+
+    No product-source pathname reread, external adapter path or caller receipt.
+    Only build-only serialized provenance is claimed, not same-UID exclusion.
+    """
+    h039_local_cancel_check("preflight")
+    recipe = h039_asset_draft_reference_recipe()
+    stage = h039_local_material_binding(facts)
+    if stage != "NOT_READY_FRESH_SERIALIZED_BUILD_COMPOSITION":
+        raise ValueError("build snapshot rejected", stage)
+    legacy = facts["material"][_LOCAL_BASE][_LOCAL_PRODUCTS[1]][1]
+    runtime = facts["disk"][_LOCAL_RUNTIME]
+    source = h039_asset_draft_reference_source(legacy, _LOCAL_ADAPTER_SOURCE)
+    pins = dict(recipe["required_tool_sha256"])
+    pins.update(recipe["required_link_input_sha256"])
+    pins["/usr/bin/sandbox-exec"] = "2f447acfae7a954ccb5a1bcf3a1955f69b1a8549c434ddff643df98fd3cb33ba"
+    private = "/Library/Developer/CommandLineTools/usr/lib/"
+    pins.update({private + "libtapi.dylib": "d4fe1afc4fee343de797e5c4f6c3891ffd8b97a18a02011b8d7371a2ac0bf2a2",
+                 private + "libcodedirectory.dylib": "07bc6fe7df6f118caa658a251e14fe44cd2391303b61013af20970902f8f0d64",
+                 private + "libLTO.dylib": "52f09013247c7da02f8d566a737427c0e7b7a6988e967a2c0ac6e534946caeaf",
+                 private + "libswiftDemangle.dylib": "c87c6d5299266089820e9da6e45d6dbfb075c43c4ed1088d992cae59c3ac1d70"})
+    for path, digest in pins.items():
+        h039_local_cancel_check("preflight_tool")
+        h039_asset_draft_retained_read(path, digest, 536870912, True)
+    inventories = {}
+    for path, count, digest in h039_asset_draft_compiler_envelope()["header_sets"]:
+        h039_local_cancel_check("preflight_headers")
+        rows = h039_asset_draft_inventory(path)
+        encoded = _asset_json.dumps(rows, separators=(",", ":"), ensure_ascii=True).encode()
+        if len(rows) != count or _asset_hashlib.sha256(encoded).hexdigest() != digest:
+            raise ValueError("header inventory identity", path)
+        inventories[path] = rows
+    disk = _asset_os.statvfs("/private/tmp")
+    if disk.f_bavail * disk.f_frsize < 21474836480:
+        raise ValueError("measurement disk floor before creation")
+    return {"status": "READ_ONLY_PREFLIGHT_ONLY_NO_BUILD_OR_GATE_CREDIT",
+            "source": source, "runtime": runtime, "pins": pins, "inventories": inventories}
+
+
+def h039_local_build_supplier(facts: dict) -> dict:
+    """Internal two-lane supplier on the asset-product path; no standalone lane.
+
+    Gate-owned input bytes derive from the completed observer, not product claims.
+    B confinement/cleanup is retained, with safe-boundary cooperative cancellation.
+    Source defines the complete conditional verdict; actual qualification NOT_RUN.
+    """
+    h039_local_cancel_check("supplier")
+    checked = h039_local_build_preflight(facts)
+    source, runtime = checked["source"], checked["runtime"]
+    pins, inventories = checked["pins"], checked["inventories"]
+    recipe = h039_asset_draft_reference_recipe()
+    descriptors, measurements, lane_outputs, lane_inventories = [], [], [], []
+    h039_local_cancel_check("supplier_before_creation")
+    parent = _asset_tempfile.mkdtemp(prefix="h039-asset-measure-", dir="/private/tmp")
+    try:
+        parent_fd = _asset_os.open(parent, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC)
+        descriptors.append(parent_fd)
+        parent_identity = _asset_os.fstat(parent_fd)
+        if parent_identity.st_uid != _asset_os.geteuid() or _asset_stat.S_IMODE(parent_identity.st_mode) != 0o700:
+            raise ValueError("exclusive measurement parent")
+        h039_asset_draft_acl_empty(parent_fd)
+        if _asset_os.listdir(parent_fd):
+            raise ValueError("measurement parent not initially empty")
+        for lane in recipe["roots"]:
+            h039_local_cancel_check("supplier_lane")
+            disk = _asset_os.statvfs("/private/tmp")
+            if disk.f_bavail * disk.f_frsize < 21474836480:
+                raise ValueError("measurement disk floor preserve", parent)
+            _asset_os.mkdir(lane, 0o700, dir_fd=parent_fd)
+            root = parent + "/" + lane
+            root_fd = _asset_os.open(lane, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, dir_fd=parent_fd)
+            descriptors.append(root_fd)
+            initial = _asset_os.fstat(root_fd)
+            h039_asset_draft_acl_empty(root_fd)
+            if initial.st_uid != _asset_os.geteuid() or _asset_stat.S_IMODE(initial.st_mode) != 0o700 or _asset_os.listdir(root_fd):
+                raise ValueError("exclusive empty build lane")
+            for name, raw in [("mediator.c", source), ("retained-runtime", runtime)]:
+                fd = _asset_os.open(name, _asset_os.O_WRONLY | _asset_os.O_CREAT | _asset_os.O_EXCL | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, 0o600, dir_fd=root_fd)
+                descriptors.append(fd)
+                offset = 0
+                while offset < len(raw):
+                    wrote = _asset_os.write(fd, raw[offset:])
+                    if wrote <= 0:
+                        raise ValueError("exclusive material write")
+                    offset += wrote
+                _asset_os.fsync(fd)
+                descriptors.pop()
+                failures = h039_asset_draft_close_owned([fd], _asset_os.close)
+                if failures:
+                    raise ValueError("material close", failures)
+            environment = dict(recipe["environment"])
+            _asset_os.fsync(root_fd)
+            _asset_os.fsync(parent_fd)
+            environment["TMPDIR"] = root
+            captures = []
+            for index, command in enumerate(recipe["commands"]):
+                h039_local_cancel_check("supplier_between_commands")
+                for flag in ["-o", "-MF"]:
+                    if flag in command:
+                        target = command[command.index(flag) + 1]
+                        try:
+                            _asset_os.stat(target, dir_fd=root_fd, follow_symlinks=False)
+                        except FileNotFoundError:
+                            pass
+                        else:
+                            raise ValueError("preexisting compiler output", target)
+                try:
+                    result = h039_asset_draft_bounded_command(command, root, environment)
+                except BaseException as exc:
+                    result = {"status": "PRELAUNCH_REJECTED", "reason": (type(exc).__name__, str(exc)),
+                              "returncode": None, "stdout": b"", "stderr": b""}
+                record = {key: value for key, value in result.items() if key not in {"stdout", "stderr"}}
+                record.update({"index": index,
+                               "stdout_sha256": _asset_hashlib.sha256(result["stdout"]).hexdigest(),
+                               "stderr_sha256": _asset_hashlib.sha256(result["stderr"]).hexdigest()})
+                captures.append(record)
+                status_raw = _asset_json.dumps(record, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("ascii")
+                for label, raw in [("stdout", result["stdout"]), ("stderr", result["stderr"]), ("status.json", status_raw)]:
+                    name = "command-%02d-%s" % (index, label)
+                    fd = _asset_os.open(name, _asset_os.O_WRONLY | _asset_os.O_CREAT | _asset_os.O_EXCL | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, 0o600, dir_fd=root_fd)
+                    descriptors.append(fd)
+                    offset = 0
+                    while offset < len(raw):
+                        count = _asset_os.write(fd, raw[offset:])
+                        if count <= 0:
+                            raise ValueError("capture write")
+                        offset += count
+                    _asset_os.fsync(fd)
+                    descriptors.pop()
+                    failures = h039_asset_draft_close_owned([fd], _asset_os.close)
+                    if failures:
+                        raise ValueError("capture close", failures)
+                _asset_os.fsync(root_fd)
+                if result["status"] != "CAPTURED" or result["returncode"] != 0:
+                    raise ValueError("confined measurement failed preserve", parent, index, record)
+            expected_names = sorted(["mediator.c", "retained-runtime"] + recipe["outputs"] +
+                ["command-%02d-%s" % (index, label) for index in range(8) for label in ["stdout", "stderr", "status.json"]])
+            if sorted(_asset_os.listdir(root_fd)) != expected_names:
+                raise ValueError("unexpected measurement residue preserve", parent)
+            rows = h039_asset_draft_inventory(root)
+            if any(not _asset_stat.S_ISREG(row[1][2]) or row[1][5] != 1 for row in rows):
+                raise ValueError("measurement leaf shape")
+            products = {row[0]: (row[1][6], row[2]) for row in rows if row[0] in recipe["outputs"]}
+            byname = {row[0]: row for row in rows}
+            if (byname["mediator.c"][2] != _asset_hashlib.sha256(source).hexdigest()
+                    or byname["retained-runtime"][2] != _asset_hashlib.sha256(runtime).hexdigest()):
+                raise ValueError("measurement input changed")
+            rebound = _asset_os.stat(lane, dir_fd=parent_fd, follow_symlinks=False)
+            final = _asset_os.fstat(root_fd)
+            h039_asset_draft_acl_empty(root_fd)
+            _asset_os.fsync(root_fd)
+            if (rebound.st_dev, rebound.st_ino, rebound.st_mode, rebound.st_uid, rebound.st_gid) != (initial.st_dev, initial.st_ino, initial.st_mode, initial.st_uid, initial.st_gid) or rebound != final:
+                raise ValueError("build lane rebind")
+            outputs = {}
+            for name in recipe["outputs"]:
+                amount, digest = products[name]
+                raw = h039_asset_draft_retained_read(root + "/" + name, digest, 1048576, False)
+                if len(raw) != amount:
+                    raise ValueError("fresh output size", name)
+                outputs[name] = raw
+            lane_outputs.append(outputs)
+            lane_inventories.append(rows)
+            measurements.append({"lane": lane, "outputs": products, "commands": captures})
+        if measurements[0]["outputs"] != measurements[1]["outputs"]:
+            raise ValueError("measurement rebuild differs preserve", parent)
+        for path, digest in pins.items():
+            h039_asset_draft_retained_read(path, digest, 536870912, True)
+        for path, before in inventories.items():
+            if h039_asset_draft_inventory(path) != before:
+                raise ValueError("header inventory changed", path)
+        if sorted(_asset_os.listdir(parent_fd)) != ["build-a", "build-b"]:
+            raise ValueError("measurement parent foreign membership")
+        parent_final = _asset_os.fstat(parent_fd)
+        parent_name = _asset_os.stat(parent, follow_symlinks=False)
+        h039_asset_draft_acl_empty(parent_fd)
+        if (parent_final.st_dev, parent_final.st_ino, parent_final.st_mode, parent_final.st_uid,
+            parent_final.st_gid, parent_final.st_flags) != (parent_identity.st_dev, parent_identity.st_ino,
+            parent_identity.st_mode, parent_identity.st_uid, parent_identity.st_gid, parent_identity.st_flags) or parent_final != parent_name:
+            raise ValueError("measurement parent rebind")
+        verdict = h039_local_rebuild_binding(facts, lane_outputs[0], lane_outputs[1],
+                                             _LOCAL_ADAPTER_SOURCE)
+        if verdict != "REBUILD_MATERIAL_BOUND_NOT_FRESH_INVOCATION_OR_GATE_CREDIT":
+            raise ValueError("fresh build material rejected", verdict)
+        controls = h039_asset_draft_product_controls(facts["material"][_LOCAL_BASE], lane_outputs[0],
+                                                    runtime, _LOCAL_ADAPTER_SOURCE)
+        if len(controls) != 29 or any(ok is not True for name, ok in controls):
+            raise ValueError("fresh material causal controls", controls)
+        # Rebind all outputs, inputs and captures after BOTH lanes and predicates,
+        # while the owned directory descriptors are still open. This is not a
+        # universal hostile same-UID pathname-consumption proof.
+        for index, lane in enumerate(recipe["roots"]):
+            if h039_asset_draft_inventory(parent + "/" + lane) != lane_inventories[index]:
+                raise ValueError("fresh build final inventory changed", lane)
+        return {"status": "SERIALIZED_BUILD_MATERIAL_BOUND_NOT_FROZEN_ACCEPTANCE",
+                "root": parent, "measurements": measurements, "controls": controls,
+                "active_external_same_uid_consumption_provenance": "UNPROVEN"}
+    except BaseException as exc:
+        raise ValueError("measurement failed; preserved root", parent) from exc
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+        if failures and primary is None:
+            raise ValueError("measurement close failures preserve", parent, failures)
+        if failures and primary is not None:
+            primary.h039_close_failures = failures
+
+
+_asset_signal.signal(_asset_signal.SIGTERM, h039_local_cancel_latch)
+_asset_signal.signal(_asset_signal.SIGINT, h039_local_cancel_latch)
+raise SystemExit(h039_local_main(_local_sys.argv[1:]))
+# H039_LOCAL_ASSET_DRAFT_END
 import array
 import ast
 import base64

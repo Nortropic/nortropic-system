@@ -47,10 +47,13 @@ import hmac
 import json
 import os
 import re
+import selectors
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 from pathlib import Path
 
@@ -629,6 +632,310 @@ REFREEZE_MAX_RETIRED_LABELS = 3
 RETIRED_NAME_RE = re.compile(r"(?i)retired")
 # The canonical invocation elements a qualification run must carry (h-035 is undecidable without -I -S -B).
 REFREEZE_INVOCATION_FLAGS = ("-I", "-S", "-B")
+# H039's local build-only subphase has its own typed rows/polarities. Historical
+# unreachable check-labels never substitute for these completed effects.
+H039_ASSET_BASE = "8095d947c83202e2b87801531d9f7cb1457c8719"
+H039_ASSET_BASE_SPEC_SHA = "3e5d564cb633c5f720a715c7591a849673b0a95736e6ceb0bcac8db9e63b1b95"
+H039_ASSET_MEMBER_SHA = "2ed88a7c76db2212b093659cacc7e082bc8b3ca1ab1472784f4626cadefeb043"
+# Held judge pin is set after H039 source closes; the declaration cannot choose it.
+H039_ASSET_GATE_SHA = "b2728b587911053453d577d3cdc4bf9c833c7cc6d6ccae6d0f15dbe7c86fa199"
+H039_ASSET_BASE_GATE_SHA = "d3d147da8d88427aad52550fffcd6156deb38ec88c7bc61908afc197062a5250"
+H039_ASSET_OWNER_SECONDS = 7200
+H039_ASSET_CANCEL_GRACE_SECONDS = 60
+H039_ASSET_CAPTURE_BYTES = 1048576
+_h039_preserved_owners = []
+H039_ASSET_CONTRACT_PATHS = (
+    "verify/bin/h-039-exit", "specs/tasks.spec.json", "verify/bin/platform-separation-final-exit",
+    "docs/loop/platform-separation-final-local-development.md", "SEPARATION-20260910/REFREEZE.json", "controller/verify/cli")
+H039_ASSET_PRODUCT_PATHS = (
+    "controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json")
+H039_ASSET_RUNTIME = "verify/h039/runtime-cleanup-mediator"
+H039_ASSET_COMMON_ROWS = (
+    ("identity_graph_disk_index_postauth", True), ("contract_six_scope", True),
+    ("historical_gate_bytes", True), ("exact_spec_member", True), ("base_material_runtime", True))
+H039_ASSET_PRODUCT_ROWS = (
+    ("product_four_scope", True), ("actual_git_numstat", True), ("asset_representation", True),
+    ("fresh_two_lane_build", True), ("material_semantics", True), ("build_inventory_postauth", True))
+H039_ASSET_CONTROL_NAMES = (
+    "four_file_positive", "four_file_mapping_order", "source_modified", "container_modified",
+    "RECIPE_duplicate", "RECIPE_noncanonical", "RECIPE_nondict", "RECIPE_unknown",
+    "RECIPE_bool_version", "RECIPE_float_version", "RECIPE_wrong_role", "RECIPE_nested_unknown",
+    "MANIFEST_duplicate", "MANIFEST_noncanonical", "MANIFEST_nondict", "MANIFEST_unknown",
+    "MANIFEST_bool_version", "MANIFEST_float_version", "MANIFEST_wrong_role", "MANIFEST_nested_unknown",
+    "coherent_wrong_recipe_manifest", "manifest_crossed_payloads", "manifest_wrong_recipe",
+    "manifest_wrong_source", "coherent_container_manifest_repin_semantic_reject",
+    "crossed_payload_prefixes_coherent_manifest", "wrong_independent_runtime", "product_mode", "baseline_modified")
+
+
+def h039_asset_canonical_invocation(subject, phase, contract, candidate):
+    """Pure exact argv builder. This is not authority to execute the command."""
+    if (type(subject) is not str or not subject.startswith("/") or "\0" in subject
+            or any(part in {"", ".", ".."} for part in subject.split("/")[1:])
+            or phase not in ("contract", "product")
+            or any(type(oid) is not str or len(oid) != 40 or
+                   any(char not in "0123456789abcdef" for char in oid) for oid in (contract, candidate))
+            or contract == H039_ASSET_BASE or candidate == H039_ASSET_BASE
+            or (phase == "contract") != (contract == candidate)):
+        raise ValueError("H039 asset invocation identity/phase")
+    prefix = [PYTHON, "-I", "-S", "-B", subject + "/verify/bin/h-039-exit"]
+    return prefix + (["--asset-contract", contract] if phase == "contract" else
+                     ["--asset-product", contract, candidate])
+
+
+def h039_asset_tree_phase(facts):
+    """Pure exact full-map B/C/P relation; the caller must authenticate facts."""
+    try:
+        base, contract, candidate = facts["base"], facts["contract"], facts["candidate"]
+        if base != H039_ASSET_BASE or contract == base or candidate == base:
+            return None
+        if any(type(oid) is not str or len(oid) != 40 or any(c not in "0123456789abcdef" for c in oid)
+               for oid in (contract, candidate)):
+            return None
+        maps, parents = facts["trees"], facts["parents"]
+        before, middle, after = maps[base], maps[contract], maps[candidate]
+        if parents[contract] != [base] or (candidate != contract and parents[candidate] != [contract]):
+            return None
+        if (any(type(mapping) is not dict for mapping in (before, middle, after))
+                or before.keys() != middle.keys() or before.keys() != after.keys()
+                or not set(H039_ASSET_CONTRACT_PATHS + H039_ASSET_PRODUCT_PATHS + (H039_ASSET_RUNTIME,)) <= before.keys()):
+            return None
+        for mapping in (before, middle, after):
+            for path, row in mapping.items():
+                if (type(row) is not tuple or len(row) != 2 or row[0] not in ("100644", "100755")
+                        or type(row[1]) is not str or len(row[1]) != 40
+                        or any(c not in "0123456789abcdef" for c in row[1]) or row[0] != before[path][0]):
+                    return None
+        if {p for p in before if before[p] != middle[p]} != set(H039_ASSET_CONTRACT_PATHS):
+            return None
+        if candidate == contract:
+            return "contract"
+        if {p for p in middle if middle[p] != after[p]} != set(H039_ASSET_PRODUCT_PATHS):
+            return None
+        return "product"
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def h039_asset_spec_matches(raw):
+    """Exact canonical member span plus byte-identical full 8095 base remainder."""
+    def unique(pairs):
+        out = {}
+        for key, value in pairs:
+            if key in out:
+                raise ValueError("duplicate spec field")
+            out[key] = value
+        return out
+    start = b'      "h039_local_asset_build_only_v1": {\n'
+    end = b'      "h039_os_exclusive_runtime_cleanup": {\n'
+    try:
+        if type(raw) is not bytes or raw.count(start) != 1 or raw.count(end) != 1:
+            return False
+        rows = [row for row in json.loads(raw, object_pairs_hook=unique)["tasks"] if row["id"] == "h-039"]
+        if len(rows) != 1:
+            return False
+        member = rows[0]["h039_local_asset_build_only_v1"]
+        a, b = raw.index(start), raw.index(end)
+        block = ('      "h039_local_asset_build_only_v1": ' + json.dumps(member, indent=2, ensure_ascii=True,
+            allow_nan=False).replace("\n", "\n      ") + ",\n").encode("ascii")
+        encoded = json.dumps(member, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode()
+        return (a < b and raw[a:b] == block
+                and hashlib.sha256(raw[:a] + raw[b:]).hexdigest() == H039_ASSET_BASE_SPEC_SHA
+                and hashlib.sha256(encoded).hexdigest() == H039_ASSET_MEMBER_SHA)
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        return False
+
+
+def h039_asset_expected_result(phase, contract, candidate, gate_sha256):
+    """Pure expected schema; never a completed-run or receipt assertion."""
+    h039_asset_canonical_invocation("/schema", phase, contract, candidate)
+    if (type(gate_sha256) is not str or len(gate_sha256) != 64
+            or any(char not in "0123456789abcdef" for char in gate_sha256)):
+        raise ValueError("H039 asset gate identity")
+    product = phase == "product"
+    rows = list(H039_ASSET_COMMON_ROWS)
+    rows += (list(H039_ASSET_PRODUCT_ROWS) + [("control:" + name, True) for name in H039_ASSET_CONTROL_NAMES]
+             if product else [("asset_representation", False)])
+    return {"contract": "h039-local-asset-build-only-v1", "phase": phase, "base": H039_ASSET_BASE,
+            "contract_commit": contract, "candidate_commit": candidate, "gate_sha256": gate_sha256,
+            "complete": True,
+            "verdict": "PASS_ASSET_BUILD_ONLY_NOT_H039_PASS_OR_ATTESTATION" if product else "ASSET_REPRESENTATION_ABSENT",
+            "credit": "ASSET_BUILD_ONLY" if product else "NONE",
+            "rows": [{"id": name, "ok": ok} for name, ok in rows]}
+
+
+def h039_asset_result_matches(stdout, stderr, returncode, phase, contract, candidate, gate_sha256):
+    """Validate a capture's complete shape, not the provenance of that capture.
+
+    Only a separate gate-owned invocation of the frozen judge may supply a
+    qualifying capture. Caller receipts and declaration hashes are not authority.
+    Canonical bytes close duplicate fields, booleans/numbers, extra terminal rows
+    and partial output without weakening other gates' existing receipt contract.
+    """
+    if type(stdout) is not bytes or type(stderr) is not bytes or type(returncode) is not int or stderr:
+        return False
+    try:
+        expected = h039_asset_expected_result(phase, contract, candidate, gate_sha256)
+    except ValueError:
+        return False
+    wire = b"H039_ASSET_RESULT " + json.dumps(expected, sort_keys=True, separators=(",", ":"),
+                                              ensure_ascii=True, allow_nan=False).encode("ascii") + b"\n"
+    return returncode == (0 if phase == "product" else 1) and stdout == wire
+
+
+def h039_asset_gate_source(subject):
+    """Retain/rebind the independently pinned judge, never declaration authority."""
+    path = subject + "/verify/bin/h-039-exit"
+    if os.path.realpath(path) != path:
+        raise ValueError("H039 judge path alias")
+    def identity(info):
+        return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid, info.st_nlink,
+                info.st_size, info.st_mtime_ns, info.st_ctime_ns, info.st_flags)
+    before = os.stat(path, follow_symlinks=False)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
+    try:
+        opened = os.fstat(fd)
+        if (identity(before) != identity(opened) or not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                or opened.st_uid != os.geteuid() or stat.S_IMODE(opened.st_mode) != 0o755
+                or not 0 < opened.st_size <= 4194304):
+            raise ValueError("H039 judge retained identity")
+        raw = bytearray()
+        while len(raw) < opened.st_size:
+            chunk = os.read(fd, min(65536, opened.st_size - len(raw)))
+            if not chunk:
+                raise ValueError("H039 judge short read")
+            raw.extend(chunk)
+        if (os.read(fd, 1) or identity(os.fstat(fd)) != identity(opened)
+                or identity(os.stat(path, follow_symlinks=False)) != identity(opened)
+                or hashlib.sha256(raw).hexdigest() != H039_ASSET_GATE_SHA):
+            raise ValueError("H039 judge source pin/rebind")
+        return H039_ASSET_GATE_SHA
+    finally:
+        os.close(fd)
+
+
+def h039_asset_owned_capture(subject, phase, contract, candidate):
+    """ONE H039 owner, cooperative cancel and bounded capture; never owner kill.
+
+    No caller commands, envelope, receipt or replay. A grace expiry preserves an
+    unresolved owner explicitly, never retries or claims child-group terminality.
+    The pinned child alone owns its setsid compiler-group cleanup. These bounds
+    are a cancellation policy, not proof that a blocked system call is finite.
+    """
+    if _h039_preserved_owners:
+        raise ValueError("H039 unresolved owner already preserved; no automatic retry")
+    argv = h039_asset_canonical_invocation(subject, phase, contract, candidate)
+    process, poller, terminal = None, None, None
+    output = {"stdout": bytearray(), "stderr": bytearray()}
+    failures, cancelled, cancel_deadline = [], False, None
+    requested, handlers = [None], []
+    def latch(signum, frame):
+        if requested[0] is None:
+            requested[0] = signum
+    class PreservedOwner(subprocess.Popen):
+        def __del__(self):
+            pass  # no implicit reaping of an unresolved owner
+    try:
+        for number in (signal.SIGTERM, signal.SIGINT):
+            handlers.append((number, signal.signal(number, latch)))
+        h039_asset_gate_source(subject)
+        if requested[0] is not None:
+            raise ValueError("H039 parent cancelled before owner start")
+        poller = selectors.DefaultSelector()
+        process = PreservedOwner(argv, cwd=subject,
+            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            shell=False, close_fds=True, start_new_session=True)
+        for stream, label in ((process.stdout, "stdout"), (process.stderr, "stderr")):
+            os.set_blocking(stream.fileno(), False)
+            poller.register(stream, selectors.EVENT_READ, label)
+        deadline = time.monotonic() + H039_ASSET_OWNER_SECONDS
+        while True:
+            # Popen.poll positively reaps only its direct child; no group/PID
+            # guessing or signal is attempted if this ownership observation fails.
+            terminal = process.poll()
+            now = time.monotonic()
+            if requested[0] is not None and not cancelled:
+                failures.append("parent cancellation")
+            if terminal is not None and not poller.get_map():
+                break
+            if now >= deadline and not cancelled:
+                failures.append("owner deadline")
+            if failures and not cancelled:
+                cancelled, cancel_deadline = True, now + H039_ASSET_CANCEL_GRACE_SECONDS
+                if terminal is None:
+                    process.send_signal(signal.SIGTERM)
+            if cancelled and now >= cancel_deadline:
+                failures.append("cancel grace expired; terminal/capture unresolved")
+                break
+            for key, unused in poller.select(0.25):
+                try:
+                    chunk = os.read(key.fileobj.fileno(), 65536)
+                except BlockingIOError:
+                    continue
+                if not chunk:
+                    poller.unregister(key.fileobj)
+                    continue
+                available = H039_ASSET_CAPTURE_BYTES - sum(map(len, output.values()))
+                output[key.data].extend(chunk[:available])
+                if len(chunk) > available and "capture bound" not in failures:
+                    failures.append("capture bound")
+        h039_asset_gate_source(subject)
+    except BaseException as exc:
+        failures.append((type(exc).__name__, str(exc)))
+    finally:
+        # Capture closes cannot authorize killing the owner. Unknown ownership,
+        # setup/IO exceptions or grace expiry remain explicit preserved failures.
+        for label, owned in (("selector", poller), ("stdout", process.stdout if process else None),
+                             ("stderr", process.stderr if process else None)):
+            if owned is not None:
+                try:
+                    owned.close()
+                except BaseException as exc:
+                    failures.append((label, type(exc).__name__, str(exc)))
+        if process is not None and terminal is None:
+            _h039_preserved_owners.append(process)
+            failures.append("owner/inner lanes unresolved; preserved; no automatic retry")
+        for number, previous in reversed(handlers):
+            try:
+                signal.signal(number, previous)
+            except BaseException as exc:
+                failures.append(("handler_restore", type(exc).__name__, str(exc)))
+    return {"status": "NOT_QUALIFIED_PRESERVED" if failures else "CAPTURED",
+            "invocation": argv, "returncode": terminal, "stdout": bytes(output["stdout"]),
+            "stderr": bytes(output["stderr"]), "failures": failures,
+            "owner_pid": process.pid if process else None,
+            "owner_state": "UNRESOLVED_PRESERVED_NO_RETRY" if process is not None and terminal is None
+                else "DIRECT_CHILD_TERMINAL_INNER_CLEANUP_NOT_INFERRED" if process is not None else "NOT_STARTED"}
+
+
+def h039_asset_declaration_matches(obj, base_raw, now_raw):
+    """Typed H039-only declaration; frozen judge pin is independent authority."""
+    expected = {"contract": REFREEZE_DECL_CONTRACT, "refreezes": [{
+        "path": "verify/bin/h-039-exit", "base_sha256": H039_ASSET_BASE_GATE_SHA,
+        "new_sha256": H039_ASSET_GATE_SHA,
+        "reason": "H039 local build-only contract: one owned frozen-judge invocation; exact B/C/P relation; no H039 completion or runtime credit.",
+        "h039_asset_build_only": {"contract": "h039-local-asset-build-only-v1", "base_commit": H039_ASSET_BASE,
+            "qualification": "ONE_FINAL_EXIT_OWNED_CAPTURE_NO_RECEIPT_AUTHORITY_OR_REPLAY",
+            "contract_selector": "--asset-contract", "product_selector": "--asset-product",
+            "credit_ceiling": "ASSET_BUILD_ONLY_NOT_H039_PASS_OR_ATTESTATION"}}]}
+    return (obj == expected and type(base_raw) is bytes and type(now_raw) is bytes
+            and hashlib.sha256(base_raw).hexdigest() == H039_ASSET_BASE_GATE_SHA
+            and hashlib.sha256(now_raw).hexdigest() == H039_ASSET_GATE_SHA)
+
+
+def h039_asset_commit_parent(raw, oid):
+    """Exact commit object, no peeled tag; one parent is mandatory in both phases."""
+    if (type(raw) is not bytes or len(raw) > 65536 or b"\n\n" not in raw
+            or hashlib.sha1(b"commit " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest() != oid):
+        raise ValueError("H039 raw commit identity")
+    headers = raw.split(b"\n\n", 1)[0].split(b"\n")
+    parents = [line[7:].decode("ascii") for line in headers if line.startswith(b"parent ")]
+    if len(parents) != 1 or not re.fullmatch("[0-9a-f]{40}", parents[0]):
+        raise ValueError("H039 exact one parent")
+    return parents[0]
+
+
 # A refreeze necessarily ADDS bytes under verify/, which the tree-wide scan classifies as frozen evidence and does
 # not read. The added LINES are therefore scanned here — except for three RETIREMENT IDENTIFIERS that a refreeze
 # against the platform generation must be able to carry: the retired document path docs/05-beslutslogg.md, the
@@ -2336,6 +2643,34 @@ def main():
     def head_oid(rel):
         return tracked_entries.get(rel, (None, None))[1]
 
+    # H039's narrow B/C/P context is reconstructed here, not chosen by receipt
+    # fields. The independent pinned H039 invocation authenticates the raw Git,
+    # disk/index/tool closure again before any supplier effect can start.
+    h039_context, h039_capture, h039_context_error = None, None, None
+    try:
+        declaration = strict((subject / REFREEZE_DECL).read_bytes())
+        if h039_asset_declaration_matches(declaration, base_bytes("verify/bin/h-039-exit", H039_ASSET_BASE),
+                                          (subject / "verify/bin/h-039-exit").read_bytes()):
+            def h039_parent(oid):
+                observed = run_bytes([GIT, "-C", str(subject), "cat-file", "commit", oid], scratch, probe_env)
+                if observed.returncode or observed.stderr:
+                    raise ValueError("H039 commit observation failed")
+                return h039_asset_commit_parent(observed.stdout, oid)
+            parent = h039_parent(head)
+            contract = head if parent == H039_ASSET_BASE else parent
+            parents = {head: [parent], contract: [H039_ASSET_BASE] if contract == head else [h039_parent(contract)]}
+            maps = {oid: ls_tree(subject, probe_env, oid, ".")
+                    for oid in dict.fromkeys((H039_ASSET_BASE, contract, head))}
+            phase = h039_asset_tree_phase({"base": H039_ASSET_BASE, "contract": contract, "candidate": head,
+                                          "parents": parents, "trees": maps})
+            if phase is None or not h039_asset_spec_matches((subject / SPEC).read_bytes()):
+                raise ValueError("H039 exact graph/spec relation")
+            h039_asset_gate_source(str(subject))
+            h039_context = {"phase": phase, "contract": contract, "candidate": head,
+                            "entry": declaration["refreezes"][0]}
+    except (OSError, ValueError, Rig) as exc:
+        h039_context_error = str(exc)
+
     # ------------------------------------------------------------------ F10 canaries
     fault = run([PYTHON, "-B", "-c", "raise NameError('fixture-canary')"], scratch, probe_env)
     check("canary_traceback_is_not_outcome", fault.returncode != 0 and json_ok(fault) is None and driver_outcome(fault) is None)
@@ -2913,7 +3248,9 @@ def main():
     check("f3_verify_cli_pins_equal_candidate_spec_register_every_generation_document_and_the_plan_generation", not problems, str(problems))
     spec_base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{SPEC}").stdout.strip()
     check("f3_spec_byte_identical_to_" + FROZEN_BASE[:8] + "_this_contract_requires_no_spec_change",
-          bool(spec_base_oid) and head_oid(SPEC) == spec_base_oid, f"head={head_oid(SPEC)} base={spec_base_oid}")
+          (h039_context is not None and h039_asset_spec_matches((subject / SPEC).read_bytes()))
+          or (bool(spec_base_oid) and head_oid(SPEC) == spec_base_oid),
+          f"head={head_oid(SPEC)} base={spec_base_oid} h039_exact_subphase={h039_context is not None}")
     rep, rep_env = replica(bench, "candidate", subject, head)
     rep_tmp = bench.tmp("candidate")
     r = run([rep / VERIFY_CLI, "preflight"], scratch, rep_env)
@@ -3637,6 +3974,9 @@ def main():
     decl_raw = decl_path.read_bytes() if decl_path.is_file() and not decl_path.is_symlink() else None
     if (decl_raw is None) != (REFREEZE_DECL not in tracked):
         decl_problems.append(f"declaration present={decl_raw is not None} tracked={REFREEZE_DECL in tracked}")
+    elif h039_context is not None:
+        declared.append(h039_context["entry"])
+        refreeze_paths.add("verify/bin/h-039-exit")
     elif decl_raw is not None and decl_raw != base_bytes(REFREEZE_DECL):
         try:
             decl = strict(decl_raw)
@@ -3711,6 +4051,11 @@ def main():
     label_problems, label_counts = [], {}
     for entry in declared:
         rel = entry["path"]
+        if h039_context is not None and rel == "verify/bin/h-039-exit":
+            # Complete executed row identities are judged from the owned capture
+            # below, never from preserved but unreachable historical labels.
+            label_counts[rel] = {"contract": "h039-local-asset-build-only-v1", "historical_label_credit": False}
+            continue
         retired = entry.get("retired_labels") or {}
         retired = retired if type(retired) is dict else {}
         try:
@@ -3773,6 +4118,7 @@ def main():
     # resolves inside the subject tree is REFUSED, tracked or not. What the receipt does and does not prove — and what
     # is left to the qualifier rather than to the gate — is written in the development document.
     receipts, receipt_problems = [], []
+    h039_product_qualified = False
     for path in (args.refreeze_receipt or []):
         try:
             resolved = Path(path).resolve()
@@ -3794,6 +4140,34 @@ def main():
     for entry in declared:
         rel = entry["path"]
         found = by_gate.get(rel, [])
+        if h039_context is not None and rel == "verify/bin/h-039-exit":
+            # No supplied receipt can create or replace this invocation. Extra
+            # receipts are refused in this subphase; legacy receipt CLI remains.
+            if found:
+                receipt_problems.append("H039 uses owned capture only; caller receipt refused")
+            if receipt_problems or decl_problems or label_problems or added_hits or not all(row["pass"] for row in rows):
+                receipt_problems.append("H039 actual qualification not started: prerequisite row failed")
+                continue
+            h039_capture = h039_asset_owned_capture(str(subject), h039_context["phase"],
+                                                    h039_context["contract"], head)
+            capture_record = {k: v for k, v in h039_capture.items() if k not in ("stdout", "stderr")}
+            write(scratch / "h039-owned-stdout", h039_capture["stdout"], 0o600)
+            write(scratch / "h039-owned-stderr", h039_capture["stderr"], 0o600)
+            write(scratch / "h039-owned-capture.json", json.dumps(capture_record, sort_keys=True), 0o600)
+            if h039_capture["owner_state"] == "UNRESOLVED_PRESERVED_NO_RETRY":
+                raise Rig("H039 NOT_QUALIFIED_PRESERVED owner=" + str(h039_capture["owner_pid"])
+                          + "; inner lanes unresolved; no following effect or automatic retry")
+            matched = h039_capture["status"] == "CAPTURED" and h039_asset_result_matches(
+                h039_capture["stdout"], h039_capture["stderr"], h039_capture["returncode"],
+                h039_context["phase"], h039_context["contract"], head, H039_ASSET_GATE_SHA)
+            if not matched:
+                raise Rig("H039 captured invocation lacks exact complete phase terminal; inner cleanup not inferred; "
+                          "captures preserved; no following effect or automatic retry")
+            elif h039_context["phase"] == "contract":
+                receipt_problems.append("H039 ASSET_REPRESENTATION_ABSENT expected preproduct RED; no product credit")
+            else:
+                h039_product_qualified = not receipt_problems
+            continue
         if len(found) != 1:
             receipt_problems.append(f"{rel}: {len(found)} qualification receipts supplied, exactly one required")
             continue
@@ -3839,8 +4213,9 @@ def main():
         and stat.S_IMODE(gate_path.lstat().st_mode) == 0o755
     path_problems, byte_problems, additions, removals = [], [], [], []
     expected_additions = []
+    frozen_reference = H039_ASSET_BASE if h039_context is not None else FROZEN_BASE
     for tree_rel in FROZEN_TREES:
-        base_entries = ls_tree(subject, probe_env, FROZEN_BASE, tree_rel)
+        base_entries = ls_tree(subject, probe_env, frozen_reference, tree_rel)
         head_entries = ls_tree(subject, probe_env, "HEAD", tree_rel)
         if tree_rel == "verify" and GATE not in base_entries:
             expected_additions.append(GATE)
@@ -3853,7 +4228,7 @@ def main():
         if git_raw(subject, probe_env, "status", "--porcelain", "--untracked-files=no", "--", tree_rel).stdout.strip():
             path_problems.append(tree_rel + " (working tree differs from HEAD)")
     for rel in FROZEN_FILES:
-        base_oid = git_raw(subject, probe_env, "rev-parse", f"{FROZEN_BASE}:{rel}").stdout.strip()
+        base_oid = git_raw(subject, probe_env, "rev-parse", f"{frozen_reference}:{rel}").stdout.strip()
         if not base_oid:
             path_problems.append(rel + " (absent at " + FROZEN_BASE[:8] + ")")
         elif rel not in tracked:
@@ -3865,7 +4240,10 @@ def main():
     check("f6_frozen_tree_paths_are_the_" + FROZEN_BASE[:8] + "_set_plus_this_gate_only",
           not path_problems and sorted(additions) == expected_additions and not removals and gate_ok,
           f"problems={path_problems[:10]} additions={sorted(additions)} removals={removals[:10]} gate_ok={gate_ok}")
-    undeclared = sorted(set(byte_problems) - refreeze_paths)
+    # The four product bytes are exceptional only AFTER the complete positive
+    # pinned asset invocation, never for C, a declaration, or a caller receipt.
+    h039_product_bytes = set(H039_ASSET_PRODUCT_PATHS) if h039_product_qualified else set()
+    undeclared = sorted(set(byte_problems) - refreeze_paths - h039_product_bytes)
     unchanged_declared = sorted(refreeze_paths - set(byte_problems))
     check("f6_frozen_tree_bytes_identical_to_" + FROZEN_BASE[:8] + "_except_the_declared_refreeze",
           not undeclared and not unchanged_declared,
@@ -3927,12 +4305,16 @@ def main():
     def base_oid_at(rev, rel):
         return git_raw(subject, probe_env, "rev-parse", f"{rev}:{rel}").stdout.strip()
 
-    frozen_h_gates = {rel: oid for rel, (mode, oid) in ls_tree(subject, probe_env, FROZEN_BASE, "verify/bin").items()
+    frozen_h_gates = {rel: oid for rel, (mode, oid) in ls_tree(subject, probe_env, frozen_reference, "verify/bin").items()
                       if REFREEZE_GATE_RE.fullmatch(rel)}
     cs_inherited = {rel for rel, oid in frozen_h_gates.items() if base_oid_at(CONTROL_SET_BASE, rel) != oid}
     lc_inherited = {rel for rel, oid in frozen_h_gates.items() if base_oid_at(LAUNCH_CWD_BASE, rel) != oid}
     cs_expected = sorted(rel for rel in cs_inherited | refreeze_paths
                          if base_oid_at(CONTROL_SET_BASE, rel) and base_oid_at(CONTROL_SET_BASE, rel) != head_oid(rel))
+    if h039_product_qualified:
+        # Exact order emitted by the unchanged held control-set gate: directory
+        # tree problems first in its FROZEN_TREES order, then H-gate listing.
+        cs_expected = ["verify/h039", "controller/runtime-cleanup"] + cs_expected
     lc_expected = sorted(rel for rel in lc_inherited | refreeze_paths
                          if base_oid_at(LAUNCH_CWD_BASE, rel) and base_oid_at(LAUNCH_CWD_BASE, rel) != head_oid(rel))
     gov_expected_fails = sorted(GOVERNANCE_EXPECTED_FAILS) + ([GOVERNANCE_CONTROL_SET_ROW] if cs_expected else [])
@@ -4073,6 +4455,10 @@ def main():
               "tree_classification": classification, "forbidden_blobs": FORBIDDEN_BLOBS,
               "governance_expected_fails": gov_expected_fails,
               "refreeze_declaration": declared, "refreeze_declaration_path": REFREEZE_DECL,
+              "h039_asset_context": h039_context, "h039_asset_context_error": h039_context_error,
+              "h039_asset_product_qualified": h039_product_qualified,
+              "h039_owned_capture": ({k: v for k, v in h039_capture.items() if k not in ("stdout", "stderr")}
+                                      if h039_capture is not None else None),
               "refreeze_added_lines": added_lines, "refreeze_label_counts": label_counts,
               "refreeze_max_retired_labels": REFREEZE_MAX_RETIRED_LABELS,
               "refreeze_receipts": [{"source": s, "gate": o.get("gate"), "exit_code": o.get("exit_code"),
