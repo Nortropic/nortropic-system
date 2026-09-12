@@ -8,6 +8,8 @@ never subject credit.  ``--reference-host`` is a
 judge-only architecture satisfiability lane and can never credit the subject.
 ``--registry-v3-refreeze`` verifies only the completed product's exact bytes,
 the published H-034/H-035/registry identities and the downstream temporal edge.
+``--current-product CANDIDATE_SHA`` requalifies the existing three-file product
+at the fixed platform generation through the same actual subject effects.
 """
 
 from __future__ import annotations
@@ -157,6 +159,18 @@ PINNED_UNCHANGED = {
     "controller/launch/runtime_snapshot.py": "35ca9dff3355bcfbd4d7536cb9658fe3342f143745547ec55f2b2cb25223eca7",
     "config/python-runtime-authority-v2.json": "460d4a89f2160ed947ed513bebc5e25de41899a9aabda613d0a233f2150ef963",
 }
+
+# These are separate generations, not replacements for PINNED_UNCHANGED or
+# CURRENT_H034_SHA (both remain inputs to the historical contract above).
+CURRENT_PRODUCT_BASE = "531d37e594410d80d3d07975b8331715dd2508b0"
+HISTORICAL_H036_REGISTRY_SHA = "829234ded2d6c9618e97b49ffc11a6725c66b976"
+HISTORICAL_DECISION_SHA = "40f0bb6b9859eaf7be8ef330fc5e53319dd0605b"
+HISTORICAL_DECISION_DIGEST = "56519fcbdc5bf0d6ffc0e8b9e1d546b0d6bd590359bbbaa8ffe56bdbf7ee62b3"
+CURRENT_CONTRACT_PATHS = (
+    "verify/bin/h-036-exit", "verify/bin/platform-separation-final-exit",
+    "docs/loop/platform-separation-final-local-development.md",
+)
+CURRENT_DECLARATION = "SEPARATION-20260910/REFREEZE.json"
 
 PRODUCT_PATHS = [
     "controller/launch/cli",
@@ -790,7 +804,9 @@ def h039_materialization_absent(
     return not task_present and not gate_present and not product_present
 
 
-def registry_v3_refreeze_adversarial_controls(task: dict[str, Any]) -> None:
+def registry_v3_refreeze_adversarial_controls(
+    task: dict[str, Any], *, current_generation: bool = False,
+) -> None:
     v1 = {**EXPECTED_REGISTRY, "schema_version": 1,
           "owner_production_paths": REGISTRY_OWNER_V1}
     v2 = {**EXPECTED_REGISTRY, "schema_version": 2,
@@ -873,11 +889,21 @@ def registry_v3_refreeze_adversarial_controls(task: dict[str, Any]) -> None:
         check(not h036_registry_v3_task_valid(mutant),
               f"J_H036_V3_CHANGED_PRODUCT_BYTE_IDENTITY_{index}_REJECT")
 
-    h039_absent = h039_materialization_absent(
-        bool(task_rows(strict_json(SPEC.read_bytes()), "h-039")),
-        os.path.lexists(H039_GATE),
-        any(os.path.lexists(path) for path in H039_PRODUCT_PATHS),
-    )
+    if current_generation:
+        historical_spec = git_blob(HISTORICAL_H036_REGISTRY_SHA, "specs/tasks.spec.json")
+        assert historical_spec is not None
+        h039_absent = h039_materialization_absent(
+            bool(task_rows(strict_json(historical_spec[2]), "h-039")),
+            git_blob(HISTORICAL_H036_REGISTRY_SHA, "verify/bin/h-039-exit", optional=True) is not None,
+            any(git_blob(HISTORICAL_H036_REGISTRY_SHA, path, optional=True) is not None
+                for path in H039_OWNER_PATHS),
+        )
+    else:
+        h039_absent = h039_materialization_absent(
+            bool(task_rows(strict_json(SPEC.read_bytes()), "h-039")),
+            os.path.lexists(H039_GATE),
+            any(os.path.lexists(path) for path in H039_PRODUCT_PATHS),
+        )
     check(h039_absent, "F_H036_V3_H039_MATERIALIZATION_EXACTLY_ABSENT")
     for label, task_present, gate_present, product_present in (
         ("TASK", True, False, False),
@@ -889,7 +915,7 @@ def registry_v3_refreeze_adversarial_controls(task: dict[str, Any]) -> None:
               f"J_H036_V3_H039_{label}_MATERIALIZATION_REJECT")
 
 
-def static_contract_checks() -> None:
+def static_contract_checks(*, current_generation: bool = False) -> None:
     try:
         compile(INNER_FIXTURE, "h036-inner-fixture", "exec")
         compile(OUTER_FIXTURE, "h036-outer-fixture", "exec")
@@ -906,10 +932,30 @@ def static_contract_checks() -> None:
         and H034_REVIEW_TREE == PUBLISHED_H034_TREE,
         "F_H036_H034_INDEPENDENT_READY_REVIEW_IDENTITY_PINNED",
     )
-    check(
-        all((ROOT / path).is_file() and not (ROOT / path).is_symlink()
+    preserved = all((ROOT / path).is_file() and not (ROOT / path).is_symlink()
             and path_sha(ROOT / path) == digest
-            for path, digest in PINNED_UNCHANGED.items()),
+            for path, digest in PINNED_UNCHANGED.items())
+    if current_generation:
+        # Preserve current consumed bytes against the fixed base. The absent
+        # historical document and the published product have independent object
+        # proofs; the config correction is judged by identity + exact_config.
+        retired_paths = current_retired_paths()
+        paths = set(PINNED_UNCHANGED) - retired_paths - {str(CONFIG.relative_to(ROOT))}
+        preserved = all(current_base_file_preserved(path) for path in paths)
+        decision_object = git_blob(HISTORICAL_DECISION_SHA, str(DECISION_LOG.relative_to(ROOT)))
+        historical_product = H036_REGISTRY_V3_CONTRACT["published_h036_product_identity"]
+        historical_ok = decision_object is not None and decision_object[0] == "100644" \
+            and sha(decision_object[2]) == HISTORICAL_DECISION_DIGEST
+        for path in retired_paths:
+            obj = git_blob(CURRENT_H034_SHA, path)
+            historical_ok = historical_ok and obj is not None and obj[0] == "100644" \
+                and sha(obj[2]) == PINNED_UNCHANGED[path]
+        for path, mode, digest in historical_product["paths_modes_sha256"]:
+            obj = git_blob(historical_product["published_merge"], path)
+            historical_ok = historical_ok and obj is not None and obj[0] == mode and sha(obj[2]) == digest
+        check(historical_ok, "F_H036_CURRENT_HISTORICAL_DOCUMENTS_AND_PUBLISHED_PRODUCT_OBJECTS")
+    check(
+        preserved,
         "F_H036_H017_H034_H035_H037_DELEGATION_CONSTITUTION_AUTOPILOT_PRODUCT_AUTHORITY_PRESERVED",
     )
     registry = strict_json(REGISTRY.read_bytes())
@@ -982,13 +1028,25 @@ def static_contract_checks() -> None:
         "h-035": H035_TASK_CANONICAL_SHA256,
         "h-037": H037_TASK_CANONICAL_SHA256,
     }
+    if current_generation:
+        base_spec = git_blob(CURRENT_PRODUCT_BASE, "specs/tasks.spec.json")
+        assert base_spec is not None
+        base_rows = task_rows(strict_json(base_spec[2]), "h-035")
+        if len(base_rows) != 1:
+            raise Rig("current base H035 task cardinality")
+        expected_task_shas["h-035"] = canonical_sha(base_rows[0])
     check(all(len(task_rows(spec, task_id)) == 1
               and canonical_sha(task_rows(spec, task_id)[0]) == digest
               for task_id, digest in expected_task_shas.items()),
           "F_H036_H032_H034_H035_H037_TASK_ROWS_PRESERVED")
 
     owner = OWNER_WORKFLOW.read_text(encoding="utf-8")
-    decision = DECISION_LOG.read_text(encoding="utf-8")
+    if current_generation:
+        decision_object = git_blob(HISTORICAL_DECISION_SHA, str(DECISION_LOG.relative_to(ROOT)))
+        assert decision_object is not None
+        decision = decision_object[2].decode("utf-8")
+    else:
+        decision = DECISION_LOG.read_text(encoding="utf-8")
     drift = DRIFT.read_text(encoding="utf-8")
     owner_terms = (
         "<!-- H036_PRE_SANDBOX_RUNTIME_SUPERVISOR_CONTRACT_V1 -->",
@@ -1134,6 +1192,83 @@ def product_identity(base: str, candidate: str) -> tuple[bool, dict[str, Any]]:
             return False, {**detail, "reason": why}
         if git_blob(candidate, "config/python-runtime-authority-v2.json")[2] != CONFIG.read_bytes():
             return False, {**detail, "reason": "config not candidate object"}
+    except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
+        return False, {**detail, "reason": str(exc)}
+    return True, detail
+
+
+def current_retired_paths() -> set[str]:
+    # Derive only from the fixed base and the untouched historical pin map,
+    # never candidate absence. No new historical path spelling/authority.
+    paths = {path for path in PINNED_UNCHANGED
+             if git_blob(CURRENT_PRODUCT_BASE, path, optional=True) is None}
+    if len(paths) != 1 or not all(path.startswith("docs/") for path in paths):
+        raise Rig("current base historical-document retirement cardinality")
+    return paths
+
+
+def current_base_file_preserved(path: str) -> bool:
+    obj = git_blob(CURRENT_PRODUCT_BASE, path)
+    disk = ROOT / path
+    return obj is not None and disk.is_file() and not disk.is_symlink() \
+        and obj[2] == disk.read_bytes() \
+        and stat.S_IMODE(disk.stat().st_mode) == int(obj[0], 8) & 0o777
+
+
+def current_product_identity(candidate: str) -> tuple[bool, dict[str, Any]]:
+    """Object-bound current product, with only the allocated config correction.
+
+    The three contract files are the independently reviewed carrier, not builder
+    authority. Its held hash and sole declaration are bound by separation F6.
+    A pre-builder carrier is admitted to identity so exact_config can report the
+    real RED; it cannot reach subject effects or PASS with the stale digest.
+    """
+    detail: dict[str, Any] = {"base": CURRENT_PRODUCT_BASE, "candidate": candidate}
+    if not re.fullmatch(r"[0-9a-f]{40}", candidate):
+        return False, {**detail, "reason": "noncanonical candidate oid"}
+    try:
+        for oid in (CURRENT_PRODUCT_BASE, candidate):
+            if str(git("cat-file", "-t", oid, text=True)).strip() != "commit":
+                return False, {**detail, "reason": "identity is not a commit object"}
+            raw_commit(oid)
+        git("merge-base", "--is-ancestor", CURRENT_PRODUCT_BASE, candidate)
+        if not checkout_clean(candidate):
+            return False, {**detail, "reason": "HEAD or physical/index state not clean"}
+        changes = diff_entries(CURRENT_PRODUCT_BASE, candidate)
+        detail["changed"] = changes
+        changed = {path for status, path in changes}
+        optional = {CURRENT_DECLARATION, str(CONFIG.relative_to(ROOT))}
+        if any(status != "M" for status, path in changes) \
+                or not set(CURRENT_CONTRACT_PATHS) <= changed \
+                or not changed <= set(CURRENT_CONTRACT_PATHS) | optional:
+            return False, {**detail, "reason": "outside exact current contract/config delta"}
+        # Full product projection: helper/launcher unchanged, config either the
+        # base RED or precisely one old-launcher digest replaced by current bytes.
+        base_cli = git_blob(CURRENT_PRODUCT_BASE, PRODUCT_PATHS[0])
+        base_config = git_blob(CURRENT_PRODUCT_BASE, PRODUCT_PATHS[2])
+        assert base_cli is not None and base_config is not None
+        old = PINNED_UNCHANGED[PRODUCT_PATHS[0]].encode("ascii")
+        if base_config[2].count(old) != 1:
+            raise Rig("base config launcher pin cardinality")
+        corrected = base_config[2].replace(old, sha(base_cli[2]).encode("ascii"))
+        consumed = changed | set(PINNED_UNCHANGED) | {"specs/tasks.spec.json", "docs/loop/drift.md"}
+        consumed -= current_retired_paths()
+        for path in sorted(consumed):
+            before = git_blob(CURRENT_PRODUCT_BASE, path)
+            after = git_blob(candidate, path)
+            disk = ROOT / path
+            if before is None or after is None or after[0] != before[0] \
+                    or after[0] not in {"100644", "100755"} \
+                    or not disk.is_file() or disk.is_symlink() \
+                    or disk.read_bytes() != after[2] \
+                    or stat.S_IMODE(disk.stat().st_mode) != int(after[0], 8) & 0o777:
+                return False, {**detail, "reason": f"object/disk/mode mismatch: {path}"}
+            if path not in CURRENT_CONTRACT_PATHS and path != CURRENT_DECLARATION:
+                allowed = (before[2], corrected) if path == PRODUCT_PATHS[2] else (before[2],)
+                if after[2] not in allowed:
+                    return False, {**detail, "reason": f"unexpected current bytes: {path}"}
+        detail["gate_sha256"] = path_sha(GATE)
+        detail["config_sha256"] = path_sha(CONFIG)
     except (OSError, ValueError, subprocess.SubprocessError, Rig) as exc:
         return False, {**detail, "reason": str(exc)}
     return True, detail
@@ -6081,14 +6216,34 @@ def main(argv: list[str]) -> int:
         return 2
     preproduct = not argv
     product_mode = len(argv) == 3 and argv[0] == "--product"
+    current_mode = len(argv) == 2 and argv[0] == "--current-product"
     reference_mode = argv == ["--reference-host"]
     registry_mode = argv == ["--registry-v3-refreeze"]
-    if not (preproduct or product_mode or reference_mode or registry_mode):
+    if not (preproduct or product_mode or current_mode or reference_mode or registry_mode):
         print("RIG_ERROR: usage: h-036-exit [--product BASE_SHA CANDIDATE_SHA|"
-              "--reference-host|--registry-v3-refreeze]",
+              "--current-product CANDIDATE_SHA|--reference-host|--registry-v3-refreeze]",
               file=sys.stderr)
         return 2
     try:
+        if current_mode:
+            if not trusted_git_valid():
+                raise Rig("trusted Git identity rejected before current product identity")
+            identity_ok, identity_detail = current_product_identity(argv[1])
+            check(identity_ok, "A_H036_CURRENT_GENERATION_OBJECT_DISK_SCOPE_IDENTITY", identity_detail)
+            if not identity_ok:
+                return finish("current-product")
+            static_contract_checks(current_generation=True)
+            task = task_rows(strict_json(SPEC.read_bytes()), "h-036")[0]
+            registry_v3_refreeze_adversarial_controls(task, current_generation=True)
+            config_ok, config_detail = exact_config(CONFIG.read_bytes())
+            check(config_ok, "A_H036_CURRENT_PRODUCT_CONFIG_BINDS_ACTUAL_LAUNCHER_AND_HELPER", config_detail)
+            # Fail closed before any execution when static/identity/config is red.
+            # The baseline's one real defect is not counted again as a fake effect.
+            if failed:
+                return finish("current-product")
+            effect_ok, effect_detail = subject_effects()
+            check(effect_ok, LABEL, effect_detail)
+            return finish("current-product")
         static_contract_checks()
         phase = product_phase()
         if registry_mode:

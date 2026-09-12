@@ -62,7 +62,7 @@ NODE = "/opt/homebrew/opt/node@22/bin/node"
 SANDBOX_EXEC = "/usr/bin/sandbox-exec"
 GATE = "verify/bin/platform-separation-final-exit"
 DOCUMENT = "docs/loop/platform-separation-final-local-development.md"
-FROZEN_BASE = "e6e4091c991ccbcaf9b7bab923a4e1e803453290"
+FROZEN_BASE = "531d37e594410d80d3d07975b8331715dd2508b0"
 # Historical transfer objects and active-document scan boundaries do not move with the H-gate generation.
 HISTORICAL_BASE = "332f07ceb914a07c6632c1393969d9d5a337566b"
 GOVERNANCE_BASE = "512490d44007373b79aca504aa92709e9810aa24"
@@ -3777,9 +3777,14 @@ def main():
             receipt_problems.append(f"{rel}: {passes} PASS lines in the receipt, receipt says {obj['pass_count']}, "
                                     f"the declaration predicted {entry['expected_pass']}")
         invocation = obj["invocation"]
-        if type(invocation) is not list or not all(type(x) is str for x in invocation) or PYTHON not in invocation \
-                or not set(REFREEZE_INVOCATION_FLAGS) <= set(invocation) \
-                or not invocation or Path(invocation[-1]).name != Path(rel).name:
+        current_h036 = rel == "verify/bin/h-036-exit"
+        canonical_current = [PYTHON, *REFREEZE_INVOCATION_FLAGS, str(subject / rel),
+                             "--current-product", head]
+        legacy_invocation_ok = type(invocation) is list and all(type(x) is str for x in invocation) \
+            and PYTHON in invocation and set(REFREEZE_INVOCATION_FLAGS) <= set(invocation) \
+            and bool(invocation) and Path(invocation[-1]).name == Path(rel).name
+        if (current_h036 and invocation != canonical_current) \
+                or (not current_h036 and not legacy_invocation_ok):
             receipt_problems.append(f"{rel}: the receipt's invocation is not the canonical pinned form: {invocation!r}")
     check("f6_declared_refreeze_is_qualified_by_a_receipt_bound_to_this_candidate_and_the_refrozen_bytes",
           not receipt_problems, f"declared={len(declared)} receipts={len(receipts)} problems={receipt_problems[:6]}")

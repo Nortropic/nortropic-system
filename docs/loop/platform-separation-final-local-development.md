@@ -2406,3 +2406,63 @@ commit `09f0ea6dde40e9b61a0be9c56aa352e19c47dfc3` (träd `6eaacb63b97a98410ed451
 
 ### Builder / kvalificering
 (fylls i efter produktkörningen)
+
+### v3.14 — H036 aktuell produktgeneration, kontraktsförberedelse 2026-09-12
+
+Basen är `531d37e594410d80d3d07975b8331715dd2508b0`. Historiska hållna baser,
+proveniensbytes och scan-gränser ändras inte. Endast H036 är nästa deklarerade refreeze.
+TEST_AUTHOR skriver H036-grinden, separationgrinden, detta dokument och deklarationen;
+BUILDER får endast rätta launcher-digesten i `config/python-runtime-authority-v2.json`.
+Launcher och helper hålls byteidentiska med basen. Specens tre produktpaths och taskrad
+ändras inte. Config ingår inte i F6:s bytefrysning: inget undantag införs.
+
+`--current-product CANDIDATE_SHA` är aktuell återkvalificering av den befintliga produkten.
+Grinden binder exakt commit (inte tagg), basens ancestry, ren HEAD/index, objekt–disk,
+modes och exakt kontraktsdelta plus configrättningen. Före BUILDER tillåts basens config
+som identitetsbundet RED-subjekt; dess gamla launcherhash fäller configraden och inga
+effekter körs. Därefter får endast den enda digestens exakta ersättning förekomma.
+Inga andra produktbytes eller produktpaths tillkommer. Kontraktsfilerna är oberoende
+granskad grindinput, inte builderauktoritet; deras held-hash binds vid kvalificeringen.
+
+Den historiska PINNED_UNCHANGED-mängden, H034-objekten och H036:s publicerade produkt
+ändras inte. Aktuella konsumentbytes binds separat till basen. De historiska dokumenten
+läses från redan bevarade exakta gitobjekt; H039-absens gäller objektet för H036:s
+registry-refreeze, inte dagens träd. Detta bevarar tidsordningen utan historisk runtimecredit.
+Historiska `--product`, `--reference-host` och `--registry-v3-refreeze` behåller sina vägar.
+
+Efter positiv identitet och samtliga statiska kontroller körs oförändrad `subject_effects()`
+och hela `run_subject_matrix()`: kopplad launcher/profil/protokoll, sessioner/capabilities,
+descriptorobservation, miljö, replay/alias-negativer, livscykel, supervisorbortfall,
+Git-undantag, andra privata runtimepositiven samt pycache/runtime-restkontroll. Ingen
+historisk registry-PASS, referensvärd eller producentmarkör kan ersätta dessa effekter.
+
+Kvittots faktiska argv ska vara exakt `[PYTHON, "-I", "-S", "-B", ABSOLUT_SUBJEKTGRIND,
+"--current-product", CANDIDATE_SHA]`; kandidatargumentet är samma som subject_head och
+körd HEAD. Gatehash, deklaration, faktisk stdout/hash, exit och radräkning binds som tidigare.
+Kvitto ligger utanför subjektet. Ingen suffixgenväg eller ometiketterad historikkörning godtas.
+
+Fokuserade negativfall: fel SHA/tagg/HEAD, dirty eller indexflaggat subjekt, mode/symlink,
+ytterligare produkt-/kontraktsdelta, configändring utöver digesten, gammalt configdigest,
+fel argv/kandidat/gatepath, gammalt kvitto och utebliven/felande effektmatris. Positiven kräver
+verklig separat BUILDER-rättning och den fulla verkliga effektkörningen på slutkandidaten.
+Noarg-vägran i produktfas är befintlig; denna lokala kvalificering ger inte ordinarie
+task-/bootstrapcompletion eller supervisor-resume. Kopplingen till den ordinarie vägen återstår.
+
+Status före körning: H036 aktuell fullacceptans NOT_RUN; röd baslinje NOT_RUN;
+produktändring NO; fullgrindar körs seriellt efter effektgranskning, inte av denna not.
+
+Fokusprov 2026-09-12: `PYTHON -I -S -B
+/private/tmp/nortropic-v313-contract.Fq5ueV/v314-focused.py`, exit 0 på H036
+`95be612be7e0d48b281a0ea7552e6bb774792b0a0f6340f91791f53c29be4194`:
+71 statiska PASS/0 FAIL; 13 virtuella identitetsfall; 8 exakta argv-fall; fel historiskt
+digest avvisat; dålig Git-identitet avvisad före repoidentitet. Både återinförd historisk
+fil och ytterligare H-grindändring avvisas. Added-line-scan 0 träffar, basetiketter 27,
+nya 30, saknade 0. Matris, subject_effects, historisk produktidentitet och config-orakel
+är AST-identiska med basen. Detta är focused-resultat, inte en full grinds PASS.
+
+Deklarationens 74 är prediktion: mätta 71 statiska rader + identitet + config + matrisens
+sammanfattningsrad. Oförändrad config förutsägs ge 72 PASS/1 FAIL (configraden), exit 1,
+utan runtimeeffekter. En riktig grön produkt måste ge 74 PASS/0 FAIL, exit 0, med matrisen.
+Den enda avsedda configersättningen ger sha256
+`92f84d8f909bdded186c2db8b8e98f4c79e3f9f5e16c53100f7e005641a183f9`;
+den är endast härledd/provad i minnet, inte skriven av TEST_AUTHOR.
