@@ -13,6 +13,2020 @@ a caller path, PID, command, state, nonce, or descriptor.
 
 from __future__ import annotations
 
+# H039_LOCAL_VERIFIER_DRAFT_BEGIN
+# Test-first held source: actual future diagnostic judge, not product code.
+# No entry below may reach the historical asset or installed selectors.
+
+_H039_VERIFIER_RUNNER_SOURCE = r'''
+class Refusal(RuntimeError):
+    pass
+
+def require(condition: bool, reason: str) -> None:
+    if not condition:
+        raise Refusal(reason)
+
+def sha256(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+def identity8(value: os.stat_result) -> list[int]:
+    return [
+        value.st_dev, value.st_ino, value.st_mode, value.st_uid,
+        value.st_gid, value.st_nlink, value.st_size,
+        getattr(value, "st_flags", 0),
+    ]
+
+def exact_int(value: Any) -> bool:
+    return type(value) is int
+
+def lower_hex(value: Any, length: int) -> bool:
+    return type(value) is str and re.fullmatch(f"[0-9a-f]{{{length}}}", value) is not None
+
+def strict_json(raw: bytes) -> Any:
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in items:
+            require(key not in result, f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(
+            raw.decode("utf-8"), object_pairs_hook=pairs,
+            parse_float=lambda token: (_ for _ in ()).throw(
+                Refusal(f"floating JSON number forbidden: {token}")),
+            parse_constant=lambda token: (_ for _ in ()).throw(
+                Refusal(f"non-finite JSON token: {token}")),
+        )
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise Refusal(f"invalid UTF-8 JSON: {exc}") from exc
+
+def canonical(value: Any, newline: bool = True) -> bytes:
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=True).encode("ascii")
+    return raw + (b"\n" if newline else b"")
+
+def normalize_received_fds(ancillary: list[tuple[int, int, bytes]],
+                           ledger: list[dict[str, Any]],
+                           cmsg_ledger: list[dict[str, Any]]) -> None:
+    """Take ownership of every received FD before any fallible inspection."""
+    item_size = array.array("i").itemsize
+    for level, kind, data in ancillary:
+        cmsg_record = {
+            "index": len(cmsg_ledger), "level": level, "type": kind,
+            "data_size": len(data), "fd_count": 0,
+        }
+        cmsg_ledger.append(cmsg_record)
+        require(level == socket.SOL_SOCKET and kind == socket.SCM_RIGHTS,
+                "unexpected ancillary message")
+        usable = len(data) - (len(data) % item_size)
+        values = array.array("i")
+        if usable:
+            values.frombytes(data[:usable])
+        owned: list[dict[str, Any]] = []
+        for descriptor in values.tolist():
+            record = {
+                "fd": descriptor, "receive_index": len(ledger),
+                "cmsg_index": cmsg_record["index"],
+                "cloexec_before": None, "normalization_attempted": False,
+                "cloexec_after": False, "closed_verified": False,
+            }
+            ledger.append(record)
+            owned.append(record)
+        cmsg_record["fd_count"] = len(owned)
+        require(len(data) > 0 and usable == len(data),
+                "misaligned SCM_RIGHTS payload")
+        for record in owned:
+            descriptor = record["fd"]
+            # Only F_GETFD/F_SETFD/F_GETFD touch the newly-owned descriptor
+            # before CLOEXEC has been established and verified.
+            require(exact_int(descriptor) and descriptor >= 3,
+                    "received descriptor overlaps stdio")
+            old = fcntl.fcntl(descriptor, fcntl.F_GETFD)
+            record["cloexec_before"] = bool(old & fcntl.FD_CLOEXEC)
+            record["normalization_attempted"] = True
+            fcntl.fcntl(descriptor, fcntl.F_SETFD, old | fcntl.FD_CLOEXEC)
+            now = fcntl.fcntl(descriptor, fcntl.F_GETFD)
+            require(now & fcntl.FD_CLOEXEC and not os.get_inheritable(descriptor),
+                    "received descriptor CLOEXEC normalization failed")
+            record["cloexec_after"] = True
+
+def recv_piece(sock: socket.socket, count: int, deadline: float,
+               fd_ledger: list[dict[str, Any]], cmsg_ledger: list[dict[str, Any]]) -> bytes:
+    result = bytearray()
+    while len(result) < count:
+        remaining = deadline - time.monotonic()
+        require(remaining > 0, "absolute receive deadline expired")
+        ready, _, _ = select.select([sock], [], [], remaining)
+        require(ready == [sock], "socket receive readiness differs")
+        chunk, ancillary, flags, address = sock.recvmsg(
+            count - len(result), socket.CMSG_SPACE(16 * array.array("i").itemsize),
+        )
+        # Kernel-delivered rights are owned at recvmsg return, even when the
+        # payload/truncation/address checks below fail.  Ledger and normalize
+        # them first so every later exit reaches the close ledger.
+        normalize_received_fds(ancillary, fd_ledger, cmsg_ledger)
+        require(flags & (getattr(socket, "MSG_TRUNC", 0)
+                         | getattr(socket, "MSG_CTRUNC", 0)) == 0,
+                "socket response was truncated")
+        require(address in (None, "", b""), "unexpected connected-socket address")
+        require(bool(chunk), "premature response EOF")
+        result.extend(chunk)
+    return bytes(result)
+
+def recv_frame(sock: socket.socket, deadline: float,
+               fd_ledger: list[dict[str, Any]], cmsg_ledger: list[dict[str, Any]]) \
+        -> tuple[bytes, dict[str, Any]]:
+    prefix = recv_piece(sock, 4, deadline, fd_ledger, cmsg_ledger)
+    size = struct.unpack(">I", prefix)[0]
+    require(0 < size <= MAX_FRAME_BODY, "response frame length outside fixed bound")
+    body = recv_piece(sock, size, deadline, fd_ledger, cmsg_ledger)
+    decoded = strict_json(body)
+    require(type(decoded) is dict and canonical(decoded, newline=False) == body,
+            "response frame is not canonical duplicate-free JSON")
+    return prefix + body, decoded
+
+def close_verified(descriptor: int) -> None:
+    os.close(descriptor)
+    try:
+        fcntl.fcntl(descriptor, fcntl.F_GETFD)
+    except OSError as exc:
+        require(exc.errno == errno.EBADF, "descriptor close probe failed")
+    else:
+        raise Refusal("descriptor remained open")
+
+def descriptor_inventory(expected: list[int]) -> list[int]:
+    """Require the complete live descriptor set, including listdir's own FD."""
+    require(len(expected) == len(set(expected))
+            and all(exact_int(value) and value >= 0 for value in expected),
+            "expected descriptor inventory differs")
+    inventory_root = "/dev/fd"
+    expected_root = [2114656325, 344, stat.S_IFDIR | 0o555, 0, 0, 1, 0, 0]
+    ephemeral = 0
+    while ephemeral in expected:
+        ephemeral += 1
+    for _pass in range(2):
+        require(identity8(os.lstat(inventory_root)) == expected_root,
+                "descriptor inventory directory differs")
+        names = os.listdir(inventory_root)
+        require(identity8(os.lstat(inventory_root)) == expected_root,
+                "descriptor inventory directory rebound")
+        require(all(type(name) is str
+                    and re.fullmatch(r"0|[1-9][0-9]*", name) is not None
+                    for name in names) and len(names) == len(set(names)),
+                "descriptor inventory name differs")
+        require(sorted(int(name) for name in names) ==
+                sorted(expected + [ephemeral]),
+                "complete descriptor inventory differs")
+        try:
+            fcntl.fcntl(ephemeral, fcntl.F_GETFD)
+        except OSError as exc:
+            require(exc.errno == errno.EBADF,
+                    "transient descriptor state differs")
+        else:
+            raise Refusal("transient descriptor remained open")
+    for descriptor in expected:
+        flags = fcntl.fcntl(descriptor, fcntl.F_GETFD)
+        require(descriptor < 3 or
+                (flags & fcntl.FD_CLOEXEC and not os.get_inheritable(descriptor)),
+                "retained descriptor policy differs")
+    return sorted(expected)
+
+def validate_prepared(prepared: dict[str, Any], fd_ledger: list[dict[str, Any]],
+                      cmsg_ledger: list[dict[str, Any]], deadline: float) \
+        -> tuple[str, dict[str, Any]]:
+    require(list(prepared) == PREPARED_KEYS, "PREPARED key order/set differs")
+    require(prepared["operation"] == "create-phase-diagnostic-prepared-v1"
+            and prepared["reached_phase"] == "PREPARED"
+            and prepared["request_nonce"] == REQUEST_NONCE
+            and prepared["schema_version"] == 1
+            and type(prepared["schema_version"]) is int
+            and prepared["transaction_sequence"] == 2
+            and type(prepared["transaction_sequence"]) is int,
+            "PREPARED fixed fields differ")
+    runtime_id = prepared["runtime_id"]
+    require(lower_hex(runtime_id, 32), "PREPARED runtime id differs")
+    for field in ("fifo_dev", "fifo_ino", "listener_fd_dev", "listener_fd_ino",
+                  "runtime_dev", "runtime_ino", "socket_dev", "socket_ino"):
+        require(exact_int(prepared[field]), f"PREPARED numeric type differs: {field}")
+    for field in ("fifo_dev", "fifo_ino", "listener_fd_ino", "runtime_dev",
+                  "runtime_ino", "socket_dev", "socket_ino"):
+        require(prepared[field] >= 0, f"PREPARED numeric range differs: {field}")
+    require(prepared["listener_fd_dev"] >= -1,
+            "PREPARED listener descriptor device range differs")
+    require(len(cmsg_ledger) == 1
+            and set(cmsg_ledger[0]) == {
+                "index", "level", "type", "data_size", "fd_count",
+            }
+            and cmsg_ledger[0] == {
+                "index": 0, "level": socket.SOL_SOCKET,
+                "type": socket.SCM_RIGHTS,
+                "data_size": 3 * array.array("i").itemsize, "fd_count": 3,
+            }
+            and len(fd_ledger) == 3
+            and len({entry["fd"] for entry in fd_ledger}) == 3
+            and [entry.get("receive_index") for entry in fd_ledger] == [0, 1, 2]
+            and all(type(entry) is dict and set(entry) == {
+                        "fd", "receive_index", "cmsg_index", "cloexec_before",
+                        "normalization_attempted", "cloexec_after",
+                        "closed_verified",
+                    }
+                    and entry.get("cmsg_index") == 0
+                    and type(entry.get("cloexec_before")) is bool
+                    and entry.get("normalization_attempted") is True
+                    and entry.get("cloexec_after") is True
+                    and entry.get("closed_verified") is False
+                    for entry in fd_ledger),
+            "PREPARED SCM_RIGHTS shape/order differs")
+    require(time.monotonic() < deadline, "PREPARED validation exceeded ACK deadline")
+
+    runtime_fd, fifo_fd, listener_fd = [entry["fd"] for entry in fd_ledger]
+    runtime_stat = os.fstat(runtime_fd)
+    fifo_stat = os.fstat(fifo_fd)
+    listener_stat = os.fstat(listener_fd)
+    runtime_flags = fcntl.fcntl(runtime_fd, fcntl.F_GETFL)
+    fifo_flags = fcntl.fcntl(fifo_fd, fcntl.F_GETFL)
+    listener_flags = fcntl.fcntl(listener_fd, fcntl.F_GETFL)
+    require(stat.S_ISDIR(runtime_stat.st_mode)
+            and runtime_stat.st_uid == CLIENT_UID and runtime_stat.st_gid == CLIENT_GID
+            and stat.S_IMODE(runtime_stat.st_mode) == 0o700
+            and (runtime_flags & os.O_ACCMODE) == os.O_RDONLY
+            and runtime_stat.st_dev == prepared["runtime_dev"]
+            and runtime_stat.st_ino == prepared["runtime_ino"],
+            "received runtime-directory capability differs")
+    require(stat.S_ISFIFO(fifo_stat.st_mode)
+            and fifo_stat.st_uid == 0 and fifo_stat.st_gid == 0
+            and stat.S_IMODE(fifo_stat.st_mode) == 0o600 and fifo_stat.st_nlink == 1
+            and (fifo_flags & os.O_ACCMODE) == os.O_WRONLY
+            and fifo_flags & os.O_NONBLOCK
+            and fifo_stat.st_dev == prepared["fifo_dev"]
+            and fifo_stat.st_ino == prepared["fifo_ino"],
+            "received mediator-local FIFO capability differs")
+    require(stat.S_ISSOCK(listener_stat.st_mode)
+            and (listener_flags & os.O_ACCMODE) == os.O_RDWR
+            and listener_stat.st_dev == prepared["listener_fd_dev"]
+            and listener_stat.st_ino == prepared["listener_fd_ino"],
+            "received listener descriptor identity differs")
+    listener = socket.socket(fileno=listener_fd)
+    try:
+        listener_family = int(listener.family)
+        listener_type = int(listener.type)
+        observed = query_received_listener(listener_fd)
+        require(type(observed) is tuple and len(observed) == 12
+                and type(observed[0]) is str and observed[0] == "proc_pidfdinfo-v1"
+                and all(type(observed[index]) is int for index in range(1, 10))
+                and observed[1] == os.getpid() and 0 < observed[1] <= 0x7fffffff
+                and observed[2] == listener_fd and observed[3] == 792
+                and -0x80000000 <= observed[4] <= 0x7fffffff
+                and observed[5:8] == (socket.AF_UNIX, socket.SOCK_STREAM, 3)
+                and -32768 <= observed[8] <= 32767 and observed[8] & 2
+                and 0 <= observed[9] <= 255
+                and type(observed[10]) is bytes and len(observed[10]) <= 103
+                and b"\0" not in observed[10]
+                and type(observed[11]) is str
+                and observed[11] == "UNVALIDATED_ADDRESS_AND_IMAGE",
+                "received listener native observation differs")
+        listener_sockname = listener.getsockname()
+        require(listener_family == socket.AF_UNIX
+                and listener_type == socket.SOCK_STREAM,
+                "received listener socket family/type differs")
+        exact_socket_path = f"{NAMESPACE}/a/o-{runtime_id}/p/c"
+        require(listener_sockname == exact_socket_path,
+                "listener is bound to another socket path")
+        require(observed[10] == exact_socket_path.encode("ascii"),
+                "listener observation address differs from independent exact path")
+        require(identity8(os.fstat(listener_fd)) == identity8(listener_stat)
+                and fcntl.fcntl(listener_fd, fcntl.F_GETFL) == listener_flags
+                and fcntl.fcntl(listener_fd, fcntl.F_GETFD) & fcntl.FD_CLOEXEC,
+                "listener identity or flags changed after native observation")
+    finally:
+        require(listener.detach() == listener_fd, "listener descriptor detach differs")
+    socket_stat = os.lstat(exact_socket_path)
+    require(stat.S_ISSOCK(socket_stat.st_mode) and socket_stat.st_uid == 0
+            and socket_stat.st_gid == CLIENT_GID
+            and stat.S_IMODE(socket_stat.st_mode) == 0o620
+            and socket_stat.st_nlink == 1
+            and socket_stat.st_dev == prepared["socket_dev"]
+            and socket_stat.st_ino == prepared["socket_ino"],
+            "named portal socket identity differs")
+    require(len({
+                (runtime_stat.st_dev, runtime_stat.st_ino),
+                (fifo_stat.st_dev, fifo_stat.st_ino),
+                (listener_stat.st_dev, listener_stat.st_ino),
+                (socket_stat.st_dev, socket_stat.st_ino),
+            }) == 4,
+            "runtime/FIFO/listener/named-socket identity domains overlap")
+    runtime_path = f"{NAMESPACE}/a/o-{runtime_id}/h/r"
+    fifo_path = f"{NAMESPACE}/a/o-{runtime_id}/h/l"
+    runtime_path_identity8 = identity8(os.lstat(runtime_path))
+    fifo_path_identity8 = identity8(os.lstat(fifo_path))
+    require(runtime_path_identity8 == identity8(runtime_stat),
+            "runtime descriptor does not bind fixed runtime path")
+    require(fifo_path_identity8 == identity8(fifo_stat),
+            "FIFO descriptor does not bind fixed mediator-local path")
+    return runtime_id, {
+        "runtime": {"fd": runtime_fd, "identity8": identity8(runtime_stat),
+                    "getfl": runtime_flags},
+        "fifo_writer": {"fd": fifo_fd, "identity8": identity8(fifo_stat),
+                        "getfl": fifo_flags},
+        "listener": {
+            "fd": listener_fd, "identity8": identity8(listener_stat),
+            "getfl": listener_flags, "family": listener_family,
+            "type": listener_type,
+            "native_query": {
+                "primitive": observed[0], "self_pid": observed[1],
+                "fd": observed[2], "return_size": observed[3], "errno": observed[4],
+                "family": observed[5], "type": observed[6], "kind": observed[7],
+                "options": observed[8], "sun_len": observed[9],
+                "address_hex": observed[10].hex(), "binding_status": observed[11],
+            },
+            "sockname": listener_sockname,
+        },
+        "named_socket_identity8": identity8(socket_stat),
+        "runtime_path_identity8": runtime_path_identity8,
+        "fifo_path_identity8": fifo_path_identity8,
+        "runtime_path": runtime_path, "fifo_path": fifo_path,
+        "socket_path": exact_socket_path,
+    }
+
+def validate_result(result: dict[str, Any], expected_runtime: Optional[str]) -> str:
+    require(list(result) == RESULT_KEYS, "diagnostic result key order/set differs")
+    phase = result["reached_phase"]
+    require(phase in EARLY_PHASES | LATE_PHASES,
+            "diagnostic result phase differs")
+    require(result["cleanup_request_nonce"] == CLEANUP_NONCE
+            and result["operation"] == "create-phase-diagnostic-result-v1"
+            and result["request_nonce"] == REQUEST_NONCE
+            and result["schema_version"] == 1
+            and type(result["schema_version"]) is int
+            and result["transaction_sequence"] == 2
+            and type(result["transaction_sequence"]) is int
+            and result["zero_runtime_residue"] is True
+            and lower_hex(result["receipt_sha256"], 64)
+            and lower_hex(result["runtime_id"], 32),
+            "diagnostic result fixed fields differ")
+    expected_sequence = 1 if phase in EARLY_PHASES else 2
+    require(result["receipt_sequence"] == expected_sequence
+            and type(result["receipt_sequence"]) is int,
+            "diagnostic result receipt sequence differs")
+    if expected_runtime is not None:
+        require(phase == "PREPARED" and result["runtime_id"] == expected_runtime,
+                "PREPARED and result runtime/phase differ")
+    else:
+        require(phase != "PREPARED", "PREPARED result lacked PREPARED frame")
+    return phase
+
+def capture_stdio_and_wait(pid: int, stdout_fd: int, stderr_fd: int,
+                           deadline: float) -> dict[str, Any]:
+    streams = {stdout_fd: bytearray(), stderr_fd: bytearray()}
+    open_fds = {stdout_fd, stderr_fd}
+    wait_status: Optional[int] = None
+    waited_pid: Optional[int] = None
+    deadline_expired = False
+    oversized = False
+    observation_errors: list[dict[str, Any]] = []
+
+    def record_error(stage: str, exc: BaseException) -> None:
+        observation_errors.append({
+            "stage": stage, "type": type(exc).__name__, "text": str(exc),
+            "errno": getattr(exc, "errno", None),
+        })
+
+    try:
+        for descriptor in sorted(open_fds):
+            try:
+                os.set_blocking(descriptor, False)
+            except BaseException as exc:
+                record_error(f"set-nonblocking-{descriptor}", exc)
+        while open_fds or wait_status is None:
+            if wait_status is None:
+                try:
+                    candidate, status_value = os.waitpid(pid, os.WNOHANG)
+                except InterruptedError:
+                    candidate, status_value = 0, 0
+                except BaseException as exc:
+                    record_error("waitpid-nonblocking", exc)
+                    break
+                if candidate == pid:
+                    waited_pid, wait_status = candidate, status_value
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                # Timeout changes the classification, never ownership.  The
+                # exact child is still drained and reaped without signal/kill.
+                deadline_expired = True
+            if open_fds:
+                try:
+                    ready, _, _ = select.select(
+                        sorted(open_fds), [], [],
+                        0.05 if remaining <= 0 else min(remaining, 0.05),
+                    )
+                except BaseException as exc:
+                    record_error("stdio-select", exc)
+                    break
+                for descriptor in ready:
+                    try:
+                        chunk = os.read(descriptor, 65536)
+                    except BlockingIOError:
+                        continue
+                    except BaseException as exc:
+                        record_error(f"stdio-read-{descriptor}", exc)
+                        open_fds.remove(descriptor)
+                        continue
+                    if chunk:
+                        streams[descriptor].extend(chunk)
+                        if len(streams[descriptor]) > MAX_STDIO:
+                            oversized = True
+                            del streams[descriptor][MAX_STDIO + 1:]
+                    else:
+                        open_fds.remove(descriptor)
+            elif wait_status is None:
+                time.sleep(0.01)
+    except BaseException as exc:
+        record_error("capture-interruption", exc)
+    finally:
+        # Once posix_spawn returned a PID, every local path owns the duty to
+        # reap exactly that PID.  No signal, kill, retry, or process scan is
+        # used.  Interrupted and otherwise failed waits are resumed forever;
+        # without signal authority there is no safe branch that may emit an
+        # owner-stop result while this exact child could still be live.
+        final_wait_error_recorded = False
+        while wait_status is None:
+            try:
+                candidate, status_value = os.waitpid(pid, 0)
+            except InterruptedError:
+                continue
+            except BaseException as exc:
+                if not final_wait_error_recorded:
+                    record_error("waitpid-final", exc)
+                    final_wait_error_recorded = True
+                try:
+                    time.sleep(0.05)
+                except BaseException:
+                    pass
+                continue
+            if candidate == pid:
+                waited_pid, wait_status = candidate, status_value
+            else:
+                if not final_wait_error_recorded:
+                    record_error("waitpid-final",
+                                 Refusal("waitpid returned another child"))
+                    final_wait_error_recorded = True
+                try:
+                    time.sleep(0.05)
+                except BaseException:
+                    pass
+    stdout = bytes(streams[stdout_fd])
+    stderr = bytes(streams[stderr_fd])
+    return {
+        "waited_pid": waited_pid, "wait_status_raw": wait_status,
+        "exited": os.WIFEXITED(wait_status) if wait_status is not None else None,
+        "exit_status": (os.WEXITSTATUS(wait_status) if wait_status is not None
+                        and os.WIFEXITED(wait_status) else None),
+        "signaled": os.WIFSIGNALED(wait_status) if wait_status is not None else None,
+        "signal": (os.WTERMSIG(wait_status) if wait_status is not None
+                   and os.WIFSIGNALED(wait_status) else None),
+        "stdout_hex": stdout.hex(), "stdout_size": len(stdout),
+        "stdout_sha256": sha256(stdout),
+        "stderr_hex": stderr.hex(), "stderr_size": len(stderr),
+        "stderr_sha256": sha256(stderr),
+        "deadline_expired": deadline_expired,
+        "stdio_oversized": oversized,
+        "exact_child_reaped": waited_pid == pid and wait_status is not None,
+        "observation_errors": observation_errors,
+    }
+
+def run_exact_protocol(persistent_fds: list[int]) -> dict[str, Any]:
+    parent: Optional[socket.socket] = None
+    child: Optional[socket.socket] = None
+    stdout_read = stdout_write = stderr_read = stderr_write = -1
+    try:
+        parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        stdout_read, stdout_write = os.pipe()
+        stderr_read, stderr_write = os.pipe()
+        for descriptor in (
+            parent.fileno(), child.fileno(), stdout_read, stdout_write,
+            stderr_read, stderr_write,
+        ):
+            os.set_inheritable(descriptor, False)
+            require(descriptor >= 3 and not os.get_inheritable(descriptor)
+                    and fcntl.fcntl(descriptor, fcntl.F_GETFD) & fcntl.FD_CLOEXEC,
+                    "workflow transport fd lacks CLOEXEC")
+    except BaseException:
+        for descriptor in (stdout_read, stdout_write, stderr_read, stderr_write):
+            if descriptor >= 0:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+        for value in (parent, child):
+            if value is not None:
+                try:
+                    value.close()
+                except OSError:
+                    pass
+        raise
+    require(parent is not None and child is not None,
+            "transport construction did not yield sockets")
+    protocol: dict[str, Any] = {
+        "spawn_attempted": False, "spawn_error": None, "pid": None,
+        "request_sent_once": False, "request_wire_sha256": REQUEST_WIRE_SHA256,
+        "request_write_shutdown": False, "first_frame": None,
+        "prepared_frame": None, "prepared_capabilities": None,
+        "invalid_ack_hex": "", "invalid_ack_write_count": 0,
+        "result_frame": None, "socket_eof": False,
+        "received_fds": [], "ancillary_messages": [], "protocol_error": None,
+        "child_capture_error": None,
+        "local_transport_fds": [
+            {"role": "parent_socket", "fd": parent.fileno(),
+             "close_attempted": False, "closed_verified": False},
+            {"role": "child_socket", "fd": child.fileno(),
+             "close_attempted": False, "closed_verified": False},
+            {"role": "stdout_read", "fd": stdout_read,
+             "close_attempted": False, "closed_verified": False},
+            {"role": "stdout_write", "fd": stdout_write,
+             "close_attempted": False, "closed_verified": False},
+            {"role": "stderr_read", "fd": stderr_read,
+             "close_attempted": False, "closed_verified": False},
+            {"role": "stderr_write", "fd": stderr_write,
+             "close_attempted": False, "closed_verified": False},
+        ],
+        "transport_cleanup_complete": False,
+        "final_fd_inventory": None,
+        "final_fd_inventory_error": None,
+    }
+
+    def close_local(role: str, descriptor: int) -> None:
+        records = [item for item in protocol["local_transport_fds"]
+                   if item["role"] == role]
+        require(len(records) == 1 and records[0]["fd"] == descriptor,
+                f"local transport ledger differs: {role}")
+        item = records[0]
+        require(item["close_attempted"] is False,
+                f"local transport close repeated: {role}")
+        item["close_attempted"] = True
+        try:
+            close_verified(descriptor)
+        except BaseException as exc:
+            item["close_error"] = {
+                "type": type(exc).__name__, "text": str(exc),
+                "errno": getattr(exc, "errno", None),
+            }
+        else:
+            item["closed_verified"] = True
+
+    def detach_and_close(role: str, value: socket.socket) -> None:
+        descriptor = value.fileno()
+        if descriptor < 0:
+            return
+        try:
+            detached = value.detach()
+        except BaseException as exc:
+            records = [item for item in protocol["local_transport_fds"]
+                       if item["role"] == role]
+            require(len(records) == 1, f"local socket ledger differs: {role}")
+            records[0]["close_attempted"] = True
+            records[0]["close_error"] = {
+                "type": type(exc).__name__, "text": str(exc),
+                "errno": getattr(exc, "errno", None),
+            }
+            try:
+                value.close()
+            except BaseException:
+                pass
+            return
+        close_local(role, detached)
+
+    pid: Optional[int] = None
+    final_deadline = time.monotonic() + FINAL_DEADLINE_SECONDS
+    try:
+        actions = [
+            (os.POSIX_SPAWN_DUP2, child.fileno(), 0),
+            (os.POSIX_SPAWN_DUP2, stdout_write, 1),
+            (os.POSIX_SPAWN_DUP2, stderr_write, 2),
+            (os.POSIX_SPAWN_CLOSE, parent.fileno()),
+            (os.POSIX_SPAWN_CLOSE, stdout_read),
+            (os.POSIX_SPAWN_CLOSE, stderr_read),
+        ]
+        for descriptor in (child.fileno(), stdout_write, stderr_write):
+            if descriptor not in (0, 1, 2):
+                actions.append((os.POSIX_SPAWN_CLOSE, descriptor))
+        protocol["spawn_attempted"] = True
+        try:
+            pid = os.posix_spawn(TARGET, [TARGET], HOSTILE_ENVIRONMENT,
+                                 file_actions=actions)
+            protocol["pid"] = pid
+        except OSError as exc:
+            protocol["spawn_error"] = {
+                "type": type(exc).__name__, "errno": exc.errno, "text": str(exc),
+            }
+        detach_and_close("child_socket", child)
+        close_local("stdout_write", stdout_write)
+        stdout_write = -1
+        close_local("stderr_write", stderr_write)
+        stderr_write = -1
+        if pid is not None:
+            parent.sendall(REQUEST_WIRE)
+            protocol["request_sent_once"] = True
+            parent.shutdown(socket.SHUT_WR)
+            protocol["request_write_shutdown"] = True
+            ack_deadline = time.monotonic() + ACK_DEADLINE_SECONDS
+            first_wire, first = recv_frame(
+                parent, ack_deadline, protocol["received_fds"],
+                protocol["ancillary_messages"],
+            )
+            protocol["first_frame"] = {
+                "wire_hex": first_wire.hex(), "wire_size": len(first_wire),
+                "wire_sha256": sha256(first_wire), "decoded": first,
+            }
+            runtime_id: Optional[str] = None
+            if first.get("operation") == "create-phase-diagnostic-prepared-v1":
+                runtime_id, capabilities = validate_prepared(
+                    first, protocol["received_fds"],
+                    protocol["ancillary_messages"], ack_deadline,
+                )
+                protocol["prepared_frame"] = protocol["first_frame"]
+                protocol["prepared_capabilities"] = capabilities
+                runtime_fd, fifo_fd, listener_fd = [
+                    entry["fd"] for entry in protocol["received_fds"]
+                ]
+                close_verified(runtime_fd)
+                protocol["received_fds"][0]["closed_verified"] = True
+                close_verified(listener_fd)
+                protocol["received_fds"][2]["closed_verified"] = True
+                require(time.monotonic() < ack_deadline,
+                        "invalid ACK missed absolute deadline")
+                written = os.write(fifo_fd, INVALID_ACK)
+                require(written == 1, "invalid ACK write was not exactly one byte")
+                protocol["invalid_ack_hex"] = INVALID_ACK.hex()
+                protocol["invalid_ack_write_count"] = 1
+                close_verified(fifo_fd)
+                protocol["received_fds"][1]["closed_verified"] = True
+                result_wire, result = recv_frame(
+                    parent, final_deadline, protocol["received_fds"],
+                    protocol["ancillary_messages"],
+                )
+                require(len(protocol["received_fds"]) == 3
+                        and len(protocol["ancillary_messages"]) == 1,
+                        "result frame carried ancillary authority")
+            else:
+                result_wire, result = first_wire, first
+                require(protocol["received_fds"] == []
+                        and protocol["ancillary_messages"] == [],
+                        "early result carried ancillary authority")
+            phase = validate_result(result, runtime_id)
+            protocol["result_frame"] = {
+                "wire_hex": result_wire.hex(), "wire_size": len(result_wire),
+                "wire_sha256": sha256(result_wire), "decoded": result,
+                "validated_phase": phase,
+            }
+            remaining = final_deadline - time.monotonic()
+            require(remaining > 0, "socket EOF deadline expired")
+            ready, _, _ = select.select([parent], [], [], remaining)
+            require(ready == [parent], "socket EOF was not readable")
+            extra, ancillary, flags, address = parent.recvmsg(
+                1, socket.CMSG_SPACE(16 * array.array("i").itemsize),
+            )
+            if ancillary:
+                normalize_received_fds(
+                    ancillary, protocol["received_fds"],
+                    protocol["ancillary_messages"],
+                )
+            require(extra == b"" and ancillary == [] and flags == 0
+                    and address in (None, "", b""),
+                    "socket did not end with clean authority-free EOF")
+            protocol["socket_eof"] = True
+    except BaseException as exc:
+        protocol["protocol_error"] = {
+            "type": type(exc).__name__, "text": str(exc),
+            "errno": getattr(exc, "errno", None),
+        }
+    finally:
+        for item in protocol["received_fds"]:
+            if not item.get("closed_verified"):
+                try:
+                    close_verified(item["fd"])
+                    item["closed_verified"] = True
+                except BaseException as exc:
+                    item["close_error"] = f"{type(exc).__name__}:{exc}"
+        detach_and_close("parent_socket", parent)
+        detach_and_close("child_socket", child)
+        if stdout_write >= 0:
+            close_local("stdout_write", stdout_write)
+            stdout_write = -1
+        if stderr_write >= 0:
+            close_local("stderr_write", stderr_write)
+            stderr_write = -1
+        if pid is not None:
+            try:
+                protocol["child"] = capture_stdio_and_wait(
+                    pid, stdout_read, stderr_read, final_deadline,
+                )
+            except BaseException as exc:
+                protocol["child_capture_error"] = {
+                    "type": type(exc).__name__, "text": str(exc),
+                    "errno": getattr(exc, "errno", None),
+                }
+        else:
+            protocol["child"] = None
+        close_local("stdout_read", stdout_read)
+        close_local("stderr_read", stderr_read)
+        protocol["transport_cleanup_complete"] = all(
+            item.get("closed_verified") is True for item in protocol["received_fds"]
+        ) and all(
+            item.get("closed_verified") is True
+            for item in protocol["local_transport_fds"]
+        )
+        try:
+            protocol["final_fd_inventory"] = descriptor_inventory(persistent_fds)
+        except BaseException as exc:
+            protocol["final_fd_inventory_error"] = {
+                "type": type(exc).__name__, "text": str(exc),
+                "errno": getattr(exc, "errno", None),
+            }
+    return protocol
+'''
+
+_H039_VERIFIER_VALIDATOR_SOURCE = r'''
+class Refusal(RuntimeError):
+    pass
+
+def require(condition: bool, reason: str) -> None:
+    if not condition:
+        raise Refusal(reason)
+
+def sha256(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+def exact_int(value: Any) -> bool:
+    return type(value) is int
+
+def exact_int_vector(value: Any, length: int,
+                     signed_indices: frozenset[int] = frozenset()) -> bool:
+    return (type(value) is list and len(value) == length
+            and all(exact_int(item)
+                    and (item >= 0 or index in signed_indices)
+                    for index, item in enumerate(value)))
+
+def exact_typed_equal(observed: Any, expected: Any) -> bool:
+    """JSON equality that never aliases bool with the integers 0 or 1."""
+    if type(observed) is not type(expected):
+        return False
+    if type(expected) is dict:
+        return (set(observed) == set(expected)
+                and all(exact_typed_equal(observed[key], expected[key])
+                        for key in expected))
+    if type(expected) is list:
+        return (len(observed) == len(expected)
+                and all(exact_typed_equal(left, right)
+                        for left, right in zip(observed, expected)))
+    return observed == expected
+
+def lower_hex(value: Any, length: int) -> bool:
+    return type(value) is str and re.fullmatch(f"[0-9a-f]{{{length}}}", value) is not None
+
+def strict_json(raw: bytes) -> Any:
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in items:
+            require(key not in result, f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+    try:
+        return json.loads(
+            raw.decode("utf-8"), object_pairs_hook=pairs,
+            parse_float=lambda token: (_ for _ in ()).throw(
+                Refusal(f"floating JSON number forbidden: {token}")),
+            parse_constant=lambda token: (_ for _ in ()).throw(
+                Refusal(f"non-finite JSON token: {token}")),
+        )
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise Refusal(f"invalid UTF-8 JSON: {exc}") from exc
+
+def canonical(value: Any, newline: bool = True) -> bytes:
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=True).encode("ascii")
+    return raw + (b"\n" if newline else b"")
+
+def decode_frame(record: Any) -> tuple[bytes, dict[str, Any]]:
+    require(type(record) is dict and set(record) >=
+            {"wire_hex", "wire_size", "wire_sha256", "decoded"},
+            "frame evidence schema differs")
+    require(type(record.get("wire_hex")) is str
+            and re.fullmatch(r"[0-9a-f]+", record["wire_hex"]) is not None
+            and len(record["wire_hex"]) % 2 == 0,
+            "frame wire hex is not strict lowercase")
+    try:
+        wire = bytes.fromhex(record["wire_hex"])
+    except (TypeError, ValueError) as exc:
+        raise Refusal("frame hex differs") from exc
+    require(record["wire_size"] == len(wire)
+            and exact_int(record["wire_size"])
+            and record["wire_size"] >= 5
+            and record["wire_sha256"] == sha256(wire)
+            and 0 < len(wire) - 4 <= MAX_FRAME_BODY
+            and struct.unpack(">I", wire[:4])[0] == len(wire) - 4,
+            "frame wire length/digest differs")
+    decoded = strict_json(wire[4:])
+    require(type(decoded) is dict and canonical(decoded, newline=False) == wire[4:]
+            and exact_typed_equal(decoded, record["decoded"]),
+            "frame decoded/canonical relation differs")
+    return wire, decoded
+
+def validate_protocol(protocol: Any) \
+        -> tuple[Optional[dict[str, Any]], bool]:
+    require(type(protocol) is dict and set(protocol) == {
+                "spawn_attempted", "spawn_error", "pid", "request_sent_once",
+                "request_wire_sha256", "request_write_shutdown", "first_frame",
+                "prepared_frame", "prepared_capabilities", "invalid_ack_hex",
+                "invalid_ack_write_count", "result_frame", "socket_eof",
+                "received_fds", "ancillary_messages", "protocol_error",
+                "child_capture_error", "local_transport_fds",
+                "transport_cleanup_complete", "final_fd_inventory",
+                "final_fd_inventory_error", "child",
+            }
+            and protocol.get("spawn_attempted") is True
+            and protocol.get("spawn_error") is None
+            and protocol.get("child_capture_error") is None
+            and exact_int(protocol.get("pid"))
+            and 0 < protocol["pid"] <= 0x7fffffff
+            and protocol.get("request_sent_once") is True
+            and protocol.get("request_wire_sha256") == REQUEST_WIRE_SHA256
+            and protocol.get("request_write_shutdown") is True
+            and protocol.get("socket_eof") is True
+            and protocol.get("protocol_error") is None
+            and protocol.get("transport_cleanup_complete") is True
+            and protocol.get("final_fd_inventory_error") is None
+            and type(protocol.get("final_fd_inventory")) is list
+            and all(exact_int(item) and item >= 0
+                    for item in protocol["final_fd_inventory"])
+            and protocol.get("final_fd_inventory") == list(range(92)),
+            "protocol lifecycle differs")
+    local = protocol.get("local_transport_fds")
+    local_roles = [
+        "parent_socket", "child_socket", "stdout_read", "stdout_write",
+        "stderr_read", "stderr_write",
+    ]
+    require(type(local) is list and len(local) == len(local_roles)
+            and all(type(item) is dict for item in local),
+            "local transport descriptor ledger shape differs")
+    require([item.get("role") for item in local] == local_roles
+            and len({item.get("fd") for item in local}) == len(local_roles)
+            and all(set(item) == {
+                        "role", "fd", "close_attempted", "closed_verified",
+                    }
+                    and exact_int(item.get("fd"))
+                    and 3 <= item["fd"] <= 1048575
+                    and item.get("close_attempted") is True
+                    and item.get("closed_verified") is True
+                    and "close_error" not in item for item in local),
+            "local transport descriptor cleanup ledger differs")
+    require(all(item["fd"] not in protocol["final_fd_inventory"]
+                for item in local),
+            "closed local transport descriptor remains in final inventory")
+    child = protocol.get("child")
+    require(type(child) is dict and set(child) == {
+                "waited_pid", "wait_status_raw", "exited", "exit_status",
+                "signaled", "signal", "stdout_hex", "stdout_size",
+                "stdout_sha256", "stderr_hex", "stderr_size",
+                "stderr_sha256", "deadline_expired", "stdio_oversized",
+                "exact_child_reaped", "observation_errors",
+            }
+            and exact_int(child.get("waited_pid"))
+            and 0 < child["waited_pid"] <= 0x7fffffff
+            and child["waited_pid"] == protocol["pid"]
+            and exact_int(child.get("wait_status_raw"))
+            and child["wait_status_raw"] == 0
+            and child.get("exited") is True
+            and exact_int(child.get("exit_status"))
+            and child["exit_status"] == 0
+            and child.get("exact_child_reaped") is True
+            and child.get("signaled") is False and child.get("signal") is None
+            and child.get("deadline_expired") is False
+            and child.get("stdio_oversized") is False
+            and child.get("stdout_hex") == child.get("stderr_hex") == ""
+            and exact_int(child.get("stdout_size"))
+            and exact_int(child.get("stderr_size"))
+            and child["stdout_size"] == child["stderr_size"] == 0
+            and child.get("stdout_sha256") == child.get("stderr_sha256")
+            == EMPTY_SHA256
+            and child.get("observation_errors") == [],
+            "child wait/output evidence differs")
+    first_wire, first = decode_frame(protocol.get("first_frame"))
+    result_wire, result = decode_frame(protocol.get("result_frame"))
+    require(set(protocol["first_frame"]) == {
+                "wire_hex", "wire_size", "wire_sha256", "decoded",
+            }
+            and set(protocol["result_frame"]) == {
+                "wire_hex", "wire_size", "wire_sha256", "decoded",
+                "validated_phase",
+            }
+            and protocol["result_frame"].get("validated_phase")
+            == result.get("reached_phase"),
+            "frame evidence exact schema differs")
+    require(list(result) == RESULT_KEYS
+            and result.get("cleanup_request_nonce") == CLEANUP_NONCE
+            and result.get("operation") == "create-phase-diagnostic-result-v1"
+            and result.get("request_nonce") == REQUEST_NONCE
+            and result.get("schema_version") == 1
+            and type(result.get("schema_version")) is int
+            and result.get("transaction_sequence") == 2
+            and type(result.get("transaction_sequence")) is int
+            and result.get("zero_runtime_residue") is True
+            and lower_hex(result.get("runtime_id"), 32)
+            and lower_hex(result.get("receipt_sha256"), 64)
+            and result.get("reached_phase") in EARLY_PHASES | LATE_PHASES,
+            "result frame fields differ")
+    prepared = result["reached_phase"] == "PREPARED"
+    expected_sequence = 1 if result["reached_phase"] in EARLY_PHASES else 2
+    require(result.get("receipt_sequence") == expected_sequence
+            and type(result.get("receipt_sequence")) is int,
+            "result receipt sequence differs")
+    received = protocol.get("received_fds")
+    ancillary = protocol.get("ancillary_messages")
+    if prepared:
+        require(first_wire != result_wire
+                and exact_typed_equal(protocol.get("prepared_frame"),
+                                      protocol.get("first_frame"))
+                and list(first) == PREPARED_KEYS
+                and first.get("operation") == "create-phase-diagnostic-prepared-v1"
+                and first.get("reached_phase") == "PREPARED"
+                and first.get("request_nonce") == REQUEST_NONCE
+                and first.get("runtime_id") == result["runtime_id"]
+                and first.get("schema_version") == 1
+                and type(first.get("schema_version")) is int
+                and first.get("transaction_sequence") == 2
+                and type(first.get("transaction_sequence")) is int,
+                "PREPARED frame fields differ")
+        for field in ("fifo_dev", "fifo_ino", "listener_fd_ino", "runtime_dev",
+                      "runtime_ino", "socket_dev", "socket_ino"):
+            require(exact_int(first.get(field)) and first[field] >= 0,
+                    f"PREPARED integer differs: {field}")
+        require(exact_int(first.get("listener_fd_dev"))
+                and first["listener_fd_dev"] >= -1,
+                "PREPARED signed listener_fd_dev differs")
+        expected_fd_keys = {
+            "fd", "receive_index", "cmsg_index", "cloexec_before",
+            "normalization_attempted", "cloexec_after", "closed_verified",
+        }
+        require(type(received) is list and len(received) == 3
+                and len({item.get("fd") for item in received}) == 3
+                and [item.get("receive_index") for item in received] == [0, 1, 2]
+                and all(type(item) is dict and set(item) == expected_fd_keys
+                        and exact_int(item.get("fd"))
+                        and 3 <= item["fd"] <= 1048575
+                        and exact_int(item.get("receive_index"))
+                        and exact_int(item.get("cmsg_index"))
+                        and item.get("cmsg_index") == 0
+                        and type(item.get("cloexec_before")) is bool
+                        and item.get("normalization_attempted") is True
+                        and item.get("cloexec_after") is True
+                        and item.get("closed_verified") is True for item in received)
+                and type(ancillary) is list and len(ancillary) == 1
+                and all(exact_int(ancillary[0].get(field)) for field in (
+                    "index", "level", "type", "data_size", "fd_count",
+                ))
+                and ancillary[0] == {
+                    "index": 0, "level": socket.SOL_SOCKET,
+                    "type": socket.SCM_RIGHTS,
+                    "data_size": 3 * array.array("i").itemsize, "fd_count": 3,
+                }
+            and protocol.get("invalid_ack_hex") == "58"
+            and exact_int(protocol.get("invalid_ack_write_count"))
+            and protocol["invalid_ack_write_count"] == 1,
+                "PREPARED descriptor/ACK ledger differs")
+        require(all(item["fd"] not in protocol["final_fd_inventory"]
+                    for item in received),
+                "closed received descriptor remains in final inventory")
+        caps = protocol.get("prepared_capabilities")
+        require(type(caps) is dict and set(caps) == {
+                    "runtime", "fifo_writer", "listener",
+                    "named_socket_identity8", "runtime_path_identity8",
+                    "fifo_path_identity8", "runtime_path", "fifo_path",
+                    "socket_path",
+                }
+                and all(type(caps.get(role)) is dict
+                        and set(caps[role]) == {"fd", "identity8", "getfl"}
+                        for role in ("runtime", "fifo_writer"))
+                and type(caps.get("listener")) is dict
+                and set(caps["listener"]) == {
+                    "fd", "identity8", "getfl", "family", "type",
+                    "native_query", "sockname",
+                }
+                and all(exact_int_vector(
+                            caps[role]["identity8"], 8,
+                            frozenset({0}) if role == "listener" else frozenset())
+                        and exact_int(caps[role]["getfl"])
+                        and caps[role]["getfl"] >= 0
+                        and exact_int(caps[role].get("fd"))
+                        and caps[role]["fd"] >= 3
+                        for role in ("runtime", "fifo_writer", "listener"))
+                and caps.get("runtime", {}).get("fd") == received[0]["fd"]
+                and caps.get("fifo_writer", {}).get("fd") == received[1]["fd"]
+                and caps.get("listener", {}).get("fd") == received[2]["fd"]
+                and caps.get("runtime", {}).get("identity8", [None, None])[0:2]
+                == [first["runtime_dev"], first["runtime_ino"]]
+                and caps.get("fifo_writer", {}).get("identity8", [None, None])[0:2]
+                == [first["fifo_dev"], first["fifo_ino"]]
+                and caps.get("listener", {}).get("identity8", [None, None])[0:2]
+                == [first["listener_fd_dev"], first["listener_fd_ino"]]
+                and stat.S_ISDIR(caps["runtime"]["identity8"][2])
+                and stat.S_IMODE(caps["runtime"]["identity8"][2]) == 0o700
+                and caps["runtime"]["identity8"][3:5] == [CLIENT_UID, CLIENT_GID]
+                and caps["runtime"]["identity8"][5] >= 1
+                and caps["runtime"]["getfl"] & os.O_ACCMODE == os.O_RDONLY
+                and stat.S_ISFIFO(caps["fifo_writer"]["identity8"][2])
+                and stat.S_IMODE(caps["fifo_writer"]["identity8"][2]) == 0o600
+                and caps["fifo_writer"]["identity8"][3:6] == [0, 0, 1]
+                and caps["fifo_writer"]["getfl"] & os.O_ACCMODE == os.O_WRONLY
+                and caps["fifo_writer"]["getfl"] & os.O_NONBLOCK
+                and stat.S_ISSOCK(caps["listener"]["identity8"][2])
+                and caps["listener"]["getfl"] & os.O_ACCMODE == os.O_RDWR
+                and caps["listener"].get("family") == socket.AF_UNIX
+                and type(caps["listener"].get("family")) is int
+                and caps["listener"].get("type") == socket.SOCK_STREAM
+                and type(caps["listener"].get("type")) is int
+                and type(caps["listener"].get("native_query")) is dict
+                and set(caps["listener"]["native_query"]) == {
+                    "primitive", "self_pid", "fd", "return_size", "errno",
+                    "family", "type", "kind", "options", "sun_len",
+                    "address_hex", "binding_status"}
+                and all(type(caps["listener"]["native_query"][field]) is int for field in (
+                    "self_pid", "fd", "return_size", "errno", "family", "type",
+                    "kind", "options", "sun_len"))
+                and caps["listener"]["native_query"]["primitive"] == "proc_pidfdinfo-v1"
+                and type(caps["listener"]["native_query"]["primitive"]) is str
+                and 0 < caps["listener"]["native_query"]["self_pid"] <= 0x7fffffff
+                and caps["listener"]["native_query"]["self_pid"] == os.getpid()
+                and caps["listener"]["native_query"]["fd"] == received[2]["fd"]
+                and caps["listener"]["native_query"]["return_size"] == 792
+                and -0x80000000 <= caps["listener"]["native_query"]["errno"] <= 0x7fffffff
+                and caps["listener"]["native_query"]["family"] == socket.AF_UNIX
+                and caps["listener"]["native_query"]["type"] == socket.SOCK_STREAM
+                and caps["listener"]["native_query"]["kind"] == 3
+                and -32768 <= caps["listener"]["native_query"]["options"] <= 32767
+                and caps["listener"]["native_query"]["options"] & 2
+                and 0 <= caps["listener"]["native_query"]["sun_len"] <= 255
+                and type(caps["listener"]["native_query"]["address_hex"]) is str
+                and caps["listener"]["native_query"]["address_hex"] ==
+                    f"{NAMESPACE}/a/o-{result['runtime_id']}/p/c".encode("ascii").hex()
+                and type(caps["listener"]["native_query"]["binding_status"]) is str
+                and caps["listener"]["native_query"]["binding_status"] ==
+                    "UNVALIDATED_ADDRESS_AND_IMAGE"
+                and exact_int_vector(caps.get("named_socket_identity8"), 8)
+                and caps.get("named_socket_identity8", [None, None])[0:2]
+                == [first["socket_dev"], first["socket_ino"]]
+                and len({
+                    tuple(caps["runtime"]["identity8"][:2]),
+                    tuple(caps["fifo_writer"]["identity8"][:2]),
+                    tuple(caps["listener"]["identity8"][:2]),
+                    tuple(caps["named_socket_identity8"][:2]),
+                }) == 4
+                and stat.S_ISSOCK(caps["named_socket_identity8"][2])
+                and stat.S_IMODE(caps["named_socket_identity8"][2]) == 0o620
+                and caps["named_socket_identity8"][3:6] == [0, CLIENT_GID, 1]
+                and caps.get("runtime_path") ==
+                f"{NAMESPACE}/a/o-{result['runtime_id']}/h/r"
+                and exact_typed_equal(
+                    caps.get("runtime_path_identity8"),
+                    caps["runtime"]["identity8"])
+                and caps.get("fifo_path") ==
+                f"{NAMESPACE}/a/o-{result['runtime_id']}/h/l"
+                and exact_typed_equal(
+                    caps.get("fifo_path_identity8"),
+                    caps["fifo_writer"]["identity8"])
+                and caps.get("socket_path") ==
+                f"{NAMESPACE}/a/o-{result['runtime_id']}/p/c"
+                and caps["listener"].get("sockname") ==
+                caps.get("socket_path"),
+                "PREPARED capability identity/path projection differs")
+    else:
+        require(first_wire == result_wire and exact_typed_equal(first, result)
+                and protocol.get("prepared_frame") is None
+                and protocol.get("prepared_capabilities") is None
+                and protocol.get("invalid_ack_hex") == ""
+                and exact_int(protocol.get("invalid_ack_write_count"))
+                and protocol["invalid_ack_write_count"] == 0
+                and received == [] and ancillary == [],
+                "early diagnostic path carried PREPARED authority or ACK")
+    return result, prepared
+'''
+
+# Exact historical consumer, selected ONLY as an adversarial negative control.
+_H039_VERIFIER_OLD_PREPARED_SOURCE = r'''
+def validate_prepared(prepared: dict[str, Any], fd_ledger: list[dict[str, Any]],
+                      cmsg_ledger: list[dict[str, Any]], deadline: float) \
+        -> tuple[str, dict[str, Any]]:
+    require(list(prepared) == PREPARED_KEYS, "PREPARED key order/set differs")
+    require(prepared["operation"] == "create-phase-diagnostic-prepared-v1"
+            and prepared["reached_phase"] == "PREPARED"
+            and prepared["request_nonce"] == REQUEST_NONCE
+            and prepared["schema_version"] == 1
+            and type(prepared["schema_version"]) is int
+            and prepared["transaction_sequence"] == 2
+            and type(prepared["transaction_sequence"]) is int,
+            "PREPARED fixed fields differ")
+    runtime_id = prepared["runtime_id"]
+    require(lower_hex(runtime_id, 32), "PREPARED runtime id differs")
+    for field in ("fifo_dev", "fifo_ino", "listener_fd_dev", "listener_fd_ino",
+                  "runtime_dev", "runtime_ino", "socket_dev", "socket_ino"):
+        require(exact_int(prepared[field]), f"PREPARED numeric type differs: {field}")
+    for field in ("fifo_dev", "fifo_ino", "listener_fd_ino", "runtime_dev",
+                  "runtime_ino", "socket_dev", "socket_ino"):
+        require(prepared[field] >= 0, f"PREPARED numeric range differs: {field}")
+    require(prepared["listener_fd_dev"] >= -1,
+            "PREPARED listener descriptor device range differs")
+    require(len(cmsg_ledger) == 1
+            and set(cmsg_ledger[0]) == {
+                "index", "level", "type", "data_size", "fd_count",
+            }
+            and cmsg_ledger[0] == {
+                "index": 0, "level": socket.SOL_SOCKET,
+                "type": socket.SCM_RIGHTS,
+                "data_size": 3 * array.array("i").itemsize, "fd_count": 3,
+            }
+            and len(fd_ledger) == 3
+            and len({entry["fd"] for entry in fd_ledger}) == 3
+            and [entry.get("receive_index") for entry in fd_ledger] == [0, 1, 2]
+            and all(type(entry) is dict and set(entry) == {
+                        "fd", "receive_index", "cmsg_index", "cloexec_before",
+                        "normalization_attempted", "cloexec_after",
+                        "closed_verified",
+                    }
+                    and entry.get("cmsg_index") == 0
+                    and type(entry.get("cloexec_before")) is bool
+                    and entry.get("normalization_attempted") is True
+                    and entry.get("cloexec_after") is True
+                    and entry.get("closed_verified") is False
+                    for entry in fd_ledger),
+            "PREPARED SCM_RIGHTS shape/order differs")
+    require(time.monotonic() < deadline, "PREPARED validation exceeded ACK deadline")
+
+    runtime_fd, fifo_fd, listener_fd = [entry["fd"] for entry in fd_ledger]
+    runtime_stat = os.fstat(runtime_fd)
+    fifo_stat = os.fstat(fifo_fd)
+    listener_stat = os.fstat(listener_fd)
+    runtime_flags = fcntl.fcntl(runtime_fd, fcntl.F_GETFL)
+    fifo_flags = fcntl.fcntl(fifo_fd, fcntl.F_GETFL)
+    listener_flags = fcntl.fcntl(listener_fd, fcntl.F_GETFL)
+    require(stat.S_ISDIR(runtime_stat.st_mode)
+            and runtime_stat.st_uid == CLIENT_UID and runtime_stat.st_gid == CLIENT_GID
+            and stat.S_IMODE(runtime_stat.st_mode) == 0o700
+            and (runtime_flags & os.O_ACCMODE) == os.O_RDONLY
+            and runtime_stat.st_dev == prepared["runtime_dev"]
+            and runtime_stat.st_ino == prepared["runtime_ino"],
+            "received runtime-directory capability differs")
+    require(stat.S_ISFIFO(fifo_stat.st_mode)
+            and fifo_stat.st_uid == 0 and fifo_stat.st_gid == 0
+            and stat.S_IMODE(fifo_stat.st_mode) == 0o600 and fifo_stat.st_nlink == 1
+            and (fifo_flags & os.O_ACCMODE) == os.O_WRONLY
+            and fifo_flags & os.O_NONBLOCK
+            and fifo_stat.st_dev == prepared["fifo_dev"]
+            and fifo_stat.st_ino == prepared["fifo_ino"],
+            "received mediator-local FIFO capability differs")
+    require(stat.S_ISSOCK(listener_stat.st_mode)
+            and (listener_flags & os.O_ACCMODE) == os.O_RDWR
+            and listener_stat.st_dev == prepared["listener_fd_dev"]
+            and listener_stat.st_ino == prepared["listener_fd_ino"],
+            "received listener descriptor identity differs")
+    listener = socket.socket(fileno=listener_fd)
+    try:
+        listener_family = int(listener.family)
+        listener_type = int(listener.type)
+        listener_acceptconn = listener.getsockopt(
+            socket.SOL_SOCKET, socket.SO_ACCEPTCONN)
+        listener_sockname = listener.getsockname()
+        require(listener_family == socket.AF_UNIX
+                and listener_type == socket.SOCK_STREAM,
+                "received listener socket family/type differs")
+        require(listener_acceptconn == 1,
+                "received socket is not a listener")
+        exact_socket_path = f"{NAMESPACE}/a/o-{runtime_id}/p/c"
+        require(listener_sockname == exact_socket_path,
+                "listener is bound to another socket path")
+    finally:
+        require(listener.detach() == listener_fd, "listener descriptor detach differs")
+    socket_stat = os.lstat(exact_socket_path)
+    require(stat.S_ISSOCK(socket_stat.st_mode) and socket_stat.st_uid == 0
+            and socket_stat.st_gid == CLIENT_GID
+            and stat.S_IMODE(socket_stat.st_mode) == 0o620
+            and socket_stat.st_nlink == 1
+            and socket_stat.st_dev == prepared["socket_dev"]
+            and socket_stat.st_ino == prepared["socket_ino"],
+            "named portal socket identity differs")
+    require(len({
+                (runtime_stat.st_dev, runtime_stat.st_ino),
+                (fifo_stat.st_dev, fifo_stat.st_ino),
+                (listener_stat.st_dev, listener_stat.st_ino),
+                (socket_stat.st_dev, socket_stat.st_ino),
+            }) == 4,
+            "runtime/FIFO/listener/named-socket identity domains overlap")
+    runtime_path = f"{NAMESPACE}/a/o-{runtime_id}/h/r"
+    fifo_path = f"{NAMESPACE}/a/o-{runtime_id}/h/l"
+    runtime_path_identity8 = identity8(os.lstat(runtime_path))
+    fifo_path_identity8 = identity8(os.lstat(fifo_path))
+    require(runtime_path_identity8 == identity8(runtime_stat),
+            "runtime descriptor does not bind fixed runtime path")
+    require(fifo_path_identity8 == identity8(fifo_stat),
+            "FIFO descriptor does not bind fixed mediator-local path")
+    return runtime_id, {
+        "runtime": {"fd": runtime_fd, "identity8": identity8(runtime_stat),
+                    "getfl": runtime_flags},
+        "fifo_writer": {"fd": fifo_fd, "identity8": identity8(fifo_stat),
+                        "getfl": fifo_flags},
+        "listener": {
+            "fd": listener_fd, "identity8": identity8(listener_stat),
+            "getfl": listener_flags, "family": listener_family,
+            "type": listener_type, "acceptconn": listener_acceptconn,
+            "sockname": listener_sockname,
+        },
+        "named_socket_identity8": identity8(socket_stat),
+        "runtime_path_identity8": runtime_path_identity8,
+        "fifo_path_identity8": fifo_path_identity8,
+        "runtime_path": runtime_path, "fifo_path": fifo_path,
+        "socket_path": exact_socket_path,
+    }
+'''
+
+
+def h039_verifier_inert_fixture(case):
+    """Test-first only: actual copied decisions, entirely in-memory primitives.
+
+    There is no filesystem, socket, process, sleep, signal, native query or
+    external source access here. The original historical nonce/sequence values
+    below are wire-shape fixtures only and never leave this memory model.
+    """
+    import __future__
+    import array
+    import ast
+    import errno
+    import fcntl
+    import hashlib
+    import json
+    import re
+    import stat
+    import struct
+    from types import SimpleNamespace
+
+    class FixtureError(RuntimeError):
+        pass
+
+    if case not in {"positive", "unrelated_options", "wrong_return_size",
+            "wrong_observed_fd", "wrong_self_pid", "nonlistener", "wrong_tuple_type",
+            "wrong_address", "wrong_getsockname", "identity_drift",
+            "adapter_exception", "capture_error", "stale_outcome", "outcome_wrong_self_pid",
+            "disconnected_adapter", "wrong_fd_call", "skip_getsockname",
+            "skip_path_check", "query_oserror", "getname_typeerror", "read_oserror",
+            "close_typeerror", "wait_typeerror", "old_getsockopt", "refusal_writes_ack"}:
+        raise FixtureError("unknown fixed inert case")
+    trace = []
+    primitive_errors = []
+    def injected(boundary, error):
+        if case == boundary and not primitive_errors:
+            primitive_errors.append(type(error).__name__)
+            trace.append(("injected_error", boundary, type(error).__name__))
+            raise error
+    live = set(range(98))
+    flags = {fd: fcntl.FD_CLOEXEC for fd in live}
+    namespace = "/private/var/db/nortropic-runtime-cleanup-v1"
+    runtime_id = "12" * 16
+    socket_path = namespace + "/a/o-" + runtime_id + "/p/c"
+    request_nonce = "a9116c1823d0ba205f93986803334750d3d35f0b887cacee46830d6d06ccde3b"
+    cleanup_nonce = "0eb67d19c1e1e55a7c38565d9a205b348410214fd0a444baa296bfe62ccc8417"
+
+    def identity(dev, ino, mode, uid, gid, links=1, size=0):
+        return SimpleNamespace(st_dev=dev, st_ino=ino, st_mode=mode,
+            st_uid=uid, st_gid=gid, st_nlink=links, st_size=size, st_flags=0)
+
+    identities = {
+        98: identity(7, 1001, stat.S_IFDIR | 0o700, 501, 20),
+        99: identity(7, 1002, stat.S_IFIFO | 0o600, 0, 0),
+        100: identity(-1, 1003, stat.S_IFSOCK | 0o600, 501, 20),
+    }
+    named_socket = identity(7, 1004, stat.S_IFSOCK | 0o620, 0, 20)
+    getfl = {98: 0, 99: 1 | 4, 100: 2}
+    prepared = dict(sorted({
+        "fifo_dev": 7, "fifo_ino": 1002, "listener_fd_dev": -1,
+        "listener_fd_ino": 1003, "operation": "create-phase-diagnostic-prepared-v1",
+        "reached_phase": "PREPARED", "request_nonce": request_nonce,
+        "runtime_dev": 7, "runtime_id": runtime_id, "runtime_ino": 1001,
+        "schema_version": 1, "socket_dev": 7, "socket_ino": 1004,
+        "transaction_sequence": 2}.items()))
+    result = dict(sorted({"cleanup_request_nonce": cleanup_nonce,
+        "operation": "create-phase-diagnostic-result-v1", "reached_phase": "PREPARED",
+        "receipt_sequence": 2, "receipt_sha256": "34" * 32,
+        "request_nonce": request_nonce, "runtime_id": runtime_id,
+        "schema_version": 1, "transaction_sequence": 2,
+        "zero_runtime_residue": True}.items()))
+
+    def frame(value):
+        raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("ascii")
+        return struct.pack(">I", len(raw)) + raw
+
+    response = bytearray(frame(prepared) + frame(result))
+    rights_sent = False
+    pipe_calls = 0
+
+    def opened(fd):
+        if fd not in live:
+            raise OSError(errno.EBADF, "inert closed descriptor")
+
+    def inert_close(fd):
+        if fd == 98:
+            injected("close_typeerror", TypeError("injected close type error"))
+        opened(fd)
+        live.remove(fd)
+        trace.append(("close", fd))
+
+    def inert_fcntl(fd, operation, value=None):
+        opened(fd)
+        if operation == fcntl.F_GETFD:
+            return flags[fd]
+        if operation == fcntl.F_SETFD:
+            flags[fd] = value
+            return 0
+        if operation == fcntl.F_GETFL:
+            return getfl[fd]
+        raise FixtureError("unexpected fcntl primitive")
+
+    def inert_stat(fd):
+        opened(fd)
+        trace.append(("fstat", fd))
+        if case == "identity_drift" and fd == 100 and ("adapter", 100) in trace:
+            return identity(-1, 1099, stat.S_IFSOCK | 0o600, 501, 20)
+        return identities[fd]
+
+    def inert_lstat(path):
+        trace.append(("lstat", path))
+        objects = {socket_path: named_socket,
+            namespace + "/a/o-" + runtime_id + "/h/r": identities[98],
+            namespace + "/a/o-" + runtime_id + "/h/l": identities[99],
+            "/dev/fd": identity(2114656325, 344, stat.S_IFDIR | 0o555, 0, 0)}
+        if path not in objects:
+            raise FixtureError("unexpected pathname primitive")
+        return objects[path]
+
+    def inert_pipe():
+        nonlocal pipe_calls
+        pipe_calls += 1
+        if pipe_calls not in (1, 2):
+            raise FixtureError("unexpected pipe creation")
+        return (94, 95) if pipe_calls == 1 else (96, 97)
+
+    def inert_spawn(path, argv, environment, file_actions):
+        trace.append(("spawn", path, tuple(argv)))
+        if path != "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator" or argv != [path]:
+            raise FixtureError("unexpected spawn primitive")
+        return 4242
+
+    def inert_write(fd, data):
+        opened(fd)
+        trace.append(("write", fd, data))
+        if fd != 99 or data != b"X":
+            raise FixtureError("unexpected ACK primitive")
+        return len(data)
+
+    def inert_listdir(path):
+        if path != "/dev/fd":
+            raise FixtureError("unexpected inventory primitive")
+        ephemeral = next(fd for fd in range(200) if fd not in live)
+        return [str(fd) for fd in sorted(live | {ephemeral})]
+
+    class InertSocket:
+        family = 1
+        type = 1
+
+        def __init__(self, fileno):
+            self.fd = fileno
+            opened(fileno)
+
+        def fileno(self):
+            return self.fd
+
+        def detach(self):
+            fd, self.fd = self.fd, -1
+            return fd
+
+        def close(self):
+            inert_close(self.detach())
+
+        def sendall(self, raw):
+            trace.append(("sendall", self.fd, raw))
+
+        def shutdown(self, how):
+            trace.append(("shutdown", self.fd, how))
+
+        def recvmsg(self, count, ancillary_limit):
+            nonlocal rights_sent
+            opened(self.fd)
+            ancillary = []
+            if not rights_sent:
+                rights_sent = True
+                live.update((98, 99, 100))
+                flags.update({98: 0, 99: 0, 100: 0})
+                ancillary = [(0xffff, 1, array.array("i", (98, 99, 100)).tobytes())]
+            raw = bytes(response[:count])
+            del response[:count]
+            return raw, ancillary, 0, None
+
+        def getsockopt(self, level, option):
+            trace.append(("getsockopt", self.fd, level, option))
+            return 1
+
+        def getsockname(self):
+            trace.append(("getsockname", self.fd))
+            injected("getname_typeerror", TypeError("injected getname type error"))
+            return socket_path + "-foreign" if case in {"wrong_getsockname", "skip_path_check"} else socket_path
+
+    inert_socket = SimpleNamespace(socket=InertSocket, AF_UNIX=1, SOCK_STREAM=1,
+        SOL_SOCKET=0xffff, SO_ACCEPTCONN=2, SCM_RIGHTS=1, SHUT_WR=1,
+        MSG_TRUNC=16, MSG_CTRUNC=32, CMSG_SPACE=lambda size: size + 16,
+        socketpair=lambda *args: (InertSocket(92), InertSocket(93)))
+    def inert_read(fd, count):
+        injected("read_oserror", OSError(5, "injected read error"))
+        if case == "capture_error":
+            raise FixtureError("injected capture error")
+        return b""
+
+    def inert_wait(pid, options):
+        injected("wait_typeerror", TypeError("injected wait type error"))
+        return (pid, 0)
+
+    inert_os = SimpleNamespace(O_ACCMODE=3, O_RDONLY=0, O_WRONLY=1, O_RDWR=2,
+        O_NONBLOCK=4, POSIX_SPAWN_DUP2=2, POSIX_SPAWN_CLOSE=1, WNOHANG=1,
+        close=inert_close, fstat=inert_stat, lstat=inert_lstat, listdir=inert_listdir,
+        pipe=inert_pipe, posix_spawn=inert_spawn, write=inert_write,
+        set_inheritable=lambda fd, value: None,
+        get_inheritable=lambda fd: not bool(inert_fcntl(fd, fcntl.F_GETFD) & fcntl.FD_CLOEXEC),
+        set_blocking=lambda fd, value: None,
+        read=inert_read, waitpid=inert_wait, WIFEXITED=lambda status: status == 0,
+        WEXITSTATUS=lambda status: 0, WIFSIGNALED=lambda status: False,
+        WTERMSIG=lambda status: 0, getpid=lambda: 4243)
+    inert_time = SimpleNamespace(monotonic=lambda: 0.0,
+        sleep=lambda seconds: (_ for _ in ()).throw(FixtureError("unexpected sleep")))
+    inert_select = SimpleNamespace(select=lambda reads, writes, errors, seconds: (reads, [], []))
+    inert_fcntl_api = SimpleNamespace(fcntl=inert_fcntl, F_GETFD=fcntl.F_GETFD,
+        F_SETFD=fcntl.F_SETFD, F_GETFL=fcntl.F_GETFL, FD_CLOEXEC=fcntl.FD_CLOEXEC)
+
+    def adapter(fd):
+        trace.append(("adapter", fd))
+        opened(fd)
+        injected("query_oserror", OSError(5, "injected query error"))
+        if case == "adapter_exception":
+            raise FixtureError("injected adapter harness exception")
+        observed = ["proc_pidfdinfo-v1", 4243, fd, 792, 0, 1, 1, 3, 2, 0,
+                    socket_path.encode("ascii"), "UNVALIDATED_ADDRESS_AND_IMAGE"]
+        if case in {"wrong_return_size", "refusal_writes_ack"}: observed[3] = 791
+        if case == "wrong_observed_fd": observed[2] = 99
+        if case == "wrong_self_pid": observed[1] = 4244
+        if case == "nonlistener": observed[8] = 0
+        if case == "unrelated_options": observed[8] = 6
+        if case == "wrong_address": observed[10] += b"-foreign"
+        return observed if case == "wrong_tuple_type" else tuple(observed)
+
+    request_wire = frame({"operation": "create-phase-diagnostic-v1",
+        "request_nonce": request_nonce, "schema_version": 1})
+    primitives = {"array": array, "errno": errno, "hashlib": hashlib,
+        "json": json, "re": re, "stat": stat, "struct": struct,
+        "fcntl": inert_fcntl_api, "os": inert_os, "socket": inert_socket,
+        "select": inert_select, "time": inert_time,
+        "CLIENT_UID": 501, "CLIENT_GID": 20, "NAMESPACE": namespace,
+        "TARGET": "/Library/PrivilegedHelperTools/se.nortropic.runtime-cleanup-mediator",
+        "HOSTILE_ENVIRONMENT": {}, "REQUEST_NONCE": request_nonce,
+        "CLEANUP_NONCE": cleanup_nonce, "REQUEST_WIRE": request_wire,
+        "REQUEST_WIRE_SHA256": hashlib.sha256(request_wire).hexdigest(),
+        "EMPTY_SHA256": hashlib.sha256(b"").hexdigest(), "INVALID_ACK": b"X",
+        "ACK_DEADLINE_SECONDS": 4.0, "FINAL_DEADLINE_SECONDS": 15.0,
+        "MAX_STDIO": 1048576, "MAX_FRAME_BODY": 4096,
+        "PREPARED_KEYS": list(prepared), "RESULT_KEYS": list(result),
+        "EARLY_PHASES": {"RESERVING", "CREATING"},
+        "LATE_PHASES": {"PUBLISHING", "PREPARING", "PREPARED"},
+        "query_received_listener": adapter}
+
+    def load_definitions(source):
+        module = ast.parse(source)
+        if any(not isinstance(node, (ast.FunctionDef, ast.ClassDef)) for node in module.body):
+            raise FixtureError("non-definition in held verifier source")
+        # No historical imports, module main, external globals or live effects.
+        scope = dict(primitives)
+        scope["__name__"] = "h039_inert_verifier_fixture"
+        exec(compile(module, "<h039-held-verifier-definitions>", "exec",
+                     flags=__future__.annotations.compiler_flag, dont_inherit=True), scope)
+        return scope
+
+    runner_source = _H039_VERIFIER_RUNNER_SOURCE
+    replacements = {
+        "disconnected_adapter": ("observed = query_received_listener(listener_fd)",
+            "observed = ('proc_pidfdinfo-v1', os.getpid(), listener_fd, 792, 0, 1, 1, 3, 2, 0, f'{NAMESPACE}/a/o-{runtime_id}/p/c'.encode('ascii'), 'UNVALIDATED_ADDRESS_AND_IMAGE')"),
+        "wrong_fd_call": ("query_received_listener(listener_fd)", "query_received_listener(fifo_fd)"),
+        "skip_getsockname": ("listener_sockname = listener.getsockname()",
+            "listener_sockname = f'{NAMESPACE}/a/o-{runtime_id}/p/c'"),
+        "skip_path_check": ("require(listener_sockname == exact_socket_path,", "require(True,"),
+    }
+    if case in replacements:
+        old, new = replacements[case]
+        if runner_source.count(old) != 1:
+            raise FixtureError("causal mutant anchor count")
+        runner_source = runner_source.replace(old, new, 1)
+    runner = load_definitions(runner_source)
+    if case == "old_getsockopt":
+        # Same run_exact_protocol callsite, actual original function, not a
+        # disconnected synthetic observation standing in for the old consumer.
+        old_nodes = ast.parse(_H039_VERIFIER_OLD_PREPARED_SOURCE)
+        if len(old_nodes.body) != 1 or old_nodes.body[0].name != "validate_prepared":
+            raise FixtureError("old consumer control source")
+        exec(compile(old_nodes, "<historical-consumer-negative>", "exec",
+                     flags=__future__.annotations.compiler_flag, dont_inherit=True), runner)
+    if case == "refusal_writes_ack":
+        old = '    except BaseException as exc:\n        protocol["protocol_error"] = {'
+        new = ('    except BaseException as exc:\n'
+               '        if isinstance(exc, Refusal):\n'
+               '            os.write(protocol["received_fds"][1]["fd"], INVALID_ACK)\n'
+               '        protocol["protocol_error"] = {')
+        if runner_source.count(old) != 1:
+            raise FixtureError("refusal ACK mutant anchor")
+        runner = load_definitions(runner_source.replace(old, new, 1))
+    validator = load_definitions(_H039_VERIFIER_VALIDATOR_SOURCE)
+    try:
+        protocol = runner["run_exact_protocol"](list(range(92)))
+    except BaseException as exc:
+        return {"credit": "NONE", "case": case, "classification": "UNJUDGEABLE_INERT_HARNESS_ERROR",
+            "actual_validator_accepted": False, "validator_error": type(exc).__name__ + ": " + str(exc),
+            "adapter_calls": [item for item in trace if item[0] == "adapter"],
+            "protocol": {"invalid_ack_write_count": trace.count(("write", 99, b"X"))}, "trace": trace}
+    if case == "stale_outcome":
+        native_query = protocol["prepared_capabilities"]["listener"].pop("native_query")
+        protocol["prepared_capabilities"]["listener"]["acceptconn"] = 1
+    if case == "outcome_wrong_self_pid":
+        protocol["prepared_capabilities"]["listener"]["native_query"]["self_pid"] = 4244
+    validated, validation_error = None, None
+    try:
+        validated = validator["validate_protocol"](protocol)
+    except validator["Refusal"] as exc:
+        validation_error = str(exc)
+    calls = [item for item in trace if item[0] == "adapter"]
+    classification = "UNFROZEN_INERT_OBSERVATION"
+    errors = [protocol.get("protocol_error"), protocol.get("child_capture_error")]
+    errors += protocol.get("child", {}).get("observation_errors", [])
+    if primitive_errors or any(type(error) is dict and error.get("type") != "Refusal" for error in errors):
+        classification = "UNJUDGEABLE_INERT_HARNESS_ERROR"
+    return {"credit": "NONE", "case": case, "classification": classification,
+        "actual_validator_accepted": validated is not None and validated[1] is True,
+        "validator_error": validation_error, "adapter_calls": calls,
+        "protocol": protocol, "trace": trace}
+
+
+def h039_verifier_inert_effect(observation):
+    """Effect oracle, never source shape or operational/host qualification."""
+    if observation.get("classification") != "UNFROZEN_INERT_OBSERVATION":
+        return False
+    trace = observation["trace"]
+    required = [("adapter", 100), ("getsockname", 100),
+                ("close", 98), ("close", 100), ("write", 99, b"X"), ("close", 99)]
+    if (observation.get("actual_validator_accepted") is not True
+            or observation.get("adapter_calls") != [("adapter", 100)]
+            or any(item[0] == "getsockopt" for item in trace)
+            or any(trace.count(item) != 1 for item in required)
+            or [trace.index(item) for item in required] != sorted(trace.index(item) for item in required)):
+        return False
+    protocol = observation["protocol"]
+    return (protocol["protocol_error"] is None and protocol["child_capture_error"] is None
+            and protocol["invalid_ack_write_count"] == 1
+            and protocol["transport_cleanup_complete"] is True
+            and protocol["final_fd_inventory"] == list(range(92)))
+
+
+_H039_VERIFIER_PARENT = "005366dd5e3a9a74d8140c9dd0c0175aea268294"
+_H039_VERIFIER_PARENT_TREE = "a548cb8876346eb505906fb3feaa7b8d33ec43aa"
+_H039_VERIFIER_PARENT_GATE_SHA = "b2728b587911053453d577d3cdc4bf9c833c7cc6d6ccae6d0f15dbe7c86fa199"
+_H039_VERIFIER_PARENT_SPEC_SHA = "d65b29c297595df20d0aa7f4d67700436d719d870b2772b82eae7bc0d8c8f957"
+_H039_VERIFIER_MEMBER_SHA = "434320f726b3e24af6f4667b1df14c0af239eb363a5ca4f6c342785b0d50d2a3"
+_H039_VERIFIER_AUTHOR_PATHS = (
+    "verify/bin/h-039-exit", "specs/tasks.spec.json", "verify/bin/platform-separation-final-exit",
+    "docs/loop/platform-separation-final-local-development.md", "SEPARATION-20260910/REFREEZE.json",
+    "controller/verify/cli")
+_H039_VERIFIER_PRODUCT_PATHS = (
+    "controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+    "verify/h039/runtime-cleanup-mediator", "verify/h039/build-recipe.json",
+    "verify/h039/identity-manifest.json")
+
+
+def h039_verifier_parent_gate_restored(raw):
+    """Pure exact P restoration; not authentication of the new block."""
+    import hashlib
+    start = b"# H039_LOCAL_VERIFIER_DRAFT_" + b"BEGIN\n"
+    end = b"# H039_LOCAL_VERIFIER_DRAFT_" + b"END\n\n"
+    if type(raw) is not bytes or raw.count(start) != 1 or raw.count(end) != 1:
+        return False
+    a, b = raw.index(start), raw.index(end) + len(end)
+    return a < b and hashlib.sha256(raw[:a] + raw[b:]).hexdigest() == _H039_VERIFIER_PARENT_GATE_SHA
+
+
+def h039_verifier_parent_spec_restored(raw):
+    """Bind the new canonical member AND unchanged complete P spec."""
+    import hashlib
+    import json
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate spec key")
+            result[key] = value
+        return result
+
+    start = b'      "h039_local_verifier_integration_v1": {\n'
+    end = b'      "h039_local_asset_build_only_v1": {\n'
+    try:
+        if type(raw) is not bytes or raw.count(start) != 1 or raw.count(end) != 1:
+            return False
+        rows = [row for row in json.loads(raw, object_pairs_hook=unique)["tasks"] if row["id"] == "h-039"]
+        if len(rows) != 1:
+            return False
+        member = rows[0]["h039_local_verifier_integration_v1"]
+        a, b = raw.index(start), raw.index(end)
+        block = ('      "h039_local_verifier_integration_v1": ' + json.dumps(member,
+            indent=2, ensure_ascii=True, allow_nan=False).replace("\n", "\n      ") + ",\n").encode("ascii")
+        canonical = json.dumps(member, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True, allow_nan=False).encode("ascii")
+        return (a < b and raw[a:b] == block
+                and hashlib.sha256(raw[:a] + raw[b:]).hexdigest() == _H039_VERIFIER_PARENT_SPEC_SHA
+                and hashlib.sha256(canonical).hexdigest() == _H039_VERIFIER_MEMBER_SHA)
+    except (ValueError, KeyError, TypeError, UnicodeError):
+        return False
+
+
+def h039_verifier_tree_relation(facts):
+    """Pure relation only; future owned observer must supply authenticated facts."""
+    try:
+        if (type(facts) is not dict or set(facts) != {
+                "parent", "parent_tree", "candidate", "candidate_parents", "before", "after"}
+                or facts["parent"] != _H039_VERIFIER_PARENT
+                or facts["parent_tree"] != _H039_VERIFIER_PARENT_TREE
+                or facts["candidate_parents"] != [_H039_VERIFIER_PARENT]):
+            return False
+        oid = facts["candidate"]
+        if (type(oid) is not str or len(oid) != 40 or oid == _H039_VERIFIER_PARENT
+                or any(char not in "0123456789abcdef" for char in oid)):
+            return False
+        before, after = facts["before"], facts["after"]
+        if (type(before) is not dict or type(after) is not dict or before.keys() != after.keys()
+                or not set(_H039_VERIFIER_AUTHOR_PATHS + _H039_VERIFIER_PRODUCT_PATHS) <= before.keys()):
+            return False
+        for mapping in (before, after):
+            for path, row in mapping.items():
+                if (type(path) is not str or type(row) is not tuple or len(row) != 2
+                        or row[0] not in ("100644", "100755") or row[0] != before[path][0]
+                        or type(row[1]) is not str or len(row[1]) != 40
+                        or any(char not in "0123456789abcdef" for char in row[1])):
+                    return False
+        return {path for path in before if before[path] != after[path]} == set(_H039_VERIFIER_AUTHOR_PATHS)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+_H039_VERIFIER_CASES = (
+    ("positive", True, True, 1, 100, False),
+    ("unrelated_options", True, True, 1, 100, False),
+    ("wrong_return_size", False, False, 0, 100, False),
+    ("wrong_observed_fd", False, False, 0, 100, False),
+    ("wrong_self_pid", False, False, 0, 100, False),
+    ("nonlistener", False, False, 0, 100, False),
+    ("wrong_tuple_type", False, False, 0, 100, False),
+    ("wrong_address", False, False, 0, 100, False),
+    ("wrong_getsockname", False, False, 0, 100, False),
+    ("identity_drift", False, False, 0, 100, False),
+    ("adapter_exception", False, False, 0, 100, True),
+    ("capture_error", False, False, 1, 100, True),
+    ("stale_outcome", False, False, 1, 100, False),
+    ("outcome_wrong_self_pid", False, False, 1, 100, False),
+    ("disconnected_adapter", False, True, 1, None, False),
+    ("wrong_fd_call", False, False, 0, 99, False),
+    ("skip_getsockname", False, True, 1, 100, False),
+    ("skip_path_check", False, False, 1, 100, False),
+    ("query_oserror", False, False, 0, 100, True),
+    ("getname_typeerror", False, False, 0, 100, True),
+    ("read_oserror", False, False, 1, 100, True),
+    ("close_typeerror", False, False, 0, 100, True),
+    ("wait_typeerror", False, False, 1, 100, True),
+    ("old_getsockopt", False, False, 1, None, False),
+    ("refusal_writes_ack", False, False, 0, 100, False))
+
+
+def h039_verifier_semantic_rows():
+    """Compute outcomes; never emit the final capture's expected result."""
+    rows = []
+    for name, effect, accepted, ack, fd, harness_error in _H039_VERIFIER_CASES:
+        observation = h039_verifier_inert_fixture(name)
+        expected_class = ("UNJUDGEABLE_INERT_HARNESS_ERROR" if harness_error
+                          else "UNFROZEN_INERT_OBSERVATION")
+        causal = True
+        refusal = {
+            "wrong_return_size": "received listener native observation differs",
+            "wrong_observed_fd": "received listener native observation differs",
+            "wrong_self_pid": "received listener native observation differs",
+            "nonlistener": "received listener native observation differs",
+            "wrong_tuple_type": "received listener native observation differs",
+            "wrong_fd_call": "received listener native observation differs",
+            "wrong_address": "listener observation address differs from independent exact path",
+            "wrong_getsockname": "listener is bound to another socket path",
+            "identity_drift": "listener identity or flags changed after native observation"}
+        if name in refusal:
+            error = observation["protocol"].get("protocol_error")
+            causal = (type(error) is dict and error.get("type") == "Refusal"
+                      and error.get("text") == refusal[name])
+        if name in {"stale_outcome", "outcome_wrong_self_pid", "skip_path_check"}:
+            causal = observation["validator_error"] == "PREPARED capability identity/path projection differs"
+        if name in {"query_oserror", "getname_typeerror", "read_oserror", "close_typeerror", "wait_typeerror"}:
+            causal = len([item for item in observation["trace"]
+                          if item[:2] == ("injected_error", name)]) == 1
+        if name == "old_getsockopt":
+            causal = observation["trace"].count(("getsockopt", 100, 65535, 2)) == 1
+        if name == "refusal_writes_ack":
+            causal = (observation["trace"].count(("write", 99, b"X")) == 1
+                and observation["protocol"]["protocol_error"]["type"] == "Refusal"
+                and observation["protocol"]["protocol_error"]["text"] == "received listener native observation differs")
+        rows.append({"id": "semantic:" + name, "ok": (causal and
+            h039_verifier_inert_effect(observation) is effect
+            and observation["actual_validator_accepted"] is accepted
+            and observation["protocol"]["invalid_ack_write_count"] == ack
+            and observation["adapter_calls"] == ([] if fd is None else [("adapter", fd)])
+            and observation["classification"] == expected_class)})
+    return rows
+
+
+def h039_verifier_config_exact(raw):
+    """Canonical isolated clone, not an assertion about any origin remote."""
+    expected = {
+        "core.repositoryformatversion": "0", "core.filemode": "true",
+        "core.bare": "false", "core.logallrefupdates": "true",
+        "core.ignorecase": "true", "core.precomposeunicode": "true"}
+    try:
+        if type(raw) is not bytes or not raw.endswith(b"\0") or len(raw) > 1048576:
+            return False
+        result = {}
+        for row in raw[:-1].split(b"\0"):
+            key, sep, value = row.partition(b"\n")
+            key, value = key.decode("ascii"), value.decode("ascii")
+            if not sep or key in result:
+                return False
+            result[key] = value
+        return result == expected
+    except (ValueError, UnicodeError):
+        return False
+
+
+def h039_verifier_extract_definitions(raw, names):
+    """Source selection only: no module top-level, defaults or decorators run."""
+    import ast
+    if type(raw) is not bytes or type(names) is not tuple or len(set(names)) != len(names):
+        raise ValueError("definition selection")
+    parsed = ast.parse(raw)
+    selected = [node for node in parsed.body
+                if isinstance(node, ast.FunctionDef) and node.name in names]
+    if sorted(node.name for node in selected) != sorted(names):
+        raise ValueError("missing or duplicate selected definition")
+    for node in selected:
+        if (node.decorator_list or node.args.defaults or any(x is not None for x in node.args.kw_defaults)):
+            raise ValueError("executable selected definition header")
+    return ast.Module(body=selected, type_ignores=[])
+
+
+def h039_verifier_observer_namespace(raw, path):
+    """Exact P observer code; only fixed-generation/config namespace differs.
+
+    This function prepares real IO primitives, but does not execute the observer.
+    The real reader retains its root-owned/ACL checks. CDLL(None) is host ACL
+    metadata inspection, never candidate loading or proc_pidfdinfo admission.
+    """
+    import __future__
+    import ast
+    import hashlib
+    import os
+    import selectors
+    import stat
+    import struct
+    import subprocess
+    import sys
+    import time
+    if not h039_verifier_parent_gate_restored(raw):
+        raise ValueError("immutable P observer source restoration")
+    start = b"# H039_LOCAL_VERIFIER_DRAFT_" + b"BEGIN\n"
+    end = b"# H039_LOCAL_VERIFIER_DRAFT_" + b"END\n\n"
+    old = raw[:raw.index(start)] + raw[raw.index(end) + len(end):]
+    names = ("h039_asset_draft_git_operation", "h039_asset_draft_git_observe_local",
+             "h039_asset_draft_git_records", "h039_asset_draft_retained_read",
+             "h039_asset_draft_close_owned", "h039_asset_draft_acl_empty",
+             "h039_local_cancel_check", "h039_local_blob")
+    # Some old definitions have inert literal defaults, which are individually
+    # checked here rather than allowing arbitrary default expressions.
+    nodes = ast.parse(old)
+    selected = [node for node in nodes.body if isinstance(node, ast.FunctionDef) and node.name in names]
+    if sorted(node.name for node in selected) != sorted(names):
+        raise ValueError("P observer closure membership")
+    for node in selected:
+        if node.decorator_list:
+            raise ValueError("P observer decorator")
+        for value in node.args.defaults + [x for x in node.args.kw_defaults if x is not None]:
+            if not isinstance(value, ast.Constant):
+                raise ValueError("P observer nonliteral default")
+    namespace = {"__name__": "h039_owned_successor_observer", "__file__": path,
+        "_asset_hashlib": hashlib, "_local_hashlib": hashlib, "_asset_os": os,
+        "_asset_stat": stat, "_asset_sys": sys, "_asset_struct": struct,
+        "_asset_subprocess": subprocess, "_asset_selectors": selectors, "_asset_time": time,
+        "_LOCAL_BASE": _H039_VERIFIER_PARENT, "_LOCAL_CONTRACT_PATHS": _H039_VERIFIER_AUTHOR_PATHS,
+        "_LOCAL_CANCELLED": None, "h039_asset_draft_git_config_exact": h039_verifier_config_exact}
+    exec(compile(ast.Module(body=selected, type_ignores=[]), "<exact-P-observer>", "exec",
+                 flags=__future__.annotations.compiler_flag, dont_inherit=True), namespace)
+    return namespace
+
+
+def h039_verifier_observed_relation(observed):
+    """Consume actual observer output, not an alternative source of Git facts."""
+    try:
+        parent, candidate = _H039_VERIFIER_PARENT, observed["candidate"]
+        if (observed["status"] != "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT"
+                or observed["base"] != parent or observed["contract"] != candidate
+                or set(observed["commits"]) != {parent, candidate}
+                or set(observed["trees"]) != {parent, candidate}
+                or set(observed["relations"]) != {"contract"}):
+            return False
+        return h039_verifier_tree_relation({
+            "parent": parent, "parent_tree": observed["commits"][parent]["tree"],
+            "candidate": candidate, "candidate_parents": observed["commits"][candidate]["parents"],
+            "before": observed["trees"][parent], "after": observed["trees"][candidate]})
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def h039_verifier_physical_identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+            info.st_nlink, info.st_size, info.st_flags, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def h039_verifier_retain_interval(root, paths, namespace):
+    """Retain actual names/FD identities across the semantic test interval.
+
+    Raw Git/disk/index authentication remains the original observer's job.
+    This adds bounded same-byte/replaced-inode detection, not universal CAS.
+    No mutation or follow-symlink traversal; all acquired FDs close once.
+    """
+    import os
+    import stat
+    descriptors, bindings, directories = [], [], {}
+    def close():
+        failures = namespace["h039_asset_draft_close_owned"](list(reversed(descriptors)), os.close)
+        descriptors.clear()
+        if failures:
+            raise ValueError("interval close failures", failures)
+    def check():
+        for parent, name, fd, expected in bindings:
+            if (h039_verifier_physical_identity(os.fstat(fd)) != expected
+                    or h039_verifier_physical_identity(os.stat(name, dir_fd=parent, follow_symlinks=False)) != expected):
+                raise ValueError("qualification physical binding changed", name)
+    try:
+        fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+        descriptors.append(fd)
+        directories[""] = fd
+        targets = [root + "/" + path for path in paths]
+        targets += [root + "/.git/config", root + "/.git/HEAD", root + "/.git/index",
+                    "/Library/Developer/CommandLineTools/usr/bin/git"]
+        for target in sorted(set(targets)):
+            if len(bindings) > 32768:
+                raise ValueError("interval binding bound")
+            parent = ""
+            parts = target.split("/")[1:]
+            for index, name in enumerate(parts):
+                current = parent + "/" + name
+                final = index == len(parts) - 1
+                if not final and current in directories:
+                    parent = current
+                    continue
+                before = os.stat(name, dir_fd=directories[parent], follow_symlinks=False)
+                flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
+                child = os.open(name, flags | (0 if final else os.O_DIRECTORY), dir_fd=directories[parent])
+                descriptors.append(child)
+                info = os.fstat(child)
+                identity = h039_verifier_physical_identity(info)
+                if (identity != h039_verifier_physical_identity(before)
+                        or not (stat.S_ISREG(info.st_mode) if final else stat.S_ISDIR(info.st_mode))):
+                    raise ValueError("interval open/rebind type")
+                bindings.append((directories[parent], name, child, identity))
+                if not final:
+                    directories[current] = child
+                parent = current
+        check()
+        return check, close
+    except BaseException:
+        close()
+        raise
+
+
+def h039_verifier_local_main(candidate):
+    """Actual local-only Git observation + real diagnostic decisions on inerts.
+
+    Invocation requires a separately reviewed/frozen exact committed subject.
+    Clean Git identity is not itself proof of contract freeze or authorization.
+    No compiler, adapter load/query, socket or historical selector is reachable.
+    """
+    import hashlib
+    import json
+    import os
+    import signal
+    import sys
+    handlers, namespace, interval_close = [], None, None
+    try:
+        if (type(candidate) is not str or len(candidate) != 40 or candidate == _H039_VERIFIER_PARENT
+                or any(c not in "0123456789abcdef" for c in candidate)):
+            raise ValueError("exact successor commit identity")
+        path = os.path.abspath(__file__)
+        if os.path.realpath(path) != path or not path.endswith("/verify/bin/h-039-exit"):
+            raise ValueError("successor path alias")
+        # Initial bytes select only the immutable-P closure. The observer then
+        # independently authenticates this entire executing source against Git.
+        with open(path, "rb") as source:
+            raw = source.read(4194305)
+        if len(raw) > 4194304:
+            raise ValueError("successor source bound")
+        namespace = h039_verifier_observer_namespace(raw, path)
+        def latch(number, frame):
+            if namespace["_LOCAL_CANCELLED"] is None:
+                namespace["_LOCAL_CANCELLED"] = number
+        for number in (signal.SIGTERM, signal.SIGINT):
+            handlers.append((number, signal.signal(number, latch)))
+        observed = namespace["h039_asset_draft_git_observe_local"](
+            _H039_VERIFIER_PARENT, candidate, "CONTRACT_SIX", candidate)
+        disk = observed["disk"]
+        rows = [
+            {"id": "owned_git_disk_index_relation", "ok": h039_verifier_observed_relation(observed)},
+            {"id": "executing_source_equals_candidate", "ok": disk["verify/bin/h-039-exit"] == raw},
+            {"id": "complete_P_gate_restored", "ok": h039_verifier_parent_gate_restored(raw)},
+            {"id": "complete_P_spec_and_new_member", "ok": h039_verifier_parent_spec_restored(disk["specs/tasks.spec.json"])}]
+        if not all(row["ok"] for row in rows):
+            raise ValueError("successor source relation")
+        interval_check, interval_close = h039_verifier_retain_interval(
+            path[:-len("/verify/bin/h-039-exit")], sorted(disk), namespace)
+        rows += h039_verifier_semantic_rows()
+        # Compare bytes/graphs across both observations. The extra retained
+        # identities span the semantic interval and second observation only;
+        # each original observer independently owns its own pre/post rebinds.
+        after = namespace["h039_asset_draft_git_observe_local"](
+            _H039_VERIFIER_PARENT, candidate, "CONTRACT_SIX", candidate)
+        interval_check()
+        interval_close()
+        interval_close = None
+        rows.append({"id": "post_execution_source_unchanged", "ok": after == observed})
+        namespace["h039_local_cancel_check"]("successor_result")
+        ok = all(row["ok"] for row in rows)
+        result = {"contract": "h039-local-verifier-integration-v1", "parent_commit": _H039_VERIFIER_PARENT,
+            "candidate_commit": candidate, "gate_sha256": hashlib.sha256(raw).hexdigest(),
+            "complete": True, "credit": "LOCAL_VERIFIER_INTEGRATION" if ok else "NONE",
+            "verdict": "PASS_LOCAL_VERIFIER_INTEGRATION_ONLY" if ok else "LOCAL_VERIFIER_INTEGRATION_RED",
+            "rows": rows}
+        # Handler restoration is part of successful completion, not deferred
+        # until after a PASS-shaped wire has escaped to the final capture.
+        for number, previous in reversed(handlers):
+            signal.signal(number, previous)
+        handlers = []
+        namespace["h039_local_cancel_check"]("successor_after_handler_restore")
+        print("H039_VERIFIER_RESULT " + json.dumps(result, sort_keys=True, separators=(",", ":"),
+                                                  ensure_ascii=True, allow_nan=False))
+        return 0 if ok else 1
+    except (Exception, KeyboardInterrupt) as exc:
+        failure = {"error": type(exc).__name__, "detail": str(exc)}
+        for name in ("h039_git_postauth", "h039_git_close_failures", "h039_close_failures",
+                     "h039_git_child_cleanup_failures", "h039_git_capture_close_failures"):
+            if hasattr(exc, name):
+                failure[name] = getattr(exc, name)
+        print("H039_VERIFIER_UNJUDGEABLE " + json.dumps(failure, sort_keys=True), file=sys.stderr)
+        return 2
+    finally:
+        if interval_close is not None:
+            interval_close()
+        for number, previous in reversed(handlers):
+            signal.signal(number, previous)
+
+
+def h039_verifier_draft_dispatch(argv):
+    """No draft selector can reach any actual primitive or historical lane."""
+    if type(argv) is not list or any(type(arg) is not str for arg in argv):
+        return (2, "VERIFIER_ARGV_REFUSED")
+    if not argv:
+        return (2, "H039_COMPLETION_UNPROVEN")
+    if argv == ["--verifier-operational"]:
+        return (2, "LOADER_IMAGE_ABI_ADDRESS_BINDINGS_UNPROVEN")
+    if len(argv) == 2 and argv[0] == "--verifier-local":
+        return (2, "SUCCESSOR_IDENTITY_CAPTURE_NOT_FROZEN")
+    return (2, "VERIFIER_ARGV_REFUSED_NO_ASSET_OR_CONSUMED_LANE")
+
+
+# Local source qualification is distinct from closed operational dispatch.
+# No historical imports/module execution is necessary in either branch.
+if __name__ == "__main__":
+    import sys as _h039_verifier_sys
+    if len(_h039_verifier_sys.argv) == 3 and _h039_verifier_sys.argv[1] == "--verifier-local":
+        raise SystemExit(h039_verifier_local_main(_h039_verifier_sys.argv[2]))
+    raise SystemExit(h039_verifier_draft_dispatch(_h039_verifier_sys.argv[1:])[0])
+# H039_LOCAL_VERIFIER_DRAFT_END
+
 # H039_LOCAL_ASSET_DRAFT_BEGIN
 # Unfrozen local asset preparation. Everything outside this exact block is
 # byte-identical historical R33 data, not an available execution lane.

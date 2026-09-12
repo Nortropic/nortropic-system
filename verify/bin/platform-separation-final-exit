@@ -40,6 +40,222 @@ F9 (reintroduction negatives) is exercised by the test author on a scratch
 reference construction and recorded in the development document.
 No historical H gate, provider, build, publication or resume is executed.
 """
+# H039_VERIFIER_SUCCESSOR_DRAFT_BEGIN
+# New P-child verifier phase: the original B/C/P asset lane is not this subject.
+# The local successor selector is separate from inherited full-final dispatch.
+_H039_VERIFIER_FINAL_DECLARATION = {
+    "contract": "platform-separation-final-refreeze-declaration-v1",
+    "refreezes": [{
+        "path": "verify/bin/h-039-exit",
+        "base_sha256": "b2728b587911053453d577d3cdc4bf9c833c7cc6d6ccae6d0f15dbe7c86fa199",
+        "new_sha256": "429523039de3708f33d510857abd4a454173999cfa387579a3d53b62abe942f8",
+        "reason": "Source-bound PREPARED diagnostic verifier integration; original asset subjects unchanged; no owned successor qualification yet.",
+        "h039_verifier_integration": {
+            "contract": "h039-local-verifier-integration-v1",
+            "parent_commit": "005366dd5e3a9a74d8140c9dd0c0175aea268294",
+            "parent_tree": "a548cb8876346eb505906fb3feaa7b8d33ec43aa",
+            "qualification": "DRAFT_OWNED_LOCAL_OBSERVER_AND_CAPTURE_IMPLEMENTED_NOT_EXECUTED_OR_FROZEN",
+            "credit_ceiling": "LOCAL_VERIFIER_INTEGRATION_NOT_H039_PASS_ATTESTATION_OR_RUNTIME",
+            "asset_relation": "RETAIN_EXACT_FIVE_PRODUCT_BYTES_NO_REBUILD_OR_TRANSFERRED_ASSET_PASS"
+        }
+    }]
+}
+
+
+def h039_verifier_final_declaration_matches(value):
+    """Pure declaration consistency; neither execution nor frozen acceptance."""
+    import json
+    try:
+        return (type(value) is dict and json.dumps(value, sort_keys=True, separators=(",", ":"),
+                    ensure_ascii=True, allow_nan=False) ==
+                json.dumps(_H039_VERIFIER_FINAL_DECLARATION, sort_keys=True, separators=(",", ":"),
+                    ensure_ascii=True, allow_nan=False))
+    except (ValueError, TypeError):
+        return False
+
+
+_H039_VERIFIER_FINAL_ROWS = (
+    "owned_git_disk_index_relation", "executing_source_equals_candidate",
+    "complete_P_gate_restored", "complete_P_spec_and_new_member",
+    "semantic:positive", "semantic:unrelated_options", "semantic:wrong_return_size",
+    "semantic:wrong_observed_fd", "semantic:wrong_self_pid", "semantic:nonlistener",
+    "semantic:wrong_tuple_type", "semantic:wrong_address", "semantic:wrong_getsockname",
+    "semantic:identity_drift", "semantic:adapter_exception", "semantic:capture_error",
+    "semantic:stale_outcome", "semantic:outcome_wrong_self_pid", "semantic:disconnected_adapter",
+    "semantic:wrong_fd_call", "semantic:skip_getsockname", "semantic:skip_path_check",
+    "semantic:query_oserror", "semantic:getname_typeerror", "semantic:read_oserror",
+    "semantic:close_typeerror", "semantic:wait_typeerror", "semantic:old_getsockopt",
+    "semantic:refusal_writes_ack", "post_execution_source_unchanged")
+_H039_VERIFIER_P_FINAL_SHA = "83d50a58b0f8e179f90fea487da7352d8ebcfe214e3b416a8c2a359132046491"
+_H039_VERIFIER_PYTHON = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+_H039_VERIFIER_PYTHON_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+_H039_VERIFIER_PRESERVED_OWNERS = []
+
+
+def h039_verifier_final_invocation(subject, candidate):
+    """Fixed new selector only, no caller argv or historical asset phase."""
+    if (type(subject) is not str or not subject.startswith("/") or "\0" in subject
+            or any(part in ("", ".", "..") for part in subject.split("/")[1:])
+            or type(candidate) is not str or len(candidate) != 40
+            or any(c not in "0123456789abcdef" for c in candidate)
+            or candidate == "005366dd5e3a9a74d8140c9dd0c0175aea268294"):
+        raise ValueError("successor capture identity")
+    return [_H039_VERIFIER_PYTHON, "-I", "-S", "-B", subject + "/verify/bin/h-039-exit",
+            "--verifier-local", candidate]
+
+
+def h039_verifier_final_result_matches(stdout, stderr, returncode, candidate):
+    """Pure wire acceptance; only owned capture can provide qualifying bytes."""
+    import json
+    try:
+        h039_verifier_final_invocation("/schema", candidate)
+        if type(stdout) is not bytes or type(stderr) is not bytes or type(returncode) is not int:
+            return False
+        expected = {"contract": "h039-local-verifier-integration-v1",
+            "parent_commit": "005366dd5e3a9a74d8140c9dd0c0175aea268294",
+            "candidate_commit": candidate,
+            "gate_sha256": _H039_VERIFIER_FINAL_DECLARATION["refreezes"][0]["new_sha256"],
+            "complete": True, "credit": "LOCAL_VERIFIER_INTEGRATION",
+            "verdict": "PASS_LOCAL_VERIFIER_INTEGRATION_ONLY",
+            "rows": [{"id": name, "ok": True} for name in _H039_VERIFIER_FINAL_ROWS]}
+        wire = b"H039_VERIFIER_RESULT " + json.dumps(expected, sort_keys=True,
+            separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("ascii") + b"\n"
+        return returncode == 0 and stderr == b"" and stdout == wire
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
+def h039_verifier_final_capture_matches(capture, subject, candidate):
+    """Schema alone does not prove provenance: final_main owns this call."""
+    try:
+        return (type(capture) is dict and set(capture) == {
+            "status", "invocation", "returncode", "stdout", "stderr", "failures", "owner_pid", "owner_state"}
+            and capture["status"] == "CAPTURED" and capture["failures"] == []
+            and type(capture["owner_pid"]) is int and capture["owner_pid"] > 0
+            and capture["owner_state"] == "DIRECT_CHILD_TERMINAL_INNER_CLEANUP_NOT_INFERRED"
+            and capture["invocation"] == h039_verifier_final_invocation(subject, candidate)
+            and h039_verifier_final_result_matches(capture["stdout"], capture["stderr"],
+                                                   capture["returncode"], candidate))
+    except (ValueError, KeyError, TypeError):
+        return False
+
+
+def h039_verifier_final_namespace(raw):
+    """Exact P final bounded capture, not the inert protocol's wait helper."""
+    import __future__
+    import ast
+    import hashlib
+    import os
+    import selectors
+    import signal
+    import stat
+    import subprocess
+    import time
+    start = b"# H039_VERIFIER_SUCCESSOR_DRAFT_" + b"BEGIN\n"
+    end = b"# H039_VERIFIER_SUCCESSOR_DRAFT_" + b"END\n\n"
+    if type(raw) is not bytes or raw.count(start) != 1 or raw.count(end) != 1:
+        raise ValueError("final successor span")
+    old = raw[:raw.index(start)] + raw[raw.index(end) + len(end):]
+    if hashlib.sha256(old).hexdigest() != _H039_VERIFIER_P_FINAL_SHA:
+        raise ValueError("complete P final restoration")
+    names = ("h039_asset_gate_source", "h039_asset_owned_capture")
+    nodes = [node for node in ast.parse(old).body if isinstance(node, ast.FunctionDef) and node.name in names]
+    if sorted(node.name for node in nodes) != sorted(names) or any(
+            node.decorator_list or node.args.defaults or node.args.kw_defaults for node in nodes):
+        raise ValueError("exact P final capture selection")
+    # Single frozen successor delta to the authenticated P capture definition:
+    # refuse a signal latched during post-source check or handler restoration.
+    # The original P source is untouched; no other capture node is changed.
+    capture_node = next(node for node in nodes if node.name == "h039_asset_owned_capture")
+    if (not isinstance(capture_node.body[-1], ast.Return)
+            or not isinstance(capture_node.body[-1].value, ast.Dict)
+            or ast.literal_eval(capture_node.body[-1].value.keys[0]) != "status"):
+        raise ValueError("P final capture return anchor")
+    late_cancel = ast.parse('if requested[0] is not None:\n    failures.append("late parent cancellation")\n').body[0]
+    capture_node.body.insert(-1, late_cancel)
+    ast.fix_missing_locations(capture_node)
+    def canonical(subject, phase, contract, candidate):
+        if phase != "verifier" or contract != candidate:
+            raise ValueError("no historical final phase")
+        return h039_verifier_final_invocation(subject, candidate)
+    namespace = {"__name__": "h039_owned_successor_final_capture", "os": os, "stat": stat,
+        "hashlib": hashlib, "subprocess": subprocess, "signal": signal,
+        "selectors": selectors, "time": time,
+        "H039_ASSET_GATE_SHA": _H039_VERIFIER_FINAL_DECLARATION["refreezes"][0]["new_sha256"],
+        "H039_ASSET_OWNER_SECONDS": 300, "H039_ASSET_CANCEL_GRACE_SECONDS": 60,
+        "H039_ASSET_CAPTURE_BYTES": 1048576,
+        "_h039_preserved_owners": _H039_VERIFIER_PRESERVED_OWNERS,
+        "h039_asset_canonical_invocation": canonical}
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), "<exact-P-final-capture>", "exec",
+                 flags=__future__.annotations.compiler_flag, dont_inherit=True), namespace)
+    return namespace
+
+
+def h039_verifier_final_main(subject, candidate):
+    """Own capture, never accept a receipt path; no inherited full-final credit."""
+    import hashlib
+    import json
+    import os
+    import sys
+    capture = None
+    try:
+        h039_verifier_final_invocation(subject, candidate)
+        if (os.path.abspath(__file__) != subject + "/verify/bin/platform-separation-final-exit"
+                or os.path.realpath(subject) != subject):
+            raise ValueError("final must run from exact subject")
+        with open(__file__, "rb") as source:
+            raw = source.read(4194305)
+        if len(raw) > 4194304:
+            raise ValueError("final source size")
+        namespace = h039_verifier_final_namespace(raw)
+        # The reused gate reader authenticates the child; independently pin the
+        # interpreter as the existing final gate does, before any owner spawn.
+        with open(_H039_VERIFIER_PYTHON, "rb") as interpreter:
+            python_raw = interpreter.read(4194305)
+        if (len(python_raw) > 4194304 or hashlib.sha256(python_raw).hexdigest() != _H039_VERIFIER_PYTHON_SHA):
+            raise ValueError("fixed Python source pin")
+        capture = namespace["h039_asset_owned_capture"](subject, "verifier", candidate, candidate)
+        with open(__file__, "rb") as source:
+            after = source.read(4194305)
+        with open(_H039_VERIFIER_PYTHON, "rb") as interpreter:
+            python_after = interpreter.read(4194305)
+        if after != raw or python_after != python_raw:
+            raise ValueError("final/interpreter source changed")
+        if not h039_verifier_final_capture_matches(capture, subject, candidate):
+            raise ValueError("owned successor capture refused", capture["status"], capture["failures"])
+        preserved_capture = dict(capture)
+        preserved_capture["stdout"] = {"encoding": "hex", "bytes": capture["stdout"].hex()}
+        preserved_capture["stderr"] = {"encoding": "hex", "bytes": capture["stderr"].hex()}
+        print(json.dumps({"contract": "h039-local-verifier-final-capture-v1",
+            "candidate_commit": candidate, "complete": True, "credit": "LOCAL_VERIFIER_INTEGRATION",
+            "verdict": "PASS_LOCAL_VERIFIER_INTEGRATION_ONLY_NOT_FULL_FINAL",
+            "owned_capture": preserved_capture,
+            "child_stdout_sha256": hashlib.sha256(capture["stdout"]).hexdigest(),
+            "child_gate_sha256": _H039_VERIFIER_FINAL_DECLARATION["refreezes"][0]["new_sha256"]},
+            sort_keys=True, separators=(",", ":")))
+        return 0
+    except (Exception, KeyboardInterrupt) as exc:
+        failure = {"error": type(exc).__name__, "detail": str(exc), "owned_capture": None}
+        if capture is not None:
+            failure["owned_capture"] = dict(capture)
+            failure["owned_capture"]["stdout"] = {"encoding": "hex", "bytes": capture["stdout"].hex()}
+            failure["owned_capture"]["stderr"] = {"encoding": "hex", "bytes": capture["stderr"].hex()}
+        print("H039_VERIFIER_FINAL_UNJUDGEABLE " + json.dumps(failure, sort_keys=True), file=sys.stderr)
+        return 2
+
+
+def h039_verifier_final_draft_dispatch(argv):
+    """Refusal before original final imports, fixtures, Git or held gates."""
+    return (2, "H039_VERIFIER_SUCCESSOR_OWNED_QUALIFICATION_NOT_FROZEN")
+
+
+if __name__ == "__main__":
+    import sys as _h039_verifier_final_sys
+    if len(_h039_verifier_final_sys.argv) == 4 and _h039_verifier_final_sys.argv[1] == "--verifier-local":
+        raise SystemExit(h039_verifier_final_main(*_h039_verifier_final_sys.argv[2:]))
+    raise SystemExit(h039_verifier_final_draft_dispatch([])[0])
+# H039_VERIFIER_SUCCESSOR_DRAFT_END
+
 import argparse
 import ast
 import hashlib

@@ -3104,3 +3104,140 @@ att inga effektfunktioner eller historiska suffix ändrats. Dessa är pure-/
 källkontroller, inte faktisk C-RED, produktgrind eller freeze. Nuvarande
 hand-off är SOURCE_UNREVIEWED, C_RED=NOT_RUN, FROZEN_GATE_READY=NO,
 PRODUCTION_IMPLEMENTATION_WRITTEN=NO, PUSH=NO, MERGE=NO.
+
+### H039 PREPARED-verifier successor: test-first criterion (2026-09-12)
+
+This is an unfrozen TEST_AUTHOR draft on exact parent
+005366dd5e3a9a74d8140c9dd0c0175aea268294, not another asset C/P phase.
+The intended code belongs to the diagnostic verifier, not an installed runtime
+consumer. Its tracked authority and implementation reside in verify/bin/h-039-exit.
+No new controller path, owner registry entry or external implementation is added.
+The current maximum author surface remains the six existing local-contract paths.
+
+Before writing the successor decision code, the required effect is fixed:
+the actual run_exact_protocol call path must call actual validate_prepared,
+publish its prepared_capabilities, close runtime and listener descriptors,
+write exactly one frozen invalid ACK to the FIFO, and close that FIFO. The
+same actual protocol projection then reaches actual validate_protocol in the
+same verifier-owned process and invocation. Unlike the historical separate
+validator script, this integrated qualifier compares the observation's self PID
+against its own getpid; no caller PID or persisted replay can provide that
+identity. An outcome-only self-PID mutation must be rejected independently of
+the consumer's tuple checks. This is an explicit invocation design change,
+not an assumption about the historical validator process. Neither
+consumer function, projection nor branch decision may be replaced by a test
+double. Only OS, transport and native-adapter primitives are inert in this
+local test. Captures are fixture observations, not evidence of real host effects.
+
+The positive fixture has exactly three ordered received descriptors. Its one
+adapter invocation uses only index 2. Independent getsockname, exact
+request-derived path, named socket, runtime/FIFO identities, four separate
+identity domains, flags and all relevant rebinds remain required. The adapter
+observations replace only the old SO_ACCEPTCONN observation; there is no
+generic native interface, descriptor search, retry or caller-selected PID.
+Unrelated socket option bits alongside the listening bit remain admissible.
+
+Test-first negative predictions, one defect per case:
+
+- The old getsockopt-only consumer is RED despite returning acceptconn=1.
+- A disconnected adapter or an invocation with a descriptor other than received
+  index 2 is RED; fabricated observation fields cannot repair the call trace.
+- Missing independent getsockname or exact-path validation is RED even when
+  the adapter returns a matching-looking prefix.
+- Wrong identity, flags or malformed adapter observations refuse before ACK.
+- A malformed or stale prepared_capabilities projection is rejected by the
+  actual outcome validator, not by a parallel test-only validator.
+- A primitive/harness exception is UNJUDGEABLE, never a successful rejection.
+- Operational entry with pending loader/image/ABI/address-policy bindings
+  refuses before any primitive effect; UNKNOWN is never operational success.
+
+The protocol fixture never performs an actual socket, process, native
+loading/query, protected-store read, root operation, receipt/sequence effect
+or historical consumed attempt. Separately reviewed future source-observer
+Git children, host ACL metadata and the final capture child are described below.
+The local result ceiling is LOCAL_VERIFIER_INTEGRATION only;
+it is not H039 PASS, attestation, runtime credit or an asset rebuild.
+
+The successor source relation must remove one exact new gate block to recover
+the complete original P gate SHA256 b2728b587911053453d577d3cdc4bf9c833c7cc6d6ccae6d0f15dbe7c86fa199.
+Likewise its exact new spec block must restore original P spec SHA256
+d65b29c297595df20d0aa7f4d67700436d719d870b2772b82eae7bc0d8c8f957.
+The original asset member, historical suffix and five product artifacts stay
+unchanged. New dispatch must refuse old asset/installed selectors before their
+effects. Final-exit needs its own explicit successor identity/capture relation;
+the old B8095 -> C-six -> P-four recognizer is not valid for this P-child.
+Old result files remain evidence of their original subjects only. No compiler
+rerun is needed or authorized for these unchanged assets in this local slice.
+
+Historical first-tranche status, superseded by exact source-bound test records:
+criterion written before successor implementation; inert
+harness review and test-first execution pending; no commit or freeze.
+FROZEN_GATE_READY=NO; BASELINE_RED_FOR_RIGHT_REASON=OVERIFIERAT;
+PRODUCTION_IMPLEMENTATION_WRITTEN=NO; PUSH=NO; MERGE=NO.
+
+#### Successor observer/capture criterion, before implementation
+
+The earlier 43-check inert result is tied to its recorded six source hashes;
+it is not a Git observation or evidence for subsequent source revisions.
+The next local judge must obtain its own exact P-child commit, complete raw
+tree/listing/diff closure, clean index and every tracked disk byte using the
+existing retained local Git observer. It may not accept caller-supplied facts.
+Only the fixed six TA paths may differ; all modes and five product blobs stay
+unchanged. Wrong object type/hash/parent, extra path, disk/index mismatch,
+noncanonical config and changed retained bindings are unjudgeable, never PASS.
+The original observer, raw parsers, bounded child capture, root-owned Git tool
+reader and ACL metadata checks remain unchanged in the restored P source.
+Their successor namespace fixes P, the six paths and a canonical local-only
+six-key config; this is not the old B/C/P asset selector. Native candidate
+loading/query remains forbidden; the retained tool ACL metadata effect must
+receive separate effect review before any actual observer execution.
+
+The separately pinned final capture must launch its own canonical local child,
+reject caller receipts, stderr, nonzero status, missing/duplicate/extra rows,
+wrong subject or source hash, source changes and unresolved capture/owner state.
+Its expected semantic rows are source-owned before execution; the child's rows
+must be computed from the actual inert protocol and validator, not emitted from
+that expected result. Pure capture controls use independently constructed wire
+fixtures and mutations, not an expected-result generator as positive evidence.
+The final local selector qualifies only this integration, not inherited final
+F1--F10 or original asset build results. All other final selectors still refuse.
+No whole gate, Git observer, subprocess capture, compiler or native effect is
+executed during this pure-test draft tranche. Freeze and independent review
+remain pending.
+
+The current uncommitted draft is prepared and pure-tested before freeze. Next
+comes independent source/effect review, final pins and an immutable contract
+commit C directly on P. Only then may a fresh canonical standalone C checkout
+run its own reviewed local selector. The observer does not create or authorize
+the commit/freeze it measures. The parent final capture selector is
+`--verifier-local ABSOLUTE_SUBJECT C`; it spawns only the child's
+`--verifier-local C`. Both use fixed Python with `-I -S -B`; the child's Git
+processes use the inherited closed environment, retained pinned CLT tool,
+canonical six-key config and no remote/helper/optional-lock operations.
+The observer's inherited ACL calls inspect only host tool metadata via
+CDLL(None), acl_get_fd_np and acl_free; they are not candidate adapter calls.
+
+The source observer runs before and after the in-memory protocol cases.
+Across the semantic interval, a small retained nofollow FD/name set additionally
+binds tracked files and their ancestors, Git config/HEAD/index and the CLT tool
+by dev/ino/mode/uid/gid/nlink/size/flags/mtime/ctime. Same-byte inode replacement
+must fail this check. This is bounded interval binding, not universal malicious
+CAS protection. The original observer's own acquired bindings stay intact.
+
+The selected protocol suite includes the actual historical getsockopt consumer
+at the actual run_exact_protocol callsite and a refusal-then-ACK source mutant.
+Injected OSError/TypeError at read/query/getname/close/wait boundaries are always
+unjudgeable. The original protocol wait helper is inert only; real final capture
+uses the separately inherited bounded final capture owner, never that helper.
+Cancellation latched during handler restoration must prevent result emission.
+The successor bounded capture has exactly one AST insertion before its original
+return: a latched request adds a late-cancellation failure after restoration.
+This closes its post-source/restoration window without editing original P bytes.
+Any post-spawn failure preserves the bounded full raw-safe child capture, PID,
+argv, state and failures in stderr; unresolved ownership permits no retry.
+
+Eventual operational qualification must use these same held consumer and
+validator definitions and run_exact_protocol callsite in one owned process,
+with only the OS/adapter primitive bindings replaced after their missing
+loader/image/ABI/address policy has real authority. This draft admits no such
+primitive bindings and operational dispatch remains a pre-effect refusal.
