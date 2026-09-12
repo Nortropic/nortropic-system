@@ -5,9 +5,14 @@
 The product is exactly one byte-preserving digest-token substitution in
 controller/verify/register.json.  The gate invokes the real preflight; fixture
 or H-017 credit is never accepted as the product effect.
+
+At the separated platform generation, no arguments verify historical completion:
+the exact published product and source-bound gate execute in a private object fixture,
+while retired paths must be absent from the current subject. No new product credit.
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -50,6 +55,20 @@ CONSTITUTION_SHA = "1bda41f6e26291d70a93b51ff53bd583c052b40631e72c368ce564ffc281
 AUTOPILOT_SHA = "4237eda9fd4554ed3d7ed78fc33c0e5f27f5d270ae21ff9e9d9f0d9467caa9fc"
 H017_GATE_SHA = "78b9d1f4fed9fa0d4c9e587dfc0069e9532a5cd8653a697b29a275a4d46ea983"
 FIXTURES_TREE = "d77af8aae40144558450d9e45a699ad93e68c7a4"
+CURRENT_HISTORY_BASE = "03a364bf248b99d4959cbfc3771c12dd33021b65"
+HISTORICAL_PRODUCT_BASE = "3560d61c0121d9156c95d3839d6cff3987e0070d"
+HISTORICAL_PRODUCT = "ee84b206a5fc755e0c708153559da6c4ec8df55e"
+HISTORICAL_GATE_SHA = "814deb69fbc6e34e57ebc89b62bf7d54281bc95a4207332ff94792d90d0e6dc3"
+HISTORICAL_SOURCE_OLD = "0a677d8fb0f022c09d003b1ef1d2b11b475fe060"
+HISTORICAL_SOURCE_NEW = "42c20b3069216218f28b3ca3ff9de7989ebc1f79"
+HISTORICAL_FIXTURE_SOURCE = "c296566f70dcfbca6b8e9ddc6789e41d66162772"
+HISTORICAL_DECISION_SHA = "3854dd9f1cd7a80530979c40ff5daa1db6778b8d147784ac519926cdd14418c9"
+CURRENT_HISTORY_PATHS = {
+    "verify/bin/h-037-exit", "verify/bin/platform-separation-final-exit",
+    "docs/loop/platform-separation-final-local-development.md",
+    "SEPARATION-20260910/REFREEZE.json",
+}
+HISTORICAL_PASS_COUNT = 38
 PRODUCT_PATH = "controller/verify/register.json"
 LABEL = "A_H037_EXACT_VERIFY_SUITE_REGISTER_REBIND_OPERATIONAL"
 REASON = "CANONICAL_PREFLIGHT_HASH_MISMATCH_SUITE_SHA256_STALE"
@@ -2036,6 +2055,216 @@ def frozen_contract_checks() -> None:
     exact_transition_selftests()
 
 
+def historical_object_checks(binding: GitBinding) -> tuple[bool, str]:
+    """Fixed archival objects; no path/ref is caller selected."""
+    for oid in (CURRENT_HISTORY_BASE, HISTORICAL_PRODUCT_BASE, HISTORICAL_PRODUCT,
+                HISTORICAL_SOURCE_OLD, HISTORICAL_SOURCE_NEW, HISTORICAL_FIXTURE_SOURCE):
+        if not exact_commit(oid, binding):
+            return False, "archival object is not an exact commit"
+    product = strict_commit_record(binding, HISTORICAL_PRODUCT)
+    changed = identity_git(binding, "diff-tree", "--no-commit-id", "--name-status", "-r",
+                           "--no-renames", HISTORICAL_PRODUCT_BASE, HISTORICAL_PRODUCT)
+    if product.parents != [HISTORICAL_PRODUCT_BASE] or changed.returncode \
+            or changed.stdout != "M\t" + PRODUCT_PATH + "\n":
+        return False, "historical product is not the exact one-file direct child"
+    pre = git_blob(binding, HISTORICAL_PRODUCT_BASE, PRODUCT_PATH)
+    post = git_blob(binding, HISTORICAL_PRODUCT, PRODUCT_PATH)
+    if sha(pre) != PRE_REGISTER_SHA or sha(post) != POST_REGISTER_SHA \
+            or pre.count(OLD_SUITE_SHA.encode()) != 1 \
+            or pre.replace(OLD_SUITE_SHA.encode(), NEW_SUITE_SHA.encode()) != post:
+        return False, "historical register transition mismatch"
+    gate_path = str(GATE.relative_to(ROOT))
+    if sha(git_blob(binding, HISTORICAL_PRODUCT, gate_path)) != HISTORICAL_GATE_SHA \
+            or git_blob(binding, HISTORICAL_PRODUCT_BASE, gate_path) != git_blob(binding, HISTORICAL_PRODUCT, gate_path) \
+            or git_blob(binding, HISTORICAL_PRODUCT_BASE, str(SPEC.relative_to(ROOT))) \
+                != git_blob(binding, HISTORICAL_PRODUCT, str(SPEC.relative_to(ROOT))):
+        return False, "historical gate/spec transition mismatch"
+    for oid, digest in ((HISTORICAL_SOURCE_OLD, OLD_SUITE_SHA), (HISTORICAL_SOURCE_NEW, NEW_SUITE_SHA)):
+        if sha(git_blob(binding, oid, str(SUITE.relative_to(ROOT)))) != digest:
+            return False, "archival object bytes mismatch"
+    if sha(git_blob(binding, HISTORICAL_PRODUCT, str(DECISION_LOG.relative_to(ROOT)))) != HISTORICAL_DECISION_SHA:
+        return False, "historical decision bytes mismatch"
+    return True, "exact published transition and archival objects"
+
+
+def current_history_identity(binding: GitBinding, head: str) -> tuple[bool, object]:
+    if not exact_commit(head, binding):
+        return False, "current HEAD is not an exact commit"
+    for ancestor in (CURRENT_HISTORY_BASE, HISTORICAL_PRODUCT):
+        result = identity_git(binding, "merge-base", "--is-ancestor", ancestor, head)
+        if result.returncode or result.stderr:
+            return False, "current subject does not descend from the bound generation/product"
+    changes = identity_git(binding, "diff-tree", "--no-commit-id", "--name-status", "-r",
+                           "--no-renames", CURRENT_HISTORY_BASE, head)
+    if changes.returncode or set(changes.stdout.splitlines()) != {"M\t" + p for p in CURRENT_HISTORY_PATHS}:
+        return False, "current subject differs outside the exact four-file contract"
+    physical_ok, detail = physical_checkout_identity(binding, head)
+    if not physical_ok:
+        return False, detail
+    # Reuse existing path constants, deriving retirement only from the fixed
+    # generation, never from candidate absence or a caller-selected list.
+    retired = []
+    for value in tuple(globals().values()):
+        if isinstance(value, Path) and ROOT in value.parents:
+            relative = str(value.relative_to(ROOT))
+            listing = identity_git(binding, "ls-tree", CURRENT_HISTORY_BASE, "--", relative)
+            if listing.returncode:
+                return False, "fixed-generation path enumeration failed"
+            if not listing.stdout:
+                retired.append(relative)
+    if len(set(retired)) != 3:
+        return False, "fixed-generation retired path cardinality"
+    trees = identity_git(binding, "ls-tree", "-r", "-t", HISTORICAL_FIXTURE_SOURCE)
+    prefix = "040000 tree " + FIXTURES_TREE + "\t"
+    fixture_paths = [line[len(prefix):] for line in trees.stdout.splitlines() if line.startswith(prefix)]
+    if trees.returncode or len(fixture_paths) != 1:
+        return False, "historical fixture tree identity/cardinality"
+    for relative in [*retired, *fixture_paths]:
+        listing = identity_git(binding, "ls-tree", head, "--", relative)
+        if listing.returncode or listing.stdout or os.path.lexists(ROOT / relative):
+            return False, "historical path reintroduced into current subject"
+    return True, {"head": head, "retired_paths": sorted(retired), "fixture_paths": fixture_paths}
+
+
+def historical_execution_projection(raw: bytes) -> bytes:
+    # Eight disposable-fixture checkout flags are removed. The sole deliberately
+    # dirty fixture is restored only AFTER its rejection has been observed, before
+    # ordinary checkout. Archived objects and checked-out gate bytes stay intact.
+    before = b'"checkout", "--detach", "--force", "--quiet",'
+    after = b'"checkout", "--detach", "--quiet",'
+    save_before = b'        dirty_target.write_bytes(dirty_target.read_bytes() + b"\\n")\n'
+    save_after = (b'        dirty_original = dirty_target.read_bytes()\n'
+                  b'        dirty_target.write_bytes(dirty_original + b"\\n")\n')
+    restore_at = b'        fixture_git_value(repo, "update-index", "--no-skip-worktree", "specs/tasks.spec.json")\n'
+    restore_after = (restore_at
+        + b'        if dirty_target.read_bytes() != dirty_original + b"\\n":\n'
+          b'            raise Rig("own dirty fixture changed beyond the deliberate append")\n'
+          b'        dirty_target.write_bytes(dirty_original)\n')
+    if sha(raw) != HISTORICAL_GATE_SHA or raw.count(before) != 8 \
+            or raw.count(save_before) != 1 or raw.count(restore_at) != 1:
+        raise Rig("archival execution projection source/site cardinality")
+    return raw.replace(before, after).replace(save_before, save_after).replace(restore_at, restore_after)
+
+
+def historical_row_labels(raw: bytes) -> set[str]:
+    if sha(raw) != HISTORICAL_GATE_SHA:
+        raise Rig("archival row-label source digest mismatch")
+    tree = ast.parse(raw)
+    labels = {arg.value for node in ast.walk(tree)
+              if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "check"
+              for arg in node.args if isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+              and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", arg.value)}
+    transition = next(node for node in tree.body
+                      if isinstance(node, ast.FunctionDef) and node.name == "exact_transition_selftests")
+    names = {node.args[0].elts[0].value for node in ast.walk(transition)
+             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+             and isinstance(node.func.value, ast.Name) and node.func.value.id == "mutants"
+             and node.func.attr == "append" and len(node.args) == 1
+             and isinstance(node.args[0], ast.Tuple) and node.args[0].elts
+             and isinstance(node.args[0].elts[0], ast.Constant)}
+    if len(labels) != 21 or len(names) != 8:
+        raise Rig("archival static/dynamic row-label cardinality")
+    for name in names:
+        labels.update({f"J_{name}_MUTANT_EXACT_IDENTITY_REJECT", f"J_{name}_MUTANT_REAL_PREFLIGHT_CLASS"})
+    labels.add(LABEL)
+    if len(labels) != HISTORICAL_PASS_COUNT:
+        raise Rig("archival expanded row-label cardinality")
+    return labels
+
+
+def historical_result_valid(result: subprocess.CompletedProcess[str], raw: bytes) -> bool:
+    lines = result.stdout.splitlines()
+    passes = [line for line in lines if line.startswith("PASS ")]
+    expected = {"PASS " + label for label in historical_row_labels(raw)}
+    trailer = ["MATERIAL_PROPERTIES_JUDGE_ONLY=NONE",
+               f"H037_GATE_SUMMARY={HISTORICAL_PASS_COUNT} PASS 0 FAIL", "H037_GATE_RESULT=PASS"]
+    return result.returncode == 0 and result.stderr == "" \
+        and len(passes) == HISTORICAL_PASS_COUNT and set(passes) == expected \
+        and [line for line in lines if not line.startswith("PASS ")] == trailer \
+        and lines[-3:] == trailer
+
+
+def historical_completion() -> int:
+    global passed, failed
+    if not trusted_git_valid():
+        raise Rig("trusted Git identity rejected before historical object access")
+    binding = canonical_git_binding(ROOT)
+    head_result = identity_git(binding, "rev-parse", "--verify", "HEAD")
+    if head_result.returncode or head_result.stderr:
+        raise Rig("current HEAD observation failed")
+    head = head_result.stdout.strip()
+    identity_ok, identity_detail = current_history_identity(binding, head)
+    history_ok, history_detail = historical_object_checks(binding) if identity_ok else (False, "current subject rejected")
+    check(identity_ok and history_ok, "F_H037_CURRENT_SUBJECT_AND_HISTORICAL_COMPLETION_BINDING",
+          {"current": identity_detail, "historical": history_detail})
+    if failed:
+        print(f"H037_GATE_SUMMARY={passed} PASS {failed} FAIL")
+        print("H037_GATE_RESULT=UNEXPECTED_RED")
+        return 2
+    # Exact object export into a new private repo: no network, shared index,
+    # alternates, current-product writes or caller-selected executable/source.
+    root = Path(tempfile.mkdtemp(prefix="h037-historical-completion-", dir="/private/tmp"))
+    root.chmod(0o700)
+    print(f"H037_HISTORICAL_FIXTURE={root}", flush=True)
+    repo = root / "repo"
+    repo.mkdir(mode=0o700)
+    ids = identity_git(binding, "rev-list", "--objects", "--no-object-names", "--missing=print", HISTORICAL_PRODUCT)
+    object_ids = ids.stdout.splitlines()
+    if ids.returncode or ids.stderr or not object_ids or len(object_ids) != len(set(object_ids)) \
+            or any(re.fullmatch(r"[0-9a-f]{40}", oid) is None for oid in object_ids):
+        raise Rig("historical reachable object enumeration failed")
+    packed = identity_git(binding, "pack-objects", "--stdout", "--no-reuse-object", "--no-reuse-delta",
+                          "--window=0", text=False, input_data=("\n".join(object_ids) + "\n").encode())
+    if packed.returncode or packed.stderr:
+        raise Rig("historical exact object export failed")
+    fixture_git_value(repo, "init", "--quiet", "--template=", "--object-format=sha1")
+    indexed = fixture_git(repo, "index-pack", "--stdin", "--strict", "--check-self-contained-and-connected", input_bytes=packed.stdout)
+    if indexed.returncode:
+        raise Rig("historical object import rejected")
+    fixture_git_value(repo, "checkout", "--quiet", "--detach", HISTORICAL_PRODUCT)
+    original = repo / GATE.relative_to(ROOT)
+    if sha(original.read_bytes()) != HISTORICAL_GATE_SHA:
+        raise Rig("historical executable does not match the fixed source")
+    runtime_temp = root / "child-runtime"
+    runtime_temp.mkdir(mode=0o700)
+    projected = historical_execution_projection(original.read_bytes())
+    projection_path = root / "historical-execution.py"
+    projection_path.write_bytes(projected)
+    # __file__ binds data/contract observations to the exact archived checkout;
+    # compile's filename and the executed bytes explicitly name the projection.
+    loader = (
+        "import sys; from pathlib import Path; "
+        "projection,original,base,candidate=sys.argv[1:]; "
+        "sys.argv=[original,'--product',base,candidate]; "
+        "exec(compile(Path(projection).read_bytes(),projection,'exec'),"
+        "{'__name__':'__main__','__file__':original})"
+    )
+    invocation = [sys.executable, "-I", "-S", "-B", "-c", loader, str(projection_path),
+                  str(original), HISTORICAL_PRODUCT_BASE, HISTORICAL_PRODUCT]
+    result = subprocess.run(invocation, cwd=repo, env=closed_process_environment(runtime_temp, verify_runtime=True),
+                            text=True, capture_output=True, shell=False, timeout=300)
+    (root / "stdout.txt").write_text(result.stdout, encoding="utf-8")
+    (root / "stderr.txt").write_text(result.stderr, encoding="utf-8")
+    (root / "invocation.json").write_text(json.dumps({"argv": invocation, "exit_code": result.returncode,
+        "current_head": head, "historical_head": HISTORICAL_PRODUCT,
+        "historical_gate_sha256": HISTORICAL_GATE_SHA, "execution_sha256": sha(projected),
+        "projection": "eight fixture checkout flag removals; one exact save/validate/restore after dirty-fixture rejection"}, sort_keys=True) + "\n", encoding="utf-8")
+    if not historical_result_valid(result, original.read_bytes()):
+        raise Rig(f"historical gate did not qualify; rc={result.returncode}; preserved={root}")
+    for line in result.stdout.splitlines():
+        print(line if line.startswith("PASS ") else "HISTORICAL_" + line)
+    passed += HISTORICAL_PASS_COUNT
+    after = identity_git(binding, "rev-parse", "--verify", "HEAD")
+    unchanged, unchanged_detail = physical_checkout_identity(binding, head)
+    check(after.returncode == 0 and after.stdout.strip() == head and unchanged,
+          "F_H037_CURRENT_SUBJECT_UNCHANGED_AFTER_HISTORICAL_REPLAY", unchanged_detail)
+    print("H037_CREDIT=HISTORICALLY_COMPLETED_ONLY")
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=HISTORICAL_H037")
+    print(f"H037_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    print("H037_GATE_RESULT=" + ("PASS" if not failed else "UNEXPECTED_RED"))
+    return 0 if not failed else 2
+
+
 def main() -> int:
     product_bound = sys.argv[1:2] == ["--product"] and len(sys.argv) == 4
     preproduct = len(sys.argv) == 1
@@ -2043,6 +2272,8 @@ def main() -> int:
         print("RIG_ERROR: usage: h-037-exit [--product BASE_SHA CANDIDATE_SHA]", file=sys.stderr)
         return 2
     try:
+        if preproduct:
+            return historical_completion()
         frozen_contract_checks()
         _pre, post = register_states()
         effect_ok, effect_detail = product_effect(REGISTER.read_bytes())

@@ -2466,3 +2466,73 @@ utan runtimeeffekter. En riktig grön produkt måste ge 74 PASS/0 FAIL, exit 0, 
 Den enda avsedda configersättningen ger sha256
 `92f84d8f909bdded186c2db8b8e98f4c79e3f9f5e16c53100f7e005641a183f9`;
 den är endast härledd/provad i minnet, inte skriven av TEST_AUTHOR.
+
+### v3.15 — H037 historiskt genomförd, 2026-09-12
+
+Bas `03a364bf248b99d4959cbfc3771c12dd33021b65`; H036 och samtliga hållna grindar
+är orörda. Endast H037 deklareras. Spec, produkt och aktuellt register ändras inte.
+Noarg verifierar uttryckligen historisk completion, aldrig en ny registerprodukt.
+
+Nuvarande kandidat binds till exakt fyra kontraktsfiler, ren fysisk commitidentitet
+och fortsatt frånvaro av de historiska sökvägarna. Historisk parent är
+`3560d61c0121d9156c95d3839d6cff3987e0070d`, produkt är
+`ee84b206a5fc755e0c708153559da6c4ec8df55e`; övergången är exakt en registertoken.
+Sviten binds vid `0a677d8fb0f022c09d003b1ef1d2b11b475fe060` och
+`42c20b3069216218f28b3ca3ff9de7989ebc1f79`; fixtures-trädet binds vid
+`c296566f70dcfbca6b8e9ddc6789e41d66162772`. Historiska pins får ingen ny mening.
+
+Den byteidentiska historiska grinden bevaras som källa. En uttrycklig exekveringskopia
+tar bort exakt åtta `--force` från disponibla kontrollfixturers checkout-anrop. Den enda
+avsiktligt nedsmutsade specfixturen sparas före append, valideras efter det redan
+observerade skip-worktree-negativprovet och återställs till exakt sparade bytes före
+vanlig checkout. Inga andra källändringar görs. Arkivhash, antal ställen (8 + 1 + 1),
+exakt transformation och körhash binds;
+detta påstås inte vara oförändrad arkivexekvering. Kopian kör verklig `--product BASE CANDIDATE`
+i en separat lokal objektreplika med egen Git-state. Befintliga identitetsnegativer,
+real-preflight och check/run-refusal bevaras; sviten är hashkontrollerad data och
+körs inte som produkt. Ingen artefakt återförs till dagens aktiva träd. Alla 21
+gamla etiketter behålls, med två nya kontroller för dagens subjekt före/efter.
+Historisk stderr, fel exit, riggfel, saknad terminal eller fel antal kan inte bli PASS.
+Nuvarande subjeks-SHA och historisk SHA hålls åtskilda. Kvitto avser dagens körda
+omfrysning; `H037_CREDIT=HISTORICALLY_COMPLETED_ONLY` begränsar dess innebörd.
+
+Effektyta: endast grindens nya `/private/tmp/h037-historical-completion-*`-rot och
+de redan befintliga historiska kontrollfixturerna. Objekt exporteras med pinnad Git,
+utan nätverk eller delad index/worktree; eget nytt repo importerar endast den exakta
+historiska closure-mängden. Yttre fixtur och stdout/stderr/argv bevaras, även vid fel.
+Ingen fullkörning har gjorts här. Förutsagt antal är 40 (38 historiska + 2 aktuella),
+inte bevisad PASS. Fokustester och seriell fullkörning föregår kvalificering.
+
+Prefreeze-fokus 2026-09-12 (ingen fullkvalificering), faktisk körning med pinnad Python och `-I -S -B`:
+`/private/tmp/nortropic-v313-contract.Fq5ueV/v315-focused.py`, exit 0.
+H037-källhash `7a458cf8494d2e8cee87029b887495412b1e79cba0060b3296bc53794d574be2`.
+Verkliga historiska objektskontroller godkända; 10 resultatfall (inklusive fel etikett,
+duplicerad rad, stderr, exit och terminal), fyra nuvarande identitetsfall, fel historisk
+commit/graf/digest, muterat arkiv och Git-vägran före repoåtkomst gav förväntade resultat.
+Alla äldre funktioner utom dispatch-main är AST-oförändrade; projektionen av arkivet
+tar bort exakt åtta argument och har hash
+`8be5a7445f14b0cc6e439001e43708df817c2f6d35b7493823edbf73de00ee96`.
+Added-line-scan 0 träffar; 21 basetiketter, 23 nu, inga saknade.
+
+Den gamla registerläsaren på dagens bytes ger mätt `unfrozen register bytes:
+9752d01d4128b3fb86488875f2dac3685db51985bc2592544de97f36ffd7ee53`.
+Det är generationsdrift för en redan genomförd historisk produkt, inte en ny saknad
+implementation. Full H037-körning/ny baslinje NOT_RUN här; ingen BUILDER-produkt beställs.
+
+Granskningen belade därefter att en vanlig checkout av samma träd lämnade den
+avsiktligt nedsmutsade specfixturen kvar. Prefreeze `7a458c…` och exekveringskopia
+`8be5a744…` är därför bevarade förstadier utan kvalificeringscredit. Den minimala
+rättningen ovan sparar/validerar/återställer endast denna fixtur efter observerad vägran.
+
+Omkörd fokus med samma kommando, exit 0 på H037
+`12ef5f55386a9f68e1b5019d52555d1573e2356408bf584e1a038d09e1d86045`.
+Ny exakt exekveringskopia:
+`a9b19e8b78e464f640f5945adc595a8c69e370996ebcc81ff2220dc07cd7cfc6`.
+Åtta flaggborttagningar och två single-site-ankare (save, validerad restore), inga andra
+ändringar. Verklig minimal fixtur `/private/tmp/h037-ta-restore-72ak_mik` bevarad:
+vanlig checkout gav `M specs/tasks.spec.json`, fysisk identitet avvisade den trots
+skip-worktree, och exakta återställningen följd av vanlig checkout blev ren. Extra
+oväntade bytes avvisades utan överskrivning och finns kvar i fixturen. Samtliga tidigare
+fokusfall passerade igen, inklusive fel etikett/arkiv/graf och återinförd historisk path.
+Resultat `v315-focused.12ef5f55386a.result.json` under samma temporära evidensrot.
+Full historisk acceptans är fortfarande NOT_RUN; förutsagt antal 40 oförändrat.
