@@ -91,7 +91,7 @@ FORBIDDEN_GIT_TOKENS = (
 MAX_ARCHITECT_ROUNDS = 5
 SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT = True
 ROADMAP_PLAN_BLOBS = {
-    ROADMAP_PLAN_PATH: "8b234a8f951b41388f809561d443202011121986",
+    ROADMAP_PLAN_PATH: "c4f3a615e5e740ffee3c4cf8353969e3134d44f3",
     ROADMAP_HANDOFF_PATH: "334671cf2aaf55a9cf8c8b2c130e1b7db3d8c4b5",
 }
 # Platform document generation after the 2026-09-10 repository split: router
@@ -2601,7 +2601,7 @@ def selftest(repo: Path | None = None) -> None:
             raise Stop(f"provider-neutral dependency floor missing from {code}")
     if PLAN_GENERATION != "platform-v2" or set(ROADMAP_PLAN_BLOBS) != {ROADMAP_PLAN_PATH, ROADMAP_HANDOFF_PATH}:
         raise Stop("plan generation identity drift")
-    if (ROADMAP_PLAN_BLOBS.get(ROADMAP_PLAN_PATH) != "8b234a8f951b41388f809561d443202011121986" or
+    if (ROADMAP_PLAN_BLOBS.get(ROADMAP_PLAN_PATH) != "c4f3a615e5e740ffee3c4cf8353969e3134d44f3" or
             ROADMAP_PLAN_BLOBS.get(ROADMAP_HANDOFF_PATH) != "334671cf2aaf55a9cf8c8b2c130e1b7db3d8c4b5"):
         raise Stop("plan generation blob drift")
     if (len(SUBSTITUTION_BLOBS) != 11 or

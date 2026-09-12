@@ -190,11 +190,18 @@ att göra. h-039:s spec-rad har `depends_on: ['h-036']`, som inte nämner h-038;
 stället fältet `h038_h032_h031_or_supervisor_resume: False`, i R33 bundet av `R33_REGISTRY_SHA256`, och
 R26:s källbindning listar `H038_H032_H031_OR_SUPERVISOR_PROGRESS_BEFORE_FULL_H039_PASS` bland sina
 `forbidden`-poster. h-039 kräver alltså ingenting av h-038 — h-039 förbjuder h-038 att gå framåt innan
-h-039 har ett fullt PASS. h-039:s kvarvarande produktarbete är `--r33-installed`-lanen:
-installationsceremonin, den oberoende valideringen av efterläget, installed-granskningen, en fryst
-R15-live-diagnostik och körningen av lanen. Lanen blockeras av `PRODUCTION_ORIGIN` och hör därför till den
-senare operativa överlämningen. Arbetskopian `R33_LIVE_R2_FAILED_EVIDENCE` är medvetet NOT_READY, fryst som
-överspelad NO-CREDIT, och återupplivas inte.
+h-039 har ett fullt PASS. Installationen är historiskt utförd och `--r33-installed`-körningen är förbrukad:
+96249 PASS/0 FAIL, `PASS_PRE_DIAGNOSTIC_OWNER_STOP_ONLY`, `retry_permitted:false`
+och `task_credit:NONE`. Den får inte köras om och innebär varken full H039-completion
+eller aktuell driftkvalificering. Efterföljande R15-diagnostik är också förbrukad med
+`STORE_CHANGED_OR_UNPROVEN_OWNER_STOP`, utan bevisat slutstate. Senast bundna observation
+avser sekvens 2, inte färskt live-state eller bevis för full policy och noll residue.
+Nästa H039-arbete är en separat efterföljare för den verkliga sekvens-2-/kvittolivscykeln,
+consumer-/adapter-/loaderkvalificeringen och den operativa kvalificeringen.
+Protected-asset-B är ett separat bevarat, ofruset kontrakts-/produktarbete, NOT_READY;
+`R33_LIVE_R2_FAILED_EVIDENCE` är ett annat historiskt NO-CREDIT-paket.
+Ingen ompinning, build-only eller historisk installed-PASS ger H039-taskcredit,
+rätt att upprepa förbrukade körningar eller rätt att gå vidare i bootstrapkedjan.
 
 Den lokala bootstrap-milstolpen är ett avgränsat leveransmål. Överlämningen till kvalificerad autonom drift
 kräver därutöver den senare installationen, driftkvalificeringen, supervisor-resume och en visad förmåga att
