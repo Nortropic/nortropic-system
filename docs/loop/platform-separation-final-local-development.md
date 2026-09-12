@@ -3241,3 +3241,49 @@ validator definitions and run_exact_protocol callsite in one owned process,
 with only the OS/adapter primitive bindings replaced after their missing
 loader/image/ABI/address policy has real authority. This draft admits no such
 primitive bindings and operational dispatch remains a pre-effect refusal.
+
+### H039 CPython 3.9.6 compatibility criterion (before implementation)
+
+This separate successor starts at immutable verifier C
+83f75968b9892ae98a6a879178c407d2a6fd935e, tree
+8da632c48be1705d536be39bb2afc3b4b2d70f51. Its previous local 3.12 result
+belongs only to C; no 3.9 compatibility or native loading credit is inherited.
+The six existing TA paths are the complete author surface; no product bytes,
+registry, historical C/P gate body or installed state may change.
+
+The effect is the unchanged held run_exact_protocol, PREPARED consumer and
+independent validator executing together in ONE authenticated CPython 3.9.6
+child. All 25 existing positive/causal cases execute there using only the
+existing inert primitives. Version printing, copied rows, a 3.12 child claiming
+3.9, or a disconnected/duplicated consumer or validator cannot satisfy this.
+The outer capture may remain 3.12, but owns the actual fixed executable argv,
+child PID, bounded raw capture and cancellation; it must bind the child's own
+runtime identity to that PID and reject malformed/partial/extra output.
+
+Before any 3.9 invocation, including --version, authenticate the prospective
+executable separately from its framework and perform independent source/effect
+review. Selected direct interpreter: Resources/Python.app/Contents/MacOS/Python
+under canonical Versions/3.9, size 101280, SHA256
+0b7aad9bf1adf74d3922cf351f7d2e908dae19edd5456299d162810ae083523d;
+framework size 5864880, SHA256
+26422f0b21cb1e07236384afa4043c7401d39d09358c91df8bf3f5496f14712f.
+Both have x86_64 and arm64 slices. The direct interpreter imports _Py_BytesMain
+and its load command selects @executable_path/../../../../Python3. The earlier
+bin/python3.9 readback (102352 bytes, SHA bdea59019a38eb6600cc9e71e984a97fedadc406448431281e7657030f54987e)
+is a launcher candidate and is not the selected command or executable pin.
+These are static relationships, not observed loaded-image or PID-continuity proof.
+Closed env and -I -S -B are required; no PYTHON/DYLD override is accepted.
+Runtime version/executable/cache-tag/flags and pointer-width are observations
+from the selected child, not caller-selected facts or authority by themselves.
+The child's actual os.uname().machine must be arm64 for the retained ARM64
+adapter's intended interpreter; a 64-bit x86_64 child is rejected. This process
+architecture observation does not prove native ABI or shared-cache image identity.
+
+Test-first baseline: C has only the owned 3.12 local selector and no connected
+owned 3.9 selector. That absence is RED for this new criterion, not a failure of
+C's existing contract. Pure tests in 3.12 may test source selection, capture
+refusals and existing actual inert semantics, but never prove 3.9 compatibility.
+All source/graph/physical-binding requirements survive in the new exact-C child
+relation. Independent freeze and actual qualification follow the pure draft.
+LOADER_IMAGE_ABI_ADDRESS_BINDINGS_UNPROVEN remains an operational refusal;
+no adapter load/query, real socket, root operation, receipt or lifecycle effect.

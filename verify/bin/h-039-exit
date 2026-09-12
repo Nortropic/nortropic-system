@@ -13,6 +13,280 @@ a caller path, PID, command, state, nonce, or descriptor.
 
 from __future__ import annotations
 
+# H039_PY39_BEGIN
+# Separate compatibility successor. The complete qualified C below is immutable.
+_H039_PY39_PARENT = "83f75968b9892ae98a6a879178c407d2a6fd935e"
+_H039_PY39_TREE = "8da632c48be1705d536be39bb2afc3b4b2d70f51"
+_H039_PY39_GATE_SHA = "429523039de3708f33d510857abd4a454173999cfa387579a3d53b62abe942f8"
+_H039_PY39_FINAL_SHA = "b19f4f690e5b10cc36494aff43ecf8b5cc21b1e8d7ecfac5ca3f2ef984c7186f"
+_H039_PY39_SPEC_SHA = "62c183bddc4b50bb15472548424e596972e318b5260cb3004d230a5eaf3d4570"
+_H039_PY39_MEMBER_SHA = "3b73f459d563cf4f42ce7be9f29b7fec709ac78cd3eca5f012c5bdc9ba8b12fb"
+_H039_PY39_EXECUTABLE = "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+_H039_PY39_EXECUTABLE_SHA = "0b7aad9bf1adf74d3922cf351f7d2e908dae19edd5456299d162810ae083523d"
+_H039_PY39_FRAMEWORK = "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Python3"
+_H039_PY39_FRAMEWORK_SHA = "26422f0b21cb1e07236384afa4043c7401d39d09358c91df8bf3f5496f14712f"
+
+
+def h039_py39_parent_source(raw, kind):
+    import hashlib
+    if kind not in ("gate", "final") or type(raw) is not bytes:
+        raise ValueError("py39 parent source kind")
+    start = b"# H039_PY39_" + (b"BEGIN\n" if kind == "gate" else b"FINAL_BEGIN\n")
+    end = b"# H039_PY39_" + (b"END\n\n" if kind == "gate" else b"FINAL_END\n\n")
+    digest = _H039_PY39_GATE_SHA if kind == "gate" else _H039_PY39_FINAL_SHA
+    if raw.count(start) == raw.count(end) == 1:
+        a, b = raw.index(start), raw.index(end) + len(end)
+        if a >= b:
+            raise ValueError("py39 parent span order")
+        raw = raw[:a] + raw[b:]
+    if hashlib.sha256(raw).hexdigest() != digest:
+        raise ValueError("complete qualified C source changed")
+    return raw
+
+
+def h039_py39_legacy(raw, kind, path):
+    """Exact C selected definitions/constants, never a historical module body."""
+    import __future__
+    import ast
+    raw = h039_py39_parent_source(raw, kind)
+    selected, names = [], []
+    for node in ast.parse(raw).body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id.startswith("_H039_VERIFIER_")):
+            ast.literal_eval(node.value)
+            selected.append(node); names.append(node.targets[0].id)
+        elif isinstance(node, ast.FunctionDef) and node.name.startswith("h039_verifier_"):
+            if node.decorator_list or node.args.defaults or any(x is not None for x in node.args.kw_defaults):
+                raise ValueError("selected C executable header")
+            selected.append(node); names.append(node.name)
+    if not names or len(names) != len(set(names)):
+        raise ValueError("selected C definition membership")
+    scope = {"__name__": "h039_py39_selected_C", "__file__": path}
+    exec(compile(ast.Module(body=selected, type_ignores=[]), "<qualified-C-definitions>", "exec",
+                 flags=__future__.annotations.compiler_flag, dont_inherit=True), scope)
+    return scope
+
+
+def h039_py39_spec(raw):
+    import hashlib
+    import json
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate spec key")
+            result[key] = value
+        return result
+    try:
+        start = b'      "h039_local_verifier_py39_v1": {\n'
+        end = b'      "h039_local_verifier_integration_v1": {\n'
+        if raw.count(start) != 1 or raw.count(end) != 1:
+            return False
+        members = [x for x in json.loads(raw, object_pairs_hook=unique)["tasks"] if x["id"] == "h-039"]
+        if len(members) != 1:
+            return False
+        member = members[0]["h039_local_verifier_py39_v1"]
+        a, b = raw.index(start), raw.index(end)
+        block = ('      "h039_local_verifier_py39_v1": ' + json.dumps(member,
+                 indent=2, ensure_ascii=True, allow_nan=False).replace("\n", "\n      ") + ",\n").encode()
+        return (a < b and raw[a:b] == block
+            and hashlib.sha256(raw[:a] + raw[b:]).hexdigest() == _H039_PY39_SPEC_SHA
+            and hashlib.sha256(json.dumps(member, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True, allow_nan=False).encode()).hexdigest() == _H039_PY39_MEMBER_SHA)
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
+def h039_py39_invocation(subject, candidate):
+    if (type(subject) is not str or not subject.startswith("/") or "\0" in subject
+            or any(x in ("", ".", "..") for x in subject.split("/")[1:])
+            or type(candidate) is not str or len(candidate) != 40 or candidate == _H039_PY39_PARENT
+            or any(c not in "0123456789abcdef" for c in candidate)):
+        raise ValueError("exact py39 subject/commit")
+    return [_H039_PY39_EXECUTABLE, "-I", "-S", "-B", subject + "/verify/bin/h-039-exit",
+            "--verifier-py39-child", candidate]
+
+
+def h039_py39_runtime():
+    import os
+    import struct
+    import sys
+    return {"implementation": sys.implementation.name, "version": list(sys.version_info),
+        "executable": os.path.realpath(sys.executable), "cache_tag": sys.implementation.cache_tag,
+        "pointer_bits": 8 * struct.calcsize("P"), "platform": sys.platform, "machine": os.uname().machine,
+        "isolated": sys.flags.isolated, "no_site": sys.flags.no_site,
+        "ignore_environment": sys.flags.ignore_environment, "dont_write_bytecode": sys.flags.dont_write_bytecode,
+        "pid": os.getpid()}
+
+
+def h039_py39_runtime_matches(value, pid):
+    expected = {"implementation": "cpython", "version": [3, 9, 6, "final", 0],
+        "executable": _H039_PY39_EXECUTABLE, "cache_tag": "cpython-39", "pointer_bits": 64,
+        "platform": "darwin", "machine": "arm64", "isolated": 1, "no_site": 1, "ignore_environment": 1,
+        "dont_write_bytecode": 1, "pid": pid}
+    import json
+    return (type(pid) is int and 0 < pid <= 0x7fffffff and type(value) is dict
+        and json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        == json.dumps(expected, sort_keys=True, separators=(",", ":"), allow_nan=False))
+
+
+def h039_py39_child(candidate):
+    """The only new 3.9 execution entry: exact C functions, all real decisions.
+
+    The protocol primitives stay inert; this entry never calls the Git observer,
+    adapter, historical body, root store or another process.
+    """
+    import hashlib
+    import json
+    import os
+    import sys
+    try:
+        path = os.path.abspath(__file__)
+        subject = path[:-len("/verify/bin/h-039-exit")]
+        if path != subject + "/verify/bin/h-039-exit" or os.path.realpath(path) != path:
+            raise ValueError("py39 child source path")
+        h039_py39_invocation(subject, candidate)
+        runtime = h039_py39_runtime()
+        if not h039_py39_runtime_matches(runtime, os.getpid()):
+            raise ValueError("actual child is not required isolated CPython3.9.6")
+        with open(path, "rb") as source:
+            raw = source.read(4194305)
+        if len(raw) > 4194304:
+            raise ValueError("py39 child source bound")
+        scope = h039_py39_legacy(raw, "gate", path)
+        rows = scope["h039_verifier_semantic_rows"]()
+        with open(path, "rb") as source:
+            if source.read(4194305) != raw:
+                raise ValueError("py39 child source changed")
+        if h039_py39_runtime() != runtime:
+            raise ValueError("py39 runtime identity changed")
+        ok = all(row["ok"] for row in rows)
+        print("H039_PY39_RESULT " + json.dumps({"contract": "h039-local-verifier-py39-v1",
+            "candidate_commit": candidate, "gate_sha256": hashlib.sha256(raw).hexdigest(),
+            "runtime": runtime, "rows": rows, "complete": True,
+            "credit": "CPYTHON39_INERT_VERIFIER_COMPATIBILITY" if ok else "NONE"},
+            sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False))
+        return 0 if ok else 1
+    except (Exception, KeyboardInterrupt) as exc:
+        print("H039_PY39_UNJUDGEABLE " + json.dumps({"error": type(exc).__name__, "detail": str(exc)},
+                                                  sort_keys=True), file=sys.stderr)
+        return 2
+
+
+def h039_py39_capture_rows(capture, subject, candidate, gate_sha, expected_names):
+    """Wire validator cannot establish capture provenance; owner supplies it."""
+    import json
+    if (capture["status"] != "CAPTURED" or capture["failures"] != []
+            or type(capture["returncode"]) is not int or capture["returncode"] != 0
+            or capture["stderr"] != b"" or type(capture["stdout"]) is not bytes
+            or capture["owner_state"] != "DIRECT_CHILD_TERMINAL_INNER_CLEANUP_NOT_INFERRED"
+            or capture["invocation"] != h039_py39_invocation(subject, candidate)):
+        raise ValueError("py39 owned capture shape/status")
+    prefix = b"H039_PY39_RESULT "
+    raw = capture["stdout"]
+    if not raw.startswith(prefix) or not raw.endswith(b"\n"):
+        raise ValueError("py39 result framing")
+    value = json.loads(raw[len(prefix):])
+    if not h039_py39_runtime_matches(value["runtime"], capture["owner_pid"]):
+        raise ValueError("py39 runtime/owned PID disagreement")
+    expected = {"contract": "h039-local-verifier-py39-v1", "candidate_commit": candidate,
+        "gate_sha256": gate_sha, "runtime": value["runtime"], "complete": True,
+        "credit": "CPYTHON39_INERT_VERIFIER_COMPATIBILITY",
+        "rows": [{"id": name, "ok": True} for name in expected_names]}
+    if raw != prefix + json.dumps(expected, sort_keys=True, separators=(",", ":"),
+                                    ensure_ascii=True, allow_nan=False).encode() + b"\n":
+        raise ValueError("py39 exact computed semantic result")
+    return value["rows"]
+
+
+def h039_py39_safe_capture(capture):
+    if capture is None:
+        return None
+    result = dict(capture)
+    for field in ("stdout", "stderr"):
+        result[field] = {"encoding": "hex", "bytes": capture[field].hex()}
+    return result
+
+
+def h039_py39_owner(subject, candidate, gate_sha, final_raw):
+    """3.12 observer owner; qualifying semantic rows come only from its 3.9 child."""
+    import contextlib
+    import hashlib
+    import io
+    import json
+    import os
+    import sys
+    capture = None
+    try:
+        h039_py39_invocation(subject, candidate)
+        if sys.version_info[:2] != (3, 12):
+            raise ValueError("py39 outer owner requires existing 3.12 host")
+        path = subject + "/verify/bin/h-039-exit"
+        with open(path, "rb") as source:
+            raw = source.read(4194305)
+        if hashlib.sha256(raw).hexdigest() != gate_sha:
+            raise ValueError("independent py39 gate pin")
+        old = h039_py39_legacy(raw, "gate", path)
+        current = h039_py39_legacy(raw, "gate", path)
+        final = h039_py39_legacy(final_raw, "final", subject + "/verify/bin/platform-separation-final-exit")
+        old_gate = h039_py39_parent_source(raw, "gate")
+        old_final = h039_py39_parent_source(final_raw, "final")
+        def observer(unused, selected_path):
+            result = old["h039_verifier_observer_namespace"](old_gate, selected_path)
+            result["_LOCAL_BASE"] = _H039_PY39_PARENT
+            return result
+        current.update(_H039_VERIFIER_PARENT=_H039_PY39_PARENT, _H039_VERIFIER_PARENT_TREE=_H039_PY39_TREE,
+            h039_verifier_parent_gate_restored=lambda value: bool(h039_py39_parent_source(value, "gate")),
+            h039_verifier_parent_spec_restored=h039_py39_spec, h039_verifier_observer_namespace=observer)
+        owned = final["h039_verifier_final_namespace"](old_final)
+        owned["H039_ASSET_GATE_SHA"] = gate_sha
+        def invocation(received_subject, phase, contract, received_candidate):
+            if (received_subject, phase, contract, received_candidate) != (subject, "py39", candidate, candidate):
+                raise ValueError("py39 capture invocation substitution")
+            return h039_py39_invocation(subject, candidate)
+        owned["h039_asset_canonical_invocation"] = invocation
+        tool_reader = old["h039_verifier_observer_namespace"](old_gate, path)["h039_asset_draft_retained_read"]
+        source_check = owned["h039_asset_gate_source"]
+        def authenticated_source(received_subject):
+            source_check(received_subject)
+            tool_reader(_H039_PY39_EXECUTABLE, _H039_PY39_EXECUTABLE_SHA, 101280, True)
+            tool_reader(_H039_PY39_FRAMEWORK, _H039_PY39_FRAMEWORK_SHA, 5864880, True)
+        owned["h039_asset_gate_source"] = authenticated_source
+        expected_names = tuple(name for name in final["_H039_VERIFIER_FINAL_ROWS"] if name.startswith("semantic:"))
+        def semantic_rows():
+            nonlocal capture
+            if capture is not None:
+                raise ValueError("py39 child already owned; no retry")
+            capture = owned["h039_asset_owned_capture"](subject, "py39", candidate, candidate)
+            return h039_py39_capture_rows(capture, subject, candidate, gate_sha, expected_names)
+        current["h039_verifier_semantic_rows"] = semantic_rows
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = current["h039_verifier_local_main"](candidate)
+        if code != 0:
+            raise ValueError("py39 observer/child qualification incomplete", code, output.getvalue())
+        result = json.loads(output.getvalue().removeprefix("H039_VERIFIER_RESULT "))
+        result.update(contract="h039-local-verifier-py39-v1", credit="CPYTHON39_INERT_VERIFIER_COMPATIBILITY",
+            verdict="PASS_CPYTHON39_INERT_VERIFIER_COMPATIBILITY_ONLY", owned_capture=h039_py39_safe_capture(capture))
+        for row in result["rows"]:
+            row["id"] = row["id"].replace("complete_P_", "complete_C_")
+        print(json.dumps(result, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False))
+        return 0
+    except (Exception, KeyboardInterrupt) as exc:
+        print("H039_PY39_OWNER_UNJUDGEABLE " + json.dumps({"error": type(exc).__name__, "detail": str(exc),
+            "owned_capture": h039_py39_safe_capture(capture)}, sort_keys=True), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    import sys as _h039_py39_sys
+    if len(_h039_py39_sys.argv) == 3 and _h039_py39_sys.argv[1] == "--verifier-py39-child":
+        raise SystemExit(h039_py39_child(_h039_py39_sys.argv[2]))
+    print("LOADER_IMAGE_ABI_ADDRESS_BINDINGS_UNPROVEN", file=_h039_py39_sys.stderr)
+    raise SystemExit(2)
+# H039_PY39_END
+
 # H039_LOCAL_VERIFIER_DRAFT_BEGIN
 # Test-first held source: actual future diagnostic judge, not product code.
 # No entry below may reach the historical asset or installed selectors.

@@ -40,6 +40,63 @@ F9 (reintroduction negatives) is exercised by the test author on a scratch
 reference construction and recorded in the development document.
 No historical H gate, provider, build, publication or resume is executed.
 """
+# H039_PY39_FINAL_BEGIN
+_H039_PY39_FINAL_GATE_SHA = "ec3e1e8e3b86f9d4cb6cef7d8b04d21bb7413a1303368e541b33fd1dcda76853"
+_H039_PY39_OUTER = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+_H039_PY39_OUTER_SHA = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941"
+
+
+def h039_py39_final_main(subject, candidate):
+    """One 3.12 observer/capture owner, one 3.9 semantic child; no nested owner."""
+    import __future__
+    import ast
+    import hashlib
+    import os
+    import sys
+    try:
+        if (sys.version_info[:2] != (3, 12) or os.path.realpath(sys.executable) != _H039_PY39_OUTER
+                or os.path.abspath(__file__) != subject + "/verify/bin/platform-separation-final-exit"
+                or os.path.realpath(subject) != subject):
+            raise ValueError("py39 outer identity/subject")
+        with open(_H039_PY39_OUTER, "rb") as source:
+            if hashlib.sha256(source.read(4194305)).hexdigest() != _H039_PY39_OUTER_SHA:
+                raise ValueError("py39 outer executable pin")
+        gate_path = subject + "/verify/bin/h-039-exit"
+        with open(gate_path, "rb") as source:
+            raw = source.read(4194305)
+        if hashlib.sha256(raw).hexdigest() != _H039_PY39_FINAL_GATE_SHA:
+            raise ValueError("py39 independently pinned gate")
+        selected, names = [], []
+        for node in ast.parse(raw).body:
+            if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name) and node.targets[0].id.startswith("_H039_PY39_")):
+                ast.literal_eval(node.value)
+                selected.append(node); names.append(node.targets[0].id)
+            elif isinstance(node, ast.FunctionDef) and node.name.startswith("h039_py39_"):
+                if node.decorator_list or node.args.defaults or any(x is not None for x in node.args.kw_defaults):
+                    raise ValueError("py39 selected executable header")
+                selected.append(node); names.append(node.name)
+        if not names or len(set(names)) != len(names):
+            raise ValueError("py39 selected definitions")
+        scope = {"__name__": "h039_py39_owned_outer", "__file__": gate_path}
+        exec(compile(ast.Module(body=selected, type_ignores=[]), "<source-pinned-py39-owner>", "exec",
+                     flags=__future__.annotations.compiler_flag, dont_inherit=True), scope)
+        with open(__file__, "rb") as source:
+            final_raw = source.read(4194305)
+        return scope["h039_py39_owner"](subject, candidate, _H039_PY39_FINAL_GATE_SHA, final_raw)
+    except (Exception, KeyboardInterrupt) as exc:
+        print("H039_PY39_FINAL_UNJUDGEABLE " + type(exc).__name__ + ": " + str(exc), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    import sys as _h039_py39_final_sys
+    if len(_h039_py39_final_sys.argv) == 4 and _h039_py39_final_sys.argv[1] == "--verifier-py39":
+        raise SystemExit(h039_py39_final_main(*_h039_py39_final_sys.argv[2:]))
+    print("LOADER_IMAGE_ABI_ADDRESS_BINDINGS_UNPROVEN", file=_h039_py39_final_sys.stderr)
+    raise SystemExit(2)
+# H039_PY39_FINAL_END
+
 # H039_VERIFIER_SUCCESSOR_DRAFT_BEGIN
 # New P-child verifier phase: the original B/C/P asset lane is not this subject.
 # The local successor selector is separate from inherited full-final dispatch.
