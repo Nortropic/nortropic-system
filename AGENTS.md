@@ -2,6 +2,26 @@
 
 Detta är en **router**, inte ett nytt regelverk.
 
+## Repots identitet
+
+Detta repo är Nortropics **trust kernel / bootstrap**. Leveransen är kontrollplanet:
+`controller/`, `verify/`, `specs/tasks.spec.json` och `docs/loop/`. Webbfabrikslagret
+(`agents/`, `skills/`, `packs/`, `backtests/`, `workflows/` och `docs/00`, `01`, `02`,
+`04`, `06`) ligger kvar i trädet efter repodelningen och beskriver kundflödet — ett annat
+spår, aldrig detta repos mål. `docs/07-konstitution.md`, `docs/03-regelverk.md` och
+`docs/05-beslutslogg.md` är DELAT styrlager och gäller båda.
+
+`node scripts/kor-vakter.mjs` är webbfabrikens grindsvit, inte kärnans; kärnans dom är
+taskens frysta `exit_test` under `verify/bin/`.
+
+`CLAUDE.md` är samma router för Claude-sessioner och bär samma auktoritetsordning.
+Ändras den ena ska den andra följa med i samma commit.
+
+Raden `PRODUCT=NORTROPIC_AUTONOMOUS_WEBSITE_FACTORY` i operating model v4 nedan står
+kvar ordagrant därför att blocket är ett fruset owner-amendment från 2026-08-11 och
+bärs av `docs/loop/harness-substitution-contract-v1.md`. Den namnger kärnans
+nedströmskonsument, aldrig detta repos leverans.
+
 ## Auktoritet
 
 Läs och följ i denna ordning när de är relevanta:

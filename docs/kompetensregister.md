@@ -1,5 +1,12 @@
 # Kompetensregister — vad systemet kan belägga
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Senast verifierad mot systemet: 2026-08-25 · v1 (denna commit)
 Verifieringsomfång: nyskapad i S1-min+K4-batchen; inga tidigare påståenden att verifiera.
 

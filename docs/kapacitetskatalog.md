@@ -1,5 +1,12 @@
 # Kapacitetskatalog — vad fabriken kan leverera OCH verifiera
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Senast verifierad mot systemet: 2026-08-25 · v1 (denna commit)
 Verifieringsomfång: nyskapad i S3-skivan; inga tidigare påståenden att verifiera.
 

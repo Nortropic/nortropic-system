@@ -7,6 +7,12 @@ Skapad: 2026-08-26 · Ankare: den återfunna masterplanens §7 (Rubric v4) och P
 
 ---
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
 ## PLACERINGSLAGEN — vad den här filen ÄR och inte är
 
 **Produktionsmåttet är och förblir `skills/nortropic-eval/references/eval-rubric.md` (v3.0.0).**

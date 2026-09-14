@@ -1,5 +1,12 @@
 # Paketkontraktet — vad ett paket ÄR, och vad det aldrig får bli
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Senast verifierad mot systemet: 2026-08-26 · v1 (denna commit)
 Verifieringsomfång: nyskapad. Kontraktet är HÄRLETT ur `packs/lokal-se/` som
 referensimplementation och ur den auktoritet paketet självt pekar på — inte ur en

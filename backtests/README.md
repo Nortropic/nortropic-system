@@ -1,5 +1,12 @@
 # Backtester — Case A och Case B (S7/S8, UTKASTLÄGE)
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Ankare: masterplanens **§26 BACKTEST / FALSIFICATION DESIGN** och **Part 12 steg 8**
 (*"Case B — Prep earlier; consume after appropriate upstream contracts"*). Uppströms­
 kontrakten S1 (researchkontrakt v3), S3 (planner + kapacitetskatalog), S4 (Site Quality

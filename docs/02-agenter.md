@@ -1,5 +1,12 @@
 # Agenterna
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
 Verifieringsomfång: delta-verifierad mot S9/S10 + S10-uppföljningen (publicerat i `main` t.o.m. PR #133); project-planner-avsnittet läst mot `agents/project-planner.md` och `workflows/nortropic-autobygg.js`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 

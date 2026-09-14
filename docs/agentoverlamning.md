@@ -1,12 +1,18 @@
 # Agentöverlämning — läs detta först i en ny session
 
-Senast verifierad mot systemet: 2026-08-27 · v2 (denna commit)
-Verifieringsomfång: v2 lade till luckornas STATUSVOKABULÄR i §4 — metod, inte status —
-efter en inventering som fann statuslagret helt oguardat. Filen finns för att en session
+Senast verifierad mot systemet: 2026-09-14 · v3 (denna commit)
+Verifieringsomfång: v3 skrev in REPOTS IDENTITET och rättade slutstycket, som pekade ut
+webbfabrikens nästa steg som systemets — metod och lagertillhörighet, inte status. Filen finns för att en session
 ska kunna rensas utan att
 arbetssättet går förlorat. **Den bär METODEN och ÄGARENS ARBETSSÄTT — aldrig teknisk
 status.** Statusen bor i `docs/05-beslutslogg.md` och i luckornas egna rader; att duplicera
 den här vore att skapa en andra sanning som driftar.
+
+**Vilket lager du arbetar i.** Detta repo är Nortropics **trust kernel / bootstrap** —
+`controller/`, `verify/`, `specs/`, `docs/loop/`. Webbfabrikslagret (`agents/`, `skills/`,
+`packs/`, `backtests/`, `docs/00`–`06`) ligger kvar i trädet efter repodelningen och
+beskriver kundflödet. Metoden nedan gäller båda lagren; exemplen är hämtade ur båda.
+Routningen står i `CLAUDE.md` (Claude) och `AGENTS.md` (Codex).
 
 ---
 
@@ -115,13 +121,19 @@ en människa.** Detta är inte "hann inte" — det är "ska inte förrän ägare
 
 | Fråga | Fil |
 |---|---|
-| Vad som beslutats och varför | `docs/05-beslutslogg.md` (nyast sist) |
-| Vad som är byggt, i klarspråk | `docs/00-borja-har.md` |
+| **Kärnans läge och senaste runda** | `docs/loop/drift.md` (nyast överst) |
+| **Kärnans byggregler** | `docs/loop/regler.md` · planen i `docs/loop/byggplan-v3.md` |
+| **Kärnans tasks och frysta exitprov** | `specs/tasks.spec.json` · `verify/bin/` |
+| Vad som beslutats och varför | `docs/05-beslutslogg.md` (aktuell kandidat först) |
+| Vad som är byggt i webbfabrikslagret, i klarspråk | `docs/00-borja-har.md` |
 | Vilka vakter som finns | `README.md`:s skriptrad · `node scripts/kor-vakter.mjs` |
 | Öppna luckor | sök `-GAP-` i trädet; varje har en rad med nästa transition — `check-luckregister.mjs` fäller om en saknas eller om två rader säger olika |
 | Kapaciteternas mognad | `docs/kapacitetskatalog.md` |
 
-**Ingen status upprepas här.** Den enda uppgiften som inte finns någon annanstans: nästa
-steg som faktiskt flyttar systemet är **en körning mot en riktig testklient** — huvudkedjan
-är byggd, och det mesta som återstår är sidospår (gym-banan, förbättringslanen) eller
-väntar på ägarens beslut om mätstocken.
+**Ingen status upprepas här.** Vad som är byggt, vad som återstår och vad som väntar på
+ägaren står i `docs/loop/drift.md` för kärnan och i `docs/05-beslutslogg.md` för besluten.
+
+En tidigare version av det här stycket pekade ut *"en körning mot en riktig testklient"* som
+det enda som flyttar systemet. Det gällde webbfabrikslagret, lästes som kernelarbetets nästa
+steg och gjorde överlämningen till en andra sanning om läget — precis det den varnar för.
+Rättelsen står kvar som rad i stället för struken, så att felet går att känna igen.

@@ -1,5 +1,12 @@
 # Börja här — Nortropic från noll
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
 Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; avsnittet "Dokumentationen hann inte med bygget" tillagt och skrivet mot README, `docs/01-oversikt.md`, `docs/00-guide.md` och `scripts/check-docs-coherence.mjs`. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad. Avsnittet om betygssystemets utkast (2026-08-26) är skrivet mot `docs/utkast/eval-rubrik-v4-UTKAST.md` och `scripts/check-v4-utkast.mjs`; det beskriver ett UTKAST utan konsument — ingen mätning i drift har ändrats.
 
