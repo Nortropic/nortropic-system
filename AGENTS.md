@@ -8,8 +8,11 @@ Detta repo är Nortropics **trust kernel / bootstrap**. Leveransen är kontrollp
 `controller/`, `verify/`, `specs/tasks.spec.json` och `docs/loop/`. Webbfabrikslagret
 (`agents/`, `skills/`, `packs/`, `backtests/`, `workflows/` och `docs/00`, `01`, `02`,
 `04`, `06`) ligger kvar i trädet efter repodelningen och beskriver kundflödet — ett annat
-spår, aldrig detta repos mål. `docs/07-konstitution.md`, `docs/03-regelverk.md` och
-`docs/05-beslutslogg.md` är DELAT styrlager och gäller båda.
+spår, aldrig detta repos mål. `docs/07-konstitution.md` och `docs/03-regelverk.md` bär
+webbfabrikens sakregler och nämner kärnan inte alls, men kärnan är PINNAD till dem: fem
+respektive ett fryst exitprov i `verify/bin/` läser dem, liksom `controller/verify/cli`.
+De binder alltså här av beroende, inte av innehåll. `docs/05-beslutslogg.md` är genuint
+delad och kernel-dominerad — tio frysta exitprov läser den.
 
 `node scripts/kor-vakter.mjs` är webbfabrikens grindsvit, inte kärnans; kärnans dom är
 taskens frysta `exit_test` under `verify/bin/`.

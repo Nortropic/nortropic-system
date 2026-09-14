@@ -4,9 +4,13 @@ Detta repo är Nortropics **trust kernel / bootstrap**. Leveransen är kontrollp
 **Tre lager, inte två:**
 
 - **Kärnan** — `controller/`, `verify/`, `specs/`, `docs/loop/`. Detta repos mål.
-- **Delat styrlager** — `docs/07-konstitution.md` (§A/§B), `docs/03-regelverk.md`
-  (invarianterna, §A1) och `docs/05-beslutslogg.md` (besluten; till största delen
-  kernelrader i dag). Bindande för båda lagren, ändras av människa.
+- **Styrlagret kärnan är pinnad till** — `docs/07-konstitution.md` (§A/§B) och
+  `docs/03-regelverk.md` (invarianterna, §A1) bär webbfabrikens sakregler och nämner
+  kärnan inte alls; varje sökväg §A skyddar ligger i webbträdet. De är ändå bindande
+  här, av BEROENDE och inte av innehåll: fem respektive ett fryst exitprov i
+  `verify/bin/` läser dem, liksom `controller/verify/cli` och rollskillsen i
+  `.agents/`. `docs/05-beslutslogg.md` är genuint delad och kernel-dominerad — tio
+  frysta exitprov läser den. Alla tre ändras av människa.
 - **Webbfabrikslagret** — `agents/`, `skills/`, `packs/`, `backtests/`, `workflows/`
   och `docs/00`, `01`, `02`, `04`, `06`. Ligger kvar i trädet efter repodelningen,
   beskriver kundflödet och bär en orienteringsrad överst.
