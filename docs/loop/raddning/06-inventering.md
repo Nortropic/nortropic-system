@@ -427,7 +427,9 @@ operativsystemet. Kör den på Macen.
 
 ```
 BOOTSTRAP-KEDJAN — pågår, 4 av 8 kvar
-  h-035 ✓ → h-037 ✓ → h-034 ✓ → h-036 ✓ → h-039 ⟳ → h-038 ○ → h-032 ○ → h-031 ○
+  h-035 ✓ → h-037 ✓ → h-034 ✓ → h-036 ✓ → h-039 ⛔ → h-038 ✓ → h-032 ⛔ → h-031 ⛔
+                                     AVSLUTADE OVERIFIERAT 2026-09-16 (regel 11b)
+     ⚠️ Denna kedja är INTE vägen till målet. Se "VÄGEN" nedan.
                                             (R33)
         h-033 ✓ (sidogren ur h-034)
 
@@ -583,7 +585,29 @@ nästa `verify/bin`-ändring. Det kräver doktrinregel iv först.
 | `h-014` notis | 1 | Gate saknas. Byggbar nu |
 | `h-015` återtag / supervisor resume | 1 | Gate saknas. Blockerad av h-030 |
 | Programdomen | 1 | `autonomous-loop-exit` saknas |
-| **Till `KERNEL_COMPLETE`** | **11** | Förmågeskivorna h-018–h-026 ingår inte |
+| **Till `KERNEL_COMPLETE`** | ~~11~~ **6** | Se rättelsen nedan |
+
+> ## ⚠️ RÄTTAT 2026-09-16 — vägen är SEX poster, inte elva
+>
+> Tabellen ovan räknade in bootstrap-kedjan (`h-039`, `h-032`, `h-031`), som **avslutades
+> `OVERIFIERAT`** 2026-09-16 enligt regel 11b — 297 omfrysningar utan en enda stängning.
+>
+> **Mätt i specen:** `h-015` (supervisor resume) beror på `h-010`, `h-013`, `h-016`,
+> `h-004` och `h-030` — **inte** på `h-031`, `h-032` eller `h-039`. Ingenting beror på de
+> tre utanför gruppen själv. De låg aldrig på vägen.
+>
+> ```
+> KLART:   h-004 ✓  h-010 ✓  h-013 ✓  h-016 ✓
+> SAKNAS:  h-027 → h-028 → h-029 → h-030   (fyra task)
+>          → h-015 supervisor resume        (grind)
+>          + verify/bin/autonomous-loop-exit
+>          + docs/loop/autonomy-kernel-v1-acceptance.md
+> ```
+>
+> **Sex poster.** `h-014` ligger utanför kedjan och kan byggas parallellt.
+> Prosaraden i `docs/loop/drift.md` rad 5495 (*"No supervisor resume before the entire
+> chain is green"*) är **upphävd** — den är prosa, specens graf gäller.
+> Fullständig härledning i `12-arbetsorder.md`.
 
 ---
 
