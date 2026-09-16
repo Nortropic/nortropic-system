@@ -47,7 +47,14 @@ fi
 
 # ── 0b. Arbetsträdet före: grindarna ska inte smutsa ner det ─────────────────
 FORE="$(git status --porcelain | wc -l | tr -d ' ')"
-echo "okommitterade filer FÖRE: $FORE"
+# IGNORERADE FILER RÄKNAS SEPARAT. `git status --porcelain` ser dem inte, och
+# .gitignore rad 3 är `/*` — en vitlista, så nästan allt är ignorerat. Mätt
+# 2026-09-16: efter kvällens körningar bar ägarens kontrollklon 1149
+# .nortropic-h036-proof-*-trust-*-source-filer i reporoten plus 30 evidensposter
+# under controller/policy/ — och detta prov skrev "OK, grindarna lämnade trädet
+# orört". Kontrollen var blind för det den skulle mäta (FYND 38/39).
+FORE_IG="$(git status --porcelain --ignored=matching | grep -c "^!!")"
+echo "okommitterade filer FÖRE: $FORE  ·  ignorerade FÖRE: $FORE_IG"
 echo
 
 # ── 1. Kärnans verifierare ───────────────────────────────────────────────────
@@ -137,10 +144,19 @@ echo
 
 # ── 6. Arbetsträdet efter: grindarna ska ha lämnat det orört ─────────────────
 EFTER="$(git status --porcelain | wc -l | tr -d ' ')"
+EFTER_IG="$(git status --porcelain --ignored=matching | grep -c "^!!")"
 echo "=== 6. Arbetsträdet ==="
-echo "okommitterade filer FÖRE=$FORE EFTER=$EFTER"
-[ "$FORE" = "$EFTER" ] && echo "OK — grindarna lämnade trädet orört" \
-                       || echo "⚠️ GRINDARNA SMUTSADE NER TRÄDET — det är ett fynd i sig"
+echo "okommitterade  FÖRE=$FORE EFTER=$EFTER"
+echo "ignorerade     FÖRE=$FORE_IG EFTER=$EFTER_IG   (delta: $((EFTER_IG - FORE_IG)))"
+if [ "$FORE" = "$EFTER" ] && [ "$FORE_IG" = "$EFTER_IG" ]; then
+  echo "OK — grindarna lämnade trädet orört, ignorerade filer inräknade"
+elif [ "$FORE" != "$EFTER" ]; then
+  echo "⚠️ GRINDARNA SMUTSADE NER TRÄDET (spårat/otrackat) — det är ett fynd i sig"
+else
+  echo "⚠️ GRINDARNA LÄMNADE $((EFTER_IG - FORE_IG)) IGNORERADE FILER EFTER SIG."
+  echo "   De syns inte i 'git status' och säkras inte av radda/smuts-*."
+  echo "   Se dem: git status --porcelain --ignored=matching | grep '\''^!!'\'' | head"
+fi
 echo
 echo "=== KLART ==="
 echo "Full logg: $LOGG"
