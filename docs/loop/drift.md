@@ -1,5 +1,83 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 32: FÖRSTA MÄTNINGEN PÅ MACEN. Sju röda grindar — men riggen är misstänkt, och domen är ODÖMBART tills kontrollprovet körts.
+
+Ägaren körde `artefakter/matning-pa-macen.sh` på Darwin arm64, Python 3.12.13.
+`controller/verify/cli list` → `exit 0`. Grindarna kördes.
+
+```
+h-001:0  h-002:0  h-003:0  h-004:1  h-005:1  h-006:0  h-007:0
+h-008:0  h-009:1  h-010:0  h-011:1  h-012:1  h-013:1  h-016:1
+SUMMA: 7 PASS · 7 FAIL av 14
+```
+
+**Två resultat står oavsett vad kontrollprovet visar:**
+
+1. **Darwin-bindningen är bekräftad empiriskt.** `h-003` och `h-010` var röda i Linux
+   och gröna på Macen. FYND 31d håller.
+2. **Fyra filer saknas, mätt:** `verify/bin/h-014-exit`, `verify/bin/h-015-exit`,
+   `verify/bin/autonomous-loop-exit`, `docs/loop/autonomy-kernel-v1-acceptance.md`.
+
+### ⚠️ Varför siffrorna ändå inte får tolkas ännu
+
+Mätningen kördes i en **git-worktree**. Grindarna skapar SJÄLVA git-worktrees (`h-005`
+K3: *"workspace är ett eget git-worktree med egen git-dir"*). I en worktree är `.git` en
+**fil**, inte en katalog. Tre felrader pekar rakt på nästlingen:
+
+| Grind | Felrad |
+|---|---|
+| `h-009` K8 | processen kördes i **worktreeroten**, inte i workspacet |
+| `h-012` K15 | kandidaten bar **HEAD-commitens filer** (`drift.md`, `matning-pa-macen.sh`, `README.md`) i stället för sessionens |
+| `h-005` K7 | worktree-rester efter SIGINT |
+
+De tre filerna i `h-012` är commit `54926a2c`:s egna. **Riggen mätte sig själv.**
+
+**Att härifrån skriva "kartan håller inte" vore exakt sessionens genomgående fel** — att
+mäta en sak och dra slutsats om en annan. Domen om kartan är därför `ODÖMBART`, inte
+`FAIL`. Kontrollprovet är en riktig klon:
+
+```bash
+git clone --branch <gren> git@github.com:Nortropic/nortropic-system.git <katalog>
+cd <katalog> && bash docs/loop/raddning/artefakter/matning-pa-macen.sh
+```
+
+Samma sju röda där → fyndet är verkligt. Färre → worktreen var artefakten.
+
+### Hypotes före kontrollen, nedtecknad för att kunna ha fel offentligt
+
+**Ser ut som riggartefakt** — allt klustrar på cwd/workspace/kuvert: `h-009` K8/K9,
+`h-011` K12, `h-012` K3/K15, `h-005` K7.
+
+**Ser ut som äkta** — `h-004` K8–K11: *"acquire gav rc=0 token=[], väntat unik lease_id"*.
+Det läser som att lease-generationer inte är implementerade, och ingen sökväg i världen
+fixar det. Står bara den gruppen kvar efter kontrollen är fyndet skarpt och begränsat.
+
+### Spärren som gör om det omöjligt
+
+`matning-pa-macen.sh` vägrar nu köra i en worktree: `exit 2` = ODÖMBART, aldrig FAIL —
+riggen mätte, inte kandidaten. **Mutationsprövat åt båda hållen:** i worktree `exit 2`
+med förklaring; i riktig klon slår spärren inte till och provet kör igenom.
+
+Under byggandet av spärren gjorde jag om felet i miniatyr: jag prövade den i en worktree,
+såg den inte slå till, och var på väg att kalla den trasig. Orsaken var att worktreen bar
+den **committade** versionen av skriptet, utan spärren. Fjärde gången samma dag att ett
+svar om en angränsande fil framläggs som svar om den ställda.
+
+### Regel 12: ~300 lokala grenar, flera opushade
+
+Klonen `~/nortropic/nortropic-system` bär omkring 300 lokala grenar. Minst sex har commits
+som inte finns på origin (`owner/h-031-codex-model-routing-1cf2caf75d22` ahead 9 ·
+`builder/h032-result-kernel-r93-4edbf9e1` ahead 3 · `owner/backtestkorare` ahead 3 ·
+`builder/h032-result-kernel-r75-fbbcfa65` ahead 2 · `builder/h032-result-kernel-24b4d575`
+ahead 1 · `owner/h035-r14-two-state-registry-fe23d062` ahead 1), och ett sextiotal saknar
+uppström helt — för dem säger `[ahead]` ingenting. Samma form som veckan med 55 opushade
+commits. **Inte åtgärdat. Ligger som nästa fråga efter kartan.**
+
+Klonens `main` låg 493 commits efter origin med tio filer från ett gammalt baslinjeläge.
+Alla tio finns i `origin/main`; `specs/tasks.spec.json`-objektet `3cbde14a` finns i repot.
+**Ingenting osäkrat där.** Klonen `~/nortropic-repos/nortropic-system` står på
+plattformsgrenen, ren och identisk med origin.
+
 ## 2026-09-16 — CODEX FÅR SKRIVA h-027–h-030, och regel 6 är kärnans egen regel
 
 Vägens fyra första poster är spec-rader. `specs/**` ligger i byggplan-v3 §3.1:s §A-mängd,

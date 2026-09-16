@@ -26,7 +26,26 @@ echo "python3:  $(python3 --version 2>&1)"
 echo "py3.12:   $(python3.12 --version 2>&1 || echo 'saknas')"
 echo
 
-# ── 0. Arbetsträdet före: grindarna ska inte smutsa ner det ──────────────────
+# ── 0a. SPÄRR: aldrig i en git-worktree ──────────────────────────────────────
+# Lärt 2026-09-16 av att ha gjort det. Grindarna skapar SJÄLVA git-worktrees
+# (h-005 K3: "workspace är ett eget git-worktree med egen git-dir"). Körs de
+# inuti en worktree är `.git` en FIL och inte en katalog, och nästlingen gav
+# sju röda grindar vars felrader alla pekade på cwd, workspace och kuvert:
+#   h-009 K8  processen kördes i worktreeroten, inte i workspacet
+#   h-012 K15 kandidaten bar HEAD-commitens filer, inte sessionens
+#   h-005 K7  worktree-rester efter SIGINT
+# Provet får aldrig kunna producera det resultatet tyst igen. En mätning som
+# mäter sin egen rigg är värre än ingen mätning.
+if [ -f .git ]; then
+  echo "❌ AVBRYTER: detta är en git-WORKTREE (.git är en fil, inte en katalog)."
+  echo "   Grindarna skapar egna worktrees. Nästlade worktrees ger falska röda"
+  echo "   grindar på cwd, workspace och kuvertleverans — mätt 2026-09-16."
+  echo "   Kör i en RIKTIG klon:"
+  echo "     git clone --branch <gren> git@github.com:Nortropic/nortropic-system.git <katalog>"
+  exit 2   # ODÖMBART — aldrig FAIL. Riggen mätte, inte kandidaten.
+fi
+
+# ── 0b. Arbetsträdet före: grindarna ska inte smutsa ner det ─────────────────
 FORE="$(git status --porcelain | wc -l | tr -d ' ')"
 echo "okommitterade filer FÖRE: $FORE"
 echo
