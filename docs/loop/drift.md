@@ -1,5 +1,63 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 26: VÄG A′ ÄR FEL. Den upphäver ett ägarbeslut från 09-10
+
+**Jag läste separationens commit-titlar och körde dess grindar. Jag läste aldrig dess
+dokumentation.** Den ligger i `SEPARATION-20260910/` på grenen och den ändrar besluten
+fattade tidigare i dag.
+
+### Ägarbeslutet jag inte kände till
+
+`SEPARATION-20260910/README.md`, 2026-09-10, ordagrant:
+
+> *"Ägarens precisering: konstitution/regelverk/beslutslogg/börja-här/agentöverlämning är
+> webbförvaltningens äldre styrdokument och hör inte till kernel/bootstrap."*
+
+**`docs/05-beslutslogg.md` är alltså redan avgjord som WEBB av ägaren.** Väg A′, som
+ägaren godkände i dag på min rekommendation, skulle återställa den som kernelfil och
+därmed upphäva det beslutet.
+
+Min mätning (kernel=113 / webb=57) var riktig som observation men besvarade fel fråga:
+den mäter vad filen INNEHÅLLER, inte vad den SKA VARA. Den frågan var redan avgjord.
+
+**`LOOP-ÄGARBESLUT-VÄG-A-PRIM` i beslutsloggen står därmed på fel grund och ska inte
+verkställas som skrivet.**
+
+### Vad separationen faktiskt levererade — som jag påstod saknades
+
+| Mitt påstående | Verkligheten på grenen |
+|---|---|
+| Fil-för-fil-dom saknas (`06-inventering.md` §0 KRAV A) | `SEPARATION-20260910/ALLOCATION.tsv`, **443 poster**: 119 plattform / 317 webb / 2 delade / 3 omskrivna / 2 oklara |
+| Inget målrepo finns | `/Users/elinhaggstrom/nortropic-repos/nortropic-webbforvaltning`, nytt, `main`, med `SEPARATION-ORIGIN/PROVENIENS.tsv` (blob-OID per fil) |
+| FYND 21 och 22 är nya fynd | `SEPARATION-20260910/EFTERARBETE.md` punkt **1–11**, mätta och ägarsatta 2026-09-10. Mitt FYND 22 = punkt 3, 4, 5, 6, 7 |
+
+### Rättningsvägen stod redan skriven
+
+`EFTERARBETE.md` punkt 3: *"plattformens dokumentauktoritet måste bindas till
+`docs/loop/**`"*. Det är den riktiga åtgärden — **inte** att återställa beslutsloggen,
+utan att ge plattformen en **egen** beslutslogg under `docs/loop/` och peka om
+`controller/verify/cli` `PRETASK_PATHS`/`PLATFORM_DOCUMENTS`, specen och grindarna dit.
+
+Punkt 5 noterar dessutom vad det kostar: *"~79 referenser till beslutsloggen i taskrader"*
+och att `specs/**` är människohand.
+
+### FYND 27 — webbrepot är också opushat
+
+`nortropic-webbforvaltning` finns bara lokalt. Sex repon under `Nortropic` på GitHub,
+inget av dem webbens. **Andra instansen av regel 12 samma dag**, och den bär 317 filer.
+
+### Metodfyndet, sextonde i ordningen
+
+Jag körde mekanismen — grindarna — men läste inte artefakten bredvid den. Att köra är
+nödvändigt men inte tillräckligt: **ett arbete som bär sin egen dokumentation ska läsas
+innan man drar slutsatser om vad det saknar.** Sex dagars arbete hade en README, en
+allokeringstabell med 443 rader och en efterarbetslista med elva punkter, och jag byggde
+en analys som delvis dubblerade dem och en rekommendation som motsade ägaren.
+
+Det var precis det underlaget varnar för i `00-LAS-FORST.md`: *"räkna med ett sextonde
+fel"*. Det kom, och det var det dyraste.
+
+
 ## 2026-09-16 — ÄGARBESLUT: väg A′ låst, vakternas placering avgjord, prompten omskriven
 
 Ägaren: *"Jag kör enligt dina rekommendationer."* Två beslut förda till
