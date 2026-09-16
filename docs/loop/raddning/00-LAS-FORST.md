@@ -63,7 +63,8 @@ påståendena är sanna.** Den oberoende omhärledningen i `06-inventering.md` �
 du ska koppla arbetsreglerna, och `04` innan du rör en vakt eller ett dokument.
 
 **Arbetar du redan och vill bara veta vad du ska göra härnäst:** läs enbart
-`05-arbetsordning.md`. Den är självbärande.
+`VAGEN.md` — den enda filen som säger det. `05-arbetsordning.md` bär
+autonomikontraktet och blockeringskontraktet, men inte ordningen (upphävt 2026-09-16).
 
 ## Det viktigaste i hela underlaget
 

@@ -141,8 +141,10 @@ i Linux med Python 3.12, men grindarna faller på `undefined symbol: sysctl`. **
 `00-VAD-NORTROPIC-AR.md` → `00-LAS-FORST.md` → `05-arbetsordning.md` → `01` → `06` →
 `07` → `03`.
 
-**Arbetar du redan och vill bara veta vad du gör härnäst:** läs enbart
-`05-arbetsordning.md`. Den är självbärande.
+**Arbetar du redan och vill bara veta vad du gör härnäst:** `VAGEN.md`. Ingen annan
+fil. `05-arbetsordning.md` beskrev det en gång och gör det inte längre — den bär
+autonomikontraktet, tripwires och blockeringskontraktet, vilket är värdefullt och
+oförändrat, men inte ordningen.
 
 ## Vad underlaget INTE är
 
