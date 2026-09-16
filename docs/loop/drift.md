@@ -1,5 +1,42 @@
 # Att köra loopen
 
+## 2026-09-16 — Inventeringen skrek varg om 31 worktrees som redan var säkrade. Rättat.
+
+Efter mergen av PR #233 kördes `inventera-lokalt-arbete.sh` en sista gång. Domen var
+`0 föräldralösa · 0 grenar utanför origin · 31 med okommitterat` — och därunder stod:
+
+> `STÄDA INGENTING förrän dessa är säkrade`
+
+**De 31 VAR säkrade.** `radda-okommitterat.sh` hade just pushat deras innehåll. Provet
+räknade "smutsigt arbetsträd" som "osäkrat arbete", och de två är inte samma sak.
+
+`11-tre-vakter-mot-aterfall.md` säger det om sin egen vakt 2: *"En vakt som skriker varg
+blir ignorerad, och en ignorerad vakt är värre än ingen."* Den meningen gällde nu vakten
+själv.
+
+**Rättat med ett innehållsprov, inte ett namnprov.** För varje smutsigt worktree byggs
+dess nuvarande träd i ett tempindex och jämförs med trädet i `radda/smuts-<namn>`:
+
+```
+GIT_INDEX_FILE=$tmp read-tree HEAD → add -A → write-tree   →   jämför med  refs/remotes/origin/radda/smuts-<namn>^{tree}
+```
+
+Lika träd = innehållet finns på origin. Att grenen bara EXISTERAR räcker inte — det hade
+varit samma lexikala fel som fällt mig åtta gånger i dag: att pröva namnet i stället för
+saken.
+
+**Mutationsprövat i tre riktningar**, alla körda:
+
+| Läge | Utfall |
+|---|---|
+| Smutsigt, inget räddat | `1 OSÄKRAT okommitterat` — larmar |
+| Smutsigt, räddat, oförändrat | `0 OSÄKRAT · 1 smutsiga men säkrade` — **grönt** |
+| Smutsigt, ändrat EFTER räddningen | `1 OSÄKRAT okommitterat` — **larmar igen** |
+
+Den tredje raden är den som gör vakten värd något. En vakt som blir grön av att man en
+gång räddat, och sedan förblir grön, mäter historia i stället för verklighet.
+
+
 ## 2026-09-16 — ✅ REGEL 12 ÄR UPPFYLLD. 259 → 0. Allt lokalt arbete finns på git.
 
 Sista fasen körd och verifierad på Macen:
