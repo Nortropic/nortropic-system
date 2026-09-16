@@ -113,7 +113,14 @@ if [ -n "$MIN_ORIGIN" ]; then
     case " $SEDDA " in *" $gem "*) continue;; esac
     SEDDA="$SEDDA $gem"
     SOKVAG="$kd"; behandla
-  done < <(find "$HOME" -maxdepth 4 -type d -name .git 2>/dev/null | sed 's|/\.git$||' | sort -u)
+  # DJUP 6, inte 4. Ägaren hittade 2026-09-16 ett git-repo på djup 4
+  # (worktrees/intake-v44/corpus-r39/.git) som varje scan i kväll missade, eftersom
+  # jag satte maxdepth 4 utan att pröva antagandet. Ett nästlat repo bär egna
+  # commits och egen origin; missas det är regel 12:s dom för smal — tredje gången
+  # samma kväll. Sex nivåer täcker <rot>/<mapp>/<projekt>/<undermapp>/.git och
+  # kostar sekunder. DJUPET ÄR ETT ANTAGANDE, INTE EN SANNING: bor ett repo
+  # djupare än så ser inte heller detta prov det.
+  done < <(find "$HOME" -maxdepth 6 -type d -name .git 2>/dev/null | sed 's|/\.git$||' | sort -u)
 fi
 SOKVAG=""
 

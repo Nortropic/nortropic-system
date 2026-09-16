@@ -99,10 +99,17 @@ behandla() { # <katalog> <källa>
 SEDDA=""
 # 1. Fristående kloner på maskinen — den kategori som föll bort 2026-09-16.
 while IFS= read -r d; do behandla "$d" "klon"; done < <(
-  find "$HOME" -maxdepth 4 -type d -name .git 2>/dev/null | sed 's|/\.git$||' | sort -u)
+  # DJUP 6, inte 4. Ägaren hittade 2026-09-16 ett git-repo på djup 4
+  # (worktrees/intake-v44/corpus-r39/.git) som varje scan i kväll missade, eftersom
+  # jag satte maxdepth 4 utan att pröva antagandet. Ett nästlat repo bär egna
+  # commits och egen origin; missas det är regel 12:s dom för smal — tredje gången
+  # samma kväll. Sex nivåer täcker <rot>/<mapp>/<projekt>/<undermapp>/.git och
+  # kostar sekunder. DJUPET ÄR ETT ANTAGANDE, INTE EN SANNING: bor ett repo
+  # djupare än så ser inte heller detta prov det.
+  find "$HOME" -maxdepth 6 -type d -name .git 2>/dev/null | sed 's|/\.git$||' | sort -u)
 # 2. Registrerade worktrees — de delar git-dir med sitt huvudrepo, så de fångas
 #    av dedupliceringen ovan. Loopen finns för de fall huvudrepot ligger djupare
-#    än maxdepth 4 och alltså aldrig sågs.
+#    än maxdepth 6 och alltså aldrig sågs.
 while IFS= read -r d; do [ -d "$d" ] && behandla "$d" "worktree"; done < <(
   git -C "$ROT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
 
