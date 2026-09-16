@@ -54,9 +54,24 @@ DE ÖVRIGA DEFEKTERNA, mätta 2026-09-16 och giltiga oavsett punkt 3:
          blir de OKÖRBARA, inte röda. En rad per fil: #!/usr/bin/env python3.12
 
   ALLA ÄR GATEDEFEKTER, INTE KANDIDATDEFEKTER (loop-regel 11c). Samma kandidat
-  körs om; rundan bokförs mot SPECIFIKATIONEN. Det är skälet till att
-  omfrysningen inte är runda 77: de tidigare gjorde grindarna MER exakta, dessa
-  gör dem MINDRE miljöbundna.
+  körs om; rundan bokförs mot SPECIFIKATIONEN.
+
+  OCH DE RÄKNAS INTE MOT OMFRYSNINGSBUDGETEN. Regel 11a mäter RIKTNING sedan
+  2026-09-16: en omfrysning som TAR BORT en miljöbindning är gatereparation och
+  räknas inte; en som LÄGGER TILL en förpliktelse räknas. Prov: git diff på
+  grindfilen. HÅLL DIFFEN REN — blandar du in en ny förpliktelse räknas hela
+  omfrysningen, och h-007 (3 omfrysningar, vid taket) spränger då sin budget.
+
+TRE HYPOTESER ÄR AVSLUTADE — PLOCKA INTE UPP DEM:
+
+  h-039 (30 omfrysningar), h-032 (120) och h-031 (147) avslutades OVERIFIERAT
+  2026-09-16 enligt regel 11b. Tillsammans 297 omfrysningar, noll stängningar.
+  De ska specificeras om i mindre delar med fasta prov — arkitektens arbete, inte
+  en runda till på den gamla specen.
+
+  Bootstrap-kedjan h-039 -> h-038 -> h-032 -> h-031 i 06-inventering.md §1 är
+  därmed INTE vägen framåt. Den leder inte heller till supervisor resume: h-015
+  beror mekaniskt på h-030, som inte finns som task i något repo.
 
 STATUS PÅ MAIN, SOM DU MÅSTE KÄNNA TILL:
   main bär fortfarande 246 webbfiler och registret pekar på

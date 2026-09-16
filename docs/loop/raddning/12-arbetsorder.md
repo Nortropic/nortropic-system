@@ -95,6 +95,17 @@ samma drag:
   contract"`) ska bli en egenskapspinning enligt **regel 11**.
 - **`h-038`:** kedjan till h-036:s exakta identitet bryts enligt **regel 11d**.
 
+> **⚠️ BUDGETEN — läs detta innan du fryser om.** `h-035` har 17 omfrysningar och
+> `h-007` ligger på taket 3. Regel 11b hade stoppat steg 3 helt.
+>
+> **Löst av ägarbeslutet 2026-09-16** (`LOOP-ÄGARBESLUT-11A-OCH-TRE-HYPOTESER`): regel 11a
+> mäter **riktning**, inte antal. En omfrysning som TAR BORT en miljöbindning är
+> gatereparation och räknas inte. Varje åtgärd i steg 3 tar bort en bindning — shebang,
+> trädpinning, referens till flyttad fil — och är därmed tillåten.
+>
+> **Håll diffen ren.** Blandar du in en ny förpliktelse räknas hela omfrysningen, och då
+> spränger `h-007` sin budget. Reparera i egen commit.
+
 **Alla är GATEDEFEKTER (regel 11c).** Samma kandidat körs om; rundan bokförs mot
 specifikationen, aldrig mot kandidaten. Det är skälet till att detta inte är runda 77:
 de tidigare omfrysningarna gjorde grindarna **mer** exakta, denna gör dem **mindre**
@@ -110,6 +121,19 @@ webbfiler** och ett register som pekar på `workflows/nortropic-verify-suite.js`
 ## Vad som INTE ingår, och vad som kommer sedan
 
 Detta är den ordning som gör grenen mergebar. Den tar **inte** kärnan i mål.
+
+### ⚠️ Tre hypoteser är AVSLUTADE — plocka inte upp dem
+
+`h-039` (30 omfrysningar), `h-032` (120) och `h-031` (147) avslutades **`OVERIFIERAT`**
+2026-09-16 enligt regel 11b. Tillsammans 297 omfrysningar utan en enda stängning.
+
+**Fortsätt dem inte.** De ska specificeras om i mindre delar med fasta prov, och det är
+arkitektens arbete — inte en runda till på den gamla specen. `OVERIFIERAT` betyder odömt,
+inte misslyckat; arbetet är underlag för omspecificeringen.
+
+Bootstrap-kedjan `h-039 → h-038 → h-032 → h-031` som `06-inventering.md` §1 beskriver är
+därmed **inte** vägen framåt. Den leder inte heller till supervisor resume — se §2 om
+`h-030`.
 
 Efter merge återstår, i den ordningen:
 

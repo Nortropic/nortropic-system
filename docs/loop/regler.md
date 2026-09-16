@@ -47,7 +47,23 @@ prövats mot ett oförändrat prov.** Konvergens kräver ett fast mål.
 
 - **11a. Omfrysningsbudget.** Varje hypotes deklarerar ett tak för hur många gånger dess
   `exit_test` får ändras. Saknas budgeten ska bygget fälla, inte passera.
-  **Rekommenderad startbudget: 3** — observerad, inte vald. Varje KLAR task har en grind
+  **Rekommenderad startbudget: 3** — observerad, inte vald.
+
+  **Vad som räknas — tillagt 2026-09-16, annars förbjuder regeln sin egen åtgärd.**
+  Budgeten mäter *målflytt*, inte *underhåll*. En omfrysning räknas efter riktning:
+
+  | Omfrysningen | Exempel | Räknas |
+  |---|---|---|
+  | **LÄGGER TILL** en förpliktelse | *"exact delta binding"*, *"no-margin maximum"*, ny obligatorisk kontroll | **JA** |
+  | **TAR BORT** en miljöbindning | shebang → `env`, trädpinning → egenskapspinning, referens till flyttad fil | **NEJ** — gatereparation enligt 11c |
+
+  **Provet är mekaniskt och kräver ingen bedömning:** `git diff` på grindfilen. Tillkommer
+  bindningar räknas omfrysningen; försvinner de gör den inte det. Är diffen blandad
+  räknas den — den som vill reparera gör det i en egen commit.
+
+  Utan denna distinktion fäller regeln varje försök att laga en trasig grind, och en
+  regel som förbjuder sin egen åtgärd blir kringgången första gången den prövas.
+  Bakgrunden står i `docs/loop/drift.md` 2026-09-16 (FYND 29). Varje KLAR task har en grind
   som rörts ≤ 3 gånger (h-016: 1 · h-013/017/038: 2 · h-001/036: 3); varje icke-klar
   17–147 (h-035: 17 · h-039: 30 · h-032: 120 · h-031: 147). Ingen mellanform.
 - **11b. Överskriden budget stoppar hypotesen.** Arkitekten delar den i mindre med var
