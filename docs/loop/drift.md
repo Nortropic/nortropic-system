@@ -1,5 +1,44 @@
 # Att köra loopen
 
+## 2026-09-17 — Tog vi bort mer än vi vet? Mätt: fyra av 38, och de 24 andra var redan borta
+
+Ägaren frågade: *"Frågan är ju om vi tog bort någon annan evidens som vi inte bara har
+upptäckt..."*
+
+Mätt genom att extrahera **varje** absolut sökväg repot refererar och pröva den mot disk:
+`193 distinkta · 38 saknas`.
+
+| Antal | Vad | Vårt? |
+|---|---|---|
+| ~10 | artefakter av extraktionens regex — sökvägar i markdown-prosa där `` ` `` fastnade i mönstret (`nortropic-kontrollklon\``) | nej, falska |
+| **24** | `evidence/bootstrap-supervisor/evidence/*-outcome.json` och `*-attempt-reservation.json` | **nej** — den katalogen rördes aldrig |
+| **4** | `worktrees/builder-h039-r14-product-96af0d2f` (2 filer) och `worktrees/h039-r8-product` (katalog + 1 fil) | **ja** |
+
+Städningen tog `worktrees/` och `work/`. `evidence/` stod orörd. De 24 saknades alltså
+redan före i kväll.
+
+### Men de 24 är ett eget fynd
+
+`verify/bin/h-039-exit` — den **frysta grinden** — refererar 30 sådana filer, varav 24
+inte finns på disk. Samma referenser står i `specs/tasks.spec.json`.
+
+Två läsningar, och vilken som gäller är **omätt**:
+
+1. Filerna skapas under körning (`-attempt-reservation.json` låter som något ceremonin
+   skriver), och frånvaro mellan körningar är normalt.
+2. Grinden binder till filer som aldrig fanns — och då kunde `h-039` aldrig passera
+   oavsett kandidat, vilket skulle förklara 30 rundor utan konvergens.
+
+`h-039` är avslutad `OVERIFIERAT` och ligger utanför de fjorton, så det är inte vägens
+problem. Men om hypotesen någonsin specificeras om är detta första stället att titta.
+
+### Metodnotisen
+
+Frågan gick att besvara på två minuter därför att repot självt bär referenserna. Det som
+saknades var inte data utan **att någon ställde frågan efter raderingen i stället för
+före**. Regel 13b:5 finns nu för att vända på den ordningen.
+
+
 ## 2026-09-17 — Städningen fällde mig: 59 absoluta sökvägar i specen
 
 Direkt efter att 386 kataloger raderats hittade en kontroll att
