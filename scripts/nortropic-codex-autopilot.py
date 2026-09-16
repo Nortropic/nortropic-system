@@ -30,13 +30,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-AUTHORITY_LIB = Path(__file__).resolve().parents[1] / "controller/authority"
-# Normal orchestrator execution must not mutate the immutable candidate merely
-# by loading the shared authority parser.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(AUTHORITY_LIB))
-from core import (AuthorityError, canonical_path, permits,
-                  strict_json_bytes)  # noqa: E402
+sys.path.insert(0, str(REPOSITORY_ROOT))
+from controller.authority.core import (AuthorityError, canonical_path, permits,
+                                       strict_json_bytes)  # noqa: E402
+from controller.result.consumer import consume_private_result  # noqa: E402
+from controller.result.materialize import materialize  # noqa: E402
 
 EXPECTED_REPO = "Nortropic/nortropic-system"
 OWNER_DECISION_PATH = "docs/loop/owner-h003-attestation-authority-v1.md"
@@ -56,6 +56,7 @@ PYTHON_IDENTITY_KEYS = {
 }
 MAX_PROVIDER_AUTHORITY_BYTES = 16 * 1024
 MAX_PROVIDER_EXECUTABLE_BYTES = 256 * 1024 * 1024
+CODEX_RUN_TIMEOUT_SECONDS = 86400
 AUTOPILOT_ROLE_POLICY = {
     "ARCHITECT": ("gpt-5.6-sol", "max"),
     "TEST_AUTHOR": ("gpt-5.6-sol", "max"),
@@ -90,6 +91,7 @@ FORBIDDEN_GIT_TOKENS = (
     "--force-with-lease",
     "--amend",
 )
+GIT_CONTROL_PREFIX = "GIT_"
 MAX_ARCHITECT_ROUNDS = 5
 SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT = True
 ROADMAP_PLAN_BLOBS = {
@@ -119,12 +121,24 @@ class Cmd:
     out: str
 
 
+def without_caller_git_controls(environment: dict[str, str]) -> dict[str, str]:
+    """Preserve the process environment except caller-selected Git controls."""
+    return {
+        key: value
+        for key, value in environment.items()
+        if not key.startswith(GIT_CONTROL_PREFIX)
+    }
+
+
 @dataclass
 class AgentRun:
     report: dict[str, Any]
     thread_id: str | None
     event_log: Path
     result_file: Path
+
+
+_LAST_AGENT_CONTEXT: tuple[str | None, Path, Path] | None = None
 
 
 @dataclass(frozen=True)
@@ -239,6 +253,7 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
             raise Stop(f"history rewrite command forbidden: {joined}")
         if any(arg.startswith("+") for arg in argv[1:]):
             raise Stop(f"leading + refspec forbidden: {joined}")
+    process_environment = None if env is None else dict(env)
     p = subprocess.run(
         argv,
         cwd=str(cwd) if cwd else None,
@@ -246,7 +261,7 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
         stderr=subprocess.STDOUT,
         text=True,
         timeout=timeout,
-        env=env,
+        env=process_environment,
     )
     if check and p.returncode != 0:
         raise Stop(f"command failed rc={p.returncode}: {' '.join(argv)}\n{p.stdout}")
@@ -254,7 +269,11 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
 
 
 def git(repo: Path, *args: str, check: bool = True, timeout: int | None = None) -> Cmd:
-    return run(["git", *args], cwd=repo, check=check, timeout=timeout)
+    environment = without_caller_git_controls({
+        key: value for key, value in os.environ.items()
+    })
+    return run(["git", *args], cwd=repo, check=check, timeout=timeout,
+               env=environment)
 
 
 def clean(repo: Path) -> bool:
@@ -768,7 +787,114 @@ def _python_snapshot(root: Path) -> tuple[Path, str]:
     return snapshot, digest
 
 
-def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
+def _remove_result_tree(root: Path) -> bool:
+    if root.is_symlink():
+        # A substituted root symlink is unlinked, never followed: iterating
+        # through it would delete the unrelated symlink target's children.
+        root.unlink()
+        return False
+    primary_failures = 0
+    for _cleanup_attempt in range(3):
+        try:
+            shutil.rmtree(root)
+            return False
+        except FileNotFoundError:
+            return False
+        except OSError:
+            primary_failures += 1
+    for child in root.iterdir():
+        opened = child.lstat()
+        if stat.S_ISDIR(opened.st_mode) and not child.is_symlink():
+            _remove_result_tree(child)
+        else:
+            child.unlink()
+    root.rmdir()
+    return primary_failures == 3
+
+
+def _cleanup_result_staging(root: Path, identity: tuple[int, int]) -> tuple[list[Path], bool]:
+    candidates: list[Path] = []
+    if root.exists() or root.is_symlink():
+        # R116: never treat the root path as owned unless it still resolves to
+        # the bound staging inode (no-follow).  A provider-substituted real
+        # foreign directory at the original path must be PRESERVED, not deleted.
+        try:
+            root_now = root.lstat()
+            if ((root_now.st_dev, root_now.st_ino) == identity
+                    and stat.S_ISDIR(root_now.st_mode) and not root.is_symlink()):
+                candidates.append(root)
+        except OSError:
+            pass
+    try:
+        siblings = list(root.parent.iterdir())
+    except OSError:
+        siblings = []
+    for candidate in siblings:
+        if candidate == root:
+            continue
+        try:
+            opened = candidate.lstat()
+        except OSError:
+            continue
+        if ((opened.st_dev, opened.st_ino) == identity
+                and stat.S_ISDIR(opened.st_mode) and not candidate.is_symlink()):
+            candidates.append(candidate)
+    degraded = False
+    for candidate in candidates:
+        degraded = _remove_result_tree(candidate) or degraded
+    residue = [candidate for candidate in candidates
+               if candidate.exists() or candidate.is_symlink()]
+    return residue, degraded
+
+
+def _retire_bound_staging(staging_dir_fd, root, identity):
+    # Authorized structured-result staging retirement.  When the staging path
+    # still resolves to the bound directory inode, remove it by the ordinary
+    # identity-verified tree cleanup.  Otherwise the path was substituted by a
+    # provider-controlled effect; remove the single relocated result sink by
+    # its exact name relative to the retained staging descriptor — never by the
+    # untrusted path — and fail closed.
+    try:
+        st = root.lstat()
+        path_bound = ((st.st_dev, st.st_ino) == identity
+                      and stat.S_ISDIR(st.st_mode) and not root.is_symlink())
+    except OSError:
+        path_bound = False
+    if path_bound:
+        for _cleanup_attempt in range(3):
+            try:
+                shutil.rmtree(root)
+                return True
+            except FileNotFoundError:
+                return True
+            except OSError:
+                continue
+        return False
+    try:
+        os.unlink("result.json", dir_fd=staging_dir_fd)
+    except FileNotFoundError:
+        pass
+    # R119: retire the relocated staging directory itself by the bound
+    # descriptor's resolved identity (macOS F_GETPATH), never by the untrusted
+    # original path.  An empty moved staging parent is residue; resolve the
+    # bound inode's current path, re-verify identity, and remove that tree using
+    # only H031-approved primitives: one fcntl.fcntl(F_GETPATH), a NUL-trimmed
+    # argumentless decode, and a Path-wrapped no-follow identity + S_ISDIR rebind
+    # before the tree removal.  A non-decodable relocated path fails closed.
+    try:
+        moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH,
+                                 b"\0" * 1024).split(b"\0", 1)[0].decode())
+        moved_now = moved.lstat()
+        if ((moved_now.st_dev, moved_now.st_ino) == identity
+                and stat.S_ISDIR(moved_now.st_mode)):
+            shutil.rmtree(moved)
+    except (OSError, ValueError):
+        pass
+    return False
+
+
+def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
+    global _LAST_AGENT_CONTEXT
     route = AUTOPILOT_ROLE_POLICY.get(role)
     if route is None:
         raise Stop(f"unknown autopilot role: {role!r}")
@@ -783,8 +909,65 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
     full_prompt = prompt.rstrip() + "\n\n" + agent_prompt_common()
     (snapshot_root, snapshot, snapshot_digest,
      host_snapshot, host_snapshot_digest) = _provider_snapshot(repo)
+    result_root: Path | None = None
+    result_root_identity: tuple[int, int] | None = None
+    sink_fd = -1
+    staging_dir_fd = -1
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
+        result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-"))
+        root_stat = result_root.lstat()
+        result_root_identity = (root_stat.st_dev, root_stat.st_ino)
+        live_root = repo.resolve()
+        live_git = common_git_dir(repo).resolve()
+        result_root_real = result_root.resolve()
+        if (result_root.is_symlink() or root_stat.st_uid != os.getuid()
+                or stat.S_IMODE(root_stat.st_mode) != 0o700
+                or result_root_real == live_root or live_root in result_root_real.parents
+                or result_root_real == live_git or live_git in result_root_real.parents):
+            raise Stop("private result staging root has unsafe identity")
+        # Bind the staging directory's inode with a retained read-only,
+        # no-follow, close-on-exec descriptor BEFORE the sink is created and
+        # BEFORE provider execution.  This handle is the sole authority for
+        # retiring a relocated result sink; it can never be a symlink and
+        # follows the bound inode across any provider-controlled cross-parent
+        # move.
+        staging_dir_fd = os.open(
+            result_root,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+        staging_dir_identity = os.fstat(staging_dir_fd)
+        if (not stat.S_ISDIR(staging_dir_identity.st_mode)
+                or (staging_dir_identity.st_dev, staging_dir_identity.st_ino)
+                    != result_root_identity):
+            raise Stop("private result staging directory identity unbound")
+        result_sink = result_root / "result.json"
+        create_fd = os.open(
+            result_sink,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        try:
+            os.fsync(create_fd)
+            # The retained read-only descriptor is opened while the writable
+            # create descriptor is still held, so their numbers can never
+            # coincide and the retained identity stays uniquely attributable.
+            sink_fd = os.open(
+                result_sink,
+                os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+            )
+        finally:
+            os.close(create_fd)
+        sink_identity = os.fstat(sink_fd)
+        if (not stat.S_ISREG(sink_identity.st_mode) or sink_identity.st_nlink != 1
+                or stat.S_IMODE(sink_identity.st_mode) != 0o600
+                or sorted(path.name for path in result_root.iterdir()) != [result_sink.name]):
+            raise Stop("private result sink has unsafe identity")
+        invocation_id = os.urandom(16).hex()
+        run_id = os.urandom(16).hex()
+        if invocation_id == run_id:
+            raise Stop("controller result bindings collided")
         provider_argv = [
             str(snapshot),
             "-C", str(wt),
@@ -796,18 +979,26 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
             "-c", f'model_reasoning_effort="{reasoning_effort}"',
             "--json",
             "--output-schema", str(schema),
-            "-o", str(result),
+            "-o", str(result_sink),
             full_prompt,
         ]
         envelope = jr / "provider-envelope.json"
         envelope.write_text(json.dumps({"task_id": prompt, "role": role}), encoding="utf-8")
         launcher = Path(__file__).resolve().parents[1] / "controller/launch/cli"
         argv = [str(python_snapshot), "-I", "-S", str(launcher),
-                "run", str(wt), str(envelope), "86400", "--", *provider_argv]
+                "run", str(wt), str(envelope), str(CODEX_RUN_TIMEOUT_SECONDS),
+                "--", *provider_argv]
         env = {key: value for key, value in os.environ.items()
-               if not key.startswith("DYLD_")
+               if not key.startswith(GIT_CONTROL_PREFIX)
+               and not key.startswith("DYLD_")
                and key not in {"LD_PRELOAD", "LD_LIBRARY_PATH", "__PYVENV_LAUNCHER__"}}
         env["NORTROPIC_TRUST_ROOT"] = str(snapshot_root)
+        # R116: hand the exact staging root and pre-created sink to the launcher
+        # so it binds them into its Seatbelt profile as a capability-exact
+        # deny-all-writes-under-staging + allow-file-write-data-on-the-sink.  The
+        # launcher canonicalizes both to /private before use.
+        env["NORTROPIC_STAGING_ROOT"] = str(result_root)
+        env["NORTROPIC_RESULT_SINK"] = str(result_sink)
         thread_id: str | None = None
         # Protect the complete execution family first.  Every final identity
         # read is deliberately after the last successful mode transition and
@@ -844,32 +1035,112 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
                 if obj.get("type") == "thread.started" and isinstance(obj.get("thread_id"), str):
                     thread_id = obj["thread_id"]
             rc = p.wait()
+        if rc != 0:
+            raise Stop(f"Codex role {role} failed rc={rc}; events={events}")
+        opened_identity = os.fstat(sink_fd)
+        substituted = False
+        try:
+            path_identity = result_sink.lstat()
+            if (result_sink.is_symlink() or not stat.S_ISREG(path_identity.st_mode)
+                    or path_identity.st_nlink != 1
+                    or (path_identity.st_dev, path_identity.st_ino)
+                        != (opened_identity.st_dev, opened_identity.st_ino)
+                    or sorted(path.name for path in result_root.iterdir())
+                        != [result_sink.name]):
+                raise Stop("provider result transport identity changed")
+        except FileNotFoundError:
+            # The provider substituted the staging path after execution; the
+            # retained sink descriptor and bound staging directory descriptor
+            # remain the sole authority for retiring the relocated result.
+            substituted = True
+        # Pathless handoff: the complete attempt-private execution family must
+        # already be absent at the consumer boundary while the original opened
+        # descriptor alone carries the result forward.  A degraded primary
+        # teardown fails closed here, before any canonical publication.
+        for _cleanup_attempt in range(3):
+            if not snapshot_root.exists():
+                break
+            try:
+                snapshot_root.chmod(0o700)
+            except OSError:
+                pass
+            try:
+                shutil.rmtree(snapshot_root)
+            except OSError:
+                pass
+            else:
+                break
+        if snapshot_root.exists():
+            raise Stop("private provider execution family cleanup incomplete")
+        retired = _retire_bound_staging(
+            staging_dir_fd, result_root, result_root_identity)
+        if substituted or not retired:
+            raise Stop("private result staging cleanup incomplete: staging substituted")
+        handoff_identity = os.fstat(sink_fd)
+        if (not stat.S_ISREG(handoff_identity.st_mode)
+                or handoff_identity.st_nlink != 0
+                or (handoff_identity.st_dev, handoff_identity.st_ino)
+                    != (opened_identity.st_dev, opened_identity.st_ino)):
+            raise Stop("retained result sink lost its handoff identity")
+        _LAST_AGENT_CONTEXT = (thread_id, events, result)
+        accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
+        return accepted
     finally:
-        cleanup_error: OSError | None = None
+        cleanup_errors: list[OSError] = []
+        for _fd in (staging_dir_fd, sink_fd):
+            if _fd >= 0:
+                try:
+                    os.close(_fd)
+                except OSError:
+                    pass
+        result_residue: list[Path] = []
+        result_cleanup_degraded = False
+        if result_root is not None and result_root_identity is not None:
+            try:
+                result_residue, result_cleanup_degraded = _cleanup_result_staging(
+                    result_root, result_root_identity)
+            except OSError as exc:
+                cleanup_errors.append(exc)
+                result_residue = [result_root]
+        elif result_root is not None:
+            try:
+                result_cleanup_degraded = _remove_result_tree(result_root)
+            except OSError as exc:
+                cleanup_errors.append(exc)
+                result_residue = [result_root]
         for _cleanup_attempt in range(3):
             if not snapshot_root.exists():
                 break
             try:
                 os.chmod(snapshot_root, 0o700)
             except OSError as exc:
-                cleanup_error = exc
+                cleanup_errors.append(exc)
             try:
                 shutil.rmtree(snapshot_root)
             except OSError as exc:
-                cleanup_error = exc
+                cleanup_errors.append(exc)
             else:
                 break
-        if snapshot_root.exists():
-            raise Stop("private provider execution family cleanup incomplete") from cleanup_error
-    if rc != 0:
-        raise Stop(f"Codex role {role} failed rc={rc}; events={events}")
-    try:
-        report = json.loads(result.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise Stop(f"Codex role {role} produced invalid structured result: {e}; file={result}") from e
-    if report.get("role") != role:
-        raise Stop(f"Codex role mismatch expected={role} got={report.get('role')}")
-    journal(repo, "AGENT_END", role=role, outcome=report.get("outcome"), thread_id=thread_id or "OVERIFIERAT")
+        cleanup_incomplete = (
+            bool(result_residue) or snapshot_root.exists() or result_cleanup_degraded
+        )
+        if cleanup_incomplete:
+            cause = cleanup_errors[-1] if cleanup_errors else None
+            raise Stop("private execution staging cleanup incomplete") from cause
+
+
+def _run_codex_agent(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
+    accepted = run_codex(repo, wt, role, prompt)
+    context = _LAST_AGENT_CONTEXT
+    if (context is None or not isinstance(accepted, dict)
+            or set(accepted) != {"schema_version", "invocation_id", "run_id", "role",
+                                 "result_sha256", "report"}
+            or not isinstance(accepted.get("report"), dict)):
+        raise Stop("structured result kernel returned an invalid controller envelope")
+    thread_id, events, result = context
+    report = accepted["report"]
+    journal(repo, "AGENT_END", role=role, outcome=report.get("outcome"),
+            thread_id=thread_id or "OVERIFIERAT")
     return AgentRun(report, thread_id, events, result)
 
 
@@ -945,7 +1216,8 @@ def architect_resolution(repo: Path, wt: Path, stage: str, task_id: str,
                          signal: dict[str, Any], context: str = "") -> dict[str, Any]:
     before_head = sha(wt)
     before_status = git(wt, "status", "--porcelain=v1", "--untracked-files=all").out
-    arun = run_codex(repo, wt, "ARCHITECT", architect_prompt(stage, task_id, signal, context))
+    arun = _run_codex_agent(repo, wt, "ARCHITECT",
+                            architect_prompt(stage, task_id, signal, context))
     after_head = sha(wt)
     after_status = git(wt, "status", "--porcelain=v1", "--untracked-files=all").out
     if before_head != after_head or before_status != after_status:
@@ -974,7 +1246,7 @@ def run_codex_resolving_architecture(repo: Path, wt: Path, role: str, prompt: st
         if guidance:
             effective += "\n\nAUTONOMOUS_ARCHITECT_RESOLUTIONS:\n" + "\n\n".join(guidance)
             effective += "\n\nApply these resolutions within higher authority. Do not re-ask the human for the same choice."
-        arun = run_codex(repo, wt, role, effective)
+        arun = _run_codex_agent(repo, wt, role, effective)
         if not owner_need(arun.report):
             return arun
         signal = str(arun.report.get("stop_reason") or arun.report.get("summary") or "OWNER_DECISION_REQUIRED")
@@ -2346,13 +2618,39 @@ def builder_flow(repo: Path, wt_root: Path, task_id: str, branch_name: str, dirn
             raise Stop(f"architecture routing failure builder task={task_id}: {agent.get('stop_reason')}")
         if agent.get("outcome") not in {"READY", "NO_CHANGES"}:
             raise Stop(f"builder not ready task={task_id}: {agent}")
-        files = assert_builder_scope(wt, task_id, base)
+        task = task_obj(repo, task_id)
+        allowed = task.get("allowed_write") or load_spec(repo).get(
+            "defaults", {}).get("allowed_write", [])
+        max_files, max_lines = task_limits(repo, task)
+        authoritative_git = common_git_dir(repo)
+        protected_materialization = (
+            authoritative_git / "nortropic-candidate-materialization")
+        protected_materialization.mkdir(mode=0o700, exist_ok=True)
+        candidate, candidate_tree, files = materialize(
+            str(authoritative_git),
+            base,
+            agent.get("candidate_delta"),
+            allowed,
+            max_files,
+            max_lines,
+            max_files,
+            str(protected_materialization),
+        )
         if not files:
-            raise Stop(f"builder returned ready but made no changes while gate is red: {task_id}")
-        gate = run_gate(wt, task_id)
-        if gate.rc != 0:
-            raise Stop(f"builder candidate is not green against frozen gate task={task_id} rc={gate.rc}\n{gate.out}")
-        candidate = stage_and_commit(wt, files, subject)
+            raise Stop(f"builder returned ready but materialized no changes: {task_id}")
+        candidate_gate_wt = detached_worktree(
+            repo, wt_root, f"candidate-gate-{task_id}-{candidate[:12]}", candidate)
+        try:
+            gate = run_gate(candidate_gate_wt, task_id)
+            if gate.rc != 0:
+                raise Stop(
+                    f"materialized builder candidate is not green against frozen gate "
+                    f"task={task_id} rc={gate.rc}\n{gate.out}")
+            if sha(candidate_gate_wt, f"{candidate}^{{tree}}") != candidate_tree:
+                raise Stop("materialized candidate tree changed before frozen gate")
+        finally:
+            if candidate_gate_wt.exists() and clean(candidate_gate_wt):
+                remove_worktree(repo, candidate_gate_wt)
     else:
         if git(repo, "merge-base", "--is-ancestor", base, head, check=False).rc != 0:
             raise Stop(f"recovered builder candidate is not based on current main task={task_id}: {head}")
@@ -2610,8 +2908,10 @@ def selftest(repo: Path | None = None) -> None:
     ]
     if src and any(x not in src for x in required):
         raise Stop("v4 architecture/substitution routing markers missing")
-    needle = "run_" + "codex(repo"
-    if src and src.count(needle) != 3:
+    direct_needle = "run_" + "codex(repo"
+    routed_needle = "_run_" + "codex_agent(repo"
+    if src and (src.count(direct_needle) != 2
+                or src.count(routed_needle) != 3):
         raise Stop("role execution bypasses v4 architecture router")
     legacy_direct = 'raise Stop(f"OWNER_' + 'DECISION_REQUIRED'
     if src and legacy_direct in src:
