@@ -1,9 +1,21 @@
-# Regelverket — systemets hårda regler
+# Regelverket — webbverksamhetens hårda regler inom Nortropic
 
 Senast verifierad mot systemet: 2026-07-31 · v17 (denna commit)
 Verifieringsomfång: delta-verifierad mot systemändringarna sedan 2026-07-30 (BATCH-001–004BE: check-invariants.mjs INV-001–005, verify-suite doctor 1–13 + OGILTIG-status, design-reviewer Bash→BLOCKED, NRT-007-blocket i agenterna, docs/100-dagar); 0 påståenden i denna fil ogiltigförklarade. Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
+Dokumentnot för domänsynkningen: verifieringsstämpeln ovan är historisk och
+omfattar inte de nya tillämpningsstyckena. Ingen ny systemverifiering påstås.
+
 Det här är reglerna som aldrig är förhandlingsbara i det dagliga arbetet — de ändras bara genom ett applicerat steward-förslag. Kolumnen "Exakt fil" pekar på filen där regeln bor; varje sökväg ska existera i repot. Motiven är komprimerade ur källfilerna och beslutsloggen ([05-beslutslogg.md](05-beslutslogg.md)).
+
+Reglerna beskriver den befintliga webbproduktionen och webbförvaltningen
+som ska återanvändas inom Digitala. De definierar inte hela Nortropic.
+Kundbrief, NAP, webbdesign, formulär och webbpaket är domänkrav; de krävs
+inte för ett rent plattformsuppdrag. Skyddade ytor, faktatrohet, måttägande
+och tillämpliga human-only-villkor får inte kringgås genom domänklassning.
+Regel 16 och 21 gäller fortsatt sina namngivna webbflöden. Regel 17 och 22
+behåller kravet på samordnad dokumentation även för kontrollplansändringar.
+Se konstitutionens tillämpningsområde och substitutionskontraktets §1.
 
 | # | Regel | Motiv | Exakt fil |
 |---|---|---|---|
@@ -30,9 +42,12 @@ Det här är reglerna som aldrig är förhandlingsbara i det dagliga arbetet —
 | 21 | **Obemannat läge klassar öppna frågor och stoppar på riktnings-/juridikrisk (v16)**: varje öppen fråga taggas STRATEGISK/FAKTA/BESLUT (ohanterad/scope-nej juridik = alltid STRATEGISK); `/nortropic-autobygg` kör kund-flödet utan mänskligt nod-3-stopp när `Läge:` saknas eller är `obemannat` (S12: obemannat är default; `bemannat` begärs uttryckligen; okänt värde stoppar som oklassificerat) OCH när §7 saknar ohanterad juridikflagga OCH ingen BLOCKERANDE strategisk fråga kvarstår (S10: dispositionen `blocking`, inte etiketten, avgör) — annars överlämnas till människa. Scope-nej och interventionsutfall ≠ NY SAJT ROUTAR i stället för att stoppa: lanen avslutas korrekt utan att invänta ägaren. FAKTA/BESLUT skjuts till FINAL-TOUCHES. Deployar aldrig (nod 8+9 mänskliga); Läge rör aldrig profile.ts | Autonomi utan riktnings-/juridikstopp bygger fel sajt tyst; klassningen gör stoppet mekaniskt och testbart, och juridik/deploy förblir mänskligt | `agents/project-planner.md` (Rules: frågeklassning + §6 Läge) + `workflows/nortropic-autobygg.js` + `workflows/nortropic-final-touches.js` + `skills/nortropic-plan/SKILL.md` |
 | 22 | **Dokumentationen har två lager (v17)**: enkelt (`docs/00-borja-har.md`) · avancerat (`docs/01`–`07` + `README.md`). Det enkla lagret läses FÖRE och uppdateras i SAMMA commit som teknisk dokumentation ändras — lagren får aldrig glida isär | Bus factor 1: en nybörjare måste kunna förstå systemet utan ägaren; ett enkelt lager som driver ifrån blir en lögn med självförtroende | `docs/00-borja-har.md` + `CLAUDE.md` + `agents/nortropic-steward.md` (doctor #12e) |
 
-## Invarianterna (v13 — flyttas ALDRIG till kalibreringsprofilen)
+## Webbverksamhetens invarianter (v13 — flyttas ALDRIG till kalibreringsprofilen)
 
-Systemet byggs åt svenska egenföretagare/lokala småföretag brett genom att kalibreringen genereras per kund (briefens §7 → `content/profile.ts`) — men följande är INVARIANTER som förblir hårdkodade, för de ÄR kvaliteten:
+Den befintliga webbverksamhetens kalibrering genereras per kund
+(briefens §7 → content/profile.ts). Följande är fortsatt hårda
+webbkrav; deras beteckning som invarianter gör dem inte till krav på
+varje verksamhetsneutralt plattformsuppdrag:
 
 **Faktatrohet med auto-FAIL · kvitton före påståenden · exakt EN primärhandling per sajt, testad på riktigt end-to-end · max 5 formulärfält · juridik human-only · adversarial verify · säkerhetsgrinden · NAP-källan business.ts · static-first · read-only mot främmande sajter · bas-antislopens universella synder (superlativ utan bevis, fejkad brådska, counters, mottagare ur request body osv.) · PK-8.**
 

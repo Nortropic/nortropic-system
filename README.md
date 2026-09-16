@@ -3,15 +3,34 @@
 Senast verifierad mot systemet: 2026-08-26 · v18 (denna commit)
 Verifieringsomfång: delta-verifierad mot S1–S4 + K0–K4 (publicerat i `main` t.o.m. PR #130) i S9-konsolideringen; ingressen och `scripts/`-raden lästa mot repot. **S5 är nu inräknad** — mergad i samma batch som denna stämpel (PR #129). Basstämpeln 2026-07-30 sattes av [AUTO-N1] 64acf9f och är inte oberoende granskad.
 
-Nortropic är ett system av Claude Code-agenter, skills och workflows som planerar, bygger, granskar och lanserar konverterande webbplatser. Systemet är **universellt i kärnan och specialiserat i paket**: kärnan bär det som gäller varje kund, ett paket bär det som gäller en kundtyp, och paket får SKÄRPA kärnan men aldrig lätta den. Första paketet är `lokal-se` — svenska egenföretagare och lokala småföretag, hantverkare, frisörer, hunddagis, blomsterhandlare... — och det är alltså systemets första kundtyp, inte dess natur (kalibrering per kund via briefens §7 Kalibreringsprofil; paketens mognadslägen och scope-gränserna i [docs/06-scope.md](docs/06-scope.md)).
+Dokumentnot för domänsynkningen: verifieringsstämpeln ovan är historisk och
+omfattar inte de nya tillämpningsstyckena. Ingen ny systemverifiering påstås.
 
-Planeringen börjar inte i antagandet att svaret är en ny sajt: plannern fäller först ett **interventionsbeslut** — NY SAJT, FÖRBÄTTRA BEFINTLIG, ICKE-SAJT-ÅTGÄRD eller AVRÅD — så att systemet kan komma fram till att en webbplats inte är det kunden behöver ([docs/01-oversikt.md](docs/01-oversikt.md)).
+Nortropic är den organisatoriska helheten. Den ska ge bestående stöd
+från rå intention till tillåtet genomförande och prövat lärande.
+Organisationen behöver en verksamhetsneutral autonomiplattform;
+Digitala är den första professionella verksamheten. Detta repo
+innehåller i dag både plattforms-/bootstraparbete och befintlig
+webbproduktion och webbförvaltning. Gränsen kvalificeras inom
+befintlig repoidentitet; fysisk flytt är inte beslutad och full
+verksamhetsneutralitet är inte bevisad.
 
-Det är byggt för en operatör som kör en sajt i taget: människan fattar besluten vid de hårda stoppen, agenterna gör arbetet däremellan. Kvaliteten mäts med en versionerad eval-rubrik, och systemet förbättrar sig självt via en steward som föreslår — och som sedan v15 dessutom självapplicerar en strikt avgränsad ändringsklass under konstitutionen ([docs/07-konstitution.md](docs/07-konstitution.md)), grindat av kill-switchen `AUTOPILOT` (default `off`); allt annat kräver mänskligt godkännande.
+Webbmaterialet består av agenter, skills, workflows och paket som
+planerar, bygger, granskar och förbereder lansering av webbplatser.
+Webbens gemensamma kundregler specialiseras genom paket. Första paketet
+inom webbverksamheten är lokal-se; paket får skärpa men aldrig lätta
+dessa krav. Denna webbgrund är inte H034 eller hela autonomiplattformen.
+Plannerns interventionsbeslut kan fortfarande vara NY SAJT,
+FÖRBÄTTRA BEFINTLIG, ICKE-SAJT-ÅTGÄRD eller AVRÅD.
 
-Det här repot är systemets källa till sanning: fabriken är REPO-NATIV (S0/R1 2026-08-24) — roten upplöses mekaniskt (`git rev-parse --show-toplevel`) och identitetsverifieras (origin `Nortropic/nortropic-system` + ankarfilerna docs/07 och AUTOPILOT) innan något konsumeras; ingen hemkatalog hårdkodas. Muterbar körtidsstat bor i `~/.nortropic/factory/`. `.gitignore` är en vitlista som spårar enbart systemfilerna.
+Webbflödets human-only-steg, eval-rubrik och stewardtrappa bevaras.
+AUTOPILOT styr trappan, inte supervisor-resume. Webbverktygens
+befintliga repo-native upplösning, origin- och docs/07-/AUTOPILOT-ankare
+samt runtimepath ~/.nortropic/factory/ ändras inte här. .gitignore
+behåller sin vitlista; den är inte ensam en behörighetsgräns.
+Se substitutionskontraktets §1 och konstitutionens tillämpningsområde.
 
-## Flödet
+## Webbverksamhetens befintliga flöde
 
 En kundsajt går genom tolv noder. Tre av dem är hårda stopp där en människa måste agera; resten drivs av kommandon.
 

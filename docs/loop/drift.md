@@ -5695,3 +5695,34 @@ until full H039 PASS.
 Live-r3 retains root-r2 and all historical bytes; the exact five consumer ASTs bind both receipt trace profiles, the preserved sequence-1 receipt singleton xattrs and exact authenticated uid501-unlistable s/lock without reading xattr values. Failed live-r2 consumer evidence is separately immutable/no-credit, not R1 stale-count evidence. The Path-keyed stale-count fixture uses mapping unpacking without changing its keys, values or negative predicate.
 
 R33 formal-A device amendment binds exactly four R24/R25 historical/current identity10 rows (16777232 to 16777230; fields 1-9 exact), with three centralized comparison replacements in the two shared binding predicates and causal positive baselines. Historical workflow bytes remain immutable and no stale lane reopens.
+
+## Domänsynkning — dokumenterad riktning, inte verifierad separation
+
+Föreslagen lydelse — EJ ANTAGET ELLER AKTIVERAT. Beslutskälla och faktisk
+aktiveringsidentitet är ännu inte bokförda; nedanstående text ger ingen auktoritet.
+
+Nortropic är organisationen; plattformen och Digitala har skilda
+ansvar enligt substitutionskontraktets §1. Den historiska
+2026-08-11-postens webbfabriksdefinition har ersatts framåt genom
+det här redovisade ägarbeslutet, inte genom omtolkning av gamla bevis.
+Dokumentpaketet ändrar inte testurval, verifierarregister, sandbox,
+installation, root-/receiptpolicy eller publiceringsbehörighet.
+Verifieringsseparationen återstår och ska prövas enligt eget
+avgränsat kontrakt. H039:s aktuella kandidat och återstående
+bootstrap behåller sina egna subjekt och beviskrav. En ny bas
+kräver föreskriven kontroll av beroenden innan senare trustövergång.
+Ingen gammal pending-körorder aktiveras av detta avsnitt.
+
+## 2026-09-09 — godkänt dokumentkandidatsteg, inte aktivering
+
+Användarens förmedlade ”jag godkänner” i Improvements-uppgift
+01a0865b-3206-7061-9344-29d0c67c0253, host local, avser §10.6 och
+diff-SHA256 4d81b60ea11ab2a7bcad4a78eeda64255416a26968f955d757e6d16bed4186be.
+Källa och begränsad verifierbarhet är bokförda i beslutsloggen samma datum.
+Tidigare förslagsstatus skrivs inte om som historiskt antagen.
+
+Separat kandidatbas: ed584ec3088c08005f99de1da825d083e350a8d2.
+Åtta dokument får agentappliceras; fyra hunkuppsättningar förblir mänskliga.
+H039-WIP överförs inte. Ingen publicering, aktivering, installation eller
+supervisor resume ingår. Oförändrade substitutionspins och authority-snapshots
+är kvarstående kopplingar inför senare aktivering, inte dokumentcredit.

@@ -8,7 +8,6 @@ The original frozen roadmap at commit `0b3212c991d4227c8df2656465ae2c0252dda39e`
 
 ```text
 NORTROPIC_ARCHITECTURE=PROVIDER_NEUTRAL_TRUST_KERNEL
-PRODUCT=NORTROPIC_AUTONOMOUS_WEBSITE_FACTORY
 AGENT_REASONING_OWNER=PROVIDER_HARNESS
 TRUST_TRANSITION_OWNER=NORTROPIC
 MODEL_OUTPUT_IS_TRUST_AUTHORITY=NO
@@ -23,11 +22,37 @@ NO_FORCE_SEMANTICS=YES
 
 ## 1. Product boundary
 
-Nortropic remains a specialized autonomous **website factory**. The provider-neutral kernel below it is infrastructure, not a change of product direction.
+Nortropic är den organisatoriska helheten: bestående stöd från ägarens råa
+intention till genomförbart initiativ, användbart resultat och prövat lärande.
+Organisationen behöver en verksamhetsneutral autonomiplattform. Digitala är
+den första professionella verksamheten; befintlig webbproduktion och
+webbförvaltning ska återanvändas som delar av denna, inte definiera hela
+Nortropic eller betraktas som hela Digitalas färdiga förmåga.
 
-The factory may use Claude, Codex or future providers for reasoning, planning, building, reviewing, debugging and remediation. The provider may change without moving trust authority into that provider.
+Trust Kernel, controller, bootstrap och supervisor hör till
+autonomiplattformen. H034 är en avgränsad verifieringsartefakt inom denna
+plattform, inte hela plattformen eller organisationen. I detta kontrakt
+avser den historiska termen Trust Kernel den bredare tillitsdelen av
+plattformen; den lägger inte hela §2:s ansvar i H034-binären.
 
-Verkstadsgolvet is the control room. It may display and later issue narrowly typed commands against the real Nortropic state, but it is never scheduler truth, verification truth, attestation truth or promotion authority.
+Verksamheter använder plattformens definierade och versionsbundna
+gränssnitt. Plattformen får anropa en tillåten verksamhetsverifierare genom
+dessa gränssnitt, men dess egen kvalificering ska inte kräva webbaffärens
+filer eller interna regler. Domänpolicy får endast skärpa eller precisera
+inom överordnat mandat, aldrig ge högre behörighet eller ändra måttstocken.
+
+Claude, Codex och framtida providers får bära resonemang och arbetsloopar.
+Providerbyte flyttar inte tillitsauktoriteten till leverantören.
+Verkstadsgolvet är kontrollrum, aldrig scheduler-, verifierings-, attest-
+eller publiceringsauktoritet.
+
+Detta är en framåtriktad ändring av den tidigare webbfabriksdefinitionen,
+inte ett påstående om att äldre kontrakt redan hade denna innebörd.
+Verksamhetsneutralitet är ett kvalificeringskrav, ännu inte en visad effekt.
+Ändringen ger ingen ny kundflödesstart, kundpublicering, rootoperation eller
+rätt att förnya ett förbrukat försök. Nuvarande säkerhetskrav, human-only-
+gränser och frusna gates gäller fortsatt. Organisatoriska funktioner är
+ansvar, inte en beställning av nya subsystem.
 
 ## 2. Stable responsibility split
 
@@ -42,7 +67,7 @@ Verkstadsgolvet is the control room. It may display and later issue narrowly typ
 - provider-native retries and turn management;
 - optional session resume as a context-preservation optimization.
 
-### Nortropic Trust Kernel owns
+### Autonomiplattformens tillitsdel äger
 
 - canonical Task IR / TaskContract and provenance;
 - allowed/denied write policy;

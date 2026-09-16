@@ -8,31 +8,51 @@ arbetssättet går förlorat. **Den bär METODEN och ÄGARENS ARBETSSÄTT — al
 status.** Statusen bor i `docs/05-beslutslogg.md` och i luckornas egna rader; att duplicera
 den här vore att skapa en andra sanning som driftar.
 
+Dokumentnot för domänsynkningen: verifieringsstämpeln ovan är historisk och
+omfattar inte de nya tillämpningsstyckena. Ingen ny systemverifiering påstås.
+
 ---
 
 ## 1. Ägarens arbetssätt
 
-Ägaren (Johnny) vill att arbetet drivs **autonomt hela vägen**: bygga, mutationspröva,
-committa, öppna PR och merga utan att fråga. Merge-/push-befogenhet är uttryckligen given.
+Bootstrap har ett stående autonomimandat mot supervisor resume. Driv
+nästa tillåtna steg utan en ny generell godkännandefråga. Bind till
+aktuellt uppdrag, rätt domän och faktiskt gällande delegation enligt
+AGENTS.md. Webbverksamhetens start-/publiceringsregler är inte i sig
+bootstrapens mandat. Gemensamma säkerhetskrav och verkliga human-only-
+gränser gäller fortsatt. Denna metodtext skapar ingen ny behörighet.
 
-**Han reagerar starkt när något påstås vänta på honom.** Det har hänt två gånger —
-*"varför krävs min hand?"* och *"hur väntar det på mig?"* — och **båda gångerna hade han
-rätt**: spärren fanns inte längre, eller så var det jag som inte tänkt färdigt.
+Ett tekniskt fel stoppar den underkända övergången och dess credit,
+inte automatiskt analys, tillåten rättning eller fortsatt verifiering.
+Fortsätt sådant arbete inom mandat, roll, skrivyta och försökstillstånd.
+En frusen kandidat ändras inte; en tillåten efterföljare följer sin
+test-first-/reviewväg. Förbrukade försök bevaras utan credit. Nytt namn,
+ny rot eller denna text återställer varken försöksrätt eller credit;
+ett nytt försök måste ha verkligt stöd i då gällande mandat.
 
-> **Testa spärren innan du kallar den en spärr.** Ett `Edit`-försök tar tre sekunder. Att
-> lista något som "ägarbeslut" utan att pröva om det stämmer är samma fel som att anta att
-> en vakt är grön utan att mutationspröva den.
+Skilj stoppad teknisk övergång, vanlig fortsättning, regel från fel
+domän, materiellt ägarbeslut och faktisk verktygsspärr. Redovisa
+händelse, regel, domän, mandat, hindrad effekt och nästa tillåtna steg.
+Vid saknad auktoritetskedja: skriv AUTHORITY_UNVERIFIED, utför tillåtna
+kontroller och håll just den obestyrkta effekten stoppad. Anta inte
+att varje ny mekanism eller avgränsad prerequisite behöver mänskligt
+beslut; pröva den befintliga delegationens villkor först.
 
-**Skilj alltid på tre klasser och namnge vilken det är:**
+Senare mandat gäller framåt, aldrig som historisk auktoritet. Återinför
+inte uttryckligen ersatta begränsningar från en gammal handoff. En
+aktuell uttrycklig förberedelsebeställning begränsar däremot detta pass.
+När den levererats är det korrekt att avsluta; det är inget ägarstopp.
+Prova inte förbjudna effekter eller kringgå verktygsspärrar. Om ett
+verkligt nytt tillits-/behörighetsbeslut krävs, ange exakt vad som
+behöver ändras i stället för att fråga efter generell fullmakt.
+Human-only följer den högre regelns ändringsväg; konstitutionen
+ändras av människa, inte genom hänvisning till denna överlämning.
 
-| Klass | Exempel |
-|---|---|
-| **(a) Hans beslut på riktigt** | pengar · §A-ytor · mätstocken (eval-rubriken) |
-| **(b) Mina operativa gränser** | jag startar inte agenter och skapar inte extern infrastruktur självmant |
-| **(c) Byggbart av mig** | allt annat — och det ska då vara byggt, inte listat |
-
-Säger han *"fixa dessa grejer"* om en §A-yta: **gör det**, men HÖGRISK-märk och citera
-instruktionen i både commit och beslutslogg.
+Följande arbetsloop, vaktbatteri och genereringskommandon avser
+webbverksamhetens underhåll inom dess mandat. De startas inte
+automatiskt i ett plattforms- eller bootstrapuppdrag. Där gäller den
+aktuella taskens frusna verifiering och giltiga delegation. Ompinning
+får aldrig användas för att godkänna den egna ändrade måttstocken.
 
 ## 2. Arbetsloopen — varje skiva, utan undantag
 
@@ -76,10 +96,13 @@ svenska teckenklasser.
   integrationslista, tomt fixturunderlag — alla är FEL, aldrig frånvaro av krav.
 - **Fail-closed åt rätt håll.** Ett okänt värde får aldrig falla tillbaka på den LÖSARE
   vägen; att gissa sig till lösare krav är att inte ha en grind.
-- **Skärpningslagen:** ett paket får smalna av kärnan, aldrig lätta den.
+- Skärpningslagen i webbpaketen avser webbverksamhetens gemensamma
+  kund-/paketregler, inte en påstådd generell H034-funktion.
 - **En stängd lucka står kvar som rad.** Kravet VÄNDS i stället för att strykas — annars
   går stängningen inte att kontrollera, och en halv stängning läses som hel.
-- **Syntetisk evidens bär aldrig något till `PROVEN`.**
+- Syntetisk evidens bär inte en verksamhetskapacitet till PROVEN enligt
+  dess skyddade statuskontrakt. Tekniskt gate-PASS har sitt eget
+  avgränsade bevisvärde och är inte verklig kundnytta.
 
 ### Luckornas statusvokabulär — sluten, och den bor här för att den är METOD
 
@@ -121,7 +144,7 @@ en människa.** Detta är inte "hann inte" — det är "ska inte förrän ägare
 | Öppna luckor | sök `-GAP-` i trädet; varje har en rad med nästa transition — `check-luckregister.mjs` fäller om en saknas eller om två rader säger olika |
 | Kapaciteternas mognad | `docs/kapacitetskatalog.md` |
 
-**Ingen status upprepas här.** Den enda uppgiften som inte finns någon annanstans: nästa
-steg som faktiskt flyttar systemet är **en körning mot en riktig testklient** — huvudkedjan
-är byggd, och det mesta som återstår är sidospår (gym-banan, förbättringslanen) eller
-väntar på ägarens beslut om mätstocken.
+Ingen teknisk status eller generell nästa körorder upprepas här.
+Läs den aktuella domänens status och därefter dess giltiga task,
+verifierare och mandat. En testklient, färdig webbhuvudkedja eller
+gammal handoff är inte bevis på aktuell bootstrap- eller supervisorberedskap.

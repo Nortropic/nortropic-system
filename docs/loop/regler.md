@@ -2,9 +2,13 @@
 
 **Beslutade 2026-08-07 · ändras endast av Johnny · gäller `controller/`, `specs/`, `verify/` och loop-PR:er**
 
-Dessa regler styr bygget av kontrollplanet. De ersätter inte
-[docs/03-regelverk.md](../03-regelverk.md) eller [docs/07-konstitution.md](../07-konstitution.md) —
-systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står över dessa.
+Dessa regler styr bygget av Nortropics autonomiplattform. Konstitutionen
+och regelverket står fortsatt över loopreglerna med sina uttryckliga
+tillämpningsområden. Webbkundens brief- och kvalitetskrav är inte
+plattformens universella funktionskrav. Samtliga skyddade ytor och
+ändringsvägar bevaras. Plattformens avsedda gräns anges i
+harness-substitution-contract-v1.md §1; den texten ger inte undantag från
+högre auktoritet.
 
 1. Inget bygge utan spec-rad i `specs/tasks.spec.json` och exit-test definierat före start.
 2. Allt arbete i repot, på gren `nortropic/loop-<id>`, committat per delsteg.
@@ -18,4 +22,6 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
    Overifierat märks OVERIFIERAT. "Klart" sägs aldrig utan kört exit-test.
 9. Scope: gör det enklaste som uppfyller exit-testet. Inga oombedda skyddslager,
    frysled, auktorisationskedjor eller framtidssäkring.
-10. Kontrollplanet rör aldrig kundflödet. Regel 16 står orörd.
+10. Plattformsbygget utför inte kundflödet. Verksamhetsuppdrag får senare
+använda kvalificerade plattformsgränssnitt inom eget giltigt mandat.
+Detta ändrar inte regel 16 eller 21 och aktiverar ingen sådan körning.
