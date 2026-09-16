@@ -40,6 +40,145 @@ F9 (reintroduction negatives) is exercised by the test author on a scratch
 reference construction and recorded in the development document.
 No historical H gate, provider, build, publication or resume is executed.
 """
+# H039_LOADER_FINAL_BEGIN
+_H039_LOADER_FINAL_GATE_SHA = "8dfbfeeb568fd851a7dee2936bb6873c50c158dd406d4ee388a6f57feb995f31"
+_H039_LOADER_FINAL_SPEC_SHA = "9282dae4426ac92c49e2503a2a03f632023707701eb9f694ddc8ce69f4b040ed"
+
+
+_H039_LOADER_FINAL_CAPTURE_SOURCE = "def capture(raw):\n    \"\"\"One fixed Popen. Tests replace module primitives, never launch a child.\"\"\"\n    if UNRESOLVED or type(raw) is not bytes or len(raw) != OBSERVER_SIZE:\n        raise ValueError(\"unresolved owner or wrong held source length\")\n    if signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:\n        raise ValueError(\"foreign child reaper\")\n    process, selector, terminal = None, None, None\n    output = {\"stdout\": bytearray(), \"stderr\": bytearray()}\n    sent, failures, killed = 0, [], False\n    requested, handlers = [], []\n    def latch(number, frame):\n        if not requested:\n            requested.append(number)\n    class OwnedChild(subprocess.Popen):\n        def __del__(self):\n            pass  # no implicit orphan reaping; unresolved owner is retained below\n    try:\n        for number in (signal.SIGTERM, signal.SIGINT):\n            handlers.append((number, signal.signal(number, latch)))\n        if requested:\n            raise InterruptedError(\"cancelled before spawn\")\n        deadline = time.monotonic() + SECONDS\n        process = OwnedChild([PY39, \"-I\", \"-S\", \"-B\", \"-c\", DRIVER], cwd=\"/\", env=dict(ENV),\n            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,\n            shell=False, close_fds=True, start_new_session=True)\n        selector = selectors.DefaultSelector()\n        for stream, event, label in ((process.stdin, selectors.EVENT_WRITE, \"stdin\"),\n                (process.stdout, selectors.EVENT_READ, \"stdout\"), (process.stderr, selectors.EVENT_READ, \"stderr\")):\n            os.set_blocking(stream.fileno(), False)\n            selector.register(stream, event, label)\n        while True:\n            terminal = process.poll()\n            if terminal is not None and not selector.get_map():\n                break\n            if requested:\n                raise InterruptedError(\"diagnostic cancelled\")\n            if time.monotonic() >= deadline:\n                raise TimeoutError(\"diagnostic deadline\")\n            for key, unused in selector.select(0.05):\n                if key.data == \"stdin\":\n                    try:\n                        count = os.write(key.fileobj.fileno(), raw[sent:sent + 4096])\n                    except BlockingIOError:\n                        continue\n                    if count <= 0:\n                        raise ValueError(\"source write stalled\")\n                    sent += count\n                    if sent == len(raw):\n                        selector.unregister(key.fileobj)\n                        key.fileobj.close()\n                else:\n                    try:\n                        chunk = os.read(key.fileobj.fileno(), min(4096, CAP - len(output[key.data]) + 1))\n                    except BlockingIOError:\n                        continue\n                    if not chunk:\n                        selector.unregister(key.fileobj)\n                    elif len(output[key.data]) + len(chunk) > CAP:\n                        raise ValueError(key.data + \" overflow\")\n                    else:\n                        output[key.data].extend(chunk)\n        if sent != len(raw) or terminal != 0 or output[\"stderr\"]:\n            raise ValueError(\"child source/exit/stderr\")\n    except BaseException as exc:\n        failures.append(type(exc).__name__)\n    finally:\n        if process is not None and terminal is None:\n            try:\n                terminal = process.poll()  # owned unreaped child only; no PID lookup\n                if terminal is None:\n                    killed = True\n                    try:\n                        process.kill()\n                    except ProcessLookupError:\n                        pass\n                    terminal = process.wait(timeout=WAIT_SECONDS)\n            except BaseException as exc:\n                failures.append(\"terminal:\" + type(exc).__name__)\n        for stream in ([selector] if selector is not None else []) + ([process.stdin, process.stdout, process.stderr] if process is not None else []):\n            try:\n                stream.close()\n            except BaseException as exc:\n                failures.append(\"close:\" + type(exc).__name__)\n        if process is not None and terminal is None:\n            UNRESOLVED.append(process)\n            failures.append(\"UNRESOLVED_PRESERVED_NO_RETRY\")\n        for number, previous in reversed(handlers):\n            try:\n                signal.signal(number, previous)\n            except BaseException as exc:\n                failures.append(\"handler_restore:\" + type(exc).__name__)\n        if requested:\n            failures.append(\"cancelled\")\n    return {\"pid\": process.pid if process is not None else None, \"returncode\": terminal,\n            \"stdout\": bytes(output[\"stdout\"]), \"stderr\": bytes(output[\"stderr\"]), \"sent\": sent,\n            \"failures\": failures, \"killed_owned_child\": killed}\n"
+
+
+_H039_LOADER_FINAL_MODEL_AST = "PENDING"
+
+
+def h039_loader_final_model(gate_raw, spec_raw, final_raw, declaration, container_raw):
+    """Pure source-bound model composition, never a candidate or runtime verdict."""
+    import __future__
+    import ast
+    import hashlib
+    expected = {"contract": "platform-separation-final-refreeze-declaration-v1", "refreezes": [{
+        "path": "verify/bin/h-039-exit",
+        "base_sha256": "ec3e1e8e3b86f9d4cb6cef7d8b04d21bb7413a1303368e541b33fd1dcda76853",
+        "new_sha256": _H039_LOADER_FINAL_GATE_SHA,
+        "reason": "Separate exact-D pure loader decision composition; native and lifecycle qualifications absent.",
+        "h039_loader_decision": {
+            "parent_commit": "571a47b8f5fbf1718125742718d2f5908d49e95c",
+            "parent_tree": "10d70b1b77601b72b07c633510cb12f5ac657b02",
+            "qualification": "UNFROZEN_PURE_MODEL_PENDING_INDEPENDENT_SOURCE_EFFECT_REVIEW",
+            "credit_ceiling": "PURE_MODEL_ONLY_NOT_OWNED_CANDIDATE_OR_NATIVE_H039_CREDIT",
+            "asset_relation": "FIVE_PRODUCT_ARTIFACTS_UNCHANGED_NO_REBUILD_OR_INSTALLATION"}}]}
+    if (type(gate_raw) is not bytes or type(spec_raw) is not bytes or type(final_raw) is not bytes
+            or hashlib.sha256(gate_raw).hexdigest() != _H039_LOADER_FINAL_GATE_SHA
+            or hashlib.sha256(spec_raw).hexdigest() != _H039_LOADER_FINAL_SPEC_SHA
+            or declaration != expected):
+        raise ValueError("loader model source/declaration identity")
+    selected = []
+    names = []
+    for node in ast.parse(gate_raw).body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) and node.targets[0].id.startswith("_H039_LOADER_")):
+            ast.literal_eval(node.value)
+            selected.append(node); names.append(node.targets[0].id)
+        elif isinstance(node, ast.FunctionDef) and node.name.startswith("h039_loader_"):
+            if node.decorator_list or node.args.defaults or any(x is not None for x in node.args.kw_defaults):
+                raise ValueError("loader selected passive definitions")
+            selected.append(node); names.append(node.name)
+    if not names or len(set(names)) != len(names):
+        raise ValueError("loader selected definition cardinality")
+    scope = {}
+    exec(compile(ast.Module(body=selected, type_ignores=[]), "<source-bound-pure-loader-model>", "exec",
+        flags=__future__.annotations.compiler_flag, dont_inherit=True), scope)
+    scope["h039_loader_parent"](final_raw, "final")
+    if not scope["h039_loader_spec"](spec_raw):
+        raise ValueError("loader full D spec/new member")
+    rows = scope["h039_loader_model_rows"](gate_raw)
+    rows.extend(scope["h039_loader_observer_rows"](gate_raw, container_raw))
+    return {"credit": "PURE_MODEL_ONLY", "rows": rows, "native": "NOT_RUN",
+        "candidate_qualified": False, "h039_credit": False}
+
+
+def h039_loader_capture_plan(gate_raw, spec_raw, final_raw, declaration, container_raw):
+    """Pure preparation only: new exact stdin/argv/rows, no Popen or OS metadata.
+
+    Retained interpreter/module-anchor preflight still belongs to a separately
+    reviewed owned invocation. No real-protocol descendant lifetime is implied.
+    """
+    import ast
+    import hashlib
+    import json
+    result = h039_loader_final_model(gate_raw, spec_raw, final_raw, declaration, container_raw)
+    selected, names = [], []
+    for node in ast.parse(final_raw).body:
+        if isinstance(node, ast.FunctionDef) and node.name == "h039_loader_final_model":
+            if hashlib.sha256(ast.dump(node, include_attributes=False).encode()).hexdigest() != _H039_LOADER_FINAL_MODEL_AST:
+                raise ValueError("loader capture actual model source")
+            selected.append(node); names.append(node.name)
+        elif (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) and node.targets[0].id in
+                ("_H039_LOADER_FINAL_GATE_SHA", "_H039_LOADER_FINAL_SPEC_SHA")):
+            expected = (_H039_LOADER_FINAL_GATE_SHA if node.targets[0].id.endswith("GATE_SHA")
+                        else _H039_LOADER_FINAL_SPEC_SHA)
+            if ast.literal_eval(node.value) != expected:
+                raise ValueError("loader capture source pins")
+            selected.append(node); names.append(node.targets[0].id)
+    if sorted(names) != sorted(("h039_loader_final_model", "_H039_LOADER_FINAL_GATE_SHA", "_H039_LOADER_FINAL_SPEC_SHA")):
+        raise ValueError("loader capture model cardinality")
+    model_source = ast.unparse(ast.Module(body=selected, type_ignores=[]))
+    packet = json.dumps({"gate": gate_raw.hex(), "spec": spec_raw.hex(), "final": final_raw.hex(),
+        "container": container_raw.hex(), "declaration": declaration}, sort_keys=True,
+        separators=(",", ":"), allow_nan=False).encode("ascii")
+    digest = hashlib.sha256(packet).hexdigest()
+    driver = ("import sys,os,json,hashlib\n"
+        + "raw=sys.stdin.buffer.read(" + str(len(packet) + 1) + ")\n"
+        + "if len(raw)!=" + str(len(packet)) + " or hashlib.sha256(raw).hexdigest()!=" + repr(digest)
+        + ": raise SystemExit(2)\n"
+        + "data=json.loads(raw); scope={}\n"
+        + "exec(compile(" + repr(model_source) + ",'<held-loader-pure-model>','exec'),scope)\n"
+        + "result=scope['h039_loader_final_model'](bytes.fromhex(data['gate']),bytes.fromhex(data['spec']),"
+        + "bytes.fromhex(data['final']),data['declaration'],bytes.fromhex(data['container']))\n"
+        + "result['rows']=[{'case':row['case'],'ok':row['ok']} for row in result['rows']]\n"
+        + "print(json.dumps({'schema':'h039-loader-pure-source-captured-v1','source_sha256':"
+        + repr(digest) + ",'pid':os.getpid(),'result':result},sort_keys=True,separators=(',',':'),allow_nan=False))\n")
+    compact = dict(result)
+    compact["rows"] = [{"case": row["case"], "ok": row["ok"]} for row in result["rows"]]
+    envelope = {"schema": "h039-loader-pure-source-captured-v1", "source_sha256": digest,
+                "pid": 2147483647, "result": compact}
+    expected_size = len((json.dumps(envelope, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode("ascii"))
+    if expected_size > 16384:
+        raise ValueError("loader compact output exceeds inherited byte cap")
+    return {"stdin": packet, "stdin_size": len(packet), "stdin_sha256": digest,
+        "argv": ["/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                 "-I", "-S", "-B", "-c", driver],
+        "env": {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C", "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x7"},
+        "cwd": "/", "capture_source": _H039_LOADER_FINAL_CAPTURE_SOURCE,
+        "stdout_cap": 16384, "stderr_cap": 16384, "wall_seconds": 15.0, "owned_wait_seconds": 3.0,
+        "expected_envelope": envelope, "maximum_expected_output_size": expected_size,
+        "execution": "NOT_RUN_NO_QUALIFIED_OUTER_INVOCATION", "native": "NOT_RUN"}
+
+
+def h039_loader_capture_output(plan, raw, owned_pid):
+    """Independent exact expected vector; raw capture failures stay separate."""
+    import json
+    if (type(raw) is not bytes or not raw or len(raw) > 16384
+            or type(owned_pid) is not int or not 0 < owned_pid <= 2147483647):
+        raise ValueError("loader capture framing/pid")
+    value = json.loads(raw)
+    if raw != (json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode("ascii"):
+        raise ValueError("loader capture canonical framing")
+    expected = dict(plan["expected_envelope"]); expected["pid"] = owned_pid
+    if value != expected or type(value["pid"]) is not int:
+        raise ValueError("loader capture subject/rows")
+    if not all(type(row["ok"]) is bool and row["ok"] for row in value["result"]["rows"]):
+        raise ValueError("loader capture not all pure rows passed")
+    return value
+
+
+if __name__ == "__main__":
+    import sys as _h039_loader_final_sys
+    print("LOADER_CONTRACT_DRAFT_NO_EXECUTION_OR_NATIVE_CREDIT", file=_h039_loader_final_sys.stderr)
+    raise SystemExit(2)
+# H039_LOADER_FINAL_END
+
 # H039_PY39_FINAL_BEGIN
 _H039_PY39_FINAL_GATE_SHA = "ec3e1e8e3b86f9d4cb6cef7d8b04d21bb7413a1303368e541b33fd1dcda76853"
 _H039_PY39_OUTER = "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12"

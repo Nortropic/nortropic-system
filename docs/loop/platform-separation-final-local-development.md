@@ -3287,3 +3287,433 @@ All source/graph/physical-binding requirements survive in the new exact-C child
 relation. Independent freeze and actual qualification follow the pure draft.
 LOADER_IMAGE_ABI_ADDRESS_BINDINGS_UNPROVEN remains an operational refusal;
 no adapter load/query, real socket, root operation, receipt or lifecycle effect.
+
+### H039 loader/actual-binding criterion — 2026-09-13, before implementation
+
+This is a proposed next contract criterion, not execution permission or a verdict.
+The separate local worktree is test-author-h039-loader-D571a47b8-20260913,
+branch nortropic/loop-h039-loader-local-20260913, based on D
+571a47b8f5fbf1718125742718d2f5908d49e95c, tree
+10d70b1b77601b72b07c633510cb12f5ac657b02. Parent prestate checks observed a
+clean standalone no-local/no-hardlinks clone; current origin/main is OVERIFIERAT.
+Only this document's append is allocated now. No implementation or test ran here.
+
+The obstacle is D's intentional refusal while loader/image/ABI/address bindings
+are unknown, not a defect in its already qualified inert CPython 3.9 semantics.
+The useful effect is one continuous owned verifier execution: authenticate the
+fixed startup and protected adapter before loading; observe actual loaded-call
+bindings before query; then execute D's exact consumer, independent validator
+and run_exact_protocol callsite with qualified native/OS primitive bindings.
+No disconnected demonstration, repeated expected rows or new parallel consumer
+can satisfy that effect. Original D/P and their results retain their subjects.
+
+Proposed next TEST_AUTHOR surface, exactly six existing files:
+
+- verify/bin/h-039-exit: successor contract and causal loader/binding controls.
+- verify/bin/platform-separation-final-exit: same-subject owned qualification.
+- specs/tasks.spec.json: bounded successor criterion and explicit credit ceiling.
+- controller/verify/cli: corresponding spec-identity literal only.
+- SEPARATION-20260910/REFREEZE.json: exact successor source/snapshot bindings.
+- docs/loop/platform-separation-final-local-development.md: criterion and guide.
+
+That proposed surface is not permission to edit the other five in this tranche.
+No register, kernel, product, old frozen body or historical result is rewritten.
+The successor must preserve complete D gate/spec projections, exact consumer,
+validator and protocol definitions, and all five existing product bytes/modes.
+Reuse P 005366dd5e3a9a74d8140c9dd0c0175aea268294, tree
+a548cb8876346eb505906fb3feaa7b8d33ec43aa; no adapter rebuild is requested.
+Its adapter is 51176 bytes, SHA256
+9f18b8dbc135d9d6e6d2395017e70827aaaf3752a9a0835a94a91b8235fda6ec.
+P's container remains inert, not an operational installer.
+
+Trust and effect boundaries, to be frozen before implementation:
+
+1. Root and the installed OS/CLT startup are trusted prerequisites. Bind the
+   existing direct PY39 executable and framework pins above, actual arm64 child,
+   fixed argv/cwd, closed literal environment and exact import/dependency choice.
+   No ambient PYTHON/DYLD selection, fallback executable or caller library path.
+   Startup includes native code; this is not native-load-free. It does not prove
+   an Apple signing chain or all kernel/shared-cache bytes. Arbitrary injected
+   native threads and hostile root/interpreter are outside the immunity claim.
+2. Before extension code can execute, authenticate its exact fixed protected
+   pathname /Library/PrivilegedHelperTools/se.nortropic.listener-adapter-v1.so,
+   retained nofollow ancestry/name/file, root protection, required metadata and
+   own P bytes. A post-load digest cannot substitute for this pre-load boundary.
+   Missing asset, writable/aliased/replaced ancestry or file, unknown ACL or
+   mismatching bytes must prevent the load call itself. No staging fallback.
+3. Bind the authenticated adapter mapping and its actual registered initializer,
+   method and relocation before the first listener query. Static P anchors are
+   initializer +0x518, method +0x538, BL +0x724 -> stub +0xc4c -> GOT +0x4090;
+   method table ml_meth +0x8170 points to +0x538. P's module definition is
+   +0x8100 (registered m_init field +0x8110).
+   Require PyModule_GetDef(returned_module) == base +0x8100 before field access;
+   a different non-NULL definition is not an acceptable module identity.
+   Offsets refer only to exact P, not a universal ABI or guessed raw address.
+   Mapping/range checks precede any
+   bounded slot access; no address search, arbitrary dump or PAC-bit stripping.
+4. Proposed initializer observation is PyModule_GetDef(returned_module)'s
+   m_base.m_init; method observation is PyCFunction_GetFunction of that module's
+   query_received_listener, with METH_O. Their values must match the authenticated
+   mapping plus the exact P offsets. Before adapter load, after authenticated
+   closed PY39 startup, select P's exact import /usr/lib/libSystem.B.dylib with
+   dlopen flags RTLD_NOW|RTLD_LOCAL|RTLD_NOLOAD (0x16), then exactly
+   dlsym(handle, "proc_pidfdinfo"). No global/default/self/NULL handle or fallback.
+   Require provider /usr/lib/system/libsystem_kernel.dylib, returned symbol start
+   dli_saddr == target and a bounded executable-image range. These checks operate
+   within explicitly trusted OS startup; a name, UUID or caller boolean alone
+   establishes no authority. Hold the selected handle/target through adapter load.
+   AFTER load, actual GOT +0x4090 must equal that target before query. The separate
+   resolver remains a comparison anchor, never proof of the actual slot.
+   Missing/NULL/unknown/mismatching binding refuses query, without a fallback.
+   SDK/re-export source observations 15c9e1, 912b7f, e5cc8e and 6bfe45 support
+   this finite proposed selection only. Host provider/start/range/GOT equality
+   remain NOT_RUN; no range implementation or native acceptance is asserted here.
+
+Initializer measurability is concrete but not yet host-proven: local fixed PY39
+Headers/moduleobject.h declares PyModule_GetDef and m_base.m_init; D gate's
+embedded P source uses a single-phase module (m_size=-1) and PyModule_Create.
+Upstream CPython v3.9.6 Python/importdl.c calls p0(), obtains the returned module's
+definition and registers p0 in m_base.m_init. Parent/architect source observations
+7471fb, fbad76 and 37766b support testing that relation, not equivalence to the
+installed Apple implementation. Its actual host behavior remains NOT_RUN.
+Even a correct registered pointer is not pre-execution authentication, nor proof
+against a hostile interpreter. Do not introduce a replacement importer to claim it.
+
+Test-first predictions: exercise actual successor callables with one defect per
+case and independent event/call counts, not implementation-produced PASS rows.
+
+- Positive local fixture reaches load, binding, query, independent getsockname,
+  actual consumer and actual validator in order; varied slides, owned FD numbers
+  and request-derived runtime IDs remain valid within their exact constraints.
+- Wrong startup pin/argv/env/import/dependency or unsafe/missing asset rejects
+  before load: zero initializer, query and ACK effects, even if later data match.
+- Correct exported initializer symbol but different/NULL registered m_init,
+  wrong method pointer/flags, wrong module definition or wrong actual GOT rejects
+  before query. A correct separate resolver cannot repair a wrong actual slot.
+- Unknown mapping, invalid range or first refusal followed by matching data
+  never becomes acceptance. No retry masks the first failure.
+- The real consumer still requires exactly three SCM_RIGHTS descriptors and
+  queries receive_index 2 only, once, self PID, flavor 3, zeroed 792-byte ABI
+  buffer and exact return/errno semantics. Wrong count/PID/FD/family/type/kind/
+  listener bit/address or descriptor-identity/flags rebind must causally reject.
+- Keep independent getsockname, exact request-derived pathname, bounded address
+  and sun_len policy, named socket identity and four distinct identity domains.
+  Preserve D's required UNVALIDATED_ADDRESS_AND_IMAGE raw observation marker;
+  final acceptance separately requires independently qualified external bindings.
+  Prefix-only matching, the marker alone or caller binding claims cannot satisfy it.
+- Preserve protocol deadlines, owned descriptor closure, only the fixed invalid
+  ACK after complete PREPARED validation, never ACTIVE, and actual outcome
+  validator consumption. Refusal followed by ACK and stale outcomes reject.
+- Harness exceptions, incomplete captures, timeout or unresolved owned process
+  state are unjudgeable failures, not successful negative tests or cleanup credit.
+
+Before any installation, local pure/mocked tests can prove decision composition,
+ordering and the above causal refusals using the exact D call chain. They cannot
+prove native startup, registered initializer, actual GOT, host ABI/address policy,
+real descriptor lifecycle, installed producer behavior or full H039 completion.
+Positive model evidence must be labelled local semantics only; native cases
+remain NOT_RUN. D's operational refusal stays closed until all required native
+bindings and the separate lifecycle prerequisites are actually qualified.
+
+The eventual coherent native test needs the fixed protected asset installed by
+its separately reviewed real installation path (last observation: absent), an
+authenticated owned PY39 child, actual initializer/method/GOT observations,
+then the same consumer/protocol/validator over the actual received FD triple,
+independent exact-path/ABI observations and complete owned terminal evidence.
+The preserved sequence2/receipt-policy annexes and consumed old operation do
+not authorize a new live transaction. Their concrete successor/installation
+requirements must be resolved before that test; old sequence2 wire constants
+cannot silently become a sequence3 run. D's consumer and validator require
+transaction_sequence=2. Preserving immutable D now does not promise that unchanged
+D can run sequence3: a real successor transaction may require a separately reviewed
+new sequence binding in both consumer and validator. None is changed here, and no
+old attempt is retried. No root, installation or live attempt is ordered by this
+criterion. No local result unlocks H038/H032/H031 or resume.
+
+Next: independent read-only criterion/measurability review, then only the reviewed
+bounded contract tranche; no new general owner question or broad trust framework.
+FROZEN_GATE_READY=NO; BASELINE_RED_FOR_RIGHT_REASON=OVERIFIERAT;
+PRODUCTION_IMPLEMENTATION_WRITTEN=NO; NATIVE_TESTS=NOT_RUN; PUSH=NO; MERGE=NO.
+
+#### First pure contract tranche, test-first evidence
+
+The criterion received independent read-only clearance before source authoring.
+Source baseline 66f13e found the successor callables absent; that is not a gate
+verdict. Actual D baseline 12764a executed its selected inert fixture: one query
+and actual validator acceptance, but zero preload/binding events. Its actual pure
+operational dispatch still returned the required refusal. This is the concrete
+missing new effect, not a defect or withdrawal of D's old inert qualification.
+Both used the pinned PY12 -I -S -B with stdin-selected definitions only.
+
+The successor selects complete restored D source, then changes exactly one
+in-memory fixture binding: query_received_listener's primitive becomes a guarded
+callable. D's runner/consumer/validator source strings are not changed. The model
+owns stage order and query count and reads the actual D outcome; it performs no
+native calls, sockets, descriptor operations, subprocesses or host fixture writes.
+Its finite startup/asset tuples are illustrative pure fixture profiles, NOT
+observed installed metadata, full import closure or executable authentication.
+The system provider/range, actual registered initializer and protected load path
+remain proposed native requirements, with no implemented native primitive here.
+Module definition +0x8100 is independently grounded in actual P's static symbol
+and initializer ADRP/ADD relation (architect 074b81, parent 5ada9a/fdc2a8), not
+chosen by the observed module. Matching a foreign non-NULL definition must fail.
+
+First moving-source run 19ea43/58dc55 passed 23 new loader cases and the original
+25 inert cases on gate017413aad5a838b84ec8d4df796acc27ed59417afa0537fb015970d612c33c76.
+Those 48 model results apply only to those bytes. Later field-specific negative
+controls, module-definition anchor and final source bindings require fresh tests.
+Both entry points remain unconditional refusal: no executable model CLI, owned
+candidate qualification, freeze, PY39/native execution, product or installation.
+
+The coherent revised model was tested through the final gate's selected pure
+h039_loader_final_model callable, not a whole gate: f3aa93/19f757, pinned PY12
+-I -S -B with stdin, exit0. Result: 56/56 (31 new loader cases plus D's unchanged
+25), four source/declaration refusals and matching controller/verify spec literal.
+The independent stage trace proves the positive fixture reaches D's actual query
+and validator; refused preconditions never enter that fixture's protocol or ACK.
+The first-refusal/then-match observer would return a valid second observation,
+but the actual composition makes only one observation and stops on the first.
+Gate SHA4276be0c5231310c44f209b3079ebcc65027bce43e1f73bfd8efa7ba7a71e961;
+final SHA fda049401bce3e8f4828e5b2284feb86994741c9a703fdecb4a5585c718f697b.
+All six input files were byte-identical before/after that pure test. This later
+documentation-only result note is not a new execution of the model. Independent
+source/effect review and owned immutable candidate qualification remain pending;
+the next implementation tranche must not infer native authority from these rows.
+
+#### Ordered bounded-read criterion, before its implementation
+
+Independent review 2648e4 did not invalidate the earlier pure model; it exposed
+missing native read ordering. Baseline c2d002 ran the held positive model and
+observed only startup/asset/system/load/bindings/query, not range-before-copy or
+module-definition-before-field events. That is limited RED for this next effect.
+The same model must now order startup -> asset -> system_resolve -> system_ranges
+-> system_identity copies -> load -> adapter_resolve -> adapter_ranges -> header
+copy -> module_def -> initializer_read -> method_api -> got_read -> bound_query.
+No memory copy may precede its successful complete-interval readable-range check.
+Wrong range yields zero subsequent copies; a foreign valid module definition
+yields zero initializer/GOT reads. Failed kernel return or short copy refuses.
+The full positive must still reach the same actual D consumer and validator.
+
+Proposed future native primitives are narrowly fixed: dladdr returns only raw
+c_void_p fields, never implicit c_char_p reads; proc_pidinfo(self,8,address,1272)
+supplies only exact-return/errno/address/size/protection bounds, never vnode/cache
+origin. Copies use mach_vm_read_overwrite with this process's task_self_trap()
+port, owned destination buffers and exact success/outsize. No foreign task port,
+global mach_task_self_ dereference, string_at, search or next-region traversal.
+P's header plus load-command prefix is exactly 32+1232=1264 bytes from its
+already-authenticated own image; compare a bounded copy before pointer fields.
+Module definition must equal base+0x8100 before reading m_init's eight bytes at
+base+0x8110; method API/flags and eight actual GOT bytes at base+0x4090 follow.
+All are NOT_RUN native requirements, not implementations in this pure tranche.
+
+The first useful proposed real invocation is SYSTEM SELECTION ONLY in one fixed
+owned PY39 -I -S -B child, closed four-literal environment, no adapter import/load,
+listener query, socket, installation or persistent store access. Reuse the already
+reviewed bounded same-stdin-source/owned-child capture pattern, not a model CLI.
+After authenticated startup: one fixed libSystem.B NOLOAD0x16 handle; fixed symbol
+selection for proc_pidfdinfo and the declared observation APIs; one raw dladdr;
+three self-PID flavor8 range calls (target one byte, provider128, symbol32);
+one task_self_trap and at most two exact mach copies (128+32 bytes) after bounds.
+Reject NULL/DEAD self port; set an ownership flag only for the acquired valid
+port, then make exactly one
+mach_port_deallocate(port, port) in finally balances that trap's extra send-right
+reference, after its final use. Require return0; no retry, destroy or baseline
+right removal or reference-count probe. The fixed symbol-selection list includes this release
+primitive as well as dladdr, proc_pidinfo, task_self_trap and mach_vm_read_overwrite.
+Retain the fixed NOLOAD handle until owned-child terminality; no dlclose loop
+or fallback is added. This is the handle's declared process-lifetime boundary.
+Both strings require NUL inside their caps; exact provider/symbol/start/RX relation
+is measured, without proc_pidfdinfo invocation or claiming kernel/cache identity.
+One 15-second owned child, 16KiB stdout and stderr caps, bounded owned-only kill/
+wait on failure, no retry; retain full bounded captures and uncertainty status.
+Exact source/argv/bootstrap validation and this effect declaration need independent
+review before implementation or execution. This paragraph orders neither.
+
+Ordered-model results: f3f15c/152f81 first passed 72/72 on moving gate2ea34195;
+after coherent source/spec/pin binding, 82b544/8ea340 ran the same cases through
+the final selected pure callable under pinned PY12 -I -S -B, exit0: 72/72
+(47 loader order/range/copy cases and 25 unchanged D cases), plus four causal
+source/declaration refusals. All six source bytes matched before/after, and the
+controller spec literal matched. Gate1e0b031841ca3eab5f7b40ded2811f956e002901b2502606455deb298d55e92a;
+final d5d885663d1ff4348fe597159f8ae1a3796311d15c61fbaf7d42317d2694293c.
+Wrong ranges stopped before copy callbacks; wrong non-NULL module definition
+stopped before initializer/GOT reads; injected failed kernel returns/short copies
+were refused rather than accepted. The separate harness exception remained
+unjudgeable. The positive fixture reached the same D validator.
+The prefix fixture bytes are explicitly synthetic, not a loaded P-header result.
+This note changes documentation only; it does not rerun or broaden those tests.
+No native code, actual memory read, PY39 child, Git mutation, freeze or product
+change occurred. The narrow lifetime source review now binds XNU043036:
+ipc_tt.c1193-1201 -> ipc_port.c2766-2797 -> ipc_right.c2465-2502 adds the trap's
+extra send-right reference; ipc_right.c1033-1056 permits decrement when urefs>1,
+while the final pinned reference stays protected. Architect observations
+turn121view0/turn124view0/turn124view1/turn126view0/turn128view0 are source evidence,
+not installed-host success. Saturation/failure never implies balanced release.
+If the child dies before finally, owned wait proves process-lifetime end only,
+not explicit deallocation PASS. All native effects remain NOT_RUN pending review.
+
+#### Leaf-region and owned-port criterion, before model implementation
+
+The preceding flavor8/1272 proposal is superseded for new bindings, not rewritten
+as historical failure or credit. Actual R1 observed a SUBMAP, not a leaf RX range.
+R2's bounded system-only observation (5abffd; independent postreview 256689)
+supports feasibility of the leaf mechanism only. It supplies no addresses,
+handles, receipts or native bindings to another child or the future adapter run.
+The prior six-file draft is preserved as the exact D-relative patch
+`h039-loader-before-r2-integration.patch`, SHA256
+`874da6875205869fa5a24ea7b8fe1a6b5e37d70440ef78e9a727e2fcc1c45146`.
+
+New criterion: authenticated startup -> own-asset pre-load binding -> fixed
+system selection -> one valid self-port acquisition -> system leaf ranges ->
+bounded system copies -> protected standard import -> adapter resolution ->
+adapter leaf ranges -> header copy -> exact module definition -> initializer
+copy -> method API -> GOT copy -> exactly one self-port release -> bound query.
+All observations must be fresh in that same authenticated child. Each fixed
+mach_vm_region_recurse query starts at depth16 with short-info48/count12 and the
+original requested address; require KR0/count12/depth<=16/is_submap0, reject
+user_tag UINT32_MAX, and retain full overflow-free interval and protection1/3/5
+with required R or RX. Depth is a nesting cap, not a kernel time/work guarantee.
+No next-region traversal, adaptive depth or fallback is introduced.
+
+Test predictions: the positive reaches the unchanged actual D consumer/protocol/
+validator after release. NULL/DEAD acquisition has no release. Every later refusal
+or harness exception attempts release exactly once and makes no query/ACK; a bad
+release return or release exception also prevents query. Submap/count/depth/tag,
+hole/straddle/overflow/RWX, short copies, foreign valid module definition and
+wrong GOT target must reject causally. Keep all earlier negative controls and
+distinguish harness failures from expected refusal. The NOLOAD handles/target and
+loaded module remain retained through query independently of the released port.
+
+Only pure selected-callable model changes and coherent source pins are ordered
+here. Operational entry stays closed, P and full D restoration remain exact,
+and the finite _ASSET fixture tuple is not installed authentication. The next
+same-child staged native implementation follows independent criterion/source
+review; installation and actual receipt/sequence lifecycle remain separately
+unqualified. No standalone model CLI, native run, freeze or product change here.
+
+Method acquisition must be possible in that same order: prepare receives only
+the observer, not an already imported method. After load/header/module/initializer,
+the method_api stage acquires the exact module attribute and actual C-function
+self/function/flags observations. Require self equals the retained module,
+function=base+0x538 and flags=METH_O, then retain that exact callable through GOT
+validation and query. No lookup after validation may substitute another callable.
+The inert fixture supplies its existing D adapter only at method_api; foreign
+self and later attribute substitution are separate causal controls. This is not
+a new native loader or generic dispatch framework.
+
+Baseline a96e35 ran the previous held positive through the actual selected inert
+callable: D accepted, but self_acquire/self_release events were absent. This is
+limited RED for the new lifetime criterion, not withdrawal of prior D credit.
+After the criterion and model change, 51f9af/5a39cf (pinned PY12 -I -S -B,
+stdin-selected pure definitions, exit0) passed 89/89 on moving gate
+2605b102d7cc134b27ef7d6767799e075f901c4c5f709752efc7031324bbc23c:
+64 loader cases plus all 25 unchanged D controls. The positive and later-method-
+substitution case reached D's actual validator after release; post-acquire
+refusals released once without query, and injected OSError remained a harness
+failure. This predates coherent source/spec repinning and is not final candidate
+qualification. No native implementation or effect occurred in this tranche.
+
+Coherent source-bound result: 034f09/aba47b, pinned PY12 -I -S -B with only
+AST-selected pure definitions from stdin, exit0: 89/89 (64 loader plus 25 D),
+four source/declaration refusals, matching controller spec literal, all six
+source inputs byte-stable before/after. Gate
+9fc27d54d7e42183682741d23f8b2a96fe95a021de2c5ae5f6f0df5352300381;
+final6b0e8592e95207c44e7f5f5a1ef8544fb53f75c999e5c2496e5af590ad55be95;
+spec ea584672889166004f580aa0536fdf55995d697b08f444e95f449ee2227cec6b.
+Read-only preservation 571d14 established all five product bytes/modes equal D,
+complete D gate/final/spec restoration, controller literal-only delta and intact
+D document prefix. This result note changes only documentation after the test.
+The next step is bounded independent prefreeze criterion/source/effect review,
+then the same-child staged native implementation. Neither the pure results nor
+the separate R2 system-only observation qualify that future loaded adapter,
+installed path, transaction sequence or lifecycle. Operational entry still
+refuses before effect; no freeze, commit, native run, product or installation.
+
+#### Combined primary/release failure criterion, before correction
+
+Independent witness 44a7c7/70c4ba, exit0, on held gate9fc27d54 exposed an
+OSError in got_read followed by release return1: finally replaced the harness
+error with an expected self-release refusal, and the existing refusal oracle
+incorrectly passed. The 89 original cases remain evidence for their old subject;
+the complete held six-file predecessor is preserved in patch SHA256
+`5670486a59ff93f35b0ccb6fb95918d42e85dc929ba43c0213c27f4c0b94378c`.
+Required correction: a primary harness exception remains harness/unjudgeable
+even when release returns a failure or raises another exception. Conversely,
+known primary refusal plus release harness exception is also unjudgeable.
+Every combination still attempts release exactly once and makes zero queries;
+release attempt alone never proves successful balancing or cleanup. Test these
+combinations through the actual existing composition and retain all 89 controls.
+Only exception precedence and causal fixtures change, not a general exception
+framework, native implementation, frozen predecessor or operational entry.
+
+Correction result: df379a/4d69e2, exit0, four actual combined-failure/control
+callables preserve harness classification, one release attempt and zero queries.
+Coherent source-bound 6b1591/f6df48 (pinned PY12 -I -S -B, stdin-selected pure
+definitions), exit0: 92/92 (67 loader including the three new combinations plus
+all 25 D controls), four source/declaration refusals, matching controller spec
+pin, six input files byte-stable. Gate
+8dfbfeeb568fd851a7dee2936bb6873c50c158dd406d4ee388a6f57feb995f31;
+final20b0e9d04485e66e832bdf639cf24789a2ecadc1cb2951e1b8f3316ed0f5fcf6.
+Preservation b509c0: five P product bytes/modes, complete D gate/final/spec,
+controller literal-only and D document prefix unchanged. Diffcheck735075 and
+empty-index26f830 separately exited0. This documentation result note follows the
+test and adds no execution credit. Bounded independent rereview remains next;
+no native implementation/run, whole historical gate, freeze or commit occurred.
+
+#### Dormant native composition criterion, before source implementation
+
+Independent bounded review a23951/e22f4e/dbd120 accepted the 92-case predecessor;
+this is not immutable qualification or native credit. Its exact six-file delta
+is preserved in `h039-loader-before-native-8dfbfeeb.patch`, SHA256
+`c6fb74759f76809a34221986a953831ecada9ba0bc4a2f9fd67ffced65b273b5`.
+The next source must implement the fixed observations behind the same prepare
+callable, not another verdict path or an executable model CLI. The protected
+asset's path, digest and size are fixed; root/non-writable nofollow ancestors,
+regular single-link exact leaf bytes, ACL absence and retained FD/name binding
+are measured from OS primitives before any standard extension import. No missing
+installation may be replaced with a temp/user-writable copy or fixture metadata.
+Retain and rebind the actual asset/ancestors before and after standard load.
+
+Reuse the reviewed R2 finite system-selection/leaf/copy/self-port operations as
+source, never invoke R2 or import its receipt/addresses. Standard import precedes
+actual module-definition/initializer and method-self/function/flags observations;
+bounded copies remain behind complete leaf-range guards. The actual held query
+must enter D's unchanged runner/consumer/validator in the same child. Native
+context must use real standard primitives, never inert_os or inert_socket;
+sequence/request bindings are not supplied by old consumed fixtures.
+
+Test predictions before dormant implementation: missing/unsafe/symlinked asset,
+wrong bytes/ACL or changed retained identity cause zero imports, queries and ACKs.
+The positive fake-OS/API test must use the actual new composition callable and
+D's actual protocol/validator, while observer failures preserve one-time resource
+closure and combined harness/release errors remain unjudgeable. Keep all 92
+previous controls. Final-owned capture must bind exact source bytes into one
+fixed PY39 -I -S -B child with closed environment and reviewed bounded capture;
+it is dormant here, not an authorization to run any child or native operation.
+
+This tranche allows only source preparation and selected pure fake-primitive
+tests. Public operational entry stays closed. Actual protected installation,
+same-child native qualification and fresh transaction/lifecycle remain NOT_RUN;
+no new product path, root action, whole gate, commit or freeze is ordered.
+
+The local proposed asset criterion requires observed root:wheel mode0444, exact
+size/hash and single link (consumer-integration-spec.md240–249); that annex is
+not a frozen installed acceptance policy or operations authority. Its flags,
+xattr/signature and installation crash semantics are explicitly still pending
+there and at324; the illustrative `_ASSET` tuple cannot adopt those decisions.
+The real observer therefore returns measured identities and fixed-FD xattr-list
+size with `NOT_QUALIFIED`, not that tuple. Even an absent ACL and zero xattr size
+cannot open the load boundary. Pure fixtures may exercise the dormant later
+stages and D body, but do not qualify installed metadata or turn fixture context
+into operational authority. ACL acquisition/free errors and any final FD-close
+failure are harness failures, not successful negative evidence. Check actual
+callables with mode0644/0445, gid changes, ACL False/acquisition/free errors,
+each partial-open chain and primary/close failure combinations before review.
+
+The only located real context owner is the consumed r3 diagnostic main4477+:
+fixed request184–195, absent/sequence1 prestate4528–35, consumed reservation and
+actual FDs4591–4606, paired with validator main3994+/validate_protocol3501+
+binding sequence2. It is not a reusable new context. A fresh reviewed context,
+reservation/prestate/sequence relation and matching validator remain a separate
+phase dependency. The operational context provider stays unimplemented/closed;
+no copying of those globals or replay of its consumed reservation is permitted.

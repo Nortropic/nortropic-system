@@ -13,6 +13,1111 @@ a caller path, PID, command, state, nonce, or descriptor.
 
 from __future__ import annotations
 
+# H039_LOADER_BEGIN
+# Pure TEST_AUTHOR decision composition only. No native implementation/selector.
+_H039_LOADER_PARENT = "571a47b8f5fbf1718125742718d2f5908d49e95c"
+_H039_LOADER_PARENT_TREE = "10d70b1b77601b72b07c633510cb12f5ac657b02"
+_H039_LOADER_PARENT_GATE_SHA = "ec3e1e8e3b86f9d4cb6cef7d8b04d21bb7413a1303368e541b33fd1dcda76853"
+_H039_LOADER_PARENT_FINAL_SHA = "e947c81c008e0e6add0cc2df745319626a3eadc17f9110ed87076b4f4a505486"
+_H039_LOADER_PARENT_SPEC_SHA = "b5f108d99c42287f2b2187ad4fa973bce9781e63d5ad9d98b6e51f28b12a6cb0"
+_H039_LOADER_FIXTURE_AST = "1a869ff8e201b2ab4ebed21e8a70d0a2dd4f778cf82f5ae704f71f83dd247882"
+_H039_LOADER_MEMBER_SHA = "db58763f920bc9a21788329e5cd72fb084c9960830f9ad97d87415ec0353f9e5"
+# Finite inert fixture profiles, NOT observed installed metadata/import closure.
+# No native consumer can use these tuples as an authentication implementation.
+_H039_LOADER_STARTUP = (
+    "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+    "0b7aad9bf1adf74d3922cf351f7d2e908dae19edd5456299d162810ae083523d",
+    "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Python3",
+    "26422f0b21cb1e07236384afa4043c7401d39d09358c91df8bf3f5496f14712f",
+    "3.9.6", "arm64", ("-I", "-S", "-B"), "/",
+    (("LANG", "C"), ("LC_ALL", "C"), ("PATH", "/usr/bin:/bin"),
+     ("__CF_USER_TEXT_ENCODING", "0x1F5:0x0:0x7")),
+    ("ctypes", "_ctypes"),
+    ("Python3", "/usr/lib/libSystem.B.dylib"))
+_H039_LOADER_ASSET = (
+    "/Library/PrivilegedHelperTools/se.nortropic.listener-adapter-v1.so",
+    "9f18b8dbc135d9d6e6d2395017e70827aaaf3752a9a0835a94a91b8235fda6ec",
+    51176, 0, 0, 0o100444, 1, 0, (), (),
+    (("/", 0, 0, 0o40755, ()), ("/Library", 0, 0, 0o40755, ()),
+     ("/Library/PrivilegedHelperTools", 0, 0, 0o40755, ())))
+
+
+def h039_loader_parent(raw, kind):
+    """Complete D restoration only, not authentication of new candidate bytes."""
+    import hashlib
+    markers = {"gate": (b"# H039_LOADER_BEGIN\n", b"# H039_LOADER_END\n\n", _H039_LOADER_PARENT_GATE_SHA),
+        "final": (b"# H039_LOADER_FINAL_BEGIN\n", b"# H039_LOADER_FINAL_END\n\n", _H039_LOADER_PARENT_FINAL_SHA)}
+    if type(raw) is not bytes or kind not in markers:
+        raise ValueError("loader parent kind")
+    start, end, digest = markers[kind]
+    if raw.count(start) == raw.count(end) == 1:
+        a, b = raw.index(start), raw.index(end) + len(end)
+        if a >= b:
+            raise ValueError("loader parent span")
+        raw = raw[:a] + raw[b:]
+    if hashlib.sha256(raw).hexdigest() != digest:
+        raise ValueError("loader complete D changed")
+    return raw
+
+
+def h039_loader_prepare(observe):
+    """Pure decisions over explicitly inert observations; not a native loader.
+
+    All callbacks here belong to the selected in-memory fixture. Real OS/file
+    authentication, native observation and executable qualification are absent.
+    A caller tuple or boolean is never operational binding evidence.
+    """
+    def require(value, reason):
+        if not value:
+            raise ValueError("loader refusal: " + reason)
+    def exact(value, expected):
+        if type(value) is not type(expected):
+            return False
+        if type(expected) is tuple:
+            return len(value) == len(expected) and all(exact(a, b) for a, b in zip(value, expected))
+        return value == expected
+    def integer(value):
+        return type(value) is int and 0 < value < 2 ** 64
+    def ranges(value, requests, reason):
+        require(type(value) is tuple and len(value) == len(requests), reason)
+        for row, (address, size, protection) in zip(value, requests):
+            require(type(row) is tuple and len(row) == 10 and all(type(x) is int for x in row)
+                and row[:2] == (0, 12) and 0 <= row[2] <= 16
+                and row[7] == 0 and 0 <= row[8] < 0xffffffff and 0 <= row[9] < 2 ** 16
+                and integer(row[3]) and integer(row[4])
+                and integer(address) and integer(size) and address + size <= 2 ** 64
+                and row[3] + row[4] <= 2 ** 64
+                and row[3] <= address and address + size <= row[3] + row[4]
+                and row[5] in (1, 3, 5) and row[5] & protection == protection
+                and 0 <= row[6] < 2 ** 32, reason)
+    def copied(value, address, size, reason):
+        require(type(value) is tuple and len(value) == 4
+            and type(value[0]) is int and value[0] == address
+            and type(value[1]) is int and value[1] == 0
+            and type(value[2]) is int and value[2] == size
+            and type(value[3]) is bytes and len(value[3]) == size, reason)
+        return value[3]
+    def cstring(raw, expected, reason):
+        require(b"\0" in raw and raw.split(b"\0", 1)[0] == expected, reason)
+    require(exact(observe("startup"), _H039_LOADER_STARTUP), "startup")
+    asset = observe("asset")
+    require(type(asset) is tuple and len(asset) == 2
+        and exact(asset[0], _H039_LOADER_ASSET)
+        and type(asset[1]) is bytes and len(asset[1]) == 1264, "asset")
+    system = observe("system_resolve")
+    require(type(system) is dict and set(system) == {
+        "library", "flags", "symbol", "target", "symbol_start", "image_base",
+        "provider_address", "symbol_address", "handle"}, "system shape")
+    require(system["library"] == "/usr/lib/libSystem.B.dylib"
+        and type(system["flags"]) is int and system["flags"] == 0x16
+        and system["symbol"] == "proc_pidfdinfo"
+        and integer(system["handle"]) and integer(system["target"])
+        and integer(system["image_base"]) and system["image_base"] <= system["target"]
+        and type(system["symbol_start"]) is int and system["symbol_start"] == system["target"]
+        and integer(system["provider_address"]) and integer(system["symbol_address"]),
+        "system selection")
+    target = system["target"]
+    self_port = observe("self_acquire")
+    require(type(self_port) is int and 0 < self_port < 0xffffffff, "self port")
+    primary_error = None
+    try:
+        requests = ((target, 1, 5), (system["provider_address"], 128, 1), (system["symbol_address"], 32, 1))
+        ranges(observe("system_ranges", self_port), requests, "system range")
+        identity = observe("system_identity", self_port)
+        require(type(identity) is tuple and len(identity) == 2, "system copy")
+        provider = copied(identity[0], system["provider_address"], 128, "system copy")
+        symbol = copied(identity[1], system["symbol_address"], 32, "system copy")
+        cstring(provider, b"/usr/lib/system/libsystem_kernel.dylib", "system identity")
+        cstring(symbol, b"proc_pidfdinfo", "system identity")
+        module = observe("load")
+        resolved = observe("adapter_resolve")
+        require(type(resolved) is tuple and len(resolved) == 4
+            and resolved[0] is module and module is not None
+            and integer(resolved[1]) and integer(resolved[2])
+            and integer(resolved[3]) and resolved[3] == resolved[2] + 0x518,
+            "adapter selection")
+        base = resolved[2]
+        requests = ((base, 1264, 1), (base + 0x8110, 8, 1), (base + 0x4090, 8, 1),
+                    (base + 0x518, 1, 5), (base + 0x538, 1, 5))
+        ranges(observe("adapter_ranges", self_port), requests, "adapter range")
+        require(copied(observe("header_read", self_port), base, 1264, "header copy") == asset[1], "header identity")
+        definition = observe("module_def")
+        require(type(definition) is tuple and len(definition) == 2 and definition[0] is module
+            and type(definition[1]) is int and definition[1] == base + 0x8100, "module identity")
+        initializer = copied(observe("initializer_read", self_port), base + 0x8110, 8, "initializer copy")
+        require(int.from_bytes(initializer, "little") == base + 0x518, "initializer identity")
+        actual_method = observe("method_api")
+        require(type(actual_method) is tuple and len(actual_method) == 4
+            and actual_method[0] is module and callable(actual_method[1])
+            and type(actual_method[2]) is int and actual_method[2] == base + 0x538
+            and type(actual_method[3]) is int and actual_method[3] == 8, "method identity")
+        method = actual_method[1]  # first acquisition, after load/module/initializer
+        got = copied(observe("got_read", self_port), base + 0x4090, 8, "GOT copy")
+        require(int.from_bytes(got, "little") == target, "GOT identity")
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        try:
+            released = observe("self_release", self_port)
+            require(type(released) is int and released == 0, "self release")
+        except BaseException:
+            if primary_error is not None and not (type(primary_error) is ValueError
+                    and str(primary_error).startswith("loader refusal: ")):
+                raise primary_error  # release failure must not erase a harness fault
+            raise  # a release harness exception also overrides a known refusal
+    # Port copies are finished; handles/target/module live independently through
+    # the query closure. These inert fixture values are not native handle proof.
+    held = (system["handle"], target, module, resolved[1])
+    called = False
+    def bound_query(fd):
+        nonlocal called
+        require(not called, "duplicate query")
+        called = True
+        retained = held  # keep selected handles/target/module live across method(fd)
+        result = method(fd)
+        return result
+    return bound_query
+
+
+def h039_loader_asset_identity(value):
+    return (value.st_dev, value.st_ino, value.st_mode, value.st_uid, value.st_gid,
+            value.st_nlink, value.st_size, value.st_flags, value.st_mtime_ns, value.st_ctime_ns)
+
+
+def h039_loader_asset_close(io, retained):
+    """Close only this reader's retained FDs once; return failures, never retry."""
+    if retained["closed"]:
+        raise ValueError("asset already closed")
+    retained["closed"] = True
+    failures = []
+    for descriptor in reversed(retained["fds"]):
+        try:
+            io.close(descriptor)
+        except BaseException as error:
+            failures.append((descriptor, type(error).__name__))
+    return failures
+
+
+def h039_loader_asset_rebind(io, acl_empty, retained):
+    """Same fixed asset, retained ancestry/name identities and exact bytes."""
+    import hashlib
+    if retained["closed"]:
+        raise ValueError("closed asset binding")
+    for parent, name, descriptor, identity in retained["bindings"]:
+        if acl_empty(descriptor) is not None:
+            raise OSError("asset ACL checker contract")
+        current = io.fstat(descriptor)
+        named = io.stat(name, follow_symlinks=False) if parent is None else io.stat(
+            name, dir_fd=parent, follow_symlinks=False)
+        if h039_loader_asset_identity(current) != identity or h039_loader_asset_identity(named) != identity:
+            raise ValueError("loader refusal: asset retained identity/name rebind")
+    raw = io.pread(retained["fds"][-1], _H039_LOADER_ASSET[2] + 1, 0)
+    if (len(raw) != _H039_LOADER_ASSET[2]
+            or hashlib.sha256(raw).hexdigest() != _H039_LOADER_ASSET[1]):
+        raise ValueError("loader refusal: asset retained exact bytes")
+    return raw
+
+
+def h039_loader_asset_open(io, acl_empty):
+    """Fixed-path retained reader, derived from D's nofollow/ACL reader.
+
+    Return measured identities and held FDs, NOT the illustrative _ASSET tuple.
+    Native entry supplies real os/ACL functions; inert tests supply fake primitives.
+    No caller-selected path/digest/size, writable fallback or installation.
+    """
+    import stat
+    retained = {"fds": [], "bindings": [], "closed": False}
+    try:
+        current = io.open("/", io.O_RDONLY | io.O_DIRECTORY | io.O_CLOEXEC)
+        retained["fds"].append(current)
+        root = io.fstat(current)
+        if root.st_uid != 0 or root.st_mode & 0o022 or not stat.S_ISDIR(root.st_mode):
+            raise ValueError("loader refusal: asset root authority")
+        if acl_empty(current) is not None:
+            raise OSError("asset ACL checker contract")
+        retained["bindings"].append((None, "/", current, h039_loader_asset_identity(root)))
+        parts = _H039_LOADER_ASSET[0].split("/")[1:]
+        for index, name in enumerate(parts):
+            final = index == len(parts) - 1
+            flags = io.O_RDONLY | io.O_NOFOLLOW | io.O_CLOEXEC | io.O_NONBLOCK
+            if not final:
+                flags |= io.O_DIRECTORY
+            child = io.open(name, flags, dir_fd=current)
+            retained["fds"].append(child)
+            value = io.fstat(child)
+            if value.st_uid != 0 or value.st_mode & 0o022:
+                raise ValueError("loader refusal: asset non-root-writable ancestry")
+            if acl_empty(child) is not None:
+                raise OSError("asset ACL checker contract")
+            if final:
+                if (value.st_mode != 0o100444 or value.st_gid != 0 or value.st_nlink != 1
+                        or value.st_size != _H039_LOADER_ASSET[2]):
+                    raise ValueError("loader refusal: asset exact root:wheel 0444 single-link leaf")
+            elif not stat.S_ISDIR(value.st_mode):
+                raise ValueError("loader refusal: asset ancestor type")
+            retained["bindings"].append((current, name, child, h039_loader_asset_identity(value)))
+            current = child
+        retained["raw"] = h039_loader_asset_rebind(io, acl_empty, retained)
+        return retained
+    except BaseException as primary:
+        failures = h039_loader_asset_close(io, retained)
+        if failures:
+            primary.h039_asset_close_failures = failures
+            if isinstance(primary, ValueError):
+                raise OSError("asset close failure after refusal") from primary
+        raise
+
+
+def h039_loader_acl_empty(api, descriptor):
+    """Fixed FD ACL presence check; API/free faults are not metadata refusals."""
+    api.set_errno(0)
+    pointer = api.acl_get_fd_np(descriptor, 0x100)
+    error = api.get_errno()
+    if pointer is None or (type(pointer) is int and pointer == 0):
+        if type(error) is int and error == 2:  # ENOENT: no extended ACL
+            return None
+        raise OSError("asset ACL acquisition failed")
+    if type(pointer) is not int or not 0 < pointer < 2 ** 64:
+        raise OSError("asset ACL pointer malformed")
+    result = api.acl_free(pointer)  # exactly once for the acquired ACL
+    if type(result) is not int or result != 0:
+        raise OSError("asset ACL release failed")
+    raise ValueError("loader refusal: asset ACL present")
+
+
+def h039_loader_xattr_size(api, descriptor):
+    """Observe only fixed-FD list size; no names/values and no invented policy."""
+    api.set_errno(0)
+    result = api.flistxattr(descriptor, None, 0, 0)
+    error = api.get_errno()
+    if (type(result) is not int or not 0 <= result <= 2 ** 63 - 1
+            or type(error) is not int or error != 0):
+        raise OSError("asset xattr observation failed")
+    return result  # zero is a fact, not a frozen signature/xattr policy
+
+
+def h039_loader_leaf_valid(row, address, size, protection):
+    return (type(row) is tuple and len(row) == 10 and all(type(x) is int for x in row)
+        and row[:2] == (0, 12) and 0 <= row[2] <= 16 and row[7] == 0
+        and 0 <= row[8] < 0xffffffff and 0 <= row[9] < 2 ** 16
+        and type(address) is int and type(size) is int
+        and 0 < address < 2 ** 64 and 0 < size < 2 ** 64
+        and 0 < row[3] < 2 ** 64 and 0 < row[4] < 2 ** 64
+        and address + size <= 2 ** 64 and row[3] + row[4] <= 2 ** 64
+        and row[3] <= address and address + size <= row[3] + row[4]
+        and row[5] in (1, 3, 5) and row[5] & protection == protection
+        and 0 <= row[6] < 2 ** 32)
+
+
+def h039_loader_observation_factory(io, api, qualify_asset, import_asset, startup):
+    """Actual ordered observation plumbing; injected primitives are test-only.
+
+    The no-argument native factory below fixes all real primitives. In particular
+    it does NOT provide a successful metadata policy or production context.
+    """
+    state = {"index": 0, "asset": None, "port": None, "released": False,
+             "system": None, "module": None, "resolved": None, "ranges": {},
+             "definition": None, "method": None, "closed": False}
+    stages = ("startup", "asset", "system_resolve", "self_acquire", "system_ranges",
+              "system_identity", "load", "adapter_resolve", "adapter_ranges",
+              "header_read", "module_def", "initializer_read", "method_api", "got_read")
+    def require(ok, reason):
+        if not ok:
+            raise ValueError("loader refusal: " + reason)
+    def ranged(port, requests):
+        rows = []
+        for request in requests:
+            row = api.region(port, request[0])
+            require(h039_loader_leaf_valid(row, *request), "native leaf range")
+            state["ranges"][request[:2]] = True
+            rows.append(row)
+        return tuple(rows)
+    def copy(port, address, size):
+        require(state["ranges"].get((address, size)) is True, "unguarded copy")
+        row = api.copy(port, address, size)
+        require(type(row) is tuple and len(row) == 4
+            and type(row[0]) is int and row[0] == address
+            and type(row[1]) is int and row[1] == 0
+            and type(row[2]) is int and row[2] == size
+            and type(row[3]) is bytes and len(row[3]) == size, "native exact copy")
+        return row
+    def observe(stage, *args):
+        require(not state["closed"], "closed native observer")
+        if stage == "self_release":
+            require(len(args) == 1 and state["port"] is not None
+                and type(args[0]) is int and args[0] == state["port"]
+                and not state["released"], "self release ownership")
+            state["released"] = True  # attempt once, even when the API raises
+            return api.release(args[0])
+        require(state["index"] < len(stages) and stage == stages[state["index"]], "observation order")
+        state["index"] += 1
+        uses_port = stage in ("system_ranges", "system_identity", "adapter_ranges",
+                              "header_read", "initializer_read", "got_read")
+        require(len(args) == (1 if uses_port else 0), "observation arguments")
+        if uses_port:
+            require(type(args[0]) is int and args[0] == state["port"]
+                and not state["released"], "copy port ownership")
+        if stage == "startup":
+            return startup()
+        if stage == "asset":
+            retained = h039_loader_asset_open(io, lambda fd: h039_loader_acl_empty(api, fd))
+            state["asset"] = retained
+            retained["xattr_list_size"] = h039_loader_xattr_size(api, retained["fds"][-1])
+            return (qualify_asset(retained), retained["raw"][:1264])
+        if stage == "system_resolve":
+            state["system"] = api.select()
+            return state["system"]
+        if stage == "self_acquire":
+            port = api.acquire()
+            if type(port) is int and 0 < port < 0xffffffff:
+                state["port"] = port
+            return port
+        if stage == "system_ranges":
+            system = state["system"]
+            return ranged(args[0], ((system["target"], 1, 5),
+                (system["provider_address"], 128, 1), (system["symbol_address"], 32, 1)))
+        if stage == "system_identity":
+            system = state["system"]
+            provider = copy(args[0], system["provider_address"], 128)
+            require(b"\0" in provider[3] and provider[3].split(b"\0", 1)[0]
+                == b"/usr/lib/system/libsystem_kernel.dylib", "native provider identity")
+            symbol = copy(args[0], system["symbol_address"], 32)
+            require(b"\0" in symbol[3] and symbol[3].split(b"\0", 1)[0]
+                == b"proc_pidfdinfo", "native symbol identity")
+            return (provider, symbol)
+        if stage == "load":
+            retained = state["asset"]
+            require(retained is not None, "asset not retained")
+            h039_loader_asset_rebind(io, lambda fd: h039_loader_acl_empty(api, fd), retained)
+            require(h039_loader_xattr_size(api, retained["fds"][-1]) == retained["xattr_list_size"],
+                    "asset xattr size changed")
+            state["module"] = import_asset(retained)  # real path stays closed below
+            h039_loader_asset_rebind(io, lambda fd: h039_loader_acl_empty(api, fd), retained)
+            require(h039_loader_xattr_size(api, retained["fds"][-1]) == retained["xattr_list_size"],
+                    "asset post-load xattr size changed")
+            return state["module"]
+        if stage == "adapter_resolve":
+            state["resolved"] = api.adapter_resolve(state["module"])
+            return state["resolved"]
+        if stage == "adapter_ranges":
+            base = state["resolved"][2]
+            return ranged(args[0], ((base, 1264, 1), (base + 0x8110, 8, 1),
+                (base + 0x4090, 8, 1), (base + 0x518, 1, 5), (base + 0x538, 1, 5)))
+        if stage == "header_read":
+            return copy(args[0], state["resolved"][2], 1264)
+        if stage == "module_def":
+            definition = api.module_def(state["module"])
+            if type(definition) is int and definition == state["resolved"][2] + 0x8100:
+                state["definition"] = definition
+            return (state["module"], definition)
+        if stage == "initializer_read":
+            require(state["definition"] is not None, "module definition before field read")
+            return copy(args[0], state["resolved"][2] + 0x8110, 8)
+        if stage == "method_api":
+            state["method"] = api.method(state["module"])
+            return state["method"]
+        if stage == "got_read":
+            require(state["definition"] is not None and state["method"] is not None,
+                    "method/module before GOT read")
+            return copy(args[0], state["resolved"][2] + 0x4090, 8)
+        raise AssertionError("finite native observation stage")
+    def finish():
+        require(not state["closed"], "duplicate observer finish")
+        state["closed"] = True
+        failures = []
+        if state["port"] is not None and not state["released"]:
+            state["released"] = True
+            try:
+                result = api.release(state["port"])
+                if type(result) is not int or result != 0:
+                    failures.append(("self_port", "release result"))
+            except BaseException as error:
+                failures.append(("self_port", type(error).__name__))
+        if state["asset"] is not None:
+            failures.extend(h039_loader_asset_close(io, state["asset"]))
+        if failures:
+            raise OSError("native observer final resource failure: " + repr(failures))
+    return observe, finish
+
+
+def h039_loader_native_api():
+    """Dormant fixed native source. Normal OS/CLT startup is a trust assumption.
+
+    ctypes/_ctypes/PyDLL(None) startup is native bootstrap, not native-load-free.
+    No proc_pidfdinfo invocation, pointer string dereference or fallback exists.
+    """
+    import ctypes
+    import struct
+    import types
+    import sys
+    if (ctypes.sizeof(ctypes.c_void_p) != 8 or ctypes.sizeof(ctypes.c_uint32) != 4
+            or ctypes.sizeof(ctypes.c_uint64) != 8 or sys.byteorder != "little"):
+        raise ValueError("loader refusal: native LP64")
+    class DlInfo(ctypes.Structure):
+        _fields_ = [(name, ctypes.c_void_p) for name in ("fname", "fbase", "sname", "saddr")]
+    class Native:
+        def __init__(self):
+            self.handle = ctypes.CDLL("/usr/lib/libSystem.B.dylib", mode=0x16, use_errno=True)
+            self.adapter_handle = None
+            self.functions = {}
+            self.set_errno, self.get_errno = ctypes.set_errno, ctypes.get_errno
+            for name, arguments, result in (
+                ("acl_get_fd_np", [ctypes.c_int, ctypes.c_int], ctypes.c_void_p),
+                ("acl_free", [ctypes.c_void_p], ctypes.c_int),
+                ("flistxattr", [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int], ctypes.c_ssize_t)):
+                function = getattr(self.handle, name)
+                function.argtypes, function.restype = arguments, result
+                setattr(self, name, function)
+        def select(self):
+            for name in ("proc_pidfdinfo", "dladdr", "mach_vm_region_recurse", "task_self_trap",
+                         "mach_vm_read_overwrite", "mach_port_deallocate"):
+                self.functions[name] = getattr(self.handle, name)
+            function = self.functions["dladdr"]
+            function.argtypes, function.restype = [ctypes.c_void_p, ctypes.POINTER(DlInfo)], ctypes.c_int
+            function = self.functions["mach_vm_region_recurse"]
+            function.argtypes = [ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64),
+                ctypes.POINTER(ctypes.c_uint32), ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)]
+            function.restype = ctypes.c_int
+            self.functions["task_self_trap"].argtypes = []
+            self.functions["task_self_trap"].restype = ctypes.c_uint32
+            function = self.functions["mach_vm_read_overwrite"]
+            function.argtypes = [ctypes.c_uint32, ctypes.c_uint64, ctypes.c_uint64,
+                                 ctypes.c_uint64, ctypes.POINTER(ctypes.c_uint64)]
+            function.restype = ctypes.c_int
+            function = self.functions["mach_port_deallocate"]
+            function.argtypes, function.restype = [ctypes.c_uint32, ctypes.c_uint32], ctypes.c_int
+            target = ctypes.cast(self.functions["proc_pidfdinfo"], ctypes.c_void_p).value
+            info = DlInfo()
+            if not target or self.functions["dladdr"](target, ctypes.byref(info)) != 1:
+                raise ValueError("loader refusal: system dladdr")
+            return {"library": "/usr/lib/libSystem.B.dylib", "flags": 0x16, "symbol": "proc_pidfdinfo",
+                "target": target, "symbol_start": info.saddr or 0, "image_base": info.fbase or 0,
+                "provider_address": info.fname or 0,
+                "symbol_address": info.sname or 0, "handle": self.handle._handle}
+        def acquire(self):
+            return self.functions["task_self_trap"]()
+        def region(self, port, address):
+            current, size = ctypes.c_uint64(address), ctypes.c_uint64(0)
+            depth, count = ctypes.c_uint32(16), ctypes.c_uint32(12)
+            buffer = ctypes.create_string_buffer(48)
+            result = self.functions["mach_vm_region_recurse"](port, ctypes.byref(current), ctypes.byref(size),
+                ctypes.byref(depth), buffer, ctypes.byref(count))
+            if result != 0 or count.value != 12:
+                return (result, count.value, depth.value, current.value, size.value, 0, 0, 0, 0, 0)
+            raw = buffer.raw
+            return (result, count.value, depth.value, current.value, size.value,
+                struct.unpack_from("<I", raw, 0)[0], struct.unpack_from("<I", raw, 4)[0],
+                struct.unpack_from("<I", raw, 32)[0], struct.unpack_from("<I", raw, 20)[0],
+                struct.unpack_from("<H", raw, 46)[0])
+        def copy(self, port, address, cap):
+            if cap not in (8, 32, 128, 1264):
+                raise ValueError("loader refusal: fixed native copy size")
+            buffer, actual = ctypes.create_string_buffer(cap), ctypes.c_uint64(0)
+            result = self.functions["mach_vm_read_overwrite"](port, address, cap,
+                ctypes.addressof(buffer), ctypes.byref(actual))
+            return (address, result, actual.value, buffer.raw)
+        def release(self, port):
+            return self.functions["mach_port_deallocate"](port, port)
+        def standard_import(self):
+            import importlib.machinery
+            import importlib.util
+            loader = importlib.machinery.ExtensionFileLoader("_h039_listener_v1", _H039_LOADER_ASSET[0])
+            spec = importlib.util.spec_from_file_location("_h039_listener_v1", _H039_LOADER_ASSET[0], loader=loader)
+            module = importlib.util.module_from_spec(spec)  # actual initializer runs here
+            loader.exec_module(module)
+            return module
+        def adapter_resolve(self, module):
+            self.adapter_handle = ctypes.CDLL(_H039_LOADER_ASSET[0], mode=0x16, use_errno=True)
+            exported = getattr(self.adapter_handle, "PyInit__h039_listener_v1")
+            address = ctypes.cast(exported, ctypes.c_void_p).value
+            info = DlInfo()
+            if not address or self.functions["dladdr"](address, ctypes.byref(info)) != 1:
+                raise ValueError("loader refusal: adapter dladdr")
+            return (module, self.adapter_handle._handle, info.fbase or 0, address)
+        def module_def(self, module):
+            function = ctypes.pythonapi.PyModule_GetDef
+            function.argtypes, function.restype = [ctypes.py_object], ctypes.c_void_p
+            return function(module) or 0
+        def method(self, module):
+            method = getattr(module, "query_received_listener")
+            if type(method) is not types.BuiltinFunctionType:
+                raise ValueError("loader refusal: actual builtin method type")
+            functions = []
+            for name, restype in (("PyCFunction_GetSelf", ctypes.c_void_p),
+                    ("PyCFunction_GetFunction", ctypes.c_void_p), ("PyCFunction_GetFlags", ctypes.c_int)):
+                function = getattr(ctypes.pythonapi, name)
+                function.argtypes, function.restype = [ctypes.py_object], restype
+                functions.append(function)
+            actual_self = functions[0](method)
+            return (module if actual_self == id(module) else None,
+                    method, functions[1](method) or 0, functions[2](method))
+    return Native()  # NOLOAD handles stay retained until the owned child exits
+
+
+def h039_loader_native_factory():
+    """Dormant real factory; installed metadata qualification remains closed."""
+    import os
+    import sys
+    import platform
+    if (sys.platform != "darwin" or sys.version_info[:3] != (3, 9, 6)
+            or sys.executable != _H039_LOADER_STARTUP[0] or platform.machine() != "arm64"
+            or not sys.flags.isolated or not sys.flags.no_site or not sys.dont_write_bytecode
+            or sys.argv != ["-c"] or os.getcwd() != "/"
+            or tuple(sorted(os.environ.items())) != _H039_LOADER_STARTUP[8]):
+        raise ValueError("loader refusal: fixed native startup")
+    api = h039_loader_native_api()
+    def startup():
+        # Existing D source authenticator; no pathname-selected executable.
+        h039_asset_draft_retained_read(_H039_LOADER_STARTUP[0], _H039_LOADER_STARTUP[1], 101280, True)
+        h039_asset_draft_retained_read(_H039_LOADER_STARTUP[2], _H039_LOADER_STARTUP[3], 5864880, True)
+        return _H039_LOADER_STARTUP  # finite checked startup profile, not all-image origin
+    def qualify_asset(retained):
+        return {"qualification": "NOT_QUALIFIED", "identities": tuple(row[3] for row in retained["bindings"]),
+                "xattr_list_size": retained["xattr_list_size"]}
+    def import_asset(retained):
+        # No installed metadata/signature policy is frozen. No caller boolean,
+        # fixture tuple or old receipt may activate api.standard_import here.
+        raise ValueError("loader refusal: installed asset policy not qualified")
+    return h039_loader_observation_factory(os, api, qualify_asset, import_asset, startup)
+
+
+def h039_loader_with_observer(observe, finish, body):
+    """One composition boundary used by inert D tests; body is not authority."""
+    primary = None
+    try:
+        query = h039_loader_prepare(observe)
+        return body(query)
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        try:
+            finish()
+        except BaseException:
+            if primary is not None and not (type(primary) is ValueError
+                    and str(primary).startswith("loader refusal: ")):
+                raise primary
+            raise
+
+
+def h039_loader_observer_case(raw, payload, case):
+    """Inert OS/API actual-callable fixture; payload is authenticated P data only."""
+    import hashlib
+    import types
+    if type(payload) is not bytes or len(payload) != 51176 or hashlib.sha256(payload).hexdigest() != _H039_LOADER_ASSET[1]:
+        raise ValueError("loader fixture payload identity")
+    events, finishes, opened, closed = [], [], [], []
+    module = object()
+    class IO:
+        O_RDONLY, O_DIRECTORY, O_CLOEXEC, O_NOFOLLOW, O_NONBLOCK = 0, 1, 2, 4, 8
+        def __init__(self):
+            self.values, self.names = {}, {}
+        def open(self, name, flags, dir_fd=None):
+            index = len(opened)
+            if case == "open" + str(index):
+                raise OSError("inert partial open failure")
+            if index and flags & (self.O_NOFOLLOW | self.O_NONBLOCK | self.O_CLOEXEC) != 14:
+                raise RuntimeError("inert missing nofollow/nonblock/cloexec")
+            fd = 10 + index
+            opened.append(fd)
+            self.names[(dir_fd, name)] = fd
+            mode, gid = (0o100444 if index == 3 else 0o40755), 0
+            if index == 3:
+                if case == "mode0644": mode = 0o100644
+                if case == "mode0445": mode = 0o100445
+                if case == "gid": gid = 20
+            self.values[fd] = types.SimpleNamespace(st_dev=1, st_ino=fd, st_mode=mode,
+                st_uid=0, st_gid=gid, st_nlink=1, st_size=len(payload) if index == 3 else 0,
+                st_flags=0, st_mtime_ns=1, st_ctime_ns=1)
+            return fd
+        def fstat(self, fd):
+            if case == "stat" + str(fd - 10):
+                raise OSError("inert partial stat failure")
+            return self.values[fd]
+        def stat(self, name, dir_fd=None, follow_symlinks=False):
+            value = self.values[self.names[(dir_fd, name)]]
+            if case == "rebind" and len(opened) == 4:
+                changed = types.SimpleNamespace(**vars(value)); changed.st_ino += 1
+                return changed
+            return value
+        def pread(self, fd, count, offset):
+            if (fd, count, offset) != (13, 51177, 0):
+                raise RuntimeError("inert bounded asset read")
+            return b"x" + payload[1:] if case in ("bytes", "refusal_close") else payload
+        def close(self, fd):
+            closed.append(fd)
+            if case in ("close", "harness_close", "refusal_close") and fd in (13, 11):
+                raise OSError("inert close failure")
+    class API:
+        def __init__(self, method):
+            self.acquired, self.error, self.region_count, self.copy_count = method, 0, 0, 0
+        def set_errno(self, error): self.error = error
+        def get_errno(self): return self.error
+        def acl_get_fd_np(self, fd, kind):
+            if kind != 0x100: raise RuntimeError("inert ACL kind")
+            self.error = 2
+            if fd == 13:
+                if case == "acl_acquire": self.error = 5
+                if case == "acl_false": return False
+                if case in ("acl_present", "acl_free"): self.error = 0; return 42
+            return None
+        def acl_free(self, pointer):
+            events.append("acl_free")
+            if pointer != 42: raise RuntimeError("inert ACL ownership")
+            return 1 if case == "acl_free" else 0
+        def flistxattr(self, fd, pointer, count, options):
+            if (fd, pointer, count, options) != (13, None, 0, 0): raise RuntimeError("inert xattr request")
+            self.error = 0
+            return -1 if case == "xattr_error" else 0
+        def select(self):
+            events.append("select")
+            return {"library": "/usr/lib/libSystem.B.dylib", "flags": 0x16, "symbol": "proc_pidfdinfo",
+                "target": 0x300080, "image_base": 0x300000, "symbol_start": 0x300080,
+                "provider_address": 0x302080, "symbol_address": 0x303080, "handle": 17}
+        def acquire(self):
+            events.append("acquire")
+            return 0 if case == "null" else 257
+        def release(self, port):
+            if port != 257: raise RuntimeError("inert release ownership")
+            events.append("release")
+            if case in ("release_error", "harness_release"): raise OSError("inert release failure")
+            return 1 if case == "release_bad" else 0
+        def region(self, port, address):
+            if port != 257: raise RuntimeError("inert region port")
+            self.region_count += 1; events.append("region")
+            protection = 5 if address in (0x300080, 0x100000, 0x100518, 0x100538) else 3
+            value = [0, 12, 2, address, 4096, protection, 7, 0, 0, 0]
+            if case == "range" + str(self.region_count): value[7] = 1
+            if case == "rwx" and self.region_count == 1: value[5] = 7
+            return tuple(value)
+        def copy(self, port, address, count):
+            if port != 257: raise RuntimeError("inert copy port")
+            self.copy_count += 1; events.append("copy")
+            if address == 0x104090 and case in ("harness_close", "harness_release"):
+                raise OSError("inert primary GOT failure")
+            values = {0x302080: b"/usr/lib/system/libsystem_kernel.dylib".ljust(128, b"\0"),
+                0x303080: b"proc_pidfdinfo".ljust(32, b"\0"), 0x100000: payload[:1264],
+                0x108110: (0x100518).to_bytes(8, "little"),
+                0x104090: (0 if case == "got" else 0x300080).to_bytes(8, "little")}
+            value = values[address]
+            if len(value) != count: raise RuntimeError("inert fixed copy address/size")
+            if case == "copy" + str(self.copy_count): value = value[:-1]
+            return (address, 0, len(value), value)
+        def adapter_resolve(self, actual):
+            if actual is not module: raise RuntimeError("inert returned module")
+            return (actual, 18, 0x100000, 0x100518)
+        def module_def(self, actual): return 0x108200 if case == "definition" else 0x108100
+        def method(self, actual):
+            events.append("method")
+            return (None if case == "method_self" else actual, self.acquired, 0x100538, 8)
+    io = IO()
+    def hook(actual_D_method):
+        api = API(actual_D_method)
+        def profile(retained):
+            # Only this explicitly inert fixture supplies an illustrative policy.
+            # No native factory calls this callback or accepts it as authority.
+            return {"qualification": "NOT_QUALIFIED"} if case == "policy" else _H039_LOADER_ASSET
+        def imported(retained): events.append("load"); return module
+        observe, finish = h039_loader_observation_factory(io, api, profile, imported, lambda: _H039_LOADER_STARTUP)
+        finishes.append(finish)
+        query = h039_loader_prepare(observe)
+        def traced(fd): events.append("query"); return query(fd)
+        return traced
+    scope = h039_loader_fixture_namespace(raw, hook)
+    observation, error, primary = None, None, None
+    try:
+        observation = scope["h039_verifier_inert_fixture"]("positive")
+    except BaseException as caught:
+        primary = caught
+        error = ("refusal" if type(caught) is ValueError and str(caught).startswith("loader refusal: ")
+                 else "harness")
+    finally:
+        for finish in finishes:
+            try: finish()
+            except BaseException:
+                error = "harness"  # final resource fault never earns negative credit
+    return {"case": case, "events": events, "opened": opened, "closed": closed,
+        "error": error, "D_effect": observation is not None and scope["h039_verifier_inert_effect"](observation),
+        "credit": "PURE_FAKE_OS_API_ONLY", "native": "NOT_RUN"}
+
+
+def h039_loader_observer_rows(raw, container):
+    """Bound P fixture bytes, then independent finite effect/count expectations."""
+    import hashlib
+    def payload(value):
+        if (type(value) is not bytes or len(value) != 181960 or hashlib.sha256(value).hexdigest()
+                != "563fcecdf4b4d7625baee7cffa09db53f087a63d437a2846e28912dbd4a598a3"):
+            raise ValueError("loader fixture P container")
+        part = value[123120:174296]
+        if len(part) != 51176 or hashlib.sha256(part).hexdigest() != _H039_LOADER_ASSET[1]:
+            raise ValueError("loader fixture P section")
+        return part
+    part = payload(container)
+    rows = []
+    for label, mutant in (("container_changed", b"x" + container[1:]),
+                          ("container_short", container[:-1]), ("container_type", bytearray(container))):
+        try: payload(mutant)
+        except ValueError: rows.append({"case": label, "ok": True})
+        else: rows.append({"case": label, "ok": False})
+    cases = [("positive", None), ("mode0644", "refusal"), ("mode0445", "refusal"),
+        ("gid", "refusal"), ("bytes", "refusal"), ("rebind", "refusal"),
+        ("acl_present", "refusal"), ("acl_acquire", "harness"), ("acl_free", "harness"),
+        ("acl_false", "harness"), ("xattr_error", "harness"), ("null", "refusal"),
+        ("rwx", "refusal"), ("definition", "refusal"), ("method_self", "refusal"),
+        ("got", "refusal"), ("release_bad", "refusal"), ("release_error", "harness"),
+        ("close", "harness"), ("harness_close", "harness"), ("harness_release", "harness"),
+        ("refusal_close", "harness"), ("policy", "refusal")]
+    cases += [(kind + str(i), "harness") for kind in ("open", "stat") for i in range(4)]
+    cases += [("range" + str(i), "refusal") for i in (1, 2, 3, 4, 8)]
+    cases += [("copy" + str(i), "refusal") for i in (1, 2, 3, 4, 5)]
+    for case, expected in cases:
+        value = h039_loader_observer_case(raw, part, case)
+        events = value["events"]
+        ok = value["error"] == expected and value["closed"] == list(reversed(value["opened"]))
+        ok = ok and len(set(value["closed"])) == len(value["closed"])
+        if case == "positive":
+            ok = ok and value["D_effect"] and events.count("query") == events.count("release") == 1
+            ok = ok and events.index("release") < events.index("query")
+        elif case != "close": ok = ok and "query" not in events
+        if case.startswith("range"):
+            count = int(case[5:]); ok = ok and events.count("region") == count
+            ok = ok and events.count("copy") == (0 if count <= 3 else 2)
+        if case.startswith("copy"): ok = ok and events.count("copy") == int(case[4:])
+        if case in ("range1", "range2", "range3", "rwx"): ok = ok and events.count("copy") == 0
+        if case == "definition": ok = ok and events.count("copy") == 3 and "method" not in events
+        if "acquire" in events and case != "null": ok = ok and events.count("release") == 1
+        else: ok = ok and "release" not in events
+        if (case.startswith(("open", "stat", "mode", "acl")) or case in
+                ("gid", "bytes", "rebind", "refusal_close", "policy", "xattr_error")):
+            ok = ok and "select" not in events and "load" not in events
+        rows.append({"case": "native_source_" + case, "ok": bool(ok), "observation": value})
+    return rows
+
+
+def h039_loader_spec(raw):
+    """Exact one new member; complete D spec restoration and strict JSON types."""
+    import hashlib
+    import json
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate loader spec key")
+            result[key] = value
+        return result
+    start = b'      "h039_local_loader_decision_v1": {\n'
+    end = b'      "h039_local_verifier_py39_v1": {\n'
+    if type(raw) is not bytes or raw.count(start) != 1 or raw.count(end) != 1:
+        return False
+    try:
+        a, b = raw.index(start), raw.index(end)
+        rows = [x for x in json.loads(raw, object_pairs_hook=unique)["tasks"] if x["id"] == "h-039"]
+        if len(rows) != 1 or a >= b:
+            return False
+        member = rows[0]["h039_local_loader_decision_v1"]
+        block = ('      "h039_local_loader_decision_v1": ' + json.dumps(member,
+            indent=2, ensure_ascii=True, allow_nan=False).replace("\n", "\n      ") + ",\n").encode()
+        return (raw[a:b] == block and hashlib.sha256(raw[:a] + raw[b:]).hexdigest() == _H039_LOADER_PARENT_SPEC_SHA
+            and hashlib.sha256(json.dumps(member, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True, allow_nan=False).encode()).hexdigest() == _H039_LOADER_MEMBER_SHA)
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
+def h039_loader_fixture_namespace(raw, hook):
+    """Reuse exact D fixture, change only its query primitive binding in memory."""
+    import __future__
+    import ast
+    import hashlib
+    body = ast.parse(h039_loader_parent(raw, "gate")).body
+    selected = []
+    for node in body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id.startswith("_H039_VERIFIER_")):
+            ast.literal_eval(node.value)
+            selected.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in (
+                "h039_verifier_inert_fixture", "h039_verifier_inert_effect", "h039_verifier_semantic_rows"):
+            if node.name == "h039_verifier_inert_fixture":
+                if hashlib.sha256(ast.dump(node, include_attributes=False).encode()).hexdigest() != _H039_LOADER_FIXTURE_AST:
+                    raise ValueError("loader exact fixture AST")
+                edits = 0
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Dict):
+                        for index, key in enumerate(child.keys):
+                            if isinstance(key, ast.Constant) and key.value == "query_received_listener":
+                                value = child.values[index]
+                                if not isinstance(value, ast.Name) or value.id != "adapter":
+                                    raise ValueError("loader query hook anchor")
+                                child.values[index] = ast.Call(func=ast.Name(id="h039_loader_hook", ctx=ast.Load()),
+                                    args=[value], keywords=[])
+                                edits += 1
+                if edits != 1:
+                    raise ValueError("loader query hook cardinality")
+            selected.append(node)
+    scope = {"h039_loader_hook": hook}
+    exec(compile(ast.fix_missing_locations(ast.Module(body=selected, type_ignores=[])),
+        "<exact-D-inert-fixture-one-primitive-hook>", "exec",
+        flags=__future__.annotations.compiler_flag, dont_inherit=True), scope)
+    return scope
+
+
+def h039_loader_model_case(raw, case):
+    """Inert range/copy/API stages connected to exact D decisions, not native."""
+    if case not in {"positive", "slide", "startup", "startup_pin", "startup_env", "startup_import",
+            "asset", "asset_bytes", "asset_mode", "asset_acl", "asset_ancestor",
+            "system_library", "system_flags", "system_symbol", "system_start", "system_handle",
+            "system_base_zero", "system_base_after",
+            "system_range", "system_rx", "system_count", "system_errno", "system_overflow",
+            "system_provider", "system_no_nul", "system_copy_short", "system_copy_error",
+            "module", "adapter_range", "adapter_count", "initializer_range", "got_range",
+            "header_mismatch", "header_short", "module_def", "module_def_null", "initializer",
+            "initializer_short", "initializer_error", "unknown", "refusal_then_match", "method",
+            "method_address", "method_flags", "got_address", "got_target", "got_short", "got_error", "harness_error",
+            "self_null", "self_dead", "self_bool", "self_release", "self_release_bool",
+            "self_release_error", "load_error", "system_depth", "system_submap", "system_tag",
+            "system_rwx", "system_highbits", "system_bool", "system_straddle", "adapter_submap",
+            "method_self", "method_substitution", "harness_release_bad",
+            "harness_release_error", "refusal_release_error"}:
+        raise ValueError("unknown fixed loader model case")
+    events = []
+    module = object()
+    base = 0x200000 if case == "slide" else 0x100000
+    target = 0x400180 if case == "slide" else 0x300080
+    provider_address, symbol_address = target + 0x2000, target + 0x3000
+    # Synthetic preauthenticated fixture prefix; not a claimed actual P header.
+    prefix = b"MODEL-ONLY-PREFIX" + b"\0" * (1264 - 17)
+    def region(address, size, protection):
+        return (0, 12, 2, address, size, protection, protection, 0, 0, 0)
+    def copy(address, value):
+        return (address, 0, len(value), value)
+    def hook(method):
+        def observe(stage, port=None):
+            nonlocal method
+            events.append(stage)
+            if stage in ("system_ranges", "system_identity", "adapter_ranges", "header_read",
+                         "initializer_read", "got_read", "self_release") and port != 257:
+                raise RuntimeError("inert self-port argument mismatch")
+            if case == "harness_error" and stage == "system_ranges":
+                raise OSError("injected inert range error")
+            if case == "load_error" and stage == "load":
+                raise OSError("injected inert load error")
+            if stage == "self_acquire":
+                return {"self_null": 0, "self_dead": 0xffffffff, "self_bool": True}.get(case, 257)
+            if stage == "self_release":
+                if case in ("self_release_error", "harness_release_error", "refusal_release_error"):
+                    raise OSError("injected inert release error")
+                return {"self_release": 1, "self_release_bool": False, "harness_release_bad": 1}.get(case, 0)
+            if stage == "startup":
+                value = list(_H039_LOADER_STARTUP)
+                if case == "startup_pin": value[1] = "0" * 64
+                if case == "startup_env": value[8] += (("DYLD_INSERT_LIBRARIES", "x"),)
+                if case == "startup_import": value[9] += ("site",)
+                return () if case == "startup" else tuple(value)
+            if stage == "asset":
+                value = list(_H039_LOADER_ASSET)
+                if case == "asset_bytes": value[1] = "0" * 64
+                if case == "asset_mode": value[5] = 0o100644
+                if case == "asset_acl": value[8] = ("allow write",)
+                if case == "asset_ancestor": value[10] = ()
+                return () if case == "asset" else (tuple(value), prefix)
+            if stage == "system_resolve":
+                value = {"library": "/usr/lib/libSystem.B.dylib", "flags": 0x16,
+                    "symbol": "proc_pidfdinfo", "target": target, "symbol_start": target, "image_base": target - 0x80,
+                    "provider_address": provider_address, "symbol_address": symbol_address, "handle": 17}
+                defects = {"system_library": ("library", ""), "system_flags": ("flags", 6),
+                    "system_symbol": ("symbol", "getpid"), "system_start": ("symbol_start", target - 4),
+                    "system_handle": ("handle", 0), "system_base_zero": ("image_base", 0),
+                    "system_base_after": ("image_base", target + 1)}
+                if case in defects:
+                    key, replacement = defects[case]; value[key] = replacement
+                return value
+            if stage == "system_ranges":
+                value = [region(target, 1, 5), region(provider_address, 128, 1),
+                         region(symbol_address, 32, 1)]
+                if case == "system_range": value[1] = region(provider_address + 1, 128, 1)
+                if case == "system_rx": value[0] = region(target, 1, 1)
+                if case == "system_overflow": value[1] = region(provider_address, 2 ** 64, 1)
+                if case == "system_straddle": value[1] = region(provider_address, 127, 1)
+                changes = {"system_count": (1, 11), "system_errno": (0, 5),
+                    "system_depth": (2, 17), "system_submap": (7, 1), "system_tag": (8, 0xffffffff),
+                    "system_rwx": (5, 7), "system_highbits": (5, 0x80000005), "system_bool": (1, True)}
+                if case in changes:
+                    index, replacement = changes[case]
+                    changed = list(value[0]); changed[index] = replacement; value[0] = tuple(changed)
+                return tuple(value)
+            if stage == "system_identity":
+                path = b"/usr/lib/system/libsystem_kernel.dylib"
+                name = b"proc_pidfdinfo"
+                if case == "system_provider": path = b"/usr/lib/libSystem.B.dylib"
+                p = copy(provider_address, path + b"\0" * (128 - len(path)))
+                s = copy(symbol_address, name + b"\0" * (32 - len(name)))
+                if case == "system_no_nul": p = copy(provider_address, b"x" * 128)
+                if case == "system_copy_short": p = copy(provider_address, p[3][:-1])
+                if case == "system_copy_error": p = (provider_address, 1, 128, p[3])
+                return (p, s)
+            if stage == "load":
+                return module
+            if stage == "adapter_resolve":
+                return (object() if case == "module" else module, 18, base, base + 0x518)
+            if stage == "adapter_ranges":
+                value = [region(base, 1264, 5), region(base + 0x8110, 8, 3),
+                    region(base + 0x4090, 8, 3), region(base + 0x518, 1, 5), region(base + 0x538, 1, 5)]
+                if case == "adapter_range": value[0] = region(base, 1263, 5)
+                if case == "initializer_range": value[1] = region(base + 0x8111, 8, 3)
+                if case == "got_range": value[2] = region(base + 0x4090, 7, 3)
+                if case == "adapter_count": value[0] = (0, 11, 2, base, 1264, 5, 5, 0, 0, 0)
+                if case == "adapter_submap": value[0] = (0, 12, 16, base, 1264, 5, 5, 1, 0, 0)
+                return tuple(value)
+            if stage == "header_read":
+                value = prefix
+                if case == "header_mismatch": value = b"x" + value[1:]
+                if case == "header_short": value = value[:-1]
+                return copy(base, value)
+            if stage == "module_def":
+                return (module, 0 if case == "module_def_null" else
+                        base + (0x8200 if case == "module_def" else 0x8100))
+            if stage == "initializer_read":
+                address = base + 0x518
+                if case in ("initializer", "unknown", "refusal_then_match"): address = 0
+                if case == "refusal_then_match" and events.count(stage) > 1: address = base + 0x518
+                value = address.to_bytes(8, "little")
+                if case == "initializer_short": value = value[:-1]
+                if case == "unknown": return None
+                result = copy(base + 0x8110, value)
+                return (result[0], 1, result[2], result[3]) if case == "initializer_error" else result
+            if stage == "method_api":
+                return (object() if case == "method_self" else module, object() if case == "method" else method,
+                        base + (0x518 if case == "method_address" else 0x538),
+                        1 if case == "method_flags" else 8)
+            if stage == "got_read":
+                if case in ("harness_release_bad", "harness_release_error"):
+                    raise OSError("injected primary GOT harness error")
+                if case == "method_substitution": method = object()
+                value = (target + (4 if case in ("got_target", "refusal_release_error") else 0)).to_bytes(8, "little")
+                if case == "got_short": value = value[:-1]
+                result = copy(base + (0x4098 if case == "got_address" else 0x4090), value)
+                return (result[0], 1, result[2], result[3]) if case == "got_error" else result
+            raise RuntimeError("unexpected inert stage")
+        query = h039_loader_prepare(observe)
+        def traced_query(fd):
+            events.append("query")
+            return query(fd)
+        return traced_query
+    scope = h039_loader_fixture_namespace(raw, hook)
+    observation = None
+    refusal = None
+    failure = None
+    try:
+        observation = scope["h039_verifier_inert_fixture"]("positive")
+    except ValueError as exc:
+        if not str(exc).startswith("loader refusal: "):
+            raise
+        refusal = str(exc)
+    except OSError as exc:
+        failure = type(exc).__name__
+    return {"case": case, "events": events, "refusal": refusal, "harness_error": failure,
+        "observation": observation, "effect": observation is not None and
+            scope["h039_verifier_inert_effect"](observation), "credit": "PURE_MODEL_ONLY"}
+
+
+def h039_loader_model_rows(raw):
+    """Independent refusal-stage oracle; bad ranges cannot reach copy callbacks."""
+    order = ["startup", "asset", "system_resolve", "self_acquire", "system_ranges", "system_identity",
+        "load", "adapter_resolve", "adapter_ranges", "header_read", "module_def",
+        "initializer_read", "method_api", "got_read", "self_release", "query"]
+    expected = [
+        ("positive", "query", None), ("slide", "query", None),
+        ("startup", "startup", "startup"), ("startup_pin", "startup", "startup"),
+        ("startup_env", "startup", "startup"), ("startup_import", "startup", "startup"),
+        ("asset", "asset", "asset"), ("asset_bytes", "asset", "asset"),
+        ("asset_mode", "asset", "asset"), ("asset_acl", "asset", "asset"),
+        ("asset_ancestor", "asset", "asset"),
+        ("system_library", "system_resolve", "system selection"),
+        ("system_flags", "system_resolve", "system selection"),
+        ("system_symbol", "system_resolve", "system selection"),
+        ("system_start", "system_resolve", "system selection"),
+        ("system_handle", "system_resolve", "system selection"),
+        ("system_base_zero", "system_resolve", "system selection"),
+        ("system_base_after", "system_resolve", "system selection"),
+        ("system_range", "system_ranges", "system range"),
+        ("system_rx", "system_ranges", "system range"),
+        ("system_count", "system_ranges", "system range"),
+        ("system_errno", "system_ranges", "system range"),
+        ("system_overflow", "system_ranges", "system range"),
+        ("system_provider", "system_identity", "system identity"),
+        ("system_no_nul", "system_identity", "system identity"),
+        ("system_copy_short", "system_identity", "system copy"),
+        ("system_copy_error", "system_identity", "system copy"),
+        ("module", "adapter_resolve", "adapter selection"),
+        ("adapter_range", "adapter_ranges", "adapter range"),
+        ("adapter_count", "adapter_ranges", "adapter range"),
+        ("initializer_range", "adapter_ranges", "adapter range"),
+        ("got_range", "adapter_ranges", "adapter range"),
+        ("header_mismatch", "header_read", "header identity"),
+        ("header_short", "header_read", "header copy"),
+        ("module_def", "module_def", "module identity"),
+        ("module_def_null", "module_def", "module identity"),
+        ("initializer", "initializer_read", "initializer identity"),
+        ("initializer_short", "initializer_read", "initializer copy"),
+        ("initializer_error", "initializer_read", "initializer copy"),
+        ("unknown", "initializer_read", "initializer copy"),
+        ("refusal_then_match", "initializer_read", "initializer identity"),
+        ("method", "method_api", "method identity"),
+        ("method_address", "method_api", "method identity"),
+        ("method_flags", "method_api", "method identity"),
+        ("got_address", "got_read", "GOT copy"), ("got_target", "got_read", "GOT identity"),
+        ("got_short", "got_read", "GOT copy"), ("got_error", "got_read", "GOT copy"),
+        ("harness_error", "system_ranges", "HARNESS_ERROR"),
+        ("self_null", "self_acquire", "self port"), ("self_dead", "self_acquire", "self port"),
+        ("self_bool", "self_acquire", "self port"),
+        ("self_release", "self_release", "self release"),
+        ("self_release_bool", "self_release", "self release"),
+        ("self_release_error", "self_release", "HARNESS_ERROR"),
+        ("load_error", "load", "HARNESS_ERROR"),
+        ("system_depth", "system_ranges", "system range"),
+        ("system_submap", "system_ranges", "system range"),
+        ("system_tag", "system_ranges", "system range"),
+        ("system_rwx", "system_ranges", "system range"),
+        ("system_highbits", "system_ranges", "system range"),
+        ("system_bool", "system_ranges", "system range"),
+        ("system_straddle", "system_ranges", "system range"),
+        ("adapter_submap", "adapter_ranges", "adapter range"),
+        ("method_self", "method_api", "method identity"),
+        ("method_substitution", "query", None),
+        ("harness_release_bad", "got_read", "HARNESS_ERROR"),
+        ("harness_release_error", "got_read", "HARNESS_ERROR"),
+        ("refusal_release_error", "got_read", "HARNESS_ERROR")]
+    rows = []
+    for case, last, reason in expected:
+        result = h039_loader_model_case(raw, case)
+        expected_events = order[:order.index(last) + 1]
+        if order.index("self_acquire") < order.index(last) < order.index("self_release"):
+            expected_events += ["self_release"]
+        ok = result["events"] == expected_events
+        if reason is None:
+            ok = (ok and result["effect"] is True and result["refusal"] is None
+                and result["harness_error"] is None and result["observation"]["adapter_calls"] == [("adapter", 100)]
+                and result["observation"]["actual_validator_accepted"] is True)
+        else:
+            ok = (ok and result["observation"] is None and result["effect"] is False
+                and ((reason == "HARNESS_ERROR" and result["harness_error"] == "OSError" and result["refusal"] is None)
+                    or (reason != "HARNESS_ERROR" and result["harness_error"] is None
+                        and result["refusal"] == "loader refusal: " + reason)))
+        rows.append({"id": "loader:" + case, "ok": ok})
+    old = h039_loader_fixture_namespace(raw, lambda method: method)
+    rows.extend(old["h039_verifier_semantic_rows"]())
+    return rows
+
+
+if __name__ == "__main__":
+    import sys as _h039_loader_sys
+    print("LOADER_CONTRACT_DRAFT_NO_EXECUTION_OR_NATIVE_CREDIT", file=_h039_loader_sys.stderr)
+    raise SystemExit(2)
+# H039_LOADER_END
+
 # H039_PY39_BEGIN
 # Separate compatibility successor. The complete qualified C below is immutable.
 _H039_PY39_PARENT = "83f75968b9892ae98a6a879178c407d2a6fd935e"
