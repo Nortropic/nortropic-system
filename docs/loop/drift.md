@@ -1,5 +1,47 @@
 # Att köra loopen
 
+## 2026-09-16 — REGLER REVIDERAS RENT. Arkeologin flyttad till sina rätta hem. 227 → 184 rader.
+
+Ägaren: *"när vi ändrar regler varför skriver man över istället för revidera och ta bort?"*
+
+**Mätt:** `regler.md` växte **92 → 228 rader på en dag**, 13 % rättelsetext.
+
+### Varför jag gjorde så — och varför det ändå var fel
+
+Projektets felklass var att **rättelser försvann**: tretton falska påståenden överlevde
+för att ingen kunde se att de rättats. Så jag behöll spåret i regeln.
+
+Men en regel är **ett påstående om vad som gäller nu**. Den ska gå att läsa i ett svep och
+lyda. Proveniensen har redan två hem byggda för ändamålet:
+
+| Hem | Bär |
+|---|---|
+| `docs/05-beslutslogg.md` | Beslutet — vem, när, varför, motargumentet |
+| `docs/loop/drift.md` | Fyndet — mätningen som fällde det gamla |
+
+Att lägga arkeologin i regeln är ett kategorifel. Och det gör regeln svårare att **lyda**:
+en regel på 228 rader skummas. `11-tre-vakter-mot-aterfall.md` säger det om sig själv —
+*"en vakt som skriker varg blir ignorerad, och en ignorerad vakt är värre än ingen."*
+
+### Orsaken är densamma som gav 470 rader utan ägarhand
+
+**När proveniens saknar hemvist landar den i närmaste dokument.** Skillnaden här: hemvisten
+fanns. Jag använde den inte, utan skrev både beslutet och arkeologin i regeln.
+
+### Utfört, och verifierat FÖRE borttagning
+
+Varje struken text prövades mot beslutsloggen och drift innan den togs bort — **alla åtta
+fanns**. Efteråt: **18 av 18** gällande regler intakta, **noll** arkeologiblock,
+innehållet kvar i sina rätta hem.
+
+**Ingen historik gick förlorad. En dubblett togs bort.**
+
+### Konventionen står nu överst i filen
+
+> Regeln revideras rent. Skälet, citatet och mätningen går till beslutslogg och drift.
+> Här står högst en rad: *(Skärpt \<datum\>, `LOOP-ÄGARBESLUT-X`.)*
+
+
 ## 2026-09-16 — PUBLICERINGSBEFOGENHETEN SAMMANJÄMKAD. Fem lager, en paragraf.
 
 Ägaren: *"varför har vi merge no på dessa ställen?"* → *"fixa detta"*.
