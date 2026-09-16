@@ -188,7 +188,7 @@ static __attribute__((unused)) int receive_frame(int fd,unsigned char **out,size
 }
 
 static int exact_names(int directory,const char*const*allowed,size_t allowed_count,unsigned required){
-  int scan=dup(directory);if(scan<0)return 0;DIR*stream=fdopendir(scan);if(!stream){close(scan);return 0;}unsigned seen=0;int ok=1;struct dirent*entry;errno=0;while((entry=readdir(stream))!=NULL){if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,".."))continue;size_t index;for(index=0;index<allowed_count;index++)if(!strcmp(entry->d_name,allowed[index]))break;if(index==allowed_count||index>=sizeof(unsigned)*8U||(seen&(1U<<index))){ok=0;break;}seen|=1U<<index;}if(errno)ok=0;if(closedir(stream))ok=0;return ok&&(seen&required)==required;
+  struct stat original_before,scan_identity,original_after;if(fstat(directory,&original_before)||!S_ISDIR(original_before.st_mode))return 0;int scan=openat(directory,".",O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW_ANY);if(scan<0)return 0;if(fstat(scan,&scan_identity)||!same_stat(&original_before,&scan_identity)){close(scan);return 0;}DIR*stream=fdopendir(scan);if(!stream){close(scan);return 0;}unsigned seen=0;int ok=1;struct dirent*entry;errno=0;while((entry=readdir(stream))!=NULL){if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,".."))continue;size_t index;for(index=0;index<allowed_count;index++)if(!strcmp(entry->d_name,allowed[index]))break;if(index==allowed_count||index>=sizeof(unsigned)*8U||(seen&(1U<<index))){ok=0;break;}seen|=1U<<index;}if(errno)ok=0;if(closedir(stream))ok=0;if(fstat(directory,&original_after)||!same_stat(&original_before,&original_after))ok=0;return ok&&(seen&required)==required;
 }
 static int exact_empty(int directory){return exact_names(directory,NULL,0,0);}
 
