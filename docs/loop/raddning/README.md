@@ -49,6 +49,27 @@ saknas, och ändå rapporterar grönt, är exakt det fel `check-docs-coherence` 
 
 Senaste körning i repot: `artefakter/valideringskorning-2026-09-16-linux.txt`.
 
+## Regel 12 — tre prov mot arbete som bara finns på en maskin
+
+```bash
+bash docs/loop/raddning/artefakter/inventera-lokalt-arbete.sh   # LÄSER BARA
+```
+
+Klassar varje worktree och gren som `I_MAIN` (säkrad), `PA_REMOTE` (säkrad så länge grenen
+finns) eller **`FORALDRALOS`** (finns ingenstans på origin — försvinner vid städning).
+
+**Varför den finns:** 2026-09-16 rapporterades sex poster utanför origin. Inventeringen
+fann **259**, varav 92 var detached HEAD-worktrees som `git branch` per konstruktion inte
+listar. En detached HEAD-commit hålls vid liv enbart av sin worktree.
+
+| Prov | Gör |
+|---|---|
+| `inventera-lokalt-arbete.sh` | Läser. Domen |
+| `radda-lokalt-arbete.sh` | Pushar grenar och föräldralösa HEADs. Additiv, torrkörning som standard |
+| `radda-okommitterat.sh` | Säkrar okommitterat arbete via tempindex — **rör aldrig ett arbetsträd** |
+
+Alla tre är mutationsprövade åt båda hållen. De tog 259 → 0.
+
 ## Och kör detta PÅ MACEN innan något byggs
 
 ```bash
@@ -105,14 +126,26 @@ Räkna med ett fjortonde fel.
 | `10-forsta-arbetspaketet-h014.md` | Första bygget. Redan specad i repot; bara grinden saknas |
 | `11-tre-vakter-mot-aterfall.md` | **Mekanismerna mot återfall** — tre vakter, var och en med ett KÖRT positivt kontrollprov |
 | `12-arbetsorder.md` | **⭐ ARBETSORDERN.** EFTERARBETE.md:s elva punkter omprövade mot HEAD 2026-09-16: åtta åtgärdade, en utgår, tre kvarstår |
+| `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
 
-**⚠️ LÄS `SEPARATION-20260910/` FÖRE DETTA UNDERLAG.** Separationen 2026-09-10 bär sin
-egen dokumentation: `README.md` (ägarbeslut och allokeringsprinciper), `ALLOCATION.tsv`
+**⚠️ LÄS `SEPARATION-20260910/` FÖRE DETTA UNDERLAG — den finns INTE på `main`.**
+Den ligger på plattformsgrenen. Leta inte, hämta:
+
+```bash
+git fetch origin nortropic/platform-integration-20260910
+B=origin/nortropic/platform-integration-20260910
+git show $B:SEPARATION-20260910/README.md       # ägarbeslut och allokeringsprinciper
+git show $B:SEPARATION-20260910/ALLOCATION.tsv  # 443 filbeslut
+git ls-tree --name-only $B SEPARATION-20260910/ # hela katalogen
+```
+
+*Sökvägen tillagd 2026-09-16: raden stod tidigare utan den, vilket hade skickat läsaren
+att leta efter en katalog som inte finns i klonen.* Separationen bär sin egen
+dokumentation: `README.md` (ägarbeslut och allokeringsprinciper), `ALLOCATION.tsv`
 (443 filbeslut), `EFTERARBETE.md` (11 mätta kvarvarande bindningar med utpekad ägare) och
 proveniens per fil. **Arbetsordern ligger där, inte här.** Detta underlag är bakgrund,
 metod och diagnos — och det skrevs delvis utan kännedom om separationens dokumentation,
 vilket gav FYND 26: en rekommendation som upphävde ett ägarbeslut.
-| `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
 
 ## ⚠️ Två artefakter är ÖVERFLÖDIGA — använd dem inte
 

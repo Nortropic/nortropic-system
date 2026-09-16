@@ -7,6 +7,20 @@ ersätter alla tidigare versioner.
 DIN FÖRSTA UPPGIFT — OCH LÄS SEPARATION-20260910/ INNAN DU RÖR NÅGOT
 ══════════════════════════════════════════════════════════════════════════════
 
+⚠️ SEPARATION-20260910/ FINNS INTE PÅ main. Den ligger på plattformsgrenen.
+   Leta inte — hämta den så här:
+
+     git fetch origin nortropic/platform-integration-20260910
+     B=origin/nortropic/platform-integration-20260910
+     git show $B:SEPARATION-20260910/README.md        # ägarbeslut, allokeringsprinciper
+     git show $B:SEPARATION-20260910/EFTERARBETE.md   # 11 mätta bindningar
+     git show $B:SEPARATION-20260910/ALLOCATION.tsv   # 443 filbeslut, femdelad dom
+     git ls-tree --name-only $B SEPARATION-20260910/  # hela katalogen
+
+   Att INTE läsa den gav FYND 26: en rekommendation som upphävde ett ägarbeslut.
+   Raden ovan stod tidigare utan sökväg, vilket hade skickat dig att leta efter
+   en katalog som inte finns i din klon. Rättat 2026-09-16.
+
 LÄS docs/loop/raddning/12-arbetsorder.md. Den är arbetsordern för DET SOM GÖRS NU.
 
 Underlaget är större än så, och varje del har ett syfte. README.md listar alla:
@@ -18,6 +32,23 @@ Underlaget är större än så, och varje del har ett syfte. README.md listar al
   12  arbetsordern nu
 Och diagnosen: 00 premissen, 01 lägesbilden, 02 bevisen, 04 grindfällorna,
 05 arbetsordningen (autonomi, tripwires, blockeringskontrakt), 06 kartan.
+
+FEM KÖRBARA PROV i docs/loop/raddning/artefakter/, alla mutationsprövade åt
+BÅDA hållen — de fäller bevisligen, och de blir bevisligen gröna:
+
+  validera-underlaget.sh      37 av underlagets tal mot repot. Kör FÖRST.
+                              Grönt = talen är oförändrade, ALDRIG att de är sanna.
+  matning-pa-macen.sh         h-015:s 14 beroendegrindar mot en Linux-baslinje.
+                              Vägrar i en git-worktree — skälet är mätt (FYND 32).
+  inventera-lokalt-arbete.sh  regel 12: finns arbetet på git eller bara här?
+                              Klassar I_MAIN / PA_REMOTE / FORALDRALOS.
+  radda-lokalt-arbete.sh      pushar det som bara finns lokalt. Additiv,
+                              torrkörning som standard, aldrig --force.
+  radda-okommitterat.sh       säkrar okommitterat arbete via tempindex UTAN
+                              att röra arbetsträdet.
+
+De tre sista kördes 2026-09-16 och tog 259 poster som bara fanns på ägarens
+maskin till 0. Kör inventeringen vid varje överlämning — regel 12a.
 
 SEPARATION-20260910/EFTERARBETE.md är sann för 2026-09-10 men FÖRÅLDRAD som
 arbetsorder: den skrevs vid commit dae90c8f, och grenen har gått 48 commits sedan
@@ -89,7 +120,14 @@ STATUS PÅ MAIN, SOM DU MÅSTE KÄNNA TILL:
   på grenen nortropic/platform-integration-20260910 (55 commits före main,
   0 bakom) och kan inte mergas förrän punkt 3 är gjord.
 
-  Arbeta på den grenen. Inte på main.
+  ⚠️ MÄT PÅ main, BYGG PÅ GRENEN — det är inte samma sak, och ORDNINGEN
+  längst ned börjar därför med main. Skälet: mätningen 2026-09-16 kördes på en
+  arbetsgren, och h-012 läser HEAD-commitens ändrade filer, så main kan ge ett
+  annat utfall för just den grinden. Kartan ska verifieras där den påstås gälla.
+
+  Steg 1 (mätning) sker alltså på main, i en RIKTIG KLON — inte i en worktree,
+  provet vägrar där och skälet är mätt (FYND 32). Allt BYGGARBETE sker sedan på
+  nortropic/platform-integration-20260910. Aldrig committa på main.
 
 ══════════════════════════════════════════════════════════════════════════════
 TVÅ NYA LOOP-REGLER — LÄS docs/loop/regler.md FÖRE ALLT ARBETE

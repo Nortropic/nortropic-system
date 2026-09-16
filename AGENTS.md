@@ -132,8 +132,8 @@ Codex egen utsaga är inte owner-bevis. Ett grönt exit-test rapporteras med fak
 
 ### ⚠️ LÄS FÖRST: BEVARANDE och PUBLICERING är inte samma sak (regel 12a, 2026-09-16)
 
-`PUSH=NO / MERGE=NO` nedan gäller **PUBLICERING**. Det har aldrig gällt **BEVARANDE**, och
-att läsa det så är vad som gav ~300 lokala grenar, en `main` 493 commits efter origin och
+Publiceringsparagrafen nedan gäller **PUBLICERING**. Den har aldrig gällt **BEVARANDE**, och
+att läsa den så är vad som gav ~300 lokala grenar, en `main` 493 commits efter origin och
 veckan med 55 opushade commits som ingen såg på sex dagar.
 
 | | Vad | Trust-innebörd | Vem |
@@ -146,24 +146,74 @@ någon.** Kör `bash scripts/nortropic-autocommit.sh "<vad du gjorde>"` vid varj
 arbetssteg och alltid innan du slutar. Den vägrar på `main`, lägger §A-ytor i en egen
 `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`-commit, pushar aldrig med `--force` och mergar aldrig.
 
-**§A bevarad är inte §A auktoriserad.** Regel 6 står orörd: en §A-ÄNDRING kräver fortfarande
-människohand och en rad i `docs/05-beslutslogg.md`. Autocommiten hindrar bara att arbetet
-försvinner. Att blanda ihop *kan* och *får* är vad `SELF_CERTIFICATION_AS_PROOF=NO`
+**§A bevarad är inte §A auktoriserad.** En ändring på §A-KONTROLLENS yta — `CLAUDE.md`,
+`AUTOPILOT`, `workflows/**`, `tests/fixtures/**`, `check-invariants.mjs`,
+`agents/nortropic-steward.md`, webbens två styrdokument, de två `skills/`-referenserna —
+kräver människohand och en rad i `docs/05-beslutslogg.md`.
+
+*(Skärpt 2026-09-16, `LOOP-ÄGARBESLUT-AUTONOM-KARNA`: `controller/**`, `specs/**` och
+`verify/**` omfattas INTE längre. De skyddas av `allowed_write` per task, rollseparationen
+och de frysta exitproven — den mekaniska vakten var alltid `allowed_write`, ägarhanden var
+en sats i prosa. Autocommitens `[HÖGRISK-OGRANSKAD]`-märkning gäller därför nu bara
+§A-kontrollens yta.)*
+
+Autocommiten hindrar bara att arbetet försvinner. Att blanda ihop *kan* och *får* är vad `SELF_CERTIFICATION_AS_PROOF=NO`
 förbjuder.
 
 **Att lämna arbete okommitterat eller opushat är ett FEL, inte försiktighet.** Rollseparationen
 hindrar en byggare från att attestera sin egen kandidat — aldrig från att spara sitt arbete.
 
-### Publicering
+### Publicering — GÄLLANDE BEFOGENHET, 2026-09-16
 
-Standard är:
+**Denna paragraf ersätter `PUSH=NO / MERGE=NO` och de fyra lager som byggdes ovanpå den.**
+Beslutad av Johnny (`LOOP-ÄGARBESLUT-PUBLICERING-V2`). Den är en **sammanjämkning av vad
+som redan var beslutat fyra gånger**, inte en ny befogenhet.
 
-```text
-PUSH=NO
-MERGE=NO
-```
+| Vem | Får publicera | Skäl |
+|---|---|---|
+| **Rollagent** — test-author, builder, reviewer | **NEJ, aldrig** | Rollseparationen ÄR integriteten: den som bygger får inte attestera sin egen kandidat |
+| **Den som driver kedjan** — autopiloten, eller Codex i arkitekt-/exekverarroll | **JA, utan ny prompt per transition** | Efter de mekaniska identity/scope/gate/reviewer-kontrollerna |
 
-Detta gäller PUBLICERING: attestation, PR och merge till `main`. Publicera eller merga endast när användaren uttryckligen har gett den befogenheten för den aktuella fasen och projektets gates tillåter det.
+**Scope: hela vägen till `KERNEL_COMPLETE`** — inte en namngiven tasklista.
+
+> ⚠️ Skälet till att scopet inte namnger task: delegationens
+> `remaining-bootstrap-delegation-v1.md` scopade till
+> `H-035 → H-034 → H-033 → H-032 → H-031 → supervisor resume`, och **h-031, h-032 och
+> h-035 avslutades `OVERIFIERAT` 2026-09-16**. Tre av fem namngivna task var döda, och
+> publiceringsbefogenheten hängde på dem. En befogenhet som namnger task dör med tasken.
+
+**Oförändrat, och det är detta som bär trusten:**
+
+- `NO_FORCE_SEMANTICS=YES` — aldrig `--force`, rebase, amend, reset eller cherry-pick
+- Guarded normal merge-commit, aldrig squash eller rebase-merge
+- Frysta `exit_test` förblir trust authority; `SELF_CERTIFICATION_AS_PROOF=NO`
+- Omedelbart före merge relockas repo, base-ref, `origin/main`, arbetsträd, kandidat,
+  fjärrgren och PR-refs enligt delegationens *Guarded publication*
+- Saknad evidens avvisar. Ny policy-/arkitekturfråga, odömbart gateutfall, oväntad
+  remote-identity eller no-progress stoppar fail-closed
+
+**Historiken står kvar nedan** — operating model v1, v2, v3 och Harness Substitution
+Amendment v1 — som proveniens, inte som gällande text. Vid konflikt gäller denna paragraf.
+
+<details>
+<summary>Varför den behövde skrivas (mätt 2026-09-16)</summary>
+
+Fem befogenhetslager på fyra dagar, alla `[LOOP] ÄGARHAND`, inget som gick tillbaka och
+ändrade det första:
+
+| Datum | Lager | Sade |
+|---|---|---|
+| 2026-08-10 | operating model v1 | `PUSH=NO` · `MERGE=NO` |
+| 2026-08-10 | operating model v2 | autopiloten FÅR publicera, PR:a, merga |
+| 2026-08-10 | operating model v3 | full roadmap autonomy |
+| 2026-08-11 | Harness Substitution Amendment v1 | — |
+| 2026-08-13 | delegationen | `OWNER_MERGE_APPROVAL_REQUIRED=NO` |
+
+Den som läste uppifrån mötte `MERGE=NO` först och undantagen hundra rader ner. Och
+delegationens scope pekade på en kedja som sedan dog. Två utfall, båda dåliga: agenten
+stannar och frågar, eller antar att han får.
+
+</details>
 
 För den strikt avgränsade kvarvarande bootstrapkedjan H-035 → H-034 → H-033 →
 H-032 → H-031 → supervisor-resume → första verkliga autonoma start gäller den

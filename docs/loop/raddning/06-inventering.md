@@ -523,7 +523,7 @@ resume är blockerad av en task som inte existerar.
 | Task | Slice | Beror på | Gate | Status |
 |---|---|---|---|---|
 | `h-001`–`h-013` | 1–11 | kedjade | ✓ | **EJ verifierat som grupp.** Körda 2026-09-16: `h-001`, `h-002`, `h-003`, `h-005`–`h-008`, `h-010` gröna; `h-004`, `h-009`, `h-011`, `h-012`, `h-013` **RÖDA** |
-| **`h-014`** | 12 | h-013 **OVERIFIERAT** (se `10-...h014.md` §1) | **SAKNAS** | *"Notisen — Slack från controllern."* Byggbar så snart `h-013` prövats grön **på Macen** |
+| **`h-014`** | 12 | h-013 **RÖD, mätt 2026-09-16** (FYND 33 · se `10-forsta-arbetspaketet-h014.md` §1) | **SAKNAS** | *"Notisen — Slack från controllern."* Byggbar så snart `h-013` prövats grön **på Macen** |
 | **`h-015`** | 13 | h-010 **GRÖN**, h-013 **RÖD**, h-016 **RÖD**, h-004 **RÖD**, **h-030 ✗** | **SAKNAS** | *"Återtaget — återstart efter avbrott."* **Detta ÄR supervisor resume.** Rättat 2026-09-16 (FYND 33): här stod ✓ på alla fyra, satt av att grindfilerna finns. Körda på Macen faller tre |
 | `h-016` | 14 | h-011, h-012, h-013 | ✓ | **RÖD** — 11 PASS / 14 FAIL på Macen, attestation sker aldrig (FYND 33) |
 | `h-017` | 15 | h-002, h-016 | ✓ | klar |
