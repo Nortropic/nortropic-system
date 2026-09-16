@@ -1883,3 +1883,27 @@ attempt only at a strictly later absent slot, then the actual run/capture/envelo
 bind that exact slot. An actual preseeded same-second product call rejects before provider
 start; rollback, stall, preseed and missing-current-effect controls reject independently. The
 barrier cannot grant product credit. Production and the guarded exact live positive are unchanged.
+
+### 2026-08-21 — H032/H031 R90 complete owner-live protocol
+
+Independent review showed that R89 isolated the call but did not yet close the transport:
+the plan omitted the exact child environment, publication used replacement, interruption
+could leave a session-escaped descendant, and the barrier mistook its release second for
+the only admissible current run.
+
+R90 carries the complete normalized child environment in the private strict plan and
+compares only its SHA-256 in results and evidence. Plan and result are owner-private,
+fsynced and published without replacement; the matching stable-read nonce/devino/digest
+channel is consumed and removed once. Signals are blocked across child assignment. The
+helper owns a new child session, binds descendants by stable PID/start identity before
+reparenting, and synchronously applies TERM, grace, KILL and wait. An escaped-session
+fixture must stop delayed writes and report at least two tracked identities. The shell
+bounds plan readiness and post-helper processing, while accepted full live still delegates
+the sole lifetime to the product and skip alone remains 120 seconds.
+
+The R74 barrier now supplies only a strict lower bound. Any actual well-formed current run
+strictly later than the predecessor is accepted and becomes the next predecessor, including
+multi-second advances. Same-second collision, rollback, stall, preseed and deletion of the
+actual current product run after one provider start reject. These are rig sensitivity facts,
+not product credit; production, provider authority, G20 and the sole prebuilder RED remain
+unchanged.

@@ -27,12 +27,13 @@ import signal
 import stat
 from subprocess import PIPE, Popen, TimeoutExpired
 import sys
+import threading
 import time
 
 MAX_PLAN_BYTES = 65536
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
-PLAN_READY_SECONDS = 300
 SKIP_SECONDS = 120
+GRACE_SECONDS = 5
 HEX = frozenset("0123456789abcdef")
 
 
@@ -51,12 +52,13 @@ def strict_json(raw: bytes):
     return json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=pairs)
 
 
-def regular_nofollow_read(path: Path, maximum: int):
+def regular_nofollow_read(path: Path, maximum: int, *, single_link: bool = True):
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     fd = os.open(path, flags)
     try:
         before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        if (not stat.S_ISREG(before.st_mode)
+                or (single_link and before.st_nlink != 1)):
             raise RuntimeError("nonregular input")
         chunks = []
         total = 0
@@ -78,8 +80,9 @@ def regular_nofollow_read(path: Path, maximum: int):
         os.close(fd)
 
 
-def sha256_path(path: Path) -> str:
-    raw, _identity = regular_nofollow_read(path, MAX_OUTPUT_BYTES)
+def sha256_path(path: Path, *, single_link: bool = True) -> str:
+    raw, _identity = regular_nofollow_read(
+        path, MAX_OUTPUT_BYTES, single_link=single_link)
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -90,8 +93,9 @@ def absolute_regular_executable(path: Path, expected_sha: str):
         st = path.stat()
     except OSError:
         return None
-    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
-            or not os.access(path, os.X_OK) or sha256_path(path) != expected_sha):
+    if (not stat.S_ISREG(st.st_mode) or st.st_nlink < 1
+            or not os.access(path, os.X_OK)
+            or sha256_path(path, single_link=False) != expected_sha):
         return None
     return st
 
@@ -100,16 +104,34 @@ def valid_hex(value, length: int) -> bool:
     return isinstance(value, str) and len(value) == length and all(char in HEX for char in value)
 
 
+def environment_valid(value) -> bool:
+    if not isinstance(value,dict) or len(value)>512:
+        return False
+    encoded=0
+    for key,item in value.items():
+        if (not isinstance(key,str) or not key or "\x00" in key or "=" in key
+                or not isinstance(item,str) or "\x00" in item):
+            return False
+        encoded+=len(key.encode("utf-8"))+len(item.encode("utf-8"))+2
+        if encoded>262144:
+            return False
+        if (key.startswith(("GIT_","DYLD_","H032_","GH_","GITHUB_","SLACK_"))
+                or key in {"LD_PRELOAD","LD_LIBRARY_PATH","__PYVENV_LAUNCHER__"}):
+            return False
+    return True
+
+
 def plan_valid(plan, result_path: Path) -> bool:
     keys = {"schema_version", "nonce", "purpose", "mode", "argv", "cwd",
-            "result_path", "executable_sha256"}
+            "result_path", "executable_sha256", "environment"}
     if not isinstance(plan, dict) or set(plan) != keys:
         return False
     if (plan.get("schema_version") != 1 or not valid_hex(plan.get("nonce"), 64)
             or plan.get("purpose") not in {"H032_OWNER_LIVE", "H031_H032_DEPENDENCY"}
             or plan.get("mode") not in {"full", "skip"}
             or plan.get("result_path") != str(result_path)
-            or not valid_hex(plan.get("executable_sha256"), 64)):
+            or not valid_hex(plan.get("executable_sha256"), 64)
+            or not environment_valid(plan.get("environment"))):
         return False
     argv = plan.get("argv")
     if (not isinstance(argv, list) or not 1 <= len(argv) <= 16
@@ -123,8 +145,8 @@ def plan_valid(plan, result_path: Path) -> bool:
             and result_path.parent.is_dir() and not result_path.parent.is_symlink())
 
 
-def atomic_write(path: Path, raw: bytes) -> None:
-    temporary = path.with_name(path.name + ".tmp")
+def atomic_write_new(path: Path, raw: bytes) -> None:
+    temporary = path.with_name(path.name + ".tmp-" + os.urandom(16).hex())
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(temporary, flags, 0o600)
     try:
@@ -134,12 +156,70 @@ def atomic_write(path: Path, raw: bytes) -> None:
         os.fsync(fd)
     finally:
         os.close(fd)
-    os.replace(temporary, path)
+    try:
+        os.link(temporary,path,follow_symlinks=False)
+    finally:
+        os.unlink(temporary)
     parent_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
         os.fsync(parent_fd)
     finally:
         os.close(parent_fd)
+
+
+def process_snapshot():
+    observer=Popen(["/bin/ps","-axo","pid=,ppid=,pgid=,lstart="],stdout=PIPE,stderr=PIPE)
+    raw,error=observer.communicate(timeout=5)
+    if observer.returncode or error:
+        raise RuntimeError("process observer unavailable")
+    result={}
+    for line in raw.decode("utf-8",errors="strict").splitlines():
+        fields=line.split(None,3)
+        if len(fields)==4 and all(item.isdigit() for item in fields[:3]):
+            result[int(fields[0])]=(int(fields[1]),int(fields[2]),fields[3])
+    return result
+
+
+def family_tracker(root_pid: int, stop: threading.Event, identities: dict):
+    family={root_pid}
+    while not stop.is_set():
+        try: snapshot=process_snapshot()
+        except Exception: return
+        changed=True
+        while changed:
+            changed=False
+            for pid,(ppid,pgid,start) in snapshot.items():
+                if pid not in family and (ppid in family or pgid==root_pid):
+                    family.add(pid);changed=True
+        for pid in family:
+            if pid in snapshot: identities[pid]=snapshot[pid][2]
+        stop.wait(.5)
+
+
+def terminate_family(root_pid: int, identities: dict) -> None:
+    try: os.killpg(root_pid,signal.SIGTERM)
+    except ProcessLookupError: pass
+    deadline=time.monotonic()+GRACE_SECONDS
+    while time.monotonic()<deadline:
+        snapshot=process_snapshot()
+        alive=[pid for pid,start in identities.items()
+               if pid in snapshot and snapshot[pid][2]==start]
+        if not alive:return
+        for pid in alive:
+            try:os.kill(pid,signal.SIGTERM)
+            except ProcessLookupError:pass
+
+
+def clear_child_signal_mask() -> None:
+    # The parent blocks termination signals only across assignment of the
+    # child capability.  The exec child must not inherit that critical window.
+    signal.pthread_sigmask(signal.SIG_SETMASK,set())
+        time.sleep(.02)
+    snapshot=process_snapshot()
+    for pid,start in identities.items():
+        if pid in snapshot and snapshot[pid][2]==start:
+            try:os.kill(pid,signal.SIGKILL)
+            except ProcessLookupError:pass
 
 
 def main() -> int:
@@ -149,13 +229,6 @@ def main() -> int:
     if (not plan_path.is_absolute() or not result_path.is_absolute()
             or plan_path.parent != result_path.parent):
         return 2
-    deadline = time.monotonic() + PLAN_READY_SECONDS
-    while not plan_path.exists():
-        if plan_path.with_name(plan_path.name + ".closed").exists():
-            return 3
-        if time.monotonic() >= deadline:
-            return 2
-        time.sleep(0.01)
     plan_raw, plan_stat = regular_nofollow_read(plan_path, MAX_PLAN_BYTES)
     plan = strict_json(plan_raw)
     if not plan_valid(plan, result_path):
@@ -163,30 +236,51 @@ def main() -> int:
     helper_path = helper_path.resolve(strict=True)
     helper_sha = sha256_path(helper_path)
     argv = plan["argv"]
-    proc = Popen(argv, cwd=plan["cwd"], stdout=PIPE, stderr=PIPE,
-                 start_new_session=True)
-    timed_out = False
+    interrupted=[]
+    blocked_signals={signal.SIGHUP,signal.SIGINT,signal.SIGTERM}
+    previous_mask=signal.pthread_sigmask(signal.SIG_BLOCK,blocked_signals)
+    def interrupted_handler(signum,_frame):
+        interrupted.append(signum)
+        raise KeyboardInterrupt
+    old_handlers={item:signal.signal(item,interrupted_handler)
+                  for item in (signal.SIGHUP,signal.SIGINT,signal.SIGTERM)}
+    proc=None
+    timed_out = False;tracker_stop=threading.Event();family={}
     try:
+        proc = Popen(argv, cwd=plan["cwd"], stdout=PIPE, stderr=PIPE,
+                     env=plan["environment"], start_new_session=True,
+                     preexec_fn=clear_child_signal_mask)
+        tracker=threading.Thread(target=family_tracker,
+                                 args=(proc.pid,tracker_stop,family),daemon=True)
+        tracker.start()
+        signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
+        if interrupted:
+            raise KeyboardInterrupt
         if plan["mode"] == "skip":
             stdout, stderr = proc.communicate(timeout=SKIP_SECONDS)
         else:
             stdout, stderr = proc.communicate()
-    except TimeoutExpired as exc:
+    except (TimeoutExpired,KeyboardInterrupt) as exc:
         timed_out = True
+        terminate_family(proc.pid,family)
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        try:
-            stdout, stderr = proc.communicate(timeout=5)
+            stdout, stderr = proc.communicate(timeout=GRACE_SECONDS)
         except TimeoutExpired:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
             stdout, stderr = proc.communicate()
-        stdout = (exc.stdout or b"") + (stdout or b"")
-        stderr = (exc.stderr or b"") + (stderr or b"")
+        stdout = (getattr(exc,"stdout",None) or b"") + (stdout or b"")
+        stderr = (getattr(exc,"stderr",None) or b"") + (stderr or b"")
+    finally:
+        tracker_stop.set()
+        if 'tracker' in locals(): tracker.join(timeout=1)
+        if proc is not None and proc.poll() is None:
+            terminate_family(proc.pid,family)
+            proc.wait(timeout=GRACE_SECONDS)
+        signal.pthread_sigmask(signal.SIG_SETMASK,previous_mask)
+        for item,handler in old_handlers.items(): signal.signal(item,handler)
     if len(stdout) > MAX_OUTPUT_BYTES or len(stderr) > MAX_OUTPUT_BYTES:
         return 2
     result = {
@@ -206,9 +300,12 @@ def main() -> int:
         "stderr_b64": base64.b64encode(stderr).decode("ascii"),
         "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
         "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        "environment_sha256": hashlib.sha256(json.dumps(
+            plan["environment"],sort_keys=True,separators=(",", ":")).encode()).hexdigest(),
+        "tracked_processes": len(family),
     }
     raw = json.dumps(result, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    atomic_write(result_path, raw)
+    atomic_write_new(result_path, raw)
     return 0
 
 
