@@ -182,8 +182,22 @@ echo
 if [ "$(uname -s)" = "Darwin" ]; then
   rad "värdmaskin" "Darwin" "Darwin"
   if [ -f verify/bin/h-013-exit ]; then
-    timeout 120 bash verify/bin/h-013-exit >/dev/null 2>&1; e=$?
-    rad "h-013-exit (h-014:s beroende)" "exit 0" "exit $e"
+    # INGET GNU `timeout` — det finns inte på macOS. Raden gav exit 127
+    # ("kommandot finns inte") och bokfördes som att GRINDEN föll. Exakt det
+    # misstag matning-pa-macen.sh varnar för i sin egen huvudkommentar:
+    # "det misstaget gav en gång en falsk 'död interpretator'-diagnos".
+    # Rättat 2026-09-16: kör grinden direkt, och använd timeout bara om den finns.
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 120 bash verify/bin/h-013-exit >/dev/null 2>&1; e=$?
+    else
+      bash verify/bin/h-013-exit >/dev/null 2>&1; e=$?
+    fi
+    # FÖRVÄNTAT ÄR exit 1, INTE exit 0. Här stod "exit 0", vilket byggde på
+    # etiketten KLAR. FYND 33 falsifierade den: h-013 ger 8 PASS / 8 FAIL på
+    # Macen i ren klon, mätt två gånger 2026-09-16 (main och plattformsgrenen).
+    # Provets kontrakt är att upptäcka FÖRÄNDRING, inte att önska ett utfall —
+    # blir h-013 grön ska denna rad FÄLLA, så att någon uppdaterar den.
+    rad "h-013-exit (h-014:s beroende) [FAIL, mätt]" "exit 1" "exit $e"
   else rad "h-013-exit finns" "JA" "ODÖMBART"; fi
 else
   rad "värdmaskin" "Darwin" "ODÖMBART"
