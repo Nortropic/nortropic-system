@@ -1,0 +1,2234 @@
+#!/usr/bin/env python3
+"""Frozen H-035 real-effect gate. 0=PASS, 1=product RED, 2=rig error.
+
+J_* checks are judge self-tests.  A_*/N_*/P_* invoke operational controller
+entrypoints against disposable repositories/state; they are acceptance.
+"""
+from __future__ import annotations
+
+import hashlib
+import io
+import json
+import os
+import re
+import runpy
+import secrets
+import shlex
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+REG = ROOT / "specs/owner-production-paths.v1.json"
+LOOP = ROOT / "controller/loop/cli"
+AUTH = ROOT / "controller/authority/cli"
+TASKVAL = ROOT / "controller/taskval/cli"
+STATE = ROOT / "controller/state/cli"
+POLICY = ROOT / "controller/policy/cli"
+REGISTER = ROOT / "controller/verify/register.json"
+passed = failed = 0
+
+V6_PROCESS_SNAPSHOT_TIMEOUT_S = 5.0
+V6_STARTUP_WINDOW_S = 24.0
+V6_POST_READY_WINDOW_S = 24.0
+V6_RELEASE_CLEANUP_MARGIN_S = 10.0
+V6_PROVIDER_FAILSAFE_S = 45
+
+
+class Rig(Exception):
+    pass
+
+
+def check(ok: bool, name: str, detail: str = "") -> None:
+    global passed, failed
+    if ok:
+        passed += 1
+        print(f"PASS {name}")
+    else:
+        failed += 1
+        print(f"FAIL {name}: {detail}")
+
+
+def run(argv: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None,
+        stdin: str | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(argv, cwd=cwd, env=env, input=stdin, text=True,
+                          capture_output=True, shell=False, timeout=45)
+
+
+def parse_path(raw: object) -> tuple[str, bool]:
+    if not isinstance(raw, str) or "\x00" in raw:
+        raise ValueError("type/NUL")
+    p = raw.replace("\\", "/")
+    if not p or p.startswith("/") or re.match(r"^[A-Za-z]:", p):
+        raise ValueError("absolute/drive/empty")
+    if p.startswith("./") or p.endswith("/") or "//" in p:
+        raise ValueError("separator")
+    recursive = p.endswith("/**")
+    core = p[:-3] if recursive else p
+    if not core or any(x in ("", ".", "..") for x in core.split("/")):
+        raise ValueError("segment")
+    if any(c in core for c in "*?[]{}"):
+        raise ValueError("unsupported glob")
+    return core, recursive
+
+
+def overlap(a: object, b: object) -> bool:
+    ap, ax = parse_path(a); bp, bx = parse_path(b)
+    return ((not ax and not bx and ap == bp)
+            or (ax and (bp == ap or bp.startswith(ap + "/")))
+            or (bx and (ap == bp or ap.startswith(bp + "/"))))
+
+
+def strict_load(path: Path) -> object:
+    def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
+        out: dict[str, object] = {}
+        for k, v in items:
+            if k in out:
+                raise ValueError(f"duplicate key {k}")
+            out[k] = v
+        return out
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=pairs)
+
+
+REG_KEYS = {
+    "schema_version", "path_grammar", "authority_source", "self_digest_is_authority",
+    "owner_production_paths", "prospective_ordinary_protected_paths",
+    "owner_author_global_denied_paths",
+}
+REQUIRED_OWNER = {
+    "controller/h034-native/**", "verify/h034/kernel",
+    "verify/h034/build-recipe.json", "verify/h034/identity-manifest.json",
+}
+
+
+def validate_registry(doc: object) -> tuple[bool, str]:
+    if not isinstance(doc, dict): return False, "top-level type"
+    if set(doc) != REG_KEYS: return False, "top-level membership"
+    if doc.get("schema_version") != 1: return False, "schema version"
+    if doc.get("path_grammar") != "repo-tree-exact-or-terminal-recursive-prefix-v1": return False, "grammar"
+    if doc.get("authority_source") != "git-candidate-plus-independent-gate-review-plus-owner-final-freeze": return False, "authority source"
+    if doc.get("self_digest_is_authority") is not False: return False, "self digest"
+    for key in ("owner_production_paths", "prospective_ordinary_protected_paths", "owner_author_global_denied_paths"):
+        value = doc.get(key)
+        if not isinstance(value, list) or not value or not all(isinstance(x, str) for x in value):
+            return False, f"{key} type/empty"
+        try: canon = [parse_path(x) for x in value]
+        except ValueError as e: return False, f"{key} path {e}"
+        if len(canon) != len(set(canon)): return False, f"{key} duplicate"
+    if set(doc["owner_production_paths"]) != REQUIRED_OWNER: return False, "required H034 membership"
+    return True, "ok"
+
+
+def registry_selftests(good: dict[str, object]) -> None:
+    ok, why = validate_registry(good); check(ok, "J_REGISTRY_POSITIVE", why)
+    mutants: list[tuple[str, object]] = []
+    for name, mutate in (
+        ("MISSING_KEY", lambda d: d.pop("path_grammar")),
+        ("UNEXPECTED_KEY", lambda d: d.update(extra=[])),
+        ("WRONG_VERSION", lambda d: d.update(schema_version=2)),
+        ("WRONG_LIST_TYPE", lambda d: d.update(owner_production_paths={})),
+        ("EMPTY_LIST", lambda d: d.update(owner_production_paths=[])),
+        ("DUPLICATE_PATH", lambda d: d.update(owner_production_paths=list(d["owner_production_paths"])+[d["owner_production_paths"][0]])),
+        ("MALFORMED_PATH", lambda d: d.update(owner_production_paths=["../escape"])),
+        ("REQUIRED_REMOVED", lambda d: d.update(owner_production_paths=list(d["owner_production_paths"])[1:])),
+        ("REQUIRED_ALTERED", lambda d: d.update(owner_production_paths=["controller/h034-native/*", *list(d["owner_production_paths"])[1:]])),
+    ):
+        copy = json.loads(json.dumps(good)); mutate(copy); mutants.append((name, copy))
+    for name, mutant in mutants:
+        accepted, _ = validate_registry(mutant)
+        check(not accepted, f"J_REGISTRY_{name}")
+    try:
+        json.loads('{"schema_version":1,"schema_version":1}', object_pairs_hook=lambda p: (_ for _ in ()).throw(ValueError("duplicate")) if len({k for k,_ in p}) != len(p) else dict(p))
+        duplicate_rejected = False
+    except ValueError: duplicate_rejected = True
+    check(duplicate_rejected, "J_REGISTRY_DUPLICATE_KEY")
+
+
+def path_selftests() -> None:
+    bad = ["", "/x", "C:/x", "./x", "x//y", "x/../y", "x/./y", "x/", "x/*", "x/**/y", "../x"]
+    check(all(_bad_path(x) for x in bad), "J_PATH_REJECT_FAMILY")
+    check(parse_path(r"a\b\c") == ("a/b/c", False), "J_PATH_BACKSLASH_NORMALIZED")
+    check(overlap("controller/**", "controller/h034-native/kernel.c"), "J_PATH_PARENT")
+    check(overlap("controller/h034-native/**", "controller/h034-native/kernel.c"), "J_PATH_CHILD")
+    check(not overlap("safe/**", "controller/h034-native/**"), "J_PATH_SIBLING")
+    # Predicted outcome: each superficial implementation is rejected by real acceptance below.
+    for mutant, guard in (
+        ("HARDCODE_PROBE_NAMES", "A_OWNER_ROUTE"),
+        ("PERMISSIVE_REGISTRY_CONSUMER", "N_REGISTRY_RUNTIME"),
+        ("DOCS_IMPACT_ESCALATION", "N_DOCS_IMPACT"),
+        ("RESTART_LAUNCHES_BUILDER", "A_OWNER_RESTART"),
+        ("REVIEW_AUTO_PUBLISH", "N_REVIEW_PUBLICATION"),
+        ("AUTOPILOT_OLD_MATCHER", "N_PATH_CONSISTENCY"),
+    ):
+        print(f"MUTANT={mutant} PREDICTED=REJECT GUARD={guard}")
+
+
+def _bad_path(value: str) -> bool:
+    try: parse_path(value); return False
+    except ValueError: return True
+
+
+def write_json(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+    return run(["git", *args], cwd=cwd)
+
+
+def git_object_bytes(repo: Path, sha: str, path: str) -> bytes | None:
+    result = subprocess.run(["git", "-C", str(repo), "show", f"{sha}:{path}"],
+                            capture_output=True, shell=False, check=False, timeout=45)
+    return result.stdout if result.returncode == 0 else None
+
+
+def init_repo(path: Path) -> str:
+    path.mkdir()
+    for args in (("init", "-q"), ("config", "user.name", "H035 Fixture"), ("config", "user.email", "fixture@example.invalid")):
+        p = git(path, *args)
+        if p.returncode: raise Rig(p.stderr)
+    (path / "seed.txt").write_text("seed\n")
+    for args in (("add", "seed.txt"), ("commit", "-qm", "seed")):
+        p = git(path, *args)
+        if p.returncode: raise Rig(p.stderr)
+    return git(path, "rev-parse", "HEAD").stdout.strip()
+
+
+def commit_paths(repo: Path, message: str, *paths: str) -> str:
+    # Fixture paths are repository data, never Git pathspec programs. This is
+    # material for R11's legitimate filenames beginning with pathspec magic.
+    for args in (("--literal-pathspecs", "add", "--", *paths),
+                 ("commit", "-qm", message)):
+        p = git(repo, *args)
+        if p.returncode: raise Rig(p.stderr)
+    return git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def authority_repo(tmp: Path, name: str, tasks: list[dict[str, object]],
+                   *, gates: dict[str, bytes] | None = None,
+                   gate_modes: dict[str, int] | None = None) -> tuple[Path, str]:
+    """A disposable Git authority root containing both canonical documents."""
+    repo = tmp / name; init_repo(repo)
+    (repo / "specs").mkdir()
+    write_json(repo / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0", "defaults":{"denied_write":[]}, "tasks":tasks})
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    gate_paths: list[str] = []
+    for task in tasks:
+        gate_path = task.get("exit_test")
+        if not isinstance(gate_path, str) or gate_path in gate_paths:
+            continue
+        target = repo / gate_path; target.parent.mkdir(parents=True, exist_ok=True)
+        if gates is not None and gate_path in gates:
+            target.write_bytes(gates[gate_path])
+        elif gate_path == "verify/bin/h-035-exit":
+            target.write_bytes(Path(__file__).read_bytes())
+        else:
+            target.write_bytes(b"#!/bin/sh\nexit 1\n")
+        target.chmod(gate_modes.get(gate_path, 0o755) if gate_modes else 0o755)
+        gate_paths.append(gate_path)
+    base = commit_paths(repo, "canonical authority", "specs/tasks.spec.json",
+                        "specs/owner-production-paths.v1.json", *gate_paths)
+    return repo, base
+
+
+def owner_task(task_id: str, surface: list[str],
+               exit_test: str = "verify/bin/h-035-exit") -> dict[str, object]:
+    return {"id":task_id, "authority_class":"owner_authority", "allowed_write":[],
+            "owner_author_allowed_write":surface, "docs_impact":[], "depends_on":[],
+            "exit_test":exit_test}
+
+
+def ordinary_task(task_id: str, surface: list[str],
+                  exit_test: str = "verify/bin/h-035-exit") -> dict[str, object]:
+    return {"id":task_id, "authority_class":"ordinary", "allowed_write":surface,
+            "owner_author_allowed_write":[], "docs_impact":[], "depends_on":[],
+            "exit_test":exit_test}
+
+
+def init_state(path: Path) -> None:
+    p = run([str(STATE), "init", str(path)])
+    if p.returncode: raise Rig(p.stderr or p.stdout)
+
+
+def set_remote_main(remote: Path, source: Path, sha: str) -> None:
+    p = run(["git", "fetch", "-q", str(source), sha], cwd=remote)
+    if p.returncode: raise Rig(p.stderr)
+    p = run(["git", "update-ref", "refs/heads/main", sha], cwd=remote)
+    if p.returncode: raise Rig(p.stderr)
+
+
+def candidate(repo: Path, base: str, path: str, serial: int) -> str:
+    p = git(repo, "checkout", "-q", base)
+    if p.returncode: raise Rig(p.stderr)
+    target = repo / path; target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(f"h035 fixture candidate {serial}\n")
+    for args in (("--literal-pathspecs", "add", "--", path),
+                 ("commit", "-qm", f"candidate-{serial}")):
+        p = git(repo, *args)
+        if p.returncode: raise Rig(p.stderr)
+    return git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def registry_candidate(tmp: Path, name: str, raw: str) -> tuple[Path, str, str]:
+    repo = tmp / f"registry-{name}"; base = init_repo(repo)
+    target = repo / "specs/owner-production-paths.v1.json"; target.parent.mkdir()
+    target.write_text(raw)
+    # Operational authority is always candidate-local. Registry tests carry
+    # a canonical task spec too, so none can pass by borrowing installed bytes.
+    (repo / "specs/tasks.spec.json").write_bytes(SPEC.read_bytes())
+    commit_paths(repo, name, "specs/tasks.spec.json", "specs/owner-production-paths.v1.json")
+    return repo, base, git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def task_candidate(tmp: Path, name: str, version: str, task: dict[str, object]) -> tuple[Path, str, str]:
+    repo = tmp / f"task-{name}"; base = init_repo(repo)
+    (repo / "specs").mkdir()
+    write_json(repo / "specs/tasks.spec.json", {"spec_version":version,"defaults":{"denied_write":[]},"tasks":[{"id":"fixture-task","depends_on":[],**task}]})
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    p = git(repo, "add", "specs")
+    if p.returncode: raise Rig(p.stderr)
+    p = git(repo, "commit", "-qm", name)
+    if p.returncode: raise Rig(p.stderr)
+    return repo, base, git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def path_candidate(tmp: Path, name: str, pattern: str) -> tuple[Path, str, str]:
+    repo = tmp / f"path-{name}"; init_repo(repo)
+    (repo / "specs").mkdir()
+    write_json(repo / "specs/tasks.spec.json", {"spec_version":"2.0.0", "defaults":{"denied_write":[]},
+        "tasks":[{"id":"fixture-task", "authority_class":"ordinary", "allowed_write":[pattern],
+                  "docs_impact":[], "depends_on":[]}]})
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    git(repo, "add", "specs"); git(repo, "commit", "-qm", "canonical authority")
+    base = git(repo, "rev-parse", "HEAD").stdout.strip()
+    target = repo / "safe/x"; target.parent.mkdir(); target.write_text("effect\n")
+    git(repo, "add", "safe/x"); git(repo, "commit", "-qm", "candidate")
+    return repo, base, git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def process_snapshot() -> tuple[str, list[dict[str, object]], str]:
+    argv = ["ps", "-ww", "-axo", "pid=,ppid=,pgid=,comm=,args="]
+    try:
+        p = subprocess.run(argv, text=True, capture_output=True, check=False,
+                           timeout=V6_PROCESS_SNAPSHOT_TIMEOUT_S)
+    except (OSError, PermissionError, subprocess.TimeoutExpired) as e:
+        return "ODÖMBART", [], f"{type(e).__name__}: {e}"
+    if p.returncode != 0:
+        return "ODÖMBART", [], f"ps exit {p.returncode}: {p.stderr.strip()[:200]}"
+    rows: list[dict[str, object]] = []
+    for line in p.stdout.splitlines():
+        fields = line.strip().split(None, 4)
+        if len(fields) == 5 and all(fields[i].isdigit() for i in range(3)):
+            rows.append({"pid":int(fields[0]), "ppid":int(fields[1]), "pgid":int(fields[2]),
+                         "comm":fields[3], "args":fields[4]})
+    return "OK", rows, ""
+
+
+def observe_provider(rows: list[dict[str, object]], *, loop_pid: int, provider: Path,
+                     nonce: str) -> tuple[dict[str, object] | None, list[dict[str, object]]]:
+    by_pid = {int(r["pid"]): r for r in rows}
+    # Bind the spelling actually passed to exec. On macOS /var resolves to
+    # /private/var; resolving here made V2 reject the real /var/folders argv.
+    provider_text = str(provider)
+    required = [str(LOOP), str(ROOT/"controller/brytare/cli"),
+                str(ROOT/"controller/utforare/cli"), str(ROOT/"controller/launch/cli")]
+    loop_row = by_pid.get(loop_pid)
+    if loop_row is None:
+        return None, []
+    controller_image = str(loop_row["comm"])
+
+    def argv(row: dict[str, object]) -> list[str]:
+        try:
+            return shlex.split(str(row["args"]), posix=True)
+        except ValueError:
+            return []
+
+    def stage(row: dict[str, object]) -> str | None:
+        tokens = argv(row)
+        # macOS truncates ps(1)'s comm field (the real Homebrew Python image is
+        # observed as /opt/homebrew/Ce). Bind every controller stage to the
+        # exact image reported for the gate-started loop.
+        if str(row["comm"]) != controller_image:
+            return None
+        hits = [expected for expected in required if expected in tokens]
+        return hits[0] if len(hits) == 1 else None
+
+    for row in rows:
+        comm = str(row["comm"]); tokens = argv(row)
+        if comm != "/bin/sh" or tokens != ["/bin/sh", provider_text, nonce]:
+            continue
+        chain = [row]; seen = {int(row["pid"])}; parent = int(row["ppid"])
+        while parent in by_pid and parent not in seen:
+            ancestor = by_pid[parent]; chain.append(ancestor); seen.add(parent)
+            if parent == loop_pid: break
+            parent = int(ancestor["ppid"])
+        if not chain or int(chain[-1]["pid"]) != loop_pid:
+            continue
+        ordered = list(reversed(chain[1:]))
+        observed_stages = [stage(ancestor) for ancestor in ordered]
+        if observed_stages == required:
+            return row, chain
+        if (len(ordered) == len(required) + 1
+                and observed_stages[:len(required)] == required
+                and str(ordered[-1]["comm"]).endswith("sandbox-exec")
+                and stage(ordered[-1]) is None):
+            return row, chain
+    return None, []
+
+
+def observe_provider_lifetime(proc: subprocess.Popen, *, provider: Path, nonce: str,
+                              ready: Path, release: Path, snapshot_fn=process_snapshot,
+                              clock=time.monotonic, pause=time.sleep,
+                              startup_window_s: float = V6_STARTUP_WINDOW_S,
+                              post_ready_window_s: float = V6_POST_READY_WINDOW_S,
+                              ) -> tuple[str, dict[str, object]]:
+    """Observe one provider attempt and unconditionally release it on conclusion.
+
+    A post-ready snapshot may finish after the nominal window.  Production
+    process_snapshot has its own hard timeout, and the controller fail-safe is
+    ordered after window + maximum overrun + cleanup margin.
+    """
+    verdict = "FAIL"
+    started = clock()
+    startup_deadline = started + startup_window_s
+    ready_deadline: float | None = None
+    evidence: dict[str, object] = {
+        "nonce":nonce, "samples":0, "post_ready_samples":0,
+        "lifetime_synchronization":"V6 observer-owned release; readiness is never verdict authority",
+        "startup_window_s":startup_window_s,
+        "post_ready_window_s":post_ready_window_s,
+        "process_snapshot_timeout_s":V6_PROCESS_SNAPSHOT_TIMEOUT_S,
+        "provider_failsafe_s":V6_PROVIDER_FAILSAFE_S,
+    }
+    try:
+        while proc.poll() is None:
+            before = clock()
+            if os.path.lexists(ready) and ready_deadline is None:
+                ready_deadline = before + post_ready_window_s
+                evidence["ready_observed"] = True
+                evidence["ready_observed_at_s"] = before - started
+            active_deadline = ready_deadline if ready_deadline is not None else startup_deadline
+            if before >= active_deadline:
+                evidence["window_exhausted"] = "post_ready" if ready_deadline is not None else "startup"
+                break
+
+            status, rows, why = snapshot_fn()
+            after = clock()
+            evidence["samples"] = int(evidence["samples"]) + 1
+            if os.path.lexists(ready):
+                if ready_deadline is None:
+                    # Readiness during a slow snapshot gets a complete new
+                    # post-ready window; elapsed pre-ready time cannot steal it.
+                    ready_deadline = after + post_ready_window_s
+                    evidence["ready_observed"] = True
+                    evidence["ready_observed_at_s"] = after - started
+                evidence["post_ready_samples"] = int(evidence["post_ready_samples"]) + 1
+            if status == "ODÖMBART":
+                verdict = "ODÖMBART"; evidence["observer_error"] = why; break
+            hit, chain = observe_provider(rows, loop_pid=proc.pid, provider=provider, nonce=nonce)
+            if hit is not None:
+                verdict = "PASS"; evidence["provider"] = hit; evidence["ancestry"] = chain; break
+            pause(0.03)
+        if proc.poll() is not None:
+            evidence["process_exited_before_observer_conclusion"] = True
+    finally:
+        # This is the only normal release.  The later controller timeout is a
+        # cleanup fail-safe and is mechanically ordered after every bounded
+        # post-ready sample can conclude, including its maximum overrun.
+        release.touch()
+        evidence["release_written"] = True
+        evidence["observer_elapsed_s"] = clock() - started
+    evidence["ready_observed"] = bool(evidence.get("ready_observed", False))
+    return verdict, evidence
+
+
+def observer_selftests() -> None:
+    provider = Path("/var/folders/h035/provider.sh"); nonce = "a" * 32
+    def row(pid: int, ppid: int, comm: str, args: str, pgid: int = 60) -> dict[str, object]:
+        return {"pid":pid,"ppid":ppid,"pgid":pgid,"comm":comm,"args":args}
+    forwarded = f" -- {provider} {nonce}"
+    real_comm = "/opt/homebrew/Ce"
+    chain = [row(10,1,real_comm,str(LOOP)+" run cfg",60),
+             row(20,10,real_comm,str(ROOT/"controller/brytare/cli")+" kor"+forwarded,60),
+             row(30,20,real_comm,str(ROOT/"controller/utforare/cli")+" kor"+forwarded,60),
+             row(40,30,real_comm,str(ROOT/"controller/launch/cli")+" run"+forwarded,60),
+             row(61,40,"/bin/sh",f"/bin/sh {provider} {nonce}",61)]
+    check(observe_provider(chain, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
+          "J_OBSERVER_REAL_OWNER_SPLIT_PGID_POSITIVE")
+    shell = lambda pid, ppid, path=provider, value=nonce, extra="": row(
+        pid, ppid, "/bin/sh", f"/bin/sh {path} {value}{extra}", pid)
+    mutants = {
+      "WRONG_NONCE":chain[:-1]+[shell(62,40,value="b"*32)],
+      "STALE_NONCE":chain[:-1]+[shell(63,40,value="c"*32)],
+      "NONCE_SUBSTRING":chain[:-1]+[shell(64,40,value=nonce+"x")],
+      "SAME_BASENAME_DIFFERENT_PATH":chain[:-1]+[shell(65,40,path=Path("/private/other/provider.sh"))],
+      "FORWARDED_ARGV_ONLY":chain[:-1],
+      "SANDBOX_WITHOUT_PROVIDER":chain[:-1]+[row(66,40,"/usr/bin/sandbox-exec",f"/usr/bin/sandbox-exec {provider} {nonce}")],
+      "OUTSIDE_LOOP_ANCESTRY":chain[:-1]+[shell(67,1)],
+      "WRONG_LOOP_PID":chain,
+      "MISSING_LAUNCH":chain[:3]+[shell(68,30)],
+      "MISSING_UTFORARE":chain[:2]+[chain[3]|{"ppid":20}]+[shell(69,40)],
+      "MISSING_BRYTARE":[chain[0],chain[2]|{"ppid":10},chain[3],shell(70,40)],
+      "REORDERED_ANCESTRY":[chain[0],chain[2]|{"ppid":10},chain[1]|{"ppid":30},chain[3]|{"ppid":20},shell(71,40)],
+      "UNRELATED_SH_EXTRA_ARG":chain[:-1]+[shell(72,40,extra=" unrelated")],
+      "FABRICATED_PPID":chain[:-1]+[shell(73,999)],
+      "FAKE_CONTROLLER_IMAGE":[chain[0],chain[1],chain[2],
+          row(40,30,"/bin/sh",str(ROOT/"controller/launch/cli")+" run"+forwarded),shell(74,40)],
+    }
+    for name, rows in mutants.items():
+        print(f"MUTANT={name} PREDICTED=REJECT GUARD=J_OBSERVER_{name}")
+        test_loop_pid = 999 if name == "WRONG_LOOP_PID" else 10
+        check(observe_provider(rows, loop_pid=test_loop_pid, provider=provider, nonce=nonce)[0] is None,
+              f"J_OBSERVER_{name}")
+
+    sandbox = chain[:-1]+[row(80,40,"/usr/bin/sandbox-exec","/usr/bin/sandbox-exec profile",80),
+                          shell(81,80)]
+    check(observe_provider(sandbox, loop_pid=10, provider=provider, nonce=nonce)[0] is not None,
+          "J_OBSERVER_OPTIONAL_SANDBOX_POSITIVE")
+
+    check((V6_PROCESS_SNAPSHOT_TIMEOUT_S, V6_STARTUP_WINDOW_S,
+           V6_POST_READY_WINDOW_S, V6_RELEASE_CLEANUP_MARGIN_S,
+           V6_PROVIDER_FAILSAFE_S) == (5.0, 24.0, 24.0, 10.0, 45),
+          "J_OBSERVER_V6_FROZEN_LIFETIME_CONSTANTS")
+    check(V6_PROVIDER_FAILSAFE_S > (V6_POST_READY_WINDOW_S
+          + V6_PROCESS_SNAPSHOT_TIMEOUT_S + V6_RELEASE_CLEANUP_MARGIN_S),
+          "J_OBSERVER_V6_FAILSAFE_AFTER_MAXIMUM_OBSERVER_COMPLETION")
+
+    def start_fixture(root: Path, *, creates_ready: bool = True,
+                      rapid_exit: bool = False) -> tuple[subprocess.Popen, Path, Path, Path]:
+        ready = root / "ready"; release = root / "release"; worker = root / "provider.sh"
+        if rapid_exit:
+            source = "#!/bin/sh\nexit 7\n"
+        elif creates_ready:
+            source = synchronized_provider_script(ready, release)
+        else:
+            source = ("#!/bin/sh\n"
+                      f"while [ ! -e {shlex.quote(str(release))} ]; do sleep 0.05; done\n"
+                      "exit 7\n")
+        worker.write_text(source); worker.chmod(0o700)
+        proc = subprocess.Popen(["/bin/sh", str(worker), nonce], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True)
+        return proc, worker, ready, release
+
+    def wait_ready(proc: subprocess.Popen, ready: Path) -> bool:
+        deadline = time.monotonic() + 2
+        while not ready.exists() and proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        return ready.exists()
+
+    # Five empty snapshots consume 21 simulated seconds.  The sixth returns
+    # the exact relationship after 25.2 seconds, later than the R7 review's
+    # 20.2722-second counterexample and after the nominal 24-second check.
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-slow-match-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root)
+        is_ready = wait_ready(proc, ready); virtual = [0.0]; calls = [0]
+        slow_chain = [row(proc.pid,1,real_comm,str(LOOP)+" run cfg",60),
+                      row(120,proc.pid,real_comm,str(ROOT/"controller/brytare/cli")+f" kor -- {worker} {nonce}",60),
+                      row(130,120,real_comm,str(ROOT/"controller/utforare/cli")+f" kor -- {worker} {nonce}",60),
+                      row(140,130,real_comm,str(ROOT/"controller/launch/cli")+f" run -- {worker} {nonce}",60),
+                      row(161,140,"/bin/sh",f"/bin/sh {worker} {nonce}",161)]
+        def slow_then_match() -> tuple[str, list[dict[str, object]], str]:
+            calls[0] += 1; virtual[0] += 4.2
+            return "OK", slow_chain if calls[0] == 6 else [], ""
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=slow_then_match, clock=lambda:virtual[0], pause=lambda _delay:None)
+        proc.communicate(timeout=3)
+        check(is_ready and verdict == "PASS" and calls[0] == 6
+              and float(evidence["observer_elapsed_s"]) > 20.2722
+              and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_SLOW_MATCH_AFTER_PRIOR_20_27_SECONDS", repr(evidence))
+
+    # Marker-only slow schedules exhaust as FAIL, but the provider remains
+    # alive for every sample and exits only after observer-owned release.
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-slow-empty-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root)
+        is_ready = wait_ready(proc, ready); virtual = [0.0]; alive = [True]
+        def slow_empty() -> tuple[str, list[dict[str, object]], str]:
+            alive[0] = alive[0] and proc.poll() is None; virtual[0] += 4.2
+            return "OK", [], ""
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=slow_empty, clock=lambda:virtual[0], pause=lambda _delay:None)
+        proc.communicate(timeout=3)
+        check(is_ready and verdict == "FAIL" and alive[0]
+              and float(evidence["observer_elapsed_s"]) > 20.2722
+              and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_SLOW_MARKER_ONLY_REJECTS_AND_RELEASES", repr(evidence))
+
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-error-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root)
+        is_ready = wait_ready(proc, ready)
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=lambda:("ODÖMBART", [], "forced observer error"))
+        proc.communicate(timeout=3)
+        check(is_ready and verdict == "ODÖMBART" and release.exists() and proc.returncode == 7
+              and not evidence.get("provider"),
+              "J_OBSERVER_V6_ERROR_RELEASES_WITHOUT_PASS", repr(evidence))
+
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-no-ready-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root, creates_ready=False)
+        virtual = [0.0]
+        def no_ready_empty() -> tuple[str, list[dict[str, object]], str]:
+            virtual[0] += 4.2; return "OK", [], ""
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=no_ready_empty, clock=lambda:virtual[0], pause=lambda _delay:None)
+        proc.communicate(timeout=3)
+        check(verdict == "FAIL" and not ready.exists() and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_NO_READY_BOUNDED_FAIL_AND_CLEANUP", repr(evidence))
+
+    with tempfile.TemporaryDirectory(prefix="h035-observer-v6-rapid-exit-") as raw:
+        root = Path(raw); proc, worker, ready, release = start_fixture(root, rapid_exit=True)
+        proc.wait(timeout=3)
+        verdict, evidence = observe_provider_lifetime(
+            proc, provider=worker, nonce=nonce, ready=ready, release=release,
+            snapshot_fn=lambda:("OK", [], ""))
+        proc.communicate(timeout=3)
+        check(verdict == "FAIL" and not ready.exists() and release.exists() and proc.returncode == 7,
+              "J_OBSERVER_V6_RAPID_EXIT_NO_READY_REJECTS", repr(evidence))
+
+
+def synchronized_provider_script(ready: Path, release: Path) -> str:
+    """V6 provider: only observer release ends normal fixture lifetime."""
+    return (
+        "#!/bin/sh\n"
+        f": > {shlex.quote(str(ready))}\n"
+        f"while [ ! -e {shlex.quote(str(release))} ]; do\n"
+        "  sleep 0.05\n"
+        "done\n"
+        "printf '%s\\n' 'fixture provider refusal' >&2\n"
+        "exit 7\n")
+
+
+def loop_fixture(tmp: Path, authority: str, *, restart: bool = False,
+                 observe: bool = False) -> tuple[subprocess.CompletedProcess, str, str, bool, dict[str, object]]:
+    """Execute the real normal loop entrypoint; only external boundaries are fixtures."""
+    # Current workspace/loop resolves the repository from its installed ROOT.
+    # The only repository effect is a disposable worktree under workspace_rot.
+    repo = ROOT; base = git(ROOT, "rev-parse", "HEAD").stdout.strip()
+    worker = tmp / f"provider-{authority}-{int(restart)}.sh"
+    nonce = secrets.token_hex(16)
+    ready = tmp / f"provider-{authority}-{int(restart)}-{nonce}.ready"
+    release = tmp / f"provider-{authority}-{int(restart)}-{nonce}.release"
+    if observe:
+        # V6 lifetime synchronization.  Only observer release ends the normal
+        # gate-owned shell lifetime; readiness is never execution evidence.
+        worker.write_text(synchronized_provider_script(ready, release))
+    else:
+        worker.write_text("#!/bin/sh\nsleep 2\nprintf '%s\\n' 'fixture provider refusal' >&2\nexit 7\n")
+    worker.chmod(0o700)
+    allowed = ["safe/**"] if authority == "ordinary" else []
+    owner_allowed = ["controller/h034-native/**"] if authority == "owner_authority" else []
+    task = {"id":"fixture-task", "authority_class":authority, "allowed_write":allowed,
+            "owner_author_allowed_write":owner_allowed, "docs_impact":[], "depends_on":[],
+            "exit_test":"verify/bin/fixture-red", "max_changed_files":5, "max_added_lines":20}
+    spec = tmp / f"spec-{authority}-{int(restart)}.json"
+    write_json(spec, {"spec_version":"2.0.0", "defaults":{"denied_write":[]}, "tasks":[task]})
+    state = tmp / f"state-{authority}-{int(restart)}"; attest = tmp / f"attest-{authority}-{int(restart)}"
+    state_init = run([str(ROOT / "controller/state/cli"), "init", str(state)])
+    if state_init.returncode: raise Rig(state_init.stderr or state_init.stdout)
+    attest.mkdir()
+    cfg = tmp / f"config-{authority}-{int(restart)}.json"
+    write_json(cfg, {"spec":str(spec), "attest_dir":str(attest), "state_dir":str(state),
+        "lease_dir":str(tmp/f"lease-{authority}-{int(restart)}"), "lease_resurs":"fixture",
+        "workspace_rot":str(tmp/f"workspaces-{authority}-{int(restart)}"), "base_sha":base,
+        "verifier_id":"h035-fixture-unregistered", "run_id":f"h035-{authority}-{int(restart)}",
+        "brytare_rot":str(tmp/f"breaker-{authority}-{int(restart)}"), "budget":1, "troskel":1,
+        "worker_cmd":[str(worker), nonce],
+        "timeout_s":V6_PROVIDER_FAILSAFE_S if observe else 5})
+    def observed_run() -> tuple[subprocess.CompletedProcess, str, dict[str, object]]:
+        proc = subprocess.Popen([str(LOOP), "run", str(cfg)], cwd=repo,
+                                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if observe:
+            verdict, evidence = observe_provider_lifetime(
+                proc, provider=worker, nonce=nonce, ready=ready, release=release)
+        else:
+            verdict, evidence = "NOT_OBSERVED", {"nonce":nonce}
+        try:
+            stdout, stderr = proc.communicate(timeout=V6_RELEASE_CLEANUP_MARGIN_S)
+        except subprocess.TimeoutExpired:
+            proc.terminate()
+            try:
+                stdout, stderr = proc.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill(); stdout, stderr = proc.communicate(timeout=2)
+            verdict = "ODÖMBART"
+            evidence["cleanup_error"] = "loop did not exit within release cleanup margin"
+        evidence.update({"loop_pid":proc.pid,"provider_path":str(worker),
+                         "ready_observed":bool(evidence.get("ready_observed", False)),
+                         "loop_cleanup_complete":proc.poll() is not None,
+                         "ps_fields":["pid","ppid","pgid","comm","args"]})
+        return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr), verdict, evidence
+    first, verdict, evidence = observed_run()
+    if restart:
+        second, second_verdict, second_evidence = observed_run()
+        if second_verdict == "PASS" or verdict != "PASS": verdict, evidence = second_verdict, second_evidence
+        result = second
+    else: result = first
+    events = state / "events.jsonl"
+    text = events.read_text(errors="replace") if events.exists() else ""
+    done = '"status": "done"' in text or '"status":"done"' in text
+    return result, verdict, text, done, evidence
+
+
+def real_routing(tmp: Path) -> None:
+    ordinary, _verdict, _, _, _ = loop_fixture(tmp, "ordinary")
+    print("OWNER_ACCEPTANCE_OBSERVATION=DEFERRED_TO_OWNER_TERMINAL_V6")
+    print("OWNER_ACCEPTANCE_REQUIRED=YES")
+    owner, verdict, state, done, _ = loop_fixture(tmp, "owner_authority")
+    owner_required = "OWNER_ACTION_REQUIRED" in state
+    check(verdict == "NOT_OBSERVED" and owner_required and not done, "A_OWNER_ROUTE_REAL_EFFECT",
+          f"rc={owner.returncode} verdict={verdict} state={state[-300:]!r}")
+    restarted, verdict, state, done, _ = loop_fixture(tmp, "owner_authority", restart=True)
+    check(verdict == "NOT_OBSERVED" and "OWNER_ACTION_REQUIRED" in state and not done,
+          "A_OWNER_RESTART_REAL_RECONSTRUCTION",
+          f"rc={restarted.returncode} verdict={verdict} state={state[-300:]!r}")
+
+
+def owner_acceptance(candidate_sha: str, artifact: Path) -> int:
+    """Candidate-bound owner-terminal subgate over the same normal loop route."""
+    actual = git(ROOT, "rev-parse", "HEAD").stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", candidate_sha) or actual != candidate_sha:
+        raise Rig(f"candidate mismatch requested={candidate_sha} actual={actual}")
+    if git(ROOT, "status", "--porcelain").stdout.strip():
+        raise Rig("owner acceptance requires clean immutable candidate")
+    with tempfile.TemporaryDirectory(prefix="h035-owner-effect-") as raw:
+        result, verdict, _state, _done, evidence = loop_fixture(Path(raw), "ordinary", observe=True)
+    record = {
+        "acceptance_mode": "H035_OWNER_PROVIDER_EXEC_V6",
+        "task": "h-035", "candidate_sha": candidate_sha,
+        "gate_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "spec_sha256": hashlib.sha256(SPEC.read_bytes()).hexdigest(),
+        "normal_entrypoint": "controller/loop/cli run",
+        "observer": "H035_OWNER_PROVIDER_EXEC_V6 exact-argv, loop-image-bound normal-ancestry, observer-release-coupled lifetime",
+        "observer_version": 6,
+        "candidate_bound_attempts": 1,
+        "observer_verdict": verdict,
+        "provider_process_execution_observed": verdict == "PASS",
+        "raw_process_evidence": evidence,
+        "loop_exit": result.returncode,
+    }
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n")
+    print(json.dumps(record, sort_keys=True))
+    return {"PASS":0, "FAIL":1, "ODÖMBART":2}.get(verdict, 2)
+
+
+def authority_call(tmp: Path, command: str, request: dict[str, object]) -> tuple[int, dict[str, object], str]:
+    if not AUTH.is_file(): return 127, {}, f"missing operational entrypoint {AUTH}"
+    # Gate-owned operational probes must not dirty the immutable candidate.
+    # RV-02 separately removes these controls when judging normal taskval and
+    # policy production execution, so this harness hygiene cannot mask it.
+    env = os.environ.copy(); env["PYTHONDONTWRITEBYTECODE"] = "1"
+    p = run([str(AUTH), command], cwd=tmp, env=env, stdin=json.dumps(request))
+    try: out = json.loads(p.stdout)
+    except ValueError: out = {}
+    return p.returncode, out, (p.stderr or p.stdout)[-500:]
+
+
+def filesystem_snapshot(root: Path, *, exclude_top: set[str] | None = None) -> dict[str, str]:
+    """Logical byte/type snapshot without following symlinks.
+
+    The root, empty directories, symlink targets and filesystem object types
+    are material.  Mode and ownership are included because content alone is
+    insufficient to restore an executable or equally owned projection.
+    Timestamps are excluded: merely reading the snapshot can update atime.
+    """
+    snapshot: dict[str, str] = {}
+    excluded = exclude_top or set()
+
+    def visit(item: Path, name: str) -> None:
+        try:
+            info = os.lstat(item)
+        except FileNotFoundError:
+            snapshot[name] = "ABSENT"
+            return
+        metadata = f"mode={stat.S_IMODE(info.st_mode):04o}:uid={info.st_uid}:gid={info.st_gid}"
+        if stat.S_ISLNK(info.st_mode):
+            snapshot[name] = f"L:{metadata}:target={os.readlink(item)}"
+        elif stat.S_ISDIR(info.st_mode):
+            snapshot[name] = f"D:{metadata}"
+            with os.scandir(item) as entries:
+                children = sorted(entries, key=lambda candidate: candidate.name)
+            for entry in children:
+                if name == "." and entry.name in excluded:
+                    continue
+                child_name = entry.name if name == "." else f"{name}/{entry.name}"
+                visit(Path(entry.path), child_name)
+        elif stat.S_ISREG(info.st_mode):
+            digest = hashlib.sha256(item.read_bytes()).hexdigest()
+            snapshot[name] = f"F:{metadata}:size={info.st_size}:sha256={digest}"
+        else:
+            snapshot[name] = f"OTHER:{stat.S_IFMT(info.st_mode):o}:{metadata}:size={info.st_size}"
+
+    visit(root, ".")
+    return snapshot
+
+
+def repository_snapshot(repo: Path) -> dict[str, str]:
+    """All repository-local filesystem bytes/types outside Git metadata."""
+    return filesystem_snapshot(repo, exclude_top={".git"})
+
+
+def snapshot_delta(before: dict[str, str], after: dict[str, str]) -> list[str]:
+    return sorted(name for name in set(before) | set(after)
+                  if before.get(name) != after.get(name))
+
+
+def snapshot_selftests() -> None:
+    """Mutate disposable objects to prove cleanup/type drift cannot collide."""
+    with tempfile.TemporaryDirectory(prefix="h035-snapshot-selftest-") as raw:
+        root = Path(raw) / "projection"; root.mkdir()
+        empty = root / "state.db"; empty.mkdir()
+        payload = root / "events.jsonl"; payload.write_bytes(b"event\n")
+        link = root / "current"; link.symlink_to("events.jsonl")
+        baseline = filesystem_snapshot(root)
+
+        empty.rmdir()
+        deleted = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, deleted) == ["state.db"],
+              "J_SNAPSHOT_CLEANUP_MUTANT_EMPTY_DIRECTORY_DELETION_REJECTS",
+              repr(snapshot_delta(baseline, deleted)))
+
+        empty.write_bytes(b"")
+        changed_type = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, changed_type) == ["state.db"],
+              "J_SNAPSHOT_DIRECTORY_TO_FILE_REJECTS",
+              repr(snapshot_delta(baseline, changed_type)))
+
+        empty.unlink(); empty.mkdir()
+        link.unlink(); link.symlink_to("state.db")
+        changed_link = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, changed_link) == ["current"],
+              "J_SNAPSHOT_SYMLINK_TARGET_REJECTS",
+              repr(snapshot_delta(baseline, changed_link)))
+
+        link.unlink(); link.symlink_to("events.jsonl")
+        payload.chmod(0o600)
+        changed_mode = filesystem_snapshot(root)
+        check(snapshot_delta(baseline, changed_mode) == ["events.jsonl"],
+              "J_SNAPSHOT_MODE_CHANGE_REJECTS",
+              repr(snapshot_delta(baseline, changed_mode)))
+
+
+def ordinary_python_env() -> dict[str, str]:
+    """Normal execution: do not let the outer gate hide bytecode writes."""
+    env = os.environ.copy()
+    env.pop("PYTHONDONTWRITEBYTECODE", None)
+    env.pop("PYTHONPYCACHEPREFIX", None)
+    return env
+
+
+def remote_refs(remote: Path) -> str:
+    p = run(["git", "for-each-ref", "--format=%(refname) %(objectname)"], cwd=remote)
+    if p.returncode: raise Rig(p.stderr)
+    return p.stdout
+
+
+def persisted_state(state_dir: Path) -> str:
+    texts = []
+    if state_dir.exists():
+        for item in sorted(state_dir.rglob("*")):
+            if item.is_file(): texts.append(item.read_text(errors="replace"))
+    return "\n".join(texts)
+
+
+def expect_auth(tmp: Path, name: str, command: str, request: dict[str, object], accepted: bool,
+                *, state_after: str | None = None, state_changes: bool | None = None,
+                workspace_changes: bool | None = None, refs_change: bool | None = None,
+                **diagnostics: object) -> None:
+    state_dir = Path(str(request["state_dir"])); workspace = Path(str(request["workspace_root"]))
+    remote = Path(str(request["remote"]))
+    before_state = filesystem_snapshot(state_dir)
+    before_ws = filesystem_snapshot(workspace)
+    before_refs = remote_refs(remote)
+    rc, out, detail = authority_call(tmp, command, request)
+    ok = ((rc == 0) == accepted) and out.get("accepted") is accepted
+    after_state = filesystem_snapshot(state_dir)
+    after_ws = filesystem_snapshot(workspace)
+    after_refs = remote_refs(remote)
+    for key, value in diagnostics.items(): ok = ok and out.get(key) == value
+    if state_after is not None: ok = ok and state_after in persisted_state(state_dir)
+    if state_changes is not None: ok = ok and ((before_state != after_state) is state_changes)
+    if workspace_changes is not None: ok = ok and ((before_ws != after_ws) is workspace_changes)
+    if refs_change is not None: ok = ok and ((before_refs != after_refs) is refs_change)
+    check(ok, name, detail or repr(out))
+
+
+def production_matrix(tmp: Path) -> None:
+    """Future operational CLI contract; every case is black-box, never a named probe."""
+    repo, base = authority_repo(tmp, "authority-repo", [
+        ordinary_task("fixture-ordinary", ["safe/**"]),
+        owner_task("fixture-owner", ["controller/h034-native/**"]),
+    ])
+    bare = tmp / "origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    spec_digest = hashlib.sha256((repo / "specs/tasks.spec.json").read_bytes()).hexdigest()
+    reg_digest = hashlib.sha256((repo / "specs/owner-production-paths.v1.json").read_bytes()).hexdigest()
+    gate_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    common: dict[str, object] = {"repo":str(repo), "task_id":"fixture-owner", "base_sha":base,
+        "main_sha":base, "spec_sha256":spec_digest, "registry_sha256":reg_digest,
+        "gate_path":"verify/bin/h-035-exit", "gate_sha256":gate_digest,
+        "state_dir":str(tmp/"authority-state"), "workspace_root":str(tmp/"authority-ws"),
+        "remote":str(bare)}
+    write_json(Path(str(common["state_dir"])) / "current.json",
+               {"task":"fixture-owner", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    def req(**kw: object) -> dict[str, object]: return {**common, **kw}
+    # Actual task/schema/authority consumer matrix (N01-N18, N36-N41; P01-P05).
+    invalid = [
+      ("N01_EXACT_OWNER", "2.0.0", dict(authority_class="ordinary",allowed_write=["verify/h034/kernel"])),
+      ("N02_PARENT_OWNER", "2.0.0", dict(authority_class="ordinary",allowed_write=["verify/**"])),
+      ("N03_WILDCARD_OWNER", "2.0.0", dict(authority_class="ordinary",allowed_write=["controller/**"])),
+      ("N09_ORDINARY_BOTH", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],owner_author_allowed_write=["controller/h034-native/**"])),
+      ("N10_OWNER_NONEMPTY_ORDINARY", "2.0.0", dict(authority_class="owner_authority",allowed_write=["safe/**"],owner_author_allowed_write=["controller/h034-native/**"])),
+      ("N10B_OWNER_EMPTY_OWNER", "2.0.0", dict(authority_class="owner_authority",allowed_write=["safe/**"],owner_author_allowed_write=[])),
+      ("N11_EMPTY_CLASS", "2.0.0", dict(authority_class="",allowed_write=["safe/**"])),
+      ("N12_UPPER_CLASS", "2.0.0", dict(authority_class="OWNER",allowed_write=["safe/**"])),
+      ("N13_MIXED_CLASS", "2.0.0", dict(authority_class="OwNeR",allowed_write=["safe/**"])),
+      ("N14_V1_OWNER_FIELD", "1.0.0", dict(allowed_write=["safe/**"],owner_author_allowed_write=["controller/h034-native/**"])),
+      ("N15_DOCS_EXACT", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=["verify/h034/kernel"])),
+      ("N16_DOCS_PARENT", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=["verify/**"])),
+      ("N16B_OWNER_DOCS_GATE", "2.0.0", dict(authority_class="owner_authority",allowed_write=[],owner_author_allowed_write=["safe-owner/**"],docs_impact=["verify/bin/h-035-exit"])),
+    ]
+    for name, version, task in invalid:
+        trepo, tbase, tsha = task_candidate(tmp, name, version, task)
+        expect_auth(tmp, name, "validate-task", {**common,"repo":str(trepo),"base_sha":tbase,"candidate_sha":tsha,"task_id":"fixture-task"}, False)
+    for name, version, task in (
+      ("P01_V1_ORDINARY", "1.0.0", dict(allowed_write=["safe/**"],docs_impact=[])),
+      ("P02_V2_ORDINARY", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=[])),
+      ("P04_DOCS_LEGITIMATE", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=["safe/docs/**"])),
+    ):
+        trepo, tbase, tsha = task_candidate(tmp, name, version, task)
+        expect_auth(tmp, name, "validate-task", {**common,"repo":str(trepo),"base_sha":tbase,"candidate_sha":tsha,"task_id":"fixture-task"}, True)
+    trepo, tbase, tsha = task_candidate(tmp, "HOSTILE_AUTHORITY_INPUTS", "2.0.0", dict(authority_class="ordinary",allowed_write=["safe/**"],docs_impact=[]))
+    canonical = {**common,"repo":str(trepo),"base_sha":tbase,"candidate_sha":tsha,"task_id":"fixture-task"}
+    expect_auth(tmp, "N17_ROLE_SELF_CLAIM", "validate-task", {**canonical,"claimed_role":"OWNER_AUTHORITY_AUTHOR"}, True, authority_class="ordinary")
+    alt = tmp / "alternate.json"; write_json(alt, {"tasks":[{"id":"fixture-task","authority_class":"owner_authority","owner_author_allowed_write":["controller/h034-native/**"]}]})
+    expect_auth(tmp, "N18_ALTERNATE_SPEC", "validate-task", {**canonical,"alternate_spec":str(alt)}, True, authority_class="ordinary")
+    freeze_common = req(review_result="PASS",candidate_sha=base,review_identity="review-1")
+    rrepo, rbase, rsha = registry_candidate(tmp, "P05_REGISTRY_RUNTIME", REG.read_text())
+    expect_auth(tmp, "P05_REGISTRY_RUNTIME", "validate-registry", {**common,"repo":str(rrepo),"base_sha":rbase,"candidate_sha":rsha}, True)
+    good_reg = strict_load(REG)
+    malformed: list[tuple[str, str]] = [
+      ("N36_DUPLICATE_KEY", REG.read_text().replace('"schema_version": 1,', '"schema_version": 1,\n  "schema_version": 1,')),
+      ("N37_UNEXPECTED_KEY", json.dumps({**good_reg, "unexpected": []})),
+      ("N38_MISSING_KEY", json.dumps({k:v for k,v in good_reg.items() if k != "path_grammar"})),
+      ("N39_DUPLICATE_PATH", json.dumps({**good_reg, "owner_production_paths":[*good_reg["owner_production_paths"], good_reg["owner_production_paths"][0]]})),
+      ("N40_REQUIRED_REMOVED", json.dumps({**good_reg, "owner_production_paths":good_reg["owner_production_paths"][1:]})),
+      ("N_REG_WRONG_VERSION", json.dumps({**good_reg, "schema_version":2})),
+      ("N_REG_WRONG_TOP_TYPE", "[]"),
+      ("N_REG_MALFORMED_PATH", json.dumps({**good_reg, "owner_production_paths":["../escape"]})),
+    ]
+    for name, raw in malformed:
+        rrepo, rbase, rsha = registry_candidate(tmp, name, raw)
+        mutant_req = {**common,"repo":str(rrepo),"base_sha":rbase,"candidate_sha":rsha}
+        expect_auth(tmp, f"{name}_VALIDATOR", "validate-registry", mutant_req, False)
+        expect_auth(tmp, f"{name}_POLICY", "check-candidate", {**mutant_req,"actor":"ordinary"}, False)
+        expect_auth(tmp, f"{name}_OWNER_TRANSITION", "owner-author", mutant_req, False,
+                    state_changes=False, workspace_changes=False, refs_change=False)
+    # Mechanical actor/candidate scope uses Git changed files, not reported lists.
+    scope_neg = [
+      ("N04_OWNER_ARTIFACT", "controller/h034-native/kernel.c", "ordinary"),
+      ("N05_SCHEMA", "specs/tasks.spec.json", "ordinary"), ("N06_REGISTRY", "specs/owner-production-paths.v1.json", "ordinary"),
+      ("N07_POLICY", "controller/policy/cli", "ordinary"), ("N08_AUTOPILOT", "scripts/nortropic-codex-autopilot.py", "ordinary"),
+      ("N23_TEST_AUTHOR_OWNER", "controller/h034-native/kernel.c", "test_author"),
+      ("N24_OWNER_SPEC", "specs/tasks.spec.json", "owner_authority"), ("N25_OWNER_REGISTRY", "specs/owner-production-paths.v1.json", "owner_authority"),
+      ("N26_OWNER_GATE", "verify/bin/h-035-exit", "owner_authority"), ("N27_OWNER_OUTSIDE", "README.md", "owner_authority"),
+    ]
+    serial = 0
+    for name, path, actor in scope_neg:
+        serial += 1; sha = candidate(repo, base, path, serial)
+        task_id = "fixture-ordinary" if actor == "ordinary" else "fixture-owner"
+        expect_auth(tmp, name, "check-candidate", req(actor=actor,candidate_sha=sha,
+                    task_id=task_id,reported_changed_files=[]), False)
+    serial += 1; sha = candidate(repo, base, "controller/h034-native/kernel.c", serial)
+    expect_auth(tmp, "P07_OWNER_EXACT_SURFACE", "check-candidate", req(actor="owner_authority",candidate_sha=sha), True)
+    serial += 1; sha = candidate(repo, base, "controller/h034-native/alternative.c", serial)
+    expect_auth(tmp, "P08_OWNER_ALT_BYTES", "check-candidate", req(actor="owner_authority",candidate_sha=sha), True)
+    serial += 1; sha = candidate(repo, base, "controller/h034-native/kernel.c", serial)
+    expect_auth(tmp, "N31_REPORTED_FILES_NOT_AUTHORITY", "check-candidate",
+                req(actor="ordinary",task_id="fixture-ordinary",candidate_sha=sha,
+                    reported_changed_files=["safe/x"]), False)
+    # Explicit operational owner transitions and publication guard.
+    expect_auth(tmp, "N_OWNER_AUTHOR_MISSING_BINDING", "owner-author", req(candidate_sha="0"*40), False,
+                state_changes=False, workspace_changes=False, refs_change=False)
+    expect_auth(tmp, "P06_OWNER_AUTHOR_EXPLICIT", "owner-author", req(candidate_sha=base), True,
+                state_after="OWNER_CANDIDATE_REVIEW_REQUIRED", state_changes=True,
+                workspace_changes=True, refs_change=False)
+    # Recovery reads persisted state; a caller-supplied state is never authority.
+    expect_auth(tmp, "N_NORMAL_ROUTE_OWNER_AUTHOR", "recover", req(state="OWNER_ACTION_REQUIRED"), True,
+                state_after="OWNER_CANDIDATE_REVIEW_REQUIRED", workspace_changes=False,
+                refs_change=False, owner_author_process_launched=False)
+    state_file = Path(str(common["state_dir"])) / "current.json"
+    write_json(state_file, {"task":"fixture-owner", "state":"UNKNOWN_FUTURE_STATE", "base_sha":base})
+    expect_auth(tmp, "N_UNKNOWN_STATE", "recover", req(state="OWNER_ACTION_REQUIRED"), False,
+                state_after="UNKNOWN_FUTURE_STATE", workspace_changes=False, refs_change=False,
+                builder_launched=False)
+    write_json(state_file, {"task":"fixture-owner", "state":"OWNER_CANDIDATE_REVIEW_REQUIRED", "base_sha":base,
+                            "candidate_sha":base, "review_identity":"review-1"})
+    expect_auth(tmp, "N32_REVIEW_PUBLICATION", "record-review", req(review_result="PASS",candidate_sha=base,review_identity="review-1"), True,
+                state_after="OWNER_FINAL_FREEZE_REQUIRED", state_changes=True, refs_change=False,
+                published=False, merged=False)
+    for name, extra in (
+      ("N33_WRONG_CANDIDATE", dict(candidate_sha="1"*40)), ("N34_WRONG_REVIEW", dict(review_identity="wrong")),
+      ("N35_WRONG_BASE", dict(base_sha="2"*40)), ("N35B_WRONG_MAIN", dict(main_sha="3"*40)),
+      ("N28_WRONG_SPEC_DIGEST", dict(spec_sha256="4"*64)), ("N29_WRONG_REGISTRY_DIGEST", dict(registry_sha256="5"*64)),
+      ("N_FREEZE_MISSING_PASS", dict(review_result="FAIL")),
+    ): expect_auth(tmp, name, "owner-freeze", {**freeze_common, **extra}, False,
+                   state_changes=False, workspace_changes=False, refs_change=False)
+    # Repeat review is idempotent in external state and still cannot publish.
+    expect_auth(tmp, "P10_REVIEW_TO_FINAL", "record-review", req(review_result="PASS",candidate_sha=base,review_identity="review-1"), True,
+                state_after="OWNER_FINAL_FREEZE_REQUIRED", refs_change=False, published=False)
+    expect_auth(tmp, "P11_EXACT_OWNER_FREEZE", "owner-freeze", req(review_result="PASS",candidate_sha=base,review_identity="review-1"), True,
+                state_after="OWNER_FROZEN", state_changes=True, refs_change=False)
+    # Identical corpus through real validation and real Git-scope policy consumers.
+    corpus = [("EXACT", "safe/x", True), ("PARENT", "safe/**", True),
+              ("CHILD", "safe/x/child", False), ("SIBLING", "sibling/**", False),
+              ("UNSUPPORTED", "safe/*", False), ("BACKSLASH", r"safe\x", True),
+              ("DOTDOT", "../safe/x", False), ("DOT", "./safe/x", False),
+              ("REPEATED", "safe//x", False), ("ROOT", "**", False)]
+    for name, pattern, permits in corpus:
+        prepo, pbase, psha = path_candidate(tmp, name, pattern)
+        preq = {**common, "repo":str(prepo), "base_sha":pbase, "candidate_sha":psha,
+                "task_id":"fixture-task"}
+        expect_auth(tmp, f"PATH_VALIDATE_{name}", "validate-task", preq, permits)
+        expect_auth(tmp, f"PATH_POLICY_{name}", "check-candidate", {**preq, "actor":"ordinary"}, permits)
+
+
+def transition_request(repo: Path, base: str, task_id: str, state: Path,
+                       workspace: Path, remote: Path, **extra: object) -> dict[str, object]:
+    identity_sha = extra.get("candidate_sha", base)
+    if not isinstance(identity_sha, str):
+        raise Rig("fixture candidate identity must be a string")
+    spec_raw = git_object_bytes(repo, identity_sha, "specs/tasks.spec.json")
+    registry_raw = git_object_bytes(repo, identity_sha, "specs/owner-production-paths.v1.json")
+    if spec_raw is None or registry_raw is None:
+        raise Rig("fixture canonical authority documents missing")
+    spec = json.loads(spec_raw)
+    hits = [task for task in spec.get("tasks", [])
+            if isinstance(task, dict) and task.get("id") == task_id]
+    canonical_gate = hits[0].get("exit_test") if len(hits) == 1 else None
+    request_gate = extra.get("gate_path", canonical_gate)
+    gate_raw = (git_object_bytes(repo, identity_sha, canonical_gate)
+                if isinstance(canonical_gate, str) else None)
+    gate_digest = (extra.get("gate_sha256") if "gate_sha256" in extra
+                   else hashlib.sha256(gate_raw).hexdigest() if gate_raw is not None
+                   else "0" * 64)
+    return {"repo":str(repo), "task_id":task_id, "base_sha":base,
+        "candidate_sha":base, "main_sha":base,
+        "spec_sha256":hashlib.sha256(spec_raw).hexdigest(),
+        "registry_sha256":hashlib.sha256(registry_raw).hexdigest(),
+        "gate_path":request_gate, "gate_sha256":gate_digest,
+        "state_dir":str(state), "workspace_root":str(workspace), "remote":str(remote),
+        **extra}
+
+
+def remediation_matrix(tmp: Path) -> None:
+    """Black-box guards for H035-IR-01..07 from independent builder review."""
+    # IR-01: normal task selection's authoritative event state must be the
+    # state consumed by the explicit owner transition. No judge-written
+    # current.json bridge is permitted in this path.
+    repo, base = authority_repo(tmp, "ir01-repo", [
+        owner_task("owner-ir01", ["controller/h034-native/**"])])
+    state, attest, workspace = tmp / "ir01-state", tmp / "ir01-attest", tmp / "ir01-ws"
+    init_state(state); attest.mkdir()
+    claim = run([str(TASKVAL), "claim", str(repo / "specs/tasks.spec.json"),
+                 str(attest), str(state)])
+    rebuilt = run([str(STATE), "rebuild", str(state)])
+    bare = tmp / "ir01-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    refs_before = remote_refs(bare)
+    request = transition_request(repo, base, "owner-ir01", state, workspace, bare)
+    rc, out, detail = authority_call(tmp, "owner-author", request)
+    check(claim.returncode == 0 and not claim.stdout.strip()
+          and "OWNER_ACTION_REQUIRED" in rebuilt.stdout
+          and rc == 0 and out.get("accepted") is True
+          and "OWNER_CANDIDATE_REVIEW_REQUIRED" in persisted_state(state)
+          and workspace.is_dir() and remote_refs(bare) == refs_before,
+          "A_IR01_NORMAL_EVENTLOG_OWNER_AUTHOR_HANDOFF", detail or repr(out))
+
+    # IR-02: persisted caller-hostile state can never change the canonical
+    # class of an ordinary task.
+    repo, base = authority_repo(tmp, "ir02-repo", [ordinary_task("ordinary-ir02", ["safe/**"])])
+    bare = tmp / "ir02-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    state, workspace = tmp / "ir02-state", tmp / "ir02-ws"
+    write_json(state / "current.json",
+               {"task":"ordinary-ir02", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    expect_auth(tmp, "A_IR02_ORDINARY_OWNER_AUTHOR_ESCALATION_REJECT", "owner-author",
+                transition_request(repo, base, "ordinary-ir02", state, workspace, bare), False,
+                state_changes=False, workspace_changes=False, refs_change=False)
+
+    # IR-03: the task's exact owner surface is narrower than the registry's
+    # global owner family. Both negative and legitimate exact-file controls
+    # use the actual Git-derived candidate check.
+    repo, base = authority_repo(tmp, "ir03-repo", [
+        owner_task("owner-ir03", ["controller/h034-native/kernel.c"])])
+    bare = tmp / "ir03-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    request = transition_request(repo, base, "owner-ir03", tmp/"ir03-state", tmp/"ir03-ws", bare)
+    alt = candidate(repo, base, "controller/h034-native/alternative.c", 301)
+    rc, out, detail = authority_call(tmp, "check-candidate",
+                                     {**request, "candidate_sha":alt, "actor":"owner_authority"})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR03_TASK_SPECIFIC_OWNER_SURFACE_REJECT", detail or repr(out))
+    exact = candidate(repo, base, "controller/h034-native/kernel.c", 302)
+    rc, out, detail = authority_call(tmp, "check-candidate",
+                                     {**request, "candidate_sha":exact, "actor":"owner_authority"})
+    check(rc == 0 and out.get("accepted") is True,
+          "A_IR03_TASK_SPECIFIC_OWNER_SURFACE_POSITIVE", detail or repr(out))
+
+    # IR-04: execute the exact policy CLI used by controller/loop/cli in a
+    # disposable clone. The task exists before its candidate; this is the
+    # prospective post-bootstrap ordinary route, not H-035's exception.
+    clone = tmp / "ir04-normal-policy-repo"
+    p = run(["git", "clone", "-q", "--no-hardlinks", str(ROOT), str(clone)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    write_json(clone / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0",
+        "defaults":{"denied_write":[], "max_changed_files":10, "max_added_lines":100},
+        "tasks":[ordinary_task("future-ordinary", ["controller/authority/**"])]})
+    policy_base = commit_paths(clone, "future ordinary task allocated", "specs/tasks.spec.json")
+    protected = candidate(clone, policy_base, "controller/authority/ir04-fixture.txt", 401)
+    p = run([str(clone / "controller/policy/cli"), "check", "future-ordinary",
+             policy_base, protected, str(clone / "specs/tasks.spec.json")], cwd=clone)
+    check(p.returncode != 0, "A_IR04_NORMAL_LOOP_POLICY_PROSPECTIVE_PROTECTION_REJECT",
+          (p.stdout or p.stderr)[-500:])
+    write_json(clone / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0",
+        "defaults":{"denied_write":[], "max_changed_files":10, "max_added_lines":100},
+        "tasks":[ordinary_task("future-safe", ["tests/h035safe/**"])]})
+    safe_base = commit_paths(clone, "future safe task allocated", "specs/tasks.spec.json")
+    safe = candidate(clone, safe_base, "tests/h035safe/effect.txt", 402)
+    p = run([str(clone / "controller/policy/cli"), "check", "future-safe",
+             safe_base, safe, str(clone / "specs/tasks.spec.json")], cwd=clone)
+    check(p.returncode == 0, "A_IR04_NORMAL_LOOP_POLICY_SAFE_POSITIVE",
+          (p.stdout or p.stderr)[-500:])
+
+    # IR-05: final freeze derives current main from the configured remote.
+    # Advancing the real bare ref after review must invalidate stale A.
+    repo, base = authority_repo(tmp, "ir05-repo", [
+        owner_task("owner-ir05", ["controller/h034-native/**"])])
+    bare = tmp / "ir05-origin.git"; run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    set_remote_main(bare, repo, base)
+    state, workspace = tmp / "ir05-state", tmp / "ir05-ws"
+    write_json(state / "current.json",
+               {"task":"owner-ir05", "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    request = transition_request(repo, base, "owner-ir05", state, workspace, bare)
+    rc1, _, d1 = authority_call(tmp, "owner-author", request)
+    rc2, _, d2 = authority_call(tmp, "record-review",
+        {**request, "review_result":"PASS", "review_identity":"ir05-review"})
+    advanced = candidate(repo, base, "advance-main.txt", 501)
+    set_remote_main(bare, repo, advanced)
+    state_before, refs_before = filesystem_snapshot(state), remote_refs(bare)
+    rc3, out3, d3 = authority_call(tmp, "owner-freeze",
+        {**request, "review_result":"PASS", "review_identity":"ir05-review"})
+    check(rc1 == 0 and rc2 == 0 and rc3 != 0 and out3.get("accepted") is False
+          and filesystem_snapshot(state) == state_before and remote_refs(bare) == refs_before
+          and advanced in refs_before,
+          "A_IR05_ACTUAL_REMOTE_CURRENT_MAIN_ADVANCE_REJECT",
+          " | ".join(x for x in (d1, d2, d3, repr(out3)) if x))
+
+    # IR-06: operational commands never borrow installed authority bytes.
+    missing = tmp / "ir06-both-missing"; seed = init_repo(missing)
+    rc, out, detail = authority_call(tmp, "validate-registry",
+                                     {"repo":str(missing), "base_sha":seed, "candidate_sha":seed})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR06_CANONICAL_SPEC_AND_REGISTRY_MISSING_REJECT", detail or repr(out))
+    spec_only = tmp / "ir06-spec-only"; base0 = init_repo(spec_only); (spec_only/"specs").mkdir()
+    write_json(spec_only / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0", "defaults":{"denied_write":[]},
+        "tasks":[ordinary_task("ordinary-ir06", ["safe/**"])]})
+    spec_sha = commit_paths(spec_only, "spec only", "specs/tasks.spec.json")
+    rc, out, detail = authority_call(tmp, "validate-registry",
+        {"repo":str(spec_only), "base_sha":base0, "candidate_sha":spec_sha})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR06_CANONICAL_REGISTRY_MISSING_REJECT", detail or repr(out))
+    reg_only = tmp / "ir06-registry-only"; base0 = init_repo(reg_only); (reg_only/"specs").mkdir()
+    (reg_only / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    reg_sha = commit_paths(reg_only, "registry only", "specs/owner-production-paths.v1.json")
+    rc, out, detail = authority_call(tmp, "validate-registry",
+        {"repo":str(reg_only), "base_sha":base0, "candidate_sha":reg_sha})
+    check(rc != 0 and out.get("accepted") is False,
+          "A_IR06_CANONICAL_SPEC_MISSING_REJECT", detail or repr(out))
+
+    # IR-07: malformed owner surfaces are rejected by taskval, the actual
+    # normal routing consumer, before any owner handoff event is appended.
+    malformed: list[tuple[str, object]] = [
+        ("EMPTY", ""), ("ABSOLUTE", "/x"), ("DRIVE", "C:/x"),
+        ("LEADING_DOT", "./x"), ("REPEATED_SEPARATOR", "x//y"),
+        ("TRAILING_SEPARATOR", "x/"), ("DOT_SEGMENT", "x/./y"),
+        ("DOTDOT_SEGMENT", "x/../y"), ("GLOB", "x/*"),
+        ("NONTERMINAL_RECURSIVE", "x/**/y"), ("ROOT_RECURSIVE", "**"),
+        ("NON_STRING", None), ("NUL", "x\x00y"),
+    ]
+    for name, path in malformed:
+        state, attest = tmp / f"ir07-state-{name}", tmp / f"ir07-attest-{name}"
+        init_state(state); attest.mkdir()
+        spec = tmp / f"ir07-{name}.json"
+        write_json(spec, {"spec_version":"2.0.0", "tasks":[
+            owner_task("owner-ir07", [path])]})
+        p = run([str(TASKVAL), "claim", str(spec), str(attest), str(state)])
+        rebuilt = run([str(STATE), "rebuild", str(state)])
+        check(p.returncode != 0 and rebuilt.returncode == 0
+              and json.loads(rebuilt.stdout) == [],
+              f"A_IR07_NORMAL_TASKVAL_MALFORMED_{name}_REJECT",
+              (p.stderr or p.stdout)[-500:])
+    state, attest = tmp / "ir07-state-positive", tmp / "ir07-attest-positive"
+    init_state(state); attest.mkdir()
+    spec = tmp / "ir07-positive.json"
+    write_json(spec, {"spec_version":"2.0.0", "tasks":[
+        owner_task("owner-ir07", [r"controller\h034-native\**"])]})
+    p = run([str(TASKVAL), "claim", str(spec), str(attest), str(state)])
+    rebuilt = run([str(STATE), "rebuild", str(state)])
+    check(p.returncode == 0 and "OWNER_ACTION_REQUIRED" in rebuilt.stdout,
+          "A_IR07_NORMAL_TASKVAL_BACKSLASH_NORMALIZATION_POSITIVE",
+          (p.stderr or p.stdout)[-500:])
+
+
+def r6_remediation_matrix(tmp: Path) -> None:
+    """Black-box guards for independent findings H035-R5-RV-01..02."""
+    # RV-01 predicted effect: after normal taskval has persisted the owner
+    # handoff, force the existing SQLite projection to reject its next write.
+    # A rejected owner-author must leave authoritative event bytes, projection,
+    # bounded workspace and remote refs byte-identical. The successful IR-01
+    # case remains the legitimate positive storage variant.
+    repo, base = authority_repo(tmp, "r6-atomic-repo", [
+        owner_task("owner-r6-atomic", ["controller/h034-native/**"])])
+    state, attest, workspace = (tmp / "r6-atomic-state", tmp / "r6-atomic-attest",
+                                tmp / "r6-atomic-workspace")
+    init_state(state); attest.mkdir()
+    claim = run([str(TASKVAL), "claim", str(repo / "specs/tasks.spec.json"),
+                 str(attest), str(state)])
+    rebuilt_before = run([str(STATE), "rebuild", str(state)])
+    database = state / "state.db"
+    database.unlink(); database.mkdir()
+    bare = tmp / "r6-atomic-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(bare, repo, base)
+    request = transition_request(repo, base, "owner-r6-atomic", state, workspace, bare)
+    state_before = filesystem_snapshot(state)
+    workspace_before = filesystem_snapshot(workspace)
+    refs_before = remote_refs(bare)
+    rc, out, detail = authority_call(tmp, "owner-author", request)
+    rebuilt_after = run([str(STATE), "rebuild", str(state)])
+    state_after = filesystem_snapshot(state)
+    workspace_after = filesystem_snapshot(workspace)
+    refs_after = remote_refs(bare)
+    check(claim.returncode == 0 and "OWNER_ACTION_REQUIRED" in rebuilt_before.stdout
+          and rc != 0 and out.get("accepted") is False
+          and state_after == state_before
+          and workspace_after == workspace_before
+          and refs_after == refs_before
+          and rebuilt_after.stdout == rebuilt_before.stdout,
+          "A_R6_RV01_REJECTED_OWNER_AUTHOR_ATOMIC_ON_PROJECTION_FAILURE",
+          f"rc={rc} accepted={out.get('accepted')!r} "
+          f"state_delta={snapshot_delta(state_before, state_after)!r} "
+          f"workspace_delta={snapshot_delta(workspace_before, workspace_after)!r} "
+          f"refs_changed={refs_after != refs_before} "
+          f"rebuilt_changed={rebuilt_after.stdout != rebuilt_before.stdout} "
+          f"detail={detail!r}")
+
+    # RV-02 predicted effect: normal task selection and policy are executed
+    # with no bytecode-control environment. Expected state/candidate effects
+    # are outside the observed repository tree; no cache or other local byte
+    # may appear. Fresh clones keep the two production consumers attributable.
+    taskval_repo = tmp / "r6-taskval-hygiene-repo"
+    p = run(["git", "clone", "-q", "--no-hardlinks", str(ROOT), str(taskval_repo)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    taskval_state, taskval_attest = tmp / "r6-taskval-state", tmp / "r6-taskval-attest"
+    p = run([str(taskval_repo / "controller/state/cli"), "init", str(taskval_state)],
+            cwd=taskval_repo, env=ordinary_python_env())
+    if p.returncode: raise Rig(p.stderr or p.stdout)
+    taskval_attest.mkdir()
+    taskval_spec = tmp / "r6-taskval-spec.json"
+    write_json(taskval_spec, {"spec_version":"2.0.0", "tasks":[
+        ordinary_task("ordinary-r6-hygiene", ["tests/h035-hygiene/**"])]})
+    taskval_before = repository_snapshot(taskval_repo)
+    p = run([str(taskval_repo / "controller/taskval/cli"), "claim", str(taskval_spec),
+             str(taskval_attest), str(taskval_state)], cwd=taskval_repo,
+            env=ordinary_python_env())
+    taskval_after = repository_snapshot(taskval_repo)
+    rebuilt = run([str(taskval_repo / "controller/state/cli"), "rebuild", str(taskval_state)],
+                  cwd=taskval_repo, env=ordinary_python_env())
+    taskval_delta = snapshot_delta(taskval_before, taskval_after)
+    check(p.returncode == 0 and p.stdout.strip() == "ordinary-r6-hygiene"
+          and "claimed" in rebuilt.stdout and not taskval_delta,
+          "A_R6_RV02_NORMAL_TASKVAL_REPOSITORY_HYGIENE",
+          f"rc={p.returncode} delta={taskval_delta!r} stderr={p.stderr[-300:]!r}")
+
+    policy_repo = tmp / "r6-policy-hygiene-repo"
+    p = run(["git", "clone", "-q", "--no-hardlinks", str(ROOT), str(policy_repo)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    policy_base = git(policy_repo, "rev-parse", "HEAD").stdout.strip()
+    policy_candidate = candidate(policy_repo, policy_base,
+                                 "tests/h035-hygiene/effect.txt", 602)
+    policy_spec = tmp / "r6-policy-spec.json"
+    write_json(policy_spec, {"spec_version":"2.0.0",
+        "defaults":{"denied_write":[], "max_changed_files":5, "max_added_lines":20},
+        "tasks":[ordinary_task("ordinary-r6-hygiene", ["tests/h035-hygiene/**"])]})
+    policy_before = repository_snapshot(policy_repo)
+    p = run([str(policy_repo / "controller/policy/cli"), "check", "ordinary-r6-hygiene",
+             policy_base, policy_candidate, str(policy_spec)], cwd=policy_repo,
+            env=ordinary_python_env())
+    policy_after = repository_snapshot(policy_repo)
+    policy_delta = snapshot_delta(policy_before, policy_after)
+    check(p.returncode == 0 and "accepterad:" in p.stdout and not policy_delta,
+          "A_R6_RV02_NORMAL_POLICY_REPOSITORY_HYGIENE",
+          f"rc={p.returncode} delta={policy_delta!r} output={(p.stdout or p.stderr)[-300:]!r}")
+
+
+def malformed_task_gate_repo(tmp: Path, name: str, kind: str,
+                             gate_path: str) -> tuple[Path, str]:
+    """Create a canonical owner task whose exit_test is absent or not a regular blob."""
+    repo = tmp / f"r9-{name}-repo"; init_repo(repo)
+    (repo / "specs").mkdir()
+    write_json(repo / "specs/tasks.spec.json", {
+        "spec_version":"2.0.0", "defaults":{"denied_write":[]},
+        "tasks":[owner_task("owner-r9-a", ["controller/h034-native/**"], gate_path)]})
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(REG.read_bytes())
+    target = repo / gate_path
+    if kind == "tree":
+        target.mkdir(parents=True)
+        (target / "payload").write_text("not a regular gate\n")
+    elif kind == "symlink":
+        target.parent.mkdir(parents=True, exist_ok=True)
+        (target.parent / "r9-symlink-target").write_text("#!/bin/sh\nexit 1\n")
+        target.symlink_to("r9-symlink-target")
+    elif kind != "missing":
+        raise Rig(f"unknown malformed task gate fixture: {kind}")
+    p = git(repo, "add", "-A")
+    if p.returncode: raise Rig(p.stderr)
+    p = git(repo, "commit", "-qm", f"canonical {kind} gate authority")
+    if p.returncode: raise Rig(p.stderr)
+    return repo, git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def seed_owner_command_state(state: Path, command: str,
+                             request: dict[str, object]) -> None:
+    task = request["task_id"]; base = request["base_sha"]
+    candidate_sha = request["candidate_sha"]
+    if command == "owner-author":
+        value = {"task":task, "state":"OWNER_ACTION_REQUIRED", "base_sha":base}
+    elif command == "record-review":
+        value = {"task":task, "state":"OWNER_CANDIDATE_REVIEW_REQUIRED",
+                 "base_sha":base, "candidate_sha":candidate_sha}
+    elif command == "owner-freeze":
+        value = {"task":task, "state":"OWNER_FINAL_FREEZE_REQUIRED",
+                 "base_sha":base, "main_sha":request["main_sha"],
+                 "candidate_sha":candidate_sha,
+                 "spec_sha256":request["spec_sha256"],
+                 "registry_sha256":request["registry_sha256"],
+                 "gate_path":request["gate_path"],
+                 "gate_sha256":request["gate_sha256"],
+                 "review_identity":"r9-review", "review_result":"PASS"}
+    else:
+        return
+    write_json(state / "current.json", value)
+
+
+def positive_owner_gate_chain(tmp: Path, label: str, repo: Path, base: str,
+                              task_id: str, remote: Path,
+                              *, revision: str = "R10") -> None:
+    """Exercise every material owner consumer as one independent positive chain."""
+    state = tmp / f"r10-{label}-state"
+    workspace = tmp / f"r10-{label}-workspace"
+    write_json(state / "current.json",
+               {"task":task_id, "state":"OWNER_ACTION_REQUIRED", "base_sha":base})
+    request = transition_request(repo, base, task_id, state, workspace, remote)
+    refs_before = remote_refs(remote)
+    rc1, out1, d1 = authority_call(tmp, "owner-author", request)
+    rc2, out2, d2 = authority_call(tmp, "check-candidate",
+                                   {**request, "actor":"owner_authority"})
+    rc3, out3, d3 = authority_call(tmp, "record-review",
+        {**request, "review_result":"PASS", "review_identity":f"r10-{label}-review"})
+    rc4, out4, d4 = authority_call(tmp, "owner-freeze",
+        {**request, "review_result":"PASS", "review_identity":f"r10-{label}-review"})
+    check(all(rc == 0 and out.get("accepted") is True for rc, out in
+              ((rc1,out1),(rc2,out2),(rc3,out3),(rc4,out4)))
+          and "OWNER_FROZEN" in persisted_state(state)
+          and workspace.is_dir() and remote_refs(remote) == refs_before,
+          f"A_{revision}_{label.upper()}_FULL_OWNER_GATE_CHAIN_POSITIVE",
+          " | ".join((d1,d2,d3,d4,repr((out1,out2,out3,out4)))))
+
+
+def set_hostile_checkout_gate(target: Path, kind: str, canonical: bytes) -> None:
+    """Change only disposable mutable checkout state, never its Git object."""
+    hostile_target = target.parent / "r10-hostile-target"
+    if target.is_symlink() or target.is_file():
+        target.unlink()
+    elif target.is_dir():
+        for child in sorted(target.rglob("*"), reverse=True):
+            if child.is_symlink() or child.is_file(): child.unlink()
+            elif child.is_dir(): child.rmdir()
+        target.rmdir()
+    if hostile_target.exists() or hostile_target.is_symlink(): hostile_target.unlink()
+    if kind == "regular-bytes":
+        target.write_bytes(b"#!/bin/sh\nprintf 'hostile mutable checkout bytes\\n'\nexit 0\n")
+    elif kind == "directory":
+        target.mkdir(); (target / "payload").write_text("hostile directory\n")
+    elif kind == "symlink":
+        hostile_target.write_bytes(b"#!/bin/sh\nexit 0\n")
+        target.symlink_to(hostile_target.name)
+    elif kind == "restore":
+        target.write_bytes(canonical); target.chmod(0o755)
+    elif kind != "missing":
+        raise Rig(f"unknown hostile checkout kind: {kind}")
+
+
+def r9_task_gate_matrix(tmp: Path) -> None:
+    """Operational task-specific gate binding for H035-H034-INTEGRATION-01."""
+    gate_a = "verify/bin/r9-owner-a-exit"
+    gate_b = "verify/bin/r9-owner-b-exit"
+    gate_literal = ":(literal)verify/bin/r11-owner-literal-exit"
+    gate_top = ":(top)verify/bin/r11-owner-top-exit"
+    gate_utf8 = "verify/bin/r12 owner-β-exit"
+    bytes_a = b"#!/bin/sh\nprintf 'r9 owner a red\\n' >&2\nexit 1\n"
+    bytes_b = b"#!/bin/sh\nprintf 'r9 owner b red\\n' >&2\nexit 1\n"
+    bytes_literal = b"#!/bin/sh\nprintf 'r11 literal owner red\\n' >&2\nexit 1\n"
+    bytes_top = b"#!/bin/sh\nprintf 'r11 top owner red\\n' >&2\nexit 1\n"
+    bytes_utf8 = b"#!/bin/sh\nprintf 'r12 utf8 space owner red\\n' >&2\nexit 1\n"
+    repo, base = authority_repo(tmp, "r9-canonical-repo", [
+        owner_task("owner-r9-a", ["controller/h034-native/**"], gate_a),
+        owner_task("owner-r9-b", ["controller/h034-native/**"], gate_b),
+        owner_task("owner-r11-literal", ["controller/h034-native/**"], gate_literal),
+        owner_task("owner-r11-top", ["controller/h034-native/**"], gate_top),
+        owner_task("owner-r12-utf8-space", ["controller/h034-native/**"], gate_utf8),
+    ], gates={gate_a:bytes_a, gate_b:bytes_b,
+              gate_literal:bytes_literal, gate_top:bytes_top,
+              gate_utf8:bytes_utf8}, gate_modes={gate_utf8:0o644})
+    bare = tmp / "r9-canonical-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(bare, repo, base)
+    refs_before = remote_refs(bare)
+
+    # Two independent full positive chains forbid a superficial implementation
+    # that special-cases the first task. Each task selects its own distinct
+    # canonical gate path and bytes from the exact same candidate object.
+    positive_owner_gate_chain(tmp, "task_a", repo, base, "owner-r9-a", bare)
+    positive_owner_gate_chain(tmp, "task_b_distinct", repo, base, "owner-r9-b", bare)
+    positive_owner_gate_chain(tmp, "pathspec_literal", repo, base,
+                              "owner-r11-literal", bare, revision="R11")
+    positive_owner_gate_chain(tmp, "pathspec_top", repo, base,
+                              "owner-r11-top", bare, revision="R11")
+    positive_owner_gate_chain(tmp, "utf8_space_100644", repo, base,
+                              "owner-r12-utf8-space", bare, revision="R12")
+
+    # R12 composes pathspec syntax with immutable candidate-object authority.
+    # Predicted before execution: a generic literal candidate-tree resolver
+    # accepts every chain; a narrow `:(...)` mutable-checkout fallback fails.
+    # Each checkout has one hostile property while candidate_sha remains exact.
+    for label, target, kind, canonical, task_id in (
+        ("pathspec_literal_checkout_regular_bytes", repo/gate_literal,
+         "regular-bytes", bytes_literal, "owner-r11-literal"),
+        ("pathspec_literal_checkout_directory", repo/gate_literal,
+         "directory", bytes_literal, "owner-r11-literal"),
+        ("pathspec_top_checkout_symlink", repo/gate_top,
+         "symlink", bytes_top, "owner-r11-top"),
+        ("pathspec_top_checkout_missing", repo/gate_top,
+         "missing", bytes_top, "owner-r11-top"),
+    ):
+        set_hostile_checkout_gate(target, kind, canonical)
+        positive_owner_gate_chain(tmp, label, repo, base, task_id, bare,
+                                  revision="R12")
+    set_hostile_checkout_gate(repo/gate_literal, "restore", bytes_literal)
+    set_hostile_checkout_gate(repo/gate_top, "restore", bytes_top)
+    check(not git(repo, "status", "--porcelain").stdout.strip(),
+          "A_R12_PATHSPEC_HOSTILE_MUTABLE_CHECKOUT_FIXTURE_CLEANUP")
+
+    # Candidate-object authority is invariant to the mutable checkout. Four
+    # one-defect checkout variants change gate bytes/type/link/existence while
+    # candidate_sha stays byte-identical. Every legitimate Git-object reader
+    # accepts; a mutable Path-based authority implementation rejects or hashes
+    # the hostile bytes and is caught. Each variant uses a fresh complete chain.
+    checkout_gate = repo / gate_a
+    for label, kind in (("checkout_regular_bytes", "regular-bytes"),
+                        ("checkout_directory", "directory"),
+                        ("checkout_symlink", "symlink"),
+                        ("checkout_missing", "missing")):
+        set_hostile_checkout_gate(checkout_gate, kind, bytes_a)
+        positive_owner_gate_chain(tmp, label, repo, base, "owner-r9-a", bare)
+    set_hostile_checkout_gate(checkout_gate, "restore", bytes_a)
+    check(not git(repo, "status", "--porcelain").stdout.strip(),
+          "A_R10_HOSTILE_MUTABLE_CHECKOUT_FIXTURE_CLEANUP")
+
+    digest_a = hashlib.sha256(bytes_a).hexdigest()
+    digest_b = hashlib.sha256(bytes_b).hexdigest()
+    canonical_request = transition_request(repo, base, "owner-r9-a",
+        tmp/"r9-unused-state", tmp/"r9-unused-workspace", bare)
+
+    # Predicted before execution: every mutant below rejects. The check is
+    # repeated through all four operational consumers; rejected commands must
+    # preserve state, bounded workspace, and real bare-remote refs byte-for-byte.
+    cases: list[tuple[str, Path, str, str, dict[str, object]]] = [
+        ("WRONG_GATE_PATH", repo, base, base,
+         {**canonical_request, "gate_path":"verify/bin/r9-not-canonical-exit",
+          "gate_sha256":digest_a}),
+        ("WRONG_GATE_DIGEST", repo, base, base,
+         {**canonical_request, "gate_sha256":"a" * 64}),
+        ("ANOTHER_TASK_GATE", repo, base, base,
+         {**canonical_request, "gate_path":gate_b, "gate_sha256":digest_b}),
+        ("CALLER_GATE_OVERRIDE", repo, base, base,
+         {**canonical_request, "exit_test_override":gate_b,
+          "exit_test_override_sha256":digest_b}),
+    ]
+
+    for label, kind in (("MISSING_GATE", "missing"),
+                        ("NONREGULAR_GATE", "tree"),
+                        ("SYMLINK_GATE", "symlink")):
+        bad_repo, bad_base = malformed_task_gate_repo(
+            tmp, label.lower(), kind, f"verify/bin/r9-{kind}-exit")
+        bad_bare = tmp / f"r9-{kind}-origin.git"
+        p = run(["git", "init", "--bare", "-q", str(bad_bare)], cwd=tmp)
+        if p.returncode: raise Rig(p.stderr)
+        set_remote_main(bad_bare, bad_repo, bad_base)
+        bad_request = transition_request(bad_repo, bad_base, "owner-r9-a",
+            tmp/f"r9-unused-{kind}-state", tmp/f"r9-unused-{kind}-workspace", bad_bare)
+        cases.append((label, bad_repo, bad_base, bad_base, bad_request))
+
+    changed = candidate(repo, base, gate_a, 901)
+    changed_request = transition_request(repo, base, "owner-r9-a",
+        tmp/"r9-unused-changed-state", tmp/"r9-unused-changed-workspace", bare,
+        candidate_sha=changed)
+    cases.append(("OWNER_CHANGED_OWN_GATE", repo, base, changed, changed_request))
+
+    # The inverse control: checkout and candidate both contain altered gate
+    # bytes, while the request repeats the prior candidate's digest. By making
+    # the altered commit both base and candidate, no changed-file or owner-
+    # author base check can independently explain rejection.
+    mismatch_repo, mismatch_old = authority_repo(tmp, "r10-object-mismatch-repo", [
+        owner_task("owner-r9-a", ["controller/h034-native/**"], gate_a)],
+        gates={gate_a:bytes_a})
+    mismatch_candidate = candidate(mismatch_repo, mismatch_old, gate_a, 1001)
+    mismatch_bare = tmp / "r10-object-mismatch-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(mismatch_bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(mismatch_bare, mismatch_repo, mismatch_candidate)
+    mismatch_request = transition_request(
+        mismatch_repo, mismatch_candidate, "owner-r9-a",
+        tmp/"r10-unused-object-mismatch-state",
+        tmp/"r10-unused-object-mismatch-workspace", mismatch_bare,
+        gate_sha256=digest_a)
+    cases.append(("CANDIDATE_GATE_OBJECT_MISMATCH", mismatch_repo,
+                  mismatch_candidate, mismatch_candidate, mismatch_request))
+
+    # Inverse R12 control: the checkout and exact candidate both contain
+    # changed bytes at a literal pathspec-looking filename, while the request
+    # repeats the prior candidate digest. All four consumers must reject with
+    # state, bounded workspace and refs unchanged.
+    literal_mismatch_repo, literal_mismatch_old = authority_repo(
+        tmp, "r12-literal-object-mismatch-repo", [
+            owner_task("owner-r11-literal", ["controller/h034-native/**"],
+                       gate_literal)], gates={gate_literal:bytes_literal})
+    literal_mismatch_candidate = candidate(
+        literal_mismatch_repo, literal_mismatch_old, gate_literal, 1201)
+    literal_mismatch_bare = tmp / "r12-literal-object-mismatch-origin.git"
+    p = run(["git", "init", "--bare", "-q", str(literal_mismatch_bare)], cwd=tmp)
+    if p.returncode: raise Rig(p.stderr)
+    set_remote_main(literal_mismatch_bare, literal_mismatch_repo,
+                    literal_mismatch_candidate)
+    literal_mismatch_request = transition_request(
+        literal_mismatch_repo, literal_mismatch_candidate, "owner-r11-literal",
+        tmp/"r12-unused-literal-object-mismatch-state",
+        tmp/"r12-unused-literal-object-mismatch-workspace", literal_mismatch_bare,
+        gate_sha256=hashlib.sha256(bytes_literal).hexdigest())
+    cases.append(("PATHSPEC_LITERAL_CANDIDATE_GATE_OBJECT_MISMATCH",
+                  literal_mismatch_repo, literal_mismatch_candidate,
+                  literal_mismatch_candidate, literal_mismatch_request))
+
+    for label, _case_repo, _case_base, _case_candidate, template in cases:
+        for command in ("owner-author", "check-candidate", "record-review", "owner-freeze"):
+            state = tmp / f"r9-{label.lower()}-{command}-state"
+            workspace = tmp / f"r9-{label.lower()}-{command}-workspace"
+            request = {**template, "state_dir":str(state),
+                       "workspace_root":str(workspace)}
+            if command == "check-candidate":
+                request["actor"] = "owner_authority"
+            else:
+                request["review_result"] = "PASS"
+                request["review_identity"] = "r9-review"
+            seed_owner_command_state(state, command, request)
+            if label == "CANDIDATE_GATE_OBJECT_MISMATCH":
+                revision = "R10"
+            elif label == "PATHSPEC_LITERAL_CANDIDATE_GATE_OBJECT_MISMATCH":
+                revision = "R12"
+            else:
+                revision = "R9"
+            expect_auth(tmp, f"A_{revision}_{label}_{command.upper().replace('-', '_')}_REJECT",
+                        command, request, False, state_changes=False,
+                        workspace_changes=False, refs_change=False)
+
+
+def frozen_checks() -> None:
+    spec = strict_load(SPEC); reg = strict_load(REG)
+    if not isinstance(spec, dict) or not isinstance(reg, dict): raise Rig("frozen JSON top-level")
+    tasks = spec.get("tasks", []); hits = [t for t in tasks if isinstance(t, dict) and t.get("id") == "h-035"]
+    check(spec.get("spec_version") == "2.0.0", "F_SCHEMA_V2")
+    check(len(hits) == 1 and hits[0].get("depends_on") == ["h-017"], "F_H035_ID_DEP")
+    criterion = hits[0].get("exit_criterion", "") if hits else ""
+    task_contract = f"{hits[0].get('summary', '')} {criterion}" if hits else ""
+    remediation_terms = (
+        "normal taskval/loop OWNER_ACTION_REQUIRED event",
+        "canonical ordinary tasks can never enter owner-author",
+        "task-specific owner_author_allowed_write",
+        "exact policy path used by the normal loop",
+        "configured remote",
+        "never falls back to installed spec or registry bytes",
+        "malformed owner_author_allowed_write path",
+        "If any owner-author persistence step fails",
+        "Normal task selection and policy create no repository-local runtime bytes",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in remediation_terms),
+          "F_IR01_IR07_PRODUCTION_CONTRACT")
+    r8_terms = (
+        "H035_OWNER_PROVIDER_EXEC_V6",
+        "observer completion/release the only normal provider lifetime terminator",
+        "slow schedules beyond 20.2722 seconds",
+        "no-ready or rapid-exit paths reject with bounded cleanup",
+        "root and nested files, empty directories, symlinks, path types, content, executable modes and ownership",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in r8_terms),
+          "F_R8_SNAPSHOT_AND_OBSERVER_V6_CONTRACT")
+    r9_terms = (
+        "exact canonical task row",
+        "task-specific exit_test",
+        "regular Git blob",
+        "another task's gate",
+        "caller gate override",
+        "missing, non-regular, symlink or changed gate",
+        "owner-author, check-candidate, record-review and owner-freeze",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in r9_terms),
+          "F_R9_TASK_SPECIFIC_GATE_CONTRACT")
+    r10_terms = (
+        "Two distinct canonical owner tasks with distinct gate paths and bytes",
+        "task identity may not be special-cased",
+        "mutable checkout path is hostile regular bytes, a directory, a symlink or missing",
+        "different candidate Git object's gate digest rejects",
+    )
+    check(isinstance(criterion, str) and all(term in criterion for term in r10_terms),
+          "F_R10_GENERIC_TASK_AND_GIT_OBJECT_AUTHORITY_CONTRACT")
+    r11_terms = (
+        "repository data, never Git pathspec programs",
+        "leading `:(literal)` and `:(top)` filenames",
+        "owner-author, check-candidate, record-review and owner-freeze",
+        "persisted state, bounded workspace and remote refs proving effects",
+    )
+    check(all(term in task_contract for term in r11_terms),
+          "F_R11_LITERAL_GIT_PATHSPEC_FILENAME_CONTRACT")
+    r12_terms = (
+        "pathspec-prefixed mutable checkout path has hostile regular bytes, a directory, a symlink or is missing",
+        "changed candidate Git object's literal gate digest rejects with no effects",
+        "UTF-8/space gate stored as a 100644 regular blob remains valid",
+    )
+    check(all(term in task_contract for term in r12_terms),
+          "F_R12_PATHSPEC_IMMUTABLE_GIT_OBJECT_COMPOSITION_CONTRACT")
+    owner_workflow = (ROOT / "docs/loop/owner-author-workflow-v1.md").read_text(encoding="utf-8")
+    delegation = (ROOT / "docs/loop/remaining-bootstrap-delegation-v1.md").read_text(encoding="utf-8")
+    delegation_terms = (
+        "OWNER_MANUAL_FINAL_APPROVAL_REQUIRED=NO",
+        "Missing evidence rejects",
+        "gh pr merge --merge",
+        "parent 1 equals the frozen base",
+        "parent 2 equals",
+        "tree equals the reviewed candidate tree",
+        "Chat context",
+    )
+    check(all(term in delegation for term in delegation_terms)
+          and "guarded normal merge" in owner_workflow
+          and "exactly two parents in order" in owner_workflow,
+          "F_CURRENT_AUTHORITY_BOUNDED_DELEGATION_AND_NORMAL_MERGE_CONTRACT")
+    python_authority = {
+        "config/python-interpreter-authority-v1.json":"2c609508a082d7068ca85182382988f89a9e29148831fc12f2bd8ddc207e5986",
+        "verify/bin/python-interpreter-authority-v1-exit":"edc84d899b09decd9eafd90a78094f86c72a8b1ce221a4adbd93636cb99a462a",
+    }
+    check(all((ROOT / path).is_file() and hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == digest
+              for path,digest in python_authority.items()),
+          "F_CURRENT_MAIN_PYTHON_AUTHORITY_BYTES_PRESERVED")
+    forbidden = {"specs/tasks.spec.json", "specs/owner-production-paths.v1.json", "verify/bin/h-035-exit"}
+    check(len(hits) == 1 and not forbidden.intersection(hits[0].get("allowed_write", [])), "F_BUILDER_CANNOT_EDIT_GATE")
+    def downstream_phase_ok(rows: list[object]) -> bool:
+        h034_rows = [t for t in rows if isinstance(t, dict) and t.get("id") == "h-034"]
+        h033_rows = [t for t in rows if isinstance(t, dict) and t.get("id") == "h-033"]
+        return (len(h034_rows) == len(h033_rows) == 1
+                and h034_rows[0].get("authority_class") == "owner_authority"
+                and h034_rows[0].get("depends_on") == ["h-035"]
+                and h034_rows[0].get("exit_test") == "verify/bin/h-034-exit"
+                and h033_rows[0].get("authority_class") == "ordinary"
+                and h033_rows[0].get("depends_on") == ["h-034"]
+                and h033_rows[0].get("exit_test") == "verify/bin/h-033-exit")
+    check(downstream_phase_ok(tasks), "F_H034_H033_EXACT_MATERIALIZED_PHASE")
+    for label,mutate in (
+        ("H034_ABSENT", lambda rows: [t for t in rows if not (isinstance(t,dict) and t.get("id")=="h-034")]),
+        ("H034_DUPLICATE", lambda rows: rows+[dict(next(t for t in rows if isinstance(t,dict) and t.get("id")=="h-034"))]),
+        ("H034_WRONG_DEPENDENCY", lambda rows: [({**t,"depends_on":["h-017"]} if isinstance(t,dict) and t.get("id")=="h-034" else t) for t in rows]),
+        ("H034_WRONG_GATE", lambda rows: [({**t,"exit_test":"verify/bin/h-035-exit"} if isinstance(t,dict) and t.get("id")=="h-034" else t) for t in rows]),
+        ("H033_ABSENT", lambda rows: [t for t in rows if not (isinstance(t,dict) and t.get("id")=="h-033")]),
+        ("H033_DUPLICATE", lambda rows: rows+[dict(next(t for t in rows if isinstance(t,dict) and t.get("id")=="h-033"))]),
+        ("H033_WRONG_DEPENDENCY", lambda rows: [({**t,"depends_on":["h-035"]} if isinstance(t,dict) and t.get("id")=="h-033" else t) for t in rows]),
+        ("H033_WRONG_GATE", lambda rows: [({**t,"exit_test":"verify/bin/h-034-exit"} if isinstance(t,dict) and t.get("id")=="h-033" else t) for t in rows]),
+    ):
+        check(not downstream_phase_ok(mutate(list(tasks))), "J_DOWNSTREAM_PHASE_"+label+"_REJECT")
+    ok, why = validate_registry(reg); check(ok, "F_REGISTRY_STRICT", why)
+    registry_selftests(reg)
+    h034 = sorted(str(p.relative_to(ROOT)) for p in ROOT.glob("controller/h034-native/**/*") if p.is_file()) + sorted(str(p.relative_to(ROOT)) for p in ROOT.glob("verify/h034/**/*") if p.is_file())
+    check(sorted(h034) == ["controller/h034-native/kernel.c","verify/h034/build-recipe.json","verify/h034/identity-manifest.json","verify/h034/kernel"],
+          "F_H034_EXACT_PUBLISHED_BYTES", repr(h034))
+
+
+def publication_contract_controls(tmp: Path) -> None:
+    script = ROOT / "scripts/nortropic-codex-autopilot.py"
+    host_path=os.environ.get("PATH","")
+    def executable_identity(name: str) -> tuple[str,str]:
+        probe=saved_subprocess["run"](["/usr/bin/which",name],capture_output=True,text=True,
+                                        env={**os.environ,"PATH":host_path})
+        if probe.returncode or not probe.stdout.strip(): raise Rig(f"missing audited executable {name}")
+        canonical=str(Path(probe.stdout.strip()).resolve(strict=True))
+        return canonical,hashlib.sha256(Path(canonical).read_bytes()).hexdigest()
+    active_boundary=[None]
+    saved_subprocess={name:getattr(subprocess,name) for name in
+                      ("run","Popen","check_output","check_call")}
+    saved_os_system=os.system
+    audited_executables={name:[executable_identity(name)] for name in ("git","gh")}
+    system_git=str(Path("/usr/bin/git").resolve(strict=True))
+    system_git_identity=(system_git,hashlib.sha256(Path(system_git).read_bytes()).hexdigest())
+    if system_git_identity not in audited_executables["git"]:
+        audited_executables["git"].append(system_git_identity)
+    def captured_run(*args,**kwargs):
+        if active_boundary[0] is None: raise Rig("captured run outside publication boundary")
+        return active_boundary[0].run(*args,**kwargs)
+    def captured_popen(*args,**kwargs):
+        if active_boundary[0] is None: raise Rig("captured Popen outside publication boundary")
+        return active_boundary[0].Popen(*args,**kwargs)
+    def captured_check_output(*args,**kwargs):
+        if active_boundary[0] is None: raise Rig("captured check_output outside publication boundary")
+        return active_boundary[0].check_output(*args,**kwargs)
+    def captured_check_call(*args,**kwargs):
+        if active_boundary[0] is None: raise Rig("captured check_call outside publication boundary")
+        return active_boundary[0].check_call(*args,**kwargs)
+    def captured_os_system(command):
+        if active_boundary[0] is None: raise Rig("captured os.system outside publication boundary")
+        return active_boundary[0].system(command)
+    subprocess.run=captured_run
+    subprocess.Popen=captured_popen
+    subprocess.check_output=captured_check_output
+    subprocess.check_call=captured_check_call
+    os.system=captured_os_system
+    try:
+        namespace = runpy.run_path(str(script), run_name="h035_publication_subject")
+    finally:
+        for name,value in saved_subprocess.items(): setattr(subprocess,name,value)
+        os.system=saved_os_system
+    subject = namespace.get("publish")
+    if not callable(subject):
+        check(False,"P_CURRENT_AUTHORITY_GUARDED_NORMAL_MERGE_PUBLISHER","publish unavailable")
+        return
+    subject_globals = subject.__globals__
+    original_subprocess = subject_globals["subprocess"]
+
+    def setup(label: str):
+        repo=tmp/f"publish-{label}"; init_repo(repo)
+        base=git(repo,"rev-parse","HEAD").stdout.strip()
+        p=git(repo,"checkout","-qb","candidate");
+        if p.returncode: raise Rig(p.stderr)
+        target=repo/"candidate.txt"; target.write_text("reviewed candidate\n",encoding="utf-8")
+        spec_path="specs/tasks.spec.json"; gate_path="verify/bin/h-035-exit"
+        (repo/spec_path).parent.mkdir(parents=True)
+        (repo/gate_path).parent.mkdir(parents=True)
+        (repo/spec_path).write_bytes(SPEC.read_bytes())
+        (repo/gate_path).write_bytes(Path(__file__).read_bytes())
+        review=tmp/f"publish-{label}-independent-review.json"
+        review.write_text('{"role":"REVIEWER","outcome":"PASS","candidate":"fixture"}\n',encoding="utf-8")
+        changed=["candidate.txt",spec_path,gate_path]
+        candidate_sha=commit_paths(repo,"reviewed candidate",*changed)
+        candidate_tree=git(repo,"rev-parse",f"{candidate_sha}^{{tree}}").stdout.strip()
+        bare=tmp/f"publish-{label}.git"; p=run(["git","init","--bare","-q",str(bare)],cwd=tmp)
+        if p.returncode: raise Rig(p.stderr)
+        set_remote_main(bare,repo,base)
+        p=git(repo,"remote","add","origin",str(bare));
+        if p.returncode: raise Rig(p.stderr)
+        authority={
+            "task_id":"h-035", "task_spec_path":spec_path,
+            "task_spec_sha256":hashlib.sha256((repo/spec_path).read_bytes()).hexdigest(),
+            "gate_path":gate_path,
+            "gate_sha256":hashlib.sha256((repo/gate_path).read_bytes()).hexdigest(),
+            "review_artifact_path":str(review),
+            "review_artifact_sha256":hashlib.sha256(review.read_bytes()).hexdigest(),
+        }
+        shims=tmp/f"publish-{label}-shims"; shims.mkdir()
+        for name,identities in audited_executables.items():
+            (shims/name).symlink_to(identities[0][0])
+        return repo,bare,base,candidate_sha,candidate_tree,changed,authority,review,shims
+
+    def evaluate(label: str, defect: str = "", callable_override=None) -> tuple[bool,str]:
+        repo,bare,base,candidate_sha,candidate_tree,changed,authority,review,shims=setup(label)
+        if defect in ("task_id","spec_digest","gate_digest","review_digest"):
+            key={"task_id":"task_id","spec_digest":"task_spec_sha256",
+                 "gate_digest":"gate_sha256","review_digest":"review_artifact_sha256"}[defect]
+            authority[key]="wrong-task" if defect=="task_id" else "0"*64
+        trace=[]; merged_sha=""; merge_called=False; post_view_index=-1; denied_executable=False
+        wrong="0"*40
+        def completed(argv, rc: int, output: str):
+            return original_subprocess.CompletedProcess(argv,rc,output,None)
+
+        class Boundary:
+            """Process boundary: both the module runner and direct subprocess.run cross here."""
+            def __getattr__(self, name):
+                return getattr(original_subprocess,name)
+            def run(self, argv, cwd=None, **kwargs):
+                nonlocal merged_sha,merge_called,post_view_index,denied_executable
+                argv=[str(x) for x in argv]
+                trace.append(tuple(argv))
+                exe=Path(argv[0]).name
+                expected=audited_executables.get(exe,[])
+                authorized_path=""
+                if expected:
+                    try:
+                        if "/" in argv[0]: authorized_path=str(Path(argv[0]).resolve(strict=True))
+                        else:
+                            requested_path=(kwargs.get("env") or {}).get("PATH",host_path)
+                            if requested_path != host_path: raise ValueError("PATH identity changed")
+                            authorized_path=expected[0][0]
+                        digest=hashlib.sha256(Path(authorized_path).read_bytes()).hexdigest()
+                        executable_ok=any(authorized_path==path and digest==identity_digest
+                                          for path,identity_digest in expected)
+                    except (OSError,ValueError): executable_ok=False
+                else:
+                    executable_ok=False
+                if not executable_ok:
+                    denied_executable=True
+                    return completed(argv,126,"publication executable identity denied\n")
+                if exe=="gh":
+                    allowed={
+                        ("repo","view"): {"nameWithOwner"},
+                        ("pr","view"): {"number","headRefOid","headRefName","baseRefName","baseRefOid","state","url","mergedAt","mergeCommit"},
+                    }
+                    kind=tuple(argv[1:3])
+                    if kind in allowed and "--json" in argv:
+                        raw=argv[argv.index("--json")+1]
+                        if not set(raw.split(",")) <= allowed[kind]:
+                            return completed(argv,1,"unsupported gh JSON field\n")
+                    if argv[1:3] == ["repo","view"]:
+                        owner="Elsewhere/not-nortropic" if defect=="repo_identity" else "Nortropic/nortropic-system"
+                        payload=owner if "-q" in argv or "--jq" in argv else json.dumps({"nameWithOwner":owner})
+                        return completed(argv,0,payload+"\n")
+                    if argv[1:3] == ["pr","view"]:
+                        if merge_called:
+                            post_view_index=len(trace)-1
+                            if defect=="not_merged":
+                                return completed(argv,0,json.dumps({"state":"CLOSED","mergedAt":None,"mergeCommit":None,"headRefOid":candidate_sha})+"\n")
+                            reported=wrong if defect=="returned_sha" else merged_sha
+                            return completed(argv,0,json.dumps({"state":"MERGED","mergedAt":"2026-08-13T00:00:00Z",
+                                                               "mergeCommit":{"oid":reported},"headRefOid":candidate_sha})+"\n")
+                        meta={"number":7,"headRefOid":candidate_sha,"headRefName":"candidate",
+                              "baseRefName":"main","baseRefOid":base,"state":"OPEN","url":"https://invalid/7"}
+                        if defect=="pr_head": meta["headRefOid"]=wrong
+                        if defect=="pr_head_ref": meta["headRefName"]="other"
+                        if defect=="pr_base_ref": meta["baseRefName"]="develop"
+                        if defect=="pr_base_sha": meta["baseRefOid"]=wrong
+                        return completed(argv,0,json.dumps(meta)+"\n")
+                    if argv[1:3] == ["pr","diff"]:
+                        if defect=="main_drift":
+                            drift=run(["git","commit-tree",git(repo,"rev-parse",f"{base}^{{tree}}").stdout.strip(),"-p",base],cwd=repo,stdin="drift\n").stdout.strip()
+                            set_remote_main(bare,repo,drift)
+                        if defect=="review_changed": review.write_text("changed after early check\n",encoding="utf-8")
+                        files=["other.txt"] if defect=="files" else changed
+                        return completed(argv,0,"\n".join(files)+"\n")
+                    if argv[1:3] == ["pr","merge"]:
+                        merge_called=True
+                        if "--merge" not in argv or "--rebase" in argv or "--squash" in argv:
+                            return completed(argv,1,"wrong method\n")
+                        if "--match-head-commit" not in argv or argv[argv.index("--match-head-commit")+1] != candidate_sha:
+                            return completed(argv,1,"wrong guard\n")
+                        tree=candidate_tree; parents=[base,candidate_sha]
+                        if defect=="one_parent": parents=[base]
+                        elif defect=="reversed": parents=[candidate_sha,base]
+                        elif defect=="extra_parent":
+                            third=run(["git","commit-tree",git(repo,"rev-parse",f"{base}^{{tree}}").stdout.strip(),"-p",base],cwd=repo,stdin="third\n").stdout.strip()
+                            parents=[base,candidate_sha,third]
+                        elif defect=="tree": tree=git(repo,"rev-parse",f"{base}^{{tree}}").stdout.strip()
+                        args=["git","commit-tree",tree]
+                        for parent in parents: args += ["-p",parent]
+                        merged_sha=run(args,cwd=repo,stdin="merge\n").stdout.strip()
+                        set_remote_main(bare,repo,merged_sha)
+                        return completed(argv,0,"merged\n")
+                    if argv[1:3] == ["pr","checks"]:
+                        return completed(argv,0,"checks\n")
+                    return completed(argv,1,"unsupported gh argv\n")
+                if exe=="git" and argv[1:3] == ["ls-remote","origin"] and defect=="remote_head":
+                    return completed(argv,0,f"{wrong}\trefs/heads/candidate\n")
+                if exe=="git" and post_view_index >= 0:
+                    if defect=="reported_main" and argv[1:3]==["rev-parse","refs/remotes/origin/main"]:
+                        return completed(argv,0,wrong+"\n")
+                    if defect=="reported_parents" and "rev-list" in argv and "--parents" in argv:
+                        return completed(argv,0,f"{merged_sha} {base} {wrong}\n")
+                    if defect=="reported_candidate_tree" and argv[1:3]==["rev-parse",f"{candidate_sha}^{{tree}}"]:
+                        return completed(argv,0,wrong+"\n")
+                    if defect=="reported_merge_tree" and argv[1:3]==["rev-parse",f"{merged_sha}^{{tree}}"]:
+                        return completed(argv,0,wrong+"\n")
+                actual=list(argv)
+                actual[0]=authorized_path
+                if exe=="git" and argv[1:4] == ["fetch","origin","main"]:
+                    actual=[argv[0],"fetch","origin","main:refs/remotes/origin/main"]
+                p=original_subprocess.run(actual,cwd=cwd,**kwargs)
+                return completed(argv,p.returncode,p.stdout or "")
+            def check_output(self, argv, cwd=None, **kwargs):
+                kwargs.pop("check",None)
+                p=self.run(argv,cwd=cwd,**kwargs)
+                if p.returncode:
+                    raise original_subprocess.CalledProcessError(p.returncode,argv,output=p.stdout)
+                return p.stdout if kwargs.get("text") or kwargs.get("universal_newlines") else p.stdout.encode()
+            def check_call(self, argv, cwd=None, **kwargs):
+                kwargs.pop("check",None)
+                p=self.run(argv,cwd=cwd,**kwargs)
+                if p.returncode:
+                    raise original_subprocess.CalledProcessError(p.returncode,argv,output=p.stdout)
+                return 0
+            def Popen(self, argv, cwd=None, **kwargs):
+                p=self.run(argv,cwd=cwd,**{k:v for k,v in kwargs.items()
+                                          if k not in ("stdin","bufsize","start_new_session")})
+                text_mode=bool(kwargs.get("text") or kwargs.get("universal_newlines"))
+                payload=p.stdout if text_mode else p.stdout.encode()
+                class Immediate:
+                    def __init__(self):
+                        self.returncode=p.returncode
+                        self.stdout=(io.StringIO(payload) if text_mode else io.BytesIO(payload)) if kwargs.get("stdout") is not None else None
+                        self.stderr=None
+                    def communicate(self,input=None,timeout=None): return payload,None
+                    def wait(self,timeout=None): return self.returncode
+                    def poll(self): return self.returncode
+                    def __enter__(self): return self
+                    def __exit__(self,*exc): return False
+                return Immediate()
+            def system(self, command):
+                try: argv=shlex.split(command)
+                except ValueError: argv=["<invalid-shell-command>"]
+                p=self.run(argv)
+                return p.returncode << 8
+        subject_globals["subprocess"]=Boundary()
+        active_boundary[0]=subject_globals["subprocess"]
+        fn=callable_override or subject
+        accepted=False; detail=""; subject_completed=False
+        try:
+            returned=fn(repo,repo,"candidate",base,candidate_sha,"title",changed,
+                        publication_authority=authority)
+            subject_completed=True
+            # Corroboration is deliberately outside the subject trace. Acceptance below
+            # still requires the publisher's own post-merge proof commands.
+            p=git(repo,"fetch","origin","main:refs/remotes/origin/main")
+            if p.returncode: raise Rig(p.stderr)
+            remote_main=git(repo,"rev-parse","refs/remotes/origin/main").stdout.strip()
+            parents=git(repo,"rev-list","--parents","-n","1",remote_main).stdout.split()
+            tree=git(repo,"rev-parse",f"{remote_main}^{{tree}}").stdout.strip()
+            is_git=lambda x: bool(x) and Path(x[0]).name=="git"
+            is_gh=lambda x: bool(x) and Path(x[0]).name=="gh"
+            merge_calls=[x for x in trace if is_gh(x) and x[1:3]==("pr","merge")]
+            push_calls=[x for x in trace if is_git(x) and len(x)>=5 and x[1:4]==("push","-u","origin")]
+            forbidden=any(any(t in ("--rebase","--squash","--force","--force-with-lease") for t in x) for x in trace)
+            merge_ok=(len(merge_calls)==1 and "--merge" in merge_calls[0]
+                      and "--match-head-commit" in merge_calls[0])
+            identity_seen=any(is_gh(x) and x[1:3]==("repo","view") for x in trace)
+            pr_views=[x for x in trace if is_gh(x) and x[1:3]==("pr","view")]
+            base_oid_requested=any("baseRefOid" in " ".join(x) for x in pr_views)
+            fetched=sum(is_git(x) and x[1:4]==("fetch","origin","main") for x in trace)
+            status_seen=any(is_git(x) and x[1:3]==("status","--porcelain=v1") for x in trace)
+            remote_seen=any(is_git(x) and x[1:3]==("ls-remote","origin") for x in trace)
+            diff_seen=any(is_gh(x) and x[1:3]==("pr","diff") for x in trace)
+            push_index=trace.index(push_calls[0]) if push_calls else -1
+            merge_index=trace.index(merge_calls[0]) if merge_calls else -1
+            premerge=trace[push_index+1:merge_index] if 0 <= push_index < merge_index else []
+            authority_objects=all(any(is_git(x) and f"{candidate_sha}:{authority[key]}" in x
+                                      for x in premerge)
+                                  for key in ("task_spec_path","gate_path"))
+            ordered_relock=(any(is_gh(x) and x[1:3]==("repo","view") for x in premerge)
+                            and any(is_git(x) and x[1:4]==("fetch","origin","main") for x in premerge)
+                            and any(is_git(x) and x[1:3]==("status","--porcelain=v1") for x in premerge)
+                            and any(is_git(x) and x[1:3]==("rev-parse","HEAD") for x in premerge)
+                            and any(is_git(x) and f"{candidate_sha}^{{tree}}" in x for x in premerge)
+                            and any(is_git(x) and x[1:3]==("ls-remote","origin") for x in premerge)
+                            and any(is_gh(x) and x[1:3]==("pr","view") for x in premerge)
+                            and any(is_gh(x) and x[1:3]==("pr","diff") for x in premerge)
+                            and authority_objects)
+            postmerge=trace[post_view_index+1:] if post_view_index >= 0 else []
+            post_proof=(any(is_git(x) and x[1:4]==("fetch","origin","main") for x in postmerge)
+                        and any(is_git(x) and "refs/remotes/origin/main" in x for x in postmerge)
+                        and any(is_git(x) and "rev-list" in x and "--parents" in x and merged_sha in x for x in postmerge)
+                        and any(is_git(x) and f"{candidate_sha}^{{tree}}" in x for x in postmerge)
+                        and any(is_git(x) and f"{merged_sha}^{{tree}}" in x for x in postmerge))
+            unexpected=any(not (is_git(x) or is_gh(x)) for x in trace)
+            clean_after=git(repo,"status","--porcelain=v1","--untracked-files=all").stdout.strip()==""
+            accepted=(returned==remote_main==merged_sha and parents==[merged_sha,base,candidate_sha]
+                      and tree==candidate_tree and len(push_calls)==1 and not forbidden and merge_ok
+                      and identity_seen and base_oid_requested and fetched>=2 and status_seen
+                      and remote_seen and diff_seen and ordered_relock and post_proof
+                      and not unexpected and not denied_executable and clean_after)
+            detail=repr((returned,parents,tree==candidate_tree,len(trace),identity_seen,
+                         base_oid_requested,fetched,ordered_relock,post_proof,unexpected,
+                         denied_executable,clean_after))
+        except Exception as exc:
+            detail=f"{type(exc).__name__}:{exc} trace={trace[-8:]}"
+        finally:
+            active_boundary[0]=None
+            subject_globals["subprocess"]=original_subprocess
+        return accepted,detail,not subject_completed
+
+    def reference_publish(repo: Path, wt: Path, branch_name: str, base_sha: str,
+                          candidate_sha: str, title: str, changed: list[str], *,
+                          publication_authority: dict[str,str], omit_postproof: bool=False,
+                          ignore_postgraph_outputs: bool=False) -> str:
+        """Gate-local, implementation-neutral witness that the hermetic rig is satisfiable."""
+        invoke=subject_globals["run"]
+        def command(argv, *, check=True):
+            return invoke(argv,cwd=wt,check=check)
+        if command(["git","status","--porcelain=v1","--untracked-files=all"]).out.strip():
+            raise Rig("dirty candidate")
+        if command(["git","rev-parse","HEAD"]).out.strip() != candidate_sha:
+            raise Rig("candidate mismatch")
+        command(["git","fetch","origin","main"])
+        if command(["git","rev-parse","refs/remotes/origin/main"]).out.strip() != base_sha:
+            raise Rig("pre-push main drift")
+        command(["git","push","-u","origin",branch_name])
+
+        repo_meta=json.loads(command(["gh","repo","view","--json","nameWithOwner"]).out)
+        if repo_meta.get("nameWithOwner") != "Nortropic/nortropic-system":
+            raise Rig("repository identity")
+        command(["git","fetch","origin","main"])
+        if command(["git","rev-parse","refs/remotes/origin/main"]).out.strip() != base_sha:
+            raise Rig("post-push main drift")
+        if command(["git","status","--porcelain=v1","--untracked-files=all"]).out.strip():
+            raise Rig("post-push dirty")
+        if command(["git","rev-parse","HEAD"]).out.strip() != candidate_sha:
+            raise Rig("post-push candidate mismatch")
+        candidate_tree=command(["git","rev-parse",f"{candidate_sha}^{{tree}}"]).out.strip()
+        remote=command(["git","ls-remote","origin",f"refs/heads/{branch_name}"]).out.split()
+        if not remote or remote[0] != candidate_sha:
+            raise Rig("remote candidate mismatch")
+        meta=json.loads(command(["gh","pr","view",branch_name,"--json",
+                                 "number,headRefOid,headRefName,baseRefName,baseRefOid,state,url"]).out)
+        if (meta.get("headRefOid"),meta.get("headRefName"),meta.get("baseRefName"),meta.get("baseRefOid"),meta.get("state")) != (
+                candidate_sha,branch_name,"main",base_sha,"OPEN"):
+            raise Rig("PR identity")
+        number=str(meta["number"])
+        files=command(["gh","pr","diff",number,"--name-only"]).out.splitlines()
+        if sorted(files) != sorted(changed):
+            raise Rig("PR file set")
+        auth=publication_authority
+        if auth.get("task_id") != "h-035":
+            raise Rig("task identity")
+        spec_bytes=command(["git","show",f"{candidate_sha}:{auth['task_spec_path']}"]).out.encode()
+        gate_bytes=command(["git","show",f"{candidate_sha}:{auth['gate_path']}"]).out.encode()
+        if hashlib.sha256(spec_bytes).hexdigest() != auth.get("task_spec_sha256"):
+            raise Rig("task spec identity")
+        if hashlib.sha256(gate_bytes).hexdigest() != auth.get("gate_sha256"):
+            raise Rig("gate identity")
+        parsed_spec=json.loads(spec_bytes)
+        task_rows=[x for x in parsed_spec.get("tasks",[]) if x.get("id")==auth["task_id"]]
+        if len(task_rows)!=1 or task_rows[0].get("exit_test") != auth["gate_path"]:
+            raise Rig("canonical task/gate binding")
+        review_path=Path(auth["review_artifact_path"])
+        if (not review_path.is_file() or review_path.is_symlink()
+                or hashlib.sha256(review_path.read_bytes()).hexdigest()!=auth.get("review_artifact_sha256")):
+            raise Rig("review artifact identity")
+        command(["git","fetch","origin","main"])
+        if command(["git","rev-parse","refs/remotes/origin/main"]).out.strip() != base_sha:
+            raise Rig("immediate pre-merge main drift")
+        command(["gh","pr","merge",number,"--merge","--match-head-commit",candidate_sha])
+        merged=json.loads(command(["gh","pr","view",number,"--json",
+                                   "state,mergedAt,mergeCommit,headRefOid,url"]).out)
+        if (merged.get("state") != "MERGED" or not merged.get("mergedAt")
+                or merged.get("headRefOid") != candidate_sha):
+            raise Rig("post-merge PR state")
+        returned=(merged.get("mergeCommit") or {}).get("oid","")
+        if omit_postproof:
+            return returned
+        command(["git","fetch","origin","main"])
+        remote_main=command(["git","rev-parse","refs/remotes/origin/main"]).out.strip()
+        if ignore_postgraph_outputs:
+            probe_target=command(["git","rev-parse","refs/remotes/origin/main^{commit}"]).out.strip()
+            command(["git","rev-list","--parents","-n","1",probe_target])
+            command(["git","rev-parse",f"{candidate_sha}^{{tree}}"]).out.strip()
+            command(["git","rev-parse",f"{probe_target}^{{tree}}"]).out.strip()
+            return returned
+        if returned != remote_main:
+            raise Rig(f"returned merge mismatch returned={returned} remote={remote_main}")
+        parents=command(["git","rev-list","--parents","-n","1",remote_main]).out.split()
+        if parents != [remote_main,base_sha,candidate_sha]:
+            raise Rig("merge parents")
+        candidate_tree=command(["git","rev-parse",f"{candidate_sha}^{{tree}}"]).out.strip()
+        if command(["git","rev-parse",f"{remote_main}^{{tree}}"]).out.strip() != candidate_tree:
+            raise Rig("merge tree")
+        return remote_main
+
+    witness,witness_detail,_=evaluate("reference-positive",callable_override=reference_publish)
+    check(witness,"J_PUBLICATION_HARNESS_REFERENCE_POSITIVE",witness_detail)
+    ok,detail,_=evaluate("positive")
+    check(ok,"P_CURRENT_AUTHORITY_GUARDED_NORMAL_MERGE_PUBLISHER",detail)
+    for defect in ("repo_identity","pr_head","pr_head_ref","pr_base_ref","pr_base_sha",
+                   "remote_head","files","main_drift","not_merged","returned_sha",
+                   "one_parent","reversed","extra_parent","tree","task_id","spec_digest",
+                   "gate_digest","review_digest","review_changed","reported_main",
+                   "reported_parents","reported_candidate_tree","reported_merge_tree"):
+        accepted,why,publisher_rejected=evaluate(defect,defect)
+        check(publisher_rejected,"P_PUBLICATION_REJECT_"+defect.upper(),why)
+        witness_accepted,witness_why,witness_rejected=evaluate("reference-"+defect,defect,reference_publish)
+        check(witness_rejected,"J_PUBLICATION_HARNESS_REJECT_"+defect.upper(),witness_why)
+    def ignore_outputs(*args,**kwargs):
+        return reference_publish(*args,**kwargs,ignore_postgraph_outputs=True)
+    ignored=[]
+    for defect in ("returned_sha","one_parent","reversed","extra_parent","tree",
+                   "reported_main","reported_parents","reported_candidate_tree","reported_merge_tree"):
+        accepted,why,publisher_rejected=evaluate("ignore-"+defect,defect,ignore_outputs)
+        ignored.append((defect,accepted,publisher_rejected,why))
+    check(all(not rejected for _,_,rejected,_ in ignored),
+          "J_PUBLICATION_INVOKE_BUT_IGNORE_OUTPUT_MUTANT_CAUGHT",repr(ignored))
+    load_aliases={"run":captured_run,"Popen":captured_popen,
+                  "check_output":captured_check_output,"check_call":captured_check_call,
+                  "os_system":captured_os_system}
+    for alias_name,alias in load_aliases.items():
+        def captured_alias_mutant(*args,_alias=alias,_name=alias_name,**kwargs):
+            merged=reference_publish(*args,**kwargs)
+            try:
+                if _name=="os_system": _alias("/usr/bin/true")
+                elif _name=="Popen": _alias(["/usr/bin/true"]).wait()
+                else: _alias(["/usr/bin/true"])
+            except Exception:
+                pass
+            return merged
+        accepted,why,publisher_rejected=evaluate("captured-"+alias_name,
+                                                 callable_override=captured_alias_mutant)
+        check(not accepted and not publisher_rejected,
+              "P_PUBLICATION_CAPTURED_AT_LOAD_"+alias_name.upper()+"_REJECT",why)
+        def captured_alias_positive(*args,_alias=alias,_name=alias_name,**kwargs):
+            merged=reference_publish(*args,**kwargs)
+            if _name=="os_system": rc=_alias("/usr/bin/git --version")
+            elif _name=="Popen": rc=_alias(["/usr/bin/git","--version"],text=True).wait()
+            elif _name=="check_output": _alias(["/usr/bin/git","--version"],text=True); rc=0
+            elif _name=="check_call": rc=_alias(["/usr/bin/git","--version"],text=True)
+            else: rc=_alias(["/usr/bin/git","--version"],text=True).returncode
+            if rc: raise Rig("audited captured alias failed")
+            return merged
+        alias_ok,alias_why,alias_rejected=evaluate("captured-positive-"+alias_name,
+                                                   callable_override=captured_alias_positive)
+        check(alias_ok and not alias_rejected,
+              "J_PUBLICATION_CAPTURED_AT_LOAD_"+alias_name.upper()+"_GIT_POSITIVE",alias_why)
+    def absolute_git_reference(*args,**kwargs):
+        merged=reference_publish(*args,**kwargs)
+        subject_globals["subprocess"].check_call(["/usr/bin/git","--version"],cwd=args[1])
+        return merged
+    accepted,why,publisher_rejected=evaluate("absolute-git-positive",
+                                             callable_override=absolute_git_reference)
+    check(accepted and not publisher_rejected,
+          "J_PUBLICATION_ABSOLUTE_GIT_AUDIT_POSITIVE",why)
+    for fake_name in ("git","gh"):
+        marker=tmp/f"absolute-fake-{fake_name}-executed"
+        fake=tmp/f"absolute-fake-{fake_name}"
+        fake.mkdir(); executable=fake/fake_name
+        executable.write_text(f"#!/bin/sh\ntouch {shlex.quote(str(marker))}\nexit 0\n",encoding="utf-8")
+        executable.chmod(0o755)
+        def absolute_fake(*args,_exe=executable,**kwargs):
+            merged=reference_publish(*args,**kwargs)
+            captured_run([str(_exe),"--version"])
+            return merged
+        accepted,why,publisher_rejected=evaluate("absolute-fake-"+fake_name,
+                                                 callable_override=absolute_fake)
+        check(not accepted and not marker.exists(),
+              "P_PUBLICATION_ABSOLUTE_FAKE_"+fake_name.upper()+"_DENIED",why)
+
+        shadow=tmp/f"path-shadow-{fake_name}"; shadow.mkdir(); shadow_exe=shadow/fake_name
+        shadow_marker=tmp/f"path-shadow-{fake_name}-executed"
+        shadow_exe.write_text(f"#!/bin/sh\ntouch {shlex.quote(str(shadow_marker))}\nexit 0\n",encoding="utf-8")
+        shadow_exe.chmod(0o755)
+        def path_shadow(*args,_name=fake_name,_shadow=shadow,**kwargs):
+            merged=reference_publish(*args,**kwargs)
+            captured_run([_name,"--version"],env={**os.environ,"PATH":str(_shadow)})
+            return merged
+        accepted,why,publisher_rejected=evaluate("path-shadow-"+fake_name,
+                                                 callable_override=path_shadow)
+        check(not accepted and not shadow_marker.exists(),
+              "P_PUBLICATION_PATH_SHADOW_"+fake_name.upper()+"_DENIED",why)
+
+        def shim_positive(*args,_name=fake_name,_label="shim-positive-"+fake_name,**kwargs):
+            merged=reference_publish(*args,**kwargs)
+            shim=tmp/f"publish-{_label}-shims"/_name
+            if _name=="git": captured_check_call([str(shim),"--version"],text=True)
+            else: captured_check_call([str(shim),"repo","view","--json","nameWithOwner"],text=True)
+            return merged
+        accepted,why,publisher_rejected=evaluate("shim-positive-"+fake_name,
+                                                 callable_override=shim_positive)
+        check(accepted and not publisher_rejected,
+              "J_PUBLICATION_HERMETIC_SYMLINK_"+fake_name.upper()+"_POSITIVE",why)
+
+    copy_dir=tmp/"copied-git-dir"; copy_dir.mkdir(); copied_git=copy_dir/"git"
+    copied_git.write_bytes(Path(audited_executables["git"][0][0]).read_bytes())
+    copied_git.chmod(0o755)
+    def copied_identity_mutant(*args,**kwargs):
+        merged=reference_publish(*args,**kwargs)
+        captured_run([str(copied_git),"--version"])
+        return merged
+    accepted,why,publisher_rejected=evaluate("copied-git",callable_override=copied_identity_mutant)
+    check(not accepted,"P_PUBLICATION_IDENTICAL_BYTES_WRONG_GIT_PATH_DENIED",why)
+    def omit_postproof(*args,**kwargs):
+        return reference_publish(*args,**kwargs,omit_postproof=True)
+    accepted,why,_=evaluate("omit-postproof",callable_override=omit_postproof)
+    check(not accepted,"P_PUBLICATION_OMITTED_POSTMERGE_PROOF_REJECT",why)
+    def direct_subprocess_bypass(*args,**kwargs):
+        merged=reference_publish(*args,**kwargs)
+        subject_globals["subprocess"].run(["/usr/bin/touch",str(args[1]/"publication-bypass")])
+        return merged
+    accepted,why,_=evaluate("direct-subprocess-bypass",callable_override=direct_subprocess_bypass)
+    check(not accepted,"P_PUBLICATION_DIRECT_SUBPROCESS_BYPASS_REJECT",why)
+    def unsupported_gh_field(*args,**kwargs):
+        probe=subject_globals["subprocess"].run(
+            ["gh","pr","view","candidate","--json","merged"],cwd=args[1],
+            stdout=original_subprocess.PIPE,stderr=original_subprocess.STDOUT,text=True)
+        if probe.returncode:
+            raise Rig("unsupported gh JSON field")
+        return reference_publish(*args,**kwargs)
+    accepted,why,_=evaluate("unsupported-gh-field",callable_override=unsupported_gh_field)
+    check(not accepted,"P_PUBLICATION_UNSUPPORTED_GH_JSON_FIELD_REJECT",why)
+    def dead_tokens(*args,**kwargs):
+        """--merge baseRefOid candidate tree rev-list --parents merged; deliberately no effects."""
+        return args[4]
+    accepted,why,_=evaluate("dead-token",callable_override=dead_tokens)
+    check(not accepted,"P_PUBLICATION_DEAD_TOKEN_NOOP_REJECT",why)
+
+
+def main() -> int:
+    try:
+        if len(sys.argv) == 4 and sys.argv[1] == "--owner-acceptance":
+            return owner_acceptance(sys.argv[2], Path(sys.argv[3]).resolve())
+        if len(sys.argv) != 1:
+            raise Rig("usage: h-035-exit [--owner-acceptance CANDIDATE_SHA ARTIFACT_PATH]")
+        frozen_checks(); path_selftests(); observer_selftests(); snapshot_selftests()
+        with tempfile.TemporaryDirectory(prefix="h035-real-effect-") as raw:
+            tmp = Path(raw)
+            real_routing(tmp)
+            production_matrix(tmp)
+            remediation_matrix(tmp)
+            r6_remediation_matrix(tmp)
+            r9_task_gate_matrix(tmp)
+            publication_contract_controls(tmp)
+    except (OSError, subprocess.SubprocessError, ValueError, Rig) as e:
+        print(f"RIG_ERROR: {e}", file=sys.stderr)
+        return 2
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+    print(f"H035_GATE_SUMMARY={passed} PASS {failed} FAIL")
+    if failed:
+        print("H035_GATE_RESULT=EXPECTED_RED")
+        return 1
+    print("H035_GATE_RESULT=PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

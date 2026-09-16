@@ -1,0 +1,720 @@
+#!/bin/bash -p
+# Owner prerequisite judge for the H-034 Python interpreter authority. This
+# gate validates authority and invocation effects only. It does
+# not implement H-034 runtime verification or protected-snapshot execution.
+#
+# MUTANT PREDICTIONS (recorded before r3 execution):
+#   M01 delegate-then-lie PATH python3 -> J_PATH_POISON_IMMUNE FAIL
+#   M02 schema_version=true            -> J_EXACT_AUTHORITY FAIL
+#   M03 required_executable=1          -> J_EXACT_AUTHORITY FAIL
+#   M04 duplicate authority key        -> J_EXACT_AUTHORITY FAIL
+#   M05 reordered legitimate object    -> gate PASS
+#   M06 symlink/nonregular/noexec       -> corresponding J_* object FAIL
+#   M07 stale pathname replacement     -> J_STALE_CHANGED_OBJECT detects it
+#   M08 active refs/replace candidate   -> exact-object audit retains real bytes
+#   M09 grafted candidate parent        -> raw actual commit parent still rejects
+
+set -u
+umask 077
+unset CDPATH ENV GLOBIGNORE
+
+AUTH_REL="config/python-interpreter-authority-v1.json"
+GATE_REL="verify/bin/python-interpreter-authority-v1-exit"
+BASE_SHA="1cf2caf75d2206d1adeab176650a2d22136687df"
+JUDGE="/usr/bin/python3"
+
+SOURCE_PATH="${BASH_SOURCE[0]}"
+case "$SOURCE_PATH" in
+  /*) ;;
+  *) SOURCE_PATH="$(/bin/pwd -P)/$SOURCE_PATH" ;;
+esac
+if [[ -L "$SOURCE_PATH" ]]; then
+  echo "FAIL K0_GATE_ENTRY — canonical gate must not be invoked through a symlink"
+  exit 1
+fi
+SCRIPT_DIR="$(cd -P -- "$(/usr/bin/dirname -- "$SOURCE_PATH")" 2>/dev/null && /bin/pwd -P)" || {
+  echo "ODÖMBART K0_GATE_ENTRY — cannot resolve canonical gate directory"
+  exit 2
+}
+ROOT="$(cd -P -- "$SCRIPT_DIR/../.." 2>/dev/null && /bin/pwd -P)" || {
+  echo "ODÖMBART K0_GATE_ENTRY — cannot resolve repository root"
+  exit 2
+}
+AUTH="$ROOT/$AUTH_REL"
+GATE="$ROOT/$GATE_REL"
+if [[ ! "$SOURCE_PATH" -ef "$GATE" ]]; then
+  echo "FAIL K0_GATE_ENTRY — invoked file is not the canonical repository gate"
+  exit 1
+fi
+if [[ ! -f "$JUDGE" || ! -x "$JUDGE" || -L "$JUDGE" ]]; then
+  echo "ODÖMBART K0_JUDGE — absolute isolated system judge unavailable"
+  exit 2
+fi
+echo "PASS K0_JUDGE — absolute /usr/bin/python3 -I -S judge selected without PATH"
+
+MODE="gate"
+CANDIDATE=""
+if [[ $# -gt 0 ]]; then
+  if [[ $# -ne 2 || "$1" != "--owner-audit" || ! "$2" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ODÖMBART K0_USAGE — usage: python-interpreter-authority-v1-exit [--owner-audit <40-hex-candidate>]"
+    exit 2
+  fi
+  MODE="audit"
+  CANDIDATE="$2"
+fi
+
+WORK="$(/usr/bin/mktemp -d /tmp/nortropic-python-authority.XXXXXX)" || {
+  echo "ODÖMBART K0_TEMP — disposable state could not be created"
+  exit 2
+}
+case "$WORK" in
+  /tmp/nortropic-python-authority.*) ;;
+  *)
+    echo "ODÖMBART K0_TEMP — unexpected disposable-state path"
+    exit 2
+    ;;
+esac
+
+cleanup() {
+  cleanup_rc=$?
+  trap - EXIT HUP INT TERM
+  if [[ -n "${WORK:-}" ]]; then
+    case "$WORK" in
+      /tmp/nortropic-python-authority.*)
+        /bin/rm -rf "$WORK" || cleanup_rc=2
+        ;;
+      *)
+        echo "ODÖMBART K_CLEANUP — refusing unexpected cleanup path" >&2
+        cleanup_rc=2
+        ;;
+    esac
+  fi
+  exit "$cleanup_rc"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+POISON_DIR="$WORK/poison"
+POISON_LOG="$WORK/poison-called"
+GIT_POISON_LOG="$WORK/git-poison-called"
+FOREIGN_EXECUTABLE="$WORK/foreign-python3"
+FOREIGN_MARKER="$WORK/foreign-executed"
+/bin/mkdir -m 700 "$POISON_DIR" || exit 2
+
+/bin/cat >"$FOREIGN_EXECUTABLE" <<EOF
+#!/bin/bash -p
+/usr/bin/printf '%s\n' 'FOREIGN_EXECUTED' >"$FOREIGN_MARKER"
+/usr/bin/printf '%s\n' '9.9.9'
+exit 0
+EOF
+/bin/chmod 700 "$FOREIGN_EXECUTABLE" || exit 2
+
+/bin/cat >"$POISON_DIR/python3" <<'SH'
+#!/bin/bash -p
+if [[ "${1-}" == "--nortropic-poison-probe" ]]; then
+  /usr/bin/printf '%s\n' 'POISON_ACTIVE' >>"$NORTROPIC_POISON_LOG"
+  /usr/bin/printf '%s\n' 'POISON_ACTIVE'
+  exit 0
+fi
+/usr/bin/printf '%s\n' "POISON_CALLED $*" >>"$NORTROPIC_POISON_LOG"
+/usr/bin/printf '%s\n' 'FOREIGN_SELECTED' >"$NORTROPIC_FOREIGN_MARKER"
+for poison_arg in "$@"; do
+  if [[ "$poison_arg" == "-" ]]; then
+    exec /usr/bin/python3 "$@"
+  fi
+done
+case "$*" in
+  *canonical_path*)
+    /usr/bin/printf '%s\n' "$NORTROPIC_FOREIGN_EXECUTABLE"
+    ;;
+  *python_version*)
+    /usr/bin/printf '%s\n' '9.9.9'
+    ;;
+  *executable_sha256*)
+    /usr/bin/shasum -a 256 "$NORTROPIC_FOREIGN_EXECUTABLE" | /usr/bin/awk '{print $1}'
+    ;;
+  *)
+    exec "$NORTROPIC_FOREIGN_EXECUTABLE" "$@"
+    ;;
+esac
+SH
+/bin/chmod 700 "$POISON_DIR/python3" || exit 2
+
+/bin/cat >"$POISON_DIR/git" <<'SH'
+#!/bin/bash -p
+/usr/bin/printf '%s\n' "GIT_POISON_CALLED $*" >>"$NORTROPIC_GIT_POISON_LOG"
+if [[ "${1-}" == "--nortropic-poison-probe" ]]; then
+  /usr/bin/printf '%s\n' 'GIT_POISON_ACTIVE'
+  exit 0
+fi
+exit 97
+SH
+/bin/chmod 700 "$POISON_DIR/git" || exit 2
+
+/usr/bin/env -i \
+  "PATH=$POISON_DIR:/usr/bin:/bin" \
+  "HOME=/var/empty" \
+  "TMPDIR=/tmp" \
+  "PYTHONHOME=$WORK/hostile-python-home" \
+  "PYTHONPATH=$WORK/hostile-python-path" \
+  "NORTROPIC_REQUESTED_PYTHON=$FOREIGN_EXECUTABLE" \
+  "NORTROPIC_POISON_LOG=$POISON_LOG" \
+  "NORTROPIC_GIT_POISON_LOG=$GIT_POISON_LOG" \
+  "NORTROPIC_FOREIGN_EXECUTABLE=$FOREIGN_EXECUTABLE" \
+  "NORTROPIC_FOREIGN_MARKER=$FOREIGN_MARKER" \
+  "$JUDGE" -I -S - \
+  "$AUTH" "$GATE" "$ROOT" "$WORK" "$MODE" "$CANDIDATE" "$BASE_SHA" <<'PY'
+import hashlib
+import json
+import os
+import pathlib
+import stat
+import subprocess
+import sys
+
+authority_path = pathlib.Path(sys.argv[1])
+gate_path = pathlib.Path(sys.argv[2])
+root = pathlib.Path(sys.argv[3])
+work = pathlib.Path(sys.argv[4])
+mode = sys.argv[5]
+candidate = sys.argv[6]
+base_sha = sys.argv[7]
+poison_dir = work / "poison"
+poison_log = work / "poison-called"
+git_poison_log = work / "git-poison-called"
+foreign_executable = work / "foreign-python3"
+foreign_marker = work / "foreign-executed"
+passed = 0
+
+KEYS = (
+    "schema_version",
+    "authority_version",
+    "canonical_path",
+    "python_version",
+    "executable_sha256",
+    "required_regular_file",
+    "required_executable",
+    "symlink_allowed",
+    "path_lookup_allowed",
+    "usr_bin_env_allowed",
+    "requester_override_allowed",
+    "isolated_flags",
+    "environment_authority",
+    "runtime_binding_model",
+)
+EXPECTED = {
+    "schema_version": 1,
+    "authority_version": "python3.12-v1",
+    "canonical_path": "/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12",
+    "python_version": "3.12.13",
+    "executable_sha256": "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf70393941",
+    "required_regular_file": True,
+    "required_executable": True,
+    "symlink_allowed": False,
+    "path_lookup_allowed": False,
+    "usr_bin_env_allowed": False,
+    "requester_override_allowed": False,
+    "isolated_flags": ["-I", "-S"],
+    "environment_authority": False,
+    "runtime_binding_model": "same-opened-source-private-protected-snapshot-final-rehash",
+}
+TYPES = {
+    "schema_version": int,
+    "authority_version": str,
+    "canonical_path": str,
+    "python_version": str,
+    "executable_sha256": str,
+    "required_regular_file": bool,
+    "required_executable": bool,
+    "symlink_allowed": bool,
+    "path_lookup_allowed": bool,
+    "usr_bin_env_allowed": bool,
+    "requester_override_allowed": bool,
+    "isolated_flags": list,
+    "environment_authority": bool,
+    "runtime_binding_model": str,
+}
+
+
+def fail(name, detail):
+    print("FAIL {} — {}".format(name, detail))
+    raise SystemExit(1)
+
+
+def unjudgeable(name, detail):
+    print("ODÖMBART {} — {}".format(name, detail))
+    raise SystemExit(2)
+
+
+def check(name, condition, detail):
+    global passed
+    if not condition:
+        fail(name, detail)
+    passed += 1
+    print("PASS {} — {}".format(name, detail))
+
+
+def metadata(value):
+    return (
+        value.st_dev,
+        value.st_ino,
+        value.st_mode,
+        value.st_nlink,
+        value.st_uid,
+        value.st_gid,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
+    )
+
+
+def read_opened_regular(path, name):
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(str(path), flags)
+    except OSError as exc:
+        fail(name, "cannot open no-follow regular object: {}".format(exc))
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            fail(name, "opened object is not regular")
+        chunks = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after_fd = os.fstat(descriptor)
+        try:
+            after_path = os.stat(str(path), follow_symlinks=False)
+        except OSError as exc:
+            fail(name, "path became unavailable after opened read: {}".format(exc))
+        if metadata(before) != metadata(after_fd) or metadata(after_fd) != metadata(after_path):
+            fail(name, "opened object or stable pathname identity changed during read")
+        return b"".join(chunks), after_fd
+    finally:
+        os.close(descriptor)
+
+
+def strict(raw):
+    def duplicate_aware_pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate key: {}".format(key))
+            result[key] = value
+        return result
+
+    value = json.loads(raw.decode("utf-8"), object_pairs_hook=duplicate_aware_pairs)
+    if type(value) is not dict:
+        raise ValueError("top-level authority must be an object")
+    if len(value) != len(KEYS) or set(value) != set(KEYS):
+        raise ValueError("authority must contain exactly the complete schema")
+    for key in KEYS:
+        if type(value[key]) is not TYPES[key]:
+            raise ValueError("wrong exact JSON type for {}".format(key))
+    if any(type(flag) is not str for flag in value["isolated_flags"]):
+        raise ValueError("isolated_flags elements must be exact strings")
+    if value != EXPECTED:
+        raise ValueError("authority values differ from the frozen semantics")
+    return value
+
+
+def rejects(value):
+    try:
+        strict(json.dumps(value, separators=(",", ":")).encode("utf-8"))
+        return False
+    except Exception:
+        return True
+
+
+authority_raw, authority_file_stat = read_opened_regular(authority_path, "J_AUTHORITY_OBJECT")
+check("J_AUTHORITY_OBJECT", stat.S_ISREG(authority_file_stat.st_mode),
+      "authority read from one stable non-symlink regular object")
+try:
+    authority = strict(authority_raw)
+except Exception as exc:
+    fail("J_EXACT_AUTHORITY", "strict authority admission failed: {}".format(exc))
+check("J_EXACT_AUTHORITY", authority == EXPECTED,
+      "duplicate-aware exact-schema authority admitted")
+
+reordered = {key: EXPECTED[key] for key in reversed(KEYS)}
+try:
+    reordered_result = strict(json.dumps(reordered, separators=(",", ":")).encode("utf-8"))
+except Exception as exc:
+    fail("J_REORDERED_KEYS", "legitimate member reordering was rejected: {}".format(exc))
+check("J_REORDERED_KEYS", reordered_result == EXPECTED,
+      "legitimate reordered authority object admitted")
+
+compact = json.dumps(EXPECTED, separators=(",", ":"))
+duplicate_raw = ('{"schema_version":1,' + compact[1:]).encode("utf-8")
+try:
+    strict(duplicate_raw)
+    duplicate_rejected = False
+except Exception:
+    duplicate_rejected = True
+check("J_DUPLICATE_KEY", duplicate_rejected, "duplicate authority field rejected")
+
+missing = dict(EXPECTED)
+del missing["authority_version"]
+check("J_MISSING_KEY", rejects(missing), "one missing authority field rejected")
+extra = dict(EXPECTED)
+extra["unexpected"] = "value"
+check("J_EXTRA_KEY", rejects(extra), "one unexpected authority field rejected")
+
+wrong_types = {
+    "schema_version": True,
+    "authority_version": 1,
+    "canonical_path": 1,
+    "python_version": 1,
+    "executable_sha256": 1,
+    "required_regular_file": 1,
+    "required_executable": 1,
+    "symlink_allowed": 0,
+    "path_lookup_allowed": 0,
+    "usr_bin_env_allowed": 0,
+    "requester_override_allowed": 0,
+    "isolated_flags": "-I -S",
+    "environment_authority": 0,
+    "runtime_binding_model": 1,
+}
+for field in KEYS:
+    mutant = dict(EXPECTED)
+    mutant[field] = wrong_types[field]
+    check("J_TYPE_{}".format(field.upper()), rejects(mutant),
+          "wrong exact JSON type for {} rejected".format(field))
+flag_item_mutant = dict(EXPECTED)
+flag_item_mutant["isolated_flags"] = ["-I", 1]
+check("J_TYPE_ISOLATED_FLAG_ITEM", rejects(flag_item_mutant),
+      "wrong nested isolated-flag scalar type rejected")
+
+semantic_mutants = (
+    ("PATH_LOOKUP", "canonical_path", "python3.12"),
+    ("USR_BIN_ENV_PATH", "canonical_path", "/usr/bin/env"),
+    ("SYMLINK_AUTHORITY", "canonical_path", "/opt/homebrew/opt/python@3.12/bin/python3.12"),
+    ("WRONG_VERSION", "python_version", "3.12.12"),
+    ("WRONG_DIGEST", "executable_sha256", "0" * 64),
+    ("REGULAR_NOT_REQUIRED", "required_regular_file", False),
+    ("EXECUTABLE_NOT_REQUIRED", "required_executable", False),
+    ("SYMLINK_ALLOWED", "symlink_allowed", True),
+    ("PATH_LOOKUP_ALLOWED", "path_lookup_allowed", True),
+    ("USR_BIN_ENV_ALLOWED", "usr_bin_env_allowed", True),
+    ("REQUESTER_OVERRIDE", "requester_override_allowed", True),
+    ("WEAK_ISOLATION", "isolated_flags", ["-I"]),
+    ("ENVIRONMENT_AUTHORITY", "environment_authority", True),
+    ("ALTERNATE_BINDING", "runtime_binding_model", "stat-then-path-exec"),
+)
+for name, field, replacement in semantic_mutants:
+    mutant = dict(EXPECTED)
+    mutant[field] = replacement
+    check("J_{}".format(name), rejects(mutant),
+          "one-defect semantic authority mutant rejected")
+
+probe = subprocess.run(
+    [
+        "/usr/bin/env", "-i",
+        "PATH={}:/usr/bin:/bin".format(poison_dir),
+        "HOME=/var/empty",
+        "TMPDIR=/tmp",
+        "NORTROPIC_POISON_LOG={}".format(poison_log),
+        "NORTROPIC_FOREIGN_EXECUTABLE={}".format(foreign_executable),
+        "NORTROPIC_FOREIGN_MARKER={}".format(foreign_marker),
+        "python3", "--nortropic-poison-probe",
+    ],
+    cwd="/",
+    env={},
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    universal_newlines=True,
+    timeout=5,
+)
+if probe.returncode != 0 or probe.stdout != "POISON_ACTIVE\n" or not poison_log.is_file():
+    unjudgeable("J_PATH_POISON_FIXTURE", "delegate-then-lie PATH poison was not active")
+check("J_PATH_POISON_FIXTURE", True,
+      "unqualified python3 resolves to the active delegate-then-lie wrapper")
+poison_log.unlink()
+
+git_probe = subprocess.run(
+    [
+        "/usr/bin/env", "-i",
+        "PATH={}:/usr/bin:/bin".format(poison_dir),
+        "HOME=/var/empty",
+        "TMPDIR=/tmp",
+        "NORTROPIC_GIT_POISON_LOG={}".format(git_poison_log),
+        "git", "--nortropic-poison-probe",
+    ],
+    cwd="/",
+    env={},
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    universal_newlines=True,
+    timeout=5,
+)
+if (git_probe.returncode != 0 or git_probe.stdout != "GIT_POISON_ACTIVE\n"
+        or not git_poison_log.is_file()):
+    unjudgeable("J_GIT_PATH_POISON_FIXTURE", "unqualified hostile Git wrapper was not active")
+check("J_GIT_PATH_POISON_FIXTURE", True,
+      "unqualified git resolves to the active hostile wrapper")
+git_poison_log.unlink()
+
+requested = os.environ.get("NORTROPIC_REQUESTED_PYTHON")
+check("J_REQUEST_ENV_SELECTION",
+      requested == str(foreign_executable)
+      and authority["canonical_path"] == EXPECTED["canonical_path"]
+      and authority["executable_sha256"] == EXPECTED["executable_sha256"],
+      "hostile request/environment values cannot select authority identity")
+check("J_SINGLE_AUTHORITY_OBJECT", authority is not None,
+      "later identity, version and digest decisions retain the one admitted authority object")
+
+canonical_text = authority["canonical_path"]
+canonical = pathlib.Path(canonical_text)
+check("K1_ABSOLUTE_PATH", canonical.is_absolute(), "canonical interpreter path is absolute")
+try:
+    lst = os.lstat(canonical_text)
+except FileNotFoundError as exc:
+    unjudgeable("K1_OWNER_OBJECT", "canonical owner interpreter is absent: {}".format(exc))
+except OSError as exc:
+    unjudgeable("K1_OWNER_OBJECT", "canonical owner interpreter cannot be inspected: {}".format(exc))
+check("K1_NOT_SYMLINK", not stat.S_ISLNK(lst.st_mode),
+      "canonical interpreter pathname is not a symlink")
+check("K1_REGULAR", stat.S_ISREG(lst.st_mode), "canonical interpreter object is regular")
+check("K1_EXECUTABLE", bool(lst.st_mode & 0o111),
+      "canonical interpreter object has executable mode semantics")
+
+open_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+try:
+    target_fd = os.open(canonical_text, open_flags)
+except OSError as exc:
+    fail("K1_OPENED_TARGET", "canonical interpreter cannot be opened no-follow: {}".format(exc))
+try:
+    target_before = os.fstat(target_fd)
+    if not stat.S_ISREG(target_before.st_mode):
+        fail("K1_OPENED_TARGET", "opened canonical interpreter is not regular")
+    digest_before = hashlib.sha256()
+    while True:
+        chunk = os.read(target_fd, 1024 * 1024)
+        if not chunk:
+            break
+        digest_before.update(chunk)
+    target_after_hash = os.fstat(target_fd)
+    try:
+        path_before_exec = os.stat(canonical_text, follow_symlinks=False)
+    except OSError as exc:
+        fail("K1_OPENED_TARGET", "canonical path became unavailable after hashing: {}".format(exc))
+    check("K1_SAME_OPENED_OBJECT",
+          metadata(target_before) == metadata(target_after_hash)
+          and metadata(target_after_hash) == metadata(path_before_exec),
+          "open, fstat, hash and pre-exec pathname stability bind one object")
+    observed_sha = digest_before.hexdigest()
+    check("K1_CURRENT_DIGEST", observed_sha == authority["executable_sha256"],
+          "opened-object digest equals frozen authority digest")
+
+    flags = tuple(authority["isolated_flags"])
+    target_result = subprocess.run(
+        [canonical_text] + list(flags) + [
+            "-c",
+            "import sys; print('.'.join(str(value) for value in sys.version_info[:3]))",
+        ],
+        executable=canonical_text,
+        cwd="/",
+        env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        timeout=15,
+        close_fds=True,
+    )
+    check("K2_FIXED_INVOCATION", target_result.returncode == 0,
+          "exact authority path invoked with fixed -I -S flags")
+    observed_lines = target_result.stdout.splitlines()
+    observed_version = observed_lines[0] if len(observed_lines) == 1 else ""
+    check("K2_VERSION", observed_version == authority["python_version"],
+          "isolated authority interpreter reports exact version {}".format(observed_version))
+
+    os.lseek(target_fd, 0, os.SEEK_SET)
+    digest_after = hashlib.sha256()
+    while True:
+        chunk = os.read(target_fd, 1024 * 1024)
+        if not chunk:
+            break
+        digest_after.update(chunk)
+    target_after_exec = os.fstat(target_fd)
+    try:
+        path_after_exec = os.stat(canonical_text, follow_symlinks=False)
+    except OSError as exc:
+        fail("K2_POST_EXEC_STABILITY", "canonical path unavailable after invocation: {}".format(exc))
+    check("K2_POST_EXEC_STABILITY",
+          metadata(target_before) == metadata(target_after_exec)
+          and metadata(target_after_exec) == metadata(path_after_exec)
+          and digest_after.hexdigest() == observed_sha,
+          "same opened source and pathname identity remain stable through judge-only invocation")
+finally:
+    os.close(target_fd)
+
+fixture = work / "fixture"
+fixture.write_bytes(b"python-fixture")
+fixture.chmod(0o700)
+link = work / "link"
+link.symlink_to(fixture)
+directory = work / "directory"
+directory.mkdir()
+noexec = work / "noexec"
+noexec.write_bytes(b"x")
+noexec.chmod(0o600)
+
+
+def admissible_origin(path):
+    try:
+        value = os.lstat(str(path))
+    except OSError:
+        return False
+    return (
+        not stat.S_ISLNK(value.st_mode)
+        and stat.S_ISREG(value.st_mode)
+        and bool(value.st_mode & 0o111)
+    )
+
+
+check("J_SYMLINK_OBJECT", not admissible_origin(link), "symlink origin rejected")
+check("J_NON_REGULAR_OBJECT", not admissible_origin(directory), "non-regular origin rejected")
+check("J_NON_EXECUTABLE_OBJECT", not admissible_origin(noexec), "non-executable origin rejected")
+
+stale = work / "stale"
+stale.write_bytes(b"A")
+stale.chmod(0o700)
+stale_fd = os.open(str(stale), os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
+try:
+    stale_before = os.fstat(stale_fd)
+    replacement = work / "replacement"
+    replacement.write_bytes(b"B")
+    replacement.chmod(0o700)
+    os.replace(str(replacement), str(stale))
+    stale_after = os.stat(str(stale), follow_symlinks=False)
+finally:
+    os.close(stale_fd)
+check("J_STALE_CHANGED_OBJECT",
+      (stale_before.st_dev, stale_before.st_ino) != (stale_after.st_dev, stale_after.st_ino),
+      "pathname replacement after open is detected")
+
+gate_raw = None
+if mode == "audit":
+    caller_git_inputs = sorted(name for name in os.environ if name.startswith("GIT_"))
+    check("K3_GIT_CALLER_ENV",
+          not caller_git_inputs,
+          "all caller Git environment inputs are absent from the isolated judge")
+    git_env = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": "/var/empty",
+        "XDG_CONFIG_HOME": "/var/empty",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+
+    def git_bytes(arguments, unavailable_name):
+        result = subprocess.run(
+            ["/usr/bin/git", "--no-replace-objects", "-C", str(root)] + list(arguments),
+            cwd="/",
+            env=git_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            close_fds=True,
+        )
+        if result.returncode != 0:
+            unjudgeable(unavailable_name, "absolute isolated git read failed")
+        return result.stdout
+
+    object_format = git_bytes(["rev-parse", "--show-object-format"],
+                              "K3_REPOSITORY_OBJECT_FORMAT").decode("ascii").strip()
+    check("K3_REPOSITORY_OBJECT_FORMAT", object_format == "sha1",
+          "40-hex candidate is a complete object name in this repository")
+    commit_type = git_bytes(["cat-file", "-t", candidate], "K3_CANDIDATE_OBJECT").decode("ascii").strip()
+    check("K3_CANDIDATE_OBJECT", commit_type == "commit", "candidate resolves to an exact commit object")
+    candidate_commit = git_bytes(["cat-file", "commit", candidate],
+                                 "K3_CANDIDATE_PARENT")
+    commit_header = candidate_commit.split(b"\n\n", 1)[0].splitlines()
+    try:
+        actual_parents = [
+            line[len(b"parent "):].decode("ascii")
+            for line in commit_header
+            if line.startswith(b"parent ")
+        ]
+    except UnicodeDecodeError:
+        fail("K3_CANDIDATE_PARENT", "actual commit object contains a non-ASCII parent header")
+    check("K3_CANDIDATE_PARENT",
+          actual_parents == [base_sha],
+          "raw actual commit object is a single-parent direct child of the authorized base")
+    changed = git_bytes(
+        ["diff-tree", "--no-commit-id", "--name-only", "-r", base_sha, candidate],
+        "K3_CANDIDATE_SCOPE",
+    ).decode("utf-8").splitlines()
+    expected_changed = sorted([
+        "config/python-interpreter-authority-v1.json",
+        "verify/bin/python-interpreter-authority-v1-exit",
+        "docs/05-beslutslogg.md",
+        "docs/loop/drift.md",
+    ])
+    check("K3_CANDIDATE_SCOPE", sorted(changed) == expected_changed and len(changed) == 4,
+          "candidate changes exactly the four owner-authorized paths")
+
+    candidate_authority = git_bytes(["show", "{}:{}".format(candidate, "config/python-interpreter-authority-v1.json")],
+                                    "K3_CANDIDATE_AUTHORITY")
+    candidate_gate = git_bytes(["show", "{}:{}".format(candidate, "verify/bin/python-interpreter-authority-v1-exit")],
+                               "K3_CANDIDATE_GATE")
+    gate_raw, gate_file_stat = read_opened_regular(gate_path, "K3_GATE_OBJECT")
+    check("K3_GATE_OBJECT", bool(gate_file_stat.st_mode & 0o111),
+          "current canonical gate is a stable executable regular object")
+    check("K3_CANDIDATE_AUTHORITY", candidate_authority == authority_raw,
+          "candidate authority bytes equal the audited working authority bytes")
+    check("K3_CANDIDATE_GATE", candidate_gate == gate_raw,
+          "candidate gate bytes equal the executing audited gate bytes")
+
+check("J_PATH_POISON_IMMUNE", not poison_log.exists() and not foreign_marker.exists(),
+      "active PATH poison received no authority-decision call and foreign executable never ran")
+check("J_GIT_PATH_POISON_IMMUNE", not git_poison_log.exists(),
+      "active Git PATH poison received no candidate-audit call")
+
+print("SELFTEST_PASS_COUNT={}".format(passed))
+if mode == "audit":
+    print("CANDIDATE_SHA={}".format(candidate))
+    print("CANDIDATE_PARENT_SHA={}".format(base_sha))
+    print("AUTHORITY_FILE_SHA256={}".format(hashlib.sha256(authority_raw).hexdigest()))
+    print("GATE_SHA256={}".format(hashlib.sha256(gate_raw).hexdigest()))
+    print("GIT_OBJECT_VIEW=NO_REPLACE_OBJECTS")
+    print("CANDIDATE_PARENT_SOURCE=RAW_ACTUAL_COMMIT_OBJECT")
+    print("JUDGE_PATH=/usr/bin/python3")
+    print("CANONICAL_INTERPRETER_PATH={}".format(canonical_text))
+    print("OBSERVED_OBJECT_TYPE=Regular File")
+    print("OBSERVED_MODE={}".format(stat.filemode(target_after_exec.st_mode)))
+    print("OBSERVED_UID={}".format(target_after_exec.st_uid))
+    print("OBSERVED_GID={}".format(target_after_exec.st_gid))
+    print("SYMLINK_STATE=NOT_SYMLINK")
+    print("OBSERVED_SHA256={}".format(observed_sha))
+    print("OBSERVED_VERSION={}".format(observed_version))
+PY
+judge_rc=$?
+if [[ $judge_rc -ne 0 ]]; then
+  exit "$judge_rc"
+fi
+
+CLEANED_WORK="$WORK"
+if ! /bin/rm -rf "$CLEANED_WORK" || [[ -e "$CLEANED_WORK" ]]; then
+  echo "ODÖMBART K_CLEANUP — disposable test state could not be proven absent"
+  exit 2
+fi
+WORK=""
+trap - EXIT HUP INT TERM
+echo "PASS K_CLEANUP — disposable test state removed"
+if [[ "$MODE" == "audit" ]]; then
+  echo "INTERPRETER_AUTHORITY_AUDIT_RESULT=PASS"
+else
+  echo "INTERPRETER_AUTHORITY_GATE_RESULT=PASS"
+fi
+exit 0

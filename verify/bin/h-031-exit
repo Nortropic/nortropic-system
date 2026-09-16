@@ -1,0 +1,2404 @@
+#!/bin/bash -p
+# h-031-exit — explicit model routing at the H-032 provider boundary
+
+set -u
+umask 077
+unset CDPATH ENV BASH_ENV GLOBIGNORE PYTHONHOME PYTHONPATH
+export PATH="/usr/bin:/bin:/opt/homebrew/bin"
+
+SOURCE_PATH="${BASH_SOURCE[0]}"
+case "$SOURCE_PATH" in
+  /*) ;;
+  *) SOURCE_PATH="$(/bin/pwd -P)/$SOURCE_PATH" ;;
+esac
+if [[ -L "$SOURCE_PATH" ]]; then
+  echo "ODÖMBART K0 — grindens entry är en symlink"
+  exit 2
+fi
+SCRIPT_DIR="$(cd -P -- "$(/usr/bin/dirname -- "$SOURCE_PATH")" 2>/dev/null && /bin/pwd -P)" || exit 2
+ROOT="$(cd -P -- "$SCRIPT_DIR/../.." 2>/dev/null && /bin/pwd -P)" || exit 2
+if [[ ! "$SOURCE_PATH" -ef "$ROOT/verify/bin/h-031-exit" ]]; then
+  echo "ODÖMBART K0 — icke-kanonisk grindentry"
+  exit 2
+fi
+
+SOURCE="$ROOT/scripts/nortropic-codex-autopilot.py"
+SCHEMA="$ROOT/docs/loop/codex-autopilot-report.schema.json"
+SPEC="$ROOT/specs/tasks.spec.json"
+H032_GATE="$ROOT/verify/bin/h-032-exit"
+WORK="$(/usr/bin/mktemp -d /private/tmp/nortropic-h031.XXXXXX)" || exit 2
+case "$WORK" in /private/tmp/nortropic-h031.*) ;; *) echo "ODÖMBART K0 — osäker tempidentitet"; exit 2;; esac
+cleanup() {
+  cleanup_rc=$?
+  trap - EXIT HUP INT TERM
+  case "${WORK:-}" in
+    /private/tmp/nortropic-h031.*) /bin/rm -rf -- "$WORK" || cleanup_rc=2 ;;
+    *) cleanup_rc=2 ;;
+  esac
+  exit "$cleanup_rc"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+OWNER_LIVE_MODE="run"
+if [[ $# -gt 0 ]]; then
+  [[ $# -eq 1 && "$1" == "--skip-owner-live" ]] || {
+    echo "ODÖMBART K0 — användning: h-031-exit [--skip-owner-live]"
+    exit 2
+  }
+  OWNER_LIVE_MODE="skip"
+fi
+
+/usr/bin/python3 -I -S - "$SOURCE" "$SCHEMA" "$SPEC" "$H032_GATE" "$WORK" "$OWNER_LIVE_MODE" <<'PY'
+from __future__ import annotations
+
+import ast
+import builtins
+import contextlib
+import fcntl
+import hashlib
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import subprocess
+import sys
+
+source, schema_source, spec_path, h032_gate, work = map(Path, sys.argv[1:6])
+owner_live_mode = sys.argv[6]
+if owner_live_mode not in {"run", "skip"}:
+    raise SystemExit("invalid owner live mode")
+root = source.parents[1]
+GIT = "/usr/bin/git"
+EXPECTED = {
+    "ARCHITECT": ("gpt-5.6-sol", "max"),
+    "TEST_AUTHOR": ("gpt-5.6-sol", "max"),
+    "GATE_REVIEWER": ("gpt-5.6-sol", "max"),
+    "BUILDER": ("gpt-5.6-sol", "high"),
+    "REVIEWER": ("gpt-5.6-sol", "max"),
+    "EMPIRICAL": ("gpt-5.6-sol", "max"),
+}
+ROUTING_SOURCE = "AUTOPILOT_ROLE_POLICY"
+EXPECTED_PREBUILDER_RED = {
+    "K_ROLE_ROUTE_MATRIX",
+    "K_AGENT_START_ROUTE_BINDING",
+    "K_UNKNOWN_ROLE_PRE_EFFECT_REJECT",
+    "K_GENERIC_CODEX_PRESPAWN_REJECT",
+}
+PROCESS_ATTRS = {
+    "subprocess": {"Popen", "run", "call", "check_call", "check_output", "getoutput", "getstatusoutput"},
+    "os": {"system", "popen", "fork", "forkpty", "register_at_fork", "kill", "killpg", "chdir", "fchdir", "putenv", "unsetenv", "umask", "posix_spawn", "posix_spawnp", "execv", "execve", "execvp", "execvpe", "spawnl", "spawnle", "spawnlp", "spawnlpe", "spawnv", "spawnve", "spawnvp", "spawnvpe"},
+    "asyncio": {"create_subprocess_exec", "create_subprocess_shell"},
+    "pty": {"spawn"},
+}
+LEGACY_EXPECTED_IMPORT_INVENTORY = sorted([
+    "F:0:__future__:annotations:",
+    "I:argparse:", "I:datetime:dt", "I:fcntl:", "I:hashlib:", "I:json:",
+    "I:os:", "I:re:", "I:shutil:", "I:stat:", "I:subprocess:", "I:sys:",
+    "I:tempfile:", "I:time:",
+    "F:0:dataclasses:dataclass:", "F:0:pathlib:Path:",
+    "F:0:typing:Any:", "F:0:typing:Iterable:",
+    "F:0:core:AuthorityError:", "F:0:core:canonical_path:",
+    "F:0:core:permits:", "F:0:core:strict_json_bytes:",
+])
+RESULT_KERNEL_EXPECTED_IMPORT_INVENTORY = sorted([
+    "F:0:__future__:annotations:",
+    "I:argparse:", "I:datetime:dt", "I:fcntl:", "I:hashlib:", "I:json:",
+    "I:os:", "I:re:", "I:shutil:", "I:stat:", "I:subprocess:", "I:sys:",
+    "I:tempfile:", "I:time:",
+    "F:0:dataclasses:dataclass:", "F:0:pathlib:Path:",
+    "F:0:typing:Any:", "F:0:typing:Iterable:",
+    "F:0:controller.authority.core:AuthorityError:",
+    "F:0:controller.authority.core:canonical_path:",
+    "F:0:controller.authority.core:permits:",
+    "F:0:controller.authority.core:strict_json_bytes:",
+    "F:0:controller.result.consumer:consume_private_result:",
+])
+SENSITIVE_MODULE_PROXIES = {
+    "os", "sys", "subprocess", "builtins", "ctypes", "importlib", "pty",
+    "asyncio", "multiprocessing", "posix", "_posixsubprocess", "threading", "_thread",
+    "signal", "atexit", "sched", "concurrent", "weakref",
+    "types",
+}
+ALLOWED_SYS_ATTRS = {
+    "dont_write_bytecode", "path", "stderr", "stdout", "version", "version_info",
+}
+ALLOWED_OS_ATTRS = {
+    "O_CREAT", "O_EXCL", "O_RDONLY", "O_WRONLY", "X_OK", "access", "chmod",
+    "close", "environ", "fdopen", "fstat", "fsync", "getpid", "getuid", "open",
+    "read", "sep", "system", "urandom", "write",
+}
+RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS = {
+    "_read_stable_opened:read": 1,
+    "_strict_provider_authority:close": 1,
+    "_strict_provider_authority:open": 1,
+    "_provider_snapshot:chmod": 1,
+    "_provider_snapshot:close": 2,
+    "_provider_snapshot:fsync": 1,
+    "_provider_snapshot:open": 2,
+    "_provider_snapshot:write": 1,
+    "_python_snapshot:close": 3,
+    "_python_snapshot:fsync": 1,
+    "_python_snapshot:open": 3,
+    "_python_snapshot:write": 1,
+    "publication_authority:fdopen": 1,
+    "publication_authority:open": 1,
+    "publish:fdopen": 1,
+    "publish:open": 1,
+    "run_codex:chmod": 5,
+    "run_codex:close": 2,
+    "run_codex:fsync": 1,
+    "run_codex:open": 2,
+    "run_codex:urandom": 2,
+}
+LEGACY_EXPECTED_OS_EFFECT_COUNTS = {
+    key:value for key,value in RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS.items()
+    if not key.startswith("run_codex:") or key=="run_codex:chmod"
+}
+DIRECT_OS_EFFECT_ATTRS = {"chmod", "close", "fdopen", "fsync", "open", "read", "urandom", "write"}
+EXPECTED_FCNTL_EFFECT_COUNTS = {"acquire_lock:flock": 1}
+EXPECTED_SYS_STREAM_COUNTS = {"main:stderr.print": 4, "run_codex:stdout.write": 1}
+EXPECTED_SYS_STATE_COUNTS = {
+    "<module>:dont_write_bytecode=True": 1,
+    "<module>:path.insert": 1,
+}
+AUDIT_MUTATION_EVENTS = {
+    "os.mkdir", "os.remove", "os.rmdir", "os.rename", "os.replace",
+    "os.link", "os.symlink", "os.truncate", "os.chmod",
+    "os.fork", "os.forkpty", "os.posix_spawn", "os.posix_spawnp", "os.system",
+    "os.register_at_fork", "os.kill", "os.killpg", "os.chdir", "os.fchdir",
+    "os.putenv", "os.unsetenv", "fcntl.fcntl", "fcntl.flock", "fcntl.ioctl",
+    "shutil.copyfile", "shutil.copytree", "shutil.rmtree", "subprocess.Popen",
+}
+GUARDED_OS_NAMES = {
+    "abort", "chdir", "chmod", "chown", "close", "closerange", "dup", "dup2",
+    "execv", "execve", "execvp", "execvpe", "fchdir", "fchmod", "fchown",
+    "fdatasync", "fdopen", "fork", "forkpty", "fsync", "kill", "killpg",
+    "lchown", "link", "lockf", "lseek", "mkdir", "makedirs", "nice", "open",
+    "pipe", "pipe2", "posix_spawn", "posix_spawnp", "putenv", "read", "readv",
+    "remove", "removedirs", "rename", "renames", "replace", "rmdir",
+    "set_blocking", "set_inheritable", "setegid", "seteuid", "setgid", "setgroups",
+    "setpgid", "setpgrp", "setregid", "setresgid", "setresuid", "setreuid",
+    "setsid", "setuid", "spawnl", "spawnle", "spawnlp", "spawnlpe", "spawnv",
+    "spawnve", "spawnvp", "spawnvpe", "symlink", "system", "truncate", "umask",
+    "unlink", "unsetenv", "write", "writev",
+}
+MODULE_EFFECT_METHODS = {
+    "chmod", "close", "flush", "hardlink_to", "mkdir", "open", "rename", "replace",
+    "rmdir", "symlink_to", "touch", "truncate", "unlink", "write", "write_bytes",
+    "write_text", "writelines",
+}
+SENSITIVE_FRAME_ATTRS = {
+    "f_globals", "f_builtins", "f_locals", "gi_frame", "cr_frame", "ag_frame", "tb_frame",
+}
+checks: list[tuple[str, bool, str]] = []
+owner_live_skip_pending = False
+
+
+class DuplicateKey(ValueError):
+    pass
+
+
+class ProductFailure(RuntimeError):
+    pass
+
+
+def effect_guard(effects, name):
+    def reject(*args, **kwargs):
+        effects.append((name, repr(args[:3]), sorted(kwargs)))
+        raise ProductFailure(f"guarded pre-role effect: {name}")
+    return reject
+
+
+def install_effect_guards(effects):
+    saved = []
+    for name in sorted(GUARDED_OS_NAMES):
+        function = getattr(os, name, None)
+        if callable(function):
+            saved.append((os, name, function))
+            setattr(os, name, effect_guard(effects, "os." + name))
+    saved.append((subprocess, "Popen", subprocess.Popen))
+    subprocess.Popen = effect_guard(effects, "subprocess.Popen")
+    saved.append((fcntl, "flock", fcntl.flock))
+    fcntl.flock = effect_guard(effects, "fcntl.flock")
+    for name in ("fcntl", "ioctl"):
+        function = getattr(fcntl, name, None)
+        if callable(function):
+            saved.append((fcntl, name, function))
+            setattr(fcntl, name, effect_guard(effects, "fcntl." + name))
+    return saved
+
+
+def restore_effect_guards(saved):
+    for target, name, function in reversed(saved):
+        setattr(target, name, function)
+
+
+def measure_umask():
+    value = os.umask(0o077)
+    os.umask(value)
+    return value
+
+
+def audit_effect_hook(active, effects):
+    write_flags = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
+    def hook(event, args):
+        if not active[0]:
+            return
+        forbidden = event in AUDIT_MUTATION_EVENTS
+        if event == "open":
+            mode = args[1] if len(args) > 1 else None
+            flags = args[2] if len(args) > 2 else 0
+            forbidden = ((isinstance(mode, str) and any(char in mode for char in "wax+"))
+                         or (isinstance(flags, int) and flags & write_flags))
+        if forbidden:
+            effects.append((event, repr(args[:3])))
+            raise ProductFailure(f"forbidden pre-role effect: {event}")
+    return hook
+
+
+def strict_json(raw: str):
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out:
+                raise DuplicateKey(key)
+            out[key] = value
+        return out
+    return json.loads(raw, object_pairs_hook=pairs)
+
+
+def check(key: str, ok: bool, detail: str) -> None:
+    checks.append((key, bool(ok), detail))
+
+
+def odombart(key: str, detail: str) -> None:
+    print(f"ODÖMBART {key} — {detail}")
+    raise SystemExit(2)
+
+
+H032_OWNER_LIVE_SKIP_SUMMARY = "SAMMANFATTNING 140 PASS / 1 FAIL"
+H032_OWNER_LIVE_SKIP_REASON = "CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN"
+H032_STRUCTURED_RESULT_REASON = "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
+H032_OWNER_LIVE_SKIP_MARKER = (
+    "ODÖMBART K_OWNER_LIVE_PHASE_NOT_RUN — explicit owner TEST_AUTHOR no-live mode; "
+    "deterministic product controls passed"
+)
+H033_PASS_PREFIX = "PASS K_H033_FRESH_UPSTREAM_PROVENANCE — rc=0 tail="
+H033_PASS_SUMMARY = "H033_GATE_SUMMARY=55 PASS 0 FAIL"
+H033_PASS_RESULT = "H033_GATE_RESULT=PASS"
+
+
+def h033_embedded_pass(lines):
+    hits = [line for line in lines if line.startswith("PASS K_H033_FRESH_UPSTREAM_PROVENANCE —")]
+    facts = {
+        "single_line": len(hits) == 1,
+        "exact_prefix": len(hits) == 1 and hits[0].startswith(H033_PASS_PREFIX),
+        "summary": False,
+        "result": False,
+        "ordered": False,
+    }
+    if not facts["exact_prefix"]:
+        return False, facts
+    tail_records = hits[0][len(H033_PASS_PREFIX):].split("|")
+    facts["summary"] = tail_records.count(H033_PASS_SUMMARY) == 1
+    facts["result"] = tail_records.count(H033_PASS_RESULT) == 1
+    if facts["summary"] and facts["result"]:
+        facts["ordered"] = tail_records.index(H033_PASS_SUMMARY) < tail_records.index(H033_PASS_RESULT)
+    return all(facts.values()), facts
+
+
+def owner_skip_fixture_from_observed_h032(stdout: str) -> str:
+    lines = stdout.splitlines()
+    if (lines.count(H032_OWNER_LIVE_SKIP_REASON) == 1
+            and lines.count(H032_OWNER_LIVE_SKIP_MARKER) == 1):
+        return stdout
+    if (lines.count(H032_STRUCTURED_RESULT_REASON) != 1
+            or H032_OWNER_LIVE_SKIP_MARKER in lines):
+        return ""
+    index = lines.index(H032_STRUCTURED_RESULT_REASON)
+    lines[index:index + 1] = [H032_OWNER_LIVE_SKIP_REASON, H032_OWNER_LIVE_SKIP_MARKER]
+    return "\n".join(lines) + "\n"
+
+
+def exclusive_h032_owner_live_skip(returncode: int, stdout: str):
+    lines = stdout.splitlines()
+    h033_ok, h033_facts = h033_embedded_pass(lines)
+    fail_labels = [
+        line[5:].split(" — ", 1)[0]
+        for line in lines
+        if line.startswith("FAIL ")
+    ]
+    odombart_lines = [line for line in lines if line.startswith("ODÖMBART ")]
+    required = {
+        "summary": lines.count(H032_OWNER_LIVE_SKIP_SUMMARY) == 1,
+        "reason": lines.count(H032_OWNER_LIVE_SKIP_REASON) == 1,
+        "marker": lines.count(H032_OWNER_LIVE_SKIP_MARKER) == 1,
+        "fail": fail_labels == ["K_STRUCTURED_RESULT_DELIVERY_BOUNDARY"],
+        "g20_pass": sum(line.startswith("PASS K_G20_NAMESPACE —") for line in lines) == 1,
+        "h033_embedded": h033_ok,
+        "exclusive_odombart": odombart_lines == [H032_OWNER_LIVE_SKIP_MARKER],
+    }
+    ordered = False
+    if required["summary"] and required["reason"] and required["marker"]:
+        ordered = (
+            lines.index(H032_OWNER_LIVE_SKIP_SUMMARY)
+            < lines.index(H032_OWNER_LIVE_SKIP_REASON)
+            < lines.index(H032_OWNER_LIVE_SKIP_MARKER)
+        )
+    required["ordered"] = ordered
+    required["h033_facts"] = h033_facts
+    verdict_fields = [value for key, value in required.items() if key != "h033_facts"]
+    return returncode == 2 and all(verdict_fields), required
+
+
+def h031_terminal_exit(owner_skip_pending: bool, failed_labels) -> int:
+    if owner_skip_pending:
+        return 2
+    return 0 if not failed_labels else 1
+
+
+def sh(*argv: str, cwd: Path | None = None) -> str:
+    if not argv or argv[0] != GIT:
+        raise RuntimeError("judge helper permits only exact system Git")
+    p = subprocess.run(argv, cwd=cwd, text=True, stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT, timeout=20)
+    if p.returncode:
+        raise RuntimeError(f"git rc={p.returncode}: {p.stdout}")
+    return p.stdout
+
+
+def sha256_bytes(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def repository_import_transition(before, after, repository_root: Path) -> bool:
+    return (
+        isinstance(before, tuple)
+        and len(before) == 2
+        and isinstance(before[0], list)
+        and isinstance(before[1], bool)
+        and isinstance(after, tuple)
+        and len(after) == 2
+        and isinstance(after[0], list)
+        and after[0] == [str(repository_root)] + before[0]
+        and after[1] is True
+    )
+
+
+def complete_route_report(role: str) -> dict:
+    return {
+        "role": role,
+        "outcome": "READY",
+        "summary": "H031 route fixture completed",
+        "changed_files": [],
+        "blocking_findings": [],
+        "tests": [],
+        "allowed_write_violation": False,
+        "frozen_artifacts_modified": False,
+        "production_files_modified": False,
+        "frozen_gate_ready": True,
+        "baseline_red_for_right_reason": False,
+        "owner_decision_required": False,
+        "stop_reason": "",
+        "next_action": None,
+        "next_task_id": None,
+    }
+
+
+def task_row_valid(rows) -> bool:
+    hits = [row for row in rows if isinstance(row, dict) and row.get("id") == "h-031"]
+    if len(hits) != 1:
+        return False
+    row = hits[0]
+    return (
+        row.get("slice") == 16
+        and row.get("authority_class") == "ordinary"
+        and row.get("depends_on") == ["h-032"]
+        and row.get("exit_test") == "verify/bin/h-031-exit"
+        and row.get("allowed_write") == [
+            "scripts/nortropic-codex-autopilot.py",
+            "docs/05-beslutslogg.md",
+            "docs/loop/drift.md",
+        ]
+        and row.get("owner_author_allowed_write") == []
+    )
+
+
+def owner_map(tree: ast.Module) -> dict[ast.AST, str]:
+    owners: dict[ast.AST, str] = {}
+    def walk(node: ast.AST, owner: str = "<module>", cls: str = "") -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            owner = f"{cls}.{node.name}" if cls else node.name
+        elif isinstance(node, ast.Lambda):
+            owner = f"<lambda@{getattr(node, 'lineno', 0)}>"
+        next_cls = f"{cls}.{node.name}".strip(".") if isinstance(node, ast.ClassDef) else cls
+        owners[node] = owner
+        for child in ast.iter_child_nodes(node):
+            walk(child, owner, next_cls)
+    walk(tree)
+    return owners
+
+
+def lexical_bindings(tree: ast.Module):
+    """Resolve import capability names without interpreting control flow."""
+    scope_parent: dict[ast.AST, ast.AST | None] = {tree: None}
+    scope_bindings: dict[ast.AST, dict[str, set[tuple[str, str | None]]]] = {
+        tree: {}
+    }
+    node_scope: dict[ast.AST, ast.AST] = {}
+    scope_globals: dict[ast.AST, set[str]] = {tree: set()}
+    scope_nonlocals: dict[ast.AST, set[str]] = {tree: set()}
+    class_process_events: set[tuple[ast.ClassDef, str, int, str]] = set()
+
+    def bind(scope: ast.AST, name: str, kind: str, value: str | None = None) -> None:
+        scope_bindings.setdefault(scope, {}).setdefault(name, set()).add((kind, value))
+
+    def bind_target(scope: ast.AST, name: str, kind: str = "local",
+                    value: str | None = None, node: ast.AST | None = None) -> None:
+        if isinstance(scope, ast.ClassDef) and name in PROCESS_ATTRS:
+            class_process_events.add(
+                (scope, name, getattr(node, "lineno", 0), kind))
+        if name in scope_globals.get(scope, set()):
+            bind(tree, name, kind, value)
+        elif name not in scope_nonlocals.get(scope, set()):
+            bind(scope, name, kind, value)
+
+    def bind_arguments(scope: ast.AST, args: ast.arguments) -> None:
+        for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
+            bind(scope, arg.arg, "local")
+        if args.vararg is not None:
+            bind(scope, args.vararg.arg, "local")
+        if args.kwarg is not None:
+            bind(scope, args.kwarg.arg, "local")
+
+    class LexicalBindings(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self.scope: ast.AST = tree
+
+        def visit(self, node: ast.AST):
+            node_scope.setdefault(node, self.scope)
+            return super().visit(node)
+
+        def visit_Name(self, node: ast.Name) -> None:
+            if isinstance(self.scope, ast.ClassDef) and node.id in PROCESS_ATTRS:
+                class_process_events.add(
+                    (self.scope, node.id, node.lineno, type(node.ctx).__name__))
+            if isinstance(node.ctx, (ast.Store, ast.Del)):
+                bind_target(self.scope, node.id, node=node)
+
+        def visit_Global(self, node: ast.Global) -> None:
+            scope_globals.setdefault(self.scope, set()).update(node.names)
+            if isinstance(self.scope, ast.ClassDef):
+                for name in set(node.names) & set(PROCESS_ATTRS):
+                    class_process_events.add(
+                        (self.scope, name, node.lineno, "Global"))
+
+        def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
+            scope_nonlocals.setdefault(self.scope, set()).update(node.names)
+            if isinstance(self.scope, ast.ClassDef):
+                for name in set(node.names) & set(PROCESS_ATTRS):
+                    class_process_events.add(
+                        (self.scope, name, node.lineno, "Nonlocal"))
+
+        def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
+            if node.type is not None:
+                self.visit(node.type)
+            if isinstance(node.name, str):
+                bind_target(self.scope, node.name, node=node)
+            for statement in node.body:
+                self.visit(statement)
+
+        def generic_visit(self, node: ast.AST):
+            node_name = type(node).__name__
+            if (node_name in {"MatchAs", "MatchStar"}
+                    and isinstance(getattr(node, "name", None), str)):
+                bind_target(self.scope, node.name, node=node)
+            if (node_name == "MatchMapping"
+                    and isinstance(getattr(node, "rest", None), str)):
+                bind_target(self.scope, node.rest, node=node)
+            return super().generic_visit(node)
+
+        def visit_Import(self, node: ast.Import) -> None:
+            for alias in node.names:
+                root = alias.name.split(".", 1)[0]
+                bind_target(self.scope, alias.asname or root, "module", alias.name,
+                            node)
+
+        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+            for alias in node.names:
+                bind_target(self.scope, alias.asname or alias.name, "member",
+                            f"{node.module}.{alias.name}", node)
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            bind_target(self.scope, node.name, node=node)
+            for item in node.decorator_list:
+                self.visit(item)
+            for item in (*node.args.defaults, *node.args.kw_defaults):
+                if item is not None:
+                    self.visit(item)
+            for arg in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
+                if arg.annotation is not None:
+                    self.visit(arg.annotation)
+            if node.args.vararg and node.args.vararg.annotation:
+                self.visit(node.args.vararg.annotation)
+            if node.args.kwarg and node.args.kwarg.annotation:
+                self.visit(node.args.kwarg.annotation)
+            if node.returns is not None:
+                self.visit(node.returns)
+            outer = self.scope
+            scope_parent[node] = outer
+            scope_bindings[node] = {}
+            scope_globals[node] = set()
+            scope_nonlocals[node] = set()
+            self.scope = node
+            bind_arguments(node, node.args)
+            for statement in node.body:
+                self.visit(statement)
+            self.scope = outer
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            for item in (*node.args.defaults, *node.args.kw_defaults):
+                if item is not None:
+                    self.visit(item)
+            outer = self.scope
+            scope_parent[node] = outer
+            scope_bindings[node] = {}
+            scope_globals[node] = set()
+            scope_nonlocals[node] = set()
+            self.scope = node
+            bind_arguments(node, node.args)
+            self.visit(node.body)
+            self.scope = outer
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            bind_target(self.scope, node.name, node=node)
+            for item in node.decorator_list:
+                self.visit(item)
+            for item in node.bases:
+                self.visit(item)
+            for item in node.keywords:
+                self.visit(item.value)
+            outer = self.scope
+            scope_parent[node] = outer
+            scope_bindings[node] = {}
+            scope_globals[node] = set()
+            scope_nonlocals[node] = set()
+            self.scope = node
+            for statement in node.body:
+                self.visit(statement)
+            self.scope = outer
+
+        def visit_comprehension_scope(self, node: ast.AST,
+                                      value_nodes: tuple[ast.AST, ...]) -> None:
+            outer = self.scope
+            generators = node.generators
+            if generators:
+                self.visit(generators[0].iter)
+            scope_parent[node] = outer
+            scope_bindings[node] = {}
+            scope_globals[node] = set()
+            scope_nonlocals[node] = set()
+            self.scope = node
+            for index, generator in enumerate(generators):
+                if index:
+                    self.visit(generator.iter)
+                self.visit(generator.target)
+                for condition in generator.ifs:
+                    self.visit(condition)
+            for value in value_nodes:
+                self.visit(value)
+            self.scope = outer
+
+        def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+            self.visit(node.value)
+            target_scope = self.scope
+            while isinstance(target_scope, (ast.ListComp, ast.SetComp,
+                                             ast.DictComp, ast.GeneratorExp)):
+                target_scope = scope_parent.get(target_scope)
+            if isinstance(node.target, ast.Name):
+                node_scope[node.target] = target_scope
+                bind_target(target_scope, node.target.id, node=node.target)
+            else:
+                outer = self.scope
+                self.scope = target_scope
+                self.visit(node.target)
+                self.scope = outer
+
+        def visit_ListComp(self, node: ast.ListComp) -> None:
+            self.visit_comprehension_scope(node, (node.elt,))
+
+        visit_SetComp = visit_ListComp
+        visit_GeneratorExp = visit_ListComp
+
+        def visit_DictComp(self, node: ast.DictComp) -> None:
+            self.visit_comprehension_scope(node, (node.key, node.value))
+
+    LexicalBindings().visit(tree)
+
+    def resolve_outside_class(scope: ast.ClassDef,
+                              name: str) -> tuple[str, str | None]:
+        """Model the binding used when a class LOAD_NAME misses its namespace."""
+        if name in scope_globals.get(scope, set()):
+            records = scope_bindings.get(tree, {}).get(name, set())
+            return (next(iter(records)) if len(records) == 1
+                    else ("ambiguous", None))
+
+        parent = scope_parent.get(scope)
+        if (name not in scope_nonlocals.get(scope, set())
+                and scope_bindings.get(scope, {}).get(name, set())):
+            # A class-local binding forces LOAD_NAME. Before that binding exists (or
+            # after deletion), LOAD_NAME falls back to module globals rather than an
+            # enclosing function's fast locals.
+            parent = tree
+
+        while parent is not None:
+            if isinstance(parent, ast.ClassDef):
+                parent = scope_parent.get(parent)
+                continue
+            if name in scope_globals.get(parent, set()):
+                parent = tree
+            elif name in scope_nonlocals.get(parent, set()):
+                parent = scope_parent.get(parent)
+                continue
+            records = scope_bindings.get(parent, {}).get(name, set())
+            if records:
+                return (next(iter(records)) if len(records) == 1
+                        else ("ambiguous", None))
+            parent = scope_parent.get(parent)
+        return ("unbound", None)
+
+    class_process_ambiguities = sorted(
+        (line, name, binding_kind)
+        for scope, name, line, binding_kind in class_process_events
+        if resolve_outside_class(scope, name) == ("module", name)
+    )
+
+    def enclosing_scope(scope: ast.AST) -> ast.AST | None:
+        """Function-like scopes do not close over an intervening class namespace."""
+        parent = scope_parent.get(scope)
+        if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda,
+                              ast.ListComp, ast.SetComp, ast.DictComp,
+                              ast.GeneratorExp)):
+            while isinstance(parent, ast.ClassDef):
+                parent = scope_parent.get(parent)
+        return parent
+
+    def resolve(node: ast.Name) -> tuple[str, str | None]:
+        scope: ast.AST | None = node_scope.get(node, tree)
+        while scope is not None:
+            if node.id in scope_globals.get(scope, set()):
+                scope = tree
+            elif node.id in scope_nonlocals.get(scope, set()):
+                scope = enclosing_scope(scope)
+                while scope is not None and scope is not tree:
+                    records = scope_bindings.get(scope, {}).get(node.id, set())
+                    if records:
+                        return (next(iter(records)) if len(records) == 1
+                                else ("ambiguous", None))
+                    scope = enclosing_scope(scope)
+                return ("unbound", None)
+            records = scope_bindings.get(scope, {}).get(node.id, set())
+            if records:
+                return next(iter(records)) if len(records) == 1 else ("ambiguous", None)
+            scope = enclosing_scope(scope)
+        return ("unbound", None)
+
+    return resolve, scope_bindings, class_process_ambiguities
+
+
+def process_shape(text: str) -> dict[str, object]:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as exc:
+        return {"boundary_ok": False, "observer_ok": False, "detail": f"syntax:{exc}"}
+    owners = owner_map(tree)
+    resolve_binding, scope_bindings, class_process_ambiguities = lexical_bindings(tree)
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    annotation_nodes: set[ast.AST] = set()
+    for candidate in ast.walk(tree):
+        annotations = []
+        if isinstance(candidate, ast.arg) and candidate.annotation is not None:
+            annotations.append(candidate.annotation)
+        elif isinstance(candidate, (ast.FunctionDef, ast.AsyncFunctionDef)) and candidate.returns is not None:
+            annotations.append(candidate.returns)
+        elif isinstance(candidate, ast.AnnAssign):
+            annotations.append(candidate.annotation)
+        for annotation in annotations:
+            annotation_nodes.update(ast.walk(annotation))
+    funcs = {node.name for node in ast.walk(tree)
+             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    calls: dict[str, set[str]] = {name: set() for name in funcs}
+    sites: list[tuple[str, str, int, str]] = []
+    violations: list[tuple[str, int, str]] = []
+    import_inventory: list[str] = []
+    os_effect_counts: dict[str, int] = {}
+    fcntl_effect_counts: dict[str, int] = {}
+    sys_stream_counts: dict[str, int] = {}
+    sys_state_counts: dict[str, int] = {}
+    authority_assignments = 0
+    expected_repository_root_assignment = ast.parse(
+        'REPOSITORY_ROOT = Path(__file__).resolve().parents[1]'
+    ).body[0]
+    expected_authority_assignment = ast.parse(
+        'AUTHORITY_LIB = Path(__file__).resolve().parents[1] / "controller/authority"'
+    ).body[0]
+    protected_roots={"AUTHORITY_LIB","REPOSITORY_ROOT"}
+
+    def exact_process_module(node: ast.AST) -> bool:
+        return (
+            isinstance(node, ast.Name)
+            and node.id in PROCESS_ATTRS
+            and resolve_binding(node) == ("module", node.id)
+        )
+
+    for required_module in ("os", "subprocess"):
+        if (scope_bindings.get(tree, {}).get(required_module, set())
+                != {("module", required_module)}):
+            violations.append(("<module>", 0,
+                               f"exact-{required_module}-import-binding"))
+    for bindings in scope_bindings.values():
+        for module in PROCESS_ATTRS:
+            records = bindings.get(module, set())
+            if len(records) > 1 and ("module", module) in records:
+                violations.append(("<module>", 0,
+                                   f"ambiguous-{module}-binding"))
+    for line, module, binding_kind in class_process_ambiguities:
+        violations.append(("<class-body>", line,
+                           f"class-body-{module}-ambiguous:{binding_kind}"))
+
+    for node in ast.walk(tree):
+        owner = owners.get(node, "<module>")
+        if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and node.name in ({"str", "Path", "__file__"}|protected_roots)):
+            violations.append((owner, node.lineno, f"protected-binding:{node.name}"))
+        if isinstance(node, ast.arg) and node.arg in ({"str", "Path", "__file__"}|protected_roots):
+            violations.append((owner, node.lineno, f"protected-argument:{node.arg}"))
+        if (isinstance(node, ast.ExceptHandler)
+                and node.name in ({"str", "Path", "__file__"}|protected_roots)):
+            violations.append((owner, node.lineno, f"protected-except-binding:{node.name}"))
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            protected_declarations = sorted(
+                set(node.names) & ({"str", "Path", "__file__"}|protected_roots))
+            if protected_declarations:
+                violations.append((owner, node.lineno,
+                                   f"protected-declaration:{protected_declarations}"))
+        if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id in protected_roots
+                for target in node.targets):
+            if ast.dump(node, include_attributes=False) in {
+                    ast.dump(expected_authority_assignment, include_attributes=False),
+                    ast.dump(expected_repository_root_assignment, include_attributes=False)}:
+                authority_assignments += 1
+            else:
+                violations.append((owner, node.lineno, "repository-root-assignment"))
+        if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+                and node.id in {"str", "Path", "__file__"}):
+            violations.append((owner, node.lineno, f"protected-binding:{node.id}"))
+        if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+                and node.id in protected_roots
+                and not isinstance(parents.get(node), ast.Assign)):
+            violations.append((owner, node.lineno, "repository-root-rebinding"))
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id == "Path":
+            parent = parents.get(node)
+            grandparent = parents.get(parent) if parent is not None else None
+            direct_path_call = isinstance(parent, ast.Call) and parent.func is node
+            direct_path_class_call = (
+                isinstance(parent, ast.Attribute) and parent.value is node
+                and isinstance(grandparent, ast.Call) and grandparent.func is parent
+                and parent.attr == "home"
+                and not grandparent.args and not grandparent.keywords
+            )
+            if node not in annotation_nodes and not direct_path_call and not direct_path_class_call:
+                violations.append((owner, node.lineno, "capturable-path-class"))
+        if isinstance(node, ast.AsyncFunctionDef):
+            violations.append((owner, node.lineno, f"deferred-async-function:{node.name}"))
+        if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name.startswith("__") and node.name.endswith("__")
+                and node.name != "__init__"):
+            violations.append((owner, node.lineno, f"dynamic-lifecycle-method:{node.name}"))
+        if isinstance(node, ast.ClassDef) and node.keywords:
+            violations.append((owner, node.lineno, "dynamic-class-keywords"))
+        if isinstance(node, ast.Constant) and node.value == "__del__":
+            violations.append((owner, node.lineno, "dynamic-finalizer-key"))
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(item, ast.Name) and item.id == "__del__"
+                   for target in targets for item in ast.walk(target)):
+                violations.append((owner, node.lineno, "deferred-finalizer-assignment:__del__"))
+        if isinstance(node, (ast.Yield, ast.YieldFrom, ast.Await)):
+            violations.append((owner, node.lineno, f"deferred-language-node:{type(node).__name__}"))
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                import_inventory.append(f"I:{alias.name}:{alias.asname or ''}")
+                if alias.name == "importlib" or alias.name.startswith("importlib."):
+                    violations.append((owner, node.lineno, f"dynamic-import-module:{alias.name}"))
+                if alias.name == "builtins" or alias.name.startswith("builtins."):
+                    violations.append((owner, node.lineno, f"dynamic-builtins-module:{alias.name}"))
+                if alias.name in PROCESS_ATTRS and alias.asname is not None:
+                    violations.append((owner, node.lineno, f"import-alias:{alias.name} as {alias.asname}"))
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                import_inventory.append(
+                    f"F:{node.level}:{node.module or ''}:{alias.name}:{alias.asname or ''}")
+            if node.module in PROCESS_ATTRS:
+                violations.append((owner, node.lineno, f"from-import:{node.module}"))
+            if node.module == "importlib" or (node.module or "").startswith("importlib."):
+                violations.append((owner, node.lineno, f"dynamic-from-import:{node.module}"))
+            if node.module == "builtins" or (node.module or "").startswith("builtins."):
+                violations.append((owner, node.lineno, f"dynamic-builtins-from-import:{node.module}"))
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            if exact_process_module(node.value):
+                violations.append((owner, node.lineno, f"module-assignment:{node.value.id}"))
+        if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+                and exact_process_module(node)):
+            parent = parents.get(node)
+            safe_getattr = (
+                isinstance(parent, ast.Call)
+                and isinstance(parent.func, ast.Name)
+                and parent.func.id == "getattr"
+                and len(parent.args) >= 2
+                and parent.args[0] is node
+                and isinstance(parent.args[1], ast.Constant)
+                and isinstance(parent.args[1].value, str)
+                and parent.args[1].value not in PROCESS_ATTRS[node.id]
+                and parent.args[1].value != "__dict__"
+            )
+            if not ((isinstance(parent, ast.Attribute) and parent.value is node) or safe_getattr):
+                violations.append((owner, node.lineno, f"bare-process-module:{node.id}"))
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            parent = parents.get(node)
+            direct_call = isinstance(parent, ast.Call) and parent.func is node
+            if node.id in {
+                "__import__", "__builtins__", "__loader__", "__spec__", "__package__",
+                "__cached__", "vars", "locals", "eval", "exec", "compile", "breakpoint", "help",
+                "setattr", "delattr",
+            }:
+                violations.append((owner, node.lineno, f"sensitive-builtin:{node.id}"))
+            elif node.id in {"getattr", "globals", "type"} and not direct_call:
+                violations.append((owner, node.lineno, f"sensitive-builtin-reference:{node.id}"))
+        if isinstance(node, ast.Name) and node.id == "sys" and isinstance(node.ctx, ast.Load):
+            parent = parents.get(node)
+            direct_attribute = isinstance(parent, ast.Attribute) and parent.value is node
+            if not direct_attribute:
+                violations.append((owner, node.lineno, "bare-sys-module"))
+            elif parent.attr not in ALLOWED_SYS_ATTRS:
+                violations.append((owner, node.lineno, f"unapproved-sys-attribute:sys.{parent.attr}"))
+            elif parent.attr == "dont_write_bytecode":
+                state_parent = parents.get(parent)
+                safe_bytecode_state = (
+                    owner == "<module>"
+                    and isinstance(state_parent, ast.Assign)
+                    and state_parent.targets == [parent]
+                    and isinstance(state_parent.value, ast.Constant)
+                    and state_parent.value.value is True
+                )
+                if safe_bytecode_state:
+                    key = f"{owner}:dont_write_bytecode=True"
+                    sys_state_counts[key] = sys_state_counts.get(key, 0) + 1
+                else:
+                    violations.append((owner, node.lineno, "mutable-sys-dont-write-bytecode"))
+            elif parent.attr == "path":
+                state_parent = parents.get(parent)
+                state_grandparent = parents.get(state_parent)
+                state_args = state_grandparent.args if isinstance(state_grandparent, ast.Call) else []
+                safe_path_insert = (
+                    owner == "<module>"
+                    and isinstance(state_parent, ast.Attribute)
+                    and state_parent.value is parent and state_parent.attr == "insert"
+                    and isinstance(state_grandparent, ast.Call)
+                    and state_grandparent.func is state_parent and not state_grandparent.keywords
+                    and len(state_args) == 2
+                    and isinstance(state_args[0], ast.Constant) and state_args[0].value == 0
+                    and isinstance(state_args[1], ast.Call)
+                    and isinstance(state_args[1].func, ast.Name) and state_args[1].func.id == "str"
+                    and len(state_args[1].args) == 1 and not state_args[1].keywords
+                    and isinstance(state_args[1].args[0], ast.Name)
+                    and state_args[1].args[0].id in protected_roots
+                )
+                if safe_path_insert:
+                    key = f"{owner}:path.insert"
+                    sys_state_counts[key] = sys_state_counts.get(key, 0) + 1
+                else:
+                    violations.append((owner, node.lineno, "mutable-sys-path"))
+            elif parent.attr == "stdout":
+                stream_parent = parents.get(parent)
+                stream_grandparent = parents.get(stream_parent)
+                safe_stdout = (
+                    owner == "run_codex"
+                    and isinstance(stream_parent, ast.Attribute)
+                    and stream_parent.value is parent and stream_parent.attr == "write"
+                    and isinstance(stream_grandparent, ast.Call)
+                    and stream_grandparent.func is stream_parent
+                )
+                if safe_stdout:
+                    key = f"{owner}:stdout.write"
+                    sys_stream_counts[key] = sys_stream_counts.get(key, 0) + 1
+                else:
+                    violations.append((owner, node.lineno, "capturable-sys-stdout"))
+            elif parent.attr == "stderr":
+                stream_parent = parents.get(parent)
+                stream_grandparent = parents.get(stream_parent)
+                safe_stderr = (
+                    owner == "main"
+                    and isinstance(stream_parent, ast.keyword) and stream_parent.arg == "file"
+                    and stream_parent.value is parent
+                    and isinstance(stream_grandparent, ast.Call)
+                    and isinstance(stream_grandparent.func, ast.Name)
+                    and stream_grandparent.func.id == "print"
+                )
+                if safe_stderr:
+                    key = f"{owner}:stderr.print"
+                    sys_stream_counts[key] = sys_stream_counts.get(key, 0) + 1
+                else:
+                    violations.append((owner, node.lineno, "capturable-sys-stderr"))
+        if isinstance(node, ast.Name) and node.id == "fcntl" and isinstance(node.ctx, ast.Load):
+            parent = parents.get(node)
+            if not (isinstance(parent, ast.Attribute) and parent.value is node):
+                violations.append((owner, node.lineno, "bare-fcntl-module"))
+            elif parent.attr not in {"LOCK_EX", "LOCK_NB", "flock"}:
+                violations.append((owner, node.lineno,
+                                   f"unapproved-fcntl-attribute:fcntl.{parent.attr}"))
+            elif parent.attr == "flock":
+                effect_parent = parents.get(parent)
+                if not (isinstance(effect_parent, ast.Call) and effect_parent.func is parent):
+                    violations.append((owner, node.lineno, "fcntl-effect-reference:fcntl.flock"))
+                else:
+                    key = f"{owner}:flock"
+                    fcntl_effect_counts[key] = fcntl_effect_counts.get(key, 0) + 1
+        if isinstance(node, ast.Name) and node.id == "os" and isinstance(node.ctx, ast.Load):
+            binding_kind, binding_value = resolve_binding(node)
+            if binding_kind == "ambiguous":
+                violations.append((owner, node.lineno, "ambiguous-os-binding"))
+                continue
+            if (binding_kind, binding_value) != ("module", "os"):
+                continue
+            parent = parents.get(node)
+            safe_getattr = (
+                isinstance(parent, ast.Call)
+                and isinstance(parent.func, ast.Name) and parent.func.id == "getattr"
+                and len(parent.args) == 3 and parent.args[0] is node
+                and isinstance(parent.args[1], ast.Constant)
+                and parent.args[1].value in {"O_CLOEXEC", "O_NOFOLLOW"}
+                and isinstance(parent.args[2], ast.Constant) and parent.args[2].value == 0
+                and not parent.keywords
+            )
+            if isinstance(parent, ast.Attribute) and parent.value is node:
+                if parent.attr not in ALLOWED_OS_ATTRS and parent.attr not in PROCESS_ATTRS["os"]:
+                    violations.append((owner, node.lineno,
+                                       f"unapproved-os-attribute:os.{parent.attr}"))
+                if parent.attr == "fstat":
+                    effect_parent = parents.get(parent)
+                    if not (isinstance(effect_parent, ast.Call)
+                            and effect_parent.func is parent):
+                        violations.append((owner, node.lineno,
+                                           "protected-fstat-not-direct-call"))
+                if parent.attr == "environ":
+                    environ_parent = parents.get(parent)
+                    environ_grandparent = parents.get(environ_parent)
+                    safe_environ_read = (
+                        isinstance(environ_parent, ast.Attribute)
+                        and environ_parent.value is parent and environ_parent.attr == "items"
+                        and isinstance(environ_grandparent, ast.Call)
+                        and environ_grandparent.func is environ_parent
+                        and not environ_grandparent.args and not environ_grandparent.keywords
+                    )
+                    if not safe_environ_read:
+                        violations.append((owner, node.lineno, "mutable-os-environ-access"))
+                if parent.attr in DIRECT_OS_EFFECT_ATTRS:
+                    effect_parent = parents.get(parent)
+                    if not (isinstance(effect_parent, ast.Call) and effect_parent.func is parent):
+                        violations.append((owner, node.lineno,
+                                           f"os-effect-reference:os.{parent.attr}"))
+                    else:
+                        key = f"{owner}:{parent.attr}"
+                        os_effect_counts[key] = os_effect_counts.get(key, 0) + 1
+            elif not safe_getattr:
+                violations.append((owner, node.lineno, "bare-os-module"))
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            module, attr = node.value.id, node.attr
+            module_is_exact = exact_process_module(node.value)
+            if module_is_exact and attr == "__dict__":
+                violations.append((owner, node.lineno, f"process-dictionary:{module}"))
+            if module_is_exact and attr in PROCESS_ATTRS[module]:
+                parent = parents.get(node)
+                if not (isinstance(parent, ast.Call) and parent.func is node):
+                    violations.append((owner, node.lineno, f"process-reference:{module}.{attr}"))
+        if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
+            safe_super_init = (
+                node.attr == "__init__"
+                and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Name) and node.value.func.id == "super"
+                and not node.value.args and not node.value.keywords
+            )
+            if not safe_super_init:
+                violations.append((owner, node.lineno, f"private-reflection:{node.attr}"))
+        if isinstance(node, ast.Attribute) and node.attr in SENSITIVE_MODULE_PROXIES:
+            violations.append((owner, node.lineno, f"sensitive-module-proxy:{node.attr}"))
+        if isinstance(node, ast.Attribute) and node.attr in SENSITIVE_FRAME_ATTRS:
+            violations.append((owner, node.lineno, f"sensitive-frame-reflection:{node.attr}"))
+        if not isinstance(node, ast.Call):
+            continue
+        if (owner == "<module>" and isinstance(node.func, ast.Attribute)
+                and node.func.attr in MODULE_EFFECT_METHODS):
+            violations.append((owner, node.lineno,
+                               f"module-import-effect-method:{node.func.attr}"))
+        if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec", "compile"}:
+            violations.append((owner, node.lineno, f"dynamic-code:{node.func.id}"))
+        if isinstance(node.func, ast.Name) and node.func.id == "type":
+            parent = parents.get(node)
+            compared = ([parent.left] + list(parent.comparators)
+                        if isinstance(parent, ast.Compare) else [])
+            safe_type_check = (
+                len(node.args) == 1 and not node.keywords
+                and isinstance(parent, ast.Compare)
+                and all(isinstance(op, (ast.Is, ast.IsNot)) for op in parent.ops)
+                and any(isinstance(item, ast.Name) and item.id in {"int", "str"}
+                        for item in compared if item is not node)
+            )
+            if not safe_type_check:
+                violations.append((owner, node.lineno, "dynamic-type-construction"))
+        if isinstance(node.func, ast.Name) and node.func.id in {"globals", "locals", "vars"}:
+            parent = parents.get(node)
+            grandparent = parents.get(parent) if parent is not None else None
+            safe_source_lookup = (
+                node.func.id == "globals"
+                and isinstance(parent, ast.Attribute) and parent.value is node and parent.attr == "get"
+                and isinstance(grandparent, ast.Call) and grandparent.func is parent
+                and len(grandparent.args) == 2
+                and all(isinstance(arg, ast.Constant) for arg in grandparent.args)
+                and [arg.value for arg in grandparent.args] == ["__file__", ""]
+            )
+            if not safe_source_lookup:
+                violations.append((owner, node.lineno, f"dynamic-namespace:{node.func.id}"))
+        if isinstance(node.func, ast.Name) and node.func.id == "getattr":
+            safe_os_flag = (
+                len(node.args) == 3 and not node.keywords
+                and isinstance(node.args[0], ast.Name) and node.args[0].id == "os"
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value in {"O_CLOEXEC", "O_NOFOLLOW"}
+                and isinstance(node.args[2], ast.Constant) and node.args[2].value == 0
+            )
+            if not safe_os_flag:
+                violations.append((owner, node.lineno, "dynamic-getattr"))
+        if isinstance(node.func, ast.Name) and owner in calls and node.func.id in funcs:
+            calls[owner].add(node.func.id)
+        if isinstance(node.func, ast.Name) and node.func.id in {"getattr", "vars"} and node.args:
+            target = node.args[0]
+            if exact_process_module(target):
+                attr = node.args[1] if len(node.args) > 1 else None
+                if (not isinstance(attr, ast.Constant) or not isinstance(attr.value, str)
+                        or attr.value in PROCESS_ATTRS[target.id]):
+                    violations.append((owner, node.lineno, f"dynamic-process-access:{target.id}"))
+        if not (isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)):
+            continue
+        module, attr = node.func.value.id, node.func.attr
+        if (not exact_process_module(node.func.value)
+                or attr not in PROCESS_ATTRS[module]):
+            continue
+        unsafe_keywords = sorted(
+            "**" if keyword.arg is None else keyword.arg
+            for keyword in node.keywords
+            if keyword.arg is None or keyword.arg in {"shell", "executable", "preexec_fn"}
+        )
+        if unsafe_keywords:
+            violations.append((owner, node.lineno, f"unsafe-process-keywords:{unsafe_keywords}"))
+        if module == "subprocess" and attr in {"Popen", "run"}:
+            if len(node.args) != 1 or any(isinstance(arg, ast.Starred) for arg in node.args):
+                violations.append((owner, node.lineno,
+                                   f"unsafe-process-positional-arity:{module}.{attr}:{len(node.args)}"))
+        literal = ""
+        if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+            literal = node.args[0].value
+        sites.append((owner, f"{module}.{attr}", node.lineno, literal))
+
+    counts = {"run": 0, "run_codex": 0, "clear": 0}
+    for owner, name, line, literal in sites:
+        if owner == "run" and name == "subprocess.run":
+            counts["run"] += 1
+        elif owner == "run_codex" and name == "subprocess.Popen":
+            counts["run_codex"] += 1
+        elif owner == "watch" and name == "os.system" and literal == "clear":
+            counts["clear"] += 1
+        else:
+            violations.append((owner, line, name))
+
+    def reachable(start: str) -> set[str]:
+        seen, todo = set(), [start]
+        while todo:
+            cur = todo.pop()
+            if cur in seen:
+                continue
+            seen.add(cur)
+            todo.extend(calls.get(cur, ()))
+        return seen
+
+    observer_hits = {name: sorted(reachable(name) & {"run_codex"})
+                     for name in ("status", "watch", "roadmap_status")}
+    observer_hits = {name: hit for name, hit in observer_hits.items() if hit}
+    inventory_ok = tuple(sorted(import_inventory)) in {
+        tuple(LEGACY_EXPECTED_IMPORT_INVENTORY),
+        tuple(RESULT_KERNEL_EXPECTED_IMPORT_INVENTORY),
+    }
+    if not inventory_ok:
+        violations.append(("<module>", 0, f"import-inventory:{sorted(import_inventory)}"))
+    if os_effect_counts not in (LEGACY_EXPECTED_OS_EFFECT_COUNTS,
+                                RESULT_KERNEL_EXPECTED_OS_EFFECT_COUNTS):
+        violations.append(("<module>", 0, f"os-effect-inventory:{os_effect_counts}"))
+    if fcntl_effect_counts != EXPECTED_FCNTL_EFFECT_COUNTS:
+        violations.append(("<module>", 0, f"fcntl-effect-inventory:{fcntl_effect_counts}"))
+    if sys_stream_counts != EXPECTED_SYS_STREAM_COUNTS:
+        violations.append(("<module>", 0, f"sys-stream-inventory:{sys_stream_counts}"))
+    if sys_state_counts != EXPECTED_SYS_STATE_COUNTS:
+        violations.append(("<module>", 0, f"sys-state-inventory:{sys_state_counts}"))
+    if authority_assignments != 1:
+        violations.append(("<module>", 0, f"repository-root-count:{authority_assignments}"))
+    exact = counts == {"run": 1, "run_codex": 1, "clear": 1}
+    return {
+        "boundary_ok": exact and not violations,
+        "observer_ok": not observer_hits,
+        "funcs": funcs,
+        "detail": f"counts={counts} imports_exact={inventory_ok} sites={sites} violations={violations}",
+        "observer_hits": observer_hits,
+    }
+
+
+def inject_run_codex_prefix(text: str, statements: str) -> str:
+    tree = ast.parse(text)
+    functions = [node for node in tree.body
+                 if isinstance(node, ast.FunctionDef) and node.name == "run_codex"]
+    if len(functions) != 1 or not functions[0].body:
+        raise ValueError("exact run_codex body unavailable")
+    first_line = functions[0].body[0].lineno - 1
+    lines = text.splitlines(keepends=True)
+    insertion = "".join("    " + line + "\n" for line in statements.splitlines())
+    lines.insert(first_line, insertion)
+    return "".join(lines)
+
+
+def route_observation(argv: list[str]) -> dict[str, object]:
+    models: list[str] = []
+    efforts: list[str] = []
+    config_models: list[str] = []
+    malformed: list[str] = []
+    ignore_count = argv.count("--ignore-user-config")
+    forbidden = [arg for arg in argv
+                 if arg in {"--oss", "--profile", "-p", "--local-provider"}
+                 or arg.startswith("--profile=") or arg.startswith("--local-provider=")
+                 or (arg.startswith("-p") and len(arg) > 2)]
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in {"-m", "--model"}:
+            if i + 1 >= len(argv):
+                malformed.append(arg); i += 1; continue
+            models.append(argv[i + 1]); i += 2; continue
+        if arg.startswith("--model="):
+            models.append(arg.split("=", 1)[1])
+        elif arg.startswith("-m="):
+            models.append(arg[3:])
+        elif arg.startswith("-m") and len(arg) > 2:
+            models.append(arg[2:])
+        value = None
+        if arg in {"-c", "--config"}:
+            if i + 1 >= len(argv):
+                malformed.append(arg); i += 1; continue
+            value = argv[i + 1]; i += 2
+        elif arg.startswith("--config="):
+            value = arg.split("=", 1)[1]; i += 1
+        elif arg.startswith("-c="):
+            value = arg[3:]; i += 1
+        elif arg.startswith("-c") and len(arg) > 2:
+            value = arg[2:]; i += 1
+        else:
+            i += 1
+        if value is not None and "=" in value:
+            key, raw = value.split("=", 1)
+            parsed = raw.strip().strip("\"'")
+            if key.strip() == "model_reasoning_effort":
+                efforts.append(parsed)
+            if key.strip() == "model":
+                config_models.append(parsed)
+    return {"models": models, "efforts": efforts, "config_models": config_models,
+            "ignore_count": ignore_count, "forbidden": forbidden, "malformed": malformed}
+
+
+def route_ok(argv: list[str], expected: tuple[str, str]) -> bool:
+    observed = route_observation(argv)
+    return (
+        observed["models"] == [expected[0]]
+        and observed["efforts"] == [expected[1]]
+        and observed["config_models"] == []
+        and observed["ignore_count"] == 1
+        and observed["forbidden"] == []
+        and observed["malformed"] == []
+    )
+
+
+try:
+    spec_document = strict_json(spec_path.read_text(encoding="utf-8"))
+    tasks = spec_document.get("tasks", []) if isinstance(spec_document, dict) else []
+    h031_static = task_row_valid(tasks)
+    check("F_H031_EXACT_TASK", h031_static, "current task identity")
+    check("J_H031_ABSENT_REJECT", not task_row_valid(
+        [row for row in tasks if not isinstance(row, dict) or row.get("id") != "h-031"]), "absence")
+    row = next((row for row in tasks if isinstance(row, dict) and row.get("id") == "h-031"), {})
+    check("J_H031_DUPLICATE_REJECT", not task_row_valid(tasks + [dict(row)]), "duplicate")
+    for label, key, value in (
+        ("WRONG_DEPENDENCY", "depends_on", ["h-033"]),
+        ("WRONG_GATE", "exit_test", "verify/bin/h-032-exit"),
+        ("WRONG_AUTHORITY", "authority_class", "owner_authority"),
+    ):
+        mutant = []
+        for item in tasks:
+            changed = dict(item) if isinstance(item, dict) else item
+            if isinstance(changed, dict) and changed.get("id") == "h-031":
+                changed[key] = value
+            mutant.append(changed)
+        check("J_H031_" + label + "_REJECT", not task_row_valid(mutant), key)
+
+    h032 = [row for row in tasks if isinstance(row, dict) and row.get("id") == "h-032"]
+    h032_static = (len(h032) == 1 and h032[0].get("authority_class") == "ordinary"
+                   and h032[0].get("depends_on") == ["h-033"]
+                   and h032[0].get("exit_test") == "verify/bin/h-032-exit"
+                   and h032_gate.is_file()
+                   and sha256_bytes(h032_gate.read_bytes())
+                       == "0c4a481b60133d9db791a766e572d5364dfc9761a0f48f9e7d3cd2581004b659")
+    check("F_H032_EXACT_PUBLISHED_DEPENDENCY", h032_static, f"rows={len(h032)}")
+
+    source_text = source.read_text(encoding="utf-8")
+    try:
+        compile(source_text, str(source), "exec")
+    except SyntaxError as exc:
+        print(f"FAIL K_SOURCE_SYNTAX — {exc}")
+        print("H031_GATE_SUMMARY=0 PASS 1 FAIL")
+        print("CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:K_SOURCE_SYNTAX")
+        print("H031_GATE_RESULT=FAIL")
+        raise SystemExit(1)
+    shape = process_shape(source_text)
+    direct_fstat_positives = [
+        inject_run_codex_prefix(source_text, "os.fstat(0)"),
+        inject_run_codex_prefix(source_text, """
+def _fstat(fd):
+    return os.fstat(fd)
+_fstat(0)
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+def h031_aliased_python_helper(fd):
+    return os.fstat(fd)
+h031_helper_alias = h031_aliased_python_helper
+h031_helper_alias(0)
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+def h031_helper_factory():
+    def h031_nested_helper(fd):
+        return os.fstat(fd)
+    return h031_nested_helper
+h031_helper_factory()(0)
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+def h031_global_direct_helper(fd):
+    global os
+    return os.fstat(fd)
+h031_global_direct_helper(0)
+""".strip()),
+        inject_run_codex_prefix(
+            source_text,
+            "h031_unrelated = next(map(lambda value: value + 1, (1,)))"),
+    ]
+    shadowed_os_positives = [
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+def h031_parameter_shadow(os):
+    return os.fstat(1)
+h031_parameter_shadow(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+def h031_local_shadow():
+    os = H031LocalOS()
+    return os.fstat(1)
+h031_local_shadow()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+h031_shadowed_values = [os.fstat for os in (H031LocalOS(),)]
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031ShadowError(Exception):
+    def fstat(self, value):
+        return value
+def h031_exception_shadow_control():
+    try:
+        raise H031ShadowError()
+    except H031ShadowError as os:
+        return os.fstat(1)
+h031_exception_shadow_control()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+def h031_local_sort_shadow(os):
+    values = [1]
+    values.sort(key=os.fstat)
+    return values
+h031_local_sort_shadow(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+def h031_nonlocal_shadow_control():
+    os = H031LocalOS()
+    def h031_nested_nonlocal():
+        nonlocal os
+        return os.fstat(1)
+    return h031_nested_nonlocal()
+h031_nonlocal_shadow_control()
+""".strip()),
+    ]
+    class_scope_positives = [
+        inject_run_codex_prefix(source_text, """
+class H031OrdinaryClass:
+    value = 1
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+class H031MethodParameter:
+    def probe(self, os):
+        return os.fstat(1)
+H031MethodParameter().probe(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+class H031MethodLocal:
+    def probe(self):
+        os = H031LocalOS()
+        return os.fstat(1)
+H031MethodLocal().probe()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+class H031MethodComprehension:
+    def probe(self):
+        return [os.fstat for os in (H031LocalOS(),)]
+H031MethodComprehension().probe()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalAsyncio:
+    def create_subprocess_exec(self, value):
+        return value
+class H031ClassLocalAsyncio:
+    asyncio = H031LocalAsyncio()
+    captured = asyncio.create_subprocess_exec
+H031ClassLocalAsyncio.captured("ordinary")
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalPty:
+    def spawn(self, value):
+        return value
+class H031ClassLocalPty:
+    pty = H031LocalPty()
+    captured = pty.spawn
+H031ClassLocalPty.captured(["ordinary"])
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalSubprocess:
+    def Popen(self, value):
+        return value
+def h031_enclosing_local_class():
+    subprocess = H031LocalSubprocess()
+    class H031ClosureClass:
+        captured = subprocess.Popen
+    return H031ClosureClass.captured(["ordinary"])
+h031_enclosing_local_class()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalSubprocess:
+    def Popen(self, value):
+        return value
+def h031_enclosing_nonlocal_class():
+    subprocess = H031LocalSubprocess()
+    class H031NonlocalClass:
+        nonlocal subprocess
+        captured = subprocess.Popen
+    return H031NonlocalClass.captured(["ordinary"])
+h031_enclosing_nonlocal_class()
+""".strip()),
+    ]
+    ordinary_process_shadow_positives = [
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+class H031GuardedMethodParameter:
+    def probe(self, os):
+        if os is None:
+            return 0
+        return os.fstat(1)
+H031GuardedMethodParameter().probe(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+class H031GuardedMethodLocal:
+    def probe(self):
+        os = H031LocalOS()
+        if not os:
+            return 0
+        return os.fstat(1)
+H031GuardedMethodLocal().probe()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+h031_lambda_shadow = (lambda os: os and os.fstat(1))(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+h031_comprehension_values = [os for os in (H031LocalOS(),)]
+h031_comprehension_values[0].fstat(1)
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+def h031_identity(value):
+    return value
+def h031_identity_relay(os):
+    return h031_identity(os).fstat(1)
+h031_identity_relay(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+def h031_alias_container(os):
+    alias = os
+    values = [os]
+    return alias.fstat(1) + values[0].fstat(1)
+h031_alias_container(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def fstat(self, value):
+        return value
+def h031_local_callback_controls(os):
+    values = [1]
+    values.sort(key=os.fstat)
+    return next(map(os.fstat, values))
+h031_local_callback_controls(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalSubprocess:
+    def Popen(self, argv):
+        return argv
+def h031_local_subprocess(subprocess):
+    if not subprocess:
+        return []
+    alias = subprocess
+    return alias.Popen(["ordinary"])
+h031_local_subprocess(H031LocalSubprocess())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalOS:
+    def system(self, command):
+        return command
+def h031_local_os_process_shape(os):
+    if not os:
+        return ""
+    return os.system("ordinary")
+h031_local_os_process_shape(H031LocalOS())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalAsyncio:
+    def create_subprocess_exec(self, argv):
+        return argv
+def h031_local_asyncio(asyncio):
+    if not asyncio:
+        return None
+    return asyncio.create_subprocess_exec("ordinary")
+h031_local_asyncio(H031LocalAsyncio())
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalPty:
+    def spawn(self, argv):
+        return argv
+def h031_local_pty(pty):
+    if not pty:
+        return None
+    return pty.spawn(["ordinary"])
+h031_local_pty(H031LocalPty())
+""".strip()),
+    ]
+    class_body_ambiguity_mutants = [
+        inject_run_codex_prefix(source_text, """
+class H031BadClassOrder:
+    captured = os.fstat
+    os = object()
+H031BadClassOrder.captured(0)
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadClassDelete:
+    os = object()
+    del os
+    captured = os.fstat
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadClassConditional:
+    if False:
+        os = object()
+    captured = os.fstat
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadClassDeclaration:
+    global os
+    captured = os.fstat
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessOrder:
+    captured = subprocess.Popen
+    subprocess = object()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessDelete:
+    subprocess = object()
+    del subprocess
+    captured = subprocess.Popen
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessConditional:
+    if False:
+        subprocess = object()
+    captured = subprocess.Popen
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessStart:
+    started = subprocess.Popen(["/bin/true"])
+    subprocess = object()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessDefault:
+    def probe(self, spawn=subprocess.Popen):
+        return spawn
+    subprocess = object()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessDecorator:
+    @subprocess.Popen
+    class Nested:
+        pass
+    subprocess = object()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessComprehension:
+    captured = [value for value in (subprocess.Popen,)]
+    subprocess = object()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadSubprocessGlobal:
+    global subprocess
+    captured = subprocess.Popen
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalSubprocess:
+    def Popen(self, value):
+        return value
+def h031_nested_function_fallback():
+    subprocess = H031LocalSubprocess()
+    class H031BadNestedFunctionClass:
+        captured = subprocess.Popen
+        subprocess = object()
+    return H031BadNestedFunctionClass
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031LocalSubprocess:
+    def Popen(self, value):
+        return value
+class H031OuterClass:
+    subprocess = H031LocalSubprocess()
+    class H031BadNestedClass:
+        captured = subprocess.Popen
+""".strip()),
+    ]
+    protected_fstat_transfer_mutants = [
+        inject_run_codex_prefix(source_text, """
+def h031_bad_default(fd, probe=os.fstat):
+    return probe(fd)
+h031_bad_default(0)
+""".strip()),
+        inject_run_codex_prefix(source_text,
+                                "next(map(os.fstat, (0,)))"),
+        inject_run_codex_prefix(source_text, """
+h031_items = [0]
+h031_items.sort(key=os.fstat)
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+h031_args = (os.fstat, (0,))
+next(map(*h031_args))
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+def h031_bad_kwargs(*, function, iterable):
+    return next(map(function, iterable))
+h031_bad_kwargs(**{"function": os.fstat, "iterable": (0,)})
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+h031_bad_lambda = lambda fd, probe=os.fstat: probe(fd)
+h031_bad_lambda(0)
+""".strip()),
+        inject_run_codex_prefix(source_text,
+                                "h031_callbacks = {\"probe\": os.fstat}"),
+        inject_run_codex_prefix(source_text, """
+def h031_bad_return():
+    return os.fstat
+h031_bad_return()(0)
+""".strip()),
+        inject_run_codex_prefix(source_text,
+                                "h031_callbacks = [os.fstat for _ in (0,)]"),
+        inject_run_codex_prefix(source_text, """
+class H031Box:
+    pass
+h031_box = H031Box()
+h031_box.probe = os.fstat
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031BadClassShadow:
+    os = object()
+    def h031_bad_method(self):
+        return os.fstat
+""".strip()),
+    ]
+    os_binding_mutants = [
+        source_text + "\n\nos = object()\n",
+        inject_run_codex_prefix(source_text, """
+def h031_bad_global_rebind():
+    global os
+    os = object()
+h031_bad_global_rebind()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+def h031_bad_ambiguous_local():
+    import os
+    os = object()
+    return os.fstat
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+def h031_bad_global_walrus():
+    global os
+    [(os := object()) for _ in (0,)]
+h031_bad_global_walrus()
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+class H031GlobalShadowError(Exception):
+    pass
+global os
+try:
+    raise H031GlobalShadowError()
+except H031GlobalShadowError as os:
+    os.fstat(1)
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+global os
+def os():
+    return None
+""".strip()),
+        inject_run_codex_prefix(source_text, """
+global os
+class os:
+    pass
+""".strip()),
+    ]
+    process_module_identity_mutants = [
+        inject_run_codex_prefix(source_text, "h031_bad_os_alias = os"),
+        inject_run_codex_prefix(source_text,
+                                "h031_bad_subprocess_alias = subprocess"),
+        inject_run_codex_prefix(source_text, "h031_bad_os_box = [os]"),
+        inject_run_codex_prefix(source_text,
+                                "h031_bad_subprocess_box = [subprocess]"),
+        inject_run_codex_prefix(source_text,
+                                "h031_bad_process_reference = subprocess.Popen"),
+        inject_run_codex_prefix(source_text,
+                                "h031_bad_os_process_reference = os.system"),
+        inject_run_codex_prefix(source_text, """
+global subprocess
+subprocess = object()
+""".strip()),
+        inject_run_codex_prefix(source_text, "import subprocess as h031_subprocess"),
+        inject_run_codex_prefix(source_text, "import os as h031_os"),
+    ]
+    profile_visibility_mutants = [
+        source_text + "\n\nh031_profile_visible = sys.getprofile()\n",
+        source_text + "\n\ndef h031_profile_default(probe=sys.getprofile):\n    return probe\n",
+    ]
+    direct_fstat_source_ok = all(
+        process_shape(candidate).get("boundary_ok") is True
+        for candidate in direct_fstat_positives)
+    shadowed_os_shapes = [process_shape(candidate) for candidate in shadowed_os_positives]
+    shadowed_os_source_ok = all(
+        item.get("boundary_ok") is True for item in shadowed_os_shapes)
+    class_scope_shapes = [process_shape(candidate) for candidate in class_scope_positives]
+    class_scope_source_ok = all(
+        item.get("boundary_ok") is True for item in class_scope_shapes)
+    ordinary_process_shadow_shapes = [
+        process_shape(candidate) for candidate in ordinary_process_shadow_positives]
+    ordinary_process_shadow_source_ok = all(
+        item.get("boundary_ok") is True
+        for item in ordinary_process_shadow_shapes)
+    class_body_ambiguity_shapes = [
+        process_shape(candidate) for candidate in class_body_ambiguity_mutants]
+    class_body_ambiguity_rejected = all(
+        item.get("boundary_ok") is False
+        and "class-body-" in str(item.get("detail"))
+        and "-ambiguous" in str(item.get("detail"))
+        for item in class_body_ambiguity_shapes)
+    protected_fstat_transfers_rejected = all(
+        process_shape(candidate).get("boundary_ok") is False
+        and "protected-fstat-not-direct-call"
+            in str(process_shape(candidate).get("detail"))
+        for candidate in protected_fstat_transfer_mutants)
+    imported_os_rebinding_rejected = all(
+        process_shape(candidate).get("boundary_ok") is False
+        and any(reason in str(process_shape(candidate).get("detail"))
+                for reason in ("exact-os-import-binding", "ambiguous-os-binding"))
+        for candidate in os_binding_mutants)
+    process_module_identity_rejected = all(
+        process_shape(candidate).get("boundary_ok") is False
+        and any(reason in str(process_shape(candidate).get("detail"))
+                for reason in (
+                    "module-assignment", "bare-process-module",
+                    "process-reference", "exact-subprocess-import-binding",
+                    "ambiguous-subprocess-binding", "import-alias",
+                    "import-inventory",
+                ))
+        for candidate in process_module_identity_mutants)
+    profile_invisible_to_admitted_source = all(
+        process_shape(candidate).get("boundary_ok") is False
+        for candidate in profile_visibility_mutants)
+    required_api = {"run", "run_codex", "status", "watch", "roadmap_status", "journal_root"}
+    required_api_ok = required_api <= shape["funcs"]
+    check("K_REQUIRED_API", required_api_ok,
+          f"present={sorted(required_api & shape['funcs'])}")
+    check("K_PROCESS_BOUNDARY_SOURCE_FORM", bool(shape["boundary_ok"])
+          and direct_fstat_source_ok and shadowed_os_source_ok
+          and class_scope_source_ok and class_body_ambiguity_rejected
+          and ordinary_process_shadow_source_ok
+          and protected_fstat_transfers_rejected
+          and imported_os_rebinding_rejected
+          and process_module_identity_rejected
+          and profile_invisible_to_admitted_source,
+          f"{shape['detail']} direct_fstat_source={direct_fstat_source_ok} "
+          f"shadowed_os_source={shadowed_os_source_ok} "
+          f"shadowed_os_shapes={[item.get('detail') for item in shadowed_os_shapes]} "
+          f"class_scope_source={class_scope_source_ok} "
+          f"class_scope_shapes={[item.get('detail') for item in class_scope_shapes]} "
+          f"ordinary_process_shadow_source={ordinary_process_shadow_source_ok} "
+          f"ordinary_process_shadow_shapes="
+          f"{[item.get('detail') for item in ordinary_process_shadow_shapes]} "
+          f"class_body_ambiguity_rejected={class_body_ambiguity_rejected} "
+          f"class_body_ambiguity_shapes="
+          f"{[item.get('detail') for item in class_body_ambiguity_shapes]} "
+          f"protected_fstat_transfers_rejected={protected_fstat_transfers_rejected} "
+          f"imported_os_rebinding_rejected={imported_os_rebinding_rejected} "
+          f"process_module_identity_rejected={process_module_identity_rejected} "
+          f"profile_visibility_rejected={profile_invisible_to_admitted_source}")
+    check("K_OBSERVERS_MODEL_FREE", bool(shape["observer_ok"]), f"hits={shape['observer_hits']}")
+    if (not h031_static or not h032_static or not required_api_ok
+            or not shape["boundary_ok"] or not direct_fstat_source_ok
+            or not shadowed_os_source_ok
+            or not class_scope_source_ok or not class_body_ambiguity_rejected
+            or not ordinary_process_shadow_source_ok
+            or not protected_fstat_transfers_rejected
+            or not imported_os_rebinding_rejected
+            or not process_module_identity_rejected
+            or not profile_invisible_to_admitted_source or not shape["observer_ok"]):
+        raise ProductFailure("static contract rejected before upstream or subject import")
+
+    shape_mutants = {
+        "DIRECT_POPEN": "\nsubprocess.Popen(['/bin/true'])\n",
+        "MODULE_ALIAS": "\nimport subprocess as sp\nsp.Popen(['/bin/true'])\n",
+        "ASSIGNMENT_ALIAS": "\nh031_alias = subprocess.Popen\nh031_alias(['/bin/true'])\n",
+        "LAMBDA": "\nh031_lambda = lambda: subprocess.Popen(['/bin/true'])\n",
+        "DEFAULT": "\ndef h031_default(x=subprocess.Popen):\n    return x\n",
+        "CONTAINER": "\nh031_box = {'x': subprocess.Popen}\nh031_box['x'](['/bin/true'])\n",
+        "CLASS_METHOD": "\nclass H031Bad:\n    def go(self):\n        return os.posix_spawn('/bin/true', ['/bin/true'], {})\n",
+        "GETATTR": "\ngetattr(subprocess, 'Popen')(['/bin/true'])\n",
+        "DYNAMIC_GETATTR": "\nh031_name = 'Popen'\ngetattr(subprocess, h031_name)(['/bin/true'])\n",
+        "IMPORTLIB": "\nimport importlib\nimportlib.import_module('subprocess').Popen(['/bin/true'])\n",
+        "IMPORTLIB_FROM": "\nfrom importlib import import_module\nimport_module('subprocess').Popen(['/bin/true'])\n",
+        "COMPUTED_IMPORT": "\nh031_module = 'sub' + 'process'\n__import__(h031_module).Popen(['/bin/true'])\n",
+        "BUILTINS_IMPORT": "\nimport builtins\nbuiltins.__import__('subprocess').Popen(['/bin/true'])\n",
+        "BUILTINS_NAMESPACE": "\n__builtins__['__import__']('subprocess').Popen(['/bin/true'])\n",
+        "GLOBALS_NAMESPACE": "\nglobals().get('__builtins__')['__import__']('subprocess').Popen(['/bin/true'])\n",
+        "SYS_MODULES": "\nsys.modules['subprocess'].Popen(['/bin/true'])\n",
+        "SYS_GETATTR_MODULES": "\ngetattr(sys, 'modules')['subprocess'].Popen(['/bin/true'])\n",
+        "SYS_DICTIONARY_MODULES": "\nsys.__dict__['modules']['subprocess'].Popen(['/bin/true'])\n",
+        "SYS_ALIAS_MODULES": "\nh031_sys = sys\nh031_sys.modules['subprocess'].Popen(['/bin/true'])\n",
+        "CTYPES_LIBC": "\nimport ctypes\nctypes.CDLL(None).system(b'/usr/bin/true')\n",
+        "OS_FORK": "\nh031_pid = os.fork()\n",
+        "OS_FORKPTY": "\nh031_pid, h031_fd = os.forkpty()\n",
+        "SUBPROCESS_OS_FORK": "\nh031_pid = subprocess.os.fork()\n",
+        "SHUTIL_OS_SPAWN": "\nshutil.os.posix_spawn('/bin/true', ['/bin/true'], {})\n",
+        "SUBPROCESS_SYS_REGISTRY": "\nsubprocess.sys.modules['subprocess'].Popen(['/bin/true'])\n",
+        "SYS_SETTRACE_FRAME": "\ndef h031_trace(frame, event, arg):\n    return frame.f_globals['subprocess'].Popen(['/bin/true'])\nsys.settrace(h031_trace)\n",
+        "SYS_SETPROFILE_FRAME": "\ndef h031_profile(frame, event, arg):\n    return frame.f_globals['subprocess'].Popen(['/bin/true'])\nsys.setprofile(h031_profile)\n",
+        "BUILTIN_BREAKPOINT": "\nbreakpoint()\n",
+        "MODULE_LOADER_GLOBAL": "\n__loader__.load_module('ctypes')\n",
+        "GENERATOR_FRAME_GLOBALS": "\ndef h031_gen():\n    yield 1\nh031_gen().gi_frame.f_globals['subprocess'].Popen(['/bin/true'])\n",
+        "COROUTINE_FRAME_GLOBALS": "\nasync def h031_coro():\n    return 1\nh031_coro().cr_frame.f_globals['subprocess'].Popen(['/bin/true'])\n",
+        "ASYNCGEN_FRAME_GLOBALS": "\nasync def h031_asyncgen():\n    yield 1\nh031_asyncgen().ag_frame.f_globals['subprocess'].Popen(['/bin/true'])\n",
+        "TRACEBACK_FRAME_GLOBALS": "\nh031_tb.tb_frame.f_globals['subprocess'].Popen(['/bin/true'])\n",
+        "SUBPROCESS_THREAD_TIMER": "\nsubprocess.threading.Timer(0.01, run_codex).start()\n",
+        "SUBPROCESS_SIGNAL_CALLBACK": "\nsubprocess.signal.signal(1, run_codex)\n",
+        "SUBPROCESS_ATEXIT_CALLBACK": "\nsubprocess.atexit.register(run_codex)\n",
+        "SUBPROCESS_WEAKREF_CALLBACK": "\nsubprocess.weakref.finalize(object(), run_codex)\n",
+        "OS_ATFORK_CALLBACK": "\nos.register_at_fork(before=run_codex)\n",
+        "LANGUAGE_FINALIZER": "\nclass H031Finalizer:\n    def __del__(self):\n        run_codex(None, None, 'BUILDER', 'late')\n",
+        "GENERATOR_FINALIZER": "\ndef h031_deferred():\n    try:\n        yield 1\n    finally:\n        run_codex(None, None, 'BUILDER', 'late')\n",
+        "FINALIZER_ASSIGNMENT": "\ndef h031_later(self):\n    run_codex(None, None, 'BUILDER', 'late')\nclass H031AliasFinalizer:\n    __del__ = h031_later\n",
+        "FINALIZER_SETATTR": "\nsetattr(H031Finalizer, '__del__', run_codex)\n",
+        "FINALIZER_DYNAMIC_TYPE": "\nH031Dynamic = type('H031Dynamic', (), {'__del__': run_codex})\n",
+        "FINALIZER_TYPES_NEW_CLASS": "\nsubprocess.types.new_class('H031Dynamic', (), {}, lambda ns: ns.update({'__del__': run_codex}))\n",
+        "FINALIZER_METACLASS_PREPARE": (
+            "\ndef h031_later(self):\n    run_codex(None, None, 'BUILDER', 'late')\n"
+            "class H031Namespace(dict):\n"
+            "    def __setitem__(self, key, value):\n"
+            "        dict.update(self, {'__' + 'del__': h031_later, key: value})\n"
+            "class H031Meta(type):\n"
+            "    @classmethod\n"
+            "    def __prepare__(meta, name, bases):\n"
+            "        return H031Namespace()\n"
+            "class H031Prepared(metaclass=H031Meta):\n"
+            "    trigger = h031_later\n"
+        ),
+        "FINALIZER_TYPE_ALIAS": (
+            "\ndef h031_later(self):\n    run_codex(None, None, 'BUILDER', 'late')\n"
+            "h031_type = type\n"
+            "H031Aliased = h031_type('H031Aliased', (), {'__' + 'del__': h031_later})\n"
+        ),
+        "OS_KILL": "\nos.kill(1, 0)\n",
+        "OS_KILLPG": "\nos.killpg(1, 0)\n",
+        "OS_CHDIR": "\nos.chdir('/private/tmp')\n",
+        "OS_PUTENV": "\nos.putenv('H031_MUTANT', '1')\n",
+        "OS_UNSETENV": "\nos.unsetenv('PATH')\n",
+        "OS_UMASK": "\nos.umask(0)\n",
+        "OS_UNKNOWN_PROCESS_STATE": "\nos.nice(1)\n",
+        "OS_WRITE_REFERENCE": "\nh031_write = os.write\n",
+        "OS_CLOSE_REFERENCE": "\nh031_close = os.close\n",
+        "FCNTL_FLOCK_REFERENCE": "\nh031_flock = fcntl.flock\n",
+        "SYS_STDOUT_REFERENCE": "\nH031_CAPTURED_STDOUT = sys.stdout\n",
+        "SYS_STDERR_REFERENCE": "\nH031_CAPTURED_STDERR = sys.stderr\n",
+        "SYS_PATH_DEFAULT_EFFECT": (
+            "\ndef h031_path_default(value=sys.path.append('/private/tmp/h031-shadow')):\n"
+            "    return value\n"
+        ),
+        "SYS_BYTECODE_STATE_EFFECT": "\ndef h031_bytecode():\n    sys.dont_write_bytecode = False\n",
+        "MODULE_CREATE_CLEAN": (
+            "\nh031_import_path = Path('/private/tmp/h031-import-mutant')\n"
+            "h031_import_path.write_text('effect', encoding='utf-8')\n"
+            "h031_import_path.unlink()\n"
+        ),
+        "REPOSITORY_ROOT_SHADOW": "\nREPOSITORY_ROOT = Path('/private/tmp/h031-shadow')\n",
+        "STR_SHADOW": (
+            "\ndef str(value):\n"
+            "    return '/private/tmp/h031-shadow' if value is REPOSITORY_ROOT else value\n"
+        ),
+        "REPOSITORY_ROOT_EXCEPT_BINDING": (
+            "\ntry:\n    raise Exception('/private/tmp/h031-shadow')\n"
+            "except Exception as REPOSITORY_ROOT:\n    pass\n"
+        ),
+        "PATH_PUBLIC_MONKEYPATCH": (
+            "\nh031_resolve = Path.resolve\n"
+            "Path.resolve = lambda self: Path('/private/tmp/a/b/c')\n"
+            "Path.resolve = h031_resolve\n"
+        ),
+        "PATH_CLASS_CONTAINER_MONKEYPATCH": (
+            "\nh031_path_mro = Path.mro()\n"
+            "h031_saved_resolve = h031_path_mro[0].resolve\n"
+            "h031_path_mro[0].resolve = lambda self: Path('/private/tmp/a/b/c')\n"
+            "h031_path_mro[0].resolve = h031_saved_resolve\n"
+        ),
+        "JSON_BUILTINS_DICTIONARY": "\njson.__dict__['__builtins__']['__import__']('ctypes')\n",
+        "JSON_BUILTINS_GETATTR": "\ngetattr(json, '__builtins__')['__import__']('ctypes')\n",
+        "GETATTR_ALIAS": "\nh031_getattr = getattr\nh031_getattr(json, '__builtins__')['__import__']('ctypes')\n",
+        "GLOBALS_ALIAS": "\nh031_globals = globals\nh031_globals()['__builtins__']['__import__']('ctypes')\n",
+        "VARS_ALIAS": "\nh031_vars = vars\nh031_vars(json)['__builtins__']['__import__']('ctypes')\n",
+        "LOCALS_ALIAS": "\nh031_locals = locals\nh031_locals()['__builtins__']['__import__']('ctypes')\n",
+        "SYS_FRAME_GLOBALS": "\nsys._getframe().f_globals['subprocess'].Popen(['/bin/true'])\n",
+        "FUNCTION_GLOBALS": "\nsha256_bytes.__globals__['subprocess'].Popen(['/bin/true'])\n",
+        "PROCESS_DICTIONARY": "\nsubprocess.__dict__['Popen'](['/bin/true'])\n",
+        "DYNAMIC_CODE": "\neval(\"__import__('subprocess').Popen(['/bin/true'])\")\n",
+    }
+    for label, suffix in shape_mutants.items():
+        mutant_shape = process_shape(source_text + suffix)
+        check("J_PROCESS_" + label + "_REJECT", not mutant_shape["boundary_ok"],
+              str(mutant_shape["detail"]))
+    missing_api_source = source_text.replace("def status(", "def h031_missing_status(", 1)
+    missing_api_shape = process_shape(missing_api_source)
+    check("J_REQUIRED_API_MISSING_REJECT",
+          missing_api_source != source_text and not (required_api <= missing_api_shape["funcs"]),
+          f"present={sorted(required_api & missing_api_shape['funcs'])}")
+    popen_anchor = "stderr=subprocess.STDOUT, text=True, bufsize=1, env=env)"
+    for label, keyword in (
+        ("PREEXEC", "preexec_fn=lambda: None"),
+        ("SHELL", "shell=True"),
+        ("EXECUTABLE", "executable='/bin/sh'"),
+    ):
+        mutant = source_text.replace(
+            popen_anchor, popen_anchor[:-1] + ", " + keyword + ")", 1)
+        mutant_shape = process_shape(mutant)
+        check("J_PROCESS_POPEN_" + label + "_REJECT",
+              mutant != source_text and not mutant_shape["boundary_ok"],
+              str(mutant_shape["detail"]))
+    positional_mutants = {
+        "POSITIONAL_EXECUTABLE": "subprocess.Popen(argv, -1, '/bin/sh', cwd=",
+        "POSITIONAL_PREEXEC": (
+            "subprocess.Popen(argv, -1, None, None, subprocess.PIPE, "
+            "subprocess.STDOUT, lambda: None, cwd="
+        ),
+        "STARRED_ARGV": "subprocess.Popen(*[argv], cwd=",
+    }
+    for label, replacement in positional_mutants.items():
+        mutant = source_text.replace("subprocess.Popen(argv, cwd=", replacement, 1)
+        mutant_shape = process_shape(mutant)
+        check("J_PROCESS_POPEN_" + label + "_REJECT",
+              mutant != source_text and not mutant_shape["boundary_ok"],
+              str(mutant_shape["detail"]))
+    harmless = process_shape(source_text + "\ndef h031_harmless(repo, wt, role, prompt):\n    return run_codex(repo, wt, role, prompt)\n")
+    check("J_HARMLESS_ROLE_CONSOLIDATION", bool(harmless["boundary_ok"]), str(harmless["detail"]))
+
+    upstream_argv=[str(h032_gate)]
+    if owner_live_mode == "skip": upstream_argv.append("--skip-owner-live")
+    upstream = subprocess.run(upstream_argv, cwd=root, text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+    owner_skip_fixture = owner_skip_fixture_from_observed_h032(upstream.stdout)
+    owner_skip_positive = exclusive_h032_owner_live_skip(2, owner_skip_fixture)
+    check("J_H032_EXCLUSIVE_OWNER_LIVE_SKIP_POSITIVE",
+          bool(owner_skip_fixture) and owner_skip_positive[0],
+          str(owner_skip_positive[1]))
+    owner_skip_mutants = {
+        "MIXED_G20": owner_skip_fixture
+            + "ODÖMBART K_G20_NAMESPACE — nested sandbox unavailable\n",
+        "MIXED_H033": owner_skip_fixture
+            + "ODÖMBART K_H033_FRESH_UPSTREAM_PROVENANCE — owner runner unavailable\n",
+        "UNKNOWN_ODOMBART": owner_skip_fixture
+            + "ODÖMBART K_UNKNOWN — unknown upstream state\n",
+        "RIG_FAILURE": owner_skip_fixture
+            + "FAIL K-RIGG — malformed owner harness\n",
+        "DUPLICATE_MARKER": owner_skip_fixture + H032_OWNER_LIVE_SKIP_MARKER + "\n",
+        "REORDERED_MARKER": owner_skip_fixture.replace(
+            H032_OWNER_LIVE_SKIP_REASON + "\n" + H032_OWNER_LIVE_SKIP_MARKER,
+            H032_OWNER_LIVE_SKIP_MARKER + "\n" + H032_OWNER_LIVE_SKIP_REASON,
+        ),
+        "MISSING_MARKER": owner_skip_fixture.replace(H032_OWNER_LIVE_SKIP_MARKER + "\n", ""),
+        "H033_MISSING_SUMMARY": owner_skip_fixture.replace(H033_PASS_SUMMARY + "|", "", 1),
+        "H033_MISSING_RESULT": owner_skip_fixture.replace(H033_PASS_RESULT + "|", "", 1),
+        "H033_WRONG_SUMMARY": owner_skip_fixture.replace(H033_PASS_SUMMARY, "H033_GATE_SUMMARY=54 PASS 1 FAIL", 1),
+        "H033_WRONG_RESULT": owner_skip_fixture.replace(H033_PASS_RESULT, "H033_GATE_RESULT=FAIL", 1),
+        "H033_DUPLICATE_SUMMARY": owner_skip_fixture.replace(
+            H033_PASS_SUMMARY + "|", H033_PASS_SUMMARY + "|" + H033_PASS_SUMMARY + "|", 1),
+        "H033_DUPLICATE_RESULT": owner_skip_fixture.replace(
+            H033_PASS_RESULT + "|", H033_PASS_RESULT + "|" + H033_PASS_RESULT + "|", 1),
+        "H033_REORDERED": owner_skip_fixture.replace(
+            H033_PASS_SUMMARY + "|" + H033_PASS_RESULT,
+            H033_PASS_RESULT + "|" + H033_PASS_SUMMARY,
+            1,
+        ),
+        "H033_STANDALONE_ONLY": owner_skip_fixture.replace(H033_PASS_SUMMARY + "|", "", 1)
+            .replace(H033_PASS_RESULT + "|", "", 1)
+            + H033_PASS_SUMMARY + "\n" + H033_PASS_RESULT + "\n",
+    }
+    for label, mutant in owner_skip_mutants.items():
+        verdict = exclusive_h032_owner_live_skip(2, mutant)
+        check("J_H032_OWNER_LIVE_SKIP_" + label + "_REJECT", not verdict[0], str(verdict[1]))
+    check("J_H032_OWNER_LIVE_SKIP_PENDING_DOMINATES_PRODUCT",
+          h031_terminal_exit(True, {"K_PRODUCT_EXECUTION"}) == 2,
+          "pending owner ODÖMBART remains exit 2 after deterministic product findings")
+    import_transition_before = (["/private/tmp/h031-existing"], False)
+    import_transition_current = ([str(root), "/private/tmp/h031-existing"], True)
+    import_transition_old = ([str(root / "controller/authority"),
+                              "/private/tmp/h031-existing"], True)
+    check("J_REPOSITORY_ROOT_IMPORT_TRANSITION_POSITIVE",
+          repository_import_transition(import_transition_before,
+                                       import_transition_current, root),
+          "exact repository root inserted once and bytecode disabled")
+    check("J_OLD_AUTHORITY_IMPORT_TRANSITION_REJECT",
+          not repository_import_transition(import_transition_before,
+                                           import_transition_old, root),
+          "legacy controller/authority insertion cannot satisfy result-kernel topology")
+
+    upstream_skip_verdict = exclusive_h032_owner_live_skip(upstream.returncode, upstream.stdout)
+    upstream_skip_ok = owner_live_mode == "skip" and upstream_skip_verdict[0]
+    if upstream.returncode == 2 and not upstream_skip_ok:
+        odombart("K_H032_FRESH_UPSTREAM",
+                 "non-exclusive owner ODÖMBART: " + str(upstream_skip_verdict[1]))
+    if owner_live_mode == "skip" and upstream.returncode == 0:
+        odombart("K_H032_FRESH_UPSTREAM", "skip ceremony unexpectedly returned PASS")
+    owner_live_skip_pending = upstream_skip_ok
+    upstream_ok = (owner_live_mode == "run" and upstream.returncode == 0) or upstream_skip_ok
+    if upstream_skip_ok:
+        check("J_H032_EXCLUSIVE_OWNER_LIVE_SKIP", True, str(upstream_skip_verdict[1]))
+    else:
+        check("K_H032_FRESH_UPSTREAM", upstream_ok,
+              f"rc={upstream.returncode} tail={upstream.stdout[-700:].replace(chr(10), '|')}")
+    if not upstream_ok:
+        raise ProductFailure("published H032 dependency is not green")
+
+    repo = work / "repo"
+    repo.mkdir()
+    sh(GIT, "init", "-q", cwd=repo)
+    sh(GIT, "config", "user.name", "h031-gate", cwd=repo)
+    sh(GIT, "config", "user.email", "h031@nortropic.invalid", cwd=repo)
+    schema = repo / "docs/loop/codex-autopilot-report.schema.json"
+    schema.parent.mkdir(parents=True)
+    shutil.copyfile(schema_source, schema)
+    (repo / "anchor").write_text("h031\n", encoding="utf-8")
+    sh(GIT, "add", ".", cwd=repo)
+    sh(GIT, "commit", "-qm", "fixture", cwd=repo)
+
+    provider_dir = work / "provider"
+    provider_dir.mkdir()
+    provider = provider_dir / "arbitrary-provider-name"
+    capture = work / "provider-capture.jsonl"
+    provider.write_text("""#!/usr/bin/env python3
+import hashlib,json,os,pathlib,re,sys
+self_path=pathlib.Path(sys.argv[0]); argv=sys.argv[1:]
+record={'argv0':str(self_path),'sha256':hashlib.sha256(self_path.read_bytes()).hexdigest(),'argv':argv,'codex_home':os.environ.get('CODEX_HOME')}
+with pathlib.Path(os.environ['H031_CAPTURE']).open('a',encoding='utf-8') as handle: handle.write(json.dumps(record,sort_keys=True)+'\\n')
+joined=' '.join(argv); match=re.search(r'H031_GATE_ROLE=([A-Z_]+)',joined); role=match.group(1) if match else 'OVERIFIERAT'
+report={'role':role,'outcome':'READY','summary':'H031 route fixture completed','changed_files':[],'blocking_findings':[],'tests':[],'allowed_write_violation':False,'frozen_artifacts_modified':False,'production_files_modified':False,'frozen_gate_ready':True,'baseline_red_for_right_reason':False,'owner_decision_required':False,'stop_reason':'','next_action':None,'next_task_id':None}
+if 'H031_GATE_PARTIAL_REPORT' in joined: report={'role':role,'outcome':'READY','owner_decision_required':False,'blocking_findings':[]}
+out=pathlib.Path(argv[argv.index('-o')+1]); out.write_text(json.dumps(report,separators=(',',':')))
+print(json.dumps({'type':'thread.started','thread_id':'h031-'+role.lower()}))
+""", encoding="utf-8")
+    provider.chmod(0o700)
+    provider_hash = sha256_bytes(provider.read_bytes())
+    code_mode_host = provider_dir / "arbitrary-sidecar-source"
+    code_mode_host.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    code_mode_host.chmod(0o700)
+    code_mode_host_hash = sha256_bytes(code_mode_host.read_bytes())
+    config = repo / "config/codex-provider-identity.json"
+    config.parent.mkdir(parents=True)
+    config.write_text(json.dumps({"schema_version": 2, "provider": "openai-codex",
+                                  "executable_path": str(provider),
+                                  "executable_sha256": provider_hash,
+                                  "code_mode_host_path": str(code_mode_host),
+                                  "code_mode_host_sha256": code_mode_host_hash}), encoding="utf-8")
+    hostile_home = work / "hostile-codex-home"
+    hostile_home.mkdir()
+    (hostile_home / "config.toml").write_text(
+        'model="caller-other-model"\nmodel_reasoning_effort="ultra"\n', encoding="utf-8")
+    shadow_dir = work / "path-shadow"
+    shadow_dir.mkdir()
+    shadow_marker = work / "PATH_CODEX_EXECUTED"
+    shadow = shadow_dir / "codex"
+    shadow.write_text(f"#!/bin/sh\ntouch '{shadow_marker}'\nexit 91\n", encoding="utf-8")
+    shadow.chmod(0o700)
+    old_environment = dict(os.environ)
+    os.environ.update(CODEX_HOME=str(hostile_home), H031_CAPTURE=str(capture),
+                      PATH=str(shadow_dir) + os.pathsep + os.environ.get("PATH", ""))
+    try:
+        module_spec = importlib.util.spec_from_file_location("h031_subject", source)
+        if module_spec is None or module_spec.loader is None:
+            odombart("K_IMPORT", "cannot create production module spec")
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_spec.name] = module
+        import_active = [False]
+        import_effects = []
+        import_guarded_effects = []
+        sys.addaudithook(audit_effect_hook(import_active, import_effects))
+        import_before = (os.getcwd(), dict(os.environ), measure_umask())
+        import_sys_before = (list(sys.path), sys.dont_write_bytecode)
+        import_output = io.StringIO()
+        import_error = None
+        import_guards = install_effect_guards(import_guarded_effects)
+        try:
+            import_active[0] = True
+            with contextlib.redirect_stdout(import_output), contextlib.redirect_stderr(import_output):
+                module_spec.loader.exec_module(module)
+        except Exception as exc:
+            import_error = f"{type(exc).__name__}:{exc}"
+        finally:
+            import_active[0] = False
+            restore_effect_guards(import_guards)
+        import_after = (os.getcwd(), dict(os.environ), measure_umask())
+        import_sys_after = (list(sys.path), sys.dont_write_bytecode)
+        import_sys_ok = repository_import_transition(import_sys_before, import_sys_after, root)
+        os.chdir(import_before[0])
+        os.environ.clear()
+        os.environ.update(import_before[1])
+        os.umask(import_before[2])
+        sys.path[:] = import_sys_before[0]
+        sys.dont_write_bytecode = import_sys_before[1]
+        import_output_ok = not import_output.closed and import_output.getvalue() == ""
+        import_ok = (import_error is None and not import_effects and not import_guarded_effects
+                     and import_output_ok and import_before == import_after and import_sys_ok)
+        check("K_MODULE_IMPORT_PRE_EFFECT", import_ok,
+              f"error={import_error} audit={import_effects} guarded={import_guarded_effects} "
+              f"output_ok={import_output_ok} process_unchanged={import_before == import_after} "
+              f"sys_state_exact={import_sys_ok}")
+        if import_error is not None:
+            raise ProductFailure(f"subject import failed: {import_error}")
+        seq = [0]
+        original_now_id = module.now_id
+        def fixture_now_id():
+            seq[0] += 1
+            return f"{original_now_id()}-{seq[0]:04d}"
+        module.now_id = fixture_now_id
+
+        journal_file = module.journal_root(repo) / "events.jsonl"
+        legacy = {"ts": "2026-01-01T00:00:00+00:00", "event": "AGENT_START",
+                  "role": "BUILDER", "model": "legacy-model",
+                  "reasoning_effort": "ultra", "model_routing_source": "USER_CONFIG"}
+        journal_file.write_text(json.dumps(legacy, sort_keys=True) + "\n", encoding="utf-8")
+        errors = []
+        accepted_reports = []
+        muted = io.StringIO()
+        for role in EXPECTED:
+            try:
+                with contextlib.redirect_stdout(muted):
+                    accepted = module.run_codex(repo, repo, role, f"H031_GATE_ROLE={role}")
+                accepted_reports.append(accepted)
+            except Exception as exc:
+                errors.append(f"{role}:{type(exc).__name__}:{exc}")
+        captures = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()
+                    if line.strip()] if capture.exists() else []
+        route_details = [route_observation(item.get("argv", [])) for item in captures]
+        accepted_reports_ok = (
+            len(accepted_reports) == len(EXPECTED)
+            and all(isinstance(accepted, dict)
+                    and set(accepted) == {"schema_version", "invocation_id", "run_id", "role",
+                                         "result_sha256", "report"}
+                    and accepted.get("role") == role
+                    and accepted.get("report") == complete_route_report(role)
+                    for accepted, role in zip(accepted_reports, EXPECTED))
+        )
+        routes_ok = (not errors and accepted_reports_ok and len(captures) == len(EXPECTED)
+                     and all(route_ok(record["argv"], EXPECTED[role])
+                             for record, role in zip(captures, EXPECTED)))
+        check("K_ROLE_ROUTE_MATRIX", routes_ok,
+              f"routes={route_details} accepted={accepted_reports_ok} errors={errors}")
+        provider_effect_ok = (len(captures) == len(EXPECTED)
+                              and all(record.get("sha256") == provider_hash
+                                      and Path(record.get("argv0", "")).is_absolute()
+                                      and Path(record.get("argv0", "")) != provider
+                                      and not Path(record.get("argv0", "")).exists()
+                                      and record.get("codex_home") == str(hostile_home)
+                                      for record in captures)
+                              and not shadow_marker.exists())
+        check("K_H032_BOUND_ACTUAL_PROVIDER", provider_effect_ok,
+              f"captures={len(captures)} shadow={shadow_marker.exists()}")
+
+        records = [json.loads(line) for line in journal_file.read_text(encoding="utf-8").splitlines()
+                   if line.strip()]
+        starts = [record for record in records[1:] if record.get("event") == "AGENT_START"]
+        journal_ok = (len(starts) == len(EXPECTED)
+                      and all(record.get("role") == role
+                              and record.get("model") == EXPECTED[role][0]
+                              and record.get("reasoning_effort") == EXPECTED[role][1]
+                              and record.get("model_routing_source") == ROUTING_SOURCE
+                              for record, role in zip(starts, EXPECTED)))
+        check("K_AGENT_START_ROUTE_BINDING", journal_ok, f"starts={starts}")
+        check("K_LEGACY_ROUTING_NONAUTHORITATIVE", records[0] == legacy
+              and all(record.get("reasoning_effort") != "ultra" for record in starts),
+              f"legacy_preserved={records[0] == legacy}")
+
+        partial_capture_before = len(captures)
+        partial_runs_before = set(path.name for path in (module.journal_root(repo) / "runs").iterdir())
+        partial_error = None
+        try:
+            with contextlib.redirect_stdout(muted):
+                module.run_codex(repo, repo, "ARCHITECT",
+                                 "H031_GATE_ROLE=ARCHITECT H031_GATE_PARTIAL_REPORT")
+        except Exception as exc:
+            partial_error = f"{type(exc).__name__}:{exc}"
+        partial_captures = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()
+                            if line.strip()]
+        partial_runs_after = set(path.name for path in (module.journal_root(repo) / "runs").iterdir())
+        partial_new_runs = partial_runs_after - partial_runs_before
+        partial_residue = [
+            str(path.relative_to(repo))
+            for name in partial_new_runs
+            for path in (module.journal_root(repo) / "runs" / name).rglob("result.json")
+        ]
+        partial_ok = (
+            partial_error is not None
+            and len(partial_captures) == partial_capture_before + 1
+            and len(partial_new_runs) == 1
+            and not partial_residue
+        )
+        check("K_PARTIAL_RESULT_SCHEMA_REJECT", partial_ok,
+              f"error={partial_error} capture_delta={len(partial_captures) - partial_capture_before} "
+              f"new_runs={len(partial_new_runs)} result_residue={partial_residue}")
+
+        runs_dir = module.journal_root(repo) / "runs"
+        before = (capture.read_bytes() if capture.exists() else b"",
+                  journal_file.read_bytes(),
+                  sorted(path.name for path in runs_dir.iterdir()) if runs_dir.exists() else [])
+        before_process = (os.getcwd(), dict(os.environ), measure_umask())
+        unknown_errors = []
+        forbidden_effects = []
+        guarded_effects = []
+        audit_active = [False]
+        sys.addaudithook(audit_effect_hook(audit_active, forbidden_effects))
+        invalid_guards = install_effect_guards(guarded_effects)
+        invalid_output = io.StringIO()
+        try:
+            audit_active[0] = True
+            for invalid_role in ("UNKNOWN_ROLE", "", "builder"):
+                try:
+                    with contextlib.redirect_stdout(invalid_output), contextlib.redirect_stderr(invalid_output):
+                        module.run_codex(repo, repo, invalid_role,
+                                         f"H031_GATE_ROLE={invalid_role or 'EMPTY'}")
+                    unknown_errors.append("NO_ERROR")
+                except Exception as exc:
+                    unknown_errors.append(f"{type(exc).__name__}:{exc}")
+        finally:
+            audit_active[0] = False
+            restore_effect_guards(invalid_guards)
+        output_ok = not invalid_output.closed and invalid_output.getvalue() == ""
+        after_process = (os.getcwd(), dict(os.environ), measure_umask())
+        os.chdir(before_process[0])
+        os.environ.clear()
+        os.environ.update(before_process[1])
+        os.umask(before_process[2])
+        after = (capture.read_bytes() if capture.exists() else b"",
+                 journal_file.read_bytes(),
+                 sorted(path.name for path in runs_dir.iterdir()) if runs_dir.exists() else [])
+        check("K_UNKNOWN_ROLE_PRE_EFFECT_REJECT",
+              all(error != "NO_ERROR" for error in unknown_errors)
+              and not forbidden_effects and not guarded_effects and output_ok
+              and before == after and before_process == after_process,
+              f"errors={unknown_errors} forbidden_effects={forbidden_effects} "
+              f"guarded_effects={guarded_effects} output_ok={output_ok} "
+              f"unchanged={before == after} process_unchanged={before_process == after_process}")
+
+        original_run = module.subprocess.run
+        spawned: list[list[str]] = []
+        class Result:
+            returncode = 0
+            stdout = "GENERIC_OK\n"
+        def stub(argv, **kwargs):
+            spawned.append(list(argv))
+            return Result()
+        module.subprocess.run = stub
+        codex_outcomes = []
+        try:
+            for executable in ("codex", "/private/tmp/codex", "/private/tmp/CODEX"):
+                try:
+                    module.run([executable, "exec"], check=False)
+                    codex_outcomes.append("ADMITTED")
+                except Exception:
+                    codex_outcomes.append("REJECTED")
+            codex_spawned = list(spawned)
+            spawned.clear()
+            helper_results = []
+            for argv in (["gh", "--version"], ["git", "--version"],
+                         ["/private/tmp/controller-helper", "token"]):
+                try:
+                    result = module.run(list(argv), check=False)
+                    helper_results.append((result.rc, result.out))
+                except Exception as exc:
+                    helper_results.append((99, type(exc).__name__))
+            helper_spawned = list(spawned)
+        finally:
+            module.subprocess.run = original_run
+        check("K_GENERIC_CODEX_PRESPAWN_REJECT",
+              codex_outcomes == ["REJECTED", "REJECTED", "REJECTED"] and not codex_spawned,
+              f"outcomes={codex_outcomes} spawned={codex_spawned}")
+        check("K_GENERIC_NONPROVIDER_ALLOWED",
+              helper_results == [(0, "GENERIC_OK\n")] * 3
+              and helper_spawned == [["gh", "--version"], ["git", "--version"],
+                                    ["/private/tmp/controller-helper", "token"]],
+              f"results={helper_results} spawned={helper_spawned}")
+
+        valid_route = ["exec", "--ignore-user-config", "-m", "gpt-5.6-sol",
+                       "-c", 'model_reasoning_effort="max"']
+        check("J_ROUTE_VALID_ORACLE", route_ok(valid_route, EXPECTED["ARCHITECT"]),
+              str(route_observation(valid_route)))
+        routing_mutants = {
+            "NO_MODEL": ["exec", "--ignore-user-config", "-c", 'model_reasoning_effort="max"'],
+            "DUPLICATE_MODEL": valid_route + ["-m", "gpt-5.6-sol"],
+            "NO_EFFORT": ["exec", "--ignore-user-config", "-m", "gpt-5.6-sol"],
+            "DUPLICATE_EFFORT": valid_route + ["-c", 'model_reasoning_effort="max"'],
+            "NO_IGNORE": [arg for arg in valid_route if arg != "--ignore-user-config"],
+            "PROFILE": valid_route + ["--profile", "hostile"],
+            "OSS": valid_route + ["--oss"],
+            "CONFIG_MODEL": valid_route + ["-c", 'model="other"'],
+            "ATTACHED_MODEL_EQUALS": valid_route + ["-m=other"],
+            "ATTACHED_MODEL_COMPACT": valid_route + ["-mother"],
+            "ATTACHED_CONFIG_COMPACT": valid_route + ['-cmodel_reasoning_effort="low"'],
+            "ATTACHED_PROFILE_EQUALS": valid_route + ["-p=hostile"],
+            "ATTACHED_PROFILE_COMPACT": valid_route + ["-phostile"],
+            "DANGLING_MODEL_SHORT": valid_route + ["-m"],
+            "DANGLING_MODEL_LONG": valid_route + ["--model"],
+            "DANGLING_CONFIG_SHORT": valid_route + ["-c"],
+            "DANGLING_CONFIG_LONG": valid_route + ["--config"],
+        }
+        for label, mutant in routing_mutants.items():
+            check("J_ROUTE_" + label + "_REJECT", not route_ok(mutant, EXPECTED["ARCHITECT"]),
+                  str(route_observation(mutant)))
+        wrong_effort = [
+            'model_reasoning_effort="ultra"' if item.startswith("model_reasoning_effort=") else item
+            for item in valid_route
+        ]
+        check("J_ROUTE_WRONG_EFFORT_REJECT", not route_ok(wrong_effort, EXPECTED["ARCHITECT"]),
+              str(route_observation(wrong_effort)))
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environment)
+
+except SystemExit:
+    raise
+except ProductFailure as exc:
+    check("K_PRODUCT_EXECUTION", False, str(exc))
+except Exception as exc:
+    odombart("K_JUDGE", f"{type(exc).__name__}:{exc}")
+
+failed = {key for key, ok, _detail in checks if not ok}
+for key, ok, detail in checks:
+    print(("PASS " if ok else "FAIL ") + key + " — " + detail)
+print(f"H031_GATE_SUMMARY={sum(1 for _k, ok, _d in checks if ok)} PASS {len(failed)} FAIL")
+if owner_live_skip_pending:
+    print("CURRENT_RED_REASON=OWNER_LIVE_PHASE_NOT_RUN")
+    print("ODÖMBART K_H032_OWNER_LIVE_PHASE_NOT_RUN — exclusive owner TEST_AUTHOR no-live mode remains pending after deterministic H031 controls")
+    raise SystemExit(h031_terminal_exit(True, failed))
+if not failed:
+    print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+    print("H031_GATE_RESULT=PASS")
+    raise SystemExit(h031_terminal_exit(False, failed))
+if (failed == {"K_H032_FRESH_UPSTREAM", "K_PRODUCT_EXECUTION"}
+        and "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
+            in getattr(locals().get("upstream"), "stdout", "")):
+    print("CURRENT_RED_REASON=UPSTREAM_STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
+elif failed == EXPECTED_PREBUILDER_RED:
+    print("CURRENT_RED_REASON=EXPLICIT_ROLE_MODEL_ROUTING_ABSENT")
+else:
+    print("CURRENT_RED_REASON=UNEXPECTED_CONTRACT_FAILURES:" + ",".join(sorted(failed)))
+print("H031_GATE_RESULT=FAIL")
+raise SystemExit(1)
+PY
