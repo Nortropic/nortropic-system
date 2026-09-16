@@ -1,9 +1,24 @@
 # Att köra loopen
 
-## 2026-09-16 — FYND 24: fyra frysta grindar är VÄRDBUNDNA i sin shebang
+## 2026-09-16 — FYND 24 (RÄTTAT): latent värdbindning i fyra shebangar
 
-Försöket att döma `h-007`, `h-035`–`h-038` på plattformsgrenen gav `exit=127` rakt
-igenom — **tolken hittades inte**. Det är `ODÖMBART`, inte FAIL. Orsaken:
+> ### ⚠️ RÄTTELSE samma dag — min första slutsats var FEL
+>
+> Jag tolkade `exit=127` som *"tolken finns inte"* och drog slutsatsen att fyra grindar
+> redan var okörbara. **Falsifierat av ägaren med ett kommando:**
+> `ls -d /opt/homebrew/Cellar/python@3.12/*/` → `3.12.13_4/` finns, exakt den pinnade
+> versionen.
+>
+> **Den verkliga orsaken till 127 var mitt eget kommando.** Jag skrev `timeout 300 "$f"`,
+> och **macOS har inte GNU:s `timeout`**. Därför gav de sex första grindarna (körda utan
+> `timeout`) riktiga verdikt, medan de fem senare gav 127 rakt igenom — inklusive `h-007`,
+> som är ett bash-skript och inte kan falla på en Python-sökväg.
+>
+> Femtonde felet i detta arbete, och samma klass som de fjorton andra: **en mekanism
+> härledd ur ett symptom, utan att mekanismen prövades.** Att den föll på ett enda
+> ägarkommando är metoden som fungerar, inte metoden som fallerar.
+
+**Vad som ändå står, och det är en riktig defekt:**
 
 ```
 h-035, h-036, h-038, h-039:
@@ -11,9 +26,13 @@ h-035, h-036, h-038, h-039:
 ```
 
 **Fyra av 29 grindar i `origin/main` bär en absolut Homebrew-sökväg med exakt
-patchversion.** När Homebrew roterar `3.12.13_4` försvinner sökvägen och grindarna blir
-**okörbara** — inte röda, utan omöjliga att starta. De kan aldrig bli gröna igen utan en
-omfrysning.
+patchversion.** Den fungerar **i dag** — men när Homebrew roterar `3.12.13_4` försvinner
+sökvägen och grindarna blir **okörbara**, inte röda. De kan då aldrig bli gröna igen utan
+en omfrysning.
+
+Det är alltså en **LATENT** värdbindning, inte en utlöst. Skillnaden är viktig: inget är
+trasigt just nu, och ingen runda har fallit på detta. Men en `brew upgrade` räcker, och
+den kommer.
 
 Jämför med resten av trädet: `h-037` har `#!/usr/bin/env python3`,
 `platform-separation-final-exit` har `#!/usr/bin/env python3.12`, `h-007` har
@@ -22,8 +41,8 @@ Jämför med resten av trädet: `h-037` har `#!/usr/bin/env python3`,
 ### Varför detta är dagens tyngsta enskilda fynd
 
 **`h-039` är en av de fyra.** Hypotesen med 30 omfrysningar och ett 2,1 MB stort exitprov
-har en shebang som pekar på en Homebrew-patchversion. Varje runda den kört har dömts av
-ett prov som slutar existera vid nästa `brew upgrade`.
+har en shebang som pekar på en Homebrew-patchversion. Den har hållit hittills — men en
+enda pakethanteraruppdatering gör hypotesens hela historik omöjlig att köra om.
 
 Det ger `raddning/01-lagesbild.md` §1 en tredje mekanism utöver de två redan mätta:
 
@@ -46,8 +65,9 @@ körs om. Rundan bokförs inte mot kandidaten.
 regel 11 kräver. Det är skillnaden mot de omfrysningar som skapade trampkvarnen — de gjorde
 grindarna mer exakta, denna gör dem mindre värdbundna.
 
-`OVERIFIERAT` tills ägaren bekräftat att Cellar-sökvägen faktiskt är borta
-(`ls -d /opt/homebrew/Cellar/python@3.12/*/`). `exit=127` är starkt indicium, inte bevis.
+**Verdikten för `h-007` och `h-035`–`h-038` är fortfarande OKÄNDA.** De måste köras om
+utan `timeout`. Tills dess står de som `OVERIFIERAT` — och den mätning som ska visa hur
+stort arbetet bakom väg A′ är saknas alltjämt.
 
 
 ## 2026-09-16 — FYND 22: plattformsgrenen är INTE mergebar — beslutsloggen är raderad
