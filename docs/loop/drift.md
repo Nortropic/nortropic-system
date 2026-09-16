@@ -1,5 +1,51 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 28: EFTERARBETE.md är föråldrad som arbetsorder — åtta av elva klara
+
+Innan `SEPARATION-20260910/EFTERARBETE.md` lämnas till Codex som arbetsorder prövades
+dess elva punkter mot grenens **nuvarande HEAD**. Listan skrevs 2026-09-10 vid commit
+`dae90c8f`; grenen har gått **48 commits** sedan dess.
+
+**Åtta åtgärdade, en utgår, tre kvarstår.**
+
+| # | Läget nu |
+|---|---|
+| 1 | ÅTGÄRDAD — enda webbträdsträffen i `check-invariants.mjs` är en kommentar på rad 102 |
+| 2 | ÅTGÄRDAD — 0 träffar på `nortropic-verify-suite` i registret |
+| 3 | ÅTGÄRDAD — `PLATFORM_DOCUMENTS` pekar på `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/loop/**`; noll `docs/0x-` |
+| 4 | **KVARSTÅR** — `document-authority-exit`, `RIG_ERROR: AGENTS.md` |
+| 5 | **KVARSTÅR** — 72 beslutsloggsreferenser i specen (människohand) |
+| 6 | ÅTGÄRDAD — 0 webbreferenser i `controller/policy/cli` |
+| 7 | **KVARSTÅR** — 5 referenser i `controller/attest/cli` |
+| 8 | ÅTGÄRDAD — §A-låsen borttagna i dag |
+| 9 | UTGÅR — `check-verifierarregistret.mjs` finns inte på grenen |
+| 10 | ÅTGÄRDAD — 0 vitlistningar för tomma kataloger i `.gitignore` |
+| 11 | ÅTGÄRDAD — 0 `"docs/0x-"`-pinnar i autopiloten |
+
+### h-035 är inte längre oförklarad
+
+Grinden läser `docs/05-beslutslogg.md` och `docs/07-konstitution.md`. Båda saknas på
+grenen. **Samma orsak som h-036 och h-038** — inte en egen defekt.
+
+Därmed har alla fem röda/odömbara grindar och alla tre kvarvarande punkter **en enda
+gemensam orsak**: kärnan refererar fem dokument som separationen flyttade till webben.
+
+### Varför detta var nödvändigt att mäta
+
+Punkt 3 — *"bind plattformens dokumentauktoritet till `docs/loop/**`"* — var den uppgift
+jag pekade ut som första steg för Codex, i prompten, för en timme sedan. **Den är redan
+gjord för `controller/verify/cli`.** Att lämna listan oprövad hade skickat Codex att
+utföra åtta avklarade punkter.
+
+Det är tredje gången i dag samma felklass fälls: ingångsdokumenten beskrev fel projekt,
+prompten pekade på ett återkallat beslut, och nu en arbetsorder som var sann för sex
+dagar sedan. **Ett dokument som beskriver ett läge är färskvara.**
+
+**Arbetsordern ligger nu i `raddning/12-arbetsorder.md`** med mätvärden, återskapande
+kommandon per rad och fyra steg. Den bär sin egen varning: kontrollera tabellen mot HEAD
+innan du följer den, för den blir osann på samma sätt.
+
+
 ## 2026-09-16 — SEPARATIONENS ANDRA HALVA KLAR: webbrepot är publicerat
 
 `Nortropic/nortropic-webbforvaltning` finns nu på GitHub (publikt, ägarens val).
