@@ -1,5 +1,59 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 29: regel 11 förbjöd sin egen arbetsorder. Åtgärdat.
+
+Mätt före överlämning till Codex:
+
+```
+h-035   17 omfrysningar   ÖVER BUDGET (3)
+h-007    3               vid taket — en reparation till = över
+h-039   30 · h-031 147 · h-032 120
+```
+
+`raddning/12-arbetsorder.md` steg 3 säger *"frys om h-007, h-035, h-036, h-037, h-038"*.
+Regel 11b säger *"överskriden budget stoppar hypotesen — aldrig en runda till"*.
+**Läser Codex reglerna först och arbetsordern sedan kör han in i en motsägelse på steg 3.**
+
+### Beslut 1 — regel 11a mäter riktning, inte antal
+
+Budgeten mäter **målflytt**, inte **underhåll**:
+
+| Omfrysningen | Räknas |
+|---|---|
+| LÄGGER TILL en förpliktelse | **JA** |
+| TAR BORT en miljöbindning | **NEJ** — gatereparation (11c) |
+
+Provet är `git diff` på grindfilen. Blandad diff räknas; reparera i egen commit.
+
+Distinktionen fanns i mitt resonemang (*"de tidigare gjorde grindarna MER exakta, dessa
+gör dem MINDRE miljöbundna"*) men aldrig i regeln. **En regel som förbjuder sin egen
+åtgärd blir kringgången första gången den prövas** — och då är den värdelös, inte sträng.
+
+### Beslut 2 — h-039, h-031 och h-032 avslutas OVERIFIERAT
+
+De enda hypoteser som är **både icke-klara och över budget**. Tillsammans **297
+omfrysningar utan en enda stängning**.
+
+`OVERIFIERAT` betyder **odömt**, inte misslyckat. Arbetet är inte kastat — det är underlag
+för omspecificeringen i mindre delar med fasta prov.
+
+`h-035`, `h-036`, `h-037`, `h-038` berörs inte: de är **klara** task vars grindar
+repareras enligt beslut 1.
+
+**Varför nu och inte senare:** plockar Codex upp bootstrap-kedjan utan detta beslut går han
+rakt in i tre hypoteser som bevisligen inte konvergerar. Det är exakt den dikeskörning
+ägaren frågade om, och den enda som fanns kvar i vägen.
+
+### Metodanmärkning
+
+Detta är fjärde gången i dag samma klass fälls: ingångsdokumenten, prompten, arbetsordern
+— och nu **regelverket självt**. Alla fyra var dokument som var sanna när de skrevs och
+osanna när de skulle användas.
+
+Skillnaden mot de tre första är att detta fel var **tolv timmar gammalt**. Jag skrev regel
+11 och arbetsordern samma eftermiddag, och de motsade varandra från första stunden.
+
+
 ## 2026-09-16 — FYND 28: EFTERARBETE.md är föråldrad som arbetsorder — åtta av elva klara
 
 Innan `SEPARATION-20260910/EFTERARBETE.md` lämnas till Codex som arbetsorder prövades
