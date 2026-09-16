@@ -41,6 +41,7 @@ import json
 import os
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -52,6 +53,15 @@ ANROP, LAUNCH, NONZERO, TIMEOUT, INTERNT = 1, 3, 4, 5, 8
 ROT = Path(__file__).resolve().parents[2]
 SANDBOX_EXEC = Path("/usr/bin/sandbox-exec")
 TRUST_ROOT_ENV = "NORTROPIC_TRUST_ROOT"
+# R116: optional provider result-staging confinement.  When both are present the
+# launcher denies every write under the staging root except a data write to the
+# exact pre-created sink.  Absent (direct h-009 calls) the profile is unchanged.
+STAGING_ROOT_ENV = "NORTROPIC_STAGING_ROOT"
+RESULT_SINK_ENV = "NORTROPIC_RESULT_SINK"
+# R128: optional controller-bound parent for isolated provider repositories.
+# When present, an escaped child may keep writing its own attempt but cannot
+# race a later BUILDER/REVIEWER sibling. Direct h-009/h-017 launches omit it.
+ATTEMPT_ROOT_ENV = "NORTROPIC_ATTEMPT_ROOT"
 
 # LOOP-ÄGARHAND-44: buildern får skriva kandidatdata och neutral scratch, men
 # aldrig live control plane eller controllerns pre-task-authority. `allow
@@ -98,8 +108,12 @@ def svar(text: str, kod: int) -> int:
 
 
 def worker_miljo(kuvertfil: Path) -> dict[str, str]:
+    # R116: the staging-confinement handoff vars are consumed by the launcher
+    # for its own Seatbelt profile and must never reach the worker environment.
     miljo = {n: v for n, v in os.environ.items()
-             if not n.startswith(KANSLIGA_PREFIX)}
+             if not n.startswith(KANSLIGA_PREFIX)
+             and n not in (
+                 STAGING_ROOT_ENV, RESULT_SINK_ENV, ATTEMPT_ROOT_ENV)}
     miljo["NORTROPIC_KUVERT"] = str(kuvertfil)
     return miljo
 
@@ -183,14 +197,21 @@ def seatbelt_prefix(ws: Path) -> list[str]:
             )
 
     aktuell_git = gitdir(ws)
-    if aktuell_git is None or aktuell_git == live_git or live_git not in aktuell_git.parents:
-        # En icke-Git-workspace behöver ingen write-exception inne i live Git.
+    linked_live = (aktuell_git is not None and aktuell_git != live_git
+                   and live_git in aktuell_git.parents)
+    if not linked_live:
+        # Ett fristående provider-repo delar varken ODB eller worktree-admin med
+        # live Git och får därför ingen write-exception där. De falska
+        # parametrarna ligger i dess egen workspace, utanför LIVE_GIT.
         aktuell_git = ws / ".nortropic-ingen-live-git-exception"
+        git_objects = ws / ".nortropic-inga-live-objekt"
+    else:
+        git_objects = live_git / "objects"
 
     parametrar = {
         "LIVE_ROOT": ROT,
         "LIVE_GIT": live_git,
-        "GIT_OBJECTS": live_git / "objects",
+        "GIT_OBJECTS": git_objects,
         "GIT_OBJECTS_INFO": live_git / "objects/info",
         "WORKTREE_GITDIR": aktuell_git,
         "WORKTREE_COMMDIR": aktuell_git / "commondir",
@@ -201,10 +222,94 @@ def seatbelt_prefix(ws: Path) -> list[str]:
         "TRUST_ROOT": trust,
     }
 
+    # Cross-attempt confinement is explicit controller authority, not a default
+    # launcher semantic: h-017 legitimately gives a direct worker neutral
+    # scratch beside its workspace. The autopilot supplies this binding only
+    # when the role workspace parent is disjoint from live/trust authority.
+    attempt_profil = ""
+    attempt_root = None
+    if ATTEMPT_ROOT_ENV in os.environ:
+        attempt_arg = os.environ[ATTEMPT_ROOT_ENV]
+        attempt_path = Path(attempt_arg)
+        try:
+            attempt_opened = attempt_path.lstat()
+        except OSError as e:
+            raise OSError(
+                f"{ATTEMPT_ROOT_ENV} är inte en säker katalog: {e}") from e
+        if (not attempt_arg or not attempt_path.is_absolute()
+                or attempt_path.is_symlink()
+                or not stat.S_ISDIR(attempt_opened.st_mode)
+                or attempt_opened.st_uid != os.getuid()
+                or attempt_opened.st_mode & 0o022):
+            raise OSError(
+                f"{ATTEMPT_ROOT_ENV} måste vara en explicit absolut katalog")
+        attempt = attempt_path.resolve(strict=True)
+        if attempt != attempt_path:
+            raise OSError(
+                f"{ATTEMPT_ROOT_ENV} måste binda den verkliga katalogen direkt")
+        if attempt == ws or attempt not in ws.parents:
+            raise OSError(
+                f"{ATTEMPT_ROOT_ENV} binder inte workspace under attempt-root")
+        for skyddad in (ROT,):
+            if (attempt == skyddad or attempt in skyddad.parents
+                    or skyddad in attempt.parents):
+                raise OSError(
+                    f"attempt-roten {attempt} överlappar skyddad rot {skyddad}")
+        if (attempt == trust or (attempt in trust.parents) != (trust != ROT)):
+            raise OSError(
+                f"attempt-roten {attempt} binder inte trust-roten säkert")
+        attempt_root = attempt
+        parametrar["ATTEMPT_ROOT"] = attempt
+        attempt_profil = (
+            '(deny file-write* (literal (param "ATTEMPT_ROOT")))\n'
+            '(deny file-write*\n'
+            '  (require-all\n'
+            '    (subpath (param "ATTEMPT_ROOT"))\n'
+            '    (require-not (subpath (param "WORKSPACE")))))\n')
+
+    # R116 provider staging confinement. When the caller hands an exact staging
+    # root and pre-created sink, deny every write under the staging root except a
+    # data write to the sink. Seatbelt matches the RESOLVED path (/var ->
+    # /private/var), so both are canonicalized; the sink must sit directly in the
+    # staging root and neither may overlap the read-only live/trust roots.
+    staging_profil = ""
+    if STAGING_ROOT_ENV in os.environ or RESULT_SINK_ENV in os.environ:
+        staging_arg = os.environ.get(STAGING_ROOT_ENV, "")
+        sink_arg = os.environ.get(RESULT_SINK_ENV, "")
+        staging = Path(staging_arg)
+        sink = Path(sink_arg)
+        if (not staging_arg or not sink_arg
+                or not staging.is_absolute() or not sink.is_absolute()):
+            raise OSError(
+                f"{STAGING_ROOT_ENV} och {RESULT_SINK_ENV} måste båda vara "
+                "explicita absoluta sökvägar")
+        if not staging.is_dir():
+            raise OSError(f"{STAGING_ROOT_ENV} är ingen katalog: {staging_arg}")
+        staging = staging.resolve(strict=True)
+        sink = sink.resolve(strict=True)
+        if sink.parent != staging:
+            raise OSError(
+                f"{RESULT_SINK_ENV} måste ligga direkt i {STAGING_ROOT_ENV}")
+        for skyddad in (ROT, trust):
+            if (staging == skyddad or staging in skyddad.parents
+                    or skyddad in staging.parents):
+                raise OSError(
+                    f"staging-roten {staging} överlappar skyddad rot {skyddad}")
+        if (attempt_root is not None
+                and attempt_root not in staging.parents):
+            raise OSError(
+                f"staging-roten {staging} ligger inte under "
+                f"attempt-roten {attempt_root}")
+        parametrar["STAGING_ROOT"] = staging
+        parametrar["RESULT_SINK"] = sink
+        staging_profil = (
+            '(deny file-write* (subpath (param "STAGING_ROOT")))\n'
+            '(allow file-write-data (literal (param "RESULT_SINK")))\n')
+
     argv = [str(SANDBOX_EXEC)]
     for namn, path in parametrar.items():
         argv.extend(("-D", f"{namn}={path}"))
-    argv.extend(("-p", SEATBELT_PROFIL))
+    argv.extend(("-p", SEATBELT_PROFIL + attempt_profil + staging_profil))
     return argv
 
 
@@ -218,22 +323,24 @@ def kommando_finns(namn: str, ws: Path, miljo: dict[str, str]) -> bool:
     return p.is_file() and os.access(p, os.X_OK)
 
 
-def doda_gruppen(p: subprocess.Popen) -> str:
+def signalera_gruppen(grupp: int, sig: signal.Signals) -> bool:
+    """Skickar en signal till en fångad processgrupp utan en andra killpg-yta."""
+    try:
+        os.killpg(grupp, sig)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
+
+
+def doda_gruppen(p: subprocess.Popen, grupp: int) -> str:
     """Dödar HELA processgruppen och skördar den. Returnerar hur det gick.
 
     Att döda p ensam räcker inte: bakgrundsjobb workern startat är egna
     processer i samma grupp och överlever sin förälder.
     """
-    try:
-        grupp = os.getpgid(p.pid)
-    except ProcessLookupError:
-        return "processen var redan borta"
-
     for sig, namn, frist in ((signal.SIGTERM, "SIGTERM", NADETID),
                              (signal.SIGKILL, "SIGKILL", SKORDEFRIST)):
-        try:
-            os.killpg(grupp, sig)
-        except (ProcessLookupError, PermissionError):
+        if not signalera_gruppen(grupp, sig):
             return f"gruppen var borta vid {namn}"
         try:
             p.communicate(timeout=frist)
@@ -296,6 +403,12 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             start_new_session=True,          # barnet blir gruppledare — se doda_gruppen
         )
+        # R116: gruppledarens pgid fångas medan barnet lever, så gruppen kan
+        # dödas även på FRAMGÅNG (inte bara vid timeout) efter att barnet skördats.
+        try:
+            grupp_pgid = os.getpgid(p.pid)
+        except ProcessLookupError:
+            grupp_pgid = p.pid
     except (OSError, subprocess.TimeoutExpired) as e:
         orsak = getattr(e, "strerror", None) or e
         return svar(f"launch_failed: kunde inte starta {kommando[0]}: {orsak}", LAUNCH)
@@ -303,7 +416,7 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
     try:
         ut, fel = p.communicate(input=ra, timeout=sekunder)
     except subprocess.TimeoutExpired:
-        utfall = doda_gruppen(p)
+        utfall = doda_gruppen(p, grupp_pgid)
         return svar(f"timeout: processen överskred {timeout_arg} s och dödades "
                     f"med hela sin processgrupp ({utfall})", TIMEOUT)
     except BrokenPipeError:
@@ -311,6 +424,10 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
         # Det är inte ett fel i sig — utfallet avgörs av dess exitkod.
         ut, fel = p.stdout.read() if p.stdout else b"", p.stderr.read() if p.stderr else b""
         p.wait(timeout=SKORDEFRIST)
+
+    # R127: ledaren är skördad efter både normal och signal/nonzero-exit. Döda
+    # kvarvarande barn i den fångade gruppen innan något utfall returneras.
+    signalera_gruppen(grupp_pgid, signal.SIGKILL)
 
     if p.returncode != 0:
         anm = kort(fel)
