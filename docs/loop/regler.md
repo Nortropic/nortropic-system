@@ -208,6 +208,34 @@ livscykeln; ett namn utan runda gör katalogen omöjlig att åldra ut mekaniskt.
 | 3 | Okommitterat innehåll är säkrat | `radda/smuts-*` med identiskt träd |
 | 4 | Ignorerat innehåll är **mätt** och är residue | `git status --porcelain --ignored=matching` |
 
+**13b:5 — INGENTING FÅR REFERERA SÖKVÄGEN.** Tillagt 2026-09-17, samma natt som
+städningen, efter att den fällde mig.
+
+`specs/tasks.spec.json` bär **59 absoluta sökvägar** till `/Users/elinhaggstrom/...`, och
+`verify/bin/h-035-exit` och `h-039-exit` gör det också. De flesta pekar på
+`~/nortropic/evidence/bootstrap-supervisor/` — **den katalogen får aldrig städas.** Tre
+pekade in i `worktrees/`, och de katalogerna hade just raderats:
+
+```
+worktrees/builder-h039-r14-product-96af0d2f/controller/runtime-cleanup/install
+worktrees/builder-h039-r14-product-96af0d2f/verify/h039/runtime-cleanup-mediator
+worktrees/h039-r8-product/controller/runtime-cleanup/install
+```
+
+Konsekvensen blev begränsad — bara `h-039` refererar dem, hypotesen är avslutad
+`OVERIFIERAT`, och båda commitsen (`e7412a35`, `936344ab`) är `I_MAIN`, så sökvägarna
+kan återskapas exakt med `git worktree add`. **Men det var tur, inte metod.**
+
+Provet före radering är ett grep, och det är billigt:
+
+```bash
+grep -rn "<katalognamn>" specs/ verify/ controller/ docs/
+```
+
+De fyra villkoren ovan prövar om **innehållet** är säkrat. Detta prövar om **sökvägen**
+är det. En fryst grind som pekar på en absolut sökväg gör katalogen till infrastruktur,
+oavsett hur mycket den ser ut som skräp.
+
 Villkor 4 tillkom av FYND 38: `.gitignore` är en vitlista, så `git status` och `git add -A`
 ser inte det mesta. En katalog vars ignorerade innehåll aldrig lästs är **inte** förbrukad,
 hur ren den än ser ut.

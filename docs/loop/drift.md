@@ -1,5 +1,55 @@
 # Att köra loopen
 
+## 2026-09-17 — Städningen fällde mig: 59 absoluta sökvägar i specen
+
+Direkt efter att 386 kataloger raderats hittade en kontroll att
+`specs/tasks.spec.json` bär **59 absoluta sökvägar till `/Users/elinhaggstrom/...`**,
+och att `verify/bin/h-035-exit` och `h-039-exit` gör det också.
+
+### `~/nortropic/evidence/` är INFRASTRUKTUR, inte skräp
+
+Cirka 56 av sökvägarna pekar på `evidence/bootstrap-supervisor/evidence/*.json` —
+`canonical_review_path`, `canonical_publication_receipt_path`, `production_review_path`.
+**Katalogen får aldrig städas.** Den såg ut som körningsavfall (272 MB, 27 poster,
+grindfixturer med namn som `bad_config` och `positive`) och är det delvis — men delar av
+den är frysta beroenden.
+
+### Tre sökvägar pekade in i det jag just raderade
+
+```
+worktrees/builder-h039-r14-product-96af0d2f/controller/runtime-cleanup/install
+worktrees/builder-h039-r14-product-96af0d2f/verify/h039/runtime-cleanup-mediator
+worktrees/h039-r8-product/controller/runtime-cleanup/install
+```
+
+**Bara `h-039` refererar dem**, hypotesen är avslutad `OVERIFIERAT`, och båda commitsen
+(`e7412a35`, `936344ab`) är `I_MAIN` — sökvägarna kan återskapas exakt med
+`git worktree add`. Skadan är noll.
+
+**Men det var tur, inte metod.** Mina fyra villkor i regel 13b prövade om INNEHÅLLET var
+säkrat. Ingen av dem prövade om något REFERERADE sökvägen.
+
+### Lagat: regel 13b:5
+
+Ett grep före radering:
+
+```bash
+grep -rn "<katalognamn>" specs/ verify/ controller/ docs/
+```
+
+En fryst grind som pekar på en absolut sökväg gör katalogen till infrastruktur, hur mycket
+den än ser ut som skräp.
+
+### Och en observation som är större än städningen
+
+**59 absoluta sökvägar till en enda användares hemkatalog, i den frysta specen.**
+`h-035` och `h-039` kan alltså bara verifieras på `elinhaggstrom`s konto, på den maskinen.
+Det är en hårdare bindning än Darwin-bindningen — den är inte ens plattformsbunden utan
+**användarbunden**. Det är inte mitt att ändra (specen är §A), men det är en observation
+arkitekten behöver: en kärna vars grindar bara kan dömas av ett konto kan aldrig byggas
+av någon annan.
+
+
 ## 2026-09-17 — Rundtrampen städad: 4,7 GB frigjort, 386 kataloger borta
 
 Genomfört på ägarens maskin enligt regel 13c, efter att regelns fyra villkor mätts.
