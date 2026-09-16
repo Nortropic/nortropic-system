@@ -4453,6 +4453,42 @@ def run_codex(sink, canonical, invocation, run, role):
     physical_git_environment_relation=(
         physical_git_capture.get("complete_environment")
         ==physical_git_expected_environment)
+    # R87 measurability probe: the product may clean the failed attempt's run
+    # directory and journal after the provider returns.  The launcher observer
+    # runs synchronously at the actual Popen boundary and retains the transient
+    # current-run/envelope identity for this exact output and start delta.
+    physical_git_transient_run=physical_git_launch_observation.get("current_run")
+    physical_git_transient_envelope=physical_git_launch_observation.get("envelope")
+    physical_git_transient_checks=physical_git_launch_observation.get("checks",{})
+    physical_git_transient_required_checks={
+        "python_flags","launcher","run","worktree","envelope_object",
+        "envelope_name","envelope_journal","current_run","timeout",
+        "provider","provider_worktree","output","python",
+    }
+    physical_git_transient_bound=(
+        physical_git_start_delta==1
+        and physical_git_capture_bound
+        and isinstance(physical_git_transient_checks,dict)
+        and set(physical_git_transient_checks)==(
+            physical_git_transient_required_checks|{"current_journal"})
+        and all(physical_git_transient_checks.get(key) is True
+                for key in physical_git_transient_required_checks)
+        and isinstance(physical_git_transient_run,str)
+        and isinstance(physical_git_transient_envelope,str)
+        and Path(physical_git_transient_run).is_absolute()
+        and Path(physical_git_transient_envelope).is_absolute()
+        and Path(physical_git_transient_envelope).parent
+            ==Path(physical_git_transient_run)
+        and Path(physical_git_transient_run).parent
+            ==physical_git_common/"nortropic-codex-autopilot"/"runs"
+        and physical_git_launch_observation.get("output")
+            ==physical_git_capture.get("output_path"))
+    check("J_R87_TRANSIENT_PHYSICAL_RUN_MEASURABILITY",
+          physical_git_transient_bound,
+          f"bound={physical_git_transient_bound} starts={physical_git_start_delta} "
+          f"capture={physical_git_capture_bound} "
+          f"false_checks={sorted(key for key,value in physical_git_transient_checks.items() if value is not True) if isinstance(physical_git_transient_checks,dict) else ['shape']} "
+          f"post_runs={len(physical_git_new_runs)} records={len(physical_git_records)}")
     stale_capture_mutant=dict(physical_git_capture)
     wrong_mode_mutant=dict(physical_git_capture);wrong_mode_mutant["mode"]="missing"
     repeated_output_mutant=dict(physical_git_capture)
