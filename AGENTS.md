@@ -40,6 +40,13 @@ beslut mot ett tal där. Grönt betyder att talen är oförändrade, aldrig att 
 den oberoende omhärledningen i `raddning/06-inventering.md` §0 är fortfarande
 obligatorisk, liksom §0c om det lokala maskintillståndet.
 
+**Backupen** ligger i `Nortropic/nortropic-backups` (repo-ID 1367371291) — inte en kopia
+av detta repo. Git bär katalog, checksummor och kvitton; arkiven är **Release assets som
+inte följer med en klon**. Rutin i dess `BACKUP-RUNBOOK.md`, plus ett kontinuitetslager
+(checkpoints, Codex→Claude-handoffs, disk-journal) utan motsvarighet här. **Backuparbete
+ska ge en rad i `docs/loop/drift.md` samma dag.** 2026-09-09→13 gav 27 commits där och
+noll rader här — fem dagar utan spår i kärnans lägesdokument.
+
 `CLAUDE.md` är samma router för Claude-sessioner och bär samma auktoritetsordning.
 Ändras den ena ska den andra följa med i samma commit.
 

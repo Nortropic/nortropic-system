@@ -1,5 +1,46 @@
 # Att köra loopen
 
+## 2026-09-16 — Backuprepot lokaliserat: tre fynd, varav ett i auktoritetskedjan
+
+`Nortropic/nortropic-backups` (repo-ID 1367371291, senast pushat 2026-09-13) är
+**inte** en kopia av detta repo utan ett backupmål: git bär katalog, checksummor och
+återställningskvitton, arkiven ligger som Release assets och följer inte med en klon.
+Inventeringens historikmätningar mot `origin/main` står därmed oförändrade — frågan
+"är backupen en delmängd av main" hade fel form.
+
+**FYND 14 — kärnan kände inte till sin egen backup.** `grep -rn "nortropic-backups\|1367371291"`
+gav noll träffar i hela repot. En ny session kunde inte upptäcka backupen, runbooken
+eller kontinuitetslagret. Åtgärdat: `CLAUDE.md` och `AGENTS.md` namnger nu repot och ID:t.
+
+**FYND 15 — ett ägarmandat från 2026-09-09 saknas i beslutsloggen.** Ordagrant i
+backupens `continuity/20260912-backup-routine/BOOTSTRAP-WORKING-METHOD.md`: *"Du har mitt
+fulla godkännande att göra det du anser fram till supervisor resume, arbeta mot
+slutmålet."* Mätt här: `grep -c "2026-09-09" docs/05-beslutslogg.md` = 0, och ingen
+träff på mandatets ordalydelse någonstans i repot. En agent som läser repot har alltså
+MINDRE befogenhet än ägaren gett — en direkt orsak till att godkännanden söks som redan
+finns. **OVERIFIERAT och INTE infört av denna session:** att bredda sin egen befogenhet
+ur en text i ett annat repo är vad `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder. Ägarens
+hand krävs för att föra in raden i `docs/05-beslutslogg.md`. Tills dess gäller
+delegationen från 2026-08-13.
+
+**FYND 16 — en fjärde statusplats, mätbar som en lucka.** Backupens
+`BOOTSTRAP-DISK-CLEANUP-JOURNAL.md` bär "senaste faktiska resultat" och
+`CLAUDE-CHECKPOINT-20260910-INVARIANT-REQUIRED.md` bär operativt sessionsminne.
+Fönstret 2026-09-09→09-13: **`nortropic-backups` 27 commits · `nortropic-system` 0
+commits och 0 drift-rader.** Fem dagars arbete utan spår i kärnans lägesdokument;
+regeln "läget står i drift.md" var falsk för den veckan. Detta är tredje instansen av
+projektets grundfel — kunskap i ett lager nästa session inte läser. Åtgärd är INTE att
+flytta filerna: backupdokumenten hör hemma där de är. Det som fattas är **en rad här per
+backupsession**. Införd som regel i `CLAUDE.md` och `AGENTS.md`.
+
+**Kvarstående, ej prövat:** backupen bevarar enligt sin runbook *"unpublished/dirty/
+untracked/generated work"*. Vad den faktiskt innehåller är oinventerat — Release-assets
+hämtas inte av en klon och `catalogue.json` pekar på en lokal rot som bara finns på
+Macen. Fråga: finns kernelarbete i backupen som main saknar, och är något av det en
+färdig kandidat? Är svaret ja ändras inventeringens restlista. Prov i
+`raddning/06-inventering.md` §0c.
+
+
 ## 2026-09-16 — Räddningsunderlaget landat i repot + konvergensfyndet
 
 Underlaget som svarar på *"varför kommer vi aldrig i mål"* ligger nu i

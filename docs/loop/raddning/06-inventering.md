@@ -247,26 +247,103 @@ svarar på en sekund, på rätt maskin.
 | Ospårade filer i klonen | Arbete som aldrig committats | `git status --short` + `git stash list` |
 | Andra kloner | Fler arbetskopior med divergerande historik | `find ~ -name 'nortropic*' -maxdepth 3` |
 
-### Backup-repot — öppen post, inte löst
+### Backup-repot — LOKALISERAT 2026-09-16, och det bar tre fynd
 
-Ägaren uppger 2026-09-16 att det finns ett backup-repo. **Det går inte att nå härifrån:**
-ofiltrerad listning av kontots repon ger 15 (4 under `Nortropic`, 11 personliga som
-ägaren avfärdat som irrelevanta), och inget av dem är en backup.
+`Nortropic/nortropic-backups` (repo-ID 1367371291), senast pushat 2026-09-13. Ägaren
+pekade ut det; det syns inte i en filtrerad reposökning.
 
-**Tre möjligheter, ingen utesluten:** ett lokalt bart repo eller en extern disk · ett
-repo under ett konto denna session inte ser · en tidsmaskin-/molnsynk utanför git.
+**Det är inte en kopia av `nortropic-system`.** 107 filer, 27 commits, platt struktur:
+katalog, checksummor, inspektioner, återställningskvitton och verktyg. **Arkiven ligger
+som Release assets och följer INTE med en vanlig `git clone`.** Runbooken är uttrycklig
+om vad den bevarar: *"sources, specifications, frozen gates, recipes, manifests, Git
+history/required objects, reviews, evidence and unpublished/dirty/untracked/generated
+work. A source-code push alone does not back up that complete state."*
 
-**Detta ska avgöras innan något planeras vidare**, av ett enkelt skäl: om backupen bär
-commits som `origin/main` saknar, är hela `06-inventering.md` mätt mot fel historik.
-Frågan är inte *"finns en backup"* utan **"är den en delmängd av `origin/main`?"**:
+Frågan §0c ställde — *är den en delmängd av `origin/main`?* — har därmed fel form. Den är
+inte en gren att jämföra, den är ett **arkiv av sådant som aldrig fanns i main**.
+Inventeringens historikmätningar mot `origin/main` står alltså kvar oförändrade. Men tre
+saker föll ut som inte stod någonstans:
+
+#### FYND 14 — kärnan vet inte att dess backup finns
 
 ```bash
-git -C <backup> log --oneline origin/main..HEAD   # tom = delmängd, inget nytt
-git -C <backup> log --oneline HEAD..origin/main   # visar hur långt efter den ligger
+grep -rn "nortropic-backups\|1367371291" --include=*.md --include=*.json --include=*.mjs --include=*.py .
+# 0 träffar utanför denna katalog
 ```
 
-Är den **inte** tom i första kommandot är det inventeringens tyngsta fynd och går före
-allt annat i `03-raddningsplan.md`.
+En ny session i `nortropic-system` kan inte upptäcka backupen, runbooken eller
+kontinuitetslagret. **Åtgärdat 2026-09-16:** `CLAUDE.md` och `AGENTS.md` namnger nu repot
+och dess ID.
+
+#### FYND 15 — ett ägarmandat från 2026-09-09 saknas i beslutsloggen
+
+I `continuity/20260912-backup-routine/BOOTSTRAP-WORKING-METHOD.md` står, ordagrant:
+
+> *"Du har mitt fulla godkännande att göra det du anser fram till supervisor resume,
+> arbeta mot slutmålet. Om du behöver uppdatera någo dokumentations för att alltid
+> förstå detta, gör det gärna."* — ägaren 2026-09-09
+
+```bash
+grep -c "2026-09-09" docs/05-beslutslogg.md      # 0
+grep -rliE "fullt godkännande|fulla godkännande" --include=*.md .   # inga träffar
+```
+
+**Auktoritetskedjan har alltså en lucka i själva trust-kerneln.** En agent som läser
+repot ser bara delegationen från 2026-08-13 och har därmed **mindre** befogenhet än
+ägaren faktiskt gett. Det är en direkt orsak till att godkännanden söks som redan
+finns.
+
+> ⚠️ **Mandatet är INTE infört av denna session, och får inte införas av en agent.**
+> Att bredda sin egen befogenhet ur en text i ett annat repo är precis det
+> `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder. Det är **ägarens hand** att bekräfta
+> raden in i `docs/05-beslutslogg.md` — ett av de fyra äkta mänskliga stoppen
+> (`05-arbetsordning.md` §1, punkt 1: uttryckligt människoägd auktoritet). Tills det är
+> gjort gäller 2026-08-13 års delegation, och fyndet står som `OVERIFIERAT`.
+
+#### FYND 16 — en fjärde statusplats, i ett annat repo
+
+`BOOTSTRAP-DISK-CLEANUP-JOURNAL.md` bär *"senaste faktiska resultat"*, och
+`CLAUDE-CHECKPOINT-20260910-INVARIANT-REQUIRED.md` bär operativt sessionsminne med
+hänvisning till en `CODEX-TO-CLAUDE`-handoff. Det är teknisk status — utanför
+`drift.md` och beslutsloggen.
+
+**Och luckan går att mäta exakt:**
+
+| Fönster 2026-09-09 → 09-13 | Commits | Drift-rader |
+|---|---|---|
+| `nortropic-system` | **0** | **0** |
+| `nortropic-backups` | **27** | — |
+
+Fem dagars arbete lämnar alltså **inget spår** i kärnans lägesdokument. Regeln *"läget
+står i `drift.md`, ingen annan fil bär teknisk status"* är **falsk för den veckan**.
+
+Detta är tredje instansen av projektets grundfel: kunskap hamnar i ett lager som nästa
+session inte läser. Först ingångsdokumenten (fynd 2), sedan räddningsunderlaget som
+tarboll, nu kontinuitetslagret i ett annat repo.
+
+**Att lösa det är inte att flytta filerna.** Backupens dokument hör hemma där de är —
+runbooken är operativ backuprutin, inte kernelstatus. Det som fattas är en **rad i
+`drift.md` per backupsession** som säger att arbete skedde och var kvittot ligger.
+En mening, samma dag. Det är hela åtgärden.
+
+### Vad §0c fortfarande INTE har prövat
+
+Backupen bevarar enligt runbooken *"unpublished/dirty/untracked work"* — alltså
+kernelarbete som aldrig nått main. **Vad den faktiskt innehåller är inte inventerat**:
+Release-assets hämtas inte av en klon, och `catalogue.json` pekar på en lokal rot
+(`/Users/…/nortropic-backups-20260910/full-20260910T103342Z`) som bara finns på Macen.
+
+Detta är en egen post i §0c:s tabell, inte en avklarad rad:
+
+```bash
+# på Macen, read-only
+python3 -c "import json;d=json.load(open('catalogue.json'));print(len(d['items']));
+[print(i['status'], i['path']) for i in d['items']]"
+ls -la /Users/*/nortropic-backups-20260910/
+```
+
+Fråga att besvara: **finns det kernelarbete i backupen som main saknar, och är något av
+det en färdig kandidat?** Är svaret ja ändras inventeringens restlista.
 
 ### Verdikt per yta — samma fyrdelning som §0
 

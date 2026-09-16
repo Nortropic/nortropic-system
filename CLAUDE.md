@@ -44,7 +44,13 @@ finns följer inte med när webbträdet flyttas. Kärnans dom ligger i taskens f
 webbträdet.
 
 **Läget** står i `docs/loop/drift.md` (nyast överst) och `docs/05-beslutslogg.md` (aktuell
-kandidat först). Ingen annan fil bär teknisk status.
+kandidat först). **Ingen annan fil i detta repo bär teknisk status** — hittar du status
+någon annanstans här är det drift; rätta den eller märk den `OVERIFIERAT`.
+
+Regeln gäller repot, och den har **en känd täckningslucka utanför det**: backupens
+kontinuitetslager (se nedan) bar 27 commits 2026-09-09→13 medan `drift.md` bar noll
+rader. Arbete utanför repot ska därför ändå ge en rad här samma dag — annars är
+lägesdokumentet falskt för den perioden, vilket det var för den veckan.
 
 **Vägen till klar kärna** står i `docs/loop/raddning/` — lägesbild, karta, slutkriterium
 (`KERNEL_COMPLETE`) och arbetsordning. Läs `raddning/README.md` först; behöver du bara
@@ -58,6 +64,14 @@ prövades mot beteendet. Kör därför
 ett tal där. Den prövar 37 påståenden mot repot; `exit 0/1/2` = stämmer / underlaget bär
 ett fel / kunde inte mätas. **Grönt betyder att talen är oförändrade, aldrig att de är
 sanna** — den oberoende omhärledningen i `raddning/06-inventering.md` §0 står kvar.
+
+**Backupen** ligger i `Nortropic/nortropic-backups` (repo-ID 1367371291). Den är inte en
+kopia av detta repo: git bär katalog, checksummor och återställningskvitton, medan
+arkiven ligger som **Release assets och följer inte med en vanlig klon**. Rutinen står i
+dess `BACKUP-RUNBOOK.md`. Där finns även ett kontinuitetslager (checkpoints,
+Codex→Claude-handoffs, disk-journal) som inte har någon motsvarighet här. **Sker
+backuparbete ska en rad om det stå i `docs/loop/drift.md` samma dag** — annars uppstår
+en vecka utan spår, vilket hände 2026-09-09→13 (27 commits där, 0 rader här).
 
 **Rollseparation** (test-author / builder / reviewer), evidenskrav och push/merge-befogenhet
 står i `AGENTS.md`. De rollerna är workflow-separation, aldrig en mekanisk säkerhetsgräns.
