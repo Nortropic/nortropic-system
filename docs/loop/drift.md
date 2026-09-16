@@ -1,5 +1,82 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 18 + ÄGARBESLUT: OS-lagrets §A-lås borttagna
+
+**Fyndet först.** Policyns §A-lås skyddade **fel lager**, mätt:
+
+```
+docs/07-konstitution.md                kernel=0  webb=4
+docs/03-regelverk.md                   kernel=0  webb=8
+skills/.../eval-rubric.md              kernel=0  webb=5
+AUTOPILOT                              kernel=0  webb=0   (webbens §A6-kill-switch)
+docs/loop/regler.md  ← KÄRNANS regler  kernel=2  webb=0   ← SKYDDADES INTE
+```
+
+Samtliga låsta regelfiler är webbfabrikens. Kärnans egen regelbok hade noll skydd
+(`grep -c "loop/regler" config/managed-settings.json` = 0).
+
+**Och skyddet fungerade inte ens där det fanns.** `verify/**` och `specs/**` stod
+skrivskyddade — alltså kärnans arbetsyta, där test-author fryser grindar och tasks
+skrivs. Arbetet stoppades inte; det **flyttade till den oskyddade andra roten**
+(`~/nortropic-repos/`, 30 worktrees 09-10→09-13, FYND 17). Samtidigt flyttade H-039 sin
+grind i 30 av 30 commits trots låset. **Låset prövade var filen låg, inte vad som hände
+med den** — samma sjukdom som resten av projektet: miljön mättes, inte mekanismen.
+
+Pass 1 såg problemet halvvägs och undantog `controller/**` uttryckligen *"annars vore
+h-001–h-007 obyggbara av sitt eget skydd"*, men lät `specs/` och `verify/` stå kvar.
+
+**Ägarbeslutet 2026-09-16:** öppna. Ändringar i `config/managed-settings.json`:
+
+| Bort | Skäl |
+|---|---|
+| 13 `Edit()`-lås på `nortropic-system/**` | Skyddade webblagret; `specs/`+`verify/` blockerade kärnans eget arbete |
+| `disableBypassPermissionsMode` | Tvingade godkännande per verktygsanrop — mest begränsande raden för obevakad drift |
+| `Bash(chmod:*)`, `Bash(chown:*)` | Vanligt arbete (`chmod +x`), ingen skyddsyta |
+| `sandbox.enabled: true → false` | **Nästlingen bort.** Kärnans egen Seatbelt i `controller/launch/cli` är den som ska prövas; inuti en yttre sandbox blir verdikten `ODÖMBART` i stället för PASS/FAIL |
+| `requiredMaximumVersion` | `min==max==2.1.224` gjorde att en enda uppdatering av Claude Code får varje session att VÄGRA STARTA. Golvet kvar, taket bort |
+
+| Kvar | Skäl |
+|---|---|
+| `Read()`-lås på `~/.ssh`, `~/.aws`, `~/.config/gh`, `**/.env`, `**/*.pem`, `.claude.json` | Nycklar och tokens. Begränsar inget arbete, minskar skadeytan |
+| `Bash(sudo/su/dscl/visudo/launchctl)` | Systemnivå. Det var så 5Z-installationen uppstod och fick rivas |
+| `Bash(git push --force/-f)` | `NO_FORCE_SEMANTICS=YES` är ägarregel i delegationen, inte en sandboxpreferens |
+
+**Vad kärnan skyddas av nu — skriv inte om detta:** frysta exitprov, rollseparation,
+`allowed_write` per task, attestation, och **omfrysningsbudgeten** (doktrin iv,
+`raddning/03-raddningsplan.md` steg 1b). Den sista är den som faktiskt gör jobbet OS-lagret
+aldrig kunde: en filrättighet ser en skrivning, inte ett mönster över tid, och det var
+mönstret — 30 omfrysningar — som var felet.
+
+**⚠️ OVERIFIERAT tills det prövas på Macen.** Med `sandbox.enabled=false` blir
+`sandbox.filesystem`, `sandbox.network` och `sandbox.credentials` inerta.
+`permissions.deny` ligger utanför sandboxblocket och ska fortfarande gälla — **men det är
+ett påstående om mekanismen, inte ett bevis.** Pröva efter installation:
+
+```bash
+# 1. SKA NEKAS — nyckelskyddet måste hålla utan sandbox
+cat ~/.ssh/id_ed25519
+
+# 2. SKA TILLÅTAS — kärnans arbetsyta ska vara öppen (ändrar inget, öppnar bara)
+python3 -c "open('specs/tasks.spec.json','a').close(); print('skrivbar')"
+
+# 3. Nätverket är nu ÖPPET (allowlistan är inert). Bekräfta medvetet:
+curl -sS -o /dev/null -w '%{http_code}
+' https://example.com
+```
+
+Håller inte prov 1 är beslutet fel implementerat — rapportera, installera inte om.
+
+**Installation kräver root och är ägarens hand:**
+```bash
+sudo cp config/managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+Kör **diffen mot den installerade filen först** — den kan ha driftat från källkopian, och
+ingen mekanism jämför dem (FYND 17).
+
+
 ## 2026-09-16 — FYND 17: en andra klonrot ligger utanför §A-skyddet
 
 Arbetsklonens sökväg lokaliserades på ägarens maskin. Utfallet var inte en sökväg utan
