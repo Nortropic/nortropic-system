@@ -1,0 +1,2791 @@
+#!/usr/bin/env python3.12
+"""Frozen H-035 owner-author workflow gate.
+
+Exit 0 = all frozen production effects PASS.
+Exit 1 = judge is sound but the product is RED.
+Exit 2 = rig/environment error; never a product verdict.
+
+The gate first proves a disposable legitimate reference can satisfy the same
+black-box contract. Production real-route negatives receive no credit until a
+provider process-image positive ordinary control has actually executed.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import unicodedata
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterable
+
+
+# Fixture Python processes must not add interpreter cache files to the Git
+# candidates whose exact changed-file set is under test.
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = ROOT / "specs/tasks.spec.json"
+REGISTRY = ROOT / "specs/owner-production-paths.v1.json"
+CONTRACT = ROOT / "docs/loop/owner-author-workflow-v1.md"
+AUTHORITY_CLI = Path("controller/authority/cli")
+LOOP_CLI = Path("controller/loop/cli")
+AUTOPILOT = Path("scripts/nortropic-codex-autopilot.py")
+
+EXPECTED_OWNER_PATHS = (
+    "verify/h034/kernel.py",
+    "verify/h034/plan.json",
+    "verify/h034/identity.json",
+)
+EXPECTED_H035_ALLOWED = (
+    "controller/authority/**",
+    "controller/policy/cli",
+    "controller/taskval/cli",
+    "controller/envelope/cli",
+    "controller/state/cli",
+    "controller/attest/cli",
+    "controller/loop/cli",
+    "scripts/nortropic-codex-autopilot.py",
+    "docs/05-beslutslogg.md",
+    "docs/loop/drift.md",
+)
+EXPECTED_GLOBAL_DENIED = (
+    ".agents/**",
+    ".github/**",
+    "AGENTS.md",
+    "AUTOPILOT",
+    "agents/**",
+    "config/**",
+    "controller/**",
+    "docs/**",
+    "scripts/**",
+    "skills/**",
+    "specs/**",
+    "tests/**",
+    "vendored-skills/**",
+    "verify/bin/**",
+    "workflows/**",
+)
+FROZEN_BUILDER_DENIED = {
+    "specs/tasks.spec.json",
+    "specs/owner-production-paths.v1.json",
+    "verify/bin/h-035-exit",
+    "docs/loop/owner-author-workflow-v1.md",
+}
+REGISTRY_KEYS = {
+    "schema_version",
+    "path_grammar",
+    "authority_source",
+    "runtime_override_allowed",
+    "owner_production_allocations",
+    "owner_author_global_denied_paths",
+}
+TASK_AUTHORITY = {
+    "classes": ["ordinary", "owner_authority"],
+    "owner_production_registry": "specs/owner-production-paths.v1.json",
+    "schema_v1_authority_class": "ordinary",
+    "schema_v1_owner_authority_inference": False,
+}
+SHA40 = re.compile(r"^[0-9a-f]{40}$")
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+DRIVE = re.compile(r"^[A-Za-z]:")
+GLOB_META = set("*?[]{}")
+
+
+class Rig(RuntimeError):
+    """The harness cannot distinguish the required effect."""
+
+
+class FixtureError(RuntimeError):
+    """The disposable reference fixture could not be constructed."""
+
+
+@dataclass
+class Results:
+    label: str
+    passed: int = 0
+    failed: int = 0
+
+    def check(self, name: str, condition: bool, detail: str = "") -> bool:
+        if condition:
+            self.passed += 1
+            print(f"PASS {self.label}:{name}")
+            return True
+        self.failed += 1
+        print(f"FAIL {self.label}:{name} — {detail}")
+        return False
+
+    def predicted(self, mutant: str, hypothesis: str, effect: str) -> None:
+        print(f"MUTANT={mutant}")
+        print(f"HYPOTHESIS={hypothesis}")
+        print(f"PREDICTED_EFFECT={effect}")
+
+
+def command(
+    argv: Iterable[object],
+    *,
+    cwd: Path,
+    stdin: str | bytes | None = None,
+    timeout: float = 60,
+    env: dict[str, str] | None = None,
+    text: bool = True,
+) -> subprocess.CompletedProcess:
+    args = [str(value) for value in argv]
+    try:
+        return subprocess.run(
+            args,
+            cwd=str(cwd),
+            input=stdin,
+            capture_output=True,
+            text=text,
+            shell=False,
+            timeout=timeout,
+            env=env,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Rig(f"command could not complete: {args!r}: {exc}") from exc
+
+
+def git(repo: Path, *args: object, timeout: float = 60) -> subprocess.CompletedProcess:
+    env = {
+        "PATH": "/usr/bin:/bin:/opt/homebrew/bin",
+        "HOME": "/var/empty",
+        "XDG_CONFIG_HOME": "/var/empty",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+    return command(
+        ["/usr/bin/git", "--no-replace-objects", "-C", repo, *args],
+        cwd=repo,
+        timeout=timeout,
+        env=env,
+    )
+
+
+def git_ok(repo: Path, *args: object) -> str:
+    result = git(repo, *args)
+    if result.returncode != 0:
+        raise FixtureError(
+            f"git {' '.join(str(x) for x in args)} failed: {(result.stderr or result.stdout)[-800:]}"
+        )
+    return result.stdout.strip()
+
+
+def git_show_bytes(repo: Path, sha: str, rel: str) -> bytes:
+    result = git(repo, "show", f"{sha}:{rel}")
+    if result.returncode != 0:
+        raise FixtureError(f"git show failed for {sha}:{rel}: {result.stderr[-500:]}")
+    return result.stdout.encode("utf-8")
+
+
+def digest_bytes(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def digest_file(path: Path) -> str:
+    return digest_bytes(path.read_bytes())
+
+
+def duplicate_aware(items: list[tuple[str, Any]]) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    for key, value in items:
+        if key in output:
+            raise ValueError(f"duplicate JSON key: {key}")
+        output[key] = value
+    return output
+
+
+def strict_json(raw: bytes | str) -> Any:
+    if isinstance(raw, str):
+        raw = raw.encode("utf-8")
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=duplicate_aware)
+
+
+def strict_file(path: Path) -> Any:
+    return strict_json(path.read_bytes())
+
+
+def canonical_json(value: Any) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def parse_path(raw: object, *, pattern: bool = True) -> tuple[str, bool]:
+    """Strict shared grammar; invalid spellings are never normalized."""
+    if type(raw) is not str or not raw:
+        raise ValueError("path must be an exact non-empty string")
+    if unicodedata.normalize("NFC", raw) != raw:
+        raise ValueError("path is not NFC")
+    if CONTROL.search(raw):
+        raise ValueError("control byte")
+    if raw.startswith("/") or DRIVE.match(raw):
+        raise ValueError("absolute or drive-prefixed path")
+    if "\\" in raw:
+        raise ValueError("alternate separator")
+    if raw.startswith("./") or raw.endswith("/") or "//" in raw:
+        raise ValueError("non-canonical separator")
+    recursive = raw.endswith("/**")
+    if recursive and not pattern:
+        raise ValueError("owner allocation must be exact")
+    core = raw[:-3] if recursive else raw
+    if not core:
+        raise ValueError("root-covering pattern")
+    parts = core.split("/")
+    if any(part in ("", ".", "..", ".git") for part in parts):
+        raise ValueError("forbidden segment")
+    if any(char in GLOB_META for char in core):
+        raise ValueError("unsupported glob")
+    return core, recursive
+
+
+def overlaps(left: object, right: object) -> bool:
+    lpath, lprefix = parse_path(left)
+    rpath, rprefix = parse_path(right)
+    # An exact owner-production file also reserves every parent/child spelling.
+    # A path like "kernel.py/child" cannot be used as a second namespace that
+    # becomes reachable when the exact protected file is absent or replaced.
+    if lpath == rpath or lpath.startswith(rpath + "/") or rpath.startswith(lpath + "/"):
+        return True
+    if lprefix and (rpath == lpath or rpath.startswith(lpath + "/")):
+        return True
+    if rprefix and (lpath == rpath or lpath.startswith(rpath + "/")):
+        return True
+    return False
+
+
+def permits(pattern: object, path: object) -> bool:
+    p, recursive = parse_path(pattern)
+    actual, actual_recursive = parse_path(path, pattern=False)
+    if actual_recursive:
+        raise ValueError("actual Git path cannot be recursive")
+    return actual == p if not recursive else actual == p or actual.startswith(p + "/")
+
+
+def validate_registry(document: object) -> tuple[bool, str]:
+    if type(document) is not dict:
+        return False, "registry top-level must be object"
+    if set(document) != REGISTRY_KEYS:
+        return False, "registry exact key membership"
+    if type(document.get("schema_version")) is not int or document["schema_version"] != 1:
+        return False, "registry schema_version"
+    if document.get("path_grammar") != "repo-relative-exact-or-terminal-recursive-prefix-v1":
+        return False, "registry path grammar"
+    if document.get("authority_source") != "canonical-git-tree-plus-explicit-owner-action":
+        return False, "registry authority source"
+    if document.get("runtime_override_allowed") is not False:
+        return False, "runtime registry override"
+    allocations = document.get("owner_production_allocations")
+    denied = document.get("owner_author_global_denied_paths")
+    if type(allocations) is not list or len(allocations) != 1:
+        return False, "registry must contain exactly one v1 allocation"
+    allocation = allocations[0]
+    if type(allocation) is not dict or set(allocation) != {
+        "task_id", "owner_author_allowed_write"
+    }:
+        return False, "allocation exact shape"
+    if allocation.get("task_id") != "h-034":
+        return False, "allocation task"
+    paths = allocation.get("owner_author_allowed_write")
+    if type(paths) is not list or any(type(path) is not str for path in paths):
+        return False, "allocation path list type"
+    if tuple(paths) != EXPECTED_OWNER_PATHS:
+        return False, "allocation exact current membership/order"
+    try:
+        parsed = [parse_path(path, pattern=False) for path in paths]
+    except ValueError as exc:
+        return False, f"allocation path: {exc}"
+    if len(parsed) != len(set(parsed)):
+        return False, "duplicate allocation path"
+    if type(denied) is not list or not denied or any(type(path) is not str for path in denied):
+        return False, "global denied path list type/empty"
+    if tuple(denied) != EXPECTED_GLOBAL_DENIED:
+        return False, "global denied authority membership/order"
+    try:
+        denied_parsed = [parse_path(path) for path in denied]
+    except ValueError as exc:
+        return False, f"global denied path: {exc}"
+    if len(denied_parsed) != len(set(denied_parsed)):
+        return False, "duplicate global denied path"
+    if any(overlaps(owner, block) for owner in paths for block in denied):
+        return False, "owner allocation intersects global denied authority"
+    return True, "ok"
+
+
+def registry_allocations(registry: dict[str, Any]) -> dict[str, list[str]]:
+    return {
+        entry["task_id"]: list(entry["owner_author_allowed_write"])
+        for entry in registry["owner_production_allocations"]
+    }
+
+
+def exact_string_list(value: object, name: str, *, empty: bool = True) -> list[str]:
+    if type(value) is not list or any(type(item) is not str or not item for item in value):
+        raise ValueError(f"{name} must be a list of non-empty exact strings")
+    if not empty and not value:
+        raise ValueError(f"{name} must be non-empty")
+    return list(value)
+
+
+def validate_task_document(
+    document: object, task_id: str, registry: dict[str, Any]
+) -> tuple[bool, str, dict[str, Any] | None]:
+    """Independent judge oracle. Production acceptance invokes real consumers."""
+    try:
+        if type(document) is not dict or type(document.get("tasks")) is not list:
+            raise ValueError("task document shape")
+        version = document.get("spec_version")
+        if version not in ("1.0.0", "2.0.0"):
+            raise ValueError("unsupported spec version")
+        tasks = document["tasks"]
+        ids = [task.get("id") for task in tasks if type(task) is dict]
+        if len(ids) != len(tasks) or any(type(item) is not str or not item for item in ids):
+            raise ValueError("task id type")
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate task id")
+        hits = [task for task in tasks if task["id"] == task_id]
+        if len(hits) != 1:
+            raise ValueError("task identity count")
+        task = hits[0]
+        if version == "1.0.0":
+            if task.get("authority_class", "ordinary") != "ordinary":
+                raise ValueError("v1 cannot select owner authority")
+            if "owner_author_allowed_write" in task:
+                raise ValueError("v1 owner surface is never authority")
+            authority_class = "ordinary"
+        else:
+            if document.get("task_authority") != TASK_AUTHORITY:
+                raise ValueError("v2 task_authority contract")
+            authority_class = task.get("authority_class")
+            if type(authority_class) is not str or authority_class not in (
+                "ordinary", "owner_authority"
+            ):
+                raise ValueError("authority_class exact enum")
+
+        allowed = exact_string_list(task.get("allowed_write"), "allowed_write")
+        docs = exact_string_list(task.get("docs_impact", []), "docs_impact")
+        owner_allocations = registry_allocations(registry)
+        all_owner = [path for values in owner_allocations.values() for path in values]
+
+        if authority_class == "ordinary":
+            if not allowed:
+                raise ValueError("ordinary allowed_write must be non-empty")
+            if "owner_author_allowed_write" in task:
+                raise ValueError("ordinary task received owner surface")
+            surface = allowed
+            for pattern in surface:
+                parse_path(pattern)
+                if any(overlaps(pattern, owner) for owner in all_owner):
+                    raise ValueError("ordinary surface overlaps owner production")
+        else:
+            if allowed != []:
+                raise ValueError("owner task has ordinary write surface")
+            owner = exact_string_list(
+                task.get("owner_author_allowed_write"),
+                "owner_author_allowed_write",
+                empty=False,
+            )
+            expected = owner_allocations.get(task_id)
+            if expected is None or owner != expected:
+                raise ValueError("owner surface differs from exact registry allocation")
+            for path in owner:
+                parse_path(path, pattern=False)
+                if any(overlaps(path, block) for block in registry["owner_author_global_denied_paths"]):
+                    raise ValueError("owner surface intersects authority-control deny")
+            surface = owner
+
+        for doc_path in docs:
+            parse_path(doc_path, pattern=False)
+            if not any(permits(pattern, doc_path) for pattern in surface):
+                raise ValueError("docs_impact outside applicable surface")
+        projected = dict(task)
+        projected["effective_authority_class"] = authority_class
+        projected["applicable_write"] = list(surface)
+        return True, "ok", projected
+    except (KeyError, TypeError, ValueError) as exc:
+        return False, str(exc), None
+
+
+def frozen_checks(results: Results) -> bool:
+    try:
+        spec = strict_file(SPEC)
+        registry = strict_file(REGISTRY)
+    except (OSError, UnicodeError, ValueError) as exc:
+        results.check("F00_FROZEN_JSON", False, str(exc))
+        return False
+    ok_registry, why_registry = validate_registry(registry)
+    results.check("F01_REGISTRY_EXACT", ok_registry, why_registry)
+    results.check("F02_SCHEMA_V2", type(spec) is dict and spec.get("spec_version") == "2.0.0")
+    results.check("F03_TASK_AUTHORITY", type(spec) is dict and spec.get("task_authority") == TASK_AUTHORITY)
+    tasks = spec.get("tasks", []) if type(spec) is dict else []
+    ids = [task.get("id") for task in tasks if type(task) is dict]
+    results.check("F04_UNIQUE_TASK_IDS", len(ids) == len(tasks) == len(set(ids)))
+    results.check("F05_H034_TASK_ABSENT", "h-034" not in ids)
+    h035 = [task for task in tasks if type(task) is dict and task.get("id") == "h-035"]
+    results.check("F06_H035_SINGLE", len(h035) == 1)
+    if len(h035) == 1:
+        task = h035[0]
+        results.check("F07_H035_ORDINARY", task.get("authority_class") == "ordinary")
+        results.check("F08_H035_DEPENDENCY", task.get("depends_on") == ["h-017"])
+        results.check(
+            "F09_H035_ALLOWED_EXACT",
+            tuple(task.get("allowed_write", [])) == EXPECTED_H035_ALLOWED,
+            repr(task.get("allowed_write")),
+        )
+        results.check(
+            "F10_H035_FREEZE_OUTSIDE_BUILDER",
+            not FROZEN_BUILDER_DENIED.intersection(task.get("allowed_write", [])),
+        )
+        results.check("F11_H035_NO_OWNER_FIELD", "owner_author_allowed_write" not in task)
+        valid, reason, _projection = validate_task_document(spec, "h-035", registry)
+        results.check("F12_H035_SCHEMA_VALID", valid, reason)
+    existing = [f"h-{number:03d}" for number in range(1, 18)]
+    existing_ok = all(
+        len([task for task in tasks if task.get("id") == task_id]) == 1
+        and [task for task in tasks if task.get("id") == task_id][0].get("authority_class") == "ordinary"
+        for task_id in existing
+    )
+    results.check("F13_LEGACY_CLASSES_EXPLICIT", existing_ok)
+    results.check("F14_CONTRACT_PRESENT", CONTRACT.is_file())
+    results.check("F15_GATE_CANONICAL", Path(__file__).resolve() == ROOT / "verify/bin/h-035-exit")
+    return results.failed == 0
+
+
+# This disposable implementation is deliberately small and provider-neutral. It is
+# generated only under the gate's temporary root and is never a production candidate.
+REFERENCE_MODEL = r'''from __future__ import annotations
+import hashlib, json, os, re, subprocess, unicodedata
+from pathlib import Path
+
+EXPECTED_AUTHORITY = {
+    "classes": ["ordinary", "owner_authority"],
+    "owner_production_registry": "specs/owner-production-paths.v1.json",
+    "schema_v1_authority_class": "ordinary",
+    "schema_v1_owner_authority_inference": False,
+}
+EXPECTED_DENIED = [".agents/**", ".github/**", "AGENTS.md", "AUTOPILOT", "agents/**", "config/**", "controller/**", "docs/**", "scripts/**", "skills/**", "specs/**", "tests/**", "vendored-skills/**", "verify/bin/**", "workflows/**"]
+REGISTRY_KEYS = {"schema_version", "path_grammar", "authority_source", "runtime_override_allowed", "owner_production_allocations", "owner_author_global_denied_paths"}
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+DRIVE = re.compile(r"^[A-Za-z]:")
+
+class Refusal(ValueError): pass
+
+def strict(raw):
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out: raise Refusal("duplicate key " + key)
+            out[key] = value
+        return out
+    if isinstance(raw, str): raw = raw.encode()
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=pairs)
+
+def run(argv, cwd, stdin=None):
+    return subprocess.run([str(x) for x in argv], cwd=str(cwd), input=stdin,
+                          text=True, capture_output=True, shell=False)
+
+def git(root, *args):
+    p = run(["/usr/bin/git", "--no-replace-objects", "-C", root, *args], root)
+    if p.returncode: raise Refusal("git: " + (p.stderr or p.stdout)[-300:])
+    return p.stdout.strip()
+
+def show(root, sha, rel):
+    p = run(["/usr/bin/git", "--no-replace-objects", "-C", root, "show", f"{sha}:{rel}"], root)
+    if p.returncode: raise Refusal("missing canonical Git bytes " + rel)
+    return p.stdout.encode()
+
+def digest(raw): return hashlib.sha256(raw).hexdigest()
+
+def path(raw, pattern=True):
+    if type(raw) is not str or not raw: raise Refusal("path type")
+    if unicodedata.normalize("NFC", raw) != raw or CONTROL.search(raw): raise Refusal("path encoding")
+    if raw.startswith("/") or DRIVE.match(raw) or "\\" in raw: raise Refusal("path absolute/alternate")
+    if raw.startswith("./") or raw.endswith("/") or "//" in raw: raise Refusal("path separator")
+    recursive = raw.endswith("/**")
+    if recursive and not pattern: raise Refusal("allocation pattern")
+    core = raw[:-3] if recursive else raw
+    if not core: raise Refusal("root pattern")
+    bits = core.split("/")
+    if any(x in ("", ".", "..", ".git") for x in bits): raise Refusal("path segment")
+    if any(x in core for x in "*?[]{}"): raise Refusal("path glob")
+    return core, recursive
+
+def overlap(a, b):
+    ap, ax = path(a); bp, bx = path(b)
+    return ((ap == bp or ap.startswith(bp + "/") or bp.startswith(ap + "/"))
+            or (ax and (bp == ap or bp.startswith(ap + "/")))
+            or (bx and (ap == bp or ap.startswith(bp + "/"))))
+
+def permit(pattern, actual):
+    pp, px = path(pattern); aa, ax = path(actual, False)
+    return (aa == pp) if not px else (aa == pp or aa.startswith(pp + "/"))
+
+def registry(root, sha):
+    value = strict(show(root, sha, "specs/owner-production-paths.v1.json"))
+    if type(value) is not dict or set(value) != REGISTRY_KEYS: raise Refusal("registry keys")
+    if type(value.get("schema_version")) is not int or value["schema_version"] != 1: raise Refusal("registry version")
+    if value.get("path_grammar") != "repo-relative-exact-or-terminal-recursive-prefix-v1": raise Refusal("registry grammar")
+    if value.get("authority_source") != "canonical-git-tree-plus-explicit-owner-action": raise Refusal("registry source")
+    if value.get("runtime_override_allowed") is not False: raise Refusal("registry override")
+    allocations = value.get("owner_production_allocations")
+    denied = value.get("owner_author_global_denied_paths")
+    if type(allocations) is not list or len(allocations) != 1: raise Refusal("registry allocations")
+    item = allocations[0]
+    if type(item) is not dict or set(item) != {"task_id", "owner_author_allowed_write"}: raise Refusal("allocation shape")
+    if item.get("task_id") != "h-034": raise Refusal("allocation task")
+    expected = ["verify/h034/kernel.py", "verify/h034/plan.json", "verify/h034/identity.json"]
+    if item.get("owner_author_allowed_write") != expected: raise Refusal("allocation membership")
+    if denied != EXPECTED_DENIED: raise Refusal("denied membership/order")
+    parsed = [path(x) for x in denied]
+    if len(parsed) != len(set(parsed)): raise Refusal("denied duplicate")
+    for owner in expected:
+        path(owner, False)
+        if any(overlap(owner, block) for block in denied): raise Refusal("allocation denied")
+    return value
+
+def task(root, sha, task_id):
+    reg = registry(root, sha)
+    doc = strict(show(root, sha, "specs/tasks.spec.json"))
+    if type(doc) is not dict or type(doc.get("tasks")) is not list: raise Refusal("spec shape")
+    version = doc.get("spec_version")
+    if version not in ("1.0.0", "2.0.0"): raise Refusal("spec version")
+    ids = []
+    for item in doc["tasks"]:
+        if type(item) is not dict or type(item.get("id")) is not str or not item["id"]: raise Refusal("task id")
+        ids.append(item["id"])
+    if len(ids) != len(set(ids)): raise Refusal("duplicate task")
+    hits = [x for x in doc["tasks"] if x["id"] == task_id]
+    if len(hits) != 1: raise Refusal("task count")
+    item = hits[0]
+    if version == "1.0.0":
+        if item.get("authority_class", "ordinary") != "ordinary" or "owner_author_allowed_write" in item: raise Refusal("v1 owner inference")
+        cls = "ordinary"
+    else:
+        if doc.get("task_authority") != EXPECTED_AUTHORITY: raise Refusal("task authority")
+        cls = item.get("authority_class")
+        if type(cls) is not str or cls not in ("ordinary", "owner_authority"): raise Refusal("authority class")
+    allowed = item.get("allowed_write")
+    docs = item.get("docs_impact", [])
+    if type(allowed) is not list or any(type(x) is not str or not x for x in allowed): raise Refusal("ordinary surface type")
+    if type(docs) is not list or any(type(x) is not str or not x for x in docs): raise Refusal("docs type")
+    allocation = reg["owner_production_allocations"][0]["owner_author_allowed_write"]
+    if cls == "ordinary":
+        if not allowed or "owner_author_allowed_write" in item: raise Refusal("ordinary surface")
+        for pattern in allowed:
+            path(pattern)
+            if any(overlap(pattern, owner) for owner in allocation): raise Refusal("ordinary owner overlap")
+        surface = allowed
+    else:
+        if allowed != []: raise Refusal("owner ordinary surface")
+        owner = item.get("owner_author_allowed_write")
+        if task_id != "h-034" or owner != allocation: raise Refusal("owner allocation")
+        for exact in owner: path(exact, False)
+        surface = owner
+    for docpath in docs:
+        path(docpath, False)
+        if not any(permit(pattern, docpath) for pattern in surface): raise Refusal("docs outside")
+    out = dict(item); out["effective_authority_class"] = cls; out["applicable_write"] = list(surface)
+    return out
+
+def changed(root, base, candidate):
+    if not re.fullmatch(r"[0-9a-f]{40}", base or "") or not re.fullmatch(r"[0-9a-f]{40}", candidate or ""): raise Refusal("sha form")
+    git(root, "cat-file", "-e", base + "^{commit}"); git(root, "cat-file", "-e", candidate + "^{commit}")
+    raw = git(root, "diff", "--name-only", "--no-renames", base, candidate)
+    files = [x for x in raw.splitlines() if x]
+    for item in files: path(item, False)
+    return files
+
+def check_candidate(root, authority_sha, task_id, base, candidate):
+    item = task(root, authority_sha, task_id)
+    files = changed(root, base, candidate)
+    if not files: raise Refusal("empty candidate")
+    if any(not any(permit(pattern, filename) for pattern in item["applicable_write"]) for filename in files): raise Refusal("candidate outside surface")
+    return item, files
+
+def state_path(state_dir): return Path(state_dir) / "owner-authority.json"
+
+def read_state(state_dir):
+    target = state_path(state_dir)
+    if not target.exists(): return None
+    value = strict(target.read_bytes())
+    if type(value) is not dict: raise Refusal("state shape")
+    return value
+
+def write_state(state_dir, value):
+    root = Path(state_dir); root.mkdir(parents=True, exist_ok=True)
+    temp = root / "owner-authority.json.new"
+    temp.write_text(json.dumps(value, sort_keys=True, indent=2) + "\n")
+    temp.replace(state_path(root))
+    log = root / "events.jsonl"
+    with log.open("a") as stream:
+        stream.write(json.dumps({"task": value["task_id"], "status": value["state"], "owner_authority": value}, sort_keys=True, separators=(",", ":")) + "\n")
+
+def canonical_binding(root, req):
+    required = {"authority_sha", "task_id", "action_id", "attempt_id", "author_identity", "base_sha", "current_main_sha", "spec_sha256", "registry_sha256", "gate_path", "gate_sha256", "state_dir", "attest_dir"}
+    if set(req) != required: raise Refusal("owner action request keys")
+    for key in required:
+        if type(req[key]) is not str or not req[key]: raise Refusal("owner action string " + key)
+    if req["authority_sha"] != req["base_sha"]: raise Refusal("authority/base binding")
+    item = task(root, req["authority_sha"], req["task_id"])
+    if item["effective_authority_class"] != "owner_authority": raise Refusal("not owner task")
+    current = git(root, "rev-parse", "refs/remotes/origin/main")
+    if current != req["current_main_sha"] or current != req["base_sha"]: raise Refusal("current main")
+    spec_raw = show(root, req["authority_sha"], "specs/tasks.spec.json")
+    reg_raw = show(root, req["authority_sha"], "specs/owner-production-paths.v1.json")
+    if digest(spec_raw) != req["spec_sha256"] or digest(reg_raw) != req["registry_sha256"]: raise Refusal("spec/registry digest")
+    if item.get("exit_test") != req["gate_path"]: raise Refusal("gate path")
+    gate_raw = show(root, req["authority_sha"], req["gate_path"])
+    if digest(gate_raw) != req["gate_sha256"]: raise Refusal("gate digest")
+    return item
+'''
+
+
+REFERENCE_AUTHORITY = r'''#!/usr/bin/env python3.12
+from __future__ import annotations
+import hashlib, json, os, shutil, subprocess, sys, tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "controller/authority"))
+import model
+
+def reply(accepted, **fields):
+    print(json.dumps({"accepted": accepted, **fields}, sort_keys=True))
+
+def request():
+    raw = sys.stdin.buffer.read()
+    if not raw: raise model.Refusal("missing JSON request")
+    value = model.strict(raw)
+    if type(value) is not dict: raise model.Refusal("request object")
+    return value
+
+def exact(req, keys):
+    if set(req) != set(keys): raise model.Refusal("request keys")
+
+def validate_task(req):
+    exact(req, {"authority_sha", "task_id"})
+    item = model.task(ROOT, req["authority_sha"], req["task_id"])
+    reply(True, authority_class=item["effective_authority_class"], applicable_write=item["applicable_write"])
+
+def validate_registry(req):
+    exact(req, {"authority_sha"})
+    reg = model.registry(ROOT, req["authority_sha"])
+    reply(True, registry_sha256=model.digest(model.show(ROOT, req["authority_sha"], "specs/owner-production-paths.v1.json")), allocations=reg["owner_production_allocations"])
+
+def check_candidate(req):
+    exact(req, {"authority_sha", "task_id", "base_sha", "candidate_sha"})
+    item, files = model.check_candidate(ROOT, req["authority_sha"], req["task_id"], req["base_sha"], req["candidate_sha"])
+    reply(True, authority_class=item["effective_authority_class"], candidate_sha=req["candidate_sha"], actual_changed_files=files)
+
+def owner_action(req):
+    model.canonical_binding(ROOT, req)
+    state = model.read_state(req["state_dir"])
+    if state is None or state.get("state") != "OWNER_ACTION_REQUIRED": raise model.Refusal("owner action state")
+    for key in ("task_id", "authority_sha", "base_sha", "current_main_sha", "spec_sha256", "registry_sha256", "gate_path", "gate_sha256", "attest_dir"):
+        if state.get(key) != req[key]: raise model.Refusal("owner action state binding " + key)
+    state.update({"action_id": req["action_id"], "attempt_id": req["attempt_id"], "author_identity": req["author_identity"]})
+    model.write_state(req["state_dir"], state)
+    reply(True, state="OWNER_ACTION_REQUIRED", action_persisted=True)
+
+def record_review(req):
+    keys = {"state_dir", "task_id", "candidate_sha", "review_id", "reviewer_identity", "review_artifact", "review_worktree"}
+    exact(req, keys)
+    state = model.read_state(req["state_dir"])
+    if state is None or state.get("state") != "OWNER_CANDIDATE_REVIEW_REQUIRED": raise model.Refusal("review state")
+    for key in keys:
+        if type(req[key]) is not str or not req[key]: raise model.Refusal("review request string")
+    if state.get("task_id") != req["task_id"] or state.get("candidate_sha") != req["candidate_sha"]: raise model.Refusal("review candidate")
+    if req["reviewer_identity"] == state.get("author_identity"): raise model.Refusal("reviewer is author")
+    artifact_path = Path(req["review_artifact"]).resolve()
+    review_root = Path(req["review_worktree"]).resolve()
+    if not artifact_path.is_file() or not review_root.is_dir(): raise model.Refusal("review evidence missing")
+    artifact_raw = artifact_path.read_bytes(); artifact = model.strict(artifact_raw)
+    expected = {
+        "schema_version": 1, "role": "REVIEWER", "verdict": "PASS",
+        "task_id": req["task_id"], "candidate_sha": req["candidate_sha"],
+        "base_sha": state["base_sha"], "review_id": req["review_id"],
+        "reviewer_identity": req["reviewer_identity"],
+    }
+    if artifact != expected: raise model.Refusal("review artifact binding/verdict")
+    if model.git(review_root, "rev-parse", "HEAD") != req["candidate_sha"]: raise model.Refusal("review worktree head")
+    if model.git(review_root, "status", "--porcelain=v1", "--untracked-files=all"): raise model.Refusal("review worktree dirty")
+    if str(review_root) == state.get("author_workspace"): raise model.Refusal("review workspace reused author workspace")
+    state.update({"state": "OWNER_FINAL_FREEZE_REQUIRED", "review_id": req["review_id"],
+                  "reviewer_identity": req["reviewer_identity"], "review_sha256": model.digest(artifact_raw)})
+    model.write_state(req["state_dir"], state)
+    reply(True, state="OWNER_FINAL_FREEZE_REQUIRED", review_sha256=state["review_sha256"], published=False)
+
+def run_frozen_gate(state):
+    root = Path(tempfile.mkdtemp(prefix="h035-reference-gate-", dir=str(Path(state["state_dir"]).parent)))
+    target = root / "candidate"
+    try:
+        model.git(ROOT, "worktree", "add", "--detach", str(target), state["candidate_sha"])
+        gate = ROOT / state["gate_path"]
+        result = subprocess.run(["/bin/bash", str(gate), str(target)], cwd=str(ROOT), capture_output=True, text=True, shell=False, timeout=20)
+        if result.returncode != 0: raise model.Refusal("frozen gate not PASS")
+    finally:
+        subprocess.run(["/usr/bin/git", "--no-replace-objects", "-C", str(ROOT), "worktree", "remove", "--force", str(target)], capture_output=True)
+        shutil.rmtree(root, ignore_errors=True)
+
+def owner_final(req):
+    keys = {"state_dir", "attest_dir", "task_id", "owner_final_id", "candidate_sha", "review_id", "review_sha256", "base_sha", "current_main_sha", "spec_sha256", "registry_sha256", "gate_path", "gate_sha256"}
+    exact(req, keys)
+    state = model.read_state(req["state_dir"])
+    if state is None or state.get("state") != "OWNER_FINAL_FREEZE_REQUIRED": raise model.Refusal("owner final state/review missing")
+    for key in keys:
+        if type(req[key]) is not str or not req[key]: raise model.Refusal("owner final string")
+    for key in ("attest_dir", "task_id", "candidate_sha", "review_id", "review_sha256", "base_sha", "current_main_sha", "spec_sha256", "registry_sha256", "gate_path", "gate_sha256"):
+        if state.get(key) != req[key]: raise model.Refusal("owner final binding " + key)
+    if model.git(ROOT, "rev-parse", "refs/remotes/origin/main") != req["current_main_sha"]: raise model.Refusal("owner final current main")
+    _item, files = model.check_candidate(ROOT, state["authority_sha"], state["task_id"], state["base_sha"], state["candidate_sha"])
+    if files != state.get("actual_changed_files"): raise model.Refusal("owner final Git file identity")
+    state["state_dir"] = req["state_dir"]
+    run_frozen_gate(state)
+    record = {
+        "task_id": state["task_id"], "authority_class": "owner_authority",
+        "action_id": state["action_id"], "attempt_id": state["attempt_id"],
+        "base_sha": state["base_sha"], "current_main_sha": state["current_main_sha"],
+        "candidate_sha": state["candidate_sha"], "actual_changed_files": files,
+        "spec_sha256": state["spec_sha256"], "registry_sha256": state["registry_sha256"],
+        "gate_path": state["gate_path"], "gate_sha256": state["gate_sha256"],
+        "review_id": state["review_id"], "review_sha256": state["review_sha256"],
+        "owner_final_id": req["owner_final_id"], "stale": False,
+    }
+    attest_dir = Path(req["attest_dir"]); attest_dir.mkdir(parents=True, exist_ok=True)
+    attest = attest_dir / "attestations.json"; temp = attest_dir / "attestations.json.new"
+    temp.write_text(json.dumps({"attestations": {state["task_id"]: record}, "omtest_ko": []}, sort_keys=True, indent=2) + "\n")
+    temp.replace(attest)
+    state.update({"state": "OWNER_PUBLICATION_ELIGIBLE", "owner_final_id": req["owner_final_id"]})
+    model.write_state(req["state_dir"], state)
+    reply(True, state="OWNER_PUBLICATION_ELIGIBLE", candidate_sha=state["candidate_sha"], published=False)
+
+def read_state(req):
+    exact(req, {"state_dir", "task_id"})
+    state = model.read_state(req["state_dir"])
+    if state is None or state.get("task_id") != req["task_id"]: raise model.Refusal("state absent")
+    reply(True, record=state)
+
+COMMANDS = {"validate-task": validate_task, "validate-registry": validate_registry,
+            "check-candidate": check_candidate, "owner-action": owner_action,
+            "record-review": record_review, "owner-final": owner_final,
+            "read-state": read_state}
+
+try:
+    if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS: raise model.Refusal("usage")
+    COMMANDS[sys.argv[1]](request())
+except Exception as exc:
+    reply(False, reason=str(exc))
+    raise SystemExit(1)
+'''
+
+
+REFERENCE_LOOP = r'''#!/usr/bin/env python3.12
+from __future__ import annotations
+import json, os, shutil, subprocess, sys, tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "controller/authority"))
+import model
+
+def run(argv, cwd, stdin=None, env=None):
+    return subprocess.run([str(x) for x in argv], cwd=str(cwd), input=stdin, text=True,
+                          capture_output=True, shell=False, env=env, timeout=30)
+
+def load_config(path):
+    value = model.strict(Path(path).read_bytes())
+    required = {"spec", "task_id", "state_dir", "attest_dir", "lease_dir", "lease_resurs", "workspace_rot", "base_sha", "current_main_sha", "verifier_id", "run_id", "brytare_rot", "budget", "troskel", "worker_cmd", "timeout_s"}
+    if type(value) is not dict or set(value) != required: raise model.Refusal("config exact shape")
+    for key in required - {"worker_cmd", "timeout_s", "budget", "troskel"}:
+        if type(value[key]) is not str or not value[key]: raise model.Refusal("config string " + key)
+    if type(value["worker_cmd"]) is not list or not value["worker_cmd"] or any(type(x) is not str or not x for x in value["worker_cmd"]): raise model.Refusal("provider argv")
+    if type(value["timeout_s"]) not in (int, float) or value["timeout_s"] <= 0: raise model.Refusal("provider timeout")
+    if type(value["budget"]) is not int or type(value["troskel"]) is not int: raise model.Refusal("budget type")
+    return value
+
+def append_status(cfg, task_id, status, owner=None):
+    state_dir = Path(cfg["state_dir"]); state_dir.mkdir(parents=True, exist_ok=True)
+    event = {"task": task_id, "status": status}
+    if owner is not None: event["owner_authority"] = owner
+    with (state_dir / "events.jsonl").open("a") as stream:
+        stream.write(json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n")
+
+def provider(cfg, workspace, envelope):
+    env = dict(os.environ)
+    env["NORTROPIC_KUVERT"] = str(envelope)
+    return subprocess.run(cfg["worker_cmd"], cwd=str(workspace), env=env,
+                          input=envelope.read_bytes(), stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, start_new_session=True,
+                          timeout=cfg["timeout_s"], shell=False)
+
+def write_owner_required(cfg, item, spec_raw, registry_raw, gate_raw):
+    existing = model.read_state(cfg["state_dir"])
+    if existing is not None:
+        if existing.get("state") not in ("OWNER_ACTION_REQUIRED", "OWNER_CANDIDATE_REVIEW_REQUIRED", "OWNER_FINAL_FREEZE_REQUIRED", "OWNER_PUBLICATION_ELIGIBLE"):
+            raise model.Refusal("unknown persisted owner state")
+        return existing
+    value = {
+        "state": "OWNER_ACTION_REQUIRED", "task_id": cfg["task_id"],
+        "authority_class": "owner_authority", "authority_sha": cfg["base_sha"],
+        "base_sha": cfg["base_sha"], "current_main_sha": cfg["current_main_sha"],
+        "spec_sha256": model.digest(spec_raw), "registry_sha256": model.digest(registry_raw),
+        "gate_path": item["exit_test"], "gate_sha256": model.digest(gate_raw),
+        "attest_dir": cfg["attest_dir"],
+    }
+    model.write_state(cfg["state_dir"], value)
+    return value
+
+def materialize_candidate(cfg, item, owner_state, workspace):
+    envelope = Path(cfg["state_dir"]) / "owner-envelope.json"
+    envelope.write_text(json.dumps({"run_id": cfg["run_id"], "task_id": cfg["task_id"], "base_sha": cfg["base_sha"], "authority_class": "owner_authority", "owner_author_allowed_write": item["applicable_write"]}, sort_keys=True))
+    result = provider(cfg, workspace, envelope)
+    if result.returncode != 0: raise model.Refusal("owner provider failure")
+    if model.git(workspace, "rev-parse", "HEAD") != cfg["base_sha"]: raise model.Refusal("provider moved HEAD")
+    dirty = model.git(workspace, "status", "--porcelain=v1", "--untracked-files=all")
+    if not dirty: raise model.Refusal("provider made no owner candidate")
+    model.git(workspace, "add", "-A")
+    model.git(workspace, "-c", "user.name=nortropic-owner-author", "-c", "user.email=owner-author@nortropic", "-c", "commit.gpgsign=false", "commit", "-qm", "owner candidate")
+    candidate = model.git(workspace, "rev-parse", "HEAD")
+    _checked, files = model.check_candidate(ROOT, cfg["base_sha"], cfg["task_id"], cfg["base_sha"], candidate)
+    owner_state.update({"state": "OWNER_CANDIDATE_REVIEW_REQUIRED", "candidate_sha": candidate,
+                        "actual_changed_files": files, "author_workspace": str(workspace),
+                        "provider_exit": result.returncode})
+    model.write_state(cfg["state_dir"], owner_state)
+    print(json.dumps({"state": owner_state["state"], "candidate_sha": candidate, "actual_changed_files": files}, sort_keys=True))
+
+def run_loop(cfg):
+    if Path(cfg["spec"]).resolve() != ROOT / "specs/tasks.spec.json": raise model.Refusal("caller-selected spec")
+    current = model.git(ROOT, "rev-parse", "refs/remotes/origin/main")
+    if current != cfg["current_main_sha"] or current != cfg["base_sha"]: raise model.Refusal("current main/base")
+    spec_raw = model.show(ROOT, cfg["base_sha"], "specs/tasks.spec.json")
+    registry_raw = model.show(ROOT, cfg["base_sha"], "specs/owner-production-paths.v1.json")
+    item = model.task(ROOT, cfg["base_sha"], cfg["task_id"])
+    for path in (cfg["state_dir"], cfg["attest_dir"], cfg["lease_dir"], cfg["brytare_rot"], cfg["workspace_rot"]):
+        Path(path).mkdir(parents=True, exist_ok=True)
+    lease = Path(cfg["lease_dir"]) / (cfg["run_id"] + ".lease")
+    lease.write_text(str(os.getpid()) + "\n")
+    try:
+        if item["effective_authority_class"] == "owner_authority":
+            gate_raw = model.show(ROOT, cfg["base_sha"], item["exit_test"])
+            state = write_owner_required(cfg, item, spec_raw, registry_raw, gate_raw)
+            if state["state"] == "OWNER_ACTION_REQUIRED" and "action_id" not in state:
+                print("OWNER_ACTION_REQUIRED")
+                return 0
+            if state["state"] in ("OWNER_CANDIDATE_REVIEW_REQUIRED", "OWNER_FINAL_FREEZE_REQUIRED", "OWNER_PUBLICATION_ELIGIBLE"):
+                print(state["state"])
+                return 0
+        else:
+            state = None
+        workspace_root = Path(cfg["workspace_rot"])
+        workspace = workspace_root / (cfg["run_id"] + "-attempt")
+        model.git(ROOT, "worktree", "add", "--detach", str(workspace), cfg["base_sha"])
+        try:
+            envelope = Path(cfg["state_dir"]) / "ordinary-envelope.json"
+            if item["effective_authority_class"] == "ordinary":
+                envelope.write_text(json.dumps({"run_id": cfg["run_id"], "task_id": cfg["task_id"], "base_sha": cfg["base_sha"], "authority_class": "ordinary", "allowed_write": item["applicable_write"]}, sort_keys=True))
+                result = provider(cfg, workspace, envelope)
+                if result.returncode != 0: raise model.Refusal("ordinary provider failure")
+                if not model.git(workspace, "status", "--porcelain=v1", "--untracked-files=all"): raise model.Refusal("ordinary provider made no candidate")
+                model.git(workspace, "add", "-A")
+                model.git(workspace, "-c", "user.name=nortropic-ordinary", "-c", "user.email=ordinary@nortropic", "-c", "commit.gpgsign=false", "commit", "-qm", "ordinary candidate")
+                candidate = model.git(workspace, "rev-parse", "HEAD")
+                model.check_candidate(ROOT, cfg["base_sha"], cfg["task_id"], cfg["base_sha"], candidate)
+                append_status(cfg, cfg["task_id"], "claimed")
+                print("ORDINARY_PROVIDER_EXECUTED " + candidate)
+                return 0
+            materialize_candidate(cfg, item, state, workspace)
+            return 0
+        finally:
+            subprocess.run(["/usr/bin/git", "--no-replace-objects", "-C", str(ROOT), "worktree", "remove", "--force", str(workspace)], capture_output=True)
+            shutil.rmtree(workspace, ignore_errors=True)
+    finally:
+        lease.unlink(missing_ok=True)
+
+try:
+    if len(sys.argv) != 3 or sys.argv[1] != "run": raise model.Refusal("usage: run <config>")
+    raise SystemExit(run_loop(load_config(sys.argv[2])))
+except model.Refusal as exc:
+    print("loop refusal: " + str(exc), file=sys.stderr)
+    raise SystemExit(1)
+'''
+
+
+REFERENCE_AUTOPILOT = r'''#!/usr/bin/env python3.12
+from __future__ import annotations
+import json, subprocess, sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+def main():
+    if len(sys.argv) != 4 or sys.argv[1] != "scope-check":
+        print("usage", file=sys.stderr); return 2
+    task_id, candidate = sys.argv[2], sys.argv[3]
+    base = subprocess.run(["/usr/bin/git", "--no-replace-objects", "-C", str(ROOT), "rev-parse", "refs/remotes/origin/main"], text=True, capture_output=True).stdout.strip()
+    req = {"authority_sha": base, "task_id": task_id, "base_sha": base, "candidate_sha": candidate}
+    p = subprocess.run([str(ROOT / "controller/authority/cli"), "check-candidate"], cwd=str(ROOT), input=json.dumps(req), text=True, capture_output=True)
+    sys.stdout.write(p.stdout); sys.stderr.write(p.stderr); return p.returncode
+
+raise SystemExit(main())
+'''
+
+
+REFERENCE_OWNER_GATE = r'''#!/bin/bash
+set -u
+TARGET="${1-}"
+test -d "$TARGET" || exit 2
+test -f "$TARGET/verify/h034/kernel.py" || exit 1
+test -f "$TARGET/verify/h034/plan.json" || exit 1
+test -f "$TARGET/verify/h034/identity.json" || exit 1
+exit 0
+'''
+
+
+REFERENCE_PROVIDER = r'''#!/usr/bin/env python3.12
+from __future__ import annotations
+import hashlib, json, os, sys, time
+from pathlib import Path
+
+image = Path(__file__).resolve()
+receipt = image.with_name(image.name + ".receipt.json")
+receipt_new = receipt.with_name(receipt.name + f".{os.getpid()}.new")
+receipt_new.write_text(json.dumps({
+    "schema_version": 1,
+    "pid": os.getpid(),
+    "ppid": os.getppid(),
+    "process_image": str(image),
+    "process_image_sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+    "started_ns": time.time_ns(),
+}, sort_keys=True))
+os.replace(receipt_new, receipt)
+
+envelope = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+if os.environ.get("H035_MUTANT_PROVIDER_CLAIMS_OWNER") == "1":
+    envelope["authority_class"] = "owner_authority"
+if envelope.get("authority_class") == "owner_authority":
+    for rel, content in (
+        ("verify/h034/kernel.py", "# disposable owner kernel\n"),
+        ("verify/h034/plan.json", '{"operations":[]}\n'),
+        ("verify/h034/identity.json", '{"identity":"fixture"}\n'),
+    ):
+        target = Path(rel); target.parent.mkdir(parents=True, exist_ok=True); target.write_text(content)
+else:
+    target = Path("docs/05-beslutslogg.md")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as stream:
+        stream.write("reference ordinary provider effect\n")
+time.sleep(1.0)
+'''
+
+
+PRODUCTION_PROVIDER = r'''#!/usr/bin/env python3.12
+from __future__ import annotations
+import hashlib, json, os, sys, time
+from pathlib import Path
+
+image = Path(__file__).resolve()
+receipt = image.with_name(image.name + ".receipt.json")
+receipt_new = receipt.with_name(receipt.name + f".{os.getpid()}.new")
+receipt_new.write_text(json.dumps({
+    "schema_version": 1,
+    "pid": os.getpid(),
+    "ppid": os.getppid(),
+    "process_image": str(image),
+    "process_image_sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+    "started_ns": time.time_ns(),
+}, sort_keys=True))
+os.replace(receipt_new, receipt)
+
+mode = sys.argv[1] if len(sys.argv) == 2 else "invalid"
+_envelope = sys.stdin.buffer.read()
+if mode == "ordinary":
+    target = Path("docs/05-beslutslogg.md")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as stream:
+        stream.write("production ordinary provider process-image effect\n")
+elif mode == "owner":
+    for rel, content in (
+        ("verify/h034/kernel.py", "# production owner provider sentinel\n"),
+        ("verify/h034/plan.json", '{"operations":[]}\n'),
+        ("verify/h034/identity.json", '{"identity":"production-sentinel"}\n'),
+    ):
+        target = Path(rel); target.parent.mkdir(parents=True, exist_ok=True); target.write_text(content)
+else:
+    raise SystemExit(9)
+time.sleep(1.0)
+'''
+
+
+def write_executable(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    path.chmod(0o700)
+
+
+def copy_file(source: Path, target: Path, *, executable: bool | None = None) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(source.read_bytes())
+    if executable is True:
+        target.chmod(0o700)
+    elif executable is False:
+        target.chmod(0o600)
+
+
+def init_repo(path: Path) -> None:
+    path.mkdir(parents=True)
+    git_ok(path, "init", "-q")
+    git_ok(path, "config", "user.name", "H035 Fixture")
+    git_ok(path, "config", "user.email", "h035@example.invalid")
+
+
+def commit_all(repo: Path, subject: str) -> str:
+    git_ok(repo, "add", "-A")
+    git_ok(repo, "-c", "commit.gpgsign=false", "commit", "-qm", subject)
+    return git_ok(repo, "rev-parse", "HEAD")
+
+
+def install_reference(path: Path) -> tuple[Path, Path, str]:
+    """Create an isolated legitimate implementation and local origin/main."""
+    repo = path / "reference-repo"
+    init_repo(repo)
+    copy_file(SPEC, repo / SPEC.relative_to(ROOT))
+    copy_file(REGISTRY, repo / REGISTRY.relative_to(ROOT))
+    copy_file(CONTRACT, repo / CONTRACT.relative_to(ROOT))
+    copy_file(Path(__file__), repo / "verify/bin/h-035-exit", executable=True)
+    write_executable(repo / "verify/bin/h-034-exit", REFERENCE_OWNER_GATE)
+    write_executable(repo / AUTHORITY_CLI, REFERENCE_AUTHORITY)
+    write_executable(repo / LOOP_CLI, REFERENCE_LOOP)
+    write_executable(repo / AUTOPILOT, REFERENCE_AUTOPILOT)
+    write_executable(repo / "controller/authority/model.py", REFERENCE_MODEL)
+    base = commit_all(repo, "reference authority")
+
+    # The canonical future owner task is created only in disposable state. H-034
+    # remains absent from the reviewed repository and from the frozen task spec.
+    spec = strict_file(repo / "specs/tasks.spec.json")
+    spec["tasks"].append(
+        {
+            "id": "h-034",
+            "authority_class": "owner_authority",
+            "slice": "fixture-owner-author",
+            "title": "Disposable owner-author fixture",
+            "summary": "Gate-owned legitimate owner-author reference only.",
+            "allowed_write": [],
+            "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS),
+            "exit_test": "verify/bin/h-034-exit",
+            "exit_criterion": "Disposable reference only.",
+            "docs_impact": [],
+            "depends_on": [],
+        }
+    )
+    (repo / "specs/tasks.spec.json").write_bytes(canonical_json(spec))
+    authority_sha = commit_all(repo, "reference owner allocation")
+    bare = path / "reference-origin.git"
+    command(["/usr/bin/git", "init", "--bare", "-q", bare], cwd=path)
+    git_ok(repo, "remote", "add", "origin", str(bare))
+    git_ok(repo, "push", "-q", "origin", f"{authority_sha}:refs/heads/main")
+    git_ok(repo, "fetch", "-q", "origin", "main:refs/remotes/origin/main")
+    return repo, bare, authority_sha
+
+
+def git_refs(repo: Path) -> str:
+    return git_ok(repo, "for-each-ref", "--format=%(refname) %(objectname)")
+
+
+def worktree_paths(repo: Path) -> set[str]:
+    output = git_ok(repo, "worktree", "list", "--porcelain")
+    return {line.removeprefix("worktree ") for line in output.splitlines() if line.startswith("worktree ")}
+
+
+def file_tree_digest(root: Path) -> str:
+    if not root.exists():
+        return "ABSENT"
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root).as_posix()
+        digest.update(rel.encode())
+        if path.is_symlink():
+            digest.update(b"SYMLINK")
+            digest.update(os.readlink(path).encode())
+        elif path.is_file():
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def process_receipt_path(executable: Path) -> Path:
+    image = executable.resolve()
+    return image.with_name(image.name + ".receipt.json")
+
+
+def process_image_present(executable: Path) -> bool:
+    """Observe the gate-owned process image without trusting controller output.
+
+    macOS may deny process-table inspection inside the outer test sandbox.  The
+    disposable sentinel therefore emits an image-bound receipt itself and stays
+    alive long enough for this parent to verify both the image digest and PID.
+    This is an effect of executing the sentinel image, not a provider/agent
+    field carried through the controller protocol.
+    """
+    receipt = process_receipt_path(executable)
+    if not receipt.is_file():
+        return False
+    try:
+        value = strict_file(receipt)
+    except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+        raise Rig(f"provider process-image receipt is unreadable: {exc}") from exc
+    expected_keys = {
+        "schema_version", "pid", "ppid", "process_image",
+        "process_image_sha256", "started_ns",
+    }
+    if type(value) is not dict or set(value) != expected_keys:
+        raise Rig("provider process-image receipt has wrong shape")
+    image = executable.resolve()
+    if (
+        value.get("schema_version") != 1
+        or type(value.get("pid")) is not int
+        or value["pid"] <= 0
+        or type(value.get("ppid")) is not int
+        or value["ppid"] <= 0
+        or type(value.get("started_ns")) is not int
+        or value["started_ns"] <= 0
+        or value.get("process_image") != str(image)
+        or value.get("process_image_sha256") != digest_file(image)
+    ):
+        raise Rig("provider process-image receipt does not bind the expected image")
+    try:
+        os.kill(value["pid"], 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError as exc:
+        raise Rig("provider PID liveness could not be observed") from exc
+    return True
+
+
+def observed_process(
+    argv: list[object], *, cwd: Path, executable: Path, timeout: float = 40,
+    env: dict[str, str] | None = None,
+) -> tuple[subprocess.CompletedProcess, bool]:
+    receipt = process_receipt_path(executable)
+    try:
+        receipt.unlink(missing_ok=True)
+    except OSError as exc:
+        raise Rig(f"could not clear provider receipt: {exc}") from exc
+    try:
+        process = subprocess.Popen(
+            [str(item) for item in argv],
+            cwd=str(cwd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+            env=env,
+        )
+    except OSError as exc:
+        raise Rig(f"real route could not start: {exc}") from exc
+    observed = False
+    deadline = time.monotonic() + timeout
+    while process.poll() is None and time.monotonic() < deadline:
+        observed = observed or process_image_present(executable)
+        time.sleep(0.02)
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, 15)
+        except ProcessLookupError:
+            pass
+        raise Rig("real route exceeded observation timeout")
+    stdout, stderr = process.communicate(timeout=5)
+    if observed and receipt.is_file():
+        value = strict_file(receipt)
+        provider_pid = value.get("pid") if type(value) is dict else None
+        if type(provider_pid) is not int or provider_pid <= 0:
+            raise Rig("observed provider receipt lost its PID binding")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                os.kill(provider_pid, 0)
+            except ProcessLookupError:
+                break
+            except PermissionError as exc:
+                raise Rig("provider cleanup liveness could not be observed") from exc
+            time.sleep(0.02)
+        else:
+            raise Rig(f"provider process residue remained after controller exit: pid={provider_pid}")
+    try:
+        receipt.unlink(missing_ok=True)
+    except OSError as exc:
+        raise Rig(f"could not clean provider receipt: {exc}") from exc
+    return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr), observed
+
+
+def fresh_roots(root: Path, name: str) -> dict[str, Path]:
+    run_root = root / name
+    if run_root.exists():
+        raise FixtureError(f"fresh run root already exists: {run_root}")
+    run_root.mkdir(parents=True)
+    values = {
+        "root": run_root,
+        "state": run_root / "state",
+        "attest": run_root / "attest",
+        "lease": run_root / "lease",
+        "breaker": run_root / "breaker",
+        "workspace": run_root / "workspaces",
+    }
+    for key in ("state", "attest", "lease", "breaker", "workspace"):
+        values[key].mkdir()
+    return values
+
+
+def loop_config(
+    repo: Path,
+    roots: dict[str, Path],
+    authority_sha: str,
+    task_id: str,
+    provider: Path,
+    run_id: str,
+) -> Path:
+    config = {
+        "spec": str((repo / "specs/tasks.spec.json").resolve()),
+        "task_id": task_id,
+        "state_dir": str(roots["state"]),
+        "attest_dir": str(roots["attest"]),
+        "lease_dir": str(roots["lease"]),
+        "lease_resurs": f"h035-{run_id}",
+        "workspace_rot": str(roots["workspace"]),
+        "base_sha": authority_sha,
+        "current_main_sha": authority_sha,
+        "verifier_id": "check-invariants",
+        "run_id": run_id,
+        "brytare_rot": str(roots["breaker"]),
+        "budget": 2,
+        "troskel": 2,
+        "worker_cmd": [str(provider.resolve())],
+        "timeout_s": 10,
+    }
+    target = roots["root"] / "config.json"
+    target.write_bytes(canonical_json(config))
+    state_cli = repo / "controller/state/cli"
+    if state_cli.is_file() and os.access(state_cli, os.X_OK):
+        initialized = command([state_cli, "init", roots["state"]], cwd=repo)
+        if initialized.returncode != 0:
+            raise FixtureError(f"state init failed: {(initialized.stderr or initialized.stdout)[-500:]}")
+    else:
+        (roots["state"] / "events.jsonl").touch()
+    return target
+
+
+def call_json(executable: Path, command_name: str, request: dict[str, Any], cwd: Path) -> tuple[int, dict[str, Any], str]:
+    result = command([executable, command_name], cwd=cwd, stdin=json.dumps(request), timeout=40)
+    try:
+        output = strict_json(result.stdout) if result.stdout.strip() else {}
+    except (UnicodeError, ValueError):
+        output = {}
+    return result.returncode, output if type(output) is dict else {}, (result.stderr or result.stdout)[-800:]
+
+
+def base_binding(repo: Path, authority_sha: str, task_id: str, roots: dict[str, Path]) -> dict[str, str]:
+    spec_raw = git_show_bytes(repo, authority_sha, "specs/tasks.spec.json")
+    registry_raw = git_show_bytes(repo, authority_sha, "specs/owner-production-paths.v1.json")
+    task = strict_json(spec_raw)["tasks"]
+    item = [entry for entry in task if entry["id"] == task_id][0]
+    return {
+        "authority_sha": authority_sha,
+        "task_id": task_id,
+        "action_id": "owner-action-1",
+        "attempt_id": "owner-attempt-1",
+        "author_identity": "owner-author-fixture",
+        "base_sha": authority_sha,
+        "current_main_sha": authority_sha,
+        "spec_sha256": digest_bytes(spec_raw),
+        "registry_sha256": digest_bytes(registry_raw),
+        "gate_path": item["exit_test"],
+        "gate_sha256": digest_bytes(git_show_bytes(repo, authority_sha, item["exit_test"])),
+        "state_dir": str(roots["state"]),
+        "attest_dir": str(roots["attest"]),
+    }
+
+
+def persisted_owner_state(state_dir: Path) -> dict[str, Any] | None:
+    target = state_dir / "owner-authority.json"
+    return strict_file(target) if target.exists() else None
+
+
+def attest_record(attest_dir: Path, task_id: str) -> dict[str, Any] | None:
+    target = attest_dir / "attestations.json"
+    if not target.exists():
+        return None
+    return strict_file(target).get("attestations", {}).get(task_id)
+
+
+def make_candidate(repo: Path, base: str, changes: dict[str, str], subject: str) -> str:
+    git_ok(repo, "checkout", "-q", base)
+    for rel, content in changes.items():
+        target = repo / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+    return commit_all(repo, subject)
+
+
+def make_authority_repo(root: Path, name: str, spec_doc: Any, registry_raw: bytes | None = None) -> tuple[Path, str]:
+    repo = root / name
+    init_repo(repo)
+    (repo / "specs").mkdir()
+    (repo / "specs/tasks.spec.json").write_bytes(
+        spec_doc if isinstance(spec_doc, bytes) else canonical_json(spec_doc)
+    )
+    (repo / "specs/owner-production-paths.v1.json").write_bytes(
+        registry_raw if registry_raw is not None else REGISTRY.read_bytes()
+    )
+    (repo / "seed.txt").write_text("seed\n")
+    base = commit_all(repo, "authority fixture")
+    return repo, base
+
+
+def v2_doc(task: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "spec_version": "2.0.0",
+        "task_authority": TASK_AUTHORITY,
+        "defaults": {"denied_write": []},
+        "tasks": [{"id": "fixture-task", "depends_on": [], "docs_impact": [], **task}],
+    }
+
+
+def schema_judge_tests(results: Results, root: Path) -> None:
+    registry = strict_file(REGISTRY)
+    results.predicted(
+        "M_SCHEMA_AUTHORITY_CLASS",
+        "Permissive enum/type handling could make requester-shaped owner authority.",
+        "Each one-defect task document is rejected by the strict judge and real validate-task consumer.",
+    )
+    invalid: list[tuple[str, str, dict[str, Any]]] = [
+        ("MISSING_CLASS", "2.0.0", {"allowed_write": ["safe/**"]}),
+        ("UNKNOWN_CLASS", "2.0.0", {"authority_class": "OWNER", "allowed_write": ["safe/**"]}),
+        ("BOOL_CLASS", "2.0.0", {"authority_class": True, "allowed_write": ["safe/**"]}),
+        ("ORDINARY_OWNER_FIELD", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["safe/**"], "owner_author_allowed_write": []}),
+        ("OWNER_ORDINARY_SURFACE", "2.0.0", {"authority_class": "owner_authority", "allowed_write": ["safe/**"], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS)}),
+        ("OWNER_MISSING_SURFACE", "2.0.0", {"authority_class": "owner_authority", "allowed_write": []}),
+        ("OWNER_EMPTY_SURFACE", "2.0.0", {"authority_class": "owner_authority", "allowed_write": [], "owner_author_allowed_write": []}),
+        ("V1_OWNER_FIELD", "1.0.0", {"allowed_write": ["safe/**"], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS)}),
+        ("DOCS_OUTSIDE_ORDINARY", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["safe/**"], "docs_impact": ["other/doc.md"]}),
+        ("DOCS_OUTSIDE_OWNER", "2.0.0", {"authority_class": "owner_authority", "allowed_write": [], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS), "docs_impact": ["docs/owner.md"]}),
+    ]
+    for name, version, task in invalid:
+        doc = v2_doc(task)
+        doc["spec_version"] = version
+        if version == "1.0.0":
+            doc.pop("task_authority")
+        accepted, why, _ = validate_task_document(doc, "fixture-task", registry)
+        results.check(f"J_SCHEMA_{name}", not accepted, why)
+    v1 = {
+        "spec_version": "1.0.0",
+        "defaults": {},
+        "tasks": [{"id": "fixture-task", "allowed_write": ["safe/**"], "docs_impact": [], "depends_on": []}],
+    }
+    accepted, why, projected = validate_task_document(v1, "fixture-task", registry)
+    results.check(
+        "J_SCHEMA_V1_ORDINARY_ONLY",
+        accepted and projected is not None and projected["effective_authority_class"] == "ordinary",
+        why,
+    )
+    ordinary = v2_doc({"authority_class": "ordinary", "allowed_write": ["safe/**"]})
+    accepted, why, _ = validate_task_document(ordinary, "fixture-task", registry)
+    results.check("J_SCHEMA_V2_ORDINARY_POSITIVE", accepted, why)
+    owner = v2_doc({"authority_class": "owner_authority", "allowed_write": [], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS)})
+    owner["tasks"][0]["id"] = "h-034"
+    accepted, why, _ = validate_task_document(owner, "h-034", registry)
+    results.check("J_SCHEMA_V2_OWNER_POSITIVE", accepted, why)
+
+
+def path_judge_tests(results: Results) -> None:
+    results.predicted(
+        "M_PATH_LANGUAGE",
+        "Normalization or permissive globbing could let ordinary scope cover an owner path.",
+        "Exact, child, parent/root cover and alternate spellings are rejected consistently.",
+    )
+    bad = [
+        "", "/verify/h034/kernel.py", "C:/verify/h034/kernel.py",
+        "./verify/h034/kernel.py", "verify//h034/kernel.py",
+        "verify/h034/../h034/kernel.py", "verify/h034/./kernel.py",
+        "verify\\h034\\kernel.py", "verify/h034/kernel.py/",
+        "verify/h034/*", "verify/**/kernel.py", "**", ".git/config",
+    ]
+    for index, value in enumerate(bad, start=1):
+        try:
+            parse_path(value)
+            rejected = False
+        except ValueError:
+            rejected = True
+        results.check(f"J_PATH_REJECT_{index:02d}", rejected, repr(value))
+    for name, ordinary in (
+        ("EXACT", "verify/h034/kernel.py"),
+        ("CHILD", "verify/h034/kernel.py/child"),
+        ("PARENT", "verify/h034/**"),
+        ("ANCESTOR", "verify/**"),
+    ):
+        results.check(
+            f"J_OVERLAP_{name}",
+            any(overlaps(ordinary, owner) for owner in EXPECTED_OWNER_PATHS),
+            ordinary,
+        )
+    results.check(
+        "J_OVERLAP_SIBLING_NEGATIVE",
+        not any(overlaps("safe/**", owner) for owner in EXPECTED_OWNER_PATHS),
+    )
+
+
+def registry_judge_tests(results: Results) -> None:
+    good = strict_file(REGISTRY)
+    ok, why = validate_registry(good)
+    results.check("J_REGISTRY_POSITIVE", ok, why)
+    results.predicted(
+        "M_REGISTRY",
+        "A loose registry parser could add, rename or runtime-select owner production.",
+        "Each one-defect registry is rejected before candidate/transition effects.",
+    )
+    mutants: list[tuple[str, Any]] = []
+    for name, mutate in (
+        ("MISSING_KEY", lambda value: value.pop("path_grammar")),
+        ("EXTRA_KEY", lambda value: value.update(extra=[])),
+        ("WRONG_VERSION", lambda value: value.update(schema_version=True)),
+        ("RUNTIME_OVERRIDE", lambda value: value.update(runtime_override_allowed=True)),
+        ("MISSING_PATH", lambda value: value["owner_production_allocations"][0]["owner_author_allowed_write"].pop()),
+        ("EXTRA_PATH", lambda value: value["owner_production_allocations"][0]["owner_author_allowed_write"].append("verify/h034/extra.json")),
+        ("STALE_PATH", lambda value: value["owner_production_allocations"][0]["owner_author_allowed_write"].__setitem__(0, "verify/h034/kernel")),
+        ("DUPLICATE_PATH", lambda value: value["owner_production_allocations"][0]["owner_author_allowed_write"].__setitem__(1, "verify/h034/kernel.py")),
+    ):
+        mutant = json.loads(json.dumps(good))
+        mutate(mutant)
+        mutants.append((name, mutant))
+    for name, mutant in mutants:
+        accepted, why = validate_registry(mutant)
+        results.check(f"J_REGISTRY_{name}", not accepted, why)
+    duplicate = REGISTRY.read_text().replace(
+        '"schema_version": 1,', '"schema_version": 1,\n  "schema_version": 1,', 1
+    )
+    try:
+        strict_json(duplicate)
+        rejected = False
+    except ValueError:
+        rejected = True
+    results.check("J_REGISTRY_DUPLICATE_KEY", rejected)
+
+
+def authority_consumer_matrix(results: Results, root: Path, repo: Path, authority_sha: str) -> None:
+    cli = repo / AUTHORITY_CLI
+    autopilot = repo / AUTOPILOT
+    results.predicted(
+        "M_REAL_AUTHORITY_CONSUMERS",
+        "A consumer may parse a weaker class/path/registry contract than the canonical authority core.",
+        "Real validate-task, check-candidate and autopilot scope-check agree on one-defect inputs.",
+    )
+    rc, out, detail = call_json(
+        cli, "validate-task", {"authority_sha": authority_sha, "task_id": "h-035"}, repo
+    )
+    results.check(
+        "A_VALIDATE_ORDINARY_POSITIVE",
+        rc == 0 and out.get("accepted") is True and out.get("authority_class") == "ordinary",
+        detail or repr(out),
+    )
+    rc, out, detail = call_json(
+        cli, "validate-task", {"authority_sha": authority_sha, "task_id": "h-034"}, repo
+    )
+    results.check(
+        "A_VALIDATE_OWNER_POSITIVE",
+        rc == 0 and out.get("accepted") is True and out.get("authority_class") == "owner_authority",
+        detail or repr(out),
+    )
+    rc, out, detail = call_json(cli, "validate-registry", {"authority_sha": authority_sha}, repo)
+    results.check(
+        "A_REGISTRY_RUNTIME_POSITIVE",
+        rc == 0 and out.get("accepted") is True and len(out.get("allocations", [])) == 1,
+        detail or repr(out),
+    )
+
+    # Each repo has canonical authority bytes in Git. No alternate path is passed.
+    invalid: list[tuple[str, dict[str, Any]]] = [
+        ("MISSING_CLASS", {"allowed_write": ["safe/**"]}),
+        ("UNKNOWN_CLASS", {"authority_class": "OWNER", "allowed_write": ["safe/**"]}),
+        ("WRONG_TYPE_CLASS", {"authority_class": 1, "allowed_write": ["safe/**"]}),
+        ("ORDINARY_OWNER_FIELD", {"authority_class": "ordinary", "allowed_write": ["safe/**"], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS)}),
+        ("OWNER_ORDINARY_SURFACE", {"authority_class": "owner_authority", "allowed_write": ["safe/**"], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS)}),
+        ("OWNER_EMPTY_SURFACE", {"authority_class": "owner_authority", "allowed_write": [], "owner_author_allowed_write": []}),
+        ("ORDINARY_EXACT", {"authority_class": "ordinary", "allowed_write": ["verify/h034/kernel.py"]}),
+        ("ORDINARY_CHILD", {"authority_class": "ordinary", "allowed_write": ["verify/h034/kernel.py/child"]}),
+        ("ORDINARY_PARENT", {"authority_class": "ordinary", "allowed_write": ["verify/h034/**"]}),
+        ("ORDINARY_ROOT", {"authority_class": "ordinary", "allowed_write": ["**"]}),
+        ("TRAVERSAL", {"authority_class": "ordinary", "allowed_write": ["safe/../verify/h034/kernel.py"]}),
+        ("BACKSLASH", {"authority_class": "ordinary", "allowed_write": [r"safe\\file"]}),
+        ("ABSOLUTE", {"authority_class": "ordinary", "allowed_write": ["/safe/file"]}),
+        ("DOCS_OUTSIDE", {"authority_class": "ordinary", "allowed_write": ["safe/**"], "docs_impact": ["other/doc.md"]}),
+    ]
+    for index, (name, task) in enumerate(invalid, start=1):
+        doc = v2_doc(task)
+        fixture, fixture_sha = make_authority_repo(root, f"schema-{index:02d}-{name.lower()}", doc)
+        fixture_cli = fixture / AUTHORITY_CLI
+        # Use the legitimate reference consumer bytes in this authority tree.
+        write_executable(fixture / "controller/authority/model.py", REFERENCE_MODEL)
+        write_executable(fixture_cli, REFERENCE_AUTHORITY)
+        fixture_sha = commit_all(fixture, "add authority consumer")
+        rc, out, detail = call_json(
+            fixture_cli,
+            "validate-task",
+            {"authority_sha": fixture_sha, "task_id": "fixture-task"},
+            fixture,
+        )
+        results.check(
+            f"A_VALIDATE_{name}",
+            rc != 0 and out.get("accepted") is False,
+            detail or repr(out),
+        )
+
+    base = authority_sha
+    safe_candidate = make_candidate(repo, base, {"docs/05-beslutslogg.md": "reference ordinary candidate\n"}, "ordinary candidate")
+    req = {"authority_sha": base, "task_id": "h-035", "base_sha": base, "candidate_sha": safe_candidate}
+    rc, out, detail = call_json(cli, "check-candidate", req, repo)
+    results.check(
+        "A_ORDINARY_CANDIDATE_POSITIVE",
+        rc == 0 and out.get("accepted") is True and out.get("actual_changed_files") == ["docs/05-beslutslogg.md"],
+        detail or repr(out),
+    )
+    auto = command([autopilot, "scope-check", "h-035", safe_candidate], cwd=repo)
+    results.check(
+        "A_AUTOPILOT_ORDINARY_POSITIVE",
+        auto.returncode == 0 and '"accepted": true' in auto.stdout,
+        (auto.stderr or auto.stdout)[-500:],
+    )
+
+    owner_candidate = make_candidate(repo, base, {EXPECTED_OWNER_PATHS[0]: "owner\n"}, "owner path candidate")
+    rc, out, detail = call_json(
+        cli,
+        "check-candidate",
+        {"authority_sha": base, "task_id": "h-035", "base_sha": base, "candidate_sha": owner_candidate},
+        repo,
+    )
+    results.check(
+        "A_ORDINARY_CANNOT_OWNER_GIT_SCOPE",
+        rc != 0 and out.get("accepted") is False,
+        detail or repr(out),
+    )
+    auto = command([autopilot, "scope-check", "h-035", owner_candidate], cwd=repo)
+    results.check(
+        "A_AUTOPILOT_CANNOT_OWNER_SCOPE",
+        auto.returncode != 0 and '"accepted": false' in auto.stdout,
+        (auto.stderr or auto.stdout)[-500:],
+    )
+
+    # Reported files, actor/provider/env/branch strings are deliberately absent
+    # from the strict request schema. Adding any one field must reject.
+    hostile = {
+        "reported_changed_files": ["docs/05-beslutslogg.md"],
+        "claimed_role": "OWNER",
+        "model_role": "OWNER",
+        "provider_role": "owner_authority",
+        "branch": "owner/h-034",
+        "environment_authority": "OWNER",
+    }
+    for name, extra in hostile.items():
+        request = {
+            "authority_sha": base,
+            "task_id": "h-035",
+            "base_sha": base,
+            "candidate_sha": owner_candidate,
+            name: extra,
+        }
+        rc, out, detail = call_json(cli, "check-candidate", request, repo)
+        results.check(
+            f"A_HOSTILE_{name.upper()}",
+            rc != 0 and out.get("accepted") is False,
+            detail or repr(out),
+        )
+
+    # Restore detached HEAD for subsequent reference controls.
+    git_ok(repo, "checkout", "-q", authority_sha)
+
+
+def ordinary_positive_anchor(
+    results: Results,
+    root: Path,
+    repo: Path,
+    authority_sha: str,
+    provider: Path,
+) -> None:
+    roots = fresh_roots(root, "real-ordinary-positive")
+    config = loop_config(repo, roots, authority_sha, "h-035", provider, "ordinary-positive")
+    result, observed = observed_process(
+        [repo / LOOP_CLI, "run", config], cwd=repo, executable=provider
+    )
+    print(f"REAL_ROUTE_POSITIVE_ORDINARY_LOOP_EXIT={result.returncode}")
+    print(f"REAL_ROUTE_POSITIVE_ORDINARY_PROCESS_IMAGE={'YES' if observed else 'NO'}")
+    if not observed:
+        raise Rig(
+            "positive ordinary control never executed the disposable provider process image; "
+            f"loop_exit={result.returncode} stdout={(result.stdout or '')[-800:]} "
+            f"stderr={(result.stderr or '')[-800:]}"
+        )
+    results.check(
+        "A_REAL_ORDINARY_PROVIDER",
+        result.returncode == 0 and "ORDINARY_PROVIDER_EXECUTED" in result.stdout,
+        f"rc={result.returncode} stdout={result.stdout[-300:]!r} stderr={result.stderr[-300:]!r}",
+    )
+    events = roots["state"] / "events.jsonl"
+    results.check(
+        "A_REAL_ORDINARY_STATE_EFFECT",
+        events.is_file() and '"status":"claimed"' in events.read_text(),
+    )
+    results.check("A_REAL_ORDINARY_NO_ATTEST", attest_record(roots["attest"], "h-035") is None)
+    results.check("A_REAL_ORDINARY_LEASE_CLEAN", not any(roots["lease"].iterdir()))
+    results.check("A_REAL_ORDINARY_WORKSPACE_CLEAN", not any(roots["workspace"].iterdir()))
+
+
+def owner_workflow_reference(
+    results: Results,
+    root: Path,
+    repo: Path,
+    bare: Path,
+    authority_sha: str,
+    provider: Path,
+) -> dict[str, Any]:
+    cli = repo / AUTHORITY_CLI
+    loop = repo / LOOP_CLI
+    roots = fresh_roots(root, "real-owner-workflow")
+    config = loop_config(repo, roots, authority_sha, "h-034", provider, "owner-route")
+    refs_initial = git_refs(bare)
+
+    # C: ordinary drain sees the owner task but cannot launch it or claim it as done.
+    hostile_env = os.environ.copy()
+    hostile_env.update({
+        "NORTROPIC_AUTHORITY_CLASS": "owner_authority",
+        "NORTROPIC_ROLE": "OWNER",
+        "NORTROPIC_PROVIDER_ROLE": "OWNER",
+        "NORTROPIC_MODEL_ROLE": "OWNER",
+    })
+    first, observed = observed_process(
+        [loop, "run", config], cwd=repo, executable=provider, env=hostile_env
+    )
+    state = persisted_owner_state(roots["state"])
+    preaction_ok = results.check(
+        "A_OWNER_PREACTION_BLOCK",
+        first.returncode == 0 and not observed and state is not None
+        and state.get("state") == "OWNER_ACTION_REQUIRED"
+        and attest_record(roots["attest"], "h-034") is None,
+        f"rc={first.returncode} observed={observed} state={state!r}",
+    )
+    results.check("A_OWNER_PREACTION_NOT_DONE", "done" not in (roots["state"] / "events.jsonl").read_text().lower())
+
+    # E: restart before owner action preserves exact state and launches nothing.
+    before = file_tree_digest(roots["state"])
+    restart, restart_observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+    after = persisted_owner_state(roots["state"])
+    restart_ok = results.check(
+        "A_RESTART_BEFORE_ACTION",
+        restart.returncode == 0 and not restart_observed and after is not None
+        and after.get("state") == "OWNER_ACTION_REQUIRED" and before != "ABSENT",
+        f"rc={restart.returncode} observed={restart_observed} state={after!r}",
+    )
+
+    if not preaction_ok or not restart_ok:
+        return {
+            "complete": False,
+            "roots": roots,
+            "refs_initial": refs_initial,
+            "reason": "pre-action/restart discrimination failed",
+        }
+
+    binding = base_binding(repo, authority_sha, "h-034", roots)
+    before_state = file_tree_digest(roots["state"])
+    before_refs = git_refs(bare)
+    for name, replacement in (
+        ("WRONG_BASE", {"base_sha": "0" * 40}),
+        ("WRONG_MAIN", {"current_main_sha": "1" * 40}),
+        ("WRONG_SPEC", {"spec_sha256": "2" * 64}),
+        ("WRONG_REGISTRY", {"registry_sha256": "3" * 64}),
+        ("WRONG_GATE", {"gate_sha256": "4" * 64}),
+        ("ROLE_CLAIM", {"claimed_role": "OWNER"}),
+        ("ENV_CLAIM", {"environment_authority": "OWNER"}),
+        ("PROVIDER_CLAIM", {"provider_role": "OWNER"}),
+    ):
+        request = {**binding, **replacement}
+        rc, out, detail = call_json(cli, "owner-action", request, repo)
+        results.check(
+            f"A_OWNER_ACTION_{name}_REFUSED",
+            rc != 0 and out.get("accepted") is False
+            and file_tree_digest(roots["state"]) == before_state
+            and git_refs(bare) == before_refs,
+            detail or repr(out),
+        )
+
+    # Preserve a real OWNER_ACTION_REQUIRED snapshot for the later test where
+    # the authoritative-main ref itself advances (rather than merely passing a
+    # wrong current_main_sha field in the request).
+    wrong_main_action_state = root / "wrong-main-owner-action-state"
+    shutil.copytree(roots["state"], wrong_main_action_state)
+
+    rc, out, detail = call_json(cli, "owner-action", binding, repo)
+    action_state = persisted_owner_state(roots["state"])
+    action_ok = results.check(
+        "A_OWNER_ACTION_EXPLICIT",
+        rc == 0 and out.get("accepted") is True and action_state is not None
+        and action_state.get("action_id") == binding["action_id"],
+        detail or repr(out),
+    )
+
+    if not action_ok:
+        return {
+            "complete": False,
+            "roots": roots,
+            "refs_initial": refs_initial,
+            "reason": "explicit owner action failed",
+        }
+
+    # D: the exact explicit action makes the same owner route genuinely live.
+    owner_run, owner_observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+    owner_state = persisted_owner_state(roots["state"])
+    print(f"REAL_ROUTE_OWNER_ACTION_LOOP_EXIT={owner_run.returncode}")
+    print(f"REAL_ROUTE_OWNER_ACTION_PROCESS_IMAGE={'YES' if owner_observed else 'NO'}")
+    owner_positive = results.check(
+        "A_OWNER_ACTION_PROVIDER_POSITIVE",
+        owner_run.returncode == 0 and owner_observed and owner_state is not None
+        and owner_state.get("state") == "OWNER_CANDIDATE_REVIEW_REQUIRED",
+        f"rc={owner_run.returncode} observed={owner_observed} state={owner_state!r}",
+    )
+    if (
+        not owner_positive
+        or owner_state is None
+        or not SHA40.fullmatch(str(owner_state.get("candidate_sha", "")))
+    ):
+        return {
+            "complete": False,
+            "roots": roots,
+            "refs_initial": refs_initial,
+            "reason": "owner provider/candidate positive failed",
+        }
+    candidate = owner_state["candidate_sha"]
+    actual_files = [line for line in git_ok(repo, "diff", "--name-only", "--no-renames", authority_sha, candidate).splitlines() if line]
+    results.check(
+        "A_OWNER_CANDIDATE_FROM_GIT",
+        owner_state.get("actual_changed_files") == actual_files
+        and sorted(actual_files) == sorted(EXPECTED_OWNER_PATHS),
+        f"state={owner_state.get('actual_changed_files')} git={actual_files}",
+    )
+    results.check("A_OWNER_STOPS_FOR_REVIEW", attest_record(roots["attest"], "h-034") is None and git_refs(bare) == refs_initial)
+    results.check("A_OWNER_WORKSPACE_CLEAN", not any(roots["workspace"].iterdir()))
+    results.check("A_OWNER_LEASE_CLEAN", not any(roots["lease"].iterdir()))
+
+    # E: restart after candidate creation keeps exact identity and launches nothing.
+    candidate_restart, candidate_observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+    restarted_state = persisted_owner_state(roots["state"])
+    results.check(
+        "A_RESTART_AFTER_CANDIDATE",
+        candidate_restart.returncode == 0 and not candidate_observed
+        and restarted_state is not None
+        and restarted_state.get("state") == "OWNER_CANDIDATE_REVIEW_REQUIRED"
+        and restarted_state.get("candidate_sha") == candidate,
+        f"rc={candidate_restart.returncode} observed={candidate_observed} state={restarted_state!r}",
+    )
+
+    # Unknown persisted state remains fail-closed and is not rewritten.
+    saved = (roots["state"] / "owner-authority.json").read_bytes()
+    unknown = json.loads(saved); unknown["state"] = "UNKNOWN_FUTURE_STATE"
+    (roots["state"] / "owner-authority.json").write_bytes(canonical_json(unknown))
+    unknown_run, unknown_observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+    results.check(
+        "A_UNKNOWN_STATE_FAILS_CLOSED",
+        unknown_run.returncode != 0 and not unknown_observed
+        and persisted_owner_state(roots["state"])["state"] == "UNKNOWN_FUTURE_STATE",
+        f"rc={unknown_run.returncode} observed={unknown_observed}",
+    )
+    (roots["state"] / "owner-authority.json").write_bytes(saved)
+
+    return {
+        "complete": True,
+        "roots": roots,
+        "candidate": candidate,
+        "refs_initial": refs_initial,
+        "binding": binding,
+        "wrong_main_action_state": wrong_main_action_state,
+    }
+
+
+def review_and_final_reference(
+    results: Results,
+    root: Path,
+    repo: Path,
+    bare: Path,
+    authority_sha: str,
+    flow: dict[str, Any],
+) -> None:
+    cli = repo / AUTHORITY_CLI
+    roots: dict[str, Path] = flow["roots"]
+    candidate: str = flow["candidate"]
+    refs_initial: str = flow["refs_initial"]
+    state = persisted_owner_state(roots["state"])
+    if state is None:
+        raise FixtureError("review phase missing owner state")
+
+    review_root = root / "independent-review"
+    git_ok(repo, "worktree", "add", "--detach", str(review_root), candidate)
+    review_artifact = root / "review-pass.json"
+    review_id = "independent-review-1"
+    reviewer = "reviewer-fixture"
+    review = {
+        "schema_version": 1,
+        "role": "REVIEWER",
+        "verdict": "PASS",
+        "task_id": "h-034",
+        "candidate_sha": candidate,
+        "base_sha": authority_sha,
+        "review_id": review_id,
+        "reviewer_identity": reviewer,
+    }
+    review_artifact.write_bytes(canonical_json(review))
+    review_request = {
+        "state_dir": str(roots["state"]),
+        "task_id": "h-034",
+        "candidate_sha": candidate,
+        "review_id": review_id,
+        "reviewer_identity": reviewer,
+        "review_artifact": str(review_artifact),
+        "review_worktree": str(review_root),
+    }
+
+    # Missing and wrong review identities leave every transition surface unchanged.
+    before_state = file_tree_digest(roots["state"])
+    before_attest = file_tree_digest(roots["attest"])
+    before_refs = git_refs(bare)
+    for name, replacement in (
+        ("MISSING_ARTIFACT", {"review_artifact": str(root / "missing-review.json")}),
+        ("WRONG_CANDIDATE", {"candidate_sha": authority_sha}),
+        ("AUTHOR_AS_REVIEWER", {"reviewer_identity": state["author_identity"]}),
+    ):
+        rc, out, detail = call_json(cli, "record-review", {**review_request, **replacement}, repo)
+        results.check(
+            f"A_REVIEW_{name}_REFUSED",
+            rc != 0 and out.get("accepted") is False
+            and file_tree_digest(roots["state"]) == before_state
+            and file_tree_digest(roots["attest"]) == before_attest
+            and git_refs(bare) == before_refs,
+            detail or repr(out),
+        )
+
+    wrong_review = root / "review-ready-only.json"
+    wrong = dict(review); wrong["verdict"] = "READY"
+    wrong_review.write_bytes(canonical_json(wrong))
+    rc, out, detail = call_json(
+        cli, "record-review", {**review_request, "review_artifact": str(wrong_review)}, repo
+    )
+    results.check(
+        "A_REVIEW_READY_NOT_PASS",
+        rc != 0 and out.get("accepted") is False
+        and file_tree_digest(roots["state"]) == before_state
+        and git_refs(bare) == before_refs,
+        detail or repr(out),
+    )
+
+    rc, out, detail = call_json(cli, "record-review", review_request, repo)
+    reviewed = persisted_owner_state(roots["state"])
+    results.check(
+        "A_INDEPENDENT_REVIEW_TO_FINAL_REQUIRED",
+        rc == 0 and out.get("accepted") is True and reviewed is not None
+        and reviewed.get("state") == "OWNER_FINAL_FREEZE_REQUIRED",
+        detail or repr(out),
+    )
+    results.check(
+        "A_REVIEW_PASS_NEVER_FREEZES_OR_PUBLISHES",
+        attest_record(roots["attest"], "h-034") is None
+        and git_refs(bare) == refs_initial
+        and out.get("published") is False,
+    )
+    if reviewed is None:
+        raise FixtureError("review transition did not persist state")
+
+    # Preserve the exact reviewed/pre-final state for an actual authoritative-
+    # main movement control after the positive final transition has completed.
+    wrong_main_final_state = root / "wrong-main-owner-final-state"
+    shutil.copytree(roots["state"], wrong_main_final_state)
+
+    final_request = {
+        "state_dir": str(roots["state"]),
+        "attest_dir": str(roots["attest"]),
+        "task_id": "h-034",
+        "owner_final_id": "owner-final-1",
+        "candidate_sha": candidate,
+        "review_id": review_id,
+        "review_sha256": reviewed["review_sha256"],
+        "base_sha": authority_sha,
+        "current_main_sha": authority_sha,
+        "spec_sha256": reviewed["spec_sha256"],
+        "registry_sha256": reviewed["registry_sha256"],
+        "gate_path": reviewed["gate_path"],
+        "gate_sha256": reviewed["gate_sha256"],
+    }
+    before_state = file_tree_digest(roots["state"])
+    before_attest = file_tree_digest(roots["attest"])
+    before_refs = git_refs(bare)
+    for name, replacement in (
+        ("WRONG_CURRENT_MAIN", {"current_main_sha": "0" * 40}),
+        ("WRONG_CANDIDATE", {"candidate_sha": authority_sha}),
+        ("WRONG_REVIEW", {"review_id": "wrong-review"}),
+        ("WRONG_REVIEW_DIGEST", {"review_sha256": "1" * 64}),
+        ("WRONG_BASE", {"base_sha": "2" * 40}),
+        ("WRONG_SPEC", {"spec_sha256": "3" * 64}),
+        ("WRONG_REGISTRY", {"registry_sha256": "4" * 64}),
+        ("WRONG_GATE", {"gate_sha256": "5" * 64}),
+    ):
+        rc, out, detail = call_json(cli, "owner-final", {**final_request, **replacement}, repo)
+        results.check(
+            f"A_OWNER_FINAL_{name}_REFUSED",
+            rc != 0 and out.get("accepted") is False
+            and file_tree_digest(roots["state"]) == before_state
+            and file_tree_digest(roots["attest"]) == before_attest
+            and git_refs(bare) == before_refs,
+            detail or repr(out),
+        )
+
+    rc, out, detail = call_json(cli, "owner-final", final_request, repo)
+    final_state = persisted_owner_state(roots["state"])
+    attestation = attest_record(roots["attest"], "h-034")
+    required_attest = {
+        "task_id", "authority_class", "action_id", "attempt_id", "base_sha",
+        "current_main_sha", "candidate_sha", "actual_changed_files", "spec_sha256",
+        "registry_sha256", "gate_path", "gate_sha256", "review_id", "review_sha256",
+        "owner_final_id", "stale",
+    }
+    results.check(
+        "A_OWNER_FINAL_EXPLICIT_POSITIVE",
+        rc == 0 and out.get("accepted") is True and final_state is not None
+        and final_state.get("state") == "OWNER_PUBLICATION_ELIGIBLE",
+        detail or repr(out),
+    )
+    results.check(
+        "A_OWNER_ATTESTATION_AUTHORITY_IDENTITY",
+        type(attestation) is dict and required_attest.issubset(attestation)
+        and attestation.get("authority_class") == "owner_authority"
+        and attestation.get("candidate_sha") == candidate,
+        repr(attestation),
+    )
+    results.check(
+        "A_OWNER_FINAL_NOT_PUBLICATION",
+        git_refs(bare) == refs_initial and out.get("published") is False,
+    )
+
+    # Advance the disposable authoritative main with an ordinary fast-forward.
+    # Requests still carrying the old persisted current-main binding must now
+    # fail because the consumer re-derives the ref, not merely because a caller
+    # supplied a mismatching field.
+    moved_main = make_candidate(
+        repo,
+        authority_sha,
+        {"remote-main-moved.txt": "authoritative main advanced\n"},
+        "advance disposable authoritative main",
+    )
+    git_ok(repo, "push", "-q", "origin", f"{moved_main}:refs/heads/main")
+    git_ok(repo, "fetch", "-q", "origin", "main:refs/remotes/origin/main")
+
+    action_request = dict(flow["binding"])
+    action_request["state_dir"] = str(flow["wrong_main_action_state"])
+    action_before = file_tree_digest(flow["wrong_main_action_state"])
+    rc, out, detail = call_json(cli, "owner-action", action_request, repo)
+    results.check(
+        "A_OWNER_ACTION_ACTUAL_CURRENT_MAIN_MOVED_REFUSED",
+        rc != 0 and out.get("accepted") is False
+        and file_tree_digest(flow["wrong_main_action_state"]) == action_before,
+        detail or repr(out),
+    )
+
+    moved_final_request = {**final_request, "state_dir": str(wrong_main_final_state)}
+    final_before = file_tree_digest(wrong_main_final_state)
+    attest_after_positive = file_tree_digest(roots["attest"])
+    rc, out, detail = call_json(cli, "owner-final", moved_final_request, repo)
+    results.check(
+        "A_OWNER_FINAL_ACTUAL_CURRENT_MAIN_MOVED_REFUSED",
+        rc != 0 and out.get("accepted") is False
+        and file_tree_digest(wrong_main_final_state) == final_before
+        and file_tree_digest(roots["attest"]) == attest_after_positive,
+        detail or repr(out),
+    )
+    git_ok(repo, "checkout", "-q", authority_sha)
+    git_ok(repo, "worktree", "remove", "--force", str(review_root))
+    shutil.rmtree(review_root, ignore_errors=True)
+
+
+def candidate_scope_negatives(
+    results: Results, root: Path, repo: Path, authority_sha: str
+) -> None:
+    cli = repo / AUTHORITY_CLI
+    results.predicted(
+        "M_OWNER_CANDIDATE_SCOPE",
+        "An owner author might edit authority control or trust its reported file list.",
+        "Actual Git files outside the exact allocation are rejected; exact allocation is accepted.",
+    )
+    exact = make_candidate(
+        repo,
+        authority_sha,
+        {path: f"exact owner {index}\n" for index, path in enumerate(EXPECTED_OWNER_PATHS)},
+        "exact owner candidate",
+    )
+    rc, out, detail = call_json(
+        cli,
+        "check-candidate",
+        {"authority_sha": authority_sha, "task_id": "h-034", "base_sha": authority_sha, "candidate_sha": exact},
+        repo,
+    )
+    results.check(
+        "A_OWNER_EXACT_SCOPE_POSITIVE",
+        rc == 0 and out.get("accepted") is True
+        and sorted(out.get("actual_changed_files", [])) == sorted(EXPECTED_OWNER_PATHS),
+        detail or repr(out),
+    )
+    for index, (name, path) in enumerate(
+        (
+            ("OUTSIDE_OWNER", "verify/h034/extra.json"),
+            ("SPEC", "specs/tasks.spec.json"),
+            ("REGISTRY", "specs/owner-production-paths.v1.json"),
+            ("GATE", "verify/bin/h-034-exit"),
+            ("TEST", "tests/owner-author-mutant.txt"),
+            ("POLICY", "controller/policy/cli"),
+            ("STATE", "controller/state/cli"),
+            ("ATTEST", "controller/attest/cli"),
+            ("LOOP", "controller/loop/cli"),
+            ("AUTOPILOT", "scripts/nortropic-codex-autopilot.py"),
+        ),
+        start=1,
+    ):
+        candidate = make_candidate(repo, authority_sha, {path: f"mutant {index}\n"}, name)
+        rc, out, detail = call_json(
+            cli,
+            "check-candidate",
+            {"authority_sha": authority_sha, "task_id": "h-034", "base_sha": authority_sha, "candidate_sha": candidate},
+            repo,
+        )
+        results.check(
+            f"A_OWNER_SCOPE_{name}_REFUSED",
+            rc != 0 and out.get("accepted") is False,
+            detail or repr(out),
+        )
+    git_ok(repo, "checkout", "-q", authority_sha)
+
+
+def copy_production_subject(reference_repo: Path, target: Path) -> None:
+    for rel in (AUTHORITY_CLI, LOOP_CLI, AUTOPILOT, Path("controller/authority/model.py")):
+        source = reference_repo / rel
+        if source.is_file():
+            copy_file(source, target / rel, executable=rel.name == "cli" or rel == AUTOPILOT)
+
+
+def prepare_mutant_repo(
+    root: Path,
+    reference_repo: Path,
+    name: str,
+    mutate: callable,
+) -> tuple[Path, str]:
+    target = root / f"mutant-{name.lower()}"
+    init_repo(target)
+    for rel in (
+        Path("specs/tasks.spec.json"),
+        Path("specs/owner-production-paths.v1.json"),
+        Path("verify/bin/h-035-exit"),
+        Path("verify/bin/h-034-exit"),
+        AUTHORITY_CLI,
+        LOOP_CLI,
+        AUTOPILOT,
+        Path("controller/authority/model.py"),
+    ):
+        source = reference_repo / rel
+        if source.is_file():
+            copy_file(source, target / rel, executable=os.access(source, os.X_OK))
+    mutate(target)
+    sha = commit_all(target, "one defect mutant")
+    bare = root / f"mutant-{name.lower()}-origin.git"
+    command(["/usr/bin/git", "init", "--bare", "-q", bare], cwd=root)
+    git_ok(target, "remote", "add", "origin", str(bare))
+    git_ok(target, "push", "-q", "origin", f"{sha}:refs/heads/main")
+    git_ok(target, "fetch", "-q", "origin", "main:refs/remotes/origin/main")
+    return target, sha
+
+
+def copy_candidate_tree(source: Path, target: Path) -> None:
+    target.mkdir(parents=True)
+    listed = git(source, "ls-files", "--cached", "--others", "--exclude-standard")
+    if listed.returncode != 0:
+        raise FixtureError(f"cannot enumerate candidate tree: {listed.stderr[-500:]}")
+    for rel in sorted(line for line in listed.stdout.splitlines() if line):
+        src = source / rel
+        dst = target / rel
+        if src.is_symlink():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.symlink_to(os.readlink(src))
+        elif src.is_file():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+
+
+def fixture_task_spec(kind: str) -> dict[str, Any]:
+    source = strict_file(SPEC)
+    if kind == "ordinary":
+        task = {
+            "id": "fixture-ordinary",
+            "authority_class": "ordinary",
+            "slice": "h035-real-route-control",
+            "title": "Disposable ordinary positive control",
+            "summary": "Exercise the real provider route with a legitimate ordinary candidate.",
+            "allowed_write": ["docs/05-beslutslogg.md"],
+            "exit_test": "verify/bin/h035-unregistered-fixture",
+            "exit_criterion": "Disposable gate fixture.",
+            "docs_impact": [],
+            "depends_on": [],
+        }
+    elif kind == "owner":
+        task = {
+            "id": "h-034",
+            "authority_class": "owner_authority",
+            "slice": "h035-owner-route-control",
+            "title": "Disposable owner route control",
+            "summary": "Exercise only the frozen owner-author authority path; no H-034 vocabulary.",
+            "allowed_write": [],
+            "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS),
+            "exit_test": "verify/bin/h034-owner-fixture-exit",
+            "exit_criterion": "All three allocated files exist; fixture only.",
+            "docs_impact": [],
+            "depends_on": [],
+        }
+    elif kind == "authority":
+        task = {
+            "id": "h-034",
+            "authority_class": "owner_authority",
+            "slice": "h035-authority-consumer-control",
+            "title": "Disposable owner authority consumer control",
+            "summary": "Canonical authority consumer fixture only.",
+            "allowed_write": [],
+            "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS),
+            "exit_test": "verify/bin/h034-owner-fixture-exit",
+            "exit_criterion": "Disposable gate fixture.",
+            "docs_impact": [],
+            "depends_on": [],
+        }
+        source["tasks"].append(task)
+        return source
+    else:
+        raise FixtureError(f"unknown subject kind {kind}")
+    source["tasks"] = [task]
+    return source
+
+
+def prepare_production_subject(root: Path, kind: str) -> tuple[Path, Path, str]:
+    repo = root / f"production-{kind}"
+    copy_candidate_tree(ROOT, repo)
+    (repo / "specs/tasks.spec.json").write_bytes(canonical_json(fixture_task_spec(kind)))
+    if kind in ("owner", "authority"):
+        write_executable(repo / "verify/bin/h034-owner-fixture-exit", REFERENCE_OWNER_GATE)
+    init_repo_existing = command(["/usr/bin/git", "init", "-q"], cwd=repo)
+    if init_repo_existing.returncode != 0:
+        raise FixtureError(f"production subject git init failed: {init_repo_existing.stderr}")
+    git_ok(repo, "config", "user.name", "H035 Production Fixture")
+    git_ok(repo, "config", "user.email", "production-fixture@example.invalid")
+    base = commit_all(repo, f"production {kind} authority")
+    bare = root / f"production-{kind}-origin.git"
+    command(["/usr/bin/git", "init", "--bare", "-q", bare], cwd=root)
+    git_ok(repo, "remote", "add", "origin", str(bare))
+    git_ok(repo, "push", "-q", "origin", f"{base}:refs/heads/main")
+    git_ok(repo, "fetch", "-q", "origin", "main:refs/remotes/origin/main")
+    return repo, bare, base
+
+
+def production_positive_ordinary(
+    results: Results, root: Path, provider: Path
+) -> tuple[bool, dict[str, Any]]:
+    repo, bare, base = prepare_production_subject(root, "ordinary")
+    roots = fresh_roots(root, "production-ordinary-roots")
+    config = loop_config(repo, roots, base, "fixture-ordinary", provider, "prod-ordinary")
+    result, observed = observed_process([repo / LOOP_CLI, "run", config], cwd=repo, executable=provider, timeout=60)
+    print(f"PRODUCTION_ORDINARY_LOOP_EXIT={result.returncode}")
+    print(f"PRODUCTION_ORDINARY_PROVIDER_PROCESS_IMAGE={'YES' if observed else 'NO'}")
+    if not observed:
+        raise Rig(
+            "production ordinary control did not execute its provider process image; "
+            f"loop_exit={result.returncode} stdout={result.stdout[-1200:]} "
+            f"stderr={result.stderr[-1200:]}"
+        )
+    attest = attest_record(roots["attest"], "fixture-ordinary")
+    success = result.returncode == 0 and attest is not None
+    results.check(
+        "P_REAL_ORDINARY_POSITIVE",
+        success,
+        f"rc={result.returncode} attest={attest!r} stdout={result.stdout[-500:]!r} stderr={result.stderr[-500:]!r}",
+    )
+    results.check("P_REAL_ORDINARY_LEASE_CLEAN", not any(roots["lease"].iterdir()))
+    results.check("P_REAL_ORDINARY_WORKSPACE_CLEAN", not any(roots["workspace"].iterdir()))
+    return success, {"repo": repo, "bare": bare, "base": base, "roots": roots}
+
+
+def production_schema_registry_matrix(
+    results: Results, repo: Path, authority_sha: str
+) -> None:
+    cli = repo / AUTHORITY_CLI
+    results.predicted(
+        "M_PRODUCTION_SCHEMA_REGISTRY",
+        "The production parser may accept a loose authority class, v1 escalation or registry drift.",
+        "The real authority CLI rejects each canonical Git one-defect candidate.",
+    )
+    invalid: list[tuple[str, str, dict[str, Any]]] = [
+        ("MISSING_CLASS", "2.0.0", {"allowed_write": ["safe/**"]}),
+        ("UNKNOWN_CLASS", "2.0.0", {"authority_class": "OWNER", "allowed_write": ["safe/**"]}),
+        ("WRONG_TYPED_CLASS", "2.0.0", {"authority_class": True, "allowed_write": ["safe/**"]}),
+        ("ORDINARY_OWNER_FIELD", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["safe/**"], "owner_author_allowed_write": []}),
+        ("OWNER_ORDINARY_WRITE", "2.0.0", {"authority_class": "owner_authority", "allowed_write": ["safe/**"], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS)}),
+        ("OWNER_MISSING_WRITE", "2.0.0", {"authority_class": "owner_authority", "allowed_write": []}),
+        ("OWNER_EMPTY_WRITE", "2.0.0", {"authority_class": "owner_authority", "allowed_write": [], "owner_author_allowed_write": []}),
+        ("ORDINARY_EXACT_OWNER", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["verify/h034/kernel.py"]}),
+        ("ORDINARY_CHILD_OWNER", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["verify/h034/kernel.py/child"]}),
+        ("ORDINARY_PARENT_OWNER", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["verify/h034/**"]}),
+        ("ROOT_COVER", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["**"]}),
+        ("TRAVERSAL", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["safe/../verify/h034/kernel.py"]}),
+        ("ALT_SEPARATOR", "2.0.0", {"authority_class": "ordinary", "allowed_write": [r"safe\\x"]}),
+        ("ABSOLUTE", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["/safe/x"]}),
+        ("DOCS_OUTSIDE", "2.0.0", {"authority_class": "ordinary", "allowed_write": ["safe/**"], "docs_impact": ["outside/doc.md"]}),
+        ("V1_OWNER_FIELD", "1.0.0", {"allowed_write": ["safe/**"], "owner_author_allowed_write": list(EXPECTED_OWNER_PATHS)}),
+    ]
+    for index, (name, version, fields) in enumerate(invalid, start=1):
+        git_ok(repo, "checkout", "-q", authority_sha)
+        doc = v2_doc(fields)
+        doc["spec_version"] = version
+        if version == "1.0.0":
+            doc.pop("task_authority")
+        (repo / "specs/tasks.spec.json").write_bytes(canonical_json(doc))
+        candidate = commit_all(repo, f"schema mutant {index}")
+        rc, out, detail = call_json(
+            cli, "validate-task", {"authority_sha": candidate, "task_id": "fixture-task"}, repo
+        )
+        results.check(
+            f"P_SCHEMA_{name}_REFUSED",
+            rc != 0 and out.get("accepted") is False,
+            detail or repr(out),
+        )
+
+    # v1 remains readable as ordinary only; renamed ordinary task proves no h-035 id bypass.
+    git_ok(repo, "checkout", "-q", authority_sha)
+    v1 = {
+        "spec_version": "1.0.0",
+        "defaults": {},
+        "tasks": [{"id": "renamed-bootstrap", "allowed_write": ["safe/**"], "docs_impact": [], "depends_on": []}],
+    }
+    (repo / "specs/tasks.spec.json").write_bytes(canonical_json(v1))
+    v1_sha = commit_all(repo, "v1 ordinary positive")
+    rc, out, detail = call_json(
+        cli, "validate-task", {"authority_sha": v1_sha, "task_id": "renamed-bootstrap"}, repo
+    )
+    results.check(
+        "P_SCHEMA_V1_ORDINARY_POSITIVE",
+        rc == 0 and out.get("accepted") is True and out.get("authority_class") == "ordinary",
+        detail or repr(out),
+    )
+
+    good_registry = strict_file(REGISTRY)
+    registry_mutants: list[tuple[str, bytes]] = []
+    for name, mutate in (
+        ("MISSING_KEY", lambda value: value.pop("path_grammar")),
+        ("EXTRA_KEY", lambda value: value.update(extra=[])),
+        ("WRONG_VERSION_TYPE", lambda value: value.update(schema_version=True)),
+        ("RUNTIME_OVERRIDE", lambda value: value.update(runtime_override_allowed=True)),
+        ("MISSING_OWNER_PATH", lambda value: value["owner_production_allocations"][0]["owner_author_allowed_write"].pop()),
+        ("EXTRA_OWNER_PATH", lambda value: value["owner_production_allocations"][0]["owner_author_allowed_write"].append("verify/h034/extra.json")),
+        ("STALE_OWNER_PATH", lambda value: value["owner_production_allocations"][0]["owner_author_allowed_write"].__setitem__(0, "verify/h034/kernel")),
+    ):
+        mutant = json.loads(json.dumps(good_registry)); mutate(mutant)
+        registry_mutants.append((name, canonical_json(mutant)))
+    registry_mutants.append((
+        "DUPLICATE_KEY",
+        REGISTRY.read_text().replace('"schema_version": 1,', '"schema_version": 1,\n  "schema_version": 1,', 1).encode(),
+    ))
+    for index, (name, raw) in enumerate(registry_mutants, start=1):
+        git_ok(repo, "checkout", "-q", authority_sha)
+        (repo / "specs/owner-production-paths.v1.json").write_bytes(raw)
+        candidate = commit_all(repo, f"registry mutant {index}")
+        rc, out, detail = call_json(cli, "validate-registry", {"authority_sha": candidate}, repo)
+        results.check(
+            f"P_REGISTRY_{name}_REFUSED",
+            rc != 0 and out.get("accepted") is False,
+            detail or repr(out),
+        )
+    git_ok(repo, "checkout", "-q", authority_sha)
+
+
+def projection_policy_autopilot_matrix(
+    results: Results,
+    ordinary: dict[str, Any],
+    owner: dict[str, Any],
+) -> None:
+    ordinary_repo: Path = ordinary["repo"]
+    ordinary_base: str = ordinary["base"]
+    owner_repo: Path = owner["repo"]
+    owner_base: str = owner["base"]
+
+    # Envelope projection must make ordinary and owner effects mechanically distinct.
+    env = command(
+        [ordinary_repo / "controller/envelope/cli", "build", "projection-ordinary", "fixture-ordinary", ordinary_base],
+        cwd=ordinary_repo,
+    )
+    try:
+        ordinary_envelope = strict_json(env.stdout)
+    except ValueError:
+        ordinary_envelope = {}
+    results.check(
+        "P_ENVELOPE_ORDINARY_CLASS",
+        env.returncode == 0 and ordinary_envelope.get("authority_class") == "ordinary"
+        and ordinary_envelope.get("allowed_write") == ["docs/05-beslutslogg.md"]
+        and "owner_author_allowed_write" not in ordinary_envelope,
+        (env.stderr or env.stdout)[-600:],
+    )
+    env = command(
+        [owner_repo / "controller/envelope/cli", "build", "projection-owner", "h-034", owner_base],
+        cwd=owner_repo,
+    )
+    try:
+        owner_envelope = strict_json(env.stdout)
+    except ValueError:
+        owner_envelope = {}
+    results.check(
+        "P_ENVELOPE_OWNER_CLASS",
+        env.returncode == 0 and owner_envelope.get("authority_class") == "owner_authority"
+        and owner_envelope.get("allowed_write") == []
+        and owner_envelope.get("owner_author_allowed_write") == list(EXPECTED_OWNER_PATHS),
+        (env.stderr or env.stdout)[-600:],
+    )
+
+    ordinary_safe = make_candidate(
+        ordinary_repo, ordinary_base, {"docs/05-beslutslogg.md": "ordinary policy safe\n"}, "ordinary policy safe"
+    )
+    policy = command(
+        [ordinary_repo / "controller/policy/cli", "check", "fixture-ordinary", ordinary_base, ordinary_safe],
+        cwd=ordinary_repo,
+    )
+    results.check("P_POLICY_ORDINARY_POSITIVE", policy.returncode == 0, (policy.stdout or policy.stderr)[-600:])
+    ordinary_owner = make_candidate(
+        ordinary_repo, ordinary_base, {EXPECTED_OWNER_PATHS[0]: "ordinary unsafe\n"}, "ordinary policy owner"
+    )
+    policy = command(
+        [ordinary_repo / "controller/policy/cli", "check", "fixture-ordinary", ordinary_base, ordinary_owner],
+        cwd=ordinary_repo,
+    )
+    results.check("P_POLICY_ORDINARY_OWNER_REFUSED", policy.returncode != 0, (policy.stdout or policy.stderr)[-600:])
+
+    owner_exact = make_candidate(
+        owner_repo,
+        owner_base,
+        {path: f"owner policy {index}\n" for index, path in enumerate(EXPECTED_OWNER_PATHS)},
+        "owner policy exact",
+    )
+    policy = command(
+        [owner_repo / "controller/policy/cli", "check", "h-034", owner_base, owner_exact],
+        cwd=owner_repo,
+    )
+    results.check("P_POLICY_OWNER_POSITIVE", policy.returncode == 0, (policy.stdout or policy.stderr)[-600:])
+    owner_outside = make_candidate(
+        owner_repo, owner_base, {"verify/h034/extra.json": "outside\n"}, "owner policy outside"
+    )
+    policy = command(
+        [owner_repo / "controller/policy/cli", "check", "h-034", owner_base, owner_outside],
+        cwd=owner_repo,
+    )
+    results.check("P_POLICY_OWNER_OUTSIDE_REFUSED", policy.returncode != 0, (policy.stdout or policy.stderr)[-600:])
+
+    # Autopilot consumes the same Git-derived candidate scope; no fnmatch widening.
+    auto = command(
+        [ordinary_repo / AUTOPILOT, "--repo", ordinary_repo, "scope-check", "fixture-ordinary", ordinary_safe],
+        cwd=ordinary_repo,
+    )
+    results.check("P_AUTOPILOT_ORDINARY_POSITIVE", auto.returncode == 0, (auto.stdout or auto.stderr)[-600:])
+    auto = command(
+        [ordinary_repo / AUTOPILOT, "--repo", ordinary_repo, "scope-check", "fixture-ordinary", ordinary_owner],
+        cwd=ordinary_repo,
+    )
+    results.check("P_AUTOPILOT_OWNER_PATH_REFUSED", auto.returncode != 0, (auto.stdout or auto.stderr)[-600:])
+    git_ok(ordinary_repo, "checkout", "-q", ordinary_base)
+    git_ok(owner_repo, "checkout", "-q", owner_base)
+
+
+def mutant_reference_tests(
+    results: Results, root: Path, reference_repo: Path, provider: Path
+) -> None:
+    results.predicted(
+        "M_OWNER_RUNTIME",
+        "Unsafe near-misses may satisfy superficial state strings without the required effects.",
+        "One-defect mutants fail the same external-effect controls while the legitimate reference stays green.",
+    )
+
+    def provider_before_action(repo: Path) -> None:
+        loop = repo / LOOP_CLI
+        text = loop.read_text()
+        old = 'if state["state"] == "OWNER_ACTION_REQUIRED" and "action_id" not in state:\n                print("OWNER_ACTION_REQUIRED")\n                return 0'
+        new = 'if state["state"] == "OWNER_ACTION_REQUIRED" and "action_id" not in state:\n                pass'
+        if old not in text:
+            raise FixtureError("mutant anchor missing: provider-before-action")
+        loop.write_text(text.replace(old, new, 1))
+
+    def action_never_provider(repo: Path) -> None:
+        loop = repo / LOOP_CLI
+        text = loop.read_text()
+        old = 'if state["state"] == "OWNER_ACTION_REQUIRED" and "action_id" not in state:\n                print("OWNER_ACTION_REQUIRED")\n                return 0'
+        new = 'if state["state"] == "OWNER_ACTION_REQUIRED":\n                print("OWNER_ACTION_REQUIRED")\n                return 0'
+        if old not in text:
+            raise FixtureError("mutant anchor missing: action-never-provider")
+        loop.write_text(text.replace(old, new, 1))
+
+    def restart_to_ordinary(repo: Path) -> None:
+        loop = repo / LOOP_CLI
+        text = loop.read_text()
+        old = 'if existing is not None:\n        if existing.get("state") not in ("OWNER_ACTION_REQUIRED", "OWNER_CANDIDATE_REVIEW_REQUIRED", "OWNER_FINAL_FREEZE_REQUIRED", "OWNER_PUBLICATION_ELIGIBLE"):\n            raise model.Refusal("unknown persisted owner state")\n        return existing'
+        new = 'if existing is not None:\n        existing["state"] = "pending"\n        model.write_state(cfg["state_dir"], existing)\n        return existing'
+        if old not in text:
+            raise FixtureError("mutant anchor missing: restart")
+        loop.write_text(text.replace(old, new, 1))
+
+    def reported_files(repo: Path) -> None:
+        model_path = repo / "controller/authority/model.py"
+        text = model_path.read_text()
+        old = 'files = changed(root, base, candidate)'
+        new = 'files = ["verify/h034/kernel.py", "verify/h034/plan.json", "verify/h034/identity.json"]'
+        if old not in text:
+            raise FixtureError("mutant anchor missing: reported files")
+        model_path.write_text(text.replace(old, new, 1))
+
+    def reviewer_auto_final(repo: Path) -> None:
+        cli = repo / AUTHORITY_CLI
+        text = cli.read_text()
+        old = 'state.update({"state": "OWNER_FINAL_FREEZE_REQUIRED", "review_id": req["review_id"],'
+        new = 'state.update({"state": "OWNER_PUBLICATION_ELIGIBLE", "review_id": req["review_id"],'
+        if old not in text:
+            raise FixtureError("mutant anchor missing: reviewer auto final")
+        cli.write_text(text.replace(old, new, 1))
+
+    for name, mutate, expected in (
+        ("PROVIDER_BEFORE_ACTION", provider_before_action, "preaction provider process image executes"),
+        ("ACTION_NEVER_PROVIDER", action_never_provider, "explicit owner action never reaches provider"),
+        ("RESTART_TO_ORDINARY", restart_to_ordinary, "restart rewrites owner-required state"),
+        ("TRUST_REPORTED_FILES", reported_files, "Git scope is no longer derived"),
+        ("REVIEW_AUTO_FINAL", reviewer_auto_final, "review PASS performs owner-final transition"),
+    ):
+        results.predicted(name, expected, "external acceptance control rejects mutant")
+        repo, sha = prepare_mutant_repo(root, reference_repo, name, mutate)
+        roots = fresh_roots(root, f"mutant-run-{name.lower()}")
+        config = loop_config(repo, roots, sha, "h-034", provider, f"mutant-{name.lower()}")
+        loop = repo / LOOP_CLI
+        rejected = False
+        detail = ""
+        if name == "PROVIDER_BEFORE_ACTION":
+            run_result, observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+            rejected = observed or run_result.returncode != 0
+            detail = f"rc={run_result.returncode} observed={observed}"
+        elif name == "ACTION_NEVER_PROVIDER":
+            first, _ = observed_process([loop, "run", config], cwd=repo, executable=provider)
+            binding = base_binding(repo, sha, "h-034", roots)
+            call_json(repo / AUTHORITY_CLI, "owner-action", binding, repo)
+            after, observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+            rejected = not observed or after.returncode != 0
+            detail = f"initial={first.returncode} after={after.returncode} observed={observed}"
+        elif name == "RESTART_TO_ORDINARY":
+            first, _ = observed_process([loop, "run", config], cwd=repo, executable=provider)
+            second, observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+            state = persisted_owner_state(roots["state"])
+            rejected = second.returncode != 0 or observed or state is None or state.get("state") != "OWNER_ACTION_REQUIRED"
+            detail = f"first={first.returncode} second={second.returncode} state={state!r}"
+        elif name == "TRUST_REPORTED_FILES":
+            outside = make_candidate(repo, sha, {"verify/h034/extra.json": "unsafe\n"}, "outside")
+            rc, out, raw = call_json(
+                repo / AUTHORITY_CLI,
+                "check-candidate",
+                {"authority_sha": sha, "task_id": "h-034", "base_sha": sha, "candidate_sha": outside},
+                repo,
+            )
+            rejected = rc == 0 and out.get("accepted") is True
+            detail = raw or repr(out)
+        else:
+            # Build a normal owner candidate, then see whether review skips the owner-final state.
+            first, _ = observed_process([loop, "run", config], cwd=repo, executable=provider)
+            binding = base_binding(repo, sha, "h-034", roots)
+            call_json(repo / AUTHORITY_CLI, "owner-action", binding, repo)
+            second, observed = observed_process([loop, "run", config], cwd=repo, executable=provider)
+            state = persisted_owner_state(roots["state"])
+            if state is None or not state.get("candidate_sha"):
+                rejected = True
+                detail = f"setup failed first={first.returncode} second={second.returncode} observed={observed}"
+            else:
+                review_root = root / f"mutant-review-{name.lower()}"
+                git_ok(repo, "worktree", "add", "--detach", str(review_root), state["candidate_sha"])
+                artifact = root / f"mutant-review-{name.lower()}.json"
+                review = {"schema_version": 1, "role": "REVIEWER", "verdict": "PASS", "task_id": "h-034", "candidate_sha": state["candidate_sha"], "base_sha": sha, "review_id": "r1", "reviewer_identity": "reviewer"}
+                artifact.write_bytes(canonical_json(review))
+                request = {"state_dir": str(roots["state"]), "task_id": "h-034", "candidate_sha": state["candidate_sha"], "review_id": "r1", "reviewer_identity": "reviewer", "review_artifact": str(artifact), "review_worktree": str(review_root)}
+                rc, out, raw = call_json(repo / AUTHORITY_CLI, "record-review", request, repo)
+                now = persisted_owner_state(roots["state"])
+                rejected = rc == 0 and now is not None and now.get("state") != "OWNER_FINAL_FREEZE_REQUIRED"
+                detail = raw or repr(now)
+                git_ok(repo, "worktree", "remove", "--force", str(review_root))
+        results.check(f"MUTANT_REJECTED_{name}", rejected, detail)
+
+
+def reference_acceptance(root: Path) -> tuple[Results, dict[str, str]]:
+    results = Results("REFERENCE")
+    repo, bare, authority_sha = install_reference(root)
+    provider = root / "reference-provider.py"
+    write_executable(provider, REFERENCE_PROVIDER)
+    authority_consumer_matrix(results, root, repo, authority_sha)
+    ordinary_positive_anchor(results, root, repo, authority_sha, provider)
+    flow = owner_workflow_reference(results, root, repo, bare, authority_sha, provider)
+    if flow.get("complete"):
+        review_and_final_reference(results, root, repo, bare, authority_sha, flow)
+    else:
+        results.check("A_REFERENCE_OWNER_FLOW_COMPLETE", False, str(flow.get("reason")))
+    candidate_scope_negatives(results, root, repo, authority_sha)
+    mutant_reference_tests(results, root, repo, provider)
+    return results, {
+        "ordinary_anchor": "PASS" if results.failed == 0 else "FAIL",
+        "owner_anchor": "PASS" if flow.get("complete") else "FAIL",
+    }
+
+
+def production_acceptance(root: Path) -> tuple[Results, dict[str, str]]:
+    results = Results("PRODUCTION")
+    provider = root / "production-provider.py"
+    write_executable(provider, PRODUCTION_PROVIDER)
+    ordinary_ok, ordinary = production_positive_ordinary(results, root, provider)
+    status = {
+        "ordinary_anchor": "PASS" if ordinary_ok else "FAIL",
+        "owner_anchor": "NOT_RUN",
+    }
+    if not ordinary_ok:
+        results.check(
+            "P_OWNER_CONTROLS_WITHHELD_AFTER_ORDINARY_FAILURE",
+            False,
+            "positive ordinary route did not complete, so owner negatives receive no credit",
+        )
+        return results, status
+
+    # This is the intended pre-implementation RED boundary. Only after the
+    # positive real route has executed do we credit a missing authority core.
+    authority_source = ROOT / AUTHORITY_CLI
+    if not authority_source.is_file() or not os.access(authority_source, os.X_OK):
+        results.check(
+            "P00_OWNER_AUTHORITY_CORE_PRESENT",
+            False,
+            f"missing executable {AUTHORITY_CLI}",
+        )
+        return results, status
+
+    authority_repo, _authority_bare, authority_sha = prepare_production_subject(root, "authority")
+    ordinary_repo: Path = ordinary["repo"]
+    owner_repo, owner_bare, owner_sha = prepare_production_subject(root, "owner")
+
+    production_schema_registry_matrix(results, authority_repo, authority_sha)
+    flow = owner_workflow_reference(
+        results, root, owner_repo, owner_bare, owner_sha, provider
+    )
+    if flow.get("complete"):
+        status["owner_anchor"] = "PASS"
+        review_and_final_reference(results, root, owner_repo, owner_bare, owner_sha, flow)
+    else:
+        status["owner_anchor"] = "FAIL"
+        results.check("P_OWNER_FLOW_COMPLETE", False, str(flow.get("reason")))
+    candidate_scope_negatives(results, root, owner_repo, owner_sha)
+    projection_policy_autopilot_matrix(
+        results,
+        ordinary,
+        {"repo": owner_repo, "bare": owner_bare, "base": owner_sha},
+    )
+    # Canonical authority task validation in the production implementation.
+    cli = authority_repo / AUTHORITY_CLI
+    for task_id, expected_class in (("h-035", "ordinary"), ("h-034", "owner_authority")):
+        rc, out, detail = call_json(
+            cli, "validate-task", {"authority_sha": authority_sha, "task_id": task_id}, authority_repo
+        )
+        results.check(
+            f"P_CANONICAL_{task_id.upper()}_{expected_class.upper()}",
+            rc == 0 and out.get("accepted") is True and out.get("authority_class") == expected_class,
+            detail or repr(out),
+        )
+
+    # Activation must not leave a task-id bootstrap bypass behind.  The real
+    # production authority, policy, envelope and autopilot consumers all see
+    # canonical h-035 as ordinary and reject its attempt to touch an owner path.
+    h035_owner_candidate = make_candidate(
+        authority_repo,
+        authority_sha,
+        {EXPECTED_OWNER_PATHS[0]: "surviving h035 bypass mutant\n"},
+        "h035 runtime special-case probe",
+    )
+    rc, out, detail = call_json(
+        cli,
+        "check-candidate",
+        {
+            "authority_sha": authority_sha,
+            "task_id": "h-035",
+            "base_sha": authority_sha,
+            "candidate_sha": h035_owner_candidate,
+        },
+        authority_repo,
+    )
+    results.check(
+        "P_H035_RUNTIME_SPECIAL_CASE_ABSENT_AUTHORITY",
+        rc != 0 and out.get("accepted") is False,
+        detail or repr(out),
+    )
+    policy = command(
+        [authority_repo / "controller/policy/cli", "check", "h-035", authority_sha, h035_owner_candidate],
+        cwd=authority_repo,
+    )
+    results.check(
+        "P_H035_RUNTIME_SPECIAL_CASE_ABSENT_POLICY",
+        policy.returncode != 0,
+        (policy.stdout or policy.stderr)[-600:],
+    )
+    auto = command(
+        [authority_repo / AUTOPILOT, "--repo", authority_repo, "scope-check", "h-035", h035_owner_candidate],
+        cwd=authority_repo,
+    )
+    results.check(
+        "P_H035_RUNTIME_SPECIAL_CASE_ABSENT_AUTOPILOT",
+        auto.returncode != 0,
+        (auto.stdout or auto.stderr)[-600:],
+    )
+    envelope = command(
+        [authority_repo / "controller/envelope/cli", "build", "h035-special-case", "h-035", authority_sha],
+        cwd=authority_repo,
+    )
+    try:
+        projected = strict_json(envelope.stdout)
+    except ValueError:
+        projected = {}
+    results.check(
+        "P_H035_RUNTIME_SPECIAL_CASE_ABSENT_ENVELOPE",
+        envelope.returncode == 0
+        and projected.get("authority_class") == "ordinary"
+        and "owner_author_allowed_write" not in projected,
+        (envelope.stderr or envelope.stdout)[-600:],
+    )
+    git_ok(authority_repo, "checkout", "-q", authority_sha)
+    return results, status
+
+
+def owner_acceptance_artifact(candidate: str, artifact: Path) -> int:
+    actual = git_ok(ROOT, "rev-parse", "HEAD")
+    if not SHA40.fullmatch(candidate) or actual != candidate:
+        print(f"RIG_ERROR: candidate mismatch requested={candidate} actual={actual}", file=sys.stderr)
+        return 2
+    if git_ok(ROOT, "status", "--porcelain=v1", "--untracked-files=all"):
+        print("RIG_ERROR: owner acceptance requires a clean exact candidate", file=sys.stderr)
+        return 2
+    rc, summary = execute_gate()
+    record = {
+        "schema_version": 1,
+        "acceptance_mode": "H035_OWNER_AUTHOR_WORKFLOW_V1",
+        "task_id": "h-035",
+        "candidate_sha": candidate,
+        "gate_sha256": digest_file(Path(__file__)),
+        "spec_sha256": digest_file(SPEC),
+        "registry_sha256": digest_file(REGISTRY),
+        "normal_entrypoint": "controller/loop/cli run",
+        "provider_observer": "gate-owned image-digest/PID receipt with external liveness observation",
+        "real_route_positive_ordinary_anchor": summary["ordinary_anchor"],
+        "real_route_owner_action_positive": summary["owner_anchor"],
+        "gate_exit": rc,
+    }
+    artifact = artifact.resolve()
+    if ROOT == artifact or ROOT in artifact.parents:
+        print("RIG_ERROR: owner acceptance artifact must be outside candidate tree", file=sys.stderr)
+        return 2
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(canonical_json(record))
+    print(json.dumps(record, sort_keys=True))
+    return rc
+
+
+def execute_gate() -> tuple[int, dict[str, str]]:
+    pre_head = git_ok(ROOT, "rev-parse", "HEAD")
+    pre_status = git_ok(ROOT, "status", "--porcelain=v1", "--untracked-files=all")
+    pre_worktrees = worktree_paths(ROOT)
+    pre_refs = git_refs(ROOT)
+    frozen = Results("FROZEN")
+    judge = Results("JUDGE")
+    production_status = {"ordinary_anchor": "NOT_RUN", "owner_anchor": "NOT_RUN"}
+    temp_root = Path(tempfile.mkdtemp(prefix="nortropic-h035."))
+    cleanup_ok = False
+    try:
+        frozen_checks(frozen)
+        schema_judge_tests(judge, temp_root)
+        path_judge_tests(judge)
+        registry_judge_tests(judge)
+        reference, _reference_status = reference_acceptance(temp_root)
+        if frozen.failed or judge.failed:
+            raise Rig(
+                f"frozen/judge self-check failed frozen={frozen.failed} judge={judge.failed}"
+            )
+        if reference.failed:
+            raise Rig(
+                f"legitimate disposable reference did not become green: {reference.failed} failures"
+            )
+        print(f"REFERENCE_GATE_SUMMARY={reference.passed} PASS {reference.failed} FAIL")
+        print("REFERENCE_GATE_RESULT=PASS")
+        production, production_status = production_acceptance(temp_root)
+        product_failed = production.failed
+        print(f"PRODUCTION_GATE_SUMMARY={production.passed} PASS {production.failed} FAIL")
+    except Rig as exc:
+        print(f"RIG_ERROR: {exc}", file=sys.stderr)
+        product_failed = -1
+    except (FixtureError, OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+        print(f"RIG_ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
+        product_failed = -1
+    finally:
+        try:
+            shutil.rmtree(temp_root)
+            cleanup_ok = not temp_root.exists()
+        except OSError as exc:
+            print(f"RIG_ERROR: cleanup failed: {exc}", file=sys.stderr)
+            cleanup_ok = False
+
+    post_head = git_ok(ROOT, "rev-parse", "HEAD")
+    post_status = git_ok(ROOT, "status", "--porcelain=v1", "--untracked-files=all")
+    post_worktrees = worktree_paths(ROOT)
+    post_refs = git_refs(ROOT)
+    repo_clean = (
+        pre_head == post_head
+        and pre_status == post_status
+        and pre_worktrees == post_worktrees
+        and pre_refs == post_refs
+    )
+    print(f"PASS FROZEN:CLEANUP_TEMP_ABSENT" if cleanup_ok else "FAIL FROZEN:CLEANUP_TEMP_ABSENT")
+    print(f"PASS FROZEN:REPOSITORY_IDENTITY_UNCHANGED" if repo_clean else "FAIL FROZEN:REPOSITORY_IDENTITY_UNCHANGED")
+    print(f"REAL_ROUTE_POSITIVE_ORDINARY_ANCHOR={production_status['ordinary_anchor']}")
+    print(f"REAL_ROUTE_OWNER_ACTION_POSITIVE={production_status['owner_anchor']}")
+    if product_failed < 0 or not cleanup_ok or not repo_clean:
+        print("H035_GATE_RESULT=UNJUDGEABLE")
+        return 2, production_status
+    if product_failed:
+        print("H035_GATE_RESULT=EXPECTED_RED")
+        return 1, production_status
+    print("H035_GATE_RESULT=PASS")
+    return 0, production_status
+
+
+def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[1] == "--owner-acceptance":
+        return owner_acceptance_artifact(sys.argv[2], Path(sys.argv[3]))
+    if len(sys.argv) != 1:
+        print(
+            "RIG_ERROR: usage: h-035-exit [--owner-acceptance <candidate-sha> <artifact-path>]",
+            file=sys.stderr,
+        )
+        return 2
+    rc, _summary = execute_gate()
+    return rc
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

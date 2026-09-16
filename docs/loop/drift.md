@@ -293,3 +293,45 @@ arbitrary same-UID race-free source-path execution. The legitimate owner prerequ
 GREEN, so a generic RED baseline is not manufactured. Independent review is a mandatory
 precondition for R3 publication; this candidate records that rule and contains no assertion that
 R3 received a passing review verdict.
+
+## 2026-08-13 — H-035 owner-author workflow bootstrap freeze candidate
+
+H-035 is an owner-authorized but ordinary one-time bootstrap on base
+`15693f9e94b28bef2238235fe5d37156cb0794eb`. It introduces no H-034 task or production file.
+The canonical task schema has exactly the classes `ordinary` and `owner_authority`; schema-v1
+documents remain ordinary-only. The owner-production registry allocates exactly:
+
+```text
+verify/h034/kernel.py
+verify/h034/plan.json
+verify/h034/identity.json
+```
+
+The effect contract is `docs/loop/owner-author-workflow-v1.md`; the frozen-gate candidate is
+`verify/bin/h-035-exit`. Ordinary scope cannot intersect those paths by exact, child, parent,
+root-covering or alternate spelling. Owner candidates can touch only the exact allocation and
+cannot touch authority-control surfaces. Explicit persisted owner action, Git-derived candidate
+identity/files, independent review and a separately bound owner-final action are mandatory.
+H-034 remains paused because its exact finite operation vocabulary and sequence are still absent.
+
+Gate construction evidence from this pass:
+
+- the disposable legitimate reference produced `REFERENCE_GATE_SUMMARY=86 PASS 0 FAIL`,
+  executed both the ordinary and post-owner-action provider process-image sentinels and refused
+  owner action/final after the actual authoritative-main ref advanced;
+- five one-defect runtime mutants were rejected: provider-before-action, action-never-provider,
+  restart-to-ordinary, provider-reported-files and reviewer-auto-final;
+- the real current controller reached `loop_exit=3` before provider execution because the outer
+  Codex sandbox forbade its nested Seatbelt with `sandbox_apply: Operation not permitted`;
+- `verify/bin/h-035-exit` classified that run as `H035_GATE_RESULT=UNJUDGEABLE`, exit 2, with
+  both real-route result fields `NOT_RUN`; no owner negative or missing-production verdict was
+  credited;
+- `verify/bin/python-interpreter-authority-v1-exit` remained green with 54 selftests and exit 0;
+- writable disposable candidate/base comparisons had matching exit codes for the schema-facing
+  and integration regressions: h-002 `0/0`, h-007 `1/1`, h-008 `0/0`, h-011 `1/1`, h-016
+  `1/1`, h-017 `1/1`. The existing red downstream gates were not converted into PASS or claimed
+  as stronger evidence by this comparison.
+
+The unchanged H-035 gate still requires an owner/host run where macOS Seatbelt may install before
+its current-main baseline can be credited as RED for missing H-035 effects. Until then that one
+field is `OVERIFIERAT`; the rig failure is deliberately not converted into a product verdict.
