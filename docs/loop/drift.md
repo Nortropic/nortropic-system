@@ -1,5 +1,54 @@
 # Att köra loopen
 
+## 2026-09-16 — VÄGEN TILL MÅLET ÄR SEX POSTER, och den prosarad som sa annat är upphävd
+
+Efter beslutet att avsluta `h-039`, `h-031` och `h-032` `OVERIFIERAT` ställdes frågan som
+borde ha ställts före beslutet: **blockerar det målet?**
+
+**Nej. Mätt i specen, som är auktoritet:**
+
+```
+h-015 (supervisor resume) beror på:  h-010, h-013, h-016, h-004, h-030
+Beroenden på h-031/h-032/h-039:      INGA utanför gruppen själv
+```
+
+Ingenting på vägen till supervisor resume beror på de tre avslutade hypoteserna. De fyra
+befintliga beroendena — `h-004`, `h-010`, `h-013`, `h-016` — **har alla grind**.
+
+### ⚠️ Prosaraden som säger motsatsen är härmed upphävd
+
+`docs/loop/drift.md` rad 5495 bär: *"No supervisor resume is authorized before the entire
+chain is green."*
+
+Den skrevs under H-039-arbetet och är **prosa, inte ett mekaniskt beroende**. Specens
+graf säger något annat, och `raddning/06-inventering.md` slår redan fast principen i sin
+första mening: *"Specens beroenden gäller, inte driftloggens prosa."*
+
+**Raden gäller inte längre.** Den band supervisor resume till en kedja som specen aldrig
+band den till, och som nu är avslutad `OVERIFIERAT`. Hade den fått stå hade den
+blockerat målet permanent — inte av en mekanism, utan av en mening.
+
+### Vägen, mekaniskt och fullständig
+
+```
+KLART:    h-004 ✓   h-010 ✓   h-013 ✓   h-016 ✓        (alla fyra har grind)
+
+SAKNAS:   h-027 → h-028 → h-029 → h-030                 (fyra task, finns inte)
+          → h-015 supervisor resume                      (grind saknas)
+          + verify/bin/autonomous-loop-exit              (mäter KERNEL_COMPLETE)
+          + docs/loop/autonomy-kernel-v1-acceptance.md   (definierar v1)
+```
+
+**Sex poster till `KERNEL_COMPLETE`.** Inte elva som `raddning/06-inventering.md` §5
+räknade — den räknade in bootstrap-kedjan, som aldrig låg på vägen och nu är avslutad.
+
+Det är den kortaste och tydligaste vägbeskrivning projektet haft, och den blev möjlig
+först när tre hypoteser som inte konvergerade togs bort ur räkningen. **297 omfrysningar
+låg bredvid vägen, inte på den.**
+
+`h-014` ligger utanför kedjan och kan byggas parallellt.
+
+
 ## 2026-09-16 — FYND 29: regel 11 förbjöd sin egen arbetsorder. Åtgärdat.
 
 Mätt före överlämning till Codex:
