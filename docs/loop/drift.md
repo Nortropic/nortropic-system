@@ -227,6 +227,21 @@ som inte behövs för det.
 **rollseparationen säger att den som fryser en grind inte bygger mot den** — vem som
 skriver den är ett arkitektval, inte en miljöfråga.
 
+### Mätningen som ingen maskin utom Macen kan göra — artefakt tillagd
+
+`artefakter/matning-pa-macen.sh` (läser bara). Kör `h-015`:s fjortonhövdade
+beroendeslutning och jämför mot en inbyggd Linux-baslinje, så att **deltat** blir läsbart:
+röd i Linux + grön på Macen = plattformsbunden och frisk; röd på **båda** = verkligt fel.
+
+**Varför:** vägen till `KERNEL_COMPLETE` vilar på att `h-004`, `h-010`, `h-013` och
+`h-016` är KLARA. Det påståendet har aldrig prövats genom att KÖRA grindarna på rätt
+plattform — och den här sessionen har visat vad oprövade påståenden är värda. Provet
+skriver ut domen om kartan explicit.
+
+Linux-baslinjen, mätt i byggmiljön 2026-09-16 (alla åtta röda är `ODÖMBART` här, fel
+maskin): `6 PASS · 6 FAIL · 2 ODÖMBART`. Gröna redan i Linux: `h-001`, `h-002`, `h-005`,
+`h-006`, `h-007`, `h-008`.
+
 ### ⚠️ Sidofynd som INTE rättas här: dinglande referens inifrån PINV
 
 Plattformsgrenens `check-invariants.mjs` namnger `scripts/check-verifierarregistret.mjs` i
