@@ -1105,12 +1105,13 @@ unset S3_BAD_MARK
 # K15 — den frysta mekanismneutrala observationsseamen. Samma numeriska PID P
 # hålls konstant. Oracle A (1 byte) skyddar efter TTL; när exakt samma P byter
 # till oracle B (256 bytes) måste en NY lease_id kunna installeras och därefter
-# skyddas. Oracle argv, felutfall och exact-prestate döms utan source checks.
+# skyddas. Oracle argv och felutfall döms enbart genom publika lease-effekter;
+# canonical storage, filnamn och serialisering inspekteras aldrig.
 cat > "$WORK/h004-incarnation-seam.py" <<'PYINCSEAM'
 import json
 import os
 import pathlib
-import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -1128,6 +1129,7 @@ log = oracle_dir / "invocations.jsonl"
 shell_sentinel = oracle_dir / "shell-sentinel"
 oracle_held_ready = oracle_dir / "incarnation-held-ready-sentinel"
 oracle_held_release = oracle_dir / "incarnation-held-release-sentinel"
+oracle_held_cli_pid = oracle_dir / "incarnation-held-cli-pid"
 pid = "424242"
 
 oracle_source = f'''#!{python}
@@ -1229,19 +1231,19 @@ def run(*args, seconds=10):
         )
     return answer
 
-def acquire(task, oracle_path=oracle, ttl="0.35"):
-    return run(
+def acquire(task, oracle_path=oracle, ttl="0.35", holder_pid=pid, with_oracle=True):
+    args = [
         lease_dir,
         "acquire",
         task,
         "--ttl",
         ttl,
         "--holder-pid",
-        pid,
-        "--incarnation-oracle",
-        oracle_path,
-        seconds=12,
-    )
+        holder_pid,
+    ]
+    if with_oracle:
+        args.extend(("--incarnation-oracle", oracle_path))
+    return run(*args, seconds=12)
 
 def token(answer):
     value = answer.stdout.strip()
@@ -1253,89 +1255,55 @@ def token(answer):
         raise RuntimeError(f"usable lease_id missing rc={answer.returncode} stdout={answer.stdout!r}")
     return value
 
-def lease_path(task):
-    return lease_dir / f"{task}.lease"
-
 def release(task, lease_id):
     answer = run(lease_dir, "release", task, lease_id)
     if answer.returncode != 0:
         raise RuntimeError(f"cleanup release failed for {task}: {answer.stderr!r}")
 
-def no_serialized_oracle_seam(raw):
-    forbidden_values = {
-        str(oracle), oracle.name, str(base_oracle), base_oracle.name,
-        str(control), str(log), str(oracle_held_ready), oracle_held_ready.name,
-        str(oracle_held_release), oracle_held_release.name, "--incarnation-oracle",
-    }
-    for value in forbidden_values:
-        if value.encode() in raw:
-            raise SystemExit(f"oracle observation input serialized as authority: {value!r}")
-    try:
-        payload = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SystemExit("canonical oracle-bound lease was not inspectable JSON") from exc
-    forbidden_keys = {
-        "incarnation_oracle", "oracle_path", "oracle_executable",
-        "test_mode", "test_seam", "test_oracle", "seam", "test",
-    }
+def owner_names(task, expected_pid=pid):
+    answer = run(lease_dir, "owner", task)
+    return answer.returncode == 0 and expected_pid in answer.stdout
 
-    def inspect(value):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                normalized = str(key).lower().replace("-", "_")
-                if normalized in forbidden_keys:
-                    raise SystemExit(f"oracle test-mode fact serialized under key {key!r}")
-                inspect(child)
-        elif isinstance(value, list):
-            for child in value:
-                inspect(child)
-        elif isinstance(value, str) and value in forbidden_values:
-            raise SystemExit(f"oracle observation value serialized as authority: {value!r}")
-
-    inspect(payload)
+def preserved_token(task, lease_id, expected_pid=pid):
+    return owner_names(task, expected_pid) and run(
+        lease_dir, "renew", task, lease_id
+    ).returncode == 0
 
 set_mode("live-A")
 first = acquire("same-pid")
 token_a = token(first)
-path = lease_path("same-pid")
-if not path.is_file():
-    raise SystemExit("oracle-bound acquire did not create canonical lease")
-bytes_a = path.read_bytes()
-no_serialized_oracle_seam(bytes_a)
 time.sleep(0.55)
 
 same_a = acquire("same-pid")
-if same_a.returncode == 0 or path.read_bytes() != bytes_a:
-    raise SystemExit("same live incarnation A was not protected beyond TTL with exact prestate")
+if same_a.returncode == 0 or not preserved_token("same-pid", token_a):
+    raise SystemExit("same live incarnation A was not protected beyond TTL with usable token")
+time.sleep(0.55)
 
 set_mode("live-B")
 second = acquire("same-pid")
 token_b = token(second)
 if token_b == token_a:
     raise SystemExit("same PID/new incarnation B reused old lease_id")
-bytes_b = path.read_bytes()
-if bytes_b == bytes_a:
-    raise SystemExit("same PID/new incarnation did not install successor state")
-no_serialized_oracle_seam(bytes_b)
+# The stale A token may fail or report harmlessness, but B must remain current.
+run(lease_dir, "release", "same-pid", token_a)
+if not preserved_token("same-pid", token_b):
+    raise SystemExit("same PID/new incarnation did not install a usable successor")
 time.sleep(0.55)
 same_b = acquire("same-pid")
-if same_b.returncode == 0 or path.read_bytes() != bytes_b:
-    raise SystemExit("new live incarnation B was not protected beyond TTL with exact prestate")
+if same_b.returncode == 0 or not preserved_token("same-pid", token_b):
+    raise SystemExit("new live incarnation B was not protected beyond TTL with usable token")
 release("same-pid", token_b)
 
 def seed_case(name):
     set_mode("live-A")
     answer = acquire(name, ttl="0.22")
     lease_id = token(answer)
-    target = lease_path(name)
-    before = target.read_bytes()
     time.sleep(0.35)
-    return lease_id, target, before
+    return lease_id
 
-def cleanup_case(name):
-    set_mode("live-B")
-    answer = acquire(name, ttl="30")
-    lease_id = token(answer)
+def require_preserved_then_cleanup(name, lease_id):
+    if not preserved_token(name, lease_id):
+        raise SystemExit(f"{name}: failed observation damaged current public token")
     release(name, lease_id)
 
 # A nonreturning oracle must be converted to a normal nonzero product result
@@ -1344,23 +1312,23 @@ def cleanup_case(name):
 # implemented timeout handling.
 for mode in ("empty", "multi", "multiline", "control", "del", "badutf8", "long", "error", "timeout"):
     name = f"malformed-{mode}"
-    _old_token, target, before = seed_case(name)
+    old_token = seed_case(name)
     set_mode(mode)
     answer = acquire(name)
     if answer.returncode == 0:
         raise SystemExit(f"{mode}: indeterminate oracle output/exit authorized reclaim")
-    if not target.is_file() or target.read_bytes() != before:
-        raise SystemExit(f"{mode}: indeterminate oracle changed canonical prestate")
-    cleanup_case(name)
+    require_preserved_then_cleanup(name, old_token)
 
 # Deterministic before-observation ordering: an expired A exists while the
-# oracle has been invoked but has emitted no result. Canonical bytes must still
-# be exact A; mutate-then-rollback after malformed output is not fail-closed
-# before mutation.
-_held_token, held_path, held_before = seed_case("held-malformed")
-for marker in (oracle_held_ready, oracle_held_release):
+# oracle has been invoked but has emitted no result. Kill the production acquire
+# at that point; A must remain the publicly usable current token. This catches
+# mutate-before-oracle/rollback without reading canonical storage or requiring
+# another lease command to make progress while an implementation holds a lock.
+held_token = seed_case("held-malformed")
+for marker in (oracle_held_ready, oracle_held_release, oracle_held_cli_pid):
     marker.unlink(missing_ok=True)
 set_mode("held-malformed")
+held_env = env | {"H004_DEADLINE_CHILD_PID_FILE": str(oracle_held_cli_pid)}
 held_process = subprocess.Popen(
     [
         python, str(deadline), "12", cli, str(lease_dir), "acquire",
@@ -1368,7 +1336,7 @@ held_process = subprocess.Popen(
         "--incarnation-oracle", str(oracle),
     ],
     cwd=oracle_dir,
-    env=env,
+    env=held_env,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True,
@@ -1377,7 +1345,7 @@ held_process = subprocess.Popen(
 try:
     entered_deadline = time.monotonic() + 5
     while time.monotonic() < entered_deadline:
-        if oracle_held_ready.is_file():
+        if oracle_held_ready.is_file() and oracle_held_cli_pid.is_file():
             break
         if held_process.poll() is not None:
             raise RuntimeError(
@@ -1388,17 +1356,13 @@ try:
         raise RuntimeError("held oracle was never invoked")
     if held_process.poll() is not None:
         raise RuntimeError(f"held oracle acquire exited after READY rc={held_process.returncode}")
-    if not held_path.is_file() or held_path.read_bytes() != held_before:
-        raise RuntimeError("canonical lease mutated before held oracle produced an observation")
-    oracle_held_release.write_bytes(b"release\n")
+    cli_pid = int(oracle_held_cli_pid.read_text(encoding="utf-8").strip())
+    os.killpg(cli_pid, signal.SIGKILL)
     held_stdout, held_stderr = held_process.communicate(timeout=15)
     if held_process.returncode == 0:
-        raise RuntimeError("held malformed oracle authorized reclaim")
-    if not held_path.is_file() or held_path.read_bytes() != held_before:
-        raise RuntimeError("held malformed oracle failed to preserve exact canonical prestate")
+        raise RuntimeError("killed pre-observation acquire reported success")
 finally:
     if held_process.poll() is None:
-        oracle_held_release.write_bytes(b"release\n")
         try:
             # Let the 12-second deadline helper perform its own cross-session
             # process-tree cleanup before the outer harness considers killing
@@ -1410,18 +1374,18 @@ finally:
             except ProcessLookupError:
                 pass
             held_process.communicate(timeout=5)
-cleanup_case("held-malformed")
+require_preserved_then_cleanup("held-malformed", held_token)
 
 # Exit 1 is the determinate no-live observation, but the same holder-bound
 # request still cannot install a successor for P when P has no incarnation to
-# bind. It therefore refuses with exact prestate, distinct from silently
-# treating PID alone as a live identity.
-_old_dead, dead_path, dead_before = seed_case("oracle-dead")
+# bind. It therefore refuses while the old public token remains usable, distinct
+# from silently treating PID alone as a live identity.
+old_dead = seed_case("oracle-dead")
 set_mode("dead")
 dead_answer = acquire("oracle-dead", ttl="30")
-if dead_answer.returncode == 0 or not dead_path.is_file() or dead_path.read_bytes() != dead_before:
-    raise SystemExit("oracle exit 1 installed/mutated a holder-bound lease without a live incarnation")
-cleanup_case("oracle-dead")
+if dead_answer.returncode == 0:
+    raise SystemExit("oracle exit 1 installed a holder-bound lease without a live incarnation")
+require_preserved_then_cleanup("oracle-dead", old_dead)
 
 for label, oracle_path in (
     ("relative", "./oracle-relative"),
@@ -1429,23 +1393,24 @@ for label, oracle_path in (
     ("nonexec", nonexec_oracle),
 ):
     name = f"unavailable-{label}"
-    _old_token, target, before = seed_case(name)
+    old_token = seed_case(name)
     set_mode("live-B")
     answer = acquire(name, oracle_path=oracle_path)
     if answer.returncode == 0:
         raise SystemExit(f"{label}: unavailable/non-absolute oracle authorized reclaim")
-    if not target.is_file() or target.read_bytes() != before:
-        raise SystemExit(f"{label}: oracle execution failure changed canonical prestate")
-    cleanup_case(name)
+    require_preserved_then_cleanup(name, old_token)
 
 # An indeterminate observation on a free holder-bound acquire must not create
-# a canonical lease for a holder whose incarnation cannot be bound.
+# public authority for a holder whose incarnation cannot be bound.
 for mode in ("empty", "dead"):
     name = f"free-{mode}"
     set_mode(mode)
     answer = acquire(name)
-    if answer.returncode == 0 or lease_path(name).exists():
-        raise SystemExit(f"free {mode}: unbound holder created canonical lease")
+    if answer.returncode == 0 or run(lease_dir, "owner", name).returncode == 0:
+        raise SystemExit(f"free {mode}: unbound holder created public lease authority")
+    set_mode("live-A")
+    cleanup_token = token(acquire(name, ttl="30"))
+    release(name, cleanup_token)
 
 try:
     rows = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -1480,19 +1445,114 @@ for required in (
     if required not in seen_modes:
         raise SystemExit(f"oracle mode was not actually invoked: {required}")
 
-print(f"same-pid A->B protected; oracle-cases={len(rows)} host={next(iter(hosts))}")
+# Decisive production-path control. Seed two expired generations for the same
+# actually-live PID with distinct prepared identities A/B. Once every oracle
+# executable is unavailable, a plain no-oracle production observation can equal
+# at most one seed identity, so at least one must reclaim. A random identity on
+# every observation reclaims again after TTL and is caught by the protection leg.
+holder = subprocess.Popen(
+    [python, "-c", "import time; time.sleep(30)"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+prepared = []
+disabled_dir = oracle_dir / "disabled"
+try:
+    real_pid = str(holder.pid)
+    for task, mode in (("production-path-A", "live-A"), ("production-path-B", "live-B")):
+        set_mode(mode)
+        answer = acquire(task, ttl="0.35", holder_pid=real_pid)
+        prepared.append((task, token(answer)))
+    if prepared[0][1] == prepared[1][1]:
+        raise RuntimeError("prepared generations reused lease_id")
+    time.sleep(0.55)
+
+    log_before_no_oracle = log.read_bytes()
+    disabled_dir.mkdir()
+    for executable in (oracle, base_oracle, relative_oracle):
+        if executable.exists():
+            executable.rename(disabled_dir / executable.name)
+    if any(executable.exists() for executable in (oracle, base_oracle, relative_oracle)):
+        raise RuntimeError("oracle executable remained available")
+
+    reclaimed = 0
+    for task, old_token in prepared:
+        answer = acquire(
+            task,
+            ttl="0.35",
+            holder_pid=real_pid,
+            with_oracle=False,
+        )
+        if answer.returncode == 0:
+            new_token = token(answer)
+            if new_token == old_token:
+                raise RuntimeError(f"{task}: no-oracle reclaim reused old lease_id")
+            reclaimed += 1
+
+            # A stale token may report failure or harmlessness, but it can never
+            # damage the new production-bound generation.
+            run(lease_dir, "release", task, old_token)
+            if run(lease_dir, "renew", task, new_token).returncode != 0:
+                raise RuntimeError(f"{task}: stale old token damaged no-oracle successor")
+            owner = run(lease_dir, "owner", task)
+            if owner.returncode != 0 or real_pid not in owner.stdout:
+                raise RuntimeError(f"{task}: owner did not name actual holder PID")
+
+            time.sleep(0.55)
+            same_lifetime = acquire(
+                task,
+                ttl="30",
+                holder_pid=real_pid,
+                with_oracle=False,
+            )
+            if same_lifetime.returncode == 0:
+                raise RuntimeError(f"{task}: same production incarnation was not protected after TTL")
+            if run(lease_dir, "renew", task, new_token).returncode != 0:
+                raise RuntimeError(f"{task}: protected production token stopped renewing")
+            release(task, new_token)
+        else:
+            # At most one prepared identity may equal the actual production
+            # identity. Its original generation must remain publicly usable.
+            owner = run(lease_dir, "owner", task)
+            if owner.returncode != 0 or real_pid not in owner.stdout:
+                raise RuntimeError(f"{task}: refused reclaim without preserving holder")
+            if run(lease_dir, "renew", task, old_token).returncode != 0:
+                raise RuntimeError(f"{task}: refused reclaim damaged prepared token")
+            release(task, old_token)
+
+    if reclaimed < 1:
+        raise RuntimeError("plain no-oracle production path treated both distinct seeds as same live PID")
+    if holder.poll() is not None:
+        raise RuntimeError("actual holder exited during no-oracle control")
+finally:
+    if holder.poll() is None:
+        holder.terminate()
+    try:
+        holder.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        holder.kill()
+        holder.wait(timeout=5)
+
+if log.read_bytes() != log_before_no_oracle or shell_sentinel.exists():
+    raise RuntimeError("plain no-oracle production path invoked/cached disposable oracle machinery")
+
+print(
+    f"same-pid A->B protected; no-oracle-reclaimed={reclaimed}; "
+    f"oracle-cases={len(rows)} host={next(iter(hosts))}"
+)
 PYINCSEAM
 
 incarnation15=$(python3 "$WORK/h004-incarnation-seam.py" "$CLI" "$WORK/incarnation-seam" "$WORK/h004-deadline.py" 2>&1); incarnation15_rc=$?
 deadline_probe_or_od "$incarnation15_rc" "K15 deadline"
 if [ "$incarnation15_rc" -eq 0 ]; then
-  ok "K15 process-incarnation: same PID A→B, direct oracle argv och exact-prestate fail-closed"
+  ok "K15 process-incarnation: prepared A/B → production no-oracle reclaim + same-lifetime protection"
 else
   no "K15 process-incarnation" "${incarnation15:-incarnation-seam harness exit $incarnation15_rc}"
 fi
 
 # K16/K17 — publika samtidiga histories plus fortsatt stale-flood efter att en
-# successor faktiskt installerats. Exakt successor-bytes och token ska överleva.
+# successor faktiskt installerats. Successorns publika token-authority överlever;
+# canonical storage och bytes inspekteras inte.
 cat > "$WORK/h004-overlap.py" <<'PYOVER'
 import concurrent.futures
 import os
@@ -1549,23 +1609,24 @@ def exercise(stale_op):
             take, token_b = acquire(task, "30")
         if take.returncode != 0 or not token_b or token_b == token_a:
             raise RuntimeError(f"{stale_op}/{round_no}: successor installerades inte")
-        path = root / f"{task}.lease"
-        # Publik tokenbunden renew bevisar B:s identity utan lagringsfältnamn.
-        if run(root, "renew", task, token_b).returncode != 0 or not path.is_file():
+        # Publik tokenbunden renew bevisar B:s current identity.
+        if run(root, "renew", task, token_b).returncode != 0:
             raise RuntimeError(f"{stale_op}/{round_no}: successor-token är inte current")
-        before = path.read_bytes()
         calls = [(root, stale_op, task, token_a) for _ in range(24)]
         with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
             answers = list(pool.map(lambda c: run(*c), calls))
-        if not path.is_file() or path.read_bytes() != before:
-            raise RuntimeError(f"{stale_op}/{round_no}: stale flood muterade/raderade successor")
+        if run(root, "renew", task, token_b).returncode != 0:
+            raise RuntimeError(f"{stale_op}/{round_no}: stale flood skadade successor-token")
         owner = run(root, "owner", task)
         if owner.returncode != 0 or not owner.stdout.strip():
             raise RuntimeError(f"{stale_op}/{round_no}: successor owner saknas")
-        if any(a.returncode == 0 for a in answers) and path.read_bytes() != before:
-            raise RuntimeError(f"{stale_op}/{round_no}: successful stale op var inte harmless")
         if run(root, "release", task, token_b).returncode != 0:
             raise RuntimeError(f"{stale_op}/{round_no}: successor-token kunde inte release:a")
+        next_answer, token_c = acquire(task, "30")
+        if next_answer.returncode != 0 or not token_c or token_c in (token_a, token_b):
+            raise RuntimeError(f"{stale_op}/{round_no}: release lämnade inte en färsk generation")
+        if run(root, "release", task, token_c).returncode != 0:
+            raise RuntimeError(f"{stale_op}/{round_no}: generation C kunde inte städas")
     print(f"{stale_op}: rounds=16 direct-successors={direct_successors}")
 
 exercise(sys.argv[3])
@@ -1573,19 +1634,18 @@ PYOVER
 
 release_overlap=$(python3 "$WORK/h004-overlap.py" "$CLI" "$WORK/overlap-release" release 2>&1); release_overlap_rc=$?
 if [ "$release_overlap_rc" -eq 0 ]; then
-  ok "K16 stale release overlap histories: successor identity och bytes överlever"
+  ok "K16 stale release overlap histories: successor token-authority överlever"
 else
   no "K16 stale release overlap" "${release_overlap:-overlap-harness exit $release_overlap_rc}"
 fi
 renew_overlap=$(python3 "$WORK/h004-overlap.py" "$CLI" "$WORK/overlap-renew" renew 2>&1); renew_overlap_rc=$?
 if [ "$renew_overlap_rc" -eq 0 ]; then
-  ok "K17 stale renew overlap histories: successor identity och bytes överlever"
+  ok "K17 stale renew overlap histories: successor token-authority överlever"
 else
   no "K17 stale renew overlap" "${renew_overlap:-overlap-harness exit $renew_overlap_rc}"
 fi
 cat > "$WORK/h004-mutation-barrier.py" <<'PYMUTBARRIER'
 import fcntl
-import json
 import os
 import pathlib
 import select
@@ -1620,16 +1680,12 @@ def acquire(task, ttl):
     answer = run(root, "acquire", task, "--ttl", str(ttl))
     return answer, valid_token(answer)
 
-def lease_path(task):
-    return root / f"{task}.lease"
-
 class Held:
     def __init__(self, operation, task, lease_id, eof=False):
         self.ready_r, ready_w_raw = os.pipe()
         continue_r_raw, self.continue_w = os.pipe()
-        # High, runtime-allocated descriptors are disposable canaries. They
-        # remain valid inherited FDs but are unlikely to collide with ordinary
-        # lease values, so numeric serialization is mechanically observable.
+        # High, runtime-allocated descriptors prove that the scheduling seam
+        # accepts ordinary inherited FDs without binding any fixed FD numbers.
         ready_w = fcntl.fcntl(ready_w_raw, fcntl.F_DUPFD, 220)
         continue_r = fcntl.fcntl(continue_r_raw, fcntl.F_DUPFD, 220)
         os.close(ready_w_raw)
@@ -1672,7 +1728,7 @@ class Held:
 
     def require_ready(self):
         data = self.ready_bytes()
-        if data != b"R" and len(data or b"") != 1:
+        if data != b"R":
             raise RuntimeError(f"barrier emitted {data!r}, expected exactly one READY byte")
         if self.process.poll() is not None:
             raise RuntimeError(f"barrier process exited after READY rc={self.process.returncode}")
@@ -1712,77 +1768,44 @@ class Held:
                 pass
             self.process.communicate(timeout=5)
 
-def exact_bytes(path, expected, label):
-    if not path.is_file() or path.read_bytes() != expected:
-        raise RuntimeError(f"{label}: canonical lease bytes changed")
-
-def no_serialized_seam(path, held):
-    raw = path.read_bytes()
-    flag = "--test-mutation-barrier-fds"
-    if flag.encode() in raw:
-        raise RuntimeError("mutation-barrier flag was serialized as lease authority")
-    try:
-        payload = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError("canonical lease was not inspectable JSON") from exc
-    fd_strings = {str(held.ready_fd), str(held.continue_fd)}
-    forbidden_keys = {
-        "mutation_barrier", "test_mutation_barrier", "ready_fd", "continue_fd",
-        "barrier_fds", "test_mode", "test_seam", "seam", "test",
-    }
-
-    def inspect(value):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                normalized = str(key).lower().replace("-", "_")
-                if normalized in forbidden_keys:
-                    raise RuntimeError(f"test seam fact serialized under key {key!r}")
-                inspect(child)
-        elif isinstance(value, list):
-            for child in value:
-                inspect(child)
-        elif isinstance(value, str) and (value == flag or value in fd_strings):
-            raise RuntimeError(f"test seam argv value serialized as authority: {value!r}")
-        elif (
-            isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and value in {held.ready_fd, held.continue_fd}
-        ):
-            raise RuntimeError(f"test seam numeric FD serialized as authority: {value!r}")
-
-    inspect(payload)
-
 def overlap(operation):
     task = f"deterministic-{operation}"
-    ttl = 1.20
+    ttl = 2.50 if operation == "renew" else 1.20
     acquire_started = time.monotonic()
     _first, token_a = acquire(task, ttl)
     acquire_returned = time.monotonic()
-    path = lease_path(task)
-    bytes_a = path.read_bytes()
+    # Age A before held RENEW so mutation-before-READY would move expiry far
+    # beyond the original TTL and becomes distinguishable by public acquire B.
+    if operation == "renew":
+        time.sleep(1.00)
     held = Held(operation, task, token_a)
     try:
         ready_at = held.require_ready()
         if ready_at >= acquire_started + ttl:
             raise RuntimeError(f"{operation}: READY was not observed before A TTL expiry")
-        exact_bytes(path, bytes_a, f"{operation} before CONTINUE")
+        early = run(root, "acquire", task, "--ttl", "30")
+        if early.returncode == 0:
+            raise RuntimeError(f"{operation}: mutation was publicly visible before READY/TTL")
         # The lease cannot have been installed after acquire returned, so this
         # upper bound guarantees expiry before public successor B is requested.
         time.sleep(max(0, acquire_returned + ttl + 0.20 - time.monotonic()))
         takeover, token_b = acquire(task, 30)
         if token_b == token_a:
             raise RuntimeError(f"{operation}: successor reused A token")
-        bytes_b = path.read_bytes()
+        if run(root, "renew", task, token_b).returncode != 0:
+            raise RuntimeError(f"{operation}: public successor B was not current before CONTINUE")
         held.continue_one()
         stale_rc, _stdout, _stderr = held.wait()
-        exact_bytes(path, bytes_b, f"{operation} after stale CONTINUE rc={stale_rc}")
-        # Usable B token is proven through normal public mutation and cleanup.
+        # Usable B token after stale CONTINUE proves successor authority survived.
         if run(root, "renew", task, token_b).returncode != 0:
             raise RuntimeError(f"{operation}: successor token could not renew")
         if run(root, "release", task, token_b).returncode != 0:
             raise RuntimeError(f"{operation}: successor token could not release")
-        if path.exists():
-            raise RuntimeError(f"{operation}: successor release did not free lease")
+        _next, token_c = acquire(task, 30)
+        if token_c in (token_a, token_b):
+            raise RuntimeError(f"{operation}: fresh generation reused stale token")
+        if run(root, "release", task, token_c).returncode != 0:
+            raise RuntimeError(f"{operation}: fresh generation cleanup failed")
     finally:
         held.close()
     print(f"{operation}-overlap ok")
@@ -1790,25 +1813,22 @@ def overlap(operation):
 def wrong_token_no_ready(operation):
     task = f"wrong-{operation}"
     _answer, current = acquire(task, 30)
-    path = lease_path(task)
-    before = path.read_bytes()
     held = Held(operation, task, "wrong-" + current)
     try:
         rc, _stdout, _stderr = held.wait(timeout=3)
         data = held.ready_bytes(timeout=0)
         if rc == 0 or data not in (b"", None):
             raise RuntimeError(f"{operation}: wrong token emitted READY/succeeded rc={rc} data={data!r}")
-        exact_bytes(path, before, f"{operation} wrong token")
     finally:
         held.close()
+    if run(root, "renew", task, current).returncode != 0:
+        raise RuntimeError(f"{operation}: wrong-token control damaged current token")
     if run(root, "release", task, current).returncode != 0:
         raise RuntimeError(f"{operation}: wrong-token control damaged current token")
 
 def invalid_descriptors(operation):
     task = f"bad-fd-{operation}"
     _answer, current = acquire(task, 30)
-    path = lease_path(task)
-    before = path.read_bytes()
     # Både syntaktiskt negativa och syntaktiskt giltiga men stängda positiva
     # descriptors ska falla före mutation. Annars kan en implementation
     # validera heltal, mutera, och först därefter upptäcka EBADF.
@@ -1837,42 +1857,52 @@ def invalid_descriptors(operation):
         )
         if answer.returncode == 0:
             raise RuntimeError(f"{operation}: {label} descriptors returned success")
-        exact_bytes(path, before, f"{operation} invalid descriptors {label}")
+        if run(root, "renew", task, current).returncode != 0:
+            raise RuntimeError(f"{operation}: {label} descriptors damaged current token")
     if run(root, "release", task, current).returncode != 0:
         raise RuntimeError(f"{operation}: invalid-descriptor control damaged token")
 
 def eof_before_mutation(operation):
     task = f"eof-{operation}"
-    _answer, current = acquire(task, 30)
-    path = lease_path(task)
-    before = path.read_bytes()
+    ttl = 2.50 if operation == "renew" else 1.20
+    acquired_at = time.monotonic()
+    _answer, current = acquire(task, ttl)
+    acquired_returned = time.monotonic()
+    if operation == "renew":
+        time.sleep(1.00)
     held = Held(operation, task, current)
     try:
-        held.require_ready()
-        exact_bytes(path, before, f"{operation} before CONTINUE EOF")
+        ready_at = held.require_ready()
+        if ready_at >= acquired_at + ttl:
+            raise RuntimeError(f"{operation}: EOF READY was not before original expiry")
+        early = run(root, "acquire", task, "--ttl", "30")
+        if early.returncode == 0:
+            raise RuntimeError(f"{operation}: mutation was visible before EOF/TTL")
+        time.sleep(max(0, acquired_returned + ttl + 0.20 - time.monotonic()))
+        _successor_answer, successor = acquire(task, 30)
+        if successor == current:
+            raise RuntimeError(f"{operation}: EOF successor reused current token")
         os.close(held.continue_w)
         held.continue_w = None
         rc, _stdout, _stderr = held.wait(timeout=3)
         if rc == 0:
             raise RuntimeError(f"{operation}: CONTINUE EOF returned success")
-        exact_bytes(path, before, f"{operation} continue EOF")
     finally:
         held.close()
-    if run(root, "release", task, current).returncode != 0:
-        raise RuntimeError(f"{operation}: EOF control damaged token")
+    if run(root, "renew", task, successor).returncode != 0:
+        raise RuntimeError(f"{operation}: EOF control damaged successor token")
+    if run(root, "release", task, successor).returncode != 0:
+        raise RuntimeError(f"{operation}: EOF successor cleanup failed")
 
 def positive_release():
     task = "positive-release"
     _answer, current = acquire(task, 30)
-    path = lease_path(task)
-    before = path.read_bytes()
     held = Held("release", task, current)
     try:
         held.require_ready()
-        exact_bytes(path, before, "positive release before CONTINUE")
         held.continue_one()
         rc, _stdout, _stderr = held.wait()
-        if rc != 0 or path.exists():
+        if rc != 0:
             raise RuntimeError(f"barrier release lost normal effect rc={rc}")
     finally:
         held.close()
@@ -1884,27 +1914,26 @@ def positive_release():
 
 def positive_renew():
     task = "positive-renew"
-    _answer, current = acquire(task, 0.55)
-    path = lease_path(task)
-    time.sleep(0.38)
-    before = path.read_bytes()
+    ttl = 3.00
+    _answer, current = acquire(task, ttl)
+    acquired_returned = time.monotonic()
+    time.sleep(1.40)
     held = Held("renew", task, current)
     try:
         held.require_ready()
-        exact_bytes(path, before, "positive renew before CONTINUE")
         held.continue_one()
         rc, _stdout, _stderr = held.wait()
-        if rc != 0 or not path.is_file() or path.read_bytes() == before:
-            raise RuntimeError(f"barrier renew lost normal serialized effect rc={rc}")
-        no_serialized_seam(path, held)
+        if rc != 0:
+            raise RuntimeError(f"barrier renew lost normal public effect rc={rc}")
+        renewed_returned = time.monotonic()
     finally:
         held.close()
     # Original TTL has elapsed, renewed TTL has not.
-    time.sleep(0.30)
+    time.sleep(max(0, acquired_returned + ttl + 0.20 - time.monotonic()))
     early = run(root, "acquire", task, "--ttl", "30")
     if early.returncode == 0:
         raise RuntimeError("barrier renew did not move TTL window")
-    time.sleep(0.35)
+    time.sleep(max(0, renewed_returned + ttl + 0.20 - time.monotonic()))
     late, successor = acquire(task, 30)
     if successor == current:
         raise RuntimeError("post-renew expiry reused token")
@@ -1923,12 +1952,12 @@ PYMUTBARRIER
 
 barrier_overlap=$(python3 "$WORK/h004-mutation-barrier.py" "$CLI" "$WORK/mutation-barrier" 2>&1); barrier_overlap_rc=$?
 if [ "$barrier_overlap_rc" -eq 0 ] && echo "$barrier_overlap" | grep -q 'release-overlap ok'; then
-  ok "K16b release barrier: READY→public B→CONTINUE bevarar exact B plus negativa/positiva ankare"
+  ok "K16b release barrier: READY→public B→CONTINUE bevarar B:s token-authority plus ankare"
 else
   no "K16b release barrier" "${barrier_overlap:-mutation-barrier harness exit $barrier_overlap_rc}"
 fi
 if [ "$barrier_overlap_rc" -eq 0 ] && echo "$barrier_overlap" | grep -q 'renew-overlap ok'; then
-  ok "K17b renew barrier: READY→public B→CONTINUE bevarar exact B plus negativa/positiva ankare"
+  ok "K17b renew barrier: READY→public B→CONTINUE bevarar B:s token-authority plus ankare"
 else
   no "K17b renew barrier" "${barrier_overlap:-mutation-barrier harness exit $barrier_overlap_rc}"
 fi

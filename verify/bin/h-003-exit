@@ -9,8 +9,11 @@
 #   controller/attest/cli <dir> write <task> <sha>
 #       [<grind-id> <grind-sha256>] --authority <opaque-authority-id>
 #   controller/attest/cli <dir> read <task> --authority <opaque-authority-id>
+#   controller/attest/cli <dir> retest-required <task>
 #   controller/attest/cli <dir> finalize-authority <opaque-authority-id>
 #       [--test-before-publication-barrier <dir>]
+#   write/begin-authority/invalidate accepterar dessutom valfritt
+#       [--test-mutation-barrier-fds <ready-fd> <continue-fd>]
 # Authority-write är alltid PROVISIONAL. Bara finalize-authority får göra den
 # aktuella generationens kompletta publication-set globalt giltigt, atomiskt.
 # Katalogen anges av anroparen, aldrig av komponenten (h-001-formen).
@@ -81,16 +84,20 @@ fi
 # stale dekoration; utan tömning kan en gammal invalidering spärra en färsk
 # verifiering.
 NYTT="0f1e2d3c4b5a69788796a5b4c3d2e1f009182736"
-# Kön ligger på toppnivå i state, inte i attestationsobjektet — read h-test
-# returnerar bara attestationen. Prövas därför mot state-filen, och parsas
-# som JSON: ett fältnamn i utdata får aldrig kunna räknas som en kö.
+# Nya implementationer observeras genom read-only effekt-API:t. Den redan
+# frysta K7-kontrollen behåller enbart sin legacy-JSON-fallback så base-K0–K7
+# fortfarande mäter exakt samma äldre kontrakt; alla nya authority-controls
+# nedan använder endast det formatneutrala publika API:t.
 i_ko() {
+  if "$CLI" "$1" retest-required h-test >/dev/null 2>&1; then
+    return 0
+  fi
   python3 -c 'import json,sys
 try: d=json.load(open(sys.argv[1]))
 except Exception: sys.exit(2)
-sys.exit(0 if "h-test" in d.get("omtest_ko",[]) else 1)' "$1"
+sys.exit(0 if "h-test" in d.get("omtest_ko",[]) else 1)' "$1/attestations.json"
 }
-if ! i_ko "$D/attestations.json"; then
+if ! i_ko "$D"; then
   no "K7 omtest-kö" "stale attestation står inte i omtest-kön"
 else
   "$CLI" "$D" write h-test "$NYTT" >/dev/null 2>&1
@@ -99,7 +106,7 @@ else
     no "K7 omtest-kö" "ny attestation på nytt SHA lämnade tasken stale"
   elif ! "$CLI" "$D" read h-test --require-valid >/dev/null 2>&1; then
     no "K7 omtest-kö" "ny attestation på nytt SHA passerar inte --require-valid"
-  elif i_ko "$D/attestations.json"; then
+  elif i_ko "$D"; then
     no "K7 omtest-kö" "kön är inte tömd efter ny attestation på nytt SHA"
   else
     ok "K7 omtest köas vid stale och töms av ny attestation"
@@ -137,10 +144,7 @@ if sys.argv[4] != "-":
 }
 
 i_ko_task() {
-  python3 -c 'import json,sys
-try: d=json.load(open(sys.argv[1]))
-except Exception: sys.exit(2)
-sys.exit(0 if sys.argv[2] in d.get("omtest_ko",[]) else 1)' "$1" "$2"
+  "$CLI" "$1" retest-required "$2" >/dev/null 2>&1
 }
 
 # K8: BEGIN tar ett generiskt opaque id och lämnar legacy-resultat giltiga.
@@ -309,20 +313,20 @@ begin13=0; write13=0; other13=0; fin13=0
 "$CLI" "$D13" begin-authority "$A13" >/dev/null 2>&1 || begin13=$?
 "$CLI" "$D13" write retest-thirteen "$NEW13" --authority "$A13" >/dev/null 2>&1 || write13=$?
 queue_during13=1
-i_ko_task "$D13/attestations.json" retest-thirteen && queue_during13=0
+i_ko_task "$D13" retest-thirteen && queue_during13=0
 "$CLI" "$D13" write unrelated-thirteen "$OTHER13" --authority "$A13" >/dev/null 2>&1 || other13=$?
 global_during13=0
 giltig "$D13" retest-thirteen || global_during13=$?
 "$CLI" "$D13" finalize-authority "$A13" >/dev/null 2>&1 || fin13=$?
 queue_after13=0
-i_ko_task "$D13/attestations.json" retest-thirteen || queue_after13=$?
+i_ko_task "$D13" retest-thirteen || queue_after13=$?
 "$CLI" "$D13" invalidate "$NEW13" >/dev/null 2>&1
 if [ "$begin13" -eq 0 ] && [ "$write13" -eq 0 ] && [ "$other13" -eq 0 ] \
    && [ "$queue_during13" -eq 0 ] && [ "$global_during13" -ne 0 ] \
    && [ "$fin13" -eq 0 ] && [ "$queue_after13" -ne 0 ] \
    && ! giltig "$D13" retest-thirteen \
    && giltig "$D13" unrelated-thirteen \
-   && i_ko_task "$D13/attestations.json" retest-thirteen; then
+   && i_ko_task "$D13" retest-thirteen; then
   ok "K13 stale/queue: provisional behåller omtestskuld, finalize tömmer, SHA-invalidate träffar authority-post"
 else
   no "K13 stale/queue" "begin/write/other/finalize=$begin13/$write13/$other13/$fin13 queue-during/after=$queue_during13/$queue_after13 global-during=$global_during13"
@@ -340,7 +344,7 @@ begin13b=0; write13bx=0; write13by=0; invalidate13b=0
 "$CLI" "$D13B" write queued-member "$X13B" --authority "$A13B" >/dev/null 2>&1 || write13bx=$?
 "$CLI" "$D13B" write clean-member "$Y13B" --authority "$A13B" >/dev/null 2>&1 || write13by=$?
 queue_before_fail13b=1
-i_ko_task "$D13B/attestations.json" queued-member && queue_before_fail13b=0
+i_ko_task "$D13B" queued-member && queue_before_fail13b=0
 "$CLI" "$D13B" invalidate "$X13B" >/dev/null 2>&1 || invalidate13b=$?
 stale_bound13b=0; clean_bound13b=0
 authority_lasbar "$D13B" queued-member "$A13B" || stale_bound13b=$?
@@ -348,7 +352,7 @@ authority_lasbar "$D13B" clean-member "$A13B" || clean_bound13b=$?
 fin13b=0
 "$CLI" "$D13B" finalize-authority "$A13B" >/dev/null 2>&1 || fin13b=$?
 queue_after_fail13b=1
-i_ko_task "$D13B/attestations.json" queued-member && queue_after_fail13b=0
+i_ko_task "$D13B" queued-member && queue_after_fail13b=0
 if [ "$begin13b" -eq 0 ] && [ "$write13bx" -eq 0 ] && [ "$write13by" -eq 0 ] \
    && [ "$queue_before_fail13b" -eq 0 ] && [ "$invalidate13b" -eq 0 ] \
    && [ "$stale_bound13b" -ne 0 ] && [ "$clean_bound13b" -eq 0 ] \
@@ -359,56 +363,12 @@ else
   no "K13b stale batch" "begin/write/invalidate=$begin13b/$write13bx,$write13by/$invalidate13b queue-before/after=$queue_before_fail13b/$queue_after_fail13b bound=$stale_bound13b/$clean_bound13b finalize=$fin13b eller partial validity"
 fi
 
-# K14: positivt giltighetsankare före korruption. Trunkerad/kontradiktorisk
-# authoritative store får aldrig behandlas som tom/färsk eller valid.
-D14="$WORK/authority-corrupt"
-A14="corrupt-A14"
-S14="$(sha_for 1140)"
-"$CLI" "$D14" begin-authority "$A14" >/dev/null 2>&1
-"$CLI" "$D14" write corrupt-anchor "$S14" --authority "$A14" >/dev/null 2>&1
-"$CLI" "$D14" finalize-authority "$A14" >/dev/null 2>&1
-anchor14=1
-giltig "$D14" corrupt-anchor && anchor14=0
-corrupt14=1
-contradict14=1
-if [ -f "$D14/attestations.json" ]; then
-  cp "$D14/attestations.json" "$D14/good.copy"
-  printf '{"partial":' > "$D14/attestations.json"
-  bad_valid14=0; bad_bound14=0; bad_begin14=0
-  giltig "$D14" corrupt-anchor || bad_valid14=$?
-  authority_lasbar "$D14" corrupt-anchor "$A14" || bad_bound14=$?
-  "$CLI" "$D14" begin-authority "corrupt-new" >/dev/null 2>&1 || bad_begin14=$?
-  if [ "$bad_valid14" -ne 0 ] && [ "$bad_bound14" -ne 0 ] && [ "$bad_begin14" -ne 0 ]; then
-    corrupt14=0
-  fi
-  cp "$D14/good.copy" "$D14/attestations.json"
-  python3 -c 'import json,pathlib,sys
-p=pathlib.Path(sys.argv[1]); text=p.read_text(encoding="utf-8").strip()
-pairs=json.loads(text, object_pairs_hook=lambda xs: xs)
-if not pairs or not text.startswith("{"):
-    raise SystemExit(1)
-key=pairs[0][0]
-p.write_text("{" + json.dumps(key) + ":null," + text[1:] + "\n", encoding="utf-8")
-' "$D14/attestations.json" >/dev/null 2>&1
-  duplicate_valid14=0; duplicate_bound14=0; duplicate_begin14=0
-  giltig "$D14" corrupt-anchor || duplicate_valid14=$?
-  authority_lasbar "$D14" corrupt-anchor "$A14" || duplicate_bound14=$?
-  "$CLI" "$D14" begin-authority "contradict-new" >/dev/null 2>&1 || duplicate_begin14=$?
-  if [ "$duplicate_valid14" -ne 0 ] && [ "$duplicate_bound14" -ne 0 ] \
-     && [ "$duplicate_begin14" -ne 0 ]; then
-    contradict14=0
-  fi
-fi
-if [ "$anchor14" -eq 0 ] && [ "$corrupt14" -eq 0 ] && [ "$contradict14" -eq 0 ]; then
-  ok "K14 corrupt/partial/contradictory state faller stängt efter positivt validitetsankare"
-else
-  no "K14 corrupt/partial/contradictory" "anchor=$anchor14 truncated=$corrupt14 duplicate-key=$contradict14"
-fi
-
-# K14b: fail-closed gäller varje authoritative mutationsväg, inte bara read
-# och BEGIN. Varje fall körs mot en isolerad kopia och en normal nonzero-return
-# måste lämna HELA katalogens bytes oförändrade. Detta fäller corrupt-as-empty
-# och implementationer som skriver en reparerad/partiell snapshot före failure.
+# K14/K14b: formatblind corrupt/partial state. Fixturen använder bara den
+# caller-supplied state-katalogen och publika CLI-effekter: inga filnamn,
+# JSON-nycklar eller lagringsformat är kontrakt. Redundant återställning till
+# exakt logisk prestate är tillåten; annars ska reads och varje mutation falla
+# stängt utan ny publik authority/validity/current-generation. Fysisk cleanup
+# eller recovery är inte kontrakt eftersom owner binder effekt, inte storage.
 cat > "$WORK/h003-corrupt-mutations.py" <<'PYCORRUPTMUT'
 import os
 import pathlib
@@ -419,7 +379,12 @@ import sys
 cli = os.path.abspath(sys.argv[1])
 root = pathlib.Path(sys.argv[2])
 seed = root / "seed"
-current = "corrupt-mutation-current"
+current = "corrupt-current"
+next_authority = "corrupt-next"
+legacy_task, legacy_sha = "corrupt-legacy", f"{1400:040x}"
+final_task, final_sha = "corrupt-final", f"{1401:040x}"
+provisional_task, provisional_sha = "corrupt-provisional", f"{1402:040x}"
+queue_task, queue_sha = "corrupt-queued", f"{1403:040x}"
 
 def run(*args):
     try:
@@ -432,72 +397,166 @@ def run(*args):
 def sha(number):
     return f"{number:040x}"
 
-def snapshot(directory):
-    answer = {}
-    if not directory.exists():
-        return answer
-    for path in sorted(directory.rglob("*")):
-        relative = str(path.relative_to(directory))
-        if path.is_symlink():
-            answer[relative] = ("link", os.readlink(path))
-        elif path.is_file():
-            answer[relative] = ("file", path.read_bytes())
-        elif path.is_dir():
-            answer[relative] = ("dir", None)
+def exact(directory, task, candidate, *read_args):
+    answer = run(directory, "read", task, *read_args)
+    return answer.returncode == 0 and candidate in answer.stdout and task in answer.stdout
+
+def logical_prestate(directory):
+    return (
+        exact(directory, legacy_task, legacy_sha, "--require-valid")
+        and exact(directory, final_task, final_sha, "--require-valid")
+        and exact(directory, provisional_task, provisional_sha, "--authority", current)
+        and run(directory, "read", provisional_task, "--require-valid").returncode != 0
+        and run(directory, "read", queue_task, "--require-valid").returncode != 0
+        and run(directory, "retest-required", queue_task).returncode == 0
+    )
+
+def fully_closed(directory):
+    probes = [
+        (directory, "read", legacy_task, "--require-valid"),
+        (directory, "read", final_task, "--require-valid"),
+        (directory, "read", provisional_task, "--authority", current),
+        (directory, "read", provisional_task, "--require-valid"),
+        (directory, "read", queue_task),
+        (directory, "retest-required", queue_task),
+    ]
+    return all(run(*probe).returncode != 0 for probe in probes)
+
+def copy_namespace(source, target):
+    def ignore_special(directory, names):
+        ignored = []
+        for name in names:
+            path = pathlib.Path(directory) / name
+            if not (path.is_dir() or path.is_file() or path.is_symlink()):
+                ignored.append(name)
+        return ignored
+    shutil.copytree(source, target, symlinks=True, ignore=ignore_special)
+
+def poison(source, target, mode):
+    copy_namespace(source, target)
+    payloads = [
+        path for path in sorted(target.rglob("*"))
+        if path.is_file() and not path.is_symlink()
+    ]
+    if not payloads:
+        shutil.rmtree(target)
+        target.write_bytes(b"nortropic-unorderable-state-namespace\n")
+        return
+    for path in payloads:
+        data = path.read_bytes()
+        if mode == "opaque-overwrite":
+            path.write_bytes(b"\x00nortropic-corrupt-state\xff\n")
+        elif mode == "proper-prefix":
+            path.write_bytes(data[: len(data) // 2])
         else:
-            answer[relative] = ("other", None)
-    return answer
+            raise AssertionError(mode)
 
-if run(seed, "write", "corrupt-legacy-anchor", sha(1400)).returncode != 0:
-    raise SystemExit("legacy seed föll")
-if run(seed, "write", "corrupt-invalidate-victim", sha(1401)).returncode != 0:
-    raise SystemExit("invalidate seed föll")
-if run(seed, "begin-authority", current).returncode != 0:
-    raise SystemExit("authority seed begin föll")
-if run(seed, "write", "corrupt-authority-anchor", sha(1402), "--authority", current).returncode != 0:
-    raise SystemExit("authority seed write föll")
+setup = [
+    (seed, "write", legacy_task, legacy_sha),
+    (seed, "write", queue_task, queue_sha),
+    (seed, "invalidate", queue_sha),
+    (seed, "begin-authority", "corrupt-prior"),
+    (seed, "write", final_task, final_sha, "--authority", "corrupt-prior"),
+    (seed, "finalize-authority", "corrupt-prior"),
+    (seed, "begin-authority", current),
+    (seed, "write", provisional_task, provisional_sha, "--authority", current),
+]
+for command in setup:
+    if run(*command).returncode != 0:
+        raise SystemExit(f"positive seed föll: {command!r}")
+if not logical_prestate(seed):
+    raise SystemExit("positive logical prestate saknas")
 
-state = seed / "attestations.json"
-good = state.read_bytes()
-stripped = good.lstrip()
-if not stripped.startswith(b"{"):
-    raise SystemExit("seed-state saknar objectform")
-prefix = good[: len(good) - len(stripped)]
-corruptions = {
-    "truncated": b'{"partial":',
-    "duplicate-key": prefix + b'{"attestations":null,' + stripped[1:],
-}
 mutations = {
     "legacy-write": ("write", "corrupt-new-legacy", sha(1410)),
     "authority-write": ("write", "corrupt-new-authority", sha(1411), "--authority", current),
-    "begin": ("begin-authority", "corrupt-next"),
+    "begin": ("begin-authority", next_authority),
     "finalize": ("finalize-authority", current),
-    "invalidate": ("invalidate", sha(1401)),
+    "invalidate": ("invalidate", legacy_sha),
 }
 
-for corruption_name, payload in corruptions.items():
+def attempted_effect_absent(directory, mutation_name):
+    if run(directory, "read", "corrupt-new-legacy", "--require-valid").returncode == 0:
+        return False
+    if run(directory, "read", "corrupt-new-authority", "--authority", current).returncode == 0:
+        return False
+    if run(directory, "read", "corrupt-new-authority", "--require-valid").returncode == 0:
+        return False
+    if mutation_name == "begin" and run(
+        directory, "write", "corrupt-next-probe", sha(1412), "--authority", next_authority
+    ).returncode == 0:
+        return False
+    return True
+
+def require_persistently_closed(directory, label):
+    """A failed corrupt-state command may not reset the namespace to fresh."""
+    chain_authority = f"closed-chain-{label}"
+    chain_legacy = f"closed-chain-legacy-{label}"
+    chain_bound = f"closed-chain-bound-{label}"
+    chain_legacy_sha = sha(1420)
+    chain_bound_sha = sha(1421)
+    probes = [
+        ("write", chain_legacy, chain_legacy_sha),
+        ("begin-authority", chain_authority),
+        ("write", chain_bound, chain_bound_sha, "--authority", chain_authority),
+        ("finalize-authority", chain_authority),
+        ("invalidate", chain_legacy_sha),
+    ]
+    for probe in probes:
+        answer = run(directory, *probe)
+        if answer.returncode == 0:
+            raise SystemExit(f"{label}: corrupt reset accepted chained mutation {probe!r}")
+        if not fully_closed(directory):
+            raise SystemExit(f"{label}: chained mutation leaked prior public authority")
+        if run(directory, "read", chain_legacy, "--require-valid").returncode == 0:
+            raise SystemExit(f"{label}: chained legacy write became public")
+        if run(directory, "read", chain_bound, "--authority", chain_authority).returncode == 0:
+            raise SystemExit(f"{label}: chained authority write became public")
+        if run(directory, "read", chain_bound, "--require-valid").returncode == 0:
+            raise SystemExit(f"{label}: chained finalize became public")
+        if run(directory, "retest-required", chain_legacy).returncode == 0:
+            raise SystemExit(f"{label}: chained invalidate created public debt")
+
+recovered = 0
+fail_closed = 0
+for corruption_name in ("opaque-overwrite", "proper-prefix"):
+    corrupt_seed = root / corruption_name
+    poison(seed, corrupt_seed, corruption_name)
+    if logical_prestate(corrupt_seed):
+        recovered += 1
+        continue
+    if not fully_closed(corrupt_seed):
+        raise SystemExit(f"{corruption_name}: partial public authority leaked")
     for mutation_name, command in mutations.items():
         case = root / f"{corruption_name}-{mutation_name}"
-        shutil.copytree(seed, case)
-        (case / "attestations.json").write_bytes(payload)
-        before = snapshot(case)
+        if corrupt_seed.is_dir():
+            copy_namespace(corrupt_seed, case)
+        else:
+            case.write_bytes(corrupt_seed.read_bytes())
         answer = run(case, *command)
-        after = snapshot(case)
         if answer.returncode == 0:
             raise SystemExit(f"{corruption_name}/{mutation_name}: corrupt state godtogs")
-        if after != before:
-            raise SystemExit(f"{corruption_name}/{mutation_name}: failure muterade authoritative bytes")
+        if logical_prestate(case):
+            if not attempted_effect_absent(case, mutation_name):
+                raise SystemExit(f"{corruption_name}/{mutation_name}: failure gav publik effekt")
+        elif not fully_closed(case):
+            raise SystemExit(f"{corruption_name}/{mutation_name}: failure lämnade partial public state")
+        else:
+            require_persistently_closed(case, f"{corruption_name}-{mutation_name}")
+        fail_closed += 1
 
-print("10 corrupt mutation paths failed closed with exact prestate")
+print(f"format-blind corrupt state: recovered={recovered} fail-closed-mutations={fail_closed}")
 PYCORRUPTMUT
 
 corrupt_mut14=$(python3 "$WORK/h003-corrupt-mutations.py" "$CLI" "$WORK/corrupt-mutations" 2>&1); corrupt_mut14_rc=$?
 if [ "$corrupt_mut14_rc" -eq 0 ]; then
-  ok "K14b corrupt mutation: write/BEGIN/FINALIZE/INVALIDATE faller före exakt prestate-mutation"
+  ok "K14 formatblind corrupt/partial state: exakt recovery eller public fail-closed för alla mutationer"
 else
-  no "K14b corrupt mutation" "${corrupt_mut14:-corrupt-mutation harness exit $corrupt_mut14_rc}"
+  no "K14 formatblind corrupt/partial state" "${corrupt_mut14:-corrupt-mutation harness exit $corrupt_mut14_rc}"
 fi
 
+# K15–K17 är bred scheduler-stress, inte den avgörande overlap-orakeln; K19
+# nedan tvingar post-read/pre-mutation-schemat deterministiskt.
 # K15: samtidiga publika histories — inte en gissning om intern mekanism.
 # Varje write som rapporterar success ska förbli observerbar, och en write av
 # en ANNAN task får aldrig skriva tillbaka en snapshot som tappar invalidate.
@@ -614,11 +673,7 @@ if not exact(run(d, "read", "filler-0", "--require-valid"), "filler-0", sha(1600
     raise SystemExit("authority finalize ändrade/tappade legacy payload")
 if run(d, "read", queue_task, "--require-valid").returncode == 0:
     raise SystemExit("authority finalize resurrected unrelated stale legacy task")
-try:
-    queue_state = json.loads((d / "attestations.json").read_text(encoding="utf-8"))
-except Exception as exc:
-    raise SystemExit(f"queue-state oläsbar efter finalize: {exc}") from exc
-if queue_task not in queue_state.get("omtest_ko", []):
+if run(d, "retest-required", queue_task).returncode != 0:
     raise SystemExit("authority finalize tömde unrelated omtest-skuld")
 
 # Samma lost-update-klass måste vara stängd på den bevarade legacy-vägen;
@@ -810,11 +865,7 @@ for i in range(16):
         raise SystemExit("K16 safe-failed begin/invalidate kunde inte retryas")
     if run(d, "read", victim, "--require-valid").returncode == 0:
         raise SystemExit("K16 BEGIN resurrected completed invalidate")
-    try:
-        state = json.loads((d / "attestations.json").read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise SystemExit(f"K16 queue-state oläsbar: {exc}") from exc
-    if victim not in state.get("omtest_ko", []):
+    if run(d, "retest-required", victim).returncode != 0:
         raise SystemExit("K16 BEGIN tappade invalidate-kön")
     btask, bsha = f"begin-current-{i}", sha(2150 + i)
     if run(d, "write", btask, bsha, "--authority", b).returncode != 0:
@@ -827,11 +878,7 @@ for i in range(16):
         raise SystemExit("K16 begin/invalidate current-resultat saknas")
     if run(d, "read", victim, "--require-valid").returncode == 0:
         raise SystemExit("K16 unrelated finalize resurrected stale victim")
-    try:
-        state_after_finalize = json.loads((d / "attestations.json").read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise SystemExit(f"K16 queue-state oläsbar efter finalize: {exc}") from exc
-    if victim not in state_after_finalize.get("omtest_ko", []):
+    if run(d, "retest-required", victim).returncode != 0:
         raise SystemExit("K16 unrelated finalize tömde invalidate-kön")
 
 print("K16 transitions preserved")
@@ -1134,15 +1181,7 @@ def globally_invalid(directory, tasks):
     return all(run(directory, "read", task, "--require-valid").returncode != 0 for task, _sha in tasks)
 
 def queue_contains(directory, task):
-    try:
-        state = json.loads((directory / "attestations.json").read_text(encoding="utf-8"))
-    except Exception:
-        return False
-    return task in state.get("omtest_ko", [])
-
-def state_bytes(directory):
-    path = directory / "attestations.json"
-    return path.read_bytes() if path.is_file() else None
+    return run(directory, "retest-required", task).returncode == 0
 
 def wait_ready(process, barrier, seconds=5):
     deadline = time.monotonic() + seconds
@@ -1484,6 +1523,603 @@ if [ "$barrier18_rc" -eq 0 ]; then
   ok "K18b publication barrier: held kill=noll, release=hel och invalid ids skapar aldrig READY"
 else
   no "K18b publication barrier" "${barrier18:-finalize-barrier harness exit $barrier18_rc}"
+fi
+
+# K19: deterministisk post-read/pre-mutation ordering för semantiskt
+# contradictory/unorderable authority-historik. K15–K17 ovan är
+# scheduler-stress; denna kontroll håller uttryckligen den äldre mutationen efter
+# positiv prestate-selection, låter den skadliga konkurrenten avslutas och släpper
+# sedan den äldre. Safe-failure döms före eventuell retry.
+cat > "$WORK/h003-mutation-barrier.py" <<'PYMUTATIONBARRIER'
+import json
+import os
+import pathlib
+import select
+import shutil
+import subprocess
+import sys
+import time
+
+cli = os.path.abspath(sys.argv[1])
+root = pathlib.Path(sys.argv[2])
+
+def run(*args, timeout=8):
+    try:
+        return subprocess.run(
+            [cli, *map(str, args)], capture_output=True, text=True, timeout=timeout
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"public conflicting mutation blocked: {args!r}") from exc
+
+def sha(number):
+    return f"{number:040x}"
+
+def exact(directory, task, candidate, *read_args):
+    answer = run(directory, "read", task, *read_args)
+    if answer.returncode != 0:
+        return False
+    try:
+        post = json.loads(answer.stdout)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(post, dict)
+        and post.get("task") == task
+        and post.get("candidate_sha") == candidate
+    )
+
+def pending(directory, task):
+    return run(directory, "retest-required", task).returncode == 0
+
+class HeldMutation:
+    def __init__(self, *args):
+        self.args = args
+        self.ready_r, ready_w = os.pipe()
+        continue_r, self.continue_w = os.pipe()
+        os.set_inheritable(ready_w, True)
+        os.set_inheritable(continue_r, True)
+        self.process = subprocess.Popen(
+            [
+                cli,
+                *map(str, args),
+                "--test-mutation-barrier-fds",
+                str(ready_w),
+                str(continue_r),
+            ],
+            pass_fds=(ready_w, continue_r),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        os.close(ready_w)
+        os.close(continue_r)
+
+    def require_ready(self, timeout=5):
+        readable, _writable, _exceptional = select.select([self.ready_r], [], [], timeout)
+        if not readable:
+            raise RuntimeError(f"mutation emitted no READY: {self.args!r}")
+        data = os.read(self.ready_r, 2)
+        if data != b"R" or self.process.poll() is not None:
+            raise RuntimeError(
+                f"mutation READY invalid/exited data={data!r} rc={self.process.poll()}: {self.args!r}"
+            )
+
+    def continue_one(self, byte=b"C"):
+        if self.continue_w is None:
+            raise RuntimeError("CONTINUE already closed")
+        if byte:
+            os.write(self.continue_w, byte)
+        os.close(self.continue_w)
+        self.continue_w = None
+
+    def wait(self, timeout=8):
+        stdout, stderr = self.process.communicate(timeout=timeout)
+        return self.process.returncode, stdout, stderr
+
+    def close(self):
+        if self.continue_w is not None:
+            os.close(self.continue_w)
+            self.continue_w = None
+        try:
+            os.close(self.ready_r)
+        except OSError:
+            pass
+        if self.process.poll() is None:
+            self.process.kill()
+            self.process.communicate(timeout=5)
+
+class HeldFinalize:
+    def __init__(self, directory, authority, label):
+        self.barrier = root / f"barrier-finalize-{label}"
+        self.barrier.mkdir(parents=True, exist_ok=False)
+        self.process = subprocess.Popen(
+            [
+                cli,
+                str(directory),
+                "finalize-authority",
+                authority,
+                "--test-before-publication-barrier",
+                str(self.barrier),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+    def require_ready(self, timeout=5):
+        deadline = time.monotonic() + timeout
+        ready = self.barrier / "ready"
+        while time.monotonic() < deadline:
+            if ready.is_file() and not ready.is_symlink():
+                if self.process.poll() is not None:
+                    raise RuntimeError(f"finalize exited after READY rc={self.process.returncode}")
+                return
+            if self.process.poll() is not None:
+                raise RuntimeError(f"finalize exited before READY rc={self.process.returncode}")
+            time.sleep(0.02)
+        raise RuntimeError("finalize emitted no READY")
+
+    def release(self):
+        (self.barrier / "release").write_bytes(b"release\n")
+
+    def wait(self, timeout=8):
+        stdout, stderr = self.process.communicate(timeout=timeout)
+        return self.process.returncode, stdout, stderr
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.kill()
+            self.process.communicate(timeout=5)
+        shutil.rmtree(self.barrier, ignore_errors=True)
+
+def setup_authority(directory, authority, seed_task, seed_sha):
+    if run(directory, "begin-authority", authority).returncode != 0:
+        raise RuntimeError("BEGIN setup failed")
+    if run(directory, "write", seed_task, seed_sha, "--authority", authority).returncode != 0:
+        raise RuntimeError("authority seed failed")
+
+def held_write_invalidate(label, authority_bound):
+    directory = root / label
+    victim, side = f"{label}-victim", f"{label}-side"
+    victim_sha, side_sha = sha(6000), sha(6001)
+    if run(directory, "write", victim, victim_sha).returncode != 0:
+        raise RuntimeError(f"{label}: victim seed failed")
+    authority = f"{label}-authority"
+    if authority_bound and run(directory, "begin-authority", authority).returncode != 0:
+        raise RuntimeError(f"{label}: authority begin failed")
+    call = (directory, "write", side, side_sha)
+    read_args = ("--require-valid",)
+    if authority_bound:
+        call += ("--authority", authority)
+        read_args = ("--authority", authority)
+    held = HeldMutation(*call)
+    try:
+        held.require_ready()
+        if run(directory, "invalidate", victim_sha).returncode != 0:
+            raise RuntimeError(f"{label}: conflicting invalidate failed")
+        if run(directory, "read", victim, "--require-valid").returncode == 0 or not pending(directory, victim):
+            raise RuntimeError(f"{label}: invalidate effect absent before CONTINUE")
+        held.continue_one()
+        rc, _stdout, _stderr = held.wait()
+    finally:
+        held.close()
+    if run(directory, "read", victim, "--require-valid").returncode == 0 or not pending(directory, victim):
+        raise RuntimeError(f"{label}: held write resurrected completed invalidate")
+    if rc != 0:
+        if run(*call).returncode != 0:
+            raise RuntimeError(f"{label}: safe-failed write could not retry")
+    if not exact(directory, side, side_sha, *read_args):
+        raise RuntimeError(f"{label}: side write missing")
+
+held_write_invalidate("legacy-write-invalidate", False)
+held_write_invalidate("authority-write-invalidate", True)
+
+# Inverse direction: INVALIDATE itself is held on an old snapshot while a
+# completed independent write or BEGIN changes the same store.
+def held_invalidate_write():
+    directory = root / "invalidate-write"
+    victim, side = "invalidate-held-victim", "invalidate-held-side"
+    victim_sha, side_sha = sha(6002), sha(6003)
+    if run(directory, "write", victim, victim_sha).returncode != 0:
+        raise RuntimeError("held invalidate victim seed failed")
+    held = HeldMutation(directory, "invalidate", victim_sha)
+    try:
+        held.require_ready()
+        if run(directory, "write", side, side_sha).returncode != 0:
+            raise RuntimeError("held invalidate blocked independent write")
+        if not exact(directory, side, side_sha, "--require-valid"):
+            raise RuntimeError("independent write absent before invalidate CONTINUE")
+        held.continue_one()
+        rc, _stdout, _stderr = held.wait()
+    finally:
+        held.close()
+    if not exact(directory, side, side_sha, "--require-valid"):
+        raise RuntimeError("held invalidate lost completed independent write")
+    if rc != 0:
+        if run(directory, "read", victim, "--require-valid").returncode != 0:
+            raise RuntimeError("failed held invalidate reported hidden effect")
+        if run(directory, "invalidate", victim_sha).returncode != 0:
+            raise RuntimeError("held invalidate safe-failure could not retry")
+    if run(directory, "read", victim, "--require-valid").returncode == 0 or not pending(directory, victim):
+        raise RuntimeError("held invalidate effect missing")
+
+def held_invalidate_begin():
+    directory = root / "invalidate-begin"
+    victim, victim_sha = "invalidate-begin-victim", sha(6004)
+    authority = "invalidate-begin-current"
+    if run(directory, "write", victim, victim_sha).returncode != 0:
+        raise RuntimeError("invalidate/BEGIN victim seed failed")
+    held = HeldMutation(directory, "invalidate", victim_sha)
+    try:
+        held.require_ready()
+        if run(directory, "begin-authority", authority).returncode != 0:
+            raise RuntimeError("held invalidate blocked BEGIN")
+        probe, probe_sha = "invalidate-begin-probe", sha(6005)
+        if run(directory, "write", probe, probe_sha, "--authority", authority).returncode != 0:
+            raise RuntimeError("BEGIN effect absent before invalidate CONTINUE")
+        held.continue_one()
+        rc, _stdout, _stderr = held.wait()
+    finally:
+        held.close()
+    if not exact(directory, probe, probe_sha, "--authority", authority):
+        raise RuntimeError("held invalidate overwrote completed BEGIN")
+    if rc != 0:
+        if run(directory, "read", victim, "--require-valid").returncode != 0:
+            raise RuntimeError("failed held invalidate reported hidden effect")
+        if run(directory, "invalidate", victim_sha).returncode != 0:
+            raise RuntimeError("invalidate/BEGIN safe-failure could not retry")
+    if run(directory, "read", victim, "--require-valid").returncode == 0 or not pending(directory, victim):
+        raise RuntimeError("invalidate/BEGIN lost invalidate effect")
+
+held_invalidate_write()
+held_invalidate_begin()
+
+# Held authority write A must become stale after completed BEGIN B.
+directory = root / "authority-write-begin"
+a, b = "barrier-write-A", "barrier-write-B"
+if run(directory, "begin-authority", a).returncode != 0:
+    raise SystemExit("write/BEGIN setup failed")
+late_task, late_sha = "write-before-begin", sha(6010)
+held = HeldMutation(directory, "write", late_task, late_sha, "--authority", a)
+try:
+    held.require_ready()
+    if run(directory, "begin-authority", b).returncode != 0:
+        raise RuntimeError("write/BEGIN conflicting BEGIN failed")
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc == 0 or run(directory, "read", late_task, "--authority", a).returncode == 0:
+    raise SystemExit("held stale authority write survived newer BEGIN")
+b_task, b_sha = "write-begin-current", sha(6011)
+if run(directory, "write", b_task, b_sha, "--authority", b).returncode != 0:
+    raise SystemExit("held authority write resurrected A over B")
+
+# Held legacy write is independent of BEGIN but cannot overwrite B-current.
+directory = root / "legacy-write-begin"
+if run(directory, "begin-authority", "legacy-A").returncode != 0:
+    raise SystemExit("legacy write/BEGIN setup failed")
+legacy_task, legacy_sha = "legacy-held", sha(6020)
+held = HeldMutation(directory, "write", legacy_task, legacy_sha)
+try:
+    held.require_ready()
+    if run(directory, "begin-authority", "legacy-B").returncode != 0:
+        raise RuntimeError("legacy write/BEGIN conflicting BEGIN failed")
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if run(directory, "write", "legacy-b-current", sha(6021), "--authority", "legacy-B").returncode != 0:
+    raise SystemExit("held legacy write overwrote newer BEGIN before retry")
+if rc != 0 and run(directory, "write", legacy_task, legacy_sha).returncode != 0:
+    raise SystemExit("legacy held write safe-failure could not retry")
+if not exact(directory, legacy_task, legacy_sha, "--require-valid"):
+    raise SystemExit("BEGIN lost held legacy write")
+
+# Held BEGIN B must not resurrect a completed invalidate.
+directory = root / "begin-invalidate"
+victim, victim_sha = "begin-held-victim", sha(6030)
+if run(directory, "write", victim, victim_sha).returncode != 0:
+    raise SystemExit("held BEGIN victim seed failed")
+held = HeldMutation(directory, "begin-authority", "held-begin-B")
+try:
+    held.require_ready()
+    if run(directory, "invalidate", victim_sha).returncode != 0:
+        raise RuntimeError("held BEGIN conflicting invalidate failed")
+    if run(directory, "read", victim, "--require-valid").returncode == 0 or not pending(directory, victim):
+        raise RuntimeError("held BEGIN invalidate absent before CONTINUE")
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if run(directory, "read", victim, "--require-valid").returncode == 0 or not pending(directory, victim):
+    raise SystemExit("held BEGIN resurrected completed invalidate")
+if rc != 0 and run(directory, "begin-authority", "held-begin-B").returncode != 0:
+    raise SystemExit("held BEGIN safe-failure could not retry")
+if run(directory, "write", "held-begin-current", sha(6031), "--authority", "held-begin-B").returncode != 0:
+    raise SystemExit("held BEGIN effect missing")
+
+# A current write held before mutation must fail after finalize closes A.
+directory = root / "write-finalize"
+a = "held-write-finalize-A"
+setup_authority(directory, a, "wf-seed", sha(6040))
+held = HeldMutation(directory, "write", "wf-late", sha(6041), "--authority", a)
+try:
+    held.require_ready()
+    if run(directory, "finalize-authority", a).returncode != 0:
+        raise RuntimeError("write/finalize conflicting finalize failed")
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc == 0 or run(directory, "read", "wf-late", "--authority", a).returncode == 0:
+    raise SystemExit("held write reopened finalized generation")
+if not exact(directory, "wf-seed", sha(6040), "--require-valid"):
+    raise SystemExit("held write damaged finalized seed")
+
+def finalize_begin():
+    directory = root / "finalize-begin"
+    a, b = "held-finalize-A", "held-finalize-B"
+    setup_authority(directory, a, "fb-seed", sha(6050))
+    held = HeldFinalize(directory, a, "begin")
+    try:
+        held.require_ready()
+        if run(directory, "begin-authority", b).returncode != 0:
+            raise RuntimeError("held finalize blocked/completed-over newer BEGIN")
+        held.release()
+        rc, _stdout, _stderr = held.wait()
+    finally:
+        held.close()
+    if rc == 0 or run(directory, "read", "fb-seed", "--require-valid").returncode == 0:
+        raise RuntimeError("held finalize published after newer BEGIN")
+    if run(directory, "write", "fb-current", sha(6051), "--authority", b).returncode != 0:
+        raise RuntimeError("held finalize resurrected A over B")
+
+def finalize_invalidate():
+    directory = root / "finalize-invalidate"
+    a = "held-finalize-invalidate"
+    x, y = "fi-x", "fi-y"
+    x_sha, y_sha = sha(6060), sha(6061)
+    setup_authority(directory, a, x, x_sha)
+    if run(directory, "write", y, y_sha, "--authority", a).returncode != 0:
+        raise RuntimeError("finalize/invalidate second seed failed")
+    held = HeldFinalize(directory, a, "invalidate")
+    try:
+        held.require_ready()
+        if run(directory, "invalidate", x_sha).returncode != 0:
+            raise RuntimeError("held finalize blocked conflicting invalidate")
+        held.release()
+        rc, _stdout, _stderr = held.wait()
+    finally:
+        held.close()
+    if rc == 0 or any(run(directory, "read", task, "--require-valid").returncode == 0 for task in (x, y)):
+        raise RuntimeError("held finalize published invalidated/partial batch")
+    if not pending(directory, x):
+        raise RuntimeError("held finalize lost invalidate debt")
+
+def finalize_late_write():
+    directory = root / "finalize-late-write"
+    a = "held-finalize-late"
+    seed_task, late_task = "fl-seed", "fl-late"
+    seed_sha, late_sha = sha(6070), sha(6071)
+    setup_authority(directory, a, seed_task, seed_sha)
+    held = HeldFinalize(directory, a, "late-write")
+    try:
+        held.require_ready()
+        if run(directory, "write", late_task, late_sha, "--authority", a).returncode != 0:
+            raise RuntimeError("held finalize blocked current late write")
+        held.release()
+        rc, _stdout, _stderr = held.wait()
+    finally:
+        held.close()
+    if rc != 0:
+        if any(run(directory, "read", task, "--require-valid").returncode == 0 for task in (seed_task, late_task)):
+            raise RuntimeError("failed held finalize left partial/global validity")
+        if not exact(directory, late_task, late_sha, "--authority", a):
+            raise RuntimeError("failed held finalize lost completed late write")
+        if run(directory, "finalize-authority", a).returncode != 0:
+            raise RuntimeError("safe-failed held finalize could not retry")
+    if not all(
+        exact(directory, task, candidate, "--require-valid")
+        for task, candidate in ((seed_task, seed_sha), (late_task, late_sha))
+    ):
+        raise RuntimeError("held finalize omitted completed late write")
+
+def finalize_legacy_write():
+    directory = root / "finalize-legacy-write"
+    a = "held-finalize-legacy"
+    seed_task, legacy_task = "fg-seed", "fg-legacy"
+    seed_sha, legacy_sha = sha(6080), sha(6081)
+    setup_authority(directory, a, seed_task, seed_sha)
+    held = HeldFinalize(directory, a, "legacy-write")
+    try:
+        held.require_ready()
+        if run(directory, "write", legacy_task, legacy_sha).returncode != 0:
+            raise RuntimeError("held finalize blocked independent legacy write")
+        if not exact(directory, legacy_task, legacy_sha, "--require-valid"):
+            raise RuntimeError("legacy effect absent before finalize RELEASE")
+        held.release()
+        rc, _stdout, _stderr = held.wait()
+    finally:
+        held.close()
+    if not exact(directory, legacy_task, legacy_sha, "--require-valid"):
+        raise RuntimeError("held finalize lost completed legacy write")
+    if rc != 0:
+        if run(directory, "read", seed_task, "--require-valid").returncode == 0:
+            raise RuntimeError("failed held finalize reported partial validity")
+        if run(directory, "finalize-authority", a).returncode != 0:
+            raise RuntimeError("held finalize safe-failure could not retry")
+    if not exact(directory, seed_task, seed_sha, "--require-valid"):
+        raise RuntimeError("held finalize seed missing")
+
+finalize_begin()
+finalize_invalidate()
+finalize_late_write()
+finalize_legacy_write()
+
+# Seam integrity: immediate-C retains normal effect; EOF and wrong authority do
+# not mutate, and invalid descriptors fail before mutation.
+directory = root / "barrier-controls"
+held = HeldMutation(directory, "write", "positive", sha(6090))
+try:
+    held.require_ready()
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc != 0 or not exact(directory, "positive", sha(6090), "--require-valid"):
+    raise SystemExit("immediate-C positive write lost normal effect")
+
+if run(directory, "write", "positive-invalidate", sha(6091)).returncode != 0:
+    raise SystemExit("positive invalidate seed failed")
+held = HeldMutation(directory, "invalidate", sha(6091))
+try:
+    held.require_ready()
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc != 0 or run(directory, "read", "positive-invalidate", "--require-valid").returncode == 0:
+    raise SystemExit("immediate-C positive invalidate lost normal effect")
+
+begin_directory = root / "barrier-positive-authority"
+held = HeldMutation(begin_directory, "begin-authority", "positive-authority")
+try:
+    held.require_ready()
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc != 0:
+    raise SystemExit("immediate-C positive BEGIN lost normal effect")
+held = HeldMutation(
+    begin_directory,
+    "write",
+    "positive-authority-write",
+    sha(6092),
+    "--authority",
+    "positive-authority",
+)
+try:
+    held.require_ready()
+    held.continue_one()
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc != 0 or not exact(
+    begin_directory,
+    "positive-authority-write",
+    sha(6092),
+    "--authority",
+    "positive-authority",
+):
+    raise SystemExit("immediate-C positive authority write lost normal effect")
+
+held = HeldMutation(directory, "write", "eof", sha(6092))
+try:
+    held.require_ready()
+    held.continue_one(b"")
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc == 0 or run(directory, "read", "eof", "--require-valid").returncode == 0:
+    raise SystemExit("CONTINUE EOF mutated/accepted write")
+
+held = HeldMutation(directory, "write", "wrong-byte", sha(6093))
+try:
+    held.require_ready()
+    held.continue_one(b"X")
+    rc, _stdout, _stderr = held.wait()
+finally:
+    held.close()
+if rc == 0 or run(directory, "read", "wrong-byte", "--require-valid").returncode == 0:
+    raise SystemExit("non-C CONTINUE mutated/accepted write")
+
+for label, ready_fd, continue_fd in (
+    ("negative", "-1", "-2"),
+    ("closed-positive", "240", "241"),
+):
+    task = f"bad-fd-{label}"
+    bad_fd = run(
+        directory,
+        "write",
+        task,
+        sha(6094),
+        "--test-mutation-barrier-fds",
+        ready_fd,
+        continue_fd,
+    )
+    if bad_fd.returncode == 0 or run(directory, "read", task, "--require-valid").returncode == 0:
+        raise SystemExit(f"{label} barrier descriptors mutated/accepted write")
+
+if run(directory, "begin-authority", "control-current").returncode != 0:
+    raise SystemExit("barrier control BEGIN failed")
+def expect_no_ready(label, *args):
+    held = HeldMutation(*args)
+    try:
+        readable, _writable, _exceptional = select.select([held.ready_r], [], [], 3)
+        rc, _stdout, _stderr = held.wait(timeout=3)
+        data = os.read(held.ready_r, 2) if readable else b""
+    finally:
+        held.close()
+    if rc == 0 or data:
+        raise RuntimeError(f"{label} emitted READY or succeeded")
+
+expect_no_ready(
+    "wrong authority",
+    directory,
+    "write",
+    "wrong-authority",
+    sha(6095),
+    "--authority",
+    "never-current",
+)
+
+if run(directory, "write", "closed-seed", sha(6096), "--authority", "control-current").returncode != 0:
+    raise SystemExit("closed authority seed failed")
+if run(directory, "finalize-authority", "control-current").returncode != 0:
+    raise SystemExit("closed authority finalize failed")
+expect_no_ready(
+    "closed authority",
+    directory,
+    "write",
+    "closed-late",
+    sha(6097),
+    "--authority",
+    "control-current",
+)
+
+stale_directory = root / "barrier-stale-authority"
+if run(stale_directory, "begin-authority", "stale-A").returncode != 0:
+    raise SystemExit("stale authority A setup failed")
+if run(stale_directory, "begin-authority", "stale-B").returncode != 0:
+    raise SystemExit("stale authority B setup failed")
+expect_no_ready(
+    "stale authority",
+    stale_directory,
+    "write",
+    "stale-late",
+    sha(6098),
+    "--authority",
+    "stale-A",
+)
+if run(
+    stale_directory,
+    "write",
+    "stale-current-probe",
+    sha(6099),
+    "--authority",
+    "stale-B",
+).returncode != 0:
+    raise SystemExit("stale no-READY control damaged current authority")
+
+print("forced post-read overlaps preserved; barrier controls passed")
+PYMUTATIONBARRIER
+
+mutation19=$(python3 "$WORK/h003-mutation-barrier.py" "$CLI" "$WORK/mutation-barrier" 2>&1); mutation19_rc=$?
+if [ "$mutation19_rc" -eq 0 ]; then
+  ok "K19 forced contradictory/unorderable ordering: varje completed effect motsvarar legal total order"
+else
+  no "K19 forced ordering" "${mutation19:-mutation-barrier harness exit $mutation19_rc}"
 fi
 
 summera
