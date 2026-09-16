@@ -33,8 +33,35 @@ MIN_ORIGIN="$(git -C "$ROT" remote get-url origin 2>/dev/null)"
 [ -z "$MIN_ORIGIN" ] && { echo "ODÖMBART: detta repo har ingen origin"; exit 2; }
 [ -f "$ROT/.githooks/post-commit" ] || { echo "ODÖMBART: .githooks/post-commit saknas i $ROT"; exit 2; }
 
-echo "repo:   $MIN_ORIGIN"
-echo "läge:   $LAGE$([ "$LAGE" = "torr" ] && echo '  (inget ändras — kör med --kor)')"
+# EN STABIL PLATS, inte en klons katalog. Första versionen lät varje klon peka på
+# sitt eget .githooks/ och föll tillbaka på DENNA klons katalog när den saknades —
+# vilket den gör i 60 av 61 repon, eftersom .githooks/ tillkom på main 2026-09-16.
+# Raderas eller flyttas den klonen slutar autopushen fungera i 60 repon UTAN ETT
+# LJUD. Det är exakt den felklass kvällen bestod av, så hooken kopieras i stället
+# till en plats som inte tillhör något arbetsträd.
+HOOKHEM="$HOME/.nortropic/githooks"
+
+echo "repo:    $MIN_ORIGIN"
+echo "hookhem: $HOOKHEM  (stabil plats — överlever att en klon raderas)"
+echo "läge:    $LAGE$([ "$LAGE" = "torr" ] && echo '  (inget ändras — kör med --kor)')"
+
+if [ "$LAGE" = "kor" ]; then
+  mkdir -p "$HOOKHEM" || { echo "ODÖMBART: kunde inte skapa $HOOKHEM"; exit 2; }
+  if cp "$ROT/.githooks/post-commit" "$HOOKHEM/post-commit" && chmod +x "$HOOKHEM/post-commit"; then
+    echo "hook:    kopierad, $(git -C "$ROT" hash-object .githooks/post-commit | cut -c1-12)"
+  else
+    echo "ODÖMBART: kunde inte kopiera hooken till $HOOKHEM"; exit 2
+  fi
+elif [ "$LAGE" = "torr" ]; then
+  if [ -x "$HOOKHEM/post-commit" ] \
+     && cmp -s "$ROT/.githooks/post-commit" "$HOOKHEM/post-commit"; then
+    echo "hook:    redan installerad och identisk med repots"
+  elif [ -e "$HOOKHEM/post-commit" ]; then
+    echo "hook:    ⚠️ installerad men SKILJER från repots — --kor skriver över"
+  else
+    echo "hook:    inte installerad än — --kor kopierar dit den"
+  fi
+fi
 echo
 
 n=0; n_andrade=0; n_redan=0
@@ -47,8 +74,7 @@ behandla() { # <katalog> <källa>
 
   [ "$(git -C "$d" remote get-url origin 2>/dev/null)" = "$MIN_ORIGIN" ] || return
   n=$((n+1))
-  onskad="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)/.githooks"
-  [ -f "$onskad/post-commit" ] || onskad="$ROT/.githooks"   # gren utan hooken: peka hit
+  onskad="$HOOKHEM"
   nuv="$(git -C "$d" config --get core.hooksPath 2>/dev/null || true)"
 
   if [ "$LAGE" = "av" ]; then
