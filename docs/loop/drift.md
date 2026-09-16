@@ -1,5 +1,49 @@
 # Att köra loopen
 
+## 2026-09-16 — INCIDENT vid policyinstallation + ospårat kernelarbete funnet
+
+**Policyn är nu installerad och verifierad identisk** mot källkopian på grenen
+`claude/inspiring-galileo-6w1pvw`. Men vägen dit bar två fynd.
+
+### Incidenten: okedjade kommandon installerade fel fil
+
+Ägaren fick ett kommandoblock med `cd` + `git checkout` + `sudo cp` **utan `&&`**.
+Utcheckningen misslyckades (lokala ändringar, se nedan), men `sudo cp` kördes ändå och
+kopierade den **föråldrade** källkopian över den installerade policyn. Maskinen blev
+därmed mer låst än före ändringen: versionstaket tillbaka, `github.com` bort ur
+nätverkslistan, alla 13 §A-lås tillbaka, godkännande per verktygsanrop tillbaka.
+
+Rättat genom att hämta filen ur grenen utan att röra arbetsträdet
+(`git show <gren>:config/managed-settings.json`) och installera om, `&&`-kedjat med en
+avslutande diff mot sig själv som kvitto.
+
+> **Regel:** kommandon som ändrar systemtillstånd ges alltid `&&`-kedjade. Ett
+> misslyckat steg får aldrig lämna de följande obevakade. Detta är samma klass som
+> `ODÖMBART`-algebran: ett steg som inte lyckades är inte ett steg som kan byggas vidare på.
+
+### Fyndet: frysta exitprov ligger OSPÅRADE i arbetsträdet
+
+`git checkout` vägrade — och gjorde rätt. Följande fanns lokalt men inte i målgrenen:
+
+```
+ändrad:    specs/tasks.spec.json
+ospårade:  verify/bin/h-031-exit  h-032-exit  h-033-exit  h-034-exit  h-035-exit
+           verify/bin/python-interpreter-authority-v1-exit
+           verify/h034/{build-recipe.json, identity-manifest.json, kernel}
+           specs/owner-production-paths.v1.json
+```
+
+**Det är frysta grindar och en ändrad taskspec som aldrig landat i git.** Det besvarar
+§0c:s fråga *"finns det kernelarbete som main saknar"* med ett preliminärt ja — och det
+ligger inte i backupen utan löst i arbetskatalogen.
+
+`OVERIFIERAT` tills det är undersökt: är det kvarglömt material från fällda rundor, eller
+arbete som aldrig committades? Skillnaden avgör om inventeringens restlista ändras.
+
+**Rör det inte.** `git checkout -f` och `git clean` raderar det. Att git vägrade är
+skyddet som fungerade — till skillnad från OS-lagret, som inte gjorde det (FYND 18).
+
+
 ## 2026-09-16 — FYND 19: källkopian var INTE det som var installerat
 
 Diffen mot den installerade policyn kördes 2026-09-16 och **bekräftade driften** som
