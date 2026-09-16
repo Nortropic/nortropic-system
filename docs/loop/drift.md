@@ -1,5 +1,102 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 37: vakten sa ✅ medan tolv commits fanns på en enda maskin
+
+`inventera-lokalt-arbete.sh` skrev **`✅ REGEL 12 UPPFYLLD — allt lokalt arbete finns
+på git`**. Tolv commits fanns inte på git. Nio av dem hade objekt som inte existerade
+någon annanstans på maskinen än i sin egen klonkatalog — hade katalogen tagits bort
+vore arbetet borta, reflog och allt.
+
+Det är den farligaste sortens fel i detta projekt: **en grön vakt som mätt fel sak.**
+
+### Två defekter, och den andra är den allvarliga
+
+**(a) Provet itererade `git worktree list --porcelain`.** En registrerad worktree har
+`.git` som en **fil**; ett trettiotal kataloger under `worktrees/` har `.git` som en
+**katalog**. De är fristående kloner som *ser ut* som worktrees. `git worktree list`
+returnerar dem inte, så provet tittade aldrig på dem. Mätt: `git worktree list
+--porcelain | grep -c "^HEAD 8f58b01d954273c489d47df2a096fc3bbdbe01cb$"` → `0`, medan
+katalogen fanns på disk med den commiten som HEAD.
+
+**(b) Alla tre mätningar dömde mot LOKALA fjärreferenser, aldrig mot origin.**
+`git branch -r --contains` läser `refs/remotes/**` i den klon frågan ställs i. En klon
+som inte fetchat sedan 10 september tror att allt efter den dagen saknas. Beviset är
+att **samma commit fick olika dom i olika kloner**:
+
+| Commit | FÖRÄLDRALÖS i | SÄKRAD i |
+|---|---|---|
+| `dae90c8fffa7` | `builder-invariant-required`, `review-invariant-required` | `test-author-platform-lane` |
+| `459bd3956807` | `test-author-document-authority` | `review-document-authority-contract-r2` |
+| `0581dc05c1ab` | `builder-document-authority` | `review-document-authority-product-r2` |
+| `8a1804d237b6` | `formal-gate-review-a-r4`, `-b-r4` | `h039-r33-test-author-r4` |
+| `9486371960cf` | `builder-v2-final-separation` | `review-final-separation` |
+| `4a0e3f967108` | `builder-launch-cwd` | `review-launch-cwd` |
+| `005366dd5e3a` | `builder-h039-asset-local` | `qualify-h039-asset` |
+| `571a47b8f5fb` | två kataloger | `test-author-h039-loader` |
+
+En commit kan inte vara både på origin och inte. Domen mätte klonens minne av origin.
+
+Provet bar en varning om detta — *"Är den inte dagsfärsk: AVBRYT, kör `git fetch`"* —
+riktad till läsaren. **Prosa, inte mekanism.** Den föll första gången den prövades.
+
+### Mina egna mätningar var sämre än provets, två gånger
+
+En improviserad census rapporterade 8 föräldralösa som provet inte såg. Sex av dem var
+spöken, och orsaken var min: jag matade `git merge-base` med **förkortade** SHA:n.
+`3c964aa` och `3303fb7` är tvetydiga — `git rev-parse` svarar *"Behövde ensam
+revision"* — och mitt `2>/dev/null` svalde felet, varpå svaret blev `FÖRÄLDRALÖS` av
+ren tystnad. Samma census dömde dessutom fristående kloner mot **huvudrotens**
+objektlager, som inte äger deras commits.
+
+Tre mätningar, tre olika fel, samma metodfel: **ingen av dem frågade origin.**
+
+### Domen, mätt mot origin
+
+```
+git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'   # en gång, alla grenar
+→ 60 kloner av nortropic-system · 43 distinkta HEAD-commits
+→ 31 PA_ORIGIN · 12 SAKNAS
+```
+
+De tolv: nio från separationsveckan **10–13 september** — samma vecka `drift.md` bar
+noll rader medan backupen bar 27 commits — och tre egna frysningar från 6 september
+(`H039 R28`, `R28-R2`, `R29`).
+
+Säkrade additivt, en push per commit inifrån sin egen klon, inga grenar rörda, ingen
+force:
+
+```
+git -C <klon> push origin HEAD:refs/heads/radda/orphan-<namn>
+```
+
+Kontroll efteråt, med samma mekanism som fann felet: **`43 PA_ORIGIN`, noll `SAKNAS`.**
+
+### Lagat, och mutationsprövat åt fyra håll
+
+`inventera-lokalt-arbete.sh`:
+
+1. **Provet fetchar själv** — `--prune` på alla grenar, inte bara `main`. En commit kan
+   vara säkrad på vilken gren som helst.
+2. **`--no-fetch` ger `ODÖMBART` och `exit 2`.** Domen kan aldrig bli grön mot stale
+   referenser. Fel läge är `ODÖMBART`, aldrig `PASS`.
+3. **Ny sektion: fristående kloner.** Matchas på `remote get-url origin`, döms mot detta
+   repo efter den fulla fetchen — finns objektet inte här går det inte att nå från någon
+   gren på origin.
+
+| Mutation | Utfall |
+|---|---|
+| Fristående klon med opushad commit | `FÖRÄLDRALÖS b5db2f05`, `exit 1` |
+| Säkrad HEAD + spårad osparad fil | `SÄKRAD · 1 OSPARADE`, räknad, `exit 1` |
+| Ren klon | ingen rad, `0 · 0` |
+| `--no-fetch` | `ODÖMBART`, `exit 2` |
+
+### Vad detta betyder för regel 8a
+
+`✅ REGEL 12 UPPFYLLD` var **ytbundet bevis anfört utanför sin yta** — provet läste 228
+registrerade worktrees och uttalade sig om maskinen. Regel 8a skrevs igår mot precis
+detta och fångade det inte, eftersom den handlar om vilka *filer* ett prov läser. Den
+gäller lika mycket vilka *objekt* det räknar.
+
 ## 2026-09-16 — REGLER REVIDERAS RENT. Arkeologin flyttad till sina rätta hem. 227 → 183 rader.
 
 Ägaren: *"när vi ändrar regler varför skriver man över istället för revidera och ta bort?"*
