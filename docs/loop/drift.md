@@ -1,5 +1,38 @@
 # Att köra loopen
 
+## 2026-09-16 — ÄGARBESLUT: väg A′ låst, vakternas placering avgjord, prompten omskriven
+
+Ägaren: *"Jag kör enligt dina rekommendationer."* Två beslut förda till
+`docs/05-beslutslogg.md` som `LOOP-ÄGARBESLUT-VÄG-A-PRIM`.
+
+**Väg A′** — endast `docs/05-beslutslogg.md` återställs. De fyra webbdokumenten förblir
+borta. Ägarens invändning (*"om de befinner sig fortfarande tillsammans med
+trustkernel/bootstrap så kan det väl ske igen detta?"*) var korrekt och ändrade min
+rekommendation från A till A′.
+
+**Arbetsordern, en omfrysning med tre gatedefekter:**
+
+| # | Åtgärd | Löser |
+|---|---|---|
+| 1 | Återställ `docs/05-beslutslogg.md` som kernelfil | `h-007`, `h-036`, `h-038` |
+| 2 | Peka om konstitutionspinnarna mot `byggplan-v3` §3.1 | `h-037` |
+| 3 | Fyra shebangar → `#!/usr/bin/env python3.12` | latent defekt i `h-035/036/038/039` |
+
+`h-035` fastställs först — den är den enda oförklarade posten (exit 2, synliga rader PASS).
+
+**Vakternas placering:** vakt 1 och 2 som nya PINV-kontroller i `check-invariants.mjs`,
+med kontraktsflödets kostnad medveten. `p-003-exit` valdes bort — det kedjan inte kör,
+kringgås. Vakt 3 får aldrig bli ett `exit_test`.
+
+**`PROMPT-TILL-CODEX.txt` är omskriven från grunden** mot detta läge. Den tidigare
+versionen beskrev en värld där separationen inte var gjord och registret pekade på
+webbfiler — alltså gårdagens. Codex läser den först, och en router som beskriver fel läge
+är precis fynd 2 en gång till.
+
+**Härifrån är arbetet Codex.** Analysen är landad, reglerna införda, besluten loggade,
+arbetsordern mätt och dimensionerad.
+
+
 ## 2026-09-16 — VÄG A′ DIMENSIONERAD: beslutsloggen löser tre av fem grindar
 
 Körda på plattformsgrenen, utan `timeout` (se rättelsen av FYND 24):

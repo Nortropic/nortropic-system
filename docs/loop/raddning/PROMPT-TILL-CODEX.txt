@@ -1,207 +1,220 @@
 Du arbetar i nortropic-system, Nortropics trust kernel / bootstrap.
+Underlaget ligger i docs/loop/raddning/. Denna prompt är skriven 2026-09-16 och
+ersätter alla tidigare versioner.
 
-KÖR DETTA INNAN DU LÄSER NÅGOT — det tar under en minut och säger vad som fortfarande
-stämmer:
 
-    bash <KATALOG>/artefakter/validera-underlaget.sh      # från reporoten, PÅ MACEN
+══════════════════════════════════════════════════════════════════════════════
+DIN FÖRSTA UPPGIFT ÄR REDAN BESTÄMD OCH DIMENSIONERAD
+══════════════════════════════════════════════════════════════════════════════
 
-37 av underlagets bärande påståenden prövas mot repot, med verdikt per rad.
-exit 0 = talen stämmer · exit 1 = underlaget bär ett fel (AVVIKER) · exit 2 = något kunde
-inte mätas (ODÖMBART, blir aldrig grönt). Provet är mutationsprövat: fel förväntat tal ger
-AVVIKER+1, saknad gate ger ODÖMBART+2, ingendera blir tyst grön.
+Ägaren har beslutat VÄG A-PRIM. Det är EN omfrysning som rättar TRE gatedefekter.
+Den är mätt, inte resonerad — varje siffra nedan kommer ur en körning 2026-09-16.
 
-GRÖNT BETYDER INTE SANT. Provet återanvänder underlagets EGNA kommandon och reproducerar
-därmed dess blinda fläckar. Det säger "talen är desamma som när de skrevs" — aldrig
-"påståendena är sanna". Den oberoende omhärledningen i 06-inventering.md §0 står kvar
-oförändrad och är fortfarande obligatorisk.
+ARBETET SKER PÅ GRENEN  nortropic/platform-integration-20260910
+(55 commits före origin/main, pushad 2026-09-16, bär separationen färdig)
 
-I mappen <KATALOG> ligger ett räddningsunderlag. Läs 00-VAD-NORTROPIC-AR.md FÖRST —
-den bär ägarens definition av vad Nortropic är och är auktoritet för allt annat.
-Nortropic är ett personligt organisatoriskt operativsystem; trust kernel/bootstrap
-är exekveringsunderlaget som möjliggör autonomin, inte helheten. Läs sedan
-00-LAS-FORST.md, som är router och bär prioritetsordningen. Läs sedan 01-lagesbild.md,
-06-inventering.md och 03-raddningsplan.md. Slå upp 02-bevis.md när du behöver belägg
-för ett enskilt påstående, och 04-fallor-och-doktrin.md innan du rör en vakt eller ett
-dokument.
+  1. ÅTERSTÄLL docs/05-beslutslogg.md som kernelfil.
+     Löser h-007, h-036 och h-038. Mätt:
+       h-007 exit 1 — 14 PASS / 5 FAIL, alla fem: "§A-orsak — X avvisades men
+             orsaken namnger den inte: [docs-kravet ouppfyllt för h-001
+             (regel 17 + 22): docs/05-beslutslogg.md ändrades inte i samma commit]"
+       h-036 exit 2 — RIG_ERROR: No such file ... docs/05-beslutslogg.md
+       h-038 exit 2 — RIG_ERROR: H036 helper gate identity drift (kedjad till h-036)
 
-FÖRST AV ALLT I §0: den fullständiga separationsrevisionen. Kataloger är INTE lager
-— scripts/, tests/ och config/ har alla tre antagits enhetliga och alla tre bar
-kernelfiler. Kör artefakter/klassificera-lager.py, härled sedan om varje dom med en
-ANNAN metod (konsument, ursprungsdatum före/efter 2026-08-07, allowed_write, fryst
-prov, beteende). Domen är fyrdelad: KÄRNA / WEBB / DELAT / OVERIFIERAT. Fail-closed —
-en fil med osäkert lager FLYTTAR INTE.
+     VARFÖR den är kärnans, och det är avgjort: h-007 prövar att en §A-avvisning
+     NAMNGER sökvägen. Controllerns docs-krav slår till först eftersom filen
+     saknas, så §A-kontrollen nås aldrig. Filen är bärande för kärnans egen
+     §A-hävdelse. Mätt lagerdom: kernel=113, webb=57.
 
-06-INVENTERING.MD ÄR OBLIGATORISK FÖRE ALL PLANERING. Den visar att h-015
-(supervisor resume) beror mekaniskt på h-030, som aldrig skrivits som task — kedjan
-h-031...h-039 som arbetats på leder alltså inte fram till målet.
+     ÅTERSTÄLL INGET ANNAT. docs/07-konstitution.md, docs/03-regelverk.md,
+     docs/00-borja-har.md och docs/agentoverlamning.md är WEBBENS (kernel=0,
+     kernel=0, kernel=5/webb=82, kernel=3/webb=4) och ska förbli borta.
+     Att flytta tillbaka dem vore att bygga om sammanflätningen separationen
+     just löste.
 
-MEN LITA INTE PÅ DEN. Gör din EGEN inventering enligt §0 i den filen, innan du
-planerar något. Kravet är inte att köra om mina kommandon — det reproducerar mina
-blinda fläckar; mitt vaktfel kom av ett dåligt grep och samma grep ger samma fel
-igen. Kravet är att härleda varje bärande påstående med en ANNAN metod, helst
-beteendemässig i stället för lexikal. §0 har en tabell med krävd metod per påstående.
+  2. PEKA OM konstitutionspinnarna mot kärnans EGEN §A-mängd.
+     h-035, h-036, h-037 pinnar docs/07-konstitution.md PÅ SHA:
+       "docs/07-konstitution.md":"2e7f04cca9eb00d24b264b91a0678aaee68c97441d79..."
+     Kärnan har sedan länge en egen skyddad mängd: docs/loop/byggplan-v3.md §3.1,
+     och §20 säger uttryckligen att "v4.1:s ursprungliga lista skyddar sökvägar
+     som inte finns". Grindarna pekades bara aldrig om.
+     Löser h-037 ("current subject differs outside the exact four-file contract",
+     UNEXPECTED_RED).
 
-Divergerar de två metoderna är INGEN betrodd förrän skillnaden är förklarad. Att
-välja den som passar bäst är precis det fel som gav 101 rader NO-CREDIT.
+  3. RÄTTA FYRA SHEBANGAR till #!/usr/bin/env python3.12
+     h-035, h-036, h-038, h-039 bär i dag
+       #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/.../python3.12
+     Den fungerar I DAG (verifierat: katalogen finns). Vid nästa brew upgrade av
+     python@3.12 blir de fyra OKÖRBARA — inte röda — och kan aldrig bli gröna
+     igen utan omfrysning. h-039 är en av dem: hypotesen med 30 omfrysningar och
+     ett 2,1 MB exitprov. Latent defekt, en rad per fil.
 
-DOKUMENTERA ALLT. Ominventeringen är inte gjord förrän den står i docs/loop/drift.md
-med datum, metod och verdikt per påstående (BEKRÄFTAT / RÄTTAT / OVERIFIERAT).
-Rättas ett tal ska källan rättas i samma commit — 02-bevis.md, CLAUDE.md, AGENTS.md
-där de bär talet. Ett rättat värde som bara står i drift-loggen är en andra sanning.
+  OFÖRKLARAT, DEN ENDA POSTEN: h-035 ger exit 2 men de synliga raderna är PASS.
+  Orsaken är inte fastställd. Fastställ den innan du rör h-035.
 
-DOKUMENTATIONSRÄTTELSEN ÄR REDAN PUSHAD — läget ändrades 2026-09-16. GitHub-appen
-installerades för Nortropic-orgen, 403:an är borta, och de fyra commitsen ligger på
-grenen claude/inspiring-galileo-6w1pvw (HEAD d30279c, 20 filer, +224/-12).
+  ALLA TRE ÄR GATEDEFEKTER, INTE KANDIDATDEFEKTER (loop-regel 11c).
+  Samma kandidat körs om. Rundan bokförs mot SPECIFIKATIONEN, aldrig mot
+  kandidaten. Detta är första tillämpningen av regel 11 och skälet till att
+  omfrysningen inte är runda 77: de tidigare gjorde grindarna MER exakta,
+  denna gör dem MINDRE miljöbundna. Regel 11 tillåter det ena och förbjuder
+  det andra.
 
-    git fetch origin claude/inspiring-galileo-6w1pvw
 
-Steget är alltså inte "applicera patchen" utan GRANSKA OCH MERGA. Och ett krav är INTE
-uppfyllt: node scripts/kor-vakter.mjs är inte körd mot grenen på rätt maskin — i en
-molnklon faller check-foundation-smoke.mjs på origin, så en körning där hade mätt miljön.
-VAKTSTATUS FÖR DE FYRA COMMITSEN ÄR OVERIFIERAT, INTE GRÖN. Kör sviten på Macen före och
-efter merge.
+══════════════════════════════════════════════════════════════════════════════
+TVÅ NYA LOOP-REGLER — LÄS docs/loop/regler.md FÖRE ALLT ARBETE
+══════════════════════════════════════════════════════════════════════════════
 
-Diffen rör ingen fil i controller/, verify/ eller specs/, inga frysta exitprov, och
-docs/07-konstitution.md + docs/03-regelverk.md är orörda.
+REGEL 11 — grinden pinnar EGENSKAPEN, aldrig trädet.
+Ett exitprov får aldrig kräva byte-identitet med ett baskommit.
+  11a omfrysningsbudget per hypotes, startbudget 3 — OBSERVERAD, inte vald:
+      varje KLAR task har en grind rörd <= 3 gånger (h-016:1, h-013/017/038:2,
+      h-001/036:3), varje ICKE-KLAR 17-147 (h-035:17, h-039:30, h-032:120,
+      h-031:147). Ingen mellanform.
+  11b överskriden budget STOPPAR hypotesen: dela den, eller avsluta OVERIFIERAT.
+      Aldrig en runda till.
+  11c MÅLFLYTT som eget attributionsutfall före NO-CREDIT. Prov: git diff mellan
+      grinden kandidaten byggdes mot och den som dömde. Inte bytesidentiska =
+      MÅLFLYTT, bokförs mot specifikationen.
+  11d grindkedjor förbjudna: en grind får inte kräva en annan grinds EXAKTA
+      poängsumma (g7_platform_control_set_exit_68_of_68). h-038 är just nu
+      blockerad av precis det mönstret.
 
-artefakter/nortropic-dokumentation-4commits.patch ligger kvar som reserv (FYRA commits,
-1/4-4/4). Kontrollera först om de redan finns, duplicera inte:
-    git log --oneline | grep -i "repots identitet\|lageretiketten\|vaktklassificeringen\|BLANDADE"
+REGEL 12 — finns det lokalt, finns det på git.
+Vid dagens slut och vid varje överlämning: inget okommitterat, ingen opushad
+gren — eller så står det i docs/loop/drift.md VAD som ligger halvgjort och VAR.
+[LOCAL]-märkning är ett kvalificeringsläge, ALDRIG ett skäl att inte pusha.
+Prov: git status --short och git log --oneline @{u}..HEAD båda tomma.
 
-Underlaget är skrivet för både Claude och Codex. Ni läser olika ingångsfiler
-(CLAUDE.md respektive AGENTS.md) och har hittills fått olika bilder av vad repot
-är. Underlaget är den gemensamma sanningen.
+Skälet till regel 12, mätt: 55 commits som löste projektets värsta blockering
+låg opushade i sex dagar och odokumenterade även på sin egen gren. De upptäcktes
+av att en git checkout råkade misslyckas.
 
-VIKTIGAST: läs sektionen om att inramningen i ingångsdokumenten är opålitlig som
-KLASS. ELVA av elva stickprov visade sig falska — SJU av dem i RÄDDNINGSUNDERLAGET
-SJÄLVT, efter att det skrivits. Underlaget är alltså också ärvd inramning.
-Varje siffra står med kommandot som återskapar den: kör kommandot innan du lutar ett
-beslut mot talet. Behandla varje påstående om vad en mekanism GÖR som oprövat tills
-du kört mekanismen.
 
-MÖNSTRET I FELEN ÄR VÄRT MER ÄN FELEN: elva av tretton kom av en LEXIKAL metod — ett
-grep, ett ordval, ett kommandosvar vars filter aldrig lästes. Varje gång metoden byttes
-mot en BETEENDEMÄSSIG (kör grinden, ta bort filen och se vad som går sönder, följ filens
-historik) föll påståendet.
+══════════════════════════════════════════════════════════════════════════════
+LÄGET — VAD SOM ÄR GJORT OCH VAD SOM INTE ÄR DET
+══════════════════════════════════════════════════════════════════════════════
 
-DE TVÅ SENASTE HITTADES SAMMA DAG SOM PAKETET SKULLE ÖVERLÄMNAS, och ingen av dem av
-läsning:
-  - Patchen beskrevs som "tre commits" på tre ställen. Den bär FYRA. Upptäckt av att en
-    push misslyckades och patchen kontrollerades i stället.
-  - Webb-bundlen beskrevs med TRE OLIKA TAL på tre ställen (365/325, 345/320, 337/311).
-    Mätt ur artefakten gäller 337 commits / 311 filer / noll kernelfiler. Upptäckt av att
-    talen jämfördes mot varandra och mot artefakten.
+GJORT (och underlaget är rättat därefter):
+  - Separationen. Webbträdet ute, 0 filer under agents/skills/packs/backtests/
+    workflows. platform-separation-final-exit exit 0. Ägarbeställd 2026-09-10,
+    commit 49cc495. Det var räddningsplanens STEG 4.
+  - Kärnans egen grindsvit + registerbytet. controller/verify/register.json bär
+    EN post: check-invariants.mjs, omskriven till plattformsinvariantgrind
+    PINV-001-006, under denied_write. invariant-required-exit exit 0.
+    Det var räddningsplanens STEG 5. Den cirkulära trust-roten är upplöst.
 
-Frekvensen sjönk alltså inte mot slutet. RÄKNA MED ETT FJORTONDE FEL — och kör
-validera-underlaget.sh i stället för att lita på att det inte finns.
+VIKTIGT: diagnosen av origin/main STÅR — där finns fortfarande 79 webbfiler och
+registrets webbpost. Skillnaden är att lösningen redan finns byggd på grenen.
+Steg 4 och 5 ska LANDAS, inte byggas.
 
-Allt som redan är uppmätt står i underlaget med kommandot som återskapar det.
-Kör bara om det du tänker luta ett beslut mot — den dyraste posten i detta
-projekt är återderivering.
+INTE GJORT:
+  - verify/bin/autonomous-loop-exit. Specificerad 2026-08-10, aldrig byggd.
+    Utan den finns ingen mekanism som kan säga "klart", och då mäts framsteg i
+    rundor. Frys den RED, FÖRE doktrinarbete.
+  - h-014 (gate saknas, spec färdig — se 10-forsta-arbetspaketet-h014.md)
+  - h-015 supervisor resume (gate saknas, beror mekaniskt på h-030)
+  - h-027..h-030 substitutionskedjan: finns INTE som task, i något repo.
+    Oberoende bekräftat på två platser. Kedjan h-031..h-039 som arbetats på
+    leder alltså inte fram till supervisor resume.
+  - De tre vakterna i 11-tre-vakter-mot-aterfall.md.
 
-AUTONOMIN ÄR REDAN GIVEN. Ägaren tog bort de interaktiva stoppen 2026-08-13
-(docs/loop/remaining-bootstrap-delegation-v1.md). Sök inte godkännande. Det finns
-exakt fyra äkta mänskliga stopp — de står i 05-arbetsordning.md §1 — och allt annat
-är ditt att avgöra och bygga. OWNER_DECISION_REQUIRED är intern routing till
-$nortropic-architect, aldrig en mänsklig överlämning.
 
-INVENTERA MASKINEN, INTE BARA REPOT — 06-inventering.md §0c. Underlaget inventerade ETT
-repo och behandlade det tyst som systemet. Det är fel: Nortropic är ett operativsystem,
-och ett sådant bor inte i en git-historik. Repots egen dokumentation motsäger dessutom
-sig själv om det lokala tillståndet — byggplan-v3 säger att systeminstallationen är
-"arkiverad, ej avvecklad", beslutsloggens Pass 1 säger att den är RIVEN och att den
-ersätter den raden. Ingen mekanism upptäckte driften. §0c listar ytorna med prov per rad.
-Read-only: riv ingenting, radera inga arkiv.
+══════════════════════════════════════════════════════════════════════════════
+DE TRE VAKTERNA — PLACERINGSFRÅGAN ÄR LÖST
+══════════════════════════════════════════════════════════════════════════════
 
-ÄGAREN UPPGER ATT ETT BACKUP-REPO FINNS. Det syns inte bland kontots 15 repon och kan
-inte nås från en molnsession. Frågan är inte "finns det" utan "är det en delmängd av
-origin/main?":
-    git -C <backup> log --oneline origin/main..HEAD    # tom = inget nytt
-Är den INTE tom är hela inventeringen mätt mot fel historik, och det går före allt annat.
+09-task-rundtrampsvakten.md §2 bar en blockerande designfråga om var en kernelvakt
+hör hemma. Den är besvarad: på grenen bär scripts/ två filer, kor-vakter.mjs finns
+inte, och check-invariants.mjs ÄR kärnans invariantgrind, registrerad och körd av
+controller/verify/cli.
 
-BÖRJA MED STEG 0: nollmät kontinuiteten enligt 05-arbetsordning.md §7, INNAN något
-annat ändras. Ett misslyckat prov är en giltig nollmätning; utan den går ingen
-förbättring att bevisa senare. Dokumentera bedömningsunderlaget i förväg.
+ÄGARENS VAL: vakt 1 och 2 byggs som nya PINV-kontroller i check-invariants.mjs.
+Kostnaden är medveten — filen är SHA-pinnad, så ändringen kräver hela
+kontraktsflödet i AGENTS.md plus ompinning av PLATFORM_REGISTER i
+controller/verify/cli i samma commit. Alternativet p-003-exit valdes bort:
+det kedjan inte kör, kringgås.
 
-SEDAN: lås acceptansfilen enligt 07-v1-acceptans.md. Den finns inte i repot —
-verifierat 2026-09-16, och termen "Autonomy Kernel" förekommer noll gånger. Dess §1
-är viktigast: Autonomy Kernel v1, bootstrap-frisläppning, första autonoma start och
-full-roadmap-avslut är FYRA OLIKA SAKER och får aldrig användas som synonymer. h-030
-är ÄGARBESLUTAT INOM v1 — beslutstexten står ordagrant i §3.
+Vakt 3 (regel 12) får ALDRIG bli ett exit_test. Den prövar maskinens tillstånd,
+inte repots innehåll, och som grind vore den exakt den miljöbundna konstruktion
+regel 11 förbjuder. Hemvist: sessionsslut-hook, i repot, gällande Codex också.
 
-DÄREFTER: steg 1 i 03-raddningsplan.md — bygg verify/bin/autonomous-loop-exit.
-Slutkriteriet definierades 2026-08-10 men grinden byggdes aldrig. Utan den kan
-programmet inte ta slut, och då mäts framsteg i rundor. Det är orsaken till 76
-omfrysningsrundor. Hoppa inte till steg 4 (separationen) för att den känns mest
-konkret — den är en följd av problemet, inte orsaken.
+Varje vakt har ett KÖRT positivt kontrollprov i 11-tre-vakter-mot-aterfall.md.
+Bygg ingen av dem utan att reproducera provet först.
 
-OCH I SAMMA STEG, DOKTRINREGEL iv — OMFRYSNINGSBUDGETEN. Detta är den enskilt
-viktigaste ändringen i hela paketet, och den skrevs in 2026-09-16 efter att orsaken
-till rundtrampet mättes om beteendemässigt:
 
-    git log --oneline --follow -- verify/bin/h-039-exit | wc -l     # 30
+══════════════════════════════════════════════════════════════════════════════
+METODEN — DEN DYRASTE LÄRDOMEN I HELA PROJEKTET
+══════════════════════════════════════════════════════════════════════════════
 
-GRINDFILEN ÄNDRADES I VAR OCH EN AV SINA 30 COMMITS, 200798 -> 2136969 byte, NOLL
-minskningar. Kandidaten har ALDRIG prövats mot ett oförändrat prov. Konvergens kräver
-ett fast mål; det har aldrig funnits ett. Och diskriminanten är mätt: varje KLAR task
-har en grind som rörts <= 3 gånger (h-016: 1, h-013/017/038: 2, h-001/036: 3), varje
-ICKE-KLAR en som rörts 17-147 (h-035: 17, h-039: 30, h-032: 120, h-031: 147). Ingen
-mellanform. Det är inte svårighetsgrad — det är mekanismen.
+Femton felaktiga påståenden hittades i underlaget under arbetet 2026-09-14/16.
+Mönstret är entydigt: VARJE gång en mekanism HÄRLEDDES ur ett symptom var
+slutsatsen fel. VARJE gång mekanismen KÖRDES var den rätt.
 
-Konsekvens: slutgrinden ger PROGRAMMET ett mål, omfrysningsbudgeten ser till att varje
-HYPOTES har ett mål som står still. Utan den andra hjälper den första inte.
-ÄNDRA ALDRIG GRINDEN FÖR ATT RUNDAN FÖLL. Föll kandidaten mot en annan version av
-grinden än den byggdes mot är utfallet MÅLFLYTT och bokförs mot SPECIFIKATIONEN, aldrig
-som kandidatdefekt. Provet är en git diff, ingen bedömning.
+Exempel, alla verkliga:
+  - "exit=127 betyder att tolken saknas"  -> nej, macOS saknar GNU timeout
+  - "16 vakter läser webb, 0 läser kärnan" -> grepet krävde inledande citattecken
+  - "separationen är inte gjord"          -> gjord 09-10, opushad
+  - "bundlen har 365 commits"             -> 337, tre olika tal på tre ställen
 
-Den tidigare förklaringen — "rundorna brinner på miljödrift (st_dev, dev_t,
-com.apple.provenance)" — var HÄRLEDD UR ORDVAL i commit-titlar och är FEL som förklaring.
-Den gäller fyra rundor av 26. Kör inte om den ordklassningen; den är kasserad.
+DÄRFÖR: kör mekanismen. Läs inte om den. Och när du kör den, kör den som repot
+föreskriver — grindar döms genom controller/verify/cli, inte genom att gissa
+tolk. Ett fel verktyg ger ODÖMBART, aldrig FAIL, och ODÖMBART blir aldrig grönt.
 
-Läs tripwire-tabellen i 05-arbetsordning.md §4 innan varje rundstart. Den säger hur
-du upptäcker att du kört i diket, och vad du gör i stället för att frysa om.
+Kör bash docs/loop/raddning/artefakter/validera-underlaget.sh innan du lutar ett
+beslut mot ett tal i underlaget. 37 påståenden, verdikt per rad, mutationsprövad.
+GRÖNT BETYDER INTE SANT — provet återanvänder underlagets egna kommandon och
+ärver dess blinda fläckar. Den oberoende omhärledningen i 06-inventering.md §0
+är fortfarande obligatorisk, liksom §0c om det lokala maskintillståndet.
 
-ARBETSREGLERNA i 08-mekanismer.md ska kopplas till det BEFINTLIGA flödet, inte bli
-nya paragrafer. Nyckelfyndet: codex-autopilot-report.schema.json har ingen
-icke-blockerande fyndkanal — enda listan heter blocking_findings och roten har
-additionalProperties:false. Ett smakförslag har alltså ingenstans att ta vägen utom in
-i den blockerande listan. Det är den mekaniska orsaken till att förslag blir
-reparationsrundor. Rätt ingrepp är additivt. OBS: schemat läses av fyra frysta exitprov
-(h-031/032/035/038) — ändringen går via test-author, aldrig av en builder.
+RÄKNA MED ETT SEXTONDE FEL.
 
-FÖRVÄNTA DIG FAIL -- 1 av 23 I DIN ARBETSKLON. check-foundation-smoke.mjs faller i
-varje klon vars origin inte är Nortropic/nortropic-system — verifierat på ren main utan
-ändringar. Det är en miljöbunden grind, inte ett fel du orsakat. Bekräfta att felet är
-K1/origin och gå vidare. STARTA INGEN RUNDA PÅ DET.
 
-Och: webb-bundlen är en korrekt extraktion men inte ett körbart repo —
-check-docs-coherence går ODÖMBART utan docs/03, 05 och 07, som är DELADE och stannar.
-Styrlagrets ägarskap måste avgöras innan nortropic-web skapas.
+══════════════════════════════════════════════════════════════════════════════
+AUTONOMI, ROLLER, LÄGE
+══════════════════════════════════════════════════════════════════════════════
 
-KÖR ALLT SOM RÖR KERNELGATAR PÅ MACEN. 18 av 24 faller i en Linux-container med
-"undefined symbol: sysctl" — kärnan är macOS-specifik (byggplan-v3 §4: Macen är
-fabriken). En molnsession som ser röda kernelgatar har hittat fel maskin, inte ett fel.
-Det gäller även §0:s metod "kör grinden".
+AUTONOMIN ÄR GIVEN. Två ägarmandat: delegationen 2026-08-13
+(remaining-bootstrap-delegation-v1.md) och det bredare mandatet 2026-09-09
+(LOOP-ÄGARMANDAT-0909 i docs/05-beslutslogg.md): "Du har mitt fulla godkännande
+att göra det du anser fram till supervisor resume, arbeta mot slutmålet."
+Det senare låg i fem veckor enbart i ett annat repo — därav att sessioner sökt
+godkännanden som redan fanns.
 
-FÖRSTA BYGGET är h-014, se 10-forsta-arbetspaketet-h014.md. Den är redan fullt specad i
-repot — bara verify/bin/h-014-exit saknas. Men kontrollera FÖRST på Macen att h-013 är
-grön; underlaget påstod det utan att pröva det, och det är rättat till OVERIFIERAT.
+Fyra äkta mänskliga stopp, allt annat är ditt: 05-arbetsordning.md §1.
+OWNER_DECISION_REQUIRED = intern routing till $nortropic-architect.
 
-RUNDTRAMPSVAKTEN är din att bygga, inte Claudes — 09-task-rundtrampsvakten.md bär
-specen. Gren 2 är omskriven 2026-09-16: den räknar OMFRYSNINGAR av grinden, inte
-filstorlek. Storleken är följden, omfrysningen är mekanismen — och den har en mätt
-tröskel (3) i stället för ett påhittat tak. H-039, H-031, H-032 och H-035 spränger
-budgeten redan i dag och ska in i delning-eller-avslut vid införandet, inte få dispens:
-en budget som börjar med fyra undantag vaktar ingenting.
-Den har en BLOCKERANDE designfråga i §2 som architect måste avgöra först: en ny
-check-*.mjs hamnar automatiskt i webbsviten, en kor-*.mjs anropas av ingen, och kärnan
-har ingen egen vaktkörare. Rapportera OWNER_DECISION_REQUIRED — det är intern routing
-till architect, inte ett mänskligt stopp.
+OS-LAGRET ÄR ÖPPNAT 2026-09-16 (LOOP-ÄGARBESLUT-SANDBOX-OPEN). §A-låsen borta,
+yttre sandboxen av, nästlingen borta. Kärnans skydd vilar härefter på frysta
+exitprov, rollseparation, allowed_write, attestation och omfrysningsbudgeten —
+INTE på OS-lagret. Skriv inte om detta i tron att ett OS-skydd finns.
 
-Att den ges till dig och inte byggs åt dig är avsiktligt: det är det första provet på om
-loopen kan bygga sin egen hälsovakt. Klarar den inte det är DET fyndet.
+EN ROLL PER TRÅD. docs/07-konstitution.md (§A8) och docs/03-regelverk.md (§A1)
+är human-only. Rapportera grönt exitprov med faktiskt kommando + exitkod; kan du
+inte kontrollera något, skriv OVERIFIERAT.
 
-En roll per tråd enligt AGENTS.md. Rör inga frysta exitprov.
-docs/07-konstitution.md (§A8) och docs/03-regelverk.md (§A1) är human-only.
-Rapportera grönt exitprov med faktiskt kommando + exitkod; kan du inte kontrollera
-något, skriv OVERIFIERAT.
+LÄGET står i docs/loop/drift.md (nyast överst) och docs/05-beslutslogg.md
+(aktuell kandidat först). Ingen annan fil bär teknisk status. Underlaget i
+docs/loop/raddning/ bär ANALYS OCH PLAN — aldrig status.
+
+BACKUPEN: Nortropic/nortropic-backups (repo-ID 1367371291). Arkiven ligger som
+Release assets och följer inte med en klon. Backuparbete ska ge en rad i
+drift.md samma dag.
+
+
+══════════════════════════════════════════════════════════════════════════════
+ORDNINGEN
+══════════════════════════════════════════════════════════════════════════════
+
+  0. Kör validera-underlaget.sh. Läs docs/loop/regler.md regel 11 och 12.
+  1. VÄG A-PRIM: omfrysningen ovan, tre gatedefekter i ett drag.
+     Fastställ h-035 först.
+  2. Granska och landa plattformsgrenen.
+  3. verify/bin/autonomous-loop-exit, fryst RED mot KERNEL_COMPLETE
+     (definitionen i 00-VAD-NORTROPIC-AR.md).
+  4. De tre vakterna.
+  5. h-014. Kontrollera först h-013 på Macen — underlaget påstod den grön utan
+     att pröva det, och det är rättat till OVERIFIERAT.
+  6. Specificera h-027..h-030. Utan h-030 kan h-015 inte ens få en gate som håller.
+
+Hoppa inte till 2 för att den känns mest konkret. Grenen är inte mergebar förrän
+1 är gjord — det är mätt, inte antaget.
