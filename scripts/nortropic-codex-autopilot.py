@@ -30,15 +30,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-AUTHORITY_LIB = Path(__file__).resolve().parents[1] / "controller/authority"
-# Normal orchestrator execution must not mutate the immutable candidate merely
-# by loading the shared authority parser.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(AUTHORITY_LIB))
-from core import (AuthorityError, canonical_path, permits,
-                  strict_json_bytes)  # noqa: E402
+sys.path.insert(0, str(REPOSITORY_ROOT))
+from controller.authority.core import (AuthorityError, canonical_path, permits,
+                                       strict_json_bytes)  # noqa: E402
+from controller.result.consumer import consume_private_result  # noqa: E402
+from controller.result.materialize import materialize  # noqa: E402
 
 EXPECTED_REPO = "Nortropic/nortropic-system"
+CANONICAL_ORIGIN_URL = "git@github.com:Nortropic/nortropic-system.git"
+CANONICAL_ORIGIN_FETCH = "+refs/heads/*:refs/remotes/origin/*"
 OWNER_DECISION_PATH = "docs/loop/owner-h003-attestation-authority-v1.md"
 REPORT_SCHEMA_PATH = "docs/loop/codex-autopilot-report.schema.json"
 PROVIDER_IDENTITY_PATH = "config/codex-provider-identity.json"
@@ -56,6 +58,8 @@ PYTHON_IDENTITY_KEYS = {
 }
 MAX_PROVIDER_AUTHORITY_BYTES = 16 * 1024
 MAX_PROVIDER_EXECUTABLE_BYTES = 256 * 1024 * 1024
+CODEX_RUN_TIMEOUT_SECONDS = 86400
+ATTEMPT_ROOT_ENV = "NORTROPIC_ATTEMPT_ROOT"
 AUTOPILOT_ROLE_POLICY = {
     "ARCHITECT": ("gpt-5.6-sol", "max"),
     "TEST_AUTHOR": ("gpt-5.6-sol", "max"),
@@ -90,6 +94,8 @@ FORBIDDEN_GIT_TOKENS = (
     "--force-with-lease",
     "--amend",
 )
+GIT_CONTROL_PREFIX = "GIT_"
+EMPTY_TREE_SHA1 = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 MAX_ARCHITECT_ROUNDS = 5
 SUBSTITUTION_BEFORE_NEW_HARNESS_COMPONENT = True
 ROADMAP_PLAN_BLOBS = {
@@ -119,6 +125,14 @@ class Cmd:
     out: str
 
 
+def raw_git_environment() -> dict[str, str]:
+    environment = {key: value for key, value in os.environ.items()
+                   if not key.startswith(GIT_CONTROL_PREFIX)}
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    environment["GIT_ALTERNATE_OBJECT_DIRECTORIES"] = ""
+    environment.update({"GIT_SSH_COMMAND": "/usr/bin/ssh -F /dev/null -oBatchMode=yes -oPermitLocalCommand=no -oProxyCommand=none",
+                        "GIT_SSH_VARIANT": "ssh", "SSH_ASKPASS_REQUIRE": "never"})
+    return environment
 @dataclass
 class AgentRun:
     report: dict[str, Any]
@@ -127,6 +141,7 @@ class AgentRun:
     result_file: Path
 
 
+_LAST_AGENT_CONTEXT: tuple[str | None, Path, Path] | None = None
 @dataclass(frozen=True)
 class RoadmapSlice:
     code: str
@@ -225,13 +240,12 @@ def now_id() -> str:
     return dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
-        timeout: int | None = None, env: dict[str, str] | None = None) -> Cmd:
+def run(argv: list[str], cwd: Path | None = None, *, check: bool = True, timeout: int | None = None, env: dict[str, str] | None = None, input_text: str | None = None) -> Cmd:
     if not argv or not all(isinstance(x, str) and x for x in argv):
         raise Stop(f"invalid argv: {argv!r}")
     if argv[0].rsplit(os.sep, 1)[-1].casefold() == "codex":
         raise Stop("generic process boundary cannot launch Codex")
-    if argv[0] == "git":
+    if argv[0].rsplit(os.sep, 1)[-1].casefold() == "git":
         joined = " ".join(argv)
         if any(tok in joined for tok in FORBIDDEN_GIT_TOKENS):
             raise Stop(f"forbidden git semantics requested: {joined}")
@@ -239,6 +253,7 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
             raise Stop(f"history rewrite command forbidden: {joined}")
         if any(arg.startswith("+") for arg in argv[1:]):
             raise Stop(f"leading + refspec forbidden: {joined}")
+    process_environment = None if env is None else dict(env)
     p = subprocess.run(
         argv,
         cwd=str(cwd) if cwd else None,
@@ -246,7 +261,8 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
         stderr=subprocess.STDOUT,
         text=True,
         timeout=timeout,
-        env=env,
+        env=process_environment,
+        input=input_text,
     )
     if check and p.returncode != 0:
         raise Stop(f"command failed rc={p.returncode}: {' '.join(argv)}\n{p.stdout}")
@@ -254,7 +270,7 @@ def run(argv: list[str], cwd: Path | None = None, *, check: bool = True,
 
 
 def git(repo: Path, *args: str, check: bool = True, timeout: int | None = None) -> Cmd:
-    return run(["git", *args], cwd=repo, check=check, timeout=timeout)
+    return closed_worktree_git(repo, *args, check=check, timeout=timeout)
 
 
 def clean(repo: Path) -> bool:
@@ -366,6 +382,7 @@ def added_lines(repo: Path, files: Iterable[str], base_ref: str = "HEAD") -> int
 
 
 def assert_builder_scope(repo: Path, task_id: str, task_base: str) -> list[str]:
+    assert_raw_git_authority(repo)
     task = task_obj(repo, task_id)
     delta_files = changed_files(repo, "HEAD")
     files = changed_files(repo, task_base)
@@ -385,7 +402,7 @@ def assert_builder_scope(repo: Path, task_id: str, task_base: str) -> list[str]:
 
 
 def assert_test_author_scope(repo: Path, base_sha: str) -> list[str]:
-    files = changed_files(repo)
+    files = changed_files(repo, base_sha)
     bad = [f for f in files if f not in TEST_AUTHOR_ALLOWED]
     if bad:
         raise Stop(f"test-author write outside owner surface: {bad}")
@@ -482,12 +499,16 @@ def repo_identity(repo: Path) -> str:
 
 
 def origin_main(repo: Path) -> str:
-    git(repo, "fetch", "origin", "main")
+    fetch_origin(repo, "main")
     return sha(repo, "refs/remotes/origin/main")
 
 
 def worktrees(repo: Path) -> list[dict[str, str]]:
-    raw = git(repo, "worktree", "list", "--porcelain").out
+    admin = common_git_dir(repo) / "worktrees"
+    if ((admin.exists() or admin.is_symlink())
+            and not _closed_control_tree(admin)):
+        raise Stop("worktree registry has an external alias")
+    raw = closed_worktree_git(repo, "worktree", "list", "--porcelain").out
     rows: list[dict[str, str]] = []
     cur: dict[str, str] = {}
     for line in raw.splitlines() + [""]:
@@ -498,6 +519,23 @@ def worktrees(repo: Path) -> list[dict[str, str]]:
             continue
         key, _, val = line.partition(" ")
         cur[key] = val
+    for row in rows:
+        path = Path(row.get("worktree", ""))
+        keys = {"worktree", "HEAD", "branch"} if "branch" in row else {"worktree", "HEAD", "detached"}
+        try:
+            gitdir = Path(closed_worktree_git(path, "rev-parse", "--path-format=absolute", "--git-dir").out.strip())
+            actual_branch = branch(path)
+        except (OSError, Stop):
+            raise Stop("worktree registry target is not readable")
+        linked = gitdir != admin.parent
+        if (set(row) != keys or path.resolve(strict=True) != path
+                or not _owned_real_directory(path) or sha(path) != row.get("HEAD")
+                or row.get("branch", "").removeprefix("refs/heads/") != actual_branch
+                or (linked and (gitdir.parent != admin or not _closed_control_tree(gitdir) or not _single_link_owned_file(path / ".git", 1024 * 1024)))
+                or (not linked and (gitdir != admin.parent or path / ".git" != admin.parent))):
+            raise Stop("worktree registry target binding mismatch")
+    if raw != closed_worktree_git(repo, "worktree", "list", "--porcelain").out:
+        raise Stop("worktree registry changed during binding")
     return rows
 
 
@@ -505,58 +543,13 @@ def local_branch_exists(repo: Path, name: str) -> bool:
     return git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{name}", check=False).rc == 0
 
 
-def ensure_worktree(repo: Path, wt_root: Path, branch_name: str, base_sha: str,
-                    dirname: str) -> Path:
-    wt_root.mkdir(parents=True, exist_ok=True)
-    wanted = (wt_root / dirname).resolve()
-    for row in worktrees(repo):
-        if row.get("branch") == f"refs/heads/{branch_name}":
-            p = Path(row["worktree"]).resolve()
-            if not clean(p):
-                raise Stop(f"existing worktree for {branch_name} is dirty: {p}")
-            head = sha(p)
-            if head != base_sha:
-                head_before_base = git(repo, "merge-base", "--is-ancestor", head, base_sha, check=False).rc == 0
-                base_before_head = git(repo, "merge-base", "--is-ancestor", base_sha, head, check=False).rc == 0
-                if head_before_base:
-                    git(p, "merge", "--ff-only", base_sha)
-                elif base_before_head:
-                    # Clean descendant = an immutable candidate left by an interrupted
-                    # orchestrator run. Keep it and re-run reviewer/final gates.
-                    journal(repo, "RECOVER_CANDIDATE", branch=branch_name, base=base_sha, candidate=head)
-                else:
-                    raise Stop(f"existing branch {branch_name} diverges from required base: head={head} base={base_sha}")
-            return p
-    if wanted.exists() and any(wanted.iterdir()):
-        raise Stop(f"wanted worktree path already non-empty: {wanted}")
-    if local_branch_exists(repo, branch_name):
-        git(repo, "worktree", "add", str(wanted), branch_name)
-        if sha(wanted) != base_sha:
-            head = sha(wanted)
-            head_before_base = git(repo, "merge-base", "--is-ancestor", head, base_sha, check=False).rc == 0
-            base_before_head = git(repo, "merge-base", "--is-ancestor", base_sha, head, check=False).rc == 0
-            if head_before_base:
-                git(wanted, "merge", "--ff-only", base_sha)
-            elif base_before_head:
-                journal(repo, "RECOVER_CANDIDATE", branch=branch_name, base=base_sha, candidate=head)
-            else:
-                raise Stop(f"local branch {branch_name} diverges from required base {base_sha}")
-    else:
-        git(repo, "worktree", "add", "-b", branch_name, str(wanted), base_sha)
-    if not clean(wanted):
-        raise Stop(f"new worktree is dirty: {wanted}")
-    head = sha(wanted)
-    if head != base_sha and git(repo, "merge-base", "--is-ancestor", base_sha, head, check=False).rc != 0:
-        raise Stop(f"new worktree identity is neither base nor descendant candidate: {wanted} head={head} base={base_sha}")
-    return wanted
-
-
 def detached_worktree(repo: Path, wt_root: Path, name: str, commit_sha: str) -> Path:
     p = (wt_root / name).resolve()
     if p.exists():
         if any(p.iterdir()):
             raise Stop(f"review worktree path not empty: {p}")
-    git(repo, "worktree", "add", "--detach", str(p), commit_sha)
+    worktrees(repo)
+    closed_worktree_git(repo, "worktree", "add", "--detach", str(p), commit_sha, raw_checkout=True)
     if sha(p) != commit_sha or not clean(p):
         raise Stop(f"detached reviewer identity mismatch: {p}")
     return p
@@ -565,9 +558,640 @@ def detached_worktree(repo: Path, wt_root: Path, name: str, commit_sha: str) -> 
 def remove_worktree(repo: Path, p: Path) -> None:
     if p.exists() and not clean(p):
         raise Stop(f"refusing to remove dirty reviewer worktree: {p}")
-    git(repo, "worktree", "remove", str(p))
+    worktrees(repo)
+    closed_worktree_git(repo, "worktree", "remove", str(p))
 
 
+def closed_worktree_git(repo: Path, *args: str, check: bool = True, timeout: int | None = None, raw_attributes: bool = False, raw_checkout: bool = False) -> Cmd:
+    environment = raw_git_environment()
+    environment.update({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+    })
+    if raw_attributes or raw_checkout:
+        environment.update({"GIT_ATTR_SOURCE": EMPTY_TREE_SHA1, "GIT_ATTR_NOSYSTEM": "1"})
+    if raw_checkout:
+        args = ("-c", "core.attributesFile=/dev/null", "-c", "core.autocrlf=false", "-c", "core.eol=lf", *args)
+    return run(
+        ["/usr/bin/git", "-c", "core.hooksPath=/dev/null",
+         "-c", "core.fsmonitor=false",
+         "-c", "core.untrackedCache=false", "-c", "protocol.allow=never",
+         "-c", "protocol.ssh.allow=always", *args],
+        cwd=repo, check=check, timeout=timeout, env=environment,
+        input_text="* diff\n" if raw_attributes else None,
+    )
+def _owned_real_directory(path: Path) -> bool:
+    try:
+        opened = path.lstat()
+        return (not path.is_symlink() and stat.S_ISDIR(opened.st_mode)
+                and opened.st_uid == os.getuid()
+                and path.resolve(strict=True) == path)
+    except OSError:
+        return False
+def _closed_control_tree(path: Path, budget: list[int] | None = None) -> bool:
+    if budget is None:
+        budget = [200000]
+    if not _owned_real_directory(path):
+        return False
+    try:
+        children = list(path.iterdir())
+    except OSError:
+        return False
+    budget[0] -= len(children)
+    if budget[0] < 0:
+        return False
+    for child in children:
+        try:
+            opened = child.lstat()
+        except OSError:
+            return False
+        if child.is_symlink() or opened.st_uid != os.getuid():
+            return False
+        if stat.S_ISDIR(opened.st_mode):
+            if not _closed_control_tree(child, budget):
+                return False
+        elif not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+            return False
+    return True
+def assert_raw_git_authority(repo: Path, standalone: bool = False) -> list[tuple[str, str, str]]:
+    common = common_git_dir(repo)
+    gitdir_raw = git(repo, "rev-parse", "--path-format=absolute", "--git-dir").out.strip()
+    gitdir = Path(gitdir_raw)
+    marker = repo / ".git"
+    linked = gitdir != common
+    if (not _owned_real_directory(repo)
+            or not _owned_real_directory(common)
+            or not _closed_control_tree(common / "refs")
+            or not _closed_control_tree(common / "info")
+            or not _closed_control_tree(common / "objects")
+            or (((common / "worktrees").exists() or (common / "worktrees").is_symlink())
+                and not _closed_control_tree(common / "worktrees"))
+            or not _single_link_owned_file(common / "config", 1024 * 1024)
+            or ((common / "packed-refs").exists()
+                or (common / "packed-refs").is_symlink())
+            and not _single_link_owned_file(common / "packed-refs", 16 * 1024 * 1024)):
+        raise Stop("authoritative Git control tree has an external alias")
+    if linked:
+        if (gitdir.parent != common / "worktrees"
+                or not _closed_control_tree(gitdir)
+                or not _single_link_owned_file(marker, 1024 * 1024)
+                or not _single_link_owned_file(gitdir / "HEAD", 1024 * 1024)
+                or not _single_link_owned_file(gitdir / "index", 64 * 1024 * 1024)
+                or not _single_link_owned_file(gitdir / "commondir", 1024 * 1024)
+                or not _single_link_owned_file(gitdir / "gitdir", 1024 * 1024)):
+            raise Stop("linked worktree Git admin has an external alias")
+    elif marker != common or not _owned_real_directory(marker):
+        raise Stop("ordinary worktree Git directory identity mismatch")
+    forbidden = (common / "refs/replace", common / "info/grafts", common / "shallow",
+                 common / "objects/info/alternates", common / "objects/info/http-alternates",
+                 common / "info/attributes", gitdir / "config.worktree")
+    if any(path.exists() or path.is_symlink() for path in forbidden):
+        raise Stop("authoritative Git contains replacement or external history")
+    raw_config = closed_worktree_git(repo, "config", "--file", str(common / "config"),
+                                     "--no-includes", "--null", "--list").out
+    config_rows = [record.partition("\n") for record in raw_config.split("\0") if record]
+    values = {key.casefold(): value for key, separator, value in config_rows if separator}
+    core = {"core.repositoryformatversion": "0", "core.bare": "false", "core.filemode": "true", "core.logallrefupdates": "false" if standalone else "true",
+            "core.ignorecase": "true", "core.precomposeunicode": "true"}
+    origin = {"remote.origin.url": CANONICAL_ORIGIN_URL, "remote.origin.fetch": CANONICAL_ORIGIN_FETCH}
+    branches = {key: value for key, value in values.items() if key.startswith("branch.")}
+    branch_ok = all((key.endswith(".remote") and value == "origin") or (key.endswith(".merge") and value.startswith("refs/heads/"))
+                    or (key.endswith(".vscode-merge-base") and value == "origin/main") for key, value in branches.items())
+    remotes = {key: value for key, value in values.items() if key.startswith(("remote.", "url."))}
+    if (len(values) != len(config_rows) or any(not separator for _key, separator, _value in config_rows)
+            or {key: values.get(key) for key in core} != core
+            or (remotes != ({} if standalone else origin) and remotes != {}) or not branch_ok
+            or (standalone and branches) or set(values) != set(core) | set(remotes) | set(branches)):
+        raise Stop("authoritative Git local config is not the closed canonical profile")
+    replacements = closed_worktree_git(repo, "for-each-ref", "--format=%(refname)",
+                                       "refs/replace").out.strip()
+    pack = common / "objects/pack"
+    try:
+        promisor = ((pack.exists() or pack.is_symlink()) and (
+            pack.is_symlink() or not pack.is_dir()
+            or any(path.name.endswith(".promisor") for path in pack.iterdir())
+        ))
+    except OSError as exc:
+        raise Stop("authoritative Git promisor inventory is unreadable") from exc
+    if (replacements or promisor
+            or closed_worktree_git(repo, "rev-parse", "--show-object-format").out.strip() != "sha1"):
+        raise Stop("authoritative Git contains replacement or promisor authority")
+    return config_rows
+def canonical_origin(repo: Path) -> str:
+    rows = assert_raw_git_authority(repo)
+    remote = sorted((key.casefold(), value) for key, separator, value in rows if separator and key.casefold().startswith(("remote.", "url.")))
+    if remote != [("remote.origin.fetch", CANONICAL_ORIGIN_FETCH), ("remote.origin.url", CANONICAL_ORIGIN_URL)]:
+        raise Stop("canonical origin config mismatch")
+    return CANONICAL_ORIGIN_URL
+def fetch_origin(repo: Path, name: str) -> None:
+    ref = f"refs/heads/{name}"
+    closed_worktree_git(repo, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", canonical_origin(repo),
+                        f"{ref}:refs/remotes/origin/{name}")
+def untracked_inventory(repo: Path) -> list[str]:
+    paths: set[str] = set()
+    variants = (
+        ("--others", "--exclude-standard", "--directory", "-z"),
+        ("--others", "--ignored", "--exclude-standard", "--directory", "-z"),
+    )
+    for variant in variants:
+        raw = closed_worktree_git(repo, "ls-files", *variant).out
+        for value in raw.split("\0"):
+            if not value:
+                continue
+            rel = value[:-1] if value.endswith("/") else value
+            try:
+                paths.add(canonical_path(rel))
+            except AuthorityError as exc:
+                raise Stop(f"unsafe provider scratch path: {exc}") from exc
+    return sorted(paths)
+def exact_worktree_clean(repo: Path) -> bool:
+    status = closed_worktree_git(
+        repo, "status", "--porcelain=v1", "--untracked-files=all",
+        "--ignore-submodules=none",
+    ).out.strip()
+    return not status and not untracked_inventory(repo)
+def _owned_common_git_directory(repo: Path, name: str) -> Path:
+    common = common_git_dir(repo)
+    root = common / name
+    root.mkdir(mode=0o700, exist_ok=True)
+    opened = root.lstat()
+    if (root.is_symlink() or not stat.S_ISDIR(opened.st_mode)
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != 0o700):
+        raise Stop(f"controller-owned Git directory has unsafe identity: {root}")
+    resolved = root.resolve()
+    if resolved.parent != common:
+        raise Stop(f"controller-owned Git directory escaped common Git: {root}")
+    return resolved
+def protected_worktree_root(repo: Path) -> Path:
+    return _owned_common_git_directory(repo, "nortropic-controller-worktrees")
+def protected_materialization_root(repo: Path) -> Path: return _owned_common_git_directory(repo, "nortropic-candidate-materialization")
+def registered_worktree(repo: Path, path: Path) -> dict[str, str]:
+    wanted = path.resolve()
+    hits = [row for row in worktrees(repo) if Path(row.get("worktree", "")).resolve() == wanted]
+    if len(hits) != 1:
+        raise Stop(f"worktree registration mismatch path={wanted} count={len(hits)}")
+    return hits[0]
+def assert_worktree_binding(repo: Path, path: Path, expected_head: str, expected_branch: str | None) -> None:
+    wanted = path.resolve()
+    if (wanted != path or path.is_symlink() or not path.is_dir()
+            or not _single_link_checkout_tree(path, repo, expected_head)
+            or not _single_link_owned_file(path / ".git", 1024 * 1024)):
+        raise Stop(f"worktree path identity mismatch: {path}")
+    top = Path(closed_worktree_git(
+        path, "rev-parse", "--show-toplevel"
+    ).out.strip()).resolve()
+    if top != wanted or common_git_dir(path) != common_git_dir(repo):
+        raise Stop(f"worktree repository binding mismatch: {path}")
+    row = registered_worktree(repo, path)
+    expected_keys = ({"worktree", "HEAD", "detached"} if expected_branch is None
+                     else {"worktree", "HEAD", "branch"})
+    gitdir = Path(closed_worktree_git(
+        path, "rev-parse", "--path-format=absolute", "--git-dir"
+    ).out.strip())
+    if (set(row) != expected_keys or row.get("worktree") != str(path)
+            or row.get("HEAD") != expected_head
+            or not _closed_control_tree(gitdir)
+            or not _single_link_owned_file(gitdir / "index", 64 * 1024 * 1024)):
+        raise Stop(f"registered worktree HEAD mismatch path={path}")
+    if expected_branch is None:
+        if "branch" in row or "detached" not in row or branch(path):
+            raise Stop(f"provider scratch is not exact detached HEAD: {path}")
+    elif (row.get("branch") != f"refs/heads/{expected_branch}"
+          or branch(path) != expected_branch):
+        raise Stop(f"protected branch binding mismatch: {path}")
+    if sha(path) != expected_head:
+        raise Stop(f"worktree resolved HEAD mismatch: {path}")
+def ensure_protected_builder_worktree(repo: Path, branch_name: str, base: str) -> Path:
+    branch_exists = local_branch_exists(repo, branch_name)
+    if branch_exists:
+        existing_head = sha(repo, f"refs/heads/{branch_name}")
+        if (existing_head != base and closed_worktree_git(
+                repo, "merge-base", "--is-ancestor", existing_head, base,
+                check=False).rc != 0):
+            raise Stop(
+                f"protected branch is not safely behind base "
+                f"branch={branch_name} head={existing_head} base={base}"
+            )
+    root = protected_worktree_root(repo)
+    branch_key = hashlib.sha256(branch_name.encode("utf-8")).hexdigest()[:20]
+    wanted = root / f"authority-{branch_key}"
+    matches = [row for row in worktrees(repo)
+               if row.get("branch") == f"refs/heads/{branch_name}"]
+    if len(matches) > 1:
+        raise Stop(f"protected builder branch has multiple worktrees: {branch_name}")
+    if matches:
+        actual = Path(matches[0]["worktree"]).resolve()
+        if actual != wanted.resolve():
+            raise Stop(
+                f"builder authority branch is outside protected root: {actual}"
+            )
+    else:
+        if wanted.exists() or wanted.is_symlink():
+            raise Stop(f"protected builder worktree path already exists: {wanted}")
+        if branch_exists:
+            closed_worktree_git(repo, "worktree", "add", str(wanted), branch_name, raw_checkout=True)
+        else:
+            closed_worktree_git(
+                repo, "worktree", "add", "-b", branch_name,
+                str(wanted), base, raw_checkout=True,
+            )
+    head = sha(wanted)
+    if head != base:
+        if closed_worktree_git(
+                repo, "merge-base", "--is-ancestor", head, base,
+                check=False).rc != 0:
+            raise Stop(
+                f"protected branch is not safely behind base "
+                f"branch={branch_name} head={head} base={base}"
+            )
+        closed_worktree_git(wanted, "merge", "--ff-only", base, raw_checkout=True)
+    assert_worktree_binding(repo, wanted, base, branch_name)
+    if not exact_worktree_clean(wanted):
+        raise Stop(f"protected builder worktree is dirty: {wanted}")
+    return wanted
+def protected_detached_worktree(repo: Path, name: str, commit_sha: str) -> Path:
+    root = protected_worktree_root(repo)
+    token = hashlib.sha256(name.encode("utf-8")).hexdigest()[:20]
+    path = root / f"gate-{commit_sha[:12]}-{token}"
+    if path.exists() or path.is_symlink():
+        raise Stop(f"protected gate worktree path already exists: {path}")
+    worktrees(repo)
+    closed_worktree_git(
+        repo, "worktree", "add", "--detach", str(path), commit_sha, raw_checkout=True
+    )
+    assert_worktree_binding(repo, path, commit_sha, None)
+    if not exact_worktree_clean(path):
+        raise Stop(f"new protected gate worktree is dirty: {path}")
+    return path
+def _single_link_object_tree(path: Path, authority: Path, relative: Path | None = None) -> bool:
+    if relative is None:
+        relative = Path(".")
+    try:
+        root = path.lstat()
+        if (path.is_symlink() or not stat.S_ISDIR(root.st_mode)
+                or root.st_uid != os.getuid()):
+            return False
+        children = list(path.iterdir())
+    except OSError:
+        return False
+    for child in children:
+        try:
+            opened = child.lstat()
+        except OSError:
+            return False
+        if child.is_symlink():
+            return False
+        if stat.S_ISDIR(opened.st_mode):
+            if not _single_link_object_tree(
+                    child, authority, relative / child.name):
+                return False
+        elif (not stat.S_ISREG(opened.st_mode)
+              or opened.st_nlink != 1
+              or child.name.endswith(".promisor")):
+            return False
+        else:
+            authoritative = authority / relative / child.name
+            try:
+                authority_opened = authoritative.lstat()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                return False
+            if ((opened.st_dev, opened.st_ino)
+                    == (authority_opened.st_dev, authority_opened.st_ino)):
+                return False
+    return True
+def _single_link_owned_file(path: Path, limit: int) -> bool:
+    try:
+        opened = path.lstat()
+        if (path.is_symlink() or not stat.S_ISREG(opened.st_mode)
+                or opened.st_uid != os.getuid() or opened.st_nlink != 1
+                or opened.st_size < 0 or opened.st_size > limit):
+            return False
+        with path.open("rb") as handle:
+            bound = os.fstat(handle.fileno())
+            final = path.lstat()
+        return ((opened.st_dev, opened.st_ino, opened.st_mode,
+                 opened.st_uid, opened.st_nlink, opened.st_size)
+                == (bound.st_dev, bound.st_ino, bound.st_mode, bound.st_uid,
+                    bound.st_nlink, bound.st_size)
+                == (final.st_dev, final.st_ino, final.st_mode, final.st_uid,
+                    final.st_nlink, final.st_size) and not path.is_symlink())
+    except OSError:
+        return False
+def _single_link_checkout_tree(path: Path, repo: Path, expected: str, *, root: bool = True,
+                               budget: list[Any] | None = None, prefix: str = "") -> bool:
+    if budget is None:
+        budget = [4096, 64 * 1024 * 1024, {}]
+    try:
+        opened = path.lstat()
+        if (path.is_symlink() or not stat.S_ISDIR(opened.st_mode)
+                or opened.st_uid != os.getuid()):
+            return False
+        children = list(path.iterdir())
+    except OSError:
+        return False
+    budget[0] -= len(children)
+    if budget[0] < 0:
+        return False
+    for child in children:
+        if root and child.name == ".git":
+            continue
+        rel = f"{prefix}/{child.name}".lstrip("/")
+        try:
+            item = child.lstat()
+        except OSError:
+            return False
+        if child.is_symlink() or item.st_uid != os.getuid():
+            return False
+        if stat.S_ISDIR(item.st_mode):
+            budget[2][rel] = ("040000", "")
+            if not _single_link_checkout_tree(
+                    child, repo, expected, root=False, budget=budget, prefix=rel):
+                return False
+        elif (stat.S_ISREG(item.st_mode) and item.st_nlink == 1
+              and stat.S_IMODE(item.st_mode) in {0o644, 0o755}):
+            budget[1] -= item.st_size
+            if item.st_size < 0 or budget[1] < 0:
+                return False
+            oid = closed_worktree_git(
+                repo, "hash-object", "--no-filters", "--", str(child)
+            ).out.strip()
+            final = child.lstat()
+            identity = lambda value: (value.st_dev, value.st_ino, value.st_mode,
+                                      value.st_uid, value.st_nlink, value.st_size,
+                                      value.st_mtime_ns, value.st_ctime_ns)
+            if (identity(item) != identity(final)
+                    or re.fullmatch(r"[0-9a-f]{40}", oid) is None):
+                return False
+            budget[2][rel] = (f"{0o100000 | stat.S_IMODE(item.st_mode):o}", oid)
+        else:
+            return False
+    if not root:
+        return True
+    wanted = {}
+    for record in closed_worktree_git(
+            repo, "ls-tree", "-rz", "--full-tree", expected).out.split("\0"):
+        if not record:
+            continue
+        meta, separator, rel = record.partition("\t")
+        parts = meta.split()
+        if (not separator or len(parts) != 3 or parts[1] != "blob"
+                or parts[0] not in {"100644", "100755"}
+                or re.fullmatch(r"[0-9a-f]{40}", parts[2]) is None
+                or rel in wanted):
+            return False
+        wanted[rel] = (parts[0], parts[2])
+    wanted.update({"/".join(rel.split("/")[:index]): ("040000", "")
+                   for rel in tuple(wanted) for index in range(1, len(rel.split("/")))})
+    return budget[2] == wanted
+def _metadata_file_contains_bytes(path: Path, needle: bytes) -> bool:
+    try:
+        opened = path.lstat()
+        if (path.is_symlink() or not stat.S_ISREG(opened.st_mode)
+                or opened.st_size < 0 or opened.st_size > 1024 * 1024):
+            return True
+        with path.open("rb") as handle:
+            bound = os.fstat(handle.fileno())
+            raw = _read_stable_opened(
+                handle.fileno(), 1024 * 1024, "Git control metadata")
+            final = path.lstat()
+        identity = lambda item: (item.st_dev, item.st_ino, item.st_mode,
+                                 item.st_size, item.st_mtime_ns, item.st_ctime_ns)
+        if identity(opened) != identity(bound) or identity(bound) != identity(final):
+            return True
+    except (OSError, Stop):
+        return True
+    return path.is_symlink() or needle in raw
+def _metadata_tree_empty(path: Path, budget: list[int] | None = None) -> bool:
+    if budget is None:
+        budget = [128, 4 * 1024 * 1024]
+    try:
+        root = path.lstat()
+        if (path.is_symlink() or not stat.S_ISDIR(root.st_mode)):
+            return False
+        children = list(path.iterdir())
+    except OSError:
+        return False
+    budget[0] -= len(children)
+    if budget[0] < 0:
+        return False
+    for child in children:
+        try:
+            opened = child.lstat()
+        except OSError:
+            return False
+        if child.is_symlink():
+            return False
+        if stat.S_ISDIR(opened.st_mode):
+            if not _metadata_tree_empty(child, budget):
+                return False
+        else:
+            return False
+    return True
+def managed_provider_root(wt_root: Path) -> Path:
+    wt_root.mkdir(parents=True, mode=0o700, exist_ok=True)
+    try:
+        opened = wt_root.lstat()
+        resolved = wt_root.resolve(strict=True)
+    except OSError as exc:
+        raise Stop(f"managed provider root is unavailable: {wt_root}") from exc
+    if (not wt_root.is_absolute() or wt_root.is_symlink()
+            or resolved != wt_root or not stat.S_ISDIR(opened.st_mode)
+            or opened.st_uid != os.getuid() or opened.st_mode & 0o022):
+        raise Stop(f"managed provider root has unsafe identity: {wt_root}")
+    return resolved
+def provider_scratch_root(repo: Path, wt_root: Path) -> Path:
+    managed = managed_provider_root(wt_root)
+    child = managed / "isolated-provider-scratch"
+    try:
+        opened = child.lstat()
+    except FileNotFoundError:
+        child.mkdir(mode=0o700)
+        opened = child.lstat()
+    except OSError as exc:
+        raise Stop(f"provider scratch root is unavailable: {child}") from exc
+    if (child.is_symlink() or not stat.S_ISDIR(opened.st_mode)
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != 0o700):
+        raise Stop(f"provider scratch root has unsafe identity: {child}")
+    root = child.resolve(strict=True)
+    if root != child or root.parent != managed:
+        raise Stop(f"provider scratch root escaped managed root: {child}")
+    protected = (
+        repo.resolve(), REPOSITORY_ROOT.resolve(), common_git_dir(repo),
+        protected_worktree_root(repo), protected_materialization_root(repo),
+    )
+    for authority in protected:
+        if (root == authority or root in authority.parents
+                or authority in root.parents):
+            raise Stop(
+                f"provider scratch root overlaps controller authority: {root}"
+            )
+    return root
+def provider_attempt_root(repo: Path, wt: Path, wt_root: Path) -> Path:
+    authority_git = common_git_dir(repo)
+    root = managed_provider_root(wt_root)
+    protected = (
+        REPOSITORY_ROOT.resolve(), repo.resolve(), authority_git,
+    )
+    resolved_wt = wt.resolve(strict=True)
+    independent = common_git_dir(wt) != authority_git
+    expected_parent = (provider_scratch_root(repo, root)
+                       if independent else root)
+    if (root == resolved_wt or root not in resolved_wt.parents
+            or resolved_wt.parent != expected_parent
+            or any(root == item or root in item.parents
+                   or item in root.parents for item in protected)):
+        raise Stop(f"provider attempt root is not safely separated: {root}")
+    return root
+def provider_execution_root(wt_root: Path) -> Path:
+    managed = managed_provider_root(wt_root)
+    root = managed / "nortropic-controller-execution"
+    root.mkdir(mode=0o700, exist_ok=True)
+    opened = root.lstat()
+    resolved = root.resolve(strict=True)
+    if (root.is_symlink() or resolved != root or resolved.parent != managed
+            or not stat.S_ISDIR(opened.st_mode)
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != 0o700):
+        raise Stop(f"provider execution root has unsafe identity: {root}")
+    return resolved
+def _isolated_scratch_config(repo: Path) -> dict[str, str]:
+    raw = closed_worktree_git(repo, "config", "--local", "--null", "--list").out
+    values: dict[str, str] = {}
+    for record in raw.split("\0"):
+        if not record:
+            continue
+        key, separator, value = record.partition("\n")
+        if not separator or not key or key in values:
+            raise Stop("isolated provider scratch config is ambiguous")
+        values[key] = value
+    allowed = {
+        "core.repositoryformatversion", "core.filemode", "core.bare",
+        "core.logallrefupdates", "core.ignorecase", "core.precomposeunicode",
+    }
+    if not set(values) <= allowed:
+        raise Stop(
+            f"isolated provider scratch retained config authority: "
+            f"{sorted(set(values) - allowed)}"
+        )
+    required = {
+        "core.repositoryformatversion": "0",
+        "core.bare": "false",
+        "core.logallrefupdates": "false",
+    }
+    if any(values.get(key) != value for key, value in required.items()):
+        raise Stop("isolated provider scratch config closure mismatch")
+    for key in ("core.filemode", "core.ignorecase", "core.precomposeunicode"):
+        if key in values and values[key] not in {"true", "false"}:
+            raise Stop(f"isolated provider scratch config value mismatch: {key}")
+    return values
+def exact_scratch_object_closure(scratch: Path, authority: Path, commit_sha: str) -> bool:
+    def object_ids(repo: Path, *args: str) -> set[str]:
+        rows = closed_worktree_git(repo, *args).out.splitlines()
+        if (not rows or len(rows) > 200000 or len(rows) != len(set(rows))
+                or any(re.fullmatch(r"[0-9a-f]{40}", row) is None
+                       for row in rows)):
+            raise Stop("isolated provider object inventory is malformed")
+        return set(rows)
+    expected = object_ids(authority, "rev-list", "--objects", "--no-object-names", commit_sha)
+    reachable = object_ids(scratch, "rev-list", "--objects", "--no-object-names", commit_sha)
+    stored = object_ids(scratch, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)")
+    return stored == reachable == expected
+def isolated_provider_scratch(repo: Path, wt_root: Path, task_id: str, role: str, commit_sha: str) -> Path:
+    root = provider_scratch_root(repo, wt_root)
+    scratch = Path(tempfile.mkdtemp(
+        prefix=f"isolated-{role.lower()}-", dir=root)).resolve()
+    if scratch.parent != root:
+        raise Stop("isolated provider scratch escaped its attempt root")
+    scratch_opened = scratch.lstat()
+    if (scratch.is_symlink() or not stat.S_ISDIR(scratch_opened.st_mode)
+            or scratch_opened.st_uid != os.getuid()
+            or stat.S_IMODE(scratch_opened.st_mode) != 0o700):
+        raise Stop("isolated provider scratch root identity mismatch")
+    closed_worktree_git(scratch, "init", "-q")
+    scratch_dot_git = scratch / ".git"
+    scratch_dot_git.chmod(0o700)
+    dot_git_opened = scratch_dot_git.lstat()
+    if (scratch_dot_git.is_symlink()
+            or not stat.S_ISDIR(dot_git_opened.st_mode)
+            or dot_git_opened.st_uid != os.getuid()
+            or stat.S_IMODE(dot_git_opened.st_mode) != 0o700):
+        raise Stop("isolated provider .git identity mismatch")
+    closed_worktree_git(scratch, "config", "--local", "core.logAllRefUpdates", "false")
+    _isolated_scratch_config(scratch)
+    bootstrap_ref = "refs/nortropic/bootstrap"
+    closed_worktree_git(scratch, "-c", "protocol.file.allow=always", "fetch",
+                        "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
+                        str(repo.resolve()), f"{commit_sha}:{bootstrap_ref}")
+    closed_worktree_git(scratch, "switch", "--detach", commit_sha, raw_checkout=True)
+    closed_worktree_git(scratch, "update-ref", "-d", bootstrap_ref)
+    scratch_git = scratch_dot_git
+    authority_git = common_git_dir(repo)
+    scratch_objects = scratch_git / "objects"
+    try:
+        objects_real = scratch_objects.resolve(strict=True)
+    except OSError as exc:
+        raise Stop("isolated provider object root is unavailable") from exc
+    if (objects_real != scratch_objects
+            or scratch_objects.parent != scratch_git
+            or not _single_link_object_tree(
+                scratch_objects, authority_git / "objects")
+            or not _single_link_owned_file(scratch_git / "index", 64 * 1024 * 1024)
+            or not _single_link_owned_file(scratch_git / "config", 1024 * 1024)
+            or not _single_link_checkout_tree(scratch, repo, commit_sha)):
+        raise Stop("isolated provider repository contains an aliased byte")
+    if (scratch_git != scratch_dot_git.resolve()
+            or common_git_dir(scratch) != scratch_git
+            or scratch_git == authority_git
+            or authority_git in scratch_git.parents
+            or scratch_git in authority_git.parents):
+        raise Stop("isolated provider scratch shares authoritative Git control")
+    alternates = scratch_git / "objects/info/alternates"
+    http_alternates = scratch_git / "objects/info/http-alternates"
+    shallow = scratch_git / "shallow"
+    if any(path.exists() or path.is_symlink()
+           for path in (alternates, http_alternates, shallow)):
+        raise Stop("isolated provider scratch retained an ODB alternate")
+    if closed_worktree_git(scratch, "for-each-ref", "--format=%(refname)").out.strip():
+        raise Stop("isolated provider scratch retained a ref")
+    _isolated_scratch_config(scratch)
+    fetch_head = scratch_git / "FETCH_HEAD"
+    logs = scratch_git / "logs"
+    refs = scratch_git / "refs"
+    packed_refs = scratch_git / "packed-refs"
+    source_path = str(repo.resolve()).encode("utf-8")
+    metadata_leak = _metadata_file_contains_bytes(scratch_git / "config", source_path)
+    if (closed_worktree_git(scratch, "remote").out.strip()
+            or fetch_head.exists() or fetch_head.is_symlink()
+            or logs.exists() or logs.is_symlink()
+            or packed_refs.exists() or packed_refs.is_symlink()
+            or not _metadata_tree_empty(refs)
+            or metadata_leak):
+        raise Stop("isolated provider scratch persisted source authority")
+    assert_raw_git_authority(scratch, standalone=True)
+    fsck = closed_worktree_git(scratch, "fsck", "--full", "--strict", check=False)
+    if (branch(scratch) or sha(scratch) != commit_sha
+            or not exact_worktree_clean(scratch)
+            or sha(scratch, f"{commit_sha}^{{tree}}")
+                != sha(repo, f"{commit_sha}^{{tree}}")
+            or not _single_link_object_tree(
+                scratch_git / "objects", authority_git / "objects")
+            or not exact_scratch_object_closure(scratch, repo, commit_sha)
+            or fsck.rc != 0
+            or any(Path(row.get("worktree", "")).resolve() == scratch
+                   for row in worktrees(repo))):
+        raise Stop("isolated provider scratch identity is not closed")
+    journal(repo, "PROVIDER_SCRATCH_ISOLATED", task=task_id, role=role,
+            scratch=str(scratch), candidate=commit_sha)
+    return scratch
+def quarantine_provider_scratch(repo: Path, scratch: Path, task_id: str, role: str, expected_head: str) -> None:
+    journal(repo, "PROVIDER_SCRATCH_QUARANTINED", task=task_id, role=role,
+            scratch=str(scratch), expected=expected_head, observed="UNTRUSTED_RESIDUE_NOT_READ")
 def agent_prompt_common() -> str:
     return """
 You are running under Nortropic Codex Operating Model v4 provider-neutral trust-kernel autonomy.
@@ -640,7 +1264,7 @@ def _strict_provider_authority(repo: Path) -> tuple[Path, str, Path, str]:
     return path, digest, host_path, host_digest
 
 
-def _provider_snapshot(repo: Path) -> tuple[Path, Path, str, Path, str]:
+def _provider_snapshot(repo: Path, execution_root: Path | None = None) -> tuple[Path, Path, str, Path, str]:
     source, expected, host_source, host_expected = _strict_provider_authority(repo)
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     payloads: list[bytes] = []
@@ -663,7 +1287,9 @@ def _provider_snapshot(repo: Path) -> tuple[Path, Path, str, Path, str]:
             raise Stop(f"{label} digest does not match authority")
         payloads.append(payload)
 
-    root = Path(tempfile.mkdtemp(prefix="nortropic-provider-"))
+    root = Path(tempfile.mkdtemp(
+        prefix="nortropic-provider-", dir=execution_root
+    ))
     try:
         snapshots: list[Path] = []
         for basename, payload, member_expected, label in (
@@ -768,7 +1394,90 @@ def _python_snapshot(root: Path) -> tuple[Path, str]:
     return snapshot, digest
 
 
-def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
+def _remove_result_tree(root: Path) -> bool:
+    if root.is_symlink():
+        root.unlink()
+        return False
+    primary_failures = 0
+    for _cleanup_attempt in range(3):
+        try:
+            shutil.rmtree(root)
+            return False
+        except FileNotFoundError:
+            return False
+        except OSError:
+            primary_failures += 1
+    for child in root.iterdir():
+        opened = child.lstat()
+        if stat.S_ISDIR(opened.st_mode) and not child.is_symlink():
+            _remove_result_tree(child)
+        else:
+            child.unlink()
+    root.rmdir()
+    return primary_failures == 3
+def _cleanup_result_staging(root: Path, identity: tuple[int, int]) -> tuple[list[Path], bool]:
+    candidates: list[Path] = []
+    if root.exists() or root.is_symlink():
+        try:
+            root_now = root.lstat()
+            if ((root_now.st_dev, root_now.st_ino) == identity
+                    and stat.S_ISDIR(root_now.st_mode) and not root.is_symlink()):
+                candidates.append(root)
+        except OSError:
+            pass
+    try:
+        siblings = list(root.parent.iterdir())
+    except OSError:
+        siblings = []
+    for candidate in siblings:
+        if candidate == root:
+            continue
+        try:
+            opened = candidate.lstat()
+        except OSError:
+            continue
+        if ((opened.st_dev, opened.st_ino) == identity
+                and stat.S_ISDIR(opened.st_mode) and not candidate.is_symlink()):
+            candidates.append(candidate)
+    degraded = False
+    for candidate in candidates:
+        degraded = _remove_result_tree(candidate) or degraded
+    residue = [candidate for candidate in candidates
+               if candidate.exists() or candidate.is_symlink()]
+    return residue, degraded
+def _retire_bound_staging(staging_dir_fd, root, identity):
+    try:
+        st = root.lstat()
+        path_bound = ((st.st_dev, st.st_ino) == identity
+                      and stat.S_ISDIR(st.st_mode) and not root.is_symlink())
+    except OSError:
+        path_bound = False
+    if path_bound:
+        for _cleanup_attempt in range(3):
+            try:
+                shutil.rmtree(root)
+                return True
+            except FileNotFoundError:
+                return True
+            except OSError:
+                continue
+        return False
+    try:
+        os.unlink("result.json", dir_fd=staging_dir_fd)
+    except FileNotFoundError:
+        pass
+    try:
+        moved = Path(fcntl.fcntl(staging_dir_fd, fcntl.F_GETPATH,
+                                 b"\0" * 1024).split(b"\0", 1)[0].decode())
+        moved_now = moved.lstat()
+        if ((moved_now.st_dev, moved_now.st_ino) == identity
+                and stat.S_ISDIR(moved_now.st_mode)):
+            shutil.rmtree(moved)
+    except (OSError, ValueError):
+        pass
+    return False
+def run_codex(repo: Path, wt: Path, role: str, prompt: str, wt_root: Path | None = None) -> dict[str, Any]:
+    global _LAST_AGENT_CONTEXT
     route = AUTOPILOT_ROLE_POLICY.get(role)
     if route is None:
         raise Stop(f"unknown autopilot role: {role!r}")
@@ -781,10 +1490,69 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
     if not schema.exists():
         raise Stop(f"report schema missing in worktree: {schema}")
     full_prompt = prompt.rstrip() + "\n\n" + agent_prompt_common()
+    attempt_root = None
+    execution_root = None
+    if wt_root is not None:
+        attempt_root = provider_attempt_root(repo, wt, wt_root)
+        execution_root = provider_execution_root(attempt_root)
     (snapshot_root, snapshot, snapshot_digest,
-     host_snapshot, host_snapshot_digest) = _provider_snapshot(repo)
+     host_snapshot, host_snapshot_digest) = _provider_snapshot(
+         repo, execution_root
+     )
+    result_root: Path | None = None
+    result_root_identity: tuple[int, int] | None = None
+    sink_fd = -1
+    staging_dir_fd = -1
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
+        result_root = Path(tempfile.mkdtemp(
+            prefix="nortropic-result-", dir=execution_root
+        ))
+        root_stat = result_root.lstat()
+        result_root_identity = (root_stat.st_dev, root_stat.st_ino)
+        live_root = repo.resolve()
+        live_git = common_git_dir(repo).resolve()
+        result_root_real = result_root.resolve()
+        if (result_root.is_symlink() or root_stat.st_uid != os.getuid()
+                or stat.S_IMODE(root_stat.st_mode) != 0o700
+                or (execution_root is not None
+                    and result_root_real.parent != execution_root)
+                or result_root_real == live_root or live_root in result_root_real.parents
+                or result_root_real == live_git or live_git in result_root_real.parents):
+            raise Stop("private result staging root has unsafe identity")
+        staging_dir_fd = os.open(
+            result_root,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+        staging_dir_identity = os.fstat(staging_dir_fd)
+        if (not stat.S_ISDIR(staging_dir_identity.st_mode)
+                or (staging_dir_identity.st_dev, staging_dir_identity.st_ino)
+                    != result_root_identity):
+            raise Stop("private result staging directory identity unbound")
+        result_sink = result_root / "result.json"
+        create_fd = os.open(
+            result_sink,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        try:
+            os.fsync(create_fd)
+            sink_fd = os.open(
+                result_sink,
+                os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+            )
+        finally:
+            os.close(create_fd)
+        sink_identity = os.fstat(sink_fd)
+        if (not stat.S_ISREG(sink_identity.st_mode) or sink_identity.st_nlink != 1
+                or stat.S_IMODE(sink_identity.st_mode) != 0o600
+                or sorted(path.name for path in result_root.iterdir()) != [result_sink.name]):
+            raise Stop("private result sink has unsafe identity")
+        invocation_id = os.urandom(16).hex()
+        run_id = os.urandom(16).hex()
+        if invocation_id == run_id:
+            raise Stop("controller result bindings collided")
         provider_argv = [
             str(snapshot),
             "-C", str(wt),
@@ -796,18 +1564,27 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
             "-c", f'model_reasoning_effort="{reasoning_effort}"',
             "--json",
             "--output-schema", str(schema),
-            "-o", str(result),
+            "-o", str(result_sink),
             full_prompt,
         ]
         envelope = jr / "provider-envelope.json"
         envelope.write_text(json.dumps({"task_id": prompt, "role": role}), encoding="utf-8")
         launcher = Path(__file__).resolve().parents[1] / "controller/launch/cli"
         argv = [str(python_snapshot), "-I", "-S", str(launcher),
-                "run", str(wt), str(envelope), "86400", "--", *provider_argv]
+                "run", str(wt), str(envelope), str(CODEX_RUN_TIMEOUT_SECONDS),
+                "--", *provider_argv]
         env = {key: value for key, value in os.environ.items()
-               if not key.startswith("DYLD_")
-               and key not in {"LD_PRELOAD", "LD_LIBRARY_PATH", "__PYVENV_LAUNCHER__"}}
+               if not key.startswith(GIT_CONTROL_PREFIX)
+               and not key.startswith("DYLD_")
+               and key not in {
+                   "LD_PRELOAD", "LD_LIBRARY_PATH", "__PYVENV_LAUNCHER__",
+                   ATTEMPT_ROOT_ENV,
+               }}
         env["NORTROPIC_TRUST_ROOT"] = str(snapshot_root)
+        if attempt_root is not None:
+            env[ATTEMPT_ROOT_ENV] = str(attempt_root)
+        env["NORTROPIC_STAGING_ROOT"] = str(result_root)
+        env["NORTROPIC_RESULT_SINK"] = str(result_sink)
         thread_id: str | None = None
         # Protect the complete execution family first.  Every final identity
         # read is deliberately after the last successful mode transition and
@@ -844,32 +1621,106 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
                 if obj.get("type") == "thread.started" and isinstance(obj.get("thread_id"), str):
                     thread_id = obj["thread_id"]
             rc = p.wait()
+        if rc != 0:
+            raise Stop(f"Codex role {role} failed rc={rc}; events={events}")
+        opened_identity = os.fstat(sink_fd)
+        substituted = False
+        try:
+            path_identity = result_sink.lstat()
+            if (result_sink.is_symlink() or not stat.S_ISREG(path_identity.st_mode)
+                    or path_identity.st_nlink != 1
+                    or (path_identity.st_dev, path_identity.st_ino)
+                        != (opened_identity.st_dev, opened_identity.st_ino)
+                    or sorted(path.name for path in result_root.iterdir())
+                        != [result_sink.name]):
+                raise Stop("provider result transport identity changed")
+        except FileNotFoundError:
+            substituted = True
+        for _cleanup_attempt in range(3):
+            if not snapshot_root.exists():
+                break
+            try:
+                snapshot_root.chmod(0o700)
+            except OSError:
+                pass
+            try:
+                shutil.rmtree(snapshot_root)
+            except OSError:
+                pass
+            else:
+                break
+        if snapshot_root.exists():
+            raise Stop("private provider execution family cleanup incomplete")
+        retired = _retire_bound_staging(
+            staging_dir_fd, result_root, result_root_identity)
+        if substituted or not retired:
+            raise Stop("private result staging cleanup incomplete: staging substituted")
+        handoff_identity = os.fstat(sink_fd)
+        if (not stat.S_ISREG(handoff_identity.st_mode)
+                or handoff_identity.st_nlink != 0
+                or (handoff_identity.st_dev, handoff_identity.st_ino)
+                    != (opened_identity.st_dev, opened_identity.st_ino)):
+            raise Stop("retained result sink lost its handoff identity")
+        _LAST_AGENT_CONTEXT = (thread_id, events, result)
+        accepted = consume_private_result(sink_fd, result, invocation_id, run_id, role)
+        if (role not in {"BUILDER", "TEST_AUTHOR"}
+                and accepted["report"].get("candidate_delta") is not None):
+            raise Stop(f"report-only role returned candidate_delta: {role}")
+        return accepted
     finally:
-        cleanup_error: OSError | None = None
+        cleanup_errors: list[OSError] = []
+        for _fd in (staging_dir_fd, sink_fd):
+            if _fd >= 0:
+                try:
+                    os.close(_fd)
+                except OSError:
+                    pass
+        result_residue: list[Path] = []
+        result_cleanup_degraded = False
+        if result_root is not None and result_root_identity is not None:
+            try:
+                result_residue, result_cleanup_degraded = _cleanup_result_staging(
+                    result_root, result_root_identity)
+            except OSError as exc:
+                cleanup_errors.append(exc)
+                result_residue = [result_root]
+        elif result_root is not None:
+            try:
+                result_cleanup_degraded = _remove_result_tree(result_root)
+            except OSError as exc:
+                cleanup_errors.append(exc)
+                result_residue = [result_root]
         for _cleanup_attempt in range(3):
             if not snapshot_root.exists():
                 break
             try:
                 os.chmod(snapshot_root, 0o700)
             except OSError as exc:
-                cleanup_error = exc
+                cleanup_errors.append(exc)
             try:
                 shutil.rmtree(snapshot_root)
             except OSError as exc:
-                cleanup_error = exc
+                cleanup_errors.append(exc)
             else:
                 break
-        if snapshot_root.exists():
-            raise Stop("private provider execution family cleanup incomplete") from cleanup_error
-    if rc != 0:
-        raise Stop(f"Codex role {role} failed rc={rc}; events={events}")
-    try:
-        report = json.loads(result.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise Stop(f"Codex role {role} produced invalid structured result: {e}; file={result}") from e
-    if report.get("role") != role:
-        raise Stop(f"Codex role mismatch expected={role} got={report.get('role')}")
-    journal(repo, "AGENT_END", role=role, outcome=report.get("outcome"), thread_id=thread_id or "OVERIFIERAT")
+        cleanup_incomplete = (
+            bool(result_residue) or snapshot_root.exists() or result_cleanup_degraded
+        )
+        if cleanup_incomplete:
+            cause = cleanup_errors[-1] if cleanup_errors else None
+            raise Stop("private execution staging cleanup incomplete") from cause
+def _run_codex_agent(repo: Path, wt: Path, role: str, prompt: str, wt_root: Path) -> AgentRun:
+    accepted = run_codex(repo, wt, role, prompt, wt_root)
+    context = _LAST_AGENT_CONTEXT
+    if (context is None or not isinstance(accepted, dict)
+            or set(accepted) != {"schema_version", "invocation_id", "run_id", "role",
+                                 "result_sha256", "report"}
+            or not isinstance(accepted.get("report"), dict)):
+        raise Stop("structured result kernel returned an invalid controller envelope")
+    thread_id, events, result = context
+    report = accepted["report"]
+    journal(repo, "AGENT_END", role=role, outcome=report.get("outcome"),
+            thread_id=thread_id or "OVERIFIERAT")
     return AgentRun(report, thread_id, events, result)
 
 
@@ -942,15 +1793,16 @@ owner_decision_required=false.
 
 
 def architect_resolution(repo: Path, wt: Path, stage: str, task_id: str,
-                         signal: dict[str, Any], context: str = "") -> dict[str, Any]:
-    before_head = sha(wt)
-    before_status = git(wt, "status", "--porcelain=v1", "--untracked-files=all").out
-    arun = run_codex(repo, wt, "ARCHITECT", architect_prompt(stage, task_id, signal, context))
-    after_head = sha(wt)
-    after_status = git(wt, "status", "--porcelain=v1", "--untracked-files=all").out
-    if before_head != after_head or before_status != after_status:
-        raise Stop(f"architect modified candidate state stage={stage} task={task_id}")
-    r = arun.report
+                         signal: dict[str, Any], wt_root: Path,
+                         context: str = "") -> dict[str, Any]:
+    current = sha(wt)
+    arun = isolated_role_run(
+        repo, wt_root, wt, task_id, branch(wt) or None, "ARCHITECT",
+        current, architect_prompt(stage, task_id, signal, context), stage,
+    )
+    return accept_architect_resolution(repo, stage, task_id, arun.report)
+def accept_architect_resolution(repo: Path, stage: str, task_id: str, report: dict[str, Any]) -> dict[str, Any]:
+    r = report
     if owner_need(r):
         raise Stop(f"HUMAN_AUTHORITY_HARD_STOP: architect attempted to delegate its delegated decision: {r.get('stop_reason')}")
     if r.get("outcome") == "BLOCKED":
@@ -966,42 +1818,137 @@ def architect_resolution(repo: Path, wt: Path, stage: str, task_id: str,
 
 
 def run_codex_resolving_architecture(repo: Path, wt: Path, role: str, prompt: str,
-                                     stage: str, task_id: str, context: str = "") -> AgentRun:
-    guidance: list[str] = []
-    last_signal = ""
-    for round_no in range(1, MAX_ARCHITECT_ROUNDS + 1):
-        effective = prompt
-        if guidance:
-            effective += "\n\nAUTONOMOUS_ARCHITECT_RESOLUTIONS:\n" + "\n\n".join(guidance)
-            effective += "\n\nApply these resolutions within higher authority. Do not re-ask the human for the same choice."
-        arun = run_codex(repo, wt, role, effective)
-        if not owner_need(arun.report):
-            return arun
-        signal = str(arun.report.get("stop_reason") or arun.report.get("summary") or "OWNER_DECISION_REQUIRED")
-        if signal == last_signal and round_no == MAX_ARCHITECT_ROUNDS:
-            raise Stop(f"HUMAN_AUTHORITY_HARD_STOP: architecture no-progress after {MAX_ARCHITECT_ROUNDS} rounds stage={stage} task={task_id}: {signal}")
-        last_signal = signal
-        resolution = architect_resolution(repo, wt, stage, task_id, arun.report, context)
-        if role in {"BUILDER", "REVIEWER"} and resolution.get("next_action") == "TEST_AUTHOR":
-            raise ContractRefreeze(task_id, str(resolution.get("summary") or signal))
-        guidance.append(str(resolution.get("summary") or ""))
-    raise Stop(f"HUMAN_AUTHORITY_HARD_STOP: architecture resolution budget exhausted stage={stage} task={task_id}")
+                                     stage: str, task_id: str, wt_root: Path,
+                                     context: str = "") -> AgentRun:
+    return isolated_role_run(
+        repo, wt_root, wt, task_id, branch(wt) or None, role, sha(wt),
+        prompt, stage, context,
+    )
 
-
-def stage_and_commit(repo: Path, files: list[str], subject: str) -> str:
-    if not files:
-        raise Stop("candidate has no changed files")
-    git(repo, "add", "--", *files)
-    git(repo, "diff", "--cached", "--check")
-    staged = [x for x in git(repo, "diff", "--cached", "--name-only").out.splitlines() if x]
-    if sorted(staged) != sorted(files):
-        raise Stop(f"staged file identity mismatch expected={files} actual={staged}")
-    git(repo, "commit", "-m", subject)
-    if not clean(repo):
-        raise Stop("worktree dirty after candidate commit")
-    c = sha(repo)
-    journal(repo, "CANDIDATE_COMMIT", sha=c, subject=subject, files=files)
-    return c
+def object_changed_files(repo: Path, base: str, candidate: str) -> list[str]:
+    raw = closed_worktree_git(repo, "diff", "--name-only", "--no-renames",
+                              "--no-ext-diff", "-z", base, candidate, "--").out
+    try:
+        files = [canonical_path(value) for value in raw.split("\0") if value]
+    except AuthorityError as exc:
+        raise Stop(f"immutable diff path is unsafe: {exc}") from exc
+    if len(files) != len(set(files)):
+        raise Stop("immutable diff path set is ambiguous")
+    return sorted(files)
+def assert_materialized_cumulative_scope(repo: Path, task_id: str, task_base: str,
+                                         candidate: str, allowed_override: Iterable[str] | None = None,
+                                         limits_override: tuple[int, int] | None = None) -> list[str]:
+    assert_raw_git_authority(repo)
+    if (re.fullmatch(r"[0-9a-f]{40}", task_base) is None
+            or re.fullmatch(r"[0-9a-f]{40}", candidate) is None
+            or sha(repo, task_base) != task_base
+            or sha(repo, candidate) != candidate
+            or closed_worktree_git(
+                repo, "merge-base", "--is-ancestor", task_base, candidate,
+                check=False,
+            ).rc != 0):
+        raise Stop(f"materialized cumulative lineage mismatch task={task_id}")
+    files = object_changed_files(repo, task_base, candidate)
+    task = task_obj(repo, task_id) if allowed_override is None else None
+    allowed = (task.get("allowed_write") or load_spec(repo).get(
+        "defaults", {}).get("allowed_write", [])
+        if task is not None else allowed_override)
+    outside = [path for path in files if not path_allowed(path, allowed)]
+    if outside:
+        raise Stop(
+            f"ALLOWED_WRITE_VIOLATION task={task_id}: {outside}"
+        )
+    max_files, max_lines = (task_limits(repo, task) if task is not None
+                            else limits_override or (0, 0))
+    if len(files) > max_files:
+        raise Stop(
+            f"cumulative file budget exceeded: {len(files)} > {max_files}"
+        )
+    numstat = closed_worktree_git(
+        repo, "-c", "core.attributesFile=/dev/stdin", "diff", "--text", "--no-textconv",
+        "--no-ext-diff", "--no-renames", "--no-relative", "--numstat", "-z", "--diff-algorithm=myers",
+        "--no-indent-heuristic", task_base, candidate, "--", raw_attributes=True,
+    ).out
+    numstat_paths: list[str] = []
+    additions = 0
+    for record in numstat.split("\0"):
+        if not record:
+            continue
+        added, separator, tail = record.partition("\t")
+        deleted, second_separator, path = tail.partition("\t")
+        if (not separator or not second_separator or not path
+                or not added.isdigit() or not deleted.isdigit()):
+            raise Stop(f"materialized cumulative numstat malformed task={task_id}")
+        try:
+            numstat_paths.append(canonical_path(path))
+        except AuthorityError as exc:
+            raise Stop(
+                f"materialized cumulative numstat path is unsafe: {exc}"
+            ) from exc
+        additions += int(added)
+    numstat_paths.sort()
+    if numstat_paths != files:
+        raise Stop(f"materialized cumulative file accounting mismatch task={task_id}")
+    if additions > max_lines:
+        raise Stop(
+            f"cumulative added-line budget exceeded: {additions} > {max_lines}"
+        )
+    closed_worktree_git(
+        repo, "diff", "--check", task_base, candidate, "--"
+    )
+    return files
+def adopt_materialized_candidate(repo: Path, wt: Path, task_id: str,
+                                 branch_name: str, task_base: str,
+                                 parent: str, candidate: str,
+                                 candidate_tree: str,
+                                 files: list[str],
+                                 allowed_override: Iterable[str] | None = None,
+                                 limits_override: tuple[int, int] | None = None) -> None:
+    assert_raw_git_authority(repo)
+    assert_worktree_binding(repo, wt, parent, branch_name)
+    if not exact_worktree_clean(wt):
+        raise Stop(f"protected adoption prestate is dirty task={task_id}")
+    lineage = closed_worktree_git(
+        wt, "rev-list", "--parents", "-n", "1", candidate
+    ).out.split()
+    if lineage != [candidate, parent]:
+        raise Stop(
+            f"materialized candidate lineage mismatch task={task_id} "
+            f"lineage={lineage}"
+        )
+    if sha(wt, f"{candidate}^{{tree}}") != candidate_tree:
+        raise Stop(f"materialized candidate tree mismatch task={task_id}")
+    candidate_files = object_changed_files(wt, parent, candidate)
+    if candidate_files != sorted(files):
+        raise Stop(
+            f"materialized candidate path mismatch task={task_id} "
+            f"expected={sorted(files)} actual={candidate_files}"
+        )
+    assert_materialized_cumulative_scope(
+        repo, task_id, task_base, candidate,
+        allowed_override, limits_override,
+    )
+    closed_worktree_git(wt, "merge", "--ff-only", candidate, raw_checkout=True)
+    assert_worktree_binding(repo, wt, candidate, branch_name)
+    if not exact_worktree_clean(wt):
+        raise Stop(f"materialized candidate adoption failed task={task_id}")
+    if sha(wt, f"{candidate}^{{tree}}") != candidate_tree:
+        raise Stop(
+            f"materialized candidate tree changed during adoption task={task_id}"
+        )
+    adopted_files = object_changed_files(wt, parent, candidate)
+    if adopted_files != candidate_files:
+        raise Stop(
+            f"materialized candidate path mismatch task={task_id} "
+            f"expected={candidate_files} actual={adopted_files}"
+        )
+    if allowed_override is None:
+        assert_builder_scope(wt, task_id, task_base)
+    else:
+        assert_materialized_cumulative_scope(
+            repo, task_id, task_base, candidate,
+            allowed_override, limits_override,
+        )
 
 
 def reviewer_prompt(task_id: str, base_sha: str, candidate_sha: str) -> str:
@@ -1071,7 +2018,9 @@ Do not repair the gate yourself.
 """
 
 
-def remediation_prompt(role: str, task_id: str | None, findings: list[dict[str, str]], base_sha: str) -> str:
+def remediation_prompt(role: str, task_id: str | None,
+                       findings: list[dict[str, str]], base_sha: str,
+                       *, current_candidate: str | None = None) -> str:
     rendered = json.dumps(findings, ensure_ascii=False, indent=2)
     if role == "TEST_AUTHOR":
         return f"""
@@ -1082,11 +2031,15 @@ BASE_SHA={base_sha}
 Owner authority remains `{OWNER_DECISION_PATH}`. Make the smallest gate/spec correction inside the same owner-authorized edit surface. Do not implement production code and do not rewrite history. Re-run decisive RED/adversarial evidence and return the structured report.
 """
     assert task_id is not None
+    if current_candidate is None:
+        raise Stop("builder remediation requires an exact current candidate")
     return f"""
 Use `$nortropic-builder` again for TASK={task_id}. The independent reviewer confirmed these blockers against the latest immutable candidate:
 {rendered}
 
 TASK_BASE_SHA={base_sha}
+CURRENT_CANDIDATE_SHA={current_candidate}
+The detached scratch is an isolated, non-authoritative checkout of CURRENT_CANDIDATE_SHA. Return one canonical candidate_delta whose base_commit is exactly CURRENT_CANDIDATE_SHA; never stage, commit, or expose scratch Git state as authority.
 Make the smallest remediation inside the existing frozen task allowed_write. Do not modify frozen artifacts and do not rewrite history. Re-run decisive tests and adversarial review, then return the structured report.
 """
 
@@ -1101,6 +2054,7 @@ def publish(repo: Path, wt: Path, branch_name: str, base_sha: str, candidate_sha
     reviewed candidate; mutable checkout bytes and caller-selected alternate
     authority never participate.
     """
+    assert_raw_git_authority(repo)
     authority_keys = {
         "task_id", "task_spec_path", "task_spec_sha256", "gate_path",
         "gate_sha256", "review_artifact_path", "review_artifact_sha256",
@@ -1129,12 +2083,15 @@ def publish(repo: Path, wt: Path, branch_name: str, base_sha: str, candidate_sha
         raise Stop(f"invalid publication changed path: {exc}") from exc
 
     # Pre-push lock.  Push is ordinary and never force-updates a ref.
+    assert_raw_git_authority(repo)
     if not clean(wt) or sha(wt) != candidate_sha:
         raise Stop("publication candidate identity/cleanliness mismatch")
-    git(wt, "fetch", "origin", "main")
+    fetch_origin(wt, "main")
     if sha(wt, "refs/remotes/origin/main") != base_sha:
         raise Stop("REMOTE_MAIN_CHANGED before push")
-    git(wt, "push", "-u", "origin", branch_name)
+    closed_worktree_git(wt, "push", "--no-verify", "--no-push-option",
+                        "--no-recurse-submodules", "--no-signed", "--no-follow-tags", canonical_origin(wt),
+                        f"{candidate_sha}:refs/heads/{branch_name}")
 
     # A body lives under the common Git metadata, never in the candidate tree.
     body_dir = journal_root(repo) / "publish"
@@ -1156,17 +2113,19 @@ def publish(repo: Path, wt: Path, branch_name: str, base_sha: str, candidate_sha
 
     # Immediate pre-merge relock.  No network mutation occurs between the
     # final main fetch/identity checks below and the expected-head merge.
+    assert_raw_git_authority(repo)
     repository_meta = json.loads(run(
         ["gh", "repo", "view", "--json", "nameWithOwner"], cwd=wt).out)
     if repository_meta.get("nameWithOwner") != EXPECTED_REPO:
         raise Stop(f"repository identity mismatch: {repository_meta}")
-    git(wt, "fetch", "origin", "main")
+    fetch_origin(wt, "main")
     if sha(wt, "refs/remotes/origin/main") != base_sha:
         raise Stop("REMOTE_MAIN_CHANGED before merge")
     if not clean(wt) or sha(wt) != candidate_sha:
         raise Stop("candidate changed before merge")
     candidate_tree = sha(wt, f"{candidate_sha}^{{tree}}")
-    remote = git(wt, "ls-remote", "origin", f"refs/heads/{branch_name}").out.split()
+    remote = closed_worktree_git(
+        wt, "ls-remote", canonical_origin(wt), f"refs/heads/{branch_name}").out.split()
     if remote != [candidate_sha, f"refs/heads/{branch_name}"]:
         raise Stop(f"remote candidate mismatch: {remote}")
 
@@ -1223,7 +2182,8 @@ def publish(repo: Path, wt: Path, branch_name: str, base_sha: str, candidate_sha
 
     # Last main observation is publisher-owned and immediately precedes the
     # merge command.  The exact expected head is supplied to GitHub.
-    git(wt, "fetch", "origin", "main")
+    assert_raw_git_authority(repo)
+    fetch_origin(wt, "main")
     if sha(wt, "refs/remotes/origin/main") != base_sha:
         raise Stop("REMOTE_MAIN_CHANGED at final merge boundary")
     run(["gh", "pr", "merge", number, "--merge",
@@ -1243,7 +2203,8 @@ def publish(repo: Path, wt: Path, branch_name: str, base_sha: str, candidate_sha
 
     # GitHub's response is not success authority by itself.  Fetch and prove
     # the returned merge commit's exact main identity, graph and tree.
-    git(wt, "fetch", "origin", "main")
+    fetch_origin(wt, "main")
+    assert_raw_git_authority(repo)
     new_main = sha(wt, "refs/remotes/origin/main")
     if new_main != returned_sha:
         raise Stop(f"returned merge mismatch returned={returned_sha} origin/main={new_main}")
@@ -1268,6 +2229,7 @@ def publication_authority(repo: Path, candidate_sha: str, task_id: str,
     task row.  Stage L is deliberately not a synthetic task: its exact program
     gate is owner-locked separately and must be supplied by that one caller.
     """
+    assert_raw_git_authority(repo)
     task_spec_path = "specs/tasks.spec.json"
     spec_object = git(repo, "show", f"{candidate_sha}:{task_spec_path}", check=False)
     if spec_object.rc:
@@ -1318,7 +2280,7 @@ def publication_authority(repo: Path, candidate_sha: str, task_id: str,
 
 def ensure_roadmap_plan(repo: Path) -> None:
     # The plan is authority by exact immutable commit, never by the mutable branch tip.
-    git(repo, "fetch", "origin", ROADMAP_PLAN_BRANCH)
+    fetch_origin(repo, ROADMAP_PLAN_BRANCH)
     if git(repo, "cat-file", "-e", f"{ROADMAP_PLAN_SHA}^{{commit}}", check=False).rc != 0:
         raise Stop(f"frozen roadmap commit unavailable after fetch: {ROADMAP_PLAN_SHA}")
     for rel, expected_blob in ROADMAP_PLAN_BLOBS.items():
@@ -1548,49 +2510,34 @@ substitution/adversarial evidence.
 
 
 def roadmap_contract_flow(repo: Path, wt_root: Path, sl: RoadmapSlice, guidance: str = "") -> str:
+    assert_raw_git_authority(repo)
     ensure_roadmap_plan(repo)
     ensure_substitution_authority(repo)
     base = origin_main(repo)
+    assert_raw_git_authority(repo)
     br = f"owner/roadmap-{sl.code.lower()}-contract-{base[:12]}"
-    wt = ensure_worktree(repo, wt_root, br, base, f"roadmap-{sl.code.lower()}-contract-{base[:12]}")
-    if not clean(wt):
-        raise Stop(f"roadmap contract worktree dirty before agent slice={sl.code}")
-    head = sha(wt)
-    if head == base:
-        agent = run_codex_resolving_architecture(repo, wt, "TEST_AUTHOR", roadmap_test_author_prompt(sl, base) + ("\n\nARCHITECT_REFREEZE_GUIDANCE:\n" + guidance if guidance else ""), f"{sl.code}_TEST_AUTHOR", sl.task_id).report
-        if sha(wt) != base:
-            raise Stop(f"roadmap test-author changed Git history slice={sl.code}")
-        if agent.get("owner_decision_required") or agent.get("outcome") == "OWNER_DECISION_REQUIRED":
-            raise Stop(f"architecture routing failure roadmap test-author slice={sl.code}: {agent.get('stop_reason')}")
-        if agent.get("outcome") != "READY" or agent.get("frozen_gate_ready") is not True or agent.get("baseline_red_for_right_reason") is not True:
-            raise Stop(f"roadmap test-author did not establish freeze-ready state slice={sl.code}: {agent}")
-        files = assert_roadmap_test_author_scope(wt, base, sl)
-        gate = run_gate(wt, sl.task_id)
-        if gate.rc != 1:
-            raise Stop(f"roadmap owner gate baseline must be RED exit 1 slice={sl.code}, got {gate.rc}\n{gate.out}")
-        candidate = stage_and_commit(wt, files, f"[LOOP] ÄGARHAND: freeze {sl.code} {sl.title}")
-    else:
-        if git(repo, "merge-base", "--is-ancestor", base, head, check=False).rc != 0:
-            raise Stop(f"roadmap contract recovery candidate not based on current main slice={sl.code}: {head}")
-        candidate = head
-        files = assert_roadmap_test_author_scope(wt, base, sl)
-        if not files:
-            raise Stop(f"roadmap contract recovery has no owner-surface diff slice={sl.code}")
-        gate = run_gate(wt, sl.task_id)
-        if gate.rc != 1:
-            raise Stop(f"recovered roadmap contract must preserve RED slice={sl.code}, got {gate.rc}")
-        journal(repo, "RECOVER_ROADMAP_CONTRACT", slice=sl.code, candidate=candidate)
+    wt = ensure_protected_builder_worktree(repo, br, base)
+    agent = run_codex_resolving_architecture(repo, wt, "TEST_AUTHOR", roadmap_test_author_prompt(sl, base) + ("\n\nARCHITECT_REFREEZE_GUIDANCE:\n" + guidance if guidance else ""), f"{sl.code}_TEST_AUTHOR", sl.task_id, wt_root).report
+    if agent.get("owner_decision_required") or agent.get("outcome") == "OWNER_DECISION_REQUIRED":
+        raise Stop(f"architecture routing failure roadmap test-author slice={sl.code}: {agent.get('stop_reason')}")
+    if agent.get("outcome") != "READY" or agent.get("frozen_gate_ready") is not True or agent.get("baseline_red_for_right_reason") is not True:
+        raise Stop(f"roadmap test-author did not establish freeze-ready state slice={sl.code}: {agent}")
+    owner_surface = roadmap_test_author_allowed(sl)
+    owner_limits = task_limits(wt, task_obj_optional(wt, sl.task_id) or {})
+    candidate = compose_owner_candidate(
+        repo, wt, sl.task_id, br, base, base, agent,
+        owner_surface, owner_limits, sl)
     seen: list[str] = []
     while True:
-        rvwt = detached_worktree(repo, wt_root, f"gate-review-{sl.code.lower()}-{candidate[:12]}", candidate)
+        rvwt = protected_detached_worktree(repo, f"gate-review-{sl.code.lower()}-{candidate[:12]}", candidate)
         try:
-            review_run = run_codex_resolving_architecture(repo, rvwt, "GATE_REVIEWER", roadmap_gate_reviewer_prompt(sl, base, candidate), f"{sl.code}_GATE_REVIEW", sl.task_id)
+            review_run = run_codex_resolving_architecture(repo, rvwt, "GATE_REVIEWER", roadmap_gate_reviewer_prompt(sl, base, candidate), f"{sl.code}_GATE_REVIEW", sl.task_id, wt_root)
             review = review_run.report
             if not clean(rvwt):
                 raise Stop(f"gate reviewer modified roadmap candidate slice={sl.code}")
         finally:
-            if rvwt.exists() and clean(rvwt):
-                remove_worktree(repo, rvwt)
+            if rvwt.exists() and exact_worktree_clean(rvwt):
+                remove_protected_detached_worktree(repo, rvwt, candidate)
         if review.get("owner_decision_required") or review.get("outcome") == "OWNER_DECISION_REQUIRED":
             raise Stop(f"architecture routing failure roadmap gate reviewer slice={sl.code}: {review.get('stop_reason')}")
         blockers = report_blockers(review)
@@ -1604,20 +2551,16 @@ def roadmap_contract_flow(repo: Path, wt_root: Path, sl: RoadmapSlice, guidance:
             raise Stop(f"NO_PROGRESS roadmap gate slice={sl.code}: identical blockers repeated")
         if sha(wt) != candidate or not clean(wt):
             raise Stop(f"roadmap remediation prestate changed slice={sl.code}")
-        rem = run_codex_resolving_architecture(repo, wt, "TEST_AUTHOR", roadmap_remediation_prompt(sl, blockers, base), f"{sl.code}_GATE_REMEDIATION", sl.task_id).report
+        rem = run_codex_resolving_architecture(repo, wt, "TEST_AUTHOR", roadmap_remediation_prompt(sl, blockers, base), f"{sl.code}_GATE_REMEDIATION", sl.task_id, wt_root).report
         if sha(wt) != candidate:
             raise Stop(f"roadmap test-author remediation changed Git history slice={sl.code}")
         if rem.get("owner_decision_required"):
             raise Stop(f"architecture routing failure roadmap remediation slice={sl.code}: {rem.get('stop_reason')}")
         if rem.get("outcome") != "READY":
             raise Stop(f"roadmap remediation not READY slice={sl.code}: {rem}")
-        files = assert_roadmap_test_author_scope(wt, base, sl)
-        if not files:
-            raise Stop(f"NO_PROGRESS roadmap remediation made no changes slice={sl.code}")
-        gate = run_gate(wt, sl.task_id)
-        if gate.rc != 1:
-            raise Stop(f"roadmap remediation must remain product RED slice={sl.code}, got {gate.rc}")
-        candidate = stage_and_commit(wt, files, f"[LOOP] ÄGARHAND: remediate {sl.code} gate review")
+        candidate = compose_owner_candidate(
+            repo, wt, sl.task_id, br, base, candidate, rem,
+            owner_surface, owner_limits, sl)
     if not clean(wt) or sha(wt) != candidate:
         raise Stop(f"roadmap contract final identity mismatch slice={sl.code}")
     gate = run_gate(wt, sl.task_id)
@@ -1825,58 +2768,43 @@ def assert_empirical_gate_author_scope(repo: Path, base_sha: str) -> list[str]:
 
 
 def empirical_gate_contract_flow(repo: Path, wt_root: Path, guidance: str = "") -> str:
+    assert_raw_git_authority(repo)
     ensure_roadmap_plan(repo)
     ensure_substitution_authority(repo)
     base = origin_main(repo)
+    assert_raw_git_authority(repo)
     branch_name = f"owner/empirical-loop-gate-L-{base[:12]}"
-    wt = ensure_worktree(repo, wt_root, branch_name, base, f"owner-empirical-loop-gate-L-{base[:12]}")
-    if not clean(wt):
-        raise Stop("empirical gate author worktree dirty at prestate")
-    head = sha(wt)
-    if head == base:
-        arun = run_codex_resolving_architecture(
-            repo, wt, "TEST_AUTHOR", empirical_gate_test_author_prompt(base, guidance),
-            "EMPIRICAL_GATE_TEST_AUTHOR", "L",
-            context="Freeze the program-level L judge. Ordinary gate-design decisions are delegated."
-        )
-        if sha(wt) != base:
-            raise Stop("empirical gate author changed Git history")
-        r = arun.report
-        if owner_need(r):
-            raise Stop(f"architecture routing failure in empirical gate author: {r.get('stop_reason')}")
-        if r.get("outcome") != "READY" or r.get("frozen_gate_ready") is not True or r.get("baseline_red_for_right_reason") is not True:
-            raise Stop(f"empirical gate author did not establish freeze-ready RED state: {r}")
-        files = assert_empirical_gate_author_scope(wt, base)
-        if not files:
-            raise Stop("empirical gate author reported READY but changed no owner artifacts")
-        gate = run_empirical_gate(wt)
-        if gate.rc != 1:
-            raise Stop(f"empirical program gate freeze baseline must be RED exit 1, got {gate.rc}\n{gate.out}")
-        candidate = stage_and_commit(wt, files, EMPIRICAL_GATE_SUBJECT)
-    else:
-        if git(repo, "merge-base", "--is-ancestor", base, head, check=False).rc != 0:
-            raise Stop(f"empirical gate recovery candidate not based on current main: {head}")
-        candidate = head
-        files = assert_empirical_gate_author_scope(wt, base)
-        gate = run_empirical_gate(wt)
-        if gate.rc != 1:
-            raise Stop(f"recovered empirical program gate must remain RED, got {gate.rc}")
-        journal(repo, "RECOVER_EMPIRICAL_GATE_CANDIDATE", candidate=candidate)
+    wt = ensure_protected_builder_worktree(repo, branch_name, base)
+    arun = run_codex_resolving_architecture(
+        repo, wt, "TEST_AUTHOR", empirical_gate_test_author_prompt(base, guidance),
+        "EMPIRICAL_GATE_TEST_AUTHOR", "L", wt_root,
+        context="Freeze the program-level L judge. Ordinary gate-design decisions are delegated."
+    )
+    r = arun.report
+    if owner_need(r):
+        raise Stop(f"architecture routing failure in empirical gate author: {r.get('stop_reason')}")
+    if r.get("outcome") != "READY" or r.get("frozen_gate_ready") is not True or r.get("baseline_red_for_right_reason") is not True:
+        raise Stop(f"empirical gate author did not establish freeze-ready RED state: {r}")
+    owner_surface = EMPIRICAL_GATE_ALLOWED
+    owner_limits = task_limits(wt, {})
+    candidate = compose_owner_candidate(
+        repo, wt, EMPIRICAL_STAGE, branch_name, base, base, r,
+        owner_surface, owner_limits)
 
     seen: list[str] = []
     while True:
-        rvwt = detached_worktree(repo, wt_root, f"gate-review-L-{candidate[:12]}", candidate)
+        rvwt = protected_detached_worktree(repo, f"gate-review-L-{candidate[:12]}", candidate)
         try:
             review_run = run_codex_resolving_architecture(
                 repo, rvwt, "GATE_REVIEWER", empirical_gate_reviewer_prompt(base, candidate),
-                "EMPIRICAL_GATE_REVIEW", "L"
+                "EMPIRICAL_GATE_REVIEW", "L", wt_root
             )
             review = review_run.report
             if not clean(rvwt):
                 raise Stop("empirical gate reviewer modified candidate")
         finally:
-            if rvwt.exists() and clean(rvwt):
-                remove_worktree(repo, rvwt)
+            if rvwt.exists() and exact_worktree_clean(rvwt):
+                remove_protected_detached_worktree(repo, rvwt, candidate)
         if owner_need(review):
             raise Stop(f"architecture routing failure in empirical gate reviewer: {review.get('stop_reason')}")
         blockers = report_blockers(review)
@@ -1894,17 +2822,15 @@ def empirical_gate_contract_flow(repo: Path, wt_root: Path, guidance: str = "") 
 against the empirical program gate:\n{json.dumps(blockers, ensure_ascii=False, indent=2)}\n
 Keep the same program-level owner surface. Do not modify production/spec/task gates. Preserve
 product RED for the incomplete roadmap and strengthen only the truthful stage-L effects.""",
-            "EMPIRICAL_GATE_REMEDIATION", "L"
+            "EMPIRICAL_GATE_REMEDIATION", "L", wt_root
         ).report
         if sha(wt) != candidate:
             raise Stop("empirical gate remediation changed Git history")
         if rem.get("outcome") != "READY":
             raise Stop(f"empirical gate remediation not READY: {rem}")
-        files = assert_empirical_gate_author_scope(wt, base)
-        gate = run_empirical_gate(wt)
-        if gate.rc != 1:
-            raise Stop(f"empirical gate remediation must remain product RED, got {gate.rc}")
-        candidate = stage_and_commit(wt, files, "[LOOP] ÄGARHAND: remediate empirical L gate review")
+        candidate = compose_owner_candidate(
+            repo, wt, EMPIRICAL_STAGE, branch_name, base, candidate, rem,
+            owner_surface, owner_limits)
 
     if not clean(wt) or sha(wt) != candidate:
         raise Stop("empirical gate final identity mismatch")
@@ -2085,6 +3011,7 @@ def empirical_unattended_flow(repo: Path, wt_root: Path) -> None:
                 raise Stop(f"HUMAN_AUTHORITY_HARD_STOP: empirical program gate unjudgeable rc={gate.rc}")
             run = run_codex_resolving_architecture(
                 repo, ew, "EMPIRICAL", empirical_prompt(base, gate.out), "EMPIRICAL_L", "L",
+                wt_root,
                 context="The frozen program gate is root of L. Map ordinary failures to an existing owning task or L for a judge defect."
             )
             if not clean(ew) or sha(ew) != base:
@@ -2113,7 +3040,7 @@ def empirical_unattended_flow(repo: Path, wt_root: Path) -> None:
                     "owner_decision_required": True, "stop_reason": "EMPIRICAL_GATE_RED",
                 }
                 resolution = architect_resolution(
-                    repo, ew, "EMPIRICAL_FAILURE", "L", synthetic,
+                    repo, ew, "EMPIRICAL_FAILURE", "L", synthetic, wt_root,
                     context="Choose next_task_id='L' if the program judge is defective; otherwise one existing owning task."
                 )
                 target = resolution.get("next_task_id")
@@ -2127,7 +3054,7 @@ def empirical_unattended_flow(repo: Path, wt_root: Path) -> None:
                 synthetic_signal["outcome"] = "OWNER_DECISION_REQUIRED"
                 synthetic_signal["owner_decision_required"] = True
                 resolution = architect_resolution(
-                    repo, ew, "EMPIRICAL_FAILURE", "L", synthetic_signal,
+                    repo, ew, "EMPIRICAL_FAILURE", "L", synthetic_signal, wt_root,
                     context="Choose exactly one existing owning task, or next_task_id='L' for a program-gate defect."
                 )
                 target = resolution.get("next_task_id") or report.get("next_task_id")
@@ -2229,56 +3156,36 @@ def full_roadmap(repo: Path, wt_root: Path) -> None:
     )
 
 
-def test_author_flow(repo: Path, wt_root: Path) -> str:
+def test_author_flow(repo: Path, wt_root: Path, guidance: str = "") -> str:
+    assert_raw_git_authority(repo)
     base = origin_main(repo)
-    wt = ensure_worktree(repo, wt_root, f"owner/h-003-attestation-validity-{base[:12]}", base,
-                         f"owner-h003-attestation-validity-{base[:12]}")
-    if not clean(wt):
-        raise Stop("test-author worktree dirty before agent/recovery")
-    head = sha(wt)
-    if head == base:
-        agent = run_codex_resolving_architecture(repo, wt, "TEST_AUTHOR", test_author_prompt(), "H003_TEST_AUTHOR", "h-003")
-        if sha(wt) != base:
-            raise Stop("test-author changed Git history; orchestrator requires uncommitted candidate bytes")
-        r = agent.report
-        if r.get("owner_decision_required") or r.get("outcome") == "OWNER_DECISION_REQUIRED":
-            raise Stop(f"architecture routing failure: unresolved owner signal h-003: {r.get('stop_reason')}")
-        if r.get("outcome") != "READY" or r.get("frozen_gate_ready") is not True or r.get("baseline_red_for_right_reason") is not True:
-            raise Stop(f"test-author did not establish freeze-ready state: {r}")
-        files = assert_test_author_scope(wt, base)
-        if not files:
-            raise Stop("test-author reported READY but changed no owner artifacts")
-        # Product should remain RED for the new owner controls at this point.
-        h3 = run_gate(wt, "h-003")
-        h4 = run_gate(wt, "h-004")
-        if h3.rc != 1:
-            raise Stop(f"h-003 owner-gate baseline must be product RED exit 1, got {h3.rc}")
-        if h4.rc != 1:
-            raise Stop(f"h-004 owner-gate baseline must be product RED exit 1, got {h4.rc}")
-        candidate = stage_and_commit(wt, files, H003_GATE_SUBJECT)
-    else:
-        if git(repo, "merge-base", "--is-ancestor", base, head, check=False).rc != 0:
-            raise Stop(f"test-author recovery candidate is not based on current main: {head}")
-        candidate = head
-        cumulative = assert_test_author_scope(wt, base)
-        if not cumulative:
-            raise Stop("test-author recovery branch is ahead of base with no owner-surface diff")
-        h3 = run_gate(wt, "h-003")
-        h4 = run_gate(wt, "h-004")
-        if h3.rc != 1 or h4.rc != 1:
-            raise Stop(f"recovered test-author candidate must preserve product RED h-003/h-004, got {h3.rc}/{h4.rc}")
-        journal(repo, "RECOVER_TEST_AUTHOR_CANDIDATE", candidate=candidate)
+    assert_raw_git_authority(repo)
+    branch_name = f"owner/h-003-attestation-validity-{base[:12]}"
+    wt = ensure_protected_builder_worktree(repo, branch_name, base)
+    r = run_codex_resolving_architecture(
+        repo, wt, "TEST_AUTHOR", test_author_prompt() + ("\n\nARCHITECT_REFREEZE_GUIDANCE:\n" + guidance if guidance else ""),
+        "H003_TEST_AUTHOR", "h-003", wt_root,
+    ).report
+    if r.get("owner_decision_required") or r.get("outcome") == "OWNER_DECISION_REQUIRED":
+        raise Stop(f"architecture routing failure: unresolved owner signal h-003: {r.get('stop_reason')}")
+    if r.get("outcome") != "READY" or r.get("frozen_gate_ready") is not True or r.get("baseline_red_for_right_reason") is not True:
+        raise Stop(f"test-author did not establish freeze-ready state: {r}")
+    owner_surface = TEST_AUTHOR_ALLOWED
+    owner_limits = task_limits(wt, task_obj(wt, "h-003"))
+    candidate = compose_owner_candidate(
+        repo, wt, "h-003", branch_name, base, base, r,
+        owner_surface, owner_limits)
     seen: list[str] = []
     while True:
-        rvwt = detached_worktree(repo, wt_root, f"gate-review-h003-{candidate[:12]}", candidate)
+        rvwt = protected_detached_worktree(repo, f"gate-review-h003-{candidate[:12]}", candidate)
         try:
-            review_run = run_codex_resolving_architecture(repo, rvwt, "GATE_REVIEWER", gate_reviewer_prompt(base, candidate), "H003_GATE_REVIEW", "h-003")
+            review_run = run_codex_resolving_architecture(repo, rvwt, "GATE_REVIEWER", gate_reviewer_prompt(base, candidate), "H003_GATE_REVIEW", "h-003", wt_root)
             review = review_run.report
             if not clean(rvwt):
                 raise Stop("gate reviewer modified reviewed worktree")
         finally:
-            if rvwt.exists() and clean(rvwt):
-                remove_worktree(repo, rvwt)
+            if rvwt.exists() and exact_worktree_clean(rvwt):
+                remove_protected_detached_worktree(repo, rvwt, candidate)
         if review.get("owner_decision_required") or review.get("outcome") == "OWNER_DECISION_REQUIRED":
             raise Stop(f"architecture routing failure from h-003 gate reviewer: {review.get('stop_reason')}")
         blockers = report_blockers(review)
@@ -2292,17 +3199,16 @@ def test_author_flow(repo: Path, wt_root: Path) -> str:
             raise Stop("NO_PROGRESS: identical gate-review blockers repeated three consecutive candidates")
         if sha(wt) != candidate or not clean(wt):
             raise Stop("test-author remediation prestate changed unexpectedly")
-        remediation = run_codex_resolving_architecture(repo, wt, "TEST_AUTHOR", remediation_prompt("TEST_AUTHOR", None, blockers, base), "H003_GATE_REMEDIATION", "h-003").report
+        remediation = run_codex_resolving_architecture(repo, wt, "TEST_AUTHOR", remediation_prompt("TEST_AUTHOR", None, blockers, base), "H003_GATE_REMEDIATION", "h-003", wt_root).report
         if sha(wt) != candidate:
             raise Stop("test-author remediation changed Git history")
         if remediation.get("owner_decision_required"):
             raise Stop(f"architecture routing failure during h-003 remediation: {remediation.get('stop_reason')}")
         if remediation.get("outcome") != "READY":
             raise Stop(f"test-author remediation not ready: {remediation}")
-        files = assert_test_author_scope(wt, candidate)
-        if not files:
-            raise Stop("NO_PROGRESS: test-author remediation made no changes")
-        candidate = stage_and_commit(wt, files, "[LOOP] ÄGARHAND: remediate h-003 authority gate review")
+        candidate = compose_owner_candidate(
+            repo, wt, "h-003", branch_name, base, candidate, remediation,
+            owner_surface, owner_limits)
     # Final owner gate: exact candidate, no production changes, RED expected, invariants unchanged.
     if not clean(wt) or sha(wt) != candidate:
         raise Stop("test-author final identity mismatch")
@@ -2322,64 +3228,239 @@ def test_author_flow(repo: Path, wt_root: Path) -> str:
     return new_main
 
 
+def remove_protected_detached_worktree(repo: Path, path: Path,
+                                       expected_head: str) -> None:
+    assert_worktree_binding(repo, path, expected_head, None)
+    if not exact_worktree_clean(path):
+        raise Stop(f"protected gate worktree is dirty: {path}")
+    closed_worktree_git(repo, "worktree", "remove", str(path))
+    if path.exists() or path.is_symlink():
+        raise Stop(f"protected gate worktree removal left residue: {path}")
+    if any(Path(row.get("worktree", "")).resolve() == path.resolve()
+           for row in worktrees(repo)):
+        raise Stop(f"protected gate worktree removal left registration: {path}")
+def isolated_role_run(repo: Path, wt_root: Path, authority_wt: Path,
+                      task_id: str, branch_name: str | None, role: str,
+                      current: str, prompt: str, stage: str,
+                      context: str = "") -> AgentRun:
+    assert_worktree_binding(repo, authority_wt, current, branch_name)
+    if not exact_worktree_clean(authority_wt):
+        raise Stop(f"provider authority prestate is dirty task={task_id} role={role}")
+    def invoke(invocation_role: str, invocation_prompt: str,
+               label: str) -> AgentRun:
+        scratch_role = f"{invocation_role}-{label}"
+        scratch = isolated_provider_scratch(
+            repo, wt_root, task_id, scratch_role, current
+        )
+        try:
+            result = _run_codex_agent(
+                repo, scratch, invocation_role, invocation_prompt, wt_root
+            )
+            return result
+        finally:
+            quarantine_provider_scratch(
+                repo, scratch, task_id, scratch_role, current
+            )
+    guidance: list[str] = []
+    last_signal = ""
+    for round_no in range(1, MAX_ARCHITECT_ROUNDS + 1):
+        effective = prompt
+        if guidance:
+            effective += "\n\nAUTONOMOUS_ARCHITECT_RESOLUTIONS:\n" + "\n\n".join(guidance)
+            effective += "\n\nApply these resolutions within higher authority. Do not re-ask the human for the same choice."
+        result = invoke(role, effective, f"{stage}-R{round_no}")
+        if not owner_need(result.report):
+            break
+        if role == "ARCHITECT":
+            accept_architect_resolution(repo, stage, task_id, result.report)
+        signal = str(result.report.get("stop_reason")
+                     or result.report.get("summary")
+                     or "OWNER_DECISION_REQUIRED")
+        if signal == last_signal and round_no == MAX_ARCHITECT_ROUNDS:
+            raise Stop(
+                f"HUMAN_AUTHORITY_HARD_STOP: architecture no-progress after "
+                f"{MAX_ARCHITECT_ROUNDS} rounds stage={stage} task={task_id}: "
+                f"{signal}"
+            )
+        last_signal = signal
+        architect = invoke(
+            "ARCHITECT", architect_prompt(
+                stage, task_id, result.report, context
+            ), f"{stage}-ARCH-R{round_no}"
+        )
+        resolution = accept_architect_resolution(
+            repo, stage, task_id, architect.report
+        )
+        if (role in {"BUILDER", "REVIEWER"}
+                and resolution.get("next_action") == "TEST_AUTHOR"):
+            raise ContractRefreeze(
+                task_id, str(resolution.get("summary") or signal)
+            )
+        guidance.append(str(resolution.get("summary") or ""))
+    else:
+        raise Stop(
+            f"HUMAN_AUTHORITY_HARD_STOP: architecture resolution budget "
+            f"exhausted stage={stage} task={task_id}"
+        )
+    assert_worktree_binding(repo, authority_wt, current, branch_name)
+    if not exact_worktree_clean(authority_wt):
+        raise Stop(
+            f"provider affected protected authority task={task_id} role={role}"
+        )
+    return result
+def _materialized_report(repo: Path, label: str, parent: str,
+                         report: dict[str, Any], allowed: Iterable[str],
+                         max_files: int, max_lines: int
+                         ) -> tuple[str, str, list[str]]:
+    assert_raw_git_authority(repo)
+    authoritative_git = common_git_dir(repo)
+    protected_materialization = protected_materialization_root(repo)
+    controller_worktrees = protected_worktree_root(repo)
+    if (protected_materialization == controller_worktrees
+            or protected_materialization in controller_worktrees.parents
+            or controller_worktrees in protected_materialization.parents):
+        raise Stop("materialization and controller-worktree authority overlap")
+    refs_before = closed_worktree_git(
+        repo, "for-each-ref", "--format=%(refname) %(objectname)"
+    ).out
+    candidate, candidate_tree, files = materialize(
+        str(authoritative_git), parent, report.get("candidate_delta"),
+        allowed, max_files, max_lines, max_files,
+        str(protected_materialization),
+    )
+    refs_after = closed_worktree_git(
+        repo, "for-each-ref", "--format=%(refname) %(objectname)"
+    ).out
+    headers = closed_worktree_git(repo, "cat-file", "-p", candidate).out.partition("\n\n")[0].splitlines()
+    trees = [row[5:] for row in headers if row.startswith("tree ")]
+    parents = [row[7:] for row in headers if row.startswith("parent ")]
+    if (not files or refs_after != refs_before or trees != [candidate_tree]
+            or parents != [parent]):
+        raise Stop(f"materialized no-ref child identity mismatch task={label}")
+    actual_files = object_changed_files(repo, parent, candidate)
+    if actual_files != sorted(files):
+        raise Stop(
+            f"materialized child path mismatch task={label} "
+            f"expected={sorted(files)} actual={actual_files}"
+        )
+    return candidate, candidate_tree, files
+def materialize_and_gate_builder_report(
+        repo: Path, task_id: str, task_base: str, parent: str,
+        report: dict[str, Any]) -> tuple[str, str, list[str]]:
+    task = task_obj(repo, task_id)
+    allowed = task.get("allowed_write") or load_spec(repo).get(
+        "defaults", {}).get("allowed_write", [])
+    max_files, max_lines = task_limits(repo, task)
+    candidate, candidate_tree, files = _materialized_report(
+        repo, task_id, parent, report, allowed, max_files, max_lines
+    )
+    assert_materialized_cumulative_scope(
+        repo, task_id, task_base, candidate
+    )
+    gate_wt = protected_detached_worktree(
+        repo, f"{task_id}\0{candidate}", candidate
+    )
+    try:
+        gate = run_gate(gate_wt, task_id)
+        if gate.rc != 0:
+            raise Stop(
+                f"materialized builder candidate is not green against frozen "
+                f"gate task={task_id} rc={gate.rc}\n{gate.out}"
+            )
+        assert_worktree_binding(repo, gate_wt, candidate, None)
+        if (not exact_worktree_clean(gate_wt)
+                or sha(gate_wt, f"{candidate}^{{tree}}") != candidate_tree):
+            raise Stop("protected candidate changed during frozen gate")
+        assert_builder_scope(gate_wt, task_id, task_base)
+    finally:
+        if gate_wt.exists() and exact_worktree_clean(gate_wt):
+            remove_protected_detached_worktree(repo, gate_wt, candidate)
+    return candidate, candidate_tree, files
+def materialize_and_gate_owner_report(
+        repo: Path, label: str, task_base: str, parent: str,
+        report: dict[str, Any], allowed: Iterable[str],
+        limits: tuple[int, int],
+        sl: RoadmapSlice | None = None) -> tuple[str, str, list[str]]:
+    surface = tuple(sorted(set(allowed)))
+    candidate, candidate_tree, files = _materialized_report(
+        repo, label, parent, report, surface, *limits
+    )
+    cumulative = assert_materialized_cumulative_scope(
+        repo, label, task_base, candidate, surface, limits
+    )
+    gate_wt = protected_detached_worktree(
+        repo, f"owner\0{label}\0{candidate}", candidate
+    )
+    try:
+        if label == "h-003":
+            scoped = assert_test_author_scope(gate_wt, task_base)
+            results = (run_gate(gate_wt, "h-003"), run_gate(gate_wt, "h-004"))
+        elif label == EMPIRICAL_STAGE:
+            scoped = assert_empirical_gate_author_scope(gate_wt, task_base)
+            results = (run_empirical_gate(gate_wt),)
+        elif sl is not None and label == sl.task_id:
+            scoped = assert_roadmap_test_author_scope(gate_wt, task_base, sl)
+            results = (run_gate(gate_wt, sl.task_id),)
+        else:
+            raise Stop(f"unknown owner materialization label: {label}")
+        if sorted(scoped) != cumulative or any(result.rc != 1 for result in results):
+            raise Stop(f"owner candidate scope/RED gate mismatch task={label}")
+        assert_raw_git_authority(gate_wt)
+        assert_worktree_binding(repo, gate_wt, candidate, None)
+        if not exact_worktree_clean(gate_wt):
+            raise Stop(f"owner RED gate changed candidate task={label}")
+    finally:
+        if gate_wt.exists() and exact_worktree_clean(gate_wt):
+            remove_protected_detached_worktree(repo, gate_wt, candidate)
+    return candidate, candidate_tree, files
+def compose_owner_candidate(repo: Path, wt: Path, label: str,
+                            branch_name: str, task_base: str, parent: str,
+                            report: dict[str, Any], allowed: Iterable[str],
+                            limits: tuple[int, int],
+                            sl: RoadmapSlice | None = None) -> str:
+    candidate, tree, files = materialize_and_gate_owner_report(
+        repo, label, task_base, parent, report, allowed, limits, sl)
+    adopt_materialized_candidate(
+        repo, wt, label, branch_name, task_base, parent, candidate, tree,
+        files, allowed, limits)
+    return candidate
 def builder_flow(repo: Path, wt_root: Path, task_id: str, branch_name: str, dirname: str,
                  subject: str, extra: str = "") -> str:
+    assert_raw_git_authority(repo)
     base = origin_main(repo)
-    wt = ensure_worktree(repo, wt_root, branch_name, base, dirname)
-    if not clean(wt):
-        raise Stop(f"builder worktree dirty at prestate task={task_id}")
-    head = sha(wt)
-    if head == base:
-        baseline_green = capture_green_gates(wt)
-        if not clean(wt):
-            raise Stop(f"baseline gate battery left builder worktree dirty task={task_id}")
-        baseline_current = run_gate(wt, task_id)
-        if baseline_current.rc == 0:
-            journal(repo, "TASK_ALREADY_GREEN", task=task_id, base=base)
-            return base
-        if baseline_current.rc != 1:
-            raise Stop(f"task gate is not judgeable product RED; task={task_id} exit={baseline_current.rc}")
-        agent = run_codex_resolving_architecture(repo, wt, "BUILDER", builder_prompt(task_id, base, extra), "BUILDER", task_id).report
-        if sha(wt) != base:
-            raise Stop(f"builder changed Git history task={task_id}; candidate must remain uncommitted")
-        if agent.get("owner_decision_required") or agent.get("outcome") == "OWNER_DECISION_REQUIRED":
-            raise Stop(f"architecture routing failure builder task={task_id}: {agent.get('stop_reason')}")
-        if agent.get("outcome") not in {"READY", "NO_CHANGES"}:
-            raise Stop(f"builder not ready task={task_id}: {agent}")
-        files = assert_builder_scope(wt, task_id, base)
-        if not files:
-            raise Stop(f"builder returned ready but made no changes while gate is red: {task_id}")
-        gate = run_gate(wt, task_id)
-        if gate.rc != 0:
-            raise Stop(f"builder candidate is not green against frozen gate task={task_id} rc={gate.rc}\n{gate.out}")
-        candidate = stage_and_commit(wt, files, subject)
-    else:
-        if git(repo, "merge-base", "--is-ancestor", base, head, check=False).rc != 0:
-            raise Stop(f"recovered builder candidate is not based on current main task={task_id}: {head}")
-        # Recompute historical-green baseline at the exact task base, not at the recovered candidate.
-        bw = detached_worktree(repo, wt_root, f"baseline-{task_id}-{base[:12]}-{now_id()}", base)
-        try:
-            baseline_green = capture_green_gates(bw)
-        finally:
-            if bw.exists() and clean(bw):
-                remove_worktree(repo, bw)
-        assert_builder_scope(wt, task_id, base)
-        gate = run_gate(wt, task_id)
-        if gate.rc != 0:
-            raise Stop(f"recovered candidate is not green task={task_id} rc={gate.rc}\n{gate.out}")
-        candidate = head
-        journal(repo, "RECOVER_BUILDER_CANDIDATE", task=task_id, candidate=candidate)
+    assert_raw_git_authority(repo)
+    wt = ensure_protected_builder_worktree(repo, branch_name, base)
+    baseline_green = capture_green_gates(wt)
+    if not exact_worktree_clean(wt):
+        raise Stop(f"baseline gate battery left builder worktree dirty task={task_id}")
+    baseline_current = run_gate(wt, task_id)
+    if baseline_current.rc == 0:
+        journal(repo, "TASK_ALREADY_GREEN", task=task_id, base=base)
+        return base
+    if baseline_current.rc != 1:
+        raise Stop(f"task gate is not judgeable product RED; task={task_id} exit={baseline_current.rc}")
+    agent = isolated_role_run(
+        repo, wt_root, wt, task_id, branch_name, "BUILDER", base,
+        builder_prompt(task_id, base, extra), "BUILDER",
+    ).report
+    if agent.get("owner_decision_required") or agent.get("outcome") == "OWNER_DECISION_REQUIRED":
+        raise Stop(f"architecture routing failure builder task={task_id}: {agent.get('stop_reason')}")
+    if agent.get("outcome") not in {"READY", "NO_CHANGES"}:
+        raise Stop(f"builder not ready task={task_id}: {agent}")
+    candidate, candidate_tree, files = materialize_and_gate_builder_report(
+        repo, task_id, base, base, agent
+    )
+    adopt_materialized_candidate(
+        repo, wt, task_id, branch_name, base, base,
+        candidate, candidate_tree, files,
+    )
     seen: list[str] = []
     while True:
-        rvwt = detached_worktree(repo, wt_root, f"review-{task_id}-{candidate[:12]}", candidate)
-        try:
-            review_run = run_codex_resolving_architecture(repo, rvwt, "REVIEWER", reviewer_prompt(task_id, base, candidate), "REVIEWER", task_id)
-            review = review_run.report
-            if not clean(rvwt):
-                raise Stop(f"reviewer modified candidate worktree task={task_id}")
-        finally:
-            if rvwt.exists() and clean(rvwt):
-                remove_worktree(repo, rvwt)
+        review_run = isolated_role_run(
+            repo, wt_root, wt, task_id, branch_name, "REVIEWER", candidate,
+            reviewer_prompt(task_id, base, candidate), "REVIEWER",
+        )
+        review = review_run.report
         if review.get("owner_decision_required") or review.get("outcome") == "OWNER_DECISION_REQUIRED":
             raise Stop(f"architecture routing failure reviewer task={task_id}: {review.get('stop_reason')}")
         blockers = report_blockers(review)
@@ -2391,30 +3472,54 @@ def builder_flow(repo: Path, wt_root: Path, task_id: str, branch_name: str, dirn
         seen.append(dg)
         if len(seen) >= 3 and len(set(seen[-3:])) == 1:
             raise Stop(f"NO_PROGRESS task={task_id}: identical blockers repeated three consecutive candidates")
-        if sha(wt) != candidate or not clean(wt):
+        assert_worktree_binding(repo, wt, candidate, branch_name)
+        if not exact_worktree_clean(wt):
             raise Stop(f"builder remediation prestate changed unexpectedly task={task_id}")
-        rem = run_codex_resolving_architecture(repo, wt, "BUILDER", remediation_prompt("BUILDER", task_id, blockers, base), "BUILDER_REMEDIATION", task_id).report
-        if sha(wt) != candidate:
-            raise Stop(f"builder remediation changed Git history task={task_id}")
+        rem = isolated_role_run(
+            repo, wt_root, wt, task_id, branch_name, "BUILDER", candidate,
+            remediation_prompt(
+                "BUILDER", task_id, blockers, base,
+                current_candidate=candidate,
+            ),
+            "BUILDER_REMEDIATION",
+        ).report
         if rem.get("owner_decision_required"):
             raise Stop(f"architecture routing failure remediation task={task_id}: {rem.get('stop_reason')}")
         if rem.get("outcome") != "READY":
             raise Stop(f"builder remediation not READY task={task_id}: {rem}")
-        files = assert_builder_scope(wt, task_id, base)
-        if not files:
-            raise Stop(f"NO_PROGRESS task={task_id}: remediation made no changes")
-        gate = run_gate(wt, task_id)
-        if gate.rc != 0:
-            raise Stop(f"remediation remains red task={task_id} rc={gate.rc}\n{gate.out}")
-        candidate = stage_and_commit(wt, files, f"[LOOP] {task_id}: remediate independent review")
+        next_candidate, next_tree, files = materialize_and_gate_builder_report(
+            repo, task_id, base, candidate, rem
+        )
+        adopt_materialized_candidate(
+            repo, wt, task_id, branch_name, base, candidate,
+            next_candidate, next_tree, files,
+        )
+        candidate = next_candidate
     assert_final_gates(wt, task_id, baseline_green)
+    assert_worktree_binding(repo, wt, candidate, branch_name)
+    if not exact_worktree_clean(wt):
+        raise Stop(f"final protected candidate worktree is dirty task={task_id}")
     if origin_main(repo) != base:
         raise Stop(f"REMOTE_MAIN_CHANGED before publication task={task_id}")
-    changed = [x for x in git(wt, "diff", "--name-only", f"{base}..{candidate}").out.splitlines() if x]
+    changed = object_changed_files(wt, base, candidate)
     authority = publication_authority(repo, candidate, task_id,
                                       review_run.result_file)
     return publish(repo, wt, branch_name, base, candidate, subject, changed,
                    publication_authority=authority)
+
+
+def bootstrap_builder_flow(repo: Path, wt_root: Path, task_id: str, branch_name: str,
+                           dirname: str, subject: str, extra: str) -> str:
+    try:
+        return builder_flow(repo, wt_root, task_id, branch_name, dirname, subject, extra)
+    except ContractRefreeze as need:
+        if task_id not in {"h-003", "h-004"}:
+            raise
+        journal(repo, "BOOTSTRAP_REFREEZE_REQUIRED", task=task_id, reason=need.reason)
+        test_author_flow(repo, wt_root, guidance=need.reason)
+        fresh = origin_main(repo)
+        return builder_flow(repo, wt_root, task_id, f"{branch_name}-{fresh[:8]}",
+                            f"{dirname}-{fresh[:8]}", subject, extra)
 
 
 def main_has_subject(repo: Path, subject: str) -> bool:
@@ -2475,6 +3580,7 @@ def drain(repo: Path, wt_root: Path) -> None:
 
 
 def bootstrap(repo: Path, wt_root: Path, do_drain: bool) -> None:
+    assert_raw_git_authority(repo)
     ensure_dependencies()
     if repo_identity(repo) != EXPECTED_REPO:
         raise Stop(f"wrong repository: {repo_identity(repo)}")
@@ -2610,9 +3716,18 @@ def selftest(repo: Path | None = None) -> None:
     ]
     if src and any(x not in src for x in required):
         raise Stop("v4 architecture/substitution routing markers missing")
-    needle = "run_" + "codex(repo"
-    if src and src.count(needle) != 3:
-        raise Stop("role execution bypasses v4 architecture router")
+    audit_root = Path(tempfile.mkdtemp(prefix="nortropic-routing-ast-"))
+    try:
+        audited = src_path if src_path.is_file() else audit_root / "autopilot.py"
+        if audited != src_path:
+            audited.write_text(src, encoding="utf-8")
+        python, _digest = _python_snapshot(audit_root)
+        checker_root = src_path.resolve().parents[1] if src_path.is_file() else repo
+        check = run([str(python), "-I", "-S", str(checker_root / "controller/result/routing_ast.py"), str(audited)], check=False)
+        if check.rc or check.out.strip() != "ROUTING_AST=PASS":
+            raise Stop("role execution ownership moved outside isolated router")
+    finally:
+        shutil.rmtree(audit_root)
     legacy_direct = 'raise Stop(f"OWNER_' + 'DECISION_REQUIRED'
     if src and legacy_direct in src:
         raise Stop("legacy direct human owner-decision stop remains")
