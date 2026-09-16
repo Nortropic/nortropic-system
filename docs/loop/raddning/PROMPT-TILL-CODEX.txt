@@ -4,6 +4,62 @@ ersätter alla tidigare versioner.
 
 
 ══════════════════════════════════════════════════════════════════════════════
+KÖRBANAN — VAR ARBETET SKER. LÄS DETTA FÖRE ALLT ANNAT.
+══════════════════════════════════════════════════════════════════════════════
+
+Maskinen bär FEM kloner av detta repo och ~290 katalogfall som ser ut som repot.
+Fyra av fem är fel plats att arbeta på, och den mest närliggande är sämst. Denna
+sektion finns för att 2026-09-16 kl 21:55 kördes mätningen i fel rot — den gav
+prydliga siffror om ett träd från 10 augusti.
+
+MASKIN: MACEN. Darwin. Ingen annan.
+  Kärnan är DARWIN-bunden, inte Python-bunden (FYND 31d). controller/verify/cli
+  startar i Linux med Python 3.12, men grindarna faller på
+  "undefined symbol: sysctl". Att installera Python 3.12 löser ingenting.
+  EN LINUXKÖRNING ÄR ODÖMBART, ALDRIG FAIL. Bokför aldrig en miljö som ett fel
+  i kandidaten (LOOP-RÄTTELSE-VAKTBEVIS).
+
+KATALOG: en FÄRSK KLON av main. Gör den själv, så du vet vad du har:
+
+    git clone git@github.com:Nortropic/nortropic-system.git ~/kernel-arbete
+    cd ~/kernel-arbete
+
+ANVÄND ALDRIG DESSA — skälet är mätt, inte antaget:
+
+  ~/nortropic/nortropic-system
+      HEAD c92755540bae, från 10 AUGUSTI. 228 registrerade worktrees. Nio
+      otrackade kvarlevor i specs/ och verify/bin/ vars innehåll är 7-19 dagar
+      ÄLDRE än origin (h-032-exit: 399 KB lokalt mot 1,1 MB på origin). En
+      mätning här ser auktoritativ ut och mäter ett fem veckor gammalt träd.
+      Detta är den katalog man hamnar i av vana. Gå inte dit.
+
+  ~/nortropic/worktrees/**  och  ~/nortropic-repos/work/**
+      Grindarna skapar SJÄLVA git-worktrees (h-005 K3). Nästlade worktrees gav
+      sju falska röda grindar på cwd, workspace och kuvertleverans (FYND 32).
+      matning-pa-macen.sh vägrar i en worktree med exit 2 — men bara när .git är
+      en FIL. Ett trettiotal av dessa kataloger är FRISTÅENDE KLONER med .git som
+      KATALOG, och där släpper spärren igenom (FYND 37). Lita inte på spärren.
+
+  ~/nortropic-repos/nortropic-system
+      Står på nortropic/platform-integration-20260910, inte main.
+
+  ~/nortropic-kontrollklon
+      Fungerar, men är min mätklon. Gör en egen.
+
+KONTROLLERA FÖRE VARJE GRINDKÖRNING. Tre rader, fem sekunder:
+
+    git rev-parse --show-toplevel                 # är jag där jag tror?
+    [ -d .git ] && echo "riktig klon" || echo "WORKTREE — FLYTTA DIG"
+    git fetch -q origin main && \
+      git diff --quiet HEAD origin/main && echo "på main, dagsfärsk" \
+                                        || echo "STALE — pulla först"
+    git status --porcelain | wc -l                # ska vara 0 före körning
+
+  En grindkörning på ett stale eller smutsigt träd producerar tal som ser ut som
+  evidens. Det är den dyraste sortens fel i detta projekt.
+
+
+══════════════════════════════════════════════════════════════════════════════
 DIN FÖRSTA UPPGIFT — OCH LÄS SEPARATION-20260910/ INNAN DU RÖR NÅGOT
 ══════════════════════════════════════════════════════════════════════════════
 
@@ -49,6 +105,18 @@ BÅDA hållen — de fäller bevisligen, och de blir bevisligen gröna:
 
 De tre sista kördes 2026-09-16 och tog 259 poster som bara fanns på ägarens
 maskin till 0. Kör inventeringen vid varje överlämning — regel 12a.
+
+⚠️ OCH DET TALET VAR OFULLSTÄNDIGT (FYND 37, samma dag). inventera-lokalt-
+arbete.sh itererade git worktree list, som bara ser REGISTRERADE worktrees, och
+dömde mot LOKALA fjärreferenser i stället för mot origin. Den skrev
+"✅ REGEL 12 UPPFYLLD" medan tolv commits fanns på en enda maskin — nio i
+fristående kloner vars objekt inte existerade någon annanstans. Provet fetchar nu
+själv alla grenar, --no-fetch ger ODÖMBART, och en ny sektion söker fristående
+kloner. Fyra mutationsprov, alla körda. Efter räddningen: 43 PA_ORIGIN, 0 SAKNAS.
+
+LÄRDOMEN GÄLLER DIG: ett prov bevisar bara det provet LÄSER — regel 8a. Det
+gäller inte bara vilka FILER det öppnar utan vilka OBJEKT det räknar. Anför
+aldrig en grön sammanfattning utan att veta vad den itererade.
 
 SEPARATION-20260910/EFTERARBETE.md är sann för 2026-09-10 men FÖRÅLDRAD som
 arbetsorder: den skrevs vid commit dae90c8f, och grenen har gått 48 commits sedan
@@ -296,14 +364,57 @@ ORDNINGEN
 ══════════════════════════════════════════════════════════════════════════════
 
   0. Kör validera-underlaget.sh. Läs docs/loop/regler.md regel 11, 12 och 12a.
-  1. KÖR artefakter/matning-pa-macen.sh PÅ MAIN. Mätningen 2026-09-16 gjordes på
-     en arbetsgren; h-012 läser HEAD-commitens ändrade filer, så main kan ge ett
-     annat utfall för just den. Kör i en RIKTIG KLON — provet vägrar i en
-     git-worktree, och skälet är mätt (FYND 32).
-  2. ROOT-ORSAKA DE SEX RÖDA GRINDARNA: h-004, h-009, h-011, h-012, h-013,
-     h-016. Detta är vägens första arbete. h-004 faller på att lease-generationer
-     (lease_id, fencing, renew) inte finns; h-016 på att attestation aldrig sker.
-     Funktionerna byggdes aldrig — det är inte en regression.
+  1. ✅ GJORD 2026-09-16 21:59 av ägaren. matning-pa-macen.sh kördes på Darwin i
+     en ren klon på main (HEAD 28ca1af), 0 okommitterade filer före och efter.
+     Konfunderingen mot arbetsgrenen är därmed upphävd, och talen är IDENTISKA
+     med FYND 33:
+
+       RAD: h-001:0 h-002:0 h-003:0 h-004:1 h-005:0 h-006:0 h-007:0 h-008:0
+            h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
+       8 PASS · 6 FAIL · 0 ODÖMBART av 14
+       h-003 och h-010 vände till grönt mot Linux — plattformsbundna, friska.
+       SEX är röda på BÅDA maskinerna. Kartan håller inte: h-004, h-013 och
+       h-016 påstås KLARA och är FAIL. Bara h-010 håller.
+
+     Kör den inte om för att se om den ändrar sig. Kör den om efter ett BYGGE.
+
+  2. ⭐ BÖRJA HÄR: h-009. INTE h-004, INTE de sex på en gång.
+
+     VARFÖR h-009 FÖRST: hypotesen (FYND 34) är att de sex röda har TVÅ rötter,
+     inte sex. h-009 är den ena, och den enda som har nedströms. Mätningen ger
+     belägg — h-009:s tre fel säger samma sak tre gånger:
+
+       K2  kuvertet når processen   -> exit 127, kommandot fanns inte
+       K8  workspace                -> processen kördes i REPOROTEN, inte i
+                                       workspacet
+       K9  kuvertleverans           -> processen hittade inget kuvert
+
+     Det är EN sak: barnprocessen startas inte i rätt katalog och får inte sitt
+     kuvert. Samma primitiv konsumeras av h-011, h-012, h-013 och h-016, och
+     deras felrader bär dess signatur (nonzero_exit kod 1, kod=4).
+
+     KOMPONENTEN: controller/launch/cli, 824 rader.
+     allowed_write: controller/launch/**, tests/controller/launch/**,
+                    docs/05-beslutslogg.md. INGENTING ANNAT.
+
+     GRINDEN RÖRS INTE. verify/bin/h-009-exit står som den är. Omfrysningsbudget
+     3 enligt regel 11a; överskrids den delas hypotesen eller avslutas
+     OVERIFIERAT (11b) — aldrig en runda till.
+
+     PROVET PÅ HYPOTESEN, och det ska köras och skrivas ner oavsett utfall:
+     när h-009 är grön, kör om alla fjorton. Blir flera av h-011/012/013/016
+     gröna med är tvårotshypotesen BEKRÄFTAD och vägen är kort. Blir de inte det
+     är den FALSIFIERAD, och det står i docs/loop/drift.md samma dag.
+
+  2b. DÄREFTER h-004. Det är ingen bugg utan en SAKNAD FUNKTION: K8-K11 ger
+     genomgående rc=0 token=[] — acquire lyckas men returnerar inget lease_id.
+     Fencing, renew och holder-liveness finns inte. Bygg dem.
+     allowed_write: controller/lease/**, controller/loop/cli,
+                    tests/controller/lease/**, tests/controller/loop/**.
+
+  2c. OCH MÄT DETTA, SOM INGEN HAR MÄTT: controller/verify/cli list ger
+     nortropic-verify-suite -> EJ STARTBAR. Registret bär en post som inte kan
+     köras. Vad den blockerar är okänt.
   3. 12-arbetsorder.md steg 1-4. Kontrollera dess tabell mot HEAD först —
      den är daterad och blir osann på samma sätt som EFTERARBETE.md blev.
   4. Granska och landa plattformsgrenen.
