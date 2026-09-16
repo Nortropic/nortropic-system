@@ -489,6 +489,15 @@ def protected_namespace_integrity(tree: ast.AST,
         return False
 
     for node in ast.walk(tree):
+        # R86 closes namespace access itself in the trusted embedded program.
+        # There is no "unrelated" globals/locals/vars exception: once such a
+        # mapping is obtained it can reach a protected binding after the spy.
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in {"globals", "locals", "vars"}):
+            return False
+        if (isinstance(node, ast.Attribute)
+                and node.attr in {"f_globals", "_getframe"}):
+            return False
         if current_namespace(node) and not namespace_use_safe(node):
             return False
         if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
@@ -1093,14 +1102,6 @@ try:
             "\ndef r83_unrelated_locals():\n"
             "    subprocess = Popen = run = object()\n"
             "    return subprocess, Popen, run\nPY\n",
-        "unrelated_global_literals": owner_gate_text[:-4] +
-            "\ndef r84_unrelated_global_literals():\n"
-            "    globals()['R84_UNRELATED_A'] = 1\n"
-            "    globals().update({'R84_UNRELATED_B': 2})\n"
-            "    value = globals().get('R84_UNRELATED_A')\n"
-            "    globals().pop('R84_UNRELATED_A')\n"
-            "    del globals()['R84_UNRELATED_B']\n"
-            "    return value\nPY\n",
     }
     owner_shadow_facts = {
         name: owner_live_capability_source_facts(variant)
@@ -1130,8 +1131,9 @@ try:
                    and facts.get("actual_direct_call") is True
                    for facts in owner_namespace_facts.values())),
           str(owner_namespace_facts))
-    check("J_R84_H032_UNRELATED_NAMESPACE_LITERALS_ADMITTED",
-          all(all(facts.values()) for facts in owner_shadow_facts.values()),
+    check("J_R86_H032_NAMESPACE_ACCESS_CLOSED",
+          (set(owner_shadow_facts) == {"parameters", "locals"}
+           and all(all(facts.values()) for facts in owner_shadow_facts.values())),
           str(owner_shadow_facts))
 
     class OwnerLiveProcessSpy:
@@ -2709,8 +2711,7 @@ def run_codex(sink, canonical, invocation, run, role):
         timeout_case = result_case("timeout")
     finally:
         module.subprocess.Popen = original_popen_timeout
-    timeout_ok = rejected_clean(timeout_case) if 'rejected_clean' in locals() else (
-        not timeout_case[0][0] and not timeout_case[2] and not timeout_case[3] and not timeout_case[4])
+    timeout_ok = rejected_clean(timeout_case)
 
     tracked_identities: set[tuple[int, int, str]] = set()
     monitor_stop = threading.Event(); monitor_threads: list[threading.Thread] = []
@@ -2954,7 +2955,8 @@ def run_codex(sink, canonical, invocation, run, role):
                                and node.func.value.id in {"os", "stat", "subprocess",
                                    "tempfile", "shutil", "hashlib", "json", "sys", "fcntl"})
                       and callable(getattr(path_type, node.func.attr, None))}
-        helper_names = {name for name, value in vars(module).items()
+        helper_names = {name for name in dir(module)
+                        for value in (getattr(module, name),)
                         if name != "run_codex" and hasattr(value, "__code__")
                         and getattr(value, "__module__", None) == module.__name__}
         # Root/sink observation uses these operations even if a legitimate source
@@ -3031,7 +3033,8 @@ def run_codex(sink, canonical, invocation, run, role):
                 elif wrap_helper_code is not None and frame.f_code is wrap_helper_code:
                     label = f"helper.{frame.f_locals.get('_h032_effect_name', 'unknown')}"
             if label is None or caller is None \
-                    or caller.f_globals.get("__name__") != module.__name__:
+                    or (caller.f_code is not module.run_codex.__code__
+                        and caller.f_code not in code_capabilities):
                 return
             if label == "os.fstat":
                 candidate_fd = caller.f_locals.get("fd", caller.f_locals.get("sink_fd"))
@@ -4287,17 +4290,31 @@ def run_codex(sink, canonical, invocation, run, role):
     r74_prior_run.mkdir()
     r74_prior_envelope=r74_prior_run/"provider-envelope.json"
     r74_prior_envelope.write_text('{"prior":true}\n',encoding="utf-8")
-    r74_last_clock_id=[None]
+    # R86 seeds the oracle chain only from the sole directory created by the
+    # immediately preceding actual physical Git-environment invocation.  The
+    # seed is bound back to that attempt's launcher observation, envelope and
+    # appended journal; now_id() is used only as a bounded collision clock and
+    # can never manufacture or select the seed.
+    physical_git_seed=(physical_git_new_runs[0]
+                       if len(physical_git_new_runs)==1 else None)
+    physical_git_seed_bound=(
+        physical_git_seed is not None
+        and physical_git_launch_observation.get("current_run")==str(physical_git_seed)
+        and physical_git_launch_observation.get("envelope")
+            ==str(physical_git_seed/"provider-envelope.json")
+        and len(physical_git_records)==1
+        and physical_git_records[0].get("event")=="AGENT_START")
+    r74_last_actual_run=[physical_git_seed if physical_git_seed_bound else None]
     def run_r74_environment_oracle(name: str) -> dict[str,object]:
-        # The product's frozen run identifier is second-granular.  Keep every
-        # oracle invocation a genuinely new attempt instead of letting a fast
-        # matrix collide with the preceding run directory.
+        # Carry the exact prior observed run into this attempt.  Waiting is
+        # judge-only and bounded; the current run is accepted only from the
+        # actual post-attempt directory delta and launcher observation.
+        seed_run=r74_last_actual_run[0]
+        seed_clock=(seed_run.name[:15] if isinstance(seed_run,Path) else None)
         clock_deadline=time.monotonic()+2.0
-        while (physical_module.now_id()==r74_last_clock_id[0]
+        while (seed_clock is not None and physical_module.now_id()==seed_clock
                 and time.monotonic()<clock_deadline):
             time.sleep(.01)
-        current_clock_id=physical_module.now_id()
-        r74_last_clock_id[0]=current_clock_id
         runs_before=frozenset(r74_runs_root.iterdir())
         journal_path=r74_runs_root.parent/"events.jsonl"
         journal_before=journal_path.read_bytes() if journal_path.is_file() else b""
@@ -4339,6 +4356,8 @@ def run_codex(sink, canonical, invocation, run, role):
         observation=launch_observations.get(output,{"valid":False})
         runs_after=set(r74_runs_root.iterdir())
         current_runs=sorted(runs_after-set(runs_before))
+        if len(current_runs)==1:
+            r74_last_actual_run[0]=current_runs[0]
         split_entries=sorted(path.name for path in split_root.iterdir())
         output_parent=observed.get("output_parent") if isinstance(observed,dict) else None
         shutil.rmtree(split_root)
@@ -4348,6 +4367,7 @@ def run_codex(sink, canonical, invocation, run, role):
                 "split_sink":str(split_sink),"split_entries":split_entries,
                 "output_parent":output_parent,"split_clean":not split_root.exists(),
                 "current_runs":[str(path) for path in current_runs],
+                "seed_run":str(seed_run) if isinstance(seed_run,Path) else None,
                 "intended_common":str(r74_intended_common)}
     r74_decoy_before_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r72_environment_variants={
@@ -4356,6 +4376,62 @@ def run_codex(sink, canonical, invocation, run, role):
     }
     r74_decoy_after_environment_oracles=exact_tree_snapshot(product_git_decoy)
     r73_split_variant=r72_environment_variants["exact"]
+
+    def actual_run_chain_admits(previous_run, expected_previous_run,
+                                current_runs, observation) -> bool:
+        if not (isinstance(previous_run,str)
+                and previous_run==expected_previous_run
+                and isinstance(current_runs,list) and len(current_runs)==1
+                and isinstance(observation,dict)):
+            return False
+        previous=Path(previous_run);current=Path(current_runs[0])
+        return (previous.is_absolute() and current.is_absolute()
+            and previous.parent==current.parent==r74_runs_root
+            and previous!=current and previous.name[:15]!=current.name[:15]
+            and observation.get("current_run")==str(current)
+            and observation.get("envelope")==str(current/"provider-envelope.json"))
+
+    r74_chain_expected=str(physical_git_seed) if physical_git_seed_bound else None
+    r74_chain_results={}
+    for variant_name,variant in r72_environment_variants.items():
+        r74_chain_results[variant_name]=actual_run_chain_admits(
+            variant.get("seed_run"),r74_chain_expected,
+            variant.get("current_runs"),variant.get("launch"))
+        if len(variant.get("current_runs",[]))==1:
+            r74_chain_expected=variant["current_runs"][0]
+    r74_chain_sequence=[r72_environment_variants[name]
+                        for name in ("exact","drop_one","length")]
+    r74_boundary_mutant=(dict(r74_chain_sequence[0])
+                         if len(r74_chain_sequence)==3 else {})
+    if r74_boundary_mutant and isinstance(r74_boundary_mutant.get("seed_run"),str):
+        r74_boundary_mutant["current_runs"]=[r74_boundary_mutant["seed_run"]]
+        r74_boundary_mutant["launch"]=dict(r74_boundary_mutant["launch"])
+        r74_boundary_mutant["launch"]["current_run"]=r74_boundary_mutant["seed_run"]
+        r74_boundary_mutant["launch"]["envelope"]=str(
+            Path(r74_boundary_mutant["seed_run"])/"provider-envelope.json")
+    r74_rollback_mutant=(dict(r74_chain_sequence[1])
+                         if len(r74_chain_sequence)==3 else {})
+    if r74_rollback_mutant and physical_git_seed is not None:
+        r74_rollback_mutant["seed_run"]=str(physical_git_seed)
+    r74_gap_mutant=(dict(r74_chain_sequence[2])
+                    if len(r74_chain_sequence)==3 else {})
+    if (r74_gap_mutant
+            and len(r74_chain_sequence[0].get("current_runs",[]))==1):
+        r74_gap_mutant["seed_run"]=r74_chain_sequence[0]["current_runs"][0]
+    r74_synthetic_seed_mutant=(dict(r74_chain_sequence[0])
+                               if len(r74_chain_sequence)==3 else {})
+    if r74_synthetic_seed_mutant:
+        r74_synthetic_seed_mutant["seed_run"]=str(
+            r74_runs_root/"synthetic-unobserved-seed")
+    r74_chain_mutants=(r74_boundary_mutant,r74_rollback_mutant,
+                       r74_gap_mutant,r74_synthetic_seed_mutant)
+    r74_chain_mutants_reject=all(
+        not actual_run_chain_admits(
+            mutant.get("seed_run"),
+            (str(physical_git_seed) if index==0
+             else r74_chain_sequence[index-1]["current_runs"][0]),
+            mutant.get("current_runs"),mutant.get("launch"))
+        for index,mutant in enumerate(r74_chain_mutants))
 
     physical_output = Path(physical_capture.get("output_path", "/private/tmp/h032-missing-physical-output"))
     physical_canonical = (physical_new_runs[0]/"result.json" if len(physical_new_runs)==1
@@ -4616,6 +4692,16 @@ def run_codex(sink, canonical, invocation, run, role):
           f"decoy_current_output={r74_current_output_decoy_envelope_rejects} "
           f"prior={r74_prior_envelope} current={r73_exact_launch.get('current_run')} "
           f"decoy_unchanged={r74_decoy_after_environment_oracles==r74_decoy_before_environment_oracles}")
+    check("J_R86_ACTUAL_RUN_CLOCK_CHAIN",
+          physical_git_seed_bound
+          and all(r74_chain_results.values())
+          and r74_chain_mutants_reject,
+          f"physical_seed_bound={physical_git_seed_bound} "
+          f"new_runs={len(physical_git_new_runs)} "
+          f"current_match={physical_git_seed is not None and physical_git_launch_observation.get('current_run')==str(physical_git_seed)} "
+          f"envelope_match={physical_git_seed is not None and physical_git_launch_observation.get('envelope')==str(physical_git_seed/'provider-envelope.json')} "
+          f"records={len(physical_git_records)} "
+          f"chain={r74_chain_results} mutants_reject={r74_chain_mutants_reject}")
     physical_git_environment_ok=(
         physical_git_case[0]
         and product_git_decoy_after==product_git_decoy_before

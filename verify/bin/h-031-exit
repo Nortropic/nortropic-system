@@ -378,9 +378,6 @@ def h031_terminal_exit(owner_skip_pending: bool, failed_labels) -> int:
     return 0 if not failed_labels else 1
 
 
-H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS = 120
-
-
 class H032DependencyTimeout(RuntimeError):
     def __init__(self, owner_mode: str, timeout_seconds, stdout, stderr):
         self.owner_mode = owner_mode
@@ -404,7 +401,10 @@ def run_h032_dependency(runner_capability, argv, cwd: Path, owner_mode: str):
         "stderr": _H031_PIPE,
     }
     if owner_mode == "skip":
-        kwargs["timeout"] = H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS
+        # This literal is deliberately local to the sole real skip branch.
+        # There is no mutable module deadline for a later namespace route to
+        # replace after the effect selftest has run.
+        kwargs["timeout"] = 120
     try:
         return runner_capability(argv, **kwargs)
     except _H031_TIMEOUT_EXPIRED as exc:
@@ -506,6 +506,15 @@ def protected_namespace_integrity(tree: ast.AST,
         return False
 
     for node in ast.walk(tree):
+        # R86 closes namespace access itself in the trusted embedded program.
+        # There is no "unrelated" globals/locals/vars exception: once such a
+        # mapping is obtained it can reach a protected binding after the spy.
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in {"globals", "locals", "vars"}):
+            return False
+        if (isinstance(node, ast.Attribute)
+                and node.attr in {"f_globals", "_getframe"}):
+            return False
         if current_namespace(node) and not namespace_use_safe(node):
             return False
         if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
@@ -576,7 +585,10 @@ def run_h032_dependency(runner_capability, argv, cwd: Path, owner_mode: str):
         "stderr": _H031_PIPE,
     }
     if owner_mode == "skip":
-        kwargs["timeout"] = H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS
+        # This literal is deliberately local to the sole real skip branch.
+        # There is no mutable module deadline for a later namespace route to
+        # replace after the effect selftest has run.
+        kwargs["timeout"] = 120
     try:
         return runner_capability(argv, **kwargs)
     except _H031_TIMEOUT_EXPIRED as exc:
@@ -690,14 +702,21 @@ if not _H031_STDLIB_CAPABILITIES_PRISTINE:
                        and node.args
                        and isinstance(node.args[0], ast.Name)
                        and node.args[0].id == "upstream_argv"]
-    timeout_constants = [node for node in tree.body
-                         if isinstance(node, ast.Assign)
-                         and len(node.targets) == 1
-                         and isinstance(node.targets[0], ast.Name)
-                         and node.targets[0].id == "H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS"
-                         and isinstance(node.value, ast.Constant)
-                         and type(node.value.value) is int
-                         and node.value.value == 120]
+    timeout_assignments = [node for node in ast.walk(helpers[0])
+                           if isinstance(node, ast.Assign)
+                           and len(node.targets) == 1
+                           and isinstance(node.targets[0], ast.Subscript)
+                           and isinstance(node.targets[0].value, ast.Name)
+                           and node.targets[0].value.id == "kwargs"
+                           and isinstance(node.targets[0].slice, ast.Constant)
+                           and node.targets[0].slice.value == "timeout"
+                           and isinstance(node.value, ast.Constant)
+                           and type(node.value.value) is int
+                           and node.value.value == 120]
+    mutable_timeout_names = [node for node in ast.walk(tree)
+                             if isinstance(node, ast.Name)
+                             and "TIMEOUT" in node.id
+                             and node.id not in {"_H031_TIMEOUT_EXPIRED"}]
     return {
         "helper_exact": helper_exact,
         "helper_binding_singleton": len(helpers) == 1 and not helper_stores,
@@ -712,7 +731,8 @@ if not _H031_STDLIB_CAPABILITIES_PRISTINE:
                 tree, namespace_protected, {"run_h032_dependency"}),
         "actual_direct_call": len(actual_calls) == 1,
         "no_direct_upstream_run": not direct_upstream,
-        "timeout_constant_exact": len(timeout_constants) == 1,
+        "skip_timeout_literal_exact": (len(timeout_assignments) == 1
+                                         and not mutable_timeout_names),
     }
 
 
@@ -2366,14 +2386,21 @@ subprocess = object()
         "run_h032_dependency(\n            _H031_PRISTINE_RUN, upstream_argv, root, owner_live_mode)",
         "run_h032_dependency(\n            hidden_runner, upstream_argv, root, owner_live_mode)")
     dependency_skip_unbounded_mutant = h031_gate_text.replace(
-        '        kwargs["timeout"] = H032_SKIP_DEPENDENCY_TIMEOUT_SECONDS\n',
+        '        kwargs["timeout"] = 120\n',
         '        pass  # mutant removes the bounded skip deadline\n', 1)
+    dependency_skip_changed_after_spy_mutant = replace_last_h031(
+        h031_gate_text,
+        '        upstream = run_h032_dependency(\n',
+        "        run_h032_dependency.__globals__['H032_SKIP_DEADLINE'] = 1\n"
+        '        upstream = run_h032_dependency(\n')
     dependency_capability_mutants = {
         "internal_timeout": h032_dependency_capability_source_facts(dependency_internal_mutant),
         "default_runner": h032_dependency_capability_source_facts(dependency_default_mutant),
         "proxy": h032_dependency_capability_source_facts(dependency_proxy_mutant),
         "captured_wrapper": h032_dependency_capability_source_facts(dependency_captured_mutant),
         "skip_unbounded": h032_dependency_capability_source_facts(dependency_skip_unbounded_mutant),
+        "post_spy_namespace_mutation": h032_dependency_capability_source_facts(
+            dependency_skip_changed_after_spy_mutant),
     }
     h031_import_anchor = "from subprocess import (\n"
     h031_import_end = ")\nimport sys\n"
@@ -2484,14 +2511,6 @@ subprocess = object()
             "\ndef r83_unrelated_locals():\n"
             "    subprocess = Popen = run = object()\n"
             "    return subprocess, Popen, run\nPY\n",
-        "unrelated_global_literals": h031_gate_text[:-4] +
-            "\ndef r84_unrelated_global_literals():\n"
-            "    globals()['R84_UNRELATED_A'] = 1\n"
-            "    globals().update({'R84_UNRELATED_B': 2})\n"
-            "    value = globals().get('R84_UNRELATED_A')\n"
-            "    globals().pop('R84_UNRELATED_A')\n"
-            "    del globals()['R84_UNRELATED_B']\n"
-            "    return value\nPY\n",
     }
     dependency_shadow_facts = {
         name: h032_dependency_capability_source_facts(variant)
@@ -2524,8 +2543,9 @@ subprocess = object()
                    and facts.get("actual_direct_call") is True
                    for facts in dependency_namespace_facts.values())),
           str(dependency_namespace_facts))
-    check("J_R84_H031_UNRELATED_NAMESPACE_LITERALS_ADMITTED",
-          all(all(facts.values()) for facts in dependency_shadow_facts.values()),
+    check("J_R86_H031_NAMESPACE_ACCESS_CLOSED",
+          (set(dependency_shadow_facts) == {"parameters", "locals"}
+           and all(all(facts.values()) for facts in dependency_shadow_facts.values())),
           str(dependency_shadow_facts))
 
     dependency_calls = []
@@ -2574,6 +2594,7 @@ subprocess = object()
 
     upstream_argv=[str(h032_gate)]
     if owner_live_mode == "skip": upstream_argv.append("--skip-owner-live")
+    upstream = None
     try:
         upstream = run_h032_dependency(
             _H031_PRISTINE_RUN, upstream_argv, root, owner_live_mode)
@@ -2979,9 +3000,10 @@ if not failed:
     print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
     print("H031_GATE_RESULT=PASS")
     raise SystemExit(h031_terminal_exit(False, failed))
+upstream_stdout = upstream.stdout if upstream is not None else ""
 if (failed == {"K_H032_FRESH_UPSTREAM", "K_PRODUCT_EXECUTION"}
         and "CURRENT_RED_REASON=STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT"
-            in getattr(locals().get("upstream"), "stdout", "")):
+            in upstream_stdout):
     print("CURRENT_RED_REASON=UPSTREAM_STRUCTURED_RESULT_DELIVERY_BOUNDARY_ABSENT")
 elif failed == EXPECTED_PREBUILDER_RED:
     print("CURRENT_RED_REASON=EXPLICIT_ROLE_MODEL_ROUTING_ABSENT")
