@@ -109,6 +109,16 @@ kandidat, eftersom allt tidigare arbete mot den gamla grinden blir omätbart.
 Det finns inget i dag. Varje runda avslutas med en ny precisering i stället för ett
 uppfyllt villkor. En hypotes utan avslutsvillkor kan per konstruktion inte bli klar.
 
+> ## ✅ INFÖRD 2026-09-16 som **loop-regel 11** i `docs/loop/regler.md`
+>
+> Denna punkt är inte längre ett förslag. Ägaren beslutade den 2026-09-16 efter FYND 21,
+> och den står nu som regel 11 med följdreglerna 11a (omfrysningsbudget, startbudget 3),
+> 11b (överskriden budget stoppar hypotesen), 11c (`MÅLFLYTT` som eget
+> attributionsutfall) och 11d (förbud mot grindkedjor).
+>
+> **Läs regeln i `docs/loop/regler.md`, inte här.** Texten nedan är bakgrunden till
+> beslutet och bevaras som sådan.
+
 **iv. ⭐ Grindens omfrysningsbudget — den ändring som faktiskt stoppar trampkvarnen.**
 
 De tre ovan gör rundorna ärligare. **Denna ger dem ett tak.**

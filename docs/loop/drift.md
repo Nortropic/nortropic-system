@@ -1,5 +1,31 @@
 # Att köra loopen
 
+## 2026-09-16 — ÄGARBESLUT: loop-regel 11 och 12 införda
+
+Doktrinregel iv är nu **regel** och inte längre ett förslag i ett underlag.
+`docs/loop/regler.md` — kärnans egen regelbok, den som FYND 18 visade saknade allt skydd
+— bär två nya regler, beslutade av ägaren 2026-09-16.
+
+**Regel 11 — grinden pinnar EGENSKAPEN, aldrig trädet.** Ett exitprov får inte kräva
+byte-identitet med ett baskommit. Med följdreglerna 11a omfrysningsbudget (startbudget 3,
+observerad), 11b överskriden budget stoppar hypotesen, 11c `MÅLFLYTT` som eget
+attributionsutfall med `git diff` som prov, och 11d förbud mot grindkedjor som kräver
+andra grindars exakta poängsummor.
+
+**Regel 12 — finns det lokalt, finns det på git.** Ägarens ord: *"I min värld så ska det
+som finns lokalt, ska finnas på git."* Med krav vid dagens slut och vid överlämning, och
+den uttryckliga raden att `[LOCAL]`-märkning är ett kvalificeringsläge — aldrig ett skäl
+att inte pusha. Mekaniskt prov: `git status --short` och `git log --oneline @{u}..HEAD`
+båda tomma, annars förklarar drift-raden varför.
+
+Regel 12 hade ensam gjort dagens arkeologi onödig. Tre mätta instanser står i regeln:
+ingångsdokumenten, den opushade grenen med 55 commits, och backupens kontinuitetslager.
+
+**Kvarstår, och kan bara göras på fabriksmaskinen:** pusha grenen
+`nortropic/platform-integration-20260910` från `~/nortropic-repos/nortropic-system`.
+Den bär separationen och registerbytet och finns i dag på en enda disk.
+
+
 ## 2026-09-16 — FYND 20: separationen ÄR gjord och verifierad — på en opushad gren
 
 `~/nortropic-repos/nortropic-system`, gren `nortropic/platform-integration-20260910`:

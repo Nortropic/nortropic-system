@@ -216,6 +216,22 @@ Varje sådan runda bokfördes som kandidatdefekt. Mätningen står i `02-bevis.m
 
 ---
 
+## 4a. Två regler som nu är BINDANDE, inte råd
+
+Tripwiretabellen ovan var prosa. Två av dess rader är sedan 2026-09-16 **loop-regler** i
+`docs/loop/regler.md`, beslutade av ägaren:
+
+- **Regel 11** — grinden pinnar egenskapen, aldrig trädet. Med 11a omfrysningsbudget
+  (startbudget 3), 11b stopp vid överskridande, 11c `MÅLFLYTT` som eget
+  attributionsutfall, 11d förbud mot grindkedjor.
+- **Regel 12** — finns det lokalt, finns det på git. Inget okommitterat och ingen opushad
+  gren vid dagens slut utan en rad i `drift.md` som säger vad och var.
+  `[LOCAL]`-märkning är ett kvalificeringsläge, aldrig ett skäl att inte pusha.
+
+De står över denna fil i auktoritetsordningen. Vid konflikt gäller `regler.md`.
+
+---
+
 ## 4b. Fastnar du — den bortre gränsen
 
 Tripwires fångar att du kör i diket. Detta säger vad du gör när du **inte kommer vidare
