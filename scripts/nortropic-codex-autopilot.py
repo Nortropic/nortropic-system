@@ -31,12 +31,15 @@ from pathlib import Path
 from typing import Any, Iterable
 
 AUTHORITY_LIB = Path(__file__).resolve().parents[1] / "controller/authority"
+CONTROLLER_ROOT = Path(__file__).resolve().parents[1]
 # Normal orchestrator execution must not mutate the immutable candidate merely
 # by loading the shared authority parser.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(AUTHORITY_LIB))
+sys.path.insert(0, str(CONTROLLER_ROOT))
 from core import (AuthorityError, canonical_path, permits,
                   strict_json_bytes)  # noqa: E402
+from controller.result.consumer import consume_private_result  # noqa: E402
 
 EXPECTED_REPO = "Nortropic/nortropic-system"
 OWNER_DECISION_PATH = "docs/loop/owner-h003-attestation-authority-v1.md"
@@ -56,6 +59,7 @@ PYTHON_IDENTITY_KEYS = {
 }
 MAX_PROVIDER_AUTHORITY_BYTES = 16 * 1024
 MAX_PROVIDER_EXECUTABLE_BYTES = 256 * 1024 * 1024
+CODEX_RUN_TIMEOUT_SECONDS = 86400
 AUTOPILOT_ROLE_POLICY = {
     "ARCHITECT": ("gpt-5.6-sol", "max"),
     "TEST_AUTHOR": ("gpt-5.6-sol", "max"),
@@ -125,6 +129,9 @@ class AgentRun:
     thread_id: str | None
     event_log: Path
     result_file: Path
+
+
+_LAST_AGENT_CONTEXT: tuple[str | None, Path, Path] | None = None
 
 
 @dataclass(frozen=True)
@@ -768,7 +775,8 @@ def _python_snapshot(root: Path) -> tuple[Path, str]:
     return snapshot, digest
 
 
-def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
+def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> dict[str, Any]:
+    global _LAST_AGENT_CONTEXT
     route = AUTOPILOT_ROLE_POLICY.get(role)
     if route is None:
         raise Stop(f"unknown autopilot role: {role!r}")
@@ -783,8 +791,45 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
     full_prompt = prompt.rstrip() + "\n\n" + agent_prompt_common()
     (snapshot_root, snapshot, snapshot_digest,
      host_snapshot, host_snapshot_digest) = _provider_snapshot(repo)
+    result_root: Path | None = None
+    sink_fd = -1
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
+        result_root = Path(tempfile.mkdtemp(prefix="nortropic-result-"))
+        root_stat = result_root.lstat()
+        live_root = repo.resolve()
+        live_git = common_git_dir(repo).resolve()
+        result_root_real = result_root.resolve()
+        if (result_root.is_symlink() or root_stat.st_uid != os.getuid()
+                or stat.S_IMODE(root_stat.st_mode) != 0o700
+                or result_root_real == live_root or live_root in result_root_real.parents
+                or result_root_real == live_git or live_git in result_root_real.parents):
+            raise Stop("private result staging root has unsafe identity")
+        result_sink = result_root / "result.json"
+        create_fd = os.open(
+            result_sink,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        try:
+            os.fsync(create_fd)
+        finally:
+            os.close(create_fd)
+        sink_fd = os.open(
+            result_sink,
+            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        sink_identity = os.fstat(sink_fd)
+        if (not stat.S_ISREG(sink_identity.st_mode) or sink_identity.st_nlink != 1
+                or stat.S_IMODE(sink_identity.st_mode) != 0o600
+                or sorted(path.name for path in result_root.iterdir()) != [result_sink.name]):
+            raise Stop("private result sink has unsafe identity")
+        invocation_id = os.urandom(16).hex()
+        run_id = os.urandom(16).hex()
+        if invocation_id == run_id:
+            raise Stop("controller result bindings collided")
         provider_argv = [
             str(snapshot),
             "-C", str(wt),
@@ -796,14 +841,15 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
             "-c", f'model_reasoning_effort="{reasoning_effort}"',
             "--json",
             "--output-schema", str(schema),
-            "-o", str(result),
+            "-o", str(result_sink),
             full_prompt,
         ]
         envelope = jr / "provider-envelope.json"
         envelope.write_text(json.dumps({"task_id": prompt, "role": role}), encoding="utf-8")
         launcher = Path(__file__).resolve().parents[1] / "controller/launch/cli"
         argv = [str(python_snapshot), "-I", "-S", str(launcher),
-                "run", str(wt), str(envelope), "86400", "--", *provider_argv]
+                "run", str(wt), str(envelope), str(CODEX_RUN_TIMEOUT_SECONDS),
+                "--", *provider_argv]
         env = {key: value for key, value in os.environ.items()
                if not key.startswith("DYLD_")
                and key not in {"LD_PRELOAD", "LD_LIBRARY_PATH", "__PYVENV_LAUNCHER__"}}
@@ -844,8 +890,37 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
                 if obj.get("type") == "thread.started" and isinstance(obj.get("thread_id"), str):
                     thread_id = obj["thread_id"]
             rc = p.wait()
+        if rc != 0:
+            raise Stop(f"Codex role {role} failed rc={rc}; events={events}")
+        path_identity = result_sink.lstat()
+        opened_identity = os.fstat(sink_fd)
+        if (result_sink.is_symlink() or not stat.S_ISREG(path_identity.st_mode)
+                or path_identity.st_nlink != 1
+                or (path_identity.st_dev, path_identity.st_ino)
+                    != (opened_identity.st_dev, opened_identity.st_ino)
+                or sorted(path.name for path in result_root.iterdir()) != [result_sink.name]):
+            raise Stop("provider result transport identity changed")
+        _LAST_AGENT_CONTEXT = (thread_id, events, result)
+        return consume_private_result(sink_fd, result, invocation_id, run_id, role)
     finally:
+        if sink_fd >= 0:
+            try:
+                os.close(sink_fd)
+            except OSError:
+                pass
         cleanup_error: OSError | None = None
+        if result_root is not None:
+            for _cleanup_attempt in range(3):
+                if not result_root.exists():
+                    break
+                try:
+                    shutil.rmtree(result_root)
+                except OSError as exc:
+                    cleanup_error = exc
+                else:
+                    break
+            if result_root.exists():
+                raise Stop("private result staging cleanup incomplete") from cleanup_error
         for _cleanup_attempt in range(3):
             if not snapshot_root.exists():
                 break
@@ -861,15 +936,20 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
                 break
         if snapshot_root.exists():
             raise Stop("private provider execution family cleanup incomplete") from cleanup_error
-    if rc != 0:
-        raise Stop(f"Codex role {role} failed rc={rc}; events={events}")
-    try:
-        report = json.loads(result.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise Stop(f"Codex role {role} produced invalid structured result: {e}; file={result}") from e
-    if report.get("role") != role:
-        raise Stop(f"Codex role mismatch expected={role} got={report.get('role')}")
-    journal(repo, "AGENT_END", role=role, outcome=report.get("outcome"), thread_id=thread_id or "OVERIFIERAT")
+
+
+def _run_codex_agent(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
+    accepted = run_codex(repo, wt, role, prompt)
+    context = _LAST_AGENT_CONTEXT
+    if (context is None or not isinstance(accepted, dict)
+            or set(accepted) != {"schema_version", "invocation_id", "run_id", "role",
+                                 "result_sha256", "report"}
+            or not isinstance(accepted.get("report"), dict)):
+        raise Stop("structured result kernel returned an invalid controller envelope")
+    thread_id, events, result = context
+    report = accepted["report"]
+    journal(repo, "AGENT_END", role=role, outcome=report.get("outcome"),
+            thread_id=thread_id or "OVERIFIERAT")
     return AgentRun(report, thread_id, events, result)
 
 
@@ -945,7 +1025,8 @@ def architect_resolution(repo: Path, wt: Path, stage: str, task_id: str,
                          signal: dict[str, Any], context: str = "") -> dict[str, Any]:
     before_head = sha(wt)
     before_status = git(wt, "status", "--porcelain=v1", "--untracked-files=all").out
-    arun = run_codex(repo, wt, "ARCHITECT", architect_prompt(stage, task_id, signal, context))
+    arun = _run_codex_agent(repo, wt, "ARCHITECT",
+                            architect_prompt(stage, task_id, signal, context))
     after_head = sha(wt)
     after_status = git(wt, "status", "--porcelain=v1", "--untracked-files=all").out
     if before_head != after_head or before_status != after_status:
@@ -974,7 +1055,7 @@ def run_codex_resolving_architecture(repo: Path, wt: Path, role: str, prompt: st
         if guidance:
             effective += "\n\nAUTONOMOUS_ARCHITECT_RESOLUTIONS:\n" + "\n\n".join(guidance)
             effective += "\n\nApply these resolutions within higher authority. Do not re-ask the human for the same choice."
-        arun = run_codex(repo, wt, role, effective)
+        arun = _run_codex_agent(repo, wt, role, effective)
         if not owner_need(arun.report):
             return arun
         signal = str(arun.report.get("stop_reason") or arun.report.get("summary") or "OWNER_DECISION_REQUIRED")
