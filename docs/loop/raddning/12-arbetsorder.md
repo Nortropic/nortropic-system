@@ -152,6 +152,37 @@ SAKNAS:   h-027 → h-028 → h-029 → h-030      (fyra task, finns inte)
 `artefakter/matning-pa-macen.sh` på `main` och därefter root-orsaka de sex röda.
 Full mätning i `docs/loop/drift.md` FYND 33.
 
+### De sex röda har TVÅ rötter, inte sex (FYND 34)
+
+```
+h-004 ← h-001 (GRÖN)                      ROT 1 — fristående
+h-009 ← h-005, h-006, h-008 (ALLA GRÖNA)  ROT 2 — fristående
+
+h-012 ← h-009
+h-011 ← h-004, h-009
+h-013 ← h-009, h-012
+h-016 ← h-011, h-012, h-013
+```
+
+Fyra av sex ligger **nedströms**. Ingen rot beror på något rött.
+
+`h-009` är kuvert- och workspacelagret. Dess egna fel: *"processen kördes i klonroten,
+inte i workspacet"*, *"processen hittade inget kuvert"*. Nedströms säger `h-011` K12
+*"workern körde någon annanstans eller fick fel kuvert"*, `h-012` K14 *"kuvertet når
+sessionen — kod=4"*, och `h-012` K3 visar att kandidaten bär **repots HEAD-filer** i
+stället för sessionens. En worker utan workspace och utan kuvert producerar ingen kandidat
+— och då kan varken kedjan, brytaren eller attestationen mätas.
+
+`h-004` är den andra roten och något annat: `lease_id`, fencing och renew är inte
+implementerade. En funktion att skriva, inte en defekt att laga.
+
+**⚠️ Detta är en hypotes.** Grafen är fakta; symtomlikheten är en svagare signal. Samma
+session gissade fel om orsaken till sju röda grindar tre timmar tidigare (FYND 33).
+**Ordningen följer därför av provet, inte av tron:** laga `h-009` FÖRST, kör om de fem.
+Blir de gröna var det en rot — blir de inte det vet du det efter en fix i stället för sex.
+
+**Arbetsordning inom de sex:** `h-009` → kör om → `h-004` → kör om → det som står kvar.
+
 `h-015` beror på `h-010`, `h-013`, `h-016`, `h-004` och `h-030` — **inte** på `h-031`,
 `h-032` eller `h-039`. De tre avslutade hypoteserna låg aldrig på vägen; ingenting i
 specen beror på dem utanför gruppen själv.

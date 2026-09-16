@@ -1,5 +1,82 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 34: VÄGEN ÄR INTE TRASIG. De sex röda grindarna har TVÅ rötter, inte sex.
+
+Ägaren, med det ursprungliga underlaget i hand: *"Det jag är orolig för är att vi startar
+bilen på en trasig väg som aldrig har förutsättningarna att komma i mål."*
+
+### Först det mekaniska: ingenting ur underlaget är förlorat
+
+Tarbollen (17 filer) jämförd fil för fil mot `docs/loop/raddning/`:
+**4 identiska, 9 VUXNA av rättelser, 0 saknade.** `06-inventering.md` 17,9 → 34,5 kB,
+`PROMPT-TILL-CODEX.txt` 7,7 → 18,1 kB. De två artefakter som inte ligger i repot är just de
+två README:t pekar ut som avsiktligt utelämnade: bundlen (`ÖVERFLÖDIG`, ersatt av det
+verkliga webbrepot) och dokumentationspatchen, vars fyra commits ligger i historien —
+validatorn bekräftar `4/4`.
+
+### Och sedan den verkliga frågan, mätt i specens beroendegraf
+
+```
+h-004 ← h-001 (GRÖN)                                    ROT 1, fristående
+h-009 ← h-005, h-006, h-008 (ALLA GRÖNA)                ROT 2, fristående
+
+h-012 ← h-009
+h-011 ← h-004, h-009
+h-013 ← h-009, h-012
+h-016 ← h-011, h-012, h-013
+```
+
+**Fyra av de sex röda ligger NEDSTRÖMS om de två andra.** Ingen av rötterna beror på något
+rött. Vägen är alltså inte sex oberoende hål — den är **två hål med fyra speglingar**.
+
+### Symtomen stämmer med grafen, ordagrant
+
+`h-009` är kuvert- och workspacelagret, och dess egna fel är:
+`K2 kuvertet når processen — kod 127` · `K8 processen kördes i klonroten, INTE i
+workspacet` · `K9 processen hittade inget kuvert`.
+
+Nedströms, ur samma körning:
+
+| Grind | Felrad |
+|---|---|
+| `h-011` K12 | *"workern körde någon annanstans eller fick fel kuvert"* |
+| `h-012` K14 | *"kuvertet når sessionen — kod=4"* |
+| `h-012` K3 | kandidatens filer är **repots HEAD-filer**, inte sessionens |
+| `h-013` K1 | *"kandidat via brytaren — kod=4 nonzero_exit"* |
+| `h-016` K1 | *"attesterad kandidat finns i git — attest ger ''"* |
+
+En worker som inte kör i sitt workspace ser repots filer i stället för sina egna, får
+inget kuvert, producerar ingen kandidat — och då kan varken kedjan, brytaren eller
+attestationen mätas. **Det är en defekt som yttrar sig fem gånger.**
+
+`h-004` är den andra roten och är något annat: `lease_id`, fencing och renew är inte
+implementerade. En funktion som ska skrivas, inte en defekt som ska lagas.
+
+### ⚠️ Detta är en HYPOTES, och jag hade fel om en sådan för tre timmar sedan
+
+FYND 33 visar vad mitt förra orsaksgissande var värt: jag läste felraderna, såg ordet
+`cwd`, och drog slutsatsen riggartefakt. Fel på fyra av fem punkter.
+
+**Skillnaden nu är att grafen är oberoende evidens.** Att `h-012`, `h-013`, `h-011` och
+`h-016` beror på `h-009` står i `specs/tasks.spec.json` och är sant oavsett vad felraderna
+säger. Symtomlikheten är en andra, svagare signal som pekar åt samma håll.
+
+**Provet är billigt och avgör saken:** laga `h-009`, kör om de fem. Blir de gröna var det
+en rot. Blir de inte det är det fler, och då vet vi det efter en fix i stället för sex.
+
+### Svaret på frågan
+
+**Vägen finns.** Ingenting bland de sex är arkitektoniskt omöjligt: två är funktioner som
+ska byggas, resten ser ut att vara följdfel. De fyra saknade taskarna `h-027`–`h-030` har
+ett ägarauktoriserat kontrakt som specificerar dem
+(`harness-substitution-contract-v1.md`). Slutkriteriet är definierat och mätbart
+(`00-VAD-NORTROPIC-AR.md`, `07-v1-acceptans.md`).
+
+**Det som faktiskt kan stoppa bilen är inte vägen — det är trampkvarnen.** 297 omfrysningar
+utan en enda stängning. Mot den står regel 11:s budget, regel 12a:s bevarande, och kravet
+att KLAR kräver ett kört exitprov i samma session. Alla tre finns nu, och ingen av dem
+fanns i det underlag du håller i handen.
+
 ## 2026-09-16 — PAKETET SANERAT MOT FYND 33. Åtta ställen bar en falsifierad premiss.
 
 Ägaren: *"Skulle vi städa nåt? … en väldokumenterad bil på en väldokumenterad
