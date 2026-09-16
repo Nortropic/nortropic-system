@@ -1,5 +1,12 @@
 # Gymkontraktet — vad en modellutvärdering får och inte får vara
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Senast verifierad mot systemet: 2026-08-26 · v1 (denna commit)
 Verifieringsomfång: nyskapad. Ankare: masterplanens **§18 GYM / CROSS-MODEL EVALUATION**
 (elva frusna lagar) och **§17 Modellkandidatregeln** (fyra led per förslag). Kontraktet

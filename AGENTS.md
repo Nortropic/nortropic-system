@@ -2,6 +2,59 @@
 
 Detta är en **router**, inte ett nytt regelverk.
 
+## Repots identitet
+
+Detta repo är Nortropics **trust kernel / bootstrap**. Leveransen är kontrollplanet:
+`controller/`, `verify/`, `specs/tasks.spec.json` och `docs/loop/`. Webbfabrikslagret
+(`agents/`, `skills/`, `packs/`, `backtests/`, `workflows/` och `docs/00`, `01`, `02`,
+`04`, `06`) ligger kvar i trädet efter repodelningen och beskriver kundflödet — ett annat
+spår, aldrig detta repos mål. `docs/07-konstitution.md` och `docs/03-regelverk.md` bär
+webbfabrikens sakregler och nämner kärnan inte alls, men kärnan är PINNAD till dem: fem
+respektive ett fryst exitprov i `verify/bin/` läser dem, liksom `controller/verify/cli`.
+De binder alltså här av beroende, inte av innehåll. `docs/05-beslutslogg.md` är genuint
+delad och kernel-dominerad — tio frysta exitprov läser den.
+
+`node scripts/kor-vakter.mjs` är ÖVERVÄGANDE webbfabrikens grindsvit: av 23 vakter
+refererar 16 enbart webbträdet, 2 enbart kärnan (`check-provanropare.mjs`,
+`check-verifierarregistret.mjs`), 1 båda och 4 inget träd alls. Den är inget bevis om en
+kerneländring — kärnans dom är taskens frysta `exit_test` under `verify/bin/` — men de
+två kernelvakterna följer inte med när webbträdet flyttas.
+
+`scripts/` och `tests/` är BLANDADE kataloger, inte webb. Kärnans där:
+`scripts/nortropic-codex-autopilot.py` (allowed_write för h-031/032/035),
+`check-provanropare.mjs`, `check-verifierarregistret.mjs`, `kor-styrprov.mjs`,
+`kor-vakter.mjs`, `tests/controller/**`, `tests/scripts/**`. De följer aldrig med
+webbträdet.
+
+**Vägen till klar kärna** står i `docs/loop/raddning/` — lägesbild, karta, slutkriterium
+(`KERNEL_COMPLETE`), arbetsordning och taskspecar. Läs `raddning/README.md` först;
+`raddning/PROMPT-TILL-CODEX.txt` är skriven för Codex-sessioner. Katalogen bär **analys
+och plan, aldrig status** — status är `docs/loop/drift.md`.
+
+**Lita inte på den, pröva den.** Tretton felaktiga påståenden hittades under arbetet,
+nio av dem i underlaget självt, och elva av tretton kom av en lexikal metod som aldrig
+prövades mot beteendet. Kör
+`bash docs/loop/raddning/artefakter/validera-underlaget.sh` (37 påståenden mot repot;
+exit 0 = talen stämmer, 1 = underlaget bär ett fel, 2 = ODÖMBART) innan du lutar ett
+beslut mot ett tal där. Grönt betyder att talen är oförändrade, aldrig att de är sanna —
+den oberoende omhärledningen i `raddning/06-inventering.md` §0 är fortfarande
+obligatorisk, liksom §0c om det lokala maskintillståndet.
+
+**Backupen** ligger i `Nortropic/nortropic-backups` (repo-ID 1367371291) — inte en kopia
+av detta repo. Git bär katalog, checksummor och kvitton; arkiven är **Release assets som
+inte följer med en klon**. Rutin i dess `BACKUP-RUNBOOK.md`, plus ett kontinuitetslager
+(checkpoints, Codex→Claude-handoffs, disk-journal) utan motsvarighet här. **Backuparbete
+ska ge en rad i `docs/loop/drift.md` samma dag.** 2026-09-09→13 gav 27 commits där och
+noll rader här — fem dagar utan spår i kärnans lägesdokument.
+
+`CLAUDE.md` är samma router för Claude-sessioner och bär samma auktoritetsordning.
+Ändras den ena ska den andra följa med i samma commit.
+
+Raden `PRODUCT=NORTROPIC_AUTONOMOUS_WEBSITE_FACTORY` i operating model v4 nedan står
+kvar ordagrant därför att blocket är ett fruset owner-amendment från 2026-08-11 och
+bärs av `docs/loop/harness-substitution-contract-v1.md`. Den namnger kärnans
+nedströmskonsument, aldrig detta repos leverans.
+
 ## Auktoritet
 
 Läs och följ i denna ordning när de är relevanta:

@@ -1,5 +1,12 @@
 # Förbättringskontraktet — vad en förbättring av en BEFINTLIG sajt får och inte får vara
 
+> **LAGER: WEBBFABRIKEN.** Detta repo är Nortropics trust kernel / bootstrap —
+> `controller/`, `verify/`, `specs/`, `docs/loop/`. Dokumentet nedan hör till
+> webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`), som ligger kvar i
+> trädet efter repodelningen och styr kundflödet. Arbetar du på kärnan: börja i
+> `CLAUDE.md` (Claude) eller `AGENTS.md` (Codex) och följ `docs/loop/regler.md`.
+
+
 Senast verifierad mot systemet: 2026-08-27 · v1 (denna commit)
 Verifieringsomfång: nyskapad. Ankare: `D-GAP-2` i `backtests/case-d-migration/FORVANTAT.md`
 och `workflows/nortropic-autobygg.js`, vars ROUTE-gren säger ordagrant

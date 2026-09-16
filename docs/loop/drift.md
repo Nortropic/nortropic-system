@@ -1,5 +1,812 @@
 # Att köra loopen
 
+## 2026-09-16 — SEPARATIONENS ANDRA HALVA KLAR: webbrepot är publicerat
+
+`Nortropic/nortropic-webbforvaltning` finns nu på GitHub (publikt, ägarens val).
+432 objekt, 2,28 MiB, `main` spårar `origin/main`.
+
+Separationen som beställdes 2026-09-10 (`49cc495`) gjordes i två halvor: webbträdet togs
+bort ur plattformen samma dag, men **målrepot skapades bara lokalt**. I sex dagar fanns
+317 filer — hela kundflödet, med proveniens per fil — på en enda disk.
+
+**Regel 12 är därmed uppfylld på båda sidor:**
+
+| | Var | Status |
+|---|---|---|
+| Kärnan | `Nortropic/nortropic-system`, gren `nortropic/platform-integration-20260910` | pushad 2026-09-16 |
+| Webben | `Nortropic/nortropic-webbforvaltning`, `main` | pushad 2026-09-16 |
+
+Ingenting av tre månaders arbete finns längre på bara en maskin.
+
+### Hemlighetssökning före publicering — ren
+
+Innehållet söktes igenom före push: privatnyckelheaders, `xox*`-tokens, `sk-`/`ghp_`/
+`AKIA`-mönster, `hooks.slack.com`, samt `.env`/`.pem`/`credential`/`.key`-filer.
+**Noll verkliga träffar.** De 27 träffarna var design-tokens, `query_tokens` i parsning,
+och runtime-genererade `localhost`-tokens i vendorade verktyg.
+
+Enda raden som krävde läsning — `docs/05-beslutslogg.md:224` — visade sig vara motsatsen
+till en läcka: den dokumenterar att Slack-hemligheten ligger i `~/.nortropic/slack-webhook`
+med `600` **utanför repot**, och att configen bär sökvägen aldrig värdet, med skälet
+*"configfilen syns i rapporter, felmeddelanden och beslutsloggsrader, så en URL i configen
+läcker varje gång configen visas"*. Ingen URL finns i filen.
+
+Samma rad bär ett processfynd från augusti: en webhook-URL klistrades en gång i ett
+transkript, återkallades och ersattes. **Exakt samma sak hände i dag med en SSH-nyckel,
+och exakt samma sak gjordes.** Två gånger med samma utfall är en rutin som fungerar, inte
+tur.
+
+### Rättelse i underlaget
+
+`raddning/01-lagesbild.md` §4 påstod *"Inget målrepo finns"*. Det var fel redan när det
+skrevs — repot fanns lokalt sedan 09-10 — och det är nu dubbelt fel. Rättat.
+
+
+## 2026-09-16 — FYND 26: VÄG A′ ÄR FEL. Den upphäver ett ägarbeslut från 09-10
+
+**Jag läste separationens commit-titlar och körde dess grindar. Jag läste aldrig dess
+dokumentation.** Den ligger i `SEPARATION-20260910/` på grenen och den ändrar besluten
+fattade tidigare i dag.
+
+### Ägarbeslutet jag inte kände till
+
+`SEPARATION-20260910/README.md`, 2026-09-10, ordagrant:
+
+> *"Ägarens precisering: konstitution/regelverk/beslutslogg/börja-här/agentöverlämning är
+> webbförvaltningens äldre styrdokument och hör inte till kernel/bootstrap."*
+
+**`docs/05-beslutslogg.md` är alltså redan avgjord som WEBB av ägaren.** Väg A′, som
+ägaren godkände i dag på min rekommendation, skulle återställa den som kernelfil och
+därmed upphäva det beslutet.
+
+Min mätning (kernel=113 / webb=57) var riktig som observation men besvarade fel fråga:
+den mäter vad filen INNEHÅLLER, inte vad den SKA VARA. Den frågan var redan avgjord.
+
+**`LOOP-ÄGARBESLUT-VÄG-A-PRIM` i beslutsloggen står därmed på fel grund och ska inte
+verkställas som skrivet.**
+
+### Vad separationen faktiskt levererade — som jag påstod saknades
+
+| Mitt påstående | Verkligheten på grenen |
+|---|---|
+| Fil-för-fil-dom saknas (`06-inventering.md` §0 KRAV A) | `SEPARATION-20260910/ALLOCATION.tsv`, **443 poster**: 119 plattform / 317 webb / 2 delade / 3 omskrivna / 2 oklara |
+| Inget målrepo finns | `/Users/elinhaggstrom/nortropic-repos/nortropic-webbforvaltning`, nytt, `main`, med `SEPARATION-ORIGIN/PROVENIENS.tsv` (blob-OID per fil) |
+| FYND 21 och 22 är nya fynd | `SEPARATION-20260910/EFTERARBETE.md` punkt **1–11**, mätta och ägarsatta 2026-09-10. Mitt FYND 22 = punkt 3, 4, 5, 6, 7 |
+
+### Rättningsvägen stod redan skriven
+
+`EFTERARBETE.md` punkt 3: *"plattformens dokumentauktoritet måste bindas till
+`docs/loop/**`"*. Det är den riktiga åtgärden — **inte** att återställa beslutsloggen,
+utan att ge plattformen en **egen** beslutslogg under `docs/loop/` och peka om
+`controller/verify/cli` `PRETASK_PATHS`/`PLATFORM_DOCUMENTS`, specen och grindarna dit.
+
+Punkt 5 noterar dessutom vad det kostar: *"~79 referenser till beslutsloggen i taskrader"*
+och att `specs/**` är människohand.
+
+### FYND 27 — webbrepot är också opushat
+
+`nortropic-webbforvaltning` finns bara lokalt. Sex repon under `Nortropic` på GitHub,
+inget av dem webbens. **Andra instansen av regel 12 samma dag**, och den bär 317 filer.
+
+### Metodfyndet, sextonde i ordningen
+
+Jag körde mekanismen — grindarna — men läste inte artefakten bredvid den. Att köra är
+nödvändigt men inte tillräckligt: **ett arbete som bär sin egen dokumentation ska läsas
+innan man drar slutsatser om vad det saknar.** Sex dagars arbete hade en README, en
+allokeringstabell med 443 rader och en efterarbetslista med elva punkter, och jag byggde
+en analys som delvis dubblerade dem och en rekommendation som motsade ägaren.
+
+Det var precis det underlaget varnar för i `00-LAS-FORST.md`: *"räkna med ett sextonde
+fel"*. Det kom, och det var det dyraste.
+
+
+## 2026-09-16 — ÄGARBESLUT: väg A′ låst, vakternas placering avgjord, prompten omskriven
+
+Ägaren: *"Jag kör enligt dina rekommendationer."* Två beslut förda till
+`docs/05-beslutslogg.md` som `LOOP-ÄGARBESLUT-VÄG-A-PRIM`.
+
+**Väg A′** — endast `docs/05-beslutslogg.md` återställs. De fyra webbdokumenten förblir
+borta. Ägarens invändning (*"om de befinner sig fortfarande tillsammans med
+trustkernel/bootstrap så kan det väl ske igen detta?"*) var korrekt och ändrade min
+rekommendation från A till A′.
+
+**Arbetsordern, en omfrysning med tre gatedefekter:**
+
+| # | Åtgärd | Löser |
+|---|---|---|
+| 1 | Återställ `docs/05-beslutslogg.md` som kernelfil | `h-007`, `h-036`, `h-038` |
+| 2 | Peka om konstitutionspinnarna mot `byggplan-v3` §3.1 | `h-037` |
+| 3 | Fyra shebangar → `#!/usr/bin/env python3.12` | latent defekt i `h-035/036/038/039` |
+
+`h-035` fastställs först — den är den enda oförklarade posten (exit 2, synliga rader PASS).
+
+**Vakternas placering:** vakt 1 och 2 som nya PINV-kontroller i `check-invariants.mjs`,
+med kontraktsflödets kostnad medveten. `p-003-exit` valdes bort — det kedjan inte kör,
+kringgås. Vakt 3 får aldrig bli ett `exit_test`.
+
+**`PROMPT-TILL-CODEX.txt` är omskriven från grunden** mot detta läge. Den tidigare
+versionen beskrev en värld där separationen inte var gjord och registret pekade på
+webbfiler — alltså gårdagens. Codex läser den först, och en router som beskriver fel läge
+är precis fynd 2 en gång till.
+
+**Härifrån är arbetet Codex.** Analysen är landad, reglerna införda, besluten loggade,
+arbetsordern mätt och dimensionerad.
+
+
+## 2026-09-16 — VÄG A′ DIMENSIONERAD: beslutsloggen löser tre av fem grindar
+
+Körda på plattformsgrenen, utan `timeout` (se rättelsen av FYND 24):
+
+| Grind | Exit | Orsak |
+|---|---|---|
+| `h-007` | 1 | 14 PASS / 5 FAIL. Alla fem: *"§A-orsak — X avvisades men orsaken namnger den inte: [docs-kravet ouppfyllt för h-001 (regel 17 + 22): docs/05-beslutslogg.md ändrades inte i samma commit]"* |
+| `h-036` | 2 | `RIG_ERROR: [Errno 2] No such file or directory: .../docs/05-beslutslogg.md`, därefter FAIL på `..._AUTHORITY_PRESERVED` och `..._TASK_ROWS_PRESERVED` |
+| `h-038` | 2 | `RIG_ERROR: H036 helper gate identity drift` — kedjad till h-036 |
+| `h-037` | 2 | `FAIL ..._CURRENT_SUBJECT_AND_HISTORICAL_COMPLETION_BINDING: "current subject differs outside the exact four-file contract"` → `UNEXPECTED_RED` |
+| `h-035` | 2 | Synliga rader är PASS. Orsaken till exit 2 är inte fastställd |
+
+**Tre av fem löses av att `docs/05-beslutslogg.md` återställs.** Väg A′ är därmed
+dimensionerad: den är inte en gissning utan en mätt åtgärd med känd täckning.
+
+`h-037` faller på trädpinningen (FYND 21) och kräver regel 11-omfrysning.
+`h-035` är den enda posten som fortfarande är oförklarad.
+
+### Beviset som avgör lagerfrågan
+
+`h-007` prövar att en §A-avvisning **namnger sökvägen som avvisades**. Den får i stället
+ett annat avslag: **controllerns docs-krav slår till först**, eftersom beslutsloggen inte
+finns och därmed "inte ändrades i samma commit". §A-kontrollen nås aldrig.
+
+`docs/05-beslutslogg.md` är alltså inte ett dokument kärnan råkar läsa. **Den är bärande
+för kärnans egen §A-hävdelse** — utan den kan controllern inte avvisa en §A-skrivning med
+rätt orsak. Det avgör lagerfrågan bortom mätningen 113 kernel- mot 57 webbomnämnanden, och
+bekräftar att separationen klassade en kernelfil som webb.
+
+### FYND 25 — regel 22 ÄR mekaniserad, men bara på ena sidan
+
+Ur h-007:s utdata: `docs-kravet ouppfyllt för h-001 (regel 17 + 22)`. Kontrollen kommer ur
+**controllern** — varje task som körs genom kedjan kräver sin docs-rad. Mekanismen finns
+alltså sedan länge, och min bedömning i `raddning/11-tre-vakter-mot-aterfall.md` att
+"regel 22 saknar mekanism" var för grov.
+
+**Men den fångade inte de 55 commitsen**, och skälet är precist: **den gäller tasks som
+körs genom controllern, inte commits som görs vid sidan av den.** Arbetet 09-09→09-12 var
+`[LOCAL]`-kontrakt utanför taskflödet, och där ser controllern ingenting.
+
+Det gör vakt 1 skarpare, inte överflödig: den ska **inte** duplicera controllerns
+task-kontroll utan täcka **commits utan task** — precis den yta controllern per
+konstruktion aldrig ser. Kravet skrivs in i vaktspecen.
+
+
+## 2026-09-16 — FYND 24 (RÄTTAT): latent värdbindning i fyra shebangar
+
+> ### ⚠️ RÄTTELSE samma dag — min första slutsats var FEL
+>
+> Jag tolkade `exit=127` som *"tolken finns inte"* och drog slutsatsen att fyra grindar
+> redan var okörbara. **Falsifierat av ägaren med ett kommando:**
+> `ls -d /opt/homebrew/Cellar/python@3.12/*/` → `3.12.13_4/` finns, exakt den pinnade
+> versionen.
+>
+> **Den verkliga orsaken till 127 var mitt eget kommando.** Jag skrev `timeout 300 "$f"`,
+> och **macOS har inte GNU:s `timeout`**. Därför gav de sex första grindarna (körda utan
+> `timeout`) riktiga verdikt, medan de fem senare gav 127 rakt igenom — inklusive `h-007`,
+> som är ett bash-skript och inte kan falla på en Python-sökväg.
+>
+> Femtonde felet i detta arbete, och samma klass som de fjorton andra: **en mekanism
+> härledd ur ett symptom, utan att mekanismen prövades.** Att den föll på ett enda
+> ägarkommando är metoden som fungerar, inte metoden som fallerar.
+
+**Vad som ändå står, och det är en riktig defekt:**
+
+```
+h-035, h-036, h-038, h-039:
+#!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
+```
+
+**Fyra av 29 grindar i `origin/main` bär en absolut Homebrew-sökväg med exakt
+patchversion.** Den fungerar **i dag** — men när Homebrew roterar `3.12.13_4` försvinner
+sökvägen och grindarna blir **okörbara**, inte röda. De kan då aldrig bli gröna igen utan
+en omfrysning.
+
+Det är alltså en **LATENT** värdbindning, inte en utlöst. Skillnaden är viktig: inget är
+trasigt just nu, och ingen runda har fallit på detta. Men en `brew upgrade` räcker, och
+den kommer.
+
+Jämför med resten av trädet: `h-037` har `#!/usr/bin/env python3`,
+`platform-separation-final-exit` har `#!/usr/bin/env python3.12`, `h-007` har
+`#!/usr/bin/env bash`. Samma repo, samma syfte, och bara fyra filer band värden.
+
+### Varför detta är dagens tyngsta enskilda fynd
+
+**`h-039` är en av de fyra.** Hypotesen med 30 omfrysningar och ett 2,1 MB stort exitprov
+har en shebang som pekar på en Homebrew-patchversion. Den har hållit hittills — men en
+enda pakethanteraruppdatering gör hypotesens hela historik omöjlig att köra om.
+
+Det ger `raddning/01-lagesbild.md` §1 en tredje mekanism utöver de två redan mätta:
+
+1. Grinden ändras varje runda (30 av 30 commits) → inget fast mål.
+2. Grinden pinnar trädet mot ett baskommit (FYND 21) → varje arbete någon annanstans fäller den.
+3. **Grinden pinnar värdmaskinens tolksökväg** → en pakethanteraruppdatering fäller den.
+
+Alla tre är samma fel i olika skepnader: **provet binder miljön i stället för egenskapen.**
+Det är exakt vad **regel 11** nu förbjuder, och fyndet gör regeln konkret på ett sätt som
+ingen prosa kunnat.
+
+### Åtgärd — och den är liten, till skillnad från allt annat
+
+Byt de fyra shebangarna till `#!/usr/bin/env python3.12`. Det är en enradsändring per
+fil. **Men de är frysta exitprov**, så ändringen kräver omfrysning — och därmed regel 11:s
+attributionssteg: detta är en **gatedefekt**, inte en kandidatdefekt, så samma kandidat
+körs om. Rundan bokförs inte mot kandidaten.
+
+**Omfrysningen är dessutom lagom:** den gör grinden mindre miljöbunden, vilket är riktningen
+regel 11 kräver. Det är skillnaden mot de omfrysningar som skapade trampkvarnen — de gjorde
+grindarna mer exakta, denna gör dem mindre värdbundna.
+
+**Verdikten för `h-007` och `h-035`–`h-038` är fortfarande OKÄNDA.** De måste köras om
+utan `timeout`. Tills dess står de som `OVERIFIERAT` — och den mätning som ska visa hur
+stort arbetet bakom väg A′ är saknas alltjämt.
+
+
+## 2026-09-16 — FYND 22: plattformsgrenen är INTE mergebar — beslutsloggen är raderad
+
+Granskning av den nu pushade grenen `nortropic/platform-integration-20260910`.
+
+**`docs/05-beslutslogg.md` finns inte på grenen.** Hela `docs/`-roten är tom; separationen
+klassade den numrerade serien som webb och tog bort den. Men filen är **kernel-dominerad**
+— `raddning/02-bevis.md` mätte 80 kernelomnämnanden och tio frysta grindar som läser den —
+och referenserna står kvar:
+
+```
+specs/tasks.spec.json          72 träffar på docs/05-beslutslogg.md
+controller/attest/cli
+verify/bin/h-007-exit          väntar sig $WS/docs/05-beslutslogg.md
+verify/bin/h-031..h-036-exit
+verify/bin/document-authority-exit
+```
+
+Ingen ersättningsfil finns i `docs/loop/`. Det är alltså **dinglande referenser från
+frysta grindar och från specen till en raderad fil på en trust-kritisk väg**.
+
+**Och det är FEM filer, inte en.** Mätt 2026-09-16 över `specs/`, `verify/bin/` och
+`controller/` på grenen:
+
+| Saknad fil | Refereras av |
+|---|---|
+| `docs/05-beslutslogg.md` | **17 filer** |
+| `docs/07-konstitution.md` | 9 (`h-035`, `h-036`, `h-037` m.fl.) |
+| `docs/03-regelverk.md` | 5 |
+| `docs/00-borja-har.md` | 4 |
+| `docs/agentoverlamning.md` | 2 |
+
+Samma körning gav falska positiver — `docs/loop/a.md`, `x.md`, `y.md`, `z.md`,
+`absent.md`, `neighbor.md` är testfixturer inne i grindarna. En vakt mot detta måste
+skilja fixtur från verklig referens; kravet står i `raddning/11-tre-vakter-mot-aterfall.md`.
+
+`platform-separation-final-exit` är ändå GRÖN — den prövar att webbträdet är borta, inte
+att det som blev kvar fortfarande hänger ihop. Det är inte ett fel i den grinden; det är
+en yta ingen grind täcker.
+
+**Konsekvens:** grenen kan inte mergas som den står. Antingen återställs
+`docs/05-beslutslogg.md` som kernelfil, eller så pekas tio kernelreferenser om — och det
+senare rör frysta grindar, alltså omfrysning under regel 11.
+
+**Detta är precis vad `raddning/06-inventering.md` §0 KRAV A varnade för:** `docs/` rot är
+DELAD, `05` är kernel-dominerad, och *"en fil vars lager är osäkert stannar"*. Separationen
+gjordes utan den fil-för-fil-domen.
+
+## 2026-09-16 — FYND 23: veckan dokumenterades inte ens på sin egen gren
+
+`drift.md` på plattformsgrenen slutar vid **2026-09-08**. De 55 commitsen 09-09→09-12 bär
+**noll rader**. Regel 22 följdes alltså inte heller — det var inte bara pushen som
+saknades, arbetet var odokumenterat även där det fanns.
+
+Beslutsloggen kan inte ens ha fått en rad: filen var borttagen från och med `49cc495`.
+
+**Det ger regel 12 sällskap av ett tyngre krav:** en regel som säger *"dokumentera i samma
+commit"* har funnits sedan starten (regel 22) och den höll inte i fem dagar av projektets
+viktigaste arbete. **Regler utan mekanism fäller ingenting.** Tre vakter med körda positiva
+kontrollprov står i `raddning/11-tre-vakter-mot-aterfall.md` — vakt 1 (regel 22) och
+vakt 2 (dinglande referenser) fäller bevisligen på exakt dessa två fynd.
+
+
+## 2026-09-16 — ÄGARBESLUT: loop-regel 11 och 12 införda
+
+Doktrinregel iv är nu **regel** och inte längre ett förslag i ett underlag.
+`docs/loop/regler.md` — kärnans egen regelbok, den som FYND 18 visade saknade allt skydd
+— bär två nya regler, beslutade av ägaren 2026-09-16.
+
+**Regel 11 — grinden pinnar EGENSKAPEN, aldrig trädet.** Ett exitprov får inte kräva
+byte-identitet med ett baskommit. Med följdreglerna 11a omfrysningsbudget (startbudget 3,
+observerad), 11b överskriden budget stoppar hypotesen, 11c `MÅLFLYTT` som eget
+attributionsutfall med `git diff` som prov, och 11d förbud mot grindkedjor som kräver
+andra grindars exakta poängsummor.
+
+**Regel 12 — finns det lokalt, finns det på git.** Ägarens ord: *"I min värld så ska det
+som finns lokalt, ska finnas på git."* Med krav vid dagens slut och vid överlämning, och
+den uttryckliga raden att `[LOCAL]`-märkning är ett kvalificeringsläge — aldrig ett skäl
+att inte pusha. Mekaniskt prov: `git status --short` och `git log --oneline @{u}..HEAD`
+båda tomma, annars förklarar drift-raden varför.
+
+Regel 12 hade ensam gjort dagens arkeologi onödig. Tre mätta instanser står i regeln:
+ingångsdokumenten, den opushade grenen med 55 commits, och backupens kontinuitetslager.
+
+**Kvarstår, och kan bara göras på fabriksmaskinen:** pusha grenen
+`nortropic/platform-integration-20260910` från `~/nortropic-repos/nortropic-system`.
+Den bär separationen och registerbytet och finns i dag på en enda disk.
+
+
+## 2026-09-16 — FYND 20: separationen ÄR gjord och verifierad — på en opushad gren
+
+`~/nortropic-repos/nortropic-system`, gren `nortropic/platform-integration-20260910`:
+**55 commits före `origin/main`, 0 bakom.** Rent arbetsträd, inga stashar. Spannet är
+**2026-09-09 → 09-12** — exakt den vecka FYND 16 visade som tom i detta lägesdokument.
+
+```
+49cc495  2026-09-10  [SEPARATION] ÄGARBESTÄLLD: bryt ut webbförvaltningen till separat repo
+```
+
+377 filer, **+15 022 / −90 414**. `workflows/`, `vendored-skills/ui-ux-pro-max/**` och hela
+webbträdet borta. Sex nya frysta grindar som main saknar:
+`platform-separation-final-exit` (4 131 rader), `platform-control-set-exit` (974),
+`platform-governance-exit` (842), `launch-cwd-exit` (665), `document-authority-exit` (604),
+`invariant-required-exit` (406).
+
+### Mätt på grenen, inte läst
+
+| Prov | Utfall |
+|---|---|
+| Webbfiler under `agents/skills/packs/backtests/workflows` | **0** |
+| `controller/verify/register.json` | **en** post, `check-invariants.mjs`, omskriven till *"plattformsinvariantgrind PINV-001–006"*; `nortropic-verify-suite.js` borta; registret under `denied_write` |
+| `verify/bin/platform-separation-final-exit` | **exit 0 — PASS** |
+| `verify/bin/invariant-required-exit` | **exit 0 — PASS** |
+
+**Den cirkulära trust-roten är alltså upplöst, och separationen är mekaniskt verifierad.**
+Det var `raddning/03-raddningsplan.md` steg 4 och 5, och de utfördes 2026-09-10.
+
+### DIAGNOSEN STÅR — det är ÅTGÄRDEN som ändras
+
+Mätt mot `origin/main` samma dag: **79 webbfiler kvar**, och registret pekar fortfarande
+på `workflows/nortropic-verify-suite.js`. Underlagets beskrivning av main är alltså
+korrekt och oförändrad. Skillnaden är att lösningen **redan finns byggd** — den är bara
+inte landad. Steg 4 och 5 går från *bygg* till *granska och landa*.
+
+### FYND 21: den strukturella grinddefekten, bevisad på sex grindar
+
+Tre av de nya grindarna är röda, och alla på samma grund:
+
+```
+FAIL g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only
+FAIL frozen_artifacts_identical_to_dae90c8f
+FAIL frozen_verify_bin_identical_to_base_383ed387
+RIG_ERROR: subject approved document mismatch: AGENTS.md
+```
+
+Ingen av dem prövar om arbetet är rätt. De kräver att trädet är **byte-identiskt med ett
+baskommit grenen redan passerat**:
+
+| Bas | Datum | Commits sedan | Ändrade `verify/bin`-filer |
+|---|---|---|---|
+| `512490d4` | 2026-09-10 | 40 | 5 |
+| `dae90c8f` | 2026-09-10 | 48 | 7 |
+| `383ed387` | 2026-09-10 | 44 | 6 |
+
+De är dessutom kedjade: `platform-governance` faller på
+`g7_platform_control_set_exit_68_of_68` och `g7_launch_cwd_exit_19_of_20` — den kräver
+andra grindars **exakta poängsummor**. En stale bas fäller en grind, som fäller varje
+grind som kräver dess utfall.
+
+**Detta är samma mekanism som H-039:s 30 omfrysningar, nu på sex oberoende grindar.** Det
+är inte en H-039-egenhet utan en konstruktionsdefekt i hur grindar skrivs: de fryser en
+ögonblicksbild av hela världen i stället för egenskapen de ska mäta. Varje arbete någon
+annanstans invaliderar dem alla.
+
+**Och facit ligger i samma katalog:** `platform-separation-final-exit` är GRÖN trots att
+trädet rört sig 40+ commits — för den prövar *att webbträdet är borta*, inte *att allt är
+identiskt med commit X*. En grind som mäter mekanismen passerar; fem som mäter miljön
+faller.
+
+Det förklarar också varför de 55 commitsen aldrig pushades. De är inte halvfärdiga av
+slarv — de sitter fast i en grindkonstruktion som inte kan vara grön två dagar i rad.
+
+**Doktrinregel iv (`raddning/03-raddningsplan.md` steg 1b) har därmed belägg långt bortom
+H-039, och den är nu paketets viktigaste post med bred marginal.** Att frysa om de fyra
+mot nuvarande bas vore runda N+1 och skulle falla igen vid nästa `verify/bin`-ändring.
+
+### ⚠️ Riskpost: 55 commits finns på EN plats
+
+Grenen är opushad och märkt `[LOCAL]` / `READY_FOR_LOCAL_QUALIFICATION_ONLY`. Den
+märkningen är avsiktlig och ska respekteras — men en disk är en disk. Backuprepots
+runbook säger att den ska bevara *"unpublished/dirty/untracked work"*; om grenen inte är
+säkrad där är det en täckningslucka som kostar sex dagars kernelarbete.
+
+
+## 2026-09-16 — Den skyddade klonen var övergiven sedan 10 augusti
+
+Undersökningen av det ospårade materialet i `~/nortropic/nortropic-system` är **stängd**.
+Klonen bär ingenting som `origin/main` saknar.
+
+```
+bakom origin/main: 493        före origin/main: 0
+HEAD = c9275554 "[LOOP] ÄGARHAND: installera Codex operating model v2"  (2026-08-10)
+```
+
+| Artefakt | Utfall |
+|---|---|
+| `h-031-exit`, `h-032-exit` | = historisk blob `d888a4d7` (2026-08-21) — gammal utcheckning |
+| `h-034-exit`, `h-035-exit` | = historisk blob `6c12820d` (2026-08-13) — gammal utcheckning |
+| `h-033-exit`, `python-interpreter-authority-v1-exit` | identiska med `origin/main` |
+| `specs/tasks.spec.json` | ocommittad, men **strikt delmängd**: 22 tasks mot mains 26; saknar `h-036`–`h-039` |
+
+Grindarna såg ospårade ut därför att de inte fanns i trädet vid `c9275554`. Filerna på
+disk är nyare än det utcheckade commit:et — en gammal utcheckning, inte nytt arbete.
+
+**Oberoende bekräftelse av inventeringens tyngsta fynd:** `h-027`–`h-030` saknas även i
+den lokala augustiversionen. Substitutionskedjan har alltså aldrig skrivits, på någon
+plats vi känner till. `raddning/06-inventering.md` §2 står.
+
+### Och det som gör detta till mer än städning
+
+**§A-skyddet pekade på den här klonen.** Varje `denyWrite`-sökväg var prefixad
+`/Users/elinhaggstrom/nortropic/nortropic-system/…` — en katalog som inte tagit emot en
+commit sedan 10 augusti, medan allt verkligt arbete skedde i `~/nortropic-repos/`
+(FYND 17, 30 worktrees 09-10→09-13).
+
+Sandboxen skyddade alltså en **övergiven** klon i fem veckor. FYND 18 sa att låset prövade
+var filen låg i stället för vad som hände med den; detta visar att det inte ens prövade
+rätt plats. Ägarbeslutet att öppna (`LOOP-ÄGARBESLUT-SANDBOX-OPEN`) vilar därmed på
+starkare grund än när det fattades.
+
+**Kvarstår:** samma prov är ännu inte kört mot den LEVANDE roten
+`~/nortropic-repos/nortropic-system`. Det är där §0c:s fråga — finns kernelarbete som
+main saknar — faktiskt ska ställas. `OVERIFIERAT` tills dess.
+
+
+## 2026-09-16 — INCIDENT vid policyinstallation + ospårat kernelarbete funnet
+
+**Policyn är nu installerad och verifierad identisk** mot källkopian på grenen
+`claude/inspiring-galileo-6w1pvw`. Men vägen dit bar två fynd.
+
+### Incidenten: okedjade kommandon installerade fel fil
+
+Ägaren fick ett kommandoblock med `cd` + `git checkout` + `sudo cp` **utan `&&`**.
+Utcheckningen misslyckades (lokala ändringar, se nedan), men `sudo cp` kördes ändå och
+kopierade den **föråldrade** källkopian över den installerade policyn. Maskinen blev
+därmed mer låst än före ändringen: versionstaket tillbaka, `github.com` bort ur
+nätverkslistan, alla 13 §A-lås tillbaka, godkännande per verktygsanrop tillbaka.
+
+Rättat genom att hämta filen ur grenen utan att röra arbetsträdet
+(`git show <gren>:config/managed-settings.json`) och installera om, `&&`-kedjat med en
+avslutande diff mot sig själv som kvitto.
+
+> **Regel:** kommandon som ändrar systemtillstånd ges alltid `&&`-kedjade. Ett
+> misslyckat steg får aldrig lämna de följande obevakade. Detta är samma klass som
+> `ODÖMBART`-algebran: ett steg som inte lyckades är inte ett steg som kan byggas vidare på.
+
+### Fyndet: frysta exitprov ligger OSPÅRADE i arbetsträdet
+
+`git checkout` vägrade — och gjorde rätt. Följande fanns lokalt men inte i målgrenen:
+
+```
+ändrad:    specs/tasks.spec.json
+ospårade:  verify/bin/h-031-exit  h-032-exit  h-033-exit  h-034-exit  h-035-exit
+           verify/bin/python-interpreter-authority-v1-exit
+           verify/h034/{build-recipe.json, identity-manifest.json, kernel}
+           specs/owner-production-paths.v1.json
+```
+
+**Det är frysta grindar och en ändrad taskspec som aldrig landat i git.** Det besvarar
+§0c:s fråga *"finns det kernelarbete som main saknar"* med ett preliminärt ja — och det
+ligger inte i backupen utan löst i arbetskatalogen.
+
+`OVERIFIERAT` tills det är undersökt: är det kvarglömt material från fällda rundor, eller
+arbete som aldrig committades? Skillnaden avgör om inventeringens restlista ändras.
+
+**Rör det inte.** `git checkout -f` och `git clean` raderar det. Att git vägrade är
+skyddet som fungerade — till skillnad från OS-lagret, som inte gjorde det (FYND 18).
+
+
+## 2026-09-16 — FYND 19: källkopian var INTE det som var installerat
+
+Diffen mot den installerade policyn kördes 2026-09-16 och **bekräftade driften** som
+FYND 17 markerade `OVERIFIERAT`. `config/managed-settings.json` i repot skilde sig från
+`/Library/Application Support/ClaudeCode/managed-settings.json` i **sex punkter**:
+
+| | Källkopian (repot) | Installerat (verkligheten) |
+|---|---|---|
+| `Bash(chmod:*)` | fanns | **borttagen** |
+| `allowUnsandboxedCommands` | `false` | **`true`** |
+| `filesystem.allowRead` | saknades | `["**/.env.example"]` |
+| `filesystem.allowWrite` | saknades | `["~/nortropic/worktrees"]` |
+| `credentials.files` | `~/.ssh`, `~/.config/gh`, `~/.aws` | **endast `~/.aws`** |
+| `network.allowedDomains` | 1 (`api.anthropic.com`) | **4** (+ `github.com`, `api.github.com`, `ssh.github.com`) |
+| `requiredMaximumVersion` | `2.1.224` | **borttagen** |
+
+Sex handgjorda ändringar hade gjorts på maskinen utan att källkopian följde med. Ingen
+mekanism jämförde dem — och Pass 1:s egen formulering, *"installeras därifrån, läses
+aldrig därifrån i drift"*, gjorde driften osynlig per konstruktion.
+
+**Det här är samma felklass som resten av projektet:** ett dokument antogs beskriva en
+mekanism, och beskrivningen prövades aldrig mot verkligheten. Skillnaden är att här var
+dokumentet en säkerhetspolicy.
+
+**Två av avvikelserna är dessutom upplysande.** `requiredMaximumVersion` var redan
+borttagen på maskinen — versionsbomben hade alltså redan detonerat en gång och rättats
+för hand. Och nätverkslistan hade vuxit till fyra domäner, vilket betyder att den
+ursprungliga enda domänen inte räckte för verkligt arbete.
+
+**Åtgärd:** den öppnade policyn är **ombyggd ur den INSTALLERADE filen**, inte ur den
+föråldrade källkopian. Annars hade installationen tyst återställt sex ändringar —
+däribland att ta bort `github.com` ur nätverkslistan och sätta tillbaka versionstaket.
+
+**Vad som faktiskt ändras på maskinen** (installerad → ny), och inget annat:
+
+```
+- disableBypassPermissionsMode: "disable"
+- 13 Edit()-lås på nortropic-system/**
+- Bash(chown:*)
+- sandbox.enabled: true → false
+```
+
+Allt annat i den installerade filen står kvar ordagrant: `allowUnsandboxedCommands: true`,
+`allowRead`, `allowWrite`, `~/.aws`-skyddet, de fyra nätverksdomänerna,
+`requiredMinimumVersion`, `DISABLE_AUTOUPDATER`.
+
+> **Stående regel härefter:** ändra aldrig den installerade policyn för hand utan att
+> commita samma ändring till `config/managed-settings.json` i samma drag. Källkopian är
+> värdelös som referens om den inte är sann — värre än värdelös, eftersom den läses som
+> om den vore det. Kör diffen före varje installation.
+
+
+## 2026-09-16 — FYND 18 + ÄGARBESLUT: OS-lagrets §A-lås borttagna
+
+**Fyndet först.** Policyns §A-lås skyddade **fel lager**, mätt:
+
+```
+docs/07-konstitution.md                kernel=0  webb=4
+docs/03-regelverk.md                   kernel=0  webb=8
+skills/.../eval-rubric.md              kernel=0  webb=5
+AUTOPILOT                              kernel=0  webb=0   (webbens §A6-kill-switch)
+docs/loop/regler.md  ← KÄRNANS regler  kernel=2  webb=0   ← SKYDDADES INTE
+```
+
+Samtliga låsta regelfiler är webbfabrikens. Kärnans egen regelbok hade noll skydd
+(`grep -c "loop/regler" config/managed-settings.json` = 0).
+
+**Och skyddet fungerade inte ens där det fanns.** `verify/**` och `specs/**` stod
+skrivskyddade — alltså kärnans arbetsyta, där test-author fryser grindar och tasks
+skrivs. Arbetet stoppades inte; det **flyttade till den oskyddade andra roten**
+(`~/nortropic-repos/`, 30 worktrees 09-10→09-13, FYND 17). Samtidigt flyttade H-039 sin
+grind i 30 av 30 commits trots låset. **Låset prövade var filen låg, inte vad som hände
+med den** — samma sjukdom som resten av projektet: miljön mättes, inte mekanismen.
+
+Pass 1 såg problemet halvvägs och undantog `controller/**` uttryckligen *"annars vore
+h-001–h-007 obyggbara av sitt eget skydd"*, men lät `specs/` och `verify/` stå kvar.
+
+**Ägarbeslutet 2026-09-16:** öppna. Ändringar i `config/managed-settings.json`:
+
+| Bort | Skäl |
+|---|---|
+| 13 `Edit()`-lås på `nortropic-system/**` | Skyddade webblagret; `specs/`+`verify/` blockerade kärnans eget arbete |
+| `disableBypassPermissionsMode` | Tvingade godkännande per verktygsanrop — mest begränsande raden för obevakad drift |
+| `Bash(chmod:*)`, `Bash(chown:*)` | Vanligt arbete (`chmod +x`), ingen skyddsyta |
+| `sandbox.enabled: true → false` | **Nästlingen bort.** Kärnans egen Seatbelt i `controller/launch/cli` är den som ska prövas; inuti en yttre sandbox blir verdikten `ODÖMBART` i stället för PASS/FAIL |
+| `requiredMaximumVersion` | `min==max==2.1.224` gjorde att en enda uppdatering av Claude Code får varje session att VÄGRA STARTA. Golvet kvar, taket bort |
+
+| Kvar | Skäl |
+|---|---|
+| `Read()`-lås på `~/.ssh`, `~/.aws`, `~/.config/gh`, `**/.env`, `**/*.pem`, `.claude.json` | Nycklar och tokens. Begränsar inget arbete, minskar skadeytan |
+| `Bash(sudo/su/dscl/visudo/launchctl)` | Systemnivå. Det var så 5Z-installationen uppstod och fick rivas |
+| `Bash(git push --force/-f)` | `NO_FORCE_SEMANTICS=YES` är ägarregel i delegationen, inte en sandboxpreferens |
+
+**Vad kärnan skyddas av nu — skriv inte om detta:** frysta exitprov, rollseparation,
+`allowed_write` per task, attestation, och **omfrysningsbudgeten** (doktrin iv,
+`raddning/03-raddningsplan.md` steg 1b). Den sista är den som faktiskt gör jobbet OS-lagret
+aldrig kunde: en filrättighet ser en skrivning, inte ett mönster över tid, och det var
+mönstret — 30 omfrysningar — som var felet.
+
+**⚠️ OVERIFIERAT tills det prövas på Macen.** Med `sandbox.enabled=false` blir
+`sandbox.filesystem`, `sandbox.network` och `sandbox.credentials` inerta.
+`permissions.deny` ligger utanför sandboxblocket och ska fortfarande gälla — **men det är
+ett påstående om mekanismen, inte ett bevis.** Pröva efter installation:
+
+```bash
+# 1. SKA NEKAS — nyckelskyddet måste hålla utan sandbox
+cat ~/.ssh/id_ed25519
+
+# 2. SKA TILLÅTAS — kärnans arbetsyta ska vara öppen (ändrar inget, öppnar bara)
+python3 -c "open('specs/tasks.spec.json','a').close(); print('skrivbar')"
+
+# 3. Nätverket är nu ÖPPET (allowlistan är inert). Bekräfta medvetet:
+curl -sS -o /dev/null -w '%{http_code}
+' https://example.com
+```
+
+Håller inte prov 1 är beslutet fel implementerat — rapportera, installera inte om.
+
+**Installation kräver root och är ägarens hand:**
+```bash
+sudo cp config/managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+Kör **diffen mot den installerade filen först** — den kan ha driftat från källkopian, och
+ingen mekanism jämför dem (FYND 17).
+
+
+## 2026-09-16 — FYND 17: en andra klonrot ligger utanför §A-skyddet
+
+Arbetsklonens sökväg lokaliserades på ägarens maskin. Utfallet var inte en sökväg utan
+**två klonrötter med tillhörande worktree-träd**:
+
+| Rot | Worktrees | Datering på worktrees |
+|---|---|---|
+| `/Users/elinhaggstrom/nortropic/nortropic-system` | `~/nortropic/worktrees/` — 32 st | 2026-09-09 → 09-10 |
+| `/Users/elinhaggstrom/nortropic-repos/nortropic-system` | `~/nortropic-repos/work/` — 30 st | 2026-09-10 → 09-13 |
+
+**Sandboxpolicyns källkopia skyddar bara den första.** Varje §A-sökväg i
+`config/managed-settings.json` är absolut och prefixad
+`/Users/elinhaggstrom/nortropic/nortropic-system/…` — `docs/07-konstitution.md`,
+`docs/03-regelverk.md`, `CLAUDE.md`, `AUTOPILOT`, `specs`, `verify`, `workflows`,
+`tests/fixtures`, `scripts/check-invariants.mjs`, två skills-referenser.
+
+```bash
+grep -c "nortropic-repos" config/managed-settings.json   # 0
+grep -rln "nortropic-repos" --include=* .                # inga träffar i hela repot
+```
+
+**Konsekvens:** en agent som arbetar i `~/nortropic-repos/nortropic-system` kan skriva i
+`docs/07-konstitution.md` — en human-only §A8-yta — utan att OS-lagret hindrar det.
+Skyddet är sökvägsbundet, och sökvägsantagandet är odokumenterat. Pass 1 (2026-08-07)
+bevisade §A-blockeringen med `PermissionError [Errno 1] EPERM` från Seatbelt; det beviset
+gäller den roten, inte den andra.
+
+Att 30 worktrees under den oskyddade roten är daterade 09-10 → 09-13 visar att arbete
+faktiskt skett där.
+
+**OVERIFIERAT och avgörande:** `config/managed-settings.json` är en **källkopia**.
+Beslutsloggen (LOOP-PASS1) säger uttryckligen *"installeras därifrån, läses aldrig
+därifrån i drift"*. Vad den INSTALLERADE policyn i
+`/Library/Application Support/ClaudeCode/managed-settings.json` innehåller går inte att
+avgöra härifrån — och **ingen mekanism jämför de två**. Det är ett andra fynd i samma
+familj: en källkopia som antas beskriva det installerade.
+
+Prov på Macen:
+```bash
+grep -c nortropic-repos "/Library/Application Support/ClaudeCode/managed-settings.json"
+diff <(python3 -m json.tool config/managed-settings.json) \
+     <(python3 -m json.tool "/Library/Application Support/ClaudeCode/managed-settings.json")
+```
+
+Noll träffar i den installerade filen bekräftar att den andra roten är oskyddad.
+En diff som inte är tom är ett eget fynd oavsett utfall.
+
+**Åtgärd kräver ägarbeslut** (§A-yta + managed scope kräver root = mänsklig ceremoni):
+antingen utvidgas policyn till båda rötterna, eller så avvecklas den andra roten. Inget
+av det görs av en agent.
+
+
+## 2026-09-16 — FYND 15 STÄNGT: ägarmandatet 2026-09-09 bekräftat och infört
+
+Ägaren bekräftade i session 2026-09-16 (*"1. JA"*) mandatet som stod ordagrant i
+backuprepots continuity-dokument men saknades helt här. Infört i
+`docs/05-beslutslogg.md` som `LOOP-ÄGARMANDAT-0909`, och i
+`raddning/05-arbetsordning.md` §1 bredvid delegationen från 2026-08-13.
+
+Mandatet är **senare och bredare**: arbetet fram till supervisor resume, med uttrycklig
+rätt att uppdatera dokumentation. Det stod i fem veckor enbart i ett annat repo — därav
+att sessioner sökt godkännanden som redan fanns.
+
+**Det upphäver ingenting mekaniskt:** inga frysta grindar, ingen `allowed_write`, ingen
+sandbox, ingen attestation, ingen §A-regel, och `SELF_CERTIFICATION_AS_PROOF=NO` gäller
+oförändrat. De fyra äkta mänskliga stoppen står kvar.
+
+Auktoritetsluckan i FYND 15 är därmed stängd. FYND 14 och 16 är åtgärdade i routrarna.
+
+## 2026-09-16 — ÖPPEN: arbetsklonens sökväg är odokumenterad
+
+Ägaren körde inventeringskommandona mot `~/nortropic-system` och katalogen finns inte:
+`cd: no such file or directory: /Users/elinhaggstrom/nortropic-system`. **Ingenstans i
+detta repo står var arbetsklonen ligger på fabriksmaskinen.** Backuprepots
+continuity-dokument nämner `/Users/elinhaggstrom/nortropic-backups-20260910/…` för
+backupmaterialet, men inte kernelklonen.
+
+Det är samma klass som FYND 14: en förutsättning som varje session behöver finns bara i
+någons huvud. Sökvägen skrivs in här så snart den är fastställd — `find`-kommandot står i
+`raddning/06-inventering.md` §0c.
+
+
+## 2026-09-16 — Backuprepot lokaliserat: tre fynd, varav ett i auktoritetskedjan
+
+`Nortropic/nortropic-backups` (repo-ID 1367371291, senast pushat 2026-09-13) är
+**inte** en kopia av detta repo utan ett backupmål: git bär katalog, checksummor och
+återställningskvitton, arkiven ligger som Release assets och följer inte med en klon.
+Inventeringens historikmätningar mot `origin/main` står därmed oförändrade — frågan
+"är backupen en delmängd av main" hade fel form.
+
+**FYND 14 — kärnan kände inte till sin egen backup.** `grep -rn "nortropic-backups\|1367371291"`
+gav noll träffar i hela repot. En ny session kunde inte upptäcka backupen, runbooken
+eller kontinuitetslagret. Åtgärdat: `CLAUDE.md` och `AGENTS.md` namnger nu repot och ID:t.
+
+**FYND 15 — ett ägarmandat från 2026-09-09 saknas i beslutsloggen.** Ordagrant i
+backupens `continuity/20260912-backup-routine/BOOTSTRAP-WORKING-METHOD.md`: *"Du har mitt
+fulla godkännande att göra det du anser fram till supervisor resume, arbeta mot
+slutmålet."* Mätt här: `grep -c "2026-09-09" docs/05-beslutslogg.md` = 0, och ingen
+träff på mandatets ordalydelse någonstans i repot. En agent som läser repot har alltså
+MINDRE befogenhet än ägaren gett — en direkt orsak till att godkännanden söks som redan
+finns. **OVERIFIERAT och INTE infört av denna session:** att bredda sin egen befogenhet
+ur en text i ett annat repo är vad `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder. Ägarens
+hand krävs för att föra in raden i `docs/05-beslutslogg.md`. Tills dess gäller
+delegationen från 2026-08-13.
+
+**FYND 16 — en fjärde statusplats, mätbar som en lucka.** Backupens
+`BOOTSTRAP-DISK-CLEANUP-JOURNAL.md` bär "senaste faktiska resultat" och
+`CLAUDE-CHECKPOINT-20260910-INVARIANT-REQUIRED.md` bär operativt sessionsminne.
+Fönstret 2026-09-09→09-13: **`nortropic-backups` 27 commits · `nortropic-system` 0
+commits och 0 drift-rader.** Fem dagars arbete utan spår i kärnans lägesdokument;
+regeln "läget står i drift.md" var falsk för den veckan. Detta är tredje instansen av
+projektets grundfel — kunskap i ett lager nästa session inte läser. Åtgärd är INTE att
+flytta filerna: backupdokumenten hör hemma där de är. Det som fattas är **en rad här per
+backupsession**. Införd som regel i `CLAUDE.md` och `AGENTS.md`.
+
+**Kvarstående, ej prövat:** backupen bevarar enligt sin runbook *"unpublished/dirty/
+untracked/generated work"*. Vad den faktiskt innehåller är oinventerat — Release-assets
+hämtas inte av en klon och `catalogue.json` pekar på en lokal rot som bara finns på
+Macen. Fråga: finns kernelarbete i backupen som main saknar, och är något av det en
+färdig kandidat? Är svaret ja ändras inventeringens restlista. Prov i
+`raddning/06-inventering.md` §0c.
+
+
+## 2026-09-16 — Räddningsunderlaget landat i repot + konvergensfyndet
+
+Underlaget som svarar på *"varför kommer vi aldrig i mål"* ligger nu i
+`docs/loop/raddning/`, inte i en tarboll hos ägaren. Skälet är underlagets eget fynd 2:
+uppdateringar har gått till det lager bara en pågående session läser, aldrig till det
+lager varje ny session läser först. `CLAUDE.md` och `AGENTS.md` pekar hit.
+
+**Tyngsta fyndet, mätt beteendemässigt och inte lexikalt:** `verify/bin/h-039-exit`
+ändrades i var och en av sina 30 commits, 200 798 → 2 136 969 byte, noll minskningar.
+Ingen kandidat har någonsin prövats mot ett oförändrat prov, och konvergens kräver ett
+fast mål. Diskriminanten gäller alla gates: varje KLAR task har en grind som rörts ≤ 3
+gånger (h-016: 1, h-013/017/038: 2, h-001/036: 3), varje ICKE-KLAR en som rörts 17–147
+(h-035: 17, h-039: 30, h-032: 120, h-031: 147). Ingen mellanform.
+Kommando: `git log --oneline --follow -- verify/bin/<task>-exit | wc -l`.
+
+**RÄTTELSE:** den tidigare förklaringen i underlaget — att rundorna brinner på miljödrift
+(`st_dev`, dev_t, `com.apple.provenance`) — var härledd ur ORDVAL i commit-titlar och
+gäller fyra rundor av 26. Två körningar med olika ordlistor gav `36 av 37` respektive
+`5 av 26` för samma kategori; måttet mätte ordlistan. Den klassningen är kasserad.
+
+**Nytt prov:** `docs/loop/raddning/artefakter/validera-underlaget.sh` prövar 37 av
+underlagets tal mot repot, verdikt per rad, exit 0/1/2 enligt samma algebra som
+`controller/verify/cli`. Mutationsprövad: fel förväntat tal → `AVVIKER` + exit 1, saknad
+grindfil → `ODÖMBART` + exit 2. Baslinje 2026-09-16 (Linux): `BEKRÄFTAT 37 · AVVIKER 0 ·
+ODÖMBART 2`, där de två odömbara är plattformsbundna och ska falla ut på Macen.
+
+**BEKRÄFTAT 2026-09-16 mot `d30279c`, metod: grindfilernas commit-historik** — 37
+påståenden, se körningen i `raddning/artefakter/`.
+
+**Vaktsviten: `PASS — 23/23 vakter gröna och SJÄLVKVITTERADE`**, körd i denna klon mot
+grenen. `check-foundation-smoke.mjs` passerar därför att klonens `origin` ÄR
+`Nortropic/nortropic-system`; den grinden prövar remote-URL:en, inte mekanismen, och
+faller i varje klon med annan origin. Det är miljöbundet men inte odömbart här.
+
+`check-v4-utkast.mjs` FÄLLDE först, och korrekt: underlagets
+`04-fallor-och-doktrin.md` namngav v4-utkastet och blev därmed en KONSUMENT av ett
+`NOT_PRODUCTION`-mått. Vakten letar tre strängar i varje spårad fil och skiljer inte på
+att nämna och att använda — den ska inte göra det. Texten skrevs om utan markörerna och
+bär nu varningen i sig själv. Dokumentationspatchen togs ur repot av samma skäl plus
+redundans: de fyra commitsen är redan pushade.
+
+**Kvar som OVERIFIERAT:** kernelgatarna. 18 av 24 faller på `undefined symbol: sysctl` i
+Linux — `bash verify/bin/h-013-exit` (h-014:s beroende) kan bara dömas på Macen.
+
+**Nästa steg:** steg 0 i `raddning/00-LAS-FORST.md` — avgör backup-repot (`git log
+origin/main..HEAD` mot backupen) och nollmät kontinuiteten. Därefter
+`verify/bin/autonomous-loop-exit`, fryst RED, FÖRE doktrinregel iv.
+
+
 ## 2026-09-08 — H-039 R33/R15 exact receipt-provenance profile
 
 Published R32 `9b9a638b…`, its product and full publication closure remain
