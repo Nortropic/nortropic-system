@@ -247,7 +247,19 @@ for d in $(find ~ -maxdepth 5 -type d -name .git 2>/dev/null); do
 done
 ```
 
-Misstänkta platser enligt repots egen dokumentation: `~/.claude` (i drift **är** denna
+**SVARET 2026-09-16 — det är TVÅ rötter, inte en:**
+
+| Rot | Worktrees | Skyddad av `managed-settings.json`? |
+|---|---|---|
+| `~/nortropic/nortropic-system` | `~/nortropic/worktrees/` (32) | **JA** — alla §A-sökvägar är prefixade hit |
+| `~/nortropic-repos/nortropic-system` | `~/nortropic-repos/work/` (30) | **NEJ** — noll träffar på `nortropic-repos` i policyn OCH i hela repot |
+
+Det är FYND 17 (`drift.md` 2026-09-16): §A-skyddet är sökvägsbundet, och en agent i den
+andra roten kan skriva i `docs/07-konstitution.md` utan att OS-lagret hindrar det.
+**Avgör vilken rot som är den aktuella innan något annat inventeras**, och kör den
+installerade-mot-källkopia-diffen i samma svep.
+
+Ursprungligen misstänkta platser enligt repots egen dokumentation: `~/.claude` (i drift **är** denna
 katalog repo-roten), `~/nortropic/`, `~/Documents/`, `~/nortropic-backups-20260910/`.
 
 **Hittas flera kloner är det i sig ett fynd** — då finns divergerande arbetskopior, och

@@ -1,5 +1,57 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 17: en andra klonrot ligger utanför §A-skyddet
+
+Arbetsklonens sökväg lokaliserades på ägarens maskin. Utfallet var inte en sökväg utan
+**två klonrötter med tillhörande worktree-träd**:
+
+| Rot | Worktrees | Datering på worktrees |
+|---|---|---|
+| `/Users/elinhaggstrom/nortropic/nortropic-system` | `~/nortropic/worktrees/` — 32 st | 2026-09-09 → 09-10 |
+| `/Users/elinhaggstrom/nortropic-repos/nortropic-system` | `~/nortropic-repos/work/` — 30 st | 2026-09-10 → 09-13 |
+
+**Sandboxpolicyns källkopia skyddar bara den första.** Varje §A-sökväg i
+`config/managed-settings.json` är absolut och prefixad
+`/Users/elinhaggstrom/nortropic/nortropic-system/…` — `docs/07-konstitution.md`,
+`docs/03-regelverk.md`, `CLAUDE.md`, `AUTOPILOT`, `specs`, `verify`, `workflows`,
+`tests/fixtures`, `scripts/check-invariants.mjs`, två skills-referenser.
+
+```bash
+grep -c "nortropic-repos" config/managed-settings.json   # 0
+grep -rln "nortropic-repos" --include=* .                # inga träffar i hela repot
+```
+
+**Konsekvens:** en agent som arbetar i `~/nortropic-repos/nortropic-system` kan skriva i
+`docs/07-konstitution.md` — en human-only §A8-yta — utan att OS-lagret hindrar det.
+Skyddet är sökvägsbundet, och sökvägsantagandet är odokumenterat. Pass 1 (2026-08-07)
+bevisade §A-blockeringen med `PermissionError [Errno 1] EPERM` från Seatbelt; det beviset
+gäller den roten, inte den andra.
+
+Att 30 worktrees under den oskyddade roten är daterade 09-10 → 09-13 visar att arbete
+faktiskt skett där.
+
+**OVERIFIERAT och avgörande:** `config/managed-settings.json` är en **källkopia**.
+Beslutsloggen (LOOP-PASS1) säger uttryckligen *"installeras därifrån, läses aldrig
+därifrån i drift"*. Vad den INSTALLERADE policyn i
+`/Library/Application Support/ClaudeCode/managed-settings.json` innehåller går inte att
+avgöra härifrån — och **ingen mekanism jämför de två**. Det är ett andra fynd i samma
+familj: en källkopia som antas beskriva det installerade.
+
+Prov på Macen:
+```bash
+grep -c nortropic-repos "/Library/Application Support/ClaudeCode/managed-settings.json"
+diff <(python3 -m json.tool config/managed-settings.json) \
+     <(python3 -m json.tool "/Library/Application Support/ClaudeCode/managed-settings.json")
+```
+
+Noll träffar i den installerade filen bekräftar att den andra roten är oskyddad.
+En diff som inte är tom är ett eget fynd oavsett utfall.
+
+**Åtgärd kräver ägarbeslut** (§A-yta + managed scope kräver root = mänsklig ceremoni):
+antingen utvidgas policyn till båda rötterna, eller så avvecklas den andra roten. Inget
+av det görs av en agent.
+
+
 ## 2026-09-16 — FYND 15 STÄNGT: ägarmandatet 2026-09-09 bekräftat och infört
 
 Ägaren bekräftade i session 2026-09-16 (*"1. JA"*) mandatet som stod ordagrant i
