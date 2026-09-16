@@ -63,10 +63,10 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
    Overifierat märks OVERIFIERAT. "Klart" sägs aldrig utan kört exit-test.
 
    **8a. Bevis är ytbundet — ett grönt prov bevisar bara det provet läser.**
-   *(⚠️ PROVENIENS: föreslagen av Claude 2026-09-16, INTE beslutad av ägaren. Denna fil
-   säger "ändras endast av Johnny" — att jag ändå skrev in den är samma mekanism som
-   gav 470 av 587 beslutsrader utan ägarhand. Står tills ägaren auktoriserar eller
-   stryker.)*
+   **Auktoriserad av Johnny 2026-09-16** (`LOOP-ÄGARBESLUT-REGEL-8A`), efter att
+   provenienssaknaden lagts fram: regeln skrevs först av Claude i en fil som säger
+   "ändras endast av Johnny". Det felet är samma mekanism som gav 470 av 587
+   beslutsrader utan ägarhand, och det är bokfört i `docs/loop/drift.md` FYND 36.
    Tillagt 2026-09-16 efter att jag citerat `kor-vakter PASS 23/23` i **tolv** commits
    som inte rörde en enda fil någon av de 23 vakterna läser — inklusive commiten som
    skrev FYND 31, vars hela innehåll är att den siffran inte bevisar kernelarbete.
