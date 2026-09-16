@@ -1,12 +1,38 @@
 #!/usr/bin/env bash
 # h-003-exit — skiva 3 (attestationer + stale-markering)
-# Kontrakt: controller/attest/cli <dir> write <task> <sha>
-#           controller/attest/cli <dir> read <task> [--require-valid]
-#           controller/attest/cli <dir> invalidate <sha>
+# Legacy-kontrakt:
+#   controller/attest/cli <dir> write <task> <sha> [<grind-id> <grind-sha256>]
+#   controller/attest/cli <dir> read <task> [--require-valid]
+#   controller/attest/cli <dir> invalidate <sha>
+# Generic authority-generation:
+#   controller/attest/cli <dir> begin-authority <opaque-id>
+#   controller/attest/cli <dir> write-provisional <opaque-id> <task> <sha>
+#       [<grind-id> <grind-sha256>]
+#   controller/attest/cli <dir> authority-current <opaque-id>
+#   controller/attest/cli <dir> read-authority <opaque-id>
+#   controller/attest/cli <dir> read <task> --require-authority <opaque-id>
+#   controller/attest/cli <dir> finalize-authority <opaque-id>
 # Katalogen anges av anroparen, aldrig av komponenten (h-001-formen).
 . "$(dirname "$0")/_lib.sh"
-CLI="controller/attest/cli"
-krav_komponent "$CLI"
+if [ "$#" -eq 0 ]; then
+  CLI="controller/attest/cli"
+  krav_komponent "$CLI"
+elif [ "$1" = "--gate-review-subject" ] && [ "$#" -ge 2 ]; then
+  shift
+  GATE_REVIEW_SUBJECT=("$@")
+  if [ ! -x "${GATE_REVIEW_SUBJECT[0]}" ]; then
+    echo "FAIL  K0 gate-review-subject — ${GATE_REVIEW_SUBJECT[0]} saknas eller är inte körbar"
+    echo; echo "0 PASS, 1 FAIL"
+    exit 1
+  fi
+  gate_review_subject() { "${GATE_REVIEW_SUBJECT[@]}" "$@"; }
+  CLI="gate_review_subject"
+  ok "K0 explicit disposable gate-review-subject är startbar"
+else
+  echo "SKIP  K0 harness — enda standardanropet har noll argument; --gate-review-subject är test-author-falsifiering"
+  echo; echo "0 PASS, 0 FAIL, ODÖMBART"
+  exit 2
+fi
 
 WORK="$(temp_kat)" || { echo "FAIL  harness — temp-katalog kunde inte skapas"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
@@ -95,4 +121,471 @@ else
     ok "K7 omtest köas vid stale och töms av ny attestation"
   fi
 fi
+
+# ========== Authority-generation + serialized mutation ordering ===============
+#
+# Barrierprotokollet är ENDAST en gate-owned scheduling seam. Det är aldrig
+# authority och föreskriver inte flock/CAS/databas/rename. En mutator som får
+# de fyra variablerna nedan skapar <dir>/ready vid vald before-observe eller
+# after-observe-gräns och väntar på <dir>/continue. Håller en
+# serialiserad implementation sitt lås där får den konkurrerande mutationen
+# blockera; slutlig effekt, inte ordningen som råkade vinna, är domen.
+
+PY3="$(command -v python3)"
+
+giltig() {
+  "$CLI" "$1" read "$2" --require-valid >/dev/null 2>&1
+}
+
+bunden() {
+  "$CLI" "$1" read "$2" --require-authority "$3" >/dev/null 2>&1
+}
+
+aktuell() {
+  "$CLI" "$1" authority-current "$2" >/dev/null 2>&1
+}
+
+authority_snapshot_kind() {
+  ask_ut=$("$CLI" "$1" read-authority "$2" 2>/dev/null) || return 1
+  "$PY3" - "$ask_ut" "$2" "$3" <<'PYSNAPSHOT'
+import json
+import sys
+
+try:
+    value = json.loads(sys.argv[1])
+    authority = sys.argv[2]
+    count = int(sys.argv[3])
+    publications = value["publications"]
+except Exception:
+    raise SystemExit(1)
+if (
+    not isinstance(value, dict)
+    or value.get("authority_id") != authority
+    or value.get("current") is not True
+    or not isinstance(publications, list)
+    or len(publications) != count
+):
+    raise SystemExit(1)
+expected = {"atomic-{}".format(index) for index in range(1, count + 1)}
+tasks = {item.get("task") for item in publications if isinstance(item, dict)}
+if tasks != expected or any(item.get("stale") is not False for item in publications):
+    raise SystemExit(1)
+statuses = {item.get("status") for item in publications}
+phase = value.get("phase")
+if statuses == {"PROVISIONAL"} and phase == "PROVISIONAL":
+    print("P")
+elif statuses == {"VALID"} and phase == "FINALIZED":
+    print("V")
+else:
+    print("X")
+PYSNAPSHOT
+}
+
+i_ko_task() {
+  "$PY3" -c 'import json,sys
+try: d=json.load(open(sys.argv[1]))
+except Exception: sys.exit(2)
+sys.exit(0 if sys.argv[2] in d.get("omtest_ko",[]) else 1)' "$1" "$2"
+}
+
+wait_ready() {
+  wr_dir="$1"
+  wr_pid="$2"
+  wr_i=0
+  while [ "$wr_i" -lt 120 ]; do
+    [ -e "$wr_dir/ready" ] && return 0
+    kill -0 "$wr_pid" 2>/dev/null || return 1
+    sleep 0.05
+    wr_i=$((wr_i + 1))
+  done
+  return 1
+}
+
+slapp_barrier() {
+  : > "$1/continue"
+}
+
+stoppa_barrier_process() {
+  sb_dir="$1"
+  sb_pid="$2"
+  slapp_barrier "$sb_dir"
+  kill "$sb_pid" 2>/dev/null || true
+  wait "$sb_pid" 2>/dev/null || true
+}
+
+SHA8A="1111111111111111111111111111111111111111"
+SHA8B="2222222222222222222222222222222222222222"
+SHA11A="3333333333333333333333333333333333333333"
+SHA11B="4444444444444444444444444444444444444444"
+SHA12A="5555555555555555555555555555555555555555"
+SHA12B="6666666666666666666666666666666666666666"
+AUTH8="opaque-generation.alpha-not-a-lease"
+AUTH10="opaque-generation.beta-not-a-lease"
+
+# K8: positivt authority-ankare. Ett alltid-failande authority-read får inte
+# belönas av de senare negativa kontrollerna.
+D8="$WORK/authority-basic"
+"$CLI" "$D8" write legacy-anchor "$ANNAT" >/dev/null 2>&1
+r8b=0; "$CLI" "$D8" begin-authority "$AUTH8" >/dev/null 2>&1 || r8b=$?
+r8w=0; "$CLI" "$D8" write-provisional "$AUTH8" authority-a "$SHA8A" >/dev/null 2>&1 || r8w=$?
+r8raw=0; "$CLI" "$D8" read authority-a 2>/dev/null | grep -q "$SHA8A" || r8raw=$?
+if [ "$r8b" -eq 0 ] \
+   && [ "$r8w" -eq 0 ] \
+   && [ "$r8raw" -eq 0 ] \
+   && aktuell "$D8" "$AUTH8" \
+   && bunden "$D8" authority-a "$AUTH8" \
+   && ! bunden "$D8" authority-a "wrong-$AUTH8" \
+   && ! giltig "$D8" authority-a; then
+  ok "K8 provisional: aktuell opaque authority är läsbar endast authority-bundet"
+else
+  no "K8 provisional authority" "begin/write/read/current/bound=$r8b/$r8w/$r8raw; provisional blev giltig, authority-read failar eller fel id godtogs"
+fi
+
+# K9: multi-publication FINALIZE är den positiva validity-övergången. En write
+# efter finalize får inte smyga in en ny delpublication.
+r9w=0; "$CLI" "$D8" write-provisional "$AUTH8" authority-b "$SHA8B" >/dev/null 2>&1 || r9w=$?
+r9f=0; "$CLI" "$D8" finalize-authority "$AUTH8" >/dev/null 2>&1 || r9f=$?
+r9late=0; "$CLI" "$D8" write-provisional "$AUTH8" authority-late "$SHA11A" >/dev/null 2>&1 || r9late=$?
+if [ "$r9w" -eq 0 ] \
+   && [ "$r9f" -eq 0 ] \
+   && giltig "$D8" authority-a \
+   && giltig "$D8" authority-b \
+   && bunden "$D8" authority-a "$AUTH8" \
+   && [ "$r9late" -ne 0 ] \
+   && ! giltig "$D8" authority-late; then
+  ok "K9 finalize: hela multi-publication-setet blir VALID och stängs atomiskt"
+else
+  no "K9 multi-finalize" "write/finalize/late=$r9w/$r9f/$r9late eller publication-setet blev inte exakt giltigt"
+fi
+
+# K10: ny BEGIN fencar all äldre bound authority men rör aldrig legacy-unbound.
+# Zero-publication är ett uttryckligt positivt ankare från owner-resolutionen.
+r10b=0; "$CLI" "$D8" begin-authority "$AUTH10" >/dev/null 2>&1 || r10b=$?
+r10oldw=0; "$CLI" "$D8" write-provisional "$AUTH8" authority-old "$SHA11A" >/dev/null 2>&1 || r10oldw=$?
+r10oldf=0; "$CLI" "$D8" finalize-authority "$AUTH8" >/dev/null 2>&1 || r10oldf=$?
+r10zero=0; "$CLI" "$D8" finalize-authority "$AUTH10" >/dev/null 2>&1 || r10zero=$?
+if [ "$r10b" -eq 0 ] \
+   && aktuell "$D8" "$AUTH10" \
+   && giltig "$D8" legacy-anchor \
+   && ! giltig "$D8" authority-a \
+   && ! bunden "$D8" authority-a "$AUTH8" \
+   && [ "$r10oldw" -ne 0 ] \
+   && [ "$r10oldf" -ne 0 ] \
+   && [ "$r10zero" -eq 0 ]; then
+  ok "K10 begin/fence: äldre authority dör, legacy står kvar och tom generation kan finaliseras"
+else
+  no "K10 begin/fence" "begin/old-write/old-finalize/zero-finalize=$r10b/$r10oldw/$r10oldf/$r10zero eller legacy/authority-fencing brast"
+fi
+
+# K11: SHA-global invalidate efter finalize är selektiv, köar träffen och lämnar
+# annan publication i samma aktuella generation giltig.
+D11="$WORK/authority-invalidate"
+A11="opaque-generation.selective"
+"$CLI" "$D11" begin-authority "$A11" >/dev/null 2>&1
+"$CLI" "$D11" write-provisional "$A11" selective-a "$SHA11A" >/dev/null 2>&1
+"$CLI" "$D11" write-provisional "$A11" selective-b "$SHA11B" >/dev/null 2>&1
+r11f=0; "$CLI" "$D11" finalize-authority "$A11" >/dev/null 2>&1 || r11f=$?
+r11i=0; "$CLI" "$D11" invalidate "$SHA11A" >/dev/null 2>&1 || r11i=$?
+if [ "$r11f" -eq 0 ] \
+   && [ "$r11i" -eq 0 ] \
+   && ! giltig "$D11" selective-a \
+   && giltig "$D11" selective-b \
+   && i_ko_task "$D11/attestations.json" selective-a; then
+  ok "K11 invalidate: finalized batch blir selektivt stale och omtest köas"
+else
+  no "K11 authority-invalidate" "finalize/invalidate=$r11f/$r11i; träff, annan publication eller omtest-kö fel"
+fi
+
+# K12: stale medlem gör hela ännu ofinaliserade batchen ofinaliserbar. En
+# implementation som finaliserar de friska posterna partiellt fälls här.
+D12="$WORK/authority-stale-batch"
+A12="opaque-generation.stale-batch"
+r12b=0; "$CLI" "$D12" begin-authority "$A12" >/dev/null 2>&1 || r12b=$?
+r12a=0; "$CLI" "$D12" write-provisional "$A12" stale-batch-a "$SHA12A" >/dev/null 2>&1 || r12a=$?
+r12c=0; "$CLI" "$D12" write-provisional "$A12" stale-batch-b "$SHA12B" >/dev/null 2>&1 || r12c=$?
+r12i=0; "$CLI" "$D12" invalidate "$SHA12A" >/dev/null 2>&1 || r12i=$?
+r12f=0; "$CLI" "$D12" finalize-authority "$A12" >/dev/null 2>&1 || r12f=$?
+if [ "$r12b" -eq 0 ] \
+   && [ "$r12a" -eq 0 ] \
+   && [ "$r12c" -eq 0 ] \
+   && [ "$r12i" -eq 0 ] \
+   && [ "$r12f" -ne 0 ] \
+   && ! giltig "$D12" stale-batch-a \
+   && ! giltig "$D12" stale-batch-b; then
+  ok "K12 all-or-none: stale publication gör att noll ur batchen blir VALID"
+else
+  no "K12 partial-finalize" "begin/write/write/invalidate/finalize=$r12b/$r12a/$r12c/$r12i/$r12f eller en delmängd blev giltig"
+fi
+
+# K13: ett godtyckligt/stale id får inte finalisera aktuell generation och ett
+# failure får inte rapporteras EFTER unsafe valid persistence.
+D13="$WORK/authority-wrong-finalize"
+A13="opaque-generation.correct"
+"$CLI" "$D13" begin-authority "$A13" >/dev/null 2>&1
+"$CLI" "$D13" write-provisional "$A13" wrong-finalize "$SHA8A" >/dev/null 2>&1
+r13=0; "$CLI" "$D13" finalize-authority "opaque-generation.attacker" >/dev/null 2>&1 || r13=$?
+if [ "$r13" -ne 0 ] \
+   && aktuell "$D13" "$A13" \
+   && bunden "$D13" wrong-finalize "$A13" \
+   && ! giltig "$D13" wrong-finalize; then
+  ok "K13 finalize-authority: fel id faller utan unsafe validity"
+else
+  no "K13 valfritt-id/failure" "rc=$r13; fel id finaliserade, ändrade current eller tappade provisional"
+fi
+
+# K14: rå korruption, två motsägande dokument och partiell/trunkerad state ska
+# ge vägran på read OCH mutation. En riggkopia återställs mellan fallen.
+D14="$WORK/authority-corrupt"
+"$CLI" "$D14" write corrupt-anchor "$SHA8A" >/dev/null 2>&1
+F14="$D14/attestations.json"
+B14="$WORK/authority-corrupt.good"
+cp "$F14" "$B14" 2>/dev/null
+fel14=""
+for mode in corrupt contradictory partial; do
+  cp "$B14" "$F14" 2>/dev/null
+  "$PY3" - "$F14" "$mode" <<'PYCORRUPT'
+import pathlib
+import sys
+
+p = pathlib.Path(sys.argv[1])
+mode = sys.argv[2]
+raw = p.read_bytes()
+if mode == "corrupt":
+    p.write_bytes(b"not-json\n")
+elif mode == "contradictory":
+    p.write_bytes(raw + raw)
+else:
+    p.write_bytes(raw[: max(1, len(raw) // 2)])
+PYCORRUPT
+  "$CLI" "$D14" read corrupt-anchor --require-valid >/dev/null 2>&1 && fel14="$fel14 $mode-read-open"
+  "$CLI" "$D14" begin-authority "corrupt-$mode" >/dev/null 2>&1 && fel14="$fel14 $mode-begin-open"
+  "$CLI" "$D14" invalidate "$SHA8A" >/dev/null 2>&1 && fel14="$fel14 $mode-invalidate-open"
+done
+cp "$B14" "$F14" 2>/dev/null
+if [ -z "$fel14" ] && giltig "$D14" corrupt-anchor; then
+  ok "K14 corrupt/contradictory/partial state failar stängt och riggen återställs"
+else
+  no "K14 corrupt state" "fail-open-fall:$fel14; återställt positivt ankare saknas"
+fi
+
+# K15: äldre legacy-write får inte resurrecta en SHA som en senare invalidate
+# supersedar. Om write håller serialiseringslåset väntar invalidate och vinner
+# sist; om den inte håller låset måste tombstone/CAS ge samma slutliga effekt.
+D15="$WORK/race-write-invalidate"
+B15="$WORK/barrier-write-invalidate"
+mkdir -p "$B15"
+(
+  export NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest
+  export NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=write
+  export NORTROPIC_TEST_MUTATION_BARRIER_PHASE=after-observe
+  export NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B15"
+  "$CLI" "$D15" write race-write "$SHA11A"
+) >"$WORK/race-write.out" 2>"$WORK/race-write.err" &
+p15old=$!
+if wait_ready "$B15" "$p15old"; then
+  "$CLI" "$D15" invalidate "$SHA11A" \
+    >"$WORK/race-invalidate.out" 2>"$WORK/race-invalidate.err" &
+  p15new=$!
+  sleep 0.25
+  slapp_barrier "$B15"
+  wait "$p15old"; r15old=$?
+  wait "$p15new"; r15new=$?
+  if [ "$r15new" -eq 0 ] && ! giltig "$D15" race-write; then
+    ok "K15 ordering write/invalidate: äldre snapshot kan inte resurrecta senare stale"
+  else
+    no "K15 write/invalidate ordering" "old/new rc=$r15old/$r15new eller tasken resurrectades giltig"
+  fi
+else
+  stoppa_barrier_process "$B15" "$p15old"
+  no "K15 write/invalidate barrier" "mutatorn nådde inte gate-owned ready-seam"
+fi
+
+# K16: äldre provisional-write som redan observerat A får aldrig återuppstå när
+# en senare BEGIN B vinner. Serialiserad och optimistic ordering accepteras.
+D16="$WORK/race-provisional-begin"
+A16OLD="opaque-generation.race-old"
+A16NEW="opaque-generation.race-new"
+B16="$WORK/barrier-provisional-begin"
+mkdir -p "$B16"
+"$CLI" "$D16" begin-authority "$A16OLD" >/dev/null 2>&1
+(
+  export NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest
+  export NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=write-provisional
+  export NORTROPIC_TEST_MUTATION_BARRIER_PHASE=after-observe
+  export NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B16"
+  "$CLI" "$D16" write-provisional "$A16OLD" race-provisional "$SHA11B"
+) >"$WORK/race-provisional.out" 2>"$WORK/race-provisional.err" &
+p16old=$!
+if wait_ready "$B16" "$p16old"; then
+  "$CLI" "$D16" begin-authority "$A16NEW" \
+    >"$WORK/race-begin.out" 2>"$WORK/race-begin.err" &
+  p16new=$!
+  sleep 0.25
+  slapp_barrier "$B16"
+  wait "$p16old"; r16old=$?
+  wait "$p16new"; r16new=$?
+  if [ "$r16new" -eq 0 ] \
+     && aktuell "$D16" "$A16NEW" \
+     && ! bunden "$D16" race-provisional "$A16OLD" \
+     && ! giltig "$D16" race-provisional; then
+    ok "K16 ordering provisional/BEGIN: ny generation fencar äldre pågående write"
+  else
+    no "K16 provisional/BEGIN ordering" "old/new rc=$r16old/$r16new eller äldre publication överlevde"
+  fi
+else
+  stoppa_barrier_process "$B16" "$p16old"
+  no "K16 provisional/BEGIN barrier" "mutatorn nådde inte gate-owned ready-seam"
+fi
+
+# K17: finalize som observerat A får inte skriva över en nyare BEGIN B.
+D17="$WORK/race-finalize-begin"
+A17OLD="opaque-generation.finalize-old"
+A17NEW="opaque-generation.finalize-new"
+B17="$WORK/barrier-finalize-begin"
+mkdir -p "$B17"
+"$CLI" "$D17" begin-authority "$A17OLD" >/dev/null 2>&1
+"$CLI" "$D17" write-provisional "$A17OLD" race-finalize "$SHA12B" >/dev/null 2>&1
+(
+  export NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest
+  export NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=finalize-authority
+  export NORTROPIC_TEST_MUTATION_BARRIER_PHASE=after-observe
+  export NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B17"
+  "$CLI" "$D17" finalize-authority "$A17OLD"
+) >"$WORK/race-finalize.out" 2>"$WORK/race-finalize.err" &
+p17old=$!
+if wait_ready "$B17" "$p17old"; then
+  "$CLI" "$D17" begin-authority "$A17NEW" \
+    >"$WORK/race-new-begin.out" 2>"$WORK/race-new-begin.err" &
+  p17new=$!
+  sleep 0.25
+  slapp_barrier "$B17"
+  wait "$p17old"; r17old=$?
+  wait "$p17new"; r17new=$?
+  if [ "$r17new" -eq 0 ] \
+     && aktuell "$D17" "$A17NEW" \
+     && ! giltig "$D17" race-finalize; then
+    ok "K17 ordering FINALIZE/BEGIN: ny generation överlever äldre pågående finalize"
+  else
+    no "K17 FINALIZE/BEGIN ordering" "old/new rc=$r17old/$r17new eller äldre batch blev giltig"
+  fi
+else
+  stoppa_barrier_process "$B17" "$p17old"
+  no "K17 FINALIZE/BEGIN barrier" "mutatorn nådde inte gate-owned ready-seam"
+fi
+
+# K18: publik visibility vid batch-finalize är 0 eller ALLA, aldrig en delmängd.
+# Observern kör samtidigt och fäller en sekventiell per-task-mutant med synligt
+# mellanläge. Barriären bevisar dessutom noll precis före publication-point.
+D18="$WORK/atomic-batch"
+A18="opaque-generation.atomic-batch"
+B18="$WORK/barrier-atomic-batch"
+P18="$WORK/atomic-partial"
+N18=12
+mkdir -p "$B18"
+"$CLI" "$D18" begin-authority "$A18" >/dev/null 2>&1
+i18=1
+while [ "$i18" -le "$N18" ]; do
+  s18=$(printf '%040x' "$i18")
+  "$CLI" "$D18" write-provisional "$A18" "atomic-$i18" "$s18" >/dev/null 2>&1
+  i18=$((i18 + 1))
+done
+before18=0
+i18=1
+while [ "$i18" -le "$N18" ]; do
+  giltig "$D18" "atomic-$i18" && before18=$((before18 + 1))
+  i18=$((i18 + 1))
+done
+kind18before="$(authority_snapshot_kind "$D18" "$A18" "$N18" 2>/dev/null || true)"
+(
+  export NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest
+  export NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=finalize-authority
+  export NORTROPIC_TEST_MUTATION_BARRIER_PHASE=before-observe
+  export NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B18"
+  "$CLI" "$D18" finalize-authority "$A18"
+) >"$WORK/atomic-finalize.out" 2>"$WORK/atomic-finalize.err" &
+p18=$!
+if wait_ready "$B18" "$p18"; then
+  (
+    seen18=0
+    while kill -0 "$p18" 2>/dev/null; do
+      kind18="$(authority_snapshot_kind "$D18" "$A18" "$N18" 2>/dev/null || echo X)"
+      [ "$kind18" = "P" ] || [ "$kind18" = "V" ] || { : > "$P18"; break; }
+      j18=1
+      while [ "$j18" -le "$N18" ]; do
+        if giltig "$D18" "atomic-$j18"; then
+          seen18=1
+        elif [ "$seen18" -eq 1 ]; then
+          : > "$P18"
+          break 2
+        fi
+        j18=$((j18 + 1))
+      done
+    done
+  ) &
+  o18=$!
+  slapp_barrier "$B18"
+  wait "$p18"; r18=$?
+  wait "$o18" 2>/dev/null || true
+  after18=0
+  i18=1
+  while [ "$i18" -le "$N18" ]; do
+    giltig "$D18" "atomic-$i18" && after18=$((after18 + 1))
+    i18=$((i18 + 1))
+  done
+  kind18after="$(authority_snapshot_kind "$D18" "$A18" "$N18" 2>/dev/null || true)"
+  if [ "$before18" -eq 0 ] \
+     && [ "$kind18before" = "P" ] \
+     && [ "$r18" -eq 0 ] \
+     && [ "$after18" -eq "$N18" ] \
+     && [ "$kind18after" = "V" ] \
+     && [ ! -e "$P18" ]; then
+    ok "K18 atomic finalize: visibility går från 0 till hela publication-setet"
+  else
+    no "K18 atomic batch" "before/kind/rc/after/kind/partial=$before18/$kind18before/$r18/$after18/$kind18after/$([ -e "$P18" ] && echo ja || echo nej)"
+  fi
+else
+  stoppa_barrier_process "$B18" "$p18"
+  no "K18 atomic-finalize barrier" "finalize nådde inte gate-owned ready-seam"
+fi
+
+# K19: crash före publication-point får inte göra ens en publication giltig.
+D19="$WORK/crash-finalize"
+A19="opaque-generation.crash"
+B19="$WORK/barrier-crash-finalize"
+mkdir -p "$B19"
+"$CLI" "$D19" begin-authority "$A19" >/dev/null 2>&1
+i19=1
+while [ "$i19" -le 4 ]; do
+  s19=$(printf 'a%039x' "$i19")
+  "$CLI" "$D19" write-provisional "$A19" "crash-$i19" "$s19" >/dev/null 2>&1
+  i19=$((i19 + 1))
+done
+(
+  export NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest
+  export NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=finalize-authority
+  export NORTROPIC_TEST_MUTATION_BARRIER_PHASE=before-observe
+  export NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B19"
+  "$CLI" "$D19" finalize-authority "$A19"
+) >"$WORK/crash-finalize.out" 2>"$WORK/crash-finalize.err" &
+p19=$!
+if wait_ready "$B19" "$p19"; then
+  kill -9 "$p19" 2>/dev/null || true
+  wait "$p19" 2>/dev/null || true
+  c19=0
+  i19=1
+  while [ "$i19" -le 4 ]; do
+    giltig "$D19" "crash-$i19" && c19=$((c19 + 1))
+    i19=$((i19 + 1))
+  done
+  "$CLI" "$D19" begin-authority "opaque-generation.after-crash" >/dev/null 2>&1
+  if [ "$c19" -eq 0 ] && ! bunden "$D19" crash-1 "$A19"; then
+    ok "K19 finalize-crash: död före publication lämnar noll giltiga och kan fencas"
+  else
+    no "K19 finalize crash" "$c19 av 4 blev giltiga eller crash-generationen överlevde ny BEGIN"
+  fi
+else
+  stoppa_barrier_process "$B19" "$p19"
+  no "K19 finalize-crash barrier" "finalize nådde inte gate-owned ready-seam"
+fi
+
 summera

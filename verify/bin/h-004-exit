@@ -5,7 +5,7 @@
 #       stdout = unik opaque lease_id
 #   controller/lease/cli [<dir>] renew <task> <lease_id>
 #   controller/lease/cli [<dir>] release <task> [<lease_id>]
-#   controller/lease/cli [<dir>] owner <task>
+#   controller/lease/cli [<dir>] owner <task> [--json]
 # Bare release är legacy för obundna leases. En --holder-pid-bunden lease får
 # aldrig kunna raderas utan rätt lease_id.
 # Katalogen är valfri och ligger först; utelämnad ger controller/lease/state/.
@@ -206,6 +206,125 @@ wait_mark_or_exit() {
     i=$((i + 1))
   done
   return 1
+}
+
+wait_barrier_ready() {
+  barrier_dir="$1"
+  barrier_pid="$2"
+  barrier_i=0
+  while [ "$barrier_i" -lt 120 ]; do
+    [ -e "$barrier_dir/ready" ] && return 0
+    kill -0 "$barrier_pid" 2>/dev/null || return 1
+    sleep 0.05
+    barrier_i=$((barrier_i + 1))
+  done
+  return 1
+}
+
+wait_process_exit() {
+  process_pid="$1"
+  process_i=0
+  while [ "$process_i" -lt 200 ]; do
+    kill -0 "$process_pid" 2>/dev/null || return 0
+    sleep 0.05
+    process_i=$((process_i + 1))
+  done
+  return 1
+}
+
+release_barrier() {
+  : > "$1/continue"
+}
+
+owner_json_valid() {
+  "$PY3" - "$1" "$2" "$3" <<'PYOWNER'
+import json
+import sys
+
+try:
+    value = json.loads(sys.argv[1])
+except Exception:
+    raise SystemExit(1)
+holder = value.get("holder") if isinstance(value, dict) else None
+ok = (
+    isinstance(value, dict)
+    and value.get("lease_id") == sys.argv[2]
+    and isinstance(holder, dict)
+    and isinstance(holder.get("host"), str)
+    and bool(holder["host"])
+    and type(holder.get("pid")) is int
+    and holder["pid"] == int(sys.argv[3])
+    and isinstance(holder.get("incarnation"), str)
+    and bool(holder["incarnation"])
+)
+raise SystemExit(0 if ok else 1)
+PYOWNER
+}
+
+owner_json_field() {
+  "$PY3" - "$1" "$2" <<'PYFIELD'
+import json
+import sys
+
+try:
+    value = json.loads(sys.argv[1])
+    if sys.argv[2] == "incarnation":
+        field = value["holder"]["incarnation"]
+    else:
+        field = value[sys.argv[2]]
+except Exception:
+    raise SystemExit(1)
+if not isinstance(field, str) or not field:
+    raise SystemExit(1)
+print(field)
+PYFIELD
+}
+
+replace_incarnation() {
+  "$PY3" - "$1" "$2" <<'PYREPLACE'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+old = sys.argv[2]
+new = "".join("y" if c == "x" else "x" for c in old)
+if not new or new == old:
+    raise SystemExit(1)
+value = json.loads(path.read_text(encoding="utf-8"))
+count = 0
+
+def walk(item):
+    global count
+    if isinstance(item, dict):
+        return {key: walk(child) for key, child in item.items()}
+    if isinstance(item, list):
+        return [walk(child) for child in item]
+    if item == old:
+        count += 1
+        return new
+    return item
+
+changed = walk(value)
+if count != 1:
+    raise SystemExit(1)
+path.write_text(
+    json.dumps(changed, ensure_ascii=False, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+PYREPLACE
+}
+
+att_valid() {
+  "$ATT" "$1" read "$2" --require-valid >/dev/null 2>&1
+}
+
+att_bound() {
+  "$ATT" "$1" read "$2" --require-authority "$3" >/dev/null 2>&1
+}
+
+att_current() {
+  "$ATT" "$1" authority-current "$2" >/dev/null 2>&1
 }
 
 
@@ -758,5 +877,605 @@ else
 fi
 
 unset S3_BAD_MARK
+
+
+# ========== S3 authority/incarnation/overlap controls ==========================
+
+# K15 — positiv process-incarnation anchor. owner --json must expose the exact
+# holder lifetime identity used by liveness; the original living incarnation
+# remains protected after TTL.
+D15="$WORK/s3-incarnation-positive"
+mkdir -p "$D15"
+sleep 6 &
+holder15=$!
+t15="$({ "$CLI" "$D15" acquire s3-incarnation-positive --ttl 1 --holder-pid "$holder15"; } 2>/dev/null)"
+r15=$?
+j15="$({ "$CLI" "$D15" owner s3-incarnation-positive --json; } 2>/dev/null)"
+j15rc=$?
+sleep 1.3
+during15="$({ "$CLI" "$D15" acquire s3-incarnation-positive --ttl 30; } 2>/dev/null)"
+during15rc=$?
+if [ "$r15" -eq 0 ] \
+   && token_ok "$t15" \
+   && [ "$j15rc" -eq 0 ] \
+   && owner_json_valid "$j15" "$t15" "$holder15" \
+   && [ "$during15rc" -ne 0 ]; then
+  ok "K15 process-incarnation: owner binder host+pid+opaque livstid och levande original skyddas efter TTL"
+else
+  no "K15 process-incarnation anchor" "acquire/json/reclaim=$r15/$j15rc/$during15rc token=[$t15] owner=[$j15]"
+fi
+kill "$holder15" 2>/dev/null || true
+wait "$holder15" 2>/dev/null || true
+if [ "$r15" -eq 0 ] && token_ok "$t15"; then
+  "$CLI" "$D15" release s3-incarnation-positive "$t15" >/dev/null 2>&1 || true
+else
+  "$CLI" "$D15" release s3-incarnation-positive >/dev/null 2>&1 || true
+fi
+
+
+# K16 — prepared PID-reuse state, uttryckligen tillåten av owner-beslutet:
+# verklig public acquire ankras först; endast det opaque incarnation-värdet i
+# serialiserad state byts. Samma numeriska PID lever fortfarande, men original
+# processlivstid matchar inte längre och får inte blockera reclaim efter TTL.
+D16="$WORK/s3-incarnation-reuse"
+mkdir -p "$D16"
+sleep 7 &
+holder16=$!
+t16="$({ "$CLI" "$D16" acquire s3-incarnation-reuse --ttl 1 --holder-pid "$holder16"; } 2>/dev/null)"
+r16=$?
+j16="$({ "$CLI" "$D16" owner s3-incarnation-reuse --json; } 2>/dev/null)"
+j16rc=$?
+inc16=""
+[ "$j16rc" -eq 0 ] && inc16="$(owner_json_field "$j16" incarnation 2>/dev/null || true)"
+prep16=1
+if [ -n "$inc16" ] && [ -f "$D16/s3-incarnation-reuse.lease" ]; then
+  replace_incarnation "$D16/s3-incarnation-reuse.lease" "$inc16" >/dev/null 2>&1
+  prep16=$?
+fi
+sleep 1.3
+reuse16="$({ "$CLI" "$D16" acquire s3-incarnation-reuse --ttl 30; } 2>/dev/null)"
+reuse16rc=$?
+if [ "$r16" -eq 0 ] \
+   && token_ok "$t16" \
+   && [ "$j16rc" -eq 0 ] \
+   && owner_json_valid "$j16" "$t16" "$holder16" \
+   && [ "$prep16" -eq 0 ] \
+   && [ "$reuse16rc" -eq 0 ] \
+   && token_ok "$reuse16" \
+   && [ "$reuse16" != "$t16" ]; then
+  ok "K16 PID reuse: samma live PID med annan incarnation reclaimas efter TTL"
+else
+  no "K16 PID-only/random-incarnation" "acquire/json/prep/reclaim=$r16/$j16rc/$prep16/$reuse16rc old/new=[$t16]/[$reuse16]"
+fi
+kill "$holder16" 2>/dev/null || true
+wait "$holder16" 2>/dev/null || true
+if [ "$reuse16rc" -eq 0 ] && token_ok "$reuse16"; then
+  "$CLI" "$D16" release s3-incarnation-reuse "$reuse16" >/dev/null 2>&1 || true
+elif [ "$r16" -eq 0 ] && token_ok "$t16"; then
+  "$CLI" "$D16" release s3-incarnation-reuse "$t16" >/dev/null 2>&1 || true
+else
+  "$CLI" "$D16" release s3-incarnation-reuse >/dev/null 2>&1 || true
+fi
+
+
+# K17 — stale release överlappar successor-installation. Barriären ligger efter
+# stale operationens authoritative observation. Om implementationen håller ett
+# serialiseringslås får successor blockera och installeras efteråt. Om successor
+# hinner installeras först måste stale release faila utan en enda byteändring.
+D17="$WORK/s3-release-overlap"
+B17="$WORK/s3-release-overlap-barrier"
+mkdir -p "$D17" "$B17"
+t17a="$({ "$CLI" "$D17" acquire s3-release-overlap --ttl 1; } 2>/dev/null)"
+r17a=$?
+sleep 1.3
+env \
+  NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=lease \
+  NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=release \
+  NORTROPIC_TEST_MUTATION_BARRIER_PHASE=after-observe \
+  NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B17" \
+  "$CLI" "$D17" release s3-release-overlap "$t17a" \
+  >"$WORK/s3-release-overlap-old.out" \
+  2>"$WORK/s3-release-overlap-old.err" &
+p17old=$!
+if [ "$r17a" -eq 0 ] && token_ok "$t17a" && wait_barrier_ready "$B17" "$p17old"; then
+  "$CLI" "$D17" acquire s3-release-overlap --ttl 60 \
+    >"$WORK/s3-release-overlap-new.out" \
+    2>"$WORK/s3-release-overlap-new.err" &
+  p17new=$!
+  sleep 0.35
+  t17b_pre="$(tr -d '\r\n' < "$WORK/s3-release-overlap-new.out")"
+  installed17=0
+  sha17pre=""
+  if token_ok "$t17b_pre" 2>/dev/null; then
+    installed17=1
+    sha17pre="$(file_sha "$D17/s3-release-overlap.lease")"
+  fi
+  release_barrier "$B17"
+  wait "$p17old"; r17old=$?
+  wait "$p17new"; r17new=$?
+  t17b="$(tr -d '\r\n' < "$WORK/s3-release-overlap-new.out")"
+  if [ "$r17new" -ne 0 ] || ! token_ok "$t17b" 2>/dev/null; then
+    t17b="$({ "$CLI" "$D17" acquire s3-release-overlap --ttl 60; } 2>/dev/null)"
+    r17new=$?
+  fi
+  sha17after="$(file_sha "$D17/s3-release-overlap.lease")"
+  j17="$({ "$CLI" "$D17" owner s3-release-overlap --json; } 2>/dev/null)"
+  identity17="$(owner_json_field "$j17" lease_id 2>/dev/null || true)"
+  overlap17_ok=1
+  if [ "$installed17" -eq 1 ]; then
+    [ "$r17old" -ne 0 ] \
+      && [ -n "$sha17pre" ] \
+      && [ "$sha17pre" = "$sha17after" ] \
+      || overlap17_ok=0
+  fi
+  if [ "$r17new" -eq 0 ] \
+     && token_ok "$t17b" \
+     && [ "$identity17" = "$t17b" ] \
+     && [ "$overlap17_ok" -eq 1 ]; then
+    ok "K17 stale-operation overlap: successor bytes och lease_id överlever release"
+  else
+    no "K17 stale release/successor" "old/new/installed=$r17old/$r17new/$installed17 identity=[$identity17] token=[$t17b] sha=[$sha17pre]/[$sha17after]"
+  fi
+  if [ "$r17new" -eq 0 ] && token_ok "$t17b"; then
+    "$CLI" "$D17" release s3-release-overlap "$t17b" >/dev/null 2>&1 || true
+  fi
+else
+  release_barrier "$B17"
+  kill "$p17old" 2>/dev/null || true
+  wait "$p17old" 2>/dev/null || true
+  no "K17 release-overlap barrier" "acquire saknade token eller release nådde inte gate-owned ready-seam"
+  "$CLI" "$D17" release s3-release-overlap >/dev/null 2>&1 || true
+fi
+
+
+# K18 — run-level lease_id är exakt h-003 authority. Task B beror på A. A:s
+# worker hålls först så BEGIN kan observeras före publishable work; B hålls sedan
+# så A måste vara authority-bundet PROVISIONAL men globalt ogiltig. FINALIZE
+# hålls vid sin publication-point: leasen ska då redan vara cleanly released och
+# båda taskerna fortfarande globalt ogiltiga. Fortsättning gör båda VALID.
+cat > "$WORK/s3-multi-backlog.json" <<'JSON'
+{
+  "spec_version": "s3-fixtur",
+  "defaults": {
+    "max_changed_files": 8,
+    "max_added_lines": 600
+  },
+  "tasks": [
+    {
+      "id": "s3-multi-a",
+      "slice": 0,
+      "title": "multi A",
+      "summary": "S3 provisional dependency A",
+      "allowed_write": ["tests/lease-authority-fixture/**"],
+      "exit_test": "verify/bin/ingen",
+      "exit_criterion": "-",
+      "docs_impact": [],
+      "depends_on": []
+    },
+    {
+      "id": "s3-multi-b",
+      "slice": 0,
+      "title": "multi B",
+      "summary": "S3 provisional dependency B",
+      "allowed_write": ["tests/lease-authority-fixture/**"],
+      "exit_test": "verify/bin/ingen",
+      "exit_criterion": "-",
+      "docs_impact": [],
+      "depends_on": ["s3-multi-a"]
+    }
+  ]
+}
+JSON
+
+cat > "$WORK/s3-multi-worker.py" <<'PYWORK'
+import json
+import os
+import pathlib
+import sys
+import time
+
+envelope = json.load(sys.stdin)
+task = envelope["task_id"]
+if task == "s3-multi-a":
+    mark = pathlib.Path(os.environ["S3_MULTI_A_MARK"])
+    go = pathlib.Path(os.environ["S3_MULTI_A_GO"])
+    name = "a.txt"
+elif task == "s3-multi-b":
+    mark = pathlib.Path(os.environ["S3_MULTI_B_MARK"])
+    go = pathlib.Path(os.environ["S3_MULTI_B_GO"])
+    name = "b.txt"
+else:
+    raise SystemExit("unexpected task: " + task)
+mark.write_text("started\n", encoding="utf-8")
+for _ in range(200):
+    if go.exists():
+        break
+    time.sleep(0.05)
+else:
+    raise SystemExit("gate did not release worker")
+pathlib.Path("tests/lease-authority-fixture").mkdir(parents=True, exist_ok=True)
+pathlib.Path("tests/lease-authority-fixture", name).write_text(task + "\n", encoding="utf-8")
+print(task + " klar")
+PYWORK
+
+D18="$WORK/s3-multi-lease"
+S18="$WORK/s3-multi-state"
+A18="$WORK/s3-multi-attest"
+W18="$WORK/s3-multi-workspaces"
+B18="$WORK/s3-multi-finalize-barrier"
+mkdir -p "$W18" "$B18"
+"$ST" init "$S18" >/dev/null 2>&1
+export S3_MULTI_A_MARK="$WORK/s3-multi-a-started"
+export S3_MULTI_A_GO="$WORK/s3-multi-a-go"
+export S3_MULTI_B_MARK="$WORK/s3-multi-b-started"
+export S3_MULTI_B_GO="$WORK/s3-multi-b-go"
+write_config \
+  "$WORK/s3-multi-config.json" \
+  "$WORK/s3-multi-backlog.json" \
+  "$A18" "$S18" "$D18" "s3-multi" "$W18" \
+  "$WORK/s3-multi-worker.py" \
+  "s3-multi-run" \
+  6 0.5
+env \
+  NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest \
+  NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=finalize-authority \
+  NORTROPIC_TEST_MUTATION_BARRIER_PHASE=before-observe \
+  NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B18" \
+  S3_MULTI_A_MARK="$S3_MULTI_A_MARK" \
+  S3_MULTI_A_GO="$S3_MULTI_A_GO" \
+  S3_MULTI_B_MARK="$S3_MULTI_B_MARK" \
+  S3_MULTI_B_GO="$S3_MULTI_B_GO" \
+  "$LOOP" run "$WORK/s3-multi-config.json" \
+  >"$WORK/s3-multi.out" \
+  2>"$WORK/s3-multi.err" &
+p18=$!
+started18a=0
+wait_mark_or_exit "$S3_MULTI_A_MARK" "$p18" && started18a=1
+j18a="$({ "$CLI" "$D18" owner s3-multi --json; } 2>/dev/null)"
+lease18="$(owner_json_field "$j18a" lease_id 2>/dev/null || true)"
+begin18=1
+if [ -n "$lease18" ]; then
+  att_current "$A18" "$lease18" && begin18=0
+fi
+: > "$S3_MULTI_A_GO"
+started18b=0
+wait_mark_or_exit "$S3_MULTI_B_MARK" "$p18" && started18b=1
+provisional18=1
+global18a=1
+if [ -n "$lease18" ]; then
+  att_bound "$A18" s3-multi-a "$lease18" && provisional18=0
+fi
+att_valid "$A18" s3-multi-a && global18a=0
+: > "$S3_MULTI_B_GO"
+ready18=0
+wait_barrier_ready "$B18" "$p18" && ready18=1
+owner18_at_finalize="$({ "$CLI" "$D18" owner s3-multi --json; } 2>/dev/null)"
+owner18rc=$?
+bound18a=1; bound18b=1; valid18a_before=1; valid18b_before=1
+if [ -n "$lease18" ]; then
+  att_bound "$A18" s3-multi-a "$lease18" && bound18a=0
+  att_bound "$A18" s3-multi-b "$lease18" && bound18b=0
+fi
+att_valid "$A18" s3-multi-a && valid18a_before=0
+att_valid "$A18" s3-multi-b && valid18b_before=0
+release_barrier "$B18"
+wait "$p18"; run18rc=$?
+valid18a_after=1; valid18b_after=1
+att_valid "$A18" s3-multi-a && valid18a_after=0
+att_valid "$A18" s3-multi-b && valid18b_after=0
+owner18_after="$({ "$CLI" "$D18" owner s3-multi --json; } 2>/dev/null)"
+owner18after_rc=$?
+if [ "$started18a" -eq 1 ] \
+   && [ "$begin18" -eq 0 ] \
+   && [ "$started18b" -eq 1 ] \
+   && [ "$provisional18" -eq 0 ] \
+   && [ "$global18a" -ne 0 ] \
+   && [ "$ready18" -eq 1 ] \
+   && [ "$owner18rc" -ne 0 ] \
+   && [ "$bound18a" -eq 0 ] \
+   && [ "$bound18b" -eq 0 ] \
+   && [ "$valid18a_before" -ne 0 ] \
+   && [ "$valid18b_before" -ne 0 ] \
+   && [ "$run18rc" -eq 0 ] \
+   && [ "$valid18a_after" -eq 0 ] \
+   && [ "$valid18b_after" -eq 0 ] \
+   && [ "$owner18after_rc" -ne 0 ]; then
+  ok "K18 run-authority: BEGIN före work, same-lease provisional dependency, release före atomic finalize"
+else
+  no "K18 run-level authority/finalize" "startA/begin/startB/prov/globalA/ready/ownerAt/bounds/validBefore/run/validAfter/ownerAfter=$started18a/$begin18/$started18b/$provisional18/$global18a/$ready18/$owner18rc/$bound18a,$bound18b/$valid18a_before,$valid18b_before/$run18rc/$valid18a_after,$valid18b_after/$owner18after_rc lease=[$lease18]"
+fi
+unset S3_MULTI_A_MARK S3_MULTI_A_GO S3_MULTI_B_MARK S3_MULTI_B_GO
+
+
+# K19 — successor BEGIN i det avsiktliga release→finalize-fönstret fencar den
+# gamla hela batchen. Successor lease bytes/identity ska också överleva gammal
+# cleanup/finalize.
+cat > "$WORK/s3-window-backlog.json" <<'JSON'
+{
+  "spec_version": "s3-fixtur",
+  "defaults": {"max_changed_files": 8, "max_added_lines": 600},
+  "tasks": [
+    {
+      "id": "s3-window-task",
+      "slice": 0,
+      "title": "finalize window",
+      "summary": "S3 release-finalize window fixture",
+      "allowed_write": ["tests/lease-window-fixture/**"],
+      "exit_test": "verify/bin/ingen",
+      "exit_criterion": "-",
+      "docs_impact": [],
+      "depends_on": []
+    }
+  ]
+}
+JSON
+cat > "$WORK/s3-window-worker.py" <<'PYWORK'
+import json
+import os
+import pathlib
+import sys
+import time
+
+json.load(sys.stdin)
+mark = pathlib.Path(os.environ["S3_WINDOW_MARK"])
+go = pathlib.Path(os.environ["S3_WINDOW_GO"])
+mark.write_text("started\n", encoding="utf-8")
+for _ in range(200):
+    if go.exists():
+        break
+    time.sleep(0.05)
+else:
+    raise SystemExit("gate did not release worker")
+pathlib.Path("tests/lease-window-fixture").mkdir(parents=True, exist_ok=True)
+pathlib.Path("tests/lease-window-fixture/result.txt").write_text("window\n", encoding="utf-8")
+print("window klar")
+PYWORK
+
+D19="$WORK/s3-window-lease"
+S19="$WORK/s3-window-state"
+A19="$WORK/s3-window-attest"
+W19="$WORK/s3-window-workspaces"
+B19="$WORK/s3-window-finalize-barrier"
+mkdir -p "$W19" "$B19"
+"$ST" init "$S19" >/dev/null 2>&1
+export S3_WINDOW_MARK="$WORK/s3-window-started"
+export S3_WINDOW_GO="$WORK/s3-window-go"
+write_config \
+  "$WORK/s3-window-config.json" \
+  "$WORK/s3-window-backlog.json" \
+  "$A19" "$S19" "$D19" "s3-window" "$W19" \
+  "$WORK/s3-window-worker.py" \
+  "s3-window-run" \
+  6 0.5
+env \
+  NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest \
+  NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=finalize-authority \
+  NORTROPIC_TEST_MUTATION_BARRIER_PHASE=before-observe \
+  NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B19" \
+  S3_WINDOW_MARK="$S3_WINDOW_MARK" \
+  S3_WINDOW_GO="$S3_WINDOW_GO" \
+  "$LOOP" run "$WORK/s3-window-config.json" \
+  >"$WORK/s3-window.out" \
+  2>"$WORK/s3-window.err" &
+p19=$!
+started19=0
+wait_mark_or_exit "$S3_WINDOW_MARK" "$p19" && started19=1
+j19old="$({ "$CLI" "$D19" owner s3-window --json; } 2>/dev/null)"
+old19="$(owner_json_field "$j19old" lease_id 2>/dev/null || true)"
+: > "$S3_WINDOW_GO"
+ready19=0
+wait_barrier_ready "$B19" "$p19" && ready19=1
+owner19released=1
+"$CLI" "$D19" owner s3-window >/dev/null 2>&1 || owner19released=0
+new19="$({ "$CLI" "$D19" acquire s3-window --ttl 60 --holder-pid "$$"; } 2>/dev/null)"
+new19rc=$?
+begin19=1
+if [ "$new19rc" -eq 0 ] && token_ok "$new19"; then
+  "$ATT" "$A19" begin-authority "$new19" >/dev/null 2>&1
+  begin19=$?
+fi
+sha19before="$(file_sha "$D19/s3-window.lease")"
+release_barrier "$B19"
+wait "$p19"; run19rc=$?
+sha19after="$(file_sha "$D19/s3-window.lease")"
+j19new="$({ "$CLI" "$D19" owner s3-window --json; } 2>/dev/null)"
+identity19="$(owner_json_field "$j19new" lease_id 2>/dev/null || true)"
+valid19=1
+att_valid "$A19" s3-window-task && valid19=0
+if [ "$started19" -eq 1 ] \
+   && [ -n "$old19" ] \
+   && [ "$ready19" -eq 1 ] \
+   && [ "$owner19released" -eq 0 ] \
+   && [ "$new19rc" -eq 0 ] \
+   && token_ok "$new19" \
+   && [ "$new19" != "$old19" ] \
+   && [ "$begin19" -eq 0 ] \
+   && [ "$run19rc" -ne 0 ] \
+   && [ "$valid19" -ne 0 ] \
+   && [ -n "$sha19before" ] \
+   && [ "$sha19before" = "$sha19after" ] \
+   && [ "$identity19" = "$new19" ]; then
+  ok "K19 release→finalize race: successor BEGIN fencar gammal batch och lease överlever"
+else
+  no "K19 stale finalize/successor" "start/old/ready/released/new/begin/run/valid/identity=$started19/[$old19]/$ready19/$owner19released/$new19rc/$begin19/$run19rc/$valid19/[$identity19] sha=[$sha19before]/[$sha19after]"
+fi
+if [ "$new19rc" -eq 0 ] && token_ok "$new19"; then
+  "$CLI" "$D19" release s3-window "$new19" >/dev/null 2>&1 || true
+fi
+unset S3_WINDOW_MARK S3_WINDOW_GO
+
+
+# K20 — release failure är skilt från lease loss: gör katalogen mekaniskt
+# icke-skrivbar först efter att holdern och run-authorityn är etablerade. Om
+# hosten inte verkställer POSIX-spärren är utfallet ODÖMBART, aldrig product RED.
+P20="$WORK/s3-release-permission-probe"
+mkdir -p "$P20"
+: > "$P20/file"
+chmod 0500 "$P20"
+if rm "$P20/file" >/dev/null 2>&1; then
+  chmod 0700 "$P20"
+  echo "SKIP  K20 mekanism — hosten verkställer inte disposable katalogspärr; release-failure är odömbart"
+  echo
+  echo "$pass PASS, $fail FAIL, ODÖMBART"
+  exit 2
+fi
+chmod 0700 "$P20"
+rm -f "$P20/file"
+
+cat > "$WORK/s3-release-failure-backlog.json" <<'JSON'
+{
+  "spec_version": "s3-fixtur",
+  "defaults": {"max_changed_files": 8, "max_added_lines": 600},
+  "tasks": [
+    {
+      "id": "s3-release-failure-task",
+      "slice": 0,
+      "title": "release failure",
+      "summary": "S3 release failure fixture",
+      "allowed_write": ["tests/lease-release-failure-fixture/**"],
+      "exit_test": "verify/bin/ingen",
+      "exit_criterion": "-",
+      "docs_impact": [],
+      "depends_on": []
+    }
+  ]
+}
+JSON
+cat > "$WORK/s3-release-failure-worker.py" <<'PYWORK'
+import json
+import os
+import pathlib
+import sys
+import time
+
+json.load(sys.stdin)
+mark = pathlib.Path(os.environ["S3_RELEASE_FAIL_MARK"])
+go = pathlib.Path(os.environ["S3_RELEASE_FAIL_GO"])
+mark.write_text("started\n", encoding="utf-8")
+for _ in range(200):
+    if go.exists():
+        break
+    time.sleep(0.05)
+else:
+    raise SystemExit("gate did not release worker")
+pathlib.Path("tests/lease-release-failure-fixture").mkdir(parents=True, exist_ok=True)
+pathlib.Path("tests/lease-release-failure-fixture/result.txt").write_text("release failure\n", encoding="utf-8")
+print("release failure fixture klar")
+PYWORK
+
+D20="$WORK/s3-release-failure-lease"
+S20="$WORK/s3-release-failure-state"
+A20="$WORK/s3-release-failure-attest"
+W20="$WORK/s3-release-failure-workspaces"
+B20="$WORK/s3-release-failure-finalize-barrier"
+mkdir -p "$W20" "$B20"
+"$ST" init "$S20" >/dev/null 2>&1
+export S3_RELEASE_FAIL_MARK="$WORK/s3-release-failure-started"
+export S3_RELEASE_FAIL_GO="$WORK/s3-release-failure-go"
+write_config \
+  "$WORK/s3-release-failure-config.json" \
+  "$WORK/s3-release-failure-backlog.json" \
+  "$A20" "$S20" "$D20" "s3-release-failure" "$W20" \
+  "$WORK/s3-release-failure-worker.py" \
+  "s3-release-failure-run" \
+  30 10
+env \
+  NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest \
+  NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=finalize-authority \
+  NORTROPIC_TEST_MUTATION_BARRIER_PHASE=before-observe \
+  NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B20" \
+  S3_RELEASE_FAIL_MARK="$S3_RELEASE_FAIL_MARK" \
+  S3_RELEASE_FAIL_GO="$S3_RELEASE_FAIL_GO" \
+  "$LOOP" run "$WORK/s3-release-failure-config.json" \
+  >"$WORK/s3-release-failure.out" \
+  2>"$WORK/s3-release-failure.err" &
+p20=$!
+started20=0
+wait_mark_or_exit "$S3_RELEASE_FAIL_MARK" "$p20" && started20=1
+j20="$({ "$CLI" "$D20" owner s3-release-failure --json; } 2>/dev/null)"
+lease20="$(owner_json_field "$j20" lease_id 2>/dev/null || true)"
+chmod 0500 "$D20" 2>/dev/null || true
+: > "$S3_RELEASE_FAIL_GO"
+timely20=1
+wait_process_exit "$p20" && timely20=0
+if [ "$timely20" -ne 0 ]; then
+  kill "$p20" 2>/dev/null || true
+fi
+wait "$p20"; run20rc=$?
+chmod 0700 "$D20" 2>/dev/null || true
+valid20=1
+att_valid "$A20" s3-release-failure-task && valid20=0
+finalize20=0
+[ -e "$B20/ready" ] && finalize20=1
+leasefile20=0
+[ -f "$D20/s3-release-failure.lease" ] && leasefile20=1
+if [ "$started20" -eq 1 ] \
+   && [ -n "$lease20" ] \
+   && [ "$timely20" -eq 0 ] \
+   && [ "$run20rc" -ne 0 ] \
+   && [ "$valid20" -ne 0 ] \
+   && [ "$finalize20" -eq 0 ] \
+   && [ "$leasefile20" -eq 1 ]; then
+  ok "K20 release failure: ingen FINALIZE och ingen global publication"
+else
+  no "K20 release-failure safety" "start/lease/timely/run/valid/finalize/leasefile=$started20/[$lease20]/$timely20/$run20rc/$valid20/$finalize20/$leasefile20"
+fi
+if [ -n "$lease20" ]; then
+  "$CLI" "$D20" release s3-release-failure "$lease20" >/dev/null 2>&1 || true
+fi
+unset S3_RELEASE_FAIL_MARK S3_RELEASE_FAIL_GO
+
+
+# K21 — crash efter clean release men före FINALIZE publication-point. Loopen
+# startas i egen processgrupp; när finalize-barriären är ready är leasen redan
+# tom. Hela gruppen dödas och generationen måste lämna noll giltiga bytes.
+D21="$WORK/s3-crash-window-lease"
+S21="$WORK/s3-crash-window-state"
+A21="$WORK/s3-crash-window-attest"
+W21="$WORK/s3-crash-window-workspaces"
+B21="$WORK/s3-crash-window-finalize-barrier"
+mkdir -p "$W21" "$B21"
+"$ST" init "$S21" >/dev/null 2>&1
+export S3_WINDOW_MARK="$WORK/s3-crash-window-started"
+export S3_WINDOW_GO="$WORK/s3-crash-window-go"
+write_config \
+  "$WORK/s3-crash-window-config.json" \
+  "$WORK/s3-window-backlog.json" \
+  "$A21" "$S21" "$D21" "s3-crash-window" "$W21" \
+  "$WORK/s3-window-worker.py" \
+  "s3-crash-window-run" \
+  6 0.5
+env \
+  NORTROPIC_TEST_MUTATION_BARRIER_COMPONENT=attest \
+  NORTROPIC_TEST_MUTATION_BARRIER_OPERATION=finalize-authority \
+  NORTROPIC_TEST_MUTATION_BARRIER_PHASE=before-observe \
+  NORTROPIC_TEST_MUTATION_BARRIER_DIR="$B21" \
+  S3_WINDOW_MARK="$S3_WINDOW_MARK" \
+  S3_WINDOW_GO="$S3_WINDOW_GO" \
+  "$PY3" -c 'import os,sys; os.setsid(); os.execv(sys.argv[1], sys.argv[1:])' \
+  "$LOOP" run "$WORK/s3-crash-window-config.json" \
+  >"$WORK/s3-crash-window.out" \
+  2>"$WORK/s3-crash-window.err" &
+p21=$!
+started21=0
+wait_mark_or_exit "$S3_WINDOW_MARK" "$p21" && started21=1
+: > "$S3_WINDOW_GO"
+ready21=0
+wait_barrier_ready "$B21" "$p21" && ready21=1
+owner21rc=0
+"$CLI" "$D21" owner s3-crash-window >/dev/null 2>&1 || owner21rc=$?
+kill -KILL -- "-$p21" 2>/dev/null || kill -KILL "$p21" 2>/dev/null || true
+wait "$p21" 2>/dev/null || true
+valid21=1
+att_valid "$A21" s3-window-task && valid21=0
+if [ "$started21" -eq 1 ] \
+   && [ "$ready21" -eq 1 ] \
+   && [ "$owner21rc" -ne 0 ] \
+   && [ "$valid21" -ne 0 ]; then
+  ok "K21 crash after release/before finalize lämnar noll giltiga publications"
+else
+  no "K21 release→finalize crash" "start/ready/owner/valid=$started21/$ready21/$owner21rc/$valid21"
+fi
+unset S3_WINDOW_MARK S3_WINDOW_GO
 
 summera
