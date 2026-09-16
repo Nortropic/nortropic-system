@@ -45,6 +45,7 @@ PROVIDER_IDENTITY_PATH = "config/codex-provider-identity.json"
 PYTHON_IDENTITY_PATH = "config/python-interpreter-authority-v1.json"
 PROVIDER_IDENTITY_KEYS = {
     "schema_version", "provider", "executable_path", "executable_sha256",
+    "code_mode_host_path", "code_mode_host_sha256",
 }
 PYTHON_IDENTITY_KEYS = {
     "schema_version", "authority_version", "canonical_path", "python_version",
@@ -604,7 +605,7 @@ def _read_stable_opened(fd: int, limit: int, label: str) -> bytes:
     return b"".join(chunks)
 
 
-def _strict_provider_authority(repo: Path) -> tuple[Path, str]:
+def _strict_provider_authority(repo: Path) -> tuple[Path, str, Path, str]:
     authority_path = repo / PROVIDER_IDENTITY_PATH
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -624,55 +625,74 @@ def _strict_provider_authority(repo: Path) -> tuple[Path, str]:
         raise Stop("provider identity authority has unexpected keys")
     schema, provider = value["schema_version"], value["provider"]
     executable, digest = value["executable_path"], value["executable_sha256"]
-    if (type(schema) is not int or schema != 1 or type(provider) is not str
+    host, host_digest = value["code_mode_host_path"], value["code_mode_host_sha256"]
+    if (type(schema) is not int or schema != 2 or type(provider) is not str
             or provider != "openai-codex" or type(executable) is not str
             or not executable or type(digest) is not str
-            or not re.fullmatch(r"[0-9a-f]{64}", digest)):
+            or not re.fullmatch(r"[0-9a-f]{64}", digest)
+            or type(host) is not str or not host or type(host_digest) is not str
+            or not re.fullmatch(r"[0-9a-f]{64}", host_digest)):
         raise Stop("provider identity authority has invalid values")
     path = Path(executable)
-    if not path.is_absolute():
-        raise Stop("provider executable path must be absolute")
-    return path, digest
+    host_path = Path(host)
+    if not path.is_absolute() or not host_path.is_absolute():
+        raise Stop("provider execution-family paths must be absolute")
+    return path, digest, host_path, host_digest
 
 
-def _provider_snapshot(repo: Path) -> tuple[Path, Path, str]:
-    source, expected = _strict_provider_authority(repo)
+def _opened_executable_payload(source: Path, expected: str, label: str) -> bytes:
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         fd = os.open(source, flags)
     except OSError as e:
-        raise Stop(f"provider executable unavailable: {e}") from e
+        raise Stop(f"{label} unavailable: {e}") from e
     try:
         opened = os.fstat(fd)
         if not stat.S_ISREG(opened.st_mode) or not (opened.st_mode & 0o111):
-            raise Stop("provider executable is not a regular executable file")
+            raise Stop(f"{label} is not a regular executable file")
         payload = _read_stable_opened(fd, MAX_PROVIDER_EXECUTABLE_BYTES,
-                                      "provider executable")
+                                      label)
     finally:
         os.close(fd)
     if hashlib.sha256(payload).hexdigest() != expected:
-        raise Stop("provider executable digest does not match authority")
+        raise Stop(f"{label} digest does not match authority")
+    return payload
+
+
+def _write_snapshot(root: Path, basename: str, payload: bytes,
+                    expected: str, label: str) -> Path:
+    snapshot = root / basename
+    out = os.open(snapshot, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                  | getattr(os, "O_CLOEXEC", 0), 0o700)
+    try:
+        view = memoryview(payload)
+        while view:
+            written = os.write(out, view)
+            if written <= 0:
+                raise OSError(f"short {label} snapshot write")
+            view = view[written:]
+        os.fsync(out)
+    finally:
+        os.close(out)
+    with snapshot.open("rb") as final:
+        final_digest = hashlib.sha256(final.read()).hexdigest()
+    if final_digest != expected:
+        raise Stop(f"private {label} snapshot changed while being created")
+    return snapshot
+
+
+def _provider_snapshot(repo: Path) -> tuple[Path, Path, str, Path, str]:
+    source, expected, host_source, host_expected = _strict_provider_authority(repo)
+    payload = _opened_executable_payload(source, expected, "provider executable")
+    host_payload = _opened_executable_payload(
+        host_source, host_expected, "code-mode host executable")
 
     root = Path(tempfile.mkdtemp(prefix="nortropic-provider-"))
-    snapshot = root / "provider"
     try:
-        out = os.open(snapshot, os.O_WRONLY | os.O_CREAT | os.O_EXCL
-                      | getattr(os, "O_CLOEXEC", 0), 0o700)
-        try:
-            view = memoryview(payload)
-            while view:
-                written = os.write(out, view)
-                if written <= 0:
-                    raise OSError("short provider snapshot write")
-                view = view[written:]
-            os.fsync(out)
-        finally:
-            os.close(out)
-        with snapshot.open("rb") as final:
-            final_digest = hashlib.sha256(final.read()).hexdigest()
-        if final_digest != expected:
-            raise Stop("private provider snapshot changed before launch")
-        return root, snapshot, expected
+        snapshot = _write_snapshot(root, "provider", payload, expected, "provider")
+        host_snapshot = _write_snapshot(
+            root, "codex-code-mode-host", host_payload, host_expected, "code-mode host")
+        return root, snapshot, expected, host_snapshot, host_expected
     except BaseException:
         os.chmod(root, 0o700)
         shutil.rmtree(root)
@@ -764,7 +784,8 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
     if not schema.exists():
         raise Stop(f"report schema missing in worktree: {schema}")
     full_prompt = prompt.rstrip() + "\n\n" + agent_prompt_common()
-    snapshot_root, snapshot, snapshot_digest = _provider_snapshot(repo)
+    (snapshot_root, snapshot, snapshot_digest,
+     host_snapshot, host_snapshot_digest) = _provider_snapshot(repo)
     try:
         python_snapshot, python_digest = _python_snapshot(snapshot_root)
     except BaseException:
@@ -796,17 +817,22 @@ def run_codex(repo: Path, wt: Path, role: str, prompt: str) -> AgentRun:
     env["NORTROPIC_TRUST_ROOT"] = str(snapshot_root)
     thread_id: str | None = None
     try:
-        # The final read is deliberately adjacent to the trust transition.
-        # No AGENT_START is emitted if the private object has changed.
+        # Protect the complete execution family first.  Every final identity
+        # read is deliberately after the last successful mode transition and
+        # adjacent to AGENT_START/spawn.
+        os.chmod(snapshot, 0o500)
+        os.chmod(host_snapshot, 0o500)
+        os.chmod(python_snapshot, 0o500)
+        os.chmod(snapshot_root, 0o500)
         with snapshot.open("rb") as final:
             if hashlib.sha256(final.read()).hexdigest() != snapshot_digest:
                 raise Stop("private provider snapshot changed at launch boundary")
+        with host_snapshot.open("rb") as final:
+            if hashlib.sha256(final.read()).hexdigest() != host_snapshot_digest:
+                raise Stop("private code-mode host snapshot changed at launch boundary")
         with python_snapshot.open("rb") as final:
             if hashlib.sha256(final.read()).hexdigest() != python_digest:
                 raise Stop("private controller Python changed at launch boundary")
-        os.chmod(snapshot, 0o500)
-        os.chmod(python_snapshot, 0o500)
-        os.chmod(snapshot_root, 0o500)
         journal(repo, "AGENT_START", role=role, model=model,
                 reasoning_effort=reasoning_effort,
                 model_routing_source="AUTOPILOT_ROLE_POLICY",
