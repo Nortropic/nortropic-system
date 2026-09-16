@@ -85,6 +85,7 @@ Räkna med ett fjortonde fel.
 | `09-task-rundtrampsvakten.md` | Taskspec att frysa (h-040). Har en blockerande designfråga i §2 |
 | `10-forsta-arbetspaketet-h014.md` | Första bygget. Redan specad i repot; bara grinden saknas |
 | `11-tre-vakter-mot-aterfall.md` | **Mekanismerna mot återfall** — tre vakter, var och en med ett KÖRT positivt kontrollprov |
+| `12-arbetsorder.md` | **⭐ ARBETSORDERN.** EFTERARBETE.md:s elva punkter omprövade mot HEAD 2026-09-16: åtta åtgärdade, en utgår, tre kvarstår |
 
 **⚠️ LÄS `SEPARATION-20260910/` FÖRE DETTA UNDERLAG.** Separationen 2026-09-10 bär sin
 egen dokumentation: `README.md` (ägarbeslut och allokeringsprinciper), `ALLOCATION.tsv`

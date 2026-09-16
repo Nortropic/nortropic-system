@@ -7,18 +7,30 @@ ersätter alla tidigare versioner.
 DIN FÖRSTA UPPGIFT — OCH LÄS SEPARATION-20260910/ INNAN DU RÖR NÅGOT
 ══════════════════════════════════════════════════════════════════════════════
 
-ARBETSORDERN LIGGER INTE I DETTA UNDERLAG. Den ligger i
-SEPARATION-20260910/EFTERARBETE.md — elva mätta bindningar med utpekad ägare,
-skrivna 2026-09-10 av den som utförde separationen. Börja där.
+LÄS docs/loop/raddning/12-arbetsorder.md. Den är arbetsordern.
 
-BÖRJA MED PUNKT 3: "plattformens dokumentauktoritet måste bindas till docs/loop/**"
+SEPARATION-20260910/EFTERARBETE.md är sann för 2026-09-10 men FÖRÅLDRAD som
+arbetsorder: den skrevs vid commit dae90c8f, och grenen har gått 48 commits sedan
+dess. Omprövat mot HEAD 2026-09-16: ÅTTA av elva punkter är redan åtgärdade, en
+utgår, TRE kvarstår. Punkt 3 — som en tidigare version av denna prompt pekade ut
+som första uppgift — är GJORD för controller/verify/cli.
 
-Det betyder: plattformen får en EGEN beslutslogg under docs/loop/, och
-controller/verify/cli (PRETASK_PATHS, PLATFORM_DOCUMENTS), specen och grindarna
-pekas om dit. Webben förblir ute; kärnan får egen auktoritet.
+DE TRE SOM KVARSTÅR ÄR EN ENDA SAK, och den förklarar alla fem röda grindar:
 
-Punkt 5 säger vad det kostar: ~79 referenser till beslutsloggen i taskrader, och
-specs/** är människohand.
+  Kärnan refererar fem dokument som separationen flyttade till webben.
+
+  punkt 4  verify/bin/document-authority-exit  DOCUMENTS-listan
+  punkt 5  specs/tasks.spec.json               72 referenser  (MÄNNISKOHAND)
+  punkt 7  controller/attest/cli               5 referenser
+
+  h-035 är därmed inte längre oförklarad: den läser docs/05-beslutslogg.md och
+  docs/07-konstitution.md, båda saknas. Samma orsak som h-036 och h-038.
+
+ORDNINGEN, med mätvärden per steg, står i 12-arbetsorder.md:
+  1. docs/loop/beslutslogg.md — plattformens egen, migrera kernelraderna dit
+  2. peka om de tre ytorna
+  3. frys om h-007/035/036/037/038 EN gång, inklusive de fyra shebangarna
+  4. landa grenen (55 commits)
 
   ⚠️ EN TIDIGARE VERSION AV DENNA PROMPT SA "VÄG A-PRIM: ÅTERSTÄLL
   docs/05-beslutslogg.md SOM KERNELFIL". DEN ÄR ÅTERKALLAD.
@@ -201,8 +213,8 @@ ORDNINGEN
 ══════════════════════════════════════════════════════════════════════════════
 
   0. Kör validera-underlaget.sh. Läs docs/loop/regler.md regel 11 och 12.
-  1. EFTERARBETE.md punkt 3: bind plattformens dokumentauktoritet till
-     docs/loop/**. Därefter de övriga defekterna ovan; fastställ h-035 först.
+  1. 12-arbetsorder.md steg 1-4. Kontrollera dess tabell mot HEAD först —
+     den är daterad och blir osann på samma sätt som EFTERARBETE.md blev.
   2. Granska och landa plattformsgrenen.
   3. verify/bin/autonomous-loop-exit, fryst RED mot KERNEL_COMPLETE
      (definitionen i 00-VAD-NORTROPIC-AR.md).
