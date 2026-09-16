@@ -6,6 +6,14 @@ Dessa regler styr bygget av kontrollplanet. De ersätter inte
 [docs/03-regelverk.md](../03-regelverk.md) eller [docs/07-konstitution.md](../07-konstitution.md) —
 systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står över dessa.
 
+> **Hur en regel ändras.** Regeln **revideras rent** — den säger vad som gäller nu, inget
+> annat. Skälet, citatet och mätningen som fällde det gamla hör hemma i
+> `docs/05-beslutslogg.md` (beslutet) och `docs/loop/drift.md` (fyndet). Här står högst en
+> rad: *(Skärpt \<datum\>, `LOOP-ÄGARBESLUT-X`.)*
+>
+> En regel som måste skummas lyds inte.
+> *(Konvention 2026-09-16, `LOOP-ÄGARBESLUT-REGELREVISION`.)*
+
 1. Inget bygge utan spec-rad i `specs/tasks.spec.json` och exit-test definierat före start.
 2. Allt arbete i repot, på gren `nortropic/loop-<id>`, committat per delsteg.
 3. Komponenter använder planens namn (skiva 1–9, där 6b/6c/8/9 tillkom via LOOP-ÄGARHAND-16–27; §-referenser). Inga nya kodnamn.
@@ -20,57 +28,15 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
    > `skills/nortropic-eval/references/eval-rubric.md` ·
    > `skills/nortropic-plan/references/juridikflaggor.md`
 
-   **⚠️ SKÄRPT 2026-09-16** (`LOOP-ÄGARBESLUT-AUTONOM-KARNA`): `controller/**`,
-   `specs/**` och `verify/**` omfattas INTE längre av människohandskravet.
-
-   Skälet är mätt, och `byggplan-v3.md` §3.1 sa det redan själv: *"`controller/**`,
-   `specs/**` och `verify/**` står i §A-mängden ovan men **vaktas INTE av skiva 7:s
-   §A-kontroll** — de skyddas av `allowed_write` (som är smalare per task) och av
-   ägarhand."* Den mekaniska vakten var alltså alltid `allowed_write`. Ägarhanden var
-   **en sats i prosa**, och den låg tvärs över sex av de sju stegen på vägen till
-   `KERNEL_COMPLETE`.
-
-   **Vad som skyddar dem i stället — oförändrat, och det är det som är integriteten:**
-
-   | Mekanism | Vad den hindrar |
-   |---|---|
-   | `allowed_write` per task | Att en task skriver utanför sin egen yta. Mekanisk, smalare än §A |
-   | Rollseparation (`AGENTS.md`) | Att en byggare attesterar sin egen kandidat |
-   | Frysta `exit_test` + `NO-CREDIT` | Att ett påstående blir sant genom att sägas |
-   | Omfrysningsbudget (11a) | Trampkvarnen |
-   | `NO_FORCE_SEMANTICS` | Att historien skrivs om |
-
-   Detta upphäver den meningen i `LOOP-ÄGARHAND-15` (2026-08-08) som gjorde de tre
-   ytorna till människohand. Resten av §3.1 står orörd.
-
-   **Undantaget för `h-027`–`h-030` (`LOOP-ÄGARBESLUT-SUB-SPECS`) behövs inte längre**
-   — `specs/**` är inte människohand. Det står kvar nedan som spår av varför det en
-   gång behövdes, inte som gällande villkor.
-
-   **Ett namngivet undantag, 2026-09-16** (`LOOP-ÄGARBESLUT-SUB-SPECS`): Codex får skriva
-   `h-027`–`h-030` i `specs/tasks.spec.json`, eftersom delegationens scope namnger
-   supervisor resume och sekvensen redan står i det ägarauktoriserade
-   `harness-substitution-contract-v1.md`. Villkor: raderna härleds ur kontraktet, hela
-   kontraktsflödet i `AGENTS.md` gäller, commiten är HÖGRISK-märkt, och **varje ny task
-   deklarerar sin omfrysningsbudget enligt 11a**.
-
-   **Undantaget kommer ur ägarbeslutet, inte ur att sandboxen öppnades.** Att en §A-yta är
-   mekaniskt skrivbar sedan `LOOP-ÄGARBESLUT-SANDBOX-OPEN` gör den inte tillåten. Att
-   blanda ihop *kan* och *får* är vad `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder.
-   För allt annat i §A står regel 6 oförändrad.
+   **`controller/**`, `specs/**` och `verify/**` omfattas INTE.** De skyddas av
+   `allowed_write` per task, rollseparationen, de frysta exitproven,
+   omfrysningsbudgeten och `NO_FORCE_SEMANTICS` — inte av att en människa trycker på
+   knappen. *(Skärpt 2026-09-16, `LOOP-ÄGARBESLUT-AUTONOM-KARNA`.)*
 7. Docs uppdateras i samma commit som systemändringen (regel 17 + 22).
 8. Bevisregeln: varje rapporterat påstående pekar på verktygsbevis ur samma session.
    Overifierat märks OVERIFIERAT. "Klart" sägs aldrig utan kört exit-test.
 
    **8a. Bevis är ytbundet — ett grönt prov bevisar bara det provet läser.**
-   **Auktoriserad av Johnny 2026-09-16** (`LOOP-ÄGARBESLUT-REGEL-8A`), efter att
-   provenienssaknaden lagts fram: regeln skrevs först av Claude i en fil som säger
-   "ändras endast av Johnny". Det felet är samma mekanism som gav 470 av 587
-   beslutsrader utan ägarhand, och det är bokfört i `docs/loop/drift.md` FYND 36.
-   Tillagt 2026-09-16 efter att jag citerat `kor-vakter PASS 23/23` i **tolv** commits
-   som inte rörde en enda fil någon av de 23 vakterna läser — inklusive commiten som
-   skrev FYND 31, vars hela innehåll är att den siffran inte bevisar kernelarbete.
-   Raden hade blivit **ritual i commit-mallen**: en form, inte en mätning.
 
    | Ändringen rör | Giltigt bevis | Bevisar INTE |
    |---|---|---|
@@ -82,8 +48,8 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
 
    **Provet innan du citerar ett prov:** `grep -rl "<sökväg du ändrat>" <provets källa>`.
    Noll träffar = provet säger ingenting om din ändring, hur grönt det än är.
-   Att skriva ut det ändå är att pröva vad utdata SÄGER i stället för vad mekanismen
-   GÖR — samma fel en nivå upp, och den här gången av den som skrev regeln.
+   Att skriva ut det ändå är att pröva vad utdata SÄGER i stället för vad mekanismen GÖR.
+   *(Tillagd 2026-09-16, `LOOP-ÄGARBESLUT-REGEL-8A`.)*
 9. Scope: gör det enklaste som uppfyller exit-testet. Inga oombedda skyddslager,
    frysled, auktorisationskedjor eller framtidssäkring.
 10. Kontrollplanet rör aldrig kundflödet. Regel 16 står orörd.
@@ -131,26 +97,16 @@ prövats mot ett oförändrat prov.** Konvergens kräver ett fast mål.
 
   Utan denna distinktion fäller regeln varje försök att laga en trasig grind, och en
   regel som förbjuder sin egen åtgärd blir kringgången första gången den prövas.
-  Bakgrunden står i `docs/loop/drift.md` 2026-09-16 (FYND 29).
 
-  **⚠️ BELÄGGET ÄR OMSKRIVET 2026-09-16 efter FYND 33 — budgeten står, motiveringen inte.**
-  Här stod: *"Varje KLAR task har en grind som rörts ≤ 3 gånger (h-016: 1 · h-013: 2 …);
-  varje icke-klar 17–147. Ingen mellanform."* Omfrysningstalen är riktiga. **Etiketterna
-  var det inte:** körda på Macen i ren klon är `h-016` (1 omfrysning) `11 PASS / 14 FAIL`
-  och `h-013` (2 omfrysningar) `8 PASS / 8 FAIL`. De var aldrig klara.
+  **Budgeten är en STOPPMEKANISM, aldrig ett framgångsmått.** Mätt: varje icke-klar task
+  har en grind rörd 17–147 gånger (`h-035: 17 · h-039: 30 · h-032: 120 · h-031: 147`).
+  **Den omvända implikationen gäller inte** — ett lågt omfrysningstal betyder att någon
+  *slutade röra* grinden, inte att den blev grön. `h-016` rördes en gång och ger
+  `11 PASS / 14 FAIL`.
 
-  Implikationen `klar ⇒ få omfrysningar` är alltså **falsifierad**. Den motsatta står kvar
-  och är mätt: `h-035: 17 · h-039: 30 · h-032: 120 · h-031: 147`, alla icke-klara.
-
-  **Och den rätta läsningen är mörkare än den jag hade.** Ett fåtal omfrysningar betyder
-  inte att grinden blev grön — det betyder att **någon slutade röra den**. `h-016` rördes
-  en gång och är röd på fjorton kontroller. Lågt omfrysningstal är ett tecken på ÖVERGIVEN
-  hypotes lika gärna som på löst problem, och de två gick inte att skilja åt därför att
-  ingen körde grinden.
-
-  **Budgeten 3 gäller oförändrat**, nu som ren stoppmekanism mot trampkvarnen och inte
-  som en framgångsmarkör. **Att deklarera en task KLAR utan ett kört, grönt exitprov i
-  samma session är förbjudet enligt regel 8 och är det fel som gjorde etiketterna falska.**
+  **Att deklarera en task KLAR utan ett kört, grönt exitprov i samma session är förbjudet
+  enligt regel 8.** Det är felet som gjorde etiketterna falska.
+  *(Skärpt 2026-09-16, FYND 29 och 33.)*
 - **11b. Överskriden budget stoppar hypotesen.** Arkitekten delar den i mindre med var
   sitt fasta prov, eller avslutar den `OVERIFIERAT`. **Aldrig en runda till.**
 - **11c. MÅLFLYTT är ett eget utfall.** Innan `NO-CREDIT` sätts: jämför grinden
@@ -216,10 +172,10 @@ attestera sin egen kandidat, inte från att spara sitt arbete.
 `~/.claude/` upprepar fynd 2), och för Codex via `AGENTS.md`. Den
 
 - **vägrar på `main`** — bevarande hör hemma på en arbetsgren
-- **delar §A i en egen commit** märkt `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`. §A bevaras men
-  **auktoriseras inte**: regel 6 står orörd, och granskaren ska antingen skriva en rad i
-  `docs/05-beslutslogg.md` eller revertera. Att låta §A-arbete ligga okommitterat vore att
-  förlora det för att skydda det
+- **delar §A-kontrollens yta i en egen commit** märkt `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`.
+  Den bevaras men **auktoriseras inte**: granskaren skriver en rad i
+  `docs/05-beslutslogg.md` eller reverterar. Att låta sådant arbete ligga okommitterat
+  vore att förlora det för att skydda det
 - **pushar aldrig med `--force`**, mergar aldrig, attesterar aldrig
 - **är tyst när inget ändrats**, och rapporterar högt när pushen misslyckas
 

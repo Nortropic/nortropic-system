@@ -1,5 +1,68 @@
 # Att köra loopen
 
+## 2026-09-16 — REGLER REVIDERAS RENT. Arkeologin flyttad till sina rätta hem. 227 → 183 rader.
+
+Ägaren: *"när vi ändrar regler varför skriver man över istället för revidera och ta bort?"*
+
+**Mätt:** `regler.md` växte **92 → 228 rader på en dag**, 13 % rättelsetext.
+
+### Varför jag gjorde så — och varför det ändå var fel
+
+Projektets felklass var att **rättelser försvann**: tretton falska påståenden överlevde
+för att ingen kunde se att de rättats. Så jag behöll spåret i regeln.
+
+Men en regel är **ett påstående om vad som gäller nu**. Den ska gå att läsa i ett svep och
+lyda. Proveniensen har redan två hem byggda för ändamålet:
+
+| Hem | Bär |
+|---|---|
+| `docs/05-beslutslogg.md` | Beslutet — vem, när, varför, motargumentet |
+| `docs/loop/drift.md` | Fyndet — mätningen som fällde det gamla |
+
+Att lägga arkeologin i regeln är ett kategorifel. Och det gör regeln svårare att **lyda**:
+en regel på 228 rader skummas. `11-tre-vakter-mot-aterfall.md` säger det om sig själv —
+*"en vakt som skriker varg blir ignorerad, och en ignorerad vakt är värre än ingen."*
+
+### Orsaken är densamma som gav 470 rader utan ägarhand
+
+**När proveniens saknar hemvist landar den i närmaste dokument.** Skillnaden här: hemvisten
+fanns. Jag använde den inte, utan skrev både beslutet och arkeologin i regeln.
+
+### Utfört, och verifierat FÖRE borttagning
+
+Varje struken text prövades mot beslutsloggen och drift innan den togs bort — **alla åtta
+fanns**. Efteråt: **18 av 18** gällande regler intakta, **noll** arkeologiblock,
+innehållet kvar i sina rätta hem.
+
+**Ingen historik gick förlorad. En dubblett togs bort.**
+
+### Konventionen står nu överst i filen
+
+> Regeln revideras rent. Skälet, citatet och mätningen går till beslutslogg och drift.
+> Här står högst en rad: *(Skärpt \<datum\>, `LOOP-ÄGARBESLUT-X`.)*
+
+### Konventionsblocket bröt mot sin egen regel — 184 → 183
+
+Första versionen av blocket ovan bar tre rader arkeologi i sig själv: ägarcitatet,
+*"Filen hade vuxit 92 → 228 rader på en dag, varav 13 % arkeologi"* och en jämförelse mot
+vargvakten. **Exakt det blocket förbjuder.** Citatet och mätningen fanns redan i
+`LOOP-ÄGARBESLUT-REGELREVISION` och här ovan; i regeln stod alltså en dubblett skriven
+under regeln som förbjuder dubbletten. Struket samma dag, ersatt av en rad och en
+beslutshänvisning.
+
+**Felklassen är värd att notera:** en nyskriven regel prövades inte mot sig själv. Samma
+mönster som FYND 31 och 33 — metoden var lexikal (*skriv konventionen*) i stället för
+beteendemässig (*kör konventionen mot texten den står i*).
+
+### Strukturkontrollen sade emot sig själv
+
+Mitt ad hoc-prov rapporterade samtidigt `⚠️ regel 1 förekommer 2 gånger` och
+`regel 1–10: en gång var ✓`. **Provet var trasigt, inte filen:** regexen `^[0-9]\. `
+träffade även den numrerade listan inuti regel 12 (`regler.md:141–145`). Mätt med
+`grep -n '^[0-9]\+\. '`: tio rader för reglerna 1–10, tre för regel 12:s punktlista. Inga
+dubbletter. **Ett prov som säger två saker är alltid provets fel att bevisa bort först.**
+
+
 ## 2026-09-16 — PUBLICERINGSBEFOGENHETEN SAMMANJÄMKAD. Fem lager, en paragraf.
 
 Ägaren: *"varför har vi merge no på dessa ställen?"* → *"fixa detta"*.
