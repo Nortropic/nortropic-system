@@ -21,6 +21,22 @@ hit.
 körbanan, faserna, autonomikontraktet och de sex fällorna. Läser du en ordning någon
 annanstans är den upphävd — `03`, `10` och `12` bär numera en banner som säger det.
 
+**Är vi redo för Codex? Det är en MÄTNING, inte en bedömning:**
+
+```bash
+bash docs/loop/raddning/artefakter/redo-for-codex.sh    # på MACEN
+```
+
+Tolv mekaniska rader — körbanan, regel 12, autopush, underlagets avvikelser, att
+`VAGEN.md` är hel, att ingen annan fil bär en egen ordning, att kartan är mätt.
+`exit 0` = redo · `exit 1` = raderna med ✗ säger vad som saknas · `exit 2` = kunde
+inte mätas här.
+
+**Varför den finns:** frågan *"är vi redo?"* ställdes tjugo gånger utan definition,
+och ett svar som är en bedömning kan alltid visa sig vara för generöst när någon
+tittar närmare. Samma felklass som gav fyra task etiketten KLAR för att grindfilen
+fanns. Nu kan svaret fällas.
+
 **Och läget läser du aldrig, du räknar fram det:**
 
 ```bash
@@ -125,8 +141,10 @@ i Linux med Python 3.12, men grindarna faller på `undefined symbol: sysctl`. **
 `00-VAD-NORTROPIC-AR.md` → `00-LAS-FORST.md` → `05-arbetsordning.md` → `01` → `06` →
 `07` → `03`.
 
-**Arbetar du redan och vill bara veta vad du gör härnäst:** läs enbart
-`05-arbetsordning.md`. Den är självbärande.
+**Arbetar du redan och vill bara veta vad du gör härnäst:** `VAGEN.md`. Ingen annan
+fil. `05-arbetsordning.md` beskrev det en gång och gör det inte längre — den bär
+autonomikontraktet, tripwires och blockeringskontraktet, vilket är värdefullt och
+oförändrat, men inte ordningen.
 
 ## Vad underlaget INTE är
 
