@@ -42,9 +42,9 @@ men **kan inte flyttas som det ser ut nu**; skälet står i `01-lagesbild.md` §
 | `10-forsta-arbetspaketet-h014.md` | **Första bygget.** Redan specad i repot; bara grinden saknas. Bär rättelsen om plattformen |
 | `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
 | `artefakter/nortropic-dokumentation-4commits.patch` | Fyra färdiga commits som rättar ingångsdokumentationen |
-| `artefakter/nortropic-web-extraktion.bundle` | Webbfabriken utbruten, **337 commits / 311 filer**, verifierat noll kernelfiler (mätt ur artefakten 2026-09-16) |
+| `artefakter/nortropic-web-extraktion.bundle` | ⚠️ **ÖVERFLÖDIG** — webbfabriken finns på riktigt i `Nortropic/nortropic-webbforvaltning` sedan 2026-09-16, med proveniens per fil. Bundlen var mitt eget utkast och ska inte användas |
 | `artefakter/validera-underlaget.sh` | **MEKANISMEN som prövar detta underlag mot repot.** 37 påståenden, verdikt per rad, exit 0/1/2. Kör den först |
-| `artefakter/klassificera-lager.py` | Klassificeringen bundlen genererades ur. Kör den, härled sedan om med annan metod |
+| `artefakter/klassificera-lager.py` | ⚠️ **ÖVERFLÖDIG** — ersatt av `SEPARATION-20260910/ALLOCATION.tsv`. Kör den inte |
 | `artefakter/lagerklassificering-2026-09-16.txt` | Utfallet: 439 filer — 121 kärna, 7 delat, 311 webb |
 
 **Kör först, läs sedan:**

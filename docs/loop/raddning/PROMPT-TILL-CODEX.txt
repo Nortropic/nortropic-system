@@ -4,61 +4,55 @@ ersätter alla tidigare versioner.
 
 
 ══════════════════════════════════════════════════════════════════════════════
-DIN FÖRSTA UPPGIFT ÄR REDAN BESTÄMD OCH DIMENSIONERAD
+DIN FÖRSTA UPPGIFT — OCH LÄS SEPARATION-20260910/ INNAN DU RÖR NÅGOT
 ══════════════════════════════════════════════════════════════════════════════
 
-Ägaren har beslutat VÄG A-PRIM. Det är EN omfrysning som rättar TRE gatedefekter.
-Den är mätt, inte resonerad — varje siffra nedan kommer ur en körning 2026-09-16.
+ARBETSORDERN LIGGER INTE I DETTA UNDERLAG. Den ligger i
+SEPARATION-20260910/EFTERARBETE.md — elva mätta bindningar med utpekad ägare,
+skrivna 2026-09-10 av den som utförde separationen. Börja där.
 
-ARBETET SKER PÅ GRENEN  nortropic/platform-integration-20260910
-(55 commits före origin/main, pushad 2026-09-16, bär separationen färdig)
+BÖRJA MED PUNKT 3: "plattformens dokumentauktoritet måste bindas till docs/loop/**"
 
-  1. ÅTERSTÄLL docs/05-beslutslogg.md som kernelfil.
-     Löser h-007, h-036 och h-038. Mätt:
-       h-007 exit 1 — 14 PASS / 5 FAIL, alla fem: "§A-orsak — X avvisades men
-             orsaken namnger den inte: [docs-kravet ouppfyllt för h-001
-             (regel 17 + 22): docs/05-beslutslogg.md ändrades inte i samma commit]"
-       h-036 exit 2 — RIG_ERROR: No such file ... docs/05-beslutslogg.md
-       h-038 exit 2 — RIG_ERROR: H036 helper gate identity drift (kedjad till h-036)
+Det betyder: plattformen får en EGEN beslutslogg under docs/loop/, och
+controller/verify/cli (PRETASK_PATHS, PLATFORM_DOCUMENTS), specen och grindarna
+pekas om dit. Webben förblir ute; kärnan får egen auktoritet.
 
-     VARFÖR den är kärnans, och det är avgjort: h-007 prövar att en §A-avvisning
-     NAMNGER sökvägen. Controllerns docs-krav slår till först eftersom filen
-     saknas, så §A-kontrollen nås aldrig. Filen är bärande för kärnans egen
-     §A-hävdelse. Mätt lagerdom: kernel=113, webb=57.
+Punkt 5 säger vad det kostar: ~79 referenser till beslutsloggen i taskrader, och
+specs/** är människohand.
 
-     ÅTERSTÄLL INGET ANNAT. docs/07-konstitution.md, docs/03-regelverk.md,
-     docs/00-borja-har.md och docs/agentoverlamning.md är WEBBENS (kernel=0,
-     kernel=0, kernel=5/webb=82, kernel=3/webb=4) och ska förbli borta.
-     Att flytta tillbaka dem vore att bygga om sammanflätningen separationen
-     just löste.
+  ⚠️ EN TIDIGARE VERSION AV DENNA PROMPT SA "VÄG A-PRIM: ÅTERSTÄLL
+  docs/05-beslutslogg.md SOM KERNELFIL". DEN ÄR ÅTERKALLAD.
 
-  2. PEKA OM konstitutionspinnarna mot kärnans EGEN §A-mängd.
-     h-035, h-036, h-037 pinnar docs/07-konstitution.md PÅ SHA:
-       "docs/07-konstitution.md":"2e7f04cca9eb00d24b264b91a0678aaee68c97441d79..."
-     Kärnan har sedan länge en egen skyddad mängd: docs/loop/byggplan-v3.md §3.1,
-     och §20 säger uttryckligen att "v4.1:s ursprungliga lista skyddar sökvägar
-     som inte finns". Grindarna pekades bara aldrig om.
-     Löser h-037 ("current subject differs outside the exact four-file contract",
-     UNEXPECTED_RED).
+  Skälet står i FYND 26 (docs/loop/drift.md 2026-09-16): rekommendationen hade
+  upphävt ett ägarbeslut. SEPARATION-20260910/README.md bär ägarens precisering
+  2026-09-10: "konstitution/regelverk/beslutslogg/börja-här/agentöverlämning är
+  webbförvaltningens äldre styrdokument och hör inte till kernel/bootstrap."
 
-  3. RÄTTA FYRA SHEBANGAR till #!/usr/bin/env python3.12
-     h-035, h-036, h-038, h-039 bär i dag
-       #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/.../python3.12
-     Den fungerar I DAG (verifierat: katalogen finns). Vid nästa brew upgrade av
-     python@3.12 blir de fyra OKÖRBARA — inte röda — och kan aldrig bli gröna
-     igen utan omfrysning. h-039 är en av dem: hypotesen med 30 omfrysningar och
-     ett 2,1 MB exitprov. Latent defekt, en rad per fil.
+  Beslutsloggen ska alltså INTE tillbaka till kärnan. Kärnan får en egen.
+  Beslutsraden LOOP-ÅTERKALLAT-VÄG-A-PRIM i docs/05-beslutslogg.md är bindande.
 
-  OFÖRKLARAT, DEN ENDA POSTEN: h-035 ger exit 2 men de synliga raderna är PASS.
-  Orsaken är inte fastställd. Fastställ den innan du rör h-035.
+DE ÖVRIGA DEFEKTERNA, mätta 2026-09-16 och giltiga oavsett punkt 3:
 
-  ALLA TRE ÄR GATEDEFEKTER, INTE KANDIDATDEFEKTER (loop-regel 11c).
-  Samma kandidat körs om. Rundan bokförs mot SPECIFIKATIONEN, aldrig mot
-  kandidaten. Detta är första tillämpningen av regel 11 och skälet till att
-  omfrysningen inte är runda 77: de tidigare gjorde grindarna MER exakta,
-  denna gör dem MINDRE miljöbundna. Regel 11 tillåter det ena och förbjuder
-  det andra.
+  h-037  FAIL "current subject differs outside the exact four-file contract"
+         -> trädpinning, FYND 21. Kräver regel 11-omfrysning.
+  h-035  exit 2, synliga rader PASS. OFÖRKLARAD. Fastställ orsaken först.
+  h-035, h-036, h-038, h-039 bär
+         #!/opt/homebrew/Cellar/python@3.12/3.12.13_4/.../python3.12
+         Fungerar i dag (katalogen finns, verifierat). Vid nästa brew upgrade
+         blir de OKÖRBARA, inte röda. En rad per fil: #!/usr/bin/env python3.12
 
+  ALLA ÄR GATEDEFEKTER, INTE KANDIDATDEFEKTER (loop-regel 11c). Samma kandidat
+  körs om; rundan bokförs mot SPECIFIKATIONEN. Det är skälet till att
+  omfrysningen inte är runda 77: de tidigare gjorde grindarna MER exakta, dessa
+  gör dem MINDRE miljöbundna.
+
+STATUS PÅ MAIN, SOM DU MÅSTE KÄNNA TILL:
+  main bär fortfarande 246 webbfiler och registret pekar på
+  workflows/nortropic-verify-suite.js. SEPARATIONEN ÄR INTE LANDAD. Den ligger
+  på grenen nortropic/platform-integration-20260910 (55 commits före main,
+  0 bakom) och kan inte mergas förrän punkt 3 är gjord.
+
+  Arbeta på den grenen. Inte på main.
 
 ══════════════════════════════════════════════════════════════════════════════
 TVÅ NYA LOOP-REGLER — LÄS docs/loop/regler.md FÖRE ALLT ARBETE
@@ -103,9 +97,9 @@ GJORT (och underlaget är rättat därefter):
     PINV-001-006, under denied_write. invariant-required-exit exit 0.
     Det var räddningsplanens STEG 5. Den cirkulära trust-roten är upplöst.
 
-VIKTIGT: diagnosen av origin/main STÅR — där finns fortfarande 79 webbfiler och
-registrets webbpost. Skillnaden är att lösningen redan finns byggd på grenen.
-Steg 4 och 5 ska LANDAS, inte byggas.
+VIKTIGT: diagnosen av origin/main STÅR — där finns fortfarande 246 webbfiler och
+registrets webbpost (workflows/nortropic-verify-suite.js). Skillnaden är att
+lösningen redan finns byggd på grenen. Steg 4 och 5 ska LANDAS, inte byggas.
 
 INTE GJORT:
   - verify/bin/autonomous-loop-exit. Specificerad 2026-08-10, aldrig byggd.
@@ -146,7 +140,8 @@ Bygg ingen av dem utan att reproducera provet först.
 METODEN — DEN DYRASTE LÄRDOMEN I HELA PROJEKTET
 ══════════════════════════════════════════════════════════════════════════════
 
-Femton felaktiga påståenden hittades i underlaget under arbetet 2026-09-14/16.
+27 felaktiga påståenden hittades under arbetet 2026-09-14/16. 13 av dem är fel i
+mitt eget arbete — nio i underlaget självt, plus FYND 20, 24, 25 och 26.
 Mönstret är entydigt: VARJE gång en mekanism HÄRLEDDES ur ett symptom var
 slutsatsen fel. VARJE gång mekanismen KÖRDES var den rätt.
 
@@ -166,7 +161,7 @@ GRÖNT BETYDER INTE SANT — provet återanvänder underlagets egna kommandon oc
 ärver dess blinda fläckar. Den oberoende omhärledningen i 06-inventering.md §0
 är fortfarande obligatorisk, liksom §0c om det lokala maskintillståndet.
 
-RÄKNA MED ETT SEXTONDE FEL.
+RÄKNA MED ETT TJUGOÅTTONDE FEL.
 
 
 ══════════════════════════════════════════════════════════════════════════════
@@ -206,8 +201,8 @@ ORDNINGEN
 ══════════════════════════════════════════════════════════════════════════════
 
   0. Kör validera-underlaget.sh. Läs docs/loop/regler.md regel 11 och 12.
-  1. VÄG A-PRIM: omfrysningen ovan, tre gatedefekter i ett drag.
-     Fastställ h-035 först.
+  1. EFTERARBETE.md punkt 3: bind plattformens dokumentauktoritet till
+     docs/loop/**. Därefter de övriga defekterna ovan; fastställ h-035 först.
   2. Granska och landa plattformsgrenen.
   3. verify/bin/autonomous-loop-exit, fryst RED mot KERNEL_COMPLETE
      (definitionen i 00-VAD-NORTROPIC-AR.md).

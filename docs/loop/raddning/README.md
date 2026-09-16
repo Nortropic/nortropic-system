@@ -94,18 +94,22 @@ metod och diagnos — och det skrevs delvis utan kännedom om separationens doku
 vilket gav FYND 26: en rekommendation som upphävde ett ägarbeslut.
 | `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
 
-## Artefakten som INTE ligger här
+## ⚠️ Två artefakter är ÖVERFLÖDIGA — använd dem inte
 
-`nortropic-web-extraktion.bundle` (2,4 MB) är utelämnad med avsikt — en binär,
-regenererbar artefakt hör inte hemma i en trust kernel. Den återskapas ur
-klassificeringen:
+**`artefakter/klassificera-lager.py`** producerade en lagerklassificering på 439 rader.
+Den är **ersatt av `SEPARATION-20260910/ALLOCATION.tsv`**: 443 poster, femdelad dom, med
+proveniens per fil och ägarens preciseringar. Kör inte skriptet — två klassificeringar som
+säger olika saker om samma träd är värre än en, och det är precis den andra-sanning-drift
+detta projekt lider av. Filen behålls som spår av hur jag arbetade, inget annat.
 
-```bash
-python3 docs/loop/raddning/artefakter/klassificera-lager.py --web-paths
-# mata sökvägslistan till git-filter-repo i en separat klon
-```
+**`nortropic-web-extraktion.bundle`** (2,4 MB, ej committad) var mitt utkast till en
+webbextraktion. Den är ersatt av verkligheten: webbfabriken ligger sedan 2026-09-16 i
+**`Nortropic/nortropic-webbforvaltning`**, utbruten 2026-09-10 med proveniens per fil i
+dess `SEPARATION-ORIGIN/PROVENIENS.tsv`. Använd repot, inte bundlen.
 
-Facit vid generering 2026-09-16: **337 commits, 311 filer, noll kernelfiler.**
+Båda misstagen har samma orsak, och den är underlagets viktigaste lärdom: **jag byggde
+lösningar på ett problem utan att först läsa den dokumentation som redan låg bredvid det.**
+Se FYND 26 i `docs/loop/drift.md`.
 
 ## Statusregeln gäller fortfarande
 
