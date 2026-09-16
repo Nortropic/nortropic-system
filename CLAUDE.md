@@ -72,10 +72,25 @@ kontinuitetslager (se nedan) bar 27 commits 2026-09-09→13 medan `drift.md` bar
 rader. Arbete utanför repot ska därför ändå ge en rad här samma dag — annars är
 lägesdokumentet falskt för den perioden, vilket det var för den veckan.
 
-**Vägen till klar kärna** står i `docs/loop/raddning/` — lägesbild, karta, slutkriterium
-(`KERNEL_COMPLETE`) och arbetsordning. Läs `raddning/README.md` först; behöver du bara
-veta vad du gör härnäst räcker `raddning/05-arbetsordning.md`. Katalogen bär **analys och
-plan, aldrig status** — status är drift.md.
+**Vägen till klar kärna** står i **`docs/loop/raddning/VAGEN.md`** — den **enda** filen i
+repot som säger vad som görs härnäst. Slutkriteriets sex mätbara rader, körbanan, faserna,
+autonomikontraktet och de sex fällorna. Läser du en ordning någon annanstans är den
+upphävd; `03`, `10` och `12` bär en banner som säger det. Katalogen bär i övrigt **analys
+och plan, aldrig status** — status är drift.md.
+
+**Läget läser du aldrig, du räknar fram det:**
+
+```bash
+bash docs/loop/raddning/artefakter/helhetsbilden.sh          # 2 sek
+bash docs/loop/raddning/artefakter/helhetsbilden.sh --kor-grindar   # + de 14, Darwin
+```
+
+Rätt maskin, rätt klon, dagsfärsk, vilka av de sex raderna som är uppfyllda, vad
+plattformsgrenen bär som `main` saknar. Provet påstår aldrig ett grindutfall det inte
+kört — utan `--kor-grindar` står det *"kräver körning"*, på fel plattform `ODÖMBART`.
+**Skälet att det är ett prov och inte ett stycke text:** katalogen är tjugo filer och
+~4 000 rader som beskriver helheten på fem överlappande sätt, och ingen av dem visar
+läget. Ett dokument om ett tillstånd är inaktuellt dagen efter.
 
 Underlaget är evidens, inte facit: tretton felaktiga påståenden hittades under arbetet,
 **nio av dem i underlaget självt**, och elva av tretton kom av en lexikal metod som aldrig

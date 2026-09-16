@@ -1,5 +1,9 @@
 # Räddningsplan
 
+> ⚠️ **ORDNINGEN I DENNA FIL ÄR UPPHÄVD.** Vägen står i `VAGEN.md` — den enda filen som
+> säger vad som görs härnäst. Steg 1 här (*"bygg slutgrinden först"*) är `VAGEN.md` FAS 7.
+> **Analysen och doktrinreglerna i filen gäller oförändrat.**
+
 Fem steg i prioritetsordning. **Ordningen följer vad som förbrukar budgeten**, inte vad
 som känns mest akut. Steg 4 (separationen) är viktig men är en följd av problemet — att
 börja där lämnar blödningen öppen.

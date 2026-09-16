@@ -15,6 +15,28 @@ paketet finns ingenstans.
 Därför bor det i `docs/loop/`, som är kärnans lager, och `CLAUDE.md` + `AGENTS.md` pekar
 hit.
 
+## ⭐ VÄGEN och HELHETSBILDEN — börja här, allt annat är bakgrund
+
+**`VAGEN.md` är den enda filen i repot som säger vad som görs härnäst.** Slutmålet,
+körbanan, faserna, autonomikontraktet och de sex fällorna. Läser du en ordning någon
+annanstans är den upphävd — `03`, `10` och `12` bär numera en banner som säger det.
+
+**Och läget läser du aldrig, du räknar fram det:**
+
+```bash
+bash docs/loop/raddning/artefakter/helhetsbilden.sh          # 2 sek
+bash docs/loop/raddning/artefakter/helhetsbilden.sh --kor-grindar   # + de 14, Darwin
+```
+
+Hela lägesbilden mätt: rätt maskin, rätt klon, dagsfärsk, vilka av slutkriteriets sex
+rader som är uppfyllda, och vad plattformsgrenen bär som `main` saknar. Provet påstår
+aldrig ett grindutfall det inte kört.
+
+**Varför ett prov och inte ett stycke text:** denna katalog är tjugo filer och ~4 000
+rader som beskriver helheten på fem överlappande sätt, och ingen av dem visar *läget*.
+Ett dokument om ett tillstånd är inaktuellt dagen efter. Det är hela skälet till att
+status bor i `drift.md` — och samma skäl gäller helhetsbilden.
+
 ## Kör detta först
 
 ```bash
@@ -121,6 +143,7 @@ Räkna med ett fjortonde fel.
 
 | Fil | Vad |
 |---|---|
+| **`VAGEN.md`** | **⭐ VÄGEN. Den enda filen som säger vad som görs härnäst.** Slutkriteriets sex rader, körbanan, faserna, autonomikontraktet, de sex fällorna |
 | `00-VAD-NORTROPIC-AR.md` | Ägarens definition av vad Nortropic är — auktoritet för allt annat här |
 | `00-LAS-FORST.md` | Router, prioritetsordning, de tretton felen |
 | `01-lagesbild.md` | Diagnosen, inklusive varför H-039 inte kan konvergera |
