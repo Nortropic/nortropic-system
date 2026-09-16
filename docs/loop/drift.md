@@ -1,5 +1,57 @@
 # Att köra loopen
 
+## 2026-09-16 — CODEX FÅR SKRIVA h-027–h-030, och regel 6 är kärnans egen regel
+
+Vägens fyra första poster är spec-rader. `specs/**` ligger i byggplan-v3 §3.1:s §A-mängd,
+och regel 6 gör den mängden till människohand. Codex hade alltså mött en tvetydighet vid
+**vägens första steg** och antingen stannat eller överträtt.
+
+Ägaren avgjorde 2026-09-16: *"det är väl klokast att codex skriver dem så länge vi talar
+om det för codex."* Beslutet ligger som `LOOP-ÄGARBESLUT-SUB-SPECS` i
+`docs/05-beslutslogg.md`, med ett namngivet undantag inskrivet i regel 6.
+
+**Befogenheten kommer ur beslutet, inte ur att sandboxen öppnades.** Att `specs/**` är
+mekaniskt skrivbart sedan `LOOP-ÄGARBESLUT-SANDBOX-OPEN` gör det inte tillåtet. Att
+blanda ihop *kan* och *får* är precis vad `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder.
+
+### FYND 30 — regel 6 är INTE ärvd webbstyrning, men §A-mängden den pekar på är blandad
+
+Ägaren invände: *"dessa regler är väl från webben? vi ska ju ta bort ägarhand."* Frågan är
+riktig att ställa — två av tre styrdokument kärnan är pinnad till ÄR webbens. Mätt:
+
+| Dokument | Läses av kärnan | Läses av webbträdet | Dom |
+|---|---|---|---|
+| `docs/07-konstitution.md` | 0 | 4 | webb |
+| `docs/03-regelverk.md` | 0 | 8 | webb |
+| **`docs/loop/regler.md`** | **`controller/verify/cli`, `specs/tasks.spec.json`, `scripts/nortropic-codex-autopilot.py`, fem rollskills i `.agents/`, `AGENTS.md`, `CLAUDE.md`** | **0** | **kärnan** |
+
+Regel 6 är alltså kontrollplanets egen regel, beslutad för kontrollplanet. Den är inte
+ägarhand som följt med från webbfabriken.
+
+**Men §A-mängden regel 6 pekar på är blandad** — byggplan-v3 §3.1 listar tretton poster,
+varav sex är webbens (`docs/07-konstitution.md`, `docs/03-regelverk.md`, två
+`skills/`-referenser, `workflows/**`, `agents/nortropic-steward.md`) och sju kärnans
+(`specs/**`, `verify/**`, `controller/**`, `CLAUDE.md`, `scripts/check-invariants.mjs`,
+`tests/fixtures/**`, `AUTOPILOT`). §3.1:s egen text säger uttryckligen att kärnans tre
+första *"skyddas av `allowed_write` (som är smalare per task) och av ägarhand"* — ägarhand
+är inskriven i konstruktionen där, av `LOOP-ÄGARHAND-15` 2026-08-08.
+
+### Den kvarvarande frågan, som är ägarens och inte min
+
+Arbetsordningens `true_human_hard_stops` har **fyra** poster: konstitutionen, juridiskt
+human-only, äkta auktoritetskonflikt, externa trust-rötter. **`specs/**` står inte bland
+dem.** Regel 6 är därmed strängare mot kärnans egna ytor än vad delegationen kräver.
+
+Dagens undantag löser det **punktvis** — fyra namngivna task. Den generella frågan är om
+regel 6 ska peka på §A-mängdens *webbdel* och lämna kärnans egna ytor till `allowed_write`
+plus rollseparation. Det vore rätt riktning enligt ägarens *"vi ska ju ta bort ägarhand"*,
+men det upphäver `LOOP-ÄGARHAND-15`, och **att upphäva ett ägarbeslut utan att läsa dess
+underlag är exakt FYND 26.** Den ändringen görs därför inte här. Den ligger som ett öppet
+ägarbeslut, och tills det fattas blockerar regel 6 ingenting på vägen till
+`KERNEL_COMPLETE` — undantaget täcker alla fyra spec-raderna vägen behöver.
+
+Vaktsviten `PASS — 23/23` vid commiten.
+
 ## 2026-09-16 — VÄGEN TILL MÅLET ÄR SEX POSTER, och den prosarad som sa annat är upphävd
 
 Efter beslutet att avsluta `h-039`, `h-031` och `h-032` `OVERIFIERAT` ställdes frågan som

@@ -193,6 +193,14 @@ Efter merge återstår, i den ordningen:
 3. `h-014` — spec färdig, grind saknas. Pröva `h-013` på Macen först.
 4. `h-027`–`h-030`, substitutionskedjan. Finns **inte** som task i något repo.
    `h-015` (supervisor resume) beror mekaniskt på `h-030`.
+
+   **Du får skriva dem.** `specs/**` ligger i §A-mängden och regel 6 gör den till
+   människohand — men ägaren gav 2026-09-16 ett namngivet undantag för just dessa fyra
+   rader (`LOOP-ÄGARBESLUT-SUB-SPECS`, inskrivet i regel 6). Villkor: raderna **härleds
+   ur** `docs/loop/harness-substitution-contract-v1.md`, hela kontraktsflödet i
+   `AGENTS.md` gäller, commiten är HÖGRISK-märkt, och **varje ny task deklarerar sin
+   omfrysningsbudget enligt 11a**. Befogenheten kommer ur ägarbeslutet, inte ur att
+   sandboxen öppnades.
 5. `h-015`.
 
 ---

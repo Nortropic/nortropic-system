@@ -13,6 +13,18 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
 5. Ingen sudo. Kontrollplanet körs som användare.
 6. §A-mängden i [byggplan-v3.md](byggplan-v3.md) §3.1 rörs aldrig av en loop-task.
    Ändringar där är alltid människa, alltid HÖGRISK-märkt commit.
+
+   **Ett namngivet undantag, 2026-09-16** (`LOOP-ÄGARBESLUT-SUB-SPECS`): Codex får skriva
+   `h-027`–`h-030` i `specs/tasks.spec.json`, eftersom delegationens scope namnger
+   supervisor resume och sekvensen redan står i det ägarauktoriserade
+   `harness-substitution-contract-v1.md`. Villkor: raderna härleds ur kontraktet, hela
+   kontraktsflödet i `AGENTS.md` gäller, commiten är HÖGRISK-märkt, och **varje ny task
+   deklarerar sin omfrysningsbudget enligt 11a**.
+
+   **Undantaget kommer ur ägarbeslutet, inte ur att sandboxen öppnades.** Att en §A-yta är
+   mekaniskt skrivbar sedan `LOOP-ÄGARBESLUT-SANDBOX-OPEN` gör den inte tillåten. Att
+   blanda ihop *kan* och *får* är vad `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder.
+   För allt annat i §A står regel 6 oförändrad.
 7. Docs uppdateras i samma commit som systemändringen (regel 17 + 22).
 8. Bevisregeln: varje rapporterat påstående pekar på verktygsbevis ur samma session.
    Overifierat märks OVERIFIERAT. "Klart" sägs aldrig utan kört exit-test.
