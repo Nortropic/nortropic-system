@@ -84,6 +84,7 @@ Räkna med ett fjortonde fel.
 | `08-mekanismer.md` | Hur arbetsreglerna kopplas till befintligt flöde så de FÄLLER |
 | `09-task-rundtrampsvakten.md` | Taskspec att frysa (h-040). Har en blockerande designfråga i §2 |
 | `10-forsta-arbetspaketet-h014.md` | Första bygget. Redan specad i repot; bara grinden saknas |
+| `11-tre-vakter-mot-aterfall.md` | **Mekanismerna mot återfall** — tre vakter, var och en med ett KÖRT positivt kontrollprov |
 | `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
 
 ## Artefakten som INTE ligger här

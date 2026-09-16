@@ -1,5 +1,67 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 22: plattformsgrenen är INTE mergebar — beslutsloggen är raderad
+
+Granskning av den nu pushade grenen `nortropic/platform-integration-20260910`.
+
+**`docs/05-beslutslogg.md` finns inte på grenen.** Hela `docs/`-roten är tom; separationen
+klassade den numrerade serien som webb och tog bort den. Men filen är **kernel-dominerad**
+— `raddning/02-bevis.md` mätte 80 kernelomnämnanden och tio frysta grindar som läser den —
+och referenserna står kvar:
+
+```
+specs/tasks.spec.json          72 träffar på docs/05-beslutslogg.md
+controller/attest/cli
+verify/bin/h-007-exit          väntar sig $WS/docs/05-beslutslogg.md
+verify/bin/h-031..h-036-exit
+verify/bin/document-authority-exit
+```
+
+Ingen ersättningsfil finns i `docs/loop/`. Det är alltså **dinglande referenser från
+frysta grindar och från specen till en raderad fil på en trust-kritisk väg**.
+
+**Och det är FEM filer, inte en.** Mätt 2026-09-16 över `specs/`, `verify/bin/` och
+`controller/` på grenen:
+
+| Saknad fil | Refereras av |
+|---|---|
+| `docs/05-beslutslogg.md` | **17 filer** |
+| `docs/07-konstitution.md` | 9 (`h-035`, `h-036`, `h-037` m.fl.) |
+| `docs/03-regelverk.md` | 5 |
+| `docs/00-borja-har.md` | 4 |
+| `docs/agentoverlamning.md` | 2 |
+
+Samma körning gav falska positiver — `docs/loop/a.md`, `x.md`, `y.md`, `z.md`,
+`absent.md`, `neighbor.md` är testfixturer inne i grindarna. En vakt mot detta måste
+skilja fixtur från verklig referens; kravet står i `raddning/11-tre-vakter-mot-aterfall.md`.
+
+`platform-separation-final-exit` är ändå GRÖN — den prövar att webbträdet är borta, inte
+att det som blev kvar fortfarande hänger ihop. Det är inte ett fel i den grinden; det är
+en yta ingen grind täcker.
+
+**Konsekvens:** grenen kan inte mergas som den står. Antingen återställs
+`docs/05-beslutslogg.md` som kernelfil, eller så pekas tio kernelreferenser om — och det
+senare rör frysta grindar, alltså omfrysning under regel 11.
+
+**Detta är precis vad `raddning/06-inventering.md` §0 KRAV A varnade för:** `docs/` rot är
+DELAD, `05` är kernel-dominerad, och *"en fil vars lager är osäkert stannar"*. Separationen
+gjordes utan den fil-för-fil-domen.
+
+## 2026-09-16 — FYND 23: veckan dokumenterades inte ens på sin egen gren
+
+`drift.md` på plattformsgrenen slutar vid **2026-09-08**. De 55 commitsen 09-09→09-12 bär
+**noll rader**. Regel 22 följdes alltså inte heller — det var inte bara pushen som
+saknades, arbetet var odokumenterat även där det fanns.
+
+Beslutsloggen kan inte ens ha fått en rad: filen var borttagen från och med `49cc495`.
+
+**Det ger regel 12 sällskap av ett tyngre krav:** en regel som säger *"dokumentera i samma
+commit"* har funnits sedan starten (regel 22) och den höll inte i fem dagar av projektets
+viktigaste arbete. **Regler utan mekanism fäller ingenting.** Tre vakter med körda positiva
+kontrollprov står i `raddning/11-tre-vakter-mot-aterfall.md` — vakt 1 (regel 22) och
+vakt 2 (dinglande referenser) fäller bevisligen på exakt dessa två fynd.
+
+
 ## 2026-09-16 — ÄGARBESLUT: loop-regel 11 och 12 införda
 
 Doktrinregel iv är nu **regel** och inte längre ett förslag i ett underlag.
