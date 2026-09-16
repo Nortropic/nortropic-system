@@ -1,5 +1,54 @@
 # Att köra loopen
 
+## 2026-09-16 — Räddningsunderlaget landat i repot + konvergensfyndet
+
+Underlaget som svarar på *"varför kommer vi aldrig i mål"* ligger nu i
+`docs/loop/raddning/`, inte i en tarboll hos ägaren. Skälet är underlagets eget fynd 2:
+uppdateringar har gått till det lager bara en pågående session läser, aldrig till det
+lager varje ny session läser först. `CLAUDE.md` och `AGENTS.md` pekar hit.
+
+**Tyngsta fyndet, mätt beteendemässigt och inte lexikalt:** `verify/bin/h-039-exit`
+ändrades i var och en av sina 30 commits, 200 798 → 2 136 969 byte, noll minskningar.
+Ingen kandidat har någonsin prövats mot ett oförändrat prov, och konvergens kräver ett
+fast mål. Diskriminanten gäller alla gates: varje KLAR task har en grind som rörts ≤ 3
+gånger (h-016: 1, h-013/017/038: 2, h-001/036: 3), varje ICKE-KLAR en som rörts 17–147
+(h-035: 17, h-039: 30, h-032: 120, h-031: 147). Ingen mellanform.
+Kommando: `git log --oneline --follow -- verify/bin/<task>-exit | wc -l`.
+
+**RÄTTELSE:** den tidigare förklaringen i underlaget — att rundorna brinner på miljödrift
+(`st_dev`, dev_t, `com.apple.provenance`) — var härledd ur ORDVAL i commit-titlar och
+gäller fyra rundor av 26. Två körningar med olika ordlistor gav `36 av 37` respektive
+`5 av 26` för samma kategori; måttet mätte ordlistan. Den klassningen är kasserad.
+
+**Nytt prov:** `docs/loop/raddning/artefakter/validera-underlaget.sh` prövar 37 av
+underlagets tal mot repot, verdikt per rad, exit 0/1/2 enligt samma algebra som
+`controller/verify/cli`. Mutationsprövad: fel förväntat tal → `AVVIKER` + exit 1, saknad
+grindfil → `ODÖMBART` + exit 2. Baslinje 2026-09-16 (Linux): `BEKRÄFTAT 37 · AVVIKER 0 ·
+ODÖMBART 2`, där de två odömbara är plattformsbundna och ska falla ut på Macen.
+
+**BEKRÄFTAT 2026-09-16 mot `d30279c`, metod: grindfilernas commit-historik** — 37
+påståenden, se körningen i `raddning/artefakter/`.
+
+**Vaktsviten: `PASS — 23/23 vakter gröna och SJÄLVKVITTERADE`**, körd i denna klon mot
+grenen. `check-foundation-smoke.mjs` passerar därför att klonens `origin` ÄR
+`Nortropic/nortropic-system`; den grinden prövar remote-URL:en, inte mekanismen, och
+faller i varje klon med annan origin. Det är miljöbundet men inte odömbart här.
+
+`check-v4-utkast.mjs` FÄLLDE först, och korrekt: underlagets
+`04-fallor-och-doktrin.md` namngav v4-utkastet och blev därmed en KONSUMENT av ett
+`NOT_PRODUCTION`-mått. Vakten letar tre strängar i varje spårad fil och skiljer inte på
+att nämna och att använda — den ska inte göra det. Texten skrevs om utan markörerna och
+bär nu varningen i sig själv. Dokumentationspatchen togs ur repot av samma skäl plus
+redundans: de fyra commitsen är redan pushade.
+
+**Kvar som OVERIFIERAT:** kernelgatarna. 18 av 24 faller på `undefined symbol: sysctl` i
+Linux — `bash verify/bin/h-013-exit` (h-014:s beroende) kan bara dömas på Macen.
+
+**Nästa steg:** steg 0 i `raddning/00-LAS-FORST.md` — avgör backup-repot (`git log
+origin/main..HEAD` mot backupen) och nollmät kontinuiteten. Därefter
+`verify/bin/autonomous-loop-exit`, fryst RED, FÖRE doktrinregel iv.
+
+
 ## 2026-09-08 — H-039 R33/R15 exact receipt-provenance profile
 
 Published R32 `9b9a638b…`, its product and full publication closure remain

@@ -46,6 +46,19 @@ webbträdet.
 **Läget** står i `docs/loop/drift.md` (nyast överst) och `docs/05-beslutslogg.md` (aktuell
 kandidat först). Ingen annan fil bär teknisk status.
 
+**Vägen till klar kärna** står i `docs/loop/raddning/` — lägesbild, karta, slutkriterium
+(`KERNEL_COMPLETE`) och arbetsordning. Läs `raddning/README.md` först; behöver du bara
+veta vad du gör härnäst räcker `raddning/05-arbetsordning.md`. Katalogen bär **analys och
+plan, aldrig status** — status är drift.md.
+
+Underlaget är evidens, inte facit: tretton felaktiga påståenden hittades under arbetet,
+**nio av dem i underlaget självt**, och elva av tretton kom av en lexikal metod som aldrig
+prövades mot beteendet. Kör därför
+`bash docs/loop/raddning/artefakter/validera-underlaget.sh` innan du lutar ett beslut mot
+ett tal där. Den prövar 37 påståenden mot repot; `exit 0/1/2` = stämmer / underlaget bär
+ett fel / kunde inte mätas. **Grönt betyder att talen är oförändrade, aldrig att de är
+sanna** — den oberoende omhärledningen i `raddning/06-inventering.md` §0 står kvar.
+
 **Rollseparation** (test-author / builder / reviewer), evidenskrav och push/merge-befogenhet
 står i `AGENTS.md`. De rollerna är workflow-separation, aldrig en mekanisk säkerhetsgräns.
 

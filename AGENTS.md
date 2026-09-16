@@ -26,6 +26,20 @@ två kernelvakterna följer inte med när webbträdet flyttas.
 `kor-vakter.mjs`, `tests/controller/**`, `tests/scripts/**`. De följer aldrig med
 webbträdet.
 
+**Vägen till klar kärna** står i `docs/loop/raddning/` — lägesbild, karta, slutkriterium
+(`KERNEL_COMPLETE`), arbetsordning och taskspecar. Läs `raddning/README.md` först;
+`raddning/PROMPT-TILL-CODEX.txt` är skriven för Codex-sessioner. Katalogen bär **analys
+och plan, aldrig status** — status är `docs/loop/drift.md`.
+
+**Lita inte på den, pröva den.** Tretton felaktiga påståenden hittades under arbetet,
+nio av dem i underlaget självt, och elva av tretton kom av en lexikal metod som aldrig
+prövades mot beteendet. Kör
+`bash docs/loop/raddning/artefakter/validera-underlaget.sh` (37 påståenden mot repot;
+exit 0 = talen stämmer, 1 = underlaget bär ett fel, 2 = ODÖMBART) innan du lutar ett
+beslut mot ett tal där. Grönt betyder att talen är oförändrade, aldrig att de är sanna —
+den oberoende omhärledningen i `raddning/06-inventering.md` §0 är fortfarande
+obligatorisk, liksom §0c om det lokala maskintillståndet.
+
 `CLAUDE.md` är samma router för Claude-sessioner och bär samma auktoritetsordning.
 Ändras den ena ska den andra följa med i samma commit.
 
