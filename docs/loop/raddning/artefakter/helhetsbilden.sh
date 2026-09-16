@@ -48,6 +48,12 @@ SMUTS="$(git status --porcelain | wc -l | tr -d ' ')"
 printf '   arbetsträd  %s okommitterade  ' "$SMUTS"
 [ "$SMUTS" = "0" ] && gron "rent" || gul "grindkörning på smutsigt träd ger tal som ser ut som evidens"; echo
 
+printf '   autopush    '
+HP="$(git config --get core.hooksPath 2>/dev/null || true)"
+if [ -n "$HP" ] && [ -x "$HP/post-commit" ]; then gron "på — varje commit pushas (regel 12)"
+elif [ -n "$HP" ]; then rod "core.hooksPath=$HP men post-commit saknas eller är inte körbar"
+else gul "AV — arbete kan bli kvar lokalt. bash scripts/installera-hooks.sh"; fi; echo
+
 printf '   färskhet    '
 if git fetch -q origin main 2>/dev/null; then
   BAK="$(git rev-list --count HEAD..origin/main 2>/dev/null || echo '?')"
