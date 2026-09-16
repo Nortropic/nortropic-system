@@ -1,5 +1,54 @@
 # Att köra loopen
 
+## 2026-09-16 — INVENTERINGEN KÖRD: 259 poster finns BARA på ägarens maskin. Min siffra var sex.
+
+`inventera-lokalt-arbete.sh` kört på Macen mot färsk `origin/main` (`82ecc192`):
+
+```
+worktrees: 228 totalt · 135 helt i main · 1 på pushad gren · 92 FÖRÄLDRALÖSA · 31 med okommitterat
+grenar:    136 med commits som saknas på origin
+SUMMA:     259 poster som bara finns på denna maskin
+```
+
+**Jag rapporterade tidigare sex.** Felet var med en faktor 40, och orsaken är den redan
+kända: `git branch` listar inte en detached HEAD, och jag prövade aldrig om listan var
+fullständig. Det som nu syns och aldrig syntes förr:
+
+| Gren | Commits utanför main |
+|---|---|
+| `owner/h034-native-test-author-r4-e0373f5` | **45** |
+| `owner/h034-native-test-author-r3-ba3a7d2` | 44 |
+| `owner/h034-native-test-author-r2-45c3ffa` | 43 |
+| `owner/h035-gate-r12-cf38404` | 39 |
+| `nortropic/loop-h-035-builder-r12` | 40 |
+
+**Det mesta är sannolikt trampkvarnens spillror** — runda r79, r80, r81, r82 av samma
+hypotes. Men `LOOP-ÄGARBESLUT-11A-OCH-TRE-HYPOTESER` slår fast att `OVERIFIERAT` betyder
+ODÖMT och att *"arbetet är inte kastat — det är underlag för omspecificeringen"*. Då ska
+det finnas kvar. Och 259 okända är ingen nystart.
+
+### Artefakt: `artefakter/radda-lokalt-arbete.sh`
+
+**Additiv. Skapar grenar och pushar, tar aldrig bort något, rör inget arbetsträd.**
+Torrkörning är standard; `--kor` utför.
+
+| Fas | Vad |
+|---|---|
+| **A** | Lokala grenar vars topp saknas på origin → pushas under sitt eget namn |
+| **B** | Föräldralösa worktree-HEADs → får `radda/wt-<namn>` som pushas. Samma SHA i flera worktrees räddas en gång — grenen bär commiten, inte katalogen |
+| — | Worktrees med okommitterat arbete **hanteras inte**. Att committa halvfärdigt arbete åt någon annan är ett beslut, inte ett svep. De listas |
+
+**Prövat från början till slut** i ett engångsrepo: en gren med unik commit plus en detached
+HEAD med unik commit. Torrkörning visar båda utan att utföra något; `--kor` pushar båda;
+`inventera-lokalt-arbete.sh` går därefter från `⚠️ 2 poster` till
+`✅ REGEL 12 UPPFYLLD`. Räddningen och inventeringen mäter alltså samma sak, och kedjan är
+sluten.
+
+**Varför pusha allt i stället för att sortera först:** en gren på origin kostar brus. En
+förlorad commit kostar arbetet. Asymmetrin är inte jämn, och sortering kan ske när som
+helst efteråt — räddning kan inte.
+
+
 ## 2026-09-16 — REGEL 12:s MÄTNING VAR OFULLSTÄNDIG. ~200 worktrees, ett femtiotal på detached HEAD.
 
 `git worktree list` i `~/nortropic/nortropic-system` gav **cirka 200 worktrees**, varav
