@@ -104,7 +104,9 @@ DIN FÖRSTA UPPGIFT — OCH LÄS SEPARATION-20260910/ INNAN DU RÖR NÅGOT
    Raden ovan stod tidigare utan sökväg, vilket hade skickat dig att leta efter
    en katalog som inte finns i din klon. Rättat 2026-09-16.
 
-LÄS docs/loop/raddning/12-arbetsorder.md. Den är arbetsordern för DET SOM GÖRS NU.
+LÄS docs/loop/raddning/VAGEN.md. Den är den ENDA arbetsordern.
+12-arbetsorder.md är dess delplan för FAS 1 (separationens landning) plus
+beroendeanalysen bakom tvårotshypotesen — läs den som UNDERLAG, aldrig som ordning.
 
 Underlaget är större än så, och varje del har ett syfte. README.md listar alla:
   07  acceptansfilen som ska SKAPAS (finns inte i repot)
@@ -112,7 +114,7 @@ Underlaget är större än så, och varje del har ett syfte. README.md listar al
   09  h-040, som mekaniserar regel 11
   10  h-014, spec färdig och grind saknas
   11  de tre vakterna, var och en med ett KÖRT kontrollprov
-  12  arbetsordern nu
+  12  delplanen för FAS 1 + beroendeanalysen (INTE en egen ordning)
 Och diagnosen: 00 premissen, 01 lägesbilden, 02 bevisen, 04 grindfällorna,
 05 arbetsordningen (autonomi, tripwires, blockeringskontrakt), 06 kartan.
 
@@ -162,7 +164,8 @@ DE TRE SOM KVARSTÅR ÄR EN ENDA SAK, och den förklarar alla fem röda grindar:
   h-035 är därmed inte längre oförklarad: den läser docs/05-beslutslogg.md och
   docs/07-konstitution.md, båda saknas. Samma orsak som h-036 och h-038.
 
-ORDNINGEN, med mätvärden per steg, står i 12-arbetsorder.md:
+Separationens landning bryts ned i fyra steg i 12-arbetsorder.md. Det är VAGEN.md
+FAS 1, och stegen är:
   1. docs/loop/beslutslogg.md — plattformens egen, migrera kernelraderna dit
   2. peka om de tre ytorna
   3. frys om h-007/035/036/037/038 EN gång, inklusive de fyra shebangarna
@@ -215,8 +218,10 @@ STATUS PÅ MAIN, SOM DU MÅSTE KÄNNA TILL:
   på grenen nortropic/platform-integration-20260910 (55 commits före main,
   0 bakom) och kan inte mergas förrän punkt 3 är gjord.
 
-  ⚠️ MÄT PÅ main, BYGG PÅ GRENEN — det är inte samma sak, och ORDNINGEN
-  längst ned börjar därför med main. Skälet: mätningen 2026-09-16 kördes på en
+  ⚠️ MÄT PÅ main, BYGG PÅ GRENEN — det är inte samma sak. Båda är nu MÄTTA:
+  main 2026-09-16 21:59 och grenen 22:43. Grenen halverar de fallande
+  kontrollerna (48 → 24) och tar h-011 grön, vilket gjorde landningen till
+  VAGEN.md FAS 1. Skälet: mätningen 2026-09-16 kördes på en
   arbetsgren, och h-012 läser HEAD-commitens ändrade filer, så main kan ge ett
   annat utfall för just den grinden. Kartan ska verifieras där den påstås gälla.
 
@@ -387,76 +392,26 @@ drift.md samma dag.
 
 
 ══════════════════════════════════════════════════════════════════════════════
-ORDNINGEN
+ORDNINGEN STÅR INTE HÄR — DEN STÅR I docs/loop/raddning/VAGEN.md
 ══════════════════════════════════════════════════════════════════════════════
 
-  0. Kör validera-underlaget.sh. Läs docs/loop/regler.md regel 11, 12 och 12a.
-  1. ✅ GJORD 2026-09-16 21:59 av ägaren. matning-pa-macen.sh kördes på Darwin i
-     en ren klon på main (HEAD 28ca1af), 0 okommitterade filer före och efter.
-     Konfunderingen mot arbetsgrenen är därmed upphävd, och talen är IDENTISKA
-     med FYND 33:
+Här stod tidigare en egen numrerad ordning. Den är BORTTAGEN, inte flyttad.
 
-       RAD: h-001:0 h-002:0 h-003:0 h-004:1 h-005:0 h-006:0 h-007:0 h-008:0
-            h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
-       8 PASS · 6 FAIL · 0 ODÖMBART av 14
-       h-003 och h-010 vände till grönt mot Linux — plattformsbundna, friska.
-       SEX är röda på BÅDA maskinerna. Kartan håller inte: h-004, h-013 och
-       h-016 påstås KLARA och är FAIL. Bara h-010 håller.
+Skälet är dagens dyraste fynd: FEM dokument beskrev var sin ordning och alla fem
+lät auktoritativa (03 "bygg slutgrinden först", 10 "första arbetspaketet h-014",
+12 "separationens landning", 06 "bootstrap-kedjan", och denna prompt). En agent
+som läser två av dem gör olika saker beroende på vilken den läste sist.
 
-     Kör den inte om för att se om den ändrar sig. Kör den om efter ett BYGGE.
+Och felet återkom omedelbart: en timme efter att VAGEN.md skrivits sa denna
+prompt fortfarande "BÖRJA HÄR: h-009" medan VAGEN.md sa "FAS 1 — landa
+plattformsgrenen". Mätningen 22:43 hade ändrat vägen; prompten hade inte följt
+med. Struket 2026-09-16 av just det skälet.
 
-  2. ⭐ BÖRJA HÄR: h-009. INTE h-004, INTE de sex på en gång.
+VAGEN.md bär FAS 0 till FAS 7, med komponent, allowed_write, fryst grind,
+omfrysningsbudget och ett klart-när per fas. Den bär också slutkriteriets sex
+mätbara rader, körbanan och de sex fällorna.
 
-     VARFÖR h-009 FÖRST: hypotesen (FYND 34) är att de sex röda har TVÅ rötter,
-     inte sex. h-009 är den ena, och den enda som har nedströms. Mätningen ger
-     belägg — h-009:s tre fel säger samma sak tre gånger:
+  bash docs/loop/raddning/artefakter/helhetsbilden.sh   # var står vi NU
+  docs/loop/raddning/VAGEN.md                           # vad görs härnäst
 
-       K2  kuvertet når processen   -> exit 127, kommandot fanns inte
-       K8  workspace                -> processen kördes i REPOROTEN, inte i
-                                       workspacet
-       K9  kuvertleverans           -> processen hittade inget kuvert
-
-     Det är EN sak: barnprocessen startas inte i rätt katalog och får inte sitt
-     kuvert. Samma primitiv konsumeras av h-011, h-012, h-013 och h-016, och
-     deras felrader bär dess signatur (nonzero_exit kod 1, kod=4).
-
-     KOMPONENTEN: controller/launch/cli, 824 rader.
-     allowed_write: controller/launch/**, tests/controller/launch/**,
-                    docs/05-beslutslogg.md. INGENTING ANNAT.
-
-     GRINDEN RÖRS INTE. verify/bin/h-009-exit står som den är. Omfrysningsbudget
-     3 enligt regel 11a; överskrids den delas hypotesen eller avslutas
-     OVERIFIERAT (11b) — aldrig en runda till.
-
-     PROVET PÅ HYPOTESEN, och det ska köras och skrivas ner oavsett utfall:
-     när h-009 är grön, kör om alla fjorton. Blir flera av h-011/012/013/016
-     gröna med är tvårotshypotesen BEKRÄFTAD och vägen är kort. Blir de inte det
-     är den FALSIFIERAD, och det står i docs/loop/drift.md samma dag.
-
-  2b. DÄREFTER h-004. Det är ingen bugg utan en SAKNAD FUNKTION: K8-K11 ger
-     genomgående rc=0 token=[] — acquire lyckas men returnerar inget lease_id.
-     Fencing, renew och holder-liveness finns inte. Bygg dem.
-     allowed_write: controller/lease/**, controller/loop/cli,
-                    tests/controller/lease/**, tests/controller/loop/**.
-
-  2c. OCH MÄT DETTA, SOM INGEN HAR MÄTT: controller/verify/cli list ger
-     nortropic-verify-suite -> EJ STARTBAR. Registret bär en post som inte kan
-     köras. Vad den blockerar är okänt.
-  3. 12-arbetsorder.md steg 1-4. Kontrollera dess tabell mot HEAD först —
-     den är daterad och blir osann på samma sätt som EFTERARBETE.md blev.
-  4. Granska och landa plattformsgrenen.
-  5. verify/bin/autonomous-loop-exit, fryst RED mot KERNEL_COMPLETE
-     (definitionen i 00-VAD-NORTROPIC-AR.md).
-  6. De tre vakterna.
-  7. h-014.
-  8. Specificera h-027..h-030. Utan h-030 kan h-015 inte ens få en gate som håller.
-  9. h-015 supervisor resume.
-
-⚠️ ORDNINGEN ÄR OMSKRIVEN 2026-09-16 (FYND 33). Steg 1-2 fanns inte. Vägen sades
-vara "sex poster" och h-027 sades vara första steget. Det byggde på att h-004,
-h-010, h-013 och h-016 var KLARA — en etikett satt för att grindFILERNA finns,
-aldrig för att grindarna körts. Körda på Macen i ren klon är tre av de fyra röda.
-Att börja på h-027 vore att bygga ovanpå sex trasiga grindar.
-
-Hoppa inte till 4 för att den känns mest konkret. Grenen är inte mergebar förrän
-3 är gjord — det är mätt, inte antaget.
+Vid konflikt mellan denna prompt och VAGEN.md gäller VAGEN.md.

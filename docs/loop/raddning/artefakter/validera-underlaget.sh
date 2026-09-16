@@ -235,6 +235,34 @@ rad "h-039/032/031 beskrivs inte som pågående" "0" \
 rad "h-014 påstås inte ha gröna beroenden" "0" \
     "$(ren_traffar 'h-014' 'beroenden gröna|byggbar nu')"
 
+# ── ⭐ DÖDA FAS-PEKARE ───────────────────────────────────────────────────────
+# VAGEN.md är den enda filen som definierar ordningen, och den definierar den som
+# FAS 0..7. Varje "FAS n" som nämns någonstans i underlaget måste alltså finnas
+# som en rubrik där. 2026-09-16 pekade §0-tabellen på "FAS 8", som aldrig funnits
+# — en död pekare införd i samma commit som skapade filen.
+#
+# Detta är den mekaniska halvan av regeln "en enda väg". Den andra halvan går inte
+# att automatisera: att en text SÄGER något annat om vad som görs först. Den delen
+# måste läsas. Se PROMPT-TILL-CODEX.txt, som en timme efter att VAGEN.md skrivits
+# fortfarande sa "BÖRJA HÄR: h-009" medan VAGEN.md sagt "FAS 1 — landa grenen".
+echo
+echo "  ⭐ DÖDA FAS-PEKARE — varje refererad FAS måste finnas i VAGEN.md"
+doda_faser() {
+  local v=docs/loop/raddning/VAGEN.md n doda=0
+  [ -f "$v" ] || { echo ODÖMBART; return; }
+  # Bara dokumentationen, aldrig proven själva. Utan filtret flaggade vakten sin
+  # EGEN kommentar om FAS 8 och blev permanent röd — en vakt som fäller på sin
+  # egen dokumentation av felet den vaktar mot. Samma självreferensfälla som
+  # konventionsblocket i regler.md bar samma dag.
+  for n in $(grep -rhoE 'FAS [0-9]+' --include='*.md' --include='*.txt' \
+                docs/loop/raddning/ 2>/dev/null \
+             | grep -oE '[0-9]+' | sort -un); do
+    grep -qE "^### FAS $n( |\$|—)" "$v" || doda=$((doda+1))
+  done
+  echo "$doda"
+}
+rad "inga döda FAS-pekare i underlaget" "0" "$(doda_faser)"
+
 # ── Summering ────────────────────────────────────────────────────────────────
 printf '%.0s-' {1..108}; echo
 echo "BEKRÄFTAT $bekraftat · AVVIKER $avvik · ODÖMBART $odombart"
