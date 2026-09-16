@@ -1,6 +1,6 @@
 # Att köra loopen
 
-## 2026-09-16 — REGLER REVIDERAS RENT. Arkeologin flyttad till sina rätta hem. 227 → 184 rader.
+## 2026-09-16 — REGLER REVIDERAS RENT. Arkeologin flyttad till sina rätta hem. 227 → 183 rader.
 
 Ägaren: *"när vi ändrar regler varför skriver man över istället för revidera och ta bort?"*
 
@@ -40,6 +40,27 @@ innehållet kvar i sina rätta hem.
 
 > Regeln revideras rent. Skälet, citatet och mätningen går till beslutslogg och drift.
 > Här står högst en rad: *(Skärpt \<datum\>, `LOOP-ÄGARBESLUT-X`.)*
+
+### Konventionsblocket bröt mot sin egen regel — 184 → 183
+
+Första versionen av blocket ovan bar tre rader arkeologi i sig själv: ägarcitatet,
+*"Filen hade vuxit 92 → 228 rader på en dag, varav 13 % arkeologi"* och en jämförelse mot
+vargvakten. **Exakt det blocket förbjuder.** Citatet och mätningen fanns redan i
+`LOOP-ÄGARBESLUT-REGELREVISION` och här ovan; i regeln stod alltså en dubblett skriven
+under regeln som förbjuder dubbletten. Struket samma dag, ersatt av en rad och en
+beslutshänvisning.
+
+**Felklassen är värd att notera:** en nyskriven regel prövades inte mot sig själv. Samma
+mönster som FYND 31 och 33 — metoden var lexikal (*skriv konventionen*) i stället för
+beteendemässig (*kör konventionen mot texten den står i*).
+
+### Strukturkontrollen sade emot sig själv
+
+Mitt ad hoc-prov rapporterade samtidigt `⚠️ regel 1 förekommer 2 gånger` och
+`regel 1–10: en gång var ✓`. **Provet var trasigt, inte filen:** regexen `^[0-9]\. `
+träffade även den numrerade listan inuti regel 12 (`regler.md:141–145`). Mätt med
+`grep -n '^[0-9]\+\. '`: tio rader för reglerna 1–10, tre för regel 12:s punktlista. Inga
+dubbletter. **Ett prov som säger två saker är alltid provets fel att bevisa bort först.**
 
 
 ## 2026-09-16 — PUBLICERINGSBEFOGENHETEN SAMMANJÄMKAD. Fem lager, en paragraf.

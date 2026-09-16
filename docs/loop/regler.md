@@ -11,9 +11,8 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
 > `docs/05-beslutslogg.md` (beslutet) och `docs/loop/drift.md` (fyndet). Här står högst en
 > rad: *(Skärpt \<datum\>, `LOOP-ÄGARBESLUT-X`.)*
 >
-> Konventionen beslutad 2026-09-16 av Johnny: *"varför skriver man över istället för
-> revidera och ta bort?"* Filen hade vuxit 92 → 228 rader på en dag, varav 13 % arkeologi.
-> En regel som måste skummas lyds inte — samma felklass som en vakt som skriker varg.
+> En regel som måste skummas lyds inte.
+> *(Konvention 2026-09-16, `LOOP-ÄGARBESLUT-REGELREVISION`.)*
 
 1. Inget bygge utan spec-rad i `specs/tasks.spec.json` och exit-test definierat före start.
 2. Allt arbete i repot, på gren `nortropic/loop-<id>`, committat per delsteg.
