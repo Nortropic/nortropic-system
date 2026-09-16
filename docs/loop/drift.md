@@ -1,5 +1,59 @@
 # Att köra loopen
 
+## 2026-09-16 — MÄTT PÅ MAIN: kartan håller inte, och nu utan konfundering
+
+FYND 33:s dom kördes mot gren `5b6ed6e`, inte `main`. Den konfunderingen skrevs ner i
+stället för att döljas. **Den är nu upphävd:** samma fjorton grindar körda på Darwin i en
+ren klon på `28ca1af` = `main`, `0` okommitterade filer före och efter.
+
+**Talen är identiska med FYND 33.** Kartan höll inte, och det berodde inte på grenen.
+
+```
+RAD: h-001:0 h-002:0 h-003:0 h-004:1 h-005:0 h-006:0 h-007:0 h-008:0
+     h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
+SUMMA: 8 PASS · 6 FAIL · 0 ODÖMBART av 14
+DELTA mot Linux: 2 vände till grönt (h-003, h-010 — plattformsbundna, friska)
+                 6 röda på BÅDA maskinerna
+```
+
+| Task | Påstått | Mätt på main |
+|---|---|---|
+| `h-004` | KLAR | **FAIL** — 8 PASS / 7 FAIL |
+| `h-010` | KLAR | **PASS** |
+| `h-013` | KLAR | **FAIL** — 8 PASS / 8 FAIL |
+| `h-016` | KLAR | **FAIL** — 11 PASS / 14 FAIL |
+
+### Två rötter, och nu med felraderna som stöder det
+
+Hypotesen från FYND 34 var att `h-004` och `h-009` är oberoende rötter och att
+`h-011/012/013/016` hänger under dem. Körningen ger belägg:
+
+**Rot 1 — `h-009`: barnprocessen startas fel.** `K8` säger att processen kördes i
+`/Users/elinhaggstrom/nortropic-kontrollklon` i stället för i workspacet. `K9` säger att
+den inte hittade något kuvert. `K2` ger **exit 127** — kommandot fanns inte. Det är
+samma primitiv `h-011`, `h-012`, `h-013` och `h-016` konsumerar, och deras felrader är
+dess signatur: `h-012` K4/K8/K14 och `h-013` K1/K3/K5 faller alla på
+`nonzero_exit kod 1` respektive `kod=4`, alltså att kommandot aldrig kom igång rätt.
+
+**Rot 2 — `h-004`: lease-generationer är inte byggda.** `K8`–`K11` ger genomgående
+`rc=0 token=[]` — `acquire` lyckas men returnerar inget `lease_id`. Det är ingen bugg
+utan en saknad funktion: fencing, renew och holder-liveness finns inte.
+
+**Provet på hypotesen står kvar:** laga `h-009` och kör om. Faller flera av de fyra
+nedströms med, är roten bekräftad. Faller de inte, är den falsifierad — och det ska stå
+här.
+
+### Fyra artefakter saknas helt
+
+`verify/bin/h-014-exit` · `verify/bin/h-015-exit` · `verify/bin/autonomous-loop-exit` ·
+`docs/loop/autonomy-kernel-v1-acceptance.md`
+
+### En registrerad verifierare är inte startbar
+
+`controller/verify/cli list` ger `nortropic-verify-suite workflows/nortropic-verify-suite.js`
+→ **`EJ STARTBAR`**. `check-invariants` är startbar. Registret bär alltså en post som
+inte kan köras; det är inte mätt vad den blockerar.
+
 ## 2026-09-16 — FYND 37: vakten sa ✅ medan tolv commits fanns på en enda maskin
 
 `inventera-lokalt-arbete.sh` skrev **`✅ REGEL 12 UPPFYLLD — allt lokalt arbete finns
