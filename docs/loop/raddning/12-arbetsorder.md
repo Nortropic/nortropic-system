@@ -118,6 +118,30 @@ webbfiler** och ett register som pekar på `workflows/nortropic-verify-suite.js`
 
 ---
 
+## VÄGEN TILL MÅLET — sex poster, mätt i specen
+
+```
+KLART:    h-004 ✓   h-010 ✓   h-013 ✓   h-016 ✓     (alla fyra har grind)
+
+SAKNAS:   h-027 → h-028 → h-029 → h-030              (fyra task, finns inte)
+          → h-015 supervisor resume                   (grind saknas)
+          + verify/bin/autonomous-loop-exit           (mäter KERNEL_COMPLETE)
+          + docs/loop/autonomy-kernel-v1-acceptance.md
+```
+
+`h-015` beror på `h-010`, `h-013`, `h-016`, `h-004` och `h-030` — **inte** på `h-031`,
+`h-032` eller `h-039`. De tre avslutade hypoteserna låg aldrig på vägen; ingenting i
+specen beror på dem utanför gruppen själv.
+
+> ⚠️ **`docs/loop/drift.md` rad 5495 säger** *"No supervisor resume is authorized before
+> the entire chain is green"*. **Den raden är upphävd 2026-09-16.** Den är prosa, inte
+> ett mekaniskt beroende, och specens graf säger något annat. Hade den fått stå hade den
+> blockerat målet permanent — inte av en mekanism, utan av en mening.
+
+`h-014` ligger utanför kedjan och kan byggas parallellt.
+
+---
+
 ## Vad som INTE ingår, och vad som kommer sedan
 
 Detta är den ordning som gör grenen mergebar. Den tar **inte** kärnan i mål.
