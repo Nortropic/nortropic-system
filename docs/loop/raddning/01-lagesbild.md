@@ -172,6 +172,16 @@ kernelträdet, 1 bara webbträdet, 2 båda.
 **Inget beslut om repodelning står i loggarna** — varken i `docs/05-beslutslogg.md`
 eller `docs/loop/drift.md`. Beslutet fattades utanför repot.
 
+> ## ⚠️ RÄTTAT 2026-09-16 — målrepot fanns, och är nu publicerat
+>
+> `Nortropic/nortropic-webbforvaltning` skapades lokalt 2026-09-10 som en del av
+> separationen (`SEPARATION-20260910/README.md`) och pushades till GitHub 2026-09-16.
+> Påståendet nedan var fel redan när det skrevs: jag mätte GitHub, inte maskinen.
+>
+> Webbträdet — 317 filer med proveniens per fil — ligger nu där. Stycket bevaras som
+> exempel på felklassen: **ett negativt påstående om vad som finns kräver att man sökt
+> på alla platser det kan finnas.**
+
 **Inget målrepo finns.** Under `Nortropic`-orgen finns fyra repon:
 `nortropic-system`, `verkstadsgolvet`, `nortropic-intake`, `innovation-intake`. De tre
 senare bär noll filer av webbfabriken; `verkstadsgolvet` är en

@@ -1,5 +1,47 @@
 # Att köra loopen
 
+## 2026-09-16 — SEPARATIONENS ANDRA HALVA KLAR: webbrepot är publicerat
+
+`Nortropic/nortropic-webbforvaltning` finns nu på GitHub (publikt, ägarens val).
+432 objekt, 2,28 MiB, `main` spårar `origin/main`.
+
+Separationen som beställdes 2026-09-10 (`49cc495`) gjordes i två halvor: webbträdet togs
+bort ur plattformen samma dag, men **målrepot skapades bara lokalt**. I sex dagar fanns
+317 filer — hela kundflödet, med proveniens per fil — på en enda disk.
+
+**Regel 12 är därmed uppfylld på båda sidor:**
+
+| | Var | Status |
+|---|---|---|
+| Kärnan | `Nortropic/nortropic-system`, gren `nortropic/platform-integration-20260910` | pushad 2026-09-16 |
+| Webben | `Nortropic/nortropic-webbforvaltning`, `main` | pushad 2026-09-16 |
+
+Ingenting av tre månaders arbete finns längre på bara en maskin.
+
+### Hemlighetssökning före publicering — ren
+
+Innehållet söktes igenom före push: privatnyckelheaders, `xox*`-tokens, `sk-`/`ghp_`/
+`AKIA`-mönster, `hooks.slack.com`, samt `.env`/`.pem`/`credential`/`.key`-filer.
+**Noll verkliga träffar.** De 27 träffarna var design-tokens, `query_tokens` i parsning,
+och runtime-genererade `localhost`-tokens i vendorade verktyg.
+
+Enda raden som krävde läsning — `docs/05-beslutslogg.md:224` — visade sig vara motsatsen
+till en läcka: den dokumenterar att Slack-hemligheten ligger i `~/.nortropic/slack-webhook`
+med `600` **utanför repot**, och att configen bär sökvägen aldrig värdet, med skälet
+*"configfilen syns i rapporter, felmeddelanden och beslutsloggsrader, så en URL i configen
+läcker varje gång configen visas"*. Ingen URL finns i filen.
+
+Samma rad bär ett processfynd från augusti: en webhook-URL klistrades en gång i ett
+transkript, återkallades och ersattes. **Exakt samma sak hände i dag med en SSH-nyckel,
+och exakt samma sak gjordes.** Två gånger med samma utfall är en rutin som fungerar, inte
+tur.
+
+### Rättelse i underlaget
+
+`raddning/01-lagesbild.md` §4 påstod *"Inget målrepo finns"*. Det var fel redan när det
+skrevs — repot fanns lokalt sedan 09-10 — och det är nu dubbelt fel. Rättat.
+
+
 ## 2026-09-16 — FYND 26: VÄG A′ ÄR FEL. Den upphäver ett ägarbeslut från 09-10
 
 **Jag läste separationens commit-titlar och körde dess grindar. Jag läste aldrig dess
