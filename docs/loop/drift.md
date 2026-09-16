@@ -1,5 +1,56 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 40: tjugofyra repon som ingen mätning såg, och 517 MB utan git
+
+Tredje gången samma kväll var `✅ REGEL 12 UPPFYLLD` för smal. Den här gången hittades
+det av att ägaren frågade varför det låg 357 kataloger under `worktrees/` när
+inventeringen kände till 228.
+
+### Kategori 1 — repon vars origin inte är GitHub: **24 stycken**
+
+| Antal | Vad |
+|---|---|
+| 22 | ingen remote alls — `gate-review-final-separation-v5`…`v15`, `qualify-h039-verifier-*`, `gate-reviewer-python-authority-*`, `test-author-separation-v311` m.fl. |
+| 2 | origin pekar på ett **lokalt bare-repo** |
+| 2 | ÄR sådana bare-repon: `h035-refreeze-origin.git`, `h035-placement-origin.git` |
+
+Kvällens dom byggde på `/tmp/alla-heads.txt`, som filtrerade på att origin innehöll
+`nortropic-system`. **Ingen av de tjugofyra kom med.** Kontrollerat mot GitHub:
+
+```
+a288e16    OBJEKTET FINNS INTE PÅ ORIGIN
+e6e4091    PÅ ORIGIN (origin/nortropic/platform-integration-20260910)
+```
+
+`a288e16` är *"h-035: refreeze av verify/bin/h-035-exit mot plattformsgenerationen"* —
+verkligt arbete, som bara finns i ett lokalt bare-repo och dess klon.
+
+**Mönstret är begripligt:** h-035 handlar om publiceringsauktoritet, och ett lokalt
+bare-repo är en rimlig fixtur för att pröva publicering utan att röra GitHub. Felet är
+inte att de finns — det är att mätningen antog att varje repo på maskinen pekar på
+GitHub.
+
+### Kategori 2 — kataloger som inte är git alls: **517 MB**
+
+| Katalog | Storlek | Nyaste fil | Innehåll |
+|---|---|---|---|
+| `intake-v44` | 385 MB | 2026-09-12 | `corpus/`, `corpus-r39/`, `r39/`, `skill/`, `REVIEW-v44-S1-S5*.md`, `vault-improvements-r39/` |
+| `claude-factory` | 132 MB | 2026-08-24 | daterade körningar: `cockpit-01_data_layer-…`, `shredder-01b_showroom_exposure-…`, `VERKSTADSGOLVET-BYGGSPEC.md` |
+
+**Ingen git-baserad mätning kan se dem**, eftersom det inte finns något git att fråga.
+De låg mitt bland worktreesen och hade följt med en katalogradering.
+
+### Vad som är lagat, och vad som inte är det
+
+**Lagat:** `docs/loop/regler.md` regel 13 — rollkatalogernas livscykel. 13d förbjuder
+uttryckligen automatisk radering av båda kategorierna: *"ett prov som inte kan se en
+kategori får aldrig auktorisera att den raderas."*
+
+**Inte lagat:** de tjugofyra repons HEADs är ännu inte prövade mot GitHub, och de två
+icke-git-katalogerna är inte säkrade. **Städningen av de 5,2 GB är pausad tills båda
+är avgjorda.**
+
+
 ## 2026-09-16 — FYND 39: grindarna lämnar tusen filer efter sig, och restkontrollen var blind
 
 Följdfynd till FYND 38, hittat av ägarens körning.

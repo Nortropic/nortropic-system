@@ -181,3 +181,59 @@ attestera sin egen kandidat, inte från att spara sitt arbete.
 
 Bevarande kräver alltså aldrig ett godkännande, av någon, någonsin. Behöver du en människa
 för att spara arbete har du byggt den felklass detta repo nästan dog av.
+
+## Regel 13 — en rollkatalog har en livscykel, och den slutar
+
+**Beslutad 2026-09-16 av Johnny:** *"alltså livscykeln"*, efter att maskinen mätts till
+**357 kataloger under `worktrees/` och 52 under `work/`, 5,2 GB**.
+
+Rollseparationen är rätt — den hindrar att den som bygger också dömer. Men den saknade
+ett slut. Varje runda av varje hypotes skapade två till fyra kataloger, och ingenting sa
+när de var förbrukade. `h-039` gick 30 rundor, `h-032` 120, `h-031` 147.
+
+**Katalogerna är inte ett städproblem. De är kvittot på rundtrampen** — varje katalog är
+en runda som inte konvergerade, materialiserad på disk, med ett eget objektlager på 75 MB
+när den är en fristående klon.
+
+**13a. En rollkatalog tillhör EN runda av EN hypotes.** Den namnges så att rundan går att
+läsa ur namnet — `<roll>-<task>-<runda>-<bas-sha>`. Namnet är gränssnittet mot
+livscykeln; ett namn utan runda gör katalogen omöjlig att åldra ut mekaniskt.
+
+**13b. Förbrukad = fyra mätta villkor, aldrig en bedömning.**
+
+| # | Villkor | Mäts med |
+|---|---|---|
+| 1 | Rundan är avslutad — attesterad, `NO-CREDIT`, `MÅLFLYTT` eller `OVERIFIERAT` | raden i `docs/05-beslutslogg.md` |
+| 2 | HEAD finns på origin | `inventera-lokalt-arbete.sh` efter en full fetch |
+| 3 | Okommitterat innehåll är säkrat | `radda/smuts-*` med identiskt träd |
+| 4 | Ignorerat innehåll är **mätt** och är residue | `git status --porcelain --ignored=matching` |
+
+Villkor 4 tillkom av FYND 38: `.gitignore` är en vitlista, så `git status` och `git add -A`
+ser inte det mesta. En katalog vars ignorerade innehåll aldrig lästs är **inte** förbrukad,
+hur ren den än ser ut.
+
+**13c. Förbrukad katalog tas bort — det är inte valfritt.** Först katalogen, sedan
+`git worktree prune` i huvudroten så registreringen följer med. Additivt bevarande sker
+FÖRE borttagningen, aldrig efter.
+
+**13d. Två kategorier får aldrig tas bort på automatik.** Mätt 2026-09-16, FYND 40:
+
+- **Kataloger som inte är git alls.** `intake-v44` (385 MB) och `claude-factory` (132 MB)
+  låg bland worktreesen utan någon versionshantering. Ingen git-baserad mätning kan se
+  dem, eftersom det inte finns något git att fråga.
+- **Repon vars origin inte är GitHub. Mätt: tjugofyra stycken.** Tjugotvå har ingen
+  remote alls (`gate-review-final-separation-v5`…`v15`, `qualify-h039-verifier-*`,
+  `test-author-separation-v311`, `gate-reviewer-python-authority-*` m.fl.), två pekar på
+  lokala bare-repon, och två ÄR sådana bare-repon (`h035-refreeze-origin.git`,
+  `h035-placement-origin.git`). Commiten `a288e16` — *"h-035: refreeze av
+  verify/bin/h-035-exit"* — finns bara där; kontrollerad mot GitHub svarar den
+  `OBJEKTET FINNS INTE PÅ ORIGIN`. Kvällens dom `43 PA_ORIGIN · 0 SAKNAS` räknade aldrig
+  någon av de tjugofyra, eftersom filtret krävde att origin innehöll `nortropic-system`.
+
+Båda kräver ägarens beslut. **Ett prov som inte kan se en kategori får aldrig auktorisera
+att den raderas.**
+
+**13e. Antalet levande rollkataloger per hypotes är ett mått på rundtramp.** Överstiger
+det omfrysningsbudgeten i regel 11a är hypotesen redan i det läge 11b beskriver — dela
+den eller avsluta `OVERIFIERAT`. Katalogerna på disk är den tidigaste synliga signalen,
+före grindfilens tillväxt.
