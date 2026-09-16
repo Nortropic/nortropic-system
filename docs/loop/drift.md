@@ -1,5 +1,57 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 38: `.gitignore` är en VITLISTA, och räddningen såg inte förbi den
+
+Ägaren frågade om de 228 worktreesen verkligen ska finnas. Svaret är nej — men
+**städa dem inte än**, och skälet är ett hål i kvällens räddning.
+
+`.gitignore` rad 3 är `/*`. Allt utom det uttryckligen insläppta är **ignorerat**.
+Och:
+
+| Mekanism | Ser ignorerade filer? |
+|---|---|
+| `git status --porcelain` | **nej** |
+| `git add -A` i `radda-okommitterat.sh`:s tempindex | **nej** — respekterar `.gitignore` |
+| `smuts_sakrad()`:s trädjämförelse | **nej** — samma `add -A` |
+
+Mätt i detta repo: `git status --porcelain` ger **0**, och
+`git status --porcelain --ignored=matching` ger **75** filer — bland dem
+`controller/policy/evidence/*.json`, alltså policyns egna evidensposter, som
+`h-007` K8 mäter mot (`evidence skrivs vid avslag, 14 → 15`).
+
+**Alltså gäller kvällens `✅ REGEL 12 UPPFYLLD` spårat och otrackat innehåll, inte
+ignorerat.** Domen var inte falsk — den var smalare än den lät. Det är samma
+felklass som FYND 37 en nivå ned: ett prov som uttalar sig om mer än det läser.
+
+### Lagat: inventeringen RAPPORTERAR nu ignorerat innehåll
+
+Både worktree-loopen och klonloopen räknar det, och raden säger rakt ut att det
+**inte** täcks av `radda/smuts-*`:
+
+```
+ignorerat innehåll: N filer i M träd — EJ täckt av radda/smuts-* (FYND 38)
+  (.gitignore är en vitlista; git status och git add -A ser dem inte.
+   Städa inte ett träd utan att först mäta vad dess ignorerade filer är.)
+```
+
+Den **bevarar** dem inte. Att automatiskt pusha allt ignorerat vore fel: där bor
+byggartefakter, cacher och potentiellt hemligheter, och ägarens egen regel säger
+att värden ligger utanför repot. Vad som ska sparas är ett beslut per träd, inte
+en automatik.
+
+### Vad detta betyder för de 228
+
+De 228 worktreesen och ~85 klonerna är ackumulation — varje session sedan
+9 september skapade sin egen och städade aldrig. De ska bort. Men ordningen är:
+
+1. Mät vad de ignorerade filerna ÄR, per träd.
+2. Avgör vad som ska bevaras — ägarens beslut, inte ett skripts.
+3. Städa först därefter.
+
+Att gå direkt till steg 3 på en grön dom som inte läste dem vore precis det här
+projektets klassiska fel.
+
+
 ## 2026-09-16 — REGEL 12 UPPFYLLD, mätt mot origin av ett prov utan blinda fläckar
 
 Avslutar dagens regel-12-arbete. `inventera-lokalt-arbete.sh` ger nu:

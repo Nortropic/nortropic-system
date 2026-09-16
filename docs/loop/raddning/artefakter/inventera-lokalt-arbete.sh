@@ -69,6 +69,7 @@ klassa() {
 }
 
 n_main=0; n_remote=0; n_foraldralos=0; n_smutsig=0; n_smuts_sakrad=0; n_tot=0
+IG_TOT=0; IG_TRAD=0
 FARLIGA=""
 
 # Är ett smutsigt worktrees NUVARANDE innehåll redan säkrat på origin?
@@ -107,6 +108,16 @@ process() {
   n_tot=$((n_tot+1))
   local k; k="$(klassa "$HEAD_SHA")"
   local s; s="$(git -C "$SOKVAG" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+  # IGNORERAT INNEHÅLL RÄKNAS SEPARAT — FYND 38. .gitignore rad 3 är `/*`, alltså
+  # en VITLISTA: allt utom det uttryckligen insläppta är ignorerat. `git status
+  # --porcelain` visar det inte, och `git add -A` i radda-okommitterat.sh
+  # RESPEKTERAR .gitignore. Det ignorerade innehållet är därför INTE säkrat av
+  # radda/smuts-*, och domen nedan gäller det inte. Mätt 2026-09-16: detta repo
+  # visar 0 osparade och bär 75 ignorerade filer, bland dem
+  # controller/policy/evidence/*.json — policyns egna evidensposter.
+  local ig; ig="$(git -C "$SOKVAG" status --porcelain --ignored=matching 2>/dev/null | grep -c "^!!")"
+  IG_TOT=$((IG_TOT + ${ig:-0}))
+  [ "${ig:-0}" -gt 0 ] && IG_TRAD=$((IG_TRAD + 1))
   local smutsmark=""
   if [ "${s:-0}" -gt 0 ]; then
     if smuts_sakrad "$SOKVAG"; then smutsmark=" (säkrad)"; n_smuts_sakrad=$((n_smuts_sakrad+1))
@@ -135,6 +146,9 @@ done < <(git worktree list --porcelain)
 process
 
 echo
+echo "ignorerat innehåll: $IG_TOT filer i $IG_TRAD träd — EJ täckt av radda/smuts-* (FYND 38)"
+echo "  (.gitignore är en vitlista; git status och git add -A ser dem inte."
+echo "   Städa inte ett träd utan att först mäta vad dess ignorerade filer är.)"
 echo "worktrees: $n_tot totalt · $n_main helt i main · $n_remote på pushad gren · $n_foraldralos FÖRÄLDRALÖSA · $n_smutsig OSÄKRAT okommitterat · $n_smuts_sakrad smutsiga men säkrade"
 echo "(rader ovan = endast de som inte är helt säkrade och rena)"
 echo
@@ -185,6 +199,8 @@ else
       klage="FÖRÄLDRALÖS"; k_farlig=$((k_farlig+1))
     fi
     ks="$(git -C "$kd" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    kig="$(git -C "$kd" status --porcelain --ignored=matching 2>/dev/null | grep -c "^!!")"
+    IG_TOT=$((IG_TOT + ${kig:-0})); [ "${kig:-0}" -gt 0 ] && IG_TRAD=$((IG_TRAD + 1))
     kmark=""
     if [ "${ks:-0}" -gt 0 ]; then
       if smuts_sakrad "$kd"; then kmark=" · $ks osparade (säkrad)"
