@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# H-034 frozen owner gate: native finite H-033 evidence-admission kernel.
+# Disposable judge subjects establish judge integrity only. K* controls below
+# separately inspect and execute the real owner-authored production artifacts.
+set +e
+set -u
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo 'ODÖMBART K0 NO_REPOSITORY'; exit 2; }
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/nortropic-h034.XXXXXX")" || exit 2
+trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+
+SOURCE="$ROOT/controller/h034-native/kernel.c"
+BINARY="$ROOT/verify/h034/kernel"
+RECIPE="$ROOT/verify/h034/build-recipe.json"
+MANIFEST="$ROOT/verify/h034/identity-manifest.json"
+EVIDENCE_ROOT="/Library/Application Support/Nortropic/provenance/evidence"
+RECEIPT_ROOT="/Library/Application Support/Nortropic/provenance/probe-receipts"
+
+if [[ "$(uname -s 2>/dev/null)" != Darwin || "$(uname -m 2>/dev/null)" != arm64 ]]; then
+  echo 'JUDGE_SELF_CONTROLS=ODÖMBART'
+  echo 'PRODUCTION_ACCEPTANCE=NOT_RUN'
+  echo 'H034_GATE_RESULT=ODÖMBART'
+  echo 'CURRENT_RED_REASON=NONE'
+  echo 'REASON=H034_REQUIRES_ARM64_MACOS'
+  exit 2
+fi
+for tool in /usr/bin/clang /usr/bin/codesign /usr/bin/file /usr/bin/lipo /usr/bin/otool /usr/bin/nm /usr/bin/python3 /usr/bin/shasum; do
+  [[ -x "$tool" ]] || { echo "ODÖMBART K0 TOOL_ABSENT=$tool"; exit 2; }
+done
+
+cat >"$WORK/judge.c" <<'C'
+#include <stdio.h>
+int main(void) { puts("ACCEPT"); return 0; }
+C
+cat >"$WORK/inject.c" <<'C'
+int h034_mutant_dependency(void) { return 0; }
+C
+cat >"$WORK/depjudge.c" <<'C'
+extern int h034_mutant_dependency(void);
+int main(void) { return h034_mutant_dependency(); }
+C
+
+/usr/bin/clang -arch arm64 -Os -Wl,-no_uuid -o "$WORK/good" "$WORK/judge.c" >/dev/null 2>&1 || { echo 'ODÖMBART J_NATIVE_COMPILE'; exit 2; }
+/usr/bin/codesign --force --sign - --options runtime --identifier com.nortropic.h034.judge "$WORK/good" >/dev/null 2>&1 || { echo 'ODÖMBART J_NATIVE_SIGN'; exit 2; }
+/usr/bin/clang -arch arm64 -dynamiclib -o "$WORK/libmutant.dylib" "$WORK/inject.c" >/dev/null 2>&1 || { echo 'ODÖMBART J_DYLIB_COMPILE'; exit 2; }
+/usr/bin/clang -arch arm64 -Os -Wl,-no_uuid -o "$WORK/nonapple" "$WORK/depjudge.c" "$WORK/libmutant.dylib" >"$WORK/depcompile.out" 2>&1 || { echo 'ODÖMBART J_DEPENDENT_COMPILE'; sed -n '1,20p' "$WORK/depcompile.out"; exit 2; }
+/usr/bin/codesign --force --sign - --options runtime --identifier com.nortropic.h034.judge "$WORK/nonapple" >/dev/null 2>&1 || { echo 'ODÖMBART J_DEPENDENT_SIGN'; exit 2; }
+/usr/bin/clang -arch arm64 -Os -Wl,-no_uuid -Wl,-rpath,"$WORK" -o "$WORK/rpath" "$WORK/judge.c" >/dev/null 2>&1 || { echo 'ODÖMBART J_RPATH_COMPILE'; exit 2; }
+/usr/bin/codesign --force --sign - --options runtime --identifier com.nortropic.h034.judge "$WORK/rpath" >/dev/null 2>&1 || { echo 'ODÖMBART J_RPATH_SIGN'; exit 2; }
+cp "$WORK/good" "$WORK/tampered"; printf X >>"$WORK/tampered"
+cp "$WORK/good" "$WORK/unsigned"; /usr/bin/codesign --remove-signature "$WORK/unsigned" >/dev/null 2>&1 || true
+ln -s "$WORK/good" "$WORK/symlink"
+mkdir "$WORK/nonregular"
+
+[[ -x "$WORK/good" ]] || { echo 'FAIL J01_NATIVE_BUILD_OUTPUT'; exit 1; }
+/usr/bin/file -b "$WORK/good" | grep -F 'Mach-O 64-bit executable arm64' >/dev/null || { echo 'FAIL J02_ARM64_INSPECTION'; exit 1; }
+/usr/bin/codesign --verify --strict "$WORK/good" >/dev/null 2>&1 || { echo 'FAIL J03_SIGNATURE_INSPECTION'; exit 1; }
+/usr/bin/codesign -d --verbose=4 "$WORK/good" >"$WORK/cs.txt" 2>&1
+grep -F 'Identifier=com.nortropic.h034.judge' "$WORK/cs.txt" >/dev/null || { echo 'FAIL J04_IDENTIFIER_INSPECTION'; exit 1; }
+grep -Eq 'flags=.*runtime' "$WORK/cs.txt" || { echo 'FAIL J05_HARDENED_RUNTIME_INSPECTION'; exit 1; }
+/usr/bin/codesign --verify --strict "$WORK/tampered" >/dev/null 2>&1 && { echo 'FAIL J06_TAMPERED_SIGNATURE_ACCEPTED'; exit 1; }
+/usr/bin/codesign --verify --strict "$WORK/unsigned" >/dev/null 2>&1 && { echo 'FAIL J07_UNSIGNED_ACCEPTED'; exit 1; }
+/usr/bin/otool -l "$WORK/rpath" | grep -A2 LC_RPATH | grep -F "$WORK" >/dev/null || { echo 'FAIL J08_RPATH_MUTANT_NOT_CREATED'; exit 1; }
+[[ -L "$WORK/symlink" && ! -f "$WORK/nonregular" ]] || { echo 'FAIL J09_PATH_MUTANTS'; exit 1; }
+
+JUDGE_WORK="$WORK" /usr/bin/python3 - <<'PY'
+import hashlib, json, os, pathlib, re, stat, subprocess, sys
+w=pathlib.Path(os.environ["JUDGE_WORK"])
+passed=9
+H40="1"*40; H64="2"*64
+MANIFEST_KEYS=("schema_version","contract_version","source_path","source_git_blob","source_sha256",
+ "binary_path","binary_git_blob","binary_sha256","build_recipe_path","build_recipe_git_blob",
+ "build_recipe_sha256","target_architecture","deployment_target","codesign_identifier",
+ "codesign_requirement","runtime_dependency_allowlist","compiled_plan")
+PLAN=("OPEN_CANONICAL_EVIDENCE_ROOT","RESOLVE_CONSTRAINED_CHILD","OPEN_CHILD_ONCE_NOFOLLOW",
+ "FSTAT_SAME_FD","REQUIRE_REGULAR_PROTECTED_ORIGIN","READ_BOUNDED_SAME_FD",
+ "FSTAT_STABLE_AFTER_READ","READ_BOUNDED_SAME_FD_AGAIN","REQUIRE_IDENTICAL_BYTES",
+ "STRICT_PARSE_H033_CANONICAL_DOCUMENT","REQUIRE_EXACT_KEYS_TYPES_ORDER_LIMITS","MATCH_TASK_H033",
+ "MATCH_CANDIDATE","MATCH_TASK_SPEC","MATCH_GATE","MATCH_PROBE","MATCH_REQUEST_ID",
+ "VERIFY_PRODUCER_AUTHORITY","OPEN_ROOT_OBSERVER_RECEIPT_ONCE","VERIFY_RECEIPT_REQUEST_EFFECT_BINDING",
+ "VERIFY_FRESH_REQUEST_BINDING","EMIT_BOUND_TRISTATE")
+def fail(label): print("FAIL "+label); raise SystemExit(1)
+def ok(label, value):
+ global passed
+ if not value: fail(label)
+ passed += 1; print("PASS "+label)
+def pairs(ps):
+ d={}
+ for k,v in ps:
+  if k in d: raise ValueError("duplicate")
+  d[k]=v
+ return d
+def strict_manifest(raw):
+ v=json.loads(raw,object_pairs_hook=pairs)
+ if type(v) is not dict or tuple(v)!=MANIFEST_KEYS: raise ValueError("keys")
+ if type(v["schema_version"]) is not int or v["schema_version"]!=1: raise ValueError("version")
+ for k in MANIFEST_KEYS[1:-1]:
+  if k=="runtime_dependency_allowlist": continue
+  if type(v[k]) is not str or not v[k]: raise ValueError("string")
+ if v["contract_version"]!="H034_NATIVE_FINITE_VERIFIER_KERNEL_V1": raise ValueError("contract")
+ expected={"source_path":"controller/h034-native/kernel.c","binary_path":"verify/h034/kernel",
+           "build_recipe_path":"verify/h034/build-recipe.json"}
+ if any(v[k]!=x for k,x in expected.items()): raise ValueError("path")
+ for k in ("source_git_blob","binary_git_blob","build_recipe_git_blob"):
+  if not re.fullmatch(r"[0-9a-f]{40}",v[k]): raise ValueError("blob")
+ for k in ("source_sha256","binary_sha256","build_recipe_sha256"):
+  if not re.fullmatch(r"[0-9a-f]{64}",v[k]): raise ValueError("sha")
+ if v["target_architecture"]!="arm64" or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,2}",v["deployment_target"]): raise ValueError("target")
+ if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,127}",v["codesign_identifier"]): raise ValueError("identifier")
+ if type(v["runtime_dependency_allowlist"]) is not list or v["runtime_dependency_allowlist"]!=["/usr/lib/libSystem.B.dylib"]: raise ValueError("deps")
+ if type(v["compiled_plan"]) is not list or tuple(v["compiled_plan"])!=PLAN: raise ValueError("plan")
+ return v
+good={"schema_version":1,"contract_version":"H034_NATIVE_FINITE_VERIFIER_KERNEL_V1",
+ "source_path":"controller/h034-native/kernel.c","source_git_blob":H40,"source_sha256":H64,
+ "binary_path":"verify/h034/kernel","binary_git_blob":H40,"binary_sha256":H64,
+ "build_recipe_path":"verify/h034/build-recipe.json","build_recipe_git_blob":H40,"build_recipe_sha256":H64,
+ "target_architecture":"arm64","deployment_target":"15.0","codesign_identifier":"com.nortropic.h034.kernel",
+ "codesign_requirement":"identifier com.nortropic.h034.kernel","runtime_dependency_allowlist":["/usr/lib/libSystem.B.dylib"],
+ "compiled_plan":list(PLAN)}
+raw=json.dumps(good,separators=(",",":"))
+ok("J10_MANIFEST_POSITIVE",strict_manifest(raw)==good)
+mut=[]
+mut.append(("J11_DUPLICATE",raw[:-1]+',"binary_sha256":"'+H64+'"}'))
+d=dict(good); d.pop("binary_sha256"); mut.append(("J12_MISSING",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["extra"]=1; mut.append(("J13_EXTRA",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["schema_version"]="1"; mut.append(("J14_WRONG_TYPE",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["source_sha256"]="bad"; mut.append(("J15_BAD_DIGEST",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["source_path"]="../kernel.c"; mut.append(("J16_PATH_TRAVERSAL",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["manifest_sha256"]=H64; mut.append(("J17_SELF_DIGEST",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["candidate_sha"]=H40; mut.append(("J18_CANDIDATE_RECURSION",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["target_architecture"]="x86_64"; mut.append(("J19_WRONG_ARCH",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["runtime_dependency_allowlist"]=["@rpath/libevil.dylib"]; mut.append(("J20_WRONG_DEPS",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["codesign_identifier"]="../bad"; mut.append(("J21_WRONG_SIGNING_ID",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["compiled_plan"]=list(PLAN)+["SHELL"]; mut.append(("J22_UNKNOWN_OPERATION",json.dumps(d,separators=(",",":"))))
+d=dict(good); d["compiled_plan"]=list(PLAN[:-1]); mut.append(("J23_MISSING_OPERATION",json.dumps(d,separators=(",",":"))))
+d=dict(good); p=list(PLAN); p[0],p[1]=p[1],p[0]; d["compiled_plan"]=p; mut.append(("J24_REORDERED_PLAN",json.dumps(d,separators=(",",":"))))
+for label,doc in mut:
+ try: strict_manifest(doc); accepted=True
+ except Exception: accepted=False
+ ok(label,not accepted)
+# Actual Mach-O judge mutants, evaluated by the same objective predicates later
+# used on production rather than by fixture labels.
+def macho(path):
+ p=pathlib.Path(path)
+ if p.is_symlink() or not p.is_file(): return False
+ def run(*a): return subprocess.run(a,text=True,capture_output=True)
+ if "Mach-O 64-bit executable arm64" not in run("/usr/bin/file","-b",str(p)).stdout: return False
+ if run("/usr/bin/codesign","--verify","--strict",str(p)).returncode: return False
+ load=run("/usr/bin/otool","-l",str(p)).stdout
+ if "LC_RPATH" in load: return False
+ deps=[x.strip().split(" (",1)[0] for x in run("/usr/bin/otool","-L",str(p)).stdout.splitlines()[1:] if x.strip()]
+ return deps==["/usr/lib/libSystem.B.dylib"]
+ok("J25_REAL_GOOD_MACHO",macho(w/"good"))
+for label,path in (("J26_UNSIGNED",w/"unsigned"),("J27_TAMPERED",w/"tampered"),
+                   ("J28_RPATH",w/"rpath"),("J29_NONAPPLE_DEP",w/"nonapple"),
+                   ("J30_SYMLINK",w/"symlink"),("J31_NONREGULAR",w/"nonregular")):
+ ok(label,not macho(path))
+# Closed canonical H-033 document language and output protocol judge controls.
+EKEYS=("schema_version","producer_authority","task","candidate_sha","task_spec_sha256","gate_sha256","probe_identity","request_id","result","effect_sha256")
+e={"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033","candidate_sha":H40,
+ "task_spec_sha256":H64,"gate_sha256":H64,"probe_identity":"h033-pass-v1","request_id":"3"*64,
+ "result":"PASS","effect_sha256":H64}
+def evidence(raw):
+ if b"\\x00" in raw or len(raw)>4096 or raw.endswith(b"\\n"): raise ValueError("bytes")
+ v=json.loads(raw.decode("ascii"),object_pairs_hook=pairs)
+ if type(v) is not dict or tuple(v)!=EKEYS or json.dumps(v,separators=(",",":")).encode()!=raw: raise ValueError("canonical")
+ if type(v["schema_version"]) is not int or v["schema_version"]!=1: raise ValueError("version")
+ if v["producer_authority"]!="_nortropic_provenance" or v["task"]!="h-033" or v["result"] not in ("PASS","FAIL","ODÖMBART"): raise ValueError("enum")
+ if not re.fullmatch(r"[0-9a-f]{40}",v["candidate_sha"]): raise ValueError("candidate")
+ for k in ("task_spec_sha256","gate_sha256","request_id","effect_sha256"):
+  if not re.fullmatch(r"[0-9a-f]{64}",v[k]): raise ValueError(k)
+ if v["probe_identity"] not in ("h033-pass-v1","h033-fail-v1","h033-odombar-v1","h032-g20-v1"): raise ValueError("probe")
+ return v
+eraw=json.dumps(e,separators=(",",":"),ensure_ascii=True).encode()
+ok("J32_EVIDENCE_POSITIVE",evidence(eraw)==e)
+bad=[b'{',b'[]',eraw[:-1]+b',"result":"PASS"}',eraw+b'\n',eraw+b'\0']
+for label,doc in zip(("J33_MALFORMED","J34_CONTAINER","J35_DUPLICATE","J36_TRAILING","J37_NUL"),bad):
+ try: evidence(doc); accepted=True
+ except Exception: accepted=False
+ ok(label,not accepted)
+d=dict(e); d["result"]="GREEN"
+try: evidence(json.dumps(d,separators=(",",":")).encode()); accepted=True
+except Exception: accepted=False
+ok("J38_UNKNOWN_RESULT",not accepted)
+ok("J39_CLEANUP_SCOPE",all(p.parent==w for p in (w/"good",w/"judge.c",w/"rpath")))
+print(f"JUDGE_SELF_CONTROLS={passed} PASS, 0 FAIL")
+PY
+judge_rc=$?
+[[ $judge_rc -eq 0 ]] || exit "$judge_rc"
+
+# Honest production boundary: disposable native subjects above can never satisfy it.
+missing=()
+[[ -f "$SOURCE" && ! -L "$SOURCE" ]] || missing+=(controller/h034-native/kernel.c)
+[[ -f "$BINARY" && ! -L "$BINARY" ]] || missing+=(verify/h034/kernel)
+[[ -f "$RECIPE" && ! -L "$RECIPE" ]] || missing+=(verify/h034/build-recipe.json)
+[[ -f "$MANIFEST" && ! -L "$MANIFEST" ]] || missing+=(verify/h034/identity-manifest.json)
+if (( ${#missing[@]} )); then
+  echo 'PRODUCTION_ACCEPTANCE=RED'
+  printf 'MISSING_PRODUCTION_ARTIFACTS=%s\n' "$(IFS=,; echo "${missing[*]}")"
+  echo 'CURRENT_RED_REASON=H034_NATIVE_KERNEL_ABSENT'
+  echo 'MATERIAL_PROPERTIES_JUDGE_ONLY=NONE'
+  echo 'H034_GATE_RESULT=RED'
+  exit 1
+fi
+
+# Strictly parse and bind the real manifest/recipe before inspecting executable
+# behavior. The Python here is a gate judge, never H-034 runtime authority.
+ROOT_PATH="$ROOT" /usr/bin/python3 - <<'PY' || { echo 'FAIL K1 MANIFEST_OR_RECIPE'; exit 1; }
+import hashlib,json,os,pathlib,re,subprocess
+r=pathlib.Path(os.environ["ROOT_PATH"])
+def pairs(ps):
+ d={}
+ for k,v in ps:
+  if k in d: raise ValueError("duplicate")
+  d[k]=v
+ return d
+def load(path): return json.loads(path.read_text(encoding="utf-8"),object_pairs_hook=pairs)
+m=load(r/"verify/h034/identity-manifest.json"); recipe=load(r/"verify/h034/build-recipe.json")
+keys=("schema_version","contract_version","source_path","source_git_blob","source_sha256","binary_path","binary_git_blob","binary_sha256","build_recipe_path","build_recipe_git_blob","build_recipe_sha256","target_architecture","deployment_target","codesign_identifier","codesign_requirement","runtime_dependency_allowlist","compiled_plan")
+if tuple(m)!=keys or m["schema_version"]!=1 or type(m["schema_version"]) is not int: raise ValueError("manifest schema")
+paths={"source":"controller/h034-native/kernel.c","binary":"verify/h034/kernel","build_recipe":"verify/h034/build-recipe.json"}
+for prefix,path in paths.items():
+ if m[prefix+"_path"]!=path: raise ValueError("path")
+ raw=(r/path).read_bytes()
+ if hashlib.sha256(raw).hexdigest()!=m[prefix+"_sha256"]: raise ValueError("digest")
+ blob=subprocess.run(["git","-C",str(r),"hash-object",str(r/path)],text=True,capture_output=True,check=True).stdout.strip()
+ if blob!=m[prefix+"_git_blob"]: raise ValueError("blob")
+if m["target_architecture"]!="arm64" or m["runtime_dependency_allowlist"]!=["/usr/lib/libSystem.B.dylib"]: raise ValueError("target/deps")
+if recipe.get("schema_version")!=1 or recipe.get("language")!="C" or recipe.get("compiler")!="/usr/bin/clang": raise ValueError("recipe")
+if recipe.get("target_architecture")!="arm64" or recipe.get("deployment_target")!=m["deployment_target"]: raise ValueError("recipe target")
+if recipe.get("codesign_identifier")!=m["codesign_identifier"] or recipe.get("codesign_requirement")!=m["codesign_requirement"]: raise ValueError("recipe signing")
+for forbidden in ("shell","command","commands","script","interpreter","runtime_plan","plugins","environment"):
+ if forbidden in recipe: raise ValueError("programmable recipe")
+print("PASS K1 MANIFEST_RECIPE_IDENTITY")
+PY
+
+/usr/bin/file -b "$BINARY" | grep -F 'Mach-O 64-bit executable arm64' >/dev/null || { echo 'FAIL K2 WRONG_ARCH_OR_FORMAT'; exit 1; }
+/usr/bin/lipo -archs "$BINARY" | grep -Ex 'arm64' >/dev/null || { echo 'FAIL K2 NONEXACT_ARCH'; exit 1; }
+/usr/bin/codesign --verify --strict "$BINARY" >/dev/null 2>&1 || { echo 'FAIL K3 INVALID_SIGNATURE'; exit 1; }
+/usr/bin/codesign -d --verbose=4 "$BINARY" >"$WORK/prod.cs" 2>&1
+grep -Eq 'flags=.*runtime' "$WORK/prod.cs" || { echo 'FAIL K3 HARDENED_RUNTIME_ABSENT'; exit 1; }
+/usr/bin/otool -L "$BINARY" >"$WORK/prod.libs" || { echo 'ODÖMBART K4 OTOOL'; exit 2; }
+[[ "$(sed -n '2,$p' "$WORK/prod.libs" | sed 's/^[[:space:]]*//;s/ (compatibility.*$//' | sed '/^$/d')" = /usr/lib/libSystem.B.dylib ]] || { echo 'FAIL K4 UNAPPROVED_RUNTIME_DEPENDENCY'; exit 1; }
+! /usr/bin/otool -l "$BINARY" | grep -Eq 'LC_RPATH|@rpath|@loader_path|@executable_path' || { echo 'FAIL K4 MUTABLE_LOADER_AUTHORITY'; exit 1; }
+/usr/bin/otool -l "$BINARY" | grep -A2 LC_LOAD_DYLINKER | grep -F '/usr/lib/dyld' >/dev/null || { echo 'FAIL K4 WRONG_DYLD'; exit 1; }
+/usr/bin/nm -u "$BINARY" >"$WORK/prod.undefined" || { echo 'ODÖMBART K5 NM'; exit 2; }
+! grep -E '(_system|_popen|_posix_spawn|_fork|_exec|_dlopen|_dlsym|_socket|_connect|getaddrinfo)' "$WORK/prod.undefined" >/dev/null || { echo 'FAIL K5 DELEGATED_OR_DYNAMIC_AUTHORITY'; exit 1; }
+
+if [[ ! -d "$EVIDENCE_ROOT" || -L "$EVIDENCE_ROOT" || ! -d "$RECEIPT_ROOT" || -L "$RECEIPT_ROOT" ]]; then
+  echo 'PRODUCTION_ACCEPTANCE=RED'
+  echo 'CURRENT_RED_REASON=H034_PROTECTED_INSTALLATION_ABSENT'
+  echo 'MATERIAL_PROPERTIES_JUDGE_ONLY=NONE'
+  echo 'H034_GATE_RESULT=RED'
+  exit 1
+fi
+
+echo 'ODÖMBART K6 OWNER_POST_PROVISION_RUNTIME_MATRIX_REQUIRES_OWNER_FIXTURES'
+echo 'PRODUCTION_ACCEPTANCE=ODÖMBART'
+echo 'CURRENT_RED_REASON=NONE'
+echo 'MATERIAL_PROPERTIES_JUDGE_ONLY=NONE'
+echo 'H034_GATE_RESULT=ODÖMBART'
+exit 2
