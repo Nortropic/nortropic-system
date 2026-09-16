@@ -1,5 +1,51 @@
 # Att köra loopen
 
+## 2026-09-16 — RÄDDNINGEN KÖRD: 259 → 31. Noll föräldralösa, noll osäkrade grenar.
+
+`radda-lokalt-arbete.sh --kor` på Macen, därefter `inventera-lokalt-arbete.sh` som dom:
+
+```
+FÖRE:   228 worktrees · 92 FÖRÄLDRALÖSA · 136 grenar utanför origin · 31 smutsiga
+EFTER:  228 worktrees ·  0 FÖRÄLDRALÖSA ·   0 grenar utanför origin · 31 smutsiga
+```
+
+**118 grenar och 1 worktree-HEAD pushades.** Torrkörningen hade förutsagt 136 respektive
+69 — och skillnaden är korrekt, inte en miss: faserna körs i ordning, så när fas A pushat
+`nortropic/loop-h-035-builder-r10` (37 commits) blev `-r5` (29), `-r8` (33) och `-v1` (23)
+förfäder till något som redan fanns på origin. Samma för `h034-native-test-author`-kedjan
+och `h035-gate-r5…r12`. Fas B tappade av samma skäl: 68 av 69 worktree-HEADs låg redan i
+en gren fas A just hade pushat. **Färre refs, samma innehåll.**
+
+Jag resonerade mig fram till den förklaringen innan inventeringen kördes och skrev ned den
+som hypotes. Provet bekräftade den. Ordningen — hypotes först, mätning sedan — är den enda
+som gör det mätbart när jag har fel, och jag hade fel sju gånger i dag.
+
+### Artefakt: `artefakter/radda-okommitterat.sh` — den sista formen
+
+Kvar är 31 worktrees med ändringar som aldrig committats. Ett vanligt `git commit` där
+vore **intrusivt**: det flyttar HEAD, tömmer indexet och gör någon annans halvfärdiga
+arbete till historia.
+
+Provet använder i stället git-plumbing med ett **tillfälligt index**:
+
+```
+GIT_INDEX_FILE=$tmp  read-tree HEAD → add -A → write-tree → commit-tree -p HEAD → push
+```
+
+Worktreets eget index, HEAD och arbetsträd rörs aldrig. **Prövat på båda påståendena:**
+
+| Påstående | Mätning |
+|---|---|
+| Worktreet är orört | `git status` och `HEAD` byte-identiska före och efter |
+| Innehållet finns på origin | Den pushade commiten bär både den ändrade filen **och** den otrackade |
+
+**Efter körning visar inventeringen dem fortfarande som "med okommitterat" — och det är
+riktigt.** Arbetsträdet ÄR smutsigt. Skillnaden är att innehållet nu också finns på origin
+under `radda/smuts-*`. Att provet inte städar bort sin egen larmsignal är avsiktligt: en
+mekanism som tystar mätningen i stället för att ändra verkligheten är vad
+`check-docs-coherence` en gång gjorde med `PASS 26/26` medan tjugo kontroller tyst utgått.
+
+
 ## 2026-09-16 — INVENTERINGEN KÖRD: 259 poster finns BARA på ägarens maskin. Min siffra var sex.
 
 `inventera-lokalt-arbete.sh` kört på Macen mot färsk `origin/main` (`82ecc192`):
