@@ -1,5 +1,64 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 39: grindarna lämnar tusen filer efter sig, och restkontrollen var blind
+
+Följdfynd till FYND 38, hittat av ägarens körning.
+
+`inventera-lokalt-arbete.sh` rapporterar över alla 61 repon:
+**`1179 ignorerade filer i 14 träd`**.
+
+Innehållet i ägarens kontrollklon, grupperat:
+
+| Antal | Vad |
+|---|---|
+| 30 | `controller/policy/evidence/*.json` — policyns evidensposter |
+| ~1 149 | `.nortropic-h036-proof-<sha>-trust-{write,unlink,rename,hardlink}-source` i reporoten |
+
+De senare är **rester från grindkörningar**. Klonen skapades ren i går.
+
+### Och provet sa att trädet var orört
+
+`matning-pa-macen.sh` avslutade varje körning med:
+
+```
+okommitterade filer FÖRE=0 EFTER=0
+OK — grindarna lämnade trädet orört
+```
+
+Kontrollen är `git status --porcelain`, som **inte ser ignorerade filer**. Grindarna
+lämnade alltså över tusen filer efter sig och provet rapporterade motsatsen — i det
+avsnitt som finns just för att upptäcka rester.
+
+Det är samma mekanism som FYND 38, men med en dyrare konsekvens: **kontrollen mot
+grindresterna var den enda som fanns.**
+
+### Lagat
+
+`matning-pa-macen.sh` räknar nu ignorerade filer före och efter, och skriver ut deltat.
+Tre utfall i stället för två:
+
+```
+okommitterade  FÖRE=0 EFTER=0
+ignorerade     FÖRE=75 EFTER=1224   (delta: 1149)
+⚠️ GRINDARNA LÄMNADE 1149 IGNORERADE FILER EFTER SIG.
+```
+
+Mutationsprövat: en fil som `git status --porcelain` inte ser tar den ignorerade
+räknaren från 75 till 76.
+
+### Vad det betyder
+
+Resterna är i sig ofarliga — det är grindfixturer, inte arbete. Men två saker följer:
+
+1. **De växer med varje körning.** En klon som kört grindarna några gånger bär tusen
+   filer som ingen städar.
+2. **Varje "inga rester"-påstående i projektet är misstänkt.** `h-016` K23 säger
+   *"reporotens HEAD, arbetsträd och refs orörda, inga worktree-rester"* och `h-013`
+   K14 säger detsamma. Om de mäter med samma blinda kommando påstår de mer än de
+   läser. **Det är inte mätt, och det ska mätas** — men grindarna är frysta, så det
+   är en observation för arkitekten, inte en ändring.
+
+
 ## 2026-09-16 — FYND 38: `.gitignore` är en VITLISTA, och räddningen såg inte förbi den
 
 Ägaren frågade om de 228 worktreesen verkligen ska finnas. Svaret är nej — men
