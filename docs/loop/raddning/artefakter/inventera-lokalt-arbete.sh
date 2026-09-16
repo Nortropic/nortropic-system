@@ -31,12 +31,28 @@ echo "datum:  $(date '+%Y-%m-%d %H:%M:%S %Z')"
 echo
 
 # ── Färskhetskontroll: en stale origin/main ger falska larm ─────────────────
+# Provet HÄMTAR SJÄLVT. Tidigare stod här en uppmaning till läsaren att fetcha
+# först — prosa, inte mekanism. 2026-09-16 föll provet på exakt det: tre
+# mätningar dömde mot varsin klons LOKALA fjärreferenser, samma commit fick
+# olika dom i olika kloner, och den lugnaste domen vann. Se FYND 37.
+# Alla grenar, inte bara main: en commit kan vara säkrad på vilken gren som helst.
+FETCHA=1
+[ "${1:-}" = "--no-fetch" ] && FETCHA=0
+
+if [ "$FETCHA" = "1" ]; then
+  echo "hämtar alla grenar från origin (domen kräver färska referenser)…"
+  if ! git fetch --prune -q origin '+refs/heads/*:refs/remotes/origin/*'; then
+    echo "ODÖMBART: kunde inte nå origin. En dom mot stale referenser är värdelös."
+    exit 2
+  fi
+else
+  echo "ODÖMBART-LÄGE: --no-fetch angivet. Domen kan inte bli grön."
+fi
+
 if ! git rev-parse --verify -q origin/main >/dev/null; then
-  echo "ODÖMBART: origin/main saknas. Kör 'git fetch origin' först."; exit 2
+  echo "ODÖMBART: origin/main saknas."; exit 2
 fi
 echo "origin/main: $(git log --oneline -1 origin/main)"
-echo "⚠️  Är den inte dagsfärsk: AVBRYT, kör 'git fetch origin', kör om."
-echo "    En stale referens gör säkrade commits till falska föräldralösa."
 echo
 
 # ── Klassificera ett commit-SHA ─────────────────────────────────────────────
@@ -139,9 +155,62 @@ done < <(git for-each-ref --format='%(refname:short)|%(upstream:short)' refs/hea
 [ "$g_farliga" = "0" ] && echo "  (inga — varje grens topp finns på origin)"
 echo
 
+# ── Fristående kloner — den blinda fläcken, FYND 37 ─────────────────────────
+# `git worktree list` ser BARA registrerade worktrees. En registrerad worktree
+# har `.git` som en FIL. Ett trettiotal kataloger under worktrees/ har `.git`
+# som en KATALOG: de är fristående kloner som ser ut som worktrees och som detta
+# prov inte tittade på alls. 2026-09-16 låg tolv commits där, varav nio i kloner
+# vars objekt inte fanns någon annanstans på maskinen — provet svarade ändå
+# "✅ REGEL 12 UPPFYLLD". En vakt som säger allt lugnt om det den inte läst är
+# värre än ingen vakt.
+#
+# Domen fälls HÄR, mot de nyss hämtade referenserna: finns objektet inte i detta
+# repo efter en full fetch, går det inte att nå från någon gren på origin.
+echo "=== FRISTÅENDE KLONER (som 'git worktree list' inte ser) ==="
+MIN_ORIGIN="$(git remote get-url origin 2>/dev/null)"
+k_tot=0; k_farlig=0; k_smutsfarlig=0
+if [ -z "$MIN_ORIGIN" ]; then
+  echo "  ODÖMBART: detta repo har ingen origin — kan inte matcha kloner."
+  k_farlig=-1
+else
+  while IFS= read -r kd; do
+    [ "$kd" = "$ROT" ] && continue
+    [ "$(git -C "$kd" remote get-url origin 2>/dev/null)" = "$MIN_ORIGIN" ] || continue
+    kh="$(git -C "$kd" rev-parse HEAD 2>/dev/null)" || continue
+    k_tot=$((k_tot+1))
+    if git cat-file -e "$kh^{commit}" 2>/dev/null \
+       && [ -n "$(git branch -r --contains "$kh" 2>/dev/null | head -1)" ]; then
+      klage="SÄKRAD"
+    else
+      klage="FÖRÄLDRALÖS"; k_farlig=$((k_farlig+1))
+    fi
+    ks="$(git -C "$kd" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    kmark=""
+    if [ "${ks:-0}" -gt 0 ]; then
+      if smuts_sakrad "$kd"; then kmark=" · $ks osparade (säkrad)"
+      else kmark=" · $ks OSPARADE"; k_smutsfarlig=$((k_smutsfarlig+1)); fi
+    fi
+    [ "$klage" = "SÄKRAD" ] && [ -z "$kmark" ] && continue
+    printf "  %-12s %-10s %s%s\n" "$klage" "${kh:0:8}" "${kd#$HOME/}" "$kmark"
+  done < <(find "$HOME" -maxdepth 4 -type d -name .git 2>/dev/null | sed 's|/\.git$||' | sort -u)
+  echo "  $k_tot fristående kloner av samma origin · $k_farlig föräldralösa · $k_smutsfarlig med osäkrat okommitterat"
+  [ "$k_farlig" = "0" ] && [ "$k_smutsfarlig" = "0" ] && echo "  (inga rader = alla säkrade och rena)"
+fi
+echo
+
 # ── Domen ───────────────────────────────────────────────────────────────────
 echo "=============================================================="
-FARA=$((n_foraldralos + g_farliga + n_smutsig))
+if [ "$k_farlig" -lt 0 ]; then
+  echo "ODÖMBART: klonsökningen kunde inte köras. Domen blir aldrig grön."
+  echo "=============================================================="
+  echo; echo "Full rapport: $RAPPORT"; exit 2
+fi
+if [ "$FETCHA" = "0" ]; then
+  echo "ODÖMBART: kört med --no-fetch. En dom mot stale referenser gäller inte."
+  echo "=============================================================="
+  echo; echo "Full rapport: $RAPPORT"; exit 2
+fi
+FARA=$((n_foraldralos + g_farliga + n_smutsig + k_farlig + k_smutsfarlig))
 if [ "$FARA" = "0" ]; then
   echo "✅ REGEL 12 UPPFYLLD — allt lokalt arbete finns på git."
   echo "   Städning kan ske utan att något går förlorat."
@@ -151,6 +220,8 @@ else
   echo "      $n_foraldralos worktrees med föräldralös HEAD"
   echo "      $g_farliga grenar utanför origin"
   echo "      $n_smutsig worktrees med okommitterat arbete"
+  echo "      $k_farlig fristående kloner med föräldralös HEAD"
+  echo "      $k_smutsfarlig fristående kloner med okommitterat arbete"
   echo
   echo "   STÄDA INGENTING förrän dessa är säkrade. En föräldralös HEAD hålls"
   echo "   vid liv ENBART av sin worktree — tas den bort finns commiten kvar"
@@ -158,6 +229,10 @@ else
   echo
   echo "   Säkra en föräldralös HEAD så här (skapar en gren, tar inte bort något):"
   echo "     git branch radda/<namn> <sha> && git push -u origin radda/<namn>"
+  echo
+  echo "   En FRISTÅENDE KLON har eget objektlager — dess commit finns inte här,"
+  echo "   så den måste pushas inifrån klonen (additivt, ingen force):"
+  echo "     git -C <klonens sökväg> push origin HEAD:refs/heads/radda/orphan-<namn>"
 fi
 echo "=============================================================="
 echo

@@ -70,6 +70,15 @@ listar. En detached HEAD-commit hålls vid liv enbart av sin worktree.
 
 Alla tre är mutationsprövade åt båda hållen. De tog 259 → 0.
 
+**Och det talet var ofullständigt (FYND 37, 2026-09-16).** `inventera-lokalt-arbete.sh`
+itererade `git worktree list`, som bara ser **registrerade** worktrees, och dömde mot
+**lokala** fjärreferenser i stället för mot origin. Den skrev `✅ REGEL 12 UPPFYLLD`
+medan tolv commits fanns på en enda maskin — nio i fristående kloner vars objekt inte
+existerade någon annanstans. Provet fetchar nu själv alla grenar, `--no-fetch` ger
+`ODÖMBART`, och en ny sektion söker fristående kloner. Domen mot origin efter
+räddningen: **43 PA_ORIGIN, noll SAKNAS.** Mätningen och de fyra mutationsproven står i
+`docs/loop/drift.md`.
+
 ## Och kör detta PÅ MACEN innan något byggs
 
 ```bash
