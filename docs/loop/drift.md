@@ -1,5 +1,57 @@
 # Att köra loopen
 
+## 2026-09-16 — ✅ REGEL 12 ÄR UPPFYLLD. 259 → 0. Allt lokalt arbete finns på git.
+
+Sista fasen körd och verifierad på Macen:
+
+```
+grenar radda/smuts-*                          31  (av 31 smutsiga worktrees)
+filer i radda/smuts-spec-r125-...-1044c01    357
+worktreet spec-r125 efter körningen            9 filer smutsigt — ORÖRT
+```
+
+**Dagens fullständiga resa, mätt vid varje steg:**
+
+| | Föräldralösa | Grenar utanför origin | Okommitterat | Summa |
+|---|---|---|---|---|
+| Min första mätning | (osedd) | 6 | (osedd) | **6** |
+| Inventeringen | 92 | 136 | 31 | **259** |
+| Efter fas A + B | 0 | 0 | 31 | **31** |
+| Efter smutsfasen | 0 | 0 | 0 osäkrade | **0** |
+
+Den första raden är den viktigaste: **jag rapporterade sex.** Felet var med en faktor 43,
+och orsaken var att `git branch` inte listar en detached HEAD och att jag aldrig prövade om
+listan var fullständig.
+
+### Vad som faktiskt låg där
+
+`owner/h034-native-test-author-r4-e0373f5` med **45 commits**. `h035-gate-r12` med 39.
+`loop-h-035-builder-r12` med 40. Ett worktree-träd på **357 filer** vars innehåll aldrig
+lämnat maskinen. Sammanlagt mer än 900 commits som inte fanns någon annanstans i världen.
+
+Det mesta är trampkvarnens spillror — r79, r80, r81 av samma hypotes. Men
+`LOOP-ÄGARBESLUT-11A` slår fast att `OVERIFIERAT` betyder ODÖMT och att arbetet är underlag
+för omspecificeringen. Nu finns det, och sortering kan ske när som helst.
+
+### Tre prov, alla mutationsprövade åt båda hållen
+
+| Prov | Gör | Bevisat |
+|---|---|---|
+| `inventera-lokalt-arbete.sh` | Läser. Klassificerar `I_MAIN` / `PA_REMOTE` / `FORALDRALOS` | Detached HEAD med unik commit → `FORALDRALOS` + exit 1; efter push → `PA_REMOTE` + `✅` |
+| `radda-lokalt-arbete.sh` | Pushar grenar och föräldralösa HEADs. Additivt | Torrkörning utför inget; `--kor` pushar; inventeringen går grön |
+| `radda-okommitterat.sh` | Tempindex-plumbing. Rör aldrig ett arbetsträd | Worktree byte-identiskt före/efter; commiten bär ändrad **och** otrackad fil |
+
+### Varför detta var värt en hel kväll
+
+Regel 12 fanns skriven sedan i morse. Den hade noll mekanism och beskrev därför ingenting.
+Nu finns tre prov och en hook, och skillnaden mellan en regel och en mekanism är hela
+skälet till att 55 commits kunde ligga osynliga i sex dagar utan att någon märkte det.
+
+**Städning är nu riskfri.** De 228 worktreesen och ~300 grenarna kan tas bort utan att en
+enda commit går förlorad — allt finns på origin. Det är ett separat beslut och ingen
+brådska.
+
+
 ## 2026-09-16 — RÄDDNINGEN KÖRD: 259 → 31. Noll föräldralösa, noll osäkrade grenar.
 
 `radda-lokalt-arbete.sh --kor` på Macen, därefter `inventera-lokalt-arbete.sh` som dom:
