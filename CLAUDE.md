@@ -26,11 +26,17 @@ De två högsta bär till större delen webbfabrikens sakregler. För kernelarbe
 bindande som §A-ytor du aldrig ändrar; de operativa byggreglerna står i
 `docs/loop/regler.md`.
 
-**Grindarna vaktar olika saker.** `node scripts/kor-vakter.mjs` är webbfabrikens
-grindsvit — dess vakter läser `agents/`, `skills/`, `packs/`, `workflows/` och den
-numrerade dokumentserien. Kärnans dom ligger i taskens frysta `exit_test` under
-`verify/bin/`. Håll `kor-vakter` grön när du rör dokumentationen eller webbträdet; den
-är inget bevis om kärnan.
+**Grindarna vaktar olika saker — men sviten är inte enbart webbens.** Av de 23
+`scripts/check-*.mjs` refererar 16 enbart webbträdet, **2 enbart kärnan**
+(`check-provanropare.mjs`, `check-verifierarregistret.mjs`), 1 båda
+(`check-v4-utkast.mjs`) och 4 inget träd alls. `kor-vakter.mjs` och
+`kor-styrprov.mjs` läser `controller/verify/register.json`.
+
+`node scripts/kor-vakter.mjs` är alltså **övervägande** webbfabrikens grindsvit och är
+inget bevis om en kerneländring — men den är inte tom på kernelvakter, och de två som
+finns följer inte med när webbträdet flyttas. Kärnans dom ligger i taskens frysta
+`exit_test` under `verify/bin/`. Håll `kor-vakter` grön när du rör dokumentationen eller
+webbträdet.
 
 **Läget** står i `docs/loop/drift.md` (nyast överst) och `docs/05-beslutslogg.md` (aktuell
 kandidat först). Ingen annan fil bär teknisk status.

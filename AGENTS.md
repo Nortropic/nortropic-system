@@ -14,8 +14,11 @@ respektive ett fryst exitprov i `verify/bin/` läser dem, liksom `controller/ver
 De binder alltså här av beroende, inte av innehåll. `docs/05-beslutslogg.md` är genuint
 delad och kernel-dominerad — tio frysta exitprov läser den.
 
-`node scripts/kor-vakter.mjs` är webbfabrikens grindsvit, inte kärnans; kärnans dom är
-taskens frysta `exit_test` under `verify/bin/`.
+`node scripts/kor-vakter.mjs` är ÖVERVÄGANDE webbfabrikens grindsvit: av 23 vakter
+refererar 16 enbart webbträdet, 2 enbart kärnan (`check-provanropare.mjs`,
+`check-verifierarregistret.mjs`), 1 båda och 4 inget träd alls. Den är inget bevis om en
+kerneländring — kärnans dom är taskens frysta `exit_test` under `verify/bin/` — men de
+två kernelvakterna följer inte med när webbträdet flyttas.
 
 `CLAUDE.md` är samma router för Claude-sessioner och bär samma auktoritetsordning.
 Ändras den ena ska den andra följa med i samma commit.
