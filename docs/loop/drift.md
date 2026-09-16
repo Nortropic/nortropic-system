@@ -1,5 +1,45 @@
 # Att köra loopen
 
+## 2026-09-16 — REGEL 12 UPPFYLLD, mätt mot origin av ett prov utan blinda fläckar
+
+Avslutar dagens regel-12-arbete. `inventera-lokalt-arbete.sh` ger nu:
+
+```
+60 fristående kloner av samma origin · 0 föräldralösa · 0 med osäkrat okommitterat
+✅ REGEL 12 UPPFYLLD — allt lokalt arbete finns på git.
+```
+
+**Skillnaden mot gårdagens gröna dom är inte tillståndet — det är provet.** Samma text
+skrevs 2026-09-16 kl 21:37 medan tolv commits fanns på en enda maskin (FYND 37). Provet
+läste då 228 registrerade worktrees och dömde mot klonens lokala fjärreferenser. Nu
+fetchar det alla grenar själv, vägrar bli grönt med `--no-fetch`, och läser även de
+fristående klonerna.
+
+### Vad som säkrades idag
+
+| Kategori | Antal | Hur |
+|---|---|---|
+| Commits som bara fanns på maskinen | **12** | `radda/orphan-*`, en push per commit inifrån sin egen klon |
+| Kloner med osparat arbete i trädet | **5** | `radda/smuts-*` via tempindex — inget arbetsträd rördes |
+
+De tolv: nio från separationsveckan 10–13 september, tre egna frysningar från 6
+september. De fem: `test-author-h039-loader-D571a47b8` (6 filer),
+`nortropic-system` (9), `builder-r129-product-exact-sha-3bf` (3),
+`docs-domain-sync-20260909` (12), `test-author-h039-protected-asset-ed584ec3` (6).
+
+**Arbetsträden är oförändrade.** Tempindex, aldrig klonens eget — `git status` i vilken
+som helst av dem är exakt vad den var före.
+
+### Och regeln är inte längre bara en regel
+
+`.githooks/post-commit` är installerad i **61 repon** via `core.hooksPath` mot
+`~/.nortropic/githooks`. Varje commit pushas: en gren till sin gren, en **detached HEAD**
+till `radda/auto-<katalog>-<sha>`. `main` autopushas aldrig — publicering går via PR.
+
+Nio av de tolv räddade commitsen var detached HEADs. Den kategorin räddar sig själv
+härefter, i samma sekund den skapas.
+
+
 ## 2026-09-16 — ⭐ PLATTFORMSGRENEN HALVERAR FELEN. Tvårotshypotesen bekräftad.
 
 **Kört 22:43 på Darwin, ren lokal klon av `nortropic/platform-integration-20260910`
