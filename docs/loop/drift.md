@@ -1,5 +1,48 @@
 # Att köra loopen
 
+## 2026-09-16 — REGEL 12:s MÄTNING VAR OFULLSTÄNDIG. ~200 worktrees, ett femtiotal på detached HEAD.
+
+`git worktree list` i `~/nortropic/nortropic-system` gav **cirka 200 worktrees**, varav
+ett femtiotal står på `(detached HEAD)`.
+
+**Min tidigare regel 12-mätning såg dem inte.** Jag mätte ~300 grenar, fann sex med commits
+utanför origin, och rapporterade det som lägesbilden. `git branch` listar inte en detached
+HEAD. Mätningen var riktig och svarade på fel fråga — sjunde gången samma dag.
+
+**Varför det är den farligaste kategorin:** en detached HEAD-commit tillhör ingen gren. Den
+syns inte i `git branch`, inte i `[ahead]`-kolumnen, och hålls vid liv **enbart av att
+worktreen finns**. Tas worktreen bort är commiten nåbar endast via reflog, och reflog
+rensas. Arbete försvinner då tyst — exakt projektets dyraste felklass, en nivå djupare än
+de 55 opushade commitsen.
+
+**Inget är akut.** Så länge worktreen står kvar är commiten skyddad. Faran uppstår först
+vid städning — och ägaren var på väg att städa.
+
+### Artefakt: `artefakter/inventera-lokalt-arbete.sh`
+
+Läser bara. Klassificerar varje worktree och varje gren i tre lägen:
+
+| Läge | Betyder |
+|---|---|
+| `I_MAIN` | Förfader till `origin/main`. Säkrad helt |
+| `PA_REMOTE` | Finns på en pushad gren. Säkrad så länge grenen inte raderas |
+| `FORALDRALOS` | Finns **ingenstans** på origin. Försvinner om worktreen tas bort |
+
+Plus okommitterat arbete per worktree — den andra förlustvägen.
+
+**Mutationsprövat åt båda hållen**, i ett engångsrepo: en detached HEAD med en unik commit
+ger `FORALDRALOS` och `exit 1`; efter `git branch` + `push` ger samma commit `PA_REMOTE`
+och `✅ REGEL 12 UPPFYLLD`. En vakt som bara kan säga "fara" mäter ingenting.
+
+**Provet fetchar inte.** En stale `origin/main` gör säkrade commits till falska
+föräldralösa — det felet gjordes denna dag när `git log origin/main..matning-6w1pvw` visade
+sex "unika" commits som i själva verket låg i mergen. Provet kräver därför att ägaren
+fetchar först, och skriver ut vilken commit `origin/main` pekar på så att stale-läget syns.
+
+**Räddningsvägen är additiv:** `git branch radda/<namn> <sha> && git push -u origin
+radda/<namn>`. Den skapar, tar aldrig bort.
+
+
 ## 2026-09-16 — FYND 34: VÄGEN ÄR INTE TRASIG. De sex röda grindarna har TVÅ rötter, inte sex.
 
 Ägaren, med det ursprungliga underlaget i hand: *"Det jag är orolig för är att vi startar
