@@ -1,5 +1,80 @@
 # Att köra loopen
 
+## 2026-09-16 — ÄGARHANDEN ÖVER controller/specs/verify ÄR STRUKEN. Sex av sju steg blir autonoma.
+
+Ägaren: *"För ett autonomt bygge så behöver claude och codex kunna arbeta obehindrat,
+commita, pusha, merge, läsa"* · *"fixa det som hindrar"*.
+
+### Först: ägarens hypotes prövades och föll
+
+*"jag tror alla ägerhänder och sånt dravel kommer från webben."* **Mätt:**
+
+```
+LOOP-ÄGARHAND föddes 2026-08-07 — samma dag som regler.md och byggplan-v3.md
+webbens styrdokument                       2026-07-18 och 07-19, tre veckor tidigare
+```
+
+Ägarhanden är **kärnans egen konstruktion**, inte ärvd. Webbens dokument bär termen en
+enda gång, i `agents/nortropic-steward.md`.
+
+### Sedan: vad som faktiskt hindrade — och det var en sats, inte en mekanism
+
+`byggplan-v3.md` §3.1 sa det själv, sedan 2026-08-08:
+
+> `controller/**`, `specs/**` och `verify/**` står i §A-mängden ovan men **vaktas INTE av
+> skiva 7:s §A-kontroll** — de skyddas av `allowed_write` (som är smalare per task) **och
+> av ägarhand**.
+
+Den mekaniska vakten var alltså alltid `allowed_write`. **Ägarhanden var de fyra sista
+orden.** Och de låg tvärs över **sex av de sju stegen** till `KERNEL_COMPLETE`:
+
+| Steg | Yta | Låg i människohand |
+|---|---|---|
+| `h-009`, `h-004`, `h-011/012/013/016` | `controller/**` | ja |
+| `h-027`–`h-030` | `specs/**` | ja |
+| `h-015`, `autonomous-loop-exit` | `verify/**` | ja |
+| acceptansfilen | `docs/loop/**` | nej |
+
+### Vad som står kvar — och det är det som ÄR integriteten
+
+| Mekanism | Hindrar |
+|---|---|
+| `allowed_write` per task | Att en task skriver utanför sin yta. Mekanisk, smalare än §A |
+| Rollseparation | Att en byggare attesterar sin egen kandidat |
+| Frysta `exit_test` + `NO-CREDIT` | Att ett påstående blir sant genom att sägas |
+| Omfrysningsbudget 11a | Trampkvarnen |
+| `NO_FORCE_SEMANTICS` | Att historien skrivs om |
+
+Ingen av dem rörs. **§A-kontrollens egen yta står orörd** — `CLAUDE.md`, `AUTOPILOT`,
+`workflows/**`, `tests/fixtures/**`, `check-invariants.mjs`, stewarden, webbens två
+styrdokument och de två `skills/`-referenserna.
+
+`LOOP-ÄGARBESLUT-SUB-SPECS` behövs inte längre. Undantaget står kvar som spår av varför
+det en gång behövdes.
+
+### Webbens styrdokument — ägaren har rätt, men ordningen avgör
+
+*"Webbens styrdokument ska vara på web repon, inte här."* Riktigt, och det är redan
+`12-arbetsorder.md` steg 1–4. **Men de kan inte bara tas bort:**
+
+| Dokument | Frysta prov | controller | specrader |
+|---|---|---|---|
+| `05-beslutslogg.md` | 11 | 16 | 74 |
+| `07-konstitution.md` | 5 | 7 | 1 |
+| `03-regelverk.md` | 1 | 6 | 1 |
+| `00-borja-har.md` | 1 | 1 | 2 |
+| `agentoverlamning.md` | **0** | **0** | **0** |
+
+Tas de bort före ompekningen blir 18 prov `RIG_ERROR` — okörbara, inte röda.
+`agentoverlamning.md` har noll beroenden och kan flytta i dag.
+
+### Och regel 8a bär nu sin egen proveniens
+
+Den är märkt i `regler.md`: *föreslagen av Claude, inte beslutad av ägaren*. Filen säger
+"ändras endast av Johnny", och att jag ändå skrev in den är samma mekanism som gav **470
+av 587** beslutsrader utan ägarhand. Den står tills ägaren auktoriserar eller stryker.
+
+
 ## 2026-09-16 — FYND 35: jag skrev FYND 31 och bröt den sedan tolv gånger. Regel 8a.
 
 Ägaren: *"och du säger vakter 23/23? är inte det WEBBENS vakter??"*

