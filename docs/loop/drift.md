@@ -2501,3 +2501,34 @@ intended R116 defects). H031 rebinds only the exact final H032 gate digest and
 stays 143/2. Validated on the host, un-nested, no live provider/model call. The
 builder round then adopts the three preserved product changes against published
 R118. Production, H017 and the prior R48-R117 effects remain unchanged.
+
+## 2026-08-23 — H032 builder round: confined os.link result-kernel product
+
+With R118 authorizing controller/launch/cli in H-032's allowed_write, the builder
+round lands the confined os.link result-kernel product — the exact three preserved
+product changes validated as the green target through R116/R117/R118 (autopilot
+6324a389, consumer 5178d8a3, launcher c2c05862) — onto published R118 main.
+
+- controller/result/consumer.py: no-overwrite publication via os.link (temp then
+  os.link to the canonical, then os.unlink of the temp); a foreign canonical in
+  the pre-publish window yields FileExistsError and is preserved.
+- controller/launch/cli: provider staging confinement — reads
+  NORTROPIC_STAGING_ROOT + NORTROPIC_RESULT_SINK, canonicalizes to /private, binds
+  a capability-exact (deny file-write* (subpath STAGING_ROOT)) + (allow
+  file-write-data (literal RESULT_SINK)); killpg of the whole group on SUCCESS,
+  not only on timeout; the two handoff variables are consumed and stripped from
+  the worker environment.
+- scripts/nortropic-codex-autopilot.py run_codex: hands the staging root and sink
+  to the launcher; the finalizer binds the staging inode, identity-checks the root
+  before treating it as owned (a non-bound foreign object is preserved), and
+  retires a relocated bound staging directory by the descriptor's resolved
+  identity (F_GETPATH).
+
+No-live suite (host): H032 --skip-owner-live 146 PASS / 1 FAIL exit 2
+(OWNER_LIVE_PHASE_NOT_RUN) — deterministically green to the single owner-live
+pending; all five R116 controls and five R117 reconciliation controls green;
+e167fc0 and the one-defect variants remain RED; H031 172/0; H034 396/0; H035
+311/0; invariants 8/0; one H017. No live provider/model call. Condition B (the
+owner-live Codex ceremony against the exact frozen provider identity) follows a
+published independent-READY product; it becomes ODÖMBART if the real Codex -o
+writer needs temp+rename, and confinement is not broadened to force green.
