@@ -1,5 +1,50 @@
 # Att köra loopen
 
+## 2026-09-16 — VÄG A′ DIMENSIONERAD: beslutsloggen löser tre av fem grindar
+
+Körda på plattformsgrenen, utan `timeout` (se rättelsen av FYND 24):
+
+| Grind | Exit | Orsak |
+|---|---|---|
+| `h-007` | 1 | 14 PASS / 5 FAIL. Alla fem: *"§A-orsak — X avvisades men orsaken namnger den inte: [docs-kravet ouppfyllt för h-001 (regel 17 + 22): docs/05-beslutslogg.md ändrades inte i samma commit]"* |
+| `h-036` | 2 | `RIG_ERROR: [Errno 2] No such file or directory: .../docs/05-beslutslogg.md`, därefter FAIL på `..._AUTHORITY_PRESERVED` och `..._TASK_ROWS_PRESERVED` |
+| `h-038` | 2 | `RIG_ERROR: H036 helper gate identity drift` — kedjad till h-036 |
+| `h-037` | 2 | `FAIL ..._CURRENT_SUBJECT_AND_HISTORICAL_COMPLETION_BINDING: "current subject differs outside the exact four-file contract"` → `UNEXPECTED_RED` |
+| `h-035` | 2 | Synliga rader är PASS. Orsaken till exit 2 är inte fastställd |
+
+**Tre av fem löses av att `docs/05-beslutslogg.md` återställs.** Väg A′ är därmed
+dimensionerad: den är inte en gissning utan en mätt åtgärd med känd täckning.
+
+`h-037` faller på trädpinningen (FYND 21) och kräver regel 11-omfrysning.
+`h-035` är den enda posten som fortfarande är oförklarad.
+
+### Beviset som avgör lagerfrågan
+
+`h-007` prövar att en §A-avvisning **namnger sökvägen som avvisades**. Den får i stället
+ett annat avslag: **controllerns docs-krav slår till först**, eftersom beslutsloggen inte
+finns och därmed "inte ändrades i samma commit". §A-kontrollen nås aldrig.
+
+`docs/05-beslutslogg.md` är alltså inte ett dokument kärnan råkar läsa. **Den är bärande
+för kärnans egen §A-hävdelse** — utan den kan controllern inte avvisa en §A-skrivning med
+rätt orsak. Det avgör lagerfrågan bortom mätningen 113 kernel- mot 57 webbomnämnanden, och
+bekräftar att separationen klassade en kernelfil som webb.
+
+### FYND 25 — regel 22 ÄR mekaniserad, men bara på ena sidan
+
+Ur h-007:s utdata: `docs-kravet ouppfyllt för h-001 (regel 17 + 22)`. Kontrollen kommer ur
+**controllern** — varje task som körs genom kedjan kräver sin docs-rad. Mekanismen finns
+alltså sedan länge, och min bedömning i `raddning/11-tre-vakter-mot-aterfall.md` att
+"regel 22 saknar mekanism" var för grov.
+
+**Men den fångade inte de 55 commitsen**, och skälet är precist: **den gäller tasks som
+körs genom controllern, inte commits som görs vid sidan av den.** Arbetet 09-09→09-12 var
+`[LOCAL]`-kontrakt utanför taskflödet, och där ser controllern ingenting.
+
+Det gör vakt 1 skarpare, inte överflödig: den ska **inte** duplicera controllerns
+task-kontroll utan täcka **commits utan task** — precis den yta controllern per
+konstruktion aldrig ser. Kravet skrivs in i vaktspecen.
+
+
 ## 2026-09-16 — FYND 24 (RÄTTAT): latent värdbindning i fyra shebangar
 
 > ### ⚠️ RÄTTELSE samma dag — min första slutsats var FEL

@@ -17,6 +17,20 @@ att förhindra.
 
 ## Vakt 1 — regel 22: en drift-rad per dag med kernelcommits
 
+> **⚠️ SKÄRPT 2026-09-16 efter FYND 25.** Regel 22 **är** delvis mekaniserad redan:
+> controllern kräver en docs-rad per task (`docs-kravet ouppfyllt för h-001 (regel 17 +
+> 22)`, syns i `h-007`:s utdata). Min första formulering — *"regel 22 saknar mekanism"* —
+> var för grov.
+>
+> **Luckan är precis:** controllerns kontroll gäller **tasks som körs genom kedjan**. De
+> 55 commitsen 09-09→09-12 var `[LOCAL]`-kontrakt **utanför** taskflödet, och där ser
+> controllern ingenting.
+>
+> **Vakt 1 ska därför inte duplicera controllern.** Den ska täcka commits UTAN task — den
+> yta controllern per konstruktion aldrig når. Överlappar de, ska vakten hänvisa till
+> controllerns verdikt i stället för att avge ett eget; två mekanismer som säger olika
+> saker om samma commit är värre än en.
+
 **Fäller när** en dag har commits som rör `controller/`, `verify/` eller `specs/` men
 `docs/loop/drift.md` saknar en `## <datum>`-rubrik för den dagen.
 
