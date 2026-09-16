@@ -1,5 +1,195 @@
 # Att köra loopen
 
+## 2026-09-16 — ✅ REGEL 12 ÄR UPPFYLLD. 259 → 0. Allt lokalt arbete finns på git.
+
+Sista fasen körd och verifierad på Macen:
+
+```
+grenar radda/smuts-*                          31  (av 31 smutsiga worktrees)
+filer i radda/smuts-spec-r125-...-1044c01    357
+worktreet spec-r125 efter körningen            9 filer smutsigt — ORÖRT
+```
+
+**Dagens fullständiga resa, mätt vid varje steg:**
+
+| | Föräldralösa | Grenar utanför origin | Okommitterat | Summa |
+|---|---|---|---|---|
+| Min första mätning | (osedd) | 6 | (osedd) | **6** |
+| Inventeringen | 92 | 136 | 31 | **259** |
+| Efter fas A + B | 0 | 0 | 31 | **31** |
+| Efter smutsfasen | 0 | 0 | 0 osäkrade | **0** |
+
+Den första raden är den viktigaste: **jag rapporterade sex.** Felet var med en faktor 43,
+och orsaken var att `git branch` inte listar en detached HEAD och att jag aldrig prövade om
+listan var fullständig.
+
+### Vad som faktiskt låg där
+
+`owner/h034-native-test-author-r4-e0373f5` med **45 commits**. `h035-gate-r12` med 39.
+`loop-h-035-builder-r12` med 40. Ett worktree-träd på **357 filer** vars innehåll aldrig
+lämnat maskinen. Sammanlagt mer än 900 commits som inte fanns någon annanstans i världen.
+
+Det mesta är trampkvarnens spillror — r79, r80, r81 av samma hypotes. Men
+`LOOP-ÄGARBESLUT-11A` slår fast att `OVERIFIERAT` betyder ODÖMT och att arbetet är underlag
+för omspecificeringen. Nu finns det, och sortering kan ske när som helst.
+
+### Tre prov, alla mutationsprövade åt båda hållen
+
+| Prov | Gör | Bevisat |
+|---|---|---|
+| `inventera-lokalt-arbete.sh` | Läser. Klassificerar `I_MAIN` / `PA_REMOTE` / `FORALDRALOS` | Detached HEAD med unik commit → `FORALDRALOS` + exit 1; efter push → `PA_REMOTE` + `✅` |
+| `radda-lokalt-arbete.sh` | Pushar grenar och föräldralösa HEADs. Additivt | Torrkörning utför inget; `--kor` pushar; inventeringen går grön |
+| `radda-okommitterat.sh` | Tempindex-plumbing. Rör aldrig ett arbetsträd | Worktree byte-identiskt före/efter; commiten bär ändrad **och** otrackad fil |
+
+### Varför detta var värt en hel kväll
+
+Regel 12 fanns skriven sedan i morse. Den hade noll mekanism och beskrev därför ingenting.
+Nu finns tre prov och en hook, och skillnaden mellan en regel och en mekanism är hela
+skälet till att 55 commits kunde ligga osynliga i sex dagar utan att någon märkte det.
+
+**Städning är nu riskfri.** De 228 worktreesen och ~300 grenarna kan tas bort utan att en
+enda commit går förlorad — allt finns på origin. Det är ett separat beslut och ingen
+brådska.
+
+
+## 2026-09-16 — RÄDDNINGEN KÖRD: 259 → 31. Noll föräldralösa, noll osäkrade grenar.
+
+`radda-lokalt-arbete.sh --kor` på Macen, därefter `inventera-lokalt-arbete.sh` som dom:
+
+```
+FÖRE:   228 worktrees · 92 FÖRÄLDRALÖSA · 136 grenar utanför origin · 31 smutsiga
+EFTER:  228 worktrees ·  0 FÖRÄLDRALÖSA ·   0 grenar utanför origin · 31 smutsiga
+```
+
+**118 grenar och 1 worktree-HEAD pushades.** Torrkörningen hade förutsagt 136 respektive
+69 — och skillnaden är korrekt, inte en miss: faserna körs i ordning, så när fas A pushat
+`nortropic/loop-h-035-builder-r10` (37 commits) blev `-r5` (29), `-r8` (33) och `-v1` (23)
+förfäder till något som redan fanns på origin. Samma för `h034-native-test-author`-kedjan
+och `h035-gate-r5…r12`. Fas B tappade av samma skäl: 68 av 69 worktree-HEADs låg redan i
+en gren fas A just hade pushat. **Färre refs, samma innehåll.**
+
+Jag resonerade mig fram till den förklaringen innan inventeringen kördes och skrev ned den
+som hypotes. Provet bekräftade den. Ordningen — hypotes först, mätning sedan — är den enda
+som gör det mätbart när jag har fel, och jag hade fel sju gånger i dag.
+
+### Artefakt: `artefakter/radda-okommitterat.sh` — den sista formen
+
+Kvar är 31 worktrees med ändringar som aldrig committats. Ett vanligt `git commit` där
+vore **intrusivt**: det flyttar HEAD, tömmer indexet och gör någon annans halvfärdiga
+arbete till historia.
+
+Provet använder i stället git-plumbing med ett **tillfälligt index**:
+
+```
+GIT_INDEX_FILE=$tmp  read-tree HEAD → add -A → write-tree → commit-tree -p HEAD → push
+```
+
+Worktreets eget index, HEAD och arbetsträd rörs aldrig. **Prövat på båda påståendena:**
+
+| Påstående | Mätning |
+|---|---|
+| Worktreet är orört | `git status` och `HEAD` byte-identiska före och efter |
+| Innehållet finns på origin | Den pushade commiten bär både den ändrade filen **och** den otrackade |
+
+**Efter körning visar inventeringen dem fortfarande som "med okommitterat" — och det är
+riktigt.** Arbetsträdet ÄR smutsigt. Skillnaden är att innehållet nu också finns på origin
+under `radda/smuts-*`. Att provet inte städar bort sin egen larmsignal är avsiktligt: en
+mekanism som tystar mätningen i stället för att ändra verkligheten är vad
+`check-docs-coherence` en gång gjorde med `PASS 26/26` medan tjugo kontroller tyst utgått.
+
+
+## 2026-09-16 — INVENTERINGEN KÖRD: 259 poster finns BARA på ägarens maskin. Min siffra var sex.
+
+`inventera-lokalt-arbete.sh` kört på Macen mot färsk `origin/main` (`82ecc192`):
+
+```
+worktrees: 228 totalt · 135 helt i main · 1 på pushad gren · 92 FÖRÄLDRALÖSA · 31 med okommitterat
+grenar:    136 med commits som saknas på origin
+SUMMA:     259 poster som bara finns på denna maskin
+```
+
+**Jag rapporterade tidigare sex.** Felet var med en faktor 40, och orsaken är den redan
+kända: `git branch` listar inte en detached HEAD, och jag prövade aldrig om listan var
+fullständig. Det som nu syns och aldrig syntes förr:
+
+| Gren | Commits utanför main |
+|---|---|
+| `owner/h034-native-test-author-r4-e0373f5` | **45** |
+| `owner/h034-native-test-author-r3-ba3a7d2` | 44 |
+| `owner/h034-native-test-author-r2-45c3ffa` | 43 |
+| `owner/h035-gate-r12-cf38404` | 39 |
+| `nortropic/loop-h-035-builder-r12` | 40 |
+
+**Det mesta är sannolikt trampkvarnens spillror** — runda r79, r80, r81, r82 av samma
+hypotes. Men `LOOP-ÄGARBESLUT-11A-OCH-TRE-HYPOTESER` slår fast att `OVERIFIERAT` betyder
+ODÖMT och att *"arbetet är inte kastat — det är underlag för omspecificeringen"*. Då ska
+det finnas kvar. Och 259 okända är ingen nystart.
+
+### Artefakt: `artefakter/radda-lokalt-arbete.sh`
+
+**Additiv. Skapar grenar och pushar, tar aldrig bort något, rör inget arbetsträd.**
+Torrkörning är standard; `--kor` utför.
+
+| Fas | Vad |
+|---|---|
+| **A** | Lokala grenar vars topp saknas på origin → pushas under sitt eget namn |
+| **B** | Föräldralösa worktree-HEADs → får `radda/wt-<namn>` som pushas. Samma SHA i flera worktrees räddas en gång — grenen bär commiten, inte katalogen |
+| — | Worktrees med okommitterat arbete **hanteras inte**. Att committa halvfärdigt arbete åt någon annan är ett beslut, inte ett svep. De listas |
+
+**Prövat från början till slut** i ett engångsrepo: en gren med unik commit plus en detached
+HEAD med unik commit. Torrkörning visar båda utan att utföra något; `--kor` pushar båda;
+`inventera-lokalt-arbete.sh` går därefter från `⚠️ 2 poster` till
+`✅ REGEL 12 UPPFYLLD`. Räddningen och inventeringen mäter alltså samma sak, och kedjan är
+sluten.
+
+**Varför pusha allt i stället för att sortera först:** en gren på origin kostar brus. En
+förlorad commit kostar arbetet. Asymmetrin är inte jämn, och sortering kan ske när som
+helst efteråt — räddning kan inte.
+
+
+## 2026-09-16 — REGEL 12:s MÄTNING VAR OFULLSTÄNDIG. ~200 worktrees, ett femtiotal på detached HEAD.
+
+`git worktree list` i `~/nortropic/nortropic-system` gav **cirka 200 worktrees**, varav
+ett femtiotal står på `(detached HEAD)`.
+
+**Min tidigare regel 12-mätning såg dem inte.** Jag mätte ~300 grenar, fann sex med commits
+utanför origin, och rapporterade det som lägesbilden. `git branch` listar inte en detached
+HEAD. Mätningen var riktig och svarade på fel fråga — sjunde gången samma dag.
+
+**Varför det är den farligaste kategorin:** en detached HEAD-commit tillhör ingen gren. Den
+syns inte i `git branch`, inte i `[ahead]`-kolumnen, och hålls vid liv **enbart av att
+worktreen finns**. Tas worktreen bort är commiten nåbar endast via reflog, och reflog
+rensas. Arbete försvinner då tyst — exakt projektets dyraste felklass, en nivå djupare än
+de 55 opushade commitsen.
+
+**Inget är akut.** Så länge worktreen står kvar är commiten skyddad. Faran uppstår först
+vid städning — och ägaren var på väg att städa.
+
+### Artefakt: `artefakter/inventera-lokalt-arbete.sh`
+
+Läser bara. Klassificerar varje worktree och varje gren i tre lägen:
+
+| Läge | Betyder |
+|---|---|
+| `I_MAIN` | Förfader till `origin/main`. Säkrad helt |
+| `PA_REMOTE` | Finns på en pushad gren. Säkrad så länge grenen inte raderas |
+| `FORALDRALOS` | Finns **ingenstans** på origin. Försvinner om worktreen tas bort |
+
+Plus okommitterat arbete per worktree — den andra förlustvägen.
+
+**Mutationsprövat åt båda hållen**, i ett engångsrepo: en detached HEAD med en unik commit
+ger `FORALDRALOS` och `exit 1`; efter `git branch` + `push` ger samma commit `PA_REMOTE`
+och `✅ REGEL 12 UPPFYLLD`. En vakt som bara kan säga "fara" mäter ingenting.
+
+**Provet fetchar inte.** En stale `origin/main` gör säkrade commits till falska
+föräldralösa — det felet gjordes denna dag när `git log origin/main..matning-6w1pvw` visade
+sex "unika" commits som i själva verket låg i mergen. Provet kräver därför att ägaren
+fetchar först, och skriver ut vilken commit `origin/main` pekar på så att stale-läget syns.
+
+**Räddningsvägen är additiv:** `git branch radda/<namn> <sha> && git push -u origin
+radda/<namn>`. Den skapar, tar aldrig bort.
+
+
 ## 2026-09-16 — FYND 34: VÄGEN ÄR INTE TRASIG. De sex röda grindarna har TVÅ rötter, inte sex.
 
 Ägaren, med det ursprungliga underlaget i hand: *"Det jag är orolig för är att vi startar
