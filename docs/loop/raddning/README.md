@@ -85,6 +85,13 @@ Räkna med ett fjortonde fel.
 | `09-task-rundtrampsvakten.md` | Taskspec att frysa (h-040). Har en blockerande designfråga i §2 |
 | `10-forsta-arbetspaketet-h014.md` | Första bygget. Redan specad i repot; bara grinden saknas |
 | `11-tre-vakter-mot-aterfall.md` | **Mekanismerna mot återfall** — tre vakter, var och en med ett KÖRT positivt kontrollprov |
+
+**⚠️ LÄS `SEPARATION-20260910/` FÖRE DETTA UNDERLAG.** Separationen 2026-09-10 bär sin
+egen dokumentation: `README.md` (ägarbeslut och allokeringsprinciper), `ALLOCATION.tsv`
+(443 filbeslut), `EFTERARBETE.md` (11 mätta kvarvarande bindningar med utpekad ägare) och
+proveniens per fil. **Arbetsordern ligger där, inte här.** Detta underlag är bakgrund,
+metod och diagnos — och det skrevs delvis utan kännedom om separationens dokumentation,
+vilket gav FYND 26: en rekommendation som upphävde ett ägarbeslut.
 | `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
 
 ## Artefakten som INTE ligger här

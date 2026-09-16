@@ -39,6 +39,25 @@ kravet på oberoende omhärledning (längre ned) och **§0c — det lokala
 maskintillståndet**. §0c är den som lättast glöms, eftersom den inte syns i något repo.
 Ägarens direktiv 2026-09-16: *"lita inte blint på repon."*
 
+> ## ⚠️ KRAV A ÄR UPPFYLLT — av separationen 2026-09-10, inte av detta krav
+>
+> **`SEPARATION-20260910/ALLOCATION.tsv` bär den fil-för-fil-dom detta avsnitt kräver:
+> 443 poster** — 119 plattform, 317 webb, 2 delade (byte-lika kopior), 3 omskrivna
+> instruktionsfiler, 2 oklara som behölls oförändrade. Plus
+> `SEPARATION-ORIGIN/PROVENIENS.tsv` i webbrepot med blob-OID per fil.
+>
+> Domen är alltså **femdelad, inte fyrdelad som jag föreskrev nedan** — och den skiljer
+> dessutom på *oklar* och *delad*, vilket min indelning inte gjorde.
+>
+> **Jag visste inte om den när jag skrev detta.** Jag läste separationens commit-titlar
+> och körde dess grindar men aldrig `SEPARATION-20260910/`. Se FYND 26 i
+> `docs/loop/drift.md`.
+>
+> **Läs `ALLOCATION.tsv` först.** Kraven nedan gäller som metod för att OMPRÖVA enskilda
+> domar i den, aldrig som uppmaning att göra om hela klassificeringen. Och
+> `artefakter/klassificera-lager.py` är därmed **överflödig** — den producerade 439
+> rader mot ALLOCATION:s 443, utan proveniens och utan ägarens preciseringar.
+
 ### KRAV A: fullständig separationsrevision — varje spårad fil, inget stickprov
 
 **Detta är det första du gör, före allt annat i §0.**

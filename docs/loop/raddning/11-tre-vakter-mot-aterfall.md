@@ -65,6 +65,19 @@ VERDIKT: FÄLLER
 
 ## Vakt 2 — dinglande referenser från trust-kritiska filer
 
+> **⚠️ SKÄRPT 2026-09-16 efter FYND 26.** De fem dinglande dokumenten nedan var **redan
+> kända och ägarsatta**: `SEPARATION-20260910/EFTERARBETE.md` punkt 3, 4, 5, 6 och 7
+> listar dem med mätt utfall och utpekad rättningsväg, skrivna 2026-09-10.
+>
+> Min "upptäckt" dubblerade alltså en färdig arbetslista. **Det stärker vakten i stället
+> för att göra den överflödig:** bindningarna var kända av den som gjorde separationen och
+> osynliga för alla andra, inklusive för mig i sex timmars analys. En vakt hade gjort dem
+> synliga i CI i stället för i ett dokument ingen läser.
+>
+> **Byggkrav som följer:** vakten ska läsa `EFTERARBETE.md` som deklarerad, tidsatt
+> undantagsmängd — en känd och ägarsatt bindning ska rapporteras som KÄND, inte som ny.
+> Annars rapporterar den elva saker någon redan arbetar på, och blir brus.
+
 **Fäller när** en fil under `specs/`, `verify/bin/` eller `controller/` refererar en
 sökväg som inte finns i trädet.
 
