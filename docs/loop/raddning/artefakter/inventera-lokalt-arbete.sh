@@ -146,9 +146,6 @@ done < <(git worktree list --porcelain)
 process
 
 echo
-echo "ignorerat innehåll: $IG_TOT filer i $IG_TRAD träd — EJ täckt av radda/smuts-* (FYND 38)"
-echo "  (.gitignore är en vitlista; git status och git add -A ser dem inte."
-echo "   Städa inte ett träd utan att först mäta vad dess ignorerade filer är.)"
 echo "worktrees: $n_tot totalt · $n_main helt i main · $n_remote på pushad gren · $n_foraldralos FÖRÄLDRALÖSA · $n_smutsig OSÄKRAT okommitterat · $n_smuts_sakrad smutsiga men säkrade"
 echo "(rader ovan = endast de som inte är helt säkrade och rena)"
 echo
@@ -212,6 +209,17 @@ else
   echo "  $k_tot fristående kloner av samma origin · $k_farlig föräldralösa · $k_smutsfarlig med osäkrat okommitterat"
   [ "$k_farlig" = "0" ] && [ "$k_smutsfarlig" = "0" ] && echo "  (inga rader = alla säkrade och rena)"
 fi
+echo
+
+# ── Ignorerat innehåll — räknat över BÅDA loopar ────────────────────────────
+# Raden stod först direkt efter worktree-loopen och rapporterade därför bara
+# worktreesen: 446 i stället för totalen. Klonloopen kör efteråt och hann aldrig
+# räknas in. Samma fel som FYND 38 handlar om — ett tal som uttalar sig om mer än
+# det läste — införd i rättelsen till det felet, och fångad av ägarens körning.
+echo "ignorerat innehåll: $IG_TOT filer i $IG_TRAD träd — EJ täckt av radda/smuts-* (FYND 38)"
+echo "  (.gitignore är en vitlista; git status och git add -A ser dem inte."
+echo "   Städa inte ett träd utan att först mäta vad dess ignorerade filer är."
+echo "   Vad de ÄR: git -C <träd> status --porcelain --ignored=matching | grep '^!!')"
 echo
 
 # ── Domen ───────────────────────────────────────────────────────────────────
