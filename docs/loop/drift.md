@@ -1,5 +1,594 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 34: VÄGEN ÄR INTE TRASIG. De sex röda grindarna har TVÅ rötter, inte sex.
+
+Ägaren, med det ursprungliga underlaget i hand: *"Det jag är orolig för är att vi startar
+bilen på en trasig väg som aldrig har förutsättningarna att komma i mål."*
+
+### Först det mekaniska: ingenting ur underlaget är förlorat
+
+Tarbollen (17 filer) jämförd fil för fil mot `docs/loop/raddning/`:
+**4 identiska, 9 VUXNA av rättelser, 0 saknade.** `06-inventering.md` 17,9 → 34,5 kB,
+`PROMPT-TILL-CODEX.txt` 7,7 → 18,1 kB. De två artefakter som inte ligger i repot är just de
+två README:t pekar ut som avsiktligt utelämnade: bundlen (`ÖVERFLÖDIG`, ersatt av det
+verkliga webbrepot) och dokumentationspatchen, vars fyra commits ligger i historien —
+validatorn bekräftar `4/4`.
+
+### Och sedan den verkliga frågan, mätt i specens beroendegraf
+
+```
+h-004 ← h-001 (GRÖN)                                    ROT 1, fristående
+h-009 ← h-005, h-006, h-008 (ALLA GRÖNA)                ROT 2, fristående
+
+h-012 ← h-009
+h-011 ← h-004, h-009
+h-013 ← h-009, h-012
+h-016 ← h-011, h-012, h-013
+```
+
+**Fyra av de sex röda ligger NEDSTRÖMS om de två andra.** Ingen av rötterna beror på något
+rött. Vägen är alltså inte sex oberoende hål — den är **två hål med fyra speglingar**.
+
+### Symtomen stämmer med grafen, ordagrant
+
+`h-009` är kuvert- och workspacelagret, och dess egna fel är:
+`K2 kuvertet når processen — kod 127` · `K8 processen kördes i klonroten, INTE i
+workspacet` · `K9 processen hittade inget kuvert`.
+
+Nedströms, ur samma körning:
+
+| Grind | Felrad |
+|---|---|
+| `h-011` K12 | *"workern körde någon annanstans eller fick fel kuvert"* |
+| `h-012` K14 | *"kuvertet når sessionen — kod=4"* |
+| `h-012` K3 | kandidatens filer är **repots HEAD-filer**, inte sessionens |
+| `h-013` K1 | *"kandidat via brytaren — kod=4 nonzero_exit"* |
+| `h-016` K1 | *"attesterad kandidat finns i git — attest ger ''"* |
+
+En worker som inte kör i sitt workspace ser repots filer i stället för sina egna, får
+inget kuvert, producerar ingen kandidat — och då kan varken kedjan, brytaren eller
+attestationen mätas. **Det är en defekt som yttrar sig fem gånger.**
+
+`h-004` är den andra roten och är något annat: `lease_id`, fencing och renew är inte
+implementerade. En funktion som ska skrivas, inte en defekt som ska lagas.
+
+### ⚠️ Detta är en HYPOTES, och jag hade fel om en sådan för tre timmar sedan
+
+FYND 33 visar vad mitt förra orsaksgissande var värt: jag läste felraderna, såg ordet
+`cwd`, och drog slutsatsen riggartefakt. Fel på fyra av fem punkter.
+
+**Skillnaden nu är att grafen är oberoende evidens.** Att `h-012`, `h-013`, `h-011` och
+`h-016` beror på `h-009` står i `specs/tasks.spec.json` och är sant oavsett vad felraderna
+säger. Symtomlikheten är en andra, svagare signal som pekar åt samma håll.
+
+**Provet är billigt och avgör saken:** laga `h-009`, kör om de fem. Blir de gröna var det
+en rot. Blir de inte det är det fler, och då vet vi det efter en fix i stället för sex.
+
+### Svaret på frågan
+
+**Vägen finns.** Ingenting bland de sex är arkitektoniskt omöjligt: två är funktioner som
+ska byggas, resten ser ut att vara följdfel. De fyra saknade taskarna `h-027`–`h-030` har
+ett ägarauktoriserat kontrakt som specificerar dem
+(`harness-substitution-contract-v1.md`). Slutkriteriet är definierat och mätbart
+(`00-VAD-NORTROPIC-AR.md`, `07-v1-acceptans.md`).
+
+**Det som faktiskt kan stoppa bilen är inte vägen — det är trampkvarnen.** 297 omfrysningar
+utan en enda stängning. Mot den står regel 11:s budget, regel 12a:s bevarande, och kravet
+att KLAR kräver ett kört exitprov i samma session. Alla tre finns nu, och ingen av dem
+fanns i det underlag du håller i handen.
+
+## 2026-09-16 — PAKETET SANERAT MOT FYND 33. Åtta ställen bar en falsifierad premiss.
+
+Ägaren: *"Skulle vi städa nåt? … en väldokumenterad bil på en väldokumenterad
+transportsträcka i ett väldefinierat mål utan dikeskörningar."* Riktig fråga: FYND 33
+gjorde delar av överlämningspaketet **osant**, och ett paket som säger KLAR om tre trasiga
+grindar är ett dike med karta.
+
+**Mätt, inte antaget** — grep efter varje formulering som vilar på premissen:
+
+| Fil | Bar |
+|---|---|
+| `regler.md` regel 11a | *"Varje KLAR task har en grind rörd ≤ 3 gånger"* |
+| `raddning/00-LAS-FORST.md` | samma diskriminant |
+| `raddning/02-bevis.md` | *"Klar ⇔ grinden rörd ≤ 3 gånger"* |
+| `raddning/05-arbetsordning.md` | samma, som tripwire-rad |
+| `raddning/09-task-rundtrampsvakten.md` | tabellkolumn *"klara"* |
+| `raddning/12-arbetsorder.md` | *"VÄGEN — sex poster"*, `h-004 ✓ h-013 ✓ h-016 ✓` |
+| `raddning/06-inventering.md` | fyra ställen: kärnloopstabell, `h-015`:s beroenderad, `h-001–h-013 klara`, `h-016 klar` |
+| `PROMPT-TILL-CODEX.txt` | diskriminanten OCH hela ORDNINGEN |
+
+### Det värsta fyndet: regel 11a:s belägg vilade på samma falska etiketter
+
+Regel 11a motiverades med *"startbudget 3 — OBSERVERAD, inte vald: varje KLAR task har en
+grind rörd ≤ 3 gånger (h-016: 1, h-013: 2 …)"*. **`h-016` rördes en gång och ger
+`11 PASS / 14 FAIL`. `h-013` rördes två gånger och ger `8 PASS / 8 FAIL`.**
+
+Omfrysningstalen var riktiga. **Etiketterna var det inte.** Implikationen
+`klar ⇒ få omfrysningar` är falsifierad; `många omfrysningar ⇒ icke-klar` står kvar och är
+mätt (17–147, alla röda).
+
+**Och den rätta läsningen är mörkare än min.** Ett lågt omfrysningstal betyder inte att
+grinden blev grön — det betyder att **någon slutade röra den**. `h-016` rördes en gång och
+är röd på fjorton kontroller. Övergiven och löst gick inte att skilja åt, därför att ingen
+körde grinden. Budgeten 3 gäller oförändrat, nu som ren stoppmekanism och aldrig som
+framgångsmarkör.
+
+### Vägen är tretton poster, och `h-027` är inte första steget
+
+```
+GRÖN:  h-010
+RÖDA:  h-004  h-009  h-011  h-012  h-013  h-016     ← vägens första arbete
+SAKNAS: h-027 → h-028 → h-029 → h-030 → h-015 + autonomous-loop-exit + acceptansfilen
+```
+
+`PROMPT-TILL-CODEX.txt` ORDNINGEN är omskriven: steg 1 är att köra
+`matning-pa-macen.sh` **på `main`** i en riktig klon, steg 2 är att root-orsaka de sex
+röda. Det gamla steg 5 (*"kontrollera h-013 på Macen"*) är utfört — svaret var FAIL, och
+det svaret flyttade hela ordningen.
+
+### Ett krav till i tripwire-tabellen
+
+`05-arbetsordning.md` har fått en rad: **"Du är på väg att skriva KLAR"** → kör grinden i
+samma session och citera exitkoden. Tre task bar etiketten utan ett kört exitprov. Det är
+regel 8 tillämpad på den dyraste förväxlingen i underlaget: **att en grindfil FINNS är
+inte att den PASSERAR.**
+
+Vaktsviten `PASS 23/23`, `validera-underlaget.sh` `BEKRÄFTAT 33 · AVVIKER 0 · ODÖMBART 4`.
+
+## 2026-09-16 — FYND 33: KONTROLLPROVET ÄR KÖRT. **KARTAN HÅLLER INTE.** Och min hypotes var fel på fyra av fem punkter.
+
+Ägaren körde `matning-pa-macen.sh` i en **riktig klon** av samma gren, `HEAD 5b6ed6e`,
+Darwin arm64, Python 3.12.13.
+
+```
+worktree:  7 PASS · 7 FAIL    h-001:0 h-002:0 h-003:0 h-004:1 h-005:1 h-006:0 h-007:0 h-008:0 h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
+KLON:      8 PASS · 6 FAIL    h-001:0 h-002:0 h-003:0 h-004:1 h-005:0 h-006:0 h-007:0 h-008:0 h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
+                                                        ↑ ENDA skillnaden
+```
+
+**Exakt en grind skilde: `h-005`.** Den föll i worktreen på `K7 avbrottsstädning —
+worktree-rester efter SIGINT` och är grön i klonen. Riggartefakten var verklig — men den
+förklarade **en** av sju röda.
+
+### Jag hade fel på fyra av fem punkter, och det står nedtecknat i FYND 32
+
+Min hypotes, skriven före kontrollen: *"riggartefakt: `h-009` K8/K9, `h-011` K12, `h-012`
+K3/K15, `h-005` K7 — alla klustrar på cwd/workspace/kuvert."*
+
+**Bara `h-005` stämde.** `h-009` K8 säger fortfarande *"processen kördes i
+[…/nortropic-kontrollklon], inte i workspacet"* — i en ren klon, utan en enda nästlad
+worktree. Att felraden NÄMNER cwd gjorde mig säker på att cwd var orsaken. Det var samma
+fel som hela dagen: **jag läste vad utdata SADE i stället för att pröva vad mekanismen
+GJORDE.** Att jag skrev ned hypotesen i förväg är det enda som gör det mätbart att den föll.
+
+Det jag kallade *"ser ut som äkta"* — `h-004` K8–K11, lease-generationer — höll.
+
+### ⭐ DOMEN: kartan håller inte
+
+| Task | Påstått | Mätt på Macen, ren klon |
+|---|---|---|
+| `h-004` | KLAR | **FAIL** — 8 PASS, 7 FAIL |
+| `h-010` | KLAR | **PASS** |
+| `h-013` | KLAR | **FAIL** — 8 PASS, 8 FAIL |
+| `h-016` | KLAR | **FAIL** — 11 PASS, 14 FAIL |
+
+**Tre av fyra "klara" beroenden för `h-015` är inte klara.** Vägen till `KERNEL_COMPLETE`
+var aldrig sex poster. `h-009`, `h-011` och `h-012` är röda därtill — sex verkliga fel i
+beroendeslutningen.
+
+**Detta är inte en ny regression.** `h-004` faller på att lease-generationer (`lease_id`,
+fencing, renew) inte är implementerade; `h-016` på att attestation aldrig sker. Sådant
+byggdes aldrig. Påståendet KLAR kom av att en grindfil FINNS, inte av att den KÖRTS —
+underlagets elfte lexikala fel, och det dyraste.
+
+### ⚠️ En konfundering som måste sägas, inte döljas
+
+Grindarna kördes mot `HEAD 5b6ed6e`, alltså **denna gren**, inte `main`. Grenens sex
+commits är dokumentation (mätt: noll filer under `verify/`, `specs/`, `controller/`).
+
+**Men `h-012` läser HEAD-commitens ändrade filer.** K3 och K15 räknar upp
+`docs/05-beslutslogg.md`, `docs/loop/drift.md`, `matning-pa-macen.sh` — just denna grens
+senaste commit. För `h-012` påverkar grenen alltså felets TEXT. Strukturen (`kod=6 inga
+ändrade filer`, `kod=4`) är densamma, och den föll även i Linux.
+
+`h-004`, `h-013` och `h-016` rör inte den ytan alls — deras fel handlar om
+lease-generationer, brytarens fingerprints och attestation. **Kartdomen står oberoende av
+grenen.** En körning på `main` vore ändå värd att göra, och det är Codex första uppgift.
+
+### Vad detta gör med arbetsordern
+
+`raddning/12-arbetsorder.md` och `06-inventering.md` bygger båda på *"h-004/010/013/016 är
+KLARA"*. **Den premissen är falsifierad.** Vägen till `KERNEL_COMPLETE` går nu genom sex
+verkliga grindfel först, och `h-027`–`h-030` är inte längre vägens första steg.
+
+Underlaget är analys, inte status — så det rättas inte till en ny plan här. **Denna rad är
+statusen.** Att Codex börjar på en karta som säger KLAR om tre trasiga task är precis det
+diket hela detta arbete skulle undvika.
+
+## 2026-09-16 — REGEL 12a: BEVARANDE ÄR AUTOMATISKT. Autocommit byggd och kopplad.
+
+Ägaren 2026-09-16: *"jag vill att vi har auto commits, inte att ägarhand eller nåt annat
+tjafs ska commita, det är därför detta sker."* (`LOOP-ÄGARBESLUT-AUTOCOMMIT`.)
+
+**Rotorsaken var mekanisk, inte slarv.** `AGENTS.md` bar `PUSH=NO / MERGE=NO` plus
+*"Rollagenterna committar/pushar/mergar fortfarande inte"*. Den regeln skrevs för
+**publicering** och tillämpades på **bevarande**. En rollagent fick alltså inte spara sitt
+eget arbete. Utfallet är mätt: ~300 lokala grenar, `main` 493 commits efter origin,
+55 opushade commits i sex dagar.
+
+| | Trust-innebörd | Vem |
+|---|---|---|
+| **BEVARANDE** — commit + push till arbetsgrenen | **ingen.** En commit är inte en attestation | **automatiskt, aldrig en människa** |
+| **PUBLICERING** — attestation, PR, merge till `main` | hela trust-kedjan | kontraktsflödet, oförändrat |
+
+Rollseparationen hindrar en byggare från att attestera sin egen kandidat. Den har aldrig
+haft något med att spara arbete att göra.
+
+**Byggt och prövat, allt i denna commit:**
+
+- `scripts/nortropic-autocommit.sh` — bash 3.2 (macOS systembash), ingen sudo, aldrig
+  `--force`, aldrig merge. **Fyra prov körda:** på `main` med smuts → `STOPP exit 1`; på
+  arbetsgren → commit + push + `regel 12 uppfylld`; utan ändringar → tyst `exit 0`; blandad
+  ändring → **två** commits, där `CLAUDE.md` och `specs/` hamnade i en egen
+  `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`.
+- `.claude/settings.json` — `Stop`- och `SessionEnd`-hookar. Schemaprövad med `jq -e` och
+  pipe-prövad (`echo '{}' | bash ...` → `exit 0`).
+- `docs/loop/regler.md` regel 12a, `AGENTS.md` (så Codex bär det).
+
+**§A bevaras men auktoriseras ALDRIG.** Regel 6 står orörd. Att låta §A-arbete ligga
+okommitterat vore att förlora det för att skydda det; att kalla commiten ett godkännande
+vore `SELF_CERTIFICATION_AS_PROOF=NO`. Därför: egen commit, skriande rubrik, granskaren
+auktoriserar med en beslutsrad eller reverterar.
+
+### Hooken avslöjade ett fel i sitt eget första andetag
+
+Pipe-provet committade `scripts/nortropic-autocommit.sh` — men **inte**
+`.claude/settings.json`. `.gitignore` är en whitelist (`/*` med `!`-undantag) och
+`.claude/` var utesluten med avsikt: *"Settings, credentials, plugins, projects, memory are
+NEVER tracked."*
+
+Hooken hade alltså funnits på **en maskin**, vilket är fynd 2 exakt — och precis vad
+`11-tre-vakter-mot-aterfall.md` varnar för: *"Den ska ligga i repot, inte i `~/.claude/`."*
+
+Rättat med minsta möjliga öppning: katalogen släpps in och stängs omedelbart igen
+(`!/.claude/` · `/.claude/*` · `!/.claude/settings.json`). **Prövat på beteende, inte på
+exitkod:** `git add --dry-run .claude/settings.json` → `add`;
+`git add --dry-run .claude/settings.local.json` → `paths are ignored`. Credentials,
+sessions, projects, memory och `settings.local.json` förblir ospårade.
+
+Mitt första prov använde `git check-ignore -v`, vars exitkod betyder *"matchade ett
+mönster"* — även ett negationsmönster. Det rapporterade fel. Femte gången samma dag att ett
+svar om en angränsande fråga togs för svar på den ställda; femte gången botemedlet var att
+mäta beteendet i stället.
+
+## 2026-09-16 — FYND 32: FÖRSTA MÄTNINGEN PÅ MACEN. Sju röda grindar — men riggen är misstänkt, och domen är ODÖMBART tills kontrollprovet körts.
+
+Ägaren körde `artefakter/matning-pa-macen.sh` på Darwin arm64, Python 3.12.13.
+`controller/verify/cli list` → `exit 0`. Grindarna kördes.
+
+```
+h-001:0  h-002:0  h-003:0  h-004:1  h-005:1  h-006:0  h-007:0
+h-008:0  h-009:1  h-010:0  h-011:1  h-012:1  h-013:1  h-016:1
+SUMMA: 7 PASS · 7 FAIL av 14
+```
+
+**Två resultat står oavsett vad kontrollprovet visar:**
+
+1. **Darwin-bindningen är bekräftad empiriskt.** `h-003` och `h-010` var röda i Linux
+   och gröna på Macen. FYND 31d håller.
+2. **Fyra filer saknas, mätt:** `verify/bin/h-014-exit`, `verify/bin/h-015-exit`,
+   `verify/bin/autonomous-loop-exit`, `docs/loop/autonomy-kernel-v1-acceptance.md`.
+
+### ⚠️ Varför siffrorna ändå inte får tolkas ännu
+
+Mätningen kördes i en **git-worktree**. Grindarna skapar SJÄLVA git-worktrees (`h-005`
+K3: *"workspace är ett eget git-worktree med egen git-dir"*). I en worktree är `.git` en
+**fil**, inte en katalog. Tre felrader pekar rakt på nästlingen:
+
+| Grind | Felrad |
+|---|---|
+| `h-009` K8 | processen kördes i **worktreeroten**, inte i workspacet |
+| `h-012` K15 | kandidaten bar **HEAD-commitens filer** (`drift.md`, `matning-pa-macen.sh`, `README.md`) i stället för sessionens |
+| `h-005` K7 | worktree-rester efter SIGINT |
+
+De tre filerna i `h-012` är commit `54926a2c`:s egna. **Riggen mätte sig själv.**
+
+**Att härifrån skriva "kartan håller inte" vore exakt sessionens genomgående fel** — att
+mäta en sak och dra slutsats om en annan. Domen om kartan är därför `ODÖMBART`, inte
+`FAIL`. Kontrollprovet är en riktig klon:
+
+```bash
+git clone --branch <gren> git@github.com:Nortropic/nortropic-system.git <katalog>
+cd <katalog> && bash docs/loop/raddning/artefakter/matning-pa-macen.sh
+```
+
+Samma sju röda där → fyndet är verkligt. Färre → worktreen var artefakten.
+
+### Hypotes före kontrollen, nedtecknad för att kunna ha fel offentligt
+
+**Ser ut som riggartefakt** — allt klustrar på cwd/workspace/kuvert: `h-009` K8/K9,
+`h-011` K12, `h-012` K3/K15, `h-005` K7.
+
+**Ser ut som äkta** — `h-004` K8–K11: *"acquire gav rc=0 token=[], väntat unik lease_id"*.
+Det läser som att lease-generationer inte är implementerade, och ingen sökväg i världen
+fixar det. Står bara den gruppen kvar efter kontrollen är fyndet skarpt och begränsat.
+
+### Spärren som gör om det omöjligt
+
+`matning-pa-macen.sh` vägrar nu köra i en worktree: `exit 2` = ODÖMBART, aldrig FAIL —
+riggen mätte, inte kandidaten. **Mutationsprövat åt båda hållen:** i worktree `exit 2`
+med förklaring; i riktig klon slår spärren inte till och provet kör igenom.
+
+Under byggandet av spärren gjorde jag om felet i miniatyr: jag prövade den i en worktree,
+såg den inte slå till, och var på väg att kalla den trasig. Orsaken var att worktreen bar
+den **committade** versionen av skriptet, utan spärren. Fjärde gången samma dag att ett
+svar om en angränsande fil framläggs som svar om den ställda.
+
+### Regel 12: ~300 lokala grenar, flera opushade
+
+Klonen `~/nortropic/nortropic-system` bär omkring 300 lokala grenar. Minst sex har commits
+som inte finns på origin (`owner/h-031-codex-model-routing-1cf2caf75d22` ahead 9 ·
+`builder/h032-result-kernel-r93-4edbf9e1` ahead 3 · `owner/backtestkorare` ahead 3 ·
+`builder/h032-result-kernel-r75-fbbcfa65` ahead 2 · `builder/h032-result-kernel-24b4d575`
+ahead 1 · `owner/h035-r14-two-state-registry-fe23d062` ahead 1), och ett sextiotal saknar
+uppström helt — för dem säger `[ahead]` ingenting. Samma form som veckan med 55 opushade
+commits. **Inte åtgärdat. Ligger som nästa fråga efter kartan.**
+
+Klonens `main` låg 493 commits efter origin med tio filer från ett gammalt baslinjeläge.
+Alla tio finns i `origin/main`; `specs/tasks.spec.json`-objektet `3cbde14a` finns i repot.
+**Ingenting osäkrat där.** Klonen `~/nortropic-repos/nortropic-system` står på
+plattformsgrenen, ren och identisk med origin.
+
+## 2026-09-16 — CODEX FÅR SKRIVA h-027–h-030, och regel 6 är kärnans egen regel
+
+Vägens fyra första poster är spec-rader. `specs/**` ligger i byggplan-v3 §3.1:s §A-mängd,
+och regel 6 gör den mängden till människohand. Codex hade alltså mött en tvetydighet vid
+**vägens första steg** och antingen stannat eller överträtt.
+
+Ägaren avgjorde 2026-09-16: *"det är väl klokast att codex skriver dem så länge vi talar
+om det för codex."* Beslutet ligger som `LOOP-ÄGARBESLUT-SUB-SPECS` i
+`docs/05-beslutslogg.md`, med ett namngivet undantag inskrivet i regel 6.
+
+**Befogenheten kommer ur beslutet, inte ur att sandboxen öppnades.** Att `specs/**` är
+mekaniskt skrivbart sedan `LOOP-ÄGARBESLUT-SANDBOX-OPEN` gör det inte tillåtet. Att
+blanda ihop *kan* och *får* är precis vad `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder.
+
+### FYND 30 — regel 6 är INTE ärvd webbstyrning, men §A-mängden den pekar på är blandad
+
+Ägaren invände: *"dessa regler är väl från webben? vi ska ju ta bort ägarhand."* Frågan är
+riktig att ställa — två av tre styrdokument kärnan är pinnad till ÄR webbens. Mätt:
+
+| Dokument | Läses av kärnan | Läses av webbträdet | Dom |
+|---|---|---|---|
+| `docs/07-konstitution.md` | 0 | 4 | webb |
+| `docs/03-regelverk.md` | 0 | 8 | webb |
+| **`docs/loop/regler.md`** | **`controller/verify/cli`, `specs/tasks.spec.json`, `scripts/nortropic-codex-autopilot.py`, fem rollskills i `.agents/`, `AGENTS.md`, `CLAUDE.md`** | **0** | **kärnan** |
+
+Regel 6 är alltså kontrollplanets egen regel, beslutad för kontrollplanet. Den är inte
+ägarhand som följt med från webbfabriken.
+
+**Men §A-mängden regel 6 pekar på är blandad** — byggplan-v3 §3.1 listar tretton poster,
+varav sex är webbens (`docs/07-konstitution.md`, `docs/03-regelverk.md`, två
+`skills/`-referenser, `workflows/**`, `agents/nortropic-steward.md`) och sju kärnans
+(`specs/**`, `verify/**`, `controller/**`, `CLAUDE.md`, `scripts/check-invariants.mjs`,
+`tests/fixtures/**`, `AUTOPILOT`). §3.1:s egen text säger uttryckligen att kärnans tre
+första *"skyddas av `allowed_write` (som är smalare per task) och av ägarhand"*.
+
+**Rättat efter ägarens invändning *"Ägarhanden är webb också"*:** regeln står i
+`byggplan-v3.md`, som `ALLOCATION.tsv` dömer `PLATFORM / PLATFORM_KEEP` — den är alltså
+kärnans. Men proveniensen jag åberopade, `LOOP-ÄGARHAND-15`, är en rad i
+`docs/05-beslutslogg.md`, som samma `ALLOCATION.tsv` dömer **`WEB / WEB_MOVE`**. Jag
+anförde alltså ett webbdokument som skäl att inte ändra en kernelregel. *Regeln* är
+kärnans; *belägget jag höll upp* var webbens. Invändningen träffar.
+
+Samma sak gäller inte `true_human_hard_stops`: de fyra stoppen kommer ur
+`docs/loop/remaining-bootstrap-delegation-v1.md` (ägarbeslut 2026-08-13), som ligger i
+`docs/loop/` — kärnans lager. Arbetsordningen citerar alltså ett kernelbeslut. **Men ett
+av de fyra stoppen är *"ändra `docs/07-konstitution.md`"*, och det dokumentet är webbens.**
+Det är samma sammanflätning en nivå ned, och den är inte löst av separationen.
+
+### Den kvarvarande frågan, som är ägarens och inte min
+
+Arbetsordningens `true_human_hard_stops` har **fyra** poster: konstitutionen, juridiskt
+human-only, äkta auktoritetskonflikt, externa trust-rötter. **`specs/**` står inte bland
+dem.** Regel 6 är därmed strängare mot kärnans egna ytor än vad delegationen kräver.
+
+Dagens undantag löser det **punktvis** — fyra namngivna task. Den generella frågan är om
+regel 6 ska peka på §A-mängdens *webbdel* och lämna kärnans egna ytor till `allowed_write`
+plus rollseparation. Det vore rätt riktning enligt ägarens *"vi ska ju ta bort ägarhand"*,
+men det upphäver `LOOP-ÄGARHAND-15`, och **att upphäva ett ägarbeslut utan att läsa dess
+underlag är exakt FYND 26.** Den ändringen görs därför inte här. Den ligger som ett öppet
+ägarbeslut, och tills det fattas blockerar regel 6 ingenting på vägen till
+`KERNEL_COMPLETE` — undantaget täcker alla fyra spec-raderna vägen behöver.
+
+### FYND 31 — "Vaktsviten PASS 23/23" är INGET bevis om en kerneländring
+
+Ägaren invände: *"Vakter är också webben, varför kommer de nu?"* Invändningen är riktig,
+och `CLAUDE.md` säger den redan i klartext: *"`node scripts/kor-vakter.mjs` är
+övervägande webbfabrikens grindsvit och är inget bevis om en kerneländring."* Jag citerade
+den ändå — i denna dags beslutsrader och i commit-meddelandet.
+
+**Mätt, tre gånger, och domen är entydig:**
+
+| Fråga | Mätning |
+|---|---|
+| Vad rör de 23 vakterna? | 2 enbart kärnan · 1 båda · 20 webb eller inget träd |
+| Läser någon vakt de filer jag ändrade i dag? | `docs/loop/regler.md` **0** · `docs/loop/drift.md` **0** · `raddning/**` **0**. Endast `docs/05-beslutslogg.md` läses — av fyra vakter, varav tre är rena webbvakter |
+| Finns `kor-vakter.mjs` på plattformsgrenen? | **Nej.** `scripts/` bär där två filer: `check-invariants.mjs` och `nortropic-codex-autopilot.py` |
+
+Sviten var alltså grön om något den inte mätte, körd med ett verktyg som inte följer med
+kärnan. Den säger *"jag har inte råkat söndra webbfabriken"* — ett sant men annat
+påstående än det jag lät den bära.
+
+**Vad som FAKTISKT dömer de filerna, mätt:** `docs/loop/regler.md` läses av
+`controller/verify/cli`; `docs/05-beslutslogg.md` av **elva** frysta exitprov plus
+`controller/attest/cli`; `docs/loop/drift.md` av **tio**. `raddning/**` läses av ingen
+mekanism — den är analys, och det är avsiktligt.
+
+**Och den domen kan inte fällas här** — men ⚠️ **skälet jag först skrev var fel, rättat
+samma dag i FYND 31d.** Jag skrev *"`controller/verify/cli` kräver Python 3.12+; denna
+Linuxmiljö bär 3.11.15"*. Jag hade mätt `python3` och dragit en slutsats om **miljön**.
+`/usr/bin/python3.12` finns här, och `python3.12 controller/verify/cli list` ger `exit 0`.
+Det som verkligen fäller är Darwin-bindningen; se FYND 31d nedan. Kärnans verdikt är
+`ODÖMBART`, och blir
+det tills det körs på Macen. Att ersätta ett ODÖMBART med en grön webbsvit är exakt det
+fel `docs/agentoverlamning.md` beskriver: att pröva vad utdata SÄGER i stället för vad
+mekanismen GÖR.
+
+**Rättelsen** ligger som en egen rad i `docs/05-beslutslogg.md`
+(`LOOP-RÄTTELSE-VAKTBEVIS`) i stället för som ändring av elva historiska rader —
+beslutsloggen rättas genom tillägg, aldrig genom omskrivning.
+
+### FYND 31b — vaktklassificeringen var fel i fyra dokument. RÄTTAD.
+
+Ägaren auktoriserade §A-ändringen 2026-09-16: *"Så länge codex och claude båda förstår
+ändringen så är jag nöjd, rätta det som behöver rättas."* (`LOOP-ÄGARHAND-VAKTKLASS`.)
+
+`CLAUDE.md` namngav `check-provanropare.mjs` som kärnans och sa att den *"aldrig får följa
+med när webbträdet flyttas"*. Tre källor säger emot:
+
+| Källa | Dom |
+|---|---|
+| `SEPARATION-20260910/ALLOCATION.tsv` | `check-provanropare` · `kor-styrprov` · `kor-vakter` = alla tre **`WEB / WEB_MOVE`** |
+| Plattformsgrenens `scripts/` | Bär **två** filer: `check-invariants.mjs`, `nortropic-codex-autopilot.py` |
+| PINV `PLATFORM_EXACT` i plattformsgrenens `check-invariants.mjs` | `check-invariants.mjs`, `nortropic-codex-autopilot.py`, `check-verifierarregistret.mjs` — inga andra `scripts/` |
+
+**Antalet var rätt, paret fel.** Kärnans två i sviten är `check-invariants.mjs` +
+`check-verifierarregistret.mjs`.
+
+**Orsaken är underlagets återkommande.** `check-provanropare.mjs` refererar sex
+kernelsökvägar och noll webbsökvägar. En **lexikal** mätning gör den därför till
+kernelfil. Separationen dömde på vad den **tillhör**. Värre: `00-LAS-FORST.md` bär redan
+ett fel av samma form — en tidigare kärnsiffra var noll, lagades med ett bättre grep, och
+**det nya svaret var lika lexikalt som det gamla.** Vad en fil PEKAR PÅ är inte vad den
+ÄR. Ägandet avgörs av separationen, aldrig av ett grep.
+
+**Rättat i fyra filer:** `CLAUDE.md` (§A), `AGENTS.md` (så Codex och Claude läser samma
+sak), `raddning/00-LAS-FORST.md`, `raddning/06-inventering.md`. Fördelningen 16/2/1/4 står
+kvar oförändrad — den är en riktig **referensmätning** och pinnas av
+`validera-underlaget.sh`; det som rättats är vad den påstås betyda.
+
+**En kernelfråga blev hemlös av det.** `check-provanropare.mjs` prövar att kärnans frysta
+prov faktiskt anropas — en riktig kernelfråga, i en fil som följer med webben. Den behöver
+byggas om som PINV om frågan ska fortsätta ställas. Noterat i `06-inventering.md`, inte
+åtgärdat här.
+
+### FYND 31c — valideringsprovet pinnade ett växande tal. RÄTTAT.
+
+`validera-underlaget.sh` gick `AVVIKER 1` direkt efter FYND 31:s commit. Kontrollen
+*"commits med H-nummer"* väntade sig **exakt 440** och mätte **441** — commiten nämnde
+`h-027`–`h-030`.
+
+**Provet AVVEK alltså av att arbete skedde.** Det är samma felform som regel 11 förbjuder
+i en grind: **provet band miljön i stället för egenskapen.** Ett exakt tal över en växande
+logg kan inte vara stabilt, och en kontroll som blir röd av varje commit blir tystad — det
+är hela mekanismen bakom de 297 omfrysningarna.
+
+Påståendet underlaget faktiskt gör är *"minst 440 av 825, alltså över hälften"*, och den
+egenskapen är monoton. Kontrollen är omskriven till tröskelform — **samma idiom som raden
+ovanför den redan använde** för historikens längd (`>=825 → JA`). `02-bevis.md` säger nu
+att båda talen är GOLV, uppmätta 2026-09-14.
+
+**Mutationsprövat, inte antaget:** tröskel höjd till `999999` → `NEJ(441)` + `AVVIKER` +
+exit 1. Kontrollen fäller när den ska, och skriver ut det uppmätta talet när den fäller,
+så drift förblir synlig. Baslinjen är åter `BEKRÄFTAT 33 · AVVIKER 0 · ODÖMBART 4`.
+
+**Och den latenta systerkontrollen föll inom samma commit.** Jag skrev först att raden
+*"NO-CREDIT-rader i drift.md" = 101* var samma felklass men lämnades orörd, eftersom den
+var grön och jag inte ville ändra på spekulation. **Nästa körning gav `101 → 102`** — den
+mening jag just hade skrivit innehöll strängen `NO-CREDIT`, och kontrollen räknar prosa
+lika gärna som verdikt. Klassen behövde alltså inte spekuleras om; den demonstrerade sig
+själv på under en minut. Även den är nu tröskelform och mutationsprövad
+(`>=999999 → NEJ(102)` + `AVVIKER`).
+
+**Och en tredje föll i nästa körning — FYND 31e, av en ANNAN felform.** Kontrollen *"de 4
+dok-commitsen i HEAD:s historik"* gav `4 → 5`, därför att den räknade rader ur
+`git log | grep -ciE 'repots identitet|lageretiketten|vaktklassificeringen|BLANDADE'` och
+commiten som rättade vaktklassificeringen bar ordet **`vaktklassificeringen` i sin rubrik**.
+
+Det är inte en växande räknare — det är **identitet prövad lexikalt**, samma felform som
+FYND 31b. Påståendet är *"alla fyra dok-commitsen finns"*; ett ANTAL svarar på en annan
+fråga, nämligen hur många rubriker som råkar innehålla något av orden. Omskriven till
+**mängdform**: varje mönster prövas för sig och antalet uppfyllda mönster räknas, `4/4`.
+Stabilt oavsett hur många senare commits som nämner samma ord. Mutationsprövat: ett mönster
+utbytt mot ett obefintligt ger `3/4` + `AVVIKER`.
+
+**Tre kontroller, två felformer, upptäckta av tre på varandra följande körningar av samma
+prov.** Ingen hittades av eftertanke; alla tre av att provet kördes igen efter en ändring.
+
+**Lärdomen är inte "jag borde ha fixat alla direkt".** Den är att provet bär **samma två
+fel som underlaget det validerar**: det pinnar miljön i stället för egenskapen (regel 11),
+och det prövar identitet med ett grep (FYND 31b). Ett prov som räknar förekomster i den
+fil det självt dokumenteras i är dessutom cirkulärt — att skriva om mätningen ändrar
+mätningen. **Kör provet efter varje ändring, inte bara före.**
+
+### FYND 31d — kärnan är DARWIN-bunden, inte Python-bunden. Och vad som därför överlämnas.
+
+Ägaren frågade: *"så alla dessa saker som inte går nu överlämnar vi till codex?"* Frågan
+tvingade fram en mätning som visade att **mitt eget skäl var fel**.
+
+Jag hade skrivit att kärnans dom är `ODÖMBART` för att *"`controller/verify/cli` kräver
+Python 3.12+ och miljön bär 3.11.15"*. Mätt:
+
+```
+python3 --version                      → 3.11.15
+/usr/bin/python3.12 --version          → 3.12.3          ← finns
+python3.12 controller/verify/cli list  → exit 0          ← kärnans verifierare KÖR
+bash verify/bin/h-013-exit             → exit 1, 5 PASS 11 FAIL
+      orsak i var och en av de elva:   undefined symbol: sysctl
+```
+
+**Jag mätte `python3` och drog en slutsats om miljön.** Samma felform som FYND 31 och 31b:
+ett svar på en angränsande fråga, framlagt som svar på den ställda. Slutsatsen *"måste
+köras på Macen"* var riktig; **skälet var fel, och ett fel skäl i ingångsdokumenten hade
+lett nästa session till att installera Python 3.12 och tro sig löst problemet.** Rättat i
+`CLAUDE.md`, `AGENTS.md` och ovan.
+
+**Den verkliga bindningen är Darwin.** `sysctl` är en macOS-symbol; `controller/provenance`
+når den via native-lagret. Det är samma 18-av-24 som `CLAUDE.md` redan bar. **Fel maskin är
+`ODÖMBART`, aldrig `FAIL`** — annars bokförs en miljö som ett fel i kandidaten.
+
+#### Vad som därför faktiskt överlämnas — tre högar, inte en
+
+| | Post | Varför just där |
+|---|---|---|
+| **A. Codex på Macen** — Darwin krävs | Allt grindverdikt: `h-013`, `h-014`, `h-035`, plattformsgrenens granskning, de fyra shebang-reparationerna | Domen kräver `sysctl`. Ingen annan maskin kan fälla den |
+| **B. Codex, men INTE maskinbundet** | `h-027`–`h-030` i `specs/tasks.spec.json` | Ren JSON-redigering, körbar var som helst. Ligger hos Codex av **ägarbeslut** (`LOOP-ÄGARBESLUT-SUB-SPECS`), inte av teknisk nödvändighet |
+| **C. Går att göra utan Macen** | `docs/loop/autonomy-kernel-v1-acceptance.md`; vakt 1 och 2 (`11-tre-vakter-mot-aterfall.md`) | Acceptansfilen är ren dokumentation. Vakt 1 och 2 är Node och läser bara git-loggen och trädet — de kör här. **Kostnaden står kvar:** `check-invariants.mjs` är §A och SHA-pinnad i `controller/verify/register.json`, så ändringen kräver ägarhand och hela kontraktsflödet i `AGENTS.md` |
+| **D. Ägaren** | De fyra `true_human_hard_stops`; varje §A-ändring utanför de namngivna undantagen | Oförändrat |
+
+**Poängen med uppdelningen:** *"det går inte här"* har varit ett samlingsnamn för fyra
+olika orsaker, och bara hög A är genuint maskinbunden. Att lägga B och C i samma hög är
+hur en förberedelsekedja blir oändlig — arbete som kunde ha gjorts skjuts till en maskin
+som inte behövs för det.
+
+`autonomous-loop-exit` ligger avsiktligt inte i C. Den kan skrivas var som helst, men
+**rollseparationen säger att den som fryser en grind inte bygger mot den** — vem som
+skriver den är ett arkitektval, inte en miljöfråga.
+
+### Mätningen som ingen maskin utom Macen kan göra — artefakt tillagd
+
+`artefakter/matning-pa-macen.sh` (läser bara). Kör `h-015`:s fjortonhövdade
+beroendeslutning och jämför mot en inbyggd Linux-baslinje, så att **deltat** blir läsbart:
+röd i Linux + grön på Macen = plattformsbunden och frisk; röd på **båda** = verkligt fel.
+
+**Varför:** vägen till `KERNEL_COMPLETE` vilar på att `h-004`, `h-010`, `h-013` och
+`h-016` är KLARA. Det påståendet har aldrig prövats genom att KÖRA grindarna på rätt
+plattform — och den här sessionen har visat vad oprövade påståenden är värda. Provet
+skriver ut domen om kartan explicit.
+
+Linux-baslinjen, mätt i byggmiljön 2026-09-16 (alla åtta röda är `ODÖMBART` här, fel
+maskin): `6 PASS · 6 FAIL · 2 ODÖMBART`. Gröna redan i Linux: `h-001`, `h-002`, `h-005`,
+`h-006`, `h-007`, `h-008`.
+
+### ⚠️ Sidofynd som INTE rättas här: dinglande referens inifrån PINV
+
+Plattformsgrenens `check-invariants.mjs` namnger `scripts/check-verifierarregistret.mjs` i
+`PLATFORM_EXACT` (rad 106) — men filen finns inte på den grenen, trots att
+`ALLOCATION.tsv` dömer den `PLATFORM_KEEP`. Det är en dinglande referens **inifrån kärnans
+egen invariantgrind**, alltså precis vad vakt 2 i `11-tre-vakter-mot-aterfall.md` byggs
+för att fånga. Hör hemma i plattformsgrenens granskning.
+
 ## 2026-09-16 — VÄGEN TILL MÅLET ÄR SEX POSTER, och den prosarad som sa annat är upphävd
 
 Efter beslutet att avsluta `h-039`, `h-031` och `h-032` `OVERIFIERAT` ställdes frågan som

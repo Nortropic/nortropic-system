@@ -194,7 +194,8 @@ Härav följer en renare uppdelning än "dessa fem stannar":
 |---|---|---|
 | `scripts/nortropic-codex-autopilot.py` | **Kärnan**, och bör flyttas ur `scripts/` | Det är kärnans mekaniska exekverare; `scripts/` är bara där den landade |
 | `kor-vakter.mjs`, `check-vaktankare.mjs` | **Webben** | Sviteinfrastruktur, född med webbapparaten |
-| `check-provanropare.mjs`, `check-verifierarregistret.mjs` | **Kontrollerna** hör till kärnan, men inte som webbvakter | De prövar att kärnans frysta prov faktiskt anropas och att registret är koherent — riktiga kernelfrågor utan hemvist i kärnan i dag |
+| `check-verifierarregistret.mjs` | **Kärnan** | Ägardömd `PLATFORM / PLATFORM_KEEP` i `ALLOCATION.tsv` och namngiven i PINV:s `PLATFORM_EXACT` |
+| `check-provanropare.mjs` | **Webben** — men FRÅGAN den ställer är kärnans | Ägardömd `WEB / WEB_MOVE`; finns inte på plattformsgrenen. Den prövar att kärnans frysta prov faktiskt anropas — en riktig kernelfråga **utan hemvist i kärnan**. Rättat 2026-09-16 (FYND 31): tidigare stod filen som kärnans, på grund av att den bara refererar kernelsökvägar. Ägandet avgörs av separationen, aldrig av ett grep. Kontrollen behöver byggas om som PINV om frågan ska fortsätta ställas |
 | `tests/controller/**`, `tests/scripts/**` | **Kärnan** | Kärnans egna tester |
 
 ### ⚠️ Bundlen är en korrekt extraktion — men inte ett körbart repo
@@ -427,7 +428,9 @@ operativsystemet. Kör den på Macen.
 
 ```
 BOOTSTRAP-KEDJAN — pågår, 4 av 8 kvar
-  h-035 ✓ → h-037 ✓ → h-034 ✓ → h-036 ✓ → h-039 ⟳ → h-038 ○ → h-032 ○ → h-031 ○
+  h-035 ✓ → h-037 ✓ → h-034 ✓ → h-036 ✓ → h-039 ⛔ → h-038 ✓ → h-032 ⛔ → h-031 ⛔
+                                     AVSLUTADE OVERIFIERAT 2026-09-16 (regel 11b)
+     ⚠️ Denna kedja är INTE vägen till målet. Se "VÄGEN" nedan.
                                             (R33)
         h-033 ✓ (sidogren ur h-034)
 
@@ -435,10 +438,16 @@ SUBSTITUTIONSKEDJAN — 0 av 4 finns som task
   h-027 ○ → h-028 ○ → h-029 ○ → h-030 ○
   AgentProvider   G20-split    TaskContract   thin task supervisor
 
-KÄRNLOOPEN — 15 av 17 har gate
+KÄRNLOOPEN — 15 av 17 HAR gate. Att HA en gate är inte att PASSERA den.
+  ✓ = grindfilen finns    (mätt 2026-09-16: se ⚠️ nedan)
   h-001…h-013 ✓   h-016 ✓   h-017 ✓
   h-014 ⊘ gate saknas (byggbar NU)
   h-015 ⊘ gate saknas OCH blockerad av h-030
+
+  ⚠️ FYND 33: KÖRDA på Macen i ren klon FALLER h-004, h-009, h-011, h-012,
+     h-013 och h-016. Grön är bara h-010 av kartans fyra. Kryssen ovan säger
+     att FILEN finns — ingenting annat. Det var precis den förväxlingen som
+     gjorde "sex poster" till tretton.
 
 FÖRMÅGESKIVORNA — 0 av 9 finns som task
   h-018 … h-026   (roadmapens S4, S5, S7–S13)
@@ -513,10 +522,10 @@ resume är blockerad av en task som inte existerar.
 
 | Task | Slice | Beror på | Gate | Status |
 |---|---|---|---|---|
-| `h-001`–`h-013` | 1–11 | kedjade | ✓ | klara |
+| `h-001`–`h-013` | 1–11 | kedjade | ✓ | **EJ verifierat som grupp.** Körda 2026-09-16: `h-001`, `h-002`, `h-003`, `h-005`–`h-008`, `h-010` gröna; `h-004`, `h-009`, `h-011`, `h-012`, `h-013` **RÖDA** |
 | **`h-014`** | 12 | h-013 **OVERIFIERAT** (se `10-...h014.md` §1) | **SAKNAS** | *"Notisen — Slack från controllern."* Byggbar så snart `h-013` prövats grön **på Macen** |
-| **`h-015`** | 13 | h-010 ✓, h-013 ✓, h-016 ✓, h-004 ✓, **h-030 ✗** | **SAKNAS** | *"Återtaget — återstart efter avbrott."* **Detta ÄR supervisor resume** |
-| `h-016` | 14 | h-011, h-012, h-013 | ✓ | klar |
+| **`h-015`** | 13 | h-010 **GRÖN**, h-013 **RÖD**, h-016 **RÖD**, h-004 **RÖD**, **h-030 ✗** | **SAKNAS** | *"Återtaget — återstart efter avbrott."* **Detta ÄR supervisor resume.** Rättat 2026-09-16 (FYND 33): här stod ✓ på alla fyra, satt av att grindfilerna finns. Körda på Macen faller tre |
+| `h-016` | 14 | h-011, h-012, h-013 | ✓ | **RÖD** — 11 PASS / 14 FAIL på Macen, attestation sker aldrig (FYND 33) |
 | `h-017` | 15 | h-002, h-016 | ✓ | klar |
 
 `h-015`:s exit-kriterium, ordagrant ur specen:
@@ -583,7 +592,33 @@ nästa `verify/bin`-ändring. Det kräver doktrinregel iv först.
 | `h-014` notis | 1 | Gate saknas. Byggbar nu |
 | `h-015` återtag / supervisor resume | 1 | Gate saknas. Blockerad av h-030 |
 | Programdomen | 1 | `autonomous-loop-exit` saknas |
-| **Till `KERNEL_COMPLETE`** | **11** | Förmågeskivorna h-018–h-026 ingår inte |
+| **Till `KERNEL_COMPLETE`** | ~~11~~ **6** | Se rättelsen nedan |
+
+> ## ⚠️ RÄTTAT 2026-09-16 — vägen är SEX poster, inte elva
+>
+> Tabellen ovan räknade in bootstrap-kedjan (`h-039`, `h-032`, `h-031`), som **avslutades
+> `OVERIFIERAT`** 2026-09-16 enligt regel 11b — 297 omfrysningar utan en enda stängning.
+>
+> **Mätt i specen:** `h-015` (supervisor resume) beror på `h-010`, `h-013`, `h-016`,
+> `h-004` och `h-030` — **inte** på `h-031`, `h-032` eller `h-039`. Ingenting beror på de
+> tre utanför gruppen själv. De låg aldrig på vägen.
+>
+> ```
+> GRÖN:    h-010 ✓                                   (kört på Macen, ren klon)
+> RÖDA:    h-004  h-009  h-011  h-012  h-013  h-016  (sex verkliga grindfel)
+> SAKNAS:  h-027 → h-028 → h-029 → h-030             (fyra task)
+>          → h-015 supervisor resume                  (grind)
+>          + verify/bin/autonomous-loop-exit
+>          + docs/loop/autonomy-kernel-v1-acceptance.md
+> ```
+>
+> **⚠️ RÄTTAT 2026-09-16 (FYND 33). Här stod "KLART: h-004 ✓ h-010 ✓ h-013 ✓ h-016 ✓" och
+> "Sex poster".** Grindarna kördes aldrig — de antogs gröna för att grindfilerna finns.
+> Körda på Macen faller `h-004` (8/7), `h-013` (8/8) och `h-016` (11/14). **Tretton poster,
+> och de sex röda kommer först.** `h-014` ligger utanför kedjan och kan byggas parallellt.
+> Prosaraden i `docs/loop/drift.md` rad 5495 (*"No supervisor resume before the entire
+> chain is green"*) är **upphävd** — den är prosa, specens graf gäller.
+> Fullständig härledning i `12-arbetsorder.md`.
 
 ---
 

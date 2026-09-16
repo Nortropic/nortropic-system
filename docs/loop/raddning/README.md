@@ -49,6 +49,25 @@ saknas, och ändå rapporterar grönt, är exakt det fel `check-docs-coherence` 
 
 Senaste körning i repot: `artefakter/valideringskorning-2026-09-16-linux.txt`.
 
+## Och kör detta PÅ MACEN innan något byggs
+
+```bash
+bash docs/loop/raddning/artefakter/matning-pa-macen.sh    # från reporoten, på MACEN
+```
+
+**Läser bara.** Kör h-015:s fjortonhövdade beroendeslutning och jämför mot en inbyggd
+Linux-baslinje, så att **deltat** blir läsbart: en grind som är röd i Linux och grön på
+Macen är plattformsbunden och alltså frisk; en som är röd på **båda** är ett verkligt fel.
+
+**Varför den finns:** hela vägen till `KERNEL_COMPLETE` vilar på att `h-004`, `h-010`,
+`h-013` och `h-016` är KLARA — och det påståendet har aldrig prövats genom att KÖRA
+grindarna på rätt plattform. Provet säger rakt ut om kartan håller. Gör den inte det ska
+det stå i `docs/loop/drift.md` innan Codex börjar bygga.
+
+Kärnan är **Darwin**-bunden, inte Python-bunden (FYND 31d): `controller/verify/cli` startar
+i Linux med Python 3.12, men grindarna faller på `undefined symbol: sysctl`. **Fel maskin
+är `ODÖMBART`, aldrig `FAIL`.**
+
 ## Läsordning
 
 `00-VAD-NORTROPIC-AR.md` → `00-LAS-FORST.md` → `05-arbetsordning.md` → `01` → `06` →

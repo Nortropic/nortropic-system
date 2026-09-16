@@ -14,11 +14,17 @@ Detta repo är Nortropics **trust kernel / bootstrap**. Leveransen är kontrollp
 - **Webbfabrikslagret** — `agents/`, `skills/`, `packs/`, `backtests/`, `workflows/`
   och `docs/00`, `01`, `02`, `04`, `06`. Ligger kvar i trädet efter repodelningen,
   beskriver kundflödet och bär en orienteringsrad överst.
-- **BLANDADE kataloger** — `scripts/` och `tests/` är INTE webb. Kärnans där:
-  `scripts/nortropic-codex-autopilot.py` (allowed_write för h-031/032/035),
-  `check-provanropare.mjs`, `check-verifierarregistret.mjs`, `kor-styrprov.mjs`,
-  `kor-vakter.mjs`, `tests/controller/**`, `tests/scripts/**`. De får aldrig följa
-  med när webbträdet flyttas.
+- **BLANDADE kataloger** — `scripts/` och `tests/` är INTE webb, men kärnans andel är
+  mindre än den såg ut. Kärnans, enligt `PLATFORM_EXACT` i plattformsgrenens
+  `scripts/check-invariants.mjs` (PINV-003/005) — den mekanism som faktiskt dömer:
+  `check-invariants.mjs`, `nortropic-codex-autopilot.py` (allowed_write för
+  h-031/032/035), `check-verifierarregistret.mjs`, `tests/controller/**`,
+  `tests/scripts/**`. De får aldrig följa med när webbträdet flyttas.
+  **`check-provanropare.mjs`, `kor-styrprov.mjs` och `kor-vakter.mjs` är INTE kärnans**
+  (rättat 2026-09-16, FYND 31): `SEPARATION-20260910/ALLOCATION.tsv` dömer alla tre
+  `WEB / WEB_MOVE`, och ingen finns på plattformsgrenen, vars `scripts/` bär två filer.
+  Att de läser `controller/verify/register.json` gör dem inte till kernelfiler — det gör
+  dem till webbvakter som pinnar sig mot kärnans register.
 
 **Auktoritetsordning** — identisk med `AGENTS.md`, som Codex läser; håll dem lika:
 `docs/07-konstitution.md` → `docs/03-regelverk.md` → `docs/loop/regler.md` → aktuell
@@ -31,16 +37,30 @@ De två högsta bär till större delen webbfabrikens sakregler. För kernelarbe
 bindande som §A-ytor du aldrig ändrar; de operativa byggreglerna står i
 `docs/loop/regler.md`.
 
-**Grindarna vaktar olika saker — men sviten är inte enbart webbens.** Av de 23
-`scripts/check-*.mjs` refererar 16 enbart webbträdet, **2 enbart kärnan**
-(`check-provanropare.mjs`, `check-verifierarregistret.mjs`), 1 båda
-(`check-v4-utkast.mjs`) och 4 inget träd alls. `kor-vakter.mjs` och
-`kor-styrprov.mjs` läser `controller/verify/register.json`.
+**Grindarna vaktar olika saker — men läs vad siffran mäter.** Av de 23
+`scripts/check-*.mjs` **refererar** 16 enbart webbträdet, 2 enbart kärnan, 1 båda
+(`check-v4-utkast.mjs`) och 4 inget träd alls. **Den fördelningen mäter vad en fil PEKAR
+PÅ, inte vad den TILLHÖR**, och de två svaren skiljer sig: `check-provanropare.mjs`
+refererar bara kärnan men är ägardömd `WEB / WEB_MOVE`. **Ägandet avgörs av separationen,
+aldrig av ett grep.** Kärnans två i sviten är `check-invariants.mjs` (på plattformsgrenen
+omskriven till plattformsinvariantgrinden PINV-001–006) och
+`check-verifierarregistret.mjs`. *Rättat 2026-09-16, FYND 31: här stod tidigare
+`check-provanropare.mjs` i stället för `check-invariants.mjs` — antalet var rätt, paret
+fel, och felet var lexikalt.*
 
-`node scripts/kor-vakter.mjs` är alltså **övervägande** webbfabrikens grindsvit och är
-inget bevis om en kerneländring — men den är inte tom på kernelvakter, och de två som
-finns följer inte med när webbträdet flyttas. Kärnans dom ligger i taskens frysta
-`exit_test` under `verify/bin/`. Håll `kor-vakter` grön när du rör dokumentationen eller
+`node scripts/kor-vakter.mjs` säger därför **exakt en sak: webbfabriken är inte söndrad.**
+Citera den aldrig som bevis för kernelarbete. Mätt 2026-09-16: **noll** av de 23 vakterna
+läser `docs/loop/regler.md`, `docs/loop/drift.md` eller `docs/loop/raddning/**`, och
+`kor-vakter.mjs` finns inte på plattformsgrenen. Kärnans dom ligger i
+`controller/verify/cli` och taskens frysta `exit_test` under `verify/bin/`.
+
+**Och de kräver MACEN — men inte av det skäl som är lätt att tro.** `controller/verify/cli`
+kräver Python 3.12+ och startar fint i en Linuxcontainer som har den. Det som fäller är
+**Darwin-bindningen**: grindarna faller på `undefined symbol: sysctl` (mätt på `h-013`:
+5 PASS, 11 FAIL, alla av den orsaken). Att installera Python 3.12 löser alltså ingenting.
+**Fel maskin är `ODÖMBART`, aldrig `FAIL`** — annars bokförs en miljö som ett fel i
+kandidaten, och ett ODÖMBART blir aldrig grönt av en grön webbsvit
+(`LOOP-RÄTTELSE-VAKTBEVIS`). Håll `kor-vakter` grön när du rör dokumentationen eller
 webbträdet.
 
 **Läget** står i `docs/loop/drift.md` (nyast överst) och `docs/05-beslutslogg.md` (aktuell

@@ -16,7 +16,12 @@ full historik (825 commits, äldsta 2026-07-17).
 
 ```bash
 # Andel av historiken på kontrollplanet
-git log --format='%s' | grep -ciE 'h-?0[0-9]{2}'        # 440 av 825 = 53 %
+git log --format='%s' | grep -ciE 'h-?0[0-9]{2}'        # >=440 av >=825 = över hälften
+                                                        # 440/825 uppmätt 2026-09-14.
+                                                        # BÅDA ÄR GOLV, inte exakta tal:
+                                                        # loggen växer, så talen stiger.
+                                                        # validera-underlaget.sh pinnar
+                                                        # dem som trösklar (FYND 31c).
 
 # Commits och rundor per hypotes
 for h in 031 032 033 034 035 036 037 038 039; do
@@ -74,9 +79,17 @@ done | sort -k2 -n
 | `h-032` | 120 | pågår |
 | `h-031` | 147 | pågår |
 
-**Ingen mellanform.** Klar ⇔ grinden rörd ≤ 3 gånger. Det är den enda variabeln som
-skiljer grupperna åt, och det är den rundtrampsvaktens gren 2 ska räkna
-(`09-task-rundtrampsvakten.md` §4).
+**⚠️ FALSIFIERAD ÅT ENA HÅLLET 2026-09-16 (FYND 33).** Här stod *"Ingen mellanform. Klar ⇔
+grinden rörd ≤ 3 gånger."* Omfrysningstalen ovan är riktiga; **etiketten "klar" var det
+inte.** Körda på Macen i ren klon: `h-016` (1 omfrysning) `11 PASS / 14 FAIL`, `h-013`
+(2 omfrysningar) `8 PASS / 8 FAIL`, `h-004` `8 PASS / 7 FAIL`.
+
+Kvar står: **många omfrysningar ⇒ icke-klar** (17–147, alla röda). Borta är: **få
+omfrysningar ⇒ klar.**
+
+Rätt läsning: ett lågt omfrysningstal betyder att någon **slutade röra grinden**, inte att
+den blev grön. Det är fortfarande den variabel rundtrampsvaktens gren 2 ska räkna
+(`09-task-rundtrampsvakten.md` §4) — men som stoppsignal, aldrig som framgångsmått.
 
 > **Varför denna mätning och inte min förra.** Mitt första försök klassade rundorna efter
 > **ordval** i commit-text via reguljära uttryck. Två körningar med olika ordlistor gav

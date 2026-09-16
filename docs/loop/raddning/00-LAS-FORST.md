@@ -141,9 +141,14 @@ orsak till projektets dyraste problem.** Underlaget sa att rundorna brinner på
 i commit-titlar. Omhärlett ur **grindfilens egen historik** ser mekanismen annorlunda ut:
 `verify/bin/h-039-exit` ändrades i var och en av sina 30 commits, från 200 798 till
 2 136 969 byte, **noll minskningar**. Kandidaten prövades aldrig mot ett oförändrat prov.
-Konvergens kräver ett fast mål; det har aldrig funnits ett. Och diskriminanten är mätbar:
-**varje klar task har en grind som rörts ≤ 3 gånger, varje icke-klar en som rörts
-17–147.** Ingen mellanform. Detta ändrar `01-lagesbild.md` §1, lägger till doktrinregel
+Konvergens kräver ett fast mål; det har aldrig funnits ett. Och omfrysningstalet är mätbart:
+**varje icke-klar task har en grind rörd 17–147 gånger.**
+
+> **⚠️ Här stod också *"varje klar task har en grind som rörts ≤ 3 gånger. Ingen
+> mellanform."* Den halvan är FALSIFIERAD 2026-09-16 (FYND 33):** `h-016` (1 omfrysning)
+> ger `11 PASS / 14 FAIL` på Macen, `h-013` (2) ger `8 PASS / 8 FAIL`. Talen var riktiga,
+> **etiketten "klar" var det inte** — den sattes utan att grinden kördes. Ett lågt
+> omfrysningstal betyder att någon slutade röra grinden, inte att den blev grön. Detta ändrar `01-lagesbild.md` §1, lägger till doktrinregel
 **iv** i `03-raddningsplan.md` steg 1b (omfrysningsbudget) och skriver om
 `09-task-rundtrampsvaktens` gren 2 — den mätte filstorlek, vilket är följden, inte
 mekanismen.
@@ -180,8 +185,18 @@ bundlen omgjord. Felet upptäcktes av en ägarfråga, inte av ett prov.
 **En femte hittades 2026-09-16 — i det här underlaget.** En tidigare version påstod
 *"16 av 23 vakter läser webbträdet, noll läser kärnan"*. Kärnsiffran var fel: grepet
 krävde inledande citattecken och missade alla tre kernelreferenserna. Rätt siffra är
-16 / 2 / 1 / 4, och två äkta kernelvakter finns (`check-provanropare.mjs`,
-`check-verifierarregistret.mjs`).
+16 / 2 / 1 / 4.
+
+**Och ett sjätte fel fanns i rättelsen av det femte — hittat 2026-09-16 (FYND 31).**
+Den löd *"två äkta kernelvakter finns (`check-provanropare.mjs`,
+`check-verifierarregistret.mjs`)"*. Fördelningen 16/2/1/4 är riktig, men den mäter vad en
+fil **refererar** — inte vad den **tillhör**. `check-provanropare.mjs` refererar bara
+kernelsökvägar och är ändå ägardömd `WEB / WEB_MOVE` i
+`SEPARATION-20260910/ALLOCATION.tsv`; den finns inte på plattformsgrenen. Kärnans två i
+sviten är `check-invariants.mjs` och `check-verifierarregistret.mjs`.
+
+**Notera formen:** felet lagades med ett bättre grep, och det nya svaret var lika lexikalt
+som det gamla. **Ägandet avgörs av separationen, aldrig av ett grep.**
 
 **Det gäller alltså detta underlag också.** Det är nu självt ärvd inramning för nästa
 session. Varje siffra i `02-bevis.md` och `06-inventering.md` står med kommandot som

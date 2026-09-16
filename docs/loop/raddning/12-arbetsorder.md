@@ -118,16 +118,70 @@ webbfiler** och ett register som pekar på `workflows/nortropic-verify-suite.js`
 
 ---
 
-## VÄGEN TILL MÅLET — sex poster, mätt i specen
+## VÄGEN TILL MÅLET — tretton poster, inte sex
+
+> ### ⚠️ RÄTTAT 2026-09-16 efter FYND 33. Här stod "sex poster".
+>
+> Den siffran byggde på att `h-004`, `h-010`, `h-013` och `h-016` var KLARA. **Premissen
+> var falsk.** Grindarna kördes aldrig — de antogs gröna för att grindfilerna FINNS. Körda
+> på Macen i ren klon (`HEAD 5b6ed6e`, Darwin arm64):
+>
+> | Task | Påstått | Mätt |
+> |---|---|---|
+> | `h-004` | KLAR | **FAIL** — 8 PASS / 7 FAIL · `lease_id`, fencing, renew saknas |
+> | `h-010` | KLAR | **PASS** |
+> | `h-013` | KLAR | **FAIL** — 8 PASS / 8 FAIL · brytarens fingerprints |
+> | `h-016` | KLAR | **FAIL** — 11 PASS / 14 FAIL · attestation sker aldrig |
+>
+> Därtill är `h-009` (8/3), `h-011` (9/7) och `h-012` (11/8) röda i samma slutning.
+> **Sex verkliga grindfel.** Ingen regression — funktionerna byggdes aldrig.
 
 ```
-KLART:    h-004 ✓   h-010 ✓   h-013 ✓   h-016 ✓     (alla fyra har grind)
+GRÖN:     h-010 ✓                            (kört på Macen, ren klon)
 
-SAKNAS:   h-027 → h-028 → h-029 → h-030              (fyra task, finns inte)
-          → h-015 supervisor resume                   (grind saknas)
-          + verify/bin/autonomous-loop-exit           (mäter KERNEL_COMPLETE)
+RÖDA, sex st — VÄGENS FÖRSTA ARBETE:
+          h-004  h-009  h-011  h-012  h-013  h-016
+
+SAKNAS:   h-027 → h-028 → h-029 → h-030      (fyra task, finns inte)
+          → h-015 supervisor resume           (grind saknas)
+          + verify/bin/autonomous-loop-exit   (mäter KERNEL_COMPLETE)
           + docs/loop/autonomy-kernel-v1-acceptance.md
 ```
+
+**Första uppgiften är inte `h-027`.** Den är att köra
+`artefakter/matning-pa-macen.sh` på `main` och därefter root-orsaka de sex röda.
+Full mätning i `docs/loop/drift.md` FYND 33.
+
+### De sex röda har TVÅ rötter, inte sex (FYND 34)
+
+```
+h-004 ← h-001 (GRÖN)                      ROT 1 — fristående
+h-009 ← h-005, h-006, h-008 (ALLA GRÖNA)  ROT 2 — fristående
+
+h-012 ← h-009
+h-011 ← h-004, h-009
+h-013 ← h-009, h-012
+h-016 ← h-011, h-012, h-013
+```
+
+Fyra av sex ligger **nedströms**. Ingen rot beror på något rött.
+
+`h-009` är kuvert- och workspacelagret. Dess egna fel: *"processen kördes i klonroten,
+inte i workspacet"*, *"processen hittade inget kuvert"*. Nedströms säger `h-011` K12
+*"workern körde någon annanstans eller fick fel kuvert"*, `h-012` K14 *"kuvertet når
+sessionen — kod=4"*, och `h-012` K3 visar att kandidaten bär **repots HEAD-filer** i
+stället för sessionens. En worker utan workspace och utan kuvert producerar ingen kandidat
+— och då kan varken kedjan, brytaren eller attestationen mätas.
+
+`h-004` är den andra roten och något annat: `lease_id`, fencing och renew är inte
+implementerade. En funktion att skriva, inte en defekt att laga.
+
+**⚠️ Detta är en hypotes.** Grafen är fakta; symtomlikheten är en svagare signal. Samma
+session gissade fel om orsaken till sju röda grindar tre timmar tidigare (FYND 33).
+**Ordningen följer därför av provet, inte av tron:** laga `h-009` FÖRST, kör om de fem.
+Blir de gröna var det en rot — blir de inte det vet du det efter en fix i stället för sex.
+
+**Arbetsordning inom de sex:** `h-009` → kör om → `h-004` → kör om → det som står kvar.
 
 `h-015` beror på `h-010`, `h-013`, `h-016`, `h-004` och `h-030` — **inte** på `h-031`,
 `h-032` eller `h-039`. De tre avslutade hypoteserna låg aldrig på vägen; ingenting i
@@ -193,6 +247,14 @@ Efter merge återstår, i den ordningen:
 3. `h-014` — spec färdig, grind saknas. Pröva `h-013` på Macen först.
 4. `h-027`–`h-030`, substitutionskedjan. Finns **inte** som task i något repo.
    `h-015` (supervisor resume) beror mekaniskt på `h-030`.
+
+   **Du får skriva dem.** `specs/**` ligger i §A-mängden och regel 6 gör den till
+   människohand — men ägaren gav 2026-09-16 ett namngivet undantag för just dessa fyra
+   rader (`LOOP-ÄGARBESLUT-SUB-SPECS`, inskrivet i regel 6). Villkor: raderna **härleds
+   ur** `docs/loop/harness-substitution-contract-v1.md`, hela kontraktsflödet i
+   `AGENTS.md` gäller, commiten är HÖGRISK-märkt, och **varje ny task deklarerar sin
+   omfrysningsbudget enligt 11a**. Befogenheten kommer ur ägarbeslutet, inte ur att
+   sandboxen öppnades.
 5. `h-015`.
 
 ---

@@ -13,6 +13,18 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
 5. Ingen sudo. Kontrollplanet körs som användare.
 6. §A-mängden i [byggplan-v3.md](byggplan-v3.md) §3.1 rörs aldrig av en loop-task.
    Ändringar där är alltid människa, alltid HÖGRISK-märkt commit.
+
+   **Ett namngivet undantag, 2026-09-16** (`LOOP-ÄGARBESLUT-SUB-SPECS`): Codex får skriva
+   `h-027`–`h-030` i `specs/tasks.spec.json`, eftersom delegationens scope namnger
+   supervisor resume och sekvensen redan står i det ägarauktoriserade
+   `harness-substitution-contract-v1.md`. Villkor: raderna härleds ur kontraktet, hela
+   kontraktsflödet i `AGENTS.md` gäller, commiten är HÖGRISK-märkt, och **varje ny task
+   deklarerar sin omfrysningsbudget enligt 11a**.
+
+   **Undantaget kommer ur ägarbeslutet, inte ur att sandboxen öppnades.** Att en §A-yta är
+   mekaniskt skrivbar sedan `LOOP-ÄGARBESLUT-SANDBOX-OPEN` gör den inte tillåten. Att
+   blanda ihop *kan* och *får* är vad `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder.
+   För allt annat i §A står regel 6 oförändrad.
 7. Docs uppdateras i samma commit som systemändringen (regel 17 + 22).
 8. Bevisregeln: varje rapporterat påstående pekar på verktygsbevis ur samma session.
    Overifierat märks OVERIFIERAT. "Klart" sägs aldrig utan kört exit-test.
@@ -63,9 +75,26 @@ prövats mot ett oförändrat prov.** Konvergens kräver ett fast mål.
 
   Utan denna distinktion fäller regeln varje försök att laga en trasig grind, och en
   regel som förbjuder sin egen åtgärd blir kringgången första gången den prövas.
-  Bakgrunden står i `docs/loop/drift.md` 2026-09-16 (FYND 29). Varje KLAR task har en grind
-  som rörts ≤ 3 gånger (h-016: 1 · h-013/017/038: 2 · h-001/036: 3); varje icke-klar
-  17–147 (h-035: 17 · h-039: 30 · h-032: 120 · h-031: 147). Ingen mellanform.
+  Bakgrunden står i `docs/loop/drift.md` 2026-09-16 (FYND 29).
+
+  **⚠️ BELÄGGET ÄR OMSKRIVET 2026-09-16 efter FYND 33 — budgeten står, motiveringen inte.**
+  Här stod: *"Varje KLAR task har en grind som rörts ≤ 3 gånger (h-016: 1 · h-013: 2 …);
+  varje icke-klar 17–147. Ingen mellanform."* Omfrysningstalen är riktiga. **Etiketterna
+  var det inte:** körda på Macen i ren klon är `h-016` (1 omfrysning) `11 PASS / 14 FAIL`
+  och `h-013` (2 omfrysningar) `8 PASS / 8 FAIL`. De var aldrig klara.
+
+  Implikationen `klar ⇒ få omfrysningar` är alltså **falsifierad**. Den motsatta står kvar
+  och är mätt: `h-035: 17 · h-039: 30 · h-032: 120 · h-031: 147`, alla icke-klara.
+
+  **Och den rätta läsningen är mörkare än den jag hade.** Ett fåtal omfrysningar betyder
+  inte att grinden blev grön — det betyder att **någon slutade röra den**. `h-016` rördes
+  en gång och är röd på fjorton kontroller. Lågt omfrysningstal är ett tecken på ÖVERGIVEN
+  hypotes lika gärna som på löst problem, och de två gick inte att skilja åt därför att
+  ingen körde grinden.
+
+  **Budgeten 3 gäller oförändrat**, nu som ren stoppmekanism mot trampkvarnen och inte
+  som en framgångsmarkör. **Att deklarera en task KLAR utan ett kört, grönt exitprov i
+  samma session är förbjudet enligt regel 8 och är det fel som gjorde etiketterna falska.**
 - **11b. Överskriden budget stoppar hypotesen.** Arkitekten delar den i mindre med var
   sitt fasta prov, eller avslutar den `OVERIFIERAT`. **Aldrig en runda till.**
 - **11c. MÅLFLYTT är ett eget utfall.** Innan `NO-CREDIT` sätts: jämför grinden
@@ -106,3 +135,37 @@ och den har nu tre mätta instanser:
 
 **Mekaniskt prov:** `git status --short` tomt och `git log --oneline @{u}..HEAD` tomt.
 Är de inte det ska drift-raden förklara varför, i samma dag.
+
+### Regel 12a — BEVARANDE är automatiskt. PUBLICERING har kvar varje grind.
+
+**Beslutad 2026-09-16 av Johnny:** *"jag vill att vi har auto commits, inte att ägarhand
+eller nåt annat tjafs ska commita, det är därför detta sker."*
+
+Projektet har blandat ihop två saker som inte är samma sak:
+
+| | Vad det är | Trust-innebörd | Vem gör det |
+|---|---|---|---|
+| **BEVARANDE** | En commit på en arbetsgren, pushad | **Ingen.** En commit är inte en attestation | **Automatiskt. Aldrig en människa.** |
+| **PUBLICERING** | Attestation, PR, merge till `main` | Bär hela trust-kedjan | Kontraktsflödet i `AGENTS.md`, oförändrat |
+
+`AGENTS.md` bar `PUSH=NO / MERGE=NO` plus *"Rollagenterna committar/pushar/mergar
+fortfarande inte"*. Den regeln skrevs för **publicering** och tillämpades på
+**bevarande**. Resultatet är mätt 2026-09-16: ~300 lokala grenar, en `main` 493 commits
+efter origin, och veckan med 55 opushade commits som ingen såg på sex dagar. **Regeln
+skyddade ingenting och förlorade allt** — rollseparationen hindrar en byggare från att
+attestera sin egen kandidat, inte från att spara sitt arbete.
+
+**Mekanismen:** `scripts/nortropic-autocommit.sh`, kopplad för Claude via `Stop`- och
+`SessionEnd`-hookarna i `.claude/settings.json` (spårad i repot — en hook som bara finns i
+`~/.claude/` upprepar fynd 2), och för Codex via `AGENTS.md`. Den
+
+- **vägrar på `main`** — bevarande hör hemma på en arbetsgren
+- **delar §A i en egen commit** märkt `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`. §A bevaras men
+  **auktoriseras inte**: regel 6 står orörd, och granskaren ska antingen skriva en rad i
+  `docs/05-beslutslogg.md` eller revertera. Att låta §A-arbete ligga okommitterat vore att
+  förlora det för att skydda det
+- **pushar aldrig med `--force`**, mergar aldrig, attesterar aldrig
+- **är tyst när inget ändrats**, och rapporterar högt när pushen misslyckas
+
+Bevarande kräver alltså aldrig ett godkännande, av någon, någonsin. Behöver du en människa
+för att spara arbete har du byggt den felklass detta repo nästan dog av.

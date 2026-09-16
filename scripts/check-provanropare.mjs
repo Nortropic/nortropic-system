@@ -49,7 +49,7 @@ const odombart = (skal) => { console.error(`ODÖMBART: ${skal}`); process.exit(2
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = 'fbd406fcc9c78556'
+const FORVANTAD_KALLHASH = '5a9af20ea3f3c405'
 
 // ---- DET SOM FÖRLITAR SIG PÅ MÄNSKLIGT MINNE, utskrivet ---------------------
 // Varje rad är en skuld, inte ett undantag. Skälet måste säga VEM som kör och NÄR.
@@ -63,6 +63,8 @@ const UTAN_ANROPARE = {
   'scripts/verify-vendored-integrity.mjs': 'anropas av stewardens doctor #9A, inte av batteriet',
   'scripts/profil-las.mjs': 'MODUL, inget prov — importeras av två vakter och är ankrad i pinntabellen',
   'scripts/nortropic-codex-autopilot.py': 'exekverare i styrplanet, inget prov — prövas av verify/bin/h-032-exit (ägarhand)',
+  'scripts/nortropic-autocommit.sh': 'ÄR prövad — tests/scripts/nortropic-autocommit/fall.sh kör den i sju fall. Vakten kan inte se det: körarmängden är hårt avgränsad till scripts/(kor|check)-*.mjs, alltså webbsvitens egna körare, och når per konstruktion inget kerneltest under tests/. Registerraden beskriver vaktens blindfläck, inte en oprövad fil (regel 12a, 2026-09-16)',
+  'tests/scripts/nortropic-autocommit/fall.sh': 'provet självt — körs av Stop/SessionEnd-hooken i .claude/settings.json och för hand; samma blindfläck som raden ovan, eftersom en hook inte är en scripts/check-*.mjs',
 }
 
 // ---- MEKANISMEN, FAKTORISERAD UT -------------------------------------------
