@@ -59,9 +59,21 @@ behandla() {
   fi
 
   # ── Allt nedan sker i ett TILLFÄLLIGT index. Worktreet rörs inte. ─────────
+  # PUSHEN SKER INIFRÅN KLONEN (`git -C "$SOKVAG" push`), inte härifrån. En
+  # fristående klon har EGET objektlager — commit-objektet finns inte i detta
+  # repo, så en push härifrån skulle misslyckas. Rättat 2026-09-16 tillsammans
+  # med worktree-blindheten nedan; båda är samma fel som FYND 37.
   local tmpidx; tmpidx="$(mktemp)"; rm -f "$tmpidx"
-  local tree commit h
+  local tree commit h forald
   h="$(git -C "$SOKVAG" rev-parse HEAD 2>/dev/null)"
+  forald="-p $h"
+  # Finns grenen redan får den bli ANDRA FÖRÄLDER, så pushen blir en
+  # snabbspolning. Alternativet vore --force, vilket NO_FORCE_SEMANTICS förbjuder.
+  if git -C "$SOKVAG" ls-remote --exit-code origin "refs/heads/$gren" >/dev/null 2>&1 \
+     && git -C "$SOKVAG" fetch -q origin "refs/heads/$gren" 2>/dev/null; then
+    local gammal; gammal="$(git -C "$SOKVAG" rev-parse FETCH_HEAD 2>/dev/null)"
+    [ -n "${gammal:-}" ] && forald="-p $h -p $gammal"
+  fi
   if GIT_INDEX_FILE="$tmpidx" git -C "$SOKVAG" read-tree HEAD 2>/dev/null \
      && GIT_INDEX_FILE="$tmpidx" git -C "$SOKVAG" add -A 2>/dev/null \
      && tree="$(GIT_INDEX_FILE="$tmpidx" git -C "$SOKVAG" write-tree 2>/dev/null)" \
@@ -69,8 +81,8 @@ behandla() {
 
 Skapat av radda-okommitterat.sh utan att röra worktreet. Dess HEAD, index och
 arbetsträd är oförändrade — detta är en ögonblicksbild, inte en publicering.
-Förälder: $h" | git -C "$SOKVAG" commit-tree "$tree" -p "$h" 2>/dev/null)" \
-     && git push origin "$commit:refs/heads/$gren" >/dev/null 2>&1; then
+Förälder: $h" | git -C "$SOKVAG" commit-tree "$tree" $forald 2>/dev/null)" \
+     && git -C "$SOKVAG" push origin "$commit:refs/heads/$gren" >/dev/null 2>&1; then
     printf "  OK      %-4s fil → %s (%s)\n" "$smuts" "$gren" "${commit:0:8}"
     ok=$((ok+1))
   else
@@ -86,6 +98,24 @@ while IFS= read -r rad; do
   esac
 done < <(git worktree list --porcelain)
 behandla
+
+# ── Fristående kloner — FYND 37:s blinda fläck, samma här ───────────────────
+# `git worktree list` ser BARA registrerade worktrees. Ett trettiotal kataloger
+# på maskinen är fristående kloner med `.git` som KATALOG. 2026-09-16 bar fyra av
+# dem osparat arbete som detta prov inte ens tittade på.
+MIN_ORIGIN="$(git remote get-url origin 2>/dev/null)"
+SEDDA=""
+if [ -n "$MIN_ORIGIN" ]; then
+  while IFS= read -r kd; do
+    [ "$kd" = "$ROT" ] && continue
+    [ "$(git -C "$kd" remote get-url origin 2>/dev/null)" = "$MIN_ORIGIN" ] || continue
+    gem="$(git -C "$kd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || continue
+    case " $SEDDA " in *" $gem "*) continue;; esac
+    SEDDA="$SEDDA $gem"
+    SOKVAG="$kd"; behandla
+  done < <(find "$HOME" -maxdepth 4 -type d -name .git 2>/dev/null | sed 's|/\.git$||' | sort -u)
+fi
+SOKVAG=""
 
 echo
 echo "=============================================================="
