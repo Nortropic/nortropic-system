@@ -29,6 +29,20 @@ SELF_CERTIFICATION_AS_PROOF=NO
 **Scope:** H-035 → H-034 → H-033 → H-032 → H-031 → supervisor resume → first real
 autonomous launch.
 
+**Och ett ANDRA, bredare mandat 2026-09-09** — hittat i backuprepot 2026-09-16, bekräftat
+av ägaren samma dag och infört i `docs/05-beslutslogg.md` som `LOOP-ÄGARMANDAT-0909`:
+
+> *"Du har mitt fulla godkännande att göra det du anser fram till supervisor resume,
+> arbeta mot slutmålet. Om du behöver uppdatera någo dokumentations för att alltid förstå
+> detta, gör det gärna."*
+
+Det är **senare och bredare** än delegationen ovan: inte en avgränsad kedja utan arbetet
+fram till supervisor resume, med uttrycklig rätt att uppdatera dokumentation. Det stod i
+fem veckor enbart i ett annat repo — därav att sessioner sökte godkännanden som redan
+fanns. **Det upphäver ingenting mekaniskt:** inga frysta grindar, ingen `allowed_write`,
+ingen sandbox, ingen attestation, ingen §A-regel, och `SELF_CERTIFICATION_AS_PROOF=NO`
+gäller oförändrat.
+
 Delegationen gäller så länge varje mekanisk förutsättning är bevisad: exakt
 task/spec/gate/base/candidate-identitet, aktuell auktoritetslinje, exakt filscope och
 `denied_write`-efterlevnad, faktiska gate-/test-/empiriska resultat, oberoende review

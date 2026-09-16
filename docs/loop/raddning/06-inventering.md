@@ -232,6 +232,28 @@ kärnans bindande §A-mängd. Ingen mekanism upptäckte driften.
 **Vilket som gäller går inte att avgöra från ett repo.** `ls -la /usr/local/libexec/`
 svarar på en sekund, på rätt maskin.
 
+### FÖRST: var ligger arbetsklonen?
+
+**Odokumenterat 2026-09-16.** Ägaren körde §0c:s kommandon mot `~/nortropic-system` och
+fick `cd: no such file or directory`. Ingen fil i repot säger var kernelklonen bor på
+fabriksmaskinen. Samma klass som FYND 14 — en förutsättning varje session behöver, som
+bara finns i någons huvud.
+
+```bash
+# hitta varje klon vars origin är detta repo
+for d in $(find ~ -maxdepth 5 -type d -name .git 2>/dev/null); do
+  r=$(git -C "${d%/.git}" remote get-url origin 2>/dev/null)
+  case "$r" in *nortropic-system*) echo "${d%/.git}";; esac
+done
+```
+
+Misstänkta platser enligt repots egen dokumentation: `~/.claude` (i drift **är** denna
+katalog repo-roten), `~/nortropic/`, `~/Documents/`, `~/nortropic-backups-20260910/`.
+
+**Hittas flera kloner är det i sig ett fynd** — då finns divergerande arbetskopior, och
+`git -C <var och en> log --oneline origin/main..HEAD` visar vilken som bär arbete som
+inte är pushat. Skriv in den rätta sökvägen i `docs/loop/drift.md` när den är fastställd.
+
 ### Ytorna som ska inventeras
 
 | Yta | Vad dokumentationen påstår | Prov |

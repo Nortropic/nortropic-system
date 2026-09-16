@@ -1,5 +1,35 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 15 STÄNGT: ägarmandatet 2026-09-09 bekräftat och infört
+
+Ägaren bekräftade i session 2026-09-16 (*"1. JA"*) mandatet som stod ordagrant i
+backuprepots continuity-dokument men saknades helt här. Infört i
+`docs/05-beslutslogg.md` som `LOOP-ÄGARMANDAT-0909`, och i
+`raddning/05-arbetsordning.md` §1 bredvid delegationen från 2026-08-13.
+
+Mandatet är **senare och bredare**: arbetet fram till supervisor resume, med uttrycklig
+rätt att uppdatera dokumentation. Det stod i fem veckor enbart i ett annat repo — därav
+att sessioner sökt godkännanden som redan fanns.
+
+**Det upphäver ingenting mekaniskt:** inga frysta grindar, ingen `allowed_write`, ingen
+sandbox, ingen attestation, ingen §A-regel, och `SELF_CERTIFICATION_AS_PROOF=NO` gäller
+oförändrat. De fyra äkta mänskliga stoppen står kvar.
+
+Auktoritetsluckan i FYND 15 är därmed stängd. FYND 14 och 16 är åtgärdade i routrarna.
+
+## 2026-09-16 — ÖPPEN: arbetsklonens sökväg är odokumenterad
+
+Ägaren körde inventeringskommandona mot `~/nortropic-system` och katalogen finns inte:
+`cd: no such file or directory: /Users/elinhaggstrom/nortropic-system`. **Ingenstans i
+detta repo står var arbetsklonen ligger på fabriksmaskinen.** Backuprepots
+continuity-dokument nämner `/Users/elinhaggstrom/nortropic-backups-20260910/…` för
+backupmaterialet, men inte kernelklonen.
+
+Det är samma klass som FYND 14: en förutsättning som varje session behöver finns bara i
+någons huvud. Sökvägen skrivs in här så snart den är fastställd — `find`-kommandot står i
+`raddning/06-inventering.md` §0c.
+
+
 ## 2026-09-16 — Backuprepot lokaliserat: tre fynd, varav ett i auktoritetskedjan
 
 `Nortropic/nortropic-backups` (repo-ID 1367371291, senast pushat 2026-09-13) är
