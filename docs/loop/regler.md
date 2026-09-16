@@ -28,6 +28,25 @@ systemets 22 regler och konstitutionens §A/§B gäller oförändrat och står �
 7. Docs uppdateras i samma commit som systemändringen (regel 17 + 22).
 8. Bevisregeln: varje rapporterat påstående pekar på verktygsbevis ur samma session.
    Overifierat märks OVERIFIERAT. "Klart" sägs aldrig utan kört exit-test.
+
+   **8a. Bevis är ytbundet — ett grönt prov bevisar bara det provet läser.**
+   Tillagt 2026-09-16 efter att jag citerat `kor-vakter PASS 23/23` i **tolv** commits
+   som inte rörde en enda fil någon av de 23 vakterna läser — inklusive commiten som
+   skrev FYND 31, vars hela innehåll är att den siffran inte bevisar kernelarbete.
+   Raden hade blivit **ritual i commit-mallen**: en form, inte en mätning.
+
+   | Ändringen rör | Giltigt bevis | Bevisar INTE |
+   |---|---|---|
+   | `controller/**`, `verify/**`, `specs/**` | taskens frysta `exit_test` + `controller/verify/cli`, **körda på Darwin** | `kor-vakter` |
+   | `docs/loop/raddning/**` | `artefakter/validera-underlaget.sh` | `kor-vakter` (noll av 23 läser katalogen) |
+   | `docs/loop/drift.md`, `docs/05-beslutslogg.md` | de frysta prov som läser dem (10 respektive 11 st) | `kor-vakter` |
+   | `agents/`, `skills/`, `packs/`, `workflows/`, `docs/0x-*` | `kor-vakter` | kärnans tillstånd |
+   | Lokalt maskintillstånd | `artefakter/inventera-lokalt-arbete.sh` | allt annat |
+
+   **Provet innan du citerar ett prov:** `grep -rl "<sökväg du ändrat>" <provets källa>`.
+   Noll träffar = provet säger ingenting om din ändring, hur grönt det än är.
+   Att skriva ut det ändå är att pröva vad utdata SÄGER i stället för vad mekanismen
+   GÖR — samma fel en nivå upp, och den här gången av den som skrev regeln.
 9. Scope: gör det enklaste som uppfyller exit-testet. Inga oombedda skyddslager,
    frysled, auktorisationskedjor eller framtidssäkring.
 10. Kontrollplanet rör aldrig kundflödet. Regel 16 står orörd.
