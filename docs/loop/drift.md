@@ -33,8 +33,20 @@ varav sex är webbens (`docs/07-konstitution.md`, `docs/03-regelverk.md`, två
 `skills/`-referenser, `workflows/**`, `agents/nortropic-steward.md`) och sju kärnans
 (`specs/**`, `verify/**`, `controller/**`, `CLAUDE.md`, `scripts/check-invariants.mjs`,
 `tests/fixtures/**`, `AUTOPILOT`). §3.1:s egen text säger uttryckligen att kärnans tre
-första *"skyddas av `allowed_write` (som är smalare per task) och av ägarhand"* — ägarhand
-är inskriven i konstruktionen där, av `LOOP-ÄGARHAND-15` 2026-08-08.
+första *"skyddas av `allowed_write` (som är smalare per task) och av ägarhand"*.
+
+**Rättat efter ägarens invändning *"Ägarhanden är webb också"*:** regeln står i
+`byggplan-v3.md`, som `ALLOCATION.tsv` dömer `PLATFORM / PLATFORM_KEEP` — den är alltså
+kärnans. Men proveniensen jag åberopade, `LOOP-ÄGARHAND-15`, är en rad i
+`docs/05-beslutslogg.md`, som samma `ALLOCATION.tsv` dömer **`WEB / WEB_MOVE`**. Jag
+anförde alltså ett webbdokument som skäl att inte ändra en kernelregel. *Regeln* är
+kärnans; *belägget jag höll upp* var webbens. Invändningen träffar.
+
+Samma sak gäller inte `true_human_hard_stops`: de fyra stoppen kommer ur
+`docs/loop/remaining-bootstrap-delegation-v1.md` (ägarbeslut 2026-08-13), som ligger i
+`docs/loop/` — kärnans lager. Arbetsordningen citerar alltså ett kernelbeslut. **Men ett
+av de fyra stoppen är *"ändra `docs/07-konstitution.md`"*, och det dokumentet är webbens.**
+Det är samma sammanflätning en nivå ned, och den är inte löst av separationen.
 
 ### Den kvarvarande frågan, som är ägarens och inte min
 
@@ -50,7 +62,51 @@ underlag är exakt FYND 26.** Den ändringen görs därför inte här. Den ligge
 ägarbeslut, och tills det fattas blockerar regel 6 ingenting på vägen till
 `KERNEL_COMPLETE` — undantaget täcker alla fyra spec-raderna vägen behöver.
 
-Vaktsviten `PASS — 23/23` vid commiten.
+### FYND 31 — "Vaktsviten PASS 23/23" är INGET bevis om en kerneländring
+
+Ägaren invände: *"Vakter är också webben, varför kommer de nu?"* Invändningen är riktig,
+och `CLAUDE.md` säger den redan i klartext: *"`node scripts/kor-vakter.mjs` är
+övervägande webbfabrikens grindsvit och är inget bevis om en kerneländring."* Jag citerade
+den ändå — i denna dags beslutsrader och i commit-meddelandet.
+
+**Mätt, tre gånger, och domen är entydig:**
+
+| Fråga | Mätning |
+|---|---|
+| Vad rör de 23 vakterna? | 2 enbart kärnan · 1 båda · 20 webb eller inget träd |
+| Läser någon vakt de filer jag ändrade i dag? | `docs/loop/regler.md` **0** · `docs/loop/drift.md` **0** · `raddning/**` **0**. Endast `docs/05-beslutslogg.md` läses — av fyra vakter, varav tre är rena webbvakter |
+| Finns `kor-vakter.mjs` på plattformsgrenen? | **Nej.** `scripts/` bär där två filer: `check-invariants.mjs` och `nortropic-codex-autopilot.py` |
+
+Sviten var alltså grön om något den inte mätte, körd med ett verktyg som inte följer med
+kärnan. Den säger *"jag har inte råkat söndra webbfabriken"* — ett sant men annat
+påstående än det jag lät den bära.
+
+**Vad som FAKTISKT dömer de filerna, mätt:** `docs/loop/regler.md` läses av
+`controller/verify/cli`; `docs/05-beslutslogg.md` av **elva** frysta exitprov plus
+`controller/attest/cli`; `docs/loop/drift.md` av **tio**. `raddning/**` läses av ingen
+mekanism — den är analys, och det är avsiktligt.
+
+**Och den domen kan inte fällas här.** `controller/verify/cli` kräver Python 3.12+; denna
+Linuxmiljö bär 3.11.15. Kärnans verdikt om dagens ändring är därför `ODÖMBART`, och blir
+det tills det körs på Macen. Att ersätta ett ODÖMBART med en grön webbsvit är exakt det
+fel `docs/agentoverlamning.md` beskriver: att pröva vad utdata SÄGER i stället för vad
+mekanismen GÖR.
+
+**Rättelsen** ligger som en egen rad i `docs/05-beslutslogg.md`
+(`LOOP-RÄTTELSE-VAKTBEVIS`) i stället för som ändring av elva historiska rader —
+beslutsloggen rättas genom tillägg, aldrig genom omskrivning.
+
+### ⚠️ Öppet för ägaren: `CLAUDE.md` bär ett fel om samma vakter
+
+`CLAUDE.md` namnger `check-provanropare.mjs` och `check-verifierarregistret.mjs` som
+kärnans och säger att de *"får aldrig följa med när webbträdet flyttas"*. Ägarens egen
+`SEPARATION-20260910/ALLOCATION.tsv` dömer `check-provanropare.mjs` **`WEB / WEB_MOVE`**,
+och ingen av de två finns på plattformsgrenen.
+
+**Jag rättar det inte.** `CLAUDE.md` står i §A-mängden och regel 6 gäller den oförändrat —
+dagens undantag omfattar `h-027`–`h-030` i specen, ingenting annat. Detta är ett
+människohandsbeslut, och att det blev synligt just här är ett argument för din invändning,
+inte mot den.
 
 ## 2026-09-16 — VÄGEN TILL MÅLET ÄR SEX POSTER, och den prosarad som sa annat är upphävd
 
