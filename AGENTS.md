@@ -20,9 +20,12 @@ refererar 16 enbart webbträdet, 2 enbart kärnan, 1 båda och 4 inget träd all
 fördelningen mäter vad en fil PEKAR PÅ, inte vad den TILLHÖR.** Mätt 2026-09-16: noll av de
 23 läser `docs/loop/regler.md`, `docs/loop/drift.md` eller `docs/loop/raddning/**`, och
 `kor-vakter.mjs` finns inte på plattformsgrenen. Kärnans dom är `controller/verify/cli`
-och taskens frysta `exit_test` under `verify/bin/` — båda kräver Python 3.12+, alltså
-Macen. I en 3.11-miljö är kärnans dom `ODÖMBART`, och ett ODÖMBART blir aldrig grönt av en
-grön webbsvit (`LOOP-RÄTTELSE-VAKTBEVIS`).
+och taskens frysta `exit_test` under `verify/bin/` — och de kräver MACEN, men **inte av
+Python-skäl**: `controller/verify/cli` kräver 3.12+ och startar fint i en Linuxcontainer
+som har den. Det som fäller är **Darwin-bindningen**, `undefined symbol: sysctl` (mätt på
+`h-013`: 5 PASS, 11 FAIL, alla av den orsaken). Att installera Python 3.12 löser
+ingenting. **Fel maskin är `ODÖMBART`, aldrig `FAIL`**, och ett ODÖMBART blir aldrig grönt
+av en grön webbsvit (`LOOP-RÄTTELSE-VAKTBEVIS`).
 
 `scripts/` och `tests/` är BLANDADE kataloger, inte webb. Kärnans där, enligt
 `PLATFORM_EXACT` i plattformsgrenens `check-invariants.mjs` (PINV-003/005):

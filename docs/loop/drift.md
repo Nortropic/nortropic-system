@@ -86,8 +86,12 @@ påstående än det jag lät den bära.
 `controller/attest/cli`; `docs/loop/drift.md` av **tio**. `raddning/**` läses av ingen
 mekanism — den är analys, och det är avsiktligt.
 
-**Och den domen kan inte fällas här.** `controller/verify/cli` kräver Python 3.12+; denna
-Linuxmiljö bär 3.11.15. Kärnans verdikt om dagens ändring är därför `ODÖMBART`, och blir
+**Och den domen kan inte fällas här** — men ⚠️ **skälet jag först skrev var fel, rättat
+samma dag i FYND 31d.** Jag skrev *"`controller/verify/cli` kräver Python 3.12+; denna
+Linuxmiljö bär 3.11.15"*. Jag hade mätt `python3` och dragit en slutsats om **miljön**.
+`/usr/bin/python3.12` finns här, och `python3.12 controller/verify/cli list` ger `exit 0`.
+Det som verkligen fäller är Darwin-bindningen; se FYND 31d nedan. Kärnans verdikt är
+`ODÖMBART`, och blir
 det tills det körs på Macen. Att ersätta ett ODÖMBART med en grön webbsvit är exakt det
 fel `docs/agentoverlamning.md` beskriver: att pröva vad utdata SÄGER i stället för vad
 mekanismen GÖR.
@@ -158,10 +162,70 @@ lika gärna som verdikt. Klassen behövde alltså inte spekuleras om; den demons
 själv på under en minut. Även den är nu tröskelform och mutationsprövad
 (`>=999999 → NEJ(102)` + `AVVIKER`).
 
-**Lärdomen är inte "jag borde ha fixat båda direkt".** Den är att ett prov som räknar
-förekomster i en fil som provet självt dokumenteras i **är cirkulärt**: att skriva om
-mätningen ändrar mätningen. Två sådana fanns i underlaget. Leta efter fler innan nästa tal
-pinnas.
+**Och en tredje föll i nästa körning — FYND 31e, av en ANNAN felform.** Kontrollen *"de 4
+dok-commitsen i HEAD:s historik"* gav `4 → 5`, därför att den räknade rader ur
+`git log | grep -ciE 'repots identitet|lageretiketten|vaktklassificeringen|BLANDADE'` och
+commiten som rättade vaktklassificeringen bar ordet **`vaktklassificeringen` i sin rubrik**.
+
+Det är inte en växande räknare — det är **identitet prövad lexikalt**, samma felform som
+FYND 31b. Påståendet är *"alla fyra dok-commitsen finns"*; ett ANTAL svarar på en annan
+fråga, nämligen hur många rubriker som råkar innehålla något av orden. Omskriven till
+**mängdform**: varje mönster prövas för sig och antalet uppfyllda mönster räknas, `4/4`.
+Stabilt oavsett hur många senare commits som nämner samma ord. Mutationsprövat: ett mönster
+utbytt mot ett obefintligt ger `3/4` + `AVVIKER`.
+
+**Tre kontroller, två felformer, upptäckta av tre på varandra följande körningar av samma
+prov.** Ingen hittades av eftertanke; alla tre av att provet kördes igen efter en ändring.
+
+**Lärdomen är inte "jag borde ha fixat alla direkt".** Den är att provet bär **samma två
+fel som underlaget det validerar**: det pinnar miljön i stället för egenskapen (regel 11),
+och det prövar identitet med ett grep (FYND 31b). Ett prov som räknar förekomster i den
+fil det självt dokumenteras i är dessutom cirkulärt — att skriva om mätningen ändrar
+mätningen. **Kör provet efter varje ändring, inte bara före.**
+
+### FYND 31d — kärnan är DARWIN-bunden, inte Python-bunden. Och vad som därför överlämnas.
+
+Ägaren frågade: *"så alla dessa saker som inte går nu överlämnar vi till codex?"* Frågan
+tvingade fram en mätning som visade att **mitt eget skäl var fel**.
+
+Jag hade skrivit att kärnans dom är `ODÖMBART` för att *"`controller/verify/cli` kräver
+Python 3.12+ och miljön bär 3.11.15"*. Mätt:
+
+```
+python3 --version                      → 3.11.15
+/usr/bin/python3.12 --version          → 3.12.3          ← finns
+python3.12 controller/verify/cli list  → exit 0          ← kärnans verifierare KÖR
+bash verify/bin/h-013-exit             → exit 1, 5 PASS 11 FAIL
+      orsak i var och en av de elva:   undefined symbol: sysctl
+```
+
+**Jag mätte `python3` och drog en slutsats om miljön.** Samma felform som FYND 31 och 31b:
+ett svar på en angränsande fråga, framlagt som svar på den ställda. Slutsatsen *"måste
+köras på Macen"* var riktig; **skälet var fel, och ett fel skäl i ingångsdokumenten hade
+lett nästa session till att installera Python 3.12 och tro sig löst problemet.** Rättat i
+`CLAUDE.md`, `AGENTS.md` och ovan.
+
+**Den verkliga bindningen är Darwin.** `sysctl` är en macOS-symbol; `controller/provenance`
+når den via native-lagret. Det är samma 18-av-24 som `CLAUDE.md` redan bar. **Fel maskin är
+`ODÖMBART`, aldrig `FAIL`** — annars bokförs en miljö som ett fel i kandidaten.
+
+#### Vad som därför faktiskt överlämnas — tre högar, inte en
+
+| | Post | Varför just där |
+|---|---|---|
+| **A. Codex på Macen** — Darwin krävs | Allt grindverdikt: `h-013`, `h-014`, `h-035`, plattformsgrenens granskning, de fyra shebang-reparationerna | Domen kräver `sysctl`. Ingen annan maskin kan fälla den |
+| **B. Codex, men INTE maskinbundet** | `h-027`–`h-030` i `specs/tasks.spec.json` | Ren JSON-redigering, körbar var som helst. Ligger hos Codex av **ägarbeslut** (`LOOP-ÄGARBESLUT-SUB-SPECS`), inte av teknisk nödvändighet |
+| **C. Går att göra utan Macen** | `docs/loop/autonomy-kernel-v1-acceptance.md`; vakt 1 och 2 (`11-tre-vakter-mot-aterfall.md`) | Acceptansfilen är ren dokumentation. Vakt 1 och 2 är Node och läser bara git-loggen och trädet — de kör här. **Kostnaden står kvar:** `check-invariants.mjs` är §A och SHA-pinnad i `controller/verify/register.json`, så ändringen kräver ägarhand och hela kontraktsflödet i `AGENTS.md` |
+| **D. Ägaren** | De fyra `true_human_hard_stops`; varje §A-ändring utanför de namngivna undantagen | Oförändrat |
+
+**Poängen med uppdelningen:** *"det går inte här"* har varit ett samlingsnamn för fyra
+olika orsaker, och bara hög A är genuint maskinbunden. Att lägga B och C i samma hög är
+hur en förberedelsekedja blir oändlig — arbete som kunde ha gjorts skjuts till en maskin
+som inte behövs för det.
+
+`autonomous-loop-exit` ligger avsiktligt inte i C. Den kan skrivas var som helst, men
+**rollseparationen säger att den som fryser en grind inte bygger mot den** — vem som
+skriver den är ett arkitektval, inte en miljöfråga.
 
 ### ⚠️ Sidofynd som INTE rättas här: dinglande referens inifrån PINV
 

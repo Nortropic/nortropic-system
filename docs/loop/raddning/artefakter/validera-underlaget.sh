@@ -136,8 +136,17 @@ done
 
 # ── Dokumentationsrättelsen: fyra commits ────────────────────────────────────
 echo
-rad "de 4 dok-commitsen i HEAD:s historik" "4" \
-    "$(matt "git log --oneline | grep -ciE 'repots identitet|lageretiketten|vaktklassificeringen|BLANDADE'")"
+# Mäts som MÄNGD, inte som antal träffar (rättat 2026-09-16, FYND 31e).
+# Kontrollen räknade tidigare rader ur `git log | grep -ciE '<fyra ord>'` och väntade sig
+# exakt 4. Påståendet är "alla fyra dok-commitsen finns i historiken" — men ett ANTAL
+# svarar på en annan fråga: hur många commit-RUBRIKER som råkar innehålla något av orden.
+# Commiten som rättade vaktklassificeringen bar ordet "vaktklassificeringen" i sin rubrik
+# och gav 5. Samma felform som FYND 31b: identitet prövad lexikalt. Nu prövas varje
+# mönster för sig och det är ANTALET UPPFYLLDA MÖNSTER som räknas — stabilt oavsett hur
+# många senare commits som nämner samma ord.
+rad "alla 4 dok-commitsen finns (mängd)" "4/4" \
+    "$(n=0; for m in 'repots identitet' 'lageretiketten' 'vaktklassificeringen' 'BLANDADE'; do
+         git log --format='%s' 2>/dev/null | grep -qiE "$m" && n=$((n+1)); done; echo "$n/4")"
 rad "patchen bär 4 commits" "4" \
     "$(p=$UNDERLAG/artefakter/nortropic-dokumentation-4commits.patch
        [ -f "$p" ] && grep -c '^From [0-9a-f]\{40\}' "$p" || echo ODÖMBART)"

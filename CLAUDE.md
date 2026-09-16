@@ -52,10 +52,16 @@ fel, och felet var lexikalt.*
 Citera den aldrig som bevis för kernelarbete. Mätt 2026-09-16: **noll** av de 23 vakterna
 läser `docs/loop/regler.md`, `docs/loop/drift.md` eller `docs/loop/raddning/**`, och
 `kor-vakter.mjs` finns inte på plattformsgrenen. Kärnans dom ligger i
-`controller/verify/cli` och taskens frysta `exit_test` under `verify/bin/` — båda kräver
-Python 3.12+, alltså Macen. I en 3.11-miljö är kärnans dom `ODÖMBART`, och ett ODÖMBART
-blir aldrig grönt av en grön webbsvit (`LOOP-RÄTTELSE-VAKTBEVIS`). Håll `kor-vakter` grön
-när du rör dokumentationen eller webbträdet.
+`controller/verify/cli` och taskens frysta `exit_test` under `verify/bin/`.
+
+**Och de kräver MACEN — men inte av det skäl som är lätt att tro.** `controller/verify/cli`
+kräver Python 3.12+ och startar fint i en Linuxcontainer som har den. Det som fäller är
+**Darwin-bindningen**: grindarna faller på `undefined symbol: sysctl` (mätt på `h-013`:
+5 PASS, 11 FAIL, alla av den orsaken). Att installera Python 3.12 löser alltså ingenting.
+**Fel maskin är `ODÖMBART`, aldrig `FAIL`** — annars bokförs en miljö som ett fel i
+kandidaten, och ett ODÖMBART blir aldrig grönt av en grön webbsvit
+(`LOOP-RÄTTELSE-VAKTBEVIS`). Håll `kor-vakter` grön när du rör dokumentationen eller
+webbträdet.
 
 **Läget** står i `docs/loop/drift.md` (nyast överst) och `docs/05-beslutslogg.md` (aktuell
 kandidat först). **Ingen annan fil i detta repo bär teknisk status** — hittar du status
