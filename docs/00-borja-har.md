@@ -1304,3 +1304,84 @@ Den nya kontrollen hittade genast ett fall som visade sig vara **falskt larm**: 
 nytt betygssystem säger korrekt att *produktionsrubriken* är skyddad, och regeln läste det
 som ett påstående om utkastet självt. Tredje gången i det här arbetet som en ordregel inte
 skiljer "om mig" från "om den där". Subjektet är nu avsmalnat mekaniskt.
+
+## Ett underlag för säkrare kontroll — inte en startad funktion (2026-09-09)
+
+Vi förbereder en liten byggdel som senare ska hjälpa styrplanet att kontrollera
+en förbindelse till operativsystemet. Ägaren har godkänt arbetet med reglerna och
+byggdelen, men **inte installation nu**. Först skrivs ett prov som ska kunna
+skilja en rätt byggdel från en felaktig; därefter granskas det oberoende.
+
+Det som finns här är fortfarande ett utkast. Kontrollprogrammet vägrar köra
+vidare, och ingen ny byggdel har startats eller installerats i detta arbete.
+Att en byggdel senare klarar sin byggkontroll betyder inte att styrplanet är
+klart eller får startas om. Kontrollen i verklig drift och reglerna för
+installation och återhämtning måste bli klara och godkända var för sig.
+
+Utkastet beskriver nu också hur granskaren ska kontrollera att själva provet
+inte har bytts ut och att reglerna saknar dubbla eller oväntade uppgifter.
+Vissa delar har nu prövats med konstruerade data. Det är inte bevis för en
+byggd eller installerad funktion; programmet vägrar fortfarande gå vidare.
+
+Ett byggrecept och kontroller av byggunderlaget finns nu också som utkast.
+Hela byggkontrollen är ännu inte genomförd. Den befintliga körfilen ska behållas exakt,
+och en lyckad byggkontroll får fortfarande inte räknas som klar drift.
+
+Byggningen ska kontrolleras med fastställda verktyg, skyddade gränser och två
+separata byggen. Detta innebär inte en garanti mot en annan aktiv skrivare med
+samma användaridentitet. Begränsade försök har nu stoppat innan något komplett
+bygge kunde godkännas; nästa försök kräver granskning av det rättade underlaget.
+
+Granskningen hittade brister innan något kördes. Utkastet har nu tydligare
+kontroller för avslutade processer, sparade felloggar och oförändrade mappar.
+En separat kontroll av underlaget ska göras före byggning. Kontroller med
+konstruerade data har gått igenom, men de ersätter inte granskning eller en
+verklig byggkontroll; ingen körfunktion har aktiverats.
+
+Ett försök visade att byggverktyget hade avslutats korrekt, men kontrollen
+försökte ändå stoppa det en gång till. Utkastet skiljer nu mellan levande och
+redan avslutade processer före den åtgärden. Oklar status eller ett verkligt
+behörighetsfel får fortfarande inte räknas som godkänt. Försöken och deras
+felloggar bevaras; ingen byggdel har installerats eller startats i drift.
+
+Nu har två separata byggen gett exakt samma filer. Det är ett uppmätt resultat,
+men ännu inte en färdig byggkontroll. Nästa kontroll läser de verkliga filerna
+utan att starta dem: den kontrollerar innehåll, gränser och fingeravtryck och
+försöker upptäcka avsiktliga fel. Författarens prov med sådana fel har gått igenom;
+oberoende granskning återstår. Detta ger fortfarande inget tillstånd att ladda
+byggdelen, installera den eller starta styrplanet.
+
+Den oberoende granskningen hittade ett äldre prov som använde en inaktuell
+statustext och därför inte skapade det avsiktliga felet. Provet utgår nu från
+den aktuella raden och kräver att ändringen faktiskt sker. Materialkontrollerna
+är oförändrade; det samlade underlaget behöver granskas igen.
+
+Efter godkänd omgranskning förbereds nu byggrecept och innehållsförteckning för
+de fyra produktfilerna. De kopplas till de uppmätta filerna och beskriver bara
+byggmaterial, aldrig installation eller drift. Storlekar och textrader mäts
+utan att skapa produktfiler. Det verkliga Git-sambandet och en fullständig
+kontroll återstår; styrplanet får fortfarande inte startas av detta steg.
+
+Nästa källkodsdel förbereder kontrollen av Git-objekt och filförändringar.
+Den får bara läsa bestämda lokala uppgifter och ska avvisa okänd konfiguration.
+Koden har ännu inte körts mot Git. Ett ofärdigt arbetsutkast får inte räknas
+som ett sparat och granskat kontrakt, och lokal Git-information bevisar inte
+att något har publicerats eller får startas.
+
+Granskningen krävde rättelser innan Git-kontrollen får användas: attribut ska
+hämtas från det kontrollerade Git-trädet, väntan får inte hoppas över när ett
+stoppförsök misslyckas, och efterkontroller ska göras även efter fel. Dessa
+rättelser ändrar inte kravet på ny granskning före en verklig körning.
+
+Efter två granskningar har den lokala Git-kontrollen nu körts på ett separat
+diagnostiskt kontrakt med sex ändrade filer. Den visade rätt filobjekt och
+oförändrade produktfiler, men är inte ett fryst eller publicerat kontrakt.
+Nästa begränsade del kopplar sådana uppgifter till granskade källfiler och
+kontraktsfasen. Den nya kopplingen prövas först som en modell utan Git-anrop;
+produktkontroll och en verklig förväntad röd grind återstår.
+
+En ytterligare modell kopplar nu ihop kontraktet, dess sammanslagning och en
+framtida fyrfilsprodukt. Den kontrollerar filinnehåll och att andra filer
+bevaras. Verkliga Git-mätningar för produkten saknas fortfarande; modellerade
+radantal får inte räknas som sådana mätningar. Ingen produkt har skapats eller
+startats av detta dokumentations- och verifieringsarbete.

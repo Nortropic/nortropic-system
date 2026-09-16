@@ -612,3 +612,207 @@ not falsely claimed distinguishable; protected/runtime-enclosing and topology-vi
 | 2026-09-06 | H-039 R27-R2/R15 atomic create-phase diagnostic | Frozen R27-R1 `ae10c55972a3122b330ae81f5180b40daed94b0d`/tree `add9ee8395c9e526b65c6af86c91937e7eefd80f`/gate `cb42e688be29622decd79f754745614c4022cb4f6d1fddf7512c4c1982c8e1ed`/spec `d30d4c63eb5390ac2cc9f7acf9da6cf92de26d73e629ad495402c1704a113d9f` is immutable NO-CREDIT, nonparent and nonretryable. Review A `5e546ece2a38a65f4ed0e8244a0e21e7603891f3ae8bdf572132a9bcc0f92449`, identity8 `[16777232,129612176,33188,501,20,1,143842,0]`, has 4,142 lines/4,141 PASS/0 FAIL and sole concatenated `RIG_ERROR: R26 current/stale dispatch branch cardinality drift`; review B `e19264feca88f1177242030ebb6d8e8a46b1319d4d9e92ec6a18c4d33e37eb83`, identity8 `[16777232,129613083,33188,501,20,1,133828,0]`, is 133,828 bytes/3,349 lines/3,323 PASS/0 FAIL with sole outer-Seatbelt ODÖMBART. Fresh direct-base R2 retains exact historical R26 installed material/order but proves its sole selector is literal false, parser/current-preproduct cardinality is zero and branch is unreachable. An independent static bootstrap plus mutual R26/R27 audits require one call each and reject double removal; after removing only the new R1-evidence call, normalized main and exact R27 CLI-helper ASTs equal immutable R1, rejecting wrapped/markerless selector branches, decoy uses, alternate admission and all route drift while retaining exact Undecidable R25/R26/R27 reporting. Published R26 `c43a4c05…`, guarded receipt `77dc52ac…` and immutable log `27196ce2…` are exact. The sole RIG_ERROR is concatenated after the named PASS on physical line 92,867; line 92,868 is blank, followed by exactly 60 PASS lines on 92,869–92,928 (61 later physical lines), with no summary or credit. No-argument review and future R28 preflight alone bind the exact live numeric identity8 values, 432-byte sequence-1 receipt `fdb437bd…`, zero-runtime state and installed R14 `4a388755…`/89392/`07ab2816…`; R15 embeds no host dev/inode and captures/rebinds its actual pre-operation identities under the lock in synthetic product lanes. R27 has only RED, `--r27-product` and `--r27-published`; fresh R15 changes the exact existing five-file product. Only body `15d1605b…`/wire `b711e43d…` selects private operation 3; generic semantics, legacy create/cleanup and ACK `A` stay exact. One request-bound create under a nondelegated OFD lock records the last fsynced RESERVING–PREPARED phase; only PREPARED sends the exact 14-key frame and three distinct typed FDs. `socket_dev/socket_ino` bind the stable named socket; signed `listener_fd_dev/listener_fd_ino` preserve Darwin `st_dev=-1`, bind the separately captured listener FD, are re-fstatted immediately before SCM_RIGHTS and receiver-matched. The root:gid20 0550 portal excludes uid501 rename/create/unlink, so no self-connect is needed. The FIFO role remains solely the request-created mediator-local runtime-object writer. The mediator verifies each sender-local FD is CLOEXEC immediately before `sendmsg`; SCM_RIGHTS does not preserve that flag. The fixed single-threaded runner immediately after `recvmsg` sets and verifies CLOEXEC on all three received FDs before any non-`fcntl` use, exposure, fork or exec. Exact X+EOF before the ACK deadline is the sole PREPARED success. Recovery EOF grace is one absolute deadline checked at every loop entry and after every positive read; EINTR, EAGAIN and continuous writes cannot extend it. A bounded continuous-writer negative must stop nonzero/no-result after grace with restoration and zero residue unclaimed. Bounded recovery is claimed only when no byte is held through that deadline and the writer closes within the fixed recovery grace, or when X is written but EOF is withheld through the deadline and the writer closes within that grace; both return nonzero with no result frame or result ancillary FD after recovery. Arbitrary or hostile retention past the grace is outside the admitted fixed cooperative execution and returns nonzero/no-result without claiming restoration or zero residue. Same-transaction recovery preserves exact sequence 1 for RESERVING/CREATING or publishes the exact 377-byte-effect/432-byte-receipt-derived sequence 2 for later phases. Exact final membership and equality to captured pre-operation identities are rebound under lock; only `r/last` is phase-dependent. Pre-RESERVING, invalid, unclassifiable or recovery-drift cases are nonzero with no fabricated phase or result. The R15 installer accepts only the exact final sequence-1 R14 state; empty `r`, every prefix, already-R15/version-2 and every other nonexact state fail before mutation. Runtime legacy create-v1/cleanup-v1 remain exact; no generic prefix/fresh installer path is reachable in R15. The undecidable terminal reporter emits exact R25/R26/R27 material extensions once under static regression. R27 ends at `PASS_PRE_ROOT_PRODUCT_PUBLICATION_ONLY`. Fresh productless R28 must freeze, receive two independent reviews and publish guarded; read-bind exact live identities; durably consume a one-shot reservation; then perform the sole fixed no-retry R14→R15 launch using prebound argv/identities. Drift, nonzero, output, ambiguity or unexpected state is a consuming owner stop without retry, rollback or general cleanup. Only exact success admits a read-only installed/update review and exactly one diagnostic as the first post-R15 store mutation, followed by mandatory owner adjudication. The mutating effect engine, H039 completion, downstream progress and resume require fresh post-diagnostic owner authority. | (this commit) |
 
 R33 formal-A device amendment binds exactly four R24/R25 historical/current identity10 rows (16777232 to 16777230; fields 1-9 exact), with three centralized comparison replacements in the two shared binding predicates and causal positive baselines. Historical workflow bytes remain immutable and no stale lane reopens.
+
+### 2026-09-09 — H039 protected listener asset design tranche (UNFROZEN)
+
+The owner directly approved the exact installed destination
+`/Library/PrivilegedHelperTools/se.nortropic.listener-adapter-v1.so` for continued
+contract/implementation work and mandatory reviews, not installation now.
+Sequence2, receipt-policy and root ceremony remain separate decisions. This is
+a conversation-derived mandate record, not a gate, attestation or proof that
+historical bounded-prerequisite delegation activation was reverified.
+
+TEST_AUTHOR starts from R33 `ed584ec3088c08005f99de1da825d083e350a8d2` in an
+isolated checkout. The initial four-file asset proposal is not adopted: its two
+new repository paths are absent from the exact owner-production registry.
+Architecture resolution within registered surfaces is pending. The workflow
+section above the future build phase records measurable build-only boundaries,
+historical R33 source/dispatch separation and causal control requirements.
+No product bytes, registry/core, spec or gate are changed in this documentation
+tranche. Budgets are not invented. Status is UNFROZEN / NOT_READY / NOT_RUN;
+there is no compile, native load, root effect, new attempt, cleanup, publication,
+H039 completion or supervisor-resume credit.
+
+Architect guidance now considers four already registered existing paths, with a
+build-private adapter payload inside the installer-path container. Its execution
+profile remains OPEN: an old effectful installer entry is not an inert container.
+No product field or inertness claim is frozen while that conflict is resolved.
+
+Later R3 design resolution requires a dedicated return-2/no-call container entry
+and excludes the old installer execution graph, while preserving old source as
+historical text and the runtime mediator bytes. The mutable spec now describes
+that registered-surface option and leaves budgets unmeasured. The gate contains
+only an unconditional exit-2 draft scaffold before old module effects and pure,
+unexecuted shape predicates; it grants no verification result. Canonical H039
+no-argument success cannot follow from an asset-only success. The simple guide
+was read in full. The initial no-simple-layer-impact assessment is superseded
+by architect reconciliation of higher rule 22: this new prospective contract
+owns exactly six paths, the prior five plus `docs/00-borja-har.md`, which now
+truthfully describes this unexecuted preparation. Historical R33 five-path
+identity stays exact; product, registry/core and operational scope do not widen.
+
+The next mutable tranche separates current-source authority from historical
+projection: an external review-held raw gate digest and exact ordered entry AST
+bind the eight passive predicates and unconditional exit-2 boundary. No caller
+or candidate manifest supplies that review authority to runnable dispatch.
+Strict whole-JSON duplicate rejection precedes draft projection; its exact
+canonical digest binds every key/type/relation, while removing only the new
+member must reconstruct the byte-exact historical spec. The six-path contract
+and four-path product predicates are separate. All predicates remain unexecuted;
+source/schema causal controls are specified, not PASS evidence or freeze credit.
+
+Independent static review blocked that hold on an ignored sibling inside the
+historical removal span. The successor requires an exact singleton member
+mapping and names the corresponding causal negative; the schema digest is
+acyclically rebound. No predicate has executed and the blocked hold earns no credit.
+
+The next cohesive draft adds exact byte-only reference source generation,
+finite two-target recipe data, graph/raw-change and full-map preservation lenses,
+payload predicates and an uncalled pure suite. Retained published runtime bytes
+are not reproduced. Known CPP conflicts and exact finite argv rejection of
+unknown definitions are distinct. Fourteen passive definitions remain behind
+unchanged refusal; no compiler, gate or product was executed. Confinement,
+authenticated inputs/graph, bounded material parsers and measured budgets remain
+uncompleted obligations, not implied by the reference generator.
+
+Independent material review blocked the first hold before execution. The
+successor removes Python arguments from container lanes, distinguishes row order,
+descriptor names, payload swaps and each protection field, and limits output-tail/
+determinism labels to their actual scope. No compiler or pure suite ran in this repair.
+
+Next draft implements strict serialized recipe acceptance, a bounded synthetic
+SDK-derived outer Mach-O parser and causal controls, plus a dormant retained-FD
+reader and restricted compiler-envelope data. Local AST-only parser/recipe
+controls passed 38/38; no reader/compiler/full gate/native operation ran.
+BUILD_CONSUMED_INPUT_BINDING_UNPROVEN prevents construction readiness: pre/post
+pathname identity is not proof of actual compiler/linker consumption. Driver
+was initially held absent pending reconciliation of that stronger claim.
+
+Published workflow 1943–1958/2338–2345 does not establish universal proof against
+an active external same-UID writer. The new draft therefore retains that property
+as UNPROVEN while implementing the narrower mandated build-measurement controls:
+fixed tools/profile/argv, bounded output, owned unreaped-child group cleanup,
+input/output identity, two independent rebuilds and composed material review.
+The driver remains dormant until two exact precompile reviews. It never grants
+H039/preproduct/root/loader credit. Reader ACL policy is exact absence of an
+ACL object, not guessed empty-entry semantics; all owned closes are attempted
+once without ambiguous retry. No driver, reader or native metadata call ran.
+
+The first dormant-driver hold (`6784b31f`) was independently blocked before
+execution: pipe EOF did not prove child exit, failure captures could be lost,
+and recursive directory/measurement-parent identity was incomplete. The mutable
+successor adds checked SDK-derived waitid/WNOWAIT state, EOF/deadline and unknown
+ownership rejection, durable bounded failure captures/status, retained-relative
+inventory and exact parent membership. Separate read-only preflight and actual
+measurement invocations require exact independent review. Local pure checks are
+39 material + 38 parser/recipe + 15 mocked close/wait; no I/O/native/compiler
+driver function was invoked and no H039 or build credit is granted.
+
+Later orchestrator measurements consumed the `defadd3f` hold without credit.
+Preserved command status records in h039-asset-measure-dz97l3_7 and
+h039-asset-measure-i4obi427 show exit 71 and 0 respectively, both with group-kill
+EPERM; the second produced only adapter preprocessing output. The narrow
+successor distinguishes exact bounded PGID live/zombie state before signal,
+retains the unreaped leader reservation and requires terminal group absence
+after reap. It never ignores EPERM or retries either consumed root. No new
+native query/build was run during this correction; fresh exact review and
+invocation remain required. Product, root, loader, sequence2 and receipt-policy
+authority are unchanged.
+
+2026-09-09 — H039 actual linked-material predicate, mutable TEST_AUTHOR only.
+The subsequent group-aware two-lane measurement completed with identical ten
+outputs and sixteen exit-zero commands; no output was executed. New pure
+actual-byte acceptance is separate from the unchanged synthetic model. It binds
+closed commands/sections, constant-return container code, independent payloads,
+adapter ABI/IR/symbols, exact fixed linker regions, zero padding and linker-adhoc
+CodeDirectory page hashes. No general Mach-O framework or loaded-image/Apple
+signature trust is claimed. Existing operational hardened-runtime requirements
+are not rewritten for this asset-only phase. All actual binary mutants traverse
+the composed predicate with semantic/region/signature reasons before final
+identity; semantic mutants reseal only in-memory page slots and prove page-hash
+validity. Author AST-only checks: both real lanes positive, 46/46 per lane.
+No new native/build/root/load/cleanup/Git-write effect; six contract files only,
+unconditional refusal retained, independent review and full preproduct work pending.
+
+2026-09-09 — independent review blocked whole hold 6589315d: the older
+duplicate-status fixture replaced an absent historical status literal and was
+a no-op (pure 38/39). Correction extracts the sole current top-level status
+line inside the exact draft member, checks cardinalities and requires changed
+bytes before rejection credit. The six actual-material definition ASTs remain
+unchanged; their bounded prior positive checks are not whole-successor credit.
+Only the six contract files change; fresh whole-hold review remains required.
+
+2026-09-09 — hold 7852d02e received two independent bounded clear reviews.
+The next mutable tranche adds five pure prospective product functions, without
+changing the six actual-material ASTs. Recipe preserves the measured eight
+commands/environment/umask but removes draft status/unresolved claims. Manifest
+binds source→recipe→material without self-hash or installed/receipt authority.
+Four-file acceptance composes external actual inputs before manifest bindings;
+coherent wrong recipe and resealed payload/permission mutants reject causally.
+Measured recipe: 8558 bytes/287 lines; manifest: 1827 bytes/78 lines. Source
+model +168/-0, recipe +282/-84, manifest +75/-52, total +525/-136/661.
+This named pure edit model is not observed Git numstat. Four-file byte totals
+364669→373937 include binary 185808→181960, not a binary text-line budget.
+No inherited 2400 ceiling, arbitrary reserve, product write or build is used.
+Unconditional refusal and missing authenticated graph/full preproduct RED remain.
+
+2026-09-09 — compound hold 52eb1e0f received independent bounded clear in
+both lanes. The next source-only tranche adds fixed typed Git operations,
+strict config/wire parsers, synthetic format controls and a dormant local
+observer. It never imports H035/H037/R33 modules. Static inspection proved
+/usr/bin/git delegates through xcselect; the new observer therefore pins the
+direct root-protected CLT Git bytes be4afb2b…/7604272, not selection through
+the shim. Historical H037 authority is unchanged. Exact raw object hashes,
+complete recursive tree/listing agreement and actual rawdiff/numstat schemas
+are required; synthetic parser positives provide no observed-Git credit.
+Only fixed trusted local builtins qualify for bounded direct-child lifecycle;
+no compiler-runner widening, native group scan, helper/network or temp cleanup.
+Relevant attribute inputs for both fixed surfaces must be absent/rebound.
+No Git observer/process ran; mutable TEST_AUTHOR remains uncommitted/refused.
+
+2026-09-09 — independent review blocked source hold 320570df. A2: the new
+top-level parser default violated the unchanged passive-definition closure;
+remove it and pass explicit empty OID for nonobject records. B1: installed
+CLT gitattributes.5 documents index fallback when worktree attributes are absent.
+Fixed diff-only --attr-source=<candidate>, documented in local CLT git.1, now
+requires previously authenticated complete candidate tree/listing and preserves
+all info/global/system exclusions. B2: a mocked kill EPERM skipped wait and
+masked the primary error; independently attempt bounded wait and retain every
+cleanup failure. B3: postauthentication existed only on success; move scoped
+acquired-binding checks into finally, collect errors independently, explicitly
+mark unacquired state and close all owned FDs even if postauth fails. No extra
+Git query, index parser, ODB scanner, native process scan or broader authority.
+The counterexample hold remains no-credit; corrected bytes require fresh review.
+Author-local AST block mocks passed ten cases: exact nested-run cleanup and
+attribute precondition, plus exact outer-finally success/failure/partial-state
+and multiple-postauth-error paths. Every external operation was a test double;
+no observer/process/native action ran and no independent credit is claimed.
+
+2026-09-09 — the corrected d8c460cc observer source passed both independent
+reviews and a separately reviewed read-only measurement. The first temporary
+fixture was preserved after ancestor tmp metadata changed; it earned no credit
+and no timestamp was normalized. The workspace diagnostic child 291b8860,
+tree 62ca41a8, parent ed584ec3, produced exact six-path local facts, 439/439
+entries, +3892/-0 and four unchanged products. Outcome audits cleared only
+that local observation, not a frozen contract or publication.
+The next two passive functions compose CONTRACT_SIX fact relations and causal
+synthetic controls: external source pins, Git blob identities, exact six-path
+full-map preservation, historical source/spec and four old product identities.
+An operational caller must obtain facts from the observer itself, not accept a
+public report mapping. Pure mappings remain models; actual numeric diff counts
+are not reconstructed by a new diff engine. No product, merge/publication,
+genuine preproduct RED or new dispatch is introduced in this source tranche.
+Author-local inspected pure extraction passed 28/28 synthetic relation controls,
+39/39 source, 38/38 parser, 38/38 driver and 33/33 Git-format controls, plus
+46/46 actual and 29/29 compound controls per preserved measured lane. No new
+observer or fixture ran; independent review of these successor bytes remains.
+
+2026-09-09 — after dual bounded clearance of f98c143a, add only pure
+PRODUCT_FOUR composition and synthetic controls. Join B→C with local merge
+M:[B,C], tree/map M=C and product P:[M]; preserve the complete nonproduct map,
+bind each four-file material blob and retained runtime to its Git OID, then
+reuse the unchanged independent product-material predicate. Absolute Git
+added/deleted budgets remain unmeasured. Strict text/binary count schema and
+byte-derived net lines do not establish absolute edit counts; a same-net
++100/+100 model explicitly demonstrates that boundary. No observer, fixture,
+build, product write, publication, genuine preproduct RED or dispatch is added.

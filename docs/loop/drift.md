@@ -5695,3 +5695,210 @@ until full H039 PASS.
 Live-r3 retains root-r2 and all historical bytes; the exact five consumer ASTs bind both receipt trace profiles, the preserved sequence-1 receipt singleton xattrs and exact authenticated uid501-unlistable s/lock without reading xattr values. Failed live-r2 consumer evidence is separately immutable/no-credit, not R1 stale-count evidence. The Path-keyed stale-count fixture uses mapping unpacking without changing its keys, values or negative predicate.
 
 R33 formal-A device amendment binds exactly four R24/R25 historical/current identity10 rows (16777232 to 16777230; fields 1-9 exact), with three centralized comparison replacements in the two shared binding predicates and causal positive baselines. Historical workflow bytes remain immutable and no stale lane reopens.
+
+### 2026-09-09 — protected listener asset preparation, no execution credit
+
+UNFROZEN / NOT_READY / NOT_RUN. The direct owner-approved protected destination
+is `/Library/PrivilegedHelperTools/se.nortropic.listener-adapter-v1.so` for
+contract/implementation preparation only; installation now is excluded, and
+sequence2, receipt-policy and root ceremony remain separate decisions.
+
+The first source-plus-standalone-bundle repository proposal conflicts with the
+unchanged exact owner registry. It is rejected, not silently added to canonical
+owner authority. Architect resolution of an already-registered representation
+must precede product fields and measured budgets. The current tranche changes
+only the three existing documentation paths under the five-path TEST_AUTHOR
+surface on base `ed584ec3088c08005f99de1da825d083e350a8d2`.
+
+Next: settle representation; specify the smallest build-only criterion; bind a
+new closed dispatch and authenticated historical R33 source projection; measure
+causal positives/negatives and the genuine preproduct RED; obtain independent
+gate review before freeze/publication and separate product work. Old R33
+selectors and consumed operations must not become current. Static or build-only
+evidence never certifies loading, kernel ABI, address semantics, installation,
+runtime cleanup, H039 completion or supervisor readiness. No test, compilation,
+native load/query, root operation, attempt, cleanup or Git mutation was performed
+by this TEST_AUTHOR documentation tranche.
+
+The registered four-path container option is now architecture guidance only.
+Container execution profile remains OPEN pending closure of the effectful-old-
+installer-entry conflict; no compiled inertness or legacy branch equivalence
+has been measured or credited.
+
+R3 architecture guidance subsequently closes the design choice, not the proof:
+new container entry returns 2 without calls, and the old installer graph is
+excluded. Exact preprocessing/IR/disassembly and outer-versus-embedded Mach-O
+checks remain unperformed. The first spec/gate tranche is a disabled scaffold:
+all argv/import modes refuse before old R33 module effects, no old anchors are
+repinned, and historical byte reconstruction is only a pure draft predicate.
+The spec retains the H039 completion goal and requires canonical no-argument
+nonzero until that complete goal is proven; future explicit asset-only success
+cannot become task doneness. Null budgets and uncompleted checks forbid freeze.
+The initial simple-guide no-impact assessment is withdrawn after higher rule-22
+reconciliation. The prospective TEST_AUTHOR scope for this new phase is exactly
+six paths: the existing five contract paths and `docs/00-borja-har.md`. Its new
+note describes unexecuted preparation and the limited build-only meaning.
+Historical R33 five-file identity and product/registry/core scope stay unchanged.
+
+Current-source/material tranche: twenty-six passive definitions, twelve draft stdlib
+imports, exact refusal print then SystemExit(2), before historical import array.
+Current raw identity must come from external held review, not the candidate's
+historical reconstruction or a self-hash claim. Duplicate-free whole JSON is
+parsed before the exact canonical draft projection and raw historical remainder.
+The draft specifies moved/removed refusal, pre-refusal execution, replaced
+predicate, duplicate/unknown field, crossed scopes, historical-spec mutation and
+premature completion controls. None has run. No operational dispatch, material
+build, native execution, consumed attempt or installed effect is introduced.
+
+The first source/schema hold was statically blocked: an unknown sibling within
+the removed new-member span escaped both digest projections. Exact built-in
+singleton member cardinality now precedes lookup, and that precise negative is
+required. Successor remains unexecuted, NOT_READY and without freeze credit.
+
+Material definitions now generate exact pinned source bytes and finite two-target
+recipe data; no compilation occurs. Runtime remains retained published bytes.
+Pure direct-child/raw-mode-status and complete tracked-map preservation criteria
+do not authenticate their own supplied Git facts. Payload rows do not prove a
+Mach-O execution graph. Uncalled controls cover exact inputs and mutations;
+external current-source trust, tool/input confinement, actual graph/material
+proof, budgets and independent reviews remain necessary before any readiness.
+
+Material hold correction after independent BLOCK: Python inputs are adapter-only;
+row-order mutation no longer claims crossed payloads. Distinct fixed-descriptor
+payload swaps, fixed-payload name swaps and independent protections are defined.
+Output-tail/generation checks do not claim command or build-reproduction proof.
+Successor remains unexecuted and blocked from compilation or operational entry.
+
+Successor now has locally exercised synthetic parser/strict recipe controls
+(38/38 through trusted AST extraction, no whole gate/native execution). Raw
+parser admits only its bounded synthetic two-segment/LC_MAIN shape; it does not
+claim acceptance of unseen linker output. Retained nofollow ancestor-FD reader
+is dormant and uninvoked. Compiler envelope is data, driver remains absent,
+and BUILD_CONSUMED_INPUT_BINDING_UNPROVEN is an implementation prerequisite,
+not an established owner stop or permission to weaken provenance requirements.
+
+Source reconciliation withdraws only the added universal same-UID consumed-byte
+prerequisite: the published build authority instead composes pinned confinement,
+bounded output/owned-group cleanup, identity, reproducibility and material review
+under serialized authorized-writer assumptions. External active-writer provenance
+remains UNPROVEN. The actual measurement driver is now dormant code, requiring
+two exact reviews before invocation; no private root or compiler process exists
+from this tranche. Reader adds exact no-ACL-object policy and close-all-owned
+failure handling. Actual metadata/inventory positive and linked-output proof are
+unobserved; no synthetic model or bounded measurement can grant H039 completion.
+
+Independent precompile review blocked hold `6784b31f` without execution. Moving
+correction now distinguishes EOF from exit with unreaped waitid observation,
+keeps failure stdout/stderr/status for exclusive durable capture before rejection,
+and binds descriptor-relative inventory plus exact parent membership. Unknown
+child ownership permits no signal/reap, including implicit Popen destruction.
+Read-only preflight is separate and actual measurement repeats it. Local pure
+39/38/15 checks passed; native wait/ACL, inventory and compiler remain unrun.
+Two exact independent reviews and positive read-only preflight are still pending.
+
+The prior pending state was followed by orchestrator preflight and two consumed
+no-credit measurement attempts on `defadd3f`. Their preserved status records
+prove command-00 exit 71/0 and cleanup group-kill EPERM; no completed binary build
+is credited. New mutable correction adds bounded exact-PGID enumeration and
+positive zombie classification before signal, then read-only terminal absence
+after reap. Unknown enumeration/ownership or real EPERM still fails closed.
+Both old roots and captures remain unchanged. No new native/process measurement
+has run on this successor; exact independent review is next.
+
+2026-09-09 actual-material tranche: the later group-aware measurement did finish,
+with two byte-identical ten-output lanes and sixteen exit-zero commands in
+`/private/tmp/h039-asset-measure-q2j4bejy`. This is measurement, not gate/product
+credit. Thirty-six passive draft definitions now include six pure actual-material
+functions; synthetic parser and refusal remain separate and unchanged in meaning.
+The actual closed shape binds all load-command/section bytes, readonly full
+payloads, container main/return2, adapter IR/object/bundle ABI and symbols,
+fixed code/linkedit regions, all zero slack and CodeDirectory page integrity.
+Semantic mutants are in-memory page-resealed and traverse the same full predicate
+before last-stage raw identities, with exact causal reasons. Author-only AST
+extraction gave both measured positives and 46/46 controls per lane, no native or
+full-module execution. Independent exact review, authenticated phase graph,
+strict manifest, final budgets and a real preproduct RED remain required.
+
+Independent whole-hold regression review blocked 6589315d on the sole
+duplicate-status no-op: an older fixture depended on a removed status value.
+The correction scopes current-line extraction to the unique draft member,
+requires one top-level status line and a nonidentical duplicated-member result.
+No actual-material definition changes. Prior bounded actual checks do not
+transfer whole-gate credit; the corrected six-file hold needs fresh review.
+
+Hold 7852d02e subsequently received two independent bounded clear reviews.
+Current mutable compound tranche has thirteen imports and forty-one passive
+definitions. Five new pure functions define exact prospective build-only recipe,
+manifest, line/byte model, four-file relation and coherent controls; actual six
+ASTs remain unchanged. Recipe 8558B/287 lines and manifest 1827B/78 lines are
+in-memory representations only. Text edit model +525/-136/661 consists of source
+168/0, recipe 282/84 and manifest 75/52; binary sizes 185808→181960 are separate.
+Aggregate four-file bytes are 364669→373937. No Git-numstat observation, new
+product candidate or executable build is claimed. The strict forms reject
+duplicate/unknown/type/representation faults, coherent bad recipe/manifest,
+repinned resealed material faults and mismatched independent runtime input.
+Independent successor review and authenticated Git/material extraction remain
+required; draft rc2 refusal is still not a genuine product-absence RED.
+
+Both independent reviewers subsequently cleared compound hold 52eb1e0f in
+their bounded lenses. New Git-fact SOURCE tranche contains five additional
+passive definitions (forty-six total; thirteen imports): typed fixed operations,
+strict normalized config, raw object/tree/diff/numstat parsers, model controls
+and an uninvoked local observer. Direct CLT Git be4afb2b…/7604272 replaces the
+prospective shim choice only, not historical H037. Raw object hashing and
+recursive full-tree membership precede comparison; only four small material
+blobs are read, so the multi-MiB unchanged gate is not falsely budgeted at 1 MiB.
+Standalone-only, safe config, finite environment and retained attribute absence
+bound the local read path. Owned direct-child deadline/capture/kill/wait is not
+a descendant-cleanup guarantee. No observer or Git child has run, no source
+tranche model has been promoted to actual facts, and no current mutable HEAD
+has been claimed as a newly committed contract. Full phase composition remains.
+
+Source hold 320570df is superseded following four independent findings: parser
+top-level default broke passive-source equality; absent worktree attributes
+still allowed index fallback; kill EPERM skipped wait/masked primary; error
+paths skipped postauthentication. Corrections keep the no-default closure,
+bind diff-only attribute source to the authenticated candidate tree using the
+locally documented option, independently attempt bounded wait despite cleanup
+errors, and execute scoped acquired-binding postauth in finally. Missing prior
+observations remain unobserved; every postauth/close failure is preserved with
+the original error. No observer query or native/actual Git action is authorized
+by this correction; pure regressions and inspected mocked blocks only.
+Ten author-local exact AST block mocks passed, including poll/kill/wait failures,
+unaltered primary exceptions, all acquired postauth observations after faults,
+explicit partial-state unknowns and continued close attempts. These are isolated
+block checks with test doubles, not a full observer run or independent review.
+
+The later exact d8c460cc source received two independent clear reviews. Its
+first /private/tmp observer fixture failed final tmp ancestor identity and is
+preserved without retry credit or metadata normalization. A distinct workspace
+fixture measured diagnostic child 291b88608250d509e115a5ba8d67db7c6a4059b3,
+tree 62ca41a8cf844738711b4881822edff7814580c4, parent ed584ec3: rc0, complete
+439/439 membership, six actual addition counts 68/175/173/544/170/2762,
+all deletions zero, four products unchanged and no six-source postcheck errors.
+The independently audited result is local Git facts only; mutable source bytes
+have not become a frozen or published contract by this diagnostic commit.
+
+Current source adds only pure CONTRACT_SIX composition and synthetic controls.
+Forty-eight passive definitions remain dominated by unconditional NOT_READY.
+The model binds externally reviewed source bytes to candidate blob OIDs, exact
+sole-parent/six-map/rawdiff/mode relations, strict numstat types and historical
+gate/spec plus unchanged baseline product bytes. It does not authenticate a
+caller-supplied dictionary, infer actual numeric diff counts, create a product
+or activate the genuine preproduct RED. Actual PRODUCT_FOUR numstat, merge-graph
+composition, attribute negatives, provenance and final dispatch remain separate.
+Author-local pure suites: relation model 28/28, source 39/39, parser 38/38,
+driver 38/38, Git format 33/33, actual 46/46 and compound 29/29 per retained
+lane. All six source files stayed byte-identical during that extraction.
+These are model/regression results, not a new observer run or independent credit.
+
+After dual bounded review of f98c143a, the next pure source tranche composes
+PRODUCT_FOUR. Contract B/C facts and merge/product M/P facts must join at exact
+ordered parents and complete tree/map equality. Only four M paths may change;
+every material byte value is linked to its map OID, including the separately
+pinned retained runtime, before unchanged product_material acceptance.
+Fifty passive definitions remain dominated by the unchanged rc2 refusal.
+Git absolute addition/deletion counts remain UNMEASURED, separate from the old
+SequenceMatcher model; this relation checks only strict count types, binary
+dash pairs and canonical text net lines. No actual PRODUCT_FOUR fixture,
+observer run, build, product file, merge/publication or preproduct RED occurs.

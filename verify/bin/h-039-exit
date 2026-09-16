@@ -13,6 +13,3188 @@ a caller path, PID, command, state, nonce, or descriptor.
 
 from __future__ import annotations
 
+# H039_ASSET_DRAFT_BEGIN
+# MUTABLE TEST_AUTHOR SCAFFOLD: NOT_READY, not a frozen or runnable verifier.
+# The preceding docstring and following R33 module are historical source only.
+# Unconditional refusal below dominates every historical import/assignment/body.
+import ast as _asset_ast
+import difflib as _asset_difflib
+import hashlib as _asset_hashlib
+import json as _asset_json
+import os as _asset_os
+import selectors as _asset_selectors
+import signal as _asset_signal
+import stat as _asset_stat
+import struct as _asset_struct
+import subprocess as _asset_subprocess
+import sys as _asset_sys
+import tempfile as _asset_tempfile
+import time as _asset_time
+
+
+def h039_asset_draft_historical_source_exact(current: bytes) -> bool:
+    """Byte projection only; never import, compile or execute the R33 subject."""
+    if type(current) is not bytes:
+        return False
+    begin = b"# H039_ASSET_DRAFT_BEGIN\n"
+    end = b"# H039_ASSET_DRAFT_END\n"
+    if current.count(begin) != 1 or current.count(end) != 1:
+        return False
+    left = current.index(begin)
+    right = current.index(end)
+    if right <= left or not current[:left].endswith(
+        b"from __future__ import annotations\n\n"
+    ):
+        return False
+    historical = current[:left] + current[right + len(end):]
+    return _asset_hashlib.sha256(historical).hexdigest() == (
+        "d3d147da8d88427aad52550fffcd6156deb38ec88c7bc61908afc197062a5250"
+    )
+
+
+def h039_asset_draft_unique_object(pairs: list) -> dict:
+    """Strict parser hook, including every nested object; no last-key-wins."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
+def h039_asset_draft_spec_exact(raw: bytes) -> bool:
+    """Exact draft keys/types/relations plus unchanged historical raw spec."""
+    if type(raw) is not bytes:
+        return False
+    try:
+        parsed = _asset_json.loads(raw, object_pairs_hook=h039_asset_draft_unique_object)
+        begin = b'      "h039_protected_listener_asset_draft": {\n'
+        end = b'      "h039_os_exclusive_runtime_cleanup": {\n'
+        if raw.count(begin) != 1 or raw.count(end) != 1:
+            return False
+        left, right = raw.index(begin), raw.index(end)
+        if right <= left:
+            return False
+        # Parse exactly the inserted member after strict whole-document parsing.
+        member = _asset_json.loads(b"{" + raw[left:right].rstrip().removesuffix(b",") + b"}",
+                                  object_pairs_hook=h039_asset_draft_unique_object)
+        if type(member) is not dict or list(member) != ["h039_protected_listener_asset_draft"]:
+            return False
+        draft = member["h039_protected_listener_asset_draft"]
+        canonical = _asset_json.dumps(draft, sort_keys=True, separators=(",", ":"),
+                                      ensure_ascii=True).encode("ascii")
+        return (type(parsed) is dict and type(draft) is dict
+                and _asset_hashlib.sha256(canonical).hexdigest() ==
+                "cbd79d3f5f8c99f647aead8277f38c225aa64af8028b5a3d0bea0736d7671d9a"
+                and _asset_hashlib.sha256(raw[:left] + raw[right:]).hexdigest() ==
+                "62380e1dfc21a9f2bc6ab9722a0df0b47b7e508f568cdd29a7584c40eaf2ca58")
+    except (ValueError, TypeError, KeyError, UnicodeError):
+        return False
+
+
+def h039_asset_draft_current_source_exact(current: bytes, reviewed_sha256: str) -> bool:
+    """Review-only lens. Anchor MUST originate outside the candidate/its manifest.
+
+    No dispatch accepts this parameter. Raw identity binds all predicate bodies;
+    ordered AST separately explains refusal dominance. Neither is a self-proof.
+    """
+    if type(current) is not bytes or type(reviewed_sha256) is not str:
+        return False
+    if len(reviewed_sha256) != 64 or any(c not in "0123456789abcdef" for c in reviewed_sha256):
+        return False
+    if _asset_hashlib.sha256(current).hexdigest() != reviewed_sha256:
+        return False
+    try:
+        body = _asset_ast.parse(current).body
+        imports = [("ast", "_asset_ast"), ("difflib", "_asset_difflib"), ("hashlib", "_asset_hashlib"),
+                   ("json", "_asset_json"), ("os", "_asset_os"),
+                   ("selectors", "_asset_selectors"), ("signal", "_asset_signal"),
+                   ("stat", "_asset_stat"), ("struct", "_asset_struct"),
+                   ("subprocess", "_asset_subprocess"), ("sys", "_asset_sys"),
+                   ("tempfile", "_asset_tempfile"), ("time", "_asset_time")]
+        names = ["historical_source_exact", "unique_object", "spec_exact",
+                 "current_source_exact", "contract_change_shape", "product_change_shape",
+                 "compilation_selectors_exact", "argv_shape", "reference_source",
+                 "reference_recipe", "graph_shape", "preserved_products_exact",
+                 "material_sections_exact", "pure_controls", "recipe_exact",
+                 "outer_macho_model", "synthetic_container", "parser_controls",
+                 "actual_layout", "actual_signature", "actual_macho",
+                 "actual_material", "actual_reseal_control", "actual_controls",
+                 "product_recipe", "product_manifest", "product_budget",
+                 "product_material", "product_controls",
+                 "git_operation", "git_config_exact", "git_records", "git_fact_controls",
+                 "git_observe_local", "contract_relation", "contract_relation_controls",
+                 "product_relation", "product_relation_controls",
+                 "compiler_envelope", "retained_read", "close_owned", "acl_empty",
+                 "inventory", "wait_state", "group_action", "group_snapshot",
+                 "bounded_command", "preflight", "build_reference", "driver_controls"]
+        if not (isinstance(body[0], _asset_ast.Expr)
+                and isinstance(body[0].value, _asset_ast.Constant)
+                and type(body[0].value.value) is str
+                and _asset_ast.dump(body[1]) == _asset_ast.dump(
+                    _asset_ast.parse("from __future__ import annotations").body[0])):
+            return False
+        for node, (module, alias) in zip(body[2:15], imports):
+            if _asset_ast.dump(node) != _asset_ast.dump(
+                    _asset_ast.parse("import " + module + " as " + alias).body[0]):
+                return False
+        for node, suffix in zip(body[15:65], names):
+            if not (isinstance(node, _asset_ast.FunctionDef)
+                    and node.name == "h039_asset_draft_" + suffix
+                    and not node.decorator_list and not node.args.defaults
+                    and not any(value is not None for value in node.args.kw_defaults)):
+                return False
+        terminal = _asset_ast.parse(
+            'print("H039_ASSET_DRAFT_NOT_READY: no verification or operation authorized", '
+            'file=_asset_sys.stderr)\nraise SystemExit(2)\nimport array').body
+        return all(_asset_ast.dump(left) == _asset_ast.dump(right)
+                   for left, right in zip(body[65:68], terminal)) and len(body) > 68
+    except (SyntaxError, ValueError, TypeError, IndexError):
+        return False
+
+
+def h039_asset_draft_contract_change_shape(paths: object) -> bool:
+    """New six-path contract surface, never the historical R33 five or product four."""
+    return type(paths) is list and paths == [
+        "docs/00-borja-har.md", "docs/05-beslutslogg.md", "docs/loop/drift.md",
+        "docs/loop/owner-author-workflow-v1.md", "specs/tasks.spec.json",
+        "verify/bin/h-039-exit",
+    ] and all(type(path) is str for path in paths)
+
+
+def h039_asset_draft_product_change_shape(changes: object) -> bool:
+    """Proposed raw Git mode/status/path shape, not full product acceptance."""
+    expected = [
+        ("controller/runtime-cleanup/install", "100755", "100755", "M"),
+        ("controller/runtime-cleanup/native/mediator.c", "100644", "100644", "M"),
+        ("verify/h039/build-recipe.json", "100644", "100644", "M"),
+        ("verify/h039/identity-manifest.json", "100644", "100644", "M"),
+    ]
+    return (type(changes) is list
+            and all(type(row) is tuple and len(row) == 4
+                    and all(type(value) is str for value in row)
+                    for row in changes)
+            and changes == expected)
+
+
+def h039_asset_draft_compilation_selectors_exact(
+    lane: object, definitions: object,
+) -> bool:
+    """Closed new-lane H039 define projection; other compiler flags not judged."""
+    if type(lane) is not str or type(definitions) is not dict:
+        return False
+    if not all(type(key) is str and type(value) is str
+               for key, value in definitions.items()):
+        return False
+    expected = {
+        "INERT_ASSET_CONTAINER": {"H039_ASSET_CONTAINER": "1"},
+        "LISTENER_ADAPTER_INTERMEDIATE": {"H039_LISTENER_ADAPTER": "1"},
+    }
+    return lane in expected and definitions == expected[lane]
+
+
+def h039_asset_draft_argv_shape(argv: object) -> str | None:
+    """Future shape only. Actual draft execution always exits 2 below."""
+    if type(argv) is not list or not all(type(value) is str for value in argv):
+        return None
+    if argv == []:
+        return "H039_COMPLETION_UNPROVEN"
+    if argv == ["--asset-contract"]:
+        return "ASSET_CONTRACT_ONLY"
+    if len(argv) != 3 or argv[0] not in {"--asset-product", "--asset-published"}:
+        return None
+    if any(len(value) != 40 or any(c not in "0123456789abcdef" for c in value)
+           for value in argv[1:]):
+        return None
+    return "ASSET_BUILD_ONLY"
+
+
+def h039_asset_draft_reference_source(legacy: bytes, adapter: bytes) -> bytes:
+    """Data-only transformation; both input sources bound by gate-owned identities."""
+    for raw, digest in [(legacy, "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b"),
+                        (adapter, "a35dc310e05f7cf83d7175e5ee5ba3213e6a7433daaa7cc5dd25f9e92ff437fa")]:
+        if type(raw) is not bytes or _asset_hashlib.sha256(raw).hexdigest() != digest:
+            raise ValueError("exact historical or adapter source")
+    historical = ["H039_INSTALLER", "H039_RUNTIME_PRESTORE_EXIT_DIAGNOSTIC",
+                  "H039_ROOT_BOOTSTRAP_EXIT_DIAGNOSTIC", "H039_MEDIATOR_SHA256",
+                  "H039_MEDIATOR_SIZE", "H039_ROOT_ENTRY_FD0_NORMALIZATION",
+                  "H039_OLD_MEDIATOR_SHA256", "H039_OLD_MEDIATOR_SIZE",
+                  "H039_R15_MEDIATOR_SHA256", "H039_R15_MEDIATOR_SIZE",
+                  "H039_R15_OLD_MEDIATOR_SHA256", "H039_R15_OLD_MEDIATOR_SIZE"]
+    prolog = ("/* Gate-generated asset branches; no installation authority. */\n"
+              "#if defined(H039_ASSET_CONTAINER) && defined(H039_LISTENER_ADAPTER)\n"
+              "#error mixed_asset_selection\n#endif\n"
+              "#if defined(H039_ASSET_CONTAINER) || defined(H039_LISTENER_ADAPTER)\n#if "
+              + " || ".join("defined(" + name + ")" for name in historical)
+              + "\n#error historical_asset_selection\n#endif\n#endif\n"
+              "#if defined(H039_ASSET_CONTAINER)\n"
+              "#if H039_ASSET_CONTAINER != 1\n#error asset_selector_value\n#endif\n"
+              "int main(void){return 2;}\n"
+              "#elif defined(H039_LISTENER_ADAPTER)\n"
+              "#if H039_LISTENER_ADAPTER != 1\n#error asset_selector_value\n#endif\n")
+    # Unknown -D names are rejected by exact recipe argv, not by this CPP prolog.
+    return prolog.encode("ascii") + adapter + b"\n#else\n" + legacy + b"\n#endif\n"
+
+
+def h039_asset_draft_reference_recipe() -> dict:
+    """Finite relative-path recipe PROPOSAL; no subprocess or build-root creation.
+
+    Authenticated tool/header/link closure, confinement and output bounds remain
+    required before any compiler execution. Relative paths resolve only below
+    separately authenticated, initially absent build-a/build-b roots.
+    """
+    clt = "/Library/Developer/CommandLineTools"
+    sdk = clt + "/SDKs/MacOSX26.5.sdk"
+    py = clt + "/Library/Frameworks/Python3.framework/Versions/3.9"
+    clang = clt + "/usr/bin/clang"
+    common = [clang, "--no-default-config", "-target", "arm64-apple-macos14.0",
+              "-isysroot", sdk, "-resource-dir", clt + "/usr/lib/clang/21",
+              "-nostdinc", "-isystem",
+              clt + "/usr/lib/clang/21/include", "-isystem", sdk + "/usr/include",
+              "-std=c11", "-O0", "-fPIC", "-fno-modules", "-fno-implicit-modules",
+              "-fno-implicit-module-maps", "-Wall", "-Wextra", "-Werror"]
+    source = "mediator.c"
+    commands = []
+    for name, selector in [("adapter", "H039_LISTENER_ADAPTER"),
+                           ("container", "H039_ASSET_CONTAINER")]:
+        selected = common + (["-isystem", py + "/Headers"] if name == "adapter" else [])
+        selected += ["-D" + selector + "=1"]
+        commands += [selected + ["-E", "-P", source, "-o", name + ".i"],
+                     selected + ["-S", "-emit-llvm", source, "-o", name + ".ll"],
+                     selected + ["-MD", "-MF", name + ".d", "-c", source,
+                                 "-o", name + ".o"]]
+    commands += [[clt + "/usr/bin/ld", "-bundle", "-arch", "arm64",
+                  "-platform_version", "macos", "14.0", "26.5", "-syslibroot", sdk,
+                  "-undefined", "error", "-o", "adapter.so", "adapter.o",
+                  py + "/Python3", sdk + "/usr/lib/libSystem.B.tbd"],
+                 [clang, "--no-default-config", "-target", "arm64-apple-macos14.0",
+                  "-isysroot", sdk, "-Wl,-pie", "-Wl,-segprot,__H039RO,r,r",
+                  "-Wl,-sectcreate,__H039RO,__h039med,retained-runtime",
+                  "-Wl,-sectcreate,__H039RO,__h039lst,adapter.so",
+                  "container.o", "-o", "container"]]
+    return {"schema_version": 1, "status": "DRAFT_NOT_COMPILE_AUTHORITY",
+            "roots": ["build-a", "build-b"], "umask": "0077",
+            "environment": {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C",
+                            "ZERO_AR_DATE": "1", "TMPDIR": "."},
+            "source": source, "retained_runtime": "retained-runtime",
+            "required_tool_sha256": {
+                clang: "f30550eab15fdf5ab8c0dc54c52679711241e5d4b636b027e18c09fef531775d",
+                clt + "/usr/bin/ld": "28d85b9af18c923db12e0b4ce70b80ee217f2b7cade0e872baa9e8ddc396c08d",
+                clt + "/usr/bin/llvm-objdump": "1dcc1432db4d828cf8cd71a84cb8d9bf63a7ca80b5eeec711a9e5f13a3f5f98e"},
+            "required_link_input_sha256": {
+                py + "/Python3": "26422f0b21cb1e07236384afa4043c7401d39d09358c91df8bf3f5496f14712f",
+                sdk + "/usr/lib/libSystem.B.tbd": "20cfce043f11a083e2eb6111efe3579919a8082fa4cc912a7bd839af2010ec57"},
+            "pin_status": "REVIEWED_INVENTORY_VALUES_REAUTHENTICATION_REQUIRED_NO_LOADED_IMAGE_CREDIT",
+            "commands": commands,
+            "outputs": ["adapter.i", "adapter.ll", "adapter.d", "adapter.o",
+                        "container.i", "container.ll", "container.d", "container.o",
+                        "adapter.so", "container"],
+            "comparison": "PER_ARTIFACT_BYTES_ACROSS_INDEPENDENT_ROOTS_NOT_EXECUTION",
+            "runtime_role": "RETAINED_PUBLISHED_RUNTIME_BYTES_NOT_REPRODUCED",
+            "container_role": "INERT_ASSET_CONTAINER",
+            "unresolved": ["AUTHENTICATED_TOOL_HEADER_LINK_AND_LOADER_CLOSURE",
+                           "CONFINED_DRIVER_AND_EXACT_TEMP_OUTPUT_POLICY",
+                           "BOUNDED_STATIC_MACHO_IR_DISASSEMBLY_PARSERS",
+                           "MEASURED_BYTE_LINE_OUTPUT_BUDGETS",
+                           "TWO_INDEPENDENT_PRECOMPILE_REVIEWS"]}
+
+
+def h039_asset_draft_graph_shape(contract: object, candidate: object,
+                                parents: object, changes: object) -> bool:
+    """Pure direct-child criterion, NOT authentication of caller-provided Git facts."""
+    if not all(type(value) is str and len(value) == 40
+               and all(c in "0123456789abcdef" for c in value)
+               for value in [contract, candidate]):
+        return False
+    return (candidate != contract and type(parents) is list and parents == [contract]
+            and h039_asset_draft_product_change_shape(changes))
+
+
+def h039_asset_draft_preserved_products_exact(before: object, after: object) -> bool:
+    """Complete authenticated tracked blob/mode maps required; no filesystem/Git IO."""
+    if type(before) is not dict or type(after) is not dict or before.keys() != after.keys():
+        return False
+    changed = {"controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+               "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"}
+    required = changed | {"verify/h039/runtime-cleanup-mediator",
+                          "controller/authority/core.py", "specs/owner-production-paths.v1.json"}
+    # Complete tree membership must additionally be derived from authenticated Git.
+    if not required <= before.keys():
+        return False
+    if not all(type(path) is str and type(row) is tuple and len(row) == 2
+               and type(row[0]) is str and row[0] in {"100644", "100755"}
+               and type(row[1]) is bytes for mapping in [before, after]
+               for path, row in mapping.items()):
+        return False
+    return (all(before[path][0] == after[path][0] for path in before)
+            and all(before[path] == after[path] for path in before if path not in changed))
+
+
+def h039_asset_draft_material_sections_exact(sections: object, runtime: bytes,
+                                           adapter: bytes) -> bool:
+    """Payload predicate only, not an outer Mach-O parser or execution-graph proof."""
+    if (type(runtime) is not bytes or type(adapter) is not bytes or not adapter
+            or _asset_hashlib.sha256(runtime).hexdigest() !=
+            "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7"):
+        return False
+    expected = [("__H039RO", "__h039med", 1, 1, runtime),
+                ("__H039RO", "__h039lst", 1, 1, adapter)]
+    return (type(sections) is list and all(type(row) is tuple and len(row) == 5
+            and type(row[0]) is str and type(row[1]) is str
+            and type(row[2]) is int and type(row[3]) is int and type(row[4]) is bytes
+            for row in sections) and sections == expected)
+
+
+def h039_asset_draft_pure_controls(current: bytes, reviewed_sha256: str,
+                                 spec: bytes, legacy: bytes, adapter: bytes,
+                                 runtime: bytes) -> list:
+    """Uncalled deterministic control suite; no file IO/compiler/native/historical exec."""
+    source = h039_asset_draft_reference_source(legacy, adapter)
+    recipe = h039_asset_draft_reference_recipe()
+    changes = [("controller/runtime-cleanup/install", "100755", "100755", "M"),
+               ("controller/runtime-cleanup/native/mediator.c", "100644", "100644", "M"),
+               ("verify/h039/build-recipe.json", "100644", "100644", "M"),
+               ("verify/h039/identity-manifest.json", "100644", "100644", "M")]
+    before = {path: (old, b"fixture") for path, old, new, status in changes}
+    before.update({"verify/h039/runtime-cleanup-mediator": ("100755", runtime),
+                   "controller/authority/core.py": ("100644", b"core fixture"),
+                   "specs/owner-production-paths.v1.json": ("100644", b"registry fixture")})
+    altered = dict(before)
+    altered["verify/h039/runtime-cleanup-mediator"] = ("100755", runtime + b"x")
+    sections = [("__H039RO", "__h039med", 1, 1, runtime),
+                ("__H039RO", "__h039lst", 1, 1, b"adapter fixture bytes")]
+    refusal = b"raise SystemExit(2)\n# H039_ASSET_DRAFT_END"
+    singleton_end = b'      "h039_os_exclusive_runtime_cleanup": {\n'
+    sibling = b'      "UNREVIEWED_SIBLING": true,\n'
+    draft_begin = b'      "h039_protected_listener_asset_draft": {\n'
+    if spec.count(draft_begin) != 1 or spec.count(singleton_end) != 1:
+        raise ValueError("duplicate-status fixture member cardinality")
+    left, right = spec.index(draft_begin), spec.index(singleton_end)
+    if right <= left:
+        raise ValueError("duplicate-status fixture member order")
+    member = spec[left:right]
+    status_lines = [line for line in member.splitlines(keepends=True)
+                    if line.startswith(b'        "status": ')]
+    if len(status_lines) != 1 or member.count(status_lines[0]) != 1:
+        raise ValueError("duplicate-status fixture status cardinality")
+    status_line = status_lines[0]
+    status = _asset_json.loads(b"{" + status_line.strip().removesuffix(b",") + b"}",
+                              object_pairs_hook=h039_asset_draft_unique_object)
+    if list(status) != ["status"] or type(status["status"]) is not str:
+        raise ValueError("duplicate-status fixture status member")
+    duplicate_status = spec[:left] + member.replace(status_line, status_line * 2, 1) + spec[right:]
+    if duplicate_status == spec:
+        raise ValueError("duplicate-status fixture unchanged")
+    controls = [
+        ("held_source", h039_asset_draft_current_source_exact(current, reviewed_sha256)),
+        ("held_spec", h039_asset_draft_spec_exact(spec)),
+        ("refusal_removed", not h039_asset_draft_current_source_exact(
+            current.replace(refusal, b"# H039_ASSET_DRAFT_END"), reviewed_sha256)),
+        ("premature_zero", not h039_asset_draft_current_source_exact(
+            current.replace(refusal, b"raise SystemExit(0)\n# H039_ASSET_DRAFT_END"), reviewed_sha256)),
+        ("unknown_sibling", not h039_asset_draft_spec_exact(
+            spec.replace(singleton_end, sibling + singleton_end))),
+        ("duplicate_status", duplicate_status != spec
+         and not h039_asset_draft_spec_exact(duplicate_status)),
+        ("source_determinism", source == h039_asset_draft_reference_source(legacy, adapter)),
+        ("legacy_contiguous", source.endswith(legacy + b"\n#endif\n")),
+        ("recipe_determinism", recipe == h039_asset_draft_reference_recipe()),
+        ("declared_output_tail_only", recipe["outputs"][-2:] == ["adapter.so", "container"]),
+        ("container_no_python_arguments", all("Python" not in arg
+            for index in [3, 4, 5, 7] for arg in recipe["commands"][index])),
+        ("adapter_python_headers_present", all(any(arg.endswith("Python3.framework/Versions/3.9/Headers")
+            for arg in recipe["commands"][index]) for index in [0, 1, 2])),
+        ("unknown_define", not h039_asset_draft_compilation_selectors_exact(
+            "INERT_ASSET_CONTAINER", {"H039_ASSET_CONTAINER": "1", "H039_UNKNOWN": "1"})),
+        ("mixed_define", not h039_asset_draft_compilation_selectors_exact(
+            "INERT_ASSET_CONTAINER", {"H039_ASSET_CONTAINER": "1", "H039_LISTENER_ADAPTER": "1"})),
+        ("noarg_not_done", h039_asset_draft_argv_shape([]) == "H039_COMPLETION_UNPROVEN"),
+        ("direct_child", h039_asset_draft_graph_shape("a" * 40, "b" * 40, ["a" * 40], changes)),
+        ("wrong_parent", not h039_asset_draft_graph_shape("a" * 40, "b" * 40, ["c" * 40], changes)),
+        ("second_parent", not h039_asset_draft_graph_shape("a" * 40, "b" * 40,
+                                                         ["a" * 40, "c" * 40], changes)),
+        ("unchanged_products", h039_asset_draft_preserved_products_exact(before, before)),
+        ("runtime_changed", not h039_asset_draft_preserved_products_exact(before, altered)),
+        ("exact_sections", h039_asset_draft_material_sections_exact(sections, runtime, b"adapter fixture bytes")),
+        ("duplicate_section", not h039_asset_draft_material_sections_exact(sections + sections[:1], runtime, b"adapter fixture bytes")),
+        ("section_order_changed", not h039_asset_draft_material_sections_exact(sections[::-1], runtime, b"adapter fixture bytes")),
+        ("section_payloads_swapped", not h039_asset_draft_material_sections_exact(
+            [sections[0][:4] + (sections[1][4],), sections[1][:4] + (sections[0][4],)],
+            runtime, b"adapter fixture bytes")),
+        ("section_names_swapped_payloads_fixed", not h039_asset_draft_material_sections_exact(
+            [(sections[0][0], sections[1][1]) + sections[0][2:],
+             (sections[1][0], sections[0][1]) + sections[1][2:]], runtime, b"adapter fixture bytes")),
+    ]
+    for index in [0, 1]:
+        for protection in [2, 3]:
+            for value in [0, 3, 5]:
+                changed_sections = list(sections)
+                row = list(sections[index])
+                row[protection] = value
+                changed_sections[index] = tuple(row)
+                controls.append(("section_%d_protection_%d_value_%d" % (index, protection, value),
+                                 not h039_asset_draft_material_sections_exact(
+                                     changed_sections, runtime, b"adapter fixture bytes")))
+    for label, historical, selected in [("changed_legacy", legacy + b"x", adapter),
+                                        ("changed_adapter", legacy, adapter + b"x")]:
+        try:
+            h039_asset_draft_reference_source(historical, selected)
+        except ValueError as exc:
+            controls.append((label, str(exc) == "exact historical or adapter source"))
+        else:
+            controls.append((label, False))
+    return controls
+
+
+def h039_asset_draft_recipe_exact(raw: bytes) -> bool:
+    """Independent serialized-input lens; duplicate-free exact canonical JSON types."""
+    if type(raw) is not bytes:
+        return False
+    try:
+        parsed = _asset_json.loads(raw, object_pairs_hook=h039_asset_draft_unique_object)
+        actual = _asset_json.dumps(parsed, sort_keys=True, separators=(",", ":"),
+                                   ensure_ascii=True, allow_nan=False)
+        expected = _asset_json.dumps(h039_asset_draft_reference_recipe(), sort_keys=True,
+                                     separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+        return actual == expected
+    except (ValueError, TypeError, UnicodeError):
+        return False
+
+
+def h039_asset_draft_outer_macho_model(raw: bytes, runtime: bytes, adapter: bytes) -> bool:
+    """Bounded synthetic ARM64 outer-file model, NOT acceptance of compiler output.
+
+    SDK26.5 loader.h: header64=32, segment64=72, section64=80, LC_MAIN=24.
+    Closed model admits only two segments and LC_MAIN; no dylib, linker, fixup,
+    thread, initializer or other load command. Actual linked shape is unmeasured.
+    """
+    if not all(type(value) is bytes for value in [raw, runtime, adapter]):
+        return False
+    if not runtime or not adapter or not 440 <= len(raw) <= 1048576:
+        return False
+    try:
+        header = _asset_struct.unpack_from("<8I", raw)
+        if header != (0xfeedfacf, 0x100000c, 0, 2, 3, 408, 0, 0):
+            return False
+        cursor, segments, sections, entries = 32, [], [], []
+        for unused in range(3):
+            cmd, size = _asset_struct.unpack_from("<II", raw, cursor)
+            if size < 8 or size % 8 or cursor + size > 440:
+                return False
+            if cmd == 0x19:
+                if size < 72:
+                    return False
+                row = _asset_struct.unpack_from("<II16sQQQQiiII", raw, cursor)
+                name, vm, vs, off, fs, maximum, initial, count, flags = row[2:]
+                expected_name = b"__TEXT" if not segments else b"__H039RO"
+                if name != expected_name.ljust(16, b"\0") or flags or count != len(segments) + 1:
+                    return False
+                if size != 72 + 80 * count or vs < fs or not fs or off + fs > len(raw):
+                    return False
+                if vm + vs > 2**64 or (maximum, initial) != ((5, 5) if not segments else (1, 1)):
+                    return False
+                if not segments and (off != 0 or fs < 440):
+                    return False
+                for oldvm, oldvs, oldoff, oldfs in segments:
+                    if (max(vm, oldvm) < min(vm + vs, oldvm + oldvs)
+                            or max(off, oldoff) < min(off + fs, oldoff + oldfs)):
+                        return False
+                segments.append((vm, vs, off, fs))
+                for index in range(count):
+                    section = _asset_struct.unpack_from("<16s16sQQ8I", raw, cursor + 72 + index * 80)
+                    sn, owner, addr, amount, so, align, reloc, nreloc, sf, r1, r2, r3 = section
+                    expected_section = b"__text" if len(segments) == 1 else [b"__h039med", b"__h039lst"][index]
+                    if sn != expected_section.ljust(16, b"\0") or owner != name:
+                        return False
+                    if not amount or align > 31 or so % (1 << align) or addr % (1 << align):
+                        return False
+                    if reloc or nreloc or r1 or r2 or r3 or sf != (0x80000400 if len(segments) == 1 else 0):
+                        return False
+                    if not (off <= so and so + amount <= off + fs
+                            and vm <= addr and addr + amount <= vm + vs
+                            and addr - vm == so - off and so >= 440):
+                        return False
+                    for oldaddr, oldamount, oldso in sections:
+                        if (max(addr, oldaddr) < min(addr + amount, oldaddr + oldamount)
+                                or max(so, oldso) < min(so + amount, oldso + oldamount)):
+                            return False
+                    sections.append((addr, amount, so))
+            elif cmd == 0x80000028 and size == 24:
+                entry, stack = _asset_struct.unpack_from("<QQ", raw, cursor + 8)
+                if stack or entries:
+                    return False
+                entries.append(entry)
+            else:
+                return False
+            cursor += size
+        if cursor != 440 or len(segments) != 2 or len(sections) != 3 or len(entries) != 1:
+            return False
+        # One admitted code interval only; entry must select its actual first byte.
+        code = bytes.fromhex("40008052c0035fd6")  # synthetic mov w0,#2; ret model
+        text, med, lst = sections
+        return (entries == [text[2]] and text[1] == len(code)
+                and raw[text[2]:text[2] + text[1]] == code
+                and med[1] == len(runtime) and raw[med[2]:med[2] + med[1]] == runtime
+                and lst[1] == len(adapter) and raw[lst[2]:lst[2] + lst[1]] == adapter
+                and segments[0][3] == text[2] + text[1]
+                and segments[1][2] == med[2] and med[2] + med[1] == lst[2]
+                and segments[1][3] == med[1] + lst[1]
+                and len(raw) == lst[2] + lst[1]
+                and not any(raw[440:text[2]])
+                and not any(raw[text[2] + text[1]:med[2]]))
+    except (ValueError, OverflowError, IndexError, _asset_struct.error):
+        return False
+
+
+def h039_asset_draft_synthetic_container(runtime: bytes, adapter: bytes) -> bytes:
+    """Non-runnable test bytes only; never compiler or product evidence."""
+    if not all(type(value) is bytes and value for value in [runtime, adapter]):
+        raise ValueError("nonempty synthetic payloads")
+    if len(runtime) + len(adapter) > 1048576 - 16384:
+        raise ValueError("synthetic bound")
+    pack = _asset_struct.pack
+    vm, textoff, rooff = 0x100000000, 4096, 16384
+    code = bytes.fromhex("40008052c0035fd6")
+    header = pack("<8I", 0xfeedfacf, 0x100000c, 0, 2, 3, 408, 0, 0)
+    text = pack("<II16sQQQQiiII", 0x19, 152, b"__TEXT", vm, textoff + 8, 0, textoff + 8, 5, 5, 1, 0)
+    text += pack("<16s16sQQ8I", b"__text", b"__TEXT", vm + textoff, 8, textoff, 2, 0, 0, 0x80000400, 0, 0, 0)
+    total = len(runtime) + len(adapter)
+    ro = pack("<II16sQQQQiiII", 0x19, 232, b"__H039RO", vm + rooff, total, rooff, total, 1, 1, 2, 0)
+    ro += pack("<16s16sQQ8I", b"__h039med", b"__H039RO", vm + rooff, len(runtime), rooff, 0, 0, 0, 0, 0, 0, 0)
+    ro += pack("<16s16sQQ8I", b"__h039lst", b"__H039RO", vm + rooff + len(runtime), len(adapter), rooff + len(runtime), 0, 0, 0, 0, 0, 0, 0)
+    commands = header + text + ro + pack("<IIQQ", 0x80000028, 24, textoff, 0)
+    return commands + bytes(textoff - len(commands)) + code + bytes(rooff - textoff - 8) + runtime + adapter
+
+
+def h039_asset_draft_parser_controls() -> list:
+    """Synthetic input mutations; no native execution or compiler proof."""
+    runtime, adapter = b"runtime model", b"adapter model"
+    raw = h039_asset_draft_synthetic_container(runtime, adapter)
+    controls = [("synthetic_outer_positive", h039_asset_draft_outer_macho_model(raw, runtime, adapter))]
+    # Fixed SDK field offsets in independently inspectable two-segment fixture.
+    changes = [("unknown_load_command", 32, "<I", 0x80000022),
+               ("competing_entry", 416, "<I", 5),
+               ("entry_decoy", 424, "<Q", 4100),
+               ("ro_maxprot_write", 240, "<I", 3),
+               ("ro_initprot_execute", 244, "<I", 5),
+               ("ro_vm_overlap", 208, "<Q", 0x100000000),
+               ("ro_file_overlap", 224, "<Q", 4096),
+               ("section_owner", 272, "<16s", b"__TEXT"),
+               ("section_initializer", 320, "<I", 0x16),
+               ("section_file_mapping_relation", 384, "<I", 16384),
+               ("section_vm_mapping_relation", 368, "<Q", 0x100004000),
+               ("load_command_overflow", 36, "<I", 0xfffffff8),
+               ("main_return_zero", 4096, "<I", 0x52800000)]
+    for label, offset, format_string, value in changes:
+        changed = bytearray(raw)
+        _asset_struct.pack_into(format_string, changed, offset, value)
+        controls.append((label, not h039_asset_draft_outer_macho_model(bytes(changed), runtime, adapter)))
+    overlap = bytearray(raw)
+    _asset_struct.pack_into("<Q", overlap, 368, 0x100004000)
+    _asset_struct.pack_into("<I", overlap, 384, 16384)
+    controls.append(("section_coherent_file_vm_overlap", not h039_asset_draft_outer_macho_model(bytes(overlap), runtime, adapter)))
+    swapped = bytearray(raw)
+    swapped[256:272], swapped[336:352] = swapped[336:352], swapped[256:272]
+    controls.append(("names_swapped_payloads_fixed", not h039_asset_draft_outer_macho_model(bytes(swapped), runtime, adapter)))
+    swapped = raw[:16384] + adapter + runtime
+    controls.append(("payloads_swapped_names_fixed", not h039_asset_draft_outer_macho_model(swapped, runtime, adapter)))
+    for offset in [240, 244]:
+        for value in [0, 3, 5, 7]:
+            changed = bytearray(raw)
+            _asset_struct.pack_into("<I", changed, offset, value)
+            controls.append(("outer_protection_%d_%d" % (offset, value),
+                             not h039_asset_draft_outer_macho_model(bytes(changed), runtime, adapter)))
+    for value in [0x9, 0xa, 0xd, 0x15, 0x16]:
+        changed = bytearray(raw)
+        _asset_struct.pack_into("<I", changed, 320, value)
+        controls.append(("closed_section_type_%d" % value,
+                         not h039_asset_draft_outer_macho_model(bytes(changed), runtime, adapter)))
+    inner = bytes.fromhex("cffaedfe28000080")
+    controls.append(("inner_macho_is_data", h039_asset_draft_outer_macho_model(
+        h039_asset_draft_synthetic_container(runtime, inner), runtime, inner)))
+    controls.append(("adapter_B_not_A", not h039_asset_draft_outer_macho_model(raw, runtime, b"adapter other")))
+    recipe = h039_asset_draft_reference_recipe()
+    controls.append(("recipe_positive", h039_asset_draft_recipe_exact(_asset_json.dumps(recipe).encode())))
+    for label, key, value in [("recipe_bool", "schema_version", True),
+                              ("recipe_float", "schema_version", 1.0),
+                              ("recipe_unknown_key", "UNKNOWN", None),
+                              ("recipe_extra_command", "commands", recipe["commands"] + [["unexpected"]])]:
+        changed = dict(recipe)
+        changed[key] = value
+        controls.append((label, not h039_asset_draft_recipe_exact(_asset_json.dumps(changed).encode())))
+    controls.append(("recipe_duplicate", not h039_asset_draft_recipe_exact(
+        _asset_json.dumps(recipe).replace('"schema_version": 1', '"schema_version": 1, "schema_version": 1').encode())))
+    return controls
+
+
+def h039_asset_draft_actual_layout(kind: str) -> dict:
+    """Closed measured CLT21/SDK26.5 shape, not a general Mach-O policy.
+
+    Constants came from two independent fixed-recipe lanes, not candidate
+    manifests. They become acceptance authority only after contract review.
+    SDK loader.h supplies structure layouts; all image offsets are measured.
+    """
+    if kind not in ("container", "adapter.so"):
+        raise ValueError("actual material kind")
+    container = kind == "container"
+    vm = 0x100000000 if container else 0
+    # segment: name, vmaddr, vmsize, fileoff, filesize, max, init, flags, sections
+    # section: name, address, size, offset, align, flags, reserved1, reserved2
+    segments = [
+        ("__PAGEZERO", 0, vm, 0, 0, 0, 0, 0, []),
+        ("__TEXT", vm, 16384, 0, 16384, 5, 5, 0, [
+            ("__text", vm + 1040, 20, 1040, 2, 0x80000400, 0, 0),
+            ("__unwind_info", vm + 1060, 88, 1060, 2, 0, 0, 0)]),
+        ("__H039RO", vm + 16384, 163840, 16384, 163840, 1, 1, 4, [
+            ("__h039med", vm + 16384, 106736, 16384, 0, 0, 0, 0),
+            ("__h039lst", vm + 123120, 51176, 123120, 0, 0, 0, 0)]),
+        ("__LINKEDIT", vm + 180224, 16384, 180224, 1736, 1, 1, 0, [])
+    ] if container else [
+        ("__TEXT", 0, 16384, 0, 16384, 5, 5, 0, [
+            ("__text", 1304, 1676, 1304, 2, 0x80000400, 0, 0),
+            ("__stubs", 2980, 180, 2980, 2, 0x80000408, 0, 12),
+            ("__cstring", 3160, 470, 3160, 0, 2, 0, 0),
+            ("__unwind_info", 3632, 112, 3632, 2, 0, 0, 0)]),
+        ("__DATA_CONST", 16384, 16384, 16384, 16384, 3, 3, 16, [
+            ("__got", 16384, 152, 16384, 3, 6, 15, 0)]),
+        ("__DATA", 32768, 16384, 32768, 16384, 3, 3, 0, [
+            ("__h039abi", 32768, 256, 32768, 3, 0, 0, 0),
+            ("__data", 33024, 168, 33024, 3, 0, 0, 0)]),
+        ("__LINKEDIT", 49152, 16384, 49152, 2024, 1, 1, 0, [])
+    ]
+    pack = _asset_struct.pack
+    commands = []
+    for name, va, vs, off, size, maximum, initial, flags, sections in segments:
+        command = pack("<II16sQQQQiiII", 0x19, 72 + 80 * len(sections),
+                       name.encode(), va, vs, off, size, maximum, initial, len(sections), flags)
+        for sn, addr, amount, so, align, sf, r1, r2 in sections:
+            command += pack("<16s16sQQ8I", sn.encode(), name.encode(), addr,
+                            amount, so, align, 0, 0, sf, r1, r2, 0)
+        commands.append(("SEGMENT", command))
+    fixoff, fixsize, expoff, expsize = (180224, 56, 180280, 48) if container else (49152, 448, 49600, 72)
+    symoff, nsyms, stroff, strsize = (180336, 2, 180368, 32) if container else (49680, 27, 50248, 392)
+    signature = (180400, 1560, 20) if container else (50640, 536, 1676)
+    commands += [("FIXUP_COMMAND", pack("<4I", 0x80000034, 16, fixoff, fixsize)),
+                 ("EXPORT_COMMAND", pack("<4I", 0x80000033, 16, expoff, expsize)),
+                 ("SYMTAB_COMMAND", pack("<6I", 2, 24, symoff, nsyms, stroff, strsize))]
+    dysym = (0, 0, 0, 2, 2, 0) + (0,) * 12 if container else (
+        0, 6, 6, 2, 8, 19, 0, 0, 0, 0, 0, 0, 50112, 34, 0, 0, 0, 0)
+    commands.append(("DYSYMTAB_COMMAND", pack("<20I", 0xb, 80, *dysym)))
+    if container:
+        commands.append(("DYLINKER", pack("<III", 0xe, 32, 12) + b"/usr/lib/dyld\0" + bytes(6)))
+    commands += [("UUID", pack("<II", 0x1b, 24) + bytes.fromhex(
+                    "080e82fc14ab34beb95ef1be04acdda9" if container else "dfe8587d374b30d1861cb0d344d148ad")),
+                 ("BUILD_VERSION", pack("<8I", 0x32, 32, 1, 0xe0000, 0x1a0500, 1, 3, 0x4f30000)),
+                 ("SOURCE_VERSION", pack("<IIQ", 0x2a, 16, 0))]
+    if container:
+        commands.append(("ENTRY", pack("<IIQQ", 0x80000028, 24, 1040, 0)))
+    else:
+        name = b"@rpath/Python3.framework/Versions/3.9/Python3\0"
+        commands.append(("PYTHON_DEPENDENCY", pack("<6I", 0xc, 72, 24, 2, 0x30900, 0x30900)
+                         + name + bytes(48 - len(name))))
+    name = b"/usr/lib/libSystem.B.dylib\0"
+    commands += [("SYSTEM_DEPENDENCY", pack("<6I", 0xc, 56, 24, 2, 0x54c0000, 0x10000)
+                  + name + bytes(32 - len(name))),
+                 ("FUNCTION_STARTS_COMMAND", pack("<4I", 0x26, 16, expoff + expsize, 8)),
+                 ("DATA_IN_CODE_COMMAND", pack("<4I", 0x29, 16, symoff, 0)),
+                 ("SIGNATURE_COMMAND", pack("<4I", 0x1d, 16, signature[0], signature[1]))]
+    # Every non-payload file region is either exact structured material, a
+    # reviewed immutable region, or zero padding. No opaque executable slack.
+    regions = [
+        ("UNWIND", 1060, 88, "8e49999106074d5ad5cf640fef39d968a8ae1bf3a06d61e9f37f86a996e4810c"),
+        ("FIXUPS", 180224, 56, "79ea0a68351986957654faa165ab71f04229d089ec2fe02e7cc7e23a6628b99f"),
+        ("EXPORTS", 180280, 48, "2c76df618c6557a5144d6137cc5c9c267d520ccd17d13e6111ce91685b3be2df"),
+        ("FUNCTION_STARTS", 180328, 8, "37dbc6f08b419bc821c0c2f30f89222907902b9481b7aa9958cb9591222858fe")
+    ] if container else [
+        ("CODE", 1304, 1676, "b7b5e2440e74bec63349a014df00f415e5684fc200e39fce572a0518ab42a5c3"),
+        ("STUBS", 2980, 180, "010f49d952499a189f3543f20f612f4ae7611be247310dc6abfc7d4ba5936286"),
+        ("STRINGS", 3160, 470, "8c70fa71265944d9b496154d8f2b32b15cdfa83397d21d9adbff256bd2c0a7d4"),
+        ("UNWIND", 3632, 112, "f1e5e9e87c32daa7584e0a8140f4bdba83246906eb9bcffff22f70dec7134a52"),
+        ("GOT", 16384, 152, "157ac58ea92021e3851b5d57e5be0774f70f49c2054e6a0b5b402bd3f240b85a"),
+        ("DATA", 33024, 168, "02f4770ed2089204013f7697127f7c99112b1eb9365a56584b8eb9341150d00b"),
+        ("FIXUPS", 49152, 448, "d944e8721950c25fb9092c55c0c15fb86965b4856946d1f3dcb15fb2b700dce2"),
+        ("EXPORTS", 49600, 72, "f36d2ffa597db1def6c6f3eae171c42dbfeca2077f7acd288c26376690b0a3c3"),
+        ("FUNCTION_STARTS", 49672, 8, "3e978cf60e336da4555973eb1db217f28bb81e036c0dd07a524d46ecfaabe8a5")
+    ]
+    symbols = [("__mh_execute_header", 15, 1, 16, vm), ("_main", 15, 1, 0, vm + 1040)] if container else [
+        ("_query_received_listener", 14, 1, 0, 1336), ("__Py_IS_TYPE", 14, 1, 0, 2576),
+        ("_refuse", 14, 1, 0, 2616), ("_same_identity", 14, 1, 0, 2668),
+        ("_module", 14, 7, 0, 33024), ("_methods", 14, 7, 0, 33128),
+        ("_H039_ABI_VALUES", 15, 6, 0, 32768), ("_PyInit__h039_listener_v1", 15, 1, 0, 1304)]
+    if not container:
+        symbols += [(name, 1, 0, 256, 0) for name in (
+            "_PyErr_Format", "_PyErr_Occurred", "_PyErr_SetFromErrno", "_PyErr_SetString",
+            "_PyExc_OSError", "_PyExc_ValueError", "_PyLong_AsLong", "_PyLong_Type",
+            "_PyModule_Create2", "__Py_BuildValue_SizeT")]
+        symbols += [(name, 1, 0, 512, 0) for name in (
+            "___error", "___stack_chk_fail", "___stack_chk_guard", "_bzero", "_fcntl",
+            "_fstat", "_getpid", "_memchr", "_proc_pidfdinfo")]
+    return {"header": (0xfeedfacf, 0x100000c, 0, 2 if container else 8,
+                        17 if container else 16, 976 if container else 1232,
+                        0x200085 if container else 0x85, 0),
+            "size": 181960 if container else 51176, "segments": segments,
+            "commands": commands, "regions": regions, "symbols": symbols,
+            "symtab": (symoff, nsyms, stroff, strsize), "signature": signature,
+            "abi": (792, 8, 24, 8, 768, 8, 136, 8, 528, 8, 106, 1, 24, 160, 152,
+                    232, 164, 240, 528, 16, 255, 0, 1, 2, 104, 2, 4, 4, 4, 4, 1, 1)}
+
+
+def h039_asset_draft_actual_signature(raw: bytes, kind: str) -> str:
+    """Pure linker-adhoc structure/pages only; never Apple trust or loading.
+
+    Apple XNU osfmk/kern/cs_blobs.h __CodeDirectory through 0x20400:
+    88-byte header, CS_ADHOC|CS_LINKER_SIGNED, SHA256, log2(page)=12.
+    No historical installer's CS_RUNTIME policy is changed or inherited here.
+    """
+    if type(raw) is not bytes or kind not in ("container", "adapter.so"):
+        return "SIGNATURE_INPUT"
+    layout = h039_asset_draft_actual_layout(kind)
+    off, amount, code_length = layout["signature"]
+    if len(raw) != off + amount:
+        return "SIGNATURE_RANGE"
+    signature = raw[off:]
+    ident = kind.encode("ascii") + b"\0"
+    slots = (off + 4095) // 4096
+    hash_offset = 88 + len(ident)
+    cd_length = hash_offset + slots * 32
+    super_length = 20 + cd_length
+    expected_super = _asset_struct.pack(">5I", 0xfade0cc0, super_length, 1, 0, 20)
+    if signature[:20] != expected_super:
+        return "SIGNATURE_SUPERBLOB"
+    expected_cd = _asset_struct.pack(">9I4B4I4Q", 0xfade0c02, cd_length, 0x20400,
+        0x20002, hash_offset, 88, 0, slots, off, 32, 2, 0, 12,
+        0, 0, 0, 0, 0, 0, code_length, 1 if kind == "container" else 0)
+    if signature[20:108] != expected_cd:
+        return "SIGNATURE_CODEDIRECTORY"
+    if signature[108:20 + hash_offset] != ident:
+        return "SIGNATURE_IDENTIFIER"
+    if amount != (super_length + 7) // 8 * 8 or any(signature[super_length:]):
+        return "SIGNATURE_PADDING"
+    for index in range(slots):
+        page = raw[index * 4096:min(off, (index + 1) * 4096)]
+        start = 20 + hash_offset + index * 32
+        if signature[start:start + 32] != _asset_hashlib.sha256(page).digest():
+            return "SIGNATURE_PAGE_HASH"
+    return "OK"
+
+
+def h039_asset_draft_actual_macho(raw: bytes, kind: str,
+                                 runtime: bytes, adapter: bytes) -> str:
+    """Semantic/region closure FIRST. Full image SHA is a separate last lens.
+
+    Exact commands bind all fields, including SG_NORELOC/SG_READ_ONLY flags,
+    nundef, section owner/mapping/relocs, initializer absence and entry order.
+    Fixed reviewed linkedit bytes close fixups/exports without a general dyld
+    interpreter; symbol rows additionally explain names, types and ordinals.
+    """
+    if kind not in ("container", "adapter.so") or not all(
+            type(value) is bytes for value in (raw, runtime, adapter)):
+        return "INPUT"
+    layout = h039_asset_draft_actual_layout(kind)
+    if len(raw) != layout["size"]:
+        return "SIZE"
+    if _asset_struct.unpack_from("<8I", raw) != layout["header"]:
+        return "HEADER"
+    cursor, occupied = 32, [(0, 32 + layout["header"][5])]
+    for label, expected in layout["commands"]:
+        cmd, amount = _asset_struct.unpack_from("<II", raw, cursor)
+        if cmd != _asset_struct.unpack_from("<I", expected)[0] or amount != len(expected):
+            return "LOAD_COMMAND_ORDER_SIZE"
+        actual = raw[cursor:cursor + amount]
+        if label == "SEGMENT":
+            if actual[56:64] != expected[56:64]:
+                return "SEGMENT_PERMISSIONS"
+            if actual[72:] != expected[72:]:
+                return "SECTION_DESCRIPTOR"
+        if actual != expected:
+            return label
+        cursor += amount
+    if cursor != 32 + layout["header"][5]:
+        return "LOAD_COMMAND_END"
+    if kind == "container":
+        if raw[1040:1060] != bytes.fromhex("ff4300d1ff0f00b940008052ff430091c0035fd6"):
+            return "ENTRY_CODE"
+        if len(runtime) != 106736 or raw[16384:123120] != runtime:
+            return "RUNTIME_PAYLOAD"
+        if len(adapter) != 51176 or raw[123120:174296] != adapter:
+            return "ADAPTER_PAYLOAD"
+        occupied += [(1040, 1060), (16384, 123120), (123120, 174296)]
+    else:
+        if _asset_struct.unpack_from("<32Q", raw, 32768) != layout["abi"]:
+            return "ADAPTER_ABI"
+        occupied.append((32768, 33024))
+    symoff, count, stroff, strsize = layout["symtab"]
+    strings, rows = raw[stroff:stroff + strsize], []
+    for index in range(count):
+        strx, ntype, nsect, desc, value = _asset_struct.unpack_from("<IBBHQ", raw, symoff + index * 16)
+        if not 0 < strx < strsize:
+            return "SYMBOL_STRING_RANGE"
+        end = strings.find(b"\0", strx)
+        if end < 0:
+            return "SYMBOL_STRING_RANGE"
+        try:
+            name = strings[strx:end].decode("ascii")
+        except UnicodeError:
+            return "SYMBOL_STRING_ENCODING"
+        rows.append((name, ntype, nsect, desc, value))
+    if rows != layout["symbols"]:
+        return "SYMBOL_ROWS"
+    # nlist/string canonical representation and indirect-symbol indices are
+    # exact bytes: semantic equality cannot hide unused names or altered slots.
+    sym_digest = ("eace2740b9ee2b9180f851323343c057ba3365e89bd2bb2e48d148c17595bc0a" if kind == "container"
+                  else "7708254384c0f57d7d1e0de744b01ac8d8f7bac6075e559baa1493ebefa6f7de")
+    if _asset_hashlib.sha256(raw[symoff:stroff + strsize]).hexdigest() != sym_digest:
+        return "SYMBOL_REGION"
+    occupied.append((symoff, stroff + strsize))
+    for label, off, amount, digest in layout["regions"]:
+        if _asset_hashlib.sha256(raw[off:off + amount]).hexdigest() != digest:
+            return label
+        occupied.append((off, off + amount))
+    result = h039_asset_draft_actual_signature(raw, kind)
+    if result != "OK":
+        return result
+    occupied.append((layout["signature"][0], len(raw)))
+    previous = 0
+    for left, right in sorted(occupied):
+        if left < previous or not left < right <= len(raw):
+            return "FILE_INTERVAL_OVERLAP"
+        if any(raw[previous:left]):
+            return "FILE_PADDING"
+        previous = right
+    if previous != len(raw):
+        return "FILE_TAIL"
+    return "OK"
+
+
+def h039_asset_draft_actual_material(outputs: dict, runtime: bytes) -> str:
+    """Composed actual bytes, no path/effects/manifest trust or native calls.
+
+    Fixed toolchain/source/relative filenames admit one measured byte result;
+    other legitimate compilers/layouts require a separately reviewed contract.
+    Cross-root determinism is checked by build_reference, not inferred here.
+    """
+    names = ("adapter.i", "adapter.ll", "adapter.d", "adapter.o", "container.i",
+             "container.ll", "container.d", "container.o", "adapter.so", "container")
+    if type(outputs) is not dict or set(outputs) != set(names) or not all(
+            type(outputs[name]) is bytes and 0 < len(outputs[name]) <= 1048576 for name in names):
+        return "OUTPUT_SCHEMA"
+    if type(runtime) is not bytes or len(runtime) != 106736 or _asset_hashlib.sha256(runtime).hexdigest() != (
+            "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7"):
+        return "TRUSTED_RUNTIME_INPUT"
+    if outputs["container.i"] != b"int main(void){return 2;}\n":
+        return "CONTAINER_PREPROCESS"
+    ir = outputs["container.ll"]
+    if (ir.count(b"define ") != 1 or b"define i32 @main() #0 {\n" not in ir
+            or b"  ret i32 2\n" not in ir or any(token in ir for token in (
+                b"call ", b"invoke ", b"declare ", b"@llvm.global_ctors", b"@llvm.global_dtors"))):
+        return "CONTAINER_IR"
+    abi = h039_asset_draft_actual_layout("adapter.so")["abi"]
+    line = ("@H039_ABI_VALUES = constant [32 x i64] [" + ", ".join("i64 " + str(n) for n in abi)
+            + '], section "__DATA,__h039abi", align 8\n').encode()
+    if outputs["adapter.ll"].count(line) != 1:
+        return "ADAPTER_IR_ABI"
+    adapter_ir = outputs["adapter.ll"]
+    definitions = [row for row in adapter_ir.splitlines() if row.startswith(b"define ")]
+    if definitions != [
+            b"define ptr @PyInit__h039_listener_v1() #0 {",
+            b"define internal ptr @query_received_listener(ptr noundef %0, ptr noundef %1) #0 {",
+            b"define internal i32 @_Py_IS_TYPE(ptr noundef %0, ptr noundef %1) #0 {",
+            b"define internal ptr @refuse(ptr noundef %0) #0 {",
+            b"define internal i32 @same_identity(ptr noundef %0, ptr noundef %1) #0 {"]:
+        return "ADAPTER_IR_DEFINITIONS"
+    init = (b"define ptr @PyInit__h039_listener_v1() #0 {\n"
+            b"  %1 = call ptr @PyModule_Create2(ptr noundef @module, i32 noundef 1013)\n"
+            b"  ret ptr %1\n}\n")
+    query = (b"  %92 = load i32, ptr %13, align 4\n"
+             b"  %93 = load i32, ptr %7, align 4\n"
+             b"  %94 = call i32 @proc_pidfdinfo(i32 noundef %92, i32 noundef %93, "
+             b"i32 noundef 3, ptr noundef %12, i32 noundef 792)\n")
+    if (adapter_ir.count(init) != 1 or adapter_ir.count(query) != 1
+            or adapter_ir.count(b"call i32 @proc_pidfdinfo(") != 1
+            or any(token in adapter_ir for token in (b"@llvm.global_ctors", b"@llvm.global_dtors", b"invoke "))):
+        return "ADAPTER_IR_ENTRY_QUERY"
+    obj = outputs["adapter.o"]
+    descriptor = _asset_struct.pack("<16s16sQQ8I", b"__h039abi", b"__DATA",
+                                    1680, 256, 2312, 3, 0, 0, 0, 0, 0, 0)
+    if (len(obj) != 5424 or obj[184:264] != descriptor
+            or _asset_struct.unpack_from("<32Q", obj, 2312) != abi):
+        return "ADAPTER_OBJECT_ABI"
+    for kind in ("adapter.so", "container"):
+        result = h039_asset_draft_actual_macho(outputs[kind], kind, runtime, outputs["adapter.so"])
+        if result != "OK":
+            return kind + ":" + result
+    # No mutation reaches generic identity until semantic/region/signature
+    # checks above completed; opaque intermediate bytes remain exactly pinned.
+    expected = (
+        (374340, "cc62b86b6ccdc50c96feba283de93e181d9c9d7ceb3482a4866cb8f7bbf7560b"),
+        (24994, "e63be921eced7c2de6357005b8881754d05f18f6a701b8ec21d7daad4f9d00fe"),
+        (32763, "f082346b75281cdca411790c9246ceefd098f9ed3f5bf68ede30dfd6489c119c"),
+        (5424, "dc74e336c98e4d8d0c418ca007cc37d71a99b9c5b3d1860c2fe1eb3b8f345e17"),
+        (26, "8e44727a9f77c05ac833f456fe5473048cdfc9139cab00b8993ba8260b5ddd74"),
+        (1154, "4aa6ececc0ef4bb346a8e034546e43e49b19813820ef3af320d8a87f150c4aa4"),
+        (24, "74132f32a4911c1fa5fc542403041eff3071650c63a103666e7f6313d596cc3b"),
+        (528, "492d07ced11ce98b5e4771966d5397bb3ca8a6ae0b83aebe302369d3f54602b0"),
+        (51176, "9f18b8dbc135d9d6e6d2395017e70827aaaf3752a9a0835a94a91b8235fda6ec"),
+        (181960, "563fcecdf4b4d7625baee7cffa09db53f087a63d437a2846e28912dbd4a598a3"))
+    for name, (size, digest) in zip(names, expected):
+        if len(outputs[name]) != size or _asset_hashlib.sha256(outputs[name]).hexdigest() != digest:
+            return "FINAL_IDENTITY:" + name
+    return "ACTUAL_STATIC_MATERIAL_ONLY_NOT_GATE_OR_LOADING_CREDIT"
+
+
+def h039_asset_draft_actual_reseal_control(raw: bytes, kind: str) -> bytes:
+    """Control construction only: rewrite in-memory code-page hashes, no signing.
+
+    Never an acceptance-path transformation or parameter. Structural/header
+    defects remain defects; only the unchanged signature's page slots change.
+    """
+    if type(raw) is not bytes:
+        raise ValueError("control bytes")
+    layout = h039_asset_draft_actual_layout(kind)
+    off, amount, unused = layout["signature"]
+    if len(raw) != off + amount:
+        raise ValueError("control length")
+    changed = bytearray(raw)
+    start = off + 20 + 88 + len(kind) + 1
+    for index in range((off + 4095) // 4096):
+        changed[start + index * 32:start + (index + 1) * 32] = _asset_hashlib.sha256(
+            raw[index * 4096:min(off, (index + 1) * 4096)]).digest()
+    return bytes(changed)
+
+
+def h039_asset_draft_actual_controls(outputs: dict, runtime: bytes) -> list:
+    """Single-fault actual-byte controls, predicted specific reasons before run.
+
+    Resealed semantic negatives prove they are not caught by a stale signature
+    or final SHA first. All edits are in memory; input mappings are not mutated.
+    """
+    verdict = "ACTUAL_STATIC_MATERIAL_ONLY_NOT_GATE_OR_LOADING_CREDIT"
+    controls = [("actual_positive", h039_asset_draft_actual_material(outputs, runtime) == verdict),
+                ("mapping_order_positive", h039_asset_draft_actual_material(
+                    dict(reversed(list(outputs.items()))), runtime) == verdict)]
+    extra = dict(outputs); extra["unexpected"] = b"x"
+    missing = dict(outputs); del missing["container"]
+    controls += [("output_extra", h039_asset_draft_actual_material(extra, runtime) == "OUTPUT_SCHEMA"),
+                 ("output_missing", h039_asset_draft_actual_material(missing, runtime) == "OUTPUT_SCHEMA"),
+                 ("wrong_trusted_runtime", h039_asset_draft_actual_material(outputs, runtime[:-1] + b"x")
+                  == "TRUSTED_RUNTIME_INPUT")]
+    cases = [
+        ("unknown_command", "container", 32, "<I", 0x80000018, "LOAD_COMMAND_ORDER_SIZE"),
+        ("command_size", "container", 36, "<I", 80, "LOAD_COMMAND_ORDER_SIZE"),
+        ("ro_max_write", "container", 392, "<I", 3, "SEGMENT_PERMISSIONS"),
+        ("ro_init_exec", "container", 396, "<I", 5, "SEGMENT_PERMISSIONS"),
+        ("section_owner", "container", 424, "<16s", b"__TEXT", "SECTION_DESCRIPTOR"),
+        ("section_initializer", "container", 472, "<I", 0x9, "SECTION_DESCRIPTOR"),
+        ("section_vm_mapping_change", "container", 440, "<Q", 0x100004008, "SECTION_DESCRIPTOR"),
+        ("entry_payload", "container", 888, "<Q", 16384, "ENTRY"),
+        ("entry_return_zero", "container", 1048, "<I", 0x52800000, "ENTRY_CODE"),
+        ("ro_payload_runtime", "container", 16384, "<B", 0, "RUNTIME_PAYLOAD"),
+        ("ro_payload_adapter", "container", 123120, "<B", 0, "ADAPTER_PAYLOAD"),
+        ("padding_code", "container", 1200, "<I", 0xd65f03c0, "FILE_PADDING"),
+        ("fixup_blob", "container", 180224, "<B", 1, "FIXUPS"),
+        ("export_blob", "container", 180280, "<B", 1, "EXPORTS"),
+        ("function_start", "container", 180328, "<B", 0, "FUNCTION_STARTS"),
+        ("symbol_value", "container", 180360, "<Q", 0x100004000, "SYMBOL_ROWS"),
+        ("unused_symbol_string", "container", 180399, "<B", 65, "SYMBOL_REGION"),
+        ("adapter_unknown_dependency", "adapter.so", 1112, "<B", 88, "PYTHON_DEPENDENCY"),
+        ("adapter_abi", "adapter.so", 32768, "<Q", 791, "ADAPTER_ABI"),
+        ("adapter_code", "adapter.so", 1304, "<I", 0xd65f03c0, "CODE"),
+        ("adapter_import_ordinal", "adapter.so", 49814, "<H", 512, "SYMBOL_ROWS"),
+        ("adapter_stub", "adapter.so", 2980, "<B", 0, "STUBS"),
+        ("adapter_fixup", "adapter.so", 49152, "<B", 1, "FIXUPS")]
+    for label, kind, off, fmt, value, predicted in cases:
+        changed = bytearray(outputs[kind])
+        _asset_struct.pack_into(fmt, changed, off, value)
+        mutated = h039_asset_draft_actual_reseal_control(bytes(changed), kind)
+        changed_outputs = dict(outputs); changed_outputs[kind] = mutated
+        controls.append((label + "_resealed", mutated != outputs[kind]
+                         and h039_asset_draft_actual_signature(mutated, kind) == "OK"
+                         and h039_asset_draft_actual_material(changed_outputs, runtime) == kind + ":" + predicted))
+    for kind in ("container", "adapter.so"):
+        off, amount, unused = h039_asset_draft_actual_layout(kind)["signature"]
+        for label, relative, value, predicted in (
+                ("super_count", 8, 2, "SIGNATURE_SUPERBLOB"),
+                ("cd_flags", 32, 0x20003, "SIGNATURE_CODEDIRECTORY"),
+                ("cd_special_slots", 44, 1, "SIGNATURE_CODEDIRECTORY"),
+                ("cd_code_limit", 52, off - 1, "SIGNATURE_CODEDIRECTORY")):
+            changed = bytearray(outputs[kind])
+            _asset_struct.pack_into(">I", changed, off + relative, value)
+            changed_outputs = dict(outputs); changed_outputs[kind] = bytes(changed)
+            controls.append((kind + "_" + label, h039_asset_draft_actual_material(
+                changed_outputs, runtime) == kind + ":" + predicted))
+        changed = bytearray(outputs[kind]); changed[-1] = 1
+        changed_outputs = dict(outputs); changed_outputs[kind] = bytes(changed)
+        controls.append((kind + "_signature_padding", h039_asset_draft_actual_material(
+            changed_outputs, runtime) == kind + ":SIGNATURE_PADDING"))
+        changed = bytearray(outputs[kind]); changed[off + amount - 10] ^= 1
+        changed_outputs = dict(outputs); changed_outputs[kind] = bytes(changed)
+        controls.append((kind + "_signature_page_hash", h039_asset_draft_actual_material(
+            changed_outputs, runtime) == kind + ":SIGNATURE_PAGE_HASH"))
+    for label, name, changed, predicted in (
+            ("source_return_zero", "container.i", outputs["container.i"].replace(b"return 2", b"return 0"), "CONTAINER_PREPROCESS"),
+            ("ir_return_zero", "container.ll", outputs["container.ll"].replace(b"ret i32 2", b"ret i32 0"), "CONTAINER_IR"),
+            ("ir_abi", "adapter.ll", outputs["adapter.ll"].replace(b"[i64 792,", b"[i64 791,"), "ADAPTER_IR_ABI"),
+            ("ir_query_flavor", "adapter.ll", outputs["adapter.ll"].replace(
+                b"i32 noundef 3, ptr noundef %12", b"i32 noundef 4, ptr noundef %12"), "ADAPTER_IR_ENTRY_QUERY"),
+            ("opaque_intermediate", "container.d", outputs["container.d"] + b" ", "FINAL_IDENTITY:container.d")):
+        changed_outputs = dict(outputs); changed_outputs[name] = changed
+        controls.append((label, h039_asset_draft_actual_material(changed_outputs, runtime) == predicted))
+    changed = bytearray(outputs["adapter.o"]); changed[2312] ^= 1
+    changed_outputs = dict(outputs); changed_outputs["adapter.o"] = bytes(changed)
+    controls.append(("object_abi", h039_asset_draft_actual_material(changed_outputs, runtime) == "ADAPTER_OBJECT_ABI"))
+    return controls
+
+
+def h039_asset_draft_product_recipe() -> bytes:
+    """Prospective product data, not permission or evidence that a build ran."""
+    proposal = h039_asset_draft_reference_recipe()
+    value = {key: proposal[key] for key in (
+        "schema_version", "roots", "umask", "environment", "source", "retained_runtime",
+        "required_tool_sha256", "required_link_input_sha256", "commands", "outputs",
+        "comparison", "runtime_role", "container_role")}
+    value.update({"role": "H039_PROTECTED_LISTENER_ASSET_BUILD_ONLY",
+                  "source_identity": {"path": "controller/runtime-cleanup/native/mediator.c",
+                      "mode": "100644", "size": 181592,
+                      "sha256": "a1dd9e698a644be61b65f1d73229747c7dfc5257c9073b063b85be75757fa1d8"},
+                  "retained_runtime_identity": {"path": "verify/h039/runtime-cleanup-mediator",
+                      "mode": "100755", "size": 106736,
+                      "sha256": "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7"},
+                  "product_output": {"build_name": "container",
+                      "path": "controller/runtime-cleanup/install", "mode": "100755"},
+                  "signing": "LINKER_ADHOC_ONLY_NO_SEPARATE_SIGN_COMMAND",
+                  "verification_ceiling": "STATIC_BUILD_MATERIAL_NOT_LOADING_INSTALLATION_OR_COMPLETION"})
+    return (_asset_json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True,
+                              allow_nan=False) + "\n").encode("ascii")
+
+
+def h039_asset_draft_product_manifest() -> bytes:
+    """Gate-owned prospective bindings; no caller descriptor, own digest or effects."""
+    recipe = h039_asset_draft_product_recipe()
+    value = {"schema_version": 1, "role": "H039_PROTECTED_LISTENER_ASSET_BUILD_ONLY",
+        "source": {"path": "controller/runtime-cleanup/native/mediator.c", "mode": "100644",
+            "size": 181592, "sha256": "a1dd9e698a644be61b65f1d73229747c7dfc5257c9073b063b85be75757fa1d8"},
+        "recipe": {"path": "verify/h039/build-recipe.json", "mode": "100644",
+            "size": len(recipe), "sha256": _asset_hashlib.sha256(recipe).hexdigest()},
+        "container": {"path": "controller/runtime-cleanup/install", "mode": "100755",
+            "size": 181960, "sha256": "563fcecdf4b4d7625baee7cffa09db53f087a63d437a2846e28912dbd4a598a3",
+            "role": "INERT_ASSET_CONTAINER", "format": "ARM64_MH_EXECUTE",
+            "entry": "EXACT_MAIN_RETURN2_NO_PAYLOAD_LOADING",
+            "payload_sections": ["__H039RO,__h039med", "__H039RO,__h039lst"]},
+        "runtime": {"path": "verify/h039/runtime-cleanup-mediator", "mode": "100755",
+            "size": 106736, "sha256": "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7",
+            "role": "RETAINED_PUBLISHED_RUNTIME_BYTES_NOT_REPRODUCED"},
+        "adapter": {"build_name": "adapter.so", "format": "ARM64_MH_BUNDLE",
+            "size": 51176, "sha256": "9f18b8dbc135d9d6e6d2395017e70827aaaf3752a9a0835a94a91b8235fda6ec",
+            "abi_values": list(h039_asset_draft_actual_layout("adapter.so")["abi"])},
+        "signature": "LINKER_ADHOC_CODEDIRECTORY_PAGE_INTEGRITY_NOT_APPLE_TRUST",
+        "verification_ceiling": "STATIC_BUILD_MATERIAL_NOT_LOADING_INSTALLATION_OR_COMPLETION"}
+    return (_asset_json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True,
+                              allow_nan=False) + "\n").encode("ascii")
+
+
+def h039_asset_draft_product_budget(before: dict, after: dict) -> dict:
+    """Pure line-edit model, NOT observed Git numstat or authenticated blob extraction.
+
+    Byte/newline sizes are exact. SequenceMatcher(autojunk=False) defines this
+    model only; later Git observation must report its own actual numstat.
+    Binary line counts are never fabricated from embedded newline bytes.
+    """
+    paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+             "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    for files in (before, after):
+        if (type(files) is not dict or set(files) != set(paths) or any(
+                type(files[path]) is not tuple or len(files[path]) != 2
+                or type(files[path][0]) is not str or type(files[path][1]) is not bytes
+                for path in paths)):
+            raise ValueError("budget file schema")
+    rows = []
+    for path in paths:
+        old, new = before[path][1], after[path][1]
+        row = {"path": path, "old_bytes": len(old), "new_bytes": len(new)}
+        if path == paths[0]:
+            row["kind"] = "BINARY_NO_TEXT_LINE_BUDGET"
+        else:
+            old.decode("utf-8", "strict"); new.decode("utf-8", "strict")
+            if not old.endswith(b"\n") or not new.endswith(b"\n"):
+                raise ValueError("budget final newline")
+            opcodes = _asset_difflib.SequenceMatcher(None, old.splitlines(keepends=True),
+                new.splitlines(keepends=True), autojunk=False).get_opcodes()
+            added = sum(j2 - j1 for tag, i1, i2, j1, j2 in opcodes if tag in ("insert", "replace"))
+            deleted = sum(i2 - i1 for tag, i1, i2, j1, j2 in opcodes if tag in ("delete", "replace"))
+            row.update({"kind": "UTF8_TEXT_MODEL", "old_lines": old.count(b"\n"),
+                        "new_lines": new.count(b"\n"), "added": added,
+                        "deleted": deleted, "total": added + deleted})
+        rows.append(row)
+    return {"projection": "STDLIB_SEQUENCE_MATCHER_AUTOJUNK_FALSE_NOT_GIT_NUMSTAT", "rows": rows,
+            "old_bytes": sum(row["old_bytes"] for row in rows),
+            "new_bytes": sum(row["new_bytes"] for row in rows),
+            "text_added": sum(row.get("added", 0) for row in rows),
+            "text_deleted": sum(row.get("deleted", 0) for row in rows),
+            "text_total": sum(row.get("total", 0) for row in rows)}
+
+
+def h039_asset_draft_product_material(before: dict, files: dict, outputs: dict,
+                                     runtime: bytes, adapter_source: bytes) -> str:
+    """Four-file relation over data; no Git provenance, build or gate verdict."""
+    paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+             "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    modes = ["100755", "100644", "100644", "100644"]
+    for label, mapping in (("BASE", before), ("PRODUCT", files)):
+        if (type(mapping) is not dict or set(mapping) != set(paths) or any(
+                type(mapping[path]) is not tuple or len(mapping[path]) != 2
+                or type(mapping[path][0]) is not str or mapping[path][0] != mode
+                or type(mapping[path][1]) is not bytes or not 0 < len(mapping[path][1]) <= 1048576
+                for path, mode in zip(paths, modes))):
+            return label + "_FILE_SCHEMA"
+    base_ids = [(185808, "05a23e0c63a295367c83a2c0de45495f9f3e3caee36101d1b088e93302a1a486"),
+        (173650, "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b"),
+        (2879, "bee82dd83dbff08fff1164294046ea3a980ecc8301a1a1563e68822693474380"),
+        (2332, "84eca73421ed1cac2c92fd01e519e259cb9088213e66311acd61846e3f27563a")]
+    if any(len(before[path][1]) != size or _asset_hashlib.sha256(before[path][1]).hexdigest() != digest
+           for path, (size, digest) in zip(paths, base_ids)):
+        return "BASE_MATERIAL_BINDING"
+    try:
+        expected_source = h039_asset_draft_reference_source(before[paths[1]][1], adapter_source)
+    except ValueError:
+        return "TRUSTED_SOURCE_BINDING"
+    if files[paths[1]][1] != expected_source:
+        return "PRODUCT_SOURCE_BINDING"
+    expected_recipe = h039_asset_draft_product_recipe()
+    expected_manifest = h039_asset_draft_product_manifest()
+    parsed = []
+    for label, path, expected in (("RECIPE", paths[2], expected_recipe),
+                                   ("MANIFEST", paths[3], expected_manifest)):
+        raw = files[path][1]
+        try:
+            obj = _asset_json.loads(raw, object_pairs_hook=h039_asset_draft_unique_object)
+            serialized = (_asset_json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=True,
+                                            allow_nan=False) + "\n").encode("ascii")
+            shape = _asset_json.loads(expected)
+            if type(obj) is not dict or set(obj) != set(shape):
+                return label + "_SCHEMA"
+        except (ValueError, TypeError, UnicodeError):
+            return label + "_PARSE"
+        if raw != serialized:
+            return label + "_REPRESENTATION"
+        parsed.append((obj, serialized))
+    if parsed[0][1] != expected_recipe:
+        return "RECIPE_BINDING"
+    source_observed = {"path": paths[1], "mode": files[paths[1]][0],
+                       "size": len(files[paths[1]][1]),
+                       "sha256": _asset_hashlib.sha256(files[paths[1]][1]).hexdigest()}
+    if parsed[0][0]["source_identity"] != source_observed:
+        return "SOURCE_RECIPE_RELATION"
+    # Independent actual inputs reach semantic checks before self-consistent
+    # candidate manifest digests can claim authority over crossed/altered bytes.
+    actual = h039_asset_draft_actual_material(outputs, runtime)
+    if actual != "ACTUAL_STATIC_MATERIAL_ONLY_NOT_GATE_OR_LOADING_CREDIT":
+        return "MATERIAL:" + actual
+    if files[paths[0]][1] != outputs["container"]:
+        return "PRODUCT_CONTAINER_BINDING"
+    if parsed[1][1] != expected_manifest:
+        return "MANIFEST_BINDING"
+    # Redundant explicit bounds audit the exact fixed forms. These are measured
+    # byte/newline counts and a named pure edit model, not Git numstat credit.
+    budget = h039_asset_draft_product_budget(before, files)
+    rows = [(row["path"], row["kind"], row["old_bytes"], row["new_bytes"],
+             row.get("old_lines"), row.get("new_lines"), row.get("added"),
+             row.get("deleted"), row.get("total")) for row in budget["rows"]]
+    if (rows != [
+            (paths[0], "BINARY_NO_TEXT_LINE_BUDGET", 185808, 181960, None, None, None, None, None),
+            (paths[1], "UTF8_TEXT_MODEL", 173650, 181592, 1180, 1348, 168, 0, 168),
+            (paths[2], "UTF8_TEXT_MODEL", 2879, 8558, 89, 287, 282, 84, 366),
+            (paths[3], "UTF8_TEXT_MODEL", 2332, 1827, 55, 78, 75, 52, 127)]
+            or (budget["text_added"], budget["text_deleted"], budget["text_total"]) != (525, 136, 661)
+            or (budget["old_bytes"], budget["new_bytes"]) != (364669, 373937)):
+        return "PRODUCT_BUDGET"
+    return "FOUR_FILE_STATIC_RELATION_ONLY_NOT_GRAPH_OR_GATE_CREDIT"
+
+
+def h039_asset_draft_product_controls(before: dict, outputs: dict, runtime: bytes,
+                                     adapter_source: bytes) -> list:
+    """Canonical forms and coherent relation mutants, all in-memory data only."""
+    paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+             "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    files = {paths[0]: ("100755", outputs["container"]),
+             paths[1]: ("100644", h039_asset_draft_reference_source(before[paths[1]][1], adapter_source)),
+             paths[2]: ("100644", h039_asset_draft_product_recipe()),
+             paths[3]: ("100644", h039_asset_draft_product_manifest())}
+    verdict = "FOUR_FILE_STATIC_RELATION_ONLY_NOT_GRAPH_OR_GATE_CREDIT"
+    cases = [("four_file_positive", h039_asset_draft_product_material(
+                 before, files, outputs, runtime, adapter_source) == verdict),
+             ("four_file_mapping_order", h039_asset_draft_product_material(
+                 dict(reversed(list(before.items()))), dict(reversed(list(files.items()))),
+                 outputs, runtime, adapter_source) == verdict)]
+    for label, index, raw, reason in [
+            ("source_modified", 1, files[paths[1]][1] + b"\n", "PRODUCT_SOURCE_BINDING"),
+            ("container_modified", 0, files[paths[0]][1] + b"x", "PRODUCT_CONTAINER_BINDING")]:
+        changed = dict(files); changed[paths[index]] = (files[paths[index]][0], raw)
+        cases.append((label, h039_asset_draft_product_material(before, changed, outputs,
+                      runtime, adapter_source) == reason))
+    for index, label in ((2, "RECIPE"), (3, "MANIFEST")):
+        raw = files[paths[index]][1]
+        for name, mutated, reason in (
+                ("duplicate", raw.replace(b'{\n', b'{\n  "schema_version": 1,\n', 1), "_PARSE"),
+                ("noncanonical", raw + b" ", "_REPRESENTATION"),
+                ("nondict", b"[]\n", "_SCHEMA")):
+            assert mutated != raw
+            changed = dict(files); changed[paths[index]] = ("100644", mutated)
+            cases.append((label + "_" + name, h039_asset_draft_product_material(
+                before, changed, outputs, runtime, adapter_source) == label + reason))
+        for name, key, value, reason in (("unknown", "unknown", 1, "_SCHEMA"),
+                ("bool_version", "schema_version", True, "_BINDING"),
+                ("float_version", "schema_version", 1.0, "_BINDING"),
+                ("wrong_role", "role", "INSTALLED_OPERATIONAL", "_BINDING")):
+            obj = _asset_json.loads(raw); obj[key] = value
+            mutated = (_asset_json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=True,
+                                         allow_nan=False) + "\n").encode("ascii")
+            assert mutated != raw
+            changed = dict(files); changed[paths[index]] = ("100644", mutated)
+            cases.append((label + "_" + name, h039_asset_draft_product_material(
+                before, changed, outputs, runtime, adapter_source) == label + reason))
+        obj = _asset_json.loads(raw)
+        nested_key = "source_identity" if index == 2 else "source"
+        obj[nested_key]["unknown"] = 1
+        changed = dict(files); changed[paths[index]] = ("100644", (_asset_json.dumps(
+            obj, sort_keys=True, indent=2) + "\n").encode("ascii"))
+        cases.append((label + "_nested_unknown", h039_asset_draft_product_material(
+            before, changed, outputs, runtime, adapter_source) == label + "_BINDING"))
+    recipe_obj = _asset_json.loads(files[paths[2]][1]); recipe_obj["umask"] = "0022"
+    recipe_raw = (_asset_json.dumps(recipe_obj, sort_keys=True, indent=2) + "\n").encode("ascii")
+    manifest_obj = _asset_json.loads(files[paths[3]][1])
+    manifest_obj["recipe"].update({"size": len(recipe_raw), "sha256": _asset_hashlib.sha256(recipe_raw).hexdigest()})
+    changed = dict(files); changed[paths[2]] = ("100644", recipe_raw)
+    changed[paths[3]] = ("100644", (_asset_json.dumps(manifest_obj, sort_keys=True, indent=2) + "\n").encode("ascii"))
+    cases.append(("coherent_wrong_recipe_manifest", h039_asset_draft_product_material(
+        before, changed, outputs, runtime, adapter_source) == "RECIPE_BINDING"))
+    for label, field in (("manifest_crossed_payloads", "runtime"),
+                          ("manifest_wrong_recipe", "recipe"), ("manifest_wrong_source", "source")):
+        obj = _asset_json.loads(files[paths[3]][1])
+        obj[field]["sha256"] = obj["adapter"]["sha256"]
+        obj[field]["size"] = obj["adapter"]["size"]
+        changed = dict(files); changed[paths[3]] = ("100644", (_asset_json.dumps(
+            obj, sort_keys=True, indent=2) + "\n").encode("ascii"))
+        cases.append((label, h039_asset_draft_product_material(before, changed, outputs,
+                     runtime, adapter_source) == "MANIFEST_BINDING"))
+    mutant_outputs = dict(outputs)
+    image = bytearray(outputs["container"]); _asset_struct.pack_into("<I", image, 392, 3)
+    mutant_outputs["container"] = h039_asset_draft_actual_reseal_control(bytes(image), "container")
+    obj = _asset_json.loads(files[paths[3]][1])
+    obj["container"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"]).hexdigest()
+    changed = dict(files); changed[paths[0]] = ("100755", mutant_outputs["container"])
+    changed[paths[3]] = ("100644", (_asset_json.dumps(obj, sort_keys=True, indent=2) + "\n").encode())
+    cases.append(("coherent_container_manifest_repin_semantic_reject",
+        h039_asset_draft_actual_signature(mutant_outputs["container"], "container") == "OK"
+        and h039_asset_draft_product_material(before, changed, mutant_outputs, runtime, adapter_source)
+        == "MATERIAL:container:SEGMENT_PERMISSIONS"))
+    image = bytearray(outputs["container"])
+    image[16384:16400], image[123120:123136] = image[123120:123136], image[16384:16400]
+    assert bytes(image) != outputs["container"]
+    mutant_outputs = dict(outputs)
+    mutant_outputs["container"] = h039_asset_draft_actual_reseal_control(bytes(image), "container")
+    obj = _asset_json.loads(files[paths[3]][1])
+    obj["container"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"]).hexdigest()
+    obj["runtime"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"][16384:123120]).hexdigest()
+    obj["adapter"]["sha256"] = _asset_hashlib.sha256(mutant_outputs["container"][123120:174296]).hexdigest()
+    changed = dict(files); changed[paths[0]] = ("100755", mutant_outputs["container"])
+    changed[paths[3]] = ("100644", (_asset_json.dumps(obj, sort_keys=True, indent=2) + "\n").encode())
+    cases.append(("crossed_payload_prefixes_coherent_manifest",
+        h039_asset_draft_actual_signature(mutant_outputs["container"], "container") == "OK"
+        and h039_asset_draft_product_material(before, changed, mutant_outputs, runtime, adapter_source)
+        == "MATERIAL:container:RUNTIME_PAYLOAD"))
+    cases.append(("wrong_independent_runtime", h039_asset_draft_product_material(
+        before, files, outputs, outputs["adapter.so"], adapter_source) == "MATERIAL:TRUSTED_RUNTIME_INPUT"))
+    changed = dict(files); changed[paths[0]] = ("100644", files[paths[0]][1])
+    cases.append(("product_mode", h039_asset_draft_product_material(before, changed, outputs,
+                  runtime, adapter_source) == "PRODUCT_FILE_SCHEMA"))
+    changed = dict(before); changed[paths[0]] = ("100755", before[paths[0]][1] + b"x")
+    cases.append(("baseline_modified", h039_asset_draft_product_material(changed, files, outputs,
+                  runtime, adapter_source) == "BASE_MATERIAL_BINDING"))
+    return cases
+
+
+def h039_asset_draft_git_operation(kind: str, oids: list) -> dict:
+    """Fixed local builtin requests, not execution or a caller-selected argv API."""
+    counts = {"config": 0, "head": 0, "type": 1, "size": 1, "commit": 1, "tree": 1,
+              "blob": 1, "listing": 1, "rawdiff": 2, "numstat": 2}
+    if (type(kind) is not str or kind not in counts or type(oids) is not list
+            or len(oids) != counts[kind] or any(type(oid) is not str or len(oid) != 40
+                or any(c not in "0123456789abcdef" for c in oid) for oid in oids)):
+        raise ValueError("fixed Git request")
+    environment = {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_COUNT": "0",
+        "GIT_ATTR_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_NO_REPLACE_OBJECTS": "1", "GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"}
+    prefix = ["/Library/Developer/CommandLineTools/usr/bin/git", "--no-pager", "--literal-pathspecs", "--no-replace-objects",
+              "-c", "core.attributesFile=/dev/null", "-c", "core.excludesFile=/dev/null",
+              "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+              "-c", "diff.external=", "-c", "pager.diff=false"]
+    if kind == "config":
+        suffix = ["config", "--no-includes", "--file", "-", "--null", "--list"]
+    elif kind == "head":
+        suffix = ["rev-parse", "--verify", "HEAD^{commit}"]
+    elif kind in ("type", "size"):
+        suffix = ["cat-file", "-t" if kind == "type" else "-s", oids[0]]
+    elif kind in ("commit", "tree", "blob"):
+        suffix = ["cat-file", kind, oids[0]]
+    elif kind == "listing":
+        suffix = ["ls-tree", "-r", "-z", "--full-tree", oids[0]]
+    else:
+        suffix = ["diff-tree", "-r", "--no-commit-id", "--no-abbrev", "--no-renames",
+                  "--no-ext-diff", "--no-textconv", "--raw" if kind == "rawdiff" else "--numstat",
+                  "-z", oids[0], oids[1], "--"]
+    return {"prefix": prefix, "suffix": suffix, "environment": environment,
+            "tool_size": 7604272,
+            "tool_sha256": "be4afb2b003904725826250de9fb76567bbacf82323457b5a1ec26706b66bcae",
+            "scope": "LOCAL_BUILTIN_ONLY_NO_REMOTE_OR_HELPERS"}
+
+
+def h039_asset_draft_git_config_exact(raw: bytes) -> bool:
+    """Strict output of pinned Git config --no-includes --file -; no config IO."""
+    if type(raw) is not bytes or not raw or len(raw) > 1048576 or not raw.endswith(b"\0"):
+        return False
+    try:
+        values = {}
+        for row in raw[:-1].split(b"\0"):
+            key, sep, value = row.partition(b"\n")
+            key, value = key.decode("ascii").lower(), value.decode("utf-8")
+            if not sep or not key or key in values or "\n" in value or "\r" in value:
+                return False
+            values[key] = value
+        required = {"core.repositoryformatversion": "0", "core.filemode": "true",
+                    "core.bare": "false", "core.logallrefupdates": "true",
+                    "core.ignorecase": "true", "core.precomposeunicode": "true",
+                    "remote.origin.url": "git@github.com:Nortropic/nortropic-system.git",
+                    "remote.origin.fetch": "+refs/heads/*:refs/remotes/origin/*"}
+        if any(values.get(key) != value for key, value in required.items()):
+            return False
+        for key, value in values.items():
+            if key in required:
+                continue
+            if key in ("user.name", "user.email") and 0 < len(value) <= 256:
+                continue
+            if not key.startswith("branch.") or "." not in key[7:]:
+                return False
+            branch, field = key[7:].rsplit(".", 1)
+            if (not branch or any(c.isspace() or c in "\0\\" for c in branch)
+                    or field not in ("remote", "merge", "vscode-merge-base")):
+                return False
+            if ((field == "remote" and value != "origin")
+                    or (field == "vscode-merge-base" and value != "origin/main")
+                    or (field == "merge" and (not value.startswith("refs/heads/")
+                        or len(value) == 11 or any(c.isspace() for c in value)))):
+                return False
+        return True
+    except (UnicodeError, ValueError):
+        return False
+
+
+def h039_asset_draft_git_records(kind: str, raw: bytes, oid: str) -> object:
+    """Closed wire formats; parsed models alone never authenticate real Git state."""
+    if type(raw) is not bytes or type(kind) is not str:
+        raise ValueError("Git record input")
+    def hexoid(value: str) -> bool:
+        return len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+    def path(value: bytes) -> str:
+        decoded = value.decode("utf-8", "strict")
+        if (not decoded or decoded.startswith("/") or "\0" in decoded
+                or any(part in ("", ".", "..") for part in decoded.split("/"))):
+            raise ValueError("Git path")
+        return decoded
+    if kind in ("commit", "tree", "blob"):
+        if type(oid) is not str or not hexoid(oid):
+            raise ValueError("Git object OID")
+        digest = _asset_hashlib.sha1(kind.encode("ascii") + b" " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+        if digest != oid:
+            raise ValueError("Git object hash")
+    if kind == "blob":
+        return raw
+    if kind == "head":
+        if not raw.endswith(b"\n") or not hexoid(raw[:-1].decode("ascii")):
+            raise ValueError("Git HEAD OID")
+        return raw[:-1].decode("ascii")
+    if kind == "type":
+        if raw not in (b"commit\n", b"tree\n", b"blob\n"):
+            raise ValueError("Git object type")
+        return raw[:-1].decode("ascii")
+    if kind == "size":
+        if not raw.endswith(b"\n") or not raw[:-1].isdigit() or str(int(raw[:-1])).encode() != raw[:-1]:
+            raise ValueError("Git object size")
+        return int(raw[:-1])
+    if kind == "commit":
+        header, separator, message = raw.partition(b"\n\n")
+        if not separator or b"\0" in header or b"\r" in header:
+            raise ValueError("Git commit header")
+        lines = header.split(b"\n")
+        trees = [line[5:].decode("ascii") for line in lines if line.startswith(b"tree ")]
+        parents = [line[7:].decode("ascii") for line in lines if line.startswith(b"parent ")]
+        if (len(trees) != 1 or lines[0] != b"tree " + trees[0].encode()
+                or not hexoid(trees[0]) or any(not hexoid(parent) for parent in parents)
+                or len(set(parents)) != len(parents)
+                or lines[1:1 + len(parents)] != [b"parent " + parent.encode() for parent in parents]
+                or len(lines) < len(parents) + 3
+                or not lines[len(parents) + 1].startswith(b"author ")
+                or not lines[len(parents) + 2].startswith(b"committer ")
+                or sum(line.startswith(b"author ") for line in lines) != 1
+                or sum(line.startswith(b"committer ") for line in lines) != 1):
+            raise ValueError("Git commit fields")
+        optional, continuation = set(), False
+        for line in lines[len(parents) + 3:]:
+            if line.startswith(b" ") and continuation:
+                continue
+            key, sep, value = line.partition(b" ")
+            if (not sep or not value or key not in (b"encoding", b"gpgsig", b"gpgsig-sha256", b"mergetag")
+                    or key in optional):
+                raise ValueError("Git commit optional header")
+            optional.add(key)
+            continuation = key != b"encoding"
+        return {"tree": trees[0], "parents": parents}
+    if kind == "tree":
+        cursor, rows, seen, order = 0, [], set(), []
+        while cursor < len(raw):
+            end = raw.find(b"\0", cursor)
+            if end < 0 or end + 21 > len(raw):
+                raise ValueError("Git tree framing")
+            mode, sep, name = raw[cursor:end].partition(b" ")
+            if not sep or mode not in (b"40000", b"100644", b"100755") or b"/" in name:
+                raise ValueError("Git tree entry")
+            label = path(name)
+            if label in seen:
+                raise ValueError("Git tree duplicate")
+            seen.add(label)
+            member = raw[end + 1:end + 21].hex()
+            if member == "0" * 40:
+                raise ValueError("Git tree null object")
+            rows.append((mode.decode(), label, member))
+            order.append(name + (b"/" if mode == b"40000" else b""))
+            cursor = end + 21
+        if order != sorted(order):
+            raise ValueError("Git tree ordering")
+        return rows
+    if kind not in ("listing", "rawdiff", "numstat"):
+        raise ValueError("Git record kind")
+    if raw and not raw.endswith(b"\0"):
+        raise ValueError("Git NUL framing")
+    parts = raw[:-1].split(b"\0") if raw else []
+    rows = {}
+    if kind == "rawdiff":
+        if len(parts) % 2:
+            raise ValueError("Git rawdiff framing")
+        for meta, name in zip(parts[::2], parts[1::2]):
+            fields = meta.split(b" ")
+            if len(fields) != 5 or not fields[0].startswith(b":"):
+                raise ValueError("Git rawdiff metadata")
+            oldmode, newmode = fields[0][1:].decode("ascii"), fields[1].decode("ascii")
+            oldoid, newoid, status = (value.decode("ascii") for value in fields[2:])
+            if (oldmode not in ("000000", "100644", "100755")
+                    or newmode not in ("000000", "100644", "100755")
+                    or not hexoid(oldoid) or not hexoid(newoid) or status not in ("A", "D", "M")
+                    or (oldmode == "000000") != (oldoid == "0" * 40)
+                    or (newmode == "000000") != (newoid == "0" * 40)
+                    or (status == "A" and (oldmode != "000000" or newmode == "000000"))
+                    or (status == "D" and (newmode != "000000" or oldmode == "000000"))
+                    or (status == "M" and "000000" in (oldmode, newmode))):
+                raise ValueError("Git rawdiff fields")
+            label = path(name)
+            if label in rows:
+                raise ValueError("Git duplicate path")
+            rows[label] = (oldmode, newmode, oldoid, newoid, status)
+    else:
+        for row in parts:
+            fields = row.split(b"\t", 2 if kind == "numstat" else 1)
+            if len(fields) != (3 if kind == "numstat" else 2):
+                raise ValueError("Git row fields")
+            label = path(fields[-1])
+            if label in rows:
+                raise ValueError("Git duplicate path")
+            if kind == "listing":
+                meta = fields[0].split(b" ")
+                if (len(meta) != 3 or meta[0] not in (b"100644", b"100755")
+                        or meta[1] != b"blob" or not hexoid(meta[2].decode("ascii"))):
+                    raise ValueError("Git listing fields")
+                rows[label] = (meta[0].decode(), meta[2].decode())
+            else:
+                counts = fields[:2]
+                if counts == [b"-", b"-"]:
+                    rows[label] = (None, None)
+                elif any(not value.isdigit() or str(int(value)).encode() != value for value in counts):
+                    raise ValueError("Git numstat counts")
+                else:
+                    rows[label] = tuple(int(value) for value in counts)
+    return rows
+
+
+def h039_asset_draft_git_fact_controls() -> list:
+    """Synthetic format/control vectors only; no Git/config/process invocation."""
+    a, b = "a" * 40, "b" * 40
+    commit = ("tree " + a + "\nparent " + b + "\nauthor A <a@x> 0 +0000\n"
+              "committer A <a@x> 0 +0000\n\nmessage\n").encode()
+    tree = b"100644 a\0" + bytes.fromhex(a) + b"40000 d\0" + bytes.fromhex(b)
+    blob = b"fixture\n"
+    vectors = [("commit", commit, {"tree": a, "parents": [b]}),
+               ("tree", tree, [("100644", "a", a), ("40000", "d", b)]),
+               ("blob", blob, blob)]
+    cases = []
+    for kind, raw, expected in vectors:
+        oid = _asset_hashlib.sha1(kind.encode() + b" " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+        cases.append((kind + "_model_positive", h039_asset_draft_git_records(kind, raw, oid) == expected))
+        try:
+            h039_asset_draft_git_records(kind, raw + b"x", oid)
+        except ValueError as exc:
+            cases.append((kind + "_wrong_hash", str(exc) == "Git object hash"))
+        else:
+            cases.append((kind + "_wrong_hash", False))
+    signed = commit.replace(b"\n\nmessage", b"\nencoding UTF-8\ngpgsig signature\n continuation\n\nmessage")
+    signed_oid = _asset_hashlib.sha1(b"commit " + str(len(signed)).encode() + b"\0" + signed).hexdigest()
+    cases.append(("signed_encoding_header_model_positive", h039_asset_draft_git_records(
+        "commit", signed, signed_oid) == {"tree": a, "parents": [b]}))
+    for label, malformed in (
+            ("late_parent", commit.replace(("parent " + b + "\n").encode(), b"").replace(
+                b"\n\nmessage", ("\nparent " + b + "\n\nmessage").encode())),
+            ("unknown_critical", commit.replace(b"\n\nmessage", b"\nunknown-critical value\n\nmessage"))):
+        oid = _asset_hashlib.sha1(b"commit " + str(len(malformed)).encode() + b"\0" + malformed).hexdigest()
+        try:
+            h039_asset_draft_git_records("commit", malformed, oid)
+        except ValueError as exc:
+            cases.append((label, str(exc) in ("Git commit fields", "Git commit optional header")))
+        else:
+            cases.append((label, False))
+    listing = b"100644 blob " + a.encode() + b"\ta\0"
+    rawdiff = (":100644 100644 " + a + " " + b + " M\0a\0").encode()
+    for kind, raw, expected in [("listing", listing, {"a": ("100644", a)}),
+            ("rawdiff", rawdiff, {"a": ("100644", "100644", a, b, "M")}),
+            ("numstat", b"2\t1\ta\0-\t-\tb\0", {"a": (2, 1), "b": (None, None)})]:
+        cases.append((kind + "_model_positive", h039_asset_draft_git_records(kind, raw, "") == expected))
+        for label, mutant in (("truncated", raw[:-1]), ("duplicate", raw + raw)):
+            try:
+                h039_asset_draft_git_records(kind, mutant, "")
+            except ValueError:
+                cases.append((kind + "_" + label, True))
+            else:
+                cases.append((kind + "_" + label, False))
+    for label, raw in (("mixed_binary", b"-\t1\ta\0"), ("float", b"1.0\t1\ta\0"),
+                       ("leading_zero", b"01\t1\ta\0"), ("escape", b"1\t1\t../a\0")):
+        try:
+            h039_asset_draft_git_records("numstat", raw, "")
+        except ValueError:
+            cases.append(("numstat_" + label, True))
+        else:
+            cases.append(("numstat_" + label, False))
+    config = (b"core.repositoryformatversion\n0\0core.filemode\ntrue\0core.bare\nfalse\0"
+              b"core.logallrefupdates\ntrue\0core.ignorecase\ntrue\0core.precomposeunicode\ntrue\0"
+              b"remote.origin.url\ngit@github.com:Nortropic/nortropic-system.git\0"
+              b"remote.origin.fetch\n+refs/heads/*:refs/remotes/origin/*\0")
+    cases.append(("config_model_positive", h039_asset_draft_git_config_exact(config)))
+    for label, tail in (("include", b"include.path\n/tmp/foreign\0"),
+                        ("extension", b"extensions.partialclone\norigin\0"),
+                        ("helper", b"core.fsmonitor\n/tmp/helper\0"),
+                        ("duplicate", b"core.bare\nfalse\0")):
+        cases.append(("config_" + label, not h039_asset_draft_git_config_exact(config + tail)))
+    for kind, oids in (("config", []), ("commit", [a]), ("numstat", [a, b])):
+        operation = h039_asset_draft_git_operation(kind, oids)
+        cases.append(("operation_" + kind, operation["prefix"][0] == "/Library/Developer/CommandLineTools/usr/bin/git"
+                      and operation["environment"]["GIT_NO_LAZY_FETCH"] == "1"
+                      and "HOME" not in operation["environment"] and "SSH_AUTH_SOCK" not in operation["environment"]))
+    for kind, oids in (("fetch", []), ("blob", ["HEAD"]), ("commit", [a, b])):
+        try:
+            h039_asset_draft_git_operation(kind, oids)
+        except ValueError as exc:
+            cases.append(("operation_reject_" + kind, str(exc) == "fixed Git request"))
+        else:
+            cases.append(("operation_reject_" + kind, False))
+    return cases
+
+
+def h039_asset_draft_git_observe_local(base: str, candidate: str, phase: str) -> dict:
+    """Dormant fixed local observer; never a published-main or phase verdict.
+
+    Only standalone exact gate-relative checkout. No temp files, helper, remote,
+    current-module import, compiler, native group scan or namespace operation.
+    Capture limits are rig ceilings, separate from product byte/line budgets.
+    Mutable TEST_AUTHOR bytes cannot invoke this through the refused entry.
+    """
+    h039_asset_draft_git_operation("rawdiff", [base, candidate])
+    if type(phase) is not str or phase not in ("CONTRACT_SIX", "PRODUCT_FOUR"):
+        raise ValueError("Git fact phase")
+    contract_paths = ["docs/00-borja-har.md", "docs/05-beslutslogg.md", "docs/loop/drift.md",
+        "docs/loop/owner-author-workflow-v1.md", "specs/tasks.spec.json", "verify/bin/h-039-exit"]
+    product_paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+                     "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    selected_paths = contract_paths if phase == "CONTRACT_SIX" else product_paths
+    source_path = _asset_os.path.abspath(__file__)
+    if not source_path.endswith("/verify/bin/h-039-exit") or _asset_os.path.realpath(source_path) != source_path:
+        raise ValueError("Git gate-relative root")
+    root = source_path[:-len("/verify/bin/h-039-exit")]
+    tool = h039_asset_draft_git_operation("config", [])
+    tool_raw, config_snapshot, head_snapshot = None, None, None
+    authenticated_attribute_source = None
+    prestate_complete = False
+    descriptors, retained, absent = [], [], []
+    def identity(info: object) -> tuple:
+        return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+                info.st_nlink, info.st_size, info.st_flags, info.st_mtime_ns, info.st_ctime_ns)
+    def open_member(parent: int, name: str, directory: bool, limit: int = 0) -> tuple:
+        before = _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+        flags = _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK
+        if directory:
+            flags |= _asset_os.O_DIRECTORY
+        fd = _asset_os.open(name, flags, dir_fd=parent); descriptors.append(fd)
+        after = _asset_os.fstat(fd)
+        if identity(before) != identity(after) or (_asset_stat.S_ISDIR(after.st_mode) if directory else
+                _asset_stat.S_ISREG(after.st_mode)) is not True:
+            raise ValueError("Git retained member identity")
+        if not directory and (after.st_uid != _asset_os.getuid() or after.st_nlink != 1
+                or _asset_stat.S_IMODE(after.st_mode) not in (0o600, 0o644) or after.st_size > limit):
+            raise ValueError("Git metadata leaf shape")
+        retained.append((parent, name, fd, identity(after)))
+        data = b""
+        if not directory:
+            while len(data) < after.st_size:
+                chunk = _asset_os.pread(fd, min(65536, after.st_size - len(data)), len(data))
+                if not chunk:
+                    raise ValueError("Git metadata short read")
+                data += chunk
+            if _asset_os.pread(fd, 1, len(data)):
+                raise ValueError("Git metadata grew")
+        return fd, data
+    def absent_member(parent: int, name: str) -> None:
+        try:
+            _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            absent.append((parent, name))
+        else:
+            raise ValueError("Git forbidden local input", name)
+    def run(kind: str, oids: list, data: bytes = b"", limit: int = 4194304) -> bytes:
+        request = h039_asset_draft_git_operation(kind, oids)
+        attr_option = []
+        if kind in ("rawdiff", "numstat"):
+            if authenticated_attribute_source != candidate or oids != [base, candidate]:
+                raise ValueError("Git attributes lack authenticated candidate tree")
+            # Installed CLT git.1 --attr-source and gitattributes.5: an absent
+            # working-tree file alone otherwise permits fallback to the index.
+            attr_option = ["--attr-source=" + authenticated_attribute_source]
+        argv = request["prefix"] + attr_option + ([] if kind == "config" else ["--git-dir=" + root + "/.git", "--work-tree=" + root]) + request["suffix"]
+        if kind != "config" and data:
+            raise ValueError("Git unexpected stdin")
+        proc = _asset_subprocess.Popen(argv, cwd="/private/var/empty" if kind == "config" else root,
+            env=request["environment"], stdin=_asset_subprocess.PIPE if data else _asset_subprocess.DEVNULL,
+            stdout=_asset_subprocess.PIPE, stderr=_asset_subprocess.PIPE, shell=False, close_fds=True)
+        poller = None
+        streams, sent = {"stdout": bytearray(), "stderr": bytearray()}, 0
+        deadline = _asset_time.monotonic() + 15.0
+        try:
+            poller = _asset_selectors.DefaultSelector()
+            for stream, label in ((proc.stdout, "stdout"), (proc.stderr, "stderr")):
+                _asset_os.set_blocking(stream.fileno(), False)
+                poller.register(stream, _asset_selectors.EVENT_READ, label)
+            if data:
+                _asset_os.set_blocking(proc.stdin.fileno(), False)
+                poller.register(proc.stdin, _asset_selectors.EVENT_WRITE, "stdin")
+            while poller.get_map():
+                remaining = deadline - _asset_time.monotonic()
+                if remaining <= 0:
+                    raise ValueError("Git direct-child deadline")
+                for key, events in poller.select(min(remaining, 0.1)):
+                    stream, label = key.fileobj, key.data
+                    if label == "stdin":
+                        try:
+                            count = _asset_os.write(stream.fileno(), data[sent:sent + 4096])
+                        except BlockingIOError:
+                            continue
+                        if count <= 0:
+                            raise ValueError("Git config stdin progress")
+                        sent += count
+                        if sent == len(data):
+                            poller.unregister(stream); stream.close()
+                        continue
+                    try:
+                        chunk = _asset_os.read(stream.fileno(), 65536)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        poller.unregister(stream); stream.close()
+                        continue
+                    streams[label].extend(chunk)
+                    if len(streams[label]) > (limit if label == "stdout" else 65536):
+                        raise ValueError("Git bounded capture", label)
+            remaining = deadline - _asset_time.monotonic()
+            if remaining <= 0:
+                raise ValueError("Git EOF is not direct-child exit")
+            status = proc.wait(timeout=remaining)
+            if status != 0 or streams["stderr"] or (data and sent != len(data)):
+                raise ValueError("Git builtin failed", status, bytes(streams["stderr"]))
+            return bytes(streams["stdout"])
+        except BaseException as primary:
+            # Eligibility is closed trusted local builtins only. This makes no
+            # descendant-cleanup claim and grants no killpg/native-scan authority.
+            cleanup_failures, polled, child_status = [], False, None
+            try:
+                child_status = proc.poll(); polled = True
+            except BaseException as exc:
+                cleanup_failures.append(("poll", type(exc).__name__, str(exc)))
+            if polled and child_status is None:
+                try:
+                    proc.kill()
+                except BaseException as exc:
+                    cleanup_failures.append(("kill", type(exc).__name__, str(exc)))
+            # Wait is attempted independently even if poll or kill failed.
+            try:
+                proc.wait(timeout=5.0)
+            except BaseException as exc:
+                cleanup_failures.append(("wait", type(exc).__name__, str(exc)))
+            primary.h039_git_child_cleanup_failures = cleanup_failures
+            raise
+        finally:
+            primary = _asset_sys.exc_info()[1]
+            close_failures = []
+            for label, owned in (("selector", poller), ("stdin", proc.stdin),
+                                 ("stdout", proc.stdout), ("stderr", proc.stderr)):
+                if owned is not None:
+                    try:
+                        owned.close()
+                    except BaseException as exc:
+                        close_failures.append((label, type(exc).__name__, str(exc)))
+            if close_failures and primary is None:
+                raise ValueError("Git owned capture close", close_failures)
+            if close_failures and primary is not None:
+                primary.h039_git_capture_close_failures = close_failures
+    def object_raw(kind: str, oid: str, limit: int) -> bytes:
+        if h039_asset_draft_git_records("type", run("type", [oid], limit=16), "") != kind:
+            raise ValueError("Git object kind disagreement")
+        size = h039_asset_draft_git_records("size", run("size", [oid], limit=32), "")
+        if size > limit:
+            raise ValueError("Git object capture bound")
+        raw = run(kind, [oid], limit=limit)
+        if len(raw) != size:
+            raise ValueError("Git object size disagreement")
+        h039_asset_draft_git_records(kind, raw, oid)
+        return raw
+    try:
+        tool_raw = h039_asset_draft_retained_read(tool["prefix"][0], tool["tool_sha256"], tool["tool_size"], True)
+        if (len(tool_raw) != tool["tool_size"] or tool_raw[:8] != bytes.fromhex("cafebabe00000002")
+                or [_asset_struct.unpack_from(">5I", tool_raw, off) for off in (8, 28)] != [
+                    (16777223, 3, 16384, 3867856, 14), (16777228, 0, 3899392, 3704880, 14)]):
+            raise ValueError("fixed direct CLT Git architecture")
+        fd = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_CLOEXEC)
+        descriptors.append(fd)
+        for component in root.split("/")[1:]:
+            fd, unused = open_member(fd, component, True)
+        root_fd = fd
+        if not _asset_stat.S_ISDIR(_asset_os.stat(".git", dir_fd=root_fd, follow_symlinks=False).st_mode):
+            raise ValueError("RIG_UNSUPPORTED_NON_STANDALONE_CHECKOUT")
+        git_fd, unused = open_member(root_fd, ".git", True)
+        config_fd, config = open_member(git_fd, "config", False, 1048576)
+        config_snapshot = (config_fd, config)
+        head_fd, head_before = open_member(git_fd, "HEAD", False, 4096)
+        head_snapshot = (head_fd, head_before)
+        for name in ("commondir", "config.worktree", "shallow"):
+            absent_member(git_fd, name)
+        info_fd, unused = open_member(git_fd, "info", True)
+        for name in ("grafts", "attributes"):
+            absent_member(info_fd, name)
+        object_fd, unused = open_member(git_fd, "objects", True)
+        object_info_fd, unused = open_member(object_fd, "info", True)
+        for name in ("alternates", "http-alternates"):
+            absent_member(object_info_fd, name)
+        refs_fd, unused = open_member(git_fd, "refs", True)
+        absent_member(refs_fd, "replace")
+        attribute_parents = {""}
+        for path in selected_paths:
+            pieces = path.split("/")[:-1]
+            attribute_parents.update("/".join(pieces[:i]) for i in range(1, len(pieces) + 1))
+        for parent in sorted(attribute_parents):
+            current = root_fd
+            for component in parent.split("/") if parent else []:
+                current, unused = open_member(current, component, True)
+            absent_member(current, ".gitattributes")
+        prestate_complete = True
+        if not h039_asset_draft_git_config_exact(run("config", [], config, 1048576)):
+            raise ValueError("Git safe config rejected before repository commands")
+        if h039_asset_draft_git_records("head", run("head", [], limit=64), "") != candidate:
+            raise ValueError("Git candidate is not observed HEAD")
+        commits, maps = {}, {}
+        for commit in (base, candidate):
+            commits[commit] = h039_asset_draft_git_records("commit", object_raw("commit", commit, 65536), commit)
+            pending = [("", commits[commit]["tree"], 0)]; complete = {}; tree_count = 0
+            while pending:
+                prefix, tree_oid, depth = pending.pop(); tree_count += 1
+                if tree_count > 8192 or depth > 128:
+                    raise ValueError("Git tree traversal capture bound")
+                rows = h039_asset_draft_git_records("tree", object_raw("tree", tree_oid, 4194304), tree_oid)
+                for mode, name, member in rows:
+                    relative = prefix + name
+                    if mode == "40000":
+                        pending.append((relative + "/", member, depth + 1))
+                    else:
+                        if relative in complete or len(complete) >= 8192:
+                            raise ValueError("Git full tree membership bound")
+                        complete[relative] = (mode, member)
+            listing = h039_asset_draft_git_records("listing", run("listing", [commit]), "")
+            if listing != complete:
+                raise ValueError("Git listing versus raw recursive tree")
+            maps[commit] = complete
+        # Attribute selection becomes eligible only after both recursive tree
+        # object closures and complete listings have been authenticated.
+        for parent in sorted(attribute_parents):
+            name = (parent + "/" if parent else "") + ".gitattributes"
+            if any(name in mapping for mapping in maps.values()):
+                raise ValueError("Git unreviewed committed attributes")
+        authenticated_attribute_source = candidate
+        diff = h039_asset_draft_git_records("rawdiff", run("rawdiff", [base, candidate]), "")
+        actual_changed = sorted(path for path in set(maps[base]) | set(maps[candidate])
+                                if maps[base].get(path) != maps[candidate].get(path))
+        if sorted(diff) != actual_changed or actual_changed != sorted(selected_paths):
+            raise ValueError("Git complete diff surface")
+        for path, row in diff.items():
+            if (row[4] != "M" or row[:2] != (maps[base][path][0], maps[candidate][path][0])
+                    or row[2:4] != (maps[base][path][1], maps[candidate][path][1])
+                    or row[0] != row[1]):
+                raise ValueError("Git raw diff/tree disagreement")
+        numstat = h039_asset_draft_git_records("numstat", run("numstat", [base, candidate]), "")
+        if set(numstat) != set(diff) or any(
+                (counts == (None, None)) != (path == "controller/runtime-cleanup/install")
+                for path, counts in numstat.items()):
+            raise ValueError("Git actual numstat membership/type")
+        # Opaque unchanged gate/spec blobs may exceed 1 MiB; their modes/OIDs
+        # are already complete. Read only four small material blobs per tree.
+        material = {}
+        for commit, mapping in maps.items():
+            material[commit] = {}
+            for path in product_paths:
+                mode, oid = mapping[path]
+                material[commit][path] = (mode, object_raw("blob", oid, 1048576))
+        if h039_asset_draft_git_records("head", run("head", [], limit=64), "") != candidate:
+            raise ValueError("Git HEAD changed")
+        return {"status": "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT",
+                "base": base, "candidate": candidate, "commits": commits,
+                "trees": maps, "rawdiff": diff, "observed_git_numstat": numstat, "material": material}
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        postauth_failures, unobserved, close_failures = [], [], []
+        try:
+            if not prestate_complete:
+                unobserved.append("remaining_prestate_bindings")
+            for label, snapshot in (("config_bytes", config_snapshot), ("head_bytes", head_snapshot)):
+                if snapshot is None:
+                    unobserved.append(label)
+                    continue
+                child, expected_bytes = snapshot
+                try:
+                    if _asset_os.pread(child, len(expected_bytes) + 1, 0) != expected_bytes:
+                        raise ValueError("Git metadata bytes changed")
+                except BaseException as exc:
+                    postauth_failures.append((label, type(exc).__name__, str(exc)))
+            for parent, name, child, expected in retained:
+                try:
+                    if identity(_asset_os.fstat(child)) != expected:
+                        raise ValueError("Git retained FD changed")
+                except BaseException as exc:
+                    postauth_failures.append(("fd:" + name, type(exc).__name__, str(exc)))
+                try:
+                    if identity(_asset_os.stat(name, dir_fd=parent, follow_symlinks=False)) != expected:
+                        raise ValueError("Git retained name changed")
+                except BaseException as exc:
+                    postauth_failures.append(("name:" + name, type(exc).__name__, str(exc)))
+            for parent, name in absent:
+                try:
+                    _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                except BaseException as exc:
+                    postauth_failures.append(("absence:" + name, type(exc).__name__, str(exc)))
+                else:
+                    postauth_failures.append(("absence:" + name, "ValueError", "Git forbidden input appeared"))
+            if tool_raw is None:
+                unobserved.append("tool_bytes")
+            else:
+                try:
+                    if h039_asset_draft_retained_read(tool["prefix"][0], tool["tool_sha256"], tool["tool_size"], True) != tool_raw:
+                        raise ValueError("Git direct tool changed")
+                except BaseException as exc:
+                    postauth_failures.append(("tool_bytes", type(exc).__name__, str(exc)))
+        except BaseException as exc:
+            postauth_failures.append(("postauth_internal", type(exc).__name__, str(exc)))
+        finally:
+            try:
+                close_failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+            except BaseException as exc:
+                close_failures.append(("close_internal", type(exc).__name__, str(exc)))
+        postauth = {"failures": postauth_failures, "unobserved": unobserved,
+                    "acquired_bindings_unchanged": not postauth_failures,
+                    "state": "UNKNOWN_OR_CHANGED" if primary is not None or postauth_failures
+                    or unobserved or close_failures else "ACQUIRED_BINDINGS_UNCHANGED"}
+        if primary is not None:
+            primary.h039_git_postauth = postauth
+            primary.h039_git_close_failures = close_failures
+        elif postauth_failures or unobserved or close_failures:
+            raise ValueError("Git final postauthentication or close failed", postauth, close_failures)
+
+
+def h039_asset_draft_contract_relation(facts: dict, phase: str, sources: dict,
+                                      reviewed: dict) -> str:
+    """Pure composition MODEL, not authentication of a supplied report dictionary.
+
+    A future operational caller must obtain facts itself from the reviewed local
+    observer. The external reviewer supplies source pins, never the candidate.
+    Tree completeness/commit authenticity and actual numstat originate there;
+    this lens checks their phase relations without pretending OIDs are blobs.
+    No IO, reference build, product-absence RED, publication or H039 verdict.
+    """
+    def oid(value: object) -> bool:
+        return type(value) is str and len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+    def blob(raw: bytes) -> str:
+        return _asset_hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+    paths = ["docs/00-borja-har.md", "docs/05-beslutslogg.md", "docs/loop/drift.md",
+             "docs/loop/owner-author-workflow-v1.md", "specs/tasks.spec.json", "verify/bin/h-039-exit"]
+    products = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+                "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    if type(phase) is not str or phase != "CONTRACT_SIX":
+        return "CONTRACT_PHASE"
+    if (type(facts) is not dict or set(facts) != {"status", "base", "candidate", "commits", "trees",
+            "rawdiff", "observed_git_numstat", "material"} or type(facts["status"]) is not str or facts["status"] !=
+            "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT"):
+        return "CONTRACT_FACT_SCHEMA"
+    base, candidate = facts["base"], facts["candidate"]
+    if (not oid(base) or not oid(candidate) or base != "ed584ec3088c08005f99de1da825d083e350a8d2"
+            or candidate == base):
+        return "CONTRACT_SUBJECT"
+    if any(type(facts[key]) is not dict or set(facts[key]) != {base, candidate}
+           for key in ("commits", "trees", "material")):
+        return "CONTRACT_SUBJECT_MAP"
+    for row in facts["commits"].values():
+        if (type(row) is not dict or set(row) != {"tree", "parents"} or not oid(row["tree"])
+                or type(row["parents"]) is not list or not all(oid(parent) for parent in row["parents"])
+                or len(set(row["parents"])) != len(row["parents"])):
+            return "CONTRACT_COMMIT_SCHEMA"
+    if facts["commits"][candidate]["parents"] != [base]:
+        return "CONTRACT_PARENT"
+    before, after = facts["trees"][base], facts["trees"][candidate]
+    for mapping in (before, after):
+        if (type(mapping) is not dict or not mapping or any(type(path) is not str or not path
+                or path.startswith("/") or "\0" in path or any(part in ("", ".", "..") for part in path.split("/"))
+                for path in mapping)):
+            return "CONTRACT_TREE_SCHEMA"
+        if any(type(row) is not tuple or len(row) != 2 or type(row[0]) is not str
+               or row[0] not in ("100644", "100755") or not oid(row[1]) for row in mapping.values()):
+            return "CONTRACT_TREE_SCHEMA"
+    required = set(paths + products + ["verify/h039/runtime-cleanup-mediator",
+                    "controller/authority/core.py", "specs/owner-production-paths.v1.json"])
+    if set(before) != set(after) or not required <= set(before):
+        return "CONTRACT_MEMBERSHIP"
+    if not h039_asset_draft_contract_change_shape(sorted(path for path in before if before[path] != after[path])):
+        return "CONTRACT_SIX_SCOPE"
+    if any(before[path][0] != after[path][0] for path in before):
+        return "CONTRACT_MODE"
+    diff = facts["rawdiff"]
+    if type(diff) is not dict or set(diff) != set(paths):
+        return "CONTRACT_RAWDIFF_SCHEMA"
+    if any(type(diff[path]) is not tuple or diff[path] !=
+           (before[path][0], after[path][0], before[path][1], after[path][1], "M") for path in paths):
+        return "CONTRACT_RAWDIFF_RELATION"
+    counts = facts["observed_git_numstat"]
+    if (type(counts) is not dict or set(counts) != set(paths) or any(type(row) is not tuple or len(row) != 2
+            or any(type(n) is not int or n < 0 for n in row) or sum(row) == 0 for row in counts.values())):
+        return "CONTRACT_NUMSTAT_SCHEMA"
+    if (type(sources) is not dict or type(reviewed) is not dict or set(sources) != set(paths)
+            or set(reviewed) != set(paths) or any(type(sources[path]) is not bytes or not sources[path]
+                or len(sources[path]) > 4194304 or type(reviewed[path]) is not str or len(reviewed[path]) != 64
+                or any(c not in "0123456789abcdef" for c in reviewed[path]) for path in paths)):
+        return "CONTRACT_SOURCE_SCHEMA"
+    for path in paths:
+        if _asset_hashlib.sha256(sources[path]).hexdigest() != reviewed[path]:
+            return "CONTRACT_EXTERNAL_SOURCE_PIN"
+        if after[path] != ("100755" if path == paths[-1] else "100644", blob(sources[path])):
+            return "CONTRACT_SOURCE_BLOB"
+    if not h039_asset_draft_current_source_exact(sources[paths[-1]], reviewed[paths[-1]]):
+        return "CONTRACT_SOURCE_CLOSURE"
+    if not h039_asset_draft_historical_source_exact(sources[paths[-1]]):
+        return "CONTRACT_HISTORICAL_SOURCE"
+    if not h039_asset_draft_spec_exact(sources[paths[-2]]):
+        return "CONTRACT_SPEC_PRESERVATION"
+    baseline = [(185808, "05a23e0c63a295367c83a2c0de45495f9f3e3caee36101d1b088e93302a1a486"),
+        (173650, "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b"),
+        (2879, "bee82dd83dbff08fff1164294046ea3a980ecc8301a1a1563e68822693474380"),
+        (2332, "84eca73421ed1cac2c92fd01e519e259cb9088213e66311acd61846e3f27563a")]
+    for subject, mapping in facts["material"].items():
+        if type(mapping) is not dict or set(mapping) != set(products):
+            return "CONTRACT_BASE_MATERIAL_SCHEMA"
+        for index, (path, (size, digest)) in enumerate(zip(products, baseline)):
+            row = mapping[path]
+            if (type(row) is not tuple or len(row) != 2 or type(row[0]) is not str
+                    or row[0] != ("100755" if index == 0 else "100644") or type(row[1]) is not bytes):
+                return "CONTRACT_BASE_MATERIAL_SCHEMA"
+            if len(row[1]) != size or _asset_hashlib.sha256(row[1]).hexdigest() != digest:
+                return "CONTRACT_BASE_MATERIAL_BINDING"
+            if facts["trees"][subject][path] != (row[0], blob(row[1])):
+                return "CONTRACT_BASE_MATERIAL_BLOB"
+    return "CONTRACT_SIX_RELATION_MODEL_ONLY_NOT_PREPRODUCT_RED_OR_PHASE_CREDIT"
+
+
+def h039_asset_draft_contract_relation_controls(sources: dict, before: dict) -> list:
+    """In-memory synthetic fact models; none is an observed commit/tree/numstat.
+
+    Locally computed source hashes are control inputs only, never external review
+    authority. A later independently bound observer run must test the composition.
+    """
+    paths = sorted(sources)
+    base, candidate = "ed584ec3088c08005f99de1da825d083e350a8d2", "1" * 40
+    def blob(raw: bytes) -> str:
+        return _asset_hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+    def clone(value: object) -> object:
+        if type(value) is dict:
+            return {key: clone(member) for key, member in value.items()}
+        if type(value) is list:
+            return [clone(member) for member in value]
+        return value
+    original = {path: (mode, blob(raw)) for path, (mode, raw) in before.items()}
+    for path in paths:
+        original[path] = ("100755" if path == "verify/bin/h-039-exit" else "100644", "2" * 40)
+    for path in ("verify/h039/runtime-cleanup-mediator", "controller/authority/core.py",
+                 "specs/owner-production-paths.v1.json"):
+        original[path] = ("100644", "3" * 40)
+    after = dict(original)
+    for path in paths:
+        after[path] = (original[path][0], blob(sources[path]))
+    facts = {"status": "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT",
+        "base": base, "candidate": candidate,
+        "commits": {base: {"tree": "4" * 40, "parents": []}, candidate: {"tree": "5" * 40, "parents": [base]}},
+        "trees": {base: original, candidate: after},
+        "rawdiff": {path: (original[path][0], after[path][0], original[path][1], after[path][1], "M") for path in paths},
+        "observed_git_numstat": {path: (1, 0) for path in paths},
+        "material": {base: before, candidate: before}}
+    reviewed = {path: _asset_hashlib.sha256(raw).hexdigest() for path, raw in sources.items()}
+    accept = "CONTRACT_SIX_RELATION_MODEL_ONLY_NOT_PREPRODUCT_RED_OR_PHASE_CREDIT"
+    cases = [("synthetic_contract_relation", h039_asset_draft_contract_relation(facts, "CONTRACT_SIX", sources, reviewed) == accept),
+             ("mapping_order_only", h039_asset_draft_contract_relation(dict(reversed(list(facts.items()))),
+                 "CONTRACT_SIX", dict(reversed(list(sources.items()))), reviewed) == accept)]
+    for phase in ("PRODUCT_FOUR", "CONTRACT_FIVE", "RED_EXPECTED", True):
+        cases.append(("wrong_phase_" + str(phase), h039_asset_draft_contract_relation(facts, phase, sources, reviewed) == "CONTRACT_PHASE"))
+    vectors = [("unknown_fact", ["unknown"], 1, "CONTRACT_FACT_SCHEMA"),
+        ("claimed_pass", ["status"], "PASS", "CONTRACT_FACT_SCHEMA"),
+        ("stale_base", ["base"], "6" * 40, "CONTRACT_SUBJECT"),
+        ("same_subject", ["candidate"], base, "CONTRACT_SUBJECT"),
+        ("crossed_subject", ["candidate"], "7" * 40, "CONTRACT_SUBJECT_MAP"),
+        ("wrong_parent", ["commits", candidate, "parents"], ["7" * 40], "CONTRACT_PARENT"),
+        ("merge_not_direct_child", ["commits", candidate, "parents"], [base, "7" * 40], "CONTRACT_PARENT"),
+        ("tree_oid_not_bytes", ["trees", candidate, paths[0]], ("100644", b"7" * 40), "CONTRACT_TREE_SCHEMA"),
+        ("outside_scope", ["trees", candidate, "controller/authority/core.py"], ("100644", "7" * 40), "CONTRACT_SIX_SCOPE"),
+        ("wrong_mode", ["trees", candidate, paths[0]], ("100755", after[paths[0]][1]), "CONTRACT_MODE"),
+        ("crossed_rawdiff", ["rawdiff", paths[0]], ("100644", "100644", "7" * 40, after[paths[0]][1], "M"), "CONTRACT_RAWDIFF_RELATION"),
+        ("numstat_bool", ["observed_git_numstat", paths[0]], (True, 0), "CONTRACT_NUMSTAT_SCHEMA"),
+        ("numstat_float", ["observed_git_numstat", paths[0]], (1.0, 0), "CONTRACT_NUMSTAT_SCHEMA"),
+        ("numstat_binary", ["observed_git_numstat", paths[0]], (None, None), "CONTRACT_NUMSTAT_SCHEMA")]
+    for label, keys, value, reason in vectors:
+        changed = clone(facts); target = changed
+        for key in keys[:-1]:
+            target = target[key]
+        target[keys[-1]] = value
+        cases.append((label, h039_asset_draft_contract_relation(changed, "CONTRACT_SIX", sources, reviewed) == reason))
+    changed = clone(facts)
+    del changed["trees"][candidate]["controller/authority/core.py"]
+    cases.append(("missing_complete_map_member", h039_asset_draft_contract_relation(changed, "CONTRACT_SIX", sources, reviewed) == "CONTRACT_MEMBERSHIP"))
+    wrong_pins = dict(reviewed); wrong_pins[paths[0]] = "0" * 64
+    cases.append(("stale_external_pin", h039_asset_draft_contract_relation(facts, "CONTRACT_SIX", sources, wrong_pins) == "CONTRACT_EXTERNAL_SOURCE_PIN"))
+    crossed = dict(sources); crossed[paths[0]] += b"\n"
+    crossed_pins = dict(reviewed); crossed_pins[paths[0]] = _asset_hashlib.sha256(crossed[paths[0]]).hexdigest()
+    cases.append(("repinned_source_not_git_blob", h039_asset_draft_contract_relation(facts, "CONTRACT_SIX", crossed, crossed_pins) == "CONTRACT_SOURCE_BLOB"))
+    for label, path, raw, reason in (
+            ("coherent_wrong_source_closure", paths[-1], sources[paths[-1]].replace(
+                b"def h039_asset_draft_graph_shape(", b"def h039_asset_draft_graph_shape_wrong(", 1), "CONTRACT_SOURCE_CLOSURE"),
+            ("coherent_changed_historical_gate", paths[-1], sources[paths[-1]] + b"\n# synthetic historical mutation\n", "CONTRACT_HISTORICAL_SOURCE"),
+            ("coherent_changed_historical_spec", paths[-2], sources[paths[-2]] + b"\n", "CONTRACT_SPEC_PRESERVATION")):
+        if raw == sources[path]:
+            raise ValueError("contract source mutant was a no-op", label)
+        changed = clone(facts); changed_sources = dict(sources); changed_pins = dict(reviewed)
+        changed_sources[path] = raw; changed_pins[path] = _asset_hashlib.sha256(raw).hexdigest()
+        changed["trees"][candidate][path] = (after[path][0], blob(raw))
+        changed["rawdiff"][path] = (original[path][0], after[path][0], original[path][1], blob(raw), "M")
+        cases.append((label, h039_asset_draft_contract_relation(changed, "CONTRACT_SIX", changed_sources, changed_pins) == reason))
+    product = sorted(before)[0]
+    changed = clone(facts)
+    mode, raw = changed["material"][candidate][product]
+    changed["material"][candidate][product] = (mode, raw + b"x")
+    cases.append(("wrong_baseline_bytes", h039_asset_draft_contract_relation(changed, "CONTRACT_SIX", sources, reviewed) == "CONTRACT_BASE_MATERIAL_BINDING"))
+    changed = clone(facts)
+    for subject in (base, candidate):
+        changed["trees"][subject][product] = (mode, "7" * 40)
+    cases.append(("baseline_blob_crossed_on_both_sides", h039_asset_draft_contract_relation(changed, "CONTRACT_SIX", sources, reviewed) == "CONTRACT_BASE_MATERIAL_BLOB"))
+    return cases
+
+
+def h039_asset_draft_product_relation(contract_facts: dict, product_facts: dict,
+        phase: str, sources: dict, reviewed: dict, outputs: dict, runtime: bytes,
+        adapter_source: bytes) -> str:
+    """Pure B/C/M/P composition MODEL, never authentication of supplied facts.
+
+    Future operational dispatch must obtain both facts from the reviewed observer
+    and the source pins externally. Local merge shape is not remote publication.
+    Absolute Git added/deleted budgets remain unmeasured; only their types and
+    byte-derived text net delta are composed here. No output is loaded or built.
+    """
+    if type(phase) is not str or phase != "PRODUCT_FOUR":
+        return "PRODUCT_PHASE"
+    contract = h039_asset_draft_contract_relation(contract_facts, "CONTRACT_SIX", sources, reviewed)
+    if contract != "CONTRACT_SIX_RELATION_MODEL_ONLY_NOT_PREPRODUCT_RED_OR_PHASE_CREDIT":
+        return "CONTRACT:" + contract
+    def oid(value: object) -> bool:
+        return type(value) is str and len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+    def blob(raw: bytes) -> str:
+        return _asset_hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+    paths = ["controller/runtime-cleanup/install", "controller/runtime-cleanup/native/mediator.c",
+             "verify/h039/build-recipe.json", "verify/h039/identity-manifest.json"]
+    facts = product_facts
+    if (type(facts) is not dict or set(facts) != {"status", "base", "candidate", "commits", "trees",
+            "rawdiff", "observed_git_numstat", "material"} or type(facts["status"]) is not str
+            or facts["status"] != "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT"):
+        return "PRODUCT_FACT_SCHEMA"
+    base, child = contract_facts["base"], contract_facts["candidate"]
+    merge, candidate = facts["base"], facts["candidate"]
+    if not oid(merge) or not oid(candidate) or len({base, child, merge, candidate}) != 4:
+        return "PRODUCT_SUBJECT"
+    if any(type(facts[key]) is not dict or set(facts[key]) != {merge, candidate}
+           for key in ("commits", "trees", "material")):
+        return "PRODUCT_SUBJECT_MAP"
+    for row in facts["commits"].values():
+        if (type(row) is not dict or set(row) != {"tree", "parents"} or not oid(row["tree"])
+                or type(row["parents"]) is not list or not all(oid(parent) for parent in row["parents"])
+                or len(set(row["parents"])) != len(row["parents"])):
+            return "PRODUCT_COMMIT_SCHEMA"
+    if facts["commits"][merge]["parents"] != [base, child]:
+        return "PRODUCT_CONTRACT_MERGE_PARENTS"
+    if facts["commits"][merge]["tree"] != contract_facts["commits"][child]["tree"]:
+        return "PRODUCT_CONTRACT_MERGE_TREE"
+    before, after = facts["trees"][merge], facts["trees"][candidate]
+    for mapping in (before, after):
+        if (type(mapping) is not dict or not mapping or any(type(path) is not str or not path
+                or path.startswith("/") or "\0" in path or any(part in ("", ".", "..") for part in path.split("/"))
+                for path in mapping)):
+            return "PRODUCT_TREE_SCHEMA"
+        if any(type(row) is not tuple or len(row) != 2 or type(row[0]) is not str
+               or row[0] not in ("100644", "100755") or not oid(row[1]) for row in mapping.values()):
+            return "PRODUCT_TREE_SCHEMA"
+    if before != contract_facts["trees"][child]:
+        return "PRODUCT_CONTRACT_MERGE_MAP"
+    if set(before) != set(after):
+        return "PRODUCT_MEMBERSHIP"
+    changed = sorted(path for path in before if before[path] != after[path])
+    if changed != paths:
+        return "PRODUCT_FOUR_SCOPE"
+    if any(before[path][0] != after[path][0] for path in before):
+        return "PRODUCT_MODE"
+    diff = facts["rawdiff"]
+    if type(diff) is not dict or set(diff) != set(paths):
+        return "PRODUCT_RAWDIFF_SCHEMA"
+    if any(type(diff[path]) is not tuple or diff[path] !=
+           (before[path][0], after[path][0], before[path][1], after[path][1], "M") for path in paths):
+        return "PRODUCT_RAWDIFF_RELATION"
+    if not h039_asset_draft_graph_shape(merge, candidate, facts["commits"][candidate]["parents"],
+            [(path, diff[path][0], diff[path][1], diff[path][4]) for path in paths]):
+        return "PRODUCT_DIRECT_CHILD_SHAPE"
+    counts = facts["observed_git_numstat"]
+    if (type(counts) is not dict or set(counts) != set(paths)
+            or type(counts[paths[0]]) is not tuple or counts[paths[0]] != (None, None)
+            or any(type(counts[path]) is not tuple or len(counts[path]) != 2
+                or any(type(n) is not int or n < 0 for n in counts[path]) or sum(counts[path]) == 0
+                for path in paths[1:])):
+        return "PRODUCT_NUMSTAT_SCHEMA"
+    for subject, mapping in facts["material"].items():
+        if type(mapping) is not dict or set(mapping) != set(paths):
+            return "PRODUCT_MATERIAL_SCHEMA"
+        for index, path in enumerate(paths):
+            row = mapping[path]
+            if (type(row) is not tuple or len(row) != 2 or type(row[0]) is not str
+                    or row[0] != ("100755" if index == 0 else "100644") or type(row[1]) is not bytes
+                    or not row[1] or len(row[1]) > 1048576):
+                return "PRODUCT_MATERIAL_SCHEMA"
+            if facts["trees"][subject][path] != (row[0], blob(row[1])):
+                return "PRODUCT_MATERIAL_BLOB"
+    if facts["material"][merge] != contract_facts["material"][child]:
+        return "PRODUCT_BASE_MATERIAL_RELATION"
+    runtime_path = "verify/h039/runtime-cleanup-mediator"
+    if (type(runtime) is not bytes or len(runtime) != 106736
+            or _asset_hashlib.sha256(runtime).hexdigest() != "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7"
+            or before[runtime_path] != ("100755", blob(runtime)) or after[runtime_path] != before[runtime_path]):
+        return "PRODUCT_RETAINED_RUNTIME_BLOB"
+    material = h039_asset_draft_product_material(facts["material"][merge], facts["material"][candidate],
+                                               outputs, runtime, adapter_source)
+    if material != "FOUR_FILE_STATIC_RELATION_ONLY_NOT_GRAPH_OR_GATE_CREDIT":
+        return "MATERIAL:" + material
+    # Canonical accepted text has final newlines. This identity constrains only
+    # net lines, not Git's absolute edit choice or an unmeasured churn budget.
+    for path in paths[1:]:
+        old, new = facts["material"][merge][path][1], facts["material"][candidate][path][1]
+        if counts[path][0] - counts[path][1] != new.count(b"\n") - old.count(b"\n"):
+            return "PRODUCT_NUMSTAT_NET_LINES"
+    return "PRODUCT_FOUR_RELATION_MODEL_ONLY_NOT_ACTUAL_GIT_BUDGET_OR_PHASE_CREDIT"
+
+
+def h039_asset_draft_product_relation_controls(sources: dict, before: dict,
+        outputs: dict, runtime: bytes, adapter_source: bytes) -> list:
+    """Synthetic local graph models using measured bytes; no actual Git counts.
+
+    Coherent source/material blob repins expose the intended downstream predicate.
+    No source hash computed here is an external review credential.
+    """
+    def blob(raw: bytes) -> str:
+        return _asset_hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+    def clone(value: object) -> object:
+        if type(value) is dict:
+            return {key: clone(member) for key, member in value.items()}
+        if type(value) is list:
+            return [clone(member) for member in value]
+        return value
+    base, child, merge, candidate = "ed584ec3088c08005f99de1da825d083e350a8d2", "1" * 40, "6" * 40, "7" * 40
+    paths, contract_paths = sorted(before), sorted(sources)
+    initial = {path: (mode, blob(raw)) for path, (mode, raw) in before.items()}
+    for path in contract_paths:
+        initial[path] = ("100755" if path == "verify/bin/h-039-exit" else "100644", "2" * 40)
+    initial["verify/h039/runtime-cleanup-mediator"] = ("100755", blob(runtime))
+    for path in ("controller/authority/core.py", "specs/owner-production-paths.v1.json"):
+        initial[path] = ("100644", "3" * 40)
+    contract_map = dict(initial)
+    for path in contract_paths:
+        contract_map[path] = (initial[path][0], blob(sources[path]))
+    contract_facts = {"status": "LOCAL_IMMUTABLE_GIT_FACTS_ONLY_NOT_REMOTE_PUBLICATION_OR_PHASE_CREDIT",
+        "base": base, "candidate": child,
+        "commits": {base: {"tree": "4" * 40, "parents": []}, child: {"tree": "5" * 40, "parents": [base]}},
+        "trees": {base: initial, child: contract_map},
+        "rawdiff": {p: (initial[p][0], contract_map[p][0], initial[p][1], contract_map[p][1], "M") for p in contract_paths},
+        "observed_git_numstat": {p: (1, 0) for p in contract_paths}, "material": {base: before, child: before}}
+    files = {paths[0]: ("100755", outputs["container"]),
+             paths[1]: ("100644", h039_asset_draft_reference_source(before[paths[1]][1], adapter_source)),
+             paths[2]: ("100644", h039_asset_draft_product_recipe()),
+             paths[3]: ("100644", h039_asset_draft_product_manifest())}
+    product_map = dict(contract_map)
+    product_map.update({p: (mode, blob(raw)) for p, (mode, raw) in files.items()})
+    counts = {paths[0]: (None, None)}
+    for p in paths[1:]:
+        net = files[p][1].count(b"\n") - before[p][1].count(b"\n")
+        counts[p] = (max(net, 0) + 1, max(-net, 0) + 1)
+    facts = {"status": contract_facts["status"], "base": merge, "candidate": candidate,
+        "commits": {merge: {"tree": "5" * 40, "parents": [base, child]}, candidate: {"tree": "8" * 40, "parents": [merge]}},
+        "trees": {merge: contract_map, candidate: product_map},
+        "rawdiff": {p: (contract_map[p][0], product_map[p][0], contract_map[p][1], product_map[p][1], "M") for p in paths},
+        "observed_git_numstat": counts, "material": {merge: before, candidate: files}}
+    reviewed = {p: _asset_hashlib.sha256(raw).hexdigest() for p, raw in sources.items()}
+    accept = "PRODUCT_FOUR_RELATION_MODEL_ONLY_NOT_ACTUAL_GIT_BUDGET_OR_PHASE_CREDIT"
+    def judge(cf: dict, pf: dict, phase: str) -> str:
+        return h039_asset_draft_product_relation(cf, pf, phase, sources, reviewed, outputs, runtime, adapter_source)
+    cases = [("synthetic_product_join", judge(contract_facts, facts, "PRODUCT_FOUR") == accept),
+        ("mapping_order_only", judge(dict(reversed(list(contract_facts.items()))), dict(reversed(list(facts.items()))), "PRODUCT_FOUR") == accept)]
+    for phase in ("CONTRACT_SIX", "PRODUCT_FIVE", "PASS", True):
+        cases.append(("wrong_phase_" + str(phase), judge(contract_facts, facts, phase) == "PRODUCT_PHASE"))
+    vectors = [("claimed_pass", ["status"], "PASS", "PRODUCT_FACT_SCHEMA"),
+        ("crossed_merge", ["base"], child, "PRODUCT_SUBJECT"),
+        ("crossed_candidate", ["candidate"], "9" * 40, "PRODUCT_SUBJECT_MAP"),
+        ("reversed_merge_parents", ["commits", merge, "parents"], [child, base], "PRODUCT_CONTRACT_MERGE_PARENTS"),
+        ("wrong_merge_tree", ["commits", merge, "tree"], "9" * 40, "PRODUCT_CONTRACT_MERGE_TREE"),
+        ("wrong_product_parent", ["commits", candidate, "parents"], [child], "PRODUCT_DIRECT_CHILD_SHAPE"),
+        ("merge_product_not_direct_child", ["commits", candidate, "parents"], [merge, child], "PRODUCT_DIRECT_CHILD_SHAPE"),
+        ("merge_map_disagreement", ["trees", merge, "controller/authority/core.py"], ("100644", "9" * 40), "PRODUCT_CONTRACT_MERGE_MAP"),
+        ("fifth_product_delta", ["trees", candidate, "controller/authority/core.py"], ("100644", "9" * 40), "PRODUCT_FOUR_SCOPE"),
+        ("runtime_changed", ["trees", candidate, "verify/h039/runtime-cleanup-mediator"], ("100755", "9" * 40), "PRODUCT_FOUR_SCOPE"),
+        ("product_mode", ["trees", candidate, paths[0]], ("100644", product_map[paths[0]][1]), "PRODUCT_MODE"),
+        ("rawdiff_crossed", ["rawdiff", paths[0]], ("100755", "100755", "9" * 40, product_map[paths[0]][1], "M"), "PRODUCT_RAWDIFF_RELATION"),
+        ("binary_numeric_counts", ["observed_git_numstat", paths[0]], (1, 1), "PRODUCT_NUMSTAT_SCHEMA"),
+        ("text_binary_counts", ["observed_git_numstat", paths[1]], (None, None), "PRODUCT_NUMSTAT_SCHEMA"),
+        ("text_bool_counts", ["observed_git_numstat", paths[1]], (True, 0), "PRODUCT_NUMSTAT_SCHEMA"),
+        ("text_float_counts", ["observed_git_numstat", paths[1]], (168.0, 0), "PRODUCT_NUMSTAT_SCHEMA"),
+        ("net_line_disagreement", ["observed_git_numstat", paths[1]], (1, 1), "PRODUCT_NUMSTAT_NET_LINES"),
+        ("unbound_material_bytes", ["material", candidate, paths[0]], ("100755", files[paths[0]][1] + b"x"), "PRODUCT_MATERIAL_BLOB")]
+    for label, keys, value, reason in vectors:
+        changed = clone(facts); target = changed
+        for key in keys[:-1]:
+            target = target[key]
+        target[keys[-1]] = value
+        cases.append((label, judge(contract_facts, changed, "PRODUCT_FOUR") == reason))
+    changed = clone(facts); del changed["trees"][candidate]["controller/authority/core.py"]
+    cases.append(("missing_fullmap_member", judge(contract_facts, changed, "PRODUCT_FOUR") == "PRODUCT_MEMBERSHIP"))
+    stale = clone(contract_facts); stale["candidate"] = "9" * 40
+    cases.append(("crossed_contract_facts", judge(stale, facts, "PRODUCT_FOUR") == "CONTRACT:CONTRACT_SUBJECT_MAP"))
+    changed = clone(facts)
+    for p in paths[1:]:
+        added, deleted = changed["observed_git_numstat"][p]
+        changed["observed_git_numstat"][p] = (added + 100, deleted + 100)
+    cases.append(("same_net_not_an_absolute_git_budget", judge(contract_facts, changed, "PRODUCT_FOUR") == accept))
+    for label, path, raw, reason in (
+            ("coherent_source_mutant", paths[1], files[paths[1]][1] + b"\n", "MATERIAL:PRODUCT_SOURCE_BINDING"),
+            ("coherent_container_mutant", paths[0], files[paths[0]][1] + b"x", "MATERIAL:PRODUCT_CONTAINER_BINDING"),
+            ("coherent_manifest_mutant", paths[3], files[paths[3]][1].replace(b'"schema_version": 1', b'"schema_version": 2', 1), "MATERIAL:MANIFEST_BINDING")):
+        if raw == files[path][1]:
+            raise ValueError("product relation mutant was a no-op", label)
+        changed = clone(facts)
+        changed["material"][candidate][path] = (files[path][0], raw)
+        changed["trees"][candidate][path] = (files[path][0], blob(raw))
+        changed["rawdiff"][path] = (contract_map[path][0], files[path][0], contract_map[path][1], blob(raw), "M")
+        cases.append((label, judge(contract_facts, changed, "PRODUCT_FOUR") == reason))
+    cf, pf = clone(contract_facts), clone(facts)
+    runtime_path = "verify/h039/runtime-cleanup-mediator"
+    for mapping in list(cf["trees"].values()) + list(pf["trees"].values()):
+        mapping[runtime_path] = ("100755", "9" * 40)
+    cases.append(("coherent_crossed_runtime_oid", judge(cf, pf, "PRODUCT_FOUR") == "PRODUCT_RETAINED_RUNTIME_BLOB"))
+    changed = clone(facts)
+    recipe = _asset_json.loads(files[paths[2]][1]); recipe["role"] = "INSTALLED_OPERATIONAL"
+    recipe_raw = (_asset_json.dumps(recipe, sort_keys=True, indent=2, ensure_ascii=True, allow_nan=False) + "\n").encode("ascii")
+    manifest = _asset_json.loads(files[paths[3]][1])
+    manifest["recipe"]["size"] = len(recipe_raw)
+    manifest["recipe"]["sha256"] = _asset_hashlib.sha256(recipe_raw).hexdigest()
+    manifest_raw = (_asset_json.dumps(manifest, sort_keys=True, indent=2, ensure_ascii=True, allow_nan=False) + "\n").encode("ascii")
+    for path, raw in ((paths[2], recipe_raw), (paths[3], manifest_raw)):
+        if raw == files[path][1]:
+            raise ValueError("coherent recipe control unchanged")
+        changed["material"][candidate][path] = ("100644", raw)
+        changed["trees"][candidate][path] = ("100644", blob(raw))
+        changed["rawdiff"][path] = ("100644", "100644", contract_map[path][1], blob(raw), "M")
+    cases.append(("coherent_recipe_manifest_graph", judge(contract_facts, changed, "PRODUCT_FOUR") == "MATERIAL:RECIPE_BINDING"))
+    return cases
+
+
+def h039_asset_draft_compiler_envelope() -> dict:
+    """Inspectable restricted-driver contract data; does not launch anything.
+
+    Profile derives the existing published build-review envelope while replacing
+    broad tool-directory exec/touch admission with exactly three fixed tools.
+    Root is controller-created and authenticated, never caller selected.
+    """
+    profile = '''(version 1)
+(deny default)
+(allow process-fork)
+(allow process-exec
+    (literal "/Library/Developer/CommandLineTools/usr/bin/clang")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/ld"))
+(allow sysctl-read (sysctl-name-prefix "hw."))
+(allow file-read* (literal "/Library") (literal "/Library/Developer"))
+(allow file-read-metadata
+    (literal "/") (literal "/dev/null") (literal "/private") (literal "/private/tmp")
+    (subpath (param "H039_BUILD_ROOT"))
+    (subpath "/Library/Developer/CommandLineTools")
+    (subpath "/System/Library") (subpath "/usr/lib") (subpath "/private/var/db/dyld"))
+(allow file-read-data (literal "/") (literal "/dev/null")
+    (subpath (param "H039_BUILD_ROOT"))
+    (subpath "/Library/Developer/CommandLineTools")
+    (subpath "/System/Library") (subpath "/usr/lib") (subpath "/private/var/db/dyld"))
+(allow file-write* (subpath (param "H039_BUILD_ROOT")))
+'''
+    return {"status": "DORMANT_MEASUREMENT_DRIVER_REQUIRES_TWO_EXACT_REVIEWS_AND_PREFLIGHT",
+            "profile": profile,
+            "root_binding": "EXCLUSIVELY_CREATED_GATE_PRIVATE_PARENT_TWO_NONALIASED_BUILD_A_B_DIRFDS_NO_CALLER_PATH",
+            "input_binding": "NOFOLLOW_SINGLE_LINK_STABLE_FD_HASH_AND_NAME_REBIND_BEFORE_AND_AFTER_BUILD",
+            "graph_binding": "AUTHENTICATED_PUBLISHED_CONTRACT_AND_PRODUCT_DIRECT_CHILD_FULL_RAW_TREE_MAP_MODES_AND_FOUR_PATH_DIFF",
+            "header_sets": [
+                ["/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include", 3664,
+                 "9af988fd6db7f7b7c96feeac0c36d3b437bc6cb9f8e8481df08a74cb267c48b1"],
+                ["/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/lib", 1116,
+                 "08117fe71bc5a7cc24fe93fc4289bb2a03dd58b79fe70db76f6e2fad54715843"],
+                ["/Library/Developer/CommandLineTools/usr/lib/clang/21/include", 309,
+                 "401608621da8b304ddc9c926b7641c454077d1d7fc39f593cf76194dbee9a54f"],
+                ["/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Headers", 158,
+                 "d0c627578e17a3955eaeb9794dbc831fa812a82a1d4f452342798d183e66d747"]],
+            "header_inventory_authority": "HISTORICAL_INVENTORY_PINS_REQUIRE_EXACT_RECONSTRUCTION_ALGORITHM_AND_FRESH_FD_AUTHENTICATION",
+            "private_link_dependencies": ["libtapi.dylib", "libcodedirectory.dylib", "libLTO.dylib", "libswiftDemangle.dylib"],
+            "system_loader_trust": "PUBLISHED_FIXED_BUILD_TOOL_OS_LIBRARY_ENVELOPE_ONLY_NOT_ADAPTER_LOADED_IMAGE_PROOF",
+            "command_binding": "EXACT_RECIPE_ARRAY_NO_SHELL_OR_AMBIENT_FLAGS_FINITE_REPLACEMENT_ENV_NO_EXTRA_COMMAND",
+            "output_binding": "EXACT_NAMED_REGULAR_SINGLE_LINK_OUTPUTS_EXCLUSIVE_CAPTURE_NO_PREEXISTING_OUTPUT_OR_FOREIGN_TEMP",
+            "failure": "NON_SUCCESS_PRESERVE_NO_AUTOMATIC_RETRY_OR_CLEANUP",
+            "measurement_limits": {"command_seconds": 300, "capture_bytes": 4194304,
+                                   "child_regular_file_bytes": 67108864,
+                                   "minimum_free_bytes": 21474836480},
+            "required_uncompleted_proofs": [
+                "TWO_INDEPENDENT_EXACT_MEASUREMENT_DRIVER_PRECOMPILE_REVIEWS",
+                "ACL_ABSENCE_AND_INVENTORY_ALGORITHM_POSITIVE_PREFLIGHT",
+                "FINITE_TOOLCHAIN_DENYDEFAULT_COMMAND_AND_OUTPUT_SATISFIABILITY",
+                "REFERENCE_REPRODUCTION_MEASUREMENT_ONLY",
+                "ACTUAL_LINKED_MACHO_CLOSED_SHAPE_AND_TOOL_OUTPUT_PARSERS",
+                "LATER_PUBLISHED_CONTRACT_PRODUCT_GRAPH_AND_FULL_PREPRODUCT_GATE"]}
+
+
+def h039_asset_draft_retained_read(path: str, expected_sha256: str,
+                                 maximum_bytes: int, root_owned: bool) -> bytes:
+    """Dormant retained-ancestor, nofollow bounded reader; never executable loading.
+
+    Path/digest/bound originate in the reviewed gate, not an untrusted manifest.
+    No caller can reach this through current argv dispatch. All opened FDs close.
+    This read primitive alone does not authenticate a compiler's later pathname IO.
+    """
+    if (type(path) is not str or not path.startswith("/") or "\0" in path
+            or any(part in {"", ".", ".."} for part in path.split("/")[1:])
+            or type(expected_sha256) is not str or len(expected_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in expected_sha256)
+            or type(maximum_bytes) is not int or not 0 < maximum_bytes <= 536870912
+            or type(root_owned) is not bool):
+        raise ValueError("retained read authority shape")
+    descriptors, bindings = [], []
+    try:
+        current = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_CLOEXEC)
+        descriptors.append(current)
+        root_stat = _asset_os.fstat(current)
+        if root_stat.st_uid != 0 or root_stat.st_mode & 0o022:
+            raise ValueError("root ancestor authority")
+        if root_owned:
+            h039_asset_draft_acl_empty(current)
+        components = path.split("/")[1:]
+        for index, name in enumerate(components):
+            final = index == len(components) - 1
+            flags = _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK
+            if not final:
+                flags |= _asset_os.O_DIRECTORY
+            child = _asset_os.open(name, flags, dir_fd=current)
+            descriptors.append(child)
+            observed = _asset_os.fstat(child)
+            identity = (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_uid,
+                        observed.st_gid, observed.st_nlink, observed.st_size, observed.st_flags,
+                        observed.st_mtime_ns, observed.st_ctime_ns)
+            if root_owned and (observed.st_uid != 0 or observed.st_mode & 0o022):
+                raise ValueError("non-root-writable tool ancestry")
+            if root_owned:
+                h039_asset_draft_acl_empty(child)
+            if final and (not _asset_stat.S_ISREG(observed.st_mode) or observed.st_nlink != 1
+                          or not 0 <= observed.st_size <= maximum_bytes):
+                raise ValueError("retained regular leaf bound")
+            if not final and not _asset_stat.S_ISDIR(observed.st_mode):
+                raise ValueError("retained ancestor type")
+            bindings.append((current, name, child, identity))
+            current = child
+        chunks, offset = [], 0
+        while offset < bindings[-1][3][6]:
+            chunk = _asset_os.pread(current, min(1048576, bindings[-1][3][6] - offset), offset)
+            if not chunk:
+                raise ValueError("retained short read")
+            chunks.append(chunk)
+            offset += len(chunk)
+        if _asset_os.pread(current, 1, offset):
+            raise ValueError("retained leaf grew")
+        raw = b"".join(chunks)
+        if _asset_hashlib.sha256(raw).hexdigest() != expected_sha256:
+            raise ValueError("retained source digest")
+        for parent, name, child, identity in bindings:
+            if root_owned:
+                h039_asset_draft_acl_empty(child)
+            for observed in [_asset_os.fstat(child), _asset_os.stat(name, dir_fd=parent, follow_symlinks=False)]:
+                if (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_uid,
+                    observed.st_gid, observed.st_nlink, observed.st_size, observed.st_flags,
+                    observed.st_mtime_ns, observed.st_ctime_ns) != identity:
+                    raise ValueError("retained final identity/name rebind")
+        return raw
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+        if failures and primary is None:
+            raise ValueError("retained close failure", failures)
+        if failures and primary is not None:
+            primary.h039_close_failures = failures
+
+
+def h039_asset_draft_close_owned(descriptors: list, closer: object) -> list:
+    """Attempt each owned close once; ambiguous close is never retried."""
+    if (type(descriptors) is not list or len(set(descriptors)) != len(descriptors)
+            or any(type(fd) is not int or fd < 0 for fd in descriptors)):
+        raise ValueError("owned descriptor list")
+    failures = []
+    for descriptor in descriptors:
+        try:
+            closer(descriptor)
+        except BaseException as exc:
+            failures.append((descriptor, type(exc).__name__, str(exc)))
+    return failures
+
+
+def h039_asset_draft_acl_empty(descriptor: int) -> None:
+    """Dormant Darwin ACL metadata query, not candidate loading.
+
+    Small retained-FD ACL arm derived from the published gate and SDK sys/acl.h.
+    UID/mode alone never claims write exclusion; any extended ACL fails closed.
+    """
+    import ctypes
+    import errno
+    if type(descriptor) is not int or descriptor < 0:
+        raise ValueError("ACL descriptor")
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.acl_get_fd_np.argtypes = [ctypes.c_int, ctypes.c_int]
+    libc.acl_get_fd_np.restype = ctypes.c_void_p
+    libc.acl_free.argtypes = [ctypes.c_void_p]
+    libc.acl_free.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    acl = libc.acl_get_fd_np(descriptor, 0x100)
+    if not acl:
+        if ctypes.get_errno() == errno.ENOENT:
+            return
+        raise ValueError("ACL acquisition error", ctypes.get_errno())
+    # Policy is absence of an ACL object, not acceptance of present-empty ACLs.
+    # No undocumented acl_get_entry return convention is used.
+    released = libc.acl_free(acl)
+    raise ValueError("ACL object present or unexpected", "released" if released == 0 else "release failed")
+
+
+def h039_asset_draft_inventory(root: str) -> list:
+    """Dormant bounded nofollow inventory; no writes or candidate execution."""
+    if (type(root) is not str or not root.startswith("/")
+            or any(part in {"", ".", ".."} for part in root.split("/")[1:])):
+        raise ValueError("inventory root")
+    rows, opened, total = [], [], [0]
+    def stable(st: object) -> tuple:
+        return (st.st_dev, st.st_ino, st.st_mode, st.st_uid, st.st_gid, st.st_nlink,
+                st.st_size, st.st_flags, st.st_mtime_ns, st.st_ctime_ns)
+    def visit(fd: int, relative: str, initial: object, parent_fd: int, own_name: str) -> None:
+        if stable(_asset_os.fstat(fd)) != stable(initial):
+            raise ValueError("inventory directory open race")
+        names = sorted(_asset_os.listdir(fd))
+        child_states = {}
+        for name in names:
+            if name in {".", ".."} or "/" in name or "\0" in name:
+                raise ValueError("inventory component")
+            rel = relative + name
+            st = _asset_os.stat(name, dir_fd=fd, follow_symlinks=False)
+            child_states[name] = stable(st)
+            ident = [st.st_dev, st.st_ino, st.st_mode, st.st_uid, st.st_gid,
+                     st.st_nlink, st.st_size, st.st_flags]
+            row = [rel, ident]
+            if _asset_stat.S_ISLNK(st.st_mode):
+                row.append(_asset_os.readlink(name, dir_fd=fd))
+                if (stable(_asset_os.stat(name, dir_fd=fd, follow_symlinks=False)) != stable(st)
+                        or _asset_os.readlink(name, dir_fd=fd) != row[-1]):
+                    raise ValueError("inventory symlink rebind")
+            elif _asset_stat.S_ISREG(st.st_mode):
+                if st.st_nlink != 1 or st.st_size > 536870912:
+                    raise ValueError("inventory regular bound")
+                leaf = _asset_os.open(name, _asset_os.O_RDONLY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC | _asset_os.O_NONBLOCK, dir_fd=fd)
+                opened.append(leaf)
+                if stable(_asset_os.fstat(leaf)) != stable(st):
+                    raise ValueError("inventory open race")
+                digest, offset = _asset_hashlib.sha256(), 0
+                while offset < st.st_size:
+                    chunk = _asset_os.pread(leaf, min(1048576, st.st_size - offset), offset)
+                    if not chunk:
+                        raise ValueError("inventory short read")
+                    digest.update(chunk)
+                    offset += len(chunk)
+                if (_asset_os.pread(leaf, 1, offset) or stable(_asset_os.fstat(leaf)) != stable(st)
+                        or stable(_asset_os.stat(name, dir_fd=fd, follow_symlinks=False)) != stable(st)):
+                    raise ValueError("inventory final rebind")
+                row.append(digest.hexdigest())
+                total[0] += st.st_size
+                opened.pop()
+                failures = h039_asset_draft_close_owned([leaf], _asset_os.close)
+                if failures:
+                    raise ValueError("inventory leaf close failure", failures)
+            elif not _asset_stat.S_ISDIR(st.st_mode):
+                raise ValueError("inventory special file")
+            rows.append(row)
+            if len(rows) > 20000 or total[0] > 2147483648:
+                raise ValueError("inventory aggregate bound")
+            if _asset_stat.S_ISDIR(st.st_mode):
+                child = _asset_os.open(name, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, dir_fd=fd)
+                opened.append(child)
+                visit(child, rel + "/", st, fd, name)
+        if (sorted(_asset_os.listdir(fd)) != names
+                or any(stable(_asset_os.stat(name, dir_fd=fd, follow_symlinks=False)) != child_states[name] for name in names)
+                or stable(_asset_os.fstat(fd)) != stable(initial)
+                or stable(_asset_os.stat(own_name, dir_fd=parent_fd, follow_symlinks=False)) != stable(initial)):
+            raise ValueError("inventory directory final rebind")
+        opened.pop()
+        failures = h039_asset_draft_close_owned([fd], _asset_os.close)
+        if failures:
+            raise ValueError("inventory directory close failure", failures)
+    try:
+        current = _asset_os.open("/", _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC)
+        opened.append(current)
+        ancestors = []
+        for component in root.split("/")[1:]:
+            initial = _asset_os.stat(component, dir_fd=current, follow_symlinks=False)
+            child = _asset_os.open(component, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, dir_fd=current)
+            opened.append(child)
+            if stable(_asset_os.fstat(child)) != stable(initial):
+                raise ValueError("inventory ancestor open race")
+            ancestors.append((current, component, child, initial))
+            current = child
+        parent_fd, component, root_fd, initial = ancestors[-1]
+        visit(root_fd, "", initial, parent_fd, component)
+        for parent_fd, component, child, initial in ancestors[:-1]:
+            if (stable(_asset_os.fstat(child)) != stable(initial)
+                    or stable(_asset_os.stat(component, dir_fd=parent_fd, follow_symlinks=False)) != stable(initial)):
+                raise ValueError("inventory ancestor final rebind")
+        return sorted(rows, key=lambda row: row[0])
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        failures = h039_asset_draft_close_owned(list(reversed(opened)), _asset_os.close)
+        if failures and primary is None:
+            raise ValueError("inventory close failure", failures)
+        if failures and primary is not None:
+            primary.h039_close_failures = failures
+
+
+def h039_asset_draft_wait_state(observation: tuple, pid: int, streams_open: bool,
+                               now: float, deadline: float) -> tuple:
+    """Pure exact Darwin wait result and EOF/deadline policy; no OS call."""
+    event, status = "UNOWNED", None
+    if (type(observation) is tuple and len(observation) == 8
+            and all(type(value) is int for value in observation[:7])
+            and type(observation[7]) is bool and type(pid) is int and pid > 0
+            and type(streams_open) is bool):
+        rc, error, signo, sierror, found_pid, code, value, zero = observation
+        if rc == -1 and error == 4:  # Darwin EINTR; no deadline restart
+            event = "INTERRUPTED"
+        elif rc == 0 and zero and observation[1:7] == (0, 0, 0, 0, 0, 0):
+            event = "ALIVE"
+        elif (rc == 0 and error == 0 and signo == 20 and sierror == 0
+                and found_pid == pid and code in {1, 2, 3} and not zero
+                and 0 <= value <= (255 if code == 1 else 31)
+                and (code == 1 or value != 0)):
+            event, status = "EXITED", value if code == 1 else -value
+    if event == "UNOWNED":
+        action = "FAIL_UNOWNED_NO_SIGNAL_NO_REAP"
+    elif now >= deadline:
+        action = "FAIL_DEADLINE"
+    elif event == "EXITED" and not streams_open:
+        action = "COMPLETE"
+    else:
+        action = "READ" if streams_open else "WAIT_SAME_DEADLINE"
+    return event, status, action
+
+
+def h039_asset_draft_group_action(snapshots: object, pid: int, uid: int,
+                                 leader_event: str, owned: bool) -> str:
+    """Pure pre-signal routing for one still-reserved Popen PGID, not global scan."""
+    reject = "FAIL_PRESERVE_NO_SIGNAL_NO_REAP"
+    if (type(owned) is not bool or type(pid) is not int or not 0 < pid < 2147483648
+            or type(uid) is not int or uid < 0 or type(leader_event) is not str
+            or leader_event not in {"ALIVE", "EXITED", "REAPED"}
+            or (not owned and leader_event != "REAPED") or (owned and leader_event == "REAPED")
+            or type(snapshots) is not list or len(snapshots) != 2):
+        return reject
+    bound = []
+    for snapshot in snapshots:
+        if type(snapshot) is not tuple or len(snapshot) != 4:
+            return reject
+        count, error, pids, rows = snapshot
+        if (type(count) is not int or type(error) is not int or error != 0
+                or not 0 <= count < 1024 or count % 4
+                or type(pids) is not list or type(rows) is not list
+                or count != len(pids) * 4 or len(rows) != len(pids)
+                or any(type(value) is not int or not 0 < value < 2147483648 for value in pids)
+                or len(set(pids)) != len(pids)):
+            return reject
+        current = {}
+        for row in rows:
+            if (type(row) is not tuple or len(row) != 6
+                    or any(type(value) is not int for value in row)
+                    or row[0] not in pids or row[0] in current
+                    or row[1] != pid or row[2] != uid or row[3] not in {1, 2, 3, 4, 5}
+                    or row[4] <= 0 or not 0 <= row[5] < 1000000):
+                return reject
+            current[row[0]] = row
+        if set(current) != set(pids):
+            return reject
+        bound.append(current)
+    if set(bound[0]) != set(bound[1]):
+        return reject
+    for member in bound[0]:
+        before, after = bound[0][member], bound[1][member]
+        if before[:3] + before[4:] != after[:3] + after[4:]:
+            return reject
+    final = bound[1]
+    if leader_event == "REAPED":
+        return "TERMINAL_ABSENT" if not final else reject
+    if leader_event == "ALIVE" and (pid not in final or final[pid][3] == 5):
+        return reject
+    if leader_event == "EXITED" and pid in final and final[pid][3] != 5:
+        return reject
+    return "KILL_BOUND_LIVE_GROUP" if any(row[3] != 5 for row in final.values()) else "REAP_WITHOUT_SIGNAL"
+
+
+def h039_asset_draft_group_snapshot(pgid: int) -> list:
+    """Dormant bounded PROC_PGRP_ONLY byte-count snapshots; no all-process query."""
+    import ctypes
+    if type(pgid) is not int or not 0 < pgid < 2147483648:
+        raise ValueError("owned group identifier")
+    class BSDInfo(ctypes.Structure):
+        _fields_ = [(name, ctypes.c_uint32) for name in
+                    ["flags", "status", "xstatus", "pid", "ppid", "uid", "gid",
+                     "ruid", "rgid", "svuid", "svgid", "reserved"]] + [
+                    ("comm", ctypes.c_char * 16), ("name", ctypes.c_char * 32),
+                    ("nfiles", ctypes.c_uint32), ("pgid", ctypes.c_uint32),
+                    ("jobc", ctypes.c_uint32), ("tdev", ctypes.c_uint32),
+                    ("tpgid", ctypes.c_uint32), ("nice", ctypes.c_int32),
+                    ("start_sec", ctypes.c_uint64), ("start_usec", ctypes.c_uint64)]
+    if (ctypes.sizeof(BSDInfo) != 136 or ctypes.alignment(BSDInfo) != 8
+            or [getattr(BSDInfo, field).offset for field in
+                ["status", "pid", "uid", "comm", "name", "pgid", "start_sec", "start_usec"]]
+                != [4, 12, 20, 48, 64, 100, 120, 128]):
+        raise ValueError("SDK26.5 proc_bsdinfo ABI")
+    libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+    listpids = libproc.proc_listpids
+    listpids.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_int]
+    listpids.restype = ctypes.c_int
+    pidinfo = libproc.proc_pidinfo
+    pidinfo.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
+    pidinfo.restype = ctypes.c_int
+    snapshots = []
+    for unused in range(2):
+        storage = (ctypes.c_int32 * 256)()
+        ctypes.set_errno(0)
+        count = listpids(2, pgid, storage, 1024)  # PROC_PGRP_ONLY; BYTES, not PID count.
+        error = ctypes.get_errno()
+        if error or count < 0 or count >= 1024 or count % 4:
+            raise ValueError("group enumeration error/full/unaligned", count, error)
+        pids = list(storage[:count // 4])
+        if any(value <= 0 for value in pids) or len(set(pids)) != len(pids):
+            raise ValueError("group enumeration PID set")
+        rows = []
+        for member in pids:
+            info = BSDInfo()
+            ctypes.set_errno(0)
+            # TBSDINFO arg=1 explicitly permits lookup of positively identified zombies.
+            size = pidinfo(member, 3, 1, ctypes.byref(info), 136)
+            error = ctypes.get_errno()
+            if size != 136 or error or info.pid != member:
+                raise ValueError("group member identity unavailable", member, size, error)
+            rows.append((info.pid, info.pgid, info.uid, info.status, info.start_sec, info.start_usec))
+        snapshots.append((count, 0, pids, rows))
+    return snapshots
+
+
+def h039_asset_draft_bounded_command(command: list, root: str, environment: dict) -> dict:
+    """Dormant confined compiler command; owned group only, no candidate exec.
+
+    Scalar safety bounds are measurement-run rejection limits, not product budgets.
+    EOF is not exit. Darwin waitid/WNOWAIT reserves the child until owned cleanup.
+    Failure captures are returned for durable preservation before caller rejection.
+    """
+    recipe = h039_asset_draft_reference_recipe()
+    if (type(command) is not list or not all(type(arg) is str for arg in command)
+            or command not in recipe["commands"]
+            or type(root) is not str or not root.startswith("/private/tmp/h039-asset-measure-")
+            or not root.endswith(("/build-a", "/build-b")) or len(root.split("/")) != 5
+            or any(part in {"", ".", ".."} for part in root.split("/")[1:])):
+        raise ValueError("finite compiler invocation")
+    expected_env = dict(recipe["environment"])
+    expected_env["TMPDIR"] = root
+    if (type(environment) is not dict
+            or any(type(k) is not str or type(v) is not str for k, v in environment.items())
+            or environment != expected_env):
+        raise ValueError("finite compiler environment")
+    profile = h039_asset_draft_compiler_envelope()["profile"]
+    argv = ["/usr/bin/sandbox-exec", "-D", "H039_BUILD_ROOT=" + root, "-p", profile] + command
+    import resource
+    import ctypes
+    class Sigval(ctypes.Union):
+        _fields_ = [("integer", ctypes.c_int), ("pointer", ctypes.c_void_p)]
+    class Siginfo(ctypes.Structure):
+        _fields_ = [("signo", ctypes.c_int), ("error", ctypes.c_int),
+                    ("code", ctypes.c_int), ("pid", ctypes.c_int32),
+                    ("uid", ctypes.c_uint32), ("status", ctypes.c_int),
+                    ("address", ctypes.c_void_p), ("value", Sigval),
+                    ("band", ctypes.c_long), ("pad", ctypes.c_ulong * 7)]
+    # SDK26.5 sys/signal.h __siginfo and sys/wait.h; no guessed oversized buffer.
+    if (ctypes.sizeof(Siginfo) != 104 or ctypes.alignment(Siginfo) != 8
+            or [getattr(Siginfo, name).offset for name in
+                ["signo", "error", "code", "pid", "uid", "status", "address", "value", "band", "pad"]]
+                != [0, 4, 8, 12, 16, 20, 24, 32, 40, 48]):
+        raise ValueError("Darwin arm64 siginfo ABI")
+    libc = ctypes.CDLL(None, use_errno=True)
+    waitid = libc.waitid
+    waitid.argtypes = [ctypes.c_int, ctypes.c_uint32, ctypes.POINTER(Siginfo), ctypes.c_int]
+    waitid.restype = ctypes.c_int
+    def observe(pid: int) -> tuple:
+        info = Siginfo()
+        ctypes.set_errno(0)
+        rc = waitid(1, pid, ctypes.byref(info), 0x25)  # P_PID, WEXITED|WNOHANG|WNOWAIT
+        error = ctypes.get_errno()
+        return rc, error, info.signo, info.error, info.pid, info.code, info.status, bytes(info) == bytes(104)
+    class ReservedChild(_asset_subprocess.Popen):
+        def __del__(self) -> None:
+            # Pinned Python Popen.__del__ polls/reaps. Disable that implicit path:
+            # only this function's positively owned explicit wait may reap.
+            pass
+    def child_limits() -> None:
+        _asset_os.umask(0o077)
+        resource.setrlimit(resource.RLIMIT_FSIZE, (67108864, 67108864))
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    process, selector = None, _asset_selectors.DefaultSelector()
+    output = {"stdout": bytearray(), "stderr": bytearray()}
+    primary, observed_status = None, None
+    ownership, truncated, cleanup_errors = "UNKNOWN", False, []
+    cleanup_observations, terminal_group = [], None
+    try:
+        process = ReservedChild(argv, cwd=root, env=environment,
+            stdin=_asset_subprocess.DEVNULL, stdout=_asset_subprocess.PIPE,
+            stderr=_asset_subprocess.PIPE, close_fds=True, start_new_session=True,
+            preexec_fn=child_limits)
+        ownership = "OWNED_UNREAPED"
+        for stream, label in [(process.stdout, "stdout"), (process.stderr, "stderr")]:
+            _asset_os.set_blocking(stream.fileno(), False)
+            selector.register(stream, _asset_selectors.EVENT_READ, label)
+        deadline = _asset_time.monotonic() + 300
+        while selector.get_map() or observed_status is None:
+            previous_ownership, ownership = ownership, "UNKNOWN"
+            event, status, action = h039_asset_draft_wait_state(observe(process.pid), process.pid,
+                bool(selector.get_map()), _asset_time.monotonic(), deadline)
+            if event == "UNOWNED":
+                raise ValueError("waitid ownership unknown; no signal or reap")
+            ownership = previous_ownership
+            if event == "EXITED":
+                observed_status = status
+            remaining = deadline - _asset_time.monotonic()
+            if action == "FAIL_DEADLINE":
+                raise ValueError("compiler deadline")
+            if action == "COMPLETE":
+                break
+            for key, unused in selector.select(min(remaining, 0.25)):
+                try:
+                    data = _asset_os.read(key.fileobj.fileno(), 65536)
+                except BlockingIOError:
+                    continue
+                if not data:
+                    selector.unregister(key.fileobj)
+                else:
+                    available = 4194304 - sum(len(value) for value in output.values())
+                    output[key.data].extend(data[:available])
+                    if len(data) > available:
+                        truncated = True
+                        raise ValueError("compiler capture bound")
+    except BaseException as exc:
+        primary = exc
+    finally:
+        try:
+            selector.close()
+        except BaseException as exc:
+            cleanup_errors.append(("selector_close", str(exc)))
+        if process is not None:
+            # Never signal/reap after a wait observation invalidates child ownership.
+            if ownership == "OWNED_UNREAPED":
+                try:
+                    cleanup_deadline, signal_sent = _asset_time.monotonic() + 10, False
+                    for cleanup_index in range(32):
+                        previous_ownership, ownership = ownership, "UNKNOWN"
+                        event, status, unused = h039_asset_draft_wait_state(observe(process.pid), process.pid,
+                            False, _asset_time.monotonic(), cleanup_deadline)
+                        if event == "UNOWNED":
+                            raise ValueError("cleanup child ownership unknown")
+                        ownership = previous_ownership
+                        if _asset_time.monotonic() >= cleanup_deadline:
+                            raise ValueError("owned group cleanup deadline")
+                        if event == "INTERRUPTED":
+                            continue
+                        snapshots = h039_asset_draft_group_snapshot(process.pid)
+                        previous_ownership, ownership = ownership, "UNKNOWN"
+                        event, status, unused = h039_asset_draft_wait_state(observe(process.pid), process.pid,
+                            False, _asset_time.monotonic(), cleanup_deadline)
+                        if event == "UNOWNED":
+                            raise ValueError("cleanup child ownership changed")
+                        ownership = previous_ownership
+                        if _asset_time.monotonic() >= cleanup_deadline:
+                            raise ValueError("owned group cleanup deadline")
+                        if event == "INTERRUPTED":
+                            continue
+                        route = h039_asset_draft_group_action(snapshots, process.pid,
+                            _asset_os.geteuid(), event, ownership == "OWNED_UNREAPED")
+                        cleanup_observations.append({"leader": event, "status": status,
+                                                     "snapshots": snapshots, "route": route})
+                        if route == "FAIL_PRESERVE_NO_SIGNAL_NO_REAP":
+                            raise ValueError("owned group identity/shape unknown")
+                        if route == "REAP_WITHOUT_SIGNAL":
+                            break
+                        if not signal_sent:
+                            # Only a bound live group is signalled, while leader remains reserved.
+                            # EPERM/ESRCH are real failure, never reclassified as empty/zombie success.
+                            _asset_os.killpg(process.pid, _asset_signal.SIGKILL)
+                            signal_sent = True
+                        _asset_time.sleep(min(0.1, max(0.0, cleanup_deadline - _asset_time.monotonic())))
+                    else:
+                        raise ValueError("owned group cleanup observation bound")
+                    remaining = cleanup_deadline - _asset_time.monotonic()
+                    if remaining <= 0:
+                        raise ValueError("owned group cleanup deadline before reap")
+                    process.wait(timeout=remaining)
+                    ownership = "REAPED"
+                    if primary is None and process.returncode != observed_status:
+                        cleanup_errors.append(("observed_exit_changed", str(process.returncode)))
+                except BaseException as exc:
+                    cleanup_errors.append(("owned_group_cleanup", type(exc).__name__, str(exc)))
+            else:
+                cleanup_errors.append(("unknown_ownership_preserved", str(process.pid)))
+            for stream in [process.stdout, process.stderr]:
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except BaseException as exc:
+                        cleanup_errors.append(("capture_close", str(exc)))
+            if ownership == "REAPED":
+                # Read-only terminal absence: remaining zombies/reused PGID are failures.
+                # Never signal a numeric group after releasing the leader reservation.
+                try:
+                    terminal_group = h039_asset_draft_group_snapshot(process.pid)
+                    if h039_asset_draft_group_action(terminal_group, process.pid, _asset_os.geteuid(),
+                            "REAPED", False) != "TERMINAL_ABSENT":
+                        raise ValueError("terminal group not absent")
+                except BaseException as exc:
+                    cleanup_errors.append(("terminal_group_absence", type(exc).__name__, str(exc)))
+    return {"status": "CAPTURED" if primary is None and not cleanup_errors else "FAILED_PRESERVED",
+            "reason": None if primary is None else (type(primary).__name__, str(primary)),
+            "returncode": None if process is None else process.returncode,
+            "ownership": ownership, "observed_exit": observed_status,
+            "cleanup_observations": cleanup_observations, "terminal_group": terminal_group,
+            "truncated": truncated, "cleanup_errors": cleanup_errors,
+            "stdout": bytes(output["stdout"]), "stderr": bytes(output["stderr"])}
+
+
+def h039_asset_draft_preflight(adapter: bytes) -> dict:
+    """DORMANT read-only metadata/input preflight; no root or compiler creation."""
+    recipe = h039_asset_draft_reference_recipe()
+    repo = _asset_os.path.dirname(_asset_os.path.dirname(_asset_os.path.dirname(_asset_os.path.abspath(__file__))))
+    legacy = h039_asset_draft_retained_read(repo + "/controller/runtime-cleanup/native/mediator.c",
+        "34142b6c7434c7e1f338e3788171086821e76d65fa4665e10d01412d2670a28b", 1048576, False)
+    runtime = h039_asset_draft_retained_read(repo + "/verify/h039/runtime-cleanup-mediator",
+        "b874693a31e5255c3b71cbd9aa4bee4a12efd3a4bf03b62d4d86e4d9029f4bf7", 1048576, False)
+    source = h039_asset_draft_reference_source(legacy, adapter)
+    pins = dict(recipe["required_tool_sha256"])
+    pins.update(recipe["required_link_input_sha256"])
+    pins["/usr/bin/sandbox-exec"] = "2f447acfae7a954ccb5a1bcf3a1955f69b1a8549c434ddff643df98fd3cb33ba"
+    private = "/Library/Developer/CommandLineTools/usr/lib/"
+    pins.update({private + "libtapi.dylib": "d4fe1afc4fee343de797e5c4f6c3891ffd8b97a18a02011b8d7371a2ac0bf2a2",
+                 private + "libcodedirectory.dylib": "07bc6fe7df6f118caa658a251e14fe44cd2391303b61013af20970902f8f0d64",
+                 private + "libLTO.dylib": "52f09013247c7da02f8d566a737427c0e7b7a6988e967a2c0ac6e534946caeaf",
+                 private + "libswiftDemangle.dylib": "c87c6d5299266089820e9da6e45d6dbfb075c43c4ed1088d992cae59c3ac1d70"})
+    for path, digest in pins.items():
+        h039_asset_draft_retained_read(path, digest, 536870912, True)
+    inventories = {}
+    for path, count, digest in h039_asset_draft_compiler_envelope()["header_sets"]:
+        rows = h039_asset_draft_inventory(path)
+        encoded = _asset_json.dumps(rows, separators=(",", ":"), ensure_ascii=True).encode()
+        if len(rows) != count or _asset_hashlib.sha256(encoded).hexdigest() != digest:
+            raise ValueError("header inventory identity", path)
+        inventories[path] = rows
+    disk = _asset_os.statvfs("/private/tmp")
+    if disk.f_bavail * disk.f_frsize < 21474836480:
+        raise ValueError("measurement disk floor before creation")
+    return {"status": "READ_ONLY_PREFLIGHT_ONLY_NO_BUILD_OR_GATE_CREDIT",
+            "source": source, "runtime": runtime, "pins": pins, "inventories": inventories}
+
+
+def h039_asset_draft_build_reference(adapter: bytes) -> dict:
+    """DORMANT measurement-only driver; two exact precompile reviews required.
+
+    Repeats preflight itself, never accepts a caller's claimed preflight result.
+    No native output is executed; active same-UID writer provenance is unproved.
+    """
+    checked = h039_asset_draft_preflight(adapter)
+    source, runtime = checked["source"], checked["runtime"]
+    pins, inventories = checked["pins"], checked["inventories"]
+    recipe = h039_asset_draft_reference_recipe()
+    descriptors, measurements = [], []
+    parent = _asset_tempfile.mkdtemp(prefix="h039-asset-measure-", dir="/private/tmp")
+    try:
+        parent_fd = _asset_os.open(parent, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC)
+        descriptors.append(parent_fd)
+        parent_identity = _asset_os.fstat(parent_fd)
+        if parent_identity.st_uid != _asset_os.geteuid() or _asset_stat.S_IMODE(parent_identity.st_mode) != 0o700:
+            raise ValueError("exclusive measurement parent")
+        h039_asset_draft_acl_empty(parent_fd)
+        if _asset_os.listdir(parent_fd):
+            raise ValueError("measurement parent not initially empty")
+        for lane in recipe["roots"]:
+            disk = _asset_os.statvfs("/private/tmp")
+            if disk.f_bavail * disk.f_frsize < 21474836480:
+                raise ValueError("measurement disk floor preserve", parent)
+            _asset_os.mkdir(lane, 0o700, dir_fd=parent_fd)
+            root = parent + "/" + lane
+            root_fd = _asset_os.open(lane, _asset_os.O_RDONLY | _asset_os.O_DIRECTORY | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, dir_fd=parent_fd)
+            descriptors.append(root_fd)
+            initial = _asset_os.fstat(root_fd)
+            h039_asset_draft_acl_empty(root_fd)
+            if initial.st_uid != _asset_os.geteuid() or _asset_stat.S_IMODE(initial.st_mode) != 0o700 or _asset_os.listdir(root_fd):
+                raise ValueError("exclusive empty build lane")
+            for name, raw in [("mediator.c", source), ("retained-runtime", runtime)]:
+                fd = _asset_os.open(name, _asset_os.O_WRONLY | _asset_os.O_CREAT | _asset_os.O_EXCL | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, 0o600, dir_fd=root_fd)
+                descriptors.append(fd)
+                offset = 0
+                while offset < len(raw):
+                    wrote = _asset_os.write(fd, raw[offset:])
+                    if wrote <= 0:
+                        raise ValueError("exclusive material write")
+                    offset += wrote
+                _asset_os.fsync(fd)
+                descriptors.pop()
+                failures = h039_asset_draft_close_owned([fd], _asset_os.close)
+                if failures:
+                    raise ValueError("material close", failures)
+            environment = dict(recipe["environment"])
+            _asset_os.fsync(root_fd)
+            _asset_os.fsync(parent_fd)
+            environment["TMPDIR"] = root
+            captures = []
+            for index, command in enumerate(recipe["commands"]):
+                for flag in ["-o", "-MF"]:
+                    if flag in command:
+                        target = command[command.index(flag) + 1]
+                        try:
+                            _asset_os.stat(target, dir_fd=root_fd, follow_symlinks=False)
+                        except FileNotFoundError:
+                            pass
+                        else:
+                            raise ValueError("preexisting compiler output", target)
+                try:
+                    result = h039_asset_draft_bounded_command(command, root, environment)
+                except BaseException as exc:
+                    result = {"status": "PRELAUNCH_REJECTED", "reason": (type(exc).__name__, str(exc)),
+                              "returncode": None, "stdout": b"", "stderr": b""}
+                record = {key: value for key, value in result.items() if key not in {"stdout", "stderr"}}
+                record.update({"index": index,
+                               "stdout_sha256": _asset_hashlib.sha256(result["stdout"]).hexdigest(),
+                               "stderr_sha256": _asset_hashlib.sha256(result["stderr"]).hexdigest()})
+                captures.append(record)
+                status_raw = _asset_json.dumps(record, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("ascii")
+                for label, raw in [("stdout", result["stdout"]), ("stderr", result["stderr"]), ("status.json", status_raw)]:
+                    name = "command-%02d-%s" % (index, label)
+                    fd = _asset_os.open(name, _asset_os.O_WRONLY | _asset_os.O_CREAT | _asset_os.O_EXCL | _asset_os.O_NOFOLLOW | _asset_os.O_CLOEXEC, 0o600, dir_fd=root_fd)
+                    descriptors.append(fd)
+                    offset = 0
+                    while offset < len(raw):
+                        count = _asset_os.write(fd, raw[offset:])
+                        if count <= 0:
+                            raise ValueError("capture write")
+                        offset += count
+                    _asset_os.fsync(fd)
+                    descriptors.pop()
+                    failures = h039_asset_draft_close_owned([fd], _asset_os.close)
+                    if failures:
+                        raise ValueError("capture close", failures)
+                _asset_os.fsync(root_fd)
+                if result["status"] != "CAPTURED" or result["returncode"] != 0:
+                    raise ValueError("confined measurement failed preserve", parent, index, record)
+            expected_names = sorted(["mediator.c", "retained-runtime"] + recipe["outputs"] +
+                ["command-%02d-%s" % (index, label) for index in range(8) for label in ["stdout", "stderr", "status.json"]])
+            if sorted(_asset_os.listdir(root_fd)) != expected_names:
+                raise ValueError("unexpected measurement residue preserve", parent)
+            rows = h039_asset_draft_inventory(root)
+            if any(not _asset_stat.S_ISREG(row[1][2]) or row[1][5] != 1 for row in rows):
+                raise ValueError("measurement leaf shape")
+            products = {row[0]: (row[1][6], row[2]) for row in rows if row[0] in recipe["outputs"]}
+            byname = {row[0]: row for row in rows}
+            if (byname["mediator.c"][2] != _asset_hashlib.sha256(source).hexdigest()
+                    or byname["retained-runtime"][2] != _asset_hashlib.sha256(runtime).hexdigest()):
+                raise ValueError("measurement input changed")
+            rebound = _asset_os.stat(lane, dir_fd=parent_fd, follow_symlinks=False)
+            final = _asset_os.fstat(root_fd)
+            h039_asset_draft_acl_empty(root_fd)
+            _asset_os.fsync(root_fd)
+            if (rebound.st_dev, rebound.st_ino, rebound.st_mode, rebound.st_uid, rebound.st_gid) != (initial.st_dev, initial.st_ino, initial.st_mode, initial.st_uid, initial.st_gid) or rebound != final:
+                raise ValueError("build lane rebind")
+            measurements.append({"lane": lane, "outputs": products, "commands": captures})
+        if measurements[0]["outputs"] != measurements[1]["outputs"]:
+            raise ValueError("measurement rebuild differs preserve", parent)
+        for path, digest in pins.items():
+            h039_asset_draft_retained_read(path, digest, 536870912, True)
+        for path, before in inventories.items():
+            if h039_asset_draft_inventory(path) != before:
+                raise ValueError("header inventory changed", path)
+        if sorted(_asset_os.listdir(parent_fd)) != ["build-a", "build-b"]:
+            raise ValueError("measurement parent foreign membership")
+        parent_final = _asset_os.fstat(parent_fd)
+        parent_name = _asset_os.stat(parent, follow_symlinks=False)
+        h039_asset_draft_acl_empty(parent_fd)
+        if (parent_final.st_dev, parent_final.st_ino, parent_final.st_mode, parent_final.st_uid,
+            parent_final.st_gid, parent_final.st_flags) != (parent_identity.st_dev, parent_identity.st_ino,
+            parent_identity.st_mode, parent_identity.st_uid, parent_identity.st_gid, parent_identity.st_flags) or parent_final != parent_name:
+            raise ValueError("measurement parent rebind")
+        return {"status": "MEASUREMENT_ONLY_NO_GATE_OR_PRODUCT_CREDIT", "root": parent,
+                "measurements": measurements,
+                "active_external_same_uid_consumption_provenance": "UNPROVEN"}
+    except BaseException as exc:
+        raise ValueError("measurement failed; preserved root", parent) from exc
+    finally:
+        primary = _asset_sys.exc_info()[1]
+        failures = h039_asset_draft_close_owned(list(reversed(descriptors)), _asset_os.close)
+        if failures and primary is None:
+            raise ValueError("measurement close failures preserve", parent, failures)
+        if failures and primary is not None:
+            primary.h039_close_failures = failures
+
+
+def h039_asset_draft_driver_controls() -> list:
+    """Pure mocked close/wait observations; no descriptor, libc or process call."""
+    calls = []
+    def successful(fd: int) -> None:
+        calls.append(fd)
+    first = h039_asset_draft_close_owned([9, 8, 7], successful)
+    positive = not first and calls == [9, 8, 7]
+    calls.clear()
+    def interrupted(fd: int) -> None:
+        calls.append(fd)
+        if fd in {9, 7}:
+            raise InterruptedError("ambiguous mock close")
+    errors = h039_asset_draft_close_owned([9, 8, 7], interrupted)
+    cases = [("mock_all_owned_closes", positive),
+            ("mock_failures_continue", calls == [9, 8, 7]),
+            ("mock_ambiguous_not_retried", [row[0] for row in errors] == [9, 7])]
+    alive = (0, 0, 0, 0, 0, 0, 0, True)
+    exited = (0, 0, 20, 0, 123, 1, 0, False)
+    vectors = [
+        ("eof_alive_waits", alive, False, 1.0, ("ALIVE", None, "WAIT_SAME_DEADLINE")),
+        ("live_capture_reads", alive, True, 1.0, ("ALIVE", None, "READ")),
+        ("eof_exited_completes", exited, False, 1.0, ("EXITED", 0, "COMPLETE")),
+        ("exited_capture_drains", exited, True, 1.0, ("EXITED", 0, "READ")),
+        ("wrong_pid_no_signal_reap", (0, 0, 20, 0, 124, 1, 0, False), False, 1.0,
+         ("UNOWNED", None, "FAIL_UNOWNED_NO_SIGNAL_NO_REAP")),
+        ("echild_no_signal_reap", (-1, 10, 0, 0, 0, 0, 0, True), False, 1.0,
+         ("UNOWNED", None, "FAIL_UNOWNED_NO_SIGNAL_NO_REAP")),
+        ("unknown_error_no_signal_reap", (-1, 22, 0, 0, 0, 0, 0, True), False, 1.0,
+         ("UNOWNED", None, "FAIL_UNOWNED_NO_SIGNAL_NO_REAP")),
+        ("eintr_same_deadline", (-1, 4, 0, 0, 0, 0, 0, True), False, 1.0,
+         ("INTERRUPTED", None, "WAIT_SAME_DEADLINE")),
+        ("eintr_expired_no_restart", (-1, 4, 0, 0, 0, 0, 0, True), False, 300.0,
+         ("INTERRUPTED", None, "FAIL_DEADLINE")),
+        ("eof_alive_absolute_deadline", alive, False, 300.0, ("ALIVE", None, "FAIL_DEADLINE")),
+        ("signal_exit_status", (0, 0, 20, 0, 123, 2, 9, False), False, 1.0,
+         ("EXITED", -9, "COMPLETE")),
+        ("unknown_cld_rejects", (0, 0, 20, 0, 123, 4, 9, False), False, 1.0,
+         ("UNOWNED", None, "FAIL_UNOWNED_NO_SIGNAL_NO_REAP")),
+    ]
+    cases.extend((name, h039_asset_draft_wait_state(value, 123, streams, now, 300.0) == expected)
+                 for name, value, streams, now, expected in vectors)
+    empty = (0, 0, [], [])
+    zombie = (4, 0, [123], [(123, 123, 501, 5, 1000, 1)])
+    live = (4, 0, [123], [(123, 123, 501, 2, 1000, 1)])
+    sleeping = (4, 0, [123], [(123, 123, 501, 3, 1000, 1)])
+    mixed = (8, 0, [123, 124], [(123, 123, 501, 5, 1000, 1), (124, 123, 501, 2, 1000, 2)])
+    reject = "FAIL_PRESERVE_NO_SIGNAL_NO_REAP"
+    group_vectors = [
+        ("group_empty_exited_skips_signal", [empty, empty], "EXITED", True, "REAP_WITHOUT_SIGNAL"),
+        ("group_zombie_exited_skips_signal", [zombie, zombie], "EXITED", True, "REAP_WITHOUT_SIGNAL"),
+        ("group_live_routes_signal", [live, live], "ALIVE", True, "KILL_BOUND_LIVE_GROUP"),
+        ("group_live_status_change_same_identity", [live, sleeping], "ALIVE", True, "KILL_BOUND_LIVE_GROUP"),
+        ("group_live_descendant_routes_signal", [mixed, mixed], "EXITED", True, "KILL_BOUND_LIVE_GROUP"),
+        ("group_empty_alive_is_unknown", [empty, empty], "ALIVE", True, reject),
+        ("group_live_with_exited_leader_rejects", [live, live], "EXITED", True, reject),
+        ("group_unowned_zombie_no_reap", [zombie, zombie], "EXITED", False, reject),
+        ("group_error_zero_not_empty", [empty, (0, 1, [], [])], "EXITED", True, reject),
+        ("group_count_not_bytes_rejects", [zombie, (1, 0, [123], zombie[3])], "EXITED", True, reject),
+        ("group_full_buffer_rejects", [empty, (1024, 0, [], [])], "EXITED", True, reject),
+        ("group_duplicate_pid_rejects", [zombie, (8, 0, [123, 123], zombie[3] * 2)], "EXITED", True, reject),
+        ("group_missing_identity_rejects", [zombie, (4, 0, [123], [])], "EXITED", True, reject),
+        ("group_foreign_pgid_rejects", [zombie, (4, 0, [123], [(123, 456, 501, 5, 1000, 1)])], "EXITED", True, reject),
+        ("group_foreign_uid_rejects", [zombie, (4, 0, [123], [(123, 123, 502, 5, 1000, 1)])], "EXITED", True, reject),
+        ("group_reused_member_rejects", [zombie, (4, 0, [123], [(123, 123, 501, 5, 1000, 2)])], "EXITED", True, reject),
+        ("group_unknown_status_rejects", [zombie, (4, 0, [123], [(123, 123, 501, 6, 1000, 1)])], "EXITED", True, reject),
+        ("group_membership_change_rejects", [zombie, empty], "EXITED", True, reject),
+        ("group_boolean_bytecount_rejects", [empty, (False, 0, [], [])], "EXITED", True, reject),
+        ("group_terminal_absence", [empty, empty], "REAPED", False, "TERMINAL_ABSENT"),
+        ("group_terminal_zombie_is_residue", [zombie, zombie], "REAPED", False, reject),
+        ("group_terminal_reused_live_is_residue", [live, live], "REAPED", False, reject),
+        ("group_terminal_error_preserved", [empty, (0, 1, [], [])], "REAPED", False, reject),
+    ]
+    cases.extend((name, h039_asset_draft_group_action(snapshot, 123, 501, event, owned) == expected)
+                 for name, snapshot, event, owned, expected in group_vectors)
+    return cases
+
+
+# No readiness flag, environment switch or import mode can enter old R33 code.
+# Predicate/control invocation, budgets, authenticated graph/tool confinement and
+# material proof are deliberately not wired: this is NOT the preproduct RED.
+print("H039_ASSET_DRAFT_NOT_READY: no verification or operation authorized",
+      file=_asset_sys.stderr)
+raise SystemExit(2)
+# H039_ASSET_DRAFT_END
 import array
 import ast
 import base64
