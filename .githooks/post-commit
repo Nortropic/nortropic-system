@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# post-commit — AUTONOM PUSH. Regel 12, mekaniskt i stället för som prosa.
+#
+# Ägaren 2026-09-16: "jag fattar inte hur det kan bli så" (55 opushade commits,
+# tolv commits som bara fanns på en maskin) → "jag vill att vi autonomt pushar".
+#
+# VARFÖR PÅ GIT-NIVÅ. Det fanns redan en autopush i .claude/settings.json. Den
+# läses bara av Claude Code, i EN katalog. Arbetet som gick förlorat låg i fem
+# ANDRA kloner och ~230 worktrees, skapade av andra verktyg. En hook som bara
+# gäller ett verktyg vaktar inte maskinen. core.hooksPath gör hooken versionerad
+# och gemensam för varje gren, och installeras per klon av installera-hooks.sh.
+#
+# VAD DEN GÖR
+#   gren:          pushar den till origin, sätter uppström om den saknas
+#   main:          pushar ALDRIG. Publicering till main går via PR
+#   detached HEAD: pushar till radda/auto-<katalog>-<sha> — den kategori som
+#                  försvinner tyst, eftersom `git branch` inte listar den
+#
+# VAD DEN ALDRIG GÖR
+#   --force, rebase, amend, reset, cherry-pick  (NO_FORCE_SEMANTICS=YES)
+#   blockerar aldrig en commit — en post-commit-hook kan inte, och ska inte
+#
+# Misslyckad push är INTE tyst: den skriver regel 12:s felläge till stderr.
+
+set -u
+command -v git >/dev/null 2>&1 || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+
+[ "${NORTROPIC_AUTOPUSH:-1}" = "0" ] && exit 0   # nödutgång, aldrig standard
+
+GREN="$(git branch --show-current 2>/dev/null || true)"
+SHA="$(git rev-parse --short HEAD 2>/dev/null)" || exit 0
+
+git remote get-url origin >/dev/null 2>&1 || {
+  echo "post-commit: ingen origin — arbetet finns BARA här. Regel 12 ej uppfylld." >&2
+  exit 0
+}
+
+case "$GREN" in
+  main|master)
+    echo "post-commit: på $GREN — pushar inte. Publicering går via PR." >&2
+    exit 0 ;;
+  "")
+    # Detached HEAD. Den farligaste kategorin: commiten tillhör ingen gren, syns
+    # inte i `git branch`, och hålls vid liv ENBART av att katalogen finns.
+    KAT="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo okand)" \
+           | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
+    MAL="refs/heads/radda/auto-$KAT-$SHA" ;;
+  *)
+    MAL="refs/heads/$GREN" ;;
+esac
+
+for f in 1 2 4 8; do
+  if git push -q origin "HEAD:$MAL" 2>/dev/null; then
+    [ -n "$GREN" ] && git rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 \
+      || git branch --set-upstream-to="origin/${MAL#refs/heads/}" "$GREN" >/dev/null 2>&1 || true
+    echo "post-commit: $SHA pushad till origin/${MAL#refs/heads/}" >&2
+    exit 0
+  fi
+  [ "$f" = "8" ] && break
+  sleep "$f"
+done
+
+echo "post-commit: ⚠️ PUSH MISSLYCKADES efter fyra försök." >&2
+echo "  $SHA är committad men finns BARA på denna maskin — regel 12:s felläge." >&2
+echo "  Kör: git push origin HEAD:${MAL#refs/heads/}" >&2
+exit 0

@@ -12,6 +12,17 @@
 !/.claude/
 /.claude/*
 !/.claude/settings.json
+
+# .githooks/ spåras. core.hooksPath pekar hit, och EN VERSIONERAD hook är hela
+# poängen: .git/hooks/ följer aldrig med en klon, så en hook som bara finns där
+# skyddar en enda katalog. 2026-09-16 låg tolv commits på en maskin fördelade
+# över fem kloner — en hook per verktyg hade inte fångat någon av dem.
+#
+# Raden tillagd efter att vitlistan tyst svalt .githooks/post-commit: `git add -A`
+# sa ingenting, commiten gick igenom, PR:en mergades, och mekanismen fanns aldrig
+# i repot. Installerarens ODÖMBART-spärr fällde den på Macen. Samma felklass som
+# FYND 37 — ett tyst utelämnande som ser ut som framgång.
+!/.githooks/
 !/README.md
 !/CLAUDE.md
 !/AGENTS.md
